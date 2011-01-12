@@ -1,207 +1,98 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Jan 2011 13:56:23 +0900
-Subject: [PATCH V2] ARM: SAMSUNG: Add support for clock debugging through
-	debug-fs interface
-In-Reply-To: <AANLkTinXk5Pefp=1emCRNrtZzsgYDk9LhC3AtOAem0y_@mail.gmail.com>
-References: <1290759545-2995-1-git-send-email-amit.daniel@samsung.com>
-	<001b01cb912a$d1381a80$73a84f80$%kim@samsung.com>
-	<AANLkTinXk5Pefp=1emCRNrtZzsgYDk9LhC3AtOAem0y_@mail.gmail.com>
-Message-ID: <018201cbb215$13b4e270$3b1ea750$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 12 Jan 2011 13:06:44 +0800
+Subject: [PATCH 2/2] ARM i.MXS: Add auart platform support for i.MX28
+In-Reply-To: <20110111151725.GT24920@pengutronix.de>
+References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
+	<1294758545-9445-3-git-send-email-s.hauer@pengutronix.de>
+	<20110111151725.GT24920@pengutronix.de>
+Message-ID: <20110112050644.GC2888@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Daniel Kachhap wrote:
+On Tue, Jan 11, 2011 at 04:17:25PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Sascha,
 > 
-> Hi Mr Kim,
+> On Tue, Jan 11, 2011 at 04:09:05PM +0100, Sascha Hauer wrote:
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  arch/arm/mach-mxs/clock-mx28.c                  |    5 ++
+> >  arch/arm/mach-mxs/devices-mx28.h                |    8 +++
+> >  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+> >  arch/arm/mach-mxs/devices/Makefile              |    1 +
+> >  arch/arm/mach-mxs/devices/platform-auart.c      |   54 +++++++++++++++++++++++
+> >  arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++++
+> >  6 files changed, 81 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
+> > 
+> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> > index 74e2103..9f65934 100644
+> > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > @@ -603,6 +603,11 @@ _DEFINE_CLOCK(fec_clk, ENET, DISABLE, &hbus_clk);
+> >  
+> >  static struct clk_lookup lookups[] = {
+> >  	_REGISTER_CLOCK("mxs-duart.0", NULL, uart_clk)
+> > +	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+> > +	_REGISTER_CLOCK("mxs-auart.1", NULL, uart_clk)
+> > +	_REGISTER_CLOCK("mxs-auart.2", NULL, uart_clk)
+> > +	_REGISTER_CLOCK("mxs-auart.3", NULL, uart_clk)
+> > +	_REGISTER_CLOCK("mxs-auart.4", NULL, uart_clk)
+> >  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+> >  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+> >  	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
+> > diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+> > index 00b736c..a0b70df 100644
+> > --- a/arch/arm/mach-mxs/devices-mx28.h
+> > +++ b/arch/arm/mach-mxs/devices-mx28.h
+> > @@ -15,6 +15,14 @@ extern const struct mxs_duart_data mx28_duart_data __initconst;
+> >  #define mx28_add_duart() \
+> >  	mxs_add_duart(&mx28_duart_data)
+> >  
+> > +extern const struct mxs_auart_data mx28_auart_data[] __initconst;
+> > +#define mx28_add_auart(id)	mxs_add_auart(&mx28_auart_data[id])
+> > +#define mx28_add_auart0()		mx28_add_auart(0)
+> > +#define mx28_add_auart1()		mx28_add_auart(1)
+> > +#define mx28_add_auart2()		mx28_add_auart(2)
+> > +#define mx28_add_auart3()		mx28_add_auart(3)
+> > +#define mx28_add_auart4()		mx28_add_auart(4)
+> I wouldn't add the mx28_add_auartX macros, only mx28_add_auart.  The
+> former are a relict of the time when we didn't use an array to get the
+> data from.
 > 
-> Thanks for your comments. Please see the inline comments below.
+> > +
+> >  extern const struct mxs_fec_data mx28_fec_data[] __initconst;
+> >  #define mx28_add_fec(id, pdata) \
+> >  	mxs_add_fec(&mx28_fec_data[id], pdata)
+> > diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+> > index a35a2dc..9d16540 100644
+> > --- a/arch/arm/mach-mxs/devices/Kconfig
+> > +++ b/arch/arm/mach-mxs/devices/Kconfig
+> > @@ -1,5 +1,8 @@
+> >  config MXS_HAVE_PLATFORM_DUART
+> >  	bool
+> >  
+> > +config MXS_HAVE_PLATFORM_AUART
+> > +	bool
+> > +
+> This doesn't happen to be an amba device, too?
 > 
-Hi Amit,
+> >  config MXS_HAVE_PLATFORM_FEC
+> >  	bool
+> > diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> > index 4b5266a..b46d18d 100644
+> > --- a/arch/arm/mach-mxs/devices/Makefile
+> > +++ b/arch/arm/mach-mxs/devices/Makefile
+> > @@ -1,2 +1,3 @@
+> >  obj-$(CONFIG_MXS_HAVE_PLATFORM_DUART) += platform-duart.o
+> > +obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+> >  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
+> this conflicts with the "make duart use amba-pl011 driver" patch.
 
-I didn't get your updated patch, but it was small things.
-So I applied this in my tree for this merge window.
+May I know the reason that the patch is still pending for being
+merged? DEBUG_SPINLOCK_SLEEP warning?
 
-Thanks.
+[...]
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> On 1 December 2010 13:08, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >
-> > Amit Daniel Kachhap wrote:
-> > >
-> > > This patch adds support for clock information exposed to debug-fs
-> > interface.
-> > >
-> > > Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> > > ---
-> > > Code modified for V2 version are,
-> > > a)Inserted the debug-fs code inside macro CONFIG_PM_DEBUG as suggested
-by
-> > > yong.shen at linaro.org.
-> >
-> > Could you please let me know why?
-> Actually this patch is mostly taken from omap architecture, so using
-> this macro in addition
-> to CONFIG_DEBUG_FS macro. Also it is better to enable all PM debugging
-> features with
-> one configuration parameter.
-> 
-> >
-> > > b)Removed macro CONFIG_PLAT_SAMSUNG and implemented other coding
-> standards
-> > > as suggested by kgene.kim at samsung.com
-> > >
-> > > ?arch/arm/plat-samsung/clock.c ? ? ? ? ? ? ?| ? 91
-> > > ++++++++++++++++++++++++++++
-> > > ?arch/arm/plat-samsung/include/plat/clock.h | ? ?3 +
-> > > ?2 files changed, 94 insertions(+), 0 deletions(-)
-> > >
-> > > diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-
-> samsung/clock.c
-> > > index e8d20b0..029a49d 100644
-> > > --- a/arch/arm/plat-samsung/clock.c
-> > > +++ b/arch/arm/plat-samsung/clock.c
-> > > @@ -39,6 +39,9 @@
-> > > ?#include <linux/clk.h>
-> > > ?#include <linux/spinlock.h>
-> > > ?#include <linux/io.h>
-> > > +#if defined(CONFIG_DEBUG_FS)
-> > > +#include <linux/debugfs.h>
-> > > +#endif
-> > >
-> > > ?#include <mach/hardware.h>
-> > > ?#include <asm/irq.h>
-> > > @@ -447,3 +450,91 @@ int __init s3c24xx_register_baseclocks(unsigned
-long
-> > > xtal)
-> > > ? ? ? return 0;
-> > > ?}
-> > >
-> > > +#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-> >
-> > Hmm...please let me know the reason...
-> same reason as above.
-> >
-> > > +/* debugfs support to trace clock tree hierarchy and attributes */
-> > > +
-> > > +static struct dentry *clk_debugfs_root;
-> > > +
-> > > +static int clk_debugfs_register_one(struct clk *c)
-> > > +{
-> > > + ? ? int err;
-> > > + ? ? struct dentry *d, *child, *child_tmp;
-> > > + ? ? struct clk *pa = c->parent;
-> > > + ? ? char s[255];
-> > > + ? ? char *p = s;
-> > > +
-> > > + ? ? p += sprintf(p, "%s", c->name);
-> > > + ? ? /*Append id field with name also*/
-> >
-> > No need above comment. If required, please add other comments also.
-> ok, will remove this comment in next patch.
-> >
-> > > + ? ? if (c->id >= 0)
-> > > + ? ? ? ? ? ? sprintf(p, ":%d", c->id);
-> > > +
-> > > + ? ? d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
-> > > + ? ? if (!d)
-> > > + ? ? ? ? ? ? return -ENOMEM;
-> > > +
-> > > + ? ? c->dent = d;
-> > > +
-> > > + ? ? d = debugfs_create_u8("usecount", S_IRUGO, c->dent, (u8
-> > *)&c->usage);
-> > > + ? ? if (!d) {
-> > > + ? ? ? ? ? ? err = -ENOMEM;
-> > > + ? ? ? ? ? ? goto err_out;
-> > > + ? ? }
-> >
-> > 1 empty line would be helpful to read.
-> ok, will update this in next patch.
-> >
-> > > + ? ? d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32
-*)&c->rate);
-> > > + ? ? if (!d) {
-> > > + ? ? ? ? ? ? err = -ENOMEM;
-> > > + ? ? ? ? ? ? goto err_out;
-> > > + ? ? }
-> > > + ? ? return 0;
-> > > +
-> > > +err_out:
-> > > + ? ? d = c->dent;
-> > > + ? ? list_for_each_entry_safe(child, child_tmp, &d->d_subdirs,
-> > d_u.d_child)
-> > > + ? ? ? ? ? ? debugfs_remove(child);
-> > > + ? ? debugfs_remove(c->dent);
-> > > + ? ? return err;
-> > > +}
-> > > +
-> > > +static int clk_debugfs_register(struct clk *c)
-> > > +{
-> > > + ? ? int err;
-> > > + ? ? struct clk *pa = c->parent;
-> > > +
-> > > + ? ? if (pa && !pa->dent) {
-> > > + ? ? ? ? ? ? err = clk_debugfs_register(pa);
-> > > + ? ? ? ? ? ? if (err)
-> > > + ? ? ? ? ? ? ? ? ? ? return err;
-> > > + ? ? }
-> > > +
-> > > + ? ? if (!c->dent) {
-> > > + ? ? ? ? ? ? err = clk_debugfs_register_one(c);
-> > > + ? ? ? ? ? ? if (err)
-> > > + ? ? ? ? ? ? ? ? ? ? return err;
-> > > + ? ? }
-> > > + ? ? return 0;
-> > > +}
-> > > +
-> > > +static int __init clk_debugfs_init(void)
-> > > +{
-> > > + ? ? struct clk *c;
-> > > + ? ? struct dentry *d;
-> > > + ? ? int err;
-> > > +
-> > > + ? ? d = debugfs_create_dir("clock", NULL);
-> > > + ? ? if (!d)
-> > > + ? ? ? ? ? ? return -ENOMEM;
-> > > + ? ? clk_debugfs_root = d;
-> > > +
-> > > + ? ? list_for_each_entry(c, &clocks, list) {
-> > > + ? ? ? ? ? ? err = clk_debugfs_register(c);
-> > > + ? ? ? ? ? ? if (err)
-> > > + ? ? ? ? ? ? ? ? ? ? goto err_out;
-> > > + ? ? }
-> > > + ? ? return 0;
-> > > +err_out:
-> > > + ? ? debugfs_remove_recursive(clk_debugfs_root);
-> > > + ? ? return err;
-> > > +}
-> > > +late_initcall(clk_debugfs_init);
-> > > +
-> > > +#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
-> > > +
-> >
-> > No need last one empty line.
-> ok, will update this comment in next patch.
-> >
-> > > diff --git a/arch/arm/plat-samsung/include/plat/clock.h
-b/arch/arm/plat-
-> > > samsung/include/plat/clock.h
-> > > index 0fbcd0e..9a82b88 100644
-> > > --- a/arch/arm/plat-samsung/include/plat/clock.h
-> > > +++ b/arch/arm/plat-samsung/include/plat/clock.h
-> > > @@ -47,6 +47,9 @@ struct clk {
-> > >
-> > > ? ? ? struct clk_ops ? ? ? ? ?*ops;
-> > > ? ? ? int ? ? ? ? ? ? ? ? (*enable)(struct clk *, int enable);
-> > > +#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
-> > > + ? ? struct dentry ? ? ? ? ? *dent; ?/* For visible tree hierarchy */
-> > > +#endif
-> > > ?};
-> > >
-> > > ?/* other clocks which may be registered by board support */
-> > > --
+-- 
+Regards,
+Shawn
