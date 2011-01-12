@@ -1,9 +1,9 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Jan 2011 17:31:59 -0600
-Subject: [PATCH 3/7] ARM: versatile: init clocks early and add sp804 clock
+Date: Wed, 12 Jan 2011 17:31:58 -0600
+Subject: [PATCH 2/7] ARM: realview: init clocks early and add sp804 clock
 In-Reply-To: <1294875123-14086-1-git-send-email-robherring2@gmail.com>
 References: <1294875123-14086-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1294875123-14086-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1294875123-14086-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,17 +14,20 @@ sp804 timer.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-versatile/core.c         |   18 ++++++++++++++----
- arch/arm/mach-versatile/core.h         |    1 +
- arch/arm/mach-versatile/versatile_ab.c |    1 +
- arch/arm/mach-versatile/versatile_pb.c |    1 +
- 4 files changed, 17 insertions(+), 4 deletions(-)
+ arch/arm/mach-realview/core.c            |   12 ++++++++----
+ arch/arm/mach-realview/core.h            |    1 +
+ arch/arm/mach-realview/realview_eb.c     |    1 +
+ arch/arm/mach-realview/realview_pb1176.c |    1 +
+ arch/arm/mach-realview/realview_pb11mp.c |    1 +
+ arch/arm/mach-realview/realview_pba8.c   |    1 +
+ arch/arm/mach-realview/realview_pbx.c    |    1 +
+ 7 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 13a83e4..399e2ef 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -417,6 +417,10 @@ static struct clk ref24_clk = {
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 1c6602c..16b8a81 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -314,6 +314,10 @@ static struct clk ref24_clk = {
  	.rate	= 24000000,
  };
  
@@ -35,72 +38,103 @@ index 13a83e4..399e2ef 100644
  static struct clk dummy_apb_pclk;
  
  static struct clk_lookup lookups[] = {
-@@ -453,9 +457,19 @@ static struct clk_lookup lookups[] = {
- 	}, {	/* CLCD */
- 		.dev_id		= "dev:20",
- 		.clk		= &osc4_clk,
+@@ -356,10 +360,13 @@ static struct clk_lookup lookups[] = {
+ 	}, {	/* SSP */
+ 		.dev_id		= "dev:ssp0",
+ 		.clk		= &ref24_clk,
 +	}, {	/* SP804 Timer */
 +		.dev_id		= "sp804",
 +		.clk		= &sp804_clk,
  	}
  };
  
-+void __init versatile_init_early(void)
-+{
-+	osc4_clk.vcoreg = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSCCLCD_OFFSET;
-+
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+}
-+
+-static int __init clk_init(void)
++void __init realview_init_early(void)
+ {
+ 	if (machine_is_realview_pb1176())
+ 		oscvco_clk.vcoreg = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC0_OFFSET;
+@@ -367,10 +374,7 @@ static int __init clk_init(void)
+ 		oscvco_clk.vcoreg = __io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_OSC4_OFFSET;
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-
+-	return 0;
+ }
+-core_initcall(clk_init);
+ 
  /*
   * CLCD support.
-  */
-@@ -867,10 +881,6 @@ void __init versatile_init(void)
- {
- 	int i;
+diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
+index 693239d..cb44595 100644
+--- a/arch/arm/mach-realview/core.h
++++ b/arch/arm/mach-realview/core.h
+@@ -65,6 +65,7 @@ extern int realview_eth_register(const char *name, struct resource *res);
+ extern int realview_usb_register(struct resource *res);
+ extern void realview_fixup(struct machine_desc *mdesc, struct tag *tags,
+ 			   char **from, struct meminfo *meminfo);
++extern void realview_init_early(void);
+ extern void (*realview_reset)(char);
  
--	osc4_clk.vcoreg	= __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSCCLCD_OFFSET;
--
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
--
- 	platform_device_register(&versatile_flash_device);
- 	platform_device_register(&versatile_i2c_device);
- 	platform_device_register(&smc91x_device);
-diff --git a/arch/arm/mach-versatile/core.h b/arch/arm/mach-versatile/core.h
-index 9d39886..e04768a 100644
---- a/arch/arm/mach-versatile/core.h
-+++ b/arch/arm/mach-versatile/core.h
-@@ -25,6 +25,7 @@
- #include <linux/amba/bus.h>
- 
- extern void __init versatile_init(void);
-+extern void __init versatile_init_early(void);
- extern void __init versatile_init_irq(void);
- extern void __init versatile_map_io(void);
- extern struct sys_timer versatile_timer;
-diff --git a/arch/arm/mach-versatile/versatile_ab.c b/arch/arm/mach-versatile/versatile_ab.c
-index aa9730f..f8ae64b 100644
---- a/arch/arm/mach-versatile/versatile_ab.c
-+++ b/arch/arm/mach-versatile/versatile_ab.c
-@@ -37,6 +37,7 @@ MACHINE_START(VERSATILE_AB, "ARM-Versatile AB")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.boot_params	= 0x00000100,
- 	.map_io		= versatile_map_io,
-+	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_init,
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index bf46964..97fb306 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -110,6 +110,7 @@ MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.boot_params	= 0x00000100,
- 	.map_io		= versatile_map_io,
-+	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_pb_init,
+ #endif
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 6ef5c5e..c00e527 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -487,6 +487,7 @@ MACHINE_START(REALVIEW_EB, "ARM-RealView EB")
+ 	.boot_params	= PHYS_OFFSET + 0x00000100,
+ 	.fixup		= realview_fixup,
+ 	.map_io		= realview_eb_map_io,
++	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_eb_timer,
+ 	.init_machine	= realview_eb_init,
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index cbdc97a..f0447bb 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -382,6 +382,7 @@ MACHINE_START(REALVIEW_PB1176, "ARM-RealView PB1176")
+ 	.boot_params	= PHYS_OFFSET + 0x00000100,
+ 	.fixup		= realview_pb1176_fixup,
+ 	.map_io		= realview_pb1176_map_io,
++	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pb1176_timer,
+ 	.init_machine	= realview_pb1176_init,
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index 8e8ab7d..3b4f788 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -384,6 +384,7 @@ MACHINE_START(REALVIEW_PB11MP, "ARM-RealView PB11MPCore")
+ 	.boot_params	= PHYS_OFFSET + 0x00000100,
+ 	.fixup		= realview_fixup,
+ 	.map_io		= realview_pb11mp_map_io,
++	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pb11mp_timer,
+ 	.init_machine	= realview_pb11mp_init,
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 841118e..f98d4fa 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -334,6 +334,7 @@ MACHINE_START(REALVIEW_PBA8, "ARM-RealView PB-A8")
+ 	.boot_params	= PHYS_OFFSET + 0x00000100,
+ 	.fixup		= realview_fixup,
+ 	.map_io		= realview_pba8_map_io,
++	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pba8_timer,
+ 	.init_machine	= realview_pba8_init,
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 02b755b..b0521e1 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -417,6 +417,7 @@ MACHINE_START(REALVIEW_PBX, "ARM-RealView PBX")
+ 	.boot_params	= PHYS_OFFSET + 0x00000100,
+ 	.fixup		= realview_pbx_fixup,
+ 	.map_io		= realview_pbx_map_io,
++	.init_early	= realview_init_early,
+ 	.init_irq	= gic_init_irq,
+ 	.timer		= &realview_pbx_timer,
+ 	.init_machine	= realview_pbx_init,
 -- 
 1.7.1
