@@ -1,61 +1,63 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Jan 2011 17:32:02 -0600
-Subject: [PATCH 6/7] ARM: smp_twd: add clock api support
+Date: Wed, 12 Jan 2011 17:32:03 -0600
+Subject: [PATCH 7/7] ARM: vexpress: add smp_twd clock
 In-Reply-To: <1294875123-14086-1-git-send-email-robherring2@gmail.com>
 References: <1294875123-14086-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1294875123-14086-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1294875123-14086-8-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-The private timer freq is currently dynamically detected
-using jiffies count to determine the rate. This method adds
-a delay to boot-up, so use the clock api instead to get the
-clock rate.
+Add smp_twd clock and call twd_timer_init to enable using it.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/include/asm/smp_twd.h |    1 +
- arch/arm/kernel/smp_twd.c      |   11 +++++++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+ arch/arm/mach-vexpress/ct-ca9x4.c |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
-index fed9981..6b0f591 100644
---- a/arch/arm/include/asm/smp_twd.h
-+++ b/arch/arm/include/asm/smp_twd.h
-@@ -24,5 +24,6 @@ extern void __iomem *twd_base;
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index db4614c..62d5a2d 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -53,9 +53,6 @@ static struct map_desc ct_ca9x4_io_desc[] __initdata = {
  
- int twd_timer_ack(void);
- void twd_timer_setup(struct clock_event_device *);
-+void twd_timer_init(void __iomem *base);
- 
- #endif
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index dd79074..9a20729 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -8,6 +8,8 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
-+#include <linux/clk.h>
-+#include <linux/err.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/delay.h>
-@@ -145,3 +147,12 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 
- 	clockevents_register_device(clk);
+ static void __init ct_ca9x4_map_io(void)
+ {
+-#ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = MMIO_P2V(A9_MPCORE_TWD);
+-#endif
+ 	v2m_map_io(ct_ca9x4_io_desc, ARRAY_SIZE(ct_ca9x4_io_desc));
  }
+ 
+@@ -183,10 +180,17 @@ static struct clk osc1_clk = {
+ 	.rate	= 24000000,
+ };
+ 
++static struct clk twd_clk = {
++	.rate	= 200000000,
++};
 +
-+void __init twd_timer_init(void __iomem *base)
-+{
-+	struct clk *clk = clk_get_sys("smp_twd", NULL);
-+	if (!IS_ERR(clk))
-+		twd_timer_rate = clk_get_rate(clk);
+ static struct clk_lookup lookups[] = {
+ 	{	/* CLCD */
+ 		.dev_id		= "ct:clcd",
+ 		.clk		= &osc1_clk,
++	}, {	/* TWD */
++		.dev_id		= "smp_twd",
++		.clk		= &twd_clk,
+ 	},
+ };
+ 
+@@ -194,6 +198,10 @@ static void __init ct_ca9x4_init_early(void)
+ {
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 	v2m_init_early();
 +
-+	twd_base = base;
-+}
++#ifdef CONFIG_LOCAL_TIMERS
++	twd_timer_init(MMIO_P2V(A9_MPCORE_TWD));
++#endif
+ }
+ 
+ static struct resource pmu_resources[] = {
 -- 
 1.7.1
