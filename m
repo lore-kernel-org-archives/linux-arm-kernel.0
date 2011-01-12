@@ -1,70 +1,38 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 12 Jan 2011 09:24:47 +0800
-Subject: [PATCH 06/16] nuc900fb: don't treat NULL clk as an error
-In-Reply-To: <1294749833-32019-7-git-send-email-jamie@jamieiles.com>
-References: <1294749833-32019-1-git-send-email-jamie@jamieiles.com>
-	<1294749833-32019-7-git-send-email-jamie@jamieiles.com>
-Message-ID: <AANLkTingg+wm8jy4kRL=ubLFrCDXq17jZQkD3v3M4h+Y@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 11 Jan 2011 17:54:42 -0800
+Subject: Locking in the clk API
+In-Reply-To: <20110111121816.GB774@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<201101111744.59712.jeremy.kerr@canonical.com>	<20110111101314.GA774@linux-sh.org>	<201101111830.18597.jeremy.kerr@canonical.com>
+	<20110111121816.GB774@linux-sh.org>
+Message-ID: <4D2D09E2.5030305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/11 Jamie Iles <jamie@jamieiles.com>:
-> clk_get() returns a struct clk cookie to the driver and some platforms
-> may return NULL if they only support a single clock. ?clk_get() has only
-> failed if it returns a ERR_PTR() encoded pointer.
->
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: linux-fbdev at vger.kernel.org
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
-> ?drivers/video/nuc900fb.c | ? ?5 +++--
-> ?1 files changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-> index 81687ed..62498bd 100644
-> --- a/drivers/video/nuc900fb.c
-> +++ b/drivers/video/nuc900fb.c
-> @@ -15,6 +15,7 @@
-> ?*/
-> ?#include <linux/module.h>
-> ?#include <linux/kernel.h>
-> +#include <linux/err.h>
-> ?#include <linux/errno.h>
-> ?#include <linux/string.h>
-> ?#include <linux/mm.h>
-> @@ -597,9 +598,9 @@ static int __devinit nuc900fb_probe(struct platform_device *pdev)
-> ? ? ? ?}
->
-> ? ? ? ?fbi->clk = clk_get(&pdev->dev, NULL);
-> - ? ? ? if (!fbi->clk || IS_ERR(fbi->clk)) {
-> + ? ? ? if (IS_ERR(fbi->clk)) {
-> ? ? ? ? ? ? ? ?printk(KERN_ERR "nuc900-lcd:failed to get lcd clock source\n");
-> - ? ? ? ? ? ? ? ret = -ENOENT;
-> + ? ? ? ? ? ? ? ret = PTR_ERR(fbi->clk);
-> ? ? ? ? ? ? ? ?goto release_irq;
-> ? ? ? ?}
->
-Hi,
+On 01/11/2011 04:18 AM, Paul Mundt wrote:
+> Again, you are approaching it from the angle that an atomic clock is a
+> special requirement rather than the default behaviour. Sleeping for
+> lookup, addition, and deletion are all quite acceptable, but
+> enable/disable pairs have always been intended to be usable from atomic
+> context. Anyone that doesn't count on that fact is either dealing with
+> special case clocks (PLLs, root clocks, etc.) or simply hasn't bothered
+> implementing any sort of fine grained runtime power management for their
+> platform.
 
-Thanks for your patch.
+Paul,
 
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
+I see you repeating this point a couple of times and I'm a bit confused 
+how you handle the clock tree/dependencies.
 
-> --
-> 1.7.3.4
->
->
+Does your clock driver NOT hide the details of what root clock/PLL a 
+branch clock is sourced from? If you do hide the details of the root/PLL 
+source, how do you get the branch clk_enable() to be done atomically if 
+the root/PLL enables are not possible in atomic context?
 
+Is it simply a matter of your hardware having PLLs and root clocks that 
+can be turned on/off quickly?
 
+-Saravana
 
 -- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
