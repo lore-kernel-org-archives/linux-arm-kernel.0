@@ -1,41 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 16:32:21 +0000
-Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
-	setup.c
-In-Reply-To: <AANLkTinwGd9pa7YQ=5hXfarw=MB=YdpBuN7xJAd+Ps4f@mail.gmail.com>
-References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
-	<20110111104051.GA11039@n2100.arm.linux.org.uk>
-	<20110111153630.GB2707@angua.secretlab.ca>
-	<20110111154833.GF11039@n2100.arm.linux.org.uk>
-	<AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
-	<20110112155215.GB11039@n2100.arm.linux.org.uk>
-	<AANLkTinwGd9pa7YQ=5hXfarw=MB=YdpBuN7xJAd+Ps4f@mail.gmail.com>
-Message-ID: <20110112163221.GD11039@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 12 Jan 2011 10:33:33 -0600
+Subject: [PATCH] ARM: Thumb-2: Fix out-of-range offset for Thumb-2 in
+	proc-v7.S
+In-Reply-To: <20110112081446.GB24920@pengutronix.de>
+References: <1294790613-17101-1-git-send-email-dave.martin@linaro.org>
+	<20110112081446.GB24920@pengutronix.de>
+Message-ID: <AANLkTinH0vJsXPkStC8nSqMjCgyv7YPscf2ORry_FdhG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 09:24:34AM -0700, Grant Likely wrote:
-> Actually it looks like the real problem is that the mmu has been
-> turned on, but the virtual mappings for devices have not yet been
-> established, and so the debug macros aren't using a valid address.
+2011/1/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Tue, Jan 11, 2011 at 06:03:33PM -0600, Dave Martin wrote:
+>> The following patch introduces a pre-increment addressing
+>> offset which is out of range for Thumb-2:
+>> ? ? ARM: pgtable: switch order of Linux vs hardware page tables
+> a commit id would be nice here
+>
+> Uwe
 
-They should be, as they're valid for use from assembly prior to MMU
-turn-on, assembly after MMU turn-on and C code.
+Apologies--- it's commit d30e45eeabefadc6039d7f876a59e5f5f6cb11c6
 
-If CONFIG_DEBUG_LL is enabled, create_page_tables() should be setting
-up the necessary initial mappings for printascii() to work.
+Cheers
+---Dave
 
-Maybe the efforts to unify that stuff ended up breaking the printascii
-debugging mechanism, and we now require a new debugging mechanism to
-debug the printascii debugging mechanism... :-P
-
-I've used it on Versatile Express during the last week and it did work
-right from before setup_arch() was called.
-
-> It looks like I'd need to get past paging_init() in order to get
-> ll_debug working between turning on the mmu and paging_init(), but
-> paging_init() needs the mdesc pointer, and the whole point of the
-> error message is that the mdesc pointer is unknown!  I don't see any
-> code that sets up a debug mapping of the uart before paging_init time.
-
-See the #ifdef CONFIG_DEBUG_LL section in create_page_tables in head.S
+>>
+>> 162: ?str ? ? r3, [r0, #2048]!
+>>
+>> Thumb-2 only permits offsets <256 for pre-increment addressing.
+>>
+>> This patch replaces the store instruction with a suitable add-str
+>> pair for the Thumb-2 case.
+>>
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> ---
+>> KernelVersion: v2.6.37
+>>
+>> ?arch/arm/mm/proc-v7.S | ? ?4 +++-
+>> ?1 files changed, 3 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>> index b49fab2..0c1172b 100644
+>> --- a/arch/arm/mm/proc-v7.S
+>> +++ b/arch/arm/mm/proc-v7.S
+>> @@ -159,7 +159,9 @@ ENTRY(cpu_v7_set_pte_ext)
+>> ? ? ? tstne ? r1, #L_PTE_PRESENT
+>> ? ? ? moveq ? r3, #0
+>>
+>> - ? ? str ? ? r3, [r0, #2048]!
+>> + ARM( ? ? ? ?str ? ? r3, [r0, #2048]! )
+>> + THUMB( ? ? ?add ? ? r0, r0, #2048 )
+>> + THUMB( ? ? ?str ? ? r3, [r0] )
+>> ? ? ? mcr ? ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte
+>> ?#endif
+>> ? ? ? mov ? ? pc, lr
+>> --
+>> 1.7.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
