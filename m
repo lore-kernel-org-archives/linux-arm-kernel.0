@@ -1,34 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 12 Jan 2011 13:55:24 -0500 (EST)
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <20110112184258.GH11039@n2100.arm.linux.org.uk>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101121350350.25498@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 12 Jan 2011 14:04:12 -0500 (EST)
+Subject: [PATCHv8 00/12] Contiguous Memory Allocator
+In-Reply-To: <001c01cbb289$864391f0$92cab5d0$%szyprowski@samsung.com>
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
+	<20101223100642.GD3636@n2100.arm.linux.org.uk>
+	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
+	<20101223121917.GG3636@n2100.arm.linux.org.uk>
+	<00ec01cba2a2$af20b8b0$0d622a10$%szyprowski@samsung.com>
+	<20101223134432.GJ3636@n2100.arm.linux.org.uk>
+	<001c01cbb289$864391f0$92cab5d0$%szyprowski@samsung.com>
+Message-ID: <alpine.LFD.2.00.1101121357580.25498@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jan 2011, Russell King - ARM Linux wrote:
+On Wed, 12 Jan 2011, Marek Szyprowski wrote:
 
-> Then came along the embedded initrd/initramfs idea which rather buggered
-> the scheme when large initramfs are embedded into the image.
-> 
-> As the overall feeling at the time was "don't use large initrds" it's
-> something I've never really cared about - and I'm still of the opinion
-> that 16MB of compressed initrd/initramfs is rather silly.
+> I understand that modifying L1 page tables is definitely not a proper way of
+> handling this. It simply costs too much. But what if we consider that the DMA
+> memory can be only allocated from a specific range of the system memory?
+> Assuming that this range of memory is known during the boot time, it CAN be
+> mapped with two-level of tables in MMU. First level mapping will stay the
+> same all the time for all processes, but it would be possible to unmap the
+> pages required for DMA from the second level mapping what will be visible
+> from all the processes at once.
 
-It is... but we have more than 32MB of RAM total now, and people are 
-running standard distributions on ARM these days, such as Fedora or 
-Ubuntu, including their corresponding initrd that may contain lots of 
-modules, splashscreen data, etc.  So it might be a good idea to think 
-about fixing this limitation before it comes back again.
+How much memory are we talking about?  What is the typical figure?
+
+> Is there any reason why such solution won't work?
+
+It could work indeed.
+
+One similar solution that is already in place is to use highmem for that 
+reclaimable DMA memory.  It is easy to ensure affected highmem pages are 
+not mapped in kernel space.  And you can decide at boot time how many 
+highmem pages you want even if the system has less that 1GB of RAM.
 
 
 Nicolas
