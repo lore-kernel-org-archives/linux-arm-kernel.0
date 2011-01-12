@@ -1,52 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Jan 2011 14:36:00 +0100
-Subject: [PATCH] MAINTAINERS: Update Atmel AT91 entry
-In-Reply-To: <1294250698-13275-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1294250698-13275-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4D2DAE40.80803@atmel.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 12 Jan 2011 19:48:10 +0530
+Subject: [PATCH] bitops: remove condition code clobber for CLZ
+In-Reply-To: <alpine.LFD.2.00.1101111347320.17086@xanadu.home>
+References: <1294767725-14814-1-git-send-email-rabin@rab.in>
+	<20110111183942.GL11039@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101111347320.17086@xanadu.home>
+Message-ID: <AANLkTimyjEvKVusSvmdpgcMT=WeP3WwYDDYcWO8XKiY2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/01/2011 19:04, Nicolas Ferre :
-> Add two co-maintainers and update the entry with new information.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Andrew Victor <linux@maxim.org.za>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Wed, Jan 12, 2011 at 00:21, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 11 Jan 2011, Russell King - ARM Linux wrote:
+>> On Tue, Jan 11, 2011 at 11:12:05PM +0530, Rabin Vincent wrote:
+>> > The CLZ instruction does not alter the condition flags, so remove the
+>> > "cc" clobber from the inline asm for fls().
+>>
+>> Do you have any evidence that this changes anything, or is it just
+>> subjective?
+>
+> This probably doesn't change anything, as gcc has been presuming that
+> inline asms do clobber the condition code for years now, in order to
+> prevent issues caused by a lack of %? appended to instructions in order
+> to conditionally execute them otherwise.
 
-Hi Andrew (Morton),
+FWIW, note that I am able to see GCC using the condition code clobber
+information.  For example, for this (artificial) test code:
 
-Maybe you can handle this "MAINTAINERS" patch?
+static inline int fls(int x)
+{
+	int ret;
 
-Thanks a lot, bye.
+#ifdef CLOBBER
+	asm("clz %0,%1" : "=r" (ret) : "r" (x): "cc");
+#else
+	asm("clz %0,%1" : "=r" (ret) : "r" (x));
+#endif
+	return 32 - ret;
+}
 
-> ---
->  MAINTAINERS |    8 ++++++--
->  1 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7585e9d..cb58500 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -552,11 +552,15 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  
-> -ARM/ATMEL AT91RM9200 ARM ARCHITECTURE
-> +ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
->  M:	Andrew Victor <linux@maxim.org.za>
-> +M:	Nicolas Ferre <nicolas.ferre@atmel.com>
-> +M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  W:	http://maxim.org.za/at91_26.html
-> -S:	Maintained
-> +W:	http://www.linux4sam.org
-> +S:	Supported
-> +F:	arch/arm/mach-at91/
->  
->  ARM/BCMRING ARM ARCHITECTURE
->  M:	Jiandong Zheng <jdzheng@broadcom.com>
+int f(int b)
+{
+	int x = fls(b);
+	return b > 100 ? x : x + 10;
+}
+
+I get (GCC 4.5.1, at -O2):
+
+--- clobber.s   2011-01-12 19:41:36.000000000 +0530
++++ noclobber.s 2011-01-12 19:41:36.000000000 +0530
+@@ -1,12 +1,12 @@
+
+-clobber.o:     file format elf32-littlearm
++noclobber.o:     file format elf32-littlearm
 
 
--- 
-Nicolas Ferre
+ Disassembly of section .text:
+
+ 00000000 <f>:
+-   0:  e16f3f10        clz     r3, r0
+-   4:  e3500064        cmp     r0, #100        ; 0x64
+-   8:  e2630020        rsb     r0, r3, #32
++   0:  e3500064        cmp     r0, #100        ; 0x64
++   4:  e16f0f10        clz     r0, r0
++   8:  e2600020        rsb     r0, r0, #32
+    c:  d280000a        addle   r0, r0, #10
+   10:  e12fff1e        bx      lr
