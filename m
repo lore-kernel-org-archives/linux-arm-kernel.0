@@ -1,60 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 10:56:59 +0000
-Subject: [RFC] ARM: Let GIC to route IRQs to any allowed CPUs
-In-Reply-To: <AANLkTim3BUvnMsH=oW1cxmzT2wmwpxPFLjrP39TGbuhx@mail.gmail.com>
-References: <AANLkTimNMcs_6-NMTSY+yZuDUSB2eC2R_NX35gq00f7E@mail.gmail.com>
-	<20110112085110.GR11039@n2100.arm.linux.org.uk>
-	<AANLkTim3BUvnMsH=oW1cxmzT2wmwpxPFLjrP39TGbuhx@mail.gmail.com>
-Message-ID: <20110112105658.GA2365@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 12 Jan 2011 11:57:50 +0100 (CET)
+Subject: BUG: spinlock recursion (sys_chdir, user_path_at, do_path_lookup
+	...)
+In-Reply-To: <20110112075229.GZ24920@pengutronix.de>
+References: <20110111110539.GP24920@pengutronix.de>
+	<20110112075229.GZ24920@pengutronix.de>
+Message-ID: <alpine.LFD.2.00.1101121153370.12146@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 05:04:43PM +0800, TAO HU wrote:
-> Hi, Russell King
+On Wed, 12 Jan 2011, Uwe Kleine-K?nig wrote:
+> > [   75.280000]  r5:be961ee4 r4:00063015
+> > 
+> > I started to bisect, but already the first test case showed a different
+> > error (my getty dying every few seconds).
+> I bisected this one now, the first bad commit is
 > 
-> Thanks.
+> 	9c0729d (x86: Eliminate bp argument from the stack tracing routines)
 > 
-> For "The result will be CPUs fighting over servicing such interrupts."
-> What's the consequence? The performance downgrade?
+> .  It made a x86 specific change to include/linux/stacktrace.h.
 
-It means you'll have the same interrupt trying to be serviced on two
-CPUs at the same time.  One will succeed and service it.  The other
-will waste time just finding out that there's nothing for it to do,
-competing with resources and wasting time that it could otherwise have
-spent executing userspace or whatever.
+As I said on IRC already, that's complete nonsense. The commit changes
+a function prototype which is only relevant for x86. So how should
+that affect ARM ?
 
-> Does it imply a design flaw in GIC or in ARM SMP?
+> According to tglx the lockup above "is related to nicks scalability
+> stuff".  I havn't researched yet the offending commit.  Is that
+> necessary?
 
-No.  The hardware is doing what you're asking it to.  Some OSes may want
-this behaviour so it would be wrong for the hardware to deny it.
+Only if you are interested that the problem gets fixed.
 
-There's quite a bit of history behind interrupt balancing across CPU
-cores, and it's not a simple issue to get to grips with.
+Thanks,
 
-I believe the x86 kernel uses software to balance interrupts across the
-cores using an algorithm in the kernel.  This tries to distribute the
-interrupts between the cores.  When this was tried on ARM, although it
-moved interrupts around the cores, it was no better than having all
-interrupts routed to one core.
-
-On x86 they now do away with their kernel algorithm, and instead run a
-boot-time utility (irqbalance) which does a one-time distribution of
-interrupts across the cores.  The idea is that it is more important to
-keep an interrupt handler running on the same core than it is to
-constantly switch it between the cores.
-
-If a handler keeps switching between the cores, you have to migrate cache
-lines between the cores, which adds to the cache coherency traffic, and
-on x86 results in a reduction in performance.
-
-So, with all that in mind, when I was sorting out the initial SMP merging,
-I tried out various algorithms for automatic interrupt distribution, and
-never got any of them to work satisfactorily.  In light of discussions with
-x86 folk, particularly Arjan van de Ven, I decided not to merge any of them
-and leave it as a matter for userspace policy to control how interrupts are
-distributed to the cores - just like the majority of x86 platforms now do.
-
-AFAIK, there's nothing stopping anyone running 'irqbalance' (the x86
-utility) on ARM - it should just be accessing procfs files.  See
-http://irqbalance.org/ for more information on the program, and on the
-issues surrounding IRQ distribution in SMP systems.
+	tglx
