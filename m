@@ -1,126 +1,52 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 12 Jan 2011 14:27:47 +0530
-Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
-In-Reply-To: <20110112082416.GE3181@pulham.picochip.com>
-References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
-	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
-	<20110112082416.GE3181@pulham.picochip.com>
-Message-ID: <AANLkTim2LJVA+qJNqYd2uPNKjP54kuyvsZ7-T3jSJsta@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jan 2011 09:03:01 +0000
+Subject: Locking in the clk API
+In-Reply-To: <4D2D184A.8020405@codeaurora.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<4D2D184A.8020405@codeaurora.org>
+Message-ID: <20110112090301.GS11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jamie,
-
-On Wed, Jan 12, 2011 at 1:54 PM, Jamie Iles <jamie@jamieiles.com> wrote:
->> I don't know why, but checkpatch used to give few errors which it is
->> not giving now.
->> Like:
->> - Mixing spaces and tabs
->> - Line over 80 columns.
+On Tue, Jan 11, 2011 at 06:56:10PM -0800, Saravana Kannan wrote:
+> On 01/11/2011 01:16 AM, Russell King - ARM Linux wrote:
+>> On Tue, Jan 11, 2011 at 10:16:42AM +0800, Jeremy Kerr wrote:
+>>> At present, we can satisfy these with:
+>>>
+>>> * clk_enable: may sleep
 >>
->> There are few places in this patch where i have seen these issues, but
->> checkpatch doesn't
->> report them at all.
+>> I object to this as one of the purposes behind the clk API is to allow
+>> power savings to be made, and unless we can perform clk enable/disable
+>> from atomic contexts, the best you can do is enable the clock when the
+>> device is probed and disable it when it's released.
 >
-> Hmm, the only lines over 80 chars are printk lines and I can't see any
-> with mixed spaces and tabs...
+> Since dev_pm_ops.suspend is not atomic anymore (am I wrong?), what is  
 
-There are few in file drivers/watchdog/dw_wdt.c
-line 40-45, 127, 133, 156, 167, 204, 216, 315, 319.
+That never has been, and that is called for the _system_ going into
+suspend.  That's not what I'm talking about.  I'm talking about drivers
+doing their own power management in response to (a) their knowledge of
+how the device behaves and (b) in response to the user state they know.
 
-I can check it easily as i have used following in my vimrc file:
-au FileType c match error /\s\+$\|\%>80v.\+\|[ ][ ]\+\|\n\n\n\+\|,[^
-]\|^[ ]\+[^\*]\|(\s\+\|\s\+)/
-au FileType c highlight error ctermbg=red guibg=red ctermfg=blue guifg=blue
-au FileType h match error /\s\+$\|\%>80v.\+\|[ ][ ]\+\|\n\n\n\+\|,[^
-]\|^[ ]\+[^\*]\|(\s\+\|\s\+)/
-au FileType h highlight error ctermbg=red guibg=red ctermfg=blue guifg=blue
+In the case of a UART, that means enabling the clock when the user opens
+the device and turning it off when the user closes the device - and in
+the case of the UART being used as the system console, enabled when
+printk calls it, disabled when finished outputting the message.
 
-and so these sections are highlighted.
+The latter is a case where you're called in atomic context.
 
-(...)
+Another case - a storage device.  While you may receive open/close calls,
+these are meaningless for power management - you'll receive an open call
+when you mount a filesystem, and a close call when you finally unmount it.
+That doesn't mean it's going to be used.  Your request handler will
+generally run in an atomic context, so in order to do dynamic power
+saving you need to be able to enable/disable clocks in that context.
 
->> > + ? ? ? dw_wdt.clk = clk_get(&pdev->dev, NULL);
->> > + ? ? ? if (IS_ERR(dw_wdt.clk))
->> > + ? ? ? ? ? ? ? return -ENODEV;
->> > +
->> > + ? ? ? ret = clk_enable(dw_wdt.clk);
->>
->> should we call this routine if clk is NULL? Probably we will get error here.
->> But as we discussed earlier, we should support machines who don't support clk
->> framework. So, shouldn't we check clk for NULL here and call this
->> routine only if we have a valid clk pointer, otherwise continue
->> instead of returning error.
->
-> I think this is right, it's perfectly valid for a platform to return
-> NULL as a clk and you can pass that to clk_enable().
->
+A touchscreen controller which you communicate with over a dedicated bus.
+The touchscreen controller doesn't require the host to be constantly
+clocked - it only needs to be clocked when communicating with the
+touchscreen.  The touchscreen controller raises an interrupt for service.
+You'd want to enable the clock in the interrupt handler to communicate
+with the device and turn it off afterwards.
 
-I agree on the first part: NULL can be returned from clk_get(), but
-passing NULL to clk_enable and clk_get_rate doesn't look fine to me.
-As they will always return error in that case and code will return from below
-error check. That's why i suggest we should check for NULL before
-clk_enable/disable and clk_get_rate.
-What do you say?
-
->> > + ? ? ? if (ret)
->> > + ? ? ? ? ? ? ? goto out_put_clk;
->> > +
->> > + ? ? ? /*
->> > + ? ? ? ?* The timeout period of the watchdog is derived from the input clock
->> > + ? ? ? ?* frequency. ?For platforms that don't have a clk for the watchdog,
->> > + ? ? ? ?* they can specify the WDT clock rate through the clk_rate field of
->> > + ? ? ? ?* the struct dw_wdt_platform_data platform data.
->> > + ? ? ? ?*/
->> > + ? ? ? if (pdata && pdata->clk_rate > 0)
->> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = pdata->clk_rate;
->> > + ? ? ? else
->> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = clk_get_rate(dw_wdt.clk);
->> > +
->>
->> I know it doesn't make sense for a platform to have support for clk framework
->> and pass rate through plat data. But this code will always take
->> pdata->rate, if it is passed.
->> Wouldn't it be better if we reverse the sequence.
->>
->> if (clk)
->> ?rate = clk_get_rate(...);
->> else {
->> ?pdata = pdev->dev.platform_data;
->> ?if (pdata)
->> ? rate = pdata->rate;
->> }
->>
->> and then following code
->
-> That's what I did first (without the test that clk is not NULL) but
-> switched it the other way round so that the platform can override the
-> frequency by setting platform_data->clk_rate to nonzero. ?That just
-> seems a little more flexible and easy for testing but I'm happy to
-> switch the order if you feel that's important.
->
-
-Problem will occur if rate is dynamically changed and we are still believing
-on platform code's clk_rate.
-Would be better if we switch order. i.e. give priority to clk_get_rate over
-pdata->rate.
-
->> > diff --git a/include/linux/platform_data/dw_wdt.h b/include/linux/platform_data/dw_wdt.h
->> > new file mode 100644
->> > index 0000000..0af10ef
->> > --- /dev/null
->> > +++ b/include/linux/platform_data/dw_wdt.h
->>
->> It looks you have created a separate generic folder platform_data.
->> But generally we put these files directly into existing folders.
->> I am not quite sure if that's fine or we should avoid this.
->
-> Yes, this was suggested by Greg K-H to stop include/linux getting filled
-> with platform data (https://lkml.org/lkml/2011/1/7/323).
->
-
-Oh. That's good.
-
---
-viresh
-ST Microelectronics
+Shall I continue?
