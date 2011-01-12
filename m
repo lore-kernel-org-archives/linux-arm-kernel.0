@@ -1,83 +1,191 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 12 Jan 2011 10:00:25 -0600
-Subject: [PATCH 0/0] RFC: ARM: Thumb-2: Symbol manipulation macros for
-	function body copying
-In-Reply-To: <20110112093209.GA18833@n2100.arm.linux.org.uk>
-References: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
-	<20110112093209.GA18833@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 12 Jan 2011 17:01:06 +0100
+Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20110112145036.GY12078@pengutronix.de>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
+	<20110111133137.GS12078@pengutronix.de>
+	<20110112064711.GG2888@freescale.com>
+	<20110112145036.GY12078@pengutronix.de>
+Message-ID: <20110112160106.GI24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Sascha,
 
-On Wed, Jan 12, 2011 at 3:32 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 11, 2011 at 06:02:30PM -0600, Dave Martin wrote:
->> To make it easier to deal with cases like this, I've had a
->> go at writing some macros to make copying function bodies
->> easier, while being robust for ARM and Thumb-2.
->
-> How about instead providing some infrastructure which coes the
-> copy too? ?Something like:
->
-> #define copy_fn_to_sram(to, fn, size) ({ ? ? ? ? ? ? ? ?\
-> ? ? ? ?__typeof__(fn) f; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> ? ? ? ?unsigned long ptr; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> ? ? ? ?__asm__("" : "=r" (ptr) : "0" (fn)); ? ? ? ? ? ?\
-> ? ? ? ?memcpy(to, (void *)(ptr & ~1), size); ? ? ? ? ? \
-> ? ? ? ?ptr = (ptr & 1) | (unsigned long)to; ? ? ? ? ? ?\
-> ? ? ? ?__asm__("" : "=r" (f) : "0" (ptr)); ? ? ? ? ? ? \
-> ? ? ? ?f; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> })
-
-omap provides some infrastructure for both allocating SRAM space and
-doing the copy, using omap_sram_push() and friends.  So I wasn't sure
-what the correct level of abstraction was for the new helpers.
-Certainly, providing a sort of "function memcpy" macro like your
-copy_fn_to_sram makes sense.  I think this should still be safe from a
-type system perspective: providing the "blind" type casts using asm()
-appear somewhere in the execution flow C shouldn't make silly
-assumptions even if Linux ends up enabling multifile optimisation
-sometime in the future.
-
-Would you agree with that assertion?
-
->
-> Used by:
-> extern void my_func(int foo);
-> extern int my_func_size;
-
-Potentially, we could define, an extra assembler macro to complement
-ENDPROC() which records the size of a function automatically.  What do
-you think?
-
->
-> void call_my_func(void *to, int arg)
+On Wed, Jan 12, 2011 at 03:50:36PM +0100, Sascha Hauer wrote:
+> On Wed, Jan 12, 2011 at 02:47:12PM +0800, Shawn Guo wrote:
+> > On Tue, Jan 11, 2011 at 02:31:37PM +0100, Sascha Hauer wrote:
+> > > On Thu, Jan 06, 2011 at 03:13:16PM +0800, Shawn Guo wrote:
+> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > > ---
+> > > > Changes for v4:
+> > > >  - Call cpu_relax() during polling
+> > > > 
+> > > > Changes for v2:
+> > > >  - Add mutex locking for mxs_read_ocotp()
+> > > >  - Use type size_t for count and i
+> > > >  - Add comment for clk_enable/disable skipping
+> > > >  - Add ERROR bit clearing and polling step
+> > > > 
+> > > >  arch/arm/mach-mxs/Makefile              |    2 +-
+> > > >  arch/arm/mach-mxs/include/mach/common.h |    1 +
+> > > >  arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
+> > > >  3 files changed, 81 insertions(+), 1 deletions(-)
+> > > >  create mode 100644 arch/arm/mach-mxs/ocotp.c
+> > > > 
+> > > > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> > > > index 39d3f9c..f23ebbd 100644
+> > > > --- a/arch/arm/mach-mxs/Makefile
+> > > > +++ b/arch/arm/mach-mxs/Makefile
+> > > > @@ -1,5 +1,5 @@
+> > > >  # Common support
+> > > > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+> > > > +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
+> > > >  
+> > > >  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+> > > >  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+> > > > diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+> > > > index 59133eb..cf02552 100644
+> > > > --- a/arch/arm/mach-mxs/include/mach/common.h
+> > > > +++ b/arch/arm/mach-mxs/include/mach/common.h
+> > > > @@ -13,6 +13,7 @@
+> > > >  
+> > > >  struct clk;
+> > > >  
+> > > > +extern int mxs_read_ocotp(int offset, int count, u32 *values);
+> > > >  extern int mxs_reset_block(void __iomem *);
+> > > >  extern void mxs_timer_init(struct clk *, int);
+> > > >  
+> > > > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> > > > new file mode 100644
+> > > > index 0000000..e2d39aa
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/mach-mxs/ocotp.c
+> > > > @@ -0,0 +1,79 @@
+> > > > +/*
+> > > > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> > > > + *
+> > > > + * This program is free software; you can redistribute it and/or modify
+> > > > + * it under the terms of the GNU General Public License as published by
+> > > > + * the Free Software Foundation; either version 2 of the License, or
+> > > > + * (at your option) any later version.
+> > > > + *
+> > > > + * This program is distributed in the hope that it will be useful,
+> > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > > + * GNU General Public License for more details.
+> > > > + */
+> > > > +
+> > > > +#include <linux/delay.h>
+> > > > +#include <linux/err.h>
+> > > > +#include <linux/mutex.h>
+> > > > +
+> > > > +#include <mach/mxs.h>
+> > > > +
+> > > > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> > > > +#define BM_OCOTP_CTRL_ERROR		(1 << 9)
+> > > > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> > > > +
+> > > > +static DEFINE_MUTEX(ocotp_mutex);
+> > > > +
+> > > > +int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
+> > > > +{
+> > > > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+> > > > +	int timeout = 0x400;
+> > > > +	size_t i;
+> > > > +
+> > > > +	mutex_lock(&ocotp_mutex);
+> > > > +
+> > > > +	/*
+> > > > +	 * clk_enable(hbus_clk) for ocotp can be skipped
+> > > > +	 * as it must be on when system is running.
+> > > > +	 */
+> > > > +
+> > > > +	/* try to clear ERROR bit */
+> > > > +	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
+> > > 
+> > > This operation does not try to clear the error bit but actually clears
+> > > it...
+> > > 
+> > > > +
+> > > > +	/* check both BUSY and ERROR cleared */
+> > > > +	while ((__raw_readl(ocotp_base) &
+> > > > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
+> > > > +		cpu_relax();
+> > > 
+> > > ...which means you do not have to poll the error bit here...
+> > > 
+> > > > +
+> > > > +	if (unlikely(!timeout))
+> > > > +		goto error_unlock;
+> > > > +
+> > > > +	/* open OCOTP banks for read */
+> > > > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+> > > > +
+> > > > +	/* approximately wait 32 hclk cycles */
+> > > > +	udelay(1);
+> > > > +
+> > > > +	/* poll BUSY bit becoming cleared */
+> > > > +	timeout = 0x400;
+> > > > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
+> > > > +		cpu_relax();
+> > > 
+> > > ...which means you can factor out a ocotp_wait_busy function and let the
+> > > code speak instead of the comments.
+> > > 
+> > > > +
+> > > > +	if (unlikely(!timeout))
+> > > > +		goto error_unlock;
+> > > > +
+> > > > +	for (i = 0; i < count; i++, offset += 4)
+> > > > +		*values++ = __raw_readl(ocotp_base + offset);
+> > > 
+> > > The registers in the ocotp are 16 byte aligned. Does it really make
+> > > sense to provide a function allowing to read the gaps between the
+> > > registers?
+> > > 
+> > Good catch.  The count was added to ease the consecutive otp word
+> > reading, as there is bank open/close cost for otp read.  What about
+> > the following changes?
+> > 
+> > int mxs_read_ocotp(unsigned offset, size_t otp_word_cnt, u32 *values)
+> > {
+> > 	......
+> > 
+> > 	for (i = 0; i < otp_word_cnt; i++, offset += 0x10)
+> > 		*values++ = __raw_readl(ocotp_base + offset);
+> > 
+> > 	......
+> > }
+> 
+> I would rather make a function like this:
+> 
+> static u32 ocotp[0x27];
+> 
+> const u32 *mxs_get_ocotp(void)
 > {
-> ? ? ? ?void (*fn)(int);
->
-> ? ? ? ?fn = copy_fn_to_sram(to, my_func, my_func_size);
-> ? ? ? ?fn(arg);
-> }
->
-> Then if you need to fix the way the copies are done for some
-> architectural reason, there's only one place to do it.
+> 	static int once = 0;
+> 
+> 	if (once)
+> 		return ocotp
+> 
+> 	/* bank open */
+> 
+> 	for (i = 0; i < 0x27; i++)
+> 		ocotp[i] = readl(ocotp_base + 0x20 + i * 0x10)
+> 
+> 	/* bank_close */
+> 
+> 	once = 1;
+> 
+> 	return ocotp;
+which is save on UP when it's not called from irq context.
 
-The model used in the omap code is to copy some functions into SRAM
-ahead of time and stash the pointers away to be called later: for that
-model, it's not so useful to have something like call_my_func
-directly.  Also, I wasn't sure whether conflating other functionality
-such as cache flushing into the new macros would be a good idea -- is
-might be cleaner and more maintainable, but might result in less
-efficient usage.  Any thoughts?
+Additionally I suggest a #define for 0x27 and 0x20.
 
->
-> I'm not sure asm/unified.h is the right place - I don't think this has
-> anything to do with the unified assembler syntax. ?Please create a new
-> header for this.
+Uwe
 
-I suspected unified.h might not be right--- thanks for the feedback.
-
-Cheers
----Dave
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
