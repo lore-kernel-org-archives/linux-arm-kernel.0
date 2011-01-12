@@ -1,141 +1,76 @@
-From: philippe.langlais@stericsson.com (Philippe Langlais)
-Date: Wed, 12 Jan 2011 11:21:09 +0100
-Subject: [PATCH] ux500: platform data for SFH7741 proximity sensor driver
-	(standard Keyboard GPIO driver)
-Message-ID: <1294827669-29884-1-git-send-email-philippe.langlais@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jan 2011 10:26:32 +0000
+Subject: [PATCH] mxcmmc: use dmaengine API
+In-Reply-To: <1294826996-13764-2-git-send-email-s.hauer@pengutronix.de>
+References: <1294826996-13764-1-git-send-email-s.hauer@pengutronix.de>
+	<1294826996-13764-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110112102632.GX11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Proximity sensor is managed as an input event (SW_PROXIMITY).
+On Wed, Jan 12, 2011 at 11:09:56AM +0100, Sascha Hauer wrote:
+> +	host->dma_nents = dma_map_sg(mmc_dev(host->mmc), data->sg,
+> +				     data->sg_len,  host->dma_dir);
 
-Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
----
- arch/arm/mach-ux500/board-mop500-regulators.c |   11 ++++
- arch/arm/mach-ux500/board-mop500.c            |   63 +++++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 0 deletions(-)
+As recently discussed, you don't need to save dma_nents - the value to
+be passed to dma_unmap_sg() is data->sg_len, not host->dma_nents.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 7584a16..6625f4a 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -9,15 +9,26 @@
-  * MOP500 board specific initialization for regulators
-  */
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/ab8500.h>
- #include "board-mop500-regulators.h"
- 
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+extern struct platform_device mop500_gpio_keys_device;
-+#endif
-+
- static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
- 	{
- 		.dev = NULL,
- 		.supply = "v-display",
- 	},
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+	{
-+		.dev = &mop500_gpio_keys_device.dev,
-+		.supply = "v-proximity",
-+	},
-+#endif
- #ifdef CONFIG_SENSORS_BH1780
- 	{
- 		.dev_name = "bh1780",
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 2635bb7..472f9a2 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -21,6 +21,8 @@
- #include <linux/spi/spi.h>
- #include <linux/mfd/ab8500.h>
- #include <linux/mfd/tc3589x.h>
-+#include <linux/input.h>
-+#include <linux/gpio_keys.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -171,10 +173,68 @@ static void __init mop500_i2c_init(void)
- 	db8500_add_i2c3(&u8500_i2c3_data);
- }
- 
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+static struct gpio_keys_button mop500_gpio_keys[] = {
-+	{
-+		.desc			= "Proximity Sensor",
-+		.type			= EV_SW,
-+		.code			= SW_FRONT_PROXIMITY,
-+		.gpio			= MOP500_EGPIO(7),
-+		.active_low		= 0,
-+		.can_disable		= 1,
-+	}
-+};
-+
-+static struct regulator *prox_regulator;
-+static int mop500_prox_activate(struct device *dev);
-+static void mop500_prox_deactivate(struct device *dev);
-+
-+static struct gpio_keys_platform_data mop500_gpio_keys_data = {
-+	.buttons	= mop500_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(mop500_gpio_keys),
-+	.enable		= mop500_prox_activate,
-+	.disable	= mop500_prox_deactivate,
-+};
-+
-+struct platform_device mop500_gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &mop500_gpio_keys_data,
-+	},
-+};
-+
-+static int mop500_prox_activate(struct device *dev)
-+{
-+	prox_regulator = regulator_get(&mop500_gpio_keys_device.dev,
-+						"v-proximity");
-+	if (IS_ERR(prox_regulator)) {
-+		dev_err(&mop500_gpio_keys_device.dev,
-+			"regulator_get(\"v-proximity\") failed\n");
-+		return PTR_ERR(prox_regulator);
-+	}
-+	regulator_enable(prox_regulator);
-+	return 0;
-+}
-+
-+static void mop500_prox_deactivate(struct device *dev)
-+{
-+	regulator_disable(prox_regulator);
-+	regulator_put(prox_regulator);
-+}
-+#endif
-+
- /* add any platform devices here - TODO */
- static struct platform_device *platform_devs[] __initdata = {
- };
- 
-+static struct platform_device *u8500_platform_devices[] __initdata = {
-+	/*TODO - add platform devices here */
-+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
-+	&mop500_gpio_keys_device,
-+#endif
-+};
-+
- #ifdef CONFIG_STE_DMA40
- static struct stedma40_chan_cfg ssp0_dma_cfg_rx = {
- 	.mode = STEDMA40_MODE_LOGICAL,
-@@ -322,6 +382,9 @@ static void __init u8500_init_machine(void)
- 
- 	i2c_register_board_info(0, mop500_i2c0_devices,
- 				ARRAY_SIZE(mop500_i2c0_devices));
-+
-+	platform_add_devices(u8500_platform_devices,
-+			     ARRAY_SIZE(u8500_platform_devices));
- }
- 
- MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
--- 
-1.7.3.1
+You should also do the map/unmap against the DMA engine device (which
+is the device actually doing DMA) rather than the peripheral (which is
+only the recipient of DMA).  The reason is - while the peripheral can
+see the DMA controller, the peripheral may be able to see all RAM but
+the DMA controller may have an IOMMU or limited view of RAM.
+
+> +static int mxcmci_setup_dma(struct mmc_host *mmc)
+> +{
+> +	struct mxcmci_host *host = mmc_priv(mmc);
+> +	struct dma_slave_config *config = &host->dma_slave_config;
+> +
+> +	config->direction = DMA_FROM_DEVICE;
+
+I would like to get some concensus on removing config->direction from
+the slave configuration entirely - and make all the fields below
+refer purely to the peripheral device parameters.  At the moment,
+the API allows them to be used ambiguously.
+
+> +static bool filter(struct dma_chan *chan, void *param)
+> +{
+> +	struct mxcmci_host *host = param;
+> +
+> +	if (!imx_dma_is_general_purpose(chan)) {
+> +		printk("no general\n");
+> +		return false;
+> +	}
+> +
+> +        chan->private = &host->dma_data;
+> +
+> +        return true;
+
+Looks like something went wrong with the tabbing here?
+
+> @@ -794,7 +823,7 @@ static int mxcmci_probe(struct platform_device *pdev)
+>  	mmc->max_blk_size = 2048;
+>  	mmc->max_blk_count = 65535;
+>  	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+> -	mmc->max_seg_size = mmc->max_req_size;
+> +	mmc->max_seg_size = 65535;
+
+You can get this from the DMA parameters for the DMA engine device:
+
+	mmc->max_seg_size = dma_get_max_seg_size(dev);
+
+where 'dev' is the DMA engine struct device - chan->dma_device->dev.
+
+Also just spotted this left in your patch:
+> +	if (!mxcmci_use_dma(host))
+> +		return 0;
+> +
+>  	for_each_sg(data->sg, sg, data->sg_len, i) {
+>  		if (sg->offset & 3 || sg->length & 3) {
+> 			host->do_dma = 0;
+
+Shouldn't this be a decision made by the DMA engine rather than the
+driver?  Having looked at the MMCI code also doing this, I think this
+should cause prep_slave_sg() to return NULL if it can't handle the
+scatterlist.  On MMCI, we fall back to PIO if prep_slave_sg() returns
+NULL.
