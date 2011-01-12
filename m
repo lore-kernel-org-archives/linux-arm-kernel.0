@@ -1,73 +1,42 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 11 Jan 2011 18:02:31 -0600
-Subject: [PATCH 1/1] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
-References: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1294790551-17069-2-git-send-email-dave.martin@linaro.org>
+Date: Tue, 11 Jan 2011 18:03:33 -0600
+Subject: [PATCH] ARM: Thumb-2: Fix out-of-range offset for Thumb-2 in proc-v7.S
+Message-ID: <1294790613-17101-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In low-level board support code, there is sometimes a need to
-copy a function body to another location at run-time.
+The following patch introduces a pre-increment addressing
+offset which is out of range for Thumb-2:
+    ARM: pgtable: switch order of Linux vs hardware page tables
 
-A straightforward call to memcpy doesn't work in Thumb-2,
-because bit 0 of external Thumb function symbols is set to 1,
-indicating that the function is Thumb.  Without corrective
-measures, this will cause an off-by-one copy, and the copy
-may be called using the wrong instruction set.
+162:	str	r3, [r0, #2048]!
 
-This patch adds macros to help with such cases.
+Thumb-2 only permits offsets <256 for pre-increment addressing.
 
-Particular care is needed, because C doesn't guarantee any
-defined behaviour when casting a function pointer to any other
-type.  This has been observed to lead to strange optimisation
-side-effects when doing the arithmetic which is required in
-order to copy/move function bodies correctly in Thumb-2.
+This patch replaces the store instruction with a suitable add-str
+pair for the Thumb-2 case.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
-KernelVersion: next-20110111
+KernelVersion: v2.6.37
 
- arch/arm/include/asm/unified.h |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+ arch/arm/mm/proc-v7.S |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index bc63116..636a765 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -24,6 +24,32 @@
- 	.syntax unified
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index b49fab2..0c1172b 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -159,7 +159,9 @@ ENTRY(cpu_v7_set_pte_ext)
+ 	tstne	r1, #L_PTE_PRESENT
+ 	moveq	r3, #0
+ 
+-	str	r3, [r0, #2048]!
++ ARM(	str	r3, [r0, #2048]! )
++ THUMB(	add	r0, r0, #2048 )
++ THUMB(	str	r3, [r0] )
+ 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
  #endif
- 
-+#ifndef __ASSEMBLY__
-+#include <linux/types.h>
-+#define __funcp_to_uint(funcp) ({				\
-+		uintptr_t __result;				\
-+								\
-+		asm("" : "=r" (__result) : "0" (funcp));	\
-+		__result;					\
-+	})
-+#define __uint_to_funcp(i, funcp) ({			\
-+		typeof(funcp) __result;			\
-+							\
-+		asm("" : "=r" (__result) : "0" (i));	\
-+		__result;				\
-+	})
-+#define FSYM_REBASE(funcp, dest_buf)					\
-+	__uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
-+#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
-+#else /* !CONFIG_THUMB2_KERNEL */
-+#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
-+#define FSYM_TYPE(funcp) 0
-+#endif /* !CONFIG_THUMB2_KERNEL */
-+#endif /* !__ASSEMBLY__ */
-+
- #ifdef CONFIG_THUMB2_KERNEL
- 
- #if __GNUC__ < 4
+ 	mov	pc, lr
 -- 
 1.7.1
