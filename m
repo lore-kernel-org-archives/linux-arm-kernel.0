@@ -1,42 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Jan 2011 15:28:14 -0600
-Subject: [PATCH v2 3/3] ARM: twd_smp: add clock api support
-In-Reply-To: <20101221134515.GB1556@n2100.arm.linux.org.uk>
-References: <1286030086-25556-1-git-send-email-robherring2@gmail.com>
-	<1286030086-25556-4-git-send-email-robherring2@gmail.com>
-	<20101221134515.GB1556@n2100.arm.linux.org.uk>
-Message-ID: <4D2E1CEE.5040900@gmail.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Thu, 13 Jan 2011 05:58:01 +0800
+Subject: mmaping a fixed address fails on ARM
+Message-ID: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi Russell,
 
-On 12/21/2010 07:45 AM, Russell King - ARM Linux wrote:
-> On Sat, Oct 02, 2010 at 09:34:46AM -0500, Rob Herring wrote:
->> From: Rob Herring<rob.herring@smooth-stone.com>
->>
->> The private timer freq is currently dynamically detected
->> using jiffies count to determine the rate. This method adds
->> a delay to boot-up, so use the clock api instead to get the
->> clock rate.
-> More or less the same comments go for this as well as the timer-sp code.
+Andre posted a mmap testcase [1] and a bug report [2] for Ubuntu
+kernel on OMAP4 system, since he is porting some applications from x86
+to ARM. He testcase works fine on x86, but always fail on ARM. I've
+tested it on OMAP3/OMAP4/i.MX51.
 
-I've implemented your requested changes for timer-sp code. The problem 
-with doing the same thing with smp_twd timer is I don't know what the 
-frequency of the timer is on various platforms or an understanding of 
-what their clock trees look like to do a proper implementation of the 
-clocks. I could make calling twd_timer_init mandatory and replace direct 
-setting of twd_base, but it would still fall back to calculating the 
-rate if no clock found. These are the current users:
+Basically what he want to do is get a mapping on a specific virtual
+address. But AFAIK, mmap doesn't make sure we can get the mapping
+address as we want. On x86, it works fine. So if this fails, the
+application can't run on ARM.
 
-mach-omap2/timer-gp.c
-mach-realview/realview_eb.c
-mach-realview/realview_pb11mp.c
-mach-realview/realview_pbx.c
-mach-s5pv310/time.c
-mach-shmobile/smp-sh73a0.c
-mach-tegra/timer.c
-mach-ux500/cpu.c
-mach-vexpress/ct-ca9x4.c
+The implementation of arch_get_unmapped_area() is different from ARM
+and x86, that might makes mmap behavior different between ARM and x86.
+Andre said 2.6.28-versatile. I'm not sure whether it is a regression.
 
-Rob
+[1]: http://launchpadlibrarian.net/61588086/main.c
+[2]: https://bugs.launchpad.net/ubuntu/+source/linux-ti-omap4/+bug/697004
+
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
