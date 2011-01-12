@@ -1,41 +1,58 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 12 Jan 2011 10:05:19 -0600
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <4D2D1942.4050905@ahsoftware.de>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-Message-ID: <AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jan 2011 16:11:51 +0000
+Subject: [PATCH 0/0] RFC: ARM: Thumb-2: Symbol manipulation macros for
+	function body copying
+In-Reply-To: <AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
+References: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
+	<20110112093209.GA18833@n2100.arm.linux.org.uk>
+	<AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
+Message-ID: <20110112161151.GB18833@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 9:00 PM, Alexander Holler <holler@ahsoftware.de> wrote:
-> Hello,
+On Wed, Jan 12, 2011 at 10:00:25AM -0600, Dave Martin wrote:
+> omap provides some infrastructure for both allocating SRAM space and
+> doing the copy, using omap_sram_push() and friends.  So I wasn't sure
+> what the correct level of abstraction was for the new helpers.
+> Certainly, providing a sort of "function memcpy" macro like your
+> copy_fn_to_sram makes sense.
 
-[...]
+It'd just be a matter of splitting the copying out of omap_sram_push().
 
-> ? ? ? ? ? ? ? ?INIT_CALLS
-> ? ? ? ? ? ? ? ?CON_INITCALL
-> ? ? ? ? ? ? ? ?SECURITY_INITCALL
-> + ? ? ? ? ? ? ? /*
-> + ? ? ? ? ? ? ? ?* TODO: The size of INIT_RAM_FS could easily reach a
-> + ? ? ? ? ? ? ? ?* point (~16MB) when loading modules will fail because
-> + ? ? ? ? ? ? ? ?* relocations will be out of range. So this place here
-> + ? ? ? ? ? ? ? ?* isn't the best one.
-> + ? ? ? ? ? ? ? ?*/
-> ? ? ? ? ? ? ? ?INIT_RAM_FS
+> I think this should still be safe from a type system perspective:
+> providing the "blind" type casts using asm() appear somewhere in
+> the execution flow C shouldn't make silly assumptions even if Linux
+> ends up enabling multifile optimisation sometime in the future.
 
-In general, do we expect always to be able to avoid the situation
-where branches in the kernel may need to cover too large a range ...
-and is there any strategy for working aroung it?
+Yes.  The only thing that is missing from my version is the
+flush_icache_range() which should also be there.
 
-If we have problems branching from the modules area into vmlinux, we
-could possibly build modules with -fPIC : this would remove the
-restriction on branch range, though there would also be some
-performance impact for the modules...
+> > Used by:
+> > extern void my_func(int foo);
+> > extern int my_func_size;
+> 
+> Potentially, we could define, an extra assembler macro to complement
+> ENDPROC() which records the size of a function automatically.  What do
+> you think?
 
-Cheers
----Dave
+That would pad the code out with a fair number of additional integers.
+That's probably not a good idea.
+
+> The model used in the omap code is to copy some functions into SRAM
+> ahead of time and stash the pointers away to be called later: for that
+> model, it's not so useful to have something like call_my_func
+> directly.  Also, I wasn't sure whether conflating other functionality
+> such as cache flushing into the new macros would be a good idea -- is
+> might be cleaner and more maintainable, but might result in less
+> efficient usage.  Any thoughts?
+
+My example was only that - an example.  You can also use it in the
+way you describe too:
+
+	to = omap_sram_push(size);
+	_omap_sram_reprogram_clock = copy_fn_to_sram(to,
+					omap1_sram_reprogram_clock, size);
+
+and it'll also ensure type-safety between the omap1_sram_reprogram_clock
+and _omap_sram_reprogram_clock symbols, which the current code doesn't
+do.
