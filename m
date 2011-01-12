@@ -1,43 +1,32 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 12 Jan 2011 10:32:46 +0100
-Subject: [PATCH v2] ARM: Change misleading warning when
-	CONFIG_CMDLINE_FORCE is used
-In-Reply-To: <20110112091716.GU11039@n2100.arm.linux.org.uk>
-References: <1294789556-3870-1-git-send-email-holler@ahsoftware.de>
-	<20110112081147.GA24920@pengutronix.de>
-	<20110112091716.GU11039@n2100.arm.linux.org.uk>
-Message-ID: <20110112093246.GA25718@pengutronix.de>
+Date: Wed, 12 Jan 2011 10:37:10 +0100
+Subject: [PATCH v3 1/4] ARM: i.MX53: enable spi support
+In-Reply-To: <1294821324-5688-2-git-send-email-yong.shen@freescale.com>
+References: <1294821324-5688-1-git-send-email-yong.shen@freescale.com>
+	<1294821324-5688-2-git-send-email-yong.shen@freescale.com>
+Message-ID: <20110112093710.GD24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hello Yong,
 
-On Wed, Jan 12, 2011 at 09:17:16AM +0000, Russell King - ARM Linux wrote:
-> > Does it make sense at all to disable CONFIG_CMDLINE_FORCE?  If not, I
-> > suggest to remove it.
-> 
-> Eeh?  Do you understand what CONFIG_CMDLINE_FORCE is and what effect it
-> has?
-> 
-> When CONFIG_CMDLINE_FORCE is enabled, we ignore the command line passed
-> in from the boot loader and always use the built-in command line.  When
-> CONFIG_CMDLINE_FORCE is disabled, we will use the boot loader supplied
-> command line if present.
-> 
-> "Does it make sense at all to disable CONFIG_CMDLINE_FORCE" so, if you
-> always have it enabled, you can never pass in a command line from a boot
-> loader.  That's an absolutely idiotic idea.
-> 
-> _Most_ of us want to pass in command lines from the boot loader so we can
-> configure things.
-ah, I thought the effect of CONFIG_CMDLINE_FORCE would be its inverse.
-And ok, this is probably about broken boot loaders that I'm just not
-used to.
- 
-> Please, if you don't understand, ask questions rather than making
-> completely misleading review comments which may confuse patch submitters.
-IMHO "Does it make sense at all to disable CONFIG_CMDLINE_FORCE?" is a
-question, isn't it?
+On Wed, Jan 12, 2011 at 04:35:21PM +0800, yong.shen at freescale.com wrote:
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> @@ -131,9 +131,9 @@ typedef enum iomux_config {
+>  #define MX53_PAD_JTAG_TDO__JTAG_TDO		IOMUX_PAD(0x454, NON_MUX_I, IOMUX_CONFIG_ALT0, 0x0, 0, NO_PAD_CTRL)
+>  #define MX53_PAD_EIM_A25__GPIO_5_2		IOMUX_PAD(0x458, 0x110,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+>  #define MX53_PAD_EIM_EB2__GPIO_2_30		IOMUX_PAD(0x45C, 0x114,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+> -#define MX53_PAD_EIM_D16__GPIO_3_16		IOMUX_PAD(0x460, 0x118,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+> -#define MX53_PAD_EIM_D17__GPIO_3_17		IOMUX_PAD(0x464, 0x11C,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+> -#define MX53_PAD_EIM_D18__GPIO_3_18		IOMUX_PAD(0x468, 0x120,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+> +#define MX53_PAD_EIM_D16__CSPI1_SCLK		IOMUX_PAD(0x460, 0x118,IOMUX_CONFIG_ALT4, 0x79c, 3, NO_PAD_CTRL)
+> +#define MX53_PAD_EIM_D17__CSPI1_MISO		IOMUX_PAD(0x464, 0x11C,IOMUX_CONFIG_ALT4, 0x7a0, 3, NO_PAD_CTRL)
+> +#define MX53_PAD_EIM_D18__CSPI1_MOSI		IOMUX_PAD(0x468, 0x120,IOMUX_CONFIG_ALT4, 0x7a4, 3, NO_PAD_CTRL)
+>  #define MX53_PAD_EIM_D19__GPIO_3_19		IOMUX_PAD(0x46C, 0x124,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+>  #define MX53_PAD_EIM_D20__GPIO_3_20		IOMUX_PAD(0x470, 0x128,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+>  #define MX53_PAD_EIM_D21__GPIO_3_21		IOMUX_PAD(0x474, 0x12C,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+Why do you remove the GPIO definitions?
 
 Best regards
 Uwe
