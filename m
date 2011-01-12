@@ -1,209 +1,187 @@
 From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 12 Jan 2011 19:19:40 +0100
-Subject: [FYI 1/4] mmci: fixup broken_blockend variant patch
-In-Reply-To: <1294856383-14187-1-git-send-email-per.forlin@linaro.org>
-References: <1294856383-14187-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1294856383-14187-2-git-send-email-per.forlin@linaro.org>
+Date: Wed, 12 Jan 2011 19:24:21 +0100
+Subject: [PATCH 0/5] mmc: add double buffering for mmc block requests
+In-Reply-To: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
+References: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <AANLkTi=c13d-hbrS565M8c1UOyv6vGh27yzWK3tt9AVD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@stericsson.com>
+I mistyped the linaro email in this patch series.
 
-NOT to be mainlined, only sets the base for the double
-buffer example implementation. The DMA implemenation for
-MMCI is under development.
+Sorry for the mess
+/Per
 
-host->last_blockend flag is now set only for the last
-MCI_DATABLOCKEND, the previous code would just react to
-any blockend, which was buggy. Consolidate Ux500 and U300
-bug flags to a single one and use only the MCI_DATAEND irq
-on U300 as well, this is faster anyway.
-
-Also make sure the MCI_DATABLOCKENDMASK is set only when
-needed, instead of being set always and then masked off.
-
-Tested successfully on Ux500, U300 and ARM RealView
-PB1176.
----
- drivers/mmc/host/mmci.c |   45 ++++++++++++++++++++++-----------------------
- drivers/mmc/host/mmci.h |    4 ++--
- 2 files changed, 24 insertions(+), 25 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5630228..aafede4 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -48,8 +48,6 @@ static unsigned int fmax = 515633;
-  *		  is asserted (likewise for RX)
-  * @broken_blockend: the MCI_DATABLOCKEND is broken on the hardware
-  *		and will not work at all.
-- * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
-- *		using DMA.
-  * @sdio: variant supports SDIO
-  * @st_clkdiv: true if using a ST-specific clock divider algorithm
-  */
-@@ -60,7 +58,6 @@ struct variant_data {
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
- 	bool			broken_blockend;
--	bool			broken_blockend_dma;
- 	bool			sdio;
- 	bool			st_clkdiv;
- };
-@@ -76,7 +73,7 @@ static struct variant_data variant_u300 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg_enable		= 1 << 13, /* HWFCEN */
- 	.datalength_bits	= 16,
--	.broken_blockend_dma	= true,
-+	.broken_blockend	= true,
- 	.sdio			= true,
- };
- 
-@@ -199,7 +196,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
- static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct variant_data *variant = host->variant;
--	unsigned int datactrl, timeout, irqmask;
-+	unsigned int datactrl, timeout, irqmask0, irqmask1;
- 	unsigned long long clks;
- 	void __iomem *base;
- 	int blksz_bits;
-@@ -210,7 +207,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	host->data = data;
- 	host->size = data->blksz * data->blocks;
- 	host->data_xfered = 0;
--	host->blockend = false;
-+	host->last_blockend = false;
- 	host->dataend = false;
- 
- 	mmci_init_sg(host, data);
-@@ -230,20 +227,20 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
- 	if (data->flags & MMC_DATA_READ) {
- 		datactrl |= MCI_DPSM_DIRECTION;
--		irqmask = MCI_RXFIFOHALFFULLMASK;
-+		irqmask1 = MCI_RXFIFOHALFFULLMASK;
- 
- 		/*
- 		 * If we have less than a FIFOSIZE of bytes to transfer,
- 		 * trigger a PIO interrupt as soon as any data is available.
- 		 */
- 		if (host->size < variant->fifosize)
--			irqmask |= MCI_RXDATAAVLBLMASK;
-+			irqmask1 |= MCI_RXDATAAVLBLMASK;
- 	} else {
- 		/*
- 		 * We don't actually need to include "FIFO empty" here
- 		 * since its implicit in "FIFO half empty".
- 		 */
--		irqmask = MCI_TXFIFOHALFEMPTYMASK;
-+		irqmask1 = MCI_TXFIFOHALFEMPTYMASK;
- 	}
- 
- 	/* The ST Micro variants has a special bit to enable SDIO */
-@@ -252,8 +249,14 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 			datactrl |= MCI_ST_DPSM_SDIOEN;
- 
- 	writel(datactrl, base + MMCIDATACTRL);
--	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
--	mmci_set_mask1(host, irqmask);
-+	irqmask0 = readl(base + MMCIMASK0);
-+	if (variant->broken_blockend)
-+		irqmask0 &= ~MCI_DATABLOCKENDMASK;
-+	else
-+		irqmask0 |= MCI_DATABLOCKENDMASK;
-+	irqmask0 &= ~MCI_DATAENDMASK;
-+	writel(irqmask0, base + MMCIMASK0);
-+	mmci_set_mask1(host, irqmask1);
- }
- 
- static void
-@@ -301,7 +304,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 			data->error = -EIO;
- 
- 		/* Force-complete the transaction */
--		host->blockend = true;
-+		host->last_blockend = true;
- 		host->dataend = true;
- 
- 		/*
-@@ -337,7 +340,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 	 *
- 	 * In the U300, the IRQs can arrive out-of-order,
- 	 * e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
--	 * so for this case we use the flags "blockend" and
-+	 * so for this case we use the flags "last_blockend" and
- 	 * "dataend" to make sure both IRQs have arrived before
- 	 * concluding the transaction. (This does not apply
- 	 * to the Ux500 which doesn't fire MCI_DATABLOCKEND
-@@ -353,7 +356,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		 */
- 		if (!variant->broken_blockend)
- 			host->data_xfered += data->blksz;
--		host->blockend = true;
-+		if (host->data_xfered == data->blksz * data->blocks)
-+			host->last_blockend = true;
- 	}
- 
- 	if (status & MCI_DATAEND)
-@@ -364,11 +368,12 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 	 * on others we must sync with the blockend signal since they can
- 	 * appear out-of-order.
- 	 */
--	if (host->dataend && (host->blockend || variant->broken_blockend)) {
-+	if (host->dataend &&
-+	    (host->last_blockend || variant->broken_blockend)) {
- 		mmci_stop_data(host);
- 
- 		/* Reset these flags */
--		host->blockend = false;
-+		host->last_blockend = false;
- 		host->dataend = false;
- 
- 		/*
-@@ -770,7 +775,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	struct variant_data *variant = id->data;
- 	struct mmci_host *host;
- 	struct mmc_host *mmc;
--	unsigned int mask;
- 	int ret;
- 
- 	/* must have platform data */
-@@ -951,12 +955,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 			goto irq0_free;
- 	}
- 
--	mask = MCI_IRQENABLE;
--	/* Don't use the datablockend flag if it's broken */
--	if (variant->broken_blockend)
--		mask &= ~MCI_DATABLOCKEND;
--
--	writel(mask, host->base + MMCIMASK0);
-+	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
- 
- 	amba_set_drvdata(dev, mmc);
- 
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index df06f01..7ac8c4d 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -137,7 +137,7 @@
- #define MCI_IRQENABLE	\
- 	(MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|	\
- 	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
--	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATABLOCKENDMASK)
-+	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK)
- 
- /* These interrupts are directed to IRQ1 when two IRQ lines are available */
- #define MCI_IRQ1MASK \
-@@ -177,7 +177,7 @@ struct mmci_host {
- 	struct timer_list	timer;
- 	unsigned int		oldstat;
- 
--	bool			blockend;
-+	bool			last_blockend;
- 	bool			dataend;
- 
- 	/* pio stuff */
--- 
-1.7.1
+On 12 January 2011 19:13, Per Forlin <per.forlin@linaro.org> wrote:
+> Add support to prepare one MMC request while another is active on
+> the host. This is done by making the issue_rw_rq() asynchronous.
+> The increase in throughput is proportional to the time it takes to
+> prepare a request and how fast the memory is. The faster the MMC/SD is
+> the more significant the prepare request time becomes. Measurements on U5500
+> and U8500 on eMMC shows significant performance gain for DMA on MMC for large
+> reads. In the PIO case there is some gain in performance for large reads too.
+> There seems to be no or small performance gain for write, don't have a good
+> explanation for this yet.
+>
+> There are two optional hooks pre_req() and post_req() that the host driver
+> may implement in order to improve double buffering. In the DMA case pre_req()
+> may do dma_map_sg() and prepare the dma descriptor and post_req runs the
+> dma_unmap_sg.
+>
+> The mmci host driver implementation for double buffering is not intended
+> nor ready for mainline yet. It is only an example of how to implement
+> pre_req() and post_req(). The reason for this is that the basic DMA support
+> for MMCI is not complete yet. The mmci patches are sent in a separate patch
+> series "[FYI 0/4] arm: mmci: example implementation of double buffering".
+>
+> Issues/Questions for issue_rw_rq() in block.c:
+> * Is it safe to claim the host for the first MMC request and wait to release
+> ?it until the MMC queue is empty again? Or must the host be claimed and
+> ?released for every request?
+> * Is it possible to predict the result from __blk_end_request().
+> ?If there are no errors for a completed MMC request and the
+> ?blk_rq_bytes(req) == data.bytes_xfered, will it be guaranteed that
+> ?__blk_end_request will return 0?
+>
+> Here follows the IOZone results for u8500 v1.1 on eMMC.
+> The numbers for DMA are a bit to good here due to the fact that the
+> CPU speed is decreased compared to u8500 v2. This makes the cache handling
+> even more significant.
+>
+> Command line used: ./iozone -az -i0 -i1 -i2 -s 50m -I -f /iozone.tmp -e -R -+u
+>
+> Relative diff: VANILLA-MMC-PIO -> 2BUF-MMC-PIO
+> cpu load is abs diff
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?random ?random
+> ? ? ? ?KB ? ? ?reclen ?write ? rewrite read ? ?reread ?read ? ?write
+> ? ? ? ?51200 ? 4 ? ? ? +0% ? ? +0% ? ? +0% ? ? +0% ? ? +0% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?-0.1 ? ?-0.5 ? ?-0.3 ? ?-0.1 ? ?-0.0
+>
+> ? ? ? ?51200 ? 8 ? ? ? +0% ? ? +0% ? ? +6% ? ? +6% ? ? +8% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?-0.1 ? ?-0.3 ? ?-0.4 ? ?-0.8 ? ?+0.0
+>
+> ? ? ? ?51200 ? 16 ? ? ?+0% ? ? -2% ? ? +0% ? ? +0% ? ? -3% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?-0.2 ? ?+0.0 ? ?+0.0 ? ?-0.2 ? ?+0.0
+>
+> ? ? ? ?51200 ? 32 ? ? ?+0% ? ? +1% ? ? +0% ? ? +0% ? ? +0% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?+0.0 ? ?-0.3 ? ?+0.0 ? ?+0.0 ? ?+0.0
+>
+> ? ? ? ?51200 ? 64 ? ? ?+0% ? ? +0% ? ? +0% ? ? +0% ? ? +0% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?+0.0 ? ?+0.0 ? ?+0.0 ? ?+0.0 ? ?+0.0
+>
+> ? ? ? ?51200 ? 128 ? ? +0% ? ? +1% ? ? +1% ? ? +1% ? ? +1% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.2 ? ?+0.1 ? ?-0.3 ? ?+0.4 ? ?+0.0
+>
+> ? ? ? ?51200 ? 256 ? ? +0% ? ? +0% ? ? +1% ? ? +1% ? ? +1% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?-0.0 ? ?+0.1 ? ?+0.1 ? ?+0.1 ? ?+0.0
+>
+> ? ? ? ?51200 ? 512 ? ? +0% ? ? +1% ? ? +2% ? ? +2% ? ? +2% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?+0.0 ? ?+0.2 ? ?+0.2 ? ?+0.2 ? ?+0.1
+>
+> ? ? ? ?51200 ? 1024 ? ?+0% ? ? +2% ? ? +2% ? ? +2% ? ? +3% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.1 ? ?+0.2 ? ?+0.5 ? ?-0.8 ? ?+0.0
+>
+> ? ? ? ?51200 ? 2048 ? ?+0% ? ? +2% ? ? +3% ? ? +3% ? ? +3% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?-0.2 ? ?+0.4 ? ?+0.8 ? ?-0.5 ? ?+0.2
+>
+> ? ? ? ?51200 ? 4096 ? ?+0% ? ? +1% ? ? +3% ? ? +3% ? ? +3% ? ? +1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.1 ? ?+0.9 ? ?+0.9 ? ?+0.5 ? ?+0.1
+>
+> ? ? ? ?51200 ? 8192 ? ?+1% ? ? +0% ? ? +3% ? ? +3% ? ? +3% ? ? +1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.2 ? ?+1.3 ? ?+1.3 ? ?+1.0 ? ?+0.0
+>
+> ? ? ? ?51200 ? 16384 ? +0% ? ? +1% ? ? +3% ? ? +3% ? ? +3% ? ? +1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.1 ? ?+1.0 ? ?+1.3 ? ?+1.0 ? ?+0.5
+>
+> Relative diff: VANILLA-MMC-DMA -> 2BUF-MMC-MMCI-DMA
+> cpu load is abs diff
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?random ?random
+> ? ? ? ?KB ? ? ?reclen ?write ? rewrite read ? ?reread ?read ? ?write
+> ? ? ? ?51200 ? 4 ? ? ? +0% ? ? -3% ? ? +6% ? ? +5% ? ? +5% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?-0.2 ? ?-0.6 ? ?-0.1 ? ?+0.3 ? ?+0.0
+>
+> ? ? ? ?51200 ? 8 ? ? ? +0% ? ? +0% ? ? +7% ? ? +7% ? ? +7% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.1 ? ?+0.8 ? ?+0.6 ? ?+0.9 ? ?+0.0
+>
+> ? ? ? ?51200 ? 16 ? ? ?+0% ? ? +0% ? ? +7% ? ? +7% ? ? +8% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?-0.0 ? ?+0.7 ? ?+0.7 ? ?+0.8 ? ?+0.0
+>
+> ? ? ? ?51200 ? 32 ? ? ?+0% ? ? +0% ? ? +8% ? ? +8% ? ? +9% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.1 ? ?+0.7 ? ?+0.7 ? ?+0.3 ? ?+0.0
+>
+> ? ? ? ?51200 ? 64 ? ? ?+0% ? ? +1% ? ? +9% ? ? +9% ? ? +9% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.0 ? ?+0.8 ? ?+0.7 ? ?+0.8 ? ?+0.0
+>
+> ? ? ? ?51200 ? 128 ? ? +1% ? ? +0% ? ? +13% ? ?+13% ? ?+14% ? ?+0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.0 ? ?+1.0 ? ?+1.0 ? ?+1.1 ? ?+0.0
+>
+> ? ? ? ?51200 ? 256 ? ? +1% ? ? +2% ? ? +8% ? ? +8% ? ? +11% ? ?+0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.3 ? ?+0.0 ? ?+0.7 ? ?+1.5 ? ?+0.0
+>
+> ? ? ? ?51200 ? 512 ? ? +1% ? ? +2% ? ? +16% ? ?+16% ? ?+17% ? ?+0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.2 ? ?+2.2 ? ?+2.1 ? ?+2.2 ? ?+0.1
+>
+> ? ? ? ?51200 ? 1024 ? ?+1% ? ? +2% ? ? +20% ? ?+20% ? ?+20% ? ?+1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.1 ? ?+2.6 ? ?+1.9 ? ?+2.6 ? ?+0.0
+>
+> ? ? ? ?51200 ? 2048 ? ?+0% ? ? +2% ? ? +22% ? ?+22% ? ?+21% ? ?+0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.3 ? ?+2.3 ? ?+2.9 ? ?+2.1 ? ?-0.0
+>
+> ? ? ? ?51200 ? 4096 ? ?+1% ? ? +2% ? ? +23% ? ?+23% ? ?+23% ? ?+1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.1 ? ?+2.0 ? ?+3.2 ? ?+3.1 ? ?+0.0
+>
+> ? ? ? ?51200 ? 8192 ? ?+1% ? ? +5% ? ? +24% ? ?+24% ? ?+24% ? ?+1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+1.4 ? ?-0.0 ? ?+4.2 ? ?+3.0 ? ?+2.8 ? ?+0.1
+>
+> ? ? ? ?51200 ? 16384 ? +1% ? ? +3% ? ? +24% ? ?+24% ? ?+24% ? ?+2%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.0 ? ?+0.3 ? ?+3.4 ? ?+3.8 ? ?+3.7 ? ?+0.1
+>
+> Here follows the IOZone results for u5500 on eMMC.
+> These numbers for DMA are more as expected.
+>
+> Command line used: ./iozone -az -i0 -i1 -i2 -s 50m -I -f /iozone.tmp -e -R -+u
+>
+> Relative diff: VANILLA-MMC-DMA -> 2BUF-MMC-MMCI-DMA
+> cpu load is abs diff
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?random ?random
+> ? ? ? ?KB ? ? ?reclen ?write ? rewrite read ? ?reread ?read ? ?write
+> ? ? ? ?51200 ? 128 ? ? +1% ? ? +1% ? ? +10% ? ?+9% ? ? +10% ? ?+0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?+0.0 ? ?+1.3 ? ?+0.1 ? ?+0.8 ? ?+0.1
+>
+> ? ? ? ?51200 ? 256 ? ? +2% ? ? +2% ? ? +7% ? ? +7% ? ? +9% ? ? +0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?+0.4 ? ?+0.5 ? ?+0.6 ? ?+0.7 ? ?+0.0
+>
+> ? ? ? ?51200 ? 512 ? ? +2% ? ? +2% ? ? +12% ? ?+12% ? ?+12% ? ?+1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.4 ? ?+0.6 ? ?+1.8 ? ?+2.4 ? ?+2.4 ? ?+0.2
+>
+> ? ? ? ?51200 ? 1024 ? ?+2% ? ? +3% ? ? +14% ? ?+14% ? ?+14% ? ?+0%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.3 ? ?+0.1 ? ?+2.1 ? ?+1.4 ? ?+1.4 ? ?+0.2
+>
+> ? ? ? ?51200 ? 2048 ? ?+3% ? ? +3% ? ? +16% ? ?+16% ? ?+16% ? ?+1%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.2 ? ?+2.5 ? ?+1.8 ? ?+2.4 ? ?-0.2
+>
+> ? ? ? ?51200 ? 4096 ? ?+3% ? ? +3% ? ? +17% ? ?+17% ? ?+18% ? ?+3%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.1 ? ?-0.1 ? ?+2.7 ? ?+2.0 ? ?+2.7 ? ?-0.1
+>
+> ? ? ? ?51200 ? 8192 ? ?+3% ? ? +3% ? ? +18% ? ?+18% ? ?+18% ? ?+3%
+> ? ? ? ?cpu: ? ? ? ? ? ?-0.1 ? ?+0.2 ? ?+3.0 ? ?+2.3 ? ?+2.2 ? ?+0.2
+>
+> ? ? ? ?51200 ? 16384 ? +3% ? ? +3% ? ? +18% ? ?+18% ? ?+18% ? ?+4%
+> ? ? ? ?cpu: ? ? ? ? ? ?+0.2 ? ?+0.2 ? ?+2.8 ? ?+3.5 ? ?+2.4 ? ?-0.0
+>
+> Per Forlin (5):
+> ?mmc: add member in mmc queue struct to hold request data
+> ?mmc: Add a block request prepare function
+> ?mmc: Add a second mmc queue request member
+> ?mmc: Store the mmc block request struct in mmc queue
+> ?mmc: Add double buffering for mmc block requests
+>
+> ?drivers/mmc/card/block.c | ?337 ++++++++++++++++++++++++++++++----------------
+> ?drivers/mmc/card/queue.c | ?171 +++++++++++++++---------
+> ?drivers/mmc/card/queue.h | ? 31 +++-
+> ?drivers/mmc/core/core.c ?| ? 77 +++++++++--
+> ?include/linux/mmc/core.h | ? ?7 +-
+> ?include/linux/mmc/host.h | ? ?8 +
+> ?6 files changed, 432 insertions(+), 199 deletions(-)
+>
+>
