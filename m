@@ -1,27 +1,126 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 08:51:10 +0000
-Subject: [RFC] ARM: Let GIC to route IRQs to any allowed CPUs
-In-Reply-To: <AANLkTimNMcs_6-NMTSY+yZuDUSB2eC2R_NX35gq00f7E@mail.gmail.com>
-References: <AANLkTimNMcs_6-NMTSY+yZuDUSB2eC2R_NX35gq00f7E@mail.gmail.com>
-Message-ID: <20110112085110.GR11039@n2100.arm.linux.org.uk>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Wed, 12 Jan 2011 14:27:47 +0530
+Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
+In-Reply-To: <20110112082416.GE3181@pulham.picochip.com>
+References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
+	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
+	<20110112082416.GE3181@pulham.picochip.com>
+Message-ID: <AANLkTim2LJVA+qJNqYd2uPNKjP54kuyvsZ7-T3jSJsta@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 04:18:51PM +0800, TAO HU wrote:
-> The current logic will always route IRQs to the first allowed CPU
-> Following two commands have the same result (all IRQs to CPU0)
-> cmd1: $ echo 3 > proc/irq/xxx/smp_affinity
-> cmd2: $ echo 1 > proc/irq/xxx/smp_affinity
-> While below command will route all IRQs to CPU1
-> cmd3: $ echo 2 > proc/irq/xxx/smp_affinity
-> 
-> With this patch, cmd1 will route IRQs to both CPU0 and CPU1
-> Meanwhile, cmd2 and cmd3 will work as before
+Jamie,
 
-There's a reason we don't do this...
+On Wed, Jan 12, 2011 at 1:54 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+>> I don't know why, but checkpatch used to give few errors which it is
+>> not giving now.
+>> Like:
+>> - Mixing spaces and tabs
+>> - Line over 80 columns.
+>>
+>> There are few places in this patch where i have seen these issues, but
+>> checkpatch doesn't
+>> report them at all.
+>
+> Hmm, the only lines over 80 chars are printk lines and I can't see any
+> with mixed spaces and tabs...
 
-We don't want to deliver one IRQ to both CPU0 and CPU1 at the same time,
-which is what will happen with this patch.  The GIC hardware doesn't
-do IRQ balancing between CPUs.
+There are few in file drivers/watchdog/dw_wdt.c
+line 40-45, 127, 133, 156, 167, 204, 216, 315, 319.
 
-The result will be CPUs fighting over servicing such interrupts.
+I can check it easily as i have used following in my vimrc file:
+au FileType c match error /\s\+$\|\%>80v.\+\|[ ][ ]\+\|\n\n\n\+\|,[^
+]\|^[ ]\+[^\*]\|(\s\+\|\s\+)/
+au FileType c highlight error ctermbg=red guibg=red ctermfg=blue guifg=blue
+au FileType h match error /\s\+$\|\%>80v.\+\|[ ][ ]\+\|\n\n\n\+\|,[^
+]\|^[ ]\+[^\*]\|(\s\+\|\s\+)/
+au FileType h highlight error ctermbg=red guibg=red ctermfg=blue guifg=blue
+
+and so these sections are highlighted.
+
+(...)
+
+>> > + ? ? ? dw_wdt.clk = clk_get(&pdev->dev, NULL);
+>> > + ? ? ? if (IS_ERR(dw_wdt.clk))
+>> > + ? ? ? ? ? ? ? return -ENODEV;
+>> > +
+>> > + ? ? ? ret = clk_enable(dw_wdt.clk);
+>>
+>> should we call this routine if clk is NULL? Probably we will get error here.
+>> But as we discussed earlier, we should support machines who don't support clk
+>> framework. So, shouldn't we check clk for NULL here and call this
+>> routine only if we have a valid clk pointer, otherwise continue
+>> instead of returning error.
+>
+> I think this is right, it's perfectly valid for a platform to return
+> NULL as a clk and you can pass that to clk_enable().
+>
+
+I agree on the first part: NULL can be returned from clk_get(), but
+passing NULL to clk_enable and clk_get_rate doesn't look fine to me.
+As they will always return error in that case and code will return from below
+error check. That's why i suggest we should check for NULL before
+clk_enable/disable and clk_get_rate.
+What do you say?
+
+>> > + ? ? ? if (ret)
+>> > + ? ? ? ? ? ? ? goto out_put_clk;
+>> > +
+>> > + ? ? ? /*
+>> > + ? ? ? ?* The timeout period of the watchdog is derived from the input clock
+>> > + ? ? ? ?* frequency. ?For platforms that don't have a clk for the watchdog,
+>> > + ? ? ? ?* they can specify the WDT clock rate through the clk_rate field of
+>> > + ? ? ? ?* the struct dw_wdt_platform_data platform data.
+>> > + ? ? ? ?*/
+>> > + ? ? ? if (pdata && pdata->clk_rate > 0)
+>> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = pdata->clk_rate;
+>> > + ? ? ? else
+>> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = clk_get_rate(dw_wdt.clk);
+>> > +
+>>
+>> I know it doesn't make sense for a platform to have support for clk framework
+>> and pass rate through plat data. But this code will always take
+>> pdata->rate, if it is passed.
+>> Wouldn't it be better if we reverse the sequence.
+>>
+>> if (clk)
+>> ?rate = clk_get_rate(...);
+>> else {
+>> ?pdata = pdev->dev.platform_data;
+>> ?if (pdata)
+>> ? rate = pdata->rate;
+>> }
+>>
+>> and then following code
+>
+> That's what I did first (without the test that clk is not NULL) but
+> switched it the other way round so that the platform can override the
+> frequency by setting platform_data->clk_rate to nonzero. ?That just
+> seems a little more flexible and easy for testing but I'm happy to
+> switch the order if you feel that's important.
+>
+
+Problem will occur if rate is dynamically changed and we are still believing
+on platform code's clk_rate.
+Would be better if we switch order. i.e. give priority to clk_get_rate over
+pdata->rate.
+
+>> > diff --git a/include/linux/platform_data/dw_wdt.h b/include/linux/platform_data/dw_wdt.h
+>> > new file mode 100644
+>> > index 0000000..0af10ef
+>> > --- /dev/null
+>> > +++ b/include/linux/platform_data/dw_wdt.h
+>>
+>> It looks you have created a separate generic folder platform_data.
+>> But generally we put these files directly into existing folders.
+>> I am not quite sure if that's fine or we should avoid this.
+>
+> Yes, this was suggested by Greg K-H to stop include/linux getting filled
+> with platform data (https://lkml.org/lkml/2011/1/7/323).
+>
+
+Oh. That's good.
+
+--
+viresh
+ST Microelectronics
