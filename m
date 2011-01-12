@@ -1,53 +1,117 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 12 Jan 2011 14:17:23 +0800
-Subject: [PATCH 2/2] ARM i.MXS: Add auart platform support for i.MX28
-In-Reply-To: <1294758545-9445-3-git-send-email-s.hauer@pengutronix.de>
-References: <1294758545-9445-1-git-send-email-s.hauer@pengutronix.de>
-	<1294758545-9445-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110112061722.GF2888@freescale.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 12 Jan 2011 15:15:07 +0900
+Subject: [RESEND PATCH] serial: samsung: fix device name
+In-Reply-To: <AANLkTinwwtE5t16zvpsU5eZvEtJedJr=0x_10DcB0U5z@mail.gmail.com>
+References: <20100923190212.18863.25678.stgit@darius-desktop>
+	<4C9BE577.4050504@fluff.org>
+	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
+	<4C9CD3E0.6060000@gmail.com> <4C9FE2C4.8070302@fluff.org>
+	<AANLkTinwwtE5t16zvpsU5eZvEtJedJr=0x_10DcB0U5z@mail.gmail.com>
+Message-ID: <018a01cbb220$13145bb0$393d1310$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Tue, Jan 11, 2011 at 04:09:05PM +0100, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-mxs/clock-mx28.c                  |    5 ++
->  arch/arm/mach-mxs/devices-mx28.h                |    8 +++
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-auart.c      |   54 +++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++++
->  6 files changed, 81 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
+Darius Augulis wrote:
 > 
-[...]
-> +struct platform_device *__init mxs_add_auart(
-> +		const struct mxs_auart_data *data)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobase,
-> +			.end = data->iobase + SZ_4K - 1,
-The io size here is supposed to mean the space for holding the
-current defined registers or the memory map size for this block
-given by SoC design?  If it's the latter, the size should be SZ_8K.
+> On Mon, Sep 27, 2010 at 3:18 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> > On 24/09/10 17:37, Paulius Zaleckas wrote:
+> >> On 09/24/2010 09:57 AM, Darius Augulis wrote:
+> >>> Hi,
+> >>>
+> >>> On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks<ben-linux@fluff.org>
+?wrote:
+> >>>> On 23/09/10 20:15, Darius Augulis wrote:
+> >>>>> Swap device and driver names in serial/samsung.c
+> >>>>
+> >>>> This is far too short, please see the notes below on trying
+> >>>> to make this more informative.
+> >>>>
+> >>>>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
+> >>>>> ---
+> >>>>>
+> >>>>> This patch was submitted about 3 months ago, but still not merged.
+> >>>>> There was another similar patch from Joonyoung Shim
+> >>>>> <jy0922.shim@samsung.com> ?and was discussed here:
+> >>>>> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
+> >>>>> Joonyoung Shim acked my patch and other people on ARM mailing list
+> >>>>> acked it. The maintainer, Ben Dooks, still not responding for
+> >>>>> a long time. Another maintainer, Kukjin Kim, refused to merge
+> >>>>> it without Ben's review.
+> >>>>> I would like to ask somebody pick up this bugfix.
+> >>>>
+> >>>> I belive last time this was brought up I asked about the affect
+> >>>> this has on the userspace. The following issues would be helpful
+> >>>> or essential to have noted in the header about the effect of this.
+> >>>>
+> >>>> - Does it change the /dev name of the device? if so I would thinl
+> >>>> ? carefully about applying it, as it would be a change in the way
+> >>>> ? that userspace sees the kernel.
+> >>>
+> >>> It does - now devices are named /dev/s3c2410_serial, and patch changes
+> >>> its name to /dev/ttySAC
+> >>>
+> >>>>
+> >>>> - Does it change the kernel output itself? A note on what diffeences
+> >>>> ? can be seen in things like dmesg would be helpful.
+> >>>
+> >>> It does. Serial driver reports device names when probing, so there
+> >>> will appear ttySACx instead of
+> >>> s3c2410_serialx.
+> >>>
+> >>>>
+> >>>> - Are there any other side effects
+> >>>>
+> >>>> - Why is this a bug? Maybe the previous points will explain what is
+> >>>> ? going on, but if not, then a reasonably concise description of
+> >>>> ? what is going on here.
+> >>>
+> >>> This is bug, because of several points:
+> >>>
+> >>> 1. Because it contradicts kernel documentation. Please read
+> >>> Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
+> >>> This should be enough to apply this patch.
+> >>>
+> >>> 2. Because s3c2410_serial isn't correct name for serial device node.
+> >>> It's name of Samsung serial driver.
+> >>>
+> >>> 3. Because now almost all userspace systems workaround it by creating
+> >>> symlink
+> >>> /dev/ttySACx> ?/dev/s3c2410_serialx and only then put some getty on
+> >>> created symlink, not on original device.
+> >>> Systems which don't create this symlink, fail to boot at all, because
+> >>> of wrong console name. Good example is Buildroot.
+> >>
+> >> I had similar issue with buildroot too, because in /etc/securetty it is
+> >> defained as ttySAC0
+> >>
+> >> 4. For console in kernel boot command line you must enter
+console=ttySACx.
+> >> Why it sould be different in userspace?
+> >>
+> >> For me it seems taht this bug was not noticed earlier, because most
+> >> embedded
+> >> systems were using static device nodes and ttySACx was used in these
+cases.
+> >
+> > As long as these are explained, then I'm reasonably happy for this to be
+> > applied, as long as there are no other complaints.
+> >
+> > However, this is a big change, and I think it should await the next
+> > merge window.
+> 
+> I agree that too.
+> 
 
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->irq,
-> +			.end = data->irq,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +
-> +	return mxs_add_platform_device_dmamask("mxs-auart", data->id,
-> +					res, ARRAY_SIZE(res), NULL, 0,
-> +					DMA_BIT_MASK(32));
-> +}
-> +
+Hi Darius and all,
 
--- 
-Regards,
-Shawn
+Maybe you remember this, I applied this in my for-next for 38 this merge
+window.
+If any opinions, please let me know.
+
+Thanks and Happy New year :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
