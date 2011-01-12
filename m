@@ -1,53 +1,75 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 12 Jan 2011 11:53:31 -0500 (EST)
-Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
-	setup.c
-In-Reply-To: <AANLkTinwGd9pa7YQ=5hXfarw=MB=YdpBuN7xJAd+Ps4f@mail.gmail.com>
-References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
-	<20110111104051.GA11039@n2100.arm.linux.org.uk>
-	<20110111153630.GB2707@angua.secretlab.ca>
-	<20110111154833.GF11039@n2100.arm.linux.org.uk>
-	<AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
-	<20110112155215.GB11039@n2100.arm.linux.org.uk>
-	<AANLkTinwGd9pa7YQ=5hXfarw=MB=YdpBuN7xJAd+Ps4f@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1101121145430.24532@xanadu.home>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 12 Jan 2011 10:55:35 -0600
+Subject: [PATCH 0/0] RFC: ARM: Thumb-2: Symbol manipulation macros for
+	function body copying
+In-Reply-To: <20110112161151.GB18833@n2100.arm.linux.org.uk>
+References: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
+	<20110112093209.GA18833@n2100.arm.linux.org.uk>
+	<AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
+	<20110112161151.GB18833@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=OtfO8xxT_8X2XzePhvYG0Zdd3V5mX9-5tRed_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jan 2011, Grant Likely wrote:
+On Wed, Jan 12, 2011 at 10:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 12, 2011 at 10:00:25AM -0600, Dave Martin wrote:
+>> omap provides some infrastructure for both allocating SRAM space and
+>> doing the copy, using omap_sram_push() and friends. ?So I wasn't sure
+>> what the correct level of abstraction was for the new helpers.
+>> Certainly, providing a sort of "function memcpy" macro like your
+>> copy_fn_to_sram makes sense.
+>
+> It'd just be a matter of splitting the copying out of omap_sram_push().
+>
+>> I think this should still be safe from a type system perspective:
+>> providing the "blind" type casts using asm() appear somewhere in
+>> the execution flow C shouldn't make silly assumptions even if Linux
+>> ends up enabling multifile optimisation sometime in the future.
+>
+> Yes. ?The only thing that is missing from my version is the
+> flush_icache_range() which should also be there.
+>
+>> > Used by:
+>> > extern void my_func(int foo);
+>> > extern int my_func_size;
+>>
+>> Potentially, we could define, an extra assembler macro to complement
+>> ENDPROC() which records the size of a function automatically. ?What do
+>> you think?
 
-> Actually it looks like the real problem is that the mmu has been
-> turned on, but the virtual mappings for devices have not yet been
-> established, and so the debug macros aren't using a valid address.
+Sure -- we shouldn't change ENDPROC() itself, but we could have, say,
+and ENDPROC_SZ() macro which people should use strictly when they know
+they need it.
 
-A temporary virtual mapping should be there -- look for addruart in 
-head.S.
+>
+> That would pad the code out with a fair number of additional integers.
+> That's probably not a good idea.
+>
+>> The model used in the omap code is to copy some functions into SRAM
+>> ahead of time and stash the pointers away to be called later: for that
+>> model, it's not so useful to have something like call_my_func
+>> directly. ?Also, I wasn't sure whether conflating other functionality
+>> such as cache flushing into the new macros would be a good idea -- is
+>> might be cleaner and more maintainable, but might result in less
+>> efficient usage. ?Any thoughts?
+>
+> My example was only that - an example. ?You can also use it in the
+> way you describe too:
+>
+> ? ? ? ?to = omap_sram_push(size);
+> ? ? ? ?_omap_sram_reprogram_clock = copy_fn_to_sram(to,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap1_sram_reprogram_clock, size);
+>
+> and it'll also ensure type-safety between the omap1_sram_reprogram_clock
+> and _omap_sram_reprogram_clock symbols, which the current code doesn't
+> do.
+>
 
-> I'm using printk to get output into the ring buffer in my patch to
-> rework lookup_machine_type() in C, and that does indeed output to the
-> ring buffer, but the kernel cannot spit stuff out the serial port.
-> 
-> It looks like I'd need to get past paging_init() in order to get
-> ll_debug working between turning on the mmu and paging_init(), but
-> paging_init() needs the mdesc pointer, and the whole point of the
-> error message is that the mdesc pointer is unknown!  I don't see any
-> code that sets up a debug mapping of the uart before paging_init time.
+Ah, OK -- I'd interpreted call_my_func() as part of the API, rather
+than a usage example.
 
-See above.
+I'll have a think and update the patch.
 
->  I could try to implement something like that, but it is looking to be
-> more complicated than it is worth when the current code works just
-> fine.
-
-My bet is that there is a bug with the current code that you are 
-exposing.
-
-> Let me know if I've missed something, but I think I should drop the
-> removal of __lookup_machine_type from head.S from my patch.
-
-It's not the location of that code which is a problem.  Even if you 
-leave that code in place, you want to call it later and I bet that the 
-display would be broken even if __lookup_machine_type doesn't move.
-
-
-Nicolas
+Cheers
+---Dave
