@@ -1,188 +1,70 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 12 Jan 2011 15:50:36 +0100
-Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110112064711.GG2888@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
-	<20110111133137.GS12078@pengutronix.de>
-	<20110112064711.GG2888@freescale.com>
-Message-ID: <20110112145036.GY12078@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jan 2011 08:46:44 -0700
+Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
+	setup.c
+In-Reply-To: <20110111154833.GF11039@n2100.arm.linux.org.uk>
+References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
+	<20110111104051.GA11039@n2100.arm.linux.org.uk>
+	<20110111153630.GB2707@angua.secretlab.ca>
+	<20110111154833.GF11039@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 02:47:12PM +0800, Shawn Guo wrote:
-> Hi Sascha,
-> 
-> On Tue, Jan 11, 2011 at 02:31:37PM +0100, Sascha Hauer wrote:
-> > On Thu, Jan 06, 2011 at 03:13:16PM +0800, Shawn Guo wrote:
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > ---
-> > > Changes for v4:
-> > >  - Call cpu_relax() during polling
-> > > 
-> > > Changes for v2:
-> > >  - Add mutex locking for mxs_read_ocotp()
-> > >  - Use type size_t for count and i
-> > >  - Add comment for clk_enable/disable skipping
-> > >  - Add ERROR bit clearing and polling step
-> > > 
-> > >  arch/arm/mach-mxs/Makefile              |    2 +-
-> > >  arch/arm/mach-mxs/include/mach/common.h |    1 +
-> > >  arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
-> > >  3 files changed, 81 insertions(+), 1 deletions(-)
-> > >  create mode 100644 arch/arm/mach-mxs/ocotp.c
-> > > 
-> > > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> > > index 39d3f9c..f23ebbd 100644
-> > > --- a/arch/arm/mach-mxs/Makefile
-> > > +++ b/arch/arm/mach-mxs/Makefile
-> > > @@ -1,5 +1,5 @@
-> > >  # Common support
-> > > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
-> > > +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
-> > >  
-> > >  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
-> > >  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
-> > > diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-> > > index 59133eb..cf02552 100644
-> > > --- a/arch/arm/mach-mxs/include/mach/common.h
-> > > +++ b/arch/arm/mach-mxs/include/mach/common.h
-> > > @@ -13,6 +13,7 @@
-> > >  
-> > >  struct clk;
-> > >  
-> > > +extern int mxs_read_ocotp(int offset, int count, u32 *values);
-> > >  extern int mxs_reset_block(void __iomem *);
-> > >  extern void mxs_timer_init(struct clk *, int);
-> > >  
-> > > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
-> > > new file mode 100644
-> > > index 0000000..e2d39aa
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-mxs/ocotp.c
-> > > @@ -0,0 +1,79 @@
-> > > +/*
-> > > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> > > + *
-> > > + * This program is free software; you can redistribute it and/or modify
-> > > + * it under the terms of the GNU General Public License as published by
-> > > + * the Free Software Foundation; either version 2 of the License, or
-> > > + * (at your option) any later version.
-> > > + *
-> > > + * This program is distributed in the hope that it will be useful,
-> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > > + * GNU General Public License for more details.
-> > > + */
-> > > +
-> > > +#include <linux/delay.h>
-> > > +#include <linux/err.h>
-> > > +#include <linux/mutex.h>
-> > > +
-> > > +#include <mach/mxs.h>
-> > > +
-> > > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
-> > > +#define BM_OCOTP_CTRL_ERROR		(1 << 9)
-> > > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
-> > > +
-> > > +static DEFINE_MUTEX(ocotp_mutex);
-> > > +
-> > > +int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
-> > > +{
-> > > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
-> > > +	int timeout = 0x400;
-> > > +	size_t i;
-> > > +
-> > > +	mutex_lock(&ocotp_mutex);
-> > > +
-> > > +	/*
-> > > +	 * clk_enable(hbus_clk) for ocotp can be skipped
-> > > +	 * as it must be on when system is running.
-> > > +	 */
-> > > +
-> > > +	/* try to clear ERROR bit */
-> > > +	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
-> > 
-> > This operation does not try to clear the error bit but actually clears
-> > it...
-> > 
-> > > +
-> > > +	/* check both BUSY and ERROR cleared */
-> > > +	while ((__raw_readl(ocotp_base) &
-> > > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
-> > > +		cpu_relax();
-> > 
-> > ...which means you do not have to poll the error bit here...
-> > 
-> > > +
-> > > +	if (unlikely(!timeout))
-> > > +		goto error_unlock;
-> > > +
-> > > +	/* open OCOTP banks for read */
-> > > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-> > > +
-> > > +	/* approximately wait 32 hclk cycles */
-> > > +	udelay(1);
-> > > +
-> > > +	/* poll BUSY bit becoming cleared */
-> > > +	timeout = 0x400;
-> > > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
-> > > +		cpu_relax();
-> > 
-> > ...which means you can factor out a ocotp_wait_busy function and let the
-> > code speak instead of the comments.
-> > 
-> > > +
-> > > +	if (unlikely(!timeout))
-> > > +		goto error_unlock;
-> > > +
-> > > +	for (i = 0; i < count; i++, offset += 4)
-> > > +		*values++ = __raw_readl(ocotp_base + offset);
-> > 
-> > The registers in the ocotp are 16 byte aligned. Does it really make
-> > sense to provide a function allowing to read the gaps between the
-> > registers?
-> > 
-> Good catch.  The count was added to ease the consecutive otp word
-> reading, as there is bank open/close cost for otp read.  What about
-> the following changes?
-> 
-> int mxs_read_ocotp(unsigned offset, size_t otp_word_cnt, u32 *values)
-> {
-> 	......
-> 
-> 	for (i = 0; i < otp_word_cnt; i++, offset += 0x10)
-> 		*values++ = __raw_readl(ocotp_base + offset);
-> 
-> 	......
-> }
+On Tue, Jan 11, 2011 at 8:48 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 11, 2011 at 08:36:30AM -0700, Grant Likely wrote:
+>> On Tue, Jan 11, 2011 at 10:40:51AM +0000, Russell King - ARM Linux wrote:
+>> > On Mon, Jan 10, 2011 at 07:15:53PM -0700, Grant Likely wrote:
+>> > > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+>> > > index 6bd82d2..9c0e938 100644
+>> > > --- a/arch/arm/kernel/head.S
+>> > > +++ b/arch/arm/kernel/head.S
+>> > > @@ -87,11 +87,6 @@ ENTRY(stext)
+>> > > ? movs ? ?r10, r5 ? ? ? ? ? ? ? ? ? ? ? ? @ invalid processor (r5=0)?
+>> > > ? THUMB( it ? ? ? eq ) ? ? ? ? ? ?@ force fixup-able long branch encoding
+>> > > ? beq ? ? __error_p ? ? ? ? ? ? ? ? ? ? ? @ yes, error 'p'
+>> > > - bl ? ? ?__lookup_machine_type ? ? ? ? ? @ r5=machinfo
+>> > > - movs ? ?r8, r5 ? ? ? ? ? ? ? ? ? ? ? ? ?@ invalid machine (r5=0)?
+>> > > - THUMB( it ? ? ? eq ) ? ? ? ? ? ?@ force fixup-able long branch encoding
+>> > > - beq ? ? __error_a ? ? ? ? ? ? ? ? ? ? ? @ yes, error 'a'
+>> > > - bl ? ? ?__vet_atags
+>> > > ?#ifdef CONFIG_SMP_ON_UP
+>> > > ? bl ? ? ?__fixup_smp
+>> > > ?#endif
+>> >
+>> > Don't forget to update the comments as well - there's two of them.
+>>
+>> I'm not entirely clear on what you're referring to here. ?Are you
+>> talking about the secondary cpu entry point? ?I've fixed up that
+>> comment now as well as a s/__lookup_machine_type/__lookup_processor_type/
+>> typo right before the call to __enable_mmu.
+>
+> In the above code, __lookup_machine_type is called, which to be
+> consistent with __lookup_processor_type, returns its value in r5. ?This
+> is then copied to r8, which is the only point that r8 is initialized.
+>
+> The remainder of the code used to make use of r8 to load various fields
+> from the machine record, and so there's a couple of comments indicating
+> that this is the case. ?These comments are left behind after your patch
+> and so are misleading.
 
-I would rather make a function like this:
+Ah, right.  I'll clean those up.
 
-static u32 ocotp[0x27];
+> Shall I assume that you've already searched the head*.S files to make
+> sure that r8 isn't used before you removed its initialization? ;-)
 
-const u32 *mxs_get_ocotp(void)
-{
-	static int once = 0;
+Yup!
 
-	if (once)
-		return ocotp
+Looks like I've hit a hiccup though.  When I remove the first call to
+__lookup_machine_type, then it is only called after the MMU is turned
+on and the kernel is no longer able to output the list of configured
+machine ids when it doesn't recognize the value in r1 (tested with
+qemu versatile emulation).  I'm still investigating, so I'll defer
+reposting the patch until I've got this issue solved.
 
-	/* bank open */
-
-	for (i = 0; i < 0x27; i++)
-		ocotp[i] = readl(ocotp_base + 0x20 + i * 0x10)
-
-	/* bank_close */
-
-	once = 1;
-
-	return ocotp;
-}
-
+g.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
