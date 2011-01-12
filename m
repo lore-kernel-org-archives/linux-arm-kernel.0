@@ -1,161 +1,40 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 12 Jan 2011 14:47:12 +0800
-Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110111133137.GS12078@pengutronix.de>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
-	<20110111133137.GS12078@pengutronix.de>
-Message-ID: <20110112064711.GG2888@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 12 Jan 2011 08:29:36 +0100
+Subject: [PATCH 2/2] ARM i.MX53 enable LOCO board bootup
+In-Reply-To: <AANLkTimODoRu8JSOs5ChOp8i3LUoUP4ZKn=aDHnVU6pL@mail.gmail.com>
+References: <1294726998-20830-1-git-send-email-yong.shen@freescale.com>
+	<1294726998-20830-3-git-send-email-yong.shen@freescale.com>
+	<AANLkTimW54m2f+Z21F+9dLw78WOS24W4yc00D5rztM0C@mail.gmail.com>
+	<AANLkTimODoRu8JSOs5ChOp8i3LUoUP4ZKn=aDHnVU6pL@mail.gmail.com>
+Message-ID: <20110112072936.GW24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wed, Jan 12, 2011 at 10:46:24AM +0800, Yong Shen wrote:
+> Hi Fabio,
+> 
+> Below is my reply to Baruch, I meant to keep this code here to show
+> the reset process clearly.
+> >> +     if (ret) {
+> >> +             printk(KERN_ERR"failed to get GPIO_FEC_PHY_RESET: %d\n", ret);
+> >> +             return;
+> >> +     }
+> >> +     gpio_direction_output(SMD_FEC_PHY_RST, 0);
+> >> +     gpio_set_value(SMD_FEC_PHY_RST, 0);
+> >
+> > This seems to be redundant. gpio_direction_output() has already set the value
+> > to 0.
+> 
+> You are right. But, gpio_set_value is meant to be here to show the
+> process of fec reset: first pull low and then pull high. And
+> gpio_direction_output here is for direction configuration although it
+> has the ability of configure output value.
+If you care about it:  I'd vote for removing the call to gpio_set_value,
+too.
 
-On Tue, Jan 11, 2011 at 02:31:37PM +0100, Sascha Hauer wrote:
-> On Thu, Jan 06, 2011 at 03:13:16PM +0800, Shawn Guo wrote:
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> > Changes for v4:
-> >  - Call cpu_relax() during polling
-> > 
-> > Changes for v2:
-> >  - Add mutex locking for mxs_read_ocotp()
-> >  - Use type size_t for count and i
-> >  - Add comment for clk_enable/disable skipping
-> >  - Add ERROR bit clearing and polling step
-> > 
-> >  arch/arm/mach-mxs/Makefile              |    2 +-
-> >  arch/arm/mach-mxs/include/mach/common.h |    1 +
-> >  arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
-> >  3 files changed, 81 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/mach-mxs/ocotp.c
-> > 
-> > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> > index 39d3f9c..f23ebbd 100644
-> > --- a/arch/arm/mach-mxs/Makefile
-> > +++ b/arch/arm/mach-mxs/Makefile
-> > @@ -1,5 +1,5 @@
-> >  # Common support
-> > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
-> > +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
-> >  
-> >  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
-> >  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
-> > diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-> > index 59133eb..cf02552 100644
-> > --- a/arch/arm/mach-mxs/include/mach/common.h
-> > +++ b/arch/arm/mach-mxs/include/mach/common.h
-> > @@ -13,6 +13,7 @@
-> >  
-> >  struct clk;
-> >  
-> > +extern int mxs_read_ocotp(int offset, int count, u32 *values);
-> >  extern int mxs_reset_block(void __iomem *);
-> >  extern void mxs_timer_init(struct clk *, int);
-> >  
-> > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
-> > new file mode 100644
-> > index 0000000..e2d39aa
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mxs/ocotp.c
-> > @@ -0,0 +1,79 @@
-> > +/*
-> > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/delay.h>
-> > +#include <linux/err.h>
-> > +#include <linux/mutex.h>
-> > +
-> > +#include <mach/mxs.h>
-> > +
-> > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
-> > +#define BM_OCOTP_CTRL_ERROR		(1 << 9)
-> > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
-> > +
-> > +static DEFINE_MUTEX(ocotp_mutex);
-> > +
-> > +int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
-> > +{
-> > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
-> > +	int timeout = 0x400;
-> > +	size_t i;
-> > +
-> > +	mutex_lock(&ocotp_mutex);
-> > +
-> > +	/*
-> > +	 * clk_enable(hbus_clk) for ocotp can be skipped
-> > +	 * as it must be on when system is running.
-> > +	 */
-> > +
-> > +	/* try to clear ERROR bit */
-> > +	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
-> 
-> This operation does not try to clear the error bit but actually clears
-> it...
-> 
-> > +
-> > +	/* check both BUSY and ERROR cleared */
-> > +	while ((__raw_readl(ocotp_base) &
-> > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
-> > +		cpu_relax();
-> 
-> ...which means you do not have to poll the error bit here...
-> 
-> > +
-> > +	if (unlikely(!timeout))
-> > +		goto error_unlock;
-> > +
-> > +	/* open OCOTP banks for read */
-> > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-> > +
-> > +	/* approximately wait 32 hclk cycles */
-> > +	udelay(1);
-> > +
-> > +	/* poll BUSY bit becoming cleared */
-> > +	timeout = 0x400;
-> > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
-> > +		cpu_relax();
-> 
-> ...which means you can factor out a ocotp_wait_busy function and let the
-> code speak instead of the comments.
-> 
-> > +
-> > +	if (unlikely(!timeout))
-> > +		goto error_unlock;
-> > +
-> > +	for (i = 0; i < count; i++, offset += 4)
-> > +		*values++ = __raw_readl(ocotp_base + offset);
-> 
-> The registers in the ocotp are 16 byte aligned. Does it really make
-> sense to provide a function allowing to read the gaps between the
-> registers?
-> 
-Good catch.  The count was added to ease the consecutive otp word
-reading, as there is bank open/close cost for otp read.  What about
-the following changes?
-
-int mxs_read_ocotp(unsigned offset, size_t otp_word_cnt, u32 *values)
-{
-	......
-
-	for (i = 0; i < otp_word_cnt; i++, offset += 0x10)
-		*values++ = __raw_readl(ocotp_base + offset);
-
-	......
-}
-
+Best regards
+Uwe
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
