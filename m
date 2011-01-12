@@ -1,61 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 16:23:08 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-Message-ID: <20110112162308.GC11039@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jan 2011 09:24:34 -0700
+Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
+	setup.c
+In-Reply-To: <20110112155215.GB11039@n2100.arm.linux.org.uk>
+References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
+	<20110111104051.GA11039@n2100.arm.linux.org.uk>
+	<20110111153630.GB2707@angua.secretlab.ca>
+	<20110111154833.GF11039@n2100.arm.linux.org.uk>
+	<AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
+	<20110112155215.GB11039@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinwGd9pa7YQ=5hXfarw=MB=YdpBuN7xJAd+Ps4f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 10:05:19AM -0600, Dave Martin wrote:
-> In general, do we expect always to be able to avoid the situation
-> where branches in the kernel may need to cover too large a range ...
-> and is there any strategy for working aroung it?
+On Wed, Jan 12, 2011 at 8:52 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jan 12, 2011 at 08:46:44AM -0700, Grant Likely wrote:
+>> Looks like I've hit a hiccup though. ?When I remove the first call to
+>> __lookup_machine_type, then it is only called after the MMU is turned
+>> on and the kernel is no longer able to output the list of configured
+>> machine ids when it doesn't recognize the value in r1 (tested with
+>> qemu versatile emulation). ?I'm still investigating, so I'll defer
+>> reposting the patch until I've got this issue solved.
+>
+> It only does this when DEBUG_LL is enabled - at which point you have
+> printascii, printhex8, etc available (although there's no prototype
+> for them.)
+>
+> You could use snprintf() to format a message and then use printascii()
+> (conditional on CONFIG_DEBUG_LL as the existing code does) as well as
+> printk("%s", buffer). ?That means if you have a debugger you can dump
+> the kernel ring buffer and see the message, or see it via the serial
+> port/debugging channel if DEBUG_LL is enabled.
 
-It's not that big a problem - 99.999999% of setups never run into the
-problem.  It's only those who use large initramfs's built into their
-kernel image at present, and that is ultimately solvable.
+Actually it looks like the real problem is that the mmu has been
+turned on, but the virtual mappings for devices have not yet been
+established, and so the debug macros aren't using a valid address.
+I'm using printk to get output into the ring buffer in my patch to
+rework lookup_machine_type() in C, and that does indeed output to the
+ring buffer, but the kernel cannot spit stuff out the serial port.
 
-I don't think we need to litter code with TODO comments.
+It looks like I'd need to get past paging_init() in order to get
+ll_debug working between turning on the mmu and paging_init(), but
+paging_init() needs the mdesc pointer, and the whole point of the
+error message is that the mdesc pointer is unknown!  I don't see any
+code that sets up a debug mapping of the uart before paging_init time.
+ I could try to implement something like that, but it is looking to be
+more complicated than it is worth when the current code works just
+fine.
 
-> If we have problems branching from the modules area into vmlinux, we
-> could possibly build modules with -fPIC : this would remove the
-> restriction on branch range, though there would also be some
-> performance impact for the modules...
+Let me know if I've missed something, but I think I should drop the
+removal of __lookup_machine_type from head.S from my patch.
 
-That also brings in issues with GOT tables and the like, and also requires
-different build options for modules and the main kernel.  I don't think
-kbuild is setup to do that - and I'd argue that it's unnecessary if we
-fix the layout of the kernel image.
+g.
 
-As I said a few emails ago, shuffling sections around in the image is
-not as trivial as it looks on the face of it as we make assumptions
-about what is in _stext.._etext, _sdata.._edata, whether there's anything
-between _etext.._sdata, and other symbolic ranges.
-
-At the moment, _stext.._etext + _sdata.._edata covers the entire kernel
-image - with the init sections at the start of _stext.  Putting the init
-sections between _etext and _sdata makes a hole in the middle of that,
-which may be suboptimal for page allocation.  It also means that the
-range no longer covers all kernel stuff.  Also whether _stext = _text,
-_sdata = _data, etc.
-
-Another technicality is that some of these ranges are used for stuff like
-DMA API debugging:
-
-        if (overlap(addr, len, _text, _etext) ||
-            overlap(addr, len, __start_rodata, __end_rodata))
-                err_printk(dev, NULL, "DMA-API: device driver maps memory from kernel text or rodata [addr=%p] [len=%lu]\n", addr, len);
-
-The last pieces of the puzzle is whether we have anything that implicitly
-relies on the init section being low down and freeing its pages (eg, as
-a way of stopping that memory being used for non-DMA stuff.)
-
-I do have a patch which shuffles some of this stuff around, but I'm not
-entirely happy with it yet.
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
