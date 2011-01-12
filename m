@@ -1,73 +1,55 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 12 Jan 2011 04:00:18 +0100
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <20110111155930.GH11039@n2100.arm.linux.org.uk>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-Message-ID: <4D2D1942.4050905@ahsoftware.de>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 11 Jan 2011 19:25:01 -0800
+Subject: Locking in the clk API
+In-Reply-To: <201101112235.43061.jeremy.kerr@canonical.com>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<201101111830.18597.jeremy.kerr@canonical.com>	<20110111121816.GB774@linux-sh.org>
+	<201101112235.43061.jeremy.kerr@canonical.com>
+Message-ID: <4D2D1F0D.5040208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Am 11.01.2011 16:59, schrieb Russell King - ARM Linux:
-> On Tue, Jan 11, 2011 at 09:16:38PM +0530, Rabin Vincent wrote:
->> It's possible to hack around this by placing the initramfs at the end of
->> the kernel image rather than at the beginning with the rest of the init
->> data.  Something like the below should work, although you should also
->> probably take care of alignment and also have this section freed when
->> the rest of the init data is freed.
+On 01/11/2011 06:35 AM, Jeremy Kerr wrote:
+> Hi Paul,
 >
-> You're then running into problems as _sdata.._edata is copied to RAM on
-> XIP kernels, and you really don't want to waste time copying the
-> initramfs to RAM.
+>> Again, you are approaching it from the angle that an atomic clock is a
+>> special requirement rather than the default behaviour.
+>
+> I'm not considering it a special requirement, but it's still a requirement
+> (that the called function does not sleep).
+>
+> The problem with the inverse logic (clk_enable/clk_enable_sleepable) is that
+> now you've made the caller need to know what kind of clock it has, or might
+> have one day.
 
+I think it's just a matter of how you interpret the name of the API in 
+English. It doesn't make the decision making of the developer any easier.
 
-Thanks to all for the provided informations. I'm now seeing some light. ;)
+Just having a _atomic suffix doesn't mean the driver developer doesn't 
+need to know what type of clock it is. They are still making the 
+assumption that the enable/disable for that clock can be done atomically 
+-- namely an "atomic clock".
 
-However, looking at the vmlinux.lds.S I think I should better not try to 
-fix that, I would likely do something wrong because of missing knowledge 
-about all those sections.
+Similarly, when a driver developer calls the _sleepable APIs in their 
+code, for all practical purposes, they are making an assumption that the 
+enable/disable for that clock *needs to* (not may) sleep.
 
-I can offer a patch wich adds a TODO to vmlinux.lds.S, but if someone 
-else feels the need to fix that, feel free to do so. ;)
+>   * For clk_enable/clk_enable_atomic, the decision is: is this call in an
+>     atomic context?
+>
+>   * For clk_enable/clk_enable_sleepable, the decision is: might the clock code
+>     have given us a sleeping clock?
 
-Regards,
+Having said the above, I'm slightly leaning towards 
+clk_enable/disable_atomic since it lines up with the 
+.suspend/.suspend_noirq functions in pm_ops.
 
-Alexander
+Also, since it's good to reduce the amount of work that needs to be done 
+atomically, I think it would be good to make a developer explicitly 
+state they need _atomic functions and make them think about if they 
+really need to do that.
 
+-Saravana
 
--------------------------------------------------------------------------
- From 2ce2934b6a55ac34734781d1a49569d79d0fdcda Mon Sep 17 00:00:00 2001
-From: Alexander Holler <holler@ahsoftware.de>
-Date: Wed, 12 Jan 2011 02:49:52 +0100
-Subject: [PATCH] ARM: Add TODO to move INIT_RAM_FS to another point.
-
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
-  arch/arm/kernel/vmlinux.lds.S |    6 ++++++
-  1 files changed, 6 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index cead889..5da3479 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -62,6 +62,12 @@ SECTIONS
-                 INIT_CALLS
-                 CON_INITCALL
-                 SECURITY_INITCALL
-+               /*
-+                * TODO: The size of INIT_RAM_FS could easily reach a
-+                * point (~16MB) when loading modules will fail because
-+                * relocations will be out of range. So this place here
-+                * isn't the best one.
-+                */
-                 INIT_RAM_FS
-
-  #ifndef CONFIG_XIP_KERNEL
 -- 
-1.7.3.4
--------------------------------------------------------------------------
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
