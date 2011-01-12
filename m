@@ -1,42 +1,23 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Thu, 13 Jan 2011 06:05:21 +0800
-Subject: mmaping a fixed address fails on ARM
-In-Reply-To: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
-References: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
-Message-ID: <AANLkTim1MOB+r1shuJDvqJexerFo3wQ_o1wQpiaALW=0@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jan 2011 22:23:37 +0000
+Subject: Bug: loops_per_jiffy based udelay() mostly shorter than requested
+In-Reply-To: <AANLkTik5BmZAOFdYVGAjuoHftQ3qh1oTCEr5MpkCiDVz@mail.gmail.com>
+References: <20110109170829.GA14252@flint.arm.linux.org.uk>
+	<AANLkTik5BmZAOFdYVGAjuoHftQ3qh1oTCEr5MpkCiDVz@mail.gmail.com>
+Message-ID: <20110112222337.GK11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let me add Andre here
+On Wed, Jan 12, 2011 at 01:19:49PM -0800, Linus Torvalds wrote:
+> On Sun, Jan 9, 2011 at 9:08 AM, Russell King <rmk@arm.linux.org.uk> wrote:
+> >
+> > Any suggestions or thoughts, or should we not care too much if udelay()
+> > produces slightly shorter than desired delays? ?Or am I doing something
+> > horribly wrong in the ARM code?
+> 
+> Judging by the numbers you quote, I would definitely put this in the
+> "don't care too much".
 
-Thanks,
--Bryan
-
-On Thu, Jan 13, 2011 at 5:58 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> Hi Russell,
->
-> Andre posted a mmap testcase [1] and a bug report [2] for Ubuntu
-> kernel on OMAP4 system, since he is porting some applications from x86
-> to ARM. He testcase works fine on x86, but always fail on ARM. I've
-> tested it on OMAP3/OMAP4/i.MX51.
->
-> Basically what he want to do is get a mapping on a specific virtual
-> address. But AFAIK, mmap doesn't make sure we can get the mapping
-> address as we want. On x86, it works fine. So if this fails, the
-> application can't run on ARM.
->
-> The implementation of arch_get_unmapped_area() is different from ARM
-> and x86, that might makes mmap behavior different between ARM and x86.
-> Andre said 2.6.28-versatile. I'm not sure whether it is a regression.
->
-> [1]: http://launchpadlibrarian.net/61588086/main.c
-> [2]: https://bugs.launchpad.net/ubuntu/+source/linux-ti-omap4/+bug/697004
->
-> Thanks,
-> --
-> Bryan Wu <bryan.wu@canonical.com>
-> Kernel Developer ? ?+86.138-1617-6545 Mobile
-> Ubuntu Kernel Team
-> Canonical Ltd. ? ? ?www.canonical.com
-> Ubuntu - Linux for human beings | www.ubuntu.com
->
+Thanks - that's my thoughts too.  I think I'm still going to push out
+the rounding patch for the sake of correctness even though it's down
+in the noise.
