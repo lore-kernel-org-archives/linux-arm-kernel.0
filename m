@@ -1,60 +1,40 @@
 From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Wed, 12 Jan 2011 16:35:23 +0800
-Subject: [PATCH v3 3/4] ARM: i.MX53 EVK: add spi nor device
+Date: Wed, 12 Jan 2011 16:35:24 +0800
+Subject: [PATCH v3 4/4] ARM: i.MX5: uart clock bug fix
 In-Reply-To: <1294821324-5688-1-git-send-email-yong.shen@freescale.com>
 References: <1294821324-5688-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <1294821324-5688-4-git-send-email-yong.shen@freescale.com>
+Message-ID: <1294821324-5688-5-git-send-email-yong.shen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yong Shen <yong.shen@freescale.com>
 
-add spi board information for spi nor device
+uart clk is from pll3 on mx53 instead of mx51
 
 Signed-off-by: Yong Shen <yong.shen@freescale.com>
 ---
- arch/arm/mach-mx5/board-mx53_evk.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index 157fe12..f85f206 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -24,6 +24,8 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -98,6 +100,17 @@ static struct fec_platform_data mx53_evk_fec_pdata = {
- 	.phy = PHY_INTERFACE_MODE_RMII,
- };
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index a20d0c0..3fb7ff8 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1370,7 +1370,6 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
  
-+static struct spi_board_info mx53_evk_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "mtd_dataflash",
-+		.max_speed_hz = 25000000,
-+		.bus_num = 0,
-+		.chip_select = 1,
-+		.mode = SPI_MODE_0,
-+		.platform_data = NULL,
-+	},
-+};
-+
- static int mx53_evk_spi_cs[] = {
- 	EVK_ECSPI1_CS0,
- 	EVK_ECSPI1_CS1,
-@@ -122,6 +135,8 @@ static void __init mx53_evk_board_init(void)
- 	imx53_add_sdhci_esdhc_imx(0, NULL);
- 	imx53_add_sdhci_esdhc_imx(1, NULL);
+ 	clk_tree_init();
  
-+	spi_register_board_info(mx53_evk_spi_board_info,
-+		ARRAY_SIZE(mx53_evk_spi_board_info));
- 	imx53_add_ecspi(0, &mx53_evk_spi_data);
- }
+-	clk_set_parent(&uart_root_clk, &pll3_sw_clk);
+ 	clk_enable(&cpu_clk);
+ 	clk_enable(&main_bus_clk);
+ 
+@@ -1413,6 +1412,7 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 
+ 	clk_tree_init();
+ 
++	clk_set_parent(&uart_root_clk, &pll3_sw_clk);
+ 	clk_enable(&cpu_clk);
+ 	clk_enable(&main_bus_clk);
  
 -- 
 1.7.1
