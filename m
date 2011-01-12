@@ -1,12 +1,12 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 12 Jan 2011 23:29:07 +0100
+Date: Wed, 12 Jan 2011 23:30:47 +0100
 Subject: [PATCH 5/5 v2] ARM: pxa: Fix recursive call of
 	pxa_(un)mask_low_gpio()
 In-Reply-To: <AANLkTikOUHOC2nrfKpcO=rE=CbdthvU0JxbCtOc1piSK@mail.gmail.com>
 References: <1294699993-4712-1-git-send-email-marek.vasut@gmail.com>
 	<1294699993-4712-5-git-send-email-marek.vasut@gmail.com>
 	<AANLkTikOUHOC2nrfKpcO=rE=CbdthvU0JxbCtOc1piSK@mail.gmail.com>
-Message-ID: <201101122329.07631.marek.vasut@gmail.com>
+Message-ID: <201101122330.47281.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,6 +14,12 @@ On Wednesday 12 January 2011 00:16:50 Eric Miao wrote:
 > The original intention is to re-use pxa_{mask,unmask}_irq(), will
 > the change below looks better? The move of irq_base() is to avoid
 > the error of function not declared.
+
+Here's your :
+
+Tested-by: Marek Vasut <marek.vasut@gmail.com>
+
+Tested on Zipit Z2
 > 
 > diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
 > index a7deff5..6107253 100644
@@ -91,11 +97,6 @@ On Wednesday 12 January 2011 00:16:50 Eric Miao wrote:
 >  void __init pxa_init_irq(int irq_nr, set_wake_t fn)
 >  {
 >  	int irq, i, n;
-
-Way better indeed
-
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-
 > 
 > On Mon, Jan 10, 2011 at 4:53 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
 > > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
