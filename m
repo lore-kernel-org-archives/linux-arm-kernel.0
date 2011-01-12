@@ -1,46 +1,50 @@
-From: shawn.gsc@gmail.com (Shawn Guo)
-Date: Wed, 12 Jan 2011 20:33:03 +0800
-Subject: [PATCH] mxcmmc: use dmaengine API
-In-Reply-To: <20110112122541.GA6569@freescale.com>
-References: <1294826996-13764-1-git-send-email-s.hauer@pengutronix.de>
-	<1294826996-13764-2-git-send-email-s.hauer@pengutronix.de>
-	<20110112122541.GA6569@freescale.com>
-Message-ID: <AANLkTim8Uc7h-GDEitGNC1k56twLF9313FkokbQsqKdf@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 12 Jan 2011 12:33:11 +0000
+Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
+In-Reply-To: <AANLkTimtW4GZmjL0ryi1HgOMrCC4gMfGDdEqLJgW_2YA@mail.gmail.com>
+References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
+	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
+	<20110112082416.GE3181@pulham.picochip.com>
+	<AANLkTim2LJVA+qJNqYd2uPNKjP54kuyvsZ7-T3jSJsta@mail.gmail.com>
+	<20110112113054.GA2658@pulham.picochip.com>
+	<AANLkTimtW4GZmjL0ryi1HgOMrCC4gMfGDdEqLJgW_2YA@mail.gmail.com>
+Message-ID: <20110112123311.GD2658@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 8:25 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> It seems all the tabs were turned into spaces.
->
-My problem.  Sorry for the noise.
+On Wed, Jan 12, 2011 at 05:08:42PM +0530, viresh kumar wrote:
+> On Wed, Jan 12, 2011 at 5:00 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> > On Wed, Jan 12, 2011 at 02:27:47PM +0530, viresh kumar wrote:
+> >> On Wed, Jan 12, 2011 at 1:54 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> >> >> I don't know why, but checkpatch used to give few errors which it is
+> >> >> not giving now.
+> >> >> Like:
+> >> >> - Mixing spaces and tabs
+> >> >> - Line over 80 columns.
+> >> >>
+> > I do need to fix up the register locations (40-45) but the others are ok
+> > - they are tab indented to get to a multiple of 8 then spaces to align
+> > to the '(' brackets etc.
+> 
+> That's what i said. Checkpatch used to give warning for them earlier.
+> I don't know if it is correct or not. Anyway, others will comment if it is
+> still a issue. You can keep that as it is.
+> 
+> >> Problem will occur if rate is dynamically changed and we are still believing
+> >> on platform code's clk_rate.
+> >> Would be better if we switch order. i.e. give priority to clk_get_rate over
+> >> pdata->rate.
+> >
+> > If the platform can change the rate then I don't see why it would define
+> > the rate in the platform data though. ?Anyway, I can make the change and
+> > issue a warning and fail the probe if we're using the rate from
+> > clk_get_rate() and there is a non-zero rate in the platform data.
+> 
+> that's better.
 
-> On Wed, Jan 12, 2011 at 11:09:56AM +0100, Sascha Hauer wrote:
->> This switches the mxcmmc driver to use the dmaengine API. Unlike
->> the old one this one is always present in the tree, even if no DMA
->> is implement, hence we can remove all the #ifdefs in from the driver.
->> The driver automatically switches to PIO mode if no DMA support or no
->> suitable channel is available.
->>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->> ---
->> ?drivers/mmc/host/mxcmmc.c | ?172 +++++++++++++++++++++++++--------------------
->> ?1 files changed, 97 insertions(+), 75 deletions(-)
->>
-> [...]
->
-> --
-> Regards,
-> Shawn
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Ok, I'll give Wim chance to have a look over v5 then I'll integrate 
+these changes.
 
+Thanks again for the review.
 
-
--- 
-Regards,
-Shawn
+Jamie
