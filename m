@@ -1,67 +1,89 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 12 Jan 2011 13:56:24 +0100 (CET)
-Subject: BUG: spinlock recursion (sys_chdir, user_path_at, do_path_lookup
-	...)
-In-Reply-To: <20110112124844.GA4415@n2100.arm.linux.org.uk>
-References: <20110111110539.GP24920@pengutronix.de>
-	<20110112075229.GZ24920@pengutronix.de>
-	<alpine.LFD.2.00.1101121153370.12146@localhost6.localdomain6>
-	<20110112120349.GH24920@pengutronix.de>
-	<20110112123508.GZ11039@n2100.arm.linux.org.uk>
-	<20110112124844.GA4415@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101121354570.12146@localhost6.localdomain6>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 12 Jan 2011 14:13:32 +0100
+Subject: [PATCH] mxcmmc: use dmaengine API
+In-Reply-To: <20110112102632.GX11039@n2100.arm.linux.org.uk>
+References: <1294826996-13764-1-git-send-email-s.hauer@pengutronix.de>
+	<1294826996-13764-2-git-send-email-s.hauer@pengutronix.de>
+	<20110112102632.GX11039@n2100.arm.linux.org.uk>
+Message-ID: <20110112131332.GW12078@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jan 2011, Russell King - ARM Linux wrote:
-> On Wed, Jan 12, 2011 at 12:35:08PM +0000, Russell King - ARM Linux wrote:
-> > ARM doesn't implement save_stack_trace_regs() nor save_stack_trace_bp()
-> > so if the compiler referenced these, you'd have a kernel which doesn't
-> > link.  The only places that this symbol appears is:
-> > 
-> > arch/x86/kernel/stacktrace.c:void save_stack_trace_regs(struct stack_trace *trac
-> > arch/x86/mm/kmemcheck/error.c:  save_stack_trace_regs(&e->trace, regs);
-> > include/linux/stacktrace.h:extern void save_stack_trace_regs(struct stack_trace
-> > 
-> > So, if this is where your bisect decided was the problem, your bisect
-> > was faulty.
+On Wed, Jan 12, 2011 at 10:26:32AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Jan 12, 2011 at 11:09:56AM +0100, Sascha Hauer wrote:
+> > +	host->dma_nents = dma_map_sg(mmc_dev(host->mmc), data->sg,
+> > +				     data->sg_len,  host->dma_dir);
 > 
-> BTW, a useful thing to do after a bisect is to return to the point in
-> the history where you first noticed the regression (so Linus' tip,
-> your tip, or whatever).  Then try reverting the commit which git bisect
-> _thinks_ is the cause of your problem and re-test that.
+> As recently discussed, you don't need to save dma_nents - the value to
+> be passed to dma_unmap_sg() is data->sg_len, not host->dma_nents.
 > 
-> If the problem is fixed, you have greater confidence that the commit is
-> the problem.
-> 
-> If it made no difference, then you know that something else (maybe in
-> combination) is causing the problem.
-> 
-> If you couldn't revert it because of other dependencies then you have
-> to rely on analysis (such as what I did) and maybe try again with a
-> slightly different strategy - maybe the problem only _occasionally_
-> occurs, making the 'git bisect good' points unreliable, so maybe you
-> need to do more testing when the problem doesn't immediately appear?
-> 
-> Lastly, it is worth bearing in mind that GCC is really finicky with its
-> optimization.  It may be hard to believe, but unrelated function
-> definitions in headers can (and do) affect the code generation in
-> completely unrelated functions causing them to be optimized
-> differently [*].  Maybe this applies to prototypes too?
+> You should also do the map/unmap against the DMA engine device (which
+> is the device actually doing DMA) rather than the peripheral (which is
+> only the recipient of DMA).  The reason is - while the peripheral can
+> see the DMA controller, the peripheral may be able to see all RAM but
+> the DMA controller may have an IOMMU or limited view of RAM.
 
-Yes, it does. Also adding an inline or define can change the
-behaviour.
+ok.
 
-> So it _could_ be that the prototype change in include/linux/stacktrace.h
-> is tickling a GCC code generation bug.
 > 
-> * - ISTR, this behaviour was raised as a bug with GCC folk, which I
-> believe was closed down as wontfix as its a result of the way the
-> optimizer works.
+> > +static int mxcmci_setup_dma(struct mmc_host *mmc)
+> > +{
+> > +	struct mxcmci_host *host = mmc_priv(mmc);
+> > +	struct dma_slave_config *config = &host->dma_slave_config;
+> > +
+> > +	config->direction = DMA_FROM_DEVICE;
+> 
+> I would like to get some concensus on removing config->direction from
+> the slave configuration entirely - and make all the fields below
+> refer purely to the peripheral device parameters.  At the moment,
+> the API allows them to be used ambiguously.
 
-Right, they just fixed the problem where this effect generated buggy
-code on x86 in some cases.
+OK, I can remove this as it's unused by the dma driver anyway (and in
+fact I wondered what purpose this field has while writing the dma
+drivers)
 
-Thanks,
+> 
+> > @@ -794,7 +823,7 @@ static int mxcmci_probe(struct platform_device *pdev)
+> >  	mmc->max_blk_size = 2048;
+> >  	mmc->max_blk_count = 65535;
+> >  	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+> > -	mmc->max_seg_size = mmc->max_req_size;
+> > +	mmc->max_seg_size = 65535;
+> 
+> You can get this from the DMA parameters for the DMA engine device:
+> 
+> 	mmc->max_seg_size = dma_get_max_seg_size(dev);
+> 
+> where 'dev' is the DMA engine struct device - chan->dma_device->dev.
 
-	tglx
+I prepared a patch to set the segment size in the i.MX DMA drivers.
+
+> 
+> Also just spotted this left in your patch:
+> > +	if (!mxcmci_use_dma(host))
+> > +		return 0;
+> > +
+> >  	for_each_sg(data->sg, sg, data->sg_len, i) {
+> >  		if (sg->offset & 3 || sg->length & 3) {
+> > 			host->do_dma = 0;
+> 
+> Shouldn't this be a decision made by the DMA engine rather than the
+> driver?  Having looked at the MMCI code also doing this, I think this
+> should cause prep_slave_sg() to return NULL if it can't handle the
+> scatterlist.  On MMCI, we fall back to PIO if prep_slave_sg() returns
+> NULL.
+
+I prepared a patch which checks for invalid addresses and lengths in the
+DMA drivers.
+
+I'd like to push this patch like it is until the two points above are
+solved upstream (with the other points fixed of course).
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
