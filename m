@@ -1,117 +1,161 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Jan 2011 15:15:07 +0900
-Subject: [RESEND PATCH] serial: samsung: fix device name
-In-Reply-To: <AANLkTinwwtE5t16zvpsU5eZvEtJedJr=0x_10DcB0U5z@mail.gmail.com>
-References: <20100923190212.18863.25678.stgit@darius-desktop>
-	<4C9BE577.4050504@fluff.org>
-	<AANLkTi=S8v19iT1DC=6Nh9BEgRvKzyzKTKoJmS0Bw1Fb@mail.gmail.com>
-	<4C9CD3E0.6060000@gmail.com> <4C9FE2C4.8070302@fluff.org>
-	<AANLkTinwwtE5t16zvpsU5eZvEtJedJr=0x_10DcB0U5z@mail.gmail.com>
-Message-ID: <018a01cbb220$13145bb0$393d1310$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 12 Jan 2011 14:47:12 +0800
+Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20110111133137.GS12078@pengutronix.de>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
+	<20110111133137.GS12078@pengutronix.de>
+Message-ID: <20110112064711.GG2888@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Darius Augulis wrote:
+Hi Sascha,
+
+On Tue, Jan 11, 2011 at 02:31:37PM +0100, Sascha Hauer wrote:
+> On Thu, Jan 06, 2011 at 03:13:16PM +0800, Shawn Guo wrote:
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> > Changes for v4:
+> >  - Call cpu_relax() during polling
+> > 
+> > Changes for v2:
+> >  - Add mutex locking for mxs_read_ocotp()
+> >  - Use type size_t for count and i
+> >  - Add comment for clk_enable/disable skipping
+> >  - Add ERROR bit clearing and polling step
+> > 
+> >  arch/arm/mach-mxs/Makefile              |    2 +-
+> >  arch/arm/mach-mxs/include/mach/common.h |    1 +
+> >  arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
+> >  3 files changed, 81 insertions(+), 1 deletions(-)
+> >  create mode 100644 arch/arm/mach-mxs/ocotp.c
+> > 
+> > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> > index 39d3f9c..f23ebbd 100644
+> > --- a/arch/arm/mach-mxs/Makefile
+> > +++ b/arch/arm/mach-mxs/Makefile
+> > @@ -1,5 +1,5 @@
+> >  # Common support
+> > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+> > +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
+> >  
+> >  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+> >  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+> > diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+> > index 59133eb..cf02552 100644
+> > --- a/arch/arm/mach-mxs/include/mach/common.h
+> > +++ b/arch/arm/mach-mxs/include/mach/common.h
+> > @@ -13,6 +13,7 @@
+> >  
+> >  struct clk;
+> >  
+> > +extern int mxs_read_ocotp(int offset, int count, u32 *values);
+> >  extern int mxs_reset_block(void __iomem *);
+> >  extern void mxs_timer_init(struct clk *, int);
+> >  
+> > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> > new file mode 100644
+> > index 0000000..e2d39aa
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mxs/ocotp.c
+> > @@ -0,0 +1,79 @@
+> > +/*
+> > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/delay.h>
+> > +#include <linux/err.h>
+> > +#include <linux/mutex.h>
+> > +
+> > +#include <mach/mxs.h>
+> > +
+> > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> > +#define BM_OCOTP_CTRL_ERROR		(1 << 9)
+> > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> > +
+> > +static DEFINE_MUTEX(ocotp_mutex);
+> > +
+> > +int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
+> > +{
+> > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+> > +	int timeout = 0x400;
+> > +	size_t i;
+> > +
+> > +	mutex_lock(&ocotp_mutex);
+> > +
+> > +	/*
+> > +	 * clk_enable(hbus_clk) for ocotp can be skipped
+> > +	 * as it must be on when system is running.
+> > +	 */
+> > +
+> > +	/* try to clear ERROR bit */
+> > +	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
 > 
-> On Mon, Sep 27, 2010 at 3:18 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> > On 24/09/10 17:37, Paulius Zaleckas wrote:
-> >> On 09/24/2010 09:57 AM, Darius Augulis wrote:
-> >>> Hi,
-> >>>
-> >>> On Fri, Sep 24, 2010 at 2:40 AM, Ben Dooks<ben-linux@fluff.org>
-?wrote:
-> >>>> On 23/09/10 20:15, Darius Augulis wrote:
-> >>>>> Swap device and driver names in serial/samsung.c
-> >>>>
-> >>>> This is far too short, please see the notes below on trying
-> >>>> to make this more informative.
-> >>>>
-> >>>>> Signed-off-by: Darius Augulis<augulis.darius@gmail.com>
-> >>>>> ---
-> >>>>>
-> >>>>> This patch was submitted about 3 months ago, but still not merged.
-> >>>>> There was another similar patch from Joonyoung Shim
-> >>>>> <jy0922.shim@samsung.com> ?and was discussed here:
-> >>>>> http://marc.info/?l=linux-serial&m=127416101222281&w=2.
-> >>>>> Joonyoung Shim acked my patch and other people on ARM mailing list
-> >>>>> acked it. The maintainer, Ben Dooks, still not responding for
-> >>>>> a long time. Another maintainer, Kukjin Kim, refused to merge
-> >>>>> it without Ben's review.
-> >>>>> I would like to ask somebody pick up this bugfix.
-> >>>>
-> >>>> I belive last time this was brought up I asked about the affect
-> >>>> this has on the userspace. The following issues would be helpful
-> >>>> or essential to have noted in the header about the effect of this.
-> >>>>
-> >>>> - Does it change the /dev name of the device? if so I would thinl
-> >>>> ? carefully about applying it, as it would be a change in the way
-> >>>> ? that userspace sees the kernel.
-> >>>
-> >>> It does - now devices are named /dev/s3c2410_serial, and patch changes
-> >>> its name to /dev/ttySAC
-> >>>
-> >>>>
-> >>>> - Does it change the kernel output itself? A note on what diffeences
-> >>>> ? can be seen in things like dmesg would be helpful.
-> >>>
-> >>> It does. Serial driver reports device names when probing, so there
-> >>> will appear ttySACx instead of
-> >>> s3c2410_serialx.
-> >>>
-> >>>>
-> >>>> - Are there any other side effects
-> >>>>
-> >>>> - Why is this a bug? Maybe the previous points will explain what is
-> >>>> ? going on, but if not, then a reasonably concise description of
-> >>>> ? what is going on here.
-> >>>
-> >>> This is bug, because of several points:
-> >>>
-> >>> 1. Because it contradicts kernel documentation. Please read
-> >>> Documentation/arm/Samsung-S3C24XX/Overview.txt line 196.
-> >>> This should be enough to apply this patch.
-> >>>
-> >>> 2. Because s3c2410_serial isn't correct name for serial device node.
-> >>> It's name of Samsung serial driver.
-> >>>
-> >>> 3. Because now almost all userspace systems workaround it by creating
-> >>> symlink
-> >>> /dev/ttySACx> ?/dev/s3c2410_serialx and only then put some getty on
-> >>> created symlink, not on original device.
-> >>> Systems which don't create this symlink, fail to boot at all, because
-> >>> of wrong console name. Good example is Buildroot.
-> >>
-> >> I had similar issue with buildroot too, because in /etc/securetty it is
-> >> defained as ttySAC0
-> >>
-> >> 4. For console in kernel boot command line you must enter
-console=ttySACx.
-> >> Why it sould be different in userspace?
-> >>
-> >> For me it seems taht this bug was not noticed earlier, because most
-> >> embedded
-> >> systems were using static device nodes and ttySACx was used in these
-cases.
-> >
-> > As long as these are explained, then I'm reasonably happy for this to be
-> > applied, as long as there are no other complaints.
-> >
-> > However, this is a big change, and I think it should await the next
-> > merge window.
+> This operation does not try to clear the error bit but actually clears
+> it...
 > 
-> I agree that too.
+> > +
+> > +	/* check both BUSY and ERROR cleared */
+> > +	while ((__raw_readl(ocotp_base) &
+> > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
+> > +		cpu_relax();
 > 
+> ...which means you do not have to poll the error bit here...
+> 
+> > +
+> > +	if (unlikely(!timeout))
+> > +		goto error_unlock;
+> > +
+> > +	/* open OCOTP banks for read */
+> > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+> > +
+> > +	/* approximately wait 32 hclk cycles */
+> > +	udelay(1);
+> > +
+> > +	/* poll BUSY bit becoming cleared */
+> > +	timeout = 0x400;
+> > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
+> > +		cpu_relax();
+> 
+> ...which means you can factor out a ocotp_wait_busy function and let the
+> code speak instead of the comments.
+> 
+> > +
+> > +	if (unlikely(!timeout))
+> > +		goto error_unlock;
+> > +
+> > +	for (i = 0; i < count; i++, offset += 4)
+> > +		*values++ = __raw_readl(ocotp_base + offset);
+> 
+> The registers in the ocotp are 16 byte aligned. Does it really make
+> sense to provide a function allowing to read the gaps between the
+> registers?
+> 
+Good catch.  The count was added to ease the consecutive otp word
+reading, as there is bank open/close cost for otp read.  What about
+the following changes?
 
-Hi Darius and all,
+int mxs_read_ocotp(unsigned offset, size_t otp_word_cnt, u32 *values)
+{
+	......
 
-Maybe you remember this, I applied this in my for-next for 38 this merge
-window.
-If any opinions, please let me know.
+	for (i = 0; i < otp_word_cnt; i++, offset += 0x10)
+		*values++ = __raw_readl(ocotp_base + offset);
 
-Thanks and Happy New year :)
+	......
+}
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+-- 
+Regards,
+Shawn
