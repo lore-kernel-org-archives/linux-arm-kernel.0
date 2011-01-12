@@ -1,23 +1,34 @@
-From: yong.shen@linaro.org (Yong Shen)
-Date: Wed, 12 Jan 2011 18:03:27 +0800
-Subject: [PATCH v3 1/4] ARM: i.MX53: enable spi support
-In-Reply-To: <20110112093710.GD24920@pengutronix.de>
-References: <1294821324-5688-1-git-send-email-yong.shen@freescale.com>
-	<1294821324-5688-2-git-send-email-yong.shen@freescale.com>
-	<20110112093710.GD24920@pengutronix.de>
-Message-ID: <AANLkTikS=cWfj1g0q8aj-d=5X8LvDduRn1xL4zJncJVs@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 12 Jan 2011 12:04:41 +0200
+Subject: [PATCH] s3c2410_udc: Add handling for S3C244X dual-packet mode
+In-Reply-To: <201012131237.12359.anarsoul@gmail.com>
+References: <1283178862-12987-1-git-send-email-anarsoul@gmail.com>
+	<4CFED6D9.9030706@fluff.org>
+	<201012131237.12359.anarsoul@gmail.com>
+Message-ID: <201101121204.42329.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Uwe,
+On Monday 13 December 2010 12:37:11 Vasily Khoruzhick wrote:
+> On Wednesday 08 December 2010 02:52:41 Ben Dooks wrote:
+> > On 06/12/10 19:39, Vasily Khoruzhick wrote:
+> > > On Monday 30 August 2010 17:34:22 Vasily Khoruzhick wrote:
+> > >> From: Fabian Godehardt <fg@emlix.com>
+> > >> 
+> > >> This is a patch that seems to make the USB hangs on the S3C244X go
+> > >> away.
+> > 
+> > Hmm who's job is it to apply it?
+> > I'd certainly ack it
+> > 
+> > Acked-by: Ben Dooks <ben-linux@fluff.org>
+> 
+> Hi, David
+> 
+> could you please merge this patch? If not, should I try to merge it through
+> mm tree?
+> 
+> Regards
+> Vasily
 
->> ?#define MX53_PAD_EIM_D20__GPIO_3_20 ? ? ? ? ?IOMUX_PAD(0x470, 0x128,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
->> ?#define MX53_PAD_EIM_D21__GPIO_3_21 ? ? ? ? ?IOMUX_PAD(0x474, 0x12C,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
-> Why do you remove the GPIO definitions?
->
-Why not? Anyway they are always used as cspi signals. IMO, we don't
-need keep that many configures, and it's better to add them when
-needed.
-
-thanks
-Yong
+Ping once again
