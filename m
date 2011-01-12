@@ -1,44 +1,32 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Wed, 12 Jan 2011 17:08:42 +0530
-Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
-In-Reply-To: <20110112113054.GA2658@pulham.picochip.com>
-References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
-	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
-	<20110112082416.GE3181@pulham.picochip.com>
-	<AANLkTim2LJVA+qJNqYd2uPNKjP54kuyvsZ7-T3jSJsta@mail.gmail.com>
-	<20110112113054.GA2658@pulham.picochip.com>
-Message-ID: <AANLkTimtW4GZmjL0ryi1HgOMrCC4gMfGDdEqLJgW_2YA@mail.gmail.com>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Wed, 12 Jan 2011 12:39:37 +0100
+Subject: [PATCH/RFC 0/3] ARM: S5P: Add a common platform setup code for
+	MIPI CSIS/DSIM
+In-Reply-To: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
+References: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <4D2D92F9.3000902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 5:00 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> On Wed, Jan 12, 2011 at 02:27:47PM +0530, viresh kumar wrote:
->> On Wed, Jan 12, 2011 at 1:54 PM, Jamie Iles <jamie@jamieiles.com> wrote:
->> >> I don't know why, but checkpatch used to give few errors which it is
->> >> not giving now.
->> >> Like:
->> >> - Mixing spaces and tabs
->> >> - Line over 80 columns.
->> >>
-> I do need to fix up the register locations (40-45) but the others are ok
-> - they are tab indented to get to a multiple of 8 then spaces to align
-> to the '(' brackets etc.
-
-That's what i said. Checkpatch used to give warning for them earlier.
-I don't know if it is correct or not. Anyway, others will comment if it is
-still a issue. You can keep that as it is.
-
->> Problem will occur if rate is dynamically changed and we are still believing
->> on platform code's clk_rate.
->> Would be better if we switch order. i.e. give priority to clk_get_rate over
->> pdata->rate.
+On 01/04/2011 04:09 PM, Sylwester Nawrocki wrote:
+> Hello,
 >
-> If the platform can change the rate then I don't see why it would define
-> the rate in the platform data though. ?Anyway, I can make the change and
-> issue a warning and fail the probe if we're using the rate from
-> clk_get_rate() and there is a non-zero rate in the platform data.
+> the following patch series adds the common platform code for configuration
+> of the MIPI CSIS and MIPI DSIM PHYs on S5PV210 and S5PV310 SoCs.
+> The spinlock is used to avoid races while the common PHY control register
+> is accessed from within MIPI DSIM and MIPI CSIS drivers.
+> The common PHY enable bit is cleared only when both CSIS and DSIM devices
+> are not in use.
+>
+>
+> The patch series contains:
+>
+> [PATCH/RFC 1/3] ARM: S5P: Add a platform callback for MIPI CSIS PHY control
+> [PATCH/RFC 2/3] ARM: S5PV310: Add a platform helper for MIPI DSIM/CSIS setup
+> [PATCH/RFC 3/3] ARM: S5PV210: Add a platform helper for MIPI DSIM/CSIS setup
+>
 
-that's better.
+Any comments on this one?
 
---
-viresh
+Regards,
+Sylwester
