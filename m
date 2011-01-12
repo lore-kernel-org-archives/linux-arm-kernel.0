@@ -1,285 +1,134 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Jan 2011 10:49:12 -0700
-Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
-	setup.c
-In-Reply-To: <20110112172552.GF11039@n2100.arm.linux.org.uk>
-References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
-	<20110111104051.GA11039@n2100.arm.linux.org.uk>
-	<20110111153630.GB2707@angua.secretlab.ca>
-	<20110111154833.GF11039@n2100.arm.linux.org.uk>
-	<AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
-	<20110112155215.GB11039@n2100.arm.linux.org.uk>
-	<AANLkTinwGd9pa7YQ=5hXfarw=MB=YdpBuN7xJAd+Ps4f@mail.gmail.com>
-	<alpine.LFD.2.00.1101121145430.24532@xanadu.home>
-	<AANLkTinPibTVUu2zoMbDYnSWXGvB6dVjCp54DoN9S1p3@mail.gmail.com>
-	<20110112172552.GF11039@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=dNaOF0wxU+OYEKiWfoGeVKGnqvF3gK8-mQjo5@mail.gmail.com>
+Date: Wed, 12 Jan 2011 11:03:07 -0700
+Subject: [PATCH v2] arm: Defer vetting of atags to setup.c
+Message-ID: <20110112180257.6824.33147.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 10:25 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jan 12, 2011 at 10:16:44AM -0700, Grant Likely wrote:
->> On Wed, Jan 12, 2011 at 9:53 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> > On Wed, 12 Jan 2011, Grant Likely wrote:
->> >
->> >> Actually it looks like the real problem is that the mmu has been
->> >> turned on, but the virtual mappings for devices have not yet been
->> >> established, and so the debug macros aren't using a valid address.
->> >
->> > A temporary virtual mapping should be there -- look for addruart in
->> > head.S.
->>
->> Hi Russell and Nicolas,
->>
->> Oops, yes all the early debug stuff works fine. ?Stupid human trick on
->> my end, but I've sorted it out now. ?Thanks for the help. ?I'll have
->> patches to post later today.
->
-> I just hacked this up, and on Versatile (real hardware) it produces
-> the below for an invalid r1 value - and of course works for a proper r1
-> value.
+Since the debug macros no longer depend on atag data, the vetting can
+be deferred to setup_arch() in setup.c which simplifies the code
+somewhat.
 
-Heh, that look pretty close to identical to what I was just about to send.
+This patch removes __vet_atags() from head.S and moves it setup_arch().
+I've tried to preserve the existing behaviour in this patch so the
+extra atags vetting is only using when CONFIG_MMU is selected.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+v2: Move removal of __machine_type_lookup to a separate patch.
 
-I'll send the updated atags patch rebased and retested on top of this one.
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ arch/arm/kernel/head-common.S |   51 +++++++----------------------------------
+ arch/arm/kernel/head.S        |    1 -
+ arch/arm/kernel/setup.c       |   16 +++++++++++++
+ 3 files changed, 25 insertions(+), 43 deletions(-)
 
-g.
-
->
-> Uncompressing Linux... done, booting the kernel.
->
-> Error: unrecognized/unsupported machine ID (r1 = 0x00123456).
->
-> Available machine support:
->
-> ID (hex) ? ? ? ?NAME
-> 00000183 ? ? ? ?ARM-Versatile PB
-> 0000025e ? ? ? ?ARM-Versatile AB
->
-> Please check your kernel config and/or bootloader.
->
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index bbecaac..c84b57d 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -25,81 +25,6 @@
-> ?* machine ID for example).
-> ?*/
-> ? ? ? ?__HEAD
-> -__error_a:
-> -#ifdef CONFIG_DEBUG_LL
-> - ? ? ? mov ? ? r4, r1 ? ? ? ? ? ? ? ? ? ? ? ? ?@ preserve machine ID
-> - ? ? ? adr ? ? r0, str_a1
-> - ? ? ? bl ? ? ?printascii
-> - ? ? ? mov ? ? r0, r4
-> - ? ? ? bl ? ? ?printhex8
-> - ? ? ? adr ? ? r0, str_a2
-> - ? ? ? bl ? ? ?printascii
-> - ? ? ? adr ? ? r3, __lookup_machine_type_data
-> - ? ? ? ldmia ? r3, {r4, r5, r6} ? ? ? ? ? ? ? ?@ get machine desc list
-> - ? ? ? sub ? ? r4, r3, r4 ? ? ? ? ? ? ? ? ? ? ?@ get offset between virt&phys
-> - ? ? ? add ? ? r5, r5, r4 ? ? ? ? ? ? ? ? ? ? ?@ convert virt addresses to
-> - ? ? ? add ? ? r6, r6, r4 ? ? ? ? ? ? ? ? ? ? ?@ physical address space
-> -1: ? ? ldr ? ? r0, [r5, #MACHINFO_TYPE] ? ? ? ?@ get machine type
-> - ? ? ? bl ? ? ?printhex8
-> - ? ? ? mov ? ? r0, #'\t'
-> - ? ? ? bl ? ? ?printch
-> - ? ? ? ldr ? ? r0, [r5, #MACHINFO_NAME] ? ? ? ?@ get machine name
-> - ? ? ? add ? ? r0, r0, r4
-> - ? ? ? bl ? ? ?printascii
-> - ? ? ? mov ? ? r0, #'\n'
-> - ? ? ? bl ? ? ?printch
-> - ? ? ? add ? ? r5, r5, #SIZEOF_MACHINE_DESC ? ?@ next machine_desc
-> - ? ? ? cmp ? ? r5, r6
-> - ? ? ? blo ? ? 1b
-> - ? ? ? adr ? ? r0, str_a3
-> - ? ? ? bl ? ? ?printascii
-> - ? ? ? b ? ? ? __error
-> -ENDPROC(__error_a)
-> -
-> -str_a1: ? ? ? ?.asciz ?"\nError: unrecognized/unsupported machine ID (r1 = 0x"
-> -str_a2: ? ? ? ?.asciz ?").\n\nAvailable machine support:\n\nID (hex)\tNAME\n"
-> -str_a3: ? ? ? ?.asciz ?"\nPlease check your kernel config and/or bootloader.\n"
-> - ? ? ? .align
-> -#endif
-> -
-> -/*
-> - * Lookup machine architecture in the linker-build list of architectures.
-> - * Note that we can't use the absolute addresses for the __arch_info
-> - * lists since we aren't running with the MMU on (and therefore, we are
-> - * not in the correct address space). ?We have to calculate the offset.
-> - *
-> - * ?r1 = machine architecture number
-> - * Returns:
-> - * ?r3, r4, r6 corrupted
-> - * ?r5 = mach_info pointer in physical address space
-> - */
-> -__lookup_machine_type:
-> - ? ? ? adr ? ? r3, __lookup_machine_type_data
-> - ? ? ? ldmia ? r3, {r4, r5, r6}
-> - ? ? ? sub ? ? r3, r3, r4 ? ? ? ? ? ? ? ? ? ? ?@ get offset between virt&phys
-> - ? ? ? add ? ? r5, r5, r3 ? ? ? ? ? ? ? ? ? ? ?@ convert virt addresses to
-> - ? ? ? add ? ? r6, r6, r3 ? ? ? ? ? ? ? ? ? ? ?@ physical address space
-> -1: ? ? ldr ? ? r3, [r5, #MACHINFO_TYPE] ? ? ? ?@ get machine type
-> - ? ? ? teq ? ? r3, r1 ? ? ? ? ? ? ? ? ? ? ? ? ?@ matches loader number?
-> - ? ? ? beq ? ? 2f ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ found
-> - ? ? ? add ? ? r5, r5, #SIZEOF_MACHINE_DESC ? ?@ next machine_desc
-> - ? ? ? cmp ? ? r5, r6
-> - ? ? ? blo ? ? 1b
-> - ? ? ? mov ? ? r5, #0 ? ? ? ? ? ? ? ? ? ? ? ? ?@ unknown machine
-> -2: ? ? mov ? ? pc, lr
-> -ENDPROC(__lookup_machine_type)
-> -
-> -/*
-> - * Look in arch/arm/kernel/arch.[ch] for information about the
-> - * __arch_info structures.
-> - */
-> - ? ? ? .align ?2
-> - ? ? ? .type ? __lookup_machine_type_data, %object
-> -__lookup_machine_type_data:
-> - ? ? ? .long ? .
-> - ? ? ? .long ? __arch_info_begin
-> - ? ? ? .long ? __arch_info_end
-> - ? ? ? .size ? __lookup_machine_type_data, . - __lookup_machine_type_data
->
-> ?/* Determine validity of the r2 atags pointer. ?The heuristic requires
-> ?* that the pointer be aligned, in the first 16k of physical RAM and
-> @@ -107,8 +32,6 @@ __lookup_machine_type_data:
-> ?* of this function may be more lenient with the physical address and
-> ?* may also be able to move the ATAGS block if necessary.
-> ?*
-> - * r8 ?= machinfo
-> - *
-> ?* Returns:
-> ?* ?r2 either valid atags pointer, or zero
-> ?* ?r5, r6 corrupted
-> @@ -183,17 +106,6 @@ __mmap_switched_data:
-> ? ? ? ?.size ? __mmap_switched_data, . - __mmap_switched_data
->
-> ?/*
-> - * This provides a C-API version of __lookup_machine_type
-> - */
-> -ENTRY(lookup_machine_type)
-> - ? ? ? stmfd ? sp!, {r4 - r6, lr}
-> - ? ? ? mov ? ? r1, r0
-> - ? ? ? bl ? ? ?__lookup_machine_type
-> - ? ? ? mov ? ? r0, r5
-> - ? ? ? ldmfd ? sp!, {r4 - r6, pc}
-> -ENDPROC(lookup_machine_type)
-> -
-> -/*
-> ?* This provides a C-API version of __lookup_processor_type
-> ?*/
-> ?ENTRY(lookup_processor_type)
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index 814ce1a..6b1e0ad 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -44,9 +44,6 @@ ENTRY(stext)
-> ? ? ? ?bl ? ? ?__lookup_processor_type ? ? ? ? @ r5=procinfo r9=cpuid
-> ? ? ? ?movs ? ?r10, r5 ? ? ? ? ? ? ? ? ? ? ? ? @ invalid processor (r5=0)?
-> ? ? ? ?beq ? ? __error_p ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ yes, error 'p'
-> - ? ? ? bl ? ? ?__lookup_machine_type ? ? ? ? ? @ r5=machinfo
-> - ? ? ? movs ? ?r8, r5 ? ? ? ? ? ? ? ? ? ? ? ? ?@ invalid machine (r5=0)?
-> - ? ? ? beq ? ? __error_a ? ? ? ? ? ? ? ? ? ? ? @ yes, error 'a'
->
-> ? ? ? ?adr ? ? lr, BSYM(__after_proc_init) ? ? @ return (PIC) address
-> ?ARM( ?add ? ? pc, r10, #PROCINFO_INITFUNC ? ? )
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 06aed19..084db6c 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -87,14 +87,10 @@ ENTRY(stext)
-> ? ? ? ?movs ? ?r10, r5 ? ? ? ? ? ? ? ? ? ? ? ? @ invalid processor (r5=0)?
-> ?THUMB( it ? ? eq ) ? ? ? ? ? ?@ force fixup-able long branch encoding
-> ? ? ? ?beq ? ? __error_p ? ? ? ? ? ? ? ? ? ? ? @ yes, error 'p'
-> - ? ? ? bl ? ? ?__lookup_machine_type ? ? ? ? ? @ r5=machinfo
-> - ? ? ? movs ? ?r8, r5 ? ? ? ? ? ? ? ? ? ? ? ? ?@ invalid machine (r5=0)?
-> - THUMB( it ? ? eq ) ? ? ? ? ? ?@ force fixup-able long branch encoding
-> - ? ? ? beq ? ? __error_a ? ? ? ? ? ? ? ? ? ? ? @ yes, error 'a'
->
-> ? ? ? ?/*
-> ? ? ? ? * r1 = machine no, r2 = atags,
-> - ? ? ? ?* r8 = machinfo, r9 = cpuid, r10 = procinfo
-> + ? ? ? ?* r9 = cpuid, r10 = procinfo
-> ? ? ? ? */
-> ? ? ? ?bl ? ? ?__vet_atags
-> ?#ifdef CONFIG_SMP_ON_UP
-> @@ -108,7 +104,7 @@ ENTRY(stext)
-> ? ? ? ?/*
-> ? ? ? ? * The following calls CPU specific code in a position independent
-> ? ? ? ? * manner. ?See arch/arm/mm/proc-*.S for details. ?r10 = base of
-> - ? ? ? ?* xxx_proc_info structure selected by __lookup_machine_type
-> + ? ? ? ?* xxx_proc_info structure selected by __lookup_processor_type
-> ? ? ? ? * above. ?On return, the CPU will be ready for the MMU to be
-> ? ? ? ? * turned on, and r0 will hold the CPU control register value.
-> ? ? ? ? */
-> @@ -127,7 +123,6 @@ ENDPROC(stext)
-> ?* amount which are required to get the kernel running, which
-> ?* generally means mapping in the kernel code.
-> ?*
-> - * r8 ?= machinfo
-> ?* r9 ?= cpuid
-> ?* r10 = procinfo
-> ?*
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 7c5499d..eb952a7 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -308,7 +308,44 @@ static void __init cacheid_init(void)
-> ?* already provide the required functionality.
-> ?*/
-> ?extern struct proc_info_list *lookup_processor_type(unsigned int);
-> -extern struct machine_desc *lookup_machine_type(unsigned int);
-> +
-> +static void __init early_print(const char *str, ...)
-> +{
-> + ? ? ? extern void printascii(const char *);
-> + ? ? ? char buf[256];
-> + ? ? ? va_list ap;
-> +
-> + ? ? ? va_start(ap, str);
-> + ? ? ? vsnprintf(buf, sizeof(buf), str, ap);
-> + ? ? ? va_end(ap);
-> +
-> +#ifdef CONFIG_DEBUG_LL
-> + ? ? ? printascii(buf);
-> +#endif
-> + ? ? ? printk("%s", buf);
-> +}
-> +
-> +static struct machine_desc * __init lookup_machine_type(unsigned int type)
-> +{
-> + ? ? ? extern struct machine_desc __arch_info_begin[], __arch_info_end[];
-> + ? ? ? struct machine_desc *p;
-> +
-> + ? ? ? for (p = __arch_info_begin; p < __arch_info_end; p++)
-> + ? ? ? ? ? ? ? if (type == p->nr)
-> + ? ? ? ? ? ? ? ? ? ? ? return p;
-> +
-> + ? ? ? early_print("\n"
-> + ? ? ? ? ? ? ? "Error: unrecognized/unsupported machine ID (r1 = 0x%08x).\n\n"
-> + ? ? ? ? ? ? ? "Available machine support:\n\nID (hex)\tNAME\n", type);
-> +
-> + ? ? ? for (p = __arch_info_begin; p < __arch_info_end; p++)
-> + ? ? ? ? ? ? ? early_print("%08x\t%s\n", p->nr, p->name);
-> +
-> + ? ? ? early_print("\nPlease check your kernel config and/or bootloader.\n");
-> +
-> + ? ? ? while (true)
-> + ? ? ? ? ? ? ? /* can't use cpu_relax() here as it may require MMU setup */;
-> +}
->
-> ?static void __init feat_v6_fixup(void)
-> ?{
->
->
-
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index c84b57d..8bb1829 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -11,50 +11,8 @@
+  *
+  */
+ 
+-#define ATAG_CORE 0x54410001
+-#define ATAG_CORE_SIZE ((2*4 + 3*4) >> 2)
+-#define ATAG_CORE_SIZE_EMPTY ((2*4) >> 2)
+-
+-/*
+- * Exception handling.  Something went wrong and we can't proceed.  We
+- * ought to tell the user, but since we don't have any guarantee that
+- * we're even running on the right architecture, we do virtually nothing.
+- *
+- * If CONFIG_DEBUG_LL is set we try to print out something about the error
+- * and hope for the best (useful if bootloader fails to pass a proper
+- * machine ID for example).
+- */
+ 	__HEAD
+ 
+-/* Determine validity of the r2 atags pointer.  The heuristic requires
+- * that the pointer be aligned, in the first 16k of physical RAM and
+- * that the ATAG_CORE marker is first and present.  Future revisions
+- * of this function may be more lenient with the physical address and
+- * may also be able to move the ATAGS block if necessary.
+- *
+- * Returns:
+- *  r2 either valid atags pointer, or zero
+- *  r5, r6 corrupted
+- */
+-__vet_atags:
+-	tst	r2, #0x3			@ aligned?
+-	bne	1f
+-
+-	ldr	r5, [r2, #0]			@ is first tag ATAG_CORE?
+-	cmp	r5, #ATAG_CORE_SIZE
+-	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
+-	bne	1f
+-	ldr	r5, [r2, #4]
+-	ldr	r6, =ATAG_CORE
+-	cmp	r5, r6
+-	bne	1f
+-
+-	mov	pc, lr				@ atag pointer is ok
+-
+-1:	mov	r2, #0
+-	mov	pc, lr
+-ENDPROC(__vet_atags)
+-
+ /*
+  * The following fragment of code is executed with the MMU on in MMU mode,
+  * and uses absolute addresses; this is not position independent.
+@@ -158,6 +116,15 @@ __lookup_processor_type_data:
+ 	.long	__proc_info_end
+ 	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
+ 
++/*
++ * Exception handling.  Something went wrong and we can't proceed.  We
++ * ought to tell the user, but since we don't have any guarantee that
++ * we're even running on the right architecture, we do virtually nothing.
++ *
++ * If CONFIG_DEBUG_LL is set we try to print out something about the error
++ * and hope for the best (useful if bootloader fails to pass a proper
++ * machine ID for example).
++ */
+ __error_p:
+ #ifdef CONFIG_DEBUG_LL
+ 	adr	r0, str_p1
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 19f3909..4b0cf4a 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -92,7 +92,6 @@ ENTRY(stext)
+ 	 * r1 = machine no, r2 = atags,
+ 	 * r9 = cpuid, r10 = procinfo
+ 	 */
+-	bl	__vet_atags
+ #ifdef CONFIG_SMP_ON_UP
+ 	bl	__fixup_smp
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 77266a8..47cf110 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -851,6 +851,22 @@ void __init setup_arch(char **cmdline_p)
+ 	if (mdesc->soft_reboot)
+ 		reboot_setup("s");
+ 
++#if defined(CONFIG_MMU)
++	/*
++	 * Determine validity of the atags pointer.  The heuristic requires
++	 * that the pointer be aligned, and that the ATAG_CORE marker is
++	 * first and present.
++	 */
++	if (__atags_pointer & 0x3)
++		__atags_pointer = 0;
++	if (__atags_pointer) {
++		struct tag *t = phys_to_virt(__atags_pointer);
++		if ((t->hdr.size != tag_size(tag_core)) &&
++		    (t->hdr.size != sizeof(struct tag_header)) &&
++		    (t->hdr.tag != ATAG_CORE))
++			__atags_pointer = 0;
++	}
++#endif
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
+ 	else if (mdesc->boot_params)
