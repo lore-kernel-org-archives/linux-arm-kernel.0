@@ -1,46 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Jan 2011 07:34:52 +0900
-Subject: [PATCH/RFC 0/3] ARM: S5P: Add a common platform setup code for
-	MIPI CSIS/DSIM
-In-Reply-To: <4D2D92F9.3000902@gmail.com>
-References: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
-	<4D2D92F9.3000902@gmail.com>
-Message-ID: <01e701cbb2a8$f048bde0$d0da39a0$%kim@samsung.com>
+From: dima@android.com (Dima Zavin)
+Date: Wed, 12 Jan 2011 14:35:57 -0800
+Subject: [PATCH] ARM: use memblock memory regions for "System RAM" I/O
+	resources
+Message-ID: <1294871757-11391-1-git-send-email-dima@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> On 01/04/2011 04:09 PM, Sylwester Nawrocki wrote:
-> > Hello,
-> >
-> > the following patch series adds the common platform code for configuration
-> > of the MIPI CSIS and MIPI DSIM PHYs on S5PV210 and S5PV310 SoCs.
-> > The spinlock is used to avoid races while the common PHY control register
-> > is accessed from within MIPI DSIM and MIPI CSIS drivers.
-> > The common PHY enable bit is cleared only when both CSIS and DSIM devices
-> > are not in use.
-> >
-> >
-> > The patch series contains:
-> >
-> > [PATCH/RFC 1/3] ARM: S5P: Add a platform callback for MIPI CSIS PHY control
-> > [PATCH/RFC 2/3] ARM: S5PV310: Add a platform helper for MIPI DSIM/CSIS
-> setup
-> > [PATCH/RFC 3/3] ARM: S5PV210: Add a platform helper for MIPI DSIM/CSIS
-> setup
-> >
-> 
-> Any comments on this one?
-> 
-Hi,
+Do not use memory bank info to request the "system ram" resources as
+they do not track holes created by memblock_remove inside
+machine's reserve callback. If the removed memory is passed as
+platform_device's ioresource, then drivers that call
+request_mem_region would fail due to a conflict with the incorrectly
+configured system ram resource.
 
-It's 38 merge window now. So I want to wait until after this merge window.
+Instead, iterate through the regions of memblock.memory and add
+those as "System RAM" resources.
 
-Thanks.
+Signed-off-by: Dima Zavin <dima@android.com>
+---
+ arch/arm/kernel/setup.c |   10 ++++------
+ 1 files changed, 4 insertions(+), 6 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..c3aa394 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -520,6 +520,7 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
+ static void __init
+ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
+ {
++	struct memblock_type *mem = &memblock.memory;
+ 	struct resource *res;
+ 	int i;
+ 
+@@ -528,14 +529,11 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
+ 	kernel_data.start   = virt_to_phys(_sdata);
+ 	kernel_data.end     = virt_to_phys(_end - 1);
+ 
+-	for (i = 0; i < mi->nr_banks; i++) {
+-		if (mi->bank[i].size == 0)
+-			continue;
+-
++	for (i = 0; i < mem->cnt; i++) {
+ 		res = alloc_bootmem_low(sizeof(*res));
+ 		res->name  = "System RAM";
+-		res->start = mi->bank[i].start;
+-		res->end   = mi->bank[i].start + mi->bank[i].size - 1;
++		res->start = mem->regions[i].base;
++		res->end   = mem->regions[i].base + mem->regions[i].size - 1;
+ 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+ 
+ 		request_resource(&iomem_resource, res);
+-- 
+1.7.3.1
