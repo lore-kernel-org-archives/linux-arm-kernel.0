@@ -1,35 +1,42 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 12 Jan 2011 13:19:49 -0800
-Subject: Bug: loops_per_jiffy based udelay() mostly shorter than requested
-In-Reply-To: <20110109170829.GA14252@flint.arm.linux.org.uk>
-References: <20110109170829.GA14252@flint.arm.linux.org.uk>
-Message-ID: <AANLkTik5BmZAOFdYVGAjuoHftQ3qh1oTCEr5MpkCiDVz@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Jan 2011 15:28:14 -0600
+Subject: [PATCH v2 3/3] ARM: twd_smp: add clock api support
+In-Reply-To: <20101221134515.GB1556@n2100.arm.linux.org.uk>
+References: <1286030086-25556-1-git-send-email-robherring2@gmail.com>
+	<1286030086-25556-4-git-send-email-robherring2@gmail.com>
+	<20101221134515.GB1556@n2100.arm.linux.org.uk>
+Message-ID: <4D2E1CEE.5040900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 9, 2011 at 9:08 AM, Russell King <rmk@arm.linux.org.uk> wrote:
->
-> Any suggestions or thoughts, or should we not care too much if udelay()
-> produces slightly shorter than desired delays? ?Or am I doing something
-> horribly wrong in the ARM code?
+Russell,
 
-Judging by the numbers you quote, I would definitely put this in the
-"don't care too much".
+On 12/21/2010 07:45 AM, Russell King - ARM Linux wrote:
+> On Sat, Oct 02, 2010 at 09:34:46AM -0500, Rob Herring wrote:
+>> From: Rob Herring<rob.herring@smooth-stone.com>
+>>
+>> The private timer freq is currently dynamically detected
+>> using jiffies count to determine the rate. This method adds
+>> a delay to boot-up, so use the clock api instead to get the
+>> clock rate.
+> More or less the same comments go for this as well as the timer-sp code.
 
-If it's about 1% off, it's all fine. If somebody picked a delay value
-that is so sensitive to small errors in the delay that they notice
-that - or even notice something like 5% - then they have picked too
-short of a delay.
+I've implemented your requested changes for timer-sp code. The problem 
+with doing the same thing with smp_twd timer is I don't know what the 
+frequency of the timer is on various platforms or an understanding of 
+what their clock trees look like to do a proper implementation of the 
+clocks. I could make calling twd_timer_init mandatory and replace direct 
+setting of twd_base, but it would still fall back to calculating the 
+rate if no clock found. These are the current users:
 
-udelay() was never really meant to be some kind of precision
-instrument. Especially with CPU's running at different frequencies,
-we've historically had some rather wild fluctuation. The traditional
-busy loop ends up being affected not just by interrupts, but also by
-things like cache alignment (we used to inline it), and then later the
-TSC-based one obviously depended on TSC's being stable (which they
-weren't for a while).
+mach-omap2/timer-gp.c
+mach-realview/realview_eb.c
+mach-realview/realview_pb11mp.c
+mach-realview/realview_pbx.c
+mach-s5pv310/time.c
+mach-shmobile/smp-sh73a0.c
+mach-tegra/timer.c
+mach-ux500/cpu.c
+mach-vexpress/ct-ca9x4.c
 
-So historically, we've seen udelay() being _really_ off (ie 50% off
-etc), I wouldn't worry about things in the 1% range.
-
-                       Linus
+Rob
