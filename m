@@ -1,31 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 15:52:16 +0000
-Subject: [RFC] arm: Defer lookup of machine_type and vet of atags to
-	setup.c
-In-Reply-To: <AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
-References: <20110111015409.18291.87166.stgit@localhost6.localdomain6>
-	<20110111104051.GA11039@n2100.arm.linux.org.uk>
-	<20110111153630.GB2707@angua.secretlab.ca>
-	<20110111154833.GF11039@n2100.arm.linux.org.uk>
-	<AANLkTi=29LB66j123ufMHQk=46hGYdmR4nZZQFnN=Tku@mail.gmail.com>
-Message-ID: <20110112155215.GB11039@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 12 Jan 2011 10:00:25 -0600
+Subject: [PATCH 0/0] RFC: ARM: Thumb-2: Symbol manipulation macros for
+	function body copying
+In-Reply-To: <20110112093209.GA18833@n2100.arm.linux.org.uk>
+References: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
+	<20110112093209.GA18833@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 08:46:44AM -0700, Grant Likely wrote:
-> Looks like I've hit a hiccup though.  When I remove the first call to
-> __lookup_machine_type, then it is only called after the MMU is turned
-> on and the kernel is no longer able to output the list of configured
-> machine ids when it doesn't recognize the value in r1 (tested with
-> qemu versatile emulation).  I'm still investigating, so I'll defer
-> reposting the patch until I've got this issue solved.
+Hi,
 
-It only does this when DEBUG_LL is enabled - at which point you have
-printascii, printhex8, etc available (although there's no prototype
-for them.)
+On Wed, Jan 12, 2011 at 3:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 11, 2011 at 06:02:30PM -0600, Dave Martin wrote:
+>> To make it easier to deal with cases like this, I've had a
+>> go at writing some macros to make copying function bodies
+>> easier, while being robust for ARM and Thumb-2.
+>
+> How about instead providing some infrastructure which coes the
+> copy too? ?Something like:
+>
+> #define copy_fn_to_sram(to, fn, size) ({ ? ? ? ? ? ? ? ?\
+> ? ? ? ?__typeof__(fn) f; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> ? ? ? ?unsigned long ptr; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> ? ? ? ?__asm__("" : "=r" (ptr) : "0" (fn)); ? ? ? ? ? ?\
+> ? ? ? ?memcpy(to, (void *)(ptr & ~1), size); ? ? ? ? ? \
+> ? ? ? ?ptr = (ptr & 1) | (unsigned long)to; ? ? ? ? ? ?\
+> ? ? ? ?__asm__("" : "=r" (f) : "0" (ptr)); ? ? ? ? ? ? \
+> ? ? ? ?f; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> })
 
-You could use snprintf() to format a message and then use printascii()
-(conditional on CONFIG_DEBUG_LL as the existing code does) as well as
-printk("%s", buffer).  That means if you have a debugger you can dump
-the kernel ring buffer and see the message, or see it via the serial
-port/debugging channel if DEBUG_LL is enabled.
+omap provides some infrastructure for both allocating SRAM space and
+doing the copy, using omap_sram_push() and friends.  So I wasn't sure
+what the correct level of abstraction was for the new helpers.
+Certainly, providing a sort of "function memcpy" macro like your
+copy_fn_to_sram makes sense.  I think this should still be safe from a
+type system perspective: providing the "blind" type casts using asm()
+appear somewhere in the execution flow C shouldn't make silly
+assumptions even if Linux ends up enabling multifile optimisation
+sometime in the future.
+
+Would you agree with that assertion?
+
+>
+> Used by:
+> extern void my_func(int foo);
+> extern int my_func_size;
+
+Potentially, we could define, an extra assembler macro to complement
+ENDPROC() which records the size of a function automatically.  What do
+you think?
+
+>
+> void call_my_func(void *to, int arg)
+> {
+> ? ? ? ?void (*fn)(int);
+>
+> ? ? ? ?fn = copy_fn_to_sram(to, my_func, my_func_size);
+> ? ? ? ?fn(arg);
+> }
+>
+> Then if you need to fix the way the copies are done for some
+> architectural reason, there's only one place to do it.
+
+The model used in the omap code is to copy some functions into SRAM
+ahead of time and stash the pointers away to be called later: for that
+model, it's not so useful to have something like call_my_func
+directly.  Also, I wasn't sure whether conflating other functionality
+such as cache flushing into the new macros would be a good idea -- is
+might be cleaner and more maintainable, but might result in less
+efficient usage.  Any thoughts?
+
+>
+> I'm not sure asm/unified.h is the right place - I don't think this has
+> anything to do with the unified assembler syntax. ?Please create a new
+> header for this.
+
+I suspected unified.h might not be right--- thanks for the feedback.
+
+Cheers
+---Dave
