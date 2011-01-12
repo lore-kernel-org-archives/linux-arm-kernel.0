@@ -1,42 +1,59 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 11 Jan 2011 18:03:33 -0600
-Subject: [PATCH] ARM: Thumb-2: Fix out-of-range offset for Thumb-2 in proc-v7.S
-Message-ID: <1294790613-17101-1-git-send-email-dave.martin@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Jan 2011 16:15:09 -0800
+Subject: [PATCH v5 3/3] omap3: beaglexm: fix power on of DVI
+In-Reply-To: <4D2CEDD7.4020507@ti.com>
+References: <1294766017-12182-4-git-send-email-nm@ti.com>
+	<20110111232329.GY4957@atomide.com> <4D2CEDD7.4020507@ti.com>
+Message-ID: <20110112001509.GA4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch introduces a pre-increment addressing
-offset which is out of range for Thumb-2:
-    ARM: pgtable: switch order of Linux vs hardware page tables
+* Nishanth Menon <nm@ti.com> [110111 15:54]:
+> Tony Lindgren had written, on 01/11/2011 05:23 PM, the following:
+> [..]
+> >>-
+> >>-	gpio_request(gpio + 1, "EHCI_nOC");
+> >>-	gpio_direction_input(gpio + 1);
+> >>+	if (omap3_beagle_get_rev() != OMAP3BEAGLE_BOARD_XM) {
+> >>+		gpio_request(gpio + 1, "EHCI_nOC");
+> >>+		gpio_direction_input(gpio + 1);
+> >>+	}
+> >
+> >The return value for gpio_request must be checked.
+> Ack.
+> we can go down two paths:
+> a) I can redo this patch as in v6.patch (attached)
 
-162:	str	r3, [r0, #2048]!
+Yes let's do that, one comment below though..
 
-Thumb-2 only permits offsets <256 for pre-increment addressing.
+> OR
+> b) we take this patch and do another one cleaning the function up -
+> gpio-check.patch
 
-This patch replaces the store instruction with a suitable add-str
-pair for the Thumb-2 case.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-KernelVersion: v2.6.37
-
- arch/arm/mm/proc-v7.S |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b49fab2..0c1172b 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -159,7 +159,9 @@ ENTRY(cpu_v7_set_pte_ext)
- 	tstne	r1, #L_PTE_PRESENT
- 	moveq	r3, #0
+That can be done later.
  
--	str	r3, [r0, #2048]!
-+ ARM(	str	r3, [r0, #2048]! )
-+ THUMB(	add	r0, r0, #2048 )
-+ THUMB(	str	r3, [r0] )
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
- #endif
- 	mov	pc, lr
--- 
-1.7.1
+> +	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+> +		r = gpio_request(gpio + 1, "nDVI_PWR_EN");
+> +		if (!r) {
+> +			r = gpio_direction_output(gpio + 1, 0);
+> +			if (r)
+> +				gpio_free(gpio + 1);
+> +		}
+> +		if (r)
+> +			pr_err("%s: unable to configure nDVI_PWR_EN\n",
+> +				__func__);
+> +		r = gpio_request(gpio + 2, "DVI_LDO_EN");
+> +		if (!r) {
+> +			r = gpio_direction_output(gpio + 2, 1);
+> +			if (r)
+> +				gpio_free(gpio + 1);
+> +		}
+> +		if (r)
+> +			pr_err("%s: unable to configure DVI_LDO_EN\n",
+> +				__func__);
+> +	}
+> +
+
+Should the second gpio_free be gpio + 2 instead of gpio + 1?
+
+Tony
