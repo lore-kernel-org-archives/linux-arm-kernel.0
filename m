@@ -1,164 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 19:56:40 +0000
-Subject: [PATCH v2] arm: Defer vetting of atags to setup.c
-In-Reply-To: <20110112180257.6824.33147.stgit@localhost6.localdomain6>
-References: <20110112180257.6824.33147.stgit@localhost6.localdomain6>
-Message-ID: <20110112195640.GJ11039@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 12 Jan 2011 22:02:42 +0100
+Subject: BUG: spinlock recursion (sys_chdir, user_path_at,
+	do_path_lookup ...)
+In-Reply-To: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
+References: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
+Message-ID: <20110112210241.GM24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch looks good to me, except for one small concerning point, which
-I should've thought about earlier - sorry.
+Hello Omar,
 
-One of the things that __vet_atags does is to make sure that the data
-pointed to by 'r2' is actually an atag list.
-
-Historically, we haven't required boot loaders to set r2 to anything -
-it used not to be defined to mean anything at all.  So with older boot
-loaders, this could be pointing at anything - it all depends what the
-boot loader code last did, and how the compiler optimized that code.
-
-So, the __vet_atags asm tries dereferencing the values there after
-checking that it's word aligned.  We hope that we won't hit a read-
-sensitive device in doing so.  If we find a valid ATAG_CORE then we
-allow the pointer.  If we don't find those magic words, then we zero.
-
-For boot loaders which always pass valid r2 values, moving this code
-after the MMU makes no difference.  For older boot loaders, it may be
-that __phys_to_virt(r2) ends up pointing at unmapped memory, which will
-cause a MMU abort - and as the vectors haven't been setup, that could
-hang the kernel.
-
-So I think this has to stay in assembly code to make sure it works as
-required - to detect old boot loaders passing random values in r2 and
-allow the old method (atag address in machine_desc struct) to work.
-
-On Wed, Jan 12, 2011 at 11:03:07AM -0700, Grant Likely wrote:
-> Since the debug macros no longer depend on atag data, the vetting can
-> be deferred to setup_arch() in setup.c which simplifies the code
-> somewhat.
+On Wed, Jan 12, 2011 at 02:59:39PM -0600, Ramirez Luna, Omar wrote:
+> I picked this mail from google so I might be missing some recipients.
 > 
-> This patch removes __vet_atags() from head.S and moves it setup_arch().
-> I've tried to preserve the existing behaviour in this patch so the
-> extra atags vetting is only using when CONFIG_MMU is selected.
+> On Wed, 12 Jan 2011, Russell King - ARM Linux wrote:
+> > On Wed, Jan 12, 2011 at 12:35:08PM +0000, Russell King - ARM Linux wrote:
+> > > ARM doesn't implement save_stack_trace_regs() nor save_stack_trace_bp()
+> > > so if the compiler referenced these, you'd have a kernel which doesn't
+> > > link.  The only places that this symbol appears is:
+> > >
+> > > arch/x86/kernel/stacktrace.c:void save_stack_trace_regs(struct stack_trace *trac
+> > > arch/x86/mm/kmemcheck/error.c:  save_stack_trace_regs(&e->trace, regs);
+> > > include/linux/stacktrace.h:extern void save_stack_trace_regs(struct stack_trace
+> > >
+> > > So, if this is where your bisect decided was the problem, your bisect
+> > > was faulty.
+> >
+> > BTW, a useful thing to do after a bisect is to return to the point in
+> > the history where you first noticed the regression (so Linus' tip,
+> > your tip, or whatever).  Then try reverting the commit which git bisect
+> > _thinks_ is the cause of your problem and re-test that.
+> >
+> > If the problem is fixed, you have greater confidence that the commit is
+> > the problem.
 > 
-> v2: Move removal of __machine_type_lookup to a separate patch.
+> Reverting this commit (9c0729dc8062bed96189bd14ac6d4920f3958743 )
+> didn't improve in my case.
+Yeah, my bisect was screwed because I somehow changed .config in the
+middle ...
+
+You're on ARM, too?
+
+> > If it made no difference, then you know that something else (maybe in
+> > combination) is causing the problem.
 > 
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  arch/arm/kernel/head-common.S |   51 +++++++----------------------------------
->  arch/arm/kernel/head.S        |    1 -
->  arch/arm/kernel/setup.c       |   16 +++++++++++++
->  3 files changed, 25 insertions(+), 43 deletions(-)
+> I tried to narrow it down using the dump and another thread mentioning
+> recent changes from "Nick" (might be Nick Piggin).
 > 
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index c84b57d..8bb1829 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -11,50 +11,8 @@
->   *
->   */
->  
-> -#define ATAG_CORE 0x54410001
-> -#define ATAG_CORE_SIZE ((2*4 + 3*4) >> 2)
-> -#define ATAG_CORE_SIZE_EMPTY ((2*4) >> 2)
-> -
-> -/*
-> - * Exception handling.  Something went wrong and we can't proceed.  We
-> - * ought to tell the user, but since we don't have any guarantee that
-> - * we're even running on the right architecture, we do virtually nothing.
-> - *
-> - * If CONFIG_DEBUG_LL is set we try to print out something about the error
-> - * and hope for the best (useful if bootloader fails to pass a proper
-> - * machine ID for example).
-> - */
->  	__HEAD
->  
-> -/* Determine validity of the r2 atags pointer.  The heuristic requires
-> - * that the pointer be aligned, in the first 16k of physical RAM and
-> - * that the ATAG_CORE marker is first and present.  Future revisions
-> - * of this function may be more lenient with the physical address and
-> - * may also be able to move the ATAGS block if necessary.
-> - *
-> - * Returns:
-> - *  r2 either valid atags pointer, or zero
-> - *  r5, r6 corrupted
-> - */
-> -__vet_atags:
-> -	tst	r2, #0x3			@ aligned?
-> -	bne	1f
-> -
-> -	ldr	r5, [r2, #0]			@ is first tag ATAG_CORE?
-> -	cmp	r5, #ATAG_CORE_SIZE
-> -	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
-> -	bne	1f
-> -	ldr	r5, [r2, #4]
-> -	ldr	r6, =ATAG_CORE
-> -	cmp	r5, r6
-> -	bne	1f
-> -
-> -	mov	pc, lr				@ atag pointer is ok
-> -
-> -1:	mov	r2, #0
-> -	mov	pc, lr
-> -ENDPROC(__vet_atags)
-> -
->  /*
->   * The following fragment of code is executed with the MMU on in MMU mode,
->   * and uses absolute addresses; this is not position independent.
-> @@ -158,6 +116,15 @@ __lookup_processor_type_data:
->  	.long	__proc_info_end
->  	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
->  
-> +/*
-> + * Exception handling.  Something went wrong and we can't proceed.  We
-> + * ought to tell the user, but since we don't have any guarantee that
-> + * we're even running on the right architecture, we do virtually nothing.
-> + *
-> + * If CONFIG_DEBUG_LL is set we try to print out something about the error
-> + * and hope for the best (useful if bootloader fails to pass a proper
-> + * machine ID for example).
-> + */
->  __error_p:
->  #ifdef CONFIG_DEBUG_LL
->  	adr	r0, str_p1
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 19f3909..4b0cf4a 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -92,7 +92,6 @@ ENTRY(stext)
->  	 * r1 = machine no, r2 = atags,
->  	 * r9 = cpuid, r10 = procinfo
->  	 */
-> -	bl	__vet_atags
->  #ifdef CONFIG_SMP_ON_UP
->  	bl	__fixup_smp
->  #endif
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 77266a8..47cf110 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -851,6 +851,22 @@ void __init setup_arch(char **cmdline_p)
->  	if (mdesc->soft_reboot)
->  		reboot_setup("s");
->  
-> +#if defined(CONFIG_MMU)
-> +	/*
-> +	 * Determine validity of the atags pointer.  The heuristic requires
-> +	 * that the pointer be aligned, and that the ATAG_CORE marker is
-> +	 * first and present.
-> +	 */
-> +	if (__atags_pointer & 0x3)
-> +		__atags_pointer = 0;
-> +	if (__atags_pointer) {
-> +		struct tag *t = phys_to_virt(__atags_pointer);
-> +		if ((t->hdr.size != tag_size(tag_core)) &&
-> +		    (t->hdr.size != sizeof(struct tag_header)) &&
-> +		    (t->hdr.tag != ATAG_CORE))
-> +			__atags_pointer = 0;
-> +	}
-> +#endif
->  	if (__atags_pointer)
->  		tags = phys_to_virt(__atags_pointer);
->  	else if (mdesc->boot_params)
-> 
+> Reverting: fs: rcu-walk aware d_revalidate method
+> commit: 34286d6662308d82aed891852d04c7c3a2649b16
+I found that one, too, in the meantime.  Currently debugging that with
+tglx on irc.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
