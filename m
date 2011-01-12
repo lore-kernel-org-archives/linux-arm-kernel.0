@@ -1,38 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Jan 2011 15:17:04 +0530
-Subject: [RFC] ARM: Let GIC to route IRQs to any allowed CPUs
-In-Reply-To: <AANLkTim3BUvnMsH=oW1cxmzT2wmwpxPFLjrP39TGbuhx@mail.gmail.com>
-References: <AANLkTimNMcs_6-NMTSY+yZuDUSB2eC2R_NX35gq00f7E@mail.gmail.com><20110112085110.GR11039@n2100.arm.linux.org.uk>
-	<AANLkTim3BUvnMsH=oW1cxmzT2wmwpxPFLjrP39TGbuhx@mail.gmail.com>
-Message-ID: <68d8f4403d87056247664a4ec82faded@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Wed, 12 Jan 2011 18:03:27 +0800
+Subject: [PATCH v3 1/4] ARM: i.MX53: enable spi support
+In-Reply-To: <20110112093710.GD24920@pengutronix.de>
+References: <1294821324-5688-1-git-send-email-yong.shen@freescale.com>
+	<1294821324-5688-2-git-send-email-yong.shen@freescale.com>
+	<20110112093710.GD24920@pengutronix.de>
+Message-ID: <AANLkTikS=cWfj1g0q8aj-d=5X8LvDduRn1xL4zJncJVs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hu Tao,
-(Please avoid top posting)
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of TAO HU
-> Sent: Wednesday, January 12, 2011 2:35 PM
-> To: Russell King - ARM Linux
-> Cc: TAO HU; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC] ARM: Let GIC to route IRQs to any allowed CPUs
->
-> Hi, Russell King
->
-> Thanks.
->
-> For "The result will be CPUs fighting over servicing such
-> interrupts."
-> What's the consequence? The performance downgrade?
->
-Few problems I can see here.
-1. Spurious interrupts will be seen by CPU who looses the IRQ race
-2. When interrupts are targeted on two CPU's, and if one of the CPU is
-in low power mode, the ON CPU will not see the interrupt till the     OFF
-CPU becomes ON again.
-3. Unnecessary wakeups on both CPUs which can screw up power savings.
-4. prone to aggravate race conditions in the existing drivers.
+hi Uwe,
 
-Regards,
-Santosh
+>> ?#define MX53_PAD_EIM_D20__GPIO_3_20 ? ? ? ? ?IOMUX_PAD(0x470, 0x128,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+>> ?#define MX53_PAD_EIM_D21__GPIO_3_21 ? ? ? ? ?IOMUX_PAD(0x474, 0x12C,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+> Why do you remove the GPIO definitions?
+>
+Why not? Anyway they are always used as cspi signals. IMO, we don't
+need keep that many configures, and it's better to add them when
+needed.
+
+thanks
+Yong
