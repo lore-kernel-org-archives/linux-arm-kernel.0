@@ -1,58 +1,61 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Jan 2011 16:11:51 +0000
-Subject: [PATCH 0/0] RFC: ARM: Thumb-2: Symbol manipulation macros for
-	function body copying
-In-Reply-To: <AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
-References: <1294790551-17069-1-git-send-email-dave.martin@linaro.org>
-	<20110112093209.GA18833@n2100.arm.linux.org.uk>
-	<AANLkTimB1dcK=F1bFh6bUtBPY0gk+Y+Y0SQqrSRW0YFa@mail.gmail.com>
-Message-ID: <20110112161151.GB18833@n2100.arm.linux.org.uk>
+Date: Wed, 12 Jan 2011 16:23:08 +0000
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+References: <4D2B4CE4.9080309@ahsoftware.de>
+	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
+	<4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+Message-ID: <20110112162308.GC11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 10:00:25AM -0600, Dave Martin wrote:
-> omap provides some infrastructure for both allocating SRAM space and
-> doing the copy, using omap_sram_push() and friends.  So I wasn't sure
-> what the correct level of abstraction was for the new helpers.
-> Certainly, providing a sort of "function memcpy" macro like your
-> copy_fn_to_sram makes sense.
+On Wed, Jan 12, 2011 at 10:05:19AM -0600, Dave Martin wrote:
+> In general, do we expect always to be able to avoid the situation
+> where branches in the kernel may need to cover too large a range ...
+> and is there any strategy for working aroung it?
 
-It'd just be a matter of splitting the copying out of omap_sram_push().
+It's not that big a problem - 99.999999% of setups never run into the
+problem.  It's only those who use large initramfs's built into their
+kernel image at present, and that is ultimately solvable.
 
-> I think this should still be safe from a type system perspective:
-> providing the "blind" type casts using asm() appear somewhere in
-> the execution flow C shouldn't make silly assumptions even if Linux
-> ends up enabling multifile optimisation sometime in the future.
+I don't think we need to litter code with TODO comments.
 
-Yes.  The only thing that is missing from my version is the
-flush_icache_range() which should also be there.
+> If we have problems branching from the modules area into vmlinux, we
+> could possibly build modules with -fPIC : this would remove the
+> restriction on branch range, though there would also be some
+> performance impact for the modules...
 
-> > Used by:
-> > extern void my_func(int foo);
-> > extern int my_func_size;
-> 
-> Potentially, we could define, an extra assembler macro to complement
-> ENDPROC() which records the size of a function automatically.  What do
-> you think?
+That also brings in issues with GOT tables and the like, and also requires
+different build options for modules and the main kernel.  I don't think
+kbuild is setup to do that - and I'd argue that it's unnecessary if we
+fix the layout of the kernel image.
 
-That would pad the code out with a fair number of additional integers.
-That's probably not a good idea.
+As I said a few emails ago, shuffling sections around in the image is
+not as trivial as it looks on the face of it as we make assumptions
+about what is in _stext.._etext, _sdata.._edata, whether there's anything
+between _etext.._sdata, and other symbolic ranges.
 
-> The model used in the omap code is to copy some functions into SRAM
-> ahead of time and stash the pointers away to be called later: for that
-> model, it's not so useful to have something like call_my_func
-> directly.  Also, I wasn't sure whether conflating other functionality
-> such as cache flushing into the new macros would be a good idea -- is
-> might be cleaner and more maintainable, but might result in less
-> efficient usage.  Any thoughts?
+At the moment, _stext.._etext + _sdata.._edata covers the entire kernel
+image - with the init sections at the start of _stext.  Putting the init
+sections between _etext and _sdata makes a hole in the middle of that,
+which may be suboptimal for page allocation.  It also means that the
+range no longer covers all kernel stuff.  Also whether _stext = _text,
+_sdata = _data, etc.
 
-My example was only that - an example.  You can also use it in the
-way you describe too:
+Another technicality is that some of these ranges are used for stuff like
+DMA API debugging:
 
-	to = omap_sram_push(size);
-	_omap_sram_reprogram_clock = copy_fn_to_sram(to,
-					omap1_sram_reprogram_clock, size);
+        if (overlap(addr, len, _text, _etext) ||
+            overlap(addr, len, __start_rodata, __end_rodata))
+                err_printk(dev, NULL, "DMA-API: device driver maps memory from kernel text or rodata [addr=%p] [len=%lu]\n", addr, len);
 
-and it'll also ensure type-safety between the omap1_sram_reprogram_clock
-and _omap_sram_reprogram_clock symbols, which the current code doesn't
-do.
+The last pieces of the puzzle is whether we have anything that implicitly
+relies on the init section being low down and freeing its pages (eg, as
+a way of stopping that memory being used for non-DMA stuff.)
+
+I do have a patch which shuffles some of this stuff around, but I'm not
+entirely happy with it yet.
