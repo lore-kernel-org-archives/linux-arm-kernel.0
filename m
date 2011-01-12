@@ -1,69 +1,43 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 12 Jan 2011 10:33:33 -0600
-Subject: [PATCH] ARM: Thumb-2: Fix out-of-range offset for Thumb-2 in
-	proc-v7.S
-In-Reply-To: <20110112081446.GB24920@pengutronix.de>
-References: <1294790613-17101-1-git-send-email-dave.martin@linaro.org>
-	<20110112081446.GB24920@pengutronix.de>
-Message-ID: <AANLkTinH0vJsXPkStC8nSqMjCgyv7YPscf2ORry_FdhG@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jan 2011 16:38:54 +0000
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <4D2DD5F8.5000200@parrot.com>
+References: <4D2B4CE4.9080309@ahsoftware.de>
+	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
+	<4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2DD5F8.5000200@parrot.com>
+Message-ID: <20110112163854.GE11039@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/12 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Tue, Jan 11, 2011 at 06:03:33PM -0600, Dave Martin wrote:
->> The following patch introduces a pre-increment addressing
->> offset which is out of range for Thumb-2:
->> ? ? ARM: pgtable: switch order of Linux vs hardware page tables
-> a commit id would be nice here
->
-> Uwe
+On Wed, Jan 12, 2011 at 05:25:28PM +0100, Matthieu CASTET wrote:
+> Russell King - ARM Linux a ?crit :
+>> On Tue, Jan 11, 2011 at 09:16:38PM +0530, Rabin Vincent wrote:
+>>> It's possible to hack around this by placing the initramfs at the end of
+>>> the kernel image rather than at the beginning with the rest of the init
+>>> data.  Something like the below should work, although you should also
+>>> probably take care of alignment and also have this section freed when
+>>> the rest of the init data is freed.
+>>
+>> You're then running into problems as _sdata.._edata is copied to RAM on
+>> XIP kernels, and you really don't want to waste time copying the
+>> initramfs to RAM.
+>>
+> But in this case initramfs is after edata and before bss.
 
-Apologies--- it's commit d30e45eeabefadc6039d7f876a59e5f5f6cb11c6
+Right, so that isn't a concern.
 
-Cheers
----Dave
+> So where is the problem ?
 
->>
->> 162: ?str ? ? r3, [r0, #2048]!
->>
->> Thumb-2 only permits offsets <256 for pre-increment addressing.
->>
->> This patch replaces the store instruction with a suitable add-str
->> pair for the Thumb-2 case.
->>
->> Signed-off-by: Dave Martin <dave.martin@linaro.org>
->> ---
->> KernelVersion: v2.6.37
->>
->> ?arch/arm/mm/proc-v7.S | ? ?4 +++-
->> ?1 files changed, 3 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> index b49fab2..0c1172b 100644
->> --- a/arch/arm/mm/proc-v7.S
->> +++ b/arch/arm/mm/proc-v7.S
->> @@ -159,7 +159,9 @@ ENTRY(cpu_v7_set_pte_ext)
->> ? ? ? tstne ? r1, #L_PTE_PRESENT
->> ? ? ? moveq ? r3, #0
->>
->> - ? ? str ? ? r3, [r0, #2048]!
->> + ARM( ? ? ? ?str ? ? r3, [r0, #2048]! )
->> + THUMB( ? ? ?add ? ? r0, r0, #2048 )
->> + THUMB( ? ? ?str ? ? r3, [r0] )
->> ? ? ? mcr ? ? p15, 0, r0, c7, c10, 1 ? ? ? ? ?@ flush_pte
->> ?#endif
->> ? ? ? mov ? ? pc, lr
->> --
->> 1.7.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+There is a problem with it, as noted by Rabin.  The initramfs will
+never be freed.  Let's try to find a proper solution to this rather
+than everyone sticking their half-baked ideas at it.  Let's see if
+we can rearrange the _entire_ layout in a way that sorts this out
+once and for all without making things even more complicated than
+they already are today.
+
+We've already got enough variables to think about here without having
+yet more freeable sections scattered in the middle of the existing
+layout.
