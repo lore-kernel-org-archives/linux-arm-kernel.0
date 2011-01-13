@@ -1,46 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 13 Jan 2011 10:12:29 +0100
-Subject: [PATCH] unbreak ehci-mxc on otg port of i.MX27
-In-Reply-To: <1294909575-32709-1-git-send-email-eric@eukrea.com>
-References: <1294909575-32709-1-git-send-email-eric@eukrea.com>
-Message-ID: <20110113091229.GE12078@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 13 Jan 2011 10:13:55 +0100
+Subject: No subject
+Message-ID: <20110113091355.GP24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 10:06:15AM +0100, Eric B?nard wrote:
-> commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
-> for i.MX51 but broke it for (at least) i.MX27 which doesn't have
-> a usb_phy1 clock but has a pdev->id 0.
+<jason77.wang@gmail.com>
+Bcc: 
+Subject: Re: i.MX & IRQF_ONESHOT
+Reply-To: 
+In-Reply-To: <4D2EB6EF.7030608@eukrea.com>
 
-Shame on me for not reviewing the patch properly :(
+Hello,
 
+[adding tglx who AFAIK invented threaded irqs and the people involved
+in 2991a1ca6e9b to Cc]
 
+On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
+> while testing 2.6.37 on our i.MX27 based board - code in
+> arch/arm/mach-imx/eukrea_mbimx27-baseboard.c - I noticed the
+> touchscreen controller (ADS7846) doesn't work anymore.
 > 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  drivers/usb/host/ehci-mxc.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> A few IRQ are generated when probing for the chipset and starting
+> calibration (usually first point works), then nothing more (even if
+> the IRQ signals is generated as seen on the scope, the irq count
+> doesn't increase anymore and stays <= 4 and no data is reported to
+> the input layer).
 > 
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index fa59b26..18eb597 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -178,7 +178,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->  	}
->  
->  	/* "dr" device has its own clock */
-> -	if (pdev->id == 0) {
-> +	if ((cpu_is_mx51()) & (pdev->id == 0)) {
+> drivers/input/touchscreen/ads7846.c was switched to threaded IRQ in
+> commit 2991a1ca6e9b13b639a82c0eec0cbc191bf1f42f where was added :
+> irq_flags |= IRQF_ONESHOT;
+AFAIK this is how threaded irq usually work.  The irq should get
+reenabled by irq_thread -> irq_finalize_oneshot then.
 
-should be && and please remove the unnecessary braces around
-cpu_is_mx51(). Otherwise ok.
+> Commenting out this line in the ads7846 driver makes it work again.
+> Am I missing something obvious or is there a reason for IRQF_ONESHOT
+> creating trouble with gpio irq or SPI on i.MX ?
+I don't know.  Is the irq masked?  pending?
 
-Sascha
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
