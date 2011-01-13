@@ -1,17 +1,19 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 13 Jan 2011 15:17:43 +0300
+Date: Thu, 13 Jan 2011 15:22:57 +0300
 Subject: [PATCH] unbreak ehci-mxc on otg port of i.MX27
 In-Reply-To: <1294909575-32709-1-git-send-email-eric@eukrea.com>
 References: <1294909575-32709-1-git-send-email-eric@eukrea.com>
-Message-ID: <4D2EED67.8070904@ru.mvista.com>
+Message-ID: <4D2EEEA1.4020607@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hello.
 
 On 13-01-2011 12:06, Eric B?nard wrote:
 
 > commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
+
+    Forgot to say that Linus has asked to also specify the commit summary in 
+parens after the commit ID.
+
 > for i.MX51 but broke it for (at least) i.MX27 which doesn't have
 > a usb_phy1 clock but has a pdev->id 0.
 
@@ -31,9 +33,8 @@ On 13-01-2011 12:06, Eric B?nard wrote:
 >
 >   	/* "dr" device has its own clock */
 > -	if (pdev->id == 0) {
-> +	if ((cpu_is_mx51()) & (pdev->id == 0)) {
+> +	if ((cpu_is_mx51())&  (pdev->id == 0)) {
 
-    Why enclose the function call in parens at all? You also don't need parens 
-around 'pdev->id == 0'...
+    And it should be &&, not &.
 
 WBR, Sergei
