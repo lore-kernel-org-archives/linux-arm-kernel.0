@@ -1,53 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Jan 2011 07:51:53 -0800
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
-	boot failure)
-In-Reply-To: <20110113091546.GA24429@n2100.arm.linux.org.uk>
-References: <20110106170805.GE1198@n2100.arm.linux.org.uk>
-	<20110106180030.GA8249@n2100.arm.linux.org.uk>
-	<20110106182023.GV7771@atomide.com>
-	<20110106203238.GH1198@n2100.arm.linux.org.uk>
-	<20110106204053.GA7771@atomide.com>
-	<20110107161230.GR1198@n2100.arm.linux.org.uk>
-	<20110110185209.GC4957@atomide.com>
-	<20110111231611.GX4957@atomide.com>
-	<2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
-	<20110113091546.GA24429@n2100.arm.linux.org.uk>
-Message-ID: <20110113155152.GG4957@atomide.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 13 Jan 2011 16:59:25 +0100
+Subject: [PATCH] ARM mxs: clkdev related compile fixes
+In-Reply-To: <20101117090635.GF12959@game.jcrosoft.org>
+References: <20101117090635.GF12959@game.jcrosoft.org>
+Message-ID: <1294934365-17087-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110113 01:15]:
-> On Thu, Jan 13, 2011 at 02:22:06PM +0530, Anand Gadiyar wrote:
-> > Tony Lindgren wrote:
-> > >  	/* Power on the ULPI PHY */
-> > > -	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
-> > > -		/* FIXME: Assumes pad is already muxed for GPIO mode */
-> > > -		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY
-> > VMDM_3V3");
-> > > +	status = gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY
-> > VMDM_3V3");
-> > > +	if (status)
-> > > +		pr_err("%s: Could not get USBB1 PHY GPIO\n");
-> > 
-> > Tony,
-> > 
-> > This throws up a build warning as there's no parameter corresponding to
-> > the %s. Showed up in linux-next as of today.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Oops, sorry, will fix.
+Since commit
+
+	6d803ba (ARM: 6483/1: arm & sh: factorised duplicated clkdev.c)
+
+platforms need to select CLKDEV_LOOKUP instead of COMMON_CLKDEV and need
+to include <linux/clkdev.h>.
+
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+[ukl: make commit log more verbose; remove selection of COMMON_CLKDEV]
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/Kconfig               |    2 +-
+ arch/arm/mach-mxs/clock-mx23.c |    1 +
+ arch/arm/mach-mxs/clock-mx28.c |    1 +
+ 3 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e2f8011..041894e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -368,7 +368,7 @@ config ARCH_MXS
+ 	bool "Freescale MXS-based"
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_REQUIRE_GPIOLIB
+-	select COMMON_CLKDEV
++	select CLKDEV_LOOKUP
+ 	help
+ 	  Support for Freescale MXS-based family of processors
  
-> It's pretty obvious that the above is wrong, and the compiler would
-> have caught it with a warning when building it.  Was the above patch
-> not build-tested before it was committed?
-
-Sure, boot tested it but missed the warning though.
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index 8f5a19a..f94925b 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/jiffies.h>
++#include <linux/clkdev.h>
  
-> Given the very sorry state of OMAP in mainline at present, I'm surprised
-> that this kind of stuff is still going on...
-
-At least I boot test the patches I send..
-
-Regards,
-
-Tony
+ #include <asm/clkdev.h>
+ #include <asm/div64.h>
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 74e2103..56d7dc7 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/jiffies.h>
++#include <linux/clkdev.h>
+ 
+ #include <asm/clkdev.h>
+ #include <asm/div64.h>
+-- 
+1.7.2.3
