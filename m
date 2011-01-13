@@ -1,24 +1,32 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 13 Jan 2011 11:48:05 +0100
-Subject: [PATCH] unbreak ehci-mxc on otg port of i.MX27
-In-Reply-To: <1294909575-32709-1-git-send-email-eric@eukrea.com> ("Eric
-	=?utf-8?Q?B=C3=A9nard=22's?= message of "Thu,
-	13 Jan 2011 10:06:15 +0100")
-References: <1294909575-32709-1-git-send-email-eric@eukrea.com>
-Message-ID: <87tyhd13mi.fsf@lechat.rtp-net.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 13 Jan 2011 12:01:00 +0100
+Subject: BUG: spinlock recursion (sys_chdir, user_path_at,
+	do_path_lookup ...)
+In-Reply-To: <alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
+References: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
+	<20110112210241.GM24920@pengutronix.de>
+	<alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
+Message-ID: <1294916460.19601.89.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric B?nard <eric@eukrea.com> writes:
+On Wed, 2011-01-12 at 23:52 +0100, Thomas Gleixner wrote:
+> On Wed, 12 Jan 2011, Uwe Kleine-K?nig wrote:
+> > > Reverting: fs: rcu-walk aware d_revalidate method
+> > > commit: 34286d6662308d82aed891852d04c7c3a2649b16
+> > I found that one, too, in the meantime.  Currently debugging that with
+> > tglx on irc.
+> 
+> The last finding is that parent and dentry in
+> nameidata_dentry_drop_rcu() are the same, which explains the lock
+> recursion nicely. 
+> 
+> @nick: Anything you want us to add to the debugging ?
+> 
+> @peterz: Why does lockdep ignore the lock recursion in that
+>          spin_lock_nested() call?
 
-> commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
-> for i.MX51 but broke it for (at least) i.MX27 which doesn't have
-> a usb_phy1 clock but has a pdev->id 0.
+$ git show 34286d6662308d82aed891852d04c7c3a2649b16 | grep spin_lock_nested | wc -l
+0
 
-ouch. Sorry for this. I didn't thought that imx51 was an exception
-rather than the rule. Also, I think that imx53 may deserve same
-treatment but I've neither a  imx53 nor its datasheet at hand to check
-that.
-
-thanks,
-Arnaud
+Uhm, whot?!
