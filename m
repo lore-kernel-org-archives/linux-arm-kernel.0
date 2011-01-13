@@ -1,42 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jan 2011 11:14:59 +0000
-Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
-In-Reply-To: <AANLkTimLcGEDrexVCyMROYA1x_GsXdpx_6_ziYWVipMp@mail.gmail.com>
-References: <20101217231449.GF9937@n2100.arm.linux.org.uk>
-	<AANLkTi=-foyb9c5F4tFpGK6KzQnP9htJW8GwYoUHVK0r@mail.gmail.com>
-	<20101218000828.GG9937@n2100.arm.linux.org.uk>
-	<AANLkTinSg+iCGM64iQqLn32Wjpta_87=HWuG==KJ9-eW@mail.gmail.com>
-	<20101218120154.GA4803@n2100.arm.linux.org.uk>
-	<AANLkTimG8yuCMOJPz9-ANi_2hf7E2HPYPy9sWaxVPXmE@mail.gmail.com>
-	<20101218200443.GM9937@n2100.arm.linux.org.uk>
-	<AANLkTikHGX6OQWfGoNiQj-UX81=8_HwP3W+DXwZASatN@mail.gmail.com>
-	<20101224173824.GI20587@n2100.arm.linux.org.uk>
-	<AANLkTimLcGEDrexVCyMROYA1x_GsXdpx_6_ziYWVipMp@mail.gmail.com>
-Message-ID: <20110113111459.GC24149@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 13 Jan 2011 11:13:23 +0000
+Subject: [PATCH] ARM: SMDK6410: Update regulator names for debugfs compatiblity
+Message-ID: <1294917203-24441-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 04:19:40AM -0600, Andrei Warkentin wrote:
-> I fully agree. Would you be interested in me bringing back the actual
-> synchronization code from platform-dependent code into the preinit
-> function and posting that as a patch for review?
+The debugfs support added to the regulator API (which will be merged
+in during this merge window) creates directories for regulators named
+after the display names for the regulators so replace / as a separator
+for multiple supplies with + in the SMDK6410 machine.
 
-I really don't like the idea of a preinit function - it's completely
-unnecessary as I've been trying to point out.  It has been shown that
-it takes a hundred or so microseconds to get into the kernel, and
-then a couple of hundred milliseconds to run the delay loop.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-As platforms are expected to wait in their boot_secondary() for the
-first half - currently platforms wait one second - we're talking
-about around a hundred microseconds vs a timeout of one second.
-That's a factor of 10000 beyond what's required.
-
-It has also been shown that the problem you were seeing was down to
-synchronization/delayed write bugs which have since been solved - and
-adding yet more synchronization is not the answer to buggy
-synchronization.
-
-So, as the timeouts are already well in excess and the root cause of
-your problem has been resolved, I see no need to make this stuff more
-complex - the more complexity there is, the more chance there is of
-things going wrong.
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index 19f9d3f..c8a84be 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -352,7 +352,7 @@ static __initdata struct regulator_init_data smdk6410_vddpll = {
+ /* VDD_UH_MMC, LDO5 on J5 */
+ static __initdata struct regulator_init_data smdk6410_vdduh_mmc = {
+ 	.constraints = {
+-		.name = "PVDD_UH/PVDD_MMC",
++		.name = "PVDD_UH+PVDD_MMC",
+ 		.always_on = 1,
+ 	},
+ };
+@@ -418,7 +418,7 @@ static __initdata struct regulator_init_data smdk6410_vddaudio = {
+ /* S3C64xx internal logic & PLL */
+ static __initdata struct regulator_init_data wm8350_dcdc1_data = {
+ 	.constraints = {
+-		.name = "PVDD_INT/PVDD_PLL",
++		.name = "PVDD_INT+PVDD_PLL",
+ 		.min_uV = 1200000,
+ 		.max_uV = 1200000,
+ 		.always_on = 1,
+@@ -453,7 +453,7 @@ static __initdata struct regulator_consumer_supply wm8350_dcdc4_consumers[] = {
+ 
+ static __initdata struct regulator_init_data wm8350_dcdc4_data = {
+ 	.constraints = {
+-		.name = "PVDD_HI/PVDD_EXT/PVDD_SYS/PVCCM2MTV",
++		.name = "PVDD_HI+PVDD_EXT+PVDD_SYS+PVCCM2MTV",
+ 		.min_uV = 3000000,
+ 		.max_uV = 3000000,
+ 		.always_on = 1,
+@@ -465,7 +465,7 @@ static __initdata struct regulator_init_data wm8350_dcdc4_data = {
+ /* OTGi/1190-EV1 HPVDD & AVDD */
+ static __initdata struct regulator_init_data wm8350_ldo4_data = {
+ 	.constraints = {
+-		.name = "PVDD_OTGI/HPVDD/AVDD",
++		.name = "PVDD_OTGI+HPVDD+AVDD",
+ 		.min_uV = 1200000,
+ 		.max_uV = 1200000,
+ 		.apply_uV = 1,
+@@ -556,7 +556,7 @@ static struct wm831x_backlight_pdata wm1192_backlight_pdata = {
+ 
+ static struct regulator_init_data wm1192_dcdc3 = {
+ 	.constraints = {
+-		.name = "PVDD_MEM/PVDD_GPS",
++		.name = "PVDD_MEM+PVDD_GPS",
+ 		.always_on = 1,
+ 	},
+ };
+@@ -567,7 +567,7 @@ static struct regulator_consumer_supply wm1192_ldo1_consumers[] = {
+ 
+ static struct regulator_init_data wm1192_ldo1 = {
+ 	.constraints = {
+-		.name = "PVDD_LCD/PVDD_EXT",
++		.name = "PVDD_LCD+PVDD_EXT",
+ 		.always_on = 1,
+ 	},
+ 	.consumer_supplies = wm1192_ldo1_consumers,
+-- 
+1.7.2.3
