@@ -1,65 +1,114 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 13 Jan 2011 14:26:23 +0100
-Subject: [patch 2/2] mx51: add support for pwm
-In-Reply-To: <20110113113007.690473432@rtp-net.org>
-References: <20110113112638.328269873@rtp-net.org>
-	<20110113113007.690473432@rtp-net.org>
-Message-ID: <20110113132623.GQ24920@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 13 Jan 2011 19:11:42 +0530
+Subject: NFS root lockups with -next 20110113
+In-Reply-To: 676f5c24375e1cc2aa14fe6630ef1324@mail.gmail.com
+References: <20110113120626.GB30351@opensource.wolfsonmicro.com>
+	<8138.1294924927@jrobl> 676f5c24375e1cc2aa14fe6630ef1324@mail.gmail.com
+Message-ID: <af7e0625d87b3596567f016e2694ffef@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 12:26:40PM +0100, Arnaud Patard wrote:
-> This patch is adding support for pwm1 and pwm2 devices found
-> on mx51.
-> [ this patch has been tested with pwm-backlight driver ]
-> 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> Index: linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/clock-mx51-mx53.c	2011-01-12 16:51:29.000000000 +0100
-> +++ linux-2.6-submit/arch/arm/mach-mx5/clock-mx51-mx53.c	2011-01-12 16:54:40.000000000 +0100
-> @@ -1228,6 +1228,11 @@
->  DEFINE_CLOCK(gpt_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG9_OFFSET,
->  	NULL,  NULL, &ipg_clk, &gpt_ipg_clk);
->  
-> +DEFINE_CLOCK(pwm1_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG6_OFFSET,
-> +	NULL, NULL, &ipg_clk, NULL);
-> +DEFINE_CLOCK(pwm2_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG8_OFFSET,
-> +	NULL, NULL, &ipg_clk, NULL);
-> +
->  /* I2C */
->  DEFINE_CLOCK(i2c1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG9_OFFSET,
->  	NULL, NULL, &ipg_clk, NULL);
-> @@ -1320,6 +1325,8 @@
->  	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
->  	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
->  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
-> +	_REGISTER_CLOCK("mxc_pwm.0", "pwm", pwm1_clk)
-> +	_REGISTER_CLOCK("mxc_pwm.1", "pwm", pwm2_clk)
-You really need "pwm"? I'd prefer NULL if that works, too.  (And if not,
-please fix the driver :-)
+(+ 'linux-arm' since same problem was getting discussed
+ in another thread)
 
-Uwe
->  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
->  	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
->  	_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
-> Index: linux-2.6-submit/arch/arm/plat-mxc/pwm.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/plat-mxc/pwm.c	2011-01-12 16:48:33.000000000 +0100
-> +++ linux-2.6-submit/arch/arm/plat-mxc/pwm.c	2011-01-12 16:54:40.000000000 +0100
-> @@ -57,7 +57,7 @@
->  	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
->  		return -EINVAL;
->  
-> -	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25()) {
-> +	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
->  		unsigned long long c;
->  		unsigned long period_cycles, duty_cycles, prescale;
->  		u32 cr;
-Hmm, time to convert to platform-id?
-
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> -----Original Message-----
+> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> Sent: Thursday, January 13, 2011 6:59 PM
+> To: 'J. R. Okajima'; 'Mark Brown'
+> Cc: 'Trond Myklebust'; 'Nick Piggin'; 'linux-nfs at vger.kernel.org';
+> 'linux-kernel at vger.kernel.org'; 'linux-fsdevel at vger.kernel.org'
+> Subject: RE: NFS root lockups with -next 20110113
+>
+> > -----Original Message-----
+> > From: J. R. Okajima [mailto:hooanon05 at yahoo.co.jp]
+> > Sent: Thursday, January 13, 2011 6:52 PM
+> > To: Mark Brown
+> > Cc: Trond Myklebust; Santosh Shilimkar; Nick Piggin; linux-
+> > nfs at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> > fsdevel at vger.kernel.org
+> > Subject: Re: NFS root lockups with -next 20110113
+> >
+> >
+> > Mark Brown:
+> > > With -next 20110113 I'm experiencing lockups shortly after
+> > userspace
+> > > starts when booting with my root filesystem on NFS, log below.
+> I
+> > can
+> > > boot into /bin/sh but running real userspace triggers this very
+> > easily.
+> > > This was introduced sometime this week.
+> > >
+> > > I've not bisected or otherwise investigated much yet, but I do
+> > notice
+> > > code added recently by Nick in "fs: rcu-walk for path lookup"
+> > showing up
+> > > in the backtrace so including him in the CCs.
+> >
+> > This and a report from Santosh Shilimkar look like the same
+> problem
+> > which I reported, and I am testing this patch. If you can, please
+> > try it
+> > too.
+> > Note: Of course this is not offcial fix.
+> >
+>
+> It works. My board booted with NFS with below patch
+>
+>
+> >
+> > diff --git a/fs/namei.c b/fs/namei.c
+> > index 5bb7588..51d052f 100644
+> > --- a/fs/namei.c
+> > +++ b/fs/namei.c
+> > @@ -480,6 +480,7 @@ static int nameidata_dentry_drop_rcu(struct
+> > nameidata *nd, struct dentry *dentry
+> >  {
+> >  	struct fs_struct *fs = current->fs;
+> >  	struct dentry *parent = nd->path.dentry;
+> > +	int isroot;
+> >
+> >  	BUG_ON(!(nd->flags & LOOKUP_RCU));
+> >  	if (nd->root.mnt) {
+> > @@ -489,18 +490,22 @@ static int nameidata_dentry_drop_rcu(struct
+> > nameidata *nd, struct dentry *dentry
+> >  			goto err_root;
+> >  	}
+> >  	spin_lock(&parent->d_lock);
+> > -	spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
+> > -	if (!__d_rcu_to_refcount(dentry, nd->seq))
+> > -		goto err;
+> > +	isroot = IS_ROOT(dentry);
+> > +	if (!isroot) {
+> > +		spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
+> > +		if (!__d_rcu_to_refcount(dentry, nd->seq))
+> > +			goto err;
+> > +	}
+> >  	/*
+> >  	 * If the sequence check on the child dentry passed, then the
+> > child has
+> >  	 * not been removed from its parent. This means the parent
+> > dentry must
+> >  	 * be valid and able to take a reference at this point.
+> >  	 */
+> > -	BUG_ON(!IS_ROOT(dentry) && dentry->d_parent != parent);
+> > +	BUG_ON(!isroot && dentry->d_parent != parent);
+> >  	BUG_ON(!parent->d_count);
+> >  	parent->d_count++;
+> > -	spin_unlock(&dentry->d_lock);
+> > +	if (!isroot)
+> > +		spin_unlock(&dentry->d_lock);
+> >  	spin_unlock(&parent->d_lock);
+> >  	if (nd->root.mnt) {
+> >  		path_get(&nd->root);
+> > @@ -513,7 +518,8 @@ static int nameidata_dentry_drop_rcu(struct
+> > nameidata *nd, struct dentry *dentry
+> >  	nd->flags &= ~LOOKUP_RCU;
+> >  	return 0;
+> >  err:
+> > -	spin_unlock(&dentry->d_lock);
+> > +	if (!isroot)
+> > +		spin_unlock(&dentry->d_lock);
+> >  	spin_unlock(&parent->d_lock);
+> >  err_root:
+> >  	if (nd->root.mnt)
