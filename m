@@ -1,1188 +1,283 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Thu, 13 Jan 2011 13:40:28 +0900
-Subject: [PATCH] drivers: ld9040 amoled driver support
-Message-ID: <1294893628-16998-1-git-send-email-dh09.lee@samsung.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 13 Jan 2011 14:30:01 +0900
+Subject: [GIT PULL] Samsung S5P for 2.6.38 merge window
+Message-ID: <021901cbb2e2$ef4a0630$cdde1290$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is ld9040 amoled panel driver.
-I resend because there was no comment.
+Hi Russell,
 
-It is similar to s6e63m0 panel driver and use spi gpio to send panel
-information.
+Please pull Samsung S5P updates from:
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Inki Dae <inki.dae@samsung.com>
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-rmk
 
----
- drivers/video/backlight/Kconfig        |    8 +
- drivers/video/backlight/Makefile       |    1 +
- drivers/video/backlight/ld9040.c       |  927 ++++++++++++++++++++++++++++++++
- drivers/video/backlight/ld9040_gamma.h |  203 +++++++
- 4 files changed, 1139 insertions(+), 0 deletions(-)
- create mode 100644 drivers/video/backlight/ld9040.c
- create mode 100644 drivers/video/backlight/ld9040_gamma.h
+These things are for 2.6.38.
 
-diff --git a/drivers/video/backlight/Kconfig b/drivers/video/backlight/Kconfig
-index e54a337..db3d123 100644
---- a/drivers/video/backlight/Kconfig
-+++ b/drivers/video/backlight/Kconfig
-@@ -109,6 +109,14 @@ config LCD_S6E63M0
- 	  If you have an S6E63M0 LCD Panel, say Y to enable its
- 	  LCD control driver.
- 
-+config LCD_LD9040
-+	tristate "LD9040 AMOLED LCD Driver"
-+	depends on SPI && BACKLIGHT_CLASS_DEVICE
-+	default n
-+	help
-+	  If you have an LD9040 Panel, say Y to enable its
-+	  control driver.
-+
- endif # LCD_CLASS_DEVICE
- 
- #
-diff --git a/drivers/video/backlight/Makefile b/drivers/video/backlight/Makefile
-index 44c0f81..457996c 100644
---- a/drivers/video/backlight/Makefile
-+++ b/drivers/video/backlight/Makefile
-@@ -12,6 +12,7 @@ obj-$(CONFIG_LCD_VGG2432A4)	   += vgg2432a4.o
- obj-$(CONFIG_LCD_TDO24M)	   += tdo24m.o
- obj-$(CONFIG_LCD_TOSA)		   += tosa_lcd.o
- obj-$(CONFIG_LCD_S6E63M0)	+= s6e63m0.o
-+obj-$(CONFIG_LCD_LD9040)	+= ld9040.o
- 
- obj-$(CONFIG_BACKLIGHT_CLASS_DEVICE) += backlight.o
- obj-$(CONFIG_BACKLIGHT_ATMEL_PWM)    += atmel-pwm-bl.o
-diff --git a/drivers/video/backlight/ld9040.c b/drivers/video/backlight/ld9040.c
-new file mode 100644
-index 0000000..248f42f
---- /dev/null
-+++ b/drivers/video/backlight/ld9040.c
-@@ -0,0 +1,927 @@
-+/*
-+ * ld9040 AMOLED LCD panel driver.
-+ *
-+ * Author: Donghwa Lee  <dh09.lee@samsung.com>
-+ *
-+ * Derived from drivers/video/backlight/s6e63m0.c
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-+ */
-+
-+#include <linux/wait.h>
-+#include <linux/fb.h>
-+#include <linux/delay.h>
-+#include <linux/gpio.h>
-+#include <linux/spi/spi.h>
-+#include <linux/irq.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/lcd.h>
-+#include <linux/backlight.h>
-+
-+#include "ld9040_gamma.h"
-+
-+#define SLEEPMSEC		0x1000
-+#define ENDDEF			0x2000
-+#define	DEFMASK			0xFF00
-+#define COMMAND_ONLY		0xFE
-+#define DATA_ONLY		0xFF
-+
-+#define MIN_BRIGHTNESS		0
-+#define MAX_BRIGHTNESS		24
-+#define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
-+
-+struct ld9040 {
-+	struct device			*dev;
-+	struct spi_device		*spi;
-+	unsigned int			power;
-+	unsigned int			gamma_mode;
-+	unsigned int			current_brightness;
-+	unsigned int			gamma_table_count;
-+
-+	struct lcd_device		*ld;
-+	struct backlight_device		*bd;
-+	struct lcd_platform_data	*lcd_pd;
-+};
-+
-+static const unsigned short SEQ_SWRESET[] = {
-+	0x01, COMMAND_ONLY,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_USER_SETTING[] = {
-+	0xF0, 0x5A,
-+
-+	DATA_ONLY, 0x5A,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_ELVSS_ON[] = {
-+	0xB1, 0x0D,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x16,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_GTCON[] = {
-+	0xF7, 0x09,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_PANEL_CONDITION[] = {
-+	0xF8, 0x05,
-+
-+	DATA_ONLY, 0x65,
-+	DATA_ONLY, 0x96,
-+	DATA_ONLY, 0x71,
-+	DATA_ONLY, 0x7D,
-+	DATA_ONLY, 0x19,
-+	DATA_ONLY, 0x3B,
-+	DATA_ONLY, 0x0D,
-+	DATA_ONLY, 0x19,
-+	DATA_ONLY, 0x7E,
-+	DATA_ONLY, 0x0D,
-+	DATA_ONLY, 0xE2,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x7E,
-+	DATA_ONLY, 0x7D,
-+	DATA_ONLY, 0x07,
-+	DATA_ONLY, 0x07,
-+	DATA_ONLY, 0x20,
-+	DATA_ONLY, 0x20,
-+	DATA_ONLY, 0x20,
-+	DATA_ONLY, 0x02,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_GAMMA_SET1[] = {
-+	0xF9, 0x00,
-+
-+	DATA_ONLY, 0xA7,
-+	DATA_ONLY, 0xB4,
-+	DATA_ONLY, 0xAE,
-+	DATA_ONLY, 0xBF,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x91,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0xB2,
-+	DATA_ONLY, 0xB4,
-+	DATA_ONLY, 0xAA,
-+	DATA_ONLY, 0xBB,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0xAC,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0xB3,
-+	DATA_ONLY, 0xB1,
-+	DATA_ONLY, 0xAA,
-+	DATA_ONLY, 0xBC,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0xB3,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_GAMMA_CTRL[] = {
-+	0xFB, 0x02,
-+
-+	DATA_ONLY, 0x5A,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_GAMMA_START[] = {
-+	0xF9, COMMAND_ONLY,
-+
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_APON[] = {
-+	0xF3, 0x00,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x0A,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_DISPCTL[] = {
-+	0xF2, 0x02,
-+
-+	DATA_ONLY, 0x08,
-+	DATA_ONLY, 0x08,
-+	DATA_ONLY, 0x10,
-+	DATA_ONLY, 0x10,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_MANPWR[] = {
-+	0xB0, 0x04,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_PWR_CTRL[] = {
-+	0xF4, 0x0A,
-+
-+	DATA_ONLY, 0x87,
-+	DATA_ONLY, 0x25,
-+	DATA_ONLY, 0x6A,
-+	DATA_ONLY, 0x44,
-+	DATA_ONLY, 0x02,
-+	DATA_ONLY, 0x88,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_SLPOUT[] = {
-+	0x11, COMMAND_ONLY,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_SLPIN[] = {
-+	0x10, COMMAND_ONLY,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_DISPON[] = {
-+	0x29, COMMAND_ONLY,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_DISPOFF[] = {
-+	0x28, COMMAND_ONLY,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VCI1_1ST_EN[] = {
-+	0xF3, 0x10,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VL1_EN[] = {
-+	0xF3, 0x11,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VL2_EN[] = {
-+	0xF3, 0x13,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VCI1_2ND_EN[] = {
-+	0xF3, 0x33,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VL3_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VREG1_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0x01,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VGH_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0x11,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VGL_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0x31,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x02,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VMOS_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xB1,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VINT_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xF1,
-+	/* DATA_ONLY, 0x71,	VMOS/VBL/VBH not used */
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VBH_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xF9,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_VBL_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xFD,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_GAM_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xFF,
-+	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_SD_AMP_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xFF,
-+	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
-+	DATA_ONLY, 0x80,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_GLS_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xFF,
-+	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
-+	DATA_ONLY, 0x81,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_ELS_EN[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xFF,
-+	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
-+	DATA_ONLY, 0x83,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
-+	ENDDEF, 0x00
-+};
-+
-+static const unsigned short SEQ_EL_ON[] = {
-+	0xF3, 0x37,
-+
-+	DATA_ONLY, 0xFF,
-+	/* DATA_ONLY, 0x73,	VMOS/VBL/VBH not used */
-+	DATA_ONLY, 0x87,
-+	DATA_ONLY, 0x00,
-+	DATA_ONLY, 0x03,
-+	/* DATA_ONLY, 0x02,	VMOS/VBL/VBH not used */
-+	ENDDEF, 0x00
-+};
-+
-+static int ld9040_spi_write_byte(struct ld9040 *lcd, int addr, int data)
-+{
-+	u16 buf[1];
-+	struct spi_message msg;
-+
-+	struct spi_transfer xfer = {
-+		.len		= 2,
-+		.tx_buf		= buf,
-+	};
-+
-+	buf[0] = (addr << 8) | data;
-+
-+	spi_message_init(&msg);
-+	spi_message_add_tail(&xfer, &msg);
-+
-+	return spi_sync(lcd->spi, &msg);
-+}
-+
-+static int ld9040_spi_write(struct ld9040 *lcd, unsigned char address,
-+	unsigned char command)
-+{
-+	int ret = 0;
-+
-+	if (address != DATA_ONLY)
-+		ret = ld9040_spi_write_byte(lcd, 0x0, address);
-+	if (command != COMMAND_ONLY)
-+		ret = ld9040_spi_write_byte(lcd, 0x1, command);
-+
-+	return ret;
-+}
-+
-+static int ld9040_panel_send_sequence(struct ld9040 *lcd,
-+	const unsigned short *wbuf)
-+{
-+	int ret = 0, i = 0;
-+
-+	while ((wbuf[i] & DEFMASK) != ENDDEF) {
-+		if ((wbuf[i] & DEFMASK) != SLEEPMSEC) {
-+			ret = ld9040_spi_write(lcd, wbuf[i], wbuf[i+1]);
-+			if (ret)
-+				break;
-+		} else
-+			udelay(wbuf[i+1]*1000);
-+		i += 2;
-+	}
-+
-+	return ret;
-+}
-+
-+static int _ld9040_gamma_ctl(struct ld9040 *lcd, const unsigned int *gamma)
-+{
-+	unsigned int i = 0;
-+	int ret = 0;
-+
-+	/* start gamma table updating. */
-+	ret = ld9040_panel_send_sequence(lcd, SEQ_GAMMA_START);
-+	if (ret) {
-+		dev_err(lcd->dev, "failed to disable gamma table updating.\n");
-+		goto gamma_err;
-+	}
-+
-+	for (i = 0 ; i < GAMMA_TABLE_COUNT; i++) {
-+		ret = ld9040_spi_write(lcd, DATA_ONLY, gamma[i]);
-+		if (ret) {
-+			dev_err(lcd->dev, "failed to set gamma table.\n");
-+			goto gamma_err;
-+		}
-+	}
-+
-+	/* update gamma table. */
-+	ret = ld9040_panel_send_sequence(lcd, SEQ_GAMMA_CTRL);
-+	if (ret)
-+		dev_err(lcd->dev, "failed to update gamma table.\n");
-+
-+gamma_err:
-+	return ret;
-+}
-+
-+static int ld9040_gamma_ctl(struct ld9040 *lcd, int gamma)
-+{
-+	int ret = 0;
-+
-+	ret = _ld9040_gamma_ctl(lcd, gamma_table.gamma_22_table[gamma]);
-+
-+	return ret;
-+}
-+
-+
-+static int ld9040_ldi_init(struct ld9040 *lcd)
-+{
-+	int ret, i;
-+	const unsigned short *init_seq[] = {
-+		SEQ_USER_SETTING,
-+		SEQ_PANEL_CONDITION,
-+		SEQ_DISPCTL,
-+		SEQ_MANPWR,
-+		SEQ_PWR_CTRL,
-+		SEQ_ELVSS_ON,
-+		SEQ_GTCON,
-+		SEQ_GAMMA_SET1,
-+		SEQ_GAMMA_CTRL,
-+		SEQ_SLPOUT,
-+	};
-+
-+	for (i = 0; i < ARRAY_SIZE(init_seq); i++) {
-+		ret = ld9040_panel_send_sequence(lcd, init_seq[i]);
-+		/* workaround: minimum delay time for transferring CMD */
-+		udelay(300);
-+		if (ret)
-+			break;
-+	}
-+
-+	return ret;
-+}
-+
-+static int ld9040_ldi_enable(struct ld9040 *lcd)
-+{
-+	int ret = 0;
-+
-+	ret = ld9040_panel_send_sequence(lcd, SEQ_DISPON);
-+
-+	return ret;
-+}
-+
-+static int ld9040_ldi_disable(struct ld9040 *lcd)
-+{
-+	int ret;
-+
-+	ret = ld9040_panel_send_sequence(lcd, SEQ_DISPOFF);
-+	ret = ld9040_panel_send_sequence(lcd, SEQ_SLPIN);
-+
-+	return ret;
-+}
-+
-+static int ld9040_power_on(struct ld9040 *lcd)
-+{
-+	int ret = 0;
-+	struct lcd_platform_data *pd = NULL;
-+	pd = lcd->lcd_pd;
-+	if (!pd) {
-+		dev_err(lcd->dev, "platform data is NULL.\n");
-+		return -EFAULT;
-+	}
-+
-+	if (!pd->power_on) {
-+		dev_err(lcd->dev, "power_on is NULL.\n");
-+		return -EFAULT;
-+	} else {
-+		pd->power_on(lcd->ld, 1);
-+		mdelay(pd->power_on_delay);
-+	}
-+
-+	if (!pd->reset) {
-+		dev_err(lcd->dev, "reset is NULL.\n");
-+		return -EFAULT;
-+	} else {
-+		pd->reset(lcd->ld);
-+		mdelay(pd->reset_delay);
-+	}
-+
-+	ret = ld9040_ldi_init(lcd);
-+	if (ret) {
-+		dev_err(lcd->dev, "failed to initialize ldi.\n");
-+		return ret;
-+	}
-+
-+	ret = ld9040_ldi_enable(lcd);
-+	if (ret) {
-+		dev_err(lcd->dev, "failed to enable ldi.\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int ld9040_power_off(struct ld9040 *lcd)
-+{
-+	int ret = 0;
-+	struct lcd_platform_data *pd = NULL;
-+
-+	pd = lcd->lcd_pd;
-+	if (!pd) {
-+		dev_err(lcd->dev, "platform data is NULL.\n");
-+		return -EFAULT;
-+	}
-+
-+	ret = ld9040_ldi_disable(lcd);
-+	if (ret) {
-+		dev_err(lcd->dev, "lcd setting failed.\n");
-+		return -EIO;
-+	}
-+
-+	mdelay(pd->power_off_delay);
-+
-+	if (!pd->power_on) {
-+		dev_err(lcd->dev, "power_on is NULL.\n");
-+		return -EFAULT;
-+	} else
-+		pd->power_on(lcd->ld, 0);
-+
-+	return 0;
-+}
-+
-+static int ld9040_power(struct ld9040 *lcd, int power)
-+{
-+	int ret = 0;
-+
-+	if (POWER_IS_ON(power) && !POWER_IS_ON(lcd->power))
-+		ret = ld9040_power_on(lcd);
-+	else if (!POWER_IS_ON(power) && POWER_IS_ON(lcd->power))
-+		ret = ld9040_power_off(lcd);
-+
-+	if (!ret)
-+		lcd->power = power;
-+
-+	return ret;
-+}
-+
-+static int ld9040_set_power(struct lcd_device *ld, int power)
-+{
-+	struct ld9040 *lcd = lcd_get_data(ld);
-+
-+	if (power != FB_BLANK_UNBLANK && power != FB_BLANK_POWERDOWN &&
-+		power != FB_BLANK_NORMAL) {
-+		dev_err(lcd->dev, "power value should be 0, 1 or 4.\n");
-+		return -EINVAL;
-+	}
-+
-+	return ld9040_power(lcd, power);
-+}
-+
-+static int ld9040_get_power(struct lcd_device *ld)
-+{
-+	struct ld9040 *lcd = lcd_get_data(ld);
-+
-+	return lcd->power;
-+}
-+
-+static int ld9040_get_brightness(struct backlight_device *bd)
-+{
-+	return bd->props.brightness;
-+}
-+
-+static int ld9040_set_brightness(struct backlight_device *bd)
-+{
-+	int ret = 0, brightness = bd->props.brightness;
-+	struct ld9040 *lcd = bl_get_data(bd);
-+
-+	if (brightness < MIN_BRIGHTNESS ||
-+		brightness > bd->props.max_brightness) {
-+		dev_err(&bd->dev, "lcd brightness should be %d to %d.\n",
-+			MIN_BRIGHTNESS, MAX_BRIGHTNESS);
-+		return -EINVAL;
-+	}
-+
-+	ret = ld9040_gamma_ctl(lcd, bd->props.brightness);
-+	if (ret) {
-+		dev_err(&bd->dev, "lcd brightness setting failed.\n");
-+		return -EIO;
-+	}
-+
-+	return ret;
-+}
-+
-+static struct lcd_ops ld9040_lcd_ops = {
-+	.set_power = ld9040_set_power,
-+	.get_power = ld9040_get_power,
-+};
-+
-+static const struct backlight_ops ld9040_backlight_ops  = {
-+	.get_brightness = ld9040_get_brightness,
-+	.update_status = ld9040_set_brightness,
-+};
-+
-+static ssize_t ld9040_sysfs_show_gamma_mode(struct device *dev,
-+				      struct device_attribute *attr, char *buf)
-+{
-+	struct ld9040 *lcd = dev_get_drvdata(dev);
-+	char temp[10];
-+
-+	switch (lcd->gamma_mode) {
-+	case 0:
-+		sprintf(temp, "2.2 mode\n");
-+		strcat(buf, temp);
-+		break;
-+	default:
-+		dev_info(dev, "gamma mode could be 0:2.2\n");
-+		break;
-+	}
-+
-+	return strlen(buf);
-+}
-+
-+static ssize_t ld9040_sysfs_store_gamma_mode(struct device *dev,
-+				       struct device_attribute *attr,
-+				       const char *buf, size_t len)
-+{
-+	struct ld9040 *lcd = dev_get_drvdata(dev);
-+	struct backlight_device *bd = NULL;
-+	int brightness, rc;
-+
-+	rc = strict_strtoul(buf, 0, (unsigned long *)&lcd->gamma_mode);
-+	if (rc < 0)
-+		return rc;
-+
-+	bd = lcd->bd;
-+
-+	brightness = bd->props.brightness;
-+
-+	switch (lcd->gamma_mode) {
-+	case 0:
-+		_ld9040_gamma_ctl(lcd, gamma_table.gamma_22_table[brightness]);
-+		break;
-+	default:
-+		dev_info(dev, "gamma mode could be 0:2.2\n");
-+		_ld9040_gamma_ctl(lcd, gamma_table.gamma_22_table[brightness]);
-+		break;
-+	}
-+	return len;
-+}
-+
-+static DEVICE_ATTR(gamma_mode, 0644,
-+		ld9040_sysfs_show_gamma_mode, ld9040_sysfs_store_gamma_mode);
-+
-+static ssize_t ld9040_sysfs_show_gamma_table(struct device *dev,
-+				      struct device_attribute *attr, char *buf)
-+{
-+	struct ld9040 *lcd = dev_get_drvdata(dev);
-+	char temp[3];
-+
-+	sprintf(temp, "%d\n", lcd->gamma_table_count);
-+	strcpy(buf, temp);
-+
-+	return strlen(buf);
-+}
-+
-+static DEVICE_ATTR(gamma_table, 0644,
-+		ld9040_sysfs_show_gamma_table, NULL);
-+
-+static int ld9040_probe(struct spi_device *spi)
-+{
-+	int ret = 0;
-+	struct ld9040 *lcd = NULL;
-+	struct lcd_device *ld = NULL;
-+	struct backlight_device *bd = NULL;
-+
-+	lcd = kzalloc(sizeof(struct ld9040), GFP_KERNEL);
-+	if (!lcd)
-+		return -ENOMEM;
-+
-+	/* ld9040 lcd panel uses 3-wire 9bits SPI Mode. */
-+	spi->bits_per_word = 9;
-+
-+	ret = spi_setup(spi);
-+	if (ret < 0) {
-+		dev_err(&spi->dev, "spi setup failed.\n");
-+		goto out_free_lcd;
-+	}
-+
-+	lcd->spi = spi;
-+	lcd->dev = &spi->dev;
-+
-+	lcd->lcd_pd = (struct lcd_platform_data *)spi->dev.platform_data;
-+	if (!lcd->lcd_pd) {
-+		dev_err(&spi->dev, "platform data is NULL.\n");
-+		goto out_free_lcd;
-+	}
-+
-+	ld = lcd_device_register("ld9040", &spi->dev, lcd, &ld9040_lcd_ops);
-+	if (IS_ERR(ld)) {
-+		ret = PTR_ERR(ld);
-+		goto out_free_lcd;
-+	}
-+
-+	lcd->ld = ld;
-+
-+	bd = backlight_device_register("ld9040-bl", &spi->dev,
-+		lcd, &ld9040_backlight_ops, NULL);
-+	if (IS_ERR(ld)) {
-+		ret = PTR_ERR(ld);
-+		goto out_free_lcd;
-+	}
-+
-+	bd->props.max_brightness = MAX_BRIGHTNESS;
-+	bd->props.brightness = MAX_BRIGHTNESS;
-+	lcd->bd = bd;
-+
-+	/*
-+	 * it gets gamma table count available so it gets user
-+	 * know that.
-+	 */
-+	lcd->gamma_table_count =
-+	    sizeof(gamma_table) / (MAX_GAMMA_LEVEL * sizeof(int));
-+
-+	ret = device_create_file(&(spi->dev), &dev_attr_gamma_mode);
-+	if (ret < 0)
-+		dev_err(&(spi->dev), "failed to add sysfs entries\n");
-+
-+	ret = device_create_file(&(spi->dev), &dev_attr_gamma_table);
-+	if (ret < 0)
-+		dev_err(&(spi->dev), "failed to add sysfs entries\n");
-+
-+	/*
-+	 * if lcd panel was on from bootloader like u-boot then
-+	 * do not lcd on.
-+	 */
-+	if (!lcd->lcd_pd->lcd_enabled) {
-+		/*
-+		 * if lcd panel was off from bootloader then
-+		 * current lcd status is powerdown and then
-+		 * it enables lcd panel.
-+		 */
-+		lcd->power = FB_BLANK_POWERDOWN;
-+
-+		ld9040_power(lcd, FB_BLANK_UNBLANK);
-+	} else
-+		lcd->power = FB_BLANK_UNBLANK;
-+
-+	dev_set_drvdata(&spi->dev, lcd);
-+
-+	dev_info(&spi->dev, "ld9040 panel driver has been probed.\n");
-+	return 0;
-+
-+out_free_lcd:
-+	kfree(lcd);
-+	return ret;
-+}
-+
-+static int __devexit ld9040_remove(struct spi_device *spi)
-+{
-+	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
-+
-+	ld9040_power(lcd, FB_BLANK_POWERDOWN);
-+	lcd_device_unregister(lcd->ld);
-+	kfree(lcd);
-+
-+	return 0;
-+}
-+
-+#if defined(CONFIG_PM)
-+unsigned int beforepower;
-+
-+static int ld9040_suspend(struct spi_device *spi, pm_message_t mesg)
-+{
-+	int ret = 0;
-+	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
-+
-+	dev_dbg(&spi->dev, "lcd->power = %d\n", lcd->power);
-+
-+	beforepower = lcd->power;
-+
-+	/*
-+	 * when lcd panel is suspend, lcd panel becomes off
-+	 * regardless of status.
-+	 */
-+	ret = ld9040_power(lcd, FB_BLANK_POWERDOWN);
-+
-+	return ret;
-+}
-+
-+static int ld9040_resume(struct spi_device *spi)
-+{
-+	int ret = 0;
-+	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
-+
-+	/*
-+	 * after suspended, if lcd panel status is FB_BLANK_UNBLANK
-+	 * (at that time, power is FB_BLANK_UNBLANK) then
-+	 * it changes that status to FB_BLANK_POWERDOWN to get lcd on.
-+	 */
-+	if (beforepower == FB_BLANK_UNBLANK)
-+		lcd->power = FB_BLANK_POWERDOWN;
-+
-+	dev_dbg(&spi->dev, "power = %d\n", beforepower);
-+
-+	ret = ld9040_power(lcd, beforepower);
-+
-+	return ret;
-+}
-+#else
-+#define ld9040_suspend		NULL
-+#define ld9040_resume		NULL
-+#endif
-+
-+/* Power down all displays on reboot, poweroff or halt. */
-+static void ld9040_shutdown(struct spi_device *spi)
-+{
-+	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
-+
-+	ld9040_power(lcd, FB_BLANK_POWERDOWN);
-+}
-+
-+static struct spi_driver ld9040_driver = {
-+	.driver = {
-+		.name	= "ld9040",
-+		.bus	= &spi_bus_type,
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= ld9040_probe,
-+	.remove		= __devexit_p(ld9040_remove),
-+	.shutdown	= ld9040_shutdown,
-+	.suspend	= ld9040_suspend,
-+	.resume		= ld9040_resume,
-+};
-+
-+static int __init ld9040_init(void)
-+{
-+	return spi_register_driver(&ld9040_driver);
-+}
-+
-+static void __exit ld9040_exit(void)
-+{
-+	spi_unregister_driver(&ld9040_driver);
-+}
-+
-+module_init(ld9040_init);
-+module_exit(ld9040_exit);
-+
-+MODULE_AUTHOR("Donghwa Lee <dh09.lee@samsung.com>");
-+MODULE_DESCRIPTION("ld9040 LCD Driver");
-+MODULE_LICENSE("GPL");
-+
-diff --git a/drivers/video/backlight/ld9040_gamma.h b/drivers/video/backlight/ld9040_gamma.h
-new file mode 100644
-index 0000000..f199133
---- /dev/null
-+++ b/drivers/video/backlight/ld9040_gamma.h
-@@ -0,0 +1,203 @@
-+/* linux/drivers/video/samsung/ld9040_brightness.h
-+ *
-+ * Gamma level definitions.
-+ *
-+ * Copyright (c) 2009 Samsung Electronics
-+ * InKi Dae <inki.dae@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#ifndef _ld9040_BRIGHTNESS_H
-+#define _ld9040_BRIGHTNESS_H
-+
-+#define MAX_GAMMA_LEVEL		25
-+#define GAMMA_TABLE_COUNT	21
-+
-+/* gamma value: 2.2 */
-+static const unsigned int ld9040_22_300[] = {
-+	0x00, 0xa7, 0xb4, 0xae, 0xbf, 0x00, 0x91,
-+	0x00, 0xb2, 0xb4, 0xaa, 0xbb, 0x00, 0xac,
-+	0x00, 0xb3, 0xb1, 0xaa, 0xbc, 0x00, 0xb3
-+};
-+
-+static const unsigned int ld9040_22_290[] = {
-+	0x00, 0xa9, 0xb7, 0xae, 0xbd, 0x00, 0x89,
-+	0x00, 0xb7, 0xb6, 0xa8, 0xba, 0x00, 0xa4,
-+	0x00, 0xb1, 0xb4, 0xaa, 0xbb, 0x00, 0xaa
-+};
-+
-+static const unsigned int ld9040_22_280[] = {
-+	0x00, 0xa9, 0xb6, 0xad, 0xbf, 0x00, 0x86,
-+	0x00, 0xb8, 0xb5, 0xa8, 0xbc, 0x00, 0xa0,
-+	0x00, 0xb3, 0xb3, 0xa9, 0xbc, 0x00, 0xa7
-+};
-+
-+static const unsigned int ld9040_22_270[] = {
-+	0x00, 0xa8, 0xb8, 0xae, 0xbe, 0x00, 0x84,
-+	0x00, 0xb9, 0xb7, 0xa8, 0xbc, 0x00, 0x9d,
-+	0x00, 0xb2, 0xb5, 0xaa, 0xbc, 0x00, 0xa4
-+
-+};
-+static const unsigned int ld9040_22_260[] = {
-+	0x00, 0xa4, 0xb8, 0xb0, 0xbf, 0x00, 0x80,
-+	0x00, 0xb8, 0xb6, 0xaa, 0xbc, 0x00, 0x9a,
-+	0x00, 0xb0, 0xb5, 0xab, 0xbd, 0x00, 0xa0
-+};
-+
-+static const unsigned int ld9040_22_250[] = {
-+	0x00, 0xa4, 0xb9, 0xaf, 0xc1, 0x00, 0x7d,
-+	0x00, 0xb9, 0xb6, 0xaa, 0xbb, 0x00, 0x97,
-+	0x00, 0xb1, 0xb5, 0xaa, 0xbf, 0x00, 0x9d
-+};
-+
-+static const unsigned int ld9040_22_240[] = {
-+	0x00, 0xa2, 0xb9, 0xaf, 0xc2, 0x00, 0x7a,
-+	0x00, 0xb9, 0xb7, 0xaa, 0xbd, 0x00, 0x94,
-+	0x00, 0xb0, 0xb5, 0xab, 0xbf, 0x00, 0x9a
-+};
-+
-+static const unsigned int ld9040_22_230[] = {
-+	0x00, 0xa0, 0xb9, 0xaf, 0xc3, 0x00, 0x77,
-+	0x00, 0xb9, 0xb7, 0xab, 0xbe, 0x00, 0x90,
-+	0x00, 0xb0, 0xb6, 0xab, 0xbf, 0x00, 0x97
-+};
-+
-+static const unsigned int ld9040_22_220[] = {
-+	0x00, 0x9e, 0xba, 0xb0, 0xc2, 0x00, 0x75,
-+	0x00, 0xb9, 0xb8, 0xab, 0xbe, 0x00, 0x8e,
-+	0x00, 0xb0, 0xb6, 0xac, 0xbf, 0x00, 0x94
-+};
-+
-+static const unsigned int ld9040_22_210[] = {
-+	0x00, 0x9c, 0xb9, 0xb0, 0xc4, 0x00, 0x72,
-+	0x00, 0xb8, 0xb8, 0xac, 0xbf, 0x00, 0x8a,
-+	0x00, 0xb0, 0xb6, 0xac, 0xc0, 0x00, 0x91
-+};
-+
-+static const unsigned int ld9040_22_200[] = {
-+	0x00, 0x9a, 0xba, 0xb1, 0xc4, 0x00, 0x6f,
-+	0x00, 0xb8, 0xb8, 0xad, 0xc0, 0x00, 0x86,
-+	0x00, 0xb0, 0xb7, 0xad, 0xc0, 0x00, 0x8d
-+};
-+
-+static const unsigned int ld9040_22_190[] = {
-+	0x00, 0x97, 0xba, 0xb2, 0xc5, 0x00, 0x6c,
-+	0x00, 0xb8, 0xb8, 0xae, 0xc1, 0x00, 0x82,
-+	0x00, 0xb0, 0xb6, 0xae, 0xc2, 0x00, 0x89
-+};
-+
-+static const unsigned int ld9040_22_180[] = {
-+	0x00, 0x93, 0xba, 0xb3, 0xc5, 0x00, 0x69,
-+	0x00, 0xb8, 0xb9, 0xae, 0xc1, 0x00, 0x7f,
-+	0x00, 0xb0, 0xb6, 0xae, 0xc3, 0x00, 0x85
-+};
-+
-+static const unsigned int ld9040_22_170[] = {
-+	0x00, 0x8b, 0xb9, 0xb3, 0xc7, 0x00, 0x65,
-+	0x00, 0xb7, 0xb8, 0xaf, 0xc3, 0x00, 0x7a,
-+	0x00, 0x80, 0xb6, 0xae, 0xc4, 0x00, 0x81
-+};
-+
-+static const unsigned int ld9040_22_160[] = {
-+	0x00, 0x89, 0xba, 0xb3, 0xc8, 0x00, 0x62,
-+	0x00, 0xb6, 0xba, 0xaf, 0xc3, 0x00, 0x76,
-+	0x00, 0xaf, 0xb7, 0xae, 0xc4, 0x00, 0x7e
-+};
-+
-+static const unsigned int ld9040_22_150[] = {
-+	0x00, 0x82, 0xba, 0xb4, 0xc7, 0x00, 0x5f,
-+	0x00, 0xb5, 0xba, 0xb0, 0xc3, 0x00, 0x72,
-+	0x00, 0xae, 0xb8, 0xb0, 0xc3, 0x00, 0x7a
-+};
-+
-+static const unsigned int ld9040_22_140[] = {
-+	0x00, 0x7b, 0xbb, 0xb4, 0xc8, 0x00, 0x5b,
-+	0x00, 0xb5, 0xba, 0xb1, 0xc4, 0x00, 0x6e,
-+	0x00, 0xae, 0xb9, 0xb0, 0xc5, 0x00, 0x75
-+};
-+
-+static const unsigned int ld9040_22_130[] = {
-+	0x00, 0x71, 0xbb, 0xb5, 0xc8, 0x00, 0x57,
-+	0x00, 0xb5, 0xbb, 0xb0, 0xc5, 0x00, 0x6a,
-+	0x00, 0xae, 0xb9, 0xb1, 0xc6, 0x00, 0x70
-+};
-+
-+static const unsigned int ld9040_22_120[] = {
-+	0x00, 0x47, 0xba, 0xb6, 0xca, 0x00, 0x53,
-+	0x00, 0xb5, 0xbb, 0xb3, 0xc6, 0x00, 0x65,
-+	0x00, 0xae, 0xb8, 0xb3, 0xc7, 0x00, 0x6c
-+};
-+
-+static const unsigned int ld9040_22_110[] = {
-+	0x00, 0x13, 0xbb, 0xb7, 0xca, 0x00, 0x4f,
-+	0x00, 0xb4, 0xbb, 0xb3, 0xc7, 0x00, 0x60,
-+	0x00, 0xad, 0xb8, 0xb4, 0xc7, 0x00, 0x67
-+};
-+
-+static const unsigned int ld9040_22_100[] = {
-+	0x00, 0x13, 0xba, 0xb8, 0xcb, 0x00, 0x4b,
-+	0x00, 0xb3, 0xbc, 0xb4, 0xc7, 0x00, 0x5c,
-+	0x00, 0xac, 0xb8, 0xb4, 0xc8, 0x00, 0x62
-+};
-+
-+static const unsigned int ld9040_22_90[] = {
-+	0x00, 0x13, 0xb9, 0xb8, 0xcd, 0x00, 0x46,
-+	0x00, 0xb1, 0xbc, 0xb5, 0xc8, 0x00, 0x56,
-+	0x00, 0xaa, 0xb8, 0xb4, 0xc9, 0x00, 0x5d
-+};
-+
-+static const unsigned int ld9040_22_80[] = {
-+	0x00, 0x13, 0xba, 0xb9, 0xcd, 0x00, 0x41,
-+	0x00, 0xb0, 0xbe, 0xb5, 0xc9, 0x00, 0x51,
-+	0x00, 0xa9, 0xb9, 0xb5, 0xca, 0x00, 0x57
-+};
-+
-+static const unsigned int ld9040_22_70[] = {
-+	0x00, 0x13, 0xb9, 0xb9, 0xd0, 0x00, 0x3c,
-+	0x00, 0xaf, 0xbf, 0xb6, 0xcb, 0x00, 0x4b,
-+	0x00, 0xa8, 0xb9, 0xb5, 0xcc, 0x00, 0x52
-+};
-+
-+static const unsigned int ld9040_22_50[] = {
-+	0x00, 0x13, 0xb2, 0xba, 0xd2, 0x00, 0x30,
-+	0x00, 0xaf, 0xc0, 0xb8, 0xcd, 0x00, 0x3d,
-+	0x00, 0xa8, 0xb8, 0xb7, 0xcd, 0x00, 0x44
-+};
-+
-+struct ld9040_gamma {
-+	unsigned int *gamma_22_table[MAX_GAMMA_LEVEL];
-+};
-+
-+static struct ld9040_gamma gamma_table = {
-+	.gamma_22_table[0] = (unsigned int *)&ld9040_22_50,
-+	.gamma_22_table[1] = (unsigned int *)&ld9040_22_70,
-+	.gamma_22_table[2] = (unsigned int *)&ld9040_22_80,
-+	.gamma_22_table[3] = (unsigned int *)&ld9040_22_90,
-+	.gamma_22_table[4] = (unsigned int *)&ld9040_22_100,
-+	.gamma_22_table[5] = (unsigned int *)&ld9040_22_110,
-+	.gamma_22_table[6] = (unsigned int *)&ld9040_22_120,
-+	.gamma_22_table[7] = (unsigned int *)&ld9040_22_130,
-+	.gamma_22_table[8] = (unsigned int *)&ld9040_22_140,
-+	.gamma_22_table[9] = (unsigned int *)&ld9040_22_150,
-+	.gamma_22_table[10] = (unsigned int *)&ld9040_22_160,
-+	.gamma_22_table[11] = (unsigned int *)&ld9040_22_170,
-+	.gamma_22_table[12] = (unsigned int *)&ld9040_22_180,
-+	.gamma_22_table[13] = (unsigned int *)&ld9040_22_190,
-+	.gamma_22_table[14] = (unsigned int *)&ld9040_22_200,
-+	.gamma_22_table[15] = (unsigned int *)&ld9040_22_210,
-+	.gamma_22_table[16] = (unsigned int *)&ld9040_22_220,
-+	.gamma_22_table[17] = (unsigned int *)&ld9040_22_230,
-+	.gamma_22_table[18] = (unsigned int *)&ld9040_22_240,
-+	.gamma_22_table[19] = (unsigned int *)&ld9040_22_250,
-+	.gamma_22_table[20] = (unsigned int *)&ld9040_22_260,
-+	.gamma_22_table[21] = (unsigned int *)&ld9040_22_270,
-+	.gamma_22_table[22] = (unsigned int *)&ld9040_22_280,
-+	.gamma_22_table[23] = (unsigned int *)&ld9040_22_290,
-+	.gamma_22_table[24] = (unsigned int *)&ld9040_22_300,
-+};
-+
-+#endif
-+
--- 
-1.6.0.4
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 387c31c7e5c9805b0aef8833d1731a5fe7bdea14
+
+  Linux 2.6.37-rc8
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-rmk
+
+Abhilash Kesavan (3):
+      ARM: S5P64X0: Change GPIOlib initialization to core_initcall
+      ARM: S5P6440: Change the name for MMC Special Clock
+      ARM: S3C24XX: Add support UART3 for S3C2443 and S3C2416
+
+Amit Daniel Kachhap (1):
+      ARM: SAMSUNG: Add support for clock debugging through debug-fs
+interface
+
+Atul Dahiya (1):
+      ARM: S5P64X0: Add clock support for RTC
+
+Changhwan Youn (6):
+      ARM: S5PV310: Add Interrupt of MCT
+      ARM: S5PV310: Limit the irqs which support cascade interrupt
+      ARM: S5PV310: Add irq_mask to handle combiner irqs properly
+      ARM: SAMSUNG: Add support for Power Domain control
+      ARM: S5PV310: Set bit 22 in the PL310 (cache controller) AuxCtlr
+register
+      ARM: S5PV310: Add support Power Domain
+
+Darius Augulis (1):
+      serial: samsung: fix device name
+
+Donguk Ryu (2):
+      ARM: S5P: Add Support System MMU
+      ARM: S5PV310: Add Support System MMU
+
+Jaecheol Lee (1):
+      ARM: S5PV310: Add FOUT APLL get rate function
+
+Jassi Brar (25):
+      ARM: S5PV310: Add platform devices for PL330 DMACs
+      ARM: SAMSUNG: Rename s3c64xx I2S platform device
+      ARM: SAMSUNG: Prepare audio header for new I2S driver
+      ARM: S3C64XX: Upgrade platform device for I2S
+      ARM: S5P64X0: Upgrade platform device for I2S
+      ARM: S5P6442: Upgrade platform device for I2S
+      ARM: S5PC100: Upgrade platform device for I2S
+      ARM: S5PV210: Upgrade platform device for I2S
+      ARM: S5PV310: Add audio platform devices
+      ARM: S5P6442: Implement i2c-gpio config
+      ARM: S5P6442: Enable I2C0 device on SMDK6442
+      ARM: S5P6450: Define clocks for I2S
+      ARM: S5P6450: Define base addresses for I2S
+      ARM: S5P6440: Enable I2S device to work on SMDK6440
+      ARM: S5P6450: Enable I2S device to work on SMDK6450
+      ARM: S5PV210: Enable I2S device to work on SMDKC110
+      ARM: S5PV210: Enable I2S device to work on SMDKV210
+      ARM: S5PV310: Enable I2C1 device
+      ARM: S5PV310: Add PDMA clocks
+      ARM: S5PV310: Add AC97 clock
+      ARM: S5PV310: Define I2S clocks
+      ARM: S5PV310: Add AC97 support for SMDK
+      ARM: S5PV310: Enable I2S device on SMDKV310
+      ARM: S5PV310: Enable I2S device on SMDKC210
+      ARM: S3C64XX: Clear DMA_HALT upon start
+
+Kukjin Kim (26):
+      Merge branch 'next-samsung-asoc' into next-samsung-asoc2
+      ARM: S5P64X0: Add GPIOlib support for S5P6450
+      ARM: SAMSUNG: Cleanup GPIOlib adding 2bit chips
+      ARM: S5P64X0: Cleanup S5P64X0 GPIOlib adding 2bit chips
+      ARM: S5P64X0: Rename GPIOlib file to gpiolib.c
+      ARM: S5P: Move the SROM register definitions to plat-s5p
+      Merge branch 'next-samsung-asoc2' into for-next-new
+      Merge branch 'next-samsung' into for-next-new
+      Merge branch 'next-s5p' into for-next-new
+      Merge branch 'next-s5p64x0' into for-next-new
+      Merge branch 'next-s5pv210' into for-next-new
+      Merge branch 'dev/s5pv310-irq' into next-s5pv310
+      Merge branch 'next-s5pv310' into for-next
+      Merge branch 'dev/s5pv310-cpufreq' into next-s5pv310
+      Merge branch 'next-s5pv310' into for-next
+      Merge branch 'next-samsung-irq_data' into for-next
+      Merge branch 'next-s3c64xx' into for-next
+      ARM: S3C64XX: Tidy register and disable clock usage
+      ARM: S5P6440: Tidy register and disable clock usage
+      ARM: S5P6442: Tidy register and disable clock usage
+      ARM: S5P6450: Tidy register and disable clock usage
+      ARM: S5PC100: Tidy register and disable clock usage
+      ARM: S5PV210: Tidy init+disable clock usage and
+s3c24xx_register_clocks cleanup
+      ARM: S5PV310: Tidy init+disable clock usage and
+s3c24xx_register_clocks cleanup
+      Merge branch 'dev/cleanup-clocks' into for-next
+      Merge branch 'next-s3c24xx' into for-next
+
+Kyungmin Park (1):
+      ARM: S5PV310: Universal SDHCI devices support
+
+Lennert Buytenhek (3):
+      ARM: S3C24XX: irq_data conversion
+      ARM: S5P: irq_data conversion
+      ARM: SAMSUNG: some GENERIC_HARDIRQS_NO_DEPRECATED build fixes
+
+Mark Brown (5):
+      ARM: SAMSUNG: Convert s3c_irqext_wake() to new irq_ interrupt methods
+      ARM: S3C64XX: Convert S3C64xx irq-eint to use new irq_ methods
+      ARM: S3C64XX: Use chip_data to store the shift for EINTs
+      ARM: SAMSUNG: Convert irq-uart to use new irq_ functions
+      ARM: SAMSUNG: Convert irq-vic-timer to irq_ functions
+
+Rajeshwari Shinde (1):
+      ARM: S5P64X0: Segregate audio devices
+
+Sangwook Ju (2):
+      ARM: S5PV310: Define missing CMU register for CPUFREQ
+      ARM: S5PV310: Update CPUFREQ
+
+Sunyoung Kang (4):
+      ARM: S5PV310: Update CMU registers for CPUFREQ
+      ARM: S5PV310: Add DMC registers and map_desc
+      ARM: S5PV310: Add support CPUFREQ
+      ARM: S5PV310: Update Kconfig and Makefile for supporting CPUFREQ
+
+Sylwester Nawrocki (3):
+      ARM: S5PV210: Add resource definitions for MIPI CSIS
+      ARM: S5PV310: Add resource definitions for MIPI CSIS
+      ARM: S5P: Add platform support for MIPI CSIS devices
+
+Thomas Abraham (6):
+      ARM: S5PV210: Add frame buffer display support for SMDKV210
+      ARM: S5P: Add SROM control register shift macros for other banks.
+      ARM: S5P: Add SROM bank 4 and 5 register offsets
+      ARM: S5P: Move SROM controller IO mapping to plat-s5p for S5P SoCs
+      ARM: S5PV210: Add SROM controller clock
+      ARM: S5PV210: Add DM9000 support on SMDKV210
+
+Yauhen Kharuzhy (5):
+      ARM: S3C24XX: Add address map and clock definitions for HSMMC0
+      ARM: S3C2416: Add platform helpers for setup SDHCI
+      ARM: S3C2416: Add support of SD/MMC card detect on SMDK2416
+      ARM: S3C2443: Implement GPIO pull-up/down configuration methods
+      ARM: SAMSUNG: Don't export __init functions to modules
+
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-s3c2410/bast-irq.c                   |   22 +-
+ arch/arm/mach-s3c2410/include/mach/irqs.h          |    4 +-
+ arch/arm/mach-s3c2410/include/mach/map.h           |    4 +-
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
+ arch/arm/mach-s3c2412/irq.c                        |   50 +-
+ arch/arm/mach-s3c2416/Kconfig                      |   12 +
+ arch/arm/mach-s3c2416/Makefile                     |    4 +
+ arch/arm/mach-s3c2416/clock.c                      |   18 +-
+ arch/arm/mach-s3c2416/irq.c                        |   76 ++--
+ arch/arm/mach-s3c2416/mach-smdk2416.c              |   23 +
+ arch/arm/mach-s3c2416/s3c2416.c                    |    5 +
+ arch/arm/mach-s3c2416/setup-sdhci-gpio.c           |   34 ++
+ arch/arm/mach-s3c2416/setup-sdhci.c                |   61 ++
+ arch/arm/mach-s3c2440/irq.c                        |   18 +-
+ arch/arm/mach-s3c2440/s3c244x-irq.c                |   18 +-
+ arch/arm/mach-s3c2443/Kconfig                      |    3 +-
+ arch/arm/mach-s3c2443/clock.c                      |    4 +-
+ arch/arm/mach-s3c2443/irq.c                        |   95 ++--
+ arch/arm/mach-s3c2443/mach-smdk2443.c              |    9 +-
+ arch/arm/mach-s3c2443/s3c2443.c                    |    7 +
+ arch/arm/mach-s3c64xx/clock.c                      |   21 +-
+ arch/arm/mach-s3c64xx/dev-audio.c                  |   60 ++-
+ arch/arm/mach-s3c64xx/dma.c                        |    1 +
+ arch/arm/mach-s3c64xx/irq-eint.c                   |   37 +-
+ arch/arm/mach-s5p6442/clock.c                      |   16 +-
+ arch/arm/mach-s5p6442/dev-audio.c                  |   44 ++-
+ arch/arm/mach-s5p6442/include/mach/map.h           |    3 +
+ arch/arm/mach-s5p6442/mach-smdk6442.c              |   10 +
+ arch/arm/mach-s5p6442/setup-i2c0.c                 |    5 +-
+ arch/arm/mach-s5p64x0/Makefile                     |    4 +-
+ arch/arm/mach-s5p64x0/clock-s5p6440.c              |   24 +-
+ arch/arm/mach-s5p64x0/clock-s5p6450.c              |   36 +-
+ arch/arm/mach-s5p64x0/dev-audio.c                  |  144 ++++-
+ arch/arm/mach-s5p64x0/{gpio.c => gpiolib.c}        |  221 +++++++-
+ arch/arm/mach-s5p64x0/include/mach/map.h           |    5 +
+ arch/arm/mach-s5p64x0/include/mach/regs-gpio.h     |   57 +--
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |    1 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |    1 +
+ arch/arm/mach-s5pc100/clock.c                      |   16 +-
+ arch/arm/mach-s5pc100/dev-audio.c                  |   54 ++-
+ arch/arm/mach-s5pc100/include/mach/map.h           |    2 +
+ arch/arm/mach-s5pv210/Kconfig                      |    2 +
+ arch/arm/mach-s5pv210/clock.c                      |   35 +-
+ arch/arm/mach-s5pv210/cpu.c                        |    5 -
+ arch/arm/mach-s5pv210/dev-audio.c                  |   56 ++-
+ arch/arm/mach-s5pv210/include/mach/irqs.h          |    3 +-
+ arch/arm/mach-s5pv210/include/mach/map.h           |    6 +
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    5 +-
+ arch/arm/mach-s5pv210/mach-smdkc110.c              |    1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c              |  139 +++++-
+ arch/arm/mach-s5pv310/Kconfig                      |   22 +
+ arch/arm/mach-s5pv310/Makefile                     |    7 +-
+ arch/arm/mach-s5pv310/clock.c                      |   77 ++-
+ arch/arm/mach-s5pv310/cpu.c                        |   21 +-
+ arch/arm/mach-s5pv310/cpufreq.c                    |  580
+++++++++++++++++++++
+ arch/arm/mach-s5pv310/dev-audio.c                  |  364 ++++++++++++
+ arch/arm/mach-s5pv310/dev-pd.c                     |  139 +++++
+ arch/arm/mach-s5pv310/dev-sysmmu.c                 |  187 +++++++
+ arch/arm/mach-s5pv310/dma.c                        |  168 ++++++
+ arch/arm/mach-s5pv310/include/mach/dma.h           |   26 +
+ arch/arm/mach-s5pv310/include/mach/irqs.h          |   37 ++-
+ arch/arm/mach-s5pv310/include/mach/map.h           |   50 ++
+ arch/arm/mach-s5pv310/include/mach/regs-clock.h    |   80 +++-
+ arch/arm/mach-s5pv310/include/mach/regs-mem.h      |   23 +
+ arch/arm/mach-s5pv310/include/mach/regs-pmu.h      |   30 +
+ arch/arm/mach-s5pv310/include/mach/regs-srom.h     |   50 --
+ arch/arm/mach-s5pv310/include/mach/regs-sysmmu.h   |   24 +
+ arch/arm/mach-s5pv310/include/mach/sysmmu.h        |  119 ++++
+ arch/arm/mach-s5pv310/irq-combiner.c               |   32 +-
+ arch/arm/mach-s5pv310/irq-eint.c                   |   55 +-
+ arch/arm/mach-s5pv310/mach-smdkc210.c              |   52 ++-
+ arch/arm/mach-s5pv310/mach-smdkv310.c              |   52 ++-
+ arch/arm/mach-s5pv310/mach-universal_c210.c        |   80 +++
+ arch/arm/plat-s3c24xx/devs.c                       |    1 -
+ arch/arm/plat-s3c24xx/include/plat/irq.h           |    4 +-
+ arch/arm/plat-s3c24xx/irq-pm.c                     |    9 +-
+ arch/arm/plat-s3c24xx/irq.c                        |  182 +++----
+ arch/arm/plat-s3c24xx/s3c2443-clock.c              |    2 +-
+ arch/arm/plat-s5p/Kconfig                          |   26 +
+ arch/arm/plat-s5p/Makefile                         |    3 +
+ arch/arm/plat-s5p/cpu.c                            |    5 +
+ arch/arm/plat-s5p/dev-csis0.c                      |   34 ++
+ arch/arm/plat-s5p/dev-csis1.c                      |   34 ++
+ arch/arm/plat-s5p/include/plat/csis.h              |   28 +
+ arch/arm/plat-s5p/include/plat/map-s5p.h           |    1 +
+ arch/arm/plat-s5p/include/plat/regs-srom.h         |   54 ++
+ arch/arm/plat-s5p/include/plat/sysmmu.h            |   23 +
+ arch/arm/plat-s5p/irq-eint.c                       |   86 ++--
+ arch/arm/plat-s5p/irq-gpioint.c                    |   50 +-
+ arch/arm/plat-s5p/irq-pm.c                         |    6 +-
+ arch/arm/plat-s5p/sysmmu.c                         |  328 +++++++++++
+ arch/arm/plat-samsung/Kconfig                      |   14 +
+ arch/arm/plat-samsung/Makefile                     |    4 +
+ arch/arm/plat-samsung/clock.c                      |   92 +++
+ arch/arm/plat-samsung/dev-nand.c                   |    2 -
+ arch/arm/plat-samsung/gpio-config.c                |   42 ++
+ arch/arm/plat-samsung/gpiolib.c                    |    7 +
+ arch/arm/plat-samsung/include/plat/audio.h         |   24 +
+ arch/arm/plat-samsung/include/plat/clock.h         |    3 +
+ arch/arm/plat-samsung/include/plat/devs.h          |   17 +
+ .../plat-samsung/include/plat/gpio-cfg-helpers.h   |    2 +-
+ arch/arm/plat-samsung/include/plat/gpio-core.h     |    2 +
+ arch/arm/plat-samsung/include/plat/pd.h            |   30 +
+ arch/arm/plat-samsung/include/plat/pm.h            |    4 +-
+ arch/arm/plat-samsung/include/plat/sdhci.h         |   35 ++
+ arch/arm/plat-samsung/irq-uart.c                   |   40 +-
+ arch/arm/plat-samsung/irq-vic-timer.c              |   26 +-
+ arch/arm/plat-samsung/pd.c                         |   95 ++++
+ arch/arm/plat-samsung/pm.c                         |    6 +-
+ drivers/serial/samsung.c                           |    4 +-
+ 111 files changed, 4277 insertions(+), 806 deletions(-)
