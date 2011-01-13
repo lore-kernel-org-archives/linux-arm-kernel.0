@@ -1,156 +1,71 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 13 Jan 2011 14:51:45 -0600
-Subject: [PATCH 1/1 v2] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <1294951905-23748-1-git-send-email-dave.martin@linaro.org>
-References: <1294951905-23748-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1294951905-23748-2-git-send-email-dave.martin@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 13 Jan 2011 22:06:00 +0100
+Subject: [PATCH v4 05/10] net/fec: add dual fec support for mx28
+In-Reply-To: <1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110113210600.GY24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In low-level board support code, there is sometimes a need to
-copy a function body to another location at run-time.
+Hello again,
 
-A straightforward call to memcpy doesn't work in Thumb-2,
-because bit 0 of external Thumb function symbols is set to 1,
-indicating that the function is Thumb.  Without corrective
-measures, this will cause an off-by-one copy, and the copy
-may be called using the wrong instruction set.
+On Thu, Jan 06, 2011 at 03:13:13PM +0800, Shawn Guo wrote:
+>  static netdev_tx_t
+>  fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>  {
+>  	struct fec_enet_private *fep = netdev_priv(dev);
+> +	const struct platform_device_id *id_entry =
+> +				platform_get_device_id(fep->pdev);
+>  	struct bufdesc *bdp;
+>  	void *bufaddr;
+>  	unsigned short	status;
+> @@ -256,6 +288,14 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
+>  		bufaddr = fep->tx_bounce[index];
+>  	}
+>  
+> +	/*
+> +	 * Some design made an incorrect assumption on endian mode of
+> +	 * the system that it's running on. As the result, driver has to
+> +	 * swap every frame going to and coming from the controller.
+> +	 */
+> +	if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
+> +		swap_buffer(bufaddr, skb->len);
+> +
+Is that save here?  bufaddr either points to a bounce buffer (which
+should be OK definitely) or skb->data.  Or asked differently:  Is the
+skb here owned by the driver such that it is allowed to write to it?
+Does the driver eventually need to restore the original data?
 
-This patch adds macros to help with such cases.
+Just before this if, there is some bounce buffer handling.  If it is not
+OK to modify skb->data, the call to swap_buffer can easily be moved in
+there.
 
-Particular care is needed, because C doesn't guarantee any
-defined behaviour when casting a function pointer to any other
-type.  This has been observed to lead to strange optimisation
-side-effects when doing the arithmetic which is required in
-order to copy/move function bodies correctly in Thumb-2.
+>  	/* Save skb pointer */
+>  	fep->tx_skbuff[fep->skb_cur] = skb;
+>  
+> @@ -424,6 +464,8 @@ static void
+>  fec_enet_rx(struct net_device *dev)
+>  {
+>  	struct	fec_enet_private *fep = netdev_priv(dev);
+> +	const struct platform_device_id *id_entry =
+> +				platform_get_device_id(fep->pdev);
+>  	struct bufdesc *bdp;
+>  	unsigned short status;
+>  	struct	sk_buff	*skb;
+> @@ -487,6 +529,9 @@ fec_enet_rx(struct net_device *dev)
+>  	        dma_unmap_single(NULL, bdp->cbd_bufaddr, bdp->cbd_datlen,
+>          			DMA_FROM_DEVICE);
+>  
+> +		if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
+> +			swap_buffer(data, pkt_len);
+> +
+Here I guess it's OK, the hardware just wrote to the buffer, so the skb
+cannot be shared to anything else and the write is all right.
 
-Thanks to Russell King for his input on this patch.
+Best regards
+Uwe
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-KernelVersion: v2.6.37
-
- arch/arm/include/asm/fncpy.h |  111 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 111 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/fncpy.h
-
-diff --git a/arch/arm/include/asm/fncpy.h b/arch/arm/include/asm/fncpy.h
-new file mode 100644
-index 0000000..a155fb7
---- /dev/null
-+++ b/arch/arm/include/asm/fncpy.h
-@@ -0,0 +1,111 @@
-+/*
-+ * arch/arm/include/asm/fncpy.h - helper macros for function body copying
-+ *
-+ * Copyright (C) 2011 Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+/*
-+ * These macros are intended for use when there is a need to copy a low-level
-+ * function body into special memory.
-+ *
-+ * For example, when reconfiguring the SDRAM controller, the code doing the
-+ * reconfiguration may need to run from SRAM.
-+ *
-+ * NOTE: that the copied function body must be entirely self-contained and
-+ * position-independent in order for this to work properly.
-+ *
-+ *
-+ * Typical usage example:
-+ *
-+ * extern int f(args);
-+ * extern uint32_t size_of_f;
-+ * int (*copied_f)(args);
-+ * void *sram_buffer;
-+ *
-+ * copied_f = fncpy(sram_buffer, &f, size_of_f);
-+ *
-+ * ... do any required D-side/I-side synchronisation ...
-+ *
-+ * ... later, call the function: ...
-+ *
-+ * copied_f(args);
-+ *
-+ * The size of the function to be copied can't be determined from C:
-+ * this must be determined by other means, such as adding assmbler directives
-+ * in the file where f is defined.
-+ */
-+
-+ */
-+
-+#ifndef __ASM_FNCPY_H
-+#define __ASM_FNCPY_H
-+
-+#include <linux/types.h>
-+#include <linux/string.h>
-+
-+#include <asm/cacheflush.h>
-+
-+/* Function pointer casting macros */
-+
-+/* Cast function pointer to integer: */
-+#define __funcp_to_uint(funcp) ({				\
-+		uintptr_t __result;				\
-+								\
-+		asm("" : "=r" (__result) : "0" (funcp));	\
-+		__result;					\
-+	})
-+
-+/* Cast integer to function pointer with type matching funcp: */
-+#define __uint_to_funcp(i, funcp) ({			\
-+		typeof(funcp) __result;			\
-+							\
-+		asm("" : "=r" (__result) : "0" (i));	\
-+		__result;				\
-+	})
-+
-+
-+/* Function symbol manipulation macros */
-+
-+/*
-+ * FSYM_REBASE: Determine the correct function pointer for funcp,
-+ * after the function has been copied to dest_buf:
-+ */
-+#define FSYM_REBASE(funcp, dest_buf)					\
-+	__uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
-+
-+/*
-+ * FSYM_BASE: Determine the base address in memory of the function funcp
-+ * FSYM_TYPE: Determine the instruction set type (ARM/Thumb) of funcp
-+ * (both defined below)
-+ */
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
-+#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
-+#else /* !CONFIG_THUMB2_KERNEL */
-+#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
-+#define FSYM_TYPE(funcp) 0
-+#endif /* !CONFIG_THUMB2_KERNEL */
-+
-+/* Function copy helper */
-+#define fncpy(dest_buf, funcp, size) ({					\
-+		memcpy(dest_buf, FSYM_BASE(funcp), size);		\
-+		flush_icache_range(dest_buf, (char *)(dest_buf) + size); \
-+									\
-+		FSYM_REBASE(funcp, dest_buf);				\
-+	})
-+
-+#endif /* !__ASM_FNCPY_H */
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
