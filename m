@@ -1,205 +1,196 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Jan 2011 10:33:45 +0900
-Subject: [PATCH/RFC 2/3] ARM: S5PV310: Add a platform helper for MIPI
-	DSIM/CSIS setup
-In-Reply-To: <1294153764-25006-3-git-send-email-s.nawrocki@samsung.com>
-References: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
-	<1294153764-25006-3-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <020401cbb2c1$ef9f7c30$cede7490$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 13 Jan 2011 09:55:46 +0800
+Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
+In-Reply-To: <20110112160106.GI24920@pengutronix.de>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
+	<20110111133137.GS12078@pengutronix.de>
+	<20110112064711.GG2888@freescale.com>
+	<20110112145036.GY12078@pengutronix.de>
+	<20110112160106.GI24920@pengutronix.de>
+Message-ID: <20110113015545.GA7122@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On Wed, Jan 12, 2011 at 05:01:06PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Sascha,
 > 
-> MIPI_PHYn_CONTROL registers are shared between MIPI DSIM
-> and MIPI CSIS drivers so a spinlock is used to protect multiple
-> access to these registers. Also a proper state of a common
-> PHY enable bit is maintained in order to avoid a DSIM
-> and CSIS driver conflict.
+> On Wed, Jan 12, 2011 at 03:50:36PM +0100, Sascha Hauer wrote:
+> > On Wed, Jan 12, 2011 at 02:47:12PM +0800, Shawn Guo wrote:
+> > > On Tue, Jan 11, 2011 at 02:31:37PM +0100, Sascha Hauer wrote:
+> > > > On Thu, Jan 06, 2011 at 03:13:16PM +0800, Shawn Guo wrote:
+> > > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > > > ---
+> > > > > Changes for v4:
+> > > > >  - Call cpu_relax() during polling
+> > > > > 
+> > > > > Changes for v2:
+> > > > >  - Add mutex locking for mxs_read_ocotp()
+> > > > >  - Use type size_t for count and i
+> > > > >  - Add comment for clk_enable/disable skipping
+> > > > >  - Add ERROR bit clearing and polling step
+> > > > > 
+> > > > >  arch/arm/mach-mxs/Makefile              |    2 +-
+> > > > >  arch/arm/mach-mxs/include/mach/common.h |    1 +
+> > > > >  arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
+> > > > >  3 files changed, 81 insertions(+), 1 deletions(-)
+> > > > >  create mode 100644 arch/arm/mach-mxs/ocotp.c
+> > > > > 
+> > > > > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> > > > > index 39d3f9c..f23ebbd 100644
+> > > > > --- a/arch/arm/mach-mxs/Makefile
+> > > > > +++ b/arch/arm/mach-mxs/Makefile
+> > > > > @@ -1,5 +1,5 @@
+> > > > >  # Common support
+> > > > > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+> > > > > +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
+> > > > >  
+> > > > >  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+> > > > >  obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+> > > > > diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+> > > > > index 59133eb..cf02552 100644
+> > > > > --- a/arch/arm/mach-mxs/include/mach/common.h
+> > > > > +++ b/arch/arm/mach-mxs/include/mach/common.h
+> > > > > @@ -13,6 +13,7 @@
+> > > > >  
+> > > > >  struct clk;
+> > > > >  
+> > > > > +extern int mxs_read_ocotp(int offset, int count, u32 *values);
+> > > > >  extern int mxs_reset_block(void __iomem *);
+> > > > >  extern void mxs_timer_init(struct clk *, int);
+> > > > >  
+> > > > > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> > > > > new file mode 100644
+> > > > > index 0000000..e2d39aa
+> > > > > --- /dev/null
+> > > > > +++ b/arch/arm/mach-mxs/ocotp.c
+> > > > > @@ -0,0 +1,79 @@
+> > > > > +/*
+> > > > > + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> > > > > + *
+> > > > > + * This program is free software; you can redistribute it and/or modify
+> > > > > + * it under the terms of the GNU General Public License as published by
+> > > > > + * the Free Software Foundation; either version 2 of the License, or
+> > > > > + * (at your option) any later version.
+> > > > > + *
+> > > > > + * This program is distributed in the hope that it will be useful,
+> > > > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > > > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > > > > + * GNU General Public License for more details.
+> > > > > + */
+> > > > > +
+> > > > > +#include <linux/delay.h>
+> > > > > +#include <linux/err.h>
+> > > > > +#include <linux/mutex.h>
+> > > > > +
+> > > > > +#include <mach/mxs.h>
+> > > > > +
+> > > > > +#define BM_OCOTP_CTRL_BUSY		(1 << 8)
+> > > > > +#define BM_OCOTP_CTRL_ERROR		(1 << 9)
+> > > > > +#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
+> > > > > +
+> > > > > +static DEFINE_MUTEX(ocotp_mutex);
+> > > > > +
+> > > > > +int mxs_read_ocotp(unsigned offset, size_t count, u32 *values)
+> > > > > +{
+> > > > > +	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
+> > > > > +	int timeout = 0x400;
+> > > > > +	size_t i;
+> > > > > +
+> > > > > +	mutex_lock(&ocotp_mutex);
+> > > > > +
+> > > > > +	/*
+> > > > > +	 * clk_enable(hbus_clk) for ocotp can be skipped
+> > > > > +	 * as it must be on when system is running.
+> > > > > +	 */
+> > > > > +
+> > > > > +	/* try to clear ERROR bit */
+> > > > > +	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
+> > > > 
+> > > > This operation does not try to clear the error bit but actually clears
+> > > > it...
+> > > > 
+> > > > > +
+> > > > > +	/* check both BUSY and ERROR cleared */
+> > > > > +	while ((__raw_readl(ocotp_base) &
+> > > > > +		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
+> > > > > +		cpu_relax();
+> > > > 
+> > > > ...which means you do not have to poll the error bit here...
+> > > > 
+> > > > > +
+> > > > > +	if (unlikely(!timeout))
+> > > > > +		goto error_unlock;
+> > > > > +
+> > > > > +	/* open OCOTP banks for read */
+> > > > > +	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
+> > > > > +
+> > > > > +	/* approximately wait 32 hclk cycles */
+> > > > > +	udelay(1);
+> > > > > +
+> > > > > +	/* poll BUSY bit becoming cleared */
+> > > > > +	timeout = 0x400;
+> > > > > +	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
+> > > > > +		cpu_relax();
+> > > > 
+> > > > ...which means you can factor out a ocotp_wait_busy function and let the
+> > > > code speak instead of the comments.
+> > > > 
+> > > > > +
+> > > > > +	if (unlikely(!timeout))
+> > > > > +		goto error_unlock;
+> > > > > +
+> > > > > +	for (i = 0; i < count; i++, offset += 4)
+> > > > > +		*values++ = __raw_readl(ocotp_base + offset);
+> > > > 
+> > > > The registers in the ocotp are 16 byte aligned. Does it really make
+> > > > sense to provide a function allowing to read the gaps between the
+> > > > registers?
+> > > > 
+> > > Good catch.  The count was added to ease the consecutive otp word
+> > > reading, as there is bank open/close cost for otp read.  What about
+> > > the following changes?
+> > > 
+> > > int mxs_read_ocotp(unsigned offset, size_t otp_word_cnt, u32 *values)
+> > > {
+> > > 	......
+> > > 
+> > > 	for (i = 0; i < otp_word_cnt; i++, offset += 0x10)
+> > > 		*values++ = __raw_readl(ocotp_base + offset);
+> > > 
+> > > 	......
+> > > }
+> > 
+> > I would rather make a function like this:
+> > 
+> > static u32 ocotp[0x27];
+> > 
+> > const u32 *mxs_get_ocotp(void)
+> > {
+> > 	static int once = 0;
+> > 
+> > 	if (once)
+> > 		return ocotp
+> > 
+> > 	/* bank open */
+> > 
+> > 	for (i = 0; i < 0x27; i++)
+> > 		ocotp[i] = readl(ocotp_base + 0x20 + i * 0x10)
+> > 
+> > 	/* bank_close */
+> > 
+> > 	once = 1;
+> > 
+> > 	return ocotp;
+> which is save on UP when it's not called from irq context.
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv310/Kconfig                 |    6 ++
->  arch/arm/mach-s5pv310/Makefile                |    2 +
->  arch/arm/mach-s5pv310/include/mach/map.h      |    7 +--
->  arch/arm/mach-s5pv310/include/mach/regs-pmu.h |    6 ++
->  arch/arm/mach-s5pv310/setup-mipi.c            |   62
-> +++++++++++++++++++++++++
->  5 files changed, 79 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/mach-s5pv310/setup-mipi.c
+> Additionally I suggest a #define for 0x27 and 0x20.
 > 
-> diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-> index b7aa3cd..2420076 100644
-> --- a/arch/arm/mach-s5pv310/Kconfig
-> +++ b/arch/arm/mach-s5pv310/Kconfig
-> @@ -15,6 +15,11 @@ config CPU_S5PV310
->  	help
->  	  Enable S5PV310 CPU support
-> 
-> +config S5PV310_SETUP_MIPI
-> +	bool
-> +	help
-> +	  Common setup code for MIPI CSIS/DSIM channels 0 and 1.
-> +
->  config S5PV310_DEV_PD
->  	bool
->  	help
-> @@ -96,6 +101,7 @@ config MACH_UNIVERSAL_C210
->  	select S3C_DEV_HSMMC3
->  	select S5PV310_SETUP_SDHCI
->  	select S3C_DEV_I2C1
-> +	select S5PV310_SETUP_MIPI
->  	select S5PV310_SETUP_I2C1
->  	help
->  	  Machine support for Samsung Mobile Universal S5PC210 Reference
-> diff --git a/arch/arm/mach-s5pv310/Makefile
-b/arch/arm/mach-s5pv310/Makefile
-> index 651f193..7f1b89b 100644
-> --- a/arch/arm/mach-s5pv310/Makefile
-> +++ b/arch/arm/mach-s5pv310/Makefile
-> @@ -29,6 +29,8 @@ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+=
-mach-universal_c210.o
->  # device support
-> 
->  obj-y					+= dev-audio.o
-> +
-> +obj-$(CONFIG_S5PV310_SETUP_MIPI)	+= setup-mipi.o
->  obj-$(CONFIG_S5PV310_DEV_PD)		+= dev-pd.o
-> 
->  obj-$(CONFIG_S5PV310_SETUP_I2C1)	+= setup-i2c1.o
-> diff --git a/arch/arm/mach-s5pv310/include/mach/map.h b/arch/arm/mach-
-> s5pv310/include/mach/map.h
-> index 33bcff2..6635287 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/map.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/map.h
-> @@ -65,8 +65,7 @@
->  #define S5PV310_PA_GPIO2		(0x11000000)
->  #define S5PV310_PA_GPIO3		(0x03860000)
-> 
-> -#define S5PV310_PA_MIPI_CSIS0		0x11880000
-> -#define S5PV310_PA_MIPI_CSIS1		0x11890000
-> +#define S5PV310_PA_MIPI_CSIS(x)		(0x11880000 + ((x) *
-0x10000))
-> 
->  #define S5PV310_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
-> 
-> @@ -124,7 +123,7 @@
->  #define S3C_PA_IIC7			S5PV310_PA_IIC(7)
->  #define S3C_PA_RTC			S5PV310_PA_RTC
->  #define S3C_PA_WDT			S5PV310_PA_WATCHDOG
-> -#define S5P_PA_MIPI_CSIS0		S5PV310_PA_MIPI_CSIS0
-> -#define S5P_PA_MIPI_CSIS1		S5PV310_PA_MIPI_CSIS1
-> +#define S5P_PA_MIPI_CSIS0		S5PV310_PA_MIPI_CSIS(0)
-> +#define S5P_PA_MIPI_CSIS1		S5PV310_PA_MIPI_CSIS(1)
-> 
->  #endif /* __ASM_ARCH_MAP_H */
-> diff --git a/arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-b/arch/arm/mach-
-> s5pv310/include/mach/regs-pmu.h
-> index fb333d0..bef8102 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/regs-pmu.h
-> @@ -27,4 +27,10 @@
-> 
->  #define S5P_INT_LOCAL_PWR_EN		0x7
-> 
-> +#define S5P_MIPI_PHY0_CONTROL		S5P_PMUREG(0x0710)
-> +#define S5P_MIPI_PHY1_CONTROL		S5P_PMUREG(0x0714)
-> +#define S5P_MIPI_PHY_ENABLE		(1 << 0)
-> +#define S5P_MIPI_PHY_SRESETN		(1 << 1)
-> +#define S5P_MIPI_PHY_MRESETN		(1 << 2)
-> +
->  #endif /* __ASM_ARCH_REGS_PMU_H */
-> diff --git a/arch/arm/mach-s5pv310/setup-mipi.c b/arch/arm/mach-
-> s5pv310/setup-mipi.c
-> new file mode 100644
-> index 0000000..fc91a29
-> --- /dev/null
-> +++ b/arch/arm/mach-s5pv310/setup-mipi.c
-> @@ -0,0 +1,62 @@
-> +/* linux/arch/arm/mach-s5pv310/setup-mipi.c
-> + *
-> + * Copyright (c) 2010 Samsung Electronics Co., Ltd
-> + *
-> + * S5PV310 - Helper functions for MIPI CSIS/DSIM PHY control
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +#include <linux/spinlock.h>
-> +#include <mach/regs-pmu.h>
-> +
-> +/* Global MIPI CSIS or DSIM PHY enable and reset control. */
-> +static int s5p_mipi_phy_control(struct platform_device *pdev, bool on,
-u32
-> rst)
-> +{
-> +	static DEFINE_SPINLOCK(lock);
-> +	void __iomem *addr;
-> +	unsigned long flags;
-> +	int pid;
-> +	u32 cfg;
-> +
-> +	if (pdev == NULL)
-> +		return -EINVAL;
-> +
-> +	pid = pdev->id;
-> +	if (pid != 0 && pid != 1)
-> +		return -EINVAL;
-> +
-> +	addr = pid ? S5P_MIPI_PHY1_CONTROL : S5P_MIPI_PHY0_CONTROL;
-> +
-> +	spin_lock_irqsave(&lock, flags);
-> +
-> +	cfg = __raw_readl(addr) & ~rst;
-> +	if (on)
-> +		cfg |= rst;
-> +	__raw_writel(cfg, addr);
-> +
-> +	if (on)
-> +		cfg |= S5P_MIPI_PHY_ENABLE;
-> +	else if (!(cfg & (S5P_MIPI_PHY_SRESETN | S5P_MIPI_PHY_MRESETN) &
-~rst))
-> +		cfg &= ~S5P_MIPI_PHY_ENABLE;
-> +
-> +	__raw_writel(cfg, addr);
-> +
-> +	spin_unlock_irqrestore(&lock, flags);
-> +	return 0;
-> +}
-> +
-> +int s5p_csis_phy_enable(struct platform_device *pdev, bool on)
-> +{
-> +	return s5p_mipi_phy_control(pdev, on, S5P_MIPI_PHY_SRESETN);
-> +}
-> +
-> +int s5p_dsim_phy_enable(struct platform_device *pdev, bool on)
-> +{
-> +	return s5p_mipi_phy_control(pdev, on, S5P_MIPI_PHY_MRESETN);
-> +}
-> --
-> 1.7.3.4
 
-Basically, it's not good that each machine(SoC) has each own setup-mipi...
-Because it is very similar(almost same)...means can move it in plat-s5p with
-following.
+So I will keep the mutex and not read SRK bits.
 
-1. # of MIPI PHY can be calculated by platform device id
-2. can use same definition of MIPI PHY control address with same name
-re-mapping.
+Thanks for the comments.
 
-And hmm...need to re-think about this after this merge window...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Shawn
