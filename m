@@ -1,47 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Jan 2011 17:28:27 +0100 (CET)
-Subject: resume regression in 2.6.37
-In-Reply-To: <1294933492.2535.23.camel@sven>
-References: <1294933492.2535.23.camel@sven>
-Message-ID: <alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jan 2011 16:49:57 +0000
+Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
+	boot failure)
+In-Reply-To: <20110113155152.GG4957@atomide.com>
+References: <20110106180030.GA8249@n2100.arm.linux.org.uk>
+	<20110106182023.GV7771@atomide.com>
+	<20110106203238.GH1198@n2100.arm.linux.org.uk>
+	<20110106204053.GA7771@atomide.com>
+	<20110107161230.GR1198@n2100.arm.linux.org.uk>
+	<20110110185209.GC4957@atomide.com>
+	<20110111231611.GX4957@atomide.com>
+	<2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
+	<20110113091546.GA24429@n2100.arm.linux.org.uk>
+	<20110113155152.GG4957@atomide.com>
+Message-ID: <20110113164957.GA28040@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jan 2011, Sven Neumann wrote:
-> Now I've tried to update the kernel to 2.6.37. After fixing the already
-> reported NULL pointer dereference on bootup in pxa3xx_nand_probe(), the
-> device seems to work fine until I suspend it and then try to wake it up
-> from suspend. Suspend seems to work fine, no warnings whatsoever.
-> However there is absolutely no sign of resume.
+On Thu, Jan 13, 2011 at 07:51:53AM -0800, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110113 01:15]:
+> > Given the very sorry state of OMAP in mainline at present, I'm surprised
+> > that this kind of stuff is still going on...
 > 
-> I've used git bisect to track this down to the following commit:
-> 
-> 
-> commit 2f7e99bb9be6a2d8d7b808dc86037710cc8b7bf1
-> Author: Thomas Gleixner <tglx@linutronix.de>
-> Date:   Mon Sep 27 12:45:50 2010 +0000
-> 
->     genirq: Provide compat handling for chip->set_wake()
->     
->     Wrap the old chip function set_wake() until the migration is
->     complete and the old chip functions are removed.
->     
->     Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
->     Cc: Peter Zijlstra <peterz@infradead.org>
->     LKML-Reference: <20100927121842.927527393@linutronix.de>
->     Reviewed-by: H. Peter Anvin <hpa@zytor.com>
->     Reviewed-by: Ingo Molnar <mingo@elte.hu>
-> 
-> 
-> Any idea on how to proceed from here? I don't think I can just revert
-> this commit and expect things to work, right?
+> At least I boot test the patches I send..
 
-Well, I somehow doubt, that this is the real culprit. The patch does
-not change anything of the set_wake() functionality. It's a functional
-equivivalent wrapper, nothing else.
-
-Can you revert it on top of 2.6.37 and verify that it helps ?
-
-Thanks,
-
-	tglx
+Which is why OMAP3 and OMAP4 can't be built in mainline because they
+spit out lots of compile errors in the OMAP code...  As they won't
+even compile they couldn't have been boot tested.
