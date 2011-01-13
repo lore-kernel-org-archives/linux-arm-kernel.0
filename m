@@ -1,50 +1,45 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Thu, 13 Jan 2011 10:44:03 +0100
-Subject: mmaping a fixed address fails on ARM
-In-Reply-To: <AANLkTim1MOB+r1shuJDvqJexerFo3wQ_o1wQpiaALW=0@mail.gmail.com>
-References: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
-	<AANLkTim1MOB+r1shuJDvqJexerFo3wQ_o1wQpiaALW=0@mail.gmail.com>
-Message-ID: <19758.51555.797311.465295@pilspetsen.it.uu.se>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jan 2011 10:04:07 +0000
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <4D2E928D.9030208@ahsoftware.de>
+References: <4D2B4CE4.9080309@ahsoftware.de>
+	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
+	<4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<4D2E928D.9030208@ahsoftware.de>
+Message-ID: <20110113100407.GB24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bryan Wu writes:
- > Let me add Andre here
- > 
- > Thanks,
- > -Bryan
- > 
- > On Thu, Jan 13, 2011 at 5:58 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
- > > Hi Russell,
- > >
- > > Andre posted a mmap testcase [1] and a bug report [2] for Ubuntu
- > > kernel on OMAP4 system, since he is porting some applications from x86
- > > to ARM. He testcase works fine on x86, but always fail on ARM. I've
- > > tested it on OMAP3/OMAP4/i.MX51.
- > >
- > > Basically what he want to do is get a mapping on a specific virtual
- > > address. But AFAIK, mmap doesn't make sure we can get the mapping
- > > address as we want. On x86, it works fine. So if this fails, the
- > > application can't run on ARM.
- > >
- > > The implementation of arch_get_unmapped_area() is different from ARM
- > > and x86, that might makes mmap behavior different between ARM and x86.
- > > Andre said 2.6.28-versatile. I'm not sure whether it is a regression.
- > >
- > > [1]: http://launchpadlibrarian.net/61588086/main.c
- > > [2]: https://bugs.launchpad.net/ubuntu/+source/linux-ti-omap4/+bug/697004
+On Thu, Jan 13, 2011 at 06:50:05AM +0100, Alexander Holler wrote:
+> Hello,
+>
+> Am 12.01.2011 19:42, schrieb Russell King - ARM Linux:
+>
+>> As the overall feeling at the time was "don't use large initrds" it's
+>> something I've never really cared about - and I'm still of the opinion
+>> that 16MB of compressed initrd/initramfs is rather silly.
+>
+> Hmm, sorry, I have to disagree. ;)
+> E.g. 12MB out of the 16MB in the initramfs I've used are modules.
+> I've also created some larger initramfs wich included  X11 and such, and  
+> I find it very convenient to use the initramfs to include a rootfs in  
+> the the kernel and so only have to handle one file for all. E.g. just  
+> load the kernel with the included rootfs via tftp and you are done.
 
-mmap() with a non-NULL hint referring to a currently unmapped area,
-but without MAP_FIXED, isn't even remotely portable or reliable
-(I've tried it myself in the context of JITs).  It may work on
-Linux/x86, but that doesn't allow you to assume it should work
-on other OS/CPU combinations (and I know of several where it
-emphatically doesn't work).
+Oddly, that's why I wrote the bootp wrapper, which predates the
+currently broken initrd-in-kernel idea.
 
-If you want a fixed address then use MAP_FIXED.  If you don't want
-MAP_FIXED to clobber an existing mapping then you have to keep track
-of existing mappings yourself and avoid them.
+> Sure this can all be done using an external initrd, but that is much  
+> less comfortable to use.
+>
+> At least I like that feature since it is available and won't miss it now. ;)
 
-What is that "some application"?
-
-/Mikael
+The feature isn't available if it doesn't work.  It's not going to get
+fixed for 2.6.38 - it'll be 2.6.39 due to the timing and complexity of
+the problem.
