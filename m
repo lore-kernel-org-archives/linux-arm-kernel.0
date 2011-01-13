@@ -1,32 +1,50 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 13 Jan 2011 12:01:00 +0100
-Subject: BUG: spinlock recursion (sys_chdir, user_path_at,
-	do_path_lookup ...)
-In-Reply-To: <alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
-References: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
-	<20110112210241.GM24920@pengutronix.de>
-	<alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
-Message-ID: <1294916460.19601.89.camel@laptop>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 13 Jan 2011 12:12:16 +0100
+Subject: i.MX & IRQF_ONESHOT
+In-Reply-To: <20110113091355.GP24920@pengutronix.de>
+References: <20110113091355.GP24920@pengutronix.de>
+Message-ID: <4D2EDE10.3040809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-12 at 23:52 +0100, Thomas Gleixner wrote:
-> On Wed, 12 Jan 2011, Uwe Kleine-K?nig wrote:
-> > > Reverting: fs: rcu-walk aware d_revalidate method
-> > > commit: 34286d6662308d82aed891852d04c7c3a2649b16
-> > I found that one, too, in the meantime.  Currently debugging that with
-> > tglx on irc.
+Le 13/01/2011 10:13, Uwe Kleine-K?nig :
+> <jason77.wang@gmail.com>
+> Bcc: 
+> Subject: Re: i.MX & IRQF_ONESHOT
+> Reply-To: 
+> In-Reply-To: <4D2EB6EF.7030608@eukrea.com>
 > 
-> The last finding is that parent and dentry in
-> nameidata_dentry_drop_rcu() are the same, which explains the lock
-> recursion nicely. 
+> Hello,
 > 
-> @nick: Anything you want us to add to the debugging ?
+> [adding tglx who AFAIK invented threaded irqs and the people involved
+> in 2991a1ca6e9b to Cc]
 > 
-> @peterz: Why does lockdep ignore the lock recursion in that
->          spin_lock_nested() call?
+> On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
+>> while testing 2.6.37 on our i.MX27 based board - code in
+>> arch/arm/mach-imx/eukrea_mbimx27-baseboard.c - I noticed the
+>> touchscreen controller (ADS7846) doesn't work anymore.
+>>
+>> A few IRQ are generated when probing for the chipset and starting
+>> calibration (usually first point works), then nothing more (even if
+>> the IRQ signals is generated as seen on the scope, the irq count
+>> doesn't increase anymore and stays <= 4 and no data is reported to
+>> the input layer).
+>>
+>> drivers/input/touchscreen/ads7846.c was switched to threaded IRQ in
+>> commit 2991a1ca6e9b13b639a82c0eec0cbc191bf1f42f where was added :
+>> irq_flags |= IRQF_ONESHOT;
+> AFAIK this is how threaded irq usually work.  The irq should get
+> reenabled by irq_thread -> irq_finalize_oneshot then.
+> 
+>> Commenting out this line in the ads7846 driver makes it work again.
+>> Am I missing something obvious or is there a reason for IRQF_ONESHOT
+>> creating trouble with gpio irq or SPI on i.MX ?
+> I don't know.  Is the irq masked?  pending?
 
-$ git show 34286d6662308d82aed891852d04c7c3a2649b16 | grep spin_lock_nested | wc -l
-0
+Just to let you know that I have the same issue on my at91sam9g10ek:
+atmel_spi + ads7846 (using ADS7843e actually).
+... solved by same workaround.
 
-Uhm, whot?!
+Best regards,
+-- 
+Nicolas Ferre
