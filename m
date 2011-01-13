@@ -1,48 +1,61 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jan 2011 23:02:35 +0000
-Subject: [GIT PULL] pxa: fixes for 2.6.38-rc
-In-Reply-To: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
-References: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
-Message-ID: <20110113230235.GE24149@n2100.arm.linux.org.uk>
+Date: Thu, 13 Jan 2011 23:11:36 +0000
+Subject: SMP: BUG() on cat /proc/$PID/stack
+In-Reply-To: <AANLkTinSNPC7+m1Uie5hbUW_hgPecAK=RRGKkMx2AqOm@mail.gmail.com>
+References: <AANLkTinSNPC7+m1Uie5hbUW_hgPecAK=RRGKkMx2AqOm@mail.gmail.com>
+Message-ID: <20110113231136.GF24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 03:15:21PM -0600, Eric Miao wrote:
-> Hi Russell,
+On Fri, Jan 14, 2011 at 12:24:19AM +0530, Rabin Vincent wrote:
+> On SMP, this BUG() in save_stack_trace_tsk() can be easily triggered
+> from user space by reading /proc/$PID/stack, where $PID is any pid but
+> the current process:
 > 
-> The following changes since commit aebf2fc9dc974270b4b25a83816c7051c73f07c8:
+>         if (tsk != current) {
+> #ifdef CONFIG_SMP
+>                 /*
+>                  * What guarantees do we have here that 'tsk'
+>                  * is not running on another CPU?
+>                  */
+>                 BUG();
+> #else
 > 
->   it8152: add IT8152_LAST_IRQ definition to fix build error
-> (2011-01-02 23:21:14 +0800)
+> x86 appears to go ahead in this case, but has its stack walking code
+> check at every step that the stack pointer it's reading from is valid --
+> is this what is needed in the ARM unwind code to get rid of this BUG()?
 
-Nope, not pulling.
+x86 stack walking is very different from ARM unwinding.  I'd rather not
+expose the unwinder to a volatile stack - that's probably a recipe for
+it "sometimes" working and other times going oops because the stack
+changed beneath it.
 
-I don't have this in my tree, and it doesn't appear to exist in Linus'
-tree either.  There is this commit:
+I suspect this may be one of the reasons x86 merged a dwarf unwinder
+and then threw it out as it was too unreliable.
 
-commit 823a2df258627b80df2e75056b850424a8eb5fed
-Author: Mike Rapoport <mike@compulab.co.il>
-Date:   Wed Dec 29 09:06:26 2010 +0200
+So, rather than going BUG(), lets instead return a terminated trace -
+something like this.  Could you test and report back please?
 
-    ARM: it8152: add IT8152_LAST_IRQ definition to fix build error
+Thanks.
 
-    The commit 6ac6b817f3f4c23c5febd960d8deb343e13af5f3 (ARM: pxa: encode
-    IRQ number into .nr_irqs) removed definition of ITE_LAST_IRQ which
-    caused the following build error:
-
-    CC      arch/arm/common/it8152.o
-    arch/arm/common/it8152.c: In function 'it8152_init_irq':
-    arch/arm/common/it8152.c:86: error: 'IT8152_LAST_IRQ' undeclared (first use
-    arch/arm/common/it8152.c:86: error: (Each undeclared identifier is reported
-    arch/arm/common/it8152.c:86: error: for each function it appears in.)
-    make[2]: *** [arch/arm/common/it8152.o] Error 1
-
-    Defining the IT8152_LAST_IRQ in the arch/arm/include/hardware/it8152.c
-    fixes the build.
-
-    Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-
-but although it matches the summary, it has a different commit ID.
-
-I smell a rebase of code already merged into mainline, and it stinks.
+diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+index c2e112e..381d23a 100644
+--- a/arch/arm/kernel/stacktrace.c
++++ b/arch/arm/kernel/stacktrace.c
+@@ -94,10 +94,13 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 	if (tsk != current) {
+ #ifdef CONFIG_SMP
+ 		/*
+-		 * What guarantees do we have here that 'tsk'
+-		 * is not running on another CPU?
++		 * What guarantees do we have here that 'tsk' is not
++		 * running on another CPU?  For now, ignore it as we
++		 * can't guarantee we won't explode.
+ 		 */
+-		BUG();
++		if (trace->nr_entries < trace->max_entries)
++			trace->entries[trace->nr_entries++] = ULONG_MAX;
++		return;
+ #else
+ 		data.no_sched_functions = 1;
+ 		frame.fp = thread_saved_fp(tsk);
