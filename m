@@ -1,72 +1,33 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Thu, 13 Jan 2011 14:22:06 +0530
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP boot
-	failure)
-In-Reply-To: <20110111231611.GX4957@atomide.com>
-References: <20110106170805.GE1198@n2100.arm.linux.org.uk>
-	<20110106180030.GA8249@n2100.arm.linux.org.uk>
-	<20110106182023.GV7771@atomide.com>
-	<20110106203238.GH1198@n2100.arm.linux.org.uk>
-	<20110106204053.GA7771@atomide.com>
-	<20110107161230.GR1198@n2100.arm.linux.org.uk>
-	<20110110185209.GC4957@atomide.com> <20110111231611.GX4957@atomide.com>
-Message-ID: <2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 13 Jan 2011 10:06:15 +0100
+Subject: [PATCH] unbreak ehci-mxc on otg port of i.MX27
+Message-ID: <1294909575-32709-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote:
-> Here's one more es1.0 fix after the recent USB changes.
->
-> Regards,
->
-> Tony
->
->
-> Author: Tony Lindgren <tony@atomide.com>
-> Date:   Tue Jan 11 15:03:03 2011 -0800
->
->     omap4: Fix ULPI PHY init for ES1.0 SDP
->
->     Commit 6aa85a5ae610106d89e50c7e1f760c56d12f9bc4 (omap4: 4430sdp:
->     enable the ehci port on 4430SDP) added code to enable EHCI
->     support on 4430sdp board.
->
->     Looks like the ULPI pin does not seem to be muxed properly on ES1.0
->     SDP and this causes the system to reboot when the ULPI PHY is
->     enabled.
->
->     Fix this by muxing the pin, this is the same setting for
->     both ES1.0 and ES2.0. Also add checking for gpio_request.
->
->     Cc: Keshava Munegowda <keshava_mgowda@ti.com
->     Signed-off-by: Tony Lindgren <tony@atomide.com>
->
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -554,6 +554,7 @@ static void __init omap_sfh7741prox_init(void)
->
->  #ifdef CONFIG_OMAP_MUX
->  static struct omap_board_mux board_mux[] __initdata = {
-> +	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
->  	{ .reg_offset = OMAP_MUX_TERMINATOR },
->  };
->  #else
-> @@ -576,11 +577,12 @@ static void __init omap_4430sdp_init(void)
->  	omap4_twl6030_hsmmc_init(mmc);
->
->  	/* Power on the ULPI PHY */
-> -	if (gpio_is_valid(OMAP4SDP_MDM_PWR_EN_GPIO)) {
-> -		/* FIXME: Assumes pad is already muxed for GPIO mode */
-> -		gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY
-VMDM_3V3");
-> +	status = gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY
-VMDM_3V3");
-> +	if (status)
-> +		pr_err("%s: Could not get USBB1 PHY GPIO\n");
+commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
+for i.MX51 but broke it for (at least) i.MX27 which doesn't have
+a usb_phy1 clock but has a pdev->id 0.
 
-Tony,
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/usb/host/ehci-mxc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-This throws up a build warning as there's no parameter corresponding to
-the %s. Showed up in linux-next as of today.
-
-- Anand
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index fa59b26..18eb597 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -178,7 +178,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* "dr" device has its own clock */
+-	if (pdev->id == 0) {
++	if ((cpu_is_mx51()) & (pdev->id == 0)) {
+ 		priv->phy1clk = clk_get(dev, "usb_phy1");
+ 		if (IS_ERR(priv->phy1clk)) {
+ 			ret = PTR_ERR(priv->phy1clk);
+-- 
+1.7.3.4
