@@ -1,61 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jan 2011 23:11:36 +0000
-Subject: SMP: BUG() on cat /proc/$PID/stack
-In-Reply-To: <AANLkTinSNPC7+m1Uie5hbUW_hgPecAK=RRGKkMx2AqOm@mail.gmail.com>
-References: <AANLkTinSNPC7+m1Uie5hbUW_hgPecAK=RRGKkMx2AqOm@mail.gmail.com>
-Message-ID: <20110113231136.GF24149@n2100.arm.linux.org.uk>
+Date: Thu, 13 Jan 2011 23:23:27 +0000
+Subject: [PATCH] ARM: make head.S less dependent on the compile time
+	PHYS_OFFSET define
+In-Reply-To: <alpine.LFD.2.00.1101131659220.11803@xanadu.home>
+References: <alpine.LFD.2.00.1101131659220.11803@xanadu.home>
+Message-ID: <20110113232327.GG24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 12:24:19AM +0530, Rabin Vincent wrote:
-> On SMP, this BUG() in save_stack_trace_tsk() can be easily triggered
-> from user space by reading /proc/$PID/stack, where $PID is any pid but
-> the current process:
-> 
->         if (tsk != current) {
-> #ifdef CONFIG_SMP
->                 /*
->                  * What guarantees do we have here that 'tsk'
->                  * is not running on another CPU?
->                  */
->                 BUG();
-> #else
-> 
-> x86 appears to go ahead in this case, but has its stack walking code
-> check at every step that the stack pointer it's reading from is valid --
-> is this what is needed in the ARM unwind code to get rid of this BUG()?
+On Thu, Jan 13, 2011 at 05:04:28PM -0500, Nicolas Pitre wrote:
+> +	.macro phys_offset, rd
+> +	mov	\rd, pc
+> +	and	\rd, \rd, #0xf8000000
+> +	.endm
 
-x86 stack walking is very different from ARM unwinding.  I'd rather not
-expose the unwinder to a volatile stack - that's probably a recipe for
-it "sometimes" working and other times going oops because the stack
-changed beneath it.
+We can do loads better than that, as the p2v fixup code has proven.
+Now that r8 has been eliminated, I may rebase the p2v stuff ontop of
+that commit, and move the computation of phys_offset out of the p2v
+fixup code - and have it in r8 for __create_page_tables to use.
 
-I suspect this may be one of the reasons x86 merged a dwarf unwinder
-and then threw it out as it was too unreliable.
+FYI, the real PHYS_OFFSET value can be found by (eg):
 
-So, rather than going BUG(), lets instead return a terminated trace -
-something like this.  Could you test and report back please?
+1:	.long	.
+	.long	PAGE_OFFSET
 
-Thanks.
+	adr	r0, 1b
+	ldmia	r0, {r1, r2}
+	sub	r1, r0, r1
+	add	r3, r2, r1
 
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index c2e112e..381d23a 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -94,10 +94,13 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 	if (tsk != current) {
- #ifdef CONFIG_SMP
- 		/*
--		 * What guarantees do we have here that 'tsk'
--		 * is not running on another CPU?
-+		 * What guarantees do we have here that 'tsk' is not
-+		 * running on another CPU?  For now, ignore it as we
-+		 * can't guarantee we won't explode.
- 		 */
--		BUG();
-+		if (trace->nr_entries < trace->max_entries)
-+			trace->entries[trace->nr_entries++] = ULONG_MAX;
-+		return;
- #else
- 		data.no_sched_functions = 1;
- 		frame.fp = thread_saved_fp(tsk);
+r1 now contains the offset between virtual and physical spaces, r2
+contains the compile-time PAGE_OFFSET constant, and r3 the runtime
+equivalent of PHYS_OFFSET.
+
+None of this uses troublesome masking which will trip up on platforms
+such as MSM - we really must stop writing code which assumes that
+physical memory is aligned to >= 32MB.
