@@ -1,52 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 13 Jan 2011 22:24:01 +0100
-Subject: i.MX & IRQF_ONESHOT
-In-Reply-To: <4D2F6AB7.30800@eukrea.com>
-References: <20110113091355.GP24920@pengutronix.de>
-	<4D2EDE10.3040809@atmel.com>
-	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
-	<4D2F6AB7.30800@eukrea.com>
-Message-ID: <20110113212401.GZ24920@pengutronix.de>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Thu, 13 Jan 2011 16:03:40 -0600
+Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
+In-Reply-To: <20110113111459.GC24149@n2100.arm.linux.org.uk>
+References: <20101217231449.GF9937@n2100.arm.linux.org.uk>
+	<AANLkTi=-foyb9c5F4tFpGK6KzQnP9htJW8GwYoUHVK0r@mail.gmail.com>
+	<20101218000828.GG9937@n2100.arm.linux.org.uk>
+	<AANLkTinSg+iCGM64iQqLn32Wjpta_87=HWuG==KJ9-eW@mail.gmail.com>
+	<20101218120154.GA4803@n2100.arm.linux.org.uk>
+	<AANLkTimG8yuCMOJPz9-ANi_2hf7E2HPYPy9sWaxVPXmE@mail.gmail.com>
+	<20101218200443.GM9937@n2100.arm.linux.org.uk>
+	<AANLkTikHGX6OQWfGoNiQj-UX81=8_HwP3W+DXwZASatN@mail.gmail.com>
+	<20101224173824.GI20587@n2100.arm.linux.org.uk>
+	<AANLkTimLcGEDrexVCyMROYA1x_GsXdpx_6_ziYWVipMp@mail.gmail.com>
+	<20110113111459.GC24149@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=GYR94UtfAnxTpu8NTWv3jzs9BkePt9TqcxFUL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 10:12:23PM +0100, Eric B?nard wrote:
-> On 13/01/2011 19:15, Thomas Gleixner wrote:
-> >On Thu, 13 Jan 2011, Nicolas Ferre wrote:
-> >>Le 13/01/2011 10:13, Uwe Kleine-K?nig :
-> >>>On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
-> >>>>Commenting out this line in the ads7846 driver makes it work again.
-> >>>>Am I missing something obvious or is there a reason for IRQF_ONESHOT
-> >>>>creating trouble with gpio irq or SPI on i.MX ?
-> >>>I don't know.  Is the irq masked?  pending?
-> >>
-> >>Just to let you know that I have the same issue on my at91sam9g10ek:
-> >>atmel_spi + ads7846 (using ADS7843e actually).
-> >>... solved by same workaround.
-> >
-> >Eric, Nicolas: How are the interrupt handlers set for the relevant
-> >interrupt lines and how are the interrupt pins configured?
-> >
-> on the i.MX27 :
-> - gpio configured as a plain input (in function ads7846_dev_init()
-> in arch/arm/mach-imx/eukrea_mbimx27-baseboard.c)
-> - threaded interrupt handler registered with flags
-> IRQF_TRIGGER_FALLING | IRQF_ONESHOT (in function ads7846_probe() in
-> drivers/input/touchscreen/ads7846.c)
-I didn't recheck the hw manual, but adding IRQF_TRIGGER_FALLING calls
-gpio_set_irq_type (defined in arch/arm/plat-mxc/gpio.c) which results
-into something called GPIO_INT_FALL_EDGE being written into a register.
+On Thu, Jan 13, 2011 at 5:14 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> On Thu, Jan 13, 2011 at 04:19:40AM -0600, Andrei Warkentin wrote:
+> > I fully agree. Would you be interested in me bringing back the actual
+> > synchronization code from platform-dependent code into the preinit
+> > function and posting that as a patch for review?
+>
+> I really don't like the idea of a preinit function - it's completely
+> unnecessary as I've been trying to point out. ?It has been shown that
+> it takes a hundred or so microseconds to get into the kernel, and
+> then a couple of hundred milliseconds to run the delay loop.
+>
+> As platforms are expected to wait in their boot_secondary() for the
+> first half - currently platforms wait one second - we're talking
+> about around a hundred microseconds vs a timeout of one second.
+> That's a factor of 10000 beyond what's required.
+>
+> It has also been shown that the problem you were seeing was down to
+> synchronization/delayed write bugs which have since been solved - and
+> adding yet more synchronization is not the answer to buggy
+> synchronization.
+>
+> So, as the timeouts are already well in excess and the root cause of
+> your problem has been resolved, I see no need to make this stuff more
+> complex - the more complexity there is, the more chance there is of
+> things going wrong.
 
-So I'd say it's configured to be edge sensitive.
-
-> - the gpio's irq is handled by a chained irq handled registered in
-> arch/arm/plat-mxc/gpio.c (the CPU has only one real interrupt for
-> all the GPIO banks so this real IRQ handles up to 5 x 32 gpio's
-> IRQ).
-
-Best reagrds
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Fair enough :).
