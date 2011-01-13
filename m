@@ -1,50 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 13 Jan 2011 12:12:16 +0100
-Subject: i.MX & IRQF_ONESHOT
-In-Reply-To: <20110113091355.GP24920@pengutronix.de>
-References: <20110113091355.GP24920@pengutronix.de>
-Message-ID: <4D2EDE10.3040809@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jan 2011 11:14:59 +0000
+Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
+In-Reply-To: <AANLkTimLcGEDrexVCyMROYA1x_GsXdpx_6_ziYWVipMp@mail.gmail.com>
+References: <20101217231449.GF9937@n2100.arm.linux.org.uk>
+	<AANLkTi=-foyb9c5F4tFpGK6KzQnP9htJW8GwYoUHVK0r@mail.gmail.com>
+	<20101218000828.GG9937@n2100.arm.linux.org.uk>
+	<AANLkTinSg+iCGM64iQqLn32Wjpta_87=HWuG==KJ9-eW@mail.gmail.com>
+	<20101218120154.GA4803@n2100.arm.linux.org.uk>
+	<AANLkTimG8yuCMOJPz9-ANi_2hf7E2HPYPy9sWaxVPXmE@mail.gmail.com>
+	<20101218200443.GM9937@n2100.arm.linux.org.uk>
+	<AANLkTikHGX6OQWfGoNiQj-UX81=8_HwP3W+DXwZASatN@mail.gmail.com>
+	<20101224173824.GI20587@n2100.arm.linux.org.uk>
+	<AANLkTimLcGEDrexVCyMROYA1x_GsXdpx_6_ziYWVipMp@mail.gmail.com>
+Message-ID: <20110113111459.GC24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/01/2011 10:13, Uwe Kleine-K?nig :
-> <jason77.wang@gmail.com>
-> Bcc: 
-> Subject: Re: i.MX & IRQF_ONESHOT
-> Reply-To: 
-> In-Reply-To: <4D2EB6EF.7030608@eukrea.com>
-> 
-> Hello,
-> 
-> [adding tglx who AFAIK invented threaded irqs and the people involved
-> in 2991a1ca6e9b to Cc]
-> 
-> On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
->> while testing 2.6.37 on our i.MX27 based board - code in
->> arch/arm/mach-imx/eukrea_mbimx27-baseboard.c - I noticed the
->> touchscreen controller (ADS7846) doesn't work anymore.
->>
->> A few IRQ are generated when probing for the chipset and starting
->> calibration (usually first point works), then nothing more (even if
->> the IRQ signals is generated as seen on the scope, the irq count
->> doesn't increase anymore and stays <= 4 and no data is reported to
->> the input layer).
->>
->> drivers/input/touchscreen/ads7846.c was switched to threaded IRQ in
->> commit 2991a1ca6e9b13b639a82c0eec0cbc191bf1f42f where was added :
->> irq_flags |= IRQF_ONESHOT;
-> AFAIK this is how threaded irq usually work.  The irq should get
-> reenabled by irq_thread -> irq_finalize_oneshot then.
-> 
->> Commenting out this line in the ads7846 driver makes it work again.
->> Am I missing something obvious or is there a reason for IRQF_ONESHOT
->> creating trouble with gpio irq or SPI on i.MX ?
-> I don't know.  Is the irq masked?  pending?
+On Thu, Jan 13, 2011 at 04:19:40AM -0600, Andrei Warkentin wrote:
+> I fully agree. Would you be interested in me bringing back the actual
+> synchronization code from platform-dependent code into the preinit
+> function and posting that as a patch for review?
 
-Just to let you know that I have the same issue on my at91sam9g10ek:
-atmel_spi + ads7846 (using ADS7843e actually).
-... solved by same workaround.
+I really don't like the idea of a preinit function - it's completely
+unnecessary as I've been trying to point out.  It has been shown that
+it takes a hundred or so microseconds to get into the kernel, and
+then a couple of hundred milliseconds to run the delay loop.
 
-Best regards,
--- 
-Nicolas Ferre
+As platforms are expected to wait in their boot_secondary() for the
+first half - currently platforms wait one second - we're talking
+about around a hundred microseconds vs a timeout of one second.
+That's a factor of 10000 beyond what's required.
+
+It has also been shown that the problem you were seeing was down to
+synchronization/delayed write bugs which have since been solved - and
+adding yet more synchronization is not the answer to buggy
+synchronization.
+
+So, as the timeouts are already well in excess and the root cause of
+your problem has been resolved, I see no need to make this stuff more
+complex - the more complexity there is, the more chance there is of
+things going wrong.
