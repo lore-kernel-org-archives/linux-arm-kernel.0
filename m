@@ -1,37 +1,18 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Jan 2011 12:21:30 +0100 (CET)
-Subject: BUG: spinlock recursion (sys_chdir, user_path_at, do_path_lookup
-	...)
-In-Reply-To: <1294917467.19601.94.camel@laptop>
-References: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
-	<20110112210241.GM24920@pengutronix.de>
-	<alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
-	<1294916460.19601.89.camel@laptop>
-	<1294917467.19601.94.camel@laptop>
-Message-ID: <alpine.LFD.2.00.1101131220240.2678@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jan 2011 11:25:52 +0000
+Subject: mmaping a fixed address fails on ARM
+In-Reply-To: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
+References: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
+Message-ID: <20110113112552.GA26828@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jan 2011, Peter Zijlstra wrote:
+On Thu, Jan 13, 2011 at 05:58:01AM +0800, Bryan Wu wrote:
+> The implementation of arch_get_unmapped_area() is different from ARM
+> and x86, that might makes mmap behavior different between ARM and x86.
+> Andre said 2.6.28-versatile. I'm not sure whether it is a regression.
 
-> 
-> > On Wed, 2011-01-12 at 23:52 +0100, Thomas Gleixner wrote:
-> 
-> > > @peterz: Why does lockdep ignore the lock recursion in that
-> > >          spin_lock_nested() call?
-> 
-> So after some hints on IRC on where to look:
-> 
-> <tglx>         spin_lock(&parent->d_lock);
-> <tglx>         spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
-> <tglx> if parent == dentry
-> 
-> That won't yell because you explicitly tell lockdep its ok, I know what
-> I'm doing.
-> 
-> Several lockdep annotations (including this one) allow you to annotate
-> real bugs away, hence you really need to be sure about things when you
-> make them.
-
-Yeah, I suspected that, but checking whether the pointers are same
-would be nice as it would tell us right away where we fcked up :)
+For the same conditions (iow, same mapping) on ARMv7 and ARMv5-only
+kernels vs x86 the results will be the same.  On ARMv6-supporting kernels
+we have aliasing caches to deal with where we intentionally force the
+alignment of non-MAP_FIXED mappings.
