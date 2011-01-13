@@ -1,32 +1,60 @@
 From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Thu, 13 Jan 2011 11:39:51 +0800
-Subject: [PATCH v4 1/3] ARM: i.MX53: add IOMUX pad for ecspi
-Message-ID: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
+Date: Thu, 13 Jan 2011 11:39:53 +0800
+Subject: [PATCH v4 3/3] ARM: i.MX53 EVK: add spi nor device
+In-Reply-To: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
+References: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
+Message-ID: <1294889993-16347-3-git-send-email-yong.shen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yong Shen <yong.shen@freescale.com>
 
-Add IOMUX pad entry for ecspi
+add spi board information for spi nor device
 
 Signed-off-by: Yong Shen <yong.shen@freescale.com>
 ---
- arch/arm/plat-mxc/include/mach/iomux-mx53.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/board-mx53_evk.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-index 2673007..68e11d7 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-@@ -134,6 +134,9 @@ typedef enum iomux_config {
- #define MX53_PAD_EIM_D16__GPIO_3_16		IOMUX_PAD(0x460, 0x118,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D17__GPIO_3_17		IOMUX_PAD(0x464, 0x11C,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D18__GPIO_3_18		IOMUX_PAD(0x468, 0x120,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
-+#define MX53_PAD_EIM_D16__CSPI1_SCLK		IOMUX_PAD(0x460, 0x118,IOMUX_CONFIG_ALT4, 0x79c, 3, NO_PAD_CTRL)
-+#define MX53_PAD_EIM_D17__CSPI1_MISO		IOMUX_PAD(0x464, 0x11C,IOMUX_CONFIG_ALT4, 0x7a0, 3, NO_PAD_CTRL)
-+#define MX53_PAD_EIM_D18__CSPI1_MOSI		IOMUX_PAD(0x468, 0x120,IOMUX_CONFIG_ALT4, 0x7a4, 3, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D19__GPIO_3_19		IOMUX_PAD(0x46C, 0x124,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D20__GPIO_3_20		IOMUX_PAD(0x470, 0x128,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
- #define MX53_PAD_EIM_D21__GPIO_3_21		IOMUX_PAD(0x474, 0x12C,IOMUX_CONFIG_ALT1, 0x0, 0, NO_PAD_CTRL)
+diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+index 2cb4415..caee04c 100644
+--- a/arch/arm/mach-mx5/board-mx53_evk.c
++++ b/arch/arm/mach-mx5/board-mx53_evk.c
+@@ -24,6 +24,8 @@
+ #include <linux/fec.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
++#include <linux/spi/flash.h>
++#include <linux/spi/spi.h>
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+@@ -99,6 +101,17 @@ static struct fec_platform_data mx53_evk_fec_pdata = {
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
++static struct spi_board_info mx53_evk_spi_board_info[] __initdata = {
++	{
++		.modalias = "mtd_dataflash",
++		.max_speed_hz = 25000000,
++		.bus_num = 0,
++		.chip_select = 1,
++		.mode = SPI_MODE_0,
++		.platform_data = NULL,
++	},
++};
++
+ static int mx53_evk_spi_cs[] = {
+ 	EVK_ECSPI1_CS0,
+ 	EVK_ECSPI1_CS1,
+@@ -123,6 +136,8 @@ static void __init mx53_evk_board_init(void)
+ 	imx53_add_sdhci_esdhc_imx(0, NULL);
+ 	imx53_add_sdhci_esdhc_imx(1, NULL);
+ 
++	spi_register_board_info(mx53_evk_spi_board_info,
++		ARRAY_SIZE(mx53_evk_spi_board_info));
+ 	imx53_add_ecspi(0, &mx53_evk_spi_data);
+ }
+ 
 -- 
 1.7.1
