@@ -1,55 +1,35 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 13 Jan 2011 08:01:51 +0100
-Subject: [PATCHv8 00/12] Contiguous Memory Allocator
-In-Reply-To: <alpine.LFD.2.00.1101121357580.25498@xanadu.home>
-References: <cover.1292443200.git.m.nazarewicz@samsung.com>
-	<AANLkTim8_=0+-zM5z4j0gBaw3PF3zgpXQNetEn-CfUGb@mail.gmail.com>
-	<20101223100642.GD3636@n2100.arm.linux.org.uk>
-	<00ea01cba290$4d67f500$e837df00$%szyprowski@samsung.com>
-	<20101223121917.GG3636@n2100.arm.linux.org.uk>
-	<00ec01cba2a2$af20b8b0$0d622a10$%szyprowski@samsung.com>
-	<20101223134432.GJ3636@n2100.arm.linux.org.uk>
-	<001c01cbb289$864391f0$92cab5d0$%szyprowski@samsung.com>
-	<alpine.LFD.2.00.1101121357580.25498@xanadu.home>
-Message-ID: <002f01cbb2ef$c55c00a0$501401e0$%szyprowski@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 13 Jan 2011 09:09:27 +0100
+Subject: BUG: spinlock recursion (sys_chdir, user_path_at,
+	do_path_lookup ...)
+In-Reply-To: <alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
+References: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
+	<20110112210241.GM24920@pengutronix.de>
+	<alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
+Message-ID: <20110113080927.GN24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Nick,
 
-On Wednesday, January 12, 2011 8:04 PM Nicolas Pitre wrote:
-
-> On Wed, 12 Jan 2011, Marek Szyprowski wrote:
+On Wed, Jan 12, 2011 at 11:52:01PM +0100, Thomas Gleixner wrote:
+> On Wed, 12 Jan 2011, Uwe Kleine-K?nig wrote:
+> > > Reverting: fs: rcu-walk aware d_revalidate method
+> > > commit: 34286d6662308d82aed891852d04c7c3a2649b16
+> > I found that one, too, in the meantime.  Currently debugging that with
+> > tglx on irc.
 > 
-> > I understand that modifying L1 page tables is definitely not a proper way of
-> > handling this. It simply costs too much. But what if we consider that the DMA
-> > memory can be only allocated from a specific range of the system memory?
-> > Assuming that this range of memory is known during the boot time, it CAN be
-> > mapped with two-level of tables in MMU. First level mapping will stay the
-> > same all the time for all processes, but it would be possible to unmap the
-> > pages required for DMA from the second level mapping what will be visible
-> > from all the processes at once.
+> The last finding is that parent and dentry in
+> nameidata_dentry_drop_rcu() are the same, which explains the lock
+> recursion nicely. 
 > 
-> How much memory are we talking about?  What is the typical figure?
-
-One typical scenario we would like to support is full-hd decoding. One frame is
-about 4MB (1920x1080x2 ~= 4MB). Depending on the codec, it may require up to 15
-buffers what gives about 60MB. This simple calculation does not include memory
-for the framebuffer, temporary buffers for the hardware codec and buffers for 
-the stream.
-
-> > Is there any reason why such solution won't work?
-> 
-> It could work indeed.
-> 
-> One similar solution that is already in place is to use highmem for that
-> reclaimable DMA memory.  It is easy to ensure affected highmem pages are
-> not mapped in kernel space.  And you can decide at boot time how many
-> highmem pages you want even if the system has less that 1GB of RAM.
-
-Hmmm, right, this might also help solving the problem.
+> @nick: Anything you want us to add to the debugging ?
+If that helps, the chdir is to / (probably while being already in /).
+Maybe the problem is that "/." == "/.."?
 
 Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
