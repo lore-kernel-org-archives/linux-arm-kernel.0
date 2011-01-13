@@ -1,40 +1,11 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 13 Jan 2011 15:22:57 +0300
-Subject: [PATCH] unbreak ehci-mxc on otg port of i.MX27
-In-Reply-To: <1294909575-32709-1-git-send-email-eric@eukrea.com>
-References: <1294909575-32709-1-git-send-email-eric@eukrea.com>
-Message-ID: <4D2EEEA1.4020607@ru.mvista.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 13 Jan 2011 12:26:39 +0100
+Subject: [patch 1/2] Fix pwm-related build failure
+References: <20110113112638.328269873@rtp-net.org>
+Message-ID: <20110113113006.269152863@rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-01-2011 12:06, Eric B?nard wrote:
-
-> commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
-
-    Forgot to say that Linus has asked to also specify the commit summary in 
-parens after the commit ID.
-
-> for i.MX51 but broke it for (at least) i.MX27 which doesn't have
-> a usb_phy1 clock but has a pdev->id 0.
-
-> Signed-off-by: Eric B?nard<eric@eukrea.com>
-> Cc: Arnaud Patard<arnaud.patard@rtp-net.org>
-> Cc: Sascha Hauer<s.hauer@pengutronix.de>
-> ---
->   drivers/usb/host/ehci-mxc.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
-
-> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-> index fa59b26..18eb597 100644
-> --- a/drivers/usb/host/ehci-mxc.c
-> +++ b/drivers/usb/host/ehci-mxc.c
-> @@ -178,7 +178,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
->   	}
->
->   	/* "dr" device has its own clock */
-> -	if (pdev->id == 0) {
-> +	if ((cpu_is_mx51())&  (pdev->id == 0)) {
-
-    And it should be &&, not &.
-
-WBR, Sergei
+An embedded and charset-unspecified text was scrubbed...
+Name: pwm_ftbfs.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110113/507e1d79/attachment.ksh>
