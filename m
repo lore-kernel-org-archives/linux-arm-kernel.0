@@ -1,71 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 13 Jan 2011 22:06:00 +0100
-Subject: [PATCH v4 05/10] net/fec: add dual fec support for mx28
-In-Reply-To: <1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110113210600.GY24920@pengutronix.de>
+From: eric@eukrea.com (=?ISO-8859-15?Q?Eric_B=E9nard?=)
+Date: Thu, 13 Jan 2011 22:12:23 +0100
+Subject: i.MX & IRQF_ONESHOT
+In-Reply-To: <alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
+References: <20110113091355.GP24920@pengutronix.de>
+	<4D2EDE10.3040809@atmel.com>
+	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
+Message-ID: <4D2F6AB7.30800@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
+On 13/01/2011 19:15, Thomas Gleixner wrote:
+> On Thu, 13 Jan 2011, Nicolas Ferre wrote:
+>> Le 13/01/2011 10:13, Uwe Kleine-K?nig :
+>>> On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
+>>>> Commenting out this line in the ads7846 driver makes it work again.
+>>>> Am I missing something obvious or is there a reason for IRQF_ONESHOT
+>>>> creating trouble with gpio irq or SPI on i.MX ?
+>>> I don't know.  Is the irq masked?  pending?
+>>
+>> Just to let you know that I have the same issue on my at91sam9g10ek:
+>> atmel_spi + ads7846 (using ADS7843e actually).
+>> ... solved by same workaround.
+>
+> Eric, Nicolas: How are the interrupt handlers set for the relevant
+> interrupt lines and how are the interrupt pins configured?
+>
+on the i.MX27 :
+- gpio configured as a plain input (in function ads7846_dev_init() in 
+arch/arm/mach-imx/eukrea_mbimx27-baseboard.c)
+- threaded interrupt handler registered with flags IRQF_TRIGGER_FALLING | 
+IRQF_ONESHOT (in function ads7846_probe() in drivers/input/touchscreen/ads7846.c)
+- the gpio's irq is handled by a chained irq handled registered in 
+arch/arm/plat-mxc/gpio.c (the CPU has only one real interrupt for all the GPIO 
+banks so this real IRQ handles up to 5 x 32 gpio's IRQ).
 
-On Thu, Jan 06, 2011 at 03:13:13PM +0800, Shawn Guo wrote:
->  static netdev_tx_t
->  fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
->  {
->  	struct fec_enet_private *fep = netdev_priv(dev);
-> +	const struct platform_device_id *id_entry =
-> +				platform_get_device_id(fep->pdev);
->  	struct bufdesc *bdp;
->  	void *bufaddr;
->  	unsigned short	status;
-> @@ -256,6 +288,14 @@ fec_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
->  		bufaddr = fep->tx_bounce[index];
->  	}
->  
-> +	/*
-> +	 * Some design made an incorrect assumption on endian mode of
-> +	 * the system that it's running on. As the result, driver has to
-> +	 * swap every frame going to and coming from the controller.
-> +	 */
-> +	if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
-> +		swap_buffer(bufaddr, skb->len);
-> +
-Is that save here?  bufaddr either points to a bounce buffer (which
-should be OK definitely) or skb->data.  Or asked differently:  Is the
-skb here owned by the driver such that it is allowed to write to it?
-Does the driver eventually need to restore the original data?
-
-Just before this if, there is some bounce buffer handling.  If it is not
-OK to modify skb->data, the call to swap_buffer can easily be moved in
-there.
-
->  	/* Save skb pointer */
->  	fep->tx_skbuff[fep->skb_cur] = skb;
->  
-> @@ -424,6 +464,8 @@ static void
->  fec_enet_rx(struct net_device *dev)
->  {
->  	struct	fec_enet_private *fep = netdev_priv(dev);
-> +	const struct platform_device_id *id_entry =
-> +				platform_get_device_id(fep->pdev);
->  	struct bufdesc *bdp;
->  	unsigned short status;
->  	struct	sk_buff	*skb;
-> @@ -487,6 +529,9 @@ fec_enet_rx(struct net_device *dev)
->  	        dma_unmap_single(NULL, bdp->cbd_bufaddr, bdp->cbd_datlen,
->          			DMA_FROM_DEVICE);
->  
-> +		if (id_entry->driver_data & FEC_QUIRK_SWAP_FRAME)
-> +			swap_buffer(data, pkt_len);
-> +
-Here I guess it's OK, the hardware just wrote to the buffer, so the skb
-cannot be shared to anything else and the write is all right.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Eric
