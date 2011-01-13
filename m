@@ -1,28 +1,54 @@
-From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
-Date: Thu, 13 Jan 2011 09:25:19 +0100
-Subject: i.MX & IRQF_ONESHOT
-Message-ID: <4D2EB6EF.7030608@eukrea.com>
+From: jonghun.han@samsung.com (Jonghun Han)
+Date: Thu, 13 Jan 2011 17:39:24 +0900
+Subject: Memory sharing issue by application on V4L2 based device driver
+	with system mmu.
+In-Reply-To: <20110111173509.GB14017@dumpdata.com>
+References: <4D25BC22.6080803@samsung.com>
+	<AANLkTi=P8qY22saY9a_-rze1wsr-DLMgc6Lfa6qnfM7u@mail.gmail.com>
+	<002201cbadfd$6d59e490$480dadb0$%han@samsung.com>
+	<AANLkTinsduJkynwwEeM5K9f3D7C6jtBgkAyZ0-_0z2X-@mail.gmail.com>
+	<003201cbae19$bda3dfc0$38eb9f40$%han@samsung.com>
+	<20110111173509.GB14017@dumpdata.com>
+Message-ID: <007b01cbb2fd$64a0f050$2de2d0f0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-while testing 2.6.37 on our i.MX27 based board - code in 
-arch/arm/mach-imx/eukrea_mbimx27-baseboard.c - I noticed the touchscreen 
-controller (ADS7846) doesn't work anymore.
+Sorry for late reply.
 
-A few IRQ are generated when probing for the chipset and starting calibration 
-(usually first point works), then nothing more (even if the IRQ signals is 
-generated as seen on the scope, the irq count doesn't increase anymore and 
-stays <= 4 and no data is reported to the input layer).
+Samsung SoC C210 has many multimedia IPs.
+Each IP has its own MMU named SYSTEM MMU like CPU's MMU.
+So it can handle discontiguous memory using device own virtual address.
 
-drivers/input/touchscreen/ads7846.c was switched to threaded IRQ in commit 
-2991a1ca6e9b13b639a82c0eec0cbc191bf1f42f where was added :
-irq_flags |= IRQF_ONESHOT;
+What Inki Dae wants to discuss is how to allocate the memory and how to
+share it with other multimedia IPs. 
 
-Commenting out this line in the ads7846 driver makes it work again.
-Am I missing something obvious or is there a reason for IRQF_ONESHOT creating 
-trouble with gpio irq or SPI on i.MX ?
+Thank you for interesting.
 
-Thanks
-Eric
+Best regards,
+
+> -----Original Message-----
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
+> owner at vger.kernel.org] On Behalf Of Konrad Rzeszutek Wilk
+> Sent: Wednesday, January 12, 2011 2:35 AM
+> To: Jonghun Han
+> Cc: 'InKi Dae'; linux-media at vger.kernel.org;
+linux-arm-kernel at lists.infradead.org;
+> 'linux-fbdev'; kyungmin.park at samsung.com
+> Subject: Re: Memory sharing issue by application on V4L2 based device
+driver
+> with system mmu.
+> 
+> 
+>  .. snip..
+> > But 64KB or 1MB physically contiguous memory is better than 4KB page
+> > in the point of performance.
+> 
+> Could you explain that in more details please? I presume you are talking
+about a
+> CPU that has a MMU unit, right?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
