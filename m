@@ -1,55 +1,71 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 12 Jan 2011 17:58:51 -0600
-Subject: [PATCH 2/2] mach-mmp: PXA910 Drive Strength FAST using wrong value
-In-Reply-To: <2F4B855B-51EF-49A9-B0AC-F2B75E3FE639@marvell.com>
-References: <22DA8CC3-8CB2-4EEE-AAD8-8599BD589CCE@marvell.com>
-	<201101062029.45604.arnd@arndb.de>
-	<ABCC071A-5598-48AA-9545-2712FA0BB624@marvell.com>
-	<201101071851.54872.arnd@arndb.de>
-	<DE4BADCB-9705-427A-B80E-BB45B8678ACB@marvell.com>
-	<2F4B855B-51EF-49A9-B0AC-F2B75E3FE639@marvell.com>
-Message-ID: <AANLkTimyahxraLzp11VtCUf6MdD3nNctMG9-vZup9LL+@mail.gmail.com>
+From: dima@android.com (Dima Zavin)
+Date: Wed, 12 Jan 2011 16:08:37 -0800
+Subject: [PATCH] ARM: use memblock memory regions for "System RAM" I/O
+	resources
+In-Reply-To: <20110112235223.GM11039@n2100.arm.linux.org.uk>
+References: <20110112235223.GM11039@n2100.arm.linux.org.uk>
+Message-ID: <1294877317-25832-1-git-send-email-dima@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 7, 2011 at 1:27 PM, Philip Rakity <prakity@marvell.com> wrote:
->
-> Drive strength for PXA910 is a 2 bit value but because of the mapping in
-> plat-pxa/mfp.h needs to be shifted up one bit to handle real
-> location in mfp registers. ?(MMP2 and PXA910 drive strength start
-> at bit 11 while PXA168 starts at bit 10).
->
-> Values 0, 1, 2, and 3 effectively need to be
-> 0, 2, 4, and 6 to fit into register. ?8 does not work.
->
-> Signed-off-by: Philip Rakity <prakity@marvell.com>
+Do not use memory bank info to request the "system ram" resources as
+they do not track holes created by memblock_remove inside
+machine's reserve callback. If the removed memory is passed as
+platform_device's ioresource, then drivers that call
+request_mem_region would fail due to a conflict with the incorrectly
+configured system ram resource.
 
-Applied.
+Instead, iterate through the regions of memblock.memory and add
+those as "System RAM" resources.
 
-> ---
-> ?arch/arm/mach-mmp/include/mach/mfp-pxa910.h | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
-> index 7e8a80f..fbd7ee8 100644
-> --- a/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
-> +++ b/arch/arm/mach-mmp/include/mach/mfp-pxa910.h
-> @@ -6,7 +6,7 @@
-> ?#define MFP_DRIVE_VERY_SLOW ? ?(0x0 << 13)
-> ?#define MFP_DRIVE_SLOW ? ? ? ? (0x2 << 13)
-> ?#define MFP_DRIVE_MEDIUM ? ? ? (0x4 << 13)
-> -#define MFP_DRIVE_FAST ? ? ? ? (0x8 << 13)
-> +#define MFP_DRIVE_FAST ? ? ? ? (0x6 << 13)
->
-> ?/* UART2 */
-> ?#define GPIO47_UART2_RXD ? ? ? MFP_CFG(GPIO47, AF6)
-> --
-> 1.7.0.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Signed-off-by: Dima Zavin <dima@android.com>
+---
+ arch/arm/kernel/setup.c |   16 ++++++----------
+ 1 files changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 336f14e..470efbc 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -517,25 +517,21 @@ setup_ramdisk(int doload, int prompt, int image_start, unsigned int rd_sz)
+ #endif
+ }
+ 
+-static void __init
+-request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
++static void __init request_standard_resources(struct machine_desc *mdesc)
+ {
++	struct memblock_region *region;
+ 	struct resource *res;
+-	int i;
+ 
+ 	kernel_code.start   = virt_to_phys(_text);
+ 	kernel_code.end     = virt_to_phys(_etext - 1);
+ 	kernel_data.start   = virt_to_phys(_sdata);
+ 	kernel_data.end     = virt_to_phys(_end - 1);
+ 
+-	for (i = 0; i < mi->nr_banks; i++) {
+-		if (mi->bank[i].size == 0)
+-			continue;
+-
++	for_each_memblock(memory, region) {
+ 		res = alloc_bootmem_low(sizeof(*res));
+ 		res->name  = "System RAM";
+-		res->start = mi->bank[i].start;
+-		res->end   = mi->bank[i].start + mi->bank[i].size - 1;
++		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
++		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
+ 		res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
+ 
+ 		request_resource(&iomem_resource, res);
+@@ -857,7 +853,7 @@ void __init setup_arch(char **cmdline_p)
+ 	arm_memblock_init(&meminfo, mdesc);
+ 
+ 	paging_init(mdesc);
+-	request_standard_resources(&meminfo, mdesc);
++	request_standard_resources(mdesc);
+ 
+ #ifdef CONFIG_SMP
+ 	if (is_smp())
+-- 
+1.7.3.1
