@@ -1,60 +1,62 @@
-From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Thu, 13 Jan 2011 11:39:53 +0800
-Subject: [PATCH v4 3/3] ARM: i.MX53 EVK: add spi nor device
-In-Reply-To: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Thu, 13 Jan 2011 11:48:36 +0800
+Subject: [PATCH v4 2/3] ARM: i.MX53 EVK: add ecspi IOMUX setting
+In-Reply-To: <1294889993-16347-2-git-send-email-yong.shen@freescale.com>
 References: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
-Message-ID: <1294889993-16347-3-git-send-email-yong.shen@freescale.com>
+	<1294889993-16347-2-git-send-email-yong.shen@freescale.com>
+Message-ID: <AANLkTinM8ewDXvjKcS=JeXFc97rkPipbVmzmmZUKdLL8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@freescale.com>
+Hi there,
 
-add spi board information for spi nor device
+Since some code are already in the tree, this patch set are based on
+the latest code and reflect some comments from Uwe.
 
-Signed-off-by: Yong Shen <yong.shen@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_evk.c |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+Yong
 
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index 2cb4415..caee04c 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -24,6 +24,8 @@
- #include <linux/fec.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/spi/flash.h>
-+#include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -99,6 +101,17 @@ static struct fec_platform_data mx53_evk_fec_pdata = {
- 	.phy = PHY_INTERFACE_MODE_RMII,
- };
- 
-+static struct spi_board_info mx53_evk_spi_board_info[] __initdata = {
-+	{
-+		.modalias = "mtd_dataflash",
-+		.max_speed_hz = 25000000,
-+		.bus_num = 0,
-+		.chip_select = 1,
-+		.mode = SPI_MODE_0,
-+		.platform_data = NULL,
-+	},
-+};
-+
- static int mx53_evk_spi_cs[] = {
- 	EVK_ECSPI1_CS0,
- 	EVK_ECSPI1_CS1,
-@@ -123,6 +136,8 @@ static void __init mx53_evk_board_init(void)
- 	imx53_add_sdhci_esdhc_imx(0, NULL);
- 	imx53_add_sdhci_esdhc_imx(1, NULL);
- 
-+	spi_register_board_info(mx53_evk_spi_board_info,
-+		ARRAY_SIZE(mx53_evk_spi_board_info));
- 	imx53_add_ecspi(0, &mx53_evk_spi_data);
- }
- 
--- 
-1.7.1
+On Thu, Jan 13, 2011 at 11:39 AM,  <yong.shen@freescale.com> wrote:
+> From: Yong Shen <yong.shen@freescale.com>
+>
+> add ecspi IOMUX setting, also fix a bug of chip select pin order
+>
+> Signed-off-by: Yong Shen <yong.shen@freescale.com>
+> ---
+> ?arch/arm/mach-mx5/board-mx53_evk.c | ? 12 ++++++++++--
+> ?1 files changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+> index 8017d68..2cb4415 100644
+> --- a/arch/arm/mach-mx5/board-mx53_evk.c
+> +++ b/arch/arm/mach-mx5/board-mx53_evk.c
+> @@ -33,8 +33,8 @@
+> ?#include <mach/iomux-mx53.h>
+>
+> ?#define SMD_FEC_PHY_RST ? ? ? ? ? ? ? ?IMX_GPIO_NR(7, 6)
+> -#define EVK_ECSPI1_CS0 ? ? ? ? IMX_GPIO_NR(3, 19)
+> -#define EVK_ECSPI1_CS1 ? ? ? ? IMX_GPIO_NR(2, 30)
+> +#define EVK_ECSPI1_CS0 ? ? ? ? IMX_GPIO_NR(2, 30)
+> +#define EVK_ECSPI1_CS1 ? ? ? ? IMX_GPIO_NR(3, 19)
+>
+> ?#include "crm_regs.h"
+> ?#include "devices-imx53.h"
+> @@ -54,6 +54,14 @@ static iomux_v3_cfg_t mx53_evk_pads[] = {
+> ? ? ? ?MX53_PAD_ATA_CS_1__UART3_RXD,
+> ? ? ? ?MX53_PAD_ATA_DA_1__UART3_CTS,
+> ? ? ? ?MX53_PAD_ATA_DA_2__UART3_RTS,
+> +
+> + ? ? ? MX53_PAD_EIM_D16__CSPI1_SCLK,
+> + ? ? ? MX53_PAD_EIM_D17__CSPI1_MISO,
+> + ? ? ? MX53_PAD_EIM_D18__CSPI1_MOSI,
+> +
+> + ? ? ? /* ecspi chip select lines */
+> + ? ? ? MX53_PAD_EIM_EB2__GPIO_2_30,
+> + ? ? ? MX53_PAD_EIM_D19__GPIO_3_19,
+> ?};
+>
+> ?static const struct imxuart_platform_data mx53_evk_uart_pdata __initconst = {
+> --
+> 1.7.1
+>
+>
+>
