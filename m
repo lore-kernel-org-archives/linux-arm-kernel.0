@@ -1,48 +1,91 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Thu, 13 Jan 2011 16:03:40 -0600
-Subject: [RFC] Make SMP secondary CPU up more resilient to failure.
-In-Reply-To: <20110113111459.GC24149@n2100.arm.linux.org.uk>
-References: <20101217231449.GF9937@n2100.arm.linux.org.uk>
-	<AANLkTi=-foyb9c5F4tFpGK6KzQnP9htJW8GwYoUHVK0r@mail.gmail.com>
-	<20101218000828.GG9937@n2100.arm.linux.org.uk>
-	<AANLkTinSg+iCGM64iQqLn32Wjpta_87=HWuG==KJ9-eW@mail.gmail.com>
-	<20101218120154.GA4803@n2100.arm.linux.org.uk>
-	<AANLkTimG8yuCMOJPz9-ANi_2hf7E2HPYPy9sWaxVPXmE@mail.gmail.com>
-	<20101218200443.GM9937@n2100.arm.linux.org.uk>
-	<AANLkTikHGX6OQWfGoNiQj-UX81=8_HwP3W+DXwZASatN@mail.gmail.com>
-	<20101224173824.GI20587@n2100.arm.linux.org.uk>
-	<AANLkTimLcGEDrexVCyMROYA1x_GsXdpx_6_ziYWVipMp@mail.gmail.com>
-	<20110113111459.GC24149@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=GYR94UtfAnxTpu8NTWv3jzs9BkePt9TqcxFUL@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 13 Jan 2011 17:04:28 -0500 (EST)
+Subject: [PATCH] ARM: make head.S less dependent on the compile time
+	PHYS_OFFSET define
+Message-ID: <alpine.LFD.2.00.1101131659220.11803@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 5:14 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> On Thu, Jan 13, 2011 at 04:19:40AM -0600, Andrei Warkentin wrote:
-> > I fully agree. Would you be interested in me bringing back the actual
-> > synchronization code from platform-dependent code into the preinit
-> > function and posting that as a patch for review?
->
-> I really don't like the idea of a preinit function - it's completely
-> unnecessary as I've been trying to point out. ?It has been shown that
-> it takes a hundred or so microseconds to get into the kernel, and
-> then a couple of hundred milliseconds to run the delay loop.
->
-> As platforms are expected to wait in their boot_secondary() for the
-> first half - currently platforms wait one second - we're talking
-> about around a hundred microseconds vs a timeout of one second.
-> That's a factor of 10000 beyond what's required.
->
-> It has also been shown that the problem you were seeing was down to
-> synchronization/delayed write bugs which have since been solved - and
-> adding yet more synchronization is not the answer to buggy
-> synchronization.
->
-> So, as the timeouts are already well in excess and the root cause of
-> your problem has been resolved, I see no need to make this stuff more
-> complex - the more complexity there is, the more chance there is of
-> things going wrong.
 
-Fair enough :).
+In preparation to support a variable PHYS_OFFSET with the same kernel 
+binary image, we need to get rid of the dependency on the compile time 
+defined PHYS_OFFSET when establishing the initial page table.  The value 
+of PHYS_OFFSET can be determined at run time by masking the pc value. A 
+mask of 0xf8000000 is used to be consistent with the mask used by the 
+CONFIG_AUTO_ZRELADDR feature.
+
+If CONFIG_XIP_KERNEL is selected then the compile time PHYS_OFFSET is 
+still used as before, as there is no point having a runtime determined 
+PHYS_OFFSET in that case, and masking the pc value wouldn't be right 
+anyway.
+
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index f17d9a0..be535b3 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -30,10 +30,6 @@
+ #error "PHYS_OFFSET must be at an even 2MiB boundary!"
+ #endif
+ 
+-#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+-#define KERNEL_RAM_PADDR	(PHYS_OFFSET + TEXT_OFFSET)
+-
+-
+ /*
+  * swapper_pg_dir is the virtual address of the initial page table.
+  * We place the page tables 16K below KERNEL_RAM_VADDR.  Therefore, we must
+@@ -41,6 +37,7 @@
+  * the least significant 16 bits to be 0x8000, but we could probably
+  * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + 0x4000.
+  */
++#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+ #if (KERNEL_RAM_VADDR & 0xffff) != 0x8000
+ #error KERNEL_RAM_VADDR must start at 0xXXXX8000
+ #endif
+@@ -49,15 +46,29 @@
+ 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - 0x4000
+ 
+ 	.macro	pgtbl, rd
+-	ldr	\rd, =(KERNEL_RAM_PADDR - 0x4000)
++	phys_offset \rd
++	add	\rd, \rd, #(TEXT_OFFSET - 0x4000)
+ 	.endm
+ 
+ #ifdef CONFIG_XIP_KERNEL
++
+ #define KERNEL_START	XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR)
+ #define KERNEL_END	_edata_loc
++
++	.macro phys_offset, rd
++	ldr	\rd, =PHYS_OFFSET
++	.endm
++
+ #else
++
+ #define KERNEL_START	KERNEL_RAM_VADDR
+ #define KERNEL_END	_end
++
++	.macro phys_offset, rd
++	mov	\rd, pc
++	and	\rd, \rd, #0xf8000000
++	.endm
++
+ #endif
+ 
+ /*
+@@ -189,10 +200,9 @@ __create_page_tables:
+ 	/*
+ 	 * Map some ram to cover our .data and .bss areas.
+ 	 */
+-	orr	r3, r7, #(KERNEL_RAM_PADDR & 0xff000000)
+-	.if	(KERNEL_RAM_PADDR & 0x00f00000)
+-	orr	r3, r3, #(KERNEL_RAM_PADDR & 0x00f00000)
+-	.endif
++	phys_offset r3
++	add	r3, r3, #TEXT_OFFSET 
++	orr	r3, r3, r7
+ 	add	r0, r4,  #(KERNEL_RAM_VADDR & 0xff000000) >> 18
+ 	str	r3, [r0, #(KERNEL_RAM_VADDR & 0x00f00000) >> 18]!
+ 	ldr	r6, =(_end - 1)
