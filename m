@@ -1,7 +1,9 @@
 From: yong.shen@freescale.com (yong.shen at freescale.com)
-Date: Thu, 13 Jan 2011 11:36:03 +0800
-Subject: [PATCH 2/3] ARM: i.MX53 EVK: add ecspi IOMUX setting
-Message-ID: <1294889764-16267-2-git-send-email-yong.shen@freescale.com>
+Date: Thu, 13 Jan 2011 11:39:52 +0800
+Subject: [PATCH v4 2/3] ARM: i.MX53 EVK: add ecspi IOMUX setting
+In-Reply-To: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
+References: <1294889993-16347-1-git-send-email-yong.shen@freescale.com>
+Message-ID: <1294889993-16347-2-git-send-email-yong.shen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
