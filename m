@@ -1,66 +1,77 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Fri, 14 Jan 2011 06:31:31 +0800
-Subject: mmaping a fixed address fails on ARM
-In-Reply-To: <19758.51555.797311.465295@pilspetsen.it.uu.se>
-References: <AANLkTin0jjxLTWzkLHnJ+sGQz=jdDDL94R9o1gh-rO9P@mail.gmail.com>
-	<AANLkTim1MOB+r1shuJDvqJexerFo3wQ_o1wQpiaALW=0@mail.gmail.com>
-	<19758.51555.797311.465295@pilspetsen.it.uu.se>
-Message-ID: <AANLkTikBho6eU_LLtvWOrks6+eP2a32K0ZSS5p+WJg++@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 13 Jan 2011 16:41:42 -0600
+Subject: [PATCH v3 0/1] ARM: Thumb-2: Symbol manipulation macros for function
+	body copying
+Message-ID: <1294958503-6537-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 5:44 PM, Mikael Pettersson <mikpe@it.uu.se> wrote:
-> Bryan Wu writes:
-> ?> Let me add Andre here
-> ?>
-> ?> Thanks,
-> ?> -Bryan
-> ?>
-> ?> On Thu, Jan 13, 2011 at 5:58 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> ?> > Hi Russell,
-> ?> >
-> ?> > Andre posted a mmap testcase [1] and a bug report [2] for Ubuntu
-> ?> > kernel on OMAP4 system, since he is porting some applications from x86
-> ?> > to ARM. He testcase works fine on x86, but always fail on ARM. I've
-> ?> > tested it on OMAP3/OMAP4/i.MX51.
-> ?> >
-> ?> > Basically what he want to do is get a mapping on a specific virtual
-> ?> > address. But AFAIK, mmap doesn't make sure we can get the mapping
-> ?> > address as we want. On x86, it works fine. So if this fails, the
-> ?> > application can't run on ARM.
-> ?> >
-> ?> > The implementation of arch_get_unmapped_area() is different from ARM
-> ?> > and x86, that might makes mmap behavior different between ARM and x86.
-> ?> > Andre said 2.6.28-versatile. I'm not sure whether it is a regression.
-> ?> >
-> ?> > [1]: http://launchpadlibrarian.net/61588086/main.c
-> ?> > [2]: https://bugs.launchpad.net/ubuntu/+source/linux-ti-omap4/+bug/697004
->
-> mmap() with a non-NULL hint referring to a currently unmapped area,
-> but without MAP_FIXED, isn't even remotely portable or reliable
-> (I've tried it myself in the context of JITs). ?It may work on
-> Linux/x86, but that doesn't allow you to assume it should work
-> on other OS/CPU combinations (and I know of several where it
-> emphatically doesn't work).
->
+For at least one board (omap3), some functions are copied from
+their link-time location into other memory at run-time.
 
-Exactly. I also think the mmap() behavior is correct in this test
-scenario. The address location was mapped by some LD libraries, so
-mmaping those address won't get the address we expected.
+This is a plausible thing to do if, for example, the board
+might need to do something like manipulating the SDRAM 
+controller configuration during power management operations.
+Such code may not be able to execute from the SDRAM itself.
 
-> If you want a fixed address then use MAP_FIXED. ?If you don't want
-> MAP_FIXED to clobber an existing mapping then you have to keep track
-> of existing mappings yourself and avoid them.
->
-> What is that "some application"?
->
 
-I guess it is 'wine', don't be surprise. -:)
+In Thumb-2, copying function bodies is not straightforward:
+for Thumb symbols, bit 0 is set by the toolchain, and so
+a function symbol can't be used directly as a base address
+for memcpy: this leads to an off-by-one error, resulting in
+garbage instructions in the destination buffer.
 
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+
+The obvious solution is to mask off this bit when calling
+memcpy() and then insert the bit into the address of the
+target buffer, in order to derive a pointer which can be
+used to call the copied function in the correct instruction
+set.  However, in practice the compiler may optimise this
+operation away.  This seems wrong, but having discussed this
+with compiler folks I believe it's not a compiler bug: rather,
+C doesn't specifiy what happens when casting function pointers
+and attempting to do arithmetic on them.  So some surprising
+optimisations can happen.
+
+
+To make it easier to deal with cases like this, I've had a
+go at writing some macros to make copying function bodies
+easier, while being robust for ARM and Thumb-2.
+
+In particular, the required type-casts are implemented as
+empty asm() blocks, to ensure that the compiler makes no
+assumptions about the result.
+
+This patch provides a fncpy() macro which resembles memcpy().
+It can be used as in this example:
+
+    extern int scary_function(int a, char *b);
+    extern const int size_of_scary_function;
+    extern void *scary_memory_buf;
+
+    int (*runtime_scary_function)(int a, char *b);
+
+    runtime_scary_function = fncpy(scary_memory_buf,
+            &scary_function, 
+            size_of_scary_function);
+
+This is quite a lot more readable than the explicit code,
+and should give the correct result.
+
+fncpy() calls flush_icache_range() as necessary.
+
+It's not possible to determine the size of a function from
+C code.  This must be done by other means, such as adding
+extra symbols in the assembler code where scary_function is
+defined.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+KernelVersion: v2.6.37
+
+Dave Martin (1):
+  ARM: Thumb-2: Symbol manipulation macros for function body copying
+
+ arch/arm/include/asm/fncpy.h |  110 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 110 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/fncpy.h
