@@ -1,46 +1,69 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 13 Jan 2011 11:36:43 +0900
-Subject: [PATCH/RFC 2/3] ARM: S5PV310: Add a platform helper for MIPI
-	DSIM/CSIS setup
-In-Reply-To: <020401cbb2c1$ef9f7c30$cede7490$%kim@samsung.com>
-References: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
-	<1294153764-25006-3-git-send-email-s.nawrocki@samsung.com>
-	<020401cbb2c1$ef9f7c30$cede7490$%kim@samsung.com>
-Message-ID: <4D2E653B.4090502@samsung.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Thu, 13 Jan 2011 11:01:44 +0800
+Subject: [PATCH] ARM i.MX SPI driver changes for i.MX53 support
+In-Reply-To: <1294737713-24015-2-git-send-email-yong.shen@freescale.com>
+References: <1294737713-24015-1-git-send-email-yong.shen@freescale.com>
+	<1294737713-24015-2-git-send-email-yong.shen@freescale.com>
+Message-ID: <AANLkTikErJYCNRM1+-hx5Qrk_iW4Ad7fE1iFUODmqK6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2011 10:33 AM, Kukjin Kim wrote:
-> Sylwester Nawrocki wrote:
->>
->> MIPI_PHYn_CONTROL registers are shared between MIPI DSIM
->> and MIPI CSIS drivers so a spinlock is used to protect multiple
->> access to these registers. Also a proper state of a common
->> PHY enable bit is maintained in order to avoid a DSIM
->> and CSIS driver conflict.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
-...
-> 
-> Basically, it's not good that each machine(SoC) has each own setup-mipi...
-> Because it is very similar(almost same)...means can move it in plat-s5p with
-> following. 
-> 
-> 1. # of MIPI PHY can be calculated by platform device id
-> 2. can use same definition of MIPI PHY control address with same name
-> re-mapping.
+Seems no comments from spi-devel list. This patch is also:
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Yes, I agree with that. Originally I had it done it plat-s5p, I will
-prepare a merged version. The main difference between s5pv210 and s5pv310
-indeed was the register naming and placement in PMU or CLK subsystem, so the
-register  address definitions were in regs-clk.h or regs-pmu.h. So there 
-just will have to be included different header files depending on on SoC 
-architecture.
+Who will take this patch into a tree?
 
+Yong
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+On Tue, Jan 11, 2011 at 5:21 PM,  <yong.shen@freescale.com> wrote:
+> From: Yong Shen <yong.shen@freescale.com>
+>
+> 1. Change the Kconfig to include i.MX53
+> 2. add devtype entry for i.MX53
+>
+> Signed-off-by: Yong Shen <yong.shen@freescale.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?drivers/spi/Kconfig ? | ? ?4 ++--
+> ?drivers/spi/spi_imx.c | ? ?6 ++++++
+> ?2 files changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index 78f9fd0..04965e2 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -153,10 +153,10 @@ config SPI_IMX_VER_0_4
+> ? ? ? ?def_bool y if ARCH_MX31
+>
+> ?config SPI_IMX_VER_0_7
+> - ? ? ? def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51
+> + ? ? ? def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51 || ARCH_MX53
+>
+> ?config SPI_IMX_VER_2_3
+> - ? ? ? def_bool y if ARCH_MX51
+> + ? ? ? def_bool y if ARCH_MX51 || ARCH_MX53
+>
+> ?config SPI_IMX
+> ? ? ? ?tristate "Freescale i.MX SPI controllers"
+> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+> index 55a38e2..9b8a733 100644
+> --- a/drivers/spi/spi_imx.c
+> +++ b/drivers/spi/spi_imx.c
+> @@ -747,6 +747,12 @@ static struct platform_device_id spi_imx_devtype[] = {
+> ? ? ? ? ? ? ? ?.name = "imx51-ecspi",
+> ? ? ? ? ? ? ? ?.driver_data = SPI_IMX_VER_2_3,
+> ? ? ? ?}, {
+> + ? ? ? ? ? ? ? .name = "imx53-cspi",
+> + ? ? ? ? ? ? ? .driver_data = SPI_IMX_VER_0_7,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .name = "imx53-ecspi",
+> + ? ? ? ? ? ? ? .driver_data = SPI_IMX_VER_2_3,
+> + ? ? ? }, {
+> ? ? ? ? ? ? ? ?/* sentinel */
+> ? ? ? ?}
+> ?};
+> --
+> 1.7.1
+>
+>
+>
