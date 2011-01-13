@@ -1,114 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 13 Jan 2011 19:11:42 +0530
-Subject: NFS root lockups with -next 20110113
-In-Reply-To: 676f5c24375e1cc2aa14fe6630ef1324@mail.gmail.com
-References: <20110113120626.GB30351@opensource.wolfsonmicro.com>
-	<8138.1294924927@jrobl> 676f5c24375e1cc2aa14fe6630ef1324@mail.gmail.com
-Message-ID: <af7e0625d87b3596567f016e2694ffef@mail.gmail.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Thu, 13 Jan 2011 14:53:17 +0100
+Subject: [PATCH v2] unbreak ehci-mxc on otg port of i.MX27
+In-Reply-To: <20110113091229.GE12078@pengutronix.de>
+References: <20110113091229.GE12078@pengutronix.de>
+Message-ID: <1294926797-19345-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ 'linux-arm' since same problem was getting discussed
- in another thread)
+commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
+for i.MX51 but broke it for (at least) i.MX27 which doesn't have
+a usb_phy1 clock but has a pdev->id 0.
 
-> -----Original Message-----
-> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> Sent: Thursday, January 13, 2011 6:59 PM
-> To: 'J. R. Okajima'; 'Mark Brown'
-> Cc: 'Trond Myklebust'; 'Nick Piggin'; 'linux-nfs at vger.kernel.org';
-> 'linux-kernel at vger.kernel.org'; 'linux-fsdevel at vger.kernel.org'
-> Subject: RE: NFS root lockups with -next 20110113
->
-> > -----Original Message-----
-> > From: J. R. Okajima [mailto:hooanon05 at yahoo.co.jp]
-> > Sent: Thursday, January 13, 2011 6:52 PM
-> > To: Mark Brown
-> > Cc: Trond Myklebust; Santosh Shilimkar; Nick Piggin; linux-
-> > nfs at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> > fsdevel at vger.kernel.org
-> > Subject: Re: NFS root lockups with -next 20110113
-> >
-> >
-> > Mark Brown:
-> > > With -next 20110113 I'm experiencing lockups shortly after
-> > userspace
-> > > starts when booting with my root filesystem on NFS, log below.
-> I
-> > can
-> > > boot into /bin/sh but running real userspace triggers this very
-> > easily.
-> > > This was introduced sometime this week.
-> > >
-> > > I've not bisected or otherwise investigated much yet, but I do
-> > notice
-> > > code added recently by Nick in "fs: rcu-walk for path lookup"
-> > showing up
-> > > in the backtrace so including him in the CCs.
-> >
-> > This and a report from Santosh Shilimkar look like the same
-> problem
-> > which I reported, and I am testing this patch. If you can, please
-> > try it
-> > too.
-> > Note: Of course this is not offcial fix.
-> >
->
-> It works. My board booted with NFS with below patch
->
->
-> >
-> > diff --git a/fs/namei.c b/fs/namei.c
-> > index 5bb7588..51d052f 100644
-> > --- a/fs/namei.c
-> > +++ b/fs/namei.c
-> > @@ -480,6 +480,7 @@ static int nameidata_dentry_drop_rcu(struct
-> > nameidata *nd, struct dentry *dentry
-> >  {
-> >  	struct fs_struct *fs = current->fs;
-> >  	struct dentry *parent = nd->path.dentry;
-> > +	int isroot;
-> >
-> >  	BUG_ON(!(nd->flags & LOOKUP_RCU));
-> >  	if (nd->root.mnt) {
-> > @@ -489,18 +490,22 @@ static int nameidata_dentry_drop_rcu(struct
-> > nameidata *nd, struct dentry *dentry
-> >  			goto err_root;
-> >  	}
-> >  	spin_lock(&parent->d_lock);
-> > -	spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
-> > -	if (!__d_rcu_to_refcount(dentry, nd->seq))
-> > -		goto err;
-> > +	isroot = IS_ROOT(dentry);
-> > +	if (!isroot) {
-> > +		spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
-> > +		if (!__d_rcu_to_refcount(dentry, nd->seq))
-> > +			goto err;
-> > +	}
-> >  	/*
-> >  	 * If the sequence check on the child dentry passed, then the
-> > child has
-> >  	 * not been removed from its parent. This means the parent
-> > dentry must
-> >  	 * be valid and able to take a reference at this point.
-> >  	 */
-> > -	BUG_ON(!IS_ROOT(dentry) && dentry->d_parent != parent);
-> > +	BUG_ON(!isroot && dentry->d_parent != parent);
-> >  	BUG_ON(!parent->d_count);
-> >  	parent->d_count++;
-> > -	spin_unlock(&dentry->d_lock);
-> > +	if (!isroot)
-> > +		spin_unlock(&dentry->d_lock);
-> >  	spin_unlock(&parent->d_lock);
-> >  	if (nd->root.mnt) {
-> >  		path_get(&nd->root);
-> > @@ -513,7 +518,8 @@ static int nameidata_dentry_drop_rcu(struct
-> > nameidata *nd, struct dentry *dentry
-> >  	nd->flags &= ~LOOKUP_RCU;
-> >  	return 0;
-> >  err:
-> > -	spin_unlock(&dentry->d_lock);
-> > +	if (!isroot)
-> > +		spin_unlock(&dentry->d_lock);
-> >  	spin_unlock(&parent->d_lock);
-> >  err_root:
-> >  	if (nd->root.mnt)
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+v2: fix missing &, remove parenthesis and add i.MX51 in the comment
+
+ drivers/usb/host/ehci-mxc.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+index fa59b26..d443fbd 100644
+--- a/drivers/usb/host/ehci-mxc.c
++++ b/drivers/usb/host/ehci-mxc.c
+@@ -177,8 +177,8 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 		clk_enable(priv->ahbclk);
+ 	}
+ 
+-	/* "dr" device has its own clock */
+-	if (pdev->id == 0) {
++	/* "dr" device has its own clock on i.MX51 */
++	if (cpu_is_mx51() && (pdev->id == 0)) {
+ 		priv->phy1clk = clk_get(dev, "usb_phy1");
+ 		if (IS_ERR(priv->phy1clk)) {
+ 			ret = PTR_ERR(priv->phy1clk);
+-- 
+1.7.3.4
