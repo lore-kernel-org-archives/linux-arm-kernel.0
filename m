@@ -1,46 +1,27 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Jan 2011 18:33:41 +0100 (CET)
-Subject: resume regression in 2.6.37
-In-Reply-To: <1294938961.10740.24.camel@sven>
-References: <1294933492.2535.23.camel@sven>
-	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
-	<1294938961.10740.24.camel@sven>
-Message-ID: <alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 13 Jan 2011 20:48:17 +0300
+Subject: [PATCH v2] unbreak ehci-mxc on otg port of i.MX27
+In-Reply-To: <1294926797-19345-1-git-send-email-eric@eukrea.com>
+References: <20110113091229.GE12078@pengutronix.de>
+	<1294926797-19345-1-git-send-email-eric@eukrea.com>
+Message-ID: <4D2F3AE1.6000505@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jan 2011, Sven Neumann wrote:
-> On Thu, 2011-01-13 at 17:28 +0100, Thomas Gleixner wrote:
-> > On Thu, 13 Jan 2011, Sven Neumann wrote:
-> > > Any idea on how to proceed from here? I don't think I can just revert
-> > > this commit and expect things to work, right?
-> > 
-> > Well, I somehow doubt, that this is the real culprit. The patch does
-> > not change anything of the set_wake() functionality. It's a functional
-> > equivivalent wrapper, nothing else.
-> > 
-> > Can you revert it on top of 2.6.37 and verify that it helps ?
-> 
-> I've done that now and while it doesn't solve the problem completely, I
-> can definitely say that reverting the change does make a difference. 
+Hello.
 
-Hmm. I have to admit that this confuses the hell out of me.
+Eric B?nard wrote:
 
-> Without the revert there is absolutely no sign of resume. With the
-> change reverted I can see that the PXA powers up again, there's an LED
-> showing that the USB controller has power again. Unfortunately there's
-> seems to be another problem and the resume doesn't complete. I've tried
-> to get console output by using no_console_suspend, but there's just
-> gibberish on the console after resume :(
-> 
-> Any idea on how to proceed from here? I could perhaps ask our hardware
-> engineer to try find out where exactly we are stuck in the resume. But
-> I'd like to avoid that if possible.
+> commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
 
-Can you stick a printk into the set_wake() function of that irq chip
-and print the irq and on arguments and the return value . Run that
-with both stock 2.6.37 and the patch reverted.
+    Please also specify the commit summary in parens, as asked by Linus. I think 
+I have already asked you to do so.
 
-Thanks,
+> for i.MX51 but broke it for (at least) i.MX27 which doesn't have
+> a usb_phy1 clock but has a pdev->id 0.
 
-	tglx
+> Signed-off-by: Eric B?nard <eric@eukrea.com>
+> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+
+WBR, Sergei
