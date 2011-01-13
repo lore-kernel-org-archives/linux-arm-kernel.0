@@ -1,208 +1,37 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 13 Jan 2011 15:14:10 +0100
-Subject: [PATCH] ARM: pxa: PalmZ72: Add OV9640 camera support
-Message-ID: <1294928050-15872-1-git-send-email-marek.vasut@gmail.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 13 Jan 2011 15:36:02 +0100
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <20110113100407.GB24149@n2100.arm.linux.org.uk>
+References: <4D2B4CE4.9080309@ahsoftware.de>
+	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
+	<4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<4D2E928D.9030208@ahsoftware.de>
+	<20110113100407.GB24149@n2100.arm.linux.org.uk>
+Message-ID: <4D2F0DD2.7030801@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework of patch from 2009:
-PalmZ72: Add support for OV9640 camera sensor
+Am 13.01.2011 11:04, schrieb Russell King - ARM Linux:
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/include/mach/palmz72.h |    5 +
- arch/arm/mach-pxa/palmz72.c              |  135 ++++++++++++++++++++++++++++++
- 2 files changed, 140 insertions(+), 0 deletions(-)
+>> At least I like that feature since it is available and won't miss it now. ;)
+>
+> The feature isn't available if it doesn't work.  It's not going to get
+> fixed for 2.6.38 - it'll be 2.6.39 due to the timing and complexity of
+> the problem.
 
-diff --git a/arch/arm/mach-pxa/include/mach/palmz72.h b/arch/arm/mach-pxa/include/mach/palmz72.h
-index 2bbcf70..0d4700a 100644
---- a/arch/arm/mach-pxa/include/mach/palmz72.h
-+++ b/arch/arm/mach-pxa/include/mach/palmz72.h
-@@ -44,6 +44,11 @@
- #define GPIO_NR_PALMZ72_BT_POWER		17
- #define GPIO_NR_PALMZ72_BT_RESET		83
- 
-+/* Camera */
-+#define GPIO_NR_PALMZ72_CAM_PWDN		56
-+#define GPIO_NR_PALMZ72_CAM_RESET		57
-+#define GPIO_NR_PALMZ72_CAM_POWER		91
-+
- /** Initial values **/
- 
- /* Battery */
-diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
-index 7bf4017..12d58d2 100644
---- a/arch/arm/mach-pxa/palmz72.c
-+++ b/arch/arm/mach-pxa/palmz72.c
-@@ -30,6 +30,7 @@
- #include <linux/wm97xx.h>
- #include <linux/power_supply.h>
- #include <linux/usb/gpio_vbus.h>
-+#include <linux/i2c-gpio.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -47,6 +48,9 @@
- #include <mach/palm27x.h>
- 
- #include <mach/pm.h>
-+#include <mach/camera.h>
-+
-+#include <media/soc_camera.h>
- 
- #include "generic.h"
- #include "devices.h"
-@@ -103,6 +107,28 @@ static unsigned long palmz72_pin_config[] __initdata = {
- 	GPIO22_GPIO,	/* LCD border color */
- 	GPIO96_GPIO,	/* lcd power */
- 
-+	/* PXA Camera */
-+	GPIO81_CIF_DD_0,
-+	GPIO48_CIF_DD_5,
-+	GPIO50_CIF_DD_3,
-+	GPIO51_CIF_DD_2,
-+	GPIO52_CIF_DD_4,
-+	GPIO53_CIF_MCLK,
-+	GPIO54_CIF_PCLK,
-+	GPIO55_CIF_DD_1,
-+	GPIO84_CIF_FV,
-+	GPIO85_CIF_LV,
-+	GPIO93_CIF_DD_6,
-+	GPIO108_CIF_DD_7,
-+
-+	GPIO56_GPIO,	/* OV9640 Powerdown */
-+	GPIO57_GPIO,	/* OV9640 Reset */
-+	GPIO91_GPIO,	/* OV9640 Power */
-+
-+	/* I2C */
-+	GPIO117_GPIO,	/* I2C_SCL */
-+	GPIO118_GPIO,	/* I2C_SDA */
-+
- 	/* Misc. */
- 	GPIO0_GPIO	| WAKEUP_ON_LEVEL_HIGH,	/* power detect */
- 	GPIO88_GPIO,				/* green led */
-@@ -254,6 +280,114 @@ device_initcall(palmz72_pm_init);
- #endif
- 
- /******************************************************************************
-+ * SoC Camera
-+ ******************************************************************************/
-+#if defined(CONFIG_SOC_CAMERA_OV9640) || \
-+	defined(CONFIG_SOC_CAMERA_OV9640_MODULE)
-+static struct pxacamera_platform_data palmz72_pxacamera_platform_data = {
-+	.flags		= PXA_CAMERA_MASTER | PXA_CAMERA_DATAWIDTH_8 |
-+			PXA_CAMERA_PCLK_EN | PXA_CAMERA_MCLK_EN,
-+	.mclk_10khz	= 2600,
-+};
-+
-+/* Board I2C devices. */
-+static struct i2c_board_info palmz72_i2c_device[] = {
-+	{
-+		I2C_BOARD_INFO("ov9640", 0x30),
-+	}
-+};
-+
-+static int palmz72_camera_power(struct device *dev, int power)
-+{
-+	gpio_set_value(GPIO_NR_PALMZ72_CAM_PWDN, !power);
-+	mdelay(50);
-+	return 0;
-+}
-+
-+static int palmz72_camera_reset(struct device *dev)
-+{
-+	gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 1);
-+	mdelay(50);
-+	gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 0);
-+	mdelay(50);
-+	return 0;
-+}
-+
-+static struct soc_camera_link palmz72_iclink = {
-+	.bus_id		= 0, /* Match id in pxa27x_device_camera in device.c */
-+	.board_info	= &palmz72_i2c_device[0],
-+	.i2c_adapter_id	= 0,
-+	.module_name	= "ov96xx",
-+	.power		= &palmz72_camera_power,
-+	.reset		= &palmz72_camera_reset,
-+	.flags		= SOCAM_DATAWIDTH_8,
-+};
-+
-+static struct i2c_gpio_platform_data palmz72_i2c_bus_data = {
-+	.sda_pin	= 118,
-+	.scl_pin	= 117,
-+	.udelay		= 10,
-+	.timeout	= 100,
-+};
-+
-+static struct platform_device palmz72_i2c_bus_device = {
-+	.name		= "i2c-gpio",
-+	.id		= 0, /* we use this as a replacement for i2c-pxa */
-+	.dev		= {
-+		.platform_data	= &palmz72_i2c_bus_data,
-+	}
-+};
-+
-+static struct platform_device palmz72_camera = {
-+	.name	= "soc-camera-pdrv",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &palmz72_iclink,
-+	},
-+};
-+
-+/* Here we request the camera GPIOs and configure them. We power up the camera
-+ * module, deassert the reset pin, but put it into powerdown (low to no power
-+ * consumption) mode. This allows us to later bring the module up fast. */
-+static inline void __init palmz72_cam_gpio_init(void)
-+{
-+	if (gpio_request(GPIO_NR_PALMZ72_CAM_PWDN, "Camera PWDN"))
-+		goto err1;
-+	if (gpio_request(GPIO_NR_PALMZ72_CAM_RESET, "Camera RESET"))
-+		goto err2;
-+	if (gpio_request(GPIO_NR_PALMZ72_CAM_POWER, "Camera DVDD"))
-+		goto err3;
-+	if (gpio_direction_output(GPIO_NR_PALMZ72_CAM_POWER, 1))
-+		goto err4;
-+	if (gpio_direction_output(GPIO_NR_PALMZ72_CAM_RESET, 0))
-+		goto err4;
-+	if (gpio_direction_output(GPIO_NR_PALMZ72_CAM_PWDN, 0))
-+		goto err4;
-+	return;
-+
-+err4:
-+	gpio_free(GPIO_NR_PALMZ72_CAM_POWER);
-+err3:
-+	gpio_free(GPIO_NR_PALMZ72_CAM_RESET);
-+err2:
-+	gpio_free(GPIO_NR_PALMZ72_CAM_PWDN);
-+err1:
-+	printk(KERN_ERR "Camera GPIO init failed!\n");
-+	return;
-+}
-+
-+static void __init palmz72_camera_init(void)
-+{
-+	palmz72_cam_gpio_init();
-+	pxa_set_camera_info(&palmz72_pxacamera_platform_data);
-+	platform_device_register(&palmz72_i2c_bus_device);
-+	platform_device_register(&palmz72_camera);
-+}
-+#else
-+static inline void palmz72_camera_init(void) {}
-+#endif
-+
-+/******************************************************************************
-  * Machine init
-  ******************************************************************************/
- static void __init palmz72_init(void)
-@@ -276,6 +410,7 @@ static void __init palmz72_init(void)
- 	palm27x_pmic_init();
- 	palmz72_kpc_init();
- 	palmz72_leds_init();
-+	palmz72_camera_init();
- }
- 
- MACHINE_START(PALMZ72, "Palm Zire72")
--- 
-1.7.2.3
+I just wanted to express that I like that feature a lot and I didn't 
+wanted to ask for a quick fix nor did I wanted to make pressure.
+
+I've tried a the patch from Rabin Vincent (along with an alignment) and 
+it works. It might not be the best solution and I certainly waste some 
+memory (no free), but I don't care.
+
+Regards,
+
+Alexander
