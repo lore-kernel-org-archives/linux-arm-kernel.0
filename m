@@ -1,90 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 13 Jan 2011 12:37:57 +0100
-Subject: BUG: spinlock recursion (sys_chdir, user_path_at,
-	do_path_lookup ...)
-In-Reply-To: <alpine.LFD.2.00.1101131220240.2678@localhost6.localdomain6>
-References: <AANLkTimb3i4BiuXvnCdhXn-xnN==NjVg8MDLsDkuFwLC@mail.gmail.com>
-	<20110112210241.GM24920@pengutronix.de>
-	<alpine.LFD.2.00.1101122344500.2678@localhost6.localdomain6>
-	<1294916460.19601.89.camel@laptop> <1294917467.19601.94.camel@laptop>
-	<alpine.LFD.2.00.1101131220240.2678@localhost6.localdomain6>
-Message-ID: <1294918677.19601.102.camel@laptop>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 13 Jan 2011 15:17:43 +0300
+Subject: [PATCH] unbreak ehci-mxc on otg port of i.MX27
+In-Reply-To: <1294909575-32709-1-git-send-email-eric@eukrea.com>
+References: <1294909575-32709-1-git-send-email-eric@eukrea.com>
+Message-ID: <4D2EED67.8070904@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-13 at 12:21 +0100, Thomas Gleixner wrote:
-> On Thu, 13 Jan 2011, Peter Zijlstra wrote:
-> 
-> > 
-> > > On Wed, 2011-01-12 at 23:52 +0100, Thomas Gleixner wrote:
-> > 
-> > > > @peterz: Why does lockdep ignore the lock recursion in that
-> > > >          spin_lock_nested() call?
-> > 
-> > So after some hints on IRC on where to look:
-> > 
-> > <tglx>         spin_lock(&parent->d_lock);
-> > <tglx>         spin_lock_nested(&dentry->d_lock, DENTRY_D_LOCK_NESTED);
-> > <tglx> if parent == dentry
-> > 
-> > That won't yell because you explicitly tell lockdep its ok, I know what
-> > I'm doing.
-> > 
-> > Several lockdep annotations (including this one) allow you to annotate
-> > real bugs away, hence you really need to be sure about things when you
-> > make them.
-> 
-> Yeah, I suspected that, but checking whether the pointers are same
-> would be nice as it would tell us right away where we fcked up :)
-> 
+Hello.
 
-Something like the below would indeed do that, but it makes the
-lock_acquire path more expensive, since it will now have to iterate the
-held lock stack every time.
+On 13-01-2011 12:06, Eric B?nard wrote:
 
-(not actually tested)
+> commit 711669e5b80b6f2d88f61ed8a9681f83d8cbd201 fixed port 0 support
+> for i.MX51 but broke it for (at least) i.MX27 which doesn't have
+> a usb_phy1 clock but has a pdev->id 0.
 
----
- kernel/lockdep.c |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
+> Signed-off-by: Eric B?nard<eric@eukrea.com>
+> Cc: Arnaud Patard<arnaud.patard@rtp-net.org>
+> Cc: Sascha Hauer<s.hauer@pengutronix.de>
+> ---
+>   drivers/usb/host/ehci-mxc.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/kernel/lockdep.c b/kernel/lockdep.c
-index 42ba65d..d053d9a 100644
---- a/kernel/lockdep.c
-+++ b/kernel/lockdep.c
-@@ -2740,11 +2740,12 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
- {
- 	struct task_struct *curr = current;
- 	struct lock_class *class = NULL;
--	struct held_lock *hlock;
-+	struct held_lock *hlock, *rhlock;
- 	unsigned int depth, id;
- 	int chain_head = 0;
- 	int class_idx;
- 	u64 chain_key;
-+	int i;
- 
- 	if (!prove_locking)
- 		check = 1;
-@@ -2817,6 +2818,21 @@ static int __lock_acquire(struct lockdep_map *lock, unsigned int subclass,
- 	hlock->holdtime_stamp = lockstat_clock();
- #endif
- 
-+	for (i = depth-1; i >= 0; i--) {
-+		rhlock = curr->held_locks + i;
-+		if (rhlock->instance == lock) {
-+			if (debug_locks_off() || debug_locks_silent)
-+				return 0;
-+			printk("Lock recursion, trying to acquire:\n");
-+			print_lock(hlock);
-+			printk("while already holding:\n");
-+			print_lock(rhlock);
-+			printk("which is the same lock instance!\n");
-+			dump_stack();
-+			return 0;
-+		}
-+	}
-+
- 	if (check == 2 && !mark_irqflags(curr, hlock))
- 		return 0;
- 
+> diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
+> index fa59b26..18eb597 100644
+> --- a/drivers/usb/host/ehci-mxc.c
+> +++ b/drivers/usb/host/ehci-mxc.c
+> @@ -178,7 +178,7 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+>   	}
+>
+>   	/* "dr" device has its own clock */
+> -	if (pdev->id == 0) {
+> +	if ((cpu_is_mx51()) & (pdev->id == 0)) {
+
+    Why enclose the function call in parens at all? You also don't need parens 
+around 'pdev->id == 0'...
+
+WBR, Sergei
