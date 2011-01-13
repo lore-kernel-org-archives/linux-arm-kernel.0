@@ -1,155 +1,48 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 13 Jan 2011 16:41:43 -0600
-Subject: [PATCH v3 1/1] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <1294958503-6537-1-git-send-email-dave.martin@linaro.org>
-References: <1294958503-6537-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1294958503-6537-2-git-send-email-dave.martin@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jan 2011 23:02:35 +0000
+Subject: [GIT PULL] pxa: fixes for 2.6.38-rc
+In-Reply-To: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
+References: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
+Message-ID: <20110113230235.GE24149@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In low-level board support code, there is sometimes a need to
-copy a function body to another location at run-time.
+On Thu, Jan 13, 2011 at 03:15:21PM -0600, Eric Miao wrote:
+> Hi Russell,
+> 
+> The following changes since commit aebf2fc9dc974270b4b25a83816c7051c73f07c8:
+> 
+>   it8152: add IT8152_LAST_IRQ definition to fix build error
+> (2011-01-02 23:21:14 +0800)
 
-A straightforward call to memcpy doesn't work in Thumb-2,
-because bit 0 of external Thumb function symbols is set to 1,
-indicating that the function is Thumb.  Without corrective
-measures, this will cause an off-by-one copy, and the copy
-may be called using the wrong instruction set.
+Nope, not pulling.
 
-This patch adds macros to help with such cases.
+I don't have this in my tree, and it doesn't appear to exist in Linus'
+tree either.  There is this commit:
 
-Particular care is needed, because C doesn't guarantee any
-defined behaviour when casting a function pointer to any other
-type.  This has been observed to lead to strange optimisation
-side-effects when doing the arithmetic which is required in
-order to copy/move function bodies correctly in Thumb-2.
+commit 823a2df258627b80df2e75056b850424a8eb5fed
+Author: Mike Rapoport <mike@compulab.co.il>
+Date:   Wed Dec 29 09:06:26 2010 +0200
 
-Thanks to Russell King and Nicolas Pitre for their input.
+    ARM: it8152: add IT8152_LAST_IRQ definition to fix build error
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
-KernelVersion: v2.6.37
+    The commit 6ac6b817f3f4c23c5febd960d8deb343e13af5f3 (ARM: pxa: encode
+    IRQ number into .nr_irqs) removed definition of ITE_LAST_IRQ which
+    caused the following build error:
 
- arch/arm/include/asm/fncpy.h |  110 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 110 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/fncpy.h
+    CC      arch/arm/common/it8152.o
+    arch/arm/common/it8152.c: In function 'it8152_init_irq':
+    arch/arm/common/it8152.c:86: error: 'IT8152_LAST_IRQ' undeclared (first use
+    arch/arm/common/it8152.c:86: error: (Each undeclared identifier is reported
+    arch/arm/common/it8152.c:86: error: for each function it appears in.)
+    make[2]: *** [arch/arm/common/it8152.o] Error 1
 
-diff --git a/arch/arm/include/asm/fncpy.h b/arch/arm/include/asm/fncpy.h
-new file mode 100644
-index 0000000..6399265
---- /dev/null
-+++ b/arch/arm/include/asm/fncpy.h
-@@ -0,0 +1,110 @@
-+/*
-+ * arch/arm/include/asm/fncpy.h - helper macros for function body copying
-+ *
-+ * Copyright (C) 2011 Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
-+
-+/*
-+ * These macros are intended for use when there is a need to copy a low-level
-+ * function body into special memory.
-+ *
-+ * For example, when reconfiguring the SDRAM controller, the code doing the
-+ * reconfiguration may need to run from SRAM.
-+ *
-+ * NOTE: that the copied function body must be entirely self-contained and
-+ * position-independent in order for this to work properly.
-+ *
-+ *
-+ * Typical usage example:
-+ *
-+ * extern int f(args);
-+ * extern uint32_t size_of_f;
-+ * int (*copied_f)(args);
-+ * void *sram_buffer;
-+ *
-+ * copied_f = fncpy(sram_buffer, &f, size_of_f);
-+ *
-+ * ... do any required D-side/I-side synchronisation ...
-+ *
-+ * ... later, call the function: ...
-+ *
-+ * copied_f(args);
-+ *
-+ * The size of the function to be copied can't be determined from C:
-+ * this must be determined by other means, such as adding assmbler directives
-+ * in the file where f is defined.
-+ */
-+
-+#ifndef __ASM_FNCPY_H
-+#define __ASM_FNCPY_H
-+
-+#include <linux/types.h>
-+#include <linux/string.h>
-+
-+#include <asm/cacheflush.h>
-+
-+/* Function pointer casting macros */
-+
-+/* Cast function pointer to integer: */
-+#define __funcp_to_uint(funcp) ({				\
-+		uintptr_t __result;				\
-+								\
-+		asm("" : "=r" (__result) : "0" (funcp));	\
-+		__result;					\
-+	})
-+
-+/* Cast integer to function pointer with type matching funcp: */
-+#define __uint_to_funcp(i, funcp) ({			\
-+		typeof(funcp) __result;			\
-+							\
-+		asm("" : "=r" (__result) : "0" (i));	\
-+		__result;				\
-+	})
-+
-+
-+/* Function symbol manipulation macros */
-+
-+/*
-+ * FSYM_REBASE: Determine the correct function pointer for funcp,
-+ * after the function has been copied to dest_buf:
-+ */
-+#define FSYM_REBASE(funcp, dest_buf)					\
-+	__uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
-+
-+/*
-+ * FSYM_BASE: Determine the base address in memory of the function funcp
-+ * FSYM_TYPE: Determine the instruction set type (ARM/Thumb) of funcp
-+ * (both defined below)
-+ */
-+
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
-+#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
-+#else /* !CONFIG_THUMB2_KERNEL */
-+#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
-+#define FSYM_TYPE(funcp) 0
-+#endif /* !CONFIG_THUMB2_KERNEL */
-+
-+/* Function copy helper */
-+#define fncpy(dest_buf, funcp, size) ({				\
-+		memcpy(dest_buf, FSYM_BASE(funcp), size);	\
-+		flush_icache_range((unsigned long)(dest_buf),	\
-+			(unsigned long)(dest_buf) + (size));	\
-+								\
-+		FSYM_REBASE(funcp, dest_buf);			\
-+	})
-+
-+#endif /* !__ASM_FNCPY_H */
--- 
-1.7.1
+    Defining the IT8152_LAST_IRQ in the arch/arm/include/hardware/it8152.c
+    fixes the build.
+
+    Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+
+but although it matches the summary, it has a different commit ID.
+
+I smell a rebase of code already merged into mainline, and it stinks.
