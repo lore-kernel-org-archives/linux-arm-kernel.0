@@ -1,37 +1,40 @@
-From: eric@eukrea.com (=?ISO-8859-15?Q?Eric_B=E9nard?=)
-Date: Thu, 13 Jan 2011 22:12:23 +0100
-Subject: i.MX & IRQF_ONESHOT
-In-Reply-To: <alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
-References: <20110113091355.GP24920@pengutronix.de>
-	<4D2EDE10.3040809@atmel.com>
-	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
-Message-ID: <4D2F6AB7.30800@eukrea.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 13 Jan 2011 15:15:21 -0600
+Subject: [GIT PULL] pxa: fixes for 2.6.38-rc
+Message-ID: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/01/2011 19:15, Thomas Gleixner wrote:
-> On Thu, 13 Jan 2011, Nicolas Ferre wrote:
->> Le 13/01/2011 10:13, Uwe Kleine-K?nig :
->>> On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
->>>> Commenting out this line in the ads7846 driver makes it work again.
->>>> Am I missing something obvious or is there a reason for IRQF_ONESHOT
->>>> creating trouble with gpio irq or SPI on i.MX ?
->>> I don't know.  Is the irq masked?  pending?
->>
->> Just to let you know that I have the same issue on my at91sam9g10ek:
->> atmel_spi + ads7846 (using ADS7843e actually).
->> ... solved by same workaround.
->
-> Eric, Nicolas: How are the interrupt handlers set for the relevant
-> interrupt lines and how are the interrupt pins configured?
->
-on the i.MX27 :
-- gpio configured as a plain input (in function ads7846_dev_init() in 
-arch/arm/mach-imx/eukrea_mbimx27-baseboard.c)
-- threaded interrupt handler registered with flags IRQF_TRIGGER_FALLING | 
-IRQF_ONESHOT (in function ads7846_probe() in drivers/input/touchscreen/ads7846.c)
-- the gpio's irq is handled by a chained irq handled registered in 
-arch/arm/plat-mxc/gpio.c (the CPU has only one real interrupt for all the GPIO 
-banks so this real IRQ handles up to 5 x 32 gpio's IRQ).
+Hi Russell,
 
-Eric
+The following changes since commit aebf2fc9dc974270b4b25a83816c7051c73f07c8:
+
+  it8152: add IT8152_LAST_IRQ definition to fix build error
+(2011-01-02 23:21:14 +0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+
+Eric Miao (1):
+      ARM: pxa: fix recursive calls in pxa_low_gpio_chip
+
+Marek Vasut (4):
+      ARM: pxa: fix warning in zeus.c
+      ARM: pxa: remove unused variable in clock-pxa3xx.c
+      ARM: pxa: use cpu_has_ipr() consistently in irq.c
+      ARM: pxa: fix suspend/resume array index miscalculation
+
+Pavel Machek (1):
+      ARM: sa1111: fix typo in sa1111_retrigger_lowirq()
+
+Philip Rakity (2):
+      ARM: mmp: MMP2 drive strength FAST using wrong value
+      ARM: mmp: PXA910 drive strength FAST using wrong value
+
+ arch/arm/common/sa1111.c                    |    2 +-
+ arch/arm/mach-mmp/include/mach/mfp-mmp2.h   |    2 +-
+ arch/arm/mach-mmp/include/mach/mfp-pxa910.h |    2 +-
+ arch/arm/mach-pxa/clock-pxa3xx.c            |    1 -
+ arch/arm/mach-pxa/irq.c                     |   49 ++++++++++-----------------
+ arch/arm/mach-pxa/zeus.c                    |    4 +-
+ 6 files changed, 23 insertions(+), 37 deletions(-)
