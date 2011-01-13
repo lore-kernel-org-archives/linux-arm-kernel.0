@@ -1,53 +1,44 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 13 Jan 2011 11:12:59 +0900
-Subject: [PATCH/RFC 1/3] ARM: S5P: Add a platform callback for MIPI CSIS
-	PHY control
-In-Reply-To: <020301cbb2c1$5ed9dec0$1c8d9c40$%kim@samsung.com>
+Date: Thu, 13 Jan 2011 11:36:43 +0900
+Subject: [PATCH/RFC 2/3] ARM: S5PV310: Add a platform helper for MIPI
+	DSIM/CSIS setup
+In-Reply-To: <020401cbb2c1$ef9f7c30$cede7490$%kim@samsung.com>
 References: <1294153764-25006-1-git-send-email-s.nawrocki@samsung.com>
-	<1294153764-25006-2-git-send-email-s.nawrocki@samsung.com>
-	<020301cbb2c1$5ed9dec0$1c8d9c40$%kim@samsung.com>
-Message-ID: <4D2E5FAB.6010106@samsung.com>
+	<1294153764-25006-3-git-send-email-s.nawrocki@samsung.com>
+	<020401cbb2c1$ef9f7c30$cede7490$%kim@samsung.com>
+Message-ID: <4D2E653B.4090502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-thank you for the update.
-
-On 01/13/2011 10:29 AM, Kukjin Kim wrote:
+On 01/13/2011 10:33 AM, Kukjin Kim wrote:
 > Sylwester Nawrocki wrote:
 >>
->> The phy_enable callback in struct s5p_platform_mipi_csis is added
->> to allow the CSIS driver to control its PHY enable and reset signals.
->> This allows to use same MIPI CSIS driver across various SoCs.
+>> MIPI_PHYn_CONTROL registers are shared between MIPI DSIM
+>> and MIPI CSIS drivers so a spinlock is used to protect multiple
+>> access to these registers. Also a proper state of a common
+>> PHY enable bit is maintained in order to avoid a DSIM
+>> and CSIS driver conflict.
 >>
 >> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >> ---
->>  arch/arm/plat-s5p/dev-csis0.c              |    2 +-
->>  arch/arm/plat-s5p/dev-csis1.c              |    2 +-
->>  arch/arm/plat-s5p/include/plat/csis.h      |   28 --------------------
->>  arch/arm/plat-s5p/include/plat/mipi_csis.h |   39
->> ++++++++++++++++++++++++++++
->>  4 files changed, 41 insertions(+), 30 deletions(-)
->>  delete mode 100644 arch/arm/plat-s5p/include/plat/csis.h
->>  create mode 100644 arch/arm/plat-s5p/include/plat/mipi_csis.h
->>
 ...
 > 
-> I think should be separated like following.
+> Basically, it's not good that each machine(SoC) has each own setup-mipi...
+> Because it is very similar(almost same)...means can move it in plat-s5p with
+> following. 
 > 
-> If required, ...
-> 
-> 1. change copyright
-> 2. rename csis.h to mipi_csis.h
+> 1. # of MIPI PHY can be calculated by platform device id
+> 2. can use same definition of MIPI PHY control address with same name
+> re-mapping.
 
-I don't want to bother with a separate patches for that, just prefer
-to drop the above changes.
+Yes, I agree with that. Originally I had it done it plat-s5p, I will
+prepare a merged version. The main difference between s5pv210 and s5pv310
+indeed was the register naming and placement in PMU or CLK subsystem, so the
+register  address definitions were in regs-clk.h or regs-pmu.h. So there 
+just will have to be included different header files depending on on SoC 
+architecture.
 
-> 3. add phy enable feature
-
-OK, I would reduce the patch to that change only.
 
 Regards,
 -- 
