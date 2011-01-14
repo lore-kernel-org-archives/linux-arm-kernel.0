@@ -1,237 +1,94 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 14 Jan 2011 16:10:48 +0000
-Subject: [PATCH] hwrng: add support for picoxcell TRNG
-Message-ID: <1295021448-25018-1-git-send-email-jamie@jamieiles.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Fri, 14 Jan 2011 17:13:01 +0100
+Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
+In-Reply-To: <20110114155806.GA22505@n2100.arm.linux.org.uk>
+References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
+	<20110114155806.GA22505@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver adds support for the True Random Number Generator in
-the Picochip PC3X3 and later devices.
+On Fri, Jan 14, 2011 at 4:58 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 14, 2011 at 04:21:10PM +0100, jean.pihet at newoldbits.com wrote:
+>> From: Jean Pihet <j-pihet@ti.com>
+>>
+>> The new fncpy API is better suited for copying some
+>> code to SRAM at runtime. This patch changes the ad-hoc
+>> code to the more generic fncpy API.
+>>
+>> Tested OK on OMAP3 in low power modes (RET/OFF)
+>> with !CONFIG_THUMB2_KERNEL
+>>
+>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+>> ---
+>> ?arch/arm/plat-omap/sram.c | ? ?7 +++----
+>> ?1 files changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+>> index e26e504..e2982b0 100644
+>> --- a/arch/arm/plat-omap/sram.c
+>> +++ b/arch/arm/plat-omap/sram.c
+>> @@ -23,7 +23,7 @@
+>>
+>> ?#include <asm/tlb.h>
+>> ?#include <asm/cacheflush.h>
+>> -
+>> +#include <asm/fncpy.h>
+>> ?#include <asm/mach/map.h>
+>>
+>> ?#include <plat/sram.h>
+>> @@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
+>>
+>> ? ? ? omap_sram_ceil -= size;
+>> ? ? ? omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
+>> - ? ? memcpy((void *)omap_sram_ceil, start, size);
+>> - ? ? flush_icache_range((unsigned long)omap_sram_ceil,
+>> - ? ? ? ? ? ? (unsigned long)(omap_sram_ceil + size));
+>> +
+>> + ? ? fncpy((void *)omap_sram_ceil, start, size);
+>>
+>> ? ? ? return (void *)omap_sram_ceil;
+>
+> That's actually wrong usage, as you won't get the T bit set if the original
+> function had it.
+Oops ok got it.
 
-Cc: Matt Mackall <mpm@selenic.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
+>
+> The right solution to this is to change omap_sram_push() to become just an
+> allocator, and then use fncpy() outside of that.
+>
+> So:
+>
+> extern int my_func_size;
+> extern void my_func(int blah);
+> void (*sram_my_func)(int);
+>
+> ? ? ? ?void *sram = omap_sram_push(my_func_size);
+> ? ? ? ?if (sram)
+> ? ? ? ? ? ? ? ?sram_my_func = fncpy(sram, my_func, my_func_size);
+Is the name 'omap_sram_push' wrong then?
+What about the following?
+@@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
+       omap_sram_ceil -= size;
+       omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
+ -     memcpy((void *)omap_sram_ceil, start, size);
+ -     flush_icache_range((unsigned long)omap_sram_ceil,
+ -             (unsigned long)(omap_sram_ceil + size));
 
-ARCH_PICOXCELL machine support patches have been posted the ARM mailing
-lists for review (with another revision to follow soon).
+ -     return (void *)omap_sram_ceil;
+ +    return fncpy((void *)omap_sram_ceil, start, size);
 
- drivers/char/hw_random/Kconfig         |   12 ++
- drivers/char/hw_random/Makefile        |    1 +
- drivers/char/hw_random/picoxcell-rng.c |  175 ++++++++++++++++++++++++++++++++
- 3 files changed, 188 insertions(+), 0 deletions(-)
- create mode 100644 drivers/char/hw_random/picoxcell-rng.c
+> Two benefits: 1. you get the thumb mode bit propagated (which is the
+> point of fncpy), and 2. you get the security of type safety between
+> my_func and the sram function pointer.
+>
+> If you cast things to a void pointer and ignore the return value of fncpy
+> then you lose the whole point of this API _and_ any form of type safety.
+>
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index d31483c..beecd1c 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -198,3 +198,15 @@ config HW_RANDOM_NOMADIK
- 	  module will be called nomadik-rng.
- 
- 	  If unsure, say Y.
-+
-+config HW_RANDOM_PICOXCELL
-+	tristate "Picochip picoXcell true random number generator support"
-+	depends on HW_RANDOM && ARCH_PICOXCELL && PICOXCELL_PC3X3
-+	---help---
-+	  This driver provides kernel-side support for the Random Number
-+	  Generator hardware found on Picochip PC3x3 and later devices.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called picoxcell-rng.
-+
-+	  If unsure, say Y.
-diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-index 4273308..3db4eb8 100644
---- a/drivers/char/hw_random/Makefile
-+++ b/drivers/char/hw_random/Makefile
-@@ -19,3 +19,4 @@ obj-$(CONFIG_HW_RANDOM_TX4939) += tx4939-rng.o
- obj-$(CONFIG_HW_RANDOM_MXC_RNGA) += mxc-rnga.o
- obj-$(CONFIG_HW_RANDOM_OCTEON) += octeon-rng.o
- obj-$(CONFIG_HW_RANDOM_NOMADIK) += nomadik-rng.o
-+obj-$(CONFIG_HW_RANDOM_PICOXCELL) += picoxcell-rng.o
-diff --git a/drivers/char/hw_random/picoxcell-rng.c b/drivers/char/hw_random/picoxcell-rng.c
-new file mode 100644
-index 0000000..e750056
---- /dev/null
-+++ b/drivers/char/hw_random/picoxcell-rng.c
-@@ -0,0 +1,175 @@
-+/*
-+ * Copyright (c) 2010-2011 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/hw_random.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+
-+#define DATA_REG_OFFSET			0x0200
-+#define CSR_REG_OFFSET			0x0278
-+#define		CSR_OUT_EMPTY_MASK	(1 << 24)
-+#define TAI_REG_OFFSET			0x0380
-+
-+static void __iomem *rng_base;
-+static struct clk *rng_clk;
-+
-+/*
-+ * Get some random data from the random number generator. The hw_random core
-+ * layer provides us with locking. We can't rely on data being word aligned
-+ * though so we'll need to do a memcpy.
-+ */
-+static int picoxcell_trng_read(struct hwrng *rng, void *buf, size_t max,
-+			       bool wait)
-+{
-+	u32 __iomem *csr = rng_base + CSR_REG_OFFSET;
-+	int data_avail = !(__raw_readl(csr) & CSR_OUT_EMPTY_MASK);
-+	u32 data;
-+
-+	if (!data_avail && !wait)
-+		return 0;
-+
-+	/* Wait for some data to become available. */
-+	while (!data_avail) {
-+		data_avail = !(__raw_readl(csr) & CSR_OUT_EMPTY_MASK);
-+		cpu_relax();
-+	}
-+
-+	data = __raw_readl(rng_base + DATA_REG_OFFSET);
-+	memcpy(buf, &data, min(max, sizeof(data)));
-+
-+	return sizeof(data);
-+}
-+
-+static struct hwrng picoxcell_trng = {
-+	.name		= "picoxcell",
-+	.read		= picoxcell_trng_read,
-+};
-+
-+/*
-+ * Take the random number generator out of reset and make sure the interrupts
-+ * are masked. We shouldn't need to get large amounts of random bytes so just
-+ * poll the status register. The hardware generates 32 bits every 320ns so we
-+ * shouldn't have to wait long enough to warrant waiting for an IRQ.
-+ */
-+static void picoxcell_trng_start(void)
-+{
-+	__raw_writel(0, rng_base + TAI_REG_OFFSET);
-+	__raw_writel(0, rng_base + CSR_REG_OFFSET);
-+}
-+
-+static int picoxcell_trng_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct resource *mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	if (!mem) {
-+		dev_warn(&pdev->dev, "no memory resource\n");
-+		return -ENOMEM;
-+	}
-+
-+	if (!devm_request_mem_region(&pdev->dev, mem->start, resource_size(mem),
-+				     "picoxcell_trng")) {
-+		dev_warn(&pdev->dev, "unable to request io mem\n");
-+		return -EBUSY;
-+	}
-+
-+	rng_base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
-+	if (!rng_base) {
-+		dev_warn(&pdev->dev, "unable to remap io mem\n");
-+		return -ENOMEM;
-+	}
-+
-+	rng_clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(rng_clk)) {
-+		dev_warn(&pdev->dev, "no clk\n");
-+		return PTR_ERR(rng_clk);
-+	}
-+
-+	ret = clk_enable(rng_clk);
-+	if (ret) {
-+		dev_warn(&pdev->dev, "unable to enable clk\n");
-+		goto err_enable;
-+	}
-+
-+	picoxcell_trng_start();
-+	ret = hwrng_register(&picoxcell_trng);
-+	if (ret)
-+		goto err_register;
-+
-+	dev_info(&pdev->dev, "pixoxcell random number generator active\n");
-+
-+	return 0;
-+
-+err_register:
-+	clk_disable(rng_clk);
-+err_enable:
-+	clk_put(rng_clk);
-+
-+	return ret;
-+}
-+
-+static int __devexit picoxcell_trng_remove(struct platform_device *pdev)
-+{
-+	hwrng_unregister(&picoxcell_trng);
-+	clk_disable(rng_clk);
-+	clk_put(rng_clk);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int picoxcell_trng_suspend(struct device *dev)
-+{
-+	clk_disable(rng_clk);
-+
-+	return 0;
-+}
-+
-+static int picoxcell_trng_resume(struct device *dev)
-+{
-+	return clk_enable(rng_clk);
-+}
-+
-+static const struct dev_pm_ops picoxcell_trng_pm_ops = {
-+	.suspend	= picoxcell_trng_suspend,
-+	.resume		= picoxcell_trng_resume,
-+};
-+#endif /* CONFIG_PM */
-+
-+static struct platform_driver picoxcell_trng_driver = {
-+	.probe		= picoxcell_trng_probe,
-+	.remove		= __devexit_p(picoxcell_trng_remove),
-+	.driver		= {
-+		.name	= "picoxcell-trng",
-+		.owner	= THIS_MODULE,
-+#ifdef CONFIG_PM
-+		.pm	= &picoxcell_trng_pm_ops,
-+#endif /* CONFIG_PM */
-+	},
-+};
-+
-+static int __init picoxcell_trng_init(void)
-+{
-+	return platform_driver_register(&picoxcell_trng_driver);
-+}
-+module_init(picoxcell_trng_init);
-+
-+static void __exit picoxcell_trng_exit(void)
-+{
-+	platform_driver_unregister(&picoxcell_trng_driver);
-+}
-+module_exit(picoxcell_trng_exit);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Jamie Iles");
-+MODULE_DESCRIPTION("Picochip picoXcell TRNG driver");
--- 
-1.7.3.4
+Thanks for reviewing the patch.
+
+Regards,
+Jean
