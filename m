@@ -1,48 +1,30 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 14 Jan 2011 01:18:20 -0500 (EST)
-Subject: [PATCH] ARM: make head.S less dependent on the compile time
-	PHYS_OFFSET define
-In-Reply-To: <20110113232327.GG24149@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1101131659220.11803@xanadu.home>
-	<20110113232327.GG24149@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101140050070.25804@xanadu.home>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 14 Jan 2011 11:55:48 +0530
+Subject: [PATCH] mm/alignment.c: fixing compilation warning
+Message-ID: <b02c30e00140f027ff1cc3fb87a719b6939dd8eb.1294986242.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jan 2011, Russell King - ARM Linux wrote:
+This patch fixes following compilation warning:
+warning: ?offset.un? may be used uninitialized in this function
 
-> On Thu, Jan 13, 2011 at 05:04:28PM -0500, Nicolas Pitre wrote:
-> > +	.macro phys_offset, rd
-> > +	mov	\rd, pc
-> > +	and	\rd, \rd, #0xf8000000
-> > +	.endm
-> 
-> We can do loads better than that, as the p2v fixup code has proven.
-> Now that r8 has been eliminated, I may rebase the p2v stuff ontop of
-> that commit, and move the computation of phys_offset out of the p2v
-> fixup code - and have it in r8 for __create_page_tables to use.
-> FYI, the real PHYS_OFFSET value can be found by (eg):
-> 
-> 1:	.long	.
-> 	.long	PAGE_OFFSET
-> 
-> 	adr	r0, 1b
-> 	ldmia	r0, {r1, r2}
-> 	sub	r1, r0, r1
-> 	add	r3, r2, r1
-> 
-> r1 now contains the offset between virtual and physical spaces, r2
-> contains the compile-time PAGE_OFFSET constant, and r3 the runtime
-> equivalent of PHYS_OFFSET.
-> 
-> None of this uses troublesome masking which will trip up on platforms
-> such as MSM - we really must stop writing code which assumes that
-> physical memory is aligned to >= 32MB.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/mm/alignment.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-That is more reliable indeed.  But without visibility into your reworked 
-version of that code I opted for a less intrusive solution.
-
-Unfortunately this trick can't work for CONFIG_AUTO_ZRELADDR.
-
-
-Nicolas
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 724ba3b..c5379f6 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -717,7 +717,7 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
+ static int
+ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ {
+-	union offset_union offset;
++	union offset_union offset = {0};
+ 	unsigned long instr = 0, instrptr;
+ 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
+ 	unsigned int type;
+-- 
+1.7.2.2
