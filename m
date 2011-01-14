@@ -1,34 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 14 Jan 2011 14:08:21 +0100
-Subject: i.MX & IRQF_ONESHOT
-In-Reply-To: <alpine.LFD.2.00.1101141138480.2678@localhost6.localdomain6>
-References: <20110113091355.GP24920@pengutronix.de>
-	<4D2EDE10.3040809@atmel.com>
-	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
-	<4D2F6AB7.30800@eukrea.com> <20110113212401.GZ24920@pengutronix.de>
-	<4D2FFCBE.3010704@eukrea.com>
-	<alpine.LFD.2.00.1101141138480.2678@localhost6.localdomain6>
-Message-ID: <20110114130821.GA1434@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Jan 2011 13:34:35 +0000
+Subject: [GIT PULL] pxa: fixes for 2.6.38-rc
+In-Reply-To: <20110113230235.GE24149@n2100.arm.linux.org.uk>
+References: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
+	<20110113230235.GE24149@n2100.arm.linux.org.uk>
+Message-ID: <20110114133435.GD15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, Jan 14, 2011 at 11:57:34AM +0100, Thomas Gleixner wrote:
-> So there are several things wrong here:
+On Thu, Jan 13, 2011 at 11:02:35PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 13, 2011 at 03:15:21PM -0600, Eric Miao wrote:
+> > Hi Russell,
+> > 
+> > The following changes since commit aebf2fc9dc974270b4b25a83816c7051c73f07c8:
+> > 
+> >   it8152: add IT8152_LAST_IRQ definition to fix build error
+> > (2011-01-02 23:21:14 +0800)
 > 
-> 1) Using handle_level_irq for an edge interrupt is wrong. That's not
->    restricted to the TS driver problem at hand. That's wrong in
->    general. Other set_type() functions adjust the handler as well when
->    they switch the edge/level types.
-That was introduced by 060d20d32ae7c6a20a8eac465795ed5bc9b37f7c.
-As a quick test you can try to revert that.  If that helps I can look
-deeper into it.  That won't help on at91 though.
+> Nope, not pulling.
+> 
+> I don't have this in my tree, and it doesn't appear to exist in Linus'
+> tree either.  There is this commit:
 
-Best regards
-Uwe
+Eric, I'm planning to do my final push for this merge window this
+evening, so I'd like to know whether it's likely that you'll have
+this fixed by then?
 
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks.
