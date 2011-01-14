@@ -1,206 +1,232 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 14 Jan 2011 11:51:38 -0800
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-In-Reply-To: <AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
-References: <1294990949-2729-1-git-send-email-ccross@android.com>
-	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
-	<20110114120229.GA15996@n2100.arm.linux.org.uk>
-	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
-	<20110114154919.GE15996@n2100.arm.linux.org.uk>
-	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
-	<20110114163520.GH15996@n2100.arm.linux.org.uk>
-	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
-	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
-	<20110114184759.GN15996@n2100.arm.linux.org.uk>
-	<AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
-Message-ID: <AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Fri, 14 Jan 2011 21:13:05 +0100
+Subject: mmci: U300 "sync with blockend" broken for multi-block?
+In-Reply-To: <20110105164344.GD8638@n2100.arm.linux.org.uk>
+References: <AANLkTimYb6TxLj4SamxRwUgykf9JyW5y9gbejOUXqZ7K@mail.gmail.com>
+	<20110101121048.GB25924@n2100.arm.linux.org.uk>
+	<AANLkTi=4SrxX-oCx-XXd+oib64j8RhMLdsQD1oWGxgU1@mail.gmail.com>
+	<20110105164344.GD8638@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim4J8xrj9axhsu4=_7YkEy_ndiJ6cjDNf2WfzEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 11:23 AM, Colin Cross <ccross@android.com> wrote:
-> On Fri, Jan 14, 2011 at 10:47 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> So... this incrementally on top of the previous patch (which I've
->> reproduced below as there's a subtle comment change in there wrt IRQ
->> state.)
->>
->> This means we have consistent state - both r2 and regs->ARM_pc always
->> point to the next instruction to be executed in every case, which means
->> its easy to understand and remember while reading through the code.
->>
->> diff -u b/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->> --- b/arch/arm/kernel/entry-armv.S
->> +++ b/arch/arm/kernel/entry-armv.S
->> @@ -499,10 +499,11 @@
->> ? ? ? ?blo ? ? __und_usr_unknown
->> ?3: ? ? ldrht ? r0, [r4]
->> ? ? ? ?add ? ? r2, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ r2 is PC + 2, make it PC + 4
->> - ? ? ? orr ? ? r0, r0, r5, lsl #16
->> + ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? ? ? ? ? @ it's a 2x16bit instr, update
->> + ? ? ? orr ? ? r0, r0, r5, lsl #16 ? ? ? ? ? ? @ ?regs->ARM_pc
->> ? ? ? ?@
->> ? ? ? ?@ r0 = the two 16-bit Thumb instructions which caused the exception
->> - ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc+2)
->> + ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
->> ? ? ? ?@ r4 = PC value for the first 16-bit Thumb instruction
->> ? ? ? ?@
->> ?#else
->>
->> 8<-x-x-
->>
->> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->> index 2b46fea..5876eec 100644
->> --- a/arch/arm/kernel/entry-armv.S
->> +++ b/arch/arm/kernel/entry-armv.S
->> @@ -461,27 +461,35 @@ ENDPROC(__irq_usr)
->> ? ? ? ?.align ?5
->> ?__und_usr:
->> ? ? ? ?usr_entry
->> -
->> - ? ? ? @
->> - ? ? ? @ fall through to the emulation code, which returns using r9 if
->> - ? ? ? @ it has emulated the instruction, or the more conventional lr
->> - ? ? ? @ if we are to treat this as a real undefined instruction
->> ? ? ? ?@
->> - ? ? ? @ ?r0 - instruction
->> + ? ? ? @ The emulation code returns using r9 if it has emulated the
->> + ? ? ? @ instruction, or the more conventional lr if we are to treat
->> + ? ? ? @ this as a real undefined instruction
->> ? ? ? ?@
->> ? ? ? ?adr ? ? r9, BSYM(ret_from_exception)
->> ? ? ? ?adr ? ? lr, BSYM(__und_usr_unknown)
->> + ? ? ? @
->> + ? ? ? @ r2 = regs->ARM_pc, which is either 2 or 4 bytes ahead of the
->> + ? ? ? @ faulting instruction depending on Thumb mode.
->> + ? ? ? @ r3 = regs->ARM_cpsr
->> + ? ? ? @
->> ? ? ? ?tst ? ? r3, #PSR_T_BIT ? ? ? ? ? ? ? ? ?@ Thumb mode?
->> - ? ? ? itet ? ?eq ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ explicit IT needed for the 1f label
->> + ? ? ? itttt ? eq ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ explicit IT needed for the 1f label
->> ? ? ? ?subeq ? r4, r2, #4 ? ? ? ? ? ? ? ? ? ? ?@ ARM instr at LR - 4
->> - ? ? ? subne ? r4, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ Thumb instr at LR - 2
->> ?1: ? ? ldreqt ?r0, [r4]
->> ?#ifdef CONFIG_CPU_ENDIAN_BE8
->> ? ? ? ?reveq ? r0, r0 ? ? ? ? ? ? ? ? ? ? ? ? ?@ little endian instruction
->> ?#endif
->> + ? ? ? @
->> + ? ? ? @ r0 = 32-bit ARM instruction which caused the exception
->> + ? ? ? @ r2 = PC value for the following instruction (:= regs->ARM_pc)
->> + ? ? ? @ r4 = PC value for the faulting instruction
->> + ? ? ? @
->> ? ? ? ?beq ? ? call_fpe
->> +
->> ? ? ? ?@ Thumb instruction
->> ?#if __LINUX_ARM_ARCH__ >= 7
->> + ? ? ? sub ? ? r4, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ Thumb instr at LR - 2
->> ?2:
->> ?ARM( ?ldrht ? r5, [r4], #2 ? ?)
->> ?THUMB( ? ? ? ?ldrht ? r5, [r4] ? ? ? ?)
->> @@ -492,18 +500,19 @@ __und_usr:
->> ?3: ? ? ldrht ? r0, [r4]
->> ? ? ? ?add ? ? r2, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ r2 is PC + 2, make it PC + 4
->> ? ? ? ?orr ? ? r0, r0, r5, lsl #16
->> + ? ? ? @
->> + ? ? ? @ r0 = the two 16-bit Thumb instructions which caused the exception
->> + ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc+2)
->> + ? ? ? @ r4 = PC value for the first 16-bit Thumb instruction
->> + ? ? ? @
->> ?#else
->> ? ? ? ?b ? ? ? __und_usr_unknown
->> ?#endif
->> - UNWIND(.fnend ? ? ? ? )
->> + UNWIND(.fnend)
->> ?ENDPROC(__und_usr)
->>
->> - ? ? ? @
->> - ? ? ? @ fallthrough to call_fpe
->> - ? ? ? @
->> -
->> ?/*
->> - * The out of line fixup for the ldrt above.
->> + * The out of line fixup for the ldrt instructions above.
->> ?*/
->> ? ? ? ?.pushsection .fixup, "ax"
->> ?4: ? ? mov ? ? pc, r9
->> @@ -534,11 +543,12 @@ ENDPROC(__und_usr)
->> ?* NEON handler code.
->> ?*
->> ?* Emulators may wish to make use of the following registers:
->> - * ?r0 ?= instruction opcode.
->> - * ?r2 ?= PC+4
->> + * ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
->> + * ?r2 ?= PC value to resume execution after successful emulation
->> ?* ?r9 ?= normal "successful" return address
->> - * ?r10 = this threads thread_info structure.
->> + * ?r10 = this threads thread_info structure
->> ?* ?lr ?= unrecognised instruction return address
->> + * IRQs disabled, FIQs enabled.
->> ?*/
->> ? ? ? ?@
->> ? ? ? ?@ Fall-through from Thumb-2 __und_usr
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index ee57640..eeb9250 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -347,9 +347,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->> ? ? ? ?void __user *pc;
->>
->> ? ? ? ?/*
->> - ? ? ? ?* According to the ARM ARM, PC is 2 or 4 bytes ahead,
->> - ? ? ? ?* depending whether we're in Thumb mode or not.
->> - ? ? ? ?* Correct this offset.
->> + ? ? ? ?* According to the ARM ARM, the PC is 2 or 4 bytes ahead
->> + ? ? ? ?* depending on Thumb mode. ?Correct this offset so that
->> + ? ? ? ?* regs->ARM_pc points at the faulting instruction.
->> ? ? ? ? */
->> ? ? ? ?regs->ARM_pc -= correction;
->>
->> diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
->> index 4fa9903..2bf6089 100644
->> --- a/arch/arm/vfp/entry.S
->> +++ b/arch/arm/vfp/entry.S
->> @@ -19,6 +19,15 @@
->> ?#include <asm/vfpmacros.h>
->> ?#include "../kernel/entry-header.S"
->>
->> +@ VFP entry point.
->> +@
->> +@ ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
->> +@ ?r2 ?= PC value to resume execution after successful emulation
->> +@ ?r9 ?= normal "successful" return address
->> +@ ?r10 = this threads thread_info structure
->> +@ ?lr ?= unrecognised instruction return address
->> +@ ?IRQs disabled.
->> +@
->> ?ENTRY(do_vfp)
->> ?#ifdef CONFIG_PREEMPT
->> ? ? ? ?ldr ? ? r4, [r10, #TI_PREEMPT] ?@ get preempt count
->> diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
->> index 9897dcf..7292921 100644
->> --- a/arch/arm/vfp/vfphw.S
->> +++ b/arch/arm/vfp/vfphw.S
->> @@ -61,13 +61,13 @@
->>
->> ?@ VFP hardware support entry point.
->> ?@
->> -@ ?r0 ?= faulted instruction
->> -@ ?r2 ?= faulted PC+4
->> -@ ?r9 ?= successful return
->> +@ ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
->> +@ ?r2 ?= PC value to resume execution after successful emulation
->> +@ ?r9 ?= normal "successful" return address
->> ?@ ?r10 = vfp_state union
->> ?@ ?r11 = CPU number
->> -@ ?lr ?= failure return
->> -
->> +@ ?lr ?= unrecognised instruction return address
->> +@ ?IRQs enabled.
->> ?ENTRY(vfp_support_entry)
->> ? ? ? ?DBGSTR3 "instr %08x pc %08x state %p", r0, r2, r10
->
-> I tested copying r2 to regs->ARM_pc like this patch does, and it fixes
-> my test case. ?Could this second patch go first so it can be applied
-> to stable?
->
+2011/1/5 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Also, both patches together Tested-by: Colin Cross <ccross@android.com>
+> Any chance of pr_debug'ing the complete status register each time you
+> service an interrupt? ?You'll probably need to set the kernel log
+> buffer fairly large to ensure that you capture everything.
+
+I did this test now.
+
+Typical read/write test:
+dd if=/dev/mmcblk0 of=/dev/null bs=16384 count=16 of=/dev/null
+dd if=/dev/zero of=/dev/mmcblk0 bs=16384 count=16
+
+The MCI_DATABLOCKENDMASK is set in both modes so it should appear
+after every block (512 bytes) no matter whether you're using DMA
+or not. In this case you would expect 0x80 x MCI_DATABLOCKEND
+followed by MCI_DATAEND, repeated 16 times.
+
+But this is what happens:
+
+TEST WITH PIO ON U8500 READ:
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0018 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0028 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+
+So MCI_DATABLOCKEND only appear if MCI_DATAEND appear
+at the same time or soon thereafter.
+
+TEST WITH PIO ON U8500 WRITE:
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000100
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND
+mmci-pl18x sdi2: MCI_DATABLOCKEND && MCI_DATAEND
+
+Note: too few MCI_DATABLOCKEND, 32 of them, while
+you're expecting 128 of them. This would lead you
+to think that maybe you get MCI_DATABLOCKEND for every
+fourth block, which has some kind of twisted logic
+to it. But in reality this varies: there are sometimes
+things like this
+for a very large number of blocks:
+
+mmci-pl18x sdi4: START DATA: blksz 0200 blks 01e2 flags 00000100
+mmci-pl18x sdi4: MCI_DATABLOCKEND
+mmci-pl18x sdi4: MCI_DATABLOCKEND
+mmci-pl18x sdi4: MCI_DATABLOCKEND
+mmci-pl18x sdi4: MCI_DATABLOCKEND
+mmci-pl18x sdi4: MCI_DATABLOCKEND && MCI_DATAEND
+
+Just 4 MCI_DATABLOCKEND for 0x1e2 blocks!
+Totally unpredictable.
+
+TEST WITH DMA ON U8500 READ:
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0008 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0038 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000200
+mmci-pl18x sdi2: MCI_DATAEND
+
+TEST WITH DMA ON U8500 WRITE:
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0018 flags 00000100
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000100
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000100
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0080 flags 00000100
+mmci-pl18x sdi2: MCI_DATAEND
+mmci-pl18x sdi2: START DATA: blksz 0200 blks 0068 flags 00000100
+mmci-pl18x sdi2: MCI_DATAEND
+
+No sign of MCI_DATABLOCKEND when using DMA. It's not there.
+
+TEST WITH PIO ON U300 READ:
+[  699.219323] mmci-pl18x mmci: START DATA: blksz 0200 blks 0080 flags 00000200
+[  699.226623] mmci-pl18x mmci: MCI_DATABLOCKEND
+[  699.231085] mmci-pl18x mmci: MCI_DATABLOCKEND
+(.. 0x80 in total ...)
+[  699.236598] mmci-pl18x mmci: MCI_DATABLOCKEND
+[  699.759572] mmci-pl18x mmci: MCI_DATABLOCKEND && MCI_DATAEND
+(repeat x16)
+
+WRITE looks the same, just flags=00000100 instead
+So yes, MCI_DATABLOCKEND indeed does work if you're not
+using DMA. Haven't been able to provoke READ nor WRITE
+to get the flags after each other, they always seem to appear
+simultaneously.
+
+What it problematic with the reads *and* writes is that
+sometimes there us a MCI_DATABLOCKEND missing, so the
+blocks simply don't add up! This is the real bug that
+the sync code was trying to solve, and not in a very
+good way.
+
+TEST WITH DMA ON U300 READ:
+[   43.402718] mmci-pl18x mmci: START DATA: blksz 0200 blks 0040 flags 00000200
+[   43.414096] mmci-pl18x mmci: MCI_DATAEND
+[   43.424922] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.439449] mmci-pl18x mmci: MCI_DATAEND
+[   43.449258] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.463692] mmci-pl18x mmci: MCI_DATAEND
+[   43.474446] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.488953] mmci-pl18x mmci: MCI_DATAEND
+[   43.498793] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.513341] mmci-pl18x mmci: MCI_DATAEND
+[   43.524605] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.539141] mmci-pl18x mmci: MCI_DATAEND
+[   43.547262] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.561702] mmci-pl18x mmci: MCI_DATAEND
+[   43.569592] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000200
+[   43.584066] mmci-pl18x mmci: MCI_DATAEND
+[   43.591893] mmci-pl18x mmci: START DATA: blksz 0200 blks 0038 flags 00000200
+[   43.602723] mmci-pl18x mmci: MCI_DATAEND
+
+TEST WITH DMA ON U300 WRITE:
+[   40.266289] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.301415] mmci-pl18x mmci: MCI_DATAEND
+[   40.310951] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.325644] mmci-pl18x mmci: MCI_DATAEND
+[   40.334980] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.349552] mmci-pl18x mmci: MCI_DATAEND
+[   40.358561] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.373245] mmci-pl18x mmci: MCI_DATAEND
+[   40.382234] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.396811] mmci-pl18x mmci: MCI_DATAEND
+[   40.406151] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.420838] mmci-pl18x mmci: MCI_DATAEND
+[   40.430276] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.444852] mmci-pl18x mmci: MCI_DATAEND
+[   40.453939] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.468638] mmci-pl18x mmci: MCI_DATAEND
+[   40.477697] mmci-pl18x mmci: START DATA: blksz 0200 blks 0078 flags 00000100
+[   40.492269] mmci-pl18x mmci: MCI_DATAEND
+[   40.501770] mmci-pl18x mmci: START DATA: blksz 0200 blks 003b flags 00000100
+[   40.512910] mmci-pl18x mmci: MCI_DATAEND
+[   40.522388] mmci-pl18x mmci: START DATA: blksz 0200 blks 0001 flags 00000100
+[   40.529674] mmci-pl18x mmci: MCI_DATAEND
+[   40.537511] mmci-pl18x mmci: START DATA: blksz 0200 blks 0001 flags 00000100
+[   40.544790] mmci-pl18x mmci: MCI_DATAEND
+[   40.552528] mmci-pl18x mmci: START DATA: blksz 0200 blks 0001 flags 00000100
+[   40.559804] mmci-pl18x mmci: MCI_DATAEND
+
+These tests were done using a file rather than dd but
+the pattern is the same as on the U8500: you only get
+MCI_DATAEND when using DMA on U300.
+
+So in conclusion:
+
+- The sync code (to make sure both MCI_DATAEND and
+  MCI_DATABLOCKEND both arrived) is not necessary.
+
+- Both U300 and Ux500 (and presumably also their
+  sibling Nomadik) should be marked as
+  .broken_blockend = true, it is simply broken, for
+  PIO as well as for DMA.
+
+So we should fix a patch that simplifies the code
+accordingly: remove the sync and drop the
+.broken_blockend_dma flag for U300, it's simply just
+broken, all agree?
+
+Yours,
+Linus Walleij
