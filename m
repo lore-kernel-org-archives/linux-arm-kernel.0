@@ -1,136 +1,48 @@
-From: mpm@selenic.com (Matt Mackall)
-Date: Fri, 14 Jan 2011 11:49:13 -0600
-Subject: [PATCH] hwrng: add support for picoxcell TRNG
-In-Reply-To: <1295021448-25018-1-git-send-email-jamie@jamieiles.com>
-References: <1295021448-25018-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1295027353.30392.20.camel@calx>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 14 Jan 2011 11:59:54 -0600
+Subject: [PATCH 1/1 v2] ARM: Thumb-2: Symbol manipulation macros for
+	function body copying
+In-Reply-To: <20110114174339.GC22505@n2100.arm.linux.org.uk>
+References: <1294951905-23748-1-git-send-email-dave.martin@linaro.org>
+	<1294951905-23748-2-git-send-email-dave.martin@linaro.org>
+	<20110113235524.GB28040@n2100.arm.linux.org.uk>
+	<AANLkTi=QRDt62wgnHW6ya+956BS9x7pQj2voTiF+H0vs@mail.gmail.com>
+	<AANLkTikiR+XN4Jb9GSEdUUiOciLvxqXB+NA3DEWhNCga@mail.gmail.com>
+	<20110114174339.GC22505@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinZsBqAYeXfV5o3asL5Vd5EhCo-+nvw3sb21KLj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-01-14 at 16:10 +0000, Jamie Iles wrote:
-> This driver adds support for the True Random Number Generator in
-> the Picochip PC3X3 and later devices.
-> 
-> Cc: Matt Mackall <mpm@selenic.com>
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
-> 
-> ARCH_PICOXCELL machine support patches have been posted the ARM mailing
-> lists for review (with another revision to follow soon).
-> 
->  drivers/char/hw_random/Kconfig         |   12 ++
->  drivers/char/hw_random/Makefile        |    1 +
->  drivers/char/hw_random/picoxcell-rng.c |  175 ++++++++++++++++++++++++++++++++
->  3 files changed, 188 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/char/hw_random/picoxcell-rng.c
-> 
-> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> index d31483c..beecd1c 100644
-> --- a/drivers/char/hw_random/Kconfig
-> +++ b/drivers/char/hw_random/Kconfig
-> @@ -198,3 +198,15 @@ config HW_RANDOM_NOMADIK
->  	  module will be called nomadik-rng.
->  
->  	  If unsure, say Y.
-> +
-> +config HW_RANDOM_PICOXCELL
-> +	tristate "Picochip picoXcell true random number generator support"
-> +	depends on HW_RANDOM && ARCH_PICOXCELL && PICOXCELL_PC3X3
-> +	---help---
-> +	  This driver provides kernel-side support for the Random Number
-> +	  Generator hardware found on Picochip PC3x3 and later devices.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called picoxcell-rng.
-> +
-> +	  If unsure, say Y.
-> diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> index 4273308..3db4eb8 100644
-> --- a/drivers/char/hw_random/Makefile
-> +++ b/drivers/char/hw_random/Makefile
-> @@ -19,3 +19,4 @@ obj-$(CONFIG_HW_RANDOM_TX4939) += tx4939-rng.o
->  obj-$(CONFIG_HW_RANDOM_MXC_RNGA) += mxc-rnga.o
->  obj-$(CONFIG_HW_RANDOM_OCTEON) += octeon-rng.o
->  obj-$(CONFIG_HW_RANDOM_NOMADIK) += nomadik-rng.o
-> +obj-$(CONFIG_HW_RANDOM_PICOXCELL) += picoxcell-rng.o
-> diff --git a/drivers/char/hw_random/picoxcell-rng.c b/drivers/char/hw_random/picoxcell-rng.c
-> new file mode 100644
-> index 0000000..e750056
-> --- /dev/null
-> +++ b/drivers/char/hw_random/picoxcell-rng.c
-> @@ -0,0 +1,175 @@
-> +/*
-> + * Copyright (c) 2010-2011 Picochip Ltd., Jamie Iles
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * All enquiries to support at picochip.com
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/hw_random.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define DATA_REG_OFFSET			0x0200
-> +#define CSR_REG_OFFSET			0x0278
-> +#define		CSR_OUT_EMPTY_MASK	(1 << 24)
-> +#define TAI_REG_OFFSET			0x0380
+On Fri, Jan 14, 2011 at 11:43 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 14, 2011 at 11:15:19AM -0600, Dave Martin wrote:
+>> There's another problem which I hadn't spotted before:
+>>
+>> In the Thumb case, we risk violating the alignment constraints of the
+>> code which gets copied (actually, this is also true of the ARM case,
+>> but less likely to bite). ?This matters because the code may contain
+>> literals and other data words -- quite likely given the requirement
+>> for self-containedness.
+>
+> There's a solution to this - require that the thumb function is
+> preceded by a .align 3 (which according to the GAS documentation I
+> have means for ARM, it aligns the PC to 1 << 3 not 3 bytes.)
+>
+> Also require 8-byte alignment from the allocation function, and make
+> fncpy() bug if the destination isn't 8-byte aligned. ?Same for the
+> source function argument (but ignoring bit 0 of course.)
+>
+> We don't then have to mess with rounding allocation sizes up, nor worry
+> about aligning the destination according to the source or any other
+> games like that.
+>
+> The down-side is wastage of maybe 7 bytes a function, but that's
+> probably going to happen anyway.
+>
 
-Some whitespace weirdness here. Recommend never using tabs except at the
-beginning of a line.
+OK, that sounds like a practical compromise.
 
-> +static void __iomem *rng_base;
-> +static struct clk *rng_clk;
-> +
-> +/*
-> + * Get some random data from the random number generator. The hw_random core
-> + * layer provides us with locking. We can't rely on data being word aligned
-> + * though so we'll need to do a memcpy.
-> + */
-> +static int picoxcell_trng_read(struct hwrng *rng, void *buf, size_t max,
-> +			       bool wait)
-> +{
-> +	u32 __iomem *csr = rng_base + CSR_REG_OFFSET;
-> +	int data_avail = !(__raw_readl(csr) & CSR_OUT_EMPTY_MASK);
-> +	u32 data;
-> +
-> +	if (!data_avail && !wait)
-> +		return 0;
-> +
-> +	/* Wait for some data to become available. */
-> +	while (!data_avail) {
-> +		data_avail = !(__raw_readl(csr) & CSR_OUT_EMPTY_MASK);
-> +		cpu_relax();
-> +	}
+I'll roll this in and repost the patch.
 
-This could be simplified a bit:
-
-- deduplicate avail check
-- only relax when data's not available
-- drop some one use vars
-
-while (!__raw_read(rng_base + ...) {
-	if (!wait)
-		return;
-	cpu_relax();
-}	
-	
-> +	data = __raw_readl(rng_base + DATA_REG_OFFSET);
-> +	memcpy(buf, &data, min(max, sizeof(data)));
-
-The buffer passed in is guaranteed aligned:
-
-static u8 rng_buffer[SMP_CACHE_BYTES < 32 ? 32 : SMP_CACHE_BYTES]
-	__cacheline_aligned;
-...
-		return rng->read(rng, (void *)buffer, size, wait);
-
--- 
-Mathematics is the supreme nostalgia of our time.
+Cheers
+---Dave
