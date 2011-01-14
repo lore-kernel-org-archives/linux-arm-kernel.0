@@ -1,41 +1,25 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 14 Jan 2011 19:14:16 +0100
-Subject: [GIT PULL] AT91: patches for v2.6.38-rc1
-In-Reply-To: <20110114180455.GL15996@n2100.arm.linux.org.uk>
-References: <4D308F30.6070503@atmel.com>
-	<20110114180455.GL15996@n2100.arm.linux.org.uk>
-Message-ID: <4D309278.5010603@atmel.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 14 Jan 2011 10:16:10 -0800
+Subject: [PATCH] ARM: msm: 7x30: don't force a gpiomux table for the whole
+	arch
+In-Reply-To: <1294686030-9817-1-git-send-email-dima@android.com> (Dima Zavin's
+	message of "Mon, 10 Jan 2011 11:00:30 -0800")
+References: <1294680810.12298.2.camel@c-dwalke-linux.qualcomm.com>
+	<1294686030-9817-1-git-send-email-dima@android.com>
+Message-ID: <8yalj2nfj11.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/01/2011 19:04, Russell King - ARM Linux :
-> On Fri, Jan 14, 2011 at 07:00:16PM +0100, Nicolas Ferre wrote:
->> Hi Russell,
->>
->> Can you please pull those little changes for AT91? They add two 
->> new boards already discussed on the mailing list and a little 
->> cleanup patch:
-> 
-> Has this already been in linux-next?
+On Mon, Jan 10 2011, Dima Zavin wrote:
 
-I must admit that... no.
+> This is completely board specific and therefore must be provided
+> on a per-board basis.
+>
+> Change-Id: I96f922ad9bb9cbce7874c5ae6ac0d7479b7a2124
+> Signed-off-by: Dima Zavin <dima@android.com>
 
-> We should only be merging new code during a merge window which has
-> already had visibility in linux-next, with the exception of bug fixes
-> and regression fixes.
+I'll pull this into msm-next once rc8-rc1 comes out.
 
-I understand your point but those are only *board* files that are lying
-around for one or two months.
-I was really wishing to see them included in mainline during merge
-window as they are not core ARM nor AT91 files...
+I'll take out the Change-Id line, though.
 
-BTW the git tree is based on the tree you specify to Eric: "9e9bc973".
-
-> Regression fixes can be merged at any time provided they're obvious.
-> Any regression fix should be acceptable during the merge window.
-> 
-> Bug fixes any time up until (I'd say) the last week of the -rc series.
-
-Best regards,
--- 
-Nicolas Ferre
+David
