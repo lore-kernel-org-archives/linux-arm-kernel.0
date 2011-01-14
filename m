@@ -1,67 +1,75 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Jan 2011 14:53:20 +0800
-Subject: [PATCH] ARM: mxs: pass fec device name via platform data
-In-Reply-To: <20110113150622.GV24920@pengutronix.de>
-References: <20110113150622.GV24920@pengutronix.de>
-Message-ID: <1294988000-20232-1-git-send-email-shawn.guo@freescale.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 14 Jan 2011 14:55:37 +0800
+Subject: [PATCH 2/2] arm: mx50_rdp: add i2c bus support
+In-Reply-To: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+References: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1294988137-24654-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 ---
- arch/arm/mach-mxs/devices/platform-fec.c        |   11 ++++++-----
- arch/arm/mach-mxs/include/mach/devices-common.h |    1 +
- 2 files changed, 7 insertions(+), 5 deletions(-)
+ arch/arm/mach-mx5/board-mx50_rdp.c           |    7 +++++++
+ arch/arm/mach-mx5/devices-mx50.h             |    3 +++
+ arch/arm/plat-mxc/devices/platform-imx-i2c.c |   10 ++++++++++
+ 3 files changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/devices/platform-fec.c b/arch/arm/mach-mxs/devices/platform-fec.c
-index c42dff7..75eb26b 100644
---- a/arch/arm/mach-mxs/devices/platform-fec.c
-+++ b/arch/arm/mach-mxs/devices/platform-fec.c
-@@ -10,20 +10,21 @@
- #include <mach/mx28.h>
- #include <mach/devices-common.h>
- 
--#define mxs_fec_data_entry_single(soc, _id)				\
-+#define mxs_fec_data_entry_single(soc, _devid, _id)			\
- 	{								\
-+		.devid = _devid,					\
- 		.id = _id,						\
- 		.iobase = soc ## _ENET_MAC ## _id ## _BASE_ADDR,	\
- 		.irq = soc ## _INT_ENET_MAC ## _id,			\
- 	}
- 
--#define mxs_fec_data_entry(soc, _id)					\
--	[_id] = mxs_fec_data_entry_single(soc, _id)
-+#define mxs_fec_data_entry(soc, _devid, _id)				\
-+	[_id] = mxs_fec_data_entry_single(soc, _devid, _id)
- 
- #ifdef CONFIG_SOC_IMX28
- const struct mxs_fec_data mx28_fec_data[] __initconst = {
- #define mx28_fec_data_entry(_id)					\
--	mxs_fec_data_entry(MX28, _id)
-+	mxs_fec_data_entry(MX28, "imx28-fec", _id)
- 	mx28_fec_data_entry(0),
- 	mx28_fec_data_entry(1),
- };
-@@ -45,6 +46,6 @@ struct platform_device *__init mxs_add_fec(
- 		},
- 	};
- 
--	return mxs_add_platform_device("imx28-fec", data->id,
-+	return mxs_add_platform_device(data->devid, data->id,
- 			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
+diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+index c174188..a7c53e6 100644
+--- a/arch/arm/mach-mx5/board-mx50_rdp.c
++++ b/arch/arm/mach-mx5/board-mx50_rdp.c
+@@ -184,6 +184,10 @@ static inline void mx50_rdp_fec_reset(void)
+ 	gpio_set_value(FEC_RESET_B, 1);
  }
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index 6c3d1a1..10fbcfd 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -33,6 +33,7 @@ int __init mxs_add_duart(const struct amba_device *dev);
- /* fec */
- #include <linux/fec.h>
- struct mxs_fec_data {
-+	const char *devid;
- 	int id;
- 	resource_size_t iobase;
- 	resource_size_t iosize;
+ 
++static const struct imxi2c_platform_data i2c_data __initconst = {
++	.bitrate = 100000,
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -196,6 +200,9 @@ static void __init mx50_rdp_board_init(void)
+ 	imx50_add_imx_uart(1, &uart_pdata);
+ 	mx50_rdp_fec_reset();
+ 	imx50_add_fec(&fec_data);
++	imx50_add_imx_i2c(0, &i2c_data);
++	imx50_add_imx_i2c(1, &i2c_data);
++	imx50_add_imx_i2c(2, &i2c_data);
+ }
+ 
+ static void __init mx50_rdp_timer_init(void)
+diff --git a/arch/arm/mach-mx5/devices-mx50.h b/arch/arm/mach-mx5/devices-mx50.h
+index e1093db..c9e4282 100644
+--- a/arch/arm/mach-mx5/devices-mx50.h
++++ b/arch/arm/mach-mx5/devices-mx50.h
+@@ -29,3 +29,6 @@ extern const struct imx_fec_data imx50_fec_data __initconst;
+ #define imx50_add_fec(pdata)	\
+ 	imx_add_fec(&imx50_fec_data, pdata)
+ 
++extern const struct imx_imx_i2c_data imx50_imx_i2c_data[] __initconst;
++#define imx50_add_imx_i2c(id, pdata)	\
++	imx_add_imx_i2c(&imx50_imx_i2c_data[id], pdata)
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-i2c.c b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
+index 7ba94e1..2ab74f0 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-i2c.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
+@@ -69,6 +69,16 @@ const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst = {
+ };
+ #endif /* ifdef CONFIG_SOC_IMX35 */
+ 
++#ifdef CONFIG_SOC_IMX50
++const struct imx_imx_i2c_data imx50_imx_i2c_data[] __initconst = {
++#define imx50_imx_i2c_data_entry(_id, _hwid)				\
++	imx_imx_i2c_data_entry(MX50, _id, _hwid, SZ_4K)
++	imx50_imx_i2c_data_entry(0, 1),
++	imx50_imx_i2c_data_entry(1, 2),
++	imx50_imx_i2c_data_entry(2, 3),
++};
++#endif /* ifdef CONFIG_SOC_IMX51 */
++
+ #ifdef CONFIG_SOC_IMX51
+ const struct imx_imx_i2c_data imx51_imx_i2c_data[] __initconst = {
+ #define imx51_imx_i2c_data_entry(_id, _hwid)				\
 -- 
-1.7.1
+1.6.3.3
