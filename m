@@ -1,47 +1,20 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 13 Jan 2011 23:42:29 -0800
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-Message-ID: <1294990949-2729-1-git-send-email-ccross@android.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 14 Jan 2011 08:50:24 +0100
+Subject: [PATCH 1/2] arm: mx50_rdp: add fec support
+In-Reply-To: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+References: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <20110114075024.GB24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exception handler in entry-armv.S checks for thumb mode and
-correctly determines the exception location and instruction,
-but VFP_bounce uses the uncorrected location off the stack.
-If the VFP exception occured in Thumb mode, fix up the
-exception location to match the value that would be returned
-in ARM mode.
+Hello Richard,
 
-Fixes segfaults in userspace applications running in Thumb mode
-caused by a handled VFP exception returning to the middle of the
-instruction that triggered the exception.
+On Fri, Jan 14, 2011 at 02:55:36PM +0800, Richard Zhao wrote:
+> +static const struct fec_platform_data fec_data = {
+This can be __initconst.
 
-Change-Id: I6c6ba1ab88e107bec166ea334d7e0974a4f6bfba
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/vfp/vfpmodule.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Uwe
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 0797cb5..63ed73d 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -275,6 +275,16 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
- 	pr_debug("VFP: bounce: trigger %08x fpexc %08x\n", trigger, fpexc);
- 
- 	/*
-+	 * If the exception occured in thumb mode, pc is exception location + 2,
-+	 * the middle of the 32-bit VFP instruction.  Add 2 to get exception
-+	 * location + 4, the same we get in ARM mode.
-+	 */
-+#ifdef CONFIG_ARM_THUMB
-+	if (regs->ARM_cpsr & PSR_T_BIT)
-+		regs->ARM_pc += 2;
-+#endif
-+
-+	/*
- 	 * At this point, FPEXC can have the following configuration:
- 	 *
- 	 *  EX DEX IXE
 -- 
-1.7.3.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
