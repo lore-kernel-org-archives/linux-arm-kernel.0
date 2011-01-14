@@ -1,35 +1,122 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 14 Jan 2011 12:47:40 +0100 (CET)
-Subject: i.MX & IRQF_ONESHOT
-In-Reply-To: <4D30329F.5040201@atmel.com>
-References: <20110113091355.GP24920@pengutronix.de>
-	<4D2EDE10.3040809@atmel.com>
-	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
-	<4D30329F.5040201@atmel.com>
-Message-ID: <alpine.LFD.2.00.1101141241330.2678@localhost6.localdomain6>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 14 Jan 2011 17:20:03 +0530
+Subject: ARM: CPU hotplug: fix hard-coded control register constants
+In-Reply-To: <4D303758.4060608@st.com>
+References: <4D303758.4060608@st.com>
+Message-ID: <4D30386B.7020200@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Jan 2011, Nicolas Ferre wrote:
-> For AT91:
-> - the platform does not provides irq_flags so default to
-> IRQF_TRIGGER_FALLING | IRQF_ONESHOT as stated in the driver.
-> - on at91sam9g10ek the touchscreen is wired to an full featured IRQ
-> entry (configured with pullup in arch/arm/mach-at91/board-sam9261ek.c).
-> - the irq description of plain interrupts is in arch/arm/mach-at91/irq.c
-> and at91_aic_set_type() has an IRQ_TYPE_EDGE_FALLING entry.
-> 
-> So it should be configured on falling edge...
-> 
-> But: is seems that looking at at91_aic_set_type() initialization
-> function, AIC is configured with:
-> set_irq_handler(i, handle_level_irq);
-> 
-> I do not know if it is the same as i.MX but it sound to be covered by
-> explanation that you gave...
 
-Seems to be the same problem. 
+Russell,
 
-Thanks,
+I was just tracking latest changes in realview, for preparing SPEAr
+support V4. I found below patch and didn't understood it very well.
 
-	tglx
+> Subject: [PATCH] ARM: CPU hotplug: fix hard-coded control register constants
+> 
+> Use the definition we've provided in asm/system.h rather than
+> numeric constants.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-realview/hotplug.c |    8 ++++----
+>  arch/arm/mach-s5pv310/hotplug.c  |    8 ++++----
+>  arch/arm/mach-tegra/hotplug.c    |    8 ++++----
+>  3 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+> index b6387cf..a87523d 100644
+> --- a/arch/arm/mach-realview/hotplug.c
+> +++ b/arch/arm/mach-realview/hotplug.c
+> @@ -31,10 +31,10 @@ static inline void cpu_enter_lowpower(void)
+>  	"	bic	%0, %0, #0x20\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, #0x04\n"
+> +	"	bic	%0, %0, %2\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	  : "=&r" (v)
+> -	  : "r" (0)
+> +	  : "r" (0), "Ir" (CR_C)
+>  	  : "cc");
+>  }
+
+This looks fine as you have replaced 0x04 with CR_C, which itself is (1 << 2).
+
+>  
+> @@ -43,13 +43,13 @@ static inline void cpu_leave_lowpower(void)
+>  	unsigned int v;
+>  
+>  	asm volatile(	"mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	orr	%0, %0, #0x04\n"
+> +	"	orr	%0, %0, %1\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>  	"	orr	%0, %0, #0x20\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	  : "=&r" (v)
+> -	  :
+> +	  : "Ir" (CR_C)
+>  	  : "cc");
+>  }
+
+fine here also.
+
+>  
+> diff --git a/arch/arm/mach-s5pv310/hotplug.c b/arch/arm/mach-s5pv310/hotplug.c
+> index 951ba6d..afa5392 100644
+> --- a/arch/arm/mach-s5pv310/hotplug.c
+> +++ b/arch/arm/mach-s5pv310/hotplug.c
+> @@ -30,13 +30,13 @@ static inline void cpu_enter_lowpower(void)
+>  	 * Turn off coherency
+>  	 */
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, #0x20\n"
+> +	"	bic	%0, %0, %2\n"
+
+but why replace 0x20 with CR_C instead of CR_D
+
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 0\n"
+>  	"	bic	%0, %0, #0x04\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	  : "=&r" (v)
+> -	  : "r" (0)
+> +	  : "r" (0), "Ir" (CR_C)
+>  	  : "cc");
+>  }
+>  
+> @@ -46,13 +46,13 @@ static inline void cpu_leave_lowpower(void)
+>  
+>  	asm volatile(
+>  	"mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	orr	%0, %0, #0x04\n"
+> +	"	orr	%0, %0, %1\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+>  	"	orr	%0, %0, #0x20\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	  : "=&r" (v)
+> -	  :
+> +	  : "Ir" (CR_C)
+>  	  : "cc");
+>  }
+>  
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> index 17faf77..a5cb1ce 100644
+> --- a/arch/arm/mach-tegra/hotplug.c
+> +++ b/arch/arm/mach-tegra/hotplug.c
+> @@ -26,13 +26,13 @@ static inline void cpu_enter_lowpower(void)
+>  	 * Turn off coherency
+>  	 */
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, #0x20\n"
+> +	"	bic	%0, %0, %2\n"
+
+here also.
+
+Was this code wrong earlier??
+
+-- 
+viresh
