@@ -1,107 +1,229 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 14 Jan 2011 10:23:27 +0100
-Subject: Pull request i.MX
-Message-ID: <20110114092327.GE24373@pengutronix.de>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Fri, 14 Jan 2011 17:34:47 +0800
+Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
+Message-ID: <1294997687-12515-1-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
+This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
 
-Please pull the following i.MX patches. These are mostly compile fixes
-plus some patches to make the recently merged i.MX features usable.
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |  140 ++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 138 insertions(+), 2 deletions(-)
 
-Sascha
-
-The following changes since commit 52cfd503ad7176d23a5dd7af3981744feb60622f:
-
-  Merge branch 'release' of git://git.kernel.org/pub/scm/linux/kernel/git/lenb/linux-acpi-2.6 (2011-01-13 20:15:35 -0800)
-
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
-
-Arnaud Patard (2):
-      Fix pwm-related build failure
-      mx51: add support for pwm
-
-Fabio Estevam (3):
-      ARM: imx/mx27_3ds: Add debug board support
-      ARM: mx5: dynamically allocate pwm devices
-      ARM: mx5: dynamically allocate imx-keypad devices
-
-Richard Zhao (1):
-      arm: mxc: move IOMUX_CONFIG_SION definition to iomux-v3.h
-
-Sascha Hauer (3):
-      ARM i.MX27 3ds: Fix mc13783 regulator names
-      ARM i.MX mx31_3ds: Fix MC13783 regulator names
-      ARM mxs: clkdev related compile fixes
-
-Shawn Guo (3):
-      ARM: mx28: update clock and device name for dual fec support
-      ARM: mx28: add the second fec device registration
-      ARM: mxs: Change duart device to use amba-pl011
-
-Yong Shen (10):
-      ARM i.MX53: enable fec driver on EVK board
-      ARM i.MX53 enable i2c on EVK board
-      ARM i.MX53 enable sdhc support on EVK board
-      ARM i.MX53 enable spi on EVK board
-      ARM i.MX5 uart clock bug fix
-      ARM: i.MX53: add IOMUX pad for ecspi
-      ARM: i.MX53 EVK: add ecspi IOMUX setting
-      ARM: i.MX53 EVK: add spi nor device
-      ARM i.MX53 enable SMD board bootup
-      ARM i.MX53 enable LOCO board bootup
-
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/mach-imx/Kconfig                          |    1 +
- arch/arm/mach-imx/mach-mx27_3ds.c                  |   10 ++-
- arch/arm/mach-mx3/mach-mx31_3ds.c                  |    4 +-
- arch/arm/mach-mx5/Kconfig                          |   20 ++++
- arch/arm/mach-mx5/Makefile                         |    2 +
- arch/arm/mach-mx5/board-mx51_3ds.c                 |    5 +-
- arch/arm/mach-mx5/board-mx53_evk.c                 |   74 +++++++++++++
- arch/arm/mach-mx5/board-mx53_loco.c                |  111 ++++++++++++++++++++
- arch/arm/mach-mx5/board-mx53_smd.c                 |  111 ++++++++++++++++++++
- arch/arm/mach-mx5/clock-mx51-mx53.c                |   18 +++-
- arch/arm/mach-mx5/devices-imx51.h                  |    8 ++
- arch/arm/mach-mx5/devices-imx53.h                  |   18 +++
- arch/arm/mach-mx5/devices.c                        |   19 ----
- arch/arm/mach-mx5/devices.h                        |    1 -
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c       |    5 +-
- arch/arm/mach-mxs/Kconfig                          |    4 +-
- arch/arm/mach-mxs/clock-mx23.c                     |   13 ++-
- arch/arm/mach-mxs/clock-mx28.c                     |   14 +++-
- arch/arm/mach-mxs/devices-mx23.h                   |    4 +-
- arch/arm/mach-mxs/devices-mx28.h                   |    4 +-
- arch/arm/mach-mxs/devices.c                        |   17 +++-
- arch/arm/mach-mxs/devices/Kconfig                  |    3 +-
- arch/arm/mach-mxs/devices/Makefile                 |    2 +-
- arch/arm/mach-mxs/devices/amba-duart.c             |   40 +++++++
- arch/arm/mach-mxs/devices/platform-duart.c         |   48 ---------
- arch/arm/mach-mxs/devices/platform-fec.c           |    2 +-
- arch/arm/mach-mxs/include/mach/devices-common.h    |   11 +--
- arch/arm/mach-mxs/mach-mx28evk.c                   |   26 ++++-
- arch/arm/plat-mxc/devices/Kconfig                  |    2 +-
- arch/arm/plat-mxc/devices/platform-fec.c           |    5 +
- arch/arm/plat-mxc/devices/platform-imx-i2c.c       |    9 ++
- arch/arm/plat-mxc/devices/platform-imx-keypad.c    |    5 +
- arch/arm/plat-mxc/devices/platform-mxc_pwm.c       |    9 ++
- .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   12 ++
- arch/arm/plat-mxc/devices/platform-spi_imx.c       |   12 ++
- arch/arm/plat-mxc/include/mach/iomux-mx53.h        |    4 +-
- arch/arm/plat-mxc/include/mach/iomux-v3.h          |    1 +
- arch/arm/plat-mxc/include/mach/mx51.h              |    6 +-
- arch/arm/plat-mxc/include/mach/mx53.h              |   28 +++---
- arch/arm/plat-mxc/pwm.c                            |    2 +-
- 41 files changed, 567 insertions(+), 125 deletions(-)
- create mode 100644 arch/arm/mach-mx5/board-mx53_loco.c
- create mode 100644 arch/arm/mach-mx5/board-mx53_smd.c
- create mode 100644 arch/arm/mach-mxs/devices/amba-duart.c
- delete mode 100644 arch/arm/mach-mxs/devices/platform-duart.c
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index ccce0f0..c2fbffe 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -48,6 +48,12 @@
+ #define no_ecc		0
+ #endif
+ 
++/* DMA for large buffers only */
++#define DMA_MIN_BYTES	512
++
++static int use_dma = 1;
++module_param(use_dma, int, 0);
++
+ static int on_flash_bbt = 0;
+ module_param(on_flash_bbt, int, 0);
+ 
+@@ -89,11 +95,20 @@ struct atmel_nand_host {
+ 	struct nand_chip	nand_chip;
+ 	struct mtd_info		mtd;
+ 	void __iomem		*io_base;
++	void __iomem		*io_phys;
+ 	struct atmel_nand_data	*board;
+ 	struct device		*dev;
+ 	void __iomem		*ecc;
++
++	struct completion comp;
++	struct dma_chan *dma_chan;
+ };
+ 
++static int cpu_has_dma(void)
++{
++	return cpu_is_at91sam9rl() || cpu_is_at91sam9g45();
++}
++
+ /*
+  * Enable NAND.
+  */
+@@ -150,7 +165,7 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
+ /*
+  * Minimal-overhead PIO for data access.
+  */
+-static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
++static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
+ {
+ 	struct nand_chip	*nand_chip = mtd->priv;
+ 
+@@ -164,7 +179,7 @@ static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
+ 	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
+ }
+ 
+-static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
++static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
+ {
+ 	struct nand_chip	*nand_chip = mtd->priv;
+ 
+@@ -178,6 +193,102 @@ static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
+ 	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
+ }
+ 
++static void dma_complete_func(void *completion)
++{
++	complete(completion);
++}
++
++static void atmel_nand_dma_op(struct mtd_info *mtd, void *buf, int len,
++			       int is_read)
++{
++	struct dma_device *dma_dev;
++	enum dma_ctrl_flags flags;
++	dma_addr_t dma_src_addr, dma_dst_addr, phys_addr;
++	struct dma_async_tx_descriptor *tx = NULL;
++	dma_cookie_t cookie;
++	struct nand_chip *chip = mtd->priv;
++	struct atmel_nand_host *host = chip->priv;
++
++	dma_dev = host->dma_chan->device;
++
++	flags = DMA_CTRL_ACK | DMA_COMPL_SKIP_DEST_UNMAP | DMA_PREP_INTERRUPT |
++			DMA_COMPL_SKIP_SRC_UNMAP;
++
++	if (is_read)
++		phys_addr = dma_map_single(dma_dev->dev, buf, len,
++					   DMA_FROM_DEVICE);
++	else
++		phys_addr = dma_map_single(dma_dev->dev, buf, len,
++					   DMA_TO_DEVICE);
++	if (!phys_addr) {
++		dev_err(host->dev, "Failed to dma_map_single\n");
++		goto err_dma_map;
++	}
++
++	if (is_read) {
++		dma_src_addr = (dma_addr_t)host->io_phys;
++		dma_dst_addr = phys_addr;
++	} else {
++		dma_src_addr = phys_addr;
++		dma_dst_addr = (dma_addr_t)host->io_phys;
++	}
++
++	tx = dma_dev->device_prep_dma_memcpy(host->dma_chan, dma_dst_addr,
++					     dma_src_addr, len, flags);
++	if (!tx) {
++		dev_err(host->dev, "Failed to prepare DMA memcpy\n");
++		goto err;
++	}
++
++	init_completion(&host->comp);
++	tx->callback = dma_complete_func;
++	tx->callback_param = &host->comp;
++
++	cookie = tx->tx_submit(tx);
++	if (dma_submit_error(cookie)) {
++		dev_err(host->dev, "Failed to do DMA tx_submit\n");
++		goto err;
++	}
++
++	dma_async_issue_pending(host->dma_chan);
++
++	wait_for_completion(&host->comp);
++
++err:
++	if (is_read)
++		dma_unmap_single(dma_dev->dev, phys_addr, len, DMA_FROM_DEVICE);
++	else
++		dma_unmap_single(dma_dev->dev, phys_addr, len, DMA_TO_DEVICE);
++err_dma_map:
++	return;
++}
++
++static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	struct atmel_nand_host *host = chip->priv;
++
++	if (use_dma && len >= DMA_MIN_BYTES)
++		atmel_nand_dma_op(mtd, buf, len, 1);
++	else if (host->board->bus_width_16)
++		atmel_read_buf16(mtd, buf, len);
++	else
++		atmel_read_buf8(mtd, buf, len);
++}
++
++static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	struct atmel_nand_host *host = chip->priv;
++
++	if (use_dma && len >= DMA_MIN_BYTES)
++		atmel_nand_dma_op(mtd, (u8 *)buf, len, 0);
++	else if (host->board->bus_width_16)
++		atmel_write_buf16(mtd, buf, len);
++	else
++		atmel_write_buf8(mtd, buf, len);
++}
++
+ /*
+  * Calculate HW ECC
+  *
+@@ -398,6 +509,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	host->io_phys = (void __iomem *)mem->start;
++
+ 	host->io_base = ioremap(mem->start, mem->end - mem->start + 1);
+ 	if (host->io_base == NULL) {
+ 		printk(KERN_ERR "atmel_nand: ioremap failed\n");
+@@ -516,6 +629,23 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	if (cpu_has_dma() && use_dma) {
++		dma_cap_mask_t mask;
++
++		dma_cap_zero(mask);
++		dma_cap_set(DMA_MEMCPY, mask);
++		host->dma_chan = dma_request_channel(mask, 0, NULL);
++
++		if (!host->dma_chan) {
++			dev_err(host->dev, "Failed to request DMA channel\n");
++			use_dma = 0;
++		}
++	}
++	if (use_dma)
++		dev_info(host->dev, "Using DMA for NAND access.\n");
++	else
++		dev_info(host->dev, "No DMA support for NAND access.\n");
++
+ 	/* second phase scan */
+ 	if (nand_scan_tail(mtd)) {
+ 		res = -ENXIO;
+@@ -555,6 +685,8 @@ err_scan_ident:
+ err_no_card:
+ 	atmel_nand_disable(host);
+ 	platform_set_drvdata(pdev, NULL);
++	if (host->dma_chan)
++		dma_release_channel(host->dma_chan);
+ 	if (host->ecc)
+ 		iounmap(host->ecc);
+ err_ecc_ioremap:
+@@ -578,6 +710,10 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+ 
+ 	if (host->ecc)
+ 		iounmap(host->ecc);
++
++	if (host->dma_chan)
++		dma_release_channel(host->dma_chan);
++
+ 	iounmap(host->io_base);
+ 	kfree(host);
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3.3
