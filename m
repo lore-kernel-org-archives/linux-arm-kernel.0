@@ -1,99 +1,206 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Jan 2011 11:39:11 -0800
-Subject: [GIT PULL] omap-fixes and minor board updates
-Message-ID: <20110114193911.GL4957@atomide.com>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 14 Jan 2011 11:51:38 -0800
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
+References: <1294990949-2729-1-git-send-email-ccross@android.com>
+	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
+	<20110114120229.GA15996@n2100.arm.linux.org.uk>
+	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+	<20110114154919.GE15996@n2100.arm.linux.org.uk>
+	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
+	<20110114163520.GH15996@n2100.arm.linux.org.uk>
+	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
+	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
+	<20110114184759.GN15996@n2100.arm.linux.org.uk>
+	<AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
+Message-ID: <AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Jan 14, 2011 at 11:23 AM, Colin Cross <ccross@android.com> wrote:
+> On Fri, Jan 14, 2011 at 10:47 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> So... this incrementally on top of the previous patch (which I've
+>> reproduced below as there's a subtle comment change in there wrt IRQ
+>> state.)
+>>
+>> This means we have consistent state - both r2 and regs->ARM_pc always
+>> point to the next instruction to be executed in every case, which means
+>> its easy to understand and remember while reading through the code.
+>>
+>> diff -u b/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+>> --- b/arch/arm/kernel/entry-armv.S
+>> +++ b/arch/arm/kernel/entry-armv.S
+>> @@ -499,10 +499,11 @@
+>> ? ? ? ?blo ? ? __und_usr_unknown
+>> ?3: ? ? ldrht ? r0, [r4]
+>> ? ? ? ?add ? ? r2, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ r2 is PC + 2, make it PC + 4
+>> - ? ? ? orr ? ? r0, r0, r5, lsl #16
+>> + ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? ? ? ? ? @ it's a 2x16bit instr, update
+>> + ? ? ? orr ? ? r0, r0, r5, lsl #16 ? ? ? ? ? ? @ ?regs->ARM_pc
+>> ? ? ? ?@
+>> ? ? ? ?@ r0 = the two 16-bit Thumb instructions which caused the exception
+>> - ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc+2)
+>> + ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
+>> ? ? ? ?@ r4 = PC value for the first 16-bit Thumb instruction
+>> ? ? ? ?@
+>> ?#else
+>>
+>> 8<-x-x-
+>>
+>> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+>> index 2b46fea..5876eec 100644
+>> --- a/arch/arm/kernel/entry-armv.S
+>> +++ b/arch/arm/kernel/entry-armv.S
+>> @@ -461,27 +461,35 @@ ENDPROC(__irq_usr)
+>> ? ? ? ?.align ?5
+>> ?__und_usr:
+>> ? ? ? ?usr_entry
+>> -
+>> - ? ? ? @
+>> - ? ? ? @ fall through to the emulation code, which returns using r9 if
+>> - ? ? ? @ it has emulated the instruction, or the more conventional lr
+>> - ? ? ? @ if we are to treat this as a real undefined instruction
+>> ? ? ? ?@
+>> - ? ? ? @ ?r0 - instruction
+>> + ? ? ? @ The emulation code returns using r9 if it has emulated the
+>> + ? ? ? @ instruction, or the more conventional lr if we are to treat
+>> + ? ? ? @ this as a real undefined instruction
+>> ? ? ? ?@
+>> ? ? ? ?adr ? ? r9, BSYM(ret_from_exception)
+>> ? ? ? ?adr ? ? lr, BSYM(__und_usr_unknown)
+>> + ? ? ? @
+>> + ? ? ? @ r2 = regs->ARM_pc, which is either 2 or 4 bytes ahead of the
+>> + ? ? ? @ faulting instruction depending on Thumb mode.
+>> + ? ? ? @ r3 = regs->ARM_cpsr
+>> + ? ? ? @
+>> ? ? ? ?tst ? ? r3, #PSR_T_BIT ? ? ? ? ? ? ? ? ?@ Thumb mode?
+>> - ? ? ? itet ? ?eq ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ explicit IT needed for the 1f label
+>> + ? ? ? itttt ? eq ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ explicit IT needed for the 1f label
+>> ? ? ? ?subeq ? r4, r2, #4 ? ? ? ? ? ? ? ? ? ? ?@ ARM instr at LR - 4
+>> - ? ? ? subne ? r4, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ Thumb instr at LR - 2
+>> ?1: ? ? ldreqt ?r0, [r4]
+>> ?#ifdef CONFIG_CPU_ENDIAN_BE8
+>> ? ? ? ?reveq ? r0, r0 ? ? ? ? ? ? ? ? ? ? ? ? ?@ little endian instruction
+>> ?#endif
+>> + ? ? ? @
+>> + ? ? ? @ r0 = 32-bit ARM instruction which caused the exception
+>> + ? ? ? @ r2 = PC value for the following instruction (:= regs->ARM_pc)
+>> + ? ? ? @ r4 = PC value for the faulting instruction
+>> + ? ? ? @
+>> ? ? ? ?beq ? ? call_fpe
+>> +
+>> ? ? ? ?@ Thumb instruction
+>> ?#if __LINUX_ARM_ARCH__ >= 7
+>> + ? ? ? sub ? ? r4, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ Thumb instr at LR - 2
+>> ?2:
+>> ?ARM( ?ldrht ? r5, [r4], #2 ? ?)
+>> ?THUMB( ? ? ? ?ldrht ? r5, [r4] ? ? ? ?)
+>> @@ -492,18 +500,19 @@ __und_usr:
+>> ?3: ? ? ldrht ? r0, [r4]
+>> ? ? ? ?add ? ? r2, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ r2 is PC + 2, make it PC + 4
+>> ? ? ? ?orr ? ? r0, r0, r5, lsl #16
+>> + ? ? ? @
+>> + ? ? ? @ r0 = the two 16-bit Thumb instructions which caused the exception
+>> + ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc+2)
+>> + ? ? ? @ r4 = PC value for the first 16-bit Thumb instruction
+>> + ? ? ? @
+>> ?#else
+>> ? ? ? ?b ? ? ? __und_usr_unknown
+>> ?#endif
+>> - UNWIND(.fnend ? ? ? ? )
+>> + UNWIND(.fnend)
+>> ?ENDPROC(__und_usr)
+>>
+>> - ? ? ? @
+>> - ? ? ? @ fallthrough to call_fpe
+>> - ? ? ? @
+>> -
+>> ?/*
+>> - * The out of line fixup for the ldrt above.
+>> + * The out of line fixup for the ldrt instructions above.
+>> ?*/
+>> ? ? ? ?.pushsection .fixup, "ax"
+>> ?4: ? ? mov ? ? pc, r9
+>> @@ -534,11 +543,12 @@ ENDPROC(__und_usr)
+>> ?* NEON handler code.
+>> ?*
+>> ?* Emulators may wish to make use of the following registers:
+>> - * ?r0 ?= instruction opcode.
+>> - * ?r2 ?= PC+4
+>> + * ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
+>> + * ?r2 ?= PC value to resume execution after successful emulation
+>> ?* ?r9 ?= normal "successful" return address
+>> - * ?r10 = this threads thread_info structure.
+>> + * ?r10 = this threads thread_info structure
+>> ?* ?lr ?= unrecognised instruction return address
+>> + * IRQs disabled, FIQs enabled.
+>> ?*/
+>> ? ? ? ?@
+>> ? ? ? ?@ Fall-through from Thumb-2 __und_usr
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index ee57640..eeb9250 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -347,9 +347,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>> ? ? ? ?void __user *pc;
+>>
+>> ? ? ? ?/*
+>> - ? ? ? ?* According to the ARM ARM, PC is 2 or 4 bytes ahead,
+>> - ? ? ? ?* depending whether we're in Thumb mode or not.
+>> - ? ? ? ?* Correct this offset.
+>> + ? ? ? ?* According to the ARM ARM, the PC is 2 or 4 bytes ahead
+>> + ? ? ? ?* depending on Thumb mode. ?Correct this offset so that
+>> + ? ? ? ?* regs->ARM_pc points at the faulting instruction.
+>> ? ? ? ? */
+>> ? ? ? ?regs->ARM_pc -= correction;
+>>
+>> diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
+>> index 4fa9903..2bf6089 100644
+>> --- a/arch/arm/vfp/entry.S
+>> +++ b/arch/arm/vfp/entry.S
+>> @@ -19,6 +19,15 @@
+>> ?#include <asm/vfpmacros.h>
+>> ?#include "../kernel/entry-header.S"
+>>
+>> +@ VFP entry point.
+>> +@
+>> +@ ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
+>> +@ ?r2 ?= PC value to resume execution after successful emulation
+>> +@ ?r9 ?= normal "successful" return address
+>> +@ ?r10 = this threads thread_info structure
+>> +@ ?lr ?= unrecognised instruction return address
+>> +@ ?IRQs disabled.
+>> +@
+>> ?ENTRY(do_vfp)
+>> ?#ifdef CONFIG_PREEMPT
+>> ? ? ? ?ldr ? ? r4, [r10, #TI_PREEMPT] ?@ get preempt count
+>> diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
+>> index 9897dcf..7292921 100644
+>> --- a/arch/arm/vfp/vfphw.S
+>> +++ b/arch/arm/vfp/vfphw.S
+>> @@ -61,13 +61,13 @@
+>>
+>> ?@ VFP hardware support entry point.
+>> ?@
+>> -@ ?r0 ?= faulted instruction
+>> -@ ?r2 ?= faulted PC+4
+>> -@ ?r9 ?= successful return
+>> +@ ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
+>> +@ ?r2 ?= PC value to resume execution after successful emulation
+>> +@ ?r9 ?= normal "successful" return address
+>> ?@ ?r10 = vfp_state union
+>> ?@ ?r11 = CPU number
+>> -@ ?lr ?= failure return
+>> -
+>> +@ ?lr ?= unrecognised instruction return address
+>> +@ ?IRQs enabled.
+>> ?ENTRY(vfp_support_entry)
+>> ? ? ? ?DBGSTR3 "instr %08x pc %08x state %p", r0, r2, r10
+>
+> I tested copying r2 to regs->ARM_pc like this patch does, and it fixes
+> my test case. ?Could this second patch go first so it can be applied
+> to stable?
+>
 
-Please pull omap fixes and some minor board updates from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-This is mostly to deal with the build and boot issues after merging
-with the arm and usb trees. The series also fixes some sparse issues.
-It would be nice to get these in before -rc1.
-
-Regards,
-
-Tony
-
-
-The following changes since commit 891cc2283216bf76f387546f0e220caf8ce9fbf9:
-
-  Merge branch 'drm-intel-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/ickle/drm-intel (2011-01-14 10:30:09 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Aaro Koskinen (1):
-      arm: mach-omap2: mux: fix buffer overrun
-
-Anand Gadiyar (1):
-      arm: omap4: pandaboard: turn on PHY reference clock at init
-
-Catalin Marinas (1):
-      ARM: Do not enable SWP emulation if CPU_V6 && CPU_V7
-
-Enric Balletbo i Serra (4):
-      omap3: igep3: Add USB EHCI support for IGEP module
-      omap3: igep3: Fix IGEP module second MMC channel power supply
-      omap3: igep2: Add keypad support
-      omap3: igep3: Add omap_reserve functionality
-
-Felipe Balbi (1):
-      arm: omap: gpio: don't access irq_desc array directly
-
-Koen Kooi (3):
-      omap3: beaglexm: fix EHCI power up GPIO dir
-      omap3: beaglexm: fix DVI reset GPIO
-      omap3: beaglexm: fix power on of DVI
-
-Mika Westerberg (1):
-      OMAP: GPIO: fix _set_gpio_triggering() for OMAP2+
-
-Nishanth Menon (8):
-      omap3|4: mux: make local structures static
-      omap3: zoom: use static for pointer passing
-      omap3: igep3: make igep3_flash_init static
-      omap2+: wdt: trivial sparse fixes
-      OMAP3+: sr_device: include pm header
-      OMAP2+: TWL: make conversion routines static
-      OMAP2+: TWL: include pm header for init protos
-      omap2+: pm_bus: make functions used as pointers as static
-
-Santosh Shilimkar (6):
-      omap2plus: clockdomain: Trivial fix for build break because of clktrctrl_mask
-      omap2plus: voltage: Trivial warning fix 'no return statement'
-      omap2plus: voltage: Trivial linking fix 'undefined reference'
-      omap2plus: voltage: Trivial linking fix for 'EINVAL' undeclared
-      omap2plus: prm: Trvial build break fix for undefined reference to 'omap2_prm_read_mod_reg'
-      omap3: clocks: Fix build error 'CK_3430ES2' undeclared here
-
-Tony Lindgren (2):
-      Merge branch 'ehci-omap-clock' into omap-fixes
-      omap4: Fix ULPI PHY init for ES1.0 SDP
-
- arch/arm/mach-omap2/board-4430sdp.c          |   10 ++-
- arch/arm/mach-omap2/board-igep0020.c         |   33 ++++++++++
- arch/arm/mach-omap2/board-igep0030.c         |   85 ++++++++++++++++++++++----
- arch/arm/mach-omap2/board-omap3beagle.c      |   60 ++++++++++++++++--
- arch/arm/mach-omap2/board-omap4panda.c       |   10 +++
- arch/arm/mach-omap2/board-zoom-peripherals.c |    4 +-
- arch/arm/mach-omap2/clock3xxx_data.c         |    2 +-
- arch/arm/mach-omap2/clockdomain.h            |    2 -
- arch/arm/mach-omap2/devices.c                |    2 +-
- arch/arm/mach-omap2/mux.c                    |    2 +-
- arch/arm/mach-omap2/mux34xx.c                |    4 +-
- arch/arm/mach-omap2/mux44xx.c                |    6 +-
- arch/arm/mach-omap2/omap_twl.c               |   10 ++-
- arch/arm/mach-omap2/pm_bus.c                 |    4 +-
- arch/arm/mach-omap2/prm2xxx_3xxx.h           |   63 +++++++++++++++++++-
- arch/arm/mach-omap2/sr_device.c              |    1 +
- arch/arm/mach-omap2/wd_timer.c               |    2 +
- arch/arm/mm/Kconfig                          |    2 +-
- arch/arm/plat-omap/gpio.c                    |   12 +++-
- arch/arm/plat-omap/include/plat/voltage.h    |   17 ++++-
- 20 files changed, 280 insertions(+), 51 deletions(-)
+Also, both patches together Tested-by: Colin Cross <ccross@android.com>
