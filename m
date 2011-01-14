@@ -1,66 +1,232 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 14 Jan 2011 10:45:08 -0800
-Subject: [PATCH] TWD: enable one-shot mode
-In-Reply-To: <20110111115209.GA12781@n2100.arm.linux.org.uk>
-References: <20101224191855.GJ20587@n2100.arm.linux.org.uk>
-	<4D2BE6C4.4040806@codeaurora.org>
-	<20110111115209.GA12781@n2100.arm.linux.org.uk>
-Message-ID: <4D3099B4.40900@codeaurora.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 14 Jan 2011 18:44:21 +0000
+Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
+In-Reply-To: <20110114181609.GN2822@pulham.picochip.com>
+References: <20110114181609.GN2822@pulham.picochip.com>
+Message-ID: <1295030661-16364-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2011 03:52 AM, Russell King - ARM Linux wrote:
-> On Mon, Jan 10, 2011 at 09:12:36PM -0800, Stephen Boyd wrote:
->>
->> I see this patch was already tested and merged but can you elaborate on
->> why this was done? From what I understand, NOHZ selects one-shot (like
->> is done in this patch), so why don't the machines with a TWD choose NOHZ
->> or high res timers?
->
-> You're right - so it's not actually required.  It should probably be
-> reverted, though it does no damage...
+This driver adds support for the True Random Number Generator in
+the Picochip PC3X3 and later devices.
 
-Now I'm wondering why there are other 'select TICK_ONESHOT' lines in
-arch/arm/Kconfig. Can we just remove them all? Otherwise it feels like
-we're making it confusing for others later on.
+v2: fix indentation and cleanup read function to remove single use
+variables and to take advantage of the rng buffer being aligned.
 
------>8---[cut here]----8<-----
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e2f8011..7750a78 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -532,7 +532,6 @@ config ARCH_MMP
-        select CLKDEV_LOOKUP
-        select GENERIC_CLOCKEVENTS
-        select HAVE_SCHED_CLOCK
--       select TICK_ONESHOT
-        select PLAT_PXA
-        select SPARSE_IRQ
-        help
-@@ -613,7 +612,6 @@ config ARCH_PXA
-        select ARCH_REQUIRE_GPIOLIB
-        select GENERIC_CLOCKEVENTS
-        select HAVE_SCHED_CLOCK
--       select TICK_ONESHOT
-        select PLAT_PXA
-        select SPARSE_IRQ
-        help
-@@ -668,7 +666,6 @@ config ARCH_SA1100
-        select GENERIC_CLOCKEVENTS
-        select HAVE_CLK
-        select HAVE_SCHED_CLOCK
--       select TICK_ONESHOT
-        select ARCH_REQUIRE_GPIOLIB
-        help
-          Support for StrongARM 11x0 based boards.
-@@ -1300,7 +1297,6 @@ config HAVE_ARM_SCU
- config HAVE_ARM_TWD
-        bool
-        depends on SMP
--       select TICK_ONESHOT
-        help
-          This options enables support for the ARM timer and watchdog unit
+Cc: Matt Mackall <mpm@selenic.com>
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
 
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ drivers/char/hw_random/Kconfig         |   12 +++
+ drivers/char/hw_random/Makefile        |    1 +
+ drivers/char/hw_random/picoxcell-rng.c |  169 ++++++++++++++++++++++++++++++++
+ 3 files changed, 182 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/char/hw_random/picoxcell-rng.c
+
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index d31483c..beecd1c 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -198,3 +198,15 @@ config HW_RANDOM_NOMADIK
+ 	  module will be called nomadik-rng.
+ 
+ 	  If unsure, say Y.
++
++config HW_RANDOM_PICOXCELL
++	tristate "Picochip picoXcell true random number generator support"
++	depends on HW_RANDOM && ARCH_PICOXCELL && PICOXCELL_PC3X3
++	---help---
++	  This driver provides kernel-side support for the Random Number
++	  Generator hardware found on Picochip PC3x3 and later devices.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called picoxcell-rng.
++
++	  If unsure, say Y.
+diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+index 4273308..3db4eb8 100644
+--- a/drivers/char/hw_random/Makefile
++++ b/drivers/char/hw_random/Makefile
+@@ -19,3 +19,4 @@ obj-$(CONFIG_HW_RANDOM_TX4939) += tx4939-rng.o
+ obj-$(CONFIG_HW_RANDOM_MXC_RNGA) += mxc-rnga.o
+ obj-$(CONFIG_HW_RANDOM_OCTEON) += octeon-rng.o
+ obj-$(CONFIG_HW_RANDOM_NOMADIK) += nomadik-rng.o
++obj-$(CONFIG_HW_RANDOM_PICOXCELL) += picoxcell-rng.o
+diff --git a/drivers/char/hw_random/picoxcell-rng.c b/drivers/char/hw_random/picoxcell-rng.c
+new file mode 100644
+index 0000000..9f32760
+--- /dev/null
++++ b/drivers/char/hw_random/picoxcell-rng.c
+@@ -0,0 +1,169 @@
++/*
++ * Copyright (c) 2010-2011 Picochip Ltd., Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * All enquiries to support at picochip.com
++ */
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/hw_random.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++
++#define DATA_REG_OFFSET		0x0200
++#define CSR_REG_OFFSET		0x0278
++#define CSR_OUT_EMPTY_MASK	(1 << 24)
++#define TAI_REG_OFFSET		0x0380
++
++static void __iomem *rng_base;
++static struct clk *rng_clk;
++
++/*
++ * Get some random data from the random number generator. The hw_random core
++ * layer provides us with locking.
++ */
++static int picoxcell_trng_read(struct hwrng *rng, void *buf, size_t max,
++			       bool wait)
++{
++	u32 __iomem *csr = rng_base + CSR_REG_OFFSET;
++
++	/* Wait for some data to become available. */
++	while (__raw_readl(csr) & CSR_OUT_EMPTY_MASK) {
++		if (!wait)
++			return 0;
++		cpu_relax();
++	}
++
++	*(u32 *)buf = __raw_readl(rng_base + DATA_REG_OFFSET);
++
++	return sizeof(u32);
++}
++
++static struct hwrng picoxcell_trng = {
++	.name		= "picoxcell",
++	.read		= picoxcell_trng_read,
++};
++
++/*
++ * Take the random number generator out of reset and make sure the interrupts
++ * are masked. We shouldn't need to get large amounts of random bytes so just
++ * poll the status register. The hardware generates 32 bits every 320ns so we
++ * shouldn't have to wait long enough to warrant waiting for an IRQ.
++ */
++static void picoxcell_trng_start(void)
++{
++	__raw_writel(0, rng_base + TAI_REG_OFFSET);
++	__raw_writel(0, rng_base + CSR_REG_OFFSET);
++}
++
++static int picoxcell_trng_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct resource *mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
++	if (!mem) {
++		dev_warn(&pdev->dev, "no memory resource\n");
++		return -ENOMEM;
++	}
++
++	if (!devm_request_mem_region(&pdev->dev, mem->start, resource_size(mem),
++				     "picoxcell_trng")) {
++		dev_warn(&pdev->dev, "unable to request io mem\n");
++		return -EBUSY;
++	}
++
++	rng_base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
++	if (!rng_base) {
++		dev_warn(&pdev->dev, "unable to remap io mem\n");
++		return -ENOMEM;
++	}
++
++	rng_clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(rng_clk)) {
++		dev_warn(&pdev->dev, "no clk\n");
++		return PTR_ERR(rng_clk);
++	}
++
++	ret = clk_enable(rng_clk);
++	if (ret) {
++		dev_warn(&pdev->dev, "unable to enable clk\n");
++		goto err_enable;
++	}
++
++	picoxcell_trng_start();
++	ret = hwrng_register(&picoxcell_trng);
++	if (ret)
++		goto err_register;
++
++	dev_info(&pdev->dev, "pixoxcell random number generator active\n");
++
++	return 0;
++
++err_register:
++	clk_disable(rng_clk);
++err_enable:
++	clk_put(rng_clk);
++
++	return ret;
++}
++
++static int __devexit picoxcell_trng_remove(struct platform_device *pdev)
++{
++	hwrng_unregister(&picoxcell_trng);
++	clk_disable(rng_clk);
++	clk_put(rng_clk);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int picoxcell_trng_suspend(struct device *dev)
++{
++	clk_disable(rng_clk);
++
++	return 0;
++}
++
++static int picoxcell_trng_resume(struct device *dev)
++{
++	return clk_enable(rng_clk);
++}
++
++static const struct dev_pm_ops picoxcell_trng_pm_ops = {
++	.suspend	= picoxcell_trng_suspend,
++	.resume		= picoxcell_trng_resume,
++};
++#endif /* CONFIG_PM */
++
++static struct platform_driver picoxcell_trng_driver = {
++	.probe		= picoxcell_trng_probe,
++	.remove		= __devexit_p(picoxcell_trng_remove),
++	.driver		= {
++		.name	= "picoxcell-trng",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_PM
++		.pm	= &picoxcell_trng_pm_ops,
++#endif /* CONFIG_PM */
++	},
++};
++
++static int __init picoxcell_trng_init(void)
++{
++	return platform_driver_register(&picoxcell_trng_driver);
++}
++module_init(picoxcell_trng_init);
++
++static void __exit picoxcell_trng_exit(void)
++{
++	platform_driver_unregister(&picoxcell_trng_driver);
++}
++module_exit(picoxcell_trng_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Jamie Iles");
++MODULE_DESCRIPTION("Picochip picoXcell TRNG driver");
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.3.4
