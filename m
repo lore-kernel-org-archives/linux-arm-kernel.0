@@ -1,119 +1,40 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 14 Jan 2011 11:15:19 -0600
-Subject: [PATCH 1/1 v2] ARM: Thumb-2: Symbol manipulation macros for
-	function body copying
-In-Reply-To: <AANLkTi=QRDt62wgnHW6ya+956BS9x7pQj2voTiF+H0vs@mail.gmail.com>
-References: <1294951905-23748-1-git-send-email-dave.martin@linaro.org>
-	<1294951905-23748-2-git-send-email-dave.martin@linaro.org>
-	<20110113235524.GB28040@n2100.arm.linux.org.uk>
-	<AANLkTi=QRDt62wgnHW6ya+956BS9x7pQj2voTiF+H0vs@mail.gmail.com>
-Message-ID: <AANLkTikiR+XN4Jb9GSEdUUiOciLvxqXB+NA3DEWhNCga@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Jan 2011 09:29:10 -0800
+Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
+	boot failure)
+In-Reply-To: <20110113164957.GA28040@n2100.arm.linux.org.uk>
+References: <20110106182023.GV7771@atomide.com>
+	<20110106203238.GH1198@n2100.arm.linux.org.uk>
+	<20110106204053.GA7771@atomide.com>
+	<20110107161230.GR1198@n2100.arm.linux.org.uk>
+	<20110110185209.GC4957@atomide.com>
+	<20110111231611.GX4957@atomide.com>
+	<2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
+	<20110113091546.GA24429@n2100.arm.linux.org.uk>
+	<20110113155152.GG4957@atomide.com>
+	<20110113164957.GA28040@n2100.arm.linux.org.uk>
+Message-ID: <20110114172910.GH4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110113 08:49]:
+> On Thu, Jan 13, 2011 at 07:51:53AM -0800, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [110113 01:15]:
+> > > Given the very sorry state of OMAP in mainline at present, I'm surprised
+> > > that this kind of stuff is still going on...
+> > 
+> > At least I boot test the patches I send..
+> 
+> Which is why OMAP3 and OMAP4 can't be built in mainline because they
+> spit out lots of compile errors in the OMAP code...  As they won't
+> even compile they couldn't have been boot tested.
 
-There's another problem which I hadn't spotted before:
+Huh? I have fixes queued up for the issues that showed up with
+merges with various other trees.
 
-In the Thumb case, we risk violating the alignment constraints of the
-code which gets copied (actually, this is also true of the ARM case,
-but less likely to bite).  This matters because the code may contain
-literals and other data words -- quite likely given the requirement
-for self-containedness.
+I certainly make sure everything I merge is compile and boot
+tested. Sure there are still tons of issues still remaining,
+but people are working on those. That's why we have the -rc
+releases.
 
-In the simplest case, we could just require the caller to ensure that
-there are is at least size+2 bytes of space at dest_buf: then we can
-actually copy the function to dest_buf+2 if this is needed to preserve
-word alignment.  But this does make the API harder to use.  For
-Thumb-2, at least word alignment is always needed, even if the start
-address of the function is only halfword-aligned, because of the way
-literals are addressed.
-
-There could also be a need for alignment greater than word alignment
-in some cases; for example, where ldrd/strd or some hardware operation
-needs an aligned buffer.  This would be rarer though; perhaps we could
-get away without it.
-
-We could provide a helper to determine how much space to request from
-the allocator:
-
-dest_size = fncpy_size(function, size_of_function, alignment);
-dest_buf = allocate(dest_size);
-fncpy(dest_buf, &function, size_of_function, alignment);
-
-If we don't know what alignment guarantee is provided by the allocator
-itself, we might have to define this conservatively, e.g.:
-
-size_t fncpy_size(function, size_of_function, alignment)
-{
-    return size_of_function + alignment - 1;
-}
-
-...to guarantee the possibility of rounding the copied function
-address up far enough to achieve the required alignment without
-overrunning the buffer.  Of course, we can probably get simpler that
-that...
-
-Any thoughts?
-
-Cheers
----Dave
-
-On Fri, Jan 14, 2011 at 9:42 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Thu, Jan 13, 2011 at 5:55 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Jan 13, 2011 at 02:51:45PM -0600, Dave Martin wrote:
->>> +/* Cast function pointer to integer: */
->>> +#define __funcp_to_uint(funcp) ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->>
->> uint is confusing here - it suggests casting a pointer to an unsigned int,
->> rather than a uintptr_t. ?Please use uintptr here.
->>
->>> +/*
->>> + * FSYM_REBASE: Determine the correct function pointer for funcp,
->>> + * after the function has been copied to dest_buf:
->>> + */
->>> +#define FSYM_REBASE(funcp, dest_buf) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->>> + ? ? __uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
->>> +
->>> +/*
->>> + * FSYM_BASE: Determine the base address in memory of the function funcp
->>> + * FSYM_TYPE: Determine the instruction set type (ARM/Thumb) of funcp
->>> + * (both defined below)
->>> + */
->>> +
->>> +#ifdef CONFIG_THUMB2_KERNEL
->>> +#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
->>> +#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
->>> +#else /* !CONFIG_THUMB2_KERNEL */
->>> +#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
->>> +#define FSYM_TYPE(funcp) 0
->>> +#endif /* !CONFIG_THUMB2_KERNEL */
->>
->> I'd really like to see these gone - otherwise they'll end up being used
->> in code inappropriately. ?I like things to be kept as simple as possible
->> with as few opportunities for people to needlessly hook into internal
->> implementation details.
->>
->> If you expose implementation details, people will use them, and then if
->> you need to change the implementation, you've got a lot of code to deal
->> with.
->
-> I guess I agree with that now ... with fncpy() implemented, there's
-> little legitimate use for the other macros, including the casting
-> macros.
->
-> I'll fold it all into fncpy() and see how that looks.
->
->>
->> I don't think we need to make this conditional on THUMB2 either - we're
->> probably not wasting much by always clearing and copying the LSB. ?And
->> this isn't particularly performance code.
->>
->
-> Agreed. ?I originally tried to avoid impacting the ARM case, but that
-> adds complexity for little benefit.
->
-> Cheers
-> ---Dave
->
+Tony
