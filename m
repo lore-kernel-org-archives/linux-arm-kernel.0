@@ -1,32 +1,24 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 22:41:50 +0000
-Subject: [GIT PULL] pxa: fixes for 2.6.38-rc
-In-Reply-To: <20110114133435.GD15996@n2100.arm.linux.org.uk>
-References: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
-	<20110113230235.GE24149@n2100.arm.linux.org.uk>
-	<20110114133435.GD15996@n2100.arm.linux.org.uk>
-Message-ID: <20110114224150.GQ15996@n2100.arm.linux.org.uk>
+Date: Fri, 14 Jan 2011 22:44:39 +0000
+Subject: mmci: U300 "sync with blockend" broken for multi-block?
+In-Reply-To: <AANLkTim4J8xrj9axhsu4=_7YkEy_ndiJ6cjDNf2WfzEg@mail.gmail.com>
+References: <AANLkTimYb6TxLj4SamxRwUgykf9JyW5y9gbejOUXqZ7K@mail.gmail.com>
+	<20110101121048.GB25924@n2100.arm.linux.org.uk>
+	<AANLkTi=4SrxX-oCx-XXd+oib64j8RhMLdsQD1oWGxgU1@mail.gmail.com>
+	<20110105164344.GD8638@n2100.arm.linux.org.uk>
+	<AANLkTim4J8xrj9axhsu4=_7YkEy_ndiJ6cjDNf2WfzEg@mail.gmail.com>
+Message-ID: <20110114224439.GR15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 01:34:35PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 13, 2011 at 11:02:35PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Jan 13, 2011 at 03:15:21PM -0600, Eric Miao wrote:
-> > > Hi Russell,
-> > > 
-> > > The following changes since commit aebf2fc9dc974270b4b25a83816c7051c73f07c8:
-> > > 
-> > >   it8152: add IT8152_LAST_IRQ definition to fix build error
-> > > (2011-01-02 23:21:14 +0800)
-> > 
-> > Nope, not pulling.
-> > 
-> > I don't have this in my tree, and it doesn't appear to exist in Linus'
-> > tree either.  There is this commit:
+On Fri, Jan 14, 2011 at 09:13:05PM +0100, Linus Walleij wrote:
+> 2011/1/5 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 > 
-> Eric, I'm planning to do my final push for this merge window this
-> evening, so I'd like to know whether it's likely that you'll have
-> this fixed by then?
+> > Any chance of pr_debug'ing the complete status register each time you
+> > service an interrupt? ?You'll probably need to set the kernel log
+> > buffer fairly large to ensure that you capture everything.
+> 
+> I did this test now.
 
-Okay, I'm deferring until tomorrow - there's still a patch and one
-git tree (PXA) containing fixes with problems.
+Just to complete the picture, can I see the patch between the version
+which produced this and mainline?
