@@ -1,47 +1,52 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 12:02:29 +0000
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-In-Reply-To: <AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
-References: <1294990949-2729-1-git-send-email-ccross@android.com>
-	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
-Message-ID: <20110114120229.GA15996@n2100.arm.linux.org.uk>
+Date: Fri, 14 Jan 2011 12:04:37 +0000
+Subject: ARM: CPU hotplug: fix hard-coded control register constants
+In-Reply-To: <4D30386B.7020200@st.com>
+References: <4D303758.4060608@st.com> <4D30386B.7020200@st.com>
+Message-ID: <20110114120437.GB15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 11:43:04AM +0000, Catalin Marinas wrote:
-> > ? ? ? ?pr_debug("VFP: bounce: trigger %08x fpexc %08x\n", trigger, fpexc);
-> >
-> > ? ? ? ?/*
-> > + ? ? ? ?* If the exception occured in thumb mode, pc is exception location + 2,
-> > + ? ? ? ?* the middle of the 32-bit VFP instruction. ?Add 2 to get exception
-> > + ? ? ? ?* location + 4, the same we get in ARM mode.
-> > + ? ? ? ?*/
-> > +#ifdef CONFIG_ARM_THUMB
-> > + ? ? ? if (regs->ARM_cpsr & PSR_T_BIT)
-> > + ? ? ? ? ? ? ? regs->ARM_pc += 2;
-> > +#endif
+On Fri, Jan 14, 2011 at 05:20:03PM +0530, viresh kumar wrote:
+> > diff --git a/arch/arm/mach-s5pv310/hotplug.c b/arch/arm/mach-s5pv310/hotplug.c
+> > index 951ba6d..afa5392 100644
+> > --- a/arch/arm/mach-s5pv310/hotplug.c
+> > +++ b/arch/arm/mach-s5pv310/hotplug.c
+> > @@ -30,13 +30,13 @@ static inline void cpu_enter_lowpower(void)
+> >  	 * Turn off coherency
+> >  	 */
+> >  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> > -	"	bic	%0, %0, #0x20\n"
+> > +	"	bic	%0, %0, %2\n"
 > 
-> You can use "if (thumb_mode(regs))" and avoid the #ifdef entirely.
+> but why replace 0x20 with CR_C instead of CR_D
 
-I don't think this is correct.  On entry to the undefined instruction
-handler, we get the uncorrected PC value, so PC points to the
-instruction after the faulting instruction.
+Looks like a mistake - it should've been the one below.
 
-If it was an ARM instruction, that is located at PC-4.  If it was a
-Thumb instruction, it is located at PC-2.  This PC value is passed
-unmodified to the VFP entry code, and the passed r2 reflect the
-value in regs->ARM_pc.
+> >  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> >  	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> >  	"	bic	%0, %0, #0x04\n"
+> >  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> >  	  : "=&r" (v)
+> > -	  : "r" (0)
+> > +	  : "r" (0), "Ir" (CR_C)
+> >  	  : "cc");
 
-The VFP entry assembly doesn't touch the PC value, except when it
-wants to retry an instruction:
+In any case, this code is probably doing the wrong thing - if s5pv310
+is not an ARMv6 MPCore the its fiddling with the auxillary control
+register is already broken.
 
-        sub     r2, r2, #4
-        str     r2, [sp, #S_PC]         @ retry the instruction
+> > diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> > index 17faf77..a5cb1ce 100644
+> > --- a/arch/arm/mach-tegra/hotplug.c
+> > +++ b/arch/arm/mach-tegra/hotplug.c
+> > @@ -26,13 +26,13 @@ static inline void cpu_enter_lowpower(void)
+> >  	 * Turn off coherency
+> >  	 */
+> >  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> > -	"	bic	%0, %0, #0x20\n"
+> > +	"	bic	%0, %0, %2\n"
+> 
+> here also.
 
-So I think that 2 to the PC when in thumb mode is incorrect, as that'll
-cause us to skip the instruction following the faulted one.
-
-I think that the undefined instruction handling needs reworking for
-Thumb entirely as we could be dealing with a 16-bit or 32-bit thumb
-instruction, and we have no way of knowing without repeatedly
-decoding that instruction.
+Same comment.
