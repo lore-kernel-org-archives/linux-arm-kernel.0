@@ -1,71 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 15:58:06 +0000
-Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
-References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
-Message-ID: <20110114155806.GA22505@n2100.arm.linux.org.uk>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Sat, 15 Jan 2011 00:10:34 +0800
+Subject: [PATCH 2/2] arm: mx50_rdp: add i2c bus support
+In-Reply-To: <AANLkTinahps3SxrSy+SRD_H+ifHnQTpuFpC4+2mTFLaC@mail.gmail.com>
+References: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+	<1294988137-24654-2-git-send-email-richard.zhao@freescale.com>
+	<AANLkTik2fL=viMrd=va0VwwNEJzk=hwkPVgFwcqhf5m0@mail.gmail.com>
+	<AANLkTinahps3SxrSy+SRD_H+ifHnQTpuFpC4+2mTFLaC@mail.gmail.com>
+Message-ID: <AANLkTinNe7+D9umDZjgBb+aVXnF75MjVP2JVD7ypC9TQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 04:21:10PM +0100, jean.pihet at newoldbits.com wrote:
-> From: Jean Pihet <j-pihet@ti.com>
-> 
-> The new fncpy API is better suited for copying some
-> code to SRAM at runtime. This patch changes the ad-hoc
-> code to the more generic fncpy API.
-> 
-> Tested OK on OMAP3 in low power modes (RET/OFF)
-> with !CONFIG_THUMB2_KERNEL
-> 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> ---
->  arch/arm/plat-omap/sram.c |    7 +++----
->  1 files changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-> index e26e504..e2982b0 100644
-> --- a/arch/arm/plat-omap/sram.c
-> +++ b/arch/arm/plat-omap/sram.c
-> @@ -23,7 +23,7 @@
->  
->  #include <asm/tlb.h>
->  #include <asm/cacheflush.h>
-> -
-> +#include <asm/fncpy.h>
->  #include <asm/mach/map.h>
->  
->  #include <plat/sram.h>
-> @@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
->  
->  	omap_sram_ceil -= size;
->  	omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
-> -	memcpy((void *)omap_sram_ceil, start, size);
-> -	flush_icache_range((unsigned long)omap_sram_ceil,
-> -		(unsigned long)(omap_sram_ceil + size));
-> +
-> +	fncpy((void *)omap_sram_ceil, start, size);
->  
->  	return (void *)omap_sram_ceil;
+Hi, Richard,
 
-That's actually wrong usage, as you won't get the T bit set if the original
-function had it.
+2011/1/14 Richard Zhao <linuxzsc@gmail.com>:
+> On Fri, Jan 14, 2011 at 10:27 PM, Jason Liu <liu.h.jason@gmail.com> wrote:
+>> Hi, Richard,
+>>
+>> 2011/1/14 Richard Zhao <richard.zhao@freescale.com>:
+>>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>>> ---
+>>> ?arch/arm/mach-mx5/board-mx50_rdp.c ? ? ? ? ? | ? ?7 +++++++
+>>> ?arch/arm/mach-mx5/devices-mx50.h ? ? ? ? ? ? | ? ?3 +++
+>>
+>> We need align the naming convention with i.mx53/i.mx50 fordevices-mx50.h ,
+>> I have send out one patch for it.It seems not good when using devices-mx50.h
+>> while using devices-imx53 and devices-imx51.h in the same directory.
+>>
+>> I think we need use imx as much as possible since i.mx is FSL chip brand name.
+>>
+>> Sascha, please help merge the following patch if you don't have some
+>> comments about it.
+>> http://lists.arm.linux.org.uk/lurker/message/20110110.223149.e2d1fe51.en.html
+> I have comments on that thread too. I past here:
+> I noticed that too. Sometimes we use imx as part of file name or macro
+> name, but other times we use mx . We'd better make some rule that when
+> and where we suppose to use what.
+> I suggest we move all to mx for short. Reasons:
+> - For freescale internal, starting from mx5, we all use mx.
+> - macros in soc header files all use mx.
+> - soc header file name all use mx too.
+> - mach-types all use mx. (count in freescale board only)
 
-The right solution to this is to change omap_sram_push() to become just an
-allocator, and then use fncpy() outside of that.
+No, I prefer to use imx since imx is the chip brand and FSL IC doc
+stat it clearly it's i.mx.
+And the most important is to keep compatible, we had better keep the
+same naming convention.
+Otherwise, it will make the directory a little mess.
 
-So:
-
-extern int my_func_size;
-extern void my_func(int blah);
-void (*sram_my_func)(int);
-
-	void *sram = omap_sram_push(my_func_size);
-	if (sram)
-		sram_my_func = fncpy(sram, my_func, my_func_size);
-
-Two benefits: 1. you get the thumb mode bit propagated (which is the
-point of fncpy), and 2. you get the security of type safety between
-my_func and the sram function pointer.
-
-If you cast things to a void pointer and ignore the return value of fncpy
-then you lose the whole point of this API _and_ any form of type safety.
+>
+> Thanks
+> Richard
+>>
+>> BR,
+>> Jason
+>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>
