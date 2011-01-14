@@ -1,25 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 16:24:17 +0000
-Subject: [PATCH 01/54] ARM: core irq_data conversion.
-In-Reply-To: <20101130132532.GB15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130132532.GB15575@mail.wantstofly.org>
-Message-ID: <20110114162417.GA23154@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 14 Jan 2011 10:24:52 -0600
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+References: <1294990949-2729-1-git-send-email-ccross@android.com>
+	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
+	<20110114120229.GA15996@n2100.arm.linux.org.uk>
+	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTi=4=c0B3Qo+boguUw-DvEihBej5Zz_d2QWmoucm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 30, 2010 at 02:25:32PM +0100, Lennert Buytenhek wrote:
-> @@ -169,10 +169,11 @@ int __init arch_probe_nr_irqs(void)
->  
->  static void route_irq(struct irq_desc *desc, unsigned int irq, unsigned int cpu)
->  {
-> -	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->node, cpu);
-> +	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->irq_data.node, cpu);
->  
->  	raw_spin_lock_irq(&desc->lock);
-> -	desc->chip->set_affinity(irq, cpumask_of(cpu));
-> +	desc->irq_data.chip->irq_set_affinity(&desc->irq_data,
-> +					      cpumask_of(cpu), false);
+Hi,
 
-Shouldn't this be 'true' to force the IRQ to move?  The old CPU is
-going down so it's not really optional.
+On Fri, Jan 14, 2011 at 8:10 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, 2011-01-14 at 12:02 +0000, Russell King - ARM Linux wrote:
+>> On Fri, Jan 14, 2011 at 11:43:04AM +0000, Catalin Marinas wrote:
+>> > > ? ? ? ?pr_debug("VFP: bounce: trigger %08x fpexc %08x\n", trigger, fpexc);
+>> > >
+>> > > ? ? ? ?/*
+>> > > + ? ? ? ?* If the exception occured in thumb mode, pc is exception location + 2,
+>> > > + ? ? ? ?* the middle of the 32-bit VFP instruction. ?Add 2 to get exception
+>> > > + ? ? ? ?* location + 4, the same we get in ARM mode.
+>> > > + ? ? ? ?*/
+>> > > +#ifdef CONFIG_ARM_THUMB
+>> > > + ? ? ? if (regs->ARM_cpsr & PSR_T_BIT)
+>> > > + ? ? ? ? ? ? ? regs->ARM_pc += 2;
+>> > > +#endif
+>> >
+>> > You can use "if (thumb_mode(regs))" and avoid the #ifdef entirely.
+>>
+>> I don't think this is correct. ?On entry to the undefined instruction
+>> handler, we get the uncorrected PC value, so PC points to the
+>> instruction after the faulting instruction.
+>>
+>> If it was an ARM instruction, that is located at PC-4. ?If it was a
+>> Thumb instruction, it is located at PC-2. ?This PC value is passed
+>> unmodified to the VFP entry code, and the passed r2 reflect the
+>> value in regs->ARM_pc.
+>
+> The entry-armv.S code adds 2 to the r2 register in case of a 32-bit
+> Thumb instruction, so it is no longer the same as the ARM_pc.
+>
+> Since the VFP instructions in Thumb mode are always 32-bit, Colin's
+> patch made sense to me.
+
+Is the comment preceding __und_usr_unknown causing some confusion here?
+
+/*
+ * The FP module is called with these registers set:
+ *  r0  = instruction
+ *  r2  = PC+4
+ ...
+
+That reflects the ARM case only: for Thumb, r2 is always PC+2 (?)
+
+The comment at the start of do_undefinstr() (which receives these
+registers) is correct though:
+
+	/*
+	 * According to the ARM ARM, PC is 2 or 4 bytes ahead,
+	 * depending whether we're in Thumb mode or not.
+	 * Correct this offset.
+
+Cheers
+---Dave
