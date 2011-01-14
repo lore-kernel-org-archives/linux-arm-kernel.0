@@ -1,31 +1,31 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 14 Jan 2011 13:08:21 -0800
-Subject: [PATCH] ARM: msm: 7x30: don't force a gpiomux table for the
-	whole arch
-In-Reply-To: <4D2FC49A.1000505@codeaurora.org>
-References: <1294680810.12298.2.camel@c-dwalke-linux.qualcomm.com>
-	<1294686030-9817-1-git-send-email-dima@android.com>
-	<4D2FC49A.1000505@codeaurora.org>
-Message-ID: <1295039301.4129.14.camel@m0nster>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Fri, 14 Jan 2011 20:45:19 +0000
+Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
+References: <20110114181609.GN2822@pulham.picochip.com>
+	<1295030661-16364-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <v7p608-mqv.ln1@chipmunk.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-13 at 19:35 -0800, Rohit Vaswani wrote:
-> On 1/10/2011 11:00 AM, Dima Zavin wrote:
-> > This is completely board specific and therefore must be provided
-> > on a per-board basis.
-> >
-> > Change-Id: I96f922ad9bb9cbce7874c5ae6ac0d7479b7a2124
-> > Signed-off-by: Dima Zavin<dima@android.com>
-> >
-> Tested-by: Rohit Vaswani <rvaswani@codeaurora.org>
+In gmane.linux.ports.arm.kernel Jamie Iles <jamie@jamieiles.com> wrote:
+>
+> This driver adds support for the True Random Number Generator in
+> the Picochip PC3X3 and later devices.
+> 
+> [snipped]
+>
+> +/*
+> + * Take the random number generator out of reset and make sure the interrupts
+> + * are masked. We shouldn't need to get large amounts of random bytes so just
+> + * poll the status register. The hardware generates 32 bits every 320ns so we
+> + * shouldn't have to wait long enough to warrant waiting for an IRQ.
+> + */
+>
+timeriomem-rng?  Example of usage in 
+arch/arm/mach-orion5x/ts78xx-setup.c.
 
-Rohit, do you have patches to do this for all the SoCs?
-
-Daniel
-
+Cheers
 
 -- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Alexander Clouter
+.sigmonster says: The more I know men the more I like my horse.
