@@ -1,43 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 21:49:00 +0000
-Subject: [GIT PULL v3] pxa: patches for v2.6.38-rc
-In-Reply-To: <20110114173147.GK15996@n2100.arm.linux.org.uk>
-References: <AANLkTi=B3sfBXS3vN1+nnRa5m64jiaqmzRFfi6w07dJB@mail.gmail.com>
-	<20110114173147.GK15996@n2100.arm.linux.org.uk>
-Message-ID: <20110114214900.GP15996@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 14 Jan 2011 21:48:24 +0000
+Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
+In-Reply-To: <v7p608-mqv.ln1@chipmunk.wormnet.eu>
+References: <20110114181609.GN2822@pulham.picochip.com>
+	<1295030661-16364-1-git-send-email-jamie@jamieiles.com>
+	<v7p608-mqv.ln1@chipmunk.wormnet.eu>
+Message-ID: <20110114214824.GO2822@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 05:31:47PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 14, 2011 at 11:08:59AM -0600, Eric Miao wrote:
-> > Hi Russell,
+On Fri, Jan 14, 2011 at 08:45:19PM +0000, Alexander Clouter wrote:
+> In gmane.linux.ports.arm.kernel Jamie Iles <jamie@jamieiles.com> wrote:
+> >
+> > This driver adds support for the True Random Number Generator in
+> > the Picochip PC3X3 and later devices.
 > > 
-> > I rebased the branch on top of devel-stable. The conflict in irq.c is
-> > fixed. And there is a one-liner patch fixing a building issue in spitz.c
-> > missing of physmap.h. Please re-pull and let know any other issue.
-> 
-> Pulled cleanly, thanks.
+> > [snipped]
+> >
+> > +/*
+> > + * Take the random number generator out of reset and make sure the interrupts
+> > + * are masked. We shouldn't need to get large amounts of random bytes so just
+> > + * poll the status register. The hardware generates 32 bits every 320ns so we
+> > + * shouldn't have to wait long enough to warrant waiting for an IRQ.
+> > + */
+> >
+> timeriomem-rng?  Example of usage in 
+> arch/arm/mach-orion5x/ts78xx-setup.c.
 
-Building my PXA config:
+No, that's not quite suitable for our hardware.  Although the hardware 
+generates the data every 320ns, it also performs self test of the data 
+in hardware to make sure it satisfies certain random qualities.  If the 
+data doesn't pass the tests then it's rejected and not placed into the 
+FIFO so we'd have the possibility of an underflow with the 
+timeriomem-rng driver.
 
-arch/arm/mach-pxa/irq.c:124: warning: initialization from incompatible pointer type
-arch/arm/mach-pxa/irq.c:125: warning: initialization from incompatible pointer type
-arch/arm/mach-pxa/irq.c:126: warning: initialization from incompatible pointer type
-arch/arm/mach-pxa/irq.c:127: warning: initialization from incompatible pointer type
-
-Seems the initializers want to be .irq_ack rather than .ack etc.
-
-I also need to remove asm/pgtable.h from arch/arm/mach-pxa/generic.c:
-  CC      arch/arm/mach-pxa/generic.o
-In file included from arch/arm/include/asm/pgtable.h:461,
-                 from arch/arm/mach-pxa/generic.c:26:
-include/asm-generic/pgtable.h: In function ?ptep_test_and_clear_young?:
-include/asm-generic/pgtable.h:29: error: dereferencing pointer to incomplete type
-
-and I also got:
-arch/arm/mach-pxa/tosa-bt.c: In function ?tosa_bt_probe?:
-arch/arm/mach-pxa/tosa-bt.c:84: error: implicit declaration of function ?rfkill_set_led_trigger_name?
-
-which looks like a missing dependency.
-
-Do you want to fix these and send an updated pull?
+Jamie
