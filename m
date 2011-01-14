@@ -1,10 +1,10 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 14 Jan 2011 09:40:09 +0100
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 14 Jan 2011 09:42:50 +0100
 Subject: [PATCH v5 08/10] ARM: mxs: add ocotp read function
 In-Reply-To: <1294989894-20780-1-git-send-email-shawn.guo@freescale.com>
 References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
 	<1294989894-20780-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110114084009.GL26617@pengutronix.de>
+Message-ID: <20110114084250.GF24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -49,6 +49,8 @@ On Fri, Jan 14, 2011 at 03:24:54PM +0800, Shawn Guo wrote:
 >  obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
 >  
 > +obj-$(CONFIG_PM) += pm.o
+this line doesn't belong here.
+
 > +obj-$(CONFIG_MXS_OCOTP) += ocotp.o
 > +
 >  obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
@@ -154,6 +156,11 @@ On Fri, Jan 14, 2011 at 03:24:54PM +0800, Shawn Guo wrote:
 > +	mutex_unlock(&ocotp_mutex);
 > +
 > +	once = 1;
+once needs to be protected by the mutex, too.
+
+Best regards
+Uwe
+
 > +
 > +	return ocotp_words;
 > +
@@ -162,13 +169,17 @@ On Fri, Jan 14, 2011 at 03:24:54PM +0800, Shawn Guo wrote:
 > +	pr_err("%s: timeout in reading OCOTP\n", __func__);
 > +	return NULL;
 > +}
-
-EXPORT_SYMBOL?
-
-Sascha
+> -- 
+> 1.7.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
