@@ -1,114 +1,48 @@
-From: hirosh.dabui@snom.com (Hirosh Dabui)
-Date: Fri, 14 Jan 2011 16:18:13 +0100
-Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs numbers >
-	31
-Message-ID: <1295018293-5953-1-git-send-email-hirosh.dabui@snom.com>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Fri, 14 Jan 2011 16:21:10 +0100
+Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
+Message-ID: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
+From: Jean Pihet <j-pihet@ti.com>
 
-This patch fix a bug in the register indexing for GPIOs numbers >  31
-to get the relevant hardware registers of tnetv107x to control the GPIOs.
+The new fncpy API is better suited for copying some
+code to SRAM at runtime. This patch changes the ad-hoc
+code to the more generic fncpy API.
 
-In the structure tnetv107x_gpio_regs:
+Tested OK on OMAP3 in low power modes (RET/OFF)
+with !CONFIG_THUMB2_KERNEL
 
-struct tnetv107x_gpio_regs {
-            u32     idver;
-            u32     data_in[3];
-            u32     data_out[3];
-            u32     direction[3];
-            u32     enable[3];
-};
-
-The GPIO hardware register addresses of tnetv107x are stored.
-The chip implements 3 registers of each entity to serve 96 GPIOs,
-each register provides a subset of 32 GPIOs.
-The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
-and gpio_reg_clear_bit.
-
-The bug implied the use of macros to access the relevant hardware
-register e.g. the driver code used the macro like this:
-'gpio_reg_clear_bit(&reg->data_out, gpio)'
-
-But it has to be used like this:
-'gpio_reg_clear_bit(reg->data_out, gpio)'.
-
-The different results are shown here:
-- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
-- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
-
-Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/plat-omap/sram.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
-index d102986..3fa3e28 100644
---- a/arch/arm/mach-davinci/gpio-tnetv107x.c
-+++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
-@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index e26e504..e2982b0 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -23,7 +23,7 @@
  
- 	spin_lock_irqsave(&ctlr->lock, flags);
+ #include <asm/tlb.h>
+ #include <asm/cacheflush.h>
+-
++#include <asm/fncpy.h>
+ #include <asm/mach/map.h>
  
--	gpio_reg_set_bit(&regs->enable, gpio);
-+	gpio_reg_set_bit(regs->enable, gpio);
+ #include <plat/sram.h>
+@@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
  
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 	omap_sram_ceil -= size;
+ 	omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
+-	memcpy((void *)omap_sram_ceil, start, size);
+-	flush_icache_range((unsigned long)omap_sram_ceil,
+-		(unsigned long)(omap_sram_ceil + size));
++
++	fncpy((void *)omap_sram_ceil, start, size);
  
-@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_clear_bit(&regs->enable, gpio);
-+	gpio_reg_clear_bit(regs->enable, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- }
-@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_set_bit(&regs->direction, gpio);
-+	gpio_reg_set_bit(regs->direction, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
- 	if (value)
--		gpio_reg_set_bit(&regs->data_out, gpio);
-+		gpio_reg_set_bit(regs->data_out, gpio);
- 	else
--		gpio_reg_clear_bit(&regs->data_out, gpio);
-+		gpio_reg_clear_bit(regs->data_out, gpio);
- 
--	gpio_reg_clear_bit(&regs->direction, gpio);
-+	gpio_reg_clear_bit(regs->direction, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	unsigned gpio = chip->base + offset;
- 	int ret;
- 
--	ret = gpio_reg_get_bit(&regs->data_in, gpio);
-+	ret = gpio_reg_get_bit(regs->data_in, gpio);
- 
- 	return ret ? 1 : 0;
- }
-@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
- 	if (value)
--		gpio_reg_set_bit(&regs->data_out, gpio);
-+		gpio_reg_set_bit(regs->data_out, gpio);
- 	else
--		gpio_reg_clear_bit(&regs->data_out, gpio);
-+		gpio_reg_clear_bit(regs->data_out, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 	return (void *)omap_sram_ceil;
  }
 -- 
-1.7.1
+1.7.2.3
