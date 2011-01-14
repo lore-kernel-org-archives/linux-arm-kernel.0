@@ -1,95 +1,50 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 14 Jan 2011 16:10:29 -0700 (MST)
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP boot
-	failure)
-In-Reply-To: <20110114212027.GD22505@n2100.arm.linux.org.uk>
-References: <20110106203238.GH1198@n2100.arm.linux.org.uk>
-	<20110106204053.GA7771@atomide.com>
-	<20110107161230.GR1198@n2100.arm.linux.org.uk>
-	<20110110185209.GC4957@atomide.com>
-	<20110111231611.GX4957@atomide.com>
-	<2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
-	<20110113091546.GA24429@n2100.arm.linux.org.uk>
-	<20110113155152.GG4957@atomide.com>
-	<20110113164957.GA28040@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101141216040.28621@utopia.booyaka.com>
-	<20110114212027.GD22505@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1101141551140.28621@utopia.booyaka.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Sat, 15 Jan 2011 10:50:38 +1100
+Subject: [PATCH] Introduce VPR200 board.
+In-Reply-To: <20110114101820.GH24920@pengutronix.de>
+References: <1294962532-15790-1-git-send-email-marc@cpdesign.com.au>
+	<20110114100640.GA4589@pengutronix.de>
+	<20110114101820.GH24920@pengutronix.de>
+Message-ID: <201101151050.38303.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Jan 2011, Russell King - ARM Linux wrote:
-
-> If it helps, here's what I do - not only do I run a few of the standard
-> defconfigs in the tree, but I also run a number of platform specific
-> builds, both covering platforms I do and do not have.  I'll pick a random
-> selection of existing build trees to rebuild and see what the results are.
-> This shows the spread of trees which I've built over the last year - and
-> note that many of these I don't even have:
+On Friday, January 14, 2011 09:18:20 pm Uwe Kleine-K?nig wrote:
+> Hi Wolfram,
 > 
-> drwxrwxr-x. 20 rmk rmk   4096 Jan 14 20:30 omap4
-> drwxrwxr-x. 21 rmk rmk   4096 Jan 14 11:45 versatile
-> drwxrwxr-x. 21 rmk rmk   4096 Jan 14 11:14 iop13xx
-> drwxrwxr-x. 20 rmk rmk   4096 Jan 13 23:10 vexpress
-> drwxrwxr-x. 21 rmk rmk   4096 Jan 11 13:48 integrator
-> drwxrwxr-x. 21 rmk rmk   4096 Jan 11 13:44 realview
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  8 11:10 assabet
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  8 11:07 rpc
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  7 17:34 omap3
-> drwxrwxr-x. 20 rmk rmk   4096 Jan  6 14:24 nommu
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  6 10:44 omap2
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  6 10:27 omap
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  6 10:24 u300
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  5 19:14 pxa
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  5 10:30 msm
-> drwxrwxr-x. 21 rmk rmk   4096 Jan  4 17:25 orion-kirkwood
-> drwxrwxr-x. 21 rmk rmk   4096 Dec 24 11:06 ks8695
-> drwxrwxr-x. 21 rmk rmk   4096 Dec 16 16:12 s3c2410
-> drwxrwxr-x. 21 rmk rmk   4096 Dec 11 17:17 ixp4xx
-> drwxrwxr-x. 20 rmk rmk   4096 Oct  9 22:59 netwinder2
-> drwxrwxr-x. 21 rmk rmk   4096 Sep  5 23:54 ebsa285
-> drwxrwxr-x. 21 rmk rmk   4096 Aug  4  2010 zylonite
-> drwxrwxr-x. 21 rmk rmk   4096 Jul  8  2010 ep93xx
-> drwxrwxr-x. 21 rmk rmk   4096 Jun 29  2010 corgi
-> drwxrwxr-x. 21 rmk rmk   4096 Apr 25  2010 ebsa110
-> drwxrwxr-x. 21 rmk rmk   4096 Mar 25  2010 clps711x
-> drwxrwxr-x. 21 rmk rmk   4096 Mar 24  2010 ixp23xx
-> drwxrwxr-x. 21 rmk rmk   4096 Mar 20  2010 n2100
-> drwxrwxr-x. 21 rmk rmk   4096 Feb 19  2010 iop32x
-> drwxrwxr-x. 21 rmk rmk   4096 Jan 20  2010 mx1
-> drwxrwxr-x. 21 rmk rmk   4096 Jan 10  2010 w90p910evb
+> On Fri, Jan 14, 2011 at 11:06:40AM +0100, Wolfram Sang wrote:
+> > > And to do it really correct, you need to check for errors returned by
+> > > gpio_request and gpio_direction_input.
+> > > 
+> > > Provided you really need it, I'd do it as follows:
+> > > 	int ret;
+> > > 	
+> > > 	#define setup_for_gpiokey(nr)					\
+> > > 	
+> > > 		ret = gpio_request(GPIO_BUTTON ## nr, "BUTTON" #nr);	\
+> > > 		if (ret)						\
+> > > 		
+> > > 			return ret;					\
+> > > 		
+> > > 		ret = gpio_direction_input(GPIO_BUTTON ## nr);		\
+> > > 		if (ret)						\
+> > > 		
+> > > 			return ret;					\
+> > > 		
+> > > 		gpio_free(GPIO_BUTTON ## nr);
+> > > 	
+> > > 	setup_for_gpiokey(1);
+> > > 	setup_for_gpiokey(2);
+> > > 	setup_for_gpiokey(3);
+> > > 	setup_for_gpiokey(4);
+> > > 	...
+> > 
+> > I'd think using gpio_request_array() is the better option ;)
 > 
-> omap4 = 4430SDP only (I have). 
-> omap3 = 3430LDP (I have) + 3430SDP + RX51 (I don't)
-> omap2 = H2 (whose config can be traced to 2005 from when I once had one.)
-> omap = some random omap1 config
-> realview = realview eb/smp only
-> assabet = assabet+neponset daugter board
-> 
-> All those are build trees, built from my git tree with:
-> 	make ARCH=arm CROSS_COMPILE=arm-linux- O=../build/$tree <args>
-> 
-> You can see from the above that I built a kernel for at least orion-kirkwood,
-> msm, u300, omap, nommu trees before sending my pull to Linus on the 6th,
-> none of which I have (ever) had hardware for.  I also built omap3, omap4,
-> and a bunch of the ARM evaluation platforms as well as older platforms
-> like RiscPC, but those are hidden by later re-builds for work I've been
-> doing since (which is all based upon commit 9e9bc97.)
-> 
-> I'm not saying that's perfect - it isn't.  It's better than just testing
-> the defconfigs - and with regular checking of kautobuild/linux-next, it
-> seems to catch quite a bit of really silly stuff.
+> didn't know that one, nice.
 
-I wonder if, in a similar vein, you would consider adding a CONFIG_CPU_V6 
-plus CONFIG_CPU_V7 config, such as omap2plus_defconfig, into your 
-compile-testing regimen, if one is not already present?
+Thanks to all for comments on this, but as Uwe and Jamie pointed out, all of 
+this is actually taken care of by the driver, so it can all go.
 
-That would help catch compile problems like the recent CONFIG_SWP_EMULATE 
-one[1].
-
-
-- Paul
-
-1. _linux-next: omap2plus_defconfig not building_.  linux-arm-kernel
-   mailing list thread, started 19 October 2010 by Anand Gadiyar.
-   http://comments.gmane.org/gmane.linux.ports.arm.kernel/93694
+Cheers
+Marc
