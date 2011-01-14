@@ -1,45 +1,51 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 Jan 2011 08:37:13 -0600
-Subject: [GIT PULL v2] pxa: patches for v2.6.37-rc
-Message-ID: <AANLkTin_LK7MtJiz7e417k4XCumOBq+dnTgLBCe8HYj1@mail.gmail.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Fri, 14 Jan 2011 22:50:05 +0800
+Subject: [PATCH 2/2] arm: mx50_rdp: add i2c bus support
+In-Reply-To: <AANLkTik2fL=viMrd=va0VwwNEJzk=hwkPVgFwcqhf5m0@mail.gmail.com>
+References: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+	<1294988137-24654-2-git-send-email-richard.zhao@freescale.com>
+	<AANLkTik2fL=viMrd=va0VwwNEJzk=hwkPVgFwcqhf5m0@mail.gmail.com>
+Message-ID: <AANLkTinahps3SxrSy+SRD_H+ifHnQTpuFpC4+2mTFLaC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, Jan 14, 2011 at 10:27 PM, Jason Liu <liu.h.jason@gmail.com> wrote:
+> Hi, Richard,
+>
+> 2011/1/14 Richard Zhao <richard.zhao@freescale.com>:
+>> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+>> ---
+>> ?arch/arm/mach-mx5/board-mx50_rdp.c ? ? ? ? ? | ? ?7 +++++++
+>> ?arch/arm/mach-mx5/devices-mx50.h ? ? ? ? ? ? | ? ?3 +++
+>
+> We need align the naming convention with i.mx53/i.mx50 fordevices-mx50.h ,
+> I have send out one patch for it.It seems not good when using devices-mx50.h
+> while using devices-imx53 and devices-imx51.h in the same directory.
+>
+> I think we need use imx as much as possible since i.mx is FSL chip brand name.
+>
+> Sascha, please help merge the following patch if you don't have some
+> comments about it.
+> http://lists.arm.linux.org.uk/lurker/message/20110110.223149.e2d1fe51.en.html
+I have comments on that thread too. I past here:
+I noticed that too. Sometimes we use imx as part of file name or macro
+name, but other times we use mx . We'd better make some rule that when
+and where we suppose to use what.
+I suggest we move all to mx for short. Reasons:
+- For freescale internal, starting from mx5, we all use mx.
+- macros in soc header files all use mx.
+- soc header file name all use mx too.
+- mach-types all use mx. (count in freescale board only)
 
-Didn't realize that some of the fixing patches are in my devel branch, sorry
-for the noise. Please pull again and let know if there's any issue.
-
-The following changes since commit 581548db3b3c0f6e25b500329eb02e3c72e7acbe:
-
-  Merge branch 'release' of
-git://git.kernel.org/pub/scm/linux/kernel/git/aegl/linux-2.6
-(2011-01-13 11:02:55 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
-
-Eric Miao (1):
-      ARM: pxa: fix recursive calls in pxa_low_gpio_chip
-
-Marek Vasut (4):
-      ARM: pxa: fix warning in zeus.c
-      ARM: pxa: remove unused variable in clock-pxa3xx.c
-      ARM: pxa: use cpu_has_ipr() consistently in irq.c
-      ARM: pxa: fix suspend/resume array index miscalculation
-
-Pavel Machek (1):
-      ARM: sa1111: fix typo in sa1111_retrigger_lowirq()
-
-Philip Rakity (2):
-      ARM: mmp: MMP2 drive strength FAST using wrong value
-      ARM: mmp: PXA910 drive strength FAST using wrong value
-
- arch/arm/common/sa1111.c                    |    2 +-
- arch/arm/mach-mmp/include/mach/mfp-mmp2.h   |    2 +-
- arch/arm/mach-mmp/include/mach/mfp-pxa910.h |    2 +-
- arch/arm/mach-pxa/clock-pxa3xx.c            |    1 -
- arch/arm/mach-pxa/irq.c                     |   49 ++++++++++-----------------
- arch/arm/mach-pxa/zeus.c                    |    4 +-
- 6 files changed, 23 insertions(+), 37 deletions(-)
+Thanks
+Richard
+>
+> BR,
+> Jason
+>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
