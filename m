@@ -1,78 +1,43 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Jan 2011 15:25:52 +0800
-Subject: [PATCH v5 09/10] ARM: mxs/mx28evk: read fec mac address from ocotp
-In-Reply-To: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1294989952-20813-1-git-send-email-shawn.guo@freescale.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Fri, 14 Jan 2011 08:35:26 +0100
+Subject: i.MX & IRQF_ONESHOT
+In-Reply-To: <20110113212401.GZ24920@pengutronix.de>
+References: <20110113091355.GP24920@pengutronix.de>	<4D2EDE10.3040809@atmel.com>	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>	<4D2F6AB7.30800@eukrea.com>
+	<20110113212401.GZ24920@pengutronix.de>
+Message-ID: <4D2FFCBE.3010704@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read fec mac address from ocotp and save it into fec_platform_data
-mac field for fec driver to use.
+On 13/01/2011 22:24, Uwe Kleine-K?nig wrote:
+> On Thu, Jan 13, 2011 at 10:12:23PM +0100, Eric B?nard wrote:
+>> On 13/01/2011 19:15, Thomas Gleixner wrote:
+>>> On Thu, 13 Jan 2011, Nicolas Ferre wrote:
+>>>> Le 13/01/2011 10:13, Uwe Kleine-K?nig :
+>>>>> On Thu, Jan 13, 2011 at 09:25:19AM +0100, Eric B?nard wrote:
+>>>>>> Commenting out this line in the ads7846 driver makes it work again.
+>>>>>> Am I missing something obvious or is there a reason for IRQF_ONESHOT
+>>>>>> creating trouble with gpio irq or SPI on i.MX ?
+>>>>> I don't know.  Is the irq masked?  pending?
+>>>>
+>>>> Just to let you know that I have the same issue on my at91sam9g10ek:
+>>>> atmel_spi + ads7846 (using ADS7843e actually).
+>>>> ... solved by same workaround.
+>>>
+>>> Eric, Nicolas: How are the interrupt handlers set for the relevant
+>>> interrupt lines and how are the interrupt pins configured?
+>>>
+>> on the i.MX27 :
+>> - gpio configured as a plain input (in function ads7846_dev_init()
+>> in arch/arm/mach-imx/eukrea_mbimx27-baseboard.c)
+>> - threaded interrupt handler registered with flags
+>> IRQF_TRIGGER_FALLING | IRQF_ONESHOT (in function ads7846_probe() in
+>> drivers/input/touchscreen/ads7846.c)
+> I didn't recheck the hw manual, but adding IRQF_TRIGGER_FALLING calls
+> gpio_set_irq_type (defined in arch/arm/plat-mxc/gpio.c) which results
+> into something called GPIO_INT_FALL_EDGE being written into a register.
+>
+> So I'd say it's configured to be edge sensitive.
+>
+I confirm this point : the gpio is configured to trigger an irq on falling edge.
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-mxs/mach-mx28evk.c |   35 ++++++++++++++++++++++++++++++++++-
- 1 files changed, 34 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-index 8e2c597..e8db99f 100644
---- a/arch/arm/mach-mxs/mach-mx28evk.c
-+++ b/arch/arm/mach-mxs/mach-mx28evk.c
-@@ -119,7 +119,7 @@ static void __init mx28evk_fec_reset(void)
- 	gpio_set_value(MX28EVK_FEC_PHY_RESET, 1);
- }
- 
--static struct fec_platform_data mx28_fec_pdata[] = {
-+static struct fec_platform_data mx28_fec_pdata[] __initdata = {
- 	{
- 		/* fec0 */
- 		.phy = PHY_INTERFACE_MODE_RMII,
-@@ -129,12 +129,45 @@ static struct fec_platform_data mx28_fec_pdata[] = {
- 	},
- };
- 
-+static int __init mx28evk_fec_get_mac(void)
-+{
-+	int i;
-+	u32 val;
-+	const u32 *ocotp = mxs_get_ocotp();
-+
-+	if (!ocotp)
-+		goto error;
-+
-+	/*
-+	 * OCOTP only stores the last 4 octets for each mac address,
-+	 * so hard-code Freescale OUI (00:04:9f) here.
-+	 */
-+	for (i = 0; i < 2; i++) {
-+		val = ocotp[i * 4];
-+		mx28_fec_pdata[i].mac[0] = 0x00;
-+		mx28_fec_pdata[i].mac[1] = 0x04;
-+		mx28_fec_pdata[i].mac[2] = 0x9f;
-+		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
-+		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
-+		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
-+	}
-+
-+	return 0;
-+
-+error:
-+	pr_err("%s: timeout when reading fec mac from OCOTP\n", __func__);
-+	return -ETIMEDOUT;
-+}
-+
- static void __init mx28evk_init(void)
- {
- 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
- 
- 	mx28_add_duart();
- 
-+	if (mx28evk_fec_get_mac())
-+		pr_warn("%s: failed on fec mac setup\n", __func__);
-+
- 	mx28evk_fec_reset();
- 	mx28_add_fec(0, &mx28_fec_pdata[0]);
- 	mx28_add_fec(1, &mx28_fec_pdata[1]);
--- 
-1.7.1
+Eric
