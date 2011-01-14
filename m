@@ -1,48 +1,23 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Jan 2011 11:43:04 +0000
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-In-Reply-To: <1294990949-2729-1-git-send-email-ccross@android.com>
-References: <1294990949-2729-1-git-send-email-ccross@android.com>
-Message-ID: <AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Fri, 14 Jan 2011 12:43:52 +0100
+Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
+In-Reply-To: <1294997687-12515-1-git-send-email-hong.xu@atmel.com> (Hong Xu's
+	message of "Fri, 14 Jan 2011 17:34:47 +0800")
+References: <1294997687-12515-1-git-send-email-hong.xu@atmel.com>
+Message-ID: <878vynww07.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2011 07:42, Colin Cross <ccross@android.com> wrote:
-> The exception handler in entry-armv.S checks for thumb mode and
-> correctly determines the exception location and instruction,
-> but VFP_bounce uses the uncorrected location off the stack.
-> If the VFP exception occured in Thumb mode, fix up the
-> exception location to match the value that would be returned
-> in ARM mode.
->
-> Fixes segfaults in userspace applications running in Thumb mode
-> caused by a handled VFP exception returning to the middle of the
-> instruction that triggered the exception.
->
-> Change-Id: I6c6ba1ab88e107bec166ea334d7e0974a4f6bfba
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
-> ?arch/arm/vfp/vfpmodule.c | ? 10 ++++++++++
-> ?1 files changed, 10 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 0797cb5..63ed73d 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -275,6 +275,16 @@ void VFP_bounce(u32 trigger, u32 fpexc, struct pt_regs *regs)
-> ? ? ? ?pr_debug("VFP: bounce: trigger %08x fpexc %08x\n", trigger, fpexc);
->
-> ? ? ? ?/*
-> + ? ? ? ?* If the exception occured in thumb mode, pc is exception location + 2,
-> + ? ? ? ?* the middle of the 32-bit VFP instruction. ?Add 2 to get exception
-> + ? ? ? ?* location + 4, the same we get in ARM mode.
-> + ? ? ? ?*/
-> +#ifdef CONFIG_ARM_THUMB
-> + ? ? ? if (regs->ARM_cpsr & PSR_T_BIT)
-> + ? ? ? ? ? ? ? regs->ARM_pc += 2;
-> +#endif
+>>>>> "Hong" == Hong Xu <hong.xu@atmel.com> writes:
 
-You can use "if (thumb_mode(regs))" and avoid the #ifdef entirely.
+ Hong> Some SAM9 chips have the ability to perform DMA between CPU and
+ Hong> SMC controller.  This patch adds DMA support for SAM9RL, SAM9G45,
+ Hong> SSAM9G46,AM9M10, SAM9M11.
+
+ Hong> Signed-off-by: Hong Xu <hong.xu@atmel.com>
+
+But mtd buffers are not guaranteed to be DMA safe (E.G. might come from
+vmalloc), so you'll need to walk the page tables.
 
 -- 
-Catalin
+Bye, Peter Korsgaard
