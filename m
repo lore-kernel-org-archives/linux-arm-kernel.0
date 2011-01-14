@@ -1,37 +1,36 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 Jan 2011 08:22:54 -0600
-Subject: [GIT PULL] pxa: fixes for 2.6.38-rc
-In-Reply-To: <20110114133435.GD15996@n2100.arm.linux.org.uk>
-References: <AANLkTim_zbLbN-WD9Fhg+Bgin2QR6ODuNw5ru2R+3hLJ@mail.gmail.com>
-	<20110113230235.GE24149@n2100.arm.linux.org.uk>
-	<20110114133435.GD15996@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=9MrOtwOhKe-vUqjUMUP5f2EM+vhN1saJg6-GD@mail.gmail.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Fri, 14 Jan 2011 22:27:15 +0800
+Subject: [PATCH 2/2] arm: mx50_rdp: add i2c bus support
+In-Reply-To: <1294988137-24654-2-git-send-email-richard.zhao@freescale.com>
+References: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
+	<1294988137-24654-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <AANLkTik2fL=viMrd=va0VwwNEJzk=hwkPVgFwcqhf5m0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 7:34 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 13, 2011 at 11:02:35PM +0000, Russell King - ARM Linux wrote:
->> On Thu, Jan 13, 2011 at 03:15:21PM -0600, Eric Miao wrote:
->> > Hi Russell,
->> >
->> > The following changes since commit aebf2fc9dc974270b4b25a83816c7051c73f07c8:
->> >
->> > ? it8152: add IT8152_LAST_IRQ definition to fix build error
->> > (2011-01-02 23:21:14 +0800)
->>
->> Nope, not pulling.
->>
->> I don't have this in my tree, and it doesn't appear to exist in Linus'
->> tree either. ?There is this commit:
->
-> Eric, I'm planning to do my final push for this merge window this
-> evening, so I'd like to know whether it's likely that you'll have
-> this fixed by then?
+Hi, Richard,
 
-Sorry, working on this right now. Will send out the pull minutes later
-again.
+2011/1/14 Richard Zhao <richard.zhao@freescale.com>:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+> ?arch/arm/mach-mx5/board-mx50_rdp.c ? ? ? ? ? | ? ?7 +++++++
+> ?arch/arm/mach-mx5/devices-mx50.h ? ? ? ? ? ? | ? ?3 +++
 
->
-> Thanks.
+We need align the naming convention with i.mx53/i.mx50 fordevices-mx50.h ,
+I have send out one patch for it.It seems not good when using devices-mx50.h
+while using devices-imx53 and devices-imx51.h in the same directory.
+
+I think we need use imx as much as possible since i.mx is FSL chip brand name.
+
+Sascha, please help merge the following patch if you don't have some
+comments about it.
+http://lists.arm.linux.org.uk/lurker/message/20110110.223149.e2d1fe51.en.html
+
+BR,
+Jason
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
