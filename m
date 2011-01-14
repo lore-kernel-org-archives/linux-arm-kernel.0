@@ -1,27 +1,31 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Fri, 14 Jan 2011 19:49:32 +0100
-Subject: [PATCH 01/54] ARM: core irq_data conversion.
-In-Reply-To: <20110114162417.GA23154@n2100.arm.linux.org.uk>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130132532.GB15575@mail.wantstofly.org>
-	<20110114162417.GA23154@n2100.arm.linux.org.uk>
-Message-ID: <20110114184932.GY15575@mail.wantstofly.org>
+From: dima@android.com (Dima Zavin)
+Date: Fri, 14 Jan 2011 11:17:51 -0800
+Subject: [PATCH] ARM: msm: 7x30: don't force a gpiomux table for the whole
+	arch
+In-Reply-To: <8yalj2nfj11.fsf@huya.qualcomm.com>
+References: <1294680810.12298.2.camel@c-dwalke-linux.qualcomm.com>
+	<1294686030-9817-1-git-send-email-dima@android.com>
+	<8yalj2nfj11.fsf@huya.qualcomm.com>
+Message-ID: <AANLkTi=YxOMwF44AJcARunZAEo+iU-1z4fpD35iqUnvR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 04:24:17PM +0000, Russell King - ARM Linux wrote:
+Thanks!
 
-> >  static void route_irq(struct irq_desc *desc, unsigned int irq, unsigned int cpu)
-> >  {
-> > -	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->node, cpu);
-> > +	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->irq_data.node, cpu);
-> >  
-> >  	raw_spin_lock_irq(&desc->lock);
-> > -	desc->chip->set_affinity(irq, cpumask_of(cpu));
-> > +	desc->irq_data.chip->irq_set_affinity(&desc->irq_data,
-> > +					      cpumask_of(cpu), false);
-> 
-> Shouldn't this be 'true' to force the IRQ to move?  The old CPU is
-> going down so it's not really optional.
+--Dima
 
-Right, that makes sense.  Can you make that change?
+On Fri, Jan 14, 2011 at 10:16 AM, David Brown <davidb@codeaurora.org> wrote:
+> On Mon, Jan 10 2011, Dima Zavin wrote:
+>
+>> This is completely board specific and therefore must be provided
+>> on a per-board basis.
+>>
+>> Change-Id: I96f922ad9bb9cbce7874c5ae6ac0d7479b7a2124
+>> Signed-off-by: Dima Zavin <dima@android.com>
+>
+> I'll pull this into msm-next once rc8-rc1 comes out.
+>
+> I'll take out the Change-Id line, though.
+>
+> David
+>
