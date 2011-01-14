@@ -1,23 +1,35 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Fri, 14 Jan 2011 12:43:52 +0100
-Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
-In-Reply-To: <1294997687-12515-1-git-send-email-hong.xu@atmel.com> (Hong Xu's
-	message of "Fri, 14 Jan 2011 17:34:47 +0800")
-References: <1294997687-12515-1-git-send-email-hong.xu@atmel.com>
-Message-ID: <878vynww07.fsf@macbook.be.48ers.dk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 14 Jan 2011 12:47:40 +0100 (CET)
+Subject: i.MX & IRQF_ONESHOT
+In-Reply-To: <4D30329F.5040201@atmel.com>
+References: <20110113091355.GP24920@pengutronix.de>
+	<4D2EDE10.3040809@atmel.com>
+	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
+	<4D30329F.5040201@atmel.com>
+Message-ID: <alpine.LFD.2.00.1101141241330.2678@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Hong" == Hong Xu <hong.xu@atmel.com> writes:
+On Fri, 14 Jan 2011, Nicolas Ferre wrote:
+> For AT91:
+> - the platform does not provides irq_flags so default to
+> IRQF_TRIGGER_FALLING | IRQF_ONESHOT as stated in the driver.
+> - on at91sam9g10ek the touchscreen is wired to an full featured IRQ
+> entry (configured with pullup in arch/arm/mach-at91/board-sam9261ek.c).
+> - the irq description of plain interrupts is in arch/arm/mach-at91/irq.c
+> and at91_aic_set_type() has an IRQ_TYPE_EDGE_FALLING entry.
+> 
+> So it should be configured on falling edge...
+> 
+> But: is seems that looking at at91_aic_set_type() initialization
+> function, AIC is configured with:
+> set_irq_handler(i, handle_level_irq);
+> 
+> I do not know if it is the same as i.MX but it sound to be covered by
+> explanation that you gave...
 
- Hong> Some SAM9 chips have the ability to perform DMA between CPU and
- Hong> SMC controller.  This patch adds DMA support for SAM9RL, SAM9G45,
- Hong> SSAM9G46,AM9M10, SAM9M11.
+Seems to be the same problem. 
 
- Hong> Signed-off-by: Hong Xu <hong.xu@atmel.com>
+Thanks,
 
-But mtd buffers are not guaranteed to be DMA safe (E.G. might come from
-vmalloc), so you'll need to walk the page tables.
-
--- 
-Bye, Peter Korsgaard
+	tglx
