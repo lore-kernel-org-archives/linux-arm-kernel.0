@@ -1,36 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 18:17:46 +0000
-Subject: [GIT PULL] AT91: patches for v2.6.38-rc1
-In-Reply-To: <4D309278.5010603@atmel.com>
-References: <4D308F30.6070503@atmel.com>
-	<20110114180455.GL15996@n2100.arm.linux.org.uk>
-	<4D309278.5010603@atmel.com>
-Message-ID: <20110114181746.GM15996@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 14 Jan 2011 10:40:12 -0800
+Subject: ARM: CPU hotplug: fix hard-coded control register constants
+In-Reply-To: <20110114120437.GB15996@n2100.arm.linux.org.uk>
+References: <4D303758.4060608@st.com> <4D30386B.7020200@st.com>
+	<20110114120437.GB15996@n2100.arm.linux.org.uk>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03105686C6@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 07:14:16PM +0100, Nicolas Ferre wrote:
-> Le 14/01/2011 19:04, Russell King - ARM Linux :
-> > On Fri, Jan 14, 2011 at 07:00:16PM +0100, Nicolas Ferre wrote:
-> >> Hi Russell,
-> >>
-> >> Can you please pull those little changes for AT91? They add two 
-> >> new boards already discussed on the mailing list and a little 
-> >> cleanup patch:
-> > 
-> > Has this already been in linux-next?
+Russell King wrote:
+> Sent: Friday, January 14, 2011 5:05 AM
 > 
-> I must admit that... no.
+> On Fri, Jan 14, 2011 at 05:20:03PM +0530, viresh kumar wrote:
+> ...
+> In any case, this code is probably doing the wrong thing - if s5pv310
+> is not an ARMv6 MPCore the its fiddling with the auxillary control
+> register is already broken.
 > 
-> > We should only be merging new code during a merge window which has
-> > already had visibility in linux-next, with the exception of bug fixes
-> > and regression fixes.
+> > > diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> > > index 17faf77..a5cb1ce 100644
+> > > --- a/arch/arm/mach-tegra/hotplug.c
+> > > +++ b/arch/arm/mach-tegra/hotplug.c
+> > > @@ -26,13 +26,13 @@ static inline void cpu_enter_lowpower(void)
+> > >  	 * Turn off coherency
+> > >  	 */
+> > >  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> > > -	"	bic	%0, %0, #0x20\n"
+> > > +	"	bic	%0, %0, %2\n"
+> >
+> > here also.
 > 
-> I understand your point but those are only *board* files that are lying
-> around for one or two months.
-> I was really wishing to see them included in mainline during merge
-> window as they are not core ARM nor AT91 files...
+> Same comment.
 
-Okay for this time, but please ensure that stuff like this is in
-linux-next before the merge window next time so that it can have
-some exposure.
+Just as an FYI, in various downstream trees, that file (for mach-tegra) has
+been removed and replaced with completely different code. However, the
+replacement isn't in the process of being upstreamed right yet. Specifically:
+
+git://android.git.kernel.org/kernel/tegra.git
+
+linux-tegra-2.6.37
+
+cb8e70bd4fa41ea7ac66f01f7425943db99ac7d3
+ARM: tegra: Add suspend and hotplug support
+
+Hope this helps.
+
+-- 
+nvpublic
