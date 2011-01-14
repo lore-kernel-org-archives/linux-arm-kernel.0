@@ -1,32 +1,34 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 14 Jan 2011 13:36:49 +0100
-Subject: [PATCH V3 25/63] Newly erased page read workaround
-In-Reply-To: <6187de0568d1ea8a6aeb6c3ca54ac6684bee9973.1292833228.git.viresh.kumar@st.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<6187de0568d1ea8a6aeb6c3ca54ac6684bee9973.1292833228.git.viresh.kumar@st.com>
-Message-ID: <AANLkTi=Z-kdW_=91RG4QOGHskvmAOe8A9uqNwyCLLRnO@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 14 Jan 2011 14:08:21 +0100
+Subject: i.MX & IRQF_ONESHOT
+In-Reply-To: <alpine.LFD.2.00.1101141138480.2678@localhost6.localdomain6>
+References: <20110113091355.GP24920@pengutronix.de>
+	<4D2EDE10.3040809@atmel.com>
+	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
+	<4D2F6AB7.30800@eukrea.com> <20110113212401.GZ24920@pengutronix.de>
+	<4D2FFCBE.3010704@eukrea.com>
+	<alpine.LFD.2.00.1101141138480.2678@localhost6.localdomain6>
+Message-ID: <20110114130821.GA1434@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/20 Viresh Kumar <viresh.kumar@st.com>:
+Hello,
 
-> From: Vipin Kumar <vipin.kumar@st.com>
->
-> A newly erased page contains ff in data as well as spare area. While reading an
-> erased page, the read out ecc from spare area does not match the ecc generated
-> by fsmc ecc hardware accelarator. This is because ecc of data ff ff is not ff
-> ff. This leads to errors when jffs2 fs erases and reads back the pages to
-> ensure consistency.
->
-> This patch adds a software workaround to ensure that the ecc check is not
-> performed for erased pages. An erased page is checked by checking data as ff ff.
->
-> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+On Fri, Jan 14, 2011 at 11:57:34AM +0100, Thomas Gleixner wrote:
+> So there are several things wrong here:
+> 
+> 1) Using handle_level_irq for an edge interrupt is wrong. That's not
+>    restricted to the TS driver problem at hand. That's wrong in
+>    general. Other set_type() functions adjust the handler as well when
+>    they switch the edge/level types.
+That was introduced by 060d20d32ae7c6a20a8eac465795ed5bc9b37f7c.
+As a quick test you can try to revert that.  If that helps I can look
+deeper into it.  That won't help on at91 though.
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Best regards
+Uwe
 
-Sorry for missing it before.
 
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
