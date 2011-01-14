@@ -1,51 +1,168 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 14 Jan 2011 22:50:05 +0800
-Subject: [PATCH 2/2] arm: mx50_rdp: add i2c bus support
-In-Reply-To: <AANLkTik2fL=viMrd=va0VwwNEJzk=hwkPVgFwcqhf5m0@mail.gmail.com>
-References: <1294988137-24654-1-git-send-email-richard.zhao@freescale.com>
-	<1294988137-24654-2-git-send-email-richard.zhao@freescale.com>
-	<AANLkTik2fL=viMrd=va0VwwNEJzk=hwkPVgFwcqhf5m0@mail.gmail.com>
-Message-ID: <AANLkTinahps3SxrSy+SRD_H+ifHnQTpuFpC4+2mTFLaC@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Fri, 14 Jan 2011 15:53:55 +0100
+Subject: [PATCH v3 1/1] ARM: Thumb-2: Symbol manipulation macros for
+	function body copying
+In-Reply-To: <1294958503-6537-2-git-send-email-dave.martin@linaro.org>
+References: <1294958503-6537-1-git-send-email-dave.martin@linaro.org>
+	<1294958503-6537-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <AANLkTin21EU3_dgB9Q1G32YrjadvxGdtzBMRmADQ6YyU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 10:27 PM, Jason Liu <liu.h.jason@gmail.com> wrote:
-> Hi, Richard,
+On Thu, Jan 13, 2011 at 11:41 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> In low-level board support code, there is sometimes a need to
+> copy a function body to another location at run-time.
 >
-> 2011/1/14 Richard Zhao <richard.zhao@freescale.com>:
->> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> ---
->> ?arch/arm/mach-mx5/board-mx50_rdp.c ? ? ? ? ? | ? ?7 +++++++
->> ?arch/arm/mach-mx5/devices-mx50.h ? ? ? ? ? ? | ? ?3 +++
+> A straightforward call to memcpy doesn't work in Thumb-2,
+> because bit 0 of external Thumb function symbols is set to 1,
+> indicating that the function is Thumb. ?Without corrective
+> measures, this will cause an off-by-one copy, and the copy
+> may be called using the wrong instruction set.
 >
-> We need align the naming convention with i.mx53/i.mx50 fordevices-mx50.h ,
-> I have send out one patch for it.It seems not good when using devices-mx50.h
-> while using devices-imx53 and devices-imx51.h in the same directory.
+> This patch adds macros to help with such cases.
 >
-> I think we need use imx as much as possible since i.mx is FSL chip brand name.
+> Particular care is needed, because C doesn't guarantee any
+> defined behaviour when casting a function pointer to any other
+> type. ?This has been observed to lead to strange optimisation
+> side-effects when doing the arithmetic which is required in
+> order to copy/move function bodies correctly in Thumb-2.
 >
-> Sascha, please help merge the following patch if you don't have some
-> comments about it.
-> http://lists.arm.linux.org.uk/lurker/message/20110110.223149.e2d1fe51.en.html
-I have comments on that thread too. I past here:
-I noticed that too. Sometimes we use imx as part of file name or macro
-name, but other times we use mx . We'd better make some rule that when
-and where we suppose to use what.
-I suggest we move all to mx for short. Reasons:
-- For freescale internal, starting from mx5, we all use mx.
-- macros in soc header files all use mx.
-- soc header file name all use mx too.
-- mach-types all use mx. (count in freescale board only)
+> Thanks to Russell King and Nicolas Pitre for their input.
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-Thanks
-Richard
+Tested OK on OMAP3 in low power modes (RET/OFF) with !CONFIG_THUMB2_KERNEL.
+
+Tested-by: Jean Pihet <j-pihet@ti.com>
+
+> ---
+> KernelVersion: v2.6.37
 >
-> BR,
-> Jason
+> ?arch/arm/include/asm/fncpy.h | ?110 ++++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 110 insertions(+), 0 deletions(-)
+> ?create mode 100644 arch/arm/include/asm/fncpy.h
 >
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> diff --git a/arch/arm/include/asm/fncpy.h b/arch/arm/include/asm/fncpy.h
+> new file mode 100644
+> index 0000000..6399265
+> --- /dev/null
+> +++ b/arch/arm/include/asm/fncpy.h
+> @@ -0,0 +1,110 @@
+> +/*
+> + * arch/arm/include/asm/fncpy.h - helper macros for function body copying
+> + *
+> + * Copyright (C) 2011 Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> + */
+> +
+> +/*
+> + * These macros are intended for use when there is a need to copy a low-level
+> + * function body into special memory.
+> + *
+> + * For example, when reconfiguring the SDRAM controller, the code doing the
+> + * reconfiguration may need to run from SRAM.
+> + *
+> + * NOTE: that the copied function body must be entirely self-contained and
+> + * position-independent in order for this to work properly.
+> + *
+> + *
+> + * Typical usage example:
+> + *
+> + * extern int f(args);
+> + * extern uint32_t size_of_f;
+> + * int (*copied_f)(args);
+> + * void *sram_buffer;
+> + *
+> + * copied_f = fncpy(sram_buffer, &f, size_of_f);
+> + *
+> + * ... do any required D-side/I-side synchronisation ...
+> + *
+> + * ... later, call the function: ...
+> + *
+> + * copied_f(args);
+> + *
+> + * The size of the function to be copied can't be determined from C:
+> + * this must be determined by other means, such as adding assmbler directives
+> + * in the file where f is defined.
+> + */
+> +
+> +#ifndef __ASM_FNCPY_H
+> +#define __ASM_FNCPY_H
+> +
+> +#include <linux/types.h>
+> +#include <linux/string.h>
+> +
+> +#include <asm/cacheflush.h>
+> +
+> +/* Function pointer casting macros */
+> +
+> +/* Cast function pointer to integer: */
+> +#define __funcp_to_uint(funcp) ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? uintptr_t __result; ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? asm("" : "=r" (__result) : "0" (funcp)); ? ? ? ?\
+> + ? ? ? ? ? ? ? __result; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? })
+> +
+> +/* Cast integer to function pointer with type matching funcp: */
+> +#define __uint_to_funcp(i, funcp) ({ ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? typeof(funcp) __result; ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? asm("" : "=r" (__result) : "0" (i)); ? ?\
+> + ? ? ? ? ? ? ? __result; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? })
+> +
+> +
+> +/* Function symbol manipulation macros */
+> +
+> +/*
+> + * FSYM_REBASE: Determine the correct function pointer for funcp,
+> + * after the function has been copied to dest_buf:
+> + */
+> +#define FSYM_REBASE(funcp, dest_buf) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? __uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
+> +
+> +/*
+> + * FSYM_BASE: Determine the base address in memory of the function funcp
+> + * FSYM_TYPE: Determine the instruction set type (ARM/Thumb) of funcp
+> + * (both defined below)
+> + */
+> +
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
+> +#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
+> +#else /* !CONFIG_THUMB2_KERNEL */
+> +#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
+> +#define FSYM_TYPE(funcp) 0
+> +#endif /* !CONFIG_THUMB2_KERNEL */
+> +
+> +/* Function copy helper */
+> +#define fncpy(dest_buf, funcp, size) ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? ? ? ? ? memcpy(dest_buf, FSYM_BASE(funcp), size); ? ? ? \
+> + ? ? ? ? ? ? ? flush_icache_range((unsigned long)(dest_buf), ? \
+> + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)(dest_buf) + (size)); ? ?\
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? ? ? ? ? FSYM_REBASE(funcp, dest_buf); ? ? ? ? ? ? ? ? ? \
+> + ? ? ? })
+> +
+> +#endif /* !__ASM_FNCPY_H */
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
