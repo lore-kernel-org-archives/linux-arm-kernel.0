@@ -1,163 +1,114 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Jan 2011 23:11:23 +0800
-Subject: [PATCH v6 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1295017883-28775-1-git-send-email-shawn.guo@freescale.com>
+From: hirosh.dabui@snom.com (Hirosh Dabui)
+Date: Fri, 14 Jan 2011 16:18:13 +0100
+Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs numbers >
+	31
+Message-ID: <1295018293-5953-1-git-send-email-hirosh.dabui@snom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-mxs/Kconfig               |    4 ++
- arch/arm/mach-mxs/Makefile              |    2 +
- arch/arm/mach-mxs/include/mach/common.h |    1 +
- arch/arm/mach-mxs/ocotp.c               |   90 +++++++++++++++++++++++++++++++
- 4 files changed, 97 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/ocotp.c
+Changelog:
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 8bfc8df..cd2fbdf 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -2,6 +2,9 @@ if ARCH_MXS
+This patch fix a bug in the register indexing for GPIOs numbers >  31
+to get the relevant hardware registers of tnetv107x to control the GPIOs.
+
+In the structure tnetv107x_gpio_regs:
+
+struct tnetv107x_gpio_regs {
+            u32     idver;
+            u32     data_in[3];
+            u32     data_out[3];
+            u32     direction[3];
+            u32     enable[3];
+};
+
+The GPIO hardware register addresses of tnetv107x are stored.
+The chip implements 3 registers of each entity to serve 96 GPIOs,
+each register provides a subset of 32 GPIOs.
+The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
+and gpio_reg_clear_bit.
+
+The bug implied the use of macros to access the relevant hardware
+register e.g. the driver code used the macro like this:
+'gpio_reg_clear_bit(&reg->data_out, gpio)'
+
+But it has to be used like this:
+'gpio_reg_clear_bit(reg->data_out, gpio)'.
+
+The different results are shown here:
+- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
+- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
+
+Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+---
+ arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
+index d102986..3fa3e28 100644
+--- a/arch/arm/mach-davinci/gpio-tnetv107x.c
++++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
+@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
  
- source "arch/arm/mach-mxs/devices/Kconfig"
+ 	spin_lock_irqsave(&ctlr->lock, flags);
  
-+config MXS_OCOTP
-+	bool
-+
- config SOC_IMX23
- 	bool
- 	select CPU_ARM926T
-@@ -26,6 +29,7 @@ config MACH_MX28EVK
- 	select SOC_IMX28
- 	select MXS_HAVE_AMBA_DUART
- 	select MXS_HAVE_PLATFORM_FEC
-+	select MXS_OCOTP
- 	default y
- 	help
- 	  Include support for MX28EVK platform. This includes specific
-diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index 39d3f9c..df501a8 100644
---- a/arch/arm/mach-mxs/Makefile
-+++ b/arch/arm/mach-mxs/Makefile
-@@ -1,6 +1,8 @@
- # Common support
- obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+-	gpio_reg_set_bit(&regs->enable, gpio);
++	gpio_reg_set_bit(regs->enable, gpio);
  
-+obj-$(CONFIG_MXS_OCOTP) += ocotp.o
-+
- obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
- obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
  
-diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
-index 59133eb..635bb5d 100644
---- a/arch/arm/mach-mxs/include/mach/common.h
-+++ b/arch/arm/mach-mxs/include/mach/common.h
-@@ -13,6 +13,7 @@
+@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
  
- struct clk;
+ 	spin_lock_irqsave(&ctlr->lock, flags);
  
-+extern const u32 *mxs_get_ocotp(void);
- extern int mxs_reset_block(void __iomem *);
- extern void mxs_timer_init(struct clk *, int);
+-	gpio_reg_clear_bit(&regs->enable, gpio);
++	gpio_reg_clear_bit(regs->enable, gpio);
  
-diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
-new file mode 100644
-index 0000000..65157a3
---- /dev/null
-+++ b/arch/arm/mach-mxs/ocotp.c
-@@ -0,0 +1,90 @@
-+/*
-+ * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/mutex.h>
-+
-+#include <mach/mxs.h>
-+
-+#define OCOTP_WORD_OFFSET		0x20
-+#define OCOTP_WORD_COUNT		0x20
-+
-+#define BM_OCOTP_CTRL_BUSY		(1 << 8)
-+#define BM_OCOTP_CTRL_ERROR		(1 << 9)
-+#define BM_OCOTP_CTRL_RD_BANK_OPEN	(1 << 12)
-+
-+static DEFINE_MUTEX(ocotp_mutex);
-+static u32 ocotp_words[OCOTP_WORD_COUNT];
-+
-+const u32 *mxs_get_ocotp(void)
-+{
-+	void __iomem *ocotp_base = MXS_IO_ADDRESS(MXS_OCOTP_BASE_ADDR);
-+	int timeout = 0x400;
-+	size_t i;
-+	static int once = 0;
-+
-+	if (once)
-+		return ocotp_words;
-+
-+	mutex_lock(&ocotp_mutex);
-+
-+	/*
-+	 * clk_enable(hbus_clk) for ocotp can be skipped
-+	 * as it must be on when system is running.
-+	 */
-+
-+	/* try to clear ERROR bit */
-+	__mxs_clrl(BM_OCOTP_CTRL_ERROR, ocotp_base);
-+
-+	/* check both BUSY and ERROR cleared */
-+	while ((__raw_readl(ocotp_base) &
-+		(BM_OCOTP_CTRL_BUSY | BM_OCOTP_CTRL_ERROR)) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		goto error_unlock;
-+
-+	/* open OCOTP banks for read */
-+	__mxs_setl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-+
-+	/* approximately wait 32 hclk cycles */
-+	udelay(1);
-+
-+	/* poll BUSY bit becoming cleared */
-+	timeout = 0x400;
-+	while ((__raw_readl(ocotp_base) & BM_OCOTP_CTRL_BUSY) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		goto error_unlock;
-+
-+	for (i = 0; i < OCOTP_WORD_COUNT; i++)
-+		ocotp_words[i] = __raw_readl(ocotp_base + OCOTP_WORD_OFFSET +
-+						i * 0x10);
-+
-+	/* close banks for power saving */
-+	__mxs_clrl(BM_OCOTP_CTRL_RD_BANK_OPEN, ocotp_base);
-+
-+	once = 1;
-+
-+	mutex_unlock(&ocotp_mutex);
-+
-+	return ocotp_words;
-+
-+error_unlock:
-+	mutex_unlock(&ocotp_mutex);
-+	pr_err("%s: timeout in reading OCOTP\n", __func__);
-+	return NULL;
-+}
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
+@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->direction, gpio);
++	gpio_reg_set_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+-	gpio_reg_clear_bit(&regs->direction, gpio);
++	gpio_reg_clear_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	unsigned gpio = chip->base + offset;
+ 	int ret;
+ 
+-	ret = gpio_reg_get_bit(&regs->data_in, gpio);
++	ret = gpio_reg_get_bit(regs->data_in, gpio);
+ 
+ 	return ret ? 1 : 0;
+ }
+@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
 -- 
 1.7.1
