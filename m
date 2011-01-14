@@ -1,47 +1,119 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 Jan 2011 11:08:59 -0600
-Subject: [GIT PULL v3] pxa: patches for v2.6.38-rc
-Message-ID: <AANLkTi=B3sfBXS3vN1+nnRa5m64jiaqmzRFfi6w07dJB@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 14 Jan 2011 11:15:19 -0600
+Subject: [PATCH 1/1 v2] ARM: Thumb-2: Symbol manipulation macros for
+	function body copying
+In-Reply-To: <AANLkTi=QRDt62wgnHW6ya+956BS9x7pQj2voTiF+H0vs@mail.gmail.com>
+References: <1294951905-23748-1-git-send-email-dave.martin@linaro.org>
+	<1294951905-23748-2-git-send-email-dave.martin@linaro.org>
+	<20110113235524.GB28040@n2100.arm.linux.org.uk>
+	<AANLkTi=QRDt62wgnHW6ya+956BS9x7pQj2voTiF+H0vs@mail.gmail.com>
+Message-ID: <AANLkTikiR+XN4Jb9GSEdUUiOciLvxqXB+NA3DEWhNCga@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi again,
 
-I rebased the branch on top of devel-stable. The conflict in irq.c is
-fixed. And there is a one-liner patch fixing a building issue in spitz.c
-missing of physmap.h. Please re-pull and let know any other issue.
+There's another problem which I hadn't spotted before:
 
-Sorry for the inconvenience.
+In the Thumb case, we risk violating the alignment constraints of the
+code which gets copied (actually, this is also true of the ARM case,
+but less likely to bite).  This matters because the code may contain
+literals and other data words -- quite likely given the requirement
+for self-containedness.
 
-The following changes since commit 5b88128fd70dcf0d5d7c0ae7d7849777ff925bde:
+In the simplest case, we could just require the caller to ensure that
+there are is at least size+2 bytes of space at dest_buf: then we can
+actually copy the function to dest_buf+2 if this is needed to preserve
+word alignment.  But this does make the API harder to use.  For
+Thumb-2, at least word alignment is always needed, even if the start
+address of the function is only halfword-aligned, because of the way
+literals are addressed.
 
-  ARM: plat-stmp3xxx: irq_data conversion. (2011-01-13 17:19:14 +0100)
+There could also be a need for alignment greater than word alignment
+in some cases; for example, where ldrd/strd or some hardware operation
+needs an aligned buffer.  This would be rarer though; perhaps we could
+get away without it.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
+We could provide a helper to determine how much space to request from
+the allocator:
 
-Eric Miao (2):
-      ARM: pxa: fix recursive calls in pxa_low_gpio_chip
-      ARM: pxa: fix building issue of missing physmap.h
+dest_size = fncpy_size(function, size_of_function, alignment);
+dest_buf = allocate(dest_size);
+fncpy(dest_buf, &function, size_of_function, alignment);
 
-Marek Vasut (4):
-      ARM: pxa: fix warning in zeus.c
-      ARM: pxa: remove unused variable in clock-pxa3xx.c
-      ARM: pxa: use cpu_has_ipr() consistently in irq.c
-      ARM: pxa: fix suspend/resume array index miscalculation
+If we don't know what alignment guarantee is provided by the allocator
+itself, we might have to define this conservatively, e.g.:
 
-Pavel Machek (1):
-      ARM: sa1111: fix typo in sa1111_retrigger_lowirq()
+size_t fncpy_size(function, size_of_function, alignment)
+{
+    return size_of_function + alignment - 1;
+}
 
-Philip Rakity (2):
-      ARM: mmp: MMP2 drive strength FAST using wrong value
-      ARM: mmp: PXA910 drive strength FAST using wrong value
+...to guarantee the possibility of rounding the copied function
+address up far enough to achieve the required alignment without
+overrunning the buffer.  Of course, we can probably get simpler that
+that...
 
- arch/arm/common/sa1111.c                    |    2 +-
- arch/arm/mach-mmp/include/mach/mfp-mmp2.h   |    2 +-
- arch/arm/mach-mmp/include/mach/mfp-pxa910.h |    2 +-
- arch/arm/mach-pxa/clock-pxa3xx.c            |    1 -
- arch/arm/mach-pxa/irq.c                     |   53 ++++++++++-----------------
- arch/arm/mach-pxa/spitz.c                   |    1 +
- arch/arm/mach-pxa/zeus.c                    |    4 +-
- 7 files changed, 26 insertions(+), 39 deletions(-)
+Any thoughts?
+
+Cheers
+---Dave
+
+On Fri, Jan 14, 2011 at 9:42 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Thu, Jan 13, 2011 at 5:55 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Thu, Jan 13, 2011 at 02:51:45PM -0600, Dave Martin wrote:
+>>> +/* Cast function pointer to integer: */
+>>> +#define __funcp_to_uint(funcp) ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>>
+>> uint is confusing here - it suggests casting a pointer to an unsigned int,
+>> rather than a uintptr_t. ?Please use uintptr here.
+>>
+>>> +/*
+>>> + * FSYM_REBASE: Determine the correct function pointer for funcp,
+>>> + * after the function has been copied to dest_buf:
+>>> + */
+>>> +#define FSYM_REBASE(funcp, dest_buf) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>>> + ? ? __uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
+>>> +
+>>> +/*
+>>> + * FSYM_BASE: Determine the base address in memory of the function funcp
+>>> + * FSYM_TYPE: Determine the instruction set type (ARM/Thumb) of funcp
+>>> + * (both defined below)
+>>> + */
+>>> +
+>>> +#ifdef CONFIG_THUMB2_KERNEL
+>>> +#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
+>>> +#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
+>>> +#else /* !CONFIG_THUMB2_KERNEL */
+>>> +#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
+>>> +#define FSYM_TYPE(funcp) 0
+>>> +#endif /* !CONFIG_THUMB2_KERNEL */
+>>
+>> I'd really like to see these gone - otherwise they'll end up being used
+>> in code inappropriately. ?I like things to be kept as simple as possible
+>> with as few opportunities for people to needlessly hook into internal
+>> implementation details.
+>>
+>> If you expose implementation details, people will use them, and then if
+>> you need to change the implementation, you've got a lot of code to deal
+>> with.
+>
+> I guess I agree with that now ... with fncpy() implemented, there's
+> little legitimate use for the other macros, including the casting
+> macros.
+>
+> I'll fold it all into fncpy() and see how that looks.
+>
+>>
+>> I don't think we need to make this conditional on THUMB2 either - we're
+>> probably not wasting much by always clearing and copying the LSB. ?And
+>> this isn't particularly performance code.
+>>
+>
+> Agreed. ?I originally tried to avoid impacting the ARM case, but that
+> adds complexity for little benefit.
+>
+> Cheers
+> ---Dave
+>
