@@ -1,49 +1,66 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 14 Jan 2011 10:40:12 -0800
-Subject: ARM: CPU hotplug: fix hard-coded control register constants
-In-Reply-To: <20110114120437.GB15996@n2100.arm.linux.org.uk>
-References: <4D303758.4060608@st.com> <4D30386B.7020200@st.com>
-	<20110114120437.GB15996@n2100.arm.linux.org.uk>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03105686C6@HQMAIL01.nvidia.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 14 Jan 2011 10:45:08 -0800
+Subject: [PATCH] TWD: enable one-shot mode
+In-Reply-To: <20110111115209.GA12781@n2100.arm.linux.org.uk>
+References: <20101224191855.GJ20587@n2100.arm.linux.org.uk>
+	<4D2BE6C4.4040806@codeaurora.org>
+	<20110111115209.GA12781@n2100.arm.linux.org.uk>
+Message-ID: <4D3099B4.40900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> Sent: Friday, January 14, 2011 5:05 AM
-> 
-> On Fri, Jan 14, 2011 at 05:20:03PM +0530, viresh kumar wrote:
-> ...
-> In any case, this code is probably doing the wrong thing - if s5pv310
-> is not an ARMv6 MPCore the its fiddling with the auxillary control
-> register is already broken.
-> 
-> > > diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-> > > index 17faf77..a5cb1ce 100644
-> > > --- a/arch/arm/mach-tegra/hotplug.c
-> > > +++ b/arch/arm/mach-tegra/hotplug.c
-> > > @@ -26,13 +26,13 @@ static inline void cpu_enter_lowpower(void)
-> > >  	 * Turn off coherency
-> > >  	 */
-> > >  	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> > > -	"	bic	%0, %0, #0x20\n"
-> > > +	"	bic	%0, %0, %2\n"
-> >
-> > here also.
-> 
-> Same comment.
+On 01/11/2011 03:52 AM, Russell King - ARM Linux wrote:
+> On Mon, Jan 10, 2011 at 09:12:36PM -0800, Stephen Boyd wrote:
+>>
+>> I see this patch was already tested and merged but can you elaborate on
+>> why this was done? From what I understand, NOHZ selects one-shot (like
+>> is done in this patch), so why don't the machines with a TWD choose NOHZ
+>> or high res timers?
+>
+> You're right - so it's not actually required.  It should probably be
+> reverted, though it does no damage...
 
-Just as an FYI, in various downstream trees, that file (for mach-tegra) has
-been removed and replaced with completely different code. However, the
-replacement isn't in the process of being upstreamed right yet. Specifically:
+Now I'm wondering why there are other 'select TICK_ONESHOT' lines in
+arch/arm/Kconfig. Can we just remove them all? Otherwise it feels like
+we're making it confusing for others later on.
 
-git://android.git.kernel.org/kernel/tegra.git
-
-linux-tegra-2.6.37
-
-cb8e70bd4fa41ea7ac66f01f7425943db99ac7d3
-ARM: tegra: Add suspend and hotplug support
-
-Hope this helps.
+----->8---[cut here]----8<-----
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e2f8011..7750a78 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -532,7 +532,6 @@ config ARCH_MMP
+        select CLKDEV_LOOKUP
+        select GENERIC_CLOCKEVENTS
+        select HAVE_SCHED_CLOCK
+-       select TICK_ONESHOT
+        select PLAT_PXA
+        select SPARSE_IRQ
+        help
+@@ -613,7 +612,6 @@ config ARCH_PXA
+        select ARCH_REQUIRE_GPIOLIB
+        select GENERIC_CLOCKEVENTS
+        select HAVE_SCHED_CLOCK
+-       select TICK_ONESHOT
+        select PLAT_PXA
+        select SPARSE_IRQ
+        help
+@@ -668,7 +666,6 @@ config ARCH_SA1100
+        select GENERIC_CLOCKEVENTS
+        select HAVE_CLK
+        select HAVE_SCHED_CLOCK
+-       select TICK_ONESHOT
+        select ARCH_REQUIRE_GPIOLIB
+        help
+          Support for StrongARM 11x0 based boards.
+@@ -1300,7 +1297,6 @@ config HAVE_ARM_SCU
+ config HAVE_ARM_TWD
+        bool
+        depends on SMP
+-       select TICK_ONESHOT
+        help
+          This options enables support for the ARM timer and watchdog unit
 
 -- 
-nvpublic
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
