@@ -1,24 +1,27 @@
-From: mpm@selenic.com (Matt Mackall)
-Date: Fri, 14 Jan 2011 12:48:15 -0600
-Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
-In-Reply-To: <1295030661-16364-1-git-send-email-jamie@jamieiles.com>
-References: <20110114181609.GN2822@pulham.picochip.com>
-	<1295030661-16364-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1295030895.30392.21.camel@calx>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Fri, 14 Jan 2011 19:49:32 +0100
+Subject: [PATCH 01/54] ARM: core irq_data conversion.
+In-Reply-To: <20110114162417.GA23154@n2100.arm.linux.org.uk>
+References: <cover.1291118519.git.buytenh@wantstofly.org>
+	<20101130132532.GB15575@mail.wantstofly.org>
+	<20110114162417.GA23154@n2100.arm.linux.org.uk>
+Message-ID: <20110114184932.GY15575@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-01-14 at 18:44 +0000, Jamie Iles wrote:
-> This driver adds support for the True Random Number Generator in
-> the Picochip PC3X3 and later devices.
-> 
-> v2: fix indentation and cleanup read function to remove single use
-> variables and to take advantage of the rng buffer being aligned.
-> 
-> Cc: Matt Mackall <mpm@selenic.com>
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+On Fri, Jan 14, 2011 at 04:24:17PM +0000, Russell King - ARM Linux wrote:
 
-Acked-by: Matt Mackall <mpm@selenic.com>
+> >  static void route_irq(struct irq_desc *desc, unsigned int irq, unsigned int cpu)
+> >  {
+> > -	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->node, cpu);
+> > +	pr_debug("IRQ%u: moving from cpu%u to cpu%u\n", irq, desc->irq_data.node, cpu);
+> >  
+> >  	raw_spin_lock_irq(&desc->lock);
+> > -	desc->chip->set_affinity(irq, cpumask_of(cpu));
+> > +	desc->irq_data.chip->irq_set_affinity(&desc->irq_data,
+> > +					      cpumask_of(cpu), false);
+> 
+> Shouldn't this be 'true' to force the IRQ to move?  The old CPU is
+> going down so it's not really optional.
 
--- 
-Mathematics is the supreme nostalgia of our time.
+Right, that makes sense.  Can you make that change?
