@@ -1,66 +1,46 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 14 Jan 2011 15:39:18 +0530
-Subject: [PATCH V3 07/63] ST SPEAr13XX: Adding machine specific src files
-In-Reply-To: <4D302081.3040708@windriver.com>
-References: <cover.1292833228.git.viresh.kumar@st.com>
-	<a2b0ef370a46a862cd4c745c04bb73c4c4657103.1292833228.git.viresh.kumar@st.com>
-	<4D302081.3040708@windriver.com>
-Message-ID: <4D3020CE.6000602@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 14 Jan 2011 11:18:20 +0100
+Subject: [PATCH] Introduce VPR200 board.
+In-Reply-To: <20110114100640.GA4589@pengutronix.de>
+References: <1294962532-15790-1-git-send-email-marc@cpdesign.com.au>
+	<1294962532-15790-2-git-send-email-marc@cpdesign.com.au>
+	<20110114083408.GD24920@pengutronix.de>
+	<20110114100640.GA4589@pengutronix.de>
+Message-ID: <20110114101820.GH24920@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Wolfram,
 
-Stanley,
-
-Thanks for reviewing!!
-
-On 01/14/2011 03:38 PM, stanley.miao wrote:
-> Viresh Kumar wrote:
->> <snip>
->> +
->> +void __cpuinit platform_secondary_init(unsigned int cpu)
->> +{
->> <snip>
->> +
->> +	/*
->> +	 * let the primary processor know we're out of the
->> +	 * pen, then head off into the C entry point
->> +	 */
->> +	pen_release = -1;
->> +	smp_wmb();
->>   
+On Fri, Jan 14, 2011 at 11:06:40AM +0100, Wolfram Sang wrote:
+> > And to do it really correct, you need to check for errors returned by
+> > gpio_request and gpio_direction_input.
+> > 
+> > Provided you really need it, I'd do it as follows:
+> > 
+> > 	int ret;
+> > 
+> > 	#define setup_for_gpiokey(nr)					\
+> > 		ret = gpio_request(GPIO_BUTTON ## nr, "BUTTON" #nr);	\
+> > 		if (ret)						\
+> > 			return ret;					\
+> > 		ret = gpio_direction_input(GPIO_BUTTON ## nr);		\
+> > 		if (ret)						\
+> > 			return ret;					\
+> > 		gpio_free(GPIO_BUTTON ## nr);
+> > 
+> > 	setup_for_gpiokey(1);
+> > 	setup_for_gpiokey(2);
+> > 	setup_for_gpiokey(3);
+> > 	setup_for_gpiokey(4);
+> > 	...
 > 
-> Russell has fixed this line. See commit
-> 3705ff6da538aff6dba535e2e9cbcbb9456d0d53 in the latest kernel.
-> 
+> I'd think using gpio_request_array() is the better option ;)
+didn't know that one, nice.
 
-Ya. I have already seen that in latest kernel and have updated it in
-V4.
-
->> +
->> +	/*
->> +	 * Synchronise with the boot thread.
->> +	 */
->> +	spin_lock(&boot_lock);
->> +	spin_unlock(&boot_lock);
->> +}
->> +
->> <snip>
->> +void __init smp_prepare_cpus(unsigned int max_cpus)
->> +{
->> +	unsigned int ncores = get_core_count();
->> +	unsigned int cpu = smp_processor_id();
->> +	int i;
->> +
->> +	/* sanity check */
->> +	if (ncores == 0) {
->> +		pr_err("Realview: strange CM count of 0? Default to 1\n");
->>   
-> 
-> RealView ?
-
-Oops!! Anyway this routine is changed now and this error is
-also removed.
+Best regards
+Uwe
 
 -- 
-viresh
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
