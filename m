@@ -1,68 +1,52 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 14 Jan 2011 09:42:11 -0600
-Subject: [PATCH 1/1 v2] ARM: Thumb-2: Symbol manipulation macros for
-	function body copying
-In-Reply-To: <20110113235524.GB28040@n2100.arm.linux.org.uk>
-References: <1294951905-23748-1-git-send-email-dave.martin@linaro.org>
-	<1294951905-23748-2-git-send-email-dave.martin@linaro.org>
-	<20110113235524.GB28040@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=QRDt62wgnHW6ya+956BS9x7pQj2voTiF+H0vs@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Jan 2011 15:49:19 +0000
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+References: <1294990949-2729-1-git-send-email-ccross@android.com>
+	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
+	<20110114120229.GA15996@n2100.arm.linux.org.uk>
+	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110114154919.GE15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 13, 2011 at 5:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 13, 2011 at 02:51:45PM -0600, Dave Martin wrote:
->> +/* Cast function pointer to integer: */
->> +#define __funcp_to_uint(funcp) ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->
-> uint is confusing here - it suggests casting a pointer to an unsigned int,
-> rather than a uintptr_t. ?Please use uintptr here.
->
->> +/*
->> + * FSYM_REBASE: Determine the correct function pointer for funcp,
->> + * after the function has been copied to dest_buf:
->> + */
->> +#define FSYM_REBASE(funcp, dest_buf) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? __uint_to_funcp((uintptr_t)(dest_buf) | FSYM_TYPE(funcp), funcp)
->> +
->> +/*
->> + * FSYM_BASE: Determine the base address in memory of the function funcp
->> + * FSYM_TYPE: Determine the instruction set type (ARM/Thumb) of funcp
->> + * (both defined below)
->> + */
->> +
->> +#ifdef CONFIG_THUMB2_KERNEL
->> +#define FSYM_BASE(funcp) ((void *)(__funcp_to_uint(funcp) & ~(uintptr_t)1))
->> +#define FSYM_TYPE(funcp) (__funcp_to_uint(funcp) & 1)
->> +#else /* !CONFIG_THUMB2_KERNEL */
->> +#define FSYM_BASE(funcp) ((void *)__funcp_to_uint(funcp))
->> +#define FSYM_TYPE(funcp) 0
->> +#endif /* !CONFIG_THUMB2_KERNEL */
->
-> I'd really like to see these gone - otherwise they'll end up being used
-> in code inappropriately. ?I like things to be kept as simple as possible
-> with as few opportunities for people to needlessly hook into internal
-> implementation details.
->
-> If you expose implementation details, people will use them, and then if
-> you need to change the implementation, you've got a lot of code to deal
-> with.
+On Fri, Jan 14, 2011 at 02:10:31PM +0000, Catalin Marinas wrote:
+> On Fri, 2011-01-14 at 12:02 +0000, Russell King - ARM Linux wrote:
+> > I don't think this is correct.  On entry to the undefined instruction
+> > handler, we get the uncorrected PC value, so PC points to the
+> > instruction after the faulting instruction.
+> > 
+> > If it was an ARM instruction, that is located at PC-4.  If it was a
+> > Thumb instruction, it is located at PC-2.  This PC value is passed
+> > unmodified to the VFP entry code, and the passed r2 reflect the
+> > value in regs->ARM_pc.
+> 
+> The entry-armv.S code adds 2 to the r2 register in case of a 32-bit
+> Thumb instruction, so it is no longer the same as the ARM_pc.
 
-I guess I agree with that now ... with fncpy() implemented, there's
-little legitimate use for the other macros, including the casting
-macros.
+That's something that should be fixed - the entry conditions should be
+the same irrespective of thumb or arm encoding.
 
-I'll fold it all into fncpy() and see how that looks.
+> Since the VFP instructions in Thumb mode are always 32-bit, Colin's
+> patch made sense to me.
 
->
-> I don't think we need to make this conditional on THUMB2 either - we're
-> probably not wasting much by always clearing and copying the LSB. ?And
-> this isn't particularly performance code.
->
+I looked up the VADD instruction in the ARM ARM.  It has both a 16-bit
+and 32-bit encoding.
 
-Agreed.  I originally tried to avoid impacting the ARM case, but that
-adds complexity for little benefit.
+> > I think that the undefined instruction handling needs reworking for
+> > Thumb entirely as we could be dealing with a 16-bit or 32-bit thumb
+> > instruction, and we have no way of knowing without repeatedly
+> > decoding that instruction.
+> 
+> We already handle the r2 for in __und_usr. We don't deal with ARM_pc but
+> we could either do it in __und_usr or let the code handling the undef
+> fix it up.
 
-Cheers
----Dave
+At the moment its just confusing as things stand, as some things are
+changed in one place and not the other.  Let's kill the pointless
+addition of 2 in the undefined instruction handler so that in every
+case we enter handlers with r2 == regs->ARM_pc, and regs->ARM_pc
+as per the ARM ARM undefined exception entry LR.
+
+Undefined instruction exception handlers can then rely on the meaning
+of both of these.
