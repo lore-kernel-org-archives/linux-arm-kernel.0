@@ -1,20 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Jan 2011 09:11:54 +0000
-Subject: [PATCH] ARM: use memblock memory regions for "System RAM" I/O
-	resources
-In-Reply-To: <1294877317-25832-1-git-send-email-dima@android.com>
-References: <20110112235223.GM11039@n2100.arm.linux.org.uk>
-	<1294877317-25832-1-git-send-email-dima@android.com>
-Message-ID: <20110114091154.GL24149@n2100.arm.linux.org.uk>
+From: julien.boibessot@free.fr (Julien Boibessot)
+Date: Fri, 14 Jan 2011 10:17:09 +0100
+Subject: [PATCH v2] i.MX51 Framebuffer support
+In-Reply-To: <20110106094237.GB31708@n2100.arm.linux.org.uk>
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+	<4D246C54.9060503@free.fr>
+	<20110106094237.GB31708@n2100.arm.linux.org.uk>
+Message-ID: <4D301495.3050906@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 04:08:37PM -0800, Dima Zavin wrote:
-> Do not use memory bank info to request the "system ram" resources as
-> they do not track holes created by memblock_remove inside
-> machine's reserve callback. If the removed memory is passed as
-> platform_device's ioresource, then drivers that call
-> request_mem_region would fail due to a conflict with the incorrectly
-> configured system ram resource.
+Russell King - ARM Linux a ?crit :
+> On Wed, Jan 05, 2011 at 02:04:20PM +0100, Julien Boibessot wrote:
+>   
+>> The only strange thing I noticed was a kind of uggly sprite/artefact
+>> (32x32, I would say) appearing at the same time as the Linux console. I
+>> think it may be related to a hardware cursor badly (?) initialised, but
+>> I didn't find a fix yet.
+>> It disappears when I launch a graphical application (Qt or SDL).
+>>     
+>
+> In the top left corner?  That'll be the linux penguin logo, and if it's
+> not coming out correctly, your framebuffer driver is badly broken.
+> Maybe your RGB bitfield information or visual is wrong?
+>   
+Sorry for my late answer...
+Penguin logo is OK, the artefact is just under the penguin and is
+looking like a blinking cursor until login message is displayed. At that
+time it becomes a kind of uggly rectangular black and white lines mix,
+overlapping logging message.
+I will follow Sascha's advise and try to play with i.MX51 hardware cursor.
 
-Patch looks fine - please send it to the patch system, thanks.
+Regards,
+Julien
