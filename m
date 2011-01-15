@@ -1,56 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 14 Jan 2011 21:16:56 +0800
-Subject: [PATCH v4 08/10] ARM: mxs: add ocotp read function
-In-Reply-To: <20110114083320.GK26617@pengutronix.de>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-9-git-send-email-shawn.guo@freescale.com>
-	<20110113151939.GX24920@pengutronix.de>
-	<20110114083320.GK26617@pengutronix.de>
-Message-ID: <20110114131655.GB27583@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Jan 2011 09:22:32 +0000
+Subject: [GIT PULL v3] pxa: patches for v2.6.38-rc
+In-Reply-To: <AANLkTinZUW9Xvp-Yoz_cQnVo+iGb7A1XBgzE0yuCJzvN@mail.gmail.com>
+References: <AANLkTi=B3sfBXS3vN1+nnRa5m64jiaqmzRFfi6w07dJB@mail.gmail.com>
+	<20110114173147.GK15996@n2100.arm.linux.org.uk>
+	<20110114214900.GP15996@n2100.arm.linux.org.uk>
+	<AANLkTinZUW9Xvp-Yoz_cQnVo+iGb7A1XBgzE0yuCJzvN@mail.gmail.com>
+Message-ID: <20110115092232.GW15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 09:33:20AM +0100, Sascha Hauer wrote:
-> On Thu, Jan 13, 2011 at 04:19:39PM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Jan 06, 2011 at 03:13:16PM +0800, Shawn Guo wrote:
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > ---
-> > > Changes for v4:
-> > >  - Call cpu_relax() during polling
-> > > 
-> > > Changes for v2:
-> > >  - Add mutex locking for mxs_read_ocotp()
-> > >  - Use type size_t for count and i
-> > >  - Add comment for clk_enable/disable skipping
-> > >  - Add ERROR bit clearing and polling step
-> > > 
-> > >  arch/arm/mach-mxs/Makefile              |    2 +-
-> > >  arch/arm/mach-mxs/include/mach/common.h |    1 +
-> > >  arch/arm/mach-mxs/ocotp.c               |   79 +++++++++++++++++++++++++++++++
-> > >  3 files changed, 81 insertions(+), 1 deletions(-)
-> > >  create mode 100644 arch/arm/mach-mxs/ocotp.c
-> > > 
-> > > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> > > index 39d3f9c..f23ebbd 100644
-> > > --- a/arch/arm/mach-mxs/Makefile
-> > > +++ b/arch/arm/mach-mxs/Makefile
-> > > @@ -1,5 +1,5 @@
-> > >  # Common support
-> > > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
-> > > +obj-y := clock.o devices.o gpio.o icoll.o iomux.o ocotp.o system.o timer.o
-> > is it worth to make ocotp optional?  (and let evk select
-> > CONFIG_MXS_OCOTP)
+On Fri, Jan 14, 2011 at 07:26:39PM -0600, Eric Miao wrote:
+> On Fri, Jan 14, 2011 at 3:49 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jan 14, 2011 at 05:31:47PM +0000, Russell King - ARM Linux wrote:
+> >> On Fri, Jan 14, 2011 at 11:08:59AM -0600, Eric Miao wrote:
+> >> > Hi Russell,
+> >> >
+> >> > I rebased the branch on top of devel-stable. The conflict in irq.c is
+> >> > fixed. And there is a one-liner patch fixing a building issue in spitz.c
+> >> > missing of physmap.h. Please re-pull and let know any other issue.
+> >>
+> >> Pulled cleanly, thanks.
+> >
+> > Building my PXA config:
+> >
+> > arch/arm/mach-pxa/irq.c:124: warning: initialization from incompatible pointer type
+> > arch/arm/mach-pxa/irq.c:125: warning: initialization from incompatible pointer type
+> > arch/arm/mach-pxa/irq.c:126: warning: initialization from incompatible pointer type
+> > arch/arm/mach-pxa/irq.c:127: warning: initialization from incompatible pointer type
+> >
+> > Seems the initializers want to be .irq_ack rather than .ack etc.
 > 
-> I think not.
-> 
-I thought it depends on how we think about it.  If we think that
-ocotp is a block of soc and should be on every system based on
-the soc, we should build it unconditional.  However, if we think
-ocotp is a function that could either be used on a machine or not,
-it should be built conditional, so that the machine does not use
-ocotp function could save the ocotp build and the memory of
-u32 ocotp_words[0x20].
+> You are right. Do you want me to have another patch on top or I
+> make the change back into the guilty commit and you re-pull? I'd
+> prefer the latter.
 
--- 
-Regards,
-Shawn
+I dropped your tree so you can fix them locally.
