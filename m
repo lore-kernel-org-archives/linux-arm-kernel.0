@@ -1,58 +1,65 @@
-From: christer@weinigel.se (Christer Weinigel)
-Date: Sat, 15 Jan 2011 18:07:38 +0100
-Subject: Locking in the clk API
-In-Reply-To: <20110115145358.GC15996@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<4D2D184A.8020405@codeaurora.org>
-	<20110112090301.GS11039@n2100.arm.linux.org.uk>
-	<4D31A8F1.4080301@weinigel.se>
-	<20110115145358.GC15996@n2100.arm.linux.org.uk>
-Message-ID: <4D31D45A.8080509@weinigel.se>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Jan 2011 17:08:29 +0000
+Subject: [PATCH v2] ARM: pxa: PalmZ72: Add OV9640 camera support
+In-Reply-To: <AANLkTimK=g3gbc913sz-nGV+gmJZsU3ESPWFP_7kQBMf@mail.gmail.com>
+References: <1295054277-7879-1-git-send-email-marek.vasut@gmail.com>
+	<AANLkTimK=g3gbc913sz-nGV+gmJZsU3ESPWFP_7kQBMf@mail.gmail.com>
+Message-ID: <20110115170829.GL15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2011 03:53 PM, Russell King - ARM Linux wrote:
-> On Sat, Jan 15, 2011 at 03:02:25PM +0100, Christer Weinigel wrote:
->> On platforms that need to sleep to enable the UART clock, configuring
->> the UART as the kernel console should be equivalent to userspace opening
->> the UART device, i.e. enable the clock.  At least to me that feels like
->> an acceptable tradeoff, and if I wanted to save the last bit of power
->> I'll have to refrain from using UART as the kernel console.
->
-> Well, we're not discussing a _new_ API here - we're discussing an API
-> with existing users which works completely fine on the devices its
-> used, with differing expectations between implementations.
+On Sat, Jan 15, 2011 at 05:37:08PM +0100, Bj?rn Forsman wrote:
+> Hi,
+> 
+> On 15 January 2011 02:17, Marek Vasut <marek.vasut@gmail.com> wrote:
+> > Rework of patch from 2009:
+> > PalmZ72: Add support for OV9640 camera sensor
+> >
+> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> > ---
+> > v2: Use gpio_request_array()/gpio_free_array() array
+> >
+> > ?arch/arm/mach-pxa/include/mach/palmz72.h | ? ?5 +
+> > ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ?| ?127 ++++++++++++++++++++++++++++++
+> > ?2 files changed, 132 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-pxa/include/mach/palmz72.h b/arch/arm/mach-pxa/include/mach/palmz72.h
+> > index 2bbcf70..0d4700a 100644
+> > --- a/arch/arm/mach-pxa/include/mach/palmz72.h
+> > +++ b/arch/arm/mach-pxa/include/mach/palmz72.h
+> 
+> [snip]
+> 
+> > +static int palmz72_camera_power(struct device *dev, int power)
+> > +{
+> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_PWDN, !power);
+> > + ? ? ? mdelay(50);
+> > + ? ? ? return 0;
+> > +}
+> > +
+> > +static int palmz72_camera_reset(struct device *dev)
+> > +{
+> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 1);
+> > + ? ? ? mdelay(50);
+> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 0);
+> > + ? ? ? mdelay(50);
+> > + ? ? ? return 0;
+> > +}
+> 
+> (Sorry if these are stupid newbie-questions.)
+> 
+> Is the entire kernel blocked during the above mdelay()s or
+> just some kernel thread? (Or: will this add like 100ms or 150ms
+> to boot time?)
+> 
+> Can mdelay() be replaced with something non-blocking?
 
-Yes, so to fulfil the requirement that printk needs to call clk_enable 
-from atomic contexts, document that clk_enable can not sleep.  Or add 
-the clk_enable_atomic call and modify printk to use it.
+mdelay() is a spinning delay - it doesn't voluntarily relinquish the
+CPU to another task.
 
->> Both of these feel like they should use a call such as clk_get_atomic
->> and be able to handle EWOULDBLOCK/EAGAIN (or whatever error code is used
->> to indicate that it would have to sleep) and delegate to a worker thread
->> to enable the clock.  To catch uses of plain clk_enable from atomic
->> contects, add a WARN_ON/BUG_ON(in_atomic()).  It won't catch everything,
->> but would help a bit at least.
->
-> We've never allowed clk_get() to be called in interruptible context,
-> so that's not the issue.  The issue is purely about clk_enable() and
-> clk_disable() and whether they should be able to be called in atomic
-> context or not.
+If you have preempt enabled and the region is preemptable, you can be
+preempted in the middle of the delay (in which case it becomes delay
+time + time away from the thread.)
 
-My bad, it should have said "clk_enable_atomic".
-
-> There's been a lot of talk on this issue for ages with no real progress
-> that I'm just going to repeat: let's unify those implementations which
-> use a spinlock for their clks into one consolidated solution, and
-> a separate consolidated solution for those which use a mutex.
->
-> This will at least allow us to have _some_ consolidation of the existing
-> implementations - and it doesn't add anything to the problem at hand.
-> It might actually help identify what can be done at code level to resolve
-> this issue.
-
-Won't that cause a lot of code duplication?  If it's possible to have 
-one sane implementation, why not go for it at once?
-
-   /Christer
+msleep() can be used for places where you can sleep, but is limited to
+the jiffy granularity for !HIRES kernels.
