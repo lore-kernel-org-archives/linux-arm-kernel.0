@@ -1,58 +1,22 @@
-From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
-Date: Sat, 15 Jan 2011 17:37:08 +0100
-Subject: [PATCH v2] ARM: pxa: PalmZ72: Add OV9640 camera support
-In-Reply-To: <1295054277-7879-1-git-send-email-marek.vasut@gmail.com>
-References: <1295054277-7879-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <AANLkTimK=g3gbc913sz-nGV+gmJZsU3ESPWFP_7kQBMf@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 15 Jan 2011 19:39:51 +0300
+Subject: [patch 1/2] Fix pwm-related build failure
+In-Reply-To: <20110113113006.269152863@rtp-net.org>
+References: <20110113112638.328269873@rtp-net.org>
+	<20110113113006.269152863@rtp-net.org>
+Message-ID: <4D31CDD7.5050105@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On 15 January 2011 02:17, Marek Vasut <marek.vasut@gmail.com> wrote:
-> Rework of patch from 2009:
-> PalmZ72: Add support for OV9640 camera sensor
->
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
-> v2: Use gpio_request_array()/gpio_free_array() array
->
-> ?arch/arm/mach-pxa/include/mach/palmz72.h | ? ?5 +
-> ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ?| ?127 ++++++++++++++++++++++++++++++
-> ?2 files changed, 132 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/palmz72.h b/arch/arm/mach-pxa/include/mach/palmz72.h
-> index 2bbcf70..0d4700a 100644
-> --- a/arch/arm/mach-pxa/include/mach/palmz72.h
-> +++ b/arch/arm/mach-pxa/include/mach/palmz72.h
+On 13-01-2011 14:26, Arnaud Patard (Rtp) wrote:
 
-[snip]
+> Commit 076762aa52de48688f6e1b6999fe58d736479f37 is adding a macro whis is
 
-> +static int palmz72_camera_power(struct device *dev, int power)
-> +{
-> + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_PWDN, !power);
-> + ? ? ? mdelay(50);
-> + ? ? ? return 0;
-> +}
-> +
-> +static int palmz72_camera_reset(struct device *dev)
-> +{
-> + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 1);
-> + ? ? ? mdelay(50);
-> + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 0);
-> + ? ? ? mdelay(50);
-> + ? ? ? return 0;
-> +}
+    Please also specify the commit summary in parens.
 
-(Sorry if these are stupid newbie-questions.)
+> calling imx_add_mxc_pwm() but gives it 2 parameters while it's taking only
+> one parameters.
 
-Is the entire kernel blocked during the above mdelay()s or
-just some kernel thread? (Or: will this add like 100ms or 150ms
-to boot time?)
-
-Can mdelay() be replaced with something non-blocking?
-
-[snip]
-
-Best regards,
-Bj?rn Forsman
+WBR, Sergei
