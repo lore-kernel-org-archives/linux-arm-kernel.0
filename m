@@ -1,74 +1,78 @@
-From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
-Date: Sat, 15 Jan 2011 18:49:16 +0100
-Subject: [PATCH v2] ARM: pxa: PalmZ72: Add OV9640 camera support
-In-Reply-To: <20110115170829.GL15996@n2100.arm.linux.org.uk>
-References: <1295054277-7879-1-git-send-email-marek.vasut@gmail.com>
-	<AANLkTimK=g3gbc913sz-nGV+gmJZsU3ESPWFP_7kQBMf@mail.gmail.com>
-	<20110115170829.GL15996@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinpAGgmLmjerVHVF6Z2ET1hZG3vtfFVcZYjB=EN@mail.gmail.com>
+From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
+Date: Sat, 15 Jan 2011 18:50:34 +0100
+Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in the same
+	kernel image
+Message-ID: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, Jan 15, 2011 at 05:37:08PM +0100, Bj?rn Forsman wrote:
->> Hi,
->>
->> On 15 January 2011 02:17, Marek Vasut <marek.vasut@gmail.com> wrote:
->> > Rework of patch from 2009:
->> > PalmZ72: Add support for OV9640 camera sensor
->> >
->> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
->> > ---
->> > v2: Use gpio_request_array()/gpio_free_array() array
->> >
->> > ?arch/arm/mach-pxa/include/mach/palmz72.h | ? ?5 +
->> > ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ?| ?127 ++++++++++++++++++++++++++++++
->> > ?2 files changed, 132 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-pxa/include/mach/palmz72.h b/arch/arm/mach-pxa/include/mach/palmz72.h
->> > index 2bbcf70..0d4700a 100644
->> > --- a/arch/arm/mach-pxa/include/mach/palmz72.h
->> > +++ b/arch/arm/mach-pxa/include/mach/palmz72.h
->>
->> [snip]
->>
->> > +static int palmz72_camera_power(struct device *dev, int power)
->> > +{
->> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_PWDN, !power);
->> > + ? ? ? mdelay(50);
->> > + ? ? ? return 0;
->> > +}
->> > +
->> > +static int palmz72_camera_reset(struct device *dev)
->> > +{
->> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 1);
->> > + ? ? ? mdelay(50);
->> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 0);
->> > + ? ? ? mdelay(50);
->> > + ? ? ? return 0;
->> > +}
->>
->> (Sorry if these are stupid newbie-questions.)
->>
->> Is the entire kernel blocked during the above mdelay()s or
->> just some kernel thread? (Or: will this add like 100ms or 150ms
->> to boot time?)
->>
->> Can mdelay() be replaced with something non-blocking?
->
-> mdelay() is a spinning delay - it doesn't voluntarily relinquish the
-> CPU to another task.
->
-> If you have preempt enabled and the region is preemptable, you can be
-> preempted in the middle of the delay (in which case it becomes delay
-> time + time away from the thread.)
->
-> msleep() can be used for places where you can sleep, but is limited to
-> the jiffy granularity for !HIRES kernels.
+Nothing actually prevents support for boards based on these SoCs to be
+compiled in the same kernel image, since the SAM9260 and SAM9G20 are
+almost identical (AT91SAM9G20 adds some new features, but is otherwise
+compatible with the AT91SAM9260).
 
-Thanks for explaining!
+Signed-off-by: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+---
+ arch/arm/mach-at91/Kconfig |   31 +++++++++++++------------------
+ 1 files changed, 13 insertions(+), 18 deletions(-)
 
-Marek, care to try msleep() so we avoid busy-waits?
-
-Best regards,
-Bj?rn Forsman
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c015b68..d1eda58 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -26,8 +26,8 @@ config ARCH_AT91RM9200
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
+ 
+-config ARCH_AT91SAM9260
+-	bool "AT91SAM9260 or AT91SAM9XE"
++config ARCH_AT91SAM9260_VARIANTS
++	bool "AT91SAM9260 / AT91SAM9XE and AT91SAM9G20"
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USART3
+@@ -61,15 +61,6 @@ config ARCH_AT91SAM9RL
+ 	select HAVE_AT91_USART3
+ 	select HAVE_FB_ATMEL
+ 
+-config ARCH_AT91SAM9G20
+-	bool "AT91SAM9G20"
+-	select CPU_ARM926T
+-	select GENERIC_CLOCKEVENTS
+-	select HAVE_AT91_USART3
+-	select HAVE_AT91_USART4
+-	select HAVE_AT91_USART5
+-	select HAVE_NET_MACB
+-
+ config ARCH_AT91SAM9G45
+ 	bool "AT91SAM9G45"
+ 	select CPU_ARM926T
+@@ -193,15 +184,19 @@ endif
+ 
+ # ----------------------------------------------------------
+ 
+-if ARCH_AT91SAM9260
++if ARCH_AT91SAM9260_VARIANTS
+ 
+-comment "AT91SAM9260 Variants"
++menu "AT91SAM9260 Variants"
+ 
+-config ARCH_AT91SAM9260_SAM9XE
+-	bool "AT91SAM9XE"
+-	help
+-	  Select this if you are using Atmel's AT91SAM9XE System-on-Chip.
+-	  They are basically AT91SAM9260s with various sizes of embedded Flash.
++config ARCH_AT91SAM9260
++	bool "AT91SAM9260 / AT91SAM9XE"
++	default y
++
++config ARCH_AT91SAM9G20
++	bool "AT91SAM9G20"
++	default y
++
++endmenu
+ 
+ comment "AT91SAM9260 / AT91SAM9XE Board Type"
+ 
+-- 
+1.7.2.3
