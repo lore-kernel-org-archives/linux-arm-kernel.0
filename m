@@ -1,108 +1,61 @@
-From: christer@weinigel.se (Christer Weinigel)
-Date: Sat, 15 Jan 2011 15:02:25 +0100
-Subject: Locking in the clk API
-In-Reply-To: <20110112090301.GS11039@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<4D2D184A.8020405@codeaurora.org>
-	<20110112090301.GS11039@n2100.arm.linux.org.uk>
-Message-ID: <4D31A8F1.4080301@weinigel.se>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Sat, 15 Jan 2011 20:05:49 +0530
+Subject: ARM: CPU hotplug: fix hard-coded control register constants
+In-Reply-To: <20110114120838.GC15996@n2100.arm.linux.org.uk>
+References: <4D303758.4060608@st.com> <4D30386B.7020200@st.com>
+	<20110114120437.GB15996@n2100.arm.linux.org.uk>
+	<20110114120838.GC15996@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinjHxxhKGoPhg26eoWy71LP2iaPFvu4aoLcS=dX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2011 10:03 AM, Russell King - ARM Linux wrote:
-
-> That never has been, and that is called for the _system_ going into
-> suspend.  That's not what I'm talking about.  I'm talking about drivers
-> doing their own power management in response to (a) their knowledge of
-> how the device behaves and (b) in response to the user state they know.
+On 1/14/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> Subject: [PATCH] ARM: fix wrongly patched constants
 >
-> In the case of a UART, that means enabling the clock when the user opens
-> the device and turning it off when the user closes the device - and in
-> the case of the UART being used as the system console, enabled when
-> printk calls it, disabled when finished outputting the message.
+> e3d9c625 (ARM: CPU hotplug: fix hard-coded control register constants)
+> changed the wrong constants in the hotplug assembly code.  Fix this.
+>
+> Reported-by: viresh kumar <viresh.kumar@st.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mach-s5pv310/hotplug.c |    4 ++--
+>  arch/arm/mach-tegra/hotplug.c   |    4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv310/hotplug.c
+> b/arch/arm/mach-s5pv310/hotplug.c
+> index afa5392..c24235c 100644
+> --- a/arch/arm/mach-s5pv310/hotplug.c
+> +++ b/arch/arm/mach-s5pv310/hotplug.c
+> @@ -30,10 +30,10 @@ static inline void cpu_enter_lowpower(void)
+>  	 * Turn off coherency
+>  	 */
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %2\n"
+> +	"	bic	%0, %0, #0x20\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, #0x04\n"
+> +	"	bic	%0, %0, %2\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	  : "=&r" (v)
+>  	  : "r" (0), "Ir" (CR_C)
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+> index a5cb1ce..f329404 100644
+> --- a/arch/arm/mach-tegra/hotplug.c
+> +++ b/arch/arm/mach-tegra/hotplug.c
+> @@ -26,10 +26,10 @@ static inline void cpu_enter_lowpower(void)
+>  	 * Turn off coherency
+>  	 */
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %2\n"
+> +	"	bic	%0, %0, #0x20\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, #0x04\n"
+> +	"	bic	%0, %0, %2\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	  : "=&r" (v)
+>  	  : "r" (0), "Ir" (CR_C)
 
- >
-
-> The latter is a case where you're called in atomic context.
-
-
-This feels a bit like perfect being the enemy of good.
-
-On platforms that need to sleep to enable the UART clock, configuring 
-the UART as the kernel console should be equivalent to userspace opening 
-the UART device, i.e. enable the clock.  At least to me that feels like 
-an acceptable tradeoff, and if I wanted to save the last bit of power 
-I'll have to refrain from using UART as the kernel console.
-
-If both printk to the console and disabling the clock is really really 
-neccesary, add a clk_enable_busywait, but that will be a bit of a hack.
-
-
-> Another case - a storage device.  While you may receive open/close calls,
-> these are meaningless for power management - you'll receive an open call
-> when you mount a filesystem, and a close call when you finally unmount it.
-> That doesn't mean it's going to be used.  Your request handler will
-> generally run in an atomic context, so in order to do dynamic power
-> saving you need to be able to enable/disable clocks in that context.
-
-
-
-> A touchscreen controller which you communicate with over a dedicated bus.
-> The touchscreen controller doesn't require the host to be constantly
-> clocked - it only needs to be clocked when communicating with the
-> touchscreen.  The touchscreen controller raises an interrupt for service.
-> You'd want to enable the clock in the interrupt handler to communicate
-> with the device and turn it off afterwards.
-
-
-Both of these feel like they should use a call such as clk_get_atomic 
-and be able to handle EWOULDBLOCK/EAGAIN (or whatever error code is used 
-to indicate that it would have to sleep) and delegate to a worker thread 
-to enable the clock.  To catch uses of plain clk_enable from atomic 
-contects, add a WARN_ON/BUG_ON(in_atomic()).  It won't catch everything, 
-but would help a bit at least.
-
-Someone suggested splitting clk_enable into a part that can sleep and a 
-part that can't, would that be workable?  I.e. extend clk_get so that it 
-knows what requirements the driver has on the clock.  So a driver that does:
-
-     clk_get(dev, "my_clk", CLK_CANSLEEP);
-
-must then either use clk_enable from contexts which can sleep or use 
-clk_enable_atomic and be able to handle EWOULDBLOCK.
-
-A driver which can't handle EWOULDBLOCK would do:
-
-     clk_get(dev, "my_clk", CLK_ATOMIC)
-
-informing the clock subsystem that clk_enable_atomic must always 
-succeed.  If the clock source driver can't do that it has to enable the 
-clock at clk_get time instead of at clk_enable time.  If a clock 
-requires a potentially slow PLL setup which needs to sleep but can gate 
-the clock atomically, do the PLL setup from clk_get and the gating from 
-clk_enable.  This means that a clock might be on when it strictly isn't 
-necessary, but at least it will be correct and assuming that Peter Mundt 
-is correct in saying that the sleeping clock case is a corner case this 
-will usually not be a problem.
-
-For the corner cases where someone ports a driver that uses CLK_ATOMIC 
-to a system with sleeping clocks and wants the last bit of power saving, 
-the burden is on that someone to add EWOULDBLOCK support to the driver.
-
-Regarding the other functions in the clock API, generic code in 
-clk_disable_atomic could check if it is a sleeping clock and based on 
-that call clk_disable directly or delegate the call to a worker thread. 
-  All other functions should be able to sleep, with the possible 
-exception of clk_get_rate which could be useful so that a driver can 
-check if the clock is running at the correct rate from atomic context 
-and delegate to a worker thread to change the clock rate if it is not.
-
-To avoid unnecessary code churn it might be better to say that plain 
-clk_enable is the atomic variant and if it is a sleeping clock it will 
-be enbled at the time plain clk_get is called.  People who want to use 
-sleeping clocks can then modify a driver at a time to use 
-clk_get_cansleep and clk_enable_cansleep.  But I must say that the name 
-clk_enable_atomic feels a lot cleaner.
-
-   /Christer
+Acked-by: Viresh Kumar <viresh.kumar@st.com>
