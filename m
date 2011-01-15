@@ -1,22 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Jan 2011 00:02:15 +0000
-Subject: [GIT PULL v3] pxa: patches for v2.6.38-rc
-In-Reply-To: <20110114214900.GP15996@n2100.arm.linux.org.uk>
-References: <AANLkTi=B3sfBXS3vN1+nnRa5m64jiaqmzRFfi6w07dJB@mail.gmail.com>
-	<20110114173147.GK15996@n2100.arm.linux.org.uk>
-	<20110114214900.GP15996@n2100.arm.linux.org.uk>
-Message-ID: <20110115000215.GS15996@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Jan 2011 16:12:55 -0800
+Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
+	boot failure)
+In-Reply-To: <20110114235840.GE22505@n2100.arm.linux.org.uk>
+References: <20110110185209.GC4957@atomide.com>
+	<20110111231611.GX4957@atomide.com>
+	<2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
+	<20110113091546.GA24429@n2100.arm.linux.org.uk>
+	<20110113155152.GG4957@atomide.com>
+	<20110113164957.GA28040@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1101141216040.28621@utopia.booyaka.com>
+	<20110114212027.GD22505@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1101141551140.28621@utopia.booyaka.com>
+	<20110114235840.GE22505@n2100.arm.linux.org.uk>
+Message-ID: <20110115001254.GU4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 09:49:00PM +0000, Russell King - ARM Linux wrote:
-> I also need to remove asm/pgtable.h from arch/arm/mach-pxa/generic.c:
->   CC      arch/arm/mach-pxa/generic.o
-> In file included from arch/arm/include/asm/pgtable.h:461,
->                  from arch/arm/mach-pxa/generic.c:26:
-> include/asm-generic/pgtable.h: In function ?ptep_test_and_clear_young?:
-> include/asm-generic/pgtable.h:29: error: dereferencing pointer to incomplete type
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110114 15:58]:
+> 
+> # ARMv6k
+> config CPU_32v6K
+>         bool "Support ARM V6K processor extensions" if !SMP
+>         depends on CPU_V6 || CPU_V7
+>         default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
+> 
+> OMAP2 prevents the selection of armv6k support.  This is probably a very
+> bad idea if you want to run the resulting kernel on SMP hardware as it
+> removes a barrier in the spinlock code and disables the SMP-safe bitops.
 
-Looking through kautobuild, it seems this also affects
-arch/arm/mach-sa1100/generic.c too, and is a recently introduced
-regression (within the last 24 hours) in mainline.
+I have some ideas to fix this. Unfortunately it will be inefficient
+as spinlock.h can be included from modules too :( I was thinking we can
+implement dsb_sev in the proc-*.S functions for the unoptimized multi-arm
+builds.
+ 
+> The original patch which started turning this off was from the MX3 stuff,
+> but without explaination.
+> 
+> However, OMAP extended this to disabling the select statement for CPU_32v6K
+> even if CPU_V7 is set:
+> 
+>  config CPU_V7
+>         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB |-       select CPU_32v6K
+> +       select CPU_32v6K if !ARCH_OMAP2
+> 
+> Arguably, SMP _requires_ CPU_32v6K to be enabled for a safe kernel, and this
+> patch should not have been merged.
+
+The only way we can fix that is do smp_on_up style rewriting of the assembly
+during init between CPUv6 and v6K. Want me to do a patch for that?
+
+For the defconfigs, I have a branch where I occasionally compile all
+the old removed defconfigs too. And I believe Kevin test compiles various
+PM options.
+
+Tony
