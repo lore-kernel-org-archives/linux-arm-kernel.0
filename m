@@ -1,78 +1,66 @@
-From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
-Date: Sat, 15 Jan 2011 18:50:34 +0100
-Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in the same
-	kernel image
-Message-ID: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
+From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
+Date: Sat, 15 Jan 2011 19:15:10 +0100
+Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
+In-Reply-To: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
+References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
+Message-ID: <AANLkTi=GsjHq+e2yFWiRveX2MJqbFq4DaB52yYnYKQn7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing actually prevents support for boards based on these SoCs to be
-compiled in the same kernel image, since the SAM9260 and SAM9G20 are
-almost identical (AT91SAM9G20 adds some new features, but is otherwise
-compatible with the AT91SAM9260).
+2010/12/23 Bj?rn Forsman <bjorn.forsman@gmail.com>:
+> The use of wrong SD detect pin was introduced by this commit:
+>
+> ?ARM: pxa: Push Colibri evalboard MFP into module files
+>
+> This fixes it.
+> ---
+> ?arch/arm/mach-pxa/colibri-evalboard.c ? ?| ? ?2 +-
+> ?arch/arm/mach-pxa/colibri-pxa300.c ? ? ? | ? ?2 +-
+> ?arch/arm/mach-pxa/include/mach/colibri.h | ? ?2 +-
+> ?3 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
+> index 6b2c800..28f667e 100644
+> --- a/arch/arm/mach-pxa/colibri-evalboard.c
+> +++ b/arch/arm/mach-pxa/colibri-evalboard.c
+> @@ -50,7 +50,7 @@ static void __init colibri_mmc_init(void)
+> ? ? ? ? ? ? ? ? ? ? ? ?GPIO0_COLIBRI_PXA270_SD_DETECT;
+> ? ? ? ?if (machine_is_colibri300()) ? ?/* PXA300 Colibri */
+> ? ? ? ? ? ? ? ?colibri_mci_platform_data.gpio_card_detect =
+> - ? ? ? ? ? ? ? ? ? ? ? GPIO39_COLIBRI_PXA300_SD_DETECT;
+> + ? ? ? ? ? ? ? ? ? ? ? GPIO13_COLIBRI_PXA300_SD_DETECT;
+> ? ? ? ?else ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* PXA320 Colibri */
+> ? ? ? ? ? ? ? ?colibri_mci_platform_data.gpio_card_detect =
+> ? ? ? ? ? ? ? ? ? ? ? ?GPIO28_COLIBRI_PXA320_SD_DETECT;
+> diff --git a/arch/arm/mach-pxa/colibri-pxa300.c b/arch/arm/mach-pxa/colibri-pxa300.c
+> index fddb16d..66dd81c 100644
+> --- a/arch/arm/mach-pxa/colibri-pxa300.c
+> +++ b/arch/arm/mach-pxa/colibri-pxa300.c
+> @@ -41,7 +41,7 @@ static mfp_cfg_t colibri_pxa300_evalboard_pin_config[] __initdata = {
+> ? ? ? ?GPIO4_MMC1_DAT1,
+> ? ? ? ?GPIO5_MMC1_DAT2,
+> ? ? ? ?GPIO6_MMC1_DAT3,
+> - ? ? ? GPIO39_GPIO, ? ?/* SD detect */
+> + ? ? ? GPIO13_GPIO, ? ?/* GPIO13_COLIBRI_PXA300_SD_DETECT */
+>
+> ? ? ? ?/* UHC */
+> ? ? ? ?GPIO0_2_USBH_PEN,
+> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h b/arch/arm/mach-pxa/include/mach/colibri.h
+> index 388a96f..cb4236e 100644
+> --- a/arch/arm/mach-pxa/include/mach/colibri.h
+> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
+> @@ -60,7 +60,7 @@ static inline void colibri_pxa3xx_init_nand(void) {}
+> ?#define GPIO113_COLIBRI_PXA270_TS_IRQ ?113
+>
+> ?/* GPIO definitions for Colibri PXA300/310 */
+> -#define GPIO39_COLIBRI_PXA300_SD_DETECT ? ? ? ?39
+> +#define GPIO13_COLIBRI_PXA300_SD_DETECT ? ? ? ?13
+>
+> ?/* GPIO definitions for Colibri PXA320 */
+> ?#define GPIO28_COLIBRI_PXA320_SD_DETECT ? ? ? ?28
+> --
+> 1.7.0.4
+>
+>
 
-Signed-off-by: Albin Tonnerre <albin.tonnerre@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig |   31 +++++++++++++------------------
- 1 files changed, 13 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c015b68..d1eda58 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -26,8 +26,8 @@ config ARCH_AT91RM9200
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
- 
--config ARCH_AT91SAM9260
--	bool "AT91SAM9260 or AT91SAM9XE"
-+config ARCH_AT91SAM9260_VARIANTS
-+	bool "AT91SAM9260 / AT91SAM9XE and AT91SAM9G20"
- 	select CPU_ARM926T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USART3
-@@ -61,15 +61,6 @@ config ARCH_AT91SAM9RL
- 	select HAVE_AT91_USART3
- 	select HAVE_FB_ATMEL
- 
--config ARCH_AT91SAM9G20
--	bool "AT91SAM9G20"
--	select CPU_ARM926T
--	select GENERIC_CLOCKEVENTS
--	select HAVE_AT91_USART3
--	select HAVE_AT91_USART4
--	select HAVE_AT91_USART5
--	select HAVE_NET_MACB
--
- config ARCH_AT91SAM9G45
- 	bool "AT91SAM9G45"
- 	select CPU_ARM926T
-@@ -193,15 +184,19 @@ endif
- 
- # ----------------------------------------------------------
- 
--if ARCH_AT91SAM9260
-+if ARCH_AT91SAM9260_VARIANTS
- 
--comment "AT91SAM9260 Variants"
-+menu "AT91SAM9260 Variants"
- 
--config ARCH_AT91SAM9260_SAM9XE
--	bool "AT91SAM9XE"
--	help
--	  Select this if you are using Atmel's AT91SAM9XE System-on-Chip.
--	  They are basically AT91SAM9260s with various sizes of embedded Flash.
-+config ARCH_AT91SAM9260
-+	bool "AT91SAM9260 / AT91SAM9XE"
-+	default y
-+
-+config ARCH_AT91SAM9G20
-+	bool "AT91SAM9G20"
-+	default y
-+
-+endmenu
- 
- comment "AT91SAM9260 / AT91SAM9XE Board Type"
- 
--- 
-1.7.2.3
+Ping?
