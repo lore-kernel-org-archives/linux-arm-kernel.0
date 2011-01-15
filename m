@@ -1,61 +1,53 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Sat, 15 Jan 2011 20:05:49 +0530
-Subject: ARM: CPU hotplug: fix hard-coded control register constants
-In-Reply-To: <20110114120838.GC15996@n2100.arm.linux.org.uk>
-References: <4D303758.4060608@st.com> <4D30386B.7020200@st.com>
-	<20110114120437.GB15996@n2100.arm.linux.org.uk>
-	<20110114120838.GC15996@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinjHxxhKGoPhg26eoWy71LP2iaPFvu4aoLcS=dX@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Jan 2011 14:53:58 +0000
+Subject: Locking in the clk API
+In-Reply-To: <4D31A8F1.4080301@weinigel.se>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<4D2D184A.8020405@codeaurora.org>
+	<20110112090301.GS11039@n2100.arm.linux.org.uk>
+	<4D31A8F1.4080301@weinigel.se>
+Message-ID: <20110115145358.GC15996@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/14/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> Subject: [PATCH] ARM: fix wrongly patched constants
+On Sat, Jan 15, 2011 at 03:02:25PM +0100, Christer Weinigel wrote:
+> This feels a bit like perfect being the enemy of good.
 >
-> e3d9c625 (ARM: CPU hotplug: fix hard-coded control register constants)
-> changed the wrong constants in the hotplug assembly code.  Fix this.
+> On platforms that need to sleep to enable the UART clock, configuring  
+> the UART as the kernel console should be equivalent to userspace opening  
+> the UART device, i.e. enable the clock.  At least to me that feels like  
+> an acceptable tradeoff, and if I wanted to save the last bit of power  
+> I'll have to refrain from using UART as the kernel console.
 >
-> Reported-by: viresh kumar <viresh.kumar@st.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-s5pv310/hotplug.c |    4 ++--
->  arch/arm/mach-tegra/hotplug.c   |    4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv310/hotplug.c
-> b/arch/arm/mach-s5pv310/hotplug.c
-> index afa5392..c24235c 100644
-> --- a/arch/arm/mach-s5pv310/hotplug.c
-> +++ b/arch/arm/mach-s5pv310/hotplug.c
-> @@ -30,10 +30,10 @@ static inline void cpu_enter_lowpower(void)
->  	 * Turn off coherency
->  	 */
->  	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %2\n"
-> +	"	bic	%0, %0, #0x20\n"
->  	"	mcr	p15, 0, %0, c1, c0, 1\n"
->  	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, #0x04\n"
-> +	"	bic	%0, %0, %2\n"
->  	"	mcr	p15, 0, %0, c1, c0, 0\n"
->  	  : "=&r" (v)
->  	  : "r" (0), "Ir" (CR_C)
-> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-> index a5cb1ce..f329404 100644
-> --- a/arch/arm/mach-tegra/hotplug.c
-> +++ b/arch/arm/mach-tegra/hotplug.c
-> @@ -26,10 +26,10 @@ static inline void cpu_enter_lowpower(void)
->  	 * Turn off coherency
->  	 */
->  	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %2\n"
-> +	"	bic	%0, %0, #0x20\n"
->  	"	mcr	p15, 0, %0, c1, c0, 1\n"
->  	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, #0x04\n"
-> +	"	bic	%0, %0, %2\n"
->  	"	mcr	p15, 0, %0, c1, c0, 0\n"
->  	  : "=&r" (v)
->  	  : "r" (0), "Ir" (CR_C)
+> If both printk to the console and disabling the clock is really really  
+> neccesary, add a clk_enable_busywait, but that will be a bit of a hack.
 
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
+Well, we're not discussing a _new_ API here - we're discussing an API
+with existing users which works completely fine on the devices its
+used, with differing expectations between implementations.
+
+> Both of these feel like they should use a call such as clk_get_atomic  
+> and be able to handle EWOULDBLOCK/EAGAIN (or whatever error code is used  
+> to indicate that it would have to sleep) and delegate to a worker thread  
+> to enable the clock.  To catch uses of plain clk_enable from atomic  
+> contects, add a WARN_ON/BUG_ON(in_atomic()).  It won't catch everything,  
+> but would help a bit at least.
+
+We've never allowed clk_get() to be called in interruptible context,
+so that's not the issue.  The issue is purely about clk_enable() and
+clk_disable() and whether they should be able to be called in atomic
+context or not.
+
+We've been around returning EAGAIN, WARN_ONs, BUG_ONs, having clk_enable()
+vs clk_enable_atomic(), clk_enable_cansleep() vs clk_enable(), etc.
+
+There's been a lot of talk on this issue for ages with no real progress
+that I'm just going to repeat: let's unify those implementations which
+use a spinlock for their clks into one consolidated solution, and
+a separate consolidated solution for those which use a mutex.
+
+This will at least allow us to have _some_ consolidation of the existing
+implementations - and it doesn't add anything to the problem at hand.
+It might actually help identify what can be done at code level to resolve
+this issue.
