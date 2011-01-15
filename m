@@ -1,156 +1,106 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 15 Jan 2011 19:25:56 +0100
-Subject: [PATCH 6/8] ARM: pxa: Use gpio arrays in vpac270_pcmcia driver
+Date: Sat, 15 Jan 2011 19:25:57 +0100
+Subject: [PATCH 7/8] ARM: pxa: Use gpio arrays in palmld_hdd driver
 In-Reply-To: <1295115958-4811-1-git-send-email-marek.vasut@gmail.com>
 References: <1295115958-4811-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1295115958-4811-6-git-send-email-marek.vasut@gmail.com>
+Message-ID: <1295115958-4811-7-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use gpio_request_array() / gpio_free_array(), this makes the code
 cleaner and less error prone.
 
+This patch also properly frees GPIOs in case ata_host_activate() call fails.
+
 Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 ---
- drivers/pcmcia/pxa2xx_vpac270.c |  107 +++++++++++----------------------------
- 1 files changed, 29 insertions(+), 78 deletions(-)
+ drivers/ata/pata_palmld.c |   43 ++++++++++++++++++++++---------------------
+ 1 files changed, 22 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_vpac270.c b/drivers/pcmcia/pxa2xx_vpac270.c
-index 55627ec..c13f411 100644
---- a/drivers/pcmcia/pxa2xx_vpac270.c
-+++ b/drivers/pcmcia/pxa2xx_vpac270.c
-@@ -22,6 +22,19 @@
+diff --git a/drivers/ata/pata_palmld.c b/drivers/ata/pata_palmld.c
+index 11fb4cc..fecf527 100644
+--- a/drivers/ata/pata_palmld.c
++++ b/drivers/ata/pata_palmld.c
+@@ -33,6 +33,11 @@
  
- #include "soc_common.h"
+ #define DRV_NAME "pata_palmld"
  
-+static struct gpio vpac270_pcmcia_gpios[] = {
-+	{ GPIO84_VPAC270_PCMCIA_CD,	GPIOF_IN,	"PCMCIA Card Detect" },
-+	{ GPIO35_VPAC270_PCMCIA_RDY,	GPIOF_IN,	"PCMCIA Ready" },
-+	{ GPIO107_VPAC270_PCMCIA_PPEN,	GPIOF_INIT_LOW,	"PCMCIA PPEN" },
-+	{ GPIO11_VPAC270_PCMCIA_RESET,	GPIOF_INIT_LOW,	"PCMCIA Reset" },
++static struct gpio palmld_hdd_gpios[] = {
++	{ GPIO_NR_PALMLD_IDE_PWEN,	GPIOF_INIT_HIGH,	"HDD Power" },
++	{ GPIO_NR_PALMLD_IDE_RESET,	GPIOF_INIT_LOW,		"HDD Reset" },
 +};
 +
-+static struct gpio vpac270_cf_gpios[] = {
-+	{ GPIO17_VPAC270_CF_CD,		GPIOF_IN,	"CF Card Detect" },
-+	{ GPIO12_VPAC270_CF_RDY,	GPIOF_IN,	"CF Ready" },
-+	{ GPIO16_VPAC270_CF_RESET,	GPIOF_INIT_LOW,	"CF Reset" },
-+};
-+
- static struct pcmcia_irqs cd_irqs[] = {
- 	{
- 		.sock = 0,
-@@ -40,96 +53,34 @@ static int vpac270_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
- 	int ret;
+ static struct scsi_host_template palmld_sht = {
+ 	ATA_PIO_SHT(DRV_NAME),
+ };
+@@ -52,28 +57,23 @@ static __devinit int palmld_pata_probe(struct platform_device *pdev)
  
- 	if (skt->nr == 0) {
--		ret = gpio_request(GPIO84_VPAC270_PCMCIA_CD, "PCMCIA CD");
--		if (ret)
--			goto err1;
--		ret = gpio_direction_input(GPIO84_VPAC270_PCMCIA_CD);
--		if (ret)
--			goto err2;
--
--		ret = gpio_request(GPIO35_VPAC270_PCMCIA_RDY, "PCMCIA RDY");
--		if (ret)
--			goto err2;
--		ret = gpio_direction_input(GPIO35_VPAC270_PCMCIA_RDY);
--		if (ret)
--			goto err3;
--
--		ret = gpio_request(GPIO107_VPAC270_PCMCIA_PPEN, "PCMCIA PPEN");
--		if (ret)
--			goto err3;
--		ret = gpio_direction_output(GPIO107_VPAC270_PCMCIA_PPEN, 0);
--		if (ret)
--			goto err4;
--
--		ret = gpio_request(GPIO11_VPAC270_PCMCIA_RESET, "PCMCIA RESET");
--		if (ret)
--			goto err4;
--		ret = gpio_direction_output(GPIO11_VPAC270_PCMCIA_RESET, 0);
--		if (ret)
--			goto err5;
-+		ret = gpio_request_array(vpac270_pcmcia_gpios,
-+				ARRAY_SIZE(vpac270_pcmcia_gpios));
+ 	/* allocate host */
+ 	host = ata_host_alloc(&pdev->dev, 1);
+-	if (!host)
+-		return -ENOMEM;
++	if (!host) {
++		ret = -ENOMEM;
++		goto err1;
++	}
  
- 		skt->socket.pci_irq = gpio_to_irq(GPIO35_VPAC270_PCMCIA_RDY);
+ 	/* remap drive's physical memory address */
+ 	mem = devm_ioremap(&pdev->dev, PALMLD_IDE_PHYS, 0x1000);
+-	if (!mem)
+-		return -ENOMEM;
++	if (!mem) {
++		ret = -ENOMEM;
++		goto err1;
++	}
  
--		return soc_pcmcia_request_irqs(skt, &cd_irqs[0], 1);
+ 	/* request and activate power GPIO, IRQ GPIO */
+-	ret = gpio_request(GPIO_NR_PALMLD_IDE_PWEN, "HDD PWR");
++	ret = gpio_request_array(palmld_hdd_gpios,
++				ARRAY_SIZE(palmld_hdd_gpios));
+ 	if (ret)
+ 		goto err1;
+-	ret = gpio_direction_output(GPIO_NR_PALMLD_IDE_PWEN, 1);
+-	if (ret)
+-		goto err2;
 -
--err5:
--		gpio_free(GPIO11_VPAC270_PCMCIA_RESET);
--err4:
--		gpio_free(GPIO107_VPAC270_PCMCIA_PPEN);
--err3:
--		gpio_free(GPIO35_VPAC270_PCMCIA_RDY);
--err2:
--		gpio_free(GPIO84_VPAC270_PCMCIA_CD);
--err1:
--		return ret;
--
-+		if (!ret)
-+			ret = soc_pcmcia_request_irqs(skt, &cd_irqs[0], 1);
- 	} else {
--		ret = gpio_request(GPIO17_VPAC270_CF_CD, "CF CD");
--		if (ret)
--			goto err6;
--		ret = gpio_direction_input(GPIO17_VPAC270_CF_CD);
--		if (ret)
--			goto err7;
--
--		ret = gpio_request(GPIO12_VPAC270_CF_RDY, "CF RDY");
--		if (ret)
--			goto err7;
--		ret = gpio_direction_input(GPIO12_VPAC270_CF_RDY);
--		if (ret)
--			goto err8;
--
--		ret = gpio_request(GPIO16_VPAC270_CF_RESET, "CF RESET");
--		if (ret)
--			goto err8;
--		ret = gpio_direction_output(GPIO16_VPAC270_CF_RESET, 0);
--		if (ret)
--			goto err9;
-+		ret = gpio_request_array(vpac270_cf_gpios,
-+				ARRAY_SIZE(vpac270_cf_gpios));
+-	ret = gpio_request(GPIO_NR_PALMLD_IDE_RESET, "HDD RST");
+-	if (ret)
+-		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMLD_IDE_RESET, 0);
+-	if (ret)
+-		goto err3;
  
- 		skt->socket.pci_irq = gpio_to_irq(GPIO12_VPAC270_CF_RDY);
+ 	/* reset the drive */
+ 	gpio_set_value(GPIO_NR_PALMLD_IDE_RESET, 0);
+@@ -96,13 +96,15 @@ static __devinit int palmld_pata_probe(struct platform_device *pdev)
+ 	ata_sff_std_ports(&ap->ioaddr);
  
--		return soc_pcmcia_request_irqs(skt, &cd_irqs[1], 1);
--
--err9:
--		gpio_free(GPIO16_VPAC270_CF_RESET);
--err8:
--		gpio_free(GPIO12_VPAC270_CF_RDY);
--err7:
--		gpio_free(GPIO17_VPAC270_CF_CD);
--err6:
--		return ret;
--
-+		if (!ret)
-+			ret = soc_pcmcia_request_irqs(skt, &cd_irqs[1], 1);
- 	}
+ 	/* activate host */
+-	return ata_host_activate(host, 0, NULL, IRQF_TRIGGER_RISING,
++	ret = ata_host_activate(host, 0, NULL, IRQF_TRIGGER_RISING,
+ 					&palmld_sht);
++	if (ret)
++		goto err2;
 +
 +	return ret;
- }
  
- static void vpac270_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
- {
--	gpio_free(GPIO11_VPAC270_PCMCIA_RESET);
--	gpio_free(GPIO107_VPAC270_PCMCIA_PPEN);
--	gpio_free(GPIO35_VPAC270_PCMCIA_RDY);
--	gpio_free(GPIO84_VPAC270_PCMCIA_CD);
--	gpio_free(GPIO16_VPAC270_CF_RESET);
--	gpio_free(GPIO12_VPAC270_CF_RDY);
--	gpio_free(GPIO17_VPAC270_CF_CD);
-+	if (skt->nr == 0)
-+		gpio_request_array(vpac270_pcmcia_gpios,
-+					ARRAY_SIZE(vpac270_pcmcia_gpios));
-+	else
-+		gpio_request_array(vpac270_cf_gpios,
-+					ARRAY_SIZE(vpac270_cf_gpios));
+-err3:
+-	gpio_free(GPIO_NR_PALMLD_IDE_RESET);
+ err2:
+-	gpio_free(GPIO_NR_PALMLD_IDE_PWEN);
++	gpio_free_array(palmld_hdd_gpios, ARRAY_SIZE(palmld_hdd_gpios));
+ err1:
+ 	return ret;
  }
+@@ -116,8 +118,7 @@ static __devexit int palmld_pata_remove(struct platform_device *dev)
+ 	/* power down the HDD */
+ 	gpio_set_value(GPIO_NR_PALMLD_IDE_PWEN, 0);
  
- static void vpac270_pcmcia_socket_state(struct soc_pcmcia_socket *skt,
+-	gpio_free(GPIO_NR_PALMLD_IDE_RESET);
+-	gpio_free(GPIO_NR_PALMLD_IDE_PWEN);
++	gpio_free_array(palmld_hdd_gpios, ARRAY_SIZE(palmld_hdd_gpios));
+ 
+ 	return 0;
+ }
 -- 
 1.7.2.3
