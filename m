@@ -1,69 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Jan 2011 00:25:31 +0000
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
-	boot failure)
-In-Reply-To: <20110115001254.GU4957@atomide.com>
-References: <20110111231611.GX4957@atomide.com>
-	<2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
-	<20110113091546.GA24429@n2100.arm.linux.org.uk>
-	<20110113155152.GG4957@atomide.com>
-	<20110113164957.GA28040@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101141216040.28621@utopia.booyaka.com>
-	<20110114212027.GD22505@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101141551140.28621@utopia.booyaka.com>
-	<20110114235840.GE22505@n2100.arm.linux.org.uk>
-	<20110115001254.GU4957@atomide.com>
-Message-ID: <20110115002531.GF22505@n2100.arm.linux.org.uk>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 14 Jan 2011 16:27:07 -0800
+Subject: [PATCH 4/6] dmaengine: at_hdmac: use subsys_initcall instead of
+	module_init
+In-Reply-To: <1294843150-6962-3-git-send-email-nicolas.ferre@atmel.com>
+References: <1292435416-16927-1-git-send-email-nicolas.ferre@atmel.com>
+	<1294843150-6962-3-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <AANLkTikY53tOv1eCtMcTqrmy52WawLZdp3Vnq24ozHJ1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 04:12:55PM -0800, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110114 15:58]:
-> > 
-> > # ARMv6k
-> > config CPU_32v6K
-> >         bool "Support ARM V6K processor extensions" if !SMP
-> >         depends on CPU_V6 || CPU_V7
-> >         default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
-> > 
-> > OMAP2 prevents the selection of armv6k support.  This is probably a very
-> > bad idea if you want to run the resulting kernel on SMP hardware as it
-> > removes a barrier in the spinlock code and disables the SMP-safe bitops.
-> 
-> I have some ideas to fix this. Unfortunately it will be inefficient
-> as spinlock.h can be included from modules too :( I was thinking we can
-> implement dsb_sev in the proc-*.S functions for the unoptimized multi-arm
-> builds.
+On Wed, Jan 12, 2011 at 6:39 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> From: Eric Xu <hong.xu@atmel.com>
+>
+> Use subsys_initcall instead of module_init in order to keep DMA engine rolling
+> before other peripheral drivers.
+>
+> Signed-off-by: Eric Xu <hong.xu@atmel.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> ?drivers/dma/at_hdmac.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 4f83431..a1a0fc6 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -1209,7 +1209,7 @@ static int __init at_dma_init(void)
+> ?{
+> ? ? ? ?return platform_driver_probe(&at_dma_driver, at_dma_probe);
+> ?}
+> -module_init(at_dma_init);
+> +subsys_initcall(at_dma_init);
 
-For spinlocks, the important thing is the barrier.  The wfe/sev are an
-optimization.  The barrier contained with the ifdef is a valid V6
-instruction.
+If this matters shouldn't we also do this?
 
-> > The original patch which started turning this off was from the MX3 stuff,
-> > but without explaination.
-> > 
-> > However, OMAP extended this to disabling the select statement for CPU_32v6K
-> > even if CPU_V7 is set:
-> > 
-> >  config CPU_V7
-> >         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB |-       select CPU_32v6K
-> > +       select CPU_32v6K if !ARCH_OMAP2
-> > 
-> > Arguably, SMP _requires_ CPU_32v6K to be enabled for a safe kernel, and this
-> > patch should not have been merged.
-> 
-> The only way we can fix that is do smp_on_up style rewriting of the assembly
-> during init between CPUv6 and v6K. Want me to do a patch for that?
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 1b61d3a..4d14626 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -90,7 +90,7 @@ config DW_DMAC
+          can be integrated in chips such as the Atmel AT32ap7000.
 
-The bitops code is quite different between the two versions, and I doubt
-the smp_on_up rewriting will look at all pretty.  I think it needs an
-alternative idea - like not using the 'byte' operations at all.
-
-Whether we have any code which passes non-word aligned pointers to bitops
-isn't particularly known - in theory they should all be unsigned long *'s,
-so should be word-aligned.  Who knows what filesystems do though... and
-such a change could be disasterous to peoples data if the block/inode
-bitmaps get corrupted.
-
-IOW, such a change needs testing on a box where a range of filesystems are
-used, and the filesystems can be thrown away if corrupted.
+ config AT_HDMAC
+-       tristate "Atmel AHB DMA support"
++       bool "Atmel AHB DMA support"
+        depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+        select DMA_ENGINE
+        help
