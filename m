@@ -1,47 +1,74 @@
-From: christer@weinigel.se (Christer Weinigel)
-Date: Sat, 15 Jan 2011 18:44:22 +0100
-Subject: Locking in the clk API
-In-Reply-To: <20110115172033.GM15996@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<4D2D184A.8020405@codeaurora.org>
-	<20110112090301.GS11039@n2100.arm.linux.org.uk>
-	<4D31A8F1.4080301@weinigel.se>
-	<20110115145358.GC15996@n2100.arm.linux.org.uk>
-	<4D31D45A.8080509@weinigel.se>
-	<20110115172033.GM15996@n2100.arm.linux.org.uk>
-Message-ID: <4D31DCF6.7090805@weinigel.se>
+From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
+Date: Sat, 15 Jan 2011 18:49:16 +0100
+Subject: [PATCH v2] ARM: pxa: PalmZ72: Add OV9640 camera support
+In-Reply-To: <20110115170829.GL15996@n2100.arm.linux.org.uk>
+References: <1295054277-7879-1-git-send-email-marek.vasut@gmail.com>
+	<AANLkTimK=g3gbc913sz-nGV+gmJZsU3ESPWFP_7kQBMf@mail.gmail.com>
+	<20110115170829.GL15996@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinpAGgmLmjerVHVF6Z2ET1hZG3vtfFVcZYjB=EN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2011 06:20 PM, Russell King - ARM Linux wrote:
- > You really need to read the entire thread - I've already said that yet
-
-> discussion continues about how to solve the problem.  This thread which
-> has been running for a number of days now has been entirely about how
-> to solve this.
-
-
-Sigh, the always oh so polite Russell.  I have read the thread before; I 
-reread the whole thread one more time before posting.
-
-> Consider this: is it better to continue talking about this for the next
-> six months, while still having N spinlock based implementations, and M
-> mutex based implementations.
+2011/1/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Sat, Jan 15, 2011 at 05:37:08PM +0100, Bj?rn Forsman wrote:
+>> Hi,
+>>
+>> On 15 January 2011 02:17, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> > Rework of patch from 2009:
+>> > PalmZ72: Add support for OV9640 camera sensor
+>> >
+>> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+>> > ---
+>> > v2: Use gpio_request_array()/gpio_free_array() array
+>> >
+>> > ?arch/arm/mach-pxa/include/mach/palmz72.h | ? ?5 +
+>> > ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ?| ?127 ++++++++++++++++++++++++++++++
+>> > ?2 files changed, 132 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-pxa/include/mach/palmz72.h b/arch/arm/mach-pxa/include/mach/palmz72.h
+>> > index 2bbcf70..0d4700a 100644
+>> > --- a/arch/arm/mach-pxa/include/mach/palmz72.h
+>> > +++ b/arch/arm/mach-pxa/include/mach/palmz72.h
+>>
+>> [snip]
+>>
+>> > +static int palmz72_camera_power(struct device *dev, int power)
+>> > +{
+>> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_PWDN, !power);
+>> > + ? ? ? mdelay(50);
+>> > + ? ? ? return 0;
+>> > +}
+>> > +
+>> > +static int palmz72_camera_reset(struct device *dev)
+>> > +{
+>> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 1);
+>> > + ? ? ? mdelay(50);
+>> > + ? ? ? gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 0);
+>> > + ? ? ? mdelay(50);
+>> > + ? ? ? return 0;
+>> > +}
+>>
+>> (Sorry if these are stupid newbie-questions.)
+>>
+>> Is the entire kernel blocked during the above mdelay()s or
+>> just some kernel thread? (Or: will this add like 100ms or 150ms
+>> to boot time?)
+>>
+>> Can mdelay() be replaced with something non-blocking?
 >
-> Or is it better to consolidate the N spinlock based implementations
-> down to one spinlock implementation, and M mutex based implementations
-> down to one mutex implementation, and then discuss how to resolve the
-> differences between the two implementations?
+> mdelay() is a spinning delay - it doesn't voluntarily relinquish the
+> CPU to another task.
+>
+> If you have preempt enabled and the region is preemptable, you can be
+> preempted in the middle of the delay (in which case it becomes delay
+> time + time away from the thread.)
+>
+> msleep() can be used for places where you can sleep, but is limited to
+> the jiffy granularity for !HIRES kernels.
 
+Thanks for explaining!
 
-Going that way might very well mean that you will be stuck with two 
-implementations forever.  But yes, it might be better with two working 
-ones than one which takes a bit longer to finish.
+Marek, care to try msleep() so we avoid busy-waits?
 
-But my impression is that the different suggestions in the thread aren't 
-that far apart.  Except for the discussion if clk_enable/disable should 
-be able to sleep or not, people seem to agree on most of the rest of the 
-API.
-
-   /Christer
+Best regards,
+Bj?rn Forsman
