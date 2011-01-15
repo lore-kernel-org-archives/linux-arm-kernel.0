@@ -1,52 +1,46 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 14 Jan 2011 19:26:39 -0600
-Subject: [GIT PULL v3] pxa: patches for v2.6.38-rc
-In-Reply-To: <20110114214900.GP15996@n2100.arm.linux.org.uk>
-References: <AANLkTi=B3sfBXS3vN1+nnRa5m64jiaqmzRFfi6w07dJB@mail.gmail.com>
-	<20110114173147.GK15996@n2100.arm.linux.org.uk>
-	<20110114214900.GP15996@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinZUW9Xvp-Yoz_cQnVo+iGb7A1XBgzE0yuCJzvN@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 14 Jan 2011 17:35:41 -0800
+Subject: [PATCH 27/48] ARM: PL08x: avoid duplicating registers in txd and
+	phychan structures
+In-Reply-To: <E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
+References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
+	<E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTi=GsMaDQDSuR=Z4AT4Vk4GThx6O_0Le=pjsu9gj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 3:49 PM, Russell King - ARM Linux
+On Mon, Jan 3, 2011 at 2:39 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 14, 2011 at 05:31:47PM +0000, Russell King - ARM Linux wrote:
->> On Fri, Jan 14, 2011 at 11:08:59AM -0600, Eric Miao wrote:
->> > Hi Russell,
->> >
->> > I rebased the branch on top of devel-stable. The conflict in irq.c is
->> > fixed. And there is a one-liner patch fixing a building issue in spitz.c
->> > missing of physmap.h. Please re-pull and let know any other issue.
->>
->> Pulled cleanly, thanks.
+> As we now have all the code accessing the phychan {csrc,cdst,clli,cctl,
+> ccfg} members in one function, there's no point storing the data into
+> the struct. ?Get rid of the struct members. ?Re-order the register dump
+> in the dev_dbg() to reflect the order we write the registers to the DMA
+> device.
 >
-> Building my PXA config:
+> The txd {csrc,cdst,clli,cctl} values are duplicates of the lli[0]
+> values, so there's no point duplicating these either. ?Program the DMAC
+> registers directly from the lli[0] values.
 >
-> arch/arm/mach-pxa/irq.c:124: warning: initialization from incompatible pointer type
-> arch/arm/mach-pxa/irq.c:125: warning: initialization from incompatible pointer type
-> arch/arm/mach-pxa/irq.c:126: warning: initialization from incompatible pointer type
-> arch/arm/mach-pxa/irq.c:127: warning: initialization from incompatible pointer type
->
-> Seems the initializers want to be .irq_ack rather than .ack etc.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-You are right. Do you want me to have another patch on top or I
-make the change back into the guilty commit and you re-pull? I'd
-prefer the latter.
+This one caused:
+drivers/dma/amba-pl08x.c: In function 'pl08x_start_txd':
+drivers/dma/amba-pl08x.c:205: warning: dereferencing 'void *' pointer
 
->
-> I also need to remove asm/pgtable.h from arch/arm/mach-pxa/generic.c:
-> ?CC ? ? ?arch/arm/mach-pxa/generic.o
-> In file included from arch/arm/include/asm/pgtable.h:461,
-> ? ? ? ? ? ? ? ? from arch/arm/mach-pxa/generic.c:26:
-> include/asm-generic/pgtable.h: In function ?ptep_test_and_clear_young?:
-> include/asm-generic/pgtable.h:29: error: dereferencing pointer to incomplete type
->
-> and I also got:
-> arch/arm/mach-pxa/tosa-bt.c: In function ?tosa_bt_probe?:
-> arch/arm/mach-pxa/tosa-bt.c:84: error: implicit declaration of function ?rfkill_set_led_trigger_name?
->
-> which looks like a missing dependency.
->
-> Do you want to fix these and send an updated pull?
->
+So I appended the following:
+diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
+index 933b4ed..5b87b6a 100644
+--- a/include/linux/amba/pl08x.h
++++ b/include/linux/amba/pl08x.h
+@@ -118,7 +118,7 @@ struct pl08x_txd {
+        dma_addr_t dst_addr;
+        size_t len;
+        dma_addr_t llis_bus;
+-       void *llis_va;
++       struct pl08x_lli *llis_va;
+        bool active;
+        /* Default cctl value for LLIs */
+        u32 cctl;
+
+--
+Dan
