@@ -1,53 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Jan 2011 14:53:58 +0000
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 15 Jan 2011 16:03:31 +0100
 Subject: Locking in the clk API
-In-Reply-To: <4D31A8F1.4080301@weinigel.se>
+In-Reply-To: <20110115145358.GC15996@n2100.arm.linux.org.uk>
 References: <201101111016.42819.jeremy.kerr@canonical.com>
 	<20110111091607.GI12552@n2100.arm.linux.org.uk>
 	<4D2D184A.8020405@codeaurora.org>
 	<20110112090301.GS11039@n2100.arm.linux.org.uk>
 	<4D31A8F1.4080301@weinigel.se>
-Message-ID: <20110115145358.GC15996@n2100.arm.linux.org.uk>
+	<20110115145358.GC15996@n2100.arm.linux.org.uk>
+Message-ID: <20110115150331.GB6917@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 15, 2011 at 03:02:25PM +0100, Christer Weinigel wrote:
-> This feels a bit like perfect being the enemy of good.
->
-> On platforms that need to sleep to enable the UART clock, configuring  
-> the UART as the kernel console should be equivalent to userspace opening  
-> the UART device, i.e. enable the clock.  At least to me that feels like  
-> an acceptable tradeoff, and if I wanted to save the last bit of power  
-> I'll have to refrain from using UART as the kernel console.
->
-> If both printk to the console and disabling the clock is really really  
-> neccesary, add a clk_enable_busywait, but that will be a bit of a hack.
+Hi Russell,
 
-Well, we're not discussing a _new_ API here - we're discussing an API
-with existing users which works completely fine on the devices its
-used, with differing expectations between implementations.
+On Sat, Jan 15, 2011 at 02:53:58PM +0000, Russell King - ARM Linux wrote:
+> We've been around returning EAGAIN, WARN_ONs, BUG_ONs, having clk_enable()
+> vs clk_enable_atomic(), clk_enable_cansleep() vs clk_enable(), etc.
+> 
+> There's been a lot of talk on this issue for ages with no real progress
+> that I'm just going to repeat: let's unify those implementations which
+> use a spinlock for their clks into one consolidated solution, and
+> a separate consolidated solution for those which use a mutex.
+> 
+> This will at least allow us to have _some_ consolidation of the existing
+> implementations - and it doesn't add anything to the problem at hand.
+> It might actually help identify what can be done at code level to resolve
+> this issue.
+Great, so how should we do it?  Take Jeremy's patch and make the
+differenciation between sleeping and atomic implementation a Kconfig
+variable?
 
-> Both of these feel like they should use a call such as clk_get_atomic  
-> and be able to handle EWOULDBLOCK/EAGAIN (or whatever error code is used  
-> to indicate that it would have to sleep) and delegate to a worker thread  
-> to enable the clock.  To catch uses of plain clk_enable from atomic  
-> contects, add a WARN_ON/BUG_ON(in_atomic()).  It won't catch everything,  
-> but would help a bit at least.
+Best regards
+Uwe
 
-We've never allowed clk_get() to be called in interruptible context,
-so that's not the issue.  The issue is purely about clk_enable() and
-clk_disable() and whether they should be able to be called in atomic
-context or not.
-
-We've been around returning EAGAIN, WARN_ONs, BUG_ONs, having clk_enable()
-vs clk_enable_atomic(), clk_enable_cansleep() vs clk_enable(), etc.
-
-There's been a lot of talk on this issue for ages with no real progress
-that I'm just going to repeat: let's unify those implementations which
-use a spinlock for their clks into one consolidated solution, and
-a separate consolidated solution for those which use a mutex.
-
-This will at least allow us to have _some_ consolidation of the existing
-implementations - and it doesn't add anything to the problem at hand.
-It might actually help identify what can be done at code level to resolve
-this issue.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
