@@ -1,83 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Jan 2011 16:37:34 -0800
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
-	boot failure)
-In-Reply-To: <20110115002531.GF22505@n2100.arm.linux.org.uk>
-References: <2f1a86cfda277de8d190e5eb9b9ccd77@mail.gmail.com>
-	<20110113091546.GA24429@n2100.arm.linux.org.uk>
-	<20110113155152.GG4957@atomide.com>
-	<20110113164957.GA28040@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101141216040.28621@utopia.booyaka.com>
-	<20110114212027.GD22505@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101141551140.28621@utopia.booyaka.com>
-	<20110114235840.GE22505@n2100.arm.linux.org.uk>
-	<20110115001254.GU4957@atomide.com>
-	<20110115002531.GF22505@n2100.arm.linux.org.uk>
-Message-ID: <20110115003734.GV4957@atomide.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sat, 15 Jan 2011 11:44:16 +1100
+Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
+In-Reply-To: <1295030661-16364-1-git-send-email-jamie@jamieiles.com>
+References: <20110114181609.GN2822@pulham.picochip.com>
+	<1295030661-16364-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110115004416.GA19686@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110114 16:24]:
-> On Fri, Jan 14, 2011 at 04:12:55PM -0800, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [110114 15:58]:
-> > > 
-> > > # ARMv6k
-> > > config CPU_32v6K
-> > >         bool "Support ARM V6K processor extensions" if !SMP
-> > >         depends on CPU_V6 || CPU_V7
-> > >         default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
-> > > 
-> > > OMAP2 prevents the selection of armv6k support.  This is probably a very
-> > > bad idea if you want to run the resulting kernel on SMP hardware as it
-> > > removes a barrier in the spinlock code and disables the SMP-safe bitops.
-> > 
-> > I have some ideas to fix this. Unfortunately it will be inefficient
-> > as spinlock.h can be included from modules too :( I was thinking we can
-> > implement dsb_sev in the proc-*.S functions for the unoptimized multi-arm
-> > builds.
-> 
-> For spinlocks, the important thing is the barrier.  The wfe/sev are an
-> optimization.  The barrier contained with the ifdef is a valid V6
-> instruction.
+On Fri, Jan 14, 2011 at 06:44:21PM +0000, Jamie Iles wrote:
+>
+> +	/* Wait for some data to become available. */
+> +	while (__raw_readl(csr) & CSR_OUT_EMPTY_MASK) {
+> +		if (!wait)
+> +			return 0;
+> +		cpu_relax();
+> +	}
 
-OK, great it's just drain WB. Then we can do the ussual iffdeffery
-on it for multi-arm builds as it does not depend on the 6K extensions.
-I can do a patch for this on Monday, gotta run now.
- 
-> > > The original patch which started turning this off was from the MX3 stuff,
-> > > but without explaination.
-> > > 
-> > > However, OMAP extended this to disabling the select statement for CPU_32v6K
-> > > even if CPU_V7 is set:
-> > > 
-> > >  config CPU_V7
-> > >         bool "Support ARM V7 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB |-       select CPU_32v6K
-> > > +       select CPU_32v6K if !ARCH_OMAP2
-> > > 
-> > > Arguably, SMP _requires_ CPU_32v6K to be enabled for a safe kernel, and this
-> > > patch should not have been merged.
-> > 
-> > The only way we can fix that is do smp_on_up style rewriting of the assembly
-> > during init between CPUv6 and v6K. Want me to do a patch for that?
-> 
-> The bitops code is quite different between the two versions, and I doubt
-> the smp_on_up rewriting will look at all pretty.  I think it needs an
-> alternative idea - like not using the 'byte' operations at all.
-> 
-> Whether we have any code which passes non-word aligned pointers to bitops
-> isn't particularly known - in theory they should all be unsigned long *'s,
-> so should be word-aligned.  Who knows what filesystems do though... and
-> such a change could be disasterous to peoples data if the block/inode
-> bitmaps get corrupted.
+This has the potential to loop indefinitely.  Please add a time-out
+to prevent that (see existing RNG drivers for example).
 
-Hmm, how about emulation of those instructions for non-v6K ARMv6 processors?
-I guess we could do some address checking in the bitops functions too for
-multi-arm builds..
- 
-> IOW, such a change needs testing on a box where a range of filesystems are
-> used, and the filesystems can be thrown away if corrupted.
-
-Or we could patch in the address checking first and only disable it
-later if now warnings.
-
-Tony
+Thanks!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
