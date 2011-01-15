@@ -1,87 +1,83 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 15 Jan 2011 19:25:58 +0100
-Subject: [PATCH 8/8] ARM: pxa: Update copyright notices for Palm devices
-In-Reply-To: <1295115958-4811-1-git-send-email-marek.vasut@gmail.com>
-References: <1295115958-4811-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <1295115958-4811-8-git-send-email-marek.vasut@gmail.com>
+Date: Sat, 15 Jan 2011 19:41:07 +0100
+Subject: [PATCH v2] ARM: pxa: PalmZ72: Add OV9640 camera support
+In-Reply-To: <AANLkTinpAGgmLmjerVHVF6Z2ET1hZG3vtfFVcZYjB=EN@mail.gmail.com>
+References: <1295054277-7879-1-git-send-email-marek.vasut@gmail.com>
+	<20110115170829.GL15996@n2100.arm.linux.org.uk>
+	<AANLkTinpAGgmLmjerVHVF6Z2ET1hZG3vtfFVcZYjB=EN@mail.gmail.com>
+Message-ID: <201101151941.07494.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
----
- arch/arm/mach-pxa/palm27x.c     |    3 +--
- drivers/pcmcia/pxa2xx_palmld.c  |    2 +-
- drivers/pcmcia/pxa2xx_palmtc.c  |    2 +-
- drivers/pcmcia/pxa2xx_palmtx.c  |    2 +-
- drivers/pcmcia/pxa2xx_vpac270.c |    3 +--
- 5 files changed, 5 insertions(+), 7 deletions(-)
+On Saturday 15 January 2011 18:49:16 Bj?rn Forsman wrote:
+> 2011/1/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Sat, Jan 15, 2011 at 05:37:08PM +0100, Bj?rn Forsman wrote:
+> >> Hi,
+> >> 
+> >> On 15 January 2011 02:17, Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> > Rework of patch from 2009:
+> >> > PalmZ72: Add support for OV9640 camera sensor
+> >> > 
+> >> > Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> >> > ---
+> >> > v2: Use gpio_request_array()/gpio_free_array() array
+> >> > 
+> >> >  arch/arm/mach-pxa/include/mach/palmz72.h |    5 +
+> >> >  arch/arm/mach-pxa/palmz72.c              |  127
+> >> > ++++++++++++++++++++++++++++++ 2 files changed, 132 insertions(+), 0
+> >> > deletions(-)
+> >> > 
+> >> > diff --git a/arch/arm/mach-pxa/include/mach/palmz72.h
+> >> > b/arch/arm/mach-pxa/include/mach/palmz72.h index 2bbcf70..0d4700a
+> >> > 100644
+> >> > --- a/arch/arm/mach-pxa/include/mach/palmz72.h
+> >> > +++ b/arch/arm/mach-pxa/include/mach/palmz72.h
+> >> 
+> >> [snip]
+> >> 
+> >> > +static int palmz72_camera_power(struct device *dev, int power)
+> >> > +{
+> >> > +       gpio_set_value(GPIO_NR_PALMZ72_CAM_PWDN, !power);
+> >> > +       mdelay(50);
+> >> > +       return 0;
+> >> > +}
+> >> > +
+> >> > +static int palmz72_camera_reset(struct device *dev)
+> >> > +{
+> >> > +       gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 1);
+> >> > +       mdelay(50);
+> >> > +       gpio_set_value(GPIO_NR_PALMZ72_CAM_RESET, 0);
+> >> > +       mdelay(50);
+> >> > +       return 0;
+> >> > +}
+> >> 
+> >> (Sorry if these are stupid newbie-questions.)
+> >> 
+> >> Is the entire kernel blocked during the above mdelay()s or
+> >> just some kernel thread? (Or: will this add like 100ms or 150ms
+> >> to boot time?)
+> >> 
+> >> Can mdelay() be replaced with something non-blocking?
+> > 
+> > mdelay() is a spinning delay - it doesn't voluntarily relinquish the
+> > CPU to another task.
+> > 
+> > If you have preempt enabled and the region is preemptable, you can be
+> > preempted in the middle of the delay (in which case it becomes delay
+> > time + time away from the thread.)
+> > 
+> > msleep() can be used for places where you can sleep, but is limited to
+> > the jiffy granularity for !HIRES kernels.
+> 
+> Thanks for explaining!
+> 
+> Marek, care to try msleep() so we avoid busy-waits?
 
-diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
-index 405b92a..7d1434a 100644
---- a/arch/arm/mach-pxa/palm27x.c
-+++ b/arch/arm/mach-pxa/palm27x.c
-@@ -1,8 +1,7 @@
- /*
-  * Common code for Palm LD, T5, TX, Z72
-  *
-- * Copyright (C) 2010
-- * Marek Vasut <marek.vasut@gmail.com>
-+ * Copyright (C) 2010-2011 Marek Vasut <marek.vasut@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-diff --git a/drivers/pcmcia/pxa2xx_palmld.c b/drivers/pcmcia/pxa2xx_palmld.c
-index 59f8405..69f7367 100644
---- a/drivers/pcmcia/pxa2xx_palmld.c
-+++ b/drivers/pcmcia/pxa2xx_palmld.c
-@@ -4,7 +4,7 @@
-  * Driver for Palm LifeDrive PCMCIA
-  *
-  * Copyright (C) 2006 Alex Osborne <ato@meshy.org>
-- * Copyright (C) 2007-2008 Marek Vasut <marek.vasut@gmail.com>
-+ * Copyright (C) 2007-2011 Marek Vasut <marek.vasut@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-diff --git a/drivers/pcmcia/pxa2xx_palmtc.c b/drivers/pcmcia/pxa2xx_palmtc.c
-index e655af9..d0ad6a7 100644
---- a/drivers/pcmcia/pxa2xx_palmtc.c
-+++ b/drivers/pcmcia/pxa2xx_palmtc.c
-@@ -4,7 +4,7 @@
-  * Driver for Palm Tungsten|C PCMCIA
-  *
-  * Copyright (C) 2008 Alex Osborne <ato@meshy.org>
-- * Copyright (C) 2009 Marek Vasut <marek.vasut@gmail.com>
-+ * Copyright (C) 2009-2011 Marek Vasut <marek.vasut@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-diff --git a/drivers/pcmcia/pxa2xx_palmtx.c b/drivers/pcmcia/pxa2xx_palmtx.c
-index 06f7f14..1a25804 100644
---- a/drivers/pcmcia/pxa2xx_palmtx.c
-+++ b/drivers/pcmcia/pxa2xx_palmtx.c
-@@ -3,7 +3,7 @@
-  *
-  * Driver for Palm T|X PCMCIA
-  *
-- * Copyright (C) 2007-2008 Marek Vasut <marek.vasut@gmail.com>
-+ * Copyright (C) 2007-2011 Marek Vasut <marek.vasut@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-diff --git a/drivers/pcmcia/pxa2xx_vpac270.c b/drivers/pcmcia/pxa2xx_vpac270.c
-index c13f411..435002d 100644
---- a/drivers/pcmcia/pxa2xx_vpac270.c
-+++ b/drivers/pcmcia/pxa2xx_vpac270.c
-@@ -3,8 +3,7 @@
-  *
-  * Driver for Voipac PXA270 PCMCIA and CF sockets
-  *
-- * Copyright (C) 2010
-- * Marek Vasut <marek.vasut@gmail.com>
-+ * Copyright (C) 2010-2011 Marek Vasut <marek.vasut@gmail.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
--- 
-1.7.2.3
+Let's keep it at mdelay() for now, can we? I'll send a subsequent patch once I 
+can test with msleep() ... I don't have the hardware available now.
+
+Cheers
+
+> 
+> Best regards,
+> Bj?rn Forsman
