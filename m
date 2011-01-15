@@ -1,66 +1,68 @@
-From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
-Date: Sat, 15 Jan 2011 19:15:10 +0100
-Subject: [PATCH] ARM: colibri-pxa300: use correct SD detect pin
-In-Reply-To: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
-References: <1293116462-10189-1-git-send-email-bjorn.forsman@gmail.com>
-Message-ID: <AANLkTi=GsjHq+e2yFWiRveX2MJqbFq4DaB52yYnYKQn7@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sat, 15 Jan 2011 19:25:51 +0100
+Subject: [PATCH 1/8] ARM: pxa: PalmTE2: Use gpio arrays in backlight init
+Message-ID: <1295115958-4811-1-git-send-email-marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/12/23 Bj?rn Forsman <bjorn.forsman@gmail.com>:
-> The use of wrong SD detect pin was introduced by this commit:
->
-> ?ARM: pxa: Push Colibri evalboard MFP into module files
->
-> This fixes it.
-> ---
-> ?arch/arm/mach-pxa/colibri-evalboard.c ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/colibri-pxa300.c ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/include/mach/colibri.h | ? ?2 +-
-> ?3 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
-> index 6b2c800..28f667e 100644
-> --- a/arch/arm/mach-pxa/colibri-evalboard.c
-> +++ b/arch/arm/mach-pxa/colibri-evalboard.c
-> @@ -50,7 +50,7 @@ static void __init colibri_mmc_init(void)
-> ? ? ? ? ? ? ? ? ? ? ? ?GPIO0_COLIBRI_PXA270_SD_DETECT;
-> ? ? ? ?if (machine_is_colibri300()) ? ?/* PXA300 Colibri */
-> ? ? ? ? ? ? ? ?colibri_mci_platform_data.gpio_card_detect =
-> - ? ? ? ? ? ? ? ? ? ? ? GPIO39_COLIBRI_PXA300_SD_DETECT;
-> + ? ? ? ? ? ? ? ? ? ? ? GPIO13_COLIBRI_PXA300_SD_DETECT;
-> ? ? ? ?else ? ? ? ? ? ? ? ? ? ? ? ? ? ?/* PXA320 Colibri */
-> ? ? ? ? ? ? ? ?colibri_mci_platform_data.gpio_card_detect =
-> ? ? ? ? ? ? ? ? ? ? ? ?GPIO28_COLIBRI_PXA320_SD_DETECT;
-> diff --git a/arch/arm/mach-pxa/colibri-pxa300.c b/arch/arm/mach-pxa/colibri-pxa300.c
-> index fddb16d..66dd81c 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa300.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa300.c
-> @@ -41,7 +41,7 @@ static mfp_cfg_t colibri_pxa300_evalboard_pin_config[] __initdata = {
-> ? ? ? ?GPIO4_MMC1_DAT1,
-> ? ? ? ?GPIO5_MMC1_DAT2,
-> ? ? ? ?GPIO6_MMC1_DAT3,
-> - ? ? ? GPIO39_GPIO, ? ?/* SD detect */
-> + ? ? ? GPIO13_GPIO, ? ?/* GPIO13_COLIBRI_PXA300_SD_DETECT */
->
-> ? ? ? ?/* UHC */
-> ? ? ? ?GPIO0_2_USBH_PEN,
-> diff --git a/arch/arm/mach-pxa/include/mach/colibri.h b/arch/arm/mach-pxa/include/mach/colibri.h
-> index 388a96f..cb4236e 100644
-> --- a/arch/arm/mach-pxa/include/mach/colibri.h
-> +++ b/arch/arm/mach-pxa/include/mach/colibri.h
-> @@ -60,7 +60,7 @@ static inline void colibri_pxa3xx_init_nand(void) {}
-> ?#define GPIO113_COLIBRI_PXA270_TS_IRQ ?113
->
-> ?/* GPIO definitions for Colibri PXA300/310 */
-> -#define GPIO39_COLIBRI_PXA300_SD_DETECT ? ? ? ?39
-> +#define GPIO13_COLIBRI_PXA300_SD_DETECT ? ? ? ?13
->
-> ?/* GPIO definitions for Colibri PXA320 */
-> ?#define GPIO28_COLIBRI_PXA320_SD_DETECT ? ? ? ?28
-> --
-> 1.7.0.4
->
->
+Use gpio_request_array() / gpio_free_array() in backlight init and exit
+functions. This makes the code cleaner and less error prone.
 
-Ping?
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+---
+ arch/arm/mach-pxa/palmte2.c |   31 +++++++------------------------
+ 1 files changed, 7 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/palmte2.c b/arch/arm/mach-pxa/palmte2.c
+index 3f25014..66311c7 100644
+--- a/arch/arm/mach-pxa/palmte2.c
++++ b/arch/arm/mach-pxa/palmte2.c
+@@ -136,30 +136,14 @@ static struct platform_device palmte2_pxa_keys = {
+ /******************************************************************************
+  * Backlight
+  ******************************************************************************/
++static struct gpio palmte_bl_gpios[] = {
++	{ GPIO_NR_PALMTE2_BL_POWER, GPIOF_INIT_LOW, "Backlight power" },
++	{ GPIO_NR_PALMTE2_LCD_POWER, GPIOF_INIT_LOW, "LCD power" },
++};
++
+ static int palmte2_backlight_init(struct device *dev)
+ {
+-	int ret;
+-
+-	ret = gpio_request(GPIO_NR_PALMTE2_BL_POWER, "BL POWER");
+-	if (ret)
+-		goto err;
+-	ret = gpio_direction_output(GPIO_NR_PALMTE2_BL_POWER, 0);
+-	if (ret)
+-		goto err2;
+-	ret = gpio_request(GPIO_NR_PALMTE2_LCD_POWER, "LCD POWER");
+-	if (ret)
+-		goto err2;
+-	ret = gpio_direction_output(GPIO_NR_PALMTE2_LCD_POWER, 0);
+-	if (ret)
+-		goto err3;
+-
+-	return 0;
+-err3:
+-	gpio_free(GPIO_NR_PALMTE2_LCD_POWER);
+-err2:
+-	gpio_free(GPIO_NR_PALMTE2_BL_POWER);
+-err:
+-	return ret;
++	return gpio_request_array(ARRAY_AND_SIZE(palmte_bl_gpios));
+ }
+ 
+ static int palmte2_backlight_notify(struct device *dev, int brightness)
+@@ -171,8 +155,7 @@ static int palmte2_backlight_notify(struct device *dev, int brightness)
+ 
+ static void palmte2_backlight_exit(struct device *dev)
+ {
+-	gpio_free(GPIO_NR_PALMTE2_BL_POWER);
+-	gpio_free(GPIO_NR_PALMTE2_LCD_POWER);
++	gpio_free_array(ARRAY_AND_SIZE(palmte_bl_gpios));
+ }
+ 
+ static struct platform_pwm_backlight_data palmte2_backlight_data = {
+-- 
+1.7.2.3
