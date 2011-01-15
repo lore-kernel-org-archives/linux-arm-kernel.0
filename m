@@ -1,46 +1,60 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 14 Jan 2011 17:35:41 -0800
-Subject: [PATCH 27/48] ARM: PL08x: avoid duplicating registers in txd and
-	phychan structures
-In-Reply-To: <E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
-References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
-	<E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTi=GsMaDQDSuR=Z4AT4Vk4GThx6O_0Le=pjsu9gj@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 14 Jan 2011 23:49:31 -0500 (EST)
+Subject: [PATCH] ARM: make head.S less dependent on the compile time
+	PHYS_OFFSET define
+In-Reply-To: <20110115004449.GU15996@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1101131659220.11803@xanadu.home>
+	<20110113232327.GG24149@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101140050070.25804@xanadu.home>
+	<20110115004449.GU15996@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101142322580.938@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 3, 2011 at 2:39 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> As we now have all the code accessing the phychan {csrc,cdst,clli,cctl,
-> ccfg} members in one function, there's no point storing the data into
-> the struct. ?Get rid of the struct members. ?Re-order the register dump
-> in the dev_dbg() to reflect the order we write the registers to the DMA
-> device.
->
-> The txd {csrc,cdst,clli,cctl} values are duplicates of the lli[0]
-> values, so there's no point duplicating these either. ?Program the DMAC
-> registers directly from the lli[0] values.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Sat, 15 Jan 2011, Russell King - ARM Linux wrote:
 
-This one caused:
-drivers/dma/amba-pl08x.c: In function 'pl08x_start_txd':
-drivers/dma/amba-pl08x.c:205: warning: dereferencing 'void *' pointer
+> I've pushed it out under the branch p2v.  I think before this
+> goes upstream, "ARM: P2V: Use pv_fixup trick to get physical address"
+> needs merging with "ARM: P2V: make head.S use PLAT_PHYS_OFFSET" -
+> it doesn't really make sense to fix the same code twice for the same
+> underlying problem in the same patch set when it's possible to only
+> fix it once.
 
-So I appended the following:
-diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-index 933b4ed..5b87b6a 100644
---- a/include/linux/amba/pl08x.h
-+++ b/include/linux/amba/pl08x.h
-@@ -118,7 +118,7 @@ struct pl08x_txd {
-        dma_addr_t dst_addr;
-        size_t len;
-        dma_addr_t llis_bus;
--       void *llis_va;
-+       struct pl08x_lli *llis_va;
-        bool active;
-        /* Default cctl value for LLIs */
-        u32 cctl;
+Indeed.  You probably should fold the following with it as well:
 
---
-Dan
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index f5fe0c4..02a7a84 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -26,10 +26,6 @@
+ #include <mach/debug-macro.S>
+ #endif
+ 
+-#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+-#define KERNEL_RAM_PADDR	(PLAT_PHYS_OFFSET + TEXT_OFFSET)
+-
+-
+ /*
+  * swapper_pg_dir is the virtual address of the initial page table.
+  * We place the page tables 16K below KERNEL_RAM_VADDR.  Therefore, we must
+@@ -37,6 +33,7 @@
+  * the least significant 16 bits to be 0x8000, but we could probably
+  * relax this restriction to KERNEL_RAM_VADDR >= PAGE_OFFSET + 0x4000.
+  */
++#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+ #if (KERNEL_RAM_VADDR & 0xffff) != 0x8000
+ #error KERNEL_RAM_VADDR must start at 0xXXXX8000
+ #endif
+@@ -195,10 +192,8 @@ __create_page_tables:
+ 	/*
+ 	 * Map some ram to cover our .data and .bss areas.
+ 	 */
+-	orr	r3, r7, #(KERNEL_RAM_PADDR & 0xff000000)
+-	.if	(KERNEL_RAM_PADDR & 0x00f00000)
+-	orr	r3, r3, #(KERNEL_RAM_PADDR & 0x00f00000)
+-	.endif
++	add	r3, r8, #TEXT_OFFSET
++	orr	r3, r3, r7
+ 	add	r0, r4,  #(KERNEL_RAM_VADDR & 0xff000000) >> 18
+ 	str	r3, [r0, #(KERNEL_RAM_VADDR & 0x00f00000) >> 18]!
+ 	ldr	r6, =(_end - 1)
