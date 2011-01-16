@@ -1,31 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 16 Jan 2011 07:53:31 -0800
-Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
-In-Reply-To: <20110116102158.GC15575@mail.wantstofly.org>
-References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
-	<20110116102158.GC15575@mail.wantstofly.org>
-Message-ID: <AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 16 Jan 2011 11:00:42 -0700 (MST)
+Subject: [PATCH 2/2] arm: omap: remove duplicated headers
+In-Reply-To: <1295174783-4099-2-git-send-email-balbi@ti.com>
+References: <1295174783-4099-1-git-send-email-balbi@ti.com>
+	<1295174783-4099-2-git-send-email-balbi@ti.com>
+Message-ID: <alpine.DEB.2.00.1101161059190.13225@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
-<buytenh@wantstofly.org> wrote:
-> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
->
->> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
->> conversion." missed changing one reference to 'irq' in the function
->> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
->>
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->
-> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
+On Sun, 16 Jan 2011, Felipe Balbi wrote:
 
-Acked-by: Olof Johansson <olof@lixom.net>
+> A few headers are included twice, remove them.
+> 
+> Found the following errors using make includecheck:
+> arch/arm/mach-omap2/clock44xx_data.c: prm44xx.h is
+> included more than once.
+> arch/arm/mach-omap2/clockdomains44xx_data.c: cm1_44xx.h
+> is included more than once.
+> arch/arm/mach-omap2/clockdomains44xx_data.c: cm2_44xx.h
+> is included more than once.
+> arch/arm/mach-omap2/powerdomain2xxx_3xxx.c: prm-regbits-34xx.h
+> is included more than once.
 
-> I built this queue against all defconfigs, but there doesn't seem to
-> be one for tegra at the moment, which is why I missed this.
+These are probably merge-related.  I'll take this patch for 2.6.38-rc.
 
-Yep, planning on fixing this for .39.
+Thanks,
 
 
--Olof
+- Paul
