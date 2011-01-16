@@ -1,90 +1,113 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 16 Jan 2011 22:07:59 +0100
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <4D33580A.8090007@bluewatersys.com>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-	<20110110104122.GI12078@pengutronix.de>
-	<20110110110028.GB12552@n2100.arm.linux.org.uk>
-	<201101110854.15653.jeremy.kerr@canonical.com>
-	<AANLkTikjnz6RBCpOZM2imzX3d1ANUkaOZ2Qg9nqhpfpt@mail.gmail.com>
-	<4D33580A.8090007@bluewatersys.com>
-Message-ID: <20110116210759.GI6917@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sun, 16 Jan 2011 22:11:57 +0100
+Subject: mmci: U300 "sync with blockend" broken for multi-block?
+In-Reply-To: <20110114224439.GR15996@n2100.arm.linux.org.uk>
+References: <AANLkTimYb6TxLj4SamxRwUgykf9JyW5y9gbejOUXqZ7K@mail.gmail.com>
+	<20110101121048.GB25924@n2100.arm.linux.org.uk>
+	<AANLkTi=4SrxX-oCx-XXd+oib64j8RhMLdsQD1oWGxgU1@mail.gmail.com>
+	<20110105164344.GD8638@n2100.arm.linux.org.uk>
+	<AANLkTim4J8xrj9axhsu4=_7YkEy_ndiJ6cjDNf2WfzEg@mail.gmail.com>
+	<20110114224439.GR15996@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikVcqQup8pB6fnUEK=bWtNBqT2nV6P6Tjmy+b-X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 09:41:46AM +1300, Ryan Mallon wrote:
-> On 01/16/2011 08:26 PM, Grant Likely wrote:
-> > On Mon, Jan 10, 2011 at 5:54 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
-> >> Hi Russell,
-> >>
-> >>> Unless the locking problems can be resolved, the patches aren't ready.
-> >>>
-> >>> From what I've seen there's still quite a problem with what kind of
-> >>> lock to use in the clock - mutex or spinlock.
-> >>
-> >> Yes, the clock driver may either use a spinlock or mutex.
-> >>
-> >> However, this exactly the same as the current clock code, my patches do not
-> >> alter what we currently have.
-> >>
-> >> I do agree that we should define some specific semantics for the clock API
-> >> with regards to sleeping, and I'll start a new thread about that. But we
-> >> should definitely separate that issue from the problem of having multiple
-> >> definitions for struct clk, which is what these patches address.
-> > 
-> > Given that each current struct clk implementation makes it's own
-> > decisions about how to handle locking, would it not make sense to omit
-> > locking entirely?  At least as a first step?  Let the clock ops
-> > implement their own locking.  Make enable count management their
-> > responsibility too.  That's all that the lock protects anyway.  The
-> > clk_* apis can fall directly through to the ops hooks with no
-> > manipulation or locking.  The way v3 of the patch worked.
-> 
-> This doesn't really work in a generic API because the call sites need to
-> know whether it safe to call clk_enable/disable, etc from a
-> non-sleepable context. This has essentially the same problems as using a
-> union with both a mutex and a spinlock.
-Note that this is the current status quo, too.  clk_enable on imx
-sleeps, clk_enable on at91 doesn't.  I think we all agree we don't want
-to change that during the unifying step.  So the common struct clk might
-not solve all problems, but it's not worse than the state now.
+2011/1/14 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Jan 14, 2011 at 09:13:05PM +0100, Linus Walleij wrote:
+>> 2011/1/5 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>>
+>> > Any chance of pr_debug'ing the complete status register each time you
+>> > service an interrupt? ?You'll probably need to set the kernel log
+>> > buffer fairly large to ensure that you capture everything.
+>>
+>> I did this test now.
+>
+> Just to complete the picture, can I see the patch between the version
+> which produced this and mainline?
 
-> That said, although we are aiming for a generic clock API, it's usage
-> typically isn't. Most of the users of the clock API are machine/platform
-> specific drivers and so they can make assumptions about the
-> implementation of the clock API calls. We currently do have a generic
-> set of clock calls which do not define rules about calling from atomic
-> context. We have a number of drivers, for several platforms, using the
-> clk_enable/disable calls. Some platforms are using sleeping clocks and
-> others are using atomic clocks, but because the _usage_ of the API is
-> largely platform specific it all hangs together.
-> 
-> This is a bit ugly in practice. It's hardly desirable to have an API
-> which looks generic, but in reality is platform/machine specific. I'm
-> guessing that a large benefit of having a unified API and well defined
-> rules about whether clock API calls may sleep or not allows the usage of
-> the clock API to become more generic.
-> 
-> I agree with Russell that the best short term approach is to create two
-> clock APIs, one for clocks which are atomic and the other for clocks
-> which need to sleep. If nothing else this at least allows the rules
-> about calling context to nailed down.
-For me this sounds like code duplication if everything is identical only
-spinlocks are substituted by mutexes.  What do you think about my
-suggestion to use a Kconfig symbol that is selected by platforms (e.g.
-COMMON_CLK_SLEEPING) and then use:
+Sure, but I patched on top of the pending DMA-patches, since I
+needed to test the workings in DMA mode. Here is that patch, if
+you want the entire DMA patch series too I can resend them:
 
-	#ifdef CONFIG_COMMON_CLK_SLEEPING
-		... mutex stuff ...
-	#else
-		... spinlock stuff ...
-	#endif
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index af0cae9..8ae32d9 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -81,7 +81,7 @@ static struct variant_data variant_u300 = {
+        .fifohalfsize           = 8 * 4,
+        .clkreg_enable          = 1 << 13, /* HWFCEN */
+        .datalength_bits        = 16,
+-       .broken_blockend        = true,
++       .broken_blockend        = false,
+        .sdio                   = true,
+ };
 
-?
+@@ -414,7 +414,8 @@ static void mmci_start_data(struct mmci_host
+*host, struct mmc_data *data)
+        void __iomem *base;
+        int blksz_bits;
 
-Best regards
-Uwe
+-       dev_dbg(mmc_dev(host->mmc), "blksz %04x blks %04x flags %08x\n",
++       dev_info(mmc_dev(host->mmc), "\n");
++       dev_info(mmc_dev(host->mmc), "START DATA: blksz %04x blks %04x
+flags %08x\n",
+                data->blksz, data->blocks, data->flags);
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+        host->data = data;
+@@ -480,10 +481,10 @@ static void mmci_start_data(struct mmci_host
+*host, struct mmc_data *data)
+
+        writel(datactrl, base + MMCIDATACTRL);
+        irqmask0 = readl(base + MMCIMASK0);
+-       if (variant->broken_blockend)
+-               irqmask0 &= ~MCI_DATABLOCKENDMASK;
+-       else
+-               irqmask0 |= MCI_DATABLOCKENDMASK;
++       // if (variant->broken_blockend)
++       //      irqmask0 &= ~MCI_DATABLOCKENDMASK;
++       // else
++               irqmask0 |= MCI_DATABLOCKENDMASK;
+        irqmask0 &= ~MCI_DATAENDMASK;
+        writel(irqmask0, base + MMCIMASK0);
+        mmci_set_mask1(host, irqmask1);
+@@ -523,6 +524,16 @@ mmci_data_irq(struct mmci_host *host, struct
+mmc_data *data,
+ {
+        struct variant_data *variant = host->variant;
+
++       if ((status & MCI_DATABLOCKEND) &&
++           (status & MCI_DATAEND)) {
++               dev_info(mmc_dev(host->mmc), "MCI_DATABLOCKEND &&
+MCI_DATAEND\n");
++               dev_info(mmc_dev(host->mmc), "xfered according to no
+of blockends = 0x%08x, expected: 0x%08x\n", host->data_xfered +
+data->blksz, data->blksz * data->blocks);
++       } else if (status & MCI_DATABLOCKEND) {
++               dev_info(mmc_dev(host->mmc), "MCI_DATABLOCKEND\n");
++       } else if (status & MCI_DATAEND) {
++               dev_info(mmc_dev(host->mmc), "MCI_DATAEND\n");
++       }
++
+        /* First check for errors */
+        if (status &
+(MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
+                dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ (status
+%08x)\n", status);
+@@ -589,8 +600,10 @@ mmci_data_irq(struct mmci_host *host, struct
+mmc_data *data,
+                 */
+                if (!variant->broken_blockend && !host->dma_on_current_xfer)
+                        host->data_xfered += data->blksz;
+-               if (host->data_xfered == data->blksz * data->blocks)
++               if (host->data_xfered == data->blksz * data->blocks) {
+                        host->last_blockend = true;
++                       dev_info(mmc_dev(host->mmc), "THIS IS THE LAST
+MCI_DATABLOCKEND\n");
++               }
+        }
+
+        if (status & MCI_DATAEND)
+
+
+Yours,
+Linus Walleij
