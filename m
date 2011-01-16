@@ -1,259 +1,740 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 16 Jan 2011 23:19:08 +0100
-Subject: [PATCH] mmci: fixup broken_blockend variant patch
-Message-ID: <1295216348-28720-1-git-send-email-linus.walleij@stericsson.com>
+From: subaparts@yandex.ru (Alexander)
+Date: Mon, 17 Jan 2011 01:35:50 +0300
+Subject: [PATCH] ASoC: CS4271 codec support
+Message-ID: <1295217350.16460.11.camel@r60e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@stericsson.com>
+From: Alexander Sverdlin <subaparts@yandex.ru>
 
-host->last_blockend flag is now set only for the last
-MCI_DATABLOCKEND, the previous code would just react to
-any blockend, which was buggy. Consolidate Ux500 and U300
-bug flags to a single one and use only the MCI_DATAEND irq
-on U300 as well, it turns out it was broken just like the
-Ux500.
+Added support for CS4271 codec to ASoC.
+Update: De-emphasis is managed automatically with on-off control.
 
-Also make sure the MCI_DATABLOCKENDMASK is set only when
-needed, instead of being set always and then masked off.
-
-Tested successfully on Ux500, U300 and ARM RealView
-PB1176.
-
-Cc: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-[Tweaking and adding err message]
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
 ---
-Disabling the bug flag on U300 now yeilds messages like
-this:
+ include/sound/cs4271.h    |   25 ++
+ sound/soc/codecs/Kconfig  |    4 +
+ sound/soc/codecs/Makefile |    2 +
+ sound/soc/codecs/cs4271.c |  641 +++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 672 insertions(+), 0 deletions(-)
 
-root at ME:/mnt cp stallmannen.jpg /
-[   17.605191] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.616936] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.641241] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.673321] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.680344] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.698537] mmci-pl18x mmci: missing 2 block interrupts!
-[   17.711471] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.718411] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.736399] mmci-pl18x mmci: missing 1 block interrupts!
-[   17.744132] mmci-pl18x mmci: missing 1 block interrupts!
-
-And the code copes with it. (Data is intact.)
-
-Disabling the flag in Ux500 also works, with the error
-message shouting about almost every single block interrupt
-missing.
-
-If you want me to twist this around some other way, e.g.
-just terminating the transfer if not enough blockend IRQs
-appear, just tell me. It's a bit sad to do that though,
-because on all HW where this fails, the bytes are actually
-there, just not signalled for each block as should have
-been done.
----
- drivers/mmc/host/mmci.c |   64 +++++++++++++++++++++++++++++-----------------
- drivers/mmc/host/mmci.h |    4 +-
- 2 files changed, 42 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 0b4a5bf..25d69f0 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -48,8 +48,6 @@ static unsigned int fmax = 515633;
-  *		  is asserted (likewise for RX)
-  * @broken_blockend: the MCI_DATABLOCKEND is broken on the hardware
-  *		and will not work at all.
-- * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
-- *		using DMA.
-  * @sdio: variant supports SDIO
-  * @st_clkdiv: true if using a ST-specific clock divider algorithm
-  */
-@@ -60,7 +58,6 @@ struct variant_data {
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
- 	bool			broken_blockend;
--	bool			broken_blockend_dma;
- 	bool			sdio;
- 	bool			st_clkdiv;
- };
-@@ -76,7 +73,7 @@ static struct variant_data variant_u300 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg_enable		= 1 << 13, /* HWFCEN */
- 	.datalength_bits	= 16,
--	.broken_blockend_dma	= true,
-+	.broken_blockend	= true,
- 	.sdio			= true,
- };
+diff --git a/include/sound/cs4271.h b/include/sound/cs4271.h
+new file mode 100644
+index 0000000..16f8d32
+--- /dev/null
++++ b/include/sound/cs4271.h
+@@ -0,0 +1,25 @@
++/*
++ * Definitions for CS4271 ASoC codec driver
++ *
++ * Copyright (c) 2010 Alexander Sverdlin <subaparts@yandex.ru>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __CS4271_H
++#define __CS4271_H
++
++struct cs4271_platform_data {
++	int gpio_nreset;	/* GPIO driving Reset pin, if any */
++	int gpio_disable;	/* GPIO that disable serial bus, if any */
++};
++
++#endif /* __CS4271_H */
+diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
+index c48b23c..c3056bd 100644
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -26,6 +26,7 @@ config SND_SOC_ALL_CODECS
+ 	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
+ 	select SND_SOC_CS42L51 if I2C
+ 	select SND_SOC_CS4270 if I2C
++	select SND_SOC_CS4271 if SND_SOC_I2C_AND_SPI
+ 	select SND_SOC_CX20442
+ 	select SND_SOC_DA7210 if I2C
+ 	select SND_SOC_JZ4740_CODEC if SOC_JZ4740
+@@ -155,6 +156,9 @@ config SND_SOC_CS4270_VD33_ERRATA
+ 	bool
+ 	depends on SND_SOC_CS4270
  
-@@ -199,7 +196,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
- static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct variant_data *variant = host->variant;
--	unsigned int datactrl, timeout, irqmask;
-+	unsigned int datactrl, timeout, irqmask0, irqmask1;
- 	unsigned long long clks;
- 	void __iomem *base;
- 	int blksz_bits;
-@@ -210,7 +207,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	host->data = data;
- 	host->size = data->blksz * data->blocks;
- 	host->data_xfered = 0;
--	host->blockend = false;
-+	host->last_blockend = false;
- 	host->dataend = false;
++config SND_SOC_CS4271
++	tristate
++
+ config SND_SOC_CX20442
+ 	tristate
  
- 	mmci_init_sg(host, data);
-@@ -230,20 +227,20 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
- 	if (data->flags & MMC_DATA_READ) {
- 		datactrl |= MCI_DPSM_DIRECTION;
--		irqmask = MCI_RXFIFOHALFFULLMASK;
-+		irqmask1 = MCI_RXFIFOHALFFULLMASK;
- 
- 		/*
- 		 * If we have less than a FIFOSIZE of bytes to transfer,
- 		 * trigger a PIO interrupt as soon as any data is available.
- 		 */
- 		if (host->size < variant->fifosize)
--			irqmask |= MCI_RXDATAAVLBLMASK;
-+			irqmask1 |= MCI_RXDATAAVLBLMASK;
- 	} else {
- 		/*
- 		 * We don't actually need to include "FIFO empty" here
- 		 * since its implicit in "FIFO half empty".
- 		 */
--		irqmask = MCI_TXFIFOHALFEMPTYMASK;
-+		irqmask1 = MCI_TXFIFOHALFEMPTYMASK;
- 	}
- 
- 	/* The ST Micro variants has a special bit to enable SDIO */
-@@ -252,8 +249,14 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 			datactrl |= MCI_ST_DPSM_SDIOEN;
- 
- 	writel(datactrl, base + MMCIDATACTRL);
--	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
--	mmci_set_mask1(host, irqmask);
-+	irqmask0 = readl(base + MMCIMASK0);
-+	if (variant->broken_blockend)
-+		irqmask0 &= ~MCI_DATABLOCKENDMASK;
-+	else
-+		irqmask0 |= MCI_DATABLOCKENDMASK;
-+	irqmask0 &= ~MCI_DATAENDMASK;
-+	writel(irqmask0, base + MMCIMASK0);
-+	mmci_set_mask1(host, irqmask1);
- }
- 
- static void
-@@ -301,7 +304,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 			data->error = -EIO;
- 
- 		/* Force-complete the transaction */
--		host->blockend = true;
-+		host->last_blockend = true;
- 		host->dataend = true;
- 
- 		/*
-@@ -337,7 +340,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 	 *
- 	 * In the U300, the IRQs can arrive out-of-order,
- 	 * e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
--	 * so for this case we use the flags "blockend" and
-+	 * so for this case we use the flags "last_blockend" and
- 	 * "dataend" to make sure both IRQs have arrived before
- 	 * concluding the transaction. (This does not apply
- 	 * to the Ux500 which doesn't fire MCI_DATABLOCKEND
-@@ -353,22 +356,41 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		 */
- 		if (!variant->broken_blockend)
- 			host->data_xfered += data->blksz;
--		host->blockend = true;
-+		if (host->data_xfered == data->blksz * data->blocks)
-+			host->last_blockend = true;
- 	}
- 
--	if (status & MCI_DATAEND)
-+	if (status & MCI_DATAEND) {
-+		if (!host->last_blockend && !variant->broken_blockend &&
-+		    !data->error) {
-+			/*
-+			 * This typically occur on hardware with broken
-+			 * blockend reporting, which will fire less blockend
-+			 * IRQs than would be expected. Print an error and
-+			 * repair the situation, but the hardware should
-+			 * really be flagged as broken so this IRQ is not used
-+			 * at all.
-+			 */
-+			dev_err(mmc_dev(host->mmc),
-+				"missing %d block interrupts!\n",
-+				(data->blksz * data->blocks - host->data_xfered) / data->blksz);
-+			host->data_xfered = data->blksz * data->blocks;
-+			host->last_blockend = true;
-+		}
- 		host->dataend = true;
+diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
+index 579af9c..ece05e1 100644
+--- a/sound/soc/codecs/Makefile
++++ b/sound/soc/codecs/Makefile
+@@ -12,6 +12,7 @@ snd-soc-ak4671-objs := ak4671.o
+ snd-soc-cq93vc-objs := cq93vc.o
+ snd-soc-cs42l51-objs := cs42l51.o
+ snd-soc-cs4270-objs := cs4270.o
++snd-soc-cs4271-objs := cs4271.o
+ snd-soc-cx20442-objs := cx20442.o
+ snd-soc-da7210-objs := da7210.o
+ snd-soc-dmic-objs := dmic.o
+@@ -91,6 +92,7 @@ obj-$(CONFIG_SND_SOC_AK4671)	+= snd-soc-ak4671.o
+ obj-$(CONFIG_SND_SOC_CQ0093VC) += snd-soc-cq93vc.o
+ obj-$(CONFIG_SND_SOC_CS42L51)	+= snd-soc-cs42l51.o
+ obj-$(CONFIG_SND_SOC_CS4270)	+= snd-soc-cs4270.o
++obj-$(CONFIG_SND_SOC_CS4271)	+= snd-soc-cs4271.o
+ obj-$(CONFIG_SND_SOC_CX20442)	+= snd-soc-cx20442.o
+ obj-$(CONFIG_SND_SOC_DA7210)	+= snd-soc-da7210.o
+ obj-$(CONFIG_SND_SOC_DMIC)	+= snd-soc-dmic.o
+diff --git a/sound/soc/codecs/cs4271.c b/sound/soc/codecs/cs4271.c
+new file mode 100644
+index 0000000..4d11e89
+--- /dev/null
++++ b/sound/soc/codecs/cs4271.c
+@@ -0,0 +1,641 @@
++/*
++ * CS4271 ASoC codec driver
++ *
++ * Copyright (c) 2010 Alexander Sverdlin <subaparts@yandex.ru>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * This driver support CS4271 codec being master or slave, working
++ * in control port mode, connected either via SPI or I2C.
++ * The data format accepted is I2S or left-justified.
++ * DAPM support not implemented.
++ */
++
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <sound/pcm.h>
++#include <sound/soc.h>
++#include <sound/tlv.h>
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/spi/spi.h>
++#include <sound/cs4271.h>
++
++#define CS4271_PCM_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
++			    SNDRV_PCM_FMTBIT_S24_LE | \
++			    SNDRV_PCM_FMTBIT_S32_LE)
++
++/*
++ * CS4271 registers
++ * High byte represents SPI chip address (0x10) + write command (0)
++ * Low byte - codec register address
++ */
++#define CS4271_MODE1	0x2001	/* Mode Control 1 */
++#define CS4271_DACCTL	0x2002	/* DAC Control */
++#define CS4271_DACVOL	0x2003	/* DAC Volume & Mixing Control */
++#define CS4271_VOLA	0x2004	/* DAC Channel A Volume Control */
++#define CS4271_VOLB	0x2005	/* DAC Channel B Volume Control */
++#define CS4271_ADCCTL	0x2006	/* ADC Control */
++#define CS4271_MODE2	0x2007	/* Mode Control 2 */
++#define CS4271_CHIPID	0x2008	/* Chip ID */
++
++#define CS4271_FIRSTREG	CS4271_MODE1
++#define CS4271_LASTREG	CS4271_MODE2
++#define CS4271_NR_REGS	((CS4271_LASTREG & 0xFF) + 1)
++
++/* Bit masks for the CS4271 registers */
++#define CS4271_MODE1_MODE_MASK	0xC0
++#define CS4271_MODE1_MODE_1X	0x00
++#define CS4271_MODE1_MODE_2X	0x80
++#define CS4271_MODE1_MODE_4X	0xC0
++
++#define CS4271_MODE1_DIV_MASK	0x30
++#define CS4271_MODE1_DIV_1	0x00
++#define CS4271_MODE1_DIV_15	0x10
++#define CS4271_MODE1_DIV_2	0x20
++#define CS4271_MODE1_DIV_3	0x30
++
++#define CS4271_MODE1_MASTER	0x08
++
++#define CS4271_MODE1_DAC_DIF_MASK	0x07
++#define CS4271_MODE1_DAC_DIF_LJ		0x00
++#define CS4271_MODE1_DAC_DIF_I2S	0x01
++#define CS4271_MODE1_DAC_DIF_RJ16	0x02
++#define CS4271_MODE1_DAC_DIF_RJ24	0x03
++#define CS4271_MODE1_DAC_DIF_RJ20	0x04
++#define CS4271_MODE1_DAC_DIF_RJ18	0x05
++
++#define CS4271_DACCTL_AMUTE	0x80
++#define CS4271_DACCTL_IF_SLOW	0x40
++
++#define CS4271_DACCTL_DEM_MASK	0x30
++#define CS4271_DACCTL_DEM_DIS	0x00
++#define CS4271_DACCTL_DEM_441	0x10
++#define CS4271_DACCTL_DEM_48	0x20
++#define CS4271_DACCTL_DEM_32	0x30
++
++#define CS4271_DACCTL_SVRU	0x08
++#define CS4271_DACCTL_SRD	0x04
++#define CS4271_DACCTL_INVA	0x02
++#define CS4271_DACCTL_INVB	0x01
++
++#define CS4271_DACVOL_BEQUA	0x40
++#define CS4271_DACVOL_SOFT	0x20
++#define CS4271_DACVOL_ZEROC	0x10
++
++#define CS4271_DACVOL_ATAPI_MASK	0x0F
++#define CS4271_DACVOL_ATAPI_M_M		0x00
++#define CS4271_DACVOL_ATAPI_M_BR	0x01
++#define CS4271_DACVOL_ATAPI_M_BL	0x02
++#define CS4271_DACVOL_ATAPI_M_BLR2	0x03
++#define CS4271_DACVOL_ATAPI_AR_M	0x04
++#define CS4271_DACVOL_ATAPI_AR_BR	0x05
++#define CS4271_DACVOL_ATAPI_AR_BL	0x06
++#define CS4271_DACVOL_ATAPI_AR_BLR2	0x07
++#define CS4271_DACVOL_ATAPI_AL_M	0x08
++#define CS4271_DACVOL_ATAPI_AL_BR	0x09
++#define CS4271_DACVOL_ATAPI_AL_BL	0x0A
++#define CS4271_DACVOL_ATAPI_AL_BLR2	0x0B
++#define CS4271_DACVOL_ATAPI_ALR2_M	0x0C
++#define CS4271_DACVOL_ATAPI_ALR2_BR	0x0D
++#define CS4271_DACVOL_ATAPI_ALR2_BL	0x0E
++#define CS4271_DACVOL_ATAPI_ALR2_BLR2	0x0F
++
++#define CS4271_VOLA_MUTE	0x80
++#define CS4271_VOLA_VOL_MASK	0x7F
++#define CS4271_VOLB_MUTE	0x80
++#define CS4271_VOLB_VOL_MASK	0x7F
++
++#define CS4271_ADCCTL_DITHER16	0x20
++
++#define CS4271_ADCCTL_ADC_DIF_MASK	0x10
++#define CS4271_ADCCTL_ADC_DIF_LJ	0x00
++#define CS4271_ADCCTL_ADC_DIF_I2S	0x10
++
++#define CS4271_ADCCTL_MUTEA	0x08
++#define CS4271_ADCCTL_MUTEB	0x04
++#define CS4271_ADCCTL_HPFDA	0x02
++#define CS4271_ADCCTL_HPFDB	0x01
++
++#define CS4271_MODE2_LOOP	0x10
++#define CS4271_MODE2_MUTECAEQUB	0x08
++#define CS4271_MODE2_FREEZE	0x04
++#define CS4271_MODE2_CPEN	0x02
++#define CS4271_MODE2_PDN	0x01
++
++#define CS4271_CHIPID_PART_MASK	0xF0
++#define CS4271_CHIPID_REV_MASK	0x0F
++
++/* CS4271 default register settings, except auto-mute is off */
++static const u8 cs4271_dflt_reg[CS4271_NR_REGS] = {
++	0, 0, 0, CS4271_DACVOL_ATAPI_AL_BR, 0, 0, 0,
++	CS4271_MODE2_CPEN | CS4271_MODE2_PDN,
++};
++
++struct cs4271_private {
++	/* SND_SOC_I2C or SND_SOC_SPI */
++	enum snd_soc_control_type	bus_type;
++	void				*control_data;
++	unsigned int			mclk;
++	/* SND_SOC_DAIFMT_I2S or SND_SOC_DAIFMT_LEFT_J */
++	unsigned int			mode;
++	unsigned int			master;
++	/* GPIO driving Reset pin, if any */
++	int				gpio_nreset;
++	/* GPIO that disable serial bus, if any */
++	int				gpio_disable;
++	bool				deemph;
++	int				rate;
++};
++
++struct cs4271_clk_cfg {
++	unsigned int	ratio;		/* MCLK / sample rate */
++	u8		speed_mode;	/* codec speed mode: 1x, 2x, 4x */
++	u8		mclk_master;	/* ratio bit mask for Master mode */
++	u8		mclk_slave;	/* ratio bit mask for Slave mode */
++};
++
++static struct cs4271_clk_cfg cs4271_clk_tab[] = {
++	{64,   CS4271_MODE1_MODE_4X, CS4271_MODE1_DIV_1,  CS4271_MODE1_DIV_1},
++	{96,   CS4271_MODE1_MODE_4X, CS4271_MODE1_DIV_15, CS4271_MODE1_DIV_1},
++	{128,  CS4271_MODE1_MODE_2X, CS4271_MODE1_DIV_1,  CS4271_MODE1_DIV_1},
++	{192,  CS4271_MODE1_MODE_2X, CS4271_MODE1_DIV_15, CS4271_MODE1_DIV_1},
++	{256,  CS4271_MODE1_MODE_1X, CS4271_MODE1_DIV_1,  CS4271_MODE1_DIV_1},
++	{384,  CS4271_MODE1_MODE_1X, CS4271_MODE1_DIV_15, CS4271_MODE1_DIV_1},
++	{512,  CS4271_MODE1_MODE_1X, CS4271_MODE1_DIV_2,  CS4271_MODE1_DIV_1},
++	{768,  CS4271_MODE1_MODE_1X, CS4271_MODE1_DIV_3,  CS4271_MODE1_DIV_3},
++	{1024, CS4271_MODE1_MODE_1X, CS4271_MODE1_DIV_3,  CS4271_MODE1_DIV_3}
++};
++
++#define CS4171_NR_RATIOS ARRAY_SIZE(cs4271_clk_tab)
++
++/*
++ * @freq is the desired MCLK rate
++ * MCLK rate should (c) be the sample rate, multiplied by one of the
++ * ratios listed in cs4271_mclk_fs_ratios table
++ */
++static int cs4271_set_dai_sysclk(struct snd_soc_dai *codec_dai,
++				 int clk_id, unsigned int freq, int dir)
++{
++	struct snd_soc_codec *codec = codec_dai->codec;
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++
++	cs4271->mclk = freq;
++	return 0;
++}
++
++static int cs4271_set_dai_fmt(struct snd_soc_dai *codec_dai,
++			      unsigned int format)
++{
++	struct snd_soc_codec *codec = codec_dai->codec;
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++
++	cs4271->mode = format & SND_SOC_DAIFMT_FORMAT_MASK;
++
++	switch (format & SND_SOC_DAIFMT_MASTER_MASK) {
++	case SND_SOC_DAIFMT_CBS_CFS:
++		cs4271->master = 0;
++		break;
++	case SND_SOC_DAIFMT_CBM_CFM:
++		cs4271->master = 1;
++		break;
++	default:
++		dev_err(codec->dev, "Invalid DAI format\n");
++		return -EINVAL;
 +	}
- 
- 	/*
- 	 * On variants with broken blockend we shall only wait for dataend,
- 	 * on others we must sync with the blockend signal since they can
- 	 * appear out-of-order.
- 	 */
--	if (host->dataend && (host->blockend || variant->broken_blockend)) {
-+	if (host->dataend &&
-+	    (host->last_blockend || variant->broken_blockend)) {
- 		mmci_stop_data(host);
- 
- 		/* Reset these flags */
--		host->blockend = false;
-+		host->last_blockend = false;
- 		host->dataend = false;
- 
- 		/*
-@@ -770,7 +792,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 	struct variant_data *variant = id->data;
- 	struct mmci_host *host;
- 	struct mmc_host *mmc;
--	unsigned int mask;
- 	int ret;
- 
- 	/* must have platform data */
-@@ -951,12 +972,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
- 			goto irq0_free;
- 	}
- 
--	mask = MCI_IRQENABLE;
--	/* Don't use the datablockend flag if it's broken */
--	if (variant->broken_blockend)
--		mask &= ~MCI_DATABLOCKEND;
--
--	writel(mask, host->base + MMCIMASK0);
-+	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
- 
- 	amba_set_drvdata(dev, mmc);
- 
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index df06f01..7ac8c4d 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -137,7 +137,7 @@
- #define MCI_IRQENABLE	\
- 	(MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|	\
- 	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
--	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATABLOCKENDMASK)
-+	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK)
- 
- /* These interrupts are directed to IRQ1 when two IRQ lines are available */
- #define MCI_IRQ1MASK \
-@@ -177,7 +177,7 @@ struct mmci_host {
- 	struct timer_list	timer;
- 	unsigned int		oldstat;
- 
--	bool			blockend;
-+	bool			last_blockend;
- 	bool			dataend;
- 
- 	/* pio stuff */
--- 
-1.7.3.2
++
++	return 0;
++}
++
++static int cs4271_deemph[] = {0, 44100, 48000, 32000};
++
++static int cs4271_set_deemph(struct snd_soc_codec *codec)
++{
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++	int i;
++	int val = CS4271_DACCTL_DEM_DIS;
++
++	if (cs4271->deemph) {
++		/* Find closest de-emphasis freq */
++		val = 1;
++		for (i = 2; i < ARRAY_SIZE(cs4271_deemph); i++)
++			if (abs(cs4271_deemph[i] - cs4271->rate) <
++			    abs(cs4271_deemph[val] - cs4271->rate))
++				val = i;
++		val <<= 4;
++	}
++
++	return snd_soc_update_bits(codec, CS4271_DACCTL,
++		CS4271_DACCTL_DEM_MASK, val);
++}
++
++static int cs4271_get_deemph(struct snd_kcontrol *kcontrol,
++			     struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++
++	ucontrol->value.enumerated.item[0] = cs4271->deemph;
++	return 0;
++}
++
++static int cs4271_put_deemph(struct snd_kcontrol *kcontrol,
++			     struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++
++	cs4271->deemph = ucontrol->value.enumerated.item[0];
++	return cs4271_set_deemph(codec);
++}
++
++static int cs4271_hw_params(struct snd_pcm_substream *substream,
++			    struct snd_pcm_hw_params *params,
++			    struct snd_soc_dai *dai)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_codec *codec = rtd->codec;
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++	unsigned int i, ratio, val;
++
++	cs4271->rate = params_rate(params);
++	ratio = cs4271->mclk / cs4271->rate;
++	for (i = 0; i < CS4171_NR_RATIOS; i++)
++		if (cs4271_clk_tab[i].ratio == ratio)
++			break;
++
++	if ((i == CS4171_NR_RATIOS) || ((ratio == 1024) && cs4271->master)) {
++		dev_err(codec->dev, "Invalid sample rate\n");
++		return -EINVAL;
++	}
++
++	/* Configure DAC */
++	val = cs4271_clk_tab[i].speed_mode;
++
++	if (cs4271->master)
++		val |= cs4271_clk_tab[i].mclk_master | CS4271_MODE1_MASTER;
++	else
++		val |= cs4271_clk_tab[i].mclk_slave;
++
++	switch (cs4271->mode) {
++	case SND_SOC_DAIFMT_LEFT_J:
++		val |= CS4271_MODE1_DAC_DIF_LJ;
++		break;
++	case SND_SOC_DAIFMT_I2S:
++		val |= CS4271_MODE1_DAC_DIF_I2S;
++		break;
++	default:
++		dev_err(codec->dev, "Invalid DAI format\n");
++		return -EINVAL;
++	}
++
++	snd_soc_update_bits(codec, CS4271_MODE1,
++		CS4271_MODE1_MODE_MASK | CS4271_MODE1_DIV_MASK |
++		CS4271_MODE1_DAC_DIF_MASK | CS4271_MODE1_MASTER, val);
++
++	/* Configure ADC */
++	val = (cs4271->mode == SND_SOC_DAIFMT_I2S) ?
++		CS4271_ADCCTL_ADC_DIF_I2S : CS4271_ADCCTL_ADC_DIF_LJ;
++	snd_soc_update_bits(codec, CS4271_ADCCTL, CS4271_ADCCTL_ADC_DIF_MASK,
++		val);
++
++	return cs4271_set_deemph(codec);
++}
++
++static int cs4271_digital_mute(struct snd_soc_dai *dai, int mute)
++{
++	struct snd_soc_codec *codec = dai->codec;
++	int val_a = 0;
++	int val_b = 0;
++
++	if (mute) {
++		val_a = CS4271_VOLA_MUTE;
++		val_b = CS4271_VOLB_MUTE;
++	}
++
++	snd_soc_update_bits(codec, CS4271_VOLA, CS4271_VOLA_MUTE, val_a);
++	snd_soc_update_bits(codec, CS4271_VOLB, CS4271_VOLB_MUTE, val_b);
++
++	return 0;
++}
++
++/* CS4271 controls */
++static DECLARE_TLV_DB_SCALE(cs4271_dac_tlv, -12700, 100, 0);
++
++static const struct snd_kcontrol_new cs4271_snd_controls[] = {
++	SOC_DOUBLE_R_TLV("Master Playback Volume", CS4271_VOLA, CS4271_VOLB,
++		0, 0x7F, 1, cs4271_dac_tlv),
++	SOC_SINGLE("Digital Loopback Switch", CS4271_MODE2, 4, 1, 0),
++	SOC_SINGLE("Soft Ramp Switch", CS4271_DACVOL, 5, 1, 0),
++	SOC_SINGLE("Zero Cross Switch", CS4271_DACVOL, 4, 1, 0),
++	SOC_SINGLE_BOOL_EXT("De-emphasis Switch", 0,
++		cs4271_get_deemph, cs4271_put_deemph),
++	SOC_SINGLE("Auto-Mute Switch", CS4271_DACCTL, 7, 1, 0),
++	SOC_SINGLE("Slow Roll Off Filter Switch", CS4271_DACCTL, 6, 1, 0),
++	SOC_SINGLE("Soft Volume Ramp-Up Switch", CS4271_DACCTL, 3, 1, 0),
++	SOC_SINGLE("Soft Ramp-Down Switch", CS4271_DACCTL, 2, 1, 0),
++	SOC_SINGLE("Left Channel Inversion Switch", CS4271_DACCTL, 1, 1, 0),
++	SOC_SINGLE("Right Channel Inversion Switch", CS4271_DACCTL, 0, 1, 0),
++	SOC_DOUBLE("Master Capture Switch", CS4271_ADCCTL, 3, 2, 1, 1),
++	SOC_SINGLE("Dither 16-Bit Data Switch", CS4271_ADCCTL, 5, 1, 0),
++	SOC_DOUBLE("High Pass Filter Switch", CS4271_ADCCTL, 1, 0, 1, 1),
++	SOC_DOUBLE_R("Master Playback Switch", CS4271_VOLA, CS4271_VOLB,
++		7, 1, 1),
++};
++
++static struct snd_soc_dai_ops cs4271_dai_ops = {
++	.hw_params	= cs4271_hw_params,
++	.set_sysclk	= cs4271_set_dai_sysclk,
++	.set_fmt	= cs4271_set_dai_fmt,
++	.digital_mute	= cs4271_digital_mute,
++};
++
++struct snd_soc_dai_driver cs4271_dai = {
++	.name = "cs4271-hifi",
++	.playback = {
++		.stream_name	= "Playback",
++		.channels_min	= 2,
++		.channels_max	= 2,
++		.rates		= SNDRV_PCM_RATE_8000_96000,
++		.formats	= CS4271_PCM_FORMATS,
++	},
++	.capture = {
++		.stream_name	= "Capture",
++		.channels_min	= 2,
++		.channels_max	= 2,
++		.rates		= SNDRV_PCM_RATE_8000_96000,
++		.formats	= CS4271_PCM_FORMATS,
++	},
++	.ops = &cs4271_dai_ops,
++	.symmetric_rates = 1,
++};
++
++/*
++ * This function writes all writeble registers from cache to codec.
++ * It's used to setup initial config and restore after suspend.
++ * The registers write order is essential (MODE1 written last),
++ * so we cannot use standard sync implementation.
++ */
++static int cs4271_write_cache(struct snd_soc_codec *codec)
++{
++	int i, ret;
++
++	for (i = CS4271_LASTREG; i >= CS4271_FIRSTREG; i--) {
++		ret = snd_soc_write(codec, i, snd_soc_read(codec, i));
++		if (ret) {
++			dev_err(codec->dev, "Cache write failed\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int cs4271_soc_suspend(struct snd_soc_codec *codec, pm_message_t mesg)
++{
++	/* Set power-down bit */
++	snd_soc_update_bits(codec, CS4271_MODE2, CS4271_MODE2_PDN,
++		CS4271_MODE2_PDN);
++
++	return 0;
++}
++#else
++#define cs4271_soc_suspend	NULL
++#endif /* CONFIG_PM */
++
++/* This function used also in codec probe function and not only for PM */
++static int cs4271_soc_resume(struct snd_soc_codec *codec)
++{
++	int ret;
++
++	/* Restore codec state */
++	ret = cs4271_write_cache(codec);
++	if (ret < 0)
++		return ret;
++
++	/* then disable the power-down bit */
++	snd_soc_update_bits(codec, CS4271_MODE2, CS4271_MODE2_PDN, 0);
++
++	return 0;
++}
++
++static int cs4271_probe(struct snd_soc_codec *codec)
++{
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++	struct cs4271_platform_data *cs4271plat = codec->dev->platform_data;
++	int ret;
++	int gpio_nreset = -EINVAL;
++	int gpio_disable = -EINVAL;
++
++	codec->control_data = cs4271->control_data;
++
++	if (cs4271plat) {
++		if (gpio_is_valid(cs4271plat->gpio_nreset))
++			gpio_nreset = cs4271plat->gpio_nreset;
++		if (gpio_is_valid(cs4271plat->gpio_disable))
++			gpio_disable = cs4271plat->gpio_disable;
++	}
++
++	if (gpio_disable >= 0)
++		if (gpio_request(gpio_disable, "CS4271 Disable"))
++			gpio_disable = -EINVAL;
++	if (gpio_disable >= 0)
++		gpio_direction_output(gpio_disable, 0);
++
++	if (gpio_nreset >= 0)
++		if (gpio_request(gpio_nreset, "CS4271 Reset"))
++			gpio_nreset = -EINVAL;
++	if (gpio_nreset >= 0) {
++		gpio_direction_output(gpio_nreset, 1);
++		/* Give the codec time to wake up */
++		udelay(1);
++	}
++
++	cs4271->gpio_nreset = gpio_nreset;
++	cs4271->gpio_disable = gpio_disable;
++
++	/*
++	 * In case of I2C, chip address specified in board data.
++	 * So cache IO operations use 8 bit codec register address.
++	 * In case of SPI, chip address and register address
++	 * passed together as 16 bit value.
++	 * Anyway, register address is masked with 0xFF inside
++	 * soc-cache code.
++	 */
++	ret = (cs4271->bus_type == SND_SOC_SPI) ? 16 : 8;
++	ret = snd_soc_codec_set_cache_io(codec, ret, 8, cs4271->bus_type);
++	if (ret) {
++		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
++		return ret;
++	}
++
++	ret = cs4271_soc_resume(codec);
++	if (ret < 0)
++		return ret;
++
++	return snd_soc_add_controls(codec, cs4271_snd_controls,
++				    ARRAY_SIZE(cs4271_snd_controls));
++}
++
++static int cs4271_remove(struct snd_soc_codec *codec)
++{
++	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
++	int gpio_nreset, gpio_disable;
++
++	gpio_nreset = cs4271->gpio_nreset;
++	gpio_disable = cs4271->gpio_disable;
++
++	if (gpio_is_valid(gpio_nreset)) {
++		/* Set codec to the reset state */
++		gpio_set_value(gpio_nreset, 0);
++		gpio_free(gpio_nreset);
++	}
++
++	if (gpio_is_valid(gpio_disable))
++		gpio_free(gpio_disable);
++
++	return 0;
++};
++
++struct snd_soc_codec_driver soc_codec_dev_cs4271 = {
++	.probe			= cs4271_probe,
++	.remove			= cs4271_remove,
++	.suspend		= cs4271_soc_suspend,
++	.resume			= cs4271_soc_resume,
++	.reg_cache_default	= &cs4271_dflt_reg,
++	.reg_cache_size		= ARRAY_SIZE(cs4271_dflt_reg),
++	.reg_word_size		= sizeof(cs4271_dflt_reg[0]),
++	.compress_type		= SND_SOC_FLAT_COMPRESSION,
++	.reg_cache_step		= 1,
++};
++
++#if defined(CONFIG_SPI_MASTER)
++static int __devinit cs4271_spi_probe(struct spi_device *spi)
++{
++	struct cs4271_private *cs4271;
++
++	cs4271 = devm_kzalloc(&spi->dev, sizeof(*cs4271), GFP_KERNEL);
++	if (!cs4271)
++		return -ENOMEM;
++
++	spi_set_drvdata(spi, cs4271);
++	cs4271->control_data = spi;
++	cs4271->bus_type = SND_SOC_SPI;
++
++	return snd_soc_register_codec(&spi->dev, &soc_codec_dev_cs4271,
++				      &cs4271_dai, 1);
++}
++
++static int __devexit cs4271_spi_remove(struct spi_device *spi)
++{
++	snd_soc_unregister_codec(&spi->dev);
++	return 0;
++}
++
++static struct spi_driver cs4271_spi_driver = {
++	.driver = {
++		.name	= "cs4271",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= cs4271_spi_probe,
++	.remove		= __devexit_p(cs4271_spi_remove),
++};
++#endif /* defined(CONFIG_SPI_MASTER) */
++
++#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
++static struct i2c_device_id cs4271_i2c_id[] = {
++	{"cs4271", 0},
++	{}
++};
++MODULE_DEVICE_TABLE(i2c, cs4271_i2c_id);
++
++static int __devinit cs4271_i2c_probe(struct i2c_client *client,
++				      const struct i2c_device_id *id)
++{
++	struct cs4271_private *cs4271;
++
++	cs4271 = devm_kzalloc(&client->dev, sizeof(*cs4271), GFP_KERNEL);
++	if (!cs4271)
++		return -ENOMEM;
++
++	i2c_set_clientdata(client, cs4271);
++	cs4271->control_data = client;
++	cs4271->bus_type = SND_SOC_I2C;
++
++	return snd_soc_register_codec(&client->dev, &soc_codec_dev_cs4271,
++				      &cs4271_dai, 1);
++}
++
++static int __devexit cs4271_i2c_remove(struct i2c_client *client)
++{
++	snd_soc_unregister_codec(&client->dev);
++	return 0;
++}
++
++static struct i2c_driver cs4271_i2c_driver = {
++	.driver = {
++		.name	= "cs4271",
++		.owner	= THIS_MODULE,
++	},
++	.id_table	= cs4271_i2c_id,
++	.probe		= cs4271_i2c_probe,
++	.remove		= __devexit_p(cs4271_i2c_remove),
++};
++#endif /* defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE) */
++
++/*
++ * We only register our serial bus driver here without
++ * assignment to particular chip. So if any of the below
++ * fails, there is some problem with I2C or SPI subsystem.
++ * In most cases this module will be compiled with support
++ * of only one serial bus.
++ */
++static int __init cs4271_modinit(void)
++{
++	int ret;
++
++#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
++	ret = i2c_add_driver(&cs4271_i2c_driver);
++	if (ret) {
++		pr_err("Failed to register CS4271 I2C driver: %d\n", ret);
++		return ret;
++	}
++#endif
++
++#if defined(CONFIG_SPI_MASTER)
++	ret = spi_register_driver(&cs4271_spi_driver);
++	if (ret) {
++		pr_err("Failed to register CS4271 SPI driver: %d\n", ret);
++		return ret;
++	}
++#endif
++
++	return 0;
++}
++module_init(cs4271_modinit);
++
++static void __exit cs4271_modexit(void)
++{
++#if defined(CONFIG_SPI_MASTER)
++	spi_unregister_driver(&cs4271_spi_driver);
++#endif
++
++#if defined(CONFIG_I2C) || defined(CONFIG_I2C_MODULE)
++	i2c_del_driver(&cs4271_i2c_driver);
++#endif
++}
++module_exit(cs4271_modexit);
++
++MODULE_AUTHOR("Alexander Sverdlin <subaparts@yandex.ru>");
++MODULE_DESCRIPTION("Cirrus Logic CS4271 ALSA SoC Codec Driver");
++MODULE_LICENSE("GPL");
