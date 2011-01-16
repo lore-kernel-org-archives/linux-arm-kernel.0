@@ -1,39 +1,63 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sun, 16 Jan 2011 22:16:59 +0100
-Subject: mmci: U300 "sync with blockend" broken for multi-block?
-In-Reply-To: <AANLkTim4J8xrj9axhsu4=_7YkEy_ndiJ6cjDNf2WfzEg@mail.gmail.com>
-References: <AANLkTimYb6TxLj4SamxRwUgykf9JyW5y9gbejOUXqZ7K@mail.gmail.com>
-	<20110101121048.GB25924@n2100.arm.linux.org.uk>
-	<AANLkTi=4SrxX-oCx-XXd+oib64j8RhMLdsQD1oWGxgU1@mail.gmail.com>
-	<20110105164344.GD8638@n2100.arm.linux.org.uk>
-	<AANLkTim4J8xrj9axhsu4=_7YkEy_ndiJ6cjDNf2WfzEg@mail.gmail.com>
-Message-ID: <AANLkTimywaKn-jKmxzottNogYiRtwvSEcO6y0LxuKLR4@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 16 Jan 2011 21:25:00 +0000
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <20110115154019.GF15996@n2100.arm.linux.org.uk>
+References: <1294990949-2729-1-git-send-email-ccross@android.com>
+	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
+	<20110114120229.GA15996@n2100.arm.linux.org.uk>
+	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+	<20110114154919.GE15996@n2100.arm.linux.org.uk>
+	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
+	<20110114163520.GH15996@n2100.arm.linux.org.uk>
+	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
+	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
+	<AANLkTin_pMzNc-ZL+rVcwaVawer0poyxhatqw5P-A2qW@mail.gmail.com>
+	<20110115154019.GF15996@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim8OhAtqADck0Snq-7z7opw=coiQ4=DeO0O7Qa-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/14 Linus Walleij <linus.ml.walleij@gmail.com>:
+On 15 January 2011 15:40, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jan 15, 2011 at 03:31:04PM +0000, Catalin Marinas wrote:
+>> On 14 January 2011 17:30, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > +@ ?r9 ?= normal "successful" return address
+>> > ?@ ?r10 = vfp_state union
+>> > ?@ ?r11 = CPU number
+>> > -@ ?lr ?= failure return
+>> > -
+>> > +@ ?lr ?= unrecognised instruction return address
+>> > +@ ?IRQs enabled.
+>> > ?ENTRY(vfp_support_entry)
+>> > ? ? ? ?DBGSTR3 "instr %08x pc %08x state %p", r0, r2, r10
+>> >
+>> > @@ -138,9 +138,12 @@ check_for_exception:
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ exception before retrying branch
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ out before setting an FPEXC that
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ stops us reading stuff
+>> > - ? ? ? VFPFMXR FPEXC, r1 ? ? ? ? ? ? ? @ restore FPEXC last
+>> > - ? ? ? sub ? ? r2, r2, #4
+>> > - ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? @ retry the instruction
+>> > + ? ? ? VFPFMXR FPEXC, r1 ? ? ? ? ? ? ? @ Restore FPEXC last
+>> > + ? ? ? sub ? ? r2, r2, #4 ? ? ? ? ? ? ?@ Retry current instruction - if Thumb
+>> > + ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? @ mode it's two 16-bit instructions,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ else it's one 32-bit instruction, so
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ always subtract 4 from the following
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ instruction address.
+>>
+>> I would say it's always a 32-bit instruction but made up of two 16-bit
+>> values to allow half-word alignment.
+>
+> Do you have a suggested replacement text?
 
-> What it problematic with the reads *and* writes is that
-> sometimes there us a MCI_DATABLOCKEND missing, so the
-> blocks simply don't add up! This is the real bug that
-> the sync code was trying to solve, and not in a very
-> good way.
+Maybe something like: Retry the current VFP instruction (32-bit in
+both ARM and Thumb modes).
 
-Here is a follow-up explanation as to why the code as it
-is today actually works: the sync code has a bug. It is
-intended to check whether the *last* blockend interrupt
-*and* the dataend interrupt has occurred. However it
-actually checks whether *any* blockend interrupt and
-the datend interrupt has occured.
+(I was wondering whether we can get on the above code path with
+asynchronous VFP exceptions where the interrupted instruction may not
+be the VFP one. But I think all Thumb-2 processors these days generate
+synchronous exceptions)
 
-Thus it works, with the side effect of ACK:ing multiblock
-transfers on U300 while the host->data_xfered value is lower
-that what was requested - the blocks have been read
-but not all are accounted for, because there are blockend
-IRQs missing.
-
-I'll follow up with a patch fixing the *real* issue, in an
-atleast a little more elegant way :-/
-
-Yours,
-Linus Walleij
+-- 
+Catalin
