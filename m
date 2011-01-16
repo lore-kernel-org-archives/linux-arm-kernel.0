@@ -1,45 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 16 Jan 2011 00:26:20 -0700
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <201101110854.15653.jeremy.kerr@canonical.com>
-References: <1294199462.347935.472473715866.0.gpush@pororo>
-	<20110110104122.GI12078@pengutronix.de>
-	<20110110110028.GB12552@n2100.arm.linux.org.uk>
-	<201101110854.15653.jeremy.kerr@canonical.com>
-Message-ID: <AANLkTikjnz6RBCpOZM2imzX3d1ANUkaOZ2Qg9nqhpfpt@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 16 Jan 2011 09:23:15 +0000
+Subject: cannot fetch arm git tree
+In-Reply-To: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
+References: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
+Message-ID: <20110116092315.GA27542@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 10, 2011 at 5:54 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
-> Hi Russell,
->
->> Unless the locking problems can be resolved, the patches aren't ready.
->>
->> From what I've seen there's still quite a problem with what kind of
->> lock to use in the clock - mutex or spinlock.
->
-> Yes, the clock driver may either use a spinlock or mutex.
->
-> However, this exactly the same as the current clock code, my patches do not
-> alter what we currently have.
->
-> I do agree that we should define some specific semantics for the clock API
-> with regards to sleeping, and I'll start a new thread about that. But we
-> should definitely separate that issue from the problem of having multiple
-> definitions for struct clk, which is what these patches address.
+On Sun, Jan 16, 2011 at 10:28:55AM +0800, Jello huang wrote:
+> Dear Russell,
+> 
+> when i use git fetch,there arm some wrong with it.
+> 
+> jello at jello-laptop:~/git/russell/linux-2.6-arm$git pull
+> error: Unable to find 89e4d4b145bb7e73b4c45671a84b401a5d8694c1 under
+> http://ftp.arm.linux.org.uk/pub/armlinux/kernel/git-cur/linux-2.6-arm.git
+> Cannot obtain needed blob 89e4d4b145bb7e73b4c45671a84b401a5d8694c1
+> while processing commit eda2e5dcc914b4d70f665443efc9780e89a5e5c1.
+> error: Fetch failed.
+> 
+> What is the wrong?
 
-Given that each current struct clk implementation makes it's own
-decisions about how to handle locking, would it not make sense to omit
-locking entirely?  At least as a first step?  Let the clock ops
-implement their own locking.  Make enable count management their
-responsibility too.  That's all that the lock protects anyway.  The
-clk_* apis can fall directly through to the ops hooks with no
-manipulation or locking.  The way v3 of the patch worked.
+No idea.  The tree has the object file in one of its pack files:
 
-Just having a common struct clk definition (without the locking) is
-valuable on its own to get closer to supporting multiple platforms
-with a single kernel on ARM.  It certainly shouldn't be worse that the
-current state.  Locking consolidation can be implemented in follow-on
-patches.
+| rmk at ZenIV:[linux-2.6-arm.git]:<1020> GIT_DIR=. git cat-file -p 89e4d4b145bb7e73b4c45671a84b401a5d8694c1|head
+| 
+|         List of maintainers and how to submit kernel changes
+| 
+| Please try to follow the guidelines below.  This will make things
+| easier on the maintainers.  Not all of these guidelines matter for every
+| trivial patch so apply some common sense.
 
-g.
+and the pack info file lists all the pack files.  Maybe you have a hash
+collision on a pack file with your repository?
+
+I suggest you do as I've always recommended: make sure your tree is up to
+date with Linus' tree before fetching my tree.  That way you avoid the
+unnecessary download of large pack files.
+
+> I have found the discussion linux-next: manual merge of
+> the arm tree with the arm-current
+> tree<http://forum.soft32.com/linux/linux-manual-merge-arm-tree-arm-current-tree-ftopict523173.html>
+> with
+> Uwe.But there is also Puzzled with me now.
+
+How so?
