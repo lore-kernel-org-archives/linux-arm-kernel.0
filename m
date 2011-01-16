@@ -1,29 +1,30 @@
-From: dhylands@gmail.com (Dave Hylands)
-Date: Sun, 16 Jan 2011 10:39:15 -0800
-Subject: about arm_add_memory
-In-Reply-To: <7ce5e8c1.b773.12d757289fc.Coremail.wj_nwpu@163.com>
-References: <7ce5e8c1.b773.12d757289fc.Coremail.wj_nwpu@163.com>
-Message-ID: <AANLkTi=6EJurjpmgHHY938UScgVwQLTNLDiDuDzpS27W@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Sun, 16 Jan 2011 11:56:08 -0800
+Subject: [PATCH 27/48] ARM: PL08x: avoid duplicating registers in txd and
+	phychan structures
+In-Reply-To: <20110116123615.GC27542@n2100.arm.linux.org.uk>
+References: <20110103222943.GB4572@n2100.arm.linux.org.uk>
+	<E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
+	<AANLkTi=GsMaDQDSuR=Z4AT4Vk4GThx6O_0Le=pjsu9gj@mail.gmail.com>
+	<20110115092324.GX15996@n2100.arm.linux.org.uk>
+	<AANLkTim_1yK_Q7sy4a1iMX2zXG1p3EJ0avGvcYeTP9Us@mail.gmail.com>
+	<20110116123615.GC27542@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=s-CQVEj4wOZo8cCbzWnj5G0p_COtKoQt7Xzy8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-2011/1/11 wangjun <wj_nwpu@163.com>:
-> in? /arch/arm/kernel/setup.c
+ On Sun, Jan 16, 2011 at 4:36 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> > That probably means you've got something out of order. ?I have them
+>> > ordered in my git tree, I'll recheck there.
+>>
+>> I rechecked here and I think everything is in order.
 >
-> static int __init arm_add_memory(unsigned long start, unsigned long size)
-> ...
-> size -= start & ~PAGE_MASK;
-> bank->start = PAGE_ALIGN(start);
-> bank->size ?= size & PAGE_MASK;
-> bank->node ?= PHYS_TO_NID(start);
-> .....
->
-> what?? size -= start & ~PAGE_MASK? to do ?
+> Okay, something's screwed in the patch set - and I think I see what it is.
+> Patch 16 is missing a change. ?I'll respin.
 
-If you passed in a non-aligned start address, then this adjusts the
-size by the same amount as bank->start = PAGE_ALIGN(start) will adjust
-the start address.
+ Can this be incremental to the previous series instead?  I'm looking
+to get my 2.6.38 pull request submitted.
 
-Dave Hylands
+--
+Dan
