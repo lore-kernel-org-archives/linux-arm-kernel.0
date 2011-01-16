@@ -1,63 +1,132 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 16 Jan 2011 21:25:00 +0000
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-In-Reply-To: <20110115154019.GF15996@n2100.arm.linux.org.uk>
-References: <1294990949-2729-1-git-send-email-ccross@android.com>
-	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
-	<20110114120229.GA15996@n2100.arm.linux.org.uk>
-	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
-	<20110114154919.GE15996@n2100.arm.linux.org.uk>
-	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
-	<20110114163520.GH15996@n2100.arm.linux.org.uk>
-	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
-	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
-	<AANLkTin_pMzNc-ZL+rVcwaVawer0poyxhatqw5P-A2qW@mail.gmail.com>
-	<20110115154019.GF15996@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTim8OhAtqADck0Snq-7z7opw=coiQ4=DeO0O7Qa-@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Mon, 17 Jan 2011 10:39:24 +1300
+Subject: [PATCH 1/2] Add a common struct clk
+In-Reply-To: <20110116210759.GI6917@pengutronix.de>
+References: <1294199462.347935.472473715866.0.gpush@pororo>
+	<20110110104122.GI12078@pengutronix.de>
+	<20110110110028.GB12552@n2100.arm.linux.org.uk>
+	<201101110854.15653.jeremy.kerr@canonical.com>
+	<AANLkTikjnz6RBCpOZM2imzX3d1ANUkaOZ2Qg9nqhpfpt@mail.gmail.com>
+	<4D33580A.8090007@bluewatersys.com>
+	<20110116210759.GI6917@pengutronix.de>
+Message-ID: <4D33658C.9020502@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2011 15:40, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Jan 15, 2011 at 03:31:04PM +0000, Catalin Marinas wrote:
->> On 14 January 2011 17:30, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > +@ ?r9 ?= normal "successful" return address
->> > ?@ ?r10 = vfp_state union
->> > ?@ ?r11 = CPU number
->> > -@ ?lr ?= failure return
->> > -
->> > +@ ?lr ?= unrecognised instruction return address
->> > +@ ?IRQs enabled.
->> > ?ENTRY(vfp_support_entry)
->> > ? ? ? ?DBGSTR3 "instr %08x pc %08x state %p", r0, r2, r10
->> >
->> > @@ -138,9 +138,12 @@ check_for_exception:
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ exception before retrying branch
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ out before setting an FPEXC that
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ stops us reading stuff
->> > - ? ? ? VFPFMXR FPEXC, r1 ? ? ? ? ? ? ? @ restore FPEXC last
->> > - ? ? ? sub ? ? r2, r2, #4
->> > - ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? @ retry the instruction
->> > + ? ? ? VFPFMXR FPEXC, r1 ? ? ? ? ? ? ? @ Restore FPEXC last
->> > + ? ? ? sub ? ? r2, r2, #4 ? ? ? ? ? ? ?@ Retry current instruction - if Thumb
->> > + ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? @ mode it's two 16-bit instructions,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ else it's one 32-bit instruction, so
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ always subtract 4 from the following
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? @ instruction address.
+On 01/17/2011 10:07 AM, Uwe Kleine-K?nig wrote:
+> On Mon, Jan 17, 2011 at 09:41:46AM +1300, Ryan Mallon wrote:
+>> On 01/16/2011 08:26 PM, Grant Likely wrote:
+>>> On Mon, Jan 10, 2011 at 5:54 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+>>>> Hi Russell,
+>>>>
+>>>>> Unless the locking problems can be resolved, the patches aren't ready.
+>>>>>
+>>>>> From what I've seen there's still quite a problem with what kind of
+>>>>> lock to use in the clock - mutex or spinlock.
+>>>>
+>>>> Yes, the clock driver may either use a spinlock or mutex.
+>>>>
+>>>> However, this exactly the same as the current clock code, my patches do not
+>>>> alter what we currently have.
+>>>>
+>>>> I do agree that we should define some specific semantics for the clock API
+>>>> with regards to sleeping, and I'll start a new thread about that. But we
+>>>> should definitely separate that issue from the problem of having multiple
+>>>> definitions for struct clk, which is what these patches address.
+>>>
+>>> Given that each current struct clk implementation makes it's own
+>>> decisions about how to handle locking, would it not make sense to omit
+>>> locking entirely?  At least as a first step?  Let the clock ops
+>>> implement their own locking.  Make enable count management their
+>>> responsibility too.  That's all that the lock protects anyway.  The
+>>> clk_* apis can fall directly through to the ops hooks with no
+>>> manipulation or locking.  The way v3 of the patch worked.
 >>
->> I would say it's always a 32-bit instruction but made up of two 16-bit
->> values to allow half-word alignment.
->
-> Do you have a suggested replacement text?
+>> This doesn't really work in a generic API because the call sites need to
+>> know whether it safe to call clk_enable/disable, etc from a
+>> non-sleepable context. This has essentially the same problems as using a
+>> union with both a mutex and a spinlock.
+> Note that this is the current status quo, too.  clk_enable on imx
+> sleeps, clk_enable on at91 doesn't.  I think we all agree we don't want
+> to change that during the unifying step.  So the common struct clk might
+> not solve all problems, but it's not worse than the state now.
 
-Maybe something like: Retry the current VFP instruction (32-bit in
-both ARM and Thumb modes).
+Yes, I pointed this out. I think we have ended up in this ugly situation
+because the clock API calls never defined rules about calling context
+and so some platforms have ended up needing to sleep in the calls, while
+drivers for other platforms assume that the clock API calls can be
+safely called from atomic context.
 
-(I was wondering whether we can get on the above code path with
-asynchronous VFP exceptions where the interrupted instruction may not
-be the VFP one. But I think all Thumb-2 processors these days generate
-synchronous exceptions)
+My point, and I think Russell's point, is that if you are going to have
+a truly generic, unified API we don't want this sort of mix and match.
+The clock API functions should have clearly defined rules about what
+context they can be called from and each platform/machine implementation
+of the API should obey those rules.
+
+Partly this is about code clarity. At the moment, to determine if a
+clk_enable call might sleep I need to go and look at the implementation
+for the platform I am on. There are drivers, such as the amba-pl010
+serial driver, which can be used on multiple platforms. To verify that
+the clock API call sites are correct you need to check each platform
+that the driver runs on. By having an explicit separation of the clock
+implementations which are atomic and those which may need to sleep these
+problems disappear.
+
+For the current patch series, the documentation for clk_enable would
+need include this.
+
+  "This function may or may not be safe to call from atomic context
+   depending on the platform you are on."
+
+I don't think we have too many other generic APIs in the kernel which
+have this kind of loose documentation.
+
+>> That said, although we are aiming for a generic clock API, it's usage
+>> typically isn't. Most of the users of the clock API are machine/platform
+>> specific drivers and so they can make assumptions about the
+>> implementation of the clock API calls. We currently do have a generic
+>> set of clock calls which do not define rules about calling from atomic
+>> context. We have a number of drivers, for several platforms, using the
+>> clk_enable/disable calls. Some platforms are using sleeping clocks and
+>> others are using atomic clocks, but because the _usage_ of the API is
+>> largely platform specific it all hangs together.
+>>
+>> This is a bit ugly in practice. It's hardly desirable to have an API
+>> which looks generic, but in reality is platform/machine specific. I'm
+>> guessing that a large benefit of having a unified API and well defined
+>> rules about whether clock API calls may sleep or not allows the usage of
+>> the clock API to become more generic.
+>>
+>> I agree with Russell that the best short term approach is to create two
+>> clock APIs, one for clocks which are atomic and the other for clocks
+>> which need to sleep. If nothing else this at least allows the rules
+>> about calling context to nailed down.
+> For me this sounds like code duplication if everything is identical only
+> spinlocks are substituted by mutexes.  What do you think about my
+> suggestion to use a Kconfig symbol that is selected by platforms (e.g.
+> COMMON_CLK_SLEEPING) and then use:
+> 
+> 	#ifdef CONFIG_COMMON_CLK_SLEEPING
+> 		... mutex stuff ...
+> 	#else
+> 		... spinlock stuff ...
+> 	#endif
+
+You still have the problem that cannot make any assumptions about
+calling context for calls to the clock API. The point is that the
+semantics about calling context for a generic clock API are currently
+too loose. Part of consolidating the clock implementations should be to
+fix that. Russell's suggestion to reduce to two implementations (from
+the 30+ we have now) will have a net reduction in code, but will also
+clarify which platforms/drivers are using sleeping clocks.
+
+~Ryan
 
 -- 
-Catalin
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
