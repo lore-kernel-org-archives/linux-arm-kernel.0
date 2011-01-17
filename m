@@ -1,36 +1,67 @@
-From: s.neumann@raumfeld.com (Sven Neumann)
-Date: Mon, 17 Jan 2011 11:36:20 +0100
-Subject: resume regression in 2.6.37
-In-Reply-To: <alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
-References: <1294933492.2535.23.camel@sven>
-	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
-	<1294938961.10740.24.camel@sven>
-	<alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
-Message-ID: <1295260580.2060.29.camel@sven>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jan 2011 10:37:39 +0000
+Subject: [PATCH] Remove CPU_32v6K dependencies in asm/spinlock.h
+In-Reply-To: <AANLkTik8j2a9XXPQXw51Vbs=24hvP-PUJrVD--VNX0DG@mail.gmail.com>
+References: <20110115161132.GH15996@n2100.arm.linux.org.uk>
+	<AANLkTik8j2a9XXPQXw51Vbs=24hvP-PUJrVD--VNX0DG@mail.gmail.com>
+Message-ID: <20110117103739.GA18626@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-13 at 18:33 +0100, Thomas Gleixner wrote:
-
-> > Without the revert there is absolutely no sign of resume. With the
-> > change reverted I can see that the PXA powers up again, there's an LED
-> > showing that the USB controller has power again. Unfortunately there's
-> > seems to be another problem and the resume doesn't complete. I've tried
-> > to get console output by using no_console_suspend, but there's just
-> > gibberish on the console after resume :(
-> > 
-> > Any idea on how to proceed from here? I could perhaps ask our hardware
-> > engineer to try find out where exactly we are stuck in the resume. But
-> > I'd like to avoid that if possible.
+On Mon, Jan 17, 2011 at 10:15:25AM +0000, Catalin Marinas wrote:
+> On 15 January 2011 16:11, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > SMP requires at least the ARMv6K extensions to be present, so if we're
+> > running on SMP, the WFE and SEV instructions must be available.
+> >
+> > However, when we run on UP, the v6K extensions may not be available,
+> > and so we don't want WFE/SEV to be in the instruction stream. ?Use the
+> > SMP alternatives infrastructure to replace these instructions with NOPs
+> > if we build for SMP but run on UP.
+> [...]
+> > --- a/arch/arm/include/asm/spinlock.h
+> > +++ b/arch/arm/include/asm/spinlock.h
+> > @@ -5,17 +5,36 @@
+> > ?#error SMP not supported on pre-ARMv6 CPUs
+> > ?#endif
+> >
+> > +/*
+> > + * sev and wfe are ARMv6K extensions. ?Uniprocessor ARMv6 may not have the K
+> > + * extensions, so when running on UP, we have to patch these instructions away.
+> > + */
+> > +#define ALT_SMP(smp, up) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> > + ? ? ? "9998: ?" smp "\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> > + ? ? ? " ? ? ? .pushsection \".alt.smp.init\", \"a\"\n" ? ? ? ?\
+> > + ? ? ? " ? ? ? .long ? 9998b\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> > + ? ? ? " ? ? ? " up "\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> > + ? ? ? " ? ? ? .popsection\n"
+> > +
+> > +#ifdef CONFIG_THUMB2_KERNEL
+> > +#define SEV ? ? ? ? ? ?ALT_SMP("sev.w", "nop.w")
+> > +#define WFE(cond) ? ? ?ALT_SMP("wfe" cond ".w", "nop.w")
+> > +#else
+> > +#define SEV ? ? ? ? ? ?ALT_SMP("sev", "nop")
+> > +#define WFE(cond) ? ? ?ALT_SMP("wfe" cond, "nop")
+> > +#endif
 > 
-> Can you stick a printk into the set_wake() function of that irq chip
-> and print the irq and on arguments and the return value . Run that
-> with both stock 2.6.37 and the patch reverted.
+> In the SEV macro definition, can you also include the dsb?
 
-pxa3xx_set_wake(31, 1) returns 0
+No, you can't do preprocessor conditionals in the middle of a macro
+definition, and I don't want to have 4 versions of the SEV stuff.
 
-Same result with stock 2.6.37 and the patch reverted. Except that
-without the patch reverted, the device doesn't power up again.
+> This barrier is only there because of sev, otherwise we don't need it
+> (we have a dmb prior to releasing the lock).
 
+1. Does it make sense to have sev and wfe instructions in non-SMP kernels?
+We now have in asm/system.h:
+#if __LINUX_ARM_ARCH__ >= 7 ||          \
+        (__LINUX_ARM_ARCH__ == 6 && defined(CONFIG_CPU_32v6K))
+#define sev()   __asm__ __volatile__ ("sev" : : : "memory")
+#define wfe()   __asm__ __volatile__ ("wfe" : : : "memory")
+#define wfi()   __asm__ __volatile__ ("wfi" : : : "memory")
+#endif
 
-Sven
+2. Should we have a smp_dsb() which makes the dsb conditional elsewhere?
+
+3. Do we always need a dsb prior to a sev?  Maybe the SPEAR patches need
+another review to determine how they're using sev()?
