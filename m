@@ -1,32 +1,43 @@
-From: bgamari.foss@gmail.com (Ben Gamari)
-Date: Mon, 17 Jan 2011 16:25:48 -0500
-Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
-Message-ID: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 18 Jan 2011 10:35:16 +1300
+Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
+In-Reply-To: <1295248809-30334-2-git-send-email-hong.xu@atmel.com>
+References: <hong.xu@atmel.com>
+	<1295248809-30334-2-git-send-email-hong.xu@atmel.com>
+Message-ID: <4D34B614.3000909@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some very basic setup (i.e. MMC) is done in the beagleboard's setup
-callback for the TWL4030's gpio driver, causing a kernel without this
-support to fail to find its root filesystem. I can't imagine why one would
-want to build a kernel for this board without this driver, so I think
-it's worthwhile to explicitly depend on it.
+On 01/17/2011 08:20 PM, Hong Xu wrote:
+> Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
+> This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
+> 
+> Signed-off-by: Hong Xu <hong.xu@atmel.com>
+> ---
 
-Signed-Off-By: Ben Gamari <bgamari.foss@gmail.com>
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+One more comment:
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index ab784bf..74173f1 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -120,6 +120,7 @@ config MACH_OMAP_2430SDP
- config MACH_OMAP3_BEAGLE
- 	bool "OMAP3 BEAGLE board"
- 	depends on ARCH_OMAP3
-+	depends on GPIO_TWL4030
- 	default y
- 	select OMAP_PACKAGE_CBB
- 
+> +	if (cpu_has_dma() && use_dma) {
+> +		dma_cap_mask_t mask;
+> +
+> +		dma_cap_zero(mask);
+> +		dma_cap_set(DMA_MEMCPY, mask);
+> +		host->dma_chan = dma_request_channel(mask, 0, NULL);
+> +
+> +		if (!host->dma_chan) {
+> +			dev_err(host->dev, "Failed to request DMA channel\n");
+> +			host->dma_ready = 0;
+
+Because host is kzalloc'ed above, you do not need to set host->dma_ready
+to zero here.
+
+~Ryan
+
 -- 
-1.7.0.4
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
