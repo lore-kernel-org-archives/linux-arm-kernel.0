@@ -1,37 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jan 2011 11:26:37 +0000
+From: schwidefsky@de.ibm.com (Martin Schwidefsky)
+Date: Mon, 17 Jan 2011 13:18:23 +0100
 Subject: [PATCH] sched: provide scheduler_ipi() callback in response to
 	smp_send_reschedule()
 In-Reply-To: <1295262433.30950.53.camel@laptop>
 References: <1295262433.30950.53.camel@laptop>
-Message-ID: <20110117112637.GA18599@n2100.arm.linux.org.uk>
+Message-ID: <20110117131823.410e515c@mschwide.boeblingen.de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 12:07:13PM +0100, Peter Zijlstra wrote:
-> diff --git a/arch/alpha/kernel/smp.c b/arch/alpha/kernel/smp.c
-> index 42aa078..c4a570b 100644
-> --- a/arch/alpha/kernel/smp.c
-> +++ b/arch/alpha/kernel/smp.c
-> @@ -587,6 +587,7 @@ handle_ipi(struct pt_regs *regs)
->  		case IPI_RESCHEDULE:
->  			/* Reschedule callback.  Everything to be done
->  			   is done by the interrupt return path.  */
-> +			scheduler_ipi();
->  			break;
+On Mon, 17 Jan 2011 12:07:13 +0100
+Peter Zijlstra <peterz@infradead.org> wrote:
+
+> I visited existing smp_send_reschedule() implementations and tried to
+> add a call to scheduler_ipi() in their handler part, but esp. for MIPS
+> I'm not quite sure I actually got all of them.
 >  
->  		case IPI_CALL_FUNC:
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 9066473..ffde790 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -579,6 +579,7 @@ asmlinkage void __exception do_IPI(struct pt_regs *regs)
->  				 * nothing more to do - eveything is
->  				 * done on the interrupt return path
->  				 */
-> +				scheduler_ipi();
+> diff --git a/arch/s390/kernel/smp.c b/arch/s390/kernel/smp.c
+> index 94cf510..61789e8 100644
+> --- a/arch/s390/kernel/smp.c
+> +++ b/arch/s390/kernel/smp.c
+> @@ -163,12 +163,12 @@ static void do_ext_call_interrupt(unsigned int ext_int_code,
+>  
+>  	/*
+>  	 * handle bit signal external calls
+> -	 *
+> -	 * For the ec_schedule signal we have to do nothing. All the work
+> -	 * is done automatically when we return from the interrupt.
+>  	 */
+>  	bits = xchg(&S390_lowcore.ext_call_fast, 0);
+>  
+> +	if (test_bit(ec_schedule, &bits))
+> +		scheduler_ipi();
+> +
+>  	if (test_bit(ec_call_function, &bits))
+>  		generic_smp_call_function_interrupt();
+>  
 
-Maybe remove the comment "everything is done on the interrupt return path"
-as with this function call, that is no longer the case.
+s390 bits are fine.
 
-Looks like the same is true for Alpha as well?
+-- 
+blue skies,
+   Martin.
+
+"Reality continues to ruin my life." - Calvin.
