@@ -1,70 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jan 2011 08:50:12 +0000
-Subject: [PATCH 27/48] ARM: PL08x: avoid duplicating registers in txd
-	and phychan structures
-In-Reply-To: <AANLkTikC7gewBjB_5ebi11J_Brpoc6p=3bWLb=8WdUk_@mail.gmail.com>
-References: <E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
-	<AANLkTi=GsMaDQDSuR=Z4AT4Vk4GThx6O_0Le=pjsu9gj@mail.gmail.com>
-	<20110115092324.GX15996@n2100.arm.linux.org.uk>
-	<AANLkTim_1yK_Q7sy4a1iMX2zXG1p3EJ0avGvcYeTP9Us@mail.gmail.com>
-	<20110116123615.GC27542@n2100.arm.linux.org.uk>
-	<AANLkTi=s-CQVEj4wOZo8cCbzWnj5G0p_COtKoQt7Xzy8@mail.gmail.com>
-	<20110116195948.GA4864@n2100.arm.linux.org.uk>
-	<4D334F15.3080705@intel.com>
-	<20110116201805.GB4864@n2100.arm.linux.org.uk>
-	<AANLkTikC7gewBjB_5ebi11J_Brpoc6p=3bWLb=8WdUk_@mail.gmail.com>
-Message-ID: <20110117085012.GA17036@n2100.arm.linux.org.uk>
+Date: Mon, 17 Jan 2011 08:52:31 +0000
+Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
+In-Reply-To: <1295253729-23153-2-git-send-email-stanley.miao@windriver.com>
+References: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
+	<1295253729-23153-2-git-send-email-stanley.miao@windriver.com>
+Message-ID: <20110117085231.GB17036@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 16, 2011 at 05:36:57PM -0800, Dan Williams wrote:
-> On Sun, Jan 16, 2011 at 12:18 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Subject: [PATCH] ARM: PL08x: cleanup comments
-> >
-> > Cleanup the formatting of comments, remove some which don't make sense
-> > anymore.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> > ?drivers/dma/amba-pl08x.c ? | ?144 ++++++++++++++++----------------------------
-> > ?include/linux/amba/pl08x.h | ? 45 +++++++-------
-> > ?2 files changed, 72 insertions(+), 117 deletions(-)
-> >
-> [..]
-> > diff --git a/include/linux/amba/pl08x.h b/include/linux/amba/pl08x.h
-> > index 933b4ed..3111385 100644
-> > --- a/include/linux/amba/pl08x.h
-> > +++ b/include/linux/amba/pl08x.h
-> [..]
+On Mon, Jan 17, 2011 at 04:42:07PM +0800, Stanley.Miao wrote:
+> The code section in BE8 kernel modules is in little-endian while data
+> section is in big-endian. When reading code from memory in the relocation
+> procedure, these instructions are read according to big-endian, so they
+> need to be inverted before writing to memory and after reading from memory.
 > 
-> Thanks, applied after changing the following hunk...
+> Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
+> ---
+>  arch/arm/Makefile         |    1 +
+>  arch/arm/include/asm/io.h |   12 ++++++++++
+>  arch/arm/kernel/module.c  |   51 ++++++++++++++++++++++++--------------------
+>  3 files changed, 41 insertions(+), 23 deletions(-)
 > 
-> > @@ -118,8 +116,7 @@ struct pl08x_txd {
-> > ? ? ? ?dma_addr_t dst_addr;
-> > ? ? ? ?size_t len;
-> > ? ? ? ?dma_addr_t llis_bus;
-> > - ? ? ? void *llis_va;
-> > - ? ? ? bool active;
-> > + ? ? ? struct pl08x_lli *llis_va;
-> > ? ? ? ?/* Default cctl value for LLIs */
-> > ? ? ? ?u32 cctl;
-> > ? ? ? ?/*
-> 
-> ...to:
-> 
-> @@ -119,7 +117,6 @@ struct pl08x_txd {
->         size_t len;
->         dma_addr_t llis_bus;
->         struct pl08x_lli *llis_va;
-> -       bool active;
->         /* Default cctl value for LLIs */
->         u32 cctl;
->         /*
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 3eec793..03e7761 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -13,6 +13,7 @@
+>  LDFLAGS_vmlinux	:=-p --no-undefined -X
+>  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+>  LDFLAGS_vmlinux	+= --be8
+> +LDFLAGS_MODULE	+= --be8
+>  endif
+>  
+>  OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 815efa2..2f088c5 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -233,6 +233,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>  
+>  #endif	/* __mem_pci */
+>  
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +#define read_instr32(c)			__swab32(*(u32 *)c)
+> +#define read_instr16(c)			__swab16(*(u16 *)c)
+> +#define write_instr32(v,a)		(*(u32 *)(a) = __swab32((__force __u32)(v)))
+> +#define write_instr16(v,a)		(*(u16 *)(a) = __swab16((__force __u16)(v)))
+> +#else
+> +#define read_instr32(c)			(*(u32 *)c)
+> +#define read_instr16(c)			(*(u16 *)c)
+> +#define write_instr32(v,a)		(*(u32 *)(a) = (v))
+> +#define write_instr16(v,a)		(*(u16 *)(a) = (v))
+> +#endif
+> +
 
-Sigh - but that was the original problem which was complained about -
-llis_va was void pointer not a struct.
-
-So what was the point of asking me for some random patch again?
-
-I'm confused.
+It makes no sense to put these in asm/io.h
