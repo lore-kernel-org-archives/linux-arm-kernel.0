@@ -1,52 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jan 2011 22:36:35 +0000
-Subject: [PATCH 10/14] ARM: v6k: select TLS register code according to
-	V6 variants
-In-Reply-To: <alpine.LFD.2.00.1101171717090.8580@xanadu.home>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peugh-0003St-DY@rmk-PC.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101171717090.8580@xanadu.home>
-Message-ID: <20110117223635.GB25829@n2100.arm.linux.org.uk>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 18 Jan 2011 11:42:07 +1300
+Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
+In-Reply-To: <4D34A37E.1060300@bluewatersys.com>
+References: <hong.xu@atmel.com>
+	<1295248809-30334-2-git-send-email-hong.xu@atmel.com>
+	<4D34A37E.1060300@bluewatersys.com>
+Message-ID: <4D34C5BF.2070107@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 05:23:43PM -0500, Nicolas Pitre wrote:
-> On Mon, 17 Jan 2011, Russell King - ARM Linux wrote:
-> 
-> > If CONFIG_CPU_V6 is enabled, we may or may not have the TLS register.
-> > Use the conditional code which copes with this variability.  Otherwise,
-> > if CONFIG_CPU_32v6K is set, we know we have the TLS register on all
-> > supported CPUs, so use it unconditionally.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> Note: this is becoming a bit confusing and prone to mistake when we have:
+On 01/18/2011 09:15 AM, Ryan Mallon wrote:
+> On 01/17/2011 08:20 PM, Hong Xu wrote:
+>> Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
+>> This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
 
-Agreed.
+I'm trying to patch this into a 2.6.33 kernel running on a custom
+SAM9G45 based board, but I get a failure requesting the DMA channel:
 
-> 	CONFIG_CPU_V6
-> 	CONFIG_CPU_V6K
-> 	CONFIG_CPU_32v6
-> 	CONFIG_CPU_32v6K
-> 
-> I don't know what to suggest for a less similar naming scheme between 
-> the CPU design and the allowed instruction set though.
+root at snapper:~$ dmesg | grep -i dma
+[    0.850000] atmel_nand atmel_nand: Failed to request DMA channel
+[    0.860000] atmel_nand atmel_nand: No DMA support for NAND access.
+[    1.530000] at_hdmac at_hdmac: Atmel AHB DMA Controller ( cpy slave ), 8 channels
 
-It's best to consider CONFIG_CPU_V6/CONFIG_CPU_V6K/CONFIG_CPU_V7 in the
-same light as CONFIG_CPU_ARM926T etc.  It selects a specific CPU core
-(or family of CPU cores) rather than an architecture - the fact that it
-_may_ tie up with an architecture is incidental.
 
-The CPU_32vX selects the major architecture version.  32vX<letter> selects
-sub-options of the architecture.
+It looks like the registration for the DMA controller happens after the
+NAND driver probe and so the request is failing. I had a quick look, but
+I can't see anything that would change this in more recent kernels. Any
+ideas?
 
-It may be better at some point to get rid of the CPU_32v* and replace
-them with CPU_ARCH_V* instead, which makes it clear that these ones
-definitely refer to the architecture versions.
+Also, I think you want to add the following for the atmel_nand Kconfig:
+  select AT_HDMAC
 
-The last point while we're here is I don't think it helps to have the
-conditionals spread between the Kconfig files and this file - I'd much
-rather see them all in Kconfig so we can see exactly how we end up with
-each option (TLS_EMUL, TLS_V6, TLS_V6K) in one place.
+or make the DMA parts of the driver ifdef CONFIG_AT_HDMAC (if the above
+won't work for some reason) since you will get build errors on the
+dmaengine functions otherwise.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751 
+Fax:   +64 3 3779135			  USA 1800 261 2934
