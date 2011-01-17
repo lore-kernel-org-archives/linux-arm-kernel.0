@@ -1,156 +1,53 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 17 Jan 2011 15:02:20 +0100
-Subject: [PATCH v4] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
-References: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <AANLkTintFe4V6BxrUxh-gwvhoa=RcH0tkHjYbfyGHKD=@mail.gmail.com>
+From: s.neumann@raumfeld.com (Sven Neumann)
+Date: Mon, 17 Jan 2011 15:04:43 +0100
+Subject: resume regression in 2.6.37
+In-Reply-To: <alpine.LFD.2.00.1101171142380.2678@localhost6.localdomain6>
+References: <1294933492.2535.23.camel@sven>
+	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
+	<1294938961.10740.24.camel@sven>
+	<alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
+	<1295260580.2060.29.camel@sven>
+	<alpine.LFD.2.00.1101171142380.2678@localhost6.localdomain6>
+Message-ID: <1295273083.2060.34.camel@sven>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 10:17 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> In low-level board support code, there is sometimes a need to
-> copy a function body to another location at run-time.
->
-> A straightforward call to memcpy doesn't work in Thumb-2,
-> because bit 0 of external Thumb function symbols is set to 1,
-> indicating that the function is Thumb. ?Without corrective
-> measures, this will cause an off-by-one copy, and the copy
-> may be called using the wrong instruction set.
->
-> This patch adds an fncpy() macro to help with such copies.
->
-> Particular care is needed, because C doesn't guarantee any
-> defined behaviour when casting a function pointer to any other
-> type. ?This has been observed to lead to strange optimisation
-> side-effects when doing the arithmetic which is required in
-> order to copy/move function bodies correctly in Thumb-2.
->
-> Thanks to Russell King and Nicolas Pitre for their input
-> on this patch.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Tested-by: Jean Pihet <j-pihet@ti.com>
-> ---
-> ?arch/arm/include/asm/fncpy.h | ? 96 ++++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 96 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/include/asm/fncpy.h
->
-> diff --git a/arch/arm/include/asm/fncpy.h b/arch/arm/include/asm/fncpy.h
-> new file mode 100644
-> index 0000000..8b94b5f
-> --- /dev/null
-> +++ b/arch/arm/include/asm/fncpy.h
-> @@ -0,0 +1,96 @@
-> +/*
-> + * arch/arm/include/asm/fncpy.h - helper macros for function body copying
-> + *
-> + * Copyright (C) 2011 Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> + */
-> +
-> +/*
-> + * These macros are intended for use when there is a need to copy a low-level
-> + * function body into special memory.
-> + *
-> + * For example, when reconfiguring the SDRAM controller, the code doing the
-> + * reconfiguration may need to run from SRAM.
-> + *
-> + * NOTE: that the copied function body must be entirely self-contained and
-> + * position-independent in order for this to work properly.
-> + *
-> + * NOTE: in order for embedded literals and data to get referenced correctly,
-> + * the alignment of functions must be preserved when copying. ?To ensure this,
-> + * the source and destination addresses for fncpy() must be aligned to a
-> + * multiple of 8 bytes: you will be get a BUG() if this condition is not met.
-> + * You will typically need a ".align 3" directive in the assembler where the
-> + * function to be copied is defined, and ensure that your allocator for the
-> + * destination buffer returns 8-byte-aligned pointers.
+On Mon, 2011-01-17 at 13:40 +0100, Thomas Gleixner wrote:
+> On Mon, 17 Jan 2011, Sven Neumann wrote:
+> 
+> > On Thu, 2011-01-13 at 18:33 +0100, Thomas Gleixner wrote:
+> > 
+> > > > Without the revert there is absolutely no sign of resume. With the
+> > > > change reverted I can see that the PXA powers up again, there's an LED
+> > > > showing that the USB controller has power again. Unfortunately there's
+> > > > seems to be another problem and the resume doesn't complete. I've tried
+> > > > to get console output by using no_console_suspend, but there's just
+> > > > gibberish on the console after resume :(
+> > > > 
+> > > > Any idea on how to proceed from here? I could perhaps ask our hardware
+> > > > engineer to try find out where exactly we are stuck in the resume. But
+> > > > I'd like to avoid that if possible.
+> > > 
+> > > Can you stick a printk into the set_wake() function of that irq chip
+> > > and print the irq and on arguments and the return value . Run that
+> > > with both stock 2.6.37 and the patch reverted.
+> > 
+> > pxa3xx_set_wake(31, 1) returns 0
+> > 
+> > Same result with stock 2.6.37 and the patch reverted. Except that
+> > without the patch reverted, the device doesn't power up again.
+> 
+> Ok, can we agree that the patch has no functional impact on the
+> set_wake function? And I don't see a reason why reverting that patch
+> results in a working resume. That does not make sense at all. Which
+> compiler version are you using ?
 
-Note that aligning the source and destination pointers to a multiple
-of 8 bytes has an impact on the behavio(u)r and so must be carefully
-thought and tested on OMAP1/2/3 platforms.
+I agree that this is all very weird and as far as I understand the patch
+it should have no functional impact. Unfortunately reverting the patch
+does not result in a working resume, but at least it makes a difference
+and at the moment it's the only trace I have.
 
-Regards,
-Jean
+My cross-compile tool-chain uses GCC 4.3.5.
 
-> + *
-> + * Typical usage example:
-> + *
-> + * extern int f(args);
-> + * extern uint32_t size_of_f;
-> + * int (*copied_f)(args);
-> + * void *sram_buffer;
-> + *
-> + * copied_f = fncpy(sram_buffer, &f, size_of_f);
-> + *
-> + * ... do any required D-side/I-side synchronisation ...
-> + *
-> + * ... later, call the function: ...
-> + *
-> + * copied_f(args);
-> + *
-> + * The size of the function to be copied can't be determined from C:
-> + * this must be determined by other means, such as adding assmbler directives
-> + * in the file where f is defined.
-> + */
-> +
-> +#ifndef __ASM_FNCPY_H
-> +#define __ASM_FNCPY_H
-> +
-> +#include <linux/types.h>
-> +#include <linux/string.h>
-> +
-> +#include <asm/bug.h>
-> +#include <asm/cacheflush.h>
-> +
-> +/*
-> + * Minimum alignment requirement for the source and destination addresses
-> + * for function copying.
-> + */
-> +#define FNCPY_ALIGN 8
-> +
-> +#define fncpy(dest_buf, funcp, size) ({ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? uintptr_t __funcp_address; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? typeof(funcp) __result; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? asm("" : "=r" (__funcp_address) : "0" (funcp)); ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? /* ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ?* Ensure alignment of source and destination addresses, ? ? ? ?\
-> + ? ? ? ?* disregarding the function's Thumb bit: ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ?*/ ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? BUG_ON((uintptr_t)(dest_buf) & (FNCPY_ALIGN - 1) || ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? (__funcp_address & ~(uintptr_t)1 & (FNCPY_ALIGN - 1))); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? memcpy(dest_buf, (void const *)(__funcp_address & ~1), size); ? \
-> + ? ? ? flush_icache_range((unsigned long)(dest_buf), ? ? ? ? ? ? ? ? ? \
-> + ? ? ? ? ? ? ? (unsigned long)(dest_buf) + (size)); ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? asm("" : "=r" (__result) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? ? ? ? ? : "0" ((uintptr_t)(dest_buf) | (__funcp_address & 1))); \
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? __result; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> +})
-> +
-> +#endif /* !__ASM_FNCPY_H */
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+
+Sven
