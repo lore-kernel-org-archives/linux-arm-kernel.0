@@ -1,37 +1,127 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 17 Jan 2011 11:43:11 -0800
-Subject: [PATCH 27/48] ARM: PL08x: avoid duplicating registers in txd and
-	phychan structures
-In-Reply-To: <20110117085012.GA17036@n2100.arm.linux.org.uk>
-References: <E1PZt3Z-00025W-0c@rmk-PC.arm.linux.org.uk>
-	<AANLkTi=GsMaDQDSuR=Z4AT4Vk4GThx6O_0Le=pjsu9gj@mail.gmail.com>
-	<20110115092324.GX15996@n2100.arm.linux.org.uk>
-	<AANLkTim_1yK_Q7sy4a1iMX2zXG1p3EJ0avGvcYeTP9Us@mail.gmail.com>
-	<20110116123615.GC27542@n2100.arm.linux.org.uk>
-	<AANLkTi=s-CQVEj4wOZo8cCbzWnj5G0p_COtKoQt7Xzy8@mail.gmail.com>
-	<20110116195948.GA4864@n2100.arm.linux.org.uk>
-	<4D334F15.3080705@intel.com>
-	<20110116201805.GB4864@n2100.arm.linux.org.uk>
-	<AANLkTikC7gewBjB_5ebi11J_Brpoc6p=3bWLb=8WdUk_@mail.gmail.com>
-	<20110117085012.GA17036@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikn6T-FQbssHY1rQnZBJ8E+CVNHqofEhFM35U_K@mail.gmail.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Mon, 17 Jan 2011 20:59:56 +0100
+Subject: resume regression in 2.6.37
+In-Reply-To: <4D349787.80201@metafoo.de>
+References: <1294933492.2535.23.camel@sven>	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>	<1294938961.10740.24.camel@sven>	<alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>	<1295260580.2060.29.camel@sven>	<alpine.LFD.2.00.1101171142380.2678@localhost6.localdomain6>
+	<4D349787.80201@metafoo.de>
+Message-ID: <4D349FBC.6050606@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 12:50 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Sigh - but that was the original problem which was complained about -
-> llis_va was void pointer not a struct.
->
-> So what was the point of asking me for some random patch again?
->
-> I'm confused.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Me too... we did a fire drill to make sure the series was applied
-correctly and I thought the outcome was that you found one more
-straggling patch to include.
+On 01/17/2011 08:24 PM, Lars-Peter Clausen wrote:
+> On 01/17/2011 01:40 PM, Thomas Gleixner wrote:
+>> On Mon, 17 Jan 2011, Sven Neumann wrote:
+> 
+>>> On Thu, 2011-01-13 at 18:33 +0100, Thomas Gleixner wrote:
+>>>
+>>>>> Without the revert there is absolutely no sign of resume. With the
+>>>>> change reverted I can see that the PXA powers up again, there's an LED
+>>>>> showing that the USB controller has power again. Unfortunately there's
+>>>>> seems to be another problem and the resume doesn't complete. I've tried
+>>>>> to get console output by using no_console_suspend, but there's just
+>>>>> gibberish on the console after resume :(
+>>>>>
+>>>>> Any idea on how to proceed from here? I could perhaps ask our hardware
+>>>>> engineer to try find out where exactly we are stuck in the resume. But
+>>>>> I'd like to avoid that if possible.
+>>>>
+>>>> Can you stick a printk into the set_wake() function of that irq chip
+>>>> and print the irq and on arguments and the return value . Run that
+>>>> with both stock 2.6.37 and the patch reverted.
+>>>
+>>> pxa3xx_set_wake(31, 1) returns 0
+>>>
+>>> Same result with stock 2.6.37 and the patch reverted. Except that
+>>> without the patch reverted, the device doesn't power up again.
+> 
+>> Ok, can we agree that the patch has no functional impact on the
+>> set_wake function? And I don't see a reason why reverting that patch
+>> results in a working resume. That does not make sense at all. Which
+>> compiler version are you using ?
+> 
+>> Thanks,
+> 
+>> 	tglx
+> 
+> 
+> Hi
+> 
+> If you take a look at the pxa gpio irq handling you'll see that it sets the
+> "set_wake" field of it's irq_chip after calling set_irq_chip for all of the irqs, so
+> the compat handler gets never installed.
+> 
+> So I guess the following patch fixes it:
+> 
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -111,13 +111,13 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+>  	GRER0 &= ~0x3;
+>  	GEDR0 = 0x3;
+> 
+> +	pxa_low_gpio_chip.set_wake = fn;
+> +
+>  	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
+>  		set_irq_chip(irq, &pxa_low_gpio_chip);
+>  		set_irq_handler(irq, handle_edge_irq);
+>  		set_irq_flags(irq, IRQF_VALID);
+>  	}
+> -
+> -	pxa_low_gpio_chip.set_wake = fn;
+>  }
+> 
+>  void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+> @@ -142,13 +142,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+>  	/* only unmasked interrupts kick us out of idle */
+>  	ICCR = 1;
+> 
+> +	pxa_internal_irq_chip.set_wake = fn;
+> +
+>  	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
+>  		set_irq_chip(irq, &pxa_internal_irq_chip);
+>  		set_irq_handler(irq, handle_level_irq);
+>  		set_irq_flags(irq, IRQF_VALID);
+>  	}
+> 
+> -	pxa_internal_irq_chip.set_wake = fn;
+>  	pxa_init_low_gpio_irq(fn);
+>  }
+> 
+and
 
-In any event I think we are all set now.
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index d1c747c..6fc8281 100644
+- --- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -558,13 +558,13 @@ static void __init pxa_init_ext_wakeup_irq(set_wake_t fn)
+ {
+ 	int irq;
 
---
-Dan
++	pxa_ext_wakeup_chip.set_wake = fn;
++
+ 	for (irq = IRQ_WAKEUP0; irq <= IRQ_WAKEUP1; irq++) {
+ 		set_irq_chip(irq, &pxa_ext_wakeup_chip);
+ 		set_irq_handler(irq, handle_edge_irq);
+ 		set_irq_flags(irq, IRQF_VALID);
+ 	}
+- -
+- -	pxa_ext_wakeup_chip.set_wake = fn;
+ }
+
+ void __init pxa3xx_init_irq(void)
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.10 (GNU/Linux)
+Comment: Using GnuPG with Mozilla - http://enigmail.mozdev.org/
+
+iEYEARECAAYFAk00n7wACgkQBX4mSR26RiO1lgCfRblXeDhxuXHe7sKzQEApzyS7
+wjgAniUvOc9RdV5jms1SU5ivQ0T3NogK
+=heYm
+-----END PGP SIGNATURE-----
