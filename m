@@ -1,78 +1,78 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Mon, 17 Jan 2011 16:40:02 +0800
-Subject: [PATCH 1/2] video: nuc900fb: fix compile error
-In-Reply-To: <1295253143.12890.3.camel@mola>
-References: <1295253143.12890.3.camel@mola>
-Message-ID: <AANLkTinXNoxtvobV1go9bLqJohiyic8qzznsoHvyJsh3@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 17 Jan 2011 09:42:21 +0100
+Subject: [PATCH v4 05/10] net/fec: add dual fec support for mx28
+In-Reply-To: <19763.64214.220441.325208@ipc1.ka-ro>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
+	<20110113144805.GS24920@pengutronix.de>
+	<20110114054838.GA14491@freescale.com>
+	<20110114075223.GC24920@pengutronix.de>
+	<20110114130849.GA27583@freescale.com>
+	<19763.64214.220441.325208@ipc1.ka-ro>
+Message-ID: <20110117084221.GM6917@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/17 Axel Lin <axel.lin@gmail.com>:
-> >From a4bd940fa4d162f95e51e67c7ec4973b1d5b6866 Mon Sep 17 00:00:00 2001
-> From: Axel Lin <axel.lin@gmail.com>
-> Date: Mon, 17 Jan 2011 16:24:36 +0800
-> Subject: [PATCH 1/2] video: nuc900fb: fix compile error
->
-> This patch fixes below compile error:
->
-> ?CC ? ? ?drivers/video/nuc900fb.o
-> drivers/video/nuc900fb.c: In function 'nuc900fb_suspend':
-> drivers/video/nuc900fb.c:726: error: too few arguments to function 'nuc900fb_stop_lcd'
-> drivers/video/nuc900fb.c: In function 'nuc900fb_resume':
-> drivers/video/nuc900fb.c:743: error: 'bfinfo' undeclared (first use in this function)
-> drivers/video/nuc900fb.c:743: error: (Each undeclared identifier is reported only once
-> drivers/video/nuc900fb.c:743: error: for each function it appears in.)
-> make[2]: *** [drivers/video/nuc900fb.o] Error 1
-> make[1]: *** [drivers/video] Error 2
-> make: *** [drivers] Error 2
->
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
-> ?drivers/video/nuc900fb.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-> index 62498bd..29ef92f 100644
-> --- a/drivers/video/nuc900fb.c
-> +++ b/drivers/video/nuc900fb.c
-> @@ -723,7 +723,7 @@ static int nuc900fb_suspend(struct platform_device *dev, pm_message_t state)
-> ? ? ? ?struct fb_info ? ? *fbinfo = platform_get_drvdata(dev);
-> ? ? ? ?struct nuc900fb_info *info = fbinfo->par;
->
-> - ? ? ? nuc900fb_stop_lcd();
-> + ? ? ? nuc900fb_stop_lcd(fbinfo);
-> ? ? ? ?msleep(1);
-> ? ? ? ?clk_disable(info->clk);
-> ? ? ? ?return 0;
-> @@ -740,7 +740,7 @@ static int nuc900fb_resume(struct platform_device *dev)
-> ? ? ? ?msleep(1);
->
-> ? ? ? ?nuc900fb_init_registers(fbinfo);
-> - ? ? ? nuc900fb_activate_var(bfinfo);
-> + ? ? ? nuc900fb_activate_var(fbinfo);
->
-> ? ? ? ?return 0;
-> ?}
+Hi,
 
-Thanks for your patches.
-Acked-by: Wan ZongShun <mcuos.com@gmail.com>
-> --
-> 1.7.2
->
->
->
->
+On Mon, Jan 17, 2011 at 09:16:22AM +0100, Lothar Wa?mann wrote:
+> Shawn Guo writes:
+> > On Fri, Jan 14, 2011 at 08:52:23AM +0100, Uwe Kleine-K?nig wrote:
+> > > On Fri, Jan 14, 2011 at 01:48:40PM +0800, Shawn Guo wrote:
+> > > > Hi Uwe,
+> > > > 
+> > > > On Thu, Jan 13, 2011 at 03:48:05PM +0100, Uwe Kleine-K?nig wrote:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > > +/* Controller is ENET-MAC */
+> > > > > > +#define FEC_QUIRK_ENET_MAC           (1 << 0)
+> > > > > does this really qualify to be a quirk?
+> > > > > 
+> > > > My understanding is that ENET-MAC is a type of "quirky" FEC
+> > > > controller.
+> > > > 
+> > > > > > +/* Controller needs driver to swap frame */
+> > > > > > +#define FEC_QUIRK_SWAP_FRAME         (1 << 1)
+> > > > > IMHO this is a bit misnamed.  FEC_QUIRK_NEEDS_BE_DATA or similar would
+> > > > > be more accurate.
+> > > > > 
+> > > > When your make this change, you may want to pick a better name for
+> > > > function swap_buffer too.
+> > > > 
+> > > > [...]
+> > > > 
+> > > > > > +static void *swap_buffer(void *bufaddr, int len)
+> > > > > > +{
+> > > > > > +     int i;
+> > > > > > +     unsigned int *buf = bufaddr;
+> > > > > > +
+> > > > > > +     for (i = 0; i < (len + 3) / 4; i++, buf++)
+> > > > > > +             *buf = cpu_to_be32(*buf);
+> > > > > if len isn't a multiple of 4 this accesses bytes behind len.  Is this
+> > > > > generally OK here?  (E.g. because skbs always have a length that is a
+> > > > > multiple of 4?)
+> > > > The len may not be a multiple of 4.  But I believe bufaddr is always
+> > > > a buffer allocated in a length that is a multiple of 4, and the 1~3
+> > > > bytes exceeding the len very likely has no data that matters.  But
+> > > > yes, it deserves a safer implementation.
+> > > Did you test what happens if bufaddr isn't aligned?  Does it work at all
+> > > then?
+> > > 
+> > I see many calls passing a len that is not a multiple of 4, but it
+> > works good.
+> > 
+> That does not prove anything, actually.
+> 
+> Anyway "bufaddr isn't aligned" != "len is not a multiple of 4".
+> Is there any guarantee that the function cannot be called with a
+> non-aligned buffer address?
+Over the weekend I wondered if we could reach alignment via a dma-mask
+setting.  Didn't check yet how this is configured.
 
-
+Best regards
+Uwe
 
 -- 
-*linux-arm-kernel mailing list
-mail addr:linux-arm-kernel at lists.infradead.org
-you can subscribe by:
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-* linux-arm-NUC900 mailing list
-mail addr:NUC900 at googlegroups.com
-main web: https://groups.google.com/group/NUC900
-you can subscribe it by sending me mail:
-mcuos.com at gmail.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
