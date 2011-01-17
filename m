@@ -1,59 +1,51 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 17 Jan 2011 22:26:04 +0530
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <4D3466AF.9030300@stericsson.com>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTik8J5M-+gk=qXZug3yXteWQGu0nFjOsSMETzJNS@mail.gmail.com>
-	<4D3466AF.9030300@stericsson.com>
-Message-ID: <AANLkTinFBd9sN01jtHtpTonZN=nvoFFnsYQjHN=4ucSU@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 17 Jan 2011 09:40:14 -0800
+Subject: [GIT PULL] pxa: patches for palm/voipac hw
+In-Reply-To: <201101151943.45554.marek.vasut@gmail.com>
+References: <201101151943.45554.marek.vasut@gmail.com>
+Message-ID: <AANLkTik5A6NMc-wD1JahkKSSV-fWVj2nrFROALsEbJbH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 21:26, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> On 01/17/2011 04:36 PM, Rabin Vincent wrote:
->> On Mon, Jan 17, 2011 at 20:07, Linus Walleij <linus.walleij@stericsson.com> ?wrote:
->>> ? ? ? ?writel(datactrl, base + MMCIDATACTRL);
->>> - ? ? ? writel(readl(base + MMCIMASK0)& ?~MCI_DATAENDMASK, base +
->>> MMCIMASK0);
->>> - ? ? ? mmci_set_mask1(host, irqmask);
->>> + ? ? ? irqmask0 = readl(base + MMCIMASK0);
->>> + ? ? ? if (variant->broken_blockend)
->>> + ? ? ? ? ? ? ? irqmask0&= ~MCI_DATABLOCKENDMASK;
->>> + ? ? ? else
->>> + ? ? ? ? ? ? ? irqmask0 |= MCI_DATABLOCKENDMASK;
->>> + ? ? ? irqmask0&= ~MCI_DATAENDMASK;
->>> + ? ? ? writel(irqmask0, base + MMCIMASK0);
->>> + ? ? ? mmci_set_mask1(host, irqmask1);
->>> ?}
->>>
->>
->> If your intention is to not have to mask MCI_DATABLOCKENDMASK off, why
->> are you doing so?
->>
-> The intention is to turn it off for HW which we know is broken,
-> (has broken_blocken set true) which is what happens above.
+On Sat, Jan 15, 2011 at 10:43 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> Hi Eric,
+>
+> can you pull the following into your -devel ?
+>
 
-Right, but don't you already remove the place where it was being set?
+Pulled.
 
-| -       mask = MCI_IRQENABLE;
-| -       /* Don't use the datablockend flag if it's broken */
-| -       if (variant->broken_blockend)
-| -               mask &= ~MCI_DATABLOCKEND;
-| -
-| -       writel(mask, host->base + MMCIMASK0);
-| +       writel(MCI_IRQENABLE, host->base + MMCIMASK0);
-|
-|        amba_set_drvdata(dev, mmc);
-|
-| diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-| index df06f01..7ac8c4d 100644
-| --- a/drivers/mmc/host/mmci.h
-| +++ b/drivers/mmc/host/mmci.h
-| @@ -137,7 +137,7 @@
-|  #define MCI_IRQENABLE  \
-|        (MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|     \
-|        MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|       \
-| -       MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATABLOCKENDMASK)
-| +       MCI_CMDRESPENDMASK|MCI_CMDSENTMASK)
-|
+> Thanks, Cheers!
+>
+> -----------------------
+>
+> The following changes since commit ea0c4f3ca8a55e7e3138c2c4b3e9f7fe34d3ecab:
+>
+> ?ARM: pxa: fix building issue of missing physmap.h (2011-01-15 04:29:21 -0600)
+>
+> are available in the git repository at:
+> ?git://git.kernel.org/pub/scm/linux/kernel/git/marex/pxa-linux-2.6.git devel-fix
+>
+> Marek Vasut (9):
+> ? ? ?ARM: pxa: PalmTE2: Use gpio arrays in backlight init
+> ? ? ?ARM: pxa: Use gpio arrays in colibri_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmld_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmtc_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmtx_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in vpac270_pcmcia driver
+> ? ? ?ARM: pxa: Use gpio arrays in palmld_hdd driver
+> ? ? ?ARM: pxa: Update copyright notices for Palm devices
+> ? ? ?ARM: pxa: PalmZ72: Add OV9640 camera support
+>
+> ?arch/arm/mach-pxa/include/mach/palmz72.h | ? ?5 +
+> ?arch/arm/mach-pxa/palm27x.c ? ? ? ? ? ? ?| ? ?3 +-
+> ?arch/arm/mach-pxa/palmte2.c ? ? ? ? ? ? ?| ? 31 ++------
+> ?arch/arm/mach-pxa/palmz72.c ? ? ? ? ? ? ?| ?127 ++++++++++++++++++++++++++++
+> ?drivers/ata/pata_palmld.c ? ? ? ? ? ? ? ?| ? 43 +++++-----
+> ?drivers/pcmcia/pxa2xx_colibri.c ? ? ? ? ?| ?133 +++++++++++-------------------
+> ?drivers/pcmcia/pxa2xx_palmld.c ? ? ? ? ? | ? 42 ++-------
+> ?drivers/pcmcia/pxa2xx_palmtc.c ? ? ? ? ? | ? 75 +++--------------
+> ?drivers/pcmcia/pxa2xx_palmtx.c ? ? ? ? ? | ? 57 +++----------
+> ?drivers/pcmcia/pxa2xx_vpac270.c ? ? ? ? ?| ?110 +++++++------------------
+> ?10 files changed, 276 insertions(+), 350 deletions(-)
+>
