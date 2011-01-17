@@ -1,86 +1,48 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Jan 2011 12:09:32 +0000
+Date: Mon, 17 Jan 2011 12:12:55 +0000
 Subject: [PATCH] Remove CPU_32v6K dependencies in asm/spinlock.h
-In-Reply-To: <20110117103739.GA18626@n2100.arm.linux.org.uk>
+In-Reply-To: <20110117105332.GC18626@n2100.arm.linux.org.uk>
 References: <20110115161132.GH15996@n2100.arm.linux.org.uk>
 	<AANLkTik8j2a9XXPQXw51Vbs=24hvP-PUJrVD--VNX0DG@mail.gmail.com>
 	<20110117103739.GA18626@n2100.arm.linux.org.uk>
-Message-ID: <1295266172.21557.10.camel@e102109-lin.cambridge.arm.com>
+	<20110117105332.GC18626@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikrgOLJ0bj_V23i-RM_wYa_4dDTXb_RaPY8Cr8v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-17 at 10:37 +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 17, 2011 at 10:15:25AM +0000, Catalin Marinas wrote:
-> > On 15 January 2011 16:11, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > SMP requires at least the ARMv6K extensions to be present, so if we're
-> > > running on SMP, the WFE and SEV instructions must be available.
-> > >
-> > > However, when we run on UP, the v6K extensions may not be available,
-> > > and so we don't want WFE/SEV to be in the instruction stream.  Use the
-> > > SMP alternatives infrastructure to replace these instructions with NOPs
-> > > if we build for SMP but run on UP.
-> > [...]
-> > > --- a/arch/arm/include/asm/spinlock.h
-> > > +++ b/arch/arm/include/asm/spinlock.h
-> > > @@ -5,17 +5,36 @@
-> > >  #error SMP not supported on pre-ARMv6 CPUs
-> > >  #endif
-> > >
-> > > +/*
-> > > + * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
-> > > + * extensions, so when running on UP, we have to patch these instructions away.
-> > > + */
-> > > +#define ALT_SMP(smp, up)                                       \
-> > > +       "9998:  " smp "\n"                                      \
-> > > +       "       .pushsection \".alt.smp.init\", \"a\"\n"        \
-> > > +       "       .long   9998b\n"                                \
-> > > +       "       " up "\n"                                       \
-> > > +       "       .popsection\n"
-> > > +
-> > > +#ifdef CONFIG_THUMB2_KERNEL
-> > > +#define SEV            ALT_SMP("sev.w", "nop.w")
-> > > +#define WFE(cond)      ALT_SMP("wfe" cond ".w", "nop.w")
-> > > +#else
-> > > +#define SEV            ALT_SMP("sev", "nop")
-> > > +#define WFE(cond)      ALT_SMP("wfe" cond, "nop")
-> > > +#endif
-> >
-> > In the SEV macro definition, can you also include the dsb?
-> 
-> No, you can't do preprocessor conditionals in the middle of a macro
-> definition, and I don't want to have 4 versions of the SEV stuff.
-> 
-> > This barrier is only there because of sev, otherwise we don't need it
-> > (we have a dmb prior to releasing the lock).
-> 
-> 1. Does it make sense to have sev and wfe instructions in non-SMP kernels?
-> We now have in asm/system.h:
-> #if __LINUX_ARM_ARCH__ >= 7 ||          \
->         (__LINUX_ARM_ARCH__ == 6 && defined(CONFIG_CPU_32v6K))
-> #define sev()   __asm__ __volatile__ ("sev" : : : "memory")
-> #define wfe()   __asm__ __volatile__ ("wfe" : : : "memory")
-> #define wfi()   __asm__ __volatile__ ("wfi" : : : "memory")
-> #endif
+On 17 January 2011 10:53, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 17, 2011 at 10:37:39AM +0000, Russell King - ARM Linux wrote:
+>> 3. Do we always need a dsb prior to a sev? ?Maybe the SPEAR patches need
+>> another review to determine how they're using sev()?
+>
+> FYI, this is how the SPEAR patches use sev():
+>
+> | +static void __init wakeup_secondary(void)
+> | +{
+> | + ? ? /* nobody is to be released from the pen yet */
+> | + ? ? pen_release = -1;
+> | +
+> | + ? ? /*
+> | + ? ? ?* Write the address of secondary startup into the system-wide
+> | + ? ? ?* location (presently it is in SRAM). The BootMonitor waits
+> | + ? ? ?* for this register to become non-zero.
+> | + ? ? ?* We must also send an sev to wake it up
+> | + ? ? ?*/
+> | + ? ? __raw_writel(BSYM(virt_to_phys(spear13xx_secondary_startup)),
+> | + ? ? ? ? ? ? ? ? ? ? __io_address(SPEAR13XX_SYS_LOCATION));
+> | +
+> | + ? ? mb();
+> | +
+> | + ? ? /*
+> | + ? ? ?* Send a 'sev' to wake the secondary core from WFE.
+> | + ? ? ?*/
+> | + ? ? sev();
+> | +}
+>
+> so the dsb() is inside mb(), before the outer sync call.
 
-The whole spinlock code doesn't make much sense. But the wfe/sev are
-usually no-ops if SMP isn't supported in hardware (though you still need
-ARMv6K not to undef).
-
-> 2. Should we have a smp_dsb() which makes the dsb conditional elsewhere?
-
-We could do but I'm not sure how confusing it would be (yet another
-ARM-specific barrier).
-
-> 3. Do we always need a dsb prior to a sev?  Maybe the SPEAR patches need
-> another review to determine how they're using sev()?
-
-We need a dsb to ensure that the prior STR completed before the sev,
-otherwise we notify the other CPU but the LDREX reads the locked value
-and goes into WFE again.
-
-The SPEAR code seems ok, though I would have used a dsb() to make it
-clear.
+BTW, don't we need some cache flushing for the pen_release?
 
 -- 
 Catalin
