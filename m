@@ -1,43 +1,37 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 18 Jan 2011 10:35:16 +1300
-Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
-In-Reply-To: <1295248809-30334-2-git-send-email-hong.xu@atmel.com>
-References: <hong.xu@atmel.com>
-	<1295248809-30334-2-git-send-email-hong.xu@atmel.com>
-Message-ID: <4D34B614.3000909@bluewatersys.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 17 Jan 2011 14:17:22 -0800
+Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
+In-Reply-To: <AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
+References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
+	<20110116102158.GC15575@mail.wantstofly.org>
+	<AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
+Message-ID: <AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2011 08:20 PM, Hong Xu wrote:
-> Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
-> This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
-> 
-> Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> ---
+On Sun, Jan 16, 2011 at 7:53 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
+> <buytenh@wantstofly.org> wrote:
+>> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
+>>
+>>> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
+>>> conversion." missed changing one reference to 'irq' in the function
+>>> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
+>>>
+>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
+>
+> Acked-by: Olof Johansson <olof@lixom.net>
+>
+>> I built this queue against all defconfigs, but there doesn't seem to
+>> be one for tegra at the moment, which is why I missed this.
+>
+> Yep, planning on fixing this for .39.
+>
+>
+> -Olof
+>
 
-One more comment:
-
-> +	if (cpu_has_dma() && use_dma) {
-> +		dma_cap_mask_t mask;
-> +
-> +		dma_cap_zero(mask);
-> +		dma_cap_set(DMA_MEMCPY, mask);
-> +		host->dma_chan = dma_request_channel(mask, 0, NULL);
-> +
-> +		if (!host->dma_chan) {
-> +			dev_err(host->dev, "Failed to request DMA channel\n");
-> +			host->dma_ready = 0;
-
-Because host is kzalloc'ed above, you do not need to set host->dma_ready
-to zero here.
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+This should get fixed in .38.  Has someone picked it up, or should I
+put it in through my tree?
