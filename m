@@ -1,50 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Jan 2011 10:15:25 +0000
-Subject: [PATCH] Remove CPU_32v6K dependencies in asm/spinlock.h
-In-Reply-To: <20110115161132.GH15996@n2100.arm.linux.org.uk>
-References: <20110115161132.GH15996@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik8j2a9XXPQXw51Vbs=24hvP-PUJrVD--VNX0DG@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 17 Jan 2011 10:23:30 +0000
+Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
+In-Reply-To: <20110115004416.GA19686@gondor.apana.org.au>
+References: <20110114181609.GN2822@pulham.picochip.com>
+	<1295030661-16364-1-git-send-email-jamie@jamieiles.com>
+	<20110115004416.GA19686@gondor.apana.org.au>
+Message-ID: <20110117102330.GB2622@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 January 2011 16:11, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> SMP requires at least the ARMv6K extensions to be present, so if we're
-> running on SMP, the WFE and SEV instructions must be available.
->
-> However, when we run on UP, the v6K extensions may not be available,
-> and so we don't want WFE/SEV to be in the instruction stream. ?Use the
-> SMP alternatives infrastructure to replace these instructions with NOPs
-> if we build for SMP but run on UP.
-[...]
-> --- a/arch/arm/include/asm/spinlock.h
-> +++ b/arch/arm/include/asm/spinlock.h
-> @@ -5,17 +5,36 @@
-> ?#error SMP not supported on pre-ARMv6 CPUs
-> ?#endif
->
-> +/*
-> + * sev and wfe are ARMv6K extensions. ?Uniprocessor ARMv6 may not have the K
-> + * extensions, so when running on UP, we have to patch these instructions away.
-> + */
-> +#define ALT_SMP(smp, up) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? "9998: ?" smp "\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? " ? ? ? .pushsection \".alt.smp.init\", \"a\"\n" ? ? ? ?\
-> + ? ? ? " ? ? ? .long ? 9998b\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
-> + ? ? ? " ? ? ? " up "\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? " ? ? ? .popsection\n"
-> +
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +#define SEV ? ? ? ? ? ?ALT_SMP("sev.w", "nop.w")
-> +#define WFE(cond) ? ? ?ALT_SMP("wfe" cond ".w", "nop.w")
-> +#else
-> +#define SEV ? ? ? ? ? ?ALT_SMP("sev", "nop")
-> +#define WFE(cond) ? ? ?ALT_SMP("wfe" cond, "nop")
-> +#endif
+On Sat, Jan 15, 2011 at 11:44:16AM +1100, Herbert Xu wrote:
+> On Fri, Jan 14, 2011 at 06:44:21PM +0000, Jamie Iles wrote:
+> >
+> > +	/* Wait for some data to become available. */
+> > +	while (__raw_readl(csr) & CSR_OUT_EMPTY_MASK) {
+> > +		if (!wait)
+> > +			return 0;
+> > +		cpu_relax();
+> > +	}
+> 
+> This has the potential to loop indefinitely.  Please add a time-out
+> to prevent that (see existing RNG drivers for example).
 
-In the SEV macro definition, can you also include the dsb? This
-barrier is only there because of sev, otherwise we don't need it (we
-have a dmb prior to releasing the lock).
+Ok, that's a fair point!  Here's an updated version with a timeout.  
+I've also added in support for the fault detection which I previously 
+overlooked.
 
--- 
-Catalin
+Jamie
+
+8<--------
