@@ -1,58 +1,59 @@
-From: daniel.morsing@gmail.com (Daniel Morsing)
-Date: Mon, 17 Jan 2011 17:47:55 +0100
-Subject: [PATCHv2 1/2] OMAP3: Devkit8000: Change lcd power pin
-In-Reply-To: <1295273519-6189-2-git-send-email-weber@corscience.de>
-References: <1295273519-6189-1-git-send-email-weber@corscience.de>
-	<1295273519-6189-2-git-send-email-weber@corscience.de>
-Message-ID: <1295282875.2167.7.camel@morsing>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 17 Jan 2011 22:26:04 +0530
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+In-Reply-To: <4D3466AF.9030300@stericsson.com>
+References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTik8J5M-+gk=qXZug3yXteWQGu0nFjOsSMETzJNS@mail.gmail.com>
+	<4D3466AF.9030300@stericsson.com>
+Message-ID: <AANLkTinFBd9sN01jtHtpTonZN=nvoFFnsYQjHN=4ucSU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-17 at 15:11 +0100, Thomas Weber wrote:
-> The reset_gpio pin for lcd is connected with TWL4030 LedA.
-> TWL4030 GPIO.1 has a not connected resistor.
-> 
-> Fix indention issue. The comment line uses 8 whitespaces. 
-> Replaced with one tabulator.
-> 
-> Reported-by: Daniel Morsing <daniel.morsing@gmail.com>
-> Signed-off-by: Thomas Weber <weber@corscience.de>
-> ---
->  arch/arm/mach-omap2/board-devkit8000.c |    7 ++-----
->  1 files changed, 2 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-> index 451e7ff..719f4e5 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -114,9 +114,6 @@ static struct omap2_hsmmc_info mmc[] = {
->  
->  static int devkit8000_panel_enable_lcd(struct omap_dss_device *dssdev)
->  {
-> -	twl_i2c_write_u8(TWL4030_MODULE_GPIO, 0x80, REG_GPIODATADIR1);
-> -	twl_i2c_write_u8(TWL4030_MODULE_LED, 0x0, 0x0);
-> -
->  	if (gpio_is_valid(dssdev->reset_gpio))
->  		gpio_set_value_cansleep(dssdev->reset_gpio, 1);
->  	return 0;
-> @@ -245,8 +242,8 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
->  	/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
->  	gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
->  
-> -        /* gpio + 1 is "LCD_PWREN" (out, active high) */
-> -	devkit8000_lcd_device.reset_gpio = gpio + 1;
-> +	/* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
-> +	devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
->  	gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
->  	/* Disable until needed */
->  	gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
+On Mon, Jan 17, 2011 at 21:26, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> On 01/17/2011 04:36 PM, Rabin Vincent wrote:
+>> On Mon, Jan 17, 2011 at 20:07, Linus Walleij <linus.walleij@stericsson.com> ?wrote:
+>>> ? ? ? ?writel(datactrl, base + MMCIDATACTRL);
+>>> - ? ? ? writel(readl(base + MMCIMASK0)& ?~MCI_DATAENDMASK, base +
+>>> MMCIMASK0);
+>>> - ? ? ? mmci_set_mask1(host, irqmask);
+>>> + ? ? ? irqmask0 = readl(base + MMCIMASK0);
+>>> + ? ? ? if (variant->broken_blockend)
+>>> + ? ? ? ? ? ? ? irqmask0&= ~MCI_DATABLOCKENDMASK;
+>>> + ? ? ? else
+>>> + ? ? ? ? ? ? ? irqmask0 |= MCI_DATABLOCKENDMASK;
+>>> + ? ? ? irqmask0&= ~MCI_DATAENDMASK;
+>>> + ? ? ? writel(irqmask0, base + MMCIMASK0);
+>>> + ? ? ? mmci_set_mask1(host, irqmask1);
+>>> ?}
+>>>
+>>
+>> If your intention is to not have to mask MCI_DATABLOCKENDMASK off, why
+>> are you doing so?
+>>
+> The intention is to turn it off for HW which we know is broken,
+> (has broken_blocken set true) which is what happens above.
 
-Hey Thomas.
+Right, but don't you already remove the place where it was being set?
 
-Only real issue I can see is that fact that the commit message doesn't
-mention the removal of the low level twl4030 calls. They are essentially
-non-functional in their current state and mentioning that and why they
-were removed would help in any future code archaeology.
-
-Regards,
-Daniel
+| -       mask = MCI_IRQENABLE;
+| -       /* Don't use the datablockend flag if it's broken */
+| -       if (variant->broken_blockend)
+| -               mask &= ~MCI_DATABLOCKEND;
+| -
+| -       writel(mask, host->base + MMCIMASK0);
+| +       writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+|
+|        amba_set_drvdata(dev, mmc);
+|
+| diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+| index df06f01..7ac8c4d 100644
+| --- a/drivers/mmc/host/mmci.h
+| +++ b/drivers/mmc/host/mmci.h
+| @@ -137,7 +137,7 @@
+|  #define MCI_IRQENABLE  \
+|        (MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|     \
+|        MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|       \
+| -       MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATABLOCKENDMASK)
+| +       MCI_CMDRESPENDMASK|MCI_CMDSENTMASK)
+|
