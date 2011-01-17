@@ -1,35 +1,44 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 17 Jan 2011 15:35:57 +0000
-Subject: [PATCH v4] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <AANLkTintFe4V6BxrUxh-gwvhoa=RcH0tkHjYbfyGHKD=@mail.gmail.com>
-References: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
-	<AANLkTintFe4V6BxrUxh-gwvhoa=RcH0tkHjYbfyGHKD=@mail.gmail.com>
-Message-ID: <AANLkTin6gfN6hpExQ0iof14Hy7_MmaOdgpgS2OgyZOLd@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 17 Jan 2011 21:06:47 +0530
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+In-Reply-To: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
+References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <AANLkTik8J5M-+gk=qXZug3yXteWQGu0nFjOsSMETzJNS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 17, 2011 at 20:07, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> - ? ? ? ?* In the U300, the IRQs can arrive out-of-order,
+> - ? ? ? ?* e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
+> - ? ? ? ?* so for this case we use the flags "blockend" and
+> - ? ? ? ?* "dataend" to make sure both IRQs have arrived before
+> - ? ? ? ?* concluding the transaction.
 
-On Mon, Jan 17, 2011 at 2:02 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+Since this was your original rationale for adding the "blockend" flag,
+why don't you just remove that flag in this patch instead of renaming to
+last_blockend and still keeping it around?
 
-[...]
+On Mon, Jan 17, 2011 at 20:07, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> Also make sure the MCI_DATABLOCKENDMASK is set only when
+> needed, instead of being set always and then masked off.
 
-> Note that aligning the source and destination pointers to a multiple
-> of 8 bytes has an impact on the behavio(u)r and so must be carefully
-> thought and tested on OMAP1/2/3 platforms.
+This seems to be unrelated to the actual problem this patch is trying to
+solve.
 
-Do you have any specific concerns regarding this?
+> ? ? ? ?writel(datactrl, base + MMCIDATACTRL);
+> - ? ? ? writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
+> - ? ? ? mmci_set_mask1(host, irqmask);
+> + ? ? ? irqmask0 = readl(base + MMCIMASK0);
+> + ? ? ? if (variant->broken_blockend)
+> + ? ? ? ? ? ? ? irqmask0 &= ~MCI_DATABLOCKENDMASK;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? irqmask0 |= MCI_DATABLOCKENDMASK;
+> + ? ? ? irqmask0 &= ~MCI_DATAENDMASK;
+> + ? ? ? writel(irqmask0, base + MMCIMASK0);
+> + ? ? ? mmci_set_mask1(host, irqmask1);
+> ?}
 
-Currently, the only issue I can think of is that the need to allocate
-aligned memory from the SRAM will increase the total amount allocated,
-which could be a problem if we end up overflowing the available SRAM.
-
-This does not appear to happen in the case I've tested -- I currently
-round up the amount allocated in omap_sram_push to be a multiple of 8
-bytes.  This, combined with a couple of ".align 3" directives, is
-enough to get me a booting system on omap3... but I haven't tested
-exhaustively.
-
-Cheers
----Dave
+If your intention is to not have to mask MCI_DATABLOCKENDMASK off, why
+are you doing so?
