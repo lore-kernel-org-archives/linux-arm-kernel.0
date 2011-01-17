@@ -1,26 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Jan 2011 11:08:57 +0100
-Subject: [RFC+CFT] Use word operations in bitops
-In-Reply-To: <20110116121911.GB27542@n2100.arm.linux.org.uk>
-References: <20110116121911.GB27542@n2100.arm.linux.org.uk>
-Message-ID: <20110117100857.GS6917@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Jan 2011 10:15:25 +0000
+Subject: [PATCH] Remove CPU_32v6K dependencies in asm/spinlock.h
+In-Reply-To: <20110115161132.GH15996@n2100.arm.linux.org.uk>
+References: <20110115161132.GH15996@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik8j2a9XXPQXw51Vbs=24hvP-PUJrVD--VNX0DG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On 15 January 2011 16:11, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> SMP requires at least the ARMv6K extensions to be present, so if we're
+> running on SMP, the WFE and SEV instructions must be available.
+>
+> However, when we run on UP, the v6K extensions may not be available,
+> and so we don't want WFE/SEV to be in the instruction stream. ?Use the
+> SMP alternatives infrastructure to replace these instructions with NOPs
+> if we build for SMP but run on UP.
+[...]
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -5,17 +5,36 @@
+> ?#error SMP not supported on pre-ARMv6 CPUs
+> ?#endif
+>
+> +/*
+> + * sev and wfe are ARMv6K extensions. ?Uniprocessor ARMv6 may not have the K
+> + * extensions, so when running on UP, we have to patch these instructions away.
+> + */
+> +#define ALT_SMP(smp, up) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? "9998: ?" smp "\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? " ? ? ? .pushsection \".alt.smp.init\", \"a\"\n" ? ? ? ?\
+> + ? ? ? " ? ? ? .long ? 9998b\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+> + ? ? ? " ? ? ? " up "\n" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+> + ? ? ? " ? ? ? .popsection\n"
+> +
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define SEV ? ? ? ? ? ?ALT_SMP("sev.w", "nop.w")
+> +#define WFE(cond) ? ? ?ALT_SMP("wfe" cond ".w", "nop.w")
+> +#else
+> +#define SEV ? ? ? ? ? ?ALT_SMP("sev", "nop")
+> +#define WFE(cond) ? ? ?ALT_SMP("wfe" cond, "nop")
+> +#endif
 
-On Sun, Jan 16, 2011 at 12:19:11PM +0000, Russell King - ARM Linux wrote:
-> This does need a fair amount of testing before it can be merged, so I'd
-> like to see a number of Tested-by's against this patch.  Please also
-> indicate whether you tested on LE or BE or both, which filesystems, and
-> whether they were read-only mounted or read-write mounted.
-You could make life a bit easier (at least for us at Pengutronix,
-probably more) if you had a branch with a defined name for patches like
-these.  We could add that to our daily test then.
-
-Best regards
-Uwe
+In the SEV macro definition, can you also include the dsb? This
+barrier is only there because of sev, otherwise we don't need it (we
+have a dmb prior to releasing the lock).
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
