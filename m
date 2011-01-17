@@ -1,33 +1,104 @@
 From: segoon@openwall.com (Vasiliy Kulikov)
-Date: Mon, 17 Jan 2011 13:08:42 +0300
+Date: Mon, 17 Jan 2011 13:08:32 +0300
 Subject: [PATCH] arm: mach-omap2: potential NULL dereference
-Message-ID: <1295258922-31242-1-git-send-email-segoon@openwall.com>
+Message-ID: <1295258913-31048-1-git-send-email-segoon@openwall.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kzalloc() may fail, if so return -ENOMEM.
+If kzalloc() failed, return -ENOMEM.
+sr_dev_init() should signal by return value that there is an error.
 
 Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
 ---
  Cannot compile this driver, so it is not tested at all.
 
- arch/arm/mach-omap2/smartreflex.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/sr_device.c |   19 +++++++++++++++----
+ 1 files changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 77ecebf..871bca9 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -260,7 +260,10 @@ static int sr_late_init(struct omap_sr *sr_info)
- 	if (sr_class->class_type == SR_CLASS2 &&
- 		sr_class->notify_flags && sr_info->irq) {
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+index b1e0af1..20fccfb 100644
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -40,7 +40,7 @@ static struct omap_device_pm_latency omap_sr_latency[] = {
+ };
  
-+		ret = -ENOMEM;
- 		name = kzalloc(SMARTREFLEX_NAME_LEN + 1, GFP_KERNEL);
-+		if (name == NULL)
-+			goto error;
- 		strcpy(name, "sr_");
- 		strcat(name, sr_info->voltdm->name);
- 		ret = request_irq(sr_info->irq, sr_interrupt,
+ /* Read EFUSE values from control registers for OMAP3430 */
+-static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
++static int __init sr_set_nvalues(struct omap_volt_data *volt_data,
+ 				struct omap_sr_data *sr_data)
+ {
+ 	struct omap_sr_nvalue_table *nvalue_table;
+@@ -51,6 +51,8 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
+ 
+ 	nvalue_table = kzalloc(sizeof(struct omap_sr_nvalue_table)*count,
+ 			GFP_KERNEL);
++	if (nvalue_table == NULL)
++		return -ENOMEM;
+ 
+ 	for (i = 0; i < count; i++) {
+ 		u32 v;
+@@ -75,6 +77,8 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
+ 
+ 	sr_data->nvalue_table = nvalue_table;
+ 	sr_data->nvalue_count = count;
++
++	return 0;
+ }
+ 
+ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+@@ -84,15 +88,18 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ 	struct omap_volt_data *volt_data;
+ 	char *name = "smartreflex";
+ 	static int i;
++	int err = 0;
+ 
+ 	sr_data = kzalloc(sizeof(struct omap_sr_data), GFP_KERNEL);
+ 	if (!sr_data) {
++		err = -ENOMEM;
+ 		pr_err("%s: Unable to allocate memory for %s sr_data.Error!\n",
+ 			__func__, oh->name);
+-		return -ENOMEM;
++		goto exit;
+ 	}
+ 
+ 	if (!oh->vdd_name) {
++		err = -EINVAL;
+ 		pr_err("%s: No voltage domain specified for %s."
+ 			"Cannot initialize\n", __func__, oh->name);
+ 		goto exit;
+@@ -104,6 +111,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ 
+ 	sr_data->voltdm = omap_voltage_domain_lookup(oh->vdd_name);
+ 	if (IS_ERR(sr_data->voltdm)) {
++		err = PTR_ERR(sr_data->voltdm);
+ 		pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
+ 			__func__, oh->vdd_name);
+ 		goto exit;
+@@ -111,12 +119,15 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ 
+ 	omap_voltage_get_volttable(sr_data->voltdm, &volt_data);
+ 	if (!volt_data) {
++		err = -EINVAL;
+ 		pr_warning("%s: No Voltage table registerd fo VDD%d."
+ 			"Something really wrong\n\n", __func__, i + 1);
+ 		goto exit;
+ 	}
+ 
+-	sr_set_nvalues(volt_data, sr_data);
++	err = sr_set_nvalues(volt_data, sr_data);
++	if (err)
++		goto exit;
+ 
+ 	sr_data->enable_on_init = sr_enable_on_init;
+ 
+@@ -129,7 +140,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
+ exit:
+ 	i++;
+ 	kfree(sr_data);
+-	return 0;
++	return err;
+ }
+ 
+ /*
 -- 
 1.7.0.4
