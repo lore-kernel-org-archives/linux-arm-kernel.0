@@ -1,35 +1,16 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 17 Jan 2011 16:33:42 +0800
-Subject: [PATCH 2/2] video: nuc900fb: properly free resources in
-	nuc900fb_remove
-In-Reply-To: <1295253143.12890.3.camel@mola>
-References: <1295253143.12890.3.camel@mola>
-Message-ID: <1295253222.12890.4.camel@mola>
+From: stanley.miao@windriver.com (Stanley.Miao)
+Date: Mon, 17 Jan 2011 16:42:06 +0800
+Subject: [PATCH 0/3] Support BE8 kernel modules relocation
+Message-ID: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From f0064467b1f9696ebcade98ec75ef3fbc6cfe38f Mon Sep 17 00:00:00 2001
-From: Axel Lin <axel.lin@gmail.com>
-Date: Mon, 17 Jan 2011 16:25:57 +0800
-Subject: [PATCH 2/2] video: nuc900fb: properly free resources in nuc900fb_remove
+The first patch is to solve the BE8 kernel modules relocation problems.
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- drivers/video/nuc900fb.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+The second patch is to support BE8 kernel on a little-endian machine.
 
-diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-index 29ef92f..f838d9e 100644
---- a/drivers/video/nuc900fb.c
-+++ b/drivers/video/nuc900fb.c
-@@ -696,6 +696,8 @@ static int nuc900fb_remove(struct platform_device *pdev)
- 	nuc900fb_stop_lcd(fbinfo);
- 	msleep(1);
- 
-+	unregister_framebuffer(fbinfo);
-+	nuc900fb_cpufreq_deregister(fbi);
- 	nuc900fb_unmap_video_memory(fbinfo);
- 
- 	iounmap(fbi->io);
--- 
-1.7.2
+The third patch is to add some debug macros to help the developer to location the boot problems.
+
+In order to test the first patch, I am sure some people will need the other two patches, so I send them together.
+
+Stanley.
