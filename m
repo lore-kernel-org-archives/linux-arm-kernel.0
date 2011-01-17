@@ -1,54 +1,35 @@
 From: axel.lin@gmail.com (Axel Lin)
-Date: Mon, 17 Jan 2011 16:32:23 +0800
-Subject: [PATCH 1/2] video: nuc900fb: fix compile error
-Message-ID: <1295253143.12890.3.camel@mola>
+Date: Mon, 17 Jan 2011 16:33:42 +0800
+Subject: [PATCH 2/2] video: nuc900fb: properly free resources in
+	nuc900fb_remove
+In-Reply-To: <1295253143.12890.3.camel@mola>
+References: <1295253143.12890.3.camel@mola>
+Message-ID: <1295253222.12890.4.camel@mola>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From a4bd940fa4d162f95e51e67c7ec4973b1d5b6866 Mon Sep 17 00:00:00 2001
+>From f0064467b1f9696ebcade98ec75ef3fbc6cfe38f Mon Sep 17 00:00:00 2001
 From: Axel Lin <axel.lin@gmail.com>
-Date: Mon, 17 Jan 2011 16:24:36 +0800
-Subject: [PATCH 1/2] video: nuc900fb: fix compile error
-
-This patch fixes below compile error:
-
-  CC      drivers/video/nuc900fb.o
-drivers/video/nuc900fb.c: In function 'nuc900fb_suspend':
-drivers/video/nuc900fb.c:726: error: too few arguments to function 'nuc900fb_stop_lcd'
-drivers/video/nuc900fb.c: In function 'nuc900fb_resume':
-drivers/video/nuc900fb.c:743: error: 'bfinfo' undeclared (first use in this function)
-drivers/video/nuc900fb.c:743: error: (Each undeclared identifier is reported only once
-drivers/video/nuc900fb.c:743: error: for each function it appears in.)
-make[2]: *** [drivers/video/nuc900fb.o] Error 1
-make[1]: *** [drivers/video] Error 2
-make: *** [drivers] Error 2
+Date: Mon, 17 Jan 2011 16:25:57 +0800
+Subject: [PATCH 2/2] video: nuc900fb: properly free resources in nuc900fb_remove
 
 Signed-off-by: Axel Lin <axel.lin@gmail.com>
 ---
- drivers/video/nuc900fb.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/video/nuc900fb.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
-index 62498bd..29ef92f 100644
+index 29ef92f..f838d9e 100644
 --- a/drivers/video/nuc900fb.c
 +++ b/drivers/video/nuc900fb.c
-@@ -723,7 +723,7 @@ static int nuc900fb_suspend(struct platform_device *dev, pm_message_t state)
- 	struct fb_info	   *fbinfo = platform_get_drvdata(dev);
- 	struct nuc900fb_info *info = fbinfo->par;
- 
--	nuc900fb_stop_lcd();
-+	nuc900fb_stop_lcd(fbinfo);
- 	msleep(1);
- 	clk_disable(info->clk);
- 	return 0;
-@@ -740,7 +740,7 @@ static int nuc900fb_resume(struct platform_device *dev)
+@@ -696,6 +696,8 @@ static int nuc900fb_remove(struct platform_device *pdev)
+ 	nuc900fb_stop_lcd(fbinfo);
  	msleep(1);
  
- 	nuc900fb_init_registers(fbinfo);
--	nuc900fb_activate_var(bfinfo);
-+	nuc900fb_activate_var(fbinfo);
++	unregister_framebuffer(fbinfo);
++	nuc900fb_cpufreq_deregister(fbi);
+ 	nuc900fb_unmap_video_memory(fbinfo);
  
- 	return 0;
- }
+ 	iounmap(fbi->io);
 -- 
 1.7.2
