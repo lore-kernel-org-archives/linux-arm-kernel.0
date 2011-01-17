@@ -1,47 +1,48 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 18 Jan 2011 11:42:07 +1300
-Subject: [PATCH] MTD: atmel_nand: Add DMA support to access Nandflash
-In-Reply-To: <4D34A37E.1060300@bluewatersys.com>
-References: <hong.xu@atmel.com>
-	<1295248809-30334-2-git-send-email-hong.xu@atmel.com>
-	<4D34A37E.1060300@bluewatersys.com>
-Message-ID: <4D34C5BF.2070107@bluewatersys.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 17 Jan 2011 15:49:27 -0700
+Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
+In-Reply-To: <AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
+References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
+	<20110116102158.GC15575@mail.wantstofly.org>
+	<AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
+	<AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
+Message-ID: <AANLkTinitxQLUxFZoVW=oZcNkAWF5k4FLJh5-f6o5pt-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2011 09:15 AM, Ryan Mallon wrote:
-> On 01/17/2011 08:20 PM, Hong Xu wrote:
->> Some SAM9 chips have the ability to perform DMA between CPU and SMC controller.
->> This patch adds DMA support for SAM9RL, SAM9G45, SSAM9G46,AM9M10, SAM9M11.
+On Mon, Jan 17, 2011 at 3:17 PM, Colin Cross <ccross@android.com> wrote:
+> On Sun, Jan 16, 2011 at 7:53 AM, Olof Johansson <olof@lixom.net> wrote:
+>> On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
+>> <buytenh@wantstofly.org> wrote:
+>>> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
+>>>
+>>>> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
+>>>> conversion." missed changing one reference to 'irq' in the function
+>>>> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
+>>>>
+>>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>>>
+>>> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
+>>
+>> Acked-by: Olof Johansson <olof@lixom.net>
+>>
+>>> I built this queue against all defconfigs, but there doesn't seem to
+>>> be one for tegra at the moment, which is why I missed this.
+>>
+>> Yep, planning on fixing this for .39.
+>>
+>>
+>> -Olof
+>>
+>
+> This should get fixed in .38. ?Has someone picked it up, or should I
+> put it in through my tree?
 
-I'm trying to patch this into a 2.6.33 kernel running on a custom
-SAM9G45 based board, but I get a failure requesting the DMA channel:
+I don't think Olof picked it up (seeing as he only acked it and it's
+not in Linus' tree).  You should take it through your tree.
 
-root at snapper:~$ dmesg | grep -i dma
-[    0.850000] atmel_nand atmel_nand: Failed to request DMA channel
-[    0.860000] atmel_nand atmel_nand: No DMA support for NAND access.
-[    1.530000] at_hdmac at_hdmac: Atmel AHB DMA Controller ( cpy slave ), 8 channels
-
-
-It looks like the registration for the DMA controller happens after the
-NAND driver probe and so the request is failing. I had a quick look, but
-I can't see anything that would change this in more recent kernels. Any
-ideas?
-
-Also, I think you want to add the following for the atmel_nand Kconfig:
-  select AT_HDMAC
-
-or make the DMA parts of the driver ifdef CONFIG_AT_HDMAC (if the above
-won't work for some reason) since you will get build errors on the
-dmaengine functions otherwise.
-
-~Ryan
+g.
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751 
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
