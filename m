@@ -1,29 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jan 2011 12:34:09 +0000
-Subject: [PATCH] ARM: smp: Fix Unknown IPI message 0x1
-In-Reply-To: <d93218062aa1e6948453d1ddd5b9e2b0@mail.gmail.com>
-References: <1295265395-28485-1-git-send-email-santosh.shilimkar@ti.com>
-	<20110117120104.GB20615@n2100.arm.linux.org.uk>
-	<72ca984700f139fea98558783dde38f3@mail.gmail.com>
-	<20110117121951.GC20615@n2100.arm.linux.org.uk>
-	<1295267193.21557.14.camel@e102109-lin.cambridge.arm.com>
-	<d93218062aa1e6948453d1ddd5b9e2b0@mail.gmail.com>
-Message-ID: <20110117123409.GD20615@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 17 Jan 2011 13:40:52 +0100 (CET)
+Subject: resume regression in 2.6.37
+In-Reply-To: <1295260580.2060.29.camel@sven>
+References: <1294933492.2535.23.camel@sven>
+	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
+	<1294938961.10740.24.camel@sven>
+	<alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
+	<1295260580.2060.29.camel@sven>
+Message-ID: <alpine.LFD.2.00.1101171142380.2678@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 06:01:31PM +0530, Santosh Shilimkar wrote:
-> > -----Original Message-----
-> > From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> > Sent: Monday, January 17, 2011 5:57 PM
-> > To: Russell King - ARM Linux
-> > Cc: Santosh Shilimkar; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH] ARM: smp: Fix Unknown IPI message 0x1
-> >
-> > At least on the ARM Ltd platforms, the boot monitor waits for any
-> > interrupt (it is in WFI). I can't tell about other platforms.
-> >
-> Same for OMAP4. Any SGI will do.
+On Mon, 17 Jan 2011, Sven Neumann wrote:
 
-Ok, so we can convert OMAP, Realview, Versatile Express to use SGI0...
-that's a start!
+> On Thu, 2011-01-13 at 18:33 +0100, Thomas Gleixner wrote:
+> 
+> > > Without the revert there is absolutely no sign of resume. With the
+> > > change reverted I can see that the PXA powers up again, there's an LED
+> > > showing that the USB controller has power again. Unfortunately there's
+> > > seems to be another problem and the resume doesn't complete. I've tried
+> > > to get console output by using no_console_suspend, but there's just
+> > > gibberish on the console after resume :(
+> > > 
+> > > Any idea on how to proceed from here? I could perhaps ask our hardware
+> > > engineer to try find out where exactly we are stuck in the resume. But
+> > > I'd like to avoid that if possible.
+> > 
+> > Can you stick a printk into the set_wake() function of that irq chip
+> > and print the irq and on arguments and the return value . Run that
+> > with both stock 2.6.37 and the patch reverted.
+> 
+> pxa3xx_set_wake(31, 1) returns 0
+> 
+> Same result with stock 2.6.37 and the patch reverted. Except that
+> without the patch reverted, the device doesn't power up again.
+
+Ok, can we agree that the patch has no functional impact on the
+set_wake function? And I don't see a reason why reverting that patch
+results in a working resume. That does not make sense at all. Which
+compiler version are you using ?
+
+Thanks,
+
+	tglx
