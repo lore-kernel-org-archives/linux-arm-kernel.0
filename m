@@ -1,48 +1,32 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 17 Jan 2011 15:49:27 -0700
-Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
-In-Reply-To: <AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
-References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
-	<20110116102158.GC15575@mail.wantstofly.org>
-	<AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
-	<AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
-Message-ID: <AANLkTinitxQLUxFZoVW=oZcNkAWF5k4FLJh5-f6o5pt-@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jan 2011 22:52:33 +0000
+Subject: [PATCH 10/14] ARM: v6k: select TLS register code according to
+	V6 variants
+In-Reply-To: <20110117223635.GB25829@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peugh-0003St-DY@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101171717090.8580@xanadu.home>
+	<20110117223635.GB25829@n2100.arm.linux.org.uk>
+Message-ID: <20110117225233.GC25829@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 3:17 PM, Colin Cross <ccross@android.com> wrote:
-> On Sun, Jan 16, 2011 at 7:53 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
->> <buytenh@wantstofly.org> wrote:
->>> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
->>>
->>>> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
->>>> conversion." missed changing one reference to 'irq' in the function
->>>> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
->>>>
->>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->>>
->>> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
->>
->> Acked-by: Olof Johansson <olof@lixom.net>
->>
->>> I built this queue against all defconfigs, but there doesn't seem to
->>> be one for tegra at the moment, which is why I missed this.
->>
->> Yep, planning on fixing this for .39.
->>
->>
->> -Olof
->>
->
-> This should get fixed in .38. ?Has someone picked it up, or should I
-> put it in through my tree?
+On Mon, Jan 17, 2011 at 10:36:35PM +0000, Russell King - ARM Linux wrote:
+> It may be better at some point to get rid of the CPU_32v* and replace
+> them with CPU_ARCH_V* instead, which makes it clear that these ones
+> definitely refer to the architecture versions.
 
-I don't think Olof picked it up (seeing as he only acked it and it's
-not in Linus' tree).  You should take it through your tree.
+Last point on this is that I think we want to sanitize PJ4.
 
-g.
+If we think about CPU_V7 as being the selection of ARM CPUs which are V7
+architectures, CPU_PJ4 should be a separate config option selecting all
+the same symbols which CPU_V7 does - and that should also select proc-v7.S
+for building.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+I'm not sure it makes sense to have (eg) the V7 perf events available on
+PJ4 or the ARM errata for their V7 cores?
+
+Does PJ4 have VFPv3?  Is Neon available on PJ4?  What about the DCC
+debug registers?
+
+etc.
