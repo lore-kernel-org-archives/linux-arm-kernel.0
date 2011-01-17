@@ -1,58 +1,34 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 17 Jan 2011 19:41:13 +0100 (CET)
-Subject: resume regression in 2.6.37
-In-Reply-To: <1295273083.2060.34.camel@sven>
-References: <1294933492.2535.23.camel@sven>
-	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
-	<1294938961.10740.24.camel@sven>
-	<alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
-	<1295260580.2060.29.camel@sven>
-	<alpine.LFD.2.00.1101171142380.2678@localhost6.localdomain6>
-	<1295273083.2060.34.camel@sven>
-Message-ID: <alpine.LFD.2.00.1101171940490.2678@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jan 2011 19:20:50 +0000
+Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
+Message-ID: <20110117192050.GE23331@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jan 2011, Sven Neumann wrote:
-> On Mon, 2011-01-17 at 13:40 +0100, Thomas Gleixner wrote:
-> > On Mon, 17 Jan 2011, Sven Neumann wrote:
-> > 
-> > > On Thu, 2011-01-13 at 18:33 +0100, Thomas Gleixner wrote:
-> > > 
-> > > > > Without the revert there is absolutely no sign of resume. With the
-> > > > > change reverted I can see that the PXA powers up again, there's an LED
-> > > > > showing that the USB controller has power again. Unfortunately there's
-> > > > > seems to be another problem and the resume doesn't complete. I've tried
-> > > > > to get console output by using no_console_suspend, but there's just
-> > > > > gibberish on the console after resume :(
-> > > > > 
-> > > > > Any idea on how to proceed from here? I could perhaps ask our hardware
-> > > > > engineer to try find out where exactly we are stuck in the resume. But
-> > > > > I'd like to avoid that if possible.
-> > > > 
-> > > > Can you stick a printk into the set_wake() function of that irq chip
-> > > > and print the irq and on arguments and the return value . Run that
-> > > > with both stock 2.6.37 and the patch reverted.
-> > > 
-> > > pxa3xx_set_wake(31, 1) returns 0
-> > > 
-> > > Same result with stock 2.6.37 and the patch reverted. Except that
-> > > without the patch reverted, the device doesn't power up again.
-> > 
-> > Ok, can we agree that the patch has no functional impact on the
-> > set_wake function? And I don't see a reason why reverting that patch
-> > results in a working resume. That does not make sense at all. Which
-> > compiler version are you using ?
-> 
-> I agree that this is all very weird and as far as I understand the patch
-> it should have no functional impact. Unfortunately reverting the patch
-> does not result in a working resume, but at least it makes a difference
-> and at the moment it's the only trace I have.
-> 
-> My cross-compile tool-chain uses GCC 4.3.5.
+This patch series reworks the ARMv6/ARMv6K support options, code
+selection, and bit operations such that it's possible to safely
+build a kernel which supports ARMv6, ARMv6K, ARMv7 and ARMv7 SMP
+in one image.
 
-Can you try a different compiler ?
+Currently, we use CPU_V6 for both ARMv6 and ARMv6K, setting CPU_32v6K
+if we have the K extensions.  CPU_32v6K directly controlled whether
+we should include the ARMv6K instructions (clrex, load/store exclusive
+byte, half-word, double).  As the bitops code uses the load/store
+exclusive byte operations, unsetting CPU_32v6K results in these
+falling back to their non-SMP local-irq-disabling variants.  These
+are only safe in uniprocessor environments.
 
-Thanks,
+So, the first two patches convert the bitops to use the ARMv6 load/store
+exclusive word operations - and ensuring correctness by ensuring that
+the pointer passed in is word-aligned.
 
-	tglx
+We then introduce a new CPU_V6K which indicates that we're including
+an ARMv6K CPU in the build, which frees up CPU_V6 to mean that we're
+including an ARMv6 non-K CPU.
+
+We can then use CPU_V6 to ensure that the non-v6K code paths which are
+still SMP safe are selected.
+
+Without this patch set, such a kernel will be unsafe when run on
+SMP platforms as it omits necessary SMP code to ensure that bit
+operations are safe.
