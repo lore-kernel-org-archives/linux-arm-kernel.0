@@ -1,104 +1,26 @@
-From: segoon@openwall.com (Vasiliy Kulikov)
-Date: Mon, 17 Jan 2011 13:08:32 +0300
-Subject: [PATCH] arm: mach-omap2: potential NULL dereference
-Message-ID: <1295258913-31048-1-git-send-email-segoon@openwall.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 17 Jan 2011 11:08:57 +0100
+Subject: [RFC+CFT] Use word operations in bitops
+In-Reply-To: <20110116121911.GB27542@n2100.arm.linux.org.uk>
+References: <20110116121911.GB27542@n2100.arm.linux.org.uk>
+Message-ID: <20110117100857.GS6917@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If kzalloc() failed, return -ENOMEM.
-sr_dev_init() should signal by return value that there is an error.
+Hello Russell,
 
-Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
----
- Cannot compile this driver, so it is not tested at all.
+On Sun, Jan 16, 2011 at 12:19:11PM +0000, Russell King - ARM Linux wrote:
+> This does need a fair amount of testing before it can be merged, so I'd
+> like to see a number of Tested-by's against this patch.  Please also
+> indicate whether you tested on LE or BE or both, which filesystems, and
+> whether they were read-only mounted or read-write mounted.
+You could make life a bit easier (at least for us at Pengutronix,
+probably more) if you had a branch with a defined name for patches like
+these.  We could add that to our daily test then.
 
- arch/arm/mach-omap2/sr_device.c |   19 +++++++++++++++----
- 1 files changed, 15 insertions(+), 4 deletions(-)
+Best regards
+Uwe
 
-diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
-index b1e0af1..20fccfb 100644
---- a/arch/arm/mach-omap2/sr_device.c
-+++ b/arch/arm/mach-omap2/sr_device.c
-@@ -40,7 +40,7 @@ static struct omap_device_pm_latency omap_sr_latency[] = {
- };
- 
- /* Read EFUSE values from control registers for OMAP3430 */
--static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
-+static int __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 				struct omap_sr_data *sr_data)
- {
- 	struct omap_sr_nvalue_table *nvalue_table;
-@@ -51,6 +51,8 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 
- 	nvalue_table = kzalloc(sizeof(struct omap_sr_nvalue_table)*count,
- 			GFP_KERNEL);
-+	if (nvalue_table == NULL)
-+		return -ENOMEM;
- 
- 	for (i = 0; i < count; i++) {
- 		u32 v;
-@@ -75,6 +77,8 @@ static void __init sr_set_nvalues(struct omap_volt_data *volt_data,
- 
- 	sr_data->nvalue_table = nvalue_table;
- 	sr_data->nvalue_count = count;
-+
-+	return 0;
- }
- 
- static int sr_dev_init(struct omap_hwmod *oh, void *user)
-@@ -84,15 +88,18 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
- 	struct omap_volt_data *volt_data;
- 	char *name = "smartreflex";
- 	static int i;
-+	int err = 0;
- 
- 	sr_data = kzalloc(sizeof(struct omap_sr_data), GFP_KERNEL);
- 	if (!sr_data) {
-+		err = -ENOMEM;
- 		pr_err("%s: Unable to allocate memory for %s sr_data.Error!\n",
- 			__func__, oh->name);
--		return -ENOMEM;
-+		goto exit;
- 	}
- 
- 	if (!oh->vdd_name) {
-+		err = -EINVAL;
- 		pr_err("%s: No voltage domain specified for %s."
- 			"Cannot initialize\n", __func__, oh->name);
- 		goto exit;
-@@ -104,6 +111,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
- 
- 	sr_data->voltdm = omap_voltage_domain_lookup(oh->vdd_name);
- 	if (IS_ERR(sr_data->voltdm)) {
-+		err = PTR_ERR(sr_data->voltdm);
- 		pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
- 			__func__, oh->vdd_name);
- 		goto exit;
-@@ -111,12 +119,15 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
- 
- 	omap_voltage_get_volttable(sr_data->voltdm, &volt_data);
- 	if (!volt_data) {
-+		err = -EINVAL;
- 		pr_warning("%s: No Voltage table registerd fo VDD%d."
- 			"Something really wrong\n\n", __func__, i + 1);
- 		goto exit;
- 	}
- 
--	sr_set_nvalues(volt_data, sr_data);
-+	err = sr_set_nvalues(volt_data, sr_data);
-+	if (err)
-+		goto exit;
- 
- 	sr_data->enable_on_init = sr_enable_on_init;
- 
-@@ -129,7 +140,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
- exit:
- 	i++;
- 	kfree(sr_data);
--	return 0;
-+	return err;
- }
- 
- /*
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
