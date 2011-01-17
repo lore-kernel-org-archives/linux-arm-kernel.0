@@ -1,80 +1,54 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 17 Jan 2011 09:16:22 +0100
-Subject: [PATCH v4 05/10] net/fec: add dual fec support for mx28
-In-Reply-To: <20110114130849.GA27583@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-	<1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
-	<20110113144805.GS24920@pengutronix.de>
-	<20110114054838.GA14491@freescale.com>
-	<20110114075223.GC24920@pengutronix.de>
-	<20110114130849.GA27583@freescale.com>
-Message-ID: <19763.64214.220441.325208@ipc1.ka-ro>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Mon, 17 Jan 2011 16:32:23 +0800
+Subject: [PATCH 1/2] video: nuc900fb: fix compile error
+Message-ID: <1295253143.12890.3.camel@mola>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+>From a4bd940fa4d162f95e51e67c7ec4973b1d5b6866 Mon Sep 17 00:00:00 2001
+From: Axel Lin <axel.lin@gmail.com>
+Date: Mon, 17 Jan 2011 16:24:36 +0800
+Subject: [PATCH 1/2] video: nuc900fb: fix compile error
 
-Shawn Guo writes:
-> On Fri, Jan 14, 2011 at 08:52:23AM +0100, Uwe Kleine-K?nig wrote:
-> > On Fri, Jan 14, 2011 at 01:48:40PM +0800, Shawn Guo wrote:
-> > > Hi Uwe,
-> > > 
-> > > On Thu, Jan 13, 2011 at 03:48:05PM +0100, Uwe Kleine-K?nig wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > > +/* Controller is ENET-MAC */
-> > > > > +#define FEC_QUIRK_ENET_MAC           (1 << 0)
-> > > > does this really qualify to be a quirk?
-> > > > 
-> > > My understanding is that ENET-MAC is a type of "quirky" FEC
-> > > controller.
-> > > 
-> > > > > +/* Controller needs driver to swap frame */
-> > > > > +#define FEC_QUIRK_SWAP_FRAME         (1 << 1)
-> > > > IMHO this is a bit misnamed.  FEC_QUIRK_NEEDS_BE_DATA or similar would
-> > > > be more accurate.
-> > > > 
-> > > When your make this change, you may want to pick a better name for
-> > > function swap_buffer too.
-> > > 
-> > > [...]
-> > > 
-> > > > > +static void *swap_buffer(void *bufaddr, int len)
-> > > > > +{
-> > > > > +     int i;
-> > > > > +     unsigned int *buf = bufaddr;
-> > > > > +
-> > > > > +     for (i = 0; i < (len + 3) / 4; i++, buf++)
-> > > > > +             *buf = cpu_to_be32(*buf);
-> > > > if len isn't a multiple of 4 this accesses bytes behind len.  Is this
-> > > > generally OK here?  (E.g. because skbs always have a length that is a
-> > > > multiple of 4?)
-> > > The len may not be a multiple of 4.  But I believe bufaddr is always
-> > > a buffer allocated in a length that is a multiple of 4, and the 1~3
-> > > bytes exceeding the len very likely has no data that matters.  But
-> > > yes, it deserves a safer implementation.
-> > Did you test what happens if bufaddr isn't aligned?  Does it work at all
-> > then?
-> > 
-> I see many calls passing a len that is not a multiple of 4, but it
-> works good.
-> 
-That does not prove anything, actually.
+This patch fixes below compile error:
 
-Anyway "bufaddr isn't aligned" != "len is not a multiple of 4".
-Is there any guarantee that the function cannot be called with a
-non-aligned buffer address?
+  CC      drivers/video/nuc900fb.o
+drivers/video/nuc900fb.c: In function 'nuc900fb_suspend':
+drivers/video/nuc900fb.c:726: error: too few arguments to function 'nuc900fb_stop_lcd'
+drivers/video/nuc900fb.c: In function 'nuc900fb_resume':
+drivers/video/nuc900fb.c:743: error: 'bfinfo' undeclared (first use in this function)
+drivers/video/nuc900fb.c:743: error: (Each undeclared identifier is reported only once
+drivers/video/nuc900fb.c:743: error: for each function it appears in.)
+make[2]: *** [drivers/video/nuc900fb.o] Error 1
+make[1]: *** [drivers/video] Error 2
+make: *** [drivers] Error 2
 
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ drivers/video/nuc900fb.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Lothar Wa?mann
+diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+index 62498bd..29ef92f 100644
+--- a/drivers/video/nuc900fb.c
++++ b/drivers/video/nuc900fb.c
+@@ -723,7 +723,7 @@ static int nuc900fb_suspend(struct platform_device *dev, pm_message_t state)
+ 	struct fb_info	   *fbinfo = platform_get_drvdata(dev);
+ 	struct nuc900fb_info *info = fbinfo->par;
+ 
+-	nuc900fb_stop_lcd();
++	nuc900fb_stop_lcd(fbinfo);
+ 	msleep(1);
+ 	clk_disable(info->clk);
+ 	return 0;
+@@ -740,7 +740,7 @@ static int nuc900fb_resume(struct platform_device *dev)
+ 	msleep(1);
+ 
+ 	nuc900fb_init_registers(fbinfo);
+-	nuc900fb_activate_var(bfinfo);
++	nuc900fb_activate_var(fbinfo);
+ 
+ 	return 0;
+ }
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.2
