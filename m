@@ -1,148 +1,40 @@
-From: subaparts@yandex.ru (Alexander)
-Date: Mon, 17 Jan 2011 16:37:29 +0300
-Subject: [alsa-devel] [PATCH] ASoC: CS4271 codec support
-In-Reply-To: <1295260210.11031.38.camel@dplaptop.localdomain>
-References: <1295217350.16460.11.camel@r60e>
-	<1295260210.11031.38.camel@dplaptop.localdomain>
-Message-ID: <1295271449.16460.34.camel@r60e>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 17 Jan 2011 15:01:28 +0100
+Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
+In-Reply-To: <20110114173400.GB22505@n2100.arm.linux.org.uk>
+References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
+	<20110114155806.GA22505@n2100.arm.linux.org.uk>
+	<AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
+	<20110114173400.GB22505@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Dimitris,
+On Fri, Jan 14, 2011 at 6:34 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jan 14, 2011 at 05:13:01PM +0100, Jean Pihet wrote:
+>> Is the name 'omap_sram_push' wrong then?
+>> What about the following?
+>> @@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
+>>
+>> ? ? ? ?omap_sram_ceil -= size;
+>> ? ? ? ?omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
+>> ?- ? ? memcpy((void *)omap_sram_ceil, start, size);
+>> ?- ? ? flush_icache_range((unsigned long)omap_sram_ceil,
+>> ?- ? ? ? ? ? ? (unsigned long)(omap_sram_ceil + size));
+>>
+>> ?- ? ? return (void *)omap_sram_ceil;
+>> ?+ ? ?return fncpy((void *)omap_sram_ceil, start, size);
+>
+> It's more correct, but still missing out on the type safety which we've
+> tried to provide with fncpy.
+IIUC the type of the function is propagated from the 2nd argument
+(funcp) to the return value, which is fine here. The (void)* is here
+only to avoid a warning thrown by memcpy.
 
-On Mon, 2011-01-17 at 10:30 +0000, Dimitris Papastamos wrote:
-> On Mon, 2011-01-17 at 01:35 +0300, Alexander wrote:
-> > +/* CS4271 default register settings, except auto-mute is off */
-> > +static const u8 cs4271_dflt_reg[CS4271_NR_REGS] = {
-> > +	0, 0, 0, CS4271_DACVOL_ATAPI_AL_BR, 0, 0, 0,
-> > +	CS4271_MODE2_CPEN | CS4271_MODE2_PDN,
-> > +};
-> 
-> I'd be better to leave these as defaults, and perform any initialization
-> in the the cs4271_probe() function.
+>?Note also the other issue with Dave Martin
+> has raised though - this isn't ready for merging yet.
+Ok I am using the latest version now and will re-spin the patch.
 
-It's space optimized without affecting readability. I can rename it to
-cs4271_init_reg[].
-
-> 
-> > +	/* Configure DAC */
-> > +	val = cs4271_clk_tab[i].speed_mode;
-> > +
-> > +	if (cs4271->master)
-> > +		val |= cs4271_clk_tab[i].mclk_master | CS4271_MODE1_MASTER;
-> > +	else
-> > +		val |= cs4271_clk_tab[i].mclk_slave;
-> 
-> This should ideally live in cs4271_set_dai_fmt().
-
-It's space optimized for particular codec hardware without affecting
-readability.
-
-> 
-> > +	switch (cs4271->mode) {
-> > +	case SND_SOC_DAIFMT_LEFT_J:
-> > +		val |= CS4271_MODE1_DAC_DIF_LJ;
-> > +		break;
-> > +	case SND_SOC_DAIFMT_I2S:
-> > +		val |= CS4271_MODE1_DAC_DIF_I2S;
-> > +		break;
-> > +	default:
-> > +		dev_err(codec->dev, "Invalid DAI format\n");
-> > +		return -EINVAL;
-> > +	}
-> 
-> Same here.
-
-Same here.
-
-> 
-> > +/* CS4271 controls */
-> > +static DECLARE_TLV_DB_SCALE(cs4271_dac_tlv, -12700, 100, 0);
-> 
-> Are you use this doesn't mute the DAC?  If so the the last parameter
-> should be 1.
-
-No I do not use this, some people asked for this last time I've tried to
-submit this code. And no, this doesn't mute the DAC.
-
-> 
-> > +#ifdef CONFIG_PM
-> > +static int cs4271_soc_suspend(struct snd_soc_codec *codec, pm_message_t mesg)
-> > +{
-> > +	/* Set power-down bit */
-> > +	snd_soc_update_bits(codec, CS4271_MODE2, CS4271_MODE2_PDN,
-> > +		CS4271_MODE2_PDN);
-> > +
-> > +	return 0;
-> > +}
-> > +#else
-> > +#define cs4271_soc_suspend	NULL
-> > +#endif /* CONFIG_PM */
-> > +
-> > +/* This function used also in codec probe function and not only for PM */
-> > +static int cs4271_soc_resume(struct snd_soc_codec *codec)
-> > +{
-> > +	int ret;
-> > +
-> > +	/* Restore codec state */
-> > +	ret = cs4271_write_cache(codec);
-> > +	if (ret < 0)
-> > +		return ret;
-> > +
-> > +	/* then disable the power-down bit */
-> > +	snd_soc_update_bits(codec, CS4271_MODE2, CS4271_MODE2_PDN, 0);
-> > +
-> > +	return 0;
-> > +}
-> 
-> Consider setting the set_bias_level callback and performing the required
-> work in there.  You can then trigger a change in the bias levels by
-> calling your cs4271_set_bias_level() function from within your suspend()
-> and resume() functions.
-> 
-> > +	/*
-> > +	 * In case of I2C, chip address specified in board data.
-> > +	 * So cache IO operations use 8 bit codec register address.
-> > +	 * In case of SPI, chip address and register address
-> > +	 * passed together as 16 bit value.
-> > +	 * Anyway, register address is masked with 0xFF inside
-> > +	 * soc-cache code.
-> > +	 */
-> 
-> Have you tested your driver using both SPI and I2C?
-
-Yes.
-
-> 
-> > +	ret = (cs4271->bus_type == SND_SOC_SPI) ? 16 : 8;
-> 
-> Please avoid using the ternary operator like this.
-
-What's wrong with it?
-
-> 
-> > +	ret = snd_soc_codec_set_cache_io(codec, ret, 8, cs4271->bus_type);
-> > +	if (ret) {
-> > +		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = cs4271_soc_resume(codec);
-> > +	if (ret < 0)
-> > +		return ret;
-> 
-> This should also changed to a call to
-> cs4271_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
-> 
-
-There is no need for DAPM on hardware I consider. I can even remove PM
-stuff. Someone may implement it later, if CS4271 would appear on
-something except Cirrus dev. boards.
-
-> Thanks,
-> Dimitris
-> 
-> 
-
-Thanks,
-	Alexander.
+Regards,
+Jean
