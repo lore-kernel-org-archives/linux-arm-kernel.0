@@ -1,26 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Jan 2011 15:33:03 +0000
-Subject: [PATCH] ux500: add a few AB8500 regulator consumers
-In-Reply-To: <AANLkTi=gsmiGFF31Si71LQBAZqpZZcxMDOK6e3xAyZV7@mail.gmail.com>
-References: <1295269491-12107-1-git-send-email-linus.walleij@stericsson.com>
-	<20110117132745.GA21113@opensource.wolfsonmicro.com>
-	<AANLkTi=gsmiGFF31Si71LQBAZqpZZcxMDOK6e3xAyZV7@mail.gmail.com>
-Message-ID: <20110117153303.GK21113@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 17 Jan 2011 15:35:57 +0000
+Subject: [PATCH v4] ARM: Thumb-2: Symbol manipulation macros for function
+	body copying
+In-Reply-To: <AANLkTintFe4V6BxrUxh-gwvhoa=RcH0tkHjYbfyGHKD=@mail.gmail.com>
+References: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
+	<AANLkTintFe4V6BxrUxh-gwvhoa=RcH0tkHjYbfyGHKD=@mail.gmail.com>
+Message-ID: <AANLkTin6gfN6hpExQ0iof14Hy7_MmaOdgpgS2OgyZOLd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 03:11:04PM +0100, Linus Walleij wrote:
-> 2011/1/17 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+Hi,
 
-> >> + ? ? {
-> >> + ? ? ? ? ? ? .supply = "ab8500-gpadc",
-> >> + ? ? },
+On Mon, Jan 17, 2011 at 2:02 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
 
-> > I suspect there's a device for the ab8500?
+[...]
 
-> This is not the AB8500 actually, but a subdevice (MFD cell) for it
-> that creates its own platform device and is separately powered.
-> (Though using in-chip wiring I presume.)
+> Note that aligning the source and destination pointers to a multiple
+> of 8 bytes has an impact on the behavio(u)r and so must be carefully
+> thought and tested on OMAP1/2/3 platforms.
 
-It may be more sane to just have the subdevices use the core struct
-device for requests for legibility.
+Do you have any specific concerns regarding this?
+
+Currently, the only issue I can think of is that the need to allocate
+aligned memory from the SRAM will increase the total amount allocated,
+which could be a problem if we end up overflowing the available SRAM.
+
+This does not appear to happen in the case I've tested -- I currently
+round up the amount allocated in omap_sram_push to be a multiple of 8
+bytes.  This, combined with a couple of ".align 3" directives, is
+enough to get me a booting system on omap3... but I haven't tested
+exhaustively.
+
+Cheers
+---Dave
