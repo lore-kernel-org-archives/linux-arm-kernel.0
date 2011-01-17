@@ -1,42 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Jan 2011 06:31:19 +0200
-Subject: [PATCH 6/7] arm: omap2: irq: fix compile warning:
+Date: Mon, 17 Jan 2011 06:31:20 +0200
+Subject: [PATCH 7/7] arm: omap2: clksel: fix compile warning
 In-Reply-To: <1295238680-26738-1-git-send-email-balbi@ti.com>
 References: <1295238680-26738-1-git-send-email-balbi@ti.com>
-Message-ID: <1295238680-26738-7-git-send-email-balbi@ti.com>
+Message-ID: <1295238680-26738-8-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Fix the following compile warning:
-arch/arm/mach-omap2/irq.c:64:31: warning: 'intc_context' defined but not
-used
+arch/arm/mach-omap2/clkt_clksel.c: In function '_get_div_and_fieldval':
+arch/arm/mach-omap2/clkt_clksel.c:100:35: warning: 'max_clkr' may be
+used uninitialized in this function
+
+While at that, also add a check to avoid using max_clkr while NULL.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/irq.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/clkt_clksel.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 23049c4..d151aac 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -61,8 +61,6 @@ struct omap3_intc_regs {
- 	u32 mir[INTCPS_NR_MIR_REGS];
- };
- 
--static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
--
- /* INTC bank register get/set */
- 
- static void intc_bank_write_reg(u32 val, struct omap_irq_bank *bank, u16 reg)
-@@ -229,6 +227,8 @@ void __init omap_init_irq(void)
- }
- 
- #ifdef CONFIG_ARCH_OMAP3
-+static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
-+
- void omap_intc_save_context(void)
+diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
+index a781cd6..baf0b6b 100644
+--- a/arch/arm/mach-omap2/clkt_clksel.c
++++ b/arch/arm/mach-omap2/clkt_clksel.c
+@@ -97,7 +97,7 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
+ 				u32 *field_val)
  {
- 	int ind = 0, i = 0;
+ 	const struct clksel *clks;
+-	const struct clksel_rate *clkr, *max_clkr;
++	const struct clksel_rate *clkr, *max_clkr = NULL;
+ 	u8 max_div = 0;
+ 
+ 	clks = _get_clksel_by_parent(clk, src_clk);
+@@ -123,6 +123,9 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
+ 		}
+ 	}
+ 
++	if (!max_clkr)
++		return 0;
++
+ 	if (max_div == 0) {
+ 		/* This indicates an error in the clksel data */
+ 		WARN(1, "clock: Could not find divisor for clock %s parent %s"
 -- 
 1.7.3.4.598.g85356
