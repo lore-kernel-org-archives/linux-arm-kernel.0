@@ -1,58 +1,80 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Jan 2011 10:18:45 +0200
-Subject: [PATCH 7/7] arm: omap2: clksel: fix compile warning
-In-Reply-To: <AANLkTimO_Vt+bjS1rP1AwD9iSqd_cNLAZ+tukveOtneD@mail.gmail.com>
-References: <1295238680-26738-1-git-send-email-balbi@ti.com>
-	<1295238680-26738-8-git-send-email-balbi@ti.com>
-	<AANLkTimO_Vt+bjS1rP1AwD9iSqd_cNLAZ+tukveOtneD@mail.gmail.com>
-Message-ID: <20110117081845.GF2812@legolas.emea.dhcp.ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 17 Jan 2011 09:16:22 +0100
+Subject: [PATCH v4 05/10] net/fec: add dual fec support for mx28
+In-Reply-To: <20110114130849.GA27583@freescale.com>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+	<1294297998-26930-6-git-send-email-shawn.guo@freescale.com>
+	<20110113144805.GS24920@pengutronix.de>
+	<20110114054838.GA14491@freescale.com>
+	<20110114075223.GC24920@pengutronix.de>
+	<20110114130849.GA27583@freescale.com>
+Message-ID: <19763.64214.220441.325208@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Jan 17, 2011 at 01:37:41PM +0530, Varadarajan, Charulatha wrote:
-> On Mon, Jan 17, 2011 at 10:01, Felipe Balbi <balbi@ti.com> wrote:
-> > Fix the following compile warning:
-> > arch/arm/mach-omap2/clkt_clksel.c: In function '_get_div_and_fieldval':
-> > arch/arm/mach-omap2/clkt_clksel.c:100:35: warning: 'max_clkr' may be
-> > used uninitialized in this function
-> >
-> > While at that, also add a check to avoid using max_clkr while NULL.
-> >
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > ?arch/arm/mach-omap2/clkt_clksel.c | ? ?5 ++++-
-> > ?1 files changed, 4 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
-> > index a781cd6..baf0b6b 100644
-> > --- a/arch/arm/mach-omap2/clkt_clksel.c
-> > +++ b/arch/arm/mach-omap2/clkt_clksel.c
-> > @@ -97,7 +97,7 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
-> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 *field_val)
-> > ?{
-> > ? ? ? ?const struct clksel *clks;
-> > - ? ? ? const struct clksel_rate *clkr, *max_clkr;
-> > + ? ? ? const struct clksel_rate *clkr, *max_clkr = NULL;
-> > ? ? ? ?u8 max_div = 0;
-> >
-> > ? ? ? ?clks = _get_clksel_by_parent(clk, src_clk);
-> > @@ -123,6 +123,9 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
-> > ? ? ? ? ? ? ? ?}
-> > ? ? ? ?}
-> >
-> > + ? ? ? if (!max_clkr)
-> > + ? ? ? ? ? ? ? return 0;
+Shawn Guo writes:
+> On Fri, Jan 14, 2011 at 08:52:23AM +0100, Uwe Kleine-K?nig wrote:
+> > On Fri, Jan 14, 2011 at 01:48:40PM +0800, Shawn Guo wrote:
+> > > Hi Uwe,
+> > > 
+> > > On Thu, Jan 13, 2011 at 03:48:05PM +0100, Uwe Kleine-K?nig wrote:
+> > > 
+> > > [...]
+> > > 
+> > > > > +/* Controller is ENET-MAC */
+> > > > > +#define FEC_QUIRK_ENET_MAC           (1 << 0)
+> > > > does this really qualify to be a quirk?
+> > > > 
+> > > My understanding is that ENET-MAC is a type of "quirky" FEC
+> > > controller.
+> > > 
+> > > > > +/* Controller needs driver to swap frame */
+> > > > > +#define FEC_QUIRK_SWAP_FRAME         (1 << 1)
+> > > > IMHO this is a bit misnamed.  FEC_QUIRK_NEEDS_BE_DATA or similar would
+> > > > be more accurate.
+> > > > 
+> > > When your make this change, you may want to pick a better name for
+> > > function swap_buffer too.
+> > > 
+> > > [...]
+> > > 
+> > > > > +static void *swap_buffer(void *bufaddr, int len)
+> > > > > +{
+> > > > > +     int i;
+> > > > > +     unsigned int *buf = bufaddr;
+> > > > > +
+> > > > > +     for (i = 0; i < (len + 3) / 4; i++, buf++)
+> > > > > +             *buf = cpu_to_be32(*buf);
+> > > > if len isn't a multiple of 4 this accesses bytes behind len.  Is this
+> > > > generally OK here?  (E.g. because skbs always have a length that is a
+> > > > multiple of 4?)
+> > > The len may not be a multiple of 4.  But I believe bufaddr is always
+> > > a buffer allocated in a length that is a multiple of 4, and the 1~3
+> > > bytes exceeding the len very likely has no data that matters.  But
+> > > yes, it deserves a safer implementation.
+> > Did you test what happens if bufaddr isn't aligned?  Does it work at all
+> > then?
+> > 
+> I see many calls passing a len that is not a multiple of 4, but it
+> works good.
 > 
-> Would it be more appropriate to move this check after the "if" check
-> of max_div==0 and it's warning?
-> or add a warning before it returns?
+That does not prove anything, actually.
 
-Maybe this return isn't even necessary. max_clkr will be true if max_div
-is valid, so they cancel each other.
+Anyway "bufaddr isn't aligned" != "len is not a multiple of 4".
+Is there any guarantee that the function cannot be called with a
+non-aligned buffer address?
 
-Tony ?
 
+Lothar Wa?mann
 -- 
-balbi
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
