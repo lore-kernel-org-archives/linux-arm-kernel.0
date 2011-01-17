@@ -1,21 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Jan 2011 15:24:50 -0800
-Subject: [PATCH 13/14] ARM: v6k: allow swp emulation again when ARMv7
-	is enabled
-In-Reply-To: <E1Peuhh-0003T5-2n@rmk-PC.arm.linux.org.uk>
+Date: Mon, 17 Jan 2011 15:25:14 -0800
+Subject: [PATCH 14/14] ARM: v6k: only allow SMP if we have v6k or v7 CPU
+In-Reply-To: <E1Peui1-0003T9-6Q@rmk-PC.arm.linux.org.uk>
 References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peuhh-0003T5-2n@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110117232450.GL4957@atomide.com>
+	<E1Peui1-0003T9-6Q@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110117232514.GM4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:26]:
-> Now that we build a v6+v6k+v7 kernel with -march=armv6k for everything,
-> we don't need to disable swp emulation to work around the build problem
-> with OMAP.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:25]:
+> SMP extensions are only supported on ARMv6k or ARMv7 architectures, so
+> only offer the option if we're building for such an architecture.
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Glad to see this issue sorted out.
-
-Tested-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
