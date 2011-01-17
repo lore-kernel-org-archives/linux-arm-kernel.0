@@ -1,68 +1,81 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 17 Jan 2011 15:46:44 +0000
-Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
-References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
-	<20110114155806.GA22505@n2100.arm.linux.org.uk>
-	<AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
-	<20110114173400.GB22505@n2100.arm.linux.org.uk>
-	<AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
-Message-ID: <AANLkTinJPyXKWwbyW05+HUW0LJUxsu=1Exbrr6ut27Kr@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 17 Jan 2011 08:47:20 -0700
+Subject: [PATCH v3 0/6] OMAP: McSPI: Hwmod adaptation + runtime conversion
+In-Reply-To: <32036.10.24.255.18.1295274181.squirrel@dbdmail.itg.ti.com>
+References: <32036.10.24.255.18.1295274181.squirrel@dbdmail.itg.ti.com>
+Message-ID: <AANLkTinOg3aPQrX+rp=UOf4UcMw2CVA=6COgfGpRkVm0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 2:01 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> On Fri, Jan 14, 2011 at 6:34 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Jan 14, 2011 at 05:13:01PM +0100, Jean Pihet wrote:
->>> Is the name 'omap_sram_push' wrong then?
->>> What about the following?
->>> @@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
->>>
->>> ? ? ? ?omap_sram_ceil -= size;
->>> ? ? ? ?omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
->>> ?- ? ? memcpy((void *)omap_sram_ceil, start, size);
->>> ?- ? ? flush_icache_range((unsigned long)omap_sram_ceil,
->>> ?- ? ? ? ? ? ? (unsigned long)(omap_sram_ceil + size));
->>>
->>> ?- ? ? return (void *)omap_sram_ceil;
->>> ?+ ? ?return fncpy((void *)omap_sram_ceil, start, size);
->>
->> It's more correct, but still missing out on the type safety which we've
->> tried to provide with fncpy.
-> IIUC the type of the function is propagated from the 2nd argument
-> (funcp) to the return value, which is fine here. The (void)* is here
-> only to avoid a warning thrown by memcpy.
+On Mon, Jan 17, 2011 at 7:23 AM, Govindraj.R <govindraj.raja@ti.com> wrote:
+> Changes invloves:
+> ----------------
+> 1) Addition of hwmod data for omap2/3/4.
+> 2) McSPI driver hwmod adaptation with cleanup of base address
+> ? macros and using omap-device API's.
+> 3) Runtime Conversion of McSPI driver.
+>
+> Changes from v2:
+> ---------------
+> 1) Fixing minor comments and adding ack from Grant Likely.
+> ? ? ? ?https://patchwork.kernel.org/patch/371321/
+> ? ? ? ?https://patchwork.kernel.org/patch/371331/
 
-I think Russell's argument was that the compiler will not notice if
-you mismatch the return type and the function to be copied, because
-the casts to/from void * make the compiler blind to the real types
-involved.  So:
+Hi Govindraj,
 
-int f(int);
-size_t size_of_f;
+My comment still stands that it looks like a lot of duplicate data is
+being generated, which makes this patch set larger than it appears to
+need to be, but those files aren't in a directory that I maintain so
+it's not my call.  :-)
 
-void *buffer;
-int (*_copied_f1)(int);
-char *(*_copied_f2)(char *);
+Tony, I'm okay with your merging this series through your tree.
 
-_copied_f1 = fncpy(buffer, f, size_of_f); /* OK */
-_copied_f2 = fncpy(buffer, f, size_of_f); /* compile error */
-_copied_f1 = omap_sram_push(f, size_of_f); /* OK */
-_copied_f2 = opam_sram_push(f, size_of_f); /* type mismatch, but
-compilation succeeds */
+g.
+
+>
+> Changes from v1:
+> ---------------
+> 1) Fixing patch 5/5 comments for hwmod+runtime
+> ?Split the patch 5/5 to hwmod adaptation
+> ?and then runtime conversion
+> ?http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
+>
+> Testing Updates:
+> ----------------
+> Was tested using data transfer test module available at:
+> http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/test_code/
+> utils/mcspi_modules/omap_mcspi_datatest.c;
+> h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
+> hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
+> This test basically involves MISO <--> MOSI lines looped and data transfer test
+> done using the above test module.
+> System wide suspend and ret/off counts observation, ensured that no behavioral
+> difference with and without this patch series.
+>
+> Charulatha V (1):
+> ?OMAP: devices: Modify McSPI device to adapt to hwmod framework
+>
+> Govindraj.R (5):
+> ?OMAP2420: hwmod data: Add McSPI
+> ?OMAP2430: hwmod data: Add McSPI
+> ?OMAP3: hwmod data: Add McSPI
+> ?OMAP4: hwmod data: Add McSPI
+> ?OMAP: runtime: McSPI driver runtime conversion
+>
+> ?arch/arm/mach-omap2/devices.c ? ? ? ? ? ? ?| ?187 ++++---------------
+> ?arch/arm/mach-omap2/omap_hwmod_2420_data.c | ?156 ++++++++++++++++
+> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ?219 ++++++++++++++++++++++
+> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ?280 ++++++++++++++++++++++++++++
+> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ?266 ++++++++++++++++++++++++++
+> ?arch/arm/plat-omap/include/plat/mcspi.h ? ?| ? 11 +
+> ?drivers/spi/omap2_mcspi.c ? ? ? ? ? ? ? ? ?| ?224 +++++++---------------
+> ?7 files changed, 1043 insertions(+), 300 deletions(-)
+>
+>
+>
 
 
-One way to work around this is would be to make omap_sram_push() a macro:
 
-#define omap_sram_push(funcp, size) \
-    (typeof(funcp))_do_omap_sram_push((void *)(funcp), size)
-
-... where the definition of _do_omap_sram_push() is the same is the
-existing definition of omap_sram_push().  Providing
-_do_omap_sram_push() is not called directly, this should now be
-type-safe.
-
-
-Cheers
----Dave
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
