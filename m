@@ -1,53 +1,68 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 17 Jan 2011 15:40:44 +0000
-Subject: [alsa-devel] [PATCH] ASoC: CS4271 codec support
-In-Reply-To: <1295271449.16460.34.camel@r60e>
-References: <1295217350.16460.11.camel@r60e>
-	<1295260210.11031.38.camel@dplaptop.localdomain>
-	<1295271449.16460.34.camel@r60e>
-Message-ID: <20110117154044.GL21113@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 17 Jan 2011 15:46:44 +0000
+Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
+In-Reply-To: <AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
+References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
+	<20110114155806.GA22505@n2100.arm.linux.org.uk>
+	<AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
+	<20110114173400.GB22505@n2100.arm.linux.org.uk>
+	<AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
+Message-ID: <AANLkTinJPyXKWwbyW05+HUW0LJUxsu=1Exbrr6ut27Kr@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 04:37:29PM +0300, Alexander wrote:
-> On Mon, 2011-01-17 at 10:30 +0000, Dimitris Papastamos wrote:
+On Mon, Jan 17, 2011 at 2:01 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> On Fri, Jan 14, 2011 at 6:34 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Fri, Jan 14, 2011 at 05:13:01PM +0100, Jean Pihet wrote:
+>>> Is the name 'omap_sram_push' wrong then?
+>>> What about the following?
+>>> @@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
+>>>
+>>> ? ? ? ?omap_sram_ceil -= size;
+>>> ? ? ? ?omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
+>>> ?- ? ? memcpy((void *)omap_sram_ceil, start, size);
+>>> ?- ? ? flush_icache_range((unsigned long)omap_sram_ceil,
+>>> ?- ? ? ? ? ? ? (unsigned long)(omap_sram_ceil + size));
+>>>
+>>> ?- ? ? return (void *)omap_sram_ceil;
+>>> ?+ ? ?return fncpy((void *)omap_sram_ceil, start, size);
+>>
+>> It's more correct, but still missing out on the type safety which we've
+>> tried to provide with fncpy.
+> IIUC the type of the function is propagated from the 2nd argument
+> (funcp) to the return value, which is fine here. The (void)* is here
+> only to avoid a warning thrown by memcpy.
 
-> > On Mon, 2011-01-17 at 01:35 +0300, Alexander wrote:
-> > > +/* CS4271 default register settings, except auto-mute is off */
-> > > +static const u8 cs4271_dflt_reg[CS4271_NR_REGS] = {
-> > > +	0, 0, 0, CS4271_DACVOL_ATAPI_AL_BR, 0, 0, 0,
-> > > +	CS4271_MODE2_CPEN | CS4271_MODE2_PDN,
-> > > +};
+I think Russell's argument was that the compiler will not notice if
+you mismatch the return type and the function to be copied, because
+the casts to/from void * make the compiler blind to the real types
+involved.  So:
 
-> > I'd be better to leave these as defaults, and perform any initialization
-> > in the the cs4271_probe() function.
+int f(int);
+size_t size_of_f;
 
-> It's space optimized without affecting readability. I can rename it to
-> cs4271_init_reg[].
+void *buffer;
+int (*_copied_f1)(int);
+char *(*_copied_f2)(char *);
 
-You're missing Dimitris' point here.  There's an expectation that the
-register defaults will be the physical register defaults, if you need to
-change them do it with an explicit write during startup.
+_copied_f1 = fncpy(buffer, f, size_of_f); /* OK */
+_copied_f2 = fncpy(buffer, f, size_of_f); /* compile error */
+_copied_f1 = omap_sram_push(f, size_of_f); /* OK */
+_copied_f2 = opam_sram_push(f, size_of_f); /* type mismatch, but
+compilation succeeds */
 
-There's several other places where you're responding to review with
-similar comments about space optimisation which don't really seem to
-engage at all with what Dimitris has said.
 
-> > > +/* CS4271 controls */
-> > > +static DECLARE_TLV_DB_SCALE(cs4271_dac_tlv, -12700, 100, 0);
+One way to work around this is would be to make omap_sram_push() a macro:
 
-> > Are you use this doesn't mute the DAC?  If so the the last parameter
-> > should be 1.
+#define omap_sram_push(funcp, size) \
+    (typeof(funcp))_do_omap_sram_push((void *)(funcp), size)
 
-> No I do not use this, some people asked for this last time I've tried to
-> submit this code. And no, this doesn't mute the DAC.
+... where the definition of _do_omap_sram_push() is the same is the
+existing definition of omap_sram_push().  Providing
+_do_omap_sram_push() is not called directly, this should now be
+type-safe.
 
-Then again -127dB is more attenuation than many actual mutes.
 
-> > > +	ret = (cs4271->bus_type == SND_SOC_SPI) ? 16 : 8;
-
-> > Please avoid using the ternary operator like this.
-
-> What's wrong with it?
-
-It's not great for legibility.
+Cheers
+---Dave
