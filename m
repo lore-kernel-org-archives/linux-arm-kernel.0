@@ -1,42 +1,44 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Jan 2011 06:31:14 +0200
-Subject: [PATCH 1/7] arm: omap: i2c: fix compile warning
+Date: Mon, 17 Jan 2011 06:31:15 +0200
+Subject: [PATCH 2/7] arm: omap1: fix compile warning
 In-Reply-To: <1295238680-26738-1-git-send-email-balbi@ti.com>
 References: <1295238680-26738-1-git-send-email-balbi@ti.com>
-Message-ID: <1295238680-26738-2-git-send-email-balbi@ti.com>
+Message-ID: <1295238680-26738-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Fix the following compile warning:
-arch/arm/plat-omap/i2c.c:120:13: warning:
-'omap_pm_set_max_mpu_wakeup_lat_compat' defined but not used
-arch/arm/plat-omap/i2c.c:125:38: warning: 'omap_i2c_latency'
-defined but not used
+arch/arm/mach-omap1/board-palmte.c:233:13: warning:
+'palmte_headphones_detect' defined but not used
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/plat-omap/i2c.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap1/board-palmte.c |   13 -------------
+ 1 files changed, 0 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-index a4f8003..3341ca4 100644
---- a/arch/arm/plat-omap/i2c.c
-+++ b/arch/arm/plat-omap/i2c.c
-@@ -112,6 +112,7 @@ static inline int omap1_i2c_add_bus(int bus_id)
- }
- 
- 
-+#ifdef CONFIG_ARCH_OMAP2PLUS
- /*
-  * XXX This function is a temporary compatibility wrapper - only
-  * needed until the I2C driver can be converted to call
-@@ -130,7 +131,6 @@ static struct omap_device_pm_latency omap_i2c_latency[] = {
+diff --git a/arch/arm/mach-omap1/board-palmte.c b/arch/arm/mach-omap1/board-palmte.c
+index fb51ce6..c9d38f4 100644
+--- a/arch/arm/mach-omap1/board-palmte.c
++++ b/arch/arm/mach-omap1/board-palmte.c
+@@ -230,19 +230,6 @@ static struct spi_board_info palmte_spi_info[] __initdata = {
  	},
  };
  
--#ifdef CONFIG_ARCH_OMAP2PLUS
- static inline int omap2_i2c_add_bus(int bus_id)
+-static void palmte_headphones_detect(void *data, int state)
+-{
+-	if (state) {
+-		/* Headphones connected, disable speaker */
+-		gpio_set_value(PALMTE_SPEAKER_GPIO, 0);
+-		printk(KERN_INFO "PM: speaker off\n");
+-	} else {
+-		/* Headphones unplugged, re-enable speaker */
+-		gpio_set_value(PALMTE_SPEAKER_GPIO, 1);
+-		printk(KERN_INFO "PM: speaker on\n");
+-	}
+-}
+-
+ static void __init palmte_misc_gpio_setup(void)
  {
- 	int l;
+ 	/* Set TSC2102 PINTDAV pin as input (used by TSC2102 driver) */
 -- 
 1.7.3.4.598.g85356
