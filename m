@@ -1,310 +1,263 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Mon, 17 Jan 2011 19:53:58 +0530 (IST)
-Subject: [PATCH v3 6/6] OMAP: runtime: McSPI driver runtime conversion
-Message-ID: <32268.10.24.255.18.1295274238.squirrel@dbdmail.itg.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 17 Jan 2011 15:37:51 +0100
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+Message-ID: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McSPI runtime conversion.
-Changes involves:
-1) remove clock framework apis to use runtime framework apis.
-2) context restore from runtime resume which is a callback for get_sync.
-3) Remove SYSCONFIG(sysc) register handling
-        (a) Remove context save and restore of sysc reg and remove soft reset
-            done from sysc reg as this will be done with hwmod framework.
-        (b) Also cleanup sysc reg bit macros.
-4) Rename the omap2_mcspi_reset function to omap2_mcspi_master_setup
-   function as with hwmod changes soft reset will be done in
-   hwmod framework itself and use the return value from clock
-   enable function to return for failure scenarios.
+From: Ulf Hansson <ulf.hansson@stericsson.com>
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Reviewed-by: Partha Basak <p-basak2@ti.com>
+host->last_blockend flag is now set only for the last
+MCI_DATABLOCKEND, the previous code would just react to
+any blockend, which was buggy. Consolidate Ux500 and U300
+bug flags to a single one and use only the MCI_DATAEND irq
+on U300 as well, it turns out it was broken just like the
+Ux500.
+
+Also make sure the MCI_DATABLOCKENDMASK is set only when
+needed, instead of being set always and then masked off.
+
+Tested successfully on Ux500, U300 and ARM RealView
+PB1176.
+
+Cc: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
+Cc: Rabin Vincent <rabin.vincent@stericsson.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+[Tweaking and adding err message]
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 ---
- drivers/spi/omap2_mcspi.c |  120 +++++++++++++++++---------------------------
- 1 files changed, 46 insertions(+), 74 deletions(-)
+v2: also updated the comment.
+---
+ drivers/mmc/host/mmci.c |   93 +++++++++++++++++++++++++----------------------
+ drivers/mmc/host/mmci.h |    4 +-
+ 2 files changed, 52 insertions(+), 45 deletions(-)
 
-diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
-index 6018fe4..6a202a1 100644
---- a/drivers/spi/omap2_mcspi.c
-+++ b/drivers/spi/omap2_mcspi.c
-@@ -33,6 +33,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/pm_runtime.h>
-
- #include <linux/spi/spi.h>
-
-@@ -46,7 +47,6 @@
- #define OMAP2_MCSPI_MAX_CTRL 		4
-
- #define OMAP2_MCSPI_REVISION		0x00
--#define OMAP2_MCSPI_SYSCONFIG		0x10
- #define OMAP2_MCSPI_SYSSTATUS		0x14
- #define OMAP2_MCSPI_IRQSTATUS		0x18
- #define OMAP2_MCSPI_IRQENABLE		0x1c
-@@ -63,13 +63,6 @@
-
- /* per-register bitmasks: */
-
--#define OMAP2_MCSPI_SYSCONFIG_SMARTIDLE	BIT(4)
--#define OMAP2_MCSPI_SYSCONFIG_ENAWAKEUP	BIT(2)
--#define OMAP2_MCSPI_SYSCONFIG_AUTOIDLE	BIT(0)
--#define OMAP2_MCSPI_SYSCONFIG_SOFTRESET	BIT(1)
--
--#define OMAP2_MCSPI_SYSSTATUS_RESETDONE	BIT(0)
--
- #define OMAP2_MCSPI_MODULCTRL_SINGLE	BIT(0)
- #define OMAP2_MCSPI_MODULCTRL_MS	BIT(2)
- #define OMAP2_MCSPI_MODULCTRL_STEST	BIT(3)
-@@ -122,13 +115,12 @@ struct omap2_mcspi {
- 	spinlock_t		lock;
- 	struct list_head	msg_queue;
- 	struct spi_master	*master;
--	struct clk		*ick;
--	struct clk		*fck;
- 	/* Virtual base address of the controller */
- 	void __iomem		*base;
- 	unsigned long		phys;
- 	/* SPI1 has 4 channels, while SPI2 has 2 */
- 	struct omap2_mcspi_dma	*dma_channels;
-+	struct  device		*dev;
- };
-
- struct omap2_mcspi_cs {
-@@ -144,7 +136,6 @@ struct omap2_mcspi_cs {
-  * corresponding registers are modified.
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 0b4a5bf..7e0d38c 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -48,8 +48,6 @@ static unsigned int fmax = 515633;
+  *		  is asserted (likewise for RX)
+  * @broken_blockend: the MCI_DATABLOCKEND is broken on the hardware
+  *		and will not work at all.
+- * @broken_blockend_dma: the MCI_DATABLOCKEND is broken on the hardware when
+- *		using DMA.
+  * @sdio: variant supports SDIO
+  * @st_clkdiv: true if using a ST-specific clock divider algorithm
   */
- struct omap2_mcspi_regs {
--	u32 sysconfig;
- 	u32 modulctrl;
- 	u32 wakeupenable;
- 	struct list_head cs;
-@@ -268,9 +259,6 @@ static void omap2_mcspi_restore_ctx(struct omap2_mcspi *mcspi)
- 	mcspi_write_reg(spi_cntrl, OMAP2_MCSPI_MODULCTRL,
- 			omap2_mcspi_ctx[spi_cntrl->bus_num - 1].modulctrl);
-
--	mcspi_write_reg(spi_cntrl, OMAP2_MCSPI_SYSCONFIG,
--			omap2_mcspi_ctx[spi_cntrl->bus_num - 1].sysconfig);
--
- 	mcspi_write_reg(spi_cntrl, OMAP2_MCSPI_WAKEUPENABLE,
- 			omap2_mcspi_ctx[spi_cntrl->bus_num - 1].wakeupenable);
-
-@@ -280,20 +268,12 @@ static void omap2_mcspi_restore_ctx(struct omap2_mcspi *mcspi)
- }
- static void omap2_mcspi_disable_clocks(struct omap2_mcspi *mcspi)
- {
--	clk_disable(mcspi->ick);
--	clk_disable(mcspi->fck);
-+	pm_runtime_put_sync(mcspi->dev);
- }
-
- static int omap2_mcspi_enable_clocks(struct omap2_mcspi *mcspi)
- {
--	if (clk_enable(mcspi->ick))
--		return -ENODEV;
--	if (clk_enable(mcspi->fck))
--		return -ENODEV;
--
--	omap2_mcspi_restore_ctx(mcspi);
--
--	return 0;
-+	return pm_runtime_get_sync(mcspi->dev);
- }
-
- static int mcspi_wait_for_reg_bit(void __iomem *reg, unsigned long bit)
-@@ -819,8 +799,9 @@ static int omap2_mcspi_setup(struct spi_device *spi)
- 			return ret;
- 	}
-
--	if (omap2_mcspi_enable_clocks(mcspi))
--		return -ENODEV;
-+	ret = omap2_mcspi_enable_clocks(mcspi);
-+	if (ret < 0)
-+		return ret;
-
- 	ret = omap2_mcspi_setup_transfer(spi, NULL);
- 	omap2_mcspi_disable_clocks(mcspi);
-@@ -863,10 +844,11 @@ static void omap2_mcspi_work(struct work_struct *work)
- 	struct omap2_mcspi	*mcspi;
-
- 	mcspi = container_of(work, struct omap2_mcspi, work);
--	spin_lock_irq(&mcspi->lock);
-
--	if (omap2_mcspi_enable_clocks(mcspi))
--		goto out;
-+	if (omap2_mcspi_enable_clocks(mcspi) < 0)
-+		return;
-+
-+	spin_lock_irq(&mcspi->lock);
-
- 	/* We only enable one channel at a time -- the one whose message is
- 	 * at the head of the queue -- although this controller would gladly
-@@ -979,10 +961,9 @@ static void omap2_mcspi_work(struct work_struct *work)
- 		spin_lock_irq(&mcspi->lock);
- 	}
-
--	omap2_mcspi_disable_clocks(mcspi);
--
--out:
- 	spin_unlock_irq(&mcspi->lock);
-+
-+	omap2_mcspi_disable_clocks(mcspi);
- }
-
- static int omap2_mcspi_transfer(struct spi_device *spi, struct spi_message *m)
-@@ -1063,25 +1044,15 @@ static int omap2_mcspi_transfer(struct spi_device *spi, struct spi_message
-*m)
- 	return 0;
- }
-
--static int __init omap2_mcspi_reset(struct omap2_mcspi *mcspi)
-+static int __init omap2_mcspi_master_setup(struct omap2_mcspi *mcspi)
- {
- 	struct spi_master	*master = mcspi->master;
- 	u32			tmp;
-+	int ret = 0;
-
--	if (omap2_mcspi_enable_clocks(mcspi))
--		return -1;
--
--	mcspi_write_reg(master, OMAP2_MCSPI_SYSCONFIG,
--			OMAP2_MCSPI_SYSCONFIG_SOFTRESET);
--	do {
--		tmp = mcspi_read_reg(master, OMAP2_MCSPI_SYSSTATUS);
--	} while (!(tmp & OMAP2_MCSPI_SYSSTATUS_RESETDONE));
--
--	tmp = OMAP2_MCSPI_SYSCONFIG_AUTOIDLE |
--		OMAP2_MCSPI_SYSCONFIG_ENAWAKEUP |
--		OMAP2_MCSPI_SYSCONFIG_SMARTIDLE;
--	mcspi_write_reg(master, OMAP2_MCSPI_SYSCONFIG, tmp);
--	omap2_mcspi_ctx[master->bus_num - 1].sysconfig = tmp;
-+	ret = omap2_mcspi_enable_clocks(mcspi);
-+	if (ret < 0)
-+		return ret;
-
- 	tmp = OMAP2_MCSPI_WAKEUPENABLE_WKEN;
- 	mcspi_write_reg(master, OMAP2_MCSPI_WAKEUPENABLE, tmp);
-@@ -1092,6 +1063,18 @@ static int __init omap2_mcspi_reset(struct omap2_mcspi *mcspi)
- 	return 0;
- }
-
-+static int omap_mcspi_runtime_resume(struct device *dev)
-+{
-+	struct omap2_mcspi	*mcspi;
-+	struct spi_master	*master;
-+
-+	master = dev_get_drvdata(dev);
-+	mcspi = spi_master_get_devdata(master);
-+	omap2_mcspi_restore_ctx(mcspi);
-+
-+	return 0;
-+}
-+
-
- static int __init omap2_mcspi_probe(struct platform_device *pdev)
- {
-@@ -1141,34 +1124,22 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
- 	if (!mcspi->base) {
- 		dev_dbg(&pdev->dev, "can't ioremap MCSPI\n");
- 		status = -ENOMEM;
--		goto err1aa;
-+		goto err2;
- 	}
-
-+	mcspi->dev = &pdev->dev;
- 	INIT_WORK(&mcspi->work, omap2_mcspi_work);
-
- 	spin_lock_init(&mcspi->lock);
- 	INIT_LIST_HEAD(&mcspi->msg_queue);
- 	INIT_LIST_HEAD(&omap2_mcspi_ctx[master->bus_num - 1].cs);
-
--	mcspi->ick = clk_get(&pdev->dev, "ick");
--	if (IS_ERR(mcspi->ick)) {
--		dev_dbg(&pdev->dev, "can't get mcspi_ick\n");
--		status = PTR_ERR(mcspi->ick);
--		goto err1a;
--	}
--	mcspi->fck = clk_get(&pdev->dev, "fck");
--	if (IS_ERR(mcspi->fck)) {
--		dev_dbg(&pdev->dev, "can't get mcspi_fck\n");
--		status = PTR_ERR(mcspi->fck);
--		goto err2;
--	}
--
- 	mcspi->dma_channels = kcalloc(master->num_chipselect,
- 			sizeof(struct omap2_mcspi_dma),
- 			GFP_KERNEL);
-
- 	if (mcspi->dma_channels == NULL)
--		goto err3;
-+		goto err2;
-
- 	for (i = 0; i < master->num_chipselect; i++) {
- 		char dma_ch_name[14];
-@@ -1198,8 +1169,10 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
- 		mcspi->dma_channels[i].dma_tx_sync_dev = dma_res->start;
- 	}
-
--	if (omap2_mcspi_reset(mcspi) < 0)
--		goto err4;
-+	pm_runtime_enable(&pdev->dev);
-+
-+	if (status || omap2_mcspi_master_setup(mcspi) < 0)
-+		goto err3;
-
- 	status = spi_register_master(master);
- 	if (status < 0)
-@@ -1208,17 +1181,13 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
- 	return status;
-
- err4:
--	kfree(mcspi->dma_channels);
-+	spi_master_put(master);
- err3:
--	clk_put(mcspi->fck);
-+	kfree(mcspi->dma_channels);
- err2:
--	clk_put(mcspi->ick);
--err1a:
--	iounmap(mcspi->base);
--err1aa:
- 	release_mem_region(r->start, (r->end - r->start) + 1);
-+	iounmap(mcspi->base);
- err1:
--	spi_master_put(master);
- 	return status;
- }
-
-@@ -1234,9 +1203,7 @@ static int __exit omap2_mcspi_remove(struct platform_device *pdev)
- 	mcspi = spi_master_get_devdata(master);
- 	dma_channels = mcspi->dma_channels;
-
--	clk_put(mcspi->fck);
--	clk_put(mcspi->ick);
--
-+	omap2_mcspi_disable_clocks(mcspi);
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	release_mem_region(r->start, (r->end - r->start) + 1);
-
-@@ -1251,10 +1218,15 @@ static int __exit omap2_mcspi_remove(struct platform_device *pdev)
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:omap2_mcspi");
-
-+static const struct dev_pm_ops omap_mcspi_dev_pm_ops = {
-+	.runtime_resume	= omap_mcspi_runtime_resume,
-+};
-+
- static struct platform_driver omap2_mcspi_driver = {
- 	.driver = {
- 		.name =		"omap2_mcspi",
- 		.owner =	THIS_MODULE,
-+		.pm = &omap_mcspi_dev_pm_ops,
- 	},
- 	.remove =	__exit_p(omap2_mcspi_remove),
+@@ -60,7 +58,6 @@ struct variant_data {
+ 	unsigned int		fifosize;
+ 	unsigned int		fifohalfsize;
+ 	bool			broken_blockend;
+-	bool			broken_blockend_dma;
+ 	bool			sdio;
+ 	bool			st_clkdiv;
  };
+@@ -76,7 +73,7 @@ static struct variant_data variant_u300 = {
+ 	.fifohalfsize		= 8 * 4,
+ 	.clkreg_enable		= 1 << 13, /* HWFCEN */
+ 	.datalength_bits	= 16,
+-	.broken_blockend_dma	= true,
++	.broken_blockend	= true,
+ 	.sdio			= true,
+ };
+ 
+@@ -199,7 +196,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	struct variant_data *variant = host->variant;
+-	unsigned int datactrl, timeout, irqmask;
++	unsigned int datactrl, timeout, irqmask0, irqmask1;
+ 	unsigned long long clks;
+ 	void __iomem *base;
+ 	int blksz_bits;
+@@ -210,7 +207,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	host->data = data;
+ 	host->size = data->blksz * data->blocks;
+ 	host->data_xfered = 0;
+-	host->blockend = false;
++	host->last_blockend = false;
+ 	host->dataend = false;
+ 
+ 	mmci_init_sg(host, data);
+@@ -230,20 +227,20 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
+ 	if (data->flags & MMC_DATA_READ) {
+ 		datactrl |= MCI_DPSM_DIRECTION;
+-		irqmask = MCI_RXFIFOHALFFULLMASK;
++		irqmask1 = MCI_RXFIFOHALFFULLMASK;
+ 
+ 		/*
+ 		 * If we have less than a FIFOSIZE of bytes to transfer,
+ 		 * trigger a PIO interrupt as soon as any data is available.
+ 		 */
+ 		if (host->size < variant->fifosize)
+-			irqmask |= MCI_RXDATAAVLBLMASK;
++			irqmask1 |= MCI_RXDATAAVLBLMASK;
+ 	} else {
+ 		/*
+ 		 * We don't actually need to include "FIFO empty" here
+ 		 * since its implicit in "FIFO half empty".
+ 		 */
+-		irqmask = MCI_TXFIFOHALFEMPTYMASK;
++		irqmask1 = MCI_TXFIFOHALFEMPTYMASK;
+ 	}
+ 
+ 	/* The ST Micro variants has a special bit to enable SDIO */
+@@ -252,8 +249,14 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 			datactrl |= MCI_ST_DPSM_SDIOEN;
+ 
+ 	writel(datactrl, base + MMCIDATACTRL);
+-	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
+-	mmci_set_mask1(host, irqmask);
++	irqmask0 = readl(base + MMCIMASK0);
++	if (variant->broken_blockend)
++		irqmask0 &= ~MCI_DATABLOCKENDMASK;
++	else
++		irqmask0 |= MCI_DATABLOCKENDMASK;
++	irqmask0 &= ~MCI_DATAENDMASK;
++	writel(irqmask0, base + MMCIMASK0);
++	mmci_set_mask1(host, irqmask1);
+ }
+ 
+ static void
+@@ -301,7 +304,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 			data->error = -EIO;
+ 
+ 		/* Force-complete the transaction */
+-		host->blockend = true;
++		host->last_blockend = true;
+ 		host->dataend = true;
+ 
+ 		/*
+@@ -322,27 +325,18 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 	}
+ 
+ 	/*
+-	 * On ARM variants in PIO mode, MCI_DATABLOCKEND
+-	 * is always sent first, and we increase the
+-	 * transfered number of bytes for that IRQ. Then
+-	 * MCI_DATAEND follows and we conclude the transaction.
++	 * On ARM variants in PIO mode, MCI_DATABLOCKEND is always sent first,
++	 * and we increase the transfered number of bytes for that IRQ. Repeat
++	 * for the number of blocks in the transfer. Then MCI_DATAEND follows
++	 * and we conclude the transaction.
+ 	 *
+-	 * On the Ux500 single-IRQ variant MCI_DATABLOCKEND
+-	 * doesn't seem to immediately clear from the status,
+-	 * so we can't use it keep count when only one irq is
+-	 * used because the irq will hit for other reasons, and
+-	 * then the flag is still up. So we use the MCI_DATAEND
+-	 * IRQ at the end of the entire transfer because
+-	 * MCI_DATABLOCKEND is broken.
+-	 *
+-	 * In the U300, the IRQs can arrive out-of-order,
+-	 * e.g. MCI_DATABLOCKEND sometimes arrives after MCI_DATAEND,
+-	 * so for this case we use the flags "blockend" and
+-	 * "dataend" to make sure both IRQs have arrived before
+-	 * concluding the transaction. (This does not apply
+-	 * to the Ux500 which doesn't fire MCI_DATABLOCKEND
+-	 * at all.) In DMA mode it suffers from the same problem
+-	 * as the Ux500.
++	 * On the U300 and Ux500 a few to many MCI_DATABLOCKEND interrupts
++	 * are usually missing, so the data counter is not properly increased.
++	 * This is likely because new block arrive while the IRQ is being
++	 * processed without the transfers being held back, and ACK:in the
++	 * interrupt will only clear the very last block and intermediate
++	 * blockend interrupts get lost. So we simply mask of the blockend
++	 * interrupt on these and only use the dataend interrupt.
+ 	 */
+ 	if (status & MCI_DATABLOCKEND) {
+ 		/*
+@@ -353,22 +347,41 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 		 */
+ 		if (!variant->broken_blockend)
+ 			host->data_xfered += data->blksz;
+-		host->blockend = true;
++		if (host->data_xfered == data->blksz * data->blocks)
++			host->last_blockend = true;
+ 	}
+ 
+-	if (status & MCI_DATAEND)
++	if (status & MCI_DATAEND) {
++		if (!host->last_blockend && !variant->broken_blockend &&
++		    !data->error) {
++			/*
++			 * This typically occur on hardware with broken
++			 * blockend reporting, which will fire less blockend
++			 * IRQs than would be expected. Print an error and
++			 * repair the situation, but the hardware should
++			 * really be flagged as broken so this IRQ is not used
++			 * at all.
++			 */
++			dev_err(mmc_dev(host->mmc),
++				"missing %d block interrupts!\n",
++				(data->blksz * data->blocks - host->data_xfered) / data->blksz);
++			host->data_xfered = data->blksz * data->blocks;
++			host->last_blockend = true;
++		}
+ 		host->dataend = true;
++	}
+ 
+ 	/*
+ 	 * On variants with broken blockend we shall only wait for dataend,
+ 	 * on others we must sync with the blockend signal since they can
+ 	 * appear out-of-order.
+ 	 */
+-	if (host->dataend && (host->blockend || variant->broken_blockend)) {
++	if (host->dataend &&
++	    (host->last_blockend || variant->broken_blockend)) {
+ 		mmci_stop_data(host);
+ 
+ 		/* Reset these flags */
+-		host->blockend = false;
++		host->last_blockend = false;
+ 		host->dataend = false;
+ 
+ 		/*
+@@ -770,7 +783,6 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 	struct variant_data *variant = id->data;
+ 	struct mmci_host *host;
+ 	struct mmc_host *mmc;
+-	unsigned int mask;
+ 	int ret;
+ 
+ 	/* must have platform data */
+@@ -951,12 +963,7 @@ static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ 			goto irq0_free;
+ 	}
+ 
+-	mask = MCI_IRQENABLE;
+-	/* Don't use the datablockend flag if it's broken */
+-	if (variant->broken_blockend)
+-		mask &= ~MCI_DATABLOCKEND;
+-
+-	writel(mask, host->base + MMCIMASK0);
++	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
+ 
+ 	amba_set_drvdata(dev, mmc);
+ 
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index df06f01..7ac8c4d 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -137,7 +137,7 @@
+ #define MCI_IRQENABLE	\
+ 	(MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|	\
+ 	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
+-	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_DATABLOCKENDMASK)
++	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK)
+ 
+ /* These interrupts are directed to IRQ1 when two IRQ lines are available */
+ #define MCI_IRQ1MASK \
+@@ -177,7 +177,7 @@ struct mmci_host {
+ 	struct timer_list	timer;
+ 	unsigned int		oldstat;
+ 
+-	bool			blockend;
++	bool			last_blockend;
+ 	bool			dataend;
+ 
+ 	/* pio stuff */
 -- 
-1.7.1
+1.7.3.2
