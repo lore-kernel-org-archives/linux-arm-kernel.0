@@ -1,51 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 Jan 2011 09:54:03 +0900
-Subject: [GIT PULL] Samsung S5P for 2.6.38 merge window
-In-Reply-To: <20110115132955.GA15996@n2100.arm.linux.org.uk>
-References: <021901cbb2e2$ef4a0630$cdde1290$%kim@samsung.com>
-	<20110115132955.GA15996@n2100.arm.linux.org.uk>
-Message-ID: <038201cbb5e1$0bd664a0$23832de0$%kim@samsung.com>
+From: jk@ozlabs.org (Jeremy Kerr)
+Date: Mon, 17 Jan 2011 09:19:44 +0800
+Subject: Locking in the clk API
+In-Reply-To: <201101111016.42819.jeremy.kerr@canonical.com>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+Message-ID: <201101170919.45100.jk@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Thu, Jan 13, 2011 at 02:30:01PM +0900, Kukjin Kim wrote:
-> > Hi Russell,
-> >
-> > Please pull Samsung S5P updates from:
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > for-rmk
-> >
-> > These things are for 2.6.38.
-> 
-Hi,
+Hi all,
 
-> This looks very large.  I really considered not merging this due to:
-> 
-> 1. possibly conflicts with Lennert's irq_data conversion patches.
-> 
-Yeah, you're right, but its changes have been merged in my for-next and
-already merged in linux-next also long ago.
+Based on the discussion from this thread, my plan is to:
 
-> 2. It's not right to push large quantities of code into mainline towards
->    the end of the merge window.  You should have everything prepared
->    that you want to send before the merge window opens.
-> 
-I'm afraid that it's late and large stuff 'pull request'. But I asked about
-that...maybe you missed it. Anyway it's my mistake...sorry for it.
+* Change the 'common struct clk' patches to only use a spinlock for locking. 
+This means that clk_{en,dis}able will acquire a per-clk spinlock (for enable 
+counts), and be callable from atomic contexts.
 
-> In future, please have your tree ready for merging *before* the merge
-> window opens and aim to get the bulk in preferably before, at the latest
-> during the first week.
+* Rework the initial docs (posted in the first mail of this thread) document 
+to illustrate the new locking requirements.
 
-Ok...I will always remember it.
+* Request input from the platforms that require clk_enable (etc) to sleep, 
+about how we can merge the two implementations.
 
-Thanks a lot.
+Russell - is this OK?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Cheers,
+
+
+Jeremy
