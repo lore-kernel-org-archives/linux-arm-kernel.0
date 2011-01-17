@@ -1,47 +1,58 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 17 Jan 2011 10:39:54 -0800
-Subject: [GIT PULL] pxa: one fix and several simplification patches for -rc
-Message-ID: <AANLkTi=2eS9YOMS8q9XuY-KSp7wpM=BXDxa4DSycxHP7@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 17 Jan 2011 19:41:13 +0100 (CET)
+Subject: resume regression in 2.6.37
+In-Reply-To: <1295273083.2060.34.camel@sven>
+References: <1294933492.2535.23.camel@sven>
+	<alpine.LFD.2.00.1101131720350.2678@localhost6.localdomain6>
+	<1294938961.10740.24.camel@sven>
+	<alpine.LFD.2.00.1101131827080.2678@localhost6.localdomain6>
+	<1295260580.2060.29.camel@sven>
+	<alpine.LFD.2.00.1101171142380.2678@localhost6.localdomain6>
+	<1295273083.2060.34.camel@sven>
+Message-ID: <alpine.LFD.2.00.1101171940490.2678@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Mon, 17 Jan 2011, Sven Neumann wrote:
+> On Mon, 2011-01-17 at 13:40 +0100, Thomas Gleixner wrote:
+> > On Mon, 17 Jan 2011, Sven Neumann wrote:
+> > 
+> > > On Thu, 2011-01-13 at 18:33 +0100, Thomas Gleixner wrote:
+> > > 
+> > > > > Without the revert there is absolutely no sign of resume. With the
+> > > > > change reverted I can see that the PXA powers up again, there's an LED
+> > > > > showing that the USB controller has power again. Unfortunately there's
+> > > > > seems to be another problem and the resume doesn't complete. I've tried
+> > > > > to get console output by using no_console_suspend, but there's just
+> > > > > gibberish on the console after resume :(
+> > > > > 
+> > > > > Any idea on how to proceed from here? I could perhaps ask our hardware
+> > > > > engineer to try find out where exactly we are stuck in the resume. But
+> > > > > I'd like to avoid that if possible.
+> > > > 
+> > > > Can you stick a printk into the set_wake() function of that irq chip
+> > > > and print the irq and on arguments and the return value . Run that
+> > > > with both stock 2.6.37 and the patch reverted.
+> > > 
+> > > pxa3xx_set_wake(31, 1) returns 0
+> > > 
+> > > Same result with stock 2.6.37 and the patch reverted. Except that
+> > > without the patch reverted, the device doesn't power up again.
+> > 
+> > Ok, can we agree that the patch has no functional impact on the
+> > set_wake function? And I don't see a reason why reverting that patch
+> > results in a working resume. That does not make sense at all. Which
+> > compiler version are you using ?
+> 
+> I agree that this is all very weird and as far as I understand the patch
+> it should have no functional impact. Unfortunately reverting the patch
+> does not result in a working resume, but at least it makes a difference
+> and at the moment it's the only trace I have.
+> 
+> My cross-compile tool-chain uses GCC 4.3.5.
 
-The commits below are good for .38, let me know if you are OK to
-pull, or I can send them later in -rc1 phases.
+Can you try a different compiler ?
 
-The following changes since commit ea0c4f3ca8a55e7e3138c2c4b3e9f7fe34d3ecab:
+Thanks,
 
-  ARM: pxa: fix building issue of missing physmap.h (2011-01-15 04:29:21 -0600)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
-
-Bj?rn Forsman (1):
-      ARM: pxa/colibri: use correct SD detect pin
-
-Marek Vasut (9):
-      ARM: pxa: PalmTE2: Use gpio arrays in backlight init
-      ARM: pxa: Use gpio arrays in colibri_pcmcia driver
-      ARM: pxa: Use gpio arrays in palmld_pcmcia driver
-      ARM: pxa: Use gpio arrays in palmtc_pcmcia driver
-      ARM: pxa: Use gpio arrays in palmtx_pcmcia driver
-      ARM: pxa: Use gpio arrays in vpac270_pcmcia driver
-      ARM: pxa: Use gpio arrays in palmld_hdd driver
-      ARM: pxa: Update copyright notices for Palm devices
-      ARM: pxa: PalmZ72: Add OV9640 camera support
-
- arch/arm/mach-pxa/colibri-evalboard.c    |    2 +-
- arch/arm/mach-pxa/colibri-pxa300.c       |    2 +-
- arch/arm/mach-pxa/include/mach/colibri.h |    2 +-
- arch/arm/mach-pxa/include/mach/palmz72.h |    5 +
- arch/arm/mach-pxa/palm27x.c              |    3 +-
- arch/arm/mach-pxa/palmte2.c              |   31 ++------
- arch/arm/mach-pxa/palmz72.c              |  127 ++++++++++++++++++++++++++++
- drivers/ata/pata_palmld.c                |   43 +++++-----
- drivers/pcmcia/pxa2xx_colibri.c          |  133 +++++++++++-------------------
- drivers/pcmcia/pxa2xx_palmld.c           |   42 ++-------
- drivers/pcmcia/pxa2xx_palmtc.c           |   75 +++--------------
- drivers/pcmcia/pxa2xx_palmtx.c           |   57 +++----------
- drivers/pcmcia/pxa2xx_vpac270.c          |  110 +++++++------------------
- 13 files changed, 279 insertions(+), 353 deletions(-)
+	tglx
