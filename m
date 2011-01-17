@@ -1,42 +1,42 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 17 Jan 2011 06:31:13 +0200
-Subject: [PATCH 0/7] OMAP compile warning fix
-Message-ID: <1295238680-26738-1-git-send-email-balbi@ti.com>
+Date: Mon, 17 Jan 2011 06:31:14 +0200
+Subject: [PATCH 1/7] arm: omap: i2c: fix compile warning
+In-Reply-To: <1295238680-26738-1-git-send-email-balbi@ti.com>
+References: <1295238680-26738-1-git-send-email-balbi@ti.com>
+Message-ID: <1295238680-26738-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Fix the following compile warning:
+arch/arm/plat-omap/i2c.c:120:13: warning:
+'omap_pm_set_max_mpu_wakeup_lat_compat' defined but not used
+arch/arm/plat-omap/i2c.c:125:38: warning: 'omap_i2c_latency'
+defined but not used
 
-I gave it a shot at dropping a few compile warnings
-from omap1-only and omap2-only builds.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/plat-omap/i2c.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Following are 7 patches which I came up with. All
-compile tested with omap1_defconfig and omap2_defconfig
-(the latter being a result of omap2plus_defconfig -
-omap3 and omap4 support and adding any other config option
-which was disabled)
-
-There are a few more warnings to clean up, though. I didn't
-tackle all of them.
-
-Felipe Balbi (7):
-  arm: omap: i2c: fix compile warning
-  arm: omap1: fix compile warning
-  arm: omap1: fix compile warnings
-  arm: omap1: fix a bunch of section mismatches
-  arm: omap2: mux: fix compile warning
-  arm: omap2: irq: fix compile warning:
-  arm: omap2: clksel: fix compile warning
-
- arch/arm/mach-omap1/board-ams-delta.c  |   14 +++---
- arch/arm/mach-omap1/board-fsample.c    |    2 +-
- arch/arm/mach-omap1/board-palmte.c     |   13 -----
- arch/arm/mach-omap2/clkt_clksel.c      |    5 ++-
- arch/arm/mach-omap2/irq.c              |    4 +-
- arch/arm/mach-omap2/mux.c              |    2 +-
- arch/arm/plat-omap/i2c.c               |    2 +-
- arch/arm/plat-omap/include/plat/fpga.h |   92 ++++++++++++++++----------------
- 8 files changed, 62 insertions(+), 72 deletions(-)
-
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index a4f8003..3341ca4 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -112,6 +112,7 @@ static inline int omap1_i2c_add_bus(int bus_id)
+ }
+ 
+ 
++#ifdef CONFIG_ARCH_OMAP2PLUS
+ /*
+  * XXX This function is a temporary compatibility wrapper - only
+  * needed until the I2C driver can be converted to call
+@@ -130,7 +131,6 @@ static struct omap_device_pm_latency omap_i2c_latency[] = {
+ 	},
+ };
+ 
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+ static inline int omap2_i2c_add_bus(int bus_id)
+ {
+ 	int l;
 -- 
 1.7.3.4.598.g85356
