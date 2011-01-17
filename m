@@ -1,23 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Jan 2011 15:15:22 -0800
-Subject: [PATCH 07/14] ARM: v6k: select clear exclusive code seqences
+Date: Mon, 17 Jan 2011 15:18:24 -0800
+Subject: [PATCH 08/14] ARM: v6k: select cmpxchg code sequences
 	according to V6 variants
-In-Reply-To: <E1Peufi-0003Sh-Ej@rmk-PC.arm.linux.org.uk>
+In-Reply-To: <E1Peug2-0003Sl-IM@rmk-PC.arm.linux.org.uk>
 References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peufi-0003Sh-Ej@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110117231522.GF4957@atomide.com>
+	<E1Peug2-0003Sl-IM@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110117231823.GG4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:27]:
-> If CONFIG_CPU_V6 is enabled, then the kernel must support ARMv6 CPUs
-> which don't have the V6K extensions implemented.  Always use the
-> dummy store-exclusive method to ensure that the exclusive monitors are
-> cleared.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:23]:
+> If CONFIG_CPU_V6 is enabled, we must avoid the byte/halfword/doubleword
+> exclusive operations, which aren't implemented before V6K.  Use the
+> generic versions (or omit them) instead.
 > 
-> If CONFIG_CPU_V6 is not set, but CONFIG_CPU_32v6K is enabled, then we
-> have the K extensions available on all CPUs we're building support for,
-> so we can use the new clear-exclusive instruction.
+> If CONFIG_CPU_V6 is not set, but CONFIG_CPU_32v6K is enabled, we have
+> the K extnesions, so use these new instructions.
 > 
 > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
