@@ -1,41 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Jan 2011 19:28:30 +0100
-Subject: [PATCH 1/2] dmaengine: imx-sdma: fix return of sdma_probe()
-In-Reply-To: <1295275164-7824-2-git-send-email-shawn.guo@freescale.com>
-References: <1295275164-7824-1-git-send-email-shawn.guo@freescale.com>
-	<1295275164-7824-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110117182830.GU6917@pengutronix.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 17 Jan 2011 10:39:54 -0800
+Subject: [GIT PULL] pxa: one fix and several simplification patches for -rc
+Message-ID: <AANLkTi=2eS9YOMS8q9XuY-KSp7wpM=BXDxa4DSycxHP7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If you make the commit log read something like:
+Russell,
 
-  dmaengine: imx-sdma: propagate error in sdma_probe instead of returning 0
+The commits below are good for .38, let me know if you are OK to
+pull, or I can send them later in -rc1 phases.
 
-you can have my ack.
+The following changes since commit ea0c4f3ca8a55e7e3138c2c4b3e9f7fe34d3ecab:
 
-Uwe
+  ARM: pxa: fix building issue of missing physmap.h (2011-01-15 04:29:21 -0600)
 
-On Mon, Jan 17, 2011 at 10:39:23PM +0800, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  drivers/dma/imx-sdma.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index d5a5d4d..48d0197 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1348,7 +1348,7 @@ err_clk:
->  err_request_region:
->  err_irq:
->  	kfree(sdma);
-> -	return 0;
-> +	return ret;
->  }
->  
->  static int __exit sdma_remove(struct platform_device *pdev)
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git devel
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Bj?rn Forsman (1):
+      ARM: pxa/colibri: use correct SD detect pin
+
+Marek Vasut (9):
+      ARM: pxa: PalmTE2: Use gpio arrays in backlight init
+      ARM: pxa: Use gpio arrays in colibri_pcmcia driver
+      ARM: pxa: Use gpio arrays in palmld_pcmcia driver
+      ARM: pxa: Use gpio arrays in palmtc_pcmcia driver
+      ARM: pxa: Use gpio arrays in palmtx_pcmcia driver
+      ARM: pxa: Use gpio arrays in vpac270_pcmcia driver
+      ARM: pxa: Use gpio arrays in palmld_hdd driver
+      ARM: pxa: Update copyright notices for Palm devices
+      ARM: pxa: PalmZ72: Add OV9640 camera support
+
+ arch/arm/mach-pxa/colibri-evalboard.c    |    2 +-
+ arch/arm/mach-pxa/colibri-pxa300.c       |    2 +-
+ arch/arm/mach-pxa/include/mach/colibri.h |    2 +-
+ arch/arm/mach-pxa/include/mach/palmz72.h |    5 +
+ arch/arm/mach-pxa/palm27x.c              |    3 +-
+ arch/arm/mach-pxa/palmte2.c              |   31 ++------
+ arch/arm/mach-pxa/palmz72.c              |  127 ++++++++++++++++++++++++++++
+ drivers/ata/pata_palmld.c                |   43 +++++-----
+ drivers/pcmcia/pxa2xx_colibri.c          |  133 +++++++++++-------------------
+ drivers/pcmcia/pxa2xx_palmld.c           |   42 ++-------
+ drivers/pcmcia/pxa2xx_palmtc.c           |   75 +++--------------
+ drivers/pcmcia/pxa2xx_palmtx.c           |   57 +++----------
+ drivers/pcmcia/pxa2xx_vpac270.c          |  110 +++++++------------------
+ 13 files changed, 279 insertions(+), 353 deletions(-)
