@@ -1,38 +1,28 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 17 Jan 2011 20:29:53 +0530
-Subject: [PATCH] ux500: add a few AB8500 regulator consumers
-In-Reply-To: <1295269491-12107-1-git-send-email-linus.walleij@stericsson.com>
-References: <1295269491-12107-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <AANLkTin+-0YJKSNhZX5JW0W8Nayy==BTqBig2ORs8xo7@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 17 Jan 2011 18:05:44 +0300
+Subject: [PATCHv2 1/2] OMAP3: Devkit8000: Change lcd power pin
+In-Reply-To: <1295273519-6189-2-git-send-email-weber@corscience.de>
+References: <1295273519-6189-1-git-send-email-weber@corscience.de>
+	<1295273519-6189-2-git-send-email-weber@corscience.de>
+Message-ID: <4D345AC8.8030304@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 18:34, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .dev_name = "bh1780",
-> + ? ? ? ? ? ? ? .supply = "v-als",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .dev_name = "lsm303dlh.0",
-> + ? ? ? ? ? ? ? .supply = "v-accel",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .dev_name = "lsm303dlh.1",
-> + ? ? ? ? ? ? ? .supply = "v-mag",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .dev_name = "bu21013_ts.0",
-> + ? ? ? ? ? ? ? .supply = "v-touch",
-> + ? ? ? },
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .dev_name = "bu21013_ts.1",
-> + ? ? ? ? ? ? ? .supply = "v-touch",
-> + ? ? ? },
+Hello.
 
-These device names are all wrong; they need to use the i2c client dev
-names.  And the recent patches for regulator support in the bu driver
-use a different supply name.
+Thomas Weber wrote:
 
-Also, there's a macro to make this list more compact:
-REGULATOR_SUPPLY().
+> The reset_gpio pin for lcd is connected with TWL4030 LedA.
+> TWL4030 GPIO.1 has a not connected resistor.
+
+> Fix indention issue.
+
+    Indentation.
+
+> The comment line uses 8 whitespaces. 
+> Replaced with one tabulator.
+
+> Reported-by: Daniel Morsing <daniel.morsing@gmail.com>
+> Signed-off-by: Thomas Weber <weber@corscience.de>
+
+WBR, Sergei
