@@ -1,38 +1,37 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 18 Jan 2011 10:14:33 -0800
-Subject: [PATCH] drivers: mmc: msm: remove clock disable in probe
-Message-ID: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jan 2011 18:18:40 +0000
+Subject: [PATCH] arm: Configure reference clock for Versatile Express
+	timers
+In-Reply-To: <000001cbb739$ef879490$ce96bdb0$@moll@arm.com>
+References: <1295368773-14531-1-git-send-email-pawel.moll@arm.com>
+	<20110118174428.GG16980@n2100.arm.linux.org.uk>
+	<000001cbb739$ef879490$ce96bdb0$@moll@arm.com>
+Message-ID: <20110118181840.GH16980@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The probe function adds the MMC host which can start accepting request
-immediately. There is an assumption here that no requests happen
-immediatly, but it's not always the case. This assumption can causes
-a BUG() when the clocks are disabled. The fix is to just remove the
-clock disable in the probe function.
+On Tue, Jan 18, 2011 at 06:02:56PM -0000, Pawel Moll wrote:
+> > This patch performs required magic and also removes code clearing
+> > > timer's control registers, as exactly the same operations are
+> > > performed by the timer driver few jiffies later.
+> > It would be nice if these registers were documented...
+> 
+> The best I can do is to create some more meaningful constants.
 
-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
----
- drivers/mmc/host/msm_sdcc.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+I was actually referring to the manuals - last time I looked these
+register bits are not documented in the user guide for the system.
+DUI0447A, 4.4.9: "You can, however, use the System Controller to change
+the timer reference from 32.768kHz to 1MHz."
 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index a46b9a8..36dbb71 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -1370,9 +1370,6 @@ msmsdcc_probe(struct platform_device *pdev)
- 	if (host->timer.function)
- 		pr_info("%s: Polling status mode enabled\n", mmc_hostname(mmc));
- 
--#if BUSCLK_PWRSAVE
--	msmsdcc_disable_clocks(host, 1);
--#endif
- 	return 0;
-  cmd_irq_free:
- 	free_irq(cmd_irqres->start, host);
--- 
-1.7.0.4
+The only other reference to "System Controller" is at the beginning of
+the document in the preface: "ARM PrimeCell System Controller (SP810)
+Technical Reference Manual (ARM DDI 0254)".
 
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Section 4.4.1 refers to the memory map, which tells me that the System
+Control ARM SP810 is at CS7 + 0x1000.
+
+Section 4.2 is titled "System control registers" but actually describes
+the "System registers" described in table 4-1.  4.3 describes those
+system registers.  4.4 describes the other peripherals.
+
+DDI0254 is not published, so there's nothing on the register layout.
