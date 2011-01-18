@@ -1,27 +1,35 @@
 From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 18 Jan 2011 09:52:38 +0200
-Subject: [PATCH 0/7] omap1 sparse warning fixes
-Message-ID: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
+Date: Tue, 18 Jan 2011 09:52:45 +0200
+Subject: [PATCH 7/7] arm: mach-omap1: board-voiceblue: add missing include
+In-Reply-To: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <1295337165-22934-8-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's some trivial omap1 sparse warning fixes.
+Eliminates the following sparse warnings:
 
-Aaro Koskinen (7):
-  arm: plat-omap: dma: make omap_dma_in_1510_mode() static
-  arm: mach-omap1: board-h2: make h2_nand_platdata static
-  arm: mach-omap1: board-innovator: make innovator_mmc_init() static
-  arm: mach-omap1: board-htcherald: make htcpld_chips and htcpld_pfdata static
-  arm: mach-omap1: board-h3: make nand_platdata static
-  arm: plat-omap: system.h: move voiceblue definitions into the board header
-  arm: mach-omap1: board-voiceblue: add missing include
+	arch/arm/mach-omap1/board-voiceblue.c:253:6: warning: symbol 'voiceblue_wdt_enable' was not declared. Should it be static?
+	arch/arm/mach-omap1/board-voiceblue.c:261:6: warning: symbol 'voiceblue_wdt_disable' was not declared. Should it be static?
+	arch/arm/mach-omap1/board-voiceblue.c:269:6: warning: symbol 'voiceblue_wdt_ping' was not declared. Should it be static?
+	arch/arm/mach-omap1/board-voiceblue.c:278:6: warning: symbol 'voiceblue_reset' was not declared. Should it be static?
 
- arch/arm/mach-omap1/board-h2.c                    |    2 +-
- arch/arm/mach-omap1/board-h3.c                    |    2 +-
- arch/arm/mach-omap1/board-htcherald.c             |    4 ++--
- arch/arm/mach-omap1/board-innovator.c             |    2 +-
- arch/arm/mach-omap1/board-voiceblue.c             |    1 +
- arch/arm/plat-omap/dma.c                          |    2 +-
- arch/arm/plat-omap/include/plat/board-voiceblue.h |    6 ++++++
- arch/arm/plat-omap/include/plat/system.h          |    7 +------
- 8 files changed, 14 insertions(+), 12 deletions(-)
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/mach-omap1/board-voiceblue.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap1/board-voiceblue.c b/arch/arm/mach-omap1/board-voiceblue.c
+index 815a69c..9c1af41 100644
+--- a/arch/arm/mach-omap1/board-voiceblue.c
++++ b/arch/arm/mach-omap1/board-voiceblue.c
+@@ -30,6 +30,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
++#include <plat/board-voiceblue.h>
+ #include <plat/common.h>
+ #include <mach/gpio.h>
+ #include <plat/flash.h>
+-- 
+1.5.6.5
