@@ -1,138 +1,91 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 18 Jan 2011 23:59:39 +0100
-Subject: [PATCH] RFC: ux500: add PMU resources
-Message-ID: <1295391579-9166-1-git-send-email-linus.walleij@stericsson.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 18 Jan 2011 15:03:25 -0800
+Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
+Message-ID: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ux500 SoCs have PMUs, both DB8500 and DB5500. However on the
-DB8500 the individual per-core IRQs are not routed: instead they
-are OR:ed into one single IRQ.
+Remove parts of this driver which use internal API calls. This
+replaces the calls as suggested by Russell King.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
-Hi Will especially, I remember discussing this issue with you
-back in Florida. IIRC you had some idea on how to go about with
-this, like we add some tweak for this board where we don't set
-affinity and let the IRQ be declared chained and then each CPU
-it's not coming from has to NACK it, do you think it is
-feasible and could you sort of point me into the right files
-to poke at?
----
- arch/arm/mach-ux500/cpu-db5500.c |   26 ++++++++++++++++++++++++--
- arch/arm/mach-ux500/cpu-db8500.c |   28 ++++++++++++++++++++++++++++
- 2 files changed, 52 insertions(+), 2 deletions(-)
+ drivers/mmc/host/msm_sdcc.c |   49 +++++++++++++++++++-----------------------
+ 1 files changed, 22 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db5500.c b/arch/arm/mach-ux500/cpu-db5500.c
-index af04e08..3912354 100644
---- a/arch/arm/mach-ux500/cpu-db5500.c
-+++ b/arch/arm/mach-ux500/cpu-db5500.c
-@@ -11,6 +11,7 @@
- #include <linux/irq.h>
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 5decfd0..733d233 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -383,14 +383,30 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+ 	host->curr.user_pages = 0;
  
- #include <asm/mach/map.h>
-+#include <asm/pmu.h>
+ 	box = &nc->cmd[0];
+-	for (i = 0; i < host->dma.num_ents; i++) {
+-		box->cmd = CMD_MODE_BOX;
  
- #include <plat/gpio.h>
- 
-@@ -43,6 +44,26 @@ static struct map_desc u5500_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U5500_PRCMU_BASE, SZ_4K),
- };
- 
-+static struct resource db5500_pmu_resources[] = {
-+	[0] = {
-+		.start		= IRQ_DB5500_PMU0,
-+		.end		= IRQ_DB5500_PMU0,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+	[1] = {
-+		.start		= IRQ_DB5500_PMU1,
-+		.end		= IRQ_DB5500_PMU1,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
+-	/* Initialize sg dma address */
+-	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
+-				+ sg->offset;
++	/* location of command block must be 64 bit aligned */
++	BUG_ON(host->dma.cmd_busaddr & 0x07);
 +
-+static struct platform_device db5500_pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= ARRAY_SIZE(db5500_pmu_resources),
-+	.resource		= db5500_pmu_resources,
-+};
++	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
++	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
++			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
++	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
 +
- static struct resource mbox0_resources[] = {
- 	{
- 		.name = "mbox_peer",
-@@ -127,7 +148,8 @@ static struct platform_device mbox2_device = {
- 	.num_resources = ARRAY_SIZE(mbox2_resources),
- };
- 
--static struct platform_device *u5500_platform_devs[] __initdata = {
-+static struct platform_device *db5500_platform_devs[] __initdata = {
-+	&db5500_pmu_device,
- 	&mbox0_device,
- 	&mbox1_device,
- 	&mbox2_device,
-@@ -172,6 +194,6 @@ void __init u5500_init_devices(void)
- 	db5500_dma_init();
- 	db5500_add_rtc();
- 
--	platform_add_devices(u5500_platform_devs,
-+	platform_add_devices(db5500_platform_devs,
- 			     ARRAY_SIZE(u5500_platform_devs));
- }
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 1748fbc..a49641c 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -18,6 +18,7 @@
- #include <linux/io.h>
- 
- #include <asm/mach/map.h>
-+#include <asm/pmu.h>
- #include <mach/hardware.h>
- #include <mach/setup.h>
- #include <mach/devices.h>
-@@ -112,6 +113,31 @@ static void __init db8500_add_gpios(void)
- }
- 
- /*
-+ * The DB8500 PMU has only one IRQ line which is the OR:ed result
-+ * from both CPU cores. This means that currently kernel measurements
-+ * such as done with perf can onlt be done by locking the subject
-+ * task to CPU0.
-+ */
-+static struct resource db8500_pmu_resources[] = {
-+	[0] = {
-+		.start		= IRQ_DB8500_PMU,
-+		.end		= IRQ_DB8500_PMU,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
++	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
++			host->dma.num_ents, host->dma.dir);
++	if (n == 0) {
++		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
++			mmc_hostname(host->mmc));
++		host->dma.sg = NULL;
++		host->dma.num_ents = 0;
++		return -ENOMEM;
++	}
 +
-+static struct platform_device db8500_pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= ARRAY_SIZE(db8500_pmu_resources),
-+	.resource		= db8500_pmu_resources,
-+};
++	for_each_sg(host->dma.sg, sg, n, i) {
 +
-+static struct platform_device *db8500_platform_devs[] __initdata = {
-+	&db8500_pmu_device,
-+};
-+
-+/*
-  * This function is called from the board init
-  */
- void __init u8500_init_devices(void)
-@@ -121,6 +147,8 @@ void __init u8500_init_devices(void)
++		box->cmd = CMD_MODE_BOX;
  
- 	db8500_add_rtc();
- 	db8500_add_gpios();
-+	platform_add_devices(db8500_platform_devs,
-+			     ARRAY_SIZE(db8500_platform_devs));
+-	if (i == (host->dma.num_ents - 1))
++		if (i == n - 1)
+ 			box->cmd |= CMD_LC;
+ 		rows = (sg_dma_len(sg) % MCI_FIFOSIZE) ?
+ 			(sg_dma_len(sg) / MCI_FIFOSIZE) + 1 :
+@@ -418,27 +434,6 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+ 			box->cmd |= CMD_DST_CRCI(crci);
+ 		}
+ 		box++;
+-		sg++;
+-	}
+-
+-	/* location of command block must be 64 bit aligned */
+-	BUG_ON(host->dma.cmd_busaddr & 0x07);
+-
+-	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
+-	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
+-			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
+-	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
+-
+-	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
+-			host->dma.num_ents, host->dma.dir);
+-/* dsb inside dma_map_sg will write nc out to mem as well */
+-
+-	if (n != host->dma.num_ents) {
+-		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
+-			mmc_hostname(host->mmc));
+-		host->dma.sg = NULL;
+-		host->dma.num_ents = 0;
+-		return -ENOMEM;
+ 	}
  
- 	platform_device_register_simple("cpufreq-u8500", -1, NULL, 0);
- 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
+ 	return 0;
 -- 
-1.7.3.2
+1.7.0.4
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
