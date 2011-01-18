@@ -1,29 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 19 Jan 2011 03:36:30 +0800
-Subject: [PATCH v2] Add i.MX23/28 auart support
-In-Reply-To: <20110117175055.GK9041@pengutronix.de>
-References: <1294924476-10653-1-git-send-email-s.hauer@pengutronix.de>
-	<20110117112508.GA23185@freescale.com>
-	<20110117175055.GK9041@pengutronix.de>
-Message-ID: <20110118193629.GA2833@S2101-09.ap.freescale.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 18 Jan 2011 14:41:13 +0300
+Subject: [PATCH 0/5] davinci: da850: clean up pinmux arrays in da850.c
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484734D4@dbde02.ent.ti.com>
+References: <1294406333-30054-1-git-send-email-michael.williamson@criticallink.com>	<B85A65D85D7EB246BE421B3FB0FBB59302484733F8@dbde02.ent.ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302484734D4@dbde02.ent.ti.com>
+Message-ID: <4D357C59.8000907@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 06:50:55PM +0100, Sascha Hauer wrote:
-> On Mon, Jan 17, 2011 at 07:25:09PM +0800, Shawn Guo wrote:
-> > Hi Sascha,
-> > 
-> > I tested the patch on mx28 evk with auart0 and auart3 connected with
-> > cross cable, and it works.  But when I try to get console on auart0
-> > with a direct-connecting cable, I do not see anything on console.
-> > 
-> > Did you verify it works for console?
-> 
-> Yes, I did, but I can recheck in case I broke something in the latest
-> version. What did you pass as console= in the kernel command line?
-> 
-console=ttyAPP0,115200n8
+Hello.
 
--- 
-Regards,
-Shawn
+On 18-01-2011 7:40, Rajashekhara, Sudhakar wrote:
+
+> I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
+> at [1] and found that audio is broken. Below patch fixes the issue.
+
+> ---
+> From: Rajashekhara, Sudhakar<sudhakar.raj@ti.com>
+
+> davinci: fixes for audio on da850/omap-l138/am18x
+>
+> On DA850/OMAP-L138/AM18x, AIC3x codec is at 0x18 slave address.
+> But in sound/soc/davinci/davinci-evm.c file, "struct snd_soc_dai_link"
+> has the wrong AIC3x codec slave address. This patch fixes this issue.
+
+> Also, this patch registers the platform device for davinci-pcm-audio.
+
+    Shouldn't this be 2 patches? I don't see a connection between the changes.
+
+> Signed-off-by: Rajashekhara, Sudhakar<sudhakar.raj@ti.com>
+
+WBR, Sergei
