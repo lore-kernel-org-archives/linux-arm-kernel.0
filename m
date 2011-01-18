@@ -1,12 +1,11 @@
 From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Tue, 18 Jan 2011 10:10:12 +0530
-Subject: [PATCH 0/5] davinci: da850: clean up pinmux arrays in da850.c
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484733F8@dbde02.ent.ti.com>
-References: <1294406333-30054-1-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302484733F8@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302484734D4@dbde02.ent.ti.com>
+Date: Tue, 18 Jan 2011 10:13:14 +0530
+Subject: ALSA issue on DA850/OMAP-L138/AM18x
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Resending with proper $SUBJECT...
 
 Hi,
 
@@ -102,3 +101,7 @@ once the issue of fixed.
 
 Regards,
 Sudhakar
+_______________________________________________
+Davinci-linux-open-source mailing list
+Davinci-linux-open-source at linux.davincidsp.com
+http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
