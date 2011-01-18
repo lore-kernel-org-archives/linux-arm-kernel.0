@@ -1,32 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 16:00:37 +0000
-Subject: [PATCH V4 06/62] ST SPEAr13XX: Adding machine specific header
-	files
-In-Reply-To: <91343ab3cb64f7082111535a9a3c006e958578fb.1295333958.git.viresh.kumar@st.com>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<91343ab3cb64f7082111535a9a3c006e958578fb.1295333958.git.viresh.kumar@st.com>
-Message-ID: <20110118160037.GC16980@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 18 Jan 2011 16:58:51 +0100
+Subject: [RFC+CFT] Use word operations in bitops
+In-Reply-To: <20110118154344.GG10997@n2100.arm.linux.org.uk>
+References: <20110116121911.GB27542@n2100.arm.linux.org.uk>
+	<20110117100857.GS6917@pengutronix.de>
+	<20110117104618.GB18626@n2100.arm.linux.org.uk>
+	<20110118153257.GA10686@pengutronix.de>
+	<20110118154344.GG10997@n2100.arm.linux.org.uk>
+Message-ID: <20110118155851.GC10686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 12:41:34PM +0530, Viresh Kumar wrote:
-> +#define MISC_BASE		VA_SPEAR13XX_MISC_BASE
-> +
-> +/* General Configuration */
-> +#define SOC_CFG			((unsigned int *)(MISC_BASE + 0x000))
-> +#define BOOTSTRAP_CFG		((unsigned int *)(MISC_BASE + 0x004))
+Hello Russell,
 
-You could really do with an IOMEM() macro, thus:
+On Tue, Jan 18, 2011 at 03:43:44PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 18, 2011 at 04:32:57PM +0100, Uwe Kleine-K?nig wrote:
+> > On Mon, Jan 17, 2011 at 10:46:18AM +0000, Russell King - ARM Linux wrote:
+> I will continue to mail out patches which I want people to test and give
+> feedback on, because that is the _only_ way to do it.
+Note that I didn't suggest to stop sending out patches and collecting
+the acks and tested-bys there.  The automated tests are just a different
+test.
 
-#ifndef __ASSEMBLY__
-#define IOMEM(x)	((void __iomem __force *)(x))
-#else
-#define IOMEM(x)	(x)
-#endif
+And IMHO it's not harder to reply with a git commit-id, but it makes it
+more likely that a reply to a wrong mail is detected.
 
-You can then use that for stuff like VA_SPEAR13XX_MISC_BASE, and all
-these definitions then become:
+Best regards
+Uwe
 
-#define SOC_CFG			(MISC_BASE + 0x000)
-
-because GCC allows void pointer arithmetic (treats it as char).
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
