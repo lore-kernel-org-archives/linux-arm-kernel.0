@@ -1,86 +1,371 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:41:38 +0530
-Subject: [PATCH V4 10/62] ST SPEAr13xx: Adding default config file
+Date: Tue, 18 Jan 2011 12:41:39 +0530
+Subject: [PATCH V4 11/62] ST SPEAr: Adding support for CLCD on SPEAr3xx/6xx
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <e99e902fb3334292d25c34b059749ffed5f923ad.1295333958.git.viresh.kumar@st.com>
+Message-ID: <da7f52b77ee5f4705a04d55a42182433db69a560.1295333958.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+From: Vipul-kumar Samar <vipulkumar.samar@st.com>
 
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+SPEAr 3xx and 6xx have ARM PL110 CLCD controller. This patch adds
+supports for CLCD in these machines.
+
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear13xx_defconfig |   60 ++++++++++++++++++++++++++++++++++
- 1 files changed, 60 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/spear13xx_defconfig
+ arch/arm/mach-spear3xx/include/mach/generic.h |    6 ++
+ arch/arm/mach-spear3xx/spear300.c             |   17 ++++
+ arch/arm/mach-spear3xx/spear300_evb.c         |    1 +
+ arch/arm/mach-spear3xx/spear320.c             |   16 ++++
+ arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
+ arch/arm/mach-spear6xx/include/mach/generic.h |    4 +
+ arch/arm/mach-spear6xx/spear600_evb.c         |    1 +
+ arch/arm/mach-spear6xx/spear6xx.c             |   17 ++++
+ arch/arm/plat-spear/Makefile                  |    2 +-
+ arch/arm/plat-spear/clcd.c                    |  114 +++++++++++++++++++++++++
+ drivers/video/Kconfig                         |   14 +++-
+ 11 files changed, 191 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/plat-spear/clcd.c
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index e7d2de8..1c8f9f1 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -100,6 +100,7 @@ extern struct pmx_driver pmx_driver;
+ /* spear300 declarations */
+ #ifdef CONFIG_MACH_SPEAR300
+ /* Add spear300 machine device structure declarations here */
++extern struct amba_device clcd_device;
+ extern struct amba_device gpio1_device;
+ 
+ /* pad mux modes */
+@@ -136,6 +137,8 @@ extern struct pmx_dev pmx_gpio1;
+ /* Add spear300 machine function declarations here */
+ void __init spear300_init(void);
+ 
++/* Add misc structure declarations here */
++extern struct clcd_board clcd_plat_data;
+ #endif /* CONFIG_MACH_SPEAR300 */
+ 
+ /* spear310 declarations */
+@@ -160,6 +163,7 @@ void __init spear310_init(void);
+ /* spear320 declarations */
+ #ifdef CONFIG_MACH_SPEAR320
+ /* Add spear320 machine device structure declarations here */
++extern struct amba_device clcd_device;
+ 
+ /* pad mux modes */
+ extern struct pmx_mode auto_net_smii_mode;
+@@ -194,6 +198,8 @@ extern struct pmx_dev pmx_i2c1;
+ /* Add spear320 machine function declarations here */
+ void __init spear320_init(void);
+ 
++/* Add misc structure declarations here */
++extern struct clcd_board clcd_plat_data;
+ #endif /* CONFIG_MACH_SPEAR320 */
+ 
+ #endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 7e01677..1921cf8 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -371,6 +371,23 @@ struct pmx_driver pmx_driver = {
+ };
+ 
+ /* Add spear300 specific devices here */
++
++/* CLCD device registration */
++struct amba_device clcd_device = {
++	.dev = {
++		.init_name = "clcd",
++		.coherent_dma_mask = ~0,
++		.platform_data = &clcd_plat_data,
++	},
++	.res = {
++		.start = SPEAR300_CLCD_BASE,
++		.end = SPEAR300_CLCD_BASE + SPEAR300_CLCD_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.dma_mask = ~0,
++	.irq = {IRQ_CLCD, NO_IRQ},
++};
++
+ /* arm gpio1 device registration */
+ static struct pl061_platform_data gpio1_plat_data = {
+ 	.gpio_base	= 8,
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index cd23c98..3bb7fbc 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -38,6 +38,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 	&uart_device,
+ 
+ 	/* spear300 specific devices */
++	&clcd_device,
+ 	&gpio1_device,
+ };
+ 
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 456bb33..70f1db2 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -386,6 +386,22 @@ struct pmx_driver pmx_driver = {
+ 
+ /* Add spear320 specific devices here */
+ 
++/* CLCD device registration */
++struct amba_device clcd_device = {
++	.dev = {
++		.init_name = "clcd",
++		.coherent_dma_mask = ~0,
++		.platform_data = &clcd_plat_data,
++	},
++	.res = {
++		.start = SPEAR320_CLCD_BASE,
++		.end = SPEAR320_CLCD_BASE + SPEAR320_CLCD_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.dma_mask = ~0,
++	.irq = {VIRQ_CLCD, NO_IRQ},
++};
++
+ /* spear3xx shared irq */
+ struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 4a7ce35..821e806 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -43,6 +43,7 @@ static struct amba_device *amba_devs[] __initdata = {
+ 	&uart_device,
+ 
+ 	/* spear320 specific devices */
++	&clcd_device,
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index e5967ed..d6a04f2 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -29,6 +29,7 @@
+ #define SPEAR_GPT0_CHAN1_IRQ	IRQ_CPU_GPT1_2
+ 
+ /* Add spear6xx family device structure declarations here */
++extern struct amba_device clcd_device;
+ extern struct amba_device gpio_device[];
+ extern struct amba_device uart_device[];
+ extern struct sys_timer spear6xx_timer;
+@@ -43,4 +44,7 @@ void __init clk_init(void);
+ 
+ /* Add spear600 machine device structure declarations here */
+ 
++/* Add misc structure declarations here */
++extern struct clcd_board clcd_plat_data;
++
+ #endif /* __MACH_GENERIC_H */
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+index bdd5b76..88e69f4 100644
+--- a/arch/arm/mach-spear6xx/spear600_evb.c
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -17,6 +17,7 @@
+ #include <mach/spear.h>
+ 
+ static struct amba_device *amba_devs[] __initdata = {
++	&clcd_device,
+ 	&gpio_device[0],
+ 	&gpio_device[1],
+ 	&gpio_device[2],
+diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+index ea4c356..9b61430 100644
+--- a/arch/arm/mach-spear6xx/spear6xx.c
++++ b/arch/arm/mach-spear6xx/spear6xx.c
+@@ -23,6 +23,23 @@
+ #include <mach/spear.h>
+ 
+ /* Add spear6xx machines common devices here */
++
++/* CLCD device registration */
++struct amba_device clcd_device = {
++	.dev = {
++		.init_name = "clcd",
++		.coherent_dma_mask = ~0,
++		.platform_data = &clcd_plat_data,
++	},
++	.res = {
++		.start = SPEAR6XX_ICM3_CLCD_BASE,
++		.end = SPEAR6XX_ICM3_CLCD_BASE + SPEAR6XX_ICM3_CLCD_SIZE - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.dma_mask = ~0,
++	.irq = {IRQ_BASIC_CLCD, NO_IRQ},
++};
++
+ /* uart device registration */
+ struct amba_device uart_device[] = {
+ 	{
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index b4f340b..01a4a91 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -3,6 +3,6 @@
+ #
+ 
+ # Common support
+-obj-y	:= clock.o time.o
++obj-y	:= clcd.o clock.o time.o
+ 
+ obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+diff --git a/arch/arm/plat-spear/clcd.c b/arch/arm/plat-spear/clcd.c
 new file mode 100644
-index 0000000..10b1cf5
+index 0000000..d469b81
 --- /dev/null
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -0,0 +1,60 @@
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_SYSVIPC=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_KALLSYMS_EXTRA_PASS=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PLAT_SPEAR=y
-+CONFIG_ARCH_SPEAR13XX=y
-+CONFIG_BOARD_SPEAR1300_EVB=y
-+CONFIG_SMP=y
-+CONFIG_NR_CPUS=2
-+CONFIG_AEABI=y
-+CONFIG_BINFMT_MISC=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_CONCAT=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_INPUT_FF_MEMLESS=y
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_RAW_DRIVER=y
-+CONFIG_MAX_RAW_DEVS=8192
-+# CONFIG_HWMON is not set
-+# CONFIG_HID_SUPPORT is not set
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT2_FS_SECURITY=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT3_FS_SECURITY=y
-+CONFIG_AUTOFS4_FS=m
-+CONFIG_MSDOS_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_NLS=y
-+CONFIG_NLS_DEFAULT="utf8"
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ASCII=m
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DETECT_HUNG_TASK=y
-+CONFIG_DEBUG_SPINLOCK=y
-+CONFIG_DEBUG_SPINLOCK_SLEEP=y
-+CONFIG_DEBUG_INFO=y
++++ b/arch/arm/plat-spear/clcd.c
+@@ -0,0 +1,114 @@
++/*
++* arch/arm/plat-spear/clcd.c
++*
++* Copyright (C) 2009 ST Microelectronics
++* Shiraz Hashim<shiraz.hashim@st.com>
++* Ashish Priyadarshi<ashish.priyadarshi@st.com>
++*
++* This file is licensed under the terms of the GNU General Public
++* License version 2. This program is licensed "as is" without any
++* warranty of any kind, whether express or implied.
++*/
++
++#include <linux/dma-mapping.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/clcd.h>
++
++/* This is enough for the size of 800x480 (1.5 MB) */
++#define FRAMESIZE 0x00180000
++
++#ifdef CONFIG_FB_ARMCLCD_SHARP_LQ043T1DG01
++static struct clcd_panel sharp_LQ043T1DG01_in = {
++	.mode = {
++		.name = "Sharp LQ043T1DG01",
++		.refresh = 0,
++		.xres = 480,
++		.yres = 272,
++		.pixclock = 48000,
++		.left_margin = 2,
++		.right_margin = 2,
++		.upper_margin = 2,
++		.lower_margin = 2,
++		.hsync_len = 41,
++		.vsync_len = 11,
++		.sync = 0,/* FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT */
++		.vmode = FB_VMODE_NONINTERLACED,
++	},
++	.width = -1,
++	.height = -1,
++	.tim2 = TIM2_IOE | TIM2_CLKSEL | 3,
++	.cntl = CNTL_LCDTFT | CNTL_BGR,
++	.bpp = 32,
++};
++#endif
++
++#ifdef CONFIG_FB_ARMCLCD_SAMSUNG_LMS700
++static struct clcd_panel samsung_LMS700_in = {
++	.mode = {
++		.name = "Samsung LMS700",
++		.refresh = 0,
++		.xres = 800,
++		.yres = 480,
++		.pixclock = 48000,
++		.left_margin = 16,
++		.right_margin = 8,
++		.upper_margin = 6,
++		.lower_margin = 5,
++		.hsync_len = 3,
++		.vsync_len = 2,
++		.sync = 0,
++		.vmode = FB_VMODE_NONINTERLACED,
++	},
++	.width = -1,
++	.height = -1,
++	.tim2 = TIM2_CLKSEL,
++	.cntl = CNTL_LCDTFT | CNTL_BGR,
++	.bpp = 32,
++};
++#endif
++
++static int clcd_setup(struct clcd_fb *fb)
++{
++	dma_addr_t dma;
++
++	/* Detect which LCD panel is connected */
++#ifdef CONFIG_FB_ARMCLCD_SHARP_LQ043T1DG01
++	fb->panel = &sharp_LQ043T1DG01_in;
++#endif
++#ifdef CONFIG_FB_ARMCLCD_SAMSUNG_LMS700
++	fb->panel = &samsung_LMS700_in;
++#endif
++	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, FRAMESIZE,
++			&dma, GFP_KERNEL);
++	if (!fb->fb.screen_base) {
++		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
++		return -ENOMEM;
++	}
++	fb->fb.fix.smem_start = dma;
++	fb->fb.fix.smem_len = FRAMESIZE;
++
++	return 0;
++}
++
++static void clcd_remove(struct clcd_fb *fb)
++{
++	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
++			fb->fb.screen_base, fb->fb.fix.smem_start);
++}
++
++static int clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
++{
++	return dma_mmap_writecombine(&fb->dev->dev, vma,
++			fb->fb.screen_base,
++			fb->fb.fix.smem_start,
++			fb->fb.fix.smem_len);
++}
++
++struct clcd_board clcd_plat_data = {
++	.name = "spear-clcd",
++	.check = clcdfb_check,
++	.decode = clcdfb_decode,
++	.setup = clcd_setup,
++	.mmap = clcd_mmap,
++	.remove = clcd_remove,
++};
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index d916ac0..bf6632d 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -324,10 +324,22 @@ config FB_ARMCLCD
+ 
+ choice
+ 
+-	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X)
++	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X || ARCH_SPEAR6XX || MACH_SPEAR300 || MACH_SPEAR320)
+ 	prompt "LCD Panel"
+ 	default FB_ARMCLCD_SHARP_LQ035Q7DB02
+ 
++config FB_ARMCLCD_SHARP_LQ043T1DG01
++	bool "SHARP LQ043T1DG01 CLCD 4.2\" TFT(480x272)"
++	help
++	  This is an implementation of the Sharp LQ043T1DG01, a 4.2"
++	  color TFT panel. The native resolution is 480x272.
++
++config FB_ARMCLCD_SAMSUNG_LMS700
++	bool "SAMSUNG CLCD 7\" TFT(800x480)"
++	help
++	  This is an implementation of the Samsung LMS700, a 7"
++	  color TFT panel. The native resolution is 800x480.
++
+ config FB_ARMCLCD_SHARP_LQ035Q7DB02_HRTFT
+ 	bool "LogicPD LCD 3.5\" QVGA w/HRTFT IC"
+ 	help
 -- 
 1.7.2.2
