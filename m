@@ -1,125 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 18:28:26 +0000
-Subject: [PATCH] drivers: mmc: msm: update to new arm pfn_to_dma API
-In-Reply-To: <1295373844-27713-1-git-send-email-dwalker@codeaurora.org>
-References: <1295373844-27713-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <20110118182826.GI16980@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 18 Jan 2011 19:52:32 +0100
+Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in
+	the same kernel image
+In-Reply-To: <4D35CB56.8070603@xenomai.org>
+References: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
+	<20110117075738.GI14798@game.jcrosoft.org>
+	<20110118070016.GA9605@pc-ran3241>
+	<20110118150030.GO14798@game.jcrosoft.org>
+	<20110118153241.GE9719@n2100.arm.linux.org.uk>
+	<4D35CB56.8070603@xenomai.org>
+Message-ID: <20110118185232.GU14798@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 10:04:04AM -0800, Daniel Walker wrote:
-> The page_to_dma() API call was removed. It caused this build
-> failure,
+On 18:18 Tue 18 Jan     , Gilles Chanteperdrix wrote:
+> Russell King - ARM Linux wrote:
+> > On Tue, Jan 18, 2011 at 04:00:30PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >> this idea is to do not have CONFIG_ARCH_AT91SAM9G20 anymore only 9260
+> >>
+> >> and detect it
+> >>
+> >> but the man issue is the CLOCK_TICK_RATE which is different between both of
+> >> them except if we use a common one for those soc or the sam9/11 we could not
+> >> put them in the same kernel
+> > 
+> > If you switch to clocksource/clockevents, then I think CLOCK_TICK_RATE
+> > is irrelevant as time advances according to the interval measured by
+> > the previous and current clocksource read, rather than 1/HZ intervals.
+> > 
+> > However, I'm never happy to say "just set CLOCK_TICK_RATE to some random
+> > value that's a multiple of HZ" because I can't convince myself that these
+> > don't have any effect when using clocksources.  The list of symbols which
+> > depend on CLOCK_TICK_RATE are:
+> > 
+> > ACTHZ
+> > LATCH
+> > TICK_NSEC
+> > TICK_USEC_TO_NSEC
+> > LOW_RES_NSEC
+> > MONOTONIC_RES_NSEC
+> > NSEC_PER_JIFFY
+> > KTIME_LOW_RES
+> > 
+> > and if you grep for those outside of arch/, you find them being used in
+> > a fair amount of code under kernel/, as well as the odd driver here and
+> > there.
+> 
+> at91rm9200_time.c even seems to use LATCH, even though the clockevent
+> frequency is not explicitly set to CLOCK_TICK_RATE.
+we can fix it but the main idea is to allow the sam9/11 to be compiled
+together in the same kernel
+and the rm9200 is not a arm926ejs but a arm920t.
 
-Because it's an API internal interface.  Don't use it.  Why is this
-driver poking about in API internals all over the place?
+So the issue is not really important for this possiblity
 
-        for (i = 0; i < host->dma.num_ents; i++) {
-
-This goes behind the scatterlist's back.  scatterlists may not remain
-contiguous in the future.  Use the proper API.
-
-                box->cmd = CMD_MODE_BOX;
-
-        /* Initialize sg dma address */
-        sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
-                                + sg->offset;
-
-        if (i == (host->dma.num_ents - 1))
-                        box->cmd |= CMD_LC;
-
-The lines above are wrongly indented.
-
-                rows = (sg_dma_len(sg) % MCI_FIFOSIZE) ?
-                        (sg_dma_len(sg) / MCI_FIFOSIZE) + 1 :
-                        (sg_dma_len(sg) / MCI_FIFOSIZE) ;
-
-                if (data->flags & MMC_DATA_READ) {
-                        box->src_row_addr = msmsdcc_fifo_addr(host);
-                        box->dst_row_addr = sg_dma_address(sg);
-
-                        box->src_dst_len = (MCI_FIFOSIZE << 16) |
-                                           (MCI_FIFOSIZE);
-                        box->row_offset = MCI_FIFOSIZE;
-
-                        box->num_rows = rows * ((1 << 16) + 1);
-                        box->cmd |= CMD_SRC_CRCI(crci);
-                } else {
-                        box->src_row_addr = sg_dma_address(sg);
-                        box->dst_row_addr = msmsdcc_fifo_addr(host);
-
-                        box->src_dst_len = (MCI_FIFOSIZE << 16) |
-                                           (MCI_FIFOSIZE);
-                        box->row_offset = (MCI_FIFOSIZE << 16);
-
-                        box->num_rows = rows * ((1 << 16) + 1);
-                        box->cmd |= CMD_DST_CRCI(crci);
-                }
-                box++;
-                sg++;
-        }
-
-        /* location of command block must be 64 bit aligned */
-        BUG_ON(host->dma.cmd_busaddr & 0x07);
-
-        nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
-        host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
-                               DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
-        host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
-
-        n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
-                        host->dma.num_ents, host->dma.dir);
-/* dsb inside dma_map_sg will write nc out to mem as well */
-
-That is completely broken.  Please use the official APIs - it's not
-hard.  Here's how to do it correctly:
-
-	/* location of command block must be 64 bit aligned */
-	BUG_ON(host->dma.cmd_busaddr & 0x07);
-
-	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
-	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
-			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
-	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
-
-	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
-			host->dma.num_ents, host->dma.dir);
-	if (n == 0)
-		/* you handle mapping error here */
-		/* a mapping error is not n != host->dma.num_ents */
-
-	for_each_sg(host->dma.sg, sg, n, i) {
-		if (i == n - 1)
-			box->cmd |= CMD_LC;
-		rows = (sg_dma_len(sg) % MCI_FIFOSIZE) ?
-			(sg_dma_len(sg) / MCI_FIFOSIZE) + 1 :
-			(sg_dma_len(sg) / MCI_FIFOSIZE) ;
-
-		if (data->flags & MMC_DATA_READ) {
-			box->src_row_addr = msmsdcc_fifo_addr(host);
-			box->dst_row_addr = sg_dma_address(sg);
-
-			box->src_dst_len = (MCI_FIFOSIZE << 16) |
-					   (MCI_FIFOSIZE);
-			box->row_offset = MCI_FIFOSIZE;
-
-			box->num_rows = rows * ((1 << 16) + 1);
-			box->cmd |= CMD_SRC_CRCI(crci);
-		} else {
-			box->src_row_addr = sg_dma_address(sg);
-			box->dst_row_addr = msmsdcc_fifo_addr(host);
-
-			box->src_dst_len = (MCI_FIFOSIZE << 16) |
-					   (MCI_FIFOSIZE);
-			box->row_offset = (MCI_FIFOSIZE << 16);
-
-			box->num_rows = rows * ((1 << 16) + 1);
-			box->cmd |= CMD_DST_CRCI(crci);
-		}
-		box++;
-	}
-
-and when you use writel() etc afterwards, those non-cacheable writes to
-box-> will be ordered with your device write.
-
-So that's a NAK for your original patch.
+Best Regards,
+J.
