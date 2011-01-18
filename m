@@ -1,36 +1,51 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Tue, 18 Jan 2011 07:58:52 +0100
-Subject: [PATCHv3 2/2] OMAP3: Devkit8000: Fix tps65930 pullup/pulldown
-	configuration
-In-Reply-To: <1295333932-23935-1-git-send-email-weber@corscience.de>
-References: <1295333932-23935-1-git-send-email-weber@corscience.de>
-Message-ID: <1295333932-23935-3-git-send-email-weber@corscience.de>
+From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
+Date: Tue, 18 Jan 2011 08:00:16 +0100
+Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in
+	the same kernel image
+In-Reply-To: <20110117075738.GI14798@game.jcrosoft.org>
+References: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
+	<20110117075738.GI14798@game.jcrosoft.org>
+Message-ID: <20110118070016.GA9605@pc-ran3241>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Morsing <daniel.morsing@gmail.com>
+On Mon, 17 Jan 2011 08:57 +0100, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> On 18:50 Sat 15 Jan     , Albin Tonnerre wrote:
+> > Nothing actually prevents support for boards based on these SoCs to be
+> > compiled in the same kernel image, since the SAM9260 and SAM9G20 are
+> > almost identical (AT91SAM9G20 adds some new features, but is otherwise
+> > compatible with the AT91SAM9260).
+> > 
+> > Signed-off-by: Albin Tonnerre <albin.tonnerre@free-electrons.com>
+> > ---
+> >  arch/arm/mach-at91/Kconfig |   31 +++++++++++++------------------
+> >  1 files changed, 13 insertions(+), 18 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> > index c015b68..d1eda58 100644
+> > --- a/arch/arm/mach-at91/Kconfig
+> > +++ b/arch/arm/mach-at91/Kconfig
+> > @@ -26,8 +26,8 @@ config ARCH_AT91RM9200
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select HAVE_AT91_USART3
+> >  
+> > -config ARCH_AT91SAM9260
+> > -	bool "AT91SAM9260 or AT91SAM9XE"
+> > +config ARCH_AT91SAM9260_VARIANTS
+> sos so
+> 
+> I'm working on a similar patch but ARCH_AT91SAM9260_VARIANTS seems so so
+> 
+> I get in mind to get rid of ARCH_AT91SAM92G20
+> 
+> and detect it
 
-gpio7 on the tps65930 is used as an output on the devkit8000 and
-gpio1 is not connected. Remove gpio7 and change gpio1 to pulldown
+I'm sorry, I can't quite parse your answer. Would you please mind elaborating a
+bit?
 
-Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
----
- arch/arm/mach-omap2/board-devkit8000.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 719f4e5..9fb416b 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -262,8 +262,7 @@ static struct twl4030_gpio_platform_data devkit8000_gpio_data = {
- 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
- 	.irq_end	= TWL4030_GPIO_IRQ_END,
- 	.use_leds	= true,
--	.pullups	= BIT(1),
--	.pulldowns	= BIT(2) | BIT(6) | BIT(7) | BIT(8) | BIT(13)
-+	.pulldowns	= BIT(1) | BIT(2) | BIT(6) | BIT(8) | BIT(13)
- 				| BIT(15) | BIT(16) | BIT(17),
- 	.setup		= devkit8000_twl_gpio_setup,
- };
+Cheers,
 -- 
-1.7.4.rc2
+Albin Tonnerre, Free Electrons
+Kernel, drivers and embedded Linux development,
+consulting, training and support.
+http://free-electrons.com
