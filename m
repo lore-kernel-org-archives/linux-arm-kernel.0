@@ -1,126 +1,42 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 18 Jan 2011 10:04:08 -0800
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-	(Sudhakar Rajashekhara's message of "Tue, 18 Jan 2011 10:13:14 +0530")
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-Message-ID: <87ei8aytpj.fsf@ti.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 18 Jan 2011 10:04:04 -0800
+Subject: [PATCH] drivers: mmc: msm: update to new arm pfn_to_dma API
+Message-ID: <1295373844-27713-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rajashekhara, Sudhakar" <sudhakar.raj@ti.com> writes:
+The page_to_dma() API call was removed. It caused this build
+failure,
 
-> Resending with proper $SUBJECT...
-> Hi,
->
-> I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
-> at [1] and found that audio is broken. Below patch fixes the issue.
-> ---
-> From: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
->
-> davinci: fixes for audio on da850/omap-l138/am18x
->
-> On DA850/OMAP-L138/AM18x, AIC3x codec is at 0x18 slave address.
-> But in sound/soc/davinci/davinci-evm.c file, "struct snd_soc_dai_link"
-> has the wrong AIC3x codec slave address. This patch fixes this issue.
+linux-2.6/drivers/mmc/host/msm_sdcc.c: In function 'msmsdcc_config_dma':
+linux-2.6/drivers/mmc/host/msm_sdcc.c:391: error: implicit declaration of function 'page_to_dma'
 
-As suggested by Sergei...
+This updates to the new usage which is pfn_to_dma().
 
-This part should be one patch, and merged by Liam via ASoC tree for
-2.6.38-rc cycle.
+Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+---
+ drivers/mmc/host/msm_sdcc.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-> Also, this patch registers the platform device for davinci-pcm-audio.
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index a5c7049..a46b9a8 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -388,8 +388,9 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+ 		box->cmd = CMD_MODE_BOX;
+ 
+ 	/* Initialize sg dma address */
+-	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
+-				+ sg->offset;
++	sg->dma_address = pfn_to_dma(mmc_dev(host->mmc),
++				     page_to_pfn(sg_page(sg)))
++				     + sg->offset;
+ 
+ 	if (i == (host->dma.num_ents - 1))
+ 			box->cmd |= CMD_LC;
+-- 
+1.7.0.4
 
-This should be a separate patch as well, and I will merge it via davinci
-tree for the .38-rc cycle.
-
-> Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
-> ---
->  arch/arm/mach-davinci/devices-da8xx.c |   12 ++++++++++++
->  sound/soc/davinci/davinci-evm.c       |    2 +-
->  2 files changed, 13 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index 9eec630..17c0dbc 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -473,6 +473,11 @@ static struct resource da850_mcasp_resources[] = {
->  	},
->  };
->  
-> +struct platform_device davinci_pcm_device = {
-> +	.name	= "davinci-pcm-audio",
-> +	.id	= -1,
-> +};
-> +
->  static struct platform_device da850_mcasp_device = {
->  	.name		= "davinci-mcasp",
->  	.id		= 0,
-> @@ -480,8 +485,15 @@ static struct platform_device da850_mcasp_device = {
->  	.resource	= da850_mcasp_resources,
->  };
->  
-> +static void davinci_init_pcm(void)
-> +{
-> +	platform_device_register(&davinci_pcm_device);
-> +}
-> +
->  void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
->  {
-> +	davinci_init_pcm();
-> +
->  	/* DA830/OMAP-L137 has 3 instances of McASP */
->  	if (cpu_is_davinci_da830() && id == 1) {
->  		da830_mcasp1_device.dev.platform_data = pdata;
-> diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-> index bc9e6b0..07db881 100644
-> --- a/sound/soc/davinci/davinci-evm.c
-> +++ b/sound/soc/davinci/davinci-evm.c
-> @@ -224,7 +224,7 @@ static struct snd_soc_dai_link da8xx_evm_dai = {
->  	.stream_name = "AIC3X",
->  	.cpu_dai_name= "davinci-mcasp.0",
->  	.codec_dai_name = "tlv320aic3x-hifi",
-> -	.codec_name = "tlv320aic3x-codec.0-001a",
-> +	.codec_name = "tlv320aic3x-codec.1-0018",
->  	.platform_name = "davinci-pcm-audio",
->  	.init = evm_aic3x_init,
->  	.ops = &evm_ops,
-> ---
->
-> Also, I found that either CONFIG_REGULATOR should not be defined or if
-> CONFIG_REGULATOR is defined then CONFIG_REGULATOR_DUMMY should also be
-> defined. Without this menuconfig fix, Soundcard does not get detected.
-
-When you send final version, care to include a patch for da8xx_omapl_defconfig?
-
-Kevin
-
-> With the above fixes, arecord and aplay does not work for the first time.
-> Couple of times I get the below error:
->
-> root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
-> arecord: main:608: audio open error: Invalid argument
-> aplay: playback:2297: read error
-> root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
-> aplay: main:608: audio open error: Invalid argument
-> Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
->
-> Third time arecord and aplay work normally.
->
-> Has anyone seen such issues on DA850 or any other platform?
->
-> I am currently debugging this issue. I'll submit the above patch to community
-> once the issue of fixed.
->
-> [1] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary 
->
-> Regards,
-> Sudhakar
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
