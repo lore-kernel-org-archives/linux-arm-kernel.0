@@ -1,53 +1,78 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 18 Jan 2011 13:28:58 -0800
-Subject: [PATCH] drivers: mmc: msm: update to new arm pfn_to_dma API
-In-Reply-To: <20110118211606.GM16980@n2100.arm.linux.org.uk>
-References: <1295373844-27713-1-git-send-email-dwalker@codeaurora.org>
-	<20110118182826.GI16980@n2100.arm.linux.org.uk>
-	<1295382134.26904.7.camel@c-dwalke-linux.qualcomm.com>
-	<20110118204446.GL16980@n2100.arm.linux.org.uk>
-	<1295384420.26904.56.camel@c-dwalke-linux.qualcomm.com>
-	<20110118211606.GM16980@n2100.arm.linux.org.uk>
-Message-ID: <1295386138.26904.70.camel@c-dwalke-linux.qualcomm.com>
+From: pgsellmann@portner-elektronik.at (Peter Gsellmann)
+Date: Tue, 18 Jan 2011 22:38:44 +0100
+Subject: [PATCH] Board support Pcontrol_G20, hardware revision 2
+In-Reply-To: <20110118185657.GV14798@game.jcrosoft.org>
+References: <201101171843.07148.pgsellmann@portner-elektronik.at>
+	<20110118185657.GV14798@game.jcrosoft.org>
+Message-ID: <201101182238.45374.pgsellmann@portner-elektronik.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-01-18 at 21:16 +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 18, 2011 at 01:00:20PM -0800, Daniel Walker wrote:
-> > Just greping the driver I found at least one writel() .. I'm not really
-> > concerned with that tho. I use this driver, I need this driver to work.
-> > You broke the driver, and your NAK'ing the fix ..
-> 
-> If drivers use documented internal APIs, they _will_ break, and that's
-> tough luck.  The advertised API (DMA-mapping) is what we guarantee to
-> support and fixup drivers for.
+Am Dienstag, 18. Januar 2011, 19:56:57 schrieb Jean-Christophe PLAGNIOL-VILLARD:
+> On 18:43 Mon 17 Jan     , Peter Gsellmann wrote:
+> >  Backplane timings adjusted
+> >  Addition of specific platform devices and resources
+> >  Leds renamed
+> >  Minor bugfixes
+> I'd prefer to split the patch for bisect
+Is this really a requirement?
+Except for added resources, changes are mostly in values of static structs reflecting
+the hardware changes from rev1 to rev2. There is no such thing as hardware rev1.5 so
+any mixed version neither works on hardware rev1 nor on rev2.
 
-I don't think that's a good policy. There could be reasons why a driver
-might use an internal API .. Breaking the build is worse, to me, than
-using an internal API.
+> > +static struct resource pcontrol_resources[] = {
+> > +	{
+> > +		.start	= AT91_CHIPSELECT_4,
+> > +		.end	= AT91_CHIPSELECT_4 + SZ_256M - 1,
+> > +		.flags	= IORESOURCE_MEM,
+> > +	}, {
+> > +		.start	= AT91_CHIPSELECT_7,
+> > +		.end	= AT91_CHIPSELECT_7 + SZ_256M - 1,
+> > +		.flags	= IORESOURCE_MEM,
+> > +	}, {
+> > +		.start	= AT91_CHIPSELECT_4,
+> > +		.end	= AT91_CHIPSELECT_4 + 0x800 - 1,
+> > +		.name   = "bus51",
+> > +		.flags	= IORESOURCE_MEM,
+> > +	}, {
+> > +		.start	= AT91_CHIPSELECT_4 + 0x800,
+> > +		.end	= AT91_CHIPSELECT_4 + 0x900 - 1,
+> > +		.name   = "lcd40x16bw",
+> > +		.flags	= IORESOURCE_MEM,
+> > +	}, {
+> > +		.start	= AT91_CHIPSELECT_4 + 0x900,
+> > +		.end	= AT91_CHIPSELECT_4 + 0xa00 - 1,
+> > +		.name   = "kbd6x3+5",
+> > +		.flags	= IORESOURCE_MEM,
+> > +	}, {
+> > +		.start	= AT91_CHIPSELECT_7,
+> > +		.end	= AT91_CHIPSELECT_7 + SZ_512K - 1,
+> > +		.name   = "ferroram",
+> > +		.flags	= IORESOURCE_MEM,
+> > +	}
+> export the same memory twice as ressource :(
+yes, this is intended:
+the first two are main resources(chipselects with size 256MB),
+ the others are subresources(real chips with smaller sizes)
+ which divide the address space of the chipselects; otherwise
+ the driver plat_ram would present the 512K ferroram as 256MB disk.
 
-> If you don't know that a driver is using an internal API then you can't
-> preempt it breaking.  The answer is drivers must not use internal APIs.
+after loading some of the drivers, /proc/iomem looks like:
+50000000-5fffffff : atmel_smc.4
+  50000000-500007ff : bus51
+  50000800-500008ff : lcd40x16bw
+    50000800-500008ff : t6963c
+  50000900-500009ff : kbd6x3+5
+    50000900-500009ff : polledio-dev
+80000000-8fffffff : atmel_smc.7
+  80000000-8007ffff : ferroram
+    80000000-8007ffff : mtd-ram
 
-At least you need to be receptive to fixes ..
+which is similar to:
+fea00000-feafffff : PCI Bus 0000:01
+  feac0000-feadffff : 0000:01:00.0
+  feaec000-feaeffff : 0000:01:00.1
+    feaec000-feaeffff : ICH HD audio
+  feaf0000-feafffff : 0000:01:00.0
 
-> Had the driver been properly reviewed before being merged, it should
-> have been caught before it was merged.
-
-I didn't merge it, so I don't know how it was merged .. Bottom line is
-it's a stable kernel driver.
-
-> I've given you the outline of a proper fix, and you've probably already
-> spent longer discussing it than it would take you to cut'n'paste the
-> code into kernel and test it...
-
-Did you give us a fix for this issue? That's what I was asking in the
-last email cause it didn't appear like you touched that area.
-
-Daniel
-
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+on my host-machine and shows the hierarchy slot - card - driver
