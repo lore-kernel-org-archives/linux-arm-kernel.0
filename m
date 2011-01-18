@@ -1,43 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Jan 2011 15:44:43 -0800
-Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <20110118234215.GB17398@n2100.arm.linux.org.uk>
-References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
-	<20110114155806.GA22505@n2100.arm.linux.org.uk>
-	<AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
-	<20110114173400.GB22505@n2100.arm.linux.org.uk>
-	<AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
-	<AANLkTinJPyXKWwbyW05+HUW0LJUxsu=1Exbrr6ut27Kr@mail.gmail.com>
-	<AANLkTikPm8_vxjF7P84q7kHq+XSvLyF+jToFt=COs8Mj@mail.gmail.com>
-	<20110118234215.GB17398@n2100.arm.linux.org.uk>
-Message-ID: <20110118234443.GV4957@atomide.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 18 Jan 2011 23:50:29 +0000
+Subject: [PATCH V4 05/62] ST SPEAr: Formalized timer support
+In-Reply-To: <b14dc485b365aa736f07bf0f684198e66ef06e16.1295333958.git.viresh.kumar@st.com>
+References: <cover.1295333957.git.viresh.kumar@st.com>
+	<b14dc485b365aa736f07bf0f684198e66ef06e16.1295333958.git.viresh.kumar@st.com>
+Message-ID: <20110118235029.GA2209@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110118 15:41]:
-> On Tue, Jan 18, 2011 at 01:05:49PM +0100, Jean Pihet wrote:
-> > Dave, Russell,
-> > 
-> > On Mon, Jan 17, 2011 at 4:46 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> > > One way to work around this is would be to make omap_sram_push() a macro:
-> > >
-> > > #define omap_sram_push(funcp, size) \
-> > > ? ?(typeof(funcp))_do_omap_sram_push((void *)(funcp), size)
-> > >
-> > > ... where the definition of _do_omap_sram_push() is the same is the
-> > > existing definition of omap_sram_push(). ?Providing
-> > > _do_omap_sram_push() is not called directly, this should now be
-> > > type-safe.
-> > >
-> > Ok I reworked the patch from your suggestions. Indeed a few functions
-> > types mismatch have been spotted and corrected using the fncpy API.
-> > 
-> > New patch sent as '[PATCH v2] OMAP: use fncpy to copy the PM code
-> > functions to SRAM'.
-> 
-> Looks good, thanks.  Next problem to sort out is who's taking the
-> patches...
+Hi,
 
-You can take them but we should have at least Kevin test and ack them.
+On Tue, Jan 18, 2011 at 12:41:33PM +0530, Viresh Kumar wrote:
+> --- a/arch/arm/mach-spear3xx/spear3xx.c
+> +++ b/arch/arm/mach-spear3xx/spear3xx.c
+> @@ -523,5 +523,35 @@ struct pmx_dev pmx_plgpio_45_46_49_50 = {
+>  	.mode_count = ARRAY_SIZE(pmx_plgpio_45_46_49_50_modes),
+>  	.enb_on_reset = 1,
+>  };
+> +#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
+>  
+> -#endif
+> +static void __init spear3xx_timer_init(void)
+> +{
+> +	char pclk_name[] = "pll3_48m_clk";
+> +	struct clk *gpt_clk, *pclk;
+> +
+> +	/* get the system timer clock */
+> +	gpt_clk = clk_get_sys("gpt0", NULL);
+> +	if (!gpt_clk) {
+> +		pr_err("%s:couldn't get clk for gpt\n", __func__);
+> +		BUG();
+> +	}
+> +
+> +	/* get the suitable parent clock for timer*/
+> +	pclk = clk_get(NULL, pclk_name);
+> +	if (!pclk) {
+> +		pr_err("%s:couldn't get %s as parent for gpt\n",
+> +				__func__, pclk_name);
+> +		BUG();
+> +	}
 
-Tony
+These should probably be using IS_ERR() rather than checking against NULL to 
+be consistent with the API.
+
+[...]
+> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+> index daff8d0..bdd5b76 100644
+> --- a/arch/arm/mach-spear6xx/spear600_evb.c
+> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+> @@ -42,10 +42,11 @@ static void __init spear600_evb_init(void)
+>  		amba_device_register(amba_devs[i], &iomem_resource);
+>  }
+>  
+> +
+
+Nitpick, why the extra newline?
+
+>  MACHINE_START(SPEAR600, "ST-SPEAR600-EVB")
+>  	.boot_params	=	0x00000100,
+>  	.map_io		=	spear6xx_map_io,
+>  	.init_irq	=	spear6xx_init_irq,
+> -	.timer		=	&spear_sys_timer,
+> +	.timer		=	&spear6xx_timer,
+>  	.init_machine	=	spear600_evb_init,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
+> index f2fe14e..ea4c356 100644
+> --- a/arch/arm/mach-spear6xx/spear6xx.c
+> +++ b/arch/arm/mach-spear6xx/spear6xx.c
+> @@ -155,3 +155,34 @@ void __init spear6xx_map_io(void)
+>  	/* This will initialize clock framework */
+>  	clk_init();
+>  }
+> +
+> +static void __init spear6xx_timer_init(void)
+> +{
+> +	char pclk_name[] = "pll3_48m_clk";
+> +	struct clk *gpt_clk, *pclk;
+> +
+> +	/* get the system timer clock */
+> +	gpt_clk = clk_get_sys("gpt0", NULL);
+> +	if (!gpt_clk) {
+> +		pr_err("%s:couldn't get clk for gpt\n", __func__);
+> +		BUG();
+> +	}
+> +
+> +	/* get the suitable parent clock for timer*/
+> +	pclk = clk_get(NULL, pclk_name);
+> +	if (!pclk) {
+> +		pr_err("%s:couldn't get %s as parent for gpt\n",
+> +				__func__, pclk_name);
+> +		BUG();
+> +	}
+
+As above, IS_ERR() would be better here.
+
+Jamie
