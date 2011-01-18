@@ -1,56 +1,82 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 19 Jan 2011 03:43:00 +0800
-Subject: A few questions on imx-sdma
-Message-ID: <20110118194259.GB2833@S2101-09.ap.freescale.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 18 Jan 2011 12:47:12 +0100
+Subject: [PATCH] pxa3xx: fix PXA GPIO IRQ handling
+In-Reply-To: <1295338738-4129-1-git-send-email-s.neumann@raumfeld.com>
+References: <1295338561.2003.3.camel@sven>
+	<1295338738-4129-1-git-send-email-s.neumann@raumfeld.com>
+Message-ID: <4D357DC0.2030006@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On 01/18/2011 09:18 AM, Sven Neumann wrote:
+> From: Lars-Peter Clausen <lars@metafoo.de>
+> 
+> Set the "set_wake" field of the irq_chip struct before calling
+> set_irq_chip() for all of the IRQs, so that the compat handler
+> actually gets installed.
+> 
+> Tested-by: Sven Neumann <s.neumann@raumfeld.com>
 
-I got a few questions when studying imx-sdma.  Can you please help me
-understand?
+Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 
-* In function sdma_prep_slave_sg, we always get "sdmac->flags = 0;"
-at line 889.  What's the code blow at line 934 for?
-
-	if (sdmac->flags & IMX_DMA_SG_LOOP) {
-		param |= BD_INTR;
-		if (i + 1 == sg_len)
-			param |= BD_WRAP;
-	}
-
-* We have sdmac->status set to DMA_ERROR in err_out of function 
-sdma_prep_dma_cyclic.  Would it be good for us to do the same for
-function sdma_prep_slave_sg.  Otherwise, sdmac->status stays at
-DMA_IN_PROGRESS, which will make the function return immediately
-next time it gets called?
-
-* It seems the only use of sdmac->status is to check if the channel
-is DMA_IN_PROGRESS when "prep" functions get called.  Is it a worth
-to check DMA_ERROR or DMA_SUCCESS for every single buffer descriptor
-(BD) in interrupt handler?
-
-* In handler mxc_sdma_handle_channel_normal, callback function gets
-called and last_completed get assigned the cookie no matter
-sdmac->status is DMA_SUCCESS or DMA_ERROR.  How would dma client know
-if this tx succeeded or failed?
-
-* Related to question above, dma client can call function
-dma_async_is_tx_complete to know if the tx succeeded or failed by
-manipulating cookie.  But is there any way for client to know the
-failure in loop (cyclic) case?  In this case, client gets no way to
-query tx status, however any period (BD) in the cyclic could fail.
-Currently, we always do callback in cyclic handler whether status is
-DMA_ERROR or DMA_SUCCESS, and the client (i.e. imx audio driver)
-always assumes the callback means a successful period.  But what if
-one period in the cyclic fails?
-
-* Regarding to cyclic case again, is DMA_TERMINATE_ALL
-(down to function sdma_disable_channel) the only way for client to
-stop the tx?  I do not know the exact behavior of sdma when STATSTOP
-bit gets set.  But if it's in the middle of a BD transfer process,
-will this bit setting possibly cause data corruption?
-
--- 
-Regards,
-Shawn
+> ---
+>  arch/arm/mach-pxa/irq.c    |    7 ++++---
+>  arch/arm/mach-pxa/pxa3xx.c |    4 ++--
+>  2 files changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> index 1beb40f..a5b42a7 100644
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -111,13 +111,13 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+>  	GRER0 &= ~0x3;
+>  	GEDR0 = 0x3;
+>  
+> +	pxa_low_gpio_chip.set_wake = fn;
+> +
+>  	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
+>  		set_irq_chip(irq, &pxa_low_gpio_chip);
+>  		set_irq_handler(irq, handle_edge_irq);
+>  		set_irq_flags(irq, IRQF_VALID);
+>  	}
+> -
+> -	pxa_low_gpio_chip.set_wake = fn;
+>  }
+>  
+>  void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+> @@ -142,13 +142,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
+>  	/* only unmasked interrupts kick us out of idle */
+>  	ICCR = 1;
+>  
+> +	pxa_internal_irq_chip.set_wake = fn;
+> +
+>  	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
+>  		set_irq_chip(irq, &pxa_internal_irq_chip);
+>  		set_irq_handler(irq, handle_level_irq);
+>  		set_irq_flags(irq, IRQF_VALID);
+>  	}
+>  
+> -	pxa_internal_irq_chip.set_wake = fn;
+>  	pxa_init_low_gpio_irq(fn);
+>  }
+>  
+> diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+> index 276e8fb..5a8fe5c 100644
+> --- a/arch/arm/mach-pxa/pxa3xx.c
+> +++ b/arch/arm/mach-pxa/pxa3xx.c
+> @@ -567,13 +567,13 @@ static void __init pxa_init_ext_wakeup_irq(set_wake_t fn)
+>  {
+>  	int irq;
+>  
+> +	pxa_ext_wakeup_chip.set_wake = fn;
+> +
+>  	for (irq = IRQ_WAKEUP0; irq <= IRQ_WAKEUP1; irq++) {
+>  		set_irq_chip(irq, &pxa_ext_wakeup_chip);
+>  		set_irq_handler(irq, handle_edge_irq);
+>  		set_irq_flags(irq, IRQF_VALID);
+>  	}
+> -
+> -	pxa_ext_wakeup_chip.set_wake = fn;
+>  }
+>  
+>  void __init pxa3xx_init_irq(void)
