@@ -1,33 +1,56 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 18 Jan 2011 14:41:13 +0300
-Subject: [PATCH 0/5] davinci: da850: clean up pinmux arrays in da850.c
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484734D4@dbde02.ent.ti.com>
-References: <1294406333-30054-1-git-send-email-michael.williamson@criticallink.com>	<B85A65D85D7EB246BE421B3FB0FBB59302484733F8@dbde02.ent.ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302484734D4@dbde02.ent.ti.com>
-Message-ID: <4D357C59.8000907@mvista.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 19 Jan 2011 03:43:00 +0800
+Subject: A few questions on imx-sdma
+Message-ID: <20110118194259.GB2833@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Sascha,
 
-On 18-01-2011 7:40, Rajashekhara, Sudhakar wrote:
+I got a few questions when studying imx-sdma.  Can you please help me
+understand?
 
-> I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
-> at [1] and found that audio is broken. Below patch fixes the issue.
+* In function sdma_prep_slave_sg, we always get "sdmac->flags = 0;"
+at line 889.  What's the code blow at line 934 for?
 
-> ---
-> From: Rajashekhara, Sudhakar<sudhakar.raj@ti.com>
+	if (sdmac->flags & IMX_DMA_SG_LOOP) {
+		param |= BD_INTR;
+		if (i + 1 == sg_len)
+			param |= BD_WRAP;
+	}
 
-> davinci: fixes for audio on da850/omap-l138/am18x
->
-> On DA850/OMAP-L138/AM18x, AIC3x codec is at 0x18 slave address.
-> But in sound/soc/davinci/davinci-evm.c file, "struct snd_soc_dai_link"
-> has the wrong AIC3x codec slave address. This patch fixes this issue.
+* We have sdmac->status set to DMA_ERROR in err_out of function 
+sdma_prep_dma_cyclic.  Would it be good for us to do the same for
+function sdma_prep_slave_sg.  Otherwise, sdmac->status stays at
+DMA_IN_PROGRESS, which will make the function return immediately
+next time it gets called?
 
-> Also, this patch registers the platform device for davinci-pcm-audio.
+* It seems the only use of sdmac->status is to check if the channel
+is DMA_IN_PROGRESS when "prep" functions get called.  Is it a worth
+to check DMA_ERROR or DMA_SUCCESS for every single buffer descriptor
+(BD) in interrupt handler?
 
-    Shouldn't this be 2 patches? I don't see a connection between the changes.
+* In handler mxc_sdma_handle_channel_normal, callback function gets
+called and last_completed get assigned the cookie no matter
+sdmac->status is DMA_SUCCESS or DMA_ERROR.  How would dma client know
+if this tx succeeded or failed?
 
-> Signed-off-by: Rajashekhara, Sudhakar<sudhakar.raj@ti.com>
+* Related to question above, dma client can call function
+dma_async_is_tx_complete to know if the tx succeeded or failed by
+manipulating cookie.  But is there any way for client to know the
+failure in loop (cyclic) case?  In this case, client gets no way to
+query tx status, however any period (BD) in the cyclic could fail.
+Currently, we always do callback in cyclic handler whether status is
+DMA_ERROR or DMA_SUCCESS, and the client (i.e. imx audio driver)
+always assumes the callback means a successful period.  But what if
+one period in the cyclic fails?
 
-WBR, Sergei
+* Regarding to cyclic case again, is DMA_TERMINATE_ALL
+(down to function sdma_disable_channel) the only way for client to
+stop the tx?  I do not know the exact behavior of sdma when STATSTOP
+bit gets set.  But if it's in the middle of a BD transfer process,
+will this bit setting possibly cause data corruption?
+
+-- 
+Regards,
+Shawn
