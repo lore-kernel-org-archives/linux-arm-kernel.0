@@ -1,165 +1,121 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 18 Jan 2011 13:29:12 -0700
-Subject: [PATCH 3/8] arm/dt: Allow CONFIG_OF on ARM
+Date: Tue, 18 Jan 2011 13:29:17 -0700
+Subject: [PATCH 4/8] arm/dt: consolidate atags setup into setup_machine_atags
 In-Reply-To: <20110118195933.13011.56098.stgit@localhost6.localdomain6>
 References: <20110118195933.13011.56098.stgit@localhost6.localdomain6>
-Message-ID: <20110118202912.13011.54485.stgit@localhost6.localdomain6>
+Message-ID: <20110118202917.13011.85691.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jeremy.kerr@canonical.com>
+In preparation for adding device tree support, this patch consolidates
+all of the atag-specific setup into a single function.
 
-Add some basic empty infrastructure for DT support on ARM.
-
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/Kconfig             |    7 ++++++
- arch/arm/include/asm/prom.h  |   25 ++++++++++++++++++++++
- arch/arm/include/asm/setup.h |    1 +
- arch/arm/kernel/Makefile     |    1 +
- arch/arm/kernel/devtree.c    |   47 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c      |    2 +-
- 6 files changed, 82 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/include/asm/prom.h
- create mode 100644 arch/arm/kernel/devtree.c
+ arch/arm/kernel/setup.c |   68 ++++++++++++++++++++++++-----------------------
+ 1 files changed, 35 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5cff165..d8a330f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1586,6 +1586,13 @@ endmenu
- 
- menu "Boot options"
- 
-+config USE_OF
-+	bool "Flattened Device Tree support"
-+	select OF
-+	select OF_EARLY_FLATTREE
-+	help
-+	  Include support for flattened device tree machine descriptions.
-+
- # Compressed boot loader in ROM.  Yes, we really want to ask about
- # TEXT and BSS so we preserve their values in the config files.
- config ZBOOT_ROM_TEXT
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-new file mode 100644
-index 0000000..8f1037f
---- /dev/null
-+++ b/arch/arm/include/asm/prom.h
-@@ -0,0 +1,25 @@
-+/*
-+ *  arch/arm/include/asm/prom.h
-+ *
-+ *  Copyright (C) 2009 Canonical Ltd. <jeremy.kerr@canonical.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#ifndef __ASMARM_PROM_H
-+#define __ASMARM_PROM_H
-+
-+#ifdef CONFIG_OF
-+
-+#include <asm/setup.h>
-+#include <asm/irq.h>
-+
-+static inline void irq_dispose_mapping(unsigned int virq)
-+{
-+	return;
-+}
-+
-+#endif /* CONFIG_OF */
-+#endif /* ASMARM_PROM_H */
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 0f3e0ac..0809235 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -222,6 +222,7 @@ extern struct meminfo meminfo;
- #define bank_phys_size(bank)	(bank)->size
- 
- extern void arm_reserve_devtree(unsigned long start, unsigned long size);
-+extern int arm_add_memory(unsigned long start, unsigned long size);
- 
- #endif  /*  __KERNEL__  */
- 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 185ee82..8df05fd 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
- obj-$(CONFIG_KGDB)		+= kgdb.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
-+obj-$(CONFIG_OF)		+= devtree.o
- obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
- obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
- CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-new file mode 100644
-index 0000000..ac48da2
---- /dev/null
-+++ b/arch/arm/kernel/devtree.c
-@@ -0,0 +1,47 @@
-+/*
-+ *  linux/arch/arm/kernel/devtree.c
-+ *
-+ *  Copyright (C) 2009 Canonical Ltd. <jeremy.kerr@canonical.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/errno.h>
-+#include <linux/types.h>
-+#include <linux/bootmem.h>
-+#include <linux/memblock.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+
-+#include <asm/setup.h>
-+#include <asm/page.h>
-+
-+void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-+{
-+	arm_add_memory(base, size);
-+}
-+
-+void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
-+{
-+	return __va(memblock_alloc(size, align));
-+}
-+
-+/**
-+ * irq_create_of_mapping - Hook to resolve OF irq specifier into a Linux irq#
-+ *
-+ * Currently the mapping mechanism is trivial; simple flat hwirq numbers are
-+ * mapped 1:1 onto Linux irq numbers.  Cascaded irq controllers are not
-+ * supported.
-+ */
-+unsigned int irq_create_of_mapping(struct device_node *controller,
-+				   const u32 *intspec, unsigned int intsize)
-+{
-+	return intspec[0];
-+}
-+EXPORT_SYMBOL_GPL(irq_create_of_mapping);
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 420b8d6..d211609 100644
+index d211609..cbc1836 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -443,7 +443,7 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
- 	return list;
+@@ -424,25 +424,6 @@ void cpu_init(void)
+ 	    : "r14");
  }
  
--static int __init arm_add_memory(unsigned long start, unsigned long size)
-+int __init arm_add_memory(unsigned long start, unsigned long size)
+-static struct machine_desc * __init setup_machine(unsigned int nr)
+-{
+-	struct machine_desc *list;
+-
+-	/*
+-	 * locate machine in the list of supported machines.
+-	 */
+-	list = lookup_machine_type(nr);
+-	if (!list) {
+-		printk("Machine configuration botched (nr %d), unable "
+-		       "to continue.\n", nr);
+-		while (1);
+-	}
+-
+-	printk("Machine: %s\n", list->name);
+-
+-	return list;
+-}
+-
+ int __init arm_add_memory(unsigned long start, unsigned long size)
  {
  	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
+@@ -796,21 +777,23 @@ static void __init squash_mem_tags(struct tag *tag)
+ 			tag->hdr.tag = ATAG_NONE;
+ }
  
+-void __init setup_arch(char **cmdline_p)
++static struct machine_desc * __init setup_machine_tags(unsigned int nr)
+ {
+ 	struct tag *tags = (struct tag *)&init_tags;
+ 	struct machine_desc *mdesc;
+ 	char *from = default_command_line;
+ 
+-	unwind_init();
+-
+-	setup_processor();
+-	mdesc = setup_machine(machine_arch_type);
+-	machine_desc = mdesc;
+-	machine_name = mdesc->name;
++	/*
++	 * locate machine in the list of supported machines.
++	 */
++	mdesc = lookup_machine_type(nr);
++	if (!mdesc) {
++		printk("Machine configuration botched (nr %d), unable "
++		       "to continue.\n", nr);
++		while (1);
++	}
+ 
+-	if (mdesc->soft_reboot)
+-		reboot_setup("s");
++	printk("Machine: %s\n", mdesc->name);
+ 
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
+@@ -838,16 +821,35 @@ void __init setup_arch(char **cmdline_p)
+ 		parse_tags(tags);
+ 	}
+ 
+-	init_mm.start_code = (unsigned long) _text;
+-	init_mm.end_code   = (unsigned long) _etext;
+-	init_mm.end_data   = (unsigned long) _edata;
+-	init_mm.brk	   = (unsigned long) _end;
+-
+ 	/* parse_early_param needs a boot_command_line */
+ 	strlcpy(boot_command_line, from, COMMAND_LINE_SIZE);
+ 
+ 	/* populate cmd_line too for later use, preserving boot_command_line */
+ 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
++
++	return mdesc;
++}
++
++
++void __init setup_arch(char **cmdline_p)
++{
++	struct machine_desc *mdesc;
++
++	unwind_init();
++
++	setup_processor();
++	mdesc = setup_machine_tags(machine_arch_type);
++	machine_desc = mdesc;
++	machine_name = mdesc->name;
++
++	if (mdesc->soft_reboot)
++		reboot_setup("s");
++
++	init_mm.start_code = (unsigned long) _text;
++	init_mm.end_code   = (unsigned long) _etext;
++	init_mm.end_data   = (unsigned long) _edata;
++	init_mm.brk	   = (unsigned long) _end;
++
+ 	*cmdline_p = cmd_line;
+ 
+ 	parse_early_param();
