@@ -1,20 +1,89 @@
-From: npiggin@gmail.com (Nick Piggin)
-Date: Wed, 19 Jan 2011 09:19:59 +1100
-Subject: BUG: spinlock recursion (sys_chdir, user_path_at,
-	do_path_lookup ...)
-In-Reply-To: <201101181759.32013.maciej.rutecki@gmail.com>
-References: <20110111110539.GP24920@pengutronix.de>
-	<201101181759.32013.maciej.rutecki@gmail.com>
-Message-ID: <AANLkTikC0ZV6pZ7jVmZ5DSrrkPCN4UPn3VY+zM2RWSc6@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 18 Jan 2011 14:25:18 -0800
+Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
+Message-ID: <1295389518-6249-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/19 Maciej Rutecki <maciej.rutecki@gmail.com>:
-> I created a Bugzilla entry at
-> https://bugzilla.kernel.org/show_bug.cgi?id=27032
-> for your bug report, please add your address to the CC list in there, thanks!
+This doesn't work yet. I tried booting with this patch, and the boot
+stops after detecting the MMC partitions. It won't actually boot off
+the MMC. Without this patch and with the page_to_dma/pfn_to_dma changes
+it does work.
 
-Sorry I missed this mail. This bug should have been fixed several
-days ago 90dbb77ba48dddb87445d238e84cd137cf97dd98
+Not-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+---
+ drivers/mmc/host/msm_sdcc.c |   46 +++++++++++++++++-------------------------
+ 1 files changed, 19 insertions(+), 27 deletions(-)
 
-Thanks for the report, please do again if you see any problems.
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 5decfd0..1f1c7cb 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -383,14 +383,27 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+ 	host->curr.user_pages = 0;
+ 
+ 	box = &nc->cmd[0];
+-	for (i = 0; i < host->dma.num_ents; i++) {
+-		box->cmd = CMD_MODE_BOX;
+ 
+-	/* Initialize sg dma address */
+-	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
+-				+ sg->offset;
++	/* location of command block must be 64 bit aligned */
++	BUG_ON(host->dma.cmd_busaddr & 0x07);
+ 
+-	if (i == (host->dma.num_ents - 1))
++	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
++	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
++			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
++	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
++
++	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
++			host->dma.num_ents, host->dma.dir);
++	if (n == 0) {
++		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
++			mmc_hostname(host->mmc));
++		host->dma.sg = NULL;
++		host->dma.num_ents = 0;
++		return -ENOMEM;
++	}
++
++	for_each_sg(host->dma.sg, sg, n, i) {
++		if (i == n - 1)
+ 			box->cmd |= CMD_LC;
+ 		rows = (sg_dma_len(sg) % MCI_FIFOSIZE) ?
+ 			(sg_dma_len(sg) / MCI_FIFOSIZE) + 1 :
+@@ -418,27 +431,6 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+ 			box->cmd |= CMD_DST_CRCI(crci);
+ 		}
+ 		box++;
+-		sg++;
+-	}
+-
+-	/* location of command block must be 64 bit aligned */
+-	BUG_ON(host->dma.cmd_busaddr & 0x07);
+-
+-	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
+-	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
+-			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
+-	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
+-
+-	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
+-			host->dma.num_ents, host->dma.dir);
+-/* dsb inside dma_map_sg will write nc out to mem as well */
+-
+-	if (n != host->dma.num_ents) {
+-		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
+-			mmc_hostname(host->mmc));
+-		host->dma.sg = NULL;
+-		host->dma.num_ents = 0;
+-		return -ENOMEM;
+ 	}
+ 
+ 	return 0;
+-- 
+1.7.0.4
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
