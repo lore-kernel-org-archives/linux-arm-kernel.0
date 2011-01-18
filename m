@@ -1,38 +1,40 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 17 Jan 2011 23:27:05 -0500 (EST)
-Subject: [PATCH 10/14] ARM: v6k: select TLS register code according to V6
-	variants
-In-Reply-To: <20110117225233.GC25829@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peugh-0003St-DY@rmk-PC.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101171717090.8580@xanadu.home>
-	<20110117223635.GB25829@n2100.arm.linux.org.uk>
-	<20110117225233.GC25829@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101172326180.8580@xanadu.home>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Tue, 18 Jan 2011 13:36:29 +0900
+Subject: [PATCH 1/2] video: nuc900fb: fix compile error
+In-Reply-To: <1295253222.12890.4.camel@mola> <1295253143.12890.3.camel@mola>
+References: <1295253143.12890.3.camel@mola> <1295253222.12890.4.camel@mola>
+	<1295253143.12890.3.camel@mola>
+Message-ID: <20110118043628.GG2122@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jan 2011, Russell King - ARM Linux wrote:
-
-> On Mon, Jan 17, 2011 at 10:36:35PM +0000, Russell King - ARM Linux wrote:
-> > It may be better at some point to get rid of the CPU_32v* and replace
-> > them with CPU_ARCH_V* instead, which makes it clear that these ones
-> > definitely refer to the architecture versions.
+On Mon, Jan 17, 2011 at 04:32:23PM +0800, Axel Lin wrote:
+> >From a4bd940fa4d162f95e51e67c7ec4973b1d5b6866 Mon Sep 17 00:00:00 2001
+> From: Axel Lin <axel.lin@gmail.com>
+> Date: Mon, 17 Jan 2011 16:24:36 +0800
+> Subject: [PATCH 1/2] video: nuc900fb: fix compile error
 > 
-> Last point on this is that I think we want to sanitize PJ4.
+> This patch fixes below compile error:
 > 
-> If we think about CPU_V7 as being the selection of ARM CPUs which are V7
-> architectures, CPU_PJ4 should be a separate config option selecting all
-> the same symbols which CPU_V7 does - and that should also select proc-v7.S
-> for building.
+>   CC      drivers/video/nuc900fb.o
+> drivers/video/nuc900fb.c: In function 'nuc900fb_suspend':
+> drivers/video/nuc900fb.c:726: error: too few arguments to function 'nuc900fb_stop_lcd'
+> drivers/video/nuc900fb.c: In function 'nuc900fb_resume':
+> drivers/video/nuc900fb.c:743: error: 'bfinfo' undeclared (first use in this function)
+> drivers/video/nuc900fb.c:743: error: (Each undeclared identifier is reported only once
+> drivers/video/nuc900fb.c:743: error: for each function it appears in.)
+> make[2]: *** [drivers/video/nuc900fb.o] Error 1
+> make[1]: *** [drivers/video] Error 2
+> make: *** [drivers] Error 2
 > 
-> I'm not sure it makes sense to have (eg) the V7 perf events available on
-> PJ4 or the ARM errata for their V7 cores?
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+
+On Mon, Jan 17, 2011 at 04:33:42PM +0800, Axel Lin wrote:
+> >From f0064467b1f9696ebcade98ec75ef3fbc6cfe38f Mon Sep 17 00:00:00 2001
+> From: Axel Lin <axel.lin@gmail.com>
+> Date: Mon, 17 Jan 2011 16:25:57 +0800
+> Subject: [PATCH 2/2] video: nuc900fb: properly free resources in nuc900fb_remove
 > 
-> Does PJ4 have VFPv3?  Is Neon available on PJ4?  What about the DCC
-> debug registers?
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-Agreed.  Actually this is also the same issue with Dove.
-
-
-Nicolas
+Both applied, thanks.
