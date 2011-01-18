@@ -1,40 +1,104 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Tue, 18 Jan 2011 13:36:29 +0900
-Subject: [PATCH 1/2] video: nuc900fb: fix compile error
-In-Reply-To: <1295253222.12890.4.camel@mola> <1295253143.12890.3.camel@mola>
-References: <1295253143.12890.3.camel@mola> <1295253222.12890.4.camel@mola>
-	<1295253143.12890.3.camel@mola>
-Message-ID: <20110118043628.GG2122@linux-sh.org>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Tue, 18 Jan 2011 10:10:12 +0530
+Subject: [PATCH 0/5] davinci: da850: clean up pinmux arrays in da850.c
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484733F8@dbde02.ent.ti.com>
+References: <1294406333-30054-1-git-send-email-michael.williamson@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302484733F8@dbde02.ent.ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302484734D4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 04:32:23PM +0800, Axel Lin wrote:
-> >From a4bd940fa4d162f95e51e67c7ec4973b1d5b6866 Mon Sep 17 00:00:00 2001
-> From: Axel Lin <axel.lin@gmail.com>
-> Date: Mon, 17 Jan 2011 16:24:36 +0800
-> Subject: [PATCH 1/2] video: nuc900fb: fix compile error
-> 
-> This patch fixes below compile error:
-> 
->   CC      drivers/video/nuc900fb.o
-> drivers/video/nuc900fb.c: In function 'nuc900fb_suspend':
-> drivers/video/nuc900fb.c:726: error: too few arguments to function 'nuc900fb_stop_lcd'
-> drivers/video/nuc900fb.c: In function 'nuc900fb_resume':
-> drivers/video/nuc900fb.c:743: error: 'bfinfo' undeclared (first use in this function)
-> drivers/video/nuc900fb.c:743: error: (Each undeclared identifier is reported only once
-> drivers/video/nuc900fb.c:743: error: for each function it appears in.)
-> make[2]: *** [drivers/video/nuc900fb.o] Error 1
-> make[1]: *** [drivers/video] Error 2
-> make: *** [drivers] Error 2
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+Hi,
 
-On Mon, Jan 17, 2011 at 04:33:42PM +0800, Axel Lin wrote:
-> >From f0064467b1f9696ebcade98ec75ef3fbc6cfe38f Mon Sep 17 00:00:00 2001
-> From: Axel Lin <axel.lin@gmail.com>
-> Date: Mon, 17 Jan 2011 16:25:57 +0800
-> Subject: [PATCH 2/2] video: nuc900fb: properly free resources in nuc900fb_remove
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
+at [1] and found that audio is broken. Below patch fixes the issue.
 
-Both applied, thanks.
+---
+From: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+
+davinci: fixes for audio on da850/omap-l138/am18x
+
+On DA850/OMAP-L138/AM18x, AIC3x codec is at 0x18 slave address.
+But in sound/soc/davinci/davinci-evm.c file, "struct snd_soc_dai_link"
+has the wrong AIC3x codec slave address. This patch fixes this issue.
+
+Also, this patch registers the platform device for davinci-pcm-audio.
+
+Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+---
+ arch/arm/mach-davinci/devices-da8xx.c |   12 ++++++++++++
+ sound/soc/davinci/davinci-evm.c       |    2 +-
+ 2 files changed, 13 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 9eec630..17c0dbc 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -473,6 +473,11 @@ static struct resource da850_mcasp_resources[] = {
+ 	},
+ };
+ 
++struct platform_device davinci_pcm_device = {
++	.name	= "davinci-pcm-audio",
++	.id	= -1,
++};
++
+ static struct platform_device da850_mcasp_device = {
+ 	.name		= "davinci-mcasp",
+ 	.id		= 0,
+@@ -480,8 +485,15 @@ static struct platform_device da850_mcasp_device = {
+ 	.resource	= da850_mcasp_resources,
+ };
+ 
++static void davinci_init_pcm(void)
++{
++	platform_device_register(&davinci_pcm_device);
++}
++
+ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
+ {
++	davinci_init_pcm();
++
+ 	/* DA830/OMAP-L137 has 3 instances of McASP */
+ 	if (cpu_is_davinci_da830() && id == 1) {
+ 		da830_mcasp1_device.dev.platform_data = pdata;
+diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
+index bc9e6b0..07db881 100644
+--- a/sound/soc/davinci/davinci-evm.c
++++ b/sound/soc/davinci/davinci-evm.c
+@@ -224,7 +224,7 @@ static struct snd_soc_dai_link da8xx_evm_dai = {
+ 	.stream_name = "AIC3X",
+ 	.cpu_dai_name= "davinci-mcasp.0",
+ 	.codec_dai_name = "tlv320aic3x-hifi",
+-	.codec_name = "tlv320aic3x-codec.0-001a",
++	.codec_name = "tlv320aic3x-codec.1-0018",
+ 	.platform_name = "davinci-pcm-audio",
+ 	.init = evm_aic3x_init,
+ 	.ops = &evm_ops,
+---
+
+Also, I found that either CONFIG_REGULATOR should not be defined or if
+CONFIG_REGULATOR is defined then CONFIG_REGULATOR_DUMMY should also be
+defined. Without this menuconfig fix, Soundcard does not get detected.
+
+With the above fixes, arecord and aplay does not work for the first time.
+Couple of times I get the below error:
+
+root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
+arecord: main:608: audio open error: Invalid argument
+aplay: playback:2297: read error
+root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
+aplay: main:608: audio open error: Invalid argument
+Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
+
+Third time arecord and aplay work normally.
+
+Has anyone seen such issues on DA850 or any other platform?
+
+I am currently debugging this issue. I'll submit the above patch to community
+once the issue of fixed.
+
+[1] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary 
+
+Regards,
+Sudhakar
