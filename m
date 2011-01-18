@@ -1,169 +1,174 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:42:21 +0530
-Subject: [PATCH V4 54/62] SPEAr3xx: Replace defconfigs with single unified
-	defconfig
+Date: Tue, 18 Jan 2011 12:42:20 +0530
+Subject: [PATCH V4 53/62] SPEAr3xx: Rework KConfig to allow all boards to be
+	compiled in
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <98ee93836f5a26eb20aed6dbde08f814fbeb6548.1295333959.git.viresh.kumar@st.com>
+Message-ID: <96f8d82b86df788b627c5248b250e5c413487ed4.1295333959.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ryan Mallon <ryan@bluewatersys.com>
 
-We only need one defconfig for SPEAr3xx now since we can build all
-three boards into one kernel.
+Now that all three SPEAr3xx platforms can be built into one kernel,
+rework KConfig to allow this. Move everything into one KConfig file
+while we are here.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/configs/spear310_defconfig                |   52 --------------------
- arch/arm/configs/spear320_defconfig                |   52 --------------------
- .../{spear300_defconfig => spear3xx_defconfig}     |    4 +-
- 3 files changed, 3 insertions(+), 105 deletions(-)
- delete mode 100644 arch/arm/configs/spear310_defconfig
- delete mode 100644 arch/arm/configs/spear320_defconfig
- rename arch/arm/configs/{spear300_defconfig => spear3xx_defconfig} (93%)
+ arch/arm/mach-spear3xx/Kconfig                |   30 ++++++++++++++++--------
+ arch/arm/mach-spear3xx/Kconfig300             |   17 --------------
+ arch/arm/mach-spear3xx/Kconfig310             |   17 --------------
+ arch/arm/mach-spear3xx/Kconfig320             |   17 --------------
+ arch/arm/mach-spear3xx/include/mach/generic.h |    6 +++-
+ 5 files changed, 24 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig300
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig310
+ delete mode 100644 arch/arm/mach-spear3xx/Kconfig320
 
-diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
+diff --git a/arch/arm/mach-spear3xx/Kconfig b/arch/arm/mach-spear3xx/Kconfig
+index 20d1317..2cee6b0 100644
+--- a/arch/arm/mach-spear3xx/Kconfig
++++ b/arch/arm/mach-spear3xx/Kconfig
+@@ -4,9 +4,26 @@
+ 
+ if ARCH_SPEAR3XX
+ 
+-choice
+-	prompt "SPEAr3XX Family"
+-	default MACH_SPEAR300
++menu "SPEAr3xx Implementations"
++config BOARD_SPEAR300_EVB
++	bool "SPEAr300 Evaluation Board"
++	select MACH_SPEAR300
++	help
++	  Supports ST SPEAr300 Evaluation Board
++
++config BOARD_SPEAR310_EVB
++	bool "SPEAr310 Evaluation Board"
++	select MACH_SPEAR310
++	help
++	  Supports ST SPEAr310 Evaluation Board
++
++config BOARD_SPEAR320_EVB
++	bool "SPEAr320 Evaluation Board"
++	select MACH_SPEAR320
++	help
++	  Supports ST SPEAr320 Evaluation Board
++
++endmenu
+ 
+ config MACH_SPEAR300
+ 	bool "SPEAr300"
+@@ -23,11 +40,4 @@ config MACH_SPEAR320
+ 	help
+ 	  Supports ST SPEAr320 Machine
+ 
+-endchoice
+-
+-# Adding SPEAr3XX machine specific configuration files
+-source "arch/arm/mach-spear3xx/Kconfig300"
+-source "arch/arm/mach-spear3xx/Kconfig310"
+-source "arch/arm/mach-spear3xx/Kconfig320"
+-
+ endif #ARCH_SPEAR3XX
+diff --git a/arch/arm/mach-spear3xx/Kconfig300 b/arch/arm/mach-spear3xx/Kconfig300
 deleted file mode 100644
-index 824e444..0000000
---- a/arch/arm/configs/spear310_defconfig
+index c519a05..0000000
+--- a/arch/arm/mach-spear3xx/Kconfig300
 +++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR310=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr300 machine configuration file
+-#
+-
+-if MACH_SPEAR300
+-
+-choice
+-	prompt "SPEAr300 Boards"
+-	default BOARD_SPEAR300_EVB
+-
+-config BOARD_SPEAR300_EVB
+-	bool "SPEAr300 Evaluation Board"
+-	help
+-	  Supports ST SPEAr300 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR300
+diff --git a/arch/arm/mach-spear3xx/Kconfig310 b/arch/arm/mach-spear3xx/Kconfig310
 deleted file mode 100644
-index 842f7f3..0000000
---- a/arch/arm/configs/spear320_defconfig
+index 60e7442..0000000
+--- a/arch/arm/mach-spear3xx/Kconfig310
 +++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR320=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear3xx_defconfig
-similarity index 93%
-rename from arch/arm/configs/spear300_defconfig
-rename to arch/arm/configs/spear3xx_defconfig
-index cf29f3e..fea7e1f 100644
---- a/arch/arm/configs/spear300_defconfig
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -7,6 +7,9 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_PLAT_SPEAR=y
-+CONFIG_BOARD_SPEAR300_EVB=y
-+CONFIG_BOARD_SPEAR310_EVB=y
-+CONFIG_BOARD_SPEAR320_EVB=y
- CONFIG_BINFMT_MISC=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
-@@ -24,7 +27,6 @@ CONFIG_MAX_RAW_DEVS=8192
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PL061=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_EXT2_FS=y
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr310 machine configuration file
+-#
+-
+-if MACH_SPEAR310
+-
+-choice
+-	prompt "SPEAr310 Boards"
+-	default BOARD_SPEAR310_EVB
+-
+-config BOARD_SPEAR310_EVB
+-	bool "SPEAr310 Evaluation Board"
+-	help
+-	  Supports ST SPEAr310 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR310
+diff --git a/arch/arm/mach-spear3xx/Kconfig320 b/arch/arm/mach-spear3xx/Kconfig320
+deleted file mode 100644
+index 1c1d438..0000000
+--- a/arch/arm/mach-spear3xx/Kconfig320
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr320 machine configuration file
+-#
+-
+-if MACH_SPEAR320
+-
+-choice
+-	prompt "SPEAr320 Boards"
+-	default BOARD_SPEAR320_EVB
+-
+-config BOARD_SPEAR320_EVB
+-	bool "SPEAr320 Evaluation Board"
+-	help
+-	  Supports ST SPEAr320 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR320
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index d250c96..3c2b189 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -160,9 +160,10 @@ void sdhci_i2s_mem_enable(u8 mask);
+ 
+ /* Add misc structure declarations here */
+ extern struct clcd_board clcd_plat_data;
++#endif
+ 
+ /* spear310 declarations */
+-#elif defined(CONFIG_MACH_SPEAR310)
++#if defined(CONFIG_MACH_SPEAR310)
+ /* Add spear310 machine device structure declarations here */
+ extern struct amba_device uart1_device;
+ extern struct amba_device uart2_device;
+@@ -187,9 +188,10 @@ extern struct pmx_dev spear310_pmx_tdm0;
+ /* Add spear310 machine function declarations here */
+ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 		u8 pmx_dev_count);
++#endif
+ 
+ /* spear320 declarations */
+-#elif defined(CONFIG_MACH_SPEAR320)
++#if defined(CONFIG_MACH_SPEAR320)
+ /* Add spear320 machine device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device ssp_device[];
 -- 
 1.7.2.2
