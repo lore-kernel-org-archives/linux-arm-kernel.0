@@ -1,229 +1,193 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:41:48 +0530
-Subject: [PATCH V4 21/62] ST SPEAr: Added ARM PL061 GPIO Support on SPEAr13xx
-	and modified resource size
+Date: Tue, 18 Jan 2011 12:41:47 +0530
+Subject: [PATCH V4 20/62] ST SPEAr: Adding machine support for keyboard
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <11d6764ae673e0ab90b5da0e54bc23f13315a918.1295333958.git.viresh.kumar@st.com>
+Message-ID: <37a5404dab64ce04f31049d27440c41495816b54.1295333958.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
  arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/include/mach/gpio.h    |   18 +++++++++++
- arch/arm/mach-spear13xx/include/mach/irqs.h    |   10 ++++++-
- arch/arm/mach-spear13xx/include/mach/spear.h   |    4 +-
- arch/arm/mach-spear13xx/spear1300_evb.c        |    2 +
- arch/arm/mach-spear13xx/spear13xx.c            |   37 ++++++++++++++++++++++++
- arch/arm/mach-spear3xx/spear300.c              |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c              |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c              |    9 ++----
- 9 files changed, 74 insertions(+), 11 deletions(-)
+ arch/arm/mach-spear13xx/spear1300_evb.c        |   17 +++++++++++++++++
+ arch/arm/mach-spear13xx/spear13xx.c            |   19 +++++++++++++++++++
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    1 +
+ arch/arm/mach-spear3xx/spear300.c              |   19 +++++++++++++++++++
+ arch/arm/mach-spear3xx/spear300_evb.c          |   17 +++++++++++++++++
+ 6 files changed, 74 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 0d21b79..2fc34f5 100644
+index 6473316..0d21b79 100644
 --- a/arch/arm/mach-spear13xx/include/mach/generic.h
 +++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -29,6 +29,7 @@
- #define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
- 
- /* Add spear13xx family device structure declarations here */
-+extern struct amba_device spear13xx_gpio_device[];
- extern struct amba_device spear13xx_uart_device;
+@@ -33,6 +33,7 @@ extern struct amba_device spear13xx_uart_device;
  extern struct platform_device spear13xx_ehci0_device;
  extern struct platform_device spear13xx_ehci1_device;
-diff --git a/arch/arm/mach-spear13xx/include/mach/gpio.h b/arch/arm/mach-spear13xx/include/mach/gpio.h
-index 43fa541..2f8ad23 100644
---- a/arch/arm/mach-spear13xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear13xx/include/mach/gpio.h
-@@ -16,4 +16,22 @@
- 
- #include <plat/gpio.h>
- 
-+#define GPIO0_0			0
-+#define GPIO0_1			1
-+#define GPIO0_2			2
-+#define GPIO0_3			3
-+#define GPIO0_4			4
-+#define GPIO0_5			5
-+#define GPIO0_6			6
-+#define GPIO0_7			7
-+
-+#define GPIO1_0			8
-+#define GPIO1_1			9
-+#define GPIO1_2			10
-+#define GPIO1_3			11
-+#define GPIO1_4			12
-+#define GPIO1_5			13
-+#define GPIO1_6			14
-+#define GPIO1_7			15
-+
- #endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
-index 036bfc6..10b64c1 100644
---- a/arch/arm/mach-spear13xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
-@@ -86,6 +86,14 @@
- 
- #define IRQ_GIC_END		(IRQ_SHPI_START + 128)
- 
--#define NR_IRQS			IRQ_GIC_END
-+#define VIRQ_START		IRQ_GIC_END
-+
-+/* GPIO pins virtual irqs */
-+#define SPEAR_GPIO0_INT_BASE	(VIRQ_START + 0)
-+#define SPEAR_GPIO1_INT_BASE	(SPEAR_GPIO0_INT_BASE + 8)
-+#define SPEAR_GPIO_INT_END	(SPEAR_GPIO1_INT_BASE + 8)
-+
-+#define VIRQ_END		SPEAR_GPIO_INT_END
-+#define NR_IRQS			VIRQ_END
- 
- #endif /* __MACH_IRQS_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-index d4b11a4..282ef2f 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-@@ -43,8 +43,8 @@
- #define SPEAR13XX_GPT2_BASE		0xE0480000
- #define SPEAR13XX_GPT3_BASE		0xE0500000
- #define SPEAR13XX_RTC_BASE		0xE0580000
--#define SPEAR13XX_GPIOA_BASE		0xE0600000
--#define SPEAR13XX_GPIOB_BASE		0xE0680000
-+#define SPEAR13XX_GPIO0_BASE		0xE0600000
-+#define SPEAR13XX_GPIO1_BASE		0xE0680000
- #define SPEAR13XX_MISC_BASE		0xE0700000
- #define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
- 
+ extern struct platform_device spear13xx_i2c_device;
++extern struct platform_device spear13xx_kbd_device;
+ extern struct platform_device spear13xx_ohci0_device;
+ extern struct platform_device spear13xx_ohci1_device;
+ extern struct platform_device spear13xx_rtc_device;
 diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 2d4b4cf..f2449ef 100644
+index 1518044..2d4b4cf 100644
 --- a/arch/arm/mach-spear13xx/spear1300_evb.c
 +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -19,6 +19,8 @@
- #include <plat/keyboard.h>
+@@ -16,6 +16,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <plat/keyboard.h>
  
  static struct amba_device *amba_devs[] __initdata = {
-+	&spear13xx_gpio_device[0],
-+	&spear13xx_gpio_device[1],
  	&spear13xx_uart_device,
+@@ -25,15 +26,31 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&spear13xx_ehci0_device,
+ 	&spear13xx_ehci1_device,
+ 	&spear13xx_i2c_device,
++	&spear13xx_kbd_device,
+ 	&spear13xx_ohci0_device,
+ 	&spear13xx_ohci1_device,
+ 	&spear13xx_rtc_device,
  };
  
++/* keyboard specific platform data */
++static DECLARE_KEYMAP(keymap);
++static struct matrix_keymap_data keymap_data = {
++	.keymap = keymap,
++	.keymap_size = ARRAY_SIZE(keymap),
++};
++
++static struct kbd_platform_data kbd_data = {
++	.keymap = &keymap_data,
++	.rep = 1,
++};
++
+ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
+ 
++	/* set keyboard plat data */
++	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
++
+ 	/* call spear1300 machine init function */
+ 	spear1300_init();
+ 
 diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index 7357f0b..c333a1d 100644
+index dc595a3..7357f0b 100644
 --- a/arch/arm/mach-spear13xx/spear13xx.c
 +++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -12,6 +12,7 @@
-  */
+@@ -166,6 +166,25 @@ struct platform_device spear13xx_ohci1_device = {
+ 	.resource = ohci1_resources,
+ };
  
- #include <linux/types.h>
-+#include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
- #include <asm/hardware/gic.h>
-@@ -24,6 +25,42 @@
- #include <mach/hardware.h>
- 
- /* Add spear13xx machines common devices here */
-+/* gpio device registeration */
-+static struct pl061_platform_data gpio_plat_data[] = {
++/* keyboard device registration */
++static struct resource kbd_resources[] = {
 +	{
-+		.gpio_base	= 0,
-+		.irq_base	= SPEAR_GPIO0_INT_BASE,
++		.start = SPEAR13XX_KBD_BASE,
++		.end = SPEAR13XX_KBD_BASE + SZ_1K - 1,
++		.flags = IORESOURCE_MEM,
 +	}, {
-+		.gpio_base	= 8,
-+		.irq_base	= SPEAR_GPIO1_INT_BASE,
++		.start = IRQ_KBD,
++		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+struct amba_device spear13xx_gpio_device[] = {
-+	{
-+		.dev = {
-+			.init_name = "gpio0",
-+			.platform_data = &gpio_plat_data[0],
-+		},
-+		.res = {
-+			.start = SPEAR13XX_GPIO0_BASE,
-+			.end = SPEAR13XX_GPIO0_BASE + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		},
-+		.irq = {IRQ_GPIO0, NO_IRQ},
-+	}, {
-+		.dev = {
-+			.init_name = "gpio1",
-+			.platform_data = &gpio_plat_data[1],
-+		},
-+		.res = {
-+			.start = SPEAR13XX_GPIO1_BASE,
-+			.end = SPEAR13XX_GPIO1_BASE + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		},
-+		.irq = {IRQ_GPIO1, NO_IRQ},
-+	}
++struct platform_device spear13xx_kbd_device = {
++	.name = "keyboard",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(kbd_resources),
++	.resource = kbd_resources,
 +};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index b65a884..e82a900 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -108,6 +108,7 @@ extern struct pmx_driver pmx_driver;
+ /* Add spear300 machine device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device gpio1_device;
++extern struct platform_device kbd_device;
  
- /* uart device registeration */
- struct amba_device spear13xx_uart_device = {
+ /* pad mux modes */
+ extern struct pmx_mode nand_mode;
 diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index fab998c..95946b3 100644
+index 1921cf8..fab998c 100644
 --- a/arch/arm/mach-spear3xx/spear300.c
 +++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -401,7 +401,7 @@ struct amba_device gpio1_device = {
- 	},
- 	.res = {
- 		.start = SPEAR300_GPIO_BASE,
--		.end = SPEAR300_GPIO_BASE + SPEAR300_GPIO_SIZE - 1,
-+		.end = SPEAR300_GPIO_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
+@@ -407,6 +407,25 @@ struct amba_device gpio1_device = {
  	.irq = {VIRQ_GPIO1, NO_IRQ},
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 568f365..93be834 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -35,7 +35,7 @@ struct amba_device gpio_device = {
- 	},
- 	.res = {
- 		.start = SPEAR3XX_ICM3_GPIO_BASE,
--		.end = SPEAR3XX_ICM3_GPIO_BASE + SPEAR3XX_ICM3_GPIO_SIZE - 1,
-+		.end = SPEAR3XX_ICM3_GPIO_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.irq = {IRQ_BASIC_GPIO, NO_IRQ},
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 5a9763f..c6c9dfb 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -89,8 +89,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_CPU_GPIO_BASE,
--			.end = SPEAR6XX_CPU_GPIO_BASE +
--				SPEAR6XX_CPU_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_CPU_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_LOCAL_GPIO, NO_IRQ},
-@@ -101,8 +100,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM3_GPIO_BASE,
--			.end = SPEAR6XX_ICM3_GPIO_BASE +
--				SPEAR6XX_ICM3_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_ICM3_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_BASIC_GPIO, NO_IRQ},
-@@ -113,8 +111,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM2_GPIO_BASE,
--			.end = SPEAR6XX_ICM2_GPIO_BASE +
--				SPEAR6XX_ICM2_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_ICM2_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_APPL_GPIO, NO_IRQ},
+ };
+ 
++/* keyboard device registration */
++static struct resource kbd_resources[] = {
++	{
++		.start = SPEAR300_KEYBOARD_BASE,
++		.end = SPEAR300_KEYBOARD_BASE + SZ_1K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = VIRQ_KEYBOARD,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device kbd_device = {
++	.name = "keyboard",
++	.id = -1,
++	.num_resources = ARRAY_SIZE(kbd_resources),
++	.resource = kbd_resources,
++};
++
+ /* spear3xx shared irq */
+ struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index caa7000..330b677 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -15,6 +15,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/spear.h>
++#include <plat/keyboard.h>
+ 
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+@@ -51,6 +52,19 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&rtc_device,
+ 
+ 	/* spear300 specific devices */
++	&kbd_device,
++};
++
++/* keyboard specific platform data */
++static DECLARE_KEYMAP(keymap);
++static struct matrix_keymap_data keymap_data = {
++	.keymap = keymap,
++	.keymap_size = ARRAY_SIZE(keymap),
++};
++
++static struct kbd_platform_data kbd_data = {
++	.keymap = &keymap_data,
++	.rep = 1,
+ };
+ 
+ static void __init spear300_evb_init(void)
+@@ -62,6 +76,9 @@ static void __init spear300_evb_init(void)
+ 	pmx_driver.devs = pmx_devs;
+ 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
+ 
++	/* set keyboard plat data */
++	kbd_set_plat_data(&kbd_device, &kbd_data);
++
+ 	/* call spear300 machine init function */
+ 	spear300_init();
+ 
 -- 
 1.7.2.2
