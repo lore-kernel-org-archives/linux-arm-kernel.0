@@ -1,58 +1,110 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 18 Jan 2011 19:52:32 +0100
-Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in
-	the same kernel image
-In-Reply-To: <4D35CB56.8070603@xenomai.org>
-References: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<20110117075738.GI14798@game.jcrosoft.org>
-	<20110118070016.GA9605@pc-ran3241>
-	<20110118150030.GO14798@game.jcrosoft.org>
-	<20110118153241.GE9719@n2100.arm.linux.org.uk>
-	<4D35CB56.8070603@xenomai.org>
-Message-ID: <20110118185232.GU14798@game.jcrosoft.org>
+Date: Tue, 18 Jan 2011 19:56:57 +0100
+Subject: [PATCH] Board support Pcontrol_G20, hardware revision 2
+In-Reply-To: <201101171843.07148.pgsellmann@portner-elektronik.at>
+References: <201101171843.07148.pgsellmann@portner-elektronik.at>
+Message-ID: <20110118185657.GV14798@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:18 Tue 18 Jan     , Gilles Chanteperdrix wrote:
-> Russell King - ARM Linux wrote:
-> > On Tue, Jan 18, 2011 at 04:00:30PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> this idea is to do not have CONFIG_ARCH_AT91SAM9G20 anymore only 9260
-> >>
-> >> and detect it
-> >>
-> >> but the man issue is the CLOCK_TICK_RATE which is different between both of
-> >> them except if we use a common one for those soc or the sam9/11 we could not
-> >> put them in the same kernel
-> > 
-> > If you switch to clocksource/clockevents, then I think CLOCK_TICK_RATE
-> > is irrelevant as time advances according to the interval measured by
-> > the previous and current clocksource read, rather than 1/HZ intervals.
-> > 
-> > However, I'm never happy to say "just set CLOCK_TICK_RATE to some random
-> > value that's a multiple of HZ" because I can't convince myself that these
-> > don't have any effect when using clocksources.  The list of symbols which
-> > depend on CLOCK_TICK_RATE are:
-> > 
-> > ACTHZ
-> > LATCH
-> > TICK_NSEC
-> > TICK_USEC_TO_NSEC
-> > LOW_RES_NSEC
-> > MONOTONIC_RES_NSEC
-> > NSEC_PER_JIFFY
-> > KTIME_LOW_RES
-> > 
-> > and if you grep for those outside of arch/, you find them being used in
-> > a fair amount of code under kernel/, as well as the odd driver here and
-> > there.
+On 18:43 Mon 17 Jan     , Peter Gsellmann wrote:
+>  Backplane timings adjusted
+>  Addition of specific platform devices and resources
+>  Leds renamed
+>  Minor bugfixes
+I'd prefer to split the patch for bisect
 > 
-> at91rm9200_time.c even seems to use LATCH, even though the clockevent
-> frequency is not explicitly set to CLOCK_TICK_RATE.
-we can fix it but the main idea is to allow the sam9/11 to be compiled
-together in the same kernel
-and the rm9200 is not a arm926ejs but a arm920t.
-
-So the issue is not really important for this possiblity
-
+> this patch should not influence any other hardware
+> 
+> Signed-off-by: Peter Gsellmann <pgsellmann@portner-elektronik.at>
+> ---
+>  arch/arm/mach-at91/board-pcontrol-g20.c |  141 ++++++++++++++++++++++++++-----
+>  1 files changed, 119 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
+> index feb6578..42798af 100644
+> --- a/arch/arm/mach-at91/board-pcontrol-g20.c
+> +++ b/arch/arm/mach-at91/board-pcontrol-g20.c
+> @@ -26,6 +26,10 @@
+>  #include <linux/gpio.h>
+>  #include <linux/w1-gpio.h>
+> 
+> +#include <linux/input.h>
+> +#include <linux/uio_driver.h>
+> +#include <linux/mtd/plat-ram.h>
+> +
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> 
+> @@ -60,19 +64,22 @@ static void __init init_irq(void)
+>  }
+> 
+> 
+> -static struct sam9_smc_config __initdata pcontrol_smc_config[2] = { {
+> -	.ncs_read_setup		= 16,
+> -	.nrd_setup		= 18,
+> -	.ncs_write_setup	= 16,
+> -	.nwe_setup		= 18,
+> +/*
+> + * Bus timings; unit = 7.57ns
+> + */
+> +static struct sam9_smc_config __initdata pcontrol_smc_config[] = { {
+> +	.ncs_read_setup		= 0,
+> +	.nrd_setup		= 8,
+> +	.ncs_write_setup	= 0,
+> +	.nwe_setup		= 8,
+> 
+>  	.ncs_read_pulse		= 63,
+> -	.nrd_pulse		= 55,
+> +	.nrd_pulse		= 45,
+>  	.ncs_write_pulse	= 63,
+> -	.nwe_pulse		= 55,
+> +	.nwe_pulse		= 45,
+> 
+> -	.read_cycle		= 127,
+> -	.write_cycle		= 127,
+> +	.read_cycle		= 100,
+> +	.write_cycle		= 100,
+> 
+>  	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE
+>  			| AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_BAT_SELECT
+> @@ -100,15 +107,105 @@ static struct sam9_smc_config __initdata pcontrol_smc_config[2] = { {
+>  	.tdf_cycles		= 1,
+>  } };
+> 
+> +
+> +static struct resource pcontrol_resources[] = {
+> +	{
+> +		.start	= AT91_CHIPSELECT_4,
+> +		.end	= AT91_CHIPSELECT_4 + SZ_256M - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start	= AT91_CHIPSELECT_7,
+> +		.end	= AT91_CHIPSELECT_7 + SZ_256M - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start	= AT91_CHIPSELECT_4,
+> +		.end	= AT91_CHIPSELECT_4 + 0x800 - 1,
+> +		.name   = "bus51",
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start	= AT91_CHIPSELECT_4 + 0x800,
+> +		.end	= AT91_CHIPSELECT_4 + 0x900 - 1,
+> +		.name   = "lcd40x16bw",
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start	= AT91_CHIPSELECT_4 + 0x900,
+> +		.end	= AT91_CHIPSELECT_4 + 0xa00 - 1,
+> +		.name   = "kbd6x3+5",
+> +		.flags	= IORESOURCE_MEM,
+> +	}, {
+> +		.start	= AT91_CHIPSELECT_7,
+> +		.end	= AT91_CHIPSELECT_7 + SZ_512K - 1,
+> +		.name   = "ferroram",
+> +		.flags	= IORESOURCE_MEM,
+> +	}
+export the same memory twice as ressource :(
+> +};
+> +
 Best Regards,
 J.
