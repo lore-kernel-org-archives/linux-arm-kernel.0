@@ -1,413 +1,921 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:42:11 +0530
-Subject: [PATCH V4 44/62] SPEAr: Adding and Updating Clock definitions
+Date: Tue, 18 Jan 2011 12:42:13 +0530
+Subject: [PATCH V4 46/62] SPEAr13xx : Fixed part devices in SPEAr13xx addded
+	to the generic implementation
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <e92b2920cffc6171f1f51c4cb03081cf86ff18e0.1295333959.git.viresh.kumar@st.com>
+Message-ID: <2f3162388b2a37b0bf4c289060927808a5921d58.1295333959.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+From: Vipin Kumar <vipin.kumar@st.com>
+
+Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/clock.c                  |  210 ++++++++++++++++++++-
- arch/arm/mach-spear13xx/include/mach/misc_regs.h |   19 ++
- arch/arm/mach-spear3xx/clock.c                   |    6 +-
- arch/arm/mach-spear6xx/clock.c                   |    4 +-
- 4 files changed, 224 insertions(+), 15 deletions(-)
+ arch/arm/mach-spear13xx/include/mach/generic.h |  164 ++++++++
+ arch/arm/mach-spear13xx/include/mach/spear.h   |    3 +
+ arch/arm/mach-spear13xx/spear1300.c            |   15 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |   25 ++
+ arch/arm/mach-spear13xx/spear1310.c            |   15 +
+ arch/arm/mach-spear13xx/spear1310_evb.c        |   25 ++
+ arch/arm/mach-spear13xx/spear13xx.c            |  528 ++++++++++++++++++++++++
+ arch/arm/plat-spear/Makefile                   |    1 +
+ 8 files changed, 776 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index a7e75ca..43e1bf1 100644
---- a/arch/arm/mach-spear13xx/clock.c
-+++ b/arch/arm/mach-spear13xx/clock.c
-@@ -355,6 +355,7 @@ static struct aux_clk_config uart_synth_config = {
- /* aux rate configuration table, in ascending order of rates */
- struct aux_rate_tbl aux_rtbl[] = {
- 	/* For PLL1div2 = 500 MHz */
-+	{.xscale = 2, .yscale = 21, .eq = 1}, /* 48 MHz */
- 	{.xscale = 1, .yscale = 6, .eq = 1}, /* 83 MHz */
- 	{.xscale = 1, .yscale = 4, .eq = 1}, /* 125 MHz */
- 	{.xscale = 1, .yscale = 3, .eq = 1}, /* 166 MHz */
-@@ -369,7 +370,7 @@ static struct clk uart_synth_clk = {
- 	.calc_rate = &aux_calc_rate,
- 	.recalc = &aux_clk_recalc,
- 	.set_rate = &aux_clk_set_rate,
--	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
-+	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 1},
- 	.private_data = &uart_synth_config,
- };
+diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
+index 20a7fb4..795d48e 100644
+--- a/arch/arm/mach-spear13xx/include/mach/generic.h
++++ b/arch/arm/mach-spear13xx/include/mach/generic.h
+@@ -19,6 +19,168 @@
+ #include <linux/amba/bus.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
++#include <plat/padmux.h>
++
++/*
++ * Function enable (Pad multiplexing register) offsets
++ */
++#define PAD_MUX_CONFIG_REG_0	0x0
++#define PAD_MUX_CONFIG_REG_1	0x4
++#define PAD_MUX_CONFIG_REG_2	0x8
++#define PAD_MUX_CONFIG_REG_3	0xC
++
++/* pad mux declarations */
++#define PMX_I2S1_MASK		(1 << 3)
++#define PMX_I2S2_MASK		(1 << 16)	/* Offset 4 */
++#define PMX_CLCD1_MASK		(1 << 5)
++#define PMX_CLCD2_MASK		(1 << 3)	/* Offset 4 */
++#define PMX_EGPIO00_MASK	(1 << 6)
++#define PMX_EGPIO01_MASK	(1 << 7)
++#define PMX_EGPIO02_MASK	(1 << 8)
++#define PMX_EGPIO03_MASK	(1 << 9)
++#define PMX_EGPIO04_MASK	(1 << 10)
++#define PMX_EGPIO05_MASK	(1 << 11)
++#define PMX_EGPIO06_MASK	(1 << 12)
++#define PMX_EGPIO07_MASK	(1 << 13)
++#define PMX_EGPIO08_MASK	(1 << 14)
++#define PMX_EGPIO09_MASK	(1 << 15)
++#define PMX_EGPIO10_MASK	(1 << 5)	/* Offset 4 */
++#define PMX_EGPIO11_MASK	(1 << 6)	/* Offset 4 */
++#define PMX_EGPIO12_MASK	(1 << 7)	/* Offset 4 */
++#define PMX_EGPIO13_MASK	(1 << 8)	/* Offset 4 */
++#define PMX_EGPIO14_MASK	(1 << 9)	/* Offset 4 */
++#define PMX_EGPIO15_MASK	(1 << 10)	/* Offset 4 */
++#define PMX_EGPIO_0_GRP_MASK	(PMX_EGPIO00_MASK | PMX_EGPIO01_MASK | \
++		PMX_EGPIO02_MASK | PMX_EGPIO03_MASK | PMX_EGPIO04_MASK | \
++		PMX_EGPIO05_MASK | PMX_EGPIO06_MASK | PMX_EGPIO07_MASK | \
++		PMX_EGPIO08_MASK | PMX_EGPIO09_MASK)
++#define PMX_EGPIO_1_GRP_MASK	(PMX_EGPIO10_MASK | PMX_EGPIO11_MASK | \
++		PMX_EGPIO12_MASK | PMX_EGPIO13_MASK | PMX_EGPIO14_MASK | \
++		PMX_EGPIO15_MASK)
++
++#define PMX_SMI_MASK		(1 << 16)
++#define PMX_SMINCS2_MASK	(1 << 1)	/* Offset 4 */
++#define PMX_SMINCS3_MASK	(1 << 2)	/* Offset 4 */
++
++#define PMX_GMIICLK_MASK			(1 << 18)
++#define PMX_GMIICOL_CRS_XFERER_MIITXCLK_MASK	(1 << 19)
++#define PMX_RXCLK_RDV_TXEN_D03_MASK		(1 << 20)
++#define PMX_GMIID47_MASK			(1 << 21)
++#define PMX_MDC_MDIO_MASK			(1 << 22)
++
++#define PMX_GMII_MASK		(PMX_GMIICLK_MASK | \
++		PMX_GMIICOL_CRS_XFERER_MIITXCLK_MASK | \
++		PMX_RXCLK_RDV_TXEN_D03_MASK | PMX_GMIID47_MASK | \
++		PMX_MDC_MDIO_MASK)
++
++#define PMX_NAND8_MASK		(1 << 17)
++#define PMX_NFAD023_MASK	(1 << 24)
++#define PMX_NFAD24_MASK		(1 << 25)
++#define PMX_NFAD25_MASK		(1 << 26)
++#define PMX_NFWPRT1_MASK	(1 << 24)	/* Offset 4 */
++#define PMX_NFWPRT2_MASK	(1 << 26)	/* Offset 4 */
++#define PMX_NFWPRT3_MASK	(1 << 28)
++#define PMX_NFRSTPWDWN0_MASK	(1 << 29)
++#define PMX_NFRSTPWDWN1_MASK	(1 << 30)
++#define PMX_NFRSTPWDWN2_MASK	(1 << 31)
++#define PMX_NFRSTPWDWN3_MASK	(1 << 0)	/* Offset 4 */
++#define PMX_NFCE1_MASK		(1 << 20)	/* Offset 4 */
++#define PMX_NFCE2_MASK		(1 << 22)	/* Offset 4 */
++#define PMX_NFCE3_MASK		(1 << 27)
++#define PMX_NFIO815_MASK	(1 << 18)	/* Offset 4 */
++
++#define PMX_NAND8BIT_0_MASK	(PMX_NAND8_MASK | PMX_NFAD023_MASK | \
++		PMX_NFAD24_MASK | PMX_NFAD25_MASK | PMX_NFWPRT3_MASK | \
++		PMX_NFRSTPWDWN0_MASK | PMX_NFRSTPWDWN1_MASK | \
++		PMX_NFRSTPWDWN2_MASK | PMX_NFCE3_MASK)
++#define PMX_NAND8BIT_1_MASK	(PMX_NFRSTPWDWN3_MASK)
++
++#define PMX_NAND8BIT4DEV_0_MASK	(PMX_NAND8BIT_0_MASK)
++#define PMX_NAND8BIT4DEV_1_MASK	(PMX_NAND8BIT_1_MASK | PMX_NFCE1_MASK | \
++		PMX_NFCE2_MASK | PMX_NFWPRT1_MASK | PMX_NFWPRT2_MASK)
++
++#define PMX_NAND16BIT_0_MASK	(PMX_NAND8BIT_0_MASK)
++#define PMX_NAND16BIT_1_MASK	(PMX_NAND8BIT_1_MASK | PMX_NFIO815_MASK)
++#define PMX_NAND16BIT4DEV_0_MASK	(PMX_NAND8BIT4DEV_0_MASK)
++#define PMX_NAND16BIT4DEV_1_MASK	(PMX_NAND8BIT4DEV_1_MASK | \
++					PMX_NFIO815_MASK)
++
++#define PMX_KBD_ROW0_MASK	(1 << 25)	/* Offset 4 */
++#define PMX_KBD_ROW1_MASK	(1 << 23)	/* Offset 4 */
++#define PMX_KBD_ROWCOL25_MASK	(1 << 17)	/* Offset 4 */
++#define PMX_KBD_ROWCOL68_MASK	(1 << 4)	/* Offset 4 */
++#define PMX_KBD_COL0_MASK	(1 << 21)	/* Offset 4 */
++#define PMX_KBD_COL1_MASK	(1 << 19)	/* Offset 4 */
++#define PMX_KEYBOARD_MASK	(PMX_KBD_ROW0_MASK | PMX_KBD_ROW1_MASK | \
++		PMX_KBD_ROWCOL25_MASK | PMX_KBD_ROWCOL68_MASK | \
++		PMX_KBD_COL0_MASK | PMX_KBD_COL1_MASK)
++
++#define PMX_UART0_MASK		(1 << 1)
++#define PMX_I2C_MASK		(1 << 2)
++#define PMX_SSP_MASK		(1 << 4)
++#define PMX_UART0_MODEM_MASK	(1 << 11)	/* Offset 4 */
++#define PMX_GPT0_TMR1_MASK	(1 << 12)	/* Offset 4 */
++#define PMX_GPT0_TMR2_MASK	(1 << 13)	/* Offset 4 */
++#define PMX_GPT1_TMR1_MASK	(1 << 14)	/* Offset 4 */
++#define PMX_GPT1_TMR2_MASK	(1 << 15)	/* Offset 4 */
++
++#define PMX_MCIDATA0_MASK	(1 << 27)	/* Offset 4 */
++#define PMX_MCIDATA1_MASK	(1 << 28)	/* Offset 4 */
++#define PMX_MCIDATA2_MASK	(1 << 29)	/* Offset 4 */
++#define PMX_MCIDATA3_MASK	(1 << 30)	/* Offset 4 */
++#define PMX_MCIDATA4_MASK	(1 << 31)	/* Offset 4 */
++#define PMX_MCIDATA5_MASK	(1 << 0)	/* Offset 8 */
++#define PMX_MCIDATA6_MASK	(1 << 1)	/* Offset 8 */
++#define PMX_MCIDATA7_MASK	(1 << 2)	/* Offset 8 */
++#define PMX_MCIDATA1SD_MASK	(1 << 3)	/* Offset 8 */
++#define PMX_MCIDATA2SD_MASK	(1 << 4)	/* Offset 8 */
++#define PMX_MCIDATA3SD_MASK	(1 << 5)	/* Offset 8 */
++#define PMX_MCIADDR0ALE_MASK	(1 << 6)	/* Offset 8 */
++#define PMX_MCIADDR1CLECLK_MASK	(1 << 7)	/* Offset 8 */
++#define PMX_MCIADDR2_MASK	(1 << 8)	/* Offset 8 */
++#define PMX_MCICECF_MASK	(1 << 9)	/* Offset 8 */
++#define PMX_MCICEXD_MASK	(1 << 10)	/* Offset 8 */
++#define PMX_MCICESDMMC_MASK	(1 << 11)	/* Offset 8 */
++#define PMX_MCICDCF1_MASK	(1 << 12)	/* Offset 8 */
++#define PMX_MCICDCF2_MASK	(1 << 13)	/* Offset 8 */
++#define PMX_MCICDXD_MASK	(1 << 14)	/* Offset 8 */
++#define PMX_MCICDSDMMC_MASK	(1 << 15)	/* Offset 8 */
++#define PMX_MCIDATADIR_MASK	(1 << 16)	/* Offset 8 */
++#define PMX_MCIDMARQWP_MASK	(1 << 17)	/* Offset 8 */
++#define PMX_MCIIORDRE_MASK	(1 << 18)	/* Offset 8 */
++#define PMX_MCIIOWRWE_MASK	(1 << 19)	/* Offset 8 */
++#define PMX_MCIRESETCF_MASK	(1 << 20)	/* Offset 8 */
++#define PMX_MCICS0CE_MASK	(1 << 21)	/* Offset 8 */
++#define PMX_MCICFINTR_MASK	(1 << 22)	/* Offset 8 */
++#define PMX_MCIIORDY_MASK	(1 << 23)	/* Offset 8 */
++#define PMX_MCICS1_MASK		(1 << 24)	/* Offset 8 */
++#define PMX_MCIDMAACK_MASK	(1 << 25)	/* Offset 8 */
++#define PMX_MCISDCMD_MASK	(1 << 26)	/* Offset 8 */
++#define PMX_MCILEDS_MASK	(1 << 27)	/* Offset 8 */
++
++#define PMX_MCIFALL_1_MASK	(0xF8000000)
++#define PMX_MCIFALL_2_MASK	(0x0FFFFFFF)
++
++/* pad mux devices */
++extern struct pmx_dev pmx_i2c;
++extern struct pmx_dev pmx_ssp;
++extern struct pmx_dev pmx_i2s2;
++extern struct pmx_dev pmx_clcd1;
++extern struct pmx_dev pmx_clcd2;
++extern struct pmx_dev pmx_egpio_grp;
++extern struct pmx_dev pmx_smi_2_chips;
++extern struct pmx_dev pmx_smi_4_chips;
++extern struct pmx_dev pmx_gmii;
++extern struct pmx_dev pmx_nand_8bit;
++extern struct pmx_dev pmx_nand_16bit;
++extern struct pmx_dev pmx_keyboard;
++extern struct pmx_dev pmx_uart0;
++extern struct pmx_dev pmx_uart0_modem;
++extern struct pmx_dev pmx_gpt_0_1;
++extern struct pmx_dev pmx_gpt_0_2;
++extern struct pmx_dev pmx_gpt_1_1;
++extern struct pmx_dev pmx_gpt_1_2;
++extern struct pmx_dev pmx_mcif;
  
-@@ -415,7 +416,7 @@ static struct clk sdhci_synth_clk = {
- 	.calc_rate = &aux_calc_rate,
- 	.recalc = &aux_clk_recalc,
- 	.set_rate = &aux_clk_set_rate,
--	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 2},
-+	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
- 	.private_data = &sdhci_synth_config,
- };
+ /*
+  * Each GPT has 2 timer channels
+@@ -28,6 +190,8 @@
+ #define SPEAR_GPT0_CHAN0_IRQ	IRQ_GPT0_TMR0
+ #define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
  
-@@ -441,7 +442,7 @@ static struct clk cfxd_synth_clk = {
- 	.calc_rate = &aux_calc_rate,
- 	.recalc = &aux_clk_recalc,
- 	.set_rate = &aux_clk_set_rate,
--	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 2},
-+	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
- 	.private_data = &cfxd_synth_config,
- };
++extern struct pmx_driver pmx_driver;
++
+ /* Add spear13xx family device structure declarations here */
+ extern struct amba_device spear13xx_gpio_device[];
+ extern struct amba_device spear13xx_ssp_device;
+diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
+index cf25eb5..ca96ce9 100644
+--- a/arch/arm/mach-spear13xx/include/mach/spear.h
++++ b/arch/arm/mach-spear13xx/include/mach/spear.h
+@@ -88,6 +88,9 @@
+ #define SPEAR13XX_MCIF_CF_BASE		UL(0xB2800000)
+ #define SPEAR13XX_MCIF_SDHCI_BASE	UL(0xB3000000)
  
-@@ -467,7 +468,7 @@ static struct clk c3_synth_clk = {
- 	.calc_rate = &aux_calc_rate,
- 	.recalc = &aux_clk_recalc,
- 	.set_rate = &aux_clk_set_rate,
--	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 0},
-+	.rate_config = {aux_rtbl, ARRAY_SIZE(aux_rtbl), 1},
- 	.private_data = &c3_synth_config,
- };
++/* Pad multiplexing base */
++#define SPEAR13XX_FUNC_ENB_BASE		UL(0xE0700650)
++
+ /* Debug uart for linux, will be used for debug and uncompress messages */
+ #define SPEAR_DBG_UART_BASE		SPEAR13XX_UART_BASE
+ #define VA_SPEAR_DBG_UART_BASE		VA_SPEAR13XX_UART_BASE
+diff --git a/arch/arm/mach-spear13xx/spear1300.c b/arch/arm/mach-spear13xx/spear1300.c
+index c1b82f1..4569cb5 100644
+--- a/arch/arm/mach-spear13xx/spear1300.c
++++ b/arch/arm/mach-spear13xx/spear1300.c
+@@ -14,10 +14,25 @@
+ #include <mach/generic.h>
+ #include <mach/spear.h>
  
-@@ -579,7 +580,7 @@ static struct pclk_sel gmac_phy_pclk_sel = {
- };
++/* pmx driver structure */
++struct pmx_driver pmx_driver;
++
+ /* Add spear1300 specific devices here */
  
- /* gmac phy clock */
--static struct clk gmac_phy_clk = {
-+static struct clk gmac_phy0_clk = {
- 	.flags = ALWAYS_ENABLED,
- 	.pclk_sel = &gmac_phy_pclk_sel,
- 	.pclk_sel_shift = GMAC_PHY_CLK_SHIFT,
-@@ -697,8 +698,8 @@ static struct clk jpeg_clk = {
- 	.recalc = &follow_parent,
- };
+ void __init spear1300_init(void)
+ {
++	int ret;
++
+ 	/* call spear13xx family common init function */
+ 	spear13xx_init();
++
++	/* pmx initialization */
++	pmx_driver.base = ioremap(SPEAR13XX_FUNC_ENB_BASE, SZ_4K);
++	if (pmx_driver.base) {
++		ret = pmx_register(&pmx_driver);
++		if (ret)
++			pr_err("padmux: registeration failed. err no: %d\n",
++					ret);
++		iounmap(pmx_driver.base);
++	}
+ }
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index ef30ffd..5bfdefa 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -26,6 +26,26 @@
+ #include <plat/fsmc.h>
+ #include <plat/spi.h>
  
--/* gmac clock */
--static struct clk gmac_clk = {
-+/* gmac clock :Fixed Part*/
-+static struct clk gmac0_clk = {
- 	.pclk = &ahb_clk,
- 	.en_reg = PERIP1_CLK_ENB,
- 	.en_reg_bit = GMAC_CLK_ENB,
-@@ -839,6 +840,92 @@ static struct clk kbd_clk = {
- 	.recalc = &follow_parent,
- };
++/* padmux devices to enable */
++static struct pmx_dev *pmx_devs[] = {
++	/* spear13xx specific devices */
++	&pmx_i2c,
++	&pmx_i2s1,
++	&pmx_i2s2,
++	&pmx_clcd1,
++	&pmx_clcd2,
++	&pmx_egpio_grp,
++	&pmx_gmii,
++	&pmx_keyboard,
++	&pmx_mcif,
++	&pmx_nand_8bit,
++	&pmx_smi_4_chips,
++	&pmx_ssp,
++	&pmx_uart0,
++
++	/* spear1300 specific devices */
++};
++
+ static struct amba_device *amba_devs[] __initdata = {
+ 	&spear13xx_gpio_device[0],
+ 	&spear13xx_gpio_device[1],
+@@ -88,6 +108,11 @@ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
  
-+/* RAS CLOCKS */
-+/* pll3 generated clock */
-+static struct clk ras_pll3_clk = {
-+	.pclk = &pll3_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = PLL3_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
++	/* padmux initialization, must be done before spear1300_init */
++	pmx_driver.mode = NULL;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
 +
-+/* pll2 generated clock */
-+static struct clk ras_pll2_clk = {
-+	.pclk = &pll2_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = PLL2_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* 125MHz clock generated on Tx pad */
-+static struct clk ras_tx125_clk = {
-+	.pclk = &gmii_txclk125_pad,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = C125_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* 30 MHz clock generated by USB PHy Pll */
-+static struct clk ras_30Mhz_clk = {
-+	.rate = 30000000,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = C30_CLK_ENB,
-+};
-+
-+/* 48 MHz clock generated by USB PHy Pll */
-+static struct clk ras_48Mhz_clk = {
-+	.pclk = &pll5_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = C48_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* osc3 generated clock */
-+static struct clk ras_osc3_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = OSC3_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* osc2 generated clock */
-+static struct clk ras_osc2_clk = {
-+	.pclk = &osc2_32k_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = OSC2_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* osc1 generated clock */
-+static struct clk ras_osc1_clk = {
-+	.pclk = &osc1_24m_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = OSC1_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* apb generated clock */
-+static struct clk ras_pclk_clk = {
-+	.pclk = &apb_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = PCLK_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* ahb generated clock */
-+static struct clk ras_aclk_clk = {
-+	.pclk = &ahb_clk,
-+	.en_reg = RAS_CLK_ENB,
-+	.en_reg_bit = ACLK_CLK_ENB,
-+	.recalc = &follow_parent,
-+};
-+
-+/* External pad 50 MHz clock for phy operation */
-+static struct clk ras_tx50_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.rate = 50000000,
-+};
-+
- /* spear1300 machine specific clock structures */
- #ifdef CONFIG_MACH_SPEAR1300
+ 	/* set keyboard plat data */
+ 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
  
-@@ -859,10 +946,92 @@ static struct clk can1_clk = {
- 	.pclk = &apb_clk,
- 	.recalc = &follow_parent,
+diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
+index 9e2036d..07c4c94 100644
+--- a/arch/arm/mach-spear13xx/spear1310.c
++++ b/arch/arm/mach-spear13xx/spear1310.c
+@@ -16,6 +16,9 @@
+ #include <mach/generic.h>
+ #include <mach/hardware.h>
+ 
++/* pmx driver structure */
++struct pmx_driver pmx_driver;
++
+ /* Add spear1310 specific devices here */
+ 
+ /* CAN device registeration */
+@@ -74,6 +77,18 @@ void __init spear1310_map_io(void)
+ 
+ void __init spear1310_init(void)
+ {
++	int ret;
++
+ 	/* call spear13xx family common init function */
+ 	spear13xx_init();
++
++	/* pmx initialization */
++	pmx_driver.base = ioremap(SPEAR13XX_FUNC_ENB_BASE, SZ_4K);
++	if (pmx_driver.base) {
++		ret = pmx_register(&pmx_driver);
++		if (ret)
++			pr_err("padmux: registeration failed. err no: %d\n",
++					ret);
++		iounmap(pmx_driver.base);
++	}
+ }
+diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
+index 010eab4..de5a2dc 100644
+--- a/arch/arm/mach-spear13xx/spear1310_evb.c
++++ b/arch/arm/mach-spear13xx/spear1310_evb.c
+@@ -26,6 +26,26 @@
+ #include <mach/spear.h>
+ #include <mach/pcie.h>
+ 
++/* padmux devices to enable */
++static struct pmx_dev *pmx_devs[] = {
++	/* spear13xx specific devices */
++	&pmx_i2c,
++	&pmx_i2s1,
++	&pmx_i2s2,
++	&pmx_clcd1,
++	&pmx_clcd2,
++	&pmx_egpio_grp,
++	&pmx_gmii,
++	&pmx_keyboard,
++	&pmx_mcif,
++	&pmx_nand_8bit,
++	&pmx_smi_4_chips,
++	&pmx_ssp,
++	&pmx_uart0,
++
++	/* spear1310 specific devices */
++};
++
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear13xx specific devices */
+ 	&spear13xx_gpio_device[0],
+@@ -94,6 +114,11 @@ static void __init spear1310_evb_init(void)
+ {
+ 	unsigned int i;
+ 
++	/* padmux initialization, must be done before spear1300_init */
++	pmx_driver.mode = NULL;
++	pmx_driver.devs = pmx_devs;
++	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
++
+ 	/* set keyboard plat data */
+ 	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index b6936c5..bbcfdf4 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -496,3 +496,531 @@ static void __init spear13xx_timer_init(void)
+ struct sys_timer spear13xx_timer = {
+ 	.init = spear13xx_timer_init,
  };
 +
-+/* gmac clocks :RAS part*/
-+static struct clk gmac_ras1_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ras_aclk_clk,
-+	.recalc = &follow_parent,
-+};
++/* pad multiplexing support */
++/* devices */
 +
-+static struct clk gmac_ras2_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ras_aclk_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk gmac_ras3_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ras_aclk_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+static struct clk gmac_ras4_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk = &ras_aclk_clk,
-+	.recalc = &follow_parent,
-+};
-+
-+/* phy clock parent select */
-+static struct pclk_info phy_pclk_info[] = {
++/* Pad multiplexing for i2c device */
++static struct pmx_mux_reg pmx_i2c_mux[] = {
 +	{
-+		.pclk = &ras_pll2_clk,
-+		.pclk_val = 0x8,
-+	}, {
-+		.pclk = &ras_tx125_clk,
-+		.pclk_val = 0x4,
-+	}, {
-+		.pclk = &ras_tx50_clk,
-+		.pclk_val = 0x0,
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_I2C_MASK,
++		.value = PMX_I2C_MASK,
 +	},
 +};
 +
-+static struct pclk_sel phy_pclk_sel = {
-+	.pclk_info = phy_pclk_info,
-+	.pclk_count = ARRAY_SIZE(phy_pclk_info),
-+	.pclk_sel_reg = (unsigned int *)(IO_ADDRESS(SPEAR1310_RAS_CTRL_REG1)),
-+	.pclk_sel_mask = SPEAR1310_PHY_CLK_MASK,
++static struct pmx_dev_mode pmx_i2c_modes[] = {
++	{
++		.mux_regs = pmx_i2c_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_i2c_mux),
++	},
 +};
 +
-+/* Phy 1 Clock */
-+struct clk gmac_phy1_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &phy_pclk_sel,
-+	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
-+	.recalc = &follow_parent,
++struct pmx_dev pmx_i2c = {
++	.name = "i2c",
++	.modes = pmx_i2c_modes,
++	.mode_count = ARRAY_SIZE(pmx_i2c_modes),
 +};
 +
-+/* Phy 2 Clock */
-+static struct clk gmac_phy2_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &phy_pclk_sel,
-+	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
-+	.recalc = &follow_parent,
++/* Pad multiplexing for ssp device */
++static struct pmx_mux_reg pmx_ssp_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_SSP_MASK,
++		.value = PMX_SSP_MASK,
++	},
 +};
 +
-+/* Phy 3 Clock */
-+static struct clk gmac_phy3_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &phy_pclk_sel,
-+	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
-+	.recalc = &follow_parent,
++static struct pmx_dev_mode pmx_ssp_modes[] = {
++	{
++		.mux_regs = pmx_ssp_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_ssp_mux),
++	},
 +};
 +
-+/* Phy 4 Clock */
-+static struct clk gmac_phy4_clk = {
-+	.flags = ALWAYS_ENABLED,
-+	.pclk_sel = &phy_pclk_sel,
-+	.pclk_sel_shift = SPEAR1310_PHY_CLK_SHIFT,
-+	.recalc = &follow_parent,
++struct pmx_dev pmx_ssp = {
++	.name = "ssp",
++	.modes = pmx_ssp_modes,
++	.mode_count = ARRAY_SIZE(pmx_ssp_modes),
 +};
 +
- #endif
- 
-+static struct clk dummy_apb_pclk;
++/* Pad multiplexing for i2s1 device */
++static struct pmx_mux_reg pmx_i2s1_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_I2S1_MASK,
++		.value = PMX_I2S1_MASK,
++	},
++};
 +
- /* array of all spear 13xx clock lookups */
- static struct clk_lookup spear_clk_lookups[] = {
-+	{ .con_id = "apb_pclk",		.clk = &dummy_apb_pclk},
- 	/* root clks */
- 	{.con_id = "osc1_24m_clk",	.clk = &osc1_24m_clk},
- 	{.con_id = "osc2_32k_clk",	.clk = &osc2_32k_clk},
-@@ -896,7 +1065,20 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.con_id = "cfxd_synth_clk",		.clk = &cfxd_synth_clk},
- 	{.con_id = "gmac_phy_input_clk",	.clk = &gmac_phy_input_clk},
- 	{.con_id = "gmac_phy_synth_clk",	.clk = &gmac_phy_synth_clk},
--	{.con_id = "gmac_phy_clk",		.clk = &gmac_phy_clk},
-+	{.dev_id = "stmmacphy.0",		.clk = &gmac_phy0_clk},
++static struct pmx_dev_mode pmx_i2s1_modes[] = {
++	{
++		.mux_regs = pmx_i2s1_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_i2s1_mux),
++	},
++};
 +
-+	/* RAS clocks */
-+	{.con_id = "ras_pll3_clk",		.clk = &ras_pll3_clk},
-+	{.con_id = "ras_pll2_clk",		.clk = &ras_pll2_clk},
-+	{.con_id = "ras_tx125_clk",		.clk = &ras_tx125_clk},
-+	{.con_id = "ras_30Mhz_clk",		.clk = &ras_30Mhz_clk},
-+	{.con_id = "ras_48Mhz_clk",		.clk = &ras_48Mhz_clk},
-+	{.con_id = "ras_osc3_clk",		.clk = &ras_osc3_clk},
-+	{.con_id = "ras_osc2_clk",		.clk = &ras_osc2_clk},
-+	{.con_id = "ras_osc1_clk",		.clk = &ras_osc1_clk},
-+	{.con_id = "ras_pclk_clk",		.clk = &ras_pclk_clk},
-+	{.con_id = "ras_aclk_clk",		.clk = &ras_aclk_clk},
-+	{.con_id = "ras_tx50_clk",		.clk = &ras_tx50_clk},
++struct pmx_dev pmx_i2s1 = {
++	.name = "i2s1",
++	.modes = pmx_i2s1_modes,
++	.mode_count = ARRAY_SIZE(pmx_i2s1_modes),
++};
++
++/* Pad multiplexing for i2s2 device */
++static struct pmx_mux_reg pmx_i2s2_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_I2S2_MASK,
++		.value = PMX_I2S2_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_i2s2_modes[] = {
++	{
++		.mux_regs = pmx_i2s2_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_i2s2_mux),
++	},
++};
++
++struct pmx_dev pmx_i2s2 = {
++	.name = "i2s2",
++	.modes = pmx_i2s2_modes,
++	.mode_count = ARRAY_SIZE(pmx_i2s2_modes),
++};
++
++/* Pad multiplexing for clcd1 device */
++static struct pmx_mux_reg pmx_clcd1_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_CLCD1_MASK,
++		.value = PMX_CLCD1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_clcd1_modes[] = {
++	{
++		.mux_regs = pmx_clcd1_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_clcd1_mux),
++	},
++};
++
++struct pmx_dev pmx_clcd1 = {
++	.name = "clcd1",
++	.modes = pmx_clcd1_modes,
++	.mode_count = ARRAY_SIZE(pmx_clcd1_modes),
++};
++
++/* Pad multiplexing for clcd2 device */
++static struct pmx_mux_reg pmx_clcd2_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_CLCD2_MASK,
++		.value = PMX_CLCD2_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_clcd2_modes[] = {
++	{
++		.mux_regs = pmx_clcd2_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_clcd2_mux),
++	},
++};
++
++struct pmx_dev pmx_clcd2 = {
++	.name = "clcd2",
++	.modes = pmx_clcd2_modes,
++	.mode_count = ARRAY_SIZE(pmx_clcd2_modes),
++};
++
++/*
++ * By default, all EGPIOs are enabled.
++ * TBD : Board specific enabling of specific GPIOs only
++ */
++static struct pmx_mux_reg pmx_egpio_grp_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_EGPIO_0_GRP_MASK,
++		.value = PMX_EGPIO_0_GRP_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_EGPIO_1_GRP_MASK,
++		.value = PMX_EGPIO_1_GRP_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_egpio_grp_modes[] = {
++	{
++		.mux_regs = pmx_egpio_grp_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_egpio_grp_mux),
++	},
++};
++
++struct pmx_dev pmx_egpio_grp = {
++	.name = "egpios",
++	.modes = pmx_egpio_grp_modes,
++	.mode_count = ARRAY_SIZE(pmx_egpio_grp_modes),
++};
++
++/* Pad multiplexing for smi 2 chips device */
++static struct pmx_mux_reg pmx_smi_2_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_SMI_MASK,
++		.value = PMX_SMI_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_smi_2_modes[] = {
++	{
++		.mux_regs = pmx_smi_2_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_smi_2_mux),
++	},
++};
++
++struct pmx_dev pmx_smi_2_chips = {
++	.name = "smi_2_chips",
++	.modes = pmx_smi_2_modes,
++	.mode_count = ARRAY_SIZE(pmx_smi_2_modes),
++};
++
++/* Pad multiplexing for smi 4 chips device */
++static struct pmx_mux_reg pmx_smi_4_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_SMI_MASK,
++		.value = PMX_SMI_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_SMINCS2_MASK | PMX_SMINCS3_MASK,
++		.value = PMX_SMINCS2_MASK | PMX_SMINCS3_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_smi_4_modes[] = {
++	{
++		.mux_regs = pmx_smi_4_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_smi_4_mux),
++	},
++};
++
++struct pmx_dev pmx_smi_4_chips = {
++	.name = "smi_4_chips",
++	.modes = pmx_smi_4_modes,
++	.mode_count = ARRAY_SIZE(pmx_smi_4_modes),
++};
++
++/* Pad multiplexing for gmii device */
++static struct pmx_mux_reg pmx_gmii_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_GMII_MASK,
++		.value = PMX_GMII_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_gmii_modes[] = {
++	{
++		.mux_regs = pmx_gmii_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_gmii_mux),
++	},
++};
++
++struct pmx_dev pmx_gmii = {
++	.name = "gmii",
++	.modes = pmx_gmii_modes,
++	.mode_count = ARRAY_SIZE(pmx_gmii_modes),
++};
++
++/* Pad multiplexing for nand 8bit (4 chips) */
++static struct pmx_mux_reg pmx_nand8_4_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_NAND8BIT4DEV_0_MASK,
++		.value = PMX_NAND8BIT4DEV_0_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_NAND8BIT4DEV_1_MASK,
++		.value = PMX_NAND8BIT4DEV_1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_nand8_4_modes[] = {
++	{
++		.mux_regs = pmx_nand8_4_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_nand8_4_mux),
++	},
++};
++
++struct pmx_dev pmx_nand_8bit_4_chips = {
++	.name = "nand-8bit_4_chips",
++	.modes = pmx_nand8_4_modes,
++	.mode_count = ARRAY_SIZE(pmx_nand8_4_modes),
++};
++
++/* Pad multiplexing for nand 8bit device */
++static struct pmx_mux_reg pmx_nand8_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_NAND8BIT_0_MASK,
++		.value = PMX_NAND8BIT_0_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_NAND8BIT_1_MASK,
++		.value = PMX_NAND8BIT_1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_nand8_modes[] = {
++	{
++		.mux_regs = pmx_nand8_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_nand8_mux),
++	},
++};
++
++struct pmx_dev pmx_nand_8bit = {
++	.name = "nand-8bit",
++	.modes = pmx_nand8_modes,
++	.mode_count = ARRAY_SIZE(pmx_nand8_modes),
++};
++
++/*
++ * Pad multiplexing for nand 16bit device
++ * Note : Enabling pmx_nand_16bit means that all the required pads for
++ *   16bit nand device operations are enabled. These also include pads
++ *   for 8bit devices
++ */
++static struct pmx_mux_reg pmx_nand16_4_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_NAND16BIT4DEV_0_MASK,
++		.value = PMX_NAND16BIT4DEV_0_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_NAND16BIT4DEV_1_MASK,
++		.value = PMX_NAND16BIT4DEV_1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_nand16_4_modes[] = {
++	{
++		.mux_regs = pmx_nand16_4_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_nand16_4_mux),
++	},
++};
++
++struct pmx_dev pmx_nand_16bit_4_chips = {
++	.name = "nand-16bit_4_chips",
++	.modes = pmx_nand16_4_modes,
++	.mode_count = ARRAY_SIZE(pmx_nand16_4_modes),
++};
++
++/* Pad multiplexing for nand 16bit device */
++static struct pmx_mux_reg pmx_nand16_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_NAND16BIT_0_MASK,
++		.value = PMX_NAND16BIT_0_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_NAND16BIT_1_MASK,
++		.value = PMX_NAND16BIT_1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_nand16_modes[] = {
++	{
++		.mux_regs = pmx_nand16_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_nand16_mux),
++	},
++};
++
++struct pmx_dev pmx_nand_16bit = {
++	.name = "nand-16bit",
++	.modes = pmx_nand16_modes,
++	.mode_count = ARRAY_SIZE(pmx_nand16_modes),
++};
++
++/* Pad multiplexing for keyboard device */
++static struct pmx_mux_reg pmx_keyboard_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_KEYBOARD_MASK,
++		.value = PMX_KEYBOARD_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_NFIO815_MASK | PMX_NFCE1_MASK | \
++			PMX_NFCE2_MASK | PMX_NFWPRT1_MASK | PMX_NFWPRT2_MASK,
++		.value = 0,
++	},
++};
++
++static struct pmx_dev_mode pmx_keyboard_modes[] = {
++	{
++		.mux_regs = pmx_keyboard_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_keyboard_mux),
++	},
++};
++
++struct pmx_dev pmx_keyboard = {
++	.name = "keyboard",
++	.modes = pmx_keyboard_modes,
++	.mode_count = ARRAY_SIZE(pmx_keyboard_modes),
++};
++
++/* Pad multiplexing for uart0 device */
++static struct pmx_mux_reg pmx_uart0_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_0,
++		.mask = PMX_UART0_MASK,
++		.value = PMX_UART0_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_uart0_modes[] = {
++	{
++		.mux_regs = pmx_uart0_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_uart0_mux),
++	},
++};
++
++struct pmx_dev pmx_uart0 = {
++	.name = "uart0",
++	.modes = pmx_uart0_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart0_modes),
++};
++
++/* Pad multiplexing for uart0_modem device */
++static struct pmx_mux_reg pmx_uart0_modem_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_UART0_MODEM_MASK,
++		.value = PMX_UART0_MODEM_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_uart0_modem_modes[] = {
++	{
++		.mux_regs = pmx_uart0_modem_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_uart0_modem_mux),
++	},
++};
++
++struct pmx_dev pmx_uart0_modem = {
++	.name = "uart0_modem",
++	.modes = pmx_uart0_modem_modes,
++	.mode_count = ARRAY_SIZE(pmx_uart0_modem_modes),
++};
++
++/* Pad multiplexing for gpt_0_1 device */
++static struct pmx_mux_reg pmx_gpt_0_1_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_GPT0_TMR1_MASK,
++		.value = PMX_GPT0_TMR1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_gpt_0_1_modes[] = {
++	{
++		.mux_regs = pmx_gpt_0_1_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_gpt_0_1_mux),
++	},
++};
++
++struct pmx_dev pmx_gpt_0_1 = {
++	.name = "gpt_0_1",
++	.modes = pmx_gpt_0_1_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpt_0_1_modes),
++};
++
++/* Pad multiplexing for gpt_0_2 device */
++static struct pmx_mux_reg pmx_gpt_0_2_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_GPT0_TMR2_MASK,
++		.value = PMX_GPT0_TMR2_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_gpt_0_2_modes[] = {
++	{
++		.mux_regs = pmx_gpt_0_2_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_gpt_0_2_mux),
++	},
++};
++
++struct pmx_dev pmx_gpt_0_2 = {
++	.name = "gpt_0_2",
++	.modes = pmx_gpt_0_2_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpt_0_2_modes),
++};
++
++/* Pad multiplexing for gpt_1_1 device */
++static struct pmx_mux_reg pmx_gpt_1_1_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_GPT1_TMR1_MASK,
++		.value = PMX_GPT1_TMR1_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_gpt_1_1_modes[] = {
++	{
++		.mux_regs = pmx_gpt_1_1_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_gpt_1_1_mux),
++	},
++};
++
++struct pmx_dev pmx_gpt_1_1 = {
++	.name = "gpt_1_1",
++	.modes = pmx_gpt_1_1_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpt_1_1_modes),
++};
++
++/* Pad multiplexing for gpt_1_2 device */
++static struct pmx_mux_reg pmx_gpt_1_2_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_GPT1_TMR2_MASK,
++		.value = PMX_GPT1_TMR2_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_gpt_1_2_modes[] = {
++	{
++		.mux_regs = pmx_gpt_1_2_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_gpt_1_2_mux),
++	},
++};
++
++struct pmx_dev pmx_gpt_1_2 = {
++	.name = "gpt_1_2",
++	.modes = pmx_gpt_1_2_modes,
++	.mode_count = ARRAY_SIZE(pmx_gpt_1_2_modes),
++};
++
++/* Pad multiplexing for mcif device */
++static struct pmx_mux_reg pmx_mcif_mux[] = {
++	{
++		.offset = PAD_MUX_CONFIG_REG_1,
++		.mask = PMX_MCIFALL_1_MASK,
++		.value = PMX_MCIFALL_1_MASK,
++	}, {
++		.offset = PAD_MUX_CONFIG_REG_2,
++		.mask = PMX_MCIFALL_2_MASK,
++		.value = PMX_MCIFALL_2_MASK,
++	},
++};
++
++static struct pmx_dev_mode pmx_mcif_modes[] = {
++	{
++		.mux_regs = pmx_mcif_mux,
++		.mux_reg_cnt = ARRAY_SIZE(pmx_mcif_mux),
++	},
++};
++
++struct pmx_dev pmx_mcif = {
++	.name = "mcif",
++	.modes = pmx_mcif_modes,
++	.mode_count = ARRAY_SIZE(pmx_mcif_modes),
++};
+diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
+index ec85b82..eafa29d 100644
+--- a/arch/arm/plat-spear/Makefile
++++ b/arch/arm/plat-spear/Makefile
+@@ -5,6 +5,7 @@
+ # Common support
+ obj-y	:= clcd.o clock.o pll_clk.o time.o
  
- 	/* clocks having multiple parent source from above clocks */
- 	{.dev_id = "clcd",		.clk = &clcd_clk},
-@@ -910,12 +1092,12 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.dev_id = "smi",		.clk = &smi_clk},
- 	{.con_id = "usbh.0_clk",	.clk = &uhci0_clk},
- 	{.con_id = "usbh.1_clk",	.clk = &uhci1_clk},
--	{.dev_id = "usbd",		.clk = &usbd_clk},
-+	{.dev_id = "designware_udc",	.clk = &usbd_clk},
- 	{.dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{.dev_id = "dma0",		.clk = &dma0_clk},
- 	{.dev_id = "dma1",		.clk = &dma1_clk},
- 	{.dev_id = "jpeg",		.clk = &jpeg_clk},
--	{.dev_id = "gmac",		.clk = &gmac_clk},
-+	{.dev_id = "stmmaceth.0",	.clk = &gmac0_clk},
- 	{.dev_id = "c3",		.clk = &c3_clk},
- 	{.dev_id = "pcie0",		.clk = &pcie0_clk},
- 	{.dev_id = "pcie1",		.clk = &pcie1_clk},
-@@ -944,6 +1126,14 @@ static struct clk_lookup spear_clk_lookups[] = {
- #ifdef CONFIG_MACH_SPEAR1310
- 	{.dev_id = "c_can_platform.0",	.clk = &can0_clk},
- 	{.dev_id = "c_can_platform.1",	.clk = &can1_clk},
-+	{.dev_id = "stmmaceth.1",	.clk = &gmac_ras1_clk},
-+	{.dev_id = "stmmaceth.2",	.clk = &gmac_ras2_clk},
-+	{.dev_id = "stmmaceth.3",	.clk = &gmac_ras3_clk},
-+	{.dev_id = "stmmaceth.4",	.clk = &gmac_ras4_clk},
-+	{.dev_id = "stmmacphy.1",	.clk = &gmac_phy1_clk},
-+	{.dev_id = "stmmacphy.2",	.clk = &gmac_phy2_clk},
-+	{.dev_id = "stmmacphy.3",	.clk = &gmac_phy3_clk},
-+	{.dev_id = "stmmacphy.4",	.clk = &gmac_phy4_clk},
- #endif
- };
- 
-diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-index 3cfd4fc..ea6096f 100644
---- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-@@ -191,6 +191,25 @@
- 	#define JPEG_SOF_RST		28
- #define PERIP2_SW_RST		((unsigned int *)(MISC_BASE + 0x280))
- #define RAS_CLK_ENB		((unsigned int *)(MISC_BASE + 0x284))
-+	/* RAS_CLK_ENB register masks */
-+	#define ACLK_CLK_ENB		0
-+	#define PCLK_CLK_ENB		1
-+	#define OSC1_CLK_ENB		2
-+	#define OSC2_CLK_ENB		3
-+	#define OSC3_CLK_ENB		4
-+	#define C48_CLK_ENB		5
-+	#define C30_CLK_ENB		6
-+	#define C125_CLK_ENB		7
-+	#define PLL2_CLK_ENB		8
-+	#define PLL3_CLK_ENB		9
-+	#define PCLK0_CLK_ENB		10
-+	#define PCLK1_CLK_ENB		11
-+	#define PCLK2_CLK_ENB		12
-+	#define PCLK3_CLK_ENB		13
-+	#define SYN0_CLK_ENB		14
-+	#define SYN1_CLK_ENB		15
-+	#define SYN2_CLK_ENB		16
-+	#define SYN3_CLK_ENB		17
- #define RAS_SW_RST		((unsigned int *)(MISC_BASE + 0x288))
- #define PLL1_SYNT		((unsigned int *)(MISC_BASE + 0x28c))
- #define I2S_CLK_CFG		((unsigned int *)(MISC_BASE + 0x290))
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 37faef1..12d8c46 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -713,7 +713,7 @@ static struct clk pwm_clk = {
- 
- /* array of all spear 3xx clock lookups */
- static struct clk_lookup spear_clk_lookups[] = {
--	{ .con_id = "apb_pclk",	.clk = &dummy_apb_pclk},
-+	{ .con_id = "apb_pclk",		.clk = &dummy_apb_pclk},
- 	/* root clks */
- 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
- 	{ .con_id = "osc_24m_clk",	.clk = &osc_24m_clk},
-@@ -738,8 +738,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "gpt1",		.clk = &gpt1_clk},
- 	{ .dev_id = "gpt2",		.clk = &gpt2_clk},
- 	/* clock derived from pll3 clk */
-+	{ .dev_id = "designware_udc",   .clk = &usbd_clk},
- 	{ .con_id = "usbh_clk",		.clk = &usbh_clk},
--	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
- 	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
- 	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
-@@ -755,7 +755,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
- 	{ .dev_id = "gpio",		.clk = &gpio_clk},
- #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--	{ .dev_id = "physmap-flash",	.clk = &emi_clk},
-+	{ .con_id = "emi",		.clk = &emi_clk},
- #endif
- #if defined(CONFIG_MACH_SPEAR300) || defined(CONFIG_MACH_SPEAR310) || \
- 	defined(CONFIG_MACH_SPEAR320)
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 0a38e16..f304102 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -685,7 +685,7 @@ static struct clk dummy_apb_pclk;
- 
- /* array of all spear 6xx clock lookups */
- static struct clk_lookup spear_clk_lookups[] = {
--	{ .con_id = "apb_pclk",	.clk = &dummy_apb_pclk},
-+	{ .con_id = "apb_pclk",		.clk = &dummy_apb_pclk},
- 	/* root clks */
- 	{ .con_id = "osc_32k_clk",	.clk = &osc_32k_clk},
- 	{ .con_id = "osc_30m_clk",	.clk = &osc_30m_clk},
-@@ -714,9 +714,9 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "gpt2",		.clk = &gpt2_clk},
- 	{ .dev_id = "gpt3",		.clk = &gpt3_clk},
- 	/* clock derived from pll3 clk */
-+	{ .dev_id = "designware_udc",	.clk = &usbd_clk},
- 	{ .con_id = "usbh.0_clk",	.clk = &usbh0_clk},
- 	{ .con_id = "usbh.1_clk",	.clk = &usbh1_clk},
--	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
- 	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
- 	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
++obj-$(CONFIG_ARCH_SPEAR13XX)	+= padmux.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
 -- 
 1.7.2.2
