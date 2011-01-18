@@ -1,43 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 15:32:41 +0000
-Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in
-	the same kernel image
-In-Reply-To: <20110118150030.GO14798@game.jcrosoft.org>
-References: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<20110117075738.GI14798@game.jcrosoft.org>
-	<20110118070016.GA9605@pc-ran3241>
-	<20110118150030.GO14798@game.jcrosoft.org>
-Message-ID: <20110118153241.GE9719@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 18 Jan 2011 16:32:57 +0100
+Subject: [RFC+CFT] Use word operations in bitops
+In-Reply-To: <20110117104618.GB18626@n2100.arm.linux.org.uk>
+References: <20110116121911.GB27542@n2100.arm.linux.org.uk>
+	<20110117100857.GS6917@pengutronix.de>
+	<20110117104618.GB18626@n2100.arm.linux.org.uk>
+Message-ID: <20110118153257.GA10686@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 04:00:30PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> this idea is to do not have CONFIG_ARCH_AT91SAM9G20 anymore only 9260
+Hi Russell,
+
+On Mon, Jan 17, 2011 at 10:46:18AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 17, 2011 at 11:08:57AM +0100, Uwe Kleine-K?nig wrote:
+> > On Sun, Jan 16, 2011 at 12:19:11PM +0000, Russell King - ARM Linux wrote:
+> > > This does need a fair amount of testing before it can be merged, so I'd
+> > > like to see a number of Tested-by's against this patch.  Please also
+> > > indicate whether you tested on LE or BE or both, which filesystems, and
+> > > whether they were read-only mounted or read-write mounted.
+> > You could make life a bit easier (at least for us at Pengutronix,
+> > probably more) if you had a branch with a defined name for patches like
+> > these.  We could add that to our daily test then.
 > 
-> and detect it
+> No, because then it's not possible to properly tie down what has been
+> tested and what hasn't.
 > 
-> but the man issue is the CLOCK_TICK_RATE which is different between both of
-> them except if we use a common one for those soc or the sam9/11 we could not
-> put them in the same kernel
+> The advantage of emailed patches is that when people reply to them, you
+> have a better idea that the patch to which they're replying to is the
+> one they tested.
+> 
+> Such as in this case where the follow-up patch hasn't received any
+> replies, and so I can't add the one received tested-by to the follow-up
+> patch.  With the git approach, I wouldn't know what was tested unless
+> you included the commit IDs each time.
+> 
+> And let's face it - if it was tested daily, are you going to go through
+> the hastle of digging out the commit IDs and emailing each day to say
+> what was tested?  That sounds to me like a _lot_ more work than testing
+> the occasional emailed patch.
+I maybe wouldn't report each success, I would report if my test fails.
+You can consider this more or less valuable. Still I think given the
+ease this could be done it's worth it.
 
-If you switch to clocksource/clockevents, then I think CLOCK_TICK_RATE
-is irrelevant as time advances according to the interval measured by
-the previous and current clocksource read, rather than 1/HZ intervals.
+That's how linux-next works, too.
 
-However, I'm never happy to say "just set CLOCK_TICK_RATE to some random
-value that's a multiple of HZ" because I can't convince myself that these
-don't have any effect when using clocksources.  The list of symbols which
-depend on CLOCK_TICK_RATE are:
+Best regards
+Uwe
 
-ACTHZ
-LATCH
-TICK_NSEC
-TICK_USEC_TO_NSEC
-LOW_RES_NSEC
-MONOTONIC_RES_NSEC
-NSEC_PER_JIFFY
-KTIME_LOW_RES
-
-and if you grep for those outside of arch/, you find them being used in
-a fair amount of code under kernel/, as well as the odd driver here and
-there.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
