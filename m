@@ -1,33 +1,27 @@
 From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 18 Jan 2011 09:52:40 +0200
-Subject: [PATCH 2/7] arm: mach-omap1: board-h2: make h2_nand_platdata static
-In-Reply-To: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1295337165-22934-3-git-send-email-aaro.koskinen@iki.fi>
+Date: Tue, 18 Jan 2011 09:52:38 +0200
+Subject: [PATCH 0/7] omap1 sparse warning fixes
+Message-ID: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eliminates the following sparse warning:
+Here's some trivial omap1 sparse warning fixes.
 
-	arch/arm/mach-omap1/board-h2.c:205:27: warning: symbol 'h2_nand_platdata' was not declared. Should it be static?
+Aaro Koskinen (7):
+  arm: plat-omap: dma: make omap_dma_in_1510_mode() static
+  arm: mach-omap1: board-h2: make h2_nand_platdata static
+  arm: mach-omap1: board-innovator: make innovator_mmc_init() static
+  arm: mach-omap1: board-htcherald: make htcpld_chips and htcpld_pfdata static
+  arm: mach-omap1: board-h3: make nand_platdata static
+  arm: plat-omap: system.h: move voiceblue definitions into the board header
+  arm: mach-omap1: board-voiceblue: add missing include
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/mach-omap1/board-h2.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/board-h2.c b/arch/arm/mach-omap1/board-h2.c
-index 28b84aa..ba3bd09 100644
---- a/arch/arm/mach-omap1/board-h2.c
-+++ b/arch/arm/mach-omap1/board-h2.c
-@@ -202,7 +202,7 @@ static int h2_nand_dev_ready(struct mtd_info *mtd)
- 
- static const char *h2_part_probes[] = { "cmdlinepart", NULL };
- 
--struct platform_nand_data h2_nand_platdata = {
-+static struct platform_nand_data h2_nand_platdata = {
- 	.chip	= {
- 		.nr_chips		= 1,
- 		.chip_offset		= 0,
--- 
-1.5.6.5
+ arch/arm/mach-omap1/board-h2.c                    |    2 +-
+ arch/arm/mach-omap1/board-h3.c                    |    2 +-
+ arch/arm/mach-omap1/board-htcherald.c             |    4 ++--
+ arch/arm/mach-omap1/board-innovator.c             |    2 +-
+ arch/arm/mach-omap1/board-voiceblue.c             |    1 +
+ arch/arm/plat-omap/dma.c                          |    2 +-
+ arch/arm/plat-omap/include/plat/board-voiceblue.h |    6 ++++++
+ arch/arm/plat-omap/include/plat/system.h          |    7 +------
+ 8 files changed, 14 insertions(+), 12 deletions(-)
