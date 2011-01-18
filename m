@@ -1,82 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 18 Jan 2011 14:22:44 +0100
-Subject: A few questions on imx-sdma
-In-Reply-To: <20110118194259.GB2833@S2101-09.ap.freescale.net>
-References: <20110118194259.GB2833@S2101-09.ap.freescale.net>
-Message-ID: <20110118132244.GP9041@pengutronix.de>
+From: claudiu.covaci@gmail.com (Claudiu Covaci)
+Date: Tue, 18 Jan 2011 14:33:30 +0100
+Subject: camera on Freescale i.MX51
+Message-ID: <AANLkTi=jDE3=J67c1KRQ7XxWY2Q2itaump1JWvLwFkET@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 03:43:00AM +0800, Shawn Guo wrote:
-> Hi Sascha,
-> 
-> I got a few questions when studying imx-sdma.  Can you please help me
-> understand?
-> 
-> * In function sdma_prep_slave_sg, we always get "sdmac->flags = 0;"
-> at line 889.  What's the code blow at line 934 for?
-> 
-> 	if (sdmac->flags & IMX_DMA_SG_LOOP) {
-> 		param |= BD_INTR;
-> 		if (i + 1 == sg_len)
-> 			param |= BD_WRAP;
-> 	}
+Hi,
 
-A leftover from the days we did not have the prep_cyclic callback and
-implemented sound dma as a looped sg chain. The above can be removed.
+I'm have trouble receiving a video stream on the Freescale i.MX51
+processor. I've tried everything I could think, so I'm trying my luck
+here.
 
-> 
-> * We have sdmac->status set to DMA_ERROR in err_out of function 
-> sdma_prep_dma_cyclic.  Would it be good for us to do the same for
-> function sdma_prep_slave_sg.  Otherwise, sdmac->status stays at
-> DMA_IN_PROGRESS, which will make the function return immediately
-> next time it gets called?
+I'm using a 2.6.31 kernel with some modifications: the camera capture
+driver [1] and the IPU (Image Processing Unit) driver [2] from the
+Freescale BSP 2010.11.
 
-yes
+I'm at a point where I can open the /dev/video0 device and can (at
+least try to) read frames, but it fails at dequeueing the video
+buffers (VIDIOC_DQBUF) with the message:
+<3>ERROR: v4l2 capture: mxc_v4l_dqueue timeout enc_counter 0
+Unable to dequeue buffer (62).
 
-> 
-> * It seems the only use of sdmac->status is to check if the channel
-> is DMA_IN_PROGRESS when "prep" functions get called.  Is it a worth
-> to check DMA_ERROR or DMA_SUCCESS for every single buffer descriptor
-> (BD) in interrupt handler?
-> 
-> * In handler mxc_sdma_handle_channel_normal, callback function gets
-> called and last_completed get assigned the cookie no matter
-> sdmac->status is DMA_SUCCESS or DMA_ERROR.  How would dma client know
-> if this tx succeeded or failed?
+- I've double-checked the IPU registers and they seem properly
+configured, but I don't get any interrupt (at end-of-frame).
+- The relevant IOMUX pins are also configured.
+- the video signal appears at the i.MX pins (so it gets there)
+- I've also tried activating the internal picture generator, but still
+nothing happens.
 
-Looking at it we should probably just return sdmac->status in
-sdma_tx_status.
+Is there anything I overlooked? Is there a way to find out where the
+problem is? Any hints will be greatly appreciated.
 
-> 
-> * Related to question above, dma client can call function
-> dma_async_is_tx_complete to know if the tx succeeded or failed by
-> manipulating cookie.  But is there any way for client to know the
-> failure in loop (cyclic) case?  In this case, client gets no way to
-> query tx status, however any period (BD) in the cyclic could fail.
-> Currently, we always do callback in cyclic handler whether status is
-> DMA_ERROR or DMA_SUCCESS, and the client (i.e. imx audio driver)
-> always assumes the callback means a successful period.  But what if
-> one period in the cyclic fails?
+Thanks!
+Claudiu
 
-I guess the driver should call dma_async_is_tx_complete, assuming this
-function is fixed in the sdma driver.
+[1] http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=drivers/media/video/mxc/capture/mxc_v4l2_capture.c;h=8133d202304eea22e94bbd8eaaa215002b2dc675;hb=0fae922f451a5bde63595a2e0c2cd7079f083440
 
-> 
-> * Regarding to cyclic case again, is DMA_TERMINATE_ALL
-> (down to function sdma_disable_channel) the only way for client to
-> stop the tx?  I do not know the exact behavior of sdma when STATSTOP
-> bit gets set.  But if it's in the middle of a BD transfer process,
-> will this bit setting possibly cause data corruption?
-
-I don't know the exact behaviour either. I only know that the FSL kernel
-does this aswell (without polling whether the channel is actually
-disabled or something).
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+[2] http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=tree;f=drivers/mxc/ipu3;h=288c21f88aa650d16d843dccec2b04ba9f1462f7;hb=0fae922f451a5bde63595a2e0c2cd7079f083440
