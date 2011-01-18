@@ -1,34 +1,44 @@
-From: stanleymiao@gmail.com (Stanley.Miao)
-Date: Tue, 18 Jan 2011 09:24:53 +0800
-Subject: [PATCH 2/3] support ARM BE8 mode on a little endian machine
-In-Reply-To: <AANLkTimXAtpRz=ZjmN8brHMQNqgGMKhpo=v_sFk_Aeuf@mail.gmail.com>
-References: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
-	<1295253729-23153-3-git-send-email-stanley.miao@windriver.com>
-	<AANLkTimXAtpRz=ZjmN8brHMQNqgGMKhpo=v_sFk_Aeuf@mail.gmail.com>
-Message-ID: <AANLkTi=zU1ipArpjuzQtzyve+1f_L79HhNjTVabj_odt@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jan 2011 17:25:42 -0800
+Subject: State of LDP3430 platform
+In-Reply-To: <alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
+References: <20101206125526.GC31777@n2100.arm.linux.org.uk>
+	<20101206181913.GH8345@atomide.com>
+	<alpine.DEB.2.00.1012061125400.13430@utopia.booyaka.com>
+	<20101207083720.GB18336@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1012071745120.13430@utopia.booyaka.com>
+	<alpine.DEB.2.00.1012072012000.13430@utopia.booyaka.com>
+	<20110115000301.GT4957@atomide.com>
+	<alpine.DEB.2.00.1101151237240.32245@utopia.booyaka.com>
+	<20110115233744.GA18159@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
+Message-ID: <20110118012541.GN4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, the bootloader can also do this. However, it is dangerous to modify the
-bootloader. If the new boot loader can't work, it is difficult to update the
-bootloader again. So, I choose to modify Linux kernel.
+Hi,
 
-Stanley.
+* Paul Walmsley <paul@pwsan.com> [110115 20:31]:
+> --- a/arch/arm/mach-omap1/time.c
+> +++ b/arch/arm/mach-omap1/time.c
+> @@ -244,6 +244,13 @@ static void __init omap_timer_init(void)
+>  
+>  	omap_init_mpu_timer(rate);
+>  	omap_init_clocksource(rate);
+> +	/*
+> +	 * XXX Since this file seems to deal mostly with the MPU timer,
+> +	 * this doesn't seem like the correct place for the sync timer
+> +	 * clocksource init.
+> +	 */
+> +	if (!cpu_is_omap7xx() && !cpu_is_omap15xx())
+> +		omap_init_clocksource_32k();
+>  }
+>  
+>  struct sys_timer omap_timer = {
 
-2011/1/17 Catalin Marinas <catalin.marinas@arm.com>:
-> On 17 January 2011 08:42, Stanley.Miao <stanley.miao@windriver.com> wrote:
->> When BE8 kernel is running on a little endian machine, the kernel endian
->> mode need to be converted at the begining of the startup procedure with
->> the instruction "setend be".
->
-> Can we not let the boot loader do this? It could also prepare the tags
-> as big endian.
->
-> --
-> Catalin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+To me it looks like the omap_init_clocksource_32k() call should be
+in arch/arm/mach-omap1/timer32k.c instead.
+
+Regards,
+
+Tony
