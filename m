@@ -1,82 +1,82 @@
-From: s.neumann@raumfeld.com (Sven Neumann)
-Date: Tue, 18 Jan 2011 13:29:45 +0100
-Subject: [PATCH] ARM: pxa: fix GPIO IRQ handling
-In-Reply-To: <4D357DC0.2030006@metafoo.de>
-References: <4D357DC0.2030006@metafoo.de>
-Message-ID: <1295353785-14972-1-git-send-email-s.neumann@raumfeld.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 18 Jan 2011 14:22:44 +0100
+Subject: A few questions on imx-sdma
+In-Reply-To: <20110118194259.GB2833@S2101-09.ap.freescale.net>
+References: <20110118194259.GB2833@S2101-09.ap.freescale.net>
+Message-ID: <20110118132244.GP9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lars-Peter Clausen <lars@metafoo.de>
+On Wed, Jan 19, 2011 at 03:43:00AM +0800, Shawn Guo wrote:
+> Hi Sascha,
+> 
+> I got a few questions when studying imx-sdma.  Can you please help me
+> understand?
+> 
+> * In function sdma_prep_slave_sg, we always get "sdmac->flags = 0;"
+> at line 889.  What's the code blow at line 934 for?
+> 
+> 	if (sdmac->flags & IMX_DMA_SG_LOOP) {
+> 		param |= BD_INTR;
+> 		if (i + 1 == sg_len)
+> 			param |= BD_WRAP;
+> 	}
 
-Set the "set_wake" field of the irq_chip struct before calling
-set_irq_chip() for all of the IRQs, so that the compat handler
-actually gets installed.
+A leftover from the days we did not have the prep_cyclic callback and
+implemented sound dma as a looped sg chain. The above can be removed.
 
-Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-Signed-off-by: Sven Neumann <s.neumann@raumfeld.com>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: stable at kernel.org (for 2.6.37 only)
----
- arch/arm/mach-pxa/irq.c    |    7 ++++---
- arch/arm/mach-pxa/pxa3xx.c |    4 ++--
- 2 files changed, 6 insertions(+), 5 deletions(-)
+> 
+> * We have sdmac->status set to DMA_ERROR in err_out of function 
+> sdma_prep_dma_cyclic.  Would it be good for us to do the same for
+> function sdma_prep_slave_sg.  Otherwise, sdmac->status stays at
+> DMA_IN_PROGRESS, which will make the function return immediately
+> next time it gets called?
 
-diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-index 1beb40f..a5b42a7 100644
---- a/arch/arm/mach-pxa/irq.c
-+++ b/arch/arm/mach-pxa/irq.c
-@@ -111,13 +111,13 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
- 	GRER0 &= ~0x3;
- 	GEDR0 = 0x3;
- 
-+	pxa_low_gpio_chip.set_wake = fn;
-+
- 	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
- 		set_irq_chip(irq, &pxa_low_gpio_chip);
- 		set_irq_handler(irq, handle_edge_irq);
- 		set_irq_flags(irq, IRQF_VALID);
- 	}
--
--	pxa_low_gpio_chip.set_wake = fn;
- }
- 
- void __init pxa_init_irq(int irq_nr, set_wake_t fn)
-@@ -142,13 +142,14 @@ void __init pxa_init_irq(int irq_nr, set_wake_t fn)
- 	/* only unmasked interrupts kick us out of idle */
- 	ICCR = 1;
- 
-+	pxa_internal_irq_chip.set_wake = fn;
-+
- 	for (irq = PXA_IRQ(0); irq < PXA_IRQ(irq_nr); irq++) {
- 		set_irq_chip(irq, &pxa_internal_irq_chip);
- 		set_irq_handler(irq, handle_level_irq);
- 		set_irq_flags(irq, IRQF_VALID);
- 	}
- 
--	pxa_internal_irq_chip.set_wake = fn;
- 	pxa_init_low_gpio_irq(fn);
- }
- 
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index 276e8fb..5a8fe5c 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -567,13 +567,13 @@ static void __init pxa_init_ext_wakeup_irq(set_wake_t fn)
- {
- 	int irq;
- 
-+	pxa_ext_wakeup_chip.set_wake = fn;
-+
- 	for (irq = IRQ_WAKEUP0; irq <= IRQ_WAKEUP1; irq++) {
- 		set_irq_chip(irq, &pxa_ext_wakeup_chip);
- 		set_irq_handler(irq, handle_edge_irq);
- 		set_irq_flags(irq, IRQF_VALID);
- 	}
--
--	pxa_ext_wakeup_chip.set_wake = fn;
- }
- 
- void __init pxa3xx_init_irq(void)
+yes
+
+> 
+> * It seems the only use of sdmac->status is to check if the channel
+> is DMA_IN_PROGRESS when "prep" functions get called.  Is it a worth
+> to check DMA_ERROR or DMA_SUCCESS for every single buffer descriptor
+> (BD) in interrupt handler?
+> 
+> * In handler mxc_sdma_handle_channel_normal, callback function gets
+> called and last_completed get assigned the cookie no matter
+> sdmac->status is DMA_SUCCESS or DMA_ERROR.  How would dma client know
+> if this tx succeeded or failed?
+
+Looking at it we should probably just return sdmac->status in
+sdma_tx_status.
+
+> 
+> * Related to question above, dma client can call function
+> dma_async_is_tx_complete to know if the tx succeeded or failed by
+> manipulating cookie.  But is there any way for client to know the
+> failure in loop (cyclic) case?  In this case, client gets no way to
+> query tx status, however any period (BD) in the cyclic could fail.
+> Currently, we always do callback in cyclic handler whether status is
+> DMA_ERROR or DMA_SUCCESS, and the client (i.e. imx audio driver)
+> always assumes the callback means a successful period.  But what if
+> one period in the cyclic fails?
+
+I guess the driver should call dma_async_is_tx_complete, assuming this
+function is fixed in the sdma driver.
+
+> 
+> * Regarding to cyclic case again, is DMA_TERMINATE_ALL
+> (down to function sdma_disable_channel) the only way for client to
+> stop the tx?  I do not know the exact behavior of sdma when STATSTOP
+> bit gets set.  But if it's in the middle of a BD transfer process,
+> will this bit setting possibly cause data corruption?
+
+I don't know the exact behaviour either. I only know that the FSL kernel
+does this aswell (without polling whether the channel is actually
+disabled or something).
+
+Sascha
+
 -- 
-1.7.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
