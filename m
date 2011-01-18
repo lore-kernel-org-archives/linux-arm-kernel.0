@@ -1,47 +1,22 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 18 Jan 2011 16:54:58 +0900
-Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
-References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
-	<20101208115510.GD10998@console-pimps.org>
-	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
-	<20101211192320.GA24430@void.printf.net>
-	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
-Message-ID: <4D354752.3030401@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Jan 2011 10:11:56 +0200
+Subject: [PATCH 7/7] arm: mach-omap1: board-voiceblue: add missing include
+In-Reply-To: <1295337165-22934-8-git-send-email-aaro.koskinen@iki.fi>
+References: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
+	<1295337165-22934-8-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20110118081156.GI2436@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will.
+On Tue, Jan 18, 2011 at 09:52:45AM +0200, Aaro Koskinen wrote:
+> Eliminates the following sparse warnings:
+> 
+> 	arch/arm/mach-omap1/board-voiceblue.c:253:6: warning: symbol 'voiceblue_wdt_enable' was not declared. Should it be static?
+> 	arch/arm/mach-omap1/board-voiceblue.c:261:6: warning: symbol 'voiceblue_wdt_disable' was not declared. Should it be static?
+> 	arch/arm/mach-omap1/board-voiceblue.c:269:6: warning: symbol 'voiceblue_wdt_ping' was not declared. Should it be static?
+> 	arch/arm/mach-omap1/board-voiceblue.c:278:6: warning: symbol 'voiceblue_reset' was not declared. Should it be static?
 
-I have some question...i'm testing dw_mmc in our environment.
-but i didn't understand pdata->init(?)...what initialize in there?
+wasn't this caused by previous patch ?
 
-plz let me know that..
-
-Thanks
-Jaehoon Chung
-
-Will Newton wrote:
-
-> +	host->pdev = pdev;
-> +	host->pdata = pdata = pdev->dev.platform_data;
-> +	if (!pdata || !pdata->init) {
-> +		dev_err(&pdev->dev,
-> +			"Platform data must supply init function\n");
-> +		ret = -ENODEV;
-> +		goto err_freehost;
-> +	}
-> +
-> +	if (!pdata->select_slot && pdata->num_slots > 1) {
-> +		dev_err(&pdev->dev,
-> +			"Platform data must supply select_slot function\n");
-> +		ret = -ENODEV;
-> +		goto err_freehost;
-> +	}
-> +
->
+-- 
+balbi
