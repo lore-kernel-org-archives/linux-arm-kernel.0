@@ -1,112 +1,53 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 17 Jan 2011 18:39:49 -0500 (EST)
-Subject: [PATCH 06/14] ARM: v6k: Dove platforms use V6K architecture CPUs
-In-Reply-To: <E1PeufN-0003Sd-W2@rmk-PC.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1PeufN-0003Sd-W2@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101171835530.8580@xanadu.home>
+From: stanleymiao@gmail.com (Stanley.Miao)
+Date: Tue, 18 Jan 2011 09:22:48 +0800
+Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
+In-Reply-To: <AANLkTi=RSpXHRpoZJsGLhVgQ=E=tcNGm8GXYC9UPaDrA@mail.gmail.com>
+References: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
+	<1295253729-23153-2-git-send-email-stanley.miao@windriver.com>
+	<AANLkTi=RSpXHRpoZJsGLhVgQ=E=tcNGm8GXYC9UPaDrA@mail.gmail.com>
+Message-ID: <AANLkTi=q=e03GhmNZypGa5na2OiAr8SAOtiXm=+NPq5t@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jan 2011, Russell King - ARM Linux wrote:
+2011/1/17 Catalin Marinas <catalin.marinas@arm.com>:
+> On 17 January 2011 08:42, Stanley.Miao <stanley.miao@windriver.com> wrote:
+>> The code section in BE8 kernel modules is in little-endian while data
+>> section is in big-endian. When reading code from memory in the relocation
+>> procedure, these instructions are read according to big-endian, so they
+>> need to be inverted before writing to memory and after reading from memory.
+> [...]
+>> --- a/arch/arm/include/asm/io.h
+>> +++ b/arch/arm/include/asm/io.h
+>> @@ -233,6 +233,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>>
+>> ?#endif /* __mem_pci */
+>>
+>> +#ifdef CONFIG_CPU_ENDIAN_BE8
+>> +#define read_instr32(c) ? ? ? ? ? ? ? ? ? ? ? ?__swab32(*(u32 *)c)
+>> +#define read_instr16(c) ? ? ? ? ? ? ? ? ? ? ? ?__swab16(*(u16 *)c)
+>> +#define write_instr32(v,a) ? ? ? ? ? ? (*(u32 *)(a) = __swab32((__force __u32)(v)))
+>> +#define write_instr16(v,a) ? ? ? ? ? ? (*(u16 *)(a) = __swab16((__force __u16)(v)))
+>> +#else
+>> +#define read_instr32(c) ? ? ? ? ? ? ? ? ? ? ? ?(*(u32 *)c)
+>> +#define read_instr16(c) ? ? ? ? ? ? ? ? ? ? ? ?(*(u16 *)c)
+>> +#define write_instr32(v,a) ? ? ? ? ? ? (*(u32 *)(a) = (v))
+>> +#define write_instr16(v,a) ? ? ? ? ? ? (*(u16 *)(a) = (v))
+>> +#endif
+>
+> Can we not use cpu_to_le32 etc in here (and as Russell said, they are
+> not really IO)?
 
-> Make Dove platforms select the new V6K CPU option.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Except moving these definition to arch/arm/kernel/module.c, do I need
+to do other modifications ?
 
-Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Stanley.
 
-I'd suggest doing the following instead of attaching the selection to 
-each individual board target , as the whole Dove architecture is V6K:
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index ba304a3..d3f5674 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -457,6 +457,7 @@ config ARCH_IXP4XX
- 
- config ARCH_DOVE
- 	bool "Marvell Dove"
-+	select CPU_V6K
- 	select PCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-index 822439a..dd937c5 100644
---- a/arch/arm/mach-dove/Kconfig
-+++ b/arch/arm/mach-dove/Kconfig
-@@ -5,14 +5,12 @@ menu "Marvell Dove Implementations"
- config MACH_DOVE_DB
- 	bool "Marvell DB-MV88AP510 Development Board"
- 	select I2C_BOARDINFO
--	select CPU_V6K
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  Marvell DB-MV88AP510 Development Board.
- 
- config MACH_CM_A510
- 	bool "CompuLab CM-A510 Board"
--	select CPU_V6K
- 	help
- 	  Say 'Y' here if you want your kernel to support the
- 	  CompuLab CM-A510 Board.
-
-
-
-
-> ---
->  arch/arm/mach-dove/Kconfig |    4 +++-
->  arch/arm/mm/Kconfig        |    4 ++--
->  2 files changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-> index a4ed390..822439a 100644
-> --- a/arch/arm/mach-dove/Kconfig
-> +++ b/arch/arm/mach-dove/Kconfig
-> @@ -5,12 +5,14 @@ menu "Marvell Dove Implementations"
->  config MACH_DOVE_DB
->  	bool "Marvell DB-MV88AP510 Development Board"
->  	select I2C_BOARDINFO
-> +	select CPU_V6K
->  	help
->  	  Say 'Y' here if you want your kernel to support the
->  	  Marvell DB-MV88AP510 Development Board.
->  
-> - config MACH_CM_A510
-> +config MACH_CM_A510
->  	bool "CompuLab CM-A510 Board"
-> +	select CPU_V6K
->  	help
->  	  Say 'Y' here if you want your kernel to support the
->  	  CompuLab CM-A510 Board.
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 559e933..22a3f4a 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -390,7 +390,7 @@ config CPU_PJ4
->  
->  # ARMv6
->  config CPU_V6
-> -	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE
-> +	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
->  	select CPU_32v6
->  	select CPU_ABRT_EV6
->  	select CPU_PABRT_V6
-> @@ -403,7 +403,7 @@ config CPU_V6
->  
->  # ARMv6k
->  config CPU_V6K
-> -	bool "Support ARM V6K processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX || ARCH_DOVE
-> +	bool "Support ARM V6K processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
->  	select CPU_32v6
->  	select CPU_32v6K if !ARCH_OMAP2
->  	select CPU_ABRT_EV6
-> -- 
-> 1.6.2.5
-> 
-> 
+>
+> --
+> Catalin
+>
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
