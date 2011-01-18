@@ -1,1110 +1,448 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:42:01 +0530
-Subject: [PATCH V4 34/62] ST SPEAr: Adding support for DDR in clock framework
+Date: Tue, 18 Jan 2011 12:42:02 +0530
+Subject: [PATCH V4 35/62] ST SPEAr : EMI (Extrenal Memory Interface)
+	controller driver
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <15c2d264d8027f20cad81f4f3547533e3ba424a3.1295333958.git.viresh.kumar@st.com>
+Message-ID: <2144e936a007468b11cd83b5c73c72514e5c0d96.1295333959.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing rate of clk, which is ancestor of DDR requires to put DDR in refresh
-mode before changing parents rate. For this DDR support is added in clock
-framework. Now at boot time all ancestors of DDR is marked specially and
-changing their rate must be first acked by ddr (i.e. ddr will run on that
-clock). This patch adds support for this.
+From: Vipin Kumar <vipin.kumar@st.com>
 
+2 SPEAr platform SoCs(spear310 and spear320) support an External Memory
+Interface controller. This controller is used to interface with
+Parallel NOR Flash devices.
+
+This patch adds just the platform code needed for EMI (mainly EMI
+initialization). The driver being used is driver/mtd/maps/physmap.c
+
+Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 ---
- arch/arm/mach-spear13xx/clock.c                  |   69 ++++++++---
- arch/arm/mach-spear13xx/include/mach/generic.h   |    2 +-
- arch/arm/mach-spear13xx/include/mach/misc_regs.h |    4 +
- arch/arm/mach-spear13xx/spear13xx.c              |    2 +-
- arch/arm/mach-spear3xx/clock.c                   |  105 ++++++++++++++----
- arch/arm/mach-spear3xx/include/mach/generic.h    |    2 +-
- arch/arm/mach-spear3xx/include/mach/misc_regs.h  |    7 +
- arch/arm/mach-spear3xx/spear3xx.c                |    2 +-
- arch/arm/mach-spear6xx/clock.c                   |  105 ++++++++++++++----
- arch/arm/mach-spear6xx/include/mach/generic.h    |    2 +-
- arch/arm/mach-spear6xx/include/mach/misc_regs.h  |    7 +
- arch/arm/mach-spear6xx/spear6xx.c                |    2 +-
- arch/arm/plat-spear/clock.c                      |  133 ++++++++++++++++++---
- arch/arm/plat-spear/include/plat/clock.h         |   42 +++++--
- 14 files changed, 385 insertions(+), 99 deletions(-)
+ arch/arm/mach-spear3xx/Makefile                |    4 +
+ arch/arm/mach-spear3xx/emi.c                   |  101 ++++++++++++++++++++++++
+ arch/arm/mach-spear3xx/include/mach/emi.h      |   64 +++++++++++++++
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    2 +
+ arch/arm/mach-spear3xx/include/mach/spear310.h |    9 ++
+ arch/arm/mach-spear3xx/include/mach/spear320.h |    6 ++
+ arch/arm/mach-spear3xx/spear310.c              |    9 ++
+ arch/arm/mach-spear3xx/spear310_evb.c          |   28 +++++++
+ arch/arm/mach-spear3xx/spear320.c              |    9 ++
+ arch/arm/mach-spear3xx/spear320_evb.c          |   27 ++++++
+ 10 files changed, 259 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-spear3xx/emi.c
+ create mode 100644 arch/arm/mach-spear3xx/include/mach/emi.h
 
-diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index c39389e..709adb2 100644
---- a/arch/arm/mach-spear13xx/clock.c
-+++ b/arch/arm/mach-spear13xx/clock.c
-@@ -23,19 +23,19 @@
- /* root clks */
- /* 24 MHz oscillator clock */
- static struct clk osc1_24m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 24000000,
- };
+diff --git a/arch/arm/mach-spear3xx/Makefile b/arch/arm/mach-spear3xx/Makefile
+index b248624..d38ae47 100644
+--- a/arch/arm/mach-spear3xx/Makefile
++++ b/arch/arm/mach-spear3xx/Makefile
+@@ -24,3 +24,7 @@ obj-$(CONFIG_MACH_SPEAR320) += spear320.o
  
- /* 32 KHz oscillator clock */
- static struct clk osc2_32k_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 32000,
- };
- 
- /* 25 MHz MIPHY oscillator clock */
- static struct clk osc3_25m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 25000000,
- };
- 
-@@ -99,7 +99,7 @@ struct pll_rate_tbl pll_rtbl[] = {
- 
- /* pll1 clock */
- static struct clk pll1_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk_sel = &pll_pclk_sel,
- 	.pclk_sel_shift = PLL1_CLK_SHIFT,
- 	.en_reg = PLL1_CTR,
-@@ -113,7 +113,7 @@ static struct clk pll1_clk = {
- 
- /* pll1div2 clock */
- static struct clk pll1div2_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 2,
- 	.recalc = &follow_parent,
-@@ -121,7 +121,7 @@ static struct clk pll1div2_clk = {
- 
- /* pll1div4 clock */
- static struct clk pll1div4_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 4,
- 	.recalc = &follow_parent,
-@@ -136,6 +136,7 @@ static struct pll_clk_config pll2_config = {
- 
- /* pll2 clock */
- static struct clk pll2_clk = {
-+	.flags = SYSTEM_CLK,
- 	.pclk_sel = &pll_pclk_sel,
- 	.pclk_sel_shift = PLL2_CLK_SHIFT,
- 	.en_reg = PLL2_CTR,
-@@ -156,6 +157,7 @@ static struct pll_clk_config pll3_config = {
- 
- /* pll3 clock */
- static struct clk pll3_clk = {
-+	.flags = SYSTEM_CLK,
- 	.pclk_sel = &pll_pclk_sel,
- 	.pclk_sel_shift = PLL3_CLK_SHIFT,
- 	.en_reg = PLL3_CTR,
-@@ -184,7 +186,7 @@ struct pll_rate_tbl pll4_rtbl[] = {
- 
- /* pll4 (DDR) clock */
- static struct clk pll4_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk = &osc1_24m_clk,
- 	.en_reg = PLL4_CTR,
- 	.en_reg_bit = PLL_ENABLE,
-@@ -197,22 +199,54 @@ static struct clk pll4_clk = {
- 
- /* pll5 USB 48 MHz clock */
- static struct clk pll5_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc1_24m_clk,
- 	.rate = 48000000,
- };
- 
- /* pll6 (MIPHY) clock */
- static struct clk pll6_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc3_25m_clk,
- 	.rate = 25000000,
- };
- 
- /* clocks derived from pll1 clk */
-+/* ddr clock */
-+struct ddr_rate_tbl ddr_rate_tbl = {
-+	.minrate = 332000000,
-+	.maxrate = 500000000,
-+};
+ # spear320 boards files
+ obj-$(CONFIG_BOARD_SPEAR320_EVB) += spear320_evb.o
 +
-+static struct pclk_info ddr_pclk_info[] = {
-+	{
-+		.pclk = &pll1_clk,
-+		.pclk_val = MCTR_CLK_PLL1_VAL,
-+	}, {
-+		.pclk = &pll4_clk,
-+		.pclk_val = MCTR_CLK_PLL4_VAL,
-+	},
-+};
-+
-+/* ddr parent select structure */
-+static struct pclk_sel ddr_pclk_sel = {
-+	.pclk_info = ddr_pclk_info,
-+	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
-+	.pclk_sel_reg = PERIP_CLK_CFG,
-+	.pclk_sel_mask = MCTR_CLK_MASK,
-+};
-+
-+static struct clk ddr_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.recalc = &follow_parent,
-+	.pclk_sel = &ddr_pclk_sel,
-+	.pclk_sel_shift = MCTR_CLK_SHIFT,
-+	.private_data = &ddr_rate_tbl,
-+};
-+
- /* cpu clock */
- static struct clk cpu_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 2,
- 	.recalc = &follow_parent,
-@@ -220,7 +254,7 @@ static struct clk cpu_clk = {
- 
- /* ahb clock */
- static struct clk ahb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 6,
- 	.recalc = &follow_parent,
-@@ -228,7 +262,7 @@ static struct clk ahb_clk = {
- 
- /* apb clock */
- static struct clk apb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.div_factor = 12,
- 	.recalc = &follow_parent,
-@@ -845,6 +879,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{.con_id = "pll6_clk",		.clk = &pll6_clk},
- 
- 	/* clock derived from pll1 clk */
-+	{.con_id = "ddr_clk",		.clk = &ddr_clk},
- 	{.con_id = "cpu_clk",		.clk = &cpu_clk},
- 	{.con_id = "ahb_clk",		.clk = &ahb_clk},
- 	{.con_id = "apb_clk",		.clk = &apb_clk},
-@@ -911,12 +946,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- #endif
- };
- 
--void __init clk_init(void)
-+/* machine clk init */
-+void __init spear13xx_clk_init(void)
- {
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
--		clk_register(&spear_clk_lookups[i]);
--
--	recalc_root_clocks();
-+	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
- }
-diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 9f25a85..6b249b5 100644
---- a/arch/arm/mach-spear13xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -44,7 +44,7 @@ extern struct platform_device spear13xx_sdhci_device;
- extern struct sys_timer spear13xx_timer;
- 
- /* Add spear13xx family function declarations here */
--void __init clk_init(void);
-+void __init spear13xx_clk_init(void);
- void __init i2c_register_default_devices(void);
- void __init spear_setup_timer(void);
- void __init spear13xx_map_io(void);
-diff --git a/arch/arm/mach-spear13xx/include/mach/misc_regs.h b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-index a7ba6cb..3cfd4fc 100644
---- a/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/misc_regs.h
-@@ -98,6 +98,10 @@
- 	#define CLCD_CLK_SHIFT		2
- 	#define C3_CLK_MASK		1
- 	#define C3_CLK_SHIFT		1
-+	#define MCTR_CLK_SHIFT		10
-+	#define MCTR_CLK_MASK		0x1
-+	#define MCTR_CLK_PLL1_VAL	0x0
-+	#define MCTR_CLK_PLL4_VAL	0x1
- 
- #define GMAC_CLK_CFG		((unsigned int *)(MISC_BASE + 0x248))
- 
-diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index f7ff7d7..6dc3f68 100644
---- a/arch/arm/mach-spear13xx/spear13xx.c
-+++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -434,7 +434,7 @@ void __init spear13xx_map_io(void)
- 	iotable_init(spear13xx_io_desc, ARRAY_SIZE(spear13xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear13xx_clk_init();
- }
- 
- static void __init spear13xx_timer_init(void)
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 8ae4ad0..58f0259 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -19,13 +19,13 @@
- /* root clks */
- /* 32 KHz oscillator clock */
- static struct clk osc_32k_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 32000,
- };
- 
- /* 24 MHz oscillator clock */
- static struct clk osc_24m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 24000000,
- };
- 
-@@ -40,7 +40,7 @@ static struct clk rtc_clk = {
- 
- /* clock derived from 24 MHz osc clk */
- /* pll masks structure */
--static struct pll_clk_masks pll1_masks = {
-+static struct pll_clk_masks pll_masks = {
- 	.mode_mask = PLL_MODE_MASK,
- 	.mode_shift = PLL_MODE_SHIFT,
- 	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
-@@ -53,22 +53,22 @@ static struct pll_clk_masks pll1_masks = {
- 	.div_n_shift = PLL_DIV_N_SHIFT,
- };
- 
--/* pll1 configuration structure */
--static struct pll_clk_config pll1_config = {
--	.mode_reg = PLL1_CTR,
--	.cfg_reg = PLL1_FRQ,
--	.masks = &pll1_masks,
--};
--
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
- 
-+/* pll1 configuration structure */
-+static struct pll_clk_config pll1_config = {
-+	.mode_reg = PLL1_CTR,
-+	.cfg_reg = PLL1_FRQ,
-+	.masks = &pll_masks,
-+};
-+
- /* PLL1 clock */
- static struct clk pll1_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk = &osc_24m_clk,
- 	.en_reg = PLL1_CTR,
- 	.en_reg_bit = PLL_ENABLE,
-@@ -79,9 +79,29 @@ static struct clk pll1_clk = {
- 	.private_data = &pll1_config,
- };
- 
-+/* pll2 configuration structure */
-+static struct pll_clk_config pll2_config = {
-+	.mode_reg = PLL2_CTR,
-+	.cfg_reg = PLL2_FRQ,
-+	.masks = &pll_masks,
-+};
-+
-+/* PLL2 clock */
-+static struct clk pll2_clk = {
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
-+	.pclk = &osc_24m_clk,
-+	.en_reg = PLL2_CTR,
-+	.en_reg_bit = PLL_ENABLE,
-+	.calc_rate = &pll_calc_rate,
-+	.recalc = &pll_clk_recalc,
-+	.set_rate = &pll_clk_set_rate,
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.private_data = &pll2_config,
-+};
-+
- /* PLL3 48 MHz clock */
- static struct clk pll3_48m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc_24m_clk,
- 	.rate = 48000000,
- };
-@@ -96,7 +116,7 @@ static struct clk wdt_clk = {
- /* clock derived from pll1 clk */
- /* cpu clock */
- static struct clk cpu_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.recalc = &follow_parent,
- };
-@@ -123,7 +143,7 @@ struct bus_rate_tbl bus_rtbl[] = {
- 
- /* ahb clock */
- static struct clk ahb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -410,6 +430,48 @@ static struct clk usbd_clk = {
- };
- 
- /* clock derived from ahb clk */
-+/* ahb multiplied by 2 clock */
-+static struct clk ahbmult2_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.pclk = &ahb_clk,
-+	.recalc = &ahbmult2_clk_recalc,
-+};
-+
-+/* ddr clock */
-+struct ddr_rate_tbl ddr_rate_tbl = {
-+	.minrate = 166000000,
-+	.maxrate = 332000000,
-+};
-+
-+static struct pclk_info ddr_pclk_info[] = {
-+	{
-+		.pclk = &ahb_clk,
-+		.pclk_val = MCTR_CLK_HCLK_VAL,
-+	}, {
-+		.pclk = &ahbmult2_clk,
-+		.pclk_val = MCTR_CLK_2HCLK_VAL,
-+	}, {
-+		.pclk = &pll2_clk,
-+		.pclk_val = MCTR_CLK_PLL2_VAL,
-+	},
-+};
-+
-+/* ddr parent select structure */
-+static struct pclk_sel ddr_pclk_sel = {
-+	.pclk_info = ddr_pclk_info,
-+	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
-+	.pclk_sel_reg = PLL_CLK_CFG,
-+	.pclk_sel_mask = MCTR_CLK_MASK,
-+};
-+
-+static struct clk ddr_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.recalc = &follow_parent,
-+	.pclk_sel = &ddr_pclk_sel,
-+	.pclk_sel_shift = MCTR_CLK_SHIFT,
-+	.private_data = &ddr_rate_tbl,
-+};
-+
- /* apb masks structure */
- static struct bus_clk_masks apb_masks = {
- 	.mask = HCLK_PCLK_RATIO_MASK,
-@@ -424,7 +486,7 @@ static struct bus_clk_config apb_config = {
- 
- /* apb clock */
- static struct clk apb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &ahb_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -658,6 +720,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
- 	/* clock derived from 24 MHz osc clk */
- 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
-+	{ .con_id = "pll2_clk",		.clk = &pll2_clk},
- 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
- 	{ .dev_id = "wdt",		.clk = &wdt_clk},
- 	/* clock derived from pll1 clk */
-@@ -677,6 +740,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "usbh_clk",		.clk = &usbh_clk},
- 	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
-+	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
-+	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
- 	{ .con_id = "apb_clk",		.clk = &apb_clk},
- 	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{ .dev_id = "dma",		.clk = &dma_clk},
-@@ -732,12 +797,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- #endif
- };
- 
--void __init clk_init(void)
-+/* machine clk init */
-+void __init spear3xx_clk_init(void)
- {
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
--		clk_register(&spear_clk_lookups[i]);
--
--	recalc_root_clocks();
-+	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
- }
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index c373f6d..f8613f4 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -43,7 +43,7 @@ extern struct platform_device rtc_device;
- extern struct sys_timer spear3xx_timer;
- 
- /* Add spear3xx family function declarations here */
--void __init clk_init(void);
-+void __init spear3xx_clk_init(void);
- void __init i2c_register_default_devices(void);
- void __init spear_setup_timer(void);
- void __init spear3xx_map_io(void);
-diff --git a/arch/arm/mach-spear3xx/include/mach/misc_regs.h b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
-index 6cb4f3c..6316900 100644
---- a/arch/arm/mach-spear3xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear3xx/include/mach/misc_regs.h
-@@ -46,6 +46,13 @@
- 
- #define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x01C))
- #define PLL_CLK_CFG		((unsigned int *)(MISC_BASE + 0x020))
-+/* PLL_CLK_CFG register masks */
-+#define MCTR_CLK_SHIFT		28
-+#define MCTR_CLK_MASK		0x7
-+#define MCTR_CLK_HCLK_VAL	0x0
-+#define MCTR_CLK_2HCLK_VAL	0x1
-+#define MCTR_CLK_PLL2_VAL	0x3
-+
- #define CORE_CLK_CFG		((unsigned int *)(MISC_BASE + 0x024))
- /* CORE CLK CFG register masks */
- #define PLL_HCLK_RATIO_SHIFT	10
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index e98cdca..2806cbc 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -261,7 +261,7 @@ void __init spear3xx_map_io(void)
- 	iotable_init(spear3xx_io_desc, ARRAY_SIZE(spear3xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear3xx_clk_init();
- }
- 
- /* pad multiplexing support */
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 9171952..99cc21d 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -19,13 +19,13 @@
- /* root clks */
- /* 32 KHz oscillator clock */
- static struct clk osc_32k_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 32000,
- };
- 
- /* 30 MHz oscillator clock */
- static struct clk osc_30m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.rate = 30000000,
- };
- 
-@@ -40,7 +40,7 @@ static struct clk rtc_clk = {
- 
- /* clock derived from 30 MHz osc clk */
- /* pll masks structure */
--static struct pll_clk_masks pll1_masks = {
-+static struct pll_clk_masks pll_masks = {
- 	.mode_mask = PLL_MODE_MASK,
- 	.mode_shift = PLL_MODE_SHIFT,
- 	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
-@@ -53,22 +53,22 @@ static struct pll_clk_masks pll1_masks = {
- 	.div_n_shift = PLL_DIV_N_SHIFT,
- };
- 
--/* pll1 configuration structure */
--static struct pll_clk_config pll1_config = {
--	.mode_reg = PLL1_CTR,
--	.cfg_reg = PLL1_FRQ,
--	.masks = &pll1_masks,
--};
--
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
- 
-+/* pll1 configuration structure */
-+static struct pll_clk_config pll1_config = {
-+	.mode_reg = PLL1_CTR,
-+	.cfg_reg = PLL1_FRQ,
-+	.masks = &pll_masks,
-+};
-+
- /* PLL1 clock */
- static struct clk pll1_clk = {
--	.flags = ENABLED_ON_INIT,
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
- 	.pclk = &osc_30m_clk,
- 	.en_reg = PLL1_CTR,
- 	.en_reg_bit = PLL_ENABLE,
-@@ -79,9 +79,29 @@ static struct clk pll1_clk = {
- 	.private_data = &pll1_config,
- };
- 
-+/* pll2 configuration structure */
-+static struct pll_clk_config pll2_config = {
-+	.mode_reg = PLL2_CTR,
-+	.cfg_reg = PLL2_FRQ,
-+	.masks = &pll_masks,
-+};
-+
-+/* PLL2 clock */
-+static struct clk pll2_clk = {
-+	.flags = ENABLED_ON_INIT | SYSTEM_CLK,
-+	.pclk = &osc_30m_clk,
-+	.en_reg = PLL2_CTR,
-+	.en_reg_bit = PLL_ENABLE,
-+	.calc_rate = &pll_calc_rate,
-+	.recalc = &pll_clk_recalc,
-+	.set_rate = &pll_clk_set_rate,
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.private_data = &pll2_config,
-+};
-+
- /* PLL3 48 MHz clock */
- static struct clk pll3_48m_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &osc_30m_clk,
- 	.rate = 48000000,
- };
-@@ -96,7 +116,7 @@ static struct clk wdt_clk = {
- /* clock derived from pll1 clk */
- /* cpu clock */
- static struct clk cpu_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.recalc = &follow_parent,
- };
-@@ -123,7 +143,7 @@ struct bus_rate_tbl bus_rtbl[] = {
- 
- /* ahb clock */
- static struct clk ahb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &pll1_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -491,6 +511,48 @@ static struct clk usbd_clk = {
- };
- 
- /* clock derived from ahb clk */
-+/* ahb multiplied by 2 clock */
-+static struct clk ahbmult2_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.pclk = &ahb_clk,
-+	.recalc = &ahbmult2_clk_recalc,
-+};
-+
-+/* ddr clock */
-+struct ddr_rate_tbl ddr_rate_tbl = {
-+	.minrate = 166000000,
-+	.maxrate = 332000000,
-+};
-+
-+static struct pclk_info ddr_pclk_info[] = {
-+	{
-+		.pclk = &ahb_clk,
-+		.pclk_val = MCTR_CLK_HCLK_VAL,
-+	}, {
-+		.pclk = &ahbmult2_clk,
-+		.pclk_val = MCTR_CLK_2HCLK_VAL,
-+	}, {
-+		.pclk = &pll2_clk,
-+		.pclk_val = MCTR_CLK_PLL2_VAL,
-+	},
-+};
-+
-+/* ddr parent select structure */
-+static struct pclk_sel ddr_pclk_sel = {
-+	.pclk_info = ddr_pclk_info,
-+	.pclk_count = ARRAY_SIZE(ddr_pclk_info),
-+	.pclk_sel_reg = PLL_CLK_CFG,
-+	.pclk_sel_mask = MCTR_CLK_MASK,
-+};
-+
-+static struct clk ddr_clk = {
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
-+	.recalc = &follow_parent,
-+	.pclk_sel = &ddr_pclk_sel,
-+	.pclk_sel_shift = MCTR_CLK_SHIFT,
-+	.private_data = &ddr_rate_tbl,
-+};
-+
- /* apb masks structure */
- static struct bus_clk_masks apb_masks = {
- 	.mask = HCLK_PCLK_RATIO_MASK,
-@@ -505,7 +567,7 @@ static struct bus_clk_config apb_config = {
- 
- /* apb clock */
- static struct clk apb_clk = {
--	.flags = ALWAYS_ENABLED,
-+	.flags = ALWAYS_ENABLED | SYSTEM_CLK,
- 	.pclk = &ahb_clk,
- 	.calc_rate = &bus_calc_rate,
- 	.recalc = &bus_clk_recalc,
-@@ -630,6 +692,7 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "rtc-spear",	.clk = &rtc_clk},
- 	/* clock derived from 30 MHz os		 clk */
- 	{ .con_id = "pll1_clk",		.clk = &pll1_clk},
-+	{ .con_id = "pll2_clk",		.clk = &pll2_clk},
- 	{ .con_id = "pll3_48m_clk",	.clk = &pll3_48m_clk},
- 	{ .dev_id = "wdt",		.clk = &wdt_clk},
- 	/* clock derived from pll1 clk */
-@@ -654,6 +717,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .con_id = "usbh.1_clk",	.clk = &usbh1_clk},
- 	{ .dev_id = "usbd",		.clk = &usbd_clk},
- 	/* clock derived from ahb clk */
-+	{ .con_id = "ahbmult2_clk",	.clk = &ahbmult2_clk},
-+	{ .con_id = "ddr_clk",		.clk = &ddr_clk},
- 	{ .con_id = "apb_clk",		.clk = &apb_clk},
- 	{ .dev_id = "i2c_designware.0",	.clk = &i2c_clk},
- 	{ .dev_id = "dma",		.clk = &dma_clk},
-@@ -671,12 +736,8 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "gpio2",		.clk = &gpio2_clk},
- };
- 
--void __init clk_init(void)
-+/* machine clk init */
-+void __init spear6xx_clk_init(void)
- {
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
--		clk_register(&spear_clk_lookups[i]);
--
--	recalc_root_clocks();
-+	clk_init(spear_clk_lookups, ARRAY_SIZE(spear_clk_lookups), &ddr_clk);
- }
-diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index 1394e45..1d288a5 100644
---- a/arch/arm/mach-spear6xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -50,7 +50,7 @@ void __init spear6xx_map_io(void);
- void __init spear6xx_init_irq(void);
- void __init spear6xx_init(void);
- void __init spear600_init(void);
--void __init clk_init(void);
-+void __init spear6xx_clk_init(void);
- 
- /* Add spear600 machine device structure declarations here */
- 
-diff --git a/arch/arm/mach-spear6xx/include/mach/misc_regs.h b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
-index bd71e72..0f4562b 100644
---- a/arch/arm/mach-spear6xx/include/mach/misc_regs.h
-+++ b/arch/arm/mach-spear6xx/include/mach/misc_regs.h
-@@ -47,6 +47,13 @@
- #define PLL2_MOD		((unsigned int *)(MISC_BASE + 0x01C))
- #define PLL_CLK_CFG		((unsigned int *)(MISC_BASE + 0x020))
- #define CORE_CLK_CFG		((unsigned int *)(MISC_BASE + 0x024))
-+/* PLL_CLK_CFG register masks */
-+#define MCTR_CLK_SHIFT		28
-+#define MCTR_CLK_MASK		0x7
-+#define MCTR_CLK_HCLK_VAL	0x0
-+#define MCTR_CLK_2HCLK_VAL	0x1
-+#define MCTR_CLK_PLL2_VAL	0x3
-+
- /* CORE CLK CFG register masks */
- #define PLL_HCLK_RATIO_SHIFT	10
- #define PLL_HCLK_RATIO_MASK	0x3
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 69287bf..eff6da1 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -420,7 +420,7 @@ void __init spear6xx_map_io(void)
- 	iotable_init(spear6xx_io_desc, ARRAY_SIZE(spear6xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear6xx_clk_init();
- }
- 
- static void __init spear6xx_timer_init(void)
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-index 7d3338f..fb1c87b 100644
---- a/arch/arm/plat-spear/clock.c
-+++ b/arch/arm/plat-spear/clock.c
-@@ -21,6 +21,8 @@
- #include <linux/spinlock.h>
- #include <plat/clock.h>
- 
-+/* pointer to ddr clock structure */
-+static struct clk *ddr_clk;
- static DEFINE_SPINLOCK(clocks_lock);
- static LIST_HEAD(root_clks);
- #ifdef CONFIG_DEBUG_FS
-@@ -160,7 +162,7 @@ static int do_clk_enable(struct clk *clk)
- 		 * time please reclac
- 		 */
- 		if (clk->recalc) {
--			ret = clk->recalc(clk);
-+			ret = clk->recalc(clk, &clk->rate, clk->pclk->rate);
- 			if (ret)
- 				goto err;
- 		}
-@@ -298,7 +300,16 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
- 			propagate_rate(clk, 0);
- 		spin_unlock_irqrestore(&clocks_lock, flags);
- 	} else if (clk->pclk) {
--		u32 mult = clk->div_factor ? clk->div_factor : 1;
-+		u32 mult;
-+		/*
-+		 * if pclk is SYSTEM_CLK and clk is not SYSTEM_CLK then return
-+		 * error
-+		 */
-+		if (clk->pclk->flags & SYSTEM_CLK)
-+			if (!(clk->flags & SYSTEM_CLK))
-+				return -EPERM;
-+
-+		mult = clk->div_factor ? clk->div_factor : 1;
- 		ret = clk_set_rate(clk->pclk, mult * rate);
- 	}
- 
-@@ -371,7 +382,7 @@ void propagate_rate(struct clk *pclk, int on_init)
- 
- 	list_for_each_entry_safe(clk, _temp, &pclk->children, sibling) {
- 		if (clk->recalc) {
--			ret = clk->recalc(clk);
-+			ret = clk->recalc(clk, &clk->rate, clk->pclk->rate);
- 			/*
- 			 * recalc will return error if clk out is not programmed
- 			 * In this case configure default rate.
-@@ -390,6 +401,47 @@ void propagate_rate(struct clk *pclk, int on_init)
- 	}
- }
- 
-+/* updates "rate" pointer with current_clk's output for input "rate" */
-+static void rate_calc(struct clk *current_clk, struct clk *ancestor_clk,
-+		unsigned long *rate)
-+{
-+	if (current_clk->pclk != ancestor_clk)
-+		rate_calc(current_clk->pclk, ancestor_clk, rate);
-+
-+	if (current_clk->recalc)
-+		current_clk->recalc(current_clk, rate, *rate);
-+}
-+
++# specific files
++obj-$(CONFIG_MACH_SPEAR310) += emi.o
++obj-$(CONFIG_MACH_SPEAR320) += emi.o
+diff --git a/arch/arm/mach-spear3xx/emi.c b/arch/arm/mach-spear3xx/emi.c
+new file mode 100644
+index 0000000..7b62ff0
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/emi.c
+@@ -0,0 +1,101 @@
 +/*
-+ * Check if ancestor clk rate is acceptable to ddr or not.
-+ * This will call recursive rate_calc function, starting from ddr upto ancestor
-+ * clk mentioned. This will calculate divisions / multiplications by all
-+ * intermediate ancestor clocks and return the final rate of ddr if ancestor clk
-+ * sets its rate to "rate", value passed in function.
++ * arch/arm/mach-spear3xx/emi.c
++ *
++ * EMI (External Memory Interface) file
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Vipin Kumar<vipin.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
-+static int ddr_rate_acceptable(struct clk *aclk, unsigned long rate)
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <mach/emi.h>
++
++int __init emi_init(struct platform_device *pdev, unsigned long base,
++		u32 bank, u32 width)
 +{
-+	struct ddr_rate_tbl *tbl = ddr_clk->private_data;
++	void __iomem *emi_reg_base;
++	struct clk *clk;
++	int ret;
 +
-+	rate_calc(ddr_clk, aclk, &rate);
-+	if ((rate >= tbl->minrate) && (rate <= tbl->maxrate))
-+		return true;
++	if (bank > (EMI_MAX_BANKS - 1))
++		return -EINVAL;
 +
-+	return false;
-+}
++	emi_reg_base = ioremap(base, EMI_REG_SIZE);
++	if (!emi_reg_base)
++		return -ENOMEM;
 +
-+/* mark all ddr ancestors with DDR_ANCESTOR flag */
-+static void mark_ddr_ancestors(struct clk *dclk)
-+{
-+	struct clk *clk = dclk->pclk;
-+
-+	/* mark all ancestors of DDR */
-+	while (clk != NULL) {
-+		clk->flags |= DDR_ANCESTOR;
-+		clk = clk->pclk;
++	clk = clk_get(NULL, "emi");
++	if (IS_ERR(clk)) {
++		iounmap(emi_reg_base);
++		return PTR_ERR(clk);
 +	}
-+}
 +
- /**
-  * round_rate - Returns index of closest programmable rate in rate_config tbl
-  * @clk: ptr to clock structure
-@@ -475,7 +527,7 @@ unsigned long pll_calc_rate(struct clk *clk, int index)
-  * In Dithered mode
-  * rate = (2 * M[15:0] * Fin)/(256 * N * 2^P)
-  */
--int pll_clk_recalc(struct clk *clk)
-+int pll_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct pll_clk_config *config = clk->private_data;
- 	unsigned int num = 2, den = 0, val, mode = 0;
-@@ -504,7 +556,7 @@ int pll_clk_recalc(struct clk *clk)
- 	if (!den)
- 		return -EINVAL;
- 
--	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
-+	*rate = (((prate/10000) * num) / den) * 10000;
- 	return 0;
- }
- 
-@@ -522,6 +574,25 @@ int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate)
- 	if (i < 0)
- 		return i;
- 
-+	/* if clk is ddrs ancestor, check if rate is acceptable to ddr */
-+	if (ddr_clk && (clk->flags & DDR_ANCESTOR)) {
-+		int ret;
-+
-+		ret = ddr_rate_acceptable(clk, rate);
-+		if (ret == false)
-+			return -EPERM;
-+		else {
-+			/*
-+			 * call routine to put ddr in refresh mode, and
-+			 * configure pll.
-+			 */
-+			/* TBD */
-+			clk->rate = rate;
-+		}
-+
++	ret = clk_enable(clk);
++	if (ret) {
++		iounmap(emi_reg_base);
 +		return ret;
 +	}
 +
- 	val = readl(config->mode_reg) &
- 		~(config->masks->mode_mask << config->masks->mode_shift);
- 	val |= (tbls[i].mode & config->masks->mode_mask) <<
-@@ -563,7 +634,7 @@ unsigned long bus_calc_rate(struct clk *clk, int index)
- }
- 
- /* calculates current programmed rate of ahb or apb bus */
--int bus_clk_recalc(struct clk *clk)
-+int bus_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct bus_clk_config *config = clk->private_data;
- 	unsigned int div;
-@@ -574,7 +645,7 @@ int bus_clk_recalc(struct clk *clk)
- 	if (!div)
- 		return -EINVAL;
- 
--	clk->rate = (unsigned long)clk->pclk->rate / div;
-+	*rate = prate / div;
- 	return 0;
- }
- 
-@@ -600,6 +671,14 @@ int bus_clk_set_rate(struct clk *clk, unsigned long desired_rate)
- 	return 0;
- }
- 
-+/* calculates current programmed rate of ahbmult2 */
-+int
-+ahbmult2_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
-+{
-+	*rate = prate * 2;
++	/*
++	 * Note: These are relaxed NOR device timings. Nor devices on spear
++	 * eval machines are working fine with these timings. Specific board
++	 * files can optimize these timings based on devices found on board.
++	 */
++	writel(0x10, emi_reg_base + (EMI_BANK_REG_SIZE * bank) + TAP_REG);
++	writel(0x05, emi_reg_base + (EMI_BANK_REG_SIZE * bank) + TSDP_REG);
++	writel(0x0a, emi_reg_base + (EMI_BANK_REG_SIZE * bank) + TDPW_REG);
++	writel(0x0a, emi_reg_base + (EMI_BANK_REG_SIZE * bank) + TDPR_REG);
++	writel(0x05, emi_reg_base + (EMI_BANK_REG_SIZE * bank) + TDCS_REG);
++
++	switch (width) {
++	case EMI_FLASH_WIDTH8:
++		width = EMI_CNTL_WIDTH8;
++		break;
++
++	case EMI_FLASH_WIDTH16:
++		width = EMI_CNTL_WIDTH16;
++		break;
++
++	case EMI_FLASH_WIDTH32:
++		width = EMI_CNTL_WIDTH32;
++		break;
++	default:
++		width = EMI_CNTL_WIDTH8;
++		break;
++	}
++	/* set the data width */
++	writel(width | EMI_CNTL_ENBBYTERW,
++		emi_reg_base + (EMI_BANK_REG_SIZE * bank) + CTRL_REG);
++
++	/* disable all the acks */
++	writel(0x3f, emi_reg_base + ack_reg);
++
++	iounmap(emi_reg_base);
++
 +	return 0;
 +}
 +
- /*
-  * gives rate for different values of eq, x and y
-  *
-@@ -627,7 +706,7 @@ unsigned long aux_calc_rate(struct clk *clk, int index)
-  *
-  * Selection of eqn 1 or 2 is programmed in register
-  */
--int aux_clk_recalc(struct clk *clk)
-+int aux_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct aux_clk_config *config = clk->private_data;
- 	unsigned int num = 1, den = 1, val, eqn;
-@@ -650,7 +729,7 @@ int aux_clk_recalc(struct clk *clk)
- 	if (!den)
- 		return -EINVAL;
- 
--	clk->rate = (((clk->pclk->rate/10000) * num) / den) * 10000;
-+	*rate = (((prate / 10000) * num) / den) * 10000;
- 	return 0;
- }
- 
-@@ -704,7 +783,7 @@ unsigned long gpt_calc_rate(struct clk *clk, int index)
-  * Fout from synthesizer can be given from below equations:
-  * Fout= Fin/((2 ^ (N+1)) * (M+1))
-  */
--int gpt_clk_recalc(struct clk *clk)
-+int gpt_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct gpt_clk_config *config = clk->private_data;
- 	unsigned int div = 1, val;
-@@ -718,7 +797,7 @@ int gpt_clk_recalc(struct clk *clk)
- 	if (!div)
- 		return -EINVAL;
- 
--	clk->rate = (unsigned long)clk->pclk->rate / div;
-+	*rate = prate / div;
- 	return 0;
- }
- 
-@@ -786,11 +865,10 @@ unsigned long clcd_calc_rate(struct clk *clk, int index)
-  * complete div (including fractional part) and then right shift the
-  * result by 14 places.
-  */
--int clcd_clk_recalc(struct clk *clk)
-+int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	struct clcd_clk_config *config = clk->private_data;
- 	unsigned int div = 1;
--	unsigned long prate;
- 	unsigned int val;
- 
- 	val = readl(config->synth_reg);
-@@ -800,10 +878,10 @@ int clcd_clk_recalc(struct clk *clk)
- 	if (!div)
- 		return -EINVAL;
- 
--	prate = clk->pclk->rate / 1000; /* first level division, make it KHz */
-+	prate = prate / 1000; /* first level division, make it KHz */
- 
--	clk->rate = (((unsigned long)prate << 12) / (2 * div)) >> 12;
--	clk->rate *= 1000;
-+	*rate = (((unsigned long)prate << 12) / (2 * div)) >> 12;
-+	*rate *= 1000;
- 	return 0;
- }
- 
-@@ -834,11 +912,11 @@ int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate)
-  * Used for clocks that always have value as the parent clock divided by a
-  * fixed divisor
-  */
--int follow_parent(struct clk *clk)
-+int follow_parent(struct clk *clk, unsigned long *rate, unsigned long prate)
- {
- 	unsigned int div_factor = (clk->div_factor < 1) ? 1 : clk->div_factor;
- 
--	clk->rate = clk->pclk->rate/div_factor;
-+	*rate = prate / div_factor;
- 	return 0;
- }
- 
-@@ -857,7 +935,7 @@ void recalc_root_clocks(void)
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	list_for_each_entry(pclk, &root_clks, sibling) {
- 		if (pclk->recalc) {
--			ret = pclk->recalc(pclk);
-+			ret = pclk->recalc(pclk, &pclk->rate, pclk->pclk->rate);
- 			/*
- 			 * recalc will return error if clk out is not programmed
- 			 * In this case configure default clock.
-@@ -873,6 +951,23 @@ void recalc_root_clocks(void)
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- 
 +void __init
-+clk_init(struct clk_lookup *clk_lookups, u32 count, struct clk *dclk)
++emi_init_board_info(struct platform_device *pdev, struct resource *resources,
++		int res_num, struct mtd_partition *partitions,
++		unsigned int nr_partitions, unsigned int width)
 +{
-+	int i;
++	struct physmap_flash_data *emi_plat_data = dev_get_platdata(&pdev->dev);
 +
-+	for (i = 0; i < count; i++)
-+		clk_register(&clk_lookups[i]);
++	pdev->resource = resources;
++	pdev->num_resources = res_num;
 +
-+	recalc_root_clocks();
-+
-+	/* Mark all ancestors of DDR with special flag */
-+	if (dclk) {
-+		ddr_clk = dclk;
-+		mark_ddr_ancestors(dclk);
++	if (partitions) {
++		emi_plat_data->parts = partitions;
++		emi_plat_data->nr_parts = nr_partitions;
 +	}
-+}
 +
- #ifdef CONFIG_DEBUG_FS
- /*
-  *	debugfs support to trace clock tree hierarchy and attributes
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-index 16aa0c9..e519900 100644
---- a/arch/arm/plat-spear/include/plat/clock.h
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -19,9 +19,12 @@
- #include <linux/types.h>
++	emi_plat_data->width = width;
++}
+diff --git a/arch/arm/mach-spear3xx/include/mach/emi.h b/arch/arm/mach-spear3xx/include/mach/emi.h
+new file mode 100644
+index 0000000..b620bf5
+--- /dev/null
++++ b/arch/arm/mach-spear3xx/include/mach/emi.h
+@@ -0,0 +1,64 @@
++/*
++ * arch/arm/mach-spear3xx/include/mach/emi.h
++ *
++ * EMI macros for SPEAr platform
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Vipin Kumar <vipin.kumar@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_EMI_H
++#define __MACH_EMI_H
++
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/physmap.h>
++
++#define EMI_FLASH_WIDTH8	1
++#define EMI_FLASH_WIDTH16	2
++#define EMI_FLASH_WIDTH32	4
++
++#define EMI_REG_SIZE		0x100
++#define EMI_BANK_REG_SIZE	0x18
++
++#define TAP_REG			(0x0)
++#define TSDP_REG		(0x4)
++#define TDPW_REG		(0x8)
++#define TDPR_REG		(0xC)
++#define TDCS_REG		(0x10)
++#define CTRL_REG		(0x14)
++
++#if defined(CONFIG_MACH_SPEAR310)
++#define TIMEOUT_REG		(0x90)
++#define ACK_REG			(0x94)
++#define IRQ_REG			(0x98)
++
++#define EMI_MAX_BANKS		6
++
++#elif defined(CONFIG_MACH_SPEAR320)
++#define TIMEOUT_REG		(0x60)
++#define ACK_REG			(0x64)
++#define IRQ_REG			(0x68)
++
++#define EMI_MAX_BANKS		4
++
++#endif
++
++/* Control register definitions */
++#define EMI_CNTL_WIDTH8		(0 << 0)
++#define EMI_CNTL_WIDTH16	(1 << 0)
++#define EMI_CNTL_WIDTH32	(2 << 0)
++#define EMI_CNTL_ENBBYTEW	(1 << 2)
++#define EMI_CNTL_ENBBYTER	(1 << 3)
++#define EMI_CNTL_ENBBYTERW	(EMI_CNTL_ENBBYTER | EMI_CNTL_ENBBYTEW)
++
++extern int __init emi_init(struct platform_device *pdev, unsigned long base,
++		u32 bank, u32 width);
++extern void __init emi_init_board_info(struct platform_device *pdev,
++		struct resource *resources, int res_num, struct mtd_partition
++		*partitions, unsigned int nr_partitions, unsigned int width);
++#endif
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index f8613f4..da0eaa3 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -165,6 +165,7 @@ extern struct amba_device uart2_device;
+ extern struct amba_device uart3_device;
+ extern struct amba_device uart4_device;
+ extern struct amba_device uart5_device;
++extern struct platform_device emi_nor_device;
+ extern struct platform_device plgpio_device;
+ extern struct platform_device nand_device;
  
- /* clk structure flags */
--#define	ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
--#define	RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
--#define	ENABLED_ON_INIT		(1 << 2) /* clocks enabled at init */
-+#define ALWAYS_ENABLED		(1 << 0) /* clock always enabled */
-+#define RESET_TO_ENABLE		(1 << 1) /* reset register bit to enable clk */
-+#define ENABLED_ON_INIT		(1 << 2) /* clocks enabled@init */
-+/* Only System clocks can call other sytem clocks set rate function */
-+#define SYSTEM_CLK		(1 << 3)
-+#define DDR_ANCESTOR		(1 << 4) /* ancestor clks of DDR */
+@@ -190,6 +191,7 @@ extern struct amba_device uart1_device;
+ extern struct amba_device uart2_device;
+ extern struct platform_device can0_device;
+ extern struct platform_device can1_device;
++extern struct platform_device emi_nor_device;
+ extern struct platform_device i2c1_device;
+ extern struct platform_device nand_device;
+ extern struct platform_device plgpio_device;
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear310.h b/arch/arm/mach-spear3xx/include/mach/spear310.h
+index 1e85347..37556b6 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear310.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear310.h
+@@ -18,6 +18,15 @@
  
- /**
-  * struct clkops - clock operations
-@@ -99,8 +102,9 @@ struct clk {
- 	unsigned int *en_reg;
- 	u8 en_reg_bit;
- 	const struct clkops *ops;
--	int (*recalc) (struct clk *);
--	int (*set_rate) (struct clk *, unsigned long rate);
-+	int (*recalc) (struct clk *clk, unsigned long *rate,
-+			unsigned long prate);
-+	int (*set_rate) (struct clk *clk, unsigned long rate);
- 	unsigned long (*calc_rate)(struct clk *, int index);
- 	struct rate_config rate_config;
- 	unsigned int div_factor;
-@@ -223,26 +227,42 @@ struct clcd_rate_tbl {
- 	u16 div;
- };
+ #define SPEAR310_NAND_BASE		UL(0x40000000)
+ #define SPEAR310_FSMC_BASE		UL(0x44000000)
++#define SPEAR310_EMI_REG_BASE		UL(0x4F000000)
++#define SPEAR310_EMI_MEM_0_BASE		UL(0x50000000)
++#define SPEAR310_EMI_MEM_1_BASE		UL(0x60000000)
++#define SPEAR310_EMI_MEM_2_BASE		UL(0x70000000)
++#define SPEAR310_EMI_MEM_3_BASE		UL(0x80000000)
++#define SPEAR310_EMI_MEM_4_BASE		UL(0x90000000)
++#define SPEAR310_EMI_MEM_5_BASE		UL(0xA0000000)
++#define SPEAR310_EMI_MEM_SIZE		UL(0x10000000)
++
+ #define SPEAR310_UART1_BASE		UL(0xB2000000)
+ #define SPEAR310_UART2_BASE		UL(0xB2080000)
+ #define SPEAR310_UART3_BASE		UL(0xB2100000)
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
+index 940f0d8..4f60073 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear320.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
+@@ -17,6 +17,12 @@
+ #define __MACH_SPEAR320_H
  
-+/* ddr min, max clk rate table */
-+struct ddr_rate_tbl {
-+	unsigned long minrate;
-+	unsigned long maxrate;
+ #define SPEAR320_EMI_CTRL_BASE		UL(0x40000000)
++#define SPEAR320_EMI_MEM_0_BASE		UL(0x44000000)
++#define SPEAR320_EMI_MEM_1_BASE		UL(0x45000000)
++#define SPEAR320_EMI_MEM_2_BASE		UL(0x46000000)
++#define SPEAR320_EMI_MEM_3_BASE		UL(0x47000000)
++#define SPEAR320_EMI_MEM_SIZE		UL(0x01000000)
++
+ #define SPEAR320_FSMC_BASE		UL(0x4C000000)
+ #define SPEAR320_NAND_BASE		UL(0x50000000)
+ #define SPEAR320_I2S_BASE		UL(0x60000000)
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 673874a..5f72d3a 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -11,6 +11,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
++#include <linux/mtd/physmap.h>
+ #include <linux/ptrace.h>
+ #include <linux/mtd/fsmc.h>
+ #include <asm/irq.h>
+@@ -268,6 +269,14 @@ int spear300_o2p(int offset)
+ 		return offset + 2;
+ }
+ 
++/* emi nor flash device registeration */
++static struct physmap_flash_data emi_norflash_data;
++struct platform_device emi_nor_device = {
++	.name	= "physmap-flash",
++	.id	= -1,
++	.dev.platform_data = &emi_norflash_data,
 +};
 +
- /* platform specific clock functions */
-+/*
-+ * must be called from machine clock.c file, dclk is pointer to ddr_clk
-+ * strucutre. Which is required by clock framework.
-+ *
-+ * Actually before changing rate of DDRs ancestor, we must put ddr in refresh
-+ * state and then change parent.
-+ */
-+void clk_init(struct clk_lookup *clk_lookups, u32 count, struct clk *dclk);
- void clk_register(struct clk_lookup *cl);
- void recalc_root_clocks(void);
+ static struct plgpio_platform_data plgpio_plat_data = {
+ 	.gpio_base = 8,
+ 	.irq_base = SPEAR_PLGPIO_INT_BASE,
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index 6daacbb..a3cd4a1 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -17,12 +17,31 @@
+ #include <asm/mach-types.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/spi.h>
++#include <mach/emi.h>
+ #include <mach/generic.h>
+ #include <mach/gpio.h>
+ #include <mach/spear.h>
+ #include <plat/fsmc.h>
+ #include <plat/spi.h>
  
- /* clock recalc & set rate functions */
--int follow_parent(struct clk *clk);
-+int follow_parent(struct clk *clk, unsigned long *rate, unsigned long prate);
- unsigned long pll_calc_rate(struct clk *clk, int index);
--int pll_clk_recalc(struct clk *clk);
-+int pll_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int pll_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long bus_calc_rate(struct clk *clk, int index);
--int bus_clk_recalc(struct clk *clk);
-+int bus_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int bus_clk_set_rate(struct clk *clk, unsigned long desired_rate);
-+int ahbmult2_clk_recalc(struct clk *clk, unsigned long *rate,
-+		unsigned long prate);
- unsigned long gpt_calc_rate(struct clk *clk, int index);
--int gpt_clk_recalc(struct clk *clk);
-+int gpt_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int gpt_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long aux_calc_rate(struct clk *clk, int index);
--int aux_clk_recalc(struct clk *clk);
-+int aux_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int aux_clk_set_rate(struct clk *clk, unsigned long desired_rate);
- unsigned long clcd_calc_rate(struct clk *clk, int index);
--int clcd_clk_recalc(struct clk *clk);
-+int clcd_clk_recalc(struct clk *clk, unsigned long *rate, unsigned long prate);
- int clcd_clk_set_rate(struct clk *clk, unsigned long desired_rate);
++#define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
++
++static struct mtd_partition partition_info[] = {
++	PARTITION("X-loader", 0, 1 * 0x20000),
++	PARTITION("U-Boot", 0x20000, 3 * 0x20000),
++	PARTITION("Kernel", 0x80000, 24 * 0x20000),
++	PARTITION("Root File System", 0x380000, 84 * 0x20000),
++};
++
++/* emi nor flash resources registeration */
++static struct resource emi_nor_resources[] = {
++	{
++		.start	= SPEAR310_EMI_MEM_0_BASE,
++		.end	= SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+ 	/* spear3xx specific devices */
+@@ -67,6 +86,7 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&rtc_device,
  
- #endif /* __PLAT_CLOCK_H */
+ 	/* spear310 specific devices */
++	&emi_nor_device,
+ 	&plgpio_device,
+ };
+ 
+@@ -119,6 +139,14 @@ static void __init spear310_evb_init(void)
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_default_devices();
+ 
++	/* initialize emi related data in emi plat data */
++	emi_init_board_info(&emi_nor_device, emi_nor_resources,
++			ARRAY_SIZE(emi_nor_resources), partition_info,
++			ARRAY_SIZE(partition_info), EMI_FLASH_WIDTH32);
++
++	/* Initialize emi regiters */
++	emi_init(&emi_nor_device, SPEAR310_EMI_REG_BASE, 0, EMI_FLASH_WIDTH32);
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 3c90d47..e7ca5db 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -12,6 +12,7 @@
+  */
+ 
+ #include <linux/amba/pl022.h>
++#include <linux/mtd/physmap.h>
+ #include <linux/ptrace.h>
+ #include <linux/types.h>
+ #include <linux/mmc/sdhci-spear.h>
+@@ -510,6 +511,14 @@ struct platform_device can1_device = {
+ 	.resource = can1_resources,
+ };
+ 
++/* emi nor flash device registeration */
++static struct physmap_flash_data emi_norflash_data;
++struct platform_device emi_nor_device = {
++	.name	= "physmap-flash",
++	.id	= -1,
++	.dev.platform_data = &emi_norflash_data,
++};
++
+ /* i2c1 device registeration */
+ static struct resource i2c1_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index cf81208..e1a0b3c 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -18,12 +18,31 @@
+ #include <linux/spi/flash.h>
+ #include <linux/mmc/sdhci-spear.h>
+ #include <linux/spi/spi.h>
++#include <mach/emi.h>
+ #include <mach/generic.h>
+ #include <mach/gpio.h>
+ #include <mach/spear.h>
+ #include <plat/fsmc.h>
+ #include <plat/spi.h>
+ 
++#define PARTITION(n, off, sz)	{.name = n, .offset = off, .size = sz}
++
++static struct mtd_partition partition_info[] = {
++	PARTITION("X-loader", 0, 1 * 0x20000),
++	PARTITION("U-Boot", 0x20000, 3 * 0x20000),
++	PARTITION("Kernel", 0x80000, 24 * 0x20000),
++	PARTITION("Root File System", 0x380000, 84 * 0x20000),
++};
++
++/* emi nor flash resources registeration */
++static struct resource emi_nor_resources[] = {
++	{
++		.start	= SPEAR310_EMI_MEM_0_BASE,
++		.end	= SPEAR310_EMI_MEM_0_BASE + SPEAR310_EMI_MEM_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+ 	/* spear3xx specific devices */
+@@ -106,6 +125,14 @@ static void __init spear320_evb_init(void)
+ 	/* Register slave devices on the I2C buses */
+ 	i2c_register_default_devices();
+ 
++	/* initialize emi related data in emi plat data */
++	emi_init_board_info(&emi_nor_device, emi_nor_resources,
++			ARRAY_SIZE(emi_nor_resources), partition_info,
++			ARRAY_SIZE(partition_info), EMI_FLASH_WIDTH16);
++
++	/* Initialize emi regiters */
++	emi_init(&emi_nor_device, SPEAR320_EMI_CTRL_BASE, 0, EMI_FLASH_WIDTH16);
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
 -- 
 1.7.2.2
