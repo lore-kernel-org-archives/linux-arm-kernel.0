@@ -1,40 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Jan 2011 05:10:39 +0200
-Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
-In-Reply-To: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
-References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
-Message-ID: <20110118031038.GA2436@legolas.emea.dhcp.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 17 Jan 2011 23:25:46 -0500 (EST)
+Subject: [PATCH 10/14] ARM: v6k: select TLS register code according to V6
+	variants
+In-Reply-To: <20110117223635.GB25829@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peugh-0003St-DY@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101171717090.8580@xanadu.home>
+	<20110117223635.GB25829@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101172302290.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 17 Jan 2011, Russell King - ARM Linux wrote:
 
-On Mon, Jan 17, 2011 at 04:25:48PM -0500, Ben Gamari wrote:
-> Some very basic setup (i.e. MMC) is done in the beagleboard's setup
-> callback for the TWL4030's gpio driver, causing a kernel without this
-> support to fail to find its root filesystem. I can't imagine why one would
-> want to build a kernel for this board without this driver, so I think
-> it's worthwhile to explicitly depend on it.
+> On Mon, Jan 17, 2011 at 05:23:43PM -0500, Nicolas Pitre wrote:
+> > Note: this is becoming a bit confusing and prone to mistake when we have:
 > 
-> Signed-Off-By: Ben Gamari <bgamari.foss@gmail.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> Agreed.
 > 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index ab784bf..74173f1 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -120,6 +120,7 @@ config MACH_OMAP_2430SDP
->  config MACH_OMAP3_BEAGLE
->  	bool "OMAP3 BEAGLE board"
->  	depends on ARCH_OMAP3
-> +	depends on GPIO_TWL4030
->  	default y
->  	select OMAP_PACKAGE_CBB
+> > 	CONFIG_CPU_V6
+> > 	CONFIG_CPU_V6K
+> > 	CONFIG_CPU_32v6
+> > 	CONFIG_CPU_32v6K
+> 
+> It may be better at some point to get rid of the CPU_32v* and replace
+> them with CPU_ARCH_V* instead, which makes it clear that these ones
+> definitely refer to the architecture versions.
 
-NAK. This is totally bogus. The board doesn't really depend on
-GPIO_TWL4030, the MMC driver does.
+Agreed.
 
--- 
-balbi
+> The last point while we're here is I don't think it helps to have the
+> conditionals spread between the Kconfig files and this file - I'd much
+> rather see them all in Kconfig so we can see exactly how we end up with
+> each option (TLS_EMUL, TLS_V6, TLS_V6K) in one place.
+
+Yep, although I'd suggest a naming based on the implementation and not 
+on the CPU level it happens to be used on.  Something like TLS_EMUL, 
+TLS_HW_REG, TLS_HIVECT, where (TLS_HW_REG && TLS_HIVECT) would 
+correspond to the current 'if defined(CONFIG_CPU_V6)' case.  That would 
+allow for an eventual combination of CONFIG_CPU_32v5 and 
+CONFIG_CPU_32v6 (that would be Kirkwood + Dove).
+
+
+Nicolas
