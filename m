@@ -1,89 +1,86 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 18 Jan 2011 14:25:18 -0800
-Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
-Message-ID: <1295389518-6249-1-git-send-email-dwalker@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jan 2011 14:26:13 -0800
+Subject: [PATCH] omap1: Fix sched_clock for the MPU timer (Re: State of
+	LDP3430 platform)
+In-Reply-To: <alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1012061125400.13430@utopia.booyaka.com>
+	<20101207083720.GB18336@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1012071745120.13430@utopia.booyaka.com>
+	<alpine.DEB.2.00.1012072012000.13430@utopia.booyaka.com>
+	<20110115000301.GT4957@atomide.com>
+	<alpine.DEB.2.00.1101151237240.32245@utopia.booyaka.com>
+	<20110115233744.GA18159@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
+	<4D3309F9.8090900@gmail.com>
+	<alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
+Message-ID: <20110118222613.GS4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This doesn't work yet. I tried booting with this patch, and the boot
-stops after detecting the MMC partitions. It won't actually boot off
-the MMC. Without this patch and with the page_to_dma/pfn_to_dma changes
-it does work.
+* Paul Walmsley <paul@pwsan.com> [110118 11:35]:
+> 
+> Here's a slightly updated version of this patch, fixing a bug in one of 
+> the comments, and revising the commit message.  There's no functional 
+> difference between this and the previous version of this patch.
 
-Not-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
----
- drivers/mmc/host/msm_sdcc.c |   46 +++++++++++++++++-------------------------
- 1 files changed, 19 insertions(+), 27 deletions(-)
+Thanks, here are two patches to fix the MPU timer, and then allow
+compiling in both the MPU timer and the 32KiHz timer.
 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 5decfd0..1f1c7cb 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -383,14 +383,27 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
- 	host->curr.user_pages = 0;
+Tony
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 18 Jan 2011 13:25:39 -0800
+Subject: [PATCH] omap1: Fix sched_clock for the MPU timer
+
+Otherwise systems using the MPU timer will hang.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -44,11 +44,14 @@
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
+ #include <linux/io.h>
++#include <linux/sched.h>
  
- 	box = &nc->cmd[0];
--	for (i = 0; i < host->dma.num_ents; i++) {
--		box->cmd = CMD_MODE_BOX;
- 
--	/* Initialize sg dma address */
--	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
--				+ sg->offset;
-+	/* location of command block must be 64 bit aligned */
-+	BUG_ON(host->dma.cmd_busaddr & 0x07);
- 
--	if (i == (host->dma.num_ents - 1))
-+	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
-+	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
-+			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
-+	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+ #include <asm/leds.h>
+ #include <asm/irq.h>
++#include <asm/sched_clock.h>
 +
-+	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
-+			host->dma.num_ents, host->dma.dir);
-+	if (n == 0) {
-+		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
-+			mmc_hostname(host->mmc));
-+		host->dma.sg = NULL;
-+		host->dma.num_ents = 0;
-+		return -ENOMEM;
-+	}
-+
-+	for_each_sg(host->dma.sg, sg, n, i) {
-+		if (i == n - 1)
- 			box->cmd |= CMD_LC;
- 		rows = (sg_dma_len(sg) % MCI_FIFOSIZE) ?
- 			(sg_dma_len(sg) / MCI_FIFOSIZE) + 1 :
-@@ -418,27 +431,6 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
- 			box->cmd |= CMD_DST_CRCI(crci);
- 		}
- 		box++;
--		sg++;
--	}
--
--	/* location of command block must be 64 bit aligned */
--	BUG_ON(host->dma.cmd_busaddr & 0x07);
--
--	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
--	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
--			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
--	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
--
--	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
--			host->dma.num_ents, host->dma.dir);
--/* dsb inside dma_map_sg will write nc out to mem as well */
--
--	if (n != host->dma.num_ents) {
--		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
--			mmc_hostname(host->mmc));
--		host->dma.sg = NULL;
--		host->dma.num_ents = 0;
--		return -ENOMEM;
- 	}
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
  
- 	return 0;
--- 
-1.7.0.4
-
--- 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+@@ -67,7 +70,7 @@ typedef struct {
+ ((volatile omap_mpu_timer_regs_t*)OMAP1_IO_ADDRESS(OMAP_MPU_TIMER_BASE +	\
+ 				 (n)*OMAP_MPU_TIMER_OFFSET))
+ 
+-static inline unsigned long omap_mpu_timer_read(int nr)
++static inline unsigned long notrace omap_mpu_timer_read(int nr)
+ {
+ 	volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
+ 	return timer->read_tim;
+@@ -212,11 +215,21 @@ static struct clocksource clocksource_mpu = {
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
++static DEFINE_CLOCK_DATA(cd);
++
++static void notrace mpu_update_sched_clock(void)
++{
++	u32 cyc = mpu_read(&clocksource_mpu);
++	update_sched_clock(&cd, cyc, (u32)~0);
++}
++
+ static void __init omap_init_clocksource(unsigned long rate)
+ {
+ 	static char err[] __initdata = KERN_ERR
+ 			"%s: can't register clocksource!\n";
+ 
++	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
++
+ 	setup_irq(INT_TIMER2, &omap_mpu_timer2_irq);
+ 	omap_mpu_timer_start(1, ~0, 1);
+ 
