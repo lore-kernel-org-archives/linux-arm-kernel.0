@@ -1,36 +1,92 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Jan 2011 15:11:10 +0000
-Subject: [PATCH 01/14] ARM: bitops: ensure set/clear/change bitops take a
-	word-aligned pointer
-In-Reply-To: <alpine.LFD.2.00.1101180043140.8580@xanadu.home>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peudk-0003SJ-Aj@rmk-PC.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101180043140.8580@xanadu.home>
-Message-ID: <AANLkTim+0nimacapGBuestYUkC4KuShSQdcHFCFa7O9b@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Jan 2011 16:17:47 +0100
+Subject: Why call calibrate_delay() in smp.c: secondary_start_kernel()
+In-Reply-To: <ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
+References: <4D3552C2.3020101@stericsson.com>
+	<ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
+Message-ID: <AANLkTinzBxM41K8r2mN==_9JTEBP+NUZ-oR1wnJmvbh=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 January 2011 06:00, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Mon, 17 Jan 2011, Russell King - ARM Linux wrote:
->
->> Add additional instructions to our assembly bitops functions to ensure
->> that they only operate on word-aligned pointers. ?This will be necessary
->> when we switch these operations to use the word-based exclusive
->> operations.
->>
->> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->
-> This breaks the Thumb2 kernel build:
->
-> ?AS ? ? ?arch/arm/lib/changebit.o
-> arch/arm/lib/changebit.S: Assembler messages:
-> arch/arm/lib/changebit.S:16: Error: Thumb does not support negative register indexing -- `strne r1,[r1,-r1]'
->
-> I also wonder what happens with a misaligned ldrex/strex... Does the
-> alignment trap get invoked?
+2011/1/18 Santosh Shilimkar <santosh.shilimkar@ti.com>:
 
-According to the ARM ARM, unaligned ldrex/strex should generate an
-alignment fault on ARMv6 (with SCTLR.U bit set) and ARMv7.
+> +config ARCH_SKIP_SECONDARY_CALIBRATE
+> + ? ? ? bool "Skip secondary CPU calibration"
+> + ? ? ? depends on SMP
+> + ? ? ? help
+> + ? ? ? ? On some architectures, secondary cores shares clock with
+> primiary
+> + ? ? ? ? core and hence scale together. Hence secondary core lpj
+> calibration
+> + ? ? ? ? is not necessary and can be skipped to save considerable time.
+> +
+> + ? ? ? ? If unsure, say n.
 
--- 
-Catalin
+Why do you want to select that manually? Surely the kernel
+writer should know whether the cores are clocked together
+or not. Just:
+
+config ARCH_HAS_COMMON_CORES_CLOCK
+      bool
+      depends on SMP
+
+This will be default "n" so archs that want to flag to the
+build system that the core clock is common can e.g.:
+
+config ARCH_U8500
+        bool "ST-Ericsson U8500 Series"
+        select CPU_V7
++       select ARCH_HAS_COMMON_CORES_CLOCK
+
+Looks reasonable? (And feel free to add that to U8500
+as part of the patch.)
+
+> ?/*
+> + * Skip the secondary calibration on architectures sharing clock
+> + * with primary cpu. Archs can use ARCH_SKIP_SECONDARY_CALIBRATE
+> + * for this.
+> + */
+> +static inline int skip_secondary_calibrate(void)
+
+bool? Returning an error code seem overdesigned for a function
+named like that.
+
+Also the name is misleading, if you look at how you
+use it, it should be named "do_not_skip_secondary_calibrate()".
+
+> +{
+> +#ifdef CONFIG_ARCH_SKIP_SECONDARY_CALIBRATE
+> + ? ? ? return 0;
+
+return false;
+
+> +#else
+> + ? ? ? return -ENXIO;
+
+return true;
+
+> +#endif
+> +}
+
+
+> +
+> +/*
+> ?* This is the secondary CPU boot entry. ?We're using this CPUs
+> ?* idle thread stack, but a set of temporary page tables.
+> ?*/
+> @@ -312,7 +326,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+> ? ? ? ? */
+> ? ? ? ?percpu_timer_setup();
+>
+> - ? ? ? calibrate_delay();
+> + ? ? ? if (skip_secondary_calibrate())
+> + ? ? ? ? ? ? ? calibrate_delay();
+
+Change sematics of that function and
+if (!skip_secondary_calibrate())
+  ...
+
+> ? ? ? ?smp_store_cpu_info(cpu);
+
+...and thanks for driving this!
+Linus Walleij
