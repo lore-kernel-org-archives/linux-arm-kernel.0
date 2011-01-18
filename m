@@ -1,33 +1,47 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 18 Jan 2011 09:52:39 +0200
-Subject: [PATCH 1/7] arm: plat-omap: dma: make omap_dma_in_1510_mode() static
-In-Reply-To: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <1295337165-22934-2-git-send-email-aaro.koskinen@iki.fi>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 18 Jan 2011 16:54:58 +0900
+Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
+	<20101211192320.GA24430@void.printf.net>
+	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
+Message-ID: <4D354752.3030401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eliminates the following sparse warning:
+Hi Will.
 
-	arch/arm/plat-omap/dma.c:137:5: warning: symbol 'omap_dma_in_1510_mode' was not declared. Should it be static?
+I have some question...i'm testing dw_mmc in our environment.
+but i didn't understand pdata->init(?)...what initialize in there?
 
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- arch/arm/plat-omap/dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+plz let me know that..
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index c4b2b47..28cdac2 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -134,7 +134,7 @@ static inline void omap_enable_channel_irq(int lch);
- 
- #ifdef CONFIG_ARCH_OMAP15XX
- /* Returns 1 if the DMA module is in OMAP1510-compatible mode, 0 otherwise */
--int omap_dma_in_1510_mode(void)
-+static int omap_dma_in_1510_mode(void)
- {
- 	return enable_1510_mode;
- }
--- 
-1.5.6.5
+Thanks
+Jaehoon Chung
+
+Will Newton wrote:
+
+> +	host->pdev = pdev;
+> +	host->pdata = pdata = pdev->dev.platform_data;
+> +	if (!pdata || !pdata->init) {
+> +		dev_err(&pdev->dev,
+> +			"Platform data must supply init function\n");
+> +		ret = -ENODEV;
+> +		goto err_freehost;
+> +	}
+> +
+> +	if (!pdata->select_slot && pdata->num_slots > 1) {
+> +		dev_err(&pdev->dev,
+> +			"Platform data must supply select_slot function\n");
+> +		ret = -ENODEV;
+> +		goto err_freehost;
+> +	}
+> +
+>
