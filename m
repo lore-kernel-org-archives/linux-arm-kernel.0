@@ -1,353 +1,196 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 19 Jan 2011 00:09:36 +0100
-Subject: [PATCH v3 4/6] OMAP4: hwmod data: Add McSPI
-In-Reply-To: <AANLkTikjDBHXKgqJwDrrZCY6j6x7adWBvjb-KXzdWbzt@mail.gmail.com>
-References: <32203.10.24.255.18.1295274218.squirrel@dbdmail.itg.ti.com>
-	<87wrm35w9g.fsf@ti.com>
-	<AANLkTikjDBHXKgqJwDrrZCY6j6x7adWBvjb-KXzdWbzt@mail.gmail.com>
-Message-ID: <4D361DB0.3030205@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 19 Jan 2011 00:38:09 +0100
+Subject: [PATCH RFC] arm: omap3evm: Add support for an MT9M032 based
+	camera board.
+In-Reply-To: <1295389936-3238-1-git-send-email-martin@neutronstar.dyndns.org>
+References: <1295389936-3238-1-git-send-email-martin@neutronstar.dyndns.org>
+Message-ID: <201101190038.14123.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Govindraj,
+Hi Martin,
 
-On 1/18/2011 7:30 AM, Govindraj wrote:
-> On Mon, Jan 17, 2011 at 9:59 PM, Kevin Hilman<khilman@ti.com>  wrote:
->> "Govindraj.R"<govindraj.raja@ti.com>  writes:
->>
->>> Update omap4 hwmod file with McSPI info.
->>>
->>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->>> Signed-off-by: Charulatha V<charu@ti.com>
->>> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
->>> Acked-by: Grant Likely<grant.likely@secretlab.ca>
->>
->> Shouldn't Benoit be the author of this patch?
->
-> Sorry my mistake, will give a quick respin and post out a new version
-> today.
+Thanks for the patch.
 
-Since you will respin, could you please fix the position of the data in 
-order to stick to the original one? Same thing for the list at the end.
+On Tuesday 18 January 2011 23:32:16 Martin Hostettler wrote:
+> Adds board support for an MT9M032 based camera to omap3evm.
+> 
+> Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+> ---
+>  arch/arm/mach-omap2/Makefile                |    1 +
+>  arch/arm/mach-omap2/board-omap3evm-camera.c |  177 ++++++++++++++++++++++++
+>  2 files changed, 178 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
 
-One flag introduced in 2.6.38 is missing, and the flags are now sorted. 
-See comments below.
+Is there a special reason to add camera support to a separate file ?
 
-If you need to check what should be the final result after the merge of 
-every hwmods series, you can check here:
-git://gitorious.org/omap-pm/linux.git pm-wip/hwmods-omap4-full
+Of course not all OMAP3 EVM systems will use an MT9M032 sensor, so some kind 
+of modularity (and if possible runtime configuration) will be needed.
 
->
-> --
-> Thanks,
-> Govindraj.R
->
->>
->> Kevin
->>
->>> ---
->>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  266 ++++++++++++++++++++++++++++
->>>   1 files changed, 266 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> index c2806bd..d4cd695 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> @@ -24,6 +24,7 @@
->>>   #include<plat/cpu.h>
->>>   #include<plat/gpio.h>
->>>   #include<plat/dma.h>
->>> +#include<plat/mcspi.h>
->>>
->>>   #include "omap_hwmod_common_data.h"
->>>
->>> @@ -2001,6 +2002,265 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
->>>        .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>>   };
->>>
->>> +/*
->>> + * 'mcspi' class
->>> + * multichannel serial port interface (mcspi) / master/slave synchronous serial
->>> + * bus
->>> + */
->>> +
->>> +static struct omap_hwmod_class_sysconfig omap44xx_mcspi_sysc = {
->>> +     .rev_offs       = 0x0000,
->>> +     .sysc_offs      = 0x0010,
->>> +     .sysc_flags     = (SYSC_HAS_SIDLEMODE | SYSC_HAS_EMUFREE |
->>> +                        SYSC_HAS_SOFTRESET | SYSC_HAS_RESET_STATUS),
+[snip]
 
-The order is slightly different due to a sort that was not done before.
+> diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
+> b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
+> index 0000000..ea82a49
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
+> @@ -0,0 +1,177 @@
 
-	  .sysc_flags = (SYSC_HAS_EMUFREE | SYSC_HAS_RESET_STATUS |
-			 SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
-
-	>>> +     .idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-
-SIDLE_SMART_WKUP is missing
+[snip]
 
 
->>> +     .sysc_fields    =&omap_hwmod_sysc_type2,
->>> +};
->>> +
->>> +static struct omap_hwmod_class omap44xx_mcspi_hwmod_class = {
->>> +     .name = "mcspi",
->>> +     .sysc =&omap44xx_mcspi_sysc,
->>> +     .rev = OMAP4_MCSPI_REV,
->>> +};
->>> +
->>> +/* mcspi1 */
->>> +static struct omap_hwmod omap44xx_mcspi1_hwmod;
->>> +static struct omap_hwmod_irq_info omap44xx_mcspi1_irqs[] = {
->>> +     { .irq = 65 + OMAP44XX_IRQ_GIC_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_dma_info omap44xx_mcspi1_sdma_reqs[] = {
->>> +     { .name = "tx0", .dma_req = 34 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx0", .dma_req = 35 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "tx1", .dma_req = 36 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx1", .dma_req = 37 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "tx2", .dma_req = 38 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx2", .dma_req = 39 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "tx3", .dma_req = 40 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx3", .dma_req = 41 + OMAP44XX_DMA_REQ_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_addr_space omap44xx_mcspi1_addrs[] = {
->>> +     {
->>> +             .pa_start       = 0x48098000,
->>> +             .pa_end         = 0x480981ff,
->>> +             .flags          = ADDR_TYPE_RT
->>> +     },
->>> +};
->>> +
->>> +/* l4_per ->  mcspi1 */
->>> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi1 = {
->>> +     .master         =&omap44xx_l4_per_hwmod,
->>> +     .slave          =&omap44xx_mcspi1_hwmod,
->>> +     .clk            = "l4_div_ck",
->>> +     .addr           = omap44xx_mcspi1_addrs,
->>> +     .addr_cnt       = ARRAY_SIZE(omap44xx_mcspi1_addrs),
->>> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
->>> +};
->>> +
->>> +/* mcspi1 slave ports */
->>> +static struct omap_hwmod_ocp_if *omap44xx_mcspi1_slaves[] = {
->>> +&omap44xx_l4_per__mcspi1,
->>> +};
->>> +
->>> +static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
->>> +     .num_chipselect = 4,
->>> +};
->>> +
->>> +static struct omap_hwmod omap44xx_mcspi1_hwmod = {
->>> +     .name           = "mcspi1",
->>> +     .class          =&omap44xx_mcspi_hwmod_class,
->>> +     .mpu_irqs       = omap44xx_mcspi1_irqs,
->>> +     .mpu_irqs_cnt   = ARRAY_SIZE(omap44xx_mcspi1_irqs),
->>> +     .sdma_reqs      = omap44xx_mcspi1_sdma_reqs,
->>> +     .sdma_reqs_cnt  = ARRAY_SIZE(omap44xx_mcspi1_sdma_reqs),
->>> +     .main_clk       = "mcspi1_fck",
->>> +     .prcm = {
->>> +             .omap4 = {
->>> +                     .clkctrl_reg = OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
->>> +             },
->>> +     },
->>> +     .slaves         = omap44xx_mcspi1_slaves,
->>> +     .slaves_cnt     = ARRAY_SIZE(omap44xx_mcspi1_slaves),
->>> +     .dev_attr       =&omap_mcspi1_dev_attr,
->>> +     .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> +};
->>> +
->>> +/* mcspi2 */
->>> +static struct omap_hwmod omap44xx_mcspi2_hwmod;
->>> +static struct omap_hwmod_irq_info omap44xx_mcspi2_irqs[] = {
->>> +     { .irq = 66 + OMAP44XX_IRQ_GIC_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_dma_info omap44xx_mcspi2_sdma_reqs[] = {
->>> +     { .name = "tx0", .dma_req = 42 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx0", .dma_req = 43 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "tx1", .dma_req = 44 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx1", .dma_req = 45 + OMAP44XX_DMA_REQ_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_addr_space omap44xx_mcspi2_addrs[] = {
->>> +     {
->>> +             .pa_start       = 0x4809a000,
->>> +             .pa_end         = 0x4809a1ff,
->>> +             .flags          = ADDR_TYPE_RT
->>> +     },
->>> +};
->>> +
->>> +/* l4_per ->  mcspi2 */
->>> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi2 = {
->>> +     .master         =&omap44xx_l4_per_hwmod,
->>> +     .slave          =&omap44xx_mcspi2_hwmod,
->>> +     .clk            = "l4_div_ck",
->>> +     .addr           = omap44xx_mcspi2_addrs,
->>> +     .addr_cnt       = ARRAY_SIZE(omap44xx_mcspi2_addrs),
->>> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
->>> +};
->>> +
->>> +/* mcspi2 slave ports */
->>> +static struct omap_hwmod_ocp_if *omap44xx_mcspi2_slaves[] = {
->>> +&omap44xx_l4_per__mcspi2,
->>> +};
->>> +
->>> +static struct omap2_mcspi_dev_attr omap_mcspi2_dev_attr = {
->>> +     .num_chipselect = 2,
->>> +};
->>> +
->>> +static struct omap_hwmod omap44xx_mcspi2_hwmod = {
->>> +     .name           = "mcspi2",
->>> +     .class          =&omap44xx_mcspi_hwmod_class,
->>> +     .mpu_irqs       = omap44xx_mcspi2_irqs,
->>> +     .mpu_irqs_cnt   = ARRAY_SIZE(omap44xx_mcspi2_irqs),
->>> +     .sdma_reqs      = omap44xx_mcspi2_sdma_reqs,
->>> +     .sdma_reqs_cnt  = ARRAY_SIZE(omap44xx_mcspi2_sdma_reqs),
->>> +     .main_clk       = "mcspi2_fck",
->>> +     .prcm = {
->>> +             .omap4 = {
->>> +                     .clkctrl_reg = OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
->>> +             },
->>> +     },
->>> +     .slaves         = omap44xx_mcspi2_slaves,
->>> +     .slaves_cnt     = ARRAY_SIZE(omap44xx_mcspi2_slaves),
->>> +     .dev_attr       =&omap_mcspi2_dev_attr,
->>> +     .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> +};
->>> +
->>> +/* mcspi3 */
->>> +static struct omap_hwmod omap44xx_mcspi3_hwmod;
->>> +static struct omap_hwmod_irq_info omap44xx_mcspi3_irqs[] = {
->>> +     { .irq = 91 + OMAP44XX_IRQ_GIC_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_dma_info omap44xx_mcspi3_sdma_reqs[] = {
->>> +     { .name = "tx0", .dma_req = 14 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx0", .dma_req = 15 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "tx1", .dma_req = 22 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx1", .dma_req = 23 + OMAP44XX_DMA_REQ_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_addr_space omap44xx_mcspi3_addrs[] = {
->>> +     {
->>> +             .pa_start       = 0x480b8000,
->>> +             .pa_end         = 0x480b81ff,
->>> +             .flags          = ADDR_TYPE_RT
->>> +     },
->>> +};
->>> +
->>> +/* l4_per ->  mcspi3 */
->>> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi3 = {
->>> +     .master         =&omap44xx_l4_per_hwmod,
->>> +     .slave          =&omap44xx_mcspi3_hwmod,
->>> +     .clk            = "l4_div_ck",
->>> +     .addr           = omap44xx_mcspi3_addrs,
->>> +     .addr_cnt       = ARRAY_SIZE(omap44xx_mcspi3_addrs),
->>> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
->>> +};
->>> +
->>> +/* mcspi3 slave ports */
->>> +static struct omap_hwmod_ocp_if *omap44xx_mcspi3_slaves[] = {
->>> +&omap44xx_l4_per__mcspi3,
->>> +};
->>> +
->>> +static struct omap2_mcspi_dev_attr omap_mcspi3_dev_attr = {
->>> +     .num_chipselect = 2,
->>> +};
->>> +
->>> +static struct omap_hwmod omap44xx_mcspi3_hwmod = {
->>> +     .name           = "mcspi3",
->>> +     .class          =&omap44xx_mcspi_hwmod_class,
->>> +     .mpu_irqs       = omap44xx_mcspi3_irqs,
->>> +     .mpu_irqs_cnt   = ARRAY_SIZE(omap44xx_mcspi3_irqs),
->>> +     .sdma_reqs      = omap44xx_mcspi3_sdma_reqs,
->>> +     .sdma_reqs_cnt  = ARRAY_SIZE(omap44xx_mcspi3_sdma_reqs),
->>> +     .main_clk       = "mcspi3_fck",
->>> +     .prcm = {
->>> +             .omap4 = {
->>> +                     .clkctrl_reg = OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
->>> +             },
->>> +     },
->>> +     .slaves         = omap44xx_mcspi3_slaves,
->>> +     .slaves_cnt     = ARRAY_SIZE(omap44xx_mcspi3_slaves),
->>> +     .dev_attr       =&omap_mcspi3_dev_attr,
->>> +     .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> +};
->>> +
->>> +/* mcspi4 */
->>> +static struct omap_hwmod omap44xx_mcspi4_hwmod;
->>> +static struct omap_hwmod_irq_info omap44xx_mcspi4_irqs[] = {
->>> +     { .irq = 48 + OMAP44XX_IRQ_GIC_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_dma_info omap44xx_mcspi4_sdma_reqs[] = {
->>> +     { .name = "tx0", .dma_req = 69 + OMAP44XX_DMA_REQ_START },
->>> +     { .name = "rx0", .dma_req = 70 + OMAP44XX_DMA_REQ_START },
->>> +};
->>> +
->>> +static struct omap_hwmod_addr_space omap44xx_mcspi4_addrs[] = {
->>> +     {
->>> +             .pa_start       = 0x480ba000,
->>> +             .pa_end         = 0x480ba1ff,
->>> +             .flags          = ADDR_TYPE_RT
->>> +     },
->>> +};
->>> +
->>> +/* l4_per ->  mcspi4 */
->>> +static struct omap_hwmod_ocp_if omap44xx_l4_per__mcspi4 = {
->>> +     .master         =&omap44xx_l4_per_hwmod,
->>> +     .slave          =&omap44xx_mcspi4_hwmod,
->>> +     .clk            = "l4_div_ck",
->>> +     .addr           = omap44xx_mcspi4_addrs,
->>> +     .addr_cnt       = ARRAY_SIZE(omap44xx_mcspi4_addrs),
->>> +     .user           = OCP_USER_MPU | OCP_USER_SDMA,
->>> +};
->>> +
->>> +/* mcspi4 slave ports */
->>> +static struct omap_hwmod_ocp_if *omap44xx_mcspi4_slaves[] = {
->>> +&omap44xx_l4_per__mcspi4,
->>> +};
->>> +
->>> +static struct omap2_mcspi_dev_attr omap_mcspi4_dev_attr = {
->>> +     .num_chipselect = 1,
->>> +};
->>> +
->>> +static struct omap_hwmod omap44xx_mcspi4_hwmod = {
->>> +     .name           = "mcspi4",
->>> +     .class          =&omap44xx_mcspi_hwmod_class,
->>> +     .mpu_irqs       = omap44xx_mcspi4_irqs,
->>> +     .mpu_irqs_cnt   = ARRAY_SIZE(omap44xx_mcspi4_irqs),
->>> +     .sdma_reqs      = omap44xx_mcspi4_sdma_reqs,
->>> +     .sdma_reqs_cnt  = ARRAY_SIZE(omap44xx_mcspi4_sdma_reqs),
->>> +     .main_clk       = "mcspi4_fck",
->>> +     .prcm = {
->>> +             .omap4 = {
->>> +                     .clkctrl_reg = OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
->>> +             },
->>> +     },
->>> +     .slaves         = omap44xx_mcspi4_slaves,
->>> +     .slaves_cnt     = ARRAY_SIZE(omap44xx_mcspi4_slaves),
->>> +     .dev_attr       =&omap_mcspi4_dev_attr,
->>> +     .omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> +};
->>> +
->>>   static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->>>
->>>        /* dmm class */
->>> @@ -2068,6 +2328,12 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
->>>        &omap44xx_wd_timer2_hwmod,
->>>        &omap44xx_wd_timer3_hwmod,
->>>
->>> +     /* mcspi class */
->>> +&omap44xx_mcspi1_hwmod,
->>> +&omap44xx_mcspi2_hwmod,
->>> +&omap44xx_mcspi3_hwmod,
->>> +&omap44xx_mcspi4_hwmod,
+> +/*
+> + * Copyright (C) 2010-2011 Lund Engineering
+> + * Contact: Gil Lund <gwlund@lundeng.com>
+> + * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+> + * 02110-1301 USA
+> + */
+> +
+> +#include <linux/i2c.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <asm/gpio.h>
+> +#include <plat/mux.h>
+> +#include "mux.h"
+> +
+> +#include "../../../drivers/media/video/isp/isp.h"
+> +#include "../../../drivers/media/video/mt9m032.h"
 
-mcspi should not be after wd_timer.
+mt9m032.h should be moved to include/media (the same is true for isp.h as 
+well, I'll probably split it and move the part required by board files to 
+include/media/omap3isp.h).
 
+> +#include "devices.h"
+> +
+> +#define EVM_TWL_GPIO_BASE OMAP_MAX_GPIO_LINES
+> +#define GPIO98_VID_DEC_RES	98
+> +#define nCAM_VD_SEL		157
+> +
+> +#define MT9M032_I2C_BUS_NUM	2
+> +
+> +
+> +enum omap3evmdc_mux {
+> +	MUX_TVP5146,
+> +	MUX_CAMERA_SENSOR,
+> +	MUX_EXP_CAMERA_SENSOR,
+> +};
+> +
+> +/**
+> + * omap3evm_set_mux - Sets mux to enable signal routing to
+> + *                           different peripherals present on new EVM
+> board + * @mux_id: enum, mux id to enable
+> + *
+> + * Returns 0 for success or a negative error code
+> + */
+> +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
+> +{
+> +	/* Set GPIO6 = 1 */
+> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
+> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> +
+> +	switch (mux_id) {
+> +	case MUX_TVP5146:
+> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> +		gpio_set_value(nCAM_VD_SEL, 1);
+> +		break;
+> +
+> +	case MUX_CAMERA_SENSOR:
+> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> +		gpio_set_value(nCAM_VD_SEL, 0);
+> +		break;
+> +
+> +	case MUX_EXP_CAMERA_SENSOR:
+> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
+> +		break;
+> +
+> +	default:
+> +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+
+> +static int __init camera_init(void)
+> +{
+> +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
+> +	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL") < 0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
+> +		       nCAM_VD_SEL);
+> +		goto err;
+
+You can return -EINVAL directly here. This removes the need for the 'err' 
+label.
+
+> +	}
+> +	if (gpio_direction_output(nCAM_VD_SEL, 1) < 0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_SEL(%d)
+> direction\n", +		       nCAM_VD_SEL);
+> +		goto err_vdsel;
+> +	}
+> +
+> +	if (gpio_request(EVM_TWL_GPIO_BASE + 2, "T2_GPIO2") < 0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO T2_GPIO2(%d)\n",
+> +		       EVM_TWL_GPIO_BASE + 2);
+> +		goto err_vdsel;
+> +	}
+> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 2, 0) < 0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO T2_GPIO2(%d) direction\n",
+> +		       EVM_TWL_GPIO_BASE + 2);
+> +		goto err_2;
+> +	}
+> +
+> +	if (gpio_request(EVM_TWL_GPIO_BASE + 8, "nCAM_VD_EN") < 0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_EN(%d)\n",
+> +		       EVM_TWL_GPIO_BASE + 8);
+> +		goto err_2;
+> +	}
+> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 8, 0) < 0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_EN(%d) direction\n",
+> +		       EVM_TWL_GPIO_BASE + 8);
+> +		goto err_8;
+> +	}
+> +
+> +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
+> +
+> +
+> +	return omap3_init_camera(&isp_platform_data);
+
+If this call fails, shouldn't you free the GPIOs ?
+
+> +
+> +err_8:
+> +	gpio_free(EVM_TWL_GPIO_BASE + 8);
+> +err_2:
+> +	gpio_free(EVM_TWL_GPIO_BASE + 2);
+> +err_vdsel:
+> +	gpio_free(nCAM_VD_SEL);
+> +err:
+> +	return -EINVAL;
+> +}
+> +
+> +device_initcall(camera_init);
+
+If the code is kept in its own file, you should make camera_init non-static 
+(and rename it) and call it from the OMAP3 EVM initialization function 
+instead.
+
+-- 
 Regards,
-Benoit
+
+Laurent Pinchart
