@@ -1,34 +1,36 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:41:29 +0530
-Subject: [PATCH V4 01/62] spear/vmalloc.h: Appending UL to VMALLOC_END
+Date: Tue, 18 Jan 2011 12:41:30 +0530
+Subject: [PATCH V4 02/62] sp810 Fix: Switch to slow mode before
+	sysctl_soft_reset
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <5e12474cf3913556a8cd4c4484a7884cebb60db2.1295333957.git.viresh.kumar@st.com>
+Message-ID: <1d7f323f40c3a6b55e7a321f762b7f8e8c4fac06.1295333957.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes following warning:
-mm/init.c:606: warning: format '%08lx' expects type 'long unsigned int', but
-argument 12 has type 'unsigned int'
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
-by appending UL to VMALLOC_END's Number.
+Before resetting system from system controller, switching to slow
+mode is required.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 ---
- arch/arm/plat-spear/include/plat/vmalloc.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/hardware/sp810.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-spear/include/plat/vmalloc.h b/arch/arm/plat-spear/include/plat/vmalloc.h
-index 09e9372..8c8b24d 100644
---- a/arch/arm/plat-spear/include/plat/vmalloc.h
-+++ b/arch/arm/plat-spear/include/plat/vmalloc.h
-@@ -14,6 +14,6 @@
- #ifndef __PLAT_VMALLOC_H
- #define __PLAT_VMALLOC_H
+diff --git a/arch/arm/include/asm/hardware/sp810.h b/arch/arm/include/asm/hardware/sp810.h
+index a101f10..6e3bafd 100644
+--- a/arch/arm/include/asm/hardware/sp810.h
++++ b/arch/arm/include/asm/hardware/sp810.h
+@@ -52,6 +52,9 @@
  
--#define VMALLOC_END		0xF0000000
-+#define VMALLOC_END		0xF0000000UL
- 
- #endif /* __PLAT_VMALLOC_H */
+ static inline void sysctl_soft_reset(void __iomem *base)
+ {
++	/* switch to slow mode */
++	writel(0x2, base + SCCTRL);
++
+ 	/* writing any value to SCSYSSTAT reg will reset system */
+ 	writel(0, base + SCSYSSTAT);
+ }
 -- 
 1.7.2.2
