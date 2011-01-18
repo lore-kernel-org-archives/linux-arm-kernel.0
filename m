@@ -1,81 +1,56 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 18 Jan 2011 13:05:49 +0100
-Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <AANLkTinJPyXKWwbyW05+HUW0LJUxsu=1Exbrr6ut27Kr@mail.gmail.com>
-References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
-	<20110114155806.GA22505@n2100.arm.linux.org.uk>
-	<AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
-	<20110114173400.GB22505@n2100.arm.linux.org.uk>
-	<AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
-	<AANLkTinJPyXKWwbyW05+HUW0LJUxsu=1Exbrr6ut27Kr@mail.gmail.com>
-Message-ID: <AANLkTikPm8_vxjF7P84q7kHq+XSvLyF+jToFt=COs8Mj@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 18 Jan 2011 17:42:22 +0530
+Subject: Why call calibrate_delay() in smp.c: secondary_start_kernel()
+In-Reply-To: <20110118113111.GA9719@n2100.arm.linux.org.uk>
+References: <4D3552C2.3020101@stericsson.com>
+	<ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
+	<20110118113111.GA9719@n2100.arm.linux.org.uk>
+Message-ID: <eadb9f7e95a290b415baaa1d35547528@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave, Russell,
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, January 18, 2011 5:01 PM
+> To: Santosh Shilimkar
+> Cc: Jonas Aaberg; linux-arm-kernel at lists.infradead.org;
+> STEricsson_nomadik_linux
+> Subject: Re: Why call calibrate_delay() in smp.c:
+> secondary_start_kernel()
+>
+> On Tue, Jan 18, 2011 at 03:46:54PM +0530, Santosh Shilimkar wrote:
+> > I did send a patch on the same some time back but the conclusion
+> > was we still need to have calibration.
+> >
+> > Have one more patch do deal with it so that platform can choose
+> > if they like to skip. My mailer might screw the patch hence
+> attaching
+> > the same
+>
+> Actually, the secondary cores probably get a far more accurate lpj
+> than the primary core as they don't have the interference from the
+> timer interrupt.  So - if we care - we probably want to update the
+> primary lpj with the secondary's calibration value at boot.
+>
+> On the measurements I've made a couple of weeks ago, the lpj value
+> can be .7% too slow, resulting in udelay() giving shorter than
+> requested delays.  I asked Linus about that, and he's happy with
+> that figure.
+>
+> So the myth which floats around on various lists about udelay()
+> giving
+> at least the requested delay is just that - a myth.  It has always
+> given _approximately_ the requested delay on all architectures with
+> software loop based implementations (as well as, according to Linus,
+> some x86 tsc implementations of udelay.)
 
-On Mon, Jan 17, 2011 at 4:46 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Mon, Jan 17, 2011 at 2:01 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
->> On Fri, Jan 14, 2011 at 6:34 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Fri, Jan 14, 2011 at 05:13:01PM +0100, Jean Pihet wrote:
->>>> Is the name 'omap_sram_push' wrong then?
->>>> What about the following?
->>>> @@ -251,9 +251,8 @@ void * omap_sram_push(void * start, unsigned long size)
->>>>
->>>> ? ? ? ?omap_sram_ceil -= size;
->>>> ? ? ? ?omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
->>>> ?- ? ? memcpy((void *)omap_sram_ceil, start, size);
->>>> ?- ? ? flush_icache_range((unsigned long)omap_sram_ceil,
->>>> ?- ? ? ? ? ? ? (unsigned long)(omap_sram_ceil + size));
->>>>
->>>> ?- ? ? return (void *)omap_sram_ceil;
->>>> ?+ ? ?return fncpy((void *)omap_sram_ceil, start, size);
->>>
->>> It's more correct, but still missing out on the type safety which we've
->>> tried to provide with fncpy.
->> IIUC the type of the function is propagated from the 2nd argument
->> (funcp) to the return value, which is fine here. The (void)* is here
->> only to avoid a warning thrown by memcpy.
->
-> I think Russell's argument was that the compiler will not notice if
-> you mismatch the return type and the function to be copied, because
-> the casts to/from void * make the compiler blind to the real types
-> involved. ?So:
->
-> int f(int);
-> size_t size_of_f;
->
-> void *buffer;
-> int (*_copied_f1)(int);
-> char *(*_copied_f2)(char *);
->
-> _copied_f1 = fncpy(buffer, f, size_of_f); /* OK */
-> _copied_f2 = fncpy(buffer, f, size_of_f); /* compile error */
-> _copied_f1 = omap_sram_push(f, size_of_f); /* OK */
-> _copied_f2 = opam_sram_push(f, size_of_f); /* type mismatch, but
-> compilation succeeds */
->
->
-> One way to work around this is would be to make omap_sram_push() a macro:
->
-> #define omap_sram_push(funcp, size) \
-> ? ?(typeof(funcp))_do_omap_sram_push((void *)(funcp), size)
->
-> ... where the definition of _do_omap_sram_push() is the same is the
-> existing definition of omap_sram_push(). ?Providing
-> _do_omap_sram_push() is not called directly, this should now be
-> type-safe.
->
-Ok I reworked the patch from your suggestions. Indeed a few functions
-types mismatch have been spotted and corrected using the fncpy API.
+Ok. Since the udelay() accuracy is acceptable now, what you think
+of my latest patch.
 
-New patch sent as '[PATCH v2] OMAP: use fncpy to copy the PM code
-functions to SRAM'.
->
-> Cheers
-> ---Dave
->
+It does help for the archs which are ok to skip the calibration .
+And since it's configurable with the proposed patch,
+the default kernel behavior is maintained if the option isn't
+selected.
 
-Thanks,
-Jean
+Regards,
+Santosh
