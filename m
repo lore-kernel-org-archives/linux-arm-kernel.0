@@ -1,39 +1,62 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 22:41:04 +0000
-Subject: [PATCH] drivers: mmc: msm: update to new arm pfn_to_dma API
-In-Reply-To: <1295386138.26904.70.camel@c-dwalke-linux.qualcomm.com>
-References: <1295373844-27713-1-git-send-email-dwalker@codeaurora.org>
-	<20110118182826.GI16980@n2100.arm.linux.org.uk>
-	<1295382134.26904.7.camel@c-dwalke-linux.qualcomm.com>
-	<20110118204446.GL16980@n2100.arm.linux.org.uk>
-	<1295384420.26904.56.camel@c-dwalke-linux.qualcomm.com>
-	<20110118211606.GM16980@n2100.arm.linux.org.uk>
-	<1295386138.26904.70.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <20110118224104.GN16980@n2100.arm.linux.org.uk>
+Date: Tue, 18 Jan 2011 22:41:59 +0000
+Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
+In-Reply-To: <1295389518-6249-1-git-send-email-dwalker@codeaurora.org>
+References: <1295389518-6249-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <20110118224159.GO16980@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 01:28:58PM -0800, Daniel Walker wrote:
-> On Tue, 2011-01-18 at 21:16 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Jan 18, 2011 at 01:00:20PM -0800, Daniel Walker wrote:
-> > > Just greping the driver I found at least one writel() .. I'm not really
-> > > concerned with that tho. I use this driver, I need this driver to work.
-> > > You broke the driver, and your NAK'ing the fix ..
-> > 
-> > If drivers use documented internal APIs, they _will_ break, and that's
-> > tough luck.  The advertised API (DMA-mapping) is what we guarantee to
-> > support and fixup drivers for.
+On Tue, Jan 18, 2011 at 02:25:18PM -0800, Daniel Walker wrote:
+> This doesn't work yet. I tried booting with this patch, and the boot
+> stops after detecting the MMC partitions. It won't actually boot off
+> the MMC. Without this patch and with the page_to_dma/pfn_to_dma changes
+> it does work.
 > 
-> I don't think that's a good policy. There could be reasons why a driver
-> might use an internal API .. Breaking the build is worse, to me, than
-> using an internal API.
+> Not-Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
+> ---
+>  drivers/mmc/host/msm_sdcc.c |   46 +++++++++++++++++-------------------------
+>  1 files changed, 19 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+> index 5decfd0..1f1c7cb 100644
+> --- a/drivers/mmc/host/msm_sdcc.c
+> +++ b/drivers/mmc/host/msm_sdcc.c
+> @@ -383,14 +383,27 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+>  	host->curr.user_pages = 0;
+>  
+>  	box = &nc->cmd[0];
+> -	for (i = 0; i < host->dma.num_ents; i++) {
+> -		box->cmd = CMD_MODE_BOX;
 
-If things use the wrong APIs they get broken, plain and simple.  It
-happens, and we cope with it and fix it properly when it happens,
-rather than subsituting the wrong way for another wrong way.
+It probably happens because this line got dropped (due to the random
+formatting in this file, it makes it harder to read.)
 
-> Did you give us a fix for this issue? That's what I was asking in the
-> last email cause it didn't appear like you touched that area.
+>  
+> -	/* Initialize sg dma address */
+> -	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
+> -				+ sg->offset;
+> +	/* location of command block must be 64 bit aligned */
+> +	BUG_ON(host->dma.cmd_busaddr & 0x07);
+>  
+> -	if (i == (host->dma.num_ents - 1))
+> +	nc->cmdptr = (host->dma.cmd_busaddr >> 3) | CMD_PTR_LP;
+> +	host->dma.hdr.cmdptr = DMOV_CMD_PTR_LIST |
+> +			       DMOV_CMD_ADDR(host->dma.cmdptr_busaddr);
+> +	host->dma.hdr.complete_func = msmsdcc_dma_complete_func;
+> +
+> +	n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
+> +			host->dma.num_ents, host->dma.dir);
+> +	if (n == 0) {
+> +		printk(KERN_ERR "%s: Unable to map in all sg elements\n",
+> +			mmc_hostname(host->mmc));
+> +		host->dma.sg = NULL;
+> +		host->dma.num_ents = 0;
+> +		return -ENOMEM;
+> +	}
+> +
+> +	for_each_sg(host->dma.sg, sg, n, i) {
 
-I gave you an example of how to fix the problem you reported - what
-more do you want?
++		box->cmd = CMD_MODE_BOX;
+
+needs to be here.
