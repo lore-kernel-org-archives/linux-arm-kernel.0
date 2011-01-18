@@ -1,111 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 16:18:28 +0000
-Subject: [PATCH V4 26/62] ST SPEAr: Adding support for SSP PL022
-In-Reply-To: <870d02e83bc5d3b3e2053dfd97a12b921d7242a3.1295333958.git.viresh.kumar@st.com>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<870d02e83bc5d3b3e2053dfd97a12b921d7242a3.1295333958.git.viresh.kumar@st.com>
-Message-ID: <20110118161828.GE16980@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 18 Jan 2011 16:39:33 +0000
+Subject: [PATCH] arm: Configure reference clock for Versatile Express timers
+Message-ID: <1295368773-14531-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 12:41:53PM +0530, Viresh Kumar wrote:
-> diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-> index ad1c6a0..088bf52 100644
-> --- a/arch/arm/mach-spear13xx/spear1300_evb.c
-> +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-> @@ -12,7 +12,10 @@
->   */
->  
->  #include <linux/types.h>
-> +#include <linux/gpio.h>
+Timers on Versatile Express mainboard are used as system clock/event
+sources. Driver assumes that they are clocked with 1MHz signal.
+Old V2M firmware apparently configured it by default, but on newer
+boards one can observe that "sleep 1" command takes over 30 seconds
+to finish, as the timers are fed with 32kHz instead...
 
-:-)
+This patch performs required magic and also removes code clearing
+timer's control registers, as exactly the same operations are
+performed by the timer driver few jiffies later.
 
-> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-> index c219691..0e3d8f3 100644
-> --- a/arch/arm/mach-spear3xx/spear300_evb.c
-> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
-> @@ -15,10 +15,14 @@
->  #include <linux/mtd/fsmc.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/spi.h>
->  #include <mach/generic.h>
-> +#include <mach/gpio.h>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Tested-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-vexpress/v2m.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
-:-(
-
-> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-> index d216c94..6daacbb 100644
-> --- a/arch/arm/mach-spear3xx/spear310_evb.c
-> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
-> @@ -15,9 +15,13 @@
->  #include <linux/mtd/fsmc.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/spi.h>
->  #include <mach/generic.h>
-> +#include <mach/gpio.h>
-
-:-(
-
-> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-> index 15db267..baa4574 100644
-> --- a/arch/arm/mach-spear3xx/spear320_evb.c
-> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
-> @@ -15,9 +15,13 @@
->  #include <linux/mtd/fsmc.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/spi.h>
->  #include <mach/generic.h>
-> +#include <mach/gpio.h>
-
-:-(
-
-> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
-> index 32d3855..fe9a8c8 100644
-> --- a/arch/arm/mach-spear6xx/spear600_evb.c
-> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
-> @@ -15,15 +15,23 @@
->  #include <linux/mtd/fsmc.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> +#include <linux/gpio.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/spi.h>
->  #include <mach/generic.h>
-> +#include <mach/gpio.h>
-
-:-(
-
-> diff --git a/arch/arm/plat-spear/include/plat/spi.h b/arch/arm/plat-spear/include/plat/spi.h
-> new file mode 100644
-> index 0000000..24d57e1
-> --- /dev/null
-> +++ b/arch/arm/plat-spear/include/plat/spi.h
-> @@ -0,0 +1,74 @@
-> +/*
-> + * arch/arm/plat-spear/include/plat/spi.h
-> + *
-> + * SPI board specific definitions common to multiple boards on multiple
-> + * machines.
-> + *
-> + * Copyright (C) 2010 ST Microelectronics
-> + * Viresh Kumar<viresh.kumar@st.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __PLAT_SPI_H
-> +#define __PLAT_SPI_H
-> +
-> +#include <linux/amba/pl022.h>
-> +#include <linux/gpio.h>
-
-:-)
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index a9ed342..6edace3 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -19,6 +19,7 @@
+ #include <asm/mach/time.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/timer-sp.h>
++#include <asm/hardware/sp810.h>
+ 
+ #include <mach/motherboard.h>
+ 
+@@ -50,10 +51,15 @@ void __init v2m_map_io(struct map_desc *tile, size_t num)
+ 
+ static void __init v2m_timer_init(void)
+ {
++	u32 scctrl;
++
+ 	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
+ 
+-	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
+-	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
++	/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
++	scctrl = readl(MMIO_P2V(V2M_SYSCTL + SCCTRL));
++	scctrl |= (1 << 15);    /* TIMCLK is used for timer 0 */
++	scctrl |= (1 << 17);    /* TIMCLK is used for timer 1 */
++	writel(scctrl, MMIO_P2V(V2M_SYSCTL + SCCTRL));
+ 
+ 	sp804_clocksource_init(MMIO_P2V(V2M_TIMER1));
+ 	sp804_clockevents_init(MMIO_P2V(V2M_TIMER0), IRQ_V2M_TIMER0);
+-- 
+1.6.3.3
