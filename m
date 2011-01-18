@@ -1,59 +1,46 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Tue, 18 Jan 2011 12:21:46 -0500
-Subject: [PATCH v1 5/5] davinci: da850: remove unused uart pinmux arrays.
-In-Reply-To: <1295371306-24035-1-git-send-email-michael.williamson@criticallink.com>
-References: <1295371306-24035-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <1295371306-24035-6-git-send-email-michael.williamson@criticallink.com>
+From: buytenh@wantstofly.org (Lennert Buijtenhek)
+Date: Tue, 18 Jan 2011 17:20:34 +0100
+Subject: [PATCH] pxa3xx: fix PXA GPIO IRQ handling
+In-Reply-To: <AANLkTi=gGDZHukdSuupg22Gb9te+Vk_rsu6-vREeQRVE@mail.gmail.com>
+References: <1295338561.2003.3.camel@sven>
+	<1295338738-4129-1-git-send-email-s.neumann@raumfeld.com>
+	<4D357DC0.2030006@metafoo.de>
+	<AANLkTi=gGDZHukdSuupg22Gb9te+Vk_rsu6-vREeQRVE@mail.gmail.com>
+Message-ID: <20110118162034.GM29224@mail.wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The da850 uart pinmux arrays are not used.  Remove them.
+On Tue, Jan 18, 2011 at 08:15:22AM -0800, Eric Miao wrote:
 
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
----
- arch/arm/mach-davinci/da850.c              |   15 ---------------
- arch/arm/mach-davinci/include/mach/da8xx.h |    3 ---
- 2 files changed, 0 insertions(+), 18 deletions(-)
+> >> Set the "set_wake" field of the irq_chip struct before calling
+> >> set_irq_chip() for all of the IRQs, so that the compat handler
+> >> actually gets installed.
+> 
+> Not really sure if this is necessary. Lennert has done the transition to
+> irq_data to those _set_wake() functions as well, so it should be OK
+> that compat handler doesn't get installed.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 8927d4a..637274d 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -552,21 +552,6 @@ static const struct mux_config da850_pins[] = {
- #endif
- };
- 
--const short da850_uart0_pins[] __initdata = {
--	DA850_NUART0_CTS, DA850_NUART0_RTS, DA850_UART0_RXD, DA850_UART0_TXD,
--	-1
--};
--
--const short da850_uart1_pins[] __initdata = {
--	DA850_UART1_RXD, DA850_UART1_TXD,
--	-1
--};
--
--const short da850_uart2_pins[] __initdata = {
--	DA850_UART2_RXD, DA850_UART2_TXD,
--	-1
--};
--
- const short da850_i2c0_pins[] __initdata = {
- 	DA850_I2C0_SDA, DA850_I2C0_SCL,
- 	-1
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 18f6c23..cfcb223 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -123,9 +123,6 @@ extern const short da830_ecap2_pins[];
- extern const short da830_eqep0_pins[];
- extern const short da830_eqep1_pins[];
- 
--extern const short da850_uart0_pins[];
--extern const short da850_uart1_pins[];
--extern const short da850_uart2_pins[];
- extern const short da850_i2c0_pins[];
- extern const short da850_i2c1_pins[];
- extern const short da850_lcdcntl_pins[];
--- 
-1.7.0.4
+Yeah, this has been dealt with upstream, and this patch won't apply.
+
+
+> >> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> >> index 1beb40f..a5b42a7 100644
+> >> --- a/arch/arm/mach-pxa/irq.c
+> >> +++ b/arch/arm/mach-pxa/irq.c
+> >> @@ -111,13 +111,13 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+> >> ? ? ? GRER0 &= ~0x3;
+> >> ? ? ? GEDR0 = 0x3;
+> >>
+> >> + ? ? pxa_low_gpio_chip.set_wake = fn;
+> >> +
+> >> ? ? ? for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
+> >> ? ? ? ? ? ? ? set_irq_chip(irq, &pxa_low_gpio_chip);
+> >> ? ? ? ? ? ? ? set_irq_handler(irq, handle_edge_irq);
+> >> ? ? ? ? ? ? ? set_irq_flags(irq, IRQF_VALID);
+> >> ? ? ? }
+> >> -
+> >> - ? ? pxa_low_gpio_chip.set_wake = fn;
+
+Upstream has:
+
+        pxa_low_gpio_chip.irq_set_wake = fn;
