@@ -1,107 +1,376 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Tue, 18 Jan 2011 10:13:14 +0530
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 18 Jan 2011 00:42:51 -0500 (EST)
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to use
+	ldrex/strex
+In-Reply-To: <E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101180015040.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resending with proper $SUBJECT...
+On Mon, 17 Jan 2011, Russell King - ARM Linux wrote:
 
-Hi,
+> Switch the set/clear/change bitops to use the word-based exclusive
+> operations, which are only present in a wider range of ARM architectures
+> than the byte-based exclusive operations.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
-at [1] and found that audio is broken. Below patch fixes the issue.
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
----
-From: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+Also heavily tested on an ext3 fs read-write, using a LE host.
 
-davinci: fixes for audio on da850/omap-l138/am18x
-
-On DA850/OMAP-L138/AM18x, AIC3x codec is at 0x18 slave address.
-But in sound/soc/davinci/davinci-evm.c file, "struct snd_soc_dai_link"
-has the wrong AIC3x codec slave address. This patch fixes this issue.
-
-Also, this patch registers the platform device for davinci-pcm-audio.
-
-Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
----
- arch/arm/mach-davinci/devices-da8xx.c |   12 ++++++++++++
- sound/soc/davinci/davinci-evm.c       |    2 +-
- 2 files changed, 13 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 9eec630..17c0dbc 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -473,6 +473,11 @@ static struct resource da850_mcasp_resources[] = {
- 	},
- };
- 
-+struct platform_device davinci_pcm_device = {
-+	.name	= "davinci-pcm-audio",
-+	.id	= -1,
-+};
-+
- static struct platform_device da850_mcasp_device = {
- 	.name		= "davinci-mcasp",
- 	.id		= 0,
-@@ -480,8 +485,15 @@ static struct platform_device da850_mcasp_device = {
- 	.resource	= da850_mcasp_resources,
- };
- 
-+static void davinci_init_pcm(void)
-+{
-+	platform_device_register(&davinci_pcm_device);
-+}
-+
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
- {
-+	davinci_init_pcm();
-+
- 	/* DA830/OMAP-L137 has 3 instances of McASP */
- 	if (cpu_is_davinci_da830() && id == 1) {
- 		da830_mcasp1_device.dev.platform_data = pdata;
-diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
-index bc9e6b0..07db881 100644
---- a/sound/soc/davinci/davinci-evm.c
-+++ b/sound/soc/davinci/davinci-evm.c
-@@ -224,7 +224,7 @@ static struct snd_soc_dai_link da8xx_evm_dai = {
- 	.stream_name = "AIC3X",
- 	.cpu_dai_name= "davinci-mcasp.0",
- 	.codec_dai_name = "tlv320aic3x-hifi",
--	.codec_name = "tlv320aic3x-codec.0-001a",
-+	.codec_name = "tlv320aic3x-codec.1-0018",
- 	.platform_name = "davinci-pcm-audio",
- 	.init = evm_aic3x_init,
- 	.ops = &evm_ops,
----
-
-Also, I found that either CONFIG_REGULATOR should not be defined or if
-CONFIG_REGULATOR is defined then CONFIG_REGULATOR_DUMMY should also be
-defined. Without this menuconfig fix, Soundcard does not get detected.
-
-With the above fixes, arecord and aplay does not work for the first time.
-Couple of times I get the below error:
-
-root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
-arecord: main:608: audio open error: Invalid argument
-aplay: playback:2297: read error
-root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
-aplay: main:608: audio open error: Invalid argument
-Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
-
-Third time arecord and aplay work normally.
-
-Has anyone seen such issues on DA850 or any other platform?
-
-I am currently debugging this issue. I'll submit the above patch to community
-once the issue of fixed.
-
-[1] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary 
-
-Regards,
-Sudhakar
-_______________________________________________
-Davinci-linux-open-source mailing list
-Davinci-linux-open-source at linux.davincidsp.com
-http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> ---
+>  arch/arm/include/asm/bitops.h |   60 +++++++++++++++--------------------------
+>  arch/arm/kernel/armksyms.c    |   18 ++++--------
+>  arch/arm/lib/bitops.h         |   38 +++++++++++++------------
+>  arch/arm/lib/changebit.S      |   10 +-----
+>  arch/arm/lib/clearbit.S       |   11 +------
+>  arch/arm/lib/setbit.S         |   11 +------
+>  arch/arm/lib/testchangebit.S  |    9 ++----
+>  arch/arm/lib/testclearbit.S   |    9 ++----
+>  arch/arm/lib/testsetbit.S     |    9 ++----
+>  9 files changed, 63 insertions(+), 112 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index 7b1bb2b..af54ed1 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -149,14 +149,18 @@ ____atomic_test_and_change_bit(unsigned int bit, volatile unsigned long *p)
+>   */
+>  
+>  /*
+> + * Native endian assembly bitops.  nr = 0 -> word 0 bit 0.
+> + */
+> +extern void _set_bit(int nr, volatile unsigned long * p);
+> +extern void _clear_bit(int nr, volatile unsigned long * p);
+> +extern void _change_bit(int nr, volatile unsigned long * p);
+> +extern int _test_and_set_bit(int nr, volatile unsigned long * p);
+> +extern int _test_and_clear_bit(int nr, volatile unsigned long * p);
+> +extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+> +
+> +/*
+>   * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+>   */
+> -extern void _set_bit_le(int nr, volatile unsigned long * p);
+> -extern void _clear_bit_le(int nr, volatile unsigned long * p);
+> -extern void _change_bit_le(int nr, volatile unsigned long * p);
+> -extern int _test_and_set_bit_le(int nr, volatile unsigned long * p);
+> -extern int _test_and_clear_bit_le(int nr, volatile unsigned long * p);
+> -extern int _test_and_change_bit_le(int nr, volatile unsigned long * p);
+>  extern int _find_first_zero_bit_le(const void * p, unsigned size);
+>  extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+>  extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+> @@ -165,12 +169,6 @@ extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+>  /*
+>   * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+>   */
+> -extern void _set_bit_be(int nr, volatile unsigned long * p);
+> -extern void _clear_bit_be(int nr, volatile unsigned long * p);
+> -extern void _change_bit_be(int nr, volatile unsigned long * p);
+> -extern int _test_and_set_bit_be(int nr, volatile unsigned long * p);
+> -extern int _test_and_clear_bit_be(int nr, volatile unsigned long * p);
+> -extern int _test_and_change_bit_be(int nr, volatile unsigned long * p);
+>  extern int _find_first_zero_bit_be(const void * p, unsigned size);
+>  extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+>  extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+> @@ -180,33 +178,26 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>  /*
+>   * The __* form of bitops are non-atomic and may be reordered.
+>   */
+> -#define	ATOMIC_BITOP_LE(name,nr,p)		\
+> -	(__builtin_constant_p(nr) ?		\
+> -	 ____atomic_##name(nr, p) :		\
+> -	 _##name##_le(nr,p))
+> -
+> -#define	ATOMIC_BITOP_BE(name,nr,p)		\
+> -	(__builtin_constant_p(nr) ?		\
+> -	 ____atomic_##name(nr, p) :		\
+> -	 _##name##_be(nr,p))
+> +#define ATOMIC_BITOP(name,nr,p)			\
+> +	(__builtin_constant_p(nr) ? ____atomic_##name(nr, p) : _##name(nr,p))
+>  #else
+> -#define ATOMIC_BITOP_LE(name,nr,p)	_##name##_le(nr,p)
+> -#define ATOMIC_BITOP_BE(name,nr,p)	_##name##_be(nr,p)
+> +#define ATOMIC_BITOP(name,nr,p)		_##name(nr,p)
+>  #endif
+>  
+> -#define NONATOMIC_BITOP(name,nr,p)		\
+> -	(____nonatomic_##name(nr, p))
+> +/*
+> + * Native endian atomic definitions.
+> + */
+> +#define set_bit(nr,p)			ATOMIC_BITOP(set_bit,nr,p)
+> +#define clear_bit(nr,p)			ATOMIC_BITOP(clear_bit,nr,p)
+> +#define change_bit(nr,p)		ATOMIC_BITOP(change_bit,nr,p)
+> +#define test_and_set_bit(nr,p)		ATOMIC_BITOP(test_and_set_bit,nr,p)
+> +#define test_and_clear_bit(nr,p)	ATOMIC_BITOP(test_and_clear_bit,nr,p)
+> +#define test_and_change_bit(nr,p)	ATOMIC_BITOP(test_and_change_bit,nr,p)
+>  
+>  #ifndef __ARMEB__
+>  /*
+>   * These are the little endian, atomic definitions.
+>   */
+> -#define set_bit(nr,p)			ATOMIC_BITOP_LE(set_bit,nr,p)
+> -#define clear_bit(nr,p)			ATOMIC_BITOP_LE(clear_bit,nr,p)
+> -#define change_bit(nr,p)		ATOMIC_BITOP_LE(change_bit,nr,p)
+> -#define test_and_set_bit(nr,p)		ATOMIC_BITOP_LE(test_and_set_bit,nr,p)
+> -#define test_and_clear_bit(nr,p)	ATOMIC_BITOP_LE(test_and_clear_bit,nr,p)
+> -#define test_and_change_bit(nr,p)	ATOMIC_BITOP_LE(test_and_change_bit,nr,p)
+>  #define find_first_zero_bit(p,sz)	_find_first_zero_bit_le(p,sz)
+>  #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_le(p,sz,off)
+>  #define find_first_bit(p,sz)		_find_first_bit_le(p,sz)
+> @@ -215,16 +206,9 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>  #define WORD_BITOFF_TO_LE(x)		((x))
+>  
+>  #else
+> -
+>  /*
+>   * These are the big endian, atomic definitions.
+>   */
+> -#define set_bit(nr,p)			ATOMIC_BITOP_BE(set_bit,nr,p)
+> -#define clear_bit(nr,p)			ATOMIC_BITOP_BE(clear_bit,nr,p)
+> -#define change_bit(nr,p)		ATOMIC_BITOP_BE(change_bit,nr,p)
+> -#define test_and_set_bit(nr,p)		ATOMIC_BITOP_BE(test_and_set_bit,nr,p)
+> -#define test_and_clear_bit(nr,p)	ATOMIC_BITOP_BE(test_and_clear_bit,nr,p)
+> -#define test_and_change_bit(nr,p)	ATOMIC_BITOP_BE(test_and_change_bit,nr,p)
+>  #define find_first_zero_bit(p,sz)	_find_first_zero_bit_be(p,sz)
+>  #define find_next_zero_bit(p,sz,off)	_find_next_zero_bit_be(p,sz,off)
+>  #define find_first_bit(p,sz)		_find_first_bit_be(p,sz)
+> diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+> index e5e1e53..d5d4185 100644
+> --- a/arch/arm/kernel/armksyms.c
+> +++ b/arch/arm/kernel/armksyms.c
+> @@ -140,24 +140,18 @@ EXPORT_SYMBOL(__aeabi_ulcmp);
+>  #endif
+>  
+>  	/* bitops */
+> -EXPORT_SYMBOL(_set_bit_le);
+> -EXPORT_SYMBOL(_test_and_set_bit_le);
+> -EXPORT_SYMBOL(_clear_bit_le);
+> -EXPORT_SYMBOL(_test_and_clear_bit_le);
+> -EXPORT_SYMBOL(_change_bit_le);
+> -EXPORT_SYMBOL(_test_and_change_bit_le);
+> +EXPORT_SYMBOL(_set_bit);
+> +EXPORT_SYMBOL(_test_and_set_bit);
+> +EXPORT_SYMBOL(_clear_bit);
+> +EXPORT_SYMBOL(_test_and_clear_bit);
+> +EXPORT_SYMBOL(_change_bit);
+> +EXPORT_SYMBOL(_test_and_change_bit);
+>  EXPORT_SYMBOL(_find_first_zero_bit_le);
+>  EXPORT_SYMBOL(_find_next_zero_bit_le);
+>  EXPORT_SYMBOL(_find_first_bit_le);
+>  EXPORT_SYMBOL(_find_next_bit_le);
+>  
+>  #ifdef __ARMEB__
+> -EXPORT_SYMBOL(_set_bit_be);
+> -EXPORT_SYMBOL(_test_and_set_bit_be);
+> -EXPORT_SYMBOL(_clear_bit_be);
+> -EXPORT_SYMBOL(_test_and_clear_bit_be);
+> -EXPORT_SYMBOL(_change_bit_be);
+> -EXPORT_SYMBOL(_test_and_change_bit_be);
+>  EXPORT_SYMBOL(_find_first_zero_bit_be);
+>  EXPORT_SYMBOL(_find_next_zero_bit_be);
+>  EXPORT_SYMBOL(_find_first_bit_be);
+> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+> index 910d599..f8a2bd3 100644
+> --- a/arch/arm/lib/bitops.h
+> +++ b/arch/arm/lib/bitops.h
+> @@ -1,15 +1,15 @@
+> -
+> -#if __LINUX_ARM_ARCH__ >= 6 && defined(CONFIG_CPU_32v6K)
+> +#if __LINUX_ARM_ARCH__ >= 6
+>  	.macro	bitop, instr
+>  	tst	r1, #3
+>  	strne	r1, [r1, -r1]		@ assert word-aligned
+>  	mov	r2, #1
+> -	and	r3, r0, #7		@ Get bit offset
+> -	add	r1, r1, r0, lsr #3	@ Get byte offset
+> +	and	r3, r0, #31		@ Get bit offset
+> +	mov	r0, r0, lsr #5
+> +	add	r1, r1, r0, lsl #2	@ Get word offset
+>  	mov	r3, r2, lsl r3
+> -1:	ldrexb	r2, [r1]
+> +1:	ldrex	r2, [r1]
+>  	\instr	r2, r2, r3
+> -	strexb	r0, r2, [r1]
+> +	strex	r0, r2, [r1]
+>  	cmp	r0, #0
+>  	bne	1b
+>  	mov	pc, lr
+> @@ -18,15 +18,16 @@
+>  	.macro	testop, instr, store
+>  	tst	r1, #3
+>  	strne	r1, [r1, -r1]		@ assert word-aligned
+> -	and	r3, r0, #7		@ Get bit offset
+>  	mov	r2, #1
+> -	add	r1, r1, r0, lsr #3	@ Get byte offset
+> +	and	r3, r0, #31		@ Get bit offset
+> +	mov	r0, r0, lsr #5
+> +	add	r1, r1, r0, lsl #2	@ Get word offset
+>  	mov	r3, r2, lsl r3		@ create mask
+>  	smp_dmb
+> -1:	ldrexb	r2, [r1]
+> +1:	ldrex	r2, [r1]
+>  	ands	r0, r2, r3		@ save old value of bit
+> -	\instr	r2, r2, r3			@ toggle bit
+> -	strexb	ip, r2, [r1]
+> +	\instr	r2, r2, r3		@ toggle bit
+> +	strex	ip, r2, [r1]
+>  	cmp	ip, #0
+>  	bne	1b
+>  	smp_dmb
+> @@ -38,13 +39,14 @@
+>  	.macro	bitop, instr
+>  	tst	r1, #3
+>  	strne	r1, [r1, -r1]		@ assert word-aligned
+> -	and	r2, r0, #7
+> +	and	r2, r0, #31
+> +	mov	r0, r0, lsr #5
+>  	mov	r3, #1
+>  	mov	r3, r3, lsl r2
+>  	save_and_disable_irqs ip
+> -	ldrb	r2, [r1, r0, lsr #3]
+> +	ldr	r2, [r1, r0, lsl #2]
+>  	\instr	r2, r2, r3
+> -	strb	r2, [r1, r0, lsr #3]
+> +	str	r2, [r1, r0, lsl #2]
+>  	restore_irqs ip
+>  	mov	pc, lr
+>  	.endm
+> @@ -60,11 +62,11 @@
+>  	.macro	testop, instr, store
+>  	tst	r1, #3
+>  	strne	r1, [r1, -r1]		@ assert word-aligned
+> -	add	r1, r1, r0, lsr #3
+> -	and	r3, r0, #7
+> -	mov	r0, #1
+> +	and	r3, r0, #31
+> +	mov	r0, r0, lsr #5
+>  	save_and_disable_irqs ip
+> -	ldrb	r2, [r1]
+> +	ldr	r2, [r1, r0, lsl #2]!
+> +	mov	r0, #1
+>  	tst	r2, r0, lsl r3
+>  	\instr	r2, r2, r0, lsl r3
+>  	\store	r2, [r1]
+> diff --git a/arch/arm/lib/changebit.S b/arch/arm/lib/changebit.S
+> index 80f3115..68ed5b6 100644
+> --- a/arch/arm/lib/changebit.S
+> +++ b/arch/arm/lib/changebit.S
+> @@ -12,12 +12,6 @@
+>  #include "bitops.h"
+>                  .text
+>  
+> -/* Purpose  : Function to change a bit
+> - * Prototype: int change_bit(int bit, void *addr)
+> - */
+> -ENTRY(_change_bit_be)
+> -		eor	r0, r0, #0x18		@ big endian byte ordering
+> -ENTRY(_change_bit_le)
+> +ENTRY(_change_bit)
+>  	bitop	eor
+> -ENDPROC(_change_bit_be)
+> -ENDPROC(_change_bit_le)
+> +ENDPROC(_change_bit)
+> diff --git a/arch/arm/lib/clearbit.S b/arch/arm/lib/clearbit.S
+> index 1a63e43..4c04c3b 100644
+> --- a/arch/arm/lib/clearbit.S
+> +++ b/arch/arm/lib/clearbit.S
+> @@ -12,13 +12,6 @@
+>  #include "bitops.h"
+>                  .text
+>  
+> -/*
+> - * Purpose  : Function to clear a bit
+> - * Prototype: int clear_bit(int bit, void *addr)
+> - */
+> -ENTRY(_clear_bit_be)
+> -		eor	r0, r0, #0x18		@ big endian byte ordering
+> -ENTRY(_clear_bit_le)
+> +ENTRY(_clear_bit)
+>  	bitop	bic
+> -ENDPROC(_clear_bit_be)
+> -ENDPROC(_clear_bit_le)
+> +ENDPROC(_clear_bit)
+> diff --git a/arch/arm/lib/setbit.S b/arch/arm/lib/setbit.S
+> index 1dd7176..bbee5c6 100644
+> --- a/arch/arm/lib/setbit.S
+> +++ b/arch/arm/lib/setbit.S
+> @@ -12,13 +12,6 @@
+>  #include "bitops.h"
+>  		.text
+>  
+> -/*
+> - * Purpose  : Function to set a bit
+> - * Prototype: int set_bit(int bit, void *addr)
+> - */
+> -ENTRY(_set_bit_be)
+> -		eor	r0, r0, #0x18		@ big endian byte ordering
+> -ENTRY(_set_bit_le)
+> +ENTRY(_set_bit)
+>  	bitop	orr
+> -ENDPROC(_set_bit_be)
+> -ENDPROC(_set_bit_le)
+> +ENDPROC(_set_bit)
+> diff --git a/arch/arm/lib/testchangebit.S b/arch/arm/lib/testchangebit.S
+> index 5c98dc5..15a4d43 100644
+> --- a/arch/arm/lib/testchangebit.S
+> +++ b/arch/arm/lib/testchangebit.S
+> @@ -12,9 +12,6 @@
+>  #include "bitops.h"
+>                  .text
+>  
+> -ENTRY(_test_and_change_bit_be)
+> -		eor	r0, r0, #0x18		@ big endian byte ordering
+> -ENTRY(_test_and_change_bit_le)
+> -	testop	eor, strb
+> -ENDPROC(_test_and_change_bit_be)
+> -ENDPROC(_test_and_change_bit_le)
+> +ENTRY(_test_and_change_bit)
+> +	testop	eor, str
+> +ENDPROC(_test_and_change_bit)
+> diff --git a/arch/arm/lib/testclearbit.S b/arch/arm/lib/testclearbit.S
+> index 543d709..521b66b 100644
+> --- a/arch/arm/lib/testclearbit.S
+> +++ b/arch/arm/lib/testclearbit.S
+> @@ -12,9 +12,6 @@
+>  #include "bitops.h"
+>                  .text
+>  
+> -ENTRY(_test_and_clear_bit_be)
+> -		eor	r0, r0, #0x18		@ big endian byte ordering
+> -ENTRY(_test_and_clear_bit_le)
+> -	testop	bicne, strneb
+> -ENDPROC(_test_and_clear_bit_be)
+> -ENDPROC(_test_and_clear_bit_le)
+> +ENTRY(_test_and_clear_bit)
+> +	testop	bicne, strne
+> +ENDPROC(_test_and_clear_bit)
+> diff --git a/arch/arm/lib/testsetbit.S b/arch/arm/lib/testsetbit.S
+> index 0b3f390..1c98cc2 100644
+> --- a/arch/arm/lib/testsetbit.S
+> +++ b/arch/arm/lib/testsetbit.S
+> @@ -12,9 +12,6 @@
+>  #include "bitops.h"
+>                  .text
+>  
+> -ENTRY(_test_and_set_bit_be)
+> -		eor	r0, r0, #0x18		@ big endian byte ordering
+> -ENTRY(_test_and_set_bit_le)
+> -	testop	orreq, streqb
+> -ENDPROC(_test_and_set_bit_be)
+> -ENDPROC(_test_and_set_bit_le)
+> +ENTRY(_test_and_set_bit)
+> +	testop	orreq, streq
+> +ENDPROC(_test_and_set_bit)
+> -- 
+> 1.6.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
