@@ -1,33 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 11:31:11 +0000
-Subject: Why call calibrate_delay() in smp.c: secondary_start_kernel()
-In-Reply-To: <ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
-References: <4D3552C2.3020101@stericsson.com>
-	<ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
-Message-ID: <20110118113111.GA9719@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 19 Jan 2011 03:36:30 +0800
+Subject: [PATCH v2] Add i.MX23/28 auart support
+In-Reply-To: <20110117175055.GK9041@pengutronix.de>
+References: <1294924476-10653-1-git-send-email-s.hauer@pengutronix.de>
+	<20110117112508.GA23185@freescale.com>
+	<20110117175055.GK9041@pengutronix.de>
+Message-ID: <20110118193629.GA2833@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 03:46:54PM +0530, Santosh Shilimkar wrote:
-> I did send a patch on the same some time back but the conclusion
-> was we still need to have calibration.
+On Mon, Jan 17, 2011 at 06:50:55PM +0100, Sascha Hauer wrote:
+> On Mon, Jan 17, 2011 at 07:25:09PM +0800, Shawn Guo wrote:
+> > Hi Sascha,
+> > 
+> > I tested the patch on mx28 evk with auart0 and auart3 connected with
+> > cross cable, and it works.  But when I try to get console on auart0
+> > with a direct-connecting cable, I do not see anything on console.
+> > 
+> > Did you verify it works for console?
 > 
-> Have one more patch do deal with it so that platform can choose
-> if they like to skip. My mailer might screw the patch hence attaching
-> the same
+> Yes, I did, but I can recheck in case I broke something in the latest
+> version. What did you pass as console= in the kernel command line?
+> 
+console=ttyAPP0,115200n8
 
-Actually, the secondary cores probably get a far more accurate lpj
-than the primary core as they don't have the interference from the
-timer interrupt.  So - if we care - we probably want to update the
-primary lpj with the secondary's calibration value at boot.
-
-On the measurements I've made a couple of weeks ago, the lpj value
-can be .7% too slow, resulting in udelay() giving shorter than
-requested delays.  I asked Linus about that, and he's happy with
-that figure.
-
-So the myth which floats around on various lists about udelay() giving
-at least the requested delay is just that - a myth.  It has always
-given _approximately_ the requested delay on all architectures with
-software loop based implementations (as well as, according to Linus,
-some x86 tsc implementations of udelay.)
+-- 
+Regards,
+Shawn
