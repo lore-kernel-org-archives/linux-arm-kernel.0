@@ -1,63 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jan 2011 12:14:55 +0000
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <4D346800.3070603@stericsson.com>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-Message-ID: <20110118121455.GB9719@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 18 Jan 2011 17:55:13 +0530
+Subject: Why call calibrate_delay() in smp.c: secondary_start_kernel()
+In-Reply-To: <20110118121650.GC9719@n2100.arm.linux.org.uk>
+References: <4D3552C2.3020101@stericsson.com>
+	<ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
+	<20110118113111.GA9719@n2100.arm.linux.org.uk>
+	<eadb9f7e95a290b415baaa1d35547528@mail.gmail.com>
+	<20110118121650.GC9719@n2100.arm.linux.org.uk>
+Message-ID: <9f7cc4850e8b0c10e77db7739fb72f96@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 17, 2011 at 05:02:08PM +0100, Linus Walleij wrote:
-> Yes it is very different, see the log I sent in reply to Russells earlier
-> mail. It's not just one blockend missing, sometimes it's two (on U300)
-> and on Ux500 it's something like 5 out of 128 blockends that actually
-> get fired, the rest are missing.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, January 18, 2011 5:47 PM
+> To: Santosh Shilimkar
+> Cc: Jonas Aaberg; linux-arm-kernel at lists.infradead.org;
+> STEricsson_nomadik_linux
+> Subject: Re: Why call calibrate_delay() in smp.c:
+> secondary_start_kernel()
 >
-> Now the only variant actually using that interrupt is the original
-> ARM version found in RealView & Versatile. I have run this code
-> on the PB1176 but it wasn't missing any blockends. No errors.
+> On Tue, Jan 18, 2011 at 05:42:22PM +0530, Santosh Shilimkar wrote:
+> > > -----Original Message-----
+> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > > Sent: Tuesday, January 18, 2011 5:01 PM
+> > > To: Santosh Shilimkar
+> > > Cc: Jonas Aaberg; linux-arm-kernel at lists.infradead.org;
+> > > STEricsson_nomadik_linux
+> > > Subject: Re: Why call calibrate_delay() in smp.c:
+> > > secondary_start_kernel()
+> > >
+> > > On Tue, Jan 18, 2011 at 03:46:54PM +0530, Santosh Shilimkar
+> wrote:
+> > > > I did send a patch on the same some time back but the
+> conclusion
+> > > > was we still need to have calibration.
+> > > >
+> > > > Have one more patch do deal with it so that platform can
+> choose
+> > > > if they like to skip. My mailer might screw the patch hence
+> > > attaching
+> > > > the same
+> > >
+> > > Actually, the secondary cores probably get a far more accurate
+> lpj
+> > > than the primary core as they don't have the interference from
+> the
+> > > timer interrupt.  So - if we care - we probably want to update
+> the
+> > > primary lpj with the secondary's calibration value at boot.
+> > >
+> > > On the measurements I've made a couple of weeks ago, the lpj
+> value
+> > > can be .7% too slow, resulting in udelay() giving shorter than
+> > > requested delays.  I asked Linus about that, and he's happy with
+> > > that figure.
+> > >
+> > > So the myth which floats around on various lists about udelay()
+> > > giving
+> > > at least the requested delay is just that - a myth.  It has
+> always
+> > > given _approximately_ the requested delay on all architectures
+> with
+> > > software loop based implementations (as well as, according to
+> Linus,
+> > > some x86 tsc implementations of udelay.)
+> >
+> > Ok. Since the udelay() accuracy is acceptable now, what you think
+> > of my latest patch.
+> >
+> > It does help for the archs which are ok to skip the calibration .
+> > And since it's configurable with the proposed patch,
+> > the default kernel behavior is maintained if the option isn't
+> > selected.
 >
-> I tried to increase the clock speed to see if I could provoke the
-> error in the RealView, but hit FIFO overflow (since these variants
-> does not have hardware flow control) before I got to the speed
-> where I presume the error could occur.
+> We should also skip printing the "total bogomips" value too if CPUs
+> were
+> skipped.
+Can be done. I can wrap the "total bogomips" print part inside the
+ARCH_SKIP_SECONDARY_CALIBRATE.
 
-How reliable is the FIFOCNT register ?
-
-What I'm wondering is whether we can get rid of the DATABLOCKEND
-interrupts completely, and instead read the FIFOCNT register to
-discover how many blocks have been successfully transferred.  FIFOCNT
-on read gives you the remaining number of words to be transferred into
-the FIFO from the card, not the number of words still to be read by the
-host CPU.
-
-It's going to require some thought though, as I don't think you can use
-the register to say X bytes, transferred, that means we got X bytes
-successfully.  If you have a data CRC error, you will have transferred
-most, if not all of the block in error, so you'd need to wind back to
-the start of the block.  In theory, data CRC errors should cause the
-card to stop transmission.
-
-A data timeout (meaning a missing start condition) on the other hand
-means the data block hasn't started to be transferred.
-
-So, what I think's required (for read) is:
-
-	remain = readl(host->base + MMCIFIFOCNT) << 2;
-	success = data->blksz * data->blocks - remain;
-
-	if (status & MCI_DATACRCFAIL) {
-		/* round down to last block */
-		host->data_xfered = ((success / data->blksz) - 1) * data->blksz;
-		data->error = -EILSEQ;
-	} else if (status & MCI_DATATIMEOUT) {
-		host->data_xfered = success;
-		data->error = -ETIMEDOUT;
-	} else if (status & (MCI_TXUNDERRUN|MCI_RXOVERRUN)) {
-		host->data_xfered = success;
-		data->error = -EIO;
-	}
-
-Not sure if that's valid for write atm.
+Regards,
+Santosh
