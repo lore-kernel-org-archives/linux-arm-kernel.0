@@ -1,51 +1,51 @@
-From: albin.tonnerre@free-electrons.com (Albin Tonnerre)
-Date: Tue, 18 Jan 2011 08:00:16 +0100
-Subject: [RFC 1/2] AT91: Support SAM9260 and SAM9G20-based boards in
-	the same kernel image
-In-Reply-To: <20110117075738.GI14798@game.jcrosoft.org>
-References: <1295113835-6776-1-git-send-email-albin.tonnerre@free-electrons.com>
-	<20110117075738.GI14798@game.jcrosoft.org>
-Message-ID: <20110118070016.GA9605@pc-ran3241>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Jan 2011 16:09:42 +0900
+Subject: [GIT PULL] Samsung S5P fixes
+Message-ID: <03f401cbb6de$b12a85a0$137f90e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jan 2011 08:57 +0100, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> On 18:50 Sat 15 Jan     , Albin Tonnerre wrote:
-> > Nothing actually prevents support for boards based on these SoCs to be
-> > compiled in the same kernel image, since the SAM9260 and SAM9G20 are
-> > almost identical (AT91SAM9G20 adds some new features, but is otherwise
-> > compatible with the AT91SAM9260).
-> > 
-> > Signed-off-by: Albin Tonnerre <albin.tonnerre@free-electrons.com>
-> > ---
-> >  arch/arm/mach-at91/Kconfig |   31 +++++++++++++------------------
-> >  1 files changed, 13 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> > index c015b68..d1eda58 100644
-> > --- a/arch/arm/mach-at91/Kconfig
-> > +++ b/arch/arm/mach-at91/Kconfig
-> > @@ -26,8 +26,8 @@ config ARCH_AT91RM9200
-> >  	select GENERIC_CLOCKEVENTS
-> >  	select HAVE_AT91_USART3
-> >  
-> > -config ARCH_AT91SAM9260
-> > -	bool "AT91SAM9260 or AT91SAM9XE"
-> > +config ARCH_AT91SAM9260_VARIANTS
-> sos so
-> 
-> I'm working on a similar patch but ARCH_AT91SAM9260_VARIANTS seems so so
-> 
-> I get in mind to get rid of ARCH_AT91SAM92G20
-> 
-> and detect it
+Hi Linus,
 
-I'm sorry, I can't quite parse your answer. Would you please mind elaborating a
-bit?
+Please pull Samsung fixes from:
 
-Cheers,
--- 
-Albin Tonnerre, Free Electrons
-Kernel, drivers and embedded Linux development,
-consulting, training and support.
-http://free-electrons.com
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+These things had build problem with sound tree so couldn't merge it.
+Its dependency has disappeared in mainline now so I'm requesting pull this.
+Of course, it would be nice to see your merging this in before -rc1 :-)
+
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit e6f597a1425b5af64917be3448b29e2d5a585ac8:
+
+ staging: fix build failure in bcm driver (2011-01-17 16:11:12 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+Jassi Brar (5):
+      ARM: S5P6442: Enable I2S device to work on SMDK6442
+      ARM: S5P6440: Add missing virtual ASoC DMA device
+      ARM: S5P6450: Add missing virtual ASoC DMA device
+      ARM: S5PV210: Add missing virtual ASoC DMA device
+      ARM: S5PV310: Add missing virtual ASoC DMA device
+
+ arch/arm/mach-s5p6442/mach-smdk6442.c |    1 +
+ arch/arm/mach-s5p64x0/mach-smdk6440.c |    1 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c |    1 +
+ arch/arm/mach-s5pv210/mach-smdkc110.c |    1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c |    1 +
+ arch/arm/mach-s5pv310/mach-smdkc210.c |    3 ++-
+ arch/arm/mach-s5pv310/mach-smdkv310.c |    3 ++-
+ 7 files changed, 9 insertions(+), 2 deletions(-)
