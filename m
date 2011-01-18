@@ -1,16 +1,16 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Tue, 18 Jan 2011 12:21:45 -0500
-Subject: [PATCH v1 4/5] davinci: da850: move da850_evm specific mmcsd pinmux
-	array to board file.
+Date: Tue, 18 Jan 2011 12:21:44 -0500
+Subject: [PATCH v1 3/5] davinci: da850: move da850_evm specific mcasp pins to
+	board file.
 In-Reply-To: <1295371306-24035-1-git-send-email-michael.williamson@criticallink.com>
 References: <1295371306-24035-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <1295371306-24035-5-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <1295371306-24035-4-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The da850_mmcsd0_pins pinmux array contains pins that are specific to the
-da850 evm board (the write protect and card detect GPIO pins).  Move
-the array to the board file.
+The da850_mcasp_pins pinmux array is specific to the da850_evm, and is
+not generic.  Move the array to the board file, make it static initdata,
+and rename it accordingly.
 
 Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
@@ -20,60 +20,61 @@ Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
  3 files changed, 8 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index c4c0b75..11f986b 100644
+index b01fb2a..c4c0b75 100644
 --- a/arch/arm/mach-davinci/board-da850-evm.c
 +++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -690,6 +690,13 @@ static struct davinci_mmc_config da850_mmc_config = {
- 	.version	= MMC_CTLR_VERSION_2,
+@@ -664,6 +664,13 @@ static struct snd_platform_data da850_evm_snd_data = {
+ 	.rxnumevt	= 1,
  };
  
-+static const short da850_evm_mmcsd0_pins[] __initconst = {
-+	DA850_MMCSD0_DAT_0, DA850_MMCSD0_DAT_1, DA850_MMCSD0_DAT_2,
-+	DA850_MMCSD0_DAT_3, DA850_MMCSD0_CLK, DA850_MMCSD0_CMD,
-+	DA850_GPIO4_0, DA850_GPIO4_1,
++static const short da850_evm_mcasp_pins[] __initconst = {
++	DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
++	DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
++	DA850_AXR_11, DA850_AXR_12,
 +	-1
 +};
 +
- static void da850_panel_power_ctrl(int val)
+ static int da850_evm_mmc_get_ro(int index)
  {
- 	/* lcd backlight */
-@@ -1077,7 +1084,7 @@ static __init void da850_evm_init(void)
- 				ret);
+ 	return gpio_get_value(DA850_MMCSD_WP_PIN);
+@@ -1106,7 +1113,7 @@ static __init void da850_evm_init(void)
+ 	__raw_writel(0, IO_ADDRESS(DA8XX_UART1_BASE) + 0x30);
+ 	__raw_writel(0, IO_ADDRESS(DA8XX_UART0_BASE) + 0x30);
  
- 	if (HAS_MMC) {
--		ret = davinci_cfg_reg_list(da850_mmcsd0_pins);
-+		ret = davinci_cfg_reg_list(da850_evm_mmcsd0_pins);
- 		if (ret)
- 			pr_warning("da850_evm_init: mmcsd0 mux setup failed:"
- 					" %d\n", ret);
+-	ret = davinci_cfg_reg_list(da850_mcasp_pins);
++	ret = davinci_cfg_reg_list(da850_evm_mcasp_pins);
+ 	if (ret)
+ 		pr_warning("da850_evm_init: mcasp mux setup failed: %d\n",
+ 				ret);
 diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 5b98232..8927d4a 100644
+index ca4f595..5b98232 100644
 --- a/arch/arm/mach-davinci/da850.c
 +++ b/arch/arm/mach-davinci/da850.c
-@@ -586,13 +586,6 @@ const short da850_lcdcntl_pins[] __initdata = {
+@@ -577,13 +577,6 @@ const short da850_i2c1_pins[] __initdata = {
  	-1
  };
  
--const short da850_mmcsd0_pins[] __initdata = {
--	DA850_MMCSD0_DAT_0, DA850_MMCSD0_DAT_1, DA850_MMCSD0_DAT_2,
--	DA850_MMCSD0_DAT_3, DA850_MMCSD0_CLK, DA850_MMCSD0_CMD,
--	DA850_GPIO4_0, DA850_GPIO4_1,
+-const short da850_mcasp_pins[] __initdata = {
+-	DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+-	DA850_AHCLKR, DA850_ACLKR, DA850_AFSR, DA850_AMUTE,
+-	DA850_AXR_11, DA850_AXR_12,
 -	-1
 -};
 -
- /* FIQ are pri 0-1; otherwise 2-7, with 7 lowest priority */
- static u8 da850_default_priorities[DA850_N_CP_INTC_IRQ] = {
- 	[IRQ_DA8XX_COMMTX]		= 7,
+ const short da850_lcdcntl_pins[] __initdata = {
+ 	DA850_LCD_D_0, DA850_LCD_D_1, DA850_LCD_D_2, DA850_LCD_D_3,
+ 	DA850_LCD_D_4, DA850_LCD_D_5, DA850_LCD_D_6, DA850_LCD_D_7,
 diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index 89668b4..18f6c23 100644
+index 4297f1e..89668b4 100644
 --- a/arch/arm/mach-davinci/include/mach/da8xx.h
 +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -129,6 +129,5 @@ extern const short da850_uart2_pins[];
+@@ -128,7 +128,6 @@ extern const short da850_uart1_pins[];
+ extern const short da850_uart2_pins[];
  extern const short da850_i2c0_pins[];
  extern const short da850_i2c1_pins[];
+-extern const short da850_mcasp_pins[];
  extern const short da850_lcdcntl_pins[];
--extern const short da850_mmcsd0_pins[];
+ extern const short da850_mmcsd0_pins[];
  
- #endif /* __ASM_ARCH_DAVINCI_DA8XX_H */
 -- 
 1.7.0.4
