@@ -1,28 +1,40 @@
-From: bgamari.foss@gmail.com (Ben Gamari)
-Date: Tue, 18 Jan 2011 08:51:52 -0500
-Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
-In-Reply-To: <20110118031038.GA2436@legolas.emea.dhcp.ti.com>
-References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
-	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
-Message-ID: <87d3nus4jr.fsf@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jan 2011 14:30:33 +0000
+Subject: [PATCH 01/14] ARM: bitops: ensure set/clear/change bitops take
+	a word-aligned pointer
+In-Reply-To: <alpine.LFD.2.00.1101180043140.8580@xanadu.home>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peudk-0003SJ-Aj@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101180043140.8580@xanadu.home>
+Message-ID: <20110118143033.GD10997@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jan 2011 05:10:39 +0200, Felipe Balbi <balbi@ti.com> wrote:
-> NAK. This is totally bogus. The board doesn't really depend on
-> GPIO_TWL4030, the MMC driver does.
-> 
-I've looked a little more deeply into this and I'm not entirely
-convinced that what you claim is true. It seems that the only dependency
-that the MMC module _might_ have on the TWL4030 is for the LDOs, which I
-believe should be covered in the regulator driver, not GPIO.
+On Tue, Jan 18, 2011 at 01:00:21AM -0500, Nicolas Pitre wrote:
+> I also wonder what happens with a misaligned ldrex/strex... Does the 
+> alignment trap get invoked?  If so, the assertion could be put there 
+> instead if that's not done already, removing this overhead from bitops 
+> calls.  In the pre-ARMv6 case the alignment trap fixup would be applied 
+> as usual since the ldr/str are not special, but the previous code 
+> allowed for misaligned pointer so result would be no worse than before 
+> in that case.  Testing appears to indicate those misaligned bitops are 
+> rather nonexistent so far.
 
-In light of this, I think the use of the TWL's GPIO lines for MMC it
-might be a board specific design decision. In the case of the
-Beagleboard, they are only TWL GPIO used by the MMC configuration is for
-.gpio_cd but as far as I could see they could have chosen any GPIO for
-this. Am I missing something?
+Well, whether LDREX/STREX always fault for misalignment is well open to
+debate.  The ARM ARM for ARMv7 seems to imply they will always fault for
+misaligned accesses.  For ARMv6, the situation is less clear - the way
+the manual is arranged, it suggests that they will if SCTLR.U is set.
+When it's clear, the ARM ARM doesn't specify what the outcome is.
 
-Cheers,
+I also don't know how our unaligned fixup will behave with an unaligned
+LDREX/STREX without checking the bit patterns.
 
-- Ben
+So... I think that's too many unknowns to rely on it, especially when
+filesystem data is at stake.
+
+Maybe changing it to:
+
+	ands	ip, r1, #3
+	strneb	r1, [ip]
+
+instead?
