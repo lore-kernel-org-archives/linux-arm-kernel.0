@@ -1,50 +1,86 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 18 Jan 2011 12:41:37 +0530
-Subject: [PATCH V4 09/62] ST SPEAr13XX: Added compilation support in arch/arm/
+Date: Tue, 18 Jan 2011 12:41:38 +0530
+Subject: [PATCH V4 10/62] ST SPEAr13xx: Adding default config file
 In-Reply-To: <cover.1295333957.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-Message-ID: <c72f802e21e19491b3ff15d9f6bad79f35c1d5bc.1295333958.git.viresh.kumar@st.com>
+Message-ID: <e99e902fb3334292d25c34b059749ffed5f923ad.1295333958.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shiraz Hashim <shiraz.hashim@st.com>
 
-This patch adds compilation support for ST Microelectronics SPEAr13xx machines.
-SPEAr13xx SOC's are based on Arm CortexA9 CPUs.
-
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/Kconfig  |    4 ++--
- arch/arm/Makefile |    1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/configs/spear13xx_defconfig |   60 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 60 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/spear13xx_defconfig
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5cff165..f3904ba 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1253,8 +1253,8 @@ config SMP
- 	depends on GENERIC_CLOCKEVENTS
- 	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
- 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
--		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
--		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-+		 ARCH_S5PV310 || ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 || \
-+		 ARCH_VEXPRESS_CA9X4 || ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
- 	select USE_GENERIC_SMP_HELPERS
- 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
- 	help
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c22c1ad..51769cc 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -193,6 +193,7 @@ machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
- machine-$(CONFIG_ARCH_W90X900)		:= w90x900
- machine-$(CONFIG_ARCH_NUC93X)		:= nuc93x
- machine-$(CONFIG_FOOTBRIDGE)		:= footbridge
-+machine-$(CONFIG_MACH_SPEAR1300)	:= spear13xx
- machine-$(CONFIG_MACH_SPEAR300)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+new file mode 100644
+index 0000000..10b1cf5
+--- /dev/null
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -0,0 +1,60 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_EXTRA_PASS=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_PLAT_SPEAR=y
++CONFIG_ARCH_SPEAR13XX=y
++CONFIG_BOARD_SPEAR1300_EVB=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_AEABI=y
++CONFIG_BINFMT_MISC=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_INPUT_FF_MEMLESS=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_RAW_DRIVER=y
++CONFIG_MAX_RAW_DEVS=8192
++# CONFIG_HWMON is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT3_FS_SECURITY=y
++CONFIG_AUTOFS4_FS=m
++CONFIG_MSDOS_FS=m
++CONFIG_VFAT_FS=m
++CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="utf8"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=m
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++CONFIG_DEBUG_INFO=y
 -- 
 1.7.2.2
