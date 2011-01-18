@@ -1,64 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Jan 2011 15:22:05 -0000
-Subject: [PATCH 04/14] ARM: v6k: introduce CPU_V6K option
-In-Reply-To: <20110118133559.GC10997@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peuej-0003SV-Dn@rmk-PC.arm.linux.org.uk>
-	<000601cbb6fb$8465c620$8d315260$@deacon@arm.com>
-	<20110118110922.GB10997@n2100.arm.linux.org.uk>
-	<20110118133559.GC10997@n2100.arm.linux.org.uk>
-Message-ID: <000901cbb723$775245d0$65f6d170$@deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Jan 2011 15:23:19 +0000
+Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
+In-Reply-To: <AANLkTi=q=e03GhmNZypGa5na2OiAr8SAOtiXm=+NPq5t@mail.gmail.com>
+References: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
+	<1295253729-23153-2-git-send-email-stanley.miao@windriver.com>
+	<AANLkTi=RSpXHRpoZJsGLhVgQ=E=tcNGm8GXYC9UPaDrA@mail.gmail.com>
+	<AANLkTi=q=e03GhmNZypGa5na2OiAr8SAOtiXm=+NPq5t@mail.gmail.com>
+Message-ID: <AANLkTi=F8_Zmm4OM2=JPMzSWbm0-Nyr4mxSPUNpdBg3N@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Jan 18, 2011 at 11:09:22AM +0000, Russell King - ARM Linux wrote:
-> > I'd rather not in this patch - this patch adds CPU_V6K as an alias for
-> > CPU_V6 - so eveywhere which referenced CPU_V6 becomes (CPU_V6 || CPU_V6K).
-> > We could remove it in a later patch though.
-> 
-> Here's a follow-up patch to do that.  There's a few other things which
-> could do with updating now that we have CPU_Vx* straightened out.  I've
-> also recently noticed that the v6 and v7 cache stuff doesn't use the
-> direct-call optimization (see commented out bits in cacheflush.h).
-> 
-> That was because my original V6 support used the block cache operations,
-> which had to be run-time tested for presence, and so modified the
-> global cpu_cache methods directly.  As the block cache stuff was dropped,
-> we should re-enable this optimization.
-> 
-> That said, I'd rather not add too much to this series as I think it needs
-> to go into mainline ASAP - and probably stable as well, even though it's
-> on the large side - once properly and fully tested.
+On 18 January 2011 01:22, Stanley.Miao <stanleymiao@gmail.com> wrote:
+> 2011/1/17 Catalin Marinas <catalin.marinas@arm.com>:
+>> On 17 January 2011 08:42, Stanley.Miao <stanley.miao@windriver.com> wrote:
+>>> The code section in BE8 kernel modules is in little-endian while data
+>>> section is in big-endian. When reading code from memory in the relocation
+>>> procedure, these instructions are read according to big-endian, so they
+>>> need to be inverted before writing to memory and after reading from memory.
+>> [...]
+>>> --- a/arch/arm/include/asm/io.h
+>>> +++ b/arch/arm/include/asm/io.h
+>>> @@ -233,6 +233,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>>>
+>>> ?#endif /* __mem_pci */
+>>>
+>>> +#ifdef CONFIG_CPU_ENDIAN_BE8
+>>> +#define read_instr32(c) ? ? ? ? ? ? ? ? ? ? ? ?__swab32(*(u32 *)c)
+>>> +#define read_instr16(c) ? ? ? ? ? ? ? ? ? ? ? ?__swab16(*(u16 *)c)
+>>> +#define write_instr32(v,a) ? ? ? ? ? ? (*(u32 *)(a) = __swab32((__force __u32)(v)))
+>>> +#define write_instr16(v,a) ? ? ? ? ? ? (*(u16 *)(a) = __swab16((__force __u16)(v)))
+>>> +#else
+>>> +#define read_instr32(c) ? ? ? ? ? ? ? ? ? ? ? ?(*(u32 *)c)
+>>> +#define read_instr16(c) ? ? ? ? ? ? ? ? ? ? ? ?(*(u16 *)c)
+>>> +#define write_instr32(v,a) ? ? ? ? ? ? (*(u32 *)(a) = (v))
+>>> +#define write_instr16(v,a) ? ? ? ? ? ? (*(u16 *)(a) = (v))
+>>> +#endif
+>>
+>> Can we not use cpu_to_le32 etc in here (and as Russell said, they are
+>> not really IO)?
+>
+> Except moving these definition to arch/arm/kernel/module.c, do I need
+> to do other modifications ?
 
-Understood. Pruning the Kconfig is an optimisation and can be done once
-the initial bulk is merged.
- 
-> Subject: [PATCH] ARM: v6k: DMA_CACHE_RWFO isn't appropriate for non-v6k CPUs
-> 
-> Limit DMA_CACHE_RWFO to only v6k SMP CPUs - V6 CPUs aren't SMP capable,
-> so the read/write for ownership work-around doesn't apply to them.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 843bc8c..808b832 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -775,7 +775,7 @@ config NEEDS_SYSCALL_FOR_CMPXCHG
-> 
->  config DMA_CACHE_RWFO
->  	bool "Enable read/write for ownership DMA cache maintenance"
-> -	depends on (CPU_V6 || CPU_V6K) && SMP
-> +	depends on CPU_V6K && SMP
->  	default y
->  	help
->  	  The Snoop Control Unit on ARM11MPCore does not detect the
+Just personal preference (not important), I'd rather have a "u32
+instr" variable set by read_instr32() than this kind of functional
+style (in C code, I'm fine with it otherwise):
 
-Looks good to me:
+> +                       write_instr32((read_instr32(loc) & 0xff000000) |
+> +                                               (offset & 0x00ffffff), loc);
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+BTW (not related to modules, but since you are looking at this), when
+we copy the sigreturn_codes to the vectors page in early_trap_init(),
+do they get there in little endian form (as required by BE8)?
 
-Will
+-- 
+Catalin
