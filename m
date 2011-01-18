@@ -1,92 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Jan 2011 16:17:47 +0100
-Subject: Why call calibrate_delay() in smp.c: secondary_start_kernel()
-In-Reply-To: <ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
-References: <4D3552C2.3020101@stericsson.com>
-	<ebe9b3d6a0cc160cd46a97ae05b72119@mail.gmail.com>
-Message-ID: <AANLkTinzBxM41K8r2mN==_9JTEBP+NUZ-oR1wnJmvbh=@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Jan 2011 15:22:05 -0000
+Subject: [PATCH 04/14] ARM: v6k: introduce CPU_V6K option
+In-Reply-To: <20110118133559.GC10997@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peuej-0003SV-Dn@rmk-PC.arm.linux.org.uk>
+	<000601cbb6fb$8465c620$8d315260$@deacon@arm.com>
+	<20110118110922.GB10997@n2100.arm.linux.org.uk>
+	<20110118133559.GC10997@n2100.arm.linux.org.uk>
+Message-ID: <000901cbb723$775245d0$65f6d170$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/18 Santosh Shilimkar <santosh.shilimkar@ti.com>:
+> On Tue, Jan 18, 2011 at 11:09:22AM +0000, Russell King - ARM Linux wrote:
+> > I'd rather not in this patch - this patch adds CPU_V6K as an alias for
+> > CPU_V6 - so eveywhere which referenced CPU_V6 becomes (CPU_V6 || CPU_V6K).
+> > We could remove it in a later patch though.
+> 
+> Here's a follow-up patch to do that.  There's a few other things which
+> could do with updating now that we have CPU_Vx* straightened out.  I've
+> also recently noticed that the v6 and v7 cache stuff doesn't use the
+> direct-call optimization (see commented out bits in cacheflush.h).
+> 
+> That was because my original V6 support used the block cache operations,
+> which had to be run-time tested for presence, and so modified the
+> global cpu_cache methods directly.  As the block cache stuff was dropped,
+> we should re-enable this optimization.
+> 
+> That said, I'd rather not add too much to this series as I think it needs
+> to go into mainline ASAP - and probably stable as well, even though it's
+> on the large side - once properly and fully tested.
 
-> +config ARCH_SKIP_SECONDARY_CALIBRATE
-> + ? ? ? bool "Skip secondary CPU calibration"
-> + ? ? ? depends on SMP
-> + ? ? ? help
-> + ? ? ? ? On some architectures, secondary cores shares clock with
-> primiary
-> + ? ? ? ? core and hence scale together. Hence secondary core lpj
-> calibration
-> + ? ? ? ? is not necessary and can be skipped to save considerable time.
-> +
-> + ? ? ? ? If unsure, say n.
+Understood. Pruning the Kconfig is an optimisation and can be done once
+the initial bulk is merged.
+ 
+> Subject: [PATCH] ARM: v6k: DMA_CACHE_RWFO isn't appropriate for non-v6k CPUs
+> 
+> Limit DMA_CACHE_RWFO to only v6k SMP CPUs - V6 CPUs aren't SMP capable,
+> so the read/write for ownership work-around doesn't apply to them.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/mm/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index 843bc8c..808b832 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -775,7 +775,7 @@ config NEEDS_SYSCALL_FOR_CMPXCHG
+> 
+>  config DMA_CACHE_RWFO
+>  	bool "Enable read/write for ownership DMA cache maintenance"
+> -	depends on (CPU_V6 || CPU_V6K) && SMP
+> +	depends on CPU_V6K && SMP
+>  	default y
+>  	help
+>  	  The Snoop Control Unit on ARM11MPCore does not detect the
 
-Why do you want to select that manually? Surely the kernel
-writer should know whether the cores are clocked together
-or not. Just:
+Looks good to me:
 
-config ARCH_HAS_COMMON_CORES_CLOCK
-      bool
-      depends on SMP
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-This will be default "n" so archs that want to flag to the
-build system that the core clock is common can e.g.:
-
-config ARCH_U8500
-        bool "ST-Ericsson U8500 Series"
-        select CPU_V7
-+       select ARCH_HAS_COMMON_CORES_CLOCK
-
-Looks reasonable? (And feel free to add that to U8500
-as part of the patch.)
-
-> ?/*
-> + * Skip the secondary calibration on architectures sharing clock
-> + * with primary cpu. Archs can use ARCH_SKIP_SECONDARY_CALIBRATE
-> + * for this.
-> + */
-> +static inline int skip_secondary_calibrate(void)
-
-bool? Returning an error code seem overdesigned for a function
-named like that.
-
-Also the name is misleading, if you look at how you
-use it, it should be named "do_not_skip_secondary_calibrate()".
-
-> +{
-> +#ifdef CONFIG_ARCH_SKIP_SECONDARY_CALIBRATE
-> + ? ? ? return 0;
-
-return false;
-
-> +#else
-> + ? ? ? return -ENXIO;
-
-return true;
-
-> +#endif
-> +}
-
-
-> +
-> +/*
-> ?* This is the secondary CPU boot entry. ?We're using this CPUs
-> ?* idle thread stack, but a set of temporary page tables.
-> ?*/
-> @@ -312,7 +326,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
-> ? ? ? ? */
-> ? ? ? ?percpu_timer_setup();
->
-> - ? ? ? calibrate_delay();
-> + ? ? ? if (skip_secondary_calibrate())
-> + ? ? ? ? ? ? ? calibrate_delay();
-
-Change sematics of that function and
-if (!skip_secondary_calibrate())
-  ...
-
-> ? ? ? ?smp_store_cpu_info(cpu);
-
-...and thanks for driving this!
-Linus Walleij
+Will
