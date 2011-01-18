@@ -1,39 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 Jan 2011 12:47:26 -0700 (MST)
-Subject: [GIT PULL] OMAP PRCM/clocksource/clockdomain fixes for 2.6.38-rc
-Message-ID: <alpine.DEB.2.00.1101181244310.13225@utopia.booyaka.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 18 Jan 2011 12:22:14 -0800
+Subject: [PATCH] drivers: mmc: msm: update to new arm pfn_to_dma API
+In-Reply-To: <20110118182826.GI16980@n2100.arm.linux.org.uk>
+References: <1295373844-27713-1-git-send-email-dwalker@codeaurora.org>
+	<20110118182826.GI16980@n2100.arm.linux.org.uk>
+Message-ID: <1295382134.26904.7.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Tue, 2011-01-18 at 18:28 +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 18, 2011 at 10:04:04AM -0800, Daniel Walker wrote:
+> > The page_to_dma() API call was removed. It caused this build
+> > failure,
+> 
+> Because it's an API internal interface.  Don't use it.  Why is this
+> driver poking about in API internals all over the place?
 
-These changes fix the clocksource oops on boot, reduce the amount of 
-now-unnecessary warning backtraces on OMAP4-only configs, and remove some 
-warnings from 'make includecheck'.
+If it's internal why is this driver able to call it?
 
-The following changes since commit e78bf5e6cbe837daa6ab628a5f679548742994d3:
+> That is completely broken.  Please use the official APIs - it's not
+> hard.  Here's how to do it correctly:
 
-  drivers/nfc/pn544.c: fix min_t warnings (2011-01-16 17:28:21 -0800)
+Can you make this into a patch and send it to David Brown ?
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 fixes_a_2.6.38rc
+> 
+> and when you use writel() etc afterwards, those non-cacheable writes to
+> box-> will be ordered with your device write.
+> 
+> So that's a NAK for your original patch.
 
-Felipe Balbi (1):
-      OMAP: PRCM: remove duplicated headers
+Are you given us alternative to my fix yet? I didn't see any of your
+comments touching that area?
 
-Paul Walmsley (2):
-      OMAP: counter_32k: init clocksource as part of machine timer init
-      OMAP4: clockdomain: bypass unimplemented wake-up dependency functions on OMAP4
+Daniel
 
- arch/arm/mach-omap1/time.c                  |    7 ++++++
- arch/arm/mach-omap2/clock44xx_data.c        |    1 -
- arch/arm/mach-omap2/clockdomain.c           |   30 +++++++++++++++++++++++---
- arch/arm/mach-omap2/clockdomains44xx_data.c |    2 -
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c  |    1 -
- arch/arm/mach-omap2/timer-gp.c              |   10 +++++++-
- arch/arm/plat-omap/counter_32k.c            |    3 +-
- arch/arm/plat-omap/include/plat/common.h    |    1 +
- 8 files changed, 43 insertions(+), 12 deletions(-)
+-- 
 
-
-- Paul
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
