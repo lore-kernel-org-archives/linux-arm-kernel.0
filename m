@@ -1,29 +1,39 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Tue, 18 Jan 2011 10:21:23 +0000
-Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <4D354752.3030401@samsung.com>
-References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
-	<20101208115510.GD10998@console-pimps.org>
-	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
-	<20101211192320.GA24430@void.printf.net>
-	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
-	<4D354752.3030401@samsung.com>
-Message-ID: <AANLkTi=SEXYk9B6N6RGmLKAx_QF6sybgHMVVpEo8mcp8@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Jan 2011 10:24:20 -0000
+Subject: [PATCH 09/14] ARM: v6k: select generic atomic64 code according to
+	V6	variants
+In-Reply-To: <E1PeugN-0003Sp-0J@rmk-PC.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1PeugN-0003Sp-0J@rmk-PC.arm.linux.org.uk>
+Message-ID: <000501cbb6f9$deb8b530$9c2a1f90$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 7:54 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Will.
->
-> I have some question...i'm testing dw_mmc in our environment.
-> but i didn't understand pdata->init(?)...what initialize in there?
+> If CONFIG_CPU_V6 is enabled, avoid using the double-word exclusive
+> instructions in the kernel's atomic implementations as these are not
+> supported.  Fall back to the generic spinlock code instead.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 95ba92f..283d7b9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -7,7 +7,7 @@ config ARM
+>  	select HAVE_MEMBLOCK
+>  	select RTC_LIB
+>  	select SYS_SUPPORTS_APM_EMULATION
+> -	select GENERIC_ATOMIC64 if (!CPU_32v6K || !AEABI)
+> +	select GENERIC_ATOMIC64 if (CPU_V6 || !CPU_32v6K || !AEABI)
+>  	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
+>  	select HAVE_ARCH_KGDB
+>  	select HAVE_KPROBES if (!XIP_KERNEL && !THUMB2_KERNEL)
 
-In most of our platforms init is empty so I guess it would be fine to
-change that code to ignore a null init pointer. An example of one of
-the things we do use the init function for is to switch pins to GPIO
-to handle card detect.
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks,
+
+Will
