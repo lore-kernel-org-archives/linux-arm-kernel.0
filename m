@@ -1,123 +1,42 @@
-From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Wed, 19 Jan 2011 18:55:02 +0530
-Subject: [PATCH RESEND v8 6/7] omap3: nand: ecc layout select from board file
-In-Reply-To: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
-References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1295443503-14515-7-git-send-email-s-ghorai@ti.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Wed, 19 Jan 2011 15:43:39 +0200
+Subject: State of LDP3430 platform
+In-Reply-To: <alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
+References: <20101206125526.GC31777@n2100.arm.linux.org.uk>
+	<20101206181913.GH8345@atomide.com>
+	<alpine.DEB.2.00.1012061125400.13430@utopia.booyaka.com>
+	<20101207083720.GB18336@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1012071745120.13430@utopia.booyaka.com>
+	<alpine.DEB.2.00.1012072012000.13430@utopia.booyaka.com>
+	<20110115000301.GT4957@atomide.com>
+	<alpine.DEB.2.00.1101151237240.32245@utopia.booyaka.com>
+	<20110115233744.GA18159@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
+	<4D3309F9.8090900@gmail.com>
+	<alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
+Message-ID: <20110119154339.9f20759b.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes it possible to select sw or hw (different layout options)
-ecc scheme supported by omap nand driver.
+On Tue, 18 Jan 2011 12:36:26 -0700 (MST)
+Paul Walmsley <paul@pwsan.com> wrote:
 
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
-Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
----
- arch/arm/mach-omap2/board-flash.c      |    1 +
- arch/arm/plat-omap/include/plat/gpmc.h |    6 ++++++
- arch/arm/plat-omap/include/plat/nand.h |    2 ++
- drivers/mtd/nand/omap2.c               |   26 +++++++++++---------------
- 4 files changed, 20 insertions(+), 15 deletions(-)
+> This is due to the recent ARM init_sched_clock() changes and the late
+> initialization of the counter_32k clock source.  More information here:
+> 
+>    http://marc.info/?l=linux-omap&m=129513468605208&w=2
+> 
+> Fix by initializing the counter_32k clocksource during the machine timer
+> initialization.
+> 
+> Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Tested-by: Thomas Weber <weber@corscience.de>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+Thanks Paul. My tested-by is late as this in already in your pull
+request but wanted to comment that this makes the mainline working on
+omap3 after commit 211baa7
+"ARM: sched_clock: allow init_sched_clock() to be called early"
 
-diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-index 1964509..a768198 100644
---- a/arch/arm/mach-omap2/board-flash.c
-+++ b/arch/arm/mach-omap2/board-flash.c
-@@ -148,6 +148,7 @@ __init board_nand_init(struct mtd_partition *nand_parts,
- 	board_nand_data.nr_parts	= nr_parts;
- 	board_nand_data.devsize		= nand_type;
- 
-+	board_nand_data.ecc_opt = OMAP_ECC_HAMMING_CODE_DEFAULT;
- 	board_nand_data.gpmc_irq = OMAP_GPMC_IRQ_BASE + cs;
- 	gpmc_nand_init(&board_nand_data);
- }
-diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index 1b4a095..4626e7a 100644
---- a/arch/arm/plat-omap/include/plat/gpmc.h
-+++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -86,6 +86,12 @@
- #define PREFETCH_FIFOTHRESHOLD_MAX	0x40
- #define PREFETCH_FIFOTHRESHOLD(val)	((val) << 8)
- 
-+enum omap_ecc {
-+		/* 1-bit ecc: stored@end of spare area */
-+	OMAP_ECC_HAMMING_CODE_DEFAULT = 0, /* Default, s/w method */
-+	OMAP_ECC_HAMMING_CODE_HW, /* gpmc to detect the error */
-+};
-+
- /*
-  * Note that all values in this struct are in nanoseconds except sync_clk
-  * (which is in picoseconds), while the register values are in gpmc_fck cycles.
-diff --git a/arch/arm/plat-omap/include/plat/nand.h b/arch/arm/plat-omap/include/plat/nand.h
-index ae5e053..d86d1ec 100644
---- a/arch/arm/plat-omap/include/plat/nand.h
-+++ b/arch/arm/plat-omap/include/plat/nand.h
-@@ -8,6 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <plat/gpmc.h>
- #include <linux/mtd/partitions.h>
- 
- enum nand_io {
-@@ -31,6 +32,7 @@ struct omap_nand_platform_data {
- 	enum nand_io		xfer_type;
- 	unsigned long		phys_base;
- 	int			devsize;
-+	enum omap_ecc           ecc_opt;
- };
- 
- /* minimum size for IO mapping */
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index f1648fd..6d4a42e 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -626,8 +626,6 @@ static int omap_verify_buf(struct mtd_info *mtd, const u_char * buf, int len)
- 	return 0;
- }
- 
--#ifdef CONFIG_MTD_NAND_OMAP_HWECC
--
- /**
-  * gen_true_ecc - This function will generate true ECC value
-  * @ecc_buf: buffer to store ecc code
-@@ -847,8 +845,6 @@ static void omap_enable_hwecc(struct mtd_info *mtd, int mode)
- 	gpmc_enable_hwecc(info->gpmc_cs, mode, dev_width, info->nand.ecc.size);
- }
- 
--#endif
--
- /**
-  * omap_wait - wait until the command is done
-  * @mtd: MTD device structure
-@@ -1038,17 +1034,17 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 
- 	info->nand.verify_buf = omap_verify_buf;
- 
--#ifdef CONFIG_MTD_NAND_OMAP_HWECC
--	info->nand.ecc.bytes		= 3;
--	info->nand.ecc.size		= 512;
--	info->nand.ecc.calculate	= omap_calculate_ecc;
--	info->nand.ecc.hwctl		= omap_enable_hwecc;
--	info->nand.ecc.correct		= omap_correct_data;
--	info->nand.ecc.mode		= NAND_ECC_HW;
--
--#else
--	info->nand.ecc.mode = NAND_ECC_SOFT;
--#endif
-+	/* selsect the ecc type */
-+	if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_DEFAULT)
-+		info->nand.ecc.mode = NAND_ECC_SOFT;
-+	else if (pdata->ecc_opt == OMAP_ECC_HAMMING_CODE_HW) {
-+		info->nand.ecc.bytes            = 3;
-+		info->nand.ecc.size             = 512;
-+		info->nand.ecc.calculate        = omap_calculate_ecc;
-+		info->nand.ecc.hwctl            = omap_enable_hwecc;
-+		info->nand.ecc.correct          = omap_correct_data;
-+		info->nand.ecc.mode             = NAND_ECC_HW;
-+	}
- 
- 	/* DIP switches on some boards change between 8 and 16 bit
- 	 * bus widths for flash.  Try the other width if the first try fails.
 -- 
-1.7.0.4
+Jarkko
