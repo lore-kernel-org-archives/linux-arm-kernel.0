@@ -1,54 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Jan 2011 13:12:51 -0000
-Subject: [PATCH] RFC: ux500: add PMU resources
-In-Reply-To: <20110119115737.GC31652@n2100.arm.linux.org.uk>
-References: <1295391579-9166-1-git-send-email-linus.walleij@stericsson.com>
-	<000001cbb7cd$7cb9c840$762d58c0$@deacon@arm.com>
-	<20110119115737.GC31652@n2100.arm.linux.org.uk>
-Message-ID: <000101cbb7da$93e05fe0$bba11fa0$@deacon@arm.com>
+From: s-ghorai@ti.com (Sukumar Ghorai)
+Date: Wed, 19 Jan 2011 18:54:56 +0530
+Subject: [PATCH RESEND v8 0/7] nand prefetch-irq support and ecc layout chanage
+Message-ID: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+The following set of patches applies on linux-2.6.
 
-Thanks for the insight.
+The main motivations behind this patch series are -
+        1. support NAND I/O in irq mode.
+        2. support of different ECC schema.
+        3. also add support ecc layout as like in romcode ecc layout, but not enabled
 
-> On Wed, Jan 19, 2011 at 11:39:09AM -0000, Will Deacon wrote:
-> > 3.) Rework the GIC code so that an IRQ can target multiple CPUs and remove
-> >     the distributor-level masking. I think this was originally done so that
-> >     we can service different IRQs simultaneously, but with the deprecation
-> >     of IRQF_DISABLED I'm not sure if this is still an issue. If not, then
-> >     we can change to masking at the CPU interfaces which will make
-> >     supporting your combined IRQ much easier.
-> 
-> If an interrupt is routed to multiple cores simultaneously, then you end
-> up with a number of problems:
-> 
-> 1. Each time an interrupt occurs, you wake up all CPUs.
-> 2. One CPU wins the race and starts to handle the interrupt.  The others
->    are left spinning on a lock waiting.  Eventually the lock is dropped
->    and they too enter the handler.
-> 3. Another race ensues on the drivers own spinlock.  The winning CPU
->    possibly holds this lock for the duration of its handling.  Meanwhile
->    the other CPUs are left spinning waiting for the lock to be dropped.
-> 4. When the winning CPU drops the lock, it returns IRQ_HANDLED.  The other
->    CPUs find that there is no IRQ pending from the device, and return
->    IRQ_NONE.
-> 
-> (4) may result in the spurious/unhandled IRQ code eventually disabling
-> the interrupt.
+v8: free_irq() added; usedtimeout for this while loop.
+Rebase and resend of http://www.mail-archive.com/linux-omap at vger.kernel.org/msg41614.html
 
-I don't think these are a problem if we only allow IRQs to be affine to
-multiple CPUs when the IRQF_PERCPU flag is set. All other interrupts will
-concern only a single CPU and the corresponding CPU interface.
+v7: NAND type (x16 or x8) is board specific and not omap specific; this passed form board file.
+    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg41469.html
 
-For these PERCPU interrupts, the wakeups and lock contention is part of the
-deal - that's a consequence of setting an affinity mask containing multiple
-CPUs.
+v6: configurable transfer type from board file; 
+    #define irq number used for nand-irq
+    http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39397.html
+    
+v5: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35860.html
+This address the input as to support the irq_chained in GPMC.
+And resend of
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35848.html
 
-It's worth noting that the Virtualisation Extensions (Cortex-A15) only provide
-a virtualised view of the CPU interfaces. The distributor must be trapped using
-a second-stage translation by the hypervisor, so accessing it becomes a massive
-overhead in the critical interrupt path in Linux.
+v4: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34882.html
+and resend of
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32689.html
 
-Will
+v3: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32071.html
+Rebase on latest codebase and previous patch(posted).
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31963.html
+
+v2: Rebase on latest codebase and previous patch(posted).
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31471.html
+
+v1: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26666.html
+
+Sukumar Ghorai (7):
+  omap3630: nand: fix device size to work in polled mode
+  omap3: nand: configurable transfer type per board
+  omap: gpmc: enable irq mode in gpmc
+  omap3: nand: prefetch in irq mode support
+  omap3: nand: configurable fifo threshold to gain the throughput
+  omap3: nand: ecc layout select from board file
+  omap3: nand: making ecc layout as compatible with romcode ecc
+
+ arch/arm/mach-omap2/board-2430sdp.c        |    1 +
+ arch/arm/mach-omap2/board-3430sdp.c        |    3 +-
+ arch/arm/mach-omap2/board-3630sdp.c        |    4 +-
+ arch/arm/mach-omap2/board-4430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +
+ arch/arm/mach-omap2/board-apollon.c        |    1 +
+ arch/arm/mach-omap2/board-cm-t35.c         |    1 +
+ arch/arm/mach-omap2/board-devkit8000.c     |    1 +
+ arch/arm/mach-omap2/board-flash.c          |   13 +-
+ arch/arm/mach-omap2/board-flash.h          |    4 +-
+ arch/arm/mach-omap2/board-generic.c        |    2 +
+ arch/arm/mach-omap2/board-h4.c             |    1 +
+ arch/arm/mach-omap2/board-igep0020.c       |    1 +
+ arch/arm/mach-omap2/board-ldp.c            |    3 +-
+ arch/arm/mach-omap2/board-n8x0.c           |    2 +
+ arch/arm/mach-omap2/board-omap3beagle.c    |    1 +
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +
+ arch/arm/mach-omap2/board-omap3stalker.c   |    1 +
+ arch/arm/mach-omap2/board-omap3touchbook.c |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c     |    2 +
+ arch/arm/mach-omap2/board-overo.c          |    1 +
+ arch/arm/mach-omap2/board-rx51.c           |    1 +
+ arch/arm/mach-omap2/board-zoom.c           |    7 +-
+ arch/arm/mach-omap2/gpmc-nand.c            |    7 +-
+ arch/arm/mach-omap2/gpmc.c                 |   50 ++++-
+ arch/arm/mach-omap2/io.c                   |    3 -
+ arch/arm/plat-omap/include/plat/gpmc.h     |   17 ++-
+ arch/arm/plat-omap/include/plat/irqs.h     |    9 +-
+ arch/arm/plat-omap/include/plat/nand.h     |   11 +
+ drivers/mtd/nand/Kconfig                   |   17 --
+ drivers/mtd/nand/omap2.c                   |  367 +++++++++++++++++++++-------
+ 32 files changed, 411 insertions(+), 129 deletions(-)
