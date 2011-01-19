@@ -1,63 +1,40 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Wed, 19 Jan 2011 12:24:08 +0200
-Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
-In-Reply-To: <87mxnfz2f4.fsf@ti.com>
-References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>	<20101221202914.GK5829@atomide.com>
-	<4D2440E0.7040008@nokia.com> <87mxnfz2f4.fsf@ti.com>
-Message-ID: <4D36BBC8.2000305@nokia.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 19 Jan 2011 10:43:02 +0000
+Subject: RFC: Host-endian device tree format
+Message-ID: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
- From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
-From: Adrian Hunter <adrian.hunter@nokia.com>
-Date: Wed, 24 Nov 2010 13:23:21 +0200
-Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
+Apologies if this has been discussed before--- I don't see an obvious
+rebuttal in my quick searching past threads, so I'll just quickly ask
+the question:
 
-When clearing the DMA channel, clear all status bits.
+Could we use host-endianness for the device tree binary blob?
 
-When handling a DMA interrupt, clear only the interrupt
-status bits that have been read and are passed to the
-channel's interrupt handler, not every status bit.
+The fdt binary format seems to lend itself strongly to a host-endian
+format: it begins with a word-sized magic number, and when parsing the
+device tree every elements type and size is known before that element
+is read; furthermore, every element is size-aligned.  Therefore, I
+(naively?) presume that a little-endian format should "just work",
+simply by flipping the endianness of every element and discarding all
+the __be32_to_cpu() type stuff when reading the fdt at boot time.  The
+magic number ensures that there's no risk of accidentally reading the
+fst in the wrong byte order.
 
-Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
----
-  arch/arm/plat-omap/dma.c |    7 +++----
-  1 files changed, 3 insertions(+), 4 deletions(-)
+Although it would be necessary to augment the fdt tools to cope with
+this, offline tools appear to be the right place to put this
+intelligence.  For the kernel to flip the byte order of everything in
+the fdt blob every time the system boots just seems unnecessary when
+the required endianness is statically known.
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index c4b2b47..8536308 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -53,7 +53,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
-  #endif
-  
-  #define OMAP_DMA_ACTIVE			0x01
--#define OMAP2_DMA_CSR_CLEAR_MASK	0xffe
-+#define OMAP2_DMA_CSR_CLEAR_MASK	0xffffffff
-  
-  #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
-  
-@@ -1873,7 +1873,7 @@ static int omap2_dma_handle_ch(int ch)
-  		printk(KERN_INFO "DMA misaligned error with device %d\n",
-  		       dma_chan[ch].dev_id);
-  
--	p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, ch);
-+	p->dma_write(status, CSR, ch);
-  	p->dma_write(1 << ch, IRQSTATUS_L0, ch);
-  	/* read back the register to flush the write */
-  	p->dma_read(IRQSTATUS_L0, ch);
-@@ -1893,10 +1893,9 @@ static int omap2_dma_handle_ch(int ch)
-  			OMAP_DMA_CHAIN_INCQHEAD(chain_id);
-  
-  		status = p->dma_read(CSR, ch);
-+		p->dma_write(status, CSR, ch);
-  	}
-  
--	p->dma_write(status, CSR, ch);
--
-  	if (likely(dma_chan[ch].callback != NULL))
-  		dma_chan[ch].callback(ch, status, dma_chan[ch].data);
-  
--- 
-1.7.0.4
+Since fdt is new on ARM we have an opportunity to change determine the
+binary format now without breaking anything in the field -- we don't
+necessarily have to adopt the host-endian format on any other
+architectures if it's not desirable.
+
+Any thoughts?
+
+Cheers
+---Dave
