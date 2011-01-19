@@ -1,16 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Jan 2011 15:19:15 +0000
-Subject: [RFC][PATCH] ARM: ptrace: remove single-step emulation code
-In-Reply-To: <1295449635-4292-1-git-send-email-will.deacon@arm.com>
-References: <1295449635-4292-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20110119151915.GG31652@n2100.arm.linux.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 19 Jan 2011 13:32:44 -0200
+Subject: [PATCH] usb: gadget/fsl_mxc_udc: Detect the CPU type in run-time
+Message-ID: <1295451164-3363-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 03:07:15PM +0000, Will Deacon wrote:
-> I'm posting this as an RFC to see if anybody has a good reason to keep this
-> code around. There's also a chance I've missed an opportunity to remove some
-> related code, but I think I found everything. Tested on a Versatile Express,
-> single-stepping in GDB worked fine.
+Instead of checking the CPU type in build-time, do it in run-time.
 
-Have you checked whether strace and ltrace use single stepping?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/usb/gadget/fsl_mxc_udc.c |   23 ++++++++++++-----------
+ 1 files changed, 12 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+index 77b1eb5..167abe0 100644
+--- a/drivers/usb/gadget/fsl_mxc_udc.c
++++ b/drivers/usb/gadget/fsl_mxc_udc.c
+@@ -88,17 +88,18 @@ eenahb:
+ void fsl_udc_clk_finalize(struct platform_device *pdev)
+ {
+ 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+-#if defined(CONFIG_ARCH_MX35)
+-	unsigned int v;
+-
+-	/* workaround ENGcm09152 for i.MX35 */
+-	if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
+-		v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+-				USBPHYCTRL_OTGBASE_OFFSET));
+-		writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+-				USBPHYCTRL_OTGBASE_OFFSET));
+-	}
+-#endif
++	if (cpu_is_mx35()) {
++		unsigned int v;
++
++		/* workaround ENGcm09152 for i.MX35 */
++		if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
++			v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
++					USBPHYCTRL_OTGBASE_OFFSET));
++			writel(v | USBPHYCTRL_EVDO,
++				MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
++					USBPHYCTRL_OTGBASE_OFFSET));
++		}
++	}
+ 
+ 	/* ULPI transceivers don't need usbpll */
+ 	if (pdata->phy_mode == FSL_USB2_PHY_ULPI) {
+-- 
+1.6.0.4
