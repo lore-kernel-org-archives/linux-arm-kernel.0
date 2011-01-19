@@ -1,142 +1,43 @@
 From: matejken@gmail.com (Matej Kenda)
-Date: Wed, 19 Jan 2011 13:01:24 +0100
-Subject: [PATCH 2/2] Updated defconfig for Iskratel XCEP
-Message-ID: <AANLkTikTdAmzB15TttO8ZRwseFEYhQRDOP5g6pBj4Vte@mail.gmail.com>
+Date: Wed, 19 Jan 2011 13:01:31 +0100
+Subject: [PATCH 1/2] Updated XCEP partition sizes
+Message-ID: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updated defconfig for Iskratel XCEP SBC for monolithically built kernel 2.6.37.
+Increased partition for Linux kernel from 1 MB to 2 MB for
+monolithically built kernel 2.6.37 for Iskratel XCEP SBC to fit in.
 
 Signed-off-by: Matej Kenda <matejken@gmail.com>
 
 ---
 
-diff --git a/arch/arm/configs/xcep_defconfig b/arch/arm/configs/xcep_defconfig
-index 70d47db..16e9279 100644
---- a/arch/arm/configs/xcep_defconfig
-+++ b/arch/arm/configs/xcep_defconfig
-@@ -1,37 +1,37 @@
- CONFIG_EXPERIMENTAL=y
--CONFIG_LOCALVERSION=".xcep-itech"
-+CONFIG_LOCALVERSION=".xcep-itech-preempt"
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
- CONFIG_BSD_PROCESS_ACCT=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_SYSFS_DEPRECATED=y
- CONFIG_SYSFS_DEPRECATED_V2=y
--CONFIG_BLK_DEV_INITRD=y
- CONFIG_EMBEDDED=y
- # CONFIG_UID16 is not set
- # CONFIG_SHMEM is not set
- # CONFIG_VM_EVENT_COUNTERS is not set
--# CONFIG_COMPAT_BRK is not set
- CONFIG_SLOB=y
--CONFIG_KPROBES=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_MODULE_SRCVERSION_ALL=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLOCK is not set
- CONFIG_ARCH_PXA=y
- CONFIG_MACH_XCEP=y
--CONFIG_IWMMXT=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
- CONFIG_AEABI=y
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_CC_STACKPROTECTOR=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="root=mtd4 rootfstype=jffs2 ro console=ttyS0,115200"
--CONFIG_FPE_NWFPE=y
-+CONFIG_FPE_FASTFPE=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_NET=y
--CONFIG_PACKET=m
-+CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_NET_KEY=y
- CONFIG_INET=y
-@@ -44,17 +44,16 @@ CONFIG_IP_PNP_BOOTP=y
- # CONFIG_INET_XFRM_MODE_BEET is not set
- # CONFIG_INET_DIAG is not set
- # CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
--CONFIG_MTD_CONCAT=y
--CONFIG_MTD_COMPLEX_MAPPINGS=y
- CONFIG_MTD_PXA2XX=y
--# CONFIG_MISC_DEVICES is not set
- CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
-+# CONFIG_WLAN is not set
- # CONFIG_INPUT_MOUSEDEV is not set
- # CONFIG_INPUT_KEYBOARD is not set
- # CONFIG_INPUT_MOUSE is not set
-@@ -64,36 +63,40 @@ CONFIG_SERIAL_PXA=y
- CONFIG_SERIAL_PXA_CONSOLE=y
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_HW_RANDOM is not set
--CONFIG_I2C=m
--CONFIG_I2C_CHARDEV=m
--CONFIG_I2C_PXA=m
--CONFIG_HWMON=m
--CONFIG_SENSORS_ADM1021=m
--CONFIG_SENSORS_MAX6650=m
--# CONFIG_VGA_CONSOLE is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_PXA=y
-+CONFIG_SPI=y
-+CONFIG_SPI_PXA2XX=y
-+CONFIG_SPI_SPIDEV=y
-+CONFIG_SENSORS_ADM1021=y
-+CONFIG_SENSORS_MAX6650=y
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
--CONFIG_RTC_CLASS=m
--CONFIG_RTC_DRV_SA1100=m
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_SA1100=y
- CONFIG_DMADEVICES=y
- # CONFIG_DNOTIFY is not set
- # CONFIG_INOTIFY_USER is not set
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_FS_WBUF_VERIFY=y
--CONFIG_NFS_FS=m
-+CONFIG_NFS_FS=y
- CONFIG_NFS_V3=y
--CONFIG_NLS=m
-+CONFIG_NFS_V4=y
-+CONFIG_NLS=y
- CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_UTF8=m
-+CONFIG_NLS_UTF8=y
- CONFIG_PRINTK_TIME=y
- CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_HEADERS_CHECK=y
- CONFIG_DEBUG_KERNEL=y
--# CONFIG_SCHED_DEBUG is not set
--# CONFIG_DEBUG_BUGVERBOSE is not set
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_DETECT_HUNG_TASK=y
-+CONFIG_LATENCYTOP=y
- CONFIG_SYSCTL_SYSCALL_CHECK=y
- # CONFIG_FTRACE is not set
--# CONFIG_ARM_UNWIND is not set
-+CONFIG_STRICT_DEVMEM=y
-+CONFIG_DEBUG_ERRORS=y
-+CONFIG_CRYPTO_CRC32C=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- # CONFIG_CRYPTO_HW is not set
--CONFIG_LIBCRC32C=m
+diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
+index 3260ce7..f7b1052 100644
+--- a/arch/arm/mach-pxa/xcep.c
++++ b/arch/arm/mach-pxa/xcep.c
+@@ -55,20 +55,20 @@ static struct mtd_partition xcep_partitions[] = {
+ 	}, {
+ 		.name =		"Bootloader ENV",
+ 		.size =		0x00040000,
+-		.offset =	0x00040000,
++		.offset =	MTDPART_OFS_APPEND,
+ 		.mask_flags =	MTD_WRITEABLE
+ 	}, {
+ 		.name =		"Kernel",
+-		.size =		0x00100000,
+-		.offset =	0x00080000,
++		.size =		0x00200000,
++		.offset =	MTDPART_OFS_APPEND,
+ 	}, {
+ 		.name =		"Rescue fs",
+ 		.size =		0x00280000,
+-		.offset =	0x00180000,
++		.offset =	MTDPART_OFS_APPEND,
+ 	}, {
+ 		.name =		"Filesystem",
+ 		.size =		MTDPART_SIZ_FULL,
+-		.offset =	0x00400000
++		.offset =	MTDPART_OFS_APPEND
+ 	}
+ };
