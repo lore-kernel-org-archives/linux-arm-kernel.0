@@ -1,39 +1,39 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 19 Jan 2011 00:09:19 +0000
-Subject: [PATCH V4 32/62] ST SPEAr 13xx : Adding support for SPEAr1310
-In-Reply-To: <24e7a018145fb94f298ac620919ec4f0a1bf7517.1295333958.git.viresh.kumar@st.com>
+Date: Wed, 19 Jan 2011 00:20:46 +0000
+Subject: [PATCH V4 38/62] SPEAr CPU freq: Adding support for CPU Freq
+	framework
+In-Reply-To: <0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-	<24e7a018145fb94f298ac620919ec4f0a1bf7517.1295333958.git.viresh.kumar@st.com>
-Message-ID: <20110119000919.GB2209@gallagher>
+	<0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
+Message-ID: <20110119002046.GC2209@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Jan 18, 2011 at 12:41:59PM +0530, Viresh Kumar wrote:
-> From: Bhupesh Sharma <bhupesh.sharma@st.com>
+On Tue, Jan 18, 2011 at 12:42:05PM +0530, Viresh Kumar wrote:
+> From: Deepak Sikri <deepak.sikri@st.com>
 > 
-> This patch adds support for SPEAr1310 Machine and evaluation board
-> 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@st.com>
+> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 > Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 > ---
 [...]
-> diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c 
-> b/arch/arm/mach-spear13xx/spear1310_evb.c
+> diff --git a/arch/arm/plat-spear/cpufreq.c b/arch/arm/plat-spear/cpufreq.c
 > new file mode 100644
-> index 0000000..1270b4d
+> index 0000000..9384d65
 > --- /dev/null
-> +++ b/arch/arm/mach-spear13xx/spear1310_evb.c
-> @@ -0,0 +1,133 @@
+> +++ b/arch/arm/plat-spear/cpufreq.c
+> @@ -0,0 +1,159 @@
 > +/*
-> + * arch/arm/mach-spear13xx/spear1310_evb.c
+> + * arch/arm/plat-spear/cpufreq.c
 > + *
-> + * SPEAr1310 evaluation board source file
+> + * CPU Frequency Scaling for SPEAr platform
 > + *
 > + * Copyright (C) 2010 ST Microelectronics
-> + * Bhupesh Sharma <bhupesh.sharma@st.com>
+> + * Deepak Sikri<deepak.sikri@st.com>
+> + *
 > + *
 > + * This file is licensed under the terms of the GNU General Public
 > + * License version 2. This program is licensed "as is" without any
@@ -41,114 +41,172 @@ On Tue, Jan 18, 2011 at 12:41:59PM +0530, Viresh Kumar wrote:
 > + */
 > +
 > +#include <linux/types.h>
-> +#include <linux/gpio.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/mtd/fsmc.h>
-> +#include <linux/spi/flash.h>
-> +#include <linux/spi/spi.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach-types.h>
-> +#include <plat/fsmc.h>
-> +#include <plat/keyboard.h>
-> +#include <plat/spi.h>
-> +#include <mach/generic.h>
-> +#include <mach/spear.h>
-> +#include <mach/pcie.h>
+> +#include <linux/kernel.h>
+> +#include <linux/sched.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <asm/system.h>
+> +#include <mach/hardware.h>
 > +
-> +static struct amba_device *amba_devs[] __initdata = {
-> +	/* spear13xx specific devices */
-> +	&spear13xx_gpio_device[0],
-> +	&spear13xx_gpio_device[1],
-> +	&spear13xx_ssp_device,
-> +	&spear13xx_uart_device,
+> +#define CPU_CLK		"cpu_clk"
+> +
+> +#ifdef CONFIG_ARCH_SPEAR13XX
+> +#define MIN_CPU_FREQ	200000
+> +#define MAX_CPU_FREQ	500000
+> +
+> +static u32 spear_cpu_freq[] = {
+> +	200000,	/* 200 MHZ */
+> +	250000,	/* 250 MHZ */
+> +	332000,	/* 332 MHZ */
+> +	400000,	/* 400 MHZ */
+> +	500000,	/* 500 MHZ */
 > +};
+> +#elif defined(CONFIG_ARCH_SPEAR6XX) || defined(CONFIG_ARCH_SPEAR3XX)
+> +#define MIN_CPU_FREQ	166000
+> +#define MAX_CPU_FREQ	332000
 > +
-> +static struct platform_device *plat_devs[] __initdata = {
-> +	/* spear13xx specific devices */
-> +	&spear13xx_ehci0_device,
-> +	&spear13xx_ehci1_device,
-> +	&spear13xx_i2c_device,
-> +	&spear13xx_kbd_device,
-> +	&spear13xx_nand_device,
-> +	&spear13xx_ohci0_device,
-> +	&spear13xx_ohci1_device,
-> +	&spear13xx_rtc_device,
-> +	&spear13xx_sdhci_device,
-> +
-> +	/* spear1310 specific devices */
-> +	&spear1310_can0_device,
-> +	&spear1310_can1_device,
+> +static u32 spear_cpu_freq[] = {
+> +	166000,	/* 166 MHZ */
+> +	266000,	/* 266 MHZ */
+> +	332000,	/* 333 MHZ */
 > +};
-> +
-> +/* keyboard specific platform data */
-> +static DECLARE_KEYMAP(keymap);
-> +static struct matrix_keymap_data keymap_data = {
-> +	.keymap = keymap,
-> +	.keymap_size = ARRAY_SIZE(keymap),
-> +};
-> +
-> +static struct kbd_platform_data kbd_data = {
-> +	.keymap = &keymap_data,
-> +	.rep = 1,
-> +};
-> +
-> +static struct spi_board_info __initdata spi_board_info[] = {
-> +};
-
-AFAICT spi_register_board_info() doesn't do anything when passed this empty 
-array so both the array and call could be removed.
-
-> +
-> +#ifdef CONFIG_PCIEPORTBUS
-> +/* this function is needed for PCIE host and device driver. Same
-> + * controller can not be programmed as host as well as device. So host
-> + * driver must call this function and if this function returns 1 then
-> + * only host should add that particular port as RC.
-> + * A port to be added as device, one must also add device's information
-> + * in plat_devs array defined in this file.
-> + * it is the responsibility of calling function to not send port number
-> + * greter than max no of controller(3)
-> + */
-> +int spear1310_pcie_port_is_host(int port)
-> +{
-> +	switch (port) {
-> +	case 0:
-> +		return 0;
-> +	case 1:
-> +		return 1;
-> +	case 2:
-> +		return 1;
-> +	}
-> +	return -EINVAL;
-> +}
 > +#endif
-
-It looks like this can be made static.  Also, given the comment, is it worth 
-adding a BUG_ON(port > 3)?
-
-> +static void __init spear1310_evb_init(void)
+> +
+> +static struct
+> +	cpufreq_frequency_table spear_freq_tbl[ARRAY_SIZE(spear_cpu_freq) + 1];
+> +static struct clk *cpu_clk;
+> +
+> +int spear_cpufreq_verify(struct cpufreq_policy *policy)
 > +{
-> +	unsigned int i;
+> +	return cpufreq_frequency_table_verify(policy, spear_freq_tbl);
+> +}
 > +
-> +	/* set keyboard plat data */
-> +	kbd_set_plat_data(&spear13xx_kbd_device, &kbd_data);
+> +unsigned int spear_cpufreq_get(unsigned int cpu)
+> +{
+> +	unsigned long rate;
 > +
-> +	/* set nand device's plat data */
-> +	fsmc_nand_set_plat_data(&spear13xx_nand_device, NULL, 0,
-> +			NAND_SKIP_BBTSCAN, FSMC_NAND_BW8);
-> +	nand_mach_init(FSMC_NAND_BW8);
+> +	if (cpu)
+> +		return 0;
 > +
-> +	/* call spear1310 machine init function */
-> +	spear1310_init();
-> +
-> +	/* Register slave devices on the I2C buses */
-> +	i2c_register_default_devices();
-> +
-> +#ifdef CONFIG_PCIEPORTBUS
-> +	/* Enable PCIE0 clk */
-> +	enable_pcie0_clk();
-> +	pcie_init(&spear1310_pcie_port_is_host);
+> +	rate = clk_get_rate(cpu_clk) / 1000;
+> +	return rate;
+> +}
 
-No '&' needed before function name.
+Can this be simplified to:
+
+	unsigned int spear_cpufreq_get(unsigned int cpu)
+	{
+		return cpu ? 0 : clk_get_rate(cpu_clk) / 1000;
+	}
+
+?  It could also be made static.
+
+> +
+> +static int spear_cpufreq_target(struct cpufreq_policy *policy,
+> +		unsigned int target_freq, unsigned int relation)
+> +{
+> +	struct cpufreq_freqs freqs;
+> +	int ret = 0;
+> +	int index;
+> +
+> +	if (policy->cpu != 0)
+> +		return -EINVAL;
+> +
+> +	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
+> +				target_freq, relation, &index))
+> +		return -EINVAL;
+> +
+> +	freqs.old = spear_cpufreq_get(0);
+> +	freqs.new = spear_cpu_freq[index];
+> +	freqs.cpu = policy->cpu;
+> +
+> +	if (freqs.old == target_freq)
+> +		return 0;
+> +
+> +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+> +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+If clk_set_rate() failed then do you need to do freqs.new = 
+clk_get_rate(cpu_clk) before doing the CPUFREQ_POSTCHANGE to make sure you 
+don't notify the wrong frequency?
+
+> +
+> +	return ret;
+> +}
+> +
+> +static int spear_cpufreq_init(struct cpufreq_policy *policy)
+> +{
+> +	int result;
+> +	int i = 0;
+> +
+> +	if (policy->cpu != 0)
+> +		return -EINVAL;
+> +
+> +	cpu_clk = clk_get(NULL, CPU_CLK);
+> +	if (IS_ERR(cpu_clk))
+> +		return PTR_ERR(cpu_clk);
+> +
+> +	policy->cpuinfo.min_freq = MIN_CPU_FREQ;
+> +	policy->cpuinfo.max_freq = MAX_CPU_FREQ;
+> +	policy->cur = policy->min = policy->max = spear_cpufreq_get(0);
+> +
+> +	for (i = 0; i < ARRAY_SIZE(spear_cpu_freq); i++) {
+> +		spear_freq_tbl[i].index = i;
+> +		spear_freq_tbl[i].frequency = spear_cpu_freq[i];
+> +	}
+> +
+> +	spear_freq_tbl[i].index = i;
+> +	spear_freq_tbl[i].frequency = CPUFREQ_TABLE_END;
+> +	result = cpufreq_frequency_table_cpuinfo(policy, spear_freq_tbl);
+> +	if (!result)
+> +		cpufreq_frequency_table_get_attr(spear_freq_tbl,
+> +				policy->cpu);
+
+result doesn't appear to be used to do anything other than check the return of 
+cpufreq_frequency_table_cpuinfo() so could tou just eliminate that local 
+variable?
+
+> +
+> +	policy->cpuinfo.transition_latency = 300*1000; /*250 uS*/
+
+The comment doesn't appear to match the value here.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int spear_cpufreq_exit(struct cpufreq_policy *policy)
+> +{
+> +	clk_put(cpu_clk);
+> +	return 0;
+> +}
+> +
+> +static struct freq_attr *spear_cpufreq_attr[] = {
+> +	 &cpufreq_freq_attr_scaling_available_freqs,
+> +	 NULL,
+> +};
+> +
+> +static struct cpufreq_driver spear_driver = {
+> +	.flags		= CPUFREQ_STICKY,
+> +	.verify		= spear_cpufreq_verify,
+> +	.target		= spear_cpufreq_target,
+> +	.get		= spear_cpufreq_get,
+> +	.init		= spear_cpufreq_init,
+> +	.exit		= spear_cpufreq_exit,
+> +	.name		= "spear_cpufreq",
+> +	.attr		= spear_cpufreq_attr,
+> +};
+> +
+> +static int __init spear_cpufreq_register(void)
+> +{
+> +	return cpufreq_register_driver(&spear_driver);
+> +}
+> +
+> +arch_initcall(spear_cpufreq_register);
 
 Jamie
