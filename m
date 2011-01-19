@@ -1,49 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jan 2011 14:10:57 -0800
-Subject: [PATCH v2] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <87mxmwr2un.fsf@ti.com>
-References: <1295352126-29171-1-git-send-email-j-pihet@ti.com>
-	<87vd1ksq2i.fsf@ti.com> <87mxmwr2un.fsf@ti.com>
-Message-ID: <20110119221056.GG4957@atomide.com>
+Date: Wed, 19 Jan 2011 14:14:12 -0800
+Subject: [PATCH 0/2] cm-t3517 fixes
+In-Reply-To: <1294935890-31160-1-git-send-email-grinberg@compulab.co.il>
+References: <1294935890-31160-1-git-send-email-grinberg@compulab.co.il>
+Message-ID: <20110119221412.GH4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [110119 13:37]:
-> Kevin Hilman <khilman@ti.com> writes:
+* Igor Grinberg <grinberg@compulab.co.il> [110113 08:24]:
+> This little patch serie is based on Tony's devel-board branch.
+> It fixes the rtc and some comments on cm-t3517.
 > 
-> > jean.pihet at newoldbits.com writes:
-> >
-> >> From: Jean Pihet <j-pihet@ti.com>
-> >>
-> >> The new fncpy API is better suited for copying some
-> >> code to SRAM at runtime. This patch changes the ad-hoc
-> >> code to the more generic fncpy API.
-> >>
-> >> Tested OK on OMAP3 in low power modes (RET/OFF)
-> >> using omap2plus_defconfig with !CONFIG_THUMB2_KERNEL.
-> >> Compile tested on OMAP1/2 using omap1_defconfig.
-> >>
-> >> Signed-off-by: Jean Pihet <j-pihet@ti.com>
-> >
-> > Acked-by: Kevin Hilman <khilman@ti.com>
-> >
-> > Boot tested on OMAP1 & OMAP2 as well.  Note that neither OMAP1 or OMAP2
-> > has had working suspend/resume for a long time now, so I did not test
-> > suspend/resume.
+> Igor Grinberg (2):
+>   arm: omap3: cm-t3517: rtc fix
+>   arm: omap3: cm-t3517: minor comment fix
 > 
-> For OMAP2:
-> 
-> Tested-by: Kevin Hilman <khilman@ti.com>
-> 
-> to test a little more on OMAP2, I just removed the WFI from the
-> low-level code and tested suspend that way.  That's enough to be sure
-> the copied code is copied and executed.
-> 
-> Worked fine on OMAP2420/n810.
-> 
-> For OMAP1, this didn't work and would require more serious hacking on
-> the OMAP1 suspend path, which I currently have no plans to do.
+>  arch/arm/mach-omap2/board-cm-t3517.c |   29 ++++++++++++++++++++++++-----
+>  1 files changed, 24 insertions(+), 5 deletions(-)
 
-Boots fine on osk5912 and n800 too:
+Thanks, queueing these as fixes.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Tony
