@@ -1,37 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jan 2011 14:44:07 -0800
-Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
-In-Reply-To: <20110119222327.GJ4957@atomide.com>
-References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>
-	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>
-	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>
-	<20101221202914.GK5829@atomide.com> <4D2440E0.7040008@nokia.com>
-	<87mxnfz2f4.fsf@ti.com> <4D36BBC8.2000305@nokia.com>
-	<20110119222327.GJ4957@atomide.com>
-Message-ID: <20110119224406.GK4957@atomide.com>
+Date: Wed, 19 Jan 2011 15:09:39 -0800
+Subject: [PATCH 7/7] arm: omap2: clksel: fix compile warning
+In-Reply-To: <20110117081845.GF2812@legolas.emea.dhcp.ti.com>
+References: <1295238680-26738-1-git-send-email-balbi@ti.com>
+	<1295238680-26738-8-git-send-email-balbi@ti.com>
+	<AANLkTimO_Vt+bjS1rP1AwD9iSqd_cNLAZ+tukveOtneD@mail.gmail.com>
+	<20110117081845.GF2812@legolas.emea.dhcp.ti.com>
+Message-ID: <20110119230939.GL4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110119 14:23]:
-> * Adrian Hunter <adrian.hunter@nokia.com> [110119 02:23]:
-> > 
-> > From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
-> > From: Adrian Hunter <adrian.hunter@nokia.com>
-> > Date: Wed, 24 Nov 2010 13:23:21 +0200
-> > Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
-> > 
-> > When clearing the DMA channel, clear all status bits.
-> > 
-> > When handling a DMA interrupt, clear only the interrupt
-> > status bits that have been read and are passed to the
-> > channel's interrupt handler, not every status bit.
-> > 
-> > Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+* Felipe Balbi <balbi@ti.com> [110117 00:18]:
+> Hi,
 > 
-> Thanks, will queue as a fix.
+> On Mon, Jan 17, 2011 at 01:37:41PM +0530, Varadarajan, Charulatha wrote:
+> > On Mon, Jan 17, 2011 at 10:01, Felipe Balbi <balbi@ti.com> wrote:
+> > > Fix the following compile warning:
+> > > arch/arm/mach-omap2/clkt_clksel.c: In function '_get_div_and_fieldval':
+> > > arch/arm/mach-omap2/clkt_clksel.c:100:35: warning: 'max_clkr' may be
+> > > used uninitialized in this function
+> > >
+> > > While at that, also add a check to avoid using max_clkr while NULL.
+> > >
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > > ?arch/arm/mach-omap2/clkt_clksel.c | ? ?5 ++++-
+> > > ?1 files changed, 4 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
+> > > index a781cd6..baf0b6b 100644
+> > > --- a/arch/arm/mach-omap2/clkt_clksel.c
+> > > +++ b/arch/arm/mach-omap2/clkt_clksel.c
+> > > @@ -97,7 +97,7 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
+> > > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 *field_val)
+> > > ?{
+> > > ? ? ? ?const struct clksel *clks;
+> > > - ? ? ? const struct clksel_rate *clkr, *max_clkr;
+> > > + ? ? ? const struct clksel_rate *clkr, *max_clkr = NULL;
+> > > ? ? ? ?u8 max_div = 0;
+> > >
+> > > ? ? ? ?clks = _get_clksel_by_parent(clk, src_clk);
+> > > @@ -123,6 +123,9 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
+> > > ? ? ? ? ? ? ? ?}
+> > > ? ? ? ?}
+> > >
+> > > + ? ? ? if (!max_clkr)
+> > > + ? ? ? ? ? ? ? return 0;
+> > 
+> > Would it be more appropriate to move this check after the "if" check
+> > of max_div==0 and it's warning?
+> > or add a warning before it returns?
+> 
+> Maybe this return isn't even necessary. max_clkr will be true if max_div
+> is valid, so they cancel each other.
+> 
+> Tony ?
 
-This did not apply for some reason, I've applied it manually.
-Please check that I got it right in omap-fixes branch soonish.
-Let me know if it needs updating.
+Looks like the max_div test should catch it to me. Paul?
 
 Tony
