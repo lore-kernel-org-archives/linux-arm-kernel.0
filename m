@@ -1,35 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Jan 2011 17:32:33 +0000
-Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
-In-Reply-To: <AANLkTiktrCOxOH30ooM_Z=ct=cR5z49DiB+P4mqzi55E@mail.gmail.com>
-References: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
-	<1295253729-23153-2-git-send-email-stanley.miao@windriver.com>
-	<AANLkTi=RSpXHRpoZJsGLhVgQ=E=tcNGm8GXYC9UPaDrA@mail.gmail.com>
-	<AANLkTi=q=e03GhmNZypGa5na2OiAr8SAOtiXm=+NPq5t@mail.gmail.com>
-	<AANLkTi=F8_Zmm4OM2=JPMzSWbm0-Nyr4mxSPUNpdBg3N@mail.gmail.com>
-	<AANLkTiktrCOxOH30ooM_Z=ct=cR5z49DiB+P4mqzi55E@mail.gmail.com>
-Message-ID: <1295458353.13373.37.camel@e102109-lin.cambridge.arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 19 Jan 2011 17:37:39 +0000
+Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
+In-Reply-To: <8yaaaiwsstw.fsf@huya.qualcomm.com>
+References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
+	<20110119082534.GA9569@gallagher>
+	<8yaaaiwsstw.fsf@huya.qualcomm.com>
+Message-ID: <20110119173739.GE3341@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-19 at 06:21 +0000, Stanley.Miao wrote:
-> 2011/1/18 Catalin Marinas <catalin.marinas@arm.com>:
-> > BTW (not related to modules, but since you are looking at this), when
-> > we copy the sigreturn_codes to the vectors page in early_trap_init(),
-> > do they get there in little endian form (as required by BE8)?
+On Wed, Jan 19, 2011 at 09:31:55AM -0800, David Brown wrote:
+> On Wed, Jan 19 2011, Jamie Iles wrote:
 > 
-> No, they get there in big endian.They are read as data in the function
-> setup_return().
+> >> @@ -38,9 +40,20 @@ struct msm_port {
+> >>  	struct uart_port	uart;
+> >>  	char			name[16];
+> >>  	struct clk		*clk;
+> >> +	struct clk		*pclk;
+> >>  	unsigned int		imr;
+> >> +	unsigned int            *gsbi_base;
+> >> +	int			is_dm;
+> >> +	unsigned int		old_snap_state;
+> >>  };
+> >
+> > Out of interest, what does .is_dm mean?  Is that obvious to someone who 
+> > knows about msm?
 > 
-> retcode = KERN_SIGRETURN_CODE + (idx << 2) + thumb;
+> It would be clear to people rather familiar with the chip, but I agree
+> it's probably not that clear of a name.
+> 
+> We have two UART blocks we use in the MSMs, the older one, supported by
+> this driver before this change, and a newer one that was designed to
+> work with our DMA engine (known as the Data Mover, or dm).  This newer
+> UART can be used in a somewhat compatible manner when being used for
+> serial-port type operations.
+> 
+> I'm not sure what would be a better name for the flag, though.  The
+> block is called UARTDM.
 
-This retcode here is an address in the vectors page which is set to LR
-when invoking the signal handler. All fine here.
+Ok, it was mainly out of curiosity.  I guess it could be 'use_dma' or 
+perhaps a comment to explain what DM is but my curiosity is now 
+satisfied ;-)
 
-But the sigreturn_codes array contains instructions which get copied to
-the vectors page in the early_trap_init() function. This array has this
-instructions in big endian format but they should be converted to little
-endian when copied to the vectors page.
-
--- 
-Catalin
+Jamie
