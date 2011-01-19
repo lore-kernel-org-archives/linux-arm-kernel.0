@@ -1,29 +1,51 @@
-From: bgamari.foss@gmail.com (Ben Gamari)
-Date: Wed, 19 Jan 2011 15:04:13 -0500
-Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
-In-Reply-To: <20110119034528.GA2406@legolas.emea.dhcp.ti.com>
-References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
-	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
-	<87d3nus4jr.fsf@gmail.com>
-	<20110119034528.GA2406@legolas.emea.dhcp.ti.com>
-Message-ID: <874o947j9e.fsf@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 19 Jan 2011 18:07:08 -0200
+Subject: [PATCH] usb: gadget/fsl_mxc_udc: Detect the CPU type in run-time
+In-Reply-To: <20110119185444.GA7228@pengutronix.de>
+References: <1295451164-3363-1-git-send-email-fabio.estevam@freescale.com>
+	<4D37050E.6010009@eukrea.com> <4D371ABB.7000608@freescale.com>
+	<20110119185444.GA7228@pengutronix.de>
+Message-ID: <AANLkTi==6U3yv5g4FHF0o=nZdC=bxWiTzjmZS4itWyri@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jan 2011 05:45:28 +0200, Felipe Balbi <balbi@ti.com> wrote:
-> The point is, being able to disable features I don't want on my kernel
-> image, is completely valid, if there's a compile breakage, then fix the
-> breakage but don't prevent the board from compiling.
-> 
-I understand. That being said, Linus has made it well known that
-defconfigs will not be an option going forward. Have we found another
-means of selecting the basic drivers necessary to get a fully functional
-board? Perhaps a CONFIG_MACH_OMAP3_BEAGLE_CORE option selecting the
-necessary driver for a fully functional board would be a solution. I
-remember this being discussed several months ago (when Linus started
-pulling defconfigs out of the tree), but I don't recall there being any
-replacement proposals. It should be possible to build a functional
-kernel from the mainline without iterating over all available
-configuration options.
+Hi Uwe,
 
-- Ben
+On Wed, Jan 19, 2011 at 4:54 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+...
+> can you please fix up the position of the '&'?
+
+The original patch had the '&' in the correct position. Looks like it
+got shifted on some of the replies.
+
+>
+>> >> + ? ? ? ? ? ?v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+>> >> + ? ? ? ? ? ? ? ? ? ?USBPHYCTRL_OTGBASE_OFFSET));
+>> >> + ? ? ? ? ? ?writel(v | USBPHYCTRL_EVDO,
+>> >> + ? ? ? ? ? ? ? ?MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+>> >> + ? ? ? ? ? ? ? ? ? ?USBPHYCTRL_OTGBASE_OFFSET));
+> I wonder if the address isn't mapped via ioremap in the driver and the
+> cookie saved somewhere? ?(And no, I don't ask you to change that in this
+> patch.) ?(If so, it this already problematic aliasing?)
+
+This address is only used once here and it is related to the MX35 USB erratum.
+
+>
+>> >> + ? ? ? ?}
+>> >> + ? ?}
+>> >>
+>> > are you sure this compiles when MX35 is not selected ?
+>>
+>> Including #include <mach/mx35.h> fixes the build for a non- mx35 kernel.
+>>
+>> Would this be acceptable? If so, I can send v2.
+> If you keep the #if defined(CONFIG_ARCH_MX35) and only add the if
+> (cpu_is_mx35()) it should work without a new #include.
+> Doing that seems a tad cleaner to me.
+
+Ok, will do as suggested in v2.
+
+Thanks,
+
+Fabio Estevam
