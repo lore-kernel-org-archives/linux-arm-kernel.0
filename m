@@ -1,30 +1,90 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 19 Jan 2011 19:13:06 +0800
-Subject: [PATCH v2 1/2] dmaengine: imx-sdma: propagate error in sdma_probe()
-	instead of returning 0
-In-Reply-To: <1295275164-7824-1-git-send-email-shawn.guo@freescale.com>
-References: <1295275164-7824-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1295435586-9538-1-git-send-email-shawn.guo@freescale.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Tue, 18 Jan 2011 19:25:43 -0800
+Subject: [PATCH 1/2] msm: Add name field to UART resources
+Message-ID: <1295407543-18352-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- drivers/dma/imx-sdma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Add a name field to the I/O resources for the UARTs on MSM
+targets in preparation for updates to the msm_serial
+driver. The driver assumed there is one I/O resource per
+UART, which is not the case on all targets.
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index d5a5d4d..48d0197 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -1348,7 +1348,7 @@ err_clk:
- err_request_region:
- err_irq:
- 	kfree(sdma);
--	return 0;
-+	return ret;
- }
- 
- static int __exit sdma_remove(struct platform_device *pdev)
--- 
-1.7.1
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+---
+ arch/arm/mach-msm/devices-msm7x00.c |    3 +++
+ arch/arm/mach-msm/devices-msm7x30.c |    3 ++-
+ arch/arm/mach-msm/devices-qsd8x50.c |    3 ++-
+ 3 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
+index fb548a8..2549fb2 100644
+--- a/arch/arm/mach-msm/devices-msm7x00.c
++++ b/arch/arm/mach-msm/devices-msm7x00.c
+@@ -38,6 +38,7 @@ static struct resource resources_uart1[] = {
+ 		.start	= MSM_UART1_PHYS,
+ 		.end	= MSM_UART1_PHYS + MSM_UART1_SIZE - 1,
+ 		.flags	= IORESOURCE_MEM,
++		.name  = "uart_resource"
+ 	},
+ };
+
+@@ -51,6 +52,7 @@ static struct resource resources_uart2[] = {
+ 		.start	= MSM_UART2_PHYS,
+ 		.end	= MSM_UART2_PHYS + MSM_UART2_SIZE - 1,
+ 		.flags	= IORESOURCE_MEM,
++		.name  = "uart_resource"
+ 	},
+ };
+
+@@ -64,6 +66,7 @@ static struct resource resources_uart3[] = {
+ 		.start	= MSM_UART3_PHYS,
+ 		.end	= MSM_UART3_PHYS + MSM_UART3_SIZE - 1,
+ 		.flags	= IORESOURCE_MEM,
++		.name  = "uart_resource"
+ 	},
+ };
+
+diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
+index 4e9a0ab..d4c7afc 100644
+--- a/arch/arm/mach-msm/devices-msm7x30.c
++++ b/arch/arm/mach-msm/devices-msm7x30.c
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) 2008 Google, Inc.
+- * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
++ * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -41,6 +41,7 @@ static struct resource resources_uart2[] = {
+ 		.start	= MSM_UART2_PHYS,
+ 		.end	= MSM_UART2_PHYS + MSM_UART2_SIZE - 1,
+ 		.flags	= IORESOURCE_MEM,
++		.name  = "uart_resource"
+ 	},
+ };
+
+diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
+index a4b798f..93bddac 100644
+--- a/arch/arm/mach-msm/devices-qsd8x50.c
++++ b/arch/arm/mach-msm/devices-qsd8x50.c
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) 2008 Google, Inc.
+- * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
++ * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -38,6 +38,7 @@ static struct resource resources_uart3[] = {
+ 		.start	= MSM_UART3_PHYS,
+ 		.end	= MSM_UART3_PHYS + MSM_UART3_SIZE - 1,
+ 		.flags	= IORESOURCE_MEM,
++		.name  = "uart_resource"
+ 	},
+ };
+
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
