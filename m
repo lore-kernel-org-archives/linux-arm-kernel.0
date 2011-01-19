@@ -1,23 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jan 2011 14:21:27 -0800
-Subject: [PATCHv4 2/4] OMAP3: Devkit8000: Fix tps65930 pullup/pulldown
-	configuration
-In-Reply-To: <1295425166-25540-3-git-send-email-weber@corscience.de>
-References: <1295425166-25540-1-git-send-email-weber@corscience.de>
-	<1295425166-25540-3-git-send-email-weber@corscience.de>
-Message-ID: <20110119222126.GI4957@atomide.com>
+Date: Wed, 19 Jan 2011 14:23:27 -0800
+Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
+In-Reply-To: <4D36BBC8.2000305@nokia.com>
+References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>
+	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>
+	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>
+	<20101221202914.GK5829@atomide.com> <4D2440E0.7040008@nokia.com>
+	<87mxnfz2f4.fsf@ti.com> <4D36BBC8.2000305@nokia.com>
+Message-ID: <20110119222327.GJ4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Weber <weber@corscience.de> [110119 00:18]:
-> From: Daniel Morsing <daniel.morsing@gmail.com>
+* Adrian Hunter <adrian.hunter@nokia.com> [110119 02:23]:
 > 
-> gpio7 on the tps65930 is used as an output on the devkit8000 and
-> gpio1 is not connected. Remove gpio7 and change gpio1 to pulldown
+> From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
+> From: Adrian Hunter <adrian.hunter@nokia.com>
+> Date: Wed, 24 Nov 2010 13:23:21 +0200
+> Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
 > 
-> Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
+> When clearing the DMA channel, clear all status bits.
+> 
+> When handling a DMA interrupt, clear only the interrupt
+> status bits that have been read and are passed to the
+> channel's interrupt handler, not every status bit.
+> 
+> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 
-I'll queue only this fix for now, looks like the other still need
-minor changes.
+Thanks, will queue as a fix.
 
 Tony
