@@ -1,91 +1,60 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Wed, 19 Jan 2011 14:30:08 +0530
-Subject: [PATCH V4 38/62] SPEAr CPU freq: Adding support for CPU Freq
-	framework
-In-Reply-To: <20110119083527.GC9569@gallagher>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
-	<20110119002046.GC2209@gallagher> <4D3648B1.4030807@st.com>
-	<20110119083527.GC9569@gallagher>
-Message-ID: <20110119090008.GA8048@DLHLAP0379>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 19 Jan 2011 14:30:12 +0530
+Subject: [PATCHv4 3/4] OMAP3: Devkit8000: Check return value of
+	gpio_request
+In-Reply-To: <1295425166-25540-4-git-send-email-weber@corscience.de>
+References: <1295425166-25540-1-git-send-email-weber@corscience.de>
+	<1295425166-25540-4-git-send-email-weber@corscience.de>
+Message-ID: <20110119090011.GD6197@m-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Wed, Jan 19, 2011 at 09:19:25AM +0100, Thomas Weber wrote:
+> The return value of gpio_request is ignored.
+> This patch adds the check of the return value of gpio_request.
+> 
+> Signed-off-by: Thomas Weber <weber@corscience.de>
+> ---
+>  arch/arm/mach-omap2/board-devkit8000.c |   16 ++++++++++++++--
+>  1 files changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+> index 9fb416b..4ddd81c 100644
+> --- a/arch/arm/mach-omap2/board-devkit8000.c
+> +++ b/arch/arm/mach-omap2/board-devkit8000.c
+> @@ -234,6 +234,8 @@ static struct gpio_led gpio_leds[];
+>  static int devkit8000_twl_gpio_setup(struct device *dev,
+>  		unsigned gpio, unsigned ngpio)
+>  {
+> +	int ret;
+> +
+>  	omap_mux_init_gpio(29, OMAP_PIN_INPUT);
+>  	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
+>  	mmc[0].gpio_cd = gpio + 0;
+> @@ -244,13 +246,23 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+>  
+>  	/* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
+>  	devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
+> -	gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
+> +	ret = gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
+> +	if (ret < 0) {
+> +		printk(KERN_ERR "Failed to request GPIO for LCD_PWRN\n");
+> +		return ret;
+> +	}
+> +
+>  	/* Disable until needed */
+>  	gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
+>  
+>  	/* gpio + 7 is "DVI_PD" (out, active low) */
+>  	devkit8000_dvi_device.reset_gpio = gpio + 7;
+> -	gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
+> +	ret = gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
+> +	if (ret < 0) {
+> +		printk(KERN_ERR "Failed to request GPIO for DVI PowerDown\n");
+> +		return ret;
+> +	}
 
-On Wed, Jan 19, 2011 at 04:35:27PM +0800, Jamie Iles wrote:
-> On Wed, Jan 19, 2011 at 07:43:05AM +0530, deepaksi wrote:
-> > Hi James,
-> > 
-> > On 1/19/2011 5:50 AM, Jamie Iles wrote:
-> > >> +static int spear_cpufreq_target(struct cpufreq_policy *policy,
-> > >> +		unsigned int target_freq, unsigned int relation)
-> > >> +{
-> > >> +	struct cpufreq_freqs freqs;
-> > >> +	int ret = 0;
-> > >> +	int index;
-> > >> +
-> > >> +	if (policy->cpu != 0)
-> > >> +		return -EINVAL;
-> > >> +
-> > >> +	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
-> > >> +				target_freq, relation, &index))
-> > >> +		return -EINVAL;
-> > >> +
-> > >> +	freqs.old = spear_cpufreq_get(0);
-> > >> +	freqs.new = spear_cpu_freq[index];
-> > >> +	freqs.cpu = policy->cpu;
-> > >> +
-> > >> +	if (freqs.old == target_freq)
-> > >> +		return 0;
-> > >> +
-> > >> +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> > >> +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-> > >> +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> > >>     
-> > > If clk_set_rate() failed then do you need to do freqs.new = 
-> > > clk_get_rate(cpu_clk) before doing the CPUFREQ_POSTCHANGE to make sure you 
-> > > don't notify the wrong frequency?
-> > >
-> > >   
-> > I do have a point over here. In few of the drivers where the the pre
-> > notifiers have been added, the operations have been stopped (assume a
-> > network driver where we stalled a dma operation), and then we set the
-> > clock rate, followed by a post notifier where driver resumes it operations.
-> > 
-> > Now lets take the case, when the clock set rate fails (  Most failure
-> > could only be when the driver is unable to find any clock rate which is
-> > less then/equal to requested rate) .
-> > The post transition notifier should happen so as to allow the driver to
-> > resume its functions. If there are no clock rate changes because of set
-> > rate failures, the driver would be aware of that by using calls such as
-> > clk_get_rate, and would carry forward it's operations accordingly.
-> > 
-> > How do you suggest to go about it ?
-> 
-> Sorry, I didn't mean to remove the post notifier, just do something like:
-> 
-> 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-> 	if (ret)
-> 		freqs.new = clk_get_rate(cpu_clk);
-> 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> 
-> Or:
-> 
-> 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-> 	if (ret)
-> 		freqs.new = freqs.old;
-> 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> 
-> So that you're notifying the cpufreq subsystem of the frequency that you're 
-> actually running at with the post change notifier rather than the one you 
-> tried to go for.  If you don't do this then for UP you'll end up recaculating 
-> lpj based on the wrong frequency.
+Nak. Why you want this change as seperate patch? Merge this with 1/4
 
-Agree. We would add it here. Thanks for pointing out.
-
--- 
-regards
-Shiraz
+-Manjunath
+[...]
