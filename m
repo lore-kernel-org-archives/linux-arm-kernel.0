@@ -1,42 +1,33 @@
-From: segoon@openwall.com (Vasiliy Kulikov)
-Date: Wed, 19 Jan 2011 15:57:22 +0300
-Subject: [PATCH v2] arm: mach-omap2: potential NULL dereference
-In-Reply-To: <4D341C35.80506@bfs.de>
-References: <1295258922-31242-1-git-send-email-segoon@openwall.com>
-	<4D341C35.80506@bfs.de>
-Message-ID: <20110119125721.GA9203@albatros>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jan 2011 13:02:02 +0000
+Subject: [PATCH] ARM: SMDK6410: Mark regulator setup data __initdata
+In-Reply-To: <1295441694-16050-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1295441694-16050-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20110119130202.GE31652@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kzalloc() may fail, if so return -ENOMEM.  Also Walter Harms suggested
-to use kasprintf() instead of kzalloc+strcpy+strcat.
+On Wed, Jan 19, 2011 at 12:54:54PM +0000, Mark Brown wrote:
+> Now that the regulator API copies out the constraints we can discard
+> the static data once we're done booting, meaning we don't need to
+> carry copies of data for regulators not in the system.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c |   38 ++++++++++++++++----------------
+>  1 files changed, 19 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> index 9fea1c2..c8a84be 100644
+> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+> @@ -303,14 +303,14 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+>  
+>  #ifdef CONFIG_REGULATOR
+>  /* ARM core */
+> -static struct regulator_consumer_supply smdk6410_vddarm_consumers[] = {
+> +static __initdata struct regulator_consumer_supply smdk6410_vddarm_consumers[] = {
 
-Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
----
- Cannot compile this driver, so it is not tested at all.
+Convention says it should be layed out as:
 
- arch/arm/mach-omap2/smartreflex.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 77ecebf..697d8d4 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -260,9 +260,11 @@ static int sr_late_init(struct omap_sr *sr_info)
- 	if (sr_class->class_type == SR_CLASS2 &&
- 		sr_class->notify_flags && sr_info->irq) {
- 
--		name = kzalloc(SMARTREFLEX_NAME_LEN + 1, GFP_KERNEL);
--		strcpy(name, "sr_");
--		strcat(name, sr_info->voltdm->name);
-+		name = kasprintf(GFP_KERNEL, "sr_%s", sr_info->voltdm->name);
-+		if (name == NULL) {
-+			ret = -ENOMEM;
-+			goto error;
-+		}
- 		ret = request_irq(sr_info->irq, sr_interrupt,
- 				0, name, (void *)sr_info);
- 		if (ret)
--- 
-Vasiliy Kulikov
-http://www.openwall.com - bringing security into open computing environments
+static struct regulator_consumer_supply smdk6410_vddarm_consumers[] __initdata = {
