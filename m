@@ -1,27 +1,27 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 22 Jan 2011 16:18:56 -0200
-Subject: [PATCH] ARM: mach-imx/mach-mx25_3ds: Fix section type 
-Message-ID: <1295720336-28304-1-git-send-email-festevam@gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 19 Jan 2011 14:40:40 -0800
+Subject: [PATCH v2 00/11] msm: Add initial support for MSM8960
+In-Reply-To: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <8ya1v48o6tz.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-mx25_3ds.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Resending with CC's actually present in the header.
 
-diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-index aa76cfd..8382e79 100644
---- a/arch/arm/mach-imx/mach-mx25_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx25_3ds.c
-@@ -180,7 +180,7 @@ static const uint32_t mx25pdk_keymap[] = {
- 	KEY(3, 3, KEY_POWER),
- };
- 
--static const struct matrix_keymap_data mx25pdk_keymap_data __initdata = {
-+static const struct matrix_keymap_data mx25pdk_keymap_data __initconst = {
- 	.keymap		= mx25pdk_keymap,
- 	.keymap_size	= ARRAY_SIZE(mx25pdk_keymap),
- };
--- 
-1.6.0.4
+This series adds initial support for the MSM8960.  Unfortunately, the
+naming of this device is misleading, and it is not a particular
+instance of the current MSM8x60 devices, but a rather different chip.
+The MSM8x60 arch supports the 8260 and 8660 devices.  I may make a
+future patch to rename this arch to be one of these names.
+
+Patch versions:
+v2 - Remove ifdefs for io mappings for the new target.  More need to
+     be cleaned up for all targets, but this doesn't add new ones.
+     The irq table still contains an ifdef, which will be cleaned up
+     in an upcoming patch.
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
