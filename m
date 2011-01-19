@@ -1,62 +1,44 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 19 Jan 2011 15:09:15 -0200
-Subject: [PATCH] usb: gadget/fsl_mxc_udc: Detect the CPU type in run-time
-In-Reply-To: <4D37050E.6010009@eukrea.com>
-References: <1295451164-3363-1-git-send-email-fabio.estevam@freescale.com>
-	<4D37050E.6010009@eukrea.com>
-Message-ID: <4D371ABB.7000608@freescale.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 19 Jan 2011 09:31:55 -0800
+Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
+In-Reply-To: <20110119082534.GA9569@gallagher> (Jamie Iles's message of "Wed,
+	19 Jan 2011 08:25:34 +0000")
+References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
+	<20110119082534.GA9569@gallagher>
+Message-ID: <8yaaaiwsstw.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/19/2011 1:36 PM, Eric B?nard wrote:
-> Hi Fabio,
-> 
-> On 19/01/2011 16:32, Fabio Estevam wrote:
->> Instead of checking the CPU type in build-time, do it in run-time.
->>
->> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
->> ---
->>   drivers/usb/gadget/fsl_mxc_udc.c |   23 ++++++++++++-----------
->>   1 files changed, 12 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
->> index 77b1eb5..167abe0 100644
->> --- a/drivers/usb/gadget/fsl_mxc_udc.c
->> +++ b/drivers/usb/gadget/fsl_mxc_udc.c
->> @@ -88,17 +88,18 @@ eenahb:
->>   void fsl_udc_clk_finalize(struct platform_device *pdev)
->>   {
->>       struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
->> -#if defined(CONFIG_ARCH_MX35)
->> -    unsigned int v;
->> -
->> -    /* workaround ENGcm09152 for i.MX35 */
->> -    if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
->> -        v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
->> -                USBPHYCTRL_OTGBASE_OFFSET));
->> -        writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
->> -                USBPHYCTRL_OTGBASE_OFFSET));
->> -    }
->> -#endif
->> +    if (cpu_is_mx35()) {
->> +        unsigned int v;
->> +
->> +        /* workaround ENGcm09152 for i.MX35 */
->> +        if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
->> +            v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
->> +                    USBPHYCTRL_OTGBASE_OFFSET));
->> +            writel(v | USBPHYCTRL_EVDO,
->> +                MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
->> +                    USBPHYCTRL_OTGBASE_OFFSET));
->> +        }
->> +    }
->>
-> are you sure this compiles when MX35 is not selected ?
+On Wed, Jan 19 2011, Jamie Iles wrote:
 
-Including #include <mach/mx35.h> fixes the build for a non- mx35 kernel.
+>> @@ -38,9 +40,20 @@ struct msm_port {
+>>  	struct uart_port	uart;
+>>  	char			name[16];
+>>  	struct clk		*clk;
+>> +	struct clk		*pclk;
+>>  	unsigned int		imr;
+>> +	unsigned int            *gsbi_base;
+>> +	int			is_dm;
+>> +	unsigned int		old_snap_state;
+>>  };
+>
+> Out of interest, what does .is_dm mean?  Is that obvious to someone who 
+> knows about msm?
 
-Would this be acceptable? If so, I can send v2.
+It would be clear to people rather familiar with the chip, but I agree
+it's probably not that clear of a name.
 
-Regards,
+We have two UART blocks we use in the MSMs, the older one, supported by
+this driver before this change, and a newer one that was designed to
+work with our DMA engine (known as the Data Mover, or dm).  This newer
+UART can be used in a somewhat compatible manner when being used for
+serial-port type operations.
 
-Fabio Estevam
+I'm not sure what would be a better name for the flag, though.  The
+block is called UARTDM.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
