@@ -1,76 +1,154 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Wed, 19 Jan 2011 12:25:47 -0800
-Subject: [PATCH v2 11/11] msm: Support for the MSM8960 RUMI3 target
+Date: Wed, 19 Jan 2011 12:25:46 -0800
+Subject: [PATCH v2 10/11] msm: Support for the MSM8960 Simulator target
 In-Reply-To: <1295468747-22796-1-git-send-email-davidb@codeaurora.org>
 References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
 	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1295468747-22796-12-git-send-email-davidb@codeaurora.org>
+Message-ID: <1295468747-22796-11-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stepan Moskovchenko <stepanm@codeaurora.org>
 
-Add the machine record, init code, and build support for
-the MSM8960 RUMI3.
+Add the board file, Kconfig options, and Makefile options
+needed to build for the MSM8960 Simulator target.
 
 Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
 Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-msm/Kconfig         |    8 +++++++-
- arch/arm/mach-msm/board-msm8960.c |   10 ++++++++++
- 2 files changed, 17 insertions(+), 1 deletions(-)
+ arch/arm/mach-msm/Kconfig         |   16 ++++++++++
+ arch/arm/mach-msm/Makefile        |    5 +++
+ arch/arm/mach-msm/board-msm8960.c |   58 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 79 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/board-msm8960.c
 
 diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index adca96c..df9d74e 100644
+index 5d3d9ad..adca96c 100644
 --- a/arch/arm/mach-msm/Kconfig
 +++ b/arch/arm/mach-msm/Kconfig
-@@ -51,7 +51,7 @@ config ARCH_MSM8X60
- config ARCH_MSM8960
- 	bool "MSM8960"
- 	select ARCH_MSM_SCORPIONMP
--	select MACH_MSM8960_SIM
-+	select MACH_MSM8960_SIM if (!MACH_MSM8960_RUMI3)
- 	select ARM_GIC
- 	select CPU_V7
- 	select MSM_V2_TLMM
-@@ -141,6 +141,12 @@ config MACH_MSM8960_SIM
- 	help
- 	  Support for the Qualcomm MSM8960 simulator.
+@@ -48,6 +48,16 @@ config ARCH_MSM8X60
+ 	select IOMMU_API
+ 	select MSM_SCM if SMP
  
-+config MACH_MSM8960_RUMI3
++config ARCH_MSM8960
++	bool "MSM8960"
++	select ARCH_MSM_SCORPIONMP
++	select MACH_MSM8960_SIM
++	select ARM_GIC
++	select CPU_V7
++	select MSM_V2_TLMM
++	select MSM_GPIOMUX
++	select MSM_SCM if SMP
++
+ endchoice
+ 
+ config MSM_SOC_REV_A
+@@ -125,6 +135,12 @@ config MACH_MSM8X60_FFA
+ 	help
+ 	  Support for the Qualcomm MSM8x60 FFA eval board.
+ 
++config MACH_MSM8960_SIM
 +	depends on ARCH_MSM8960
-+	bool "MSM8960 RUMI3"
++	bool "MSM8960 Simulator"
 +	help
-+	  Support for the Qualcomm MSM8960 RUMI3 emulator.
++	  Support for the Qualcomm MSM8960 simulator.
 +
  endmenu
  
  config IOMMU_PGTABLES_L2
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-index 90efd54..2b09573 100644
---- a/arch/arm/mach-msm/board-msm8960.c
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -41,6 +41,9 @@ static void __init msm8960_init_irq(void)
- 	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
- 	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 3e15ff3..0229427 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o acpuclock-arm11.o
+ obj-$(CONFIG_ARCH_MSM7X30) += dma.o
+ obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
+ obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o iommu.o iommu_dev.o devices-msm8x60-iommu.o
++obj-$(CONFIG_ARCH_MSM8960) += clock-dummy.o
  
-+	if (machine_is_msm8960_rumi3())
-+		writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
+ obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
+ obj-$(CONFIG_MSM_PROC_COMM) += clock.o
+@@ -23,12 +24,16 @@ obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
+ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+ obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
+ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
++obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o
+ 
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
+ ifdef CONFIG_MSM_V2_TLMM
++ifndef CONFIG_ARCH_MSM8960
++# TODO: TLMM Mapping issues need to be resolved
+ obj-y	+= gpio-v2.o
++endif
+ else
+ obj-y	+= gpio.o
+ endif
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+new file mode 100644
+index 0000000..90efd54
+--- /dev/null
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -0,0 +1,58 @@
++/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ */
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/irq.h>
 +
- 	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
- 	 * as they are configured as level, which does not play nice with
- 	 * handle_percpu_irq.
-@@ -56,3 +59,10 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
- 	.init_irq = msm8960_init_irq,
- 	.timer = &msm_timer,
- MACHINE_END
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/hardware/gic.h>
 +
-+MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
++#include <mach/board.h>
++#include <mach/msm_iomap.h>
++
++static void __init msm8960_map_io(void)
++{
++	msm_map_msm8960_io();
++}
++
++static void __init msm8960_init_irq(void)
++{
++	unsigned int i;
++	gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE,
++		 (void *)MSM_QGIC_CPU_BASE);
++
++	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
++	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
++
++	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
++	 * as they are configured as level, which does not play nice with
++	 * handle_percpu_irq.
++	 */
++	for (i = GIC_PPI_START; i < GIC_SPI_START; i++) {
++		if (i != AVS_SVICINT && i != AVS_SVICINTSWDONE)
++			set_irq_handler(i, handle_percpu_irq);
++	}
++}
++
++MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
 +	.map_io = msm8960_map_io,
 +	.init_irq = msm8960_init_irq,
 +	.timer = &msm_timer,
 +MACHINE_END
-+
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
