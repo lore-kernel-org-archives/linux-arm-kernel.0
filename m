@@ -1,60 +1,66 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 19 Jan 2011 14:30:12 +0530
-Subject: [PATCHv4 3/4] OMAP3: Devkit8000: Check return value of
-	gpio_request
-In-Reply-To: <1295425166-25540-4-git-send-email-weber@corscience.de>
-References: <1295425166-25540-1-git-send-email-weber@corscience.de>
-	<1295425166-25540-4-git-send-email-weber@corscience.de>
-Message-ID: <20110119090011.GD6197@m-desktop>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 19 Jan 2011 14:32:28 +0530
+Subject: [PATCH V4 06/62] ST SPEAr13XX: Adding machine specific header
+	files
+In-Reply-To: <4D366ABD.4010809@st.com>
+References: <cover.1295333957.git.viresh.kumar@st.com>
+	<91343ab3cb64f7082111535a9a3c006e958578fb.1295333958.git.viresh.kumar@st.com>
+	<20110118160037.GC16980@n2100.arm.linux.org.uk>
+	<4D366ABD.4010809@st.com>
+Message-ID: <4D36A8A4.5010706@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 09:19:25AM +0100, Thomas Weber wrote:
-> The return value of gpio_request is ignored.
-> This patch adds the check of the return value of gpio_request.
+On 01/19/2011 10:08 AM, viresh kumar wrote:
+> On 01/18/2011 09:30 PM, Russell King - ARM Linux wrote:
+>> On Tue, Jan 18, 2011 at 12:41:34PM +0530, Viresh Kumar wrote:
+>>> +#define MISC_BASE		VA_SPEAR13XX_MISC_BASE
+>>> +
+>>> +/* General Configuration */
+>>> +#define SOC_CFG			((unsigned int *)(MISC_BASE + 0x000))
+>>> +#define BOOTSTRAP_CFG		((unsigned int *)(MISC_BASE + 0x004))
+>>
+>> You could really do with an IOMEM() macro, thus:
+>>
+>> #ifndef __ASSEMBLY__
+>> #define IOMEM(x)	((void __iomem __force *)(x))
+>> #else
+>> #define IOMEM(x)	(x)
+>> #endif
+>>
+>> You can then use that for stuff like VA_SPEAR13XX_MISC_BASE, and all
+>> these definitions then become:
+>>
+>> #define SOC_CFG			(MISC_BASE + 0x000)
+>>
+>> because GCC allows void pointer arithmetic (treats it as char).
+>>
 > 
-> Signed-off-by: Thomas Weber <weber@corscience.de>
-> ---
->  arch/arm/mach-omap2/board-devkit8000.c |   16 ++++++++++++++--
->  1 files changed, 14 insertions(+), 2 deletions(-)
+> Yes. I agree with this solution.
+> Actually the VA* macros are like:
+> #define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
 > 
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-> index 9fb416b..4ddd81c 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -234,6 +234,8 @@ static struct gpio_led gpio_leds[];
->  static int devkit8000_twl_gpio_setup(struct device *dev,
->  		unsigned gpio, unsigned ngpio)
->  {
-> +	int ret;
-> +
->  	omap_mux_init_gpio(29, OMAP_PIN_INPUT);
->  	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
->  	mmc[0].gpio_cd = gpio + 0;
-> @@ -244,13 +246,23 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
->  
->  	/* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
->  	devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
-> -	gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
-> +	ret = gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "Failed to request GPIO for LCD_PWRN\n");
-> +		return ret;
-> +	}
-> +
->  	/* Disable until needed */
->  	gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
->  
->  	/* gpio + 7 is "DVI_PD" (out, active low) */
->  	devkit8000_dvi_device.reset_gpio = gpio + 7;
-> -	gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
-> +	ret = gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "Failed to request GPIO for DVI PowerDown\n");
-> +		return ret;
-> +	}
+> Adding IOMEM() over IO_ADDRESS(SPEAR13XX_MISC_BASE) will make it too long.
+> And might cross 80 columns. Can we modify IO_ADDRESS() to use IOMEM()?
+> 
 
-Nak. Why you want this change as seperate patch? Merge this with 1/4
+Russell,
 
--Manjunath
-[...]
+I tried to change IO_ADDRESS() to use IOMEM. But even this doesn't seem to be a
+good enough solution. __typesafe_io expects unsigned long and we have:
+define __io_address(n)		__io(IO_ADDRESS(n)).
+
+Also, struct map_desc, .virtual field expects unsigned long, where we are getting
+warnings.
+
+I tried looking at what others did, and found either they are using (unsigned int *)
+(as  earlier done by us) or casting with (unsigned long) for new warnings mentioned
+above.
+
+Both didn't seem to be good enough to me. Maybe we can use IOMEM only for MISC_BASE
+and similar places, where we had been using (unsigned int *).
+
+I will do this in V5, unless you suggest something better.
+
+-- 
+viresh
