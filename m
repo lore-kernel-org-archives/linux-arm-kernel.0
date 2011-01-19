@@ -1,79 +1,62 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 19 Jan 2011 22:01:15 +0530
-Subject: [PATCH] ARM: disable preempt when unwinding another task's stack
-Message-ID: <mailman.124.1295456618.1530.linux-arm-kernel@lists.infradead.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 19 Jan 2011 15:09:15 -0200
+Subject: [PATCH] usb: gadget/fsl_mxc_udc: Detect the CPU type in run-time
+In-Reply-To: <4D37050E.6010009@eukrea.com>
+References: <1295451164-3363-1-git-send-email-fabio.estevam@freescale.com>
+	<4D37050E.6010009@eukrea.com>
+Message-ID: <4D371ABB.7000608@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we don't want to expose the unwinder to a volatile stack, we
-should make sure that we don't get preempted while doing the unwinding.
+On 1/19/2011 1:36 PM, Eric B?nard wrote:
+> Hi Fabio,
+> 
+> On 19/01/2011 16:32, Fabio Estevam wrote:
+>> Instead of checking the CPU type in build-time, do it in run-time.
+>>
+>> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
+>> ---
+>>   drivers/usb/gadget/fsl_mxc_udc.c |   23 ++++++++++++-----------
+>>   1 files changed, 12 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+>> index 77b1eb5..167abe0 100644
+>> --- a/drivers/usb/gadget/fsl_mxc_udc.c
+>> +++ b/drivers/usb/gadget/fsl_mxc_udc.c
+>> @@ -88,17 +88,18 @@ eenahb:
+>>   void fsl_udc_clk_finalize(struct platform_device *pdev)
+>>   {
+>>       struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+>> -#if defined(CONFIG_ARCH_MX35)
+>> -    unsigned int v;
+>> -
+>> -    /* workaround ENGcm09152 for i.MX35 */
+>> -    if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
+>> -        v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+>> -                USBPHYCTRL_OTGBASE_OFFSET));
+>> -        writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+>> -                USBPHYCTRL_OTGBASE_OFFSET));
+>> -    }
+>> -#endif
+>> +    if (cpu_is_mx35()) {
+>> +        unsigned int v;
+>> +
+>> +        /* workaround ENGcm09152 for i.MX35 */
+>> +        if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
+>> +            v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+>> +                    USBPHYCTRL_OTGBASE_OFFSET));
+>> +            writel(v | USBPHYCTRL_EVDO,
+>> +                MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+>> +                    USBPHYCTRL_OTGBASE_OFFSET));
+>> +        }
+>> +    }
+>>
+> are you sure this compiles when MX35 is not selected ?
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/kernel/process.c    |   15 +++++++++++----
- arch/arm/kernel/stacktrace.c |    5 +++++
- 2 files changed, 16 insertions(+), 4 deletions(-)
+Including #include <mach/mx35.h> fixes the build for a non- mx35 kernel.
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 94bbedb..56f10e6 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -459,10 +459,13 @@ EXPORT_SYMBOL(kernel_thread);
- unsigned long get_wchan(struct task_struct *p)
- {
- 	struct stackframe frame;
-+	unsigned long wchan = 0;
- 	int count = 0;
- 	if (!p || p == current || p->state == TASK_RUNNING)
- 		return 0;
- 
-+	preempt_disable();
-+
- 	frame.fp = thread_saved_fp(p);
- 	frame.sp = thread_saved_sp(p);
- 	frame.lr = 0;			/* recovered from the stack */
-@@ -470,11 +473,15 @@ unsigned long get_wchan(struct task_struct *p)
- 	do {
- 		int ret = unwind_frame(&frame);
- 		if (ret < 0)
--			return 0;
--		if (!in_sched_functions(frame.pc))
--			return frame.pc;
-+			break;
-+		if (!in_sched_functions(frame.pc)) {
-+			wchan = frame.pc;
-+			break;
-+		}
- 	} while (count ++ < 16);
--	return 0;
-+
-+	preempt_enable();
-+	return wchan;
- }
- 
- unsigned long arch_randomize_brk(struct mm_struct *mm)
-diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-index 381d23a..c6c9d2d 100644
---- a/arch/arm/kernel/stacktrace.c
-+++ b/arch/arm/kernel/stacktrace.c
-@@ -102,6 +102,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 			trace->entries[trace->nr_entries++] = ULONG_MAX;
- 		return;
- #else
-+		preempt_disable();
-+
- 		data.no_sched_functions = 1;
- 		frame.fp = thread_saved_fp(tsk);
- 		frame.sp = thread_saved_sp(tsk);
-@@ -121,6 +123,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 	walk_stackframe(&frame, save_trace, &data);
- 	if (trace->nr_entries < trace->max_entries)
- 		trace->entries[trace->nr_entries++] = ULONG_MAX;
-+
-+	if (tsk != current)
-+		preempt_enable();
- }
- 
- void save_stack_trace(struct stack_trace *trace)
--- 
-1.7.2.3
+Would this be acceptable? If so, I can send v2.
+
+Regards,
+
+Fabio Estevam
