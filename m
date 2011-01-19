@@ -1,111 +1,80 @@
-From: hirosh.dabui@snom.com (Hirosh Dabui)
-Date: Wed, 19 Jan 2011 21:17:02 +0100
-Subject: [PATCH] This patch fix a bug in the register indexing for GPIOs
-	numbers > 31 to get the relevant hardware registers of
-	tnetv107x to control the GPIOs.
-Message-ID: <1295468222-10329-1-git-send-email-hirosh.dabui@snom.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 19 Jan 2011 12:25:37 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1295468747-22796-2-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the structure tnetv107x_gpio_regs:
+Create runtime queries to distinguish the various MSM targets.
+Although these would probably be better named soc_is..., use
+cpu_is... to match convention in the rest of the kernel.
 
-struct tnetv107x_gpio_regs {
-            u32     idver;
-            u32     data_in[3];
-            u32     data_out[3];
-            u32     direction[3];
-            u32     enable[3];
-};
+Hard code the tests based on config options for now.  When runtime
+device detection is implemented, these can be made dynamic.
 
-The GPIO hardware register addresses of tnetv107x are stored.
-The chip implements 3 registers of each entity to serve 96 GPIOs,
-each register provides a subset of 32 GPIOs.
-The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
-and gpio_reg_clear_bit.
-
-The bug implied the use of macros to access the relevant hardware
-register e.g. the driver code used the macro like this:
-'gpio_reg_clear_bit(&reg->data_out, gpio)'
-
-But it has to be used like this:
-'gpio_reg_clear_bit(reg->data_out, gpio)'.
-
-The different results are shown here:
-- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
-- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
-
-Acked-by: Cyril Chemparathy <cyril@ti.com>
-Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
- arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-msm/include/mach/cpu.h |   48 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 48 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/include/mach/cpu.h
 
-diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
-index d102986..3fa3e28 100644
---- a/arch/arm/mach-davinci/gpio-tnetv107x.c
-+++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
-@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_set_bit(&regs->enable, gpio);
-+	gpio_reg_set_bit(regs->enable, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_clear_bit(&regs->enable, gpio);
-+	gpio_reg_clear_bit(regs->enable, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- }
-@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_set_bit(&regs->direction, gpio);
-+	gpio_reg_set_bit(regs->direction, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
- 	if (value)
--		gpio_reg_set_bit(&regs->data_out, gpio);
-+		gpio_reg_set_bit(regs->data_out, gpio);
- 	else
--		gpio_reg_clear_bit(&regs->data_out, gpio);
-+		gpio_reg_clear_bit(regs->data_out, gpio);
- 
--	gpio_reg_clear_bit(&regs->direction, gpio);
-+	gpio_reg_clear_bit(regs->direction, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	unsigned gpio = chip->base + offset;
- 	int ret;
- 
--	ret = gpio_reg_get_bit(&regs->data_in, gpio);
-+	ret = gpio_reg_get_bit(regs->data_in, gpio);
- 
- 	return ret ? 1 : 0;
- }
-@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
- 	if (value)
--		gpio_reg_set_bit(&regs->data_out, gpio);
-+		gpio_reg_set_bit(regs->data_out, gpio);
- 	else
--		gpio_reg_clear_bit(&regs->data_out, gpio);
-+		gpio_reg_clear_bit(regs->data_out, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- }
+diff --git a/arch/arm/mach-msm/include/mach/cpu.h b/arch/arm/mach-msm/include/mach/cpu.h
+new file mode 100644
+index 0000000..e1ba9db
+--- /dev/null
++++ b/arch/arm/mach-msm/include/mach/cpu.h
+@@ -0,0 +1,48 @@
++/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ */
++
++#ifndef __ARCH_ARM_MACH_MSM_CPU_H__
++#define __ARCH_ARM_MACH_MSM_CPU_H__
++
++/* TODO: For now, only one CPU can be compiled at a time. */
++
++#define cpu_is_msm7x01()	0
++#define cpu_is_msm7x30()	0
++#define cpu_is_qsd8x50()	0
++#define cpu_is_msm8x60()	0
++
++#ifdef CONFIG_ARCH_MSM7X00A
++# undef cpu_is_msm7x01
++# define cpu_is_msm7x01()	1
++#endif
++
++#ifdef CONFIG_ARCH_MSM7X30
++# undef cpu_is_msm7x30
++# define cpu_is_msm7x30()	1
++#endif
++
++#ifdef CONFIG_ARCH_QSD8X50
++# undef cpu_is_qsd8x50
++# define cpu_is_qsd8x50()	1
++#endif
++
++#ifdef CONFIG_ARCH_MSM8X60
++# undef cpu_is_msm8x60
++# define cpu_is_msm8x60()	1
++#endif
++
++#endif
 -- 
-1.7.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
