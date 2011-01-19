@@ -1,32 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 19 Jan 2011 15:14:12 +0300
-Subject: [PATCH 8/8] arm/dt: Basic tegra devicetree support
-In-Reply-To: <20110118202938.13011.35918.stgit@localhost6.localdomain6>
-References: <20110118195933.13011.56098.stgit@localhost6.localdomain6>
-	<20110118202938.13011.35918.stgit@localhost6.localdomain6>
-Message-ID: <4D36D594.3010909@ru.mvista.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 19 Jan 2011 10:27:33 -0200
+Subject: [PATCH] ARM: mx5: Use dummy clock for the keypad
+Message-ID: <1295440053-9897-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Reuse dummy_clk for the imx-keypad device instead of using a dedicated kpp_clk.
 
-On 18-01-2011 23:29, Grant Likely wrote:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-> This patch adds adds
-
-    One word is enough. :-)
-
-> very basic support for booting versatile with a
-> device tree.  It simply allows the existing machine_descs to match
-> against the tegra compatible values so that the kernel can boot.
-> Kernel parameters and the initrd pointer is read out of the tree
-> instead of atags.
-
-> This is not complete device tree support.  This change will be
-> reverted when a new machine_desc is added that can populate the
-> versatile device registrations directly from data in the tree instead
-> of using hard coded data.  That change will be made in a future patch.
-
-> Signed-off-by: Grant Likely<grant.likely@secretlab.ca>
-
-WBR, Sergei
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index ce4ffd7..dc2ce0d 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -867,10 +867,6 @@ static struct clk gpt_32k_clk = {
+ 	.parent = &ckil_clk,
+ };
+ 
+-static struct clk kpp_clk = {
+-	.id = 0,
+-};
+-
+ static struct clk dummy_clk = {
+ 	.id = 0,
+ };
+@@ -1302,7 +1298,7 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", usb_ahb_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
+ 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
+-	_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
++	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
+ 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
+ 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+-- 
+1.6.0.4
