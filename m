@@ -1,55 +1,36 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 19 Jan 2011 09:06:40 +0100
-Subject: [PATCH] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <20110118234443.GV4957@atomide.com>
-References: <1295018470-18099-1-git-send-email-j-pihet@ti.com>
-	<20110114155806.GA22505@n2100.arm.linux.org.uk>
-	<AANLkTikz_gSQE5QfO6ZXwbp9w+HTNMtb6RLBY+3Z0XF6@mail.gmail.com>
-	<20110114173400.GB22505@n2100.arm.linux.org.uk>
-	<AANLkTim9At1MZmid1jqqCJAk28BPo0aJEf7QkZM=y4h2@mail.gmail.com>
-	<AANLkTinJPyXKWwbyW05+HUW0LJUxsu=1Exbrr6ut27Kr@mail.gmail.com>
-	<AANLkTikPm8_vxjF7P84q7kHq+XSvLyF+jToFt=COs8Mj@mail.gmail.com>
-	<20110118234215.GB17398@n2100.arm.linux.org.uk>
-	<20110118234443.GV4957@atomide.com>
-Message-ID: <AANLkTin=XwKC5LvXimCfkNatLcq=RYqb-32x5HLx0rOa@mail.gmail.com>
+From: weber@corscience.de (Thomas Weber)
+Date: Wed, 19 Jan 2011 09:19:24 +0100
+Subject: [PATCHv4 2/4] OMAP3: Devkit8000: Fix tps65930 pullup/pulldown
+	configuration
+In-Reply-To: <1295425166-25540-1-git-send-email-weber@corscience.de>
+References: <1295425166-25540-1-git-send-email-weber@corscience.de>
+Message-ID: <1295425166-25540-3-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 12:44 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110118 15:41]:
->> On Tue, Jan 18, 2011 at 01:05:49PM +0100, Jean Pihet wrote:
->> > Dave, Russell,
->> >
->> > On Mon, Jan 17, 2011 at 4:46 PM, Dave Martin <dave.martin@linaro.org> wrote:
->> > > One way to work around this is would be to make omap_sram_push() a macro:
->> > >
->> > > #define omap_sram_push(funcp, size) \
->> > > ? ?(typeof(funcp))_do_omap_sram_push((void *)(funcp), size)
->> > >
->> > > ... where the definition of _do_omap_sram_push() is the same is the
->> > > existing definition of omap_sram_push(). ?Providing
->> > > _do_omap_sram_push() is not called directly, this should now be
->> > > type-safe.
->> > >
->> > Ok I reworked the patch from your suggestions. Indeed a few functions
->> > types mismatch have been spotted and corrected using the fncpy API.
->> >
->> > New patch sent as '[PATCH v2] OMAP: use fncpy to copy the PM code
->> > functions to SRAM'.
->>
->> Looks good, thanks. ?Next problem to sort out is who's taking the
->> patches...
->
-> You can take them but we should have at least Kevin test and ack them.
-Sure, this needs some testing on OMAP1 & 2 platforms. It has only been
-compile tested on those (means: compile OK, functions types mismatches
-fixed).
+From: Daniel Morsing <daniel.morsing@gmail.com>
 
-Anyone with OMAP1 & 2 boards willing to test?
+gpio7 on the tps65930 is used as an output on the devkit8000 and
+gpio1 is not connected. Remove gpio7 and change gpio1 to pulldown
 
-Thanks,
-Jean
+Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
+---
+ arch/arm/mach-omap2/board-devkit8000.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
->
-> Tony
->
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 719f4e5..9fb416b 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -262,8 +262,7 @@ static struct twl4030_gpio_platform_data devkit8000_gpio_data = {
+ 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
+ 	.irq_end	= TWL4030_GPIO_IRQ_END,
+ 	.use_leds	= true,
+-	.pullups	= BIT(1),
+-	.pulldowns	= BIT(2) | BIT(6) | BIT(7) | BIT(8) | BIT(13)
++	.pulldowns	= BIT(1) | BIT(2) | BIT(6) | BIT(8) | BIT(13)
+ 				| BIT(15) | BIT(16) | BIT(17),
+ 	.setup		= devkit8000_twl_gpio_setup,
+ };
+-- 
+1.7.4.rc2
