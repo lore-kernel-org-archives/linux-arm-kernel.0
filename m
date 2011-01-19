@@ -1,119 +1,77 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 19 Jan 2011 09:46:37 +0530
-Subject: [PATCH V4 26/62] ST SPEAr: Adding support for SSP PL022
-In-Reply-To: <20110118161828.GE16980@n2100.arm.linux.org.uk>
+Date: Wed, 19 Jan 2011 09:47:04 +0530
+Subject: [PATCH V4 25/62] ST SPEAr: Added PCIE host controller base	driver
+	support.
+In-Reply-To: <20110119000556.GQ16980@n2100.arm.linux.org.uk>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-	<870d02e83bc5d3b3e2053dfd97a12b921d7242a3.1295333958.git.viresh.kumar@st.com>
-	<20110118161828.GE16980@n2100.arm.linux.org.uk>
-Message-ID: <4D3665A5.7090604@st.com>
+	<2c8dc40cb00bd8c6253ce45888ce1c331968d0e7.1295333958.git.viresh.kumar@st.com>
+	<20110119000556.GQ16980@n2100.arm.linux.org.uk>
+Message-ID: <4D3665C0.7060700@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2011 09:48 PM, Russell King - ARM Linux wrote:
-> On Tue, Jan 18, 2011 at 12:41:53PM +0530, Viresh Kumar wrote:
->> diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
->> index ad1c6a0..088bf52 100644
->> --- a/arch/arm/mach-spear13xx/spear1300_evb.c
->> +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
->> @@ -12,7 +12,10 @@
->>   */
->>  
->>  #include <linux/types.h>
->> +#include <linux/gpio.h>
+On 01/19/2011 05:35 AM, Russell King - ARM Linux wrote:
+> On Tue, Jan 18, 2011 at 12:41:52PM +0530, Viresh Kumar wrote:
+>> +			clk = clk_get_sys("pcie1", NULL);
+>> +			if (!clk) {
 > 
-> :-)
+> IS_ERR(clk)
 > 
->> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
->> index c219691..0e3d8f3 100644
->> --- a/arch/arm/mach-spear3xx/spear300_evb.c
->> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
->> @@ -15,10 +15,14 @@
->>  #include <linux/mtd/fsmc.h>
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach-types.h>
->> +#include <linux/spi/flash.h>
->> +#include <linux/spi/spi.h>
->>  #include <mach/generic.h>
->> +#include <mach/gpio.h>
+>> +				pr_err("%s:couldn't get clk for pcie1\n",
+>> +						__func__);
+>> +				continue;
+>> +			}
+>> +			if (clk_enable(clk)) {
+>> +				pr_err("%s:couldn't enable clk for pcie1\n",
+>> +						__func__);
+>> +				continue;
+>> +			}
+>> +		} else if (port == 2) {
+>> +			/* Ideally CFG Clock should have been also enabled
+>> +			 * here. But it is done currently during board
+>> +			 * init routne*/
+>> +			clk = clk_get_sys("pcie2", NULL);
+>> +			if (!clk) {
 > 
-> :-(
+> IS_ERR(clk)
 > 
->> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
->> index d216c94..6daacbb 100644
->> --- a/arch/arm/mach-spear3xx/spear310_evb.c
->> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
->> @@ -15,9 +15,13 @@
->>  #include <linux/mtd/fsmc.h>
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach-types.h>
->> +#include <linux/spi/flash.h>
->> +#include <linux/spi/spi.h>
->>  #include <mach/generic.h>
->> +#include <mach/gpio.h>
-> 
-> :-(
-> 
->> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
->> index 15db267..baa4574 100644
->> --- a/arch/arm/mach-spear3xx/spear320_evb.c
->> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
->> @@ -15,9 +15,13 @@
->>  #include <linux/mtd/fsmc.h>
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach-types.h>
->> +#include <linux/spi/flash.h>
->> +#include <linux/spi/spi.h>
->>  #include <mach/generic.h>
->> +#include <mach/gpio.h>
-> 
-> :-(
-> 
->> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
->> index 32d3855..fe9a8c8 100644
->> --- a/arch/arm/mach-spear6xx/spear600_evb.c
->> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
->> @@ -15,15 +15,23 @@
->>  #include <linux/mtd/fsmc.h>
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach-types.h>
->> +#include <linux/gpio.h>
->> +#include <linux/spi/flash.h>
->> +#include <linux/spi/spi.h>
->>  #include <mach/generic.h>
->> +#include <mach/gpio.h>
-> 
-> :-(
-> 
->> diff --git a/arch/arm/plat-spear/include/plat/spi.h b/arch/arm/plat-spear/include/plat/spi.h
->> new file mode 100644
->> index 0000000..24d57e1
->> --- /dev/null
->> +++ b/arch/arm/plat-spear/include/plat/spi.h
->> @@ -0,0 +1,74 @@
->> +/*
->> + * arch/arm/plat-spear/include/plat/spi.h
->> + *
->> + * SPI board specific definitions common to multiple boards on multiple
->> + * machines.
->> + *
->> + * Copyright (C) 2010 ST Microelectronics
->> + * Viresh Kumar<viresh.kumar@st.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2. This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
+>> +				pr_err("%s:couldn't get clk for pcie2\n",
+>> +						__func__);
+>> +				continue;
+>> +			}
+>> +			if (clk_enable(clk)) {
+>> +				pr_err("%s:couldn't enable clk for pcie2\n",
+>> +						__func__);
+>> +				continue;
+>> +			}
+>> +		}
+>> +
+>> +		if ((*pcie_port_is_host)(port))
+>> +			add_pcie_port(port, spr_pcie_base[port],
+>> +					spr_pcie_app_base[port]);
+>> +	}
+> ...
+>> +#ifdef CONFIG_PCIEPORTBUS
+>> +/* PCIE0 clock always needs to be enabled if any of the three PCIE port
+>> + * have to be used. So call this function from the board initilization
+>> + * file. Ideally , all controller should have been independent from
+>> + * others with respect to clock.
 >> + */
->> +
->> +#ifndef __PLAT_SPI_H
->> +#define __PLAT_SPI_H
->> +
->> +#include <linux/amba/pl022.h>
->> +#include <linux/gpio.h>
+>> +int enable_pcie0_clk(void)
+>> +{
+>> +	struct clk *clk;
+>> +	/*Enable all CLK in CFG registers here only. Idealy only PCIE0
+>> +	 * should have been enabled. But Controler does not work
+>> +	 * properly if PCIE1 and PCIE2's CFG CLK is enabled in stages.
+>> +	 */
+>> +	writel(PCIE0_CFG_VAL | PCIE1_CFG_VAL | PCIE2_CFG_VAL, PCIE_CFG);
+>> +	clk = clk_get_sys("pcie0", NULL);
+>> +	if (!clk) {
 > 
-> :-)
-> .
+> IS_ERR(clk)
+> 
 
-Will use linux/gpio.h everywhere and not mach/gpio.h
+Ok.
 
 -- 
 viresh
