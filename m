@@ -1,40 +1,60 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 19 Jan 2011 10:27:33 -0200
-Subject: [PATCH] ARM: mx5: Use dummy clock for the keypad
-Message-ID: <1295440053-9897-1-git-send-email-fabio.estevam@freescale.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 19 Jan 2011 15:23:56 +0300
+Subject: [PATCHv4 3/4] OMAP3: Devkit8000: Check return value of
+	gpio_request
+In-Reply-To: <1295425166-25540-4-git-send-email-weber@corscience.de>
+References: <1295425166-25540-1-git-send-email-weber@corscience.de>
+	<1295425166-25540-4-git-send-email-weber@corscience.de>
+Message-ID: <4D36D7DC.4020705@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reuse dummy_clk for the imx-keypad device instead of using a dedicated kpp_clk.
+Hello.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
+On 19-01-2011 11:19, Thomas Weber wrote:
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index ce4ffd7..dc2ce0d 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -867,10 +867,6 @@ static struct clk gpt_32k_clk = {
- 	.parent = &ckil_clk,
- };
- 
--static struct clk kpp_clk = {
--	.id = 0,
--};
--
- static struct clk dummy_clk = {
- 	.id = 0,
- };
-@@ -1302,7 +1298,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("mxc-ehci.2", "usb_ahb", usb_ahb_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb", usboh3_clk)
- 	_REGISTER_CLOCK("fsl-usb2-udc", "usb_ahb", ahb_clk)
--	_REGISTER_CLOCK("imx-keypad", NULL, kpp_clk)
-+	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
- 	_REGISTER_CLOCK("mxc_nand", NULL, nfc_clk)
- 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
--- 
-1.6.0.4
+> The return value of gpio_request is ignored.
+> This patch adds the check of the return value of gpio_request.
+
+> Signed-off-by: Thomas Weber<weber@corscience.de>
+> ---
+>   arch/arm/mach-omap2/board-devkit8000.c |   16 ++++++++++++++--
+>   1 files changed, 14 insertions(+), 2 deletions(-)
+
+> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+> index 9fb416b..4ddd81c 100644
+> --- a/arch/arm/mach-omap2/board-devkit8000.c
+> +++ b/arch/arm/mach-omap2/board-devkit8000.c
+[...]
+> @@ -244,13 +246,23 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
+>
+>   	/* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
+>   	devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
+> -	gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
+> +	ret = gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
+> +	if (ret < 0) {
+> +		printk(KERN_ERR "Failed to request GPIO for LCD_PWRN\n");
+> +		return ret;
+> +	}
+> +
+>   	/* Disable until needed */
+>   	gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
+>
+>   	/* gpio + 7 is "DVI_PD" (out, active low) */
+>   	devkit8000_dvi_device.reset_gpio = gpio + 7;
+> -	gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
+> +	ret = gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
+> +	if (ret < 0) {
+> +		printk(KERN_ERR "Failed to request GPIO for DVI PowerDown\n");
+
+    You forgot to call:
+
+		gpio_free(devkit8000_lcd_device.reset_gpio);
+
+> +		return ret;
+> +	}
+> +
+>   	/* Disable until needed */
+>   	gpio_direction_output(devkit8000_dvi_device.reset_gpio, 0);
+
+WBR, Sergei
