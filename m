@@ -1,32 +1,50 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Jan 2011 18:45:00 +0000
-Subject: [PATCH v2 0/8] Switch ARM platforms from integrator-flash to
-	physmap
-In-Reply-To: <20110119145425.GF31652@n2100.arm.linux.org.uk>
-References: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
-	<20110119145425.GF31652@n2100.arm.linux.org.uk>
-Message-ID: <1295462700.5742.76.camel@e102391-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Jan 2011 10:44:53 -0800
+Subject: [PATCH] omap1: Fix sched_clock for the MPU timer (Re: State of
+	LDP3430 platform)
+In-Reply-To: <20110118222613.GS4957@atomide.com>
+References: <20101207083720.GB18336@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1012071745120.13430@utopia.booyaka.com>
+	<alpine.DEB.2.00.1012072012000.13430@utopia.booyaka.com>
+	<20110115000301.GT4957@atomide.com>
+	<alpine.DEB.2.00.1101151237240.32245@utopia.booyaka.com>
+	<20110115233744.GA18159@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
+	<4D3309F9.8090900@gmail.com>
+	<alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
+	<20110118222613.GS4957@atomide.com>
+Message-ID: <20110119184452.GZ4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-19 at 14:54 +0000, Russell King - ARM Linux wrote:
-> On Fri, Jan 07, 2011 at 02:09:51PM +0000, Marc Zyngier wrote:
-> > As the integrator-flash driver is mostly a duplicate of physmap,
-> > move all users of this driver to physmap and get rid of the
-> > then unused driver.
+* Tony Lindgren <tony@atomide.com> [110118 14:25]:
+> * Paul Walmsley <paul@pwsan.com> [110118 11:35]:
+> > 
+> > Here's a slightly updated version of this patch, fixing a bug in one of 
+> > the comments, and revising the commit message.  There's no functional 
+> > difference between this and the previous version of this patch.
 > 
-> Does MTD guarantee that the vpp will be turned off whenever the physmap
-> module is removed?  If not, can it?
+> Thanks, here are two patches to fix the MPU timer, and then allow
+> compiling in both the MPU timer and the 32KiHz timer.
 
-Vpp seems to be controlled directly from the chip drivers (using the
-{ENABLE,DISABLE}_VPP macros and a command-set specific state machine),
-and none of the map drivers play with vpp at all, integrator-flash
-included.
+I've updated this patch with the following fix to reset the timer
+first to get correct PRINTK_TIME timestamps.
 
-By the look of it, it seems pretty safe, though your own experience
-seems to indicate otherwise. It should be quite easy to plug the vpp off
-feature in physmap. I'll give it a go and re-spin the patchset.
+Regards,
 
-	M.
--- 
-Reality is an implementation detail.
+Tony
+
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -228,10 +228,9 @@ static void __init omap_init_clocksource(unsigned long rate)
+ 	static char err[] __initdata = KERN_ERR
+ 			"%s: can't register clocksource!\n";
+ 
+-	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
+-
+ 	setup_irq(INT_TIMER2, &omap_mpu_timer2_irq);
+ 	omap_mpu_timer_start(1, ~0, 1);
++	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
+ 
+ 	if (clocksource_register_hz(&clocksource_mpu, rate))
+ 		printk(err, clocksource_mpu.name);
