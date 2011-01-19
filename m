@@ -1,45 +1,21 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 19 Jan 2011 17:37:39 +0000
-Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
-In-Reply-To: <8yaaaiwsstw.fsf@huya.qualcomm.com>
-References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
-	<20110119082534.GA9569@gallagher>
-	<8yaaaiwsstw.fsf@huya.qualcomm.com>
-Message-ID: <20110119173739.GE3341@pulham.picochip.com>
+From: segher@kernel.crashing.org (Segher Boessenkool)
+Date: Wed, 19 Jan 2011 18:47:54 +0100 (CET)
+Subject: RFC: Host-endian device tree format
+In-Reply-To: <alpine.LFD.2.00.1101191101230.8580@xanadu.home>
+References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
+	<AANLkTikoZj1WSpE8QNSRiF3oFL4qAb68kNnCKdExvBz7@mail.gmail.com>
+	<AANLkTi=xdJ_c3LvCFkeqBRNDf6TSC40Fjxihm9eSeMmf@mail.gmail.com>
+	<alpine.LFD.2.00.1101191031481.8580@xanadu.home>
+	<AANLkTi==KLWXAv79u32ioQ9eSr7JEii7fW93WPPNdAez@mail.gmail.com>
+	<alpine.LFD.2.00.1101191101230.8580@xanadu.home>
+Message-ID: <59796.94.211.195.167.1295459274.squirrel@gate.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 09:31:55AM -0800, David Brown wrote:
-> On Wed, Jan 19 2011, Jamie Iles wrote:
-> 
-> >> @@ -38,9 +40,20 @@ struct msm_port {
-> >>  	struct uart_port	uart;
-> >>  	char			name[16];
-> >>  	struct clk		*clk;
-> >> +	struct clk		*pclk;
-> >>  	unsigned int		imr;
-> >> +	unsigned int            *gsbi_base;
-> >> +	int			is_dm;
-> >> +	unsigned int		old_snap_state;
-> >>  };
-> >
-> > Out of interest, what does .is_dm mean?  Is that obvious to someone who 
-> > knows about msm?
-> 
-> It would be clear to people rather familiar with the chip, but I agree
-> it's probably not that clear of a name.
-> 
-> We have two UART blocks we use in the MSMs, the older one, supported by
-> this driver before this change, and a newer one that was designed to
-> work with our DMA engine (known as the Data Mover, or dm).  This newer
-> UART can be used in a somewhat compatible manner when being used for
-> serial-port type operations.
-> 
-> I'm not sure what would be a better name for the flag, though.  The
-> block is called UARTDM.
+> The actual problem is not that DT chose to use big endian ordering, but
+> rather that BE ordering was invented in the first place.  ;-)
 
-Ok, it was mainly out of curiosity.  I guess it could be 'use_dma' or 
-perhaps a comment to explain what DM is but my curiosity is now 
-satisfied ;-)
+Blame the Greeks, they started it, approximately 500 B.C.
 
-Jamie
+
+Segher
