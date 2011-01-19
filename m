@@ -1,77 +1,45 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 19 Jan 2011 09:47:04 +0530
-Subject: [PATCH V4 25/62] ST SPEAr: Added PCIE host controller base	driver
-	support.
-In-Reply-To: <20110119000556.GQ16980@n2100.arm.linux.org.uk>
+Date: Wed, 19 Jan 2011 10:08:21 +0530
+Subject: [PATCH V4 06/62] ST SPEAr13XX: Adding machine specific header
+	files
+In-Reply-To: <20110118160037.GC16980@n2100.arm.linux.org.uk>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-	<2c8dc40cb00bd8c6253ce45888ce1c331968d0e7.1295333958.git.viresh.kumar@st.com>
-	<20110119000556.GQ16980@n2100.arm.linux.org.uk>
-Message-ID: <4D3665C0.7060700@st.com>
+	<91343ab3cb64f7082111535a9a3c006e958578fb.1295333958.git.viresh.kumar@st.com>
+	<20110118160037.GC16980@n2100.arm.linux.org.uk>
+Message-ID: <4D366ABD.4010809@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2011 05:35 AM, Russell King - ARM Linux wrote:
-> On Tue, Jan 18, 2011 at 12:41:52PM +0530, Viresh Kumar wrote:
->> +			clk = clk_get_sys("pcie1", NULL);
->> +			if (!clk) {
-> 
-> IS_ERR(clk)
-> 
->> +				pr_err("%s:couldn't get clk for pcie1\n",
->> +						__func__);
->> +				continue;
->> +			}
->> +			if (clk_enable(clk)) {
->> +				pr_err("%s:couldn't enable clk for pcie1\n",
->> +						__func__);
->> +				continue;
->> +			}
->> +		} else if (port == 2) {
->> +			/* Ideally CFG Clock should have been also enabled
->> +			 * here. But it is done currently during board
->> +			 * init routne*/
->> +			clk = clk_get_sys("pcie2", NULL);
->> +			if (!clk) {
-> 
-> IS_ERR(clk)
-> 
->> +				pr_err("%s:couldn't get clk for pcie2\n",
->> +						__func__);
->> +				continue;
->> +			}
->> +			if (clk_enable(clk)) {
->> +				pr_err("%s:couldn't enable clk for pcie2\n",
->> +						__func__);
->> +				continue;
->> +			}
->> +		}
+On 01/18/2011 09:30 PM, Russell King - ARM Linux wrote:
+> On Tue, Jan 18, 2011 at 12:41:34PM +0530, Viresh Kumar wrote:
+>> +#define MISC_BASE		VA_SPEAR13XX_MISC_BASE
 >> +
->> +		if ((*pcie_port_is_host)(port))
->> +			add_pcie_port(port, spr_pcie_base[port],
->> +					spr_pcie_app_base[port]);
->> +	}
-> ...
->> +#ifdef CONFIG_PCIEPORTBUS
->> +/* PCIE0 clock always needs to be enabled if any of the three PCIE port
->> + * have to be used. So call this function from the board initilization
->> + * file. Ideally , all controller should have been independent from
->> + * others with respect to clock.
->> + */
->> +int enable_pcie0_clk(void)
->> +{
->> +	struct clk *clk;
->> +	/*Enable all CLK in CFG registers here only. Idealy only PCIE0
->> +	 * should have been enabled. But Controler does not work
->> +	 * properly if PCIE1 and PCIE2's CFG CLK is enabled in stages.
->> +	 */
->> +	writel(PCIE0_CFG_VAL | PCIE1_CFG_VAL | PCIE2_CFG_VAL, PCIE_CFG);
->> +	clk = clk_get_sys("pcie0", NULL);
->> +	if (!clk) {
+>> +/* General Configuration */
+>> +#define SOC_CFG			((unsigned int *)(MISC_BASE + 0x000))
+>> +#define BOOTSTRAP_CFG		((unsigned int *)(MISC_BASE + 0x004))
 > 
-> IS_ERR(clk)
+> You could really do with an IOMEM() macro, thus:
+> 
+> #ifndef __ASSEMBLY__
+> #define IOMEM(x)	((void __iomem __force *)(x))
+> #else
+> #define IOMEM(x)	(x)
+> #endif
+> 
+> You can then use that for stuff like VA_SPEAR13XX_MISC_BASE, and all
+> these definitions then become:
+> 
+> #define SOC_CFG			(MISC_BASE + 0x000)
+> 
+> because GCC allows void pointer arithmetic (treats it as char).
 > 
 
-Ok.
+Yes. I agree with this solution.
+Actually the VA* macros are like:
+#define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
+
+Adding IOMEM() over IO_ADDRESS(SPEAR13XX_MISC_BASE) will make it too long.
+And might cross 80 columns. Can we modify IO_ADDRESS() to use IOMEM()?
 
 -- 
 viresh
