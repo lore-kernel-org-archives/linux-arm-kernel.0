@@ -1,46 +1,119 @@
 From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 19 Jan 2011 09:33:01 +0530
-Subject: [PATCH V4 04/62] ST SPEAr: Making clock functions more generic
-In-Reply-To: <20110118155620.GB16980@n2100.arm.linux.org.uk>
+Date: Wed, 19 Jan 2011 09:46:37 +0530
+Subject: [PATCH V4 26/62] ST SPEAr: Adding support for SSP PL022
+In-Reply-To: <20110118161828.GE16980@n2100.arm.linux.org.uk>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-	<70889215d9aa6c1c3ad604763d7b831865fe3eb5.1295333957.git.viresh.kumar@st.com>
-	<20110118155620.GB16980@n2100.arm.linux.org.uk>
-Message-ID: <4D366275.9030007@st.com>
+	<870d02e83bc5d3b3e2053dfd97a12b921d7242a3.1295333958.git.viresh.kumar@st.com>
+	<20110118161828.GE16980@n2100.arm.linux.org.uk>
+Message-ID: <4D3665A5.7090604@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2011 09:26 PM, Russell King - ARM Linux wrote:
-> On Tue, Jan 18, 2011 at 12:41:32PM +0530, Viresh Kumar wrote:
->>  /* pll1 configuration structure */
->>  static struct pll_clk_config pll1_config = {
->>  	.mode_reg = PLL1_CTR,
->>  	.cfg_reg = PLL1_FRQ,
->> +	.masks = &pll1_masks,
->>  };
+On 01/18/2011 09:48 PM, Russell King - ARM Linux wrote:
+> On Tue, Jan 18, 2011 at 12:41:53PM +0530, Viresh Kumar wrote:
+>> diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+>> index ad1c6a0..088bf52 100644
+>> --- a/arch/arm/mach-spear13xx/spear1300_evb.c
+>> +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+>> @@ -12,7 +12,10 @@
+>>   */
 >>  
->>  /* PLL1 clock */
-> ...
->> -	mode = (readl(config->mode_reg) >> PLL_MODE_SHIFT) &
->> -		PLL_MODE_MASK;
->> +	mode = (readl(config->mode_reg) >> config->masks->mode_shift) &
->> +		config->masks->mode_mask;
->>  
-> ...
->>  struct pll_clk_config {
->> -	unsigned int *mode_reg;
->> -	unsigned int *cfg_reg;
->> +	u32 *mode_reg;
->> +	u32 *cfg_reg;
->> +	struct pll_clk_masks *masks;
->>  };
+>>  #include <linux/types.h>
+>> +#include <linux/gpio.h>
 > 
-> Registers should have an __iomem attribute on them.  Preferably, but
-> not absolutely necessary, should be void to prevent any direct
-> dereferencing.
+> :-)
+> 
+>> diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+>> index c219691..0e3d8f3 100644
+>> --- a/arch/arm/mach-spear3xx/spear300_evb.c
+>> +++ b/arch/arm/mach-spear3xx/spear300_evb.c
+>> @@ -15,10 +15,14 @@
+>>  #include <linux/mtd/fsmc.h>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach-types.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>>  #include <mach/generic.h>
+>> +#include <mach/gpio.h>
+> 
+> :-(
+> 
+>> diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+>> index d216c94..6daacbb 100644
+>> --- a/arch/arm/mach-spear3xx/spear310_evb.c
+>> +++ b/arch/arm/mach-spear3xx/spear310_evb.c
+>> @@ -15,9 +15,13 @@
+>>  #include <linux/mtd/fsmc.h>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach-types.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>>  #include <mach/generic.h>
+>> +#include <mach/gpio.h>
+> 
+> :-(
+> 
+>> diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+>> index 15db267..baa4574 100644
+>> --- a/arch/arm/mach-spear3xx/spear320_evb.c
+>> +++ b/arch/arm/mach-spear3xx/spear320_evb.c
+>> @@ -15,9 +15,13 @@
+>>  #include <linux/mtd/fsmc.h>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach-types.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>>  #include <mach/generic.h>
+>> +#include <mach/gpio.h>
+> 
+> :-(
+> 
+>> diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+>> index 32d3855..fe9a8c8 100644
+>> --- a/arch/arm/mach-spear6xx/spear600_evb.c
+>> +++ b/arch/arm/mach-spear6xx/spear600_evb.c
+>> @@ -15,15 +15,23 @@
+>>  #include <linux/mtd/fsmc.h>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach-types.h>
+>> +#include <linux/gpio.h>
+>> +#include <linux/spi/flash.h>
+>> +#include <linux/spi/spi.h>
+>>  #include <mach/generic.h>
+>> +#include <mach/gpio.h>
+> 
+> :-(
+> 
+>> diff --git a/arch/arm/plat-spear/include/plat/spi.h b/arch/arm/plat-spear/include/plat/spi.h
+>> new file mode 100644
+>> index 0000000..24d57e1
+>> --- /dev/null
+>> +++ b/arch/arm/plat-spear/include/plat/spi.h
+>> @@ -0,0 +1,74 @@
+>> +/*
+>> + * arch/arm/plat-spear/include/plat/spi.h
+>> + *
+>> + * SPI board specific definitions common to multiple boards on multiple
+>> + * machines.
+>> + *
+>> + * Copyright (C) 2010 ST Microelectronics
+>> + * Viresh Kumar<viresh.kumar@st.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2. This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#ifndef __PLAT_SPI_H
+>> +#define __PLAT_SPI_H
+>> +
+>> +#include <linux/amba/pl022.h>
+>> +#include <linux/gpio.h>
+> 
+> :-)
 > .
-> 
 
-Yes, it should be void __iomem *
+Will use linux/gpio.h everywhere and not mach/gpio.h
 
 -- 
 viresh
