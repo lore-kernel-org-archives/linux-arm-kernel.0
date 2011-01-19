@@ -1,45 +1,73 @@
-From: ytang5@marvell.com (Yu Tang)
-Date: Wed, 19 Jan 2011 22:18:54 +0800
-Subject: [PATCH] ARM: pxa: fix mfpr_sync to read from valid offset
-Message-ID: <1295446734-18464-1-git-send-email-ytang5@marvell.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 19 Jan 2011 19:50:51 +0530
+Subject: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for build
+	break because of clktrctrl_mask
+In-Reply-To: <874o9ko25j.fsf@ti.com>
+References: <1294225024-21857-1-git-send-email-santosh.shilimkar@ti.com><87fwt7z1p3.fsf@ti.com><alpine.DEB.2.00.1101061059590.22048@utopia.booyaka.com><87ipy1vqdi.fsf@ti.com><3f76fc53e9b50d75480bcfe1d2b6312e@mail.gmail.com>
+	<874o9ko25j.fsf@ti.com>
+Message-ID: <d199cd6e7e9191bc611f1987fd32fdea@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since mfpr_mmio_base[0] is not always valid on later SoCs,
-fixed mpfr_sync() to read back from valid mfp offset always.
+Hi Kevin,
 
-Signed-off-by: Yu Tang <ytang5@marvell.com>
----
- arch/arm/plat-pxa/mfp.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Saturday, January 08, 2011 2:35 AM
+> To: Rajendra Nayak
+> Cc: Paul Walmsley; Santosh Shilimkar; linux-omap at vger.kernel.org;
+tony at atomide.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 1/5] omap2plus: clockdomain: Trivial fix for
+build break because of clktrctrl_mask
+>
+> Rajendra Nayak <rnayak@ti.com> writes:
+>
+> [...]
+>
+> > Just another trivial fix.
+> >
+> > From bb46b74d2b0ab3d35e72b760da7e123a891e6813 Mon Sep 17 00:00:00 2001
+> > From: Rajendra Nayak <rnayak@ti.com>
+> > Date: Fri, 7 Jan 2011 14:07:25 +0530
+> > Subject: [PATCH] OMAP: powerdomain: remove unused func declaration
+> >
+> > Trivial fix to remove the unused function declaration
+> > from the powerdomain header.
+> >
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/powerdomain.h |    1 -
+> >  1 files changed, 0 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/powerdomain.h
+> > b/arch/arm/mach-omap2/powerdomain.h
+> > index c66431e..0b7a357 100644
+> > --- a/arch/arm/mach-omap2/powerdomain.h
+> > +++ b/arch/arm/mach-omap2/powerdomain.h
+> > @@ -165,7 +165,6 @@ struct pwrdm_ops {
+> >  	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
+> >  };
+> >
+> > -void pwrdm_fw_init(void);
+> >  void pwrdm_init(struct powerdomain **pwrdm_list, struct pwrdm_ops
+> > *custom_funcs);
+>
+> Note this is line-wrapped.
+>
+> Looks like you need to get get-send-email setup so you can avoid having
+> the patch sending problems.
 
-diff --git a/arch/arm/plat-pxa/mfp.c b/arch/arm/plat-pxa/mfp.c
-index b77e018..a9aa5ad 100644
---- a/arch/arm/plat-pxa/mfp.c
-+++ b/arch/arm/plat-pxa/mfp.c
-@@ -139,10 +139,11 @@ static const unsigned long mfpr_edge[] = {
- #define mfp_configured(p)	((p)->config != -1)
- 
- /*
-- * perform a read-back of any MFPR register to make sure the
-+ * perform a read-back of any valid MFPR register to make sure the
-  * previous writings are finished
-  */
--#define mfpr_sync()	(void)__raw_readl(mfpr_mmio_base + 0)
-+static unsigned long mfpr_off_readback;
-+#define mfpr_sync()	(void)__raw_readl(mfpr_mmio_base + mfpr_off_readback)
- 
- static inline void __mfp_config_run(struct mfp_pin *p)
- {
-@@ -248,6 +249,9 @@ void __init mfp_init_addr(struct mfp_addr_map *map)
- 
- 	spin_lock_irqsave(&mfp_spin_lock, flags);
- 
-+	/* mfp offset for readback */
-+	mfpr_off_readback = map[0].offset;
-+
- 	for (p = map; p->start != MFP_PIN_INVALID; p++) {
- 		offset = p->offset;
- 		i = p->start;
--- 
-1.7.1
+Sorry, I seemed to have completely missed this one.
+Will repost.
+
+Thanks,
+Rajendra
+
+>
+> >
+> >  struct powerdomain *pwrdm_lookup(const char *name);
+>
+> In any case, with Paul's ack, I can queue this with the others.
+>
+> Kevin
