@@ -1,29 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Jan 2011 15:21:03 -0800
-Subject: [PATCH] omap1: Fix booting for 15xx and 730 with
-	omap1_defconfig (Re: State of LDP3430 platform)
-In-Reply-To: <20110118223536.GT4957@atomide.com>
-References: <alpine.DEB.2.00.1012071745120.13430@utopia.booyaka.com>
-	<alpine.DEB.2.00.1012072012000.13430@utopia.booyaka.com>
-	<20110115000301.GT4957@atomide.com>
-	<alpine.DEB.2.00.1101151237240.32245@utopia.booyaka.com>
-	<20110115233744.GA18159@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
-	<4D3309F9.8090900@gmail.com>
-	<alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
-	<20110118222613.GS4957@atomide.com>
-	<20110118223536.GT4957@atomide.com>
-Message-ID: <20110118232102.GU4957@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jan 2011 00:05:56 +0000
+Subject: [PATCH V4 25/62] ST SPEAr: Added PCIE host controller base
+	driver support.
+In-Reply-To: <2c8dc40cb00bd8c6253ce45888ce1c331968d0e7.1295333958.git.viresh.kumar@st.com>
+References: <cover.1295333957.git.viresh.kumar@st.com>
+	<2c8dc40cb00bd8c6253ce45888ce1c331968d0e7.1295333958.git.viresh.kumar@st.com>
+Message-ID: <20110119000556.GQ16980@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110118 14:34]:
-> For omap15xx and 730 we need to use the MPU timer
-> as the 32K timer is not available. For omap16xx
-> we want to use the 32K timer because of PM. Fix this
-> by allowing to build in both timers.
+On Tue, Jan 18, 2011 at 12:41:52PM +0530, Viresh Kumar wrote:
+> +			clk = clk_get_sys("pcie1", NULL);
+> +			if (!clk) {
 
-This still needs one more patch to deal with the
-sched_clock for MPU timer..
+IS_ERR(clk)
 
-Tony
+> +				pr_err("%s:couldn't get clk for pcie1\n",
+> +						__func__);
+> +				continue;
+> +			}
+> +			if (clk_enable(clk)) {
+> +				pr_err("%s:couldn't enable clk for pcie1\n",
+> +						__func__);
+> +				continue;
+> +			}
+> +		} else if (port == 2) {
+> +			/* Ideally CFG Clock should have been also enabled
+> +			 * here. But it is done currently during board
+> +			 * init routne*/
+> +			clk = clk_get_sys("pcie2", NULL);
+> +			if (!clk) {
+
+IS_ERR(clk)
+
+> +				pr_err("%s:couldn't get clk for pcie2\n",
+> +						__func__);
+> +				continue;
+> +			}
+> +			if (clk_enable(clk)) {
+> +				pr_err("%s:couldn't enable clk for pcie2\n",
+> +						__func__);
+> +				continue;
+> +			}
+> +		}
+> +
+> +		if ((*pcie_port_is_host)(port))
+> +			add_pcie_port(port, spr_pcie_base[port],
+> +					spr_pcie_app_base[port]);
+> +	}
+...
+> +#ifdef CONFIG_PCIEPORTBUS
+> +/* PCIE0 clock always needs to be enabled if any of the three PCIE port
+> + * have to be used. So call this function from the board initilization
+> + * file. Ideally , all controller should have been independent from
+> + * others with respect to clock.
+> + */
+> +int enable_pcie0_clk(void)
+> +{
+> +	struct clk *clk;
+> +	/*Enable all CLK in CFG registers here only. Idealy only PCIE0
+> +	 * should have been enabled. But Controler does not work
+> +	 * properly if PCIE1 and PCIE2's CFG CLK is enabled in stages.
+> +	 */
+> +	writel(PCIE0_CFG_VAL | PCIE1_CFG_VAL | PCIE2_CFG_VAL, PCIE_CFG);
+> +	clk = clk_get_sys("pcie0", NULL);
+> +	if (!clk) {
+
+IS_ERR(clk)
