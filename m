@@ -1,52 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 19 Jan 2011 21:34:49 +0100
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <20110118121455.GB9719@n2100.arm.linux.org.uk>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 19 Jan 2011 21:41:57 +0100
+Subject: [PATCH v2] usb: gadget/fsl_mxc_udc: Detect the CPU type in
+	run-time
+In-Reply-To: <1295468223-11371-1-git-send-email-fabio.estevam@freescale.com>
+References: <1295468223-11371-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <4D374C95.7020204@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-
-> How reliable is the FIFOCNT register ?
+On 19/01/2011 21:17, Fabio Estevam wrote:
+> Make sure we are running on a MX35 processor.
 >
-> What I'm wondering is whether we can get rid of the DATABLOCKEND
-> interrupts completely, and instead read the FIFOCNT register to
-> discover how many blocks have been successfully transferred. ?FIFOCNT
-> on read gives you the remaining number of words to be transferred into
-> the FIFO from the card, not the number of words still to be read by the
-> host CPU.
+> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
+Acked-by: Eric B?nard <eric@eukrea.com>
 
-Hmm... the FIFOCNT is just the FIFO.
-
-Do you mean the MMCIDATACNT register? According to the manual
-it has exactly that meaning, and is valid "when the data transfer is
-complete" which you could assume it to be if you hit an error.
-But I'm not betting on it...
-
-Possibly you should add/subtract the words in FIFOCNT too,
-but I would say that's a later excercise.
-
-But I think it's a good idea. I'll prep an RFC patch we can test,
-we may need some broken cards to test it on though.
-
-> Not sure if that's valid for write atm.
-
-In that specific case you may need to also add the FIFOCNT I
-suspect, but I guess we can/will find out.
-
-This approach surely gives better precision than using the blockend
-interrupts any day.
-
-I'll hack up something and give it a spin.
-
-I don't know what the purpose of the blockend interrupt really
-is, but suspect it may be about reusing ring buffers for MMC
-transfers which Linux currently doesn't have need for.
-
-Yours,
-Linus Walleij
+> ---
+>   drivers/usb/gadget/fsl_mxc_udc.c |   19 +++++++++++--------
+>   1 files changed, 11 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+> index 77b1eb5..c1a65cd 100644
+> --- a/drivers/usb/gadget/fsl_mxc_udc.c
+> +++ b/drivers/usb/gadget/fsl_mxc_udc.c
+> @@ -89,14 +89,17 @@ void fsl_udc_clk_finalize(struct platform_device *pdev)
+>   {
+>   	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+>   #if defined(CONFIG_ARCH_MX35)
+> -	unsigned int v;
+> -
+> -	/* workaround ENGcm09152 for i.MX35 */
+> -	if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
+> -		v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> -				USBPHYCTRL_OTGBASE_OFFSET));
+> -		writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> -				USBPHYCTRL_OTGBASE_OFFSET));
+> +	if (cpu_is_mx35()) {
+> +		unsigned int v;
+> +
+> +		/* workaround ENGcm09152 for i.MX35 */
+> +		if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
+> +			v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> +					USBPHYCTRL_OTGBASE_OFFSET));
+> +			writel(v | USBPHYCTRL_EVDO,
+> +				MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> +					USBPHYCTRL_OTGBASE_OFFSET));
+> +		}
+>   	}
+>   #endif
+>
