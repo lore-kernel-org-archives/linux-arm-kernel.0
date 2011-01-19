@@ -1,47 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Jan 2011 09:53:58 +0000
-Subject: [PATCH V4 38/62] SPEAr CPU freq: Adding support for CPU Freq
-	framework
-In-Reply-To: <20110119093942.GC8048@DLHLAP0379>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
-	<20110119002046.GC2209@gallagher> <4D3648B1.4030807@st.com>
-	<20110119083527.GC9569@gallagher>
-	<20110119090008.GA8048@DLHLAP0379>
-	<20110119093942.GC8048@DLHLAP0379>
-Message-ID: <20110119095358.GA31652@n2100.arm.linux.org.uk>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Wed, 19 Jan 2011 12:24:08 +0200
+Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
+In-Reply-To: <87mxnfz2f4.fsf@ti.com>
+References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>	<20101221202914.GK5829@atomide.com>
+	<4D2440E0.7040008@nokia.com> <87mxnfz2f4.fsf@ti.com>
+Message-ID: <4D36BBC8.2000305@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 03:09:42PM +0530, Shiraz Hashim wrote:
-> On second thought it should always be there irrespective of failures
-> as in our case it may happen that eventually CPU sets to a clock <=
-> desired clock. So we would do following
-> 
-> cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-> if (ret)
->         pr_err("Could not change cpu clk rate\n");
-> freqs.new = clk_get_rate(cpu_clk);
-> cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
-It probably makes more sense to do:
+ From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
+From: Adrian Hunter <adrian.hunter@nokia.com>
+Date: Wed, 24 Nov 2010 13:23:21 +0200
+Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
 
-	newfreq = clk_round_rate(cpu_clk, freqs.new * 1000);
-	if (newfreq < 0) {
-		pr_err("Invalid frequency blah blah\n");
-		return newfreq;
-	}
+When clearing the DMA channel, clear all status bits.
 
-	freqs.new = newfreq / 1000;
-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-	ret = clk_set_rate(cpu_clk, newfreq);
-	if (ret) {
-	        pr_err("Could not change cpu clk rate\n");
-		freqs.new = clk_get_rate(cpu_clk) / 1000;
-	}
-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+When handling a DMA interrupt, clear only the interrupt
+status bits that have been read and are passed to the
+channel's interrupt handler, not every status bit.
 
-so that the prechange notifier gets the actual frequency to be switched
-to too.  In theory clk_set_rate() should only fail if the new frequency
-couldn't be set for some reason.
+Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+---
+  arch/arm/plat-omap/dma.c |    7 +++----
+  1 files changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index c4b2b47..8536308 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -53,7 +53,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
+  #endif
+  
+  #define OMAP_DMA_ACTIVE			0x01
+-#define OMAP2_DMA_CSR_CLEAR_MASK	0xffe
++#define OMAP2_DMA_CSR_CLEAR_MASK	0xffffffff
+  
+  #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
+  
+@@ -1873,7 +1873,7 @@ static int omap2_dma_handle_ch(int ch)
+  		printk(KERN_INFO "DMA misaligned error with device %d\n",
+  		       dma_chan[ch].dev_id);
+  
+-	p->dma_write(OMAP2_DMA_CSR_CLEAR_MASK, CSR, ch);
++	p->dma_write(status, CSR, ch);
+  	p->dma_write(1 << ch, IRQSTATUS_L0, ch);
+  	/* read back the register to flush the write */
+  	p->dma_read(IRQSTATUS_L0, ch);
+@@ -1893,10 +1893,9 @@ static int omap2_dma_handle_ch(int ch)
+  			OMAP_DMA_CHAIN_INCQHEAD(chain_id);
+  
+  		status = p->dma_read(CSR, ch);
++		p->dma_write(status, CSR, ch);
+  	}
+  
+-	p->dma_write(status, CSR, ch);
+-
+  	if (likely(dma_chan[ch].callback != NULL))
+  		dma_chan[ch].callback(ch, status, dma_chan[ch].data);
+  
+-- 
+1.7.0.4
