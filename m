@@ -1,82 +1,30 @@
-From: daniel.morsing@gmail.com (Daniel Morsing)
-Date: Wed, 19 Jan 2011 13:29:50 +0100
-Subject: [PATCHv4 3/4] OMAP3: Devkit8000: Check return value of
-	gpio_request
-In-Reply-To: <1295425166-25540-4-git-send-email-weber@corscience.de>
-References: <1295425166-25540-1-git-send-email-weber@corscience.de>
-	<1295425166-25540-4-git-send-email-weber@corscience.de>
-Message-ID: <1295440190.2635.18.camel@morsing>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 19 Jan 2011 13:48:20 +0100
+Subject: [PATCH] ux500: add a few AB8500 regulator consumers v2
+In-Reply-To: <AANLkTiki4E9zPKZVNV_LGDkUD=5eajYxrvq=8h3g-GHx@mail.gmail.com>
+References: <1295390574-8969-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTiki4E9zPKZVNV_LGDkUD=5eajYxrvq=8h3g-GHx@mail.gmail.com>
+Message-ID: <4D36DD94.9090906@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thomas
+On 01/19/2011 06:13 AM, Rabin Vincent wrote:
+> On Wed, Jan 19, 2011 at 04:12, Linus Walleij
+> <linus.walleij@stericsson.com>  wrote:
+>    
+>> +       /* lsm303dlh magnetometer */
+>> +       REGULATOR_SUPPLY("avdd", "3-001e"),
+>>      
+> I don't see an "avdd" in the lsm303dlh datasheet.
+> http://www.st.com/stonline/books/pdf/docs/16941.pdf
+>    
+>> +       /* Synaptics RMI4 Touchscreen device */
+>> +       REGULATOR_SUPPLY("avdd", "3-004b"),
+>> +};
+>>      
+> And neither in the Synaptics datasheet.
+>    
+Thanks! Will try to find the right names and update.
 
-On Wed, 2011-01-19 at 09:19 +0100, Thomas Weber wrote:
-> The return value of gpio_request is ignored.
-> This patch adds the check of the return value of gpio_request.
-> 
-> Signed-off-by: Thomas Weber <weber@corscience.de>
-> ---
->  arch/arm/mach-omap2/board-devkit8000.c |   16 ++++++++++++++--
->  1 files changed, 14 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-> index 9fb416b..4ddd81c 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -234,6 +234,8 @@ static struct gpio_led gpio_leds[];
->  static int devkit8000_twl_gpio_setup(struct device *dev,
->  		unsigned gpio, unsigned ngpio)
->  {
-> +	int ret;
-> +
->  	omap_mux_init_gpio(29, OMAP_PIN_INPUT);
->  	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
->  	mmc[0].gpio_cd = gpio + 0;
-> @@ -244,13 +246,23 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
->  
->  	/* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
->  	devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
-> -	gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
-> +	ret = gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "Failed to request GPIO for LCD_PWRN\n");
-> +		return ret;
-> +	}
-> +
-
-If we fail here, reset_gpio will be set to the gpio the was requested.
-The main reason for this would be that the gpio has already been
-requested, so any subsequent lcd operations could potentially mess up
-some other code.
-
->  	/* Disable until needed */
->  	gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
->  
->  	/* gpio + 7 is "DVI_PD" (out, active low) */
->  	devkit8000_dvi_device.reset_gpio = gpio + 7;
-> -	gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
-> +	ret = gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "Failed to request GPIO for DVI PowerDown\n");
-> +		return ret;
-> +	}
-> +
-
-Same as above.
-
->  	/* Disable until needed */
->  	gpio_direction_output(devkit8000_dvi_device.reset_gpio, 0);
->  
-
-Consider switching to gpio_request_{one, array}. Besides making
-everything cleaner, it would also provide error checking for the
-unlikely case that the request succeeded, but the direction setting
-failed.
-
-Also agreeing with Manjunath. This patch should be merged with the
-adjust lcd gpio patch. The patches depend on each other and the
-resulting patch is not big enough to warrant a split.
-
-Regards,
-Daniel
+Yours,
+Linus Walleij
