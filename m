@@ -1,265 +1,72 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Wed, 19 Jan 2011 11:33:09 +0530
-Subject: [PATCH V4 07/62] ST SPEAr13XX: Adding machine specific src files
-In-Reply-To: <20110118160655.GD16980@n2100.arm.linux.org.uk>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<86b571fe06bdc264254a4125ec32195fdff46457.1295333958.git.viresh.kumar@st.com>
-	<20110118160655.GD16980@n2100.arm.linux.org.uk>
-Message-ID: <20110119060308.GA24820@DLHLAP0379>
+From: stanleymiao@gmail.com (Stanley.Miao)
+Date: Wed, 19 Jan 2011 14:21:00 +0800
+Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
+In-Reply-To: <AANLkTi=F8_Zmm4OM2=JPMzSWbm0-Nyr4mxSPUNpdBg3N@mail.gmail.com>
+References: <1295253729-23153-1-git-send-email-stanley.miao@windriver.com>
+	<1295253729-23153-2-git-send-email-stanley.miao@windriver.com>
+	<AANLkTi=RSpXHRpoZJsGLhVgQ=E=tcNGm8GXYC9UPaDrA@mail.gmail.com>
+	<AANLkTi=q=e03GhmNZypGa5na2OiAr8SAOtiXm=+NPq5t@mail.gmail.com>
+	<AANLkTi=F8_Zmm4OM2=JPMzSWbm0-Nyr4mxSPUNpdBg3N@mail.gmail.com>
+Message-ID: <AANLkTiktrCOxOH30ooM_Z=ct=cR5z49DiB+P4mqzi55E@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+2011/1/18 Catalin Marinas <catalin.marinas@arm.com>:
+> On 18 January 2011 01:22, Stanley.Miao <stanleymiao@gmail.com> wrote:
+>> 2011/1/17 Catalin Marinas <catalin.marinas@arm.com>:
+>>> On 17 January 2011 08:42, Stanley.Miao <stanley.miao@windriver.com> wrote:
+>>>> The code section in BE8 kernel modules is in little-endian while data
+>>>> section is in big-endian. When reading code from memory in the relocation
+>>>> procedure, these instructions are read according to big-endian, so they
+>>>> need to be inverted before writing to memory and after reading from memory.
+>>> [...]
+>>>> --- a/arch/arm/include/asm/io.h
+>>>> +++ b/arch/arm/include/asm/io.h
+>>>> @@ -233,6 +233,18 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>>>>
+>>>> ?#endif /* __mem_pci */
+>>>>
+>>>> +#ifdef CONFIG_CPU_ENDIAN_BE8
+>>>> +#define read_instr32(c) ? ? ? ? ? ? ? ? ? ? ? ?__swab32(*(u32 *)c)
+>>>> +#define read_instr16(c) ? ? ? ? ? ? ? ? ? ? ? ?__swab16(*(u16 *)c)
+>>>> +#define write_instr32(v,a) ? ? ? ? ? ? (*(u32 *)(a) = __swab32((__force __u32)(v)))
+>>>> +#define write_instr16(v,a) ? ? ? ? ? ? (*(u16 *)(a) = __swab16((__force __u16)(v)))
+>>>> +#else
+>>>> +#define read_instr32(c) ? ? ? ? ? ? ? ? ? ? ? ?(*(u32 *)c)
+>>>> +#define read_instr16(c) ? ? ? ? ? ? ? ? ? ? ? ?(*(u16 *)c)
+>>>> +#define write_instr32(v,a) ? ? ? ? ? ? (*(u32 *)(a) = (v))
+>>>> +#define write_instr16(v,a) ? ? ? ? ? ? (*(u16 *)(a) = (v))
+>>>> +#endif
+>>>
+>>> Can we not use cpu_to_le32 etc in here (and as Russell said, they are
+>>> not really IO)?
+>>
+>> Except moving these definition to arch/arm/kernel/module.c, do I need
+>> to do other modifications ?
+>
+> Just personal preference (not important), I'd rather have a "u32
+> instr" variable set by read_instr32() than this kind of functional
+> style (in C code, I'm fine with it otherwise):
 
-On Wed, Jan 19, 2011 at 12:06:55AM +0800, Russell King - ARM Linux wrote:
-> On Tue, Jan 18, 2011 at 12:41:35PM +0530, Viresh Kumar wrote:
-> > diff --git a/arch/arm/mach-spear13xx/headsmp.S b/arch/arm/mach-spear13xx/headsmp.S
-> > new file mode 100644
-> > index 0000000..30761d3
-> > --- /dev/null
-> > +++ b/arch/arm/mach-spear13xx/headsmp.S
-> > @@ -0,0 +1,96 @@
-> > +/*
-> > + * arch/arm/mach-spear13XX/headsmp.S
-> > + *
-> > + * Picked from realview
-> > + * Copyright (c) 2010 ST Microelectronics Limited
-> > + * Shiraz Hashim <shiraz.hashim@st.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/linkage.h>
-> > +#include <linux/init.h>
-> > +
-> > +	__INIT
-> 
-> Is this ever called after the kernel text is thrown away?  What if we
-> add support in the generic code to start with secondary CPUs offline
-> as a power saving or boot time feature?
-> 
+upper, lower and offset are used. It looks we don't need another "instr".
 
-No. SPEAr platform has no additional feature to explicitly control
-this aspect of secondary CPUs. Does ARMv7 itself provdes some features
-for power management of secondary CPUs ?
+>
+>> + ? ? ? ? ? ? ? ? ? ? ? write_instr32((read_instr32(loc) & 0xff000000) |
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (offset & 0x00ffffff), loc);
+>
+> BTW (not related to modules, but since you are looking at this), when
+> we copy the sigreturn_codes to the vectors page in early_trap_init(),
+> do they get there in little endian form (as required by BE8)?
 
-> > +
-> > +/*
-> > + * This one is picked from Tegra :-
-> > + *
-> > + * The secondary kernel init calls v7_flush_dcache_all before it enables
-> > + * the L1; however, the L1 comes out of reset in an undefined state, so
-> > + * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
-> > + * of cache lines with uninitialized data and uninitialized tags to get
-> > + * written out to memory, which does really unpleasant things to the ain
-> > + * processor. We fix this by performing an invalidate, rather than a
-> > + * clean + invalidate, before jumping into the kernel.
-> > + */
-> > +ENTRY(v7_invalidate_l1)
-> > +	mov	r0, #0
-> > +	mcr	p15, 2, r0, c0, c0, 0
-> > +	mrc	p15, 1, r0, c0, c0, 0
-> > +
-> > +	ldr	r1, =0x7fff
-> > +	and	r2, r1, r0, lsr #13
-> > +
-> > +	ldr	r1, =0x3ff
-> > +
-> > +	and	r3, r1, r0, lsr #3	@ NumWays - 1
-> > +	add	r2, r2, #1	@ NumSets
-> > +
-> > +	and	r0, r0, #0x7
-> > +	add	r0, r0, #4	@ SetShift
-> > +
-> > +	clz	r1, r3		@ WayShift
-> > +	add	r4, r3, #1	@ NumWays
-> > +1:	sub	r2, r2, #1	@ NumSets--
-> > +	mov	r3, r4		@ Temp = NumWays
-> > +2:	subs	r3, r3, #1	@ Temp--
-> > +	mov	r5, r3, lsl r1
-> > +	mov	r6, r2, lsl r0
-> > +	orr	r5, r5, r6	@ Reg = Temp<<WayShift)|(NumSets<<SetShift)
-> > +	mcr	p15, 0, r5, c7, c6, 2
-> > +	bgt	2b
-> > +	cmp	r2, #0
-> > +	bgt	1b
-> > +	dsb
-> > +	isb
-> > +	mov	pc, lr
-> > +ENDPROC(v7_invalidate_l1)
-> 
-> This code appears to have its only caller commented out.  Should it be
-> removed?
-> 
+No, they get there in big endian.They are read as data in the function
+setup_return().
 
-yes, would remove it.
+retcode = KERN_SIGRETURN_CODE + (idx << 2) + thumb;
 
-> > +
-> > +/*
-> > + * spear13xx specific entry point for secondary CPUs. This provides
-> > + * a "holding pen" into which all secondary cores are held until we're
-> > + * ready for them to initialise.
-> > + */
-> > +ENTRY(spear13xx_secondary_startup)
-> > +	/* If we don't do this then we have a crash */
-> > +
-> > +	/*
-> > +	 * Since now this is being called from xloader so removing it
-> > +	 * here
-> > +	 */
-> > +#if 0
-> > +	bl v7_invalidate_l1
-> > +#endif
-> > +
-> > +	mrc	p15, 0, r0, c0, c0, 5
-> > +	and	r0, r0, #15
-> > +	adr	r4, 1f
-> > +	ldmia	r4, {r5, r6}
-> > +	sub	r4, r4, r5
-> > +	add	r6, r6, r4
-> > +pen:	ldr	r7, [r6]
-> > +	cmp	r7, r0
-> > +	bne	pen
-> > +
-> > +	/*
-> > +	 * we've been released from the holding pen: secondary_stack
-> > +	 * should now contain the SVC stack for this core
-> > +	 */
-> > +	b	secondary_startup
-> > +
-> > +	.align
-> > +1:	.long	.
-> > +	.long	pen_release
-> ...
-> > +volatile int __cpuinitdata pen_release = -1;
-> > +static DEFINE_SPINLOCK(boot_lock);
-> > +
-> > +/*
-> > + * Write pen_release in a way that is guaranteed to be visible to all
-> > + * observers, irrespective of whether they're taking part in coherency
-> > + * or not. This is necessary for the hotplug code to work reliably.
-> > + */
-> > +static void write_pen_release(int val)
-> > +{
-> > +	pen_release = val;
-> > +	smp_wmb();
-> > +	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
-> > +	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
-> > +}
-> > +
-> > +static void __iomem *scu_base_addr(void)
-> > +{
-> > +	return __io_address(SPEAR13XX_SCU_BASE);
-> > +}
-> > +
-> > +void __cpuinit platform_secondary_init(unsigned int cpu)
-> > +{
-> > +	/*
-> > +	 * if any interrupts are already enabled for the primary
-> > +	 * core (e.g. timer irq), then they will not have been enabled
-> > +	 * for us: do so
-> > +	 */
-> > +	gic_secondary_init(0);
-> > +
-> > +	/*
-> > +	 * let the primary processor know we're out of the
-> > +	 * pen, then head off into the C entry point
-> > +	 */
-> > +	write_pen_release(-1);
-> > +
-> > +	/*
-> > +	 * Synchronise with the boot thread.
-> > +	 */
-> > +	spin_lock(&boot_lock);
-> > +	spin_unlock(&boot_lock);
-> > +}
-> > +
-> > +int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > +{
-> > +	unsigned long timeout;
-> > +
-> > +	/*
-> > +	 * set synchronisation state between this boot processor
-> > +	 * and the secondary one
-> > +	 */
-> > +	spin_lock(&boot_lock);
-> > +
-> > +	/*
-> > +	 * The secondary processor is waiting to be released from
-> > +	 * the holding pen - release it, then wait for it to flag
-> > +	 * that it has been released by resetting pen_release.
-> > +	 *
-> > +	 * Note that "pen_release" is the hardware CPU ID, whereas
-> > +	 * "cpu" is Linux's internal ID.
-> > +	 */
-> > +	write_pen_release(cpu);
-> > +
-> > +	timeout = jiffies + (1 * HZ);
-> > +	while (time_before(jiffies, timeout)) {
-> > +		smp_rmb();
-> > +		if (pen_release == -1)
-> > +			break;
-> > +
-> > +		udelay(10);
-> > +	}
-> > +
-> > +	/*
-> > +	 * now the secondary core is starting up let it run its
-> > +	 * calibrations, then wait for it to finish
-> > +	 */
-> > +	spin_unlock(&boot_lock);
-> > +
-> > +	return pen_release != -1 ? -ENOSYS : 0;
-> > +}
-> > +
-> > +/*
-> > + * Initialise the CPU possible map early - this describes the CPUs
-> > + * which may be present or become present in the system.
-> > + */
-> > +void __init smp_init_cpus(void)
-> > +{
-> > +	void __iomem *scu_base = scu_base_addr();
-> > +	unsigned int i, ncores;
-> > +
-> > +	ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-> > +
-> > +	for (i = 0; i < ncores; i++)
-> > +		set_cpu_possible(i, true);
-> > +}
-> > +
-> > +static void __init wakeup_secondary(void)
-> > +{
-> > +	/* nobody is to be released from the pen yet */
-> > +	pen_release = -1;
-> 
-> But pen_release starts off as -1, so is this really needed?
-> 
 
-Not required, would remove.
+Stanley.
 
-> > +
-> > +	/*
-> > +	 * Write the address of secondary startup into the system-wide
-> > +	 * location (presently it is in SRAM). The BootMonitor waits
-> > +	 * for this register to become non-zero.
-> > +	 * We must also send an sev to wake it up
-> > +	 */
-> > +	__raw_writel(BSYM(virt_to_phys(spear13xx_secondary_startup)),
-> > +			__io_address(SPEAR13XX_SYS_LOCATION));
-> > +
-> > +	mb();
-> 
-> Do you really need to sync back to L2, or will a dsb() do here - and
-> as the spinlock code uses dsb() + sev() together, would it make sense
-> to combine the two?  (dsb() is required to ensure all previous writes
-> are visible prior to the sev() executing.)
-
-Presently L2 cache is initialized after we bootup secondary CPU but
-one can have the possibility of initializing L2 earlier also.
-So this would be safer.
-
--- 
-regards
-Shiraz
+>
+> --
+> Catalin
+>
