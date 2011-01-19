@@ -1,29 +1,37 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 19 Jan 2011 14:36:22 -0800
-Subject: [GIT PULL for 38-rc2] msm: initdata fix
-Message-ID: <8ya8vygo715.fsf@huya.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Jan 2011 14:44:07 -0800
+Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
+In-Reply-To: <20110119222327.GJ4957@atomide.com>
+References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>
+	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>
+	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>
+	<20101221202914.GK5829@atomide.com> <4D2440E0.7040008@nokia.com>
+	<87mxnfz2f4.fsf@ti.com> <4D36BBC8.2000305@nokia.com>
+	<20110119222327.GJ4957@atomide.com>
+Message-ID: <20110119224406.GK4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I seem to have missed this fix for the rc1.  Without it, access to
-/sys entries for the ethernet access freed memory.
+* Tony Lindgren <tony@atomide.com> [110119 14:23]:
+> * Adrian Hunter <adrian.hunter@nokia.com> [110119 02:23]:
+> > 
+> > From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
+> > From: Adrian Hunter <adrian.hunter@nokia.com>
+> > Date: Wed, 24 Nov 2010 13:23:21 +0200
+> > Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
+> > 
+> > When clearing the DMA channel, clear all status bits.
+> > 
+> > When handling a DMA interrupt, clear only the interrupt
+> > status bits that have been read and are passed to the
+> > channel's interrupt handler, not every status bit.
+> > 
+> > Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+> 
+> Thanks, will queue as a fix.
 
-Thanks,
-David
+This did not apply for some reason, I've applied it manually.
+Please check that I got it right in omap-fixes branch soonish.
+Let me know if it needs updating.
 
-The following changes since commit c56eb8fb6dccb83d9fe62fd4dc00c834de9bc470:
-
-  Linux 2.6.38-rc1 (2011-01-18 15:14:02 -0800)
-
-are available in the git repository at:
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git for-38-rc2
-
-Stephen Boyd (1):
-      msm: qsd8x50: Platform data isn't init data
-
- arch/arm/mach-msm/board-qsd8x50.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
