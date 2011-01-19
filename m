@@ -1,43 +1,32 @@
-From: matejken@gmail.com (Matej Kenda)
-Date: Wed, 19 Jan 2011 13:01:31 +0100
-Subject: [PATCH 1/2] Updated XCEP partition sizes
-Message-ID: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 19 Jan 2011 15:14:12 +0300
+Subject: [PATCH 8/8] arm/dt: Basic tegra devicetree support
+In-Reply-To: <20110118202938.13011.35918.stgit@localhost6.localdomain6>
+References: <20110118195933.13011.56098.stgit@localhost6.localdomain6>
+	<20110118202938.13011.35918.stgit@localhost6.localdomain6>
+Message-ID: <4D36D594.3010909@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increased partition for Linux kernel from 1 MB to 2 MB for
-monolithically built kernel 2.6.37 for Iskratel XCEP SBC to fit in.
+Hello.
 
-Signed-off-by: Matej Kenda <matejken@gmail.com>
+On 18-01-2011 23:29, Grant Likely wrote:
 
----
+> This patch adds adds
 
-diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
-index 3260ce7..f7b1052 100644
---- a/arch/arm/mach-pxa/xcep.c
-+++ b/arch/arm/mach-pxa/xcep.c
-@@ -55,20 +55,20 @@ static struct mtd_partition xcep_partitions[] = {
- 	}, {
- 		.name =		"Bootloader ENV",
- 		.size =		0x00040000,
--		.offset =	0x00040000,
-+		.offset =	MTDPART_OFS_APPEND,
- 		.mask_flags =	MTD_WRITEABLE
- 	}, {
- 		.name =		"Kernel",
--		.size =		0x00100000,
--		.offset =	0x00080000,
-+		.size =		0x00200000,
-+		.offset =	MTDPART_OFS_APPEND,
- 	}, {
- 		.name =		"Rescue fs",
- 		.size =		0x00280000,
--		.offset =	0x00180000,
-+		.offset =	MTDPART_OFS_APPEND,
- 	}, {
- 		.name =		"Filesystem",
- 		.size =		MTDPART_SIZ_FULL,
--		.offset =	0x00400000
-+		.offset =	MTDPART_OFS_APPEND
- 	}
- };
+    One word is enough. :-)
+
+> very basic support for booting versatile with a
+> device tree.  It simply allows the existing machine_descs to match
+> against the tegra compatible values so that the kernel can boot.
+> Kernel parameters and the initrd pointer is read out of the tree
+> instead of atags.
+
+> This is not complete device tree support.  This change will be
+> reverted when a new machine_desc is added that can populate the
+> versatile device registrations directly from data in the tree instead
+> of using hard coded data.  That change will be made in a future patch.
+
+> Signed-off-by: Grant Likely<grant.likely@secretlab.ca>
+
+WBR, Sergei
