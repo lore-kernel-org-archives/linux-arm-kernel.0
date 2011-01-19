@@ -1,34 +1,42 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 20 Jan 2011 05:50:38 +0800
-Subject: [PATCH 4/6] dmaengine: imxs-sdma: correct sdmac->status in
-	sdma_handle_channel_loop()
+Date: Thu, 20 Jan 2011 05:50:39 +0800
+Subject: [PATCH 5/6] dmaengine: imx-sdma: fix up param for the last BD in
+	sdma_prep_slave_sg()
 In-Reply-To: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
 References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1295473840-17295-5-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1295473840-17295-6-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdma_handle_channel_loop() is the handler of cyclic tx.  One period
-success does not really mean the success of the tx.  Instead of
-DMA_SUCCESS, DMA_IN_PROGRESS should be the one to tell.
+As per the reference manual, bit "L" should be set while bit "C"
+should be cleared for the last buffer descriptor in the non-cyclic
+chain, so that sdma can stop trying to find the next BD and end
+the transfer.
+
+In case of sdma_prep_slave_sg(), BD_LAST needs to be set and BD_CONT
+be cleared for the last BD.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/dma/imx-sdma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/dma/imx-sdma.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index ccdafa4..e5af547 100644
+index e5af547..fa63ace 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -449,7 +449,7 @@ static void sdma_handle_channel_loop(struct sdma_channel *sdmac)
- 		if (bd->mode.status & BD_RROR)
- 			sdmac->status = DMA_ERROR;
- 		else
--			sdmac->status = DMA_SUCCESS;
-+			sdmac->status = DMA_IN_PROGRESS;
+@@ -931,8 +931,11 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
  
- 		bd->mode.status |= BD_DONE;
- 		sdmac->buf_tail++;
+ 		param = BD_DONE | BD_EXTD | BD_CONT;
+ 
+-		if (i + 1 == sg_len)
++		if (i + 1 == sg_len) {
+ 			param |= BD_INTR;
++			param |= BD_LAST;
++			param &= ~BD_CONT;
++		}
+ 
+ 		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
+ 				i, count, sg->dma_address,
 -- 
 1.7.1
