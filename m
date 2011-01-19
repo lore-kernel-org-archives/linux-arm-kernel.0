@@ -1,36 +1,31 @@
 From: weber@corscience.de (Thomas Weber)
-Date: Wed, 19 Jan 2011 09:19:24 +0100
-Subject: [PATCHv4 2/4] OMAP3: Devkit8000: Fix tps65930 pullup/pulldown
-	configuration
+Date: Wed, 19 Jan 2011 09:19:26 +0100
+Subject: [PATCHv4 4/4] OMAP3: Devkit8000: Fix indentation of brace
 In-Reply-To: <1295425166-25540-1-git-send-email-weber@corscience.de>
 References: <1295425166-25540-1-git-send-email-weber@corscience.de>
-Message-ID: <1295425166-25540-3-git-send-email-weber@corscience.de>
+Message-ID: <1295425166-25540-5-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Morsing <daniel.morsing@gmail.com>
+Fix indentation of a closing curly brace.
 
-gpio7 on the tps65930 is used as an output on the devkit8000 and
-gpio1 is not connected. Remove gpio7 and change gpio1 to pulldown
-
-Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
+Signed-off-by: Thomas Weber <weber@corscience.de>
 ---
- arch/arm/mach-omap2/board-devkit8000.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-devkit8000.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 719f4e5..9fb416b 100644
+index 4ddd81c..a344cd8 100644
 --- a/arch/arm/mach-omap2/board-devkit8000.c
 +++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -262,8 +262,7 @@ static struct twl4030_gpio_platform_data devkit8000_gpio_data = {
- 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
- 	.irq_end	= TWL4030_GPIO_IRQ_END,
- 	.use_leds	= true,
--	.pullups	= BIT(1),
--	.pulldowns	= BIT(2) | BIT(6) | BIT(7) | BIT(8) | BIT(13)
-+	.pulldowns	= BIT(1) | BIT(2) | BIT(6) | BIT(8) | BIT(13)
- 				| BIT(15) | BIT(16) | BIT(17),
- 	.setup		= devkit8000_twl_gpio_setup,
- };
+@@ -553,7 +553,7 @@ static void __init omap_dm9000_init(void)
+ 		printk(KERN_ERR "Failed to request GPIO%d for dm9000 IRQ\n",
+ 			OMAP_DM9000_GPIO_IRQ);
+ 		return;
+-		}
++	}
+ 
+ 	gpio_direction_input(OMAP_DM9000_GPIO_IRQ);
+ 
 -- 
 1.7.4.rc2
