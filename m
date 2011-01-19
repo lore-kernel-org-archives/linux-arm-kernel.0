@@ -1,41 +1,38 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 20 Jan 2011 05:50:37 +0800
-Subject: [PATCH 3/6] dmaengine: imx-sdma: return sdmac->status in
-	sdma_tx_status()
+Date: Thu, 20 Jan 2011 05:50:35 +0800
+Subject: [PATCH 1/6] dmaengine: imx-sdma: remove IMX_DMA_SG_LOOP handling in
+	sdma_prep_slave_sg()
 In-Reply-To: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
 References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1295473840-17295-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1295473840-17295-2-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdmac->status was designed to reflect the status of the tx,
-so simply return it in sdma_tx_status().  Then dma client can call
-dma_async_is_tx_complete() to know the status of the tx.
+This is a leftover from the time that the driver did not have
+sdma_prep_dma_cyclic callback and implemented sound dma as a looped
+sg chain.  And it can be removed now.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- drivers/dma/imx-sdma.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ drivers/dma/imx-sdma.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index 2aa5131..ccdafa4 100644
+index 5456480..45413b7 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -1061,14 +1061,12 @@ static enum dma_status sdma_tx_status(struct dma_chan *chan,
- {
- 	struct sdma_channel *sdmac = to_sdma_chan(chan);
- 	dma_cookie_t last_used;
--	enum dma_status ret;
+@@ -931,12 +931,6 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
  
- 	last_used = chan->cookie;
+ 		param = BD_DONE | BD_EXTD | BD_CONT;
  
--	ret = dma_async_is_complete(cookie, sdmac->last_completed, last_used);
- 	dma_set_tx_state(txstate, sdmac->last_completed, last_used, 0);
+-		if (sdmac->flags & IMX_DMA_SG_LOOP) {
+-			param |= BD_INTR;
+-			if (i + 1 == sg_len)
+-				param |= BD_WRAP;
+-		}
+-
+ 		if (i + 1 == sg_len)
+ 			param |= BD_INTR;
  
--	return ret;
-+	return sdmac->status;
- }
- 
- static void sdma_issue_pending(struct dma_chan *chan)
 -- 
 1.7.1
