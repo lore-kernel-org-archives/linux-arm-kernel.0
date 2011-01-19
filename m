@@ -1,52 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Jan 2011 20:51:58 +0000
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-Message-ID: <20110119205158.GC6335@n2100.arm.linux.org.uk>
+From: kauppi@papupata.org (Ari Kauppi)
+Date: Wed, 19 Jan 2011 22:54:33 +0200
+Subject: [PATCH] ARM: oprofile: Always allow backtraces
+Message-ID: <1295470473-1095-1-git-send-email-kauppi@papupata.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 09:34:49PM +0100, Linus Walleij wrote:
-> 2011/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> 
-> > How reliable is the FIFOCNT register ?
-> >
-> > What I'm wondering is whether we can get rid of the DATABLOCKEND
-> > interrupts completely, and instead read the FIFOCNT register to
-> > discover how many blocks have been successfully transferred. ?FIFOCNT
-> > on read gives you the remaining number of words to be transferred into
-> > the FIFO from the card, not the number of words still to be read by the
-> > host CPU.
-> 
-> Hmm... the FIFOCNT is just the FIFO.
+Always allow backtrace when using oprofile on ARM, even if a PMU
+isn't present.
 
-No, FIFOCNT.
+Restores functionality originally introduced in
+1b7b56982fdcd9d85effd76f3928cf5d6eb26155 by Richard Purdie.
 
- The MCIFifoCnt register contains the remaining number of words to be
- written to or read from the FIFO. The FIFO counter loads the value from
- the data length register (see Data length register, MCIDataLength on page
- 3-11) when the Enable bit is set in the data control register. If the data
- length is not word aligned (multiple of 4), the remaining 1 to 3 bytes are
- regarded as a word. Table 3-19 shows the bit assignment of the MCIFifoCnt
- register.
+Signed-off-by: Ari Kauppi <kauppi@papupata.org>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Matt Fleming <matt@console-pimps.org>
+---
+ arch/arm/oprofile/common.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int remain)
-{
-        do {
-                int count = host_remain - (readl(base + MMCIFIFOCNT) << 2);
-
-                if (count > remain)
-                        count = remain;
-
-                if (count <= 0)
-                        break;
-
-                readsl(base + MMCIFIFO, ptr, count >> 2);
-
-We use FIFOCNT to work out how many bytes are needing to be transferred
-from the FIFO on PIO reads.
+diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+index 8aa9744..a23e5ae 100644
+--- a/arch/arm/oprofile/common.c
++++ b/arch/arm/oprofile/common.c
+@@ -46,6 +46,7 @@ char *op_name_from_perf_id(void)
+ 		return NULL;
+ 	}
+ }
++#endif
+ 
+ static int report_trace(struct stackframe *frame, void *d)
+ {
+@@ -109,6 +110,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
+ 		tail = user_backtrace(tail);
+ }
+ 
++#ifdef CONFIG_HW_PERF_EVENTS
+ int __init oprofile_arch_init(struct oprofile_operations *ops)
+ {
+ 	ops->backtrace		= arm_backtrace;
+@@ -124,6 +126,8 @@ void __exit oprofile_arch_exit(void)
+ int __init oprofile_arch_init(struct oprofile_operations *ops)
+ {
+ 	pr_info("oprofile: hardware counters not available\n");
++	ops->backtrace		= arm_backtrace;
++
+ 	return -ENODEV;
+ }
+ void __exit oprofile_arch_exit(void) {}
+-- 
+1.7.4.rc2.3.g60a2e
