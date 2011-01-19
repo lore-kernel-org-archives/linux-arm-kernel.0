@@ -1,154 +1,52 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 19 Jan 2011 12:25:46 -0800
-Subject: [PATCH v2 10/11] msm: Support for the MSM8960 Simulator target
-In-Reply-To: <1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1295468747-22796-11-git-send-email-davidb@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 19 Jan 2011 21:34:49 +0100
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+In-Reply-To: <20110118121455.GB9719@n2100.arm.linux.org.uk>
+References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
+	<4D346800.3070603@stericsson.com>
+	<20110118121455.GB9719@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stepan Moskovchenko <stepanm@codeaurora.org>
+2011/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Add the board file, Kconfig options, and Makefile options
-needed to build for the MSM8960 Simulator target.
+> How reliable is the FIFOCNT register ?
+>
+> What I'm wondering is whether we can get rid of the DATABLOCKEND
+> interrupts completely, and instead read the FIFOCNT register to
+> discover how many blocks have been successfully transferred. ?FIFOCNT
+> on read gives you the remaining number of words to be transferred into
+> the FIFO from the card, not the number of words still to be read by the
+> host CPU.
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig         |   16 ++++++++++
- arch/arm/mach-msm/Makefile        |    5 +++
- arch/arm/mach-msm/board-msm8960.c |   58 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 79 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/board-msm8960.c
+Hmm... the FIFOCNT is just the FIFO.
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 5d3d9ad..adca96c 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -48,6 +48,16 @@ config ARCH_MSM8X60
- 	select IOMMU_API
- 	select MSM_SCM if SMP
- 
-+config ARCH_MSM8960
-+	bool "MSM8960"
-+	select ARCH_MSM_SCORPIONMP
-+	select MACH_MSM8960_SIM
-+	select ARM_GIC
-+	select CPU_V7
-+	select MSM_V2_TLMM
-+	select MSM_GPIOMUX
-+	select MSM_SCM if SMP
-+
- endchoice
- 
- config MSM_SOC_REV_A
-@@ -125,6 +135,12 @@ config MACH_MSM8X60_FFA
- 	help
- 	  Support for the Qualcomm MSM8x60 FFA eval board.
- 
-+config MACH_MSM8960_SIM
-+	depends on ARCH_MSM8960
-+	bool "MSM8960 Simulator"
-+	help
-+	  Support for the Qualcomm MSM8960 simulator.
-+
- endmenu
- 
- config IOMMU_PGTABLES_L2
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 3e15ff3..0229427 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o acpuclock-arm11.o
- obj-$(CONFIG_ARCH_MSM7X30) += dma.o
- obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
- obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o iommu.o iommu_dev.o devices-msm8x60-iommu.o
-+obj-$(CONFIG_ARCH_MSM8960) += clock-dummy.o
- 
- obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
- obj-$(CONFIG_MSM_PROC_COMM) += clock.o
-@@ -23,12 +24,16 @@ obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
- obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
- obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
- obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
-+obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o
- 
- obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-7x30.o gpiomux-v1.o gpiomux.o
- obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
- obj-$(CONFIG_ARCH_MSM8X60) += gpiomux-8x60.o gpiomux-v2.o gpiomux.o
- ifdef CONFIG_MSM_V2_TLMM
-+ifndef CONFIG_ARCH_MSM8960
-+# TODO: TLMM Mapping issues need to be resolved
- obj-y	+= gpio-v2.o
-+endif
- else
- obj-y	+= gpio.o
- endif
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-new file mode 100644
-index 0000000..90efd54
---- /dev/null
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -0,0 +1,58 @@
-+/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-+ * 02110-1301, USA.
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/hardware/gic.h>
-+
-+#include <mach/board.h>
-+#include <mach/msm_iomap.h>
-+
-+static void __init msm8960_map_io(void)
-+{
-+	msm_map_msm8960_io();
-+}
-+
-+static void __init msm8960_init_irq(void)
-+{
-+	unsigned int i;
-+	gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE,
-+		 (void *)MSM_QGIC_CPU_BASE);
-+
-+	/* Edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
-+	writel(0xFFFFD7FF, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
-+
-+	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
-+	 * as they are configured as level, which does not play nice with
-+	 * handle_percpu_irq.
-+	 */
-+	for (i = GIC_PPI_START; i < GIC_SPI_START; i++) {
-+		if (i != AVS_SVICINT && i != AVS_SVICINTSWDONE)
-+			set_irq_handler(i, handle_percpu_irq);
-+	}
-+}
-+
-+MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
-+	.map_io = msm8960_map_io,
-+	.init_irq = msm8960_init_irq,
-+	.timer = &msm_timer,
-+MACHINE_END
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Do you mean the MMCIDATACNT register? According to the manual
+it has exactly that meaning, and is valid "when the data transfer is
+complete" which you could assume it to be if you hit an error.
+But I'm not betting on it...
+
+Possibly you should add/subtract the words in FIFOCNT too,
+but I would say that's a later excercise.
+
+But I think it's a good idea. I'll prep an RFC patch we can test,
+we may need some broken cards to test it on though.
+
+> Not sure if that's valid for write atm.
+
+In that specific case you may need to also add the FIFOCNT I
+suspect, but I guess we can/will find out.
+
+This approach surely gives better precision than using the blockend
+interrupts any day.
+
+I'll hack up something and give it a spin.
+
+I don't know what the purpose of the blockend interrupt really
+is, but suspect it may be about reusing ring buffers for MMC
+transfers which Linux currently doesn't have need for.
+
+Yours,
+Linus Walleij
