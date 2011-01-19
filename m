@@ -1,41 +1,52 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Jan 2011 20:48:50 +0000
-Subject: [PATCH v2 0/8] Switch ARM platforms from integrator-flash to
-	physmap
-In-Reply-To: <1295462700.5742.76.camel@e102391-lin.cambridge.arm.com>
-References: <1294409399-19245-1-git-send-email-marc.zyngier@arm.com>
-	<20110119145425.GF31652@n2100.arm.linux.org.uk>
-	<1295462700.5742.76.camel@e102391-lin.cambridge.arm.com>
-Message-ID: <20110119204850.GB6335@n2100.arm.linux.org.uk>
+Date: Wed, 19 Jan 2011 20:51:58 +0000
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+In-Reply-To: <AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
+References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
+	<4D346800.3070603@stericsson.com>
+	<20110118121455.GB9719@n2100.arm.linux.org.uk>
+	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
+Message-ID: <20110119205158.GC6335@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 06:45:00PM +0000, Marc Zyngier wrote:
-> On Wed, 2011-01-19 at 14:54 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 07, 2011 at 02:09:51PM +0000, Marc Zyngier wrote:
-> > > As the integrator-flash driver is mostly a duplicate of physmap,
-> > > move all users of this driver to physmap and get rid of the
-> > > then unused driver.
-> > 
-> > Does MTD guarantee that the vpp will be turned off whenever the physmap
-> > module is removed?  If not, can it?
+On Wed, Jan 19, 2011 at 09:34:49PM +0100, Linus Walleij wrote:
+> 2011/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 > 
-> Vpp seems to be controlled directly from the chip drivers (using the
-> {ENABLE,DISABLE}_VPP macros and a command-set specific state machine),
-> and none of the map drivers play with vpp at all, integrator-flash
-> included.
+> > How reliable is the FIFOCNT register ?
+> >
+> > What I'm wondering is whether we can get rid of the DATABLOCKEND
+> > interrupts completely, and instead read the FIFOCNT register to
+> > discover how many blocks have been successfully transferred. ?FIFOCNT
+> > on read gives you the remaining number of words to be transferred into
+> > the FIFO from the card, not the number of words still to be read by the
+> > host CPU.
 > 
-> By the look of it, it seems pretty safe, though your own experience
-> seems to indicate otherwise. It should be quite easy to plug the vpp off
-> feature in physmap. I'll give it a go and re-spin the patchset.
+> Hmm... the FIFOCNT is just the FIFO.
 
-No - we need VPP enabled to write to the flash.  I'm talking about module
-removal.  integrator-flash calls back on removal and insertion, where
-VPP is controlled at platform level to make sure VPP is turned off.
+No, FIFOCNT.
 
-Also there's the matter of the write enable on Integrator platforms.
-That's not the same as VPP - it prevents any write to the flash devices,
-even for ID probing.  MTD keeps VPP off during such operations.
+ The MCIFifoCnt register contains the remaining number of words to be
+ written to or read from the FIFO. The FIFO counter loads the value from
+ the data length register (see Data length register, MCIDataLength on page
+ 3-11) when the Enable bit is set in the data control register. If the data
+ length is not word aligned (multiple of 4), the remaining 1 to 3 bytes are
+ regarded as a word. Table 3-19 shows the bit assignment of the MCIFifoCnt
+ register.
 
-So, unless physmap is extended with these callbacks, it can't be used
-for Integrator.  So there's no point converting the other platforms.
+static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int remain)
+{
+        do {
+                int count = host_remain - (readl(base + MMCIFIFOCNT) << 2);
+
+                if (count > remain)
+                        count = remain;
+
+                if (count <= 0)
+                        break;
+
+                readsl(base + MMCIFIFO, ptr, count >> 2);
+
+We use FIFOCNT to work out how many bytes are needing to be transferred
+from the FIFO on PIO reads.
