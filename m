@@ -1,37 +1,107 @@
 From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Wed, 19 Jan 2011 14:50:35 +0530
-Subject: [PATCH V4 07/62] ST SPEAr13XX: Adding machine specific src files
-In-Reply-To: <20110119085246.GA30307@n2100.arm.linux.org.uk>
+Date: Wed, 19 Jan 2011 15:09:42 +0530
+Subject: [PATCH V4 38/62] SPEAr CPU freq: Adding support for CPU Freq
+	framework
+In-Reply-To: <20110119090008.GA8048@DLHLAP0379>
 References: <cover.1295333957.git.viresh.kumar@st.com>
-	<86b571fe06bdc264254a4125ec32195fdff46457.1295333958.git.viresh.kumar@st.com>
-	<20110118160655.GD16980@n2100.arm.linux.org.uk>
-	<20110119060308.GA24820@DLHLAP0379>
-	<20110119085246.GA30307@n2100.arm.linux.org.uk>
-Message-ID: <20110119092035.GB8048@DLHLAP0379>
+	<0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
+	<20110119002046.GC2209@gallagher> <4D3648B1.4030807@st.com>
+	<20110119083527.GC9569@gallagher>
+	<20110119090008.GA8048@DLHLAP0379>
+Message-ID: <20110119093942.GC8048@DLHLAP0379>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 04:52:46PM +0800, Russell King - ARM Linux wrote:
-> On Wed, Jan 19, 2011 at 11:33:09AM +0530, Shiraz Hashim wrote:
-> > Hello Russell,
-> > 
-> > On Wed, Jan 19, 2011 at 12:06:55AM +0800, Russell King - ARM Linux wrote:
-> > > Do you really need to sync back to L2, or will a dsb() do here - and
-> > > as the spinlock code uses dsb() + sev() together, would it make sense
-> > > to combine the two?  (dsb() is required to ensure all previous writes
-> > > are visible prior to the sev() executing.)
-> > 
-> > Presently L2 cache is initialized after we bootup secondary CPU but
-> > one can have the possibility of initializing L2 earlier also.
-> > So this would be safer.
-> 
-> It shouldn't make any difference as we explicitly flush the required
-> data for the secondary while it is incoherent out of L2 into RAM -
-> that being secondary_data and pen_release.
+Hi Jamie,
 
-OK, but sev must follow after the SPEAR13XX_SYS_LOCATION has been
-updated as secondary CPU boot code is in wfe and expects the location
-to be updated when it is woken.
+On Wed, Jan 19, 2011 at 02:30:08PM +0530, Shiraz Hashim wrote:
+> Hi James,
+> 
+> On Wed, Jan 19, 2011 at 04:35:27PM +0800, Jamie Iles wrote:
+> > On Wed, Jan 19, 2011 at 07:43:05AM +0530, deepaksi wrote:
+> > > Hi James,
+> > > 
+> > > On 1/19/2011 5:50 AM, Jamie Iles wrote:
+> > > >> +static int spear_cpufreq_target(struct cpufreq_policy *policy,
+> > > >> +		unsigned int target_freq, unsigned int relation)
+> > > >> +{
+> > > >> +	struct cpufreq_freqs freqs;
+> > > >> +	int ret = 0;
+> > > >> +	int index;
+> > > >> +
+> > > >> +	if (policy->cpu != 0)
+> > > >> +		return -EINVAL;
+> > > >> +
+> > > >> +	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
+> > > >> +				target_freq, relation, &index))
+> > > >> +		return -EINVAL;
+> > > >> +
+> > > >> +	freqs.old = spear_cpufreq_get(0);
+> > > >> +	freqs.new = spear_cpu_freq[index];
+> > > >> +	freqs.cpu = policy->cpu;
+> > > >> +
+> > > >> +	if (freqs.old == target_freq)
+> > > >> +		return 0;
+> > > >> +
+> > > >> +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > > >> +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+> > > >> +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > > >>     
+> > > > If clk_set_rate() failed then do you need to do freqs.new = 
+> > > > clk_get_rate(cpu_clk) before doing the CPUFREQ_POSTCHANGE to make sure you 
+> > > > don't notify the wrong frequency?
+> > > >
+> > > >   
+> > > I do have a point over here. In few of the drivers where the the pre
+> > > notifiers have been added, the operations have been stopped (assume a
+> > > network driver where we stalled a dma operation), and then we set the
+> > > clock rate, followed by a post notifier where driver resumes it operations.
+> > > 
+> > > Now lets take the case, when the clock set rate fails (  Most failure
+> > > could only be when the driver is unable to find any clock rate which is
+> > > less then/equal to requested rate) .
+> > > The post transition notifier should happen so as to allow the driver to
+> > > resume its functions. If there are no clock rate changes because of set
+> > > rate failures, the driver would be aware of that by using calls such as
+> > > clk_get_rate, and would carry forward it's operations accordingly.
+> > > 
+> > > How do you suggest to go about it ?
+> > 
+> > Sorry, I didn't mean to remove the post notifier, just do something like:
+> > 
+> > 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+> > 	if (ret)
+> > 		freqs.new = clk_get_rate(cpu_clk);
+> > 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > 
+> > Or:
+> > 
+> > 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> > 	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+> > 	if (ret)
+> > 		freqs.new = freqs.old;
+> > 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> > 
+> > So that you're notifying the cpufreq subsystem of the frequency that you're 
+> > actually running at with the post change notifier rather than the one you 
+> > tried to go for.  If you don't do this then for UP you'll end up recaculating 
+> > lpj based on the wrong frequency.
+> 
+> Agree. We would add it here. Thanks for pointing out.
+
+On second thought it should always be there irrespective of failures
+as in our case it may happen that eventually CPU sets to a clock <=
+desired clock. So we would do following
+
+cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+if (ret)
+        pr_err("Could not change cpu clk rate\n");
+freqs.new = clk_get_rate(cpu_clk);
+cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+Is it fine?
 
 -- 
 regards
