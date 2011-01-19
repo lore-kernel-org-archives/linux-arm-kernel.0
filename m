@@ -1,20 +1,38 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 18 Jan 2011 19:30:46 -0800
-Subject: [PATCH] drivers: ld9040 amoled driver support
-In-Reply-To: <20110119032518.GD19486@linux-sh.org>
-References: <1294893628-16998-1-git-send-email-dh09.lee@samsung.com>
-	<4D364EFF.6080401@samsung.com>
-	<20110119032518.GD19486@linux-sh.org>
-Message-ID: <20110118193046.27790664.akpm@linux-foundation.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 19 Jan 2011 05:45:28 +0200
+Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
+In-Reply-To: <87d3nus4jr.fsf@gmail.com>
+References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
+	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
+	<87d3nus4jr.fsf@gmail.com>
+Message-ID: <20110119034528.GA2406@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jan 2011 12:25:18 +0900 Paul Mundt <lethal@linux-sh.org> wrote:
+On Tue, Jan 18, 2011 at 08:51:52AM -0500, Ben Gamari wrote:
+> On Tue, 18 Jan 2011 05:10:39 +0200, Felipe Balbi <balbi@ti.com> wrote:
+> > NAK. This is totally bogus. The board doesn't really depend on
+> > GPIO_TWL4030, the MMC driver does.
+> > 
+> I've looked a little more deeply into this and I'm not entirely
+> convinced that what you claim is true. It seems that the only dependency
+> that the MMC module _might_ have on the TWL4030 is for the LDOs, which I
+> believe should be covered in the regulator driver, not GPIO.
+> 
+> In light of this, I think the use of the TWL's GPIO lines for MMC it
+> might be a board specific design decision. In the case of the
+> Beagleboard, they are only TWL GPIO used by the MMC configuration is for
+> .gpio_cd but as far as I could see they could have chosen any GPIO for
+> this. Am I missing something?
 
-> For now the easiest option is still likely to be just making Andrew aware
-> of it, while gradually leaning towards -mm as the primary path for
-> backlight patches.
+it's all true, still you making a board depend on a driver is inverting
+the dependencies. If you don't enable TWL4030_GPIO, all what will happen
+is that MMC won't work, but that's completely valid if I'm e.g.
+debugging UART of USB.
 
-The current status of backlight (and drivers/leds/) it that I review
-(lol) and merge the patches and send them upstream.  I cc Richard on
-them all and he reviews them if he has the time available.
+The point is, being able to disable features I don't want on my kernel
+image, is completely valid, if there's a compile breakage, then fix the
+breakage but don't prevent the board from compiling.
+
+-- 
+balbi
