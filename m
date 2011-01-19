@@ -1,45 +1,29 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 19 Jan 2011 14:29:00 -0800
-Subject: [PATCH v4] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <1295039877-7976-1-git-send-email-dave.martin@linaro.org> (Dave
-	Martin's message of "Fri, 14 Jan 2011 15:17:57 -0600")
-References: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <87bp3cr0ib.fsf@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 19 Jan 2011 14:36:22 -0800
+Subject: [GIT PULL for 38-rc2] msm: initdata fix
+Message-ID: <8ya8vygo715.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <dave.martin@linaro.org> writes:
+I seem to have missed this fix for the rc1.  Without it, access to
+/sys entries for the ethernet access freed memory.
 
-> In low-level board support code, there is sometimes a need to
-> copy a function body to another location at run-time.
->
-> A straightforward call to memcpy doesn't work in Thumb-2,
-> because bit 0 of external Thumb function symbols is set to 1,
-> indicating that the function is Thumb.  Without corrective
-> measures, this will cause an off-by-one copy, and the copy
-> may be called using the wrong instruction set.
->
-> This patch adds an fncpy() macro to help with such copies.
->
-> Particular care is needed, because C doesn't guarantee any
-> defined behaviour when casting a function pointer to any other
-> type.  This has been observed to lead to strange optimisation
-> side-effects when doing the arithmetic which is required in
-> order to copy/move function bodies correctly in Thumb-2.
->
-> Thanks to Russell King and Nicolas Pitre for their input
-> on this patch.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Tested-by: Jean Pihet <j-pihet@ti.com>
+Thanks,
+David
 
-Tested-by: Kevin Hilman <khilman@ti.com>
+The following changes since commit c56eb8fb6dccb83d9fe62fd4dc00c834de9bc470:
 
-along with Jean's OMAP patch on:
+  Linux 2.6.38-rc1 (2011-01-18 15:14:02 -0800)
 
-OMAP2420/n810: including basic suspend/resume test.
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git for-38-rc2
 
-OMAP16xx/OSK: boot test only.
+Stephen Boyd (1):
+      msm: qsd8x50: Platform data isn't init data
 
-Kevin
+ arch/arm/mach-msm/board-qsd8x50.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
