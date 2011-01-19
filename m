@@ -1,212 +1,27 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 19 Jan 2011 00:20:46 +0000
-Subject: [PATCH V4 38/62] SPEAr CPU freq: Adding support for CPU Freq
-	framework
-In-Reply-To: <0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<0f47958e70aa830f749fe1a5e8c03b853740d701.1295333959.git.viresh.kumar@st.com>
-Message-ID: <20110119002046.GC2209@gallagher>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 19 Jan 2011 06:39:43 +0530
+Subject: ALSA issue on DA850/OMAP-L138/AM18x
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930248473C06@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sudhakar,
 
-On Tue, Jan 18, 2011 at 12:42:05PM +0530, Viresh Kumar wrote:
-> From: Deepak Sikri <deepak.sikri@st.com>
-> 
-> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
+On Tue, Jan 18, 2011 at 10:13:14, Rajashekhara, Sudhakar wrote:
+
+> I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
+> at [1] and found that audio is broken. Below patch fixes the issue.
+
 [...]
-> diff --git a/arch/arm/plat-spear/cpufreq.c b/arch/arm/plat-spear/cpufreq.c
-> new file mode 100644
-> index 0000000..9384d65
-> --- /dev/null
-> +++ b/arch/arm/plat-spear/cpufreq.c
-> @@ -0,0 +1,159 @@
-> +/*
-> + * arch/arm/plat-spear/cpufreq.c
-> + *
-> + * CPU Frequency Scaling for SPEAr platform
-> + *
-> + * Copyright (C) 2010 ST Microelectronics
-> + * Deepak Sikri<deepak.sikri@st.com>
-> + *
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/sched.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/delay.h>
-> +#include <linux/init.h>
-> +#include <linux/err.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <asm/system.h>
-> +#include <mach/hardware.h>
-> +
-> +#define CPU_CLK		"cpu_clk"
-> +
-> +#ifdef CONFIG_ARCH_SPEAR13XX
-> +#define MIN_CPU_FREQ	200000
-> +#define MAX_CPU_FREQ	500000
-> +
-> +static u32 spear_cpu_freq[] = {
-> +	200000,	/* 200 MHZ */
-> +	250000,	/* 250 MHZ */
-> +	332000,	/* 332 MHZ */
-> +	400000,	/* 400 MHZ */
-> +	500000,	/* 500 MHZ */
-> +};
-> +#elif defined(CONFIG_ARCH_SPEAR6XX) || defined(CONFIG_ARCH_SPEAR3XX)
-> +#define MIN_CPU_FREQ	166000
-> +#define MAX_CPU_FREQ	332000
-> +
-> +static u32 spear_cpu_freq[] = {
-> +	166000,	/* 166 MHZ */
-> +	266000,	/* 266 MHZ */
-> +	332000,	/* 333 MHZ */
-> +};
-> +#endif
-> +
-> +static struct
-> +	cpufreq_frequency_table spear_freq_tbl[ARRAY_SIZE(spear_cpu_freq) + 1];
-> +static struct clk *cpu_clk;
-> +
-> +int spear_cpufreq_verify(struct cpufreq_policy *policy)
-> +{
-> +	return cpufreq_frequency_table_verify(policy, spear_freq_tbl);
-> +}
-> +
-> +unsigned int spear_cpufreq_get(unsigned int cpu)
-> +{
-> +	unsigned long rate;
-> +
-> +	if (cpu)
-> +		return 0;
-> +
-> +	rate = clk_get_rate(cpu_clk) / 1000;
-> +	return rate;
-> +}
 
-Can this be simplified to:
+> I am currently debugging this issue. I'll submit the above patch to community
+> once the issue of fixed.
 
-	unsigned int spear_cpufreq_get(unsigned int cpu)
-	{
-		return cpu ? 0 : clk_get_rate(cpu_clk) / 1000;
-	}
+When posting the formal patch please don't forget:
 
-?  It could also be made static.
+Cc: stable at kernel.org  [2.6.37]
 
-> +
-> +static int spear_cpufreq_target(struct cpufreq_policy *policy,
-> +		unsigned int target_freq, unsigned int relation)
-> +{
-> +	struct cpufreq_freqs freqs;
-> +	int ret = 0;
-> +	int index;
-> +
-> +	if (policy->cpu != 0)
-> +		return -EINVAL;
-> +
-> +	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
-> +				target_freq, relation, &index))
-> +		return -EINVAL;
-> +
-> +	freqs.old = spear_cpufreq_get(0);
-> +	freqs.new = spear_cpu_freq[index];
-> +	freqs.cpu = policy->cpu;
-> +
-> +	if (freqs.old == target_freq)
-> +		return 0;
-> +
-> +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-> +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-
-If clk_set_rate() failed then do you need to do freqs.new = 
-clk_get_rate(cpu_clk) before doing the CPUFREQ_POSTCHANGE to make sure you 
-don't notify the wrong frequency?
-
-> +
-> +	return ret;
-> +}
-> +
-> +static int spear_cpufreq_init(struct cpufreq_policy *policy)
-> +{
-> +	int result;
-> +	int i = 0;
-> +
-> +	if (policy->cpu != 0)
-> +		return -EINVAL;
-> +
-> +	cpu_clk = clk_get(NULL, CPU_CLK);
-> +	if (IS_ERR(cpu_clk))
-> +		return PTR_ERR(cpu_clk);
-> +
-> +	policy->cpuinfo.min_freq = MIN_CPU_FREQ;
-> +	policy->cpuinfo.max_freq = MAX_CPU_FREQ;
-> +	policy->cur = policy->min = policy->max = spear_cpufreq_get(0);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(spear_cpu_freq); i++) {
-> +		spear_freq_tbl[i].index = i;
-> +		spear_freq_tbl[i].frequency = spear_cpu_freq[i];
-> +	}
-> +
-> +	spear_freq_tbl[i].index = i;
-> +	spear_freq_tbl[i].frequency = CPUFREQ_TABLE_END;
-> +	result = cpufreq_frequency_table_cpuinfo(policy, spear_freq_tbl);
-> +	if (!result)
-> +		cpufreq_frequency_table_get_attr(spear_freq_tbl,
-> +				policy->cpu);
-
-result doesn't appear to be used to do anything other than check the return of 
-cpufreq_frequency_table_cpuinfo() so could tou just eliminate that local 
-variable?
-
-> +
-> +	policy->cpuinfo.transition_latency = 300*1000; /*250 uS*/
-
-The comment doesn't appear to match the value here.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int spear_cpufreq_exit(struct cpufreq_policy *policy)
-> +{
-> +	clk_put(cpu_clk);
-> +	return 0;
-> +}
-> +
-> +static struct freq_attr *spear_cpufreq_attr[] = {
-> +	 &cpufreq_freq_attr_scaling_available_freqs,
-> +	 NULL,
-> +};
-> +
-> +static struct cpufreq_driver spear_driver = {
-> +	.flags		= CPUFREQ_STICKY,
-> +	.verify		= spear_cpufreq_verify,
-> +	.target		= spear_cpufreq_target,
-> +	.get		= spear_cpufreq_get,
-> +	.init		= spear_cpufreq_init,
-> +	.exit		= spear_cpufreq_exit,
-> +	.name		= "spear_cpufreq",
-> +	.attr		= spear_cpufreq_attr,
-> +};
-> +
-> +static int __init spear_cpufreq_register(void)
-> +{
-> +	return cpufreq_register_driver(&spear_driver);
-> +}
-> +
-> +arch_initcall(spear_cpufreq_register);
-
-Jamie
+Thanks,
+Sekhar
