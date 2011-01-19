@@ -1,186 +1,288 @@
 From: stanley.miao@windriver.com (Stanley.Miao)
-Date: Wed, 19 Jan 2011 14:44:46 +0800
-Subject: [PATCH 2/3] support ARM BE8 mode on a little endian machine
+Date: Wed, 19 Jan 2011 14:44:47 +0800
+Subject: [PATCH 3/3] Add ARM kernel debug macros for locating the boot
+	problems quickly
 In-Reply-To: <1295419487-31185-1-git-send-email-stanley.miao@windriver.com>
 References: <1295419487-31185-1-git-send-email-stanley.miao@windriver.com>
-Message-ID: <1295419487-31185-3-git-send-email-stanley.miao@windriver.com>
+Message-ID: <1295419487-31185-4-git-send-email-stanley.miao@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When BE8 kernel is running on a little endian machine, the kernel endian
-mode need to be converted at the begining of the startup procedure with
-the instruction "setend be".
+When we are porting Linux to a new board, we ofter encounter the problems
+that the board can't boot up and there is no any messages output in
+console. These debug macros can help the developers print registers' value
+or messages easily and locate the root cause quickly.
 
-Besides, the tags that the bootloader passed to the kernel are in
-little-endian mode and they need to be inverted.
+All these debug macros are under CONFIG_DEBUG_LL. When CONFIG_DEBUG_LL is
+enabled, the following messages will be printed in the boot procedure.
+
+Uncompressing Linux... done, booting the kernel.
+r13:005454ec
+stext enter.
+__lookup_processor_type enter.
+__lookup_machine_type enter.
+__vet_atags enter.
+__create_page_tables enter.
+__enable_mmu enter.
+__mmap_switched enter.
+__lookup_processor_type enter.
+__lookup_machine_type enter.
+secondary_startup enter.
+__lookup_processor_type enter.
+__enable_mmu enter.
+__secondary_switched enter.
+Linux version 2.6.38.rc1 ...
 
 Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
 ---
- arch/arm/boot/compressed/head.S |    3 +++
- arch/arm/include/asm/setup.h    |   13 +++++++++----
- arch/arm/kernel/head-common.S   |    6 ++++++
- arch/arm/kernel/setup.c         |   22 +++++++++++-----------
- arch/arm/mm/Kconfig             |    7 +++++++
- 5 files changed, 36 insertions(+), 15 deletions(-)
+ arch/arm/kernel/debug_macro.S |   88 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-common.S |    8 ++++
+ arch/arm/kernel/head.S        |   19 +++++++--
+ arch/arm/kernel/vmlinux.lds.S |    7 +++
+ 4 files changed, 118 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/kernel/debug_macro.S
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index a00055d..a33075b 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -131,6 +131,9 @@ start:
- 		mov	r0, r0
- 		.endr
- 
-+#ifdef CONFIG_BE8_ON_LE
-+		setend	be
-+#endif
- 		b	1f
- 		.word	0x016f2818		@ Magic numbers to help the loader
- 		.word	start			@ absolute load/run zImage address
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index f1e5a9b..1504d09 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -173,15 +173,20 @@ struct tagtable {
- 	int (*parse)(const struct tag *);
- };
- 
-+#ifdef CONFIG_BE8_ON_LE
-+#define read_tag(a)	le32_to_cpu(a)
-+#else
-+#define read_tag(a)	a
-+#endif
+diff --git a/arch/arm/kernel/debug_macro.S b/arch/arm/kernel/debug_macro.S
+new file mode 100644
+index 0000000..033acf3
+--- /dev/null
++++ b/arch/arm/kernel/debug_macro.S
+@@ -0,0 +1,88 @@
++/*
++ *  linux/arch/arm/kernel/debug_macro.S
++ *
++ *  Copyright (c) 2011 Wind River Systems, Inc.
++ *  Stanley.Miao <stanley.miao@windriver.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ *  32-bit debugging code
++ */
 +
- #define tag_member_present(tag,member)				\
- 	((unsigned long)(&((struct tag *)0L)->member + 1)	\
--		<= (tag)->hdr.size * 4)
--
--#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-+		<= read_tag((tag)->hdr.size) * 4)
-+#define tag_next(t)	((struct tag *)((__u32 *)(t) + read_tag((t)->hdr.size)))
- #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
- 
- #define for_each_tag(t,base)		\
--	for (t = base; t->hdr.size; t = tag_next(t))
-+	for (t = base; read_tag((t)->hdr.size); t = tag_next(t))
- 
- #ifdef __KERNEL__
- 
++#ifdef CONFIG_DEBUG_LL
++
++	.macro  kputc,val
++	mov     r0, \val
++	bl      printch
++	.endm
++
++	.macro	dbgmsg, str
++	stmfd   sp!, {r0-r3, lr}
++	adr	r0, \str
++	bl	printascii
++	ldmfd   sp!, {r0-r3, lr}
++	.endm
++
++	.macro  read_reg reg, num
++	stmfd	sp!, {r0-r4, lr}
++	kputc	#'r'
++	mov	r4, #\num
++	cmp	r4, #10
++	blt	901f
++	sub	r4, r4, #10
++	kputc	#'1'
++901:	add	r0, r4, #'0'
++	bl	printch
++	kputc   #':'
++	ldmfd	sp, {r0-r4, lr}
++	mov     r0, \reg
++	bl      printhex8
++	kputc   #'\n'
++	ldmfd   sp!, {r0-r4, lr}
++	.endm
++
++	.macro	PRINT_SCTLR
++	stmfd	sp!, {r0-r4, lr}
++	kputc	#'S'
++	kputc	#'C'
++	kputc	#'T'
++	kputc	#'L'
++	kputc	#'R'
++	kputc	#':'
++	mrc	p15, 0, r0, c1, c0, 0
++	bl	printhex8
++	kputc	#'\n'
++	ldmfd   sp!, {r0-r4, lr}
++	.endm
++
++	.macro	PRINT_CPSR
++	stmfd	sp!, {r0-r4, lr}
++	kputc	#'C'
++	kputc	#'P'
++	kputc	#'S'
++	kputc	#'R'
++	kputc	#':'
++	mrs	r0, cpsr
++	bl	printhex8
++	kputc	#'\n'
++	ldmfd   sp!, {r0-r4, lr}
++	.endm
++
++#define DBG_MSG(x)	dbgmsg dbg_##x
++#define PRINT_REG(x)	read_reg r##x, x
++
++#undef ENDPROC
++#define ENDPROC(name) \
++	.type name, %function; \
++		END(name); \
++	dbg_##name:; \
++	.ascii #name; \
++	.asciz " enter.\n"; \
++	.align 2
++
++#else
++#define DBG_MSG(x)
++#define PRINT_REG(x)
++#endif
 diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-index bbecaac..37cfa88 100644
+index 37cfa88..f916bb8 100644
 --- a/arch/arm/kernel/head-common.S
 +++ b/arch/arm/kernel/head-common.S
-@@ -118,10 +118,16 @@ __vet_atags:
- 	bne	1f
- 
- 	ldr	r5, [r2, #0]			@ is first tag ATAG_CORE?
-+#ifdef CONFIG_BE8_ON_LE
-+	rev	r5, r5
-+#endif
- 	cmp	r5, #ATAG_CORE_SIZE
- 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
- 	bne	1f
- 	ldr	r5, [r2, #4]
-+#ifdef CONFIG_BE8_ON_LE
-+	rev	r5, r5
-+#endif
- 	ldr	r6, =ATAG_CORE
- 	cmp	r5, r6
- 	bne	1f
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3cadb46..9098aa5 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -578,10 +578,10 @@ request_standard_resources(struct meminfo *mi, struct machine_desc *mdesc)
+@@ -74,6 +74,7 @@ str_a3:	.asciz	"\nPlease check your kernel config and/or bootloader.\n"
+  *  r5 = mach_info pointer in physical address space
   */
- static int __init parse_tag_core(const struct tag *tag)
- {
--	if (tag->hdr.size > 2) {
--		if ((tag->u.core.flags & 1) == 0)
-+	if (read_tag(tag->hdr.size) > 2) {
-+		if ((read_tag(tag->u.core.flags) & 1) == 0)
- 			root_mountflags &= ~MS_RDONLY;
--		ROOT_DEV = old_decode_dev(tag->u.core.rootdev);
-+		ROOT_DEV = old_decode_dev(read_tag(tag->u.core.rootdev));
- 	}
- 	return 0;
- }
-@@ -590,7 +590,7 @@ __tagtable(ATAG_CORE, parse_tag_core);
- 
- static int __init parse_tag_mem32(const struct tag *tag)
- {
--	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
-+	return arm_add_memory(read_tag(tag->u.mem.start), read_tag(tag->u.mem.size));
- }
- 
- __tagtable(ATAG_MEM, parse_tag_mem32);
-@@ -643,7 +643,7 @@ __tagtable(ATAG_SERIAL, parse_tag_serialnr);
- 
- static int __init parse_tag_revision(const struct tag *tag)
- {
--	system_rev = tag->u.revision.rev;
-+	system_rev = read_tag(tag->u.revision.rev);
- 	return 0;
- }
- 
-@@ -670,7 +670,7 @@ static int __init parse_tag(const struct tag *tag)
- 	struct tagtable *t;
- 
- 	for (t = &__tagtable_begin; t < &__tagtable_end; t++)
--		if (tag->hdr.tag == t->tag) {
-+		if ((read_tag(tag->hdr.tag) == t->tag)) {
- 			t->parse(tag);
- 			break;
- 		}
-@@ -684,9 +684,9 @@ static int __init parse_tag(const struct tag *tag)
+ __lookup_machine_type:
++	DBG_MSG(__lookup_machine_type)
+ 	adr	r3, __lookup_machine_type_data
+ 	ldmia	r3, {r4, r5, r6}
+ 	sub	r3, r3, r4			@ get offset between virt&phys
+@@ -114,6 +115,7 @@ __lookup_machine_type_data:
+  *  r5, r6 corrupted
   */
- static void __init parse_tags(const struct tag *t)
- {
--	for (; t->hdr.size; t = tag_next(t))
-+	for (; read_tag(t->hdr.size); t = tag_next(t))
- 		if (!parse_tag(t))
--			printk(KERN_WARNING
-+			early_printk(KERN_WARNING
- 				"Ignoring unrecognised tag 0x%08x\n",
- 				t->hdr.tag);
- }
-@@ -824,16 +824,16 @@ void __init setup_arch(char **cmdline_p)
- 	 * If we have the old style parameters, convert them to
- 	 * a tag list.
- 	 */
--	if (tags->hdr.tag != ATAG_CORE)
-+	if (read_tag(tags->hdr.tag) != ATAG_CORE)
- 		convert_to_tag_list(tags);
- #endif
--	if (tags->hdr.tag != ATAG_CORE)
-+	if (read_tag(tags->hdr.tag) != ATAG_CORE)
- 		tags = (struct tag *)&init_tags;
+ __vet_atags:
++	DBG_MSG(__vet_atags)
+ 	tst	r2, #0x3			@ aligned?
+ 	bne	1f
  
- 	if (mdesc->fixup)
- 		mdesc->fixup(mdesc, tags, &from, &meminfo);
+@@ -149,6 +151,7 @@ ENDPROC(__vet_atags)
+  */
+ 	__INIT
+ __mmap_switched:
++	DBG_MSG(__mmap_switched)
+ 	adr	r3, __mmap_switched_data
  
--	if (tags->hdr.tag == ATAG_CORE) {
-+	if (read_tag(tags->hdr.tag) == ATAG_CORE) {
- 		if (meminfo.nr_banks != 0)
- 			squash_mem_tags(tags);
- 		save_atags(tags);
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c16ae86..eb74e6b 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -686,6 +686,13 @@ config CPU_ENDIAN_BE32
- 	help
- 	  Support for the BE-32 (big-endian) mode on pre-ARMv6 processors.
- 
-+config BE8_ON_LE
-+	bool "Run BE8 kernel on a little endian machine"
-+	depends on CPU_V6 || CPU_V7
-+	select CPU_BIG_ENDIAN
-+	help
-+	  Run BE8 kernel on a little endian machine.
+ 	ldmia	r3!, {r4, r5, r6, r7}
+@@ -225,6 +228,7 @@ ENDPROC(lookup_processor_type)
+  */
+ 	__CPUINIT
+ __lookup_processor_type:
++	DBG_MSG(__lookup_processor_type)
+ 	adr	r3, __lookup_processor_type_data
+ 	ldmia	r3, {r4 - r6}
+ 	sub	r3, r3, r4			@ get offset between virt&phys
+@@ -284,3 +288,7 @@ __error:
+ 1:	mov	r0, r0
+ 	b	1b
+ ENDPROC(__error)
 +
- config CPU_HIGH_VECTOR
- 	depends on !MMU && CPU_CP15 && !CPU_ARM740T
- 	bool "Select the High exception vector"
++		.align
++		.section ".boot.stack", "aw"
++boot_stack:	.space 512
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index dd6b369..bde50cd 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -33,6 +33,7 @@
+ #define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
+ #define KERNEL_RAM_PADDR	(PHYS_OFFSET + TEXT_OFFSET)
+ 
++#include "debug_macro.S"
+ 
+ /*
+  * swapper_pg_dir is the virtual address of the initial page table.
+@@ -82,6 +83,9 @@
+ ENTRY(stext)
+ 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
+ 						@ and irqs disabled
++	ldr	r13, =(__stack_end - PAGE_OFFSET + PHYS_OFFSET)
++	PRINT_REG(13)
++	DBG_MSG(stext)
+ 	mrc	p15, 0, r9, c0, c0		@ get processor id
+ 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
+ 	movs	r10, r5				@ invalid processor (r5=0)?
+@@ -102,8 +106,8 @@ ENTRY(stext)
+ 	 * above.  On return, the CPU will be ready for the MMU to be
+ 	 * turned on, and r0 will hold the CPU control register value.
+ 	 */
+-	ldr	r13, =__mmap_switched		@ address to jump to after
+-						@ mmu has been enabled
++	ldr	r0, =__mmap_switched		@ address to jump to after
++	str	r0, [r13, #-4]!			@ mmu has been enabled
+ 	adr	lr, BSYM(1f)			@ return (PIC) address
+  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+@@ -126,6 +130,7 @@ ENDPROC(stext)
+  *  r4 = physical page table address
+  */
+ __create_page_tables:
++	DBG_MSG(__create_page_tables)
+ 	pgtbl	r4				@ page table address
+ 
+ 	/*
+@@ -278,6 +283,8 @@ ENTRY(secondary_startup)
+ 	 * as it has already been validated by the primary processor.
+ 	 */
+ 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9
++	ldr	r13, =(__stack_end - PAGE_OFFSET + PHYS_OFFSET)
++	DBG_MSG(secondary_startup)
+ 	mrc	p15, 0, r9, c0, c0		@ get processor id
+ 	bl	__lookup_processor_type
+ 	movs	r10, r5				@ invalid processor?
+@@ -292,7 +299,7 @@ ENTRY(secondary_startup)
+ 	sub	r4, r4, r5			@ mmu has been enabled
+ 	ldr	r4, [r7, r4]			@ get secondary_data.pgdir
+ 	adr	lr, BSYM(__enable_mmu)		@ return address
+-	mov	r13, r12			@ __secondary_switched address
++	str	r12, [r13, #-4]!		@ __secondary_switched address
+  ARM(	add	pc, r10, #PROCINFO_INITFUNC	) @ initialise processor
+ 						  @ (return control reg)
+  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+@@ -303,6 +310,7 @@ ENDPROC(secondary_startup)
+ 	 * r6  = &secondary_data
+ 	 */
+ ENTRY(__secondary_switched)
++	DBG_MSG(__secondary_switched)
+ 	ldr	sp, [r7, #4]			@ get secondary_data.stack
+ 	mov	fp, #0
+ 	b	secondary_start_kernel
+@@ -330,6 +338,7 @@ __secondary_data:
+  *  r13 = *virtual* address to jump to upon completion
+  */
+ __enable_mmu:
++	DBG_MSG(__enable_mmu)
+ #ifdef CONFIG_ALIGNMENT_TRAP
+ 	orr	r0, r0, #CR_A
+ #else
+@@ -373,7 +382,9 @@ __turn_mmu_on:
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
+ 	mov	r3, r3
+-	mov	r3, r13
++	sub	r13, r13, #PHYS_OFFSET
++	add	r13, r13, #PAGE_OFFSET
++	ldr	r3, [r13], #4
+ 	mov	pc, r3
+ __enable_mmu_end:
+ ENDPROC(__turn_mmu_on)
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index cead889..5030bc0 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -246,6 +246,13 @@ SECTIONS
+ #endif
+ 
+ 	BSS_SECTION(0, 0, 0)
++	.stack : {
++		. = ALIGN(4);
++		__stack_start = .;
++		*(.boot.stack)
++		. = ALIGN(4);
++		__stack_end = .;
++	}
+ 	_end = .;
+ 
+ 	STABS_DEBUG
 -- 
 1.5.4.3
