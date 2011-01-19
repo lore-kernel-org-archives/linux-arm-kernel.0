@@ -1,18 +1,111 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 19 Jan 2011 21:10:58 +0100
-Subject: RFC: Host-endian device tree format
-In-Reply-To: <20110119121925.2680afd1@udp111988uds.am.freescale.net>
-References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
-	<20110119121925.2680afd1@udp111988uds.am.freescale.net>
-Message-ID: <19767.17746.895925.532946@pilspetsen.it.uu.se>
+From: hirosh.dabui@snom.com (Hirosh Dabui)
+Date: Wed, 19 Jan 2011 21:17:02 +0100
+Subject: [PATCH] This patch fix a bug in the register indexing for GPIOs
+	numbers > 31 to get the relevant hardware registers of
+	tnetv107x to control the GPIOs.
+Message-ID: <1295468222-10329-1-git-send-email-hirosh.dabui@snom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Scott Wood writes:
- > What about bi-endian hardware?  Is it possible you might ever want to
- > boot a kernel in one endianness when the device tree was generated
- > assuming the opposite choice?
+In the structure tnetv107x_gpio_regs:
 
-There are ARMs out there, for instance IXP4XXs, that
-are bi-endian, and people can and do switch endianess
-when booting their kernels.
+struct tnetv107x_gpio_regs {
+            u32     idver;
+            u32     data_in[3];
+            u32     data_out[3];
+            u32     direction[3];
+            u32     enable[3];
+};
+
+The GPIO hardware register addresses of tnetv107x are stored.
+The chip implements 3 registers of each entity to serve 96 GPIOs,
+each register provides a subset of 32 GPIOs.
+The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
+and gpio_reg_clear_bit.
+
+The bug implied the use of macros to access the relevant hardware
+register e.g. the driver code used the macro like this:
+'gpio_reg_clear_bit(&reg->data_out, gpio)'
+
+But it has to be used like this:
+'gpio_reg_clear_bit(reg->data_out, gpio)'.
+
+The different results are shown here:
+- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
+- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
+
+Acked-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+---
+ arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
+index d102986..3fa3e28 100644
+--- a/arch/arm/mach-davinci/gpio-tnetv107x.c
++++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
+@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->enable, gpio);
++	gpio_reg_set_bit(regs->enable, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_clear_bit(&regs->enable, gpio);
++	gpio_reg_clear_bit(regs->enable, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
+@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->direction, gpio);
++	gpio_reg_set_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+-	gpio_reg_clear_bit(&regs->direction, gpio);
++	gpio_reg_clear_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	unsigned gpio = chip->base + offset;
+ 	int ret;
+ 
+-	ret = gpio_reg_get_bit(&regs->data_in, gpio);
++	ret = gpio_reg_get_bit(regs->data_in, gpio);
+ 
+ 	return ret ? 1 : 0;
+ }
+@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
+-- 
+1.7.1
