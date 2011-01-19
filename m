@@ -1,50 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jan 2011 10:44:53 -0800
-Subject: [PATCH] omap1: Fix sched_clock for the MPU timer (Re: State of
-	LDP3430 platform)
-In-Reply-To: <20110118222613.GS4957@atomide.com>
-References: <20101207083720.GB18336@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1012071745120.13430@utopia.booyaka.com>
-	<alpine.DEB.2.00.1012072012000.13430@utopia.booyaka.com>
-	<20110115000301.GT4957@atomide.com>
-	<alpine.DEB.2.00.1101151237240.32245@utopia.booyaka.com>
-	<20110115233744.GA18159@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1101152028580.13225@utopia.booyaka.com>
-	<4D3309F9.8090900@gmail.com>
-	<alpine.DEB.2.00.1101181234130.13225@utopia.booyaka.com>
-	<20110118222613.GS4957@atomide.com>
-Message-ID: <20110119184452.GZ4957@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 19 Jan 2011 19:54:44 +0100
+Subject: [PATCH] usb: gadget/fsl_mxc_udc: Detect the CPU type in run-time
+In-Reply-To: <4D371ABB.7000608@freescale.com>
+References: <1295451164-3363-1-git-send-email-fabio.estevam@freescale.com>
+	<4D37050E.6010009@eukrea.com> <4D371ABB.7000608@freescale.com>
+Message-ID: <20110119185444.GA7228@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110118 14:25]:
-> * Paul Walmsley <paul@pwsan.com> [110118 11:35]:
+On Wed, Jan 19, 2011 at 03:09:15PM -0200, Fabio Estevam wrote:
+> On 1/19/2011 1:36 PM, Eric B?nard wrote:
+> > Hi Fabio,
 > > 
-> > Here's a slightly updated version of this patch, fixing a bug in one of 
-> > the comments, and revising the commit message.  There's no functional 
-> > difference between this and the previous version of this patch.
+> > On 19/01/2011 16:32, Fabio Estevam wrote:
+> >> Instead of checking the CPU type in build-time, do it in run-time.
+> >>
+> >> Signed-off-by: Fabio Estevam<fabio.estevam@freescale.com>
+> >> ---
+> >>   drivers/usb/gadget/fsl_mxc_udc.c |   23 ++++++++++++-----------
+> >>   1 files changed, 12 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
+> >> index 77b1eb5..167abe0 100644
+> >> --- a/drivers/usb/gadget/fsl_mxc_udc.c
+> >> +++ b/drivers/usb/gadget/fsl_mxc_udc.c
+> >> @@ -88,17 +88,18 @@ eenahb:
+> >>   void fsl_udc_clk_finalize(struct platform_device *pdev)
+> >>   {
+> >>       struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+> >> -#if defined(CONFIG_ARCH_MX35)
+> >> -    unsigned int v;
+> >> -
+> >> -    /* workaround ENGcm09152 for i.MX35 */
+> >> -    if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
+> >> -        v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> >> -                USBPHYCTRL_OTGBASE_OFFSET));
+> >> -        writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> >> -                USBPHYCTRL_OTGBASE_OFFSET));
+> >> -    }
+> >> -#endif
+> >> +    if (cpu_is_mx35()) {
+> >> +        unsigned int v;
+> >> +
+> >> +        /* workaround ENGcm09152 for i.MX35 */
+> >> +        if (pdata->workaround&  FLS_USB2_WORKAROUND_ENGCM09152) {
+can you please fix up the position of the '&'?
+
+> >> +            v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> >> +                    USBPHYCTRL_OTGBASE_OFFSET));
+> >> +            writel(v | USBPHYCTRL_EVDO,
+> >> +                MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
+> >> +                    USBPHYCTRL_OTGBASE_OFFSET));
+I wonder if the address isn't mapped via ioremap in the driver and the
+cookie saved somewhere?  (And no, I don't ask you to change that in this
+patch.)  (If so, it this already problematic aliasing?)
+
+> >> +        }
+> >> +    }
+> >>
+> > are you sure this compiles when MX35 is not selected ?
 > 
-> Thanks, here are two patches to fix the MPU timer, and then allow
-> compiling in both the MPU timer and the 32KiHz timer.
+> Including #include <mach/mx35.h> fixes the build for a non- mx35 kernel.
+> 
+> Would this be acceptable? If so, I can send v2.
+If you keep the #if defined(CONFIG_ARCH_MX35) and only add the if
+(cpu_is_mx35()) it should work without a new #include.
+Doing that seems a tad cleaner to me.
 
-I've updated this patch with the following fix to reset the timer
-first to get correct PRINTK_TIME timestamps.
+Best regards
+Uwe 
 
-Regards,
-
-Tony
-
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -228,10 +228,9 @@ static void __init omap_init_clocksource(unsigned long rate)
- 	static char err[] __initdata = KERN_ERR
- 			"%s: can't register clocksource!\n";
- 
--	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
--
- 	setup_irq(INT_TIMER2, &omap_mpu_timer2_irq);
- 	omap_mpu_timer_start(1, ~0, 1);
-+	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
- 
- 	if (clocksource_register_hz(&clocksource_mpu, rate))
- 		printk(err, clocksource_mpu.name);
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
