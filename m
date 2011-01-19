@@ -1,49 +1,91 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 19 Jan 2011 12:10:48 +0530
-Subject: [PATCH V4 32/62] ST SPEAr 13xx : Adding support for SPEAr1310
-In-Reply-To: <4D366B07.5040509@st.com>
-References: <cover.1295333957.git.viresh.kumar@st.com>
-	<24e7a018145fb94f298ac620919ec4f0a1bf7517.1295333958.git.viresh.kumar@st.com>
-	<20110119000919.GB2209@gallagher> <4D366B07.5040509@st.com>
-Message-ID: <4D368770.7030808@st.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 19 Jan 2011 23:29:51 +0800
+Subject: A few questions on imx-sdma
+In-Reply-To: <20110118132244.GP9041@pengutronix.de>
+References: <20110118194259.GB2833@S2101-09.ap.freescale.net>
+	<20110118132244.GP9041@pengutronix.de>
+Message-ID: <20110119152950.GA11435@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2011 10:09 AM, viresh kumar wrote:
->>> >> +
->>> >> +#ifdef CONFIG_PCIEPORTBUS
->>> >> +/* this function is needed for PCIE host and device driver. Same
->>> >> + * controller can not be programmed as host as well as device. So host
->>> >> + * driver must call this function and if this function returns 1 then
->>> >> + * only host should add that particular port as RC.
->>> >> + * A port to be added as device, one must also add device's information
->>> >> + * in plat_devs array defined in this file.
->>> >> + * it is the responsibility of calling function to not send port number
->>> >> + * greter than max no of controller(3)
->>> >> + */
->>> >> +int spear1310_pcie_port_is_host(int port)
->>> >> +{
->>> >> +	switch (port) {
->>> >> +	case 0:
->>> >> +		return 0;
->>> >> +	case 1:
->>> >> +		return 1;
->>> >> +	case 2:
->>> >> +		return 1;
->>> >> +	}
->>> >> +	return -EINVAL;
->>> >> +}
->>> >> +#endif
->> > 
->> > It looks like this can be made static.  Also, given the comment, is it worth 
->> > adding a BUG_ON(port > 3)?
->> > 
-> will be done. BUG_ON() can be added here.
+On Tue, Jan 18, 2011 at 02:22:44PM +0100, Sascha Hauer wrote:
+> On Wed, Jan 19, 2011 at 03:43:00AM +0800, Shawn Guo wrote:
+> > Hi Sascha,
+> > 
+> > I got a few questions when studying imx-sdma.  Can you please help me
+> > understand?
+> > 
+> > * In function sdma_prep_slave_sg, we always get "sdmac->flags = 0;"
+> > at line 889.  What's the code blow at line 934 for?
+> > 
+> > 	if (sdmac->flags & IMX_DMA_SG_LOOP) {
+> > 		param |= BD_INTR;
+> > 		if (i + 1 == sg_len)
+> > 			param |= BD_WRAP;
+> > 	}
 > 
+> A leftover from the days we did not have the prep_cyclic callback and
+> implemented sound dma as a looped sg chain. The above can be removed.
+> 
+> > 
+> > * We have sdmac->status set to DMA_ERROR in err_out of function 
+> > sdma_prep_dma_cyclic.  Would it be good for us to do the same for
+> > function sdma_prep_slave_sg.  Otherwise, sdmac->status stays at
+> > DMA_IN_PROGRESS, which will make the function return immediately
+> > next time it gets called?
+> 
+> yes
+> 
+> > 
+> > * It seems the only use of sdmac->status is to check if the channel
+> > is DMA_IN_PROGRESS when "prep" functions get called.  Is it a worth
+> > to check DMA_ERROR or DMA_SUCCESS for every single buffer descriptor
+> > (BD) in interrupt handler?
+> > 
+> > * In handler mxc_sdma_handle_channel_normal, callback function gets
+> > called and last_completed get assigned the cookie no matter
+> > sdmac->status is DMA_SUCCESS or DMA_ERROR.  How would dma client know
+> > if this tx succeeded or failed?
+> 
+> Looking at it we should probably just return sdmac->status in
+> sdma_tx_status.
+> 
+OK.  In that case, I assume that DMA_SUCCESS sdma_handle_channel_loop
+should be changed to DMA_IN_PROGRESS, as the success of one period
+does not really mean the success of the tx.
 
-There is another thought here. We may not require a BUG_ON here.
-Returning error would be better, so that driver can take steps accordingly.
-Also it is not that much blocking of a issue, that we need BUG_ON.
+> > 
+> > * Related to question above, dma client can call function
+> > dma_async_is_tx_complete to know if the tx succeeded or failed by
+> > manipulating cookie.  But is there any way for client to know the
+> > failure in loop (cyclic) case?  In this case, client gets no way to
+> > query tx status, however any period (BD) in the cyclic could fail.
+> > Currently, we always do callback in cyclic handler whether status is
+> > DMA_ERROR or DMA_SUCCESS, and the client (i.e. imx audio driver)
+> > always assumes the callback means a successful period.  But what if
+> > one period in the cyclic fails?
+> 
+> I guess the driver should call dma_async_is_tx_complete, assuming this
+> function is fixed in the sdma driver.
+> 
+> > 
+> > * Regarding to cyclic case again, is DMA_TERMINATE_ALL
+> > (down to function sdma_disable_channel) the only way for client to
+> > stop the tx?  I do not know the exact behavior of sdma when STATSTOP
+> > bit gets set.  But if it's in the middle of a BD transfer process,
+> > will this bit setting possibly cause data corruption?
+> 
+> I don't know the exact behaviour either. I only know that the FSL kernel
+> does this aswell (without polling whether the channel is actually
+> disabled or something).
+> 
+I consulted the designer and was told that sdma will stop the channel
+immediately once the current burst other than BD is done.  IOW,
+the data transfered by the BD may get corrupted.
 
---
-viresh
+I will give it a try to send out a patch set to address these
+concerns.
+
+-- 
+Regards,
+Shawn
