@@ -1,28 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Jan 2011 15:37:38 -0000
-Subject: [RFC][PATCH] ARM: ptrace: remove single-step emulation code
-In-Reply-To: <20110119151915.GG31652@n2100.arm.linux.org.uk>
-References: <1295449635-4292-1-git-send-email-will.deacon@arm.com>
-	<20110119151915.GG31652@n2100.arm.linux.org.uk>
-Message-ID: <000501cbb7ee$cdccc680$69665380$@deacon@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 19 Jan 2011 10:41:32 -0500 (EST)
+Subject: RFC: Host-endian device tree format
+In-Reply-To: <AANLkTi=xdJ_c3LvCFkeqBRNDf6TSC40Fjxihm9eSeMmf@mail.gmail.com>
+References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
+	<AANLkTikoZj1WSpE8QNSRiF3oFL4qAb68kNnCKdExvBz7@mail.gmail.com>
+	<AANLkTi=xdJ_c3LvCFkeqBRNDf6TSC40Fjxihm9eSeMmf@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1101191031481.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> On Wed, Jan 19, 2011 at 03:07:15PM +0000, Will Deacon wrote:
-> > I'm posting this as an RFC to see if anybody has a good reason to keep this
-> > code around. There's also a chance I've missed an opportunity to remove some
-> > related code, but I think I found everything. Tested on a Versatile Express,
-> > single-stepping in GDB worked fine.
+On Wed, 19 Jan 2011, Dave Martin wrote:
+> On Wed, Jan 19, 2011 at 1:41 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > The dtb isn't so much bigendian as it is network byte order.
 > 
-> Have you checked whether strace and ltrace use single stepping?
+> (For me, "network byte order" is a euphemism ... <insert
+> unconstructive rant here>)
 
-strace works fine with this patch applied and, looking at the
-sources, it doesn't use the SINGLESTEP request. As for ltrace,
-it *does* use SINGLESTEP but it can use PTRACE_SYSCALL instead
-(indeed, it does this for sparc, ia64 and mips). ltrace doesn't
-have code for checking the ptrace return value so I'd say it's
-their bug.
+I concur.
 
-Will
+> However I digress... it sounds like you are familiar with the
+> arguments I would make, and I'm not trying to get into an endianness
+> war ;)
+
+I think this is the same issue as for filesystems.  Having different 
+endianness in use might only lead to confusion when a piece of data can 
+be externally provided.  And since DT was created on PPC first then that 
+naturally decided on the endianness for it.
+
+
+Nicolas
