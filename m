@@ -1,61 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jan 2011 15:09:39 -0800
-Subject: [PATCH 7/7] arm: omap2: clksel: fix compile warning
-In-Reply-To: <20110117081845.GF2812@legolas.emea.dhcp.ti.com>
-References: <1295238680-26738-1-git-send-email-balbi@ti.com>
-	<1295238680-26738-8-git-send-email-balbi@ti.com>
-	<AANLkTimO_Vt+bjS1rP1AwD9iSqd_cNLAZ+tukveOtneD@mail.gmail.com>
-	<20110117081845.GF2812@legolas.emea.dhcp.ti.com>
-Message-ID: <20110119230939.GL4957@atomide.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Thu, 20 Jan 2011 00:52:33 +0100
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+In-Reply-To: <20110119205158.GC6335@n2100.arm.linux.org.uk>
+References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
+	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
+	<4D346800.3070603@stericsson.com>
+	<20110118121455.GB9719@n2100.arm.linux.org.uk>
+	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
+	<20110119205158.GC6335@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [110117 00:18]:
-> Hi,
-> 
-> On Mon, Jan 17, 2011 at 01:37:41PM +0530, Varadarajan, Charulatha wrote:
-> > On Mon, Jan 17, 2011 at 10:01, Felipe Balbi <balbi@ti.com> wrote:
-> > > Fix the following compile warning:
-> > > arch/arm/mach-omap2/clkt_clksel.c: In function '_get_div_and_fieldval':
-> > > arch/arm/mach-omap2/clkt_clksel.c:100:35: warning: 'max_clkr' may be
-> > > used uninitialized in this function
-> > >
-> > > While at that, also add a check to avoid using max_clkr while NULL.
-> > >
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > > ?arch/arm/mach-omap2/clkt_clksel.c | ? ?5 ++++-
-> > > ?1 files changed, 4 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-omap2/clkt_clksel.c b/arch/arm/mach-omap2/clkt_clksel.c
-> > > index a781cd6..baf0b6b 100644
-> > > --- a/arch/arm/mach-omap2/clkt_clksel.c
-> > > +++ b/arch/arm/mach-omap2/clkt_clksel.c
-> > > @@ -97,7 +97,7 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
-> > > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 *field_val)
-> > > ?{
-> > > ? ? ? ?const struct clksel *clks;
-> > > - ? ? ? const struct clksel_rate *clkr, *max_clkr;
-> > > + ? ? ? const struct clksel_rate *clkr, *max_clkr = NULL;
-> > > ? ? ? ?u8 max_div = 0;
-> > >
-> > > ? ? ? ?clks = _get_clksel_by_parent(clk, src_clk);
-> > > @@ -123,6 +123,9 @@ static u8 _get_div_and_fieldval(struct clk *src_clk, struct clk *clk,
-> > > ? ? ? ? ? ? ? ?}
-> > > ? ? ? ?}
-> > >
-> > > + ? ? ? if (!max_clkr)
-> > > + ? ? ? ? ? ? ? return 0;
-> > 
-> > Would it be more appropriate to move this check after the "if" check
-> > of max_div==0 and it's warning?
-> > or add a warning before it returns?
-> 
-> Maybe this return isn't even necessary. max_clkr will be true if max_div
-> is valid, so they cancel each other.
-> 
-> Tony ?
+2011/1/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Wed, Jan 19, 2011 at 09:34:49PM +0100, Linus Walleij wrote:
+>> 2011/1/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+>>
+>> > How reliable is the FIFOCNT register ?
+>>
+>> Hmm... the FIFOCNT is just the FIFO.
+>
+> No, FIFOCNT.
+>
+> ?The MCIFifoCnt register contains the remaining number of words to be
+> ?written to or read from the FIFO.
 
-Looks like the max_div test should catch it to me. Paul?
+Yeah I B damned that's right. Sorry for the confusion. I'll respin
+the latest patch on the FIFOCNT register instead and test
+tomorrow.
 
-Tony
+But if the transfer is complete, MCIDataCnt should be valid
+as well. I'll read the datasheet(s) closer and see if I get some
+useful clues about which one is more reliable in the error
+case.
+
+Sorry for late night confusion...
+Linus Walleij
