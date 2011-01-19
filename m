@@ -1,61 +1,45 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 20 Jan 2011 05:50:40 +0800
-Subject: [PATCH 6/6] dmaengine: imx-sdma: avoid stopping channel in the middle
-	of a BD transfer
-In-Reply-To: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
-References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1295473840-17295-7-git-send-email-shawn.guo@freescale.com>
+From: ytang5@marvell.com (Yu Tang)
+Date: Wed, 19 Jan 2011 22:18:54 +0800
+Subject: [PATCH] ARM: pxa: fix mfpr_sync to read from valid offset
+Message-ID: <1295446734-18464-1-git-send-email-ytang5@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When STOP register bit gets set, SDMA hardware will immediately stop
-the channel once the current burst other than buffer descriptor
-transfer is done.
+Since mfpr_mmio_base[0] is not always valid on later SoCs,
+fixed mpfr_sync() to read back from valid mfp offset always.
 
-* Change sdma_disable_channel() to only set STOP register bit after
-  polling the current BD done, so that the current BD transfer
-  corruption could be avoided.
-
-* Increment buf_tail in mxc_sdma_handle_channel_normal() as well as
-  sdma_handle_channel_loop(), since buf_tail now is used in
-  sdma_disable_channel() which could be called in both sg and cyclic
-  cases.
-
-* Return DMA_SUCCESS other than DMA_ERROR in sdma_disable_channel().
-
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Yu Tang <ytang5@marvell.com>
 ---
- drivers/dma/imx-sdma.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+ arch/arm/plat-pxa/mfp.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index fa63ace..ae87287 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -481,6 +481,8 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
- 	else
- 		sdmac->status = DMA_SUCCESS;
+diff --git a/arch/arm/plat-pxa/mfp.c b/arch/arm/plat-pxa/mfp.c
+index b77e018..a9aa5ad 100644
+--- a/arch/arm/plat-pxa/mfp.c
++++ b/arch/arm/plat-pxa/mfp.c
+@@ -139,10 +139,11 @@ static const unsigned long mfpr_edge[] = {
+ #define mfp_configured(p)	((p)->config != -1)
  
-+	sdmac->buf_tail++;
-+
- 	if (sdmac->desc.callback)
- 		sdmac->desc.callback(sdmac->desc.callback_param);
- 	sdmac->last_completed = sdmac->desc.cookie;
-@@ -655,9 +657,14 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+ /*
+- * perform a read-back of any MFPR register to make sure the
++ * perform a read-back of any valid MFPR register to make sure the
+  * previous writings are finished
+  */
+-#define mfpr_sync()	(void)__raw_readl(mfpr_mmio_base + 0)
++static unsigned long mfpr_off_readback;
++#define mfpr_sync()	(void)__raw_readl(mfpr_mmio_base + mfpr_off_readback)
+ 
+ static inline void __mfp_config_run(struct mfp_pin *p)
  {
- 	struct sdma_engine *sdma = sdmac->sdma;
- 	int channel = sdmac->channel;
-+	struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
-+
-+	while (bd->mode.status & BD_DONE)
-+		cpu_relax();
+@@ -248,6 +249,9 @@ void __init mfp_init_addr(struct mfp_addr_map *map)
  
- 	__raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
--	sdmac->status = DMA_ERROR;
-+
-+	sdmac->status = DMA_SUCCESS;
- }
+ 	spin_lock_irqsave(&mfp_spin_lock, flags);
  
- static int sdma_config_channel(struct sdma_channel *sdmac)
++	/* mfp offset for readback */
++	mfpr_off_readback = map[0].offset;
++
+ 	for (p = map; p->start != MFP_PIN_INVALID; p++) {
+ 		offset = p->offset;
+ 		i = p->start;
 -- 
 1.7.1
