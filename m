@@ -1,153 +1,67 @@
-From: dansharon@nanometrics.ca (Dan Sharon)
-Date: Tue, 18 Jan 2011 14:02:21 -0500
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-Message-ID: <AANLkTi=X3KRngiNz5iQzojh_-h4W-iRDsbq8Hvy6Lm1x@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 19 Jan 2011 06:41:15 -0700
+Subject: RFC: Host-endian device tree format
+In-Reply-To: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
+References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
+Message-ID: <AANLkTikoZj1WSpE8QNSRiF3oFL4qAb68kNnCKdExvBz7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches apply cleanly to 'v2.6.37'
-3c0eee3fe6a3a1c745379547c7e7c904aa64f6d5
-of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git.
+On Jan 19, 2011 3:43 AM, "Dave Martin" <dave.martin@linaro.org> wrote:
+>
+> Hi all,
+>
+> Apologies if this has been discussed before--- I don't see an obvious
+> rebuttal in my quick searching past threads, so I'll just quickly ask
+> the question:
+>
+> Could we use host-endianness for the device tree binary blob?
 
-The kernel was built with the 'da8xx_omapl_defconfig' from the omap-l1tree,
-and 'make menuconfig' to enable ASoC (the defconfig already has
-CONFIG_REGULATOR=y, CONFIG_REGULATOR_DUMMY=y, and
-CONFIG_REGULATOR_TPS6507X=y).
+Hi David.
 
-Testing was done on a da850evm by tftp'ing the kernel into ram, and using
-the
-SPI-flash-based rootfs from the PSP that shipped with the board.
+This has been discussed thoroughly and rejected. The dtb isn't so much
+bigendian as it is network byte order. While we /could/ switch it for arm,
+it creates all kinds of problems with tools and working with .dtb files on
+dissimilar platforms.  Plus all the property values must remain in BE
+because all the bindings are already defined that way in the OpenFirmware
+specifications.
 
-Using 'arecord -r 48000 -c 2 -f S32_BE -t raw -v -d 1 > /tmp/arecord.cap'
-produced
-a file of 384000 bytes (48000 x 2 x 4 bytes/sample).
-'arecord -r 48000 -c 2 -f S32_BE -t raw -v > /dev/null' ran flawlessly for
-several hours.
+Besides, there is no real advantage to changing it: it already works as-is
+on le architectures.  :-)
 
-I was not able to reproduce Sudhakar's problems with 'arecord -f dat | aplay
--f dat'.
+g.
 
-Tested-by: Dan Sharon <dansharon at nanometrics.ca <bengardiner@nanometrics.ca>
 >
-
-Regards,
-Dan Sharon
-
-
-On Mon, Jan 17, 2011 at 11:43 PM, Rajashekhara, Sudhakar <
-sudhakar.raj@ti.com> wrote:
-
-> Resending with proper $SUBJECT...
+> The fdt binary format seems to lend itself strongly to a host-endian
+> format: it begins with a word-sized magic number, and when parsing the
+> device tree every elements type and size is known before that element
+> is read; furthermore, every element is size-aligned.  Therefore, I
+> (naively?) presume that a little-endian format should "just work",
+> simply by flipping the endianness of every element and discarding all
+> the __be32_to_cpu() type stuff when reading the fdt at boot time.  The
+> magic number ensures that there's no risk of accidentally reading the
+> fst in the wrong byte order.
 >
-> Hi,
+> Although it would be necessary to augment the fdt tools to cope with
+> this, offline tools appear to be the right place to put this
+> intelligence.  For the kernel to flip the byte order of everything in
+> the fdt blob every time the system boots just seems unnecessary when
+> the required endianness is statically known.
 >
-> I was testing Audio with 2.6.37 on DA850 from Kevin Hilman Linux tree
-> at [1] and found that audio is broken. Below patch fixes the issue.
+> Since fdt is new on ARM we have an opportunity to change determine the
+> binary format now without breaking anything in the field -- we don't
+> necessarily have to adopt the host-endian format on any other
+> architectures if it's not desirable.
 >
-> ---
-> From: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+> Any thoughts?
 >
-> davinci: fixes for audio on da850/omap-l138/am18x
+> Cheers
+> ---Dave
 >
-> On DA850/OMAP-L138/AM18x, AIC3x codec is at 0x18 slave address.
-> But in sound/soc/davinci/davinci-evm.c file, "struct snd_soc_dai_link"
-> has the wrong AIC3x codec slave address. This patch fixes this issue.
->
-> Also, this patch registers the platform device for davinci-pcm-audio.
->
-> Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
-> ---
->  arch/arm/mach-davinci/devices-da8xx.c |   12 ++++++++++++
->  sound/soc/davinci/davinci-evm.c       |    2 +-
->  2 files changed, 13 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c
-> b/arch/arm/mach-davinci/devices-da8xx.c
-> index 9eec630..17c0dbc 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -473,6 +473,11 @@ static struct resource da850_mcasp_resources[] = {
->        },
->  };
->
-> +struct platform_device davinci_pcm_device = {
-> +       .name   = "davinci-pcm-audio",
-> +       .id     = -1,
-> +};
-> +
->  static struct platform_device da850_mcasp_device = {
->        .name           = "davinci-mcasp",
->        .id             = 0,
-> @@ -480,8 +485,15 @@ static struct platform_device da850_mcasp_device = {
->        .resource       = da850_mcasp_resources,
->  };
->
-> +static void davinci_init_pcm(void)
-> +{
-> +       platform_device_register(&davinci_pcm_device);
-> +}
-> +
->  void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
->  {
-> +       davinci_init_pcm();
-> +
->        /* DA830/OMAP-L137 has 3 instances of McASP */
->        if (cpu_is_davinci_da830() && id == 1) {
->                da830_mcasp1_device.dev.platform_data = pdata;
-> diff --git a/sound/soc/davinci/davinci-evm.c
-> b/sound/soc/davinci/davinci-evm.c
-> index bc9e6b0..07db881 100644
-> --- a/sound/soc/davinci/davinci-evm.c
-> +++ b/sound/soc/davinci/davinci-evm.c
-> @@ -224,7 +224,7 @@ static struct snd_soc_dai_link da8xx_evm_dai = {
->        .stream_name = "AIC3X",
->        .cpu_dai_name= "davinci-mcasp.0",
->        .codec_dai_name = "tlv320aic3x-hifi",
-> -       .codec_name = "tlv320aic3x-codec.0-001a",
-> +       .codec_name = "tlv320aic3x-codec.1-0018",
->        .platform_name = "davinci-pcm-audio",
->        .init = evm_aic3x_init,
->        .ops = &evm_ops,
-> ---
->
-> Also, I found that either CONFIG_REGULATOR should not be defined or if
-> CONFIG_REGULATOR is defined then CONFIG_REGULATOR_DUMMY should also be
-> defined. Without this menuconfig fix, Soundcard does not get detected.
->
-> With the above fixes, arecord and aplay does not work for the first time.
-> Couple of times I get the below error:
->
-> root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
-> arecord: main:608: audio open error: Invalid argument
-> aplay: playback:2297: read error
-> root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
-> aplay: main:608: audio open error: Invalid argument
-> Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
->
-> Third time arecord and aplay work normally.
->
-> Has anyone seen such issues on DA850 or any other platform?
->
-> I am currently debugging this issue. I'll submit the above patch to
-> community
-> once the issue of fixed.
->
-> [1]
-> http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary
->
-> Regards,
-> Sudhakar
 > _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
->
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110118/b0eb32dc/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110119/1b3e10e4/attachment-0001.html>
