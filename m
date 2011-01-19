@@ -1,23 +1,24 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Wed, 19 Jan 2011 11:50:28 +0100
-Subject: [PATCH] drivers: mmc: msm: remove clock disable in probe
-In-Reply-To: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>
-References: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <AANLkTim-=40MM=TeH1XSQ-rio1ctwcZAs4qbf9SaxmdH@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Jan 2011 11:07:54 +0000
+Subject: [PATCH 0/2] ARM: Gemini: add RTC support for Gemini SoC
+In-Reply-To: <20110107093155.GN31708@n2100.arm.linux.org.uk>
+References: <1292339307-14336-1-git-send-email-ulli.kroll@googlemail.com>
+	<20110107093155.GN31708@n2100.arm.linux.org.uk>
+Message-ID: <20110119110754.GB31652@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jan 07, 2011 at 09:31:55AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Dec 14, 2010 at 04:08:25PM +0100, Hans Ulli Kroll wrote:
+> > This patch adds the driver for the rtc chip on the Gemini SoC
+> 
+> I'll take patch 2, but not patch 1.  There is no requirement for patch 1
+> to come via my tree - it can be handled by the RTC people.
+> 
+> My tree is not for random driver code being merged into mainline just
+> because it's used on some ARM platform somewhere.
+> 
+> (I'm making this request as a result of feedback from Linus on last nights
+> merge of the ARM tree.)
 
-On Tue, Jan 18, 2011 at 7:14 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> The probe function adds the MMC host which can start accepting request
-> immediately. There is an assumption here that no requests happen
-> immediatly, but it's not always the case. This assumption can causes
-> a BUG() when the clocks are disabled. The fix is to just remove the
-> clock disable in the probe function.
->
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-
-I can add acked-by and/or tested-by if needed.
-
-~Vitaly
+What's the status of patch 1 wrt the RTC folk?
