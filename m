@@ -1,40 +1,38 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Wed, 19 Jan 2011 14:39:25 +0530
-Subject: [PATCHv4 4/4] OMAP3: Devkit8000: Fix indentation of brace
-In-Reply-To: <1295425166-25540-5-git-send-email-weber@corscience.de>
-References: <1295425166-25540-1-git-send-email-weber@corscience.de>
-	<1295425166-25540-5-git-send-email-weber@corscience.de>
-Message-ID: <AANLkTi=oWsKyAcDwpW-oO8nPM=vHOhJ8NGnFp4jjCGAL@mail.gmail.com>
+From: shiraz.hashim@st.com (Shiraz Hashim)
+Date: Wed, 19 Jan 2011 14:50:35 +0530
+Subject: [PATCH V4 07/62] ST SPEAr13XX: Adding machine specific src files
+In-Reply-To: <20110119085246.GA30307@n2100.arm.linux.org.uk>
+References: <cover.1295333957.git.viresh.kumar@st.com>
+	<86b571fe06bdc264254a4125ec32195fdff46457.1295333958.git.viresh.kumar@st.com>
+	<20110118160655.GD16980@n2100.arm.linux.org.uk>
+	<20110119060308.GA24820@DLHLAP0379>
+	<20110119085246.GA30307@n2100.arm.linux.org.uk>
+Message-ID: <20110119092035.GB8048@DLHLAP0379>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 13:49, Thomas Weber <weber@corscience.de> wrote:
->
-> Fix indentation of a closing curly brace.
+On Wed, Jan 19, 2011 at 04:52:46PM +0800, Russell King - ARM Linux wrote:
+> On Wed, Jan 19, 2011 at 11:33:09AM +0530, Shiraz Hashim wrote:
+> > Hello Russell,
+> > 
+> > On Wed, Jan 19, 2011 at 12:06:55AM +0800, Russell King - ARM Linux wrote:
+> > > Do you really need to sync back to L2, or will a dsb() do here - and
+> > > as the spinlock code uses dsb() + sev() together, would it make sense
+> > > to combine the two?  (dsb() is required to ensure all previous writes
+> > > are visible prior to the sev() executing.)
+> > 
+> > Presently L2 cache is initialized after we bootup secondary CPU but
+> > one can have the possibility of initializing L2 earlier also.
+> > So this would be safer.
+> 
+> It shouldn't make any difference as we explicitly flush the required
+> data for the secondary while it is incoherent out of L2 into RAM -
+> that being secondary_data and pen_release.
 
-As Manjunath mentioned for the other patch, I guess this patch can
-also be merged
-with some other patch in this series.
+OK, but sev must follow after the SPEAR13XX_SYS_LOCATION has been
+updated as secondary CPU boot code is in wfe and expects the location
+to be updated when it is woken.
 
->
-> Signed-off-by: Thomas Weber <weber@corscience.de>
-> ---
-> ?arch/arm/mach-omap2/board-devkit8000.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-> index 4ddd81c..a344cd8 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -553,7 +553,7 @@ static void __init omap_dm9000_init(void)
-> ? ? ? ? ? ? ? ?printk(KERN_ERR "Failed to request GPIO%d for dm9000 IRQ\n",
-> ? ? ? ? ? ? ? ? ? ? ? ?OMAP_DM9000_GPIO_IRQ);
-> ? ? ? ? ? ? ? ?return;
-> - ? ? ? ? ? ? ? }
-> + ? ? ? }
->
-> ? ? ? ?gpio_direction_input(OMAP_DM9000_GPIO_IRQ);
->
-> --
-> 1.7.4.rc2
->
+-- 
+regards
+Shiraz
