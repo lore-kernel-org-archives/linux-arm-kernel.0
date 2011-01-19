@@ -1,38 +1,16 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 19 Jan 2011 05:45:28 +0200
-Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
-In-Reply-To: <87d3nus4jr.fsf@gmail.com>
-References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
-	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
-	<87d3nus4jr.fsf@gmail.com>
-Message-ID: <20110119034528.GA2406@legolas.emea.dhcp.ti.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 19 Jan 2011 09:19:21 +0530
+Subject: [PATCH V4 00/62] Updating SPEAr Support
+In-Reply-To: <20110118155302.GA16980@n2100.arm.linux.org.uk>
+References: <cover.1295333957.git.viresh.kumar@st.com>
+	<20110118155302.GA16980@n2100.arm.linux.org.uk>
+Message-ID: <4D365F41.1080106@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 18, 2011 at 08:51:52AM -0500, Ben Gamari wrote:
-> On Tue, 18 Jan 2011 05:10:39 +0200, Felipe Balbi <balbi@ti.com> wrote:
-> > NAK. This is totally bogus. The board doesn't really depend on
-> > GPIO_TWL4030, the MMC driver does.
-> > 
-> I've looked a little more deeply into this and I'm not entirely
-> convinced that what you claim is true. It seems that the only dependency
-> that the MMC module _might_ have on the TWL4030 is for the LDOs, which I
-> believe should be covered in the regulator driver, not GPIO.
-> 
-> In light of this, I think the use of the TWL's GPIO lines for MMC it
-> might be a board specific design decision. In the case of the
-> Beagleboard, they are only TWL GPIO used by the MMC configuration is for
-> .gpio_cd but as far as I could see they could have chosen any GPIO for
-> this. Am I missing something?
+On 01/18/2011 09:23 PM, Russell King - ARM Linux wrote:
+> Does this mean I can get rid of the entire set of spear patches in the
+> patch system now?
+> .
 
-it's all true, still you making a board depend on a driver is inverting
-the dependencies. If you don't enable TWL4030_GPIO, all what will happen
-is that MMC won't work, but that's completely valid if I'm e.g.
-debugging UART of USB.
-
-The point is, being able to disable features I don't want on my kernel
-image, is completely valid, if there's a compile breakage, then fix the
-breakage but don't prevent the board from compiling.
-
--- 
-balbi
+Ya. Sure.
