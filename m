@@ -1,143 +1,119 @@
-From: kauppi@papupata.org (Ari Kauppi)
-Date: Thu, 20 Jan 2011 12:17:16 +0200 (EET)
-Subject: [PATCH] ARM: oprofile: Always allow backtraces
-In-Reply-To: <20110120095239.GT21401@erda.amd.com>
-References: <1295470473-1095-1-git-send-email-kauppi@papupata.org>
-	<000101cbb886$582f1480$088d3d80$@deacon@arm.com>
-	<20110120095239.GT21401@erda.amd.com>
-Message-ID: <alpine.DEB.2.00.1101201213230.14307@lakka.kapsi.fi>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 20 Jan 2011 11:27:01 +0100
+Subject: [PATCH 6/6] dmaengine: imx-sdma: avoid stopping channel in the
+	middle of a BD transfer
+In-Reply-To: <20110120104312.GA18834@S2101-09.ap.freescale.net>
+References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
+	<1295473840-17295-7-git-send-email-shawn.guo@freescale.com>
+	<20110120104312.GA18834@S2101-09.ap.freescale.net>
+Message-ID: <20110120102701.GW9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jan 2011, Robert Richter wrote:
+On Thu, Jan 20, 2011 at 06:43:13PM +0800, Shawn Guo wrote:
+> On Thu, Jan 20, 2011 at 05:50:40AM +0800, Shawn Guo wrote:
+> > When STOP register bit gets set, SDMA hardware will immediately stop
+> > the channel once the current burst other than buffer descriptor
+> > transfer is done.
+> > 
+> > * Change sdma_disable_channel() to only set STOP register bit after
+> >   polling the current BD done, so that the current BD transfer
+> >   corruption could be avoided.
+> > 
+> > * Increment buf_tail in mxc_sdma_handle_channel_normal() as well as
+> >   sdma_handle_channel_loop(), since buf_tail now is used in
+> >   sdma_disable_channel() which could be called in both sg and cyclic
+> >   cases.
+> > 
+> > * Return DMA_SUCCESS other than DMA_ERROR in sdma_disable_channel().
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  drivers/dma/imx-sdma.c |    9 ++++++++-
+> >  1 files changed, 8 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > index fa63ace..ae87287 100644
+> > --- a/drivers/dma/imx-sdma.c
+> > +++ b/drivers/dma/imx-sdma.c
+> > @@ -481,6 +481,8 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+> >  	else
+> >  		sdmac->status = DMA_SUCCESS;
+> >  
+> > +	sdmac->buf_tail++;
+> > +
+> >  	if (sdmac->desc.callback)
+> >  		sdmac->desc.callback(sdmac->desc.callback_param);
+> >  	sdmac->last_completed = sdmac->desc.cookie;
+> > @@ -655,9 +657,14 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+> >  {
+> >  	struct sdma_engine *sdma = sdmac->sdma;
+> >  	int channel = sdmac->channel;
+> > +	struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
+> > +
+> > +	while (bd->mode.status & BD_DONE)
+> > +		cpu_relax();
+> >  
+> >  	__raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> > -	sdmac->status = DMA_ERROR;
+> > +
+> > +	sdmac->status = DMA_SUCCESS;
+> >  }
+> 
+> Sorry. The patch lost the change as below.  Will pick it up in v2.
+> 
+> @@ -658,11 +658,15 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+>         struct sdma_engine *sdma = sdmac->sdma;
+>         int channel = sdmac->channel;
+>         struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
+> +       u32 stat = __raw_readl(sdma->regs + SDMA_H_STATSTOP);
+> 
+> -       while (bd->mode.status & BD_DONE)
+> -               cpu_relax();
+> +       /* stop the channel if it's running */
+> +       if (stat & (1 << channel)) {
+> +               while (bd->mode.status & BD_DONE)
+> +                       cpu_relax();
+> 
+> -       __raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> +               __raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> +       }
+> 
+>         sdmac->status = DMA_SUCCESS;
 
-Hi,
+NAK.
 
-> On 20.01.11 04:42:24, Will Deacon wrote:
->> Hi Ari,
->>
->>> Always allow backtrace when using oprofile on ARM, even if a PMU
->>> isn't present.
->>>
->>> Restores functionality originally introduced in
->>> 1b7b56982fdcd9d85effd76f3928cf5d6eb26155 by Richard Purdie.
->>
->> Well spotted, I'd forgotten we still want this for timer mode.
->> Comments inline.
->>
->>> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
->>> index 8aa9744..a23e5ae 100644
->>> --- a/arch/arm/oprofile/common.c
->>> +++ b/arch/arm/oprofile/common.c
->>> @@ -46,6 +46,7 @@ char *op_name_from_perf_id(void)
->>>  		return NULL;
->>>  	}
->>>  }
->>> +#endif
->>>
->>>  static int report_trace(struct stackframe *frame, void *d)
->>>  {
->>> @@ -109,6 +110,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
->>>  		tail = user_backtrace(tail);
->>>  }
->>>
->>> +#ifdef CONFIG_HW_PERF_EVENTS
->>
->> Can you reorder the backtrace stuff so that we don't need the extra
->> #endif/#ifdef please?
->
-> I would like to go even further, see the diff below.
+The patches has several problems.
 
-Thanks for comments, I can prepare a new patch. I think your patch below 
-has two typos but the idea was clear, please see comments below.
+- buf_tail is only used for cyclic transfers, so in case of non cyclic
+  transfers you poll for an arbitrary descriptor being ready.
 
-> -Robert
->
-> ---
-> arch/arm/oprofile/common.c |   45 ++++++++++++++++++++++++-------------------
-> 1 files changed, 25 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-> index 8aa9744..916aa2e 100644
-> --- a/arch/arm/oprofile/common.c
-> +++ b/arch/arm/oprofile/common.c
-> @@ -47,18 +47,6 @@ char *op_name_from_perf_id(void)
-> 	}
-> }
->
-> -static int report_trace(struct stackframe *frame, void *d)
-> -{
-> -	unsigned int *depth = d;
-> -
-> -	if (*depth) {
-> -		oprofile_add_trace(frame->pc);
-> -		(*depth)--;
-> -	}
-> -
-> -	return *depth == 0;
-> -}
-> -
-> /*
->  * The registers we're interested in are at the end of the variable
->  * length saved register structure. The fp points at the end of this
-> @@ -91,6 +79,30 @@ static struct frame_tail* user_backtrace(struct frame_tail *tail)
-> 	return buftail[0].fp-1;
-> }
->
-> +#else
-> +
-> +static int oprofile_arch_init(struct oprofile_operations *ops)
-> +{
-> +	pr_info("oprofile: hardware counters not available\n");
-> +	return -ENODEV;
-> +}
-> +
-> +static void oprofile_arch_exit(void) { }
+- Even in cyclic transfers when buf_tail points to the correct
+  descriptor the hardware will immediatly start the next descriptor
+  before you have a chance to set the STATSTOP bit. So you probably
+  will corrupt the next descriptor instead of the current one
+  which makes this patch useless.
 
-I guess you mean oprofile_perf_init and oprofile_perf_exit?
+- buf_tail is increased in the interrupt handler, so if you
+  happen to disable the channel after the bd is done but before
+  the interrupt handler has increased buf_tail you poll for the
+  wrong bd being ready which again makes this patch useless.
 
-Also the user_backtrace and frame_tail need to be moved out from the 
-#ifdef.
+If in non cyclic transfers we want to disable a channel we have our
+reasons (device error or timeout) and then the data is corrupted anyway,
+so no reason to poll for a descriptor getting done. Even worse, in case
+of an device error the descriptor might not get ready at all and
+we will poll for ever in the loop above.
+Cyclic transfers are designed for audio and disabling a channel
+basically means pausing the stream. When the SDMA engine does not
+support pausing the stream in hardware, we have to live with the
+fact that we pick up the stream on the next descriptor resulting
+in some bytes missing in the resulting audio stream.
 
-> +
-> +#endif /* CONFIG_HW_PERF_EVENTS */
-> +
-> +static int report_trace(struct stackframe *frame, void *d)
-> +{
-> +	unsigned int *depth = d;
-> +
-> +	if (*depth) {
-> +		oprofile_add_trace(frame->pc);
-> +		(*depth)--;
-> +	}
-> +
-> +	return *depth == 0;
-> +}
-> +
-> static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
-> {
-> 	struct frame_tail *tail = ((struct frame_tail *) regs->ARM_fp) - 1;
-> @@ -111,6 +123,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
->
-> int __init oprofile_arch_init(struct oprofile_operations *ops)
-> {
-> +	/* provide backtrace support also in timer mode: */
-> 	ops->backtrace		= arm_backtrace;
->
-> 	return oprofile_perf_init(ops);
-> @@ -120,11 +133,3 @@ void __exit oprofile_arch_exit(void)
-> {
-> 	oprofile_perf_exit();
-> }
-> -#else
-> -int __init oprofile_arch_init(struct oprofile_operations *ops)
-> -{
-> -	pr_info("oprofile: hardware counters not available\n");
-> -	return -ENODEV;
-> -}
-> -void __exit oprofile_arch_exit(void) {}
-> -#endif /* CONFIG_HW_PERF_EVENTS */
->
+Sascha
 
 -- 
-Ari
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
