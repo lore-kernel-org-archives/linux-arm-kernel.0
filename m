@@ -1,39 +1,49 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 20 Jan 2011 09:25:13 -0800
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <20110120142844.GA28358@barrios-desktop>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<20110120142844.GA28358@barrios-desktop>
-Message-ID: <1295544313.9039.618.camel@nimitz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Jan 2011 09:27:41 -0800
+Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
+In-Reply-To: <20110120040825.GB2389@legolas.emea.dhcp.ti.com>
+References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
+	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
+	<87d3nus4jr.fsf@gmail.com>
+	<20110119034528.GA2406@legolas.emea.dhcp.ti.com>
+	<874o947j9e.fsf@gmail.com>
+	<20110120040825.GB2389@legolas.emea.dhcp.ti.com>
+Message-ID: <20110120172741.GU4957@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-20 at 23:28 +0900, Minchan Kim wrote:
-> On Thu, Jan 20, 2011 at 06:45:39PM +0900, KyongHo Cho wrote:
-> > Sparsemem allows that a bank of memory spans over several adjacent
-> > sections if the start address and the end address of the bank
-> > belong to different sections.
-> > When gathering statictics of physical memory in mem_init() and
-> > show_mem(), this possiblity was not considered.
+* Felipe Balbi <balbi@ti.com> [110119 20:07]:
+> On Wed, Jan 19, 2011 at 03:04:13PM -0500, Ben Gamari wrote:
+> > On Wed, 19 Jan 2011 05:45:28 +0200, Felipe Balbi <balbi@ti.com> wrote:
+> > > The point is, being able to disable features I don't want on my kernel
+> > > image, is completely valid, if there's a compile breakage, then fix the
+> > > breakage but don't prevent the board from compiling.
+> > > 
+> > I understand. That being said, Linus has made it well known that
+> > defconfigs will not be an option going forward. Have we found another
 > 
-> Please write down the result if we doesn't consider this patch.
-> I can understand what happens but for making good description and review,
-> merging easily, it would be better to write down the result without 
-> the patch explicitly. 
+> I never mentioned defconfigs here.
+> 
+> > means of selecting the basic drivers necessary to get a fully functional
+> > board? Perhaps a CONFIG_MACH_OMAP3_BEAGLE_CORE option selecting the
+> > necessary driver for a fully functional board would be a solution. I
+> 
+> I'll leave this for Tony to decide, but I don't like your proposal.
+> 
+> > remember this being discussed several months ago (when Linus started
+> > pulling defconfigs out of the tree), but I don't recall there being any
+> > replacement proposals. It should be possible to build a functional
+> > kernel from the mainline without iterating over all available
+> > configuration options.
+> 
+> So you're saying that when you're building a kernel for you
+> laptop/desktop you don't have to get a menuconfig and choose the drivers
+> you want to compile ? I dare to doubt that.
 
-You'll oops.  __section_mem_map_addr() in:
+What we want to do in the long run is build a minimal kernel and make
+everything else loaded as modules from initramfs. In order to do that
+we need to cut down all the dependencies between core omap code and
+the drivers. So I'd stay away from selecting things for boards where
+possible.
 
-> #define __pfn_to_page(pfn)                              \
-> ({      unsigned long __pfn = (pfn);                    \
->         struct mem_section *__sec = __pfn_to_section(__pfn);    \
->         __section_mem_map_addr(__sec) + __pfn;          \
-> })
-
-will return NULL, you'll add some fuzz on to it with __pfn, then you'll
-oops when the arm show_mem() does PageReserved() and dereferences
-page->flags.
-
-Ether that, or with the sparsemem vmemmap variant, you'll get a
-valid-looking pointer with no backing memory, and oops as well.
-
--- Dave
+Tony
