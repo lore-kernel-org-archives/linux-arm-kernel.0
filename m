@@ -1,52 +1,28 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 20 Jan 2011 03:20:21 -0800
-Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
-In-Reply-To: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
-References: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1295522421.4366.34.camel@m0nster>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 20 Jan 2011 15:31:34 +0300
+Subject: [PATCH] ARM: oprofile: Always allow backtraces
+In-Reply-To: <1295470473-1095-1-git-send-email-kauppi@papupata.org>
+References: <1295470473-1095-1-git-send-email-kauppi@papupata.org>
+Message-ID: <4D382B26.9030801@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-01-18 at 15:03 -0800, Daniel Walker wrote:
-> Remove parts of this driver which use internal API calls. This
-> replaces the calls as suggested by Russell King.
-> 
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> ---
->  drivers/mmc/host/msm_sdcc.c |   49 +++++++++++++++++++-----------------------
->  1 files changed, 22 insertions(+), 27 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-> index 5decfd0..733d233 100644
-> --- a/drivers/mmc/host/msm_sdcc.c
-> +++ b/drivers/mmc/host/msm_sdcc.c
-> @@ -383,14 +383,30 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
->  	host->curr.user_pages = 0;
->  
->  	box = &nc->cmd[0];
-> -	for (i = 0; i < host->dma.num_ents; i++) {
-> -		box->cmd = CMD_MODE_BOX;
->  
-> -	/* Initialize sg dma address */
-> -	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
-> -				+ sg->offset;
+Hello.
 
-It would seem there was a reason for this change.. The person that added
-this was Brent Degraaf (who is CC'd) ..
+On 19-01-2011 23:54, Ari Kauppi wrote:
 
-Quoting him below speaking about why dma_map_sg() isn't just used,
+> Always allow backtrace when using oprofile on ARM, even if a PMU
+> isn't present.
 
-"Previous version of msm_sdcc.c had a cache coherency problem for
-precisely this reason. The dma_map_sg is what cleans the caches for
-these commands and so must be done AFTER the commands are populated. If
-this entry is left until the map function is called, the
-box->dst_row_addr will not be filled properly for reads."
+> Restores functionality originally introduced in
+> 1b7b56982fdcd9d85effd76f3928cf5d6eb26155 by Richard Purdie.
 
-Daniel
+    You're lacking the commit summary specified in parens which Linus asked to 
+add.
 
+> Signed-off-by: Ari Kauppi<kauppi@papupata.org>
+> Cc: Richard Purdie<rpurdie@rpsys.net>
+> Cc: Will Deacon<will.deacon@arm.com>
+> Cc: Matt Fleming<matt@console-pimps.org>
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+WBR, Sergei
