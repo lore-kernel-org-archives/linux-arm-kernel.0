@@ -1,48 +1,57 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Thu, 20 Jan 2011 15:29:50 +0100
-Subject: [PATCH v2] omap2: fix DPLL_FREQSEL calculation
-In-Reply-To: <20110120111645.GB2223@legolas.emea.dhcp.ti.com> (Felipe Balbi's
-	message of "Thu\, 20 Jan 2011 13\:16\:45 +0200")
-References: <87ei8726wf.fsf@vostro.fn.ogness.net>
-	<20110120111645.GB2223@legolas.emea.dhcp.ti.com>
-Message-ID: <8739on1wdd.fsf_-_@vostro.fn.ogness.net>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 20 Jan 2011 14:44:09 +0000
+Subject: [PATCH] ARM: TWD: fix the clock calculation for TWD
+In-Reply-To: <20110120140811.GE6335@n2100.arm.linux.org.uk>
+References: <1295505237-5735-1-git-send-email-chao.xie@marvell.com>
+	<20110120140811.GE6335@n2100.arm.linux.org.uk>
+Message-ID: <20110120144409.GA25954@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2011-01-20, Felipe Balbi <balbi@ti.com> wrote:
-> scripts/get_maintainer.pl would've helped you getting a better Cc
-> list. I'm adding linux-omap and lakml
+On Thu, Jan 20, 2011 at 02:08:11PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 20, 2011 at 02:33:57PM +0800, Chao Xie wrote:
+> > The original code will do count * (HZ /5). It will make the twd
+> > timer rate decreased if HZ can not be excatly divided. For
+> > example HZ=128.
+> > 
+> > Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> > ---
+> >  arch/arm/kernel/smp_twd.c |    3 ++-
+> >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > index 35882fb..ca6405b 100644
+> > --- a/arch/arm/kernel/smp_twd.c
+> > +++ b/arch/arm/kernel/smp_twd.c
+> > @@ -111,7 +111,8 @@ static void __cpuinit twd_calibrate_rate(void)
+> >  
+> >  		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+> >  
+> > -		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+> > +		twd_timer_rate = ((unsigned long)(0xFFFFFFFFU - count))
+> > +			* HZ / 5;
+> >  
+> >  		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+> >  			(twd_timer_rate / 100000) % 100);
+> 
+> I don't think this patch has any effect what so ever, so I just tried:
+> 
+> #define HZ      128
+> unsigned long twd_timer_rate;
+> void calc1(unsigned long count)
+> {
+>         twd_timer_rate = (0xffffffffU - count) * (HZ / 5);
+> }
+> void calc2(unsigned long count)
+> {
+>         twd_timer_rate = ((unsigned long)(0xffffffffU - count)) * (HZ / 5);
+> }
 
-Thanks.
+Hi Russell,
 
-After investigating the issue further it seems that I had it
-backwards. The value of "n" is the value to divide by, not the value
-that goes in the register. This means that it is _dpll_test_fint()
-that is doing it incorrectly. Here is a new version of the patch to
-fix the right function.
+In Chao's patch the parentheses around (HZ / 5) have been removed so its 
+now dowing the multiplication before the division (if I remember the 
+precedences correctly!).  I don't think the cast to unsigned long is 
+needed though.
 
-
-
-This patch fixes the calculation of the internal frequency. The value
-of "n" is the actual divider to use.
-
-This patch is against linux-next-20110120.
-
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
----
- arch/arm/mach-omap2/clkt_dpll.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
-index 337392c..acb7ae5 100644
---- a/arch/arm/mach-omap2/clkt_dpll.c
-+++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -77,7 +77,7 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
- 	dd = clk->dpll_data;
- 
- 	/* DPLL divider must result in a valid jitter correction val */
--	fint = clk->parent->rate / (n + 1);
-+	fint = clk->parent->rate / n;
- 	if (fint < DPLL_FINT_BAND1_MIN) {
- 
- 		pr_debug("rejecting n=%d due to Fint failure, "
+Jamie
