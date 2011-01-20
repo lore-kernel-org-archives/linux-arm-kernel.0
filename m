@@ -1,48 +1,52 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Jan 2011 13:16:45 +0200
-Subject: [PATCH] omap2: fix DPLL_FREQSEL calculation
-In-Reply-To: <87ei8726wf.fsf@vostro.fn.ogness.net>
-References: <87ei8726wf.fsf@vostro.fn.ogness.net>
-Message-ID: <20110120111645.GB2223@legolas.emea.dhcp.ti.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 20 Jan 2011 03:20:21 -0800
+Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
+In-Reply-To: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
+References: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1295522421.4366.34.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 20, 2011 at 11:42:24AM +0100, John Ogness wrote:
-> This patch fixes the calculation of the internal frequency. The value
-> of "n" is one less than the actual divider. 0 is a valid value.
+On Tue, 2011-01-18 at 15:03 -0800, Daniel Walker wrote:
+> Remove parts of this driver which use internal API calls. This
+> replaces the calls as suggested by Russell King.
 > 
-> An example where the internal frequency is calculated correctly can be
-> found here: clkt_dpll.c:_dpll_test_fint()
-> 
-> This patch is against linux-next-20110120.
-> 
-> Signed-off-by: John Ogness <john.ogness@linutronix.de>
-
-scripts/get_maintainer.pl would've helped you getting a better Cc list.
-I'm adding linux-omap and lakml
-
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 > ---
->  arch/arm/mach-omap2/dpll3xxx.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/mmc/host/msm_sdcc.c |   49 +++++++++++++++++++-----------------------
+>  1 files changed, 22 insertions(+), 27 deletions(-)
 > 
-> --- a/arch/arm/mach-omap2/dpll3xxx.c	2011-01-20 11:20:41.706860086 +0100
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c	2011-01-20 11:21:27.966860086 +0100
-> @@ -93,7 +93,7 @@ static u16 _omap3_dpll_compute_freqsel(s
->  	unsigned long fint;
->  	u16 f = 0;
+> diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+> index 5decfd0..733d233 100644
+> --- a/drivers/mmc/host/msm_sdcc.c
+> +++ b/drivers/mmc/host/msm_sdcc.c
+> @@ -383,14 +383,30 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
+>  	host->curr.user_pages = 0;
 >  
-> -	fint = clk->dpll_data->clk_ref->rate / n;
-> +	fint = clk->dpll_data->clk_ref->rate / (n + 1);
+>  	box = &nc->cmd[0];
+> -	for (i = 0; i < host->dma.num_ents; i++) {
+> -		box->cmd = CMD_MODE_BOX;
 >  
->  	pr_debug("clock: fint is %lu\n", fint);
->  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> -	/* Initialize sg dma address */
+> -	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
+> -				+ sg->offset;
+
+It would seem there was a reason for this change.. The person that added
+this was Brent Degraaf (who is CC'd) ..
+
+Quoting him below speaking about why dma_map_sg() isn't just used,
+
+"Previous version of msm_sdcc.c had a cache coherency problem for
+precisely this reason. The dma_map_sg is what cleans the caches for
+these commands and so must be done AFTER the commands are populated. If
+this entry is left until the map function is called, the
+box->dst_row_addr will not be filled properly for reads."
+
+Daniel
+
 
 -- 
-balbi
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
