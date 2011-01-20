@@ -1,48 +1,121 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jan 2011 10:02:30 -0000
-Subject: [PATCH] ARM: oprofile: Always allow backtraces
-In-Reply-To: <20110120095239.GT21401@erda.amd.com>
-References: <1295470473-1095-1-git-send-email-kauppi@papupata.org>
-	<000101cbb886$582f1480$088d3d80$@deacon@arm.com>
-	<20110120095239.GT21401@erda.amd.com>
-Message-ID: <000601cbb889$26887ae0$739970a0$@deacon@arm.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Thu, 20 Jan 2011 18:45:39 +0900
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+Message-ID: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Sparsemem allows that a bank of memory spans over several adjacent
+sections if the start address and the end address of the bank
+belong to different sections.
+When gathering statictics of physical memory in mem_init() and
+show_mem(), this possiblity was not considered.
 
-> I would like to go even further, see the diff below.
+This patch guarantees that simple increasing the pointer to page
+descriptors does not exceed the boundary of a section.
 
-[...]
+Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
+---
+ arch/arm/mm/init.c |   74 +++++++++++++++++++++++++++++++++++----------------
+ 1 files changed, 51 insertions(+), 23 deletions(-)
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 57c4c5c..6ccecbe 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -93,24 +93,38 @@ void show_mem(void)
  
-> +#else
-> +
-> +static int oprofile_arch_init(struct oprofile_operations *ops)
-> +{
-> +	pr_info("oprofile: hardware counters not available\n");
-> +	return -ENODEV;
-> +}
-> +
-> +static void oprofile_arch_exit(void) { }
-> +
-> +#endif /* CONFIG_HW_PERF_EVENTS */
-
-Don't we now have oprofile_arch_init defined twice in the non-PMU 
-case? (and one of these definitions is __init)?
-
->  static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
->  {
->  	struct frame_tail *tail = ((struct frame_tail *) regs->ARM_fp) - 1;
-> @@ -111,6 +123,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
-> 
->  int __init oprofile_arch_init(struct oprofile_operations *ops)
->  {
-> +	/* provide backtrace support also in timer mode: */
->  	ops->backtrace		= arm_backtrace;
-
-Right, so this becomes common code but we need to ensure that we
-don't call oprofile_perf_init. I suppose an alternative would be
-to provide an empty static inline stub for oprofile_perf_init
-instead.
-
-Will
+ 		pfn1 = bank_pfn_start(bank);
+ 		pfn2 = bank_pfn_end(bank);
+-
++#ifndef CONFIG_SPARSEMEM
+ 		page = pfn_to_page(pfn1);
+ 		end  = pfn_to_page(pfn2 - 1) + 1;
+-
++#else
++		pfn2--;
+ 		do {
+-			total++;
+-			if (PageReserved(page))
+-				reserved++;
+-			else if (PageSwapCache(page))
+-				cached++;
+-			else if (PageSlab(page))
+-				slab++;
+-			else if (!page_count(page))
+-				free++;
+-			else
+-				shared += page_count(page) - 1;
+-			page++;
+-		} while (page < end);
++			page = pfn_to_page(pfn1);
++			if (pfn_to_section_nr(pfn1) < pfn_to_section_nr(pfn2)) {
++				pfn1 += PAGES_PER_SECTION;
++				pfn1 &= PAGE_SECTION_MASK;
++			} else {
++				pfn1 = pfn2;
++			}
++			end = pfn_to_page(pfn1) + 1;
++#endif
++			do {
++				total++;
++				if (PageReserved(page))
++					reserved++;
++				else if (PageSwapCache(page))
++					cached++;
++				else if (PageSlab(page))
++					slab++;
++				else if (!page_count(page))
++					free++;
++				else
++					shared += page_count(page) - 1;
++				page++;
++			} while (page < end);
++#ifdef CONFIG_SPARSEMEM
++		} while (pfn1 < pfn2);
++#endif
+ 	}
+ 
+ 	printk("%d pages of RAM\n", total);
+@@ -470,17 +484,31 @@ void __init mem_init(void)
+ 
+ 		pfn1 = bank_pfn_start(bank);
+ 		pfn2 = bank_pfn_end(bank);
+-
++#ifndef CONFIG_SPARSEMEM
+ 		page = pfn_to_page(pfn1);
+ 		end  = pfn_to_page(pfn2 - 1) + 1;
+-
++#else
++		pfn2--;
+ 		do {
+-			if (PageReserved(page))
+-				reserved_pages++;
+-			else if (!page_count(page))
+-				free_pages++;
+-			page++;
+-		} while (page < end);
++			page = pfn_to_page(pfn1);
++			if (pfn_to_section_nr(pfn1) < pfn_to_section_nr(pfn2)) {
++				pfn1 += PAGES_PER_SECTION;
++				pfn1 &= PAGE_SECTION_MASK;
++			} else {
++				pfn1 = pfn2;
++			}
++			end = pfn_to_page(pfn1) + 1;
++#endif
++			do {
++				if (PageReserved(page))
++					reserved_pages++;
++				else if (!page_count(page))
++					free_pages++;
++				page++;
++			} while (page < end);
++#ifdef CONFIG_SPARSEMEM
++		} while (pfn1 < pfn2);
++#endif
+ 	}
+ 
+ 	/*
+-- 
+1.6.2.5
