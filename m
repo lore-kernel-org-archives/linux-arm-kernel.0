@@ -1,47 +1,45 @@
-From: kauppi@papupata.org (Ari Kauppi)
-Date: Thu, 20 Jan 2011 20:57:19 +0200
-Subject: [PATCH v2 2/3] oprofile: Provide stubs for oprofile_perf_{init,exit}
-In-Reply-To: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
-References: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
-Message-ID: <1295549840-17809-3-git-send-email-kauppi@papupata.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jan 2011 19:08:22 +0000
+Subject: Locking in the clk API
+In-Reply-To: <4D386ABF.9060908@fluff.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111103929.GN24920@pengutronix.de>
+	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
+	<4D386ABF.9060908@fluff.org>
+Message-ID: <20110120190822.GK6335@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_HW_PERF_EVENTS is not defined, provide stubs for
-oprofile_perf_init and oprofile_perf_exit. Allows cleaning of
-architecture specific implementations.
+On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
+> If you want to make it so that each low-power mode has to work
+> out what PLLs need to be disabled and then re-enabled makes me
+> want to be sick. Hiding this stuff behind specific implementations
+> is a recipe for disaster.
 
-Signed-off-by: Ari Kauppi <kauppi@papupata.org>
----
- include/linux/oprofile.h |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Why should systems which don't suffer from such problems be prevented
+from gaining power saving from turning off their clocks when devices
+are not being used (eg, the console serial port.)
 
-diff --git a/include/linux/oprofile.h b/include/linux/oprofile.h
-index 54c8382..1ca6411 100644
---- a/include/linux/oprofile.h
-+++ b/include/linux/oprofile.h
-@@ -16,6 +16,8 @@
- #include <linux/types.h>
- #include <linux/spinlock.h>
- #include <linux/init.h>
-+#include <linux/errno.h>
-+#include <linux/printk.h>
- #include <asm/atomic.h>
-  
- /* Each escaped entry is prefixed by ESCAPE_CODE
-@@ -190,6 +192,13 @@ int oprofile_write_commit(struct op_entry *entry);
- int __init oprofile_perf_init(struct oprofile_operations *ops);
- void oprofile_perf_exit(void);
- char *op_name_from_perf_id(void);
-+#else
-+static inline int __init oprofile_perf_init(struct oprofile_operations *ops)
-+{
-+	pr_info("oprofile: hardware counters not available\n");
-+	return -ENODEV;
-+}
-+static inline void oprofile_perf_exit(void) { }
- #endif /* CONFIG_HW_PERF_EVENTS */
- 
- #endif /* OPROFILE_H */
--- 
-1.7.4.rc2.3.g60a2e
+One solution to your root PLL issue would be to have a separate set of
+enable/disable API calls which get called at setup/release time (or
+whatever you'd like to call it) which can only be called from non-atomic
+context.  Maybe clk_prepare() and clk_unprepare().  These functions
+should perform whatever is necessary to ensure that the clock source
+is available for use atomically when clk_enable() is called.
+
+So, in your case, clk_prepare() ensures that the root PLL is enabled,
+clk_unprepare() allows it to be turned off.
+
+In the case of a console driver, clk_prepare() can be called when we
+know the port will be used as a console.  clk_enable() is then called
+before writing out the string, and clk_disable() after we've completely
+sent the last character.
+
+This allows the best of both worlds.  We now have a clk_enable() which
+can be used to turn the clocks off through the clock tree up to the first
+non-atomic clock, and we also have a way to deal with those which need
+to sleep.  So not only do "sleeping clock" implementations become possible
+but these "sleeping clock" implementations also get the opportunity to
+shutdown some of their clock tree with minimal latency for doing so.
