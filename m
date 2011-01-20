@@ -1,48 +1,51 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 20 Jan 2011 13:51:52 -0200
-Subject: [PATCH v3] usb: gadget/fsl_mxc_udc: Detect the CPU type in run-time
-Message-ID: <1295538712-6117-1-git-send-email-fabio.estevam@freescale.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 20 Jan 2011 16:29:15 +0000
+Subject: Locking in the clk API
+In-Reply-To: <20110111031552.GJ3760@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org>
+Message-ID: <4D3862DB.5000708@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure we are running on a MX35 processor.
+On 11/01/11 03:15, Paul Mundt wrote:
+> On Tue, Jan 11, 2011 at 10:16:42AM +0800, Jeremy Kerr wrote:
+>> * clk_enable: may sleep
+>>
+>> * clk_disable: may not sleep, but it's possible to make the global
+>>   clk_disable() atomic and defer the actual disable (clk->ops.disable()) to a
+>>   non-atomic context.
+>>
+>> * clk_get_rate: may not sleep
+>>
+>> * clk_set_rate: may sleep
+>>
+>> As we build up our requirements, we can adjust as suitable.
+>>
+> This looks like a complete disaster, and is also completely inconsistent
+> with how the API is being used by the vast majority of users today. You
+> have an API that can or can not sleep with no indication as to which is
+> which based off of the API naming, which is just asking for trouble.
+> 
+> As it is today, most users expect that these are all usable from atomic
+> context, and as far as I can tell the only special case you have are for
+> some crap busses with insane latencies. In this case you should simply
+> pile on _cansleep() versions of the API and make it apparent that those
+> drivers are the special cases, not the other way around.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- drivers/usb/gadget/fsl_mxc_udc.c |   21 ++++++++++++---------
- 1 files changed, 12 insertions(+), 9 deletions(-)
+The trouble is not with the drivers, is the fact there could be a clock
+tree where, say the closest to the driver is easy to control but the
+base of the tree may be a PLL which requires time to settle.
 
-diff --git a/drivers/usb/gadget/fsl_mxc_udc.c b/drivers/usb/gadget/fsl_mxc_udc.c
-index 77b1eb5..43a49ec 100644
---- a/drivers/usb/gadget/fsl_mxc_udc.c
-+++ b/drivers/usb/gadget/fsl_mxc_udc.c
-@@ -88,15 +88,18 @@ eenahb:
- void fsl_udc_clk_finalize(struct platform_device *pdev)
- {
- 	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
--#if defined(CONFIG_ARCH_MX35)
--	unsigned int v;
--
--	/* workaround ENGcm09152 for i.MX35 */
--	if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
--		v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
--				USBPHYCTRL_OTGBASE_OFFSET));
--		writel(v | USBPHYCTRL_EVDO, MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
--				USBPHYCTRL_OTGBASE_OFFSET));
-+#if defined(CONFIG_SOC_IMX35)
-+	if (cpu_is_mx35()) {
-+		unsigned int v;
-+
-+		/* workaround ENGcm09152 for i.MX35 */
-+		if (pdata->workaround & FLS_USB2_WORKAROUND_ENGCM09152) {
-+			v = readl(MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
-+					USBPHYCTRL_OTGBASE_OFFSET));
-+			writel(v | USBPHYCTRL_EVDO,
-+				MX35_IO_ADDRESS(MX35_USB_BASE_ADDR +
-+					USBPHYCTRL_OTGBASE_OFFSET));
-+		}
- 	}
- #endif
- 
--- 
-1.6.0.4
+Now, there's a lot of work in the 'embedded' space where the focus is on
+the power consumption, so powering down PLLs when they are not needed is
+a good thing to have/
+
+> Having half of the API sleepable and the other not with no indication of
+> which is which simply makes it completely unusable and error prone for
+> both atomic and non-atomic contexts.
+
+I really don't like the fact that people are doing these things in
+atomic contexts, and I think we should apply some pressure to move
+the atomic caller cases to use systems where they can sleep such as
+using threaded-irq handlers (they work very nicely)
