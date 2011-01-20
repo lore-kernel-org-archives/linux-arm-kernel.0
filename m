@@ -1,72 +1,112 @@
-From: minchan.kim@gmail.com (Minchan Kim)
-Date: Fri, 21 Jan 2011 02:44:09 +0900
+From: pullip.linux@gmail.com (KyongHo Cho)
+Date: Fri, 21 Jan 2011 02:48:59 +0900
 Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <AANLkTikBbknwsLvN-b4HVqL_gAUHC-4VjQ=WQ=h_kLhW@mail.gmail.com>
+In-Reply-To: <AANLkTi=nsAOtLPK75Wy5Rm8pfWob8xTP5259DyYuxR9J@mail.gmail.com>
 References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<20110120142844.GA28358@barrios-desktop>
-	<AANLkTinXAiShaf1f69ufVHg7KPaY5j=jmOTtK71GNNp5@mail.gmail.com>
-	<AANLkTikBbknwsLvN-b4HVqL_gAUHC-4VjQ=WQ=h_kLhW@mail.gmail.com>
-Message-ID: <AANLkTi=MizfGY4koMmRHprts6Ji3ofeSZPBBTiH1FDcn@mail.gmail.com>
+	<1295544047.9039.609.camel@nimitz>
+	<AANLkTi=nsAOtLPK75Wy5Rm8pfWob8xTP5259DyYuxR9J@mail.gmail.com>
+Message-ID: <AANLkTinLLYYUXe=ZYKKGXgKU_p5RHv2COX_L1zCk8Ba+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix linux-arm-kernel address.
-
-On Fri, Jan 21, 2011 at 2:43 AM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> Restore Cced.
->
-> On Fri, Jan 21, 2011 at 2:24 AM, KyongHo Cho <pullip.linux@gmail.com> wrote:
->> On Thu, Jan 20, 2011 at 11:28 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
->>> On Thu, Jan 20, 2011 at 06:45:39PM +0900, KyongHo Cho wrote:
->>>> Sparsemem allows that a bank of memory spans over several adjacent
->>>> sections if the start address and the end address of the bank
->>>> belong to different sections.
->>>> When gathering statictics of physical memory in mem_init() and
->>>> show_mem(), this possiblity was not considered.
->>>
->>> Please write down the result if we doesn't consider this patch.
->>> I can understand what happens but for making good description and review,
->>> merging easily, it would be better to write down the result without
->>> the patch explicitly.
->>>
->> As we know that each section has its own memmap and
->> a contiguous chunk of physical memory that is represented by 'bank' in meminfo
->> can be larger than the size of a section.
->> "page++" in the current implementation can access invalid memory area.
->> The size of the section is 256 MiB in ARM and the number of banks in
->> meminfo is 8.
->> This means that the maximum size of the physical memory cannot be grow than 2GiB
->> to avoid this problem in the current implementation.
->> Thus we need to fix the calculation of the last page descriptor in
->> terms of sections.
+On Fri, Jan 21, 2011 at 2:20 AM, Dave Hansen <dave@linux.vnet.ibm.com> wrote:
+> On Thu, 2011-01-20 at 18:45 +0900, KyongHo Cho wrote:
+>> Sparsemem allows that a bank of memory spans over several adjacent
+>> sections if the start address and the end address of the bank
+>> belong to different sections.
+>> When gathering statictics of physical memory in mem_init() and
+>> show_mem(), this possiblity was not considered.
 >>
->> This patch determines the last page descriptor in a memmap with
->> min(last_pfn_of_bank, last_pfn_of_current_section)
->> If there remains physical memory not consumed, it calculates the last
->> page descriptor
->> with min(last_pfn_of_bank, last_pfn_of_next_section).
+>> This patch guarantees that simple increasing the pointer to page
+>> descriptors does not exceed the boundary of a section
+> ...
+>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+>> index 57c4c5c..6ccecbe 100644
+>> --- a/arch/arm/mm/init.c
+>> +++ b/arch/arm/mm/init.c
+>> @@ -93,24 +93,38 @@ void show_mem(void)
 >>
->>>
->>> Hmm.. new ifndef magic makes code readability bad.
->>> Couldn't we do it by simple pfn iterator not page and pfn_valid check?
->>>
->> True.
->> We need to consider the implementation again.
->> I think the previous implementation gave the importance to the
->> efficiency but to the readability.
->>
+>> ? ? ? ? ? ? ? pfn1 = bank_pfn_start(bank);
+>> ? ? ? ? ? ? ? pfn2 = bank_pfn_end(bank);
+>> -
+>> +#ifndef CONFIG_SPARSEMEM
+>> ? ? ? ? ? ? ? page = pfn_to_page(pfn1);
+>> ? ? ? ? ? ? ? end ?= pfn_to_page(pfn2 - 1) + 1;
+>> -
+>> +#else
+>> + ? ? ? ? ? ? pfn2--;
+>> ? ? ? ? ? ? ? do {
+>> - ? ? ? ? ? ? ? ? ? ? total++;
+>> - ? ? ? ? ? ? ? ? ? ? if (PageReserved(page))
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? reserved++;
+>> - ? ? ? ? ? ? ? ? ? ? else if (PageSwapCache(page))
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? cached++;
+>> - ? ? ? ? ? ? ? ? ? ? else if (PageSlab(page))
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? slab++;
+>> - ? ? ? ? ? ? ? ? ? ? else if (!page_count(page))
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? free++;
+>> - ? ? ? ? ? ? ? ? ? ? else
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? shared += page_count(page) - 1;
+>> - ? ? ? ? ? ? ? ? ? ? page++;
+>> - ? ? ? ? ? ? } while (page < end);
+>> + ? ? ? ? ? ? ? ? ? ? page = pfn_to_page(pfn1);
+>> + ? ? ? ? ? ? ? ? ? ? if (pfn_to_section_nr(pfn1) < pfn_to_section_nr(pfn2)) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pfn1 += PAGES_PER_SECTION;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pfn1 &= PAGE_SECTION_MASK;
+>> + ? ? ? ? ? ? ? ? ? ? } else {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? pfn1 = pfn2;
+>> + ? ? ? ? ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ? ? ? ? end = pfn_to_page(pfn1) + 1;
+>> +#endif
 >
-> Please consider readability and consistency with other architectures
-> if we can do. :)
-> Thanks.
->
-> --
-> Kind regards,
-> Minchan Kim
+> This problem actually exists without sparsemem, too. ?Discontigmem (at
+> least) does it as well.
 >
 
+Actually, as long as a bank in meminfo only resides in a pgdat, no
+problem happens
+because there is no restriction of size of area in a pgdat.
+That's why I just considered about sparsemem.
 
+> The x86 version of show_mem() actually manages to do this without any
+> #ifdefs, and works for a ton of configuration options. ?It uses
+> pfn_valid() to tell whether it can touch a given pfn.
+>
+> Long-term, it might be a good idea to convert arm's show_mem() over to
+> use pgdat's like everything else. ?But, for now, you should just be able
+> to do something roughly like this:
+>
+> - ? ? ? ? ? ? ? page = pfn_to_page(pfn1);
+> - ? ? ? ? ? ? ? end ?= pfn_to_page(pfn2 - 1) + 1;
+> -
+> - ? ? ? ? ? ? ? do {
+> + ? ? ? ? ? ? ? for (pfn = pfn1; pfn < pfn2; pfn++) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (!pfn_valid(pfn))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? continue;
+> + ? ? ? ? ? ? ? ? ? ? ? page = pfn_to_page(pfn);
+> +
+> ? ? ? ? ? ? ? ? ? ? ? ?total++;
+> ? ? ? ? ? ? ? ? ? ? ? ?if (PageReserved(page))
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?reserved++;
+> ? ? ? ? ? ? ? ? ? ? ? ?else if (PageSwapCache(page))
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cached++;
+> ? ? ? ? ? ? ? ? ? ? ? ?else if (PageSlab(page))
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?slab++;
+> ? ? ? ? ? ? ? ? ? ? ? ?else if (!page_count(page))
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?free++;
+> ? ? ? ? ? ? ? ? ? ? ? ?else
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?shared += page_count(page) - 1;
+> ? ? ? ? ? ? ? ? ? ? ? ?page++;
+> - ? ? ? ? ? ? ? } while (page < end);
+> + ? ? ? ? ? ? ? }
+>
+> That should work for sparsemem, or any other crazy memory models that we
+> come up with. ?pfn_to_page() is pretty quick, especially when doing it
+> in a tight loop like that.
+>
 
--- 
-Kind regards,
-Minchan Kim
+That's true.
+I worried that pfn_to_page() in sparsemem is a bit slower than that in flatmem.
+Moreover, the previous one didn't use pfn_to_page() but page++ for the
+performance.
+Nevertheless, I also think that pfn_to_page() make the code neat.
