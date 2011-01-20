@@ -1,44 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jan 2011 17:26:44 -0800
-Subject: [PATCH 6/7] arm: plat-omap: system.h: move voiceblue
-	definitions into the board header
-In-Reply-To: <20110118092203.GA10997@n2100.arm.linux.org.uk>
-References: <1295337165-22934-1-git-send-email-aaro.koskinen@iki.fi>
-	<1295337165-22934-7-git-send-email-aaro.koskinen@iki.fi>
-	<20110118092203.GA10997@n2100.arm.linux.org.uk>
-Message-ID: <20110120012644.GR4957@atomide.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Wed, 19 Jan 2011 18:38:14 -0800
+Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
+In-Reply-To: <20110119222407.GD6335@n2100.arm.linux.org.uk>
+References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
+	<20110119082534.GA9569@gallagher> <4D3760DD.1010609@codeaurora.org>
+	<20110119222407.GD6335@n2100.arm.linux.org.uk>
+Message-ID: <4D37A016.8060902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110118 01:23]:
-> On Tue, Jan 18, 2011 at 09:52:44AM +0200, Aaro Koskinen wrote:
-> > Move voiceblue definitions into the board-specific header.
-> > 
-> > Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> 
-> Let's instead simplify this, and allow other platforms to hook into the
-> reset handler if they choose.  This has only been build-tested on my
-> omap1 (which includes voiceblue) and omap4 configurations.
-> 
-> 8<------
-> Subject: ARM: OMAP: Allow platforms to hook reset cleanly
-> 
-> This adds a clean method to allow platforms to hook into the reset
-> code if they require to.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/mach-omap1/Makefile             |    2
->  arch/arm/mach-omap1/board-voiceblue.c    |  106 +++++++++++++++++--------------
->  arch/arm/mach-omap1/reset.c              |   25 +++++++
->  arch/arm/mach-omap2/prcm.c               |    5 +
->  arch/arm/plat-omap/include/plat/prcm.h   |    1
->  arch/arm/plat-omap/include/plat/system.h |   38 -----------
->  6 files changed, 91 insertions(+), 86 deletions(-)
+On 1/19/2011 2:24 PM, Russell King - ARM Linux wrote:
+> On Wed, Jan 19, 2011 at 02:08:29PM -0800, Stepan Moskovchenko wrote:
+>>>> +		/* Mask conditions we're ignorning. */
+>>>> +		sr&= port->read_status_mask;
+>>>> +		if (sr&   UART_SR_RX_BREAK)
+>>>> +			flag = TTY_BREAK;
+>>>> +		else if (sr&   UART_SR_PAR_FRAME_ERR)
+>>>> +			flag = TTY_FRAME;
+>>> It doesn't look like the flag is used anywhere after it has been
+>>> assigned.
+>> An artifact of an old driver. Removed.
+> But still required to support proper error signalling.
+>
 
-Looks good to me. I'll queue all these into devel-cleanup
-branch for the next merge window.
+On second thought, from poking around the kernel some more, I believe 
+the following should be a better approach:
+         if (sr & UART_SR_RX_BREAK) {
+             tty_insert_flip_char(tty, 0, TTY_BREAK);
+         } else if (sr & UART_SR_PAR_FRAME_ERR) {
+             tty_insert_flip_char(tty, 0, TTY_FRAME);
+         }
 
-Regards,
+Russell, what do you think? Shall I make the change in v2?
 
-Tony
+Thanks
+Steve
+
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
