@@ -1,53 +1,32 @@
-From: saaguirre@ti.com (Aguirre, Sergio)
-Date: Thu, 20 Jan 2011 15:06:30 -0600
-Subject: [Query] mm: !*pte hit in mm/memory.c:remap_pte_range
-Message-ID: <A24693684029E5489D1D202277BE89448521EEAA@dlee02.ent.ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 20 Jan 2011 16:30:27 -0500 (EST)
+Subject: Locking in the clk API
+In-Reply-To: <20110120185617.GI6335@n2100.arm.linux.org.uk>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
+	<20110120185617.GI6335@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101201623480.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 20 Jan 2011, Russell King - ARM Linux wrote:
 
-WARNING: Linux MM newbie here. Please bare with me a bit.
+> On Thu, Jan 20, 2011 at 04:29:15PM +0000, Ben Dooks wrote:
+> > I really don't like the fact that people are doing these things in
+> > atomic contexts, and I think we should apply some pressure to move
+> > the atomic caller cases to use systems where they can sleep such as
+> > using threaded-irq handlers (they work very nicely)
+> 
+> How do you ensure that printk is always called from a non-atomic
+> context?
 
-While debugging a new v4l2 driver that makes use of the OMAP4 Tiler allocators in mmap calls, I found out that
-remap_pfn_range was getting completely stalled.
-
-And while debugging further, i realized that the point of stall was in mm/memory.c, function:
-
-static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
-			unsigned long addr, unsigned long end,
-			unsigned long pfn, pgprot_t prot)
-{
-	pte_t *pte;
-	spinlock_t *ptl;
-
-	pte = pte_alloc_map_lock(mm, pmd, addr, &ptl);
-	if (!pte)
-		return -ENOMEM;
-	arch_enter_lazy_mmu_mode();
-	do {
+Is this a good example?  I don't think that power sensitive systems such 
+as a cellphone should keep printk() enabled in the final product.  The 
+output from printk() over a serial port is a debugging convenience, and 
+trying to aggressively turn on/off the serial clock around each call to 
+printk() is a bit silly.  Better simply turn the serial clock on 
+whenever its console facility is opened, and turn it off when the 
+console is closed, which should be good enough in that context.
 
 
-		BUG_ON(!pte_none(*pte)); <---******* HERE
-
-
-		set_pte_at(mm, addr, pte, pte_mkspecial(pfn_pte(pfn, prot)));
-		pfn++;
-	} while (pte++, addr += PAGE_SIZE, addr != end);
-	arch_leave_lazy_mmu_mode();
-	pte_unmap_unlock(pte - 1, ptl);
-	return 0;
-}
-
-This is in 2.6.35.6 kernel + TI Android kernel changes. [1]
-
-How should i interpret this? Does this mean something specific?
-
-Any pointers will be appreciated.
-
-Regards,
-Sergio
-
----
-
-[1] http://git.omapzoom.org/?p=kernel/omap.git;a=shortlog;h=refs/heads/p-android-omap-2.6.35
+Nicolas
