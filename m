@@ -1,93 +1,213 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:07 +0530
-Subject: [PATCH V5 29/63] ST SPEAr: Changing resource size of amba devices to
-	SZ_4K
+Date: Thu, 20 Jan 2011 12:56:10 +0530
+Subject: [PATCH V5 32/63] ST SPEAr: Adding miscellaneous devices
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <ec487864395c6c1b6fcd74ab5280d29a7400b197.1295499395.git.viresh.kumar@st.com>
+Message-ID: <c7901091e22c37b0c6bc44766ef227164982d7e0.1295499395.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/spear300.c |    2 +-
- arch/arm/mach-spear3xx/spear320.c |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c |    8 +++-----
- 4 files changed, 6 insertions(+), 8 deletions(-)
+ arch/arm/mach-spear3xx/include/mach/generic.h |    7 ++
+ arch/arm/mach-spear3xx/spear310.c             |  115 +++++++++++++++++++------
+ arch/arm/mach-spear3xx/spear320.c             |   26 ++++++
+ 3 files changed, 123 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index fceb71f..6989407 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -382,7 +382,7 @@ struct amba_device clcd_device = {
- 	},
- 	.res = {
- 		.start = SPEAR300_CLCD_BASE,
--		.end = SPEAR300_CLCD_BASE + SPEAR300_CLCD_SIZE - 1,
-+		.end = SPEAR300_CLCD_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.dma_mask = ~0,
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 12af694..b45b85a 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -160,6 +160,11 @@ extern struct clcd_board clcd_plat_data;
+ /* spear310 declarations */
+ #elif defined(CONFIG_MACH_SPEAR310)
+ /* Add spear310 machine device structure declarations here */
++extern struct amba_device uart1_device;
++extern struct amba_device uart2_device;
++extern struct amba_device uart3_device;
++extern struct amba_device uart4_device;
++extern struct amba_device uart5_device;
+ extern struct platform_device plgpio_device;
+ extern struct platform_device nand_device;
+ 
+@@ -181,6 +186,8 @@ void __init spear310_init(void);
+ /* Add spear320 machine device structure declarations here */
+ extern struct amba_device clcd_device;
+ extern struct amba_device ssp_device[];
++extern struct amba_device uart1_device;
++extern struct amba_device uart2_device;
+ extern struct platform_device i2c1_device;
+ extern struct platform_device nand_device;
+ extern struct platform_device plgpio_device;
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index ffc1f63..673874a 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -142,6 +142,96 @@ struct pmx_driver pmx_driver = {
+ };
+ 
+ /* Add spear310 specific devices here */
++/* uart1 device registeration */
++struct amba_device uart1_device = {
++	.dev = {
++		.init_name = "uart1",
++	},
++	.res = {
++		.start = SPEAR310_UART1_BASE,
++		.end = SPEAR310_UART1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART1, NO_IRQ},
++};
++
++/* uart2 device registeration */
++struct amba_device uart2_device = {
++	.dev = {
++		.init_name = "uart2",
++	},
++	.res = {
++		.start = SPEAR310_UART2_BASE,
++		.end = SPEAR310_UART2_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART2, NO_IRQ},
++};
++
++/* uart3 device registeration */
++struct amba_device uart3_device = {
++	.dev = {
++		.init_name = "uart3",
++	},
++	.res = {
++		.start = SPEAR310_UART3_BASE,
++		.end = SPEAR310_UART3_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART3, NO_IRQ},
++};
++
++/* uart4 device registeration */
++struct amba_device uart4_device = {
++	.dev = {
++		.init_name = "uart4",
++	},
++	.res = {
++		.start = SPEAR310_UART4_BASE,
++		.end = SPEAR310_UART4_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART4, NO_IRQ},
++};
++
++/* uart5 device registeration */
++struct amba_device uart5_device = {
++	.dev = {
++		.init_name = "uart5",
++	},
++	.res = {
++		.start = SPEAR310_UART5_BASE,
++		.end = SPEAR310_UART5_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART5, NO_IRQ},
++};
++
++/* nand device registeration */
++static struct fsmc_nand_platform_data nand_platform_data;
++
++static struct resource nand_resources[] = {
++	{
++		.name = "nand_data",
++		.start = SPEAR310_NAND_BASE,
++		.end = SPEAR310_NAND_BASE + SZ_16 - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.name = "fsmc_regs",
++		.start = SPEAR310_FSMC_BASE,
++		.end = SPEAR310_FSMC_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++};
++
++struct platform_device nand_device = {
++	.name = "nand",
++	.id = -1,
++	.resource = nand_resources,
++	.num_resources = ARRAY_SIZE(nand_resources),
++	.dev.platform_data = &nand_platform_data,
++};
++
+ /* plgpio device registeration */
+ /*
+  * pin to offset and offset to pin converter functions
+@@ -178,31 +268,6 @@ int spear300_o2p(int offset)
+ 		return offset + 2;
+ }
+ 
+-/* nand device registeration */
+-static struct fsmc_nand_platform_data nand_platform_data;
+-
+-static struct resource nand_resources[] = {
+-	{
+-		.name = "nand_data",
+-		.start = SPEAR310_NAND_BASE,
+-		.end = SPEAR310_NAND_BASE + SZ_16 - 1,
+-		.flags = IORESOURCE_MEM,
+-	}, {
+-		.name = "fsmc_regs",
+-		.start = SPEAR310_FSMC_BASE,
+-		.end = SPEAR310_FSMC_BASE + SZ_4K - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-};
+-
+-struct platform_device nand_device = {
+-	.name = "nand",
+-	.id = -1,
+-	.resource = nand_resources,
+-	.num_resources = ARRAY_SIZE(nand_resources),
+-	.dev.platform_data = &nand_platform_data,
+-};
+-
+ static struct plgpio_platform_data plgpio_plat_data = {
+ 	.gpio_base = 8,
+ 	.irq_base = SPEAR_PLGPIO_INT_BASE,
 diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 6ab35db..ab4ad8e 100644
+index ac4f80b..e506203 100644
 --- a/arch/arm/mach-spear3xx/spear320.c
 +++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -399,7 +399,7 @@ struct amba_device clcd_device = {
- 	},
- 	.res = {
- 		.start = SPEAR320_CLCD_BASE,
--		.end = SPEAR320_CLCD_BASE + SPEAR320_CLCD_SIZE - 1,
-+		.end = SPEAR320_CLCD_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.dma_mask = ~0,
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 9d6d125..6be49b3 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -79,7 +79,7 @@ struct amba_device uart_device = {
- 	},
- 	.res = {
- 		.start = SPEAR3XX_ICM1_UART_BASE,
--		.end = SPEAR3XX_ICM1_UART_BASE + SPEAR3XX_ICM1_UART_SIZE - 1,
-+		.end = SPEAR3XX_ICM1_UART_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.irq = {IRQ_UART, NO_IRQ},
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index f39538e..a948dd4 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -35,7 +35,7 @@ struct amba_device clcd_device = {
- 	},
- 	.res = {
- 		.start = SPEAR6XX_ICM3_CLCD_BASE,
--		.end = SPEAR6XX_ICM3_CLCD_BASE + SPEAR6XX_ICM3_CLCD_SIZE - 1,
-+		.end = SPEAR6XX_ICM3_CLCD_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.dma_mask = ~0,
-@@ -117,8 +117,7 @@ struct amba_device uart_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM1_UART0_BASE,
--			.end = SPEAR6XX_ICM1_UART0_BASE +
--				SPEAR6XX_ICM1_UART0_SIZE - 1,
-+			.end = SPEAR6XX_ICM1_UART0_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_UART_0, NO_IRQ},
-@@ -128,8 +127,7 @@ struct amba_device uart_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM1_UART1_BASE,
--			.end = SPEAR6XX_ICM1_UART1_BASE +
--				SPEAR6XX_ICM1_UART1_SIZE - 1,
-+			.end = SPEAR6XX_ICM1_UART1_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_UART_1, NO_IRQ},
+@@ -447,6 +447,32 @@ struct amba_device ssp_device[] = {
+ 	}
+ };
+ 
++/* uart1 device registeration */
++struct amba_device uart1_device = {
++	.dev = {
++		.init_name = "uart1",
++	},
++	.res = {
++		.start = SPEAR320_UART1_BASE,
++		.end = SPEAR320_UART1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART1, NO_IRQ},
++};
++
++/* uart2 device registeration */
++struct amba_device uart2_device = {
++	.dev = {
++		.init_name = "uart2",
++	},
++	.res = {
++		.start = SPEAR320_UART2_BASE,
++		.end = SPEAR320_UART2_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {VIRQ_UART2, NO_IRQ},
++};
++
+ /* i2c1 device registeration */
+ static struct resource i2c1_resources[] = {
+ 	{
 -- 
 1.7.3.4
