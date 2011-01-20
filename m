@@ -1,32 +1,44 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 20 Jan 2011 16:30:27 -0500 (EST)
-Subject: Locking in the clk API
-In-Reply-To: <20110120185617.GI6335@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
-	<20110120185617.GI6335@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+From: bgamari.foss@gmail.com (Ben Gamari)
+Date: Thu, 20 Jan 2011 16:44:42 -0500
+Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
+In-Reply-To: <20110120040825.GB2389@legolas.emea.dhcp.ti.com>
+References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
+	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
+	<87d3nus4jr.fsf@gmail.com>
+	<20110119034528.GA2406@legolas.emea.dhcp.ti.com>
+	<874o947j9e.fsf@gmail.com>
+	<20110120040825.GB2389@legolas.emea.dhcp.ti.com>
+Message-ID: <8739ondzcl.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Jan 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Jan 20, 2011 at 04:29:15PM +0000, Ben Dooks wrote:
-> > I really don't like the fact that people are doing these things in
-> > atomic contexts, and I think we should apply some pressure to move
-> > the atomic caller cases to use systems where they can sleep such as
-> > using threaded-irq handlers (they work very nicely)
+--text follows this line--
+On Thu, 20 Jan 2011 06:08:25 +0200, Felipe Balbi <balbi@ti.com> wrote:
+> On Wed, Jan 19, 2011 at 03:04:13PM -0500, Ben Gamari wrote:
+> > I understand. That being said, Linus has made it well known that
+> > defconfigs will not be an option going forward. Have we found another
 > 
-> How do you ensure that printk is always called from a non-atomic
-> context?
+> I never mentioned defconfigs here.
+> 
+Certainly, I was trying to point out that there is no good way to
+package a configuration for a given board, which definitely increases
+the learning curve for a board integrator.
 
-Is this a good example?  I don't think that power sensitive systems such 
-as a cellphone should keep printk() enabled in the final product.  The 
-output from printk() over a serial port is a debugging convenience, and 
-trying to aggressively turn on/off the serial clock around each call to 
-printk() is a bit silly.  Better simply turn the serial clock on 
-whenever its console facility is opened, and turn it off when the 
-console is closed, which should be good enough in that context.
+> > means of selecting the basic drivers necessary to get a fully functional
+> > board? Perhaps a CONFIG_MACH_OMAP3_BEAGLE_CORE option selecting the
+> > necessary driver for a fully functional board would be a solution. I
+> 
+> I'll leave this for Tony to decide, but I don't like your proposal.
+> 
+Fair enough.
 
+> So you're saying that when you're building a kernel for you
+> laptop/desktop you don't have to get a menuconfig and choose the drivers
+> you want to compile ? I dare to doubt that.
+> 
+On the whole x86 hardware is far more uniform than ARM hardware. There
+is a good reason why there used to be so many defconfigs for ARM in the tree.
 
-Nicolas
+Cheers,
+
+- Ben
