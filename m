@@ -1,105 +1,383 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:40 +0530
-Subject: [PATCH V5 62/63] ST SPEAr: Adding information in Documentation/ and
-	MAINTAINERS
+Date: Thu, 20 Jan 2011 12:56:41 +0530
+Subject: [PATCH V5 63/63] ST SPEAr: Updating defconfigs
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <85f00c321b9531cde470a9863c8e5d3664ce7376.1295499395.git.viresh.kumar@st.com>
+Message-ID: <5266021cabc3fc7018b53345e98a62a15fa2a930.1295499395.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
-
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 ---
- Documentation/arm/SPEAr/overview.txt |   34 +++++++++++++++++++++++-----------
- MAINTAINERS                          |    6 ++++++
- 2 files changed, 29 insertions(+), 11 deletions(-)
+ arch/arm/configs/spear13xx_defconfig |   78 ++++++++++++++++++++++++++++++---
+ arch/arm/configs/spear3xx_defconfig  |   80 +++++++++++++++++++++++++++++++---
+ arch/arm/configs/spear6xx_defconfig  |   72 ++++++++++++++++++++++++++++---
+ 3 files changed, 211 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
-index 253a35c..4e510061 100644
---- a/Documentation/arm/SPEAr/overview.txt
-+++ b/Documentation/arm/SPEAr/overview.txt
-@@ -9,8 +9,9 @@ Introduction
- 
-   The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
-   supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
--  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
--  series is in progress.
-+  SPEAr310, SPEAr320, SPEAr600, SPEAr1300 and SPEAr1310 SOCs are supported.
-+  SPEAr3XX and SPEAr6XX are based on ARM9 whereas SPEAr13XX is based on latest
-+  ARM Cortex A9 CPUs.
- 
-   Hierarchy in SPEAr is as follows:
- 
-@@ -27,16 +28,25 @@ Introduction
- 			- SPEAr600_EVB (Evaluation Board)
- 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
- 		- SPEAr1300 (SOC)
-+			- SPEAr1300_EVB (Evaluation Board)
-+		- SPEAr1310 (SOC)
-+			- SPEAr1310_EVB (Evaluation Board)
- 
-   Configuration
-   -------------
- 
--  A generic configuration is provided for each machine, and can be used as the
-+  A generic configuration is provided for each machine family, and can be used as the
-   default by
--	make spear600_defconfig
--	make spear300_defconfig
--	make spear310_defconfig
--	make spear320_defconfig
-+	#make ARCH=arm spear13xx_defconfig
-+	#make ARCH=arm spear3xx_defconfig
-+	#make ARCH=arm spear6xx_defconfig
-+
-+  Compilation
-+  -----------
-+
-+  After applying default configuration, Linux kernel for SPEAr architecture
-+  can be compiled as
-+	#make ARCH=arm CROSS_COMPILE=arm-linux- uImage
- 
-   Layout
-   ------
-@@ -48,13 +58,15 @@ Introduction
-   Each machine series have a directory with name arch/arm/mach-spear followed by
-   series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
- 
--  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
--  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
-+  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c, for
-+  spear6xx is mach-spear6xx/spear6xx.c and similarly for spear13xx is
-+  mach-spear13xx/spear13xx.c. mach-spear* also contain soc/machine
-   specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
--  mach-spear* also contains board specific files for each machine type.
-+  Board specific files for each machine type is also contained in mach-spear*
-+  folder.
- 
- 
-   Document Author
-   ---------------
- 
--  Viresh Kumar, (c) 2010 ST Microelectronics
-+  Viresh Kumar, Shiraz Hashim (c) 2010 ST Microelectronics
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1af022e..a62e783 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5802,6 +5802,12 @@ W:	http://www.st.com/spear
- S:	Maintained
- F:	arch/arm/plat-spear/
- 
-+SPEAR13XX MACHINE SUPPORT
-+M:	Shiraz Hashim <shiraz.hashim@st.com>
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	arch/arm/mach-spear13xx/
-+
- SPEAR3XX MACHINE SUPPORT
- M:	Viresh Kumar <viresh.kumar@st.com>
- W:	http://www.st.com/spear
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 9f3baf8..d764fee 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -10,31 +10,94 @@ CONFIG_PLAT_SPEAR=y
+ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_BOARD_SPEAR1300_EVB=y
+ CONFIG_BOARD_SPEAR1310_EVB=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCIEPORTBUS=y
++# CONFIG_PCIEAER is not set
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_AEABI=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_STAT_DETAILS=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
++CONFIG_ARPD=y
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CONCAT=y
+ CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_ST=y
++CONFIG_CHR_DEV_OSST=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_NETDEVICES=y
++# CONFIG_WLAN is not set
+ CONFIG_INPUT_FF_MEMLESS=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_INPUT_EVDEV=y
++CONFIG_INPUT_EVBUG=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_SPEAR=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_RAW_DRIVER=y
+ CONFIG_MAX_RAW_DEVS=8192
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_SPIDEV=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_TEST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_SPEAR=y
++CONFIG_RTC_CLASS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_SECURITY=y
+@@ -42,16 +105,18 @@ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
++CONFIG_NLS_ASCII=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
+@@ -59,3 +124,4 @@ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
++# CONFIG_ARM_UNWIND is not set
+diff --git a/arch/arm/configs/spear3xx_defconfig b/arch/arm/configs/spear3xx_defconfig
+index fea7e1f..5a210ce 100644
+--- a/arch/arm/configs/spear3xx_defconfig
++++ b/arch/arm/configs/spear3xx_defconfig
+@@ -10,13 +10,54 @@ CONFIG_PLAT_SPEAR=y
+ CONFIG_BOARD_SPEAR300_EVB=y
+ CONFIG_BOARD_SPEAR310_EVB=y
+ CONFIG_BOARD_SPEAR320_EVB=y
++CONFIG_AEABI=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_ARPD=y
++# CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++CONFIG_SCSI_TGT=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_ST=y
++CONFIG_CHR_DEV_OSST=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_NETDEVICES=y
++# CONFIG_WLAN is not set
+ CONFIG_INPUT_FF_MEMLESS=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_SPEAR=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+@@ -24,30 +65,55 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_RAW_DRIVER=y
+ CONFIG_MAX_RAW_DEVS=8192
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_FB_ARMCLCD_SAMSUNG_LMS700=y
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_TEST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_SPEAR=y
++CONFIG_RTC_CLASS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
++CONFIG_NLS_ASCII=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
++# CONFIG_ARM_UNWIND is not set
+diff --git a/arch/arm/configs/spear6xx_defconfig b/arch/arm/configs/spear6xx_defconfig
+index cef2e83..5217396 100644
+--- a/arch/arm/configs/spear6xx_defconfig
++++ b/arch/arm/configs/spear6xx_defconfig
+@@ -9,10 +9,48 @@ CONFIG_MODVERSIONS=y
+ CONFIG_PLAT_SPEAR=y
+ CONFIG_ARCH_SPEAR6XX=y
+ CONFIG_BOARD_SPEAR600_EVB=y
++CONFIG_AEABI=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_POWERSAVE=y
++CONFIG_CPU_FREQ_GOV_USERSPACE=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_BINFMT_MISC=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_ARPD=y
++# CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_M25P80=y
++# CONFIG_M25PXX_USE_FAST_READ is not set
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_ST=y
++CONFIG_CHR_DEV_OSST=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_NETDEVICES=y
++# CONFIG_WLAN is not set
+ CONFIG_INPUT_FF_MEMLESS=y
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+@@ -20,30 +58,52 @@ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_RAW_DRIVER=y
+ CONFIG_MAX_RAW_DEVS=8192
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_DESIGNWARE=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_SPI_SPIDEV=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_ARM_SP805_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_FB_ARMCLCD_SAMSUNG_LMS700=y
+ # CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++# CONFIG_USB_EHCI_TT_NEWSCHED is not set
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_TEST=y
++CONFIG_RTC_CLASS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
++CONFIG_NLS_ASCII=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
++# CONFIG_ARM_UNWIND is not set
 -- 
 1.7.3.4
