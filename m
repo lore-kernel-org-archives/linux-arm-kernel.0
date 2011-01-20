@@ -1,44 +1,42 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Thu, 20 Jan 2011 09:14:59 +0530
-Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
-In-Reply-To: <20110119224406.GK4957@atomide.com>
-References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>
-	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>
-	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>
-	<20101221202914.GK5829@atomide.com> <4D2440E0.7040008@nokia.com>
-	<87mxnfz2f4.fsf@ti.com> <4D36BBC8.2000305@nokia.com>
-	<20110119222327.GJ4957@atomide.com>
-	<20110119224406.GK4957@atomide.com>
-Message-ID: <20110120034459.GB3615@manju-desktop>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 20 Jan 2011 06:08:25 +0200
+Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
+In-Reply-To: <874o947j9e.fsf@gmail.com>
+References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
+	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
+	<87d3nus4jr.fsf@gmail.com>
+	<20110119034528.GA2406@legolas.emea.dhcp.ti.com>
+	<874o947j9e.fsf@gmail.com>
+Message-ID: <20110120040825.GB2389@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 02:44:07PM -0800, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [110119 14:23]:
-> > * Adrian Hunter <adrian.hunter@nokia.com> [110119 02:23]:
-> > > 
-> > > From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
-> > > From: Adrian Hunter <adrian.hunter@nokia.com>
-> > > Date: Wed, 24 Nov 2010 13:23:21 +0200
-> > > Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
-> > > 
-> > > When clearing the DMA channel, clear all status bits.
-> > > 
-> > > When handling a DMA interrupt, clear only the interrupt
-> > > status bits that have been read and are passed to the
-> > > channel's interrupt handler, not every status bit.
-> > > 
-> > > Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+On Wed, Jan 19, 2011 at 03:04:13PM -0500, Ben Gamari wrote:
+> On Wed, 19 Jan 2011 05:45:28 +0200, Felipe Balbi <balbi@ti.com> wrote:
+> > The point is, being able to disable features I don't want on my kernel
+> > image, is completely valid, if there's a compile breakage, then fix the
+> > breakage but don't prevent the board from compiling.
 > > 
-> > Thanks, will queue as a fix.
-> 
-> This did not apply for some reason, I've applied it manually.
-> Please check that I got it right in omap-fixes branch soonish.
-> Let me know if it needs updating.
-Looks like the commit message is missing:
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> I understand. That being said, Linus has made it well known that
+> defconfigs will not be an option going forward. Have we found another
 
-you can also add:
-Acked-by: G, Manjunath Kondaiah <manjugk@ti.com>
+I never mentioned defconfigs here.
 
--Manjunath
+> means of selecting the basic drivers necessary to get a fully functional
+> board? Perhaps a CONFIG_MACH_OMAP3_BEAGLE_CORE option selecting the
+> necessary driver for a fully functional board would be a solution. I
+
+I'll leave this for Tony to decide, but I don't like your proposal.
+
+> remember this being discussed several months ago (when Linus started
+> pulling defconfigs out of the tree), but I don't recall there being any
+> replacement proposals. It should be possible to build a functional
+> kernel from the mainline without iterating over all available
+> configuration options.
+
+So you're saying that when you're building a kernel for you
+laptop/desktop you don't have to get a menuconfig and choose the drivers
+you want to compile ? I dare to doubt that.
+
+-- 
+balbi
