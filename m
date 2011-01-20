@@ -1,92 +1,74 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jan 2011 13:02:46 +0000
+Date: Thu, 20 Jan 2011 13:12:39 +0000
 Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
-In-Reply-To: <1295522421.4366.34.camel@m0nster>
+In-Reply-To: <20110120130246.GA23941@n2100.arm.linux.org.uk>
 References: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
 	<1295522421.4366.34.camel@m0nster>
-Message-ID: <20110120130246.GA23941@n2100.arm.linux.org.uk>
+	<20110120130246.GA23941@n2100.arm.linux.org.uk>
+Message-ID: <20110120131239.GB23941@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 03:20:21AM -0800, Daniel Walker wrote:
-> On Tue, 2011-01-18 at 15:03 -0800, Daniel Walker wrote:
-> > Remove parts of this driver which use internal API calls. This
-> > replaces the calls as suggested by Russell King.
-> > 
-> > Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
-> > ---
-> >  drivers/mmc/host/msm_sdcc.c |   49 +++++++++++++++++++-----------------------
-> >  1 files changed, 22 insertions(+), 27 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-> > index 5decfd0..733d233 100644
-> > --- a/drivers/mmc/host/msm_sdcc.c
-> > +++ b/drivers/mmc/host/msm_sdcc.c
-> > @@ -383,14 +383,30 @@ static int msmsdcc_config_dma(struct msmsdcc_host *host, struct mmc_data *data)
-> >  	host->curr.user_pages = 0;
-> >  
-> >  	box = &nc->cmd[0];
-> > -	for (i = 0; i < host->dma.num_ents; i++) {
-> > -		box->cmd = CMD_MODE_BOX;
-> >  
-> > -	/* Initialize sg dma address */
-> > -	sg->dma_address = page_to_dma(mmc_dev(host->mmc), sg_page(sg))
-> > -				+ sg->offset;
+On Thu, Jan 20, 2011 at 01:02:46PM +0000, Russell King - ARM Linux wrote:
+> Strongly ordered requires no additional maintainence to ensure that writes
+> to it are immediately visible to hardware.  However, ARMv6 and later
+> requires a data synchronization barrier to ensure that writes to 'normal
+> non-cachable' memory are visible before writes to 'device' memory complete.
 > 
-> It would seem there was a reason for this change.. The person that added
-> this was Brent Degraaf (who is CC'd) ..
-> 
-> Quoting him below speaking about why dma_map_sg() isn't just used,
-> 
-> "Previous version of msm_sdcc.c had a cache coherency problem for
-> precisely this reason. The dma_map_sg is what cleans the caches for
-> these commands and so must be done AFTER the commands are populated. If
-> this entry is left until the map function is called, the
-> box->dst_row_addr will not be filled properly for reads."
+> >From what I can see, the driver does use writel() as does the DMA driver
+> in arch/arm/mach-msm/dma.c, so there should be no problem with ARMv6 CPUs.
 
-It would be nice if problems such as this were discussed on the
-linux-arm-kernel mailing list when they appear.
+BTW, it looks like the work-around was added at the time when writel() did
+not have the necessary barriers:
 
-My response to this is:
+commit 56a8b5b8ae81bd766e527a0e5274a087c3c1109d
+Author: San Mehat <san@google.com>
+Date:   Sat Nov 21 12:29:46 2009 -0800
 
-dma_map_sg() does two things.  For each scatterlist entry:
+    mmc: msm_sdcc: Reduce command timeouts and improve reliability.
 
-* it converts the entry to a DMA address for the device and puts
-  this in sg_dma_address().  The length of the entry is sg_dma_len().
++       n = dma_map_sg(mmc_dev(host->mmc), host->dma.sg,
++                       host->dma.num_ents, host->dma.dir);
++/* dsb inside dma_map_sg will write nc out to mem as well */
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    so we are talking about ARMv6 or later as previous versions did not
+    have dsb.
 
-* for each of the buffers described by the scatterlist, it ensures
-  that the DMA device can see the data for DMA_TO_DEVICE transfers.
-  for DMA_FROM_DEVICE transfers, it ensures that there are no dirty
-  cache lines.  For some implementations the cache lines are
-  invalidated to achieve this.
+vs
 
-It is not guaranteed (and implementations do not predictably) cause any
-other cache lines to be evicted or written back which are not described
-by the scatterlist.
+commit e936771a76a7b61ca55a5142a3de835c2e196871
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Wed Jul 28 22:00:54 2010 +0100
 
-On dma_unmap_sg(), for each scatterlist entry:
+    ARM: 6271/1: Introduce *_relaxed() I/O accessors
 
-* for DMA_FROM_DEVICE, some implementations cause the cache lines
-  described by the scatterlist to be invalidated.
+commit 79f64dbf68c8a9779a7e9a25e0a9f0217a25b57a
+Author: Catalin Marinas <catalin.marinas@arm.com>
+Date:   Wed Jul 28 22:01:55 2010 +0100
 
-So, for anything _outside_ of the scatterlist, it is *unpredictable*
-whether anything happens to them by way of the DMA API, and writing a
-driver to rely on any behaviour observed is invalid.
+    ARM: 6273/1: Add barriers to the I/O accessors if ARM_DMA_MEM_BUFFERABLE
 
-The driver uses the passed scatterlist from the MMC layer to map, so the
-only thing that the DMA API is going to touch is the pages which it's
-performing IO on.
+    When the coherent DMA buffers are mapped as Normal Non-cacheable
+    (ARM_DMA_MEM_BUFFERABLE enabled), buffer accesses are no longer ordered
+    with Device memory accesses causing failures in device drivers that do
+    not use the mandatory memory barriers before starting a DMA transfer.
+    LKML discussions led to the conclusion that such barriers have to be
+    added to the I/O accessors:
 
-Therefore, it is entirely wrong for this driver to expect this box->blah
-data to be written back by the DMA scatterlist mapping code.
+    http://thread.gmane.org/gmane.linux.kernel/683509/focus=686153
+    http://thread.gmane.org/gmane.linux.ide/46414
+    http://thread.gmane.org/gmane.linux.kernel.cross-arch/5250
 
-Now, looking at the code a little more closely, host->dma.nc is allocated
-via dma_alloc_coherent().  This returns either strongly ordered memory
-for architectures prior to ARMv6, or 'normal non-cacheable' for ARMv6
-onwards.
+    This patch introduces a wmb() barrier to the write*() I/O accessors to
+    handle the situations where Normal Non-cacheable writes are still in the
+    processor (or L2 cache controller) write buffer before a DMA transfer
+    command is issued. For the read*() accessors, a rmb() is introduced
+    after the I/O to avoid speculative loads where the driver polls for a
+    DMA transfer ready bit.
 
-Strongly ordered requires no additional maintainence to ensure that writes
-to it are immediately visible to hardware.  However, ARMv6 and later
-requires a data synchronization barrier to ensure that writes to 'normal
-non-cachable' memory are visible before writes to 'device' memory complete.
+So the necessary barriers were found to be necessary way after MSM
+discovered the problem.  It _is_ related to the ARMv6 weakly ordered
+memory model, and it _was_ a bug in the ARM IO accessor implementation.
+
+It would've been nice to have had the problem discussed at architecture
+level so maybe the problem could've been found sooner and fixed earlier.
