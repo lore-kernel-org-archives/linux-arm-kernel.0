@@ -1,52 +1,41 @@
-From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
-Date: Thu, 20 Jan 2011 21:25:36 +0100
-Subject: [Openpxa-users] Linux udelay() is way off
-In-Reply-To: <20110120193013.GL6335@n2100.arm.linux.org.uk>
-References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>
-	<201101201800.04289.marek.vasut@gmail.com>
-	<20110120175551.GG6335@n2100.arm.linux.org.uk>
-	<AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
-	<20110120193013.GL6335@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikawLY2QcoUdcrF-SmmAbGM1MhzWLZogKb=5VAV@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Thu, 20 Jan 2011 12:32:38 -0800
+Subject: [PATCH 0/7] Nexus One Support
+Message-ID: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/20 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Jan 20, 2011 at 08:18:10PM +0100, Bj?rn Forsman wrote:
->> [ ? 11.425363] cpufreq-core: saving 518144 as reference value for
->> loops_per_jiffy; freq is 312000 kHz
->> [ ? 11.425523] cpufreq-core: scaling loops_per_jiffy to 1036288 for
->> frequency 624000 kHz
->
-> So despite scaling lpj by a factor of two for the doubling in clock
-> frequency, we see a 30% error in it?
+This series adds basic Nexus One support which includes a booting
+kernel, and functional MMC .
 
-No. udelay() is ~30 % of what it should be. My gpio + oscilloscope
-test showed that udelay(50) => 16 us in real time with cpufreq
-enabled. This gives 16/50 = 0.32.
+Most people won't be able to use this yet unfortunately because
+you need a serial cable to get any output. However, it's a start.
 
-> Is it possible to boot at 624MHz and report the resulting lpj?
+Brian Swetland (1):
+  [ARM] msm: qsd8k memory base is at 0x20000000
 
-I think I need some help doing that. I found some clock setup in
-<u-boot-pxa>/arch/arm/cpu/pxa/start.S (OpenPXA tree) but I'm not
-familiar with it.
+Daniel Walker (6):
+  msm: qsd8x50: add uart platform data
+  msm: qsd8x50: add acpuclock code
+  msm: mahimahi: add mahimahi board file
+  msm: mahimahi: add in mmc support code
+  msm: mahimahi: add gpio pin muxing code
+  msm: mahimahi: initialize mmc at start up
 
-> Alternatively, call calibrate_delay() after the cpufreq switch to
-> 624MHz, disabling the 'printed' stuff and see what it reports.
+ arch/arm/mach-msm/Kconfig              |    8 +-
+ arch/arm/mach-msm/Makefile             |    5 +-
+ arch/arm/mach-msm/Makefile.boot        |    5 +
+ arch/arm/mach-msm/acpuclock-qsd8x50.c  |  457 ++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/board-mahimahi-mmc.c |  238 +++++++++++++++++
+ arch/arm/mach-msm/board-mahimahi.c     |   52 +++-
+ arch/arm/mach-msm/board-mahimahi.h     |  147 ++++++++++
+ arch/arm/mach-msm/devices-qsd8x50.c    |   42 +++
+ arch/arm/mach-msm/include/mach/board.h |    1 +
+ 9 files changed, 942 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-msm/acpuclock-qsd8x50.c
+ create mode 100644 arch/arm/mach-msm/board-mahimahi-mmc.c
+ create mode 100644 arch/arm/mach-msm/board-mahimahi.h
 
-First attempts at moving calibrate_delay() after freq switch failed. I
-will try more. Just had to send this so stop the misunderstanding
-about how much udelay() is off...
-
-What do you mean by disabling the 'printed' stuff? The cpufreq debug stuff?
-
-Best regards,
-Bj?rn Forsman
-
-> I wonder if this is a case where it scales according to
->
-> ? ? ? ?new_lpj = ref_lpj * (new_freq / ref_freq) + some_offset
->
-> rather than just
->
-> ? ? ? ?new_lpj = ref_lpj * (new_freq / ref_freq)
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
