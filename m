@@ -1,43 +1,48 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu, 20 Jan 2011 13:10:40 +0200
-Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
-In-Reply-To: <20110119224406.GK4957@atomide.com>
-References: <20101130132341.13286.25157.sendpatchset@ahunter-work.research.nokia.com>
-	<20101130132355.13286.77389.sendpatchset@ahunter-work.research.nokia.com>
-	<541b3a50479779f3e814aa93d506cbdd@mail.gmail.com>
-	<20101221202914.GK5829@atomide.com>
-	<4D2440E0.7040008@nokia.com> <87mxnfz2f4.fsf@ti.com>
-	<4D36BBC8.2000305@nokia.com> <20110119222327.GJ4957@atomide.com>
-	<20110119224406.GK4957@atomide.com>
-Message-ID: <4D381830.8@nokia.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 20 Jan 2011 13:16:45 +0200
+Subject: [PATCH] omap2: fix DPLL_FREQSEL calculation
+In-Reply-To: <87ei8726wf.fsf@vostro.fn.ogness.net>
+References: <87ei8726wf.fsf@vostro.fn.ogness.net>
+Message-ID: <20110120111645.GB2223@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/11 00:44, Tony Lindgren wrote:
-> * Tony Lindgren<tony@atomide.com>  [110119 14:23]:
->> * Adrian Hunter<adrian.hunter@nokia.com>  [110119 02:23]:
->>>
->>>  From fffa19df17d73c1ed2e8c65c0b6604ee1dddff84 Mon Sep 17 00:00:00 2001
->>> From: Adrian Hunter<adrian.hunter@nokia.com>
->>> Date: Wed, 24 Nov 2010 13:23:21 +0200
->>> Subject: [PATCH] OMAP: DMA: clear interrupt status correctly
->>>
->>> When clearing the DMA channel, clear all status bits.
->>>
->>> When handling a DMA interrupt, clear only the interrupt
->>> status bits that have been read and are passed to the
->>> channel's interrupt handler, not every status bit.
->>>
->>> Signed-off-by: Adrian Hunter<adrian.hunter@nokia.com>
->>
->> Thanks, will queue as a fix.
->
-> This did not apply for some reason, I've applied it manually.
-> Please check that I got it right in omap-fixes branch soonish.
-> Let me know if it needs updating.
+Hi,
 
-Looks fine
+On Thu, Jan 20, 2011 at 11:42:24AM +0100, John Ogness wrote:
+> This patch fixes the calculation of the internal frequency. The value
+> of "n" is one less than the actual divider. 0 is a valid value.
+> 
+> An example where the internal frequency is calculated correctly can be
+> found here: clkt_dpll.c:_dpll_test_fint()
+> 
+> This patch is against linux-next-20110120.
+> 
+> Signed-off-by: John Ogness <john.ogness@linutronix.de>
 
->
-> Tony
->
+scripts/get_maintainer.pl would've helped you getting a better Cc list.
+I'm adding linux-omap and lakml
+
+> ---
+>  arch/arm/mach-omap2/dpll3xxx.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> --- a/arch/arm/mach-omap2/dpll3xxx.c	2011-01-20 11:20:41.706860086 +0100
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c	2011-01-20 11:21:27.966860086 +0100
+> @@ -93,7 +93,7 @@ static u16 _omap3_dpll_compute_freqsel(s
+>  	unsigned long fint;
+>  	u16 f = 0;
+>  
+> -	fint = clk->dpll_data->clk_ref->rate / n;
+> +	fint = clk->dpll_data->clk_ref->rate / (n + 1);
+>  
+>  	pr_debug("clock: fint is %lu\n", fint);
+>  
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+-- 
+balbi
