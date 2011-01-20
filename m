@@ -1,209 +1,169 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:29 +0530
-Subject: [PATCH V5 51/63] SPEAr3xx: Make local structures static
+Date: Thu, 20 Jan 2011 12:56:33 +0530
+Subject: [PATCH V5 55/63] SPEAr3xx: Replace defconfigs with single unified
+	defconfig
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <81f915888d05e56a1e70b86de386c52daff0a2d7.1295499395.git.viresh.kumar@st.com>
+Message-ID: <a2ad7cc5be33aee96bfd39848d07362afe46e73d.1295499395.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ryan Mallon <ryan@bluewatersys.com>
 
-Several structures in arch/arm/mach-spear3xx are not marked static
-like they should be. Fix this.
+We only need one defconfig for SPEAr3xx now since we can build all
+three boards into one kernel.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/spear300.c |    6 +++---
- arch/arm/mach-spear3xx/spear310.c |   16 ++++++++--------
- arch/arm/mach-spear3xx/spear320.c |   12 ++++++------
- arch/arm/mach-spear3xx/spear3xx.c |    2 --
- 4 files changed, 17 insertions(+), 19 deletions(-)
+ arch/arm/configs/spear310_defconfig                |   52 --------------------
+ arch/arm/configs/spear320_defconfig                |   52 --------------------
+ .../{spear300_defconfig => spear3xx_defconfig}     |    4 +-
+ 3 files changed, 3 insertions(+), 105 deletions(-)
+ delete mode 100644 arch/arm/configs/spear310_defconfig
+ delete mode 100644 arch/arm/configs/spear320_defconfig
+ rename arch/arm/configs/{spear300_defconfig => spear3xx_defconfig} (93%)
 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 313938f..230940f 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -114,7 +114,6 @@ struct pmx_mode caml_lcd_mode = {
- 	.value = 0x0F,
- };
- 
--/* devices */
- /* Pad multiplexing for FSMC 2 NAND devices */
- static struct pmx_mux_reg pmx_fsmc_2_mux[] = {
- 	{
-@@ -700,7 +699,7 @@ struct platform_device sdhci_device = {
- };
- 
- /* spear3xx shared irq */
--struct shirq_dev_config shirq_ras1_config[] = {
-+static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
- 		.virq = VIRQ_IT_PERS_S,
- 		.enb_mask = IT_PERS_S_IRQ_MASK,
-@@ -740,7 +739,8 @@ struct shirq_dev_config shirq_ras1_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_ras1 = {
-+
-+static struct spear_shirq shirq_ras1 = {
- 	.irq = IRQ_GEN_RAS_1,
- 	.dev_config = shirq_ras1_config,
- 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 4192ed2..848bdde 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -363,7 +363,7 @@ struct platform_device plgpio_device = {
- 
- 
- /* spear3xx shared irq */
--struct shirq_dev_config shirq_ras1_config[] = {
-+static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
- 		.virq = VIRQ_SMII0,
- 		.status_mask = SMII0_IRQ_MASK,
-@@ -391,7 +391,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_ras1 = {
-+static struct spear_shirq shirq_ras1 = {
- 	.irq = IRQ_GEN_RAS_1,
- 	.dev_config = shirq_ras1_config,
- 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
-@@ -403,7 +403,7 @@ struct spear_shirq shirq_ras1 = {
- 	},
- };
- 
--struct shirq_dev_config shirq_ras2_config[] = {
-+static struct shirq_dev_config shirq_ras2_config[] = {
- 	{
- 		.virq = VIRQ_UART1,
- 		.status_mask = UART1_IRQ_MASK,
-@@ -422,7 +422,7 @@ struct shirq_dev_config shirq_ras2_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_ras2 = {
-+static struct spear_shirq shirq_ras2 = {
- 	.irq = IRQ_GEN_RAS_2,
- 	.dev_config = shirq_ras2_config,
- 	.dev_count = ARRAY_SIZE(shirq_ras2_config),
-@@ -434,14 +434,14 @@ struct spear_shirq shirq_ras2 = {
- 	},
- };
- 
--struct shirq_dev_config shirq_ras3_config[] = {
-+static struct shirq_dev_config shirq_ras3_config[] = {
- 	{
- 		.virq = VIRQ_EMI,
- 		.status_mask = EMI_IRQ_MASK,
- 	},
- };
- 
--struct spear_shirq shirq_ras3 = {
-+static struct spear_shirq shirq_ras3 = {
- 	.irq = IRQ_GEN_RAS_3,
- 	.dev_config = shirq_ras3_config,
- 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
-@@ -453,7 +453,7 @@ struct spear_shirq shirq_ras3 = {
- 	},
- };
- 
--struct shirq_dev_config shirq_intrcomm_ras_config[] = {
-+static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
- 	{
- 		.virq = VIRQ_TDM_HDLC,
- 		.status_mask = TDM_HDLC_IRQ_MASK,
-@@ -466,7 +466,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_intrcomm_ras = {
-+static struct spear_shirq shirq_intrcomm_ras = {
- 	.irq = IRQ_INTRCOMM_RAS_ARM,
- 	.dev_config = shirq_intrcomm_ras_config,
- 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 419d968..2660d9a 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -835,7 +835,7 @@ struct platform_device sdhci_device = {
- };
- 
- /* spear3xx shared irq */
--struct shirq_dev_config shirq_ras1_config[] = {
-+static struct shirq_dev_config shirq_ras1_config[] = {
- 	{
- 		.virq = VIRQ_EMI,
- 		.status_mask = EMI_IRQ_MASK,
-@@ -851,7 +851,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_ras1 = {
-+static struct spear_shirq shirq_ras1 = {
- 	.irq = IRQ_GEN_RAS_1,
- 	.dev_config = shirq_ras1_config,
- 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
-@@ -864,7 +864,7 @@ struct spear_shirq shirq_ras1 = {
- 	},
- };
- 
--struct shirq_dev_config shirq_ras3_config[] = {
-+static struct shirq_dev_config shirq_ras3_config[] = {
- 	{
- 		.virq = VIRQ_PLGPIO,
- 		.enb_mask = GPIO_IRQ_MASK,
-@@ -883,7 +883,7 @@ struct shirq_dev_config shirq_ras3_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_ras3 = {
-+static struct spear_shirq shirq_ras3 = {
- 	.irq = IRQ_GEN_RAS_3,
- 	.dev_config = shirq_ras3_config,
- 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
-@@ -897,7 +897,7 @@ struct spear_shirq shirq_ras3 = {
- 	},
- };
- 
--struct shirq_dev_config shirq_intrcomm_ras_config[] = {
-+static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
- 	{
- 		.virq = VIRQ_CANU,
- 		.status_mask = CAN_U_IRQ_MASK,
-@@ -945,7 +945,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
- 	},
- };
- 
--struct spear_shirq shirq_intrcomm_ras = {
-+static struct spear_shirq shirq_intrcomm_ras = {
- 	.irq = IRQ_INTRCOMM_RAS_ARM,
- 	.dev_config = shirq_intrcomm_ras_config,
- 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 7fcde43..f8408f6 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -273,7 +273,6 @@ void __init spear3xx_map_io(void)
- }
- 
- /* pad multiplexing support */
--/* devices */
- 
- /* Pad multiplexing for firda device */
- static struct pmx_mux_reg pmx_firda_mux[] = {
-@@ -606,7 +605,6 @@ struct pmx_dev pmx_timer_1_2 = {
- };
- 
- #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--/* plgpios devices */
- /* Pad multiplexing for plgpio_0_1 devices */
- static struct pmx_mux_reg pmx_plgpio_0_1_mux[] = {
- 	{
+diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
+deleted file mode 100644
+index 824e444..0000000
+--- a/arch/arm/configs/spear310_defconfig
++++ /dev/null
+@@ -1,52 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_EXTRA_PASS=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
+-CONFIG_PLAT_SPEAR=y
+-CONFIG_MACH_SPEAR310=y
+-CONFIG_BINFMT_MISC=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=16384
+-CONFIG_INPUT_FF_MEMLESS=y
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_SERIAL_AMBA_PL011=y
+-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+-# CONFIG_HW_RANDOM is not set
+-CONFIG_RAW_DRIVER=y
+-CONFIG_MAX_RAW_DEVS=8192
+-CONFIG_GPIO_SYSFS=y
+-CONFIG_GPIO_PL061=y
+-# CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT2_FS_XATTR=y
+-CONFIG_EXT2_FS_SECURITY=y
+-CONFIG_EXT3_FS=y
+-CONFIG_EXT3_FS_SECURITY=y
+-CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
+-CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+-CONFIG_TMPFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+-CONFIG_NLS_DEFAULT="utf8"
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_SPINLOCK=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
+diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
+deleted file mode 100644
+index 842f7f3..0000000
+--- a/arch/arm/configs/spear320_defconfig
++++ /dev/null
+@@ -1,52 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
+-CONFIG_BSD_PROCESS_ACCT=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_EXTRA_PASS=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
+-CONFIG_PLAT_SPEAR=y
+-CONFIG_MACH_SPEAR320=y
+-CONFIG_BINFMT_MISC=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=16384
+-CONFIG_INPUT_FF_MEMLESS=y
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_SERIAL_AMBA_PL011=y
+-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+-# CONFIG_HW_RANDOM is not set
+-CONFIG_RAW_DRIVER=y
+-CONFIG_MAX_RAW_DEVS=8192
+-CONFIG_GPIO_SYSFS=y
+-CONFIG_GPIO_PL061=y
+-# CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT2_FS_XATTR=y
+-CONFIG_EXT2_FS_SECURITY=y
+-CONFIG_EXT3_FS=y
+-CONFIG_EXT3_FS_SECURITY=y
+-CONFIG_AUTOFS4_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=m
+-CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+-CONFIG_TMPFS=y
+-CONFIG_PARTITION_ADVANCED=y
+-CONFIG_NLS=y
+-CONFIG_NLS_DEFAULT="utf8"
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=m
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+-CONFIG_DEBUG_SPINLOCK=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_CRC32 is not set
+diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear3xx_defconfig
+similarity index 93%
+rename from arch/arm/configs/spear300_defconfig
+rename to arch/arm/configs/spear3xx_defconfig
+index cf29f3e..fea7e1f 100644
+--- a/arch/arm/configs/spear300_defconfig
++++ b/arch/arm/configs/spear3xx_defconfig
+@@ -7,6 +7,9 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_PLAT_SPEAR=y
++CONFIG_BOARD_SPEAR300_EVB=y
++CONFIG_BOARD_SPEAR310_EVB=y
++CONFIG_BOARD_SPEAR320_EVB=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_BLK_DEV_RAM=y
+@@ -24,7 +27,6 @@ CONFIG_MAX_RAW_DEVS=8192
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PL061=y
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ # CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_EXT2_FS=y
 -- 
 1.7.3.4
