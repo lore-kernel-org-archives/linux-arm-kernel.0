@@ -1,65 +1,47 @@
 From: kauppi@papupata.org (Ari Kauppi)
-Date: Thu, 20 Jan 2011 20:57:20 +0200
-Subject: [PATCH v2 3/3] ARM: oprofile: Always allow backtraces
+Date: Thu, 20 Jan 2011 20:57:19 +0200
+Subject: [PATCH v2 2/3] oprofile: Provide stubs for oprofile_perf_{init,exit}
 In-Reply-To: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
 References: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
-Message-ID: <1295549840-17809-4-git-send-email-kauppi@papupata.org>
+Message-ID: <1295549840-17809-3-git-send-email-kauppi@papupata.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Always allow backtrace when using oprofile on ARM, even if a PMU
-isn't present. Implemented by removing code and using stubs
-provided by <linux/oprofile.h>.
-
-Restores functionality originally introduced in commit
-1b7b56982fdcd9d85effd76f3928cf5d6eb26155 ("oprofile: Always allow
-backtraces on ARM") by Richard Purdie.
+If CONFIG_HW_PERF_EVENTS is not defined, provide stubs for
+oprofile_perf_init and oprofile_perf_exit. Allows cleaning of
+architecture specific implementations.
 
 Signed-off-by: Ari Kauppi <kauppi@papupata.org>
 ---
- arch/arm/oprofile/common.c |   12 ++----------
- 1 files changed, 2 insertions(+), 10 deletions(-)
+ include/linux/oprofile.h |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 8aa9744..2b66391 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -10,8 +10,6 @@
-  */
- 
- #include <linux/cpumask.h>
--#include <linux/err.h>
--#include <linux/errno.h>
+diff --git a/include/linux/oprofile.h b/include/linux/oprofile.h
+index 54c8382..1ca6411 100644
+--- a/include/linux/oprofile.h
++++ b/include/linux/oprofile.h
+@@ -16,6 +16,8 @@
+ #include <linux/types.h>
+ #include <linux/spinlock.h>
  #include <linux/init.h>
- #include <linux/mutex.h>
- #include <linux/oprofile.h>
-@@ -46,6 +44,7 @@ char *op_name_from_perf_id(void)
- 		return NULL;
- 	}
- }
-+#endif
++#include <linux/errno.h>
++#include <linux/printk.h>
+ #include <asm/atomic.h>
+  
+ /* Each escaped entry is prefixed by ESCAPE_CODE
+@@ -190,6 +192,13 @@ int oprofile_write_commit(struct op_entry *entry);
+ int __init oprofile_perf_init(struct oprofile_operations *ops);
+ void oprofile_perf_exit(void);
+ char *op_name_from_perf_id(void);
++#else
++static inline int __init oprofile_perf_init(struct oprofile_operations *ops)
++{
++	pr_info("oprofile: hardware counters not available\n");
++	return -ENODEV;
++}
++static inline void oprofile_perf_exit(void) { }
+ #endif /* CONFIG_HW_PERF_EVENTS */
  
- static int report_trace(struct stackframe *frame, void *d)
- {
-@@ -111,6 +110,7 @@ static void arm_backtrace(struct pt_regs * const regs, unsigned int depth)
- 
- int __init oprofile_arch_init(struct oprofile_operations *ops)
- {
-+	/* provide backtrace support also in timer mode: */
- 	ops->backtrace		= arm_backtrace;
- 
- 	return oprofile_perf_init(ops);
-@@ -120,11 +120,3 @@ void __exit oprofile_arch_exit(void)
- {
- 	oprofile_perf_exit();
- }
--#else
--int __init oprofile_arch_init(struct oprofile_operations *ops)
--{
--	pr_info("oprofile: hardware counters not available\n");
--	return -ENODEV;
--}
--void __exit oprofile_arch_exit(void) {}
--#endif /* CONFIG_HW_PERF_EVENTS */
+ #endif /* OPROFILE_H */
 -- 
 1.7.4.rc2.3.g60a2e
