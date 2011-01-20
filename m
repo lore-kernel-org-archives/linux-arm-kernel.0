@@ -1,56 +1,44 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 20 Jan 2011 10:11:27 -0800
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <20110120180146.GH6335@n2100.arm.linux.org.uk>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<1295544047.9039.609.camel@nimitz>
-	<20110120180146.GH6335@n2100.arm.linux.org.uk>
-Message-ID: <1295547087.9039.694.camel@nimitz>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 20 Jan 2011 13:48:24 -0500
+Subject: [PATCH] pxa3xx: fix PXA GPIO IRQ handling
+In-Reply-To: <1295387347.20633.3.camel@bender>
+References: <1295338561.2003.3.camel@sven>
+	<1295338738-4129-1-git-send-email-s.neumann@raumfeld.com>
+	<4D357DC0.2030006@metafoo.de>
+	<AANLkTi=gGDZHukdSuupg22Gb9te+Vk_rsu6-vREeQRVE@mail.gmail.com>
+	<1295387347.20633.3.camel@bender>
+Message-ID: <AANLkTi=2Tx7M4=wF7GkQZLFe5=JLGv2G7roavKroWZ78@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
-> > The x86 version of show_mem() actually manages to do this without any
-> > #ifdefs, and works for a ton of configuration options.  It uses
-> > pfn_valid() to tell whether it can touch a given pfn.
-> 
-> x86 memory layout tends to be very simple as it expects memory to
-> start at the beginning of every region described by a pgdat and extend
-> in one contiguous block.  I wish ARM was that simple.
+On Tue, Jan 18, 2011 at 4:49 PM, Sven Neumann <s.neumann@raumfeld.com> wrote:
+> On Tue, 2011-01-18 at 08:15 -0800, Eric Miao wrote:
+>> On Tue, Jan 18, 2011 at 3:47 AM, Lars-Peter Clausen <lars@metafoo.de> wrote:
+>> > On 01/18/2011 09:18 AM, Sven Neumann wrote:
+>> >> From: Lars-Peter Clausen <lars@metafoo.de>
+>> >>
+>> >> Set the "set_wake" field of the irq_chip struct before calling
+>> >> set_irq_chip() for all of the IRQs, so that the compat handler
+>> >> actually gets installed.
+>>
+>> Not really sure if this is necessary. Lennert has done the transition to
+>> irq_data to those _set_wake() functions as well, so it should be OK
+>> that compat handler doesn't get installed.
+>>
+>> Now I'm not against moving this above, just wondering if there were
+>> any consequences/errors coming out?
+>
+> Well, our PXA300 device doesn't power up again when it should resume
+> from suspend. Fine with me if this has been fixed upstream,
 
-x86 memory layouts can be pretty funky and have been that way for a long
-time.  That's why we *have* to handle holes in x86's show_mem().  My
-laptop even has a ~1GB hole in its ZONE_DMA32:
+Yeah, that's true. Mind re-post with your SOB?
 
-[    0.000000] Zone PFN ranges:
-[    0.000000]   DMA      0x00000010 -> 0x00001000
-[    0.000000]   DMA32    0x00001000 -> 0x00100000
-[    0.000000]   Normal   0x00100000 -> 0x0013c000
-
-But:
-
-Node 0, zone    DMA32
-  pages free     82877
-        min      12783
-        low      15978
-        high     19174
-        scanned  0
-        spanned  1044480
-        present  765672
-
-See how the present is ~1GB less than spanned?  That's because of an I/O
-hole from ~3-4GB:
-
-        # cat /proc/iomem  | grep RAM
-        00010000-0009d7ff : System RAM
-        00100000-bf6affff : System RAM
-        100000000-13bffffff : System RAM
-
-I guess if we were being really smart we'd just shrink the DMA32 zone
-down and not even cover that area.  But, we don't.
-
-Memory hotplug was the original reason that we put sparsemem in place,
-but we also have plenty of configurations where there are holes in the
-middle of zones and pgdats.  
-
--- Dave
+> but I would
+> still like to get this patch into 2.6.37. I'll try to test upstream as
+> soon as Linus releases 2.6.38-rc1...
+>
+>
+> Sven
+>
+>
+>
