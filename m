@@ -1,244 +1,606 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:55:43 +0530
-Subject: [PATCH V5 04/63] ST SPEAr: Padmux code Updated
+Date: Thu, 20 Jan 2011 12:55:44 +0530
+Subject: [PATCH V5 05/63] ST SPEAr: Making clock functions more generic
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <0a5c4cf2aaf0f95d4cc38c3977af247e72415208.1295499394.git.viresh.kumar@st.com>
+Message-ID: <fce44d09a606c8600de6e685e551ba04acf8a38b.1295499394.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- compiling padmux only for spear3xx
-- padmux initialization code rearranged in evaluation board and machine files.
+Modifications include:
+ - Adding dummy clk_set_rate function. Required for compilation of few drivers
+ - Making function present in plat-spear/clock.c more generic over all platforms
+ - Added div_factor filed in struct clk for clks with .recalc = follow_parent
+ - changing type of register pointers to void __iomem *
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |    7 -------
- arch/arm/mach-spear3xx/spear300.c             |   14 ++++++++++----
- arch/arm/mach-spear3xx/spear300_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear310.c             |   11 ++++++-----
- arch/arm/mach-spear3xx/spear310_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear320.c             |   11 ++++++-----
- arch/arm/mach-spear3xx/spear320_evb.c         |    9 ++++-----
- arch/arm/mach-spear3xx/spear3xx.c             |   21 ---------------------
- arch/arm/plat-spear/Makefile                  |    4 ++--
- 9 files changed, 36 insertions(+), 59 deletions(-)
+ arch/arm/mach-spear3xx/clock.c           |   66 +++++++++++++++++++++++++----
+ arch/arm/mach-spear6xx/clock.c           |   67 ++++++++++++++++++++++++++----
+ arch/arm/plat-spear/clock.c              |   59 ++++++++++++++++++--------
+ arch/arm/plat-spear/include/plat/clock.h |   68 ++++++++++++++++++++++++-----
+ 4 files changed, 214 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index af7e02c..c16d2f8 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -40,7 +40,6 @@ void __init clk_init(void);
- void __init spear3xx_map_io(void);
- void __init spear3xx_init_irq(void);
- void __init spear3xx_init(void);
--void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size);
- 
- /* pad mux declarations */
- #define PMX_FIRDA_MASK		(1 << 14)
-@@ -133,8 +132,6 @@ extern struct pmx_dev pmx_telecom_sdio_4bit;
- extern struct pmx_dev pmx_telecom_sdio_8bit;
- extern struct pmx_dev pmx_gpio1;
- 
--void spear300_pmx_init(void);
--
- /* Add spear300 machine function declarations here */
- void __init spear300_init(void);
- 
-@@ -154,8 +151,6 @@ extern struct pmx_dev pmx_fsmc;
- extern struct pmx_dev pmx_rs485_0_1;
- extern struct pmx_dev pmx_tdm0;
- 
--void spear310_pmx_init(void);
--
- /* Add spear310 machine function declarations here */
- void __init spear310_init(void);
- 
-@@ -195,8 +190,6 @@ extern struct pmx_dev pmx_smii0;
- extern struct pmx_dev pmx_smii1;
- extern struct pmx_dev pmx_i2c1;
- 
--void spear320_pmx_init(void);
--
- /* Add spear320 machine function declarations here */
- void __init spear320_init(void);
- 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 5aa2d54..7e01677 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -459,10 +459,16 @@ void __init spear300_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ\n");
- 	}
--}
- 
--void spear300_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR300_SOC_CONFIG_BASE,
-+	/* pmx initialization */
-+	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
- 			SPEAR300_SOC_CONFIG_SIZE);
-+	if (pmx_driver.base) {
-+		ret = pmx_register(&pmx_driver);
-+		if (ret)
-+			printk(KERN_ERR "padmux: registeration failed. err no"
-+					": %d\n", ret);
-+		/* Free Mapping, device selection already done */
-+		iounmap(pmx_driver.base);
-+	}
- }
-diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
-index bb21db1..2c90663 100644
---- a/arch/arm/mach-spear3xx/spear300_evb.c
-+++ b/arch/arm/mach-spear3xx/spear300_evb.c
-@@ -51,14 +51,13 @@ static void __init spear300_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear300 machine init function */
--	spear300_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear300_init */
- 	pmx_driver.mode = &photo_frame_mode;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear300_pmx_init();
-+
-+	/* call spear300 machine init function */
-+	spear300_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 53b41b5..f38eb21 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -293,10 +293,11 @@ void __init spear310_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
--}
- 
--void spear310_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR310_SOC_CONFIG_BASE,
--			SPEAR310_SOC_CONFIG_SIZE);
-+	/* pmx initialization */
-+	pmx_driver.base = base;
-+	ret = pmx_register(&pmx_driver);
-+	if (ret)
-+		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
-+				ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index 7facf66..4e55e55 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -58,14 +58,13 @@ static void __init spear310_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear310 machine init function */
--	spear310_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear310_init */
- 	pmx_driver.mode = NULL;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear310_pmx_init();
-+
-+	/* call spear310 machine init function */
-+	spear310_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 88b4652..456bb33 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -540,10 +540,11 @@ void __init spear320_init(void)
- 		if (ret)
- 			printk(KERN_ERR "Error registering Shared IRQ 4\n");
- 	}
--}
- 
--void spear320_pmx_init(void)
--{
--	spear_pmx_init(&pmx_driver, SPEAR320_SOC_CONFIG_BASE,
--			SPEAR320_SOC_CONFIG_SIZE);
-+	/* pmx initialization */
-+	pmx_driver.base = base;
-+	ret = pmx_register(&pmx_driver);
-+	if (ret)
-+		printk(KERN_ERR "padmux: registeration failed. err no: %d\n",
-+				ret);
- }
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 62ac685..7083a06 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -55,14 +55,13 @@ static void __init spear320_evb_init(void)
- {
- 	unsigned int i;
- 
--	/* call spear320 machine init function */
--	spear320_init();
--
--	/* padmux initialization */
-+	/* padmux initialization, must be done before spear320_init */
- 	pmx_driver.mode = &auto_net_mii_mode;
- 	pmx_driver.devs = pmx_devs;
- 	pmx_driver.devs_count = ARRAY_SIZE(pmx_devs);
--	spear320_pmx_init();
-+
-+	/* call spear320 machine init function */
-+	spear320_init();
- 
- 	/* Add Platform Devices */
- 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 52f553c..faf8709 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -525,24 +525,3 @@ struct pmx_dev pmx_plgpio_45_46_49_50 = {
+diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
+index 18febf9..7ea8749 100644
+--- a/arch/arm/mach-spear3xx/clock.c
++++ b/arch/arm/mach-spear3xx/clock.c
+@@ -39,10 +39,25 @@ static struct clk rtc_clk = {
  };
  
- #endif
--
--/* spear padmux initialization function */
--void spear_pmx_init(struct pmx_driver *pmx_driver, uint base, uint size)
--{
--	int ret = 0;
--
--	/* pad mux initialization */
--	pmx_driver->base = ioremap(base, size);
--	if (!pmx_driver->base) {
--		ret = -ENOMEM;
--		goto pmx_fail;
--	}
--
--	ret = pmx_register(pmx_driver);
--	iounmap(pmx_driver->base);
--
--pmx_fail:
--	if (ret)
--		printk(KERN_ERR "padmux: registration failed. err no: %d\n",
--				ret);
--}
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index eb89540..b4f340b 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -3,6 +3,6 @@
- #
+ /* clock derived from 24 MHz osc clk */
++/* pll masks structure */
++static struct pll_clk_masks pll1_masks = {
++	.mode_mask = PLL_MODE_MASK,
++	.mode_shift = PLL_MODE_SHIFT,
++	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
++	.norm_fdbk_m_shift = PLL_NORM_FDBK_M_SHIFT,
++	.dith_fdbk_m_mask = PLL_DITH_FDBK_M_MASK,
++	.dith_fdbk_m_shift = PLL_DITH_FDBK_M_SHIFT,
++	.div_p_mask = PLL_DIV_P_MASK,
++	.div_p_shift = PLL_DIV_P_SHIFT,
++	.div_n_mask = PLL_DIV_N_MASK,
++	.div_n_shift = PLL_DIV_N_SHIFT,
++};
++
+ /* pll1 configuration structure */
+ static struct pll_clk_config pll1_config = {
+ 	.mode_reg = PLL1_CTR,
+ 	.cfg_reg = PLL1_FRQ,
++	.masks = &pll1_masks,
+ };
  
- # Common support
--obj-y	:= clock.o padmux.o time.o
-+obj-y	:= clock.o time.o
+ /* PLL1 clock */
+@@ -50,7 +65,7 @@ static struct clk pll1_clk = {
+ 	.pclk = &osc_24m_clk,
+ 	.en_reg = PLL1_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
+-	.recalc = &pll1_clk_recalc,
++	.recalc = &pll_clk_recalc,
+ 	.private_data = &pll1_config,
+ };
  
--obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o
-+obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
+@@ -76,11 +91,16 @@ static struct clk cpu_clk = {
+ 	.recalc = &follow_parent,
+ };
+ 
++/* ahb masks structure */
++static struct bus_clk_masks ahb_masks = {
++	.mask = PLL_HCLK_RATIO_MASK,
++	.shift = PLL_HCLK_RATIO_SHIFT,
++};
++
+ /* ahb configuration structure */
+ static struct bus_clk_config ahb_config = {
+ 	.reg = CORE_CLK_CFG,
+-	.mask = PLL_HCLK_RATIO_MASK,
+-	.shift = PLL_HCLK_RATIO_SHIFT,
++	.masks = &ahb_masks,
+ };
+ 
+ /* ahb clock */
+@@ -91,9 +111,22 @@ static struct clk ahb_clk = {
+ 	.private_data = &ahb_config,
+ };
+ 
++/* auxiliary synthesizers masks */
++static struct aux_clk_masks aux_masks = {
++	.eq_sel_mask = AUX_EQ_SEL_MASK,
++	.eq_sel_shift = AUX_EQ_SEL_SHIFT,
++	.eq1_mask = AUX_EQ1_SEL,
++	.eq2_mask = AUX_EQ2_SEL,
++	.xscale_sel_mask = AUX_XSCALE_MASK,
++	.xscale_sel_shift = AUX_XSCALE_SHIFT,
++	.yscale_sel_mask = AUX_YSCALE_MASK,
++	.yscale_sel_shift = AUX_YSCALE_SHIFT,
++};
++
+ /* uart configurations */
+ static struct aux_clk_config uart_config = {
+ 	.synth_reg = UART_CLK_SYNT,
++	.masks = &aux_masks,
+ };
+ 
+ /* uart parents */
+@@ -130,6 +163,7 @@ static struct clk uart_clk = {
+ /* firda configurations */
+ static struct aux_clk_config firda_config = {
+ 	.synth_reg = FIRDA_CLK_SYNT,
++	.masks = &aux_masks,
+ };
+ 
+ /* firda parents */
+@@ -184,9 +218,18 @@ static struct pclk_sel gpt_pclk_sel = {
+ 	.pclk_sel_mask = GPT_CLK_MASK,
+ };
+ 
++/* gpt synthesizer masks */
++static struct gpt_clk_masks gpt_masks = {
++	.mscale_sel_mask = GPT_MSCALE_MASK,
++	.mscale_sel_shift = GPT_MSCALE_SHIFT,
++	.nscale_sel_mask = GPT_NSCALE_MASK,
++	.nscale_sel_shift = GPT_NSCALE_SHIFT,
++};
++
+ /* gpt0 configurations */
+-static struct aux_clk_config gpt0_config = {
++static struct gpt_clk_config gpt0_config = {
+ 	.synth_reg = PRSC1_CLK_CFG,
++	.masks = &gpt_masks,
+ };
+ 
+ /* gpt0 timer clock */
+@@ -199,8 +242,9 @@ static struct clk gpt0_clk = {
+ };
+ 
+ /* gpt1 configurations */
+-static struct aux_clk_config gpt1_config = {
++static struct gpt_clk_config gpt1_config = {
+ 	.synth_reg = PRSC2_CLK_CFG,
++	.masks = &gpt_masks,
+ };
+ 
+ /* gpt1 timer clock */
+@@ -214,8 +258,9 @@ static struct clk gpt1_clk = {
+ };
+ 
+ /* gpt2 configurations */
+-static struct aux_clk_config gpt2_config = {
++static struct gpt_clk_config gpt2_config = {
+ 	.synth_reg = PRSC3_CLK_CFG,
++	.masks = &gpt_masks,
+ };
+ 
+ /* gpt2 timer clock */
+@@ -253,11 +298,16 @@ static struct clk clcd_clk = {
+ };
+ 
+ /* clock derived from ahb clk */
++/* apb masks structure */
++static struct bus_clk_masks apb_masks = {
++	.mask = HCLK_PCLK_RATIO_MASK,
++	.shift = HCLK_PCLK_RATIO_SHIFT,
++};
++
+ /* apb configuration structure */
+ static struct bus_clk_config apb_config = {
+ 	.reg = CORE_CLK_CFG,
+-	.mask = HCLK_PCLK_RATIO_MASK,
+-	.shift = HCLK_PCLK_RATIO_SHIFT,
++	.masks = &apb_masks,
+ };
+ 
+ /* apb clock */
+diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
+index 36ff056..ef88922 100644
+--- a/arch/arm/mach-spear6xx/clock.c
++++ b/arch/arm/mach-spear6xx/clock.c
+@@ -39,10 +39,25 @@ static struct clk rtc_clk = {
+ };
+ 
+ /* clock derived from 30 MHz osc clk */
++/* pll masks structure */
++static struct pll_clk_masks pll1_masks = {
++	.mode_mask = PLL_MODE_MASK,
++	.mode_shift = PLL_MODE_SHIFT,
++	.norm_fdbk_m_mask = PLL_NORM_FDBK_M_MASK,
++	.norm_fdbk_m_shift = PLL_NORM_FDBK_M_SHIFT,
++	.dith_fdbk_m_mask = PLL_DITH_FDBK_M_MASK,
++	.dith_fdbk_m_shift = PLL_DITH_FDBK_M_SHIFT,
++	.div_p_mask = PLL_DIV_P_MASK,
++	.div_p_shift = PLL_DIV_P_SHIFT,
++	.div_n_mask = PLL_DIV_N_MASK,
++	.div_n_shift = PLL_DIV_N_SHIFT,
++};
++
+ /* pll1 configuration structure */
+ static struct pll_clk_config pll1_config = {
+ 	.mode_reg = PLL1_CTR,
+ 	.cfg_reg = PLL1_FRQ,
++	.masks = &pll1_masks,
+ };
+ 
+ /* PLL1 clock */
+@@ -50,7 +65,7 @@ static struct clk pll1_clk = {
+ 	.pclk = &osc_30m_clk,
+ 	.en_reg = PLL1_CTR,
+ 	.en_reg_bit = PLL_ENABLE,
+-	.recalc = &pll1_clk_recalc,
++	.recalc = &pll_clk_recalc,
+ 	.private_data = &pll1_config,
+ };
+ 
+@@ -76,11 +91,16 @@ static struct clk cpu_clk = {
+ 	.recalc = &follow_parent,
+ };
+ 
++/* ahb masks structure */
++static struct bus_clk_masks ahb_masks = {
++	.mask = PLL_HCLK_RATIO_MASK,
++	.shift = PLL_HCLK_RATIO_SHIFT,
++};
++
+ /* ahb configuration structure */
+ static struct bus_clk_config ahb_config = {
+ 	.reg = CORE_CLK_CFG,
+-	.mask = PLL_HCLK_RATIO_MASK,
+-	.shift = PLL_HCLK_RATIO_SHIFT,
++	.masks = &ahb_masks,
+ };
+ 
+ /* ahb clock */
+@@ -112,9 +132,22 @@ static struct pclk_sel uart_pclk_sel = {
+ 	.pclk_sel_mask = UART_CLK_MASK,
+ };
+ 
++/* auxiliary synthesizers masks */
++static struct aux_clk_masks aux_masks = {
++	.eq_sel_mask = AUX_EQ_SEL_MASK,
++	.eq_sel_shift = AUX_EQ_SEL_SHIFT,
++	.eq1_mask = AUX_EQ1_SEL,
++	.eq2_mask = AUX_EQ2_SEL,
++	.xscale_sel_mask = AUX_XSCALE_MASK,
++	.xscale_sel_shift = AUX_XSCALE_SHIFT,
++	.yscale_sel_mask = AUX_YSCALE_MASK,
++	.yscale_sel_shift = AUX_YSCALE_SHIFT,
++};
++
+ /* uart configurations */
+ static struct aux_clk_config uart_config = {
+ 	.synth_reg = UART_CLK_SYNT,
++	.masks = &aux_masks,
+ };
+ 
+ /* uart0 clock */
+@@ -140,6 +173,7 @@ static struct clk uart1_clk = {
+ /* firda configurations */
+ static struct aux_clk_config firda_config = {
+ 	.synth_reg = FIRDA_CLK_SYNT,
++	.masks = &aux_masks,
+ };
+ 
+ /* firda parents */
+@@ -176,6 +210,7 @@ static struct clk firda_clk = {
+ /* clcd configurations */
+ static struct aux_clk_config clcd_config = {
+ 	.synth_reg = CLCD_CLK_SYNT,
++	.masks = &aux_masks,
+ };
+ 
+ /* clcd parents */
+@@ -230,9 +265,18 @@ static struct pclk_sel gpt_pclk_sel = {
+ 	.pclk_sel_mask = GPT_CLK_MASK,
+ };
+ 
++/* gpt synthesizer masks */
++static struct gpt_clk_masks gpt_masks = {
++	.mscale_sel_mask = GPT_MSCALE_MASK,
++	.mscale_sel_shift = GPT_MSCALE_SHIFT,
++	.nscale_sel_mask = GPT_NSCALE_MASK,
++	.nscale_sel_shift = GPT_NSCALE_SHIFT,
++};
++
+ /* gpt0_1 configurations */
+-static struct aux_clk_config gpt0_1_config = {
++static struct gpt_clk_config gpt0_1_config = {
+ 	.synth_reg = PRSC1_CLK_CFG,
++	.masks = &gpt_masks,
+ };
+ 
+ /* gpt0 ARM1 subsystem timer clock */
+@@ -254,8 +298,9 @@ static struct clk gpt1_clk = {
+ };
+ 
+ /* gpt2 configurations */
+-static struct aux_clk_config gpt2_config = {
++static struct gpt_clk_config gpt2_config = {
+ 	.synth_reg = PRSC2_CLK_CFG,
++	.masks = &gpt_masks,
+ };
+ 
+ /* gpt2 timer clock */
+@@ -269,8 +314,9 @@ static struct clk gpt2_clk = {
+ };
+ 
+ /* gpt3 configurations */
+-static struct aux_clk_config gpt3_config = {
++static struct gpt_clk_config gpt3_config = {
+ 	.synth_reg = PRSC3_CLK_CFG,
++	.masks = &gpt_masks,
+ };
+ 
+ /* gpt3 timer clock */
+@@ -309,11 +355,16 @@ static struct clk usbd_clk = {
+ };
+ 
+ /* clock derived from ahb clk */
++/* apb masks structure */
++static struct bus_clk_masks apb_masks = {
++	.mask = HCLK_PCLK_RATIO_MASK,
++	.shift = HCLK_PCLK_RATIO_SHIFT,
++};
++
+ /* apb configuration structure */
+ static struct bus_clk_config apb_config = {
+ 	.reg = CORE_CLK_CFG,
+-	.mask = HCLK_PCLK_RATIO_MASK,
+-	.shift = HCLK_PCLK_RATIO_SHIFT,
++	.masks = &apb_masks,
+ };
+ 
+ /* apb clock */
+diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
+index ee4f90e..f1cf832 100644
+--- a/arch/arm/plat-spear/clock.c
++++ b/arch/arm/plat-spear/clock.c
+@@ -17,7 +17,6 @@
+ #include <linux/list.h>
+ #include <linux/module.h>
+ #include <linux/spinlock.h>
+-#include <mach/misc_regs.h>
+ #include <plat/clock.h>
+ 
+ static DEFINE_SPINLOCK(clocks_lock);
+@@ -187,6 +186,20 @@ int clk_set_parent(struct clk *clk, struct clk *parent)
+ }
+ EXPORT_SYMBOL(clk_set_parent);
+ 
++/**
++ * clk_set_rate - set the clock rate for a clock source
++ * @clk: clock source
++ * @rate: desired clock rate in Hz
++ *
++ * Returns success (0) or negative errno.
++ */
++int clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	/* TODO */
++	return -EINVAL;
++}
++EXPORT_SYMBOL(clk_set_rate);
++
+ /* registers clock in platform clock framework */
+ void clk_register(struct clk_lookup *cl)
+ {
+@@ -212,6 +225,7 @@ void clk_register(struct clk_lookup *cl)
+ 		list_add(&clk->sibling, &clk->pclk->children);
+ 	} else {
+ 		/* add clocks with > 1 parent to 1st parent's children list */
++		clk->pclk = clk->pclk_sel->pclk_info[0].pclk;
+ 		list_add(&clk->sibling,
+ 			 &clk->pclk_sel->pclk_info[0].pclk->children);
+ 	}
+@@ -283,29 +297,31 @@ static void change_parent(struct clk *cclk, struct clk *pclk)
+  * In Dithered mode
+  * rate = (2 * M[15:0] * Fin)/(256 * N * 2^P)
+  */
+-void pll1_clk_recalc(struct clk *clk)
++void pll_clk_recalc(struct clk *clk)
+ {
+ 	struct pll_clk_config *config = clk->private_data;
+ 	unsigned int num = 2, den = 0, val, mode = 0;
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
+-	mode = (readl(config->mode_reg) >> PLL_MODE_SHIFT) &
+-		PLL_MODE_MASK;
++	mode = (readl(config->mode_reg) >> config->masks->mode_shift) &
++		config->masks->mode_mask;
+ 
+ 	val = readl(config->cfg_reg);
+ 	/* calculate denominator */
+-	den = (val >> PLL_DIV_P_SHIFT) & PLL_DIV_P_MASK;
++	den = (val >> config->masks->div_p_shift) & config->masks->div_p_mask;
+ 	den = 1 << den;
+-	den *= (val >> PLL_DIV_N_SHIFT) & PLL_DIV_N_MASK;
++	den *= (val >> config->masks->div_n_shift) & config->masks->div_n_mask;
+ 
+ 	/* calculate numerator & denominator */
+ 	if (!mode) {
+ 		/* Normal mode */
+-		num *= (val >> PLL_NORM_FDBK_M_SHIFT) & PLL_NORM_FDBK_M_MASK;
++		num *= (val >> config->masks->norm_fdbk_m_shift) &
++			config->masks->norm_fdbk_m_mask;
+ 	} else {
+ 		/* Dithered mode */
+-		num *= (val >> PLL_DITH_FDBK_M_SHIFT) & PLL_DITH_FDBK_M_MASK;
++		num *= (val >> config->masks->dith_fdbk_m_shift) &
++			config->masks->dith_fdbk_m_mask;
+ 		den *= 256;
+ 	}
+ 
+@@ -321,7 +337,8 @@ void bus_clk_recalc(struct clk *clk)
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
+-	div = ((readl(config->reg) >> config->shift) & config->mask) + 1;
++	div = ((readl(config->reg) >> config->masks->shift) &
++			config->masks->mask) + 1;
+ 	clk->rate = (unsigned long)clk->pclk->rate / div;
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
+@@ -359,15 +376,18 @@ void aux_clk_recalc(struct clk *clk)
+ 	if (pclk_info->scalable) {
+ 		val = readl(config->synth_reg);
+ 
+-		eqn = (val >> AUX_EQ_SEL_SHIFT) & AUX_EQ_SEL_MASK;
+-		if (eqn == AUX_EQ1_SEL)
++		eqn = (val >> config->masks->eq_sel_shift) &
++			config->masks->eq_sel_mask;
++		if (eqn == config->masks->eq1_mask)
+ 			den *= 2;
+ 
+ 		/* calculate numerator */
+-		num = (val >> AUX_XSCALE_SHIFT) & AUX_XSCALE_MASK;
++		num = (val >> config->masks->xscale_sel_shift) &
++			config->masks->xscale_sel_mask;
+ 
+ 		/* calculate denominator */
+-		den *= (val >> AUX_YSCALE_SHIFT) & AUX_YSCALE_MASK;
++		den *= (val >> config->masks->yscale_sel_shift) &
++			config->masks->yscale_sel_mask;
+ 		val = (((clk->pclk->rate/10000) * num) / den) * 10000;
+ 	} else
+ 		val = clk->pclk->rate;
+@@ -383,7 +403,7 @@ void aux_clk_recalc(struct clk *clk)
+  */
+ void gpt_clk_recalc(struct clk *clk)
+ {
+-	struct aux_clk_config *config = clk->private_data;
++	struct gpt_clk_config *config = clk->private_data;
+ 	struct pclk_info *pclk_info = NULL;
+ 	unsigned int div = 1, val;
+ 	unsigned long flags;
+@@ -402,8 +422,10 @@ void gpt_clk_recalc(struct clk *clk)
+ 	spin_lock_irqsave(&clocks_lock, flags);
+ 	if (pclk_info->scalable) {
+ 		val = readl(config->synth_reg);
+-		div += (val >> GPT_MSCALE_SHIFT) & GPT_MSCALE_MASK;
+-		div *= 1 << (((val >> GPT_NSCALE_SHIFT) & GPT_NSCALE_MASK) + 1);
++		div += (val >> config->masks->mscale_sel_shift) &
++			config->masks->mscale_sel_mask;
++		div *= 1 << (((val >> config->masks->nscale_sel_shift) &
++					config->masks->nscale_sel_mask) + 1);
+ 	}
+ 
+ 	clk->rate = (unsigned long)clk->pclk->rate / div;
+@@ -411,15 +433,16 @@ void gpt_clk_recalc(struct clk *clk)
+ }
+ 
+ /*
+- * Used for clocks that always have same value as the parent clock divided by a
++ * Used for clocks that always have value as the parent clock divided by a
+  * fixed divisor
+  */
+ void follow_parent(struct clk *clk)
+ {
+ 	unsigned long flags;
++	unsigned int div_factor = (clk->div_factor < 1) ? 1 : clk->div_factor;
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
+-	clk->rate = clk->pclk->rate;
++	clk->rate = clk->pclk->rate/div_factor;
+ 	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
+ 
+diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
+index 2572260..863d9e9 100644
+--- a/arch/arm/plat-spear/include/plat/clock.h
++++ b/arch/arm/plat-spear/include/plat/clock.h
+@@ -54,7 +54,7 @@ struct pclk_info {
+ struct pclk_sel {
+ 	struct pclk_info *pclk_info;
+ 	u8 pclk_count;
+-	unsigned int *pclk_sel_reg;
++	void __iomem *pclk_sel_reg;
+ 	unsigned int pclk_sel_mask;
+ };
+ 
+@@ -67,6 +67,7 @@ struct pclk_sel {
+  * @en_reg_bit: clk enable/disable bit
+  * @ops: clk enable/disable ops - generic_clkops selected if NULL
+  * @recalc: pointer to clock rate recalculate function
++ * @div_factor: division factor to parent clock. Only for recalc = follow_parent
+  * @pclk: current parent clk
+  * @pclk_sel: pointer to parent selection structure
+  * @pclk_sel_shift: register shift for selecting parent of this clock
+@@ -78,10 +79,11 @@ struct clk {
+ 	unsigned int usage_count;
+ 	unsigned int flags;
+ 	unsigned long rate;
+-	unsigned int *en_reg;
++	void __iomem *en_reg;
+ 	u8 en_reg_bit;
+ 	const struct clkops *ops;
+ 	void (*recalc) (struct clk *);
++	unsigned int div_factor;
+ 
+ 	struct clk *pclk;
+ 	struct pclk_sel *pclk_sel;
+@@ -93,23 +95,65 @@ struct clk {
+ };
+ 
+ /* pll configuration structure */
++struct pll_clk_masks {
++	u32 mode_mask;
++	u32 mode_shift;
++
++	u32 norm_fdbk_m_mask;
++	u32 norm_fdbk_m_shift;
++	u32 dith_fdbk_m_mask;
++	u32 dith_fdbk_m_shift;
++	u32 div_p_mask;
++	u32 div_p_shift;
++	u32 div_n_mask;
++	u32 div_n_shift;
++};
++
+ struct pll_clk_config {
+-	unsigned int *mode_reg;
+-	unsigned int *cfg_reg;
++	void __iomem *mode_reg;
++	void __iomem *cfg_reg;
++	struct pll_clk_masks *masks;
+ };
+ 
+ /* ahb and apb bus configuration structure */
++struct bus_clk_masks {
++	u32 mask;
++	u32 shift;
++};
++
+ struct bus_clk_config {
+-	unsigned int *reg;
+-	unsigned int mask;
+-	unsigned int shift;
++	void __iomem *reg;
++	struct bus_clk_masks *masks;
++};
++
++/* Aux clk configuration structure: applicable to UART and FIRDA */
++struct aux_clk_masks {
++	u32 eq_sel_mask;
++	u32 eq_sel_shift;
++	u32 eq1_mask;
++	u32 eq2_mask;
++	u32 xscale_sel_mask;
++	u32 xscale_sel_shift;
++	u32 yscale_sel_mask;
++	u32 yscale_sel_shift;
+ };
+ 
+-/*
+- * Aux clk configuration structure: applicable to GPT, UART and FIRDA
+- */
+ struct aux_clk_config {
+-	unsigned int *synth_reg;
++	void __iomem *synth_reg;
++	struct aux_clk_masks *masks;
++};
++
++/* GPT clk configuration structure */
++struct gpt_clk_masks {
++	u32 mscale_sel_mask;
++	u32 mscale_sel_shift;
++	u32 nscale_sel_mask;
++	u32 nscale_sel_shift;
++};
++
++struct gpt_clk_config {
++	void __iomem *synth_reg;
++	struct gpt_clk_masks *masks;
+ };
+ 
+ /* platform specific clock functions */
+@@ -118,7 +162,7 @@ void recalc_root_clocks(void);
+ 
+ /* clock recalc functions */
+ void follow_parent(struct clk *clk);
+-void pll1_clk_recalc(struct clk *clk);
++void pll_clk_recalc(struct clk *clk);
+ void bus_clk_recalc(struct clk *clk);
+ void gpt_clk_recalc(struct clk *clk);
+ void aux_clk_recalc(struct clk *clk);
 -- 
 1.7.3.4
