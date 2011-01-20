@@ -1,86 +1,81 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 20 Jan 2011 12:32:39 -0800
-Subject: [PATCH 1/7] msm: qsd8x50: add uart platform data
+Date: Thu, 20 Jan 2011 12:32:44 -0800
+Subject: [PATCH 6/7] msm: mahimahi: add gpio pin muxing code
 In-Reply-To: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
 References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1295555565-21563-2-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1295555565-21563-7-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the uart for QSD8x50.
+Add in old style pin muxing code. This code is from Google's
+tree. However, the other way to do this is to use gpiomux, but
+it's currently not mature enough to have on/off configurations.
+
+This code was taken from Google's tree, with slight modifications
+and clean up.
 
 Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mach-msm/devices-qsd8x50.c |   42 +++++++++++++++++++++++++++++++++++
- 1 files changed, 42 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/board-mahimahi-mmc.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-index b1a8f0f..24b2051 100644
---- a/arch/arm/mach-msm/devices-qsd8x50.c
-+++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -28,6 +28,32 @@
- 
- #include <mach/mmc.h>
- 
-+static struct resource resources_uart1[] = {
-+	{
-+		.start	= INT_UART1,
-+		.end	= INT_UART1,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= MSM_UART1_PHYS,
-+		.end	= MSM_UART1_PHYS + MSM_UART1_SIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct resource resources_uart2[] = {
-+	{
-+		.start	= INT_UART2,
-+		.end	= INT_UART2,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= MSM_UART2_PHYS,
-+		.end	= MSM_UART2_PHYS + MSM_UART2_SIZE - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
- static struct resource resources_uart3[] = {
- 	{
- 		.start	= INT_UART3,
-@@ -41,6 +67,20 @@ static struct resource resources_uart3[] = {
- 	},
+diff --git a/arch/arm/mach-msm/board-mahimahi-mmc.c b/arch/arm/mach-msm/board-mahimahi-mmc.c
+index 991818e..13e45d0 100644
+--- a/arch/arm/mach-msm/board-mahimahi-mmc.c
++++ b/arch/arm/mach-msm/board-mahimahi-mmc.c
+@@ -54,6 +54,34 @@ static struct msm_mmc_gpio sdc1_gpio_cfg[] = {
+ 	{67, "sdc1_dat_0"},
  };
  
-+struct platform_device msm_device_uart1 = {
-+	.name	= "msm_serial",
-+	.id	= 0,
-+	.num_resources	= ARRAY_SIZE(resources_uart1),
-+	.resource	= resources_uart1,
++static void config_gpio_table(uint32_t *table, int len)
++{
++	int n;
++	unsigned id;
++	for (n = 0; n < len; n++) {
++		id = table[n];
++		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
++	}
++}
++
++static uint32_t sdcard_on_gpio_table[] = {
++	PCOM_GPIO_CFG(62, 1, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA), /* CLK */
++	PCOM_GPIO_CFG(63, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), /* CMD */
++	PCOM_GPIO_CFG(64, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT3 */
++	PCOM_GPIO_CFG(65, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT2 */
++	PCOM_GPIO_CFG(66, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT1 */
++	PCOM_GPIO_CFG(67, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* DAT0 */
 +};
 +
-+struct platform_device msm_device_uart2 = {
-+	.name	= "msm_serial",
-+	.id	= 1,
-+	.num_resources	= ARRAY_SIZE(resources_uart2),
-+	.resource	= resources_uart2,
++static uint32_t sdcard_off_gpio_table[] = {
++	PCOM_GPIO_CFG(62, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CLK */
++	PCOM_GPIO_CFG(63, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CMD */
++	PCOM_GPIO_CFG(64, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT3 */
++	PCOM_GPIO_CFG(65, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT2 */
++	PCOM_GPIO_CFG(66, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT1 */
++	PCOM_GPIO_CFG(67, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT0 */
 +};
 +
- struct platform_device msm_device_uart3 = {
- 	.name	= "msm_serial",
- 	.id	= 2,
-@@ -345,6 +385,8 @@ struct clk msm_clocks_8x50[] = {
- 	CLK_PCOM("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
- 	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
- 	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
-+	CLK_PCOM("uart_clk",	UART1_CLK,	&msm_device_uart1.dev, OFF),
-+	CLK_PCOM("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, OFF),
- 	CLK_PCOM("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
- 	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	NULL, OFF),
- 	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	NULL, OFF),
+ static struct vreg	*sdslot_vreg;
+ static uint32_t		sdslot_vdd = 0xffffffff;
+ static uint32_t		sdslot_vreg_enabled;
+@@ -86,6 +114,8 @@ static uint32_t mahimahi_sdslot_switchvdd(struct device *dev, unsigned int vdd)
+ 	sdslot_vdd = vdd;
+ 
+ 	if (vdd == 0) {
++		config_gpio_table(sdcard_off_gpio_table,
++				  ARRAY_SIZE(sdcard_off_gpio_table));
+ 		vreg_disable(sdslot_vreg);
+ 		sdslot_vreg_enabled = 0;
+ 		return 0;
+@@ -95,6 +125,8 @@ static uint32_t mahimahi_sdslot_switchvdd(struct device *dev, unsigned int vdd)
+ 		ret = vreg_enable(sdslot_vreg);
+ 		if (ret)
+ 			pr_err("Error enabling vreg (%d)\n", ret);
++		config_gpio_table(sdcard_on_gpio_table,
++				  ARRAY_SIZE(sdcard_on_gpio_table));
+ 		sdslot_vreg_enabled = 1;
+ 	}
+ 
 -- 
 1.7.0.4
 
