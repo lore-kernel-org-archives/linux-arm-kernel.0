@@ -1,265 +1,72 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:35 +0530
-Subject: [PATCH V5 57/63] ST SPEAr3xx: Updating plgpio and emi source to make
-	it compliant with single image strategy
+Date: Thu, 20 Jan 2011 12:56:36 +0530
+Subject: [PATCH V5 58/63] SPEAr6xx: Rework Kconfig for single image solution
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <29f3e319e062a9f2f65ea9683fb9663f938dfa3b.1295499395.git.viresh.kumar@st.com>
+Message-ID: <0df6108cb45fbbdbfd2b4bfa445961c45d515275.1295499395.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/emi.c               |   18 ++++++++++-
- arch/arm/mach-spear3xx/include/mach/emi.h  |   19 ++++++-----
- arch/arm/mach-spear3xx/include/mach/gpio.h |   27 ++++++++--------
- arch/arm/plat-spear/plgpio.c               |   46 ++++++++++++++++++++-------
- 4 files changed, 75 insertions(+), 35 deletions(-)
+ arch/arm/mach-spear6xx/Kconfig    |   15 ++++++++-------
+ arch/arm/mach-spear6xx/Kconfig600 |   17 -----------------
+ 2 files changed, 8 insertions(+), 24 deletions(-)
+ delete mode 100644 arch/arm/mach-spear6xx/Kconfig600
 
-diff --git a/arch/arm/mach-spear3xx/emi.c b/arch/arm/mach-spear3xx/emi.c
-index 7b62ff0..7d7cea7 100644
---- a/arch/arm/mach-spear3xx/emi.c
-+++ b/arch/arm/mach-spear3xx/emi.c
-@@ -15,6 +15,7 @@
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <asm/mach-types.h>
- #include <mach/emi.h>
+diff --git a/arch/arm/mach-spear6xx/Kconfig b/arch/arm/mach-spear6xx/Kconfig
+index bddba03..ff4ae5b 100644
+--- a/arch/arm/mach-spear6xx/Kconfig
++++ b/arch/arm/mach-spear6xx/Kconfig
+@@ -4,17 +4,18 @@
  
- int __init emi_init(struct platform_device *pdev, unsigned long base,
-@@ -23,8 +24,23 @@ int __init emi_init(struct platform_device *pdev, unsigned long base,
- 	void __iomem *emi_reg_base;
- 	struct clk *clk;
- 	int ret;
-+	u32 ack_reg, max_banks;
-+	/* u32 timeout_reg, irq_reg; */
+ if ARCH_SPEAR6XX
+ 
+-choice
+-	prompt "SPEAr6XX Family"
+-	default MACH_SPEAR600
++menu "SPEAr6xx Implementations"
++config BOARD_SPEAR600_EVB
++	bool "SPEAr600 Evaluation Board"
++	select MACH_SPEAR600
++	help
++	  Supports ST SPEAr600 Evaluation Board
 +
-+	/* fixing machine dependent values */
-+	if (machine_is_spear310()) {
-+		ack_reg = SPEAR310_ACK_REG;
-+		max_banks = SPEAR310_EMI_MAX_BANKS;
-+		/* timeout_reg = SPEAR310_TIMEOUT_REG; */
-+		/* irq_reg = SPEAR310_IRQ_REG; */
-+	} else {
-+		ack_reg = SPEAR320_ACK_REG;
-+		max_banks = SPEAR320_EMI_MAX_BANKS;
-+		/* timeout_reg = SPEAR320_TIMEOUT_REG; */
-+		/* irq_reg = SPEAR320_IRQ_REG; */
-+	}
++endmenu
  
--	if (bank > (EMI_MAX_BANKS - 1))
-+	if (bank > (max_banks - 1))
- 		return -EINVAL;
+ config MACH_SPEAR600
+ 	bool "SPEAr600"
+ 	help
+ 	  Supports ST SPEAr600 Machine
+-endchoice
+-
+-# Adding SPEAr6XX machine specific configuration files
+-source "arch/arm/mach-spear6xx/Kconfig600"
  
- 	emi_reg_base = ioremap(base, EMI_REG_SIZE);
-diff --git a/arch/arm/mach-spear3xx/include/mach/emi.h b/arch/arm/mach-spear3xx/include/mach/emi.h
-index b620bf5..59f69c4 100644
---- a/arch/arm/mach-spear3xx/include/mach/emi.h
-+++ b/arch/arm/mach-spear3xx/include/mach/emi.h
-@@ -33,18 +33,19 @@
- #define CTRL_REG		(0x14)
- 
- #if defined(CONFIG_MACH_SPEAR310)
--#define TIMEOUT_REG		(0x90)
--#define ACK_REG			(0x94)
--#define IRQ_REG			(0x98)
-+#define SPEAR310_TIMEOUT_REG	(0x90)
-+#define SPEAR310_ACK_REG	(0x94)
-+#define SPEAR310_IRQ_REG	(0x98)
- 
--#define EMI_MAX_BANKS		6
-+#define SPEAR310_EMI_MAX_BANKS	6
-+#endif
- 
--#elif defined(CONFIG_MACH_SPEAR320)
--#define TIMEOUT_REG		(0x60)
--#define ACK_REG			(0x64)
--#define IRQ_REG			(0x68)
-+#if defined(CONFIG_MACH_SPEAR320)
-+#define SPEAR320_TIMEOUT_REG	(0x60)
-+#define SPEAR320_ACK_REG	(0x64)
-+#define SPEAR320_IRQ_REG	(0x68)
- 
--#define EMI_MAX_BANKS		4
-+#define SPEAR320_EMI_MAX_BANKS	4
- 
- #endif
- 
-diff --git a/arch/arm/mach-spear3xx/include/mach/gpio.h b/arch/arm/mach-spear3xx/include/mach/gpio.h
-index f15248c..0c13d8c 100644
---- a/arch/arm/mach-spear3xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear3xx/include/mach/gpio.h
-@@ -17,20 +17,21 @@
- #include <plat/gpio.h>
- 
- #ifdef CONFIG_MACH_SPEAR310
--#define PLGPIO_ENB		0x0010
--#define PLGPIO_WDATA		0x0020
--#define PLGPIO_DIR		0x0030
--#define PLGPIO_IE		0x0040
--#define PLGPIO_RDATA		0x0050
--#define PLGPIO_MIS		0x0060
-+#define SPEAR310_PLGPIO_ENB		0x0010
-+#define SPEAR310_PLGPIO_WDATA		0x0020
-+#define SPEAR310_PLGPIO_DIR		0x0030
-+#define SPEAR310_PLGPIO_IE		0x0040
-+#define SPEAR310_PLGPIO_RDATA		0x0050
-+#define SPEAR310_PLGPIO_MIS		0x0060
-+#endif
- 
--#elif defined(CONFIG_MACH_SPEAR320)
--#define PLGPIO_ENB		0x0024
--#define PLGPIO_WDATA		0x0034
--#define PLGPIO_DIR		0x0044
--#define PLGPIO_RDATA		0x0054
--#define PLGPIO_IE		0x0064
--#define PLGPIO_MIS		0x0074
-+#if defined(CONFIG_MACH_SPEAR320)
-+#define SPEAR320_PLGPIO_ENB		0x0024
-+#define SPEAR320_PLGPIO_WDATA		0x0034
-+#define SPEAR320_PLGPIO_DIR		0x0044
-+#define SPEAR320_PLGPIO_RDATA		0x0054
-+#define SPEAR320_PLGPIO_IE		0x0064
-+#define SPEAR320_PLGPIO_MIS		0x0074
- #endif
- 
- #define BASIC_GPIO_0		0
-diff --git a/arch/arm/plat-spear/plgpio.c b/arch/arm/plat-spear/plgpio.c
-index 3080178..f5220c0 100644
---- a/arch/arm/plat-spear/plgpio.c
-+++ b/arch/arm/plat-spear/plgpio.c
-@@ -22,12 +22,16 @@
- #include <linux/gpio.h>
- #include <linux/slab.h>
- #include <linux/platform_device.h>
-+#include <asm/mach-types.h>
- 
- #define MAX_GPIO_PER_REG		32
- #define PIN_OFFSET(pin)			(pin % MAX_GPIO_PER_REG)
- #define REG_OFFSET(base, reg, pin)	(base + reg + (pin / MAX_GPIO_PER_REG)\
- 		* sizeof(int *))
- 
-+static u32 plgpio_enb, plgpio_wdata, plgpio_dir, plgpio_rdata, plgpio_ie,
-+	   plgpio_mis;
-+
- /*
-  * struct plgpio: plgpio driver specific structure
-  *
-@@ -96,7 +100,7 @@ static int plgpio_direction_input(struct gpio_chip *chip, unsigned offset)
- 	}
- 
- 	spin_lock_irqsave(&plgpio->lock, flags);
--	plgpio_reg_set(plgpio->base, offset, PLGPIO_DIR);
-+	plgpio_reg_set(plgpio->base, offset, plgpio_dir);
- 	spin_unlock_irqrestore(&plgpio->lock, flags);
- 
- 	return 0;
-@@ -125,11 +129,11 @@ static int plgpio_direction_output(struct gpio_chip *chip, unsigned offset,
- 	}
- 
- 	spin_lock_irqsave(&plgpio->lock, flags);
--	plgpio_reg_reset(plgpio->base, dir_offset, PLGPIO_DIR);
-+	plgpio_reg_reset(plgpio->base, dir_offset, plgpio_dir);
- 	if (value)
--		plgpio_reg_set(plgpio->base, wdata_offset, PLGPIO_WDATA);
-+		plgpio_reg_set(plgpio->base, wdata_offset, plgpio_wdata);
- 	else
--		plgpio_reg_reset(plgpio->base, wdata_offset, PLGPIO_WDATA);
-+		plgpio_reg_reset(plgpio->base, wdata_offset, plgpio_wdata);
- 	spin_unlock_irqrestore(&plgpio->lock, flags);
- 
- 	return 0;
-@@ -149,7 +153,7 @@ static int plgpio_get_value(struct gpio_chip *chip, unsigned offset)
- 			return -EINVAL;
- 	}
- 
--	return is_plgpio_set(plgpio->base, offset, PLGPIO_RDATA);
-+	return is_plgpio_set(plgpio->base, offset, plgpio_rdata);
- }
- 
- static void plgpio_set_value(struct gpio_chip *chip, unsigned offset, int value)
-@@ -167,9 +171,9 @@ static void plgpio_set_value(struct gpio_chip *chip, unsigned offset, int value)
- 	}
- 
- 	if (value)
--		plgpio_reg_set(plgpio->base, offset, PLGPIO_WDATA);
-+		plgpio_reg_set(plgpio->base, offset, plgpio_wdata);
- 	else
--		plgpio_reg_reset(plgpio->base, offset, PLGPIO_WDATA);
-+		plgpio_reg_reset(plgpio->base, offset, plgpio_wdata);
- }
- 
- static int plgpio_request(struct gpio_chip *chip, unsigned offset)
-@@ -196,7 +200,7 @@ static int plgpio_request(struct gpio_chip *chip, unsigned offset)
- 	}
- 
- 	spin_lock_irqsave(&plgpio->lock, flags);
--	plgpio_reg_set(plgpio->base, offset, PLGPIO_ENB);
-+	plgpio_reg_set(plgpio->base, offset, plgpio_enb);
- 	spin_unlock_irqrestore(&plgpio->lock, flags);
- 
- 	return 0;
-@@ -218,7 +222,7 @@ static void plgpio_free(struct gpio_chip *chip, unsigned offset)
- 	}
- 
- 	spin_lock_irqsave(&plgpio->lock, flags);
--	plgpio_reg_reset(plgpio->base, offset, PLGPIO_ENB);
-+	plgpio_reg_reset(plgpio->base, offset, plgpio_enb);
- 	spin_unlock_irqrestore(&plgpio->lock, flags);
- }
- 
-@@ -247,7 +251,7 @@ static void plgpio_irq_mask(unsigned irq)
- 	}
- 
- 	spin_lock_irqsave(&plgpio->lock, flags);
--	plgpio_reg_set(plgpio->base, offset, PLGPIO_IE);
-+	plgpio_reg_set(plgpio->base, offset, plgpio_ie);
- 	spin_unlock_irqrestore(&plgpio->lock, flags);
- }
- 
-@@ -265,7 +269,7 @@ static void plgpio_irq_unmask(unsigned irq)
- 	}
- 
- 	spin_lock_irqsave(&plgpio->lock, flags);
--	plgpio_reg_reset(plgpio->base, offset, PLGPIO_IE);
-+	plgpio_reg_reset(plgpio->base, offset, plgpio_ie);
- 	spin_unlock_irqrestore(&plgpio->lock, flags);
- }
- 
-@@ -298,7 +302,7 @@ static void plgpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 
- 	/* check all plgpio MIS registers for a possible interrupt */
- 	for (; i < regs_count; i++) {
--		pending = readl(plgpio->base + PLGPIO_MIS + i * sizeof(int *));
-+		pending = readl(plgpio->base + plgpio_mis + i * sizeof(int *));
- 		if (!pending)
- 			continue;
- 
-@@ -443,6 +447,24 @@ static struct platform_driver plgpio_driver = {
- 
- static int __init plgpio_init(void)
- {
-+	if (machine_is_spear310()) {
-+		plgpio_enb = SPEAR310_PLGPIO_ENB;
-+		plgpio_wdata = SPEAR310_PLGPIO_WDATA;
-+		plgpio_dir = SPEAR310_PLGPIO_DIR;
-+		plgpio_rdata = SPEAR310_PLGPIO_IE;
-+		plgpio_ie = SPEAR310_PLGPIO_RDATA;
-+		plgpio_mis = SPEAR310_PLGPIO_MIS;
-+	} else if (machine_is_spear320()) {
-+		plgpio_enb = SPEAR320_PLGPIO_ENB;
-+		plgpio_wdata = SPEAR320_PLGPIO_WDATA;
-+		plgpio_dir = SPEAR320_PLGPIO_DIR;
-+		plgpio_rdata = SPEAR320_PLGPIO_IE;
-+		plgpio_ie = SPEAR320_PLGPIO_RDATA;
-+		plgpio_mis = SPEAR320_PLGPIO_MIS;
-+	} else {
-+		return 0;
-+	}
-+
- 	return platform_driver_register(&plgpio_driver);
- }
- subsys_initcall(plgpio_init);
+ endif #ARCH_SPEAR6XX
+diff --git a/arch/arm/mach-spear6xx/Kconfig600 b/arch/arm/mach-spear6xx/Kconfig600
+deleted file mode 100644
+index 9e19f65..0000000
+--- a/arch/arm/mach-spear6xx/Kconfig600
++++ /dev/null
+@@ -1,17 +0,0 @@
+-#
+-# SPEAr600 machine configuration file
+-#
+-
+-if MACH_SPEAR600
+-
+-choice
+-	prompt "SPEAr600 Boards"
+-	default BOARD_SPEAR600_EVB
+-
+-config	BOARD_SPEAR600_EVB
+-	bool "SPEAr600 Evaluation Board"
+-	help
+-	  Supports ST SPEAr600 Evaluation Board
+-endchoice
+-
+-endif	#MACH_SPEAR600
 -- 
 1.7.3.4
