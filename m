@@ -1,41 +1,91 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Wed, 19 Jan 2011 18:38:14 -0800
-Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
-In-Reply-To: <20110119222407.GD6335@n2100.arm.linux.org.uk>
-References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
-	<20110119082534.GA9569@gallagher> <4D3760DD.1010609@codeaurora.org>
-	<20110119222407.GD6335@n2100.arm.linux.org.uk>
-Message-ID: <4D37A016.8060902@codeaurora.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 20 Jan 2011 18:43:13 +0800
+Subject: [PATCH 6/6] dmaengine: imx-sdma: avoid stopping channel in the
+	middle of a BD transfer
+In-Reply-To: <1295473840-17295-7-git-send-email-shawn.guo@freescale.com>
+References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
+	<1295473840-17295-7-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110120104312.GA18834@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/19/2011 2:24 PM, Russell King - ARM Linux wrote:
-> On Wed, Jan 19, 2011 at 02:08:29PM -0800, Stepan Moskovchenko wrote:
->>>> +		/* Mask conditions we're ignorning. */
->>>> +		sr&= port->read_status_mask;
->>>> +		if (sr&   UART_SR_RX_BREAK)
->>>> +			flag = TTY_BREAK;
->>>> +		else if (sr&   UART_SR_PAR_FRAME_ERR)
->>>> +			flag = TTY_FRAME;
->>> It doesn't look like the flag is used anywhere after it has been
->>> assigned.
->> An artifact of an old driver. Removed.
-> But still required to support proper error signalling.
->
+On Thu, Jan 20, 2011 at 05:50:40AM +0800, Shawn Guo wrote:
+> When STOP register bit gets set, SDMA hardware will immediately stop
+> the channel once the current burst other than buffer descriptor
+> transfer is done.
+> 
+> * Change sdma_disable_channel() to only set STOP register bit after
+>   polling the current BD done, so that the current BD transfer
+>   corruption could be avoided.
+> 
+> * Increment buf_tail in mxc_sdma_handle_channel_normal() as well as
+>   sdma_handle_channel_loop(), since buf_tail now is used in
+>   sdma_disable_channel() which could be called in both sg and cyclic
+>   cases.
+> 
+> * Return DMA_SUCCESS other than DMA_ERROR in sdma_disable_channel().
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  drivers/dma/imx-sdma.c |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index fa63ace..ae87287 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -481,6 +481,8 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+>  	else
+>  		sdmac->status = DMA_SUCCESS;
+>  
+> +	sdmac->buf_tail++;
+> +
+>  	if (sdmac->desc.callback)
+>  		sdmac->desc.callback(sdmac->desc.callback_param);
+>  	sdmac->last_completed = sdmac->desc.cookie;
+> @@ -655,9 +657,14 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+>  {
+>  	struct sdma_engine *sdma = sdmac->sdma;
+>  	int channel = sdmac->channel;
+> +	struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
+> +
+> +	while (bd->mode.status & BD_DONE)
+> +		cpu_relax();
+>  
+>  	__raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> -	sdmac->status = DMA_ERROR;
+> +
+> +	sdmac->status = DMA_SUCCESS;
+>  }
 
-On second thought, from poking around the kernel some more, I believe 
-the following should be a better approach:
-         if (sr & UART_SR_RX_BREAK) {
-             tty_insert_flip_char(tty, 0, TTY_BREAK);
-         } else if (sr & UART_SR_PAR_FRAME_ERR) {
-             tty_insert_flip_char(tty, 0, TTY_FRAME);
-         }
+Sorry. The patch lost the change as below.  Will pick it up in v2.
 
-Russell, what do you think? Shall I make the change in v2?
+@@ -658,11 +658,15 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+        struct sdma_engine *sdma = sdmac->sdma;
+        int channel = sdmac->channel;
+        struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
++       u32 stat = __raw_readl(sdma->regs + SDMA_H_STATSTOP);
 
-Thanks
-Steve
+-       while (bd->mode.status & BD_DONE)
+-               cpu_relax();
++       /* stop the channel if it's running */
++       if (stat & (1 << channel)) {
++               while (bd->mode.status & BD_DONE)
++                       cpu_relax();
 
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+-       __raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
++               __raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
++       }
+
+        sdmac->status = DMA_SUCCESS;
+ }
+
+>  
+>  static int sdma_config_channel(struct sdma_channel *sdmac)
+> -- 
+> 1.7.1
+> 
+
+-- 
+Regards,
+Shawn
