@@ -1,78 +1,62 @@
-From: pullip.linux@gmail.com (KyongHo Cho)
-Date: Fri, 21 Jan 2011 02:52:34 +0900
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <AANLkTi=MizfGY4koMmRHprts6Ji3ofeSZPBBTiH1FDcn@mail.gmail.com>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<20110120142844.GA28358@barrios-desktop>
-	<AANLkTinXAiShaf1f69ufVHg7KPaY5j=jmOTtK71GNNp5@mail.gmail.com>
-	<AANLkTikBbknwsLvN-b4HVqL_gAUHC-4VjQ=WQ=h_kLhW@mail.gmail.com>
-	<AANLkTi=MizfGY4koMmRHprts6Ji3ofeSZPBBTiH1FDcn@mail.gmail.com>
-Message-ID: <AANLkTimf4oqEs4Oq1gMEjRsqhGM=vYkU6zm2MSuRBVdk@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jan 2011 17:55:51 +0000
+Subject: [Openpxa-users] Linux udelay() is way off
+In-Reply-To: <201101201800.04289.marek.vasut@gmail.com>
+References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>
+	<201101201800.04289.marek.vasut@gmail.com>
+Message-ID: <20110120175551.GG6335@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 2:44 AM, Minchan Kim <minchan.kim@gmail.com> wrote:
-> Fix linux-arm-kernel address.
->
-Thank you!
-Too late in the night:)
+On Thu, Jan 20, 2011 at 06:00:04PM +0100, Marek Vasut wrote:
+> On Thursday 20 January 2011 17:09:00 Bj?rn Forsman wrote:
+> > Hi,
+> > 
+> > On my Colibri PXA310, I see that Linux udelay() is only 30 % of the
+> > length it's supposed to. This is way off and cause problems (e.g.
+> > 1-Wire device driver breaks). I'm running OpenPXA bootloaders (OBM2 +
+> > U-Boot) and mainline Linux 2.6.36.
+> > 
+> > Any ideas how to fix this?
+> > 
+> > Could it be that U-Boot sets up the system clock to something
+> > different than what Linux "expects" so that loops_per_jiffy becomes
+> > wrong? I see some clock setup in <u-boot-pxa>/arch/arm/cpu/pxa/start.S
+> > but I'm not sure what to do with it (yet). I'd like to try out
+> > different clock speeds to see if it helps. Any pointers?
+> > 
+> > I also have a workaround in mind: Try out different lpj= settings on
+> > the kernel command line until a udelay(1000) actually is 1000 us. Is
+> > this a sane thing to do?
+> 
+> CCing relevant people.
+> 
+> And no, linux kernel should derive it's timing properly so it's a kernel bug.
 
-> On Fri, Jan 21, 2011 at 2:43 AM, Minchan Kim <minchan.kim@gmail.com> wrote:
->> Restore Cced.
->>
->> On Fri, Jan 21, 2011 at 2:24 AM, KyongHo Cho <pullip.linux@gmail.com> wrote:
->>> On Thu, Jan 20, 2011 at 11:28 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
->>>> On Thu, Jan 20, 2011 at 06:45:39PM +0900, KyongHo Cho wrote:
->>>>> Sparsemem allows that a bank of memory spans over several adjacent
->>>>> sections if the start address and the end address of the bank
->>>>> belong to different sections.
->>>>> When gathering statictics of physical memory in mem_init() and
->>>>> show_mem(), this possiblity was not considered.
->>>>
->>>> Please write down the result if we doesn't consider this patch.
->>>> I can understand what happens but for making good description and review,
->>>> merging easily, it would be better to write down the result without
->>>> the patch explicitly.
->>>>
->>> As we know that each section has its own memmap and
->>> a contiguous chunk of physical memory that is represented by 'bank' in meminfo
->>> can be larger than the size of a section.
->>> "page++" in the current implementation can access invalid memory area.
->>> The size of the section is 256 MiB in ARM and the number of banks in
->>> meminfo is 8.
->>> This means that the maximum size of the physical memory cannot be grow than 2GiB
->>> to avoid this problem in the current implementation.
->>> Thus we need to fix the calculation of the last page descriptor in
->>> terms of sections.
->>>
->>> This patch determines the last page descriptor in a memmap with
->>> min(last_pfn_of_bank, last_pfn_of_current_section)
->>> If there remains physical memory not consumed, it calculates the last
->>> page descriptor
->>> with min(last_pfn_of_bank, last_pfn_of_next_section).
->>>
->>>>
->>>> Hmm.. new ifndef magic makes code readability bad.
->>>> Couldn't we do it by simple pfn iterator not page and pfn_valid check?
->>>>
->>> True.
->>> We need to consider the implementation again.
->>> I think the previous implementation gave the importance to the
->>> efficiency but to the readability.
->>>
->>
->> Please consider readability and consistency with other architectures
->> if we can do. :)
->> Thanks.
->>
->> --
->> Kind regards,
->> Minchan Kim
->>
->
->
->
-> --
-> Kind regards,
-> Minchan Kim
->
+I recently looked into the udelay() timing accuracy, and I saw it only
+being reduced by .7% at boot time - due to the cycles stolen by the timer
+IRQ handler.
+
+The delay calibration algorithm shouldn't produce big errors due to the
+way it works.  It first tries to find a delay longer than the timer tick.
+It then uses a successive approximation technique over about 9 bits of
+loops_per_jiffy value.
+
+So, I wouldn't expect the boot time lpj value to be significantly out.
+
+However, what might be happening is you boot at X MHz.  You then use cpufreq
+and drop the frequency to Y MHz.  You then suspend and resume.  On resume,
+the boot loader starts the processor again at X MHz, but the kernel still
+assumes that you're running at Y MHz and has not adjusted the delay loop
+accordingly.
+
+This will result in a much shorter than expected delay.
+
+So, the first thing that needs doing is to ascertain when the delay
+becomes wrong.
+
+The other thing to check is whether you're suffering from rounding errors
+in the us-to-loops calculation - 56949d4 (ARM: udelay: prevent math
+rounding resulting in short udelays) which aren't calibrated away.
+(The lpj delay testing bypasses the calculation as its dealing with
+number of loops, not us.)
