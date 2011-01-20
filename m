@@ -1,582 +1,72 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 20 Jan 2011 18:36:50 +0100
-Subject: [PATCH RESEND] arm/mach-stmp3xxx: remove headers for DUART
-Message-ID: <1295545010-13847-1-git-send-email-w.sang@pengutronix.de>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Fri, 21 Jan 2011 02:44:09 +0900
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <AANLkTikBbknwsLvN-b4HVqL_gAUHC-4VjQ=WQ=h_kLhW@mail.gmail.com>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<20110120142844.GA28358@barrios-desktop>
+	<AANLkTinXAiShaf1f69ufVHg7KPaY5j=jmOTtK71GNNp5@mail.gmail.com>
+	<AANLkTikBbknwsLvN-b4HVqL_gAUHC-4VjQ=WQ=h_kLhW@mail.gmail.com>
+Message-ID: <AANLkTi=MizfGY4koMmRHprts6Ji3ofeSZPBBTiH1FDcn@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DUART is an AMBA PL011 and its registers are already available in
-linux/amba/serial.h. Support for the DUART can be obtained via the
-existing pl011 driver.
+Fix linux-arm-kernel address.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: dmitry pervushin <dpervushin@embeddedalley.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
+On Fri, Jan 21, 2011 at 2:43 AM, Minchan Kim <minchan.kim@gmail.com> wrote:
+> Restore Cced.
+>
+> On Fri, Jan 21, 2011 at 2:24 AM, KyongHo Cho <pullip.linux@gmail.com> wrote:
+>> On Thu, Jan 20, 2011 at 11:28 PM, Minchan Kim <minchan.kim@gmail.com> wrote:
+>>> On Thu, Jan 20, 2011 at 06:45:39PM +0900, KyongHo Cho wrote:
+>>>> Sparsemem allows that a bank of memory spans over several adjacent
+>>>> sections if the start address and the end address of the bank
+>>>> belong to different sections.
+>>>> When gathering statictics of physical memory in mem_init() and
+>>>> show_mem(), this possiblity was not considered.
+>>>
+>>> Please write down the result if we doesn't consider this patch.
+>>> I can understand what happens but for making good description and review,
+>>> merging easily, it would be better to write down the result without
+>>> the patch explicitly.
+>>>
+>> As we know that each section has its own memmap and
+>> a contiguous chunk of physical memory that is represented by 'bank' in meminfo
+>> can be larger than the size of a section.
+>> "page++" in the current implementation can access invalid memory area.
+>> The size of the section is 256 MiB in ARM and the number of banks in
+>> meminfo is 8.
+>> This means that the maximum size of the physical memory cannot be grow than 2GiB
+>> to avoid this problem in the current implementation.
+>> Thus we need to fix the calculation of the last page descriptor in
+>> terms of sections.
+>>
+>> This patch determines the last page descriptor in a memmap with
+>> min(last_pfn_of_bank, last_pfn_of_current_section)
+>> If there remains physical memory not consumed, it calculates the last
+>> page descriptor
+>> with min(last_pfn_of_bank, last_pfn_of_next_section).
+>>
+>>>
+>>> Hmm.. new ifndef magic makes code readability bad.
+>>> Couldn't we do it by simple pfn iterator not page and pfn_valid check?
+>>>
+>> True.
+>> We need to consider the implementation again.
+>> I think the previous implementation gave the importance to the
+>> efficiency but to the readability.
+>>
+>
+> Please consider readability and consistency with other architectures
+> if we can do. :)
+> Thanks.
+>
+> --
+> Kind regards,
+> Minchan Kim
+>
 
-Originally, these registers were used in a driver posted here:
 
-http://www.spinics.net/lists/arm-kernel/msg65548.html
 
-It was luckily never merged, because now we know that amba-pl011 should be
-used. This duplicate was found because the situation for MXS (MX23/MX28) is the
-same and meanwhile pl011 is working there fine.
-
-I checked that no file included these headers.
-
- arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h |  268 --------------------
- arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h |  268 --------------------
- 2 files changed, 0 insertions(+), 536 deletions(-)
- delete mode 100644 arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
- delete mode 100644 arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h
-
-diff --git a/arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h b/arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
-deleted file mode 100644
-index b810deb..0000000
---- a/arch/arm/mach-stmp378x/include/mach/regs-uartdbg.h
-+++ /dev/null
-@@ -1,268 +0,0 @@
--/*
-- * stmp378x: UARTDBG register definitions
-- *
-- * Copyright (c) 2008 Freescale Semiconductor
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-- */
--#define REGS_UARTDBG_BASE	(STMP3XXX_REGS_BASE + 0x70000)
--#define REGS_UARTDBG_PHYS	0x80070000
--#define REGS_UARTDBG_SIZE	0x2000
--
--#define HW_UARTDBGDR 0x00000000
--#define BP_UARTDBGDR_UNAVAILABLE      16
--#define BM_UARTDBGDR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGDR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGDR_UNAVAILABLE)
--#define BP_UARTDBGDR_RESERVED      12
--#define BM_UARTDBGDR_RESERVED 0x0000F000
--#define BF_UARTDBGDR_RESERVED(v)  \
--	(((v) << 12) & BM_UARTDBGDR_RESERVED)
--#define BM_UARTDBGDR_OE 0x00000800
--#define BM_UARTDBGDR_BE 0x00000400
--#define BM_UARTDBGDR_PE 0x00000200
--#define BM_UARTDBGDR_FE 0x00000100
--#define BP_UARTDBGDR_DATA      0
--#define BM_UARTDBGDR_DATA 0x000000FF
--#define BF_UARTDBGDR_DATA(v)  \
--	(((v) << 0) & BM_UARTDBGDR_DATA)
--#define HW_UARTDBGRSR_ECR 0x00000004
--#define BP_UARTDBGRSR_ECR_UNAVAILABLE      8
--#define BM_UARTDBGRSR_ECR_UNAVAILABLE 0xFFFFFF00
--#define BF_UARTDBGRSR_ECR_UNAVAILABLE(v) \
--	(((v) << 8) & BM_UARTDBGRSR_ECR_UNAVAILABLE)
--#define BP_UARTDBGRSR_ECR_EC      4
--#define BM_UARTDBGRSR_ECR_EC 0x000000F0
--#define BF_UARTDBGRSR_ECR_EC(v)  \
--	(((v) << 4) & BM_UARTDBGRSR_ECR_EC)
--#define BM_UARTDBGRSR_ECR_OE 0x00000008
--#define BM_UARTDBGRSR_ECR_BE 0x00000004
--#define BM_UARTDBGRSR_ECR_PE 0x00000002
--#define BM_UARTDBGRSR_ECR_FE 0x00000001
--#define HW_UARTDBGFR 0x00000018
--#define BP_UARTDBGFR_UNAVAILABLE      16
--#define BM_UARTDBGFR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGFR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGFR_UNAVAILABLE)
--#define BP_UARTDBGFR_RESERVED      9
--#define BM_UARTDBGFR_RESERVED 0x0000FE00
--#define BF_UARTDBGFR_RESERVED(v)  \
--	(((v) << 9) & BM_UARTDBGFR_RESERVED)
--#define BM_UARTDBGFR_RI 0x00000100
--#define BM_UARTDBGFR_TXFE 0x00000080
--#define BM_UARTDBGFR_RXFF 0x00000040
--#define BM_UARTDBGFR_TXFF 0x00000020
--#define BM_UARTDBGFR_RXFE 0x00000010
--#define BM_UARTDBGFR_BUSY 0x00000008
--#define BM_UARTDBGFR_DCD 0x00000004
--#define BM_UARTDBGFR_DSR 0x00000002
--#define BM_UARTDBGFR_CTS 0x00000001
--#define HW_UARTDBGILPR 0x00000020
--#define BP_UARTDBGILPR_UNAVAILABLE      8
--#define BM_UARTDBGILPR_UNAVAILABLE 0xFFFFFF00
--#define BF_UARTDBGILPR_UNAVAILABLE(v) \
--	(((v) << 8) & BM_UARTDBGILPR_UNAVAILABLE)
--#define BP_UARTDBGILPR_ILPDVSR      0
--#define BM_UARTDBGILPR_ILPDVSR 0x000000FF
--#define BF_UARTDBGILPR_ILPDVSR(v)  \
--	(((v) << 0) & BM_UARTDBGILPR_ILPDVSR)
--#define HW_UARTDBGIBRD 0x00000024
--#define BP_UARTDBGIBRD_UNAVAILABLE      16
--#define BM_UARTDBGIBRD_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGIBRD_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGIBRD_UNAVAILABLE)
--#define BP_UARTDBGIBRD_BAUD_DIVINT      0
--#define BM_UARTDBGIBRD_BAUD_DIVINT 0x0000FFFF
--#define BF_UARTDBGIBRD_BAUD_DIVINT(v)  \
--	(((v) << 0) & BM_UARTDBGIBRD_BAUD_DIVINT)
--#define HW_UARTDBGFBRD 0x00000028
--#define BP_UARTDBGFBRD_UNAVAILABLE      8
--#define BM_UARTDBGFBRD_UNAVAILABLE 0xFFFFFF00
--#define BF_UARTDBGFBRD_UNAVAILABLE(v) \
--	(((v) << 8) & BM_UARTDBGFBRD_UNAVAILABLE)
--#define BP_UARTDBGFBRD_RESERVED      6
--#define BM_UARTDBGFBRD_RESERVED 0x000000C0
--#define BF_UARTDBGFBRD_RESERVED(v)  \
--	(((v) << 6) & BM_UARTDBGFBRD_RESERVED)
--#define BP_UARTDBGFBRD_BAUD_DIVFRAC      0
--#define BM_UARTDBGFBRD_BAUD_DIVFRAC 0x0000003F
--#define BF_UARTDBGFBRD_BAUD_DIVFRAC(v)  \
--	(((v) << 0) & BM_UARTDBGFBRD_BAUD_DIVFRAC)
--#define HW_UARTDBGLCR_H 0x0000002c
--#define BP_UARTDBGLCR_H_UNAVAILABLE      16
--#define BM_UARTDBGLCR_H_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGLCR_H_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGLCR_H_UNAVAILABLE)
--#define BP_UARTDBGLCR_H_RESERVED      8
--#define BM_UARTDBGLCR_H_RESERVED 0x0000FF00
--#define BF_UARTDBGLCR_H_RESERVED(v)  \
--	(((v) << 8) & BM_UARTDBGLCR_H_RESERVED)
--#define BM_UARTDBGLCR_H_SPS 0x00000080
--#define BP_UARTDBGLCR_H_WLEN      5
--#define BM_UARTDBGLCR_H_WLEN 0x00000060
--#define BF_UARTDBGLCR_H_WLEN(v)  \
--	(((v) << 5) & BM_UARTDBGLCR_H_WLEN)
--#define BM_UARTDBGLCR_H_FEN 0x00000010
--#define BM_UARTDBGLCR_H_STP2 0x00000008
--#define BM_UARTDBGLCR_H_EPS 0x00000004
--#define BM_UARTDBGLCR_H_PEN 0x00000002
--#define BM_UARTDBGLCR_H_BRK 0x00000001
--#define HW_UARTDBGCR 0x00000030
--#define BP_UARTDBGCR_UNAVAILABLE      16
--#define BM_UARTDBGCR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGCR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGCR_UNAVAILABLE)
--#define BM_UARTDBGCR_CTSEN 0x00008000
--#define BM_UARTDBGCR_RTSEN 0x00004000
--#define BM_UARTDBGCR_OUT2 0x00002000
--#define BM_UARTDBGCR_OUT1 0x00001000
--#define BM_UARTDBGCR_RTS 0x00000800
--#define BM_UARTDBGCR_DTR 0x00000400
--#define BM_UARTDBGCR_RXE 0x00000200
--#define BM_UARTDBGCR_TXE 0x00000100
--#define BM_UARTDBGCR_LBE 0x00000080
--#define BP_UARTDBGCR_RESERVED      3
--#define BM_UARTDBGCR_RESERVED 0x00000078
--#define BF_UARTDBGCR_RESERVED(v)  \
--	(((v) << 3) & BM_UARTDBGCR_RESERVED)
--#define BM_UARTDBGCR_SIRLP 0x00000004
--#define BM_UARTDBGCR_SIREN 0x00000002
--#define BM_UARTDBGCR_UARTEN 0x00000001
--#define HW_UARTDBGIFLS 0x00000034
--#define BP_UARTDBGIFLS_UNAVAILABLE      16
--#define BM_UARTDBGIFLS_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGIFLS_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGIFLS_UNAVAILABLE)
--#define BP_UARTDBGIFLS_RESERVED      6
--#define BM_UARTDBGIFLS_RESERVED 0x0000FFC0
--#define BF_UARTDBGIFLS_RESERVED(v)  \
--	(((v) << 6) & BM_UARTDBGIFLS_RESERVED)
--#define BP_UARTDBGIFLS_RXIFLSEL      3
--#define BM_UARTDBGIFLS_RXIFLSEL 0x00000038
--#define BF_UARTDBGIFLS_RXIFLSEL(v)  \
--	(((v) << 3) & BM_UARTDBGIFLS_RXIFLSEL)
--#define BV_UARTDBGIFLS_RXIFLSEL__NOT_EMPTY      0x0
--#define BV_UARTDBGIFLS_RXIFLSEL__ONE_QUARTER    0x1
--#define BV_UARTDBGIFLS_RXIFLSEL__ONE_HALF       0x2
--#define BV_UARTDBGIFLS_RXIFLSEL__THREE_QUARTERS 0x3
--#define BV_UARTDBGIFLS_RXIFLSEL__SEVEN_EIGHTHS  0x4
--#define BV_UARTDBGIFLS_RXIFLSEL__INVALID5       0x5
--#define BV_UARTDBGIFLS_RXIFLSEL__INVALID6       0x6
--#define BV_UARTDBGIFLS_RXIFLSEL__INVALID7       0x7
--#define BP_UARTDBGIFLS_TXIFLSEL      0
--#define BM_UARTDBGIFLS_TXIFLSEL 0x00000007
--#define BF_UARTDBGIFLS_TXIFLSEL(v)  \
--	(((v) << 0) & BM_UARTDBGIFLS_TXIFLSEL)
--#define BV_UARTDBGIFLS_TXIFLSEL__EMPTY	  0x0
--#define BV_UARTDBGIFLS_TXIFLSEL__ONE_QUARTER    0x1
--#define BV_UARTDBGIFLS_TXIFLSEL__ONE_HALF       0x2
--#define BV_UARTDBGIFLS_TXIFLSEL__THREE_QUARTERS 0x3
--#define BV_UARTDBGIFLS_TXIFLSEL__SEVEN_EIGHTHS  0x4
--#define BV_UARTDBGIFLS_TXIFLSEL__INVALID5       0x5
--#define BV_UARTDBGIFLS_TXIFLSEL__INVALID6       0x6
--#define BV_UARTDBGIFLS_TXIFLSEL__INVALID7       0x7
--#define HW_UARTDBGIMSC 0x00000038
--#define BP_UARTDBGIMSC_UNAVAILABLE      16
--#define BM_UARTDBGIMSC_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGIMSC_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGIMSC_UNAVAILABLE)
--#define BP_UARTDBGIMSC_RESERVED      11
--#define BM_UARTDBGIMSC_RESERVED 0x0000F800
--#define BF_UARTDBGIMSC_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGIMSC_RESERVED)
--#define BM_UARTDBGIMSC_OEIM 0x00000400
--#define BM_UARTDBGIMSC_BEIM 0x00000200
--#define BM_UARTDBGIMSC_PEIM 0x00000100
--#define BM_UARTDBGIMSC_FEIM 0x00000080
--#define BM_UARTDBGIMSC_RTIM 0x00000040
--#define BM_UARTDBGIMSC_TXIM 0x00000020
--#define BM_UARTDBGIMSC_RXIM 0x00000010
--#define BM_UARTDBGIMSC_DSRMIM 0x00000008
--#define BM_UARTDBGIMSC_DCDMIM 0x00000004
--#define BM_UARTDBGIMSC_CTSMIM 0x00000002
--#define BM_UARTDBGIMSC_RIMIM 0x00000001
--#define HW_UARTDBGRIS 0x0000003c
--#define BP_UARTDBGRIS_UNAVAILABLE      16
--#define BM_UARTDBGRIS_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGRIS_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGRIS_UNAVAILABLE)
--#define BP_UARTDBGRIS_RESERVED      11
--#define BM_UARTDBGRIS_RESERVED 0x0000F800
--#define BF_UARTDBGRIS_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGRIS_RESERVED)
--#define BM_UARTDBGRIS_OERIS 0x00000400
--#define BM_UARTDBGRIS_BERIS 0x00000200
--#define BM_UARTDBGRIS_PERIS 0x00000100
--#define BM_UARTDBGRIS_FERIS 0x00000080
--#define BM_UARTDBGRIS_RTRIS 0x00000040
--#define BM_UARTDBGRIS_TXRIS 0x00000020
--#define BM_UARTDBGRIS_RXRIS 0x00000010
--#define BM_UARTDBGRIS_DSRRMIS 0x00000008
--#define BM_UARTDBGRIS_DCDRMIS 0x00000004
--#define BM_UARTDBGRIS_CTSRMIS 0x00000002
--#define BM_UARTDBGRIS_RIRMIS 0x00000001
--#define HW_UARTDBGMIS 0x00000040
--#define BP_UARTDBGMIS_UNAVAILABLE      16
--#define BM_UARTDBGMIS_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGMIS_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGMIS_UNAVAILABLE)
--#define BP_UARTDBGMIS_RESERVED      11
--#define BM_UARTDBGMIS_RESERVED 0x0000F800
--#define BF_UARTDBGMIS_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGMIS_RESERVED)
--#define BM_UARTDBGMIS_OEMIS 0x00000400
--#define BM_UARTDBGMIS_BEMIS 0x00000200
--#define BM_UARTDBGMIS_PEMIS 0x00000100
--#define BM_UARTDBGMIS_FEMIS 0x00000080
--#define BM_UARTDBGMIS_RTMIS 0x00000040
--#define BM_UARTDBGMIS_TXMIS 0x00000020
--#define BM_UARTDBGMIS_RXMIS 0x00000010
--#define BM_UARTDBGMIS_DSRMMIS 0x00000008
--#define BM_UARTDBGMIS_DCDMMIS 0x00000004
--#define BM_UARTDBGMIS_CTSMMIS 0x00000002
--#define BM_UARTDBGMIS_RIMMIS 0x00000001
--#define HW_UARTDBGICR 0x00000044
--#define BP_UARTDBGICR_UNAVAILABLE      16
--#define BM_UARTDBGICR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGICR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGICR_UNAVAILABLE)
--#define BP_UARTDBGICR_RESERVED      11
--#define BM_UARTDBGICR_RESERVED 0x0000F800
--#define BF_UARTDBGICR_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGICR_RESERVED)
--#define BM_UARTDBGICR_OEIC 0x00000400
--#define BM_UARTDBGICR_BEIC 0x00000200
--#define BM_UARTDBGICR_PEIC 0x00000100
--#define BM_UARTDBGICR_FEIC 0x00000080
--#define BM_UARTDBGICR_RTIC 0x00000040
--#define BM_UARTDBGICR_TXIC 0x00000020
--#define BM_UARTDBGICR_RXIC 0x00000010
--#define BM_UARTDBGICR_DSRMIC 0x00000008
--#define BM_UARTDBGICR_DCDMIC 0x00000004
--#define BM_UARTDBGICR_CTSMIC 0x00000002
--#define BM_UARTDBGICR_RIMIC 0x00000001
--#define HW_UARTDBGDMACR 0x00000048
--#define BP_UARTDBGDMACR_UNAVAILABLE      16
--#define BM_UARTDBGDMACR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGDMACR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGDMACR_UNAVAILABLE)
--#define BP_UARTDBGDMACR_RESERVED      3
--#define BM_UARTDBGDMACR_RESERVED 0x0000FFF8
--#define BF_UARTDBGDMACR_RESERVED(v)  \
--	(((v) << 3) & BM_UARTDBGDMACR_RESERVED)
--#define BM_UARTDBGDMACR_DMAONERR 0x00000004
--#define BM_UARTDBGDMACR_TXDMAE 0x00000002
--#define BM_UARTDBGDMACR_RXDMAE 0x00000001
-diff --git a/arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h b/arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h
-deleted file mode 100644
-index b810deb..0000000
---- a/arch/arm/mach-stmp37xx/include/mach/regs-uartdbg.h
-+++ /dev/null
-@@ -1,268 +0,0 @@
--/*
-- * stmp378x: UARTDBG register definitions
-- *
-- * Copyright (c) 2008 Freescale Semiconductor
-- * Copyright 2008 Embedded Alley Solutions, Inc All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-- */
--#define REGS_UARTDBG_BASE	(STMP3XXX_REGS_BASE + 0x70000)
--#define REGS_UARTDBG_PHYS	0x80070000
--#define REGS_UARTDBG_SIZE	0x2000
--
--#define HW_UARTDBGDR 0x00000000
--#define BP_UARTDBGDR_UNAVAILABLE      16
--#define BM_UARTDBGDR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGDR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGDR_UNAVAILABLE)
--#define BP_UARTDBGDR_RESERVED      12
--#define BM_UARTDBGDR_RESERVED 0x0000F000
--#define BF_UARTDBGDR_RESERVED(v)  \
--	(((v) << 12) & BM_UARTDBGDR_RESERVED)
--#define BM_UARTDBGDR_OE 0x00000800
--#define BM_UARTDBGDR_BE 0x00000400
--#define BM_UARTDBGDR_PE 0x00000200
--#define BM_UARTDBGDR_FE 0x00000100
--#define BP_UARTDBGDR_DATA      0
--#define BM_UARTDBGDR_DATA 0x000000FF
--#define BF_UARTDBGDR_DATA(v)  \
--	(((v) << 0) & BM_UARTDBGDR_DATA)
--#define HW_UARTDBGRSR_ECR 0x00000004
--#define BP_UARTDBGRSR_ECR_UNAVAILABLE      8
--#define BM_UARTDBGRSR_ECR_UNAVAILABLE 0xFFFFFF00
--#define BF_UARTDBGRSR_ECR_UNAVAILABLE(v) \
--	(((v) << 8) & BM_UARTDBGRSR_ECR_UNAVAILABLE)
--#define BP_UARTDBGRSR_ECR_EC      4
--#define BM_UARTDBGRSR_ECR_EC 0x000000F0
--#define BF_UARTDBGRSR_ECR_EC(v)  \
--	(((v) << 4) & BM_UARTDBGRSR_ECR_EC)
--#define BM_UARTDBGRSR_ECR_OE 0x00000008
--#define BM_UARTDBGRSR_ECR_BE 0x00000004
--#define BM_UARTDBGRSR_ECR_PE 0x00000002
--#define BM_UARTDBGRSR_ECR_FE 0x00000001
--#define HW_UARTDBGFR 0x00000018
--#define BP_UARTDBGFR_UNAVAILABLE      16
--#define BM_UARTDBGFR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGFR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGFR_UNAVAILABLE)
--#define BP_UARTDBGFR_RESERVED      9
--#define BM_UARTDBGFR_RESERVED 0x0000FE00
--#define BF_UARTDBGFR_RESERVED(v)  \
--	(((v) << 9) & BM_UARTDBGFR_RESERVED)
--#define BM_UARTDBGFR_RI 0x00000100
--#define BM_UARTDBGFR_TXFE 0x00000080
--#define BM_UARTDBGFR_RXFF 0x00000040
--#define BM_UARTDBGFR_TXFF 0x00000020
--#define BM_UARTDBGFR_RXFE 0x00000010
--#define BM_UARTDBGFR_BUSY 0x00000008
--#define BM_UARTDBGFR_DCD 0x00000004
--#define BM_UARTDBGFR_DSR 0x00000002
--#define BM_UARTDBGFR_CTS 0x00000001
--#define HW_UARTDBGILPR 0x00000020
--#define BP_UARTDBGILPR_UNAVAILABLE      8
--#define BM_UARTDBGILPR_UNAVAILABLE 0xFFFFFF00
--#define BF_UARTDBGILPR_UNAVAILABLE(v) \
--	(((v) << 8) & BM_UARTDBGILPR_UNAVAILABLE)
--#define BP_UARTDBGILPR_ILPDVSR      0
--#define BM_UARTDBGILPR_ILPDVSR 0x000000FF
--#define BF_UARTDBGILPR_ILPDVSR(v)  \
--	(((v) << 0) & BM_UARTDBGILPR_ILPDVSR)
--#define HW_UARTDBGIBRD 0x00000024
--#define BP_UARTDBGIBRD_UNAVAILABLE      16
--#define BM_UARTDBGIBRD_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGIBRD_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGIBRD_UNAVAILABLE)
--#define BP_UARTDBGIBRD_BAUD_DIVINT      0
--#define BM_UARTDBGIBRD_BAUD_DIVINT 0x0000FFFF
--#define BF_UARTDBGIBRD_BAUD_DIVINT(v)  \
--	(((v) << 0) & BM_UARTDBGIBRD_BAUD_DIVINT)
--#define HW_UARTDBGFBRD 0x00000028
--#define BP_UARTDBGFBRD_UNAVAILABLE      8
--#define BM_UARTDBGFBRD_UNAVAILABLE 0xFFFFFF00
--#define BF_UARTDBGFBRD_UNAVAILABLE(v) \
--	(((v) << 8) & BM_UARTDBGFBRD_UNAVAILABLE)
--#define BP_UARTDBGFBRD_RESERVED      6
--#define BM_UARTDBGFBRD_RESERVED 0x000000C0
--#define BF_UARTDBGFBRD_RESERVED(v)  \
--	(((v) << 6) & BM_UARTDBGFBRD_RESERVED)
--#define BP_UARTDBGFBRD_BAUD_DIVFRAC      0
--#define BM_UARTDBGFBRD_BAUD_DIVFRAC 0x0000003F
--#define BF_UARTDBGFBRD_BAUD_DIVFRAC(v)  \
--	(((v) << 0) & BM_UARTDBGFBRD_BAUD_DIVFRAC)
--#define HW_UARTDBGLCR_H 0x0000002c
--#define BP_UARTDBGLCR_H_UNAVAILABLE      16
--#define BM_UARTDBGLCR_H_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGLCR_H_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGLCR_H_UNAVAILABLE)
--#define BP_UARTDBGLCR_H_RESERVED      8
--#define BM_UARTDBGLCR_H_RESERVED 0x0000FF00
--#define BF_UARTDBGLCR_H_RESERVED(v)  \
--	(((v) << 8) & BM_UARTDBGLCR_H_RESERVED)
--#define BM_UARTDBGLCR_H_SPS 0x00000080
--#define BP_UARTDBGLCR_H_WLEN      5
--#define BM_UARTDBGLCR_H_WLEN 0x00000060
--#define BF_UARTDBGLCR_H_WLEN(v)  \
--	(((v) << 5) & BM_UARTDBGLCR_H_WLEN)
--#define BM_UARTDBGLCR_H_FEN 0x00000010
--#define BM_UARTDBGLCR_H_STP2 0x00000008
--#define BM_UARTDBGLCR_H_EPS 0x00000004
--#define BM_UARTDBGLCR_H_PEN 0x00000002
--#define BM_UARTDBGLCR_H_BRK 0x00000001
--#define HW_UARTDBGCR 0x00000030
--#define BP_UARTDBGCR_UNAVAILABLE      16
--#define BM_UARTDBGCR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGCR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGCR_UNAVAILABLE)
--#define BM_UARTDBGCR_CTSEN 0x00008000
--#define BM_UARTDBGCR_RTSEN 0x00004000
--#define BM_UARTDBGCR_OUT2 0x00002000
--#define BM_UARTDBGCR_OUT1 0x00001000
--#define BM_UARTDBGCR_RTS 0x00000800
--#define BM_UARTDBGCR_DTR 0x00000400
--#define BM_UARTDBGCR_RXE 0x00000200
--#define BM_UARTDBGCR_TXE 0x00000100
--#define BM_UARTDBGCR_LBE 0x00000080
--#define BP_UARTDBGCR_RESERVED      3
--#define BM_UARTDBGCR_RESERVED 0x00000078
--#define BF_UARTDBGCR_RESERVED(v)  \
--	(((v) << 3) & BM_UARTDBGCR_RESERVED)
--#define BM_UARTDBGCR_SIRLP 0x00000004
--#define BM_UARTDBGCR_SIREN 0x00000002
--#define BM_UARTDBGCR_UARTEN 0x00000001
--#define HW_UARTDBGIFLS 0x00000034
--#define BP_UARTDBGIFLS_UNAVAILABLE      16
--#define BM_UARTDBGIFLS_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGIFLS_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGIFLS_UNAVAILABLE)
--#define BP_UARTDBGIFLS_RESERVED      6
--#define BM_UARTDBGIFLS_RESERVED 0x0000FFC0
--#define BF_UARTDBGIFLS_RESERVED(v)  \
--	(((v) << 6) & BM_UARTDBGIFLS_RESERVED)
--#define BP_UARTDBGIFLS_RXIFLSEL      3
--#define BM_UARTDBGIFLS_RXIFLSEL 0x00000038
--#define BF_UARTDBGIFLS_RXIFLSEL(v)  \
--	(((v) << 3) & BM_UARTDBGIFLS_RXIFLSEL)
--#define BV_UARTDBGIFLS_RXIFLSEL__NOT_EMPTY      0x0
--#define BV_UARTDBGIFLS_RXIFLSEL__ONE_QUARTER    0x1
--#define BV_UARTDBGIFLS_RXIFLSEL__ONE_HALF       0x2
--#define BV_UARTDBGIFLS_RXIFLSEL__THREE_QUARTERS 0x3
--#define BV_UARTDBGIFLS_RXIFLSEL__SEVEN_EIGHTHS  0x4
--#define BV_UARTDBGIFLS_RXIFLSEL__INVALID5       0x5
--#define BV_UARTDBGIFLS_RXIFLSEL__INVALID6       0x6
--#define BV_UARTDBGIFLS_RXIFLSEL__INVALID7       0x7
--#define BP_UARTDBGIFLS_TXIFLSEL      0
--#define BM_UARTDBGIFLS_TXIFLSEL 0x00000007
--#define BF_UARTDBGIFLS_TXIFLSEL(v)  \
--	(((v) << 0) & BM_UARTDBGIFLS_TXIFLSEL)
--#define BV_UARTDBGIFLS_TXIFLSEL__EMPTY	  0x0
--#define BV_UARTDBGIFLS_TXIFLSEL__ONE_QUARTER    0x1
--#define BV_UARTDBGIFLS_TXIFLSEL__ONE_HALF       0x2
--#define BV_UARTDBGIFLS_TXIFLSEL__THREE_QUARTERS 0x3
--#define BV_UARTDBGIFLS_TXIFLSEL__SEVEN_EIGHTHS  0x4
--#define BV_UARTDBGIFLS_TXIFLSEL__INVALID5       0x5
--#define BV_UARTDBGIFLS_TXIFLSEL__INVALID6       0x6
--#define BV_UARTDBGIFLS_TXIFLSEL__INVALID7       0x7
--#define HW_UARTDBGIMSC 0x00000038
--#define BP_UARTDBGIMSC_UNAVAILABLE      16
--#define BM_UARTDBGIMSC_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGIMSC_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGIMSC_UNAVAILABLE)
--#define BP_UARTDBGIMSC_RESERVED      11
--#define BM_UARTDBGIMSC_RESERVED 0x0000F800
--#define BF_UARTDBGIMSC_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGIMSC_RESERVED)
--#define BM_UARTDBGIMSC_OEIM 0x00000400
--#define BM_UARTDBGIMSC_BEIM 0x00000200
--#define BM_UARTDBGIMSC_PEIM 0x00000100
--#define BM_UARTDBGIMSC_FEIM 0x00000080
--#define BM_UARTDBGIMSC_RTIM 0x00000040
--#define BM_UARTDBGIMSC_TXIM 0x00000020
--#define BM_UARTDBGIMSC_RXIM 0x00000010
--#define BM_UARTDBGIMSC_DSRMIM 0x00000008
--#define BM_UARTDBGIMSC_DCDMIM 0x00000004
--#define BM_UARTDBGIMSC_CTSMIM 0x00000002
--#define BM_UARTDBGIMSC_RIMIM 0x00000001
--#define HW_UARTDBGRIS 0x0000003c
--#define BP_UARTDBGRIS_UNAVAILABLE      16
--#define BM_UARTDBGRIS_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGRIS_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGRIS_UNAVAILABLE)
--#define BP_UARTDBGRIS_RESERVED      11
--#define BM_UARTDBGRIS_RESERVED 0x0000F800
--#define BF_UARTDBGRIS_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGRIS_RESERVED)
--#define BM_UARTDBGRIS_OERIS 0x00000400
--#define BM_UARTDBGRIS_BERIS 0x00000200
--#define BM_UARTDBGRIS_PERIS 0x00000100
--#define BM_UARTDBGRIS_FERIS 0x00000080
--#define BM_UARTDBGRIS_RTRIS 0x00000040
--#define BM_UARTDBGRIS_TXRIS 0x00000020
--#define BM_UARTDBGRIS_RXRIS 0x00000010
--#define BM_UARTDBGRIS_DSRRMIS 0x00000008
--#define BM_UARTDBGRIS_DCDRMIS 0x00000004
--#define BM_UARTDBGRIS_CTSRMIS 0x00000002
--#define BM_UARTDBGRIS_RIRMIS 0x00000001
--#define HW_UARTDBGMIS 0x00000040
--#define BP_UARTDBGMIS_UNAVAILABLE      16
--#define BM_UARTDBGMIS_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGMIS_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGMIS_UNAVAILABLE)
--#define BP_UARTDBGMIS_RESERVED      11
--#define BM_UARTDBGMIS_RESERVED 0x0000F800
--#define BF_UARTDBGMIS_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGMIS_RESERVED)
--#define BM_UARTDBGMIS_OEMIS 0x00000400
--#define BM_UARTDBGMIS_BEMIS 0x00000200
--#define BM_UARTDBGMIS_PEMIS 0x00000100
--#define BM_UARTDBGMIS_FEMIS 0x00000080
--#define BM_UARTDBGMIS_RTMIS 0x00000040
--#define BM_UARTDBGMIS_TXMIS 0x00000020
--#define BM_UARTDBGMIS_RXMIS 0x00000010
--#define BM_UARTDBGMIS_DSRMMIS 0x00000008
--#define BM_UARTDBGMIS_DCDMMIS 0x00000004
--#define BM_UARTDBGMIS_CTSMMIS 0x00000002
--#define BM_UARTDBGMIS_RIMMIS 0x00000001
--#define HW_UARTDBGICR 0x00000044
--#define BP_UARTDBGICR_UNAVAILABLE      16
--#define BM_UARTDBGICR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGICR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGICR_UNAVAILABLE)
--#define BP_UARTDBGICR_RESERVED      11
--#define BM_UARTDBGICR_RESERVED 0x0000F800
--#define BF_UARTDBGICR_RESERVED(v)  \
--	(((v) << 11) & BM_UARTDBGICR_RESERVED)
--#define BM_UARTDBGICR_OEIC 0x00000400
--#define BM_UARTDBGICR_BEIC 0x00000200
--#define BM_UARTDBGICR_PEIC 0x00000100
--#define BM_UARTDBGICR_FEIC 0x00000080
--#define BM_UARTDBGICR_RTIC 0x00000040
--#define BM_UARTDBGICR_TXIC 0x00000020
--#define BM_UARTDBGICR_RXIC 0x00000010
--#define BM_UARTDBGICR_DSRMIC 0x00000008
--#define BM_UARTDBGICR_DCDMIC 0x00000004
--#define BM_UARTDBGICR_CTSMIC 0x00000002
--#define BM_UARTDBGICR_RIMIC 0x00000001
--#define HW_UARTDBGDMACR 0x00000048
--#define BP_UARTDBGDMACR_UNAVAILABLE      16
--#define BM_UARTDBGDMACR_UNAVAILABLE 0xFFFF0000
--#define BF_UARTDBGDMACR_UNAVAILABLE(v) \
--	(((v) << 16) & BM_UARTDBGDMACR_UNAVAILABLE)
--#define BP_UARTDBGDMACR_RESERVED      3
--#define BM_UARTDBGDMACR_RESERVED 0x0000FFF8
--#define BF_UARTDBGDMACR_RESERVED(v)  \
--	(((v) << 3) & BM_UARTDBGDMACR_RESERVED)
--#define BM_UARTDBGDMACR_DMAONERR 0x00000004
--#define BM_UARTDBGDMACR_TXDMAE 0x00000002
--#define BM_UARTDBGDMACR_RXDMAE 0x00000001
 -- 
-1.7.2.3
+Kind regards,
+Minchan Kim
