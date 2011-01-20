@@ -1,35 +1,86 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 20 Jan 2011 12:32:40 -0800
-Subject: [PATCH 2/7] [ARM] msm: qsd8k memory base is at 0x20000000
+Date: Thu, 20 Jan 2011 12:32:39 -0800
+Subject: [PATCH 1/7] msm: qsd8x50: add uart platform data
 In-Reply-To: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
 References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-Message-ID: <1295555565-21563-3-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1295555565-21563-2-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Swetland <swetland@google.com>
+This enables the uart for QSD8x50.
 
-The memory layout is effective as of AMSS 3170+.
-
-Signed-off-by: Haley Teng <haley_teng@htc.com>
-Signed-off-by: Dima Zavin <dima@android.com>
+Signed-off-by: Daniel Walker <dwalker@codeaurora.org>
 ---
- arch/arm/mach-msm/Makefile.boot |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/devices-qsd8x50.c |   42 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 42 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Makefile.boot b/arch/arm/mach-msm/Makefile.boot
-index 24dfbf8..3266727 100644
---- a/arch/arm/mach-msm/Makefile.boot
-+++ b/arch/arm/mach-msm/Makefile.boot
-@@ -1,3 +1,8 @@
-   zreladdr-y		:= 0x10008000
- params_phys-y		:= 0x10000100
- initrd_phys-y		:= 0x10800000
+diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
+index b1a8f0f..24b2051 100644
+--- a/arch/arm/mach-msm/devices-qsd8x50.c
++++ b/arch/arm/mach-msm/devices-qsd8x50.c
+@@ -28,6 +28,32 @@
+ 
+ #include <mach/mmc.h>
+ 
++static struct resource resources_uart1[] = {
++	{
++		.start	= INT_UART1,
++		.end	= INT_UART1,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= MSM_UART1_PHYS,
++		.end	= MSM_UART1_PHYS + MSM_UART1_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
 +
-+# for now, override for QSD8x50
-+  zreladdr-$(CONFIG_ARCH_QSD8X50)		:= 0x20008000
-+params_phys-$(CONFIG_ARCH_QSD8X50)		:= 0x20000100
-+initrd_phys-$(CONFIG_ARCH_QSD8X50)		:= 0x21000000
++static struct resource resources_uart2[] = {
++	{
++		.start	= INT_UART2,
++		.end	= INT_UART2,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= MSM_UART2_PHYS,
++		.end	= MSM_UART2_PHYS + MSM_UART2_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
+ static struct resource resources_uart3[] = {
+ 	{
+ 		.start	= INT_UART3,
+@@ -41,6 +67,20 @@ static struct resource resources_uart3[] = {
+ 	},
+ };
+ 
++struct platform_device msm_device_uart1 = {
++	.name	= "msm_serial",
++	.id	= 0,
++	.num_resources	= ARRAY_SIZE(resources_uart1),
++	.resource	= resources_uart1,
++};
++
++struct platform_device msm_device_uart2 = {
++	.name	= "msm_serial",
++	.id	= 1,
++	.num_resources	= ARRAY_SIZE(resources_uart2),
++	.resource	= resources_uart2,
++};
++
+ struct platform_device msm_device_uart3 = {
+ 	.name	= "msm_serial",
+ 	.id	= 2,
+@@ -345,6 +385,8 @@ struct clk msm_clocks_8x50[] = {
+ 	CLK_PCOM("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
+ 	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
+ 	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
++	CLK_PCOM("uart_clk",	UART1_CLK,	&msm_device_uart1.dev, OFF),
++	CLK_PCOM("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, OFF),
+ 	CLK_PCOM("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
+ 	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	NULL, OFF),
 -- 
 1.7.0.4
 
