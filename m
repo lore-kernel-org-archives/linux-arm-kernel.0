@@ -1,42 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Jan 2011 06:08:25 +0200
-Subject: [PATCH] omap2-beagle: Depend upon CONFIG_GPIO_TWL4030
-In-Reply-To: <874o947j9e.fsf@gmail.com>
-References: <1295299548-22839-1-git-send-email-bgamari.foss@gmail.com>
-	<20110118031038.GA2436@legolas.emea.dhcp.ti.com>
-	<87d3nus4jr.fsf@gmail.com>
-	<20110119034528.GA2406@legolas.emea.dhcp.ti.com>
-	<874o947j9e.fsf@gmail.com>
-Message-ID: <20110120040825.GB2389@legolas.emea.dhcp.ti.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 20 Jan 2011 12:35:22 +0800
+Subject: [PATCH] arm: fix oops in sched_clock_poll
+In-Reply-To: <20110119165602.GA6335@n2100.arm.linux.org.uk>
+References: <1295455641-4791-1-git-send-email-tom.leiming@gmail.com>
+	<20110119165602.GA6335@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik-cxbwZZ_PfuC8DKqyHSnUM+R56PNXJdrPqSCb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 03:04:13PM -0500, Ben Gamari wrote:
-> On Wed, 19 Jan 2011 05:45:28 +0200, Felipe Balbi <balbi@ti.com> wrote:
-> > The point is, being able to disable features I don't want on my kernel
-> > image, is completely valid, if there's a compile breakage, then fix the
-> > breakage but don't prevent the board from compiling.
-> > 
-> I understand. That being said, Linus has made it well known that
-> defconfigs will not be an option going forward. Have we found another
+Hi,
 
-I never mentioned defconfigs here.
+2011/1/20 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Jan 20, 2011 at 12:47:21AM +0800, tom.leiming at gmail.com wrote:
+>> From: Ming Lei <tom.leiming@gmail.com>
+>>
+>> The patch fixes one oops in sched_clock_poll, tested on
+>> beagle xm, follows the oops message:
+>
+>> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+>> index 9a46370..782dd08 100644
+>> --- a/arch/arm/kernel/sched_clock.c
+>> +++ b/arch/arm/kernel/sched_clock.c
+>> @@ -21,7 +21,9 @@ static void (*sched_clock_update_fn)(void);
+>> ?static void sched_clock_poll(unsigned long wrap_ticks)
+>> ?{
+>> ? ? ? mod_timer(&sched_clock_timer, round_jiffies(jiffies + wrap_ticks));
+>> - ? ? sched_clock_update_fn();
+>> +
+>> + ? ? if (sched_clock_update_fn)
+>> + ? ? ? ? ? ? sched_clock_update_fn();
+>
+> It's called here because it's supposed to be initialized by the time this
+> function is called. ?Please ensure that is the case.
 
-> means of selecting the basic drivers necessary to get a fully functional
-> board? Perhaps a CONFIG_MACH_OMAP3_BEAGLE_CORE option selecting the
-> necessary driver for a fully functional board would be a solution. I
+On omap2,  sched_clock_update_fn is initialized in omap_init_clocksource_32k,
+and certainly is after calling sched_clock_poll, so the oops is triggered.
 
-I'll leave this for Tony to decide, but I don't like your proposal.
 
-> remember this being discussed several months ago (when Linus started
-> pulling defconfigs out of the tree), but I don't recall there being any
-> replacement proposals. It should be possible to build a functional
-> kernel from the mainline without iterating over all available
-> configuration options.
-
-So you're saying that when you're building a kernel for you
-laptop/desktop you don't have to get a menuconfig and choose the drivers
-you want to compile ? I dare to doubt that.
-
+thanks,
 -- 
-balbi
+Lei Ming
