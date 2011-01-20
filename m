@@ -1,73 +1,119 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Thu, 20 Jan 2011 09:46:12 +0100
-Subject: [PATCHv4 3/4] OMAP3: Devkit8000: Check return value of
-	gpio_request
-In-Reply-To: <4D36D7DC.4020705@ru.mvista.com>
-References: <1295425166-25540-1-git-send-email-weber@corscience.de>
-	<1295425166-25540-4-git-send-email-weber@corscience.de>
-	<4D36D7DC.4020705@ru.mvista.com>
-Message-ID: <4D37F654.70405@corscience.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jan 2011 09:04:09 +0000
+Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
+In-Reply-To: <4D37A016.8060902@codeaurora.org>
+References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
+	<20110119082534.GA9569@gallagher> <4D3760DD.1010609@codeaurora.org>
+	<20110119222407.GD6335@n2100.arm.linux.org.uk>
+	<4D37A016.8060902@codeaurora.org>
+Message-ID: <20110120090408.GA22101@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-Am 19.01.2011 13:23, schrieb Sergei Shtylyov:
-> Hello.
->
-> On 19-01-2011 11:19, Thomas Weber wrote:
->
->> The return value of gpio_request is ignored.
->> This patch adds the check of the return value of gpio_request.
->
->> Signed-off-by: Thomas Weber<weber@corscience.de>
->> ---
->>   arch/arm/mach-omap2/board-devkit8000.c |   16 ++++++++++++++--
->>   1 files changed, 14 insertions(+), 2 deletions(-)
->
->> diff --git a/arch/arm/mach-omap2/board-devkit8000.c
->> b/arch/arm/mach-omap2/board-devkit8000.c
->> index 9fb416b..4ddd81c 100644
->> --- a/arch/arm/mach-omap2/board-devkit8000.c
->> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> [...]
->> @@ -244,13 +246,23 @@ static int devkit8000_twl_gpio_setup(struct
->> device *dev,
+On Wed, Jan 19, 2011 at 06:38:14PM -0800, Stepan Moskovchenko wrote:
+> On 1/19/2011 2:24 PM, Russell King - ARM Linux wrote:
+>> On Wed, Jan 19, 2011 at 02:08:29PM -0800, Stepan Moskovchenko wrote:
+>>>>> +		/* Mask conditions we're ignorning. */
+>>>>> +		sr&= port->read_status_mask;
+>>>>> +		if (sr&   UART_SR_RX_BREAK)
+>>>>> +			flag = TTY_BREAK;
+>>>>> +		else if (sr&   UART_SR_PAR_FRAME_ERR)
+>>>>> +			flag = TTY_FRAME;
+>>>> It doesn't look like the flag is used anywhere after it has been
+>>>> assigned.
+>>> An artifact of an old driver. Removed.
+>> But still required to support proper error signalling.
 >>
->>       /* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
->>       devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
->> -    gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
->> +    ret = gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
->> +    if (ret < 0) {
->> +        printk(KERN_ERR "Failed to request GPIO for LCD_PWRN\n");
->> +        return ret;
->> +    }
->> +
->>       /* Disable until needed */
->>       gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
->>
->>       /* gpio + 7 is "DVI_PD" (out, active low) */
->>       devkit8000_dvi_device.reset_gpio = gpio + 7;
->> -    gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
->> +    ret = gpio_request(devkit8000_dvi_device.reset_gpio, "DVI
->> PowerDown");
->> +    if (ret < 0) {
->> +        printk(KERN_ERR "Failed to request GPIO for DVI PowerDown\n");
 >
->    You forgot to call:
+> On second thought, from poking around the kernel some more, I believe  
+> the following should be a better approach:
+>         if (sr & UART_SR_RX_BREAK) {
+>             tty_insert_flip_char(tty, 0, TTY_BREAK);
+>         } else if (sr & UART_SR_PAR_FRAME_ERR) {
+>             tty_insert_flip_char(tty, 0, TTY_FRAME);
+>         }
 >
->         gpio_free(devkit8000_lcd_device.reset_gpio);
->
-Couldn't I use lcd without dvi?
-And shouldn't the gpio then be set to -EINVAL for the gpio_is_valid()
-check in enable_lcd()/disable_lcd() and enable_dvi()/disable_dvi()?
+> Russell, what do you think? Shall I make the change in v2?
 
-Thomas
->> +        return ret;
->> +    }
->> +
->>       /* Disable until needed */
->>       gpio_direction_output(devkit8000_dvi_device.reset_gpio, 0);
->
-> WBR, Sergei
-> -- 
->
+Why not take a look at what a known good serial driver such as 8250.c
+does?  The expected flow is something like:
+
+        lsr = serial_inp(up, UART_LSR);
+        do {
+		if (!(lsr & UART_LSR_DR))
+			break;
+                ch = serial_inp(up, UART_RX);
+                flag = TTY_NORMAL;
+                up->port.icount.rx++;
+                if (unlikely(lsr & UART_LSR_BRK_ERROR_BITS)) {
+
+This is where we handle errors.
+
+                        /*
+                         * For statistics only
+                         */
+                        if (lsr & UART_LSR_BI) {
+
+A break error shouldn't flag framing or parity errors
+
+                                lsr &= ~(UART_LSR_FE | UART_LSR_PE);
+                                up->port.icount.brk++;
+                                /*
+                                 * We do the SysRQ and SAK checking
+                                 * here because otherwise the break
+                                 * may get masked by ignore_status_mask
+                                 * or read_status_mask.
+                                 */
+                                if (uart_handle_break(&up->port))
+                                        continue;
+
+You only need that if you want SAK handling (secure attention key) or
+magic sysrq - which is useful for debugging.
+
+                        } else if (lsr & UART_LSR_PE)
+                                up->port.icount.parity++;
+                        else if (lsr & UART_LSR_FE)
+                                up->port.icount.frame++;
+                        if (lsr & UART_LSR_OE)
+                                up->port.icount.overrun++;
+
+These update the per-port statistics.
+
+                        /*
+                         * Mask off conditions which should be ignored.
+                         */
+                        lsr &= up->port.read_status_mask;
+
+This gets rid of conditions that the user has told TTY that they're not
+interested in (based on termios flags).  Setting up this mask is specific
+to the hardware.
+
+                        if (lsr & UART_LSR_BI) {
+                                DEBUG_INTR("handling break....");
+                                flag = TTY_BREAK;
+                        } else if (lsr & UART_LSR_PE)
+                                flag = TTY_PARITY;
+                        else if (lsr & UART_LSR_FE)
+                                flag = TTY_FRAME;
+
+This sets the error marker for the tty layer.
+
+                }
+                if (uart_handle_sysrq_char(&up->port, ch))
+                        continue;
+
+Again, if you're handling sysrq, then this passes the character to the
+sysrq handlers.
+
+                uart_insert_char(&up->port, lsr, UART_LSR_OE, ch, flag);
+
+This finally does the handling of which characters to ignore, again
+based on the users termios settings.
+
+        } while (max_count-- > 0);
+
+Without the handling with these errors, the termios settings for ignoring
+parity, parity checking, break handling, marking parity errors, etc.  The
+handling of these termios flags depend on this code:
+
+  INPCK, BRKINT, PARMRK, IGNPAR, IGNBRK and CREAD.
