@@ -1,26 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jan 2011 18:01:46 +0000
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <1295544047.9039.609.camel@nimitz>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<1295544047.9039.609.camel@nimitz>
-Message-ID: <20110120180146.GH6335@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 20 Jan 2011 18:10:50 +0000
+Subject: [PATCH] ARM: TWD: fix the clock calculation for TWD
+In-Reply-To: <20110120163836.GF6335@n2100.arm.linux.org.uk>
+References: <1295505237-5735-1-git-send-email-chao.xie@marvell.com>
+	<20110120140811.GE6335@n2100.arm.linux.org.uk>
+	<20110120144409.GA25954@pulham.picochip.com>
+	<20110120163836.GF6335@n2100.arm.linux.org.uk>
+Message-ID: <20110120181050.GF25954@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 09:20:47AM -0800, Dave Hansen wrote:
-> This problem actually exists without sparsemem, too.  Discontigmem (at
-> least) does it as well.
+On Thu, Jan 20, 2011 at 04:38:36PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 20, 2011 at 02:44:09PM +0000, Jamie Iles wrote:
+> > On Thu, Jan 20, 2011 at 02:08:11PM +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Jan 20, 2011 at 02:33:57PM +0800, Chao Xie wrote:
+> > > > The original code will do count * (HZ /5). It will make the twd
+> > > > timer rate decreased if HZ can not be excatly divided. For
+> > > > example HZ=128.
+> > > > 
+> > > > Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> > > > ---
+> > > >  arch/arm/kernel/smp_twd.c |    3 ++-
+> > > >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > > > index 35882fb..ca6405b 100644
+> > > > --- a/arch/arm/kernel/smp_twd.c
+> > > > +++ b/arch/arm/kernel/smp_twd.c
+> > > > @@ -111,7 +111,8 @@ static void __cpuinit twd_calibrate_rate(void)
+> > > >  
+> > > >  		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+> > > >  
+> > > > -		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+> > > > +		twd_timer_rate = ((unsigned long)(0xFFFFFFFFU - count))
+> > > > +			* HZ / 5;
+> > > >  
+> > > >  		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+> > > >  			(twd_timer_rate / 100000) % 100);
+> > > 
+> > > I don't think this patch has any effect what so ever, so I just tried:
+> > > 
+> > > #define HZ      128
+> > > unsigned long twd_timer_rate;
+> > > void calc1(unsigned long count)
+> > > {
+> > >         twd_timer_rate = (0xffffffffU - count) * (HZ / 5);
+> > > }
+> > > void calc2(unsigned long count)
+> > > {
+> > >         twd_timer_rate = ((unsigned long)(0xffffffffU - count)) * (HZ / 5);
+> > > }
+> > 
+> > Hi Russell,
+> > 
+> > In Chao's patch the parentheses around (HZ / 5) have been removed so its 
+> > now dowing the multiplication before the division (if I remember the 
+> > precedences correctly!).  I don't think the cast to unsigned long is 
+> > needed though.
+> 
+> Hmm.  That means the maximum twd timer rate we can support is about
+> 860MHz.  Is that enough?
 
-We don't expect banks to cross sparsemem boundaries, or the older
-discontigmem nodes (esp. as we used to store the node number.)
-Discontigmem support has been removed now so that doesn't apply
-anymore.
+I'm not familiar with any ARM SMP systems so I wouldn't like to commit 
+to that!  If the answer is no, then I guess could we do something like 
+the (untested in a kernel) patch below to get a few more bits and we 
+should then be able to support rates of up to ~4294MHz.
 
-> The x86 version of show_mem() actually manages to do this without any
-> #ifdefs, and works for a ton of configuration options.  It uses
-> pfn_valid() to tell whether it can touch a given pfn.
+Jamie
 
-x86 memory layout tends to be very simple as it expects memory to
-start at the beginning of every region described by a pgdat and extend
-in one contiguous block.  I wish ARM was that simple.
+8<----
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index fd91566..334ad95 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -89,6 +89,8 @@ static void __cpuinit twd_calibrate_rate(void)
+ 	 * the timer ticks
+ 	 */
+ 	if (twd_timer_rate == 0) {
++		u64 rate64;
++
+ 		printk(KERN_INFO "Calibrating local timer... ");
+ 
+ 		/* Wait for a tick to start */
+@@ -111,7 +113,9 @@ static void __cpuinit twd_calibrate_rate(void)
+ 
+ 		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+ 
+-		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
++		rate64 = (0xFFFFFFFFLLU - count) * (u64)HZ;
++		do_div(rate64, 5);
++		twd_timer_rate = rate64;
+ 
+ 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+ 			(twd_timer_rate / 1000000) % 100);
