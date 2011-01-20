@@ -1,40 +1,37 @@
 From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 20 Jan 2011 12:32:38 -0800
-Subject: [PATCH 0/7] Nexus One Support
-Message-ID: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+Date: Thu, 20 Jan 2011 12:32:40 -0800
+Subject: [PATCH 2/7] [ARM] msm: qsd8k memory base is at 0x20000000
+In-Reply-To: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+Message-ID: <1295555565-21563-3-git-send-email-dwalker@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds basic Nexus One support which includes a booting
-kernel, and functional MMC .
+From: Brian Swetland <swetland@google.com>
 
-Most people won't be able to use this yet unfortunately because
-you need a serial cable to get any output. However, it's a start.
+The memory layout is effective as of AMSS 3170+.
 
-Brian Swetland (1):
-  [ARM] msm: qsd8k memory base is at 0x20000000
+Signed-off-by: Haley Teng <haley_teng@htc.com>
+Signed-off-by: Dima Zavin <dima@android.com>
+---
+ arch/arm/mach-msm/Makefile.boot |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Daniel Walker (6):
-  msm: qsd8x50: add uart platform data
-  msm: qsd8x50: add acpuclock code
-  msm: mahimahi: add mahimahi board file
-  msm: mahimahi: add in mmc support code
-  msm: mahimahi: add gpio pin muxing code
-  msm: mahimahi: initialize mmc at start up
-
- arch/arm/mach-msm/Kconfig              |    8 +-
- arch/arm/mach-msm/Makefile             |    5 +-
- arch/arm/mach-msm/Makefile.boot        |    5 +
- arch/arm/mach-msm/acpuclock-qsd8x50.c  |  457 ++++++++++++++++++++++++++++++++
- arch/arm/mach-msm/board-mahimahi-mmc.c |  238 +++++++++++++++++
- arch/arm/mach-msm/board-mahimahi.c     |   52 +++-
- arch/arm/mach-msm/board-mahimahi.h     |  147 ++++++++++
- arch/arm/mach-msm/devices-qsd8x50.c    |   42 +++
- arch/arm/mach-msm/include/mach/board.h |    1 +
- 9 files changed, 942 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/mach-msm/acpuclock-qsd8x50.c
- create mode 100644 arch/arm/mach-msm/board-mahimahi-mmc.c
- create mode 100644 arch/arm/mach-msm/board-mahimahi.h
+diff --git a/arch/arm/mach-msm/Makefile.boot b/arch/arm/mach-msm/Makefile.boot
+index 24dfbf8..3266727 100644
+--- a/arch/arm/mach-msm/Makefile.boot
++++ b/arch/arm/mach-msm/Makefile.boot
+@@ -1,3 +1,8 @@
+   zreladdr-y		:= 0x10008000
+ params_phys-y		:= 0x10000100
+ initrd_phys-y		:= 0x10800000
++
++# for now, override for QSD8x50
++  zreladdr-$(CONFIG_ARCH_QSD8X50)		:= 0x20008000
++params_phys-$(CONFIG_ARCH_QSD8X50)		:= 0x20000100
++initrd_phys-$(CONFIG_ARCH_QSD8X50)		:= 0x21000000
+-- 
+1.7.0.4
 
 -- 
 Sent by a consultant of the Qualcomm Innovation Center, Inc.
