@@ -1,49 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Jan 2011 17:21:48 +0100
-Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK to
-	speed-up boot
-In-Reply-To: <4D385155.4050301@gmail.com>
-References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D385155.4050301@gmail.com>
-Message-ID: <AANLkTin00ULesF4vnCUEQh6A_CLyTrUAwWxk2NN01y5v@mail.gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 20 Jan 2011 16:53:14 +0000
+Subject: Locking in the clk API
+In-Reply-To: <20110111121816.GB774@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<201101111744.59712.jeremy.kerr@canonical.com>	<20110111101314.GA774@linux-sh.org>	<201101111830.18597.jeremy.kerr@canonical.com>
+	<20110111121816.GB774@linux-sh.org>
+Message-ID: <4D38687A.6040307@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/20 Rob Herring <robherring2@gmail.com>:
-> On 01/20/2011 03:42 AM, Santosh Shilimkar wrote:
+On 11/01/11 12:18, Paul Mundt wrote:
+> On Tue, Jan 11, 2011 at 06:30:18PM +0800, Jeremy Kerr wrote:
+>> Hi Paul,
 >>
->> On some architectures, secondary cores shares clock with primiary
->> core and hence scale together. Hence secondary core lpj calibration
->> is not necessary and can be skipped to save considerable time.
+>>> No, the sleeping clock case is and always will be a corner case, and I
+>>> have no interest in pretending otherwise. On SH we have hundreds of
+>>> clocks that are all usable in the atomic context and perhaps less than a
+>>> dozen that aren't (and even in those cases much of the PLL negotiation is
+>>> handled in hardware so there's never any visibility for the lock-down
+>>> from the software side, other architectures also have similar behaviour).
 >>
->> This can speed up the secondary cpu boot and hotplug cpu online
->> paths.
+>> I'm not too worried about the corner-cases on the *implementation* side, more 
+>> the corner-cases on the API side: are we seeing more users of the API that 
+>> require an atomic clock, or more that don't care?
 >>
->> Discussion thread:
->> ? ? ? ?http://www.spinics.net/lists/arm-kernel/msg111124.html
->>
->
-> There's already one way to do this with pre-calculated lpj.
->
-> Also, this isn't multi-platform friendly.
+> Again, you are approaching it from the angle that an atomic clock is a
+> special requirement rather than the default behaviour. Sleeping for
+> lookup, addition, and deletion are all quite acceptable, but
+> enable/disable pairs have always been intended to be usable from atomic
+> context. Anyone that doesn't count on that fact is either dealing with
+> special case clocks (PLLs, root clocks, etc.) or simply hasn't bothered
+> implementing any sort of fine grained runtime power management for their
+> platform.
 
-It can be made to be, then -
-skip all Kconfig business (more elegant like this anyway):
-
-static inline int skip_secondary_calibrate(void)
-{
-    return machine_is_u8500() ||
-        machine_is_svp8500v1() ||
-        machine_is_svp8500v2() ||
-        machine_is_svp5500() ||
-        machine_is_b5500() ||
-        machine_is_s5500() ||
-        machine_is_omap4_panda();
-}
-
-Hm if this multi-platform stuff is desirable we probably need
-a runtime arch_is_omap4(), arch_is_u8500() etc so this machine
-list doesn't grow ridiculously long, but ftm this will work.
-
-Yours,
-Linus Walleij
+No, the API has always been defined to ensure clk_enable() returns once
+a clock is running and usable, so if the case where there are PLLs in
+the way is inconvenient to you, then sorry but they exist already.
