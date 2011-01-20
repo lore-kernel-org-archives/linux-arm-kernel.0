@@ -1,119 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jan 2011 09:04:09 +0000
-Subject: [PATCH 2/2] serial: msm: Add support for UARTDM cores
-In-Reply-To: <4D37A016.8060902@codeaurora.org>
-References: <1295407585-18386-1-git-send-email-stepanm@codeaurora.org>
-	<20110119082534.GA9569@gallagher> <4D3760DD.1010609@codeaurora.org>
-	<20110119222407.GD6335@n2100.arm.linux.org.uk>
-	<4D37A016.8060902@codeaurora.org>
-Message-ID: <20110120090408.GA22101@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Jan 2011 09:23:17 -0000
+Subject: [RFC][PATCH] ARM: ptrace: remove single-step emulation code
+In-Reply-To: <87vd1kblax.fsf@lechat.rtp-net.org>
+References: <1295449635-4292-1-git-send-email-will.deacon@arm.com>	<20110119151915.GG31652@n2100.arm.linux.org.uk>	<000501cbb7ee$cdccc680$69665380$@deacon@arm.com>
+	<87vd1kblax.fsf@lechat.rtp-net.org>
+Message-ID: <000001cbb883$ac70a0c0$0551e240$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 06:38:14PM -0800, Stepan Moskovchenko wrote:
-> On 1/19/2011 2:24 PM, Russell King - ARM Linux wrote:
->> On Wed, Jan 19, 2011 at 02:08:29PM -0800, Stepan Moskovchenko wrote:
->>>>> +		/* Mask conditions we're ignorning. */
->>>>> +		sr&= port->read_status_mask;
->>>>> +		if (sr&   UART_SR_RX_BREAK)
->>>>> +			flag = TTY_BREAK;
->>>>> +		else if (sr&   UART_SR_PAR_FRAME_ERR)
->>>>> +			flag = TTY_FRAME;
->>>> It doesn't look like the flag is used anywhere after it has been
->>>> assigned.
->>> An artifact of an old driver. Removed.
->> But still required to support proper error signalling.
->>
->
-> On second thought, from poking around the kernel some more, I believe  
-> the following should be a better approach:
->         if (sr & UART_SR_RX_BREAK) {
->             tty_insert_flip_char(tty, 0, TTY_BREAK);
->         } else if (sr & UART_SR_PAR_FRAME_ERR) {
->             tty_insert_flip_char(tty, 0, TTY_FRAME);
->         }
->
-> Russell, what do you think? Shall I make the change in v2?
+Arnaud,
 
-Why not take a look at what a known good serial driver such as 8250.c
-does?  The expected flow is something like:
+> > strace works fine with this patch applied and, looking at the
+> > sources, it doesn't use the SINGLESTEP request. As for ltrace,
+> > it *does* use SINGLESTEP but it can use PTRACE_SYSCALL instead
+> > (indeed, it does this for sparc, ia64 and mips). ltrace doesn't
+> > have code for checking the ptrace return value so I'd say it's
+> > their bug.
+> 
+> afair, the current way to prevent SINGLESTEP usage in ltrace is to
+> modify some #ifdef. So, while I agree that not checking ptrace return
+> value is not nice, it has nothing to do with SINGLESTEP removal as this
+> call will not get compiled in. What matters is rather to know if things
+> are still working once the #ifdef are changed and if they're not,
+> finding if it's a bug in ltrace or kernel.
 
-        lsr = serial_inp(up, UART_LSR);
-        do {
-		if (!(lsr & UART_LSR_DR))
-			break;
-                ch = serial_inp(up, UART_RX);
-                flag = TTY_NORMAL;
-                up->port.icount.rx++;
-                if (unlikely(lsr & UART_LSR_BRK_ERROR_BITS)) {
+Not true. A PTRACE_SINGLESTEP request will simply return -EIO. Userspace
+programs should check the return value anyway because it could fail and
+then handle the failure gracefully (in the case of ltrace, by trying a
+PTRACE_SYSCALL request). This also means that ltrace is currently broken
+on Thumb, where PTRACE_SINGLESTEP will return an error code.
 
-This is where we handle errors.
-
-                        /*
-                         * For statistics only
-                         */
-                        if (lsr & UART_LSR_BI) {
-
-A break error shouldn't flag framing or parity errors
-
-                                lsr &= ~(UART_LSR_FE | UART_LSR_PE);
-                                up->port.icount.brk++;
-                                /*
-                                 * We do the SysRQ and SAK checking
-                                 * here because otherwise the break
-                                 * may get masked by ignore_status_mask
-                                 * or read_status_mask.
-                                 */
-                                if (uart_handle_break(&up->port))
-                                        continue;
-
-You only need that if you want SAK handling (secure attention key) or
-magic sysrq - which is useful for debugging.
-
-                        } else if (lsr & UART_LSR_PE)
-                                up->port.icount.parity++;
-                        else if (lsr & UART_LSR_FE)
-                                up->port.icount.frame++;
-                        if (lsr & UART_LSR_OE)
-                                up->port.icount.overrun++;
-
-These update the per-port statistics.
-
-                        /*
-                         * Mask off conditions which should be ignored.
-                         */
-                        lsr &= up->port.read_status_mask;
-
-This gets rid of conditions that the user has told TTY that they're not
-interested in (based on termios flags).  Setting up this mask is specific
-to the hardware.
-
-                        if (lsr & UART_LSR_BI) {
-                                DEBUG_INTR("handling break....");
-                                flag = TTY_BREAK;
-                        } else if (lsr & UART_LSR_PE)
-                                flag = TTY_PARITY;
-                        else if (lsr & UART_LSR_FE)
-                                flag = TTY_FRAME;
-
-This sets the error marker for the tty layer.
-
-                }
-                if (uart_handle_sysrq_char(&up->port, ch))
-                        continue;
-
-Again, if you're handling sysrq, then this passes the character to the
-sysrq handlers.
-
-                uart_insert_char(&up->port, lsr, UART_LSR_OE, ch, flag);
-
-This finally does the handling of which characters to ignore, again
-based on the users termios settings.
-
-        } while (max_count-- > 0);
-
-Without the handling with these errors, the termios settings for ignoring
-parity, parity checking, break handling, marking parity errors, etc.  The
-handling of these termios flags depend on this code:
-
-  INPCK, BRKINT, PARMRK, IGNPAR, IGNBRK and CREAD.
+Will
