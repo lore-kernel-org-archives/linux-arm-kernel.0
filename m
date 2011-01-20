@@ -1,33 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Jan 2011 09:23:17 -0000
-Subject: [RFC][PATCH] ARM: ptrace: remove single-step emulation code
-In-Reply-To: <87vd1kblax.fsf@lechat.rtp-net.org>
-References: <1295449635-4292-1-git-send-email-will.deacon@arm.com>	<20110119151915.GG31652@n2100.arm.linux.org.uk>	<000501cbb7ee$cdccc680$69665380$@deacon@arm.com>
-	<87vd1kblax.fsf@lechat.rtp-net.org>
-Message-ID: <000001cbb883$ac70a0c0$0551e240$@deacon@arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 20 Jan 2011 09:28:08 +0000
+Subject: RFC: Host-endian device tree format
+In-Reply-To: <20110119234755.GA20128@yookeroo>
+References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
+	<AANLkTikoZj1WSpE8QNSRiF3oFL4qAb68kNnCKdExvBz7@mail.gmail.com>
+	<AANLkTi=xdJ_c3LvCFkeqBRNDf6TSC40Fjxihm9eSeMmf@mail.gmail.com>
+	<alpine.LFD.2.00.1101191031481.8580@xanadu.home>
+	<AANLkTi==KLWXAv79u32ioQ9eSr7JEii7fW93WPPNdAez@mail.gmail.com>
+	<AANLkTim7F8PBd_4zmQY7717N7CoiGvvyX473CL=6qCaj@mail.gmail.com>
+	<20110119234755.GA20128@yookeroo>
+Message-ID: <AANLkTi=EmCaTJ6esSZvJDe2-Z-GR8OvvBQ7k1_Qz7qMj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+On Wed, Jan 19, 2011 at 11:47 PM, David Gibson
+<david@gibson.dropbear.id.au> wrote:
+> On Wed, Jan 19, 2011 at 04:09:39PM +0000, Dave Martin wrote:
+>> On Wed, Jan 19, 2011 at 3:52 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> > On Wed, Jan 19, 2011 at 8:41 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> >> On Wed, 19 Jan 2011, Dave Martin wrote:
+>> >>> On Wed, Jan 19, 2011 at 1:41 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> >>> > The dtb isn't so much bigendian as it is network byte order.
+>> >>>
+>> >>> (For me, "network byte order" is a euphemism ... <insert
+>> >>> unconstructive rant here>)
+>> >>
+>> >> I concur.
+>> >
+>> > meh. it's all about conventions. ?When talking about external data, it
+>> > is far more important for everyone to agree on the same representation
+>> > than it is to tailor to each platforms preferences. ?That said, rant
+>> > away! ?I love a good tangent.
+>>
+>> I guess a good example of what I mean is ELF - the endianness of an
+>> ELF image is discoverable, and cross tools do exist -- but because ELF
+>> images are strongly bound to their target platform, running the image
+>> takes precedence over the simplicity of the tools: so the images are
+>> specified in such a way that they can always be host-endian for the
+>> machine they run on, without creating format ambiguities.
+>
+> Yes, there's no technical impediment to making a little-endian dtb
+> format. ?In fact dtc and libfdt were written with this possibility in
+> mind, to the extent that there are hooks / functions in the right
+> places to make this reasonably straightforward.
+>
+> The fact that there are actually two questions here - the endianness
+> of the framing dtb format, and the endianness of the property values
+> themselves complicates the issue.
+>
+>> Of course, it's stretching things rather a lot to claim that fdt
+>> parsing is performance critical ... or that ELF cross tools work well
+>> in all host/target combinations ... rather it's a niggle.
+>
+> But, there is just no point in creating a variant format. ?The
+> performance cost is completely negligible (even using the rather
+> stupid conversion macros from libfdt which gcc generates horrible code
+> for).
+>
+> The simplicity of having only one variant for tools to deal with wins,
+> no contest.
 
-> > strace works fine with this patch applied and, looking at the
-> > sources, it doesn't use the SINGLESTEP request. As for ltrace,
-> > it *does* use SINGLESTEP but it can use PTRACE_SYSCALL instead
-> > (indeed, it does this for sparc, ia64 and mips). ltrace doesn't
-> > have code for checking the ptrace return value so I'd say it's
-> > their bug.
-> 
-> afair, the current way to prevent SINGLESTEP usage in ltrace is to
-> modify some #ifdef. So, while I agree that not checking ptrace return
-> value is not nice, it has nothing to do with SINGLESTEP removal as this
-> call will not get compiled in. What matters is rather to know if things
-> are still working once the #ifdef are changed and if they're not,
-> finding if it's a bug in ltrace or kernel.
+All good arguments, everyone-- thanks for the background.
 
-Not true. A PTRACE_SINGLESTEP request will simply return -EIO. Userspace
-programs should check the return value anyway because it could fail and
-then handle the failure gracefully (in the case of ltrace, by trying a
-PTRACE_SYSCALL request). This also means that ltrace is currently broken
-on Thumb, where PTRACE_SINGLESTEP will return an error code.
+Like I said, I'm happy for things to stay the way they are.
 
-Will
+Cheers
+---Dave
