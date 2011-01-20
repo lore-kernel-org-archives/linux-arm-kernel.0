@@ -1,68 +1,50 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 20 Jan 2011 09:28:08 +0000
-Subject: RFC: Host-endian device tree format
-In-Reply-To: <20110119234755.GA20128@yookeroo>
-References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
-	<AANLkTikoZj1WSpE8QNSRiF3oFL4qAb68kNnCKdExvBz7@mail.gmail.com>
-	<AANLkTi=xdJ_c3LvCFkeqBRNDf6TSC40Fjxihm9eSeMmf@mail.gmail.com>
-	<alpine.LFD.2.00.1101191031481.8580@xanadu.home>
-	<AANLkTi==KLWXAv79u32ioQ9eSr7JEii7fW93WPPNdAez@mail.gmail.com>
-	<AANLkTim7F8PBd_4zmQY7717N7CoiGvvyX473CL=6qCaj@mail.gmail.com>
-	<20110119234755.GA20128@yookeroo>
-Message-ID: <AANLkTi=EmCaTJ6esSZvJDe2-Z-GR8OvvBQ7k1_Qz7qMj@mail.gmail.com>
+Date: Thu, 20 Jan 2011 09:42:12 +0000
+Subject: [PATCH v4] ARM: Thumb-2: Symbol manipulation macros for function
+	body copying
+In-Reply-To: <87bp3cr0ib.fsf@ti.com>
+References: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
+	<87bp3cr0ib.fsf@ti.com>
+Message-ID: <AANLkTinPV+v4+T8jPHiVA7=D7tNkoeDrWLQBRhDX5bmV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 11:47 PM, David Gibson
-<david@gibson.dropbear.id.au> wrote:
-> On Wed, Jan 19, 2011 at 04:09:39PM +0000, Dave Martin wrote:
->> On Wed, Jan 19, 2011 at 3:52 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> > On Wed, Jan 19, 2011 at 8:41 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> >> On Wed, 19 Jan 2011, Dave Martin wrote:
->> >>> On Wed, Jan 19, 2011 at 1:41 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> >>> > The dtb isn't so much bigendian as it is network byte order.
->> >>>
->> >>> (For me, "network byte order" is a euphemism ... <insert
->> >>> unconstructive rant here>)
->> >>
->> >> I concur.
->> >
->> > meh. it's all about conventions. ?When talking about external data, it
->> > is far more important for everyone to agree on the same representation
->> > than it is to tailor to each platforms preferences. ?That said, rant
->> > away! ?I love a good tangent.
+On Wed, Jan 19, 2011 at 10:29 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Dave Martin <dave.martin@linaro.org> writes:
+>
+>> In low-level board support code, there is sometimes a need to
+>> copy a function body to another location at run-time.
 >>
->> I guess a good example of what I mean is ELF - the endianness of an
->> ELF image is discoverable, and cross tools do exist -- but because ELF
->> images are strongly bound to their target platform, running the image
->> takes precedence over the simplicity of the tools: so the images are
->> specified in such a way that they can always be host-endian for the
->> machine they run on, without creating format ambiguities.
+>> A straightforward call to memcpy doesn't work in Thumb-2,
+>> because bit 0 of external Thumb function symbols is set to 1,
+>> indicating that the function is Thumb. ?Without corrective
+>> measures, this will cause an off-by-one copy, and the copy
+>> may be called using the wrong instruction set.
+>>
+>> This patch adds an fncpy() macro to help with such copies.
+>>
+>> Particular care is needed, because C doesn't guarantee any
+>> defined behaviour when casting a function pointer to any other
+>> type. ?This has been observed to lead to strange optimisation
+>> side-effects when doing the arithmetic which is required in
+>> order to copy/move function bodies correctly in Thumb-2.
+>>
+>> Thanks to Russell King and Nicolas Pitre for their input
+>> on this patch.
+>>
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> Tested-by: Jean Pihet <j-pihet@ti.com>
 >
-> Yes, there's no technical impediment to making a little-endian dtb
-> format. ?In fact dtc and libfdt were written with this possibility in
-> mind, to the extent that there are hooks / functions in the right
-> places to make this reasonably straightforward.
+> Tested-by: Kevin Hilman <khilman@ti.com>
 >
-> The fact that there are actually two questions here - the endianness
-> of the framing dtb format, and the endianness of the property values
-> themselves complicates the issue.
+> along with Jean's OMAP patch on:
 >
->> Of course, it's stretching things rather a lot to claim that fdt
->> parsing is performance critical ... or that ELF cross tools work well
->> in all host/target combinations ... rather it's a niggle.
+> OMAP2420/n810: including basic suspend/resume test.
 >
-> But, there is just no point in creating a variant format. ?The
-> performance cost is completely negligible (even using the rather
-> stupid conversion macros from libfdt which gcc generates horrible code
-> for).
+> OMAP16xx/OSK: boot test only.
 >
-> The simplicity of having only one variant for tools to deal with wins,
-> no contest.
+> Kevin
+>
 
-All good arguments, everyone-- thanks for the background.
-
-Like I said, I'm happy for things to stay the way they are.
-
-Cheers
+Thanks
 ---Dave
