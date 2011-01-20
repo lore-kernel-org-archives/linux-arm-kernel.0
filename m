@@ -1,67 +1,66 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 19 Jan 2011 06:41:15 -0700
-Subject: RFC: Host-endian device tree format
-In-Reply-To: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
-References: <AANLkTi=AdwaW5vvm1TzNxcNrjYiJ3dOEjwoZrm-koxuw@mail.gmail.com>
-Message-ID: <AANLkTikoZj1WSpE8QNSRiF3oFL4qAb68kNnCKdExvBz7@mail.gmail.com>
+From: dansharon@nanometrics.ca (Dan Sharon)
+Date: Thu, 20 Jan 2011 10:33:23 -0500
+Subject: ALSA issue on DA850/OMAP-L138/AM18x
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024850919E@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+	<AANLkTi=X3KRngiNz5iQzojh_-h4W-iRDsbq8Hvy6Lm1x@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024850919E@dbde02.ent.ti.com>
+Message-ID: <AANLkTin-xRaiwsj05h7aL3r=3nbAMDFPkjPo0gzGCbwf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jan 19, 2011 3:43 AM, "Dave Martin" <dave.martin@linaro.org> wrote:
->
-> Hi all,
->
-> Apologies if this has been discussed before--- I don't see an obvious
-> rebuttal in my quick searching past threads, so I'll just quickly ask
-> the question:
->
-> Could we use host-endianness for the device tree binary blob?
+Hi Sudhakar,
 
-Hi David.
+you're quite right - if 'arecord -f dat | aplay -f dat' is executed
+immediately after boot, indeed I do get the same errors as you.
 
-This has been discussed thoroughly and rejected. The dtb isn't so much
-bigendian as it is network byte order. While we /could/ switch it for arm,
-it creates all kinds of problems with tools and working with .dtb files on
-dissimilar platforms.  Plus all the property values must remain in BE
-because all the bindings are already defined that way in the OpenFirmware
-specifications.
+Thank you very much for the patches.
+Regards,
+/Dan
 
-Besides, there is no real advantage to changing it: it already works as-is
-on le architectures.  :-)
+On Thu, Jan 20, 2011 at 12:05 AM, Rajashekhara, Sudhakar <
+sudhakar.raj@ti.com> wrote:
 
-g.
-
+> Hi Dan,
 >
-> The fdt binary format seems to lend itself strongly to a host-endian
-> format: it begins with a word-sized magic number, and when parsing the
-> device tree every elements type and size is known before that element
-> is read; furthermore, every element is size-aligned.  Therefore, I
-> (naively?) presume that a little-endian format should "just work",
-> simply by flipping the endianness of every element and discarding all
-> the __be32_to_cpu() type stuff when reading the fdt at boot time.  The
-> magic number ensures that there's no risk of accidentally reading the
-> fst in the wrong byte order.
+> Thanks for testing this patch. I'll add your Tested-by tag when I submit
+> this patch.
 >
-> Although it would be necessary to augment the fdt tools to cope with
-> this, offline tools appear to be the right place to put this
-> intelligence.  For the kernel to flip the byte order of everything in
-> the fdt blob every time the system boots just seems unnecessary when
-> the required endianness is statically known.
+> On Wed, Jan 19, 2011 at 00:32:21, Dan Sharon wrote:
+> > These patches apply cleanly to 'v2.6.37'
+> > 3c0eee3fe6a3a1c745379547c7e7c904aa64f6d5
+> >
+> > of
+> > git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-davinci.git.
+> >
+> > The kernel was built with the 'da8xx_omapl_defconfig' from the
+> omap-l1tree,
+> > and 'make menuconfig' to enable ASoC (the defconfig already has
+> CONFIG_REGULATOR=y,
+> > CONFIG_REGULATOR_DUMMY=y, and CONFIG_REGULATOR_TPS6507X=y).
+> >
+> > Testing was done on a da850evm by tftp'ing the kernel into ram, and using
+> the
+> > SPI-flash-based rootfs from the PSP that shipped with the board.
+> >
+> > Using 'arecord -r 48000 -c 2 -f S32_BE -t raw -v -d 1 > /tmp/arecord.cap'
+> produced
+> > a file of 384000 bytes (48000 x 2 x 4 bytes/sample).
+> > 'arecord -r 48000 -c 2 -f S32_BE -t raw -v > /dev/null' ran flawlessly
+> for several
+> > hours.
+> >
+> > I was not able to reproduce Sudhakar's problems with 'arecord -f dat |
+> aplay -f dat'.
+> >
 >
-> Since fdt is new on ARM we have an opportunity to change determine the
-> binary format now without breaking anything in the field -- we don't
-> necessarily have to adopt the host-endian format on any other
-> architectures if it's not desirable.
+> Did you try the above, immediately after the da850evm boots? I am not
+> facing the issue if I run arecod and aplay together after executing
+> arecord or aplay individually.
 >
-> Any thoughts?
+> Thanks,
+> Sudhakar
 >
-> Cheers
-> ---Dave
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110119/1b3e10e4/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110120/bbe43d9d/attachment-0001.html>
