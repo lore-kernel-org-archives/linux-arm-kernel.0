@@ -1,37 +1,31 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 Jan 2011 16:53:14 +0000
-Subject: Locking in the clk API
-In-Reply-To: <20110111121816.GB774@linux-sh.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>	<201101111744.59712.jeremy.kerr@canonical.com>	<20110111101314.GA774@linux-sh.org>	<201101111830.18597.jeremy.kerr@canonical.com>
-	<20110111121816.GB774@linux-sh.org>
-Message-ID: <4D38687A.6040307@fluff.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 20 Jan 2011 15:02:59 -0200
+Subject: [PATCH] mmc: mmc_mxc: Allow selection only for the correct platforms
+Message-ID: <1295542979-10329-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/11 12:18, Paul Mundt wrote:
-> On Tue, Jan 11, 2011 at 06:30:18PM +0800, Jeremy Kerr wrote:
->> Hi Paul,
->>
->>> No, the sleeping clock case is and always will be a corner case, and I
->>> have no interest in pretending otherwise. On SH we have hundreds of
->>> clocks that are all usable in the atomic context and perhaps less than a
->>> dozen that aren't (and even in those cases much of the PLL negotiation is
->>> handled in hardware so there's never any visibility for the lock-down
->>> from the software side, other architectures also have similar behaviour).
->>
->> I'm not too worried about the corner-cases on the *implementation* side, more 
->> the corner-cases on the API side: are we seeing more users of the API that 
->> require an atomic clock, or more that don't care?
->>
-> Again, you are approaching it from the angle that an atomic clock is a
-> special requirement rather than the default behaviour. Sleeping for
-> lookup, addition, and deletion are all quite acceptable, but
-> enable/disable pairs have always been intended to be usable from atomic
-> context. Anyone that doesn't count on that fact is either dealing with
-> special case clocks (PLLs, root clocks, etc.) or simply hasn't bothered
-> implementing any sort of fine grained runtime power management for their
-> platform.
+Currently MMC_MXC driver can be selected by all i.MX devices.
 
-No, the API has always been defined to ensure clk_enable() returns once
-a clock is running and usable, so if the case where there are PLLs in
-the way is inconvenient to you, then sorry but they exist already.
+Restrict its use only for the appropriate processors.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ drivers/mmc/host/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index d618e86..a3a9ec1 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -288,7 +288,7 @@ config MMC_MSM
+ 
+ config MMC_MXC
+ 	tristate "Freescale i.MX2/3 Multimedia Card Interface support"
+-	depends on ARCH_MXC
++	depends on MACH_MX21 || MACH_MX27 || ARCH_MX31
+ 	help
+ 	  This selects the Freescale i.MX2/3 Multimedia card Interface.
+ 	  If you have a i.MX platform with a Multimedia Card slot,
+-- 
+1.6.0.4
