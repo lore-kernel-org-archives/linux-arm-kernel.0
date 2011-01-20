@@ -1,69 +1,61 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 20 Jan 2011 10:34:38 -0600
-Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK to
-	speed-up boot
-In-Reply-To: <43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com>
-References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D385155.4050301@gmail.com>
-	<43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com>
-Message-ID: <4D38641E.2000301@gmail.com>
+From: ben-linux@fluff.org (Ben Dooks)
+Date: Thu, 20 Jan 2011 16:32:44 +0000
+Subject: Locking in the clk API
+In-Reply-To: <20110111045423.GP3760@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>	<201101111211.30172.jeremy.kerr@canonical.com>
+	<20110111045423.GP3760@linux-sh.org>
+Message-ID: <4D3863AC.4020209@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2011 09:36 AM, Santosh Shilimkar wrote:
->> -----Original Message-----
->> From: Rob Herring [mailto:robherring2 at gmail.com]
->> Sent: Thursday, January 20, 2011 8:44 PM
->> To: Santosh Shilimkar
->> Cc: linux-arm-kernel at lists.infradead.org; Russell King; linux-
->> omap at vger.kernel.org; Linus Walleij
->> Subject: Re: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK
->> to speed-up boot
+On 11/01/11 04:54, Paul Mundt wrote:
+> Hi Jeremy,
+> 
+> On Tue, Jan 11, 2011 at 12:11:29PM +0800, Jeremy Kerr wrote:
+>>> This looks like a complete disaster, and is also completely inconsistent
+>>> with how the API is being used by the vast majority of users today.
 >>
->> On 01/20/2011 03:42 AM, Santosh Shilimkar wrote:
->>> On some architectures, secondary cores shares clock with primiary
->>> core and hence scale together. Hence secondary core lpj
->> calibration
->>> is not necessary and can be skipped to save considerable time.
->>>
->>> This can speed up the secondary cpu boot and hotplug cpu online
->>> paths.
->>>
->>> Discussion thread:
->>> 	http://www.spinics.net/lists/arm-kernel/msg111124.html
->>>
+>> I've been basing this on the mxc clock code, which acquires a mutex for all 
+>> clk_enable()s. This may not be representative of the majority of clock usage.
 >>
->> There's already one way to do this with pre-calculated lpj.
->>
-> How about the hot-plug path? This is not for just boot.
+>> From a qui
 
-The path is the same for hotplug and secondary boot, so yes for both. 
-Plus you get the added benefit of speeding up the primary core boot as well.
+[snip]
 
->
->> Also, this isn't multi-platform friendly. You could accomplish the
->> same
->> thing using the clock api to get the core frequency of each core and
->> only calculate lpj if the frequency is different.
-> May be but what's wrong with the obvious approach which is
-> completely non-intrusive.
-> Why is not multi-platform friendly ?
-> Archs can choose not to select this option.
+> One other thing to be aware of is that the clkdev code maintains its own
+> list mutex, so the addition and deletion of clkdev lookups in addition to
+> the clkdev-backed clk_get() will all be sleepable. It would however be
+> possible to back a one-shot atomic-safe clk_get() with a mutex_trylock()
+> for the common cases, but it's not entirely obvious that it would be
+> worth the complexity it would introduce.
 
-I meant you can't have single kernel binary with a platform with single 
-core freq and a platform with independent core freq.
+Anyone looking up clks on the fly really should think more carefully
+about this, as it is firstly possible to be an expensive operation on
+systems with multiple clocks, and secondly, in my view, stupid.
 
-Looking at this some more, the only reason to call calibrate_delay is to 
-get a more accurate value. If you have different frequencies per core, 
-you've got bigger problems as loops_per_jiffy value is not per core. So 
-your kconfig option name is misleading. Something like 
-ARCH_WANT_UDELAY_RECALC would be more accurate. To get a more accurate 
-calculation, calibrate_delay only needs to be called by 1 secondary 
-core. Perhaps it could be called from somewhere that is not in the 
-boot/hotplug path or only done once.
+> If you're going to do this work it would also be helpful to spell out the
+> locking semantics within linux/clk.h at the same time (it might even be
+> worthwhile doing this incrementally and getting all of the platforms
+> in-line before attempting to consolidate things too aggressively), as
+> it's apparent from the cases you cite there are at least a couple of
+> boards that aren't quite in line with what everyone else is doing.
+> 
+> In general we have to accept that the dynamic creation, deletion, and
+> looking up of clocks is going to be a sleepable case, and the rest will
+> likely have to be split out in to _cansleep and default atomic-safe
+> variants.
 
-Rob
+I would vote for all clk lookup and reference counting code be made
+sleep-able and define it as such.
 
->
-> Regards,
-> Santosh
+> set_rate/parent and friends likewise are done atomically for some and
+> sleepable for others, so it doesn't seem like there's going to be much
+> choice other than simply splitting out the API for these cases.
+
+And we fall into another problem here, if we set_parent of a clock,
+which causes one clock to start and another to stop, then what
+happens with non-atomic clocks?
+
+if not, we're going to have drivers either keeping clocks on all
+the time, or having to put duplicated enable/set-parent/disable
+logic in all over the place.
