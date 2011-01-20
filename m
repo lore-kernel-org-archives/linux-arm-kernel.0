@@ -1,51 +1,60 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 Jan 2011 16:40:04 +0000
-Subject: Locking in the clk API
-In-Reply-To: <20110111101314.GA774@linux-sh.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111091607.GI12552@n2100.arm.linux.org.uk>	<201101111744.59712.jeremy.kerr@canonical.com>
-	<20110111101314.GA774@linux-sh.org>
-Message-ID: <4D386564.2090601@fluff.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Jan 2011 16:38:36 +0000
+Subject: [PATCH] ARM: TWD: fix the clock calculation for TWD
+In-Reply-To: <20110120144409.GA25954@pulham.picochip.com>
+References: <1295505237-5735-1-git-send-email-chao.xie@marvell.com>
+	<20110120140811.GE6335@n2100.arm.linux.org.uk>
+	<20110120144409.GA25954@pulham.picochip.com>
+Message-ID: <20110120163836.GF6335@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/11 10:13, Paul Mundt wrote:
-> On Tue, Jan 11, 2011 at 05:44:59PM +0800, Jeremy Kerr wrote:
->> So, it sounds like the best approach is to provide an atomic clk_enable. I 
->> agree with Sascha that the clk_enable and clk_enable_atomic polarity makes the 
->> most sense, so how about:
->>
->> int clk_enable(struct clk *clk)
->> {
->> 	might_sleep();
->>
->> 	[...]
->> }
->>
->> int clk_enable_atomic(struct clk *clk)
->> {
->> 	BUG_ON(!(clk->flags & CLK_ATOMIC));
->>
->> 	[...]
->> }
->>
->> Paul: even though you mention that the atomic clocks are the usual case, I 
->> think that this way around illustrates the atomic 'restriction' at the call 
->> site more clearly. When the drivers don't care about the atomicity, 
->> clk_enable() is fine. When drivers do need an atomic clock, 
->> clk_enable_atomic() shows this requirement.
->>
-> No, the sleeping clock case is and always will be a corner case, and I
-> have no interest in pretending otherwise. On SH we have hundreds of
-> clocks that are all usable in the atomic context and perhaps less than a
-> dozen that aren't (and even in those cases much of the PLL negotiation is
-> handled in hardware so there's never any visibility for the lock-down
-> from the software side, other architectures also have similar behaviour).
+On Thu, Jan 20, 2011 at 02:44:09PM +0000, Jamie Iles wrote:
+> On Thu, Jan 20, 2011 at 02:08:11PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Jan 20, 2011 at 02:33:57PM +0800, Chao Xie wrote:
+> > > The original code will do count * (HZ /5). It will make the twd
+> > > timer rate decreased if HZ can not be excatly divided. For
+> > > example HZ=128.
+> > > 
+> > > Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> > > ---
+> > >  arch/arm/kernel/smp_twd.c |    3 ++-
+> > >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > > index 35882fb..ca6405b 100644
+> > > --- a/arch/arm/kernel/smp_twd.c
+> > > +++ b/arch/arm/kernel/smp_twd.c
+> > > @@ -111,7 +111,8 @@ static void __cpuinit twd_calibrate_rate(void)
+> > >  
+> > >  		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+> > >  
+> > > -		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+> > > +		twd_timer_rate = ((unsigned long)(0xFFFFFFFFU - count))
+> > > +			* HZ / 5;
+> > >  
+> > >  		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+> > >  			(twd_timer_rate / 100000) % 100);
+> > 
+> > I don't think this patch has any effect what so ever, so I just tried:
+> > 
+> > #define HZ      128
+> > unsigned long twd_timer_rate;
+> > void calc1(unsigned long count)
+> > {
+> >         twd_timer_rate = (0xffffffffU - count) * (HZ / 5);
+> > }
+> > void calc2(unsigned long count)
+> > {
+> >         twd_timer_rate = ((unsigned long)(0xffffffffU - count)) * (HZ / 5);
+> > }
+> 
+> Hi Russell,
+> 
+> In Chao's patch the parentheses around (HZ / 5) have been removed so its 
+> now dowing the multiplication before the division (if I remember the 
+> precedences correctly!).  I don't think the cast to unsigned long is 
+> needed though.
 
-So, how does the software deal with the clock not being available if the
-PLL powers up and takes time to lock and the software goes and tries to
-use the device? We need to ensure the clock is on and stable before the
-clk_enable() call returns.
-
-For all the drivers I've written so far, clk_enable() and disable()
-calls are done from sleep-able contexts such as the mmc work queue
-or other such systems.
+Hmm.  That means the maximum twd timer rate we can support is about
+860MHz.  Is that enough?
