@@ -1,143 +1,49 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 20 Jan 2011 17:30:13 +0100
-Subject: [PATCH] ux500: add a few AB8500 regulator consumers v3
-Message-ID: <1295541013-12656-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Jan 2011 17:21:48 +0100
+Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK to
+	speed-up boot
+In-Reply-To: <4D385155.4050301@gmail.com>
+References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
+	<4D385155.4050301@gmail.com>
+Message-ID: <AANLkTin00ULesF4vnCUEQh6A_CLyTrUAwWxk2NN01y5v@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Try to make the regulators a little bit more useful by adding some
-of the most basic consumers we're going to have in the end.
+2011/1/20 Rob Herring <robherring2@gmail.com>:
+> On 01/20/2011 03:42 AM, Santosh Shilimkar wrote:
+>>
+>> On some architectures, secondary cores shares clock with primiary
+>> core and hence scale together. Hence secondary core lpj calibration
+>> is not necessary and can be skipped to save considerable time.
+>>
+>> This can speed up the secondary cpu boot and hotplug cpu online
+>> paths.
+>>
+>> Discussion thread:
+>> ? ? ? ?http://www.spinics.net/lists/arm-kernel/msg111124.html
+>>
+>
+> There's already one way to do this with pre-calculated lpj.
+>
+> Also, this isn't multi-platform friendly.
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Rabin Vincent <rabin@rab.in>
-Cc: Naveen Kumar Gaddipati <naveen.gaddipati@stericsson.com>
-Cc: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
-Changes v2->v3:
-- Found the proper name "vdd" for the accelerometer supply.
-- Guessing the RMI4 chip supply is named "vdd" (whatever)
-  if anyone knows the name better, hit me and I'll fix it.
-- Keeping subdevices of the MFD as supply devices for the
-  time being.
----
- arch/arm/mach-ux500/board-mop500-regulators.c |   62 +++++++++++++++++++++++++
- 1 files changed, 62 insertions(+), 0 deletions(-)
+It can be made to be, then -
+skip all Kconfig business (more elegant like this anyway):
 
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 533967c..875c91b 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -11,6 +11,56 @@
- #include <linux/kernel.h>
- #include <linux/regulator/machine.h>
- #include <linux/regulator/ab8500.h>
-+#include "board-mop500-regulators.h"
-+
-+static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
-+	/* External displays, connector on board 2v5 power supply */
-+	REGULATOR_SUPPLY("vaux12v5", "mcde.0"),
-+	/* SFH7741 proximity sensor */
-+	REGULATOR_SUPPLY("vcc", "gpio-keys.0"),
-+	/* BH1780GLS ambient light sensor */
-+	REGULATOR_SUPPLY("vcc", "2-0029"),
-+	/* lsm303dlh accelerometer */
-+	REGULATOR_SUPPLY("vdd", "3-0018"),
-+	/* lsm303dlh magnetometer */
-+	REGULATOR_SUPPLY("vdd", "3-001e"),
-+	/* Rohm BU21013 Touchscreen devices */
-+	REGULATOR_SUPPLY("avdd", "3-005c"),
-+	REGULATOR_SUPPLY("avdd", "3-005d"),
-+	/* Synaptics RMI4 Touchscreen device */
-+	REGULATOR_SUPPLY("vdd", "3-004b"),
-+};
-+
-+static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
-+	/* On-board eMMC power */
-+	REGULATOR_SUPPLY("vmmc", "sdi4"),
-+	/* AB8500 audio codec */
-+	REGULATOR_SUPPLY("vcc-N2158", "ab8500-codec.0"),
-+};
-+
-+static struct regulator_consumer_supply ab8500_vaux3_consumers[] = {
-+	/* External MMC slot power */
-+	REGULATOR_SUPPLY("vmmc", "sdi0"),
-+};
-+
-+static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
-+	/* TV-out DENC supply */
-+	REGULATOR_SUPPLY("vtvout", "ab8500-denc.0"),
-+	/* Internal general-purpose ADC */
-+	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
-+};
-+
-+static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
-+	/* SoC core supply, no device */
-+	REGULATOR_SUPPLY("v-intcore", NULL),
-+	/* USB Transciever */
-+	REGULATOR_SUPPLY("vddulpivio18", "ab8500-usb.0"),
-+};
-+
-+static struct regulator_consumer_supply ab8500_vana_consumers[] = {
-+	/* External displays, connector on board, 1v8 power supply */
-+	REGULATOR_SUPPLY("vsmps2", "mcde.0"),
-+};
- 
- /* AB8500 regulators */
- struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
-@@ -23,6 +73,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
- 					  REGULATOR_CHANGE_STATUS,
- 		},
-+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux1_consumers),
-+		.consumer_supplies = ab8500_vaux1_consumers,
- 	},
- 	/* supplies to the on-board eMMC */
- 	[AB8500_LDO_AUX2] = {
-@@ -33,6 +85,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
- 					  REGULATOR_CHANGE_STATUS,
- 		},
-+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux2_consumers),
-+		.consumer_supplies = ab8500_vaux2_consumers,
- 	},
- 	/* supply for VAUX3, supplies to SDcard slots */
- 	[AB8500_LDO_AUX3] = {
-@@ -43,6 +97,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
- 					  REGULATOR_CHANGE_STATUS,
- 		},
-+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux3_consumers),
-+		.consumer_supplies = ab8500_vaux3_consumers,
- 	},
- 	/* supply for tvout, gpadc, TVOUT LDO */
- 	[AB8500_LDO_TVOUT] = {
-@@ -50,6 +106,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.name = "V-TVOUT",
- 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
- 		},
-+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vtvout_consumers),
-+		.consumer_supplies = ab8500_vtvout_consumers,
- 	},
- 	/* supply for ab8500-vaudio, VAUDIO LDO */
- 	[AB8500_LDO_AUDIO] = {
-@@ -85,6 +143,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.name = "V-INTCORE",
- 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
- 		},
-+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vintcore_consumers),
-+		.consumer_supplies = ab8500_vintcore_consumers,
- 	},
- 	/* supply for U8500 CSI/DSI, VANA LDO */
- 	[AB8500_LDO_ANA] = {
-@@ -92,5 +152,7 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 			.name = "V-CSI/DSI",
- 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
- 		},
-+		.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
-+		.consumer_supplies = ab8500_vana_consumers,
- 	},
- };
--- 
-1.7.3.2
+static inline int skip_secondary_calibrate(void)
+{
+    return machine_is_u8500() ||
+        machine_is_svp8500v1() ||
+        machine_is_svp8500v2() ||
+        machine_is_svp5500() ||
+        machine_is_b5500() ||
+        machine_is_s5500() ||
+        machine_is_omap4_panda();
+}
+
+Hm if this multi-platform stuff is desirable we probably need
+a runtime arch_is_omap4(), arch_is_u8500() etc so this machine
+list doesn't grow ridiculously long, but ftm this will work.
+
+Yours,
+Linus Walleij
