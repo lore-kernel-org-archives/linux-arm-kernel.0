@@ -1,50 +1,46 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:55:49 +0530
-Subject: [PATCH V5 10/63] ST SPEAr13XX: Added compilation support in arch/arm/
+Date: Thu, 20 Jan 2011 12:55:48 +0530
+Subject: [PATCH V5 09/63] ST SPEAr: Adding support for SPEAr13xx SoC in spear
+	generic plat/
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <d71b8689c5ffe1db4c6f253907804fdc83d9bbe3.1295499394.git.viresh.kumar@st.com>
+Message-ID: <61082d797d969e31338969bf40a0d0185560beb2.1295499394.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shiraz Hashim <shiraz.hashim@st.com>
 
-This patch adds compilation support for ST Microelectronics SPEAr13xx machines.
-SPEAr13xx SOC's are based on Arm CortexA9 CPUs.
-
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/Kconfig  |    4 ++--
- arch/arm/Makefile |    1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/plat-spear/Kconfig |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5cff165..f3904ba 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1253,8 +1253,8 @@ config SMP
- 	depends on GENERIC_CLOCKEVENTS
- 	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
- 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
--		 ARCH_S5PV310 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
--		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-+		 ARCH_S5PV310 || ARCH_SPEAR13XX || ARCH_TEGRA || ARCH_U8500 || \
-+		 ARCH_VEXPRESS_CA9X4 || ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
- 	select USE_GENERIC_SMP_HELPERS
- 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
- 	help
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c22c1ad..51769cc 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -193,6 +193,7 @@ machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
- machine-$(CONFIG_ARCH_W90X900)		:= w90x900
- machine-$(CONFIG_ARCH_NUC93X)		:= nuc93x
- machine-$(CONFIG_FOOTBRIDGE)		:= footbridge
-+machine-$(CONFIG_MACH_SPEAR1300)	:= spear13xx
- machine-$(CONFIG_MACH_SPEAR300)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 1bb3dbc..29a25d2 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -8,6 +8,13 @@ choice
+ 	prompt "ST SPEAr Family"
+ 	default ARCH_SPEAR3XX
+ 
++config ARCH_SPEAR13XX
++	bool "SPEAr13XX"
++	select ARM_GIC
++	select CPU_V7
++	help
++	  Supports for ARM's SPEAR13XX family
++
+ config ARCH_SPEAR3XX
+ 	bool "SPEAr3XX"
+ 	select ARM_VIC
+@@ -25,6 +32,7 @@ config ARCH_SPEAR6XX
+ endchoice
+ 
+ # Adding SPEAr machine specific configuration files
++source "arch/arm/mach-spear13xx/Kconfig"
+ source "arch/arm/mach-spear3xx/Kconfig"
+ source "arch/arm/mach-spear6xx/Kconfig"
+ 
 -- 
 1.7.3.4
