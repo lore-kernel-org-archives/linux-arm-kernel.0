@@ -1,34 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Jan 2011 08:43:32 +0200
-Subject: [RESEND PATCH 3/3] arm: Kconfig: allow OMAP to use sparse IRQ
-	numbering
-In-Reply-To: <1295505812-5062-1-git-send-email-balbi@ti.com>
-References: <1295505812-5062-1-git-send-email-balbi@ti.com>
-Message-ID: <1295505812-5062-4-git-send-email-balbi@ti.com>
+From: thomas.weber.linux@googlemail.com (Thomas Weber)
+Date: Thu, 20 Jan 2011 07:56:55 +0100
+Subject: [PATCHv4 2/4] OMAP3: Devkit8000: Fix tps65930 pullup/pulldown
+	configuration
+In-Reply-To: <20110119222126.GI4957@atomide.com>
+References: <1295425166-25540-1-git-send-email-weber@corscience.de>
+	<1295425166-25540-3-git-send-email-weber@corscience.de>
+	<20110119222126.GI4957@atomide.com>
+Message-ID: <4D37DCB7.9010505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select HAVE_SPARSE_IRQ to allow OMAP to use
-sparse IRQ numbering scheme. The main difference
-is that irq_descs will be added to a radix tree
-instead of a static array.
+Am 19.01.2011 23:21, schrieb Tony Lindgren:
+> * Thomas Weber <weber@corscience.de> [110119 00:18]:
+>> From: Daniel Morsing <daniel.morsing@gmail.com>
+>>
+>> gpio7 on the tps65930 is used as an output on the devkit8000 and
+>> gpio1 is not connected. Remove gpio7 and change gpio1 to pulldown
+>>
+>> Signed-off-by: Daniel Morsing <daniel.morsing@gmail.com>
+> 
+> I'll queue only this fix for now, looks like the other still need
+> minor changes.
+> 
+> Tony
+> --
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c231192..d0b5b26 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -858,6 +858,7 @@ config ARCH_DAVINCI
- config ARCH_OMAP
- 	bool "TI OMAP"
- 	select HAVE_CLK
-+	select HAVE_SPARSE_IRQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_HAS_CPUFREQ
- 	select GENERIC_CLOCKEVENTS
--- 
-1.7.4.rc2
+Thanks.
