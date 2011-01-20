@@ -1,229 +1,482 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:00 +0530
-Subject: [PATCH V5 22/63] ST SPEAr: Added ARM PL061 GPIO Support on SPEAr13xx
-	and modified resource size
+Date: Thu, 20 Jan 2011 12:55:58 +0530
+Subject: [PATCH V5 20/63] ST SPEAr: Adding machine support for USB host
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <49ffea40dd3de5059f2ddf01d2608c90896605ad.1295499394.git.viresh.kumar@st.com>
+Message-ID: <75b8eec2cfdc8c6c8a94d58a8fc2634bc101b831.1295499394.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
+
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear13xx/include/mach/gpio.h    |   18 +++++++++++
- arch/arm/mach-spear13xx/include/mach/irqs.h    |   10 ++++++-
- arch/arm/mach-spear13xx/include/mach/spear.h   |    4 +-
- arch/arm/mach-spear13xx/spear1300_evb.c        |    2 +
- arch/arm/mach-spear13xx/spear13xx.c            |   37 ++++++++++++++++++++++++
- arch/arm/mach-spear3xx/spear300.c              |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c              |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c              |    9 ++----
- 9 files changed, 74 insertions(+), 11 deletions(-)
+ arch/arm/mach-spear13xx/include/mach/generic.h |    4 +
+ arch/arm/mach-spear13xx/spear1300_evb.c        |    4 +
+ arch/arm/mach-spear13xx/spear13xx.c            |  106 +++++++++++++++++++++++
+ arch/arm/mach-spear3xx/include/mach/generic.h  |    3 +
+ arch/arm/mach-spear3xx/spear300_evb.c          |    3 +
+ arch/arm/mach-spear3xx/spear310_evb.c          |    3 +
+ arch/arm/mach-spear3xx/spear320_evb.c          |    3 +
+ arch/arm/mach-spear3xx/spear3xx.c              |   80 +++++++++++++++++
+ arch/arm/mach-spear6xx/include/mach/generic.h  |    4 +
+ arch/arm/mach-spear6xx/spear600_evb.c          |    4 +
+ arch/arm/mach-spear6xx/spear6xx.c              |  108 ++++++++++++++++++++++++
+ 11 files changed, 322 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-spear13xx/include/mach/generic.h b/arch/arm/mach-spear13xx/include/mach/generic.h
-index 0d21b79..2fc34f5 100644
+index c8db271..6473316 100644
 --- a/arch/arm/mach-spear13xx/include/mach/generic.h
 +++ b/arch/arm/mach-spear13xx/include/mach/generic.h
-@@ -29,6 +29,7 @@
- #define SPEAR_GPT0_CHAN1_IRQ	IRQ_GPT0_TMR1
+@@ -30,7 +30,11 @@
  
  /* Add spear13xx family device structure declarations here */
-+extern struct amba_device spear13xx_gpio_device[];
  extern struct amba_device spear13xx_uart_device;
- extern struct platform_device spear13xx_ehci0_device;
- extern struct platform_device spear13xx_ehci1_device;
-diff --git a/arch/arm/mach-spear13xx/include/mach/gpio.h b/arch/arm/mach-spear13xx/include/mach/gpio.h
-index 43fa541..2f8ad23 100644
---- a/arch/arm/mach-spear13xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear13xx/include/mach/gpio.h
-@@ -16,4 +16,22 @@
- 
- #include <plat/gpio.h>
- 
-+#define GPIO0_0			0
-+#define GPIO0_1			1
-+#define GPIO0_2			2
-+#define GPIO0_3			3
-+#define GPIO0_4			4
-+#define GPIO0_5			5
-+#define GPIO0_6			6
-+#define GPIO0_7			7
-+
-+#define GPIO1_0			8
-+#define GPIO1_1			9
-+#define GPIO1_2			10
-+#define GPIO1_3			11
-+#define GPIO1_4			12
-+#define GPIO1_5			13
-+#define GPIO1_6			14
-+#define GPIO1_7			15
-+
- #endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
-index 036bfc6..10b64c1 100644
---- a/arch/arm/mach-spear13xx/include/mach/irqs.h
-+++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
-@@ -86,6 +86,14 @@
- 
- #define IRQ_GIC_END		(IRQ_SHPI_START + 128)
- 
--#define NR_IRQS			IRQ_GIC_END
-+#define VIRQ_START		IRQ_GIC_END
-+
-+/* GPIO pins virtual irqs */
-+#define SPEAR_GPIO0_INT_BASE	(VIRQ_START + 0)
-+#define SPEAR_GPIO1_INT_BASE	(SPEAR_GPIO0_INT_BASE + 8)
-+#define SPEAR_GPIO_INT_END	(SPEAR_GPIO1_INT_BASE + 8)
-+
-+#define VIRQ_END		SPEAR_GPIO_INT_END
-+#define NR_IRQS			VIRQ_END
- 
- #endif /* __MACH_IRQS_H */
-diff --git a/arch/arm/mach-spear13xx/include/mach/spear.h b/arch/arm/mach-spear13xx/include/mach/spear.h
-index d4b11a4..282ef2f 100644
---- a/arch/arm/mach-spear13xx/include/mach/spear.h
-+++ b/arch/arm/mach-spear13xx/include/mach/spear.h
-@@ -43,8 +43,8 @@
- #define SPEAR13XX_GPT2_BASE		0xE0480000
- #define SPEAR13XX_GPT3_BASE		0xE0500000
- #define SPEAR13XX_RTC_BASE		0xE0580000
--#define SPEAR13XX_GPIOA_BASE		0xE0600000
--#define SPEAR13XX_GPIOB_BASE		0xE0680000
-+#define SPEAR13XX_GPIO0_BASE		0xE0600000
-+#define SPEAR13XX_GPIO1_BASE		0xE0680000
- #define SPEAR13XX_MISC_BASE		0xE0700000
- #define VA_SPEAR13XX_MISC_BASE		IO_ADDRESS(SPEAR13XX_MISC_BASE)
++extern struct platform_device spear13xx_ehci0_device;
++extern struct platform_device spear13xx_ehci1_device;
+ extern struct platform_device spear13xx_i2c_device;
++extern struct platform_device spear13xx_ohci0_device;
++extern struct platform_device spear13xx_ohci1_device;
+ extern struct platform_device spear13xx_rtc_device;
+ extern struct sys_timer spear13xx_timer;
  
 diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
-index 2d4b4cf..f2449ef 100644
+index 8df2a6c..1518044 100644
 --- a/arch/arm/mach-spear13xx/spear1300_evb.c
 +++ b/arch/arm/mach-spear13xx/spear1300_evb.c
-@@ -19,6 +19,8 @@
- #include <plat/keyboard.h>
+@@ -22,7 +22,11 @@ static struct amba_device *amba_devs[] __initdata = {
+ };
  
- static struct amba_device *amba_devs[] __initdata = {
-+	&spear13xx_gpio_device[0],
-+	&spear13xx_gpio_device[1],
- 	&spear13xx_uart_device,
+ static struct platform_device *plat_devs[] __initdata = {
++	&spear13xx_ehci0_device,
++	&spear13xx_ehci1_device,
+ 	&spear13xx_i2c_device,
++	&spear13xx_ohci0_device,
++	&spear13xx_ohci1_device,
+ 	&spear13xx_rtc_device,
  };
  
 diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
-index a0ef36d..faf2eef 100644
+index 4b04a20..2ebe8db 100644
 --- a/arch/arm/mach-spear13xx/spear13xx.c
 +++ b/arch/arm/mach-spear13xx/spear13xx.c
-@@ -12,6 +12,7 @@
-  */
+@@ -60,6 +60,112 @@ struct platform_device spear13xx_i2c_device = {
+ 	.resource = i2c_resources,
+ };
  
- #include <linux/types.h>
-+#include <linux/amba/pl061.h>
- #include <linux/ptrace.h>
- #include <linux/io.h>
- #include <asm/hardware/gic.h>
-@@ -24,6 +25,42 @@
- #include <mach/hardware.h>
- 
- /* Add spear13xx machines common devices here */
-+/* gpio device registeration */
-+static struct pl061_platform_data gpio_plat_data[] = {
-+	{
-+		.gpio_base	= 0,
-+		.irq_base	= SPEAR_GPIO0_INT_BASE,
-+	}, {
-+		.gpio_base	= 8,
-+		.irq_base	= SPEAR_GPIO1_INT_BASE,
++/* usb host device registeration */
++static struct resource ehci0_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC0_EHCI_BASE,
++		.end = SPEAR13XX_UHC0_EHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_EHCI0,
++		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+struct amba_device spear13xx_gpio_device[] = {
-+	{
-+		.dev = {
-+			.init_name = "gpio0",
-+			.platform_data = &gpio_plat_data[0],
-+		},
-+		.res = {
-+			.start = SPEAR13XX_GPIO0_BASE,
-+			.end = SPEAR13XX_GPIO0_BASE + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		},
-+		.irq = {IRQ_GPIO0, NO_IRQ},
-+	}, {
-+		.dev = {
-+			.init_name = "gpio1",
-+			.platform_data = &gpio_plat_data[1],
-+		},
-+		.res = {
-+			.start = SPEAR13XX_GPIO1_BASE,
-+			.end = SPEAR13XX_GPIO1_BASE + SZ_4K - 1,
-+			.flags = IORESOURCE_MEM,
-+		},
-+		.irq = {IRQ_GPIO1, NO_IRQ},
-+	}
++static struct resource ehci1_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC1_EHCI_BASE,
++		.end = SPEAR13XX_UHC1_EHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_EHCI1,
++		.flags = IORESOURCE_IRQ,
++	},
 +};
++
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC0_OHCI_BASE,
++		.end = SPEAR13XX_UHC0_OHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_OHCI0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start = SPEAR13XX_UHC1_OHCI_BASE,
++		.end = SPEAR13XX_UHC1_OHCI_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USBH_OHCI1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++/* usbh0_id defaults to 0, being static variable */
++static int usbh0_id;
++static int usbh1_id = 1;
++static u64 ehci0_dmamask = ~0;
++
++struct platform_device spear13xx_ehci0_device = {
++	.name = "spear-ehci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci0_resources),
++	.resource = ehci0_resources,
++};
++
++static u64 ehci1_dmamask = ~0;
++
++struct platform_device spear13xx_ehci1_device = {
++	.name = "spear-ehci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci1_resources),
++	.resource = ehci1_resources,
++};
++
++static u64 ohci0_dmamask = ~0;
++
++struct platform_device spear13xx_ohci0_device = {
++	.name = "spear-ohci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci0_resources),
++	.resource = ohci0_resources,
++};
++
++static u64 ohci1_dmamask = ~0;
++struct platform_device spear13xx_ohci1_device = {
++	.name = "spear-ohci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci1_resources),
++	.resource = ohci1_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 2933b39..b65a884 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -33,7 +33,10 @@
+ /* Add spear3xx family device structure declarations here */
+ extern struct amba_device gpio_device;
+ extern struct amba_device uart_device;
++extern struct platform_device ehci_device;
+ extern struct platform_device i2c_device;
++extern struct platform_device ohci0_device;
++extern struct platform_device ohci1_device;
+ extern struct platform_device rtc_device;
+ extern struct sys_timer spear3xx_timer;
  
- /* uart device registeration */
- struct amba_device spear13xx_uart_device = {
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index fab998c..95946b3 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -401,7 +401,7 @@ struct amba_device gpio1_device = {
- 	},
- 	.res = {
- 		.start = SPEAR300_GPIO_BASE,
--		.end = SPEAR300_GPIO_BASE + SPEAR300_GPIO_SIZE - 1,
-+		.end = SPEAR300_GPIO_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.irq = {VIRQ_GPIO1, NO_IRQ},
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 7c079ae..caa7000 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -44,7 +44,10 @@ static struct amba_device *amba_devs[] __initdata = {
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
++	&ehci_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
+ 
+ 	/* spear300 specific devices */
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index cbe6f42..7b7a236 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -50,7 +50,10 @@ static struct amba_device *amba_devs[] __initdata = {
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
++	&ehci_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
+ 
+ 	/* spear310 specific devices */
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 2c8d32c..7bfe609 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -48,7 +48,10 @@ static struct amba_device *amba_devs[] __initdata = {
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+ 	/* spear3xx specific devices */
++	&ehci_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
+ 
+ 	/* spear320 specific devices */
 diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index 6a096f4..862be65 100644
+index 168b9fb..6a096f4 100644
 --- a/arch/arm/mach-spear3xx/spear3xx.c
 +++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -35,7 +35,7 @@ struct amba_device gpio_device = {
- 	},
- 	.res = {
- 		.start = SPEAR3XX_ICM3_GPIO_BASE,
--		.end = SPEAR3XX_ICM3_GPIO_BASE + SPEAR3XX_ICM3_GPIO_SIZE - 1,
-+		.end = SPEAR3XX_ICM3_GPIO_BASE + SZ_4K - 1,
- 		.flags = IORESOURCE_MEM,
- 	},
- 	.irq = {IRQ_BASIC_GPIO, NO_IRQ},
+@@ -76,6 +76,86 @@ struct platform_device i2c_device = {
+ 	.resource = i2c_resources,
+ };
+ 
++/* usb host device registeration */
++static struct resource ehci_resources[] = {
++	[0] = {
++		.start = SPEAR3XX_ICM4_USB_EHCI0_1_BASE,
++		.end = SPEAR3XX_ICM4_USB_EHCI0_1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_EHCI_0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start = SPEAR3XX_ICM4_USB_OHCI0_BASE,
++		.end = SPEAR3XX_ICM4_USB_OHCI0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start = SPEAR3XX_ICM4_USB_OHCI1_BASE,
++		.end = SPEAR3XX_ICM4_USB_OHCI1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static u64 ehci_dmamask = ~0;
++static int usbh_id = -1;
++
++struct platform_device ehci_device = {
++	.name = "spear-ehci",
++	.id = -1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci_dmamask,
++		.platform_data = &usbh_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci_resources),
++	.resource = ehci_resources,
++};
++
++static u64 ohci0_dmamask = ~0;
++
++struct platform_device ohci0_device = {
++	.name = "spear-ohci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci0_dmamask,
++		.platform_data = &usbh_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci0_resources),
++	.resource = ohci0_resources,
++};
++
++static u64 ohci1_dmamask = ~0;
++
++struct platform_device ohci1_device = {
++	.name = "spear-ohci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci1_dmamask,
++		.platform_data = &usbh_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci1_resources),
++	.resource = ohci1_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
+diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
+index 3c04487..ed1dbfc 100644
+--- a/arch/arm/mach-spear6xx/include/mach/generic.h
++++ b/arch/arm/mach-spear6xx/include/mach/generic.h
+@@ -32,7 +32,11 @@
+ extern struct amba_device clcd_device;
+ extern struct amba_device gpio_device[];
+ extern struct amba_device uart_device[];
++extern struct platform_device ehci0_device;
++extern struct platform_device ehci1_device;
+ extern struct platform_device i2c_device;
++extern struct platform_device ohci0_device;
++extern struct platform_device ohci1_device;
+ extern struct platform_device rtc_device;
+ extern struct sys_timer spear6xx_timer;
+ 
+diff --git a/arch/arm/mach-spear6xx/spear600_evb.c b/arch/arm/mach-spear6xx/spear600_evb.c
+index 59abb31..4297c3a 100644
+--- a/arch/arm/mach-spear6xx/spear600_evb.c
++++ b/arch/arm/mach-spear6xx/spear600_evb.c
+@@ -26,7 +26,11 @@ static struct amba_device *amba_devs[] __initdata = {
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
++	&ehci0_device,
++	&ehci1_device,
+ 	&i2c_device,
++	&ohci0_device,
++	&ohci1_device,
+ 	&rtc_device,
+ };
+ 
 diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index ec42549..540fadb 100644
+index a421ae3..ec42549 100644
 --- a/arch/arm/mach-spear6xx/spear6xx.c
 +++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -89,8 +89,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_CPU_GPIO_BASE,
--			.end = SPEAR6XX_CPU_GPIO_BASE +
--				SPEAR6XX_CPU_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_CPU_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_LOCAL_GPIO, NO_IRQ},
-@@ -101,8 +100,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM3_GPIO_BASE,
--			.end = SPEAR6XX_ICM3_GPIO_BASE +
--				SPEAR6XX_ICM3_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_ICM3_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_BASIC_GPIO, NO_IRQ},
-@@ -113,8 +111,7 @@ struct amba_device gpio_device[] = {
- 		},
- 		.res = {
- 			.start = SPEAR6XX_ICM2_GPIO_BASE,
--			.end = SPEAR6XX_ICM2_GPIO_BASE +
--				SPEAR6XX_ICM2_GPIO_SIZE - 1,
-+			.end = SPEAR6XX_ICM2_GPIO_BASE + SZ_4K - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		.irq = {IRQ_APPL_GPIO, NO_IRQ},
+@@ -143,6 +143,114 @@ struct platform_device i2c_device = {
+ 	.resource = i2c_resources,
+ };
+ 
++/* usb host device registeration */
++static struct resource ehci0_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_EHCI0_BASE,
++		.end = SPEAR6XX_ICM4_USB_EHCI0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_EHCI_0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource ehci1_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_EHCI1_BASE,
++		.end = SPEAR6XX_ICM4_USB_EHCI1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_EHCI_1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_OHCI0_BASE,
++		.end = SPEAR6XX_ICM4_USB_OHCI0_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start = SPEAR6XX_ICM4_USB_OHCI1_BASE,
++		.end = SPEAR6XX_ICM4_USB_OHCI1_BASE + SZ_4K - 1,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_USB_H_OHCI_1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++/* usbh0_id defaults to 0, being static variable */
++static int usbh0_id;
++static int usbh1_id = 1;
++static u64 ehci0_dmamask = ~0;
++
++struct platform_device ehci0_device = {
++	.name = "spear-ehci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci0_resources),
++	.resource = ehci0_resources,
++};
++
++static u64 ehci1_dmamask = ~0;
++
++struct platform_device ehci1_device = {
++	.name = "spear-ehci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ehci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ehci1_resources),
++	.resource = ehci1_resources,
++};
++
++static u64 ohci0_dmamask = ~0;
++
++struct platform_device ohci0_device = {
++	.name = "spear-ohci",
++	.id = 0,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci0_dmamask,
++		.platform_data = &usbh0_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci0_resources),
++	.resource = ohci0_resources,
++};
++
++static u64 ohci1_dmamask = ~0;
++
++struct platform_device ohci1_device = {
++	.name = "spear-ohci",
++	.id = 1,
++	.dev = {
++		.coherent_dma_mask = ~0,
++		.dma_mask = &ohci1_dmamask,
++		.platform_data = &usbh1_id,
++	},
++	.num_resources = ARRAY_SIZE(ohci1_resources),
++	.resource = ohci1_resources,
++};
++
+ /* rtc device registration */
+ static struct resource rtc_resources[] = {
+ 	{
 -- 
 1.7.3.4
