@@ -1,57 +1,26 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 20 Jan 2011 14:14:40 +0100
-Subject: [PATCH v2] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <20110119221056.GG4957@atomide.com>
-References: <1295352126-29171-1-git-send-email-j-pihet@ti.com>
-	<87vd1ksq2i.fsf@ti.com> <87mxmwr2un.fsf@ti.com>
-	<20110119221056.GG4957@atomide.com>
-Message-ID: <AANLkTimOc8PcEUaC81M=cYdyfbcJChG9ckriCsxHz-4m@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 20 Jan 2011 13:49:26 +0000
+Subject: [PATCH] ux500: add a few AB8500 regulator consumers
+In-Reply-To: <AANLkTins3Xgz+83cNJsoUY=KKfBdzWpMs7KFX05DpNfp@mail.gmail.com>
+References: <1295269491-12107-1-git-send-email-linus.walleij@stericsson.com>
+	<20110117132745.GA21113@opensource.wolfsonmicro.com>
+	<AANLkTi=gsmiGFF31Si71LQBAZqpZZcxMDOK6e3xAyZV7@mail.gmail.com>
+	<20110117153303.GK21113@opensource.wolfsonmicro.com>
+	<AANLkTins3Xgz+83cNJsoUY=KKfBdzWpMs7KFX05DpNfp@mail.gmail.com>
+Message-ID: <20110120134926.GG2551@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 11:10 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Kevin Hilman <khilman@ti.com> [110119 13:37]:
->> Kevin Hilman <khilman@ti.com> writes:
->>
->> > jean.pihet at newoldbits.com writes:
->> >
->> >> From: Jean Pihet <j-pihet@ti.com>
->> >>
->> >> The new fncpy API is better suited for copying some
->> >> code to SRAM at runtime. This patch changes the ad-hoc
->> >> code to the more generic fncpy API.
->> >>
->> >> Tested OK on OMAP3 in low power modes (RET/OFF)
->> >> using omap2plus_defconfig with !CONFIG_THUMB2_KERNEL.
->> >> Compile tested on OMAP1/2 using omap1_defconfig.
->> >>
->> >> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->> >
->> > Acked-by: Kevin Hilman <khilman@ti.com>
->> >
->> > Boot tested on OMAP1 & OMAP2 as well. ?Note that neither OMAP1 or OMAP2
->> > has had working suspend/resume for a long time now, so I did not test
->> > suspend/resume.
->>
->> For OMAP2:
->>
->> Tested-by: Kevin Hilman <khilman@ti.com>
->>
->> to test a little more on OMAP2, I just removed the WFI from the
->> low-level code and tested suspend that way. ?That's enough to be sure
->> the copied code is copied and executed.
->>
->> Worked fine on OMAP2420/n810.
->>
->> For OMAP1, this didn't work and would require more serious hacking on
->> the OMAP1 suspend path, which I currently have no plans to do.
->
-> Boots fine on osk5912 and n800 too:
->
-> Tested-by: Tony Lindgren <tony@atomide.com>
->
+On Tue, Jan 18, 2011 at 10:11:16PM +0100, Linus Walleij wrote:
 
-Thanks for testing!
+> If all AB8500 subdevices were to ask for regulators using the
+> core device there would be just one big entry pointing
+> to the ab8500-i2c.0 entry in this case, and a huge usecount,
+> which is not helpful IMO. I like the detail.
 
-Regards,
-Jean
+It can make life easier from the point of view of setting stuff up since
+you're not reliant on the internals of the MFD - for example, if you fix
+the MFD to not create .0 devices you'll end up needing to update all the
+users.
+
+The supply names are generally relatively obvious.
