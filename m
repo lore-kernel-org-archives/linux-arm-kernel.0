@@ -1,163 +1,36 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:33 +0530
-Subject: [PATCH V5 55/63] SPEAr3xx: Replace defconfigs with single unified
-	defconfig
+Date: Thu, 20 Jan 2011 12:56:37 +0530
+Subject: [PATCH V5 59/63] ST SPEAR6xx: renaming spear600_defconfig as
+	spear6xx_defconfig
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <a2ad7cc5be33aee96bfd39848d07362afe46e73d.1295499395.git.viresh.kumar@st.com>
+Message-ID: <8979e533ed8edafe7ef36d7ee22fb8e11803508f.1295499395.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryan Mallon <ryan@bluewatersys.com>
-
-We only need one defconfig for SPEAr3xx now since we can build all
-three boards into one kernel.
-
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/configs/spear310_defconfig                |   52 --------------------
- arch/arm/configs/spear320_defconfig                |   52 --------------------
- .../{spear300_defconfig => spear3xx_defconfig}     |    4 +-
- 3 files changed, 3 insertions(+), 105 deletions(-)
- delete mode 100644 arch/arm/configs/spear310_defconfig
- delete mode 100644 arch/arm/configs/spear320_defconfig
- rename arch/arm/configs/{spear300_defconfig => spear3xx_defconfig} (93%)
+ .../{spear600_defconfig => spear6xx_defconfig}     |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+ rename arch/arm/configs/{spear600_defconfig => spear6xx_defconfig} (97%)
 
-diff --git a/arch/arm/configs/spear310_defconfig b/arch/arm/configs/spear310_defconfig
-deleted file mode 100644
-index 824e444..0000000
---- a/arch/arm/configs/spear310_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR310=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear320_defconfig b/arch/arm/configs/spear320_defconfig
-deleted file mode 100644
-index 842f7f3..0000000
---- a/arch/arm/configs/spear320_defconfig
-+++ /dev/null
-@@ -1,52 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--CONFIG_PLAT_SPEAR=y
--CONFIG_MACH_SPEAR320=y
--CONFIG_BINFMT_MISC=y
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_BLK_DEV_RAM=y
--CONFIG_BLK_DEV_RAM_SIZE=16384
--CONFIG_INPUT_FF_MEMLESS=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_SERIAL_AMBA_PL011=y
--CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_RAW_DRIVER=y
--CONFIG_MAX_RAW_DEVS=8192
--CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PL061=y
--# CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_EXT2_FS=y
--CONFIG_EXT2_FS_XATTR=y
--CONFIG_EXT2_FS_SECURITY=y
--CONFIG_EXT3_FS=y
--CONFIG_EXT3_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=m
--CONFIG_MSDOS_FS=m
--CONFIG_VFAT_FS=m
--CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
--CONFIG_TMPFS=y
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_NLS=y
--CONFIG_NLS_DEFAULT="utf8"
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ASCII=m
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_SPINLOCK=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
--CONFIG_DEBUG_INFO=y
--# CONFIG_CRC32 is not set
-diff --git a/arch/arm/configs/spear300_defconfig b/arch/arm/configs/spear3xx_defconfig
-similarity index 93%
-rename from arch/arm/configs/spear300_defconfig
-rename to arch/arm/configs/spear3xx_defconfig
-index cf29f3e..fea7e1f 100644
---- a/arch/arm/configs/spear300_defconfig
-+++ b/arch/arm/configs/spear3xx_defconfig
-@@ -7,6 +7,9 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
+diff --git a/arch/arm/configs/spear600_defconfig b/arch/arm/configs/spear6xx_defconfig
+similarity index 97%
+rename from arch/arm/configs/spear600_defconfig
+rename to arch/arm/configs/spear6xx_defconfig
+index 6777c11..cef2e83 100644
+--- a/arch/arm/configs/spear600_defconfig
++++ b/arch/arm/configs/spear6xx_defconfig
+@@ -8,6 +8,7 @@ CONFIG_MODULE_UNLOAD=y
  CONFIG_MODVERSIONS=y
  CONFIG_PLAT_SPEAR=y
-+CONFIG_BOARD_SPEAR300_EVB=y
-+CONFIG_BOARD_SPEAR310_EVB=y
-+CONFIG_BOARD_SPEAR320_EVB=y
+ CONFIG_ARCH_SPEAR6XX=y
++CONFIG_BOARD_SPEAR600_EVB=y
  CONFIG_BINFMT_MISC=y
  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
  CONFIG_BLK_DEV_RAM=y
-@@ -24,7 +27,6 @@ CONFIG_MAX_RAW_DEVS=8192
+@@ -22,7 +23,6 @@ CONFIG_MAX_RAW_DEVS=8192
  CONFIG_GPIO_SYSFS=y
  CONFIG_GPIO_PL061=y
  # CONFIG_HWMON is not set
