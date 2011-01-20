@@ -1,17 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jan 2011 18:57:07 +0000
-Subject: Locking in the clk API
-In-Reply-To: <4D3863AC.4020209@fluff.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org>
-	<201101111211.30172.jeremy.kerr@canonical.com>
-	<20110111045423.GP3760@linux-sh.org> <4D3863AC.4020209@fluff.org>
-Message-ID: <20110120185707.GJ6335@n2100.arm.linux.org.uk>
+From: kauppi@papupata.org (Ari Kauppi)
+Date: Thu, 20 Jan 2011 20:57:17 +0200
+Subject: [PATCH v2 0/3] oprofile: ARM backtraces and few minors
+Message-ID: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 04:32:44PM +0000, Ben Dooks wrote:
-> I would vote for all clk lookup and reference counting code be made
-> sleep-able and define it as such.
+This patchset re-enables ARM backtraces with non-PMU capable CPUs.
 
-Always has been and probably always will be.
+In V2 I have tried to address the comments received for the V1
+patches. arch/sh/oprofile/common.c is untouched but should work
+as earlier.
+
+Compile tested with arm/omap2plus_defconfig (with and without
+CONFIG_HW_PERF_EVENTS).
+
+Ari Kauppi (3):
+  oprofile: Use CONFIG_HW_PERF_EVENTS for oprofile_perf_init and
+    friends
+  oprofile: Provide stubs for oprofile_perf_{init,exit}
+  ARM: oprofile: Always allow backtraces
+
+ arch/arm/oprofile/common.c |   12 ++----------
+ include/linux/oprofile.h   |   13 +++++++++++--
+ 2 files changed, 13 insertions(+), 12 deletions(-)
+
+-- 
+1.7.4.rc2.3.g60a2e
