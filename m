@@ -1,9 +1,9 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:55:53 +0530
-Subject: [PATCH V5 14/63] ST SPEAr: Adding Debugfs support on clock framework
+Date: Thu, 20 Jan 2011 12:55:50 +0530
+Subject: [PATCH V5 11/63] ST SPEAr13xx: Adding default config file
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <18c6d838de7706e0db459f94f9fbabba45582394.1295499394.git.viresh.kumar@st.com>
+Message-ID: <fd1d609b5ca7222f1434449900c2334a6b68519f.1295499394.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,189 +12,75 @@ From: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/plat-spear/clock.c              |  116 ++++++++++++++++++++++++++++++
- arch/arm/plat-spear/include/plat/clock.h |    8 ++
- 2 files changed, 124 insertions(+), 0 deletions(-)
+ arch/arm/configs/spear13xx_defconfig |   60 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 60 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/spear13xx_defconfig
 
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-index a8f912f..a7ba3de 100644
---- a/arch/arm/plat-spear/clock.c
-+++ b/arch/arm/plat-spear/clock.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/bug.h>
- #include <linux/clk.h>
-+#include <linux/debugfs.h>
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/list.h>
-@@ -22,8 +23,14 @@
- 
- static DEFINE_SPINLOCK(clocks_lock);
- static LIST_HEAD(root_clks);
-+#ifdef CONFIG_DEBUG_FS
-+static LIST_HEAD(clocks);
-+#endif
- 
- static void propagate_rate(struct clk *, int on_init);
-+#ifdef CONFIG_DEBUG_FS
-+static int clk_debugfs_reparent(struct clk *);
-+#endif
- 
- static int generic_clk_enable(struct clk *clk)
- {
-@@ -96,6 +103,10 @@ static void clk_reparent(struct clk *clk, struct pclk_info *pclk_info)
- 
- 	clk->pclk = pclk_info->pclk;
- 	spin_unlock_irqrestore(&clocks_lock, flags);
-+
-+#ifdef CONFIG_DEBUG_FS
-+	clk_debugfs_reparent(clk);
-+#endif
- }
- 
- static void do_clk_disable(struct clk *clk)
-@@ -336,6 +347,12 @@ void clk_register(struct clk_lookup *cl)
- 
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- 
-+	/* debugfs specific */
-+#ifdef CONFIG_DEBUG_FS
-+	list_add(&clk->node, &clocks);
-+	clk->cl = cl;
-+#endif
-+
- 	/* add clock to arm clockdev framework */
- 	clkdev_add(cl);
- }
-@@ -872,3 +889,102 @@ void recalc_root_clocks(void)
- 	}
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
-+
-+#ifdef CONFIG_DEBUG_FS
-+/*
-+ *	debugfs support to trace clock tree hierarchy and attributes
-+ */
-+static struct dentry *clk_debugfs_root;
-+static int clk_debugfs_register_one(struct clk *c)
-+{
-+	int err;
-+	struct dentry *d, *child;
-+	struct clk *pa = c->pclk;
-+	char s[255];
-+	char *p = s;
-+
-+	if (c) {
-+		if (c->cl->con_id)
-+			p += sprintf(p, "%s", c->cl->con_id);
-+		if (c->cl->dev_id)
-+			p += sprintf(p, "%s", c->cl->dev_id);
-+	}
-+	d = debugfs_create_dir(s, pa ? pa->dent : clk_debugfs_root);
-+	if (!d)
-+		return -ENOMEM;
-+	c->dent = d;
-+
-+	d = debugfs_create_u32("usage_count", S_IRUGO, c->dent,
-+			(u32 *)&c->usage_count);
-+	if (!d) {
-+		err = -ENOMEM;
-+		goto err_out;
-+	}
-+	d = debugfs_create_u32("rate", S_IRUGO, c->dent, (u32 *)&c->rate);
-+	if (!d) {
-+		err = -ENOMEM;
-+		goto err_out;
-+	}
-+	d = debugfs_create_x32("flags", S_IRUGO, c->dent, (u32 *)&c->flags);
-+	if (!d) {
-+		err = -ENOMEM;
-+		goto err_out;
-+	}
-+	return 0;
-+
-+err_out:
-+	d = c->dent;
-+	list_for_each_entry(child, &d->d_subdirs, d_u.d_child)
-+		debugfs_remove(child);
-+	debugfs_remove(c->dent);
-+	return err;
-+}
-+
-+static int clk_debugfs_register(struct clk *c)
-+{
-+	int err;
-+	struct clk *pa = c->pclk;
-+
-+	if (pa && !pa->dent) {
-+		err = clk_debugfs_register(pa);
-+		if (err)
-+			return err;
-+	}
-+
-+	if (!c->dent) {
-+		err = clk_debugfs_register_one(c);
-+		if (err)
-+			return err;
-+	}
-+	return 0;
-+}
-+
-+static int __init clk_debugfs_init(void)
-+{
-+	struct clk *c;
-+	struct dentry *d;
-+	int err;
-+
-+	d = debugfs_create_dir("clock", NULL);
-+	if (!d)
-+		return -ENOMEM;
-+	clk_debugfs_root = d;
-+
-+	list_for_each_entry(c, &clocks, node) {
-+		err = clk_debugfs_register(c);
-+		if (err)
-+			goto err_out;
-+	}
-+	return 0;
-+err_out:
-+	debugfs_remove_recursive(clk_debugfs_root);
-+	return err;
-+}
-+late_initcall(clk_debugfs_init);
-+
-+static int clk_debugfs_reparent(struct clk *c)
-+{
-+	debugfs_remove(c->dent);
-+	return clk_debugfs_register_one(c);
-+}
-+#endif /* CONFIG_DEBUG_FS */
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-index 5a601d8..2ae6606 100644
---- a/arch/arm/plat-spear/include/plat/clock.h
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -88,6 +88,9 @@ struct rate_config {
-  * @children: list for childrens or this clock
-  * @sibling: node for list of clocks having same parents
-  * @private_data: clock specific private data
-+ * @node: list to maintain clocks linearly
-+ * @cl: clocklook up assoicated with this clock
-+ * @dent: object for debugfs
-  */
- struct clk {
- 	unsigned int usage_count;
-@@ -109,6 +112,11 @@ struct clk {
- 	struct list_head children;
- 	struct list_head sibling;
- 	void *private_data;
-+#ifdef CONFIG_DEBUG_FS
-+	struct list_head node;
-+	struct clk_lookup *cl;
-+	struct dentry *dent;
-+#endif
- };
- 
- /* pll configuration structure */
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+new file mode 100644
+index 0000000..10b1cf5
+--- /dev/null
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -0,0 +1,60 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_EXTRA_PASS=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_PLAT_SPEAR=y
++CONFIG_ARCH_SPEAR13XX=y
++CONFIG_BOARD_SPEAR1300_EVB=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_AEABI=y
++CONFIG_BINFMT_MISC=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_INPUT_FF_MEMLESS=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_RAW_DRIVER=y
++CONFIG_MAX_RAW_DEVS=8192
++# CONFIG_HWMON is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT3_FS_SECURITY=y
++CONFIG_AUTOFS4_FS=m
++CONFIG_MSDOS_FS=m
++CONFIG_VFAT_FS=m
++CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="utf8"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=m
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++CONFIG_DEBUG_INFO=y
 -- 
 1.7.3.4
