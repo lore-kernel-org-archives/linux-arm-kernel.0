@@ -1,71 +1,145 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Jan 2011 14:08:11 +0000
-Subject: [PATCH] ARM: TWD: fix the clock calculation for TWD
-In-Reply-To: <1295505237-5735-1-git-send-email-chao.xie@marvell.com>
-References: <1295505237-5735-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <20110120140811.GE6335@n2100.arm.linux.org.uk>
+From: minchan.kim@gmail.com (Minchan Kim)
+Date: Thu, 20 Jan 2011 23:28:44 +0900
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+Message-ID: <20110120142844.GA28358@barrios-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 02:33:57PM +0800, Chao Xie wrote:
-> The original code will do count * (HZ /5). It will make the twd
-> timer rate decreased if HZ can not be excatly divided. For
-> example HZ=128.
+On Thu, Jan 20, 2011 at 06:45:39PM +0900, KyongHo Cho wrote:
+> Sparsemem allows that a bank of memory spans over several adjacent
+> sections if the start address and the end address of the bank
+> belong to different sections.
+> When gathering statictics of physical memory in mem_init() and
+> show_mem(), this possiblity was not considered.
+
+Please write down the result if we doesn't consider this patch.
+I can understand what happens but for making good description and review,
+merging easily, it would be better to write down the result without 
+the patch explicitly.
+
 > 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> This patch guarantees that simple increasing the pointer to page
+> descriptors does not exceed the boundary of a section.
+> 
+> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
 > ---
->  arch/arm/kernel/smp_twd.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+>  arch/arm/mm/init.c |   74 +++++++++++++++++++++++++++++++++++----------------
+>  1 files changed, 51 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index 35882fb..ca6405b 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -111,7 +111,8 @@ static void __cpuinit twd_calibrate_rate(void)
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 57c4c5c..6ccecbe 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -93,24 +93,38 @@ void show_mem(void)
 >  
->  		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+>  		pfn1 = bank_pfn_start(bank);
+>  		pfn2 = bank_pfn_end(bank);
+> -
+> +#ifndef CONFIG_SPARSEMEM
+>  		page = pfn_to_page(pfn1);
+>  		end  = pfn_to_page(pfn2 - 1) + 1;
+> -
+> +#else
+> +		pfn2--;
+>  		do {
+> -			total++;
+> -			if (PageReserved(page))
+> -				reserved++;
+> -			else if (PageSwapCache(page))
+> -				cached++;
+> -			else if (PageSlab(page))
+> -				slab++;
+> -			else if (!page_count(page))
+> -				free++;
+> -			else
+> -				shared += page_count(page) - 1;
+> -			page++;
+> -		} while (page < end);
+> +			page = pfn_to_page(pfn1);
+> +			if (pfn_to_section_nr(pfn1) < pfn_to_section_nr(pfn2)) {
+> +				pfn1 += PAGES_PER_SECTION;
+> +				pfn1 &= PAGE_SECTION_MASK;
+> +			} else {
+> +				pfn1 = pfn2;
+> +			}
+> +			end = pfn_to_page(pfn1) + 1;
+> +#endif
+> +			do {
+> +				total++;
+> +				if (PageReserved(page))
+> +					reserved++;
+> +				else if (PageSwapCache(page))
+> +					cached++;
+> +				else if (PageSlab(page))
+> +					slab++;
+> +				else if (!page_count(page))
+> +					free++;
+> +				else
+> +					shared += page_count(page) - 1;
+> +				page++;
+> +			} while (page < end);
+> +#ifdef CONFIG_SPARSEMEM
+> +		} while (pfn1 < pfn2);
+> +#endif
+>  	}
 >  
-> -		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
-> +		twd_timer_rate = ((unsigned long)(0xFFFFFFFFU - count))
-> +			* HZ / 5;
+>  	printk("%d pages of RAM\n", total);
+> @@ -470,17 +484,31 @@ void __init mem_init(void)
 >  
->  		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
->  			(twd_timer_rate / 100000) % 100);
+>  		pfn1 = bank_pfn_start(bank);
+>  		pfn2 = bank_pfn_end(bank);
+> -
+> +#ifndef CONFIG_SPARSEMEM
+>  		page = pfn_to_page(pfn1);
+>  		end  = pfn_to_page(pfn2 - 1) + 1;
+> -
+> +#else
+> +		pfn2--;
+>  		do {
+> -			if (PageReserved(page))
+> -				reserved_pages++;
+> -			else if (!page_count(page))
+> -				free_pages++;
+> -			page++;
+> -		} while (page < end);
+> +			page = pfn_to_page(pfn1);
+> +			if (pfn_to_section_nr(pfn1) < pfn_to_section_nr(pfn2)) {
+> +				pfn1 += PAGES_PER_SECTION;
+> +				pfn1 &= PAGE_SECTION_MASK;
+> +			} else {
+> +				pfn1 = pfn2;
+> +			}
+> +			end = pfn_to_page(pfn1) + 1;
+> +#endif
+> +			do {
+> +				if (PageReserved(page))
+> +					reserved_pages++;
+> +				else if (!page_count(page))
+> +					free_pages++;
+> +				page++;
+> +			} while (page < end);
+> +#ifdef CONFIG_SPARSEMEM
+> +		} while (pfn1 < pfn2);
+> +#endif
+>  	}
 
-I don't think this patch has any effect what so ever, so I just tried:
+Hmm.. new ifndef magic makes code readability bad.
+Couldn't we do it by simple pfn iterator not page and pfn_valid check?
 
-#define HZ      128
-unsigned long twd_timer_rate;
-void calc1(unsigned long count)
-{
-        twd_timer_rate = (0xffffffffU - count) * (HZ / 5);
-}
-void calc2(unsigned long count)
-{
-        twd_timer_rate = ((unsigned long)(0xffffffffU - count)) * (HZ / 5);
-}
+>  
+>  	/*
+> -- 
+> 1.6.2.5
+> 
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Fight unfair telecom policy in Canada: sign http://dissolvethecrtc.ca/
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 
-calc1:
-	@ args = 0, pretend = 0, frame = 0
-	@ frame_needed = 0, uses_anonymous_args = 0
-	@ link register save eliminated.
-	mvn	r0, r0
-	add	r0, r0, r0, asl #2
-	ldr	r3, .L2
-	add	r0, r0, r0, asl #2
-	@ lr needed for prologue
-	str	r0, [r3, #0]
-	mov	pc, lr
-calc2:
-	@ args = 0, pretend = 0, frame = 0
-	@ frame_needed = 0, uses_anonymous_args = 0
-	@ link register save eliminated.
-	mvn	r0, r0
-	add	r0, r0, r0, asl #2
-	ldr	r3, .L5
-	add	r0, r0, r0, asl #2
-	@ lr needed for prologue
-	str	r0, [r3, #0]
-	mov	pc, lr
-
-The code looks identical to me, so the patch appears to have no effect.
+-- 
+Kind regards,
+Minchan Kim
