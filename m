@@ -1,24 +1,33 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 20 Jan 2011 08:43:29 +0200
-Subject: [RESEND PATCH 0/3] ARM IRQ patches
-Message-ID: <1295505812-5062-1-git-send-email-balbi@ti.com>
+Date: Thu, 20 Jan 2011 08:43:30 +0200
+Subject: [RESEND PATCH 1/3] arm: Kconfig: remove duplicated GENERIC_HARDIRQS
+	entry
+In-Reply-To: <1295505812-5062-1-git-send-email-balbi@ti.com>
+References: <1295505812-5062-1-git-send-email-balbi@ti.com>
+Message-ID: <1295505812-5062-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+GENERIC_HARDIRQS is defined under kernel/irq/Kconfig,
+so it's safe to drop the duplicated entry and simply
+select HAVE_GENERIC_HARDIRQS.
 
-I'm resending these patches as they were not taken previously.
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-If you want me to wait until closer to next merge window, let
-me know and I'll re-send when we get to -rc4.
-
-Felipe Balbi (3):
-  arm: Kconfig: remove duplicated GENERIC_HARDIRQS entry
-  arm: Kconfig: remove duplicated SPARSE_IRQ entry
-  arm: Kconfig: allow OMAP to use sparse IRQ numbering
-
- arch/arm/Kconfig |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5cff165..9756f07 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -17,6 +17,7 @@ config ARM
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+ 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
+ 	select HAVE_GENERIC_DMA_COHERENT
++	select HAVE_GENERIC_HARDIRQS
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
+ 	select HAVE_KERNEL_LZMA
 -- 
 1.7.4.rc2
