@@ -1,28 +1,37 @@
 From: kauppi@papupata.org (Ari Kauppi)
-Date: Thu, 20 Jan 2011 20:57:17 +0200
-Subject: [PATCH v2 0/3] oprofile: ARM backtraces and few minors
-Message-ID: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
+Date: Thu, 20 Jan 2011 20:57:18 +0200
+Subject: [PATCH v2 1/3] oprofile: Use CONFIG_HW_PERF_EVENTS for
+	oprofile_perf_init and friends
+In-Reply-To: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
+References: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
+Message-ID: <1295549840-17809-2-git-send-email-kauppi@papupata.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset re-enables ARM backtraces with non-PMU capable CPUs.
+The implementations are flagged in Makefile with CONFIG_HW_PERF_EVENTS
+instead of CONFIG_PERF_EVENTS.
 
-In V2 I have tried to address the comments received for the V1
-patches. arch/sh/oprofile/common.c is untouched but should work
-as earlier.
+Signed-off-by: Ari Kauppi <kauppi@papupata.org>
+---
+ include/linux/oprofile.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Compile tested with arm/omap2plus_defconfig (with and without
-CONFIG_HW_PERF_EVENTS).
-
-Ari Kauppi (3):
-  oprofile: Use CONFIG_HW_PERF_EVENTS for oprofile_perf_init and
-    friends
-  oprofile: Provide stubs for oprofile_perf_{init,exit}
-  ARM: oprofile: Always allow backtraces
-
- arch/arm/oprofile/common.c |   12 ++----------
- include/linux/oprofile.h   |   13 +++++++++++--
- 2 files changed, 13 insertions(+), 12 deletions(-)
-
+diff --git a/include/linux/oprofile.h b/include/linux/oprofile.h
+index 32fb812..54c8382 100644
+--- a/include/linux/oprofile.h
++++ b/include/linux/oprofile.h
+@@ -186,10 +186,10 @@ int oprofile_add_data(struct op_entry *entry, unsigned long val);
+ int oprofile_add_data64(struct op_entry *entry, u64 val);
+ int oprofile_write_commit(struct op_entry *entry);
+ 
+-#ifdef CONFIG_PERF_EVENTS
++#ifdef CONFIG_HW_PERF_EVENTS
+ int __init oprofile_perf_init(struct oprofile_operations *ops);
+ void oprofile_perf_exit(void);
+ char *op_name_from_perf_id(void);
+-#endif /* CONFIG_PERF_EVENTS */
++#endif /* CONFIG_HW_PERF_EVENTS */
+ 
+ #endif /* OPROFILE_H */
 -- 
 1.7.4.rc2.3.g60a2e
