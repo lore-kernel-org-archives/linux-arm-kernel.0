@@ -1,174 +1,209 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 20 Jan 2011 12:56:32 +0530
-Subject: [PATCH V5 54/63] SPEAr3xx: Rework KConfig to allow all boards to be
-	compiled in
+Date: Thu, 20 Jan 2011 12:56:29 +0530
+Subject: [PATCH V5 51/63] SPEAr3xx: Make local structures static
 In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-Message-ID: <a9b5a72c2c6f5596d1fbcdd484bfc5ddec7c7b1c.1295499395.git.viresh.kumar@st.com>
+Message-ID: <81f915888d05e56a1e70b86de386c52daff0a2d7.1295499395.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ryan Mallon <ryan@bluewatersys.com>
 
-Now that all three SPEAr3xx platforms can be built into one kernel,
-rework KConfig to allow this. Move everything into one KConfig file
-while we are here.
+Several structures in arch/arm/mach-spear3xx are not marked static
+like they should be. Fix this.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/Kconfig                |   30 ++++++++++++++++--------
- arch/arm/mach-spear3xx/Kconfig300             |   17 --------------
- arch/arm/mach-spear3xx/Kconfig310             |   17 --------------
- arch/arm/mach-spear3xx/Kconfig320             |   17 --------------
- arch/arm/mach-spear3xx/include/mach/generic.h |    6 +++-
- 5 files changed, 24 insertions(+), 63 deletions(-)
- delete mode 100644 arch/arm/mach-spear3xx/Kconfig300
- delete mode 100644 arch/arm/mach-spear3xx/Kconfig310
- delete mode 100644 arch/arm/mach-spear3xx/Kconfig320
+ arch/arm/mach-spear3xx/spear300.c |    6 +++---
+ arch/arm/mach-spear3xx/spear310.c |   16 ++++++++--------
+ arch/arm/mach-spear3xx/spear320.c |   12 ++++++------
+ arch/arm/mach-spear3xx/spear3xx.c |    2 --
+ 4 files changed, 17 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/Kconfig b/arch/arm/mach-spear3xx/Kconfig
-index 20d1317..2cee6b0 100644
---- a/arch/arm/mach-spear3xx/Kconfig
-+++ b/arch/arm/mach-spear3xx/Kconfig
-@@ -4,9 +4,26 @@
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 313938f..230940f 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -114,7 +114,6 @@ struct pmx_mode caml_lcd_mode = {
+ 	.value = 0x0F,
+ };
  
- if ARCH_SPEAR3XX
+-/* devices */
+ /* Pad multiplexing for FSMC 2 NAND devices */
+ static struct pmx_mux_reg pmx_fsmc_2_mux[] = {
+ 	{
+@@ -700,7 +699,7 @@ struct platform_device sdhci_device = {
+ };
  
--choice
--	prompt "SPEAr3XX Family"
--	default MACH_SPEAR300
-+menu "SPEAr3xx Implementations"
-+config BOARD_SPEAR300_EVB
-+	bool "SPEAr300 Evaluation Board"
-+	select MACH_SPEAR300
-+	help
-+	  Supports ST SPEAr300 Evaluation Board
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_IT_PERS_S,
+ 		.enb_mask = IT_PERS_S_IRQ_MASK,
+@@ -740,7 +739,8 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras1 = {
 +
-+config BOARD_SPEAR310_EVB
-+	bool "SPEAr310 Evaluation Board"
-+	select MACH_SPEAR310
-+	help
-+	  Supports ST SPEAr310 Evaluation Board
-+
-+config BOARD_SPEAR320_EVB
-+	bool "SPEAr320 Evaluation Board"
-+	select MACH_SPEAR320
-+	help
-+	  Supports ST SPEAr320 Evaluation Board
-+
-+endmenu
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 4192ed2..848bdde 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -363,7 +363,7 @@ struct platform_device plgpio_device = {
  
- config MACH_SPEAR300
- 	bool "SPEAr300"
-@@ -23,11 +40,4 @@ config MACH_SPEAR320
- 	help
- 	  Supports ST SPEAr320 Machine
  
--endchoice
--
--# Adding SPEAr3XX machine specific configuration files
--source "arch/arm/mach-spear3xx/Kconfig300"
--source "arch/arm/mach-spear3xx/Kconfig310"
--source "arch/arm/mach-spear3xx/Kconfig320"
--
- endif #ARCH_SPEAR3XX
-diff --git a/arch/arm/mach-spear3xx/Kconfig300 b/arch/arm/mach-spear3xx/Kconfig300
-deleted file mode 100644
-index c519a05..0000000
---- a/arch/arm/mach-spear3xx/Kconfig300
-+++ /dev/null
-@@ -1,17 +0,0 @@
--#
--# SPEAr300 machine configuration file
--#
--
--if MACH_SPEAR300
--
--choice
--	prompt "SPEAr300 Boards"
--	default BOARD_SPEAR300_EVB
--
--config BOARD_SPEAR300_EVB
--	bool "SPEAr300 Evaluation Board"
--	help
--	  Supports ST SPEAr300 Evaluation Board
--endchoice
--
--endif	#MACH_SPEAR300
-diff --git a/arch/arm/mach-spear3xx/Kconfig310 b/arch/arm/mach-spear3xx/Kconfig310
-deleted file mode 100644
-index 60e7442..0000000
---- a/arch/arm/mach-spear3xx/Kconfig310
-+++ /dev/null
-@@ -1,17 +0,0 @@
--#
--# SPEAr310 machine configuration file
--#
--
--if MACH_SPEAR310
--
--choice
--	prompt "SPEAr310 Boards"
--	default BOARD_SPEAR310_EVB
--
--config BOARD_SPEAR310_EVB
--	bool "SPEAr310 Evaluation Board"
--	help
--	  Supports ST SPEAr310 Evaluation Board
--endchoice
--
--endif	#MACH_SPEAR310
-diff --git a/arch/arm/mach-spear3xx/Kconfig320 b/arch/arm/mach-spear3xx/Kconfig320
-deleted file mode 100644
-index 1c1d438..0000000
---- a/arch/arm/mach-spear3xx/Kconfig320
-+++ /dev/null
-@@ -1,17 +0,0 @@
--#
--# SPEAr320 machine configuration file
--#
--
--if MACH_SPEAR320
--
--choice
--	prompt "SPEAr320 Boards"
--	default BOARD_SPEAR320_EVB
--
--config BOARD_SPEAR320_EVB
--	bool "SPEAr320 Evaluation Board"
--	help
--	  Supports ST SPEAr320 Evaluation Board
--endchoice
--
--endif	#MACH_SPEAR320
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index d250c96..3c2b189 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -160,9 +160,10 @@ void sdhci_i2s_mem_enable(u8 mask);
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_SMII0,
+ 		.status_mask = SMII0_IRQ_MASK,
+@@ -391,7 +391,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
  
- /* Add misc structure declarations here */
- extern struct clcd_board clcd_plat_data;
-+#endif
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+@@ -403,7 +403,7 @@ struct spear_shirq shirq_ras1 = {
+ 	},
+ };
  
- /* spear310 declarations */
--#elif defined(CONFIG_MACH_SPEAR310)
-+#if defined(CONFIG_MACH_SPEAR310)
- /* Add spear310 machine device structure declarations here */
- extern struct amba_device uart1_device;
- extern struct amba_device uart2_device;
-@@ -187,9 +188,10 @@ extern struct pmx_dev spear310_pmx_tdm0;
- /* Add spear310 machine function declarations here */
- void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 		u8 pmx_dev_count);
-+#endif
+-struct shirq_dev_config shirq_ras2_config[] = {
++static struct shirq_dev_config shirq_ras2_config[] = {
+ 	{
+ 		.virq = VIRQ_UART1,
+ 		.status_mask = UART1_IRQ_MASK,
+@@ -422,7 +422,7 @@ struct shirq_dev_config shirq_ras2_config[] = {
+ 	},
+ };
  
- /* spear320 declarations */
--#elif defined(CONFIG_MACH_SPEAR320)
-+#if defined(CONFIG_MACH_SPEAR320)
- /* Add spear320 machine device structure declarations here */
- extern struct amba_device clcd_device;
- extern struct amba_device ssp_device[];
+-struct spear_shirq shirq_ras2 = {
++static struct spear_shirq shirq_ras2 = {
+ 	.irq = IRQ_GEN_RAS_2,
+ 	.dev_config = shirq_ras2_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras2_config),
+@@ -434,14 +434,14 @@ struct spear_shirq shirq_ras2 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras3_config[] = {
++static struct shirq_dev_config shirq_ras3_config[] = {
+ 	{
+ 		.virq = VIRQ_EMI,
+ 		.status_mask = EMI_IRQ_MASK,
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras3 = {
++static struct spear_shirq shirq_ras3 = {
+ 	.irq = IRQ_GEN_RAS_3,
+ 	.dev_config = shirq_ras3_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
+@@ -453,7 +453,7 @@ struct spear_shirq shirq_ras3 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_intrcomm_ras_config[] = {
++static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	{
+ 		.virq = VIRQ_TDM_HDLC,
+ 		.status_mask = TDM_HDLC_IRQ_MASK,
+@@ -466,7 +466,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_intrcomm_ras = {
++static struct spear_shirq shirq_intrcomm_ras = {
+ 	.irq = IRQ_INTRCOMM_RAS_ARM,
+ 	.dev_config = shirq_intrcomm_ras_config,
+ 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 419d968..2660d9a 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -835,7 +835,7 @@ struct platform_device sdhci_device = {
+ };
+ 
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_EMI,
+ 		.status_mask = EMI_IRQ_MASK,
+@@ -851,7 +851,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+@@ -864,7 +864,7 @@ struct spear_shirq shirq_ras1 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras3_config[] = {
++static struct shirq_dev_config shirq_ras3_config[] = {
+ 	{
+ 		.virq = VIRQ_PLGPIO,
+ 		.enb_mask = GPIO_IRQ_MASK,
+@@ -883,7 +883,7 @@ struct shirq_dev_config shirq_ras3_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras3 = {
++static struct spear_shirq shirq_ras3 = {
+ 	.irq = IRQ_GEN_RAS_3,
+ 	.dev_config = shirq_ras3_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
+@@ -897,7 +897,7 @@ struct spear_shirq shirq_ras3 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_intrcomm_ras_config[] = {
++static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	{
+ 		.virq = VIRQ_CANU,
+ 		.status_mask = CAN_U_IRQ_MASK,
+@@ -945,7 +945,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_intrcomm_ras = {
++static struct spear_shirq shirq_intrcomm_ras = {
+ 	.irq = IRQ_INTRCOMM_RAS_ARM,
+ 	.dev_config = shirq_intrcomm_ras_config,
+ 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 7fcde43..f8408f6 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -273,7 +273,6 @@ void __init spear3xx_map_io(void)
+ }
+ 
+ /* pad multiplexing support */
+-/* devices */
+ 
+ /* Pad multiplexing for firda device */
+ static struct pmx_mux_reg pmx_firda_mux[] = {
+@@ -606,7 +605,6 @@ struct pmx_dev pmx_timer_1_2 = {
+ };
+ 
+ #if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
+-/* plgpios devices */
+ /* Pad multiplexing for plgpio_0_1 devices */
+ static struct pmx_mux_reg pmx_plgpio_0_1_mux[] = {
+ 	{
 -- 
 1.7.3.4
