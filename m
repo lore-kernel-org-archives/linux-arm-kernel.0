@@ -1,51 +1,51 @@
 From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 Jan 2011 16:29:15 +0000
+Date: Thu, 20 Jan 2011 16:40:04 +0000
 Subject: Locking in the clk API
-In-Reply-To: <20110111031552.GJ3760@linux-sh.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org>
-Message-ID: <4D3862DB.5000708@fluff.org>
+In-Reply-To: <20110111101314.GA774@linux-sh.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111091607.GI12552@n2100.arm.linux.org.uk>	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111101314.GA774@linux-sh.org>
+Message-ID: <4D386564.2090601@fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/11 03:15, Paul Mundt wrote:
-> On Tue, Jan 11, 2011 at 10:16:42AM +0800, Jeremy Kerr wrote:
->> * clk_enable: may sleep
+On 11/01/11 10:13, Paul Mundt wrote:
+> On Tue, Jan 11, 2011 at 05:44:59PM +0800, Jeremy Kerr wrote:
+>> So, it sounds like the best approach is to provide an atomic clk_enable. I 
+>> agree with Sascha that the clk_enable and clk_enable_atomic polarity makes the 
+>> most sense, so how about:
 >>
->> * clk_disable: may not sleep, but it's possible to make the global
->>   clk_disable() atomic and defer the actual disable (clk->ops.disable()) to a
->>   non-atomic context.
+>> int clk_enable(struct clk *clk)
+>> {
+>> 	might_sleep();
 >>
->> * clk_get_rate: may not sleep
+>> 	[...]
+>> }
 >>
->> * clk_set_rate: may sleep
+>> int clk_enable_atomic(struct clk *clk)
+>> {
+>> 	BUG_ON(!(clk->flags & CLK_ATOMIC));
 >>
->> As we build up our requirements, we can adjust as suitable.
+>> 	[...]
+>> }
 >>
-> This looks like a complete disaster, and is also completely inconsistent
-> with how the API is being used by the vast majority of users today. You
-> have an API that can or can not sleep with no indication as to which is
-> which based off of the API naming, which is just asking for trouble.
-> 
-> As it is today, most users expect that these are all usable from atomic
-> context, and as far as I can tell the only special case you have are for
-> some crap busses with insane latencies. In this case you should simply
-> pile on _cansleep() versions of the API and make it apparent that those
-> drivers are the special cases, not the other way around.
+>> Paul: even though you mention that the atomic clocks are the usual case, I 
+>> think that this way around illustrates the atomic 'restriction' at the call 
+>> site more clearly. When the drivers don't care about the atomicity, 
+>> clk_enable() is fine. When drivers do need an atomic clock, 
+>> clk_enable_atomic() shows this requirement.
+>>
+> No, the sleeping clock case is and always will be a corner case, and I
+> have no interest in pretending otherwise. On SH we have hundreds of
+> clocks that are all usable in the atomic context and perhaps less than a
+> dozen that aren't (and even in those cases much of the PLL negotiation is
+> handled in hardware so there's never any visibility for the lock-down
+> from the software side, other architectures also have similar behaviour).
 
-The trouble is not with the drivers, is the fact there could be a clock
-tree where, say the closest to the driver is easy to control but the
-base of the tree may be a PLL which requires time to settle.
+So, how does the software deal with the clock not being available if the
+PLL powers up and takes time to lock and the software goes and tries to
+use the device? We need to ensure the clock is on and stable before the
+clk_enable() call returns.
 
-Now, there's a lot of work in the 'embedded' space where the focus is on
-the power consumption, so powering down PLLs when they are not needed is
-a good thing to have/
-
-> Having half of the API sleepable and the other not with no indication of
-> which is which simply makes it completely unusable and error prone for
-> both atomic and non-atomic contexts.
-
-I really don't like the fact that people are doing these things in
-atomic contexts, and I think we should apply some pressure to move
-the atomic caller cases to use systems where they can sleep such as
-using threaded-irq handlers (they work very nicely)
+For all the drivers I've written so far, clk_enable() and disable()
+calls are done from sleep-able contexts such as the mmc work queue
+or other such systems.
