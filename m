@@ -1,61 +1,143 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 20 Jan 2011 16:32:44 +0000
-Subject: Locking in the clk API
-In-Reply-To: <20110111045423.GP3760@linux-sh.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>	<201101111211.30172.jeremy.kerr@canonical.com>
-	<20110111045423.GP3760@linux-sh.org>
-Message-ID: <4D3863AC.4020209@fluff.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 20 Jan 2011 17:30:13 +0100
+Subject: [PATCH] ux500: add a few AB8500 regulator consumers v3
+Message-ID: <1295541013-12656-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/11 04:54, Paul Mundt wrote:
-> Hi Jeremy,
-> 
-> On Tue, Jan 11, 2011 at 12:11:29PM +0800, Jeremy Kerr wrote:
->>> This looks like a complete disaster, and is also completely inconsistent
->>> with how the API is being used by the vast majority of users today.
->>
->> I've been basing this on the mxc clock code, which acquires a mutex for all 
->> clk_enable()s. This may not be representative of the majority of clock usage.
->>
->> From a qui
+Try to make the regulators a little bit more useful by adding some
+of the most basic consumers we're going to have in the end.
 
-[snip]
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Cc: Rabin Vincent <rabin@rab.in>
+Cc: Naveen Kumar Gaddipati <naveen.gaddipati@stericsson.com>
+Cc: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+Changes v2->v3:
+- Found the proper name "vdd" for the accelerometer supply.
+- Guessing the RMI4 chip supply is named "vdd" (whatever)
+  if anyone knows the name better, hit me and I'll fix it.
+- Keeping subdevices of the MFD as supply devices for the
+  time being.
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |   62 +++++++++++++++++++++++++
+ 1 files changed, 62 insertions(+), 0 deletions(-)
 
-> One other thing to be aware of is that the clkdev code maintains its own
-> list mutex, so the addition and deletion of clkdev lookups in addition to
-> the clkdev-backed clk_get() will all be sleepable. It would however be
-> possible to back a one-shot atomic-safe clk_get() with a mutex_trylock()
-> for the common cases, but it's not entirely obvious that it would be
-> worth the complexity it would introduce.
-
-Anyone looking up clks on the fly really should think more carefully
-about this, as it is firstly possible to be an expensive operation on
-systems with multiple clocks, and secondly, in my view, stupid.
-
-> If you're going to do this work it would also be helpful to spell out the
-> locking semantics within linux/clk.h at the same time (it might even be
-> worthwhile doing this incrementally and getting all of the platforms
-> in-line before attempting to consolidate things too aggressively), as
-> it's apparent from the cases you cite there are at least a couple of
-> boards that aren't quite in line with what everyone else is doing.
-> 
-> In general we have to accept that the dynamic creation, deletion, and
-> looking up of clocks is going to be a sleepable case, and the rest will
-> likely have to be split out in to _cansleep and default atomic-safe
-> variants.
-
-I would vote for all clk lookup and reference counting code be made
-sleep-able and define it as such.
-
-> set_rate/parent and friends likewise are done atomically for some and
-> sleepable for others, so it doesn't seem like there's going to be much
-> choice other than simply splitting out the API for these cases.
-
-And we fall into another problem here, if we set_parent of a clock,
-which causes one clock to start and another to stop, then what
-happens with non-atomic clocks?
-
-if not, we're going to have drivers either keeping clocks on all
-the time, or having to put duplicated enable/set-parent/disable
-logic in all over the place.
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 533967c..875c91b 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -11,6 +11,56 @@
+ #include <linux/kernel.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/ab8500.h>
++#include "board-mop500-regulators.h"
++
++static struct regulator_consumer_supply ab8500_vaux1_consumers[] = {
++	/* External displays, connector on board 2v5 power supply */
++	REGULATOR_SUPPLY("vaux12v5", "mcde.0"),
++	/* SFH7741 proximity sensor */
++	REGULATOR_SUPPLY("vcc", "gpio-keys.0"),
++	/* BH1780GLS ambient light sensor */
++	REGULATOR_SUPPLY("vcc", "2-0029"),
++	/* lsm303dlh accelerometer */
++	REGULATOR_SUPPLY("vdd", "3-0018"),
++	/* lsm303dlh magnetometer */
++	REGULATOR_SUPPLY("vdd", "3-001e"),
++	/* Rohm BU21013 Touchscreen devices */
++	REGULATOR_SUPPLY("avdd", "3-005c"),
++	REGULATOR_SUPPLY("avdd", "3-005d"),
++	/* Synaptics RMI4 Touchscreen device */
++	REGULATOR_SUPPLY("vdd", "3-004b"),
++};
++
++static struct regulator_consumer_supply ab8500_vaux2_consumers[] = {
++	/* On-board eMMC power */
++	REGULATOR_SUPPLY("vmmc", "sdi4"),
++	/* AB8500 audio codec */
++	REGULATOR_SUPPLY("vcc-N2158", "ab8500-codec.0"),
++};
++
++static struct regulator_consumer_supply ab8500_vaux3_consumers[] = {
++	/* External MMC slot power */
++	REGULATOR_SUPPLY("vmmc", "sdi0"),
++};
++
++static struct regulator_consumer_supply ab8500_vtvout_consumers[] = {
++	/* TV-out DENC supply */
++	REGULATOR_SUPPLY("vtvout", "ab8500-denc.0"),
++	/* Internal general-purpose ADC */
++	REGULATOR_SUPPLY("vddadc", "ab8500-gpadc.0"),
++};
++
++static struct regulator_consumer_supply ab8500_vintcore_consumers[] = {
++	/* SoC core supply, no device */
++	REGULATOR_SUPPLY("v-intcore", NULL),
++	/* USB Transciever */
++	REGULATOR_SUPPLY("vddulpivio18", "ab8500-usb.0"),
++};
++
++static struct regulator_consumer_supply ab8500_vana_consumers[] = {
++	/* External displays, connector on board, 1v8 power supply */
++	REGULATOR_SUPPLY("vsmps2", "mcde.0"),
++};
+ 
+ /* AB8500 regulators */
+ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+@@ -23,6 +73,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+ 					  REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux1_consumers),
++		.consumer_supplies = ab8500_vaux1_consumers,
+ 	},
+ 	/* supplies to the on-board eMMC */
+ 	[AB8500_LDO_AUX2] = {
+@@ -33,6 +85,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+ 					  REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux2_consumers),
++		.consumer_supplies = ab8500_vaux2_consumers,
+ 	},
+ 	/* supply for VAUX3, supplies to SDcard slots */
+ 	[AB8500_LDO_AUX3] = {
+@@ -43,6 +97,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
+ 					  REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vaux3_consumers),
++		.consumer_supplies = ab8500_vaux3_consumers,
+ 	},
+ 	/* supply for tvout, gpadc, TVOUT LDO */
+ 	[AB8500_LDO_TVOUT] = {
+@@ -50,6 +106,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-TVOUT",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vtvout_consumers),
++		.consumer_supplies = ab8500_vtvout_consumers,
+ 	},
+ 	/* supply for ab8500-vaudio, VAUDIO LDO */
+ 	[AB8500_LDO_AUDIO] = {
+@@ -85,6 +143,8 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-INTCORE",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vintcore_consumers),
++		.consumer_supplies = ab8500_vintcore_consumers,
+ 	},
+ 	/* supply for U8500 CSI/DSI, VANA LDO */
+ 	[AB8500_LDO_ANA] = {
+@@ -92,5 +152,7 @@ struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 			.name = "V-CSI/DSI",
+ 			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 		},
++		.num_consumer_supplies = ARRAY_SIZE(ab8500_vana_consumers),
++		.consumer_supplies = ab8500_vana_consumers,
+ 	},
+ };
+-- 
+1.7.3.2
