@@ -1,30 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 21 Jan 2011 17:27:09 +0000
-Subject: [PATCH] ARM: SMDK6410: Fix build with WM1190 disabled and WM1192
-	enabled
-Message-ID: <1295630829-13812-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: acme@ghostprotocols.net (Arnaldo Carvalho de Melo)
+Date: Fri, 21 Jan 2011 15:40:55 -0200
+Subject: [PATCH] fix perf Annotation of Thumb code
+In-Reply-To: <4D39BF9E.3030007@ru.mvista.com>
+References: <20110121163922.GA31398@davesworkthinkpad>
+	<4D39BF9E.3030007@ru.mvista.com>
+Message-ID: <20110121174055.GD15066@ghostprotocols.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid relying on implicit inclusion of machine.h
+Em Fri, Jan 21, 2011 at 08:17:18PM +0300, Sergei Shtylyov escreveu:
+> >(For reference this corresponds to this bug
+> >https://bugs.launchpad.net/linux-linaro/+bug/677547 )
+> 
+> >        Signed-off-by: Dr. David Alan Gilbert <david.gilbert@linaro.org>
+> 
+>    Hm, I think there should be no spaces/tabs before signoff...
+> 
+> >+			sym.st_value-=1;
+> 
+>   The coding style used suggests spaces around -=.
+> 
+> WBR, Sergei
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: stable at kernel.org
----
- arch/arm/mach-s3c64xx/mach-smdk6410.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I noticed both issues and will fix them up when applying the patch.
 
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index c8a84be..e7b40ba 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -28,6 +28,7 @@
- #include <linux/delay.h>
- #include <linux/smsc911x.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/regulator/machine.h>
- 
- #ifdef CONFIG_SMDK6410_WM1190_EV1
- #include <linux/mfd/wm8350/core.h>
--- 
-1.7.2.3
+Thanks
+
+- Arnaldo
