@@ -1,51 +1,45 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 21 Jan 2011 18:08:39 +0000
-Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
-In-Reply-To: <AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
-References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
-	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
-Message-ID: <20110121180838.GO6768@pulham.picochip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Jan 2011 18:13:13 +0000
+Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
+In-Reply-To: <e95d92f6f19f474442f6e817067614e9.squirrel@www.codeaurora.org>
+References: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
+	<1295522421.4366.34.camel@m0nster>
+	<20110120130246.GA23941@n2100.arm.linux.org.uk>
+	<20110120131239.GB23941@n2100.arm.linux.org.uk>
+	<1295536094.9236.11.camel@m0nster>
+	<ff5d6c73aa50329b025bfe69297a92d9.squirrel@www.codeaurora.org>
+	<e95d92f6f19f474442f6e817067614e9.squirrel@www.codeaurora.org>
+Message-ID: <20110121181313.GA23151@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 10:46:28AM +0530, viresh kumar wrote:
-> > + ? ? ? if (ret)
-> > + ? ? ? ? ? ? ? goto out_put_clk;
-> > +
-> > + ? ? ? /*
-> > + ? ? ? ?* The timeout period of the watchdog is derived from the input clock
-> > + ? ? ? ?* frequency. ?For platforms that don't have a clk for the watchdog,
-> > + ? ? ? ?* they can specify the WDT clock rate through the clk_rate field of
-> > + ? ? ? ?* the struct dw_wdt_platform_data platform data.
-> > + ? ? ? ?*/
-> > + ? ? ? if (pdata && pdata->clk_rate > 0)
-> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = pdata->clk_rate;
-> > + ? ? ? else
-> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = clk_get_rate(dw_wdt.clk);
-> > +
+On Fri, Jan 21, 2011 at 08:57:42AM -0800, Brent DeGraaf wrote:
+> Russell,
 > 
-> I know it doesn't make sense for a platform to have support for clk framework
-> and pass rate through plat data.
-> But this code will always take pdata->rate, if it is passed.
-> Wouldn't it be better if we reverse the sequence.
+> I just had a chat with Daniel and I think I understand what you're doing
+> now.  The reason for the original change was to ensure there was a barrier
+> (dmb minimum) between population of the nc box structure and the command
+> port write to the datamover.
+
+> With the original code structure, the dsb for the cache management is
+> happening too early to benefit the nc writes.
+
+That DSB has precisely *nothing* to do with making sure that anything but
+the cache operations which the DMA API performed are complete by the time
+the API returns.
+
+> Since dsbs are costly operations, I elected to call the other api, then do
+> the cache management with its barrier after everything was populated.
 > 
-> if (clk)
->  rate = clk_get_rate(...);
-> else {
->  pdata = pdev->dev.platform_data;
->  if (pdata)
->   rate = pdata->rate;
-> }
+> Since the nc box and the command port writes are not using writel to do
+> their assignment (unless I'm missing some change here),
 
-Hmm, looking back at this again, I wonder if the correct thing to do is 
-just add a dependency in Kconfig for the driver on HAVE_CLK like 
-drivers/spi/dw_spi_mmio and ditch the ability to set the rate through 
-platform data?  The platform has to at least provide clk_get(), 
-clk_put() and clk_get_rate() at a minimum or the driver won't even 
-build...
+You must not use writel on anything but ioremapped memory.  So that's
+correct.
 
-This would make things a lot simpler and it's not as if this is going to 
-break anything as there aren't currently any users of the driver (and 
-the one that will be does support the clk framework).
+Writing to the device registers though should be using a memory accessor
+like writel.  That contains the necessary barrier to ensure that any
+previous writes to memory will be ordered with respect to device writes.
 
-Jamie
+As you seem to already be using writel, you have all the necessary barriers
+in place provided by architecture code.
