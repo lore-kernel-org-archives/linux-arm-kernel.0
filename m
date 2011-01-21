@@ -1,34 +1,59 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 21 Jan 2011 14:47:05 -0800
-Subject: [PATCH] ARM: msm: gpio-v2 irq_data conversion.
-In-Reply-To: <20110121111110.GM13235@n2100.arm.linux.org.uk> (Russell King's
-	message of "Fri, 21 Jan 2011 11:11:10 +0000")
-References: <20110121110219.GD23596@mail.wantstofly.org>
-	<20110121111110.GM13235@n2100.arm.linux.org.uk>
-Message-ID: <8yak4hxoowm.fsf@huya.qualcomm.com>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Fri, 21 Jan 2011 15:02:01 -0800
+Subject: [PATCH] ARM: mm: enforce pageblock alignment when freeing
+	memmap entries at init
+In-Reply-To: <1295567231-2384-1-git-send-email-dima@android.com>
+References: <1295567231-2384-1-git-send-email-dima@android.com>
+Message-ID: <20110121230201.GA13669@labbmf-linux.quicinc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21 2011, Russell King - ARM Linux wrote:
+On 20 Jan 11 15:47, Dima Zavin wrote:
+> On some machines, the nodes do not always start on pageblock
+> boundaries. In these cases it is possible for free_unused_memmap
+> to free mappings for pages inside a pageblock with otherwise
+> valid pages. This presents problems for page migration since it
+> operates on whole pageblocks at a time.
+> 
+> Round down bank_start to pageblock boundary so that whole
+> pageblocks always have valid mappings.
+> 
+> Signed-off-by: Dima Zavin <dima@android.com>
+> ---
+>  arch/arm/mm/init.c |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 5164069..98de5d8 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -418,7 +418,11 @@ static void __init free_unused_memmap(struct meminfo *mi)
+>  	for_each_bank(i, mi) {
+>  		struct membank *bank = &mi->bank[i];
+>  
+> -		bank_start = bank_pfn_start(bank);
+> +		/* Round bank_start down to the start of a pageblock so that
+> +		 * all pages in a pageblock always have a mapping.
+> +		 */
+> +		bank_start = round_down(bank_pfn_start(bank),
+> +					MAX_ORDER_NR_PAGES);
+>  
+>  		/*
+>  		 * If we had a previous bank, and there is a space
+> -- 
+> 1.7.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-> On Fri, Jan 21, 2011 at 12:02:19PM +0100, Lennert Buytenhek wrote:
->> Convert gpio-v2.c to the new irq_data methods.  This was overlooked
->> in the first pass as there is currently no defconfig in the tree that
->> builds this file.
->> 
->> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
->
-> Rather than merging this into the MSM git tree, please let me have your
-> acks so that it can be packaged up with the addition of adding
-> 	select GENERIC_HARDIRQS_NO_DEPRECATED
-> to the ARM architecture (otherwise MSM will break.)
+I tested this (booted, ran various commands for about 10 minutes)
+on a MSM8x50 with the standard memory map and on a MSM8x50 given
+a synthetic memory map which would be affected by this patch.
 
-Acked-by: David Brown <davidb@codeaurora.org>
-
-I'm also working on getting some defconfigs for these targets into
-linux-next.
-
-David
+Tested-by: Larry Bassel <lbassel@codeaurora.org>
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
