@@ -1,22 +1,25 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 21 Jan 2011 12:24:58 +0000
-Subject: [PATCH V5 resend 39/63] SPEAr CPU freq: Adding support for CPU
-	Freq framework
-In-Reply-To: <01612f9ae6c475b861c2f03cc24a4cb4639e01d1.1295581815.git.viresh.kumar@st.com>
-References: <cover.1295581815.git.viresh.kumar@st.com>
-	<01612f9ae6c475b861c2f03cc24a4cb4639e01d1.1295581815.git.viresh.kumar@st.com>
-Message-ID: <20110121122458.GH6768@pulham.picochip.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 21 Jan 2011 15:26:07 +0300
+Subject: i.MX28 fixes
+In-Reply-To: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4D397B5F.4000602@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 09:23:15AM +0530, Viresh Kumar wrote:
-> From: Deepak Sikri <deepak.sikri@st.com>
-> 
-> Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Hello.
 
-Looks nice to me!
+On 21-01-2011 13:57, Sascha Hauer wrote:
 
-Jamie
+> The following patches fix some issues with the i.MX28 clock support.
+
+> The following changes since commit c56eb8fb6dccb83d9fe62fd4dc00c834de9bc470:
+
+>    Linux 2.6.38-rc1 (2011-01-18 15:14:02 -0800)
+
+> are available in the git repository at:
+>    none ..BRANCH.NOT.VERIFIED..
+
+    Not pushed?
+
+WBR, Sergei
