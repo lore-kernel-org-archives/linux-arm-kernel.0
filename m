@@ -1,47 +1,67 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Fri, 21 Jan 2011 21:13:06 +0530
-Subject: [PATCH v2] davinci: da8xx/omap-l1x: add platform device for
-	davinci-pcm-audio
-Message-ID: <1295624586-24636-1-git-send-email-sudhakar.raj@ti.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 21 Jan 2011 07:46:41 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295576730.4096.24.camel@Joe-Laptop>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+	<1295576730.4096.24.camel@Joe-Laptop>
+Message-ID: <1295624801.19880.13.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After the multi-component commit f0fba2ad (ASoC: multi-component - ASoC
-Multi-Component Support) for ASoC, we need to register the platform
-device for davinci-pcm-audio.
+On Thu, 2011-01-20 at 18:25 -0800, Joe Perches wrote:
+> On Thu, 2011-01-20 at 17:58 -0800, Daniel Walker wrote:
+> > On Thu, 2011-01-20 at 17:41 -0800, Joe Perches wrote:
+> > > On Thu, 2011-01-20 at 16:55 -0800, Daniel Walker wrote:
+> > > > On Thu, 2011-01-20 at 16:42 -0800, Dima Zavin wrote:
+> > > > > You are not the author of any of these patches. Where are the author
+> > > > > attributions for the team that actually wrote this code?
+> > > > In the commit text.. The author field is used to denote who authored the
+> > > > commit, which in this case is me.
+> > > You have that wrong.
+> > > Author and Committer are different git fields.
+> > > http://www.kernel.org/pub/software/scm/git/docs/user-manual.html
+> > > 
+> > >       * an author: The name of the person responsible for this change,
+> > >         together with its date.
+> > >       * a committer: The name of the person who actually created the
+> > >         commit, with the date it was done. This may be different from
+> > >         the author, for example, if the author was someone who wrote a
+> > >         patch and emailed it to the person who used it to create the
+> > >         commit.
+> > I'm not even sure how to make these different, but in this case it
+> > doesn't matter because the "committer" as you defined it above is more
+> > than one person ..
+> 
+> Not really, no.
+> 
+> The authors may be different, but the first git
+> committer of the patch is different.
+> 
+> The committer is the person that does a git commit
+> either directly with git commit or git am.
+> 
+> If a git tree is pulled by someone else, the initial
+> committer name remains on the commit.
+> 
+> You should keep the original patch author names and
+> add your own "Signed-off-by:" and not claim authorship
+> of the patches themselves.
 
-This patch and patch at [1] are required for audio to work on
-DA850/OMAP-L138.
+This isn't what's happening tho. In maintainer land if someone forwards
+you a patch then you leave the original author on the patch. They wrote
+the patch and your just forwarding it on up the ladder. This isn't the
+case with these patches.. I crafted each of the commit I have authorship
+on, no one forwarded those commits to me. I'm not taking authorship
+credit for any thing I didn't create, although I an giving credit to the
+place which gave me the raw material which was Google. From my
+experience this is how it's done in Linux ..
 
-[1] https://patchwork.kernel.org/patch/495211/
+Daniel
 
-Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
----
-Since v1, removed davinci_init_pcm() function and called
-platform_device_register() from within da8xx_register_mcasp().
-
- arch/arm/mach-davinci/devices-da8xx.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 9eec630..beda8a4 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -480,8 +480,15 @@ static struct platform_device da850_mcasp_device = {
- 	.resource	= da850_mcasp_resources,
- };
- 
-+struct platform_device davinci_pcm_device = {
-+	.name	= "davinci-pcm-audio",
-+	.id	= -1,
-+};
-+
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
- {
-+	platform_device_register(&davinci_pcm_device);
-+
- 	/* DA830/OMAP-L137 has 3 instances of McASP */
- 	if (cpu_is_davinci_da830() && id == 1) {
- 		da830_mcasp1_device.dev.platform_data = pdata;
 -- 
-1.7.1
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
