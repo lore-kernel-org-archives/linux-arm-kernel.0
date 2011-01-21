@@ -1,89 +1,32 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 21 Jan 2011 14:28:15 -0800
-Subject: Locking in the clk API
-In-Reply-To: <20110121220238.GE23151@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
-	<20110120185617.GI6335@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
-	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
-	<4D3907BD.4040900@codeaurora.org>
-	<AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>
-	<alpine.LFD.2.00.1101211618170.8580@xanadu.home>
-	<20110121220238.GE23151@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimT+vfg9p4GSnn1jGW9r_gVom7xEUzMVJDscPg2@mail.gmail.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Fri, 21 Jan 2011 14:29:16 -0800
+Subject: [PATCH] ARM: smp: Fix Unknown IPI message 0x1
+In-Reply-To: <20110117123409.GD20615@n2100.arm.linux.org.uk>
+References: <1295265395-28485-1-git-send-email-santosh.shilimkar@ti.com>	<20110117120104.GB20615@n2100.arm.linux.org.uk>	<72ca984700f139fea98558783dde38f3@mail.gmail.com>	<20110117121951.GC20615@n2100.arm.linux.org.uk>	<1295267193.21557.14.camel@e102109-lin.cambridge.arm.com>	<d93218062aa1e6948453d1ddd5b9e2b0@mail.gmail.com>
+	<20110117123409.GD20615@n2100.arm.linux.org.uk>
+Message-ID: <4D3A08BC.8010303@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 2:02 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 21, 2011 at 04:53:44PM -0500, Nicolas Pitre wrote:
->> So I think that the API must be augmented with more methods, such as:
->>
->> clk_slow_enable():
->> ? - may sleep
->> ? - may be a no-op if the clk_fast_enable() is supported
->>
->> clk_fast_enable():
->> ? - may not sleep, used in atomic context
->> ? - may be a no-op if controlling the clock takes time, in which case
->> ? ? clk_slow_enable() must have set the clock up entirely
->>
->> ... and similar for clk_slow_disable() and clk_fast_disable().
+Russell King - ARM Linux wrote:
+> On Mon, Jan 17, 2011 at 06:01:31PM +0530, Santosh Shilimkar wrote:
+>   
+>> Same for OMAP4. Any SGI will do.
+>>     
 >
-> Isn't this along the same lines as my clk_prepare() vs clk_enable()
-> suggestion?
+> Ok, so we can convert OMAP, Realview, Versatile Express to use SGI0...
+> that's a start!
 >
-> I suggested that clk_prepare() be callable only from non-atomic contexts,
-> and do whatever's required to ensure that the clock is available. ?That
-> may end up enabling the clock as a result.
->
-> clk_enable() callable from atomic contexts, and turns the clock on if
-> the hardware supports such an operation.
->
-> So, if you have something like:
->
-> Xtal--->PLL--->Routing/Masking--->Device
->
-> clk = clk_get() returns the clock for the device.
->
-> clk_prepare(clk) would walk up the clock tree, selecting the routing and
-> preparing each clock. ?Clocks prior to _and_ including the PLL would need
-> to be enabled.
->
-> clk_enable(clk) would walk up the tree if the clock isn't already enabled,
-> calling clk_enable() on the parent clock. ?As we require prepared clocks
-> to already be enabled, this automatically stops at the PLL.
->
-> To encourage correct usage, we just need to make sure that clk_prepare()
-> has a might_sleep() thing, and clk_enable() throws a fit if it's used
-> on a clk without prepare being used first. ?The second point is not easy
-> to do in a foolproof manner though, but doing _something_ is better than
-> nothing.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>   
 
-I like this proposal, and I prefer the clk_prepare naming over
-clk_slow_enable - too many people would call clk_slow_enable instead
-of, and not as well as, clk_fast_enable.
+SGI0 works fine for msm as well.
 
-On Tegra, I currently use the ugly conditional mutex or spinlock
-method to deal with voltage scaling based on clock frequency.  Clocks
-that have a voltage dependency, or depend on a clock that has a
-voltage dependency, are non-atomic, everything else is atomic.  PLLs
-are atomic because they lock very fast (300 uS or 1ms) and are shared
-by so many clocks that they realistically don't get turned off very
-often, and if I made them non-atomic, all clocks would be non-atomic.
+Jeff
 
-If clk_prepare, clk_unprepare, and clk_set_rate were only callable in
-sleepable contexts, I could make PLLs and voltage-dependent clocks
-sleepable, but allow atomic clocks to depend on them.  Calling
-clk_prepare on a voltage-dependent clock would bump the voltage up if
-necessary, but not enable the clock.  Drivers that don't need atomic
-clocks can call clk_prepare and clk_enable when they want the clock
-on, keeping the same power savings as my current implementation.
-
-Converting all the existing clk API users could be hard, but with a
-little trickery backwards compatibility with the previous API could
-also be maintained.  clk_enable could call clk_prepare if it hasn't
-been called, with a WARN_ON_ONCE to find drivers that need to be
-fixed, and the last clk_disable could call clk_unprepare.  For systems
-where all clocks are atomic, everything would continue to work.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
