@@ -1,31 +1,35 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 12:02:18 +0000
-Subject: [PATCH] ARM: aaec2000: remove support for mach-aaec2000
-In-Reply-To: <20110121120006.GE6768@pulham.picochip.com>
-References: <1294430422-939-1-git-send-email-jamie@jamieiles.com>
-	<20110121111355.GN13235@n2100.arm.linux.org.uk>
-	<20110121120006.GE6768@pulham.picochip.com>
-Message-ID: <20110121120218.GP13235@n2100.arm.linux.org.uk>
+Date: Fri, 21 Jan 2011 12:14:21 +0000
+Subject: CLCD support in phy3250
+Message-ID: <20110121121421.GQ13235@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 12:00:06PM +0000, Jamie Iles wrote:
-> On Fri, Jan 21, 2011 at 11:13:55AM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 07, 2011 at 08:00:22PM +0000, Jamie Iles wrote:
-> > > mach-aaec2000 is no longer actively maintained and is only receiving
-> > > fixups to remain building with other kernel updates.
-> > > 
-> > > Cc: Bellido Nicolas <ml@acolin.be>
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> > 
-> > Okay, could you send the two patches to the patch system and I'll add it
-> > to a 'remove' branch (which now has lh7a40x in as well) for 2.6.39.
-> 
-> Dmitry has taken the keyboard driver into his tree so I've just 
-> submitted the mach removal one to the patch system.
+While looking at clcd support, I spotted this:
 
-I suggest basing it against mainline rather than my devel branch,
-otherwise it'll have to sit on top of the p2v code (and I'd rather
-not have it depend on other stuff.)  I'll modify the p2v stuff to
-avoid the conflicts.
+        .tim2           = (TIM2_IVS | TIM2_IHS),
+
+Note that we already do this:
+
+        val = fb->panel->tim2;
+        val |= fb->fb.var.sync & FB_SYNC_HOR_HIGH_ACT  ? 0 : TIM2_IHS;
+        val |= fb->fb.var.sync & FB_SYNC_VERT_HIGH_ACT ? 0 : TIM2_IVS;
+
+so if your .mode.sync member is unset, you'll have IHS and IVS already
+set.  So this can be removed.  Please can you submit a patch for this?
+Thanks.
+
+
+Also, I spotted this:
+
+        .cntl           = (CNTL_BGR | CNTL_LCDTFT | CNTL_LCDVCOMP(1) |
+                                CNTL_LCDBPP16_565),
+
+This doesn't switch to 565 mode - this is decided by other parts of the
+code.  As we or in the mode, this could cause problems.  If you ensure
+that .bpp is 16, and you have a PL111, it will default to 565 mode.
+
+Having looked at this, I think we need a capability field to mark what
+depths and layouts are supported, both from the platform and from the
+panel information, as you don't want to permit RGB5551 if your panel can
+only do BGR565.  I'll see about adding that.
