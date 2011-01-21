@@ -1,53 +1,41 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 21 Jan 2011 09:56:09 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <20110121094827.41818a55@jbarnes-desktop>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-	<1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-Message-ID: <1295632569.19880.20.camel@m0nster>
+From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
+Date: Fri, 21 Jan 2011 18:56:28 +0100
+Subject: [Openpxa-users] Linux udelay() is way off
+In-Reply-To: <4D3935D2.4050307@codeaurora.org>
+References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>
+	<201101201800.04289.marek.vasut@gmail.com>
+	<20110120175551.GG6335@n2100.arm.linux.org.uk>
+	<AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
+	<4D3935D2.4050307@codeaurora.org>
+Message-ID: <AANLkTinOjqgxf7zEhYM35iTrv9Eo_rq8feYaXrqjhAiR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-01-21 at 09:48 -0800, Jesse Barnes wrote:
-> On Fri, 21 Jan 2011 07:46:41 -0800
-> Daniel Walker <dwalker@codeaurora.org> wrote:
-> > This isn't what's happening tho. In maintainer land if someone forwards
-> > you a patch then you leave the original author on the patch. They wrote
-> > the patch and your just forwarding it on up the ladder. This isn't the
-> > case with these patches.. I crafted each of the commit I have authorship
-> > on, no one forwarded those commits to me. I'm not taking authorship
-> > credit for any thing I didn't create, although I an giving credit to the
-> > place which gave me the raw material which was Google. From my
-> > experience this is how it's done in Linux ..
-> 
-> I don't know why you're even trying to defend this, just admit you were
-> wrong and move on.
-> 
-> Trying to claim the author field for these patches for yourself is both
-> misleading and vain.  You did not write the code and are therefore not
-> the author, trying to conflate the author and commit fields in this way
-> is so misguided I thought you must be trolling when I first saw this
-> thread.
-> 
-> This is not "how it's done in Linux" at all.  In this case you're
-> trying to act like a maintainer by collecting patches and forwarding
-> them upstream, so you need to preserve authorship and the s-o-b chain.
-> If you want to take responsibility for the code going forward, great,
-> but don't pollute the logs with bogus author fields that imply you
-> wrote the stuff in the first place.
+2011/1/21 Saravana Kannan <skannan@codeaurora.org>:
 
-I did create these commits. Do you think someone else created the
-commits? There is no commit forwarding happening here.
+[snip]
 
-Daniel
+> The most likely scenario seems to be that the CPU freq driver that's
+> specific to your CPU is not setting the CPU to the frequency it thinks it's
+> setting it to. It might THINK it's running at 624 MHz, but it might really
+> be at 310 MHz or 100 MHz or something. Since, if the frequency at which the
+> calibration was done or if the new frequencies are not what really what they
+> are reported to be, then the math will go wrong and you would see these kind
+> of issues.
 
+Yes, I'm thinking the same.
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+> If you can somehow measure your CPU freq with an oscilloscope, measure these
+> two:
+> - Just before calibrate_delay is run for the first time.
+> - When you are seeing the udelay to be wrong.
+>
+> One of these two won't match what you think the CPU is running at.
+
+The processor has an external 13 MHz crystal and the CPU frequency is
+set by internal multipliers. I don't think the actual CPU clock (after
+multipliers) is available on any of the chip pins. But thanks for the
+tip.
+
+Best regards,
+Bj?rn Forsman
