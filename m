@@ -1,33 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Jan 2011 11:27:36 -0000
-Subject: [PATCH v2 3/3] ARM: oprofile: Always allow backtraces
-In-Reply-To: <1295549840-17809-4-git-send-email-kauppi@papupata.org>
-References: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
-	<1295549840-17809-4-git-send-email-kauppi@papupata.org>
-Message-ID: <001601cbb95e$3479e820$9d6db860$@deacon@arm.com>
+From: daiane.angolini@freescale.com (Daiane Angolini)
+Date: Fri, 21 Jan 2011 09:37:32 -0200
+Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
+In-Reply-To: <20101209190950.GA17441@pengutronix.de>
+References: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
+	<20101209184242.GY17441@pengutronix.de>
+	<4D012512.4040709@freescale.com>
+	<20101209190950.GA17441@pengutronix.de>
+Message-ID: <4D396FFC.6050303@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ari,
+Hi,
 
-> Always allow backtrace when using oprofile on ARM, even if a PMU
-> isn't present. Implemented by removing code and using stubs
-> provided by <linux/oprofile.h>.
-> 
-> Restores functionality originally introduced in commit
-> 1b7b56982fdcd9d85effd76f3928cf5d6eb26155 ("oprofile: Always allow
-> backtraces on ARM") by Richard Purdie.
-> 
-> Signed-off-by: Ari Kauppi <kauppi@papupata.org>
-> ---
->  arch/arm/oprofile/common.c |   12 ++----------
->  1 files changed, 2 insertions(+), 10 deletions(-)
+Is this patch ok?
 
-[...]
+Daiane
 
-Providing Robert is happy with the associated changes to
-linux/oprofile.h then this patch looks good to me.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+On 12/09/2010 05:09 PM, Uwe Kleine-K?nig wrote:
+> Hallo Daiane,
+>
+> On Thu, Dec 09, 2010 at 04:50:58PM -0200, Daiane Angolini wrote:
+>> On 12/09/2010 04:42 PM, Uwe Kleine-K?nig wrote:
+>>> On Thu, Dec 09, 2010 at 03:50:49PM -0200, Daiane Angolini wrote:
+>>>> Signed-off-by: Daiane Angolini<daiane.angolini@freescale.com>
+>>> This is a duplicate of
+>>>
+>>> http://mid.gmane.org/1291749285-11406-2-git-send-email-fabio.estevam at freescale.com
+>> My patch is for iMX51_3DS board, and Fabio's patch in the link you sent
+>> me is for iMX27_3DS
+> You're right, I mixed up the series.  There is another one (
+> http://mid.gmane.org/1291660714-16396-1-git-send-email-fabio.estevam at freescale.com
+> ) for mx51.  I just searched in my mail folder, found 3ds and thought
+> this was the mx51 series.
+>
+> Sorry and Ack for your patch
+> Uwe
+>
