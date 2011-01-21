@@ -1,274 +1,34 @@
 From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 21 Jan 2011 10:56:17 +0530
-Subject: [PATCH 3/4] mach-ux500: add ST-UIB platform data
-In-Reply-To: <1295587578-14461-1-git-send-email-sundar.iyer@stericsson.com>
-References: <1295587578-14461-1-git-send-email-sundar.iyer@stericsson.com>
-Message-ID: <1295587578-14461-4-git-send-email-sundar.iyer@stericsson.com>
+Date: Fri, 21 Jan 2011 10:56:14 +0530
+Subject: [PATCH 0/4] mach-ux500: add input devices
+Message-ID: <1295587578-14461-1-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ST-UIB contains a matrix keypad interfaced with the
-STMPE1601 port expander and a ROHM BU2101 touch panel.
+Introduce dynamic User Interface Board (UIB) detection for the
+U8500 platform. Add platform data for the different UIBs supported.
 
-Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
----
- arch/arm/mach-ux500/board-mop500-stuib.c |  185 +++++++++++++++++++++++++++++-
- arch/arm/mach-ux500/board-mop500.h       |    1 +
- arch/arm/mach-ux500/include/mach/gpio.h  |   29 +++++
- 3 files changed, 213 insertions(+), 2 deletions(-)
+Also fix a ux500 build issue.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-stuib.c b/arch/arm/mach-ux500/board-mop500-stuib.c
-index d1a85c5..74fbbbe 100644
---- a/arch/arm/mach-ux500/board-mop500-stuib.c
-+++ b/arch/arm/mach-ux500/board-mop500-stuib.c
-@@ -3,13 +3,194 @@
-  *
-  * License terms: GNU General Public License (GPL), version 2
-  */
--
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/mfd/stmpe.h>
-+#include <linux/input/bu21013.h>
-+#include <linux/gpio.h>
-+#include <linux/interrupt.h>
-+#include <linux/i2c.h>
-+#include <linux/input/matrix_keypad.h>
- 
- #include "board-mop500.h"
- 
--void __init mop500_stuib_init(void)
-+/* STMPE/SKE keypad use this key layout */
-+static const unsigned int mop500_keymap[] = {
-+	KEY(2, 5, KEY_END),
-+	KEY(4, 1, KEY_POWER),
-+	KEY(3, 5, KEY_VOLUMEDOWN),
-+	KEY(1, 3, KEY_3),
-+	KEY(5, 2, KEY_RIGHT),
-+	KEY(5, 0, KEY_9),
-+
-+	KEY(0, 5, KEY_MENU),
-+	KEY(7, 6, KEY_ENTER),
-+	KEY(4, 5, KEY_0),
-+	KEY(6, 7, KEY_2),
-+	KEY(3, 4, KEY_UP),
-+	KEY(3, 3, KEY_DOWN),
-+
-+	KEY(6, 4, KEY_SEND),
-+	KEY(6, 2, KEY_BACK),
-+	KEY(4, 2, KEY_VOLUMEUP),
-+	KEY(5, 5, KEY_1),
-+	KEY(4, 3, KEY_LEFT),
-+	KEY(3, 2, KEY_7),
-+};
-+
-+static const struct matrix_keymap_data mop500_keymap_data = {
-+	.keymap         = mop500_keymap,
-+	.keymap_size    = ARRAY_SIZE(mop500_keymap),
-+};
-+/*
-+ * STMPE1601
-+ */
-+static struct stmpe_keypad_platform_data stmpe1601_keypad_data = {
-+	.debounce_ms    = 64,
-+	.scan_count     = 8,
-+	.no_autorepeat  = true,
-+	.keymap_data    = &mop500_keymap_data,
-+};
-+
-+static struct stmpe_platform_data stmpe1601_data = {
-+	.id             = 1,
-+	.blocks         = STMPE_BLOCK_KEYPAD,
-+	.irq_trigger    = IRQF_TRIGGER_FALLING,
-+	.irq_base       = MOP500_STMPE1601_IRQ(0),
-+	.keypad         = &stmpe1601_keypad_data,
-+	.autosleep      = true,
-+	.autosleep_timeout = 1024,
-+};
-+
-+static struct i2c_board_info __initdata mop500_i2c0_devices_stuib[] = {
-+	{
-+		I2C_BOARD_INFO("stmpe1601", 0x40),
-+		.irq = NOMADIK_GPIO_TO_IRQ(218),
-+		.platform_data = &stmpe1601_data,
-+		.flags = I2C_CLIENT_WAKE,
-+	},
-+};
-+
-+/*
-+ * BU21013 ROHM touchscreen interface on the STUIBs
-+ */
-+
-+/* tracks number of bu21013 devices being enabled */
-+static int bu21013_devices;
-+
-+#define TOUCH_GPIO_PIN  84
-+
-+#define TOUCH_XMAX	384
-+#define TOUCH_YMAX	704
-+
-+#define PRCMU_CLOCK_OCR		0x1CC
-+#define TSC_EXT_CLOCK_9_6MHZ	0x840000
-+
-+/**
-+ * bu21013_gpio_board_init : configures the touch panel.
-+ * @reset_pin: reset pin number
-+ * This function can be used to configures
-+ * the voltage and reset the touch panel controller.
-+ */
-+static int bu21013_gpio_board_init(int reset_pin)
-+{
-+	int retval = 0;
-+
-+	bu21013_devices++;
-+	if (bu21013_devices == 1) {
-+		retval = gpio_request(reset_pin, "touchp_reset");
-+		if (retval) {
-+			printk(KERN_ERR "Unable to request gpio reset_pin");
-+			return retval;
-+		}
-+		retval = gpio_direction_output(reset_pin, 1);
-+		if (retval < 0) {
-+			printk(KERN_ERR "%s: gpio direction failed\n",
-+					__func__);
-+			return retval;
-+		}
-+	}
-+
-+	return retval;
-+}
-+
-+/**
-+ * bu21013_gpio_board_exit : deconfigures the touch panel controller
-+ * @reset_pin: reset pin number
-+ * This function can be used to deconfigures the chip selection
-+ * for touch panel controller.
-+ */
-+static int bu21013_gpio_board_exit(int reset_pin)
- {
-+	int retval = 0;
-+
-+	if (bu21013_devices == 1) {
-+		retval = gpio_direction_output(reset_pin, 0);
-+		if (retval < 0) {
-+			printk(KERN_ERR "%s: gpio direction failed\n",
-+					__func__);
-+			return retval;
-+		}
-+		gpio_set_value(reset_pin, 0);
-+	}
-+	bu21013_devices--;
-+
-+	return retval;
- }
- 
-+/**
-+ * bu21013_read_pin_val : get the interrupt pin value
-+ * This function can be used to get the interrupt pin value for touch panel
-+ * controller.
-+ */
-+static int bu21013_read_pin_val(void)
-+{
-+	return gpio_get_value(TOUCH_GPIO_PIN);
-+}
-+
-+static struct bu21013_platform_device tsc_plat_device = {
-+	.cs_en = bu21013_gpio_board_init,
-+	.cs_dis = bu21013_gpio_board_exit,
-+	.irq_read_val = bu21013_read_pin_val,
-+	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
-+	.cs_pin = GPIO_BU21013_CS,
-+	.touch_x_max = TOUCH_XMAX,
-+	.touch_y_max = TOUCH_YMAX,
-+	.ext_clk = false,
-+	.x_flip = false,
-+	.y_flip = true,
-+};
-+
-+static struct bu21013_platform_device tsc_plat2_device = {
-+	.cs_en = bu21013_gpio_board_init,
-+	.cs_dis = bu21013_gpio_board_exit,
-+	.irq_read_val = bu21013_read_pin_val,
-+	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
-+	.cs_pin = GPIO_BU21013_CS,
-+	.touch_x_max = TOUCH_XMAX,
-+	.touch_y_max = TOUCH_YMAX,
-+	.ext_clk = false,
-+	.x_flip = false,
-+	.y_flip = true,
-+};
-+
-+static struct i2c_board_info __initdata u8500_i2c3_devices_stuib[] = {
-+	{
-+		I2C_BOARD_INFO("bu21013_tp", 0x5C),
-+		.platform_data = &tsc_plat_device,
-+	},
-+	{
-+		I2C_BOARD_INFO("bu21013_tp", 0x5D),
-+		.platform_data = &tsc_plat2_device,
-+	},
-+
-+};
-+
-+void __init mop500_stuib_init(void)
-+{
-+	mop500_uib_i2c_add(0, mop500_i2c0_devices_stuib,
-+			ARRAY_SIZE(mop500_i2c0_devices_stuib));
-+
-+	mop500_uib_i2c_add(3, u8500_i2c3_devices_stuib,
-+			ARRAY_SIZE(u8500_i2c3_devices_stuib));
-+}
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index cedf8eb..80821c6 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -13,6 +13,7 @@
- #define GPIO_SDMMC_CD			MOP500_EGPIO(3)
- #define GPIO_SDMMC_EN			MOP500_EGPIO(17)
- #define GPIO_SDMMC_1V8_3V_SEL		MOP500_EGPIO(18)
-+#define GPIO_BU21013_CS			MOP500_EGPIO(13)
- 
- struct i2c_board_info;
- 
-diff --git a/arch/arm/mach-ux500/include/mach/gpio.h b/arch/arm/mach-ux500/include/mach/gpio.h
-index 3c4cd31..f8c6ad2 100644
---- a/arch/arm/mach-ux500/include/mach/gpio.h
-+++ b/arch/arm/mach-ux500/include/mach/gpio.h
-@@ -7,6 +7,35 @@
-  */
- #define ARCH_NR_GPIOS	350
- 
-+#include <mach/irqs.h>
-+
- #include <plat/gpio.h>
- 
-+enum {
-+	EGPIO_PIN_0 = NOMADIK_NR_GPIO,
-+	EGPIO_PIN_1,
-+	EGPIO_PIN_2,
-+	EGPIO_PIN_3,
-+	EGPIO_PIN_4,
-+	EGPIO_PIN_5,
-+	EGPIO_PIN_6,
-+	EGPIO_PIN_7,
-+	EGPIO_PIN_8,
-+	EGPIO_PIN_9,
-+	EGPIO_PIN_10,
-+	EGPIO_PIN_11,
-+	EGPIO_PIN_12,
-+	EGPIO_PIN_13,
-+	EGPIO_PIN_14,
-+	EGPIO_PIN_15,
-+	EGPIO_PIN_16,
-+	EGPIO_PIN_17,
-+	EGPIO_PIN_18,
-+	EGPIO_PIN_19,
-+	EGPIO_PIN_20,
-+	EGPIO_PIN_21,
-+	EGPIO_PIN_22,
-+	EGPIO_PIN_23,
-+};
-+
- #endif /* __ASM_ARCH_GPIO_H */
+Rabin Vincent (1):
+  mach-ux500: dynamic UIB (user interface boards) detection
+
+Sundar Iyer (3):
+  mach-ux500: fix ux500 build error
+  mach-ux500: add ST-UIB platform data
+  mach-ux500: add U8500 UIB platform data
+
+ arch/arm/mach-ux500/Makefile                |    7 +-
+ arch/arm/mach-ux500/board-mop500-stuib.c    |  196 +++++++++++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500-u8500uib.c |  112 +++++++++++++++
+ arch/arm/mach-ux500/board-mop500-uib.c      |  136 +++++++++++++++++++
+ arch/arm/mach-ux500/board-mop500.c          |    5 +-
+ arch/arm/mach-ux500/board-mop500.h          |    9 +-
+ arch/arm/mach-ux500/include/mach/gpio.h     |   29 ++++
+ 7 files changed, 488 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/board-mop500-stuib.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500-u8500uib.c
+ create mode 100644 arch/arm/mach-ux500/board-mop500-uib.c
+
 -- 
 1.7.2.dirty
