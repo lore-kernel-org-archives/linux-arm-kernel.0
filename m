@@ -1,69 +1,49 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Fri, 21 Jan 2011 10:04:41 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <1295632828.19880.22.camel@m0nster>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster>
-	<1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-	<1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-Message-ID: <20110121100441.06a94482@jbarnes-desktop>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 21 Jan 2011 19:07:07 +0100
+Subject: [PATCH] video: pxa168fb: remove a redundant pxa168fb_check_var
+	call
+In-Reply-To: <1295608686.3976.9.camel@phoenix>
+References: <1295608686.3976.9.camel@phoenix>
+Message-ID: <201101211907.07386.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Jan 2011 10:00:28 -0800
-Daniel Walker <dwalker@codeaurora.org> wrote:
-
-> On Fri, 2011-01-21 at 09:56 -0800, Jesse Barnes wrote:
-> > On Fri, 21 Jan 2011 09:48:27 -0800
-> > Jesse Barnes <jbarnes@virtuousgeek.org> wrote:
-> > 
-> > > On Fri, 21 Jan 2011 07:46:41 -0800
-> > > Daniel Walker <dwalker@codeaurora.org> wrote:
-> > > > This isn't what's happening tho. In maintainer land if someone forwards
-> > > > you a patch then you leave the original author on the patch. They wrote
-> > > > the patch and your just forwarding it on up the ladder. This isn't the
-> > > > case with these patches.. I crafted each of the commit I have authorship
-> > > > on, no one forwarded those commits to me. I'm not taking authorship
-> > > > credit for any thing I didn't create, although I an giving credit to the
-> > > > place which gave me the raw material which was Google. From my
-> > > > experience this is how it's done in Linux ..
-> > > 
-> > > I don't know why you're even trying to defend this, just admit you were
-> > > wrong and move on.
-> > > 
-> > > Trying to claim the author field for these patches for yourself is both
-> > > misleading and vain.  You did not write the code and are therefore not
-> > > the author, trying to conflate the author and commit fields in this way
-> > > is so misguided I thought you must be trolling when I first saw this
-> > > thread.
-> > > 
-> > > This is not "how it's done in Linux" at all.  In this case you're
-> > > trying to act like a maintainer by collecting patches and forwarding
-> > > them upstream, so you need to preserve authorship and the s-o-b chain.
-> > > If you want to take responsibility for the code going forward, great,
-> > > but don't pollute the logs with bogus author fields that imply you
-> > > wrote the stuff in the first place.
-> > 
-> > That said, if you did significant work on these before committing them,
-> > then you're right and I'm wrong.  It *is* fairly common for committers
-> > to change things; and if the changes are significant enough, they claim
-> > authorship and note the original author in the changelog.
-> > 
-> > So if that's the case here, I apologize, but I didn't see that
-> > explained in any part of the thread I read.
+On Friday 21 January 2011 12:18:06 Axel Lin wrote:
+> Current implementation calls pxa168fb_check_var twice in pxa168fb_probe.
 > 
-> I did a significant amount of work to create the commits and series. I'm
-> sorry if that's not clear, but it is in fact true.
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+>  drivers/video/pxa168fb.c |    6 +-----
+>  1 files changed, 1 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/video/pxa168fb.c b/drivers/video/pxa168fb.c
+> index cea6403..35f61dd 100644
+> --- a/drivers/video/pxa168fb.c
+> +++ b/drivers/video/pxa168fb.c
+> @@ -701,16 +701,12 @@ static int __devinit pxa168fb_probe(struct
+> platform_device *pdev) */
+>  	pxa168fb_init_mode(info, mi);
+> 
+> -	ret = pxa168fb_check_var(&info->var, info);
+> -	if (ret)
+> -		goto failed_free_fbmem;
+> -
+>  	/*
+>  	 * Fill in sane defaults.
+>  	 */
+>  	ret = pxa168fb_check_var(&info->var, info);
+>  	if (ret)
+> -		goto failed;
+> +		goto failed_free_fbmem;
+> 
+>  	/*
+>  	 * enable controller clock
 
-Changes to the code or just reordering and merging commits?  If the
-former, then I think Christoph's comment applies, if the latter, I
-think preserving authorship is still the right thing to do.
+Please, don't use the get_maintainers script. This CCs too many people, really. 
+As for pxa168, only CC linux-arm-kernel, Eric, Haojian and that's about it 
+(fixed). Thanks
 
--- 
-Jesse Barnes, Intel Open Source Technology Center
+I can't comment on the code, though Haojian, is there any particular reason why 
+the call's twice in there? Maybe some HW quirk or something?
+
+Cheers
