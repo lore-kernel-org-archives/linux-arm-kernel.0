@@ -1,44 +1,48 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 21 Jan 2011 08:58:06 -0800
-Subject: [PATCH] drivers: mmc: msm: remove clock disable in probe
-In-Reply-To: <4D38FC55.2030601@codeaurora.org>
-References: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTim-=40MM=TeH1XSQ-rio1ctwcZAs4qbf9SaxmdH@mail.gmail.com>
-	<4D38FC55.2030601@codeaurora.org>
-Message-ID: <1295629086.19880.17.camel@m0nster>
+From: saaguirre@ti.com (Aguirre, Sergio)
+Date: Fri, 21 Jan 2011 10:57:13 -0600
+Subject: [Query] mm: !*pte hit in mm/memory.c:remap_pte_range
+In-Reply-To: <20110121103005.GA14142@n2100.arm.linux.org.uk>
+References: <A24693684029E5489D1D202277BE89448521EEAA@dlee02.ent.ti.com>,
+	<20110121103005.GA14142@n2100.arm.linux.org.uk>
+Message-ID: <A24693684029E5489D1D202277BE89448521EEB1@dlee02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-20 at 19:24 -0800, Saravana Kannan wrote:
-> On 01/19/2011 02:50 AM, Vitaly Wool wrote:
-> > Hi,
-> >
-> > On Tue, Jan 18, 2011 at 7:14 PM, Daniel Walker<dwalker@codeaurora.org>  wrote:
-> >> The probe function adds the MMC host which can start accepting request
-> >> immediately. There is an assumption here that no requests happen
-> >> immediatly, but it's not always the case. This assumption can causes
-> >> a BUG() when the clocks are disabled. The fix is to just remove the
-> >> clock disable in the probe function.
-> >>
-> >> Signed-off-by: Daniel Walker<dwalker@codeaurora.org>
-> >
-> > I can add acked-by and/or tested-by if needed.
-> >
-> > ~Vitaly
+Hi Russell,
+
+> ________________________________________
+> From: Russell King - ARM Linux [linux at arm.linux.org.uk]
+> Sent: Friday, January 21, 2011 4:30 AM
+> To: Aguirre, Sergio
+> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
+> Subject: Re: [Query] mm: !*pte hit in mm/memory.c:remap_pte_range
 > 
-> Nack from me. The fix is incorrect. The clocks are alread refcounted in 
-> the clock driver. There should be no need to "leave it on because 
-> someone else might access it". Every code that needs the clock should 
-> have a clk_enable/disable around it and it would all work fine.
+> On Thu, Jan 20, 2011 at 03:06:30PM -0600, Aguirre, Sergio wrote:
+> > And while debugging further, i realized that the point of stall was
+> > in mm/memory.c, function:
+> >
+> > static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
+> >                       unsigned long addr, unsigned long end,
+> >                       unsigned long pfn, pgprot_t prot)
+> > {
 
-You appear to be wrong Saravana .. The clocks are off at that point,
-which means there's no need to disable them twice. If you look at the
-MMC code mmc_add_host() will disable the clocks.
+> >               BUG_ON(!pte_none(*pte)); <---******* HERE
 
-Daniel
+> > }
 
+> > How should i interpret this? Does this mean something specific?
+> 
+> It is asserting that the pte we are about to overwrite was empty.  In
+> other words, there is no existing mapping in place at that virtual
+> address.
+> 
+> If there was a pre-existing mapping, you're doing something wrong
+> because you're potentially overwriting something else.
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Ok. I see.
+
+Thanks for the detailed explanation. I appreciate it.
+
+Regards,
+Sergio
+> 
