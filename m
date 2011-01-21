@@ -1,32 +1,51 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 21 Jan 2011 11:57:53 +0100
-Subject: [PATCH 2/3] ARM i.MX28: use correct register for setting the rate
+Date: Fri, 21 Jan 2011 11:57:54 +0100
+Subject: [PATCH 3/3] ARM i.MX23/28: remove secondary field from struct clk.
+	It's unused
 In-Reply-To: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
 References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1295607474-6559-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1295607474-6559-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_CLK_SET_RATE does not only handle the cpu clock but also other
-clocks, so do not hardcode the HW_CLKCTRL_CPU register.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mxs/clock-mx28.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-mxs/clock.c              |    2 --
+ arch/arm/mach-mxs/include/mach/clock.h |    2 --
+ 2 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 4146b38..44acd9c 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -360,7 +360,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 			return -EINVAL;					\
- 		}							\
- 	}								\
--	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_CPU);		\
-+	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
- 									\
- 	for (i = 10000; i; i--)						\
- 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
+diff --git a/arch/arm/mach-mxs/clock.c b/arch/arm/mach-mxs/clock.c
+index e7d2269..a7093c8 100644
+--- a/arch/arm/mach-mxs/clock.c
++++ b/arch/arm/mach-mxs/clock.c
+@@ -57,7 +57,6 @@ static void __clk_disable(struct clk *clk)
+ 		if (clk->disable)
+ 			clk->disable(clk);
+ 		__clk_disable(clk->parent);
+-		__clk_disable(clk->secondary);
+ 	}
+ }
+ 
+@@ -68,7 +67,6 @@ static int __clk_enable(struct clk *clk)
+ 
+ 	if (clk->usecount++ == 0) {
+ 		__clk_enable(clk->parent);
+-		__clk_enable(clk->secondary);
+ 
+ 		if (clk->enable)
+ 			clk->enable(clk);
+diff --git a/arch/arm/mach-mxs/include/mach/clock.h b/arch/arm/mach-mxs/include/mach/clock.h
+index 041e276..592c9ab 100644
+--- a/arch/arm/mach-mxs/include/mach/clock.h
++++ b/arch/arm/mach-mxs/include/mach/clock.h
+@@ -29,8 +29,6 @@ struct clk {
+ 	int id;
+ 	/* Source clock this clk depends on */
+ 	struct clk *parent;
+-	/* Secondary clock to enable/disable with this clock */
+-	struct clk *secondary;
+ 	/* Reference count of clock enable/disable */
+ 	__s8 usecount;
+ 	/* Register bit position for clock's enable/disable control. */
 -- 
 1.7.2.3
