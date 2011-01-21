@@ -1,29 +1,26 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 21 Jan 2011 07:47:44 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTikH=jj8G2tJ88HOW82gUxAouk6mbYz2txF73Fsf@mail.gmail.com>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-	<AANLkTikH=jj8G2tJ88HOW82gUxAouk6mbYz2txF73Fsf@mail.gmail.com>
-Message-ID: <1295624864.19880.15.camel@m0nster>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 21 Jan 2011 16:48:12 +0100
+Subject: [PATCH] Board support Pcontrol_G20, hardware revision 2
+In-Reply-To: <201101182238.45374.pgsellmann@portner-elektronik.at>
+References: <201101171843.07148.pgsellmann@portner-elektronik.at>
+	<20110118185657.GV14798@game.jcrosoft.org>
+	<201101182238.45374.pgsellmann@portner-elektronik.at>
+Message-ID: <20110121154812.GF24284@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-20 at 18:13 -0800, Dima Zavin wrote:
-> You did not write ANY code for the mahimahi (Nexus One) board. You
-> took patches from the android.git.kernel.org git server, squashed some
-> together, and then slapped your name on them as the author. I
-> appreciate your effort to send this code upstream and do whatever
-> minor cleanups, but I still maintain that you are not the author of
-> this code.
+On 22:38 Tue 18 Jan     , Peter Gsellmann wrote:
+> Am Dienstag, 18. Januar 2011, 19:56:57 schrieb Jean-Christophe PLAGNIOL-VILLARD:
+> > On 18:43 Mon 17 Jan     , Peter Gsellmann wrote:
+> > >  Backplane timings adjusted
+> > >  Addition of specific platform devices and resources
+> > >  Leds renamed
+> > >  Minor bugfixes
+> > I'd prefer to split the patch for bisect
+> Is this really a requirement?
+no a preference
 
-I'm not claiming I wrote it all, clearly the copyrights indicate that.
+I'd prefer to split at least between bug fix and new features
 
-Daniel
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Best Regards,
+J.
