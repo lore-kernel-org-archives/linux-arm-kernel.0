@@ -1,64 +1,78 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 21 Jan 2011 20:32:10 +0100
-Subject: [PATCH] mmc: mmc_mxc: Allow selection only for the correct
-	platforms
-In-Reply-To: <4D39B042.5050004@freescale.com>
-References: <1295542979-10329-1-git-send-email-fabio.estevam@freescale.com>
-	<20110121153351.GR14956@pengutronix.de>
-	<4D39B042.5050004@freescale.com>
-Message-ID: <20110121193210.GU14956@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 21 Jan 2011 12:32:39 -0700
+Subject: [PATCH 6/6] i2c/pxa2xx: pass of_node from platform driver to
+	adapter and publish
+In-Reply-To: <1294246263-31960-7-git-send-email-bigeasy@linutronix.de>
+References: <1294246263-31960-1-git-send-email-bigeasy@linutronix.de>
+	<1294246263-31960-7-git-send-email-bigeasy@linutronix.de>
+Message-ID: <AANLkTinh4395wuWwH2E2kJG+rhMXUzFeGekeugyCSzWt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+On Wed, Jan 5, 2011 at 9:51 AM, Sebastian Andrzej Siewior
+<bigeasy@linutronix.de> wrote:
+> the of_node will auto-publish devices which are added to the device
+> tree.
+>
+> Commit 925bb9c6 aka ("of/i2c: Fix module load order issue caused by
+> of_i2c.c) moved the of_i2c_register_devices() function from the i2c core
+> back to the drivers. This patch does the same thing for the pxa driver.
+>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 
-On Fri, Jan 21, 2011 at 02:11:46PM -0200, Fabio Estevam wrote:
-> On 1/21/2011 1:33 PM, Uwe Kleine-K?nig wrote:
-> > On Thu, Jan 20, 2011 at 03:02:59PM -0200, Fabio Estevam wrote:
-> >> Currently MMC_MXC driver can be selected by all i.MX devices.
-> >>
-> >> Restrict its use only for the appropriate processors.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >> ---
-> >>  drivers/mmc/host/Kconfig |    2 +-
-> >>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> >> index d618e86..a3a9ec1 100644
-> >> --- a/drivers/mmc/host/Kconfig
-> >> +++ b/drivers/mmc/host/Kconfig
-> >> @@ -288,7 +288,7 @@ config MMC_MSM
-> >>  
-> >>  config MMC_MXC
-> >>  	tristate "Freescale i.MX2/3 Multimedia Card Interface support"
-> >> -	depends on ARCH_MXC
-> >> +	depends on MACH_MX21 || MACH_MX27 || ARCH_MX31
-> > What about
-> > 
-> > 	depends IMX_HAVE_PLATFORM_MXC_MMC
-> 
-> I would prefer to let the architectures explicitly in Kconfig.
-> 
-> If someone selects IMX_HAVE_PLATFORM_MXC_MMC by mistake on a MX51
-> board, it will be possible to select the MXC_MMC driver in the kernel
-> for MX51, which is incorrect.
-it's not optimal, but nothing happens unless this someone registers a
-corresponding device, too.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> Using the approach of explicitly marking the architectures that
-> support MXC_MMC would avoid such problems as well.
-> > 
-> > ?  Then if i.MX29 has the same IP you don't need to touch this again.
-> 
-> Not likely to happen. 
-I wouldn't bet ...
+Ben, I'll leave you to pick this one up.
 
-Note I don't argue, if you still prefer the explicit list it's OK for
-me.
+g.
 
-Uwe
+> ---
+> ?drivers/i2c/busses/i2c-pxa.c | ? ?5 +++++
+> ?1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+> index bfd115d..a90739b 100644
+> --- a/drivers/i2c/busses/i2c-pxa.c
+> +++ b/drivers/i2c/busses/i2c-pxa.c
+> @@ -29,6 +29,7 @@
+> ?#include <linux/errno.h>
+> ?#include <linux/interrupt.h>
+> ?#include <linux/i2c-pxa.h>
+> +#include <linux/of_i2c.h>
+> ?#include <linux/platform_device.h>
+> ?#include <linux/err.h>
+> ?#include <linux/clk.h>
+> @@ -1138,6 +1139,9 @@ static int i2c_pxa_probe(struct platform_device *dev)
+>
+> ? ? ? ?i2c->adap.algo_data = i2c;
+> ? ? ? ?i2c->adap.dev.parent = &dev->dev;
+> +#ifdef CONFIG_OF
+> + ? ? ? i2c->adap.dev.of_node = dev->dev.of_node;
+> +#endif
+>
+> ? ? ? ?if (i2c_type == REGS_CE4100)
+> ? ? ? ? ? ? ? ?ret = i2c_add_adapter(&i2c->adap);
+> @@ -1147,6 +1151,7 @@ static int i2c_pxa_probe(struct platform_device *dev)
+> ? ? ? ? ? ? ? ?printk(KERN_INFO "I2C: Failed to add bus\n");
+> ? ? ? ? ? ? ? ?goto eadapt;
+> ? ? ? ?}
+> + ? ? ? of_i2c_register_devices(&i2c->adap);
+>
+> ? ? ? ?platform_set_drvdata(dev, i2c);
+>
+> --
+> 1.7.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
