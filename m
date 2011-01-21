@@ -1,24 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 10:52:01 +0000
-Subject: [PATCH] ARM: mxs: irq_data conversion
-In-Reply-To: <20110121104742.GC23596@mail.wantstofly.org>
-References: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110121094338.GE13235@n2100.arm.linux.org.uk>
-	<20110121101536.GH14956@pengutronix.de>
-	<20110121102707.GH13235@n2100.arm.linux.org.uk>
-	<20110121104742.GC23596@mail.wantstofly.org>
-Message-ID: <20110121105201.GL13235@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 21 Jan 2011 11:57:53 +0100
+Subject: [PATCH 2/3] ARM i.MX28: use correct register for setting the rate
+In-Reply-To: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1295607474-6559-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 11:47:42AM +0100, Lennert Buytenhek wrote:
-> On Fri, Jan 21, 2011 at 10:27:07AM +0000, Russell King - ARM Linux wrote:
-> For msm, gpio-v2.c doesn't get built by any defconfig since
-> there is no defconfig that sets ARCH_MSM8X60, irq-kev7a400.c is never
-> even referenced in arch/arm/mach-lh7a40x/Makefile so it never gets
-> built at all, and the other platforms I didn't see as I built against
-> -linus and ARM devel-stable rather than against ARM devel.
+_CLK_SET_RATE does not only handle the cpu clock but also other
+clocks, so do not hardcode the HW_CLKCTRL_CPU register.
 
-Okay, ignore the lh7a40x stuff - I think we really should kill that
-off as its not receiving anything but our updates, and it's clearly
-not right.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 4146b38..44acd9c 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -360,7 +360,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 			return -EINVAL;					\
+ 		}							\
+ 	}								\
+-	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_CPU);		\
++	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
+ 									\
+ 	for (i = 10000; i; i--)						\
+ 		if (!(__raw_readl(CLKCTRL_BASE_ADDR +			\
+-- 
+1.7.2.3
