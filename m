@@ -1,35 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 21:51:10 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-Message-ID: <20110121215110.GD23151@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Jan 2011 16:53:44 -0500 (EST)
+Subject: Locking in the clk API
+In-Reply-To: <AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
+	<20110120185617.GI6335@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
+	<4D3907BD.4040900@codeaurora.org>
+	<AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1101211618170.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 02:59:35PM -0500, Nicolas Pitre wrote:
-> On Fri, 21 Jan 2011, Pawel Moll wrote:
+On Fri, 21 Jan 2011, Dima Zavin wrote:
+
+> On Thu, Jan 20, 2011 at 8:12 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> > On 01/20/2011 06:06 PM, Dima Zavin wrote:
+> >> Here's a better one.
+> >>
+> >> Many devices use serial display panels sitting on either MDDI or MIPI
+> >> links. The interface clocks need to be on, but they stay in low-power
+> >> mode while the display is on. The display controller however does not
+> >> need to be on since the serial panels typically have a local
+> >> framebuffer that does the idle panel refresh on it's own. When a new
+> >> frame comes in to be displayed, you need to clock on the display
+> >> controller, DMA the data to the panel, and when it's done turn the
+> >> controller off. The clk_enable may or may not happen at irq context,
+> >> depending on whether or not you are starting the DMA from a
+> >> vsync/tear-effect irq or simply from the screen_update() function. The
+> >> clk_disable will most certainly happen from the DMA_DONE irq.
+> >
+> > Why do we need to turn on the clock in the IRQ? Why not defer it to a
+> > workqueue (or whatever is the method of the day to defer work from an IRQ)?
+> > The advantage of doing the clk_enable in the IRQ should be negligible
+> > compared to the time it takes to do the DMA.
 > 
-> > VE suffers from serious problem with MMC transfers - low performance,
-> > errors when other IO peripherals (especially USB) are used at the
-> > same time etc.
-> > 
-> > It all boils down to the MMC controller short FIFO and - in result -
-> > timing constrains. The most problematic case - USB driver hogging
-> > CPU and MMC FIFO under/overruns in the result - can be mitigated on
-> > SMP system by distributing interrupts handling for these peripherals
-> > between cores.
-> 
-> Wouldn't the ultimate solution be to simply use FIQs to service the MMC FIFO?
+> Because in an interactive system running at 60fps, you only have 16ms
+> budget per frame. During the blanking interval when you receive the
+> IRQ you need to immediately start the DMA. If you defer to a workqueue
+> and schedule you are practically guaranteeing to never run at 60fps
+> (more like 30 if you are consistently late, which you would with that
+> kind of timing and even a mildly busy system).
 
-Could you suggest how to route an arbitary interrupt to the FIQ using
-the GIC?
+And... is there really some advantage to turn the clock off in between 
+frames when you're otherwise busy generating them anyway?
 
-On systems which implement security extensions, the non-secure world can
-only use IRQs and not FIQs.  The secure world can use FIQs - in which
-case interrupts marked as secure interrupts can go to FIQ.
+I think the fundamental problem with this clock API is that it tries to 
+consolidate completely different usages behind the same set of 
+interfaces, and that obviously fails.
 
-On systems without security extensions, the GIC only supports IRQ, and
-you need a second GIC implemented for FIQs.  I'm not aware of any system
-doing that.
+Some people have clocks that are derived from slow-stabilizing PLLs and 
+in that case you do want to use a sleeping API.  Obviously such clocks 
+just can't be turned off and on between video frames while in interrupt 
+context, hence for such clocks, the hypothetical clk_disable() call must 
+do nothing.
+
+So I think that the API must be augmented with more methods, such as:
+
+clk_slow_enable():
+  - may sleep
+  - may be a no-op if the clk_fast_enable() is supported
+
+clk_fast_enable():
+  - may not sleep, used in atomic context
+  - may be a no-op if controlling the clock takes time, in which case 
+    clk_slow_enable() must have set the clock up entirely
+
+... and similar for clk_slow_disable() and clk_fast_disable().
+
+Then the driver must call clk_slow_enable() when in sleepable context, 
+at worst after a successful probe, or better within the open method, or 
+even better right before some processing request if possible.  The 
+driver must also call clk_fast_enable() right before the hardware is 
+kicked into motion.
+
+Then, as soon as the IRQ from the hardware to indicate that the job is 
+done is received, you call clk_fast_disable().  At that point you might 
+awake a sleeping thread waiting for the resulting data.  In that thread, 
+you then call clk_slow_disable() if possible, or from the driver's 
+release() method otherwise.
+
+So if you happen to have a fast-enabling clock, you make 
+clk_slow_enable() a no op, and do everything in clk_fast_enable().  If 
+your clock control sits on some I2C bus then you must do everything from 
+clk_slow_enable() and make clk_fast_enable() a no op.  If you do have 
+both a PLL and the ability to gate clock signals, then you just 
+configure the PLL from clk_slow_enable() keeping the clock signal gated, 
+and ungate it only from clk_fast_enable(), to gate it (and only 
+gate it) with clk_fast_disable() so it can be quickly be ungated again 
+with clk_fast_enable().
+
+This way, the API has a chance of making drivers look generic, and the 
+clock providers have more flexibility to hook into the API and optimize 
+to the best they can do.
+
+Of course that means that drivers must call both the slow and the fast 
+methods eventually, each in their best place.  If a driver has no use 
+for clk_fast_enable() then it should simply call it right after 
+clk_slow_enable() returns (and a convenience macro could be provided for 
+that case).
+
+
+Nicolas
