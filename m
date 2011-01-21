@@ -1,43 +1,56 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Thu, 20 Jan 2011 17:58:43 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <1295574085.4096.6.camel@Joe-Laptop>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-Message-ID: <1295575123.9236.54.camel@m0nster>
+From: dmitriyz@google.com (Dima Zavin)
+Date: Thu, 20 Jan 2011 18:06:12 -0800
+Subject: Locking in the clk API
+In-Reply-To: <alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
+	<20110120185617.GI6335@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+Message-ID: <AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-20 at 17:41 -0800, Joe Perches wrote:
-> On Thu, 2011-01-20 at 16:55 -0800, Daniel Walker wrote:
-> > On Thu, 2011-01-20 at 16:42 -0800, Dima Zavin wrote:
-> > > You are not the author of any of these patches. Where are the author
-> > > attributions for the team that actually wrote this code?
-> > In the commit text.. The author field is used to denote who authored the
-> > commit, which in this case is me.
-> 
-> You have that wrong.
-> Author and Committer are different git fields.
-> 
-> http://www.kernel.org/pub/software/scm/git/docs/user-manual.html
-> 
->       * an author: The name of the person responsible for this change,
->         together with its date.
->       * a committer: The name of the person who actually created the
->         commit, with the date it was done. This may be different from
->         the author, for example, if the author was someone who wrote a
->         patch and emailed it to the person who used it to create the
->         commit.
+Here's a better one.
 
+Many devices use serial display panels sitting on either MDDI or MIPI
+links. The interface clocks need to be on, but they stay in low-power
+mode while the display is on. The display controller however does not
+need to be on since the serial panels typically have a local
+framebuffer that does the idle panel refresh on it's own. When a new
+frame comes in to be displayed, you need to clock on the display
+controller, DMA the data to the panel, and when it's done turn the
+controller off. The clk_enable may or may not happen at irq context,
+depending on whether or not you are starting the DMA from a
+vsync/tear-effect irq or simply from the screen_update() function. The
+clk_disable will most certainly happen from the DMA_DONE irq.
 
-I'm not even sure how to make these different, but in this case it
-doesn't matter because the "committer" as you defined it above is more
-than one person ..
+--Dima
 
-Daniel
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+On Thu, Jan 20, 2011 at 1:30 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 20 Jan 2011, Russell King - ARM Linux wrote:
+>
+>> On Thu, Jan 20, 2011 at 04:29:15PM +0000, Ben Dooks wrote:
+>> > I really don't like the fact that people are doing these things in
+>> > atomic contexts, and I think we should apply some pressure to move
+>> > the atomic caller cases to use systems where they can sleep such as
+>> > using threaded-irq handlers (they work very nicely)
+>>
+>> How do you ensure that printk is always called from a non-atomic
+>> context?
+>
+> Is this a good example? ?I don't think that power sensitive systems such
+> as a cellphone should keep printk() enabled in the final product. ?The
+> output from printk() over a serial port is a debugging convenience, and
+> trying to aggressively turn on/off the serial clock around each call to
+> printk() is a bit silly. ?Better simply turn the serial clock on
+> whenever its console facility is opened, and turn it off when the
+> console is closed, which should be good enough in that context.
+>
+>
+> Nicolas
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
