@@ -1,55 +1,47 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Fri, 21 Jan 2011 13:54:05 +0530
-Subject: [PATCH] omap3: nand: bch ecc support added
-In-Reply-To: <AANLkTimsD1108ASF3H9Y8pjaTsfv0D33K11KOXDmypvJ@mail.gmail.com>
-References: <1295518680-8737-1-git-send-email-s-ghorai@ti.com>
-	<AANLkTimsD1108ASF3H9Y8pjaTsfv0D33K11KOXDmypvJ@mail.gmail.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A8DB174@dbde02.ent.ti.com>
+From: john.ogness@linutronix.de (John Ogness)
+Date: Fri, 21 Jan 2011 09:33:33 +0100
+Subject: [PATCH v3] OMAP2/3: clock: fix fint calculation for DPLL_FREQSEL
+In-Reply-To: <20110121031553.GA2448@legolas.emea.dhcp.ti.com> (Felipe Balbi's
+	message of "Fri\, 21 Jan 2011 05\:15\:53 +0200")
+References: <87ei8726wf.fsf@vostro.fn.ogness.net>
+	<20110120111645.GB2223@legolas.emea.dhcp.ti.com>
+	<8739on1wdd.fsf_-_@vostro.fn.ogness.net>
+	<20110121031553.GA2448@legolas.emea.dhcp.ti.com>
+Message-ID: <87y66e3bc2.fsf_-_@vostro.fn.ogness.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: John Ogness <john.ogness@linutronix.de>
 
+In OMAP35X TRM Rev 2010-05 Figure 7-18 "DPLL With EMI Reduction
+Feature", it is shown that the internal frequency is calculated by
+CLK_IN/(N+1). However, the value passed to _dpll_test_fint() is
+already "N+1" since Linux is using the values to divide by. In the
+technical reference manual, "N" is referring to the divider's register
+value (0-127).
 
-> -----Original Message-----
-> From: Kishore Kadiyala [mailto:kishorek.kadiyala at gmail.com]
-> Sent: Friday, January 21, 2011 1:42 PM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] omap3: nand: bch ecc support added
-> 
-> Ghorai,
-> 
-> <snip>
-> 
-> > ?#ifdef CONFIG_MTD_PARTITIONS
-> > diff --git a/drivers/mtd/nand/omap_bch_decoder.c
-> b/drivers/mtd/nand/omap_bch_decoder.c
-> > new file mode 100644
-> > index 0000000..da42bda
-> > --- /dev/null
-> > +++ b/drivers/mtd/nand/omap_bch_decoder.c
-> > @@ -0,0 +1,393 @@
-> > +/*
-> > + * drivers/mtd/nand/omap_omap_bch_decoder.c
-> > + *
-> > + * Whole BCH ECC Decoder (Post hardware generated syndrome decoding)
-> > + *
-> > + * Copyright (c) 2007 Texas Instruments
-> > + *
-> > + * Author: Sukumar Ghorai <s-ghorai@ti.com
-> > + * ? ? ? ? ? ? ? ?Michael Fillinger <m-fillinger@ti.com>
-> 
-> Vimal was the original author who has created this file
-> [No change in file name/directory hierarchy].
-> It's not fair to remove Vimal's author and add your's.
-> 
-> Instead you should have kept his name and added your's.
-[Ghorai] Ok.  I will do .. 
-But can you send me working version of these? At least comipled version for any kernel?
+Signed-off-by: John Ogness <john.ogness@linutronix.de>
+---
+patch v3:
+Patch against linux-next-20110121.
+I have improved the commit message so that it is acceptable for the
+git commit log.
 
-> 
-> <snip>
-> 
-> Regards,
-> Kishore
+ arch/arm/mach-omap2/clkt_dpll.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+index 337392c..acb7ae5 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/arch/arm/mach-omap2/clkt_dpll.c
+@@ -77,7 +77,7 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
+ 	dd = clk->dpll_data;
+ 
+ 	/* DPLL divider must result in a valid jitter correction val */
+-	fint = clk->parent->rate / (n + 1);
++	fint = clk->parent->rate / n;
+ 	if (fint < DPLL_FINT_BAND1_MIN) {
+ 
+ 		pr_debug("rejecting n=%d due to Fint failure, "
+-- 
+1.5.6.5
