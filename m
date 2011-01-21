@@ -1,25 +1,32 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 21 Jan 2011 11:57:51 +0100
-Subject: i.MX28 fixes
-Message-ID: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+Date: Fri, 21 Jan 2011 11:57:52 +0100
+Subject: [PATCH 1/3] ARM i.MX28: fix bit operation
+In-Reply-To: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1295607474-6559-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches fix some issues with the i.MX28 clock support.
+reg | (1 << clk->enable_shift) always evaluates to true. Switch it
+to & which makes much more sense
 
-The following changes since commit c56eb8fb6dccb83d9fe62fd4dc00c834de9bc470:
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-  Linux 2.6.38-rc1 (2011-01-18 15:14:02 -0800)
-
-are available in the git repository at:
-  none ..BRANCH.NOT.VERIFIED..
-
-Sascha Hauer (3):
-      ARM i.MX28: fix bit operation
-      ARM i.MX28: use correct register for setting the rate
-      ARM i.MX23/28: remove secondary field from struct clk. It's unused
-
- arch/arm/mach-mxs/clock-mx28.c         |    4 ++--
- arch/arm/mach-mxs/clock.c              |    2 --
- arch/arm/mach-mxs/include/mach/clock.h |    2 --
- 3 files changed, 2 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 56312c0..4146b38 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -355,7 +355,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 	} else {							\
+ 		reg &= ~BM_CLKCTRL_##dr##_DIV;				\
+ 		reg |= div << BP_CLKCTRL_##dr##_DIV;			\
+-		if (reg | (1 << clk->enable_shift)) {			\
++		if (reg & (1 << clk->enable_shift)) {			\
+ 			pr_err("%s: clock is gated\n", __func__);	\
+ 			return -EINVAL;					\
+ 		}							\
+-- 
+1.7.2.3
