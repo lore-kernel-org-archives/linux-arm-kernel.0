@@ -1,68 +1,51 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 21 Jan 2011 19:11:35 +0100
-Subject: [Openpxa-users] Linux udelay() is way off
-In-Reply-To: <AANLkTi=cwRNCxS6qbR3Kp2Sf-ckx+wcUAgTc8LOYES9F@mail.gmail.com>
-References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>
-	<20110120193013.GL6335@n2100.arm.linux.org.uk>
-	<AANLkTi=cwRNCxS6qbR3Kp2Sf-ckx+wcUAgTc8LOYES9F@mail.gmail.com>
-Message-ID: <201101211911.35162.marek.vasut@gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 21 Jan 2011 18:08:39 +0000
+Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
+In-Reply-To: <AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
+References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
+	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
+Message-ID: <20110121180838.GO6768@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 January 2011 18:46:48 Bj?rn Forsman wrote:
-> 2011/1/20 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Thu, Jan 20, 2011 at 08:18:10PM +0100, Bj?rn Forsman wrote:
-> >> [   11.425363] cpufreq-core: saving 518144 as reference value for
-> >> loops_per_jiffy; freq is 312000 kHz
-> >> [   11.425523] cpufreq-core: scaling loops_per_jiffy to 1036288 for
-> >> frequency 624000 kHz
+On Wed, Jan 12, 2011 at 10:46:28AM +0530, viresh kumar wrote:
+> > + ? ? ? if (ret)
+> > + ? ? ? ? ? ? ? goto out_put_clk;
+> > +
+> > + ? ? ? /*
+> > + ? ? ? ?* The timeout period of the watchdog is derived from the input clock
+> > + ? ? ? ?* frequency. ?For platforms that don't have a clk for the watchdog,
+> > + ? ? ? ?* they can specify the WDT clock rate through the clk_rate field of
+> > + ? ? ? ?* the struct dw_wdt_platform_data platform data.
+> > + ? ? ? ?*/
+> > + ? ? ? if (pdata && pdata->clk_rate > 0)
+> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = pdata->clk_rate;
+> > + ? ? ? else
+> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = clk_get_rate(dw_wdt.clk);
+> > +
 > 
-> [snip]
+> I know it doesn't make sense for a platform to have support for clk framework
+> and pass rate through plat data.
+> But this code will always take pdata->rate, if it is passed.
+> Wouldn't it be better if we reverse the sequence.
 > 
-> > Is it possible to boot at 624MHz and report the resulting lpj?
-> > Alternatively, call calibrate_delay() after the cpufreq switch to
-> > 624MHz, disabling the 'printed' stuff and see what it reports.
-> 
-> Now I have an extra calibrate_delay() after cpufreq changes the frequency.
-> 
-> First call:
-> Calibrating delay loop... 103.62 BogoMIPS (lpj=518144)
-> 
-> Second call:
-> Calibrating delay loop... 622.59 BogoMIPS (lpj=3112960)
-> 
-> (udelay() is correct when having that second call.)
-> 
-> It seems cpufreq thinks it transitions from 312 to 624 MHz, but in
-> reality it may be transitioning from 104 to 624 MHz (because it now
-> runs 6 times as fast according to lpj). This may explain the udelay()
-> error ratio (~0.32):
-> 
->   104 MHz / 312 MHz = 0.3333..
-> 
-> I think this means either the clock speed or the jiffies interval do
-> not match what the kernel thinks.
-> 
-> I also did some tests changing the clock speed in the bootloader.
+> if (clk)
+>  rate = clk_get_rate(...);
+> else {
+>  pdata = pdev->dev.platform_data;
+>  if (pdata)
+>   rate = pdata->rate;
+> }
 
-Hi,
-how did you change the speed in the bootloader? Didn't you just adjust the 
-apropriate registers? Don't forget, you need to issue CP15 (maybe CP14) 
-coprocessor call.
+Hmm, looking back at this again, I wonder if the correct thing to do is 
+just add a dependency in Kconfig for the driver on HAVE_CLK like 
+drivers/spi/dw_spi_mmio and ditch the ability to set the rate through 
+platform data?  The platform has to at least provide clk_get(), 
+clk_put() and clk_get_rate() at a minimum or the driver won't even 
+build...
 
-Well, just my quick thought.
+This would make things a lot simpler and it's not as if this is going to 
+break anything as there aren't currently any users of the driver (and 
+the one that will be does support the clk framework).
 
-btw. Bjorn, I just dug out the pxa320 board, maybe I can also find the pxa310/300 
-cards, mind IRC-ing ? ;-)
-> It
-> seems like the only thing that works for the kernel is booting with a
-> 104 MHz clock. Any other frequency and cpufreq will do bad things to
-> udelay().
-> 
-> Any thoughts?
-> 
-> BTW, I failed at locating the jiffies implementation for PXA310. Any
-> pointers?
-> 
-> Best regards,
-> Bj?rn Forsman
+Jamie
