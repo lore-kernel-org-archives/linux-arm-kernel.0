@@ -1,39 +1,58 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 21 Jan 2011 11:12:27 +0900
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <20110120180146.GH6335@n2100.arm.linux.org.uk>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<1295544047.9039.609.camel@nimitz>
-	<20110120180146.GH6335@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimsL8YfSdXCBpN2cNVpj8HeJF0f-A7MJQoie+Zm@mail.gmail.com>
+From: dmitriyz@google.com (Dima Zavin)
+Date: Thu, 20 Jan 2011 18:13:31 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295575123.9236.54.camel@m0nster>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster>
+	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+Message-ID: <AANLkTikH=jj8G2tJ88HOW82gUxAouk6mbYz2txF73Fsf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 3:01 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 20, 2011 at 09:20:47AM -0800, Dave Hansen wrote:
->> This problem actually exists without sparsemem, too. ?Discontigmem (at
->> least) does it as well.
->
-> We don't expect banks to cross sparsemem boundaries, or the older
-> discontigmem nodes (esp. as we used to store the node number.)
-> Discontigmem support has been removed now so that doesn't apply
-> anymore.
->
+You did not write ANY code for the mahimahi (Nexus One) board. You
+took patches from the android.git.kernel.org git server, squashed some
+together, and then slapped your name on them as the author. I
+appreciate your effort to send this code upstream and do whatever
+minor cleanups, but I still maintain that you are not the author of
+this code.
 
-Our system can have 3 GiB of RAM in maximum.
-In the near future, ARM APs can have up to 1 TiB with LPAE.
+--Dima
 
-Since the size of section is 256 mib and NR_BANKS is defined as 8,
-no ARM system can have more RAM than 2GiB in the current implementation.
-If you want banks in meminfo not to cross sparsemem boundaries,
-we need to find another way of physical memory specification in the kernel.
-
->> The x86 version of show_mem() actually manages to do this without any
->> #ifdefs, and works for a ton of configuration options. ?It uses
->> pfn_valid() to tell whether it can touch a given pfn.
+On Thu, Jan 20, 2011 at 5:58 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> On Thu, 2011-01-20 at 17:41 -0800, Joe Perches wrote:
+>> On Thu, 2011-01-20 at 16:55 -0800, Daniel Walker wrote:
+>> > On Thu, 2011-01-20 at 16:42 -0800, Dima Zavin wrote:
+>> > > You are not the author of any of these patches. Where are the author
+>> > > attributions for the team that actually wrote this code?
+>> > In the commit text.. The author field is used to denote who authored the
+>> > commit, which in this case is me.
+>>
+>> You have that wrong.
+>> Author and Committer are different git fields.
+>>
+>> http://www.kernel.org/pub/software/scm/git/docs/user-manual.html
+>>
+>> ? ? ? * an author: The name of the person responsible for this change,
+>> ? ? ? ? together with its date.
+>> ? ? ? * a committer: The name of the person who actually created the
+>> ? ? ? ? commit, with the date it was done. This may be different from
+>> ? ? ? ? the author, for example, if the author was someone who wrote a
+>> ? ? ? ? patch and emailed it to the person who used it to create the
+>> ? ? ? ? commit.
 >
-> x86 memory layout tends to be very simple as it expects memory to
-> start at the beginning of every region described by a pgdat and extend
-> in one contiguous block. ?I wish ARM was that simple.
+>
+> I'm not even sure how to make these different, but in this case it
+> doesn't matter because the "committer" as you defined it above is more
+> than one person ..
+>
+> Daniel
+>
+> --
+> Sent by an consultant of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+> Forum.
+>
+>
 >
