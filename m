@@ -1,67 +1,41 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 21 Jan 2011 13:47:29 +0900
-Subject: Locking in the clk API
-In-Reply-To: <AANLkTim5N_sCCoOR40y7sTvdDoFkUJd4tUSSbrCccGjy@mail.gmail.com>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<201101111744.59712.jeremy.kerr@canonical.com>
-	<20110111103929.GN24920@pengutronix.de>
-	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
-	<4D386ABF.9060908@fluff.org>
-	<20110120190822.GK6335@n2100.arm.linux.org.uk>
-	<AANLkTim5N_sCCoOR40y7sTvdDoFkUJd4tUSSbrCccGjy@mail.gmail.com>
-Message-ID: <AANLkTikJjkJvr2J-9eq2-Jj8L=JvwUQS+QNj9gWFX-TL@mail.gmail.com>
+From: sundar.iyer@stericsson.com (Sundar Iyer)
+Date: Fri, 21 Jan 2011 10:56:15 +0530
+Subject: [PATCH 1/4] mach-ux500: fix ux500 build error
+In-Reply-To: <1295587578-14461-1-git-send-email-sundar.iyer@stericsson.com>
+References: <1295587578-14461-1-git-send-email-sundar.iyer@stericsson.com>
+Message-ID: <1295587578-14461-2-git-send-email-sundar.iyer@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 9:09 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, Jan 21, 2011 at 4:08 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
->>> If you want to make it so that each low-power mode has to work
->>> out what PLLs need to be disabled and then re-enabled makes me
->>> want to be sick. Hiding this stuff behind specific implementations
->>> is a recipe for disaster.
->>
->> Why should systems which don't suffer from such problems be prevented
->> from gaining power saving from turning off their clocks when devices
->> are not being used (eg, the console serial port.)
->>
->> One solution to your root PLL issue would be to have a separate set of
->> enable/disable API calls which get called at setup/release time (or
->> whatever you'd like to call it) which can only be called from non-atomic
->> context. ?Maybe clk_prepare() and clk_unprepare(). ?These functions
->> should perform whatever is necessary to ensure that the clock source
->> is available for use atomically when clk_enable() is called.
->>
->> So, in your case, clk_prepare() ensures that the root PLL is enabled,
->> clk_unprepare() allows it to be turned off.
->>
->> In the case of a console driver, clk_prepare() can be called when we
->> know the port will be used as a console. ?clk_enable() is then called
->> before writing out the string, and clk_disable() after we've completely
->> sent the last character.
->>
->> This allows the best of both worlds. ?We now have a clk_enable() which
->> can be used to turn the clocks off through the clock tree up to the first
->> non-atomic clock, and we also have a way to deal with those which need
->> to sleep. ?So not only do "sleeping clock" implementations become possible
->> but these "sleeping clock" implementations also get the opportunity to
->> shutdown some of their clock tree with minimal latency for doing so.
->
-> This is exactly what I suggested in my last post, except the console example.
-> Only to be a part of common clock api because it's not very safe to assume
-> future SoCs will have the same simple clock topologies that they have today.
->
-> Not to mean to teach, but I hope you realize with more and more
-> device controller being crammed into ever shrinking SoCs,
-> clock would eventually have to be flexible in functionality
-> and complicated in hierarchy. Ben already gave examples
-> of Audio, MFC and Video controllers of latest Samsung SoCs.
+Include ab8500 regulators for DB8500 SoC by default
+and fix build issues
 
-plus
+Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
+---
+ arch/arm/mach-ux500/Makefile |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-a) If only Samsung bsp implements the api, it would be impossible to
-share drivers, those that can be, with other platforms without nasty ifdef's.
-b) If the task of unification starts with only a particular platform made to
-implement a new api, the attempt kills its own purpose.
+diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
+index 12052e8..84dc03e 100644
+--- a/arch/arm/mach-ux500/Makefile
++++ b/arch/arm/mach-ux500/Makefile
+@@ -4,14 +4,14 @@
+ 
+ obj-y				:= clock.o cpu.o devices.o devices-common.o
+ obj-$(CONFIG_UX500_SOC_DB5500)	+= cpu-db5500.o dma-db5500.o
+-obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o prcmu.o
++obj-$(CONFIG_UX500_SOC_DB8500)	+= cpu-db8500.o devices-db8500.o prcmu.o \
++				   board-mop500-regulators.o
+ obj-$(CONFIG_MACH_U8500_MOP)	+= board-mop500.o board-mop500-sdi.o \
+-				board-mop500-keypads.o
++				   board-mop500-keypads.o
+ obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
+-obj-$(CONFIG_REGULATOR_AB8500)	+= board-mop500-regulators.o
+ obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
+ obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+-- 
+1.7.2.dirty
