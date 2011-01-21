@@ -1,34 +1,26 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Fri, 21 Jan 2011 16:03:57 -0200
-Subject: [PATCH] ARM: imx: Add VPR200 and MX51_3DS entries to uncompress.h
-Message-ID: <1295633037-3475-1-git-send-email-fabio.estevam@freescale.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Fri, 21 Jan 2011 12:59:15 -0500
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295632569.19880.20.camel@m0nster>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster>
+	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+	<1295576730.4096.24.camel@Joe-Laptop>
+	<1295624801.19880.13.camel@m0nster>
+	<20110121094827.41818a55@jbarnes-desktop>
+	<1295632569.19880.20.camel@m0nster>
+Message-ID: <20110121175915.GA27611@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/include/mach/uncompress.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+On Fri, Jan 21, 2011 at 09:56:09AM -0800, Daniel Walker wrote:
+> I did create these commits. Do you think someone else created the
+> commits? There is no commit forwarding happening here.
 
-diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
-index 3a70ebf..ff469c4 100644
---- a/arch/arm/plat-mxc/include/mach/uncompress.h
-+++ b/arch/arm/plat-mxc/include/mach/uncompress.h
-@@ -95,6 +95,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- 	case MACH_TYPE_MX35_3DS:
- 	case MACH_TYPE_PCM043:
- 	case MACH_TYPE_LILLY1131:
-+	case MACH_TYPE_VPR200:
- 		uart_base = MX3X_UART1_BASE_ADDR;
- 		break;
- 	case MACH_TYPE_MAGX_ZN5:
-@@ -102,6 +103,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- 		break;
- 	case MACH_TYPE_MX51_BABBAGE:
- 	case MACH_TYPE_EUKREA_CPUIMX51SD:
-+	case MACH_TYPE_MX51_3DS:
- 		uart_base = MX51_UART1_BASE_ADDR;
- 		break;
- 	case MACH_TYPE_MX50_RDP:
--- 
-1.6.0.4
+Creating a commit is easy.  I think for cases like this it's a good
+idea to at least write down a "Based on patches from ..." in the
+commit message, and preferably also how it relates to their patches.
+E.g. dropped android local crap, ported to $FOO kernel ABI, or just
+rolled up totally confused local repository history.
