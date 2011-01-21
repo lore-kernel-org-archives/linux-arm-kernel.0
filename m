@@ -1,70 +1,68 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 21 Jan 2011 09:00:04 -0600
-Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK to
-	speed-up boot
-In-Reply-To: <c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com>
-References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D385155.4050301@gmail.com>
-	<43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com>
-	<4D38641E.2000301@gmail.com>
-	<c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com>
-Message-ID: <4D399F74.9050302@gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 21 Jan 2011 18:09:44 +0300
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <4D39A1B8.4020607@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
+Hello.
 
-On 01/21/2011 07:43 AM, Santosh Shilimkar wrote:
->> -----Original Message-----
->> From: Rob Herring [mailto:robherring2 at gmail.com]
->> Sent: Thursday, January 20, 2011 10:05 PM
->> To: Santosh Shilimkar
->> Cc: linux-arm-kernel at lists.infradead.org; Russell King; linux-
->> omap at vger.kernel.org; Linus Walleij
->> Subject: Re: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK
->> to speed-up boot
->
-> [..]
->
->>>>
->>>> There's already one way to do this with pre-calculated lpj.
->>>>
->>> How about the hot-plug path? This is not for just boot.
->>
->> The path is the same for hotplug and secondary boot, so yes for
->> both.
->> Plus you get the added benefit of speeding up the primary core boot
->> as well.
->>
-> No 'preset_lpj' will not work for the hotplug path when
-> cpufreq is active. It just useful only for boot in
-> its current form.
+Pawel Moll wrote:
 
-Why? If preset_lpj is non-zero, calibrate_delay will effectively be 
-skipped which is the same thing your patch does.
+> VE suffers from serious problem with MMC transfers - low performance,
+> errors when other IO peripherals (especially USB) are used at the
+> same time etc.
 
-This is the cpfreq loops_per_jiffy adjustment function for SMP:
+> It all boils down to the MMC controller short FIFO and - in result -
+> timing constrains. The most problematic case - USB driver hogging
+> CPU and MMC FIFO under/overruns in the result - can be mitigated on
+> SMP system by distributing interrupts handling for these peripherals
+> between cores.
 
-static inline void adjust_jiffies(unsigned long val, struct 
-cpufreq_freqs *ci)
-{
-	return;
-}
+> With this, the MMC card clock can be safely (at least it looks like
+> it) increased to 1.5MHz, improving performance.
 
-And delay.S uses the global loops_per_jiffy, not the per cpu value. The 
-only place I see the per cpu value get used is /proc/cpuinfo.
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  arch/arm/mach-vexpress/v2m.c |   14 ++++++++++++++
+>  1 files changed, 14 insertions(+), 0 deletions(-)
 
-Consider the following sequence:
+> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+> index 4b5af01..300ac72 100644
+> --- a/arch/arm/mach-vexpress/v2m.c
+> +++ b/arch/arm/mach-vexpress/v2m.c
+[...]
+>  static AMBA_DEVICE(aaci,  "mb:aaci",  V2M_AACI, NULL);
+> @@ -391,6 +392,19 @@ static void __init v2m_init(void)
+>  	for (i = 0; i < ARRAY_SIZE(v2m_amba_devs); i++)
+>  		amba_device_register(v2m_amba_devs[i], &iomem_resource);
+>  
+> +	/* WARNING: HACK HACK HACK!
+> +	 *
+> +	 * MMCI cell has very tight timing requirements regarding interrupt
+> +	 * handling (fractions of millisecond), while the USB host controller
+> +	 * interrupt handler can hog the CPU for more then 1 millisecond!
+> +	 *
+> +	 * To mitigate the problem on SMP systems, we can set CPU affinities
+> +	 * of these interrupts to different cores... */
 
-- scale down the cpu freq
-- hot unplug a core
-- hot plug a core
-   - calls calibrate_delay and update the global loops_per_jiffy
-- scale up the cpu freq
-- udelay time is now much too short!!!
+    The preferred style for the mutli-line comments is this:
 
-So for that reason, I would just remove calibrate_delay unconditionally. 
-Better to have the 1% inaccuracy and longer delays at low frequency than 
-to have too short of a delay at high freq.
+/*
+  * bla
+  * bla
+  */
 
-Rob
+    You were close. :-)
+
+> +	BUG_ON(v2m_usb_resources[1].flags != IORESOURCE_IRQ);
+> +	irq_set_affinity(v2m_usb_resources[1].start, cpumask_of(0));
+> +	irq_set_affinity(mmci_device.irq[0], cpumask_of(1));
+> +	irq_set_affinity(mmci_device.irq[1], cpumask_of(1));
+> +
+>  	pm_power_off = v2m_power_off;
+>  	arm_pm_restart = v2m_restart;
+
+WBR, Sergei
