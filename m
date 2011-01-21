@@ -1,11 +1,10 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Fri, 21 Jan 2011 13:01:06 -0800
+From: joe@perches.com (Joe Perches)
+Date: Fri, 21 Jan 2011 13:02:42 -0800
 Subject: [PATCH 0/7] Nexus One Support
 In-Reply-To: <1295642995.19880.42.camel@m0nster>
 References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
 	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster>
-	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
 	<1295575123.9236.54.camel@m0nster>
 	<1295576730.4096.24.camel@Joe-Laptop>
 	<1295624801.19880.13.camel@m0nster>
@@ -16,28 +15,28 @@ References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
 	<1295633882.19880.31.camel@m0nster>
 	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
 	<1295642995.19880.42.camel@m0nster>
-Message-ID: <20110121130106.5f30908d@jbarnes-desktop>
+Message-ID: <1295643762.25868.31.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Jan 2011 12:49:55 -0800
-Daniel Walker <dwalker@codeaurora.org> wrote:
-
+On Fri, 2011-01-21 at 12:49 -0800, Daniel Walker wrote:
 > On Fri, 2011-01-21 at 12:44 -0800, Dima Zavin wrote:
 > > Really though? Let's look at one of them:
-> > 
-> 
 > >       2 Arve Hj?nnev?g <arve@android.com>
 > >       6 Brian Swetland <swetland@google.com>
 > >      14 Dima Zavin <dima@android.com>
 > >       2 Haley Teng <Haley_Teng@htc.com>
 > >       1 Iliyan Malchev <malchev@google.com>
 > >       5 Mike Chan <mike@android.com>
-> 
 > I'll add this list into the commit text ..
 
-Sounds like a good example of a patch where you should preserve the
-author field as well.
+I think it'd be better if you pull them into a
+git repository, then use either:
+	git format-patch
+	git send-email
+or
+	git request-pull
 
--- 
-Jesse Barnes, Intel Open Source Technology Center
+That way no author history is lost.
+
+cheers, Joe
