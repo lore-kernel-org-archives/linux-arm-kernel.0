@@ -1,74 +1,68 @@
 From: prakity@marvell.com (Philip Rakity)
-Date: Fri, 21 Jan 2011 10:45:14 -0800
-Subject: ARM: mach-mmp: SDH register definitions for (pxa168, pxa910, mmp2)
-Message-ID: <55E83F63-00EC-4D2F-B97E-161E4FE82F2D@marvell.com>
+Date: Fri, 21 Jan 2011 10:46:28 -0800
+Subject: [PATCH] plat-pxa/mach-mmp: brownstone support for multiple sd slots
+Message-ID: <1F8A48A2-361A-41A3-82BB-117F4FEAA887@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Register definitions added for APMU registers for all platforms
-Definitions are platform dependent (not same for pxa168, pxz910, mmp2).
+brownstone.c extended to support multiple sd/eMMC interfaces.
+enable mmc1, 2, and 3.
+mmc2 is used eMMC and slot is marked PERMANENT and 8 bit device
+mmc1 is used for Wifi and slot is marked PERMANENT
 
-mmp2.c modified to use correct platform registers for MMC/SDH.
+Note: eMMC (mmc2) is set to initialize first to workaround a problem
+where booting in logical order requires mmc create work queue
+to be multi-threaded otherwise boot process hangs.  BUG report
+send to linux-mmc and linux-kernel mailing list.
 
 Signed-off-by: Philip Rakity <prakity@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/regs-apmu.h |   18 ++++++++++++++----
- arch/arm/mach-mmp/mmp2.c                   |    8 ++++----
- 2 files changed, 18 insertions(+), 8 deletions(-)
+ arch/arm/mach-mmp/brownstone.c         |   11 +++++++++++
+ arch/arm/plat-pxa/include/plat/sdhci.h |    1 +
+ 2 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/regs-apmu.h b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-index f7011ef..9d1146f 100644
---- a/arch/arm/mach-mmp/include/mach/regs-apmu.h
-+++ b/arch/arm/mach-mmp/include/mach/regs-apmu.h
-@@ -20,15 +20,25 @@
- #define APMU_IRE	APMU_REG(0x048)
- #define APMU_LCD	APMU_REG(0x04c)
- #define APMU_CCIC	APMU_REG(0x050)
--#define APMU_SDH0	APMU_REG(0x054)
--#define APMU_SDH1	APMU_REG(0x058)
- #define APMU_USB	APMU_REG(0x05c)
- #define APMU_NAND	APMU_REG(0x060)
- #define APMU_DMA	APMU_REG(0x064)
- #define APMU_GEU	APMU_REG(0x068)
- #define APMU_BUS	APMU_REG(0x06c)
--#define APMU_SDH2	APMU_REG(0x0e8)
--#define APMU_SDH3	APMU_REG(0x0ec)
-+
-+#define APMU_PXA168_SDH0	APMU_REG(0x054)
-+#define APMU_PXA168_SDH1	APMU_REG(0x058)
-+#define APMU_PXA168_SDH2	APMU_REG(0x0e0)
-+#define APMU_PXA168_SDH3	APMU_REG(0x0e4)
-+
-+#define APMU_PXA910_SDH0	APMU_REG(0x054)
-+#define APMU_PXA910_SDH1	APMU_REG(0x058)
-+#define APMU_PXA910_SDH2	APMU_REG(0x0e0)
-+
-+#define APMU_MMP2_SDH0	APMU_REG(0x054)
-+#define APMU_MMP2_SDH1	APMU_REG(0x058)
-+#define APMU_MMP2_SDH2	APMU_REG(0x0e8)
-+#define APMU_MMP2_SDH3	APMU_REG(0x0ec)
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index 7bb78fd..75b4f63 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -180,6 +180,15 @@ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+ 	.max_speed	= 25000000,
+ };
  
- #define APMU_FNCLK_EN	(1 << 4)
- #define APMU_AXICLK_EN	(1 << 3)
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index 8e6c3ac..564bfbc 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -151,10 +151,10 @@ static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
- static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
++static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
++	.flags		= PXA_FLAG_CARD_PERMANENT,
++};
++
++static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
++	.flags		= PXA_FLAG_CARD_PERMANENT |
++				PXA_FLAG_SD_8_BIT_CAPABLE_SLOT,
++};
++
+ static void __init brownstone_init(void)
+ {
+ 	mfp_config(ARRAY_AND_SIZE(brownstone_pin_config));
+@@ -188,7 +197,9 @@ static void __init brownstone_init(void)
+ 	mmp2_add_uart(1);
+ 	mmp2_add_uart(3);
+ 	mmp2_add_twsi(1, NULL, ARRAY_AND_SIZE(brownstone_twsi1_info));
++	mmp2_add_sdhost(2, &mmp2_sdh_platdata_mmc2); /* eMMC */
+ 	mmp2_add_sdhost(0, &mmp2_sdh_platdata_mmc0); /* SD/MMC */
++	mmp2_add_sdhost(1, &mmp2_sdh_platdata_mmc1); /* Wifi */
  
- static APMU_CLK(nand, NAND, 0xbf, 100000000);
--static APMU_CLK_OPS(sdh0, SDH0, 0x1b, 200000000, &sdhc_clk_ops);
--static APMU_CLK_OPS(sdh1, SDH1, 0x1b, 200000000, &sdhc_clk_ops);
--static APMU_CLK_OPS(sdh2, SDH2, 0x1b, 200000000, &sdhc_clk_ops);
--static APMU_CLK_OPS(sdh3, SDH3, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh0, MMP2_SDH0, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh1, MMP2_SDH1, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh2, MMP2_SDH2, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh3, MMP2_SDH3, 0x1b, 200000000, &sdhc_clk_ops);
+ 	/* enable 5v regulator */
+ 	platform_device_register(&brownstone_v_5vp_device);
+diff --git a/arch/arm/plat-pxa/include/plat/sdhci.h b/arch/arm/plat-pxa/include/plat/sdhci.h
+index 1ab332e..a5bf405 100644
+--- a/arch/arm/plat-pxa/include/plat/sdhci.h
++++ b/arch/arm/plat-pxa/include/plat/sdhci.h
+@@ -17,6 +17,7 @@
+ /* Require clock free running */
+ #define PXA_FLAG_DISABLE_CLOCK_GATING (1<<0)
  
- static struct clk_lookup mmp2_clkregs[] = {
- 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
++#define PXA_FLAG_CARD_PERMANENT		(1<<1)
+ /* Board design supports 8-bit data on SD/SDIO BUS */
+ #define PXA_FLAG_SD_8_BIT_CAPABLE_SLOT (1<<2)
+ 
 -- 
 1.7.0.4
