@@ -1,59 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 22:02:38 +0000
-Subject: Locking in the clk API
-In-Reply-To: <alpine.LFD.2.00.1101211618170.8580@xanadu.home>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
-	<20110120185617.GI6335@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
-	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
-	<4D3907BD.4040900@codeaurora.org>
-	<AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>
-	<alpine.LFD.2.00.1101211618170.8580@xanadu.home>
-Message-ID: <20110121220238.GE23151@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Jan 2011 17:20:57 -0500 (EST)
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <20110121215110.GD23151@n2100.arm.linux.org.uk>
+References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
+	<20110121215110.GD23151@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101211655110.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 04:53:44PM -0500, Nicolas Pitre wrote:
-> So I think that the API must be augmented with more methods, such as:
+On Fri, 21 Jan 2011, Russell King - ARM Linux wrote:
+
+> On Fri, Jan 21, 2011 at 02:59:35PM -0500, Nicolas Pitre wrote:
+> > On Fri, 21 Jan 2011, Pawel Moll wrote:
+> > 
+> > > VE suffers from serious problem with MMC transfers - low performance,
+> > > errors when other IO peripherals (especially USB) are used at the
+> > > same time etc.
+> > > 
+> > > It all boils down to the MMC controller short FIFO and - in result -
+> > > timing constrains. The most problematic case - USB driver hogging
+> > > CPU and MMC FIFO under/overruns in the result - can be mitigated on
+> > > SMP system by distributing interrupts handling for these peripherals
+> > > between cores.
+> > 
+> > Wouldn't the ultimate solution be to simply use FIQs to service the MMC FIFO?
 > 
-> clk_slow_enable():
->   - may sleep
->   - may be a no-op if the clk_fast_enable() is supported
-> 
-> clk_fast_enable():
->   - may not sleep, used in atomic context
->   - may be a no-op if controlling the clock takes time, in which case 
->     clk_slow_enable() must have set the clock up entirely
-> 
-> ... and similar for clk_slow_disable() and clk_fast_disable().
+> Could you suggest how to route an arbitary interrupt to the FIQ using
+> the GIC?
 
-Isn't this along the same lines as my clk_prepare() vs clk_enable()
-suggestion?
+No I can't, hence my question.
 
-I suggested that clk_prepare() be callable only from non-atomic contexts,
-and do whatever's required to ensure that the clock is available.  That
-may end up enabling the clock as a result.
+> On systems which implement security extensions, the non-secure world can
+> only use IRQs and not FIQs.  The secure world can use FIQs - in which
+> case interrupts marked as secure interrupts can go to FIQ.
 
-clk_enable() callable from atomic contexts, and turns the clock on if
-the hardware supports such an operation.
+In that case, in theory, the secure world could provide some kind of 
+software based DMA engine facility to the non-secure world for this FIFO 
+servicing purpose.
 
-So, if you have something like:
+> On systems without security extensions, the GIC only supports IRQ, and
+> you need a second GIC implemented for FIQs.  I'm not aware of any system
+> doing that.
 
-Xtal--->PLL--->Routing/Masking--->Device
+The only solution in that case is to give top priority to the FIFO IRQ 
+and never disable IRQs when in interrupt context, except for that FIFO 
+servicing handler which should keep IRQs masked out throughout.  In any 
+case this would certainly be only a hack for badly misdesigned hardware.
 
-clk = clk_get() returns the clock for the device.
 
-clk_prepare(clk) would walk up the clock tree, selecting the routing and
-preparing each clock.  Clocks prior to _and_ including the PLL would need
-to be enabled.
-
-clk_enable(clk) would walk up the tree if the clock isn't already enabled,
-calling clk_enable() on the parent clock.  As we require prepared clocks
-to already be enabled, this automatically stops at the PLL.
-
-To encourage correct usage, we just need to make sure that clk_prepare()
-has a might_sleep() thing, and clk_enable() throws a fit if it's used
-on a clk without prepare being used first.  The second point is not easy
-to do in a foolproof manner though, but doing _something_ is better than
-nothing.
+Nicolas
