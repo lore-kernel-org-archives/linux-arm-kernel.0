@@ -1,82 +1,193 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 09:39:40 +0000
-Subject: Locking in the clk API
-In-Reply-To: <AANLkTikJjkJvr2J-9eq2-Jj8L=JvwUQS+QNj9gWFX-TL@mail.gmail.com>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<201101111744.59712.jeremy.kerr@canonical.com>
-	<20110111103929.GN24920@pengutronix.de>
-	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
-	<4D386ABF.9060908@fluff.org>
-	<20110120190822.GK6335@n2100.arm.linux.org.uk>
-	<AANLkTim5N_sCCoOR40y7sTvdDoFkUJd4tUSSbrCccGjy@mail.gmail.com>
-	<AANLkTikJjkJvr2J-9eq2-Jj8L=JvwUQS+QNj9gWFX-TL@mail.gmail.com>
-Message-ID: <20110121093940.GC13235@n2100.arm.linux.org.uk>
+From: stanleymiao@gmail.com (Stanley.Miao)
+Date: Fri, 21 Jan 2011 17:40:54 +0800
+Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
+In-Reply-To: <1295419487-31185-2-git-send-email-stanley.miao@windriver.com>
+References: <1295419487-31185-1-git-send-email-stanley.miao@windriver.com>
+	<1295419487-31185-2-git-send-email-stanley.miao@windriver.com>
+Message-ID: <AANLkTiknacY=61GLsJ-hyT5BPmKhKJ8JrRCm-ZCCOetG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 01:47:29PM +0900, Jassi Brar wrote:
-> On Fri, Jan 21, 2011 at 9:09 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> > On Fri, Jan 21, 2011 at 4:08 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> >> On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
-> >>> If you want to make it so that each low-power mode has to work
-> >>> out what PLLs need to be disabled and then re-enabled makes me
-> >>> want to be sick. Hiding this stuff behind specific implementations
-> >>> is a recipe for disaster.
-> >>
-> >> Why should systems which don't suffer from such problems be prevented
-> >> from gaining power saving from turning off their clocks when devices
-> >> are not being used (eg, the console serial port.)
-> >>
-> >> One solution to your root PLL issue would be to have a separate set of
-> >> enable/disable API calls which get called at setup/release time (or
-> >> whatever you'd like to call it) which can only be called from non-atomic
-> >> context. ?Maybe clk_prepare() and clk_unprepare(). ?These functions
-> >> should perform whatever is necessary to ensure that the clock source
-> >> is available for use atomically when clk_enable() is called.
-> >>
-> >> So, in your case, clk_prepare() ensures that the root PLL is enabled,
-> >> clk_unprepare() allows it to be turned off.
-> >>
-> >> In the case of a console driver, clk_prepare() can be called when we
-> >> know the port will be used as a console. ?clk_enable() is then called
-> >> before writing out the string, and clk_disable() after we've completely
-> >> sent the last character.
-> >>
-> >> This allows the best of both worlds. ?We now have a clk_enable() which
-> >> can be used to turn the clocks off through the clock tree up to the first
-> >> non-atomic clock, and we also have a way to deal with those which need
-> >> to sleep. ?So not only do "sleeping clock" implementations become possible
-> >> but these "sleeping clock" implementations also get the opportunity to
-> >> shutdown some of their clock tree with minimal latency for doing so.
-> >
-> > This is exactly what I suggested in my last post, except the console example.
-> > Only to be a part of common clock api because it's not very safe to assume
-> > future SoCs will have the same simple clock topologies that they have today.
-> >
-> > Not to mean to teach, but I hope you realize with more and more
-> > device controller being crammed into ever shrinking SoCs,
-> > clock would eventually have to be flexible in functionality
-> > and complicated in hierarchy. Ben already gave examples
-> > of Audio, MFC and Video controllers of latest Samsung SoCs.
-> 
-> plus
-> 
-> a) If only Samsung bsp implements the api, it would be impossible to
-> share drivers, those that can be, with other platforms without nasty ifdef's.
-> b) If the task of unification starts with only a particular platform made to
-> implement a new api, the attempt kills its own purpose.
+Hi, Russell,
 
-I guess we give up with the idea of unifying the API then, because it is
-proving to be impossible to come to any kind of concensus.  Even ideas
-to solve the points of contention are argued against.
+It looks no other comments. I uploaded these patches to you patches
+tracking system.
 
-I see no one else coming up with any practical ideas how to resolve this,
-but what I do see is that attempts to provide a solution to allow progress
-towards a unified API are shot down with great vigour.
+Stanley.
 
-So from what I can see it's a complete waste of time discussing this any
-further.
 
-Unified clock API?  It'll *never* happen.
+2011/1/19, Stanley.Miao <stanley.miao@windriver.com>:
+> The code section in BE8 kernel modules is in little-endian while data
+> section is in big-endian. When reading code from memory in the relocation
+> procedure, these instructions are read according to big-endian, so they are
+> needed to be inverted.
+>
+> Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
+> ---
+>  arch/arm/Makefile        |    1 +
+>  arch/arm/kernel/module.c |   62
+> +++++++++++++++++++++++++++++-----------------
+>  2 files changed, 40 insertions(+), 23 deletions(-)
+>
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 3eec793..03e7761 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -13,6 +13,7 @@
+>  LDFLAGS_vmlinux	:=-p --no-undefined -X
+>  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+>  LDFLAGS_vmlinux	+= --be8
+> +LDFLAGS_MODULE	+= --be8
+>  endif
+>
+>  OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index d9bd786..c5e5bb1 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -99,6 +99,18 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
+>  	return 0;
+>  }
+>
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +#define read_instr32(c)			__swab32(*(u32 *)c)
+> +#define read_instr16(c)			__swab16(*(u16 *)c)
+> +#define write_instr32(v,a)		(*(u32 *)(a) = __swab32((__force __u32)(v)))
+> +#define write_instr16(v,a)		(*(u16 *)(a) = __swab16((__force __u16)(v)))
+> +#else
+> +#define read_instr32(c)			(*(u32 *)c)
+> +#define read_instr16(c)			(*(u16 *)c)
+> +#define write_instr32(v,a)		(*(u32 *)(a) = (v))
+> +#define write_instr16(v,a)		(*(u16 *)(a) = (v))
+> +#endif
+> +
+>  int
+>  apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int
+> symindex,
+>  	       unsigned int relindex, struct module *module)
+> @@ -148,7 +160,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
+> unsigned int symindex,
+>  		case R_ARM_PC24:
+>  		case R_ARM_CALL:
+>  		case R_ARM_JUMP24:
+> -			offset = (*(u32 *)loc & 0x00ffffff) << 2;
+> +			offset = (read_instr32(loc) & 0x00ffffff) << 2;
+>  			if (offset & 0x02000000)
+>  				offset -= 0x04000000;
+>
+> @@ -165,8 +177,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
+> unsigned int symindex,
+>
+>  			offset >>= 2;
+>
+> -			*(u32 *)loc &= 0xff000000;
+> -			*(u32 *)loc |= offset & 0x00ffffff;
+> +			write_instr32((read_instr32(loc) & 0xff000000) |
+> +						(offset & 0x00ffffff), loc);
+>  			break;
+>
+>  	       case R_ARM_V4BX:
+> @@ -174,9 +186,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
+> unsigned int symindex,
+>  			* other bits to re-code instruction as
+>  			* MOV PC,Rm.
+>  			*/
+> -		       *(u32 *)loc &= 0xf000000f;
+> -		       *(u32 *)loc |= 0x01a0f000;
+> -		       break;
+> +			write_instr32((read_instr32(loc) & 0xf000000f) |
+> +							0x01a0f000, loc);
+> +			break;
+>
+>  		case R_ARM_PREL31:
+>  			offset = *(u32 *)loc + sym->st_value - loc;
+> @@ -185,7 +197,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
+> unsigned int symindex,
+>
+>  		case R_ARM_MOVW_ABS_NC:
+>  		case R_ARM_MOVT_ABS:
+> -			offset = *(u32 *)loc;
+> +			offset = read_instr32(loc);
+>  			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
+>  			offset = (offset ^ 0x8000) - 0x8000;
+>
+> @@ -193,16 +205,16 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
+> *strtab, unsigned int symindex,
+>  			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
+>  				offset >>= 16;
+>
+> -			*(u32 *)loc &= 0xfff0f000;
+> -			*(u32 *)loc |= ((offset & 0xf000) << 4) |
+> -					(offset & 0x0fff);
+> +			write_instr32((read_instr32(loc) & 0xfff0f000) |
+> +					((offset & 0xf000) << 4) |
+> +					(offset & 0x0fff), loc);
+>  			break;
+>
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  		case R_ARM_THM_CALL:
+>  		case R_ARM_THM_JUMP24:
+> -			upper = *(u16 *)loc;
+> -			lower = *(u16 *)(loc + 2);
+> +			upper = read_instr16(loc);
+> +			lower = read_instr16(loc + 2);
+>
+>  			/*
+>  			 * 25 bit signed address range (Thumb-2 BL and B.W
+> @@ -242,17 +254,19 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
+> *strtab, unsigned int symindex,
+>  			sign = (offset >> 24) & 1;
+>  			j1 = sign ^ (~(offset >> 23) & 1);
+>  			j2 = sign ^ (~(offset >> 22) & 1);
+> -			*(u16 *)loc = (u16)((upper & 0xf800) | (sign << 10) |
+> -					    ((offset >> 12) & 0x03ff));
+> -			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
+> -						  (j1 << 13) | (j2 << 11) |
+> -						  ((offset >> 1) & 0x07ff));
+> +			write_instr16((u16)((upper & 0xf800) | (sign << 10) |
+> +						((offset >> 12) & 0x03ff)),
+> +					loc);
+> +			write_instr16((u16)((lower & 0xd000) |
+> +						(j1 << 13) | (j2 << 11) |
+> +						((offset >> 1) & 0x07ff)),
+> +					loc + 2);
+>  			break;
+>
+>  		case R_ARM_THM_MOVW_ABS_NC:
+>  		case R_ARM_THM_MOVT_ABS:
+> -			upper = *(u16 *)loc;
+> -			lower = *(u16 *)(loc + 2);
+> +			upper = read_instr16(loc);
+> +			lower = read_instr16(loc + 2);
+>
+>  			/*
+>  			 * MOVT/MOVW instructions encoding in Thumb-2:
+> @@ -273,12 +287,14 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
+> *strtab, unsigned int symindex,
+>  			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
+>  				offset >>= 16;
+>
+> -			*(u16 *)loc = (u16)((upper & 0xfbf0) |
+> +			write_instr16((u16)((upper & 0xfbf0) |
+>  					    ((offset & 0xf000) >> 12) |
+> -					    ((offset & 0x0800) >> 1));
+> -			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
+> +					    ((offset & 0x0800) >> 1)),
+> +					doc);
+> +			write_instr16((u16)((lower & 0x8f00) |
+>  						  ((offset & 0x0700) << 4) |
+> -						  (offset & 0x00ff));
+> +						  (offset & 0x00ff)),
+> +					doc + 2);
+>  			break;
+>  #endif
+>
+> --
+> 1.5.4.3
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
