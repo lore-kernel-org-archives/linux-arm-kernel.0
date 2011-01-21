@@ -1,67 +1,94 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 20 Jan 2011 23:16:04 -0800
-Subject: Locking in the clk API
-In-Reply-To: <20110120190822.GK6335@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111091607.GI12552@n2100.arm.linux.org.uk>	<201101111744.59712.jeremy.kerr@canonical.com>	<20110111103929.GN24920@pengutronix.de>	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>	<4D386ABF.9060908@fluff.org>
-	<20110120190822.GK6335@n2100.arm.linux.org.uk>
-Message-ID: <4D3932B4.8010904@codeaurora.org>
+Date: Thu, 20 Jan 2011 23:29:22 -0800
+Subject: [Openpxa-users] Linux udelay() is way off
+In-Reply-To: <AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
+References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>	<201101201800.04289.marek.vasut@gmail.com>	<20110120175551.GG6335@n2100.arm.linux.org.uk>
+	<AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
+Message-ID: <4D3935D2.4050307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2011 11:08 AM, Russell King - ARM Linux wrote:
-> On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
->> If you want to make it so that each low-power mode has to work
->> out what PLLs need to be disabled and then re-enabled makes me
->> want to be sick. Hiding this stuff behind specific implementations
->> is a recipe for disaster.
+On 01/20/2011 11:18 AM, Bj?rn Forsman wrote:
+> On 20 January 2011 18:55, Russell King - ARM Linux
+> <linux@arm.linux.org.uk>  wrote:
+>> On Thu, Jan 20, 2011 at 06:00:04PM +0100, Marek Vasut wrote:
+>>> On Thursday 20 January 2011 17:09:00 Bj?rn Forsman wrote:
+>>>> Hi,
+>>>>
+>>>> On my Colibri PXA310, I see that Linux udelay() is only 30 % of the
+>>>> length it's supposed to. This is way off and cause problems (e.g.
+>>>> 1-Wire device driver breaks). I'm running OpenPXA bootloaders (OBM2 +
+>>>> U-Boot) and mainline Linux 2.6.36.
+>>>>
+>>>> Any ideas how to fix this?
+>>>>
+>>>> Could it be that U-Boot sets up the system clock to something
+>>>> different than what Linux "expects" so that loops_per_jiffy becomes
+>>>> wrong? I see some clock setup in<u-boot-pxa>/arch/arm/cpu/pxa/start.S
+>>>> but I'm not sure what to do with it (yet). I'd like to try out
+>>>> different clock speeds to see if it helps. Any pointers?
+>>>>
+>>>> I also have a workaround in mind: Try out different lpj= settings on
+>>>> the kernel command line until a udelay(1000) actually is 1000 us. Is
+>>>> this a sane thing to do?
+>>>
+>>> CCing relevant people.
+>>>
+>>> And no, linux kernel should derive it's timing properly so it's a kernel bug.
+>>
+>> I recently looked into the udelay() timing accuracy, and I saw it only
+>> being reduced by .7% at boot time - due to the cycles stolen by the timer
+>> IRQ handler.
+>>
+>> The delay calibration algorithm shouldn't produce big errors due to the
+>> way it works.  It first tries to find a delay longer than the timer tick.
+>> It then uses a successive approximation technique over about 9 bits of
+>> loops_per_jiffy value.
+>>
+>> So, I wouldn't expect the boot time lpj value to be significantly out.
+>>
+>> However, what might be happening is you boot at X MHz.  You then use cpufreq
+>> and drop the frequency to Y MHz.  You then suspend and resume.  On resume,
+>> the boot loader starts the processor again at X MHz, but the kernel still
+>> assumes that you're running at Y MHz and has not adjusted the delay loop
+>> accordingly.
+>>
+>> This will result in a much shorter than expected delay.
+>>
+>> So, the first thing that needs doing is to ascertain when the delay
+>> becomes wrong.
 >
-> Why should systems which don't suffer from such problems be prevented
-> from gaining power saving from turning off their clocks when devices
-> are not being used (eg, the console serial port.)
+> I'm not doing any suspend/resume stuff.
 >
-> One solution to your root PLL issue would be to have a separate set of
-> enable/disable API calls which get called at setup/release time (or
-> whatever you'd like to call it) which can only be called from non-atomic
-> context.  Maybe clk_prepare() and clk_unprepare().  These functions
-> should perform whatever is necessary to ensure that the clock source
-> is available for use atomically when clk_enable() is called.
+> But I did have cpufreq enabled (using default 'performance' governor).
+> Disabling cpufreq makes udelay() correct. Yay!
 >
-> So, in your case, clk_prepare() ensures that the root PLL is enabled,
-> clk_unprepare() allows it to be turned off.
+> In order to try diagnosing the problem I re-enabled cpufreq and booted
+> with cpufreq.debug=7.
 >
-> In the case of a console driver, clk_prepare() can be called when we
-> know the port will be used as a console.  clk_enable() is then called
-> before writing out the string, and clk_disable() after we've completely
-> sent the last character.
->
-> This allows the best of both worlds.  We now have a clk_enable() which
-> can be used to turn the clocks off through the clock tree up to the first
-> non-atomic clock, and we also have a way to deal with those which need
-> to sleep.  So not only do "sleeping clock" implementations become possible
-> but these "sleeping clock" implementations also get the opportunity to
-> shutdown some of their clock tree with minimal latency for doing so.
 
-This suggestion looked promising till I realized that clk_set_rate() 
-will still be atomic. clk_set_rate() will need to enable/disable the 
-PLLs depending on which PLLs the rates are derived from. So, the locking 
-in clk_prepare/unprepare() still has to be atomic since the "slow stuff" 
-is shared with clk_set_rate().
+Bjorn,
 
-IMO, the most workable/flexible suggestion I have seen so far is:
-- Having a way to explicitly ask for an atomic clock from clk_get(). 
-That way the driver can decide to fail early during probe or decide to 
-enable/disable in open/close or if it gets atomic clocks to 
-enable/disable in atomic context.
-- Atomic and sleep-able variants of clk_enable/disable/set_rate. I 
-personally prefer the existing APIs to be sleep-able and introduce new 
-atomic variants, but it's not worth the time arguing over that.
+Assuming your hardware is not weird at scaling and needs something like 
+Russell said:
+	new_lpj = ref_lpj * (new_freq / ref_freq) + some_offset
 
-Taking one step at a time, do we all at least agree having two variants 
-of enable/disable/set_rate?
+The most likely scenario seems to be that the CPU freq driver that's 
+specific to your CPU is not setting the CPU to the frequency it thinks 
+it's setting it to. It might THINK it's running at 624 MHz, but it might 
+really be at 310 MHz or 100 MHz or something. Since, if the frequency at 
+which the calibration was done or if the new frequencies are not what 
+really what they are reported to be, then the math will go wrong and you 
+would see these kind of issues.
 
-Thanks,
-Saravana
+If you can somehow measure your CPU freq with an oscilloscope, measure 
+these two:
+- Just before calibrate_delay is run for the first time.
+- When you are seeing the udelay to be wrong.
 
+One of these two won't match what you think the CPU is running at.
+
+-Saravana
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
