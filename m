@@ -1,68 +1,62 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 21 Jan 2011 22:14:17 +0300
-Subject: [PATCH] ASoC: correct link specifications for corgi, poodle and spitz
-Message-ID: <1295637257-28299-1-git-send-email-dbaryshkov@gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 21 Jan 2011 11:16:52 -0800
+Subject: [PATCH] drivers: mmc: msm: remove clock disable in probe
+In-Reply-To: <1295629086.19880.17.camel@m0nster>
+References: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>	
+	<AANLkTim-=40MM=TeH1XSQ-rio1ctwcZAs4qbf9SaxmdH@mail.gmail.com>	
+	<4D38FC55.2030601@codeaurora.org>
+	<1295629086.19880.17.camel@m0nster>
+Message-ID: <4D39DBA4.2040107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ASoC DAI link descriptions for Corgi, Poodle and Spitz platforms
-contained incorrect names for cpu_dai and codec, which effectievly disabled sound
-on theese platforms. Fix that errors.
+On 01/21/2011 08:58 AM, Daniel Walker wrote:
+> On Thu, 2011-01-20 at 19:24 -0800, Saravana Kannan wrote:
+>> On 01/19/2011 02:50 AM, Vitaly Wool wrote:
+>>> Hi,
+>>>
+>>> On Tue, Jan 18, 2011 at 7:14 PM, Daniel Walker<dwalker@codeaurora.org>   wrote:
+>>>> The probe function adds the MMC host which can start accepting request
+>>>> immediately. There is an assumption here that no requests happen
+>>>> immediatly, but it's not always the case. This assumption can causes
+>>>> a BUG() when the clocks are disabled. The fix is to just remove the
+>>>> clock disable in the probe function.
+>>>>
+>>>> Signed-off-by: Daniel Walker<dwalker@codeaurora.org>
+>>>
+>>> I can add acked-by and/or tested-by if needed.
+>>>
+>>> ~Vitaly
+>>
+>> Nack from me. The fix is incorrect. The clocks are alread refcounted in
+>> the clock driver. There should be no need to "leave it on because
+>> someone else might access it". Every code that needs the clock should
+>> have a clk_enable/disable around it and it would all work fine.
+>
+> You appear to be wrong Saravana .. The clocks are off at that point,
+> which means there's no need to disable them twice. If you look at the
+> MMC code mmc_add_host() will disable the clocks.
+>
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- sound/soc/pxa/corgi.c  |    4 ++--
- sound/soc/pxa/poodle.c |    2 +-
- sound/soc/pxa/spitz.c  |    4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+Does the clock disable in the probe fail all the time or only sometimes?
 
-diff --git a/sound/soc/pxa/corgi.c b/sound/soc/pxa/corgi.c
-index f451acd..135d903 100644
---- a/sound/soc/pxa/corgi.c
-+++ b/sound/soc/pxa/corgi.c
-@@ -305,10 +305,10 @@ static int corgi_wm8731_init(struct snd_soc_pcm_runtime *rtd)
- static struct snd_soc_dai_link corgi_dai = {
- 	.name = "WM8731",
- 	.stream_name = "WM8731",
--	.cpu_dai_name = "pxa-is2-dai",
-+	.cpu_dai_name = "pxa2xx-i2s",
- 	.codec_dai_name = "wm8731-hifi",
- 	.platform_name = "pxa-pcm-audio",
--	.codec_name = "wm8731-codec-0.001a",
-+	.codec_name = "wm8731-codec-0.001b",
- 	.init = corgi_wm8731_init,
- 	.ops = &corgi_ops,
- };
-diff --git a/sound/soc/pxa/poodle.c b/sound/soc/pxa/poodle.c
-index 84edd03..0eebe11 100644
---- a/sound/soc/pxa/poodle.c
-+++ b/sound/soc/pxa/poodle.c
-@@ -274,7 +274,7 @@ static struct snd_soc_dai_link poodle_dai = {
- 	.cpu_dai_name = "pxa2xx-i2s",
- 	.codec_dai_name = "wm8731-hifi",
- 	.platform_name = "pxa-pcm-audio",
--	.codec_name = "wm8731-codec.0-001a",
-+	.codec_name = "wm8731-codec.0-001b",
- 	.init = poodle_wm8731_init,
- 	.ops = &poodle_ops,
- };
-diff --git a/sound/soc/pxa/spitz.c b/sound/soc/pxa/spitz.c
-index 0b30d7d..7604471 100644
---- a/sound/soc/pxa/spitz.c
-+++ b/sound/soc/pxa/spitz.c
-@@ -313,10 +313,10 @@ static int spitz_wm8750_init(struct snd_soc_pcm_runtime *rtd)
- static struct snd_soc_dai_link spitz_dai = {
- 	.name = "wm8750",
- 	.stream_name = "WM8750",
--	.cpu_dai_name = "pxa-is2",
-+	.cpu_dai_name = "pxa2xx-i2s",
- 	.codec_dai_name = "wm8750-hifi",
- 	.platform_name = "pxa-pcm-audio",
--	.codec_name = "wm8750-codec.0-001a",
-+	.codec_name = "wm8750-codec.0-001b",
- 	.init = spitz_wm8750_init,
- 	.ops = &spitz_ops,
- };
+mmc_add_host() does a lot of things, so it's hard to figure out how it 
+eventually ends up disabling the clocks as you claim. The only execution 
+path from add_host() that I can see disabling the clocks are the calls 
+to host->ios(). But that function has an enable and disable inside it. 
+So, that's already balanced.
+
+To me this still looks like a clock enable/disable mismatch. My best 
+*guess* would be that the deferred disable code in 
+msmsdcc_disable_clocks() might be missing a corner case and causing a 
+disable to happen more that it should.
+
+I will look further into this if I have time, but at this point I'm 
+still skeptical whether this is the right fix. The reason I went from 
+"sure" to "skeptical" is due to the deferred clock delay code in the driver.
+
+-Saravana
+
 -- 
-1.7.2.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
