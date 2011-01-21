@@ -1,94 +1,46 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 20 Jan 2011 23:29:22 -0800
-Subject: [Openpxa-users] Linux udelay() is way off
-In-Reply-To: <AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
-References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>	<201101201800.04289.marek.vasut@gmail.com>	<20110120175551.GG6335@n2100.arm.linux.org.uk>
-	<AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
-Message-ID: <4D3935D2.4050307@codeaurora.org>
+From: vimal.newwork@gmail.com (Vimal Singh)
+Date: Fri, 21 Jan 2011 13:07:44 +0530
+Subject: [PATCH] omap3: nand: bch ecc support added
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B036A8DAF6C@dbde02.ent.ti.com>
+References: <1295518680-8737-1-git-send-email-s-ghorai@ti.com>
+	<AANLkTin3pRkqLkQ_J1iTtqr0M+iz5V25S9ZwJc9+T0VW@mail.gmail.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B036A8DAF6C@dbde02.ent.ti.com>
+Message-ID: <AANLkTi=0ZuG6i3x4uZ2+R8ZVmvmydrvK2zZQJbLoz=4L@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2011 11:18 AM, Bj?rn Forsman wrote:
-> On 20 January 2011 18:55, Russell King - ARM Linux
-> <linux@arm.linux.org.uk>  wrote:
->> On Thu, Jan 20, 2011 at 06:00:04PM +0100, Marek Vasut wrote:
->>> On Thursday 20 January 2011 17:09:00 Bj?rn Forsman wrote:
->>>> Hi,
->>>>
->>>> On my Colibri PXA310, I see that Linux udelay() is only 30 % of the
->>>> length it's supposed to. This is way off and cause problems (e.g.
->>>> 1-Wire device driver breaks). I'm running OpenPXA bootloaders (OBM2 +
->>>> U-Boot) and mainline Linux 2.6.36.
->>>>
->>>> Any ideas how to fix this?
->>>>
->>>> Could it be that U-Boot sets up the system clock to something
->>>> different than what Linux "expects" so that loops_per_jiffy becomes
->>>> wrong? I see some clock setup in<u-boot-pxa>/arch/arm/cpu/pxa/start.S
->>>> but I'm not sure what to do with it (yet). I'd like to try out
->>>> different clock speeds to see if it helps. Any pointers?
->>>>
->>>> I also have a workaround in mind: Try out different lpj= settings on
->>>> the kernel command line until a udelay(1000) actually is 1000 us. Is
->>>> this a sane thing to do?
->>>
->>> CCing relevant people.
->>>
->>> And no, linux kernel should derive it's timing properly so it's a kernel bug.
->>
->> I recently looked into the udelay() timing accuracy, and I saw it only
->> being reduced by .7% at boot time - due to the cycles stolen by the timer
->> IRQ handler.
->>
->> The delay calibration algorithm shouldn't produce big errors due to the
->> way it works.  It first tries to find a delay longer than the timer tick.
->> It then uses a successive approximation technique over about 9 bits of
->> loops_per_jiffy value.
->>
->> So, I wouldn't expect the boot time lpj value to be significantly out.
->>
->> However, what might be happening is you boot at X MHz.  You then use cpufreq
->> and drop the frequency to Y MHz.  You then suspend and resume.  On resume,
->> the boot loader starts the processor again at X MHz, but the kernel still
->> assumes that you're running at Y MHz and has not adjusted the delay loop
->> accordingly.
->>
->> This will result in a much shorter than expected delay.
->>
->> So, the first thing that needs doing is to ascertain when the delay
->> becomes wrong.
+On Fri, Jan 21, 2011 at 9:37 AM, Ghorai, Sukumar <s-ghorai@ti.com> wrote:
 >
-> I'm not doing any suspend/resume stuff.
+>> -----Original Message-----
+>> From: Vimal Singh [mailto:vimal.newwork at gmail.com]
+>> Sent: Thursday, January 20, 2011 8:47 PM
+>> To: Ghorai, Sukumar
+>> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+>> kernel at lists.infradead.org; Kamat, Nishant
+>> Subject: Re: [PATCH] omap3: nand: bch ecc support added
+>>
+>> Hi Ghorai,
+>>
+>> I am the initial author of this patch. And I guess this patch still
+>> uses most of my work.
+> [Ghorai] I know you are working on it,
 >
-> But I did have cpufreq enabled (using default 'performance' governor).
-> Disabling cpufreq makes udelay() correct. Yay!
->
-> In order to try diagnosing the problem I re-enabled cpufreq and booted
-> with cpufreq.debug=7.
->
+> But I think your code was in a shape for -
+> 1. not for up-streamble shape
+That's because I never posted it for up-stream.
 
-Bjorn,
+> 2. non functional,
+No, it was a working (at least for 8-bit correction) patch on that
+kernel version (I do not remember the correct version now, may be
+.29-.30)
+It did not work for 4-bit, because of known reason. And I guess while
+posting this patch you should also have mentioned/documented about
+that. No?
 
-Assuming your hardware is not weird at scaling and needs something like 
-Russell said:
-	new_lpj = ref_lpj * (new_freq / ref_freq) + some_offset
+> So can you check this version matching with your original code?
+> In that case I can add your Signed-off.
+Yes, you should. I can see this version has got many changes, but
+original idea is same. And not all code is changed. Does it?
 
-The most likely scenario seems to be that the CPU freq driver that's 
-specific to your CPU is not setting the CPU to the frequency it thinks 
-it's setting it to. It might THINK it's running at 624 MHz, but it might 
-really be at 310 MHz or 100 MHz or something. Since, if the frequency at 
-which the calibration was done or if the new frequencies are not what 
-really what they are reported to be, then the math will go wrong and you 
-would see these kind of issues.
-
-If you can somehow measure your CPU freq with an oscilloscope, measure 
-these two:
-- Just before calibrate_delay is run for the first time.
-- When you are seeing the udelay to be wrong.
-
-One of these two won't match what you think the CPU is running at.
-
--Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Vimal
