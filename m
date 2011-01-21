@@ -1,193 +1,25 @@
-From: stanleymiao@gmail.com (Stanley.Miao)
-Date: Fri, 21 Jan 2011 17:40:54 +0800
-Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
-In-Reply-To: <1295419487-31185-2-git-send-email-stanley.miao@windriver.com>
-References: <1295419487-31185-1-git-send-email-stanley.miao@windriver.com>
-	<1295419487-31185-2-git-send-email-stanley.miao@windriver.com>
-Message-ID: <AANLkTiknacY=61GLsJ-hyT5BPmKhKJ8JrRCm-ZCCOetG@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Jan 2011 09:40:42 +0000
+Subject: Locking in the clk API
+In-Reply-To: <4D3932B4.8010904@codeaurora.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111103929.GN24920@pengutronix.de>
+	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
+	<4D386ABF.9060908@fluff.org>
+	<20110120190822.GK6335@n2100.arm.linux.org.uk>
+	<4D3932B4.8010904@codeaurora.org>
+Message-ID: <20110121094042.GD13235@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell,
+On Thu, Jan 20, 2011 at 11:16:04PM -0800, Saravana Kannan wrote:
+> This suggestion looked promising till I realized that clk_set_rate()  
+> will still be atomic. clk_set_rate() will need to enable/disable the  
+> PLLs depending on which PLLs the rates are derived from. So, the locking  
+> in clk_prepare/unprepare() still has to be atomic since the "slow stuff"  
+> is shared with clk_set_rate().
 
-It looks no other comments. I uploaded these patches to you patches
-tracking system.
-
-Stanley.
-
-
-2011/1/19, Stanley.Miao <stanley.miao@windriver.com>:
-> The code section in BE8 kernel modules is in little-endian while data
-> section is in big-endian. When reading code from memory in the relocation
-> procedure, these instructions are read according to big-endian, so they are
-> needed to be inverted.
->
-> Signed-off-by: Stanley.Miao <stanley.miao@windriver.com>
-> ---
->  arch/arm/Makefile        |    1 +
->  arch/arm/kernel/module.c |   62
-> +++++++++++++++++++++++++++++-----------------
->  2 files changed, 40 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 3eec793..03e7761 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -13,6 +13,7 @@
->  LDFLAGS_vmlinux	:=-p --no-undefined -X
->  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
->  LDFLAGS_vmlinux	+= --be8
-> +LDFLAGS_MODULE	+= --be8
->  endif
->
->  OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
-> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-> index d9bd786..c5e5bb1 100644
-> --- a/arch/arm/kernel/module.c
-> +++ b/arch/arm/kernel/module.c
-> @@ -99,6 +99,18 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
->  	return 0;
->  }
->
-> +#ifdef CONFIG_CPU_ENDIAN_BE8
-> +#define read_instr32(c)			__swab32(*(u32 *)c)
-> +#define read_instr16(c)			__swab16(*(u16 *)c)
-> +#define write_instr32(v,a)		(*(u32 *)(a) = __swab32((__force __u32)(v)))
-> +#define write_instr16(v,a)		(*(u16 *)(a) = __swab16((__force __u16)(v)))
-> +#else
-> +#define read_instr32(c)			(*(u32 *)c)
-> +#define read_instr16(c)			(*(u16 *)c)
-> +#define write_instr32(v,a)		(*(u32 *)(a) = (v))
-> +#define write_instr16(v,a)		(*(u16 *)(a) = (v))
-> +#endif
-> +
->  int
->  apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int
-> symindex,
->  	       unsigned int relindex, struct module *module)
-> @@ -148,7 +160,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
-> unsigned int symindex,
->  		case R_ARM_PC24:
->  		case R_ARM_CALL:
->  		case R_ARM_JUMP24:
-> -			offset = (*(u32 *)loc & 0x00ffffff) << 2;
-> +			offset = (read_instr32(loc) & 0x00ffffff) << 2;
->  			if (offset & 0x02000000)
->  				offset -= 0x04000000;
->
-> @@ -165,8 +177,8 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
-> unsigned int symindex,
->
->  			offset >>= 2;
->
-> -			*(u32 *)loc &= 0xff000000;
-> -			*(u32 *)loc |= offset & 0x00ffffff;
-> +			write_instr32((read_instr32(loc) & 0xff000000) |
-> +						(offset & 0x00ffffff), loc);
->  			break;
->
->  	       case R_ARM_V4BX:
-> @@ -174,9 +186,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
-> unsigned int symindex,
->  			* other bits to re-code instruction as
->  			* MOV PC,Rm.
->  			*/
-> -		       *(u32 *)loc &= 0xf000000f;
-> -		       *(u32 *)loc |= 0x01a0f000;
-> -		       break;
-> +			write_instr32((read_instr32(loc) & 0xf000000f) |
-> +							0x01a0f000, loc);
-> +			break;
->
->  		case R_ARM_PREL31:
->  			offset = *(u32 *)loc + sym->st_value - loc;
-> @@ -185,7 +197,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab,
-> unsigned int symindex,
->
->  		case R_ARM_MOVW_ABS_NC:
->  		case R_ARM_MOVT_ABS:
-> -			offset = *(u32 *)loc;
-> +			offset = read_instr32(loc);
->  			offset = ((offset & 0xf0000) >> 4) | (offset & 0xfff);
->  			offset = (offset ^ 0x8000) - 0x8000;
->
-> @@ -193,16 +205,16 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
-> *strtab, unsigned int symindex,
->  			if (ELF32_R_TYPE(rel->r_info) == R_ARM_MOVT_ABS)
->  				offset >>= 16;
->
-> -			*(u32 *)loc &= 0xfff0f000;
-> -			*(u32 *)loc |= ((offset & 0xf000) << 4) |
-> -					(offset & 0x0fff);
-> +			write_instr32((read_instr32(loc) & 0xfff0f000) |
-> +					((offset & 0xf000) << 4) |
-> +					(offset & 0x0fff), loc);
->  			break;
->
->  #ifdef CONFIG_THUMB2_KERNEL
->  		case R_ARM_THM_CALL:
->  		case R_ARM_THM_JUMP24:
-> -			upper = *(u16 *)loc;
-> -			lower = *(u16 *)(loc + 2);
-> +			upper = read_instr16(loc);
-> +			lower = read_instr16(loc + 2);
->
->  			/*
->  			 * 25 bit signed address range (Thumb-2 BL and B.W
-> @@ -242,17 +254,19 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
-> *strtab, unsigned int symindex,
->  			sign = (offset >> 24) & 1;
->  			j1 = sign ^ (~(offset >> 23) & 1);
->  			j2 = sign ^ (~(offset >> 22) & 1);
-> -			*(u16 *)loc = (u16)((upper & 0xf800) | (sign << 10) |
-> -					    ((offset >> 12) & 0x03ff));
-> -			*(u16 *)(loc + 2) = (u16)((lower & 0xd000) |
-> -						  (j1 << 13) | (j2 << 11) |
-> -						  ((offset >> 1) & 0x07ff));
-> +			write_instr16((u16)((upper & 0xf800) | (sign << 10) |
-> +						((offset >> 12) & 0x03ff)),
-> +					loc);
-> +			write_instr16((u16)((lower & 0xd000) |
-> +						(j1 << 13) | (j2 << 11) |
-> +						((offset >> 1) & 0x07ff)),
-> +					loc + 2);
->  			break;
->
->  		case R_ARM_THM_MOVW_ABS_NC:
->  		case R_ARM_THM_MOVT_ABS:
-> -			upper = *(u16 *)loc;
-> -			lower = *(u16 *)(loc + 2);
-> +			upper = read_instr16(loc);
-> +			lower = read_instr16(loc + 2);
->
->  			/*
->  			 * MOVT/MOVW instructions encoding in Thumb-2:
-> @@ -273,12 +287,14 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
-> *strtab, unsigned int symindex,
->  			if (ELF32_R_TYPE(rel->r_info) == R_ARM_THM_MOVT_ABS)
->  				offset >>= 16;
->
-> -			*(u16 *)loc = (u16)((upper & 0xfbf0) |
-> +			write_instr16((u16)((upper & 0xfbf0) |
->  					    ((offset & 0xf000) >> 12) |
-> -					    ((offset & 0x0800) >> 1));
-> -			*(u16 *)(loc + 2) = (u16)((lower & 0x8f00) |
-> +					    ((offset & 0x0800) >> 1)),
-> +					doc);
-> +			write_instr16((u16)((lower & 0x8f00) |
->  						  ((offset & 0x0700) << 4) |
-> -						  (offset & 0x00ff));
-> +						  (offset & 0x00ff)),
-> +					doc + 2);
->  			break;
->  #endif
->
-> --
-> 1.5.4.3
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Who calls clk_set_rate() from an atomic context?  Do we know whether
+anyone does?
