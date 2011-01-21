@@ -1,37 +1,43 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 20 Jan 2011 19:24:05 -0800
-Subject: [PATCH] drivers: mmc: msm: remove clock disable in probe
-In-Reply-To: <AANLkTim-=40MM=TeH1XSQ-rio1ctwcZAs4qbf9SaxmdH@mail.gmail.com>
-References: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTim-=40MM=TeH1XSQ-rio1ctwcZAs4qbf9SaxmdH@mail.gmail.com>
-Message-ID: <4D38FC55.2030601@codeaurora.org>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 21 Jan 2011 09:10:26 +0530
+Subject: [PATCH V5 39/63] SPEAr CPU freq: Adding support for CPU Freq
+	framework
+In-Reply-To: <20110120144941.GB25954@pulham.picochip.com>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+	<403ef0da274038357f72e84e2378dc4e55be8cb0.1295499395.git.viresh.kumar@st.com>
+	<20110120144941.GB25954@pulham.picochip.com>
+Message-ID: <4D39002A.10703@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2011 02:50 AM, Vitaly Wool wrote:
-> Hi,
->
-> On Tue, Jan 18, 2011 at 7:14 PM, Daniel Walker<dwalker@codeaurora.org>  wrote:
->> The probe function adds the MMC host which can start accepting request
->> immediately. There is an assumption here that no requests happen
->> immediatly, but it's not always the case. This assumption can causes
->> a BUG() when the clocks are disabled. The fix is to just remove the
->> clock disable in the probe function.
->>
->> Signed-off-by: Daniel Walker<dwalker@codeaurora.org>
->
-> I can add acked-by and/or tested-by if needed.
->
-> ~Vitaly
+On 01/20/2011 08:19 PM, Jamie Iles wrote:
+>> > +	newfreq = clk_round_rate(cpu_clk, freqs.new * 1000);
+>> > +	if (newfreq < 0) {
+>> > +		pr_err("CPU Freq: clk_round_rate failed: %ld\n", newfreq);
+>> > +		freqs.new = freqs.old;
+> Nitpick, you don't need to assign freqs.new here as you return 
+> immediately after.
+> 
+>> > +		return newfreq;
+>> > +	}
+>> > +
+>> > +	freqs.new = newfreq / 1000;
+>> > +
+>> > +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+>> > +
+>> > +	/* Get current rate after clk_set_rate, for both success and failure */
+>> > +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
+>> > +	if (ret) {
+>> > +		pr_err("CPU Freq: cpu clk_set_rate failed: %d\n", ret);
+>> > +		freqs.new = clk_get_rate(cpu_clk) / 1000;
+>> > +	}
+>> > +
+>> > +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+>> > +	return 0;
+> Shouldn't this return 'ret' here in case clk_set_rate() failed?
 
-Nack from me. The fix is incorrect. The clocks are alread refcounted in 
-the clock driver. There should be no need to "leave it on because 
-someone else might access it". Every code that needs the clock should 
-have a clk_enable/disable around it and it would all work fine.
-
--Saravana
-
+Will correct both of them.
+I will resend this patch alone, instead of sending everything again.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+viresh
