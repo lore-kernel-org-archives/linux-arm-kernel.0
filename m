@@ -1,46 +1,141 @@
-From: vimal.newwork@gmail.com (Vimal Singh)
-Date: Fri, 21 Jan 2011 13:07:44 +0530
-Subject: [PATCH] omap3: nand: bch ecc support added
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B036A8DAF6C@dbde02.ent.ti.com>
-References: <1295518680-8737-1-git-send-email-s-ghorai@ti.com>
-	<AANLkTin3pRkqLkQ_J1iTtqr0M+iz5V25S9ZwJc9+T0VW@mail.gmail.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B036A8DAF6C@dbde02.ent.ti.com>
-Message-ID: <AANLkTi=0ZuG6i3x4uZ2+R8ZVmvmydrvK2zZQJbLoz=4L@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 21 Jan 2011 23:55:19 +0800
+Subject: [PATCH 6/6] dmaengine: imx-sdma: avoid stopping channel in the
+	middle of a BD transfer
+In-Reply-To: <20110120102701.GW9041@pengutronix.de>
+References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
+	<1295473840-17295-7-git-send-email-shawn.guo@freescale.com>
+	<20110120104312.GA18834@S2101-09.ap.freescale.net>
+	<20110120102701.GW9041@pengutronix.de>
+Message-ID: <20110121155518.GB1897@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 9:37 AM, Ghorai, Sukumar <s-ghorai@ti.com> wrote:
->
->> -----Original Message-----
->> From: Vimal Singh [mailto:vimal.newwork at gmail.com]
->> Sent: Thursday, January 20, 2011 8:47 PM
->> To: Ghorai, Sukumar
->> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
->> kernel at lists.infradead.org; Kamat, Nishant
->> Subject: Re: [PATCH] omap3: nand: bch ecc support added
->>
->> Hi Ghorai,
->>
->> I am the initial author of this patch. And I guess this patch still
->> uses most of my work.
-> [Ghorai] I know you are working on it,
->
-> But I think your code was in a shape for -
-> 1. not for up-streamble shape
-That's because I never posted it for up-stream.
+Hi Sascha,
 
-> 2. non functional,
-No, it was a working (at least for 8-bit correction) patch on that
-kernel version (I do not remember the correct version now, may be
-.29-.30)
-It did not work for 4-bit, because of known reason. And I guess while
-posting this patch you should also have mentioned/documented about
-that. No?
+On Thu, Jan 20, 2011 at 11:27:01AM +0100, Sascha Hauer wrote:
+> On Thu, Jan 20, 2011 at 06:43:13PM +0800, Shawn Guo wrote:
+> > On Thu, Jan 20, 2011 at 05:50:40AM +0800, Shawn Guo wrote:
+> > > When STOP register bit gets set, SDMA hardware will immediately stop
+> > > the channel once the current burst other than buffer descriptor
+> > > transfer is done.
+> > > 
+> > > * Change sdma_disable_channel() to only set STOP register bit after
+> > >   polling the current BD done, so that the current BD transfer
+> > >   corruption could be avoided.
+> > > 
+> > > * Increment buf_tail in mxc_sdma_handle_channel_normal() as well as
+> > >   sdma_handle_channel_loop(), since buf_tail now is used in
+> > >   sdma_disable_channel() which could be called in both sg and cyclic
+> > >   cases.
 
-> So can you check this version matching with your original code?
-> In that case I can add your Signed-off.
-Yes, you should. I can see this version has got many changes, but
-original idea is same. And not all code is changed. Does it?
+As the commit message tells, buf_tail is now handled by non-cyclic too.
 
+> > > 
+> > > * Return DMA_SUCCESS other than DMA_ERROR in sdma_disable_channel().
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  drivers/dma/imx-sdma.c |    9 ++++++++-
+> > >  1 files changed, 8 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > > index fa63ace..ae87287 100644
+> > > --- a/drivers/dma/imx-sdma.c
+> > > +++ b/drivers/dma/imx-sdma.c
+> > > @@ -481,6 +481,8 @@ static void mxc_sdma_handle_channel_normal(struct sdma_channel *sdmac)
+> > >  	else
+> > >  		sdmac->status = DMA_SUCCESS;
+> > >  
+> > > +	sdmac->buf_tail++;
+> > > +
+
+ditto
+
+> > >  	if (sdmac->desc.callback)
+> > >  		sdmac->desc.callback(sdmac->desc.callback_param);
+> > >  	sdmac->last_completed = sdmac->desc.cookie;
+> > > @@ -655,9 +657,14 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+> > >  {
+> > >  	struct sdma_engine *sdma = sdmac->sdma;
+> > >  	int channel = sdmac->channel;
+> > > +	struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
+> > > +
+> > > +	while (bd->mode.status & BD_DONE)
+> > > +		cpu_relax();
+> > >  
+> > >  	__raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> > > -	sdmac->status = DMA_ERROR;
+> > > +
+> > > +	sdmac->status = DMA_SUCCESS;
+> > >  }
+> > 
+> > Sorry. The patch lost the change as below.  Will pick it up in v2.
+> > 
+> > @@ -658,11 +658,15 @@ static void sdma_disable_channel(struct sdma_channel *sdmac)
+> >         struct sdma_engine *sdma = sdmac->sdma;
+> >         int channel = sdmac->channel;
+> >         struct sdma_buffer_descriptor *bd = &sdmac->bd[sdmac->buf_tail];
+> > +       u32 stat = __raw_readl(sdma->regs + SDMA_H_STATSTOP);
+> > 
+> > -       while (bd->mode.status & BD_DONE)
+> > -               cpu_relax();
+> > +       /* stop the channel if it's running */
+> > +       if (stat & (1 << channel)) {
+> > +               while (bd->mode.status & BD_DONE)
+> > +                       cpu_relax();
+> > 
+> > -       __raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> > +               __raw_writel(1 << channel, sdma->regs + SDMA_H_STATSTOP);
+> > +       }
+> > 
+> >         sdmac->status = DMA_SUCCESS;
+> 
+> NAK.
+> 
+> The patches has several problems.
+> 
+> - buf_tail is only used for cyclic transfers, so in case of non cyclic
+>   transfers you poll for an arbitrary descriptor being ready.
+> 
+See above.
+
+> - Even in cyclic transfers when buf_tail points to the correct
+>   descriptor the hardware will immediatly start the next descriptor
+>   before you have a chance to set the STATSTOP bit. So you probably
+>   will corrupt the next descriptor instead of the current one
+>   which makes this patch useless.
+> 
+You are right that the buf_tail will not stop immediately until next
+time it gets looped on.  But in any case, polling BD_DONE will not
+corrupt any descriptor.
+
+> - buf_tail is increased in the interrupt handler, so if you
+>   happen to disable the channel after the bd is done but before
+>   the interrupt handler has increased buf_tail you poll for the
+>   wrong bd being ready which again makes this patch useless.
+> 
+> If in non cyclic transfers we want to disable a channel we have our
+> reasons (device error or timeout) and then the data is corrupted anyway,
+> so no reason to poll for a descriptor getting done. Even worse, in case
+> of an device error the descriptor might not get ready at all and
+Hmm, we should polling (BD_DONE | BD_ERROR).
+
+> we will poll for ever in the loop above.
+> Cyclic transfers are designed for audio and disabling a channel
+> basically means pausing the stream. When the SDMA engine does not
+I thought pausing channel is different from disabling channel, or we
+do not need DMA_PAUSE and DMA_TERMINATE_ALL for dma_ctrl_cmd.
+
+> support pausing the stream in hardware, we have to live with the
+What about on the fly setting bit "L" of the next descriptor that's
+not been running?  So that SDMA can stop the channel when it gets
+this descriptor done.
+
+> fact that we pick up the stream on the next descriptor resulting
+> in some bytes missing in the resulting audio stream.
+> 
+
+-- 
 Regards,
-Vimal
+Shawn
