@@ -1,26 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 21 Jan 2011 16:48:12 +0100
-Subject: [PATCH] Board support Pcontrol_G20, hardware revision 2
-In-Reply-To: <201101182238.45374.pgsellmann@portner-elektronik.at>
-References: <201101171843.07148.pgsellmann@portner-elektronik.at>
-	<20110118185657.GV14798@game.jcrosoft.org>
-	<201101182238.45374.pgsellmann@portner-elektronik.at>
-Message-ID: <20110121154812.GF24284@game.jcrosoft.org>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 21 Jan 2011 14:11:46 -0200
+Subject: [PATCH] mmc: mmc_mxc: Allow selection only for the correct
+	platforms
+In-Reply-To: <20110121153351.GR14956@pengutronix.de>
+References: <1295542979-10329-1-git-send-email-fabio.estevam@freescale.com>
+	<20110121153351.GR14956@pengutronix.de>
+Message-ID: <4D39B042.5050004@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:38 Tue 18 Jan     , Peter Gsellmann wrote:
-> Am Dienstag, 18. Januar 2011, 19:56:57 schrieb Jean-Christophe PLAGNIOL-VILLARD:
-> > On 18:43 Mon 17 Jan     , Peter Gsellmann wrote:
-> > >  Backplane timings adjusted
-> > >  Addition of specific platform devices and resources
-> > >  Leds renamed
-> > >  Minor bugfixes
-> > I'd prefer to split the patch for bisect
-> Is this really a requirement?
-no a preference
+Hi Uwe,
 
-I'd prefer to split at least between bug fix and new features
+On 1/21/2011 1:33 PM, Uwe Kleine-K?nig wrote:
+> Hallo,
+> 
+> On Thu, Jan 20, 2011 at 03:02:59PM -0200, Fabio Estevam wrote:
+>> Currently MMC_MXC driver can be selected by all i.MX devices.
+>>
+>> Restrict its use only for the appropriate processors.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>>  drivers/mmc/host/Kconfig |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>> index d618e86..a3a9ec1 100644
+>> --- a/drivers/mmc/host/Kconfig
+>> +++ b/drivers/mmc/host/Kconfig
+>> @@ -288,7 +288,7 @@ config MMC_MSM
+>>  
+>>  config MMC_MXC
+>>  	tristate "Freescale i.MX2/3 Multimedia Card Interface support"
+>> -	depends on ARCH_MXC
+>> +	depends on MACH_MX21 || MACH_MX27 || ARCH_MX31
+> What about
+> 
+> 	depends IMX_HAVE_PLATFORM_MXC_MMC
 
-Best Regards,
-J.
+I would prefer to let the architectures explicitly in Kconfig.
+
+If someone selects IMX_HAVE_PLATFORM_MXC_MMC by mistake on a MX51 board, it will be possible to select the MXC_MMC driver in the kernel for MX51, which is incorrect.
+
+Using the approach of explicitly marking the architectures that support MXC_MMC would avoid such problems as well.
+> 
+> ?  Then if i.MX29 has the same IP you don't need to touch this again.
+
+Not likely to happen. 
+
+Thanks,
+
+Fabio Estevam
