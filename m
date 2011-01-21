@@ -1,32 +1,70 @@
-From: johlstei@codeaurora.org (Jeff Ohlstein)
-Date: Fri, 21 Jan 2011 14:29:16 -0800
-Subject: [PATCH] ARM: smp: Fix Unknown IPI message 0x1
-In-Reply-To: <20110117123409.GD20615@n2100.arm.linux.org.uk>
-References: <1295265395-28485-1-git-send-email-santosh.shilimkar@ti.com>	<20110117120104.GB20615@n2100.arm.linux.org.uk>	<72ca984700f139fea98558783dde38f3@mail.gmail.com>	<20110117121951.GC20615@n2100.arm.linux.org.uk>	<1295267193.21557.14.camel@e102109-lin.cambridge.arm.com>	<d93218062aa1e6948453d1ddd5b9e2b0@mail.gmail.com>
-	<20110117123409.GD20615@n2100.arm.linux.org.uk>
-Message-ID: <4D3A08BC.8010303@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Jan 2011 17:29:33 -0500 (EST)
+Subject: Locking in the clk API
+In-Reply-To: <20110121220238.GE23151@n2100.arm.linux.org.uk>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
+	<20110120185617.GI6335@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
+	<4D3907BD.4040900@codeaurora.org>
+	<AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>
+	<alpine.LFD.2.00.1101211618170.8580@xanadu.home>
+	<20110121220238.GE23151@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101211723220.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> On Mon, Jan 17, 2011 at 06:01:31PM +0530, Santosh Shilimkar wrote:
->   
->> Same for OMAP4. Any SGI will do.
->>     
->
-> Ok, so we can convert OMAP, Realview, Versatile Express to use SGI0...
-> that's a start!
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->   
+On Fri, 21 Jan 2011, Russell King - ARM Linux wrote:
 
-SGI0 works fine for msm as well.
+> On Fri, Jan 21, 2011 at 04:53:44PM -0500, Nicolas Pitre wrote:
+> > So I think that the API must be augmented with more methods, such as:
+> > 
+> > clk_slow_enable():
+> >   - may sleep
+> >   - may be a no-op if the clk_fast_enable() is supported
+> > 
+> > clk_fast_enable():
+> >   - may not sleep, used in atomic context
+> >   - may be a no-op if controlling the clock takes time, in which case 
+> >     clk_slow_enable() must have set the clock up entirely
+> > 
+> > ... and similar for clk_slow_disable() and clk_fast_disable().
+> 
+> Isn't this along the same lines as my clk_prepare() vs clk_enable()
+> suggestion?
+> 
+> I suggested that clk_prepare() be callable only from non-atomic contexts,
+> and do whatever's required to ensure that the clock is available.  That
+> may end up enabling the clock as a result.
+> 
+> clk_enable() callable from atomic contexts, and turns the clock on if
+> the hardware supports such an operation.
+> 
+> So, if you have something like:
+> 
+> Xtal--->PLL--->Routing/Masking--->Device
+> 
+> clk = clk_get() returns the clock for the device.
+> 
+> clk_prepare(clk) would walk up the clock tree, selecting the routing and
+> preparing each clock.  Clocks prior to _and_ including the PLL would need
+> to be enabled.
+> 
+> clk_enable(clk) would walk up the tree if the clock isn't already enabled,
+> calling clk_enable() on the parent clock.  As we require prepared clocks
+> to already be enabled, this automatically stops at the PLL.
+> 
+> To encourage correct usage, we just need to make sure that clk_prepare()
+> has a might_sleep() thing, and clk_enable() throws a fit if it's used
+> on a clk without prepare being used first.  The second point is not easy
+> to do in a foolproof manner though, but doing _something_ is better than
+> nothing.
 
-Jeff
+Exactly.  That model does cover both situations: i.e. clocks with slow 
+setups which need to sleep, and clocks with fast setups that can be 
+dealt with and taken advantage of within atomic context.  And in some 
+cases there is even a mixture of both involved.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+Nicolas
