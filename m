@@ -1,139 +1,111 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 21 Jan 2011 21:07:32 +0100
-Subject: [PATCH v2] ARM: mxs: irq_data conversion
-In-Reply-To: <20110121094338.GE13235@n2100.arm.linux.org.uk>
-References: <20110121094338.GE13235@n2100.arm.linux.org.uk>
-Message-ID: <1295640452-9311-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: dmitriyz@google.com (Dima Zavin)
+Date: Fri, 21 Jan 2011 12:44:17 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295633882.19880.31.camel@m0nster>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster>
+	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+	<1295576730.4096.24.camel@Joe-Laptop>
+	<1295624801.19880.13.camel@m0nster>
+	<20110121094827.41818a55@jbarnes-desktop>
+	<20110121095658.1ab623fe@jbarnes-desktop>
+	<1295632828.19880.22.camel@m0nster>
+	<20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+Message-ID: <AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+Really though? Let's look at one of them:
 
-compared to (implicit) v1 ARCH_MXS doesn't select
-GENERIC_HARDIRQS_NO_DEPRECATED anymore.
+[PATCH 3/7] msm: qsd8x50: add acpuclock code
 
-Best regards
-Uwe
+Please tell me the amount of time it took you to "debug and fix
+defects in the code" from the following:
+http://android.git.kernel.org/?p=kernel/experimental.git;a=blob;f=arch/arm/mach-msm/acpuclock-qsd8x50.c;h=691acdeaad74c2f29927308b8110af7d4dd5070b;hb=refs/heads/android-msm-2.6.37-wip
 
- arch/arm/mach-mxs/gpio.c  |   30 +++++++++++++++---------------
- arch/arm/mach-mxs/icoll.c |   16 ++++++++--------
- 3 files changed, 24 insertions(+), 23 deletions(-)
+That is basically a squash of 3 commits (one of which was another
+squash of ~20 commits during a cleanup which has all the attributions
+in the squash). This file's main authors was Brian, Arve, and myself,
+with some contributions from Mike, Iliyan, and Haley from HTC. Doing a
+quick-and-dirty grep through the history, the contributions break down
+as:
+      2 Arve Hj?nnev?g <arve@android.com>
+      6 Brian Swetland <swetland@google.com>
+     14 Dima Zavin <dima@android.com>
+      2 Haley Teng <Haley_Teng@htc.com>
+      1 Iliyan Malchev <malchev@google.com>
+      5 Mike Chan <mike@android.com>
 
-diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
-index d7ad7a6..ba810db 100644
---- a/arch/arm/mach-mxs/gpio.c
-+++ b/arch/arm/mach-mxs/gpio.c
-@@ -68,29 +68,29 @@ static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
- 	}
- }
- 
--static void mxs_gpio_ack_irq(u32 irq)
-+static void mxs_gpio_ack_irq(struct irq_data *d)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
- }
- 
--static void mxs_gpio_mask_irq(u32 irq)
-+static void mxs_gpio_mask_irq(struct irq_data *d)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
- }
- 
--static void mxs_gpio_unmask_irq(u32 irq)
-+static void mxs_gpio_unmask_irq(struct irq_data *d)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
- }
- 
- static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
- 
--static int mxs_gpio_set_irq_type(u32 irq, u32 type)
-+static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	u32 pin_mask = 1 << (gpio & 31);
- 	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
- 	void __iomem *pin_addr;
-@@ -158,9 +158,9 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-  * @param  enable       enable as wake-up if equal to non-zero
-  * @return       This function returns 0 on success.
-  */
--static int mxs_gpio_set_wake_irq(u32 irq, u32 enable)
-+static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
- {
--	u32 gpio = irq_to_gpio(irq);
-+	u32 gpio = irq_to_gpio(d->irq);
- 	u32 gpio_idx = gpio & 0x1f;
- 	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
- 
-@@ -180,11 +180,11 @@ static int mxs_gpio_set_wake_irq(u32 irq, u32 enable)
- }
- 
- static struct irq_chip gpio_irq_chip = {
--	.ack = mxs_gpio_ack_irq,
--	.mask = mxs_gpio_mask_irq,
--	.unmask = mxs_gpio_unmask_irq,
--	.set_type = mxs_gpio_set_irq_type,
--	.set_wake = mxs_gpio_set_wake_irq,
-+	.irq_ack = mxs_gpio_ack_irq,
-+	.irq_mask = mxs_gpio_mask_irq,
-+	.irq_unmask = mxs_gpio_unmask_irq,
-+	.irq_set_type = mxs_gpio_set_irq_type,
-+	.irq_set_wake = mxs_gpio_set_wake_irq,
- };
- 
- static void mxs_set_gpio_direction(struct gpio_chip *chip, unsigned offset,
-diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
-index 5dd43ba..0f4c120 100644
---- a/arch/arm/mach-mxs/icoll.c
-+++ b/arch/arm/mach-mxs/icoll.c
-@@ -34,7 +34,7 @@
- 
- static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
- 
--static void icoll_ack_irq(unsigned int irq)
-+static void icoll_ack_irq(struct irq_data *d)
- {
- 	/*
- 	 * The Interrupt Collector is able to prioritize irqs.
-@@ -45,22 +45,22 @@ static void icoll_ack_irq(unsigned int irq)
- 			icoll_base + HW_ICOLL_LEVELACK);
- }
- 
--static void icoll_mask_irq(unsigned int irq)
-+static void icoll_mask_irq(struct irq_data *d)
- {
- 	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_CLR(irq));
-+			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->irq));
- }
- 
--static void icoll_unmask_irq(unsigned int irq)
-+static void icoll_unmask_irq(struct irq_data *d)
- {
- 	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
--			icoll_base + HW_ICOLL_INTERRUPTn_SET(irq));
-+			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->irq));
- }
- 
- static struct irq_chip mxs_icoll_chip = {
--	.ack = icoll_ack_irq,
--	.mask = icoll_mask_irq,
--	.unmask = icoll_unmask_irq,
-+	.irq_ack = icoll_ack_irq,
-+	.irq_mask = icoll_mask_irq,
-+	.irq_unmask = icoll_unmask_irq,
- };
- 
- void __init icoll_init_irq(void)
--- 
-1.7.2.3
+Your commit is a:
+   git checkout <branch> -- <file> ; git add ; git commit;
+
+--Dima
+
+On Fri, Jan 21, 2011 at 10:18 AM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> On Fri, 2011-01-21 at 10:04 -0800, Jesse Barnes wrote:
+>> On Fri, 21 Jan 2011 10:00:28 -0800
+>> Daniel Walker <dwalker@codeaurora.org> wrote:
+>>
+>> > On Fri, 2011-01-21 at 09:56 -0800, Jesse Barnes wrote:
+>> > > On Fri, 21 Jan 2011 09:48:27 -0800
+>> > > Jesse Barnes <jbarnes@virtuousgeek.org> wrote:
+>> > >
+>> > > > On Fri, 21 Jan 2011 07:46:41 -0800
+>> > > > Daniel Walker <dwalker@codeaurora.org> wrote:
+>> > > > > This isn't what's happening tho. In maintainer land if someone forwards
+>> > > > > you a patch then you leave the original author on the patch. They wrote
+>> > > > > the patch and your just forwarding it on up the ladder. This isn't the
+>> > > > > case with these patches.. I crafted each of the commit I have authorship
+>> > > > > on, no one forwarded those commits to me. I'm not taking authorship
+>> > > > > credit for any thing I didn't create, although I an giving credit to the
+>> > > > > place which gave me the raw material which was Google. From my
+>> > > > > experience this is how it's done in Linux ..
+>> > > >
+>> > > > I don't know why you're even trying to defend this, just admit you were
+>> > > > wrong and move on.
+>> > > >
+>> > > > Trying to claim the author field for these patches for yourself is both
+>> > > > misleading and vain. ?You did not write the code and are therefore not
+>> > > > the author, trying to conflate the author and commit fields in this way
+>> > > > is so misguided I thought you must be trolling when I first saw this
+>> > > > thread.
+>> > > >
+>> > > > This is not "how it's done in Linux" at all. ?In this case you're
+>> > > > trying to act like a maintainer by collecting patches and forwarding
+>> > > > them upstream, so you need to preserve authorship and the s-o-b chain.
+>> > > > If you want to take responsibility for the code going forward, great,
+>> > > > but don't pollute the logs with bogus author fields that imply you
+>> > > > wrote the stuff in the first place.
+>> > >
+>> > > That said, if you did significant work on these before committing them,
+>> > > then you're right and I'm wrong. ?It *is* fairly common for committers
+>> > > to change things; and if the changes are significant enough, they claim
+>> > > authorship and note the original author in the changelog.
+>> > >
+>> > > So if that's the case here, I apologize, but I didn't see that
+>> > > explained in any part of the thread I read.
+>> >
+>> > I did a significant amount of work to create the commits and series. I'm
+>> > sorry if that's not clear, but it is in fact true.
+>>
+>> Changes to the code or just reordering and merging commits? ?If the
+>> former, then I think Christoph's comment applies, if the latter, I
+>> think preserving authorship is still the right thing to do.
+>
+> I changed both, switching to new kernel API's, clean ups, finding a
+> minimum set of code for this support, and debugging that and fixing
+> defects in the code. This wasn't a trivial amount of work to create the
+> series and commits.
+>
+> Daniel
+>
+> --
+> Sent by an consultant of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+> Forum.
+>
+>
+>
