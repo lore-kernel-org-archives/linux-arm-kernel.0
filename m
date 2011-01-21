@@ -1,63 +1,54 @@
-From: bdegraaf@codeaurora.org (Brent DeGraaf)
-Date: Fri, 21 Jan 2011 13:37:15 -0800 (PST)
-Subject: [PATCH] mmc: msm: fix dma usage not to use internal APIs
-In-Reply-To: <8yaaaiuot1l.fsf@huya.qualcomm.com>
-References: <1295391805-15251-1-git-send-email-dwalker@codeaurora.org>
-	<1295522421.4366.34.camel@m0nster>
-	<20110120130246.GA23941@n2100.arm.linux.org.uk>
-	<20110120131239.GB23941@n2100.arm.linux.org.uk>
-	<1295536094.9236.11.camel@m0nster>
-	<ff5d6c73aa50329b025bfe69297a92d9.squirrel@www.codeaurora.org>
-	<20110121192854.GB23151@n2100.arm.linux.org.uk>
-	<8yaaaiuot1l.fsf@huya.qualcomm.com>
-Message-ID: <0db2f2bf1ef87fbbedecece6ae2c8d33.squirrel@www.codeaurora.org>
+From: dmitriyz@google.com (Dima Zavin)
+Date: Fri, 21 Jan 2011 13:42:56 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295645218.22882.2.camel@m0nster>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster>
+	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+	<1295576730.4096.24.camel@Joe-Laptop>
+	<1295624801.19880.13.camel@m0nster>
+	<20110121094827.41818a55@jbarnes-desktop>
+	<20110121095658.1ab623fe@jbarnes-desktop>
+	<1295632828.19880.22.camel@m0nster>
+	<20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
+	<1295642995.19880.42.camel@m0nster>
+	<20110121130106.5f30908d@jbarnes-desktop>
+	<1295645218.22882.2.camel@m0nster>
+Message-ID: <AANLkTinrGUMBqh657Y2fFCUWKDFwYsGZKb73O_iO9wzm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-Thanks for your comments. Yes, reverting is OK. The writel's are doing the
-controller write after the barrier so even though it'll be a little
-slower, it will be correct.
-
-Regarding the "unnecessary" pre-invalidate, yeah, I misspoke.  I meant
-unnecessary POST-invalidates for non-speculative cpus.  I just checked and
-it looks like someone's already put a "FIXME" in the current 2.6.37 source
-for those.
-
-We'll look into how much gains we can expect from the relaxed I/O calls
-and decide where to go from there.  Thanks for pointing out the api.
-
-Best regards,
-Brent
-
-On Fri, January 21, 2011 1:17 pm, David Brown wrote:
-> On Fri, Jan 21 2011, Russell King - ARM Linux wrote:
+On Fri, Jan 21, 2011 at 1:26 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> On Fri, 2011-01-21 at 13:01 -0800, Jesse Barnes wrote:
+>> On Fri, 21 Jan 2011 12:49:55 -0800
+>> Daniel Walker <dwalker@codeaurora.org> wrote:
+>>
+>> > On Fri, 2011-01-21 at 12:44 -0800, Dima Zavin wrote:
+>> > > Really though? Let's look at one of them:
+>> > >
+>> >
+>> > > ? ? ? 2 Arve Hj?nnev?g <arve@android.com>
+>> > > ? ? ? 6 Brian Swetland <swetland@google.com>
+>> > > ? ? ?14 Dima Zavin <dima@android.com>
+>> > > ? ? ? 2 Haley Teng <Haley_Teng@htc.com>
+>> > > ? ? ? 1 Iliyan Malchev <malchev@google.com>
+>> > > ? ? ? 5 Mike Chan <mike@android.com>
+>> >
+>> > I'll add this list into the commit text ..
+>>
+>> Sounds like a good example of a patch where you should preserve the
+>> author field as well.
 >
->> On Fri, Jan 21, 2011 at 08:13:59AM -0800, Brent DeGraaf wrote:
->
->> This is one of the *biggest* problems I have with people setting up per-
->> platform mailing lists.  It hides information from the rest of the
->> community
->> and causes idiotic practices and abuses such as has happened here.
->
-> I have been requesting, internally, that nothing should be sent
-> to the linux-arm-msm mailing list that isn't sent to at least
-> linux-arm-kernel, and preferrably linux-kernel as well.  It hasn't
-> happened yet, but I will be asking people to resend patches if they only
-> send them to the MSM list.
->
-> As Daniel pointed out, though, I don't think this particular case was
-> even discussed.  We're trying to get better.
->
-> David
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
+> preserve it as who ?
 
+My main point is that the authorship of this code is VERY easy to
+ascertain. It is not like a lot of other vendor code that gets thrown
+over the wall as a tarball. We really do our best to follow the right
+practices, give the right credits, create legible well separated
+commits, etc.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+--Dima
