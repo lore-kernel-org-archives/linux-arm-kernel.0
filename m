@@ -1,25 +1,25 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 21 Jan 2011 19:57:55 +0000
-Subject: [stable] [PATCH] ARM: SMDK6410: Fix build with WM1190 disabled
-	and WM1192 enabled
-In-Reply-To: <20110121195418.GA18700@kroah.com>
-References: <1295630829-13812-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<20110121191507.GA16210@kroah.com>
-	<20110121194656.GB3075@sirena.org.uk>
-	<20110121195418.GA18700@kroah.com>
-Message-ID: <20110121195754.GA27353@opensource.wolfsonmicro.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 21 Jan 2011 14:59:35 -0500 (EST)
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <alpine.LFD.2.00.1101211456200.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 11:54:18AM -0800, Greg KH wrote:
-> On Fri, Jan 21, 2011 at 07:46:56PM +0000, Mark Brown wrote:
+On Fri, 21 Jan 2011, Pawel Moll wrote:
 
-> > I believe the build breakage affects existing released kernels with the
-> > appropriate set of configuration options chosen (1192 enabled and 1190
-> > disabled), yes.  This is a pretty obscure combination so it's unlikely
-> > anyone will run into it in practice.
+> VE suffers from serious problem with MMC transfers - low performance,
+> errors when other IO peripherals (especially USB) are used at the
+> same time etc.
+> 
+> It all boils down to the MMC controller short FIFO and - in result -
+> timing constrains. The most problematic case - USB driver hogging
+> CPU and MMC FIFO under/overruns in the result - can be mitigated on
+> SMP system by distributing interrupts handling for these peripherals
+> between cores.
 
-> Ok, then it probably shouldn't be a -stable patch :)
+Wouldn't the ultimate solution be to simply use FIQs to service the MMC FIFO?
 
-Oh, OK.  It seemed like it was sufficiently safe to make the risk/value
-for the change reasonable.
+
+Nicolas
