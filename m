@@ -1,56 +1,39 @@
-From: dmitriyz@google.com (Dima Zavin)
-Date: Thu, 20 Jan 2011 18:06:12 -0800
-Subject: Locking in the clk API
-In-Reply-To: <alpine.LFD.2.00.1101201623480.8580@xanadu.home>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
-	<20110120185617.GI6335@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
-Message-ID: <AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 21 Jan 2011 11:12:27 +0900
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <20110120180146.GH6335@n2100.arm.linux.org.uk>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimsL8YfSdXCBpN2cNVpj8HeJF0f-A7MJQoie+Zm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a better one.
+On Fri, Jan 21, 2011 at 3:01 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 20, 2011 at 09:20:47AM -0800, Dave Hansen wrote:
+>> This problem actually exists without sparsemem, too. ?Discontigmem (at
+>> least) does it as well.
+>
+> We don't expect banks to cross sparsemem boundaries, or the older
+> discontigmem nodes (esp. as we used to store the node number.)
+> Discontigmem support has been removed now so that doesn't apply
+> anymore.
+>
 
-Many devices use serial display panels sitting on either MDDI or MIPI
-links. The interface clocks need to be on, but they stay in low-power
-mode while the display is on. The display controller however does not
-need to be on since the serial panels typically have a local
-framebuffer that does the idle panel refresh on it's own. When a new
-frame comes in to be displayed, you need to clock on the display
-controller, DMA the data to the panel, and when it's done turn the
-controller off. The clk_enable may or may not happen at irq context,
-depending on whether or not you are starting the DMA from a
-vsync/tear-effect irq or simply from the screen_update() function. The
-clk_disable will most certainly happen from the DMA_DONE irq.
+Our system can have 3 GiB of RAM in maximum.
+In the near future, ARM APs can have up to 1 TiB with LPAE.
 
---Dima
+Since the size of section is 256 mib and NR_BANKS is defined as 8,
+no ARM system can have more RAM than 2GiB in the current implementation.
+If you want banks in meminfo not to cross sparsemem boundaries,
+we need to find another way of physical memory specification in the kernel.
 
-On Thu, Jan 20, 2011 at 1:30 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 20 Jan 2011, Russell King - ARM Linux wrote:
+>> The x86 version of show_mem() actually manages to do this without any
+>> #ifdefs, and works for a ton of configuration options. ?It uses
+>> pfn_valid() to tell whether it can touch a given pfn.
 >
->> On Thu, Jan 20, 2011 at 04:29:15PM +0000, Ben Dooks wrote:
->> > I really don't like the fact that people are doing these things in
->> > atomic contexts, and I think we should apply some pressure to move
->> > the atomic caller cases to use systems where they can sleep such as
->> > using threaded-irq handlers (they work very nicely)
->>
->> How do you ensure that printk is always called from a non-atomic
->> context?
->
-> Is this a good example? ?I don't think that power sensitive systems such
-> as a cellphone should keep printk() enabled in the final product. ?The
-> output from printk() over a serial port is a debugging convenience, and
-> trying to aggressively turn on/off the serial clock around each call to
-> printk() is a bit silly. ?Better simply turn the serial clock on
-> whenever its console facility is opened, and turn it off when the
-> console is closed, which should be good enough in that context.
->
->
-> Nicolas
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
+> x86 memory layout tends to be very simple as it expects memory to
+> start at the beginning of every region described by a pgdat and extend
+> in one contiguous block. ?I wish ARM was that simple.
 >
