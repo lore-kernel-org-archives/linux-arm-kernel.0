@@ -1,47 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 21 Jan 2011 11:24:24 +0100
-Subject: [PATCH 5/6] dmaengine: imx-sdma: fix up param for the last BD
-	in sdma_prep_slave_sg()
-In-Reply-To: <20110121151537.GA1897@S2101-09.ap.freescale.net>
-References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
-	<1295473840-17295-6-git-send-email-shawn.guo@freescale.com>
-	<20110120102808.GX9041@pengutronix.de>
-	<20110121151537.GA1897@S2101-09.ap.freescale.net>
-Message-ID: <20110121102424.GB9041@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Jan 2011 10:27:07 +0000
+Subject: [PATCH] ARM: mxs: irq_data conversion
+In-Reply-To: <20110121101536.GH14956@pengutronix.de>
+References: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110121094338.GE13235@n2100.arm.linux.org.uk>
+	<20110121101536.GH14956@pengutronix.de>
+Message-ID: <20110121102707.GH13235@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 11:15:39PM +0800, Shawn Guo wrote:
-> Hi Sascha,
+On Fri, Jan 21, 2011 at 11:15:36AM +0100, Uwe Kleine-K?nig wrote:
+> IMHO doing it the other way round would be better.  (i.e. use a def_bool
+> y for the unconverted platforms and then push that down.)  But maybe
+> this is just a matter of taste.
 > 
-> On Thu, Jan 20, 2011 at 11:28:08AM +0100, Sascha Hauer wrote:
-> > On Thu, Jan 20, 2011 at 05:50:39AM +0800, Shawn Guo wrote:
-> > > As per the reference manual, bit "L" should be set while bit "C"
-> > > should be cleared for the last buffer descriptor in the non-cyclic
-> > > chain, so that sdma can stop trying to find the next BD and end
-> > > the transfer.
-> > > 
-> > > In case of sdma_prep_slave_sg(), BD_LAST needs to be set and BD_CONT
-> > > be cleared for the last BD.
-> > 
-> > Did you test this patch?
-> > 
-> Would you suggest any driver on mx51 using this api?  So that I can
-> test it on my babbage board.  Or you can help test it with mx27/31
-> mmc driver?  I do not have them on my end.  Thanks.
+> How should we proceed?  Lennert, do you take my patch?  Should I resend
+> without the select?  IIRC there were send a few other patches (for tegra
+> maybe?).  Don't know if you missed these, too?
 
-I can only suggest the imx/imx-sdma-sound-mx353ds-mx51_babbage
-branch, but this only uses cyclic transfers so you can't use it
-to test this patch.
-I asked because I could add an ack to this patch if it has been
-tested. Without testing I'd like delaying it until I found some
-time testing it.
+It looks like it's relatively few platforms which were missed:
 
-Sascha
+arch/arm/mach-msm/gpio-v2.c-    .mask           = msm_gpio_irq_mask,
+arch/arm/mach-msm/gpio-v2.c-    .unmask         = msm_gpio_irq_unmask,
+arch/arm/mach-msm/gpio-v2.c-    .ack            = msm_gpio_irq_ack,
+arch/arm/mach-lh7a40x/irq-kev7a400.c-   .ack    = lh7a400_ack_cpld_irq,
+arch/arm/mach-lh7a40x/irq-kev7a400.c-   .mask   = lh7a400_mask_cpld_irq,
+arch/arm/mach-lh7a40x/irq-kev7a400.c-   .unmask = lh7a400_unmask_cpld_irq,
+arch/arm/mach-vt8500/irq.c-     .ack       = vt8500_irq_mask,
+arch/arm/mach-vt8500/irq.c-     .mask      = vt8500_irq_mask,
+arch/arm/mach-vt8500/irq.c-     .unmask    = vt8500_irq_unmask,
+arch/arm/mach-mxs/gpio.c-       .ack = mxs_gpio_ack_irq,
+arch/arm/mach-mxs/gpio.c-       .mask = mxs_gpio_mask_irq,
+arch/arm/mach-mxs/gpio.c-       .unmask = mxs_gpio_unmask_irq,
+arch/arm/mach-mxs/icoll.c-      .ack = icoll_ack_irq,
+arch/arm/mach-mxs/icoll.c-      .mask = icoll_mask_irq,
+arch/arm/mach-mxs/icoll.c-      .unmask = icoll_unmask_irq,
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+vt8500 is new in my tree, so needs to be updated.  The other stuff I
+guessed Lennert missed for one reason or another, so... patches welcome.
