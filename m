@@ -1,85 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 22 Jan 2011 12:20:18 +0000
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
-References: <20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-	<20110121100441.06a94482@jbarnes-desktop>
-	<1295633882.19880.31.camel@m0nster>
-	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
-	<1295642995.19880.42.camel@m0nster>
-	<1295643762.25868.31.camel@Joe-Laptop>
-	<1295645098.22882.1.camel@m0nster>
-	<AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
-Message-ID: <20110122122018.GC5194@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 21 Jan 2011 22:45:30 +0800
+Subject: [PATCH 5/6] dmaengine: imx-sdma: fix up param for the last BD
+	in sdma_prep_slave_sg()
+In-Reply-To: <20110121102424.GB9041@pengutronix.de>
+References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
+	<1295473840-17295-6-git-send-email-shawn.guo@freescale.com>
+	<20110120102808.GX9041@pengutronix.de>
+	<20110121151537.GA1897@S2101-09.ap.freescale.net>
+	<20110121102424.GB9041@pengutronix.de>
+Message-ID: <20110121144528.GA13825@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 22, 2011 at 01:18:54PM +0200, Pekka Enberg wrote:
-> Why is that? I don't see any technical problem of upstreaming the
-> original patches even if they don't compile (as long as they're not
-> included in Makefiles or Kconfig files). There's no need to hide the
-> real history even if it looks ugly...
+Hi Sascha,
 
-I've asked Daniel in private whether he'd mind posting the original
-set of patches which he based his work on to this thread.
+On Fri, Jan 21, 2011 at 11:24:24AM +0100, Sascha Hauer wrote:
+> On Fri, Jan 21, 2011 at 11:15:39PM +0800, Shawn Guo wrote:
+> > Hi Sascha,
+> > 
+> > On Thu, Jan 20, 2011 at 11:28:08AM +0100, Sascha Hauer wrote:
+> > > On Thu, Jan 20, 2011 at 05:50:39AM +0800, Shawn Guo wrote:
+> > > > As per the reference manual, bit "L" should be set while bit "C"
+> > > > should be cleared for the last buffer descriptor in the non-cyclic
+> > > > chain, so that sdma can stop trying to find the next BD and end
+> > > > the transfer.
+> > > > 
+> > > > In case of sdma_prep_slave_sg(), BD_LAST needs to be set and BD_CONT
+> > > > be cleared for the last BD.
+> > > 
+> > > Did you test this patch?
+> > > 
+> > Would you suggest any driver on mx51 using this api?  So that I can
+> > test it on my babbage board.  Or you can help test it with mx27/31
+> > mmc driver?  I do not have them on my end.  Thanks.
+> 
+> I can only suggest the imx/imx-sdma-sound-mx353ds-mx51_babbage
+> branch, but this only uses cyclic transfers so you can't use it
+> to test this patch.
+Yes, I tested the patch set against imx/imx-sdma-sound-mx353ds-mx51_babbage.
+But the only use of sdma_prep_slave_sg I know is mxcmmc.c that you
+patched recently.  And this driver is for mx27/31 which I do not have
+the setup.
 
-I suspect that the situation is that there's many patches which he's
-taken from the repository and consolidated them down into a nice set
-of easy to review patches.
+> I asked because I could add an ack to this patch if it has been
+> tested. Without testing I'd like delaying it until I found some
+> time testing it.
+Reasonable.  Thanks.
 
-One of the problems of preserving the micro-detail of history right
-from the early inception of support for a platform is that quite often
-the early support is buggy or broken - it might not even compile.  There
-may be 20 or so patches on top of that which eventually get it to a
-usable state.
-
-Do we really want to put off people from reviewing patches because of
-the size of micro-development that happened prior to getting to a point
-where the result of that development is usable?
-
-Tell me this: does a patch which cleanly adds support for board X get
-reviewed by more, the same, or less people than a set of twenty patches
-which goes about the same thing, adding code, removing previously added
-code, changing it again.
-
-I personally _hate_ patch sets which do that, and I tend to ignore them
-(or maybe review the first twenty patches before taking a break... and
-then never going back to them) because I quickly get tired reading all
-that code - which means I'm not able to do an effective review.  I
-suspect most people suffer from reviewer tiredness when faced with large
-patch sets changing the same code time and time again.
-
-I personally believe that Daniel is doing the right thing here, except
-he needs to preserve a better record of authorship.  I even think it's
-fine if he decides to drop people's sign-offs if he thinks the code has
-changed significantly from the original authors - provided he's willing
-to take responsibility for the submission of that code.
-
-If you read what a sign-off means (the DCO) then it's clear that if the
-code has changed significantly, the original sign-offs do not apply
-anymore - the original sign-offs can't warrant that the modified code
-is covered by appropriate licenses or even that the person who modified
-their code has the rights to submit it.
-
-Take a moment to think about that.  If I took some of your code with
-your sign-off, changed it significantly by including someone elses work
-where there were no rights to submit that persons work into mainline,
-and I kept your sign-off on that, would you be happy when someone starts
-making accusations against you submitting their code?
-
-The sign-offs make no representation of who was the author.  In many
-cases where companies are involved, the first sign-off is the person
-who authorized the release of the code, not the person who wrote the
-code, so it's a complete mistake to attribute authorship by whoever was
-listed first in the Sign-off lines.  Authorship may be jointly held by
-the first 4 people listed, and attributing authorship to only the first
-is just as bad as not attributing authorship at all.
-
-Lastly, from the arguments being made over this, if they are supported,
-I think that people are saying that the actions listed in DCO (b) are
-no longer allowed, and so DCO (b) should be removed entirely as an
-acceptable practice.  IOW, what's being promoted as "you must do" (iow,
-preserving all history) is completely contary to the allowances of
-DCO (b).
+-- 
+Regards,
+Shawn
