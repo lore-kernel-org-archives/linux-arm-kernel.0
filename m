@@ -1,38 +1,26 @@
-From: daiane.angolini@freescale.com (Daiane Angolini)
-Date: Fri, 21 Jan 2011 09:37:32 -0200
-Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
-In-Reply-To: <20101209190950.GA17441@pengutronix.de>
-References: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
-	<20101209184242.GY17441@pengutronix.de>
-	<4D012512.4040709@freescale.com>
-	<20101209190950.GA17441@pengutronix.de>
-Message-ID: <4D396FFC.6050303@freescale.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 21 Jan 2011 12:00:06 +0000
+Subject: [PATCH] ARM: aaec2000: remove support for mach-aaec2000
+In-Reply-To: <20110121111355.GN13235@n2100.arm.linux.org.uk>
+References: <1294430422-939-1-git-send-email-jamie@jamieiles.com>
+	<20110121111355.GN13235@n2100.arm.linux.org.uk>
+Message-ID: <20110121120006.GE6768@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jan 21, 2011 at 11:13:55AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 07, 2011 at 08:00:22PM +0000, Jamie Iles wrote:
+> > mach-aaec2000 is no longer actively maintained and is only receiving
+> > fixups to remain building with other kernel updates.
+> > 
+> > Cc: Bellido Nicolas <ml@acolin.be>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> 
+> Okay, could you send the two patches to the patch system and I'll add it
+> to a 'remove' branch (which now has lh7a40x in as well) for 2.6.39.
 
-Is this patch ok?
+Dmitry has taken the keyboard driver into his tree so I've just 
+submitted the mach removal one to the patch system.
 
-Daiane
-
-On 12/09/2010 05:09 PM, Uwe Kleine-K?nig wrote:
-> Hallo Daiane,
->
-> On Thu, Dec 09, 2010 at 04:50:58PM -0200, Daiane Angolini wrote:
->> On 12/09/2010 04:42 PM, Uwe Kleine-K?nig wrote:
->>> On Thu, Dec 09, 2010 at 03:50:49PM -0200, Daiane Angolini wrote:
->>>> Signed-off-by: Daiane Angolini<daiane.angolini@freescale.com>
->>> This is a duplicate of
->>>
->>> http://mid.gmane.org/1291749285-11406-2-git-send-email-fabio.estevam at freescale.com
->> My patch is for iMX51_3DS board, and Fabio's patch in the link you sent
->> me is for iMX27_3DS
-> You're right, I mixed up the series.  There is another one (
-> http://mid.gmane.org/1291660714-16396-1-git-send-email-fabio.estevam at freescale.com
-> ) for mx51.  I just searched in my mail folder, found 3ds and thought
-> this was the mx51 series.
->
-> Sorry and Ack for your patch
-> Uwe
->
+Jamie
