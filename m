@@ -1,25 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 09:40:42 +0000
-Subject: Locking in the clk API
-In-Reply-To: <4D3932B4.8010904@codeaurora.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<201101111744.59712.jeremy.kerr@canonical.com>
-	<20110111103929.GN24920@pengutronix.de>
-	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
-	<4D386ABF.9060908@fluff.org>
-	<20110120190822.GK6335@n2100.arm.linux.org.uk>
-	<4D3932B4.8010904@codeaurora.org>
-Message-ID: <20110121094042.GD13235@n2100.arm.linux.org.uk>
+Date: Fri, 21 Jan 2011 09:43:38 +0000
+Subject: [PATCH] ARM: mxs: irq_data conversion
+In-Reply-To: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110121094338.GE13235@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 11:16:04PM -0800, Saravana Kannan wrote:
-> This suggestion looked promising till I realized that clk_set_rate()  
-> will still be atomic. clk_set_rate() will need to enable/disable the  
-> PLLs depending on which PLLs the rates are derived from. So, the locking  
-> in clk_prepare/unprepare() still has to be atomic since the "slow stuff"  
-> is shared with clk_set_rate().
+On Fri, Jan 21, 2011 at 10:01:58AM +0100, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/Kconfig          |    1 +
+>  arch/arm/mach-mxs/gpio.c  |   30 +++++++++++++++---------------
+>  arch/arm/mach-mxs/icoll.c |   16 ++++++++--------
+>  3 files changed, 24 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5cff165..c8d888e 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -364,6 +364,7 @@ config ARCH_MXS
+>  	select GENERIC_CLOCKEVENTS
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CLKDEV_LOOKUP
+> +	select GENERIC_HARDIRQS_NO_DEPRECATED
 
-Who calls clk_set_rate() from an atomic context?  Do we know whether
-anyone does?
+No.  Let's do it architecture wide otherwise we're going to get into
+problems working out what's been done and what hasn't.  By all means
+use it as a way of ensuring that your platform is converted, but don't
+submit patches with this in.
+
+I thought the point of Lennert's patches were to convert everyone over,
+so it should just be those trees which weren't merged at that point who
+are missing the fixup.
+
+We'll set this architecture wide for 2.6.39, and I'll see about queueing
+it soon so that we catch those places which haven't been done.  That
+should allow the remainder to be caught.
