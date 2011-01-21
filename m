@@ -1,51 +1,34 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 20 Jan 2011 18:25:30 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <1295575123.9236.54.camel@m0nster>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-Message-ID: <1295576730.4096.24.camel@Joe-Laptop>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 21 Jan 2011 05:15:53 +0200
+Subject: [PATCH v2] omap2: fix DPLL_FREQSEL calculation
+In-Reply-To: <8739on1wdd.fsf_-_@vostro.fn.ogness.net>
+References: <87ei8726wf.fsf@vostro.fn.ogness.net>
+	<20110120111645.GB2223@legolas.emea.dhcp.ti.com>
+	<8739on1wdd.fsf_-_@vostro.fn.ogness.net>
+Message-ID: <20110121031553.GA2448@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-20 at 17:58 -0800, Daniel Walker wrote:
-> On Thu, 2011-01-20 at 17:41 -0800, Joe Perches wrote:
-> > On Thu, 2011-01-20 at 16:55 -0800, Daniel Walker wrote:
-> > > On Thu, 2011-01-20 at 16:42 -0800, Dima Zavin wrote:
-> > > > You are not the author of any of these patches. Where are the author
-> > > > attributions for the team that actually wrote this code?
-> > > In the commit text.. The author field is used to denote who authored the
-> > > commit, which in this case is me.
-> > You have that wrong.
-> > Author and Committer are different git fields.
-> > http://www.kernel.org/pub/software/scm/git/docs/user-manual.html
-> > 
-> >       * an author: The name of the person responsible for this change,
-> >         together with its date.
-> >       * a committer: The name of the person who actually created the
-> >         commit, with the date it was done. This may be different from
-> >         the author, for example, if the author was someone who wrote a
-> >         patch and emailed it to the person who used it to create the
-> >         commit.
-> I'm not even sure how to make these different, but in this case it
-> doesn't matter because the "committer" as you defined it above is more
-> than one person ..
+On Thu, Jan 20, 2011 at 03:29:50PM +0100, John Ogness wrote:
+> On 2011-01-20, Felipe Balbi <balbi@ti.com> wrote:
+> > scripts/get_maintainer.pl would've helped you getting a better Cc
+> > list. I'm adding linux-omap and lakml
+> 
+> Thanks.
+> 
+> After investigating the issue further it seems that I had it
+> backwards. The value of "n" is the value to divide by, not the value
+> that goes in the register. This means that it is _dpll_test_fint()
+> that is doing it incorrectly. Here is a new version of the patch to
+> fix the right function.
 
-Not really, no.
+you might want to look at Documentation/SubmittingPatches before sending
+these patches. If anyone applies this patch of yours the commitlog will
+have all the comments you've made above. Generally, patches are
+"standalone" emails, without a discussion on them, if you want to add
+comments which aren't supposed to go into commit log, then do so after
+the tear line (---) and before the diff --git line; that way, git will
+know it must drop that part of the comments.
 
-The authors may be different, but the first git
-committer of the patch is different.
-
-The committer is the person that does a git commit
-either directly with git commit or git am.
-
-If a git tree is pulled by someone else, the initial
-committer name remains on the commit.
-
-You should keep the original patch author names and
-add your own "Signed-off-by:" and not claim authorship
-of the patches themselves.
-
-cheers, Joe
+-- 
+balbi
