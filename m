@@ -1,21 +1,37 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Jan 2011 11:13:55 +0000
-Subject: [PATCH] ARM: aaec2000: remove support for mach-aaec2000
-In-Reply-To: <1294430422-939-1-git-send-email-jamie@jamieiles.com>
-References: <1294430422-939-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110121111355.GN13235@n2100.arm.linux.org.uk>
+Date: Fri, 21 Jan 2011 11:14:32 +0000
+Subject: [PATCH] ARM: vexpress: register platform PATA device.
+In-Reply-To: <20110110211622.GA10381@elliptictech.com>
+References: <1294435445-2020-1-git-send-email-nbowler@elliptictech.com>
+	<20110107224348.GZ31708@n2100.arm.linux.org.uk>
+	<20110110211622.GA10381@elliptictech.com>
+Message-ID: <20110121111432.GO13235@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 07, 2011 at 08:00:22PM +0000, Jamie Iles wrote:
-> mach-aaec2000 is no longer actively maintained and is only receiving
-> fixups to remain building with other kernel updates.
+On Mon, Jan 10, 2011 at 04:16:22PM -0500, Nick Bowler wrote:
+> On 2011-01-07 22:43 +0000, Russell King - ARM Linux wrote:
+> > On Fri, Jan 07, 2011 at 04:24:05PM -0500, Nick Bowler wrote:
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index d56d21c..ee61039 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -264,6 +264,7 @@ config ARCH_VEXPRESS
+> > >  	select HAVE_CLK
+> > >  	select ICST
+> > >  	select PLAT_VERSATILE
+> > > +	select HAVE_PATA_PLATFORM
+> > 
+> > To avoid the Kconfig warning, this should be:
+> > 
+> > 	select HAVE_PATA_PLATFORM if ATA
+> > 
+> > or it needs to be moved outside of the if ATA ... endif block in
+> > drivers/ata/Kconfig.
 > 
-> Cc: Bellido Nicolas <ml@acolin.be>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> The Kconfig dependency fix was merged into mainline today, so this patch
+> should no longer trigger the aforementioned warning.
 
-Okay, could you send the two patches to the patch system and I'll add it
-to a 'remove' branch (which now has lh7a40x in as well) for 2.6.39.
+Ok, can you put it in the patch system please?
 
 Thanks.
