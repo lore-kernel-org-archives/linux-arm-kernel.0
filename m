@@ -1,26 +1,34 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 21 Jan 2011 15:23:17 +0100
-Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK to
-	speed-up boot
-In-Reply-To: <c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com>
-References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D385155.4050301@gmail.com>
-	<43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com>
-	<4D38641E.2000301@gmail.com>
-	<c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com>
-Message-ID: <AANLkTi=ymmg6siqwxFJyh33VwAy7ZaURcTmUZyOWEz2r@mail.gmail.com>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Fri, 21 Jan 2011 19:54:56 +0530
+Subject: [PATCH] davinci: da8xx/omap-l1xx: match codec_name with i2c ids
+Message-ID: <1295619896-5498-1-git-send-email-sudhakar.raj@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/21 Santosh Shilimkar <santosh.shilimkar@ti.com>:
+The codec_name entry for da8xx evm in sound/soc/davinci/davinci-evm.c
+is not matching with the i2c ids in the board file. Without this fix the
+soundcard does not get detected on da850/omap-l138/am18x evm.
 
-> How about below approach?
->
-> -----------------------------------------------------
-> [PATCH] ARM: smp: Skip secondary cpu calibration to speed-up boot
+Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+Tested-by: Dan Sharon <dansharon@nanometrics.ca>
+---
+This patch applies to Linus's kernel tree.
 
-Hey this looks like a good way to do it,
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+ sound/soc/davinci/davinci-evm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
+index 0c2d6ba..b36f0b3 100644
+--- a/sound/soc/davinci/davinci-evm.c
++++ b/sound/soc/davinci/davinci-evm.c
+@@ -223,7 +223,7 @@ static struct snd_soc_dai_link da8xx_evm_dai = {
+ 	.stream_name = "AIC3X",
+ 	.cpu_dai_name= "davinci-mcasp.0",
+ 	.codec_dai_name = "tlv320aic3x-hifi",
+-	.codec_name = "tlv320aic3x-codec.0-001a",
++	.codec_name = "tlv320aic3x-codec.1-0018",
+ 	.platform_name = "davinci-pcm-audio",
+ 	.init = evm_aic3x_init,
+ 	.ops = &evm_ops,
+-- 
+1.7.1
