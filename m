@@ -1,322 +1,64 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Fri, 21 Jan 2011 09:23:15 +0530
-Subject: [PATCH V5 resend 39/63] SPEAr CPU freq: Adding support for CPU Freq
-	framework
-In-Reply-To: <cover.1295581815.git.viresh.kumar@st.com>
-References: <cover.1295581815.git.viresh.kumar@st.com>
-Message-ID: <01612f9ae6c475b861c2f03cc24a4cb4639e01d1.1295581815.git.viresh.kumar@st.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 20 Jan 2011 20:12:45 -0800
+Subject: Locking in the clk API
+In-Reply-To: <AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>
+	<4D3862DB.5000708@fluff.org>	<20110120185617.GI6335@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
+Message-ID: <4D3907BD.4040900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+On 01/20/2011 06:06 PM, Dima Zavin wrote:
+> On Thu, Jan 20, 2011 at 1:30 PM, Nicolas Pitre<nicolas.pitre@linaro.org>  wrote:
+>> On Thu, 20 Jan 2011, Russell King - ARM Linux wrote:
+>>
+>>> On Thu, Jan 20, 2011 at 04:29:15PM +0000, Ben Dooks wrote:
+>>>> I really don't like the fact that people are doing these things in
+>>>> atomic contexts, and I think we should apply some pressure to move
+>>>> the atomic caller cases to use systems where they can sleep such as
+>>>> using threaded-irq handlers (they work very nicely)
+>>>
+>>> How do you ensure that printk is always called from a non-atomic
+>>> context?
+>>
+>> Is this a good example?  I don't think that power sensitive systems such
+>> as a cellphone should keep printk() enabled in the final product.  The
+>> output from printk() over a serial port is a debugging convenience, and
+>> trying to aggressively turn on/off the serial clock around each call to
+>> printk() is a bit silly.  Better simply turn the serial clock on
+>> whenever its console facility is opened, and turn it off when the
+>> console is closed, which should be good enough in that context.
 
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- arch/arm/Kconfig                |    1 +
- arch/arm/mach-spear13xx/clock.c |    7 +-
- arch/arm/mach-spear3xx/clock.c  |    5 +-
- arch/arm/mach-spear6xx/clock.c  |    5 +-
- arch/arm/plat-spear/Makefile    |    2 +-
- arch/arm/plat-spear/cpufreq.c   |  164 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 176 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/plat-spear/cpufreq.c
+[fixing top post]
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 957d320..11501de 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -872,6 +872,7 @@ config PLAT_SPEAR
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
-+	select ARCH_HAS_CPUFREQ
- 	help
- 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
- 
-diff --git a/arch/arm/mach-spear13xx/clock.c b/arch/arm/mach-spear13xx/clock.c
-index 709adb2..a7e75ca 100644
---- a/arch/arm/mach-spear13xx/clock.c
-+++ b/arch/arm/mach-spear13xx/clock.c
-@@ -91,6 +91,7 @@ static struct pll_clk_config pll1_config = {
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
- 	/* PCLK 24MHz */
-+	{.mode = 0, .m = 0x64, .n = 0x03, .p = 0x2}, /* 400 MHz */
- 	{.mode = 0, .m = 0x7D, .n = 0x03, .p = 0x2}, /* 500 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x03, .p = 0x2}, /* 664 MHz */
- 	{.mode = 0, .m = 0xC8, .n = 0x03, .p = 0x2}, /* 800 MHz */
-@@ -107,7 +108,7 @@ static struct clk pll1_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 3},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 4},
- 	.private_data = &pll1_config,
- };
- 
-@@ -144,7 +145,7 @@ static struct clk pll2_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 3},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 4},
- 	.private_data = &pll2_config,
- };
- 
-@@ -165,7 +166,7 @@ static struct clk pll3_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 3},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 4},
- 	.private_data = &pll3_config,
- };
- 
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 58f0259..37faef1 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
- 
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
-+	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
-@@ -75,7 +76,7 @@ static struct clk pll1_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 2},
- 	.private_data = &pll1_config,
- };
- 
-@@ -95,7 +96,7 @@ static struct clk pll2_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 2},
- 	.private_data = &pll2_config,
- };
- 
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 99cc21d..0a38e16 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -55,6 +55,7 @@ static struct pll_clk_masks pll_masks = {
- 
- /* pll rate configuration table, in ascending order of rates */
- struct pll_rate_tbl pll_rtbl[] = {
-+	{.mode = 0, .m = 0x53, .n = 0x0C, .p = 0x1}, /* 166 MHz */
- 	{.mode = 0, .m = 0x85, .n = 0x0C, .p = 0x1}, /* 266 MHz */
- 	{.mode = 0, .m = 0xA6, .n = 0x0C, .p = 0x1}, /* 332 MHz */
- };
-@@ -75,7 +76,7 @@ static struct clk pll1_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 2},
- 	.private_data = &pll1_config,
- };
- 
-@@ -95,7 +96,7 @@ static struct clk pll2_clk = {
- 	.calc_rate = &pll_calc_rate,
- 	.recalc = &pll_clk_recalc,
- 	.set_rate = &pll_clk_set_rate,
--	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 1},
-+	.rate_config = {pll_rtbl, ARRAY_SIZE(pll_rtbl), 2},
- 	.private_data = &pll2_config,
- };
- 
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 4c28f01..ec85b82 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -6,7 +6,7 @@
- obj-y	:= clcd.o clock.o pll_clk.o time.o
- 
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
--
-+obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
- obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
-diff --git a/arch/arm/plat-spear/cpufreq.c b/arch/arm/plat-spear/cpufreq.c
-new file mode 100644
-index 0000000..d8fb1e2
---- /dev/null
-+++ b/arch/arm/plat-spear/cpufreq.c
-@@ -0,0 +1,164 @@
-+/*
-+ * arch/arm/plat-spear/cpufreq.c
-+ *
-+ * CPU Frequency Scaling for SPEAr platform
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Deepak Sikri<deepak.sikri@st.com>
-+ *
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/cpufreq.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <asm/system.h>
-+#include <mach/hardware.h>
-+
-+#define CPU_CLK		"cpu_clk"
-+
-+#ifdef CONFIG_ARCH_SPEAR13XX
-+#define MIN_CPU_FREQ	200000
-+#define MAX_CPU_FREQ	500000
-+
-+static u32 spear_cpu_freq[] = {
-+	200000, /* 200 MHZ */
-+	250000, /* 250 MHZ */
-+	332000, /* 332 MHZ */
-+	400000, /* 400 MHZ */
-+	500000, /* 500 MHZ */
-+};
-+#elif defined(CONFIG_ARCH_SPEAR6XX) || defined(CONFIG_ARCH_SPEAR3XX)
-+#define MIN_CPU_FREQ	166000
-+#define MAX_CPU_FREQ	332000
-+
-+static u32 spear_cpu_freq[] = {
-+	166000, /* 166 MHZ */
-+	266000, /* 266 MHZ */
-+	332000, /* 333 MHZ */
-+};
-+#endif
-+
-+static struct
-+	cpufreq_frequency_table spear_freq_tbl[ARRAY_SIZE(spear_cpu_freq) + 1];
-+static struct clk *cpu_clk;
-+
-+int spear_cpufreq_verify(struct cpufreq_policy *policy)
-+{
-+	return cpufreq_frequency_table_verify(policy, spear_freq_tbl);
-+}
-+
-+static unsigned int spear_cpufreq_get(unsigned int cpu)
-+{
-+	return cpu ? 0 : clk_get_rate(cpu_clk) / 1000;
-+}
-+
-+static int spear_cpufreq_target(struct cpufreq_policy *policy,
-+		unsigned int target_freq, unsigned int relation)
-+{
-+	struct cpufreq_freqs freqs;
-+	int index, ret;
-+	long newfreq;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	if (cpufreq_frequency_table_target(policy, spear_freq_tbl,
-+				target_freq, relation, &index))
-+		return -EINVAL;
-+
-+	freqs.old = spear_cpufreq_get(0);
-+	freqs.cpu = policy->cpu;
-+
-+	if (freqs.old == target_freq)
-+		return 0;
-+
-+	newfreq = clk_round_rate(cpu_clk, spear_cpu_freq[index] * 1000);
-+	if (newfreq < 0) {
-+		pr_err("CPU Freq: clk_round_rate failed: %ld\n", newfreq);
-+		return newfreq;
-+	}
-+
-+	freqs.new = newfreq / 1000;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+	/* Get current rate after clk_set_rate, for both success and failure */
-+	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
-+	if (ret) {
-+		pr_err("CPU Freq: cpu clk_set_rate failed: %d\n", ret);
-+		freqs.new = clk_get_rate(cpu_clk) / 1000;
-+	}
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+	return ret;
-+}
-+
-+static int spear_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int i = 0;
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	cpu_clk = clk_get(NULL, CPU_CLK);
-+	if (IS_ERR(cpu_clk))
-+		return PTR_ERR(cpu_clk);
-+
-+	policy->cpuinfo.min_freq = MIN_CPU_FREQ;
-+	policy->cpuinfo.max_freq = MAX_CPU_FREQ;
-+	policy->cur = policy->min = policy->max = spear_cpufreq_get(0);
-+
-+	for (i = 0; i < ARRAY_SIZE(spear_cpu_freq); i++) {
-+		spear_freq_tbl[i].index = i;
-+		spear_freq_tbl[i].frequency = spear_cpu_freq[i];
-+	}
-+
-+	spear_freq_tbl[i].index = i;
-+	spear_freq_tbl[i].frequency = CPUFREQ_TABLE_END;
-+	if (!cpufreq_frequency_table_cpuinfo(policy, spear_freq_tbl))
-+		cpufreq_frequency_table_get_attr(spear_freq_tbl,
-+				policy->cpu);
-+
-+	policy->cpuinfo.transition_latency = 300*1000; /*300 us*/
-+
-+	return 0;
-+}
-+
-+static int spear_cpufreq_exit(struct cpufreq_policy *policy)
-+{
-+	clk_put(cpu_clk);
-+	return 0;
-+}
-+
-+static struct freq_attr *spear_cpufreq_attr[] = {
-+	 &cpufreq_freq_attr_scaling_available_freqs,
-+	 NULL,
-+};
-+
-+static struct cpufreq_driver spear_driver = {
-+	.flags		= CPUFREQ_STICKY,
-+	.verify		= spear_cpufreq_verify,
-+	.target		= spear_cpufreq_target,
-+	.get		= spear_cpufreq_get,
-+	.init		= spear_cpufreq_init,
-+	.exit		= spear_cpufreq_exit,
-+	.name		= "spear_cpufreq",
-+	.attr		= spear_cpufreq_attr,
-+};
-+
-+static int __init spear_cpufreq_register(void)
-+{
-+	return cpufreq_register_driver(&spear_driver);
-+}
-+
-+arch_initcall(spear_cpufreq_register);
+ > Here's a better one.
+ >
+ > Many devices use serial display panels sitting on either MDDI or MIPI
+ > links. The interface clocks need to be on, but they stay in low-power
+ > mode while the display is on. The display controller however does not
+ > need to be on since the serial panels typically have a local
+ > framebuffer that does the idle panel refresh on it's own. When a new
+ > frame comes in to be displayed, you need to clock on the display
+ > controller, DMA the data to the panel, and when it's done turn the
+ > controller off. The clk_enable may or may not happen at irq context,
+ > depending on whether or not you are starting the DMA from a
+ > vsync/tear-effect irq or simply from the screen_update() function. The
+ > clk_disable will most certainly happen from the DMA_DONE irq.
+
+Why do we need to turn on the clock in the IRQ? Why not defer it to a 
+workqueue (or whatever is the method of the day to defer work from an 
+IRQ)? The advantage of doing the clk_enable in the IRQ should be 
+negligible compared to the time it takes to do the DMA.
+
+In my opinion, the only major reason for needing atomic clk APIs was due 
+to device_ops->suspend being atomic. Since that's not the case anymore, 
+I really don't see a justification for atomic clocks. Sure, I might have 
+missed some exceptions, but in that case we should make the atomic APIs 
+an exception (add clk_enable_atomic) and not the norm.
+
+-Saravana
+
 -- 
-1.7.2.2
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
