@@ -1,61 +1,58 @@
-From: bjorn.forsman@gmail.com (=?UTF-8?Q?Bj=C3=B8rn_Forsman?=)
-Date: Fri, 21 Jan 2011 01:02:34 +0100
-Subject: [Openpxa-users] Linux udelay() is way off
-In-Reply-To: <20110120221025.GM6335@n2100.arm.linux.org.uk>
-References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>
-	<201101201800.04289.marek.vasut@gmail.com>
-	<20110120175551.GG6335@n2100.arm.linux.org.uk>
-	<AANLkTin8UR_1kU=+Dw-O9zHahquGJvBC560nByO=F6YV@mail.gmail.com>
-	<20110120193013.GL6335@n2100.arm.linux.org.uk>
-	<AANLkTikawLY2QcoUdcrF-SmmAbGM1MhzWLZogKb=5VAV@mail.gmail.com>
-	<20110120221025.GM6335@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=6-U7ZYei+4scG9Jdcaa-Z36=3F=F7oQYLu5Hd@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 21 Jan 2011 09:09:51 +0900
+Subject: Locking in the clk API
+In-Reply-To: <20110120190822.GK6335@n2100.arm.linux.org.uk>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111103929.GN24920@pengutronix.de>
+	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
+	<4D386ABF.9060908@fluff.org>
+	<20110120190822.GK6335@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim5N_sCCoOR40y7sTvdDoFkUJd4tUSSbrCccGjy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/20 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Jan 20, 2011 at 09:25:36PM +0100, Bj?rn Forsman wrote:
->> 2011/1/20 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Thu, Jan 20, 2011 at 08:18:10PM +0100, Bj?rn Forsman wrote:
->> >> [ ? 11.425363] cpufreq-core: saving 518144 as reference value for
->> >> loops_per_jiffy; freq is 312000 kHz
->> >> [ ? 11.425523] cpufreq-core: scaling loops_per_jiffy to 1036288 for
->> >> frequency 624000 kHz
->> >
->> > So despite scaling lpj by a factor of two for the doubling in clock
->> > frequency, we see a 30% error in it?
->>
->> No. udelay() is ~30 % of what it should be. My gpio + oscilloscope
->> test showed that udelay(50) => 16 us in real time with cpufreq
->> enabled. This gives 16/50 = 0.32.
->>
->> > Is it possible to boot at 624MHz and report the resulting lpj?
->>
->> I think I need some help doing that. I found some clock setup in
->> <u-boot-pxa>/arch/arm/cpu/pxa/start.S (OpenPXA tree) but I'm not
->> familiar with it.
->>
->> > Alternatively, call calibrate_delay() after the cpufreq switch to
->> > 624MHz, disabling the 'printed' stuff and see what it reports.
->>
->> First attempts at moving calibrate_delay() after freq switch failed. I
->> will try more. Just had to send this so stop the misunderstanding
->> about how much udelay() is off...
+On Fri, Jan 21, 2011 at 4:08 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
+>> If you want to make it so that each low-power mode has to work
+>> out what PLLs need to be disabled and then re-enabled makes me
+>> want to be sick. Hiding this stuff behind specific implementations
+>> is a recipe for disaster.
 >
-> Not a good idea to remove it from its current location. ?I was suggesting
-> adding another call to calibrate_delay() after the cpufreq stuff has
-> initialized.
-
-Ok, thanks!
-
->> What do you mean by disabling the 'printed' stuff? The cpufreq debug stuff?
+> Why should systems which don't suffer from such problems be prevented
+> from gaining power saving from turning off their clocks when devices
+> are not being used (eg, the console serial port.)
 >
-> See calibrate_delay() in init/calibrate.c. ?'static bool printed;' ?It's
-> set true after the first run, and there after it won't print the
-> information again. ?So if you want to see it from subsequent runs, you
-> need to defeat it.
+> One solution to your root PLL issue would be to have a separate set of
+> enable/disable API calls which get called at setup/release time (or
+> whatever you'd like to call it) which can only be called from non-atomic
+> context. ?Maybe clk_prepare() and clk_unprepare(). ?These functions
+> should perform whatever is necessary to ensure that the clock source
+> is available for use atomically when clk_enable() is called.
+>
+> So, in your case, clk_prepare() ensures that the root PLL is enabled,
+> clk_unprepare() allows it to be turned off.
+>
+> In the case of a console driver, clk_prepare() can be called when we
+> know the port will be used as a console. ?clk_enable() is then called
+> before writing out the string, and clk_disable() after we've completely
+> sent the last character.
+>
+> This allows the best of both worlds. ?We now have a clk_enable() which
+> can be used to turn the clocks off through the clock tree up to the first
+> non-atomic clock, and we also have a way to deal with those which need
+> to sleep. ?So not only do "sleeping clock" implementations become possible
+> but these "sleeping clock" implementations also get the opportunity to
+> shutdown some of their clock tree with minimal latency for doing so.
 
-Thanks for the pointers!
+This is exactly what I suggested in my last post, except the console example.
+Only to be a part of common clock api because it's not very safe to assume
+future SoCs will have the same simple clock topologies that they have today.
 
-Best regards,
-Bj?rn Forsman
+Not to mean to teach, but I hope you realize with more and more
+device controller being crammed into ever shrinking SoCs,
+clock would eventually have to be flexible in functionality
+and complicated in hierarchy. Ben already gave examples
+of Audio, MFC and Video controllers of latest Samsung SoCs.
