@@ -1,234 +1,69 @@
-From: sundar.iyer@stericsson.com (Sundar Iyer)
-Date: Fri, 21 Jan 2011 11:58:43 +0530
-Subject: [PATCHv1 3/4] mach-ux500: add ST-UIB platform data
-Message-ID: <1295591323-17469-1-git-send-email-sundar.iyer@stericsson.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 21 Jan 2011 23:15:39 +0800
+Subject: [PATCH 5/6] dmaengine: imx-sdma: fix up param for the last BD
+	in sdma_prep_slave_sg()
+In-Reply-To: <20110120102808.GX9041@pengutronix.de>
+References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
+	<1295473840-17295-6-git-send-email-shawn.guo@freescale.com>
+	<20110120102808.GX9041@pengutronix.de>
+Message-ID: <20110121151537.GA1897@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ST-UIB contains a matrix keypad interfaced with the
-STMPE1601 port expander and a ROHM BU2101 touch panel.
+Hi Sascha,
 
-Signed-off-by: Sundar Iyer <sundar.iyer@stericsson.com>
----
-Changes:
- - Remove obsolete gpio definitions which crept in
+On Thu, Jan 20, 2011 at 11:28:08AM +0100, Sascha Hauer wrote:
+> On Thu, Jan 20, 2011 at 05:50:39AM +0800, Shawn Guo wrote:
+> > As per the reference manual, bit "L" should be set while bit "C"
+> > should be cleared for the last buffer descriptor in the non-cyclic
+> > chain, so that sdma can stop trying to find the next BD and end
+> > the transfer.
+> > 
+> > In case of sdma_prep_slave_sg(), BD_LAST needs to be set and BD_CONT
+> > be cleared for the last BD.
+> 
+> Did you test this patch?
+> 
+Would you suggest any driver on mx51 using this api?  So that I can
+test it on my babbage board.  Or you can help test it with mx27/31
+mmc driver?  I do not have them on my end.  Thanks.
 
- arch/arm/mach-ux500/board-mop500-stuib.c |  185 +++++++++++++++++++++++++++++-
- arch/arm/mach-ux500/board-mop500.h       |    1 +
- 2 files changed, 184 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500-stuib.c b/arch/arm/mach-ux500/board-mop500-stuib.c
-index d1a85c5..74fbbbe 100644
---- a/arch/arm/mach-ux500/board-mop500-stuib.c
-+++ b/arch/arm/mach-ux500/board-mop500-stuib.c
-@@ -3,13 +3,194 @@
-  *
-  * License terms: GNU General Public License (GPL), version 2
-  */
--
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/mfd/stmpe.h>
-+#include <linux/input/bu21013.h>
-+#include <linux/gpio.h>
-+#include <linux/interrupt.h>
-+#include <linux/i2c.h>
-+#include <linux/input/matrix_keypad.h>
- 
- #include "board-mop500.h"
- 
--void __init mop500_stuib_init(void)
-+/* STMPE/SKE keypad use this key layout */
-+static const unsigned int mop500_keymap[] = {
-+	KEY(2, 5, KEY_END),
-+	KEY(4, 1, KEY_POWER),
-+	KEY(3, 5, KEY_VOLUMEDOWN),
-+	KEY(1, 3, KEY_3),
-+	KEY(5, 2, KEY_RIGHT),
-+	KEY(5, 0, KEY_9),
-+
-+	KEY(0, 5, KEY_MENU),
-+	KEY(7, 6, KEY_ENTER),
-+	KEY(4, 5, KEY_0),
-+	KEY(6, 7, KEY_2),
-+	KEY(3, 4, KEY_UP),
-+	KEY(3, 3, KEY_DOWN),
-+
-+	KEY(6, 4, KEY_SEND),
-+	KEY(6, 2, KEY_BACK),
-+	KEY(4, 2, KEY_VOLUMEUP),
-+	KEY(5, 5, KEY_1),
-+	KEY(4, 3, KEY_LEFT),
-+	KEY(3, 2, KEY_7),
-+};
-+
-+static const struct matrix_keymap_data mop500_keymap_data = {
-+	.keymap         = mop500_keymap,
-+	.keymap_size    = ARRAY_SIZE(mop500_keymap),
-+};
-+/*
-+ * STMPE1601
-+ */
-+static struct stmpe_keypad_platform_data stmpe1601_keypad_data = {
-+	.debounce_ms    = 64,
-+	.scan_count     = 8,
-+	.no_autorepeat  = true,
-+	.keymap_data    = &mop500_keymap_data,
-+};
-+
-+static struct stmpe_platform_data stmpe1601_data = {
-+	.id             = 1,
-+	.blocks         = STMPE_BLOCK_KEYPAD,
-+	.irq_trigger    = IRQF_TRIGGER_FALLING,
-+	.irq_base       = MOP500_STMPE1601_IRQ(0),
-+	.keypad         = &stmpe1601_keypad_data,
-+	.autosleep      = true,
-+	.autosleep_timeout = 1024,
-+};
-+
-+static struct i2c_board_info __initdata mop500_i2c0_devices_stuib[] = {
-+	{
-+		I2C_BOARD_INFO("stmpe1601", 0x40),
-+		.irq = NOMADIK_GPIO_TO_IRQ(218),
-+		.platform_data = &stmpe1601_data,
-+		.flags = I2C_CLIENT_WAKE,
-+	},
-+};
-+
-+/*
-+ * BU21013 ROHM touchscreen interface on the STUIBs
-+ */
-+
-+/* tracks number of bu21013 devices being enabled */
-+static int bu21013_devices;
-+
-+#define TOUCH_GPIO_PIN  84
-+
-+#define TOUCH_XMAX	384
-+#define TOUCH_YMAX	704
-+
-+#define PRCMU_CLOCK_OCR		0x1CC
-+#define TSC_EXT_CLOCK_9_6MHZ	0x840000
-+
-+/**
-+ * bu21013_gpio_board_init : configures the touch panel.
-+ * @reset_pin: reset pin number
-+ * This function can be used to configures
-+ * the voltage and reset the touch panel controller.
-+ */
-+static int bu21013_gpio_board_init(int reset_pin)
-+{
-+	int retval = 0;
-+
-+	bu21013_devices++;
-+	if (bu21013_devices == 1) {
-+		retval = gpio_request(reset_pin, "touchp_reset");
-+		if (retval) {
-+			printk(KERN_ERR "Unable to request gpio reset_pin");
-+			return retval;
-+		}
-+		retval = gpio_direction_output(reset_pin, 1);
-+		if (retval < 0) {
-+			printk(KERN_ERR "%s: gpio direction failed\n",
-+					__func__);
-+			return retval;
-+		}
-+	}
-+
-+	return retval;
-+}
-+
-+/**
-+ * bu21013_gpio_board_exit : deconfigures the touch panel controller
-+ * @reset_pin: reset pin number
-+ * This function can be used to deconfigures the chip selection
-+ * for touch panel controller.
-+ */
-+static int bu21013_gpio_board_exit(int reset_pin)
- {
-+	int retval = 0;
-+
-+	if (bu21013_devices == 1) {
-+		retval = gpio_direction_output(reset_pin, 0);
-+		if (retval < 0) {
-+			printk(KERN_ERR "%s: gpio direction failed\n",
-+					__func__);
-+			return retval;
-+		}
-+		gpio_set_value(reset_pin, 0);
-+	}
-+	bu21013_devices--;
-+
-+	return retval;
- }
- 
-+/**
-+ * bu21013_read_pin_val : get the interrupt pin value
-+ * This function can be used to get the interrupt pin value for touch panel
-+ * controller.
-+ */
-+static int bu21013_read_pin_val(void)
-+{
-+	return gpio_get_value(TOUCH_GPIO_PIN);
-+}
-+
-+static struct bu21013_platform_device tsc_plat_device = {
-+	.cs_en = bu21013_gpio_board_init,
-+	.cs_dis = bu21013_gpio_board_exit,
-+	.irq_read_val = bu21013_read_pin_val,
-+	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
-+	.cs_pin = GPIO_BU21013_CS,
-+	.touch_x_max = TOUCH_XMAX,
-+	.touch_y_max = TOUCH_YMAX,
-+	.ext_clk = false,
-+	.x_flip = false,
-+	.y_flip = true,
-+};
-+
-+static struct bu21013_platform_device tsc_plat2_device = {
-+	.cs_en = bu21013_gpio_board_init,
-+	.cs_dis = bu21013_gpio_board_exit,
-+	.irq_read_val = bu21013_read_pin_val,
-+	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
-+	.cs_pin = GPIO_BU21013_CS,
-+	.touch_x_max = TOUCH_XMAX,
-+	.touch_y_max = TOUCH_YMAX,
-+	.ext_clk = false,
-+	.x_flip = false,
-+	.y_flip = true,
-+};
-+
-+static struct i2c_board_info __initdata u8500_i2c3_devices_stuib[] = {
-+	{
-+		I2C_BOARD_INFO("bu21013_tp", 0x5C),
-+		.platform_data = &tsc_plat_device,
-+	},
-+	{
-+		I2C_BOARD_INFO("bu21013_tp", 0x5D),
-+		.platform_data = &tsc_plat2_device,
-+	},
-+
-+};
-+
-+void __init mop500_stuib_init(void)
-+{
-+	mop500_uib_i2c_add(0, mop500_i2c0_devices_stuib,
-+			ARRAY_SIZE(mop500_i2c0_devices_stuib));
-+
-+	mop500_uib_i2c_add(3, u8500_i2c3_devices_stuib,
-+			ARRAY_SIZE(u8500_i2c3_devices_stuib));
-+}
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index cedf8eb..80821c6 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -13,6 +13,7 @@
- #define GPIO_SDMMC_CD			MOP500_EGPIO(3)
- #define GPIO_SDMMC_EN			MOP500_EGPIO(17)
- #define GPIO_SDMMC_1V8_3V_SEL		MOP500_EGPIO(18)
-+#define GPIO_BU21013_CS			MOP500_EGPIO(13)
- 
- struct i2c_board_info;
- 
 -- 
-1.7.2.dirty
+Regards,
+Shawn
+> 
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  drivers/dma/imx-sdma.c |    5 ++++-
+> >  1 files changed, 4 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > index e5af547..fa63ace 100644
+> > --- a/drivers/dma/imx-sdma.c
+> > +++ b/drivers/dma/imx-sdma.c
+> > @@ -931,8 +931,11 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
+> >  
+> >  		param = BD_DONE | BD_EXTD | BD_CONT;
+> >  
+> > -		if (i + 1 == sg_len)
+> > +		if (i + 1 == sg_len) {
+> >  			param |= BD_INTR;
+> > +			param |= BD_LAST;
+> > +			param &= ~BD_CONT;
+> > +		}
+> >  
+> >  		dev_dbg(sdma->dev, "entry %d: count: %d dma: 0x%08x %s%s\n",
+> >  				i, count, sg->dma_address,
+> > -- 
+> > 1.7.1
+> > 
+> > 
+> > 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
