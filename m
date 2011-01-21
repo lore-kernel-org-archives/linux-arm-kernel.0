@@ -1,64 +1,201 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 21 Jan 2011 10:00:28 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <20110121095658.1ab623fe@jbarnes-desktop>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-	<1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-Message-ID: <1295632828.19880.22.camel@m0nster>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 21 Jan 2011 18:01:45 +0000
+Subject: [PATCH] ARM: SMDK6410: Mark regulator setup data __initdata
+Message-ID: <1295632905-23376-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-01-21 at 09:56 -0800, Jesse Barnes wrote:
-> On Fri, 21 Jan 2011 09:48:27 -0800
-> Jesse Barnes <jbarnes@virtuousgeek.org> wrote:
-> 
-> > On Fri, 21 Jan 2011 07:46:41 -0800
-> > Daniel Walker <dwalker@codeaurora.org> wrote:
-> > > This isn't what's happening tho. In maintainer land if someone forwards
-> > > you a patch then you leave the original author on the patch. They wrote
-> > > the patch and your just forwarding it on up the ladder. This isn't the
-> > > case with these patches.. I crafted each of the commit I have authorship
-> > > on, no one forwarded those commits to me. I'm not taking authorship
-> > > credit for any thing I didn't create, although I an giving credit to the
-> > > place which gave me the raw material which was Google. From my
-> > > experience this is how it's done in Linux ..
-> > 
-> > I don't know why you're even trying to defend this, just admit you were
-> > wrong and move on.
-> > 
-> > Trying to claim the author field for these patches for yourself is both
-> > misleading and vain.  You did not write the code and are therefore not
-> > the author, trying to conflate the author and commit fields in this way
-> > is so misguided I thought you must be trolling when I first saw this
-> > thread.
-> > 
-> > This is not "how it's done in Linux" at all.  In this case you're
-> > trying to act like a maintainer by collecting patches and forwarding
-> > them upstream, so you need to preserve authorship and the s-o-b chain.
-> > If you want to take responsibility for the code going forward, great,
-> > but don't pollute the logs with bogus author fields that imply you
-> > wrote the stuff in the first place.
-> 
-> That said, if you did significant work on these before committing them,
-> then you're right and I'm wrong.  It *is* fairly common for committers
-> to change things; and if the changes are significant enough, they claim
-> authorship and note the original author in the changelog.
-> 
-> So if that's the case here, I apologize, but I didn't see that
-> explained in any part of the thread I read.
+Now that the regulator API copies out the constraints we can discard
+the static data once we're done booting, meaning we don't need to
+carry copies of data for regulators not in the system.
 
-I did a significant amount of work to create the commits and series. I'm
-sorry if that's not clear, but it is in fact true.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-smdk6410.c |   40 ++++++++++++++++----------------
+ 1 files changed, 20 insertions(+), 20 deletions(-)
 
-Daniel
-
+diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+index df9b76b..2f30c79 100644
+--- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
++++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
+@@ -224,7 +224,7 @@ static struct regulator_consumer_supply smdk6410_b_pwr_5v_consumers[] = {
+ 	},
+ };
+ 
+-static struct regulator_init_data smdk6410_b_pwr_5v_data = {
++static struct regulator_init_data smdk6410_b_pwr_5v_data __initdata = {
+ 	.constraints = {
+ 		.always_on = 1,
+ 	},
+@@ -304,14 +304,14 @@ static struct platform_device *smdk6410_devices[] __initdata = {
+ 
+ #ifdef CONFIG_REGULATOR
+ /* ARM core */
+-static struct regulator_consumer_supply smdk6410_vddarm_consumers[] = {
++static struct regulator_consumer_supply smdk6410_vddarm_consumers[] __initdata  = {
+ 	{
+ 		.supply = "vddarm",
+ 	}
+ };
+ 
+ /* VDDARM, BUCK1 on J5 */
+-static struct regulator_init_data smdk6410_vddarm = {
++static struct regulator_init_data smdk6410_vddarm __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_ARM",
+ 		.min_uV = 1000000,
+@@ -324,7 +324,7 @@ static struct regulator_init_data smdk6410_vddarm = {
+ };
+ 
+ /* VDD_INT, BUCK2 on J5 */
+-static struct regulator_init_data smdk6410_vddint = {
++static struct regulator_init_data smdk6410_vddint __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_INT",
+ 		.min_uV = 1000000,
+@@ -335,7 +335,7 @@ static struct regulator_init_data smdk6410_vddint = {
+ };
+ 
+ /* VDD_HI, LDO3 on J5 */
+-static struct regulator_init_data smdk6410_vddhi = {
++static struct regulator_init_data smdk6410_vddhi __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_HI",
+ 		.always_on = 1,
+@@ -343,7 +343,7 @@ static struct regulator_init_data smdk6410_vddhi = {
+ };
+ 
+ /* VDD_PLL, LDO2 on J5 */
+-static struct regulator_init_data smdk6410_vddpll = {
++static struct regulator_init_data smdk6410_vddpll __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_PLL",
+ 		.always_on = 1,
+@@ -351,7 +351,7 @@ static struct regulator_init_data smdk6410_vddpll = {
+ };
+ 
+ /* VDD_UH_MMC, LDO5 on J5 */
+-static struct regulator_init_data smdk6410_vdduh_mmc = {
++static struct regulator_init_data smdk6410_vdduh_mmc __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_UH+PVDD_MMC",
+ 		.always_on = 1,
+@@ -359,7 +359,7 @@ static struct regulator_init_data smdk6410_vdduh_mmc = {
+ };
+ 
+ /* VCCM3BT, LDO8 on J5 */
+-static struct regulator_init_data smdk6410_vccmc3bt = {
++static struct regulator_init_data smdk6410_vccmc3bt __initdata = {
+ 	.constraints = {
+ 		.name = "PVCCM3BT",
+ 		.always_on = 1,
+@@ -367,7 +367,7 @@ static struct regulator_init_data smdk6410_vccmc3bt = {
+ };
+ 
+ /* VCCM2MTV, LDO11 on J5 */
+-static struct regulator_init_data smdk6410_vccm2mtv = {
++static struct regulator_init_data smdk6410_vccm2mtv __initdata = {
+ 	.constraints = {
+ 		.name = "PVCCM2MTV",
+ 		.always_on = 1,
+@@ -375,7 +375,7 @@ static struct regulator_init_data smdk6410_vccm2mtv = {
+ };
+ 
+ /* VDD_LCD, LDO12 on J5 */
+-static struct regulator_init_data smdk6410_vddlcd = {
++static struct regulator_init_data smdk6410_vddlcd __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_LCD",
+ 		.always_on = 1,
+@@ -383,7 +383,7 @@ static struct regulator_init_data smdk6410_vddlcd = {
+ };
+ 
+ /* VDD_OTGI, LDO9 on J5 */
+-static struct regulator_init_data smdk6410_vddotgi = {
++static struct regulator_init_data smdk6410_vddotgi __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_OTGI",
+ 		.always_on = 1,
+@@ -391,7 +391,7 @@ static struct regulator_init_data smdk6410_vddotgi = {
+ };
+ 
+ /* VDD_OTG, LDO14 on J5 */
+-static struct regulator_init_data smdk6410_vddotg = {
++static struct regulator_init_data smdk6410_vddotg __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_OTG",
+ 		.always_on = 1,
+@@ -399,7 +399,7 @@ static struct regulator_init_data smdk6410_vddotg = {
+ };
+ 
+ /* VDD_ALIVE, LDO15 on J5 */
+-static struct regulator_init_data smdk6410_vddalive = {
++static struct regulator_init_data smdk6410_vddalive __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_ALIVE",
+ 		.always_on = 1,
+@@ -407,7 +407,7 @@ static struct regulator_init_data smdk6410_vddalive = {
+ };
+ 
+ /* VDD_AUDIO, VLDO_AUDIO on J5 */
+-static struct regulator_init_data smdk6410_vddaudio = {
++static struct regulator_init_data smdk6410_vddaudio __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_AUDIO",
+ 		.always_on = 1,
+@@ -417,7 +417,7 @@ static struct regulator_init_data smdk6410_vddaudio = {
+ 
+ #ifdef CONFIG_SMDK6410_WM1190_EV1
+ /* S3C64xx internal logic & PLL */
+-static struct regulator_init_data wm8350_dcdc1_data = {
++static struct regulator_init_data wm8350_dcdc1_data __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_INT+PVDD_PLL",
+ 		.min_uV = 1200000,
+@@ -428,7 +428,7 @@ static struct regulator_init_data wm8350_dcdc1_data = {
+ };
+ 
+ /* Memory */
+-static struct regulator_init_data wm8350_dcdc3_data = {
++static struct regulator_init_data wm8350_dcdc3_data __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_MEM",
+ 		.min_uV = 1800000,
+@@ -444,7 +444,7 @@ static struct regulator_init_data wm8350_dcdc3_data = {
+ };
+ 
+ /* USB, EXT, PCM, ADC/DAC, USB, MMC */
+-static struct regulator_consumer_supply wm8350_dcdc4_consumers[] = {
++static struct regulator_consumer_supply wm8350_dcdc4_consumers[] __initdata = {
+ 	{
+ 		/* WM8580 */
+ 		.supply = "DVDD",
+@@ -452,7 +452,7 @@ static struct regulator_consumer_supply wm8350_dcdc4_consumers[] = {
+ 	},
+ };
+ 
+-static struct regulator_init_data wm8350_dcdc4_data = {
++static struct regulator_init_data wm8350_dcdc4_data __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_HI+PVDD_EXT+PVDD_SYS+PVCCM2MTV",
+ 		.min_uV = 3000000,
+@@ -464,7 +464,7 @@ static struct regulator_init_data wm8350_dcdc4_data = {
+ };
+ 
+ /* OTGi/1190-EV1 HPVDD & AVDD */
+-static struct regulator_init_data wm8350_ldo4_data = {
++static struct regulator_init_data wm8350_ldo4_data __initdata = {
+ 	.constraints = {
+ 		.name = "PVDD_OTGI+HPVDD+AVDD",
+ 		.min_uV = 1200000,
+@@ -477,7 +477,7 @@ static struct regulator_init_data wm8350_ldo4_data = {
+ static struct {
+ 	int regulator;
+ 	struct regulator_init_data *initdata;
+-} wm1190_regulators[] = {
++} wm1190_regulators[] __initdata = {
+ 	{ WM8350_DCDC_1, &wm8350_dcdc1_data },
+ 	{ WM8350_DCDC_3, &wm8350_dcdc3_data },
+ 	{ WM8350_DCDC_4, &wm8350_dcdc4_data },
 -- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+1.7.2.3
