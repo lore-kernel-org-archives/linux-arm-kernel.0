@@ -1,43 +1,37 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 21 Jan 2011 09:10:26 +0530
-Subject: [PATCH V5 39/63] SPEAr CPU freq: Adding support for CPU Freq
-	framework
-In-Reply-To: <20110120144941.GB25954@pulham.picochip.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<403ef0da274038357f72e84e2378dc4e55be8cb0.1295499395.git.viresh.kumar@st.com>
-	<20110120144941.GB25954@pulham.picochip.com>
-Message-ID: <4D39002A.10703@st.com>
+From: tytso@MIT.EDU (Theodore Tso)
+Date: Thu, 20 Jan 2011 22:41:15 -0500
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295576730.4096.24.camel@Joe-Laptop>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster>
+	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+	<1295576730.4096.24.camel@Joe-Laptop>
+Message-ID: <C4B33E70-E4B2-4C56-8C53-D9EFA283384D@mit.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2011 08:19 PM, Jamie Iles wrote:
->> > +	newfreq = clk_round_rate(cpu_clk, freqs.new * 1000);
->> > +	if (newfreq < 0) {
->> > +		pr_err("CPU Freq: clk_round_rate failed: %ld\n", newfreq);
->> > +		freqs.new = freqs.old;
-> Nitpick, you don't need to assign freqs.new here as you return 
-> immediately after.
+
+On Jan 20, 2011, at 9:25 PM, Joe Perches wrote:
 > 
->> > +		return newfreq;
->> > +	}
->> > +
->> > +	freqs.new = newfreq / 1000;
->> > +
->> > +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
->> > +
->> > +	/* Get current rate after clk_set_rate, for both success and failure */
->> > +	ret = clk_set_rate(cpu_clk, freqs.new * 1000);
->> > +	if (ret) {
->> > +		pr_err("CPU Freq: cpu clk_set_rate failed: %d\n", ret);
->> > +		freqs.new = clk_get_rate(cpu_clk) / 1000;
->> > +	}
->> > +
->> > +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
->> > +	return 0;
-> Shouldn't this return 'ret' here in case clk_set_rate() failed?
+> The authors may be different, but the first git
+> committer of the patch is different.
+> 
+> The committer is the person that does a git commit
+> either directly with git commit or git am.
+> 
+> You should keep the original patch author names and
+> add your own "Signed-off-by:" and not claim authorship
+> of the patches themselves.
+> 
 
-Will correct both of them.
-I will resend this patch alone, instead of sending everything again.
+For example, many people send me patches for the ext4 tree.
 
--- 
-viresh
+Even if I get the patches from somewhere else, say the SuSE RPM, I will try to determine the author, and use that as the author field in the patches.  If I put a
+
+From: The Original Author <author@original.com>
+
+in the patch before I suck it in using git am, it will use the original author in the Author field.   I will add my Signed-off-by, preserving the other Signed-off-by's, and my name will appear in the Committer field, which is as it should be.
+
+-- Ted
