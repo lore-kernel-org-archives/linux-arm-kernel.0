@@ -1,47 +1,142 @@
-From: john.ogness@linutronix.de (John Ogness)
-Date: Fri, 21 Jan 2011 09:33:33 +0100
-Subject: [PATCH v3] OMAP2/3: clock: fix fint calculation for DPLL_FREQSEL
-In-Reply-To: <20110121031553.GA2448@legolas.emea.dhcp.ti.com> (Felipe Balbi's
-	message of "Fri\, 21 Jan 2011 05\:15\:53 +0200")
-References: <87ei8726wf.fsf@vostro.fn.ogness.net>
-	<20110120111645.GB2223@legolas.emea.dhcp.ti.com>
-	<8739on1wdd.fsf_-_@vostro.fn.ogness.net>
-	<20110121031553.GA2448@legolas.emea.dhcp.ti.com>
-Message-ID: <87y66e3bc2.fsf_-_@vostro.fn.ogness.net>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 21 Jan 2011 10:01:58 +0100
+Subject: [PATCH] ARM: mxs: irq_data conversion
+Message-ID: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Ogness <john.ogness@linutronix.de>
-
-In OMAP35X TRM Rev 2010-05 Figure 7-18 "DPLL With EMI Reduction
-Feature", it is shown that the internal frequency is calculated by
-CLK_IN/(N+1). However, the value passed to _dpll_test_fint() is
-already "N+1" since Linux is using the values to divide by. In the
-technical reference manual, "N" is referring to the divider's register
-value (0-127).
-
-Signed-off-by: John Ogness <john.ogness@linutronix.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-patch v3:
-Patch against linux-next-20110121.
-I have improved the commit message so that it is acceptable for the
-git commit log.
+ arch/arm/Kconfig          |    1 +
+ arch/arm/mach-mxs/gpio.c  |   30 +++++++++++++++---------------
+ arch/arm/mach-mxs/icoll.c |   16 ++++++++--------
+ 3 files changed, 24 insertions(+), 23 deletions(-)
 
- arch/arm/mach-omap2/clkt_dpll.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
-index 337392c..acb7ae5 100644
---- a/arch/arm/mach-omap2/clkt_dpll.c
-+++ b/arch/arm/mach-omap2/clkt_dpll.c
-@@ -77,7 +77,7 @@ static int _dpll_test_fint(struct clk *clk, u8 n)
- 	dd = clk->dpll_data;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5cff165..c8d888e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -364,6 +364,7 @@ config ARCH_MXS
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
++	select GENERIC_HARDIRQS_NO_DEPRECATED
+ 	help
+ 	  Support for Freescale MXS-based family of processors
  
- 	/* DPLL divider must result in a valid jitter correction val */
--	fint = clk->parent->rate / (n + 1);
-+	fint = clk->parent->rate / n;
- 	if (fint < DPLL_FINT_BAND1_MIN) {
+diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
+index d7ad7a6..ba810db 100644
+--- a/arch/arm/mach-mxs/gpio.c
++++ b/arch/arm/mach-mxs/gpio.c
+@@ -68,29 +68,29 @@ static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
+ 	}
+ }
  
- 		pr_debug("rejecting n=%d due to Fint failure, "
+-static void mxs_gpio_ack_irq(u32 irq)
++static void mxs_gpio_ack_irq(struct irq_data *d)
+ {
+-	u32 gpio = irq_to_gpio(irq);
++	u32 gpio = irq_to_gpio(d->irq);
+ 	clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
+ }
+ 
+-static void mxs_gpio_mask_irq(u32 irq)
++static void mxs_gpio_mask_irq(struct irq_data *d)
+ {
+-	u32 gpio = irq_to_gpio(irq);
++	u32 gpio = irq_to_gpio(d->irq);
+ 	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
+ }
+ 
+-static void mxs_gpio_unmask_irq(u32 irq)
++static void mxs_gpio_unmask_irq(struct irq_data *d)
+ {
+-	u32 gpio = irq_to_gpio(irq);
++	u32 gpio = irq_to_gpio(d->irq);
+ 	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
+ }
+ 
+ static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
+ 
+-static int mxs_gpio_set_irq_type(u32 irq, u32 type)
++static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+ {
+-	u32 gpio = irq_to_gpio(irq);
++	u32 gpio = irq_to_gpio(d->irq);
+ 	u32 pin_mask = 1 << (gpio & 31);
+ 	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+ 	void __iomem *pin_addr;
+@@ -158,9 +158,9 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+  * @param  enable       enable as wake-up if equal to non-zero
+  * @return       This function returns 0 on success.
+  */
+-static int mxs_gpio_set_wake_irq(u32 irq, u32 enable)
++static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
+ {
+-	u32 gpio = irq_to_gpio(irq);
++	u32 gpio = irq_to_gpio(d->irq);
+ 	u32 gpio_idx = gpio & 0x1f;
+ 	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+ 
+@@ -180,11 +180,11 @@ static int mxs_gpio_set_wake_irq(u32 irq, u32 enable)
+ }
+ 
+ static struct irq_chip gpio_irq_chip = {
+-	.ack = mxs_gpio_ack_irq,
+-	.mask = mxs_gpio_mask_irq,
+-	.unmask = mxs_gpio_unmask_irq,
+-	.set_type = mxs_gpio_set_irq_type,
+-	.set_wake = mxs_gpio_set_wake_irq,
++	.irq_ack = mxs_gpio_ack_irq,
++	.irq_mask = mxs_gpio_mask_irq,
++	.irq_unmask = mxs_gpio_unmask_irq,
++	.irq_set_type = mxs_gpio_set_irq_type,
++	.irq_set_wake = mxs_gpio_set_wake_irq,
+ };
+ 
+ static void mxs_set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
+index 5dd43ba..0f4c120 100644
+--- a/arch/arm/mach-mxs/icoll.c
++++ b/arch/arm/mach-mxs/icoll.c
+@@ -34,7 +34,7 @@
+ 
+ static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
+ 
+-static void icoll_ack_irq(unsigned int irq)
++static void icoll_ack_irq(struct irq_data *d)
+ {
+ 	/*
+ 	 * The Interrupt Collector is able to prioritize irqs.
+@@ -45,22 +45,22 @@ static void icoll_ack_irq(unsigned int irq)
+ 			icoll_base + HW_ICOLL_LEVELACK);
+ }
+ 
+-static void icoll_mask_irq(unsigned int irq)
++static void icoll_mask_irq(struct irq_data *d)
+ {
+ 	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+-			icoll_base + HW_ICOLL_INTERRUPTn_CLR(irq));
++			icoll_base + HW_ICOLL_INTERRUPTn_CLR(d->irq));
+ }
+ 
+-static void icoll_unmask_irq(unsigned int irq)
++static void icoll_unmask_irq(struct irq_data *d)
+ {
+ 	__raw_writel(BM_ICOLL_INTERRUPTn_ENABLE,
+-			icoll_base + HW_ICOLL_INTERRUPTn_SET(irq));
++			icoll_base + HW_ICOLL_INTERRUPTn_SET(d->irq));
+ }
+ 
+ static struct irq_chip mxs_icoll_chip = {
+-	.ack = icoll_ack_irq,
+-	.mask = icoll_mask_irq,
+-	.unmask = icoll_unmask_irq,
++	.irq_ack = icoll_ack_irq,
++	.irq_mask = icoll_mask_irq,
++	.irq_unmask = icoll_unmask_irq,
+ };
+ 
+ void __init icoll_init_irq(void)
 -- 
-1.5.6.5
+1.7.2.3
