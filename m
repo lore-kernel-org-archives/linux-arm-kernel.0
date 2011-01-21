@@ -1,94 +1,58 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 21 Jan 2011 19:11:48 +0900
-Subject: Locking in the clk API
-In-Reply-To: <20110121093940.GC13235@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<201101111744.59712.jeremy.kerr@canonical.com>
-	<20110111103929.GN24920@pengutronix.de>
-	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
-	<4D386ABF.9060908@fluff.org>
-	<20110120190822.GK6335@n2100.arm.linux.org.uk>
-	<AANLkTim5N_sCCoOR40y7sTvdDoFkUJd4tUSSbrCccGjy@mail.gmail.com>
-	<AANLkTikJjkJvr2J-9eq2-Jj8L=JvwUQS+QNj9gWFX-TL@mail.gmail.com>
-	<20110121093940.GC13235@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimrZGd80+L-X3d9tZDHg4n_ajv8tv55pLFx_kRC@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Jan 2011 11:15:36 +0100
+Subject: [PATCH] ARM: mxs: irq_data conversion
+In-Reply-To: <20110121094338.GE13235@n2100.arm.linux.org.uk>
+References: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110121094338.GE13235@n2100.arm.linux.org.uk>
+Message-ID: <20110121101536.GH14956@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 6:39 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jan 21, 2011 at 01:47:29PM +0900, Jassi Brar wrote:
->> On Fri, Jan 21, 2011 at 9:09 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> > On Fri, Jan 21, 2011 at 4:08 AM, Russell King - ARM Linux
->> > <linux@arm.linux.org.uk> wrote:
->> >> On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
->> >>> If you want to make it so that each low-power mode has to work
->> >>> out what PLLs need to be disabled and then re-enabled makes me
->> >>> want to be sick. Hiding this stuff behind specific implementations
->> >>> is a recipe for disaster.
->> >>
->> >> Why should systems which don't suffer from such problems be prevented
->> >> from gaining power saving from turning off their clocks when devices
->> >> are not being used (eg, the console serial port.)
->> >>
->> >> One solution to your root PLL issue would be to have a separate set of
->> >> enable/disable API calls which get called at setup/release time (or
->> >> whatever you'd like to call it) which can only be called from non-atomic
->> >> context. ?Maybe clk_prepare() and clk_unprepare(). ?These functions
->> >> should perform whatever is necessary to ensure that the clock source
->> >> is available for use atomically when clk_enable() is called.
->> >>
->> >> So, in your case, clk_prepare() ensures that the root PLL is enabled,
->> >> clk_unprepare() allows it to be turned off.
->> >>
->> >> In the case of a console driver, clk_prepare() can be called when we
->> >> know the port will be used as a console. ?clk_enable() is then called
->> >> before writing out the string, and clk_disable() after we've completely
->> >> sent the last character.
->> >>
->> >> This allows the best of both worlds. ?We now have a clk_enable() which
->> >> can be used to turn the clocks off through the clock tree up to the first
->> >> non-atomic clock, and we also have a way to deal with those which need
->> >> to sleep. ?So not only do "sleeping clock" implementations become possible
->> >> but these "sleeping clock" implementations also get the opportunity to
->> >> shutdown some of their clock tree with minimal latency for doing so.
->> >
->> > This is exactly what I suggested in my last post, except the console example.
->> > Only to be a part of common clock api because it's not very safe to assume
->> > future SoCs will have the same simple clock topologies that they have today.
->> >
->> > Not to mean to teach, but I hope you realize with more and more
->> > device controller being crammed into ever shrinking SoCs,
->> > clock would eventually have to be flexible in functionality
->> > and complicated in hierarchy. Ben already gave examples
->> > of Audio, MFC and Video controllers of latest Samsung SoCs.
->>
->> plus
->>
->> a) If only Samsung bsp implements the api, it would be impossible to
->> share drivers, those that can be, with other platforms without nasty ifdef's.
->> b) If the task of unification starts with only a particular platform made to
->> implement a new api, the attempt kills its own purpose.
->
-> I guess we give up with the idea of unifying the API then, because it is
-> proving to be impossible to come to any kind of concensus. ?Even ideas
-> to solve the points of contention are argued against.
->
-> I see no one else coming up with any practical ideas how to resolve this,
-> but what I do see is that attempts to provide a solution to allow progress
-> towards a unified API are shot down with great vigour.
->
-> So from what I can see it's a complete waste of time discussing this any
-> further.
->
-> Unified clock API? ?It'll *never* happen.
+On Fri, Jan 21, 2011 at 09:43:38AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Jan 21, 2011 at 10:01:58AM +0100, Uwe Kleine-K?nig wrote:
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  arch/arm/Kconfig          |    1 +
+> >  arch/arm/mach-mxs/gpio.c  |   30 +++++++++++++++---------------
+> >  arch/arm/mach-mxs/icoll.c |   16 ++++++++--------
+> >  3 files changed, 24 insertions(+), 23 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 5cff165..c8d888e 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -364,6 +364,7 @@ config ARCH_MXS
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select ARCH_REQUIRE_GPIOLIB
+> >  	select CLKDEV_LOOKUP
+> > +	select GENERIC_HARDIRQS_NO_DEPRECATED
+> 
+> No.  Let's do it architecture wide otherwise we're going to get into
+> problems working out what's been done and what hasn't.  By all means
+> use it as a way of ensuring that your platform is converted, but don't
+> submit patches with this in.
+OK.
+ 
+> I thought the point of Lennert's patches were to convert everyone over,
+> so it should just be those trees which weren't merged at that point who
+> are missing the fixup.
+Yes, but he missed mxs, probably because the tree he based his work on
+doesn't contain it yet.
 
-Why can't we have that new function, clk_setup or whatever, a part of new API?
-For now, it'll just be a place holder whit NULL as platform specific hooks.
-Eventually platforms like Samsung will have that filled and others
-keep that empty.
-Only let it be defined for drivers to always call clk_setup at probe
-and clk_enable when
-needed.
-Or am I overlooking something?
+> We'll set this architecture wide for 2.6.39, and I'll see about queueing
+> it soon so that we catch those places which haven't been done.  That
+> should allow the remainder to be caught.
+IMHO doing it the other way round would be better.  (i.e. use a def_bool
+y for the unconverted platforms and then push that down.)  But maybe
+this is just a matter of taste.
+
+How should we proceed?  Lennert, do you take my patch?  Should I resend
+without the select?  IIRC there were send a few other patches (for tegra
+maybe?).  Don't know if you missed these, too?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
