@@ -1,43 +1,44 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 21 Jan 2011 10:35:06 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <20110121102740.7f7a57f9@jbarnes-desktop>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-	<1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-	<20110121100441.06a94482@jbarnes-desktop>
-	<1295633882.19880.31.camel@m0nster>
-	<20110121102740.7f7a57f9@jbarnes-desktop>
-Message-ID: <1295634906.19880.34.camel@m0nster>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Jan 2011 10:40:21 -0800
+Subject: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
+In-Reply-To: <1295443503-14515-4-git-send-email-s-ghorai@ti.com>
+References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
+	<1295443503-14515-4-git-send-email-s-ghorai@ti.com>
+Message-ID: <20110121184020.GD11678@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-01-21 at 10:27 -0800, Jesse Barnes wrote:
+* Sukumar Ghorai <s-ghorai@ti.com> [110119 05:24]:
+> add support the irq mode in GPMC.
+> gpmc_init() function move after omap_init_irq() as it has dependecy on irq.
+> 
+> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+> index e066177..527374f 100644
+> --- a/arch/arm/mach-omap2/board-2430sdp.c
+> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+> @@ -146,6 +146,7 @@ static void __init omap_2430sdp_init_irq(void)
+>  	omap2_init_common_infrastructure();
+>  	omap2_init_common_devices(NULL, NULL);
+>  	omap_init_irq();
+> +	gpmc_init();
+>  }
+>  
+>  static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
+> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+> index 8fb5f43..8304d16 100644
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -335,6 +335,7 @@ static void __init omap_3430sdp_init_irq(void)
+>  	omap2_init_common_infrastructure();
+>  	omap2_init_common_devices(hyb18m512160af6_sdrc_params, NULL);
+>  	omap_init_irq();
+> +	gpmc_init();
+>  }
+...
 
-> Ok, then I'm sorry for jumping the gun.  The changelogs made the
-> changes sound more trivial ("slight modifications and cleanup"); and
-> those would only justify a small [] text near the s-o-b lines.  But if
-> they're larger, maybe you should expand on the text and include the
-> original authorship like Christoph suggested (or use the original
-> author for patches where the changes really were trivial).
+I think I've commented on this before, but why don't you make gpmc_init
+a subsys_initcall? There should be no reason to call this earlier.
+If something does not work because of that, then that issue must be
+fixed.
 
-yeah, I didn't really think about that line when I wrote it.. It should
-just says "Base on code from Google." I was just trying to give them
-some credit.
-
-I've done changes like your suggesting
-(923a081c72fa2dccb7ea7070bd8e0f4dc99ceff8) so I'm not a novice to this.
-
-Daniel
-
-
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+Tony
