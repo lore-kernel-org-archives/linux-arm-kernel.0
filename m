@@ -1,47 +1,19 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 21 Jan 2011 11:35:17 +0100
-Subject: [PATCH] mmc: mmc_mxc: Allow selection only for the correct
-	platforms
-In-Reply-To: <1295542979-10329-1-git-send-email-fabio.estevam@freescale.com>
-References: <1295542979-10329-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110121103517.GD9041@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Jan 2011 10:38:50 +0000
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <AANLkTimsL8YfSdXCBpN2cNVpj8HeJF0f-A7MJQoie+Zm@mail.gmail.com>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+	<AANLkTimsL8YfSdXCBpN2cNVpj8HeJF0f-A7MJQoie+Zm@mail.gmail.com>
+Message-ID: <20110121103850.GI13235@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 03:02:59PM -0200, Fabio Estevam wrote:
-> Currently MMC_MXC driver can be selected by all i.MX devices.
-> 
-> Restrict its use only for the appropriate processors.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jan 21, 2011 at 11:12:27AM +0900, KyongHo Cho wrote:
+> Since the size of section is 256 mib and NR_BANKS is defined as 8,
+> no ARM system can have more RAM than 2GiB in the current implementation.
+> If you want banks in meminfo not to cross sparsemem boundaries,
+> we need to find another way of physical memory specification in the kernel.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-> ---
->  drivers/mmc/host/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-> index d618e86..a3a9ec1 100644
-> --- a/drivers/mmc/host/Kconfig
-> +++ b/drivers/mmc/host/Kconfig
-> @@ -288,7 +288,7 @@ config MMC_MSM
->  
->  config MMC_MXC
->  	tristate "Freescale i.MX2/3 Multimedia Card Interface support"
-> -	depends on ARCH_MXC
-> +	depends on MACH_MX21 || MACH_MX27 || ARCH_MX31
->  	help
->  	  This selects the Freescale i.MX2/3 Multimedia card Interface.
->  	  If you have a i.MX platform with a Multimedia Card slot,
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+There is no problem with increasing NR_BANKS.
