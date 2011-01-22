@@ -1,7 +1,7 @@
 From: penberg@kernel.org (Pekka Enberg)
-Date: Sat, 22 Jan 2011 13:03:38 +0200
+Date: Sat, 22 Jan 2011 13:15:38 +0200
 Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTik-7tOEzwgk=xy6q756uayxjTy9Nx3XiQKtXSLs@mail.gmail.com>
+In-Reply-To: <AANLkTinEnNYjhA2WRD=1AqmHYY3ec0uJxRVmLW57_EU=@mail.gmail.com>
 References: <1295576730.4096.24.camel@Joe-Laptop>
 	<1295624801.19880.13.camel@m0nster>
 	<20110121094827.41818a55@jbarnes-desktop>
@@ -15,15 +15,33 @@ References: <1295576730.4096.24.camel@Joe-Laptop>
 	<20110121234930.GK3043@thunk.org>
 	<1295684398.19231.47.camel@jaguar>
 	<AANLkTinEnNYjhA2WRD=1AqmHYY3ec0uJxRVmLW57_EU=@mail.gmail.com>
-	<AANLkTik-7tOEzwgk=xy6q756uayxjTy9Nx3XiQKtXSLs@mail.gmail.com>
-Message-ID: <AANLkTi=b5B7W3_P06j87fPno0TT6Ket4A3qzmMeAbUj-@mail.gmail.com>
+Message-ID: <AANLkTikrDxtkVFJ0C-SwH9QCq4m0A2KMp0vAFA=PaSGM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 22, 2011 at 12:45 PM, Anca Emanuel <anca.emanuel@gmail.com> wrote:
-> Can you show how to import history ? Until then, a line like From:
-> x at y.x I think will be fine.
-> And maybe an link to https://review.source.android.com/'some review'
+Hi Dima!
 
-The best solution is to keep the original patches as-is and rebase
-Daniel's cleanups on top of those.
+On Sat, Jan 22, 2011 at 12:35 PM, Dima Zavin <dmitriyz@google.com> wrote:
+> There's absolutely no hostility. I stated from the very beginning that
+> I appreciate the voluntary effort by a 3rd party to upstream the board
+> files. I only asked that proper authorship be attributed, which is
+> standard linux kernel patch submission procedure when the committer
+> did not originate the code.
+
+OK, that's great! It's poorly reflected in this discussion thread, though.
+
+>> who have been sitting on these patches for over a year now AFAICT.
+>
+> Even if that were true, that does not somehow revoke the original
+> author/contributor list.
+
+No, it does not. But it does make me much more sympathetic towards
+Daniel's efforts even though authorship info is misappropriated. It's
+not as if he changed copyrights or anything malicious like that so I
+do think people are making this into a bigger thing than it really is.
+
+Anyway, I hope Daniel has the time to rebase his patches on top of
+your original ones so history is preserved and we can get this stuff
+merged.
+
+                       Pekka
