@@ -1,77 +1,78 @@
-From: buytenh@wantstofly.org (Lennert Buytenhek)
-Date: Sat, 22 Jan 2011 02:16:39 +0100
-Subject: [PATCH] ARM: mxs: irq_data conversion
-In-Reply-To: <20110121104742.GC23596@mail.wantstofly.org>
-References: <1295600518-11300-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110121094338.GE13235@n2100.arm.linux.org.uk>
-	<20110121101536.GH14956@pengutronix.de>
-	<20110121102707.GH13235@n2100.arm.linux.org.uk>
-	<20110121104742.GC23596@mail.wantstofly.org>
-Message-ID: <20110122011639.GA27938@mail.wantstofly.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 21 Jan 2011 17:35:42 -0800
+Subject: Locking in the clk API
+In-Reply-To: <AANLkTimT+vfg9p4GSnn1jGW9r_gVom7xEUzMVJDscPg2@mail.gmail.com>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>
+	<4D3862DB.5000708@fluff.org>	<20110120185617.GI6335@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>	<4D3907BD.4040900@codeaurora.org>	<AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>	<alpine.LFD.2.00.1101211618170.8580@xanadu.home>	<20110121220238.GE23151@n2100.arm.linux.org.uk>
+	<AANLkTimT+vfg9p4GSnn1jGW9r_gVom7xEUzMVJDscPg2@mail.gmail.com>
+Message-ID: <4D3A346E.9070709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 11:47:42AM +0100, Lennert Buytenhek wrote:
+On 01/21/2011 02:28 PM, Colin Cross wrote:
+> On Fri, Jan 21, 2011 at 2:02 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk>  wrote:
+>> On Fri, Jan 21, 2011 at 04:53:44PM -0500, Nicolas Pitre wrote:
+>>> So I think that the API must be augmented with more methods, such as:
+>>>
+>>> clk_slow_enable():
+>>>    - may sleep
+>>>    - may be a no-op if the clk_fast_enable() is supported
+>>>
+>>> clk_fast_enable():
+>>>    - may not sleep, used in atomic context
+>>>    - may be a no-op if controlling the clock takes time, in which case
+>>>      clk_slow_enable() must have set the clock up entirely
+>>>
+>>> ... and similar for clk_slow_disable() and clk_fast_disable().
+>>
+>> Isn't this along the same lines as my clk_prepare() vs clk_enable()
+>> suggestion?
+>>
+>> I suggested that clk_prepare() be callable only from non-atomic contexts,
+>> and do whatever's required to ensure that the clock is available.  That
+>> may end up enabling the clock as a result.
+>>
+>> clk_enable() callable from atomic contexts, and turns the clock on if
+>> the hardware supports such an operation.
+>>
+>> So, if you have something like:
+>>
+>> Xtal--->PLL--->Routing/Masking--->Device
+>>
+>> clk = clk_get() returns the clock for the device.
+>>
+>> clk_prepare(clk) would walk up the clock tree, selecting the routing and
+>> preparing each clock.  Clocks prior to _and_ including the PLL would need
+>> to be enabled.
+>>
+>> clk_enable(clk) would walk up the tree if the clock isn't already enabled,
+>> calling clk_enable() on the parent clock.  As we require prepared clocks
+>> to already be enabled, this automatically stops at the PLL.
+>>
+>> To encourage correct usage, we just need to make sure that clk_prepare()
+>> has a might_sleep() thing, and clk_enable() throws a fit if it's used
+>> on a clk without prepare being used first.  The second point is not easy
+>> to do in a foolproof manner though, but doing _something_ is better than
+>> nothing.
+>
+> I like this proposal, and I prefer the clk_prepare naming over
+> clk_slow_enable - too many people would call clk_slow_enable instead
+> of, and not as well as, clk_fast_enable.
+>
+> On Tegra, I currently use the ugly conditional mutex or spinlock
+> method to deal with voltage scaling based on clock frequency.
 
-> > so... patches welcome.
-> 
-> I'll submit a patch for the above, and to make sure I'll build all
-> defconfigs on current -devel as well.
+Colin,
 
-Results:
+MSM is in a similar situation, so thought I should bring this up to you 
+attention -- do you have no use case for changing the rate in atomic 
+context? If you do, the clk_prepare/unprepare() approach won't work.
 
-ag5evm_defconfig fails with:
+Do you have no such requirement?
 
-	arch/arm/mach-shmobile/built-in.o: In function `ag5evm_init':
-	board-ag5evm.c:(.init.text+0x238): undefined reference to `sh73a0_pinmux_init'
+-Saravana
 
-which isn't my fault.
-
-
-iop32x_defconfig fails with:
-
-	/tmp/ccLtyaJK.s: Assembler messages:
-	/tmp/ccLtyaJK.s:1468: Error: selected processor does not support `movt r2,32768'
-	make[3]: *** [drivers/net/r8169.o] Error 1
-
-which isn't immediately obvious (but also doesn't seem to be my fault).
-
-
-magician_defconfig fails with:
-
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/mfd/asic3.c: In function ?asic3_irq_demux?:
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/mfd/asic3.c:146:6: error: ?struct irq_desc? has no member named ?chip?
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/mfd/asic3.c:148:13: error: ?struct irq_desc? has no member named ?handler_data?
-	make[3]: *** [drivers/mfd/asic3.o] Error 1
-
-for which I've submitted a patch here (my original mfd asic3 irq_data
-patch did address this, but the patch that got merged instead didn't):
-
-	http://marc.info/?l=linux-kernel&m=129565853125126&w=2
-
-
-mx3_defconfig fails with:
-
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/dma/ipu/ipu_irq.c:349:2: error: unknown field ?ack? specified in initializer
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/dma/ipu/ipu_irq.c:349:2: warning: initialization from incompatible pointer type
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/dma/ipu/ipu_irq.c:350:2: error: unknown field ?mask? specified in initializer
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/dma/ipu/ipu_irq.c:350:2: warning: initialization from incompatible pointer type
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/dma/ipu/ipu_irq.c:351:2: error: unknown field ?unmask? specified in initializer
-	/data/buytenh/kern.irqdata/linux-2.6/drivers/dma/ipu/ipu_irq.c:351:2: warning: initialization from incompatible pointer type
-	make[4]: *** [drivers/dma/ipu/ipu_irq.o] Error 1
-
-for which I've (re)submitted a patch here:
-
-	http://marc.info/?l=linux-kernel&m=129565867725213&w=2
-
-
-u8500_defconfig fails with:
-
-	arch/arm/mach-ux500/built-in.o:(.data+0x2c04): undefined reference to `ab8500_regulators'
-	make[1]: *** [.tmp_vmlinux1] Error 1
-
-which isn't my fault.
-
-
-The rest of the defconfigs build fine.  So I think that turning on
-GENERIC_HARDIRQS_NO_DEPRECATED for ARM should be OK.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
