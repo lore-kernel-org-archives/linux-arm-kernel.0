@@ -1,58 +1,113 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Sat, 22 Jan 2011 23:24:09 +0530
-Subject: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
-In-Reply-To: <20110121184020.GD11678@atomide.com>
-References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
-	<1295443503-14515-4-git-send-email-s-ghorai@ti.com>
-	<20110121184020.GD11678@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A8DB549@dbde02.ent.ti.com>
+From: dmitriyz@google.com (Dima Zavin)
+Date: Sat, 22 Jan 2011 10:06:44 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <20110122122018.GC5194@n2100.arm.linux.org.uk>
+References: <20110121094827.41818a55@jbarnes-desktop>
+	<20110121095658.1ab623fe@jbarnes-desktop>
+	<1295632828.19880.22.camel@m0nster>
+	<20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
+	<1295642995.19880.42.camel@m0nster>
+	<1295643762.25868.31.camel@Joe-Laptop>
+	<1295645098.22882.1.camel@m0nster>
+	<AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
+	<20110122122018.GC5194@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinH47x9S8m3yKt3MarCDudB0Sdh3gFWb_MHGrRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell,
 
+I completely agree with you that the entire history of the evolution
+of the code is not interesting or useful to everyone on the list or in
+linux kernel tree. I'm not advocating posting the original patches
+(which as you rightfully point out are plentiful due to long
+development cycle). It would be a waste of time.
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Saturday, January 22, 2011 12:10 AM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
-> 
-> * Sukumar Ghorai <s-ghorai@ti.com> [110119 05:24]:
-> > add support the irq mode in GPMC.
-> > gpmc_init() function move after omap_init_irq() as it has dependecy on
-> irq.
-> >
-[..snip..]
+I also like how Daniel has split up the board file additions into nice
+small patches, and I already thanked him for doing this work.
 
-> >
-> >  static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
-> > diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-
-> omap2/board-3430sdp.c
-> > index 8fb5f43..8304d16 100644
-> > --- a/arch/arm/mach-omap2/board-3430sdp.c
-> > +++ b/arch/arm/mach-omap2/board-3430sdp.c
-> > @@ -335,6 +335,7 @@ static void __init omap_3430sdp_init_irq(void)
-> >  	omap2_init_common_infrastructure();
-> >  	omap2_init_common_devices(hyb18m512160af6_sdrc_params, NULL);
-> >  	omap_init_irq();
-> > +	gpmc_init();
-> >  }
-> ...
-> 
-> I think I've commented on this before, but why don't you make gpmc_init
-> a subsys_initcall? There should be no reason to call this earlier.
-> If something does not work because of that, then that issue must be
-> fixed.
+All I ask is that if files are directly copied out of the tree with
+only slight modifications or if they are copied and stripped down for
+easier consumption, just say
+Original Authors: <dude@co> if it's reasonable to gather who the
+primary contributors are. If that is hard due to lots of commits and
+squashes, even a Cc: to the people who wrote the code would have been
+enough. Had any of that been done, I would have not said a word.
 
-[Ghorai] You suggested the same in previous v5 and v6; and I mentioned 
-the issues [1] that - nand_init()called before subsys_initcall(gpmc_init);
-Let me know if I am missing anything again.
- 
-[1] https://patchwork.kernel.org/patch/212452/
-[2] https://patchwork.kernel.org/patch/359152/
+I still do appreciate Daniel's efforts and the way he is splitting up
+the commits for public consumption, as they do logically make sense.
 
+--Dima
 
-> 
-> Tony
+On Sat, Jan 22, 2011 at 4:20 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jan 22, 2011 at 01:18:54PM +0200, Pekka Enberg wrote:
+>> Why is that? I don't see any technical problem of upstreaming the
+>> original patches even if they don't compile (as long as they're not
+>> included in Makefiles or Kconfig files). There's no need to hide the
+>> real history even if it looks ugly...
+>
+> I've asked Daniel in private whether he'd mind posting the original
+> set of patches which he based his work on to this thread.
+>
+> I suspect that the situation is that there's many patches which he's
+> taken from the repository and consolidated them down into a nice set
+> of easy to review patches.
+>
+> One of the problems of preserving the micro-detail of history right
+> from the early inception of support for a platform is that quite often
+> the early support is buggy or broken - it might not even compile. ?There
+> may be 20 or so patches on top of that which eventually get it to a
+> usable state.
+>
+> Do we really want to put off people from reviewing patches because of
+> the size of micro-development that happened prior to getting to a point
+> where the result of that development is usable?
+>
+> Tell me this: does a patch which cleanly adds support for board X get
+> reviewed by more, the same, or less people than a set of twenty patches
+> which goes about the same thing, adding code, removing previously added
+> code, changing it again.
+>
+> I personally _hate_ patch sets which do that, and I tend to ignore them
+> (or maybe review the first twenty patches before taking a break... and
+> then never going back to them) because I quickly get tired reading all
+> that code - which means I'm not able to do an effective review. ?I
+> suspect most people suffer from reviewer tiredness when faced with large
+> patch sets changing the same code time and time again.
+>
+> I personally believe that Daniel is doing the right thing here, except
+> he needs to preserve a better record of authorship. ?I even think it's
+> fine if he decides to drop people's sign-offs if he thinks the code has
+> changed significantly from the original authors - provided he's willing
+> to take responsibility for the submission of that code.
+>
+> If you read what a sign-off means (the DCO) then it's clear that if the
+> code has changed significantly, the original sign-offs do not apply
+> anymore - the original sign-offs can't warrant that the modified code
+> is covered by appropriate licenses or even that the person who modified
+> their code has the rights to submit it.
+>
+> Take a moment to think about that. ?If I took some of your code with
+> your sign-off, changed it significantly by including someone elses work
+> where there were no rights to submit that persons work into mainline,
+> and I kept your sign-off on that, would you be happy when someone starts
+> making accusations against you submitting their code?
+>
+> The sign-offs make no representation of who was the author. ?In many
+> cases where companies are involved, the first sign-off is the person
+> who authorized the release of the code, not the person who wrote the
+> code, so it's a complete mistake to attribute authorship by whoever was
+> listed first in the Sign-off lines. ?Authorship may be jointly held by
+> the first 4 people listed, and attributing authorship to only the first
+> is just as bad as not attributing authorship at all.
+>
+> Lastly, from the arguments being made over this, if they are supported,
+> I think that people are saying that the actions listed in DCO (b) are
+> no longer allowed, and so DCO (b) should be removed entirely as an
+> acceptable practice. ?IOW, what's being promoted as "you must do" (iow,
+> preserving all history) is completely contary to the allowances of
+> DCO (b).
+>
