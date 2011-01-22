@@ -1,156 +1,34 @@
-From: GNUtoo@no-log.org (Denis 'GNUtoo' Carikli)
-Date: Sat, 22 Jan 2011 21:42:39 +0100
-Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
-Message-ID: <1295728959-5790-1-git-send-email-GNUtoo@no-log.org>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Sat, 22 Jan 2011 15:50:45 -0500
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <20110122184909.GB11960@n2100.arm.linux.org.uk>
+References: <20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
+	<1295642995.19880.42.camel@m0nster>
+	<1295643762.25868.31.camel@Joe-Laptop>
+	<1295645098.22882.1.camel@m0nster>
+	<AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
+	<20110122122018.GC5194@n2100.arm.linux.org.uk>
+	<AANLkTinH47x9S8m3yKt3MarCDudB0Sdh3gFWb_MHGrRA@mail.gmail.com>
+	<20110122184909.GB11960@n2100.arm.linux.org.uk>
+Message-ID: <20110122205045.GB8666@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This work was based on bug-linux-2.6.30.patch that can be found
-  in buglabs's svn here:
-  svn://bugcamp.net/bug/branches/izzy/experimental
+On Sat, Jan 22, 2011 at 06:49:09PM +0000, Russell King - ARM Linux wrote:
+> http://android.git.kernel.org/?p=kernel/msm.git;a=commit;h=37431502c4
 
-Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
----
- arch/arm/mach-mx3/Kconfig            |    9 +++
- arch/arm/mach-mx3/Makefile           |    1 +
- arch/arm/mach-mx3/mach-mx31bugbase.c |   98 ++++++++++++++++++++++++++++++++++
- 3 files changed, 108 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mx3/mach-mx31bugbase.c
+> Maybe you could illustrate how to take that particular commit, which
+> Daniel apparantly based his 3/7 patch on, and identify who Daniel should
+> and should not give credit to using *just* the text in that commit and
+> no other information.
 
-diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-index 0717f88..f36b3ef 100644
---- a/arch/arm/mach-mx3/Kconfig
-+++ b/arch/arm/mach-mx3/Kconfig
-@@ -199,6 +199,15 @@ config MACH_KZM_ARM11_01
- 	  Include support for KZM-ARM11-01. This includes specific
- 	  configurations for the board and its peripherals.
+I'd add a:
+
+"Based a on shitty codedump from a secrit Google repository, credited to
+ Dima Zavin <dmitriyz@google.com>."
  
-+config MACH_BUG
-+	bool "Support Buglabs BUGBase platform"
-+	select SOC_IMX31
-+	select IMX_HAVE_PLATFORM_IMX_UART
-+	default y
-+	help
-+	  Include support for BUGBase 1.3 platform. This includes specific
-+	  configurations for the board and its peripherals.
-+
- config MACH_EUKREA_CPUIMX35
- 	bool "Support Eukrea CPUIMX35 Platform"
- 	select SOC_IMX35
-diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
-index 8db1329..8a74dcf 100644
---- a/arch/arm/mach-mx3/Makefile
-+++ b/arch/arm/mach-mx3/Makefile
-@@ -20,5 +20,6 @@ obj-$(CONFIG_MACH_PCM043)	+= mach-pcm043.o
- obj-$(CONFIG_MACH_ARMADILLO5X0) += mach-armadillo5x0.o
- obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35_3ds.o
- obj-$(CONFIG_MACH_KZM_ARM11_01)	+= mach-kzm_arm11_01.o
-+obj-$(CONFIG_MACH_BUG)          += mach-mx31bugbase.o
- obj-$(CONFIG_MACH_EUKREA_CPUIMX35)	+= mach-cpuimx35.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD)	+= eukrea_mbimxsd-baseboard.o
-diff --git a/arch/arm/mach-mx3/mach-mx31bugbase.c b/arch/arm/mach-mx3/mach-mx31bugbase.c
-new file mode 100644
-index 0000000..a839bf0
---- /dev/null
-+++ b/arch/arm/mach-mx3/mach-mx31bugbase.c
-@@ -0,0 +1,98 @@
-+/*
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-+ *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+
-+#include <mach/iomux-mx3.h>
-+#include <mach/imx-uart.h>
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+
-+#include <asm/mach/time.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+
-+#include "devices-imx31.h"
-+
-+/*!
-+ * @file mx31bugbase.c
-+ *
-+ * @brief This file contains the board-specific initialization routines.
-+ *
-+ * @ingroup System
-+ */
-+
-+#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
-+static struct imxuart_platform_data uart_pdata = {
-+	.flags = IMXUART_HAVE_RTSCTS,
-+};
-+
-+static unsigned int uart5_pins[] = {
-+	MX31_PIN_PC_RST__CTS5,
-+	MX31_PIN_PC_VS2__RTS5,
-+	MX31_PIN_PC_BVD2__TXD5,
-+	MX31_PIN_PC_BVD1__RXD5
-+};
-+
-+static inline void mxc_init_imx_uart(void)
-+{
-+	mxc_iomux_setup_multiple_pins(uart5_pins,
-+				ARRAY_SIZE(uart5_pins), "uart-4");
-+	imx31_add_imx_uart4(&uart_pdata);
-+}
-+#else /* !SERIAL_IMX */
-+static inline void mxc_init_imx_uart(void)
-+{
-+}
-+#endif /* !SERIAL_IMX */
-+
-+/*!
-+ * Board specific initialization.
-+ */
-+static void __init mxc_board_init(void)
-+{
-+	mxc_init_imx_uart();
-+}
-+
-+
-+static void __init mx31bug_timer_init(void)
-+{
-+	mx31_clocks_init(26000000);
-+}
-+
-+static struct sys_timer mx31bug_timer = {
-+	.init	= mx31bug_timer_init,
-+};
-+
-+/*
-+ * The following uses standard kernel macros defined in arch.h in order to
-+ * initialize __mach_desc_MX31BUG data structure.
-+ */
-+
-+MACHINE_START(BUG, "BugLabs BUGBase")
-+	/* Maintainer: Denis 'GNUtoo' Carikli */
-+	.boot_params    = PHYS_OFFSET + 0x100,
-+	.timer          = &mx31bug_timer,
-+	.map_io         = mx31_map_io,
-+	.init_irq       = mx31_init_irq,
-+	.init_machine   = mxc_board_init,
-+MACHINE_END
--- 
-1.7.0.4
+at the end of the commit line and Cc Dima to see if there's any
+interested from his side to sort this out.  But maybe that's just my
+attitude, and a less colourful language would also do it.
