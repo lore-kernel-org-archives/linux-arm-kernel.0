@@ -1,47 +1,38 @@
-From: penberg@kernel.org (Pekka Enberg)
-Date: Sat, 22 Jan 2011 10:19:58 +0200
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <20110121234930.GK3043@thunk.org>
-References: <1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-	<20110121100441.06a94482@jbarnes-desktop>
-	<1295633882.19880.31.camel@m0nster>
-	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
-	<1295642995.19880.42.camel@m0nster>
-	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
-	<20110121234930.GK3043@thunk.org>
-Message-ID: <1295684398.19231.47.camel@jaguar>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Jan 2011 09:15:26 +0000
+Subject: Locking in the clk API
+In-Reply-To: <4D3A38A7.5000807@codeaurora.org>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
+	<20110120185617.GI6335@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
+	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
+	<4D3907BD.4040900@codeaurora.org>
+	<20110121093218.GB13235@n2100.arm.linux.org.uk>
+	<4D3A38A7.5000807@codeaurora.org>
+Message-ID: <20110122091525.GA5194@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ted,
+On Fri, Jan 21, 2011 at 05:53:43PM -0800, Saravana Kannan wrote:
+> On 01/21/2011 01:32 AM, Russell King - ARM Linux wrote:
+>> On Thu, Jan 20, 2011 at 08:12:45PM -0800, Saravana Kannan wrote:
+>>> In my opinion, the only major reason for needing atomic clk APIs was due
+>>> to device_ops->suspend being atomic. Since that's not the case anymore,
+>>> I really don't see a justification for atomic clocks. Sure, I might have
+>>> missed some exceptions, but in that case we should make the atomic APIs
+>>> an exception (add clk_enable_atomic) and not the norm.
+>>
+>> The suspend method has never been atomic.  It has always been able to
+>> sleep.  You're mistaken.
+>
+> I distinctly remember trying to do sleeping stuff inside a .suspend  
+> function and have it complain that it's atomic. So, I think you might be  
+> mistaken.
 
-On Fri, Jan 21, 2011 at 10:49 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
-> > > I'll add this list into the commit text ..
+No I'm not.  I've always had stuff which takes mutexes/semaphores in
+the suspend method.
 
-On Fri, Jan 21, 2011 at 11:05:54PM +0200, Pekka Enberg wrote: 
-> > So why is everyone bitching at Daniel when he's doing something the
-> > Android folks should have done themselves a long time ago?
-
-On Fri, 2011-01-21 at 18:49 -0500, Ted Ts'o wrote:
-> Two wrongs don't make a right.  And it's not like not submitting
-> changes is wrong, although granted it's not ideal.  (I'd say removing
-> attribution from a git commit is even worse.  If you're doing the
-> equivalent of a cherry pick, you should preserve the Author field.
-> Even if you're doing some cleanup work, as the maintainer I generally
-> preserve the Author line, and will simply add the fact that I did some
-> cleanup to the commit body.  The question is who did more work; the
-> person who originally submitted the code, or the person who did the
-> cleanup.)
-
-Sure, it would have been nicer for everyone involved if Daniel would
-have kept the original patches and added new patches to clean it up on
-top of that to preserve the history. However, I don't understand the
-harsh comments when this looks like a honest mistake! And I especially
-don't understand the almost hostile attitude of the Android developers
-who have been sitting on these patches for over a year now AFAICT.
-
-			Pekka
+You'll get the warning if you take a spinlock and then try sleeping -
+but that's your error for creating an atomic context (you can't sleep
+while holding a spinlock), not the fault of the callback.
