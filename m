@@ -1,28 +1,39 @@
-From: lool@dooz.org (=?iso-8859-1?Q?Lo=EFc?= Minier)
-Date: Sun, 23 Jan 2011 00:15:46 +0100
-Subject: Linux ARM SMP kernel for qemu
-In-Reply-To: <AANLkTim4UTckvZeokXy9jhzyvw0NXZTjbE8w6cGvy02d@mail.gmail.com>
-References: <AANLkTimi5B8pBVatpq4n2HvcT-iU6+EXwdntV1ucAkVL@mail.gmail.com>
-	<AANLkTim4UTckvZeokXy9jhzyvw0NXZTjbE8w6cGvy02d@mail.gmail.com>
-Message-ID: <20110122231546.GG11630@bee.dooz.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Jan 2011 23:15:28 +0000
+Subject: [PATCH 1/2] ARM: calculate VMALLOC_END by probing in
+	mdesc->map_io()
+In-Reply-To: <1295737001-19578-1-git-send-email-eric.y.miao@gmail.com>
+References: <1295737001-19578-1-git-send-email-eric.y.miao@gmail.com>
+Message-ID: <20110122231528.GD11960@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011, Kevin Pouget wrote:
-> do you know if it's feasible to compile a Linux kernel to be run by a Qemu
-> SMP ARM machine? after so many hours of tries, I can say that any version of
-> the kernel, any Qemu machine would be okay, provided that the SMP capability
-> is set, and the kernel boots !
+On Sun, Jan 23, 2011 at 06:56:40AM +0800, Eric Miao wrote:
+> From: Eric Miao <eric.miao@linaro.org>
+> 
+> Provided that the only place initializing the fixed IO mapping is
+> in mdesc->map_io(), the VMALLOC_END can actually be calculated by
+> first invoking the function without actually doing the map.
 
- I apologize for the old references, but I wondered the same a while ago
- and managed to get a SMP Realview EB kernel booted in QEMU IIRC.  I
- think it was only armv6 SMP back then.  Main issue I had back then was
- that it wouldn't support PCI so no networking or IDE.  My notes are at:
- https://lists.ubuntu.com/archives/ubuntu-mobile/2009-May/002485.html
- (some other related message same month and next month)
+We really can't do this.  You're assuming that platforms only do IO
+mapping in their map_io callback - that's way far from the truth.
 
- I would myself love hearing what you manage to achieve, with which
- configs and issues!
+Samsung platforms for instance register clocks and other stuff.
 
--- 
-Lo?c Minier
+OMAP platforms issue cache flushes which won't work on CPUs requiring
+a mapping to be setup for this to work.  They also check CPU revisions
+(requiring mappings in place for that), probe the size of sram, etc.
+None of this will work without mappings setup.
+
+And there's a catch-you in OMAP there - it needs accessible mappings
+to work out what other mappings (eg, sram size) to setup.  It can't map
+a larger area than is actually present because that's known to cause
+problems.
+
+So, without a lot of effort to clean up platform code first, it's
+really unsafe to do this double-call of map_io().  Given that it
+takes some platform support _years_ to change, I really don't see
+that this is a practical approach.
+
+I'd instead suggest adding vmalloc_end to the machine description
+record.
