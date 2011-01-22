@@ -1,92 +1,42 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 21 Jan 2011 18:50:06 -0500 (EST)
-Subject: Locking in the clk API
-In-Reply-To: <AANLkTimT+vfg9p4GSnn1jGW9r_gVom7xEUzMVJDscPg2@mail.gmail.com>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111031552.GJ3760@linux-sh.org> <4D3862DB.5000708@fluff.org>
-	<20110120185617.GI6335@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>
-	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>
-	<4D3907BD.4040900@codeaurora.org>
-	<AANLkTik53zyXytvuAd5zK0_zExfQT3FmOgTr8BexmGeT@mail.gmail.com>
-	<alpine.LFD.2.00.1101211618170.8580@xanadu.home>
-	<20110121220238.GE23151@n2100.arm.linux.org.uk>
-	<AANLkTimT+vfg9p4GSnn1jGW9r_gVom7xEUzMVJDscPg2@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1101211833080.8580@xanadu.home>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Fri, 21 Jan 2011 16:03:13 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <20110121234930.GK3043@thunk.org>
+References: <1295576730.4096.24.camel@Joe-Laptop>
+	<1295624801.19880.13.camel@m0nster>
+	<20110121094827.41818a55@jbarnes-desktop>
+	<20110121095658.1ab623fe@jbarnes-desktop>
+	<1295632828.19880.22.camel@m0nster>
+	<20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
+	<1295642995.19880.42.camel@m0nster>
+	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
+	<20110121234930.GK3043@thunk.org>
+Message-ID: <1295654593.22882.9.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Jan 2011, Colin Cross wrote:
-
-> On Fri, Jan 21, 2011 at 2:02 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jan 21, 2011 at 04:53:44PM -0500, Nicolas Pitre wrote:
-> >> So I think that the API must be augmented with more methods, such as:
-> >>
-> >> clk_slow_enable():
-> >> ? - may sleep
-> >> ? - may be a no-op if the clk_fast_enable() is supported
-> >>
-> >> clk_fast_enable():
-> >> ? - may not sleep, used in atomic context
-> >> ? - may be a no-op if controlling the clock takes time, in which case
-> >> ? ? clk_slow_enable() must have set the clock up entirely
-> >>
-> >> ... and similar for clk_slow_disable() and clk_fast_disable().
-> >
-> > Isn't this along the same lines as my clk_prepare() vs clk_enable()
-> > suggestion?
-> >
-> > I suggested that clk_prepare() be callable only from non-atomic contexts,
-> > and do whatever's required to ensure that the clock is available. ?That
-> > may end up enabling the clock as a result.
-> >
-> > clk_enable() callable from atomic contexts, and turns the clock on if
-> > the hardware supports such an operation.
-> >
-> > So, if you have something like:
-> >
-> > Xtal--->PLL--->Routing/Masking--->Device
-> >
-> > clk = clk_get() returns the clock for the device.
-> >
-> > clk_prepare(clk) would walk up the clock tree, selecting the routing and
-> > preparing each clock. ?Clocks prior to _and_ including the PLL would need
-> > to be enabled.
-> >
-> > clk_enable(clk) would walk up the tree if the clock isn't already enabled,
-> > calling clk_enable() on the parent clock. ?As we require prepared clocks
-> > to already be enabled, this automatically stops at the PLL.
-> >
-> > To encourage correct usage, we just need to make sure that clk_prepare()
-> > has a might_sleep() thing, and clk_enable() throws a fit if it's used
-> > on a clk without prepare being used first. ?The second point is not easy
-> > to do in a foolproof manner though, but doing _something_ is better than
-> > nothing.
+On Fri, 2011-01-21 at 18:49 -0500, Ted Ts'o wrote:
+> On Fri, Jan 21, 2011 at 11:05:54PM +0200, Pekka Enberg wrote:
+> > 
+> > On Fri, Jan 21, 2011 at 10:49 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> > > I'll add this list into the commit text ..
+> > 
+> > So why is everyone bitching at Daniel when he's doing something the
+> > Android folks should have done themselves a long time ago?
 > 
-> I like this proposal, and I prefer the clk_prepare naming over
-> clk_slow_enable - too many people would call clk_slow_enable instead
-> of, and not as well as, clk_fast_enable.
+> Two wrongs don't make a right.  And it's not like not submitting
+> changes is wrong, although granted it's not ideal.  (I'd say removing
+> attribution from a git commit is even worse.  If you're doing the
+> equivalent of a cherry pick, you should preserve the Author field.
 
-I do prefer those names too.  My clk_slow/fast_enable() was just an 
-example for illustration purpose.
+right, but it wasn't a cherrypick which was explain in the thread. So
+there's no wrongs here ..
 
-> On Tegra, I currently use the ugly conditional mutex or spinlock
-> method to deal with voltage scaling based on clock frequency.  Clocks
-> that have a voltage dependency, or depend on a clock that has a
-> voltage dependency, are non-atomic, everything else is atomic.  PLLs
-> are atomic because they lock very fast (300 uS or 1ms) and are shared
-> by so many clocks that they realistically don't get turned off very
-> often, and if I made them non-atomic, all clocks would be non-atomic.
+Daniel
 
-That's of course implementation details.  The API should define purpose, 
-and then you get to decide how your hardware will behave.  If you 
-consider that 300us is short enough to busy wait for, and that the 
-likelyhood for that PLL to be disabled is low, then you can make it into 
-the clk_enable() and make clk_prepare() empty.  But if you are going to 
-use a driver with aggressive power saving through frequent usage of 
-clk_enable()/clk_disable() then it is probably best to lock the PLLs in 
-clk_prepare() instead.
-
-
-Nicolas
+-- 
+Sent by an consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
