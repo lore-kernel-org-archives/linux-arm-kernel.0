@@ -1,7 +1,7 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 22 Jan 2011 16:17:38 -0200
+Date: Sat, 22 Jan 2011 16:18:56 -0200
 Subject: [PATCH] ARM: mach-imx/mach-mx25_3ds: Fix section type 
-Message-ID: <1295720258-28277-1-git-send-email-festevam@gmail.com>
+Message-ID: <1295720336-28304-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
