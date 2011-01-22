@@ -1,62 +1,59 @@
-From: sumit.semwal@ti.com (Sumit Semwal)
-Date: Sat, 22 Jan 2011 15:35:58 +0530
-Subject: [PATCH v9 18/18] OMAP2,3: DSS2: Get DSS IRQ from platform device
-In-Reply-To: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
-References: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
-Message-ID: <1295690758-5845-19-git-send-email-sumit.semwal@ti.com>
+From: dmitriyz@google.com (Dima Zavin)
+Date: Sat, 22 Jan 2011 02:35:27 -0800
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <1295684398.19231.47.camel@jaguar>
+References: <1295576730.4096.24.camel@Joe-Laptop>
+	<1295624801.19880.13.camel@m0nster>
+	<20110121094827.41818a55@jbarnes-desktop>
+	<20110121095658.1ab623fe@jbarnes-desktop>
+	<1295632828.19880.22.camel@m0nster>
+	<20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
+	<1295642995.19880.42.camel@m0nster>
+	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
+	<20110121234930.GK3043@thunk.org>
+	<1295684398.19231.47.camel@jaguar>
+Message-ID: <AANLkTinEnNYjhA2WRD=1AqmHYY3ec0uJxRVmLW57_EU=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Senthilvadivu Guruswamy <svadivu@ti.com>
+On Sat, Jan 22, 2011 at 12:19 AM, Pekka Enberg <penberg@kernel.org> wrote:
+> Hi Ted,
+>
+> On Fri, Jan 21, 2011 at 10:49 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
+>> > > I'll add this list into the commit text ..
+>
+> On Fri, Jan 21, 2011 at 11:05:54PM +0200, Pekka Enberg wrote:
+>> > So why is everyone bitching at Daniel when he's doing something the
+>> > Android folks should have done themselves a long time ago?
+>
+> On Fri, 2011-01-21 at 18:49 -0500, Ted Ts'o wrote:
+>> Two wrongs don't make a right. ?And it's not like not submitting
+>> changes is wrong, although granted it's not ideal. ?(I'd say removing
+>> attribution from a git commit is even worse. ?If you're doing the
+>> equivalent of a cherry pick, you should preserve the Author field.
+>> Even if you're doing some cleanup work, as the maintainer I generally
+>> preserve the Author line, and will simply add the fact that I did some
+>> cleanup to the commit body. ?The question is who did more work; the
+>> person who originally submitted the code, or the person who did the
+>> cleanup.)
+>
+> Sure, it would have been nicer for everyone involved if Daniel would
+> have kept the original patches and added new patches to clean it up on
+> top of that to preserve the history. However, I don't understand the
+> harsh comments when this looks like a honest mistake! And I especially
+> don't understand the almost hostile attitude of the Android developers
 
-DSS IRQ number can be obtained from platform_get_irq().  This API in turn
-picks the right IRQ number belonging to HW IP from the hwmod database.
-So hardcoding of IRQ number could be removed.
+There's absolutely no hostility. I stated from the very beginning that
+I appreciate the voluntary effort by a 3rd party to upstream the board
+files. I only asked that proper authorship be attributed, which is
+standard linux kernel patch submission procedure when the committer
+did not originate the code.
 
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Senthilvadivu Guruswamy <svadivu@ti.com>
-Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
----
- drivers/video/omap2/dss/dss.c |   13 ++++++++-----
- 1 files changed, 8 insertions(+), 5 deletions(-)
+> who have been sitting on these patches for over a year now AFAICT.
 
-diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
-index 4d7a816..22690e9 100644
---- a/drivers/video/omap2/dss/dss.c
-+++ b/drivers/video/omap2/dss/dss.c
-@@ -563,7 +563,7 @@ void dss_set_dac_pwrdn_bgz(bool enable)
- 
- static int dss_init(bool skip_init)
- {
--	int r;
-+	int r, dss_irq;
- 	u32 rev;
- 	struct resource *dss_mem;
- 
-@@ -609,15 +609,18 @@ static int dss_init(bool skip_init)
- 	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
- #endif
- 
--	r = request_irq(INT_24XX_DSS_IRQ,
-+	dss_irq = platform_get_irq(dss.pdev, 0);
-+	if (dss_irq != -ENXIO) {
-+		r = request_irq(dss_irq,
- 			cpu_is_omap24xx()
- 			? dss_irq_handler_omap2
- 			: dss_irq_handler_omap3,
- 			0, "OMAP DSS", NULL);
- 
--	if (r < 0) {
--		DSSERR("omap2 dss: request_irq failed\n");
--		goto fail1;
-+		if (r < 0) {
-+			DSSERR("omap2 dss: request_irq failed\n");
-+			goto fail1;
-+		}
- 	}
- 
- 	if (cpu_is_omap34xx()) {
--- 
-1.7.1
+Even if that were true, that does not somehow revoke the original
+author/contributor list.
+
+--Dima
