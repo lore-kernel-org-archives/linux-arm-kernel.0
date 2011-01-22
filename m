@@ -1,37 +1,36 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Sat, 22 Jan 2011 23:58:47 +1000
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTinrGUMBqh657Y2fFCUWKDFwYsGZKb73O_iO9wzm@mail.gmail.com>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
-	<1295571359.9236.53.camel@m0nster> <1295574085.4096.6.camel@Joe-Laptop>
-	<1295575123.9236.54.camel@m0nster>
-	<1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-	<20110121100441.06a94482@jbarnes-desktop>
-	<1295633882.19880.31.camel@m0nster>
-	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
-	<1295642995.19880.42.camel@m0nster>
-	<20110121130106.5f30908d@jbarnes-desktop>
-	<1295645218.22882.2.camel@m0nster>
-	<AANLkTinrGUMBqh657Y2fFCUWKDFwYsGZKb73O_iO9wzm@mail.gmail.com>
-Message-ID: <1295704727.7115.35.camel@macbook.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Jan 2011 17:00:44 +0000
+Subject: [PATCH 1/3] Support BE8 mode kernel modules relocation
+In-Reply-To: <4D395BE1.2050806@windriver.com>
+References: <1295419487-31185-1-git-send-email-stanley.miao@windriver.com>
+	<1295419487-31185-2-git-send-email-stanley.miao@windriver.com>
+	<20110121094446.GF13235@n2100.arm.linux.org.uk>
+	<4D395BE1.2050806@windriver.com>
+Message-ID: <20110122170044.GA12982@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-01-21 at 13:42 -0800, Dima Zavin wrote:
-> My main point is that the authorship of this code is VERY easy to
-> ascertain. It is not like a lot of other vendor code that gets thrown
-> over the wall as a tarball. We really do our best to follow the right
-> practices, give the right credits, create legible well separated
-> commits, etc. 
+On Fri, Jan 21, 2011 at 06:11:45PM +0800, stanley.miao wrote:
+> Russell King - ARM Linux wrote:
+>> On Wed, Jan 19, 2011 at 02:44:45PM +0800, Stanley.Miao wrote:
+>>   
+>>> @@ -174,9 +186,9 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+>>>  			* other bits to re-code instruction as
+>>>  			* MOV PC,Rm.
+>>>  			*/
+>>> -		       *(u32 *)loc &= 0xf000000f;
+>>> -		       *(u32 *)loc |= 0x01a0f000;
+>>> -		       break;
+>>> +			write_instr32((read_instr32(loc) & 0xf000000f) |
+>>> +							0x01a0f000, loc);
+>>> +			break;
+>>>     
+>>
+>> Indentation error.
+>>
+>>   
+> Actually, The indentation of my code is right, and the original code is  
+> wrong.
 
-So your code was already submitted to Linus in a form that he'll accept,
-and Daniel is just completely wasting his time?
-
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+Yes, you're right.  Please precede your patch which a patch which _just_
+corrects the formatting of the old code.
