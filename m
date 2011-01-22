@@ -1,29 +1,45 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 21 Jan 2011 18:45:16 -0800
-Subject: __arm_ioremap creates page table with domain set to kernel
-Message-ID: <AANLkTi=iD_ipD=KBdgB+xT4dP2Yd7UYu1fmpQ4NO5OJx@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Fri, 21 Jan 2011 18:56:53 -0800
+Subject: Locking in the clk API
+In-Reply-To: <AANLkTimS_=JnKD42fMfD38vnaPQu2vfsSQvNs-mKsj=2@mail.gmail.com>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>
+	<4D3862DB.5000708@fluff.org>	<20110120185617.GI6335@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>	<4D3907BD.4040900@codeaurora.org>	<20110121093218.GB13235@n2100.arm.linux.org.uk>	<4D3A38A7.5000807@codeaurora.org>
+	<AANLkTimS_=JnKD42fMfD38vnaPQu2vfsSQvNs-mKsj=2@mail.gmail.com>
+Message-ID: <4D3A4775.2080804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_SMP is set, __arm_ioremap always creates a page table
-mapping by calling ioremap_page_range in lib/ioremap.c, and passes it
-the memory prot value but not the domain.  iormap_page_range
-eventually calls pte_alloc_kernel, which sets the domain to
-DOMAIN_KERNEL, instead of DOMAIN_IO.
+On 01/21/2011 06:24 PM, Colin Cross wrote:
+> On Fri, Jan 21, 2011 at 5:53 PM, Saravana Kannan<skannan@codeaurora.org>  wrote:
+>> On 01/21/2011 01:32 AM, Russell King - ARM Linux wrote:
+>>>
+>>> On Thu, Jan 20, 2011 at 08:12:45PM -0800, Saravana Kannan wrote:
+>>>>
+>>>> In my opinion, the only major reason for needing atomic clk APIs was due
+>>>> to device_ops->suspend being atomic. Since that's not the case anymore,
+>>>> I really don't see a justification for atomic clocks. Sure, I might have
+>>>> missed some exceptions, but in that case we should make the atomic APIs
+>>>> an exception (add clk_enable_atomic) and not the norm.
+>>>
+>>> The suspend method has never been atomic.  It has always been able to
+>>> sleep.  You're mistaken.
+>>
+>> I distinctly remember trying to do sleeping stuff inside a .suspend function
+>> and have it complain that it's atomic. So, I think you might be mistaken.
+>> But I will have to back up my claims. Let me trying to find that info. In
+>> the end, one of us will learn something new -- which is good and all that
+>> matters.
+>
+> platform_driver->suspend and dev_pm_ops->suspend can sleep, but
+> dev_pm_ops->suspend_noirq is called after irqs are disabled and can't
+> sleep.  Maybe that's what you were using?
+>
 
-The kernel domain is normally set to client, the same as the IO
-domain, but it can get temporarily switched to manager mode.  When it
-is in manager mode, it ignores the memory protection bits, and the
-instruction prefetcher is allowed by the ARMv7 spec to ignore the XN
-(eXecute Never) bit and fetch from IO memory.  I don't know that this
-would ever actually occur, but the ARM spec says in B3.6.2:
+The stuff I did was before suspend_noirq was added. Well, at least the 
+struct that I was filling up had no suspend_noirq.
 
-The XN attribute is not checked for domains marked as Manager.
-Read-sensitive memory must not be
-included in domains marked as Manager, because the XN bit does not
-prevent prefetches in these cases.
+-Saravana
 
-If this is a real problem, I don't see any quick fix.  The domain bits
-are set in the pmd, so ioremapped memory can not share a pmd with
-regular vmalloc memory, and ioremap_page_range has no way to carry a
-domain to pte_alloc_kernel.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
