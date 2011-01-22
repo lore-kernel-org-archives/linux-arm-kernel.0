@@ -1,106 +1,58 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 22 Jan 2011 18:28:05 +0100 (CET)
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTikrDxtkVFJ0C-SwH9QCq4m0A2KMp0vAFA=PaSGM@mail.gmail.com>
-References: <1295576730.4096.24.camel@Joe-Laptop>
-	<1295624801.19880.13.camel@m0nster>
-	<20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-	<20110121100441.06a94482@jbarnes-desktop>
-	<1295633882.19880.31.camel@m0nster>
-	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
-	<1295642995.19880.42.camel@m0nster>
-	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
-	<20110121234930.GK3043@thunk.org>
-	<1295684398.19231.47.camel@jaguar>
-	<AANLkTinEnNYjhA2WRD=1AqmHYY3ec0uJxRVmLW57_EU=@mail.gmail.com>
-	<AANLkTikrDxtkVFJ0C-SwH9QCq4m0A2KMp0vAFA=PaSGM@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1101221802280.31804@localhost6.localdomain6>
+From: s-ghorai@ti.com (Ghorai, Sukumar)
+Date: Sat, 22 Jan 2011 23:24:09 +0530
+Subject: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
+In-Reply-To: <20110121184020.GD11678@atomide.com>
+References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
+	<1295443503-14515-4-git-send-email-s-ghorai@ti.com>
+	<20110121184020.GD11678@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036A8DB549@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 22 Jan 2011, Pekka Enberg wrote:
 
-> Hi Dima!
+
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Saturday, January 22, 2011 12:10 AM
+> To: Ghorai, Sukumar
+> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
 > 
-> On Sat, Jan 22, 2011 at 12:35 PM, Dima Zavin <dmitriyz@google.com> wrote:
-> > There's absolutely no hostility. I stated from the very beginning that
-> > I appreciate the voluntary effort by a 3rd party to upstream the board
-> > files. I only asked that proper authorship be attributed, which is
-> > standard linux kernel patch submission procedure when the committer
-> > did not originate the code.
-> 
-> OK, that's great! It's poorly reflected in this discussion thread, though.
-> 
-> >> who have been sitting on these patches for over a year now AFAICT.
+> * Sukumar Ghorai <s-ghorai@ti.com> [110119 05:24]:
+> > add support the irq mode in GPMC.
+> > gpmc_init() function move after omap_init_irq() as it has dependecy on
+> irq.
 > >
-> > Even if that were true, that does not somehow revoke the original
-> > author/contributor list.
+[..snip..]
+
+> >
+> >  static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
+> > diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-
+> omap2/board-3430sdp.c
+> > index 8fb5f43..8304d16 100644
+> > --- a/arch/arm/mach-omap2/board-3430sdp.c
+> > +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> > @@ -335,6 +335,7 @@ static void __init omap_3430sdp_init_irq(void)
+> >  	omap2_init_common_infrastructure();
+> >  	omap2_init_common_devices(hyb18m512160af6_sdrc_params, NULL);
+> >  	omap_init_irq();
+> > +	gpmc_init();
+> >  }
+> ...
 > 
-> No, it does not. But it does make me much more sympathetic towards
-> Daniel's efforts even though authorship info is misappropriated. It's
-> not as if he changed copyrights or anything malicious like that so I
-> do think people are making this into a bigger thing than it really is.
+> I think I've commented on this before, but why don't you make gpmc_init
+> a subsys_initcall? There should be no reason to call this earlier.
+> If something does not work because of that, then that issue must be
+> fixed.
+
+[Ghorai] You suggested the same in previous v5 and v6; and I mentioned 
+the issues [1] that - nand_init()called before subsys_initcall(gpmc_init);
+Let me know if I am missing anything again.
+ 
+[1] https://patchwork.kernel.org/patch/212452/
+[2] https://patchwork.kernel.org/patch/359152/
+
+
 > 
-> Anyway, I hope Daniel has the time to rebase his patches on top of
-> your original ones so history is preserved and we can get this stuff
-> merged.
-
-Crap. There is no history which has remotely to do anything with
-Daniel patches, which are btw. very sensible and well done.
-
-Patch 1/7 is extracted from one large dump (f5ee31ab10c1) in the
-android tree, which has:
-
-	9 files changed, 1445 insertions(+), 45 deletions(-)
-
-versus Daniels patch:
-
-       1 files changed, 42 insertions(+), 0 deletions(-)
-
-Patch 2/7 is properly assigned to the original author.
-
-Patch 3/7 is extracted from another large dump (37431502c4) in the
-android tree which has:
-
-      11 files changed, 5336 insertions(+), 6 deletions(-)
-
-versus Daniels patch:
-
-       4 files changed, 484 insertions(+), 1 deletions(-)
-
-And if you look at the above 37431502c4 commit then you'll notice that
-the author is Dima Zavin <dima@android.com>, while in fact the whole
-commit is a conglomerate of commits from some other place with 16
-different authors, but there is no way to identify who wrote what.
-
-How the f*ck should Daniel attribute the authorship from that shit
-pile? And the person who "authored" that mega commit is now
-complaining.
-
-I stoppped looking at this point as the whole "so well done" android
-tree is a huge stinking pile of sh*t! Not only code wise, also the
-history is completely useless due to these mega commits which have no
-reference at all.
-
-The only thing what Daniel missed is to add in the change log of his
-patches:
-
-	Extracted from: git-url branch commit ID
-or:
-	Based on: git-url branch commit ID
-
-That's oversight and not a malicious crime and easy to repair.
-
-The people who make a lot of noise about this including you did not
-even bother to look at the patches and the originating mess, which is
-in no way suitable to go near mainline in any form.
-
-I really appreciate the well structured effort which Daniel is putting
-into this. An effort which should have been done in the first place by
-those who cry murder now.
-
-Thanks,
-
-	tglx
+> Tony
