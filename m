@@ -1,70 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 22 Jan 2011 13:14:21 +0530
-Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK
-	tospeed-up boot
-In-Reply-To: <20110121171555.GB30823@n2100.arm.linux.org.uk>
-References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com><4D385155.4050301@gmail.com><43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com><4D38641E.2000301@gmail.com><c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com><4D399F74.9050302@gmail.com>
-	<20110121171555.GB30823@n2100.arm.linux.org.uk>
-Message-ID: <bccc6a7edf66bedd311bc869bfa89ae8@mail.gmail.com>
+From: penberg@kernel.org (Pekka Enberg)
+Date: Sat, 22 Jan 2011 10:19:58 +0200
+Subject: [PATCH 0/7] Nexus One Support
+In-Reply-To: <20110121234930.GK3043@thunk.org>
+References: <1295576730.4096.24.camel@Joe-Laptop>
+	<1295624801.19880.13.camel@m0nster>
+	<20110121094827.41818a55@jbarnes-desktop>
+	<20110121095658.1ab623fe@jbarnes-desktop>
+	<1295632828.19880.22.camel@m0nster>
+	<20110121100441.06a94482@jbarnes-desktop>
+	<1295633882.19880.31.camel@m0nster>
+	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
+	<1295642995.19880.42.camel@m0nster>
+	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
+	<20110121234930.GK3043@thunk.org>
+Message-ID: <1295684398.19231.47.camel@jaguar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King -
-> ARM Linux
-> Sent: Friday, January 21, 2011 10:46 PM
-> To: Rob Herring
-> Cc: linux-omap at vger.kernel.org; Santosh Shilimkar; Linus Walleij;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK
-> tospeed-up boot
->
-[...]
+Hi Ted,
 
->
-> That means cpufreq scaling on SMP is broken then...  Why isn't
-> cpufreq
-> marked with a !SMP dependence or something similar (eg, depends on
-> !SMP || CPU_INDEPENDENT_UDELAY)...  Maybe it should be.
->
-Actually it's not broken but documented to use arch specific
-per-cpu lpj with cpufreq scaling. And that update cab be
-managed by arch specific cpufreq code based on the way
-CPUs scale. That's how other arch including x86 doing it.
-And global lpj can be update as well there which is not
-done at this moment.
+On Fri, Jan 21, 2011 at 10:49 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> > > I'll add this list into the commit text ..
 
-> > And delay.S uses the global loops_per_jiffy, not the per cpu
-> value. The
-> > only place I see the per cpu value get used is /proc/cpuinfo.
-> >
-> > Consider the following sequence:
-> >
-> > - scale down the cpu freq
-> > - hot unplug a core
-> > - hot plug a core
-> >   - calls calibrate_delay and update the global loops_per_jiffy
-> > - scale up the cpu freq
-> > - udelay time is now much too short!!!
-> >
-> > So for that reason, I would just remove calibrate_delay
-> unconditionally.
-> > Better to have the 1% inaccuracy and longer delays at low
-> frequency than
-> > to have too short of a delay at high freq.
->
-> As you've shown above, it makes not a blind bit of difference
-> whether
-> calibrate_delay() is called... on SMP the loops_per_jiffy will be
-> wrong
-> as soon as you start scaling no matter what.
->
-Surely whichever way we should remove the recalibration otherwise
-every time secondary cpus spend ~ 200 ms there.
+On Fri, Jan 21, 2011 at 11:05:54PM +0200, Pekka Enberg wrote: 
+> > So why is everyone bitching at Daniel when he's doing something the
+> > Android folks should have done themselves a long time ago?
 
-Russell,
-How do you like to address this?
+On Fri, 2011-01-21 at 18:49 -0500, Ted Ts'o wrote:
+> Two wrongs don't make a right.  And it's not like not submitting
+> changes is wrong, although granted it's not ideal.  (I'd say removing
+> attribution from a git commit is even worse.  If you're doing the
+> equivalent of a cherry pick, you should preserve the Author field.
+> Even if you're doing some cleanup work, as the maintainer I generally
+> preserve the Author line, and will simply add the fact that I did some
+> cleanup to the commit body.  The question is who did more work; the
+> person who originally submitted the code, or the person who did the
+> cleanup.)
 
-Regards,
-Santosh
+Sure, it would have been nicer for everyone involved if Daniel would
+have kept the original patches and added new patches to clean it up on
+top of that to preserve the history. However, I don't understand the
+harsh comments when this looks like a honest mistake! And I especially
+don't understand the almost hostile attitude of the Android developers
+who have been sitting on these patches for over a year now AFAICT.
+
+			Pekka
