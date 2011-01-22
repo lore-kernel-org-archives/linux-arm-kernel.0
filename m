@@ -1,30 +1,46 @@
-From: penberg@kernel.org (Pekka Enberg)
-Date: Sun, 23 Jan 2011 00:13:47 +0200
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Sat, 22 Jan 2011 21:57:56 +0000
 Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <20110122215855.GA22255@infradead.org>
+In-Reply-To: <20110122210405.GC11960@n2100.arm.linux.org.uk>
 References: <1295632828.19880.22.camel@m0nster>
 	<20110121100441.06a94482@jbarnes-desktop>
 	<1295633882.19880.31.camel@m0nster>
 	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
 	<1295642995.19880.42.camel@m0nster>
-	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
-	<20110121234930.GK3043@thunk.org>
-	<1295684398.19231.47.camel@jaguar>
-	<20110122205535.GD8666@infradead.org>
-	<AANLkTimKRCAVQSn8cic2OH2+2eOP+RKxWhUkpRw-B3k3@mail.gmail.com>
-	<20110122215855.GA22255@infradead.org>
-Message-ID: <AANLkTinadcirsSEA7vsnYfw=KGKppUu=TtQQOWmLCFZ4@mail.gmail.com>
+	<1295643762.25868.31.camel@Joe-Laptop>
+	<1295645098.22882.1.camel@m0nster>
+	<AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
+	<20110122122018.GC5194@n2100.arm.linux.org.uk>
+	<AANLkTi=47z21zExtfHq2WYdUdXeC1rNhe7vQsqPkFsMi@mail.gmail.com>
+	<20110122210405.GC11960@n2100.arm.linux.org.uk>
+Message-ID: <20110122215756.10428245@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 22, 2011 at 11:58 PM, Christoph Hellwig <hch@infradead.org> wrote:
->> Usually even "shitty git trees" have value in the history for people
->> who're interested why the code is the way it is. But as people who
->> actually looked at the patches, it doesn't apply here.
->
-> Thomas posted how the android tree commits looks. ?How about getting a
-> clue before posting more useless noise in this thread?
+On Sat, 22 Jan 2011 21:04:05 +0000
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Oh, don't you even try to "pull a Christoph" on me! I did see Thomas'
-and Russell's comments about the quality of the tree which is why I
-said "it doesn't apply here" (that the history is useless).
+> On Sat, Jan 22, 2011 at 11:22:57AM -0800, Brian Swetland wrote:
+> > What would be useful would be a reasonable convention for
+> > acknowledging multiple authors, perhaps something along the lines of:
+> 
+> I asked for the answer to a _specific_ example.  If you can't answer
+> that example, then you *can't* expect Daniel to either, and it is
+> utterly unreasonable to demand it of him.
+
+I've always just put it in the text. I'm not fond of it being in URLs
+because some day they break and move, at least if the list of names is in
+the git log it's ensuring the contributor data isn't going to get
+completely lost.
+
+Yeah
+
+Based on blah by
+	name
+	name
+	name
+	name
+	name
+
+isn't the most thrilling git commit message but it works and sometimes
+you can even generate the list with grep
