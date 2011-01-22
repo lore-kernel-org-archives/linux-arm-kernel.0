@@ -1,58 +1,120 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 22 Jan 2011 10:10:03 +0000
-Subject: __arm_ioremap creates page table with domain set to kernel
-In-Reply-To: <AANLkTi=nxMUNBGGVWjn+0JtEPGt3RZa5Y4BmH4=ytSiX@mail.gmail.com>
-References: <AANLkTi=iD_ipD=KBdgB+xT4dP2Yd7UYu1fmpQ4NO5OJx@mail.gmail.com>
-	<alpine.LFD.2.00.1101212232000.8580@xanadu.home>
-	<AANLkTi=nxMUNBGGVWjn+0JtEPGt3RZa5Y4BmH4=ytSiX@mail.gmail.com>
-Message-ID: <AANLkTikSiZzwUUuV-amJXCMZCtf3WBLkiVk0JWB75e4b@mail.gmail.com>
+From: sumit.semwal@ti.com (Sumit Semwal)
+Date: Sat, 22 Jan 2011 15:35:47 +0530
+Subject: [PATCH v9 07/18] OMAP2,
+	3: DSS2: Create new file display.c for central dss driver
+	registration.
+In-Reply-To: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
+References: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
+Message-ID: <1295690758-5845-8-git-send-email-sumit.semwal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2011 03:46, Colin Cross <ccross@google.com> wrote:
-> On Fri, Jan 21, 2011 at 7:37 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> On Fri, 21 Jan 2011, Colin Cross wrote:
->>
->>> If CONFIG_SMP is set, __arm_ioremap always creates a page table
->>> mapping by calling ioremap_page_range in lib/ioremap.c, and passes it
->>> the memory prot value but not the domain. ?iormap_page_range
->>> eventually calls pte_alloc_kernel, which sets the domain to
->>> DOMAIN_KERNEL, instead of DOMAIN_IO.
->>>
->>> The kernel domain is normally set to client, the same as the IO
->>> domain, but it can get temporarily switched to manager mode. ?When it
->>> is in manager mode, it ignores the memory protection bits, and the
->>> instruction prefetcher is allowed by the ARMv7 spec to ignore the XN
->>> (eXecute Never) bit and fetch from IO memory. ?I don't know that this
->>> would ever actually occur, but the ARM spec says in B3.6.2:
->>>
->>> The XN attribute is not checked for domains marked as Manager.
->>> Read-sensitive memory must not be
->>> included in domains marked as Manager, because the XN bit does not
->>> prevent prefetches in these cases.
->>>
->>> If this is a real problem, I don't see any quick fix. ?The domain bits
->>> are set in the pmd, so ioremapped memory can not share a pmd with
->>> regular vmalloc memory, and ioremap_page_range has no way to carry a
->>> domain to pte_alloc_kernel.
->>
->> This has been fixed already. Have a look at:
->>
->> |commit 247055aa21ffef1c49dd64710d5e94c2aee19b58
->> |Author: Catalin Marinas <catalin.marinas@arm.com>
->> |Date: ? Mon Sep 13 16:03:21 2010 +0100
->> |
->> | ? ?ARM: 6384/1: Remove the domain switching on ARMv6k/v7 CPUs
->> |
->> |[...]
->
-> Ah, thanks. ?For the linux-tegra-2.6.36 kernel I worked around the
-> problem by statically mapping all of the IO regions and preventing
-> ioremaps outside of the static mappings or physical memory.
+A new file display.c is introduced for display driver init, which adds a function
+omap_display_init to do the DSS driver registration. This is the first step in moving
+away registration of DSS from board files into a common place.
 
-The domains removal patch has been around for nearly two years, you
-can get an earlier version (a 2.6.35 variant went into the Linaro
-kernel as well.
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Kevin Hilman <khilman@ti.com>
+Signed-off-by: Senthilvadivu Guruswamy <svadivu@ti.com>
+Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
+---
+ arch/arm/mach-omap2/Makefile              |    3 ++
+ arch/arm/mach-omap2/display.c             |   46 +++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/display.h |   11 +++++++
+ 3 files changed, 60 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/display.c
 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 1c0c2b0..2e81173 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -242,3 +242,6 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
+ 
+ smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
+ obj-y					+= $(smsc911x-m) $(smsc911x-y)
++
++disp-$(CONFIG_OMAP2_DSS)		:= display.o
++obj-y					+= $(disp-m) $(disp-y)
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+new file mode 100644
+index 0000000..6e21cb8
+--- /dev/null
++++ b/arch/arm/mach-omap2/display.c
+@@ -0,0 +1,46 @@
++/*
++ * OMAP2plus display device setup / initialization.
++ *
++ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
++ *	Senthilvadivu Guruswamy
++ *	Sumit Semwal
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++
++#include <plat/display.h>
++
++static struct platform_device omap_display_device = {
++	.name          = "omap_display",
++	.id            = -1,
++	.dev            = {
++		.platform_data = NULL,
++	},
++};
++
++int __init omap_display_init(struct omap_dss_board_info
++					*board_data)
++{
++	int r = 0;
++	omap_display_device.dev.platform_data = board_data;
++
++	r = platform_device_register(&omap_display_device);
++	if (r < 0)
++		printk(KERN_ERR "Unable to register OMAP-Display device\n");
++
++	return r;
++}
+diff --git a/arch/arm/plat-omap/include/plat/display.h b/arch/arm/plat-omap/include/plat/display.h
+index 537f4e4..0f140ec 100644
+--- a/arch/arm/plat-omap/include/plat/display.h
++++ b/arch/arm/plat-omap/include/plat/display.h
+@@ -23,6 +23,7 @@
+ #include <linux/list.h>
+ #include <linux/kobject.h>
+ #include <linux/device.h>
++#include <linux/platform_device.h>
+ #include <asm/atomic.h>
+ 
+ #define DISPC_IRQ_FRAMEDONE		(1 << 0)
+@@ -226,6 +227,16 @@ struct omap_dss_board_info {
+ 	struct omap_dss_device *default_device;
+ };
+ 
++#if defined(CONFIG_OMAP2_DSS_MODULE) || defined(CONFIG_OMAP2_DSS)
++/* Init with the board info */
++extern int omap_display_init(struct omap_dss_board_info *board_data);
++#else
++static inline int omap_display_init(struct omap_dss_board_info *board_data)
++{
++	return 0;
++}
++#endif
++
+ struct omap_video_timings {
+ 	/* Unit: pixels */
+ 	u16 x_res;
 -- 
-Catalin
+1.7.1
