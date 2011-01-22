@@ -1,8 +1,13 @@
 From: penberg@kernel.org (Pekka Enberg)
-Date: Sat, 22 Jan 2011 13:15:38 +0200
+Date: Sat, 22 Jan 2011 13:18:54 +0200
 Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTinEnNYjhA2WRD=1AqmHYY3ec0uJxRVmLW57_EU=@mail.gmail.com>
-References: <1295576730.4096.24.camel@Joe-Laptop>
+In-Reply-To: <1295645098.22882.1.camel@m0nster>
+References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
+	<AANLkTik+HCj9dkD2s4WgwCqKWCXDbdSnKDUbyGfYfaPr@mail.gmail.com>
+	<1295571359.9236.53.camel@m0nster>
+	<1295574085.4096.6.camel@Joe-Laptop>
+	<1295575123.9236.54.camel@m0nster>
+	<1295576730.4096.24.camel@Joe-Laptop>
 	<1295624801.19880.13.camel@m0nster>
 	<20110121094827.41818a55@jbarnes-desktop>
 	<20110121095658.1ab623fe@jbarnes-desktop>
@@ -11,37 +16,41 @@ References: <1295576730.4096.24.camel@Joe-Laptop>
 	<1295633882.19880.31.camel@m0nster>
 	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
 	<1295642995.19880.42.camel@m0nster>
-	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
-	<20110121234930.GK3043@thunk.org>
-	<1295684398.19231.47.camel@jaguar>
-	<AANLkTinEnNYjhA2WRD=1AqmHYY3ec0uJxRVmLW57_EU=@mail.gmail.com>
-Message-ID: <AANLkTikrDxtkVFJ0C-SwH9QCq4m0A2KMp0vAFA=PaSGM@mail.gmail.com>
+	<1295643762.25868.31.camel@Joe-Laptop>
+	<1295645098.22882.1.camel@m0nster>
+Message-ID: <AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dima!
+Hi Daniel,
 
-On Sat, Jan 22, 2011 at 12:35 PM, Dima Zavin <dmitriyz@google.com> wrote:
-> There's absolutely no hostility. I stated from the very beginning that
-> I appreciate the voluntary effort by a 3rd party to upstream the board
-> files. I only asked that proper authorship be attributed, which is
-> standard linux kernel patch submission procedure when the committer
-> did not originate the code.
-
-OK, that's great! It's poorly reflected in this discussion thread, though.
-
->> who have been sitting on these patches for over a year now AFAICT.
+On Fri, Jan 21, 2011 at 11:24 PM, Daniel Walker <dwalker@codeaurora.org> wrote:
+> On Fri, 2011-01-21 at 13:02 -0800, Joe Perches wrote:
+>> On Fri, 2011-01-21 at 12:49 -0800, Daniel Walker wrote:
+>> > On Fri, 2011-01-21 at 12:44 -0800, Dima Zavin wrote:
+>> > > Really though? Let's look at one of them:
+>> > > ? ? ? 2 Arve Hj?nnev?g <arve@android.com>
+>> > > ? ? ? 6 Brian Swetland <swetland@google.com>
+>> > > ? ? ?14 Dima Zavin <dima@android.com>
+>> > > ? ? ? 2 Haley Teng <Haley_Teng@htc.com>
+>> > > ? ? ? 1 Iliyan Malchev <malchev@google.com>
+>> > > ? ? ? 5 Mike Chan <mike@android.com>
+>> > I'll add this list into the commit text ..
+>>
+>> I think it'd be better if you pull them into a
+>> git repository, then use either:
+>> ? ? ? git format-patch
+>> ? ? ? git send-email
+>> or
+>> ? ? ? git request-pull
+>>
+>> That way no author history is lost.
 >
-> Even if that were true, that does not somehow revoke the original
-> author/contributor list.
+> The history isn't upstreamable ..
 
-No, it does not. But it does make me much more sympathetic towards
-Daniel's efforts even though authorship info is misappropriated. It's
-not as if he changed copyrights or anything malicious like that so I
-do think people are making this into a bigger thing than it really is.
+Why is that? I don't see any technical problem of upstreaming the
+original patches even if they don't compile (as long as they're not
+included in Makefiles or Kconfig files). There's no need to hide the
+real history even if it looks ugly...
 
-Anyway, I hope Daniel has the time to rebase his patches on top of
-your original ones so history is preserved and we can get this stuff
-merged.
-
-                       Pekka
+                         Pekka
