@@ -1,44 +1,78 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 21 Jan 2011 20:53:18 -0800
-Subject: __arm_ioremap creates page table with domain set to kernel
-In-Reply-To: <alpine.LFD.2.00.1101212253070.8580@xanadu.home>
-References: <AANLkTi=iD_ipD=KBdgB+xT4dP2Yd7UYu1fmpQ4NO5OJx@mail.gmail.com>
-	<alpine.LFD.2.00.1101212232000.8580@xanadu.home>
-	<AANLkTi=nxMUNBGGVWjn+0JtEPGt3RZa5Y4BmH4=ytSiX@mail.gmail.com>
-	<alpine.LFD.2.00.1101212253070.8580@xanadu.home>
-Message-ID: <AANLkTikTDknegJFLFYLXW=KZTDgubY3jy-Z1qJ=GEPbO@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 22 Jan 2011 14:30:51 +0900
+Subject: Locking in the clk API
+In-Reply-To: <20110122040757.GA2094@richard-laptop>
+References: <201101111016.42819.jeremy.kerr@canonical.com>
+	<20110111091607.GI12552@n2100.arm.linux.org.uk>
+	<201101111744.59712.jeremy.kerr@canonical.com>
+	<20110111103929.GN24920@pengutronix.de>
+	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
+	<4D386ABF.9060908@fluff.org>
+	<20110120190822.GK6335@n2100.arm.linux.org.uk>
+	<AANLkTim5N_sCCoOR40y7sTvdDoFkUJd4tUSSbrCccGjy@mail.gmail.com>
+	<AANLkTikJjkJvr2J-9eq2-Jj8L=JvwUQS+QNj9gWFX-TL@mail.gmail.com>
+	<20110122040757.GA2094@richard-laptop>
+Message-ID: <AANLkTimW70Wq7hEhgz021ZEknGgsaTXs3nVPNig4F3Tj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 8:00 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 21 Jan 2011, Colin Cross wrote:
->
->> On Fri, Jan 21, 2011 at 7:37 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> > On Fri, 21 Jan 2011, Colin Cross wrote:
+On Sat, Jan 22, 2011 at 1:08 PM, Richard Zhao <linuxzsc@gmail.com> wrote:
+> On Fri, Jan 21, 2011 at 01:47:29PM +0900, Jassi Brar wrote:
+>> On Fri, Jan 21, 2011 at 9:09 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> > On Fri, Jan 21, 2011 at 4:08 AM, Russell King - ARM Linux
+>> > <linux@arm.linux.org.uk> wrote:
+>> >> On Thu, Jan 20, 2011 at 05:02:55PM +0000, Ben Dooks wrote:
+>> >>> If you want to make it so that each low-power mode has to work
+>> >>> out what PLLs need to be disabled and then re-enabled makes me
+>> >>> want to be sick. Hiding this stuff behind specific implementations
+>> >>> is a recipe for disaster.
+>> >>
+>> >> Why should systems which don't suffer from such problems be prevented
+>> >> from gaining power saving from turning off their clocks when devices
+>> >> are not being used (eg, the console serial port.)
+>> >>
+>> >> One solution to your root PLL issue would be to have a separate set of
+>> >> enable/disable API calls which get called at setup/release time (or
+>> >> whatever you'd like to call it) which can only be called from non-atomic
+>> >> context. ?Maybe clk_prepare() and clk_unprepare(). ?These functions
+>> >> should perform whatever is necessary to ensure that the clock source
+>> >> is available for use atomically when clk_enable() is called.
+>> >>
+>> >> So, in your case, clk_prepare() ensures that the root PLL is enabled,
+>> >> clk_unprepare() allows it to be turned off.
+>> >>
+>> >> In the case of a console driver, clk_prepare() can be called when we
+>> >> know the port will be used as a console. ?clk_enable() is then called
+>> >> before writing out the string, and clk_disable() after we've completely
+>> >> sent the last character.
+>> >>
+>> >> This allows the best of both worlds. ?We now have a clk_enable() which
+>> >> can be used to turn the clocks off through the clock tree up to the first
+>> >> non-atomic clock, and we also have a way to deal with those which need
+>> >> to sleep. ?So not only do "sleeping clock" implementations become possible
+>> >> but these "sleeping clock" implementations also get the opportunity to
+>> >> shutdown some of their clock tree with minimal latency for doing so.
 >> >
->> >> If this is a real problem, I don't see any quick fix. ?The domain bits
->> >> are set in the pmd, so ioremapped memory can not share a pmd with
->> >> regular vmalloc memory, and ioremap_page_range has no way to carry a
->> >> domain to pte_alloc_kernel.
+>> > This is exactly what I suggested in my last post, except the console example.
+>> > Only to be a part of common clock api because it's not very safe to assume
+>> > future SoCs will have the same simple clock topologies that they have today.
 >> >
->> > This has been fixed already. Have a look at:
->> >
->> > |commit 247055aa21ffef1c49dd64710d5e94c2aee19b58
->> > |Author: Catalin Marinas <catalin.marinas@arm.com>
->> > |Date: ? Mon Sep 13 16:03:21 2010 +0100
->> > |
->> > | ? ?ARM: 6384/1: Remove the domain switching on ARMv6k/v7 CPUs
->> > |
->> > |[...]
+>> > Not to mean to teach, but I hope you realize with more and more
+>> > device controller being crammed into ever shrinking SoCs,
+>> > clock would eventually have to be flexible in functionality
+>> > and complicated in hierarchy. Ben already gave examples
+>> > of Audio, MFC and Video controllers of latest Samsung SoCs.
 >>
->> Ah, thanks. ?For the linux-tegra-2.6.36 kernel I worked around the
->> problem by statically mapping all of the IO regions and preventing
->> ioremaps outside of the static mappings or physical memory.
->
-> Beware that the ARM ARM also mention that multiple mappings of the same
-> physical memory but with different caching attributes is undefined. ?So
-> you should not ioremap memory if it is already mapped in the direct
-> kernel memory space. ?I think 2.6.36 would produce a warning, but now
-> this also returns NULL.
+>> plus
+>>
+>> a) If only Samsung bsp implements the api, it would be impossible to
+>> share drivers, those that can be, with other platforms without nasty ifdef's.
+>> b) If the task of unification starts with only a particular platform made to
+>> implement a new api, the attempt kills its own purpose.
+> I'm not clear. Why does Samsung SoC go against clk_prepare/unprepare?
+> If its clock tree has many plls and device clock is not far away from plls and
+> may sleep, we may use prepare/unprepare to do actually clock enable/disable.
 
-I use memblock_remove on any area of memory that will later be ioremapped.
+I am not against clk_prepare/unprepare.
+I rather suggest make it part of common clock API.
+Please read my last two posts again.
