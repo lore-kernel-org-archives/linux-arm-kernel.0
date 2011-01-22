@@ -1,145 +1,58 @@
-From: sumit.semwal@ti.com (Sumit Semwal)
-Date: Sat, 22 Jan 2011 15:35:46 +0530
-Subject: [PATCH v9 06/18] OMAP2,3 DSS2 Use Regulator init with driver name
-In-Reply-To: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
-References: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
-Message-ID: <1295690758-5845-7-git-send-email-sumit.semwal@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 22 Jan 2011 10:10:03 +0000
+Subject: __arm_ioremap creates page table with domain set to kernel
+In-Reply-To: <AANLkTi=nxMUNBGGVWjn+0JtEPGt3RZa5Y4BmH4=ytSiX@mail.gmail.com>
+References: <AANLkTi=iD_ipD=KBdgB+xT4dP2Yd7UYu1fmpQ4NO5OJx@mail.gmail.com>
+	<alpine.LFD.2.00.1101212232000.8580@xanadu.home>
+	<AANLkTi=nxMUNBGGVWjn+0JtEPGt3RZa5Y4BmH4=ytSiX@mail.gmail.com>
+Message-ID: <AANLkTikSiZzwUUuV-amJXCMZCtf3WBLkiVk0JWB75e4b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Senthilvadivu Guruswamy <svadivu@ti.com>
+On 22 January 2011 03:46, Colin Cross <ccross@google.com> wrote:
+> On Fri, Jan 21, 2011 at 7:37 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> On Fri, 21 Jan 2011, Colin Cross wrote:
+>>
+>>> If CONFIG_SMP is set, __arm_ioremap always creates a page table
+>>> mapping by calling ioremap_page_range in lib/ioremap.c, and passes it
+>>> the memory prot value but not the domain. ?iormap_page_range
+>>> eventually calls pte_alloc_kernel, which sets the domain to
+>>> DOMAIN_KERNEL, instead of DOMAIN_IO.
+>>>
+>>> The kernel domain is normally set to client, the same as the IO
+>>> domain, but it can get temporarily switched to manager mode. ?When it
+>>> is in manager mode, it ignores the memory protection bits, and the
+>>> instruction prefetcher is allowed by the ARMv7 spec to ignore the XN
+>>> (eXecute Never) bit and fetch from IO memory. ?I don't know that this
+>>> would ever actually occur, but the ARM spec says in B3.6.2:
+>>>
+>>> The XN attribute is not checked for domains marked as Manager.
+>>> Read-sensitive memory must not be
+>>> included in domains marked as Manager, because the XN bit does not
+>>> prevent prefetches in these cases.
+>>>
+>>> If this is a real problem, I don't see any quick fix. ?The domain bits
+>>> are set in the pmd, so ioremapped memory can not share a pmd with
+>>> regular vmalloc memory, and ioremap_page_range has no way to carry a
+>>> domain to pte_alloc_kernel.
+>>
+>> This has been fixed already. Have a look at:
+>>
+>> |commit 247055aa21ffef1c49dd64710d5e94c2aee19b58
+>> |Author: Catalin Marinas <catalin.marinas@arm.com>
+>> |Date: ? Mon Sep 13 16:03:21 2010 +0100
+>> |
+>> | ? ?ARM: 6384/1: Remove the domain switching on ARMv6k/v7 CPUs
+>> |
+>> |[...]
+>
+> Ah, thanks. ?For the linux-tegra-2.6.36 kernel I worked around the
+> problem by statically mapping all of the IO regions and preventing
+> ioremaps outside of the static mappings or physical memory.
 
-Use driver name in regulator inits needed for display instead of using device
-structure name.
+The domains removal patch has been around for nearly two years, you
+can get an earlier version (a 2.6.35 variant went into the Linaro
+kernel as well.
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Senthilvadivu Guruswamy <svadivu@ti.com>
-Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
----
- arch/arm/mach-omap2/board-3430sdp.c      |   11 +++--------
- arch/arm/mach-omap2/board-cm-t35.c       |   12 ++++--------
- arch/arm/mach-omap2/board-igep0020.c     |    6 ++----
- arch/arm/mach-omap2/board-omap3evm.c     |    6 ++----
- arch/arm/mach-omap2/board-omap3stalker.c |   12 ++++--------
- 5 files changed, 15 insertions(+), 32 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 6f4e7cf..d99902c 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -315,10 +315,8 @@ static struct platform_device sdp3430_dss_device = {
- 	},
- };
- 
--static struct regulator_consumer_supply sdp3430_vdda_dac_supply = {
--	.supply		= "vdda_dac",
--	.dev		= &sdp3430_dss_device.dev,
--};
-+static struct regulator_consumer_supply sdp3430_vdda_dac_supply =
-+	REGULATOR_SUPPLY("vdda_dac", "omap_display");
- 
- static struct platform_device *sdp3430_devices[] __initdata = {
- 	&sdp3430_dss_device,
-@@ -546,10 +544,7 @@ static struct regulator_init_data sdp3430_vdac = {
- 
- /* VPLL2 for digital video outputs */
- static struct regulator_consumer_supply sdp3430_vpll2_supplies[] = {
--	{
--		.supply		= "vdds_dsi",
--		.dev		= &sdp3430_dss_device.dev,
--	}
-+	REGULATOR_SUPPLY("vdds_dsi", "omap_display"),
- };
- 
- static struct regulator_init_data sdp3430_vpll2 = {
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 79f87ec..22322d1 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -495,15 +495,11 @@ static struct regulator_consumer_supply cm_t35_vsim_supply = {
- 	.supply			= "vmmc_aux",
- };
- 
--static struct regulator_consumer_supply cm_t35_vdac_supply = {
--	.supply		= "vdda_dac",
--	.dev		= &cm_t35_dss_device.dev,
--};
-+static struct regulator_consumer_supply cm_t35_vdac_supply =
-+	REGULATOR_SUPPLY("vdda_dac", "omap_display");
- 
--static struct regulator_consumer_supply cm_t35_vdvi_supply = {
--	.supply		= "vdvi",
--	.dev		= &cm_t35_dss_device.dev,
--};
-+static struct regulator_consumer_supply cm_t35_vdvi_supply =
-+	REGULATOR_SUPPLY("vdvi", "omap_display");
- 
- /* VMMC1 for MMC1 pins CMD, CLK, DAT0..DAT3 (20 mA, plus card == max 220 mA) */
- static struct regulator_init_data cm_t35_vmmc1 = {
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index 23abfa3..238c69e 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -493,10 +493,8 @@ static struct platform_device igep2_dss_device = {
- 	},
- };
- 
--static struct regulator_consumer_supply igep2_vpll2_supply = {
--	.supply	= "vdds_dsi",
--	.dev	= &igep2_dss_device.dev,
--};
-+static struct regulator_consumer_supply igep2_vpll2_supply =
-+	REGULATOR_SUPPLY("vdds_dsi", "omap_display");
- 
- static struct regulator_init_data igep2_vpll2 = {
- 	.constraints = {
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 4ad3c4d..32ac816 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -500,10 +500,8 @@ static struct twl4030_codec_data omap3evm_codec_data = {
- 	.audio = &omap3evm_audio_data,
- };
- 
--static struct regulator_consumer_supply omap3_evm_vdda_dac_supply = {
--	.supply		= "vdda_dac",
--	.dev		= &omap3_evm_dss_device.dev,
--};
-+static struct regulator_consumer_supply omap3_evm_vdda_dac_supply =
-+	REGULATOR_SUPPLY("vdda_dac", "omap_display");
- 
- /* VDAC for DSS driving S-Video */
- static struct regulator_init_data omap3_evm_vdac = {
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 51c010c..7b675cb 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -448,10 +448,8 @@ static struct twl4030_codec_data omap3stalker_codec_data = {
- 	.audio		= &omap3stalker_audio_data,
- };
- 
--static struct regulator_consumer_supply omap3_stalker_vdda_dac_supply = {
--	.supply		= "vdda_dac",
--	.dev		= &omap3_stalker_dss_device.dev,
--};
-+static struct regulator_consumer_supply omap3_stalker_vdda_dac_supply =
-+	REGULATOR_SUPPLY("vdda_dac", "omap_display");
- 
- /* VDAC for DSS driving S-Video */
- static struct regulator_init_data omap3_stalker_vdac = {
-@@ -469,10 +467,8 @@ static struct regulator_init_data omap3_stalker_vdac = {
- };
- 
- /* VPLL2 for digital video outputs */
--static struct regulator_consumer_supply omap3_stalker_vpll2_supply = {
--	.supply		= "vdds_dsi",
--	.dev		= &omap3_stalker_lcd_device.dev,
--};
-+static struct regulator_consumer_supply omap3_stalker_vpll2_supply =
-+	REGULATOR_SUPPLY("vdds_dsi", "omap_display");
- 
- static struct regulator_init_data omap3_stalker_vpll2 = {
- 	.constraints		= {
 -- 
-1.7.1
+Catalin
