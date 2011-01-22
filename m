@@ -1,23 +1,33 @@
-From: kevin.pouget@gmail.com (Kevin Pouget)
-Date: Fri, 21 Jan 2011 16:17:28 +0100
-Subject: Linux ARM SMP kernel for qemu
-In-Reply-To: <AANLkTimi5B8pBVatpq4n2HvcT-iU6+EXwdntV1ucAkVL@mail.gmail.com>
-References: <AANLkTimi5B8pBVatpq4n2HvcT-iU6+EXwdntV1ucAkVL@mail.gmail.com>
-Message-ID: <AANLkTim4UTckvZeokXy9jhzyvw0NXZTjbE8w6cGvy02d@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Jan 2011 21:20:17 +0000
+Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCK
+	tospeed-up boot
+In-Reply-To: <bccc6a7edf66bedd311bc869bfa89ae8@mail.gmail.com>
+References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
+	<4D385155.4050301@gmail.com>
+	<43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com>
+	<4D38641E.2000301@gmail.com>
+	<c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com>
+	<4D399F74.9050302@gmail.com>
+	<20110121171555.GB30823@n2100.arm.linux.org.uk>
+	<bccc6a7edf66bedd311bc869bfa89ae8@mail.gmail.com>
+Message-ID: <20110122212017.GA17725@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Jan 22, 2011 at 01:14:21PM +0530, Santosh Shilimkar wrote:
+> Surely whichever way we should remove the recalibration otherwise
+> every time secondary cpus spend ~ 200 ms there.
+> 
+> Russell,
+> How do you like to address this?
 
-do you know if it's feasible to compile a Linux kernel to be run by a Qemu
-SMP ARM machine? after so many hours of tries, I can say that any version of
-the kernel, any Qemu machine would be okay, provided that the SMP capability
-is set, and the kernel boots !
+Well, the last piece of the puzzle which needs consideration is that
+omitting the calibration means that it produces user-visible
+/proc/cpuinfo changes.  I can't say what effect that has.  So, I
+think we need to do something about that to ensure that userspace
+won't be impacted should they be using the information in there.
 
-
-Cordially,
-
-Kevin Pouget
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110121/da9fe01f/attachment-0001.html>
+Maybe we need to initialize the secondary CPU bogomips values
+accordingly?  Maybe zero is acceptable to mark that the calculation
+hasn't been done?  Dunno.
