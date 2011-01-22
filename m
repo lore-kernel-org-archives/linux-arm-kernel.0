@@ -1,35 +1,42 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 22 Jan 2011 20:46:21 +0100
-Subject: [PATCH] ARM: mach-imx/mach-mx25_3ds: Fix section type
-In-Reply-To: <1295720336-28304-1-git-send-email-festevam@gmail.com>
-References: <1295720336-28304-1-git-send-email-festevam@gmail.com>
-Message-ID: <20110122194621.GW14956@pengutronix.de>
+Date: Sat, 22 Jan 2011 20:46:40 +0100
+Subject: [PATCH] ARM: imx: Add VPR200 and MX51_3DS entries to uncompress.h
+In-Reply-To: <1295633037-3475-1-git-send-email-fabio.estevam@freescale.com>
+References: <1295633037-3475-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110122194640.GX14956@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 22, 2011 at 04:18:56PM -0200, Fabio Estevam wrote:
+On Fri, Jan 21, 2011 at 04:03:57PM -0200, Fabio Estevam wrote:
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
 > ---
->  arch/arm/mach-imx/mach-mx25_3ds.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/plat-mxc/include/mach/uncompress.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-> index aa76cfd..8382e79 100644
-> --- a/arch/arm/mach-imx/mach-mx25_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx25_3ds.c
-> @@ -180,7 +180,7 @@ static const uint32_t mx25pdk_keymap[] = {
->  	KEY(3, 3, KEY_POWER),
->  };
->  
-> -static const struct matrix_keymap_data mx25pdk_keymap_data __initdata = {
-> +static const struct matrix_keymap_data mx25pdk_keymap_data __initconst = {
->  	.keymap		= mx25pdk_keymap,
->  	.keymap_size	= ARRAY_SIZE(mx25pdk_keymap),
->  };
+> diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+> index 3a70ebf..ff469c4 100644
+> --- a/arch/arm/plat-mxc/include/mach/uncompress.h
+> +++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+> @@ -95,6 +95,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+>  	case MACH_TYPE_MX35_3DS:
+>  	case MACH_TYPE_PCM043:
+>  	case MACH_TYPE_LILLY1131:
+> +	case MACH_TYPE_VPR200:
+>  		uart_base = MX3X_UART1_BASE_ADDR;
+>  		break;
+>  	case MACH_TYPE_MAGX_ZN5:
+> @@ -102,6 +103,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+>  		break;
+>  	case MACH_TYPE_MX51_BABBAGE:
+>  	case MACH_TYPE_EUKREA_CPUIMX51SD:
+> +	case MACH_TYPE_MX51_3DS:
+>  		uart_base = MX51_UART1_BASE_ADDR;
+>  		break;
+>  	case MACH_TYPE_MX50_RDP:
 > -- 
 > 1.6.0.4
+> 
 > 
 > 
 
