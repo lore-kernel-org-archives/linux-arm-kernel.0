@@ -1,27 +1,25 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Sat, 22 Jan 2011 15:55:35 -0500
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Jan 2011 21:04:05 +0000
 Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <1295684398.19231.47.camel@jaguar>
-References: <20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
+In-Reply-To: <AANLkTi=47z21zExtfHq2WYdUdXeC1rNhe7vQsqPkFsMi@mail.gmail.com>
+References: <1295632828.19880.22.camel@m0nster>
 	<20110121100441.06a94482@jbarnes-desktop>
 	<1295633882.19880.31.camel@m0nster>
 	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
 	<1295642995.19880.42.camel@m0nster>
-	<AANLkTikVDn+W8t7KSym5tCGZowyYvoLFrk8d0mumiRF-@mail.gmail.com>
-	<20110121234930.GK3043@thunk.org>
-	<1295684398.19231.47.camel@jaguar>
-Message-ID: <20110122205535.GD8666@infradead.org>
+	<1295643762.25868.31.camel@Joe-Laptop>
+	<1295645098.22882.1.camel@m0nster>
+	<AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
+	<20110122122018.GC5194@n2100.arm.linux.org.uk>
+	<AANLkTi=47z21zExtfHq2WYdUdXeC1rNhe7vQsqPkFsMi@mail.gmail.com>
+Message-ID: <20110122210405.GC11960@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 22, 2011 at 10:19:58AM +0200, Pekka Enberg wrote:
-> Sure, it would have been nicer for everyone involved if Daniel would
-> have kept the original patches and added new patches to clean it up on
-> top of that to preserve the history.
+On Sat, Jan 22, 2011 at 11:22:57AM -0800, Brian Swetland wrote:
+> What would be useful would be a reasonable convention for
+> acknowledging multiple authors, perhaps something along the lines of:
 
-No, it would be a complete fucking mess that way.  We tell people to
-submit standalone and well formed patches all the time.  Why would it
-make any difference just because they were also commited to a shitty git
-tree somewhere else?
+I asked for the answer to a _specific_ example.  If you can't answer
+that example, then you *can't* expect Daniel to either, and it is
+utterly unreasonable to demand it of him.
