@@ -1,64 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 23 Jan 2011 12:55:25 +0530
-Subject: [PATCH] ARM: smp: Introduce ARCH_HAS_COMMON_CORES_CLOCKtospeed-up
-	boot
-In-Reply-To: <20110122212017.GA17725@n2100.arm.linux.org.uk>
-References: <1295516579-10225-1-git-send-email-santosh.shilimkar@ti.com>
-	<4D385155.4050301@gmail.com>
-	<43c027bd53818ab19bdc1c823aa21ea4@mail.gmail.com>
-	<4D38641E.2000301@gmail.com>
-	<c1a2c539e2677e9a56d2d3aaaaf34851@mail.gmail.com>
-	<4D399F74.9050302@gmail.com>
-	<20110121171555.GB30823@n2100.arm.linux.org.uk>
-	<bccc6a7edf66bedd311bc869bfa89ae8@mail.gmail.com>
-	<20110122212017.GA17725@n2100.arm.linux.org.uk>
-Message-ID: <8d59200413b98810a4e7c2039ffb9a77@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 23 Jan 2011 19:00:06 +1100
+Subject: [PATCHv2] hwrng: add support for picoxcell TRNG
+In-Reply-To: <20110117102330.GB2622@pulham.picochip.com>
+References: <20110114181609.GN2822@pulham.picochip.com>
+	<1295030661-16364-1-git-send-email-jamie@jamieiles.com>
+	<20110115004416.GA19686@gondor.apana.org.au>
+	<20110117102330.GB2622@pulham.picochip.com>
+Message-ID: <20110123080006.GB19175@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Sunday, January 23, 2011 2:50 AM
-> To: Santosh Shilimkar
-> Cc: Rob Herring; linux-omap at vger.kernel.org; Linus Walleij; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM: smp: Introduce
-> ARCH_HAS_COMMON_CORES_CLOCKtospeed-up boot
+On Mon, Jan 17, 2011 at 10:23:30AM +0000, Jamie Iles wrote:
 >
-> On Sat, Jan 22, 2011 at 01:14:21PM +0530, Santosh Shilimkar wrote:
-> > Surely whichever way we should remove the recalibration otherwise
-> > every time secondary cpus spend ~ 200 ms there.
-> >
-> > Russell,
-> > How do you like to address this?
->
-> Well, the last piece of the puzzle which needs consideration is that
-> omitting the calibration means that it produces user-visible
-> /proc/cpuinfo changes.  I can't say what effect that has.  So, I
-> think we need to do something about that to ensure that userspace
-> won't be impacted should they be using the information in there.
->
-Ok. /proc/cpuinfo uses the per-cpu lpj which gets updated as mentioned
-as part of the arch cpufreq drivers. So this not seems to be the
-problem.
+> Ok, that's a fair point!  Here's an updated version with a timeout.  
+> I've also added in support for the fault detection which I previously 
+> overlooked.
 
-> Maybe we need to initialize the secondary CPU bogomips values
-> accordingly?  Maybe zero is acceptable to mark that the calculation
-> hasn't been done?  Dunno.
-The only issue is global lpj not getting updated as part of CPU
-scaling. This is anyway broken today on SMP machines even without
-cpufreq. It's getting corrected as part of the hotplug path if
-recalibration is carried out. And same value gets copied to
-per-cpu lpj for the secondary cores.
-
-The above gets completely wrong if the individual CPUs can
-scale with different speed.
-
-Since per-cpu lpj is suppose to be taken care by scaling
-Code, /proc/cpuinfo will get updated with right information.
-
-With this, I think we could safely skip secondary cpu
-calibration.
-
-Regards,
-Santosh
+Patch applied.  Thanks!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
