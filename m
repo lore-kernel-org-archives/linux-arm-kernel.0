@@ -1,37 +1,45 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 23 Jan 2011 11:14:11 +0530
-Subject: Linux ARM SMP kernel for qemu
-In-Reply-To: <AANLkTim4UTckvZeokXy9jhzyvw0NXZTjbE8w6cGvy02d@mail.gmail.com>
-References: <AANLkTimi5B8pBVatpq4n2HvcT-iU6+EXwdntV1ucAkVL@mail.gmail.com>
-	<AANLkTim4UTckvZeokXy9jhzyvw0NXZTjbE8w6cGvy02d@mail.gmail.com>
-Message-ID: <AANLkTik4V3E8G5AZtHxiwb74doBEOVZWUxntNajoPYjg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 23 Jan 2011 12:45:55 +0530
+Subject: [PATCH 1/2] ARM: calculate VMALLOC_END by probing
+	inmdesc->map_io()
+In-Reply-To: <alpine.LFD.2.00.1101230024240.8580@xanadu.home>
+References: <1295737001-19578-1-git-send-email-eric.y.miao@gmail.com><20110122231528.GD11960@n2100.arm.linux.org.uk><AANLkTikkiMKseQznf99p3uiL4he_P3TyGLx0XOPuZgHs@mail.gmail.com>
+	<alpine.LFD.2.00.1101230024240.8580@xanadu.home>
+Message-ID: <9dbba3c432aab294761c32527bc5e96d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 20:47, Kevin Pouget <kevin.pouget@gmail.com> wrote:
-> do you know if it's feasible to compile a Linux kernel to be run by a
-> Qemu SMP ARM machine? after so many hours of tries, I can say that any
-> version of the kernel, any Qemu machine would be okay, provided that
-> the SMP capability is set, and the kernel boots !
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Nicolas Pitre
+> Sent: Sunday, January 23, 2011 11:01 AM
+> To: Eric Miao
+> Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] ARM: calculate VMALLOC_END by probing
+> inmdesc->map_io()
+>
+> On Sun, 23 Jan 2011, Eric Miao wrote:
+>
+> > On Sun, Jan 23, 2011 at 7:15 AM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > I'd instead suggest adding vmalloc_end to the machine
+> description
+> > > record.
+> > >
+> >
+> > And since all boards sharing a same machine_class is going to use
+> > the same value, I'd rather we first introduce struct machine_class
+> > like in the patch I posted months ago?
+>
+> Can we possibly get away with a global VMALLOC_END?  What if we were
+> to
+> decide it is fixed at 0xf0000000 for everyone?
+>
+Which would potentialy shrink the lowmem and vmalloc area. With
+current flexibility of adjustable VMALLOC_END, in 1G:3G model,
+we managed to  have almost ~ 896 MB virtual space available
+for lowmem + vmalloc. So keeping 128MB for vmalloc ~768MB of
+memory can be directly addressable without highmem support.
 
-Try the kernel from latest git, QEMU from latest git, and the attached
-.config.
-
-The .config is just realview_smp-defconfig with:
- - PB11 and ARMv6 disabled
- - PBX A9 and ARMv7 enabled
- - CONFIG_REALVIEW_HIGH_PHYS_OFFSET disabled
-
-Initramfs support is also enabled.  You can boot it with this line (you'll
-need an initramfs or initrd to get to userspace):
-
-qemu-system-arm -kernel arch/arm/boot/uImage -nographic \
-		-append "earlyprintk console=ttyAMA0 mem=128M debug" \
-		-M realview-pbx-a9 -m 128M -initrd ~/kernel/root -smp 2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: qemu-pbx-config
-Type: application/octet-stream
-Size: 38104 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110123/674c7a1e/attachment-0001.obj>
+Regards,
+Santosh
