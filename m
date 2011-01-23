@@ -1,28 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Jan 2011 18:01:10 +0000
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-	<20110119205158.GC6335@n2100.arm.linux.org.uk>
-	<AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
-	<AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-Message-ID: <20110123180110.GJ30094@n2100.arm.linux.org.uk>
+Date: Sun, 23 Jan 2011 18:05:32 +0000
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <1295547087.9039.694.camel@nimitz>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+	<1295547087.9039.694.camel@nimitz>
+Message-ID: <20110123180532.GA3509@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 01:53:06PM +0100, Linus Walleij wrote:
-> This means that I think the patch I've sent should be the way
-> forward.
+On Thu, Jan 20, 2011 at 10:11:27AM -0800, Dave Hansen wrote:
+> On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
+> > > The x86 version of show_mem() actually manages to do this without any
+> > > #ifdefs, and works for a ton of configuration options.  It uses
+> > > pfn_valid() to tell whether it can touch a given pfn.
+> > 
+> > x86 memory layout tends to be very simple as it expects memory to
+> > start at the beginning of every region described by a pgdat and extend
+> > in one contiguous block.  I wish ARM was that simple.
+> 
+> x86 memory layouts can be pretty funky and have been that way for a long
+> time.  That's why we *have* to handle holes in x86's show_mem().  My
+> laptop even has a ~1GB hole in its ZONE_DMA32:
 
-Which particular patch - there seems to be soo many fiddling with
-the various broken flags and so forth.
-
-If we're going to move away from the blockend IRQs to using the data
-counter, can we have a patch which switches the driver to use the data
-counter and then a followup patch which removes the broken blockend
-stuff, rather than somethign that changes the broken blockend stuff
-and then removes it?
+If x86 is soo funky, I suggest you try the x86 version of show_mem()
+on an ARM platform with memory holes.  Make sure you try it with
+sparsemem as well...
