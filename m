@@ -1,31 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Jan 2011 09:35:26 +0000
-Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to
-	use ldrex/strex
-In-Reply-To: <alpine.LFD.2.00.1101222323190.8580@xanadu.home>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
-	<20110123001636.GA20841@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101222323190.8580@xanadu.home>
-Message-ID: <20110123093526.GA26120@n2100.arm.linux.org.uk>
+Date: Sun, 23 Jan 2011 09:40:02 +0000
+Subject: [PATCH 1/2] ARM: calculate VMALLOC_END by probing in
+	mdesc->map_io()
+In-Reply-To: <AANLkTikkiMKseQznf99p3uiL4he_P3TyGLx0XOPuZgHs@mail.gmail.com>
+References: <1295737001-19578-1-git-send-email-eric.y.miao@gmail.com>
+	<20110122231528.GD11960@n2100.arm.linux.org.uk>
+	<AANLkTikkiMKseQznf99p3uiL4he_P3TyGLx0XOPuZgHs@mail.gmail.com>
+Message-ID: <20110123094001.GB26120@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 22, 2011 at 11:44:59PM -0500, Nicolas Pitre wrote:
-> At least another person did post results:
+On Sun, Jan 23, 2011 at 12:59:52PM +0800, Eric Miao wrote:
+> On Sun, Jan 23, 2011 at 7:15 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Sun, Jan 23, 2011 at 06:56:40AM +0800, Eric Miao wrote:
+> >> From: Eric Miao <eric.miao@linaro.org>
+> >>
+> >> Provided that the only place initializing the fixed IO mapping is
+> >> in mdesc->map_io(), the VMALLOC_END can actually be calculated by
+> >> first invoking the function without actually doing the map.
+> >
+> > We really can't do this. ?You're assuming that platforms only do IO
+> > mapping in their map_io callback - that's way far from the truth.
+> >
+> > Samsung platforms for instance register clocks and other stuff.
+> >
+> > OMAP platforms issue cache flushes which won't work on CPUs requiring
+> > a mapping to be setup for this to work. ?They also check CPU revisions
+> > (requiring mappings in place for that), probe the size of sram, etc.
+> > None of this will work without mappings setup.
+> >
+> > And there's a catch-you in OMAP there - it needs accessible mappings
+> > to work out what other mappings (eg, sram size) to setup. ?It can't map
+> > a larger area than is actually present because that's known to cause
+> > problems.
+> >
+> > So, without a lot of effort to clean up platform code first, it's
+> > really unsafe to do this double-call of map_io(). ?Given that it
+> > takes some platform support _years_ to change, I really don't see
+> > that this is a practical approach.
 > 
-> http://mid.gmane.org/20110117094602.GA2622 at pulham.picochip.com
-> http://mid.gmane.org/20110117110308.GC2622 at pulham.picochip.com
+> Indeed. One other way I was thinking of is to use data representation
+> instead of calling iotable_init() in .map_io, i.e. introduce .iotable instead
+> of .map_io. All the other hacking stuffs we are currently doing can be
+> moved to .init_early(). But this still needs a lot clean-up, thoughts?
 
-Slightly different patch - there were three revisions.  I can't attach
-a tested-by given to a different patch to this one.
-
-> > That means omap2plus_defconfig .38 mainline kernels
-> > (including -stable) will remain potentially dangerous when run on
-> > SMP capable hardware.
-> 
-> I must admit that this series looks a bit large for stable IMHO.  I 
-> think that the fix for stable should limit itself only to prevent SMP 
-> from being selected if anything else than CPU_32v6K is selected.
-
-The first three are the bare minimum required for -stable.
+No, that still doesn't work.  As I said, some platforms need to create
+mappings and access through those mappings to work out what other
+mappings to create - iow, they aren't representable as a static set of
+mappings.
