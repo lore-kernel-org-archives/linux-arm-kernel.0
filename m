@@ -1,51 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Jan 2011 09:40:02 +0000
-Subject: [PATCH 1/2] ARM: calculate VMALLOC_END by probing in
-	mdesc->map_io()
-In-Reply-To: <AANLkTikkiMKseQznf99p3uiL4he_P3TyGLx0XOPuZgHs@mail.gmail.com>
-References: <1295737001-19578-1-git-send-email-eric.y.miao@gmail.com>
-	<20110122231528.GD11960@n2100.arm.linux.org.uk>
-	<AANLkTikkiMKseQznf99p3uiL4he_P3TyGLx0XOPuZgHs@mail.gmail.com>
-Message-ID: <20110123094001.GB26120@n2100.arm.linux.org.uk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 23 Jan 2011 11:35:52 +0100
+Subject: [Openpxa-users] Linux udelay() is way off
+In-Reply-To: <AANLkTi=cwRNCxS6qbR3Kp2Sf-ckx+wcUAgTc8LOYES9F@mail.gmail.com>
+References: <AANLkTin_cCzNWhJnD=A2h1qiKpeUrnPrSZPs_Kmfjjd1@mail.gmail.com>
+	<20110120193013.GL6335@n2100.arm.linux.org.uk>
+	<AANLkTi=cwRNCxS6qbR3Kp2Sf-ckx+wcUAgTc8LOYES9F@mail.gmail.com>
+Message-ID: <201101231135.53384.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 23, 2011 at 12:59:52PM +0800, Eric Miao wrote:
-> On Sun, Jan 23, 2011 at 7:15 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Sun, Jan 23, 2011 at 06:56:40AM +0800, Eric Miao wrote:
-> >> From: Eric Miao <eric.miao@linaro.org>
-> >>
-> >> Provided that the only place initializing the fixed IO mapping is
-> >> in mdesc->map_io(), the VMALLOC_END can actually be calculated by
-> >> first invoking the function without actually doing the map.
-> >
-> > We really can't do this. ?You're assuming that platforms only do IO
-> > mapping in their map_io callback - that's way far from the truth.
-> >
-> > Samsung platforms for instance register clocks and other stuff.
-> >
-> > OMAP platforms issue cache flushes which won't work on CPUs requiring
-> > a mapping to be setup for this to work. ?They also check CPU revisions
-> > (requiring mappings in place for that), probe the size of sram, etc.
-> > None of this will work without mappings setup.
-> >
-> > And there's a catch-you in OMAP there - it needs accessible mappings
-> > to work out what other mappings (eg, sram size) to setup. ?It can't map
-> > a larger area than is actually present because that's known to cause
-> > problems.
-> >
-> > So, without a lot of effort to clean up platform code first, it's
-> > really unsafe to do this double-call of map_io(). ?Given that it
-> > takes some platform support _years_ to change, I really don't see
-> > that this is a practical approach.
+On Friday 21 January 2011 18:46:48 Bj?rn Forsman wrote:
+> 2011/1/20 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Thu, Jan 20, 2011 at 08:18:10PM +0100, Bj?rn Forsman wrote:
+> >> [   11.425363] cpufreq-core: saving 518144 as reference value for
+> >> loops_per_jiffy; freq is 312000 kHz
+> >> [   11.425523] cpufreq-core: scaling loops_per_jiffy to 1036288 for
+> >> frequency 624000 kHz
 > 
-> Indeed. One other way I was thinking of is to use data representation
-> instead of calling iotable_init() in .map_io, i.e. introduce .iotable instead
-> of .map_io. All the other hacking stuffs we are currently doing can be
-> moved to .init_early(). But this still needs a lot clean-up, thoughts?
+> [snip]
+> 
+> > Is it possible to boot at 624MHz and report the resulting lpj?
+> > Alternatively, call calibrate_delay() after the cpufreq switch to
+> > 624MHz, disabling the 'printed' stuff and see what it reports.
+> 
+> Now I have an extra calibrate_delay() after cpufreq changes the frequency.
+> 
+> First call:
+> Calibrating delay loop... 103.62 BogoMIPS (lpj=518144)
+> 
+> Second call:
+> Calibrating delay loop... 622.59 BogoMIPS (lpj=3112960)
+> 
+> (udelay() is correct when having that second call.)
+> 
+> It seems cpufreq thinks it transitions from 312 to 624 MHz, but in
+> reality it may be transitioning from 104 to 624 MHz (because it now
+> runs 6 times as fast according to lpj). This may explain the udelay()
+> error ratio (~0.32):
+> 
+>   104 MHz / 312 MHz = 0.3333..
+> 
+> I think this means either the clock speed or the jiffies interval do
+> not match what the kernel thinks.
+> 
+> I also did some tests changing the clock speed in the bootloader. It
+> seems like the only thing that works for the kernel is booting with a
+> 104 MHz clock. Any other frequency and cpufreq will do bad things to
+> udelay().
+> 
+> Any thoughts?
+> 
+> BTW, I failed at locating the jiffies implementation for PXA310. Any
+> pointers?
 
-No, that still doesn't work.  As I said, some platforms need to create
-mappings and access through those mappings to work out what other
-mappings to create - iow, they aren't representable as a static set of
-mappings.
+DAMN.
+
+I cannot replicate this. Bjorn, can you please write me a step-by-step howto for 
+morons?
+
+Ah, also, please update your OBM2 and u-boot from openpxa_new branch ;-)
+
+Cheers, thanks
+> 
+> Best regards,
+> Bj?rn Forsman
