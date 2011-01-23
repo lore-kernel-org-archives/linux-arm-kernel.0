@@ -1,25 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 23 Jan 2011 11:02:30 +0000
-Subject: [PATCH] Realview: name configuration options after actual board
-	names
-In-Reply-To: <20110122183038.GA11960@n2100.arm.linux.org.uk>
-References: <20110122183038.GA11960@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimvvNCNsViqs4_=sXB0+HqzdTZkuD5Hc5U18UQc@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 23 Jan 2011 15:39:23 +0300
+Subject: [PATCH v9 18/18] OMAP2,3: DSS2: Get DSS IRQ from platform device
+In-Reply-To: <1295690758-5845-19-git-send-email-sumit.semwal@ti.com>
+References: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
+	<1295690758-5845-19-git-send-email-sumit.semwal@ti.com>
+Message-ID: <4D3C217B.9020301@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, 22 January 2011, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I haven't significantly updated the descriptions for the tiles as that
-> is even less clear - as far as I can see on ARMs website, there is no
-> Cortex-A9 tile for Realview EB - only ARM11MPCore, ARM1156T2F-S,
-> ARM1176TZF-S and Cortex-R4F. ?So exactly what this 'Multicore Cortex-A9
-> Tile' is..
+Hello.
 
-AFAIK there isn't any official A9 tile for EB. this configuration has
-been used in processor validation and also on the ARMv7 software
-models, that's why we pushed this option. You can remove it if you
-want, we'll probably keep it around in our patches.
+On 22-01-2011 13:05, Sumit Semwal wrote:
 
--- 
-Catalin
+> From: Senthilvadivu Guruswamy<svadivu@ti.com>
+
+> DSS IRQ number can be obtained from platform_get_irq().  This API in turn
+> picks the right IRQ number belonging to HW IP from the hwmod database.
+> So hardcoding of IRQ number could be removed.
+>
+> Reviewed-by: Paul Walmsley<paul@pwsan.com>
+> Reviewed-by: Kevin Hilman<khilman@ti.com>
+> Tested-by: Kevin Hilman<khilman@ti.com>
+> Signed-off-by: Senthilvadivu Guruswamy<svadivu@ti.com>
+> Signed-off-by: Sumit Semwal<sumit.semwal@ti.com>
+[...]
+
+> diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+> index 4d7a816..22690e9 100644
+> --- a/drivers/video/omap2/dss/dss.c
+> +++ b/drivers/video/omap2/dss/dss.c
+[...]
+> @@ -609,15 +609,18 @@ static int dss_init(bool skip_init)
+>   	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
+>   #endif
+>
+> -	r = request_irq(INT_24XX_DSS_IRQ,
+> +	dss_irq = platform_get_irq(dss.pdev, 0);
+> +	if (dss_irq != -ENXIO) {
+
+    Better just 'dss_irq > 0', IMHO.
+
+WBR, Sergei
