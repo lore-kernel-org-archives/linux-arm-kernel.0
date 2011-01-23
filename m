@@ -1,53 +1,42 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Sun, 23 Jan 2011 12:38:17 +1000
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <AANLkTi=47z21zExtfHq2WYdUdXeC1rNhe7vQsqPkFsMi@mail.gmail.com>
-References: <20110121094827.41818a55@jbarnes-desktop>
-	<20110121095658.1ab623fe@jbarnes-desktop>
-	<1295632828.19880.22.camel@m0nster>
-	<20110121100441.06a94482@jbarnes-desktop>
-	<1295633882.19880.31.camel@m0nster>
-	<AANLkTi=L+MW5-KLP_TKSxhstD8JEtBW=RKci5wSbZsd6@mail.gmail.com>
-	<1295642995.19880.42.camel@m0nster>
-	<1295643762.25868.31.camel@Joe-Laptop>
-	<1295645098.22882.1.camel@m0nster>
-	<AANLkTi=mvdfpCPefGeDr+eGxpSUr3is5jgugHtgB-m1w@mail.gmail.com>
-	<20110122122018.GC5194@n2100.arm.linux.org.uk>
-	<AANLkTi=47z21zExtfHq2WYdUdXeC1rNhe7vQsqPkFsMi@mail.gmail.com>
-Message-ID: <1295750297.2980.47.camel@macbook.infradead.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 22 Jan 2011 23:44:59 -0500 (EST)
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to use
+	ldrex/strex
+In-Reply-To: <20110123001636.GA20841@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+	<20110123001636.GA20841@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101222323190.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-01-22 at 11:22 -0800, Brian Swetland wrote:
+On Sun, 23 Jan 2011, Russell King - ARM Linux wrote:
+
+> On Mon, Jan 17, 2011 at 07:21:40PM +0000, Russell King - ARM Linux wrote:
+> > Switch the set/clear/change bitops to use the word-based exclusive
+> > operations, which are only present in a wider range of ARM architectures
+> > than the byte-based exclusive operations.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> What would be useful would be a reasonable convention for
-> acknowledging multiple authors, perhaps something along the lines of:
-> 
-> Author: Awesome Upstreamer <au@example.com>  or  Main Author <main@example.com>
-> Committer: Awesome Upstreamer <au@example.com>
-> Subject: arm: msm8k: acpu clock management
-> 
-> ... summary of the patch ...
-> 
-> Original-Author: Joe Firmware Guy <joe@oem.com>
-> Original-Author: Kernel Droid <droid@android.com>
-> Signed-off-by: ... 
+> As only one person replied to this patch with test information, I'm
+> not happy to push this into -rc, and hence that prevents it going into
+> -stable too.  
 
-Nah, sod that. If the original authors couldn't be bothered to do their
-work properly in the first place so that it was upstreamable, then as
-far as I'm concerned they don't deserve the credit.
+At least another person did post results:
 
-We should do the bare minimum that's required by copyright law, which is
-making sure that the code is permitted in the kernel under the GPL.
+http://mid.gmane.org/20110117094602.GA2622 at pulham.picochip.com
+http://mid.gmane.org/20110117110308.GC2622 at pulham.picochip.com
 
-Since the GPL doesn't have, and doesn't *allow*, a clause like the BSD
-advertising clause, we have no requirement to credit the original
-authors.
+> That means omap2plus_defconfig .38 mainline kernels
+> (including -stable) will remain potentially dangerous when run on
+> SMP capable hardware.
 
-If they wanted credit, they should have done the job right in the first
-place. Or at least finished the job for themselves rather than forcing
-someone else to clean up their mess.
+I must admit that this series looks a bit large for stable IMHO.  I 
+think that the fix for stable should limit itself only to prevent SMP 
+from being selected if anything else than CPU_32v6K is selected.
 
--- 
-David Woodhouse                            Open Source Technology Centre
-David.Woodhouse at intel.com                              Intel Corporation
+This looks perfectly reasonable for 2.6.38-rc to me though.
+
+
+Nicolas
