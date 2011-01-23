@@ -1,85 +1,58 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 23 Jan 2011 14:08:19 +0100
-Subject: colibri-pxa300 USB patch
-In-Reply-To: <AANLkTinN7TyOaj9=-8eXtrJPzf=iZdvqJOBMwyS=9D=c@mail.gmail.com>
-References: <AANLkTikN2bqq7khp4mvqmfH=14Gzewd1da=2OGLJcnTZ@mail.gmail.com>
-	<201101231212.27627.marek.vasut@gmail.com>
-	<AANLkTinN7TyOaj9=-8eXtrJPzf=iZdvqJOBMwyS=9D=c@mail.gmail.com>
-Message-ID: <201101231408.19511.marek.vasut@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 23 Jan 2011 09:17:58 -0500 (EST)
+Subject: [PATCH 1/2] ARM: calculate VMALLOC_END by probing
+	inmdesc->map_io()
+In-Reply-To: <9dbba3c432aab294761c32527bc5e96d@mail.gmail.com>
+References: <1295737001-19578-1-git-send-email-eric.y.miao@gmail.com>
+	<20110122231528.GD11960@n2100.arm.linux.org.uk>
+	<AANLkTikkiMKseQznf99p3uiL4he_P3TyGLx0XOPuZgHs@mail.gmail.com>
+	<alpine.LFD.2.00.1101230024240.8580@xanadu.home>
+	<9dbba3c432aab294761c32527bc5e96d@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1101230911350.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 23 January 2011 13:49:41 Bj?rn Forsman wrote:
-> 2011/1/23 Marek Vasut <marek.vasut@gmail.com>:
-> > On Wednesday 22 December 2010 20:30:10 Bj?rn Forsman wrote:
-> >> Hi,
-> >> 
-> >> 2010/12/22 Eric Miao <eric.y.miao@gmail.com>:
-> >> > 2010/12/22 Bj?rn Forsman <bjorn.forsman@gmail.com>:
-> >> >> Hi,
-> >> >> 
-> >> >> 2010/12/22 Eric Miao <eric.y.miao@gmail.com>:
-> >> >>> 2010/12/22 Bj?rn Forsman <bjorn.forsman@gmail.com>:
-> >> >>>> Hi Eric,
-> >> >>>> 
-> >> >>>> 2010/12/21 Bj?rn Forsman <bjorn.forsman@gmail.com>:
-> >> >>>>> Hi Eric,
-> >> >>>>> 
-> >> >>>>> 2010/12/21 Eric Miao <eric.y.miao@gmail.com>:
-> >> >>>>>> This has been merged by Marek and cherry-picked into my devel,
-> >> >>>>>> thanks.
-> >> >>>>> 
-> >> >>>>> Thanks.
-> >> >>>> 
-> >> >>>> Oh, and one more thing:
-> >> >>>> 
-> >> >>>> Russell King syncs his tree with Linus every two days[1][2] which
-> >> >>>> means ARM developers can/should base their patches on mainline.
-> >> >>>> I didn't find any similar information on how you handle your
-> >> >>>> pxa-linux-2.6.git tree. When and how does patches flow from
-> >> >>>> your tree to mainline?
-> >> >>>> 
-> >> >>>> The reason I ask is that I may have some more PXA patches to post,
-> >> >>>> but I don't know what tree to base it on. I'd like to use your
-> >> >>>> tree, as it has improvements for colibri-pxa300, but it's
-> >> >>>> difficult when you regularly(?) rebase your tree. Comments?
-> >> >>> 
-> >> >>> I'm basically doing rebase every -rc cycle against Linus' tree
-> >> >>> instead of against Russell's, and he prefers this. Considering the
-> >> >>> changes during -rc phase are normally fixing patches,
-> >> >>> merge/cherry-pick/rebase are all comparatively easy. I personally
-> >> >>> prefer rebase more than merge because it gives cleaner history.
-> >> >> 
-> >> >> Thanks for clearing that up. Now I know how you get stuff into your
-> >> >> tree. But how and when do stuff get from your tree to Linus' tree?
-> >> >> (I see some of the newly rebased patches in your tree are from
-> >> >> august...? Shouldn't it have been in mainline by now?)
-> >> > 
-> >> > Will go via Russell's tree.
-> >> 
-> >> Ok. Thanks for explaining.
-> > 
-> > Hi,
-> > 
-> > just curious, this should make the TOP usb port or the BOTTOM one
-> > working?
-> 
-> TOP port.
+On Sun, 23 Jan 2011, Santosh Shilimkar wrote:
 
-Maybe it really cannot be used with pxa310 colibri. But then I think it worked 
-on their wince crap.
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> > arm-kernel-bounces at lists.infradead.org] On Behalf Of Nicolas Pitre
+> > Sent: Sunday, January 23, 2011 11:01 AM
+> > To: Eric Miao
+> > Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH 1/2] ARM: calculate VMALLOC_END by probing
+> > inmdesc->map_io()
+> >
+> > On Sun, 23 Jan 2011, Eric Miao wrote:
+> >
+> > > On Sun, Jan 23, 2011 at 7:15 AM, Russell King - ARM Linux
+> > > <linux@arm.linux.org.uk> wrote:
+> > > > I'd instead suggest adding vmalloc_end to the machine
+> > description
+> > > > record.
+> > > >
+> > >
+> > > And since all boards sharing a same machine_class is going to use
+> > > the same value, I'd rather we first introduce struct machine_class
+> > > like in the patch I posted months ago?
+> >
+> > Can we possibly get away with a global VMALLOC_END?  What if we were
+> > to
+> > decide it is fixed at 0xf0000000 for everyone?
+> >
+> Which would potentialy shrink the lowmem and vmalloc area. With
+> current flexibility of adjustable VMALLOC_END, in 1G:3G model,
+> we managed to  have almost ~ 896 MB virtual space available
+> for lowmem + vmalloc. So keeping 128MB for vmalloc ~768MB of
+> memory can be directly addressable without highmem support.
 
-btw. please keep the LAKML CCed.
-> 
-> > I got the TOP one operational, but no luck with the bottom one on pxa310
-> > colibri. Checking the colibri datasheet, there's an SMSC USB3329 chip
-> > attached to usb port3 ... well did you have any luck getting the BOTTOM
-> > port working ? Maybe with some further patching?
-> 
-> No luck with bottom port for me. Do you have a link to that datasheet?
+OK, I just wanted to see if people do think that the simplicity of a 
+global definition would have made the per-architecture flexibility 
+irrelevant.  But looking at some of the mappings it seems that quite a 
+lot of virtual space wastage would be imposed in some cases.
 
-Quick google shows some 10-page thing ... that's it.
+Plus, moving vmalloc_end to the machine record is almost as simple while 
+preserving the current flexibility.
 
-> 
-> Best regards,
-> Bj?rn Forsman
+
+Nicolas
