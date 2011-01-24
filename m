@@ -1,117 +1,31 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:20 -0800
-Subject: [PATCH v2 15/28] ARM: tegra: irq: Add debugfs file to show wake irqs
+Date: Sun, 23 Jan 2011 18:01:29 -0800
+Subject: [PATCH v2 24/28] ARM: tegra: Use writel_relaxed in tegra_init_cache
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-16-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-25-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
-v2: Fix permissions on debufs file
+ arch/arm/mach-tegra/common.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
- arch/arm/mach-tegra/irq.c |   66 +++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 66 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index c292d3b..12c62a8 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -19,10 +19,12 @@
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 1b32495..dc41669 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -68,8 +68,8 @@ void tegra_init_cache(void)
+ #ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
  
- #include <linux/kernel.h>
- #include <linux/delay.h>
-+#include <linux/debugfs.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/seq_file.h>
+-	writel(0x331, p + L2X0_TAG_LATENCY_CTRL);
+-	writel(0x441, p + L2X0_DATA_LATENCY_CTRL);
++	writel_relaxed(0x331, p + L2X0_TAG_LATENCY_CTRL);
++	writel_relaxed(0x441, p + L2X0_DATA_LATENCY_CTRL);
  
- #include <asm/hardware/gic.h>
- 
-@@ -46,6 +48,8 @@ static u32 tegra_lp0_wake_enb;
- static u32 tegra_lp0_wake_level;
- static u32 tegra_lp0_wake_level_any;
- 
-+static unsigned int tegra_wake_irq_count[32];
-+
- /* ensures that sufficient time is passed for a register write to
-  * serialize into the 32KHz domain */
- static void pmc_32kwritel(u32 val, unsigned long offs)
-@@ -165,6 +169,8 @@ static void tegra_irq_handle_wake(void)
- 		pr_info("Resume caused by WAKE%d, %s\n", wake,
- 			desc->action->name);
- 
-+		tegra_wake_irq_count[wake]++;
-+
- 		generic_handle_irq(irq);
- 	}
- }
-@@ -242,3 +248,63 @@ void tegra_irq_resume(void)
- 	tegra_legacy_irq_resume();
- 	tegra_irq_handle_wake();
- }
-+
-+#ifdef CONFIG_DEBUG_FS
-+static int tegra_wake_irq_debug_show(struct seq_file *s, void *data)
-+{
-+	int wake;
-+	int irq;
-+	struct irq_desc *desc;
-+	const char *irq_name;
-+
-+	seq_printf(s, "wake  irq  count  name\n");
-+	seq_printf(s, "----------------------\n");
-+	for (wake = 0; wake < 32; wake++) {
-+		irq = tegra_wake_to_irq(wake);
-+		if (irq < 0)
-+			continue;
-+
-+		desc = irq_to_desc(irq);
-+		if (tegra_wake_irq_count[wake] == 0 && desc->action == NULL)
-+			continue;
-+
-+		if (!(desc->status & IRQ_WAKEUP))
-+			continue;
-+
-+		irq_name = (desc->action && desc->action->name) ?
-+			desc->action->name : "???";
-+
-+		seq_printf(s, "%4d  %3d  %5d  %s\n",
-+			wake, irq, tegra_wake_irq_count[wake], irq_name);
-+	}
-+	return 0;
-+}
-+
-+static int tegra_wake_irq_debug_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, tegra_wake_irq_debug_show, NULL);
-+}
-+
-+static const struct file_operations tegra_wake_irq_debug_fops = {
-+	.open		= tegra_wake_irq_debug_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+
-+static int __init tegra_irq_debug_init(void)
-+{
-+	struct dentry *d;
-+
-+	d = debugfs_create_file("wake_irq", S_IRUGO, NULL, NULL,
-+		&tegra_wake_irq_debug_fops);
-+	if (!d) {
-+		pr_info("Failed to create suspend_mode debug file\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+late_initcall(tegra_irq_debug_init);
-+#endif
+ 	l2x0_init(p, 0x6C080001, 0x8200c3fe);
+ #endif
 -- 
 1.7.3.1
