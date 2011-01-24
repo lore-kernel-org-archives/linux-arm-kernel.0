@@ -1,49 +1,192 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Jan 2011 17:55:59 +0000
-Subject: [PATCH v4 17/19] ARM: LPAE: mark memory banks with start > ULONG_MAX
-	as highmem
+Date: Mon, 24 Jan 2011 17:55:53 +0000
+Subject: [PATCH v4 11/19] ARM: LPAE: Add fault handling support
 In-Reply-To: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1295891761-18366-18-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1295891761-18366-12-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+The DFSR and IFSR register format is different when LPAE is enabled. In
+addition, DFSR and IFSR have the similar definitions for the fault type.
+This modifies modifies the fault code to correctly handle the new
+format.
 
-Memory banks living outside of the 32-bit physical address
-space do not have a 1:1 pa <-> va mapping and therefore the
-__va macro may wrap.
-
-This patch ensures that such banks are marked as highmem so
-that the Kernel doesn't try to split them up when it sees that
-the wrapped virtual address overlaps the vmalloc space.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/mmu.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mm/alignment.c |    8 ++++-
+ arch/arm/mm/fault.c     |   80 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 87 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index a1d8a07..8a55be4 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -782,7 +782,8 @@ static void __init sanity_check_meminfo(void)
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 724ba3b..bc98a6e 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -906,6 +906,12 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	return 0;
+ }
  
- #ifdef CONFIG_HIGHMEM
- 		if (__va(bank->start) > vmalloc_min ||
--		    __va(bank->start) < (void *)PAGE_OFFSET)
-+		    __va(bank->start) < (void *)PAGE_OFFSET ||
-+		    bank->start > ULONG_MAX)
- 			highmem = 1;
++#ifdef CONFIG_ARM_LPAE
++#define ALIGNMENT_FAULT		33
++#else
++#define ALIGNMENT_FAULT		1
++#endif
++
+ /*
+  * This needs to be done after sysctl_init, otherwise sys/ will be
+  * overwritten.  Actually, this shouldn't be in sys/ at all since
+@@ -939,7 +945,7 @@ static int __init alignment_init(void)
+ 		ai_usermode = UM_FIXUP;
+ 	}
  
- 		bank->highmem = highmem;
-@@ -791,7 +792,7 @@ static void __init sanity_check_meminfo(void)
- 		 * Split those memory banks which are partially overlapping
- 		 * the vmalloc area greatly simplifying things later.
- 		 */
--		if (__va(bank->start) < vmalloc_min &&
-+		if (!highmem && __va(bank->start) < vmalloc_min &&
- 		    bank->size > vmalloc_min - __va(bank->start)) {
- 			if (meminfo.nr_banks >= NR_BANKS) {
- 				printk(KERN_CRIT "NR_BANKS too low, "
+-	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
++	hook_fault_code(ALIGNMENT_FAULT, do_alignment, SIGBUS, BUS_ADRALN,
+ 			"alignment exception");
+ 
+ 	/*
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index ef0e24f..350eb0a 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -33,10 +33,15 @@
+ #define FSR_WRITE		(1 << 11)
+ #define FSR_FS4			(1 << 10)
+ #define FSR_FS3_0		(15)
++#define FSR_FS5_0		(0x3f)
+ 
+ static inline int fsr_fs(unsigned int fsr)
+ {
++#ifdef CONFIG_ARM_LPAE
++	return fsr & FSR_FS5_0;
++#else
+ 	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
++#endif
+ }
+ 
+ #ifdef CONFIG_MMU
+@@ -109,8 +114,10 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 		pte = pte_offset_map(pmd, addr);
+ 		printk(", *pte=%08llx", (long long)pte_val(*pte));
++#ifndef CONFIG_ARM_LPAE
+ 		printk(", *ppte=%08llx",
+ 		       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
++#endif
+ 		pte_unmap(pte);
+ 	} while(0);
+ 
+@@ -469,6 +476,72 @@ static struct fsr_info {
+ 	int	code;
+ 	const char *name;
+ } fsr_info[] = {
++#ifdef CONFIG_ARM_LPAE
++	{ do_bad,		SIGBUS,  0,		"unknown 0"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 1"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 2"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 3"			},
++	{ do_bad,		SIGBUS,  0,		"reserved translation fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
++	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
++	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
++	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
++	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
++	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
++	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
++	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
++	{ do_bad,		SIGBUS,  0,		"asynchronous external abort"	},
++	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
++	{ do_bad,		SIGBUS,  0,		"asynchronous parity error"	},
++	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
++	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
++	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
++	{ do_bad,		SIGBUS,  0,		"debug event"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 37"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 38"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 39"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 40"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 41"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 42"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 43"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 44"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 48"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 49"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 50"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 51"			},
++	{ do_bad,		SIGBUS,  0,		"implementation fault (lockdown abort)" },
++	{ do_bad,		SIGBUS,  0,		"unknown 53"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 54"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 55"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 56"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 57"			},
++	{ do_bad,		SIGBUS,  0,		"implementation fault (coprocessor abort)" },
++	{ do_bad,		SIGBUS,  0,		"unknown 59"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 60"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 61"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 62"			},
++	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
++#else	/* !CONFIG_ARM_LPAE */
+ 	/*
+ 	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
+ 	 * defines these to be "precise" aborts.
+@@ -510,6 +583,7 @@ static struct fsr_info {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
+ 	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+ 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
++#endif	/* CONFIG_ARM_LPAE */
+ };
+ 
+ void __init
+@@ -548,6 +622,9 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ }
+ 
+ 
++#ifdef CONFIG_ARM_LPAE
++#define ifsr_info	fsr_info
++#else	/* !CONFIG_ARM_LPAE */
+ static struct fsr_info ifsr_info[] = {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
+ 	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
+@@ -582,6 +659,7 @@ static struct fsr_info ifsr_info[] = {
+ 	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
+ 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
+ };
++#endif	/* CONFIG_ARM_LPAE */
+ 
+ void __init
+ hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
+@@ -617,6 +695,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
+ 
+ static int __init exceptions_init(void)
+ {
++#ifndef CONFIG_ARM_LPAE
+ 	if (cpu_architecture() >= CPU_ARCH_ARMv6) {
+ 		hook_fault_code(4, do_translation_fault, SIGSEGV, SEGV_MAPERR,
+ 				"I-cache maintenance fault");
+@@ -632,6 +711,7 @@ static int __init exceptions_init(void)
+ 		hook_fault_code(6, do_bad, SIGSEGV, SEGV_MAPERR,
+ 				"section access flag fault");
+ 	}
++#endif
+ 
+ 	return 0;
+ }
