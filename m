@@ -1,88 +1,34 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 24 Jan 2011 17:05:25 +0800
-Subject: [PATCH v5] ARM: mxs: add initial pm support
-In-Reply-To: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1295859925-2639-1-git-send-email-shawn.guo@freescale.com>
+Date: Mon, 24 Jan 2011 17:16:09 +0800
+Subject: i.MX28 fixes
+In-Reply-To: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110124091608.GA2625@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a very initial pm support and basically does nothing.
-With this pm support entry, drivers can start testing their own
-pm functions.
+On Fri, Jan 21, 2011 at 11:57:51AM +0100, Sascha Hauer wrote:
+> The following patches fix some issues with the i.MX28 clock support.
+> 
+> The following changes since commit c56eb8fb6dccb83d9fe62fd4dc00c834de9bc470:
+> 
+>   Linux 2.6.38-rc1 (2011-01-18 15:14:02 -0800)
+> 
+> are available in the git repository at:
+>   none ..BRANCH.NOT.VERIFIED..
+> 
+> Sascha Hauer (3):
+>       ARM i.MX28: fix bit operation
+>       ARM i.MX28: use correct register for setting the rate
+>       ARM i.MX23/28: remove secondary field from struct clk. It's unused
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-Hi Sascha,
+All acked-by: Shawn Guo <shawn.guo@freescale.com>
 
-The merging conflict was fixed in this version, and you can pick it
-up on imx-for-2.6.39 branch now.
-
- arch/arm/mach-mxs/Makefile |    1 +
- arch/arm/mach-mxs/pm.c     |   43 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/pm.c
-
-diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-index df501a8..6b26f02 100644
---- a/arch/arm/mach-mxs/Makefile
-+++ b/arch/arm/mach-mxs/Makefile
-@@ -2,6 +2,7 @@
- obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
- 
- obj-$(CONFIG_MXS_OCOTP) += ocotp.o
-+obj-$(CONFIG_PM) += pm.o
- 
- obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
- obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
-diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
-new file mode 100644
-index 0000000..fb042da
---- /dev/null
-+++ b/arch/arm/mach-mxs/pm.c
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (C) 2010 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/io.h>
-+#include <mach/system.h>
-+
-+static int mxs_suspend_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		arch_idle();
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static struct platform_suspend_ops mxs_suspend_ops = {
-+	.enter = mxs_suspend_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int __init mxs_pm_init(void)
-+{
-+	suspend_set_ops(&mxs_suspend_ops);
-+	return 0;
-+}
-+device_initcall(mxs_pm_init);
--- 
-1.7.1
+> 
+>  arch/arm/mach-mxs/clock-mx28.c         |    4 ++--
+>  arch/arm/mach-mxs/clock.c              |    2 --
+>  arch/arm/mach-mxs/include/mach/clock.h |    2 --
+>  3 files changed, 2 insertions(+), 6 deletions(-)
+> 
+> 
+> 
