@@ -1,20 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 10:30:43 +0000
-Subject: [PATCH 5/5] ARM: smp: Skip secondary cpu calibration to
-	speed-up boot
-In-Reply-To: <1295859080-15259-6-git-send-email-santosh.shilimkar@ti.com>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-6-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110124103043.GB18459@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Jan 2011 10:39:48 +0000
+Subject: [PATCH] Realview: name configuration options after actual
+	board names
+In-Reply-To: <20110123155549.GF30094@n2100.arm.linux.org.uk>
+References: <20110122183038.GA11960@n2100.arm.linux.org.uk>
+	<AANLkTimvvNCNsViqs4_=sXB0+HqzdTZkuD5Hc5U18UQc@mail.gmail.com>
+	<20110123155549.GF30094@n2100.arm.linux.org.uk>
+Message-ID: <1295865588.14687.36.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 02:21:19PM +0530, Santosh Shilimkar wrote:
-> On some architectures, secondary cores shares clock with primiary
-> core and hence scale together. Hence secondary core lpj calibration
-> is not necessary and can be skipped to save considerable time.
+On Sun, 2011-01-23 at 15:55 +0000, Russell King - ARM Linux wrote:
+> On Sun, Jan 23, 2011 at 11:02:30AM +0000, Catalin Marinas wrote:
+> > On Saturday, 22 January 2011, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > I haven't significantly updated the descriptions for the tiles as that
+> > > is even less clear - as far as I can see on ARMs website, there is no
+> > > Cortex-A9 tile for Realview EB - only ARM11MPCore, ARM1156T2F-S,
+> > > ARM1176TZF-S and Cortex-R4F.  So exactly what this 'Multicore Cortex-A9
+> > > Tile' is..
+> >
+> > AFAIK there isn't any official A9 tile for EB. this configuration has
+> > been used in processor validation and also on the ARMv7 software
+> > models, that's why we pushed this option. You can remove it if you
+> > want, we'll probably keep it around in our patches.
 > 
-> This can speed up the secondary cpu boot and hotplug cpu online
-> paths.
+> But otherwise that's an ack for the patch?
 
-I still point out that this will be a user visible change in /proc/cpuinfo.
+It looks fine to me.
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
