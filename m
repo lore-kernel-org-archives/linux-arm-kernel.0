@@ -1,60 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 16:53:56 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-	<000001cbbbc2$0e815e80$2b841b80$@moll@arm.com>
-	<20110124133513.GL16202@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
-	<20110124162400.GC24104@n2100.arm.linux.org.uk>
-	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
-Message-ID: <20110124165356.GG24104@n2100.arm.linux.org.uk>
+From: dave@linux.vnet.ibm.com (Dave Hansen)
+Date: Mon, 24 Jan 2011 08:52:17 -0800
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <20110123180532.GA3509@n2100.arm.linux.org.uk>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+	<1295547087.9039.694.camel@nimitz>
+	<20110123180532.GA3509@n2100.arm.linux.org.uk>
+Message-ID: <1295887937.11047.119.camel@nimitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 04:39:21PM -0000, Pawel Moll wrote:
-> > Well, fixing MMCI because ISP1761 is buggy is not the way forward.
-> > The answer is to fix the broken ISP1761 driver.
+On Sun, 2011-01-23 at 18:05 +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 20, 2011 at 10:11:27AM -0800, Dave Hansen wrote:
+> > On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
+> > > > The x86 version of show_mem() actually manages to do this without any
+> > > > #ifdefs, and works for a ton of configuration options.  It uses
+> > > > pfn_valid() to tell whether it can touch a given pfn.
+> > > 
+> > > x86 memory layout tends to be very simple as it expects memory to
+> > > start at the beginning of every region described by a pgdat and extend
+> > > in one contiguous block.  I wish ARM was that simple.
+> > 
+> > x86 memory layouts can be pretty funky and have been that way for a long
+> > time.  That's why we *have* to handle holes in x86's show_mem().  My
+> > laptop even has a ~1GB hole in its ZONE_DMA32:
 > 
-> Totally agree. The thing is that you are the only person right now who
-> doesn't have any problems.
+> If x86 is soo funky, I suggest you try the x86 version of show_mem()
+> on an ARM platform with memory holes.  Make sure you try it with
+> sparsemem as well...
 
-That's not my problem.  A simple search of the linux-usb mailing list
-will give you the patch:
+x86 uses the generic lib/ show_mem().  It works for any holes, as long
+as they're expressed in one of the memory models so that pfn_valid()
+notices them.
 
-	http://marc.info/?l=linux-usb&m=129469114904445&w=2
+ARM looks like its pfn_valid() is backed up by searching the (ASM
+arch-specific) memblocks.  That looks like it would be fairly slow
+compared to the other pfn_valid() implementations and I can see why it's
+being avoided in show_mem().
 
-> The others can quickly benefit from the workaround.
+Maybe we should add either the MAX_ORDER or section_nr() trick to the
+lib/ implementation.  I bet that would use pfn_valid() rarely enough to
+meet any performance concerns.
 
-Others _can_ quickly benefit from the ISP1761 fix by applying the above
-patch, which not only fixes the MMCI overruns, but also allows USB to
-serial devices to work with Versatile Express.  The above patch is
-the correct solution.
-
-For christ sake, that patch is a fix for a *known* errata issued by the
-ISP1761 manufacturer.
-
-> > Well as I see it, it's pointless enlarging the FIFO.  ARM Ltd isn't
-> > going to give me updated FPGA images for the Integrator/CP, Versatile
-> > PB926, Realview EB and Versatile Express.
-> 
-> If we succeed with this, you (and all other users) will get the
-> "improved" FPGA image. But for VE only indeed.
-
-That's utterly useless and completely pointless.
-
-Look, stop jumping off a cliff with this and come back to reality.  The
-ISP1761 is buggy.  We have a fix.  We have a tested fix.  We have a tested
-fix out on mailing lists for everyone to use.  It fixes more than MMC
-overruns and makes the ISP1761 usable.
-
-The only problem is that it's taking *FAR* too long for it to get into
-mainline for no apparant reason.  That doesn't stop anyone taking the
-tested patch in the URL above and gaining proper USB functionality.
-
-The right thing to do is to follow up on my reply on the ISP1761 thread
-to find out why it's taking soo long for it to get into Linus' tree.
-
-I repeat, with the proper set of patches in mainline THERE IS NO ISSUE
-WITH MMCI.  THE HARDWARE DOES NOT NEED "FIXING".  Please listen to me.
+-- Dave
