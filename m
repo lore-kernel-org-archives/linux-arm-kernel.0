@@ -1,27 +1,27 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 24 Jan 2011 15:29:17 +0100
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <20110124112103.GK16202@n2100.arm.linux.org.uk>
-References: <4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-	<20110119205158.GC6335@n2100.arm.linux.org.uk>
-	<AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
-	<AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-	<20110123180110.GJ30094@n2100.arm.linux.org.uk>
-	<AANLkTiko9X_ua-ZAOZ-jEaAkPTKLCKyhgCHt6hbM5C-K@mail.gmail.com>
-	<20110123230932.GK30094@n2100.arm.linux.org.uk>
-	<AANLkTikw1wThEn0h+xv3mFaXVG8H45JUt2vqfECXnn6k@mail.gmail.com>
-	<20110124112103.GK16202@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTiny78Ytuvh8CKUsjk6fOBa64kRj0z0-3MxSwvWK@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 24 Jan 2011 14:41:43 +0000
+Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
+	suspend
+In-Reply-To: <1295834493-5019-21-git-send-email-ccross@android.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-21-git-send-email-ccross@android.com>
+Message-ID: <20110124144142.GA16813@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Sun, Jan 23, 2011 at 06:01:25PM -0800, Colin Cross wrote:
+> Adds a SUSPEND_PREPARE notification hook to drop the frequency to
+> the lowest possible during suspend.  This prevents the cpufreq driver
+> from attempting regulator calls after suspend has started - the
+> regulator api can call into drivers that have already been suspended.
 
-> The rest of the combined patch looks sensible, so maybe 6630/1 should be
-> combined into 6632/2 as well, and the above changes stripped out?
+Hrm, what's the situation where that happens and why does it cause
+problems?  The regulator API doesn't care if suspend is going on, and
+nor do any of the current drivers for regulators.  There is an issue
+with keeping things like I2C alive until the bitter end of suspend so
+you've got a control bus to the regulators but that's a generic issue
+which crops up with other subsystems too so a regulator-specific
+workaround seems dodgy.
 
-OK squashed them, took out the noop code and put in as 6632/3.
-
-Linus Walleij
+The patch itself seems fine, it's just that it feels like there's
+something else going on.
