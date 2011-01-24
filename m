@@ -1,85 +1,95 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 24 Jan 2011 16:46:08 +0530
-Subject: [PATCH 3/5] ARM: twd: Add context save restore support
-In-Reply-To: <20110124111114.GA19409@n2100.arm.linux.org.uk>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
-	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
-	<20110124111114.GA19409@n2100.arm.linux.org.uk>
-Message-ID: <fae59ce4176caaa32c9515eb2e425328@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 11:21:03 +0000
+Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
+In-Reply-To: <AANLkTikw1wThEn0h+xv3mFaXVG8H45JUt2vqfECXnn6k@mail.gmail.com>
+References: <4D346800.3070603@stericsson.com>
+	<20110118121455.GB9719@n2100.arm.linux.org.uk>
+	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
+	<20110119205158.GC6335@n2100.arm.linux.org.uk>
+	<AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
+	<AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
+	<20110123180110.GJ30094@n2100.arm.linux.org.uk>
+	<AANLkTiko9X_ua-ZAOZ-jEaAkPTKLCKyhgCHt6hbM5C-K@mail.gmail.com>
+	<20110123230932.GK30094@n2100.arm.linux.org.uk>
+	<AANLkTikw1wThEn0h+xv3mFaXVG8H45JUt2vqfECXnn6k@mail.gmail.com>
+Message-ID: <20110124112103.GK16202@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, January 24, 2011 4:41 PM
-> To: Santosh Shilimkar
-> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-> ccross at android.com; linus.ml.walleij at gmail.com; linux-
-> omap at vger.kernel.org
-> Subject: Re: [PATCH 3/5] ARM: twd: Add context save restore support
->
-> On Mon, Jan 24, 2011 at 11:06:09AM +0000, Russell King - ARM Linux
-> wrote:
-> > On Mon, Jan 24, 2011 at 02:21:17PM +0530, Santosh Shilimkar wrote:
-> > > In CPU low power state, local timer looses its register context.
-> This
-> > > patch adds context save restore hooks which can be used by
-> platforms
-> > > appropriately.
+On Mon, Jan 24, 2011 at 09:18:19AM +0100, Linus Walleij wrote:
+> 2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Sun, Jan 23, 2011 at 10:40:05PM +0100, Linus Walleij wrote:
+> >> 2011/1/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> >> > On Fri, Jan 21, 2011 at 01:53:06PM +0100, Linus Walleij wrote:
+> >>
+> >> > If we're going to move away from the blockend IRQs to using the data
+> >> > counter, can we have a patch which switches the driver to use the data
+> >> > counter and then a followup patch which removes the broken blockend
+> >> > stuff, rather than somethign that changes the broken blockend stuff
+> >> > and then removes it?
+> >>
+> >> 6631/1 fixes the broken blockend stuff into a state that works,
+> >> then 6632/1 removes it in favor of using the MMCIDATACNT.
 > >
-> > I thought the whole point of CLOCK_EVT_FEAT_C3STOP was that the
-> generic
-> > timer stuff wouldn't rely on it being kept alive?
-> >
-> > Hmm, it looks like we bypass the clockevents code by only setting
-> the
-> > TWD load value at initialization time, not when we switch to
-> periodic
-> > mode.  We really ought to rewrite it whenever we switch back to
-> periodic
-> > mode.
-> >
-> > I suspect fixing that means you won't need this save/restore
-> support.
->
-> Untested, but should do what's required.
-:) I was just typing an email and you sent a patch. Will test this
-and update you.
+> > What I'm saying is why do we need to fix the blockend stuff if in the
+> > next patch we remove it - why not just combine the two patches and
+> > remove the thing in one go as a "we give up using the blockend irq"?
+> 
+> OK I get it, no, of course 6631 and 6632 can be squashed. I'll do
+> this, take out 6631 and have 6632 be the squashed result, will
+> be fixed in a few minutes.
 
->
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index fd91566..60636f4 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -36,6 +36,7 @@ static void twd_set_mode(enum clock_event_mode
-> mode,
->  		/* timer load already set up */
->  		ctrl = TWD_TIMER_CONTROL_ENABLE |
-> TWD_TIMER_CONTROL_IT_ENABLE
->  			| TWD_TIMER_CONTROL_PERIODIC;
-> +		__raw_writel(twd_timer_rate / HZ, twd_base +
-> TWD_TIMER_LOAD);
->  		break;
->  	case CLOCK_EVT_MODE_ONESHOT:
->  		/* period set, and timer enabled in 'next_event' hook */
-> @@ -81,7 +82,7 @@ int twd_timer_ack(void)
->
->  static void __cpuinit twd_calibrate_rate(void)
->  {
-> -	unsigned long load, count;
-> +	unsigned long count;
->  	u64 waitjiffies;
->
->  	/*
-> @@ -116,10 +117,6 @@ static void __cpuinit twd_calibrate_rate(void)
->  		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
->  			(twd_timer_rate / 1000000) % 100);
->  	}
-> -
-> -	load = twd_timer_rate / HZ;
-> -
-> -	__raw_writel(load, twd_base + TWD_TIMER_LOAD);
->  }
->
->  /*
+I think we're getting there - but what about 6630/1 as well?  Is there a
+good reason to keep that separate?  After combining those two, I see this,
+which doesn't look like a change we need:
+
+@@ -199,7 +191,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ {
+        struct variant_data *variant = host->variant;
+-       unsigned int datactrl, timeout, irqmask;
++       unsigned int datactrl, timeout, irqmask0, irqmask1;
+        unsigned long long clks;
+        void __iomem *base;
+        int blksz_bits;
+@@ -230,20 +220,20 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+        datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
+        if (data->flags & MMC_DATA_READ) {
+                datactrl |= MCI_DPSM_DIRECTION;
+-               irqmask = MCI_RXFIFOHALFFULLMASK;
++               irqmask1 = MCI_RXFIFOHALFFULLMASK;
+
+                /*
+                 * If we have less than a FIFOSIZE of bytes to transfer,
+                 * trigger a PIO interrupt as soon as any data is available.
+                 */
+                if (host->size < variant->fifosize)
+-                       irqmask |= MCI_RXDATAAVLBLMASK;
++                       irqmask1 |= MCI_RXDATAAVLBLMASK;
+        } else {
+                /*
+                 * We don't actually need to include "FIFO empty" here
+                 * since its implicit in "FIFO half empty".
+                 */
+-               irqmask = MCI_TXFIFOHALFEMPTYMASK;
++               irqmask1 = MCI_TXFIFOHALFEMPTYMASK;
+        }
+
+        /* The ST Micro variants has a special bit to enable SDIO */
+@@ -252,8 +242,10 @@ static void mmci_start_data(struct mmci_host *host, struct
+mmc_data *data)
+                        datactrl |= MCI_ST_DPSM_SDIOEN;
+
+        writel(datactrl, base + MMCIDATACTRL);
+-       writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
+-       mmci_set_mask1(host, irqmask);
++       irqmask0 = readl(base + MMCIMASK0);
++       irqmask0 &= ~MCI_DATAENDMASK;
++       writel(irqmask0, base + MMCIMASK0);
++       mmci_set_mask1(host, irqmask1);
+ }
+
+ static void
+
+The rest of the combined patch looks sensible, so maybe 6630/1 should be
+combined into 6632/2 as well, and the above changes stripped out?
