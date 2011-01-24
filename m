@@ -1,95 +1,88 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Jan 2011 17:56:00 +0000
-Subject: [PATCH v4 18/19] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1295891761-18366-19-git-send-email-catalin.marinas@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 17:58:07 +0000
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <1295887937.11047.119.camel@nimitz>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+	<1295547087.9039.694.camel@nimitz>
+	<20110123180532.GA3509@n2100.arm.linux.org.uk>
+	<1295887937.11047.119.camel@nimitz>
+Message-ID: <20110124175807.GA27427@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+On Mon, Jan 24, 2011 at 08:52:17AM -0800, Dave Hansen wrote:
+> On Sun, 2011-01-23 at 18:05 +0000, Russell King - ARM Linux wrote:
+> > On Thu, Jan 20, 2011 at 10:11:27AM -0800, Dave Hansen wrote:
+> > > On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
+> > > > > The x86 version of show_mem() actually manages to do this without any
+> > > > > #ifdefs, and works for a ton of configuration options.  It uses
+> > > > > pfn_valid() to tell whether it can touch a given pfn.
+> > > > 
+> > > > x86 memory layout tends to be very simple as it expects memory to
+> > > > start at the beginning of every region described by a pgdat and extend
+> > > > in one contiguous block.  I wish ARM was that simple.
+> > > 
+> > > x86 memory layouts can be pretty funky and have been that way for a long
+> > > time.  That's why we *have* to handle holes in x86's show_mem().  My
+> > > laptop even has a ~1GB hole in its ZONE_DMA32:
+> > 
+> > If x86 is soo funky, I suggest you try the x86 version of show_mem()
+> > on an ARM platform with memory holes.  Make sure you try it with
+> > sparsemem as well...
+> 
+> x86 uses the generic lib/ show_mem().  It works for any holes, as long
+> as they're expressed in one of the memory models so that pfn_valid()
+> notices them.
 
-LPAE provides support for memory banks with physical addresses of up
-to 40 bits.
+I think that's what I said.
 
-This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
-informed about memory that exists above the 4GB boundary.
+> ARM looks like its pfn_valid() is backed up by searching the (ASM
+> arch-specific) memblocks.  That looks like it would be fairly slow
+> compared to the other pfn_valid() implementations and I can see why it's
+> being avoided in show_mem().
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/setup.h |   10 +++++++++-
- arch/arm/kernel/compat.c     |    4 ++--
- arch/arm/kernel/setup.c      |   12 +++++++++++-
- 3 files changed, 22 insertions(+), 4 deletions(-)
+Wrong.  For flatmem, we have a pfn_valid() which is backed by doing a
+one, two or maybe rarely three compare search of the memblocks.  Short
+of having a bitmap of every page in the 4GB memory space, you can't
+get more efficient than that.
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 5092118..fab849f 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -43,6 +43,13 @@ struct tag_mem32 {
- 	__u32	start;	/* physical start address */
- };
- 
-+#define ATAG_MEM64	0x54420002
-+
-+struct tag_mem64 {
-+	__u64	size;
-+	__u64	start;	/* physical start address */
-+};
-+
- /* VGA text type displays */
- #define ATAG_VIDEOTEXT	0x54410003
- 
-@@ -147,7 +154,8 @@ struct tag {
- 	struct tag_header hdr;
- 	union {
- 		struct tag_core		core;
--		struct tag_mem32	mem;
-+		struct tag_mem32	mem32;
-+		struct tag_mem64	mem64;
- 		struct tag_videotext	videotext;
- 		struct tag_ramdisk	ramdisk;
- 		struct tag_initrd	initrd;
-diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
-index 9256523..f224d95 100644
---- a/arch/arm/kernel/compat.c
-+++ b/arch/arm/kernel/compat.c
-@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
- 	tag = tag_next(tag);
- 	tag->hdr.tag = ATAG_MEM;
- 	tag->hdr.size = tag_size(tag_mem32);
--	tag->u.mem.size = size;
--	tag->u.mem.start = start;
-+	tag->u.mem32.size = size;
-+	tag->u.mem32.start = start;
- 
- 	return tag;
- }
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index fe951e4..420a4e1 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -588,11 +588,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
- 
- static int __init parse_tag_mem32(const struct tag *tag)
- {
--	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
-+	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
- }
- 
- __tagtable(ATAG_MEM, parse_tag_mem32);
- 
-+#ifdef CONFIG_PHYS_ADDR_T_64BIT
-+static int __init parse_tag_mem64(const struct tag *tag)
-+{
-+	/* We only use 32-bits for the size. */
-+	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
-+}
-+
-+__tagtable(ATAG_MEM64, parse_tag_mem64);
-+#endif /* CONFIG_PHYS_ADDR_T_64BIT */
-+
- #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
- struct screen_info screen_info = {
-  .orig_video_lines	= 30,
+For sparsemem, sparsemem provides its own pfn_valid() which is _far_
+from what we require:
+
+static inline int pfn_valid(unsigned long pfn)
+{
+        if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+                return 0;
+        return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+}
+
+> Maybe we should add either the MAX_ORDER or section_nr() trick to the
+> lib/ implementation.  I bet that would use pfn_valid() rarely enough to
+> meet any performance concerns.
+
+No.  I think it's entirely possible that on some platforms we have holes
+within sections.  Like I said, ours is more funky than x86.
+
+The big problem we have on ARM is that the kernel sparsemem stuff doesn't
+*actually* support sparse memory.  What it supports is fully populated
+blocks of memory of fixed size (known at compile time) where some blocks
+may be contiguous.  Blocks are assumed to be populated from physical
+address zero.
+
+It doesn't actually support partially populated blocks.
+
+So, if your memory granule size is 4MB, and your memory starts at
+0xc0000000 physical, you're stuck with 768 unused sparsemem blocks
+at the beginning of memory.  If it's 1MB, then you have 3072 unused
+sparsemem blocks.  Each mem_section structure is 8 bytes, so that
+could be 24K of zeros.
+
+What we actually need is infrastructure in the kernel which can properly
+handle sparse memory efficiently without causing such wastage.  If your
+platform has four memory chunks, eg at 0xc0000000, 0xc4000000, 0xc8000000,
+and 0xcc000000, then you want to build the kernel to tell it "there may
+be four chunks with a 64MB offset, each chunk may be partially populated."
+
+It seems that Sparsemem can't do that efficiently.
