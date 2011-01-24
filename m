@@ -1,74 +1,132 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 24 Jan 2011 14:21:16 +0530
-Subject: [PATCH 2/5] ARM: gic: Add distributor and interface enable/disable
-	accessory api
+Date: Mon, 24 Jan 2011 14:21:19 +0530
+Subject: [PATCH 5/5] ARM: smp: Skip secondary cpu calibration to speed-up boot
 In-Reply-To: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1295859080-15259-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1295859080-15259-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power management code needs to have access to enable/disable the
-gic cpu interface and distributor based on targetted low power
-states.
+On some architectures, secondary cores shares clock with primiary
+core and hence scale together. Hence secondary core lpj calibration
+is not necessary and can be skipped to save considerable time.
 
-This patch adds and exports one API each for distributor and cpu
-interface enable/disable.
+This can speed up the secondary cpu boot and hotplug cpu online
+paths.
+
+The patch is still under discussion and relevant thread is
+here.
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42902.html
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/gic.c               |   24 ++++++++++++++++++++++++
- arch/arm/include/asm/hardware/gic.h |    2 ++
- 2 files changed, 26 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/smp.h     |    8 ++++++++
+ arch/arm/kernel/smp.c          |   35 ++++++++++++++++++++++++++---------
+ arch/arm/mach-omap2/omap-smp.c |    3 +++
+ 3 files changed, 37 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index b4a9ea7..6384bb7 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -369,6 +369,30 @@ void __cpuinit gic_enable_ppi(unsigned int irq)
- 	local_irq_restore(flags);
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 96ed521..150d202 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -69,6 +69,14 @@ asmlinkage void secondary_start_kernel(void);
+ extern void platform_secondary_init(unsigned int cpu);
+ 
+ /*
++ * Skip the secondary calibration on architectures sharing clock
++ * with primary cpu. Needs to be called for archs inside
++ * platform_secondary_init()
++ */
++extern void secondary_skip_calibrate(void);
++
++
++/*
+  * Initialize cpu_possible map, and enable coherency
+  */
+ extern void platform_smp_prepare_cpus(unsigned int);
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 4539ebc..6aa99bc 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -55,6 +55,8 @@ enum ipi_msg_type {
+ 	IPI_CPU_STOP,
+ };
+ 
++static unsigned int skip_secondary_calibrate;
++
+ int __cpuinit __cpu_up(unsigned int cpu)
+ {
+ 	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
+@@ -270,6 +272,16 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
  }
  
-+/* Used in power management paths */
-+void gic_secondary_set(unsigned int gic_nr, unsigned int on)
+ /*
++ * Skip the secondary calibration on architectures sharing clock
++ * with primary cpu. Needs to be called for archs from
++ * platform_secondary_init()
++ */
++void secondary_skip_calibrate(void)
 +{
-+	BUG_ON(gic_nr >= MAX_GIC_NR);
-+
-+	if (on) {
-+		__raw_writel(0xf0, gic_data[gic_nr].cpu_base + GIC_CPU_PRIMASK);
-+		__raw_writel(1, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
-+
-+	} else {
-+		__raw_writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
-+	}
++	skip_secondary_calibrate = 1;
 +}
 +
-+void gic_dist_set(unsigned int gic_nr, unsigned int on)
-+{
-+	BUG_ON(gic_nr >= MAX_GIC_NR);
-+
-+	if (on)
-+		__raw_writel(0x1, gic_data[gic_nr].dist_base + GIC_DIST_CTRL);
-+	else
-+		__raw_writel(0, gic_data[gic_nr].cpu_base + GIC_CPU_CTRL);
-+}
-+
- #ifdef CONFIG_SMP
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 0691f9d..638d9dc 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -41,6 +41,8 @@ void gic_secondary_init(unsigned int);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
- void gic_enable_ppi(unsigned int);
-+void gic_secondary_set(unsigned int gic_nr, unsigned int on);
-+void gic_dist_set(unsigned int gic_nr, unsigned int on);
- #endif
++/*
+  * This is the secondary CPU boot entry.  We're using this CPUs
+  * idle thread stack, but a set of temporary page tables.
+  */
+@@ -312,7 +324,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	 */
+ 	percpu_timer_setup();
  
- #endif
+-	calibrate_delay();
++	if (!skip_secondary_calibrate)
++		calibrate_delay();
+ 
+ 	smp_store_cpu_info(cpu);
+ 
+@@ -330,16 +343,20 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+ 	int cpu;
+-	unsigned long bogosum = 0;
++	char bogosum[32];
++	unsigned long bogosums = 0;
++
++	if (!skip_secondary_calibrate) {
++		for_each_online_cpu(cpu)
++			bogosums += per_cpu(cpu_data, cpu).loops_per_jiffy;
+ 
+-	for_each_online_cpu(cpu)
+-		bogosum += per_cpu(cpu_data, cpu).loops_per_jiffy;
++		snprintf(bogosum, sizeof(bogosums), " (%lu.%02lu BogoMIPS).\n",
++			bogosums / (500000/HZ), (bogosums / (5000/HZ)) % 100);
++	} else
++		bogosum[0] = '\0';
+ 
+-	printk(KERN_INFO "SMP: Total of %d processors activated "
+-	       "(%lu.%02lu BogoMIPS).\n",
+-	       num_online_cpus(),
+-	       bogosum / (500000/HZ),
+-	       (bogosum / (5000/HZ)) % 100);
++	pr_info("SMP: Total of %d processors activated%s.\n",
++		num_online_cpus(), bogosum);
+ }
+ 
+ void __init smp_prepare_boot_cpu(void)
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index b66cfe8..7342cd5 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -39,6 +39,9 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	 */
+ 	gic_secondary_init(0);
+ 
++	/* Allow to skip secondary CPU calibration */
++	secondary_skip_calibrate();
++
+ 	/*
+ 	 * Synchronise with the boot thread.
+ 	 */
 -- 
 1.6.0.4
