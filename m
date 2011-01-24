@@ -1,88 +1,84 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 24 Jan 2011 11:40:20 -0800
-Subject: [PATCH] drivers: mmc: msm: remove clock disable in probe
-In-Reply-To: <1295873046.32231.54.camel@stummala-linux.in.qualcomm.com>
-References: <1295374473-27872-1-git-send-email-dwalker@codeaurora.org>	
-	<AANLkTim-=40MM=TeH1XSQ-rio1ctwcZAs4qbf9SaxmdH@mail.gmail.com>	
-	<4D38FC55.2030601@codeaurora.org>
-	<1295629086.19880.17.camel@m0nster>	
-	<4D39DBA4.2040107@codeaurora.org>
-	<1295873046.32231.54.camel@stummala-linux.in.qualcomm.com>
-Message-ID: <4D3DD5A4.6020607@codeaurora.org>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 24 Jan 2011 11:52:12 -0800
+Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
+	suspend
+In-Reply-To: <20110124193539.GI29925@opensource.wolfsonmicro.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-21-git-send-email-ccross@android.com>
+	<20110124144142.GA16813@sirena.org.uk>
+	<AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
+	<20110124193539.GI29925@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTikOEm=watbA1G-SFK3PZrntDc+Wun84nGio=YKv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2011 04:44 AM, Sahitya Tummala wrote:
-> On Fri, 2011-01-21 at 11:16 -0800, Saravana Kannan wrote:
+On Mon, Jan 24, 2011 at 11:35 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Jan 24, 2011 at 10:50:53AM -0800, Colin Cross wrote:
+>> On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
 >
->> I will look further into this if I have time, but at this point I'm
->> still skeptical whether this is the right fix. The reason I went from
->> "sure" to "skeptical" is due to the deferred clock delay code in the driver.
+>> > Hrm, what's the situation where that happens and why does it cause
+>> > problems? ?The regulator API doesn't care if suspend is going on, and
+>> > nor do any of the current drivers for regulators. ?There is an issue
+>> > with keeping things like I2C alive until the bitter end of suspend so
+>> > you've got a control bus to the regulators but that's a generic issue
+>> > which crops up with other subsystems too so a regulator-specific
+>> > workaround seems dodgy.
 >
-> Saravana,
+>> The end result is that the regulator driver calls the i2c driver after
+>> the i2c driver has been suspended. ?On Tegra, this happens because of
+>> voltage scaling on the CPU regulator, which can be on the i2c bus. ?A
+>> sleep in a suspend handler after the i2c bus has been suspended can
+>> cause the cpufreq governor to lower the frequency, and try to lower
+>> the voltage as well.
 >
-> Let me try to make things clear regarding clocks management in this
-> driver -
->
-> 1. Before sending any MMC command msmsdcc_enable_clocks() will be called
-> (check the function msmsdcc_request()) and at the end of that command
-> disabling of clocks will be deferred by calling msmsdcc_disable_clocks()
-> (check the function msmsdcc_request_end()).
->
-> 2. The driver ensures that clocks are enabled/disabled only once for any
-> number of calls to msmsdcc_enable_clocks/msmsdcc_disable_clocks. Thus,
-> there is no harm in calling msmsdcc_disable_clocks/msmsdcc_enable_clocks
-> twice.
->
-> Now coming to the actual problem -
->
-> During msmsdcc_probe(), clocks are enabled and at the end of probe
-> clocks are disabled in the current code. But just before disabling
-> clocks, there is a call to mmc_add_host(). This mmc_add_host() will
-> schedule the detect work to run in another thread context. The detect
-> work will send MMC commands for card detection. Thus, if clocks are
-> disabled immediately after calling mmc_add_host(), then we might end up
-> turning off clocks while the detect work commands are in progress.
->
-> Fix to this problem ?
->
-> 1. The clocks will anyways be turned off at the end of MMC commands that
-> are sent by detect work.  Thus,  there is no need to disable clocks at
-> the end of probe. This is exactly the fix that Daniel submitted.
->
-> 2. Otherwise, we can also move disabling of clocks just before
-> mmc_add_host() so that clocks are enabled and disabled in probe itself.
->> From there on, clocks will be enabled for any MMC command and disabled
-> at the end of that request.
->
-> I would prefer Daniel's fix because the clocks are anyway going to be
-> turned on soon in mmc_add_host() and thus there will be no real
-> advantage of disabling before add_host and enabling immediately for
-> detect work MMC commands. Please let us know your comments.
+> OK, that's a general problem - you need to ensure that the I2C and SPI
+> controllers are suspended really late. ?The OMAP guys also have this
+> problem for some RTCs, though in their case things are slightly
+> different due to their use of runtime PM. ?Looking at your I2C driver
+> (BTW, I'd suggest reminding Ben on a more regular basis about that) I
+> suspect that moving your suspend and resume callbacks to the _noirq
+> varaints will cover a lot of this.
 
-Sahitya,
+Even _noirq isn't late enough, if cpufreq keeps trying to change the
+frequency (and thus voltage) until sysdev suspend.
 
-Thanks a lot for the detailed explanation. It certainly makes it easier 
-to understand what's going on.
+>> The problem isn't limited to i2c busses, there are some regulators on
+>> spi busses. ?You would need to ensure that any driver that has a
+>
+> For all practical purposes in this sort of discussion you can typically
+> do a s/I2C/I2C and SPI/ - in terms of system integration issues they're
+> very similar.
 
-Going to the fix, the 2nd way would work without unnecessarily turning 
-on/off clocks if you didn't ensure that clk_enable/clk_disable is not 
-called more than once. They already maintain ref count, so there is no 
-need for doing it again in your driver.
+True
 
-Also, having the driver do something like "if I already disabled the 
-clock, then ignore this new disable request I got", _could_ mask a lot 
-of incorrect behavior.
+>> regulator consumer suspends before the regulator driver it
+>> communicates with, and that still wouldn't fix cpufreq, which has a
+>> sysdev suspend handler.
+>
+> So you actively need to push the processor into low power mode during
+> suspend? ?I'm still not 100% clear what's triggering the issues you're
+> seeing and why this seems to be Tegra-only. ?If there were a general
+> cpufreq/regulator interaction here I'd expect to see all ARM cpufreq
+> drivers needing to do the same thing (and probably some handling of this
+> in cpufreq core as a result). ?If it's not such an issue I'd expect
+> there's also entertaining suspend ordering issues elsewhere.
 
-Having said that, the way the msm sdcc driver is designed today, I'm 
-willing to consider Daniel's patch as acceptable first step fix. You 
-might still want to look into seeing if this could be modified to take 
-advantage of the ref counting done in the clock code.
+It's more of a voltage scaling issue than a cpufreq issue directly.
+Tegra requires the voltage be set to nominal during resume, and the
+only time it can be set for resume is before I2C suspends.  I handle
+the problem with a suspend notifier in the latest version of the clock
+voltage scaling patches, but I kept this patch to avoid cpufreq trying
+to go to frequencies that are not supported by the suspend voltage.
 
-Thanks,
-Saravana
+> Typically this stuff isn't a problem for regulators themselves since if
+> they're active by the time I2C is off they normally get suspended by
+> hardware handshakes from the CPU as that enters low power mode - right
+> now we have no regulators at all in mainline that do anything in
+> software on suspend. ?We can get a long way by just ignoring what
+> happens to regulators over suspend (there is some work to do here but
+> it's orthogonal to this sort of issue).
 
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+The regulator driver itself has nothing to do, and when the CPU enters
+its lowest power mode it signals the regulator to turn off, but
+something needs to tell the regulator to go to the correct voltage.
