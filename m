@@ -1,27 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 24 Jan 2011 14:41:43 +0000
-Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
-	suspend
-In-Reply-To: <1295834493-5019-21-git-send-email-ccross@android.com>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-21-git-send-email-ccross@android.com>
-Message-ID: <20110124144142.GA16813@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 14:47:53 +0000
+Subject: [PATCH v2] arm: Configure reference clock for Versatile
+	Express timers
+In-Reply-To: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
+References: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <20110124144753.GB22949@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 23, 2011 at 06:01:25PM -0800, Colin Cross wrote:
-> Adds a SUSPEND_PREPARE notification hook to drop the frequency to
-> the lowest possible during suspend.  This prevents the cpufreq driver
-> from attempting regulator calls after suspend has started - the
-> regulator api can call into drivers that have already been suspended.
+On Tue, Jan 18, 2011 at 06:04:43PM +0000, Pawel Moll wrote:
+>  static void __init v2m_timer_init(void)
+>  {
+> +	u32 scctrl;
+> +
+>  	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
+>  
+> -	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
+> -	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
+> +	/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
+> +	scctrl = readl(MMIO_P2V(V2M_SYSCTL + SCCTRL));
+> +	scctrl |= SCCTRL_TIMEREN0SEL_TIMCLK;
+> +	scctrl |= SCCTRL_TIMEREN1SEL_TIMCLK;
+> +	writel(scctrl, MMIO_P2V(V2M_SYSCTL + SCCTRL));
 
-Hrm, what's the situation where that happens and why does it cause
-problems?  The regulator API doesn't care if suspend is going on, and
-nor do any of the current drivers for regulators.  There is an issue
-with keeping things like I2C alive until the bitter end of suspend so
-you've got a control bus to the regulators but that's a generic issue
-which crops up with other subsystems too so a regulator-specific
-workaround seems dodgy.
-
-The patch itself seems fine, it's just that it feels like there's
-something else going on.
+BTW, why are you removing the initialization of TIMER_CTRL ?  You don't
+describe why you do this in the commit log so I suspect it's a mistake.
