@@ -1,52 +1,152 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:30 -0800
-Subject: [PATCH v2 25/28] ARM: tegra: suspend: Save protected aperture across
-	LP0
+Date: Sun, 23 Jan 2011 18:01:28 -0800
+Subject: [PATCH v2 23/28] ARM: tegra: add tegra_defconfig
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-26-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-24-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Olof Johansson <olof@lixom.net>
+
+Adding one single defconfig for the tegra family of boards, to over time
+cover the superset of supported platform and drivers.
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/suspend.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/configs/tegra_defconfig |  123 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 123 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/tegra_defconfig
 
-diff --git a/arch/arm/mach-tegra/suspend.c b/arch/arm/mach-tegra/suspend.c
-index ded2c36..be8c78f 100644
---- a/arch/arm/mach-tegra/suspend.c
-+++ b/arch/arm/mach-tegra/suspend.c
-@@ -497,12 +497,13 @@ static void tegra_debug_uart_resume(void)
- 
- #define MC_SECURITY_START	0x6c
- #define MC_SECURITY_SIZE	0x70
-+#define MC_SECURITY_CFG2	0x7c
- 
- static int tegra_suspend_enter(suspend_state_t state)
- {
- 	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
- 	unsigned long flags;
--	u32 mc_data[2];
-+	u32 mc_data[3] = {0, 0, 0};
- 	bool do_lp0 = (current_suspend_mode == TEGRA_SUSPEND_LP0);
- 	bool do_lp2 = (current_suspend_mode == TEGRA_SUSPEND_LP2);
- 	int lp_state;
-@@ -533,6 +534,7 @@ static int tegra_suspend_enter(suspend_state_t state)
- 
- 		mc_data[0] = readl(mc + MC_SECURITY_START);
- 		mc_data[1] = readl(mc + MC_SECURITY_SIZE);
-+		mc_data[2] = readl(mc + MC_SECURITY_CFG2);
- 	}
- 
- 	rtc_before = tegra_rtc_read_ms();
-@@ -550,6 +552,7 @@ static int tegra_suspend_enter(suspend_state_t state)
- 	if (do_lp0) {
- 		writel(mc_data[0], mc + MC_SECURITY_START);
- 		writel(mc_data[1], mc + MC_SECURITY_SIZE);
-+		writel(mc_data[2], mc + MC_SECURITY_CFG2);
- 
- 		tegra_clk_resume();
- 		tegra_gpio_resume();
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+new file mode 100644
+index 0000000..7a9267e
+--- /dev/null
++++ b/arch/arm/configs/tegra_defconfig
+@@ -0,0 +1,123 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_CGROUPS=y
++CONFIG_CGROUP_DEBUG=y
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_RESOURCE_COUNTERS=y
++CONFIG_CGROUP_SCHED=y
++CONFIG_RT_GROUP_SCHED=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_EMBEDDED=y
++# CONFIG_SYSCTL_SYSCALL is not set
++# CONFIG_ELF_CORE is not set
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODULE_FORCE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_TEGRA=y
++CONFIG_MACH_HARMONY=y
++CONFIG_TEGRA_DEBUG_UARTD=y
++CONFIG_ARM_ERRATA_742230=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_HIGHMEM=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_VFP=y
++CONFIG_PM=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_INET_ESP=y
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++CONFIG_IPV6=y
++CONFIG_IPV6_PRIVACY=y
++CONFIG_IPV6_ROUTER_PREF=y
++CONFIG_IPV6_OPTIMISTIC_DAD=y
++CONFIG_INET6_AH=y
++CONFIG_INET6_ESP=y
++CONFIG_INET6_IPCOMP=y
++CONFIG_IPV6_MIP6=y
++CONFIG_IPV6_TUNNEL=y
++CONFIG_IPV6_MULTIPLE_TABLES=y
++# CONFIG_WIRELESS is not set
++# CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_MISC_DEVICES=y
++CONFIG_AD525X_DPOT=y
++CONFIG_AD525X_DPOT_I2C=y
++CONFIG_ICS932S401=y
++CONFIG_APDS9802ALS=y
++CONFIG_ISL29003=y
++CONFIG_NETDEVICES=y
++CONFIG_DUMMY=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++# CONFIG_WLAN is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++# CONFIG_HWMON is not set
++# CONFIG_MFD_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_POSIX_ACL=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT3_FS_POSIX_ACL=y
++CONFIG_EXT3_FS_SECURITY=y
++# CONFIG_DNOTIFY is not set
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_PRINTK_TIME=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_SCHEDSTATS=y
++CONFIG_TIMER_STATS=y
++CONFIG_DEBUG_SLAB=y
++# CONFIG_DEBUG_PREEMPT is not set
++CONFIG_DEBUG_MUTEXES=y
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_VM=y
++CONFIG_DEBUG_SG=y
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_ECB=y
++CONFIG_CRYPTO_AES=y
++CONFIG_CRYPTO_ARC4=y
++CONFIG_CRYPTO_TWOFISH=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRC_CCITT=y
++CONFIG_CRC16=y
 -- 
 1.7.3.1
