@@ -1,54 +1,70 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 24 Jan 2011 08:47:15 +0100
-Subject: [PATCH] ARM: mx5/mx51_3ds: Add watchdog support
-In-Reply-To: <4D396FFC.6050303@freescale.com>
-References: <1291917049-8183-1-git-send-email-daiane.angolini@freescale.com>
-	<20101209184242.GY17441@pengutronix.de>
-	<4D012512.4040709@freescale.com>
-	<20101209190950.GA17441@pengutronix.de>
-	<4D396FFC.6050303@freescale.com>
-Message-ID: <20110124074715.GJ9041@pengutronix.de>
+From: warthog19@eaglescrag.net (J.H.)
+Date: Sun, 23 Jan 2011 23:34:28 -0800
+Subject: cannot fetch arm git tree
+In-Reply-To: <4D3D2865.4020408@viscovery.net>
+References: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
+	<20110116092315.GA27542@n2100.arm.linux.org.uk>
+	<20110116110819.GG6917@pengutronix.de>
+	<AANLkTinrZ0GnT71GCueUUpAXM5ckq+LBd0RjA51DMR-a@mail.gmail.com>
+	<20110116134248.GD27542@n2100.arm.linux.org.uk>
+	<4D398C43.1000306@vollmann.ch>
+	<20110121134728.GO14956@pengutronix.de>
+	<20110121135725.GR13235@n2100.arm.linux.org.uk>
+	<4D3997FE.5030109@vollmann.ch>
+	<20110121145025.GS13235@n2100.arm.linux.org.uk>
+	<4D3D2865.4020408@viscovery.net>
+Message-ID: <4D3D2B84.6090409@eaglescrag.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 09:37:32AM -0200, Daiane Angolini wrote:
-> Hi,
+On 01/23/2011 11:21 PM, Johannes Sixt wrote:
+> Am 1/21/2011 15:50, schrieb Russell King - ARM Linux:
+>>  SetEnv GIT_PROJECT_ROOT /var/www/git
+>>  SetEnv GIT_HTTP_EXPORT_ALL
+>>  ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+>>
+>> Great.  Deciding that it will be http://servername.example.com/git/ is
+>> really damned annoying as that's traditionally where gitweb lives,
+>> which requires a different script alias.
+>> ...
+>> I'm really not interested in working out how to bodge this into working
+>> along side the existing gitweb setup by adding lots of rewrite rules,...
 > 
-> Is this patch ok?
+> It has been worked out for you already. It's just a single rule (although
+> a bit longish). Look for 'ScriptAliasMatch' in
+> http://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html
 
-Yes, it's ok, applied now. Sorry for not reacting earlier.
+I was going to say, I have both gitweb and smart http support running in
+parallel, it's not terribly complicated.  The way I'm doing it is a bit
+older (mainly that long ScriptAliasMatch broken out more), but it's
+still only 11 lines to the apache config:
 
-Sascha
+# Various environment setup, should be obvious
+SetEnv GIT_PROJECT_ROOT /path
+SetEnv GIT_HTTP_EXPORT_ALL 1
+SetEnv GIT_EXEC_PATH /usr/libexec/git-core/
 
-> 
-> Daiane
-> 
-> On 12/09/2010 05:09 PM, Uwe Kleine-K?nig wrote:
-> >Hallo Daiane,
-> >
-> >On Thu, Dec 09, 2010 at 04:50:58PM -0200, Daiane Angolini wrote:
-> >>On 12/09/2010 04:42 PM, Uwe Kleine-K?nig wrote:
-> >>>On Thu, Dec 09, 2010 at 03:50:49PM -0200, Daiane Angolini wrote:
-> >>>>Signed-off-by: Daiane Angolini<daiane.angolini@freescale.com>
-> >>>This is a duplicate of
-> >>>
-> >>>http://mid.gmane.org/1291749285-11406-2-git-send-email-fabio.estevam at freescale.com
-> >>My patch is for iMX51_3DS board, and Fabio's patch in the link you sent
-> >>me is for iMX27_3DS
-> >You're right, I mixed up the series.  There is another one (
-> >http://mid.gmane.org/1291660714-16396-1-git-send-email-fabio.estevam at freescale.com
-> >) for mx51.  I just searched in my mail folder, found 3ds and thought
-> >this was the mx51 series.
-> >
-> >Sorry and Ack for your patch
-> >Uwe
-> >
-> 
-> 
-> 
+# Here so that we can do straight wget fetches for the objects files,
+# pack files and refs heads.
+# This isn't strictly neccisary, but if it's done we can use the inbuilt
+# sendfile() of apache for the sending of those files vs. funneling them
+# through the CGI
+AliasMatch ^/(.*/objects/[0-9a-f]{2}/[0-9a-f]{38})$		/path/$1
+AliasMatch ^/(.*/objects/pack/pack-[0-9a-f]{40}.(pack|idx))$	/path/$1
+AliasMatch ^/(.*/refs/heads/.*)$				/path/$1
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+# Meat of how to make this all work
+ScriptAliasMatch "^/(.*/HEAD)$"
+/usr/libexec/git-core/git-http-backend/path/$1
+ScriptAliasMatch "^/(.*/info/refs)$"
+/usr/libexec/git-core/git-http-backend/path/$1
+ScriptAliasMatch "^/(.*/objects/info/[^/]+)$"
+/usr/libexec/git-core/git-http-backend/path/$1
+ScriptAliasMatch "^/pub/scm/(.*/git-upload-pack)$"
+/usr/libexec/git-core/git-http-backend/path/$1
+ScriptAliasMatch "^/pub/scm/(.*/git-receive-pack)$"
+/usr/libexec/git-core/git-http-backend/path/$1
+
+Just an example anyway, the paths have been shortened to fit e-mail better.
+
+- John 'Warthog9' Hawley
