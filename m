@@ -1,88 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 17:58:07 +0000
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <1295887937.11047.119.camel@nimitz>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<1295544047.9039.609.camel@nimitz>
-	<20110120180146.GH6335@n2100.arm.linux.org.uk>
-	<1295547087.9039.694.camel@nimitz>
-	<20110123180532.GA3509@n2100.arm.linux.org.uk>
-	<1295887937.11047.119.camel@nimitz>
-Message-ID: <20110124175807.GA27427@n2100.arm.linux.org.uk>
+Date: Mon, 24 Jan 2011 18:09:44 +0000
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
+References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
+	<000001cbbbc2$0e815e80$2b841b80$@moll@arm.com>
+	<20110124133513.GL16202@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
+	<20110124162400.GC24104@n2100.arm.linux.org.uk>
+	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
+	<20110124165356.GG24104@n2100.arm.linux.org.uk>
+	<20110124170304.GH24104@n2100.arm.linux.org.uk>
+	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
+Message-ID: <20110124180944.GK24104@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 08:52:17AM -0800, Dave Hansen wrote:
-> On Sun, 2011-01-23 at 18:05 +0000, Russell King - ARM Linux wrote:
-> > On Thu, Jan 20, 2011 at 10:11:27AM -0800, Dave Hansen wrote:
-> > > On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
-> > > > > The x86 version of show_mem() actually manages to do this without any
-> > > > > #ifdefs, and works for a ton of configuration options.  It uses
-> > > > > pfn_valid() to tell whether it can touch a given pfn.
-> > > > 
-> > > > x86 memory layout tends to be very simple as it expects memory to
-> > > > start at the beginning of every region described by a pgdat and extend
-> > > > in one contiguous block.  I wish ARM was that simple.
-> > > 
-> > > x86 memory layouts can be pretty funky and have been that way for a long
-> > > time.  That's why we *have* to handle holes in x86's show_mem().  My
-> > > laptop even has a ~1GB hole in its ZONE_DMA32:
-> > 
-> > If x86 is soo funky, I suggest you try the x86 version of show_mem()
-> > on an ARM platform with memory holes.  Make sure you try it with
-> > sparsemem as well...
+On Mon, Jan 24, 2011 at 05:54:18PM -0000, Pawel Moll wrote:
+> $ git am 0001-arm-Improve-MMC-performance-on-Versatile-Express.patch
 > 
-> x86 uses the generic lib/ show_mem().  It works for any holes, as long
-> as they're expressed in one of the memory models so that pfn_valid()
-> notices them.
+> / # uname -a
+> Linux (none) 2.6.38-rc2+ #12 SMP Mon Jan 24 17:41:53 GMT 2011 armv7l GNU/Linux
+> / # cat /dev/sda > /dev/null &
+> / # dd if=/dev/mmcblk0 of=/dev/null bs=64k count=128
+> 128+0 records in
+> 128+0 records out
+> 8388608 bytes (8.0MB) copied, 1.501529 seconds, 5.3MB/s
+> 
+> > THERE IS NO ISSUE WITH MMCI.  THE HARDWARE DOES NOT NEED "FIXING".
+> 
+> I'm really pleased you think so. It's always nice to have happy customers :-)
 
-I think that's what I said.
+If you're flooding the system with USB traffic, enlargening the FIFO size
+won't help.  Making the FIFO larger just decreases the _interrupt_ _latency_
+requirements.  It doesn't mean you can cope with the amount of data being
+transferred.
 
-> ARM looks like its pfn_valid() is backed up by searching the (ASM
-> arch-specific) memblocks.  That looks like it would be fairly slow
-> compared to the other pfn_valid() implementations and I can see why it's
-> being avoided in show_mem().
+	if (cycles-to-transfer-usb-packets + cycles-to-transfer-MMC-data >
+			available-cpu-cycles)
+		you_are_stuffed(even_with_larger_fifo);
 
-Wrong.  For flatmem, we have a pfn_valid() which is backed by doing a
-one, two or maybe rarely three compare search of the memblocks.  Short
-of having a bitmap of every page in the 4GB memory space, you can't
-get more efficient than that.
+So I'm not surprised that running USB and MMC at full speed results in
+MMC losing out.  You will find that even with a larger FIFO, MMC will
+still lose out.
 
-For sparsemem, sparsemem provides its own pfn_valid() which is _far_
-from what we require:
+Why?  The ISP1761 can store the packets without complaint, and the host
+CPU can read them when it's ready.  As soon as one packet is read off
+the host, the next packet is probably sitting there waiting for the
+host CPU to read it.  When the ISP1761 buffer becomes full, it can
+tell the device to stop sending data.
 
-static inline int pfn_valid(unsigned long pfn)
-{
-        if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-                return 0;
-        return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
-}
-
-> Maybe we should add either the MAX_ORDER or section_nr() trick to the
-> lib/ implementation.  I bet that would use pfn_valid() rarely enough to
-> meet any performance concerns.
-
-No.  I think it's entirely possible that on some platforms we have holes
-within sections.  Like I said, ours is more funky than x86.
-
-The big problem we have on ARM is that the kernel sparsemem stuff doesn't
-*actually* support sparse memory.  What it supports is fully populated
-blocks of memory of fixed size (known at compile time) where some blocks
-may be contiguous.  Blocks are assumed to be populated from physical
-address zero.
-
-It doesn't actually support partially populated blocks.
-
-So, if your memory granule size is 4MB, and your memory starts at
-0xc0000000 physical, you're stuck with 768 unused sparsemem blocks
-at the beginning of memory.  If it's 1MB, then you have 3072 unused
-sparsemem blocks.  Each mem_section structure is 8 bytes, so that
-could be 24K of zeros.
-
-What we actually need is infrastructure in the kernel which can properly
-handle sparse memory efficiently without causing such wastage.  If your
-platform has four memory chunks, eg at 0xc0000000, 0xc4000000, 0xc8000000,
-and 0xcc000000, then you want to build the kernel to tell it "there may
-be four chunks with a 64MB offset, each chunk may be partially populated."
-
-It seems that Sparsemem can't do that efficiently.
+The result of that is the ISP1761 will be able to transfer data as fast
+as the host CPU can possibly go - to the exclusion of the MMC interface.
+No amount of FIFO (well, except several KB to cover the _largest_ size
+of MMC transfer we request) will resolve the problem of USB and MMC
+sharing the same CPU.
