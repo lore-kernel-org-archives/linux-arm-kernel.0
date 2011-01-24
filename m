@@ -1,43 +1,65 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 24 Jan 2011 11:31:01 -0800
-Subject: Locking in the clk API
-In-Reply-To: <20110122091525.GA5194@n2100.arm.linux.org.uk>
-References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>
-	<4D3862DB.5000708@fluff.org>	<20110120185617.GI6335@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>	<4D3907BD.4040900@codeaurora.org>	<20110121093218.GB13235@n2100.arm.linux.org.uk>	<4D3A38A7.5000807@codeaurora.org>
-	<20110122091525.GA5194@n2100.arm.linux.org.uk>
-Message-ID: <4D3DD375.40504@codeaurora.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 24 Jan 2011 19:35:40 +0000
+Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
+	suspend
+In-Reply-To: <AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-21-git-send-email-ccross@android.com>
+	<20110124144142.GA16813@sirena.org.uk>
+	<AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
+Message-ID: <20110124193539.GI29925@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2011 01:15 AM, Russell King - ARM Linux wrote:
-> On Fri, Jan 21, 2011 at 05:53:43PM -0800, Saravana Kannan wrote:
->> On 01/21/2011 01:32 AM, Russell King - ARM Linux wrote:
->>> On Thu, Jan 20, 2011 at 08:12:45PM -0800, Saravana Kannan wrote:
->>>> In my opinion, the only major reason for needing atomic clk APIs was due
->>>> to device_ops->suspend being atomic. Since that's not the case anymore,
->>>> I really don't see a justification for atomic clocks. Sure, I might have
->>>> missed some exceptions, but in that case we should make the atomic APIs
->>>> an exception (add clk_enable_atomic) and not the norm.
->>>
->>> The suspend method has never been atomic.  It has always been able to
->>> sleep.  You're mistaken.
->>
->> I distinctly remember trying to do sleeping stuff inside a .suspend
->> function and have it complain that it's atomic. So, I think you might be
->> mistaken.
->
-> No I'm not.  I've always had stuff which takes mutexes/semaphores in
-> the suspend method.
->
-> You'll get the warning if you take a spinlock and then try sleeping -
-> but that's your error for creating an atomic context (you can't sleep
-> while holding a spinlock), not the fault of the callback.
+On Mon, Jan 24, 2011 at 10:50:53AM -0800, Colin Cross wrote:
+> On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
 
-I'm well aware of the fact that you can't grab a mutex inside a 
-spinlock. Like I said, I will dig into this sometime and get back.
+> > Hrm, what's the situation where that happens and why does it cause
+> > problems? ?The regulator API doesn't care if suspend is going on, and
+> > nor do any of the current drivers for regulators. ?There is an issue
+> > with keeping things like I2C alive until the bitter end of suspend so
+> > you've got a control bus to the regulators but that's a generic issue
+> > which crops up with other subsystems too so a regulator-specific
+> > workaround seems dodgy.
 
--Saravana
+> The end result is that the regulator driver calls the i2c driver after
+> the i2c driver has been suspended.  On Tegra, this happens because of
+> voltage scaling on the CPU regulator, which can be on the i2c bus.  A
+> sleep in a suspend handler after the i2c bus has been suspended can
+> cause the cpufreq governor to lower the frequency, and try to lower
+> the voltage as well.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+OK, that's a general problem - you need to ensure that the I2C and SPI
+controllers are suspended really late.  The OMAP guys also have this
+problem for some RTCs, though in their case things are slightly
+different due to their use of runtime PM.  Looking at your I2C driver
+(BTW, I'd suggest reminding Ben on a more regular basis about that) I
+suspect that moving your suspend and resume callbacks to the _noirq
+varaints will cover a lot of this.
+
+> The problem isn't limited to i2c busses, there are some regulators on
+> spi busses.  You would need to ensure that any driver that has a
+
+For all practical purposes in this sort of discussion you can typically
+do a s/I2C/I2C and SPI/ - in terms of system integration issues they're
+very similar.
+
+> regulator consumer suspends before the regulator driver it
+> communicates with, and that still wouldn't fix cpufreq, which has a
+> sysdev suspend handler.
+
+So you actively need to push the processor into low power mode during
+suspend?  I'm still not 100% clear what's triggering the issues you're
+seeing and why this seems to be Tegra-only.  If there were a general
+cpufreq/regulator interaction here I'd expect to see all ARM cpufreq
+drivers needing to do the same thing (and probably some handling of this
+in cpufreq core as a result).  If it's not such an issue I'd expect
+there's also entertaining suspend ordering issues elsewhere.
+
+Typically this stuff isn't a problem for regulators themselves since if
+they're active by the time I2C is off they normally get suspended by
+hardware handshakes from the CPU as that enters low power mode - right
+now we have no regulators at all in mainline that do anything in
+software on suspend.  We can get a long way by just ignoring what
+happens to regulators over suspend (there is some work to do here but
+it's orthogonal to this sort of issue).
