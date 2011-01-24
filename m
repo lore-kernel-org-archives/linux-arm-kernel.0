@@ -1,151 +1,35 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 24 Jan 2011 12:11:54 +0530
-Subject: [PATCH] OMAP2+: remove unused UART base addresses from
-	omap_globals
-In-Reply-To: <1295649015-26348-1-git-send-email-khilman@ti.com>
-References: <1295649015-26348-1-git-send-email-khilman@ti.com>
-Message-ID: <20110124064154.GA16582@m-desktop>
+From: j.sixt@viscovery.net (Johannes Sixt)
+Date: Mon, 24 Jan 2011 08:21:09 +0100
+Subject: cannot fetch arm git tree
+In-Reply-To: <20110121145025.GS13235@n2100.arm.linux.org.uk>
+References: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
+	<20110116092315.GA27542@n2100.arm.linux.org.uk>
+	<20110116110819.GG6917@pengutronix.de>
+	<AANLkTinrZ0GnT71GCueUUpAXM5ckq+LBd0RjA51DMR-a@mail.gmail.com>
+	<20110116134248.GD27542@n2100.arm.linux.org.uk>
+	<4D398C43.1000306@vollmann.ch>
+	<20110121134728.GO14956@pengutronix.de>
+	<20110121135725.GR13235@n2100.arm.linux.org.uk>
+	<4D3997FE.5030109@vollmann.ch>
+	<20110121145025.GS13235@n2100.arm.linux.org.uk>
+Message-ID: <4D3D2865.4020408@viscovery.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin, 
-How about folding below changes into your patch since the UART dma irq
-numbers are getting assigned from hwmod database.
+Am 1/21/2011 15:50, schrieb Russell King - ARM Linux:
+>  SetEnv GIT_PROJECT_ROOT /var/www/git
+>  SetEnv GIT_HTTP_EXPORT_ALL
+>  ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+> 
+> Great.  Deciding that it will be http://servername.example.com/git/ is
+> really damned annoying as that's traditionally where gitweb lives,
+> which requires a different script alias.
+> ...
+> I'm really not interested in working out how to bodge this into working
+> along side the existing gitweb setup by adding lots of rewrite rules,...
 
--Manjunath
+It has been worked out for you already. It's just a single rule (although
+a bit longish). Look for 'ScriptAliasMatch' in
+http://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html
 
-diff --git a/arch/arm/plat-omap/include/plat/dma-44xx.h
-b/arch/arm/plat-omap/include/plat/dma-44xx.h
-index 1f767cb..129d147 100644
---- a/arch/arm/plat-omap/include/plat/dma-44xx.h
-+++ b/arch/arm/plat-omap/include/plat/dma-44xx.h
-@@ -68,14 +68,6 @@
- #define OMAP44XX_DMA_SPI2_RX1                  46
- #define OMAP44XX_DMA_MMC2_TX                   47
- #define OMAP44XX_DMA_MMC2_RX                   48
--#define OMAP44XX_DMA_UART1_TX                  49
--#define OMAP44XX_DMA_UART1_RX                  50
--#define OMAP44XX_DMA_UART2_TX                  51
--#define OMAP44XX_DMA_UART2_RX                  52
--#define OMAP44XX_DMA_UART3_TX                  53
--#define OMAP44XX_DMA_UART3_RX                  54
--#define OMAP44XX_DMA_UART4_TX                  55
--#define OMAP44XX_DMA_UART4_RX                  56
- #define OMAP44XX_DMA_MMC4_TX                   57
- #define OMAP44XX_DMA_MMC4_RX                   58
- #define OMAP44XX_DMA_MMC5_TX                   59
-diff --git a/arch/arm/plat-omap/include/plat/dma.h
-b/arch/arm/plat-omap/include/plat/dma.h
-index d1c916f..c5be190 100644
---- a/arch/arm/plat-omap/include/plat/dma.h
-+++ b/arch/arm/plat-omap/include/plat/dma.h
-@@ -159,12 +159,6 @@
- #define OMAP24XX_DMA_SPI2_RX1          46      /* S_DMA_45 */
- #define OMAP24XX_DMA_MMC2_TX           47      /* S_DMA_46 */
- #define OMAP24XX_DMA_MMC2_RX           48      /* S_DMA_47 */
--#define OMAP24XX_DMA_UART1_TX          49      /* S_DMA_48 */
--#define OMAP24XX_DMA_UART1_RX          50      /* S_DMA_49 */
--#define OMAP24XX_DMA_UART2_TX          51      /* S_DMA_50 */
--#define OMAP24XX_DMA_UART2_RX          52      /* S_DMA_51 */
--#define OMAP24XX_DMA_UART3_TX          53      /* S_DMA_52 */
--#define OMAP24XX_DMA_UART3_RX          54      /* S_DMA_53 */
- #define OMAP24XX_DMA_USB_W2FC_TX0      55      /* S_DMA_54 */
- #define OMAP24XX_DMA_USB_W2FC_RX0      56      /* S_DMA_55 */
- #define OMAP24XX_DMA_USB_W2FC_TX1      57      /* S_DMA_56 */
-@@ -193,8 +187,6 @@
- #define OMAP34XX_DMA_USIM_TX           79      /* S_DMA_78 */
- #define OMAP34XX_DMA_USIM_RX           80      /* S_DMA_79 */
- 
--#define OMAP36XX_DMA_UART4_TX          81      /* S_DMA_80 */
--#define OMAP36XX_DMA_UART4_RX          82      /* S_DMA_81 */
- /*----------------------------------------------------------------------------*/
- 
- #define OMAP1_DMA_TOUT_IRQ             (1 << 0)
-
-
-On Fri, Jan 21, 2011@02:30:15PM -0800, Kevin Hilman wrote:
-> Now that omap_hwmod + omap_device is used for OMAP UART device and
-> driver code, we no longer need the UART physical addresses in
-> omap_globals.
-> 
-> Note that the #defines for the base addresses are still left in
-> <plat/serial.h> since they are used by DEBUG_LL and uncompress code.
-> 
-> Build tested for OMAP1 (omap1_defconfig) and OMAP2+ (omap2plus_defconfig)
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Applies on Tony's for-next branch.
-> 
->  arch/arm/mach-omap2/common.c             |   14 --------------
->  arch/arm/plat-omap/include/plat/common.h |    4 ----
->  2 files changed, 0 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-> index d5eaee3..8044c8a 100644
-> --- a/arch/arm/mach-omap2/common.c
-> +++ b/arch/arm/mach-omap2/common.c
-> @@ -50,9 +50,6 @@ static struct omap_globals omap242x_globals = {
->  	.ctrl	= OMAP242X_CTRL_BASE,
->  	.prm	= OMAP2420_PRM_BASE,
->  	.cm	= OMAP2420_CM_BASE,
-> -	.uart1_phys	= OMAP2_UART1_BASE,
-> -	.uart2_phys	= OMAP2_UART2_BASE,
-> -	.uart3_phys	= OMAP2_UART3_BASE,
->  };
->  
->  void __init omap2_set_globals_242x(void)
-> @@ -71,9 +68,6 @@ static struct omap_globals omap243x_globals = {
->  	.ctrl	= OMAP243X_CTRL_BASE,
->  	.prm	= OMAP2430_PRM_BASE,
->  	.cm	= OMAP2430_CM_BASE,
-> -	.uart1_phys	= OMAP2_UART1_BASE,
-> -	.uart2_phys	= OMAP2_UART2_BASE,
-> -	.uart3_phys	= OMAP2_UART3_BASE,
->  };
->  
->  void __init omap2_set_globals_243x(void)
-> @@ -92,10 +86,6 @@ static struct omap_globals omap3_globals = {
->  	.ctrl	= OMAP343X_CTRL_BASE,
->  	.prm	= OMAP3430_PRM_BASE,
->  	.cm	= OMAP3430_CM_BASE,
-> -	.uart1_phys	= OMAP3_UART1_BASE,
-> -	.uart2_phys	= OMAP3_UART2_BASE,
-> -	.uart3_phys	= OMAP3_UART3_BASE,
-> -	.uart4_phys	= OMAP3_UART4_BASE,	/* Only on 3630 */
->  };
->  
->  void __init omap2_set_globals_3xxx(void)
-> @@ -119,10 +109,6 @@ static struct omap_globals omap4_globals = {
->  	.prm	= OMAP4430_PRM_BASE,
->  	.cm	= OMAP4430_CM_BASE,
->  	.cm2	= OMAP4430_CM2_BASE,
-> -	.uart1_phys	= OMAP4_UART1_BASE,
-> -	.uart2_phys	= OMAP4_UART2_BASE,
-> -	.uart3_phys	= OMAP4_UART3_BASE,
-> -	.uart4_phys	= OMAP4_UART4_BASE,
->  };
->  
->  void __init omap2_set_globals_443x(void)
-> diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-> index 29b2afb..1b8095b 100644
-> --- a/arch/arm/plat-omap/include/plat/common.h
-> +++ b/arch/arm/plat-omap/include/plat/common.h
-> @@ -56,10 +56,6 @@ struct omap_globals {
->  	unsigned long   prm;            /* Power and Reset Management */
->  	unsigned long   cm;             /* Clock Management */
->  	unsigned long   cm2;
-> -	unsigned long	uart1_phys;
-> -	unsigned long	uart2_phys;
-> -	unsigned long	uart3_phys;
-> -	unsigned long	uart4_phys;
->  };
->  
->  void omap2_set_globals_242x(void);
-> -- 
-> 1.7.3.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- Hannes
