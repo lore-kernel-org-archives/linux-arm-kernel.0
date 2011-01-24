@@ -1,26 +1,44 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Mon, 24 Jan 2011 10:47:37 -0800
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <20110124175807.GA27427@n2100.arm.linux.org.uk>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<1295544047.9039.609.camel@nimitz>
-	<20110120180146.GH6335@n2100.arm.linux.org.uk>
-	<1295547087.9039.694.camel@nimitz>
-	<20110123180532.GA3509@n2100.arm.linux.org.uk>
-	<1295887937.11047.119.camel@nimitz>
-	<20110124175807.GA27427@n2100.arm.linux.org.uk>
-Message-ID: <1295894857.11047.556.camel@nimitz>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 24 Jan 2011 10:50:53 -0800
+Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
+	suspend
+In-Reply-To: <20110124144142.GA16813@sirena.org.uk>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-21-git-send-email-ccross@android.com>
+	<20110124144142.GA16813@sirena.org.uk>
+Message-ID: <AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-24 at 17:58 +0000, Russell King - ARM Linux wrote:
-> Wrong.  For flatmem, we have a pfn_valid() which is backed by doing a
-> one, two or maybe rarely three compare search of the memblocks.  Short
-> of having a bitmap of every page in the 4GB memory space, you can't
-> get more efficient than that.
+On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Sun, Jan 23, 2011 at 06:01:25PM -0800, Colin Cross wrote:
+>> Adds a SUSPEND_PREPARE notification hook to drop the frequency to
+>> the lowest possible during suspend. ?This prevents the cpufreq driver
+>> from attempting regulator calls after suspend has started - the
+>> regulator api can call into drivers that have already been suspended.
+>
+> Hrm, what's the situation where that happens and why does it cause
+> problems? ?The regulator API doesn't care if suspend is going on, and
+> nor do any of the current drivers for regulators. ?There is an issue
+> with keeping things like I2C alive until the bitter end of suspend so
+> you've got a control bus to the regulators but that's a generic issue
+> which crops up with other subsystems too so a regulator-specific
+> workaround seems dodgy.
 
-Sweet.  So, we can just take the original patch that started this
-conversation, add the requisite pfn_valid()s and pfn_to_page()s, and
-skip the sparsemem #ifdefs.  Right?
+The end result is that the regulator driver calls the i2c driver after
+the i2c driver has been suspended.  On Tegra, this happens because of
+voltage scaling on the CPU regulator, which can be on the i2c bus.  A
+sleep in a suspend handler after the i2c bus has been suspended can
+cause the cpufreq governor to lower the frequency, and try to lower
+the voltage as well.
 
--- Dave
+The problem isn't limited to i2c busses, there are some regulators on
+spi busses.  You would need to ensure that any driver that has a
+regulator consumer suspends before the regulator driver it
+communicates with, and that still wouldn't fix cpufreq, which has a
+sysdev suspend handler.
+
+> The patch itself seems fine, it's just that it feels like there's
+> something else going on.
+>
