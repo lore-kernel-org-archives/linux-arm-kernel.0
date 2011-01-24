@@ -1,37 +1,111 @@
-From: Pawel.Moll@arm.com (Pawel Moll)
-Date: Mon, 24 Jan 2011 19:59:03 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <20110124180944.GK24104@n2100.arm.linux.org.uk>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-	<000001cbbbc2$0e815e80$2b841b80$@moll@arm.com>
-	<20110124133513.GL16202@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
-	<20110124162400.GC24104@n2100.arm.linux.org.uk>
-	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
-	<20110124165356.GG24104@n2100.arm.linux.org.uk>
-	<20110124170304.GH24104@n2100.arm.linux.org.uk>
-	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
-	<20110124180944.GK24104@n2100.arm.linux.org.uk>
-Message-ID: <F01D8B85CFF58440B2A13965FBA90CA45911F432EF@GEORGE.Emea.Arm.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Mon, 24 Jan 2011 21:00:59 +0100 (CET)
+Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
+In-Reply-To: <4D3DD964.9020107@bluewatersys.com>
+References: <1295898922-18822-1-git-send-email-julia@diku.dk>
+	<1295898922-18822-3-git-send-email-julia@diku.dk>
+	<4D3DD964.9020107@bluewatersys.com>
+Message-ID: <Pine.LNX.4.64.1101242058430.3167@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> If you're flooding the system with USB traffic, enlargening the
-> FIFO size won't help.  Making the FIFO larger just decreases the
-> _interrupt_ _latency_ requirements.  It doesn't mean you can
-> cope with the amount of data being transferred.
+On Tue, 25 Jan 2011, Ryan Mallon wrote:
 
-On VE both ISP and MMCI are sharing the same static memory interface, which naturally limit their throughput. The ISP has a limited transfer buffer (about 60kB) and will not start new transfers before there is some space available. And of course USB devices are unable to initiate _any_ transactions on their own, so host can simply stall the bus on its discretion.
+> On 01/25/2011 08:55 AM, Julia Lawall wrote:
+> > Function clk_get, defined just below this code, returns ERR_PTR not NULL in
+> > an error case.
+> > 
+> > The semantic match that finds this problem is as follows:
+> > (http://coccinelle.lip6.fr/)
+> > 
+> > // <smpl>
+> > @r@
+> > identifier f;
+> > @@
+> > f(...) { ... return ERR_PTR(...); }
+> > 
+> > @@
+> > identifier r.f, fld;
+> > expression x;
+> > statement S1,S2;
+> > @@
+> >  x = f(...)
+> >  ... when != IS_ERR(x)
+> > (
+> >  if (IS_ERR(x) ||...) S1 else S2
+> > |
+> > *x->fld
+> > )
+> > // </smpl>
+> 
+> I'm always really impressed by this tool :-).
+> 
+> > 
+> > Signed-off-by: Julia Lawall <julia@diku.dk>
+> > 
+> > ---
+> >  arch/arm/mach-at91/clock.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
+> > index 9113da6..c9ee6d0 100644
+> > --- a/arch/arm/mach-at91/clock.c
+> > +++ b/arch/arm/mach-at91/clock.c
+> > @@ -224,7 +224,7 @@ void __init at91_clock_associate(const char *id, struct device *dev, const char
+> >  {
+> >  	struct clk *clk = clk_get(NULL, id);
+> >  
+> > -	if (!dev || !clk || !IS_ERR(clk_get(dev, func)))
+> > +	if (!dev || IS_ERR(clk) || !IS_ERR(clk_get(dev, func)))
+> >  		return;
+> 
+> I think we want:
+> 
+> 	if (!dev || !clk || IS_ERR(clk) || !IS_ERR(clk_get(dev, func)))
+> 		return;
+> 
+> Since it is valid to return a NULL clk, and we don't want to try and
+> dereference it if that is the case.
 
-In my example, when I'm reading as much data from an USB device as possible, the ISP buffer will be filled at some point and the interrupt asserted. Now the handler will perform its duties. I'm guessing (not sure, I'm just unable to read this code today) it gathers all the received transfers and schedules new descriptors, then return. And now it's the MMC opportunity - if it can "survive", not being starved, till this moment (and, as experiments suggest it's about 1.3ms in the worst case scenario), it has a chance to grab CPU's attention, before the USB transfers are finished and the USB interrupt asserted again. If not that - I'll try to bump up MMC interrupt priority.
+Looking at the given defintion of clk_get, I can't see how that could 
+happen:
 
-But it's all theory right now, just what I'm hoping to achieve, and - will all due respect - it's not your decision whether or not we perform this exercise. And there are virtually no changes to the driver required - all we have to do is to add additional "struct variant_data", so you may not be concerned about horrible driver hacks.
+struct clk *clk_get(struct device *dev, const char *id)
+{
+        struct clk *clk;
 
-Of course you may be absolutely right and we won't succeed to make it much better. But even in this case we should be able to clock the card faster, which will bring performance gain on its own.
+        list_for_each_entry(clk, &clocks, node) {
+                if (strcmp(id, clk->name) == 0)
+                        return clk;
+                if (clk->function && (dev == clk->dev) && strcmp(id, clk->function) == 0)
+                        return clk;
+        }
 
-Good night!
+        return ERR_PTR(-ENOENT);
+}
 
-Pawe?
+Both paths to the non-ERR_PTR return dereference clk.
 
--- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+julia
+
+> We could also probably drop the !IS_ERR(clk_get(dev, func)) check, since
+> as far as I can tell it is just checking to see if the clock is already
+> associated, but there is no harm in re-assigning the same values, and
+> the two assignments in at91_clock_associate are going to be much quicker
+> than the lookup in clk_get.
+> 
+> ~Ryan
+> 
+> -- 
+> Bluewater Systems Ltd - ARM Technology Solution Centre
+> 
+> Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+> ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+> http://www.bluewatersys.com	New Zealand
+> Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+> Fax:   +64 3 3779135			  USA 1800 261 2934
+> --
+> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
