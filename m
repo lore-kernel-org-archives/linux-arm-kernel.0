@@ -1,27 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Jan 2011 11:19:52 -0800
-Subject: [PATCH v4 01/19] ARM: Make the argument to virt_to_phys() "const
-	volatile"
-In-Reply-To: <1295891761-18366-2-git-send-email-catalin.marinas@arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-2-git-send-email-catalin.marinas@arm.com>
-Message-ID: <4D3DD0D8.10905@codeaurora.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 24 Jan 2011 11:31:01 -0800
+Subject: Locking in the clk API
+In-Reply-To: <20110122091525.GA5194@n2100.arm.linux.org.uk>
+References: <201101111016.42819.jeremy.kerr@canonical.com>	<20110111031552.GJ3760@linux-sh.org>
+	<4D3862DB.5000708@fluff.org>	<20110120185617.GI6335@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1101201623480.8580@xanadu.home>	<AANLkTimwBruVgGQWs5NQG7U3PcF6RQHZ6Pd1hjxyGpcA@mail.gmail.com>	<4D3907BD.4040900@codeaurora.org>	<20110121093218.GB13235@n2100.arm.linux.org.uk>	<4D3A38A7.5000807@codeaurora.org>
+	<20110122091525.GA5194@n2100.arm.linux.org.uk>
+Message-ID: <4D3DD375.40504@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2011 09:55 AM, Catalin Marinas wrote:
-> Changing the virt_to_phys() argument to "const volatile void *" avoids
-> compiler warnings in some situations where this function is used.
+On 01/22/2011 01:15 AM, Russell King - ARM Linux wrote:
+> On Fri, Jan 21, 2011 at 05:53:43PM -0800, Saravana Kannan wrote:
+>> On 01/21/2011 01:32 AM, Russell King - ARM Linux wrote:
+>>> On Thu, Jan 20, 2011 at 08:12:45PM -0800, Saravana Kannan wrote:
+>>>> In my opinion, the only major reason for needing atomic clk APIs was due
+>>>> to device_ops->suspend being atomic. Since that's not the case anymore,
+>>>> I really don't see a justification for atomic clocks. Sure, I might have
+>>>> missed some exceptions, but in that case we should make the atomic APIs
+>>>> an exception (add clk_enable_atomic) and not the norm.
+>>>
+>>> The suspend method has never been atomic.  It has always been able to
+>>> sleep.  You're mistaken.
+>>
+>> I distinctly remember trying to do sleeping stuff inside a .suspend
+>> function and have it complain that it's atomic. So, I think you might be
+>> mistaken.
 >
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> ---
+> No I'm not.  I've always had stuff which takes mutexes/semaphores in
+> the suspend method.
+>
+> You'll get the warning if you take a spinlock and then try sleeping -
+> but that's your error for creating an atomic context (you can't sleep
+> while holding a spinlock), not the fault of the callback.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+I'm well aware of the fact that you can't grab a mutex inside a 
+spinlock. Like I said, I will dig into this sometime and get back.
 
-Any chance we can get this one patch into 2.6.38? It fixes a warning for
-MSM.
+-Saravana
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
