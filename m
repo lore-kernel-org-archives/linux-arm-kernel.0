@@ -1,38 +1,32 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 24 Jan 2011 20:05:36 +0100
-Subject: [PATCH] ARM: print FPGA info on plat-versatile variants
-In-Reply-To: <20110124173004.GA27080@n2100.arm.linux.org.uk>
-References: <1287422635-21492-1-git-send-email-linus.walleij@stericsson.com>
-	<20110124173004.GA27080@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTintRdFf0RaK6kEtT-Tsy2NvYPhK43NqcLMnV_bT@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 24 Jan 2011 19:13:27 -0000
+Subject: [PATCH v2] arm: Configure reference clock for Versatile	Express
+	timers
+In-Reply-To: <20110124171007.GI24104@n2100.arm.linux.org.uk>
+References: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
+	<20110124144753.GB22949@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F4328E@GEORGE.Emea.Arm.com>
+	<20110124161453.GB24104@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F432AE@GEORGE.Emea.Arm.com>
+	<20110124171007.GI24104@n2100.arm.linux.org.uk>
+Message-ID: <000601cbbbfa$c83d4db0$58b7e910$@moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Oct 18, 2010 at 07:23:55PM +0200, Linus Walleij wrote:
->> This adds a small piece of code that displays some basic FPGA
->> characteristics for the Integrator, Versatile, RealView and
->> Versatile Express reference platforms, then hooks it into
->> respective platform startup code.
->
-> Firstly, isn't this shown on the character LCD screen at boot, so I wonder
-> what the value of this is.
+> Right, I'm chucking your original patch out of my tree.
 
-Two things: the RealView EB, PB11MPCore, PBA8, PBA9 nor
-the integrator board have the character LCD.
+Ok, I'd like to separate these two things.
 
-Then I've added a driver for the Char LCD so that you loose this
-information if you use the LCD for anything, but yes, it is available
-while booting.
+First is the reference clock configuration, and this change is really important. I'll send v3 in a second, which does not touch the TIMER_CTRL lines. I hope you are happy about this.
 
-> Secondly, with your revised patch, it could really do without adding more
-> non-timer stuff back into the timer initialization function when I've just
-> removed non-timer stuff from it. ?I don't see that there's anything
-> particularly urgent about printing this information, so can't it be a
-> normal initcall?
+The second thing is the SP804 reset... You said:
 
-No problem, this was mainly to get it out as early as possible.
-I'll fix it up.
+> Some platforms have four timers. Should we leave two uninitialized?
 
-Thanks,
-Linus Walleij
+VE _has_ four timers - two dual-timer modules - and you don't initialize V2M_TIMER[23]. True, the (potential) problem lies at "twin timers", sharing common interrupt, but if you want to reset all available timers on all platforms, we should perform the rites on them as well.
+
+I also had a look at the TRM and the reset value for the control register is 0, but I'm guessing you are worried about boot monitor leftovers.
+
+Cheers!
+
+Pawe?
