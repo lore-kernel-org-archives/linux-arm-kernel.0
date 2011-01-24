@@ -1,112 +1,138 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 24 Jan 2011 14:50:19 +0530
-Subject: [PATCH] OMAP: PM: DMA: Enable runtime pm
-Message-ID: <1295860819-20142-1-git-send-email-manjugk@ti.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 24 Jan 2011 01:26:39 -0800
+Subject: [PATCH v2 13/28] ARM: tegra: Add suspend and hotplug support
+In-Reply-To: <20110124090708.GA16202@n2100.arm.linux.org.uk>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-14-git-send-email-ccross@android.com>
+	<20110124090708.GA16202@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimEdkMsv+NERv6E6AyBcAKv9szJBsJYHmFBDnbS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Manjunath G Kondaiah <manjugk@ti.com>
+On Mon, Jan 24, 2011 at 1:07 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 23, 2011 at 06:01:18PM -0800, Colin Cross wrote:
+>> Tegra supports three low power modes that involve powering down the CPU.
+>
+> It is a common misconception that on CPU hot-unplug you need to save the
+> entire universe of the CPU going down.
+>
+> When CPUs are hot-plugged, they reinitialize, which includes resetting
+> most of the CPU state.
 
-Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put
-for OMAP DMA driver.
+The hotplug code path on Tegra currently shares the same path as cpu
+idle, because the CPU ends up in the same state for both.  This
+version of the patch ensures that when the cpu is brought back online,
+it goes through the normal reset vector.  In hotplug, the state ends
+up getting saved on the way down, but not used on the way back up.
 
-Since DMA driver callback will happen from interrupt context and
-DMA client driver will release all DMA resources from interrupt
-context itself, pm_runtime_put_sync() cannot be used in DMA driver.
-Instead, pm_runtime_put() is used which is asynchronous call and
-gets executed in work queue.
+> There is no point saving the user register state, svc register state,
+> abort register state, interrupt register state, undefined mode register
+> state, TTB base registers, TTB control register, memory type remapping
+> registers nor the context register. ?These are all reinitialized when
+> the CPU is brought up again.
 
-Boot tested on OMAP4 blaze and all applicable tests are executed
-along with dma hwmod series.
+The register state is fixed in this version of the patch by calling
+cpu_init() in the resume and idle code.  I'll look again if there is a
+better way of handling the rest of the registers, but this code is
+mostly needed for the suspend and idle cases where the normal boot
+process is not used.
 
-Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
----
-Discussion and alignment for using runtime API's in DMA can be accessed at:
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37819.html
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38355.html
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38391.html
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38400.html
+> VFP state should already be saved - when a CPU is hot-unplugged, we can't
+> leave a threads VFP register set stored in that hardware as it would
+> become inaccessible, so there's no point saving VFP state. ?Recently
+> code was added to invalidate the software VFP state for a CPU being
+> hot-unplugged and reinitialize the VFP hardware on CPU hotplug.
 
- arch/arm/plat-omap/dma.c |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
+Despite what the patch description says, this version of the patch
+does not save VFP state any more.  I will update the description.  It
+looks like if CONFIG_SMP=y, the VFP code saves the VFP context on
+every task switch, so nothing is needed during cpu idle.  However, if
+CONFIG_SMP=n, I think some way to save the VFP context is needed.
 
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index c4b2b47..48ee292 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -35,6 +35,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/delay.h>
-+#include <linux/pm_runtime.h>
- 
- #include <asm/system.h>
- #include <mach/hardware.h>
-@@ -58,6 +59,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
- #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
- 
- static struct omap_system_dma_plat_info *p;
-+static struct platform_device           *pd;
- static struct omap_dma_dev_attr *d;
- 
- static int enable_1510_mode;
-@@ -676,6 +678,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
- 	unsigned long flags;
- 	struct omap_dma_lch *chan;
- 
-+	pm_runtime_get_sync(&pd->dev);
- 	spin_lock_irqsave(&dma_chan_lock, flags);
- 	for (ch = 0; ch < dma_chan_count; ch++) {
- 		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
-@@ -686,6 +689,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
- 	}
- 	if (free_ch == -1) {
- 		spin_unlock_irqrestore(&dma_chan_lock, flags);
-+		pm_runtime_put(&pd->dev);
- 		return -EBUSY;
- 	}
- 	chan = dma_chan + free_ch;
-@@ -779,7 +783,7 @@ void omap_free_dma(int lch)
- 		p->dma_write(0, CCR, lch);
- 		omap_clear_dma(lch);
- 	}
--
-+	pm_runtime_put(&pd->dev);
- 	spin_lock_irqsave(&dma_chan_lock, flags);
- 	dma_chan[lch].dev_id = -1;
- 	dma_chan[lch].next_lch = -1;
-@@ -1979,6 +1983,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+	pd			= pdev;
- 	d			= p->dma_attr;
- 	errata			= p->errata;
- 
-@@ -2000,6 +2005,9 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	pm_runtime_enable(&pd->dev);
-+	pm_runtime_get_sync(&pd->dev);
-+
- 	spin_lock_init(&dma_chan_lock);
- 	for (ch = 0; ch < dma_chan_count; ch++) {
- 		omap_clear_dma(ch);
-@@ -2065,6 +2073,14 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
- 		dma_chan[1].dev_id = 1;
- 	}
- 	p->show_dma_caps();
-+
-+	/*
-+	 * Note: If dma channels are reserved through boot paramters,
-+	 * then dma device is always enabled.
-+	 */
-+	if (!omap_dma_reserve_channels)
-+		pm_runtime_put(&pd->dev);
-+
- 	return 0;
- 
- exit_dma_irq_fail:
--- 
-1.7.1
+> We also have the necessary hooks into the PM code to deal with VFP state
+> saving/restore on PM suspend/resume.
+>
+> The breakpoint/watchdog stuff _should_ be handled by the breakpoint/
+> watchdog code, not by each individual platform. ?Please can you work
+> with Will Deacon if this is not the case to ensure that the breakpoint/
+> watchdog code can handle CPU hotplug.
+
+This version of the patch does not save breakpoint/watchdogs, but
+something will need to save them during idle when the cpu is powered
+down.
+
+> Lastly, L2 cache controller should have suspend/resume support added.
+
+Patch 4 in this series improves the L2 controller's PM support, and
+this patch uses l2x0_disable, l2x0_enable, and l2x0_init.
+
+> We _really_ need to stop having platforms manually saving lots of CPU
+> state for suspend/hot unplug.
+>
+> That should reduce the amount of state you're saving down to something
+> more manageable.
+>
+>> +
+>> +#ifdef CONFIG_HOTPLUG_CPU
+>> +
+>> +int platform_cpu_kill(unsigned int cpu)
+>> +{
+>> + ? ? unsigned int reg;
+>> +
+>> + ? ? do {
+>> + ? ? ? ? ? ? reg = readl(CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET);
+>> + ? ? ? ? ? ? cpu_relax();
+>> + ? ? } while (!(reg & (1<<cpu)));
+>> +
+>> + ? ? spin_lock(&boot_lock);
+>> + ? ? reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
+>> + ? ? writel(reg | (1<<(8+cpu)), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
+>> + ? ? spin_unlock(&boot_lock);
+>> +
+>> + ? ? return 1;
+>> +}
+>> +
+>> +void platform_cpu_die(unsigned int cpu)
+>> +{
+>> +#ifdef DEBUG
+>> + ? ? unsigned int this_cpu = hard_smp_processor_id();
+>> +
+>> + ? ? if (cpu != this_cpu) {
+>> + ? ? ? ? ? ? printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ?this_cpu, cpu);
+>> + ? ? ? ? ? ? BUG();
+>> + ? ? }
+>> +#endif
+>> +
+>> + ? ? gic_cpu_exit(0);
+>> + ? ? barrier();
+>> + ? ? flush_cache_all();
+>> + ? ? barrier();
+>> + ? ? __cortex_a9_save(0);
+>> +
+>> + ? ? /*
+>> + ? ? ?* __cortex_a9_save can return through __cortex_a9_restore, but that
+>> + ? ? ?* should never happen for a hotplugged cpu
+>> + ? ? ?*/
+>> + ? ? BUG();
+>> +}
+>> +
+>> +int platform_cpu_disable(unsigned int cpu)
+>> +{
+>> + ? ? /*
+>> + ? ? ?* we don't allow CPU 0 to be shutdown (it is still too special
+>> + ? ? ?* e.g. clock tick interrupts)
+>> + ? ? ?*/
+>> + ? ? if (unlikely(!tegra_context_area))
+>> + ? ? ? ? ? ? return -ENXIO;
+>> +
+>> + ? ? return cpu == 0 ? -EPERM : 0;
+>> +}
+>> +#endif
+>
+> Please leave this in hotplug.c so that it matches what other platforms
+> do. ?Otherwise it's likely to be missed by any updates that happen
+> architecture-wide.
+
+Will do
