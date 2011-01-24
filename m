@@ -1,140 +1,94 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 24 Jan 2011 13:43:31 -0800
-Subject: [PATCH] OMAP: PM: DMA: Enable runtime pm
-In-Reply-To: <1295860819-20142-1-git-send-email-manjugk@ti.com> (Manjunath
-	Kondaiah G.'s message of "Mon, 24 Jan 2011 14:50:19 +0530")
-References: <1295860819-20142-1-git-send-email-manjugk@ti.com>
-Message-ID: <87d3nm7zb0.fsf@ti.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 25 Jan 2011 10:51:38 +1300
+Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
+In-Reply-To: <Pine.LNX.4.64.1101242231240.3167@ask.diku.dk>
+References: <1295898922-18822-1-git-send-email-julia@diku.dk>
+	<1295898922-18822-3-git-send-email-julia@diku.dk>
+	<4D3DD964.9020107@bluewatersys.com>
+	<Pine.LNX.4.64.1101242058430.3167@ask.diku.dk>
+	<20110124200515.GA30963@albatros>
+	<4D3DDD07.1030809@bluewatersys.com>
+	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
+	<4D3DE35B.1030102@bluewatersys.com>
+	<Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
+	<4D3DE9CD.2040800@bluewatersys.com>
+	<Pine.LNX.4.64.1101242231240.3167@ask.diku.dk>
+Message-ID: <4D3DF46A.1030009@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+On 01/25/2011 10:31 AM, Julia Lawall wrote:
+> On Tue, 25 Jan 2011, Ryan Mallon wrote:
+> 
+>> On 01/25/2011 10:01 AM, Julia Lawall wrote:
+>>> On Tue, 25 Jan 2011, Ryan Mallon wrote:
+>>>
+>>>> On 01/25/2011 09:28 AM, Julia Lawall wrote:
+>>>>>> Julia is correct. Some architectures can return NULL from clk_get, but I
+>>>>>> didn't check the at91 before posting :-/. If we can't return NULL from
+>>>>>> clk_get then we shouldn't bother checking for it. I do think we should
+>>>>>> drop the !IS_ERR(clk_get(dev, func)) check though.
+>>>>>
+>>>>> It seems a bit subtle, because the clk manipulated by clk_get in the call 
+>>>>> of clk_get(dev, func) is not necessarily the same as the one in 
+>>>>> clock_associate.  But perhaps this is the only possibility in practice?
+>>>>
+>>>> Not sure I follow. The at91 clk_get does not modify the clk. In
+>>>> at91_clock_associate we have:
+>>>>
+>>>> 	clk->function = func;
+>>>> 	clk->dev = dev;
+>>>>
+>>>> and in clk_get we have:
+>>>>
+>>>> 	if (clk->function && (dev == clk->dev) &&
+>>>> 		strcmp(id, clk->function) == 0)
+>>>>             return clk;
+>>>>
+>>>> So at91_clock_associate sets the function for a clock, and clk_get
+>>>> returns clocks based on the function association if the name lookup
+>>>> fails. The only caveat to this is that the the clock function name
+>>>> (clk->function) is not the same as any others clock's clk->name.
+>>>
+>>> Right, that was what I was worried about.  That one would find the same 
+>>> information already present but somewhere else.  But perhaps it can't 
+>>> happen, or it doesn't matter if it does?
+>>
+>> I think that users are expected to ensure that clock names and clock
+>> function names do not overlap.
+> 
+> One can't have a clock with a different name but the same device and 
+> function?
 
-> From: Manjunath G Kondaiah <manjugk@ti.com>
->
-> Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put
-> for OMAP DMA driver.
->
-> Since DMA driver callback will happen from interrupt context and
-> DMA client driver will release all DMA resources from interrupt
-> context itself, pm_runtime_put_sync() cannot be used in DMA driver.
-> Instead, pm_runtime_put() is used which is asynchronous call and
-> gets executed in work queue.
+You could, but it would not be helpful. Clock associations are used so
+that _different_ devices can have the same function and map to the
+correct clock. This is used when there are multiple instances of a
+single peripheral. For example, the uart clocks work like this:
 
-It's fine that the asynchronous version of put is uses (it's actually
-preferred.)  However, the description is confusing here.  You talk about
-driver callbacks here but in the patch, your calling _put() from
-omap_dma_free(), not from the callback.
+	at91_clock_associate("usart1_clk", &pdev->dev, "usart");
 
-You're also calling _get() from the request.  That means, as long as the
-DMA channel is allocated, it will be active.   
+so then you can do this in a driver:
+	
+	uart_clk = clk_get(&pdev->dev, "usart");
 
-Wouldn't it be better to do the 'get' when the channel is started and
-the 'put' when the callback has finished, possibly using the
-'autosuspend' feature with a timeout so that back-to-back DMA transfers
-will not have have additional latency between transfers?
+Rather than:
 
-> Boot tested on OMAP4 blaze and all applicable tests are executed
-> along with dma hwmod series.
+	uart_clk = clk_get(NULL, "usart1_clk");
 
-Any OMAP2 or OMAP3 testing?
+The former will find the correct uart clock for the device. Because each
+uart is a separate device the correct clock will be selected for each uart.
+	
+My point was that there should be no overlap between clk->name and
+clk->function otherwise clk_get will not be able to return the correct
+clock.
 
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> ---
-> Discussion and alignment for using runtime API's in DMA can be accessed at:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37819.html
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38355.html
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38391.html
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38400.html
->
->  arch/arm/plat-omap/dma.c |   18 +++++++++++++++++-
->  1 files changed, 17 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> index c4b2b47..48ee292 100644
-> --- a/arch/arm/plat-omap/dma.c
-> +++ b/arch/arm/plat-omap/dma.c
-> @@ -35,6 +35,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> +#include <linux/pm_runtime.h>
->  
->  #include <asm/system.h>
->  #include <mach/hardware.h>
-> @@ -58,6 +59,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
->  #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
->  
->  static struct omap_system_dma_plat_info *p;
-> +static struct platform_device           *pd;
->  static struct omap_dma_dev_attr *d;
->  
->  static int enable_1510_mode;
-> @@ -676,6 +678,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->  	unsigned long flags;
->  	struct omap_dma_lch *chan;
->  
-> +	pm_runtime_get_sync(&pd->dev);
->  	spin_lock_irqsave(&dma_chan_lock, flags);
->  	for (ch = 0; ch < dma_chan_count; ch++) {
->  		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
-> @@ -686,6 +689,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->  	}
->  	if (free_ch == -1) {
->  		spin_unlock_irqrestore(&dma_chan_lock, flags);
-> +		pm_runtime_put(&pd->dev);
->  		return -EBUSY;
->  	}
->  	chan = dma_chan + free_ch;
-> @@ -779,7 +783,7 @@ void omap_free_dma(int lch)
->  		p->dma_write(0, CCR, lch);
->  		omap_clear_dma(lch);
->  	}
-> -
-> +	pm_runtime_put(&pd->dev);
->  	spin_lock_irqsave(&dma_chan_lock, flags);
->  	dma_chan[lch].dev_id = -1;
->  	dma_chan[lch].next_lch = -1;
-> @@ -1979,6 +1983,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> +	pd			= pdev;
+~Ryan
 
-minor: platform_device pointers are more commonly named pdev
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
->  	d			= p->dma_attr;
->  	errata			= p->errata;
->  
-> @@ -2000,6 +2005,9 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	pm_runtime_enable(&pd->dev);
-> +	pm_runtime_get_sync(&pd->dev);
-> +
->  	spin_lock_init(&dma_chan_lock);
->  	for (ch = 0; ch < dma_chan_count; ch++) {
->  		omap_clear_dma(ch);
-> @@ -2065,6 +2073,14 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		dma_chan[1].dev_id = 1;
->  	}
->  	p->show_dma_caps();
-> +
-> +	/*
-> +	 * Note: If dma channels are reserved through boot paramters,
-> +	 * then dma device is always enabled.
-> +	 */
-> +	if (!omap_dma_reserve_channels)
-> +		pm_runtime_put(&pd->dev);
-> +
-
-Readability would be improved if there was an unconditional
-pm_runtime_put() at the end of this function preceeded by an extra
-pm_runtime_get() (async version) if reserve_channels has been used.
-
-Kevin
-
->  	return 0;
->  
->  exit_dma_irq_fail:
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
