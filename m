@@ -1,83 +1,71 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 24 Jan 2011 12:52:51 -0800
-Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
-	suspend
-In-Reply-To: <20110124202610.GJ29925@opensource.wolfsonmicro.com>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-21-git-send-email-ccross@android.com>
-	<20110124144142.GA16813@sirena.org.uk>
-	<AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
-	<20110124193539.GI29925@opensource.wolfsonmicro.com>
-	<AANLkTikOEm=watbA1G-SFK3PZrntDc+Wun84nGio=YKv@mail.gmail.com>
-	<20110124202610.GJ29925@opensource.wolfsonmicro.com>
-Message-ID: <AANLkTinY5mJtC2fiV1iBnPbgwH9v3AmQQ7RR3pYJVACL@mail.gmail.com>
+From: julia@diku.dk (Julia Lawall)
+Date: Mon, 24 Jan 2011 22:01:46 +0100 (CET)
+Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
+In-Reply-To: <4D3DE35B.1030102@bluewatersys.com>
+References: <1295898922-18822-1-git-send-email-julia@diku.dk>
+	<1295898922-18822-3-git-send-email-julia@diku.dk>
+	<4D3DD964.9020107@bluewatersys.com>
+	<Pine.LNX.4.64.1101242058430.3167@ask.diku.dk>
+	<20110124200515.GA30963@albatros>
+	<4D3DDD07.1030809@bluewatersys.com>
+	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
+	<4D3DE35B.1030102@bluewatersys.com>
+Message-ID: <Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 12:26 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jan 24, 2011 at 11:52:12AM -0800, Colin Cross wrote:
->
->> Even _noirq isn't late enough, if cpufreq keeps trying to change the
->> frequency (and thus voltage) until sysdev suspend.
->
-> If it were just cpufreq in isolation I'm not sure it'd be a big deal -
-> nothing will go hideously wrong if it's ticking away by itself providing
-> it's just governors working away providing the error handling is OK.
-> However...
->
->> On Mon, Jan 24, 2011 at 11:35 AM, Mark Brown
->
->> > So you actively need to push the processor into low power mode during
->> > suspend? ?I'm still not 100% clear what's triggering the issues you're
->
->> It's more of a voltage scaling issue than a cpufreq issue directly.
->> Tegra requires the voltage be set to nominal during resume, and the
->> only time it can be set for resume is before I2C suspends. ?I handle
->> the problem with a suspend notifier in the latest version of the clock
->> voltage scaling patches, but I kept this patch to avoid cpufreq trying
->> to go to frequencies that are not supported by the suspend voltage.
->
-> ...it sounds like you do actually have something of the above issue -
-> but I think it's a generic-ish problem. ?See below.
->
->> > Typically this stuff isn't a problem for regulators themselves since if
->> > they're active by the time I2C is off they normally get suspended by
->> > hardware handshakes from the CPU as that enters low power mode - right
->> > now we have no regulators at all in mainline that do anything in
->> > software on suspend. ?We can get a long way by just ignoring what
->> > happens to regulators over suspend (there is some work to do here but
->> > it's orthogonal to this sort of issue).
->
->> The regulator driver itself has nothing to do, and when the CPU enters
->> its lowest power mode it signals the regulator to turn off, but
->> something needs to tell the regulator to go to the correct voltage.
->
-> Normally that's handled by the same transition logic - the core PMIC
-> will usually sequence a bunch of voltage and power status changes when
-> entering its own low power mode and have a similar transition on resume
-> which will ensure that the regulators power back up with a sane setup
-> regardless of the state they were in beforehand.
+On Tue, 25 Jan 2011, Ryan Mallon wrote:
 
-I believe Tegra supports this mode, where the Tegra PMC can master the
-I2C bus to control an external PMIC during resume, but I've never seen
-it used.
+> On 01/25/2011 09:28 AM, Julia Lawall wrote:
+> >> Julia is correct. Some architectures can return NULL from clk_get, but I
+> >> didn't check the at91 before posting :-/. If we can't return NULL from
+> >> clk_get then we shouldn't bother checking for it. I do think we should
+> >> drop the !IS_ERR(clk_get(dev, func)) check though.
+> > 
+> > It seems a bit subtle, because the clk manipulated by clk_get in the call 
+> > of clk_get(dev, func) is not necessarily the same as the one in 
+> > clock_associate.  But perhaps this is the only possibility in practice?
+> 
+> Not sure I follow. The at91 clk_get does not modify the clk. In
+> at91_clock_associate we have:
+> 
+> 	clk->function = func;
+> 	clk->dev = dev;
+> 
+> and in clk_get we have:
+> 
+> 	if (clk->function && (dev == clk->dev) &&
+> 		strcmp(id, clk->function) == 0)
+>             return clk;
+> 
+> So at91_clock_associate sets the function for a clock, and clk_get
+> returns clocks based on the function association if the name lookup
+> fails. The only caveat to this is that the the clock function name
+> (clk->function) is not the same as any others clock's clk->name.
 
-> It sounds like for your systems what's happening is that the resume is
-> restoring the previously configured voltages for the core rails rather
-> than going to a known good state. ?Is my understanding correct here?
-> While your fix is good and I don't see any reason not to do it this does
-> sound like something we should have a solution for in common code as I'd
-> not be surprised if there were other hardware out there which did a
-> similar thing.
+Right, that was what I was worried about.  That one would find the same 
+information already present but somewhere else.  But perhaps it can't 
+happen, or it doesn't matter if it does?
 
-Yes - the core can be connected to a dumb I2C regulator, which the
-core can turn on and off with a request line, but can't control the
-voltage without a regulator driver controlling the I2C bus.
+julia
 
-> Assuming I'm not completely off base with the above it'd be good if you
-> could clarify this in the commit message - there's enough dragons with
-> this stuff and it's common to refer to other implementations so it'd be
-> nice if we had a clear record of the issue in the log.
-
-Will do
+> The !IS_ERR(clk_get(dev, func)) check in at91_clock_associate just
+> appears to check that the clock is not already associated with the given
+> function. We don't really need this check because we are just making the
+> same assignment anyway.
+> 
+> ~Ryan
+> 
+> -- 
+> Bluewater Systems Ltd - ARM Technology Solution Centre
+> 
+> Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+> ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+> http://www.bluewatersys.com	New Zealand
+> Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+> Fax:   +64 3 3779135			  USA 1800 261 2934
+> --
+> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
