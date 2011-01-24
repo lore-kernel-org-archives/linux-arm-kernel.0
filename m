@@ -1,57 +1,38 @@
-From: matejken@gmail.com (Matej Kenda)
-Date: Mon, 24 Jan 2011 19:54:50 +0100
-Subject: [PATCH 1/2] Updated XCEP partition sizes
-In-Reply-To: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
-References: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
-Message-ID: <AANLkTimMniHC==y6majqBGKNBa91J1DpVK8zbnDxEWvy@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 24 Jan 2011 20:05:36 +0100
+Subject: [PATCH] ARM: print FPGA info on plat-versatile variants
+In-Reply-To: <20110124173004.GA27080@n2100.arm.linux.org.uk>
+References: <1287422635-21492-1-git-send-email-linus.walleij@stericsson.com>
+	<20110124173004.GA27080@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTintRdFf0RaK6kEtT-Tsy2NvYPhK43NqcLMnV_bT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-I've sent two simple patches for Iskratel XCEP last week.
-
-Can they be included in the kernel?
-
-TIA,
-
-Matej
-
-On 19 January 2011 13:01, Matej Kenda <matejken@gmail.com> wrote:
-> Increased partition for Linux kernel from 1 MB to 2 MB for
-> monolithically built kernel 2.6.37 for Iskratel XCEP SBC to fit in.
+2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Oct 18, 2010 at 07:23:55PM +0200, Linus Walleij wrote:
+>> This adds a small piece of code that displays some basic FPGA
+>> characteristics for the Integrator, Versatile, RealView and
+>> Versatile Express reference platforms, then hooks it into
+>> respective platform startup code.
 >
-> Signed-off-by: Matej Kenda <matejken@gmail.com>
->
-> ---
->
-> diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
-> index 3260ce7..f7b1052 100644
-> --- a/arch/arm/mach-pxa/xcep.c
-> +++ b/arch/arm/mach-pxa/xcep.c
-> @@ -55,20 +55,20 @@ static struct mtd_partition xcep_partitions[] = {
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Bootloader ENV",
-> ? ? ? ? ? ? ? ?.size = ? ? ? ? 0x00040000,
-> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00040000,
-> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
-> ? ? ? ? ? ? ? ?.mask_flags = ? MTD_WRITEABLE
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Kernel",
-> - ? ? ? ? ? ? ? .size = ? ? ? ? 0x00100000,
-> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00080000,
-> + ? ? ? ? ? ? ? .size = ? ? ? ? 0x00200000,
-> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Rescue fs",
-> ? ? ? ? ? ? ? ?.size = ? ? ? ? 0x00280000,
-> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00180000,
-> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Filesystem",
-> ? ? ? ? ? ? ? ?.size = ? ? ? ? MTDPART_SIZ_FULL,
-> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00400000
-> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND
-> ? ? ? ?}
-> ?};
->
+> Firstly, isn't this shown on the character LCD screen at boot, so I wonder
+> what the value of this is.
+
+Two things: the RealView EB, PB11MPCore, PBA8, PBA9 nor
+the integrator board have the character LCD.
+
+Then I've added a driver for the Char LCD so that you loose this
+information if you use the LCD for anything, but yes, it is available
+while booting.
+
+> Secondly, with your revised patch, it could really do without adding more
+> non-timer stuff back into the timer initialization function when I've just
+> removed non-timer stuff from it. ?I don't see that there's anything
+> particularly urgent about printing this information, so can't it be a
+> normal initcall?
+
+No problem, this was mainly to get it out as early as possible.
+I'll fix it up.
+
+Thanks,
+Linus Walleij
