@@ -1,142 +1,26 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 24 Jan 2011 16:55:02 -0200
-Subject: [PATCH v2] ARM: imx: Add initial support for IMX27IPCAM board
-Message-ID: <1295895302-32636-1-git-send-email-fabio.estevam@freescale.com>
+From: dave@linux.vnet.ibm.com (Dave Hansen)
+Date: Mon, 24 Jan 2011 10:47:37 -0800
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <20110124175807.GA27427@n2100.arm.linux.org.uk>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+	<1295547087.9039.694.camel@nimitz>
+	<20110123180532.GA3509@n2100.arm.linux.org.uk>
+	<1295887937.11047.119.camel@nimitz>
+	<20110124175807.GA27427@n2100.arm.linux.org.uk>
+Message-ID: <1295894857.11047.556.camel@nimitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- remove unneeded include file
- arch/arm/mach-imx/Kconfig                   |    9 +++
- arch/arm/mach-imx/Makefile                  |    1 +
- arch/arm/mach-imx/mach-imx27ipcam.c         |   77 +++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
- 4 files changed, 88 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/mach-imx27ipcam.c
+On Mon, 2011-01-24 at 17:58 +0000, Russell King - ARM Linux wrote:
+> Wrong.  For flatmem, we have a pfn_valid() which is backed by doing a
+> one, two or maybe rarely three compare search of the memblocks.  Short
+> of having a bitmap of every page in the 4GB memory space, you can't
+> get more efficient than that.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 56684b5..c172418 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -300,4 +300,13 @@ config MACH_MXT_TD60
- 	  Include support for i-MXT (aka td60) platform. This
- 	  includes specific configurations for the module and its peripherals.
- 
-+config MACH_IMX27IPCAM
-+	bool "IMX27 IPCAM platform"
-+	select SOC_IMX27
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
-+	select IMX_HAVE_PLATFORM_IMX_UART
-+	help
-+	  Include support for IMX27 IPCAM platform. This includes specific
-+	  configurations for the board and its peripherals.
-+
- endif
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 77100bf..3e49ae0 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -36,3 +36,4 @@ obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
- obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
- obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
- obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
-+obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
-diff --git a/arch/arm/mach-imx/mach-imx27ipcam.c b/arch/arm/mach-imx/mach-imx27ipcam.c
-new file mode 100644
-index 0000000..d099ea6
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx27ipcam.c
-@@ -0,0 +1,77 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * Author: Fabio Estevam <fabio.estevam@freescale.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+#include <mach/hardware.h>
-+#include <mach/common.h>
-+#include <mach/iomux-mx27.h>
-+
-+#include "devices-imx27.h"
-+
-+static const int mx27ipcam_pins[] __initconst = {
-+	/* UART1 */
-+	PE12_PF_UART1_TXD,
-+	PE13_PF_UART1_RXD,
-+	/* FEC */
-+	PD0_AIN_FEC_TXD0,
-+	PD1_AIN_FEC_TXD1,
-+	PD2_AIN_FEC_TXD2,
-+	PD3_AIN_FEC_TXD3,
-+	PD4_AOUT_FEC_RX_ER,
-+	PD5_AOUT_FEC_RXD1,
-+	PD6_AOUT_FEC_RXD2,
-+	PD7_AOUT_FEC_RXD3,
-+	PD8_AF_FEC_MDIO,
-+	PD9_AIN_FEC_MDC,
-+	PD10_AOUT_FEC_CRS,
-+	PD11_AOUT_FEC_TX_CLK,
-+	PD12_AOUT_FEC_RXD0,
-+	PD13_AOUT_FEC_RX_DV,
-+	PD14_AOUT_FEC_RX_CLK,
-+	PD15_AOUT_FEC_COL,
-+	PD16_AIN_FEC_TX_ER,
-+	PF23_AIN_FEC_TX_EN,
-+};
-+
-+static void __init mx27ipcam_init(void)
-+{
-+	mxc_gpio_setup_multiple_pins(mx27ipcam_pins, ARRAY_SIZE(mx27ipcam_pins),
-+		"mx27ipcam");
-+
-+	imx27_add_imx_uart0(NULL);
-+	imx27_add_fec(NULL);
-+	imx27_add_imx2_wdt(NULL);
-+}
-+
-+static void __init mx27ipcam_timer_init(void)
-+{
-+	mx27_clocks_init(25000000);
-+}
-+
-+static struct sys_timer mx27ipcam_timer = {
-+	.init	= mx27ipcam_timer_init,
-+};
-+
-+MACHINE_START(IMX27IPCAM, "Freescale IMX27IPCAM")
-+	/* maintainer: Freescale Semiconductor, Inc. */
-+	.boot_params    = MX27_PHYS_OFFSET + 0x100,
-+	.map_io         = mx27_map_io,
-+	.init_irq       = mx27_init_irq,
-+	.init_machine   = mx27ipcam_init,
-+	.timer          = &mx27ipcam_timer,
-+MACHINE_END
-diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
-index 3a70ebf..2315541 100644
---- a/arch/arm/plat-mxc/include/mach/uncompress.h
-+++ b/arch/arm/plat-mxc/include/mach/uncompress.h
-@@ -83,6 +83,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- 	case MACH_TYPE_MX21ADS:
- 	case MACH_TYPE_PCA100:
- 	case MACH_TYPE_MXT_TD60:
-+	case MACH_TYPE_IMX27IPCAM:
- 		uart_base = MX2X_UART1_BASE_ADDR;
- 		break;
- 	case MACH_TYPE_MX31LITE:
--- 
-1.6.0.4
+Sweet.  So, we can just take the original patch that started this
+conversation, add the requisite pfn_valid()s and pfn_to_page()s, and
+skip the sparsemem #ifdefs.  Right?
+
+-- Dave
