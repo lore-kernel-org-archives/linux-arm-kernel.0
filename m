@@ -1,47 +1,53 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 24 Jan 2011 15:00:57 -0800
-Subject: [PATCH] davinci: da8xx/omap-l1xx: match codec_name with i2c ids
-In-Reply-To: <1295620708.3348.233.camel@odin> (Liam Girdwood's message of
-	"Fri, 21 Jan 2011 14:38:28 +0000")
-References: <1295619896-5498-1-git-send-email-sudhakar.raj@ti.com>
-	<1295620708.3348.233.camel@odin>
-Message-ID: <8739oh6h5i.fsf@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 24 Jan 2011 16:03:34 -0700
+Subject: [PATCH] ep93xx: default multiplexed gpio ports to gpio mode
+Message-ID: <201101241603.34433.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Liam Girdwood <lrg@slimlogic.co.uk> writes:
+The EP93xx C and D GPIO ports are multiplexed with the Keypad Interface
+peripheral. ?At power-up they default into non-GPIO mode with the Key
+Matrix controller enabled so these ports are unusable for GPIO. ?Note
+that the Keypad Interface peripheral is only available in the EP9307,
+EP9312, and EP9315 processor variants.
 
-> On Fri, 2011-01-21 at 19:54 +0530, Rajashekhara, Sudhakar wrote:
->> The codec_name entry for da8xx evm in sound/soc/davinci/davinci-evm.c
->> is not matching with the i2c ids in the board file. Without this fix the
->> soundcard does not get detected on da850/omap-l138/am18x evm.
->> 
->> Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
->> Tested-by: Dan Sharon <dansharon@nanometrics.ca>
->> ---
->> This patch applies to Linus's kernel tree.
->> 
->>  sound/soc/davinci/davinci-evm.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->> 
->> diff --git a/sound/soc/davinci/davinci-evm.c b/sound/soc/davinci/davinci-evm.c
->> index 0c2d6ba..b36f0b3 100644
->> --- a/sound/soc/davinci/davinci-evm.c
->> +++ b/sound/soc/davinci/davinci-evm.c
->> @@ -223,7 +223,7 @@ static struct snd_soc_dai_link da8xx_evm_dai = {
->>  	.stream_name = "AIC3X",
->>  	.cpu_dai_name= "davinci-mcasp.0",
->>  	.codec_dai_name = "tlv320aic3x-hifi",
->> -	.codec_name = "tlv320aic3x-codec.0-001a",
->> +	.codec_name = "tlv320aic3x-codec.1-0018",
->>  	.platform_name = "davinci-pcm-audio",
->>  	.init = evm_aic3x_init,
->>  	.ops = &evm_ops,
->
-> Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+The keypad support will clear the DeviceConfig bits appropriately to
+enable the Keypad Interface when the driver is loaded. ?And, when the
+driver is unloaded it will set the bits to return the ports to GPIO mode.
 
-Liam,
+To make these ports available for GPIO after power-up on all EP93xx
+processor variants, set the KEYS and GONK bits in the DeviceConfig
+register.
 
-I'm assuming you'll merge this one via the ASoC tree?
+Similarly, the E, G, and H ports are multiplexed with the IDE Interface
+peripheral. ?At power-up these also default into non-GPIO mode. ?Note
+that the IDE peripheral is only available in the EP9312 and EP9315
+processor variants.
 
-Kevin
+Since an IDE driver is not even available in mainline, set the EONIDE,
+GONIDE, and HONIDE bits in the DeviceConfig register so that these
+ports will be available for GPIO use after power-up.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+
+---
+
+diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
+index f3dc76f..bec34b8 100644
+--- a/arch/arm/mach-ep93xx/gpio.c
++++ b/arch/arm/mach-ep93xx/gpio.c
+@@ -427,6 +427,13 @@ void __init ep93xx_gpio_init(void)
+?{
+????????int i;
+?
++???????/* Set Ports C, D, E, G, and H for GPIO use */
++???????ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
++??????????????????????????????? EP93XX_SYSCON_DEVCFG_GONK |
++??????????????????????????????? EP93XX_SYSCON_DEVCFG_EONIDE |
++??????????????????????????????? EP93XX_SYSCON_DEVCFG_GONIDE |
++??????????????????????????????? EP93XX_SYSCON_DEVCFG_HONIDE);
++
+????????for (i = 0; i < ARRAY_SIZE(ep93xx_gpio_banks); i++)
+????????????????gpiochip_add(&ep93xx_gpio_banks[i].chip);
+?}
