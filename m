@@ -1,13 +1,13 @@
 From: julia@diku.dk (Julia Lawall)
-Date: Mon, 24 Jan 2011 20:55:20 +0100
-Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
+Date: Mon, 24 Jan 2011 20:55:22 +0100
+Subject: [PATCH 4/4] arch/arm/mach-omap2/smartreflex.c: Add missing IS_ERR test
 In-Reply-To: <1295898922-18822-1-git-send-email-julia@diku.dk>
 References: <1295898922-18822-1-git-send-email-julia@diku.dk>
-Message-ID: <1295898922-18822-3-git-send-email-julia@diku.dk>
+Message-ID: <1295898922-18822-5-git-send-email-julia@diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function clk_get, defined just below this code, returns ERR_PTR not NULL in
+Function _sr_lookup, defined in the same file, returns ERR_PTR not NULL in
 an error case.
 
 The semantic match that finds this problem is as follows:
@@ -36,19 +36,19 @@ statement S1,S2;
 Signed-off-by: Julia Lawall <julia@diku.dk>
 
 ---
- arch/arm/mach-at91/clock.c |    2 +-
+ arch/arm/mach-omap2/smartreflex.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-at91/clock.c b/arch/arm/mach-at91/clock.c
-index 9113da6..c9ee6d0 100644
---- a/arch/arm/mach-at91/clock.c
-+++ b/arch/arm/mach-at91/clock.c
-@@ -224,7 +224,7 @@ void __init at91_clock_associate(const char *id, struct device *dev, const char
- {
- 	struct clk *clk = clk_get(NULL, id);
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index 77ecebf..d7deadf 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -966,7 +966,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+ 	}
  
--	if (!dev || !clk || !IS_ERR(clk_get(dev, func)))
-+	if (!dev || IS_ERR(clk) || !IS_ERR(clk_get(dev, func)))
- 		return;
- 
- 	clk->function = func;
+ 	sr_info = _sr_lookup(pdata->voltdm);
+-	if (!sr_info) {
++	if (IS_ERR(sr_info)) {
+ 		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
+ 			__func__);
+ 		return -EINVAL;
