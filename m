@@ -1,35 +1,75 @@
-From: j.sixt@viscovery.net (Johannes Sixt)
-Date: Mon, 24 Jan 2011 08:21:09 +0100
-Subject: cannot fetch arm git tree
-In-Reply-To: <20110121145025.GS13235@n2100.arm.linux.org.uk>
-References: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
-	<20110116092315.GA27542@n2100.arm.linux.org.uk>
-	<20110116110819.GG6917@pengutronix.de>
-	<AANLkTinrZ0GnT71GCueUUpAXM5ckq+LBd0RjA51DMR-a@mail.gmail.com>
-	<20110116134248.GD27542@n2100.arm.linux.org.uk>
-	<4D398C43.1000306@vollmann.ch>
-	<20110121134728.GO14956@pengutronix.de>
-	<20110121135725.GR13235@n2100.arm.linux.org.uk>
-	<4D3997FE.5030109@vollmann.ch>
-	<20110121145025.GS13235@n2100.arm.linux.org.uk>
-Message-ID: <4D3D2865.4020408@viscovery.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 24 Jan 2011 08:27:31 +0100
+Subject: [PATCH 1/3] ARM i.MX28: fix bit operation
+In-Reply-To: <20110124092923.GB2625@S2100-06.ap.freescale.net>
+References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
+	<1295607474-6559-2-git-send-email-s.hauer@pengutronix.de>
+	<20110124092923.GB2625@S2100-06.ap.freescale.net>
+Message-ID: <20110124072731.GH9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 1/21/2011 15:50, schrieb Russell King - ARM Linux:
->  SetEnv GIT_PROJECT_ROOT /var/www/git
->  SetEnv GIT_HTTP_EXPORT_ALL
->  ScriptAlias /git/ /usr/libexec/git-core/git-http-backend/
+On Mon, Jan 24, 2011 at 05:29:28PM +0800, Shawn Guo wrote:
+> Hi Sascha,
 > 
-> Great.  Deciding that it will be http://servername.example.com/git/ is
-> really damned annoying as that's traditionally where gitweb lives,
-> which requires a different script alias.
-> ...
-> I'm really not interested in working out how to bodge this into working
-> along side the existing gitweb setup by adding lots of rewrite rules,...
+> On Fri, Jan 21, 2011 at 11:57:52AM +0100, Sascha Hauer wrote:
+> > reg | (1 << clk->enable_shift) always evaluates to true. Switch it
+> > to & which makes much more sense
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  arch/arm/mach-mxs/clock-mx28.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> > index 56312c0..4146b38 100644
+> > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > @@ -355,7 +355,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+> >  	} else {							\
+> >  		reg &= ~BM_CLKCTRL_##dr##_DIV;				\
+> >  		reg |= div << BP_CLKCTRL_##dr##_DIV;			\
+> > -		if (reg | (1 << clk->enable_shift)) {			\
+> > +		if (reg & (1 << clk->enable_shift)) {			\
+> >  			pr_err("%s: clock is gated\n", __func__);	\
+> >  			return -EINVAL;					\
+> >  		}							\
+> > -- 
+> > 1.7.2.3
+> > 
+> > 
+> Would you mind fixing the same issue in clock-mx23.c name##_set_rate()?
+>
 
-It has been worked out for you already. It's just a single rule (although
-a bit longish). Look for 'ScriptAliasMatch' in
-http://www.kernel.org/pub/software/scm/git/docs/git-http-backend.html
+No, here it is:
 
--- Hannes
+8<---------------------------
+
+[PATCH] ARM i.MX23: use correct register for setting the rate
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mxs/clock-mx23.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index b1a362e..7206924 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -304,7 +304,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
+ 	reg &= ~BM_CLKCTRL_##dr##_DIV;					\
+ 	reg |= div << BP_CLKCTRL_##dr##_DIV;				\
+-	if (reg | (1 << clk->enable_shift)) {				\
++	if (reg & (1 << clk->enable_shift)) {				\
+ 		pr_err("%s: clock is gated\n", __func__);		\
+ 		return -EINVAL;						\
+ 	}								\
+-- 
+1.7.2.3
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
