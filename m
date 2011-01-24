@@ -1,192 +1,122 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Jan 2011 17:55:53 +0000
-Subject: [PATCH v4 11/19] ARM: LPAE: Add fault handling support
+Date: Mon, 24 Jan 2011 17:55:55 +0000
+Subject: [PATCH v4 13/19] ARM: LPAE: Add identity mapping support for the
+	3-level page table format
 In-Reply-To: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1295891761-18366-12-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1295891761-18366-14-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DFSR and IFSR register format is different when LPAE is enabled. In
-addition, DFSR and IFSR have the similar definitions for the fault type.
-This modifies modifies the fault code to correctly handle the new
-format.
+With LPAE, the pgd is a separate page table with entries pointing to the
+pmd. The identity_mapping_add() function needs to ensure that the pgd is
+populated before populating the pmd level. The do..while blocks now loop
+over the pmd in order to have the same implementation for the two page
+table formats. The pmd_addr_end() definition has been removed and the
+generic one used instead. The pmd clean-up is done in the pgd_free()
+function.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/alignment.c |    8 ++++-
- arch/arm/mm/fault.c     |   80 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 87 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/pgtable.h |    4 ----
+ arch/arm/mm/idmap.c            |   39 ++++++++++++++++++++++++++++-----------
+ 2 files changed, 28 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index 724ba3b..bc98a6e 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -906,6 +906,12 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 	return 0;
- }
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index a833701..40b21c1 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -257,10 +257,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
  
-+#ifdef CONFIG_ARM_LPAE
-+#define ALIGNMENT_FAULT		33
-+#else
-+#define ALIGNMENT_FAULT		1
-+#endif
+ #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+-/* we don't need complex calculations here as the pmd is folded into the pgd */
+-#define pmd_addr_end(addr,end)	(end)
+-
+-
+ #ifndef CONFIG_HIGHPTE
+ #define __pte_map(pmd)		pmd_page_vaddr(*(pmd))
+ #define __pte_unmap(pte)	do { } while (0)
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 5729944..dffc7a2 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -1,3 +1,5 @@
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 +
- /*
-  * This needs to be done after sysctl_init, otherwise sys/ will be
-  * overwritten.  Actually, this shouldn't be in sys/ at all since
-@@ -939,7 +945,7 @@ static int __init alignment_init(void)
- 		ai_usermode = UM_FIXUP;
- 	}
+ #include <linux/kernel.h>
  
--	hook_fault_code(1, do_alignment, SIGBUS, BUS_ADRALN,
-+	hook_fault_code(ALIGNMENT_FAULT, do_alignment, SIGBUS, BUS_ADRALN,
- 			"alignment exception");
- 
- 	/*
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index ef0e24f..350eb0a 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -33,10 +33,15 @@
- #define FSR_WRITE		(1 << 11)
- #define FSR_FS4			(1 << 10)
- #define FSR_FS3_0		(15)
-+#define FSR_FS5_0		(0x3f)
- 
- static inline int fsr_fs(unsigned int fsr)
+ #include <asm/cputype.h>
+@@ -7,12 +9,25 @@
+ static void idmap_add_pmd(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	unsigned long prot)
  {
-+#ifdef CONFIG_ARM_LPAE
-+	return fsr & FSR_FS5_0;
-+#else
- 	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
-+#endif
- }
+-	pmd_t *pmd = pmd_offset(pgd, addr);
++	pmd_t *pmd;
++
++	if (pgd_none_or_clear_bad(pgd) || (pgd_val(*pgd) & L_PGD_SWAPPER)) {
++		pmd = pmd_alloc_one(NULL, addr);
++		if (!pmd) {
++			pr_warning("Failed to allocate identity pmd.\n");
++			return;
++		}
++		pgd_populate(NULL, pgd, pmd);
++		pmd += pmd_index(addr);
++	} else
++		pmd = pmd_offset(pgd, addr);
  
- #ifdef CONFIG_MMU
-@@ -109,8 +114,10 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 
- 		pte = pte_offset_map(pmd, addr);
- 		printk(", *pte=%08llx", (long long)pte_val(*pte));
+ 	addr = (addr & PMD_MASK) | prot;
+ 	pmd[0] = __pmd(addr);
 +#ifndef CONFIG_ARM_LPAE
- 		printk(", *ppte=%08llx",
- 		       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
+ 	addr += SECTION_SIZE;
+ 	pmd[1] = __pmd(addr);
 +#endif
- 		pte_unmap(pte);
- 	} while(0);
- 
-@@ -469,6 +476,72 @@ static struct fsr_info {
- 	int	code;
- 	const char *name;
- } fsr_info[] = {
-+#ifdef CONFIG_ARM_LPAE
-+	{ do_bad,		SIGBUS,  0,		"unknown 0"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 1"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 2"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 3"			},
-+	{ do_bad,		SIGBUS,  0,		"reserved translation fault"	},
-+	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
-+	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
-+	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
-+	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
-+	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
-+	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
-+	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
-+	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
-+	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
-+	{ do_sect_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
-+	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
-+	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
-+	{ do_bad,		SIGBUS,  0,		"asynchronous external abort"	},
-+	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
-+	{ do_bad,		SIGBUS,  0,		"asynchronous parity error"	},
-+	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
-+	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
-+	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
-+	{ do_bad,		SIGBUS,  0,		"debug event"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 37"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 38"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 39"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 40"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 41"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 42"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 43"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 44"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 48"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 49"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 50"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 51"			},
-+	{ do_bad,		SIGBUS,  0,		"implementation fault (lockdown abort)" },
-+	{ do_bad,		SIGBUS,  0,		"unknown 53"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 54"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 55"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 56"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 57"			},
-+	{ do_bad,		SIGBUS,  0,		"implementation fault (coprocessor abort)" },
-+	{ do_bad,		SIGBUS,  0,		"unknown 59"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 60"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 61"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 62"			},
-+	{ do_bad,		SIGBUS,  0,		"unknown 63"			},
-+#else	/* !CONFIG_ARM_LPAE */
- 	/*
- 	 * The following are the standard ARMv3 and ARMv4 aborts.  ARMv5
- 	 * defines these to be "precise" aborts.
-@@ -510,6 +583,7 @@ static struct fsr_info {
- 	{ do_bad,		SIGBUS,  0,		"unknown 29"			   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   }
-+#endif	/* CONFIG_ARM_LPAE */
- };
- 
- void __init
-@@ -548,6 +622,9 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	flush_pmd_entry(pmd);
  }
  
- 
-+#ifdef CONFIG_ARM_LPAE
-+#define ifsr_info	fsr_info
-+#else	/* !CONFIG_ARM_LPAE */
- static struct fsr_info ifsr_info[] = {
- 	{ do_bad,		SIGBUS,  0,		"unknown 0"			   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 1"			   },
-@@ -582,6 +659,7 @@ static struct fsr_info ifsr_info[] = {
- 	{ do_bad,		SIGBUS,  0,		"unknown 30"			   },
- 	{ do_bad,		SIGBUS,  0,		"unknown 31"			   },
- };
-+#endif	/* CONFIG_ARM_LPAE */
- 
- void __init
- hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int, struct pt_regs *),
-@@ -617,6 +695,7 @@ do_PrefetchAbort(unsigned long addr, unsigned int ifsr, struct pt_regs *regs)
- 
- static int __init exceptions_init(void)
+@@ -20,21 +35,24 @@ void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
  {
-+#ifndef CONFIG_ARM_LPAE
- 	if (cpu_architecture() >= CPU_ARCH_ARMv6) {
- 		hook_fault_code(4, do_translation_fault, SIGSEGV, SEGV_MAPERR,
- 				"I-cache maintenance fault");
-@@ -632,6 +711,7 @@ static int __init exceptions_init(void)
- 		hook_fault_code(6, do_bad, SIGSEGV, SEGV_MAPERR,
- 				"section access flag fault");
- 	}
-+#endif
+ 	unsigned long prot, next;
  
- 	return 0;
+-	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE;
++	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
+ 	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+ 		prot |= PMD_BIT4;
+ 
+-	pgd += pgd_index(addr);
+ 	do {
+-		next = pgd_addr_end(addr, end);
+-		idmap_add_pmd(pgd, addr, next, prot);
+-	} while (pgd++, addr = next, addr != end);
++		next = pmd_addr_end(addr, end);
++		idmap_add_pmd(pgd + pgd_index(addr), addr, next, prot);
++	} while (addr = next, addr < end);
  }
+ 
+ #ifdef CONFIG_SMP
+ static void idmap_del_pmd(pgd_t *pgd, unsigned long addr, unsigned long end)
+ {
+-	pmd_t *pmd = pmd_offset(pgd, addr);
++	pmd_t *pmd;
++
++	if (pgd_none_or_clear_bad(pgd))
++		return;
++	pmd = pmd_offset(pgd, addr);
+ 	pmd_clear(pmd);
+ }
+ 
+@@ -42,11 +60,10 @@ void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end)
+ {
+ 	unsigned long next;
+ 
+-	pgd += pgd_index(addr);
+ 	do {
+-		next = pgd_addr_end(addr, end);
+-		idmap_del_pmd(pgd, addr, next);
+-	} while (pgd++, addr = next, addr != end);
++		next = pmd_addr_end(addr, end);
++		idmap_del_pmd(pgd + pgd_index(addr), addr, next);
++	} while (addr = next, addr < end);
+ }
+ #endif
+ 
