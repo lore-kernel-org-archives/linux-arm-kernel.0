@@ -1,58 +1,43 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 24 Jan 2011 09:36:13 +0530
-Subject: [PATCH] watchdog: add support for the Synopsys DesignWare WDT
-In-Reply-To: <20110121180838.GO6768@pulham.picochip.com>
-References: <1294675181-18273-1-git-send-email-jamie@jamieiles.com>
-	<AANLkTikbxyCSX5eKiwtZyW+gYToTD7Jcucst6su2fEjN@mail.gmail.com>
-	<20110121180838.GO6768@pulham.picochip.com>
-Message-ID: <AANLkTi=dm5FQciKjg=g-nTxYNH-BJEKVot5cAPnP2MJT@mail.gmail.com>
+From: miles@gnu.org (Miles Bader)
+Date: Mon, 24 Jan 2011 14:01:43 +0900
+Subject: cannot fetch arm git tree
+In-Reply-To: <20110121145025.GS13235@n2100.arm.linux.org.uk> (Russell King's
+	message of "Fri, 21 Jan 2011 14:50:26 +0000")
+References: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
+	<20110116092315.GA27542@n2100.arm.linux.org.uk>
+	<20110116110819.GG6917@pengutronix.de>
+	<AANLkTinrZ0GnT71GCueUUpAXM5ckq+LBd0RjA51DMR-a@mail.gmail.com>
+	<20110116134248.GD27542@n2100.arm.linux.org.uk>
+	<4D398C43.1000306@vollmann.ch> <20110121134728.GO14956@pengutronix.de>
+	<20110121135725.GR13235@n2100.arm.linux.org.uk>
+	<4D3997FE.5030109@vollmann.ch>
+	<20110121145025.GS13235@n2100.arm.linux.org.uk>
+Message-ID: <buok4huzyh4.fsf@dhlpc061.dev.necel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 11:38 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> On Wed, Jan 12, 2011 at 10:46:28AM +0530, viresh kumar wrote:
->> > + ? ? ? if (ret)
->> > + ? ? ? ? ? ? ? goto out_put_clk;
->> > +
->> > + ? ? ? /*
->> > + ? ? ? ?* The timeout period of the watchdog is derived from the input clock
->> > + ? ? ? ?* frequency. ?For platforms that don't have a clk for the watchdog,
->> > + ? ? ? ?* they can specify the WDT clock rate through the clk_rate field of
->> > + ? ? ? ?* the struct dw_wdt_platform_data platform data.
->> > + ? ? ? ?*/
->> > + ? ? ? if (pdata && pdata->clk_rate > 0)
->> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = pdata->clk_rate;
->> > + ? ? ? else
->> > + ? ? ? ? ? ? ? dw_wdt.clk_rate = clk_get_rate(dw_wdt.clk);
->> > +
->>
->> I know it doesn't make sense for a platform to have support for clk framework
->> and pass rate through plat data.
->> But this code will always take pdata->rate, if it is passed.
->> Wouldn't it be better if we reverse the sequence.
->>
->> if (clk)
->> ?rate = clk_get_rate(...);
->> else {
->> ?pdata = pdev->dev.platform_data;
->> ?if (pdata)
->> ? rate = pdata->rate;
->> }
->
-> Hmm, looking back at this again, I wonder if the correct thing to do is
-> just add a dependency in Kconfig for the driver on HAVE_CLK like
-> drivers/spi/dw_spi_mmio and ditch the ability to set the rate through
-> platform data? ?The platform has to at least provide clk_get(),
-> clk_put() and clk_get_rate() at a minimum or the driver won't even
-> build...
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+> I'm really not interested in working out how to bodge this into working
+> along side the existing gitweb setup by adding lots of rewrite rules, so
+> as gitweb got there first I think it has priority, that's what we have
+> and we'll have to live without the smart http extensions.
+...
+> It's really not that big a deal if you follow the advice I've given.
 
-Yes, this has to be done from compilation point of view, we need
-HAVE_CLK in kconfig.
+Smart http is actually a very big deal -- the old git http protocol is
+almost unusable in practice with big repos, at least over somewhat
+latency-limited network connections.
 
->
-> This would make things a lot simpler and it's not as if this is going to
-> break anything as there aren't currently any users of the driver (and
-> the one that will be does support the clk framework).
->
+If you don't intend to support people pulling over http, then maybe you
+don't care.  But if you do care, it's very much worth a second look.
 
-Ok.
+[My personal reason for caring is that I'm behind a corporate firewall
+that's latency limited, although it seems to have pretty good bandwidth.
+With some public repos, pulling via the old http protocol was a
+multi-hour operation; the new http protocol is typically multiple orders
+of magnitude faster in these cases.]
+
+-Miles
+
+-- 
+Omochiroi!
