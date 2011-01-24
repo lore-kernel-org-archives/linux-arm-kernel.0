@@ -1,32 +1,108 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Mon, 24 Jan 2011 09:05:35 -0000
-Subject: [PATCH] Realview: name configuration options after actual board
-	names
-In-Reply-To: <AANLkTimvvNCNsViqs4_=sXB0+HqzdTZkuD5Hc5U18UQc@mail.gmail.com>
-References: <20110122183038.GA11960@n2100.arm.linux.org.uk>
-	<AANLkTimvvNCNsViqs4_=sXB0+HqzdTZkuD5Hc5U18UQc@mail.gmail.com>
-Message-ID: <000001cbbba5$dcc88d80$9659a880$@tuckley@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 09:07:08 +0000
+Subject: [PATCH v2 13/28] ARM: tegra: Add suspend and hotplug support
+In-Reply-To: <1295834493-5019-14-git-send-email-ccross@android.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-14-git-send-email-ccross@android.com>
+Message-ID: <20110124090708.GA16202@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: catalin.marinas at gmail.com [mailto:catalin.marinas at gmail.com] On
+On Sun, Jan 23, 2011 at 06:01:18PM -0800, Colin Cross wrote:
+> Tegra supports three low power modes that involve powering down the CPU.
 
-> On Saturday, 22 January 2011, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > I haven't significantly updated the descriptions for the tiles as
-> that
-> > is even less clear - as far as I can see on ARMs website, there is no
-> > Cortex-A9 tile for Realview EB - only ARM11MPCore, ARM1156T2F-S,
-> > ARM1176TZF-S and Cortex-R4F.  So exactly what this 'Multicore Cortex-
-> A9
-> > Tile' is..
-> 
-> AFAIK there isn't any official A9 tile for EB. this configuration has
-> been used in processor validation and also on the ARMv7 software
-> models, that's why we pushed this option. You can remove it if you
-> want, we'll probably keep it around in our patches.
+It is a common misconception that on CPU hot-unplug you need to save the
+entire universe of the CPU going down.
 
-No, please do *not* delete it. It is used by one of the emulation platforms.
+When CPUs are hot-plugged, they reinitialize, which includes resetting
+most of the CPU state.
 
-Colin
+There is no point saving the user register state, svc register state,
+abort register state, interrupt register state, undefined mode register
+state, TTB base registers, TTB control register, memory type remapping
+registers nor the context register.  These are all reinitialized when
+the CPU is brought up again.
+
+VFP state should already be saved - when a CPU is hot-unplugged, we can't
+leave a threads VFP register set stored in that hardware as it would
+become inaccessible, so there's no point saving VFP state.  Recently
+code was added to invalidate the software VFP state for a CPU being
+hot-unplugged and reinitialize the VFP hardware on CPU hotplug.
+
+We also have the necessary hooks into the PM code to deal with VFP state
+saving/restore on PM suspend/resume.
+
+The breakpoint/watchdog stuff _should_ be handled by the breakpoint/
+watchdog code, not by each individual platform.  Please can you work
+with Will Deacon if this is not the case to ensure that the breakpoint/
+watchdog code can handle CPU hotplug.
+
+Lastly, L2 cache controller should have suspend/resume support added.
+
+We _really_ need to stop having platforms manually saving lots of CPU
+state for suspend/hot unplug.
+
+That should reduce the amount of state you're saving down to something
+more manageable.
+
+> +
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +
+> +int platform_cpu_kill(unsigned int cpu)
+> +{
+> +	unsigned int reg;
+> +
+> +	do {
+> +		reg = readl(CLK_RST_CONTROLLER_RST_CPU_CMPLX_SET);
+> +		cpu_relax();
+> +	} while (!(reg & (1<<cpu)));
+> +
+> +	spin_lock(&boot_lock);
+> +	reg = readl(CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
+> +	writel(reg | (1<<(8+cpu)), CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
+> +	spin_unlock(&boot_lock);
+> +
+> +	return 1;
+> +}
+> +
+> +void platform_cpu_die(unsigned int cpu)
+> +{
+> +#ifdef DEBUG
+> +	unsigned int this_cpu = hard_smp_processor_id();
+> +
+> +	if (cpu != this_cpu) {
+> +		printk(KERN_CRIT "Eek! platform_cpu_die running on %u, should be %u\n",
+> +			   this_cpu, cpu);
+> +		BUG();
+> +	}
+> +#endif
+> +
+> +	gic_cpu_exit(0);
+> +	barrier();
+> +	flush_cache_all();
+> +	barrier();
+> +	__cortex_a9_save(0);
+> +
+> +	/*
+> +	 * __cortex_a9_save can return through __cortex_a9_restore, but that
+> +	 * should never happen for a hotplugged cpu
+> +	 */
+> +	BUG();
+> +}
+> +
+> +int platform_cpu_disable(unsigned int cpu)
+> +{
+> +	/*
+> +	 * we don't allow CPU 0 to be shutdown (it is still too special
+> +	 * e.g. clock tick interrupts)
+> +	 */
+> +	if (unlikely(!tegra_context_area))
+> +		return -ENXIO;
+> +
+> +	return cpu == 0 ? -EPERM : 0;
+> +}
+> +#endif
+
+Please leave this in hotplug.c so that it matches what other platforms
+do.  Otherwise it's likely to be missed by any updates that happen
+architecture-wide.
