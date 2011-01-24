@@ -1,59 +1,49 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Jan 2011 17:55:58 +0000
-Subject: [PATCH v4 16/19] ARM: LPAE: Use generic dma_addr_t type definition
+Date: Mon, 24 Jan 2011 17:55:59 +0000
+Subject: [PATCH v4 17/19] ARM: LPAE: mark memory banks with start > ULONG_MAX
+	as highmem
 In-Reply-To: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1295891761-18366-18-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-This patch uses the types.h implementation in asm-generic to define the
-dma_addr_t type as the same width as phys_addr_t.
+Memory banks living outside of the 32-bit physical address
+space do not have a 1:1 pa <-> va mapping and therefore the
+__va macro may wrap.
 
-NOTE: this is a temporary patch until the corresponding patches unifying
-the dma_addr_t and removing the dma64_addr_t are merged into mainline.
+This patch ensures that such banks are marked as highmem so
+that the Kernel doesn't try to split them up when it sees that
+the wrapped virtual address overlaps the vmalloc space.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/types.h |   20 +-------------------
- 1 files changed, 1 insertions(+), 19 deletions(-)
+ arch/arm/mm/mmu.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-index 345df01..dc1bdbb 100644
---- a/arch/arm/include/asm/types.h
-+++ b/arch/arm/include/asm/types.h
-@@ -1,30 +1,12 @@
- #ifndef __ASM_ARM_TYPES_H
- #define __ASM_ARM_TYPES_H
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index a1d8a07..8a55be4 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -782,7 +782,8 @@ static void __init sanity_check_meminfo(void)
  
--#include <asm-generic/int-ll64.h>
-+#include <asm-generic/types.h>
+ #ifdef CONFIG_HIGHMEM
+ 		if (__va(bank->start) > vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET)
++		    __va(bank->start) < (void *)PAGE_OFFSET ||
++		    bank->start > ULONG_MAX)
+ 			highmem = 1;
  
--#ifndef __ASSEMBLY__
--
--typedef unsigned short umode_t;
--
--#endif /* __ASSEMBLY__ */
--
--/*
-- * These aren't exported outside the kernel to avoid name space clashes
-- */
- #ifdef __KERNEL__
- 
- #define BITS_PER_LONG 32
- 
--#ifndef __ASSEMBLY__
--
--/* Dma addresses are 32-bits wide.  */
--
--typedef u32 dma_addr_t;
--typedef u32 dma64_addr_t;
--
--#endif /* __ASSEMBLY__ */
--
- #endif /* __KERNEL__ */
- 
- #endif
+ 		bank->highmem = highmem;
+@@ -791,7 +792,7 @@ static void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (__va(bank->start) < vmalloc_min &&
++		if (!highmem && __va(bank->start) < vmalloc_min &&
+ 		    bank->size > vmalloc_min - __va(bank->start)) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
