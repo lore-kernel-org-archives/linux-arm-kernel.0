@@ -1,43 +1,49 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 24 Jan 2011 09:18:19 +0100
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <20110123230932.GK30094@n2100.arm.linux.org.uk>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-	<20110119205158.GC6335@n2100.arm.linux.org.uk>
-	<AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
-	<AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-	<20110123180110.GJ30094@n2100.arm.linux.org.uk>
-	<AANLkTiko9X_ua-ZAOZ-jEaAkPTKLCKyhgCHt6hbM5C-K@mail.gmail.com>
-	<20110123230932.GK30094@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikw1wThEn0h+xv3mFaXVG8H45JUt2vqfECXnn6k@mail.gmail.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Mon, 24 Jan 2011 14:08:50 +0530
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to use
+	ldrex/strex
+In-Reply-To: <20110123093526.GA26120@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+	<20110123001636.GA20841@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101222323190.8580@xanadu.home>
+	<20110123093526.GA26120@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=tpnNXm8w9-VFi72nYvXRQV5-jE7Qn9NNk1wLW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sun, Jan 23, 2011 at 10:40:05PM +0100, Linus Walleij wrote:
->> 2011/1/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> > On Fri, Jan 21, 2011 at 01:53:06PM +0100, Linus Walleij wrote:
+On Sun, Jan 23, 2011 at 3:05 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Jan 22, 2011 at 11:44:59PM -0500, Nicolas Pitre wrote:
+>> At least another person did post results:
 >>
->> > If we're going to move away from the blockend IRQs to using the data
->> > counter, can we have a patch which switches the driver to use the data
->> > counter and then a followup patch which removes the broken blockend
->> > stuff, rather than somethign that changes the broken blockend stuff
->> > and then removes it?
->>
->> 6631/1 fixes the broken blockend stuff into a state that works,
->> then 6632/1 removes it in favor of using the MMCIDATACNT.
+>> http://mid.gmane.org/20110117094602.GA2622 at pulham.picochip.com
+>> http://mid.gmane.org/20110117110308.GC2622 at pulham.picochip.com
 >
-> What I'm saying is why do we need to fix the blockend stuff if in the
-> next patch we remove it - why not just combine the two patches and
-> remove the thing in one go as a "we give up using the blockend irq"?
+> Slightly different patch - there were three revisions. ?I can't attach
+> a tested-by given to a different patch to this one.
+>
+>> > That means omap2plus_defconfig .38 mainline kernels
+>> > (including -stable) will remain potentially dangerous when run on
+>> > SMP capable hardware.
+>>
+>> I must admit that this series looks a bit large for stable IMHO. ?I
+>> think that the fix for stable should limit itself only to prevent SMP
+>> from being selected if anything else than CPU_32v6K is selected.
+>
+> The first three are the bare minimum required for -stable.
+>
 
-OK I get it, no, of course 6631 and 6632 can be squashed. I'll do
-this, take out 6631 and have 6632 be the squashed result, will
-be fixed in a few minutes.
+Boot tested the 14 patch series  with CONFIG_SWP_EMULATE enabled, on
+the following boards :
 
-Thanks
-Linus Walleij
+
+1. Omap2420 SDP
+
+2. Omap2430 SDP
+
+3. Omap3430 SDP
+
+4. Omap4 Blaze
+
+Tested by : Sourav Poddar <sourav.poddar@ti.com>
