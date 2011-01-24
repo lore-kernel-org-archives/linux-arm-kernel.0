@@ -1,58 +1,166 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:05 -0800
-Subject: [PATCH v2 00/28] Updates for Tegra support in 2.6.39
-Message-ID: <1295834493-5019-1-git-send-email-ccross@android.com>
+Date: Sun, 23 Jan 2011 18:01:16 -0800
+Subject: [PATCH v2 11/28] ARM: tegra: timer: Add idle and suspend support to
+	timers
+In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-12-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for suspend, idle, and cpufreq
-for the Tegra subsystem.
+The Tegra processor cannot be woken from idle by the internal
+ARM timers.  Reserve timer 4 to be used as a wake source
+during idle.
 
-Patch 2 adds functions to save and restore the GIC state
-during suspend and resume, and patch 3 exports the GIC irq 
-chip functions to support custom IRQ chips that need to
-update the GIC as well as another block during IRQ 
-operations.  Patches 2 and 3 depend on patch 1, which fixes
-a naming conflict in mach-tegra, so the whole stack will
-need to go in through one tree.
+Implement read_persistent_clock by reading the Tegra RTC
+registers that stay running during suspend.
 
- arch/arm/common/gic.c                          |  138 ++++-
- arch/arm/configs/tegra_defconfig               |  123 ++++
- arch/arm/include/asm/hardware/cache-l2x0.h     |    3 +-
- arch/arm/include/asm/hardware/gic.h            |   13 +
- arch/arm/mach-tegra/Makefile                   |   12 +-
- arch/arm/mach-tegra/board.h                    |    6 +
- arch/arm/mach-tegra/common.c                   |   49 ++-
- arch/arm/mach-tegra/cortex-a9.S                |  504 +++++++++++++++
- arch/arm/mach-tegra/cpu-tegra.c                |   75 ++-
- arch/arm/mach-tegra/cpuidle.c                  |  714 ++++++++++++++++++++++
- arch/arm/mach-tegra/dma.c                      |  198 ++++---
- arch/arm/mach-tegra/gpio.c                     |   15 +-
- arch/arm/mach-tegra/headsmp-t2.S               |  216 +++++++
- arch/arm/mach-tegra/headsmp.S                  |   61 --
- arch/arm/mach-tegra/hotplug.c                  |  126 ----
- arch/arm/mach-tegra/include/mach/clk.h         |    2 +
- arch/arm/mach-tegra/include/mach/clkdev.h      |    2 +
- arch/arm/mach-tegra/include/mach/debug-macro.S |   25 +-
- arch/arm/mach-tegra/include/mach/iomap.h       |   69 ++-
- arch/arm/mach-tegra/include/mach/irqs.h        |   14 +-
- arch/arm/mach-tegra/include/mach/legacy_irq.h  |    7 +-
- arch/arm/mach-tegra/include/mach/pinmux-t2.h   |   10 +
- arch/arm/mach-tegra/include/mach/powergate.h   |   40 ++
- arch/arm/mach-tegra/include/mach/suspend.h     |   80 +++
- arch/arm/mach-tegra/include/mach/system.h      |   10 +-
- arch/arm/mach-tegra/include/mach/uncompress.h  |   18 +-
- arch/arm/mach-tegra/irq.c                      |  334 ++++++++---
- arch/arm/mach-tegra/legacy_irq.c               |  109 ++++-
- arch/arm/mach-tegra/pinmux-t2-tables.c         |   26 +-
- arch/arm/mach-tegra/platsmp.c                  |   89 +++-
- arch/arm/mach-tegra/power-macros.S             |   57 ++
- arch/arm/mach-tegra/power.h                    |   64 ++
- arch/arm/mach-tegra/powergate.c                |  212 +++++++
- arch/arm/mach-tegra/suspend-t2.c               |  414 +++++++++++++
- arch/arm/mach-tegra/suspend.c                  |  776 ++++++++++++++++++++++++
- arch/arm/mach-tegra/tegra2_clocks.c            |  264 ++++++++-
- arch/arm/mach-tegra/tegra2_save.S              |  413 +++++++++++++
- arch/arm/mach-tegra/timer.c                    |   96 +++-
- arch/arm/mm/cache-l2x0.c                       |   14 +-
- 39 files changed, 4898 insertions(+), 500 deletions(-)
+Save and restore the timer configuration register and the
+sched_clock value in LP0.
+
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/mach-tegra/timer.c |   95 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 93 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index 36b53a7..2d0b76f 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -38,6 +38,10 @@
+ #include "board.h"
+ #include "clock.h"
+ 
++#define RTC_SECONDS            0x08
++#define RTC_SHADOW_SECONDS     0x0c
++#define RTC_MILLISECONDS       0x10
++
+ #define TIMERUS_CNTR_1US 0x10
+ #define TIMERUS_USEC_CFG 0x14
+ #define TIMERUS_CNTR_FREEZE 0x4c
+@@ -50,9 +54,11 @@
+ #define TIMER_PTV 0x0
+ #define TIMER_PCR 0x4
+ 
+-struct tegra_timer;
+-
+ static void __iomem *timer_reg_base = IO_ADDRESS(TEGRA_TMR1_BASE);
++static void __iomem *rtc_base = IO_ADDRESS(TEGRA_RTC_BASE);
++
++static struct timespec persistent_ts;
++static u64 persistent_ms, last_persistent_ms;
+ 
+ #define timer_writel(value, reg) \
+ 	__raw_writel(value, (u32)timer_reg_base + (reg))
+@@ -133,6 +139,42 @@ static void notrace tegra_update_sched_clock(void)
+ 	update_sched_clock(&cd, cyc, (u32)~0);
+ }
+ 
++/*
++ * tegra_rtc_read - Reads the Tegra RTC registers
++ * Care must be taken that this funciton is not called while the
++ * tegra_rtc driver could be executing to avoid race conditions
++ * on the RTC shadow register
++ */
++u64 tegra_rtc_read_ms(void)
++{
++	u32 ms = readl(rtc_base + RTC_MILLISECONDS);
++	u32 s = readl(rtc_base + RTC_SHADOW_SECONDS);
++	return (u64)s * MSEC_PER_SEC + ms;
++}
++
++/*
++ * read_persistent_clock -  Return time from a persistent clock.
++ *
++ * Reads the time from a source which isn't disabled during PM, the
++ * 32k sync timer.  Convert the cycles elapsed since last read into
++ * nsecs and adds to a monotonically increasing timespec.
++ * Care must be taken that this funciton is not called while the
++ * tegra_rtc driver could be executing to avoid race conditions
++ * on the RTC shadow register
++ */
++void read_persistent_clock(struct timespec *ts)
++{
++	u64 delta;
++	struct timespec *tsp = &persistent_ts;
++
++	last_persistent_ms = persistent_ms;
++	persistent_ms = tegra_rtc_read_ms();
++	delta = persistent_ms - last_persistent_ms;
++
++	timespec_add_ns(tsp, delta * NSEC_PER_MSEC);
++	*ts = *tsp;
++}
++
+ static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
+ {
+ 	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+@@ -149,6 +191,20 @@ static struct irqaction tegra_timer_irq = {
+ 	.irq		= INT_TMR3,
+ };
+ 
++static irqreturn_t tegra_lp2wake_interrupt(int irq, void *dev_id)
++{
++	timer_writel(1<<30, TIMER4_BASE + TIMER_PCR);
++	return IRQ_HANDLED;
++}
++
++static struct irqaction tegra_lp2wake_irq = {
++	.name		= "timer_lp2wake",
++	.flags		= IRQF_DISABLED,
++	.handler	= tegra_lp2wake_interrupt,
++	.dev_id		= NULL,
++	.irq		= INT_TMR4,
++};
++
+ static void __init tegra_init_timer(void)
+ {
+ 	unsigned long rate = clk_measure_input_freq();
+@@ -189,6 +245,12 @@ static void __init tegra_init_timer(void)
+ 		BUG();
+ 	}
+ 
++	ret = setup_irq(tegra_lp2wake_irq.irq, &tegra_lp2wake_irq);
++	if (ret) {
++		printk(KERN_ERR "Failed to register LP2 timer IRQ: %d\n", ret);
++		BUG();
++	}
++
+ 	clockevents_calc_mult_shift(&tegra_clockevent, 1000000, 5);
+ 	tegra_clockevent.max_delta_ns =
+ 		clockevent_delta2ns(0x1fffffff, &tegra_clockevent);
+@@ -204,3 +266,32 @@ static void __init tegra_init_timer(void)
+ struct sys_timer tegra_timer = {
+ 	.init = tegra_init_timer,
+ };
++
++void tegra_lp2_set_trigger(unsigned long cycles)
++{
++	timer_writel(0, TIMER4_BASE + TIMER_PTV);
++	if (cycles) {
++		u32 reg = 0x80000000ul | min(0x1ffffffful, cycles);
++		timer_writel(reg, TIMER4_BASE + TIMER_PTV);
++	}
++}
++EXPORT_SYMBOL(tegra_lp2_set_trigger);
++
++unsigned long tegra_lp2_timer_remain(void)
++{
++	return timer_readl(TIMER4_BASE + TIMER_PCR) & 0x1ffffffful;
++}
++
++#ifdef CONFIG_PM
++static u32 usec_config;
++
++void tegra_timer_suspend(void)
++{
++	usec_config = timer_readl(TIMERUS_USEC_CFG);
++}
++
++void tegra_timer_resume(void)
++{
++	timer_writel(usec_config, TIMERUS_USEC_CFG);
++}
++#endif
+-- 
+1.7.3.1
