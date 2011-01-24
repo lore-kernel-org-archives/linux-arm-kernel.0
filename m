@@ -1,36 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 23:31:38 +0000
-Subject: [PATCH v2 05/11] msm: Physical offset for MSM8960
-In-Reply-To: <1295468747-22796-6-git-send-email-davidb@codeaurora.org>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-6-git-send-email-davidb@codeaurora.org>
-Message-ID: <20110124233138.GS24104@n2100.arm.linux.org.uk>
+Date: Mon, 24 Jan 2011 23:38:01 +0000
+Subject: [PATCH v4 01/19] ARM: Make the argument to virt_to_phys()
+	"const volatile"
+In-Reply-To: <4D3DD0D8.10905@codeaurora.org>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-2-git-send-email-catalin.marinas@arm.com>
+	<4D3DD0D8.10905@codeaurora.org>
+Message-ID: <20110124233801.GT24104@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 12:25:41PM -0800, David Brown wrote:
-> From: Stepan Moskovchenko <stepanm@codeaurora.org>
+On Mon, Jan 24, 2011 at 11:19:52AM -0800, Stephen Boyd wrote:
+> On 01/24/2011 09:55 AM, Catalin Marinas wrote:
+> > Changing the virt_to_phys() argument to "const volatile void *" avoids
+> > compiler warnings in some situations where this function is used.
+> >
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > ---
 > 
-> Add the physical memory offset value for the Qualcomm
-> MSM8960 chip.
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 > 
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> ---
->  arch/arm/mach-msm/include/mach/memory.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/include/mach/memory.h b/arch/arm/mach-msm/include/mach/memory.h
-> index 070e17d..014bbd3 100644
-> --- a/arch/arm/mach-msm/include/mach/memory.h
-> +++ b/arch/arm/mach-msm/include/mach/memory.h
-> @@ -25,6 +25,8 @@
->  #define PHYS_OFFSET		UL(0x00200000)
->  #elif defined(CONFIG_ARCH_MSM8X60)
->  #define PHYS_OFFSET		UL(0x40200000)
-> +#elif defined(CONFIG_ARCH_MSM8960)
-> +#define PHYS_OFFSET		UL(0x40200000)
+> Any chance we can get this one patch into 2.6.38? It fixes a warning for
+> MSM.
 
-Note that this will all change during the next merge window to
-PLAT_PHYS_OFFSET.
+I don't see any reason why this can't.  Catalin, can you put it in the
+patch system with Stephen's ack please?
