@@ -1,38 +1,31 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 24 Jan 2011 13:36:51 -0800
-Subject: [PATCH v2 04/11] msm: io: I/O register definitions for MSM8960
-In-Reply-To: <8yafwsikmyn.fsf@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-5-git-send-email-davidb@codeaurora.org>
-	<1295902153.29639.54.camel@c-dwalke-linux.qualcomm.com>
-	<8yafwsikmyn.fsf@huya.qualcomm.com>
-Message-ID: <1295905011.29639.60.camel@c-dwalke-linux.qualcomm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 21:42:25 +0000
+Subject: [PATCH v4 08/19] ARM: LPAE: Introduce the 3-level page table
+	format definitions
+In-Reply-To: <AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-9-git-send-email-catalin.marinas@arm.com>
+	<AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
+Message-ID: <20110124214225.GO24104@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-24 at 13:31 -0800, David Brown wrote:
-> On Mon, Jan 24 2011, Daniel Walker wrote:
+On Tue, Jan 25, 2011 at 08:26:42AM +1100, Nick Piggin wrote:
+> Too bad about the PAE thing; my condolences.
 > 
-> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
-> >> +/*
-> >> + * Copyright (C) 2007 Google, Inc.
-> >> + * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
-> >> + * Author: Brian Swetland <swetland@google.com>
-> >
-> > Brian didn't really write this did he?
 > 
-> He wrote the code it is based off of.  The author line could probably be
-> removed.
+> On Tue, Jan 25, 2011 at 4:55 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > This patch introduces the pgtable-3level*.h files with definitions
+> > specific to the LPAE page table format (3 levels of page tables).
+> 
+> Seeing as you're shaking up these definitions, what do you think about
+> switching from 4level-fixup.h to pgtable-nopud.h / pgtable-nopmd.h headers?
+> One day eventually it would be nice to get rid of the fixup mode.
 
-I think it's kind of like a total re-write.. So I'd assume removing him
-is acceptable, besides he likely doesn't want to get email asking
-questions about this thing he's never seen.
+I have patches to do this which I de-queued for the last merge window.
+It's not entirely trivial and without problem.  You can find the patches
+in linux-next now.
 
-Daniel
-
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I was waiting for the new set of patches from Catalin before going back
+and working out the solutions to some of those problems.
