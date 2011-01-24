@@ -1,102 +1,117 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:08 -0800
-Subject: [PATCH v2 03/28] ARM: gic: Export irq chip functions
+Date: Sun, 23 Jan 2011 18:01:20 -0800
+Subject: [PATCH v2 15/28] ARM: tegra: irq: Add debugfs file to show wake irqs
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-4-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-16-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some systems combine the GIC with an external interrupt controller.
-On these systems it may be necessary to update both the GIC registers
-and the external controller's registers to control IRQ behavior.
-Export the irq chip functions so that these systems can define a
-custom irq chip that calls into the GIC handlers.
-
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
-v2: Updated on top of irq_data changes
+v2: Fix permissions on debufs file
 
- arch/arm/common/gic.c               |   11 +++++------
- arch/arm/include/asm/hardware/gic.h |   10 ++++++++++
- 2 files changed, 15 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/irq.c |   66 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 66 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index a6f8c58..c11f478 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -78,14 +78,14 @@ static inline unsigned int gic_irq(struct irq_data *d)
- /*
-  * Routines to acknowledge, disable and enable interrupts
-  */
--static void gic_ack_irq(struct irq_data *d)
-+void gic_ack_irq(struct irq_data *d)
- {
- 	spin_lock(&irq_controller_lock);
- 	writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
- 	spin_unlock(&irq_controller_lock);
- }
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index c292d3b..12c62a8 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -19,10 +19,12 @@
  
--static void gic_mask_irq(struct irq_data *d)
-+void gic_mask_irq(struct irq_data *d)
- {
- 	u32 mask = 1 << (d->irq % 32);
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
++#include <linux/debugfs.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/seq_file.h>
  
-@@ -94,7 +94,7 @@ static void gic_mask_irq(struct irq_data *d)
- 	spin_unlock(&irq_controller_lock);
- }
+ #include <asm/hardware/gic.h>
  
--static void gic_unmask_irq(struct irq_data *d)
-+void gic_unmask_irq(struct irq_data *d)
- {
- 	u32 mask = 1 << (d->irq % 32);
+@@ -46,6 +48,8 @@ static u32 tegra_lp0_wake_enb;
+ static u32 tegra_lp0_wake_level;
+ static u32 tegra_lp0_wake_level_any;
  
-@@ -103,7 +103,7 @@ static void gic_unmask_irq(struct irq_data *d)
- 	spin_unlock(&irq_controller_lock);
- }
- 
--static int gic_set_type(struct irq_data *d, unsigned int type)
-+int gic_set_type(struct irq_data *d, unsigned int type)
- {
- 	void __iomem *base = gic_dist_base(d);
- 	unsigned int gicirq = gic_irq(d);
-@@ -149,8 +149,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- }
- 
- #ifdef CONFIG_SMP
--static int
--gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
-+int gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
- {
- 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
- 	unsigned int shift = (d->irq % 4) * 8;
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index d0c2ba9..2ab5cf0 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -33,6 +33,8 @@
- #define GIC_DIST_SOFTINT		0xf00
- 
- #ifndef __ASSEMBLY__
-+struct irq_data;
++static unsigned int tegra_wake_irq_count[32];
 +
- extern void __iomem *gic_cpu_base_addr;
+ /* ensures that sufficient time is passed for a register write to
+  * serialize into the 32KHz domain */
+ static void pmc_32kwritel(u32 val, unsigned long offs)
+@@ -165,6 +169,8 @@ static void tegra_irq_handle_wake(void)
+ 		pr_info("Resume caused by WAKE%d, %s\n", wake,
+ 			desc->action->name);
  
- void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
-@@ -43,6 +45,14 @@ void gic_cpu_exit(unsigned int gic_nr);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
- void gic_enable_ppi(unsigned int);
++		tegra_wake_irq_count[wake]++;
 +
-+void gic_ack_irq(struct irq_data *d);
-+void gic_mask_irq(struct irq_data *d);
-+void gic_unmask_irq(struct irq_data *d);
-+int gic_set_type(struct irq_data *d, unsigned int type);
-+#ifdef CONFIG_SMP
-+int gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force);
+ 		generic_handle_irq(irq);
+ 	}
+ }
+@@ -242,3 +248,63 @@ void tegra_irq_resume(void)
+ 	tegra_legacy_irq_resume();
+ 	tegra_irq_handle_wake();
+ }
++
++#ifdef CONFIG_DEBUG_FS
++static int tegra_wake_irq_debug_show(struct seq_file *s, void *data)
++{
++	int wake;
++	int irq;
++	struct irq_desc *desc;
++	const char *irq_name;
++
++	seq_printf(s, "wake  irq  count  name\n");
++	seq_printf(s, "----------------------\n");
++	for (wake = 0; wake < 32; wake++) {
++		irq = tegra_wake_to_irq(wake);
++		if (irq < 0)
++			continue;
++
++		desc = irq_to_desc(irq);
++		if (tegra_wake_irq_count[wake] == 0 && desc->action == NULL)
++			continue;
++
++		if (!(desc->status & IRQ_WAKEUP))
++			continue;
++
++		irq_name = (desc->action && desc->action->name) ?
++			desc->action->name : "???";
++
++		seq_printf(s, "%4d  %3d  %5d  %s\n",
++			wake, irq, tegra_wake_irq_count[wake], irq_name);
++	}
++	return 0;
++}
++
++static int tegra_wake_irq_debug_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, tegra_wake_irq_debug_show, NULL);
++}
++
++static const struct file_operations tegra_wake_irq_debug_fops = {
++	.open		= tegra_wake_irq_debug_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static int __init tegra_irq_debug_init(void)
++{
++	struct dentry *d;
++
++	d = debugfs_create_file("wake_irq", S_IRUGO, NULL, NULL,
++		&tegra_wake_irq_debug_fops);
++	if (!d) {
++		pr_info("Failed to create suspend_mode debug file\n");
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++late_initcall(tegra_irq_debug_init);
 +#endif
- #endif
- 
- #endif
 -- 
 1.7.3.1
