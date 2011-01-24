@@ -1,43 +1,41 @@
-From: miles@gnu.org (Miles Bader)
-Date: Mon, 24 Jan 2011 14:01:43 +0900
-Subject: cannot fetch arm git tree
-In-Reply-To: <20110121145025.GS13235@n2100.arm.linux.org.uk> (Russell King's
-	message of "Fri, 21 Jan 2011 14:50:26 +0000")
-References: <AANLkTikRrewCLGDTU7DjVssjpxz-EFK8AhRScAGPRumg@mail.gmail.com>
-	<20110116092315.GA27542@n2100.arm.linux.org.uk>
-	<20110116110819.GG6917@pengutronix.de>
-	<AANLkTinrZ0GnT71GCueUUpAXM5ckq+LBd0RjA51DMR-a@mail.gmail.com>
-	<20110116134248.GD27542@n2100.arm.linux.org.uk>
-	<4D398C43.1000306@vollmann.ch> <20110121134728.GO14956@pengutronix.de>
-	<20110121135725.GR13235@n2100.arm.linux.org.uk>
-	<4D3997FE.5030109@vollmann.ch>
-	<20110121145025.GS13235@n2100.arm.linux.org.uk>
-Message-ID: <buok4huzyh4.fsf@dhlpc061.dev.necel.com>
+From: sumit.semwal@ti.com (Semwal, Sumit)
+Date: Mon, 24 Jan 2011 11:20:57 +0530
+Subject: [PATCH v9 18/18] OMAP2,3: DSS2: Get DSS IRQ from platform device
+In-Reply-To: <20110123125216.GA29926@n2100.arm.linux.org.uk>
+References: <1295690758-5845-1-git-send-email-sumit.semwal@ti.com>
+	<1295690758-5845-19-git-send-email-sumit.semwal@ti.com>
+	<4D3C217B.9020301@ru.mvista.com>
+	<20110123125216.GA29926@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=zrLh5kaFUOsJvc1jyD5kcgw9NBRoT2zjB=2jy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> I'm really not interested in working out how to bodge this into working
-> along side the existing gitweb setup by adding lots of rewrite rules, so
-> as gitweb got there first I think it has priority, that's what we have
-> and we'll have to live without the smart http extensions.
-...
-> It's really not that big a deal if you follow the advice I've given.
+On Sun, Jan 23, 2011 at 6:22 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 23, 2011 at 03:39:23PM +0300, Sergei Shtylyov wrote:
+>>> diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+>>> index 4d7a816..22690e9 100644
+>>> --- a/drivers/video/omap2/dss/dss.c
+>>> +++ b/drivers/video/omap2/dss/dss.c
+>> [...]
+>>> @@ -609,15 +609,18 @@ static int dss_init(bool skip_init)
+>>> ? ? ?REG_FLD_MOD(DSS_CONTROL, 0, 2, 2); ? ? ?/* venc clock mode = normal */
+>>> ? #endif
+>>>
+>>> - ? ?r = request_irq(INT_24XX_DSS_IRQ,
+>>> + ? ?dss_irq = platform_get_irq(dss.pdev, 0);
+>>> + ? ?if (dss_irq != -ENXIO) {
+>>
+>> ? ?Better just 'dss_irq > 0', IMHO.
+>
+> If a function returns negative error codes, the correct test is
+> ? ? ? ?ret < 0
+> not
+> ? ? ? ?ret <= 0
+>
+> The fact that it happens to be dealing with IRQ numbers where IRQ0
+> may not be valid is neither here nor there.
+>
+Thanks Sergei, Russell,
 
-Smart http is actually a very big deal -- the old git http protocol is
-almost unusable in practice with big repos, at least over somewhat
-latency-limited network connections.
-
-If you don't intend to support people pulling over http, then maybe you
-don't care.  But if you do care, it's very much worth a second look.
-
-[My personal reason for caring is that I'm behind a corporate firewall
-that's latency limited, although it seems to have pretty good bandwidth.
-With some public repos, pulling via the old http protocol was a
-multi-hour operation; the new http protocol is typically multiple orders
-of magnitude faster in these cases.]
-
--Miles
-
--- 
-Omochiroi!
+I will update this to check for (ret < 0) as the error case, and re-submit.
