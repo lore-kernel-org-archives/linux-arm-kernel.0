@@ -1,72 +1,142 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jan 2011 09:40:44 -0800
-Subject: [GIT PULL] omap fixes for v2.6.38-rc2
-Message-ID: <20110124174043.GA13589@atomide.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 24 Jan 2011 15:57:41 -0200
+Subject: [PATCH] ARM: imx: Add initial support for IMX27IPCAM board
+Message-ID: <1295891861-29054-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/Kconfig                   |    9 +++
+ arch/arm/mach-imx/Makefile                  |    1 +
+ arch/arm/mach-imx/mach-imx27ipcam.c         |   79 +++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
+ 4 files changed, 90 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-imx/mach-imx27ipcam.c
 
-Please pull omap fixes from:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-This is mostly to fix issues with recent omap1_defconfig and sched_clock
-changes.
-
-We need both the MPU timer and the 32KiHz timer usable together for
-omap1_defconfig. This is needed as the 32KiHz timer is not available on
-omap15xx or 730. Did not notice this earlier with omap1_defconfig as it
-does not have CONFIG_PRINTK_TIME set currently..
-
-Regards,
-
-Tony
-
-
-The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
-
-  Linux 2.6.38-rc2 (2011-01-21 19:01:34 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-Adrian Hunter (1):
-      omap: DMA: clear interrupt status correctly
-
-Daniel Morsing (1):
-      OMAP3: Devkit8000: Fix tps65930 pullup/pulldown configuration
-
-Felipe Balbi (1):
-      OMAP: PRCM: remove duplicated headers
-
-Igor Grinberg (2):
-      arm: omap3: cm-t3517: rtc fix
-      arm: omap3: cm-t3517: minor comment fix
-
-Paul Walmsley (2):
-      OMAP: counter_32k: init clocksource as part of machine timer init
-      OMAP4: clockdomain: bypass unimplemented wake-up dependency functions on OMAP4
-
-Tony Lindgren (4):
-      Merge branch 'fixes_a_2.6.38rc' of git://git.pwsan.com/linux-2.6 into omap-fixes
-      omap1: Fix sched_clock for the MPU timer
-      omap1: Fix booting for 15xx and 730 with omap1_defconfig
-      omap1: Fix sched_clock implementation when both MPU timer and 32K timer are used
-
- arch/arm/mach-omap1/Kconfig                 |    2 +
- arch/arm/mach-omap1/Makefile                |    3 +-
- arch/arm/mach-omap1/time.c                  |  101 +++++++++++++++++++++++++--
- arch/arm/mach-omap1/timer32k.c              |   13 ++--
- arch/arm/mach-omap2/board-cm-t3517.c        |   29 ++++++--
- arch/arm/mach-omap2/board-devkit8000.c      |    3 +-
- arch/arm/mach-omap2/clock44xx_data.c        |    1 -
- arch/arm/mach-omap2/clockdomain.c           |   30 +++++++-
- arch/arm/mach-omap2/clockdomains44xx_data.c |    2 -
- arch/arm/mach-omap2/powerdomain2xxx_3xxx.c  |    1 -
- arch/arm/mach-omap2/timer-gp.c              |   10 ++-
- arch/arm/plat-omap/Kconfig                  |    8 +--
- arch/arm/plat-omap/counter_32k.c            |   22 ++++--
- arch/arm/plat-omap/dma.c                    |    7 +-
- arch/arm/plat-omap/include/plat/common.h    |    3 +
- 15 files changed, 184 insertions(+), 51 deletions(-)
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 56684b5..c172418 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -300,4 +300,13 @@ config MACH_MXT_TD60
+ 	  Include support for i-MXT (aka td60) platform. This
+ 	  includes specific configurations for the module and its peripherals.
+ 
++config MACH_IMX27IPCAM
++	bool "IMX27 IPCAM platform"
++	select SOC_IMX27
++	select IMX_HAVE_PLATFORM_IMX2_WDT
++	select IMX_HAVE_PLATFORM_IMX_UART
++	help
++	  Include support for IMX27 IPCAM platform. This includes specific
++	  configurations for the board and its peripherals.
++
+ endif
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 77100bf..3e49ae0 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -36,3 +36,4 @@ obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
+ obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
+ obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
++obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
+diff --git a/arch/arm/mach-imx/mach-imx27ipcam.c b/arch/arm/mach-imx/mach-imx27ipcam.c
+new file mode 100644
+index 0000000..506a8f3
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx27ipcam.c
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * Author: Fabio Estevam <fabio.estevam@freescale.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/platform_device.h>
++
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <mach/hardware.h>
++#include <mach/common.h>
++#include <mach/iomux-mx27.h>
++
++#include "devices-imx27.h"
++
++static const int mx27ipcam_pins[] __initconst = {
++	/* UART1 */
++	PE12_PF_UART1_TXD,
++	PE13_PF_UART1_RXD,
++	/* FEC */
++	PD0_AIN_FEC_TXD0,
++	PD1_AIN_FEC_TXD1,
++	PD2_AIN_FEC_TXD2,
++	PD3_AIN_FEC_TXD3,
++	PD4_AOUT_FEC_RX_ER,
++	PD5_AOUT_FEC_RXD1,
++	PD6_AOUT_FEC_RXD2,
++	PD7_AOUT_FEC_RXD3,
++	PD8_AF_FEC_MDIO,
++	PD9_AIN_FEC_MDC,
++	PD10_AOUT_FEC_CRS,
++	PD11_AOUT_FEC_TX_CLK,
++	PD12_AOUT_FEC_RXD0,
++	PD13_AOUT_FEC_RX_DV,
++	PD14_AOUT_FEC_RX_CLK,
++	PD15_AOUT_FEC_COL,
++	PD16_AIN_FEC_TX_ER,
++	PF23_AIN_FEC_TX_EN,
++};
++
++static void __init mx27ipcam_init(void)
++{
++	mxc_gpio_setup_multiple_pins(mx27ipcam_pins, ARRAY_SIZE(mx27ipcam_pins),
++		"mx27ipcam");
++
++	imx27_add_imx_uart0(NULL);
++	imx27_add_fec(NULL);
++	imx27_add_imx2_wdt(NULL);
++}
++
++static void __init mx27ipcam_timer_init(void)
++{
++	mx27_clocks_init(25000000);
++}
++
++static struct sys_timer mx27ipcam_timer = {
++	.init	= mx27ipcam_timer_init,
++};
++
++MACHINE_START(IMX27IPCAM, "Freescale IMX27IPCAM")
++	/* maintainer: Freescale Semiconductor, Inc. */
++	.boot_params    = MX27_PHYS_OFFSET + 0x100,
++	.map_io         = mx27_map_io,
++	.init_irq       = mx27_init_irq,
++	.init_machine   = mx27ipcam_init,
++	.timer          = &mx27ipcam_timer,
++MACHINE_END
+diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+index 3a70ebf..2315541 100644
+--- a/arch/arm/plat-mxc/include/mach/uncompress.h
++++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+@@ -83,6 +83,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+ 	case MACH_TYPE_MX21ADS:
+ 	case MACH_TYPE_PCA100:
+ 	case MACH_TYPE_MXT_TD60:
++	case MACH_TYPE_IMX27IPCAM:
+ 		uart_base = MX2X_UART1_BASE_ADDR;
+ 		break;
+ 	case MACH_TYPE_MX31LITE:
+-- 
+1.6.0.4
