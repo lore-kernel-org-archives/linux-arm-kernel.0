@@ -1,30 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 16:14:53 +0000
-Subject: [PATCH v2] arm: Configure reference clock for Versatile Express
-	timers
-In-Reply-To: <F01D8B85CFF58440B2A13965FBA90CA45911F4328E@GEORGE.Emea.Arm.com>
-References: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
-	<20110124144753.GB22949@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F4328E@GEORGE.Emea.Arm.com>
-Message-ID: <20110124161453.GB24104@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Jan 2011 16:18:17 -0000
+Subject: [RFC][PATCH] ARM: ptrace: remove single-step emulation code
+In-Reply-To: <84r5c2hbpo.fsf@sauna.l.org>
+References: <1295449635-4292-1-git-send-email-will.deacon@arm.com>
+	<84r5c2hbpo.fsf@sauna.l.org>
+Message-ID: <000501cbbbe2$4fb55d00$ef201700$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 04:12:16PM +0000, Pawel Moll wrote:
-> > > -   writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
-> > > -   writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
-> > BTW, why are you removing the initialization of TIMER_CTRL ?  You
-> > don't
-> > describe why you do this in the commit log so I suspect it's a
-> > mistake.
-> 
-> Uh, apologies. The explanation got lost while moving the patch between
-> one tree and another...
-> 
-> I've removed them, because the sp804 driver is initializing these
-> registers in sp804_clocksource_init() and sp804_set_mode(), just a
-> jiffy later.
+Hi Timo,
 
-What if we have some other more preferable clock events which
-rules in set_mode not being called?  How do we ensure that these
-timers won't create some spurious interrupts?
+> I agree that decoding ARM instruction in kernel space is really
+> funky. Perhaps my best be would be to copy the old kernel code to my
+> own userland tool and use PTRACE_POKETEXT to set breakpoints? The only
+> drawbacks I see are:
+
+You could copy the old code, but it may need updating to support ARMv7.
+It also doesn't handle Thumb instructions as it stands.
+ 
+> 1) I need more syscalls per instruction: PTRACE_GETREGS +
+> PTRACE_SINGLESTEP vs. PTRACE_GETREGS + PTRACE_PEEKTEXT +
+> PTRACE_POKETEXT * (number of potential branch targets) +
+> PTRACE_CONTINUE but I guess I can live with this.
+
+Ok.
+
+> 2) itrace does not know where user helpers are. Parsing
+> /proc/config.gz at runtime for CONFIG_VECTORS_BASE is probably not a
+> good idea. If this location does not change often it is not a problem
+> to hardcode it in itrace.
+> 
+> > GDB, for example, uses PTRACE_POKETEXT and PTRACE_PEEKTEXT to manage
+> > breakpoints itself and does not require any kernel assistance.
+> 
+> I was going to say that GDB does not work either with user helpers but
+> it seems that in
+> 
+> commit 52d6c8167d4e91d89bc5c26cf0bacc2200272f96
+> Author: Julian Brown <julian@codesourcery.com>
+> Date:   Thu Jul 30 23:05:00 2009 +0000
+> 
+> the function arm_catch_kernel_helper_return was added to GDB. They
+> hard code 0xffff0000 but I guess that is ok?
+
+I think it's always mapped at the high address if you have an MMU, so
+you might need to detect the uclinux case.
+
+Will
