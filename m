@@ -1,44 +1,57 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 24 Jan 2011 10:50:53 -0800
-Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
-	suspend
-In-Reply-To: <20110124144142.GA16813@sirena.org.uk>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-21-git-send-email-ccross@android.com>
-	<20110124144142.GA16813@sirena.org.uk>
-Message-ID: <AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
+From: matejken@gmail.com (Matej Kenda)
+Date: Mon, 24 Jan 2011 19:54:50 +0100
+Subject: [PATCH 1/2] Updated XCEP partition sizes
+In-Reply-To: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
+References: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
+Message-ID: <AANLkTimMniHC==y6majqBGKNBa91J1DpVK8zbnDxEWvy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Sun, Jan 23, 2011 at 06:01:25PM -0800, Colin Cross wrote:
->> Adds a SUSPEND_PREPARE notification hook to drop the frequency to
->> the lowest possible during suspend. ?This prevents the cpufreq driver
->> from attempting regulator calls after suspend has started - the
->> regulator api can call into drivers that have already been suspended.
+Hi Eric,
+
+I've sent two simple patches for Iskratel XCEP last week.
+
+Can they be included in the kernel?
+
+TIA,
+
+Matej
+
+On 19 January 2011 13:01, Matej Kenda <matejken@gmail.com> wrote:
+> Increased partition for Linux kernel from 1 MB to 2 MB for
+> monolithically built kernel 2.6.37 for Iskratel XCEP SBC to fit in.
 >
-> Hrm, what's the situation where that happens and why does it cause
-> problems? ?The regulator API doesn't care if suspend is going on, and
-> nor do any of the current drivers for regulators. ?There is an issue
-> with keeping things like I2C alive until the bitter end of suspend so
-> you've got a control bus to the regulators but that's a generic issue
-> which crops up with other subsystems too so a regulator-specific
-> workaround seems dodgy.
-
-The end result is that the regulator driver calls the i2c driver after
-the i2c driver has been suspended.  On Tegra, this happens because of
-voltage scaling on the CPU regulator, which can be on the i2c bus.  A
-sleep in a suspend handler after the i2c bus has been suspended can
-cause the cpufreq governor to lower the frequency, and try to lower
-the voltage as well.
-
-The problem isn't limited to i2c busses, there are some regulators on
-spi busses.  You would need to ensure that any driver that has a
-regulator consumer suspends before the regulator driver it
-communicates with, and that still wouldn't fix cpufreq, which has a
-sysdev suspend handler.
-
-> The patch itself seems fine, it's just that it feels like there's
-> something else going on.
+> Signed-off-by: Matej Kenda <matejken@gmail.com>
+>
+> ---
+>
+> diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
+> index 3260ce7..f7b1052 100644
+> --- a/arch/arm/mach-pxa/xcep.c
+> +++ b/arch/arm/mach-pxa/xcep.c
+> @@ -55,20 +55,20 @@ static struct mtd_partition xcep_partitions[] = {
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Bootloader ENV",
+> ? ? ? ? ? ? ? ?.size = ? ? ? ? 0x00040000,
+> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00040000,
+> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
+> ? ? ? ? ? ? ? ?.mask_flags = ? MTD_WRITEABLE
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Kernel",
+> - ? ? ? ? ? ? ? .size = ? ? ? ? 0x00100000,
+> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00080000,
+> + ? ? ? ? ? ? ? .size = ? ? ? ? 0x00200000,
+> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Rescue fs",
+> ? ? ? ? ? ? ? ?.size = ? ? ? ? 0x00280000,
+> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00180000,
+> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
+> ? ? ? ?}, {
+> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Filesystem",
+> ? ? ? ? ? ? ? ?.size = ? ? ? ? MTDPART_SIZ_FULL,
+> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00400000
+> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND
+> ? ? ? ?}
+> ?};
 >
