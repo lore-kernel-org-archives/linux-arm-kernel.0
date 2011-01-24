@@ -1,73 +1,50 @@
-From: jorgesolla@gmail.com (Jorge S.)
-Date: Sun, 23 Jan 2011 16:58:15 +0100
-Subject: AT91SAM9260 Board. Questions about design.
-Message-ID: <AANLkTinuqqHzHFr6J7XkCytJY66UdmRL+dMuMpXwrmAh@mail.gmail.com>
+From: kevin.pouget@gmail.com (Kevin Pouget)
+Date: Mon, 24 Jan 2011 09:34:06 +0100
+Subject: Linux ARM SMP kernel for qemu -- jiffies not updated
+Message-ID: <AANLkTi=DER1tomNE3bqKco2iWB0HEkf9gHFa6vHQqQNh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello:
+thanks for your answers,
 
- I'm planning to build a new board based on the AT91SAM9260 processor, but
-before doing it so, i would like to
-confirm several issues:
+[it seems that] the problem was actually related to the version of
+Qemu, v0.12.5 never triggered the jiffies update, as described below
+for the record, whereas v0.13 is okay !
 
-SDIO Support:
+thanks,
 
- I would like to integrate a SDIO Wifi module (marvel 8686, atheros or any
-other SDIO module). I'm unable to find
-any conclusive information regarding this matter. There are several posts on
-forums and mailing lists from people
-trying it and getting only partial success (slow performance, errors, etc).
+Kevin
 
-Question: Can somebody confirm if SDIO+WIFI is properly working with this
-kind of WIFI modules on AT91SAM9260?
+--
 
-GPIO Support:
+> Program received signal SIGINT, Interrupt.
+> calibrate_delay () at /home/kevin/travail/srcs/linux-2.6.38-rc2/init/calibrate.c:149
+> 149				while (ticks == jiffies)
+> 150					/* nothing */;
 
-  I'm aware of the existence of a kind of GPIO subsystem on the kernel
-(linux/gpio.h) documented on "gpio.txt"
-file. I know i can use /dev/mem to access the hardware registers, but a
-ready-made API would help a lot.
-
-Questions: Are the GPIO pins on the 9260 integrated on this kernel GPIO
-subsystem? Or do i have to provide my own
-GPIO driver to allow user-land applications using GPIO, or just use
-/dev/mem?
+jiffies are not updated, and the kernel never goes any further ...
+(the second CPU is waiting for an interrup --WFI-- before starting)
 
 
-ADC Support:
-
- I would like to be able to use the ADC on the 9260. I've seen several posts
-on forums using an ADC driver
-from ATMEL, but again nothing conclusive.
-
-Question: Is this ADC driver available on the mainline kernel?
-
-
-FLASH Support:
-
- I'm planning to use at least 1GB NAND on my board, but it's difficult to
-find reference designs using one.
-Question: Any warnings here...? Source code reference or something to start
-with? Problems booting? Do i have
- to provide a serial dataflash for booting? or the NAND is just enough?
-
-
-
-Any "BE AWARE OF.."
-
- Some time ago (years) i faced problems with a RM9200 based board having
-issues with hardware SPI and
-with lack of support for the RTC, and some others things that consumed lots
-of time with software
-work-arounds,etc..
-
-Question: Are there any "erratas" or bad-supported things that must be taken
-into account before starting
-the hardware desing of a new board?
-
-
-Thank you all.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110123/d457efca/attachment-0001.html>
+On Sun, Jan 23, 2011 at 6:44 AM, Rabin Vincent <rabin@rab.in> wrote:
+> On Fri, Jan 21, 2011 at 20:47, Kevin Pouget <kevin.pouget@gmail.com> wrote:
+>> do you know if it's feasible to compile a Linux kernel to be run by a
+>> Qemu SMP ARM machine? after so many hours of tries, I can say that any
+>> version of the kernel, any Qemu machine would be okay, provided that
+>> the SMP capability is set, and the kernel boots !
+>
+> Try the kernel from latest git, QEMU from latest git, and the attached
+> .config.
+>
+> The .config is just realview_smp-defconfig with:
+> ?- PB11 and ARMv6 disabled
+> ?- PBX A9 and ARMv7 enabled
+> ?- CONFIG_REALVIEW_HIGH_PHYS_OFFSET disabled
+>
+> Initramfs support is also enabled. ?You can boot it with this line (you'll
+> need an initramfs or initrd to get to userspace):
+>
+> qemu-system-arm -kernel arch/arm/boot/uImage -nographic \
+> ? ? ? ? ? ? ? ?-append "earlyprintk console=ttyAMA0 mem=128M debug" \
+> ? ? ? ? ? ? ? ?-M realview-pbx-a9 -m 128M -initrd ~/kernel/root -smp 2
+>
