@@ -1,132 +1,118 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 24 Jan 2011 14:21:19 +0530
-Subject: [PATCH 5/5] ARM: smp: Skip secondary cpu calibration to speed-up boot
+Date: Mon, 24 Jan 2011 14:21:15 +0530
+Subject: [PATCH 1/5] ARM: gic: Add hooks for architecture specific extensions
 In-Reply-To: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1295859080-15259-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1295859080-15259-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some architectures, secondary cores shares clock with primiary
-core and hence scale together. Hence secondary core lpj calibration
-is not necessary and can be skipped to save considerable time.
+Few architectures combine the GIC with an external interrupt controller.
+On such systems it may be necessary to update both the GIC registers
+and the external controller's registers to control IRQ behavior.
 
-This can speed up the secondary cpu boot and hotplug cpu online
-paths.
+This can be addressed in couple of possible methods.
+ 1.	Export common GIC routines along with 'struct irq_chip gic_chip'
+	and allow architectures to have custom function by override.
 
-The patch is still under discussion and relevant thread is
-here.
-	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42902.html
+ 2.	Provide architecture specific function pointer hooks
+	within GIC library and leave platforms to add the necessary
+	code as part of these hooks.
+
+First one might be non-intrusive but have few shortcomings like arch needs
+to have there own custom gic library. Locks used should be common since it
+caters to same IRQs etc. Maintenance point of view also it leads to
+multiple file fixes.
+
+The second probably is cleaner and portable. It ensures that all the
+common GIC infrastructure is not touched and also provides archs to
+address their specific issue.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/smp.h     |    8 ++++++++
- arch/arm/kernel/smp.c          |   35 ++++++++++++++++++++++++++---------
- arch/arm/mach-omap2/omap-smp.c |    3 +++
- 3 files changed, 37 insertions(+), 9 deletions(-)
+ arch/arm/common/gic.c               |   28 ++++++++++++++++++++++++++++
+ arch/arm/include/asm/hardware/gic.h |    1 +
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 96ed521..150d202 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -69,6 +69,14 @@ asmlinkage void secondary_start_kernel(void);
- extern void platform_secondary_init(unsigned int cpu);
- 
- /*
-+ * Skip the secondary calibration on architectures sharing clock
-+ * with primary cpu. Needs to be called for archs inside
-+ * platform_secondary_init()
-+ */
-+extern void secondary_skip_calibrate(void);
-+
-+
-+/*
-  * Initialize cpu_possible map, and enable coherency
-  */
- extern void platform_smp_prepare_cpus(unsigned int);
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 4539ebc..6aa99bc 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -55,6 +55,8 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 2243772..b4a9ea7 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -44,6 +44,15 @@ struct gic_chip_data {
+ 	void __iomem *cpu_base;
  };
  
-+static unsigned int skip_secondary_calibrate;
++/* Default make arch specific GIC functions NULL */
++struct irq_chip gic_arch_extn = {
++	.irq_mask	= NULL,
++	.irq_unmask	= NULL,
++#ifdef CONFIG_PM
++	.irq_set_wake	= NULL,
++#endif
++};
 +
- int __cpuinit __cpu_up(unsigned int cpu)
- {
- 	struct cpuinfo_arm *ci = &per_cpu(cpu_data, cpu);
-@@ -270,6 +272,16 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+ #ifndef MAX_GIC_NR
+ #define MAX_GIC_NR	1
+ #endif
+@@ -84,6 +93,8 @@ static void gic_mask_irq(struct irq_data *d)
+ 
+ 	spin_lock(&irq_controller_lock);
+ 	writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
++	if (gic_arch_extn.irq_mask)
++		gic_arch_extn.irq_mask(d);
+ 	spin_unlock(&irq_controller_lock);
  }
  
- /*
-+ * Skip the secondary calibration on architectures sharing clock
-+ * with primary cpu. Needs to be called for archs from
-+ * platform_secondary_init()
-+ */
-+void secondary_skip_calibrate(void)
+@@ -92,6 +103,8 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	u32 mask = 1 << (d->irq % 32);
+ 
+ 	spin_lock(&irq_controller_lock);
++	if (gic_arch_extn.irq_unmask)
++		gic_arch_extn.irq_unmask(d);
+ 	writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_SET + (gic_irq(d) / 32) * 4);
+ 	spin_unlock(&irq_controller_lock);
+ }
+@@ -167,6 +180,18 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
+ }
+ #endif
+ 
++#ifdef CONFIG_PM
++static int gic_set_wake(struct irq_data *d, unsigned int on)
 +{
-+	skip_secondary_calibrate = 1;
++	int ret = -ENXIO;
++
++	if (gic_arch_extn.irq_set_wake)
++		ret = gic_arch_extn.irq_set_wake(d, on);
++
++	return ret;
 +}
++#endif
 +
-+/*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-  */
-@@ -312,7 +324,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
- 	 */
- 	percpu_timer_setup();
- 
--	calibrate_delay();
-+	if (!skip_secondary_calibrate)
-+		calibrate_delay();
- 
- 	smp_store_cpu_info(cpu);
- 
-@@ -330,16 +343,20 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
- void __init smp_cpus_done(unsigned int max_cpus)
+ static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
  {
- 	int cpu;
--	unsigned long bogosum = 0;
-+	char bogosum[32];
-+	unsigned long bogosums = 0;
-+
-+	if (!skip_secondary_calibrate) {
-+		for_each_online_cpu(cpu)
-+			bogosums += per_cpu(cpu_data, cpu).loops_per_jiffy;
+ 	struct gic_chip_data *chip_data = get_irq_data(irq);
+@@ -205,6 +230,9 @@ static struct irq_chip gic_chip = {
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity	= gic_set_cpu,
+ #endif
++#ifdef CONFIG_PM
++	.irq_set_wake	= gic_set_wake,
++#endif
+ };
  
--	for_each_online_cpu(cpu)
--		bogosum += per_cpu(cpu_data, cpu).loops_per_jiffy;
-+		snprintf(bogosum, sizeof(bogosums), " (%lu.%02lu BogoMIPS).\n",
-+			bogosums / (500000/HZ), (bogosums / (5000/HZ)) % 100);
-+	} else
-+		bogosum[0] = '\0';
+ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 84557d3..0691f9d 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -34,6 +34,7 @@
  
--	printk(KERN_INFO "SMP: Total of %d processors activated "
--	       "(%lu.%02lu BogoMIPS).\n",
--	       num_online_cpus(),
--	       bogosum / (500000/HZ),
--	       (bogosum / (5000/HZ)) % 100);
-+	pr_info("SMP: Total of %d processors activated%s.\n",
-+		num_online_cpus(), bogosum);
- }
+ #ifndef __ASSEMBLY__
+ extern void __iomem *gic_cpu_base_addr;
++extern struct irq_chip gic_arch_extn;
  
- void __init smp_prepare_boot_cpu(void)
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index b66cfe8..7342cd5 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -39,6 +39,9 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	 */
- 	gic_secondary_init(0);
- 
-+	/* Allow to skip secondary CPU calibration */
-+	secondary_skip_calibrate();
-+
- 	/*
- 	 * Synchronise with the boot thread.
- 	 */
+ void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
+ void gic_secondary_init(unsigned int);
 -- 
 1.6.0.4
