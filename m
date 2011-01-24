@@ -1,54 +1,150 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Mon, 24 Jan 2011 14:43:15 +0530
-Subject: [PATCH v1 0/5] davinci: da850: clean up pinmux arrays in da850.c
-In-Reply-To: <1295371306-24035-1-git-send-email-michael.williamson@criticallink.com>
-References: <1295371306-24035-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302485AD393@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 09:19:57 +0000
+Subject: HIGHMEM is broken when working in SMP V6 mode
+In-Reply-To: <AANLkTim3VVYTrWZX+UJUtK73bUkmSufW_4awhgQcVeNZ@mail.gmail.com>
+References: <AANLkTikjcgRgPd7oLjf0ESxeyC2BHpaaRi8DiMz3b+JQ@mail.gmail.com>
+	<20110123145639.GB30094@n2100.arm.linux.org.uk>
+	<AANLkTi=HtLjnOLGVVqWvqToiXdQAm_+cDdZf51M+ABV4@mail.gmail.com>
+	<20110123170830.GG30094@n2100.arm.linux.org.uk>
+	<AANLkTim3VVYTrWZX+UJUtK73bUkmSufW_4awhgQcVeNZ@mail.gmail.com>
+Message-ID: <20110124091957.GB16202@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jan 24, 2011 at 10:47:36AM +0200, saeed bishara wrote:
+> >> >> I've port 2.6.35 to SMP system that runs in V6 mode, this system
+> >> >> doesn't support TLB operations broadcasting by hw, so it uses IPI
+> >> >> messages for that. ?when enabling DEBUG_LOCKDEP, I got the following
+> >> >> error message while booting the system from NFS:
+> >> >
+> >> > You've bypassed this check:
+> >> >
+> >> > ? ? ? ? ? ? ? ?if (is_smp() && tlb_ops_need_broadcast()) {
+> >> > ? ? ? ? ? ? ? ? ? ? ? ?/*
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? * kmap_high needs to occasionally flush TLB entries,
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? * however, if the TLB entries need to be broadcast
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? * we may deadlock:
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? * ?kmap_high(irqs off)->flush_all_zero_pkmaps->
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? * ?flush_tlb_kernel_range->smp_call_function_many
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? * ? (must not be called with irqs off)
+> >> > ? ? ? ? ? ? ? ? ? ? ? ? */
+> >> > ? ? ? ? ? ? ? ? ? ? ? ?reason = "without hardware TLB ops broadcasting";
+> >> > ? ? ? ? ? ? ? ?}
+> >> >
+> >> > so you lose. ?There's reasons why such checks are put in. ?We can not
+> >> > support SMP and highmem on systems which do not have TLB broadcasting.
+> >> > That's not because the code doesn't support it, it's because there are
+> >> > deadlocks which will occur.
+> >> thanks, I missed that
+> >> >
+> >> > The fact is that it is unsafe to send IPIs with IRQs disabled, which
+> >> > means you can't IPI a TLB operation and wait for it to complete with IRQs
+> >> > disabled.
+> >> as I understand it, the lock_kmap() started to disable IRQs in order
+> >> to support the vivt and vipt caches, but in SMP (at least in my case),
+> >> the caches are PIPT, so I think I can do the following:
+> >> 1. undef ?the ?ARCH_NEEDS_KMAP_HIGH_GET
+> >> 2. use page_address instead of kmap_high_get()
+> >> do you think it will work?
+> >
+> > Definitely not. ?We use kmap_high_get() so that we can ensure that we've
+> > flushed data out of the PIPT cache for highmem pages. ?highmem pages
+> > which are unmapped do not have a valid page_address() but may have PIPT
+> > cache lines associated with them.
+> >
+> > So no, I don't think it'll be safe.
+> ok, what about the following patch, the idea is to use only the
+> kmap_high_l1_vipt when doing cache maintenance.
 
-On Tue, Jan 18, 2011 at 22:51:41, Michael Williamson wrote:
-> The following patch series is an attempt to clean up unused and platform specific
-> pinmux arrays in the da850 CPU files.  This series was developed as a result of 
-> the following email thread:
-> 
-> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg19921.html
-> 
-> This patch is against commit cda6ca38f96f0719ce3500da856e7d4bf0abbc38 of linux-davinci.
-> 
-> This series should not be applied until someone with a da850 EVM can please test
-> and confirm the mcasp and mmc interfaces continue to work properly with these patches.
-> 
-> ---
->   changes since v0:
->   - correct use of __initdata/__initconst attributes
-> 
-> Michael Williamson (5):
->   davinci: da850: remove unused pinmux array
->   davinci: da850: remove unused emif pinmux array
->   davinci: da850: move da850_evm specific mcasp pins to board file.
->   davinci: da850: move da850_evm specific mmcsd pinmux array to board
->     file.
->   davinci: da850: remove unused uart pinmux arrays.
-> 
->  arch/arm/mach-davinci/board-da850-evm.c    |   18 ++++++++-
->  arch/arm/mach-davinci/da850.c              |   56 ----------------------------
->  arch/arm/mach-davinci/include/mach/da8xx.h |    7 ---
->  3 files changed, 16 insertions(+), 65 deletions(-)
-> 
+You're really not listening.
 
-These patches apply cleanly to davinci tree at [1].
+> diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+> index feb988a..457998c 100644
+> --- a/arch/arm/include/asm/highmem.h
+> +++ b/arch/arm/include/asm/highmem.h
+> @@ -19,7 +19,9 @@
+> 
+>  extern pte_t *pkmap_page_table;
+> 
+> +#ifndef CONFIG_SMP
+>  #define ARCH_NEEDS_KMAP_HIGH_GET
+> +#endif
+> 
+>  extern void *kmap_high(struct page *page);
+>  extern void *kmap_high_get(struct page *page);
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 9e7742f..d22366b 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -459,12 +459,15 @@ static void dma_cache_maint_page(struct page
+> *page, unsigned long offset,
+>  				}
+>  				len = PAGE_SIZE - offset;
+>  			}
+> +#ifdef ARCH_NEEDS_KMAP_HIGH_GET
+>  			vaddr = kmap_high_get(page);
+>  			if (vaddr) {
+>  				vaddr += offset;
+>  				op(vaddr, len, dir);
+>  				kunmap_high(page);
+> -			} else if (cache_is_vipt()) {
+> +			} else if (cache_is_vipt())
+> +#endif
 
-The kernel was built using da8xx_omapl_defconfig.
+So you're disabling DMA cache maintainence, making DMA support *unsafe*
+on your platform.  You'll get filesystem corruption and other crap like
+that.  Maybe you don't care for users data?
 
-Tested Ethernet (booted using NFS), UART, Audio, MMC/SD and NAND.
+> +			{
+>  				pte_t saved_pte;
+>  				vaddr = kmap_high_l1_vipt(page, &saved_pte);
+>  				op(vaddr + offset, len, dir);
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index c6844cb..7f96b2c 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -161,11 +161,15 @@ void __flush_dcache_page(struct address_space
+> *mapping, struct page *page)
+>  	if (!PageHighMem(page)) {
+>  		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+>  	} else {
+> -		void *addr = kmap_high_get(page);
+> +		void *addr;
+> +#ifdef ARCH_NEEDS_KMAP_HIGH_GET
+> +	        addr = kmap_high_get(page);
+>  		if (addr) {
+>  			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+>  			kunmap_high(page);
+> -		} else if (cache_is_vipt()) {
+> +		} else if (cache_is_vipt())
+> +#endif
 
-For the entire series:
-Tested-by: Sudhakar Rajashekhara <sudhakar.raj@ti.com>
+I suggest you read the commit comments in 7e5a69e83.
 
-[1] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-davinci.git;a=summary
+Not only that but this can lead to I/D cache incoherency, leading to
+segfaults and illegal instruction exceptions from userspace programs.
 
-Thanks,
-Sudhakar
+> +		{
+>  			pte_t saved_pte;
+>  			addr = kmap_high_l1_vipt(page, &saved_pte);
+>  			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+> index 6ab2440..7493a79 100644
+> --- a/arch/arm/mm/highmem.c
+> +++ b/arch/arm/mm/highmem.c
+> @@ -57,7 +57,11 @@ void *kmap_atomic(struct page *page, enum km_type type)
+>  		kmap = NULL;
+>  	else
+>  #endif
+> +#ifdef ARCH_NEEDS_KMAP_HIGH_GET
+>  		kmap = kmap_high_get(page);
+> +#else
+> +	kmap = NULL;
+> +#endif
+>  	if (kmap)
+>  		return kmap;
+
+So I doubt you'll be able to get this to work reliably, even if you
+disabled all DMA support for your platform.
+
+I really think you're wasting your time.
