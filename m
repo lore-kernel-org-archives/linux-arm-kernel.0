@@ -1,64 +1,94 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 25 Jan 2011 10:06:21 +1300
-Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
-In-Reply-To: <Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
-References: <1295898922-18822-1-git-send-email-julia@diku.dk>
-	<1295898922-18822-3-git-send-email-julia@diku.dk>
-	<4D3DD964.9020107@bluewatersys.com>
-	<Pine.LNX.4.64.1101242058430.3167@ask.diku.dk>
-	<20110124200515.GA30963@albatros>
-	<4D3DDD07.1030809@bluewatersys.com>
-	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
-	<4D3DE35B.1030102@bluewatersys.com>
-	<Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
-Message-ID: <4D3DE9CD.2040800@bluewatersys.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Jan 2011 22:06:53 +0100
+Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
+In-Reply-To: <20110124160127.GA24104@n2100.arm.linux.org.uk>
+References: <1286358159-6994-1-git-send-email-linus.walleij@stericsson.com>
+	<20101219163240.GA27929@n2100.arm.linux.org.uk>
+	<20101219195959.GA28157@n2100.arm.linux.org.uk>
+	<20101221135421.GS28157@n2100.arm.linux.org.uk>
+	<20101221155935.GV28157@n2100.arm.linux.org.uk>
+	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
+	<20110124160127.GA24104@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2011 10:01 AM, Julia Lawall wrote:
-> On Tue, 25 Jan 2011, Ryan Mallon wrote:
-> 
->> On 01/25/2011 09:28 AM, Julia Lawall wrote:
->>>> Julia is correct. Some architectures can return NULL from clk_get, but I
->>>> didn't check the at91 before posting :-/. If we can't return NULL from
->>>> clk_get then we shouldn't bother checking for it. I do think we should
->>>> drop the !IS_ERR(clk_get(dev, func)) check though.
->>>
->>> It seems a bit subtle, because the clk manipulated by clk_get in the call 
->>> of clk_get(dev, func) is not necessarily the same as the one in 
->>> clock_associate.  But perhaps this is the only possibility in practice?
->>
->> Not sure I follow. The at91 clk_get does not modify the clk. In
->> at91_clock_associate we have:
->>
->> 	clk->function = func;
->> 	clk->dev = dev;
->>
->> and in clk_get we have:
->>
->> 	if (clk->function && (dev == clk->dev) &&
->> 		strcmp(id, clk->function) == 0)
->>             return clk;
->>
->> So at91_clock_associate sets the function for a clock, and clk_get
->> returns clocks based on the function association if the name lookup
->> fails. The only caveat to this is that the the clock function name
->> (clk->function) is not the same as any others clock's clk->name.
-> 
-> Right, that was what I was worried about.  That one would find the same 
-> information already present but somewhere else.  But perhaps it can't 
-> happen, or it doesn't matter if it does?
+2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-I think that users are expected to ensure that clock names and clock
-function names do not overlap.
+> Any response to doing this for MMCI:
 
-~Ryan
+Sorry, got stalled tinkering with other stuff.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+> +static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+> +{
+> + ? ? ? struct variant_data *variant = host->variant;
+> + ? ? ? struct dma_slave_config conf = {
+> + ? ? ? ? ? ? ? .src_addr = host->phybase + MMCIFIFO,
+> + ? ? ? ? ? ? ? .dst_addr = host->phybase + MMCIFIFO,
+> + ? ? ? ? ? ? ? .src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
+> + ? ? ? ? ? ? ? .dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
+> + ? ? ? ? ? ? ? .src_maxburst = variant->fifohalfsize >> 2, /* # of words */
+> + ? ? ? ? ? ? ? .dst_maxburst = variant->fifohalfsize >> 2, /* # of words */
+> + ? ? ? };
+> ...
+> + ? ? ? if (data->flags & MMC_DATA_READ) {
+> + ? ? ? ? ? ? ? conf.direction = DMA_FROM_DEVICE;
+> + ? ? ? ? ? ? ? chan = host->dma_rx_channel;
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? conf.direction = DMA_TO_DEVICE;
+> + ? ? ? ? ? ? ? chan = host->dma_tx_channel;
+> + ? ? ? }
+> ...
+> + ? ? ? /* shouldn't this be in the DMA engine driver? */
+> + ? ? ? if (host->size <= variant->dmasize_threshold) {
+> + ? ? ? ? ? ? ? conf.src_maxburst = 1;
+> + ? ? ? ? ? ? ? conf.dst_maxburst = 1;
+> + ? ? ? }
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+This was an addition from Per Forlin, IIRC the requirement
+to not push more than one word at the time into the FIFO
+below a certain threadhold is a requirement for the MMCI,
+not the DMA engine.
+
+What it does is to emulate single requests below a certain
+threshold by requesting one-word bursts. I think this is
+primarily for SDIO, not card transfers.
+
+I'd have to ask around as to the reasons for. We'd better
+understand that, but I noted we added a special hardware
+register to the PL011 just to handle this kind of thresholds,
+so there is something about emulating that threshold in
+software.
+
+> + ? ? ? /* Check for weird stuff in the sg list */
+> + ? ? ? /* shouldn't this be in the DMA engine driver? */
+> + ? ? ? for_each_sg(data->sg, sg, data->sg_len, i) {
+> + ? ? ? ? ? ? ? dev_vdbg(mmc_dev(host->mmc), "MMCI SGlist %d dir %d: length: %08
+> + ? ? ? ? ? ? ? ? ? ? ? ?i, conf.direction, sg->length);
+> + ? ? ? ? ? ? ? if (sg->offset & 3 || sg->length & 3)
+> + ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+
+This one is just overcautious and for SDIO we don't even want to do
+such things, so it should be dropped altogether.
+
+The original intent was to avoid writing anything than 32bit words
+into the register, and with the SDIO-modified versions you can
+actually do that.
+
+So I'll drop it for the next iteration.
+
+> Can we move that size threshold and scatterlist checks inside the slave
+> DMA engine driver?
+>
+> It is entirely possible that different DMA engines have different alignment
+> requirements and different bursting requirements, so surely it makes sense
+> for this kind of stuff to be in their drivers rather than in the DMA engine
+> users?
+>
+> After all, the DMA engine users don't have much idea about what kind of
+> DMA engine will be used with themselves with Primecells.
+
+True.
+
+Linus Walleij
