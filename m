@@ -1,42 +1,106 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 24 Jan 2011 17:29:28 +0800
-Subject: [PATCH 1/3] ARM i.MX28: fix bit operation
-In-Reply-To: <1295607474-6559-2-git-send-email-s.hauer@pengutronix.de>
-References: <1295607474-6559-1-git-send-email-s.hauer@pengutronix.de>
-	<1295607474-6559-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110124092923.GB2625@S2100-06.ap.freescale.net>
+From: cxie4@marvell.com (Chao Xie)
+Date: Sun, 23 Jan 2011 17:35:56 -0800
+Subject: [PATCH] ARM: TWD: fix the clock calculation for TWD
+In-Reply-To: <20110120181050.GF25954@pulham.picochip.com>
+References: <1295505237-5735-1-git-send-email-chao.xie@marvell.com>
+	<20110120140811.GE6335@n2100.arm.linux.org.uk>
+	<20110120144409.GA25954@pulham.picochip.com>
+	<20110120163836.GF6335@n2100.arm.linux.org.uk>
+	<20110120181050.GF25954@pulham.picochip.com>
+Message-ID: <AAD1C6EB06EE3649B35B7E026785068D1534B197BB@SC-VEXCH2.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Your patch is better. 64bit is enough, I think.
 
-On Fri, Jan 21, 2011 at 11:57:52AM +0100, Sascha Hauer wrote:
-> reg | (1 << clk->enable_shift) always evaluates to true. Switch it
-> to & which makes much more sense
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-mxs/clock-mx28.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 56312c0..4146b38 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -355,7 +355,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  	} else {							\
->  		reg &= ~BM_CLKCTRL_##dr##_DIV;				\
->  		reg |= div << BP_CLKCTRL_##dr##_DIV;			\
-> -		if (reg | (1 << clk->enable_shift)) {			\
-> +		if (reg & (1 << clk->enable_shift)) {			\
->  			pr_err("%s: clock is gated\n", __func__);	\
->  			return -EINVAL;					\
->  		}							\
-> -- 
-> 1.7.2.3
-> 
-> 
-Would you mind fixing the same issue in clock-mx23.c name##_set_rate()?
+-----Original Message-----
+From: Jamie Iles [mailto:jamie at jamieiles.com] 
+Sent: Friday, January 21, 2011 2:11 AM
+To: Russell King - ARM Linux
+Cc: Jamie Iles; Chao Xie; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] ARM: TWD: fix the clock calculation for TWD
 
-Regards,
-Shawn
+On Thu, Jan 20, 2011 at 04:38:36PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 20, 2011 at 02:44:09PM +0000, Jamie Iles wrote:
+> > On Thu, Jan 20, 2011 at 02:08:11PM +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Jan 20, 2011 at 02:33:57PM +0800, Chao Xie wrote:
+> > > > The original code will do count * (HZ /5). It will make the twd
+> > > > timer rate decreased if HZ can not be excatly divided. For
+> > > > example HZ=128.
+> > > > 
+> > > > Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> > > > ---
+> > > >  arch/arm/kernel/smp_twd.c |    3 ++-
+> > > >  1 files changed, 2 insertions(+), 1 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > > > index 35882fb..ca6405b 100644
+> > > > --- a/arch/arm/kernel/smp_twd.c
+> > > > +++ b/arch/arm/kernel/smp_twd.c
+> > > > @@ -111,7 +111,8 @@ static void __cpuinit twd_calibrate_rate(void)
+> > > >  
+> > > >  		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+> > > >  
+> > > > -		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+> > > > +		twd_timer_rate = ((unsigned long)(0xFFFFFFFFU - count))
+> > > > +			* HZ / 5;
+> > > >  
+> > > >  		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+> > > >  			(twd_timer_rate / 100000) % 100);
+> > > 
+> > > I don't think this patch has any effect what so ever, so I just tried:
+> > > 
+> > > #define HZ      128
+> > > unsigned long twd_timer_rate;
+> > > void calc1(unsigned long count)
+> > > {
+> > >         twd_timer_rate = (0xffffffffU - count) * (HZ / 5);
+> > > }
+> > > void calc2(unsigned long count)
+> > > {
+> > >         twd_timer_rate = ((unsigned long)(0xffffffffU - count)) * (HZ / 5);
+> > > }
+> > 
+> > Hi Russell,
+> > 
+> > In Chao's patch the parentheses around (HZ / 5) have been removed so its 
+> > now dowing the multiplication before the division (if I remember the 
+> > precedences correctly!).  I don't think the cast to unsigned long is 
+> > needed though.
+> 
+> Hmm.  That means the maximum twd timer rate we can support is about
+> 860MHz.  Is that enough?
+
+I'm not familiar with any ARM SMP systems so I wouldn't like to commit 
+to that!  If the answer is no, then I guess could we do something like 
+the (untested in a kernel) patch below to get a few more bits and we 
+should then be able to support rates of up to ~4294MHz.
+
+Jamie
+
+8<----
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index fd91566..334ad95 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -89,6 +89,8 @@ static void __cpuinit twd_calibrate_rate(void)
+ 	 * the timer ticks
+ 	 */
+ 	if (twd_timer_rate == 0) {
++		u64 rate64;
++
+ 		printk(KERN_INFO "Calibrating local timer... ");
+ 
+ 		/* Wait for a tick to start */
+@@ -111,7 +113,9 @@ static void __cpuinit twd_calibrate_rate(void)
+ 
+ 		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+ 
+-		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
++		rate64 = (0xFFFFFFFFLLU - count) * (u64)HZ;
++		do_div(rate64, 5);
++		twd_timer_rate = rate64;
+ 
+ 		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+ 			(twd_timer_rate / 1000000) % 100);
