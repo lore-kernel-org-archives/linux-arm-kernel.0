@@ -1,174 +1,250 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Jan 2011 17:55:45 +0000
-Subject: [PATCH v4 03/19] ARM: LPAE: use long long format when printing
-	physical addresses and ptes
+Date: Mon, 24 Jan 2011 17:55:48 +0000
+Subject: [PATCH v4 06/19] ARM: LPAE: Add (pte|pmd|pgd|pgprot)val_t type
+	definitions as u32
 In-Reply-To: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1295891761-18366-4-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1295891761-18366-7-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+This patch defines the (pte|pmd|pgd|pgprot)val_t as u32 and changes the
+page table types to be based on these. The PMD bits are converted to the
+corresponding type using the _AT macro.
 
-Now that the Kernel supports 2 level and 3 level page tables, physical
-addresses (and also page table entries) may be 32 or 64-bits depending
-upon the configuration.
+The flush_pmd_entry/clean_pmd_entry argument was changed to (void *) to
+allow them to be used with both PGD and PMD pointers and avoid code
+duplication.
 
-This patch uses the %08llx conversion specifier for physical addresses
-and page table entries, ensuring that they are cast to (long long) so
-that common code can be used regardless of the datatype widths.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/kernel/setup.c |    2 +-
- arch/arm/kernel/traps.c |    6 +++---
- arch/arm/mm/fault.c     |   10 ++++++----
- arch/arm/mm/mmu.c       |   30 +++++++++++++++---------------
- 4 files changed, 25 insertions(+), 23 deletions(-)
+ arch/arm/include/asm/pgalloc.h              |    4 +-
+ arch/arm/include/asm/pgtable-2level-hwdef.h |   82 +++++++++++++-------------
+ arch/arm/include/asm/pgtable-2level-types.h |   17 +++--
+ arch/arm/include/asm/tlbflush.h             |    4 +-
+ arch/arm/mm/mm.h                            |    4 +-
+ arch/arm/mm/mmu.c                           |    2 +-
+ 6 files changed, 58 insertions(+), 55 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 5ea4fb7..3d23f0f 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -449,7 +449,7 @@ static int __init arm_add_memory(unsigned long start, unsigned long size)
- 
- 	if (meminfo.nr_banks >= NR_BANKS) {
- 		printk(KERN_CRIT "NR_BANKS too low, "
--			"ignoring memory at %#lx\n", start);
-+			"ignoring memory at %#08llx\n", (long long)start);
- 		return -EINVAL;
- 	}
- 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index ee57640..8f3ca04 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -712,17 +712,17 @@ EXPORT_SYMBOL(__readwrite_bug);
- 
- void __pte_error(const char *file, int line, pte_t pte)
- {
--	printk("%s:%d: bad pte %08lx.\n", file, line, pte_val(pte));
-+	printk("%s:%d: bad pte %08llx.\n", file, line, (long long)pte_val(pte));
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index 9763be0..841293e 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -103,9 +103,9 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
  }
  
- void __pmd_error(const char *file, int line, pmd_t pmd)
+ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
+-	unsigned long prot)
++				  pmdval_t prot)
  {
--	printk("%s:%d: bad pmd %08lx.\n", file, line, pmd_val(pmd));
-+	printk("%s:%d: bad pmd %08llx.\n", file, line, (long long)pmd_val(pmd));
+-	unsigned long pmdval = (pte + PTE_HWTABLE_OFF) | prot;
++	pmdval_t pmdval = (pte + PTE_HWTABLE_OFF) | prot;
+ 	pmdp[0] = __pmd(pmdval);
+ 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+ 	flush_pmd_entry(pmdp);
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 436529c..2b52c40 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -16,29 +16,29 @@
+  * + Level 1 descriptor (PMD)
+  *   - common
+  */
+-#define PMD_TYPE_MASK		(3 << 0)
+-#define PMD_TYPE_FAULT		(0 << 0)
+-#define PMD_TYPE_TABLE		(1 << 0)
+-#define PMD_TYPE_SECT		(2 << 0)
+-#define PMD_BIT4		(1 << 4)
+-#define PMD_DOMAIN(x)		((x) << 5)
+-#define PMD_PROTECTION		(1 << 9)	/* v5 */
++#define PMD_TYPE_MASK		(_AT(pmdval_t, 3) << 0)
++#define PMD_TYPE_FAULT		(_AT(pmdval_t, 0) << 0)
++#define PMD_TYPE_TABLE		(_AT(pmdval_t, 1) << 0)
++#define PMD_TYPE_SECT		(_AT(pmdval_t, 2) << 0)
++#define PMD_BIT4		(_AT(pmdval_t, 1) << 4)
++#define PMD_DOMAIN(x)		(_AT(pmdval_t, (x)) << 5)
++#define PMD_PROTECTION		(_AT(pmdval_t, 1) << 9)		/* v5 */
+ /*
+  *   - section
+  */
+-#define PMD_SECT_BUFFERABLE	(1 << 2)
+-#define PMD_SECT_CACHEABLE	(1 << 3)
+-#define PMD_SECT_XN		(1 << 4)	/* v6 */
+-#define PMD_SECT_AP_WRITE	(1 << 10)
+-#define PMD_SECT_AP_READ	(1 << 11)
+-#define PMD_SECT_TEX(x)		((x) << 12)	/* v5 */
+-#define PMD_SECT_APX		(1 << 15)	/* v6 */
+-#define PMD_SECT_S		(1 << 16)	/* v6 */
+-#define PMD_SECT_nG		(1 << 17)	/* v6 */
+-#define PMD_SECT_SUPER		(1 << 18)	/* v6 */
+-#define PMD_SECT_AF		(0)
++#define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
++#define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
++#define PMD_SECT_XN		(_AT(pmdval_t, 1) << 4)		/* v6 */
++#define PMD_SECT_AP_WRITE	(_AT(pmdval_t, 1) << 10)
++#define PMD_SECT_AP_READ	(_AT(pmdval_t, 1) << 11)
++#define PMD_SECT_TEX(x)		(_AT(pmdval_t, (x)) << 12)	/* v5 */
++#define PMD_SECT_APX		(_AT(pmdval_t, 1) << 15)	/* v6 */
++#define PMD_SECT_S		(_AT(pmdval_t, 1) << 16)	/* v6 */
++#define PMD_SECT_nG		(_AT(pmdval_t, 1) << 17)	/* v6 */
++#define PMD_SECT_SUPER		(_AT(pmdval_t, 1) << 18)	/* v6 */
++#define PMD_SECT_AF		(_AT(pmdval_t, 0))
+ 
+-#define PMD_SECT_UNCACHED	(0)
++#define PMD_SECT_UNCACHED	(_AT(pmdval_t, 0))
+ #define PMD_SECT_BUFFERED	(PMD_SECT_BUFFERABLE)
+ #define PMD_SECT_WT		(PMD_SECT_CACHEABLE)
+ #define PMD_SECT_WB		(PMD_SECT_CACHEABLE | PMD_SECT_BUFFERABLE)
+@@ -54,38 +54,38 @@
+  * + Level 2 descriptor (PTE)
+  *   - common
+  */
+-#define PTE_TYPE_MASK		(3 << 0)
+-#define PTE_TYPE_FAULT		(0 << 0)
+-#define PTE_TYPE_LARGE		(1 << 0)
+-#define PTE_TYPE_SMALL		(2 << 0)
+-#define PTE_TYPE_EXT		(3 << 0)	/* v5 */
+-#define PTE_BUFFERABLE		(1 << 2)
+-#define PTE_CACHEABLE		(1 << 3)
++#define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
++#define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
++#define PTE_TYPE_LARGE		(_AT(pteval_t, 1) << 0)
++#define PTE_TYPE_SMALL		(_AT(pteval_t, 2) << 0)
++#define PTE_TYPE_EXT		(_AT(pteval_t, 3) << 0)		/* v5 */
++#define PTE_BUFFERABLE		(_AT(pteval_t, 1) << 2)
++#define PTE_CACHEABLE		(_AT(pteval_t, 1) << 3)
+ 
+ /*
+  *   - extended small page/tiny page
+  */
+-#define PTE_EXT_XN		(1 << 0)	/* v6 */
+-#define PTE_EXT_AP_MASK		(3 << 4)
+-#define PTE_EXT_AP0		(1 << 4)
+-#define PTE_EXT_AP1		(2 << 4)
+-#define PTE_EXT_AP_UNO_SRO	(0 << 4)
++#define PTE_EXT_XN		(_AT(pteval_t, 1) << 0)		/* v6 */
++#define PTE_EXT_AP_MASK		(_AT(pteval_t, 3) << 4)
++#define PTE_EXT_AP0		(_AT(pteval_t, 1) << 4)
++#define PTE_EXT_AP1		(_AT(pteval_t, 2) << 4)
++#define PTE_EXT_AP_UNO_SRO	(_AT(pteval_t, 0) << 4)
+ #define PTE_EXT_AP_UNO_SRW	(PTE_EXT_AP0)
+ #define PTE_EXT_AP_URO_SRW	(PTE_EXT_AP1)
+ #define PTE_EXT_AP_URW_SRW	(PTE_EXT_AP1|PTE_EXT_AP0)
+-#define PTE_EXT_TEX(x)		((x) << 6)	/* v5 */
+-#define PTE_EXT_APX		(1 << 9)	/* v6 */
+-#define PTE_EXT_COHERENT	(1 << 9)	/* XScale3 */
+-#define PTE_EXT_SHARED		(1 << 10)	/* v6 */
+-#define PTE_EXT_NG		(1 << 11)	/* v6 */
++#define PTE_EXT_TEX(x)		(_AT(pteval_t, (x)) << 6)	/* v5 */
++#define PTE_EXT_APX		(_AT(pteval_t, 1) << 9)		/* v6 */
++#define PTE_EXT_COHERENT	(_AT(pteval_t, 1) << 9)		/* XScale3 */
++#define PTE_EXT_SHARED		(_AT(pteval_t, 1) << 10)	/* v6 */
++#define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* v6 */
+ 
+ /*
+  *   - small page
+  */
+-#define PTE_SMALL_AP_MASK	(0xff << 4)
+-#define PTE_SMALL_AP_UNO_SRO	(0x00 << 4)
+-#define PTE_SMALL_AP_UNO_SRW	(0x55 << 4)
+-#define PTE_SMALL_AP_URO_SRW	(0xaa << 4)
+-#define PTE_SMALL_AP_URW_SRW	(0xff << 4)
++#define PTE_SMALL_AP_MASK	(_AT(pteval_t, 0xff) << 4)
++#define PTE_SMALL_AP_UNO_SRO	(_AT(pteval_t, 0x00) << 4)
++#define PTE_SMALL_AP_UNO_SRW	(_AT(pteval_t, 0x55) << 4)
++#define PTE_SMALL_AP_URO_SRW	(_AT(pteval_t, 0xaa) << 4)
++#define PTE_SMALL_AP_URW_SRW	(_AT(pteval_t, 0xff) << 4)
+ 
+ #endif
+diff --git a/arch/arm/include/asm/pgtable-2level-types.h b/arch/arm/include/asm/pgtable-2level-types.h
+index 8ff6941..a4a4067 100644
+--- a/arch/arm/include/asm/pgtable-2level-types.h
++++ b/arch/arm/include/asm/pgtable-2level-types.h
+@@ -19,7 +19,10 @@
+ #ifndef _ASM_PGTABLE_2LEVEL_TYPES_H
+ #define _ASM_PGTABLE_2LEVEL_TYPES_H
+ 
+-typedef unsigned long pteval_t;
++typedef u32 pteval_t;
++typedef u32 pmdval_t;
++typedef u32 pgdval_t;
++typedef u32 pgprotval_t;
+ 
+ #undef STRICT_MM_TYPECHECKS
+ 
+@@ -28,9 +31,9 @@ typedef unsigned long pteval_t;
+  * These are used to make use of C type-checking..
+  */
+ typedef struct { pteval_t pte; } pte_t;
+-typedef struct { unsigned long pmd; } pmd_t;
+-typedef struct { unsigned long pgd[2]; } pgd_t;
+-typedef struct { unsigned long pgprot; } pgprot_t;
++typedef struct { pmdval_t pmd; } pmd_t;
++typedef struct { pgdval_t pgd[2]; } pgd_t;
++typedef struct { pgprotval_t pgprot; } pgprot_t;
+ 
+ #define pte_val(x)      ((x).pte)
+ #define pmd_val(x)      ((x).pmd)
+@@ -46,9 +49,9 @@ typedef struct { unsigned long pgprot; } pgprot_t;
+  * .. while these make it easier on the compiler
+  */
+ typedef pteval_t pte_t;
+-typedef unsigned long pmd_t;
+-typedef unsigned long pgd_t[2];
+-typedef unsigned long pgprot_t;
++typedef pmdval_t pmd_t;
++typedef pgdval_t pgd_t[2];
++typedef pgprotval_t pgprot_t;
+ 
+ #define pte_val(x)      (x)
+ #define pmd_val(x)      (x)
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index ce7378e..8746b9a 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -514,7 +514,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+  *	these operations.  This is typically used when we are removing
+  *	PMD entries.
+  */
+-static inline void flush_pmd_entry(pmd_t *pmd)
++static inline void flush_pmd_entry(void *pmd)
+ {
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+@@ -530,7 +530,7 @@ static inline void flush_pmd_entry(pmd_t *pmd)
+ 		dsb();
  }
  
- void __pgd_error(const char *file, int line, pgd_t pgd)
+-static inline void clean_pmd_entry(pmd_t *pmd)
++static inline void clean_pmd_entry(void *pmd)
  {
--	printk("%s:%d: bad pgd %08lx.\n", file, line, pgd_val(pgd));
-+	printk("%s:%d: bad pgd %08llx.\n", file, line, (long long)pgd_val(pgd));
- }
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
  
- asmlinkage void __div0(void)
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index f10f9ba..ef0e24f 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -76,7 +76,8 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index 36960df..794e83e 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -17,8 +17,8 @@ static inline pmd_t *pmd_off_k(unsigned long virt)
  
- 	printk(KERN_ALERT "pgd = %p\n", mm->pgd);
- 	pgd = pgd_offset(mm, addr);
--	printk(KERN_ALERT "[%08lx] *pgd=%08lx", addr, pgd_val(*pgd));
-+	printk(KERN_ALERT "[%08lx] *pgd=%08llx",
-+			addr, (long long)pgd_val(*pgd));
- 
- 	do {
- 		pmd_t *pmd;
-@@ -92,7 +93,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 
- 		pmd = pmd_offset(pgd, addr);
- 		if (PTRS_PER_PMD != 1)
--			printk(", *pmd=%08lx", pmd_val(*pmd));
-+			printk(", *pmd=%08llx", (long long)pmd_val(*pmd));
- 
- 		if (pmd_none(*pmd))
- 			break;
-@@ -107,8 +108,9 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 			break;
- 
- 		pte = pte_offset_map(pmd, addr);
--		printk(", *pte=%08lx", pte_val(*pte));
--		printk(", *ppte=%08lx", pte_val(pte[PTE_HWTABLE_PTRS]));
-+		printk(", *pte=%08llx", (long long)pte_val(*pte));
-+		printk(", *ppte=%08llx",
-+		       (long long)pte_val(pte[PTE_HWTABLE_PTRS]));
- 		pte_unmap(pte);
- 	} while(0);
+ struct mem_type {
+ 	pteval_t prot_pte;
+-	unsigned int prot_l1;
+-	unsigned int prot_sect;
++	pgprotval_t prot_l1;
++	pgprotval_t prot_sect;
+ 	unsigned int domain;
+ };
  
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index dcafa5c..cae8d68 100644
+index 195a31e..57f9688 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -597,8 +597,8 @@ static void __init create_36bit_mapping(struct map_desc *md,
- 
- 	if (!(cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())) {
- 		printk(KERN_ERR "MM: CPU does not support supersection "
--		       "mapping for 0x%08llx at 0x%08lx\n",
--		       __pfn_to_phys((u64)md->pfn), addr);
-+		       "mapping for %#08llx at %#08lx\n",
-+		       (long long)__pfn_to_phys((u64)md->pfn), addr);
- 		return;
- 	}
- 
-@@ -610,15 +610,15 @@ static void __init create_36bit_mapping(struct map_desc *md,
- 	 */
- 	if (type->domain) {
- 		printk(KERN_ERR "MM: invalid domain in supersection "
--		       "mapping for 0x%08llx at 0x%08lx\n",
--		       __pfn_to_phys((u64)md->pfn), addr);
-+		       "mapping for %#08llx at %#08lx\n",
-+		       (long long)__pfn_to_phys((u64)md->pfn), addr);
- 		return;
- 	}
- 
- 	if ((addr | length | __pfn_to_phys(md->pfn)) & ~SUPERSECTION_MASK) {
--		printk(KERN_ERR "MM: cannot create mapping for "
--		       "0x%08llx at 0x%08lx invalid alignment\n",
--		       __pfn_to_phys((u64)md->pfn), addr);
-+		printk(KERN_ERR "MM: cannot create mapping for %#08llx"
-+		       " at %#08lx invalid alignment\n",
-+		       (long long)__pfn_to_phys((u64)md->pfn), addr);
- 		return;
- 	}
- 
-@@ -657,17 +657,17 @@ static void __init create_mapping(struct map_desc *md)
- 	pgd_t *pgd;
- 
- 	if (md->virtual != vectors_base() && md->virtual < TASK_SIZE) {
--		printk(KERN_WARNING "BUG: not creating mapping for "
--		       "0x%08llx@0x%08lx in user region\n",
--		       __pfn_to_phys((u64)md->pfn), md->virtual);
-+		printk(KERN_WARNING "BUG: not creating mapping for %#08llx"
-+		       " at %#08lx in user region\n",
-+		       (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
- 		return;
- 	}
- 
- 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
- 	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
--		printk(KERN_WARNING "BUG: mapping for 0x%08llx@0x%08lx "
--		       "overlaps vmalloc space\n",
--		       __pfn_to_phys((u64)md->pfn), md->virtual);
-+		printk(KERN_WARNING "BUG: mapping for %#08llx"
-+		       " at %#08lx overlaps vmalloc space\n",
-+		       (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
- 	}
- 
- 	type = &mem_types[md->type];
-@@ -685,9 +685,9 @@ static void __init create_mapping(struct map_desc *md)
- 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
- 
- 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
--		printk(KERN_WARNING "BUG: map for 0x%08lx at 0x%08lx can not "
-+		printk(KERN_WARNING "BUG: map for %#08llx at %#08lx can not "
- 		       "be mapped using pages, ignoring.\n",
--		       __pfn_to_phys(md->pfn), addr);
-+		       (long long)__pfn_to_phys(md->pfn), addr);
- 		return;
- 	}
+@@ -290,7 +290,7 @@ static void __init build_mem_type_table(void)
+ {
+ 	struct cachepolicy *cp;
+ 	unsigned int cr = get_cr();
+-	unsigned int user_pgprot, kern_pgprot, vecs_pgprot;
++	pgprotval_t user_pgprot, kern_pgprot, vecs_pgprot;
+ 	int cpu_arch = cpu_architecture();
+ 	int i;
  
