@@ -1,135 +1,52 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:24 -0800
-Subject: [PATCH v2 19/28] ARM: tegra: iomap: Add missing devices,
-	fix use of SZ_8, SZ_64
+Date: Sun, 23 Jan 2011 18:01:30 -0800
+Subject: [PATCH v2 25/28] ARM: tegra: suspend: Save protected aperture across
+	LP0
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-20-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-26-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gary King <gking@nvidia.com>
-
-Adds gart, hdmi, avp, host1x, and pwm controllers to mach/iomap.h
-There is no SZ_8 or SZ_64, replace them with constants
-
-Signed-off-by: Gary King <gking@nvidia.com>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/include/mach/iomap.h |   55 ++++++++++++++++++++++++------
- 1 files changed, 44 insertions(+), 11 deletions(-)
+ arch/arm/mach-tegra/suspend.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
-index 325eca3..26f2363 100644
---- a/arch/arm/mach-tegra/include/mach/iomap.h
-+++ b/arch/arm/mach-tegra/include/mach/iomap.h
-@@ -26,6 +26,9 @@
- #define TEGRA_IRAM_BASE			0x40000000
- #define TEGRA_IRAM_SIZE			SZ_256K
+diff --git a/arch/arm/mach-tegra/suspend.c b/arch/arm/mach-tegra/suspend.c
+index ded2c36..be8c78f 100644
+--- a/arch/arm/mach-tegra/suspend.c
++++ b/arch/arm/mach-tegra/suspend.c
+@@ -497,12 +497,13 @@ static void tegra_debug_uart_resume(void)
  
-+#define TEGRA_HOST1X_BASE		0x50000000
-+#define TEGRA_HOST1X_SIZE		0x24000
-+
- #define TEGRA_ARM_PERIF_BASE		0x50040000
- #define TEGRA_ARM_PERIF_SIZE		SZ_8K
+ #define MC_SECURITY_START	0x6c
+ #define MC_SECURITY_SIZE	0x70
++#define MC_SECURITY_CFG2	0x7c
  
-@@ -35,38 +38,56 @@
- #define TEGRA_ARM_INT_DIST_BASE		0x50041000
- #define TEGRA_ARM_INT_DIST_SIZE		SZ_4K
+ static int tegra_suspend_enter(suspend_state_t state)
+ {
+ 	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
+ 	unsigned long flags;
+-	u32 mc_data[2];
++	u32 mc_data[3] = {0, 0, 0};
+ 	bool do_lp0 = (current_suspend_mode == TEGRA_SUSPEND_LP0);
+ 	bool do_lp2 = (current_suspend_mode == TEGRA_SUSPEND_LP2);
+ 	int lp_state;
+@@ -533,6 +534,7 @@ static int tegra_suspend_enter(suspend_state_t state)
  
-+#define TEGRA_MPE_BASE			0x54040000
-+#define TEGRA_MPE_SIZE			SZ_256K
-+
-+#define TEGRA_VI_BASE			0x54080000
-+#define TEGRA_VI_SIZE			SZ_256K
-+
-+#define TEGRA_ISP_BASE			0x54100000
-+#define TEGRA_ISP_SIZE			SZ_256K
-+
- #define TEGRA_DISPLAY_BASE		0x54200000
- #define TEGRA_DISPLAY_SIZE		SZ_256K
+ 		mc_data[0] = readl(mc + MC_SECURITY_START);
+ 		mc_data[1] = readl(mc + MC_SECURITY_SIZE);
++		mc_data[2] = readl(mc + MC_SECURITY_CFG2);
+ 	}
  
- #define TEGRA_DISPLAY2_BASE		0x54240000
- #define TEGRA_DISPLAY2_SIZE		SZ_256K
+ 	rtc_before = tegra_rtc_read_ms();
+@@ -550,6 +552,7 @@ static int tegra_suspend_enter(suspend_state_t state)
+ 	if (do_lp0) {
+ 		writel(mc_data[0], mc + MC_SECURITY_START);
+ 		writel(mc_data[1], mc + MC_SECURITY_SIZE);
++		writel(mc_data[2], mc + MC_SECURITY_CFG2);
  
-+#define TEGRA_HDMI_BASE			0x54280000
-+#define TEGRA_HDMI_SIZE			SZ_256K
-+
-+#define TEGRA_GART_BASE			0x58000000
-+#define TEGRA_GART_SIZE			SZ_32M
-+
-+#define TEGRA_RES_SEMA_BASE		0x60001000
-+#define TEGRA_RES_SEMA_SIZE		SZ_4K
-+
- #define TEGRA_PRIMARY_ICTLR_BASE	0x60004000
--#define TEGRA_PRIMARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_PRIMARY_ICTLR_SIZE	64
- 
- #define TEGRA_SECONDARY_ICTLR_BASE	0x60004100
--#define TEGRA_SECONDARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_SECONDARY_ICTLR_SIZE	64
- 
- #define TEGRA_TERTIARY_ICTLR_BASE	0x60004200
--#define TEGRA_TERTIARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_TERTIARY_ICTLR_SIZE	64
- 
- #define TEGRA_QUATERNARY_ICTLR_BASE	0x60004300
--#define TEGRA_QUATERNARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_QUATERNARY_ICTLR_SIZE	64
- 
- #define TEGRA_TMR1_BASE			0x60005000
--#define TEGRA_TMR1_SIZE			SZ_8
-+#define TEGRA_TMR1_SIZE			8
- 
- #define TEGRA_TMR2_BASE			0x60005008
--#define TEGRA_TMR2_SIZE			SZ_8
-+#define TEGRA_TMR2_SIZE			8
- 
- #define TEGRA_TMRUS_BASE		0x60005010
--#define TEGRA_TMRUS_SIZE		SZ_64
-+#define TEGRA_TMRUS_SIZE		64
- 
- #define TEGRA_TMR3_BASE			0x60005050
--#define TEGRA_TMR3_SIZE			SZ_8
-+#define TEGRA_TMR3_SIZE			8
- 
- #define TEGRA_TMR4_BASE			0x60005058
--#define TEGRA_TMR4_SIZE			SZ_8
-+#define TEGRA_TMR4_SIZE			8
- 
- #define TEGRA_CLK_RESET_BASE		0x60006000
- #define TEGRA_CLK_RESET_SIZE		SZ_4K
-@@ -114,10 +135,10 @@
- #define TEGRA_I2S2_SIZE			SZ_256
- 
- #define TEGRA_UARTA_BASE		0x70006000
--#define TEGRA_UARTA_SIZE		SZ_64
-+#define TEGRA_UARTA_SIZE		64
- 
- #define TEGRA_UARTB_BASE		0x70006040
--#define TEGRA_UARTB_SIZE		SZ_64
-+#define TEGRA_UARTB_SIZE		64
- 
- #define TEGRA_UARTC_BASE		0x70006200
- #define TEGRA_UARTC_SIZE		SZ_256
-@@ -140,6 +161,18 @@
- #define TEGRA_PWFM_BASE			0x7000A000
- #define TEGRA_PWFM_SIZE			SZ_256
- 
-+#define TEGRA_PWFM0_BASE		0x7000A000
-+#define TEGRA_PWFM0_SIZE		4
-+
-+#define TEGRA_PWFM1_BASE		0x7000A010
-+#define TEGRA_PWFM1_SIZE		4
-+
-+#define TEGRA_PWFM2_BASE		0x7000A020
-+#define TEGRA_PWFM2_SIZE		4
-+
-+#define TEGRA_PWFM3_BASE		0x7000A030
-+#define TEGRA_PWFM3_SIZE		4
-+
- #define TEGRA_MIPI_BASE			0x7000B000
- #define TEGRA_MIPI_SIZE			SZ_256
- 
+ 		tegra_clk_resume();
+ 		tegra_gpio_resume();
 -- 
 1.7.3.1
