@@ -1,55 +1,102 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:32 -0800
-Subject: [PATCH v2 27/28] ARM: tegra: enable emc clock updates after lp0
+Date: Sun, 23 Jan 2011 18:01:08 -0800
+Subject: [PATCH v2 03/28] ARM: gic: Export irq chip functions
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-28-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-4-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Wylder <james.wylder@motorola.com>
+Some systems combine the GIC with an external interrupt controller.
+On these systems it may be necessary to update both the GIC registers
+and the external controller's registers to control IRQ behavior.
+Export the irq chip functions so that these systems can define a
+custom irq chip that calls into the GIC handlers.
 
-Write a dummy value to EMC_MRW_0 to allow
-clock frequency changes after lp0.
-
-Signed-off-by: James Wylder <james.wylder@motorola.com>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/suspend.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+v2: Updated on top of irq_data changes
 
-diff --git a/arch/arm/mach-tegra/suspend.c b/arch/arm/mach-tegra/suspend.c
-index 8b32707..9b851c7 100644
---- a/arch/arm/mach-tegra/suspend.c
-+++ b/arch/arm/mach-tegra/suspend.c
-@@ -122,6 +122,10 @@ static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
- #define FLOW_CTRL_CPU_CSR	0x8
- #define FLOW_CTRL_CPU1_CSR	0x18
- 
-+#define EMC_MRW_0		0x0e8
-+#define EMC_MRW_DEV_SELECTN     30
-+#define EMC_MRW_DEV_NONE	(3 << EMC_MRW_DEV_SELECTN)
-+
- unsigned long tegra_pgd_phys;  /* pgd used by hotplug & LP2 bootup */
- static pgd_t *tegra_pgd;
- void *tegra_context_area;
-@@ -503,6 +507,7 @@ static void tegra_debug_uart_resume(void)
- static int tegra_suspend_enter(suspend_state_t state)
+ arch/arm/common/gic.c               |   11 +++++------
+ arch/arm/include/asm/hardware/gic.h |   10 ++++++++++
+ 2 files changed, 15 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index a6f8c58..c11f478 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -78,14 +78,14 @@ static inline unsigned int gic_irq(struct irq_data *d)
+ /*
+  * Routines to acknowledge, disable and enable interrupts
+  */
+-static void gic_ack_irq(struct irq_data *d)
++void gic_ack_irq(struct irq_data *d)
  {
- 	void __iomem *mc = IO_ADDRESS(TEGRA_MC_BASE);
-+	void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
- 	unsigned long flags;
- 	u32 mc_data[3] = {0, 0, 0};
- 	bool do_lp0 = (current_suspend_mode == TEGRA_SUSPEND_LP0);
-@@ -555,6 +560,9 @@ static int tegra_suspend_enter(suspend_state_t state)
- 		writel(mc_data[1], mc + MC_SECURITY_SIZE);
- 		writel(mc_data[2], mc + MC_SECURITY_CFG2);
+ 	spin_lock(&irq_controller_lock);
+ 	writel(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
+ 	spin_unlock(&irq_controller_lock);
+ }
  
-+		/* trigger emc mode write */
-+		writel(EMC_MRW_DEV_NONE, emc + EMC_MRW_0);
+-static void gic_mask_irq(struct irq_data *d)
++void gic_mask_irq(struct irq_data *d)
+ {
+ 	u32 mask = 1 << (d->irq % 32);
+ 
+@@ -94,7 +94,7 @@ static void gic_mask_irq(struct irq_data *d)
+ 	spin_unlock(&irq_controller_lock);
+ }
+ 
+-static void gic_unmask_irq(struct irq_data *d)
++void gic_unmask_irq(struct irq_data *d)
+ {
+ 	u32 mask = 1 << (d->irq % 32);
+ 
+@@ -103,7 +103,7 @@ static void gic_unmask_irq(struct irq_data *d)
+ 	spin_unlock(&irq_controller_lock);
+ }
+ 
+-static int gic_set_type(struct irq_data *d, unsigned int type)
++int gic_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	void __iomem *base = gic_dist_base(d);
+ 	unsigned int gicirq = gic_irq(d);
+@@ -149,8 +149,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+ }
+ 
+ #ifdef CONFIG_SMP
+-static int
+-gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
++int gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
+ {
+ 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+ 	unsigned int shift = (d->irq % 4) * 8;
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index d0c2ba9..2ab5cf0 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -33,6 +33,8 @@
+ #define GIC_DIST_SOFTINT		0xf00
+ 
+ #ifndef __ASSEMBLY__
++struct irq_data;
 +
- 		tegra_clk_resume();
- 		tegra_gpio_resume();
- 		tegra_timer_resume();
+ extern void __iomem *gic_cpu_base_addr;
+ 
+ void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
+@@ -43,6 +45,14 @@ void gic_cpu_exit(unsigned int gic_nr);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+ void gic_enable_ppi(unsigned int);
++
++void gic_ack_irq(struct irq_data *d);
++void gic_mask_irq(struct irq_data *d);
++void gic_unmask_irq(struct irq_data *d);
++int gic_set_type(struct irq_data *d, unsigned int type);
++#ifdef CONFIG_SMP
++int gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force);
++#endif
+ #endif
+ 
+ #endif
 -- 
 1.7.3.1
