@@ -1,29 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 23:38:01 +0000
-Subject: [PATCH v4 01/19] ARM: Make the argument to virt_to_phys()
-	"const volatile"
-In-Reply-To: <4D3DD0D8.10905@codeaurora.org>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-2-git-send-email-catalin.marinas@arm.com>
-	<4D3DD0D8.10905@codeaurora.org>
-Message-ID: <20110124233801.GT24104@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 24 Jan 2011 15:42:21 -0800
+Subject: [GIT PULL for 38-rc3] msm: sdcc driver fixes
+Message-ID: <8yatygxj2ci.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 11:19:52AM -0800, Stephen Boyd wrote:
-> On 01/24/2011 09:55 AM, Catalin Marinas wrote:
-> > Changing the virt_to_phys() argument to "const volatile void *" avoids
-> > compiler warnings in some situations where this function is used.
-> >
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Any chance we can get this one patch into 2.6.38? It fixes a warning for
-> MSM.
+These two patches fix some problems with the MMC/SD driver for MSM
+chips.  The first fixes a compilation error.  The driver was using
+internal DMA apis, this fix changes it to use the proper APIs.  The
+second patch fixes a clock enable/disable mismatch.
 
-I don't see any reason why this can't.  Catalin, can you put it in the
-patch system with Stephen's ack please?
+Thanks,
+David Brown
+
+The following changes since commit c56eb8fb6dccb83d9fe62fd4dc00c834de9bc470:
+
+  Linux 2.6.38-rc1 (2011-01-18 15:14:02 -0800)
+
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git for-38-rc3
+
+Daniel Walker (2):
+      mmc: msm: fix dma usage not to use internal APIs
+      drivers: mmc: msm: remove clock disable in probe
+
+ drivers/mmc/host/msm_sdcc.c |   52 ++++++++++++++++++------------------------
+ 1 files changed, 22 insertions(+), 30 deletions(-)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
