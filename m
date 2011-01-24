@@ -1,41 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Jan 2011 12:19:52 -0800
-Subject: [PATCH] ARM: OMAP2: use early init hook
-In-Reply-To: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-Message-ID: <20110124201952.GD13589@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Jan 2011 20:20:31 +0000
+Subject: [PATCH v2] arm: Configure reference clock for Versatile Express
+	timers
+In-Reply-To: <000601cbbbfa$c83d4db0$58b7e910$@moll@arm.com>
+References: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
+	<20110124144753.GB22949@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F4328E@GEORGE.Emea.Arm.com>
+	<20110124161453.GB24104@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F432AE@GEORGE.Emea.Arm.com>
+	<20110124171007.GI24104@n2100.arm.linux.org.uk>
+	<000601cbbbfa$c83d4db0$58b7e910$@moll@arm.com>
+Message-ID: <20110124202031.GL24104@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110123 09:12]:
-> Move non-mapping and non-irq initialization code out of .map_io and
-> .init_irq respectively into the new init_early hook.
-
-Nice :)
- 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> I think I've updated this patch correctly for the new platforms merged
-> into mainline.
+On Mon, Jan 24, 2011 at 07:13:27PM -0000, Pawel Moll wrote:
+> > Right, I'm chucking your original patch out of my tree.
 > 
-> Please ensure that new platforms merged after this patch also use the
-> new structure, and note that the initializers should be listed in the
-> following order:
+> Ok, I'd like to separate these two things.
 > 
-> 	.fixup
-> 	.reserve
-> 	.map_io
-> 	.init_early
-> 	.init_irq
-> 	.timer
-> 	.init_machine
-> 
-> This is the order in which they are called, so it helps to make sense
-> when reading the board level code if they're arranged in called order.
+> First is the reference clock configuration, and this change is really important. I'll send v3 in a second, which does not touch the TIMER_CTRL lines. I hope you are happy about this.
 
-OK, will do.
-
-Will also add this also into omap-testing. Any other issues that
-might remain should be easy to fix.
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+I'm not going to bother replying to this message until you wrap your
+messages sensibly.  I can't read most of your message while composing
+a reply.
