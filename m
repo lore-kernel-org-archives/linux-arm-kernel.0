@@ -1,59 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 23:10:50 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <F01D8B85CFF58440B2A13965FBA90CA45911F432EF@GEORGE.Emea.Arm.com>
-References: <000001cbbbc2$0e815e80$2b841b80$@moll@arm.com>
-	<20110124133513.GL16202@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
-	<20110124162400.GC24104@n2100.arm.linux.org.uk>
-	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
-	<20110124165356.GG24104@n2100.arm.linux.org.uk>
-	<20110124170304.GH24104@n2100.arm.linux.org.uk>
-	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
-	<20110124180944.GK24104@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F432EF@GEORGE.Emea.Arm.com>
-Message-ID: <20110124231050.GP24104@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 24 Jan 2011 15:19:53 -0800
+Subject: [PATCH v2 02/11] msm: Generalize timer register mappings
+In-Reply-To: <1295909876.29639.69.camel@c-dwalke-linux.qualcomm.com> (Daniel
+	Walker's message of "Mon, 24 Jan 2011 14:57:56 -0800")
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-3-git-send-email-davidb@codeaurora.org>
+	<1295908604.29639.62.camel@c-dwalke-linux.qualcomm.com>
+	<8yaei81kjlc.fsf@huya.qualcomm.com>
+	<1295909876.29639.69.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <8yazkqpj3dy.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 07:59:03PM +0000, Pawel Moll wrote:
-> > If you're flooding the system with USB traffic, enlargening the
-> > FIFO size won't help.  Making the FIFO larger just decreases the
-> > _interrupt_ _latency_ requirements.  It doesn't mean you can
-> > cope with the amount of data being transferred.
-> 
-> On VE both ISP and MMCI are sharing the same static memory interface,
+On Mon, Jan 24 2011, Daniel Walker wrote:
 
-What has that to do with it?  If the static memory controller was the
-bottleneck, don't you think that two CPUs running in parallel, one
-reading data from the ISP1761 and the other reading the MMCI would
-suffer bus starvation?  Your "HACK HACK HACK" patch shows that clearly
-isn't the case.
+> On Mon, 2011-01-24 at 14:44 -0800, David Brown wrote:
+>> On Mon, Jan 24 2011, Daniel Walker wrote:
+>> 
+>> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
+>> >> +       int global_offset = 0;
+>> >> +
+>> >> +       if (cpu_is_msm7x01()) {
+>> >> +               msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
+>> >> +               msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
+>> >> +       } else if (cpu_is_msm7x30()) {
+>> >> +               msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE + 0x04;
+>> >> +               msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x24;
+>> >> +       } else if (cpu_is_qsd8x50()) {
+>> >> +               msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
+>> >> +               msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
+>> >> +       } else if (cpu_is_msm8x60()) {
+>> >> +               msm_clocks[MSM_CLOCK_GPT].regbase = MSM_TMR_BASE + 0x04;
+>> >> +               msm_clocks[MSM_CLOCK_DGT].regbase = MSM_TMR_BASE + 0x24;
+>> >> +
+>> >> +               /* Use CPU0's timer as the global timer. */
+>> >> +               global_offset = MSM_TMR0_BASE - MSM_TMR_BASE;
+>> >> +       } else
+>> >> +               BUG(); 
+>> >
+>> > Ifdef's here would be OK I think, your already using the "runtime"
+>> > checks ..
+>> 
+>> The point of the change is to get rid of the ifdefs so that we can
+>> dynamically detect which target we are on.  Yes, there are other places
+>> where it doesn't work, but we'll get there gradually.
+>
+> I'm not suggesting you do something you can't do right now ..
+>
+> For instance you could make,
+>
+> #define MSM_MSM7XXX_DGT_BASE          (MSM_TMR_BASE + 0x10)
+>
+> and use that instead of what you have above.
 
-You've already told me that you've measured the ISP1761 interrupt
-handler taking 1.3ms to empty data off of the chip.  If that's 60K
-of data, that's a data rate of around 47MiB/s.
+I did it this way intentionally.
 
-At 521kHz transfer rate, it takes about 490us for MMCI to half-fill
-its FIFO, or 980us to fully fill it.  It takes (measured) about 6-9us
-to unload 32 bytes of data from the FIFO.
+I don't see how adding an extra level of indirection to the name helps
+make it any clearer.  The register offsets are defined in only one
+place, right in this block of code.  It is obvious which target and
+which register is which.  Having an extra name defined somewhere else
+just gives me another symbol I have to follow when I'm trying to read
+the code later.
 
-Translating the CPU read rate, that's a data rate of around 4MiB/s.
+Avoiding magic numbers is fine in the code, when it actually helps.
+Here, it doesn't do anything other than add a name that only gets used
+once in a context that already describes what it is.
 
-So I put it to you that there's plenty of bus bandwidth present to
-service both the ISP1761 and MMCI.  What we're lacking is CPU
-bandwidth.
+David
 
-I guess you haven't thought about moving MMCI to an adaptive clocking
-solution?  What I'm suggesting is halve the clock rate on FIFO error
-and retry.  Increase the clock rate on each successful transfer up
-to the maximum provided by the core MMC code.
-
-That should _significantly_ increase the achievable PIO data rate
-way beyond what a deeper FIFO could ever hope to achieve, and will
-allow it to adapt to situations where you load the system up beyond
-the maximum latency which the MMCI can stand.
-
-This would benefit a whole range of platforms, improving performance
-across the board, which as you've already indicated merely going for
-a deeper FIFO would be unable to do.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
