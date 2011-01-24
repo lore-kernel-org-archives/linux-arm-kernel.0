@@ -1,57 +1,151 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 18:09:44 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-	<000001cbbbc2$0e815e80$2b841b80$@moll@arm.com>
-	<20110124133513.GL16202@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
-	<20110124162400.GC24104@n2100.arm.linux.org.uk>
-	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
-	<20110124165356.GG24104@n2100.arm.linux.org.uk>
-	<20110124170304.GH24104@n2100.arm.linux.org.uk>
-	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
-Message-ID: <20110124180944.GK24104@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 Jan 2011 19:37:56 +0100
+Subject: [PATCH] ARM: imx: Add initial support for IMX27IPCAM board
+In-Reply-To: <1295891861-29054-1-git-send-email-fabio.estevam@freescale.com>
+References: <1295891861-29054-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110124183756.GG17737@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 05:54:18PM -0000, Pawel Moll wrote:
-> $ git am 0001-arm-Improve-MMC-performance-on-Versatile-Express.patch
+On Mon, Jan 24, 2011 at 03:57:41PM -0200, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig                   |    9 +++
+>  arch/arm/mach-imx/Makefile                  |    1 +
+>  arch/arm/mach-imx/mach-imx27ipcam.c         |   79 +++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
+>  4 files changed, 90 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/mach-imx27ipcam.c
 > 
-> / # uname -a
-> Linux (none) 2.6.38-rc2+ #12 SMP Mon Jan 24 17:41:53 GMT 2011 armv7l GNU/Linux
-> / # cat /dev/sda > /dev/null &
-> / # dd if=/dev/mmcblk0 of=/dev/null bs=64k count=128
-> 128+0 records in
-> 128+0 records out
-> 8388608 bytes (8.0MB) copied, 1.501529 seconds, 5.3MB/s
-> 
-> > THERE IS NO ISSUE WITH MMCI.  THE HARDWARE DOES NOT NEED "FIXING".
-> 
-> I'm really pleased you think so. It's always nice to have happy customers :-)
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 56684b5..c172418 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -300,4 +300,13 @@ config MACH_MXT_TD60
+>  	  Include support for i-MXT (aka td60) platform. This
+>  	  includes specific configurations for the module and its peripherals.
+>  
+> +config MACH_IMX27IPCAM
+> +	bool "IMX27 IPCAM platform"
+> +	select SOC_IMX27
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+> +	select IMX_HAVE_PLATFORM_IMX_UART
+> +	help
+> +	  Include support for IMX27 IPCAM platform. This includes specific
+> +	  configurations for the board and its peripherals.
+> +
+>  endif
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index 77100bf..3e49ae0 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -36,3 +36,4 @@ obj-$(CONFIG_MACH_CPUIMX27) += mach-cpuimx27.o
+>  obj-$(CONFIG_MACH_EUKREA_MBIMX27_BASEBOARD) += eukrea_mbimx27-baseboard.o
+>  obj-$(CONFIG_MACH_PCA100) += mach-pca100.o
+>  obj-$(CONFIG_MACH_MXT_TD60) += mach-mxt_td60.o
+> +obj-$(CONFIG_MACH_IMX27IPCAM) += mach-imx27ipcam.o
+> diff --git a/arch/arm/mach-imx/mach-imx27ipcam.c b/arch/arm/mach-imx/mach-imx27ipcam.c
+> new file mode 100644
+> index 0000000..506a8f3
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/mach-imx27ipcam.c
+> @@ -0,0 +1,79 @@
+> +/*
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * Author: Fabio Estevam <fabio.estevam@freescale.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/platform_device.h>
+Why do you need this one?
 
-If you're flooding the system with USB traffic, enlargening the FIFO size
-won't help.  Making the FIFO larger just decreases the _interrupt_ _latency_
-requirements.  It doesn't mean you can cope with the amount of data being
-transferred.
+Best regards
+Uwe
 
-	if (cycles-to-transfer-usb-packets + cycles-to-transfer-MMC-data >
-			available-cpu-cycles)
-		you_are_stuffed(even_with_larger_fifo);
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/time.h>
+> +#include <mach/hardware.h>
+> +#include <mach/common.h>
+> +#include <mach/iomux-mx27.h>
+> +
+> +#include "devices-imx27.h"
+> +
+> +static const int mx27ipcam_pins[] __initconst = {
+> +	/* UART1 */
+> +	PE12_PF_UART1_TXD,
+> +	PE13_PF_UART1_RXD,
+> +	/* FEC */
+> +	PD0_AIN_FEC_TXD0,
+> +	PD1_AIN_FEC_TXD1,
+> +	PD2_AIN_FEC_TXD2,
+> +	PD3_AIN_FEC_TXD3,
+> +	PD4_AOUT_FEC_RX_ER,
+> +	PD5_AOUT_FEC_RXD1,
+> +	PD6_AOUT_FEC_RXD2,
+> +	PD7_AOUT_FEC_RXD3,
+> +	PD8_AF_FEC_MDIO,
+> +	PD9_AIN_FEC_MDC,
+> +	PD10_AOUT_FEC_CRS,
+> +	PD11_AOUT_FEC_TX_CLK,
+> +	PD12_AOUT_FEC_RXD0,
+> +	PD13_AOUT_FEC_RX_DV,
+> +	PD14_AOUT_FEC_RX_CLK,
+> +	PD15_AOUT_FEC_COL,
+> +	PD16_AIN_FEC_TX_ER,
+> +	PF23_AIN_FEC_TX_EN,
+> +};
+> +
+> +static void __init mx27ipcam_init(void)
+> +{
+> +	mxc_gpio_setup_multiple_pins(mx27ipcam_pins, ARRAY_SIZE(mx27ipcam_pins),
+> +		"mx27ipcam");
+> +
+> +	imx27_add_imx_uart0(NULL);
+> +	imx27_add_fec(NULL);
+> +	imx27_add_imx2_wdt(NULL);
+> +}
+> +
+> +static void __init mx27ipcam_timer_init(void)
+> +{
+> +	mx27_clocks_init(25000000);
+> +}
+> +
+> +static struct sys_timer mx27ipcam_timer = {
+> +	.init	= mx27ipcam_timer_init,
+> +};
+> +
+> +MACHINE_START(IMX27IPCAM, "Freescale IMX27IPCAM")
+> +	/* maintainer: Freescale Semiconductor, Inc. */
+> +	.boot_params    = MX27_PHYS_OFFSET + 0x100,
+> +	.map_io         = mx27_map_io,
+> +	.init_irq       = mx27_init_irq,
+> +	.init_machine   = mx27ipcam_init,
+> +	.timer          = &mx27ipcam_timer,
+> +MACHINE_END
+> diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+> index 3a70ebf..2315541 100644
+> --- a/arch/arm/plat-mxc/include/mach/uncompress.h
+> +++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+> @@ -83,6 +83,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+>  	case MACH_TYPE_MX21ADS:
+>  	case MACH_TYPE_PCA100:
+>  	case MACH_TYPE_MXT_TD60:
+> +	case MACH_TYPE_IMX27IPCAM:
+>  		uart_base = MX2X_UART1_BASE_ADDR;
+>  		break;
+>  	case MACH_TYPE_MX31LITE:
 
-So I'm not surprised that running USB and MMC at full speed results in
-MMC losing out.  You will find that even with a larger FIFO, MMC will
-still lose out.
-
-Why?  The ISP1761 can store the packets without complaint, and the host
-CPU can read them when it's ready.  As soon as one packet is read off
-the host, the next packet is probably sitting there waiting for the
-host CPU to read it.  When the ISP1761 buffer becomes full, it can
-tell the device to stop sending data.
-
-The result of that is the ISP1761 will be able to transfer data as fast
-as the host CPU can possibly go - to the exclusion of the MMC interface.
-No amount of FIFO (well, except several KB to cover the _largest_ size
-of MMC transfer we request) will resolve the problem of USB and MMC
-sharing the same CPU.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
