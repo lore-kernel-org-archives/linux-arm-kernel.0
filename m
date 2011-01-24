@@ -1,68 +1,120 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:06 -0800
-Subject: [PATCH v2 01/28] ARM: tegra: irq: Rename gic pointers to avoid
-	conflicts
+Date: Sun, 23 Jan 2011 18:01:10 -0800
+Subject: [PATCH v2 05/28] ARM: tegra: Centralize macros to define debug uart
+	base
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-2-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-6-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A future patch will export gic_mask_irq and gic_unmask_irq.
-Rename the pointers in arch/arm/mach-tegra/irq.c to avoid
-a compile error.
-
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/irq.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-tegra/include/mach/debug-macro.S |   25 ++++-------------------
+ arch/arm/mach-tegra/include/mach/iomap.h       |   14 +++++++++++++
+ arch/arm/mach-tegra/include/mach/uncompress.h  |   18 +---------------
+ 3 files changed, 21 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index de7dfad..17c74d2 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -46,24 +46,24 @@
- #define ICTLR_COP_IER_CLR	0x38
- #define ICTLR_COP_IEP_CLASS	0x3c
+diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
+index a0e7c12..e0ebe65 100644
+--- a/arch/arm/mach-tegra/include/mach/debug-macro.S
++++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
+@@ -19,30 +19,15 @@
+  */
  
--static void (*gic_mask_irq)(struct irq_data *d);
--static void (*gic_unmask_irq)(struct irq_data *d);
-+static void (*tegra_gic_mask_irq)(struct irq_data *d);
-+static void (*tegra_gic_unmask_irq)(struct irq_data *d);
+ #include <mach/io.h>
++#include <mach/iomap.h>
  
--#define irq_to_ictlr(irq) (((irq)-32) >> 5)
-+#define irq_to_ictlr(irq) (((irq) - 32) >> 5)
- static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
--#define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr)*0x100)
-+#define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr) * 0x100)
+ 	.macro  addruart, rp, rv
+         ldr     \rp, =IO_APB_PHYS       @ physical
+         ldr     \rv, =IO_APB_VIRT        @ virtual
+-#if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
+-#error "A debug UART must be selected in the kernel config to use DEBUG_LL"
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
+-        orr     \rp, \rp, #0x6000
+-        orr     \rv, \rv, #0x6000
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+-        orr     \rp, \rp, #0x6000
+-	orr	\rp, \rp, #0x40
+-        orr     \rv, \rv, #0x6000
+-	orr	\rv, \rv, #0x40
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+-        orr     \rp, \rp, #0x6200
+-        orr     \rv, \rv, #0x6200
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+-        orr     \rp, \rp, #0x6300
+-        orr     \rv, \rv, #0x6300
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+-        orr     \rp, \rp, #0x6400
+-        orr     \rv, \rv, #0x6400
+-#endif
++	orr	\rp, \rp, #(TEGRA_DEBUG_UART_BASE & 0xFF)
++	orr	\rp, \rp, #(TEGRA_DEBUG_UART_BASE & 0xFF00)
++	orr	\rv, \rv, #(TEGRA_DEBUG_UART_BASE & 0xFF)
++	orr	\rv, \rv, #(TEGRA_DEBUG_UART_BASE & 0xFF00)
+ 	.endm
  
- static void tegra_mask(struct irq_data *d)
+ #define UART_SHIFT	2
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index 44a4f4b..325eca3 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -221,4 +221,18 @@
+ #define TEGRA_SDMMC4_BASE		0xC8000600
+ #define TEGRA_SDMMC4_SIZE		SZ_512
+ 
++#if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
++# define TEGRA_DEBUG_UART_BASE 0
++#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTA_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTB_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTC_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTD_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTE_BASE
++#endif
++
+ #endif
+diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
+index 6c4dd81..4e83237 100644
+--- a/arch/arm/mach-tegra/include/mach/uncompress.h
++++ b/arch/arm/mach-tegra/include/mach/uncompress.h
+@@ -26,23 +26,9 @@
+ 
+ #include <mach/iomap.h>
+ 
+-#if defined(CONFIG_TEGRA_DEBUG_UARTA)
+-#define DEBUG_UART_BASE TEGRA_UARTA_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+-#define DEBUG_UART_BASE TEGRA_UARTB_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+-#define DEBUG_UART_BASE TEGRA_UARTC_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+-#define DEBUG_UART_BASE TEGRA_UARTD_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+-#define DEBUG_UART_BASE TEGRA_UARTE_BASE
+-#else
+-#define DEBUG_UART_BASE NULL
+-#endif
+-
+ static void putc(int c)
  {
- 	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(d->irq));
--	gic_mask_irq(d);
--	writel(1<<(d->irq&31), addr+ICTLR_CPU_IER_CLR);
-+	tegra_gic_mask_irq(d);
-+	writel(1 << (d->irq & 31), addr+ICTLR_CPU_IER_CLR);
- }
+-	volatile u8 *uart = (volatile u8 *)DEBUG_UART_BASE;
++	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 	int shift = 2;
  
- static void tegra_unmask(struct irq_data *d)
+ 	if (uart == NULL)
+@@ -59,7 +45,7 @@ static inline void flush(void)
+ 
+ static inline void arch_decomp_setup(void)
  {
- 	void __iomem *addr = ictlr_to_virt(irq_to_ictlr(d->irq));
--	gic_unmask_irq(d);
-+	tegra_gic_unmask_irq(d);
- 	writel(1<<(d->irq&31), addr+ICTLR_CPU_IER_SET);
- }
+-	volatile u8 *uart = (volatile u8 *)DEBUG_UART_BASE;
++	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 	int shift = 2;
  
-@@ -98,8 +98,8 @@ void __init tegra_init_irq(void)
- 		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
- 
- 	gic = get_irq_chip(29);
--	gic_unmask_irq = gic->irq_unmask;
--	gic_mask_irq = gic->irq_mask;
-+	tegra_gic_unmask_irq = gic->irq_unmask;
-+	tegra_gic_mask_irq = gic->irq_mask;
- 	tegra_irq.irq_ack = gic->irq_ack;
- #ifdef CONFIG_SMP
- 	tegra_irq.irq_set_affinity = gic->irq_set_affinity;
+ 	if (uart == NULL)
 -- 
 1.7.3.1
