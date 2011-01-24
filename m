@@ -1,34 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 23 Jan 2011 23:09:32 +0000
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <AANLkTiko9X_ua-ZAOZ-jEaAkPTKLCKyhgCHt6hbM5C-K@mail.gmail.com>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-	<20110119205158.GC6335@n2100.arm.linux.org.uk>
-	<AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
-	<AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-	<20110123180110.GJ30094@n2100.arm.linux.org.uk>
-	<AANLkTiko9X_ua-ZAOZ-jEaAkPTKLCKyhgCHt6hbM5C-K@mail.gmail.com>
-Message-ID: <20110123230932.GK30094@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 24 Jan 2011 17:05:25 +0800
+Subject: [PATCH v5] ARM: mxs: add initial pm support
+In-Reply-To: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+References: <1294297998-26930-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1295859925-2639-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 23, 2011 at 10:40:05PM +0100, Linus Walleij wrote:
-> 2011/1/23 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Fri, Jan 21, 2011 at 01:53:06PM +0100, Linus Walleij wrote:
-> 
-> > If we're going to move away from the blockend IRQs to using the data
-> > counter, can we have a patch which switches the driver to use the data
-> > counter and then a followup patch which removes the broken blockend
-> > stuff, rather than somethign that changes the broken blockend stuff
-> > and then removes it?
-> 
-> 6631/1 fixes the broken blockend stuff into a state that works,
-> then 6632/1 removes it in favor of using the MMCIDATACNT.
+This is a very initial pm support and basically does nothing.
+With this pm support entry, drivers can start testing their own
+pm functions.
 
-What I'm saying is why do we need to fix the blockend stuff if in the
-next patch we remove it - why not just combine the two patches and
-remove the thing in one go as a "we give up using the blockend irq"?
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+Hi Sascha,
+
+The merging conflict was fixed in this version, and you can pick it
+up on imx-for-2.6.39 branch now.
+
+ arch/arm/mach-mxs/Makefile |    1 +
+ arch/arm/mach-mxs/pm.c     |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/pm.c
+
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index df501a8..6b26f02 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -2,6 +2,7 @@
+ obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
+ 
+ obj-$(CONFIG_MXS_OCOTP) += ocotp.o
++obj-$(CONFIG_PM) += pm.o
+ 
+ obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+diff --git a/arch/arm/mach-mxs/pm.c b/arch/arm/mach-mxs/pm.c
+new file mode 100644
+index 0000000..fb042da
+--- /dev/null
++++ b/arch/arm/mach-mxs/pm.c
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2010 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/io.h>
++#include <mach/system.h>
++
++static int mxs_suspend_enter(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		arch_idle();
++		break;
++
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static struct platform_suspend_ops mxs_suspend_ops = {
++	.enter = mxs_suspend_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++static int __init mxs_pm_init(void)
++{
++	suspend_set_ops(&mxs_suspend_ops);
++	return 0;
++}
++device_initcall(mxs_pm_init);
+-- 
+1.7.1
