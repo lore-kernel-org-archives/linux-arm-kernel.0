@@ -1,27 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Jan 2011 21:22:28 +0000
-Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
-In-Reply-To: <AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
-References: <1286358159-6994-1-git-send-email-linus.walleij@stericsson.com>
-	<20101219163240.GA27929@n2100.arm.linux.org.uk>
-	<20101219195959.GA28157@n2100.arm.linux.org.uk>
-	<20101221135421.GS28157@n2100.arm.linux.org.uk>
-	<20101221155935.GV28157@n2100.arm.linux.org.uk>
-	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
-	<20110124160127.GA24104@n2100.arm.linux.org.uk>
-	<AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
-Message-ID: <20110124212228.GN24104@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 24 Jan 2011 13:24:00 -0800
+Subject: [PATCH 4/4] arch/arm/mach-omap2/smartreflex.c: Add missing IS_ERR
+	test
+In-Reply-To: <1295898922-18822-5-git-send-email-julia@diku.dk> (Julia Lawall's
+	message of "Mon, 24 Jan 2011 20:55:22 +0100")
+References: <1295898922-18822-1-git-send-email-julia@diku.dk>
+	<1295898922-18822-5-git-send-email-julia@diku.dk>
+Message-ID: <87tygy807j.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 10:06:53PM +0100, Linus Walleij wrote:
-> This was an addition from Per Forlin, IIRC the requirement
-> to not push more than one word at the time into the FIFO
-> below a certain threadhold is a requirement for the MMCI,
-> not the DMA engine.
+Julia Lawall <julia@diku.dk> writes:
 
-The MMCI has four DMA request signals:
-- BREQ (burst request)
-- SREQ (single request)
-- LBREQ (last burst request)
-- LSREQ (last single request)
+> Function _sr_lookup, defined in the same file, returns ERR_PTR not NULL in
+> an error case.
+
+Thanks, will queue this via the OMAP tree for 2.6.38-rc.
+
+Kevin
+
+> The semantic match that finds this problem is as follows:
+> (http://coccinelle.lip6.fr/)
+>
+> // <smpl>
+> @r@
+> identifier f;
+> @@
+> f(...) { ... return ERR_PTR(...); }
+>
+> @@
+> identifier r.f, fld;
+> expression x;
+> statement S1,S2;
+> @@
+>  x = f(...)
+>  ... when != IS_ERR(x)
+> (
+>  if (IS_ERR(x) ||...) S1 else S2
+> |
+> *x->fld
+> )
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <julia@diku.dk>
+>
+> ---
+>  arch/arm/mach-omap2/smartreflex.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index 77ecebf..d7deadf 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -966,7 +966,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
+>  	}
+>  
+>  	sr_info = _sr_lookup(pdata->voltdm);
+> -	if (!sr_info) {
+> +	if (IS_ERR(sr_info)) {
+>  		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
+>  			__func__);
+>  		return -EINVAL;
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
