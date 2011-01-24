@@ -1,49 +1,130 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Mon, 24 Jan 2011 14:08:50 +0530
-Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to use
-	ldrex/strex
-In-Reply-To: <20110123093526.GA26120@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
-	<20110123001636.GA20841@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101222323190.8580@xanadu.home>
-	<20110123093526.GA26120@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=tpnNXm8w9-VFi72nYvXRQV5-jE7Qn9NNk1wLW@mail.gmail.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 24 Jan 2011 10:47:36 +0200
+Subject: HIGHMEM is broken when working in SMP V6 mode
+In-Reply-To: <20110123170830.GG30094@n2100.arm.linux.org.uk>
+References: <AANLkTikjcgRgPd7oLjf0ESxeyC2BHpaaRi8DiMz3b+JQ@mail.gmail.com>
+	<20110123145639.GB30094@n2100.arm.linux.org.uk>
+	<AANLkTi=HtLjnOLGVVqWvqToiXdQAm_+cDdZf51M+ABV4@mail.gmail.com>
+	<20110123170830.GG30094@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim3VVYTrWZX+UJUtK73bUkmSufW_4awhgQcVeNZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 23, 2011 at 3:05 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sat, Jan 22, 2011 at 11:44:59PM -0500, Nicolas Pitre wrote:
->> At least another person did post results:
->>
->> http://mid.gmane.org/20110117094602.GA2622 at pulham.picochip.com
->> http://mid.gmane.org/20110117110308.GC2622 at pulham.picochip.com
+>> >> I've port 2.6.35 to SMP system that runs in V6 mode, this system
+>> >> doesn't support TLB operations broadcasting by hw, so it uses IPI
+>> >> messages for that. ?when enabling DEBUG_LOCKDEP, I got the following
+>> >> error message while booting the system from NFS:
+>> >
+>> > You've bypassed this check:
+>> >
+>> > ? ? ? ? ? ? ? ?if (is_smp() && tlb_ops_need_broadcast()) {
+>> > ? ? ? ? ? ? ? ? ? ? ? ?/*
+>> > ? ? ? ? ? ? ? ? ? ? ? ? * kmap_high needs to occasionally flush TLB entries,
+>> > ? ? ? ? ? ? ? ? ? ? ? ? * however, if the TLB entries need to be broadcast
+>> > ? ? ? ? ? ? ? ? ? ? ? ? * we may deadlock:
+>> > ? ? ? ? ? ? ? ? ? ? ? ? * ?kmap_high(irqs off)->flush_all_zero_pkmaps->
+>> > ? ? ? ? ? ? ? ? ? ? ? ? * ?flush_tlb_kernel_range->smp_call_function_many
+>> > ? ? ? ? ? ? ? ? ? ? ? ? * ? (must not be called with irqs off)
+>> > ? ? ? ? ? ? ? ? ? ? ? ? */
+>> > ? ? ? ? ? ? ? ? ? ? ? ?reason = "without hardware TLB ops broadcasting";
+>> > ? ? ? ? ? ? ? ?}
+>> >
+>> > so you lose. ?There's reasons why such checks are put in. ?We can not
+>> > support SMP and highmem on systems which do not have TLB broadcasting.
+>> > That's not because the code doesn't support it, it's because there are
+>> > deadlocks which will occur.
+>> thanks, I missed that
+>> >
+>> > The fact is that it is unsafe to send IPIs with IRQs disabled, which
+>> > means you can't IPI a TLB operation and wait for it to complete with IRQs
+>> > disabled.
+>> as I understand it, the lock_kmap() started to disable IRQs in order
+>> to support the vivt and vipt caches, but in SMP (at least in my case),
+>> the caches are PIPT, so I think I can do the following:
+>> 1. undef ?the ?ARCH_NEEDS_KMAP_HIGH_GET
+>> 2. use page_address instead of kmap_high_get()
+>> do you think it will work?
 >
-> Slightly different patch - there were three revisions. ?I can't attach
-> a tested-by given to a different patch to this one.
+> Definitely not. ?We use kmap_high_get() so that we can ensure that we've
+> flushed data out of the PIPT cache for highmem pages. ?highmem pages
+> which are unmapped do not have a valid page_address() but may have PIPT
+> cache lines associated with them.
 >
->> > That means omap2plus_defconfig .38 mainline kernels
->> > (including -stable) will remain potentially dangerous when run on
->> > SMP capable hardware.
->>
->> I must admit that this series looks a bit large for stable IMHO. ?I
->> think that the fix for stable should limit itself only to prevent SMP
->> from being selected if anything else than CPU_32v6K is selected.
->
-> The first three are the bare minimum required for -stable.
->
+> So no, I don't think it'll be safe.
+ok, what about the following patch, the idea is to use only the
+kmap_high_l1_vipt when doing cache maintenance.
 
-Boot tested the 14 patch series  with CONFIG_SWP_EMULATE enabled, on
-the following boards :
+diff --git a/arch/arm/include/asm/highmem.h b/arch/arm/include/asm/highmem.h
+index feb988a..457998c 100644
+--- a/arch/arm/include/asm/highmem.h
++++ b/arch/arm/include/asm/highmem.h
+@@ -19,7 +19,9 @@
 
+ extern pte_t *pkmap_page_table;
 
-1. Omap2420 SDP
++#ifndef CONFIG_SMP
+ #define ARCH_NEEDS_KMAP_HIGH_GET
++#endif
 
-2. Omap2430 SDP
-
-3. Omap3430 SDP
-
-4. Omap4 Blaze
-
-Tested by : Sourav Poddar <sourav.poddar@ti.com>
+ extern void *kmap_high(struct page *page);
+ extern void *kmap_high_get(struct page *page);
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 9e7742f..d22366b 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -459,12 +459,15 @@ static void dma_cache_maint_page(struct page
+*page, unsigned long offset,
+ 				}
+ 				len = PAGE_SIZE - offset;
+ 			}
++#ifdef ARCH_NEEDS_KMAP_HIGH_GET
+ 			vaddr = kmap_high_get(page);
+ 			if (vaddr) {
+ 				vaddr += offset;
+ 				op(vaddr, len, dir);
+ 				kunmap_high(page);
+-			} else if (cache_is_vipt()) {
++			} else if (cache_is_vipt())
++#endif
++			{
+ 				pte_t saved_pte;
+ 				vaddr = kmap_high_l1_vipt(page, &saved_pte);
+ 				op(vaddr + offset, len, dir);
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index c6844cb..7f96b2c 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -161,11 +161,15 @@ void __flush_dcache_page(struct address_space
+*mapping, struct page *page)
+ 	if (!PageHighMem(page)) {
+ 		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+ 	} else {
+-		void *addr = kmap_high_get(page);
++		void *addr;
++#ifdef ARCH_NEEDS_KMAP_HIGH_GET
++	        addr = kmap_high_get(page);
+ 		if (addr) {
+ 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+ 			kunmap_high(page);
+-		} else if (cache_is_vipt()) {
++		} else if (cache_is_vipt())
++#endif
++		{
+ 			pte_t saved_pte;
+ 			addr = kmap_high_l1_vipt(page, &saved_pte);
+ 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+diff --git a/arch/arm/mm/highmem.c b/arch/arm/mm/highmem.c
+index 6ab2440..7493a79 100644
+--- a/arch/arm/mm/highmem.c
++++ b/arch/arm/mm/highmem.c
+@@ -57,7 +57,11 @@ void *kmap_atomic(struct page *page, enum km_type type)
+ 		kmap = NULL;
+ 	else
+ #endif
++#ifdef ARCH_NEEDS_KMAP_HIGH_GET
+ 		kmap = kmap_high_get(page);
++#else
++	kmap = NULL;
++#endif
+ 	if (kmap)
+ 		return kmap;
