@@ -1,94 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Jan 2011 22:06:53 +0100
-Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
-In-Reply-To: <20110124160127.GA24104@n2100.arm.linux.org.uk>
-References: <1286358159-6994-1-git-send-email-linus.walleij@stericsson.com>
-	<20101219163240.GA27929@n2100.arm.linux.org.uk>
-	<20101219195959.GA28157@n2100.arm.linux.org.uk>
-	<20101221135421.GS28157@n2100.arm.linux.org.uk>
-	<20101221155935.GV28157@n2100.arm.linux.org.uk>
-	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
-	<20110124160127.GA24104@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 24 Jan 2011 21:08:34 +0000
+Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
+	suspend
+In-Reply-To: <AANLkTinY5mJtC2fiV1iBnPbgwH9v3AmQQ7RR3pYJVACL@mail.gmail.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-21-git-send-email-ccross@android.com>
+	<20110124144142.GA16813@sirena.org.uk>
+	<AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
+	<20110124193539.GI29925@opensource.wolfsonmicro.com>
+	<AANLkTikOEm=watbA1G-SFK3PZrntDc+Wun84nGio=YKv@mail.gmail.com>
+	<20110124202610.GJ29925@opensource.wolfsonmicro.com>
+	<AANLkTinY5mJtC2fiV1iBnPbgwH9v3AmQQ7RR3pYJVACL@mail.gmail.com>
+Message-ID: <20110124210833.GK29925@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Mon, Jan 24, 2011 at 12:52:51PM -0800, Colin Cross wrote:
+> On Mon, Jan 24, 2011 at 12:26 PM, Mark Brown
 
-> Any response to doing this for MMCI:
+> > Normally that's handled by the same transition logic - the core PMIC
+> > will usually sequence a bunch of voltage and power status changes when
+> > entering its own low power mode and have a similar transition on resume
+> > which will ensure that the regulators power back up with a sane setup
+> > regardless of the state they were in beforehand.
 
-Sorry, got stalled tinkering with other stuff.
+> I believe Tegra supports this mode, where the Tegra PMC can master the
+> I2C bus to control an external PMIC during resume, but I've never seen
+> it used.
 
-> +static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
-> +{
-> + ? ? ? struct variant_data *variant = host->variant;
-> + ? ? ? struct dma_slave_config conf = {
-> + ? ? ? ? ? ? ? .src_addr = host->phybase + MMCIFIFO,
-> + ? ? ? ? ? ? ? .dst_addr = host->phybase + MMCIFIFO,
-> + ? ? ? ? ? ? ? .src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
-> + ? ? ? ? ? ? ? .dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES,
-> + ? ? ? ? ? ? ? .src_maxburst = variant->fifohalfsize >> 2, /* # of words */
-> + ? ? ? ? ? ? ? .dst_maxburst = variant->fifohalfsize >> 2, /* # of words */
-> + ? ? ? };
-> ...
-> + ? ? ? if (data->flags & MMC_DATA_READ) {
-> + ? ? ? ? ? ? ? conf.direction = DMA_FROM_DEVICE;
-> + ? ? ? ? ? ? ? chan = host->dma_rx_channel;
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? conf.direction = DMA_TO_DEVICE;
-> + ? ? ? ? ? ? ? chan = host->dma_tx_channel;
-> + ? ? ? }
-> ...
-> + ? ? ? /* shouldn't this be in the DMA engine driver? */
-> + ? ? ? if (host->size <= variant->dmasize_threshold) {
-> + ? ? ? ? ? ? ? conf.src_maxburst = 1;
-> + ? ? ? ? ? ? ? conf.dst_maxburst = 1;
-> + ? ? ? }
+In almost all cases it's implemented in the PMIC rather than the CPU -
+it's essentially the same logic as implements the initial power on of
+the system and the PMIC needs to be capable of starting the system boot
+without external assistance anyway, including sequencing the power up of
+the CPU.
 
-This was an addition from Per Forlin, IIRC the requirement
-to not push more than one word at the time into the FIFO
-below a certain threadhold is a requirement for the MMCI,
-not the DMA engine.
+With most PMICs the settings will be hard coded into the silicon so
+you really need to get a PMIC specifically designed for whatever CPU
+you're using (this is one of the reasons you always see the same
+CPU/PMIC combinations, people are terrified of changing a known good
+pairing in case they build something that won't power on).  Some more
+modern PMICs make this configurable which gives system designers a lot
+more flexibility.
 
-What it does is to emulate single requests below a certain
-threshold by requesting one-word bursts. I think this is
-primarily for SDIO, not card transfers.
+The PMC stuff is newer and in the designs I've seen is more focused on
+runtime management than this stuff.
 
-I'd have to ask around as to the reasons for. We'd better
-understand that, but I noted we added a special hardware
-register to the PL011 just to handle this kind of thresholds,
-so there is something about emulating that threshold in
-software.
+> > It sounds like for your systems what's happening is that the resume is
+> > restoring the previously configured voltages for the core rails rather
+> > than going to a known good state. ?Is my understanding correct here?
+> > While your fix is good and I don't see any reason not to do it this does
+> > sound like something we should have a solution for in common code as I'd
+> > not be surprised if there were other hardware out there which did a
+> > similar thing.
 
-> + ? ? ? /* Check for weird stuff in the sg list */
-> + ? ? ? /* shouldn't this be in the DMA engine driver? */
-> + ? ? ? for_each_sg(data->sg, sg, data->sg_len, i) {
-> + ? ? ? ? ? ? ? dev_vdbg(mmc_dev(host->mmc), "MMCI SGlist %d dir %d: length: %08
-> + ? ? ? ? ? ? ? ? ? ? ? ?i, conf.direction, sg->length);
-> + ? ? ? ? ? ? ? if (sg->offset & 3 || sg->length & 3)
-> + ? ? ? ? ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
+> Yes - the core can be connected to a dumb I2C regulator, which the
+> core can turn on and off with a request line, but can't control the
+> voltage without a regulator driver controlling the I2C bus.
 
-This one is just overcautious and for SDIO we don't even want to do
-such things, so it should be dropped altogether.
-
-The original intent was to avoid writing anything than 32bit words
-into the register, and with the SDIO-modified versions you can
-actually do that.
-
-So I'll drop it for the next iteration.
-
-> Can we move that size threshold and scatterlist checks inside the slave
-> DMA engine driver?
->
-> It is entirely possible that different DMA engines have different alignment
-> requirements and different bursting requirements, so surely it makes sense
-> for this kind of stuff to be in their drivers rather than in the DMA engine
-> users?
->
-> After all, the DMA engine users don't have much idea about what kind of
-> DMA engine will be used with themselves with Primecells.
-
-True.
-
-Linus Walleij
+AIUI generally they end up working because whatever puts them into
+suspend actually resets them so when you release reset during resume
+they just recover whatever the default voltage they have is and normally
+the boot and resume conditions for the CPU are identical.  I could be
+off base there, most of the regulator API stuff has been done with
+integrated PMICs.
