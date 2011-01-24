@@ -1,57 +1,140 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 23 Jan 2011 18:01:31 -0800
-Subject: [PATCH v2 26/28] ARM: tegra: suspend: protect suspend functions with
-	CONFIG_PM
+Date: Sun, 23 Jan 2011 18:01:13 -0800
+Subject: [PATCH v2 08/28] ARM: tegra: Add prototypes for subsystem suspend
+	functions
 In-Reply-To: <1295834493-5019-1-git-send-email-ccross@android.com>
 References: <1295834493-5019-1-git-send-email-ccross@android.com>
-Message-ID: <1295834493-5019-27-git-send-email-ccross@android.com>
+Message-ID: <1295834493-5019-9-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Allen Martin <amartin@nvidia.com>
-
-Protect suspend/resume functions behind #ifdef CONFIG_PM.  This
-prevents a compile error with CONFIG_PM turned off.
-
-Signed-off-by: Allen Martin <amartin@nvidia.com>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/suspend.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-tegra/dma.c                  |    1 +
+ arch/arm/mach-tegra/gpio.c                 |    1 +
+ arch/arm/mach-tegra/include/mach/suspend.h |   38 ++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/irq.c                  |    1 +
+ arch/arm/mach-tegra/pinmux-t2-tables.c     |    1 +
+ arch/arm/mach-tegra/tegra2_clocks.c        |    1 +
+ arch/arm/mach-tegra/timer.c                |    1 +
+ 7 files changed, 44 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/include/mach/suspend.h
 
-diff --git a/arch/arm/mach-tegra/suspend.c b/arch/arm/mach-tegra/suspend.c
-index be8c78f..8b32707 100644
---- a/arch/arm/mach-tegra/suspend.c
-+++ b/arch/arm/mach-tegra/suspend.c
-@@ -75,10 +75,12 @@ struct suspend_context {
- struct suspend_context tegra_sctx;
+diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+index edda6ec..a2a252d 100644
+--- a/arch/arm/mach-tegra/dma.c
++++ b/arch/arm/mach-tegra/dma.c
+@@ -30,6 +30,7 @@
+ #include <mach/dma.h>
+ #include <mach/irqs.h>
+ #include <mach/iomap.h>
++#include <mach/suspend.h>
  
- static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-+#ifdef CONFIG_PM
- static void __iomem *clk_rst = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
- static void __iomem *flow_ctrl = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE);
- static void __iomem *evp_reset = IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE) + 0x100;
- static void __iomem *tmrus = IO_ADDRESS(TEGRA_TMRUS_BASE);
-+#endif
+ #define APB_DMA_GEN				0x000
+ #define GEN_ENABLE				(1<<31)
+diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+index ad80488..132dcd6 100644
+--- a/arch/arm/mach-tegra/gpio.c
++++ b/arch/arm/mach-tegra/gpio.c
+@@ -25,6 +25,7 @@
+ #include <linux/gpio.h>
  
- #define PMC_CTRL		0x0
- #define PMC_CTRL_LATCH_WAKEUPS	(1 << 5)
-@@ -205,6 +207,7 @@ static int create_suspend_pgtable(void)
- 	return 0;
- }
+ #include <mach/iomap.h>
++#include <mach/suspend.h>
  
-+#ifdef CONFIG_PM
- static noinline void restore_cpu_complex(void)
- {
- 	unsigned int reg;
-@@ -326,8 +329,6 @@ unsigned int tegra_suspend_lp2(unsigned int us)
- 	return remain;
- }
+ #define GPIO_BANK(x)		((x) >> 5)
+ #define GPIO_PORT(x)		(((x) >> 3) & 0x3)
+diff --git a/arch/arm/mach-tegra/include/mach/suspend.h b/arch/arm/mach-tegra/include/mach/suspend.h
+new file mode 100644
+index 0000000..5af8715
+--- /dev/null
++++ b/arch/arm/mach-tegra/include/mach/suspend.h
+@@ -0,0 +1,38 @@
++/*
++ * arch/arm/mach-tegra/include/mach/suspend.h
++ *
++ * Copyright (C) 2010 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++
++#ifndef _MACH_TEGRA_SUSPEND_H_
++#define _MACH_TEGRA_SUSPEND_H_
++
++void tegra_pinmux_suspend(void);
++void tegra_irq_suspend(void);
++void tegra_gpio_suspend(void);
++void tegra_clk_suspend(void);
++void tegra_dma_suspend(void);
++void tegra_timer_suspend(void);
++
++void tegra_pinmux_resume(void);
++void tegra_irq_resume(void);
++void tegra_gpio_resume(void);
++void tegra_clk_resume(void);
++void tegra_dma_resume(void);
++void tegra_timer_resume(void);
++
++#endif /* _MACH_TEGRA_SUSPEND_H_ */
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 17c74d2..5f065f9 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -26,6 +26,7 @@
+ #include <asm/hardware/gic.h>
  
--#ifdef CONFIG_PM
--
- /* ensures that sufficient time is passed for a register write to
-  * serialize into the 32KHz domain */
- static void pmc_32kwritel(u32 val, unsigned long offs)
+ #include <mach/iomap.h>
++#include <mach/suspend.h>
+ 
+ #include "board.h"
+ 
+diff --git a/arch/arm/mach-tegra/pinmux-t2-tables.c b/arch/arm/mach-tegra/pinmux-t2-tables.c
+index a6ea34e..4d97d5c 100644
+--- a/arch/arm/mach-tegra/pinmux-t2-tables.c
++++ b/arch/arm/mach-tegra/pinmux-t2-tables.c
+@@ -29,6 +29,7 @@
+ 
+ #include <mach/iomap.h>
+ #include <mach/pinmux.h>
++#include <mach/suspend.h>
+ 
+ #define DRIVE_PINGROUP(pg_name, r)				\
+ 	[TEGRA_DRIVE_PINGROUP_ ## pg_name] = {			\
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index f0dae6d..2dd2b03 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -27,6 +27,7 @@
+ #include <linux/clkdev.h>
+ 
+ #include <mach/iomap.h>
++#include <mach/suspend.h>
+ 
+ #include "clock.h"
+ #include "fuse.h"
+diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+index 7b8ad1f..36b53a7 100644
+--- a/arch/arm/mach-tegra/timer.c
++++ b/arch/arm/mach-tegra/timer.c
+@@ -33,6 +33,7 @@
+ 
+ #include <mach/iomap.h>
+ #include <mach/irqs.h>
++#include <mach/suspend.h>
+ 
+ #include "board.h"
+ #include "clock.h"
 -- 
 1.7.3.1
