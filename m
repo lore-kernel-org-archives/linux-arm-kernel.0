@@ -1,244 +1,95 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 24 Jan 2011 17:55:57 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of unsigned long
-	for physical addresses
+Date: Mon, 24 Jan 2011 17:56:00 +0000
+Subject: [PATCH v4 18/19] ARM: LPAE: add support for ATAG_MEM64
 In-Reply-To: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1295891761-18366-19-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Will Deacon <will.deacon@arm.com>
 
-The unsigned long datatype is not sufficient for mapping physical addresses
->= 4GB.
+LPAE provides support for memory banks with physical addresses of up
+to 40 bits.
 
-This patch ensures that the phys_addr_t datatype is used to represent
-physical addresses which may be beyond the range of an unsigned long.
-The virt <-> phys macros are updated accordingly to ensure that virtual
-addresses can remain as they are.
+This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
+informed about memory that exists above the 4GB boundary.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/memory.h     |   17 +++++++++--------
- arch/arm/include/asm/outercache.h |   14 ++++++++------
- arch/arm/include/asm/pgtable.h    |    2 +-
- arch/arm/include/asm/setup.h      |    2 +-
- arch/arm/kernel/setup.c           |    5 +++--
- arch/arm/mm/init.c                |    6 +++---
- arch/arm/mm/mmu.c                 |    7 ++++---
- 7 files changed, 29 insertions(+), 24 deletions(-)
+ arch/arm/include/asm/setup.h |   10 +++++++++-
+ arch/arm/kernel/compat.c     |    4 ++--
+ arch/arm/kernel/setup.c      |   12 +++++++++++-
+ 3 files changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index d0ee74b..44ea5cd 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -15,6 +15,7 @@
- 
- #include <linux/compiler.h>
- #include <linux/const.h>
-+#include <linux/types.h>
- #include <mach/memory.h>
- #include <asm/sizes.h>
- 
-@@ -138,15 +139,15 @@
-  * files.  Use virt_to_phys/phys_to_virt/__pa/__va instead.
-  */
- #ifndef __virt_to_phys
--#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
--#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
-+#define __virt_to_phys(x)	(((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-+#define __phys_to_virt(x)	((unsigned long)((x) - PHYS_OFFSET + PAGE_OFFSET))
- #endif
- 
- /*
-  * Convert a physical address to a Page Frame Number and back
-  */
--#define	__phys_to_pfn(paddr)	((paddr) >> PAGE_SHIFT)
--#define	__pfn_to_phys(pfn)	((pfn) << PAGE_SHIFT)
-+#define	__phys_to_pfn(paddr)	((unsigned long)((paddr) >> PAGE_SHIFT))
-+#define	__pfn_to_phys(pfn)	((phys_addr_t)(pfn) << PAGE_SHIFT)
- 
- /*
-  * Convert a page to/from a physical address
-@@ -188,21 +189,21 @@
-  * translation for translating DMA addresses.  Use the driver
-  * DMA support - see dma-mapping.h.
-  */
--static inline unsigned long virt_to_phys(const volatile void *x)
-+static inline phys_addr_t virt_to_phys(const volatile void *x)
- {
- 	return __virt_to_phys((unsigned long)(x));
- }
- 
--static inline void *phys_to_virt(unsigned long x)
-+static inline void *phys_to_virt(phys_addr_t x)
- {
--	return (void *)(__phys_to_virt((unsigned long)(x)));
-+	return (void *)(__phys_to_virt(x));
- }
- 
- /*
-  * Drivers should NOT use these either.
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
--#define __va(x)			((void *)__phys_to_virt((unsigned long)(x)))
-+#define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- 
- /*
-diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-index fc19009..88ad892 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -21,6 +21,8 @@
- #ifndef __ASM_OUTERCACHE_H
- #define __ASM_OUTERCACHE_H
- 
-+#include <linux/types.h>
-+
- struct outer_cache_fns {
- 	void (*inv_range)(unsigned long, unsigned long);
- 	void (*clean_range)(unsigned long, unsigned long);
-@@ -37,17 +39,17 @@ struct outer_cache_fns {
- 
- extern struct outer_cache_fns outer_cache;
- 
--static inline void outer_inv_range(unsigned long start, unsigned long end)
-+static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.inv_range)
- 		outer_cache.inv_range(start, end);
- }
--static inline void outer_clean_range(unsigned long start, unsigned long end)
-+static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.clean_range)
- 		outer_cache.clean_range(start, end);
- }
--static inline void outer_flush_range(unsigned long start, unsigned long end)
-+static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
- {
- 	if (outer_cache.flush_range)
- 		outer_cache.flush_range(start, end);
-@@ -73,11 +75,11 @@ static inline void outer_disable(void)
- 
- #else
- 
--static inline void outer_inv_range(unsigned long start, unsigned long end)
-+static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
- { }
--static inline void outer_clean_range(unsigned long start, unsigned long end)
-+static inline void outer_clean_range(phys_addr_t start, phys_addr_t end)
- { }
--static inline void outer_flush_range(unsigned long start, unsigned long end)
-+static inline void outer_flush_range(phys_addr_t start, phys_addr_t end)
- { }
- static inline void outer_flush_all(void) { }
- static inline void outer_inv_all(void) { }
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 40b21c1..110f6f4 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -273,7 +273,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- #define pte_unmap(pte)			__pte_unmap(pte)
- 
- #define pte_pfn(pte)		((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT)
--#define pfn_pte(pfn,prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
-+#define pfn_pte(pfn,prot)	__pte(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
- 
- #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
- #define mk_pte(page,prot)	pfn_pte(page_to_pfn(page), prot)
 diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index f1e5a9b..5092118 100644
+index 5092118..fab849f 100644
 --- a/arch/arm/include/asm/setup.h
 +++ b/arch/arm/include/asm/setup.h
-@@ -199,7 +199,7 @@ static struct tagtable __tagtable_##fn __tag = { tag, fn }
- #endif
- 
- struct membank {
--	unsigned long start;
-+	phys_addr_t start;
- 	unsigned long size;
- 	unsigned int highmem;
+@@ -43,6 +43,13 @@ struct tag_mem32 {
+ 	__u32	start;	/* physical start address */
  };
+ 
++#define ATAG_MEM64	0x54420002
++
++struct tag_mem64 {
++	__u64	size;
++	__u64	start;	/* physical start address */
++};
++
+ /* VGA text type displays */
+ #define ATAG_VIDEOTEXT	0x54410003
+ 
+@@ -147,7 +154,8 @@ struct tag {
+ 	struct tag_header hdr;
+ 	union {
+ 		struct tag_core		core;
+-		struct tag_mem32	mem;
++		struct tag_mem32	mem32;
++		struct tag_mem64	mem64;
+ 		struct tag_videotext	videotext;
+ 		struct tag_ramdisk	ramdisk;
+ 		struct tag_initrd	initrd;
+diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
+index 9256523..f224d95 100644
+--- a/arch/arm/kernel/compat.c
++++ b/arch/arm/kernel/compat.c
+@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
+ 	tag = tag_next(tag);
+ 	tag->hdr.tag = ATAG_MEM;
+ 	tag->hdr.size = tag_size(tag_mem32);
+-	tag->u.mem.size = size;
+-	tag->u.mem.start = start;
++	tag->u.mem32.size = size;
++	tag->u.mem32.start = start;
+ 
+ 	return tag;
+ }
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3d23f0f..fe951e4 100644
+index fe951e4..420a4e1 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -443,7 +443,7 @@ static struct machine_desc * __init setup_machine(unsigned int nr)
- 	return list;
+@@ -588,11 +588,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
+ 
+ static int __init parse_tag_mem32(const struct tag *tag)
+ {
+-	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
++	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
  }
  
--static int __init arm_add_memory(unsigned long start, unsigned long size)
-+static int __init arm_add_memory(phys_addr_t start, unsigned long size)
- {
- 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
+ __tagtable(ATAG_MEM, parse_tag_mem32);
  
-@@ -479,7 +479,8 @@ static int __init arm_add_memory(unsigned long start, unsigned long size)
- static int __init early_mem(char *p)
- {
- 	static int usermem __initdata = 0;
--	unsigned long size, start;
-+	unsigned long size;
-+	phys_addr_t start;
- 	char *endp;
- 
- 	/*
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 5164069..14a00a1 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -344,7 +344,7 @@ void __init bootmem_init(void)
- 	 */
- 	arm_bootmem_free(min, max_low, max_high);
- 
--	high_memory = __va((max_low << PAGE_SHIFT) - 1) + 1;
-+	high_memory = __va(((phys_addr_t)max_low << PAGE_SHIFT) - 1) + 1;
- 
- 	/*
- 	 * This doesn't seem to be used by the Linux memory manager any
-@@ -392,8 +392,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * Convert to physical addresses, and
- 	 * round start upwards and end downwards.
- 	 */
--	pg = PAGE_ALIGN(__pa(start_pg));
--	pgend = __pa(end_pg) & PAGE_MASK;
-+	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
-+	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
- 
- 	/*
- 	 * If there are free pages between these,
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 251056a..a1d8a07 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -611,7 +611,7 @@ static void __init create_36bit_mapping(struct map_desc *md,
- 	pgd_t *pgd;
- 
- 	addr = md->virtual;
--	phys = (unsigned long)__pfn_to_phys(md->pfn);
-+	phys = __pfn_to_phys(md->pfn);
- 	length = PAGE_ALIGN(md->length);
- 
- 	if (!(cpu_architecture() >= CPU_ARCH_ARMv6 || cpu_is_xsc3())) {
-@@ -672,7 +672,8 @@ static void __init create_36bit_mapping(struct map_desc *md,
-  */
- static void __init create_mapping(struct map_desc *md)
- {
--	unsigned long phys, addr, length, end;
-+	unsigned long addr, length, end;
-+	phys_addr_t phys;
- 	const struct mem_type *type;
- 	pgd_t *pgd;
- 
-@@ -703,7 +704,7 @@ static void __init create_mapping(struct map_desc *md)
- #endif
- 
- 	addr = md->virtual & PAGE_MASK;
--	phys = (unsigned long)__pfn_to_phys(md->pfn);
-+	phys = __pfn_to_phys(md->pfn);
- 	length = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
- 
- 	if (type->prot_l1 == 0 && ((addr | phys | length) & ~SECTION_MASK)) {
++#ifdef CONFIG_PHYS_ADDR_T_64BIT
++static int __init parse_tag_mem64(const struct tag *tag)
++{
++	/* We only use 32-bits for the size. */
++	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
++}
++
++__tagtable(ATAG_MEM64, parse_tag_mem64);
++#endif /* CONFIG_PHYS_ADDR_T_64BIT */
++
+ #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+ struct screen_info screen_info = {
+  .orig_video_lines	= 30,
