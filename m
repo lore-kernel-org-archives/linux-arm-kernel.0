@@ -1,32 +1,34 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 24 Jan 2011 16:39:21 -0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <20110124162400.GC24104@n2100.arm.linux.org.uk>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-	<000001cbbbc2$0e815e80$2b841b80$@moll@arm.com>
-	<20110124133513.GL16202@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
-	<20110124162400.GC24104@n2100.arm.linux.org.uk>
-Message-ID: <000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
+Date: Mon, 24 Jan 2011 16:39:48 +0000
+Subject: [PATCH] arm: Reset SP804 timer when initialising it as a clock events
+	device
+Message-ID: <1295887188-25924-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Given that the problem is already fixed via a set of patches, I see
-> no reason to mess about with the hardware, thereby making the driver
-> more complicated for *no* benefit.
+The SP804 driver resets relevant timer when initialising it as
+a clock source, but it doesn't do this for clock event device.
 
-There will be virtually no change in the driver - all required stuff is already there. See the STE UX500 variant - they did exactly the same, enlarged the FIFO. One of the main reason I've immediately abandoned the idea of using FIQ was the need of changing the driver for no good reason.
+Fixed.
 
-> Well, fixing MMCI because ISP1761 is buggy is not the way forward.
-> The answer is to fix the broken ISP1761 driver.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/common/timer-sp.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Totally agree. The thing is that you are the only person right now who doesn't have any problems. The others can quickly benefit from the workaround. I think I made the status of this patch clear enough - let me quote myself: "HACK HACK HACK" ;-)
-
-> Well as I see it, it's pointless enlarging the FIFO.  ARM Ltd isn't
-> going to give me updated FPGA images for the Integrator/CP, Versatile
-> PB926, Realview EB and Versatile Express.
-
-If we succeed with this, you (and all other users) will get the "improved" FPGA image. But for VE only indeed.
-
-Pawe?
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index 6ef3342..e64cad3 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -142,6 +142,9 @@ void __init sp804_clockevents_init(void __iomem *base, unsigned int timer_irq)
+ 
+ 	clkevt_base = base;
+ 
++	/* Reset the timer to prevent spurious interrupts */
++	writel(0, clkevt_base + TIMER_CTRL);
++
+ 	evt->irq = timer_irq;
+ 	evt->mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC, evt->shift);
+ 	evt->max_delta_ns = clockevent_delta2ns(0xffffffff, evt);
+-- 
+1.6.3.3
