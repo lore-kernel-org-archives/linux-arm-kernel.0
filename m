@@ -1,34 +1,31 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 25 Jan 2011 14:18:27 +0000
-Subject: [PATCH v2] arm: Configure reference clock for Versatile
-	Express timers
-In-Reply-To: <20110124202031.GL24104@n2100.arm.linux.org.uk>
-References: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
-	<20110124144753.GB22949@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F4328E@GEORGE.Emea.Arm.com>
-	<20110124161453.GB24104@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F432AE@GEORGE.Emea.Arm.com>
-	<20110124171007.GI24104@n2100.arm.linux.org.uk>
-	<000601cbbbfa$c83d4db0$58b7e910$@moll@arm.com>
-	<20110124202031.GL24104@n2100.arm.linux.org.uk>
-Message-ID: <1295965107.20017.7.camel@hornet.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Jan 2011 14:19:39 -0000
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to	use
+	ldrex/strex
+In-Reply-To: <20110125141153.GA17286@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+	<20110123001636.GA20841@n2100.arm.linux.org.uk>
+	<000601cbbc97$cc6955d0$653c0170$@deacon@arm.com>
+	<20110125141153.GA17286@n2100.arm.linux.org.uk>
+Message-ID: <000c01cbbc9a$e71faf70$b55f0e50$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > First is the reference clock configuration, and this change is
-> really important. I'll send v3 in a second, which does not touch the
-> TIMER_CTRL lines. I hope you are happy about this.
+> > I've tested this on the Versatile Express (ca9x4, little endian) with a USB
+> > hard drive and ext3 (rw) filesystem. I did a bunch of parallel dds of a 2GB
+> > file containing random data whilst the system was fairly loaded. File checksums
+> > all passed and the kernel didn't do anything untowards.
+> >
+> > Tested-by: Will Deacon <will.deacon@arm.com>
+> >
+> > I appreciate this is the same test configuration as the one Nicolas did,
+> > but it at least replicates his findings.
 > 
-> I'm not going to bother replying to this message until you wrap your
-> messages sensibly.  I can't read most of your message while composing
-> a reply.
+> Was this for just the first three or the complete set?
 
-Point taken, guilt accepted. Apologies.
+This was for your -devel branch as of last night (head 75c4aa97).
+If I try to extract patches from the mailing list, Exchange destroys
+them :(
 
-I shouldn't have even tried to tame Outlook, my fault ;-)
-
-Now - are you ok with sending v3 to your patch system?
-
-Cheers!
-
-Pawe?
+Will
