@@ -1,63 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jan 2011 19:25:01 +0530
-Subject: [PATCH 3/5] ARM: twd: Add context save restore support
-In-Reply-To: <20110125133752.GI13300@n2100.arm.linux.org.uk>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
-	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
-	<20110124111114.GA19409@n2100.arm.linux.org.uk>
-	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
-	<20110125103231.GD11507@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
-	<20110125133752.GI13300@n2100.arm.linux.org.uk>
-Message-ID: <35c687f501c0d8d8a4435f7b98850b16@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Jan 2011 13:57:26 -0000
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to	use
+	ldrex/strex
+In-Reply-To: <20110123001636.GA20841@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+	<20110123001636.GA20841@n2100.arm.linux.org.uk>
+Message-ID: <000601cbbc97$cc6955d0$653c0170$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, January 25, 2011 7:08 PM
-> To: Thomas Gleixner
-> Cc: Colin Cross; Santosh Shilimkar; catalin.marinas at arm.com;
-> linus.ml.walleij at gmail.com; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 3/5] ARM: twd: Add context save restore support
->
-> On Tue, Jan 25, 2011 at 02:23:10PM +0100, Thomas Gleixner wrote:
-> > On Tue, 25 Jan 2011, Russell King - ARM Linux wrote:
+Hi Russell,
 
-[...]
-> > > The next question is can we teach the generic time
-> infrastructure about
-> > > this so we don't have to modify every clock event driver for it?
-> We
-> > > really need to get away from having this kind of knowledge
-> buried down
-> > > in the lowest levels of every driver.
+Hopefully this isn't too late to be useful.
+
+> On Mon, Jan 17, 2011 at 07:21:40PM +0000, Russell King - ARM Linux wrote:
+> > Switch the set/clear/change bitops to use the word-based exclusive
+> > operations, which are only present in a wider range of ARM architectures
+> > than the byte-based exclusive operations.
 > >
-> > In which way? I mean the generic code issues a call to the
-> set_mode
-> > function when we leave the broadcast mode. So what should the
-> generic
-> > code do more ?
->
-> I can't say because these patches only add the hooks, there's no
-> implementation yet which uses the hooks.
->
-> Given the description about _why_ those hooks are necessary, it
-> seems
-> that something is required.  Either we start adding custom hacks to
-> each clockevent driver as is done with this patch, or we get some
-> generic help in place.
->
-> I'm not thrilled by the custom hack approach - and I thought the
-> clockevent stuff was created to stop this kind of thing happening.
->
-> I suggest we defer this until there's a visible use case available.
-Just for clarification. Without the TWD save restore patch the PM
-won't work. So what you mean by visible usecase.
-We need this to be fixed and that's what was done with the my
-patch. Ofcourse it's a custom hack approach but does the job.
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> As only one person replied to this patch with test information, I'm
+> not happy to push this into -rc, and hence that prevents it going into
+> -stable too.  That means omap2plus_defconfig .38 mainline kernels
+> (including -stable) will remain potentially dangerous when run on
+> SMP capable hardware.
+> 
+> Therefore, I see no alternative at the moment but to purposely cause
+> builds which cover ARMv6, and ARMv6K or ARMv7 CPUs to save people from
+> data corruption.
+> 
+> Please get your tested-by's to me for at least the first three patches
+> of this series ASAP.
 
-Regards,
-Santosh
+I've tested this on the Versatile Express (ca9x4, little endian) with a USB
+hard drive and ext3 (rw) filesystem. I did a bunch of parallel dds of a 2GB
+file containing random data whilst the system was fairly loaded. File checksums
+all passed and the kernel didn't do anything untowards.
+
+Tested-by: Will Deacon <will.deacon@arm.com>
+
+I appreciate this is the same test configuration as the one Nicolas did,
+but it at least replicates his findings.
+
+Will
