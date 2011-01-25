@@ -1,38 +1,36 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 24 Jan 2011 19:03:42 -0800
-Subject: [PATCH 1/5] ARM: gic: Add hooks for architecture specific
-	extensions
-In-Reply-To: <1295859080-15259-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <AANLkTikT=muk5A8MkSe0dXvE-GPsfMn4Am7KuOndvBdi@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 24 Jan 2011 19:45:14 -0800
+Subject: [PATCH 0/4] MSM: clock debugfs and cleanups
+Message-ID: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 12:51 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Few architectures combine the GIC with an external interrupt controller.
-> On such systems it may be necessary to update both the GIC registers
-> and the external controller's registers to control IRQ behavior.
->
-> This can be addressed in couple of possible methods.
-> ?1. ? ? Export common GIC routines along with 'struct irq_chip gic_chip'
-> ? ? ? ?and allow architectures to have custom function by override.
->
-> ?2. ? ? Provide architecture specific function pointer hooks
-> ? ? ? ?within GIC library and leave platforms to add the necessary
-> ? ? ? ?code as part of these hooks.
->
-> First one might be non-intrusive but have few shortcomings like arch needs
-> to have there own custom gic library. Locks used should be common since it
-> caters to same IRQs etc. Maintenance point of view also it leads to
-> multiple file fixes.
->
-> The second probably is cleaner and portable. It ensures that all the
-> common GIC infrastructure is not touched and also provides archs to
-> address their specific issue.
+These patches were previously posted as part of a larger series.
+I've refreshed these against the latest msm for-next branch.
 
-This method would work for most of Tegra's needs, although we would
-need gic_set_type and gic_ack_irq to have arch extensions as well.
-However, it does not allow for irq_retrigger, which can be implemented
-on Tegra.
+They cleanup debugfs and the clock code and add support for
+some proc_comm clocks.
+
+Matt Wagantall (1):
+  msm: clock: Move debugfs code from clock.c to clock-debug.c
+
+Stephen Boyd (3):
+  msm: clock: Remove unused code and definitions
+  msm: clock: Invert debugfs directory layout
+  msm: clock: Add support for more proc_comm clocks
+
+ arch/arm/mach-msm/Makefile          |    3 +
+ arch/arm/mach-msm/board-msm8x60.c   |    5 +-
+ arch/arm/mach-msm/clock-debug.c     |  131 +++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/clock-pcom.c      |    1 +
+ arch/arm/mach-msm/clock-pcom.h      |    4 +-
+ arch/arm/mach-msm/clock.c           |  148 ++---------------------------------
+ arch/arm/mach-msm/clock.h           |   52 ++----------
+ arch/arm/mach-msm/devices-msm7x30.c |    3 +
+ arch/arm/mach-msm/devices-qsd8x50.c |    7 ++
+ 9 files changed, 165 insertions(+), 189 deletions(-)
+ create mode 100644 arch/arm/mach-msm/clock-debug.c
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
