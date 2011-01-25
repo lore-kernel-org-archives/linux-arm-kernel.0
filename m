@@ -1,31 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Jan 2011 13:41:28 +0000
-Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
-In-Reply-To: <4534e82bf14eeea9f96769df760df5ae@mail.gmail.com>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-5-git-send-email-santosh.shilimkar@ti.com>
-	<20110125114635.GB13300@n2100.arm.linux.org.uk>
-	<236d45e400a960cc3b32db538b3a79ae@mail.gmail.com>
-	<20110125121655.GD13300@n2100.arm.linux.org.uk>
-	<4534e82bf14eeea9f96769df760df5ae@mail.gmail.com>
-Message-ID: <20110125134128.GJ13300@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Jan 2011 13:45:13 +0000
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <20110123154607.GC30094@n2100.arm.linux.org.uk>
+References: <20110114120229.GA15996@n2100.arm.linux.org.uk>
+	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+	<20110114154919.GE15996@n2100.arm.linux.org.uk>
+	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
+	<20110114163520.GH15996@n2100.arm.linux.org.uk>
+	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
+	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
+	<AANLkTin_pMzNc-ZL+rVcwaVawer0poyxhatqw5P-A2qW@mail.gmail.com>
+	<20110115154019.GF15996@n2100.arm.linux.org.uk>
+	<AANLkTim8OhAtqADck0Snq-7z7opw=coiQ4=DeO0O7Qa-@mail.gmail.com>
+	<20110123154607.GC30094@n2100.arm.linux.org.uk>
+Message-ID: <1295963113.10109.255.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 06:06:27PM +0530, Santosh Shilimkar wrote:
-> Ok. I missed some information my last email.
-> The SCU power status programming is used to take CPU in/out
-> of coherency as an alternative to SMP bit. We don't
-> have an access to SMP bit on OMAP4. ARM has already
-> confirmed SCU programming is same as SMP bit enable/disable.
-> 
-> I don't know how safe is to use spin lock when one CPU is
-> goes out of coherency after programming the power state. The
-> spin lock release may not even be visible to other CPU.
-> The programming happens from IDLE or suspend where the
+On Sun, 2011-01-23 at 15:46 +0000, Russell King - ARM Linux wrote:
+> So, here's the revised patch.  Ack?
 
-BTW, presumably we should be flushing the caches/tlbs before setting
-the CPU power register to a non-normal setting?
+Apart from the itttt instruction, it looks fine. So once we agree on
+that, you can add my Ack.
 
-I'll wait until there's more information available (such as an example
-implementation.)
+-- 
+Catalin
