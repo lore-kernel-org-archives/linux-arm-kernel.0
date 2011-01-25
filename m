@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Jan 2011 11:17:01 +0000
+From: julia@diku.dk (Julia Lawall)
+Date: Tue, 25 Jan 2011 12:18:40 +0100 (CET)
 Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
 In-Reply-To: <4D3EB02D.6090302@bfs.de>
 References: <1295898922-18822-1-git-send-email-julia@diku.dk>
@@ -11,11 +11,14 @@ References: <1295898922-18822-1-git-send-email-julia@diku.dk>
 	<4D3EA6EC.5050305@bfs.de>
 	<20110125104333.GE11507@n2100.arm.linux.org.uk>
 	<4D3EB02D.6090302@bfs.de>
-Message-ID: <20110125111701.GF11507@n2100.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.64.1101251216190.12123@pc-004.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 12:12:45PM +0100, walter harms wrote:
+On Tue, 25 Jan 2011, walter harms wrote:
+
+> 
+> 
 > Am 25.01.2011 11:43, schrieb Russell King - ARM Linux:
 > > On Tue, Jan 25, 2011 at 11:33:16AM +0100, walter harms wrote:
 > >> Would it be more easy to return NULL in the error case of clk_get() instead
@@ -45,11 +48,19 @@ On Tue, Jan 25, 2011 at 12:12:45PM +0100, walter harms wrote:
 > >
 > 
 > So these is a bug ? They should return -ENOENT ?
+> 
+> The interessting question is: what to do with an error ?
+> 
+> Obviously some architecture can live with NULL, so it is not an critical
+> error. An the patch shows a code that is simply a return, not even the
+> user is informed that something did not work as expected.
+> 
+> From that point of view i would like question if it is useful to have
+> a "detailed" error instead of just returning NULL.
 
-You're stuck in "NULL is an error" mode.  struct clk * is a cookie which
-only the clk API implementation understands.  It must not be treated as
-anything different by drivers.  The only defined values for drivers are
-error pointer codes which translate to errors.  Everything else, drivers
-must assume is valid.  Drivers are not allowed to dereference struct clk.
+Somewhat unrelatedly, I often run into code where error handling code is 
+needed, but not present, and the function returns void, so nothing is 
+provided for propagating the error further.  I generally consider these 
+cases to be beyond my expertise to fix...
 
-It is for the clk API to interpret the struct clk * cookie as it sees fit.
+julia
