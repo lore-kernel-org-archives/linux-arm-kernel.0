@@ -1,128 +1,43 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 25 Jan 2011 20:58:44 +0530
-Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
-	in board_init
-In-Reply-To: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
-References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 26 Jan 2011 07:37:13 +0800
+Subject: [PATCH v3] Add i.MX23/28 auart support
+In-Reply-To: <1295863436-16663-1-git-send-email-s.hauer@pengutronix.de>
+References: <1295863436-16663-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110125233712.GA1146@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Hiremath, Vaibhav
-> Sent: Tuesday, January 25, 2011 8:53 PM
-> To: linux-omap at vger.kernel.org
-> Cc: Hiremath, Vaibhav; Varadarajan, Charulatha
-> Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
-> in board_init
+On Mon, Jan 24, 2011 at 11:03:54AM +0100, Sascha Hauer wrote:
+> changes since v2:
+> - Fix console support
+> - For handling the CREAD flag just disable the receiver instead of
+>   ignoring the characters in the receive interrupt
+> - Add timeout to loops in console support
 > 
-> With addition of hwmod support to gpio, the ethernet controller
-> goes undetected for OMAP35xEVM. So explicitly assert the reset signal to
-> ethernet controller smsc911x -
+> The following changes since commit 0c21e3aaf6ae85bee804a325aa29c325209180fd:
 > 
-> 	- GPIO7 (>=RevG version of EVM's)
-> 	- GPIO64 (<=RevD version of EVM's)
+>   Merge branch 'for-next' of git://git.kernel.org/pub/scm/linux/kernel/git/hch/hfsplus (2011-01-07 17:16:27 -0800)
 > 
-> This patch is based on intial version from Charulatha V, reference
-> to original discussion -
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Tested-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Since Kevin reported that this patch doesn't get applied cleanly,
-> so I am reposting it again after making sure that it gets applied cleanly.
+> are available in the git repository at:
 > 
-[Hiremath, Vaibhav] Oops, missed linux-arm-kernel list, adding here.
-
-Not sure whether I need to repost keeping linux-arm-kernel?
-
-Thanks,
-Vaibhav
-
->  arch/arm/mach-omap2/board-omap3evm.c |   39
-> +++++++++++++++++++++++++++++++++-
->  1 files changed, 38 insertions(+), 1 deletions(-)
+>   nowhere ..BRANCH.NOT.VERIFIED..
 > 
-> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
-> omap2/board-omap3evm.c
-> index 323c380..97e0f65 100644
-> --- a/arch/arm/mach-omap2/board-omap3evm.c
-> +++ b/arch/arm/mach-omap2/board-omap3evm.c
-> @@ -58,6 +58,13 @@
->  #define OMAP3EVM_ETHR_ID_REV	0x50
->  #define OMAP3EVM_ETHR_GPIO_IRQ	176
->  #define OMAP3EVM_SMSC911X_CS	5
-> +/*
-> + * Eth Reset signal
-> + *	64 = Generation 1 (<=RevD)
-> + *	7 = Generation 2 (>=RevE)
-> + */
-> +#define OMAP3EVM_GEN1_ETHR_GPIO_RST	64
-> +#define OMAP3EVM_GEN2_ETHR_GPIO_RST	7
+> Sascha Hauer (2):
+>       serial: Add auart driver for i.MX23/28
+>       ARM MXS: Add auart platform support for i.MX28
 > 
->  static u8 omap3_evm_version;
+>  arch/arm/mach-mxs/clock-mx28.c                  |    5 +
+>  arch/arm/mach-mxs/devices-mx28.h                |    8 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-auart.c      |   54 ++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |   10 +
+>  drivers/serial/Kconfig                          |   15 +
+>  drivers/serial/Makefile                         |    1 +
+>  drivers/serial/mxs-auart.c                      |  799 +++++++++++++++++++++++
+>  9 files changed, 896 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
+>  create mode 100644 drivers/serial/mxs-auart.c
 > 
-> @@ -124,10 +131,15 @@ static struct platform_device
-> omap3evm_smsc911x_device = {
 > 
->  static inline void __init omap3evm_init_smsc911x(void)
->  {
-> -	int eth_cs;
-> +	int eth_cs, eth_rst;
->  	struct clk *l3ck;
->  	unsigned int rate;
-> 
-> +	if (get_omap3_evm_rev() == OMAP3EVM_BOARD_GEN_1)
-> +		eth_rst = OMAP3EVM_GEN1_ETHR_GPIO_RST;
-> +	else
-> +		eth_rst = OMAP3EVM_GEN2_ETHR_GPIO_RST;
-> +
->  	eth_cs = OMAP3EVM_SMSC911X_CS;
-> 
->  	l3ck = clk_get(NULL, "l3_ck");
-> @@ -136,6 +148,27 @@ static inline void __init
-> omap3evm_init_smsc911x(void)
->  	else
->  		rate = clk_get_rate(l3ck);
-> 
-> +	/* Configure ethernet controller reset gpio */
-> +	if (cpu_is_omap3430()) {
-> +		if (gpio_request(eth_rst, "SMSC911x gpio") < 0) {
-> +			pr_err(KERN_ERR "Failed to request %d for smsc911x\n",
-> +					eth_rst);
-> +			return;
-> +		}
-> +
-> +		if (gpio_direction_output(eth_rst, 1) < 0) {
-> +			pr_err(KERN_ERR "Failed to set direction of %d for" \
-> +					" smsc911x\n", eth_rst);
-> +			return;
-> +		}
-> +		/* reset pulse to ethernet controller*/
-> +		usleep_range(150, 220);
-> +		gpio_set_value(eth_rst, 0);
-> +		usleep_range(150, 220);
-> +		gpio_set_value(eth_rst, 1);
-> +		usleep_range(1, 2);
-> +	}
-> +
->  	if (gpio_request(OMAP3EVM_ETHR_GPIO_IRQ, "SMSC911x irq") < 0) {
->  		printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
->  			OMAP3EVM_ETHR_GPIO_IRQ);
-> @@ -658,6 +691,10 @@ static struct omap_board_mux board_mux[] __initdata =
-> {
->  				OMAP_PIN_OFF_WAKEUPENABLE),
->  	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
->  				OMAP_PIN_OFF_INPUT_PULLUP |
-> OMAP_PIN_OFF_OUTPUT_LOW),
-> +	OMAP3_MUX(SYS_BOOT5, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
-> +				OMAP_PIN_OFF_NONE),
-> +	OMAP3_MUX(GPMC_WAIT2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
-> +				OMAP_PIN_OFF_NONE),
->  	{ .reg_offset = OMAP_MUX_TERMINATOR },
->  };
->  #endif
-> --
-> 1.6.2.4
+Tested-by: Shawn Guo <shawn.guo@freescale.com>
