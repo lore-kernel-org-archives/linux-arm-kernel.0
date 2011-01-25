@@ -1,123 +1,56 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 25 Jan 2011 08:00:29 -0800
-Subject: [PATCH] This patch fix a bug in the register indexing for GPIOs
-	numbers > 31
-In-Reply-To: <1295945785-7393-1-git-send-email-hirosh.dabui@snom.com> (Hirosh
-	Dabui's message of "Tue, 25 Jan 2011 09:56:25 +0100")
-References: <1295945785-7393-1-git-send-email-hirosh.dabui@snom.com>
-Message-ID: <87tygx0y8y.fsf@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 25 Jan 2011 21:34:15 +0530
+Subject: [PATCH 3/5] ARM: twd: Add context save restore support
+In-Reply-To: <20110125133752.GI13300@n2100.arm.linux.org.uk>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
+	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
+	<20110124111114.GA19409@n2100.arm.linux.org.uk>
+	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
+	<20110125103231.GD11507@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
+	<20110125133752.GI13300@n2100.arm.linux.org.uk>
+Message-ID: <68b4be46e93b4017650bc4bf230afef6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hirosh,
+Russell, Thomas
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, January 25, 2011 7:08 PM
+> To: Thomas Gleixner
+> Cc: Colin Cross; Santosh Shilimkar; catalin.marinas at arm.com;
+> linus.ml.walleij at gmail.com; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 3/5] ARM: twd: Add context save restore support
+>
+[...]
+>
+> I can't say because these patches only add the hooks, there's no
+> implementation yet which uses the hooks.
+>
+> Given the description about _why_ those hooks are necessary, it
+> seems
+> that something is required.  Either we start adding custom hacks to
+> each clockevent driver as is done with this patch, or we get some
+> generic help in place.
+>
+> I'm not thrilled by the custom hack approach - and I thought the
+> clockevent stuff was created to stop this kind of thing happening.
+>
+> I suggest we defer this until there's a visible use case available.
+Got some time to debug this issue. OMAP idle code already has the
+broad-cast notifiers working for sometime. So I removed the existing
+save restore twd code and just used the below patch which Russell
+posted on this thread.
+And things just work and I guess we are done with this issue !!
+Timer framework is doing all right things with notifiers.
 
-Hirosh Dabui <hirosh.dabui@snom.com> writes:
+Am going to use this patch for my further work and drop the
+save/restore patch. Will update you if there is any other
+issue on this. I should have validated this patch on my own
+earlier :(
 
-> to get the relevant hardware registers of tnetv107x to control the GPIOs.
+Thanks for the discussion.
 
-Your patch/changelog is still messed up.   You're missing a good
-subject/shortlog and the first line of the changelog has become the
-subject/shortlog.
-
-Kevin
-
-> In the structure tnetv107x_gpio_regs:
->
-> struct tnetv107x_gpio_regs {
->        u32     idver;
->        u32     data_in[3];
->        u32     data_out[3];
->        u32     direction[3];
->        u32     enable[3];
-> };
->
-> The GPIO hardware register addresses of tnetv107x are stored.
-> The chip implements 3 registers of each entity to serve 96 GPIOs,
-> each register provides a subset of 32 GPIOs.
-> The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
-> and gpio_reg_clear_bit.
->
-> The bug implied the use of macros to access the relevant hardware
-> register e.g. the driver code used the macro like this:
-> 'gpio_reg_clear_bit(&reg->data_out, gpio)'
->
-> But it has to be used like this:
-> 'gpio_reg_clear_bit(reg->data_out, gpio)'.
->
-> The different results are shown here:
-> - &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
-> - reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
->
-> Acked-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
-> ---
->  arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
->  1 files changed, 9 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
-> index d102986..3fa3e28 100644
-> --- a/arch/arm/mach-davinci/gpio-tnetv107x.c
-> +++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
-> @@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
->  
->  	spin_lock_irqsave(&ctlr->lock, flags);
->  
-> -	gpio_reg_set_bit(&regs->enable, gpio);
-> +	gpio_reg_set_bit(regs->enable, gpio);
->  
->  	spin_unlock_irqrestore(&ctlr->lock, flags);
->  
-> @@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
->  
->  	spin_lock_irqsave(&ctlr->lock, flags);
->  
-> -	gpio_reg_clear_bit(&regs->enable, gpio);
-> +	gpio_reg_clear_bit(regs->enable, gpio);
->  
->  	spin_unlock_irqrestore(&ctlr->lock, flags);
->  }
-> @@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
->  
->  	spin_lock_irqsave(&ctlr->lock, flags);
->  
-> -	gpio_reg_set_bit(&regs->direction, gpio);
-> +	gpio_reg_set_bit(regs->direction, gpio);
->  
->  	spin_unlock_irqrestore(&ctlr->lock, flags);
->  
-> @@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
->  	spin_lock_irqsave(&ctlr->lock, flags);
->  
->  	if (value)
-> -		gpio_reg_set_bit(&regs->data_out, gpio);
-> +		gpio_reg_set_bit(regs->data_out, gpio);
->  	else
-> -		gpio_reg_clear_bit(&regs->data_out, gpio);
-> +		gpio_reg_clear_bit(regs->data_out, gpio);
->  
-> -	gpio_reg_clear_bit(&regs->direction, gpio);
-> +	gpio_reg_clear_bit(regs->direction, gpio);
->  
->  	spin_unlock_irqrestore(&ctlr->lock, flags);
->  
-> @@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
->  	unsigned gpio = chip->base + offset;
->  	int ret;
->  
-> -	ret = gpio_reg_get_bit(&regs->data_in, gpio);
-> +	ret = gpio_reg_get_bit(regs->data_in, gpio);
->  
->  	return ret ? 1 : 0;
->  }
-> @@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
->  	spin_lock_irqsave(&ctlr->lock, flags);
->  
->  	if (value)
-> -		gpio_reg_set_bit(&regs->data_out, gpio);
-> +		gpio_reg_set_bit(regs->data_out, gpio);
->  	else
-> -		gpio_reg_clear_bit(&regs->data_out, gpio);
-> +		gpio_reg_clear_bit(regs->data_out, gpio);
->  
->  	spin_unlock_irqrestore(&ctlr->lock, flags);
->  }
+-----------------
