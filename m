@@ -1,42 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jan 2011 17:16:19 +0530
-Subject: questions about arm trustzone
-In-Reply-To: <20110125102652.GB11507@n2100.arm.linux.org.uk>
-References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com><8yad3nlh18e.fsf@huya.qualcomm.com><AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
-	<20110125102652.GB11507@n2100.arm.linux.org.uk>
-Message-ID: <bb0c3855a121603232d022b4062752a6@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 11:46:35 +0000
+Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
+In-Reply-To: <1295859080-15259-5-git-send-email-santosh.shilimkar@ti.com>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20110125114635.GB13300@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King -
-> ARM Linux
-> Sent: Tuesday, January 25, 2011 3:57 PM
-> To: sen wang
-> Cc: David Brown; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: questions about arm trustzone
->
-> On Tue, Jan 25, 2011 at 05:19:16PM +0800, sen wang wrote:
-> > It seems linux run in the normal world, and the "scm.c" ?is the
-> path
-> > to the monitor mode.
-> > where can I find the example code for monitor and secure world?
->
-> OMAP also uses smc: arch/arm/mach-omap2/omap44xx-smc.S
->
-> There's no interface defined for smc because it's highly vendor and
-> implementation specific.  It's just like a SWI (or svc) where it
-> causes entry via a vector into a priviledged mode, which can be
-> thought of being similar to a branch to a vector with a mode switch.
->
-The code above won't give major details of how the monitor mode is
-implemented.  But as Russell said, it's pretty much vendor specific.
+On Mon, Jan 24, 2011 at 02:21:18PM +0530, Santosh Shilimkar wrote:
+> This patch moves SCU register defines from smp_scu.c to smp_scu.h
+> so that its available for platforms to use
+> 
+> The SCU CPU power status registers is used for power management
+> on OMAP4.
 
-On OMAP, We have standard API interfaces to enter into monitor
-world. One of the parameter denotes the kind of service, is
-requested.
+Could we instead have an API inside smp_scu.c rather than having each
+SoC implement its own SCU PM stuff?
 
-Regards,
-Santosh
+Maybe this.  Note that scu_power_mode() needs to be called from a non-
+preemptible context, which is sane as we don't want to be rescheduled
+onto a different CPU between scu_power_mode() and the wfi/wfe required
+to enter the selected mode.
+
+ arch/arm/include/asm/smp_scu.h |    5 +++++
+ arch/arm/kernel/smp_scu.c      |   11 +++++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 2376835..ec11a92 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -1,7 +1,12 @@
+ #ifndef __ASMARM_ARCH_SCU_H
+ #define __ASMARM_ARCH_SCU_H
+ 
++#define	SCU_PM_NORMAL	0
++#define SCU_PM_DORMANT	2
++#define SCU_PM_POWEROFF	3
++
+ unsigned int scu_get_core_count(void __iomem *);
+ void scu_enable(void __iomem *);
++int scu_power_mode(unsigned int);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 9ab4149..bbb9b1c 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -50,3 +50,14 @@ void __init scu_enable(void __iomem *scu_base)
+ 	 */
+ 	flush_cache_all();
+ }
++
++int scu_power_mode(unsigned int mode)
++{
++	int cpu = smp_processor_id();
++
++	if (mode > 3 || mode == 1 || cpu > 3)
++		return -EINVAL;
++
++	__raw_writel(mode << (8 * cpu), scu_base + SCU_CPU_STATUS);
++	return 0;
++}
