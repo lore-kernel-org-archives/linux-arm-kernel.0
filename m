@@ -1,98 +1,65 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 25 Jan 2011 13:08:33 -0200
-Subject: [PATCH 1/3] ARM: mach-mx5: Fix build for mx53_loco and mx53_smd
-Message-ID: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
+Date: Tue, 25 Jan 2011 13:08:35 -0200
+Subject: [PATCH 3/3] ARM: mach-mx5/board-mx53_loco: Remove unused UARTs
+In-Reply-To: <1295968115-11447-2-git-send-email-fabio.estevam@freescale.com>
+References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
+	<1295968115-11447-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1295968115-11447-3-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 816ad74 (ARM: i.MX53: Add full iomux support for mx53) renamed some of the pad names.
+On mx53_loco only UART1 is used and its signals go to connector J16.
 
-Make the changes accordingly so that mx53_loco and mx53_cmd can build without errors.
+Remove UART2 and UART3 as they are not used on this board.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mx5/board-mx53_loco.c |   25 +++++++++++++------------
- arch/arm/mach-mx5/board-mx53_smd.c  |   24 ++++++++++++------------
- 2 files changed, 25 insertions(+), 24 deletions(-)
+ arch/arm/mach-mx5/board-mx53_loco.c |   24 +-----------------------
+ 1 files changed, 1 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index d1348e0..dadc856 100644
+index cba4cd5..3aefd6d 100644
 --- a/arch/arm/mach-mx5/board-mx53_loco.c
 +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -39,20 +39,21 @@
- #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
- 
+@@ -41,30 +41,8 @@
  static iomux_v3_cfg_t mx53_loco_pads[] = {
--	MX53_PAD_CSI0_D10__UART1_TXD,
--	MX53_PAD_CSI0_D11__UART1_RXD,
--	MX53_PAD_ATA_DIOW__UART1_TXD,
--	MX53_PAD_ATA_DMACK__UART1_RXD,
+ 	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+ 	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
 -
--	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
--	MX53_PAD_ATA_DMARQ__UART2_TXD,
--	MX53_PAD_ATA_DIOR__UART2_RTS,
--	MX53_PAD_ATA_INTRQ__UART2_CTS,
+-	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+-	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+-	MX53_PAD_PATA_DIOR__UART2_RTS,
+-	MX53_PAD_PATA_INTRQ__UART2_CTS,
 -
--	MX53_PAD_ATA_CS_0__UART3_TXD,
--	MX53_PAD_ATA_CS_1__UART3_RXD,
--	MX53_PAD_ATA_DA_1__UART3_CTS,
--	MX53_PAD_ATA_DA_2__UART3_RTS,
-+	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
-+	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-+	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
-+	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
-+
-+	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
-+	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
-+	MX53_PAD_PATA_DIOR__UART2_RTS,
-+	MX53_PAD_PATA_INTRQ__UART2_CTS,
-+
-+	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
-+	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
-+	MX53_PAD_PATA_DA_1__UART3_CTS,
-+	MX53_PAD_PATA_DA_2__UART3_RTS,
-+
+-	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
+-	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
+-	MX53_PAD_PATA_DA_1__UART3_CTS,
+-	MX53_PAD_PATA_DA_2__UART3_RTS,
+-
+-};
+-
+-static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
  };
  
- static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
-diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
-index 7970f7a..06070c5 100644
---- a/arch/arm/mach-mx5/board-mx53_smd.c
-+++ b/arch/arm/mach-mx5/board-mx53_smd.c
-@@ -39,20 +39,20 @@
- #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
- 
- static iomux_v3_cfg_t mx53_smd_pads[] = {
--	MX53_PAD_CSI0_D10__UART1_TXD,
--	MX53_PAD_CSI0_D11__UART1_RXD,
--	MX53_PAD_ATA_DIOW__UART1_TXD,
--	MX53_PAD_ATA_DMACK__UART1_RXD,
+-static inline void mx53_loco_init_uart(void)
+-{
+-	imx53_add_imx_uart(0, NULL);
+-	imx53_add_imx_uart(1, &mx53_loco_uart_data);
+-	imx53_add_imx_uart(2, &mx53_loco_uart_data);
+-}
 -
--	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
--	MX53_PAD_ATA_DMARQ__UART2_TXD,
--	MX53_PAD_ATA_DIOR__UART2_RTS,
--	MX53_PAD_ATA_INTRQ__UART2_CTS,
--
--	MX53_PAD_ATA_CS_0__UART3_TXD,
--	MX53_PAD_ATA_CS_1__UART3_RXD,
--	MX53_PAD_ATA_DA_1__UART3_CTS,
--	MX53_PAD_ATA_DA_2__UART3_RTS,
-+	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
-+	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-+	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
-+	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
-+
-+	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
-+	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
-+	MX53_PAD_PATA_DIOR__UART2_RTS,
-+	MX53_PAD_PATA_INTRQ__UART2_CTS,
-+
-+	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
-+	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
-+	MX53_PAD_PATA_DA_1__UART3_CTS,
-+	MX53_PAD_PATA_DA_2__UART3_RTS,
- };
- 
- static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+ static inline void mx53_loco_fec_reset(void)
+ {
+ 	int ret;
+@@ -88,7 +66,7 @@ static void __init mx53_loco_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+ 					ARRAY_SIZE(mx53_loco_pads));
+-	mx53_loco_init_uart();
++	imx53_add_imx_uart(0, NULL);
+ 	mx53_loco_fec_reset();
+ 	imx53_add_fec(&mx53_loco_fec_data);
+ }
 -- 
 1.6.0.4
