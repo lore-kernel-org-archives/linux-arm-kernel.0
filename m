@@ -1,34 +1,22 @@
-From: wangchendu@gmail.com (sen wang)
-Date: Tue, 25 Jan 2011 17:19:16 +0800
-Subject: questions about arm trustzone
-In-Reply-To: <8yad3nlh18e.fsf@huya.qualcomm.com>
-References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
-	<8yad3nlh18e.fsf@huya.qualcomm.com>
-Message-ID: <AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 25 Jan 2011 14:50:32 +0530
+Subject: [PATCH V5 25/63] ST SPEAr: Adding machine support for nand
+In-Reply-To: <4D3E906C.50206@windriver.com>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+	<4388cfaa47bd0ee1c511e997c50ee5375142593c.1295499394.git.viresh.kumar@st.com>
+	<4D3E906C.50206@windriver.com>
+Message-ID: <4D3E95E0.2040301@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-thanks,
-It seems linux run in the normal world, and the "scm.c" ?is the path
-to the monitor mode.
-where can I find the example code for monitor and secure world?
+On 01/25/2011 02:27 PM, stanley.miao wrote:
+>> > +struct platform_device nand_device = {
+>> > +	.name = "nand",
+>> >   
+> fsmc-nand ?
+> 
 
+Will correct this and resend.
 
-
-2011/1/25 David Brown <davidb@codeaurora.org>:
-> On Mon, Jan 24 2011, sen wang wrote:
->
->> we need to build a little os in the secure mode,and run linux in the
->> normal world.but, can I use gcc to compile the special instructions like 'smc'.
->> which gcc version can work? and where can i find the example code
->> switching between the secure and normal worlds?
->
-> In the 2.6.38-rc2 kernel, arch/arm/mach-msm/scm.c does this. ?I don't
-> think there is any other code in the kernel, yet.
->
-> David
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
+thanks.
+viresh
