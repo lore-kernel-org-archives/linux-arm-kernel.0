@@ -1,112 +1,34 @@
-From: hirosh.dabui@snom.com (Hirosh Dabui)
-Date: Tue, 25 Jan 2011 09:56:25 +0100
-Subject: [PATCH] This patch fix a bug in the register indexing for GPIOs
-	numbers > 31
-Message-ID: <1295945785-7393-1-git-send-email-hirosh.dabui@snom.com>
+From: wangchendu@gmail.com (sen wang)
+Date: Tue, 25 Jan 2011 17:19:16 +0800
+Subject: questions about arm trustzone
+In-Reply-To: <8yad3nlh18e.fsf@huya.qualcomm.com>
+References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
+	<8yad3nlh18e.fsf@huya.qualcomm.com>
+Message-ID: <AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-to get the relevant hardware registers of tnetv107x to control the GPIOs.
+thanks,
+It seems linux run in the normal world, and the "scm.c" ?is the path
+to the monitor mode.
+where can I find the example code for monitor and secure world?
 
-In the structure tnetv107x_gpio_regs:
 
-struct tnetv107x_gpio_regs {
-       u32     idver;
-       u32     data_in[3];
-       u32     data_out[3];
-       u32     direction[3];
-       u32     enable[3];
-};
 
-The GPIO hardware register addresses of tnetv107x are stored.
-The chip implements 3 registers of each entity to serve 96 GPIOs,
-each register provides a subset of 32 GPIOs.
-The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
-and gpio_reg_clear_bit.
-
-The bug implied the use of macros to access the relevant hardware
-register e.g. the driver code used the macro like this:
-'gpio_reg_clear_bit(&reg->data_out, gpio)'
-
-But it has to be used like this:
-'gpio_reg_clear_bit(reg->data_out, gpio)'.
-
-The different results are shown here:
-- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
-- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
-
-Acked-by: Cyril Chemparathy <cyril@ti.com>
-Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
----
- arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
-index d102986..3fa3e28 100644
---- a/arch/arm/mach-davinci/gpio-tnetv107x.c
-+++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
-@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_set_bit(&regs->enable, gpio);
-+	gpio_reg_set_bit(regs->enable, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_clear_bit(&regs->enable, gpio);
-+	gpio_reg_clear_bit(regs->enable, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- }
-@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
- 
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
--	gpio_reg_set_bit(&regs->direction, gpio);
-+	gpio_reg_set_bit(regs->direction, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
- 	if (value)
--		gpio_reg_set_bit(&regs->data_out, gpio);
-+		gpio_reg_set_bit(regs->data_out, gpio);
- 	else
--		gpio_reg_clear_bit(&regs->data_out, gpio);
-+		gpio_reg_clear_bit(regs->data_out, gpio);
- 
--	gpio_reg_clear_bit(&regs->direction, gpio);
-+	gpio_reg_clear_bit(regs->direction, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- 
-@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	unsigned gpio = chip->base + offset;
- 	int ret;
- 
--	ret = gpio_reg_get_bit(&regs->data_in, gpio);
-+	ret = gpio_reg_get_bit(regs->data_in, gpio);
- 
- 	return ret ? 1 : 0;
- }
-@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
- 	spin_lock_irqsave(&ctlr->lock, flags);
- 
- 	if (value)
--		gpio_reg_set_bit(&regs->data_out, gpio);
-+		gpio_reg_set_bit(regs->data_out, gpio);
- 	else
--		gpio_reg_clear_bit(&regs->data_out, gpio);
-+		gpio_reg_clear_bit(regs->data_out, gpio);
- 
- 	spin_unlock_irqrestore(&ctlr->lock, flags);
- }
--- 
-1.7.1
+2011/1/25 David Brown <davidb@codeaurora.org>:
+> On Mon, Jan 24 2011, sen wang wrote:
+>
+>> we need to build a little os in the secure mode,and run linux in the
+>> normal world.but, can I use gcc to compile the special instructions like 'smc'.
+>> which gcc version can work? and where can i find the example code
+>> switching between the secure and normal worlds?
+>
+> In the 2.6.38-rc2 kernel, arch/arm/mach-msm/scm.c does this. ?I don't
+> think there is any other code in the kernel, yet.
+>
+> David
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
