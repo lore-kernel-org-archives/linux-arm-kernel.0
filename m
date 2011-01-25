@@ -1,170 +1,38 @@
 From: ccross@android.com (Colin Cross)
-Date: Mon, 24 Jan 2011 18:42:15 -0800
-Subject: [PATCH v3 20/28] ARM: tegra: cpufreq: Disable cpufreq during suspend
-In-Reply-To: <Message-ID: <AANLkTimK7vD6mrPXyRdx331mCnRNLnajCRONT=MzQHwW@mail.gmail.com>
-References: <Message-ID: <AANLkTimK7vD6mrPXyRdx331mCnRNLnajCRONT=MzQHwW@mail.gmail.com>
-Message-ID: <1295923340-28539-1-git-send-email-ccross@android.com>
+Date: Mon, 24 Jan 2011 19:03:42 -0800
+Subject: [PATCH 1/5] ARM: gic: Add hooks for architecture specific
+	extensions
+In-Reply-To: <1295859080-15259-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <AANLkTikT=muk5A8MkSe0dXvE-GPsfMn4Am7KuOndvBdi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tegra, calling clk_set_rate on the CPU clock may call into the
-regulator API.  If the regulator driver that controls the CPU
-voltage rail has been suspended, this can lead to attempted
-communication with a hardware block that has already been turned
-off.
+On Mon, Jan 24, 2011 at 12:51 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Few architectures combine the GIC with an external interrupt controller.
+> On such systems it may be necessary to update both the GIC registers
+> and the external controller's registers to control IRQ behavior.
+>
+> This can be addressed in couple of possible methods.
+> ?1. ? ? Export common GIC routines along with 'struct irq_chip gic_chip'
+> ? ? ? ?and allow architectures to have custom function by override.
+>
+> ?2. ? ? Provide architecture specific function pointer hooks
+> ? ? ? ?within GIC library and leave platforms to add the necessary
+> ? ? ? ?code as part of these hooks.
+>
+> First one might be non-intrusive but have few shortcomings like arch needs
+> to have there own custom gic library. Locks used should be common since it
+> caters to same IRQs etc. Maintenance point of view also it leads to
+> multiple file fixes.
+>
+> The second probably is cleaner and portable. It ensures that all the
+> common GIC infrastructure is not touched and also provides archs to
+> address their specific issue.
 
-Adds a SUSPEND_PREPARE notification hook to drop the frequency to
-the lowest possible during suspend.
-
-Also adds 216MHz (off of PLLP) as the lowest CPU frequency, which
-allows PLLX to be turned off.
-
-Signed-off-by: Colin Cross <ccross@android.com>
----
-v3: Updated commit message to clarify issues with regulator api
-
- arch/arm/mach-tegra/cpu-tegra.c |   75 +++++++++++++++++++++++++++++++--------
- 1 files changed, 60 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index fea5719..ad26a9f 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -28,6 +28,7 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/suspend.h>
- 
- #include <asm/system.h>
- 
-@@ -36,14 +37,15 @@
- 
- /* Frequency table index must be sequential starting at 0 */
- static struct cpufreq_frequency_table freq_table[] = {
--	{ 0, 312000 },
--	{ 1, 456000 },
--	{ 2, 608000 },
--	{ 3, 760000 },
--	{ 4, 816000 },
--	{ 5, 912000 },
--	{ 6, 1000000 },
--	{ 7, CPUFREQ_TABLE_END },
-+	{ 0, 216000 },
-+	{ 1, 312000 },
-+	{ 2, 456000 },
-+	{ 3, 608000 },
-+	{ 4, 760000 },
-+	{ 5, 816000 },
-+	{ 6, 912000 },
-+	{ 7, 1000000 },
-+	{ 8, CPUFREQ_TABLE_END },
- };
- 
- #define NUM_CPUS	2
-@@ -51,6 +53,8 @@ static struct cpufreq_frequency_table freq_table[] = {
- static struct clk *cpu_clk;
- 
- static unsigned long target_cpu_speed[NUM_CPUS];
-+static DEFINE_MUTEX(tegra_cpu_lock);
-+static bool is_suspended;
- 
- int tegra_verify_speed(struct cpufreq_policy *policy)
- {
-@@ -68,16 +72,11 @@ unsigned int tegra_getspeed(unsigned int cpu)
- 	return rate;
- }
- 
--static int tegra_update_cpu_speed(void)
-+static int tegra_update_cpu_speed(unsigned long rate)
- {
--	int i;
--	unsigned long rate = 0;
- 	int ret = 0;
- 	struct cpufreq_freqs freqs;
- 
--	for_each_online_cpu(i)
--		rate = max(rate, target_cpu_speed[i]);
--
- 	freqs.old = tegra_getspeed(0);
- 	freqs.new = rate;
- 
-@@ -105,12 +104,30 @@ static int tegra_update_cpu_speed(void)
- 	return 0;
- }
- 
-+static unsigned long tegra_cpu_highest_speed(void)
-+{
-+	unsigned long rate = 0;
-+	int i;
-+
-+	for_each_online_cpu(i)
-+		rate = max(rate, target_cpu_speed[i]);
-+	return rate;
-+}
-+
- static int tegra_target(struct cpufreq_policy *policy,
- 		       unsigned int target_freq,
- 		       unsigned int relation)
- {
- 	int idx;
- 	unsigned int freq;
-+	int ret = 0;
-+
-+	mutex_lock(&tegra_cpu_lock);
-+
-+	if (is_suspended) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
- 
- 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
- 		relation, &idx);
-@@ -119,9 +136,34 @@ static int tegra_target(struct cpufreq_policy *policy,
- 
- 	target_cpu_speed[policy->cpu] = freq;
- 
--	return tegra_update_cpu_speed();
-+	ret = tegra_update_cpu_speed(tegra_cpu_highest_speed());
-+
-+out:
-+	mutex_unlock(&tegra_cpu_lock);
-+	return ret;
- }
- 
-+static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
-+	void *dummy)
-+{
-+	mutex_lock(&tegra_cpu_lock);
-+	if (event == PM_SUSPEND_PREPARE) {
-+		is_suspended = true;
-+		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
-+			freq_table[0].frequency);
-+		tegra_update_cpu_speed(freq_table[0].frequency);
-+	} else if (event == PM_POST_SUSPEND) {
-+		is_suspended = false;
-+	}
-+	mutex_unlock(&tegra_cpu_lock);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block tegra_cpu_pm_notifier = {
-+	.notifier_call = tegra_pm_notify,
-+};
-+
- static int tegra_cpu_init(struct cpufreq_policy *policy)
- {
- 	if (policy->cpu >= NUM_CPUS)
-@@ -142,6 +184,9 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 	policy->shared_type = CPUFREQ_SHARED_TYPE_ALL;
- 	cpumask_copy(policy->related_cpus, cpu_possible_mask);
- 
-+	if (policy->cpu == 0)
-+		register_pm_notifier(&tegra_cpu_pm_notifier);
-+
- 	return 0;
- }
- 
--- 
-1.7.3.1
+This method would work for most of Tegra's needs, although we would
+need gic_set_type and gic_ack_irq to have arch extensions as well.
+However, it does not allow for irq_retrigger, which can be implemented
+on Tegra.
