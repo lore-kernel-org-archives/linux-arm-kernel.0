@@ -1,53 +1,72 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Tue, 25 Jan 2011 07:12:34 +0100 (CET)
-Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
-In-Reply-To: <20110125014428.GO24284@game.jcrosoft.org>
-References: <Pine.LNX.4.64.1101242058430.3167@ask.diku.dk>
-	<20110124200515.GA30963@albatros> <4D3DDD07.1030809@bluewatersys.com>
-	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
-	<4D3DE35B.1030102@bluewatersys.com>
-	<Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
-	<4D3DE9CD.2040800@bluewatersys.com>
-	<Pine.LNX.4.64.1101242231240.3167@ask.diku.dk>
-	<4D3DF46A.1030009@bluewatersys.com>
-	<20110124232302.GQ24104@n2100.arm.linux.org.uk>
-	<20110125014428.GO24284@game.jcrosoft.org>
-Message-ID: <Pine.LNX.4.64.1101250712110.29909@ask.diku.dk>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 24 Jan 2011 23:39:13 -0800
+Subject: [PATCH 3/5] ARM: twd: Add context save restore support
+In-Reply-To: <20110124111114.GA19409@n2100.arm.linux.org.uk>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
+	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
+	<20110124111114.GA19409@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jan 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Mon, Jan 24, 2011 at 3:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 24, 2011 at 11:06:09AM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Jan 24, 2011 at 02:21:17PM +0530, Santosh Shilimkar wrote:
+>> > In CPU low power state, local timer looses its register context. This
+>> > patch adds context save restore hooks which can be used by platforms
+>> > appropriately.
+>>
+>> I thought the whole point of CLOCK_EVT_FEAT_C3STOP was that the generic
+>> timer stuff wouldn't rely on it being kept alive?
+>>
+>> Hmm, it looks like we bypass the clockevents code by only setting the
+>> TWD load value at initialization time, not when we switch to periodic
+>> mode. ?We really ought to rewrite it whenever we switch back to periodic
+>> mode.
+>>
+>> I suspect fixing that means you won't need this save/restore support.
+>
+> Untested, but should do what's required.
+>
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index fd91566..60636f4 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -36,6 +36,7 @@ static void twd_set_mode(enum clock_event_mode mode,
+> ? ? ? ? ? ? ? ?/* timer load already set up */
+> ? ? ? ? ? ? ? ?ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+> ? ? ? ? ? ? ? ? ? ? ? ?| TWD_TIMER_CONTROL_PERIODIC;
+> + ? ? ? ? ? ? ? __raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
+> ? ? ? ? ? ? ? ?break;
+> ? ? ? ?case CLOCK_EVT_MODE_ONESHOT:
+> ? ? ? ? ? ? ? ?/* period set, and timer enabled in 'next_event' hook */
+> @@ -81,7 +82,7 @@ int twd_timer_ack(void)
+>
+> ?static void __cpuinit twd_calibrate_rate(void)
+> ?{
+> - ? ? ? unsigned long load, count;
+> + ? ? ? unsigned long count;
+> ? ? ? ?u64 waitjiffies;
+>
+> ? ? ? ?/*
+> @@ -116,10 +117,6 @@ static void __cpuinit twd_calibrate_rate(void)
+> ? ? ? ? ? ? ? ?printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+> ? ? ? ? ? ? ? ? ? ? ? ?(twd_timer_rate / 1000000) % 100);
+> ? ? ? ?}
+> -
+> - ? ? ? load = twd_timer_rate / HZ;
+> -
+> - ? ? ? __raw_writel(load, twd_base + TWD_TIMER_LOAD);
+> ?}
+>
+> ?/*
 
-> On 23:23 Mon 24 Jan     , Russell King - ARM Linux wrote:
-> > On Tue, Jan 25, 2011 at 10:51:38AM +1300, Ryan Mallon wrote:
-> > > You could, but it would not be helpful. Clock associations are used so
-> > > that _different_ devices can have the same function and map to the
-> > > correct clock. This is used when there are multiple instances of a
-> > > single peripheral. For example, the uart clocks work like this:
-> > > 
-> > > 	at91_clock_associate("usart1_clk", &pdev->dev, "usart");
-> > > 
-> > > so then you can do this in a driver:
-> > > 	
-> > > 	uart_clk = clk_get(&pdev->dev, "usart");
-> > > 
-> > > Rather than:
-> > > 
-> > > 	uart_clk = clk_get(NULL, "usart1_clk");
-> > > 
-> > > The former will find the correct uart clock for the device. Because each
-> > > uart is a separate device the correct clock will be selected for each uart.
-> > > 	
-> > > My point was that there should be no overlap between clk->name and
-> > > clk->function otherwise clk_get will not be able to return the correct
-> > > clock.
-> > 
-> > It would be nice if AT91 could switch over to using clkdev at some
-> > point, which greatly helps with associating struct clk's with their
-> > device/function names - and reduces the amount of "different" code.
-> I working on it that's was one of the reason I move clkdev to drivers
-> as AT91 and AVR32 need to switch
-
-Shall I just leave the patch as is then?
-
-julia
+This doesn't work for oneshot timers if the TWD_TIMER_CONTROL register
+gets reset by cpu idle between twd_set_mode and twd_set_next_event.
+Shadowing ctrl in a percpu variable and rewriting it during every call
+to twd_set_next_event does work, but that's not much different, and a
+little less efficient, than just saving and restoring the control and
+load registers in idle.  It does have the advantage that platforms
+don't need any extra calls.
