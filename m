@@ -1,33 +1,57 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 25 Jan 2011 11:20:51 -0800
-Subject: [PATCH] msm: smd: Add smd_pkt driver
-In-Reply-To: <1292437675-11561-1-git-send-email-nvishwan@codeaurora.org>
-	(Niranjana Vishwanathapura's message of "Wed, 15 Dec 2010 10:27:55
-	-0800")
-References: <1292437675-11561-1-git-send-email-nvishwan@codeaurora.org>
-Message-ID: <8yatygweqng.fsf@huya.qualcomm.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 25 Jan 2011 11:25:49 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <8ya39ogg5dm.fsf@huya.qualcomm.com>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
+	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
+	<8yak4htj0lb.fsf@huya.qualcomm.com>
+	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+	<8yay669hka5.fsf@huya.qualcomm.com>
+	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
+	<8ya39ogg5dm.fsf@huya.qualcomm.com>
+Message-ID: <1295983549.25496.33.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 15 2010, Niranjana Vishwanathapura wrote:
+On Tue, 2011-01-25 at 11:17 -0800, David Brown wrote:
+> On Tue, Jan 25 2011, Daniel Walker wrote:
+> 
+> > On Mon, 2011-01-24 at 16:57 -0800, David Brown wrote:
+> >> MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
+> >> goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
+> >> of the two, and it doesn't matter which one you use.
+> >> 
+> >> MSM8960 is a completely different chip, it just shares a similar name,
+> >> to other chips.
+> >
+> > If you break it down without the "x" then you can recreate the "x"
+> > variant with the actual numerical identifier .. For 8660/8960 you just
+> > would do as much of a unification as with the others.. You could still
+> > use 8x60 to identify those two, you just wouldn't use it as often.
+> 
+> There isn't any unification to do here.  There are two issues.  We make
+> some chips in groups where we have _identical_ silicon on the Linux
+> side, but happen to have different numbers.  That's what the X is
+> about.  There are other cases where we have completely different silicon
+> that happen to have similar numbers.
+> 
+> The whole point of the cpu_is tests is to tell us exactly which chip we
+> are on.  If there is _anything_ different between two chips, that query
+> needs to be different.  If there is any kind of unification, it can be
+> done at a higher level.  Otherwise, you have no way of making the
+> distinction that needs to be made.
 
-> Add smd_pkt driver which provides device interface
-> to smd packet ports.
->
-> Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
-> ---
->  drivers/char/Kconfig       |    8 +
->  drivers/char/Makefile      |    2 +
->  drivers/char/msm_smd_pkt.c |  466 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 476 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/char/msm_smd_pkt.c
+I suggesting we do it across the board because consistency is a good
+thing .. It also allows us to use 8x60 when 8660 and 8960 are actually
+similar .. You can't deny that 8960 is similar to 8660 because your
+patches show some duplication due to it.
 
-Andrew, what's the proper destination for this change?  Should this go
-into your tree?  Is there anything you want me to do with this change?
+Daniel
 
-Thanks,
-David
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
