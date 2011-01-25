@@ -1,82 +1,85 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 25 Jan 2011 13:26:29 +0900
-Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
-	suspend
-In-Reply-To: <20110124193539.GI29925@opensource.wolfsonmicro.com>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-21-git-send-email-ccross@android.com>
-	<20110124144142.GA16813@sirena.org.uk>
-	<AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
-	<20110124193539.GI29925@opensource.wolfsonmicro.com>
-Message-ID: <AANLkTine4aB+N4RpJS+Nfi8G7wsF6PFZw-LnA9jBMz52@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 25 Jan 2011 10:13:59 +0530
+Subject: [PATCH] OMAP: PM: DMA: Enable runtime pm
+In-Reply-To: <871v414yna.fsf@ti.com>
+References: <1295860819-20142-1-git-send-email-manjugk@ti.com>
+	<87d3nm7zb0.fsf@ti.com> <20110124235205.GA6351@manju-desktop>
+	<871v414yna.fsf@ti.com>
+Message-ID: <20110125044359.GA29117@m-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 4:35 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jan 24, 2011 at 10:50:53AM -0800, Colin Cross wrote:
->> On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
->
->> > Hrm, what's the situation where that happens and why does it cause
->> > problems? ?The regulator API doesn't care if suspend is going on, and
->> > nor do any of the current drivers for regulators. ?There is an issue
->> > with keeping things like I2C alive until the bitter end of suspend so
->> > you've got a control bus to the regulators but that's a generic issue
->> > which crops up with other subsystems too so a regulator-specific
->> > workaround seems dodgy.
->
->> The end result is that the regulator driver calls the i2c driver after
->> the i2c driver has been suspended. ?On Tegra, this happens because of
->> voltage scaling on the CPU regulator, which can be on the i2c bus. ?A
->> sleep in a suspend handler after the i2c bus has been suspended can
->> cause the cpufreq governor to lower the frequency, and try to lower
->> the voltage as well.
->
-> OK, that's a general problem - you need to ensure that the I2C and SPI
-> controllers are suspended really late. ?The OMAP guys also have this
-> problem for some RTCs, though in their case things are slightly
-> different due to their use of runtime PM. ?Looking at your I2C driver
-> (BTW, I'd suggest reminding Ben on a more regular basis about that) I
-> suspect that moving your suspend and resume callbacks to the _noirq
-> varaints will cover a lot of this.
+On Mon, Jan 24, 2011 at 04:26:01PM -0800, Kevin Hilman wrote:
+> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> 
+> > Kevin,
+> >
+> > On Mon, Jan 24, 2011 at 01:43:31PM -0800, Kevin Hilman wrote:
+> >> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> >> 
+> >> > From: Manjunath G Kondaiah <manjugk@ti.com>
+> >> >
+> >> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put
+> >> > for OMAP DMA driver.
+> >> >
+> >> > Since DMA driver callback will happen from interrupt context and
+> >> > DMA client driver will release all DMA resources from interrupt
+> >> > context itself, pm_runtime_put_sync() cannot be used in DMA driver.
+> >> > Instead, pm_runtime_put() is used which is asynchronous call and
+> >> > gets executed in work queue.
+> >> 
+> >> It's fine that the asynchronous version of put is uses (it's actually
+> >> preferred.)  However, the description is confusing here.  You talk about
+> >> driver callbacks here but in the patch, your calling _put() from
+> >> omap_dma_free(), not from the callback.
+> >
+> > All dma client drivers are calling omap_dma_free from callback
+> > context. 
+> 
+> Maybe so, but that's not a requirement of the API.  I have a DMA test
+> driver that doesn't do that.
+> 
+> It's also legitimate (and IMO, expected) for a client driver to, for
+> example do a omap_dma_request() on module load and omap_free_dma() on
+> module unload and only use omap_start_dma() + callbacks for xfers.
+> It would be nice (and IMO, expected) that the channels would go idle
+> between xfers (using the autosuspend feature for timeouts.)
 
-Right, it's same as Samsung SoCs. we also disable to access the
-cpufreq when suspending.
-the PMIC is connected with I2C  and I2C is suspended before PMIC.
+I can use autosuspend feature which can handle if there is no free_dma and also
+if there is no callback registered by the client.
 
-Thank you,
-Kyungmin Park
+> 
+> > I can update this info in patch description if it is useful.
+> >
+> >> 
+> >> You're also calling _get() from the request.  That means, as long as the
+> >> DMA channel is allocated, it will be active.   
+> >> 
+> >> Wouldn't it be better to do the 'get' when the channel is started
+> >
+> > No. omap_dma_request will call omap_clear_dma which in turn access all channel
+> > specific registers for writing zeros.
+> 
+> Of course, you always have to do get/put around any device access.
+> 
+> >> and the 'put' when the callback has finished, possibly using the
+> >
+> > after omap_free_dma, none of the dma registers are accessed hence it is safe to
+> > use _put immediately after free_dma.
+> 
+> Right, but my point above is: what if the user does not call free_dma?
+> What if the client will be using the channel again sometime in the
+> future, but will be idle.   What I would expect is that the channel
+> could go idle until another xfer is initiated rather than waiting for
+> the channel to be freed.
+ok.
+> 
+> > Also, dma driver is not aware of callback completion status since it will be
+> > executed in client driver.
+> 
+> Why not?  DMA driver knows when the callback returns.
 
->
->> The problem isn't limited to i2c busses, there are some regulators on
->> spi busses. ?You would need to ensure that any driver that has a
->
-> For all practical purposes in this sort of discussion you can typically
-> do a s/I2C/I2C and SPI/ - in terms of system integration issues they're
-> very similar.
->
->> regulator consumer suspends before the regulator driver it
->> communicates with, and that still wouldn't fix cpufreq, which has a
->> sysdev suspend handler.
->
-> So you actively need to push the processor into low power mode during
-> suspend? ?I'm still not 100% clear what's triggering the issues you're
-> seeing and why this seems to be Tegra-only. ?If there were a general
-> cpufreq/regulator interaction here I'd expect to see all ARM cpufreq
-> drivers needing to do the same thing (and probably some handling of this
-> in cpufreq core as a result). ?If it's not such an issue I'd expect
-> there's also entertaining suspend ordering issues elsewhere.
->
-> Typically this stuff isn't a problem for regulators themselves since if
-> they're active by the time I2C is off they normally get suspended by
-> hardware handshakes from the CPU as that enters low power mode - right
-> now we have no regulators at all in mainline that do anything in
-> software on suspend. ?We can get a long way by just ignoring what
-> happens to regulators over suspend (there is some work to do here but
-> it's orthogonal to this sort of issue).
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+You are right. We can get this info from DMA interrupt handler.
+
+-Manjunath
+[...]
