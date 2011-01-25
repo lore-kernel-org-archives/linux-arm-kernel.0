@@ -1,59 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Jan 2011 13:23:43 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-Message-ID: <AANLkTim3C7P=Wzd9w--yrCrXsq7JQLPQdLMkSv28xqDB@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 25 Jan 2011 13:25:02 +0000
+Subject: questions about arm trustzone
+In-Reply-To: <20110125124524.GJ11507@n2100.arm.linux.org.uk>
+References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
+	<8yad3nlh18e.fsf@huya.qualcomm.com>
+	<AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
+	<20110125102652.GB11507@n2100.arm.linux.org.uk>
+	<bb0c3855a121603232d022b4062752a6@mail.gmail.com>
+	<AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
+	<20110125124524.GJ11507@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikVW3vcygUQDTH-x6cXkNdf2WEztbTvdz4YkmCk@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2011 08:44, Sachin Verma <imschnvrm@gmail.com> wrote:
-> On Thu, Jan 13, 2011 at 12:25 AM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
->> On Wed, 12 Jan 2011, Russell King - ARM Linux wrote:
->>
->>> Then came along the embedded initrd/initramfs idea which rather buggered
->>> the scheme when large initramfs are embedded into the image.
->>>
->>> As the overall feeling at the time was "don't use large initrds" it's
->>> something I've never really cared about - and I'm still of the opinion
->>> that 16MB of compressed initrd/initramfs is rather silly.
->>
->> It is... but we have more than 32MB of RAM total now, and people are
->> running standard distributions on ARM these days, such as Fedora or
->> Ubuntu, including their corresponding initrd that may contain lots of
->> modules, splashscreen data, etc. ?So it might be a good idea to think
->> about fixing this limitation before it comes back again.
->>
+On Tue, Jan 25, 2011 at 12:45 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 25, 2011 at 12:24:13PM +0000, Dave Martin wrote:
+>> Avoiding this complexity is one of the motivations for using r7 for
+>> the syscall number with CONFIG_EABI (instead of using the SVC comment
+>> field).
 >
-> in fact it is not just the initrd/initramfs size, i am facing issues
-> with loading modules on MMU-less envt(Cortex M3).
-> I have 128MB of Physical RAM and i am using a 4MB initrd to boot my
-> system. when i try to load kernel modules i get relocation errors.
-> As MMU-less systems are allowing modules to be loaded anywhere from
-> RAM and not from any predefined limits of MODULES_VADDR and
-> MODULES_END.
+> Your history is not entirely correct.
 >
-> Do you have any pointers on how to tackle this situation for MMU less
-> environments?
+> I had the kernel side of Thumb userspace support in place long before EABI
+> came along. ?Thumb doesn't have a large enough comment field to store the
+> Linux syscall number, so to get around that problem, I decided to use r7
+> for the syscall number. ?You'll find 2.4 kernels support Thumb instructions
+> in userspace.
+>
+> As part of the EABI switch for ARM mode - which created an incompatible
+> SWI interface anyway, we decided that we could reduce data cache pollution
+> by eliminating the read of the SWI instruction, so we adopted the r7
+> method for ARM EABI mode.
+>
 
-I don't think there is a simple solution. As a hack, you could define
-DMA and Normal Zones in your system and force module allocations from
-the DMA zone (which would be close to the kernel).
+Fair enough -- I was glossing over things a bit and I'm not familiar
+with all the history.  So, I guess there were plenty of other good
+reasons.
 
-I'm not sure whether the kernel could be compile with a larger memory
-model, but then you have to improve the kernel to handle new
-relocation types.
-
--- 
-Catalin
+Cheers
+---Dave
