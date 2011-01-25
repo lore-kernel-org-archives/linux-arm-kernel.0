@@ -1,65 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 26 Jan 2011 00:02:15 +0530
-Subject: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support for re-enabling
-	l2x0
-In-Reply-To: <1295979242.10109.308.camel@e102109-lin.cambridge.arm.com>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-5-git-send-email-ccross@android.com>
-	<1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
-	<20110125154133.GB17280@n2100.arm.linux.org.uk>
-	<1295979242.10109.308.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <2f97ec8a084e590220e1548fc927b60e@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 25 Jan 2011 10:36:31 -0800
+Subject: [alsa-devel] [PATCH] davinci: da8xx/omap-l1xx: match codec_name
+	with i2c ids
+In-Reply-To: <20110125123529.GC13051@sirena.org.uk> (Mark Brown's message of
+	"Tue, 25 Jan 2011 12:35:29 +0000")
+References: <1295619896-5498-1-git-send-email-sudhakar.raj@ti.com>
+	<1295620708.3348.233.camel@odin> <8739oh6h5i.fsf@ti.com>
+	<87r5c15272.fsf@ti.com> <1295953146.3322.17.camel@odin>
+	<20110125123529.GC13051@sirena.org.uk>
+Message-ID: <87fwsg25lc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Tuesday, January 25, 2011 11:44 PM
-> To: Russell King - ARM Linux
-> Cc: Colin Cross; linux-tegra at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; olof at lixom.net; konkers at android.com;
-> Santosh Shilimkar; Linus Walleij; Tony Lindgren; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support for
-> re-enabling l2x0
->
-> On Tue, 2011-01-25 at 15:41 +0000, Russell King - ARM Linux wrote:
-> > I think we need to come up with some proper way to deal with
-> cpuidle
-> > which doesn't involve adding lots of globally visible functions to
-> all
-> > sorts of bits of code and having platforms call them individually,
-> > otherwise this is going to get _really_ messy in the future.
-> >
-> > Maybe we need a notifier list which can be told when cpuidle
-> events
-> > happen, so that parts of the system such as VFP and L2 cache
-> support
-> > can do the right thing without having platforms add lots of stuff
-> like
-> >
-> >         gic_secondary_init();
-> >         gic_restore_interrupt_types();
-> >         vfp_enable();
-> >         l2x0_enable();
-> >         twd_enable();
-> >         ... etc ...
-> >
-> > in their SoC specific code.
->
-> But do we need a strict order between such operations? The notifier
-> call
-> chain isn't too flexible.
->
-I guess it does depends on how the archs have integrated a9. Example
-on OMAP there are different power modes possible.
-	1. CPU context ,TWD lost
-	2. CPU context ,TWD + L1 is lost
-	3. CPU context + L1 is lost + GIC lost
-	4. CPU context + L1 is lost + GIC lost + L2 lost
-So there is need to have flexibility of calling these function
-based on power modes. I don't know how notifiers can give
-this flexibility
+Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 
-Regards,
-Santosh
+> On Tue, Jan 25, 2011 at 10:59:05AM +0000, Liam Girdwood wrote:
+>> On Mon, 2011-01-24 at 15:09 -0800, Kevin Hilman wrote:
+>
+>> > On second thought, these should probably merge for .38-rc3.
+>
+>> > If you're OK with it, I can merge this and the platform fix together for
+>> > .38-rc3.
+>
+>> Yes please :)
+>
+> I applied it and sent it off towards Linux a few days ago.
+
+OK, missed that.
+
+I'll queue up the platform one then.
+
+Thanks,
+
+Kevin
