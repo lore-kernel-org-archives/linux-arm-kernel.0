@@ -1,83 +1,82 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Jan 2011 19:45:18 -0800
-Subject: [PATCH 4/4] msm: clock: Add support for more proc_comm clocks
-In-Reply-To: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
-References: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1295927118-27591-5-git-send-email-sboyd@codeaurora.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 25 Jan 2011 13:26:29 +0900
+Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
+	suspend
+In-Reply-To: <20110124193539.GI29925@opensource.wolfsonmicro.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-21-git-send-email-ccross@android.com>
+	<20110124144142.GA16813@sirena.org.uk>
+	<AANLkTikrUdLM8VmW5yCndf927E=drZF1gGBwXq6Dj5mW@mail.gmail.com>
+	<20110124193539.GI29925@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTine4aB+N4RpJS+Nfi8G7wsF6PFZw-LnA9jBMz52@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the CE_CLK and CODEC_SSBI_CLK. Also add support for uart,
-and i2c clocks on targets which support proc_comm clocks.
+On Tue, Jan 25, 2011 at 4:35 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Jan 24, 2011 at 10:50:53AM -0800, Colin Cross wrote:
+>> On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
+>
+>> > Hrm, what's the situation where that happens and why does it cause
+>> > problems? ?The regulator API doesn't care if suspend is going on, and
+>> > nor do any of the current drivers for regulators. ?There is an issue
+>> > with keeping things like I2C alive until the bitter end of suspend so
+>> > you've got a control bus to the regulators but that's a generic issue
+>> > which crops up with other subsystems too so a regulator-specific
+>> > workaround seems dodgy.
+>
+>> The end result is that the regulator driver calls the i2c driver after
+>> the i2c driver has been suspended. ?On Tegra, this happens because of
+>> voltage scaling on the CPU regulator, which can be on the i2c bus. ?A
+>> sleep in a suspend handler after the i2c bus has been suspended can
+>> cause the cpufreq governor to lower the frequency, and try to lower
+>> the voltage as well.
+>
+> OK, that's a general problem - you need to ensure that the I2C and SPI
+> controllers are suspended really late. ?The OMAP guys also have this
+> problem for some RTCs, though in their case things are slightly
+> different due to their use of runtime PM. ?Looking at your I2C driver
+> (BTW, I'd suggest reminding Ben on a more regular basis about that) I
+> suspect that moving your suspend and resume callbacks to the _noirq
+> varaints will cover a lot of this.
 
-Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/clock-pcom.h      |    4 +++-
- arch/arm/mach-msm/devices-msm7x30.c |    2 ++
- arch/arm/mach-msm/devices-qsd8x50.c |    6 ++++++
- 3 files changed, 11 insertions(+), 1 deletions(-)
+Right, it's same as Samsung SoCs. we also disable to access the
+cpufreq when suspending.
+the PMIC is connected with I2C  and I2C is suspended before PMIC.
 
-diff --git a/arch/arm/mach-msm/clock-pcom.h b/arch/arm/mach-msm/clock-pcom.h
-index 17d027b..2c813f1 100644
---- a/arch/arm/mach-msm/clock-pcom.h
-+++ b/arch/arm/mach-msm/clock-pcom.h
-@@ -132,8 +132,10 @@
- #define P_CSI1_P_CLK		97
- #define P_GSBI_CLK		98
- #define P_GSBI_P_CLK		99
-+#define P_CE_CLK		100 /* Crypto engine */
-+#define P_CODEC_SSBI_CLK	101
- 
--#define P_NR_CLKS		100
-+#define P_NR_CLKS		102
- 
- struct clk_ops;
- extern struct clk_ops clk_ops_pcom;
-diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-index e430fdd..cd4343b 100644
---- a/arch/arm/mach-msm/devices-msm7x30.c
-+++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -134,6 +134,8 @@ struct clk msm_clocks_7x30[] = {
- 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
- 	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
- 	CLK_PCOM("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
-+	CLK_PCOM("ce_clk",	CE_CLK,	NULL, 0),
-+	CLK_PCOM("codec_ssbi_clk",	CODEC_SSBI_CLK,	NULL, 0),
- 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
- 	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
- 	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
-diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-index c5dad8f..bd545f9 100644
---- a/arch/arm/mach-msm/devices-qsd8x50.c
-+++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -316,12 +316,14 @@ int __init msm_add_sdcc(unsigned int controller,
- 
- struct clk msm_clocks_8x50[] = {
- 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
-+	CLK_PCOM("ce_clk",	CE_CLK,		NULL, 0),
- 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
- 	CLK_PCOM("ebi2_clk",	EBI2_CLK,	NULL, 0),
- 	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
- 	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
- 	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
- 	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
-+	CLK_PCOM("i2c_clk",	I2C_CLK,	NULL, 0),
- 	CLK_PCOM("icodec_rx_clk",	ICODEC_RX_CLK,	NULL, 0),
- 	CLK_PCOM("icodec_tx_clk",	ICODEC_TX_CLK,	NULL, 0),
- 	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
-@@ -347,7 +349,11 @@ struct clk msm_clocks_8x50[] = {
- 	CLK_PCOM("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
- 	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
- 	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
-+	CLK_PCOM("uart_clk",	UART1_CLK,	NULL, OFF),
-+	CLK_PCOM("uart_clk",	UART2_CLK,	NULL, 0),
- 	CLK_PCOM("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
-+	CLK_PCOM("uartdm_clk",	UART1DM_CLK,	NULL, OFF),
-+	CLK_PCOM("uartdm_clk",	UART2DM_CLK,	NULL, 0),
- 	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	NULL, OFF),
- 	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	NULL, OFF),
- 	CLK_PCOM("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thank you,
+Kyungmin Park
+
+>
+>> The problem isn't limited to i2c busses, there are some regulators on
+>> spi busses. ?You would need to ensure that any driver that has a
+>
+> For all practical purposes in this sort of discussion you can typically
+> do a s/I2C/I2C and SPI/ - in terms of system integration issues they're
+> very similar.
+>
+>> regulator consumer suspends before the regulator driver it
+>> communicates with, and that still wouldn't fix cpufreq, which has a
+>> sysdev suspend handler.
+>
+> So you actively need to push the processor into low power mode during
+> suspend? ?I'm still not 100% clear what's triggering the issues you're
+> seeing and why this seems to be Tegra-only. ?If there were a general
+> cpufreq/regulator interaction here I'd expect to see all ARM cpufreq
+> drivers needing to do the same thing (and probably some handling of this
+> in cpufreq core as a result). ?If it's not such an issue I'd expect
+> there's also entertaining suspend ordering issues elsewhere.
+>
+> Typically this stuff isn't a problem for regulators themselves since if
+> they're active by the time I2C is off they normally get suspended by
+> hardware handshakes from the CPU as that enters low power mode - right
+> now we have no regulators at all in mainline that do anything in
+> software on suspend. ?We can get a long way by just ignoring what
+> happens to regulators over suspend (there is some work to do here but
+> it's orthogonal to this sort of issue).
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
