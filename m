@@ -1,60 +1,83 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 25 Jan 2011 23:07:38 +0530
-Subject: [PATCH 2/5] OMAP3EVM: Add vio regulator supply required for ads7846
-	TSC driver
+Date: Tue, 25 Jan 2011 23:07:39 +0530
+Subject: [PATCH 3/5] AM/DM37x: DSS mux configuration for >Rev-B processor cards
 In-Reply-To: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
 References: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1295977061-11086-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <1295977061-11086-4-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add vio regulator supply, needed for ads7846 touchscreen controller
-driver.
+To support higher resolution (e.g 720P at 60), on OMAP36x (AM/DM37x)
+DSS data bus has been muxed with sys_boot pins.
 
-Tested on OMAP3 (ES3.1 Si) RevG version of EVM.
+DSS[18-23] => DSS[0-5]
+sys_boot[0,1 3-5] => DSS[18-23]
+
+EVM revision >=RevB adopt this mux changes, which is going to ship outside.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3evm.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-omap3evm.c |   34 ++++++++++++++++++++++++++++++++--
+ 1 files changed, 32 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 8d2e413..dcef454 100644
+index dcef454..0d235bc 100644
 --- a/arch/arm/mach-omap2/board-omap3evm.c
 +++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -571,6 +571,25 @@ static struct regulator_init_data omap3_evm_vpll2 = {
- 	.consumer_supplies	= &omap3_evm_vpll2_supply,
+@@ -705,7 +705,7 @@ static struct ehci_hcd_omap_platform_data ehci_pdata __initdata = {
  };
  
-+/* ads7846 on SPI */
-+static struct regulator_consumer_supply omap3evm_vio_supply =
-+	REGULATOR_SUPPLY("vcc", "spi1.0");
+ #ifdef CONFIG_OMAP_MUX
+-static struct omap_board_mux board_mux[] __initdata = {
++static struct omap_board_mux omap35x_board_mux[] __initdata = {
+ 	OMAP3_MUX(SYS_NIRQ, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP |
+ 				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW |
+ 				OMAP_PIN_OFF_WAKEUPENABLE),
+@@ -717,6 +717,32 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 				OMAP_PIN_OFF_NONE),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
 +
-+/* VIO for ads7846 */
-+static struct regulator_init_data omap3evm_vio = {
-+	.constraints = {
-+		.min_uV			= 1800000,
-+		.max_uV			= 1800000,
-+		.apply_uV		= true,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &omap3evm_vio_supply,
++static struct omap_board_mux omap36x_board_mux[] __initdata = {
++	OMAP3_MUX(SYS_NIRQ, OMAP_MUX_MODE0 | OMAP_PIN_INPUT_PULLUP |
++				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW |
++				OMAP_PIN_OFF_WAKEUPENABLE),
++	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
++				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW),
++	/* AM/DM37x EVM: DSS data bus muxed with sys_boot */
++	OMAP3_MUX(DSS_DATA18, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(DSS_DATA19, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(DSS_DATA22, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(DSS_DATA21, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(DSS_DATA22, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(DSS_DATA23, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(SYS_BOOT0, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(SYS_BOOT1, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(SYS_BOOT3, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(SYS_BOOT4, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(SYS_BOOT5, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++	OMAP3_MUX(SYS_BOOT6, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
++
++	{ .reg_offset = OMAP_MUX_TERMINATOR },
 +};
-+
- static struct twl4030_platform_data omap3evm_twldata = {
- 	.irq_base	= TWL4030_IRQ_BASE,
- 	.irq_end	= TWL4030_IRQ_END,
-@@ -583,6 +602,7 @@ static struct twl4030_platform_data omap3evm_twldata = {
- 	.codec		= &omap3evm_codec_data,
- 	.vdac		= &omap3_evm_vdac,
- 	.vpll2		= &omap3_evm_vpll2,
-+	.vio		= &omap3evm_vio,
- };
++#else
++#define omap35x_board_mux	NULL
++#define omap36x_board_mux	NULL
+ #endif
  
- static struct i2c_board_info __initdata omap3evm_i2c_boardinfo[] = {
+ static struct omap_musb_board_data musb_board_data = {
+@@ -728,7 +754,11 @@ static struct omap_musb_board_data musb_board_data = {
+ static void __init omap3_evm_init(void)
+ {
+ 	omap3_evm_get_revision();
+-	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
++
++	if (cpu_is_omap3630())
++		omap3_mux_init(omap36x_board_mux, OMAP_PACKAGE_CBB);
++	else
++		omap3_mux_init(omap35x_board_mux, OMAP_PACKAGE_CBB);
+ 
+ 	omap3_evm_i2c_init();
+ 
 -- 
 1.6.2.4
