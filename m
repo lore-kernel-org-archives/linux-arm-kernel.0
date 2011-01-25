@@ -1,68 +1,28 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 25 Jan 2011 09:35:10 -0800
-Subject: [PATCH v2 01/11] msm: Add CPU queries
-In-Reply-To: <8yay669hka5.fsf@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
-	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
-	<8yak4htj0lb.fsf@huya.qualcomm.com>
-	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
-	<8yay669hka5.fsf@huya.qualcomm.com>
-Message-ID: <1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 25 Jan 2011 23:07:36 +0530
+Subject: [PATCH 0/5] OMAP3EVM: Board bug fixes/enhancements
+Message-ID: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-24 at 16:57 -0800, David Brown wrote:
-> On Mon, Jan 24 2011, Daniel Walker wrote:
-> 
-> > On Mon, 2011-01-24 at 16:20 -0800, David Brown wrote:
-> >> On Mon, Jan 24 2011, Daniel Walker wrote:
-> >> 
-> >> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
-> >> >> +#define cpu_is_msm7x01()       0
-> >> >> +#define cpu_is_msm7x30()       0
-> >> >> +#define cpu_is_qsd8x50()       0
-> >> >> +#define cpu_is_msm8x60()       0
-> >> >
-> >> > Now that I look at this again, why not drop the "x" all together ?
-> >> 
-> >> That might be better for the 8x60.  The complexity is that most of the
-> >> MSM chips have some variants, where the CPU running Linux isn't changed,
-> >> but the modem CPU is different (think CDMA/UMTS).  Until 8960, that was
-> >> distinguished by the second letter.
-> >> 
-> >> Either way doesn't quite match reality, unfortunately.  There are
-> >> devices using a MSM7201 and others using a MSM7601.  As far as Linux is
-> >> concerned, there isn't any difference between them.  If someone wanted
-> >> to try and identify the device they have with the code, it could be
-> >> confusing for either name chosen.
-> >> 
-> >> I was planning on turning msm8x60 into msm8660, since that seems to be
-> >> the most common one.  Perhaps the decoder ring should be put into the
-> >> help text for the options so people can at least figure out which is
-> >> which.
-> >
-> > Are there any of those which do , right now, have Linux support for more
-> > than one variant ?
-> 
-> All of them, in fact.
-> 
-> MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
-> goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
-> of the two, and it doesn't matter which one you use.
-> 
-> MSM8960 is a completely different chip, it just shares a similar name,
-> to other chips.
+The current linux-omap/master is broken for lots of features/modules
+and also there are few enhancements required with addition of AM/DM37x
+family of devices.
 
-If you break it down without the "x" then you can recreate the "x"
-variant with the actual numerical identifier .. For 8660/8960 you just
-would do as much of a unification as with the others.. You could still
-use 8x60 to identify those two, you just wouldn't use it as often.
+	- Migrate TWL gpio_xxx api to gpio_xx_cansleep
+	- TSC: Driver init fails due to missing VIO regulator
+	- TSC: Wakeup is broken, enable the wakeup capability
+	- DSS: Addition of Mux changes for AM/DM37x
+	- Make Backlight gpio off in default state
 
-Daniel
+Note: Resetting the revision of patches since this is first bundled series.
 
--- 
+Vaibhav Hiremath (5):
+  OMAP:board-omap3evm: Change TWL related gpio API's to gpio*_cansleep
+  OMAP3EVM: Add vio regulator supply required for ads7846 TSC driver
+  AM/DM37x: DSS mux configuration for >Rev-B processor cards
+  OMAP3EVM: Made backlight GPIO default state to off
+  OMAP3EVM: Set TSC wakeup option in pad config
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ arch/arm/mach-omap2/board-omap3evm.c |   80 +++++++++++++++++++++++++++++-----
+ 1 files changed, 69 insertions(+), 11 deletions(-)
