@@ -1,33 +1,37 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 24 Jan 2011 17:05:22 -0800
-Subject: [PATCH] msm: serial: Add MSM8960 serial support
-In-Reply-To: <1295663921-32723-1-git-send-email-stepanm@codeaurora.org>
-	(Stepan Moskovchenko's message of "Fri, 21 Jan 2011 18:38:41 -0800")
-References: <1295663921-32723-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <8yar5c1hjxp.fsf@huya.qualcomm.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 24 Jan 2011 17:23:30 -0800
+Subject: [PATCH v2 28/28] ARM: tegra: clock: Add forward reference to
+	struct clk
+In-Reply-To: <20110124102647.GF16202@n2100.arm.linux.org.uk>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-29-git-send-email-ccross@android.com>
+	<20110124102647.GF16202@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=Ar7dAtRHj=uZ9a+CGSaU4FhJA92+AyHoJcrcH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21 2011, Stepan Moskovchenko wrote:
+On Mon, Jan 24, 2011 at 2:26 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 23, 2011 at 06:01:33PM -0800, Colin Cross wrote:
+>> diff --git a/arch/arm/mach-tegra/include/mach/clkdev.h b/arch/arm/mach-tegra/include/mach/clkdev.h
+>> index 412f5c6..66cd3f4 100644
+>> --- a/arch/arm/mach-tegra/include/mach/clkdev.h
+>> +++ b/arch/arm/mach-tegra/include/mach/clkdev.h
+>> @@ -20,6 +20,8 @@
+>> ?#ifndef __MACH_CLKDEV_H
+>> ?#define __MACH_CLKDEV_H
+>>
+>> +struct clk;
+>> +
+>> ?static inline int __clk_get(struct clk *clk)
+>> ?{
+>> ? ? ? return 1;
+>
+> If you're having to add that, I suspect this include is being
+> inappropriately included by files.
+>
 
-> diff --git a/arch/arm/mach-msm/devices-msm8960.c b/arch/arm/mach-msm/devices-msm8960.c
-> new file mode 100644
-> index 0000000..821e6d1
-> --- /dev/null
-> +++ b/arch/arm/mach-msm/devices-msm8960.c
-> @@ -0,0 +1,83 @@
-> +/*
-> + * Copyright (C) 2008 Google, Inc.
-> + * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
-
-What is the general consenus on this kind of copyright.  Stepan started
-with a file with a Google copyright on it, but has largely rewritten the
-file to support the new board.  Should we be keeping the copyright from
-the file?
-
-Thanks,
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+The Tegra clock definition file, arch/arm/mach-tegra/tegra2_clocks.c,
+includes the private clock.h that defines struct clk after including
+linux/clkdev.h, and does not include linux/clk.h, so the forward
+declaration is necessary.
