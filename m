@@ -1,43 +1,70 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 26 Jan 2011 07:37:13 +0800
-Subject: [PATCH v3] Add i.MX23/28 auart support
-In-Reply-To: <1295863436-16663-1-git-send-email-s.hauer@pengutronix.de>
-References: <1295863436-16663-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110125233712.GA1146@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 15:41:33 +0000
+Subject: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support for
+	re-enabling l2x0
+In-Reply-To: <1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-5-git-send-email-ccross@android.com>
+	<1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110125154133.GB17280@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 11:03:54AM +0100, Sascha Hauer wrote:
-> changes since v2:
-> - Fix console support
-> - For handling the CREAD flag just disable the receiver instead of
->   ignoring the characters in the receive interrupt
-> - Add timeout to loops in console support
+On Tue, Jan 25, 2011 at 03:14:24PM +0000, Catalin Marinas wrote:
+> On Mon, 2011-01-24 at 02:01 +0000, Colin Cross wrote:
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -252,16 +252,26 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
+> >         spin_unlock_irqrestore(&l2x0_lock, flags);
+> >  }
+> > 
+> > +/* enables l2x0 after l2x0_disable, does not invalidate */
+> > +void l2x0_enable(void)
+> > +{
+> > +       unsigned long flags;
+> > +
+> > +       spin_lock_irqsave(&l2x0_lock, flags);
+> > +       writel_relaxed(1, l2x0_base + L2X0_CTRL);
+> > +       spin_unlock_irqrestore(&l2x0_lock, flags);
+> > +}
+> > +
+> >  static void l2x0_disable(void)
+> >  {
+> >         unsigned long flags;
+> > 
+> >         spin_lock_irqsave(&l2x0_lock, flags);
+> > -       writel(0, l2x0_base + L2X0_CTRL);
+> > +       writel_relaxed(0, l2x0_base + L2X0_CTRL);
+> >         spin_unlock_irqrestore(&l2x0_lock, flags);
+> >  }
+> > 
+> > -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+> > +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+> >  {
+> >         __u32 aux;
+> >         __u32 cache_id;
 > 
-> The following changes since commit 0c21e3aaf6ae85bee804a325aa29c325209180fd:
+> So this assumes that the L2 registers are accessible. I suspect the
+> platform code calling it should know this.
 > 
->   Merge branch 'for-next' of git://git.kernel.org/pub/scm/linux/kernel/git/hch/hfsplus (2011-01-07 17:16:27 -0800)
+> The patch looks fine.
 > 
-> are available in the git repository at:
-> 
->   nowhere ..BRANCH.NOT.VERIFIED..
-> 
-> Sascha Hauer (2):
->       serial: Add auart driver for i.MX23/28
->       ARM MXS: Add auart platform support for i.MX28
-> 
->  arch/arm/mach-mxs/clock-mx28.c                  |    5 +
->  arch/arm/mach-mxs/devices-mx28.h                |    8 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-auart.c      |   54 ++
->  arch/arm/mach-mxs/include/mach/devices-common.h |   10 +
->  drivers/serial/Kconfig                          |   15 +
->  drivers/serial/Makefile                         |    1 +
->  drivers/serial/mxs-auart.c                      |  799 +++++++++++++++++++++++
->  9 files changed, 896 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-auart.c
->  create mode 100644 drivers/serial/mxs-auart.c
-> 
-> 
-Tested-by: Shawn Guo <shawn.guo@freescale.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+I think we need to come up with some proper way to deal with cpuidle
+which doesn't involve adding lots of globally visible functions to all
+sorts of bits of code and having platforms call them individually,
+otherwise this is going to get _really_ messy in the future.
+
+Maybe we need a notifier list which can be told when cpuidle events
+happen, so that parts of the system such as VFP and L2 cache support
+can do the right thing without having platforms add lots of stuff like
+
+	gic_secondary_init();
+	gic_restore_interrupt_types();
+	vfp_enable();
+	l2x0_enable();
+	twd_enable();
+	... etc ...
+
+in their SoC specific code.
