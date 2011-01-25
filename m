@@ -1,57 +1,75 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 25 Jan 2011 11:25:49 -0800
-Subject: [PATCH v2 01/11] msm: Add CPU queries
-In-Reply-To: <8ya39ogg5dm.fsf@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
-	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
-	<8yak4htj0lb.fsf@huya.qualcomm.com>
-	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
-	<8yay669hka5.fsf@huya.qualcomm.com>
-	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
-	<8ya39ogg5dm.fsf@huya.qualcomm.com>
-Message-ID: <1295983549.25496.33.camel@c-dwalke-linux.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Jan 2011 11:27:20 -0800
+Subject: [PATCH] omap: hwmod: Populate _mpu_rt_va later on in
+	omap_hwmod_late_init
+In-Reply-To: <20110125022119.GG13589@atomide.com>
+References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
+	<20110123174814.GI30094@n2100.arm.linux.org.uk>
+	<20110124201731.GC13589@atomide.com>
+	<20110124202629.GE13589@atomide.com>
+	<20110124215213.GA27044@n2100.arm.linux.org.uk>
+	<20110125022119.GG13589@atomide.com>
+Message-ID: <20110125192719.GO13589@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-01-25 at 11:17 -0800, David Brown wrote:
-> On Tue, Jan 25 2011, Daniel Walker wrote:
-> 
-> > On Mon, 2011-01-24 at 16:57 -0800, David Brown wrote:
-> >> MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
-> >> goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
-> >> of the two, and it doesn't matter which one you use.
-> >> 
-> >> MSM8960 is a completely different chip, it just shares a similar name,
-> >> to other chips.
-> >
-> > If you break it down without the "x" then you can recreate the "x"
-> > variant with the actual numerical identifier .. For 8660/8960 you just
-> > would do as much of a unification as with the others.. You could still
-> > use 8x60 to identify those two, you just wouldn't use it as often.
-> 
-> There isn't any unification to do here.  There are two issues.  We make
-> some chips in groups where we have _identical_ silicon on the Linux
-> side, but happen to have different numbers.  That's what the X is
-> about.  There are other cases where we have completely different silicon
-> that happen to have similar numbers.
-> 
-> The whole point of the cpu_is tests is to tell us exactly which chip we
-> are on.  If there is _anything_ different between two chips, that query
-> needs to be different.  If there is any kind of unification, it can be
-> done at a higher level.  Otherwise, you have no way of making the
-> distinction that needs to be made.
+Otherwise ioremap can fail with early_init patch unless we have
+a static mapping for everything.
 
-I suggesting we do it across the board because consistency is a good
-thing .. It also allows us to use 8x60 when 8660 and 8960 are actually
-similar .. You can't deny that 8960 is similar to 8660 because your
-patches show some duplication due to it.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Daniel
-
-
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index eacdfd3..9e89a58 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1467,12 +1467,10 @@ static int __init _register(struct omap_hwmod *oh)
+ 		return -EEXIST;
+ 
+ 	ms_id = _find_mpu_port_index(oh);
+-	if (!IS_ERR_VALUE(ms_id)) {
++	if (!IS_ERR_VALUE(ms_id))
+ 		oh->_mpu_port_index = ms_id;
+-		oh->_mpu_rt_va = _find_mpu_rt_base(oh, oh->_mpu_port_index);
+-	} else {
++	else
+ 		oh->_int_flags |= _HWMOD_NO_MPU_PORT;
+-	}
+ 
+ 	list_add_tail(&oh->node, &omap_hwmod_list);
+ 
+@@ -1621,6 +1619,26 @@ int __init omap_hwmod_init(struct omap_hwmod **ohs)
+ 	return 0;
+ }
+ 
++/*
++ * _populate_mpu_rt_base - populate the virtual address for a hwmod
++ *
++ * Must be called only from omap_hwmod_late_init so ioremap works properly.
++ * Assumes the caller takes care of locking if needed.
++ *
++ */
++static int __init _populate_mpu_rt_base(struct omap_hwmod *oh, void *data)
++{
++	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
++		return 0;
++
++	oh->_mpu_rt_va = _find_mpu_rt_base(oh, oh->_mpu_port_index);
++	if (!oh->_mpu_rt_va)
++		pr_warning("omap_hwmod: %s found no _mpu_rt_va for %s\n",
++				__func__, oh->name);
++
++	return 0;
++}
++
+ /**
+  * omap_hwmod_late_init - do some post-clock framework initialization
+  *
+@@ -1632,6 +1650,8 @@ static int __init omap_hwmod_late_init(void)
+ {
+ 	int r;
+ 
++	r = omap_hwmod_for_each(_populate_mpu_rt_base, NULL);
++
+ 	/* XXX check return value */
+ 	r = omap_hwmod_for_each(_init_clocks, NULL);
+ 	WARN(r, "omap_hwmod: omap_hwmod_late_init(): _init_clocks failed\n");
