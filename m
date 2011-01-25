@@ -1,56 +1,61 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 25 Jan 2011 18:23:47 +0100
-Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
-In-Reply-To: <Pine.LNX.4.64.1101250712110.29909@ask.diku.dk>
-References: <4D3DDD07.1030809@bluewatersys.com>
-	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
-	<4D3DE35B.1030102@bluewatersys.com>
-	<Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
-	<4D3DE9CD.2040800@bluewatersys.com>
-	<Pine.LNX.4.64.1101242231240.3167@ask.diku.dk>
-	<4D3DF46A.1030009@bluewatersys.com>
-	<20110124232302.GQ24104@n2100.arm.linux.org.uk>
-	<20110125014428.GO24284@game.jcrosoft.org>
-	<Pine.LNX.4.64.1101250712110.29909@ask.diku.dk>
-Message-ID: <20110125172347.GC1441@game.jcrosoft.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 25 Jan 2011 17:33:14 +0000
+Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
+	asm/spinlock.h
+In-Reply-To: <20110125165919.GD17286@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
+	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
+	<20110125165919.GD17286@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07:12 Tue 25 Jan     , Julia Lawall wrote:
-> On Tue, 25 Jan 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > On 23:23 Mon 24 Jan     , Russell King - ARM Linux wrote:
-> > > On Tue, Jan 25, 2011 at 10:51:38AM +1300, Ryan Mallon wrote:
-> > > > You could, but it would not be helpful. Clock associations are used so
-> > > > that _different_ devices can have the same function and map to the
-> > > > correct clock. This is used when there are multiple instances of a
-> > > > single peripheral. For example, the uart clocks work like this:
-> > > > 
-> > > > 	at91_clock_associate("usart1_clk", &pdev->dev, "usart");
-> > > > 
-> > > > so then you can do this in a driver:
-> > > > 	
-> > > > 	uart_clk = clk_get(&pdev->dev, "usart");
-> > > > 
-> > > > Rather than:
-> > > > 
-> > > > 	uart_clk = clk_get(NULL, "usart1_clk");
-> > > > 
-> > > > The former will find the correct uart clock for the device. Because each
-> > > > uart is a separate device the correct clock will be selected for each uart.
-> > > > 	
-> > > > My point was that there should be no overlap between clk->name and
-> > > > clk->function otherwise clk_get will not be able to return the correct
-> > > > clock.
-> > > 
-> > > It would be nice if AT91 could switch over to using clkdev at some
-> > > point, which greatly helps with associating struct clk's with their
-> > > device/function names - and reduces the amount of "different" code.
-> > I working on it that's was one of the reason I move clkdev to drivers
-> > as AT91 and AVR32 need to switch
-> 
-> Shall I just leave the patch as is then?
-I'll try to send a patch before chinese new year
+On Tue, Jan 25, 2011 at 4:59 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 25, 2011 at 04:43:52PM +0000, Dave Martin wrote:
+>> A couple of questions on this:
+>>
+>> 1) I notice these spinlock functions are generally marked inline.
+>>
+>> Is that likely to happen in modules? ?If so, there would be a need to
+>> do SMP_ON_UP fixups at module load time -- I don't think that's
+>> currently implemented.
+>
+> No one should be using the arch_* spinlocks directly. ?The spinlocks
+> are implemented in out of line code in kernel/spinlock.c
 
-Best Regards,
-J.
+OK--- do think this is something we need a sanity-check for, or does
+this fall into to a category of bad driver implementation which will
+get thrown out during peer review?
+
+>
+>> 2) When building with this patch and CONFIG_SMP_ON_UP=y, I've seen
+>> vmlinux link errors like this:
+>>
+>> ? LD ? ? ?.tmp_vmlinux1
+>> `.exit.text' referenced in section `.alt.smp.init' of
+>> drivers/built-in.o: defined in discarded section `.exit.text' of
+>> drivers/built-in.o
+>> make: *** [.tmp_vmlinux1] Error 1
+>>
+>> I don't know whether this is caused by the patch directly or as a
+>> side-effect -- I've only noticed it in the linaro-2.6.37 tree so far.
+>> git bisect indentified this above patch as the first one with the
+>> error in that case.
+>>
+>> I don't understand the section discarding logic too well, so I'm not
+>> sure how to fix it for now...
+>
+> Hmm. ?I don't see how that could happen, unless some driver is going
+> behind the spinlock APIs, or using our dsb_sev() directly.
+>
+> I think you need to first track down what's responsible for inserting
+> architecture spinlock code into drivers.
+>
+
+OK, I'll try and do a bit more digging.  I think I have a better idea
+of what to look for now, anyhow.
+
+Cheers
+---Dave
