@@ -1,53 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Jan 2011 16:09:05 -0000
-Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet
-	controller	in board_init
-In-Reply-To: <19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
-References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
-	<19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
-Message-ID: <000e01cbbcaa$30b74350$9225c9f0$@deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 16:13:16 +0000
+Subject: [PATCH 3/5] ARM: twd: Add context save restore support
+In-Reply-To: <68b4be46e93b4017650bc4bf230afef6@mail.gmail.com>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
+	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
+	<20110124111114.GA19409@n2100.arm.linux.org.uk>
+	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
+	<20110125103231.GD11507@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
+	<20110125133752.GI13300@n2100.arm.linux.org.uk>
+	<68b4be46e93b4017650bc4bf230afef6@mail.gmail.com>
+Message-ID: <20110125161316.GC17286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-> > Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
-> > in board_init
+On Tue, Jan 25, 2011 at 09:34:15PM +0530, Santosh Shilimkar wrote:
+> Russell, Thomas
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Tuesday, January 25, 2011 7:08 PM
+> > To: Thomas Gleixner
+> > Cc: Colin Cross; Santosh Shilimkar; catalin.marinas at arm.com;
+> > linus.ml.walleij at gmail.com; linux-omap at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH 3/5] ARM: twd: Add context save restore support
 > >
-> > With addition of hwmod support to gpio, the ethernet controller
-> > goes undetected for OMAP35xEVM. So explicitly assert the reset signal to
-> > ethernet controller smsc911x -
+> [...]
 > >
-> > 	- GPIO7 (>=RevG version of EVM's)
-> > 	- GPIO64 (<=RevD version of EVM's)
+> > I can't say because these patches only add the hooks, there's no
+> > implementation yet which uses the hooks.
 > >
-> > This patch is based on intial version from Charulatha V, reference
-> > to original discussion -
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Signed-off-by: Charulatha V <charu@ti.com>
-> > Tested-by: Kevin Hilman <khilman@ti.com>
+> > Given the description about _why_ those hooks are necessary, it
+> > seems
+> > that something is required.  Either we start adding custom hacks to
+> > each clockevent driver as is done with this patch, or we get some
+> > generic help in place.
+> >
+> > I'm not thrilled by the custom hack approach - and I thought the
+> > clockevent stuff was created to stop this kind of thing happening.
+> >
+> > I suggest we defer this until there's a visible use case available.
+> Got some time to debug this issue. OMAP idle code already has the
+> broad-cast notifiers working for sometime. So I removed the existing
+> save restore twd code and just used the below patch which Russell
+> posted on this thread.
+> And things just work and I guess we are done with this issue !!
+> Timer framework is doing all right things with notifiers.
+> 
+> Am going to use this patch for my further work and drop the
+> save/restore patch. Will update you if there is any other
+> issue on this. I should have validated this patch on my own
+> earlier :(
+> 
+> Thanks for the discussion.
 
-Out of interest - have you tried this network chip (smsc9118) in an SMP
-environment [is it on OMAP4?]? On the Versatile Express it's quite easy to
-get it to `lock up'. It claims to be servicing interrupts but you certainly
-don't get any useful packets. and ifdown/ifup brings it back to life again.
-
-I took a brief look at the driver and found a few issues there:
-
-1.) Read-after-read and read-after-write minimum delays aren't respected
-2.) The locking is too low-level (it's around the register accessors) so
-    there is plenty of scope for deadlock if a calling function holds some
-    other locks too.
-3.) FIFO fastforwarding uses the word count instead of the byte count.
-4.) Bit 20 of the HW_CFG register apparently always needs to be asserted,
-    but it's 0 out of reset (who knows what they were thinking?!).
-
-I tried to resolve these problems (admittedly as a quick bit of hacking)
-but the issue persists.
-
-Anyway, it would just be nice to know if anybody else has seen problems
-with this chip/driver because it makes the Versatile Express pretty much
-useless as a remote box.
-
-Will
+Thanks - I guess that's a tested-by then?
