@@ -1,59 +1,31 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Mon, 24 Jan 2011 16:57:54 -0800
-Subject: [PATCH v2 01/11] msm: Add CPU queries
-In-Reply-To: <1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com> (Daniel
-	Walker's message of "Mon, 24 Jan 2011 16:23:54 -0800")
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
-	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
-	<8yak4htj0lb.fsf@huya.qualcomm.com>
-	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <8yay669hka5.fsf@huya.qualcomm.com>
+Date: Mon, 24 Jan 2011 17:05:22 -0800
+Subject: [PATCH] msm: serial: Add MSM8960 serial support
+In-Reply-To: <1295663921-32723-1-git-send-email-stepanm@codeaurora.org>
+	(Stepan Moskovchenko's message of "Fri, 21 Jan 2011 18:38:41 -0800")
+References: <1295663921-32723-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <8yar5c1hjxp.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24 2011, Daniel Walker wrote:
+On Fri, Jan 21 2011, Stepan Moskovchenko wrote:
 
-> On Mon, 2011-01-24 at 16:20 -0800, David Brown wrote:
->> On Mon, Jan 24 2011, Daniel Walker wrote:
->> 
->> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
->> >> +#define cpu_is_msm7x01()       0
->> >> +#define cpu_is_msm7x30()       0
->> >> +#define cpu_is_qsd8x50()       0
->> >> +#define cpu_is_msm8x60()       0
->> >
->> > Now that I look at this again, why not drop the "x" all together ?
->> 
->> That might be better for the 8x60.  The complexity is that most of the
->> MSM chips have some variants, where the CPU running Linux isn't changed,
->> but the modem CPU is different (think CDMA/UMTS).  Until 8960, that was
->> distinguished by the second letter.
->> 
->> Either way doesn't quite match reality, unfortunately.  There are
->> devices using a MSM7201 and others using a MSM7601.  As far as Linux is
->> concerned, there isn't any difference between them.  If someone wanted
->> to try and identify the device they have with the code, it could be
->> confusing for either name chosen.
->> 
->> I was planning on turning msm8x60 into msm8660, since that seems to be
->> the most common one.  Perhaps the decoder ring should be put into the
->> help text for the options so people can at least figure out which is
->> which.
->
-> Are there any of those which do , right now, have Linux support for more
-> than one variant ?
+> diff --git a/arch/arm/mach-msm/devices-msm8960.c b/arch/arm/mach-msm/devices-msm8960.c
+> new file mode 100644
+> index 0000000..821e6d1
+> --- /dev/null
+> +++ b/arch/arm/mach-msm/devices-msm8960.c
+> @@ -0,0 +1,83 @@
+> +/*
+> + * Copyright (C) 2008 Google, Inc.
+> + * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
 
-All of them, in fact.
+What is the general consenus on this kind of copyright.  Stepan started
+with a file with a Google copyright on it, but has largely rewritten the
+file to support the new board.  Should we be keeping the copyright from
+the file?
 
-MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
-goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
-of the two, and it doesn't matter which one you use.
-
-MSM8960 is a completely different chip, it just shares a similar name,
-to other chips.
-
+Thanks,
 David
 
 -- 
