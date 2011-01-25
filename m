@@ -1,22 +1,19 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jan 2011 11:50:39 -0800
-Subject: [PATCH 01/14] ARM: bitops: ensure set/clear/change bitops take
-	a word-aligned pointer
-In-Reply-To: <E1Peudk-0003SJ-Aj@rmk-PC.arm.linux.org.uk>
+Date: Tue, 25 Jan 2011 11:51:18 -0800
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to
+	use ldrex/strex
+In-Reply-To: <E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
 References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peudk-0003SJ-Aj@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110125195038.GR13589@atomide.com>
+	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110125195118.GS13589@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:20]:
-> Add additional instructions to our assembly bitops functions to ensure
-> that they only operate on word-aligned pointers.  This will be necessary
-> when we switch these operations to use the word-based exclusive
-> operations.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:23]:
+> Switch the set/clear/change bitops to use the word-based exclusive
+> operations, which are only present in a wider range of ARM architectures
+> than the byte-based exclusive operations.
 
-If it's still not too late, we've had this in the testing branch
-in the linux-omap tree for about a week now. So far no problems,
-for me file systems tested have been ext3 and nfs.
+This too been in use for about a week now with ext3 and nfs:
 
 Tested-by: Tony Lindgren <tony@atomide.com>
