@@ -1,50 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Jan 2011 15:14:24 +0000
-Subject: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support for
-	re-enabling l2x0
-In-Reply-To: <1295834493-5019-5-git-send-email-ccross@android.com>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-5-git-send-email-ccross@android.com>
-Message-ID: <1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 25 Jan 2011 15:16:30 +0000
+Subject: [PATCH] ASoC: correct link specifications for corgi, poodle
+	and spitz
+In-Reply-To: <20110125150317.GG31453@opensource.wolfsonmicro.com>
+References: <1295637257-28299-1-git-send-email-dbaryshkov@gmail.com>
+	<20110125150317.GG31453@opensource.wolfsonmicro.com>
+Message-ID: <1295968590.3322.256.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-24 at 02:01 +0000, Colin Cross wrote:
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -252,16 +252,26 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
->         spin_unlock_irqrestore(&l2x0_lock, flags);
->  }
+On Tue, 2011-01-25 at 15:03 +0000, Mark Brown wrote:
+> On Fri, Jan 21, 2011 at 10:14:17PM +0300, Dmitry Eremin-Solenikov wrote:
+> > ASoC DAI link descriptions for Corgi, Poodle and Spitz platforms
+> > contained incorrect names for cpu_dai and codec, which effectievly disabled sound
+> > on theese platforms. Fix that errors.
 > 
-> +/* enables l2x0 after l2x0_disable, does not invalidate */
-> +void l2x0_enable(void)
-> +{
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&l2x0_lock, flags);
-> +       writel_relaxed(1, l2x0_base + L2X0_CTRL);
-> +       spin_unlock_irqrestore(&l2x0_lock, flags);
-> +}
-> +
->  static void l2x0_disable(void)
->  {
->         unsigned long flags;
+> Ccing in Liam who you forgot to CC - please make sure you CC all
+> maintainers on patches.
 > 
->         spin_lock_irqsave(&l2x0_lock, flags);
-> -       writel(0, l2x0_base + L2X0_CTRL);
-> +       writel_relaxed(0, l2x0_base + L2X0_CTRL);
->         spin_unlock_irqrestore(&l2x0_lock, flags);
->  }
-> 
-> -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
-> +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
->  {
->         __u32 aux;
->         __u32 cache_id;
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> > ---
+> >  sound/soc/pxa/corgi.c  |    4 ++--
+> >  sound/soc/pxa/poodle.c |    2 +-
+> >  sound/soc/pxa/spitz.c  |    4 ++--
+> >  3 files changed, 5 insertions(+), 5 deletions(-)
+> >
 
-So this assumes that the L2 registers are accessible. I suspect the
-platform code calling it should know this.
+Looks fine to me.
 
-The patch looks fine.
+Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+-- 
+Freelance Developer, SlimLogic Ltd
+ASoC and Voltage Regulator Maintainer.
+http://www.slimlogic.co.uk
