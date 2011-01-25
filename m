@@ -1,42 +1,100 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 25 Jan 2011 13:25:02 +0000
-Subject: questions about arm trustzone
-In-Reply-To: <20110125124524.GJ11507@n2100.arm.linux.org.uk>
-References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
-	<8yad3nlh18e.fsf@huya.qualcomm.com>
-	<AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
-	<20110125102652.GB11507@n2100.arm.linux.org.uk>
-	<bb0c3855a121603232d022b4062752a6@mail.gmail.com>
-	<AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
-	<20110125124524.GJ11507@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikVW3vcygUQDTH-x6cXkNdf2WEztbTvdz4YkmCk@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 13:37:52 +0000
+Subject: [PATCH 3/5] ARM: twd: Add context save restore support
+In-Reply-To: <alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
+	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
+	<20110124111114.GA19409@n2100.arm.linux.org.uk>
+	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
+	<20110125103231.GD11507@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
+Message-ID: <20110125133752.GI13300@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 12:45 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 25, 2011 at 12:24:13PM +0000, Dave Martin wrote:
->> Avoiding this complexity is one of the motivations for using r7 for
->> the syscall number with CONFIG_EABI (instead of using the SVC comment
->> field).
->
-> Your history is not entirely correct.
->
-> I had the kernel side of Thumb userspace support in place long before EABI
-> came along. ?Thumb doesn't have a large enough comment field to store the
-> Linux syscall number, so to get around that problem, I decided to use r7
-> for the syscall number. ?You'll find 2.4 kernels support Thumb instructions
-> in userspace.
->
-> As part of the EABI switch for ARM mode - which created an incompatible
-> SWI interface anyway, we decided that we could reduce data cache pollution
-> by eliminating the read of the SWI instruction, so we adopted the r7
-> method for ARM EABI mode.
->
+On Tue, Jan 25, 2011 at 02:23:10PM +0100, Thomas Gleixner wrote:
+> On Tue, 25 Jan 2011, Russell King - ARM Linux wrote:
+> > On Mon, Jan 24, 2011 at 11:39:13PM -0800, Colin Cross wrote:
+> > > On Mon, Jan 24, 2011 at 3:11 AM, Russell King - ARM Linux
+> > > <linux@arm.linux.org.uk> wrote:
+> > > > On Mon, Jan 24, 2011 at 11:06:09AM +0000, Russell King - ARM Linux wrote:
+> > > >> On Mon, Jan 24, 2011 at 02:21:17PM +0530, Santosh Shilimkar wrote:
+> > > >> > In CPU low power state, local timer looses its register context. This
+> > > >> > patch adds context save restore hooks which can be used by platforms
+> > > >> > appropriately.
+> > > >>
+> > > >> I thought the whole point of CLOCK_EVT_FEAT_C3STOP was that the generic
+> > > >> timer stuff wouldn't rely on it being kept alive?
+> > > >>
+> > > >> Hmm, it looks like we bypass the clockevents code by only setting the
+> > > >> TWD load value at initialization time, not when we switch to periodic
+> > > >> mode. ?We really ought to rewrite it whenever we switch back to periodic
+> > > >> mode.
+> > > >>
+> > > >> I suspect fixing that means you won't need this save/restore support.
+> > > >
+> > > > Untested, but should do what's required.
+> > > >
+> > > > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> > > > index fd91566..60636f4 100644
+> > > > --- a/arch/arm/kernel/smp_twd.c
+> > > > +++ b/arch/arm/kernel/smp_twd.c
+> > > > @@ -36,6 +36,7 @@ static void twd_set_mode(enum clock_event_mode mode,
+> > > > ? ? ? ? ? ? ? ?/* timer load already set up */
+> > > > ? ? ? ? ? ? ? ?ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+> > > > ? ? ? ? ? ? ? ? ? ? ? ?| TWD_TIMER_CONTROL_PERIODIC;
+> > > > + ? ? ? ? ? ? ? __raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
+> > > > ? ? ? ? ? ? ? ?break;
+> > > > ? ? ? ?case CLOCK_EVT_MODE_ONESHOT:
+> > > > ? ? ? ? ? ? ? ?/* period set, and timer enabled in 'next_event' hook */
+> > > > @@ -81,7 +82,7 @@ int twd_timer_ack(void)
+> > > >
+> > > > ?static void __cpuinit twd_calibrate_rate(void)
+> > > > ?{
+> > > > - ? ? ? unsigned long load, count;
+> > > > + ? ? ? unsigned long count;
+> > > > ? ? ? ?u64 waitjiffies;
+> > > >
+> > > > ? ? ? ?/*
+> > > > @@ -116,10 +117,6 @@ static void __cpuinit twd_calibrate_rate(void)
+> > > > ? ? ? ? ? ? ? ?printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+> > > > ? ? ? ? ? ? ? ? ? ? ? ?(twd_timer_rate / 1000000) % 100);
+> > > > ? ? ? ?}
+> > > > -
+> > > > - ? ? ? load = twd_timer_rate / HZ;
+> > > > -
+> > > > - ? ? ? __raw_writel(load, twd_base + TWD_TIMER_LOAD);
+> > > > ?}
+> > > >
+> > > > ?/*
+> > > 
+> > > This doesn't work for oneshot timers if the TWD_TIMER_CONTROL register
+> > > gets reset by cpu idle between twd_set_mode and twd_set_next_event.
+> > > Shadowing ctrl in a percpu variable and rewriting it during every call
+> > > to twd_set_next_event does work, but that's not much different, and a
+> > > little less efficient, than just saving and restoring the control and
+> > > load registers in idle.  It does have the advantage that platforms
+> > > don't need any extra calls.
+> > 
+> > The next question is can we teach the generic time infrastructure about
+> > this so we don't have to modify every clock event driver for it?  We
+> > really need to get away from having this kind of knowledge buried down
+> > in the lowest levels of every driver.
+> 
+> In which way? I mean the generic code issues a call to the set_mode
+> function when we leave the broadcast mode. So what should the generic
+> code do more ?
 
-Fair enough -- I was glossing over things a bit and I'm not familiar
-with all the history.  So, I guess there were plenty of other good
-reasons.
+I can't say because these patches only add the hooks, there's no
+implementation yet which uses the hooks.
 
-Cheers
----Dave
+Given the description about _why_ those hooks are necessary, it seems
+that something is required.  Either we start adding custom hacks to
+each clockevent driver as is done with this patch, or we get some
+generic help in place.
+
+I'm not thrilled by the custom hack approach - and I thought the
+clockevent stuff was created to stop this kind of thing happening.
+
+I suggest we defer this until there's a visible use case available.
