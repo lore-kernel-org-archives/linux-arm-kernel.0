@@ -1,19 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jan 2011 11:51:18 -0800
-Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to
-	use ldrex/strex
-In-Reply-To: <E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110125195118.GS13589@atomide.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 25 Jan 2011 12:06:18 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <8yaei80epie.fsf@huya.qualcomm.com>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
+	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
+	<8yak4htj0lb.fsf@huya.qualcomm.com>
+	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+	<8yay669hka5.fsf@huya.qualcomm.com>
+	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
+	<8ya39ogg5dm.fsf@huya.qualcomm.com>
+	<1295983549.25496.33.camel@c-dwalke-linux.qualcomm.com>
+	<8yaei80epie.fsf@huya.qualcomm.com>
+Message-ID: <1295985978.25496.35.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110117 11:23]:
-> Switch the set/clear/change bitops to use the word-based exclusive
-> operations, which are only present in a wider range of ARM architectures
-> than the byte-based exclusive operations.
+On Tue, 2011-01-25 at 11:45 -0800, David Brown wrote:
+> On Tue, Jan 25 2011, Daniel Walker wrote:
+> 
+> > On Tue, 2011-01-25 at 11:17 -0800, David Brown wrote:
+> 
+> > I suggesting we do it across the board because consistency is a good
+> > thing .. It also allows us to use 8x60 when 8660 and 8960 are actually
+> > similar .. You can't deny that 8960 is similar to 8660 because your
+> > patches show some duplication due to it.
+> 
+> You're completely missing the point of these tests.  If _anything_ is
+> different, the macros need to be different.  I don't care if they're
+> similar, I need to know when they are different.  That is the point of
+> the macros.
 
-This too been in use for about a week now with ext3 and nfs:
+I said you would have macros specifically for 8660 and 8960, so if you
+need to know when they're different then you have macro's to do that. 
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+Daniel
+
+-- 
+
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
