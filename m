@@ -1,39 +1,115 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Jan 2011 10:04:02 +0000
-Subject: [PATCH v4 08/19] ARM: LPAE: Introduce the 3-level page table
-	format definitions
-In-Reply-To: <20110124214225.GO24104@n2100.arm.linux.org.uk>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-9-git-send-email-catalin.marinas@arm.com>
-	<AANLkTi=d0q0Upde3=b4tpu3icOr4XdifcFRvBHuXgsBN@mail.gmail.com>
-	<20110124214225.GO24104@n2100.arm.linux.org.uk>
-Message-ID: <1295949842.10109.16.camel@e102109-lin.cambridge.arm.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Tue, 25 Jan 2011 15:34:33 +0530
+Subject: [PATCH v5 0/6] OMAP: McSPI: Hwmod adaptation + runtime conversion
+In-Reply-To: <87lj2a5462.fsf@ti.com>
+References: <1295614547-1920-1-git-send-email-govindraj.raja@ti.com>
+	<87lj2a5462.fsf@ti.com>
+Message-ID: <AANLkTimdBJe64bYyBZnuOPhshyik4Z90zpsSSXJPosPs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-24 at 21:42 +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 25, 2011 at 08:26:42AM +1100, Nick Piggin wrote:
-> > On Tue, Jan 25, 2011 at 4:55 AM, Catalin Marinas
-> > <catalin.marinas@arm.com> wrote:
-> > > This patch introduces the pgtable-3level*.h files with definitions
-> > > specific to the LPAE page table format (3 levels of page tables).
-> >
-> > Seeing as you're shaking up these definitions, what do you think about
-> > switching from 4level-fixup.h to pgtable-nopud.h / pgtable-nopmd.h headers?
-> > One day eventually it would be nice to get rid of the fixup mode.
-> 
-> I have patches to do this which I de-queued for the last merge window.
-> It's not entirely trivial and without problem.  You can find the patches
-> in linux-next now.
-> 
-> I was waiting for the new set of patches from Catalin before going back
-> and working out the solutions to some of those problems.
+On Tue, Jan 25, 2011 at 3:56 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Govindraj,
+>
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> Changes invloves:
+>> ----------------
+>> 1) Addition of hwmod data for omap2/3/4.
+>> 2) McSPI driver hwmod adaptation with cleanup of base address
+>> ? ?macros and using omap-device API's.
+>> 3) Runtime Conversion of McSPI driver.
+>
+> I accidentally replied to the v4 series about the refresh, but this one
+> still needs ar refresh.
+>
+> Specifically, this change from Gregory Clement touches some of the same
+> code as your patch:
+>
+> commit 42ce7fd6319bed8ecb26d656c476365da46b29e9
+> Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date: ? Wed Dec 29 11:52:53 2010 +0100
+>
+> ? ?spi/omap2_mcspi.c: Force CS to be in inactive state after off-mode transition
+>
 
-I'm fine with going this route but I haven't had time to review your
-patches yet (have they been posted to the list, I've been busy lately
-and haven't followed everything).
+Yes correct.
 
-Thanks.
+Will rebase and repost in couple of days.
 
--- 
-Catalin
+--
+Thanks
+Govindraj.R
+
+
+>
+> Kevin
+>
+>>
+>> Changes from v4:
+>> ---------------
+>> 1) 4430 hwmod file alignment based on Benoit's comments.
+>> ? ?http://www.spinics.net/lists/arm-kernel/msg111215.html
+>> ? ?4430 Hwmod file now aligned based on:
+>> ? ?http://gitorious.org/omap-pm/linux/blobs/pm-wip/
+>> ? ?hwmods-omap4-full/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>
+>> Changes from v3:
+>> ---------------
+>> 1) Updated proper Author for all patches which was missed
+>> ? ?in v2.
+>> 2) Modified 4430 hwmod data file so that mcspi data gets
+>> ? ?updated in proper alphabetical order.
+>> 3) Update omap2/3 hwmod dat files with SYSS_HAS_RESET_STATUS
+>> ? ?flag.
+>>
+>> Changes from v2:
+>> ---------------
+>> 1) Fixing minor comments and adding ack from Grant Likely.
+>> ? ? ? https://patchwork.kernel.org/patch/371321/
+>> ? ? ? https://patchwork.kernel.org/patch/371331/
+>>
+>> Changes from v1:
+>> ---------------
+>> 1) Fixing patch 5/5 comments for hwmod+runtime
+>> ? Split the patch 5/5 to hwmod adaptation
+>> ? and then runtime conversion
+>> ? http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
+>>
+>> Testing Updates:
+>> ----------------
+>> Was tested using data transfer test module available at:
+>> http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/test_code/
+>> utils/mcspi_modules/omap_mcspi_datatest.c;
+>> h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
+>> hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
+>> This test basically involves MISO <--> MOSI lines looped and data transfer test
+>> done using the above test module.
+>> System wide suspend and ret/off counts observation, ensured that no behavioral
+>> difference with and without this patch series.
+>>
+>> Benoit Cousson (1):
+>> ? OMAP4: hwmod data: Add McSPI
+>>
+>> Charulatha V (4):
+>> ? OMAP2420: hwmod data: Add McSPI
+>> ? OMAP2430: hwmod data: Add McSPI
+>> ? OMAP3: hwmod data: Add McSPI
+>> ? OMAP: devices: Modify McSPI device to adapt to hwmod framework
+>>
+>> Govindraj.R (1):
+>> ? OMAP: runtime: McSPI driver runtime conversion
+>>
+>> ?arch/arm/mach-omap2/devices.c ? ? ? ? ? ? ?| ?187 ++++---------------
+>> ?arch/arm/mach-omap2/omap_hwmod_2420_data.c | ?156 ++++++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ?219 ++++++++++++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ?280 ++++++++++++++++++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ?267 ++++++++++++++++++++++++++
+>> ?arch/arm/plat-omap/include/plat/mcspi.h ? ?| ? 11 +
+>> ?drivers/spi/omap2_mcspi.c ? ? ? ? ? ? ? ? ?| ?224 +++++++---------------
+>> ?7 files changed, 1044 insertions(+), 300 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
