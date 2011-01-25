@@ -1,129 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Jan 2011 13:58:41 +0000
-Subject: [PATCH 2/2] ALSA: AACI: fix timeout duration
-Message-ID: <20110125135841.GL11507@n2100.arm.linux.org.uk>
+Date: Tue, 25 Jan 2011 14:11:53 +0000
+Subject: [PATCH 02/14] ARM: bitops: switch set/clear/change bitops to
+	use ldrex/strex
+In-Reply-To: <000601cbbc97$cc6955d0$653c0170$@deacon@arm.com>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peue4-0003SN-Gk@rmk-PC.arm.linux.org.uk>
+	<20110123001636.GA20841@n2100.arm.linux.org.uk>
+	<000601cbbc97$cc6955d0$653c0170$@deacon@arm.com>
+Message-ID: <20110125141153.GA17286@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Relying on the access time of peripherals is unreliable - it depends
-on the speed of the CPU and the bus.  On Versatile Express, these
-timeouts were expiring, causing the driver to fail.
+On Tue, Jan 25, 2011 at 01:57:26PM -0000, Will Deacon wrote:
+> Hi Russell,
+> 
+> Hopefully this isn't too late to be useful.
+> 
+> > On Mon, Jan 17, 2011 at 07:21:40PM +0000, Russell King - ARM Linux wrote:
+> > > Switch the set/clear/change bitops to use the word-based exclusive
+> > > operations, which are only present in a wider range of ARM architectures
+> > > than the byte-based exclusive operations.
+> > >
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > As only one person replied to this patch with test information, I'm
+> > not happy to push this into -rc, and hence that prevents it going into
+> > -stable too.  That means omap2plus_defconfig .38 mainline kernels
+> > (including -stable) will remain potentially dangerous when run on
+> > SMP capable hardware.
+> > 
+> > Therefore, I see no alternative at the moment but to purposely cause
+> > builds which cover ARMv6, and ARMv6K or ARMv7 CPUs to save people from
+> > data corruption.
+> > 
+> > Please get your tested-by's to me for at least the first three patches
+> > of this series ASAP.
+> 
+> I've tested this on the Versatile Express (ca9x4, little endian) with a USB
+> hard drive and ext3 (rw) filesystem. I did a bunch of parallel dds of a 2GB
+> file containing random data whilst the system was fairly loaded. File checksums
+> all passed and the kernel didn't do anything untowards.
+> 
+> Tested-by: Will Deacon <will.deacon@arm.com>
+> 
+> I appreciate this is the same test configuration as the one Nicolas did,
+> but it at least replicates his findings.
 
-Add udelay(1) to ensure that they don't expire early, and adjust
-timeouts to give a reasonable margin over the response times.
+Was this for just the first three or the complete set?
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- sound/arm/aaci.c |   42 +++++++++++++++++++++++-------------------
- 1 files changed, 23 insertions(+), 19 deletions(-)
-
-diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
-index 21ff629..24d3013 100644
---- a/sound/arm/aaci.c
-+++ b/sound/arm/aaci.c
-@@ -30,6 +30,8 @@
- 
- #define DRIVER_NAME	"aaci-pl041"
- 
-+#define FRAME_PERIOD_US	21
-+
- /*
-  * PM support is not complete.  Turn it off.
-  */
-@@ -64,8 +66,8 @@ static void aaci_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
- 			    unsigned short val)
- {
- 	struct aaci *aaci = ac97->private_data;
-+	int timeout;
- 	u32 v;
--	int timeout = 5000;
- 
- 	if (ac97->num >= 4)
- 		return;
-@@ -81,10 +83,13 @@ static void aaci_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
- 	writel(val << 4, aaci->base + AACI_SL2TX);
- 	writel(reg << 12, aaci->base + AACI_SL1TX);
- 
--	/*
--	 * Wait for the transmission of both slots to complete.
--	 */
-+	/* Initially, wait one frame period */
-+	udelay(FRAME_PERIOD_US);
-+
-+	/* And then wait an additional eight frame periods for it to be sent */
-+	timeout = FRAME_PERIOD_US * 8;
- 	do {
-+		udelay(1);
- 		v = readl(aaci->base + AACI_SLFR);
- 	} while ((v & (SLFR_1TXB|SLFR_2TXB)) && --timeout);
- 
-@@ -101,9 +106,8 @@ static void aaci_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
- static unsigned short aaci_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
- {
- 	struct aaci *aaci = ac97->private_data;
-+	int timeout, retries = 10;
- 	u32 v;
--	int timeout = 5000;
--	int retries = 10;
- 
- 	if (ac97->num >= 4)
- 		return ~0;
-@@ -117,10 +121,13 @@ static unsigned short aaci_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
- 	 */
- 	writel((reg << 12) | (1 << 19), aaci->base + AACI_SL1TX);
- 
--	/*
--	 * Wait for the transmission to complete.
--	 */
-+	/* Initially, wait one frame period */
-+	udelay(FRAME_PERIOD_US);
-+
-+	/* And then wait an additional eight frame periods for it to be sent */
-+	timeout = FRAME_PERIOD_US * 8;
- 	do {
-+		udelay(1);
- 		v = readl(aaci->base + AACI_SLFR);
- 	} while ((v & SLFR_1TXB) && --timeout);
- 
-@@ -130,17 +137,13 @@ static unsigned short aaci_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
- 		goto out;
- 	}
- 
--	/*
--	 * Give the AC'97 codec more than enough time
--	 * to respond. (42us = ~2 frames at 48kHz.)
--	 */
--	udelay(42);
-+	/* Now wait for the response frame */
-+	udelay(FRAME_PERIOD_US);
- 
--	/*
--	 * Wait for slot 2 to indicate data.
--	 */
--	timeout = 5000;
-+	/* And then wait an additional eight frame periods for data */
-+	timeout = FRAME_PERIOD_US * 8;
- 	do {
-+		udelay(1);
- 		cond_resched();
- 		v = readl(aaci->base + AACI_SLFR) & (SLFR_1RXV|SLFR_2RXV);
- 	} while ((v != (SLFR_1RXV|SLFR_2RXV)) && --timeout);
-@@ -179,6 +182,7 @@ aaci_chan_wait_ready(struct aaci_runtime *aacirun, unsigned long mask)
- 	int timeout = 5000;
- 
- 	do {
-+		udelay(1);
- 		val = readl(aacirun->base + AACI_SR);
- 	} while (val & mask && timeout--);
- }
-@@ -874,7 +878,7 @@ static int __devinit aaci_probe_ac97(struct aaci *aaci)
- 	 * Give the AC'97 codec more than enough time
- 	 * to wake up. (42us = ~2 frames at 48kHz.)
- 	 */
--	udelay(42);
-+	udelay(FRAME_PERIOD_US * 2);
- 
- 	ret = snd_ac97_bus(aaci->card, 0, &aaci_bus_ops, aaci, &ac97_bus);
- 	if (ret)
--- 
-1.6.2.5
+Thanks.
