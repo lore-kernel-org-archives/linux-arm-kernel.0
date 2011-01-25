@@ -1,85 +1,53 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 25 Jan 2011 10:13:59 +0530
-Subject: [PATCH] OMAP: PM: DMA: Enable runtime pm
-In-Reply-To: <871v414yna.fsf@ti.com>
-References: <1295860819-20142-1-git-send-email-manjugk@ti.com>
-	<87d3nm7zb0.fsf@ti.com> <20110124235205.GA6351@manju-desktop>
-	<871v414yna.fsf@ti.com>
-Message-ID: <20110125044359.GA29117@m-desktop>
+From: julia@diku.dk (Julia Lawall)
+Date: Tue, 25 Jan 2011 07:12:34 +0100 (CET)
+Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
+In-Reply-To: <20110125014428.GO24284@game.jcrosoft.org>
+References: <Pine.LNX.4.64.1101242058430.3167@ask.diku.dk>
+	<20110124200515.GA30963@albatros> <4D3DDD07.1030809@bluewatersys.com>
+	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
+	<4D3DE35B.1030102@bluewatersys.com>
+	<Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
+	<4D3DE9CD.2040800@bluewatersys.com>
+	<Pine.LNX.4.64.1101242231240.3167@ask.diku.dk>
+	<4D3DF46A.1030009@bluewatersys.com>
+	<20110124232302.GQ24104@n2100.arm.linux.org.uk>
+	<20110125014428.GO24284@game.jcrosoft.org>
+Message-ID: <Pine.LNX.4.64.1101250712110.29909@ask.diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 04:26:01PM -0800, Kevin Hilman wrote:
-> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
-> 
-> > Kevin,
-> >
-> > On Mon, Jan 24, 2011 at 01:43:31PM -0800, Kevin Hilman wrote:
-> >> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
-> >> 
-> >> > From: Manjunath G Kondaiah <manjugk@ti.com>
-> >> >
-> >> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put
-> >> > for OMAP DMA driver.
-> >> >
-> >> > Since DMA driver callback will happen from interrupt context and
-> >> > DMA client driver will release all DMA resources from interrupt
-> >> > context itself, pm_runtime_put_sync() cannot be used in DMA driver.
-> >> > Instead, pm_runtime_put() is used which is asynchronous call and
-> >> > gets executed in work queue.
-> >> 
-> >> It's fine that the asynchronous version of put is uses (it's actually
-> >> preferred.)  However, the description is confusing here.  You talk about
-> >> driver callbacks here but in the patch, your calling _put() from
-> >> omap_dma_free(), not from the callback.
-> >
-> > All dma client drivers are calling omap_dma_free from callback
-> > context. 
-> 
-> Maybe so, but that's not a requirement of the API.  I have a DMA test
-> driver that doesn't do that.
-> 
-> It's also legitimate (and IMO, expected) for a client driver to, for
-> example do a omap_dma_request() on module load and omap_free_dma() on
-> module unload and only use omap_start_dma() + callbacks for xfers.
-> It would be nice (and IMO, expected) that the channels would go idle
-> between xfers (using the autosuspend feature for timeouts.)
+On Tue, 25 Jan 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-I can use autosuspend feature which can handle if there is no free_dma and also
-if there is no callback registered by the client.
+> On 23:23 Mon 24 Jan     , Russell King - ARM Linux wrote:
+> > On Tue, Jan 25, 2011 at 10:51:38AM +1300, Ryan Mallon wrote:
+> > > You could, but it would not be helpful. Clock associations are used so
+> > > that _different_ devices can have the same function and map to the
+> > > correct clock. This is used when there are multiple instances of a
+> > > single peripheral. For example, the uart clocks work like this:
+> > > 
+> > > 	at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+> > > 
+> > > so then you can do this in a driver:
+> > > 	
+> > > 	uart_clk = clk_get(&pdev->dev, "usart");
+> > > 
+> > > Rather than:
+> > > 
+> > > 	uart_clk = clk_get(NULL, "usart1_clk");
+> > > 
+> > > The former will find the correct uart clock for the device. Because each
+> > > uart is a separate device the correct clock will be selected for each uart.
+> > > 	
+> > > My point was that there should be no overlap between clk->name and
+> > > clk->function otherwise clk_get will not be able to return the correct
+> > > clock.
+> > 
+> > It would be nice if AT91 could switch over to using clkdev at some
+> > point, which greatly helps with associating struct clk's with their
+> > device/function names - and reduces the amount of "different" code.
+> I working on it that's was one of the reason I move clkdev to drivers
+> as AT91 and AVR32 need to switch
 
-> 
-> > I can update this info in patch description if it is useful.
-> >
-> >> 
-> >> You're also calling _get() from the request.  That means, as long as the
-> >> DMA channel is allocated, it will be active.   
-> >> 
-> >> Wouldn't it be better to do the 'get' when the channel is started
-> >
-> > No. omap_dma_request will call omap_clear_dma which in turn access all channel
-> > specific registers for writing zeros.
-> 
-> Of course, you always have to do get/put around any device access.
-> 
-> >> and the 'put' when the callback has finished, possibly using the
-> >
-> > after omap_free_dma, none of the dma registers are accessed hence it is safe to
-> > use _put immediately after free_dma.
-> 
-> Right, but my point above is: what if the user does not call free_dma?
-> What if the client will be using the channel again sometime in the
-> future, but will be idle.   What I would expect is that the channel
-> could go idle until another xfer is initiated rather than waiting for
-> the channel to be freed.
-ok.
-> 
-> > Also, dma driver is not aware of callback completion status since it will be
-> > executed in client driver.
-> 
-> Why not?  DMA driver knows when the callback returns.
+Shall I just leave the patch as is then?
 
-You are right. We can get this info from DMA interrupt handler.
-
--Manjunath
-[...]
+julia
