@@ -1,61 +1,68 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 25 Jan 2011 17:33:14 +0000
-Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
-	asm/spinlock.h
-In-Reply-To: <20110125165919.GD17286@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
-	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
-	<20110125165919.GD17286@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+From: dwalker@codeaurora.org (Daniel Walker)
+Date: Tue, 25 Jan 2011 09:35:10 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <8yay669hka5.fsf@huya.qualcomm.com>
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
+	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
+	<8yak4htj0lb.fsf@huya.qualcomm.com>
+	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+	<8yay669hka5.fsf@huya.qualcomm.com>
+Message-ID: <1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 4:59 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jan 25, 2011 at 04:43:52PM +0000, Dave Martin wrote:
->> A couple of questions on this:
->>
->> 1) I notice these spinlock functions are generally marked inline.
->>
->> Is that likely to happen in modules? ?If so, there would be a need to
->> do SMP_ON_UP fixups at module load time -- I don't think that's
->> currently implemented.
->
-> No one should be using the arch_* spinlocks directly. ?The spinlocks
-> are implemented in out of line code in kernel/spinlock.c
+On Mon, 2011-01-24 at 16:57 -0800, David Brown wrote:
+> On Mon, Jan 24 2011, Daniel Walker wrote:
+> 
+> > On Mon, 2011-01-24 at 16:20 -0800, David Brown wrote:
+> >> On Mon, Jan 24 2011, Daniel Walker wrote:
+> >> 
+> >> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
+> >> >> +#define cpu_is_msm7x01()       0
+> >> >> +#define cpu_is_msm7x30()       0
+> >> >> +#define cpu_is_qsd8x50()       0
+> >> >> +#define cpu_is_msm8x60()       0
+> >> >
+> >> > Now that I look at this again, why not drop the "x" all together ?
+> >> 
+> >> That might be better for the 8x60.  The complexity is that most of the
+> >> MSM chips have some variants, where the CPU running Linux isn't changed,
+> >> but the modem CPU is different (think CDMA/UMTS).  Until 8960, that was
+> >> distinguished by the second letter.
+> >> 
+> >> Either way doesn't quite match reality, unfortunately.  There are
+> >> devices using a MSM7201 and others using a MSM7601.  As far as Linux is
+> >> concerned, there isn't any difference between them.  If someone wanted
+> >> to try and identify the device they have with the code, it could be
+> >> confusing for either name chosen.
+> >> 
+> >> I was planning on turning msm8x60 into msm8660, since that seems to be
+> >> the most common one.  Perhaps the decoder ring should be put into the
+> >> help text for the options so people can at least figure out which is
+> >> which.
+> >
+> > Are there any of those which do , right now, have Linux support for more
+> > than one variant ?
+> 
+> All of them, in fact.
+> 
+> MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
+> goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
+> of the two, and it doesn't matter which one you use.
+> 
+> MSM8960 is a completely different chip, it just shares a similar name,
+> to other chips.
 
-OK--- do think this is something we need a sanity-check for, or does
-this fall into to a category of bad driver implementation which will
-get thrown out during peer review?
+If you break it down without the "x" then you can recreate the "x"
+variant with the actual numerical identifier .. For 8660/8960 you just
+would do as much of a unification as with the others.. You could still
+use 8x60 to identify those two, you just wouldn't use it as often.
 
->
->> 2) When building with this patch and CONFIG_SMP_ON_UP=y, I've seen
->> vmlinux link errors like this:
->>
->> ? LD ? ? ?.tmp_vmlinux1
->> `.exit.text' referenced in section `.alt.smp.init' of
->> drivers/built-in.o: defined in discarded section `.exit.text' of
->> drivers/built-in.o
->> make: *** [.tmp_vmlinux1] Error 1
->>
->> I don't know whether this is caused by the patch directly or as a
->> side-effect -- I've only noticed it in the linaro-2.6.37 tree so far.
->> git bisect indentified this above patch as the first one with the
->> error in that case.
->>
->> I don't understand the section discarding logic too well, so I'm not
->> sure how to fix it for now...
->
-> Hmm. ?I don't see how that could happen, unless some driver is going
-> behind the spinlock APIs, or using our dsb_sev() directly.
->
-> I think you need to first track down what's responsible for inserting
-> architecture spinlock code into drivers.
->
+Daniel
 
-OK, I'll try and do a bit more digging.  I think I have a better idea
-of what to look for now, anyhow.
+-- 
 
-Cheers
----Dave
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
