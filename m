@@ -1,49 +1,181 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 24 Jan 2011 16:23:54 -0800
-Subject: [PATCH v2 01/11] msm: Add CPU queries
-In-Reply-To: <8yak4htj0lb.fsf@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
-	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
-	<8yak4htj0lb.fsf@huya.qualcomm.com>
-Message-ID: <1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 24 Jan 2011 16:26:01 -0800
+Subject: [PATCH] OMAP: PM: DMA: Enable runtime pm
+In-Reply-To: <20110124235205.GA6351@manju-desktop> (Manjunath Kondaiah G.'s
+	message of "Tue, 25 Jan 2011 05:22:05 +0530")
+References: <1295860819-20142-1-git-send-email-manjugk@ti.com>
+	<87d3nm7zb0.fsf@ti.com> <20110124235205.GA6351@manju-desktop>
+Message-ID: <871v414yna.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-01-24 at 16:20 -0800, David Brown wrote:
-> On Mon, Jan 24 2011, Daniel Walker wrote:
-> 
-> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
-> >> +#define cpu_is_msm7x01()       0
-> >> +#define cpu_is_msm7x30()       0
-> >> +#define cpu_is_qsd8x50()       0
-> >> +#define cpu_is_msm8x60()       0
-> >
-> > Now that I look at this again, why not drop the "x" all together ?
-> 
-> That might be better for the 8x60.  The complexity is that most of the
-> MSM chips have some variants, where the CPU running Linux isn't changed,
-> but the modem CPU is different (think CDMA/UMTS).  Until 8960, that was
-> distinguished by the second letter.
-> 
-> Either way doesn't quite match reality, unfortunately.  There are
-> devices using a MSM7201 and others using a MSM7601.  As far as Linux is
-> concerned, there isn't any difference between them.  If someone wanted
-> to try and identify the device they have with the code, it could be
-> confusing for either name chosen.
-> 
-> I was planning on turning msm8x60 into msm8660, since that seems to be
-> the most common one.  Perhaps the decoder ring should be put into the
-> help text for the options so people can at least figure out which is
-> which.
+"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 
-Are there any of those which do , right now, have Linux support for more
-than one variant ?
+> Kevin,
+>
+> On Mon, Jan 24, 2011 at 01:43:31PM -0800, Kevin Hilman wrote:
+>> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+>> 
+>> > From: Manjunath G Kondaiah <manjugk@ti.com>
+>> >
+>> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put
+>> > for OMAP DMA driver.
+>> >
+>> > Since DMA driver callback will happen from interrupt context and
+>> > DMA client driver will release all DMA resources from interrupt
+>> > context itself, pm_runtime_put_sync() cannot be used in DMA driver.
+>> > Instead, pm_runtime_put() is used which is asynchronous call and
+>> > gets executed in work queue.
+>> 
+>> It's fine that the asynchronous version of put is uses (it's actually
+>> preferred.)  However, the description is confusing here.  You talk about
+>> driver callbacks here but in the patch, your calling _put() from
+>> omap_dma_free(), not from the callback.
+>
+> All dma client drivers are calling omap_dma_free from callback
+> context. 
 
-Daniel
+Maybe so, but that's not a requirement of the API.  I have a DMA test
+driver that doesn't do that.
 
--- 
+It's also legitimate (and IMO, expected) for a client driver to, for
+example do a omap_dma_request() on module load and omap_free_dma() on
+module unload and only use omap_start_dma() + callbacks for xfers.
+It would be nice (and IMO, expected) that the channels would go idle
+between xfers (using the autosuspend feature for timeouts.)
 
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> I can update this info in patch description if it is useful.
+>
+>> 
+>> You're also calling _get() from the request.  That means, as long as the
+>> DMA channel is allocated, it will be active.   
+>> 
+>> Wouldn't it be better to do the 'get' when the channel is started
+>
+> No. omap_dma_request will call omap_clear_dma which in turn access all channel
+> specific registers for writing zeros.
+
+Of course, you always have to do get/put around any device access.
+
+>> and the 'put' when the callback has finished, possibly using the
+>
+> after omap_free_dma, none of the dma registers are accessed hence it is safe to
+> use _put immediately after free_dma.
+
+Right, but my point above is: what if the user does not call free_dma?
+What if the client will be using the channel again sometime in the
+future, but will be idle.   What I would expect is that the channel
+could go idle until another xfer is initiated rather than waiting for
+the channel to be freed.
+
+> Also, dma driver is not aware of callback completion status since it will be
+> executed in client driver.
+
+Why not?  DMA driver knows when the callback returns.
+
+Kevin
+
+>> 'autosuspend' feature with a timeout so that back-to-back DMA transfers
+>> will not have have additional latency between transfers?
+>> 
+>> > Boot tested on OMAP4 blaze and all applicable tests are executed
+>> > along with dma hwmod series.
+>> 
+>> Any OMAP2 or OMAP3 testing?
+>> 
+>> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
+>> > ---
+>> > Discussion and alignment for using runtime API's in DMA can be accessed at:
+>> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37819.html
+>> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38355.html
+>> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38391.html
+>> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38400.html
+>> >
+>> >  arch/arm/plat-omap/dma.c |   18 +++++++++++++++++-
+>> >  1 files changed, 17 insertions(+), 1 deletions(-)
+>> >
+>> > diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+>> > index c4b2b47..48ee292 100644
+>> > --- a/arch/arm/plat-omap/dma.c
+>> > +++ b/arch/arm/plat-omap/dma.c
+>> > @@ -35,6 +35,7 @@
+>> >  #include <linux/io.h>
+>> >  #include <linux/slab.h>
+>> >  #include <linux/delay.h>
+>> > +#include <linux/pm_runtime.h>
+>> >  
+>> >  #include <asm/system.h>
+>> >  #include <mach/hardware.h>
+>> > @@ -58,6 +59,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
+>> >  #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
+>> >  
+>> >  static struct omap_system_dma_plat_info *p;
+>> > +static struct platform_device           *pd;
+>> >  static struct omap_dma_dev_attr *d;
+>> >  
+>> >  static int enable_1510_mode;
+>> > @@ -676,6 +678,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
+>> >  	unsigned long flags;
+>> >  	struct omap_dma_lch *chan;
+>> >  
+>> > +	pm_runtime_get_sync(&pd->dev);
+>> >  	spin_lock_irqsave(&dma_chan_lock, flags);
+>> >  	for (ch = 0; ch < dma_chan_count; ch++) {
+>> >  		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
+>> > @@ -686,6 +689,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
+>> >  	}
+>> >  	if (free_ch == -1) {
+>> >  		spin_unlock_irqrestore(&dma_chan_lock, flags);
+>> > +		pm_runtime_put(&pd->dev);
+>> >  		return -EBUSY;
+>> >  	}
+>> >  	chan = dma_chan + free_ch;
+>> > @@ -779,7 +783,7 @@ void omap_free_dma(int lch)
+>> >  		p->dma_write(0, CCR, lch);
+>> >  		omap_clear_dma(lch);
+>> >  	}
+>> > -
+>> > +	pm_runtime_put(&pd->dev);
+>> >  	spin_lock_irqsave(&dma_chan_lock, flags);
+>> >  	dma_chan[lch].dev_id = -1;
+>> >  	dma_chan[lch].next_lch = -1;
+>> > @@ -1979,6 +1983,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
+>> >  		return -EINVAL;
+>> >  	}
+>> >  
+>> > +	pd			= pdev;
+>> 
+>> minor: platform_device pointers are more commonly named pdev
+>> 
+>> >  	d			= p->dma_attr;
+>> >  	errata			= p->errata;
+>> >  
+>> > @@ -2000,6 +2005,9 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
+>> >  		}
+>> >  	}
+>> >  
+>> > +	pm_runtime_enable(&pd->dev);
+>> > +	pm_runtime_get_sync(&pd->dev);
+>> > +
+>> >  	spin_lock_init(&dma_chan_lock);
+>> >  	for (ch = 0; ch < dma_chan_count; ch++) {
+>> >  		omap_clear_dma(ch);
+>> > @@ -2065,6 +2073,14 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
+>> >  		dma_chan[1].dev_id = 1;
+>> >  	}
+>> >  	p->show_dma_caps();
+>> > +
+>> > +	/*
+>> > +	 * Note: If dma channels are reserved through boot paramters,
+>> > +	 * then dma device is always enabled.
+>> > +	 */
+>> > +	if (!omap_dma_reserve_channels)
+>> > +		pm_runtime_put(&pd->dev);
+>> > +
+>> 
+>> Readability would be improved if there was an unconditional
+>> pm_runtime_put() at the end of this function preceeded by an extra
+>> pm_runtime_get() (async version) if reserve_channels has been used.
+> ok. I will update.
+>
+> -Manjunath
