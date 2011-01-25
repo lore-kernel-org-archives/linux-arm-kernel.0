@@ -1,31 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Jan 2011 12:45:24 +0000
-Subject: questions about arm trustzone
-In-Reply-To: <AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
-References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
-	<8yad3nlh18e.fsf@huya.qualcomm.com>
-	<AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
-	<20110125102652.GB11507@n2100.arm.linux.org.uk>
-	<bb0c3855a121603232d022b4062752a6@mail.gmail.com>
-	<AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
-Message-ID: <20110125124524.GJ11507@n2100.arm.linux.org.uk>
+Date: Tue, 25 Jan 2011 12:56:56 +0000
+Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
+In-Reply-To: <4534e82bf14eeea9f96769df760df5ae@mail.gmail.com>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-5-git-send-email-santosh.shilimkar@ti.com>
+	<20110125114635.GB13300@n2100.arm.linux.org.uk>
+	<236d45e400a960cc3b32db538b3a79ae@mail.gmail.com>
+	<20110125121655.GD13300@n2100.arm.linux.org.uk>
+	<4534e82bf14eeea9f96769df760df5ae@mail.gmail.com>
+Message-ID: <20110125125656.GG13300@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 12:24:13PM +0000, Dave Martin wrote:
-> Avoiding this complexity is one of the motivations for using r7 for
-> the syscall number with CONFIG_EABI (instead of using the SVC comment
-> field).
+On Tue, Jan 25, 2011 at 06:06:27PM +0530, Santosh Shilimkar wrote:
+> Ok. I missed some information my last email.
+> The SCU power status programming is used to take CPU in/out
+> of coherency as an alternative to SMP bit. We don't
+> have an access to SMP bit on OMAP4. ARM has already
+> confirmed SCU programming is same as SMP bit enable/disable.
+> 
+> I don't know how safe is to use spin lock when one CPU is
+> goes out of coherency after programming the power state. The
+> spin lock release may not even be visible to other CPU.
 
-Your history is not entirely correct.
+Erm, I do hope that's not the case, as that means it is unsafe for CPUs in
+a SMP system to write to this register without them potentially trampling
+over each other.
 
-I had the kernel side of Thumb userspace support in place long before EABI
-came along.  Thumb doesn't have a large enough comment field to store the
-Linux syscall number, so to get around that problem, I decided to use r7
-for the syscall number.  You'll find 2.4 kernels support Thumb instructions
-in userspace.
+If it is the case, then the solutions are either:
+1. Fix the hardware so that coherency requests only yet turned off
+   when entering the WFI state.
+2. Fix the hardware such that each CPU has a separate register.
 
-As part of the EABI switch for ARM mode - which created an incompatible
-SWI interface anyway, we decided that we could reduce data cache pollution
-by eliminating the read of the SWI instruction, so we adopted the r7
-method for ARM EABI mode.
+I can't see a software solution to this as we can't use ldrex/strex anything
+but memory regions, and memory regions without coherency won't work.
+Maybe ARM Support can help by suggesting how a 4-CPU system is supposed
+to safely read/modify/write the SCU power control register...
