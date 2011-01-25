@@ -1,283 +1,56 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 25 Jan 2011 18:22:37 +0100
-Subject: [PATCH v2] OMAP: use fncpy to copy the PM code functions to SRAM
-In-Reply-To: <AANLkTin5k7q0Vfy7MGKPSxP3b_h0RUHmKEWTtV7iYbWm@mail.gmail.com>
-References: <1295352126-29171-1-git-send-email-j-pihet@ti.com>
-	<AANLkTinT8YZn3igYBqSdOZURzof3d_hX_QwRccPe=7Vi@mail.gmail.com>
-	<AANLkTi=NO1ewna_rNPwj-kHUtuyo0ay3CdC+mX=Ttq-6@mail.gmail.com>
-	<AANLkTin5k7q0Vfy7MGKPSxP3b_h0RUHmKEWTtV7iYbWm@mail.gmail.com>
-Message-ID: <AANLkTi=LKMm9Rs7wgMrQP9ivSa-f0ubUvYqOJRJw4=Q+@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 25 Jan 2011 18:23:47 +0100
+Subject: [PATCH 2/4] arch/arm/mach-at91/clock.c: Add missing IS_ERR test
+In-Reply-To: <Pine.LNX.4.64.1101250712110.29909@ask.diku.dk>
+References: <4D3DDD07.1030809@bluewatersys.com>
+	<Pine.LNX.4.64.1101242126570.3167@ask.diku.dk>
+	<4D3DE35B.1030102@bluewatersys.com>
+	<Pine.LNX.4.64.1101242200500.3167@ask.diku.dk>
+	<4D3DE9CD.2040800@bluewatersys.com>
+	<Pine.LNX.4.64.1101242231240.3167@ask.diku.dk>
+	<4D3DF46A.1030009@bluewatersys.com>
+	<20110124232302.GQ24104@n2100.arm.linux.org.uk>
+	<20110125014428.GO24284@game.jcrosoft.org>
+	<Pine.LNX.4.64.1101250712110.29909@ask.diku.dk>
+Message-ID: <20110125172347.GC1441@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 11:33 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Mon, Jan 24, 2011 at 5:25 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
->> Hi,
->>
->> On Mon, Jan 24, 2011 at 5:11 PM, Dave Martin <dave.martin@linaro.org> wrote:
->>> Hi there, I just spotted a couple of things merging your patch...
->>>
->>> On Tue, Jan 18, 2011 at 12:02 PM, ?<jean.pihet@newoldbits.com> wrote:
->>>> From: Jean Pihet <j-pihet@ti.com>
->>>>
->>>> The new fncpy API is better suited for copying some
->>>> code to SRAM at runtime. This patch changes the ad-hoc
->>>> code to the more generic fncpy API.
->>>>
->>>> Tested OK on OMAP3 in low power modes (RET/OFF)
->>>> using omap2plus_defconfig with !CONFIG_THUMB2_KERNEL.
->>>> Compile tested on OMAP1/2 using omap1_defconfig.
->>>>
->>>> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->>>> ---
->>>> ?arch/arm/mach-omap1/pm.h ? ? ? ? ? ? ? | ? ?6 +++---
->>>> ?arch/arm/mach-omap1/sleep.S ? ? ? ? ? ?| ? ?3 +++
->>>> ?arch/arm/mach-omap1/sram.S ? ? ? ? ? ? | ? ?1 +
->>>> ?arch/arm/mach-omap2/pm.h ? ? ? ? ? ? ? | ? ?2 +-
->>>> ?arch/arm/mach-omap2/sleep24xx.S ? ? ? ?| ? ?2 ++
->>>> ?arch/arm/mach-omap2/sleep34xx.S ? ? ? ?| ? ?2 ++
->>>> ?arch/arm/mach-omap2/sram242x.S ? ? ? ? | ? ?3 +++
->>>> ?arch/arm/mach-omap2/sram243x.S ? ? ? ? | ? ?3 +++
->>>> ?arch/arm/mach-omap2/sram34xx.S ? ? ? ? | ? ?1 +
->>>> ?arch/arm/plat-omap/include/plat/sram.h | ? 14 +++++++++++++-
->>>> ?arch/arm/plat-omap/sram.c ? ? ? ? ? ? ?| ? 14 +++++++++-----
->>>> ?11 files changed, 41 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap1/pm.h b/arch/arm/mach-omap1/pm.h
->>>> index 56a6479..cd926dc 100644
->>>> --- a/arch/arm/mach-omap1/pm.h
->>>> +++ b/arch/arm/mach-omap1/pm.h
->>>> @@ -123,9 +123,9 @@ extern void allow_idle_sleep(void);
->>>> ?extern void omap1_pm_idle(void);
->>>> ?extern void omap1_pm_suspend(void);
->>>>
->>>> -extern void omap7xx_cpu_suspend(unsigned short, unsigned short);
->>>> -extern void omap1510_cpu_suspend(unsigned short, unsigned short);
->>>> -extern void omap1610_cpu_suspend(unsigned short, unsigned short);
->>>> +extern void omap7xx_cpu_suspend(unsigned long, unsigned long);
->>>> +extern void omap1510_cpu_suspend(unsigned long, unsigned long);
->>>> +extern void omap1610_cpu_suspend(unsigned long, unsigned long);
->>>> ?extern void omap7xx_idle_loop_suspend(void);
->>>> ?extern void omap1510_idle_loop_suspend(void);
->>>> ?extern void omap1610_idle_loop_suspend(void);
->>>> diff --git a/arch/arm/mach-omap1/sleep.S b/arch/arm/mach-omap1/sleep.S
->>>> index ef771ce..c875bdc 100644
->>>> --- a/arch/arm/mach-omap1/sleep.S
->>>> +++ b/arch/arm/mach-omap1/sleep.S
->>>> @@ -58,6 +58,7 @@
->>>> ?*/
->>>>
->>>> ?#if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap7xx_cpu_suspend)
->>>>
->>>> ? ? ? ?@ save registers on stack
->>>> @@ -137,6 +138,7 @@ ENTRY(omap7xx_cpu_suspend_sz)
->>>> ?#endif /* CONFIG_ARCH_OMAP730 || CONFIG_ARCH_OMAP850 */
->>>>
->>>> ?#ifdef CONFIG_ARCH_OMAP15XX
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap1510_cpu_suspend)
->>>>
->>>> ? ? ? ?@ save registers on stack
->>>> @@ -211,6 +213,7 @@ ENTRY(omap1510_cpu_suspend_sz)
->>>> ?#endif /* CONFIG_ARCH_OMAP15XX */
->>>>
->>>> ?#if defined(CONFIG_ARCH_OMAP16XX)
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap1610_cpu_suspend)
->>>>
->>>> ? ? ? ?@ save registers on stack
->>>> diff --git a/arch/arm/mach-omap1/sram.S b/arch/arm/mach-omap1/sram.S
->>>> index 7724e52..692587d 100644
->>>> --- a/arch/arm/mach-omap1/sram.S
->>>> +++ b/arch/arm/mach-omap1/sram.S
->>>> @@ -18,6 +18,7 @@
->>>> ?/*
->>>> ?* Reprograms ULPD and CKCTL.
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap1_sram_reprogram_clock)
->>>> ? ? ? ?stmfd ? sp!, {r0 - r12, lr} ? ? ? ? ? ? @ save registers on stack
->>>>
->>>> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
->>>> index 1c1b0ab..39580e6 100644
->>>> --- a/arch/arm/mach-omap2/pm.h
->>>> +++ b/arch/arm/mach-omap2/pm.h
->>>> @@ -92,7 +92,7 @@ extern void omap24xx_idle_loop_suspend(void);
->>>> ?extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
->>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?void __iomem *sdrc_power);
->>>> ?extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
->>>> -extern void save_secure_ram_context(u32 *addr);
->>>> +extern int save_secure_ram_context(u32 *addr);
->>>> ?extern void omap3_save_scratchpad_contents(void);
->>>>
->>>> ?extern unsigned int omap24xx_idle_loop_suspend_sz;
->>>> diff --git a/arch/arm/mach-omap2/sleep24xx.S b/arch/arm/mach-omap2/sleep24xx.S
->>>> index c7780cc..b5071a4 100644
->>>> --- a/arch/arm/mach-omap2/sleep24xx.S
->>>> +++ b/arch/arm/mach-omap2/sleep24xx.S
->>>> @@ -47,6 +47,7 @@
->>>> ?* Note: This code get's copied to internal SRAM at boot. When the OMAP
->>>> ?* ? ? ?wakes up it continues execution at the point it went to sleep.
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap24xx_idle_loop_suspend)
->>>> ? ? ? ?stmfd ? sp!, {r0, lr} ? ? ? ? ? @ save registers on stack
->>>> ? ? ? ?mov ? ? r0, #0 ? ? ? ? ? ? ? ? ?@ clear for mcr setup
->>>> @@ -82,6 +83,7 @@ ENTRY(omap24xx_idle_loop_suspend_sz)
->>>> ?* The DLL load value is not kept in RETENTION or OFF. It needs to be restored
->>>> ?* at wake
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap24xx_cpu_suspend)
->>>> ? ? ? ?stmfd ? sp!, {r0 - r12, lr} ? ? @ save registers on stack
->>>> ? ? ? ?mov ? ? r3, #0x0 ? ? ? ? ? ? ? ?@ clear for mcr call
->>>> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
->>>> index 98d8232..951a0be 100644
->>>> --- a/arch/arm/mach-omap2/sleep34xx.S
->>>> +++ b/arch/arm/mach-omap2/sleep34xx.S
->>>> @@ -118,6 +118,7 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
->>>>
->>>> ? ? ? ?.text
->>>> ?/* Function to call rom code to save secure ram context */
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(save_secure_ram_context)
->>>> ? ? ? ?stmfd ? sp!, {r1-r12, lr} ? ? ? @ save registers on stack
->>>> ? ? ? ?adr ? ? r3, api_params ? ? ? ? ?@ r3 points to parameters
->>>> @@ -169,6 +170,7 @@ ENTRY(save_secure_ram_context_sz)
->>>> ?* ? depending on the low power mode (non-OFF vs OFF modes),
->>>> ?* ? cf. 'Resume path for xxx mode' comments.
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap34xx_cpu_suspend)
->>>> ? ? ? ?stmfd ? sp!, {r0-r12, lr} ? ? ? @ save registers on stack
->>>>
->>>> diff --git a/arch/arm/mach-omap2/sram242x.S b/arch/arm/mach-omap2/sram242x.S
->>>> index 055310c..ff9b9db 100644
->>>> --- a/arch/arm/mach-omap2/sram242x.S
->>>> +++ b/arch/arm/mach-omap2/sram242x.S
->>>> @@ -39,6 +39,7 @@
->>>>
->>>> ? ? ? ?.text
->>>>
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap242x_sram_ddr_init)
->>>> ? ? ? ?stmfd ? sp!, {r0 - r12, lr} ? ? @ save registers on stack
->>>>
->>>> @@ -143,6 +144,7 @@ ENTRY(omap242x_sram_ddr_init_sz)
->>>> ?* r0 = [PRCM_FULL | PRCM_HALF] r1 = SDRC_DLLA_CTRL value r2 = [DDR | SDR]
->>>> ?* PRCM_FULL = 2, PRCM_HALF = 1, DDR = 1, SDR = 0
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap242x_sram_reprogram_sdrc)
->>>> ? ? ? ?stmfd ? sp!, {r0 - r10, lr} ? ? @ save registers on stack
->>>> ? ? ? ?mov ? ? r3, #0x0 ? ? ? ? ? ? ? ?@ clear for mrc call
->>>> @@ -238,6 +240,7 @@ ENTRY(omap242x_sram_reprogram_sdrc_sz)
->>>> ?/*
->>>> ?* Set dividers and pll. Also recalculate DLL value for DDR and unlock mode.
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap242x_sram_set_prcm)
->>>> ? ? ? ?stmfd ? sp!, {r0-r12, lr} ? ? ? @ regs to stack
->>>> ? ? ? ?adr ? ? r4, pbegin ? ? ? ? ? ? ?@ addr of preload start
->>>> diff --git a/arch/arm/mach-omap2/sram243x.S b/arch/arm/mach-omap2/sram243x.S
->>>> index f900758..7673020 100644
->>>> --- a/arch/arm/mach-omap2/sram243x.S
->>>> +++ b/arch/arm/mach-omap2/sram243x.S
->>>> @@ -39,6 +39,7 @@
->>>>
->>>> ? ? ? ?.text
->>>>
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap243x_sram_ddr_init)
->>>> ? ? ? ?stmfd ? sp!, {r0 - r12, lr} ? ? @ save registers on stack
->>>>
->>>> @@ -143,6 +144,7 @@ ENTRY(omap243x_sram_ddr_init_sz)
->>>> ?* r0 = [PRCM_FULL | PRCM_HALF] r1 = SDRC_DLLA_CTRL value r2 = [DDR | SDR]
->>>> ?* PRCM_FULL = 2, PRCM_HALF = 1, DDR = 1, SDR = 0
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap243x_sram_reprogram_sdrc)
->>>> ? ? ? ?stmfd ? sp!, {r0 - r10, lr} ? ? @ save registers on stack
->>>> ? ? ? ?mov ? ? r3, #0x0 ? ? ? ? ? ? ? ?@ clear for mrc call
->>>> @@ -238,6 +240,7 @@ ENTRY(omap243x_sram_reprogram_sdrc_sz)
->>>> ?/*
->>>> ?* Set dividers and pll. Also recalculate DLL value for DDR and unlock mode.
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap243x_sram_set_prcm)
->>>> ? ? ? ?stmfd ? sp!, {r0-r12, lr} ? ? ? @ regs to stack
->>>> ? ? ? ?adr ? ? r4, pbegin ? ? ? ? ? ? ?@ addr of preload start
->>>> diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
->>>> index 7f893a2..25011ca 100644
->>>> --- a/arch/arm/mach-omap2/sram34xx.S
->>>> +++ b/arch/arm/mach-omap2/sram34xx.S
->>>> @@ -111,6 +111,7 @@
->>>> ?* since it will cause the ARM MMU to attempt to walk the page tables.
->>>> ?* These crashes may be intermittent.
->>>> ?*/
->>>> + ? ? ? .align ?3
->>>> ?ENTRY(omap3_sram_configure_core_dpll)
->>>> ? ? ? ?stmfd ? sp!, {r1-r12, lr} ? ? ? @ store regs to stack
->>>>
->>>> diff --git a/arch/arm/plat-omap/include/plat/sram.h b/arch/arm/plat-omap/include/plat/sram.h
->>>> index 9967d5e..d673f2c 100644
->>>> --- a/arch/arm/plat-omap/include/plat/sram.h
->>>> +++ b/arch/arm/plat-omap/include/plat/sram.h
->>>> @@ -12,7 +12,19 @@
->>>> ?#define __ARCH_ARM_OMAP_SRAM_H
->>>>
->>>> ?#ifndef __ASSEMBLY__
->>>> -extern void * omap_sram_push(void * start, unsigned long size);
->>>> +#include <asm/fncpy.h>
->>>> +
->>>> +extern void *omap_sram_push_address(unsigned long size);
->>>> +
->>>> +/* Macro to push a function to the internal SRAM, using the fncpy API */
->>>> +#define omap_sram_push(funcp, size) ({ ? ? ? ? ? ? ? ? ? ? ? ? \
->>>> + ? ? ? typeof(&funcp) _res = NULL; ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
->>>
->>> 1) For fncpy() itself, I decided not to take the address of funcp
->>> inside the macro: the reason for this was that if you do this, the
->>> macro will silently do something silly if called with a function
->>> pointer instead of the function itself -- i.e., some memory starting
->>> at the stored function pointer itself will be copied instead of the
->>> function body.
->>>
->>> Forcing the caller to supply the '&' is a bit ugly, but I decided it
->>> was preferable from a safety standpoint.
->>>
->>> This doesn't necessarily mean that omap_sram_push can't add the '&',
->>> but if you do, you need to be careful how the macro is called. ?It
->>> will work for all existing uses of omap_sram_push, IIUC.
->> I am OK with that.
->> In the first place it was not obvious that the '&' was needed but the
->> compiler quickly reminded me about it. The type checking is one of the
->> advantages of the new API.
->>
->>>
->>> 2) Should this be &(funcp)? ?This will only matter for pretty weird
->>> uses though. ?Currently most weird uses won't work properly anyway,
->>> because of (1). ?So this might not be much of a concern.
->>>
->>>> + ? ? ? void *_sram_address = omap_sram_push_address(size); ? ? \
->>>> + ? ? ? if (_sram_address) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
->>>> + ? ? ? ? ? ? ? _res = fncpy(_sram_address, &funcp, size); ? ? ?\
->>>
->>> &(funcp)
->> Yes that is correct but the current code does not have problem since
->> the functions to push have 'non-weird' types.
->> If needed I can change that.
->
-> Fair enough. Because of the way omap_sram_push is used I think this
-> isn't a significant risk -- just thought it was worth pointing out.
-OK!
-Just sent an extra patch '[PATCH] OMAP: fix fncpy API call' for completeness.
+On 07:12 Tue 25 Jan     , Julia Lawall wrote:
+> On Tue, 25 Jan 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> > On 23:23 Mon 24 Jan     , Russell King - ARM Linux wrote:
+> > > On Tue, Jan 25, 2011 at 10:51:38AM +1300, Ryan Mallon wrote:
+> > > > You could, but it would not be helpful. Clock associations are used so
+> > > > that _different_ devices can have the same function and map to the
+> > > > correct clock. This is used when there are multiple instances of a
+> > > > single peripheral. For example, the uart clocks work like this:
+> > > > 
+> > > > 	at91_clock_associate("usart1_clk", &pdev->dev, "usart");
+> > > > 
+> > > > so then you can do this in a driver:
+> > > > 	
+> > > > 	uart_clk = clk_get(&pdev->dev, "usart");
+> > > > 
+> > > > Rather than:
+> > > > 
+> > > > 	uart_clk = clk_get(NULL, "usart1_clk");
+> > > > 
+> > > > The former will find the correct uart clock for the device. Because each
+> > > > uart is a separate device the correct clock will be selected for each uart.
+> > > > 	
+> > > > My point was that there should be no overlap between clk->name and
+> > > > clk->function otherwise clk_get will not be able to return the correct
+> > > > clock.
+> > > 
+> > > It would be nice if AT91 could switch over to using clkdev at some
+> > > point, which greatly helps with associating struct clk's with their
+> > > device/function names - and reduces the amount of "different" code.
+> > I working on it that's was one of the reason I move clkdev to drivers
+> > as AT91 and AVR32 need to switch
+> 
+> Shall I just leave the patch as is then?
+I'll try to send a patch before chinese new year
 
-> Cheers
-> ---Dave
->
-
-Cheers,
-Jean
+Best Regards,
+J.
