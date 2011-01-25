@@ -1,70 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Jan 2011 15:41:33 +0000
-Subject: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support for
-	re-enabling l2x0
-In-Reply-To: <1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
-References: <1295834493-5019-1-git-send-email-ccross@android.com>
-	<1295834493-5019-5-git-send-email-ccross@android.com>
-	<1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110125154133.GB17280@n2100.arm.linux.org.uk>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Tue, 25 Jan 2011 21:16:37 +0530
+Subject: [PATCH] ARM: OMAP2: use early init hook
+In-Reply-To: <20110124201731.GC13589@atomide.com>
+References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
+	<20110123174814.GI30094@n2100.arm.linux.org.uk>
+	<20110124201731.GC13589@atomide.com>
+Message-ID: <AANLkTi=PqUBrrZwWbipXDNxoKrcX8MefZjdeaOrgPApV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 03:14:24PM +0000, Catalin Marinas wrote:
-> On Mon, 2011-01-24 at 02:01 +0000, Colin Cross wrote:
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -252,16 +252,26 @@ static void l2x0_flush_range(unsigned long start, unsigned long end)
-> >         spin_unlock_irqrestore(&l2x0_lock, flags);
-> >  }
-> > 
-> > +/* enables l2x0 after l2x0_disable, does not invalidate */
-> > +void l2x0_enable(void)
-> > +{
-> > +       unsigned long flags;
-> > +
-> > +       spin_lock_irqsave(&l2x0_lock, flags);
-> > +       writel_relaxed(1, l2x0_base + L2X0_CTRL);
-> > +       spin_unlock_irqrestore(&l2x0_lock, flags);
-> > +}
-> > +
-> >  static void l2x0_disable(void)
-> >  {
-> >         unsigned long flags;
-> > 
-> >         spin_lock_irqsave(&l2x0_lock, flags);
-> > -       writel(0, l2x0_base + L2X0_CTRL);
-> > +       writel_relaxed(0, l2x0_base + L2X0_CTRL);
-> >         spin_unlock_irqrestore(&l2x0_lock, flags);
-> >  }
-> > 
-> > -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
-> > +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
-> >  {
-> >         __u32 aux;
-> >         __u32 cache_id;
-> 
-> So this assumes that the L2 registers are accessible. I suspect the
-> platform code calling it should know this.
-> 
-> The patch looks fine.
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On Tue, Jan 25, 2011 at 1:47 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110123 09:47]:
+>> On Sun, Jan 23, 2011 at 05:13:44PM +0000, Russell King - ARM Linux wrote:
+>> > Move non-mapping and non-irq initialization code out of .map_io and
+>> > .init_irq respectively into the new init_early hook.
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > ---
+>> > I think I've updated this patch correctly for the new platforms merged
+>> > into mainline.
+>>
+>> Grr, this breaks on OMAP because some of this stuff wants to do ioremap()
+>> and therefore wants the kmem allocators initialized. ?That's rather
+>> annoying...
+>
+> So far tested on zoom3 only, but the following gets it booting
+> on top of your patch.
+>
+> Want to take this one into your series?
+>
+> Meanwhile, I'll add these both into our omap-testing branch
+> for some more testing.
+>
+> Regards,
+>
+> Tony
+>
+>
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Mon, 24 Jan 2011 11:56:37 -0800
+> Subject: [PATCH] omap2+: Fix omap_serial_early_init to work with init_early hook
+>
+> The new init_early hook happens at the end of setup_arch,
+> which is too early for kzalloc. However, there's no need
+> to call omap_serial_early_init that early, so fix this
+> by setting it up as a subsys_initcall.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -400,8 +400,6 @@ void __init omap2_init_common_infrastructure(void)
+> ?void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct omap_sdrc_params *sdrc_cs1)
+> ?{
+> - ? ? ? omap_serial_early_init();
+> -
+> ? ? ? ?omap_hwmod_late_init();
+>
+> ? ? ? ?if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -655,7 +655,7 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
+> ?}
+> ?#endif
+>
+> -void __init omap_serial_early_init(void)
+> +static int __init omap_serial_early_init(void)
+> ?{
+> ? ? ? ?int i = 0;
+>
+> @@ -691,7 +691,10 @@ void __init omap_serial_early_init(void)
+> ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ?uart->oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
+> ? ? ? ?} while (1);
+> +
+> + ? ? ? return 0;
+> ?}
+> +subsys_initcall(omap_serial_early_init);
+>
+> ?/**
+> ?* omap_serial_init_port() - initialize single serial port
+> --- a/arch/arm/plat-omap/include/plat/serial.h
+> +++ b/arch/arm/plat-omap/include/plat/serial.h
+> @@ -96,7 +96,6 @@
+>
+> ?struct omap_board_data;
+>
+> -extern void __init omap_serial_early_init(void);
+> ?extern void omap_serial_init(void);
+> ?extern void omap_serial_init_port(struct omap_board_data *bdata);
+> ?extern int omap_uart_can_sleep(void);
+> --
 
-I think we need to come up with some proper way to deal with cpuidle
-which doesn't involve adding lots of globally visible functions to all
-sorts of bits of code and having platforms call them individually,
-otherwise this is going to get _really_ messy in the future.
-
-Maybe we need a notifier list which can be told when cpuidle events
-happen, so that parts of the system such as VFP and L2 cache support
-can do the right thing without having platforms add lots of stuff like
-
-	gic_secondary_init();
-	gic_restore_interrupt_types();
-	vfp_enable();
-	l2x0_enable();
-	twd_enable();
-	... etc ...
-
-in their SoC specific code.
+Just FYI, I observed similar results on OMAP4 for these patches.
+For OMAP2420, OMAP2430 and OMAP3430 SDPs, you can add my boot
+Tested-by: Sourav Poddar<sourav.poddar@ti.com>
