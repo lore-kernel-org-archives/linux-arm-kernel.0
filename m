@@ -1,110 +1,61 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 25 Jan 2011 09:33:59 +0900
-Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
-In-Reply-To: <20110124175807.GA27427@n2100.arm.linux.org.uk>
-References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
-	<1295544047.9039.609.camel@nimitz>
-	<20110120180146.GH6335@n2100.arm.linux.org.uk>
-	<1295547087.9039.694.camel@nimitz>
-	<20110123180532.GA3509@n2100.arm.linux.org.uk>
-	<1295887937.11047.119.camel@nimitz>
-	<20110124175807.GA27427@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikK4oGx1dNTDfxketVr2kPdrg=WsrOXThVD6_U2@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 24 Jan 2011 16:57:54 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com> (Daniel
+	Walker's message of "Mon, 24 Jan 2011 16:23:54 -0800")
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
+	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
+	<8yak4htj0lb.fsf@huya.qualcomm.com>
+	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <8yay669hka5.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 2:58 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 24, 2011 at 08:52:17AM -0800, Dave Hansen wrote:
->> On Sun, 2011-01-23 at 18:05 +0000, Russell King - ARM Linux wrote:
->> > On Thu, Jan 20, 2011 at 10:11:27AM -0800, Dave Hansen wrote:
->> > > On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
->> > > > > The x86 version of show_mem() actually manages to do this without any
->> > > > > #ifdefs, and works for a ton of configuration options. ?It uses
->> > > > > pfn_valid() to tell whether it can touch a given pfn.
->> > > >
->> > > > x86 memory layout tends to be very simple as it expects memory to
->> > > > start at the beginning of every region described by a pgdat and extend
->> > > > in one contiguous block. ?I wish ARM was that simple.
->> > >
->> > > x86 memory layouts can be pretty funky and have been that way for a long
->> > > time. ?That's why we *have* to handle holes in x86's show_mem(). ?My
->> > > laptop even has a ~1GB hole in its ZONE_DMA32:
+On Mon, Jan 24 2011, Daniel Walker wrote:
+
+> On Mon, 2011-01-24 at 16:20 -0800, David Brown wrote:
+>> On Mon, Jan 24 2011, Daniel Walker wrote:
+>> 
+>> > On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
+>> >> +#define cpu_is_msm7x01()       0
+>> >> +#define cpu_is_msm7x30()       0
+>> >> +#define cpu_is_qsd8x50()       0
+>> >> +#define cpu_is_msm8x60()       0
 >> >
->> > If x86 is soo funky, I suggest you try the x86 version of show_mem()
->> > on an ARM platform with memory holes. ?Make sure you try it with
->> > sparsemem as well...
->>
->> x86 uses the generic lib/ show_mem(). ?It works for any holes, as long
->> as they're expressed in one of the memory models so that pfn_valid()
->> notices them.
+>> > Now that I look at this again, why not drop the "x" all together ?
+>> 
+>> That might be better for the 8x60.  The complexity is that most of the
+>> MSM chips have some variants, where the CPU running Linux isn't changed,
+>> but the modem CPU is different (think CDMA/UMTS).  Until 8960, that was
+>> distinguished by the second letter.
+>> 
+>> Either way doesn't quite match reality, unfortunately.  There are
+>> devices using a MSM7201 and others using a MSM7601.  As far as Linux is
+>> concerned, there isn't any difference between them.  If someone wanted
+>> to try and identify the device they have with the code, it could be
+>> confusing for either name chosen.
+>> 
+>> I was planning on turning msm8x60 into msm8660, since that seems to be
+>> the most common one.  Perhaps the decoder ring should be put into the
+>> help text for the options so people can at least figure out which is
+>> which.
 >
-> I think that's what I said.
->
->> ARM looks like its pfn_valid() is backed up by searching the (ASM
->> arch-specific) memblocks. ?That looks like it would be fairly slow
->> compared to the other pfn_valid() implementations and I can see why it's
->> being avoided in show_mem().
->
-> Wrong. ?For flatmem, we have a pfn_valid() which is backed by doing a
-> one, two or maybe rarely three compare search of the memblocks. ?Short
-> of having a bitmap of every page in the 4GB memory space, you can't
-> get more efficient than that.
->
-> For sparsemem, sparsemem provides its own pfn_valid() which is _far_
-> from what we require:
->
-> static inline int pfn_valid(unsigned long pfn)
-> {
-> ? ? ? ?if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-> ? ? ? ? ? ? ? ?return 0;
-> ? ? ? ?return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
-> }
->
->> Maybe we should add either the MAX_ORDER or section_nr() trick to the
->> lib/ implementation. ?I bet that would use pfn_valid() rarely enough to
->> meet any performance concerns.
->
-> No. ?I think it's entirely possible that on some platforms we have holes
-> within sections. ?Like I said, ours is more funky than x86.
->
-I don't think the improving performance can result the possibility of
-misbehavior.
+> Are there any of those which do , right now, have Linux support for more
+> than one variant ?
 
-> The big problem we have on ARM is that the kernel sparsemem stuff doesn't
-> *actually* support sparse memory. ?What it supports is fully populated
-> blocks of memory of fixed size (known at compile time) where some blocks
-> may be contiguous. ?Blocks are assumed to be populated from physical
-> address zero.
->
-> It doesn't actually support partially populated blocks.
->
-> So, if your memory granule size is 4MB, and your memory starts at
-> 0xc0000000 physical, you're stuck with 768 unused sparsemem blocks
-> at the beginning of memory. ?If it's 1MB, then you have 3072 unused
-> sparsemem blocks. ?Each mem_section structure is 8 bytes, so that
-> could be 24K of zeros.
->
-> What we actually need is infrastructure in the kernel which can properly
-> handle sparse memory efficiently without causing such wastage. ?If your
-> platform has four memory chunks, eg at 0xc0000000, 0xc4000000, 0xc8000000,
-> and 0xcc000000, then you want to build the kernel to tell it "there may
-> be four chunks with a 64MB offset, each chunk may be partially populated."
->
-> It seems that Sparsemem can't do that efficiently.
->
+All of them, in fact.
 
-If sparsemem is not the correct choice for ARM, why don't we go back
-to the  flatmem? Still, the flatmem has problem on wastage of memory
-because of memory holes. But it is more reliable for us, at least.
-I think the idea of sparsemem is not bad for ARM, though. The
-implementation is quite efficient. The problem is that we still
-believe that sparsemem needs more verification to prove its
-robustness.
+MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
+goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
+of the two, and it doesn't matter which one you use.
 
-Anyway, you told that we need to define NR_BANKS more that 8 to use
-larger memory than 2gb without worry about misbehavior in mem_init()
-and mem_show(). As i said before, I think that it is not reasonable to
-create a number of memory chunks to avoid the problem. Nowhere in the
-kernel code and descriptions informs that contiguous physical memory
-chunks must not cross sparsemem section's boundaries.
+MSM8960 is a completely different chip, it just shares a similar name,
+to other chips.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
