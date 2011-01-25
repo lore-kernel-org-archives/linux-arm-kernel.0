@@ -1,60 +1,55 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jan 2011 17:32:57 +0530
-Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
-In-Reply-To: <20110125114635.GB13300@n2100.arm.linux.org.uk>
+Date: Tue, 25 Jan 2011 17:38:49 +0530
+Subject: [PATCH 3/5] ARM: twd: Add context save restore support
+In-Reply-To: <20110125114848.GC13300@n2100.arm.linux.org.uk>
 References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-5-git-send-email-santosh.shilimkar@ti.com>
-	<20110125114635.GB13300@n2100.arm.linux.org.uk>
-Message-ID: <236d45e400a960cc3b32db538b3a79ae@mail.gmail.com>
+	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
+	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
+	<20110124111114.GA19409@n2100.arm.linux.org.uk>
+	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
+	<20110125112946.GA13300@n2100.arm.linux.org.uk>
+	<b4c0d6db681c3fcfaf5d6f39d1022bb7@mail.gmail.com>
+	<20110125114848.GC13300@n2100.arm.linux.org.uk>
+Message-ID: <8784651c2ea55ec67dabca6037034970@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Looping Thomas G
 > -----Original Message-----
 > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, January 25, 2011 5:17 PM
+> Sent: Tuesday, January 25, 2011 5:19 PM
 > To: Santosh Shilimkar
-> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-> ccross at android.com; linus.ml.walleij at gmail.com; linux-
-> omap at vger.kernel.org
-> Subject: Re: [PATCH 4/5] ARM: scu: Move register defines to header
-> file
+> Cc: Colin Cross; catalin.marinas at arm.com;
+> linus.ml.walleij at gmail.com; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 3/5] ARM: twd: Add context save restore support
 >
-> On Mon, Jan 24, 2011 at 02:21:18PM +0530, Santosh Shilimkar wrote:
-> > This patch moves SCU register defines from smp_scu.c to smp_scu.h
-> > so that its available for platforms to use
+> On Tue, Jan 25, 2011 at 05:10:37PM +0530, Santosh Shilimkar wrote:
+> > As I was suspecting the one shot mode wouldn't work it. Collin
+> > just confirmed it.
+> > To make it fully work it needs control register save restore.
+> > And that can be managed within TWD library so that every platform
+> > doesn't have to bother of calling it from their idle code.
 > >
-> > The SCU CPU power status registers is used for power management
-> > on OMAP4.
+> > Do you prefer that as a separate patch or I can post a new version
+> > in which can add your fix + per cpu control register shadowing ?
 >
-> Could we instead have an API inside smp_scu.c rather than having
-> each
-> SoC implement its own SCU PM stuff?
+> I said earlier:
+> | The next question is can we teach the generic time infrastructure
+> about
+> | this so we don't have to modify every clock event driver for it?
+> We
+> | really need to get away from having this kind of knowledge buried
+> down
+> | in the lowest levels of every driver.
 >
-I have similar patch implemented but what it does is just
-prepares the value to be programmed and stores it to a scratchpad.
-I see your point but below patch may now work well. The reason is the SCU
-register needs to accessed at the lowest level. May be even when
-stack is not available. Also this register needs to be cleared in cases
-where the attempted power state is failed for some reason.
-
-Also note that this register can be blocked using trust-zone which
-again makes it platform dependent because direct write won't be
-allowed in that case.
-
-> Maybe this.  Note that scu_power_mode() needs to be called from a
-> non-
-> preemptible context, which is sane as we don't want to be
-> rescheduled
-> onto a different CPU between scu_power_mode() and the wfi/wfe
-> required
-> to enter the selected mode.
->
-I would prefer the header export if there is no major
-objection since there is already a possibility of custom
-implementation with trust zone.
-
-On OMAP4, on ES1.0 we need to use a secure API to achieve
-this where as on ES2.0, it can be directly accessed.
+> IOW, if we go into a PM idle mode, when we come back out we need to
+> call clockevent set_mode to ensure that the control register is
+> properly
+> reset.  I don't think its right to have this kind of knowledge
+> buried
+> in each and every clockevent driver.
+May be Thomas can comment on this.
 
 Regards,
 Santosh
