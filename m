@@ -1,39 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 25 Jan 2011 11:29:22 -0800
-Subject: [PATCH] ARM: OMAP2: use early init hook
-In-Reply-To: <20110125022119.GG13589@atomide.com>
-References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-	<20110123174814.GI30094@n2100.arm.linux.org.uk>
-	<20110124201731.GC13589@atomide.com>
-	<20110124202629.GE13589@atomide.com>
-	<20110124215213.GA27044@n2100.arm.linux.org.uk>
-	<20110125022119.GG13589@atomide.com>
-Message-ID: <20110125192922.GQ13589@atomide.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 25 Jan 2011 11:45:29 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <1295983549.25496.33.camel@c-dwalke-linux.qualcomm.com> (Daniel
+	Walker's message of "Tue, 25 Jan 2011 11:25:49 -0800")
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
+	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
+	<8yak4htj0lb.fsf@huya.qualcomm.com>
+	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+	<8yay669hka5.fsf@huya.qualcomm.com>
+	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
+	<8ya39ogg5dm.fsf@huya.qualcomm.com>
+	<1295983549.25496.33.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <8yaei80epie.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110124 18:20]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110124 13:51]:
-> > On Mon, Jan 24, 2011 at 12:26:29PM -0800, Tony Lindgren wrote:
-> > > * Tony Lindgren <tony@atomide.com> [110124 12:16]:
-> > > > 
-> > > > So far tested on zoom3 only, but the following gets it booting
-> > > > on top of your patch.
-> > > 
-> > > Looks like there are some other patches needed too.. At least
-> > > omap4 still fails with these.
-> > 
-> > From what I remember, the problem I saw on OMAP4 was hwmod related as
-> > it seemed to be using ioremap() - which with its initialization moved
-> > before memory allocators were up and running causes an oops.
-> 
-> To me it seems _find_mpu_rt_base should be moved to omap_hwmod_late_init
-> as we don't want to have a static mapping for everything. AFAIK the
-> oh->_mpu_rt_va should not be needed early.
-> 
-> Any comments on that Paul? See also the two patches I'll post as a reply
-> to this thread make omap_hwmod_late_init a core_initcall.
+On Tue, Jan 25 2011, Daniel Walker wrote:
 
-Posted this patch also, now also omap4 boots.
+> On Tue, 2011-01-25 at 11:17 -0800, David Brown wrote:
 
-Tony
+> I suggesting we do it across the board because consistency is a good
+> thing .. It also allows us to use 8x60 when 8660 and 8960 are actually
+> similar .. You can't deny that 8960 is similar to 8660 because your
+> patches show some duplication due to it.
+
+You're completely missing the point of these tests.  If _anything_ is
+different, the macros need to be different.  I don't care if they're
+similar, I need to know when they are different.  That is the point of
+the macros.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
