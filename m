@@ -1,68 +1,60 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 25 Jan 2011 23:07:37 +0530
-Subject: [PATCH 1/5] OMAP:board-omap3evm: Change TWL related gpio API's to
-	gpio*_cansleep
+Date: Tue, 25 Jan 2011 23:07:38 +0530
+Subject: [PATCH 2/5] OMAP3EVM: Add vio regulator supply required for ads7846
+	TSC driver
 In-Reply-To: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
 References: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1295977061-11086-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <1295977061-11086-3-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since TWL GPIO's can go into sleep, and using normal
-gpio_get/set_value() API will lead to kernel dump (WARN_ON()).
-So replacing standard gpio_get/set_value() to
-gpio_get/set_value_cansleep().
+Add vio regulator supply, needed for ads7846 touchscreen controller
+driver.
+
+Tested on OMAP3 (ES3.1 Si) RevG version of EVM.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3evm.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/board-omap3evm.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 97e0f65..8d2e413 100644
+index 8d2e413..dcef454 100644
 --- a/arch/arm/mach-omap2/board-omap3evm.c
 +++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -268,9 +268,9 @@ static int omap3_evm_enable_lcd(struct omap_dss_device *dssdev)
- 	gpio_set_value(OMAP3EVM_LCD_PANEL_ENVDD, 0);
-
- 	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
--		gpio_set_value(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 0);
-+		gpio_set_value_cansleep(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 0);
- 	else
--		gpio_set_value(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 1);
-+		gpio_set_value_cansleep(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 1);
-
- 	lcd_enabled = 1;
- 	return 0;
-@@ -281,9 +281,9 @@ static void omap3_evm_disable_lcd(struct omap_dss_device *dssdev)
- 	gpio_set_value(OMAP3EVM_LCD_PANEL_ENVDD, 1);
-
- 	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
--		gpio_set_value(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 1);
-+		gpio_set_value_cansleep(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 1);
- 	else
--		gpio_set_value(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 0);
-+		gpio_set_value_cansleep(OMAP3EVM_LCD_PANEL_BKLIGHT_GPIO, 0);
-
- 	lcd_enabled = 0;
- }
-@@ -322,7 +322,7 @@ static int omap3_evm_enable_dvi(struct omap_dss_device *dssdev)
- 		return -EINVAL;
- 	}
-
--	gpio_set_value(OMAP3EVM_DVI_PANEL_EN_GPIO, 1);
-+	gpio_set_value_cansleep(OMAP3EVM_DVI_PANEL_EN_GPIO, 1);
-
- 	dvi_enabled = 1;
- 	return 0;
-@@ -330,7 +330,7 @@ static int omap3_evm_enable_dvi(struct omap_dss_device *dssdev)
-
- static void omap3_evm_disable_dvi(struct omap_dss_device *dssdev)
- {
--	gpio_set_value(OMAP3EVM_DVI_PANEL_EN_GPIO, 0);
-+	gpio_set_value_cansleep(OMAP3EVM_DVI_PANEL_EN_GPIO, 0);
-
- 	dvi_enabled = 0;
- }
---
+@@ -571,6 +571,25 @@ static struct regulator_init_data omap3_evm_vpll2 = {
+ 	.consumer_supplies	= &omap3_evm_vpll2_supply,
+ };
+ 
++/* ads7846 on SPI */
++static struct regulator_consumer_supply omap3evm_vio_supply =
++	REGULATOR_SUPPLY("vcc", "spi1.0");
++
++/* VIO for ads7846 */
++static struct regulator_init_data omap3evm_vio = {
++	.constraints = {
++		.min_uV			= 1800000,
++		.max_uV			= 1800000,
++		.apply_uV		= true,
++		.valid_modes_mask	= REGULATOR_MODE_NORMAL
++					| REGULATOR_MODE_STANDBY,
++		.valid_ops_mask		= REGULATOR_CHANGE_MODE
++					| REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= 1,
++	.consumer_supplies	= &omap3evm_vio_supply,
++};
++
+ static struct twl4030_platform_data omap3evm_twldata = {
+ 	.irq_base	= TWL4030_IRQ_BASE,
+ 	.irq_end	= TWL4030_IRQ_END,
+@@ -583,6 +602,7 @@ static struct twl4030_platform_data omap3evm_twldata = {
+ 	.codec		= &omap3evm_codec_data,
+ 	.vdac		= &omap3_evm_vdac,
+ 	.vpll2		= &omap3_evm_vpll2,
++	.vio		= &omap3evm_vio,
+ };
+ 
+ static struct i2c_board_info __initdata omap3evm_i2c_boardinfo[] = {
+-- 
 1.6.2.4
