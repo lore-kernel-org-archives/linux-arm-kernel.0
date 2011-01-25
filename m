@@ -1,181 +1,110 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 24 Jan 2011 16:26:01 -0800
-Subject: [PATCH] OMAP: PM: DMA: Enable runtime pm
-In-Reply-To: <20110124235205.GA6351@manju-desktop> (Manjunath Kondaiah G.'s
-	message of "Tue, 25 Jan 2011 05:22:05 +0530")
-References: <1295860819-20142-1-git-send-email-manjugk@ti.com>
-	<87d3nm7zb0.fsf@ti.com> <20110124235205.GA6351@manju-desktop>
-Message-ID: <871v414yna.fsf@ti.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 25 Jan 2011 09:33:59 +0900
+Subject: [PATCH] ARM: mm: Regarding section when dealing with meminfo
+In-Reply-To: <20110124175807.GA27427@n2100.arm.linux.org.uk>
+References: <1295516739-9839-1-git-send-email-pullip.cho@samsung.com>
+	<1295544047.9039.609.camel@nimitz>
+	<20110120180146.GH6335@n2100.arm.linux.org.uk>
+	<1295547087.9039.694.camel@nimitz>
+	<20110123180532.GA3509@n2100.arm.linux.org.uk>
+	<1295887937.11047.119.camel@nimitz>
+	<20110124175807.GA27427@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikK4oGx1dNTDfxketVr2kPdrg=WsrOXThVD6_U2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
-
-> Kevin,
->
-> On Mon, Jan 24, 2011 at 01:43:31PM -0800, Kevin Hilman wrote:
->> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
->> 
->> > From: Manjunath G Kondaiah <manjugk@ti.com>
+On Tue, Jan 25, 2011 at 2:58 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jan 24, 2011 at 08:52:17AM -0800, Dave Hansen wrote:
+>> On Sun, 2011-01-23 at 18:05 +0000, Russell King - ARM Linux wrote:
+>> > On Thu, Jan 20, 2011 at 10:11:27AM -0800, Dave Hansen wrote:
+>> > > On Thu, 2011-01-20 at 18:01 +0000, Russell King - ARM Linux wrote:
+>> > > > > The x86 version of show_mem() actually manages to do this without any
+>> > > > > #ifdefs, and works for a ton of configuration options. ?It uses
+>> > > > > pfn_valid() to tell whether it can touch a given pfn.
+>> > > >
+>> > > > x86 memory layout tends to be very simple as it expects memory to
+>> > > > start at the beginning of every region described by a pgdat and extend
+>> > > > in one contiguous block. ?I wish ARM was that simple.
+>> > >
+>> > > x86 memory layouts can be pretty funky and have been that way for a long
+>> > > time. ?That's why we *have* to handle holes in x86's show_mem(). ?My
+>> > > laptop even has a ~1GB hole in its ZONE_DMA32:
 >> >
->> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put
->> > for OMAP DMA driver.
->> >
->> > Since DMA driver callback will happen from interrupt context and
->> > DMA client driver will release all DMA resources from interrupt
->> > context itself, pm_runtime_put_sync() cannot be used in DMA driver.
->> > Instead, pm_runtime_put() is used which is asynchronous call and
->> > gets executed in work queue.
->> 
->> It's fine that the asynchronous version of put is uses (it's actually
->> preferred.)  However, the description is confusing here.  You talk about
->> driver callbacks here but in the patch, your calling _put() from
->> omap_dma_free(), not from the callback.
+>> > If x86 is soo funky, I suggest you try the x86 version of show_mem()
+>> > on an ARM platform with memory holes. ?Make sure you try it with
+>> > sparsemem as well...
+>>
+>> x86 uses the generic lib/ show_mem(). ?It works for any holes, as long
+>> as they're expressed in one of the memory models so that pfn_valid()
+>> notices them.
 >
-> All dma client drivers are calling omap_dma_free from callback
-> context. 
-
-Maybe so, but that's not a requirement of the API.  I have a DMA test
-driver that doesn't do that.
-
-It's also legitimate (and IMO, expected) for a client driver to, for
-example do a omap_dma_request() on module load and omap_free_dma() on
-module unload and only use omap_start_dma() + callbacks for xfers.
-It would be nice (and IMO, expected) that the channels would go idle
-between xfers (using the autosuspend feature for timeouts.)
-
-> I can update this info in patch description if it is useful.
+> I think that's what I said.
 >
->> 
->> You're also calling _get() from the request.  That means, as long as the
->> DMA channel is allocated, it will be active.   
->> 
->> Wouldn't it be better to do the 'get' when the channel is started
+>> ARM looks like its pfn_valid() is backed up by searching the (ASM
+>> arch-specific) memblocks. ?That looks like it would be fairly slow
+>> compared to the other pfn_valid() implementations and I can see why it's
+>> being avoided in show_mem().
 >
-> No. omap_dma_request will call omap_clear_dma which in turn access all channel
-> specific registers for writing zeros.
-
-Of course, you always have to do get/put around any device access.
-
->> and the 'put' when the callback has finished, possibly using the
+> Wrong. ?For flatmem, we have a pfn_valid() which is backed by doing a
+> one, two or maybe rarely three compare search of the memblocks. ?Short
+> of having a bitmap of every page in the 4GB memory space, you can't
+> get more efficient than that.
 >
-> after omap_free_dma, none of the dma registers are accessed hence it is safe to
-> use _put immediately after free_dma.
-
-Right, but my point above is: what if the user does not call free_dma?
-What if the client will be using the channel again sometime in the
-future, but will be idle.   What I would expect is that the channel
-could go idle until another xfer is initiated rather than waiting for
-the channel to be freed.
-
-> Also, dma driver is not aware of callback completion status since it will be
-> executed in client driver.
-
-Why not?  DMA driver knows when the callback returns.
-
-Kevin
-
->> 'autosuspend' feature with a timeout so that back-to-back DMA transfers
->> will not have have additional latency between transfers?
->> 
->> > Boot tested on OMAP4 blaze and all applicable tests are executed
->> > along with dma hwmod series.
->> 
->> Any OMAP2 or OMAP3 testing?
->> 
->> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
->> > ---
->> > Discussion and alignment for using runtime API's in DMA can be accessed at:
->> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg37819.html
->> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38355.html
->> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38391.html
->> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38400.html
->> >
->> >  arch/arm/plat-omap/dma.c |   18 +++++++++++++++++-
->> >  1 files changed, 17 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
->> > index c4b2b47..48ee292 100644
->> > --- a/arch/arm/plat-omap/dma.c
->> > +++ b/arch/arm/plat-omap/dma.c
->> > @@ -35,6 +35,7 @@
->> >  #include <linux/io.h>
->> >  #include <linux/slab.h>
->> >  #include <linux/delay.h>
->> > +#include <linux/pm_runtime.h>
->> >  
->> >  #include <asm/system.h>
->> >  #include <mach/hardware.h>
->> > @@ -58,6 +59,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
->> >  #define OMAP_FUNC_MUX_ARM_BASE		(0xfffe1000 + 0xec)
->> >  
->> >  static struct omap_system_dma_plat_info *p;
->> > +static struct platform_device           *pd;
->> >  static struct omap_dma_dev_attr *d;
->> >  
->> >  static int enable_1510_mode;
->> > @@ -676,6 +678,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->> >  	unsigned long flags;
->> >  	struct omap_dma_lch *chan;
->> >  
->> > +	pm_runtime_get_sync(&pd->dev);
->> >  	spin_lock_irqsave(&dma_chan_lock, flags);
->> >  	for (ch = 0; ch < dma_chan_count; ch++) {
->> >  		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
->> > @@ -686,6 +689,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->> >  	}
->> >  	if (free_ch == -1) {
->> >  		spin_unlock_irqrestore(&dma_chan_lock, flags);
->> > +		pm_runtime_put(&pd->dev);
->> >  		return -EBUSY;
->> >  	}
->> >  	chan = dma_chan + free_ch;
->> > @@ -779,7 +783,7 @@ void omap_free_dma(int lch)
->> >  		p->dma_write(0, CCR, lch);
->> >  		omap_clear_dma(lch);
->> >  	}
->> > -
->> > +	pm_runtime_put(&pd->dev);
->> >  	spin_lock_irqsave(&dma_chan_lock, flags);
->> >  	dma_chan[lch].dev_id = -1;
->> >  	dma_chan[lch].next_lch = -1;
->> > @@ -1979,6 +1983,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->> >  		return -EINVAL;
->> >  	}
->> >  
->> > +	pd			= pdev;
->> 
->> minor: platform_device pointers are more commonly named pdev
->> 
->> >  	d			= p->dma_attr;
->> >  	errata			= p->errata;
->> >  
->> > @@ -2000,6 +2005,9 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->> >  		}
->> >  	}
->> >  
->> > +	pm_runtime_enable(&pd->dev);
->> > +	pm_runtime_get_sync(&pd->dev);
->> > +
->> >  	spin_lock_init(&dma_chan_lock);
->> >  	for (ch = 0; ch < dma_chan_count; ch++) {
->> >  		omap_clear_dma(ch);
->> > @@ -2065,6 +2073,14 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->> >  		dma_chan[1].dev_id = 1;
->> >  	}
->> >  	p->show_dma_caps();
->> > +
->> > +	/*
->> > +	 * Note: If dma channels are reserved through boot paramters,
->> > +	 * then dma device is always enabled.
->> > +	 */
->> > +	if (!omap_dma_reserve_channels)
->> > +		pm_runtime_put(&pd->dev);
->> > +
->> 
->> Readability would be improved if there was an unconditional
->> pm_runtime_put() at the end of this function preceeded by an extra
->> pm_runtime_get() (async version) if reserve_channels has been used.
-> ok. I will update.
+> For sparsemem, sparsemem provides its own pfn_valid() which is _far_
+> from what we require:
 >
-> -Manjunath
+> static inline int pfn_valid(unsigned long pfn)
+> {
+> ? ? ? ?if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+> ? ? ? ? ? ? ? ?return 0;
+> ? ? ? ?return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+> }
+>
+>> Maybe we should add either the MAX_ORDER or section_nr() trick to the
+>> lib/ implementation. ?I bet that would use pfn_valid() rarely enough to
+>> meet any performance concerns.
+>
+> No. ?I think it's entirely possible that on some platforms we have holes
+> within sections. ?Like I said, ours is more funky than x86.
+>
+I don't think the improving performance can result the possibility of
+misbehavior.
+
+> The big problem we have on ARM is that the kernel sparsemem stuff doesn't
+> *actually* support sparse memory. ?What it supports is fully populated
+> blocks of memory of fixed size (known at compile time) where some blocks
+> may be contiguous. ?Blocks are assumed to be populated from physical
+> address zero.
+>
+> It doesn't actually support partially populated blocks.
+>
+> So, if your memory granule size is 4MB, and your memory starts at
+> 0xc0000000 physical, you're stuck with 768 unused sparsemem blocks
+> at the beginning of memory. ?If it's 1MB, then you have 3072 unused
+> sparsemem blocks. ?Each mem_section structure is 8 bytes, so that
+> could be 24K of zeros.
+>
+> What we actually need is infrastructure in the kernel which can properly
+> handle sparse memory efficiently without causing such wastage. ?If your
+> platform has four memory chunks, eg at 0xc0000000, 0xc4000000, 0xc8000000,
+> and 0xcc000000, then you want to build the kernel to tell it "there may
+> be four chunks with a 64MB offset, each chunk may be partially populated."
+>
+> It seems that Sparsemem can't do that efficiently.
+>
+
+If sparsemem is not the correct choice for ARM, why don't we go back
+to the  flatmem? Still, the flatmem has problem on wastage of memory
+because of memory holes. But it is more reliable for us, at least.
+I think the idea of sparsemem is not bad for ARM, though. The
+implementation is quite efficient. The problem is that we still
+believe that sparsemem needs more verification to prove its
+robustness.
+
+Anyway, you told that we need to define NR_BANKS more that 8 to use
+larger memory than 2gb without worry about misbehavior in mem_init()
+and mem_show(). As i said before, I think that it is not reasonable to
+create a number of memory chunks to avoid the problem. Nowhere in the
+kernel code and descriptions informs that contiguous physical memory
+chunks must not cross sparsemem section's boundaries.
