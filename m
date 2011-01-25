@@ -1,69 +1,46 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 26 Jan 2011 05:19:55 +0800
-Subject: [PATCH 1/2] Updated XCEP partition sizes
-In-Reply-To: <AANLkTimMniHC==y6majqBGKNBa91J1DpVK8zbnDxEWvy@mail.gmail.com>
-References: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
-	<AANLkTimMniHC==y6majqBGKNBa91J1DpVK8zbnDxEWvy@mail.gmail.com>
-Message-ID: <AANLkTinLTuJY9vDH_oHeKk7j6oo4369cF35PG+fVc5A_@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 25 Jan 2011 16:21:08 -0500 (EST)
+Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
+	asm/spinlock.h
+In-Reply-To: <20110125174636.GE17286@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
+	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
+	<20110125165919.GD17286@n2100.arm.linux.org.uk>
+	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+	<20110125174636.GE17286@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101251618230.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 2:54 AM, Matej Kenda <matejken@gmail.com> wrote:
-> Hi Eric,
->
-> I've sent two simple patches for Iskratel XCEP last week.
->
-> Can they be included in the kernel?
+On Tue, 25 Jan 2011, Russell King - ARM Linux wrote:
 
-I'm a bit tentative on this. Patch 1 is basically OK, but what if
-someone needs a even larger partition in the future?  And some work
-is on-going with cleanup of those defconfigs, guess I'll hold a
-while those changes to the defconfig until that's clear enough.
+> On Tue, Jan 25, 2011 at 05:33:14PM +0000, Dave Martin wrote:
+> > On Tue, Jan 25, 2011 at 4:59 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > On Tue, Jan 25, 2011 at 04:43:52PM +0000, Dave Martin wrote:
+> > >> A couple of questions on this:
+> > >>
+> > >> 1) I notice these spinlock functions are generally marked inline.
+> > >>
+> > >> Is that likely to happen in modules? ?If so, there would be a need to
+> > >> do SMP_ON_UP fixups at module load time -- I don't think that's
+> > >> currently implemented.
+> > >
+> > > No one should be using the arch_* spinlocks directly. ?The spinlocks
+> > > are implemented in out of line code in kernel/spinlock.c
+> > 
+> > OK--- do think this is something we need a sanity-check for, or does
+> > this fall into to a category of bad driver implementation which will
+> > get thrown out during peer review?
+> 
+> Hmm, actually it looks like you can end up with configurations where the
+> spinlocks are inlined.
+> 
+> That means we'll have to get rid of the link-time discarding of the
+> .exit sections, and discard them along with the .init sections.
 
-BTW - did you run Uwe's script to make sure the changes to defconfig
-is the smallest one?
+... but only when CONFIG_SMP_ON_UP=y.
 
->
-> TIA,
->
-> Matej
->
-> On 19 January 2011 13:01, Matej Kenda <matejken@gmail.com> wrote:
->> Increased partition for Linux kernel from 1 MB to 2 MB for
->> monolithically built kernel 2.6.37 for Iskratel XCEP SBC to fit in.
->>
->> Signed-off-by: Matej Kenda <matejken@gmail.com>
->>
->> ---
->>
->> diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
->> index 3260ce7..f7b1052 100644
->> --- a/arch/arm/mach-pxa/xcep.c
->> +++ b/arch/arm/mach-pxa/xcep.c
->> @@ -55,20 +55,20 @@ static struct mtd_partition xcep_partitions[] = {
->> ? ? ? ?}, {
->> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Bootloader ENV",
->> ? ? ? ? ? ? ? ?.size = ? ? ? ? 0x00040000,
->> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00040000,
->> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
->> ? ? ? ? ? ? ? ?.mask_flags = ? MTD_WRITEABLE
->> ? ? ? ?}, {
->> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Kernel",
->> - ? ? ? ? ? ? ? .size = ? ? ? ? 0x00100000,
->> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00080000,
->> + ? ? ? ? ? ? ? .size = ? ? ? ? 0x00200000,
->> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
->> ? ? ? ?}, {
->> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Rescue fs",
->> ? ? ? ? ? ? ? ?.size = ? ? ? ? 0x00280000,
->> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00180000,
->> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND,
->> ? ? ? ?}, {
->> ? ? ? ? ? ? ? ?.name = ? ? ? ? "Filesystem",
->> ? ? ? ? ? ? ? ?.size = ? ? ? ? MTDPART_SIZ_FULL,
->> - ? ? ? ? ? ? ? .offset = ? ? ? 0x00400000
->> + ? ? ? ? ? ? ? .offset = ? ? ? MTDPART_OFS_APPEND
->> ? ? ? ?}
->> ?};
->>
->
+
+Nicolas
