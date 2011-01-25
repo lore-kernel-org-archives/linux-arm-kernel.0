@@ -1,206 +1,106 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 24 Jan 2011 19:45:15 -0800
-Subject: [PATCH 1/4] msm: clock: Remove unused code and definitions
+Date: Mon, 24 Jan 2011 19:45:17 -0800
+Subject: [PATCH 3/4] msm: clock: Invert debugfs directory layout
 In-Reply-To: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
 References: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1295927118-27591-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1295927118-27591-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove dead code and push out clock-7x30.h and clock-pcom.h to
-where they are actually used.
+There are currently 3 separate directories for clock debugging in
+debugfs: clk_enable, clk_rate, and clk_local. Each of these
+directories contains a list of clocks. This is rather annoying
+when you are focusing on one clock and want to enable/disable it
+and then check its rate. You either have to cd to the other
+directory or cat ../clk_rate/<clk>.
+
+Invert the layout so that there is one clock directory containing
+a directory for each clock. Inside each respective clock
+directory place an enable, rate, and is_local file relating to
+the clk_enable, clk_disable, and clk_local directories that exist
+today.
 
 Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/board-msm8x60.c   |    5 +---
- arch/arm/mach-msm/clock-pcom.c      |    1 +
- arch/arm/mach-msm/clock.c           |   21 ++--------------
- arch/arm/mach-msm/clock.h           |   45 -----------------------------------
- arch/arm/mach-msm/devices-msm7x30.c |    1 +
- arch/arm/mach-msm/devices-qsd8x50.c |    1 +
- 6 files changed, 7 insertions(+), 67 deletions(-)
+ arch/arm/mach-msm/clock-debug.c |   48 ++++++++++++++++++--------------------
+ 1 files changed, 23 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index 9b5eb2b..e09c174 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -28,10 +28,7 @@
- #include <mach/board.h>
- #include <mach/msm_iomap.h>
+diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
+index 6f603ed..b67b9e82 100644
+--- a/arch/arm/mach-msm/clock-debug.c
++++ b/arch/arm/mach-msm/clock-debug.c
+@@ -87,47 +87,45 @@ static int clock_debug_local_get(void *data, u64 *val)
+ DEFINE_SIMPLE_ATTRIBUTE(clock_local_fops, clock_debug_local_get,
+ 			NULL, "%llu\n");
  
--unsigned long clk_get_max_axi_khz(void)
--{
--	return 0;
--}
-+#include "devices.h"
+-static struct dentry *dent_rate, *dent_enable, *dent_local;
++static struct dentry *debugfs_base;
  
- static void __init msm8x60_map_io(void)
+ int __init clock_debug_init(void)
  {
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index a3b4562..8c4e867 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -20,6 +20,7 @@
- 
- #include "proc_comm.h"
- #include "clock.h"
-+#include "clock-pcom.h"
- 
- /*
-  * glue for the proc_comm interface
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index 2069bfa..8f71f8d 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -29,6 +29,7 @@
- #include "clock.h"
- #include "proc_comm.h"
- #include "clock-7x30.h"
-+#include "clock-pcom.h"
- 
- static DEFINE_MUTEX(clocks_mutex);
- static DEFINE_SPINLOCK(clocks_lock);
-@@ -37,13 +38,6 @@ struct clk *msm_clocks;
- unsigned msm_num_clocks;
- 
- /*
-- * Bitmap of enabled clocks, excluding ACPU which is always
-- * enabled
-- */
--static DECLARE_BITMAP(clock_map_enabled, NR_CLKS);
--static DEFINE_SPINLOCK(clock_map_lock);
+-	dent_rate = debugfs_create_dir("clk_rate", 0);
+-	if (!dent_rate)
+-		goto err;
 -
--/*
-  * Standard clock functions defined in include/linux/clk.h
-  */
- struct clk *clk_get(struct device *dev, const char *id)
-@@ -77,12 +71,8 @@ int clk_enable(struct clk *clk)
- 	unsigned long flags;
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	clk->count++;
--	if (clk->count == 1) {
-+	if (clk->count == 1)
- 		clk->ops->enable(clk->id);
--		spin_lock(&clock_map_lock);
--		clock_map_enabled[BIT_WORD(clk->id)] |= BIT_MASK(clk->id);
--		spin_unlock(&clock_map_lock);
--	}
- 	spin_unlock_irqrestore(&clocks_lock, flags);
+-	dent_enable = debugfs_create_dir("clk_enable", 0);
+-	if (!dent_enable)
+-		goto err;
+-
+-	dent_local = debugfs_create_dir("clk_local", NULL);
+-	if (!dent_local)
+-		goto err;
+-
++	debugfs_base = debugfs_create_dir("clk", NULL);
++	if (!debugfs_base)
++		return -ENOMEM;
  	return 0;
+-err:
+-	debugfs_remove(dent_local);
+-	debugfs_remove(dent_enable);
+-	debugfs_remove(dent_rate);
+-	return -ENOMEM;
  }
-@@ -94,12 +84,8 @@ void clk_disable(struct clk *clk)
- 	spin_lock_irqsave(&clocks_lock, flags);
- 	BUG_ON(clk->count == 0);
- 	clk->count--;
--	if (clk->count == 0) {
-+	if (clk->count == 0)
- 		clk->ops->disable(clk->id);
--		spin_lock(&clock_map_lock);
--		clock_map_enabled[BIT_WORD(clk->id)] &= ~BIT_MASK(clk->id);
--		spin_unlock(&clock_map_lock);
--	}
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- EXPORT_SYMBOL(clk_disable);
-@@ -196,7 +182,6 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks)
+ 
+ int __init clock_debug_add(struct clk *clock)
  {
- 	unsigned n;
+ 	char temp[50], *ptr;
++	struct dentry *clk_dir;
  
--	spin_lock_init(&clocks_lock);
- 	mutex_lock(&clocks_mutex);
- 	msm_clocks = clock_tbl;
- 	msm_num_clocks = num_clocks;
-diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-index c270b55..6a0cade 100644
---- a/arch/arm/mach-msm/clock.h
-+++ b/arch/arm/mach-msm/clock.h
-@@ -20,9 +20,6 @@
- #include <linux/list.h>
- #include <mach/clk.h>
+-	if (!dent_rate || !dent_enable || !dent_local)
++	if (!debugfs_base)
+ 		return -ENOMEM;
  
--#include "clock-pcom.h"
--#include "clock-7x30.h"
--
- #define CLKFLAG_INVERT			0x00000001
- #define CLKFLAG_NOINVERT		0x00000002
- #define CLKFLAG_NONEST			0x00000004
-@@ -59,51 +56,9 @@ struct clk {
- 	struct device *dev;
- };
+ 	strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
+ 	for (ptr = temp; *ptr; ptr++)
+ 		*ptr = tolower(*ptr);
  
--#define A11S_CLK_CNTL_ADDR		(MSM_CSR_BASE + 0x100)
--#define A11S_CLK_SEL_ADDR		(MSM_CSR_BASE + 0x104)
--#define A11S_VDD_SVS_PLEVEL_ADDR	(MSM_CSR_BASE + 0x124)
--
--#ifdef CONFIG_DEBUG_FS
--#define CLOCK_DBG_NAME(x) .dbg_name = x,
--#else
--#define CLOCK_DBG_NAME(x)
--#endif
--
--#define CLOCK(clk_name, clk_id, clk_dev, clk_flags) {	\
--	.name = clk_name, \
--	.id = clk_id, \
--	.flags = clk_flags, \
--	.dev = clk_dev, \
--	 CLOCK_DBG_NAME(#clk_id) \
--	}
--
- #define OFF CLKFLAG_AUTO_OFF
- #define CLK_MIN CLKFLAG_MIN
- #define CLK_MAX CLKFLAG_MAX
- #define CLK_MINMAX (CLK_MIN | CLK_MAX)
--#define NR_CLKS	P_NR_CLKS
--
--enum {
--	PLL_0 = 0,
--	PLL_1,
--	PLL_2,
--	PLL_3,
--	PLL_4,
--	PLL_5,
--	PLL_6,
--	NUM_PLL
--};
--
--enum clkvote_client {
--	CLKVOTE_ACPUCLK = 0,
--	CLKVOTE_PMQOS,
--	CLKVOTE_MAX,
--};
--
--int msm_clock_require_tcxo(unsigned long *reason, int nbits);
--int msm_clock_get_name(uint32_t id, char *name, uint32_t size);
--int ebi1_clk_set_min_rate(enum clkvote_client client, unsigned long rate);
--unsigned long clk_get_max_axi_khz(void);
+-	debugfs_create_file(temp, S_IRUGO | S_IWUSR, dent_rate,
+-			    clock, &clock_rate_fops);
+-	debugfs_create_file(temp, S_IRUGO | S_IWUSR, dent_enable,
+-			    clock, &clock_enable_fops);
+-	debugfs_create_file(temp, S_IRUGO, dent_local,
+-			    clock, &clock_local_fops);
++	clk_dir = debugfs_create_dir(temp, debugfs_base);
++	if (!clk_dir)
++		return -ENOMEM;
++
++	if (!debugfs_create_file("rate", S_IRUGO | S_IWUSR, clk_dir,
++				clock, &clock_rate_fops))
++		goto error;
  
- #endif
--
-diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-index d4c7afc..e430fdd 100644
---- a/arch/arm/mach-msm/devices-msm7x30.c
-+++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -28,6 +28,7 @@
- #include <asm/mach/flash.h>
- 
- #include "clock-pcom.h"
-+#include "clock-7x30.h"
- 
- #include <mach/mmc.h>
- 
-diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-index c9fa655..c5dad8f 100644
---- a/arch/arm/mach-msm/devices-qsd8x50.c
-+++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -27,6 +27,7 @@
- #include <asm/mach/flash.h>
- 
- #include <mach/mmc.h>
-+#include "clock-pcom.h"
- 
- static struct resource resources_uart3[] = {
- 	{
++	if (!debugfs_create_file("enable", S_IRUGO | S_IWUSR, clk_dir,
++				clock, &clock_enable_fops))
++		goto error;
++
++	if (!debugfs_create_file("is_local", S_IRUGO, clk_dir, clock,
++				&clock_local_fops))
++		goto error;
+ 	return 0;
++error:
++	debugfs_remove_recursive(clk_dir);
++	return -ENOMEM;
+ }
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
