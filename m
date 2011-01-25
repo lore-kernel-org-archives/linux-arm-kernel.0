@@ -1,52 +1,42 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 25 Jan 2011 17:10:37 +0530
-Subject: [PATCH 3/5] ARM: twd: Add context save restore support
-In-Reply-To: <20110125112946.GA13300@n2100.arm.linux.org.uk>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
-	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
-	<20110124111114.GA19409@n2100.arm.linux.org.uk>
-	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
-	<20110125112946.GA13300@n2100.arm.linux.org.uk>
-Message-ID: <b4c0d6db681c3fcfaf5d6f39d1022bb7@mail.gmail.com>
+Date: Tue, 25 Jan 2011 17:16:19 +0530
+Subject: questions about arm trustzone
+In-Reply-To: <20110125102652.GB11507@n2100.arm.linux.org.uk>
+References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com><8yad3nlh18e.fsf@huya.qualcomm.com><AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
+	<20110125102652.GB11507@n2100.arm.linux.org.uk>
+Message-ID: <bb0c3855a121603232d022b4062752a6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, January 25, 2011 5:00 PM
-> To: Colin Cross
-> Cc: Santosh Shilimkar; catalin.marinas at arm.com;
-> linus.ml.walleij at gmail.com; linux-omap at vger.kernel.org; linux-arm-
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King -
+> ARM Linux
+> Sent: Tuesday, January 25, 2011 3:57 PM
+> To: sen wang
+> Cc: David Brown; linux-kernel at vger.kernel.org; linux-arm-
 > kernel at lists.infradead.org
-> Subject: Re: [PATCH 3/5] ARM: twd: Add context save restore support
+> Subject: Re: questions about arm trustzone
 >
-> On Mon, Jan 24, 2011 at 11:39:13PM -0800, Colin Cross wrote:
-> > This doesn't work for oneshot timers if the TWD_TIMER_CONTROL
-> register
-> > gets reset by cpu idle between twd_set_mode and
-> twd_set_next_event.
-> > Shadowing ctrl in a percpu variable and rewriting it during every
-> call
-> > to twd_set_next_event does work, but that's not much different,
-> and a
-> > little less efficient, than just saving and restoring the control
-> and
-> > load registers in idle.  It does have the advantage that platforms
-> > don't need any extra calls.
+> On Tue, Jan 25, 2011 at 05:19:16PM +0800, sen wang wrote:
+> > It seems linux run in the normal world, and the "scm.c" ?is the
+> path
+> > to the monitor mode.
+> > where can I find the example code for monitor and secure world?
 >
-> BTW, do you think the patch is, nevertheless, an improvement and
-> something
-> we should do?  If so, please can I have your ack for it?
+> OMAP also uses smc: arch/arm/mach-omap2/omap44xx-smc.S
 >
-As I was suspecting the one shot mode wouldn't work it. Collin
-just confirmed it.
-To make it fully work it needs control register save restore.
-And that can be managed within TWD library so that every platform
-doesn't have to bother of calling it from their idle code.
+> There's no interface defined for smc because it's highly vendor and
+> implementation specific.  It's just like a SWI (or svc) where it
+> causes entry via a vector into a priviledged mode, which can be
+> thought of being similar to a branch to a vector with a mode switch.
+>
+The code above won't give major details of how the monitor mode is
+implemented.  But as Russell said, it's pretty much vendor specific.
 
-Do you prefer that as a separate patch or I can post a new version
-in which can add your fix + per cpu control register shadowing ?
+On OMAP, We have standard API interfaces to enter into monitor
+world. One of the parameter denotes the kind of service, is
+requested.
 
 Regards,
 Santosh
