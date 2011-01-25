@@ -1,89 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 25 Jan 2011 14:23:10 +0100 (CET)
-Subject: [PATCH 3/5] ARM: twd: Add context save restore support
-In-Reply-To: <20110125103231.GD11507@n2100.arm.linux.org.uk>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
-	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
-	<20110124111114.GA19409@n2100.arm.linux.org.uk>
-	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
-	<20110125103231.GD11507@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Jan 2011 13:23:43 +0000
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
+References: <4D2B4CE4.9080309@ahsoftware.de>
+	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
+	<4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
+	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
+Message-ID: <AANLkTim3C7P=Wzd9w--yrCrXsq7JQLPQdLMkSv28xqDB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jan 2011, Russell King - ARM Linux wrote:
-> On Mon, Jan 24, 2011 at 11:39:13PM -0800, Colin Cross wrote:
-> > On Mon, Jan 24, 2011 at 3:11 AM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > On Mon, Jan 24, 2011 at 11:06:09AM +0000, Russell King - ARM Linux wrote:
-> > >> On Mon, Jan 24, 2011 at 02:21:17PM +0530, Santosh Shilimkar wrote:
-> > >> > In CPU low power state, local timer looses its register context. This
-> > >> > patch adds context save restore hooks which can be used by platforms
-> > >> > appropriately.
-> > >>
-> > >> I thought the whole point of CLOCK_EVT_FEAT_C3STOP was that the generic
-> > >> timer stuff wouldn't rely on it being kept alive?
-> > >>
-> > >> Hmm, it looks like we bypass the clockevents code by only setting the
-> > >> TWD load value at initialization time, not when we switch to periodic
-> > >> mode. ?We really ought to rewrite it whenever we switch back to periodic
-> > >> mode.
-> > >>
-> > >> I suspect fixing that means you won't need this save/restore support.
-> > >
-> > > Untested, but should do what's required.
-> > >
-> > > diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> > > index fd91566..60636f4 100644
-> > > --- a/arch/arm/kernel/smp_twd.c
-> > > +++ b/arch/arm/kernel/smp_twd.c
-> > > @@ -36,6 +36,7 @@ static void twd_set_mode(enum clock_event_mode mode,
-> > > ? ? ? ? ? ? ? ?/* timer load already set up */
-> > > ? ? ? ? ? ? ? ?ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
-> > > ? ? ? ? ? ? ? ? ? ? ? ?| TWD_TIMER_CONTROL_PERIODIC;
-> > > + ? ? ? ? ? ? ? __raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
-> > > ? ? ? ? ? ? ? ?break;
-> > > ? ? ? ?case CLOCK_EVT_MODE_ONESHOT:
-> > > ? ? ? ? ? ? ? ?/* period set, and timer enabled in 'next_event' hook */
-> > > @@ -81,7 +82,7 @@ int twd_timer_ack(void)
-> > >
-> > > ?static void __cpuinit twd_calibrate_rate(void)
-> > > ?{
-> > > - ? ? ? unsigned long load, count;
-> > > + ? ? ? unsigned long count;
-> > > ? ? ? ?u64 waitjiffies;
-> > >
-> > > ? ? ? ?/*
-> > > @@ -116,10 +117,6 @@ static void __cpuinit twd_calibrate_rate(void)
-> > > ? ? ? ? ? ? ? ?printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
-> > > ? ? ? ? ? ? ? ? ? ? ? ?(twd_timer_rate / 1000000) % 100);
-> > > ? ? ? ?}
-> > > -
-> > > - ? ? ? load = twd_timer_rate / HZ;
-> > > -
-> > > - ? ? ? __raw_writel(load, twd_base + TWD_TIMER_LOAD);
-> > > ?}
-> > >
-> > > ?/*
-> > 
-> > This doesn't work for oneshot timers if the TWD_TIMER_CONTROL register
-> > gets reset by cpu idle between twd_set_mode and twd_set_next_event.
-> > Shadowing ctrl in a percpu variable and rewriting it during every call
-> > to twd_set_next_event does work, but that's not much different, and a
-> > little less efficient, than just saving and restoring the control and
-> > load registers in idle.  It does have the advantage that platforms
-> > don't need any extra calls.
-> 
-> The next question is can we teach the generic time infrastructure about
-> this so we don't have to modify every clock event driver for it?  We
-> really need to get away from having this kind of knowledge buried down
-> in the lowest levels of every driver.
+On 25 January 2011 08:44, Sachin Verma <imschnvrm@gmail.com> wrote:
+> On Thu, Jan 13, 2011 at 12:25 AM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+>> On Wed, 12 Jan 2011, Russell King - ARM Linux wrote:
+>>
+>>> Then came along the embedded initrd/initramfs idea which rather buggered
+>>> the scheme when large initramfs are embedded into the image.
+>>>
+>>> As the overall feeling at the time was "don't use large initrds" it's
+>>> something I've never really cared about - and I'm still of the opinion
+>>> that 16MB of compressed initrd/initramfs is rather silly.
+>>
+>> It is... but we have more than 32MB of RAM total now, and people are
+>> running standard distributions on ARM these days, such as Fedora or
+>> Ubuntu, including their corresponding initrd that may contain lots of
+>> modules, splashscreen data, etc. ?So it might be a good idea to think
+>> about fixing this limitation before it comes back again.
+>>
+>
+> in fact it is not just the initrd/initramfs size, i am facing issues
+> with loading modules on MMU-less envt(Cortex M3).
+> I have 128MB of Physical RAM and i am using a 4MB initrd to boot my
+> system. when i try to load kernel modules i get relocation errors.
+> As MMU-less systems are allowing modules to be loaded anywhere from
+> RAM and not from any predefined limits of MODULES_VADDR and
+> MODULES_END.
+>
+> Do you have any pointers on how to tackle this situation for MMU less
+> environments?
 
-In which way? I mean the generic code issues a call to the set_mode
-function when we leave the broadcast mode. So what should the generic
-code do more ?
+I don't think there is a simple solution. As a hack, you could define
+DMA and Normal Zones in your system and force module allocations from
+the DMA zone (which would be close to the kernel).
 
-Thanks,
+I'm not sure whether the kernel could be compile with a larger memory
+model, but then you have to improve the kernel to handle new
+relocation types.
 
-	tglx
+-- 
+Catalin
