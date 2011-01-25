@@ -1,106 +1,545 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 25 Jan 2011 19:56:19 +0900
-Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
-	suspend
-Message-ID: <AANLkTinzXJ=PoSNEHAh1gCeH=2araVTvEB++9kcuUmes@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 26 Jan 2011 05:00:36 +0800
+Subject: [PATCH RFC] ARM: Make VMALLOC_END a variable
+Message-ID: <AANLkTinadBvmnjN=kUt82e=hmM0xumFs8WP_ca8V-e8Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011. 1. 25. ?? 1:27? "Kyungmin Park" <kmpark@infradead.org>?? ??:
->
-> On Tue, Jan 25, 2011 at 4:35 AM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
-> > On Mon, Jan 24, 2011 at 10:50:53AM -0800, Colin Cross wrote:
-> >> On Mon, Jan 24, 2011 at 6:41 AM, Mark Brown
-> >
-> >> > Hrm, what's the situation where that happens and why does it cause
-> >> > problems?  The regulator API doesn't care if suspend is going on, and
-> >> > nor do any of the current drivers for regulators.  There is an issue
-> >> > with keeping things like I2C alive until the bitter end of suspend so
-> >> > you've got a control bus to the regulators but that's a generic issue
-> >> > which crops up with other subsystems too so a regulator-specific
-> >> > workaround seems dodgy.
-> >
-> >> The end result is that the regulator driver calls the i2c driver after
-> >> the i2c driver has been suspended.  On Tegra, this happens because of
-> >> voltage scaling on the CPU regulator, which can be on the i2c bus.  A
-> >> sleep in a suspend handler after the i2c bus has been suspended can
-> >> cause the cpufreq governor to lower the frequency, and try to lower
-> >> the voltage as well.
-> >
-> > OK, that's a general problem - you need to ensure that the I2C and SPI
-> > controllers are suspended really late.  The OMAP guys also have this
-> > problem for some RTCs, though in their case things are slightly
-> > different due to their use of runtime PM.  Looking at your I2C driver
-> > (BTW, I'd suggest reminding Ben on a more regular basis about that) I
-> > suspect that moving your suspend and resume callbacks to the _noirq
-> > varaints will cover a lot of this.
->
-> Right, it's same as Samsung SoCs. we also disable to access the
-> cpufreq when suspending.
-> the PMIC is connected with I2C  and I2C is suspended before PMIC.
->
-> Thank you,
-> Kyungmin Park
->
+VMALLOC_END is machine specific and is preventing multiple SoCs from
+being built together. This patch makes it into a global variable and
+is initially defined in 'struct machine_desc' (.vmalloc_end).  Each board
+file must define this. As a result, machine specific vmalloc.h are
+no longer needed and thus are removed.
 
-Moreover, the suspend-related cpufreq issue gets worse with hibernation.
-Generally PMICs preserve their register values during suspend-to-mem;
-however, they lose the values with power-off (and hibernation).
+This is really a big hunk of change, so I make it as attachment,
+and the diff stat below.
 
-In samsung SoCs, we have mitigated the issue by stopping cpufreq at pm_begin
-(could have a bit different name) and resume with end.  When stopping
-cpufreq, we have made it to fix at the boot freq so that we dont face into
-the inconsistency with hibernation.
-
-Sometimes, when we set voltages for the core, bus, and others, simply saving
-the whole things and restoring them does not work because the order how the
-voltages change may matter (and it does with some of Samsung SoCs). Thus, we
-made them to stop changing and fix at the boot-time default during suspend
-and hibernation.
-
-Cheers!
-
-MyungJoo
-
-> >
-> >> The problem isn't limited to i2c busses, there are some regulators on
-> >> spi busses.  You would need to ensure that any driver that has a
-> >
-> > For all practical purposes in this sort of discussion you can typically
-> > do a s/I2C/I2C and SPI/ - in terms of system integration issues they're
-> > very similar.
-> >
-> >> regulator consumer suspends before the regulator driver it
-> >> communicates with, and that still wouldn't fix cpufreq, which has a
-> >> sysdev suspend handler.
-> >
-> > So you actively need to push the processor into low power mode during
-> > suspend?  I'm still not 100% clear what's triggering the issues you're
-> > seeing and why this seems to be Tegra-only.  If there were a general
-> > cpufreq/regulator interaction here I'd expect to see all ARM cpufreq
-> > drivers needing to do the same thing (and probably some handling of this
-> > in cpufreq core as a result).  If it's not such an issue I'd expect
-> > there's also entertaining suspend ordering issues elsewhere.
-> >
-> > Typically this stuff isn't a problem for regulators themselves since if
-> > they're active by the time I2C is off they normally get suspended by
-> > hardware handshakes from the CPU as that enters low power mode - right
-> > now we have no regulators at all in mainline that do anything in
-> > software on suspend.  We can get a long way by just ignoring what
-> > happens to regulators over suspend (there is some work to do here but
-> > it's orthogonal to this sort of issue).
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+---
+ arch/arm/include/asm/mach/arch.h                |    1 +
+ arch/arm/include/asm/pgtable.h                  |    6 ++++-
+ arch/arm/mach-aaec2000/aaed2000.c               |    1 +
+ arch/arm/mach-aaec2000/include/mach/vmalloc.h   |   16 ------------
+ arch/arm/mach-at91/board-1arm.c                 |    1 +
+ arch/arm/mach-at91/board-afeb-9260v1.c          |    1 +
+ arch/arm/mach-at91/board-at572d940hf_ek.c       |    1 +
+ arch/arm/mach-at91/board-cam60.c                |    1 +
+ arch/arm/mach-at91/board-cap9adk.c              |    1 +
+ arch/arm/mach-at91/board-carmeva.c              |    1 +
+ arch/arm/mach-at91/board-cpu9krea.c             |    1 +
+ arch/arm/mach-at91/board-cpuat91.c              |    1 +
+ arch/arm/mach-at91/board-csb337.c               |    1 +
+ arch/arm/mach-at91/board-csb637.c               |    1 +
+ arch/arm/mach-at91/board-eb01.c                 |    1 +
+ arch/arm/mach-at91/board-eb9200.c               |    1 +
+ arch/arm/mach-at91/board-ecbat91.c              |    1 +
+ arch/arm/mach-at91/board-eco920.c               |    1 +
+ arch/arm/mach-at91/board-flexibity.c            |    1 +
+ arch/arm/mach-at91/board-foxg20.c               |    1 +
+ arch/arm/mach-at91/board-gsia18s.c              |    1 +
+ arch/arm/mach-at91/board-kafa.c                 |    1 +
+ arch/arm/mach-at91/board-kb9202.c               |    1 +
+ arch/arm/mach-at91/board-neocore926.c           |    1 +
+ arch/arm/mach-at91/board-pcontrol-g20.c         |    1 +
+ arch/arm/mach-at91/board-picotux200.c           |    1 +
+ arch/arm/mach-at91/board-qil-a9260.c            |    1 +
+ arch/arm/mach-at91/board-rm9200dk.c             |    1 +
+ arch/arm/mach-at91/board-rm9200ek.c             |    1 +
+ arch/arm/mach-at91/board-sam9-l9260.c           |    1 +
+ arch/arm/mach-at91/board-sam9260ek.c            |    1 +
+ arch/arm/mach-at91/board-sam9261ek.c            |    1 +
+ arch/arm/mach-at91/board-sam9263ek.c            |    1 +
+ arch/arm/mach-at91/board-sam9g20ek.c            |    2 +
+ arch/arm/mach-at91/board-sam9m10g45ek.c         |    1 +
+ arch/arm/mach-at91/board-sam9rlek.c             |    1 +
+ arch/arm/mach-at91/board-snapper9260.c          |    1 +
+ arch/arm/mach-at91/board-stamp9g20.c            |    2 +
+ arch/arm/mach-at91/board-usb-a9260.c            |    1 +
+ arch/arm/mach-at91/board-usb-a9263.c            |    1 +
+ arch/arm/mach-at91/board-yl-9200.c              |    1 +
+ arch/arm/mach-at91/include/mach/vmalloc.h       |   26 --------------------
+ arch/arm/mach-bcmring/arch.c                    |    1 +
+ arch/arm/mach-bcmring/include/mach/vmalloc.h    |   25 -------------------
+ arch/arm/mach-clps711x/autcpu12.c               |    1 +
+ arch/arm/mach-clps711x/cdb89712.c               |    1 +
+ arch/arm/mach-clps711x/ceiva.c                  |    1 +
+ arch/arm/mach-clps711x/clep7312.c               |    1 +
+ arch/arm/mach-clps711x/edb7211-arch.c           |    1 +
+ arch/arm/mach-clps711x/fortunet.c               |    1 +
+ arch/arm/mach-clps711x/include/mach/vmalloc.h   |   20 ---------------
+ arch/arm/mach-clps711x/p720t.c                  |    1 +
+ arch/arm/mach-cns3xxx/cns3420vb.c               |    1 +
+ arch/arm/mach-cns3xxx/include/mach/vmalloc.h    |   11 --------
+ arch/arm/mach-davinci/board-da830-evm.c         |    1 +
+ arch/arm/mach-davinci/board-da850-evm.c         |    1 +
+ arch/arm/mach-davinci/board-dm355-evm.c         |    1 +
+ arch/arm/mach-davinci/board-dm355-leopard.c     |    1 +
+ arch/arm/mach-davinci/board-dm365-evm.c         |    1 +
+ arch/arm/mach-davinci/board-dm644x-evm.c        |    1 +
+ arch/arm/mach-davinci/board-dm646x-evm.c        |    2 +
+ arch/arm/mach-davinci/board-mityomapl138.c      |    1 +
+ arch/arm/mach-davinci/board-neuros-osd2.c       |    1 +
+ arch/arm/mach-davinci/board-omapl138-hawk.c     |    1 +
+ arch/arm/mach-davinci/board-sffsdr.c            |    1 +
+ arch/arm/mach-davinci/board-tnetv107x-evm.c     |    1 +
+ arch/arm/mach-davinci/include/mach/vmalloc.h    |   14 -----------
+ arch/arm/mach-dove/cm-a510.c                    |    1 +
+ arch/arm/mach-dove/dove-db-setup.c              |    1 +
+ arch/arm/mach-dove/include/mach/vmalloc.h       |    5 ----
+ arch/arm/mach-ebsa110/core.c                    |    1 +
+ arch/arm/mach-ebsa110/include/mach/vmalloc.h    |   10 --------
+ arch/arm/mach-ep93xx/adssphere.c                |    1 +
+ arch/arm/mach-ep93xx/edb93xx.c                  |    8 ++++++
+ arch/arm/mach-ep93xx/gesbc9312.c                |    1 +
+ arch/arm/mach-ep93xx/include/mach/vmalloc.h     |    5 ----
+ arch/arm/mach-ep93xx/micro9.c                   |    4 +++
+ arch/arm/mach-ep93xx/simone.c                   |    1 +
+ arch/arm/mach-ep93xx/snappercl15.c              |    1 +
+ arch/arm/mach-ep93xx/ts72xx.c                   |    1 +
+ arch/arm/mach-footbridge/cats-hw.c              |    1 +
+ arch/arm/mach-footbridge/ebsa285.c              |    1 +
+ arch/arm/mach-footbridge/include/mach/vmalloc.h |   10 --------
+ arch/arm/mach-footbridge/netwinder-hw.c         |    1 +
+ arch/arm/mach-footbridge/personal.c             |    1 +
+ arch/arm/mach-gemini/board-nas4220b.c           |    1 +
+ arch/arm/mach-gemini/board-rut1xx.c             |    1 +
+ arch/arm/mach-gemini/board-wbd111.c             |    1 +
+ arch/arm/mach-gemini/board-wbd222.c             |    1 +
+ arch/arm/mach-gemini/include/mach/vmalloc.h     |   10 --------
+ arch/arm/mach-h720x/h7201-eval.c                |    1 +
+ arch/arm/mach-h720x/h7202-eval.c                |    1 +
+ arch/arm/mach-h720x/include/mach/vmalloc.h      |   10 --------
+ arch/arm/mach-imx/mach-cpuimx27.c               |    1 +
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c        |    1 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c     |    1 +
+ arch/arm/mach-imx/mach-imx27lite.c              |    1 +
+ arch/arm/mach-imx/mach-mx1ads.c                 |    2 +
+ arch/arm/mach-imx/mach-mx21ads.c                |    1 +
+ arch/arm/mach-imx/mach-mx25_3ds.c               |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c               |    1 +
+ arch/arm/mach-imx/mach-mx27ads.c                |    1 +
+ arch/arm/mach-imx/mach-mxt_td60.c               |    1 +
+ arch/arm/mach-imx/mach-pca100.c                 |    1 +
+ arch/arm/mach-imx/mach-pcm038.c                 |    1 +
+ arch/arm/mach-imx/mach-scb9328.c                |    1 +
+ arch/arm/mach-integrator/include/mach/vmalloc.h |   20 ---------------
+ arch/arm/mach-integrator/integrator_ap.c        |    1 +
+ arch/arm/mach-integrator/integrator_cp.c        |    1 +
+ arch/arm/mach-iop13xx/include/mach/vmalloc.h    |    4 ---
+ arch/arm/mach-iop13xx/iq81340mc.c               |    1 +
+ arch/arm/mach-iop13xx/iq81340sc.c               |    1 +
+ arch/arm/mach-iop32x/em7210.c                   |    1 +
+ arch/arm/mach-iop32x/glantank.c                 |    1 +
+ arch/arm/mach-iop32x/include/mach/vmalloc.h     |    5 ----
+ arch/arm/mach-iop32x/iq31244.c                  |    2 +
+ arch/arm/mach-iop32x/iq80321.c                  |    1 +
+ arch/arm/mach-iop32x/n2100.c                    |    1 +
+ arch/arm/mach-iop33x/include/mach/vmalloc.h     |    5 ----
+ arch/arm/mach-iop33x/iq80331.c                  |    1 +
+ arch/arm/mach-iop33x/iq80332.c                  |    1 +
+ arch/arm/mach-ixp2000/enp2611.c                 |    1 +
+ arch/arm/mach-ixp2000/include/mach/vmalloc.h    |   20 ---------------
+ arch/arm/mach-ixp2000/ixdp2400.c                |    1 +
+ arch/arm/mach-ixp2000/ixdp2800.c                |    1 +
+ arch/arm/mach-ixp2000/ixdp2x01.c                |    3 ++
+ arch/arm/mach-ixp23xx/espresso.c                |    1 +
+ arch/arm/mach-ixp23xx/include/mach/vmalloc.h    |   10 --------
+ arch/arm/mach-ixp23xx/ixdp2351.c                |    1 +
+ arch/arm/mach-ixp23xx/roadrunner.c              |    1 +
+ arch/arm/mach-ixp4xx/avila-setup.c              |    2 +
+ arch/arm/mach-ixp4xx/coyote-setup.c             |    2 +
+ arch/arm/mach-ixp4xx/dsmg600-setup.c            |    1 +
+ arch/arm/mach-ixp4xx/fsg-setup.c                |    1 +
+ arch/arm/mach-ixp4xx/gateway7001-setup.c        |    1 +
+ arch/arm/mach-ixp4xx/goramo_mlr.c               |    1 +
+ arch/arm/mach-ixp4xx/gtwx5715-setup.c           |    1 +
+ arch/arm/mach-ixp4xx/include/mach/vmalloc.h     |    5 ----
+ arch/arm/mach-ixp4xx/ixdp425-setup.c            |    4 +++
+ arch/arm/mach-ixp4xx/nas100d-setup.c            |    1 +
+ arch/arm/mach-ixp4xx/nslu2-setup.c              |    1 +
+ arch/arm/mach-ixp4xx/vulcan-setup.c             |    1 +
+ arch/arm/mach-ixp4xx/wg302v2-setup.c            |    1 +
+ arch/arm/mach-kirkwood/d2net_v2-setup.c         |    1 +
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c     |    1 +
+ arch/arm/mach-kirkwood/dockstar-setup.c         |    1 +
+ arch/arm/mach-kirkwood/guruplug-setup.c         |    1 +
+ arch/arm/mach-kirkwood/include/mach/vmalloc.h   |    5 ----
+ arch/arm/mach-kirkwood/mv88f6281gtw_ge-setup.c  |    1 +
+ arch/arm/mach-kirkwood/netspace_v2-setup.c      |    3 ++
+ arch/arm/mach-kirkwood/netxbig_v2-setup.c       |    2 +
+ arch/arm/mach-kirkwood/openrd-setup.c           |    3 ++
+ arch/arm/mach-kirkwood/rd88f6192-nas-setup.c    |    1 +
+ arch/arm/mach-kirkwood/rd88f6281-setup.c        |    1 +
+ arch/arm/mach-kirkwood/sheevaplug-setup.c       |    2 +
+ arch/arm/mach-kirkwood/t5325-setup.c            |    1 +
+ arch/arm/mach-kirkwood/ts219-setup.c            |    1 +
+ arch/arm/mach-kirkwood/ts41x-setup.c            |    1 +
+ arch/arm/mach-ks8695/board-acs5k.c              |    1 +
+ arch/arm/mach-ks8695/board-dsm320.c             |    1 +
+ arch/arm/mach-ks8695/board-micrel.c             |    1 +
+ arch/arm/mach-ks8695/include/mach/vmalloc.h     |   19 ---------------
+ arch/arm/mach-lh7a40x/arch-kev7a400.c           |    1 +
+ arch/arm/mach-lh7a40x/arch-lpd7a40x.c           |    2 +
+ arch/arm/mach-lh7a40x/include/mach/vmalloc.h    |   10 --------
+ arch/arm/mach-loki/include/mach/vmalloc.h       |    5 ----
+ arch/arm/mach-loki/lb88rc8480-setup.c           |    1 +
+ arch/arm/mach-lpc32xx/include/mach/vmalloc.h    |   24 -------------------
+ arch/arm/mach-lpc32xx/phy3250.c                 |    1 +
+ arch/arm/mach-mmp/aspenite.c                    |    2 +
+ arch/arm/mach-mmp/avengers_lite.c               |    1 +
+ arch/arm/mach-mmp/brownstone.c                  |    1 +
+ arch/arm/mach-mmp/flint.c                       |    1 +
+ arch/arm/mach-mmp/include/mach/vmalloc.h        |    5 ----
+ arch/arm/mach-mmp/jasper.c                      |    1 +
+ arch/arm/mach-mmp/tavorevb.c                    |    1 +
+ arch/arm/mach-mmp/teton_bga.c                   |    1 +
+ arch/arm/mach-mmp/ttc_dkb.c                     |    1 +
+ arch/arm/mach-msm/board-halibut.c               |    1 +
+ arch/arm/mach-msm/board-mahimahi.c              |    1 +
+ arch/arm/mach-msm/board-msm7x27.c               |    4 +++
+ arch/arm/mach-msm/board-msm7x30.c               |    3 ++
+ arch/arm/mach-msm/board-msm8x60.c               |    4 +++
+ arch/arm/mach-msm/board-qsd8x50.c               |    2 +
+ arch/arm/mach-msm/board-sapphire.c              |    1 +
+ arch/arm/mach-msm/board-trout.c                 |    1 +
+ arch/arm/mach-msm/include/mach/vmalloc.h        |   22 -----------------
+ arch/arm/mach-mv78xx0/buffalo-wxl-setup.c       |    1 +
+ arch/arm/mach-mv78xx0/db78x00-bp-setup.c        |    1 +
+ arch/arm/mach-mv78xx0/include/mach/vmalloc.h    |    5 ----
+ arch/arm/mach-mv78xx0/rd78x00-masa-setup.c      |    1 +
+ arch/arm/mach-mx3/mach-armadillo5x0.c           |    1 +
+ arch/arm/mach-mx3/mach-cpuimx35.c               |    1 +
+ arch/arm/mach-mx3/mach-kzm_arm11_01.c           |    1 +
+ arch/arm/mach-mx3/mach-mx31_3ds.c               |    1 +
+ arch/arm/mach-mx3/mach-mx31ads.c                |    1 +
+ arch/arm/mach-mx3/mach-mx31lilly.c              |    1 +
+ arch/arm/mach-mx3/mach-mx31lite.c               |    1 +
+ arch/arm/mach-mx3/mach-mx31moboard.c            |    1 +
+ arch/arm/mach-mx3/mach-mx35_3ds.c               |    1 +
+ arch/arm/mach-mx3/mach-pcm037.c                 |    1 +
+ arch/arm/mach-mx3/mach-pcm043.c                 |    1 +
+ arch/arm/mach-mx3/mach-qong.c                   |    1 +
+ arch/arm/mach-mx5/board-cpuimx51.c              |    1 +
+ arch/arm/mach-mx5/board-cpuimx51sd.c            |    1 +
+ arch/arm/mach-mx5/board-mx50_rdp.c              |    1 +
+ arch/arm/mach-mx5/board-mx51_3ds.c              |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c          |    1 +
+ arch/arm/mach-mx5/board-mx51_efikamx.c          |    1 +
+ arch/arm/mach-mx5/board-mx53_evk.c              |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c             |    1 +
+ arch/arm/mach-mx5/board-mx53_smd.c              |    1 +
+ arch/arm/mach-mxc91231/magx-zn5.c               |    1 +
+ arch/arm/mach-mxs/include/mach/vmalloc.h        |   22 -----------------
+ arch/arm/mach-mxs/mach-mx23evk.c                |    1 +
+ arch/arm/mach-mxs/mach-mx28evk.c                |    1 +
+ arch/arm/mach-netx/include/mach/vmalloc.h       |   19 ---------------
+ arch/arm/mach-netx/nxdb500.c                    |    1 +
+ arch/arm/mach-netx/nxdkn.c                      |    1 +
+ arch/arm/mach-netx/nxeb500hmi.c                 |    1 +
+ arch/arm/mach-nomadik/board-nhk8815.c           |    1 +
+ arch/arm/mach-nomadik/include/mach/vmalloc.h    |    2 -
+ arch/arm/mach-ns9xxx/include/mach/vmalloc.h     |   16 ------------
+ arch/arm/mach-ns9xxx/mach-cc9p9360dev.c         |    1 +
+ arch/arm/mach-ns9xxx/mach-cc9p9360js.c          |    1 +
+ arch/arm/mach-nuc93x/include/mach/vmalloc.h     |   23 ------------------
+ arch/arm/mach-nuc93x/mach-nuc932evb.c           |    1 +
+ arch/arm/mach-omap1/board-ams-delta.c           |    1 +
+ arch/arm/mach-omap1/board-fsample.c             |    1 +
+ arch/arm/mach-omap1/board-generic.c             |    1 +
+ arch/arm/mach-omap1/board-h2.c                  |    1 +
+ arch/arm/mach-omap1/board-h3.c                  |    1 +
+ arch/arm/mach-omap1/board-htcherald.c           |    1 +
+ arch/arm/mach-omap1/board-innovator.c           |    1 +
+ arch/arm/mach-omap1/board-nokia770.c            |    1 +
+ arch/arm/mach-omap1/board-osk.c                 |    1 +
+ arch/arm/mach-omap1/board-palmte.c              |    1 +
+ arch/arm/mach-omap1/board-palmtt.c              |    1 +
+ arch/arm/mach-omap1/board-palmz71.c             |    1 +
+ arch/arm/mach-omap1/board-perseus2.c            |    1 +
+ arch/arm/mach-omap1/board-sx1.c                 |    1 +
+ arch/arm/mach-omap1/board-voiceblue.c           |    1 +
+ arch/arm/mach-omap1/include/mach/vmalloc.h      |   20 ---------------
+ arch/arm/mach-omap2/board-2430sdp.c             |    1 +
+ arch/arm/mach-omap2/board-3430sdp.c             |    1 +
+ arch/arm/mach-omap2/board-3630sdp.c             |    1 +
+ arch/arm/mach-omap2/board-4430sdp.c             |    1 +
+ arch/arm/mach-omap2/board-am3517crane.c         |    1 +
+ arch/arm/mach-omap2/board-am3517evm.c           |    1 +
+ arch/arm/mach-omap2/board-apollon.c             |    1 +
+ arch/arm/mach-omap2/board-cm-t35.c              |    1 +
+ arch/arm/mach-omap2/board-cm-t3517.c            |    1 +
+ arch/arm/mach-omap2/board-devkit8000.c          |    1 +
+ arch/arm/mach-omap2/board-generic.c             |    1 +
+ arch/arm/mach-omap2/board-h4.c                  |    1 +
+ arch/arm/mach-omap2/board-igep0020.c            |    1 +
+ arch/arm/mach-omap2/board-igep0030.c            |    1 +
+ arch/arm/mach-omap2/board-ldp.c                 |    1 +
+ arch/arm/mach-omap2/board-n8x0.c                |    3 ++
+ arch/arm/mach-omap2/board-omap3beagle.c         |    1 +
+ arch/arm/mach-omap2/board-omap3evm.c            |    1 +
+ arch/arm/mach-omap2/board-omap3logic.c          |    2 +
+ arch/arm/mach-omap2/board-omap3pandora.c        |    1 +
+ arch/arm/mach-omap2/board-omap3stalker.c        |    1 +
+ arch/arm/mach-omap2/board-omap3touchbook.c      |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c          |    1 +
+ arch/arm/mach-omap2/board-overo.c               |    1 +
+ arch/arm/mach-omap2/board-rm680.c               |    1 +
+ arch/arm/mach-omap2/board-rx51.c                |    1 +
+ arch/arm/mach-omap2/board-zoom.c                |    2 +
+ arch/arm/mach-omap2/include/mach/vmalloc.h      |   20 ---------------
+ arch/arm/mach-orion5x/d2net-setup.c             |    2 +
+ arch/arm/mach-orion5x/db88f5281-setup.c         |    1 +
+ arch/arm/mach-orion5x/dns323-setup.c            |    1 +
+ arch/arm/mach-orion5x/edmini_v2-setup.c         |    1 +
+ arch/arm/mach-orion5x/include/mach/vmalloc.h    |    5 ----
+ arch/arm/mach-orion5x/kurobox_pro-setup.c       |    2 +
+ arch/arm/mach-orion5x/ls-chl-setup.c            |    1 +
+ arch/arm/mach-orion5x/ls_hgl-setup.c            |    1 +
+ arch/arm/mach-orion5x/lsmini-setup.c            |    1 +
+ arch/arm/mach-orion5x/mss2-setup.c              |    1 +
+ arch/arm/mach-orion5x/mv2120-setup.c            |    1 +
+ arch/arm/mach-orion5x/net2big-setup.c           |    1 +
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c    |    1 +
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c     |    1 +
+ arch/arm/mach-orion5x/rd88f5182-setup.c         |    1 +
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c    |    1 +
+ arch/arm/mach-orion5x/terastation_pro2-setup.c  |    1 +
+ arch/arm/mach-orion5x/ts209-setup.c             |    1 +
+ arch/arm/mach-orion5x/ts409-setup.c             |    1 +
+ arch/arm/mach-orion5x/ts78xx-setup.c            |    1 +
+ arch/arm/mach-orion5x/wnr854t-setup.c           |    1 +
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c        |    1 +
+ arch/arm/mach-pnx4008/core.c                    |    1 +
+ arch/arm/mach-pnx4008/include/mach/vmalloc.h    |   20 ---------------
+ arch/arm/mach-pxa/balloon3.c                    |    1 +
+ arch/arm/mach-pxa/capc7117.c                    |    1 +
+ arch/arm/mach-pxa/cm-x2xx.c                     |    1 +
+ arch/arm/mach-pxa/cm-x300.c                     |    1 +
+ arch/arm/mach-pxa/colibri-pxa270.c              |    2 +
+ arch/arm/mach-pxa/colibri-pxa300.c              |    1 +
+ arch/arm/mach-pxa/colibri-pxa320.c              |    1 +
+ arch/arm/mach-pxa/corgi.c                       |    3 ++
+ arch/arm/mach-pxa/csb726.c                      |    1 +
+ arch/arm/mach-pxa/em-x270.c                     |    2 +
+ arch/arm/mach-pxa/eseries.c                     |    6 ++++
+ arch/arm/mach-pxa/ezx.c                         |    6 ++++
+ arch/arm/mach-pxa/gumstix.c                     |    1 +
+ arch/arm/mach-pxa/h5000.c                       |    1 +
+ arch/arm/mach-pxa/himalaya.c                    |    1 +
+ arch/arm/mach-pxa/hx4700.c                      |    1 +
+ arch/arm/mach-pxa/icontrol.c                    |    1 +
+ arch/arm/mach-pxa/idp.c                         |    1 +
+ arch/arm/mach-pxa/include/mach/vmalloc.h        |   11 --------
+ arch/arm/mach-pxa/littleton.c                   |    1 +
+ arch/arm/mach-pxa/lpd270.c                      |    1 +
+ arch/arm/mach-pxa/lubbock.c                     |    1 +
+ arch/arm/mach-pxa/magician.c                    |    1 +
+ arch/arm/mach-pxa/mainstone.c                   |    1 +
+ arch/arm/mach-pxa/mioa701.c                     |    1 +
+ arch/arm/mach-pxa/mp900.c                       |    1 +
+ arch/arm/mach-pxa/palmld.c                      |    1 +
+ arch/arm/mach-pxa/palmt5.c                      |    1 +
+ arch/arm/mach-pxa/palmtc.c                      |    1 +
+ arch/arm/mach-pxa/palmte2.c                     |    1 +
+ arch/arm/mach-pxa/palmtreo.c                    |    2 +
+ arch/arm/mach-pxa/palmtx.c                      |    1 +
+ arch/arm/mach-pxa/palmz72.c                     |    1 +
+ arch/arm/mach-pxa/pcm027.c                      |    1 +
+ arch/arm/mach-pxa/poodle.c                      |    1 +
+ arch/arm/mach-pxa/raumfeld.c                    |    3 ++
+ arch/arm/mach-pxa/saar.c                        |    1 +
+ arch/arm/mach-pxa/saarb.c                       |    1 +
+ arch/arm/mach-pxa/spitz.c                       |    3 ++
+ arch/arm/mach-pxa/stargate2.c                   |    2 +
+ arch/arm/mach-pxa/tavorevb.c                    |    1 +
+ arch/arm/mach-pxa/tavorevb3.c                   |    1 +
+ arch/arm/mach-pxa/tosa.c                        |    1 +
+ arch/arm/mach-pxa/trizeps4.c                    |    2 +
+ arch/arm/mach-pxa/viper.c                       |    1 +
+ arch/arm/mach-pxa/vpac270.c                     |    1 +
+ arch/arm/mach-pxa/xcep.c                        |    1 +
+ arch/arm/mach-pxa/z2.c                          |    1 +
+ arch/arm/mach-pxa/zeus.c                        |    1 +
+ arch/arm/mach-pxa/zylonite.c                    |    1 +
+ arch/arm/mach-realview/include/mach/vmalloc.h   |   21 ----------------
+ arch/arm/mach-realview/realview_eb.c            |    1 +
+ arch/arm/mach-realview/realview_pb1176.c        |    1 +
+ arch/arm/mach-realview/realview_pb11mp.c        |    1 +
+ arch/arm/mach-realview/realview_pba8.c          |    1 +
+ arch/arm/mach-realview/realview_pbx.c           |    1 +
+ arch/arm/mach-rpc/include/mach/vmalloc.h        |   10 --------
+ arch/arm/mach-rpc/riscpc.c                      |    1 +
+ arch/arm/mach-s3c2410/include/mach/vmalloc.h    |   20 ---------------
+ arch/arm/mach-s3c2410/mach-amlm5900.c           |    1 +
+ arch/arm/mach-s3c2410/mach-bast.c               |    1 +
+ arch/arm/mach-s3c2410/mach-h1940.c              |    1 +
+ arch/arm/mach-s3c2410/mach-n30.c                |    2 +
+ arch/arm/mach-s3c2410/mach-otom.c               |    1 +
+ arch/arm/mach-s3c2410/mach-qt2410.c             |    1 +
+ arch/arm/mach-s3c2410/mach-smdk2410.c           |    1 +
+ arch/arm/mach-s3c2410/mach-tct_hammer.c         |    1 +
+ arch/arm/mach-s3c2410/mach-vr1000.c             |    1 +
+ arch/arm/mach-s3c2412/mach-jive.c               |    1 +
+ arch/arm/mach-s3c2412/mach-smdk2413.c           |    3 ++
+ arch/arm/mach-s3c2412/mach-vstms.c              |    1 +
+ arch/arm/mach-s3c2416/mach-smdk2416.c           |    1 +
+ arch/arm/mach-s3c2440/mach-anubis.c             |    1 +
+ arch/arm/mach-s3c2440/mach-at2440evb.c          |    1 +
+ arch/arm/mach-s3c2440/mach-gta02.c              |    1 +
+ arch/arm/mach-s3c2440/mach-mini2440.c           |    1 +
+ arch/arm/mach-s3c2440/mach-nexcoder.c           |    1 +
+ arch/arm/mach-s3c2440/mach-osiris.c             |    1 +
+ arch/arm/mach-s3c2440/mach-rx1950.c             |    1 +
+ arch/arm/mach-s3c2440/mach-rx3715.c             |    1 +
+ arch/arm/mach-s3c2440/mach-smdk2440.c           |    1 +
+ arch/arm/mach-s3c2443/mach-smdk2443.c           |    1 +
+ arch/arm/mach-s3c24a0/include/mach/vmalloc.h    |   17 -------------
+ arch/arm/mach-s3c64xx/include/mach/vmalloc.h    |   20 ---------------
+ arch/arm/mach-s3c64xx/mach-anw6410.c            |    1 +
+ arch/arm/mach-s3c64xx/mach-hmt.c                |    1 +
+ arch/arm/mach-s3c64xx/mach-mini6410.c           |    1 +
+ arch/arm/mach-s3c64xx/mach-ncp.c                |    1 +
+ arch/arm/mach-s3c64xx/mach-real6410.c           |    1 +
+ arch/arm/mach-s3c64xx/mach-smartq5.c            |    1 +
+ arch/arm/mach-s3c64xx/mach-smartq7.c            |    1 +
+ arch/arm/mach-s3c64xx/mach-smdk6400.c           |    1 +
+ arch/arm/mach-s3c64xx/mach-smdk6410.c           |    1 +
+ arch/arm/mach-s5p6442/include/mach/vmalloc.h    |   17 -------------
+ arch/arm/mach-s5p6442/mach-smdk6442.c           |    1 +
+ arch/arm/mach-s5p64x0/include/mach/vmalloc.h    |   20 ---------------
+ arch/arm/mach-s5p64x0/mach-smdk6440.c           |    1 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c           |    1 +
+ arch/arm/mach-s5pc100/include/mach/vmalloc.h    |   17 -------------
+ arch/arm/mach-s5pc100/mach-smdkc100.c           |    1 +
+ arch/arm/mach-s5pv210/include/mach/vmalloc.h    |   22 -----------------
+ arch/arm/mach-s5pv210/mach-aquila.c             |    1 +
+ arch/arm/mach-s5pv210/mach-goni.c               |    1 +
+ arch/arm/mach-s5pv210/mach-smdkc110.c           |    1 +
+ arch/arm/mach-s5pv210/mach-smdkv210.c           |    1 +
+ arch/arm/mach-s5pv210/mach-torbreck.c           |    1 +
+ arch/arm/mach-s5pv310/include/mach/vmalloc.h    |   22 -----------------
+ arch/arm/mach-s5pv310/mach-smdkc210.c           |    1 +
+ arch/arm/mach-s5pv310/mach-smdkv310.c           |    1 +
+ arch/arm/mach-s5pv310/mach-universal_c210.c     |    1 +
+ arch/arm/mach-sa1100/assabet.c                  |    1 +
+ arch/arm/mach-sa1100/badge4.c                   |    1 +
+ arch/arm/mach-sa1100/cerf.c                     |    1 +
+ arch/arm/mach-sa1100/collie.c                   |    1 +
+ arch/arm/mach-sa1100/h3100.c                    |    1 +
+ arch/arm/mach-sa1100/h3600.c                    |    1 +
+ arch/arm/mach-sa1100/hackkit.c                  |    1 +
+ arch/arm/mach-sa1100/include/mach/vmalloc.h     |    4 ---
+ arch/arm/mach-sa1100/jornada720.c               |    1 +
+ arch/arm/mach-sa1100/lart.c                     |    1 +
+ arch/arm/mach-sa1100/nanoengine.c               |    1 +
+ arch/arm/mach-sa1100/pleb.c                     |    1 +
+ arch/arm/mach-sa1100/shannon.c                  |    1 +
+ arch/arm/mach-sa1100/simpad.c                   |    1 +
+ arch/arm/mach-shark/core.c                      |    1 +
+ arch/arm/mach-shark/include/mach/vmalloc.h      |    4 ---
+ arch/arm/mach-shmobile/board-ag5evm.c           |    1 +
+ arch/arm/mach-shmobile/board-ap4evb.c           |    1 +
+ arch/arm/mach-shmobile/board-g3evm.c            |    1 +
+ arch/arm/mach-shmobile/board-g4evm.c            |    1 +
+ arch/arm/mach-shmobile/board-mackerel.c         |    1 +
+ arch/arm/mach-shmobile/include/mach/vmalloc.h   |    7 -----
+ arch/arm/mach-spear3xx/include/mach/vmalloc.h   |   19 ---------------
+ arch/arm/mach-spear3xx/spear300_evb.c           |    1 +
+ arch/arm/mach-spear3xx/spear310_evb.c           |    1 +
+ arch/arm/mach-spear3xx/spear320_evb.c           |    1 +
+ arch/arm/mach-spear6xx/include/mach/vmalloc.h   |   19 ---------------
+ arch/arm/mach-spear6xx/spear600_evb.c           |    1 +
+ arch/arm/mach-stmp378x/stmp378x_devb.c          |    1 +
+ arch/arm/mach-stmp37xx/stmp37xx_devb.c          |    1 +
+ arch/arm/mach-tcc8k/board-tcc8000-sdk.c         |    1 +
+ arch/arm/mach-tegra/board-harmony.c             |    1 +
+ arch/arm/mach-tegra/include/mach/vmalloc.h      |   28 ----------------------
+ arch/arm/mach-u300/include/mach/vmalloc.h       |   12 ---------
+ arch/arm/mach-u300/u300.c                       |    1 +
+ arch/arm/mach-ux500/board-mop500.c              |    1 +
+ arch/arm/mach-ux500/board-u5500.c               |    1 +
+ arch/arm/mach-ux500/include/mach/vmalloc.h      |   18 --------------
+ arch/arm/mach-versatile/include/mach/vmalloc.h  |   21 ----------------
+ arch/arm/mach-versatile/versatile_ab.c          |    1 +
+ arch/arm/mach-versatile/versatile_pb.c          |    1 +
+ arch/arm/mach-vexpress/ct-ca9x4.c               |    1 +
+ arch/arm/mach-vexpress/include/mach/vmalloc.h   |   21 ----------------
+ arch/arm/mach-w90x900/include/mach/vmalloc.h    |   23 ------------------
+ arch/arm/mach-w90x900/mach-nuc910evb.c          |    1 +
+ arch/arm/mach-w90x900/mach-nuc950evb.c          |    1 +
+ arch/arm/mach-w90x900/mach-nuc960evb.c          |    1 +
+ arch/arm/mm/init.c                              |    1 -
+ arch/arm/mm/mmu.c                               |   29 ++++++++++++++--------
+ arch/arm/plat-mxc/include/mach/vmalloc.h        |   22 -----------------
+ arch/arm/plat-spear/include/plat/vmalloc.h      |   19 ---------------
+ arch/arm/plat-stmp3xxx/include/mach/vmalloc.h   |   12 ---------
+ arch/arm/plat-tcc/include/mach/vmalloc.h        |   10 --------
+ 458 files changed, 485 insertions(+), 922 deletions(-)
+ delete mode 100644 arch/arm/mach-aaec2000/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-bcmring/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-cns3xxx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-dove/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ebsa110/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ep93xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-footbridge/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-iop13xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-iop32x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-iop33x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ixp2000/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ixp23xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ixp4xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-kirkwood/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ks8695/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-lh7a40x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-loki/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-lpc32xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-mmp/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-msm/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-mv78xx0/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-netx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-nomadik/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ns9xxx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-nuc93x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-omap1/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-omap2/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-orion5x/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-pnx4008/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-pxa/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-realview/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-rpc/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s3c2410/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s3c24a0/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s5p6442/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-s5pv310/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-sa1100/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-shark/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-spear3xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-spear6xx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-tegra/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-ux500/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-versatile/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-vexpress/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/mach-w90x900/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/plat-mxc/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/plat-spear/include/plat/vmalloc.h
+ delete mode 100644 arch/arm/plat-stmp3xxx/include/mach/vmalloc.h
+ delete mode 100644 arch/arm/plat-tcc/include/mach/vmalloc.h
 -------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110125/5ffddccf/attachment-0001.html>
+A non-text attachment was scrubbed...
+Name: 0001-ARM-Make-VMALLOC_END-a-variable-defined-in-struct-ma.patch
+Type: text/x-patch
+Size: 291432 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110126/0a33131a/attachment-0001.bin>
