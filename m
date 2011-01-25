@@ -1,86 +1,34 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 25 Jan 2011 15:24:49 +0100 (CET)
-Subject: [PATCH 3/5] ARM: twd: Add context save restore support
-In-Reply-To: <20110125141530.GB17286@n2100.arm.linux.org.uk>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
-	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
-	<20110124111114.GA19409@n2100.arm.linux.org.uk>
-	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
-	<20110125103231.GD11507@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251418260.31804@localhost6.localdomain6>
-	<20110125133752.GI13300@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251506360.31804@localhost6.localdomain6>
-	<20110125141530.GB17286@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101251519530.31804@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 14:38:34 +0000
+Subject: [PATCH v2] arm: Configure reference clock for Versatile
+	Express timers
+In-Reply-To: <1295965107.20017.7.camel@hornet.cambridge.arm.com>
+References: <1295373883-21513-1-git-send-email-pawel.moll@arm.com>
+	<20110124144753.GB22949@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F4328E@GEORGE.Emea.Arm.com>
+	<20110124161453.GB24104@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F432AE@GEORGE.Emea.Arm.com>
+	<20110124171007.GI24104@n2100.arm.linux.org.uk>
+	<000601cbbbfa$c83d4db0$58b7e910$@moll@arm.com>
+	<20110124202031.GL24104@n2100.arm.linux.org.uk>
+	<1295965107.20017.7.camel@hornet.cambridge.arm.com>
+Message-ID: <20110125143833.GA17280@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jan 2011, Russell King - ARM Linux wrote:
-> On Tue, Jan 25, 2011 at 03:12:24PM +0100, Thomas Gleixner wrote:
-> > On Tue, 25 Jan 2011, Russell King - ARM Linux wrote:
-> > > On Tue, Jan 25, 2011 at 02:23:10PM +0100, Thomas Gleixner wrote:
-> > > > In which way? I mean the generic code issues a call to the set_mode
-> > > > function when we leave the broadcast mode. So what should the generic
-> > > > code do more ?
-> > > 
-> > > I can't say because these patches only add the hooks, there's no
-> > > implementation yet which uses the hooks.
-> > > 
-> > > Given the description about _why_ those hooks are necessary, it seems
-> > > that something is required.  Either we start adding custom hacks to
-> > > each clockevent driver as is done with this patch, or we get some
-> > > generic help in place.
-> > > 
-> > > I'm not thrilled by the custom hack approach - and I thought the
-> > > clockevent stuff was created to stop this kind of thing happening.
+On Tue, Jan 25, 2011 at 02:18:27PM +0000, Pawel Moll wrote:
+> > > First is the reference clock configuration, and this change is
+> > really important. I'll send v3 in a second, which does not touch the
+> > TIMER_CTRL lines. I hope you are happy about this.
 > > 
-> > Yes, and it does the right thing:
-> > 
-> >      idle enter (where the cpu local tick device stops)
-> > 
-> >      	  tick_broadcast_oneshot_control(CLOCK_EVT_NOTIFY_BROADCAST_ENTER)
-> > 
-> > 		clockevents_set_mode(dev, CLOCK_EVT_MODE_SHUTDOWN)
-> > 		tick_broadcast_set_event(dev->next_event, 1)
-> > 
-> >     idle exit
-> > 
-> >      	  tick_broadcast_oneshot_control(CLOCK_EVT_NOTIFY_BROADCAST_EXIT)
-> > 
-> > 		clockevents_set_mode(dev, CLOCK_EVT_MODE_ONESHOT)
-> > 		tick_program_event(dev->next_event, 1)
-> > 
-> > So the generic code has all the calls in place. If a clock chip
-> > implementation misses to set control registers in the
-> > CLOCK_EVT_MODE_ONESHOT case, then it's not a short coming of the
-> > generic code which needs magic hooks in the arch code.
-> > 
-> > The same applies for the periodic mode switch, which is handled via
-> > tick_broadcast_on_off().
-> > 
-> > Am I missing something ?
+> > I'm not going to bother replying to this message until you wrap your
+> > messages sensibly.  I can't read most of your message while composing
+> > a reply.
 > 
-> I quote Colin:
+> Point taken, guilt accepted. Apologies.
 > 
-> | This doesn't work for oneshot timers if the TWD_TIMER_CONTROL register
-> | gets reset by cpu idle between twd_set_mode and twd_set_next_event.
+> I shouldn't have even tried to tame Outlook, my fault ;-)
+> 
+> Now - are you ok with sending v3 to your patch system?
 
-And I fear that he means the twd_set_mode(ONESHOT) call which happens
-during boot/cpuonline.
-
-The point is that the above function needs to be called from the cpu
-idle code to notify the clock events layer. The correct mechanism is
-clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER/EXIT). The
-existing callers are in:
-
-arch/x86/kernel/process.c
-drivers/acpi/acpi_pad.c
-drivers/acpi/processor_idle.c
-drivers/idle/intel_idle.c
-
-So i'm not surprised, that this wont work on ARM :)
-
-Thanks,
-
-	tglx
+v3 looks much better, thanks.
