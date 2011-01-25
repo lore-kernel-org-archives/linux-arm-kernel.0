@@ -1,46 +1,33 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Tue, 25 Jan 2011 11:17:25 -0800
-Subject: [PATCH v2 01/11] msm: Add CPU queries
-In-Reply-To: <1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com> (Daniel
-	Walker's message of "Tue, 25 Jan 2011 09:35:10 -0800")
+Date: Tue, 25 Jan 2011 11:18:39 -0800
+Subject: [PATCH v2 02/11] msm: Generalize timer register mappings
+In-Reply-To: <1295979136.16668.4.camel@carlv-linux.qualcomm.com> (Carl
+	Vanderlip's message of "Tue, 25 Jan 2011 10:12:16 -0800")
 References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
 	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
-	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
-	<8yak4htj0lb.fsf@huya.qualcomm.com>
-	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
-	<8yay669hka5.fsf@huya.qualcomm.com>
-	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <8ya39ogg5dm.fsf@huya.qualcomm.com>
+	<1295468747-22796-3-git-send-email-davidb@codeaurora.org>
+	<1295979136.16668.4.camel@carlv-linux.qualcomm.com>
+Message-ID: <8yay668eqr4.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25 2011, Daniel Walker wrote:
+On Tue, Jan 25 2011, Carl Vanderlip wrote:
 
-> On Mon, 2011-01-24 at 16:57 -0800, David Brown wrote:
->> MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
->> goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
->> of the two, and it doesn't matter which one you use.
->> 
->> MSM8960 is a completely different chip, it just shares a similar name,
->> to other chips.
+>>  #if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7X27) \
+>>  	|| defined(CONFIG_ARCH_MSM7X25)
+>>  static struct map_desc msm_io_desc[] __initdata = {
+>>  	MSM_DEVICE(VIC),
+>> -	MSM_DEVICE(CSR),
+>> +	MSM_CHIP_DEVICE(CSR, MSM7X00),
+>>  	MSM_DEVICE(GPT),
+>>  	MSM_DEVICE(DMOV),
+>>  	MSM_DEVICE(GPIO1),
 >
-> If you break it down without the "x" then you can recreate the "x"
-> variant with the actual numerical identifier .. For 8660/8960 you just
-> would do as much of a unification as with the others.. You could still
-> use 8x60 to identify those two, you just wouldn't use it as often.
+> MSM_DEVICE(GPT) still references MSM_GPT_PHYS, MSM_GPT_SIZE and
+> MSM_GPT_BASE on the 7x00a though they are being removed.
 
-There isn't any unification to do here.  There are two issues.  We make
-some chips in groups where we have _identical_ silicon on the Linux
-side, but happen to have different numbers.  That's what the X is
-about.  There are other cases where we have completely different silicon
-that happen to have similar numbers.
-
-The whole point of the cpu_is tests is to tell us exactly which chip we
-are on.  If there is _anything_ different between two chips, that query
-needs to be different.  If there is any kind of unification, it can be
-done at a higher level.  Otherwise, you have no way of making the
-distinction that needs to be made.
+Shouldn't be too hard to fix.  I'll look at it later today.  It mostly
+points out that I haven't been building against 7x00A.
 
 David
 
