@@ -1,36 +1,113 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Tue, 25 Jan 2011 14:02:17 -0800
-Subject: [PATCH 1/4] msm: clock: Remove unused code and definitions
-In-Reply-To: <4D3F4609.3000808@codeaurora.org>
-References: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
-	<1295927118-27591-2-git-send-email-sboyd@codeaurora.org>
-	<1295991537.25496.49.camel@c-dwalke-linux.qualcomm.com>
-	<4D3F4609.3000808@codeaurora.org>
-Message-ID: <1295992937.25496.75.camel@c-dwalke-linux.qualcomm.com>
+From: hirosh.dabui@snom.com (Hirosh Dabui)
+Date: Tue, 25 Jan 2011 23:05:26 +0100
+Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs numbers >
+	31
+Message-ID: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-01-25 at 13:52 -0800, Saravana Kannan wrote:
-> On 01/25/2011 01:38 PM, Daniel Walker wrote:
-> > On Mon, 2011-01-24 at 19:45 -0800, Stephen Boyd wrote:
-> >> Remove dead code and push out clock-7x30.h and clock-pcom.h to
-> >> where they are actually used.
-> >>
-> >
-> > I'd do two patches for this. The stuff your doing is too disconnected.
-> >
-> > Daniel
-> >
-> There is a whole bunch of unused code in the clock files and it's being 
-> deleted. I don't see a point of splitting it up per file.
+This patch fix a bug in the register indexing for GPIOs numbers >  31
+to get the relevant hardware registers of tnetv107x to control the GPIOs.
 
-It's easier to review when changes aren't merged that don't related to
-each other.
+In the structure tnetv107x_gpio_regs:
 
-Daniel
+struct tnetv107x_gpio_regs {
+            u32     idver;
+            u32     data_in[3];
+            u32     data_out[3];
+            u32     direction[3];
+            u32     enable[3];
+};
 
+The GPIO hardware register addresses of tnetv107x are stored.
+The chip implements 3 registers of each entity to serve 96 GPIOs,
+each register provides a subset of 32 GPIOs.
+The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
+and gpio_reg_clear_bit.
 
+The bug implied the use of macros to access the relevant hardware
+register e.g. the driver code used the macro like this:
+'gpio_reg_clear_bit(&reg->data_out, gpio)'
+
+But it has to be used like this:
+'gpio_reg_clear_bit(reg->data_out, gpio)'.
+
+The different results are shown here:
+- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
+- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
+
+Acked-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+---
+ arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
+index d102986..3fa3e28 100644
+--- a/arch/arm/mach-davinci/gpio-tnetv107x.c
++++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
+@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->enable, gpio);
++	gpio_reg_set_bit(regs->enable, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_clear_bit(&regs->enable, gpio);
++	gpio_reg_clear_bit(regs->enable, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
+@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->direction, gpio);
++	gpio_reg_set_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+-	gpio_reg_clear_bit(&regs->direction, gpio);
++	gpio_reg_clear_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	unsigned gpio = chip->base + offset;
+ 	int ret;
+ 
+-	ret = gpio_reg_get_bit(&regs->data_in, gpio);
++	ret = gpio_reg_get_bit(regs->data_in, gpio);
+ 
+ 	return ret ? 1 : 0;
+ }
+@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
