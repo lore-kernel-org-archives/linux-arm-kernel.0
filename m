@@ -1,44 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 25 Jan 2011 12:40:05 +0000
-Subject: [PATCH v2 20/28] ARM: tegra: cpufreq: Disable cpufreq during
-	suspend
-In-Reply-To: <AANLkTinzXJ=PoSNEHAh1gCeH=2araVTvEB++9kcuUmes@mail.gmail.com>
-References: <AANLkTinzXJ=PoSNEHAh1gCeH=2araVTvEB++9kcuUmes@mail.gmail.com>
-Message-ID: <20110125124005.GB31453@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 12:45:24 +0000
+Subject: questions about arm trustzone
+In-Reply-To: <AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
+References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
+	<8yad3nlh18e.fsf@huya.qualcomm.com>
+	<AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
+	<20110125102652.GB11507@n2100.arm.linux.org.uk>
+	<bb0c3855a121603232d022b4062752a6@mail.gmail.com>
+	<AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
+Message-ID: <20110125124524.GJ11507@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 07:56:19PM +0900, MyungJoo Ham wrote:
+On Tue, Jan 25, 2011 at 12:24:13PM +0000, Dave Martin wrote:
+> Avoiding this complexity is one of the motivations for using r7 for
+> the syscall number with CONFIG_EABI (instead of using the SVC comment
+> field).
 
-> Moreover, the suspend-related cpufreq issue gets worse with hibernation.
-> Generally PMICs preserve their register values during suspend-to-mem;
-> however, they lose the values with power-off (and hibernation).
+Your history is not entirely correct.
 
-That's interesting - hibernation has been a bit easier when I've looked
-at this stuff precisely because it's equivalent to a cold boot, if the
-PMIC weren't able to boot the CPU then us software engineers wouldn't
-have to worry about any of this stuff :)
+I had the kernel side of Thumb userspace support in place long before EABI
+came along.  Thumb doesn't have a large enough comment field to store the
+Linux syscall number, so to get around that problem, I decided to use r7
+for the syscall number.  You'll find 2.4 kernels support Thumb instructions
+in userspace.
 
-> In samsung SoCs, we have mitigated the issue by stopping cpufreq at pm_begin
-> (could have a bit different name) and resume with end.  When stopping
-> cpufreq, we have made it to fix at the boot freq so that we dont face into
-> the inconsistency with hibernation.
-
-> Sometimes, when we set voltages for the core, bus, and others, simply saving
-> the whole things and restoring them does not work because the order how the
-> voltages change may matter (and it does with some of Samsung SoCs). Thus, we
-> made them to stop changing and fix at the boot-time default during suspend
-> and hibernation.
-
-The ordering matters greatly, this is the big part of what the PMIC
-power sequencing is doing.  There's also often some handshaking going on
-so the PMIC has to wait for the CPU at various points (with delays or
-with explicit signals) in the process.
-
-Just thinking about how we could address this in cpufreq is the major
-issue that the CPU comes back from resume in a state other than that
-which cpufreq remembered it being in or is the issue that the system
-tries to restore old voltages as part of the resume process?  I guess
-either way a feature in cpufreq which allows the driver to override the
-governor-chosen configuration for suspend would provide a mechanism to
-deal with the issue.
+As part of the EABI switch for ARM mode - which created an incompatible
+SWI interface anyway, we decided that we could reduce data cache pollution
+by eliminating the read of the SWI instruction, so we adopted the r7
+method for ARM EABI mode.
