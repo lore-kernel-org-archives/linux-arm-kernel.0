@@ -1,23 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Jan 2011 12:32:13 +0000
-Subject: timer_tick vs clockevent
-In-Reply-To: <AANLkTikfhObABzCcq4gMYaTQ+i2UdVN-xS+XDWc8kZw2@mail.gmail.com>
-References: <AANLkTikfhObABzCcq4gMYaTQ+i2UdVN-xS+XDWc8kZw2@mail.gmail.com>
-Message-ID: <20110125123213.GI11507@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 25 Jan 2011 12:35:29 +0000
+Subject: [alsa-devel] [PATCH] davinci: da8xx/omap-l1xx: match
+	codec_name with i2c ids
+In-Reply-To: <1295953146.3322.17.camel@odin>
+References: <1295619896-5498-1-git-send-email-sudhakar.raj@ti.com>
+	<1295620708.3348.233.camel@odin> <8739oh6h5i.fsf@ti.com>
+	<87r5c15272.fsf@ti.com> <1295953146.3322.17.camel@odin>
+Message-ID: <20110125123529.GC13051@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 03:21:12PM +0300, Sergey Mironov wrote:
-> Hi. I am working on porting linux to ARM 1176-based SoC. My quiestion
-> is about system time. I see 2 ways of implementing it: 1) Define
-> struct sys_timer variable and call timer_tick() from timer's interrupt
-> handler 2) Use clocksource/clockevents. Looks like 2nd way is more
-> elaborate, but what will I get if choose it?
+On Tue, Jan 25, 2011 at 10:59:05AM +0000, Liam Girdwood wrote:
+> On Mon, 2011-01-24 at 15:09 -0800, Kevin Hilman wrote:
 
-For all new implementations, (2) is the way to go.  (1) is deprecated,
-and involves some pretty hairy code for the gettimeoffset() stuff.
+> > On second thought, these should probably merge for .38-rc3.
 
-While (2) is more elaborate, you get additional features like NO_HZ
-mode and hi-res timer support.  We recently had someone complaining that
-they couldn't do something in userspace because their platform support
-implemented (1) rather than (2), but I don't recall the details.
+> > If you're OK with it, I can merge this and the platform fix together for
+> > .38-rc3.
+
+> Yes please :)
+
+I applied it and sent it off towards Linux a few days ago.
