@@ -1,120 +1,128 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 25 Jan 2011 16:26:04 +0100
-Subject: [PATCH 4/4] mach-ux500: add MUSB to db5500 devices
-Message-ID: <1295969164-12149-1-git-send-email-linus.walleij@stericsson.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 25 Jan 2011 20:58:44 +0530
+Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+	in board_init
+In-Reply-To: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
+References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
 
-- DMA tx and rx maps for usb channels are set to be configured at
-  runtime
-- MUSB is enabled with soc specific base address, irq and dma
-  configurations
+> -----Original Message-----
+> From: Hiremath, Vaibhav
+> Sent: Tuesday, January 25, 2011 8:53 PM
+> To: linux-omap at vger.kernel.org
+> Cc: Hiremath, Vaibhav; Varadarajan, Charulatha
+> Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+> in board_init
+> 
+> With addition of hwmod support to gpio, the ethernet controller
+> goes undetected for OMAP35xEVM. So explicitly assert the reset signal to
+> ethernet controller smsc911x -
+> 
+> 	- GPIO7 (>=RevG version of EVM's)
+> 	- GPIO64 (<=RevD version of EVM's)
+> 
+> This patch is based on intial version from Charulatha V, reference
+> to original discussion -
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Charulatha V <charu@ti.com>
+> Tested-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Since Kevin reported that this patch doesn't get applied cleanly,
+> so I am reposting it again after making sure that it gets applied cleanly.
+> 
+[Hiremath, Vaibhav] Oops, missed linux-arm-kernel list, adding here.
 
-Signed-off-by: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/mach-ux500/cpu-db5500.c     |   25 +++++++++++++++++++++++++
- arch/arm/mach-ux500/devices-db5500.h |    3 +++
- arch/arm/mach-ux500/dma-db5500.c     |   16 ++++++++++++++++
- 3 files changed, 44 insertions(+), 0 deletions(-)
+Not sure whether I need to repost keeping linux-arm-kernel?
 
-diff --git a/arch/arm/mach-ux500/cpu-db5500.c b/arch/arm/mach-ux500/cpu-db5500.c
-index 38a01c3..c9dc2ef 100644
---- a/arch/arm/mach-ux500/cpu-db5500.c
-+++ b/arch/arm/mach-ux500/cpu-db5500.c
-@@ -19,8 +19,10 @@
- #include <mach/devices.h>
- #include <mach/setup.h>
- #include <mach/irqs.h>
-+#include <mach/usb.h>
- 
- #include "devices-db5500.h"
-+#include "ste-dma40-db5500.h"
- 
- static struct map_desc u5500_uart_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U5500_UART0_BASE, SZ_4K),
-@@ -188,11 +190,34 @@ void __init u5500_map_io(void)
- 	iotable_init(u5500_io_desc, ARRAY_SIZE(u5500_io_desc));
- }
- 
-+static int usb_db5500_rx_dma_cfg[] = {
-+	DB5500_DMA_DEV4_USB_OTG_IEP_1_9,
-+	DB5500_DMA_DEV5_USB_OTG_IEP_2_10,
-+	DB5500_DMA_DEV6_USB_OTG_IEP_3_11,
-+	DB5500_DMA_DEV20_USB_OTG_IEP_4_12,
-+	DB5500_DMA_DEV21_USB_OTG_IEP_5_13,
-+	DB5500_DMA_DEV22_USB_OTG_IEP_6_14,
-+	DB5500_DMA_DEV23_USB_OTG_IEP_7_15,
-+	DB5500_DMA_DEV38_USB_OTG_IEP_8
-+};
-+
-+static int usb_db5500_tx_dma_cfg[] = {
-+	DB5500_DMA_DEV4_USB_OTG_OEP_1_9,
-+	DB5500_DMA_DEV5_USB_OTG_OEP_2_10,
-+	DB5500_DMA_DEV6_USB_OTG_OEP_3_11,
-+	DB5500_DMA_DEV20_USB_OTG_OEP_4_12,
-+	DB5500_DMA_DEV21_USB_OTG_OEP_5_13,
-+	DB5500_DMA_DEV22_USB_OTG_OEP_6_14,
-+	DB5500_DMA_DEV23_USB_OTG_OEP_7_15,
-+	DB5500_DMA_DEV38_USB_OTG_OEP_8
-+};
-+
- void __init u5500_init_devices(void)
- {
- 	db5500_add_gpios();
- 	db5500_dma_init();
- 	db5500_add_rtc();
-+	db5500_add_usb(usb_db5500_rx_dma_cfg, usb_db5500_tx_dma_cfg);
- 
- 	platform_add_devices(db5500_platform_devs,
- 			     ARRAY_SIZE(db5500_platform_devs));
-diff --git a/arch/arm/mach-ux500/devices-db5500.h b/arch/arm/mach-ux500/devices-db5500.h
-index c8d7901..481ae5c 100644
---- a/arch/arm/mach-ux500/devices-db5500.h
-+++ b/arch/arm/mach-ux500/devices-db5500.h
-@@ -34,6 +34,9 @@
- #define db5500_add_rtc() \
- 	dbx500_add_rtc(U5500_RTC_BASE, IRQ_DB5500_RTC);
- 
-+#define db5500_add_usb(rx_cfg, tx_cfg) \
-+	ux500_add_usb(U5500_USBOTG_BASE, IRQ_DB5500_USBOTG, rx_cfg, tx_cfg)
-+
- #define db5500_add_sdi0(pdata) \
- 	dbx500_add_sdi("sdi0", U5500_SDI0_BASE, IRQ_DB5500_SDMMC0, pdata)
- #define db5500_add_sdi1(pdata) \
-diff --git a/arch/arm/mach-ux500/dma-db5500.c b/arch/arm/mach-ux500/dma-db5500.c
-index 32a061f..1cfab68 100644
---- a/arch/arm/mach-ux500/dma-db5500.c
-+++ b/arch/arm/mach-ux500/dma-db5500.c
-@@ -73,11 +73,27 @@ static struct stedma40_chan_cfg dma40_memcpy_conf_log = {
-  */
- static const dma_addr_t dma40_rx_map[DB5500_DMA_NR_DEV] = {
- 	[DB5500_DMA_DEV24_SDMMC0_RX] = -1,
-+	[DB5500_DMA_DEV38_USB_OTG_IEP_8] = -1,
-+	[DB5500_DMA_DEV23_USB_OTG_IEP_7_15] = -1,
-+	[DB5500_DMA_DEV22_USB_OTG_IEP_6_14] = -1,
-+	[DB5500_DMA_DEV21_USB_OTG_IEP_5_13] = -1,
-+	[DB5500_DMA_DEV20_USB_OTG_IEP_4_12] = -1,
-+	[DB5500_DMA_DEV6_USB_OTG_IEP_3_11] = -1,
-+	[DB5500_DMA_DEV5_USB_OTG_IEP_2_10] = -1,
-+	[DB5500_DMA_DEV4_USB_OTG_IEP_1_9] = -1,
- };
- 
- /* Mapping between destination event lines and physical device address */
- static const dma_addr_t dma40_tx_map[DB5500_DMA_NR_DEV] = {
- 	[DB5500_DMA_DEV24_SDMMC0_TX] = -1,
-+	[DB5500_DMA_DEV38_USB_OTG_OEP_8] = -1,
-+	[DB5500_DMA_DEV23_USB_OTG_OEP_7_15] = -1,
-+	[DB5500_DMA_DEV22_USB_OTG_OEP_6_14] = -1,
-+	[DB5500_DMA_DEV21_USB_OTG_OEP_5_13] = -1,
-+	[DB5500_DMA_DEV20_USB_OTG_OEP_4_12] = -1,
-+	[DB5500_DMA_DEV6_USB_OTG_OEP_3_11] = -1,
-+	[DB5500_DMA_DEV5_USB_OTG_OEP_2_10] = -1,
-+	[DB5500_DMA_DEV4_USB_OTG_OEP_1_9] = -1,
- };
- 
- static int dma40_memcpy_event[] = {
--- 
-1.7.3.2
+Thanks,
+Vaibhav
+
+>  arch/arm/mach-omap2/board-omap3evm.c |   39
+> +++++++++++++++++++++++++++++++++-
+>  1 files changed, 38 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+> omap2/board-omap3evm.c
+> index 323c380..97e0f65 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -58,6 +58,13 @@
+>  #define OMAP3EVM_ETHR_ID_REV	0x50
+>  #define OMAP3EVM_ETHR_GPIO_IRQ	176
+>  #define OMAP3EVM_SMSC911X_CS	5
+> +/*
+> + * Eth Reset signal
+> + *	64 = Generation 1 (<=RevD)
+> + *	7 = Generation 2 (>=RevE)
+> + */
+> +#define OMAP3EVM_GEN1_ETHR_GPIO_RST	64
+> +#define OMAP3EVM_GEN2_ETHR_GPIO_RST	7
+> 
+>  static u8 omap3_evm_version;
+> 
+> @@ -124,10 +131,15 @@ static struct platform_device
+> omap3evm_smsc911x_device = {
+> 
+>  static inline void __init omap3evm_init_smsc911x(void)
+>  {
+> -	int eth_cs;
+> +	int eth_cs, eth_rst;
+>  	struct clk *l3ck;
+>  	unsigned int rate;
+> 
+> +	if (get_omap3_evm_rev() == OMAP3EVM_BOARD_GEN_1)
+> +		eth_rst = OMAP3EVM_GEN1_ETHR_GPIO_RST;
+> +	else
+> +		eth_rst = OMAP3EVM_GEN2_ETHR_GPIO_RST;
+> +
+>  	eth_cs = OMAP3EVM_SMSC911X_CS;
+> 
+>  	l3ck = clk_get(NULL, "l3_ck");
+> @@ -136,6 +148,27 @@ static inline void __init
+> omap3evm_init_smsc911x(void)
+>  	else
+>  		rate = clk_get_rate(l3ck);
+> 
+> +	/* Configure ethernet controller reset gpio */
+> +	if (cpu_is_omap3430()) {
+> +		if (gpio_request(eth_rst, "SMSC911x gpio") < 0) {
+> +			pr_err(KERN_ERR "Failed to request %d for smsc911x\n",
+> +					eth_rst);
+> +			return;
+> +		}
+> +
+> +		if (gpio_direction_output(eth_rst, 1) < 0) {
+> +			pr_err(KERN_ERR "Failed to set direction of %d for" \
+> +					" smsc911x\n", eth_rst);
+> +			return;
+> +		}
+> +		/* reset pulse to ethernet controller*/
+> +		usleep_range(150, 220);
+> +		gpio_set_value(eth_rst, 0);
+> +		usleep_range(150, 220);
+> +		gpio_set_value(eth_rst, 1);
+> +		usleep_range(1, 2);
+> +	}
+> +
+>  	if (gpio_request(OMAP3EVM_ETHR_GPIO_IRQ, "SMSC911x irq") < 0) {
+>  		printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
+>  			OMAP3EVM_ETHR_GPIO_IRQ);
+> @@ -658,6 +691,10 @@ static struct omap_board_mux board_mux[] __initdata =
+> {
+>  				OMAP_PIN_OFF_WAKEUPENABLE),
+>  	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+>  				OMAP_PIN_OFF_INPUT_PULLUP |
+> OMAP_PIN_OFF_OUTPUT_LOW),
+> +	OMAP3_MUX(SYS_BOOT5, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+> +				OMAP_PIN_OFF_NONE),
+> +	OMAP3_MUX(GPMC_WAIT2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+> +				OMAP_PIN_OFF_NONE),
+>  	{ .reg_offset = OMAP_MUX_TERMINATOR },
+>  };
+>  #endif
+> --
+> 1.6.2.4
