@@ -1,32 +1,49 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 25 Jan 2011 10:44:49 -0800
-Subject: [PATCH 3/5] ARM: twd: Add context save restore support
-In-Reply-To: <20110125112946.GA13300@n2100.arm.linux.org.uk>
-References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
-	<1295859080-15259-4-git-send-email-santosh.shilimkar@ti.com>
-	<20110124110609.GJ16202@n2100.arm.linux.org.uk>
-	<20110124111114.GA19409@n2100.arm.linux.org.uk>
-	<AANLkTikLDamkp9TgnWRESyx4=698D4NXP=W_M9=abfax@mail.gmail.com>
-	<20110125112946.GA13300@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimAkfwKB2yt0h-tvgQpMMBHhxvRXEUnOnZLZdUV@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 25 Jan 2011 11:17:25 -0800
+Subject: [PATCH v2 01/11] msm: Add CPU queries
+In-Reply-To: <1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com> (Daniel
+	Walker's message of "Tue, 25 Jan 2011 09:35:10 -0800")
+References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
+	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
+	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
+	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
+	<8yak4htj0lb.fsf@huya.qualcomm.com>
+	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
+	<8yay669hka5.fsf@huya.qualcomm.com>
+	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <8ya39ogg5dm.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 3:29 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jan 24, 2011 at 11:39:13PM -0800, Colin Cross wrote:
->> This doesn't work for oneshot timers if the TWD_TIMER_CONTROL register
->> gets reset by cpu idle between twd_set_mode and twd_set_next_event.
->> Shadowing ctrl in a percpu variable and rewriting it during every call
->> to twd_set_next_event does work, but that's not much different, and a
->> little less efficient, than just saving and restoring the control and
->> load registers in idle. ?It does have the advantage that platforms
->> don't need any extra calls.
->
-> BTW, do you think the patch is, nevertheless, an improvement and something
-> we should do? ?If so, please can I have your ack for it?
+On Tue, Jan 25 2011, Daniel Walker wrote:
 
-This patch does work after adding the missing clockevent broadcasts to
-the Tegra idle driver, and allows me to remove all references to twd
-registers in the idle and suspend code, so:
-Acked-by: Colin Cross <ccross@android.com>
+> On Mon, 2011-01-24 at 16:57 -0800, David Brown wrote:
+>> MSM7201 and MSM7601 are identical as far as Linux is concerned.  Same
+>> goes for MSM8250 and MSM8650.  Our dev boards are a somewhat random mix
+>> of the two, and it doesn't matter which one you use.
+>> 
+>> MSM8960 is a completely different chip, it just shares a similar name,
+>> to other chips.
+>
+> If you break it down without the "x" then you can recreate the "x"
+> variant with the actual numerical identifier .. For 8660/8960 you just
+> would do as much of a unification as with the others.. You could still
+> use 8x60 to identify those two, you just wouldn't use it as often.
+
+There isn't any unification to do here.  There are two issues.  We make
+some chips in groups where we have _identical_ silicon on the Linux
+side, but happen to have different numbers.  That's what the X is
+about.  There are other cases where we have completely different silicon
+that happen to have similar numbers.
+
+The whole point of the cpu_is tests is to tell us exactly which chip we
+are on.  If there is _anything_ different between two chips, that query
+needs to be different.  If there is any kind of unification, it can be
+done at a higher level.  Otherwise, you have no way of making the
+distinction that needs to be made.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
