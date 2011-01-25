@@ -1,34 +1,31 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Tue, 25 Jan 2011 11:18:39 -0800
-Subject: [PATCH v2 02/11] msm: Generalize timer register mappings
-In-Reply-To: <1295979136.16668.4.camel@carlv-linux.qualcomm.com> (Carl
-	Vanderlip's message of "Tue, 25 Jan 2011 10:12:16 -0800")
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-3-git-send-email-davidb@codeaurora.org>
-	<1295979136.16668.4.camel@carlv-linux.qualcomm.com>
-Message-ID: <8yay668eqr4.fsf@huya.qualcomm.com>
+Date: Tue, 25 Jan 2011 11:20:51 -0800
+Subject: [PATCH] msm: smd: Add smd_pkt driver
+In-Reply-To: <1292437675-11561-1-git-send-email-nvishwan@codeaurora.org>
+	(Niranjana Vishwanathapura's message of "Wed, 15 Dec 2010 10:27:55
+	-0800")
+References: <1292437675-11561-1-git-send-email-nvishwan@codeaurora.org>
+Message-ID: <8yatygweqng.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25 2011, Carl Vanderlip wrote:
+On Wed, Dec 15 2010, Niranjana Vishwanathapura wrote:
 
->>  #if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7X27) \
->>  	|| defined(CONFIG_ARCH_MSM7X25)
->>  static struct map_desc msm_io_desc[] __initdata = {
->>  	MSM_DEVICE(VIC),
->> -	MSM_DEVICE(CSR),
->> +	MSM_CHIP_DEVICE(CSR, MSM7X00),
->>  	MSM_DEVICE(GPT),
->>  	MSM_DEVICE(DMOV),
->>  	MSM_DEVICE(GPIO1),
+> Add smd_pkt driver which provides device interface
+> to smd packet ports.
 >
-> MSM_DEVICE(GPT) still references MSM_GPT_PHYS, MSM_GPT_SIZE and
-> MSM_GPT_BASE on the 7x00a though they are being removed.
+> Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
+> ---
+>  drivers/char/Kconfig       |    8 +
+>  drivers/char/Makefile      |    2 +
+>  drivers/char/msm_smd_pkt.c |  466 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 476 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/char/msm_smd_pkt.c
 
-Shouldn't be too hard to fix.  I'll look at it later today.  It mostly
-points out that I haven't been building against 7x00A.
+Andrew, what's the proper destination for this change?  Should this go
+into your tree?  Is there anything you want me to do with this change?
 
+Thanks,
 David
 
 -- 
