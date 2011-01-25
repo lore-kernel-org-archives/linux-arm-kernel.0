@@ -1,50 +1,112 @@
-From: stanley.miao@windriver.com (stanley.miao)
-Date: Tue, 25 Jan 2011 16:57:16 +0800
-Subject: [PATCH V5 25/63] ST SPEAr: Adding machine support for nand
-In-Reply-To: <4388cfaa47bd0ee1c511e997c50ee5375142593c.1295499394.git.viresh.kumar@st.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<4388cfaa47bd0ee1c511e997c50ee5375142593c.1295499394.git.viresh.kumar@st.com>
-Message-ID: <4D3E906C.50206@windriver.com>
+From: hirosh.dabui@snom.com (Hirosh Dabui)
+Date: Tue, 25 Jan 2011 09:56:25 +0100
+Subject: [PATCH] This patch fix a bug in the register indexing for GPIOs
+	numbers > 31
+Message-ID: <1295945785-7393-1-git-send-email-hirosh.dabui@snom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar wrote:
-> From: Vipin Kumar <vipin.kumar@st.com>
->
-> <snip>
->  
-> +/* nand device registeration */
-> +static struct fsmc_nand_platform_data nand_platform_data;
-> +
-> +static struct resource nand_resources[] = {
-> +	{
-> +		.name = "nand_data",
-> +		.start = SPEAR6XX_ICM1_NAND_BASE,
-> +		.end = SPEAR6XX_ICM1_NAND_BASE + SZ_16 - 1,
-> +		.flags = IORESOURCE_MEM,
-> +	}, {
-> +		.name = "fsmc_regs",
-> +		.start = SPEAR6XX_ICM1_FSMC_BASE,
-> +		.end = SPEAR6XX_ICM1_FSMC_BASE + SZ_4K - 1,
-> +		.flags = IORESOURCE_MEM,
-> +	},
-> +};
-> +
-> +struct platform_device nand_device = {
-> +	.name = "nand",
->   
+to get the relevant hardware registers of tnetv107x to control the GPIOs.
 
-fsmc-nand ?
+In the structure tnetv107x_gpio_regs:
 
-Stanley.
+struct tnetv107x_gpio_regs {
+       u32     idver;
+       u32     data_in[3];
+       u32     data_out[3];
+       u32     direction[3];
+       u32     enable[3];
+};
 
-> +	.id = -1,
-> +	.resource = nand_resources,
-> +	.num_resources = ARRAY_SIZE(nand_resources),
-> +	.dev.platform_data = &nand_platform_data,
-> +};
-> +
->  /* usb host device registeration */
->  static struct resource ehci0_resources[] = {
->  	[0] = {
->   
+The GPIO hardware register addresses of tnetv107x are stored.
+The chip implements 3 registers of each entity to serve 96 GPIOs,
+each register provides a subset of 32 GPIOs.
+The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
+and gpio_reg_clear_bit.
+
+The bug implied the use of macros to access the relevant hardware
+register e.g. the driver code used the macro like this:
+'gpio_reg_clear_bit(&reg->data_out, gpio)'
+
+But it has to be used like this:
+'gpio_reg_clear_bit(reg->data_out, gpio)'.
+
+The different results are shown here:
+- &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
+- reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
+
+Acked-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+---
+ arch/arm/mach-davinci/gpio-tnetv107x.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/gpio-tnetv107x.c b/arch/arm/mach-davinci/gpio-tnetv107x.c
+index d102986..3fa3e28 100644
+--- a/arch/arm/mach-davinci/gpio-tnetv107x.c
++++ b/arch/arm/mach-davinci/gpio-tnetv107x.c
+@@ -58,7 +58,7 @@ static int tnetv107x_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->enable, gpio);
++	gpio_reg_set_bit(regs->enable, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -74,7 +74,7 @@ static void tnetv107x_gpio_free(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_clear_bit(&regs->enable, gpio);
++	gpio_reg_clear_bit(regs->enable, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
+@@ -88,7 +88,7 @@ static int tnetv107x_gpio_dir_in(struct gpio_chip *chip, unsigned offset)
+ 
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+-	gpio_reg_set_bit(&regs->direction, gpio);
++	gpio_reg_set_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -106,11 +106,11 @@ static int tnetv107x_gpio_dir_out(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+-	gpio_reg_clear_bit(&regs->direction, gpio);
++	gpio_reg_clear_bit(regs->direction, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ 
+@@ -124,7 +124,7 @@ static int tnetv107x_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	unsigned gpio = chip->base + offset;
+ 	int ret;
+ 
+-	ret = gpio_reg_get_bit(&regs->data_in, gpio);
++	ret = gpio_reg_get_bit(regs->data_in, gpio);
+ 
+ 	return ret ? 1 : 0;
+ }
+@@ -140,9 +140,9 @@ static void tnetv107x_gpio_set(struct gpio_chip *chip,
+ 	spin_lock_irqsave(&ctlr->lock, flags);
+ 
+ 	if (value)
+-		gpio_reg_set_bit(&regs->data_out, gpio);
++		gpio_reg_set_bit(regs->data_out, gpio);
+ 	else
+-		gpio_reg_clear_bit(&regs->data_out, gpio);
++		gpio_reg_clear_bit(regs->data_out, gpio);
+ 
+ 	spin_unlock_irqrestore(&ctlr->lock, flags);
+ }
+-- 
+1.7.1
