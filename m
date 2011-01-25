@@ -1,65 +1,132 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 25 Jan 2011 12:24:13 +0000
-Subject: questions about arm trustzone
-In-Reply-To: <bb0c3855a121603232d022b4062752a6@mail.gmail.com>
-References: <AANLkTi=eCOiP7MrUSG4WRMN0kj_+ZWvZ=z7VYDfkshU_@mail.gmail.com>
-	<8yad3nlh18e.fsf@huya.qualcomm.com>
-	<AANLkTin9fSw5DdqdgCEvtdtc83LFOeA7t0OAUugVmRFD@mail.gmail.com>
-	<20110125102652.GB11507@n2100.arm.linux.org.uk>
-	<bb0c3855a121603232d022b4062752a6@mail.gmail.com>
-Message-ID: <AANLkTi=vZSZkN2k1gZD0F-C74b_jFWX5HhDhr7BiPhN7@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Jan 2011 12:29:24 +0000
+Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
+In-Reply-To: <20110125121655.GD13300@n2100.arm.linux.org.uk>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<1295859080-15259-5-git-send-email-santosh.shilimkar@ti.com>
+	<20110125114635.GB13300@n2100.arm.linux.org.uk>
+	<236d45e400a960cc3b32db538b3a79ae@mail.gmail.com>
+	<20110125121655.GD13300@n2100.arm.linux.org.uk>
+Message-ID: <20110125122924.GF13300@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 11:46 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
->> arm-kernel-bounces at lists.infradead.org] On Behalf Of Russell King -
->> ARM Linux
->> Sent: Tuesday, January 25, 2011 3:57 PM
->> To: sen wang
->> Cc: David Brown; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: questions about arm trustzone
->>
->> On Tue, Jan 25, 2011 at 05:19:16PM +0800, sen wang wrote:
->> > It seems linux run in the normal world, and the "scm.c" ?is the
->> path
->> > to the monitor mode.
->> > where can I find the example code for monitor and secure world?
->>
->> OMAP also uses smc: arch/arm/mach-omap2/omap44xx-smc.S
->>
->> There's no interface defined for smc because it's highly vendor and
->> implementation specific. ?It's just like a SWI (or svc) where it
->> causes entry via a vector into a priviledged mode, which can be
->> thought of being similar to a branch to a vector with a mode switch.
->>
-> The code above won't give major details of how the monitor mode is
-> implemented. ?But as Russell said, it's pretty much vendor specific.
->
-> On OMAP, We have standard API interfaces to enter into monitor
-> world. One of the parameter denotes the kind of service, is
-> requested.
+On Tue, Jan 25, 2011 at 12:16:56PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 25, 2011 at 05:32:57PM +0530, Santosh Shilimkar wrote:
+> > I have similar patch implemented but what it does is just
+> > prepares the value to be programmed and stores it to a scratchpad.
+> > I see your point but below patch may now work well. The reason is the SCU
+> > register needs to accessed at the lowest level. May be even when
+> > stack is not available. Also this register needs to be cleared in cases
+> > where the attempted power state is failed for some reason.
+> 
+> >From the documentation I have, the power control register has no effect
+> until the CPU enters WFI mode - which means that provided we can
+> guarantee no one issues a WFI instruction between setting the power mode,
+> and executing that instruction, being woken up (or failing) and resetting
+> the power mode back... that shouldn't require the power mode to be
+> programmed from assembly code.
+> 
+> In any case, we actually need the help of spinlocks to deal with
+> concurrent access to the SCU power control register - something you
+> can't do in assembly code.
+> 
+> On the way down to a WFI low power mode, we can call scu_power_mode(),
+> do the rest of the cleanup (which must not schedule) and issue WFI.  On
+> the way back up, do whatever needs to be done and call scu_power_mode()
+> to reset back to 'normal' mode.
+> 
+> > Also note that this register can be blocked using trust-zone which
+> > again makes it platform dependent because direct write won't be
+> > allowed in that case.
+> 
+> Yes, I did notice.  What's the OMAP SMC interface for that?
+> 
+> > I would prefer the header export if there is no major
+> > objection since there is already a possibility of custom
+> > implementation with trust zone.
+> > 
+> > On OMAP4, on ES1.0 we need to use a secure API to achieve
+> > this where as on ES2.0, it can be directly accessed.
+> 
+> As I say, I'd rather not have each SoC implementing access to this as
+> someone's bound to forget the spinlock if they're dealing with more than
+> one CPU, which'll make stuff unreliable (just like I did on my initial
+> version.)
+> 
+> We could have a callback to SoC code which does the appropriate SMC call,
+> but first I'll need to know what's required for the SMC call.
 
-I'm going off on a bit of a tangent here, but do you know whether the
-Secure World code on OMAP can cope with being called from Thumb?  In
-particular, if the Secure World tries to read the comment field from
-the SMC instruction (which I notice is non-zero in some cases for
-OMAP), it would need to be specifically coded to cope with the Thumb
-case for this to work.
+I did mean to include the updated patch:
 
-Avoiding this complexity is one of the motivations for using r7 for
-the syscall number with CONFIG_EABI (instead of using the SVC comment
-field).
+ arch/arm/include/asm/smp_scu.h |    5 +++++
+ arch/arm/kernel/smp_scu.c      |   23 +++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 0 deletions(-)
 
-Currently in my efforts to get the OMAP kernel working in Thumb-2, I
-have assumed for simplicity that the Secure World will choke on SMCs
-from Thumb code, but it would be nice to minimise the amount of code
-which we need to build as ARM in the CONFIG_THUMB2_KERNEL case.  In
-principle, everything could be Thumb code, now that the SWP
-instruction usage is gone.
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 2376835..108f31d 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -1,7 +1,12 @@
+ #ifndef __ASMARM_ARCH_SCU_H
+ #define __ASMARM_ARCH_SCU_H
+ 
++#define SCU_PM_NORMAL	0
++#define SCU_PM_DORMANT	2
++#define SCU_PM_POWEROFF	3
++
+ unsigned int scu_get_core_count(void __iomem *);
+ void scu_enable(void __iomem *);
++int scu_power_mode(unsigned int);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 9ab4149..4c4c90d 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -10,6 +10,7 @@
+  */
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/spinlock.h>
+ 
+ #include <asm/smp_scu.h>
+ #include <asm/cacheflush.h>
+@@ -20,6 +21,8 @@
+ #define SCU_INVALIDATE		0x0c
+ #define SCU_FPGA_REVISION	0x10
+ 
++static DEFINE_SPINLOCK(scu_power_lock);
++
+ /*
+  * Get the number of CPU cores from the SCU configuration
+  */
+@@ -50,3 +53,23 @@ void __init scu_enable(void __iomem *scu_base)
+ 	 */
+ 	flush_cache_all();
+ }
++
++int scu_power_mode(unsigned int mode)
++{
++	int cpu = smp_processor_id();
++	int shift;
++	u32 val;
++
++	if (mode > 3 || mode == 1 || cpu > 3)
++		return -EINVAL;
++
++	shift = cpu * 8;
++
++	spin_lock(&scu_power_lock);
++	val = raw_readl(scu_base + SCU_CPU_STATUS) & ~(0x03 << shift);
++	val |= mode << shift;
++	__raw_writel(val, scu_base + SCU_CPU_STATUS);
++	spin_unlock(&scu_power_lock);
++
++	return 0;
++}
 
-Cheers
----Dave
+If we need a SMC call, that should happen within the spinlock'd region via
+a function pointer which the platform can set.  I can't code that into this
+patch until I know what the SMC call requires as arguments (cpu number,
+power state, or new register value, or mask and bits to set?)
