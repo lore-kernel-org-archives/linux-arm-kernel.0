@@ -1,25 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 26 Jan 2011 10:11:03 +0100
-Subject: [PATCH] ARM: OMAP2: use early init hook
-In-Reply-To: <20110126085240.GA2698@n2100.arm.linux.org.uk>
-References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-	<20110126084613.GD1147@pengutronix.de>
-	<20110126085240.GA2698@n2100.arm.linux.org.uk>
-Message-ID: <20110126091103.GE1147@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jan 2011 09:24:14 +0000
+Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
+In-Reply-To: <AANLkTi=kMnXm+VU2V8HR98DhL1wVk6cJJQ0DtkV=yFqs@mail.gmail.com>
+References: <1286358159-6994-1-git-send-email-linus.walleij@stericsson.com>
+	<20101219163240.GA27929@n2100.arm.linux.org.uk>
+	<20101219195959.GA28157@n2100.arm.linux.org.uk>
+	<20101221135421.GS28157@n2100.arm.linux.org.uk>
+	<20101221155935.GV28157@n2100.arm.linux.org.uk>
+	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
+	<20110124160127.GA24104@n2100.arm.linux.org.uk>
+	<AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
+	<20110124212228.GN24104@n2100.arm.linux.org.uk>
+	<AANLkTi=kMnXm+VU2V8HR98DhL1wVk6cJJQ0DtkV=yFqs@mail.gmail.com>
+Message-ID: <20110126092414.GA2562@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 08:52:40AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 26, 2011 at 09:46:13AM +0100, Uwe Kleine-K?nig wrote:
-> > Will you care for imx (mach-{mx*,imx}), too, or should I fix them up?
+On Tue, Jan 25, 2011 at 09:33:07AM +0100, Linus Walleij wrote:
+> In any case I'm happy if you post/commit the MMCI support
+> you have, if there are problems we can certainly sort it out later
+> in any case.
 > 
-> Does mx stuff do non-irq setup or non-map_io stuff in those callbacks?
-the map_io callbacks (e.g. mx27_map_io) setup the infrastructure for
-cpu_is_xyz and arch_reset.
+> Hm, does this mean you got it working with one of the
+> reference boards eventually?
 
-Best regards
-Uwe
+Nope.  ARM reference boards all seem to have broken DMA.  I've given up
+with the idea of getting DMA working on any of these platforms, and as
+yet I've not had a response from the ARM Support request which Catalin
+logged for me on this subject.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I don't believe it is possible for MMCI to ever work correctly with DMA
+on ARM development platforms.
