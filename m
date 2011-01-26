@@ -1,57 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Jan 2011 11:26:24 +0000
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-In-Reply-To: <AANLkTimZ9itumf=QZPD55+JA5cUOWKgwuA1_5=XsdPsP@mail.gmail.com>
-References: <1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
-	<20110114154919.GE15996@n2100.arm.linux.org.uk>
-	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
-	<20110114163520.GH15996@n2100.arm.linux.org.uk>
-	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
-	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
-	<20110114184759.GN15996@n2100.arm.linux.org.uk>
-	<AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
-	<AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
-	<AANLkTimZ9itumf=QZPD55+JA5cUOWKgwuA1_5=XsdPsP@mail.gmail.com>
-Message-ID: <20110126112624.GC2562@n2100.arm.linux.org.uk>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Wed, 26 Jan 2011 11:30:01 +0100
+Subject: [PATCH] ARM:ucb1x00-ts: Fix NULL pointer due to non-initialized
+	absinfo
+Message-ID: <1296037801-20427-1-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 03:33:24PM -0800, Colin Cross wrote:
-> I think there is an additional change needed to
-> __und_usr_unknown/do_undefinstr.  do_undefinstr, which gets called
-> directly in __und_usr as well as by mov pc, lr, expects regs->ARM_pc
-> to be the fault address, and not the next PC, and gets called for 2 or
-> 4 byte instructions.
+Call input_set_abs_params instead of manually setting absbit only.
+This fixes this oops:
 
-It expects it to be the next PC:
+Unable to handle kernel NULL pointer dereference at virtual address 00000024
+Internal error: Oops: 41b67017 [#1]
+CPU: 0    Not tainted  (2.6.37 #4)
+pc : [<c016d1fc>]    lr : [<00000000>]    psr: 20000093
+sp : c19e5f30  ip : c19e5e6c  fp : c19e5f58
+r10: 00000000  r9 : c19e4000  r8 : 00000003
+r7 : 000001e4  r6 : 00000001  r5 : c1854400  r4 : 00000003
+r3 : 00000018  r2 : 00000018  r1 : 00000018  r0 : c185447c
+Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: c1b6717f  Table: c1b6717f  DAC: 00000017
+Stack: (0xc19e5f30 to 0xc19e6000)
+5f20:                                     00000003 00000003 c1854400 00000013
+5f40: 00000001 000001e4 000001c5 c19e5f80 c19e5f5c c016d5e8 c016cf5c 000001e4
+5f60: c1854400 c18b5860 00000000 00000171 000001e4 c19e5fc4 c19e5f84 c01559a4
+5f80: c016d584 c18b5868 00000000 c1bb5c40 c0035afc c18b5868 c18b5868 c1a55d54
+5fa0: c18b5860 c0155750 00000013 00000000 00000000 00000000 c19e5ff4 c19e5fc8
+5fc0: c0050174 c015575c 00000000 c18b5860 00000000 c19e5fd4 c19e5fd4 c1a55d54
+5fe0: c00500f0 c003b464 00000000 c19e5ff8 c003b464 c00500fc 04000400 04000400
+Backtrace:
+Function entered at [<c016cf50>] from [<c016d5e8>]
+Function entered at [<c016d578>] from [<c01559a4>]
+ r8:000001e4 r7:00000171 r6:00000000 r5:c18b5860 r4:c1854400
+Function entered at [<c0155750>] from [<c0050174>]
+Function entered at [<c00500f0>] from [<c003b464>]
+ r6:c003b464 r5:c00500f0 r4:c1a55d54
+Code: e59520fc e1a03286 e0433186 e0822003 (e592000c)
 
-asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
-{
-        unsigned int correction = thumb_mode(regs) ? 2 : 4;
-        unsigned int instr;
-        siginfo_t info;
-        void __user *pc;
 
-        /*
-         * According to the ARM ARM, PC is 2 or 4 bytes ahead,
-         * depending whether we're in Thumb mode or not.
-         * Correct this offset.
-         */
-        regs->ARM_pc -= correction;
+>>PC;  c016d1fc <input_handle_event+2ac/5a0>   <=====
 
-We expect the PC to be pointing at the next instruction to be executed.
-This is the value of the PC saved by the CPU when entering the exception.
-We correct the PC by four bytes for ARM mode to point at the previously
-executed instruction.
+Trace; c016cf50 <input_handle_event+0/5a0>
+Trace; c016d5e8 <input_event+70/88>
+Trace; c016d578 <input_event+0/88>
+Trace; c01559a4 <ucb1x00_thread+254/2dc>
+Trace; c0155750 <ucb1x00_thread+0/2dc>
+Trace; c0050174 <kthread+84/8c>
+Trace; c00500f0 <kthread+0/8c>
+Trace; c003b464 <do_exit+0/624>
 
-For 16-bit Thumb mode, the PC is again pointing at the next instruction
-to be executed, and this is the value saved by the CPU.  So we correct
-the PC by two bytes as that is the Thumb instruction size.
+Signed-off-by: Jochen Friedrich <jochen@scram.de>
+CC: stable at kernel.org
+---
+ drivers/mfd/ucb1x00-ts.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-The problem comes with T2, where we advance the saved PC by two bytes
-if the instruction was 32-bit such that it again points at the next
-instruction to be executed.  This is where the problem comes in because
-we have two different chunks of code with completely different
-expectations.
-
-Maybe we need to pass in the correction factor to do_undefinstr instead.
+diff --git a/drivers/mfd/ucb1x00-ts.c b/drivers/mfd/ucb1x00-ts.c
+index 000cb41..92b85e2 100644
+--- a/drivers/mfd/ucb1x00-ts.c
++++ b/drivers/mfd/ucb1x00-ts.c
+@@ -385,12 +385,18 @@ static int ucb1x00_ts_add(struct ucb1x00_dev *dev)
+ 	idev->close      = ucb1x00_ts_close;
+ 
+ 	__set_bit(EV_ABS, idev->evbit);
+-	__set_bit(ABS_X, idev->absbit);
+-	__set_bit(ABS_Y, idev->absbit);
+-	__set_bit(ABS_PRESSURE, idev->absbit);
+ 
+ 	input_set_drvdata(idev, ts);
+ 
++	ucb1x00_adc_enable(ts->ucb);
++	ts->x_res = ucb1x00_ts_read_xres(ts);
++	ts->y_res = ucb1x00_ts_read_yres(ts);
++	ucb1x00_adc_disable(ts->ucb);
++
++	input_set_abs_params(idev, ABS_X, 0, ts->x_res, 0, 0);
++	input_set_abs_params(idev, ABS_Y, 0, ts->y_res, 0, 0);
++	input_set_abs_params(idev, ABS_PRESSURE, 0, 0, 0, 0);
++
+ 	err = input_register_device(idev);
+ 	if (err)
+ 		goto fail;
+-- 
+1.7.2.3
