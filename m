@@ -1,40 +1,114 @@
 From: agust@denx.de (Anatolij Gustschin)
-Date: Wed, 26 Jan 2011 09:49:48 +0100
-Subject: [PATCH 1/2] v4l: soc-camera: start stream after queueing the buffers
+Date: Wed, 26 Jan 2011 09:49:49 +0100
+Subject: [PATCH 2/2] dma: ipu_idmac: do not lose valid received data in the
+	irq handler
 In-Reply-To: <1296031789-1721-1-git-send-email-agust@denx.de>
 References: <1296031789-1721-1-git-send-email-agust@denx.de>
-Message-ID: <1296031789-1721-2-git-send-email-agust@denx.de>
+Message-ID: <1296031789-1721-3-git-send-email-agust@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some camera systems have strong requirement for capturing
-an exact number of frames after starting the stream and do
-not tolerate losing captured frames. By starting the stream
-after the videobuf has queued the buffers, we ensure that
-no frame will be lost.
+Currently when two or more buffers are queued by the camera driver
+and so the double buffering is enabled in the idmac, we lose the
+first frame comming from CSI since it is just dropped by the
+interrupt handler. The reason for this dropping is that the interrupt
+handler misleadingly assumes that the cur_buf flag is pointing to the
+buffer used by the IDMAC. Actually it is not the case since the
+CUR_BUF flag will be flipped by the FSU when the FSU is sending the
+<TASK>_NEW_FRM_RDY signal when new frame data is delivered by the CSI.
+When sending this singal, FSU updates the DMA_CUR_BUF and the
+DMA_BUFx_RDY flags: the DMA_CUR_BUF is flipped, the DMA_BUFx_RDY
+is cleared, indicating that the frame data is beeing written by
+the IDMAC to the pointed buffer. DMA_BUFx_RDY is supposed to be
+set to the ready state again by the MCU, when it has handled the
+received data. DMA_BUFx_RDY won't be set by the IPU, so waiting
+for this event in the interrupt handler is wrong. Actually there
+is no spurious interrupt as described in the comments, this
+is the valid DMAIC_7_EOF interrupt indicating reception of the
+frame from CSI.
+
+This has been verified on the hardware which is triggering the
+image sensor by the programmable state machine, allowing to
+obtain exact number of frames. On this hardware we do not tolerate
+losing frames.
+
+This patch also removes resetting the DMA_BUFx_RDY flags of
+all channels in ipu_disable_channel() since transfers on other
+DMA channels might be triggered by other running tasks and the
+buffers should always be ready for data sending or reception.
 
 Signed-off-by: Anatolij Gustschin <agust@denx.de>
 ---
- drivers/media/video/soc_camera.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/ipu/ipu_idmac.c |   50 -------------------------------------------
+ 1 files changed, 0 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/media/video/soc_camera.c b/drivers/media/video/soc_camera.c
-index a66811b..7299de0 100644
---- a/drivers/media/video/soc_camera.c
-+++ b/drivers/media/video/soc_camera.c
-@@ -646,11 +646,11 @@ static int soc_camera_streamon(struct file *file, void *priv,
- 	if (icd->streamer != file)
- 		return -EBUSY;
+diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+index cb26ee9..c1a125e 100644
+--- a/drivers/dma/ipu/ipu_idmac.c
++++ b/drivers/dma/ipu/ipu_idmac.c
+@@ -1145,29 +1145,6 @@ static int ipu_disable_channel(struct idmac *idmac, struct idmac_channel *ichan,
+ 	reg = idmac_read_icreg(ipu, IDMAC_CHA_EN);
+ 	idmac_write_icreg(ipu, reg & ~chan_mask, IDMAC_CHA_EN);
  
--	v4l2_subdev_call(sd, video, s_stream, 1);
+-	/*
+-	 * Problem (observed with channel DMAIC_7): after enabling the channel
+-	 * and initialising buffers, there comes an interrupt with current still
+-	 * pointing at buffer 0, whereas it should use buffer 0 first and only
+-	 * generate an interrupt when it is done, then current should already
+-	 * point to buffer 1. This spurious interrupt also comes on channel
+-	 * DMASDC_0. With DMAIC_7 normally, is we just leave the ISR after the
+-	 * first interrupt, there comes the second with current correctly
+-	 * pointing to buffer 1 this time. But sometimes this second interrupt
+-	 * doesn't come and the channel hangs. Clearing BUFx_RDY when disabling
+-	 * the channel seems to prevent the channel from hanging, but it doesn't
+-	 * prevent the spurious interrupt. This might also be unsafe. Think
+-	 * about the IDMAC controller trying to switch to a buffer, when we
+-	 * clear the ready bit, and re-enable it a moment later.
+-	 */
+-	reg = idmac_read_ipureg(ipu, IPU_CHA_BUF0_RDY);
+-	idmac_write_ipureg(ipu, 0, IPU_CHA_BUF0_RDY);
+-	idmac_write_ipureg(ipu, reg & ~(1UL << channel), IPU_CHA_BUF0_RDY);
 -
- 	/* This calls buf_queue from host driver's videobuf_queue_ops */
- 	ret = videobuf_streamon(&icd->vb_vidq);
+-	reg = idmac_read_ipureg(ipu, IPU_CHA_BUF1_RDY);
+-	idmac_write_ipureg(ipu, 0, IPU_CHA_BUF1_RDY);
+-	idmac_write_ipureg(ipu, reg & ~(1UL << channel), IPU_CHA_BUF1_RDY);
+-
+ 	spin_unlock_irqrestore(&ipu->lock, flags);
  
-+	v4l2_subdev_call(sd, video, s_stream, 1);
-+
- 	return ret;
- }
+ 	return 0;
+@@ -1246,33 +1223,6 @@ static irqreturn_t idmac_interrupt(int irq, void *dev_id)
  
+ 	/* Other interrupts do not interfere with this channel */
+ 	spin_lock(&ichan->lock);
+-	if (unlikely(chan_id != IDMAC_SDC_0 && chan_id != IDMAC_SDC_1 &&
+-		     ((curbuf >> chan_id) & 1) == ichan->active_buffer &&
+-		     !list_is_last(ichan->queue.next, &ichan->queue))) {
+-		int i = 100;
+-
+-		/* This doesn't help. See comment in ipu_disable_channel() */
+-		while (--i) {
+-			curbuf = idmac_read_ipureg(&ipu_data, IPU_CHA_CUR_BUF);
+-			if (((curbuf >> chan_id) & 1) != ichan->active_buffer)
+-				break;
+-			cpu_relax();
+-		}
+-
+-		if (!i) {
+-			spin_unlock(&ichan->lock);
+-			dev_dbg(dev,
+-				"IRQ on active buffer on channel %x, active "
+-				"%d, ready %x, %x, current %x!\n", chan_id,
+-				ichan->active_buffer, ready0, ready1, curbuf);
+-			return IRQ_NONE;
+-		} else
+-			dev_dbg(dev,
+-				"Buffer deactivated on channel %x, active "
+-				"%d, ready %x, %x, current %x, rest %d!\n", chan_id,
+-				ichan->active_buffer, ready0, ready1, curbuf, i);
+-	}
+-
+ 	if (unlikely((ichan->active_buffer && (ready1 >> chan_id) & 1) ||
+ 		     (!ichan->active_buffer && (ready0 >> chan_id) & 1)
+ 		     )) {
 -- 
 1.7.1
