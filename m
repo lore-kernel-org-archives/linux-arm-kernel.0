@@ -1,52 +1,40 @@
-From: bones@secretlab.ca (John Bonesio)
-Date: Wed, 26 Jan 2011 13:22:51 -0800
-Subject: [RFC 0/2] Appended Device Tree
-Message-ID: <20110126212220.6723.28773.stgit@riker>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 26 Jan 2011 16:31:37 -0500 (EST)
+Subject: [PATCH] ARM: Avoid discarding sections that might have SMP_ON_UP
+	fixups
+In-Reply-To: <20110126172535.GA15983@arm.com>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
+	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
+	<20110125165919.GD17286@n2100.arm.linux.org.uk>
+	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+	<20110125174636.GE17286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
+	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
+	<20110126124452.GB4232@n2100.arm.linux.org.uk>
+	<20110126172535.GA15983@arm.com>
+Message-ID: <alpine.LFD.2.00.1101261617190.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This not intended to be merged. This is a request for comments on the approach
-being taken.
+On Wed, 26 Jan 2011, Dave P. Martin wrote:
 
-The following series implements a prototype/proof of concept for allowing a
-device-tree binary (dtb) to be appended to the end of zImage. The dtb can be
-appended with a command like:
-   cat zImage myboard.dtb > zImage_w_dtb.
+> SMP_ON_UP fixups lead to vmlinux link errors if those sections are
+> discarded at link-time.  In particular this may happen for built-in
+> __exit stuff.
+> 
+> This patch modifies the vmlinux linker script to reduce the amount
+> of discarded sections, and tries to make sure that __exit sections
+> are kept in.
+> 
+> This is a hack and probably wrong!  Further discussion is needed.  
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-The purpose is to allow a single kernel to be built for multiple boards/systems
-and allow a simple process to apply the right device tree right before the
-kernel image is written into flash. This way the system that applies the
-device tree doesn't have to have the full gnu compiler set installed.
-
-The old behavior has not changed. If a dtb is not appended, the kernel will
-still boot as expected.
-
-The frst patch detects if a dtb is present at the end of the zImage and uses
-it, if present. The second patch merges in a couple of key atags, if present,
-into the appended device-tree, if found.
-
-With the new kernel config option enabled, this patch adds 11400 bytes to
-zImage. The kernel code itself doesn't change size.
-The first patch in this series adds 96 bytes to zImage.
-The second patch in this series adds 11304 bytes to zImage.
-
-These numbers vary depending on the kernel version, probably due to alignment requirements.
+Since discarded sections are by definition not used, we should at least 
+put them into the .init section so to discard them at run time.  And 
+only the EXIT_TEXT and EXIT_DATA would need to be kept (see x86 for 
+example).
 
 
----
-
-John Bonesio (2):
-      ARM:boot:device tree: Allow the device tree binary to be appended to zImage
-      ARM:boot:device tree: Merge specific atags into the device tree
-
-
- arch/arm/Kconfig                  |    7 ++++
- arch/arm/boot/compressed/Makefile |   31 ++++++++++++++++---
- arch/arm/boot/compressed/atags.c  |   50 +++++++++++++++++++++++++++++++
- arch/arm/boot/compressed/head.S   |   59 ++++++++++++++++++++++++++++++++++++-
- arch/arm/boot/compressed/misc.c   |   58 +++++++++++++++++++++++++++++++++++-
- 5 files changed, 196 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/compressed/atags.c
-
--- 
-Signature
+Nicolas
