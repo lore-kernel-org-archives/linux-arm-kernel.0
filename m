@@ -1,28 +1,22 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Wed, 26 Jan 2011 15:46:21 +0530
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Jan 2011 10:31:07 +0000
 Subject: [PATCH] ARM: OMAP2: use early init hook
-In-Reply-To: <20110125192836.GP13589@atomide.com>
+In-Reply-To: <20110126091103.GE1147@pengutronix.de>
 References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-	<20110123174814.GI30094@n2100.arm.linux.org.uk>
-	<20110124201731.GC13589@atomide.com>
-	<AANLkTi=PqUBrrZwWbipXDNxoKrcX8MefZjdeaOrgPApV@mail.gmail.com>
-	<20110125192836.GP13589@atomide.com>
-Message-ID: <AANLkTik6zf1GcPHxSv5pBOHVf=GjCPMuNf-qvpTgiyqT@mail.gmail.com>
+	<20110126084613.GD1147@pengutronix.de>
+	<20110126085240.GA2698@n2100.arm.linux.org.uk>
+	<20110126091103.GE1147@pengutronix.de>
+Message-ID: <20110126103107.GA4232@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 12:58 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Poddar, Sourav <sourav.poddar@ti.com> [110125 07:45]:
->>
->> Just FYI, I observed similar results on OMAP4 for these patches.
->> For OMAP2420, OMAP2430 and OMAP3430 SDPs, you can add my boot
->> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
->
-> Thanks, just posted third patch to this thread that fixes things
-> for omap4, care to give that a try too?
->
+On Wed, Jan 26, 2011 at 10:11:03AM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Jan 26, 2011 at 08:52:40AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Jan 26, 2011 at 09:46:13AM +0100, Uwe Kleine-K?nig wrote:
+> > > Will you care for imx (mach-{mx*,imx}), too, or should I fix them up?
+> > 
+> > Does mx stuff do non-irq setup or non-map_io stuff in those callbacks?
+> the map_io callbacks (e.g. mx27_map_io) setup the infrastructure for
+> cpu_is_xyz and arch_reset.
 
-I applied the third patch and now its booting
-fine for OMAP4 also. :)
-
-Tested-by: Sourav Poddar<sourav.poddar@ti.com>
+In which case yes please.
