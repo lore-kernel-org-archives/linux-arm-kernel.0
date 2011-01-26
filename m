@@ -1,49 +1,73 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 25 Jan 2011 22:52:24 -0800
-Subject: [PATCH v2 01/11] msm: Add CPU queries
-In-Reply-To: <65e852891f18ed0cd764fba918bb842b.squirrel@www.codeaurora.org>
-	(Stepan Moskovchenko's message of "Tue, 25 Jan 2011 22:32:44 -0800
-	(PST)")
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-2-git-send-email-davidb@codeaurora.org>
-	<1295914163.29639.77.camel@c-dwalke-linux.qualcomm.com>
-	<8yak4htj0lb.fsf@huya.qualcomm.com>
-	<1295915034.29639.78.camel@c-dwalke-linux.qualcomm.com>
-	<8yay669hka5.fsf@huya.qualcomm.com>
-	<1295976910.25496.1.camel@c-dwalke-linux.qualcomm.com>
-	<8ya39ogg5dm.fsf@huya.qualcomm.com>
-	<1295983549.25496.33.camel@c-dwalke-linux.qualcomm.com>
-	<8yaei80epie.fsf@huya.qualcomm.com>
-	<1295985978.25496.35.camel@c-dwalke-linux.qualcomm.com>
-	<00e801cbbd11$96b3ca90$c41b5fb0$@gmu.edu>
-	<8yafwsgchlz.fsf@huya.qualcomm.com>
-	<65e852891f18ed0cd764fba918bb842b.squirrel@www.codeaurora.org>
-Message-ID: <8ya7hdsb1hz.fsf@huya.qualcomm.com>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 25 Jan 2011 23:10:37 -0800
+Subject: [PATCH v2 01/28] ARM: tegra: irq: Rename gic pointers to avoid
+	conflicts
+In-Reply-To: <1295834493-5019-2-git-send-email-ccross@android.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-2-git-send-email-ccross@android.com>
+Message-ID: <AANLkTiniMu1Y_q5W=Fui0CNc99MJB5eCkeiVe8JJoO_D@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25 2011, Stepan Moskovchenko wrote:
-
->> On Tue, Jan 25 2011, Zhaohui Wang wrote:
->>
->>> Maybe it's not appropriate to cut in your discussion.
->>
->> It's quite appropriate.
->>
->>> Can anyone explain what's the difference between qsd8X50 and msm8x60?
->>> No msm8x50, right?
->>
->> Well, they're just part numbers, and the numbering isn't all that
->> consistent over time:
->> http://www.qualcomm.com/products_services/chipsets/snapdragon.html
->>
->> The first snapdragon device was calls a QSD (8250 and 8660).  They are
+On Sun, Jan 23, 2011 at 6:01 PM, Colin Cross <ccross@android.com> wrote:
+> A future patch will export gic_mask_irq and gic_unmask_irq.
+> Rename the pointers in arch/arm/mach-tegra/irq.c to avoid
+> a compile error.
 >
-> David, I think you mean "8250 and 8650" here. QSD8250 and QSD8650 are
-> identical as far as Linux is concerned, whereas MSM8660 is different,
-> having two cores, etc.
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+> ?arch/arm/mach-tegra/irq.c | ? 18 +++++++++---------
+> ?1 files changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+> index de7dfad..17c74d2 100644
+> --- a/arch/arm/mach-tegra/irq.c
+> +++ b/arch/arm/mach-tegra/irq.c
+> @@ -46,24 +46,24 @@
+> ?#define ICTLR_COP_IER_CLR ? ? ?0x38
+> ?#define ICTLR_COP_IEP_CLASS ? ?0x3c
+>
+> -static void (*gic_mask_irq)(struct irq_data *d);
+> -static void (*gic_unmask_irq)(struct irq_data *d);
+> +static void (*tegra_gic_mask_irq)(struct irq_data *d);
+> +static void (*tegra_gic_unmask_irq)(struct irq_data *d);
+>
+> -#define irq_to_ictlr(irq) (((irq)-32) >> 5)
+> +#define irq_to_ictlr(irq) (((irq) - 32) >> 5)
+> ?static void __iomem *tegra_ictlr_base = IO_ADDRESS(TEGRA_PRIMARY_ICTLR_BASE);
+> -#define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr)*0x100)
+> +#define ictlr_to_virt(ictlr) (tegra_ictlr_base + (ictlr) * 0x100)
+>
+> ?static void tegra_mask(struct irq_data *d)
+> ?{
+> ? ? ? ?void __iomem *addr = ictlr_to_virt(irq_to_ictlr(d->irq));
+> - ? ? ? gic_mask_irq(d);
+> - ? ? ? writel(1<<(d->irq&31), addr+ICTLR_CPU_IER_CLR);
+> + ? ? ? tegra_gic_mask_irq(d);
+> + ? ? ? writel(1 << (d->irq & 31), addr+ICTLR_CPU_IER_CLR);
+> ?}
+>
+> ?static void tegra_unmask(struct irq_data *d)
+> ?{
+> ? ? ? ?void __iomem *addr = ictlr_to_virt(irq_to_ictlr(d->irq));
+> - ? ? ? gic_unmask_irq(d);
+> + ? ? ? tegra_gic_unmask_irq(d);
+> ? ? ? ?writel(1<<(d->irq&31), addr+ICTLR_CPU_IER_SET);
+> ?}
+>
+> @@ -98,8 +98,8 @@ void __init tegra_init_irq(void)
+> ? ? ? ? ? ? ? ? IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+>
+> ? ? ? ?gic = get_irq_chip(29);
+> - ? ? ? gic_unmask_irq = gic->irq_unmask;
+> - ? ? ? gic_mask_irq = gic->irq_mask;
+> + ? ? ? tegra_gic_unmask_irq = gic->irq_unmask;
+> + ? ? ? tegra_gic_mask_irq = gic->irq_mask;
+> ? ? ? ?tegra_irq.irq_ack = gic->irq_ack;
+> ?#ifdef CONFIG_SMP
+> ? ? ? ?tegra_irq.irq_set_affinity = gic->irq_set_affinity;
+> --
+> 1.7.3.1
 
-Yes, thanks.
-
-David
+If there are no objections, I'm going to put this patch into
+tegra/for-linus for a pull request for 2.6.38-rc3.
