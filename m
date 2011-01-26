@@ -1,61 +1,29 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Wed, 26 Jan 2011 14:47:09 +0900
-Subject: [RFC PATCH 3/5] of: add clock providers
-In-Reply-To: <20110126044422.16410.78703.stgit@localhost6.localdomain6>
-	<20110126044416.16410.68942.stgit@localhost6.localdomain6>
-References: <20110126043338.16410.75019.stgit@localhost6.localdomain6>
-	<20110126044422.16410.78703.stgit@localhost6.localdomain6>
-	<20110126043338.16410.75019.stgit@localhost6.localdomain6>
-	<20110126044416.16410.68942.stgit@localhost6.localdomain6>
-Message-ID: <20110126054709.GC19428@linux-sh.org>
+From: Jon.Povey@racelogic.co.uk (Jon Povey)
+Date: Wed, 26 Jan 2011 06:14:11 +0000
+Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs
+	numbers >31
+In-Reply-To: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com>
+Message-ID: <70E876B0EA86DD4BAF101844BC814DFE093F977AC9@Cloud.RL.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 09:44:17PM -0700, Grant Likely wrote:
-> +struct clk *of_clk_get(struct device *dev, const char *id)
-> +{
-...
-> +	snprintf(prop_name, 32, "%s-clock", id ? id : "bus");
-> +	prop = of_get_property(dev->of_node, prop_name, &sz);
-> +	if (!prop || sz < 4)
-> +		return NULL;
-...
-> +	 * size of the property. */
-> +	if (strlen(prop) + 1 > sz)
-> +		return NULL;
-> +
-> +	/* Find the clock provider node; check if it is registered as a
-> +	 * provider, and ask it for the relevant clk structure */
-> +	provnode = of_find_node_by_phandle(provhandle);
-> +	if (!provnode) {
-> +		pr_warn("%s: %s property in node %s references invalid phandle",
-> +			__func__, prop_name, dev->of_node->full_name);
-> +		return NULL;
-...
+davinci-linux-open-source-bounces at linux.davincidsp.com wrote:
 
-> +	return clk;
-> +}
+> The bug implied the use of macros to access the relevant hardware
+> register e.g. the driver code used the macro like this:
+> 'gpio_reg_clear_bit(&reg->data_out, gpio)'
+>
+> But it has to be used like this:
+> 'gpio_reg_clear_bit(reg->data_out, gpio)'.
 
-On Tue, Jan 25, 2011 at 09:44:22PM -0700, Grant Likely wrote:
-> @@ -79,6 +81,11 @@ EXPORT_SYMBOL(clk_get_sys);
->  struct clk *clk_get(struct device *dev, const char *con_id)
->  {
->  	const char *dev_id = dev ? dev_name(dev) : NULL;
-> +	struct clk *clk;
-> +
-> +	clk = of_clk_get(dev, con_id);
-> +	if (clk && __clk_get(clk))
-> +		return clk;
->  
->  	return clk_get_sys(dev_id, con_id);
->  }
-> 
+Could the macro be made into an inline function so it can do type-checking
+to avoid/catch this in future?
 
-The return value for clk_get() by almost all users is checked for
-specifically with IS_ERR() rather than an IS_ERR_OR_NULL(), so you're
-going to want to change your of_clk_get() error paths to return
-ERR_PTR()'s directly, or wrap it up like clk_get_sys() does.
+--
+Jon Povey
+jon.povey at racelogic.co.uk
 
-Given that there are multiple reasons why of_clk_get() can fail however,
-it's probably worth handing down the actual error rather than simply
-chomping it in to an -ENOENT.
+Racelogic is a limited company registered in England. Registered number 2743719 .
+Registered Office Unit 10, Swan Business Centre, Osier Way, Buckingham, Bucks, MK18 1TB .
+
+The information contained in this electronic mail transmission is intended by Racelogic Ltd for the use of the named individual or entity to which it is directed and may contain information that is confidential or privileged. If you have received this electronic mail transmission in error, please delete it from your system without copying or forwarding it, and notify the sender of the error by reply email so that the sender's address records can be corrected. The views expressed by the sender of this communication do not necessarily represent those of Racelogic Ltd. Please note that Racelogic reserves the right to monitor e-mail communications passing through its network
