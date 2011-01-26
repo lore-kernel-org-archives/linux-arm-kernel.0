@@ -1,130 +1,67 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 26 Jan 2011 09:24:02 +0100
-Subject: [PATCH 1/2] mach-ux500: update the U8500 defconfig
-Message-ID: <1296030242-32136-1-git-send-email-linus.walleij@stericsson.com>
+From: mel@csn.ul.ie (Mel Gorman)
+Date: Wed, 26 Jan 2011 08:29:16 +0000
+Subject: [PATCH] ARM: mm: enforce pageblock alignment when freeing
+	memmap entries at init
+In-Reply-To: <1295567231-2384-1-git-send-email-dima@android.com>
+References: <1295567231-2384-1-git-send-email-dima@android.com>
+Message-ID: <20110126082916.GM18984@csn.ul.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Config and activate all the devices we've merged for Ux500
-in 2.6.38-rc1.
+On Thu, Jan 20, 2011 at 03:47:11PM -0800, Dima Zavin wrote:
+> On some machines, the nodes do not always start on pageblock
+> boundaries. In these cases it is possible for free_unused_memmap
+> to free mappings for pages inside a pageblock with otherwise
+> valid pages. This presents problems for page migration since it
+> operates on whole pageblocks at a time.
+> 
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/configs/u8500_defconfig |   59 ++++++++++++++++++++++++++++++++-----
- 1 files changed, 51 insertions(+), 8 deletions(-)
+This patch is not aligning on a pageblock boundary - it's aligning on
+MAX_ORDER_NR_PAGES which is the boundary the buddy allocator works on.
+This is a minor but important nit as different assumptions are made
+about pageblocks and MAX_ORDER_NR_PAGES. Anyway;
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 52d86c4..a5cce24 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -1,7 +1,6 @@
- CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
-@@ -13,43 +12,89 @@ CONFIG_UX500_SOC_DB5500=y
- CONFIG_UX500_SOC_DB8500=y
- CONFIG_MACH_U8500=y
- CONFIG_MACH_U5500=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
-+CONFIG_HOTPLUG_CPU=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_CMDLINE="root=/dev/ram0 console=ttyAMA2,115200n8"
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
- CONFIG_VFP=y
- CONFIG_NEON=y
-+CONFIG_NET=y
-+CONFIG_PHONET=y
-+CONFIG_PHONET_PIPECTRLR=y
-+# CONFIG_WIRELESS is not set
-+CONFIG_CAIF=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
--# CONFIG_MISC_DEVICES is not set
-+CONFIG_MISC_DEVICES=y
-+CONFIG_AB8500_PWM=y
-+CONFIG_SENSORS_BH1780=y
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
--# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_NOMADIK=y
-+CONFIG_KEYBOARD_STMPE=y
-+CONFIG_KEYBOARD_TC3589X=y
- # CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_BU21013=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_AB8500_PONKEY=y
- # CONFIG_SERIO is not set
- CONFIG_VT_HW_CONSOLE_BINDING=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- # CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
-+CONFIG_HW_RANDOM=y
-+CONFIG_HW_RANDOM_NOMADIK=y
-+CONFIG_I2C=y
-+CONFIG_I2C_NOMADIK=y
- CONFIG_SPI=y
- CONFIG_SPI_PL022=y
-+CONFIG_GPIO_STMPE=y
-+CONFIG_GPIO_TC3589X=y
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
-+CONFIG_MFD_STMPE=y
-+CONFIG_MFD_TC3589X=y
-+CONFIG_AB8500_CORE=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_AB8500=y
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_LP5521=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_AB8500=y
-+CONFIG_RTC_DRV_PL031=y
-+CONFIG_DMADEVICES=y
-+CONFIG_STE_DMA40=y
-+CONFIG_STAGING=y
-+# CONFIG_STAGING_EXCLUDE_BUILD is not set
-+CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT2_FS_SECURITY=y
--CONFIG_INOTIFY=y
-+CONFIG_EXT3_FS=y
-+CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- CONFIG_CONFIGFS_FS=m
- # CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
- CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_PREEMPT is not set
-@@ -58,5 +103,3 @@ CONFIG_DEBUG_INFO=y
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
- CONFIG_DEBUG_ERRORS=y
--CONFIG_CRC_T10DIF=m
--# CONFIG_CRC32 is not set
+If the node is not starting on the MAX_ORDER boundary then node_start_pfn
+should also not be on the same boundary but the patch does not imply
+that this has been broken. If anything it appears at a glance that there
+is memmap *not* being freed because it was allocated on the
+MAX_ORDER_NR_PAGES boundary and only partially freed.
+
+The comment then is confusing because the function is freeing memmap but
+rounding down to free more of it ensures that all pages get a mapping?
+It's not clear at all to me what was broken or how this patch fixes it
+but bear in mind that it's rare I look at how ARM is initialised.
+
+> Round down bank_start to pageblock boundary so that whole
+> pageblocks always have valid mappings.
+> 
+> Signed-off-by: Dima Zavin <dima@android.com>
+> ---
+>  arch/arm/mm/init.c |    6 +++++-
+>  1 files changed, 5 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 5164069..98de5d8 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -418,7 +418,11 @@ static void __init free_unused_memmap(struct meminfo *mi)
+>  	for_each_bank(i, mi) {
+>  		struct membank *bank = &mi->bank[i];
+>  
+> -		bank_start = bank_pfn_start(bank);
+> +		/* Round bank_start down to the start of a pageblock so that
+> +		 * all pages in a pageblock always have a mapping.
+> +		 */
+> +		bank_start = round_down(bank_pfn_start(bank),
+> +					MAX_ORDER_NR_PAGES);
+>  
+>  		/*
+>  		 * If we had a previous bank, and there is a space
+> -- 
+> 1.7.3.1
+> 
+
 -- 
-1.7.3.2
+Mel Gorman
+Linux Technology Center
+IBM Dublin Software Lab
