@@ -1,41 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 26 Jan 2011 16:06:40 -0500 (EST)
-Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
-	asm/spinlock.h
-In-Reply-To: <AANLkTikG4bPmesNPvLGt8G+Q8YWwRzyYL3i+uL1FE=K2@mail.gmail.com>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
-	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
-	<20110125165919.GD17286@n2100.arm.linux.org.uk>
-	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
-	<20110125174636.GE17286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
-	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
-	<alpine.LFD.2.00.1101261023470.8580@xanadu.home>
-	<20110126155203.GA10141@n2100.arm.linux.org.uk>
-	<AANLkTikG4bPmesNPvLGt8G+Q8YWwRzyYL3i+uL1FE=K2@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1101261558470.8580@xanadu.home>
+From: bones@secretlab.ca (John Bonesio)
+Date: Wed, 26 Jan 2011 13:22:51 -0800
+Subject: [RFC 0/2] Appended Device Tree
+Message-ID: <20110126212220.6723.28773.stgit@riker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jan 2011, Dave Martin wrote:
+This not intended to be merged. This is a request for comments on the approach
+being taken.
 
-> On Wed, Jan 26, 2011 at 3:52 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > So I don't think weak symbols work like we want them to.
-> >
-> 
-> That was the conclusion I came to also ... the linker seems to resolve
-> references in each object before discarding sections, so the weak
-> reference has already become concrete and section discard breaks it.
+The following series implements a prototype/proof of concept for allowing a
+device-tree binary (dtb) to be appended to the end of zImage. The dtb can be
+appended with a command like:
+   cat zImage myboard.dtb > zImage_w_dtb.
 
-Well, I must add to the chorus.
+The purpose is to allow a single kernel to be built for multiple boards/systems
+and allow a simple process to apply the right device tree right before the
+kernel image is written into flash. This way the system that applies the
+device tree doesn't have to have the full gnu compiler set installed.
 
-And it seems to be impossible to obtain the name of the currently active 
-section from gas either, which would have made the conditional omission 
-of the fixup possible, or similar.
+The old behavior has not changed. If a dtb is not appended, the kernel will
+still boot as expected.
 
-Bummer.
+The frst patch detects if a dtb is present at the end of the zImage and uses
+it, if present. The second patch merges in a couple of key atags, if present,
+into the appended device-tree, if found.
+
+With the new kernel config option enabled, this patch adds 11400 bytes to
+zImage. The kernel code itself doesn't change size.
+The first patch in this series adds 96 bytes to zImage.
+The second patch in this series adds 11304 bytes to zImage.
+
+These numbers vary depending on the kernel version, probably due to alignment requirements.
 
 
-Nicolas
+---
+
+John Bonesio (2):
+      ARM:boot:device tree: Allow the device tree binary to be appended to zImage
+      ARM:boot:device tree: Merge specific atags into the device tree
+
+
+ arch/arm/Kconfig                  |    7 ++++
+ arch/arm/boot/compressed/Makefile |   31 ++++++++++++++++---
+ arch/arm/boot/compressed/atags.c  |   50 +++++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/head.S   |   59 ++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/compressed/misc.c   |   58 +++++++++++++++++++++++++++++++++++-
+ 5 files changed, 196 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/atags.c
+
+-- 
+Signature
