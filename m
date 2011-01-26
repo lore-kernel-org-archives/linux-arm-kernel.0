@@ -1,78 +1,77 @@
-From: robert.richter@amd.com (Robert Richter)
-Date: Wed, 26 Jan 2011 19:33:55 +0100
-Subject: [PATCH v2 0/3] oprofile: ARM backtraces and few minors
-In-Reply-To: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
-References: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
-Message-ID: <20110126183355.GM5874@erda.amd.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 26 Jan 2011 12:05:27 -0700 (MST)
+Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling mstandby
+	mode
+In-Reply-To: <20110126004128.GA8524@manju-desktop>
+References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+	<4CF8AC8B.9040800@ti.com> <20101203092514.GA10048@GLPP-machine>
+	<4CF8E03A.4010000@ti.com> <20101214014822.GA3858@manju-desktop>
+	<20110124093349.GC16582@m-desktop>
+	<20110126004128.GA8524@manju-desktop>
+Message-ID: <alpine.DEB.2.00.1101261159070.16671@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.01.11 13:57:17, Ari Kauppi wrote:
-> This patchset re-enables ARM backtraces with non-PMU capable CPUs.
+On Wed, 26 Jan 2011, G, Manjunath Kondaiah wrote:
+
+> On Mon, Jan 24, 2011 at 03:03:49PM +0530, G, Manjunath Kondaiah wrote:
+> > Paul/Benoit,
+> > 
+> > On Tue, Dec 14, 2010 at 07:18:22AM +0530, G, Manjunath Kondaiah wrote:
+> > > Paul/Benoit,
+> > > 
+> > > On Fri, Dec 03, 2010 at 01:19:06PM +0100, Cousson, Benoit wrote:
+> > > > On 12/3/2010 10:47 AM, G, Manjunath Kondaiah wrote:
+> > > > >* Cousson, Benoit<b-cousson@ti.com>  [2010-12-03 09:38:35 +0100]:
+> > > > 
+> > > > [...]
+> > > > 
+> > > > >>>v7: replaced mutex lock with spin lock. Added use count for controlling
+> > > > >>>access to sysconfig registers in case if overlapping request/release API's
+> > > > >>>are used.
+> > > > >>
+> > > > >>I'm not sure it should be done here. I'd rather keep that code in
+> > > > >>the DMA, since this is the only user of that feature.
+> > > > >
+> > > > >Are you referring to spin lock or usage count?
+> > > > 
+> > > > The spinlock is needed, I was referring to the usage count.
+> > > > 
+> > > > That being said, the API proposed by Paul (request/release
+> > > > ) sound like a get/put, so maybe he had that kind of usage in mind.
+> > > > 
+> > > > I'm still not convince it should be done at hwmod API level.
+> > > > 
+> > > > 
+> > > > Paul,
+> > > > Any thoughts on that?
+> > > 
+> > > How do we proceed further?
+> > Gentle reminder!
+> > 
+> > Can we please align on this so that DMA sysconfig patches can be
+> > upstreamed?
+> > 
+> > Discussion on this topic can be accessed at:
+> > https://patchwork.kernel.org/patch/372231/
+> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39728.html
 > 
-> In V2 I have tried to address the comments received for the V1
-> patches. arch/sh/oprofile/common.c is untouched but should work
-> as earlier.
-> 
-> Compile tested with arm/omap2plus_defconfig (with and without
-> CONFIG_HW_PERF_EVENTS).
-> 
-> Ari Kauppi (3):
->   oprofile: Use CONFIG_HW_PERF_EVENTS for oprofile_perf_init and
->     friends
->   oprofile: Provide stubs for oprofile_perf_{init,exit}
->   ARM: oprofile: Always allow backtraces
-> 
->  arch/arm/oprofile/common.c |   12 ++----------
->  include/linux/oprofile.h   |   13 +++++++++++--
->  2 files changed, 13 insertions(+), 12 deletions(-)
+> As there is no response from paul on this topic, I will go ahead with usage
+> count logic proposed by Adrian Hunter <adrian.hunter@nokia.com> at:
+> https://patchwork.kernel.org/patch/366831/
+> Above logic has got:
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
 
-Applied to oprofile/urgent, thanks Ari.
+Yes, that's probably a good idea for right now.  There's a wider spectrum 
+of opinion than I had thought on whether this type of thing belongs in the 
+hwmod code.  I'd like to have a greater degree of alignment on that before 
+we merge something into the hwmod code.
 
-I squashed patch 2 and 3 and modified the commit messages (see below).
-
-Added to .37-stable.
-
--Robert
+So, unless there is some reason why it will cause problems not to have 
+this in the hwmod code for right now, please just go ahead and deal with 
+it in your DMA code, and then we will move it to the hwmod code later as 
+needed.
 
 
-commit d14dd7e20d5e526557f5d3cfef4046a642f80924
-Author: Ari Kauppi <kauppi@papupata.org>
-Date:   Thu Jan 20 13:57:19 2011 -0500
-
-    ARM: oprofile: Fix backtraces in timer mode
-    
-    Always allow backtraces when using oprofile on ARM, even if a PMU
-    isn't present. Restores functionality originally introduced in commit
-    1b7b56982fdcd9d85effd76f3928cf5d6eb26155 ("oprofile: Always allow
-    backtraces on ARM") by Richard Purdie.
-    
-    It is not that obvious, but there is now only one oprofile_arch_init()
-    function. So the .backtrace callback is available also in timer mode.
-    
-    Implemented by removing code and using stubs for oprofile_perf_{init,
-    exit} provided by <linux/oprofile.h>. This allows cleaning of other
-    architecture specific implementations too.
-    
-    Cc: stable at kernel.org # 37.x
-    Signed-off-by: Ari Kauppi <kauppi@papupata.org>
-    Acked-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Robert Richter <robert.richter@amd.com>
-
-commit 1ea1bdf7faa4d0b5293e605f2e1ef1c2c59f6b53
-Author: Ari Kauppi <kauppi@papupata.org>
-Date:   Thu Jan 20 13:57:18 2011 -0500
-
-    oprofile: Fix usage of CONFIG_HW_PERF_EVENTS for oprofile_perf_init and friends
-    
-    The implementations are flagged in Makefile with CONFIG_HW_PERF_EVENTS
-    instead of CONFIG_PERF_EVENTS.
-    
-    Cc: stable at kernel.org # 37.x
-    Signed-off-by: Ari Kauppi <kauppi@papupata.org>
-    Signed-off-by: Robert Richter <robert.richter@amd.com>
-
-
--- 
-Advanced Micro Devices, Inc.
-Operating System Research Center
+- Paul
