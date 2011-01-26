@@ -1,48 +1,41 @@
-From: matejken@gmail.com (Matej Kenda)
-Date: Wed, 26 Jan 2011 22:59:38 +0100
-Subject: [PATCH 1/2] Updated XCEP partition sizes
-In-Reply-To: <AANLkTinLTuJY9vDH_oHeKk7j6oo4369cF35PG+fVc5A_@mail.gmail.com>
-References: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
-	<AANLkTimMniHC==y6majqBGKNBa91J1DpVK8zbnDxEWvy@mail.gmail.com>
-	<AANLkTinLTuJY9vDH_oHeKk7j6oo4369cF35PG+fVc5A_@mail.gmail.com>
-Message-ID: <AANLkTimVuHx4_Z=89Fj_yh-Pos8-gT3mD-yr_9+OJ07u@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 26 Jan 2011 14:01:37 -0800
+Subject: [PATCH 1/4] msm: clock: Remove unused code and definitions
+In-Reply-To: <1295992937.25496.75.camel@c-dwalke-linux.qualcomm.com> (Daniel
+	Walker's message of "Tue, 25 Jan 2011 14:02:17 -0800")
+References: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>
+	<1295927118-27591-2-git-send-email-sboyd@codeaurora.org>
+	<1295991537.25496.49.camel@c-dwalke-linux.qualcomm.com>
+	<4D3F4609.3000808@codeaurora.org>
+	<1295992937.25496.75.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <8ya1v3z8gu6.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/25 Eric Miao <eric.y.miao@gmail.com>:
-> On Tue, Jan 25, 2011 at 2:54 AM, Matej Kenda <matejken@gmail.com> wrote:
->> I've sent two simple patches for Iskratel XCEP last week.
->>
->> Can they be included in the kernel?
+On Tue, Jan 25 2011, Daniel Walker wrote:
+
+> On Tue, 2011-01-25 at 13:52 -0800, Saravana Kannan wrote:
+>> On 01/25/2011 01:38 PM, Daniel Walker wrote:
+>> > On Mon, 2011-01-24 at 19:45 -0800, Stephen Boyd wrote:
+>> >> Remove dead code and push out clock-7x30.h and clock-pcom.h to
+>> >> where they are actually used.
+>> >>
+>> >
+>> > I'd do two patches for this. The stuff your doing is too disconnected.
+>> >
+>> > Daniel
+>> >
+>> There is a whole bunch of unused code in the clock files and it's being 
+>> deleted. I don't see a point of splitting it up per file.
 >
-> I'm a bit tentative on this. Patch 1 is basically OK, but what if
-> someone needs a even larger partition in the future?
+> It's easier to review when changes aren't merged that don't related to
+> each other.
 
-This small embedded computer has relatively small Flash (32 MB).
+In this particular case, the patch is a bunch of removal of dead code,
+and kind of makes sense to keep it together.  I'm fine with it as is.
 
-1MB partition for the kernel was created initially for kernel 2.4 a
-few years ago. The size of that kernel was around 800 kB.
+David Brown
 
-Later on, the size increased to 900 kB with kernel 2.6.20 (still
-monolithic kernel). 2.6.32 was still small enough to be squeezed in by
-moving some driver out to modules.
-
-However, with 2.6.36 this was not possible any more: I was unable to
-make the kernel smaller that 1.1 MB and therefore the partition needed
-to be increased.
-
-Assuming the growth rate of the kernel from 800 kB to 1.1 in four
-years, 2 MB should be enough for next 8 years or so.
-
-> And some work
-> is on-going with cleanup of those defconfigs, guess I'll hold a
-> while those changes to the defconfig until that's clear enough.
->
-> BTW - did you run Uwe's script to make sure the changes to defconfig
-> is the smallest one?
-
-defconfig file was created with "make ARCH=arm savedefconfig"
-
-Regards,
-
-Matej
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
