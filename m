@@ -1,87 +1,48 @@
-From: dima@android.com (Dima Zavin)
-Date: Wed, 26 Jan 2011 13:57:53 -0800
-Subject: [PATCH] ARM: mm: enforce pageblock alignment when freeing memmap
-	entries at init
-In-Reply-To: <20110126082916.GM18984@csn.ul.ie>
-References: <1295567231-2384-1-git-send-email-dima@android.com>
-	<20110126082916.GM18984@csn.ul.ie>
-Message-ID: <AANLkTimrP4u5VJBVGCK0tXZo6G2S4tXJnJcqc0+oVeeF@mail.gmail.com>
+From: matejken@gmail.com (Matej Kenda)
+Date: Wed, 26 Jan 2011 22:59:38 +0100
+Subject: [PATCH 1/2] Updated XCEP partition sizes
+In-Reply-To: <AANLkTinLTuJY9vDH_oHeKk7j6oo4369cF35PG+fVc5A_@mail.gmail.com>
+References: <AANLkTi=42n+h+0buU_83R-y4XkXqy8bkWSquwuLAY56m@mail.gmail.com>
+	<AANLkTimMniHC==y6majqBGKNBa91J1DpVK8zbnDxEWvy@mail.gmail.com>
+	<AANLkTinLTuJY9vDH_oHeKk7j6oo4369cF35PG+fVc5A_@mail.gmail.com>
+Message-ID: <AANLkTimVuHx4_Z=89Fj_yh-Pos8-gT3mD-yr_9+OJ07u@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 12:29 AM, Mel Gorman <mel@csn.ul.ie> wrote:
-> On Thu, Jan 20, 2011 at 03:47:11PM -0800, Dima Zavin wrote:
->> On some machines, the nodes do not always start on pageblock
->> boundaries. In these cases it is possible for free_unused_memmap
->> to free mappings for pages inside a pageblock with otherwise
->> valid pages. This presents problems for page migration since it
->> operates on whole pageblocks at a time.
+2011/1/25 Eric Miao <eric.y.miao@gmail.com>:
+> On Tue, Jan 25, 2011 at 2:54 AM, Matej Kenda <matejken@gmail.com> wrote:
+>> I've sent two simple patches for Iskratel XCEP last week.
 >>
+>> Can they be included in the kernel?
 >
-> This patch is not aligning on a pageblock boundary - it's aligning on
-> MAX_ORDER_NR_PAGES which is the boundary the buddy allocator works on.
-> This is a minor but important nit as different assumptions are made
-> about pageblocks and MAX_ORDER_NR_PAGES. Anyway;
+> I'm a bit tentative on this. Patch 1 is basically OK, but what if
+> someone needs a even larger partition in the future?
 
-Thank you for the nit. I'm kind of a VM noob so any insight is
-appreciated. I naively equated the two in my head when writing the
-description.
+This small embedded computer has relatively small Flash (32 MB).
 
-> If the node is not starting on the MAX_ORDER boundary then node_start_pfn
-> should also not be on the same boundary but the patch does not imply
-> that this has been broken. If anything it appears at a glance that there
-> is memmap *not* being freed because it was allocated on the
-> MAX_ORDER_NR_PAGES boundary and only partially freed.
+1MB partition for the kernel was created initially for kernel 2.4 a
+few years ago. The size of that kernel was around 800 kB.
+
+Later on, the size increased to 900 kB with kernel 2.6.20 (still
+monolithic kernel). 2.6.32 was still small enough to be squeezed in by
+moving some driver out to modules.
+
+However, with 2.6.36 this was not possible any more: I was unable to
+make the kernel smaller that 1.1 MB and therefore the partition needed
+to be increased.
+
+Assuming the growth rate of the kernel from 800 kB to 1.1 in four
+years, 2 MB should be enough for next 8 years or so.
+
+> And some work
+> is on-going with cleanup of those defconfigs, guess I'll hold a
+> while those changes to the defconfig until that's clear enough.
 >
-> The comment then is confusing because the function is freeing memmap but
-> rounding down to free more of it ensures that all pages get a mapping?
-> It's not clear at all to me what was broken or how this patch fixes it
-> but bear in mind that it's rare I look at how ARM is initialised.
+> BTW - did you run Uwe's script to make sure the changes to defconfig
+> is the smallest one?
 
-The function frees the mappings *between* the nodes. So when the patch
-rounds down the start of the node, it preserves (i.e. frees less) the
-mappings from MAX_ORDER_NR_PAGES boundary to the actual first valid
-page. Otherwise, I would have to define CONFIG_HOLES_IN_ZONE and pay
-the penalty. Looking through the history, a similar patch was already
-taken to roundup the previous bank end to MAX_ORDER_NR_PAGES. I'm
-doing the same to the start.
+defconfig file was created with "make ARCH=arm savedefconfig"
 
-Am I totally off base?
+Regards,
 
---Dima
-
->
->> Round down bank_start to pageblock boundary so that whole
->> pageblocks always have valid mappings.
->>
->> Signed-off-by: Dima Zavin <dima@android.com>
->> ---
->> ?arch/arm/mm/init.c | ? ?6 +++++-
->> ?1 files changed, 5 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->> index 5164069..98de5d8 100644
->> --- a/arch/arm/mm/init.c
->> +++ b/arch/arm/mm/init.c
->> @@ -418,7 +418,11 @@ static void __init free_unused_memmap(struct meminfo *mi)
->> ? ? ? for_each_bank(i, mi) {
->> ? ? ? ? ? ? ? struct membank *bank = &mi->bank[i];
->>
->> - ? ? ? ? ? ? bank_start = bank_pfn_start(bank);
->> + ? ? ? ? ? ? /* Round bank_start down to the start of a pageblock so that
->> + ? ? ? ? ? ? ?* all pages in a pageblock always have a mapping.
->> + ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? bank_start = round_down(bank_pfn_start(bank),
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MAX_ORDER_NR_PAGES);
->>
->> ? ? ? ? ? ? ? /*
->> ? ? ? ? ? ? ? ?* If we had a previous bank, and there is a space
->> --
->> 1.7.3.1
->>
->
-> --
-> Mel Gorman
-> Linux Technology Center
-> IBM Dublin Software Lab
->
+Matej
