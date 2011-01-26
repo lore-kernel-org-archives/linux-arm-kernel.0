@@ -1,35 +1,39 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Wed, 26 Jan 2011 21:52:55 +0900
-Subject: [PATCH] ARM: S5PV210: Add GONI board setup for CIF camera support
-In-Reply-To: <1294419468-13700-1-git-send-email-s.nawrocki@samsung.com>
-References: <1294419468-13700-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <4D401927.6040005@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 27 Jan 2011 06:09:57 +0800
+Subject: [PATCH] ARM: mxs: acknowledge gpio irq
+In-Reply-To: <1295970862-23679-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1295970862-23679-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110126220956.GA9820@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Uwe,
 
-On 01/08/2011 01:57 AM, Sylwester Nawrocki wrote:
-> Hello,
->
-> the following patch series introduces changes in GONI board setup file
-> required for the CIF camera sensor driver.
-> The first patch adds the I2C0 bus driver, the second one adds the regulator
-> supply definitions and the third one just increases virtual size
-> of the framebuffer window 0 for preview double buffering.
->
->
-> The patch series contains:
->
-> [PATCH 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
-> [PATCH 2/3] ARM: S5PV210: Add supplies for CIF camera on GONI board
-> [PATCH 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
->
-> Created against kgene-for-next branch at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->
+On Tue, Jan 25, 2011 at 04:54:22PM +0100, Uwe Kleine-K?nig wrote:
+> This fixes a machine hang after a gpio irq triggered.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mxs/gpio.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
+> index d7ad7a6..cb0c0e8 100644
+> --- a/arch/arm/mach-mxs/gpio.c
+> +++ b/arch/arm/mach-mxs/gpio.c
+> @@ -139,6 +139,8 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  	struct mxs_gpio_port *port = (struct mxs_gpio_port *)get_irq_data(irq);
+>  	u32 gpio_irq_no_base = port->virtual_irq_start;
+>  
+> +	desc->irq_data.chip->irq_ack(&desc->irq_data);
+> +
+>  	irq_stat = __raw_readl(port->base + PINCTRL_IRQSTAT(port->id)) &
+>  			__raw_readl(port->base + PINCTRL_IRQEN(port->id));
+>  
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
 
-Any comments about these patches?
+The implementation were referring to mxc gpio.  We are not running
+into this problem on mxc?
 
 Regards,
-Sylwester
+Shawn
