@@ -1,28 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Jan 2011 22:46:49 +0000
-Subject: [PATCH v2 02/11] msm: Generalize timer register mappings
-In-Reply-To: <AANLkTi=UBfBp-VOQ=n_a4sjA9v_dhcv-rXcXiE6zrf23@mail.gmail.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-3-git-send-email-davidb@codeaurora.org>
-	<1295908604.29639.62.camel@c-dwalke-linux.qualcomm.com>
-	<8yaei81kjlc.fsf@huya.qualcomm.com>
-	<AANLkTi=UBfBp-VOQ=n_a4sjA9v_dhcv-rXcXiE6zrf23@mail.gmail.com>
-Message-ID: <20110126224649.GC7323@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Jan 2011 14:50:10 -0800
+Subject: [PATCH 1/4] msm: clock: Remove unused code and definitions
+In-Reply-To: <1296079382.29801.45.camel@c-dwalke-linux.qualcomm.com>
+References: <1295927118-27591-1-git-send-email-sboyd@codeaurora.org>	
+	<1295927118-27591-2-git-send-email-sboyd@codeaurora.org>	
+	<1295991537.25496.49.camel@c-dwalke-linux.qualcomm.com>	
+	<4D3F4609.3000808@codeaurora.org>	
+	<1295992937.25496.75.camel@c-dwalke-linux.qualcomm.com>	
+	<8ya1v3z8gu6.fsf@huya.qualcomm.com>
+	<1296079382.29801.45.camel@c-dwalke-linux.qualcomm.com>
+Message-ID: <4D40A522.4000808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 02:12:59PM -0800, Dima Zavin wrote:
-> To be honest I don't understand why you would want to do this at
-> runtime. You cannot select multiple SoCs in the kernel build anyway,
-> nor would you want to. Trying to have same kernel to boot on ARM v6
-> and ARM v7 would already be freaky enough.
+On 01/26/2011 02:03 PM, Daniel Walker wrote:
+>
+> He's adding stuff too .. So it's not _just_ removal which is what I was
+> getting at.
 
-Wrong.  We already have that working with mainline plus some additional
-patches.  OMAP people want it, and it's precisely the direction which
-quite a number of people within the ARM community want to move.
+I'll split this, no worries.
 
-Building an ARM kernel to cover multiple different CPU types is something
-which has always been possible, although with SMP and a few other things
-it's become a little harder.  Not impossible though, and not impossible
-to do efficiently either.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
