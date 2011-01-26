@@ -1,55 +1,54 @@
-From: dmitriyz@google.com (Dima Zavin)
-Date: Wed, 26 Jan 2011 14:50:30 -0800
-Subject: [PATCH v2 02/11] msm: Generalize timer register mappings
-In-Reply-To: <8ya7hdr70fw.fsf@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-3-git-send-email-davidb@codeaurora.org>
-	<1295908604.29639.62.camel@c-dwalke-linux.qualcomm.com>
-	<8yaei81kjlc.fsf@huya.qualcomm.com>
-	<AANLkTi=UBfBp-VOQ=n_a4sjA9v_dhcv-rXcXiE6zrf23@mail.gmail.com>
-	<8ya7hdr70fw.fsf@huya.qualcomm.com>
-Message-ID: <AANLkTinzALPyX5ehXD_DMALt4szqA2hXzguohAGkzVbe@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Jan 2011 15:04:12 -0800
+Subject: [PATCH] ARM: Fix SMP_ON_UP for non ARM ltd. implementations
+Message-ID: <1296083052-20034-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 2:41 PM, David Brown <davidb@codeaurora.org> wrote:
-> On Wed, Jan 26 2011, Dima Zavin wrote:
->
->> On Mon, Jan 24, 2011 at 2:44 PM, David Brown <davidb@codeaurora.org> wrote:
->
->> To be honest I don't understand why you would want to do this at
->> runtime. You cannot select multiple SoCs in the kernel build anyway,
->> nor would you want to. Trying to have same kernel to boot on ARM v6
->> and ARM v7 would already be freaky enough. On top of that mixing 7201a
->> with all the baggage that it comes with 8x60 just wouldn't make sense.
->> These architectures are so different that it I can't see that ever
->> being useful. When would you ever envision building for multiple of
->> these SoCs at the same time?
->
-> People (especially distributions) want to be able to build one arm
-> kernel rather than multiple ones. ?The issues about CPU detection and
-> base addresses are being worked on now.
+The SMP_ON_UP checks restrict the feature to ARM limited designs,
+when other implementers support SMP designs. Instead of checking
+for an ARM CPU and ARMv6/v7 just check for a v6 or v7 and then
+rely on the MPIDR for non ARM 11MPCore designs.
 
-Yeah, you are right. I guess for distributions that would make a lot
-of sense. Point taken.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/head.S |   13 +++++++++----
+ 1 files changed, 9 insertions(+), 4 deletions(-)
 
-I think the hard part for msm will be in the peripheral drivers and
-not in core. The subtle ways in which all the bits move around in the
-peripherals like the display and nand controllers made it very hard
-without doing defines and build time. I'm not sure how much worse or
-better it is in TI land?
-
---Dima
-
-> Other targets, especially omap, are already way ahead of MSM in this
-> area.
-
-
->
-> David
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
->
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index f17d9a0..ede5b70 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -393,20 +393,25 @@ ENDPROC(__turn_mmu_on)
+ #ifdef CONFIG_SMP_ON_UP
+ __fixup_smp:
+ 	mov	r4, #0x00070000
+-	orr	r3, r4, #0xff000000	@ mask 0xff070000
+-	orr	r4, r4, #0x41000000	@ val 0x41070000
+-	and	r0, r9, r3
+-	teq	r0, r4			@ ARM CPU and ARMv6/v7?
++	and	r0, r9, r4
++	teq	r0, r4			@ ARMv6/v7?
+ 	bne	__fixup_smp_on_up	@ no, assume UP
+ 
++	orr	r3, r4, #0xff000000	@ mask 0xff070000
+ 	orr	r3, r3, #0x0000ff00
+ 	orr	r3, r3, #0x000000f0	@ mask 0xff07fff0
++	orr	r4, r4, #0x41000000	@ val 0x41070000
+ 	orr	r4, r4, #0x0000b000
+ 	orr	r4, r4, #0x00000020	@ val 0x4107b020
+ 	and	r0, r9, r3
+ 	teq	r0, r4			@ ARM 11MPCore?
+ 	moveq	pc, lr			@ yes, assume SMP
+ 
++	mov	r4, #0x00070000
++	and	r0, r9, #0x000f0000
++	teq	r0, r4			@ ARMv6?
++	beq	__fixup_smp_on_up	@ yes, assume UP
++
+ 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+ 	tst	r0, #1 << 31
+ 	movne	pc, lr			@ bit 31 => SMP
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
