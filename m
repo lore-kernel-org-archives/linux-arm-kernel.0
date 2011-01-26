@@ -1,139 +1,246 @@
 From: bones@secretlab.ca (John Bonesio)
-Date: Wed, 26 Jan 2011 13:23:14 -0800
-Subject: [RFC 1/2] ARM:boot:device tree: Allow the device tree binary to be
-	appended to zImage
+Date: Wed, 26 Jan 2011 13:23:34 -0800
+Subject: [RFC 2/2] ARM:boot:device tree: Merge specific atags into the device
+	tree
 In-Reply-To: <20110126212220.6723.28773.stgit@riker>
 References: <20110126212220.6723.28773.stgit@riker>
-Message-ID: <20110126212301.6723.89059.stgit@riker>
+Message-ID: <20110126212324.6723.25307.stgit@riker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides the ability to boot using a device tree that is appended
-to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+This patch is to merge in key atags into the appended device tree.  An appended
+device tree is where the zImage has a dtb binary appended at the end of it. The
+boot code looks for an appended device tree, then looks for a few key atags
+passed in by the bootloader.
 
-Constraints:
-1) A maximum 16k device tree binary is copied to memory at 0x0. If the device
-   tree is bigger than 16k, the kernel will probably fail ungracefully - unless
-   there is a device tree already embedded in the zImage.
+The bootargs and memory size settings, if they exist, override existing values
+in the appended device tree. If these values don't currently exist in the
+appended device tree, they are added.
 
 Signed-off-by: John Bonesio <bones@secretlab.ca>
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
 
- arch/arm/Kconfig                |    7 +++++
- arch/arm/boot/compressed/head.S |   52 ++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 57 insertions(+), 2 deletions(-)
+ arch/arm/boot/compressed/Makefile |   31 +++++++++++++++++---
+ arch/arm/boot/compressed/atags.c  |   50 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/head.S   |    7 ++++
+ arch/arm/boot/compressed/misc.c   |   58 ++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 139 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/atags.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d8a330f..e63a441 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1593,6 +1593,13 @@ config USE_OF
- 	help
- 	  Include support for flattened device tree machine descriptions.
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 0a8f748..7978a39 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -49,6 +49,10 @@ ifeq ($(CONFIG_ARCH_SHMOBILE),y)
+ OBJS		+= head-shmobile.o
+ endif
  
-+config ARM_APPENDED_DTB
-+	bool "Use appended device tree blob" if OF
-+	default n
-+	help
-+	  With this option, the boot code will look for a dtb bianry
-+	  appended to zImage.
++ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
++OBJS		+= atags.o libfdt.a 
++endif
 +
- # Compressed boot loader in ROM.  Yes, we really want to ask about
- # TEXT and BSS so we preserve their values in the config files.
- config ZBOOT_ROM_TEXT
+ #
+ # We now have a PIC decompressor implementation.  Decompressors running
+ # from RAM should not define ZTEXTADDR.  Decompressors running directly
+@@ -80,7 +84,9 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
+-EXTRA_CFLAGS  := -fpic -fno-builtin
++fdttree      := $(srctree)/scripts/dtc/libfdt
++
++EXTRA_CFLAGS  := -fpic -fno-builtin -I$(fdttree) -I$(obj)
+ EXTRA_AFLAGS  := -Wa,-march=all
+ 
+ # Supply ZRELADDR to the decompressor via a linker symbol.
+@@ -100,13 +106,28 @@ LDFLAGS_vmlinux += -X
+ LDFLAGS_vmlinux += -T
+ 
+ # For __aeabi_uidivmod
+-lib1funcs = $(obj)/lib1funcs.o
++libfuncs = $(obj)/lib1funcs.o
+ 
+-$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
+-	$(call cmd,shipped)
++ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
++# For memchr, memmove, etc
++libfuncs += $(obj)/memchr.o $(obj)/strchr.o $(obj)/memmove.o $(obj)/memzero.o
++endif
++
++
++libfdtheader := $(fdttree)/fdt.h $(fdttree)/libfdt.h $(fdttree)/libfdt_internal.h
++libfdtobj    := $(obj)/fdt.o $(obj)/fdt_ro.o $(obj)/fdt_wip.o $(obj)/fdt_sw.o $(obj)/fdt_rw.o $(obj)/fdt_strerror.o
++
++$(libfdtobj): $(obj)/%.o: $(srctree)/scripts/dtc/libfdt/%.c $(libfdtheader)
++	$(call cmd_cc_o_c)
++
++$(obj)/libfdt.a: $(libfdtobj)
++	$(AR) rcs $@ $^
++
++$(libfuncs): $(obj)/%.o: $(srctree)/arch/$(SRCARCH)/lib/%.S
++	$(call cmd_as_o_S)
+ 
+ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+-	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
++	 	$(addprefix $(obj)/, $(OBJS)) $(libfuncs) FORCE
+ 	$(call if_changed,ld)
+ 	@:
+ 
+diff --git a/arch/arm/boot/compressed/atags.c b/arch/arm/boot/compressed/atags.c
+new file mode 100644
+index 0000000..e37d8de
+--- /dev/null
++++ b/arch/arm/boot/compressed/atags.c
+@@ -0,0 +1,50 @@
++#include <stddef.h>
++#include <asm/byteorder.h>
++#include <asm/setup.h>
++#include <fdt.h>
++#include <libfdt.h>
++
++
++int dt_setprop(void *fdt, const char *node_path, const char *property,
++               uint32_t *val_array, int size)
++{
++	int offset;
++
++	offset = fdt_path_offset(fdt, node_path);
++	if (offset < 0)
++		return offset;
++
++	return fdt_setprop(fdt, offset, property, val_array, size);
++}
++
++int dt_setprop_string(void *fdt, const char *node_path,
++                      const char *property, const char *string)
++{
++	int offset;
++		
++	offset = fdt_path_offset(fdt, node_path);
++	if (offset < 0)
++		return offset;
++			
++	return fdt_setprop_string(fdt, offset, property, string);
++}
++
++void dt_merge_atags(void *dt,  void *ataglist)
++{
++	struct tag *atag = ataglist;
++	uint32_t mem_reg_property[2];
++
++	while (atag && atag->hdr.tag != 0) {
++		if (atag->hdr.tag == ATAG_CMDLINE) {
++			dt_setprop_string(dt, "/chosen", "bootargs",
++			                  atag->u.cmdline.cmdline);
++		} else if (atag->hdr.tag == ATAG_MEM) {
++			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
++			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
++			dt_setprop(dt, "/memory", "reg", mem_reg_property,
++			           sizeof(mem_reg_property));
++		}
++		atag = tag_next(atag);
++	}
++}
++
 diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 7193884..db860b3 100644
+index db860b3..09e659d 100644
 --- a/arch/arm/boot/compressed/head.S
 +++ b/arch/arm/boot/compressed/head.S
-@@ -138,7 +138,7 @@ start:
- 		b	1f
- 		.word	0x016f2818		@ Magic numbers to help the loader
- 		.word	start			@ absolute load/run zImage address
--		.word	_edata			@ zImage end address
-+DTB:		.word	_edata			@ zImage end address
-  THUMB(		.thumb			)
- 1:		mov	r7, r1			@ save architecture ID
- 		mov	r8, r2			@ save atags pointer
-@@ -173,6 +173,9 @@ not_angel:
- 		 * by the linker here, but it should preserve r7, r8, and r9.
- 		 */
+@@ -257,6 +257,13 @@ not_relocated:
+ 		cmp	r1, r9
+ 		bne	keep_atags
  
-+		/* Check if there is an appended device tree binary */
-+		ldr	r10, DTB			@ get the address of _dtb
++		/* Merge some of the atags into the device tree */
++		push	{r2, r3, r10, r11}
++		mov	r0, r2
++		mov	r1, r8
++		bl	dt_merge_atags
++		pop	{r2, r3, r10, r11}
 +
- 		.text
- 		adr	r0, LC0
- 		ldmia	r0, {r1, r2, r3, r5, r6, r11, ip}
-@@ -196,10 +199,12 @@ not_angel:
- 		 * up various pointers:
- 		 *   r5 - zImage base address (_start)
- 		 *   r6 - size of decompressed image
-+		 *   r10 - zImage end
- 		 *   r11 - GOT start
- 		 *   ip - GOT end
- 		 */
- 		add	r5, r5, r0
-+		add	r10, r10, r0
- 		add	r11, r11, r0
- 		add	ip, ip, r0
+ 		/* copy the device tree binary to 0x0 */
+ 		ldr	r9, [r10, #4]	@ device tree size
  
-@@ -215,6 +220,7 @@ not_angel:
- 		add	r3, r3, r0
- 		add	sp, sp, r0
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index e653a6d..2d4da4c 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -29,7 +29,7 @@ unsigned int __machine_arch_type;
+ #include <asm/unaligned.h>
  
-+
- 		/*
- 		 * Relocate all entries in the GOT table.
- 		 */
-@@ -238,7 +244,49 @@ not_angel:
- 		blo	1b
+ 
+-static void putstr(const char *ptr);
++void putstr(const char *ptr);
+ extern void error(char *x);
+ 
+ #include <mach/uncompress.h>
+@@ -100,7 +100,7 @@ static void icedcc_putc(int ch)
+ #define putc(ch)	icedcc_putc(ch)
  #endif
  
--not_relocated:	mov	r0, #0
-+not_relocated:
+-static void putstr(const char *ptr)
++void putstr(const char *ptr)
+ {
+ 	char c;
+ 
+@@ -114,6 +114,60 @@ static void putstr(const char *ptr)
+ }
+ 
+ 
 +#ifdef CONFIG_ARM_APPENDED_DTB
-+		/*
-+		 * Check if there is an appended device tree binary, by testing
-+		 * for the device tree magic signature
-+		 *
-+		 * An appended device tree will be at the end of the zImage
-+		 */
-+		ldr	r1, [r10, #0]
-+		ldr	r9, =0xedfe0dd0	@ sig is 0xdoodfeed stored big endian
-+		cmp	r1, r9
-+		bne	keep_atags
++/**
++ * strlen - Find the length of a string
++ * @s: The string to be sized
++ */
++size_t strlen(const char *s)
++{
++        const char *sc;
 +
-+		/* copy the device tree binary to 0x0 */
-+		ldr	r9, [r10, #4]	@ device tree size
++        for (sc = s; *sc != '\0'; ++sc)
++                /* nothing */;
++        return sc - s;
++}
 +
-+		/* convert r9 (dtb size) to little endian */
-+		eor	r1, r9, r9, ror #16
-+		bic	r1, r1, #0x00ff0000
-+		mov	r9, r9, ror #8
-+		eor	r9, r9, r1, lsr #8
++/**
++ * strcmp - Compare two strings
++ * @cs: One string
++ * @ct: Another string
++ */
++#undef strcmp
++int strcmp(const char *cs, const char *ct)
++{
++	unsigned char c1, c2;
 +
-+		/* make sure the device tree isn't too big */
-+		mov	r0, #16384
-+		cmp	r9, r0
-+		bhi	keep_atags
++	while (1) {
++		c1 = *cs++;
++		c2 = *ct++;
++		if (c1 != c2)
++			return c1 < c2 ? -1 : 1;
++		if (!c1)
++			break;
++	}
++	return 0;
++}
 +
-+		mov	r0, r2
-+		mov	r1, #0x0
-+		add	r9, r1		@ size to address from target location
-+1:
-+		.rept	4
-+		ldmia	r0!, {r10}	@ relocate device tree
-+		stmia	r1!, {r10}
-+		.endr
-+		cmp	r1, r9
-+		blo	1b
-+		mov	r8, #0x0
++/**
++ * memcmp - Compare two areas of memory
++ * @cs: One area of memory
++ * @ct: Another area of memory
++ * @count: The size of the area.
++ */
++#undef memcmp
++int memcmp(const void *cs, const void *ct, size_t count)
++{
++	const unsigned char *su1, *su2;
++	int res = 0;
 +
-+keep_atags:
++	for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
++		if ((res = *su1 - *su2) != 0)
++			break;
++	return res;
++}
 +#endif
 +
-+__not_relocated:	mov	r0, #0
- 1:		str	r0, [r2], #4		@ clear bss
- 		str	r0, [r2], #4
- 		str	r0, [r2], #4
+ void *memcpy(void *__dest, __const void *__src, size_t __n)
+ {
+ 	int i = 0;
