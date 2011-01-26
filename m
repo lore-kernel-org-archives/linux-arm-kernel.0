@@ -1,67 +1,95 @@
-From: dmitriyz@google.com (Dima Zavin)
-Date: Wed, 26 Jan 2011 14:12:59 -0800
-Subject: [PATCH v2 02/11] msm: Generalize timer register mappings
-In-Reply-To: <8yaei81kjlc.fsf@huya.qualcomm.com>
-References: <1292384961-8851-1-git-send-email-stepanm@codeaurora.org>
-	<1295468747-22796-1-git-send-email-davidb@codeaurora.org>
-	<1295468747-22796-3-git-send-email-davidb@codeaurora.org>
-	<1295908604.29639.62.camel@c-dwalke-linux.qualcomm.com>
-	<8yaei81kjlc.fsf@huya.qualcomm.com>
-Message-ID: <AANLkTi=UBfBp-VOQ=n_a4sjA9v_dhcv-rXcXiE6zrf23@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Jan 2011 16:32:54 -0600
+Subject: [PATCH 0/8] Basic ARM device tree support
+In-Reply-To: <00bcd596-2108-4c54-92d3-7fda39e333e3@VA3EHSMHS015.ehs.local>
+References: <20110118195933.13011.56098.stgit@localhost6.localdomain6>
+	<00bcd596-2108-4c54-92d3-7fda39e333e3@VA3EHSMHS015.ehs.local>
+Message-ID: <4D40A116.6040209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 2:44 PM, David Brown <davidb@codeaurora.org> wrote:
-> On Mon, Jan 24 2011, Daniel Walker wrote:
->
->> On Wed, 2011-01-19 at 12:25 -0800, David Brown wrote:
->>> + ? ? ? int global_offset = 0;
->>> +
->>> + ? ? ? if (cpu_is_msm7x01()) {
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
->>> + ? ? ? } else if (cpu_is_msm7x30()) {
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE + 0x04;
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x24;
->>> + ? ? ? } else if (cpu_is_qsd8x50()) {
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
->>> + ? ? ? } else if (cpu_is_msm8x60()) {
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_GPT].regbase = MSM_TMR_BASE + 0x04;
->>> + ? ? ? ? ? ? ? msm_clocks[MSM_CLOCK_DGT].regbase = MSM_TMR_BASE + 0x24;
->>> +
->>> + ? ? ? ? ? ? ? /* Use CPU0's timer as the global timer. */
->>> + ? ? ? ? ? ? ? global_offset = MSM_TMR0_BASE - MSM_TMR_BASE;
->>> + ? ? ? } else
->>> + ? ? ? ? ? ? ? BUG();
+On 01/26/2011 02:04 PM, John Linn wrote:
+>> -----Original Message-----
+>> From: Grant Likely [mailto:glikely at secretlab.ca] On Behalf Of Grant Likely
+>> Sent: Tuesday, January 18, 2011 1:29 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: Nicolas Pitre; Russell King; Catalin Marinas; devicetree-discuss at lists.ozlabs.org; linux-
+>> kernel at vger.kernel.org; Olof Johansson; Jeremy Kerr; John Linn; Lennert Buijtenhek
+>> Subject: [PATCH 0/8] Basic ARM device tree support
 >>
->> Ifdef's here would be OK I think, your already using the "runtime"
->> checks ..
+>> It's been a while since these patches have been circulated for review.
+>> Much has changed since the last posting and there are no longer any
+>> ugly hacks or workarounds to it working.  From my viewpoint, these
+>> patches are complete and ready to be used.
+>>
+>> This patch series allows CONFIG_OF to be enabled on ARM and allows the
+>> kernel to accept a dtb pointer from boot firmware instead of atags.
+>> If a dtb is passed, then the kernel will use the root 'compatible'
+>> property to find a matching machine_desc, and it will use it to obtain
+>> the memory layout, initrd location and kernel parameters string.
+>>
+>> Only limited device tree support is enabled here.  It does not perform
+>> any kind of device registration from device tree data.  That support
+>> will be enabled in a later patch set.  Right now those patches depend
+>> on the common struct clk patches that Jeremy is working on, so I'm not
+>> going to post them yet.  Rather, this series is a stable base that
+>> other engineers can use to start working on device tree support for
+>> their platforms.
+>>
+>> Tested on Versatile (qemu) and nVidia Tegra Harmony.  Kernel compiles
+>> an boot with CONFIG_OF both on and off, both with and without passing
+>> a device tree blob.
 >
-> The point of the change is to get rid of the ifdefs so that we can
-> dynamically detect which target we are on. ?Yes, there are other places
-> where it doesn't work, but we'll get there gradually.
+> Tested on Xilinx platform.  Did see an issue with loading the device
+> tree blob into higher memory.  At address 0 there was no issue.
+>
 
-To be honest I don't understand why you would want to do this at
-runtime. You cannot select multiple SoCs in the kernel build anyway,
-nor would you want to. Trying to have same kernel to boot on ARM v6
-and ARM v7 would already be freaky enough. On top of that mixing 7201a
-with all the baggage that it comes with 8x60 just wouldn't make sense.
-These architectures are so different that it I can't see that ever
-being useful. When would you ever envision building for multiple of
-these SoCs at the same time?
+I have a fix for this. The issue is the early mmu page table needs to 
+map the dtb. I later realized this is also may be problem for ATAGs as 
+well, so I planned to re-work to make it unconditional and work for 
+ATAGs. Or perhaps ATAGs only get accessed with the MMU on later than the 
+dtb and everything is okay?
 
---Dima
+This applies to the DT patch set prior to the one Grant sent out
+this week, so it may need updates.
 
->
-> David
->
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+From: Rob Herring <rob.herring@calxeda.com>
+Date: Tue, 5 Oct 2010 10:32:51 -0500
+Subject: [PATCH] arm/dt: map devtree blob in initial page table
+
+If the DTB is not in 1st 1MB of RAM, it will not be mapped before
+memblock is setup, so map it early. We assume the dtb is less than
+1MB and map 2MB so it can be at any alignment.
+
+Some assembly optimizations from Nicolas Pitre.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+  arch/arm/kernel/head.S |   13 +++++++++++++
+  1 files changed, 13 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 0480f25..1fcb962 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -228,6 +228,19 @@ __create_page_tables:
+  	.endif
+  	str	r6, [r0]
+
++#ifdef CONFIG_OF_FLATTREE
++	/* Make sure DT blob is mapped */
++	adr	r0, __devtree_pointer
++	ldr	r0, [r0]
++	mov	r0, r0, lsr #20
++	mov	r0, r0, lsl #20
++	add	r3, r0, #PAGE_OFFSET
++	add	r3, r4, r3, lsr #18
++	orr	r6, r7, r0
++	str	r6, [r3]
++	add	r6, r6, #0x100000
++	str	r6, [r3, #4]
++#endif
+  #ifdef CONFIG_DEBUG_LL
+  #ifndef CONFIG_DEBUG_ICEDCC
+  	/*
+-- 
