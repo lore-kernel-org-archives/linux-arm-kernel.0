@@ -1,36 +1,78 @@
-From: miltonm@bga.com (Milton Miller)
-Date: Wed, 26 Jan 2011 12:27:50 -0600
-Subject: [RFC,1/5] arm/dt: Add dt machine definition
-In-Reply-To: <20110126044406.16410.22096.stgit@localhost6.localdomain6>
-References: <20110126044406.16410.22096.stgit@localhost6.localdomain6>
-Message-ID: <lkml-patchwork-507601-use-section@mdm.bga.com>
+From: robert.richter@amd.com (Robert Richter)
+Date: Wed, 26 Jan 2011 19:33:55 +0100
+Subject: [PATCH v2 0/3] oprofile: ARM backtraces and few minors
+In-Reply-To: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
+References: <1295549840-17809-1-git-send-email-kauppi@papupata.org>
+Message-ID: <20110126183355.GM5874@erda.amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jan 2011 about 04:44:06 -0000, Grant Likely wrote:
+On 20.01.11 13:57:17, Ari Kauppi wrote:
+> This patchset re-enables ARM backtraces with non-PMU capable CPUs.
 > 
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-
-needs a description ...
+> In V2 I have tried to address the comments received for the V1
+> patches. arch/sh/oprofile/common.c is untouched but should work
+> as earlier.
 > 
-> ---
-> arch/arm/include/asm/mach/arch.h |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
+> Compile tested with arm/omap2plus_defconfig (with and without
+> CONFIG_HW_PERF_EVENTS).
 > 
+> Ari Kauppi (3):
+>   oprofile: Use CONFIG_HW_PERF_EVENTS for oprofile_perf_init and
+>     friends
+>   oprofile: Provide stubs for oprofile_perf_{init,exit}
+>   ARM: oprofile: Always allow backtraces
 > 
->  
-> +#define MACH_TYPE_DT	0xffffffff
-> +
-> +#define DT_MACHINE_START(_name, _namestr)		\
-> +static const struct machine_desc __mach_desc_##_name	\
-> + __used							\
-> + __attribute__((__section__(".arch.info.init"))) = {	\
+>  arch/arm/oprofile/common.c |   12 ++----------
+>  include/linux/oprofile.h   |   13 +++++++++++--
+>  2 files changed, 13 insertions(+), 12 deletions(-)
 
-linux/compiler.h defines __section for this
+Applied to oprofile/urgent, thanks Ari.
 
-> +	.nr		= MACH_TYPE_DT,			\
-> +	.name		= _namestr,
-> +
->  #endif
+I squashed patch 2 and 3 and modified the commit messages (see below).
 
-milton
+Added to .37-stable.
+
+-Robert
+
+
+commit d14dd7e20d5e526557f5d3cfef4046a642f80924
+Author: Ari Kauppi <kauppi@papupata.org>
+Date:   Thu Jan 20 13:57:19 2011 -0500
+
+    ARM: oprofile: Fix backtraces in timer mode
+    
+    Always allow backtraces when using oprofile on ARM, even if a PMU
+    isn't present. Restores functionality originally introduced in commit
+    1b7b56982fdcd9d85effd76f3928cf5d6eb26155 ("oprofile: Always allow
+    backtraces on ARM") by Richard Purdie.
+    
+    It is not that obvious, but there is now only one oprofile_arch_init()
+    function. So the .backtrace callback is available also in timer mode.
+    
+    Implemented by removing code and using stubs for oprofile_perf_{init,
+    exit} provided by <linux/oprofile.h>. This allows cleaning of other
+    architecture specific implementations too.
+    
+    Cc: stable at kernel.org # 37.x
+    Signed-off-by: Ari Kauppi <kauppi@papupata.org>
+    Acked-by: Will Deacon <will.deacon@arm.com>
+    Signed-off-by: Robert Richter <robert.richter@amd.com>
+
+commit 1ea1bdf7faa4d0b5293e605f2e1ef1c2c59f6b53
+Author: Ari Kauppi <kauppi@papupata.org>
+Date:   Thu Jan 20 13:57:18 2011 -0500
+
+    oprofile: Fix usage of CONFIG_HW_PERF_EVENTS for oprofile_perf_init and friends
+    
+    The implementations are flagged in Makefile with CONFIG_HW_PERF_EVENTS
+    instead of CONFIG_PERF_EVENTS.
+    
+    Cc: stable at kernel.org # 37.x
+    Signed-off-by: Ari Kauppi <kauppi@papupata.org>
+    Signed-off-by: Robert Richter <robert.richter@amd.com>
+
+
+-- 
+Advanced Micro Devices, Inc.
+Operating System Research Center
