@@ -1,77 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 26 Jan 2011 12:05:27 -0700 (MST)
-Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling mstandby
-	mode
-In-Reply-To: <20110126004128.GA8524@manju-desktop>
-References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
-	<4CF8AC8B.9040800@ti.com> <20101203092514.GA10048@GLPP-machine>
-	<4CF8E03A.4010000@ti.com> <20101214014822.GA3858@manju-desktop>
-	<20110124093349.GC16582@m-desktop>
-	<20110126004128.GA8524@manju-desktop>
-Message-ID: <alpine.DEB.2.00.1101261159070.16671@utopia.booyaka.com>
+From: R00091@freescale.com (Nguyen Dinh-R00091)
+Date: Wed, 26 Jan 2011 19:57:04 +0000
+Subject: SDMA on imx35
+In-Reply-To: <201101261224.37260.alexander.stein@systec-electronic.com>
+References: <201101261224.37260.alexander.stein@systec-electronic.com>
+Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA126F19@039-SN1MPN1-005.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jan 2011, G, Manjunath Kondaiah wrote:
+Hi Alexander,
 
-> On Mon, Jan 24, 2011 at 03:03:49PM +0530, G, Manjunath Kondaiah wrote:
-> > Paul/Benoit,
-> > 
-> > On Tue, Dec 14, 2010 at 07:18:22AM +0530, G, Manjunath Kondaiah wrote:
-> > > Paul/Benoit,
-> > > 
-> > > On Fri, Dec 03, 2010 at 01:19:06PM +0100, Cousson, Benoit wrote:
-> > > > On 12/3/2010 10:47 AM, G, Manjunath Kondaiah wrote:
-> > > > >* Cousson, Benoit<b-cousson@ti.com>  [2010-12-03 09:38:35 +0100]:
-> > > > 
-> > > > [...]
-> > > > 
-> > > > >>>v7: replaced mutex lock with spin lock. Added use count for controlling
-> > > > >>>access to sysconfig registers in case if overlapping request/release API's
-> > > > >>>are used.
-> > > > >>
-> > > > >>I'm not sure it should be done here. I'd rather keep that code in
-> > > > >>the DMA, since this is the only user of that feature.
-> > > > >
-> > > > >Are you referring to spin lock or usage count?
-> > > > 
-> > > > The spinlock is needed, I was referring to the usage count.
-> > > > 
-> > > > That being said, the API proposed by Paul (request/release
-> > > > ) sound like a get/put, so maybe he had that kind of usage in mind.
-> > > > 
-> > > > I'm still not convince it should be done at hwmod API level.
-> > > > 
-> > > > 
-> > > > Paul,
-> > > > Any thoughts on that?
-> > > 
-> > > How do we proceed further?
-> > Gentle reminder!
-> > 
-> > Can we please align on this so that DMA sysconfig patches can be
-> > upstreamed?
-> > 
-> > Discussion on this topic can be accessed at:
-> > https://patchwork.kernel.org/patch/372231/
-> > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39728.html
-> 
-> As there is no response from paul on this topic, I will go ahead with usage
-> count logic proposed by Adrian Hunter <adrian.hunter@nokia.com> at:
-> https://patchwork.kernel.org/patch/366831/
-> Above logic has got:
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
+>-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-
+>bounces at lists.infradead.org] On Behalf Of Alexander Stein
+>Sent: Wednesday, January 26, 2011 5:25 AM
+>To: linux-arm-kernel at lists.infradead.org
+>Subject: SDMA on imx35
+>
+>Hello,
+>
+>I'm currently fiddling on SDMA support for the uart driver on my imx35 rev2.
+>TX is working great, no problems so far. But on RX I never get the SDMA
+>interrupt that the request has been processed.
+>So I'm wondering if the UART-DMS-Script in ROM is actually working. Has
+>anybody get this to work (doesn't matter if linux-2.6 from git or kernel from
+>freescale)?
 
-Yes, that's probably a good idea for right now.  There's a wider spectrum 
-of opinion than I had thought on whether this type of thing belongs in the 
-hwmod code.  I'd like to have a greater degree of alignment on that before 
-we merge something into the hwmod code.
+I'm also looking at enabling SDMA support for the imx-uart on MX51. Should be the same driver. Unfortunately, I'm not at your stage of _working_ yet, so I can't comment on your RX problem. I know that internally, we haven't had any issue with RX on uart with SDMA, but FSL's SDMA implementation is quite different(part of my problem is taking the time to understand how to use dmaengine) from kernel.org. 
 
-So, unless there is some reason why it will cause problems not to have 
-this in the hwmod code for right now, please just go ahead and deal with 
-it in your DMA code, and then we will move it to the hwmod code later as 
-needed.
+Do you have a patch to share?
 
+Thanks,
 
-- Paul
+Dinh
+
+>
+>Best regards,
+>Alexander
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
