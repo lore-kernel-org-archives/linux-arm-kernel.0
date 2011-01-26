@@ -1,46 +1,243 @@
-From: s.neumann@raumfeld.com (Sven Neumann)
-Date: Wed, 26 Jan 2011 09:10:47 +0100
-Subject: [PATCH] ARM: pxa: fix suspend on PXA3XX
-In-Reply-To: <AANLkTinrxiHx6jX9jFzVzjq5FH-W=MLoDThAtRq2a1zZ@mail.gmail.com>
-References: <20110124101701.GE16202@n2100.arm.linux.org.uk>
-	<1295864750-1238-1-git-send-email-s.neumann@raumfeld.com>
-	<AANLkTinrxiHx6jX9jFzVzjq5FH-W=MLoDThAtRq2a1zZ@mail.gmail.com>
-Message-ID: <1296029447.2013.8.camel@sven>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 26 Jan 2011 09:24:10 +0100
+Subject: [PATCH 2/2] mach-ux500: rename defconfig
+Message-ID: <1296030250-32171-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-26 at 05:06 +0800, Eric Miao wrote:
-> How about this instead?
-> 
-> diff --git a/arch/arm/mach-pxa/pm.c b/arch/arm/mach-pxa/pm.c
-> index 978e1b2..1807c9a 100644
-> --- a/arch/arm/mach-pxa/pm.c
-> +++ b/arch/arm/mach-pxa/pm.c
-> @@ -33,7 +33,7 @@ int pxa_pm_enter(suspend_state_t state)
->  #endif
-> 
->  	/* skip registers saving for standby */
-> -	if (state != PM_SUSPEND_STANDBY) {
-> +	if (state != PM_SUSPEND_STANDBY && pxa_cpu_pm_fns->save) {
->  		pxa_cpu_pm_fns->save(sleep_save);
->  		/* before sleeping, calculate and save a checksum */
->  		for (i = 0; i < pxa_cpu_pm_fns->save_count - 1; i++)
-> @@ -44,7 +44,7 @@ int pxa_pm_enter(suspend_state_t state)
->  	pxa_cpu_pm_fns->enter(state);
->  	cpu_init();
-> 
-> -	if (state != PM_SUSPEND_STANDBY) {
-> +	if (state != PM_SUSPEND_STANDBY && pxa_cpu_pm_fns->restore) {
->  		/* after sleeping, validate the checksum */
->  		for (i = 0; i < pxa_cpu_pm_fns->save_count - 1; i++)
->  			checksum += sleep_save[i];
-> 
+This renames the former u8500_defconfig to ux500_defconfig to
+reflect the fact that this kernel image supports any ux500
+platform nowadays.
 
-Not sure if that will work as well. With this change the code is
-skipping more than just the calls to pxa_cpu_pm_fns->save() and
-pxa_cpu_pm_fns->restore(). In particular it doesn't call
-pxa_cpu_pm_fns->enter(state).
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/configs/u8500_defconfig |  105 --------------------------------------
+ arch/arm/configs/ux500_defconfig |  105 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 105 insertions(+), 105 deletions(-)
+ delete mode 100644 arch/arm/configs/u8500_defconfig
+ create mode 100644 arch/arm/configs/ux500_defconfig
 
-
-Thanks,
-Sven
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+deleted file mode 100644
+index a5cce24..0000000
+--- a/arch/arm/configs/u8500_defconfig
++++ /dev/null
+@@ -1,105 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-# CONFIG_SWAP is not set
+-CONFIG_SYSVIPC=y
+-CONFIG_BLK_DEV_INITRD=y
+-CONFIG_KALLSYMS_ALL=y
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-# CONFIG_LBDAF is not set
+-# CONFIG_BLK_DEV_BSG is not set
+-CONFIG_ARCH_U8500=y
+-CONFIG_UX500_SOC_DB5500=y
+-CONFIG_UX500_SOC_DB8500=y
+-CONFIG_MACH_U8500=y
+-CONFIG_MACH_U5500=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_SMP=y
+-CONFIG_NR_CPUS=2
+-CONFIG_HOTPLUG_CPU=y
+-CONFIG_PREEMPT=y
+-CONFIG_AEABI=y
+-CONFIG_CMDLINE="root=/dev/ram0 console=ttyAMA2,115200n8"
+-CONFIG_CPU_FREQ=y
+-CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-CONFIG_NET=y
+-CONFIG_PHONET=y
+-CONFIG_PHONET_PIPECTRLR=y
+-# CONFIG_WIRELESS is not set
+-CONFIG_CAIF=y
+-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=65536
+-CONFIG_MISC_DEVICES=y
+-CONFIG_AB8500_PWM=y
+-CONFIG_SENSORS_BH1780=y
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_INPUT_EVDEV=y
+-# CONFIG_KEYBOARD_ATKBD is not set
+-CONFIG_KEYBOARD_GPIO=y
+-CONFIG_KEYBOARD_NOMADIK=y
+-CONFIG_KEYBOARD_STMPE=y
+-CONFIG_KEYBOARD_TC3589X=y
+-# CONFIG_INPUT_MOUSE is not set
+-CONFIG_INPUT_TOUCHSCREEN=y
+-CONFIG_TOUCHSCREEN_BU21013=y
+-CONFIG_INPUT_MISC=y
+-CONFIG_INPUT_AB8500_PONKEY=y
+-# CONFIG_SERIO is not set
+-CONFIG_VT_HW_CONSOLE_BINDING=y
+-CONFIG_SERIAL_AMBA_PL011=y
+-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_HW_RANDOM=y
+-CONFIG_HW_RANDOM_NOMADIK=y
+-CONFIG_I2C=y
+-CONFIG_I2C_NOMADIK=y
+-CONFIG_SPI=y
+-CONFIG_SPI_PL022=y
+-CONFIG_GPIO_STMPE=y
+-CONFIG_GPIO_TC3589X=y
+-# CONFIG_HWMON is not set
+-CONFIG_MFD_STMPE=y
+-CONFIG_MFD_TC3589X=y
+-CONFIG_AB8500_CORE=y
+-CONFIG_REGULATOR=y
+-CONFIG_REGULATOR_AB8500=y
+-# CONFIG_HID_SUPPORT is not set
+-# CONFIG_USB_SUPPORT is not set
+-CONFIG_MMC=y
+-CONFIG_MMC_ARMMMCI=y
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_LEDS_LP5521=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_DRV_AB8500=y
+-CONFIG_RTC_DRV_PL031=y
+-CONFIG_DMADEVICES=y
+-CONFIG_STE_DMA40=y
+-CONFIG_STAGING=y
+-# CONFIG_STAGING_EXCLUDE_BUILD is not set
+-CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4=y
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT2_FS_XATTR=y
+-CONFIG_EXT2_FS_POSIX_ACL=y
+-CONFIG_EXT2_FS_SECURITY=y
+-CONFIG_EXT3_FS=y
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_TMPFS_POSIX_ACL=y
+-CONFIG_CONFIGFS_FS=m
+-# CONFIG_MISC_FILESYSTEMS is not set
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+-# CONFIG_SCHED_DEBUG is not set
+-# CONFIG_DEBUG_PREEMPT is not set
+-CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-# CONFIG_FTRACE is not set
+-CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+diff --git a/arch/arm/configs/ux500_defconfig b/arch/arm/configs/ux500_defconfig
+new file mode 100644
+index 0000000..a5cce24
+--- /dev/null
++++ b/arch/arm/configs/ux500_defconfig
+@@ -0,0 +1,105 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_U8500=y
++CONFIG_UX500_SOC_DB5500=y
++CONFIG_UX500_SOC_DB8500=y
++CONFIG_MACH_U8500=y
++CONFIG_MACH_U5500=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_HOTPLUG_CPU=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_CMDLINE="root=/dev/ram0 console=ttyAMA2,115200n8"
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_NET=y
++CONFIG_PHONET=y
++CONFIG_PHONET_PIPECTRLR=y
++# CONFIG_WIRELESS is not set
++CONFIG_CAIF=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=65536
++CONFIG_MISC_DEVICES=y
++CONFIG_AB8500_PWM=y
++CONFIG_SENSORS_BH1780=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_NOMADIK=y
++CONFIG_KEYBOARD_STMPE=y
++CONFIG_KEYBOARD_TC3589X=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_BU21013=y
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_AB8500_PONKEY=y
++# CONFIG_SERIO is not set
++CONFIG_VT_HW_CONSOLE_BINDING=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_HW_RANDOM=y
++CONFIG_HW_RANDOM_NOMADIK=y
++CONFIG_I2C=y
++CONFIG_I2C_NOMADIK=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_GPIO_STMPE=y
++CONFIG_GPIO_TC3589X=y
++# CONFIG_HWMON is not set
++CONFIG_MFD_STMPE=y
++CONFIG_MFD_TC3589X=y
++CONFIG_AB8500_CORE=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_AB8500=y
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_ARMMMCI=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_LP5521=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_AB8500=y
++CONFIG_RTC_DRV_PL031=y
++CONFIG_DMADEVICES=y
++CONFIG_STE_DMA40=y
++CONFIG_STAGING=y
++# CONFIG_STAGING_EXCLUDE_BUILD is not set
++CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_POSIX_ACL=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_CONFIGFS_FS=m
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_PREEMPT is not set
++CONFIG_DEBUG_INFO=y
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
+-- 
+1.7.3.2
