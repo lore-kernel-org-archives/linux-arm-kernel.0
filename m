@@ -1,100 +1,73 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 27 Jan 2011 12:51:25 +1300
-Subject: [PATCH] ep93xx: add framebuffer support to edb93xx boards
-In-Reply-To: <0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
-References: <0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4D40B37D.7030608@bluewatersys.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 26 Jan 2011 17:59:43 -0600
+Subject: [PATCH] ep93xx: implement gpiolib set_debounce for built-in GPIOs
+In-Reply-To: <4D40B2A2.2070403@bluewatersys.com>
+References: <201101261622.48750.hartleys@visionengravers.com>
+	<4D40B2A2.2070403@bluewatersys.com>
+Message-ID: <0D753D10438DA54287A00B027084269764CEC45F7A@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/08/2011 11:38 AM, H Hartley Sweeten wrote:
-> The ep9307, ep9312, and ep9315 variants of the ep93xx processor include the
-> raster engine needed for framebuffer support.
-> 
-> This allows the EDB93xx boards with those processors to use the framebuffer
-> driver.
-> 
-> Tested on an EDB9307A with the following kernel parameters:
-> 	video=640x480-16 at 60
-> 	video=1024x768-16 at 60
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> 
-> ---
-> 
-> diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-> index 4b04316..49e3b3d 100644
-> --- a/arch/arm/mach-ep93xx/edb93xx.c
-> +++ b/arch/arm/mach-ep93xx/edb93xx.c
-> @@ -32,6 +32,7 @@
->  #include <linux/i2c-gpio.h>
->  
->  #include <mach/hardware.h>
-> +#include <mach/fb.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -111,6 +112,41 @@ static void __init edb93xx_register_pwm(void)
->  }
->  
->  
-> +/*************************************************************************
-> + * EDB93xx framebuffer
-> + *************************************************************************/
-> +static struct ep93xxfb_mach_info __initdata edb93xxfb_info = {
-> +	.num_modes	= EP93XXFB_USE_MODEDB,
-> +	.bpp		= 16,
-> +	.flags		= 0,
-> +};
-> +
-> +static int __init edb93xx_has_fb(void)
-> +{
-> +	if (machine_is_edb9307() || machine_is_edb9307a() ||
-> +	    machine_is_edb9312() || machine_is_edb9315() ||
-> +	    machine_is_edb9315a()) {
+On Wednesday, January 26, 2011 4:48 PM, Ryan Mallon wrote:
+> On 01/27/2011 12:22 PM, H Hartley Sweeten wrote:
+>> GPIO Ports A, B, and F on the ep93xx provide interrupt capability.  It is
+>> possible to debounce the input signal on these ports when interrupts are
+>> enabled.
+>> 
+>> Support for this debounce capability was provided with an ep93xx internal
+>> function.  Now that gpiolib knows about gpio debounce, use the gpiolib
+>> method and do not export the internal function.
+>> 
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Ryan Mallon <ryan@bluewatersys.com>
+>> 
+>> ---
+>> 
+>> diff --git a/arch/arm/mach-ep93xx/gpio.c b/arch/arm/mach-ep93xx/gpio.c
+>> index bec34b8..a889fa7 100644
+>> --- a/arch/arm/mach-ep93xx/gpio.c
+>> +++ b/arch/arm/mach-ep93xx/gpio.c
+>> @@ -61,7 +61,7 @@ static inline void ep93xx_gpio_int_mask(unsigned line)
+>>  	gpio_int_unmasked[line >> 3] &= ~(1 << (line & 7));
+>>  }
+>>  
+>> -void ep93xx_gpio_int_debounce(unsigned int irq, int enable)
+>> +static void ep93xx_gpio_int_debounce(unsigned int irq, bool enable)
+>>  {
+>>  	int line = irq_to_gpio(irq);
+>>  	int port = line >> 3;
+>> @@ -75,7 +75,6 @@ void ep93xx_gpio_int_debounce(unsigned int irq, int enable)
+>>  	__raw_writeb(gpio_int_debounce[port],
+>>  		EP93XX_GPIO_REG(int_debounce_register_offset[port]));
+>>  }
+>> -EXPORT_SYMBOL(ep93xx_gpio_int_debounce);
+>>  
+>>  static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
+>>  {
+>> @@ -335,6 +334,20 @@ static void ep93xx_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+>>  	local_irq_restore(flags);
+>>  }
+>>  
+>> +static int ep93xx_gpio_set_debounce(struct gpio_chip *chip,
+>> +				    unsigned offset, unsigned debounce)
+>> +{
+>> +	int gpio = chip->base + offset;
+>> +	int irq = gpio_to_irq(gpio);
+>> +
+>> +	if (irq < 0)
+>> +		return -EINVAL;
+>> +
+>> +	ep93xx_gpio_int_debounce(irq, debounce ? true : false);
+>
+> We should just move the code from ep93xx_gpio_int_debounce here. Why
+> have two functions to do one thing?
 
-return (machine_is_edb9307() || machine_is_edb9307a() ...
+The reason I left the original function it that it messes with the cached gpio_int_debounce
+values.  Also, the 'debounce' feature is interrupt specific.  If the gpio pin is no enabled
+as an interrupt the debounce has no effect.  As such I figured it was cleaner to leave it
+in place.
 
-> +		/* These all have an ep93xx with video capability */
-> +		return 1;
-> +	} else {
-> +		/* The ep9301 and ep9302 do not have a video peripheral */
-> +		return 0;
-> +	}
-> +}
-> +
-> +static void __init edb93xx_register_fb(void)
-> +{
-> +	if (!edb93xx_has_fb())
-> +		return;
-> +
-> +	if (machine_is_edb9307a() || machine_is_edb9315a())
-> +		edb93xxfb_info.flags |= EP93XXFB_USE_SDCSN0;
-> +	else
-> +		edb93xxfb_info.flags |= EP93XXFB_USE_SDCSN3;
-> +
-> +	ep93xx_register_fb(&edb93xxfb_info);
-> +}
-> +
->  static void __init edb93xx_init_machine(void)
->  {
->  	ep93xx_init_devices();
-> @@ -118,6 +154,7 @@ static void __init edb93xx_init_machine(void)
->  	ep93xx_register_eth(&edb93xx_eth_data, 1);
->  	edb93xx_register_i2c();
->  	edb93xx_register_pwm();
-> +	edb93xx_register_fb();
->  }
+Would you still like me to combine the functions?
 
-Otherwise looks fine.
-
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Regards,
+Hartley
