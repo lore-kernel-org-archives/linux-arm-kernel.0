@@ -1,227 +1,63 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 25 Jan 2011 15:33:24 -0800
-Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
-In-Reply-To: <AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
-References: <1294990949-2729-1-git-send-email-ccross@android.com>
-	<AANLkTimqiqABxCejdeOQWZZ62DVUZW2v-yMpdu1aNDQT@mail.gmail.com>
-	<20110114120229.GA15996@n2100.arm.linux.org.uk>
-	<1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
-	<20110114154919.GE15996@n2100.arm.linux.org.uk>
-	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
-	<20110114163520.GH15996@n2100.arm.linux.org.uk>
-	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
-	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
-	<20110114184759.GN15996@n2100.arm.linux.org.uk>
-	<AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
-	<AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
-Message-ID: <AANLkTimZ9itumf=QZPD55+JA5cUOWKgwuA1_5=XsdPsP@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 26 Jan 2011 06:11:28 +0530
+Subject: [PATCH v7] OMAP2+: PM: omap device: API's for handling
+	mstandby mode
+In-Reply-To: <20110124093349.GC16582@m-desktop>
+References: <1291298392-28729-1-git-send-email-manjugk@ti.com>
+	<4CF8AC8B.9040800@ti.com> <20101203092514.GA10048@GLPP-machine>
+	<4CF8E03A.4010000@ti.com> <20101214014822.GA3858@manju-desktop>
+	<20110124093349.GC16582@m-desktop>
+Message-ID: <20110126004128.GA8524@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 14, 2011 at 11:51 AM, Colin Cross <ccross@android.com> wrote:
-> On Fri, Jan 14, 2011 at 11:23 AM, Colin Cross <ccross@android.com> wrote:
->> On Fri, Jan 14, 2011 at 10:47 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> So... this incrementally on top of the previous patch (which I've
->>> reproduced below as there's a subtle comment change in there wrt IRQ
->>> state.)
->>>
->>> This means we have consistent state - both r2 and regs->ARM_pc always
->>> point to the next instruction to be executed in every case, which means
->>> its easy to understand and remember while reading through the code.
->>>
->>> diff -u b/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->>> --- b/arch/arm/kernel/entry-armv.S
->>> +++ b/arch/arm/kernel/entry-armv.S
->>> @@ -499,10 +499,11 @@
->>> ? ? ? ?blo ? ? __und_usr_unknown
->>> ?3: ? ? ldrht ? r0, [r4]
->>> ? ? ? ?add ? ? r2, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ r2 is PC + 2, make it PC + 4
->>> - ? ? ? orr ? ? r0, r0, r5, lsl #16
->>> + ? ? ? str ? ? r2, [sp, #S_PC] ? ? ? ? ? ? ? ? @ it's a 2x16bit instr, update
->>> + ? ? ? orr ? ? r0, r0, r5, lsl #16 ? ? ? ? ? ? @ ?regs->ARM_pc
->>> ? ? ? ?@
->>> ? ? ? ?@ r0 = the two 16-bit Thumb instructions which caused the exception
->>> - ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc+2)
->>> + ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc)
->>> ? ? ? ?@ r4 = PC value for the first 16-bit Thumb instruction
->>> ? ? ? ?@
->>> ?#else
->>>
->>> 8<-x-x-
->>>
->>> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->>> index 2b46fea..5876eec 100644
->>> --- a/arch/arm/kernel/entry-armv.S
->>> +++ b/arch/arm/kernel/entry-armv.S
->>> @@ -461,27 +461,35 @@ ENDPROC(__irq_usr)
->>> ? ? ? ?.align ?5
->>> ?__und_usr:
->>> ? ? ? ?usr_entry
->>> -
->>> - ? ? ? @
->>> - ? ? ? @ fall through to the emulation code, which returns using r9 if
->>> - ? ? ? @ it has emulated the instruction, or the more conventional lr
->>> - ? ? ? @ if we are to treat this as a real undefined instruction
->>> ? ? ? ?@
->>> - ? ? ? @ ?r0 - instruction
->>> + ? ? ? @ The emulation code returns using r9 if it has emulated the
->>> + ? ? ? @ instruction, or the more conventional lr if we are to treat
->>> + ? ? ? @ this as a real undefined instruction
->>> ? ? ? ?@
->>> ? ? ? ?adr ? ? r9, BSYM(ret_from_exception)
->>> ? ? ? ?adr ? ? lr, BSYM(__und_usr_unknown)
->>> + ? ? ? @
->>> + ? ? ? @ r2 = regs->ARM_pc, which is either 2 or 4 bytes ahead of the
->>> + ? ? ? @ faulting instruction depending on Thumb mode.
->>> + ? ? ? @ r3 = regs->ARM_cpsr
->>> + ? ? ? @
->>> ? ? ? ?tst ? ? r3, #PSR_T_BIT ? ? ? ? ? ? ? ? ?@ Thumb mode?
->>> - ? ? ? itet ? ?eq ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ explicit IT needed for the 1f label
->>> + ? ? ? itttt ? eq ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ explicit IT needed for the 1f label
->>> ? ? ? ?subeq ? r4, r2, #4 ? ? ? ? ? ? ? ? ? ? ?@ ARM instr at LR - 4
->>> - ? ? ? subne ? r4, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ Thumb instr at LR - 2
->>> ?1: ? ? ldreqt ?r0, [r4]
->>> ?#ifdef CONFIG_CPU_ENDIAN_BE8
->>> ? ? ? ?reveq ? r0, r0 ? ? ? ? ? ? ? ? ? ? ? ? ?@ little endian instruction
->>> ?#endif
->>> + ? ? ? @
->>> + ? ? ? @ r0 = 32-bit ARM instruction which caused the exception
->>> + ? ? ? @ r2 = PC value for the following instruction (:= regs->ARM_pc)
->>> + ? ? ? @ r4 = PC value for the faulting instruction
->>> + ? ? ? @
->>> ? ? ? ?beq ? ? call_fpe
->>> +
->>> ? ? ? ?@ Thumb instruction
->>> ?#if __LINUX_ARM_ARCH__ >= 7
->>> + ? ? ? sub ? ? r4, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ Thumb instr at LR - 2
->>> ?2:
->>> ?ARM( ?ldrht ? r5, [r4], #2 ? ?)
->>> ?THUMB( ? ? ? ?ldrht ? r5, [r4] ? ? ? ?)
->>> @@ -492,18 +500,19 @@ __und_usr:
->>> ?3: ? ? ldrht ? r0, [r4]
->>> ? ? ? ?add ? ? r2, r2, #2 ? ? ? ? ? ? ? ? ? ? ?@ r2 is PC + 2, make it PC + 4
->>> ? ? ? ?orr ? ? r0, r0, r5, lsl #16
->>> + ? ? ? @
->>> + ? ? ? @ r0 = the two 16-bit Thumb instructions which caused the exception
->>> + ? ? ? @ r2 = PC value for the following Thumb instruction (:= regs->ARM_pc+2)
->>> + ? ? ? @ r4 = PC value for the first 16-bit Thumb instruction
->>> + ? ? ? @
->>> ?#else
->>> ? ? ? ?b ? ? ? __und_usr_unknown
->>> ?#endif
->>> - UNWIND(.fnend ? ? ? ? )
->>> + UNWIND(.fnend)
->>> ?ENDPROC(__und_usr)
->>>
->>> - ? ? ? @
->>> - ? ? ? @ fallthrough to call_fpe
->>> - ? ? ? @
->>> -
->>> ?/*
->>> - * The out of line fixup for the ldrt above.
->>> + * The out of line fixup for the ldrt instructions above.
->>> ?*/
->>> ? ? ? ?.pushsection .fixup, "ax"
->>> ?4: ? ? mov ? ? pc, r9
->>> @@ -534,11 +543,12 @@ ENDPROC(__und_usr)
->>> ?* NEON handler code.
->>> ?*
->>> ?* Emulators may wish to make use of the following registers:
->>> - * ?r0 ?= instruction opcode.
->>> - * ?r2 ?= PC+4
->>> + * ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
->>> + * ?r2 ?= PC value to resume execution after successful emulation
->>> ?* ?r9 ?= normal "successful" return address
->>> - * ?r10 = this threads thread_info structure.
->>> + * ?r10 = this threads thread_info structure
->>> ?* ?lr ?= unrecognised instruction return address
->>> + * IRQs disabled, FIQs enabled.
->>> ?*/
->>> ? ? ? ?@
->>> ? ? ? ?@ Fall-through from Thumb-2 __und_usr
->>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->>> index ee57640..eeb9250 100644
->>> --- a/arch/arm/kernel/traps.c
->>> +++ b/arch/arm/kernel/traps.c
->>> @@ -347,9 +347,9 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->>> ? ? ? ?void __user *pc;
->>>
->>> ? ? ? ?/*
->>> - ? ? ? ?* According to the ARM ARM, PC is 2 or 4 bytes ahead,
->>> - ? ? ? ?* depending whether we're in Thumb mode or not.
->>> - ? ? ? ?* Correct this offset.
->>> + ? ? ? ?* According to the ARM ARM, the PC is 2 or 4 bytes ahead
->>> + ? ? ? ?* depending on Thumb mode. ?Correct this offset so that
->>> + ? ? ? ?* regs->ARM_pc points at the faulting instruction.
->>> ? ? ? ? */
->>> ? ? ? ?regs->ARM_pc -= correction;
->>>
->>> diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
->>> index 4fa9903..2bf6089 100644
->>> --- a/arch/arm/vfp/entry.S
->>> +++ b/arch/arm/vfp/entry.S
->>> @@ -19,6 +19,15 @@
->>> ?#include <asm/vfpmacros.h>
->>> ?#include "../kernel/entry-header.S"
->>>
->>> +@ VFP entry point.
->>> +@
->>> +@ ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
->>> +@ ?r2 ?= PC value to resume execution after successful emulation
->>> +@ ?r9 ?= normal "successful" return address
->>> +@ ?r10 = this threads thread_info structure
->>> +@ ?lr ?= unrecognised instruction return address
->>> +@ ?IRQs disabled.
->>> +@
->>> ?ENTRY(do_vfp)
->>> ?#ifdef CONFIG_PREEMPT
->>> ? ? ? ?ldr ? ? r4, [r10, #TI_PREEMPT] ?@ get preempt count
->>> diff --git a/arch/arm/vfp/vfphw.S b/arch/arm/vfp/vfphw.S
->>> index 9897dcf..7292921 100644
->>> --- a/arch/arm/vfp/vfphw.S
->>> +++ b/arch/arm/vfp/vfphw.S
->>> @@ -61,13 +61,13 @@
->>>
->>> ?@ VFP hardware support entry point.
->>> ?@
->>> -@ ?r0 ?= faulted instruction
->>> -@ ?r2 ?= faulted PC+4
->>> -@ ?r9 ?= successful return
->>> +@ ?r0 ?= instruction opcode (32-bit ARM or two 16-bit Thumb)
->>> +@ ?r2 ?= PC value to resume execution after successful emulation
->>> +@ ?r9 ?= normal "successful" return address
->>> ?@ ?r10 = vfp_state union
->>> ?@ ?r11 = CPU number
->>> -@ ?lr ?= failure return
->>> -
->>> +@ ?lr ?= unrecognised instruction return address
->>> +@ ?IRQs enabled.
->>> ?ENTRY(vfp_support_entry)
->>> ? ? ? ?DBGSTR3 "instr %08x pc %08x state %p", r0, r2, r10
->>
->> I tested copying r2 to regs->ARM_pc like this patch does, and it fixes
->> my test case. ?Could this second patch go first so it can be applied
->> to stable?
->>
->
-> Also, both patches together Tested-by: Colin Cross <ccross@android.com>
->
+On Mon, Jan 24, 2011 at 03:03:49PM +0530, G, Manjunath Kondaiah wrote:
+> Paul/Benoit,
+> 
+> On Tue, Dec 14, 2010 at 07:18:22AM +0530, G, Manjunath Kondaiah wrote:
+> > Paul/Benoit,
+> > 
+> > On Fri, Dec 03, 2010 at 01:19:06PM +0100, Cousson, Benoit wrote:
+> > > On 12/3/2010 10:47 AM, G, Manjunath Kondaiah wrote:
+> > > >* Cousson, Benoit<b-cousson@ti.com>  [2010-12-03 09:38:35 +0100]:
+> > > 
+> > > [...]
+> > > 
+> > > >>>v7: replaced mutex lock with spin lock. Added use count for controlling
+> > > >>>access to sysconfig registers in case if overlapping request/release API's
+> > > >>>are used.
+> > > >>
+> > > >>I'm not sure it should be done here. I'd rather keep that code in
+> > > >>the DMA, since this is the only user of that feature.
+> > > >
+> > > >Are you referring to spin lock or usage count?
+> > > 
+> > > The spinlock is needed, I was referring to the usage count.
+> > > 
+> > > That being said, the API proposed by Paul (request/release
+> > > ) sound like a get/put, so maybe he had that kind of usage in mind.
+> > > 
+> > > I'm still not convince it should be done at hwmod API level.
+> > > 
+> > > 
+> > > Paul,
+> > > Any thoughts on that?
+> > 
+> > How do we proceed further?
+> Gentle reminder!
+> 
+> Can we please align on this so that DMA sysconfig patches can be
+> upstreamed?
+> 
+> Discussion on this topic can be accessed at:
+> https://patchwork.kernel.org/patch/372231/
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39728.html
 
-I think there is an additional change needed to
-__und_usr_unknown/do_undefinstr.  do_undefinstr, which gets called
-directly in __und_usr as well as by mov pc, lr, expects regs->ARM_pc
-to be the fault address, and not the next PC, and gets called for 2 or
-4 byte instructions.  If it gets called after the regs->ARM_pc fixup
-added in the second patch, it will return to the middle of the
-faulting instruction.
+As there is no response from paul on this topic, I will go ahead with usage
+count logic proposed by Adrian Hunter <adrian.hunter@nokia.com> at:
+https://patchwork.kernel.org/patch/366831/
+Above logic has got:
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Peter Ujfalusi <peter.ujfalusi@nokia.com>
 
-If it do_undefinstr called on a 4 byte thumb instruction, with
-regs->ARM_pc pointing to the end of the faulting instruction, there is
-no good way to figure out where the PC of the instruction that faulted
-is.  Would it make more sense to convert all the exception handlers to
-get regs->ARM_pc as the PC of the faulting instruction, rather than
-getting the PC of the next instruction?  That way, each handler can
-easily use thumb_mode(regs) and decoding the instruction to determine
-how big the instruction is, and decide whether to return to the
-beginning or end of the faulting instruction.
+-Manjunath
