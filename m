@@ -1,21 +1,40 @@
 From: agust@denx.de (Anatolij Gustschin)
-Date: Wed, 26 Jan 2011 09:49:47 +0100
-Subject: [PATCH 0/2] Fix issues with frame reception from CSI on i.MX31
-Message-ID: <1296031789-1721-1-git-send-email-agust@denx.de>
+Date: Wed, 26 Jan 2011 09:49:48 +0100
+Subject: [PATCH 1/2] v4l: soc-camera: start stream after queueing the buffers
+In-Reply-To: <1296031789-1721-1-git-send-email-agust@denx.de>
+References: <1296031789-1721-1-git-send-email-agust@denx.de>
+Message-ID: <1296031789-1721-2-git-send-email-agust@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some camera systems we do not tolerate the losing of
-captured frames. We observed losing of the first frame
-from CSI when double buffering is used (multiple buffers
-queued by the mx3-camera driver).
+Some camera systems have strong requirement for capturing
+an exact number of frames after starting the stream and do
+not tolerate losing captured frames. By starting the stream
+after the videobuf has queued the buffers, we ensure that
+no frame will be lost.
 
-The patches provide fixes for the observed problem.
+Signed-off-by: Anatolij Gustschin <agust@denx.de>
+---
+ drivers/media/video/soc_camera.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Anatolij Gustschin (2):
-  v4l: soc-camera: start stream after queueing the buffers
-  dma: ipu_idmac: do not lose valid received data in the irq handler
-
- drivers/dma/ipu/ipu_idmac.c      |   50 --------------------------------------
- drivers/media/video/soc_camera.c |    4 +-
- 2 files changed, 2 insertions(+), 52 deletions(-)
+diff --git a/drivers/media/video/soc_camera.c b/drivers/media/video/soc_camera.c
+index a66811b..7299de0 100644
+--- a/drivers/media/video/soc_camera.c
++++ b/drivers/media/video/soc_camera.c
+@@ -646,11 +646,11 @@ static int soc_camera_streamon(struct file *file, void *priv,
+ 	if (icd->streamer != file)
+ 		return -EBUSY;
+ 
+-	v4l2_subdev_call(sd, video, s_stream, 1);
+-
+ 	/* This calls buf_queue from host driver's videobuf_queue_ops */
+ 	ret = videobuf_streamon(&icd->vb_vidq);
+ 
++	v4l2_subdev_call(sd, video, s_stream, 1);
++
+ 	return ret;
+ }
+ 
+-- 
+1.7.1
