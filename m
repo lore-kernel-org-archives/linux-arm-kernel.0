@@ -1,43 +1,86 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 26 Jan 2011 16:57:07 +0000
-Subject: [PATCH v4] ARM: Thumb-2: Symbol manipulation macros for function
-	body copying
-In-Reply-To: <20110126163837.GA7323@n2100.arm.linux.org.uk>
-References: <1295039877-7976-1-git-send-email-dave.martin@linaro.org>
-	<AANLkTintFe4V6BxrUxh-gwvhoa=RcH0tkHjYbfyGHKD=@mail.gmail.com>
-	<20110117160136.GA25829@n2100.arm.linux.org.uk>
-	<AANLkTimZGvsEEnLqYoNkZ1L0Rw+5K5O2Gsc0x-5Lj-dx@mail.gmail.com>
-	<20110126163837.GA7323@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikrbvhHpVzHienS0e2aVXAigOFo2-UrWS3n9Z9_@mail.gmail.com>
+Date: Wed, 26 Jan 2011 16:59:59 +0000
+Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
+	asm/spinlock.h
+In-Reply-To: <20110126155203.GA10141@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
+	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
+	<20110125165919.GD17286@n2100.arm.linux.org.uk>
+	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+	<20110125174636.GE17286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
+	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
+	<alpine.LFD.2.00.1101261023470.8580@xanadu.home>
+	<20110126155203.GA10141@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikG4bPmesNPvLGt8G+Q8YWwRzyYL3i+uL1FE=K2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 4:38 PM, Russell King - ARM Linux
+On Wed, Jan 26, 2011 at 3:52 PM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Wed, Jan 26, 2011 at 04:05:33PM +0000, Dave Martin wrote:
->> Hi Russell,
+> On Wed, Jan 26, 2011 at 10:42:41AM -0500, Nicolas Pitre wrote:
+>> On Wed, 26 Jan 2011, Dave Martin wrote:
+>> > Alternatively, I wonder .alt.smp.init could make weak references
+>> > instead of normal references: then if the referenced section is
+>> > discarded, the reference will revert to 0 and the fixup code can
+>> > ignore it (at the expense of wasting a bit of space in the fixup table
+>> > ... but it's no worse than the current situation). ?From
+>> > experimentation, it seems this doesn't work if the referenced symbol
+>> > is defined in the same file, since the linker resolves the reference
+>> > before discarding sections, but maybe there's a way around it...
 >>
->> I tried to send this patch to your patch system, but I've received no
->> response or any bounce. ?On my end the mail appears to have been sent,
->> and previous submissions made via the same route have succeeded.
->>
->> The patch doesn't seem to be in the patch system, but I'm not sure
->> what went wrong ... hopefully I'm not doing anything stupid.
->>
->> Do you have any ideas what might have gone wrong?
+>> That's strange. ?How can the linker resolve the reference if the
+>> referenced symbol is not in the same section as the reference source?
+>> What happens when the final link completes?
 >
-> Probably the lack of a line matching '^PATCH\s+FOLLOWS\s*$', '^--[- ]$'.
+> $ cat t.s
+> ? ? ? ?.section ".exit.text", "ax", %progbits
+> ? ? ? ?mov ? ? r0, r0
+> a: ? ? ?mov ? ? r0, r0
 >
-> It's rather particular about that before it'll even consider sending a
-> reply,  It's a measure to prevent excessive collateral spam and my MTA
-> being blacklisted as a result.
+> ? ? ? ?.pushsection ".alt.smp.fixup", "a"
+> ? ? ? ?.weak ? a
+> ? ? ? ?.long ? a
+> ? ? ? ?mov ? ? r0, r1
+> ? ? ? ?.popsection
+> $ arm-linux-as -o t.o t.s
+> $ arm-linux-nm t.o
+> 00000004 W a
+> $ arm-linux-objdump -Dr t.o
+>
+> Disassembly of section .exit.text:
+>
+> 00000000 <a-0x4>:
+> ? 0: ? e1a00000 ? ? ? ?nop ? ? ? ? ? ? ? ? ? ? (mov r0,r0)
+>
+> 00000004 <a>:
+> ? 4: ? e1a00000 ? ? ? ?.word ? 0xe1a00000
+>
+> Disassembly of section .alt.smp.fixup:
+>
+> 00000000 <.alt.smp.fixup>:
+> ? 0: ? 00000000 ? ? ? ?.word ? 0x00000000
+> ? ? ? ? ? ? ? ? ? ? ? ?0: R_ARM_ABS32 ?a
+> ? 4: ? e1a00001 ? ? ? ?mov ? ? r0, r1
+>
+> which when linked with:
+>
+> SECTIONS
+> {
+> ? ? ? ?.alt.smp.init : { *(.alt.smp.init) }
+>
+> ? ? ? ?/DISCARD/ : { *(.exit.text) }
+> }
+>
+> $ arm-linux-ld -T t.lds -r -o t.oo t.o
+> `a' referenced in section `.alt.smp.fixup' of t.o: defined in discarded section `.exit.text' of t.o
+>
+> So I don't think weak symbols work like we want them to.
 >
 
-Darn, not enough ---
+That was the conclusion I came to also ... the linker seems to resolve
+references in each object before discarding sections, so the weak
+reference has already become concrete and section discard breaks it.
 
-Looks like I did something stupid after all...
-
-The patch should be successfully posted now -- apologies for the spam!
-
-Cheers
 ---Dave
