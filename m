@@ -1,256 +1,511 @@
-From: dave.martin@linaro.org (Dave P. Martin)
-Date: Thu, 27 Jan 2011 11:44:31 +0000
-Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
-	asm/spinlock.h
-In-Reply-To: <alpine.LFD.2.00.1101261558470.8580@xanadu.home>
-References: <AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
-	<20110125165919.GD17286@n2100.arm.linux.org.uk>
-	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
-	<20110125174636.GE17286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
-	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
-	<alpine.LFD.2.00.1101261023470.8580@xanadu.home>
-	<20110126155203.GA10141@n2100.arm.linux.org.uk>
-	<AANLkTikG4bPmesNPvLGt8G+Q8YWwRzyYL3i+uL1FE=K2@mail.gmail.com>
-	<alpine.LFD.2.00.1101261558470.8580@xanadu.home>
-Message-ID: <20110127114431.GA3194@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 27 Jan 2011 12:48:28 +0100
+Subject: [PATCH] ARM: i.MX23/28: Add pwm driver
+Message-ID: <20110127114828.GW9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 04:06:40PM -0500, Nicolas Pitre wrote:
-> On Wed, 26 Jan 2011, Dave Martin wrote:
-> 
-> > On Wed, Jan 26, 2011 at 3:52 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > > So I don't think weak symbols work like we want them to.
-> > >
-> > 
-> > That was the conclusion I came to also ... the linker seems to resolve
-> > references in each object before discarding sections, so the weak
-> > reference has already become concrete and section discard breaks it.
-> 
-> Well, I must add to the chorus.
-> 
-> And it seems to be impossible to obtain the name of the currently active 
-> section from gas either, which would have made the conditional omission 
-> of the fixup possible, or similar.
-> 
-> Bummer.
-> 
-> 
-> Nicolas
 
-I've achieved this sort of thing in the past by wrapping the assmbler.
-It's not pretty though, and it's unlikely anyone would be interested
-in merging such a thing...
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/Makefile                      |    2 +
+ arch/arm/mach-mxs/clock-mx23.c                  |    6 +-
+ arch/arm/mach-mxs/clock-mx28.c                  |    9 +-
+ arch/arm/mach-mxs/devices-mx23.h                |    3 +
+ arch/arm/mach-mxs/devices-mx28.h                |    3 +
+ arch/arm/mach-mxs/devices/Kconfig               |    4 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-pwm.c        |   25 ++
+ arch/arm/mach-mxs/include/mach/devices-common.h |    5 +
+ arch/arm/mach-mxs/pwm.c                         |  318 +++++++++++++++++++++++
+ 11 files changed, 376 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-pwm.c
+ create mode 100644 arch/arm/mach-mxs/pwm.c
 
-The example below is really a hack and won't work well in the the
-presence of macros or conditional assembler.  However, since gcc output
-contains none of either except in inline asm, you can get away with
-a surprising amount.
-
-If it needed to be robust this could mostly be implemented in 
-assembler macros, but the need to hook things like .section, combined
-with gas's refusal to redefine existing directives, means that you
-would have a run a script over the input first, to translate .section
-and friends into something you can hook.
-
-And implementing anything non-trivial with assembler macros, while
-almost always possible (unlike crippled cpp) gets very painful and
-confusing...
-
-Cheers
----Dave
-
-$ chmod +x gasfilter filt-as
-$ PATH=$PWD:$PATH
-$ arm-linux-gnueabi-gcc -wrapper $PWD/filt-as -c tst.s
-$ arm-linux-gnueabi-objdump -dsh tst.o
-
-tst.o:     file format elf32-littlearm
-
-Sections:
-Idx Name          Size      VMA       LMA       File off  Algn
-  0 .text         00000004  00000000  00000000  00000034  2**0
-                  CONTENTS, ALLOC, LOAD, READONLY, CODE
-  1 .data         00000000  00000000  00000000  00000038  2**0
-                  CONTENTS, ALLOC, LOAD, DATA
-  2 .bss          00000000  00000000  00000000  00000038  2**0
-                  ALLOC
-  3 .text.fixup   00000004  00000000  00000000  00000038  2**0
-                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
-  4 .text.init    00000008  00000000  00000000  0000003c  2**0
-                  CONTENTS, ALLOC, LOAD, READONLY, CODE
-  5 .text.init.fixup 00000004  00000000  00000000  00000044  2**0
-                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
-  6 .ARM.attributes 00000021  00000000  00000000  00000048  2**0
-                  CONTENTS, READONLY
-Contents of section .text:
- 0000 00f020e3                             .. .            
-Contents of section .text.fixup:
- 0000 00000000                             ....            
-Contents of section .text.init:
- 0000 00f020e3 00f020e3                    .. ... .        
-Contents of section .text.init.fixup:
- 0000 04000000                             ....            
-Contents of section .ARM.attributes:
- 0000 41200000 00616561 62690001 16000000  A ...aeabi......
- 0010 05372d41 00060a07 41080109 020a042c  .7-A....A......,
- 0020 01                                   .               
-
-Disassembly of section .text:
-
-00000000 <main>:
-   0:	e320f000 	nop	{0}
-
-Disassembly of section .text.fixup:
-
-00000000 <.text.fixup>:
-   0:	00000000 	.word	0x00000000
-
-Disassembly of section .text.init:
-
-00000000 <init>:
-   0:	e320f000 	nop	{0}
-
-00000004 <__fixup_3>:
-   4:	e320f000 	nop	{0}
-
-Disassembly of section .text.init.fixup:
-
-00000000 <.text.init.fixup>:
-   0:	00000004 	.word	0x00000004
-
-diff -Nur filt-as filt-as
---- filt-as	1970-01-01 01:00:00.000000000 +0100
-+++ filt-as	2011-01-27 11:30:11.858552002 +0000
-@@ -0,0 +1,30 @@
-+#!/bin/sh
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index cd2fbdf..99813e0 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -8,10 +8,12 @@ config MXS_OCOTP
+ config SOC_IMX23
+ 	bool
+ 	select CPU_ARM926T
++	select HAVE_PWM
+ 
+ config SOC_IMX28
+ 	bool
+ 	select CPU_ARM926T
++	select HAVE_PWM
+ 
+ comment "MXS platforms:"
+ 
+diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+index 6b26f02..5c7ce1f 100644
+--- a/arch/arm/mach-mxs/Makefile
++++ b/arch/arm/mach-mxs/Makefile
+@@ -7,6 +7,8 @@ obj-$(CONFIG_PM) += pm.o
+ obj-$(CONFIG_SOC_IMX23) += clock-mx23.o mm-mx23.o
+ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+ 
++obj-$(CONFIG_MXS_HAVE_PLATFORM_PWM) += pwm.o
 +
-+case "$1" in
-+	as|*/as|*-as) ;;
-+	*) exec "$@"
-+esac
+ obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+ obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+ 
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index b1a362e..017d4a3 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -446,7 +446,11 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+ 	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+ 	_REGISTER_CLOCK(NULL, "audio", audio_clk)
+-	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.3", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.4", NULL, pwm_clk)
+ };
+ 
+ static int clk_misc_init(void)
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 2f1a990..4b48b0a 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -623,7 +623,14 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "can1", can1_clk)
+ 	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+ 	_REGISTER_CLOCK(NULL, "usb1", usb1_clk)
+-	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.1", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.2", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.3", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.4", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.5", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.6", NULL, pwm_clk)
++	_REGISTER_CLOCK("mxs-pwm.7", NULL, pwm_clk)
+ 	_REGISTER_CLOCK(NULL, "lradc", lradc_clk)
+ 	_REGISTER_CLOCK(NULL, "spdif", spdif_clk)
+ };
+diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+index 1256788..fb9def8 100644
+--- a/arch/arm/mach-mxs/devices-mx23.h
++++ b/arch/arm/mach-mxs/devices-mx23.h
+@@ -14,3 +14,6 @@
+ extern const struct amba_device mx23_duart_device __initconst;
+ #define mx23_add_duart() \
+ 	mxs_add_duart(&mx23_duart_device)
 +
-+real_as=$1
-+shift
++#define mx23_add_pwm(id)		mxs_add_pwm(MX23_PWM_BASE_ADDR, pdata)
 +
-+out=a.out
-+in=-
+diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+index 1ab7bf0..6927250 100644
+--- a/arch/arm/mach-mxs/devices-mx28.h
++++ b/arch/arm/mach-mxs/devices-mx28.h
+@@ -26,3 +26,6 @@ extern const struct mxs_auart_data mx28_auart_data[] __initconst;
+ extern const struct mxs_fec_data mx28_fec_data[] __initconst;
+ #define mx28_add_fec(id, pdata) \
+ 	mxs_add_fec(&mx28_fec_data[id], pdata)
 +
-+while [ $# != 0 ]; do
-+	case "$1" in
-+		-o)
-+			out=$2
-+			shift
-+			;;
-+		*.s)
-+			in=$1
-+			;;
-+		*)
-+			args=$args\ $1
-+	esac
-+	shift
-+done
++#define mx28_add_pwm(id)		mxs_add_pwm(MX28_PWM_BASE_ADDR, id)
 +
-+gasfilter <"$in" \
-+| "$real_as" $args -o "$out"
-diff -Nur gasfilter gasfilter
---- gasfilter	1970-01-01 01:00:00.000000000 +0100
-+++ gasfilter	2011-01-27 11:10:01.478552002 +0000
-@@ -0,0 +1,68 @@
-+#!/usr/bin/perl
+diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+index 3001b75..f8599e5 100644
+--- a/arch/arm/mach-mxs/devices/Kconfig
++++ b/arch/arm/mach-mxs/devices/Kconfig
+@@ -7,3 +7,7 @@ config MXS_HAVE_PLATFORM_AUART
+ 
+ config MXS_HAVE_PLATFORM_FEC
+ 	bool
 +
-+use strict;
++config MXS_HAVE_PLATFORM_PWM
++	bool
 +
-+my $xpushsection_defined;
+diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+index c814d05..cdb026e 100644
+--- a/arch/arm/mach-mxs/devices/Makefile
++++ b/arch/arm/mach-mxs/devices/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+ obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
++obj-$(CONFIG_MXS_HAVE_PLATFORM_PWM) += platform-pwm.o
+diff --git a/arch/arm/mach-mxs/devices/platform-pwm.c b/arch/arm/mach-mxs/devices/platform-pwm.c
+new file mode 100644
+index 0000000..2f1f549
+--- /dev/null
++++ b/arch/arm/mach-mxs/devices/platform-pwm.c
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Sascha Hauer <s.hauer@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <asm/sizes.h>
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++#include <mach/devices-common.h>
 +
-+my @section_stack = ( undef );
-+
-+sub setsection ($$) {
-+	my ($name, $line) = @_;
-+
-+	print ".purgem __xpushsection\n" if $xpushsection_defined;
-+
-+	print
-+".macro __xpushsection name:req, flags
-+	.pushsection \"$name.\\name\", \"\\flags\"
-+.endm
-+";
-+
-+	$section_stack[$#section_stack] = $name;
-+
-+	$xpushsection_defined = 1;
-+
-+	print $line
-+}
-+
-+sub popsection ($)
++struct platform_device *__init mxs_add_pwm(resource_size_t iobase, int id)
 +{
-+	pop @section_stack;
-+	setsection $section_stack[$#section_stack], $_[0];
++	struct resource res = {
++		.flags = IORESOURCE_MEM,
++	};
++
++	res.start = iobase + 0x10 + 0x20 * id;
++	res.end = res.start + 0x1f;
++
++	return mxs_add_platform_device("mxs-pwm", id, &res, 1, NULL, 0);
 +}
 +
-+sub pushsection ($$)
+diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+index bed4002..82d5311 100644
+--- a/arch/arm/mach-mxs/include/mach/devices-common.h
++++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+@@ -51,3 +51,8 @@ struct mxs_fec_data {
+ struct platform_device *__init mxs_add_fec(
+ 		const struct mxs_fec_data *data,
+ 		const struct fec_platform_data *pdata);
++
++/* pwm */
++struct platform_device *__init mxs_add_pwm(
++		resource_size_t iobase, int id);
++
+diff --git a/arch/arm/mach-mxs/pwm.c b/arch/arm/mach-mxs/pwm.c
+new file mode 100644
+index 0000000..f2c83a6
+--- /dev/null
++++ b/arch/arm/mach-mxs/pwm.c
+@@ -0,0 +1,318 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Sascha Hauer <s.hauer@pengutronix.de>
++ *
++ * simple driver for PWM (Pulse Width Modulator) controller
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Derived from pxa PWM driver by eric miao <eric.miao@marvell.com>
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/pwm.h>
++#include <mach/hardware.h>
++#include <mach/mxs.h>
++#include <mach/mx23.h>
++#include <mach/mx28.h>
++#include <asm/div64.h>
++
++struct pwm_device {
++	struct list_head	node;
++	struct device		*dev;
++
++	const char	*label;
++	struct clk	*clk;
++
++	int		enabled;
++	void __iomem	*mmio_base;
++
++	unsigned int	use_count;
++	unsigned int	pwm_id;
++
++	u32		val_active;
++	u32		val_period;
++	int		period_us;
++};
++
++/* common register space */
++static void __iomem *pwm_base_common;
++#define REG_PWM_CTRL	0x0
++#define PWM_SFTRST	(1 << 31)
++#define PWM_CLKGATE	(1 << 30)
++#define PWM_ENABLE(p)	(1 << (p))
++
++/* per pwm register space */
++#define REG_ACTIVE	0x0
++#define REG_PERIOD	0x10
++
++#define PERIOD_PERIOD(p)	((p) & 0xffff)
++#define PERIOD_ACTIVE_HIGH	(3 << 16)
++#define PERIOD_INACTIVE_LOW	(2 << 18)
++#define PERIOD_CDIV(div)	(((div) & 0x7) << 20)
++
++static void pwm_update(struct pwm_device *pwm)
 +{
-+	my ($name, $line) = @_;
-+
-+	push @section_stack, $name;
-+	setsection $name, $line;
++	writel(pwm->val_active, pwm->mmio_base + REG_ACTIVE);
++	writel(pwm->val_period, pwm->mmio_base + REG_PERIOD);
 +}
 +
-+sub xpushsection ($$) {
-+	my ($name, $rest) = @_;
++int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++{
++	int div = 0;
++	unsigned long rate;
++	unsigned long long c;
++	unsigned long period_cycles, duty_cycles;
 +
-+	print "__xpushsection \"$name\"$rest\n"
-+}
++	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
++		return -EINVAL;
 +
-+sub process_line {
-+	$_ = $_[0] if defined $_[0];
++	rate = clk_get_rate(pwm->clk);
 +
-+	if (/^\s*(\.(text|data|bss))(\s|$)/) {
-+		setsection $1, $_
-+	} elsif (/^\s*\.section\s+([\$._0-9A-Za-z]+).*/) {
-+		setsection $1, $_
-+	} elsif (/^\s*\.pushsection\s+([\$._0-9A-Za-z]+).*/) {
-+		pushsection $1, $_
-+	} elsif (/^\s*\.popsection(\s|$)/) {
-+		popsection $_
-+	} elsif (/^\s*\.xpushsection\s+([\$._0-9A-Za-z]+)(.*)/) {
-+		xpushsection $1, $2
-+	} elsif (/^\s*\.xpopsection(\s|$)/) {
-+		print ".popsection\n"
-+	} else {
-+		print
++	dev_dbg(pwm->dev, "config: duty_ns: %d, period_ns: %d (clkrate %ld)\n",
++			duty_ns, period_ns, rate);
++
++	while (1) {
++		c = rate / (1 << div);
++		c = c * period_ns;
++		do_div(c, 1000000000);
++		if (c < 0x10000)
++			break;
++		div++;
++
++		if (div > 8)
++			return -EINVAL;
 +	}
-+}	
 +
-+process_line ".text\n";
-+process_line while <>;
-diff -Nur tst.s tst.s
---- tst.s	1970-01-01 01:00:00.000000000 +0100
-+++ tst.s	2011-01-27 11:07:39.338552001 +0000
-@@ -0,0 +1,23 @@
-+.macro fixup
-+	_fixup \@
-+.endm
++	period_cycles = c;
++	duty_cycles = period_cycles * duty_ns / period_ns;
 +
-+.macro _fixup num
-+__fixup_\num :
-+	.xpushsection fixup, "a"
-+	.long __fixup_\num
-+	.xpopsection
-+.endm
++	dev_dbg(pwm->dev, "config period_cycles: %ld duty_cycles: %ld\n",
++			period_cycles, duty_cycles);
 +
-+.globl main
-+main:
-+	fixup
-+	nop
++	pwm->val_active = period_cycles << 16 | duty_cycles;
++	pwm->val_period = PERIOD_PERIOD(period_cycles) | PERIOD_ACTIVE_HIGH |
++			PERIOD_INACTIVE_LOW | PERIOD_CDIV(div);
++	pwm->period_us = period_ns / 1000;
 +
-+.section .text.init, "ax"
-+.globl init
-+init:	nop
++	pwm_update(pwm);
 +
-+	fixup
-+	nop
++	return 0;
++}
++EXPORT_SYMBOL(pwm_config);
 +
++static void __pwm_enable(struct pwm_device *pwm, int enable)
++{
++	if (enable)
++		__mxs_setl(PWM_ENABLE(pwm->pwm_id), pwm_base_common + REG_PWM_CTRL);
++	else
++		__mxs_clrl(PWM_ENABLE(pwm->pwm_id), pwm_base_common + REG_PWM_CTRL);
++}
++
++int pwm_enable(struct pwm_device *pwm)
++{
++	int rc = 0;
++
++	dev_dbg(pwm->dev, "enable\n");
++
++	if (!pwm->enabled) {
++		rc = clk_enable(pwm->clk);
++		if (!rc) {
++			pwm->enabled = 1;
++			__pwm_enable(pwm, 1);
++			pwm_update(pwm);
++		}
++	}
++	return rc;
++}
++EXPORT_SYMBOL(pwm_enable);
++
++void pwm_disable(struct pwm_device *pwm)
++{
++	dev_dbg(pwm->dev, "disable\n");
++
++	if (pwm->enabled) {
++		/*
++		 * We need a little delay here, it takes one period for
++		 * the last pwm_config call to take effect. If we disable
++		 * the pwm too early it just freezes the current output
++		 * state.
++		 */
++		usleep_range(pwm->period_us, pwm->period_us * 2);
++		__pwm_enable(pwm, 0);
++		clk_disable(pwm->clk);
++		pwm->enabled = 0;
++	}
++}
++EXPORT_SYMBOL(pwm_disable);
++
++static DEFINE_MUTEX(pwm_lock);
++static LIST_HEAD(pwm_list);
++
++struct pwm_device *pwm_request(int pwm_id, const char *label)
++{
++	struct pwm_device *pwm;
++	int found = 0;
++
++	mutex_lock(&pwm_lock);
++
++	list_for_each_entry(pwm, &pwm_list, node) {
++		if (pwm->pwm_id == pwm_id) {
++			found = 1;
++			break;
++		}
++	}
++
++	if (found) {
++		if (pwm->use_count == 0) {
++			pwm->use_count++;
++			pwm->label = label;
++		} else
++			pwm = ERR_PTR(-EBUSY);
++	} else
++		pwm = ERR_PTR(-ENOENT);
++
++	mutex_unlock(&pwm_lock);
++
++	return pwm;
++}
++EXPORT_SYMBOL(pwm_request);
++
++void pwm_free(struct pwm_device *pwm)
++{
++	mutex_lock(&pwm_lock);
++
++	if (pwm->use_count) {
++		pwm->use_count--;
++		pwm->label = NULL;
++	} else
++		pr_warning("PWM device already freed\n");
++
++	mutex_unlock(&pwm_lock);
++}
++EXPORT_SYMBOL(pwm_free);
++
++static int __devinit mxs_pwm_probe(struct platform_device *pdev)
++{
++	struct pwm_device *pwm;
++	struct resource *r;
++	int ret = 0;
++
++	pwm = kzalloc(sizeof(struct pwm_device), GFP_KERNEL);
++	if (pwm == NULL) {
++		dev_err(&pdev->dev, "failed to allocate memory\n");
++		return -ENOMEM;
++	}
++
++	pwm->clk = clk_get(&pdev->dev, NULL);
++
++	if (IS_ERR(pwm->clk)) {
++		ret = PTR_ERR(pwm->clk);
++		goto err_free;
++	}
++
++	pwm->enabled = 0;
++
++	pwm->use_count = 0;
++	pwm->pwm_id = pdev->id;
++	pwm->dev = &pdev->dev;
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (r == NULL) {
++		dev_err(&pdev->dev, "no memory resource defined\n");
++		ret = -ENODEV;
++		goto err_free_clk;
++	}
++
++	r = request_mem_region(r->start, resource_size(r), pdev->name);
++	if (r == NULL) {
++		dev_err(&pdev->dev, "failed to request memory resource\n");
++		ret = -EBUSY;
++		goto err_free_clk;
++	}
++
++	pwm->mmio_base = ioremap(r->start, resource_size(r));
++	if (pwm->mmio_base == NULL) {
++		dev_err(&pdev->dev, "failed to ioremap() registers\n");
++		ret = -ENODEV;
++		goto err_free_mem;
++	}
++
++	mutex_lock(&pwm_lock);
++	list_add_tail(&pwm->node, &pwm_list);
++	mutex_unlock(&pwm_lock);
++
++	platform_set_drvdata(pdev, pwm);
++	return 0;
++
++err_free_mem:
++	release_mem_region(r->start, resource_size(r));
++err_free_clk:
++	clk_put(pwm->clk);
++err_free:
++	kfree(pwm);
++	return ret;
++}
++
++static int __devexit mxs_pwm_remove(struct platform_device *pdev)
++{
++	struct pwm_device *pwm;
++	struct resource *r;
++
++	pwm = platform_get_drvdata(pdev);
++	if (pwm == NULL)
++		return -ENODEV;
++
++	mutex_lock(&pwm_lock);
++	list_del(&pwm->node);
++	mutex_unlock(&pwm_lock);
++
++	iounmap(pwm->mmio_base);
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	release_mem_region(r->start, resource_size(r));
++
++	clk_put(pwm->clk);
++
++	kfree(pwm);
++	return 0;
++}
++
++static struct platform_driver mxs_pwm_driver = {
++	.driver		= {
++		.name	= "mxs-pwm",
++	},
++	.probe		= mxs_pwm_probe,
++	.remove		= __devexit_p(mxs_pwm_remove),
++};
++
++static int __init mxs_pwm_init(void)
++{
++	if (cpu_is_mx28())
++		pwm_base_common = MX28_IO_ADDRESS(MX28_PWM_BASE_ADDR);
++	else
++		pwm_base_common = MX23_IO_ADDRESS(MX23_PWM_BASE_ADDR);
++
++	__mxs_clrl(PWM_SFTRST | PWM_CLKGATE, pwm_base_common + REG_PWM_CTRL);
++
++	return platform_driver_register(&mxs_pwm_driver);
++}
++arch_initcall(mxs_pwm_init);
++
++static void __exit mxs_pwm_exit(void)
++{
++	platform_driver_unregister(&mxs_pwm_driver);
++}
++module_exit(mxs_pwm_exit);
++
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
+-- 
+1.7.2.3
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
