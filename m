@@ -1,64 +1,85 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 26 Jan 2011 23:02:03 -0700
-Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
-In-Reply-To: <AANLkTikdAB-scO=dRwhggZD--dJoWq_tFGL-ay1OdY9E@mail.gmail.com>
-References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
-	<20110116102158.GC15575@mail.wantstofly.org>
-	<AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
-	<AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
-	<AANLkTinitxQLUxFZoVW=oZcNkAWF5k4FLJh5-f6o5pt-@mail.gmail.com>
-	<AANLkTinTzT-UiVGdg2M99VpYQCyWONh_RDrwExsasv_d@mail.gmail.com>
-	<AANLkTikdAB-scO=dRwhggZD--dJoWq_tFGL-ay1OdY9E@mail.gmail.com>
-Message-ID: <AANLkTimg1YxUOGh3Gm1uoZABo8see99=1WOd34aFtQD=@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 26 Jan 2011 22:11:43 -0800
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <20110126112624.GC2562@n2100.arm.linux.org.uk>
+References: <1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+	<20110114154919.GE15996@n2100.arm.linux.org.uk>
+	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
+	<20110114163520.GH15996@n2100.arm.linux.org.uk>
+	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
+	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
+	<20110114184759.GN15996@n2100.arm.linux.org.uk>
+	<AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
+	<AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
+	<AANLkTimZ9itumf=QZPD55+JA5cUOWKgwuA1_5=XsdPsP@mail.gmail.com>
+	<20110126112624.GC2562@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim2fPySEMFn+ckrVAvJj8ZXEvBoZpgmZAKOWf=9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 10:42 PM, Colin Cross <ccross@android.com> wrote:
-> On Wed, Jan 26, 2011 at 7:41 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Mon, Jan 17, 2011 at 3:49 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> On Mon, Jan 17, 2011 at 3:17 PM, Colin Cross <ccross@android.com> wrote:
->>>> On Sun, Jan 16, 2011 at 7:53 AM, Olof Johansson <olof@lixom.net> wrote:
->>>>> On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
->>>>> <buytenh@wantstofly.org> wrote:
->>>>>> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
->>>>>>
->>>>>>> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
->>>>>>> conversion." missed changing one reference to 'irq' in the function
->>>>>>> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
->>>>>>>
->>>>>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->>>>>>
->>>>>> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
->>>>>
->>>>> Acked-by: Olof Johansson <olof@lixom.net>
->>>>>
->>>>>> I built this queue against all defconfigs, but there doesn't seem to
->>>>>> be one for tegra at the moment, which is why I missed this.
->>>>>
->>>>> Yep, planning on fixing this for .39.
->>>>>
->>>>>
->>>>> -Olof
->>>>>
->>>>
->>>> This should get fixed in .38. ?Has someone picked it up, or should I
->>>> put it in through my tree?
->>>
->>> I don't think Olof picked it up (seeing as he only acked it and it's
->>> not in Linus' tree). ?You should take it through your tree.
->>
->> Ping? ?I've not seen this hit Linus' tree yet. ?Do you want me to take
->> care of it?
+On Wed, Jan 26, 2011 at 3:26 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jan 25, 2011 at 03:33:24PM -0800, Colin Cross wrote:
+>> I think there is an additional change needed to
+>> __und_usr_unknown/do_undefinstr. ?do_undefinstr, which gets called
+>> directly in __und_usr as well as by mov pc, lr, expects regs->ARM_pc
+>> to be the fault address, and not the next PC, and gets called for 2 or
+>> 4 byte instructions.
 >
-> I confused your previous request for the struct clk patch with this
-> patch. ?I just sent a pull request with both this and the struct clk
-> patch to Linus.
+> It expects it to be the next PC:
+>
+> asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+> {
+> ? ? ? ?unsigned int correction = thumb_mode(regs) ? 2 : 4;
+> ? ? ? ?unsigned int instr;
+> ? ? ? ?siginfo_t info;
+> ? ? ? ?void __user *pc;
+>
+> ? ? ? ?/*
+> ? ? ? ? * According to the ARM ARM, PC is 2 or 4 bytes ahead,
+> ? ? ? ? * depending whether we're in Thumb mode or not.
+> ? ? ? ? * Correct this offset.
+> ? ? ? ? */
+> ? ? ? ?regs->ARM_pc -= correction;
+>
+> We expect the PC to be pointing at the next instruction to be executed.
+> This is the value of the PC saved by the CPU when entering the exception.
+> We correct the PC by four bytes for ARM mode to point at the previously
+> executed instruction.
+>
+> For 16-bit Thumb mode, the PC is again pointing at the next instruction
+> to be executed, and this is the value saved by the CPU. ?So we correct
+> the PC by two bytes as that is the Thumb instruction size.
+>
+> The problem comes with T2, where we advance the saved PC by two bytes
+> if the instruction was 32-bit such that it again points at the next
+> instruction to be executed. ?This is where the problem comes in because
+> we have two different chunks of code with completely different
+> expectations.
 
-Cool, thanks.
+All do_undefinstr will do with the correction is subtract it off so
+that pc points to the faulting instruction instead of the next
+instruction, and calls any registered handlers.  VFP_bounce sometimes
+subtracts off 4 (it doesn't care about T2 mode there, because T2 VFP
+instructions are all 32 bit), and sometimes leaves pc pointing at the
+next instruction.  If both were modified to expect the faulting
+instruction's pc, do_undefinstr would leave pc unmodified, and
+VFP_bounce would add 4 in the opposite cases from where it subtracts 4
+now.
 
-g.
+iwmmxt_task_enable and crunch_task_enable can also get called from __und_usr.
 
+Currently, iwmmxt_task_enable will either end up in do_undefinstr
+through mov pc, lr, or it will subtract 4 from the pc register value
+and return through ret_from_exception.  With the change above, it
+would not need to modify the pc value at all.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+crunch_task_enable is based on iwmmxt_task_enable, and works exactly the same.
+
+> Maybe we need to pass in the correction factor to do_undefinstr instead.
+>
+
+That just makes it even more complicated, the correction factor has to
+be tracked through every code path.
+
+RFC patch to follow.
