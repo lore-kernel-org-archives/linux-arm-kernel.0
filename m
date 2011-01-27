@@ -1,50 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Jan 2011 16:31:24 +0100
-Subject: [PATCH] ARM: mxs: fix clock base address missing
-In-Reply-To: <20110127231929.GC14993@S2100-06.ap.freescale.net>
-References: <1296080796-10896-1-git-send-email-shawn.guo@freescale.com>
-	<20110126155858.GP9041@pengutronix.de>
-	<20110127231929.GC14993@S2100-06.ap.freescale.net>
-Message-ID: <20110127153124.GB9041@pengutronix.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Thu, 27 Jan 2011 15:33:32 +0000
+Subject: [PATCH] MMCI: don't read command response when invalid
+In-Reply-To: <20110127121901.GB25968@n2100.arm.linux.org.uk>
+References: <20110111163502.GJ11039@n2100.arm.linux.org.uk>
+	<20110111163556.GA18746@n2100.arm.linux.org.uk>
+	<20110111232025.GA25752@void.printf.net>
+	<20110127121901.GB25968@n2100.arm.linux.org.uk>
+Message-ID: <20110127153332.GA14591@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 28, 2011 at 07:19:30AM +0800, Shawn Guo wrote:
-> On Wed, Jan 26, 2011 at 04:58:58PM +0100, Sascha Hauer wrote:
-> > On Thu, Jan 27, 2011 at 06:26:36AM +0800, Shawn Guo wrote:
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > ---
-> > >  arch/arm/mach-mxs/clock-mx23.c |    2 +-
-> > >  arch/arm/mach-mxs/clock-mx28.c |    2 +-
-> > >  2 files changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-> > > index b1a362e..a0296a4 100644
-> > > --- a/arch/arm/mach-mxs/clock-mx23.c
-> > > +++ b/arch/arm/mach-mxs/clock-mx23.c
-> > > @@ -347,7 +347,7 @@ static int name##_set_parent(struct clk *clk, struct clk *parent)	\
-> > >  {									\
-> > >  	if (parent != clk->parent) {					\
-> > >  		__raw_writel(BM_CLKCTRL_CLKSEQ_BYPASS_##bit,		\
-> > > -			 HW_CLKCTRL_CLKSEQ_TOG);			\
-> > > +			 CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_TOG);	\
-> > >  		clk->parent = parent;					\
-> > >  	}								\
-> > >  									\
-> > 
-> > While at it you could also add some parameter checking to this function.
-> > Implemented like this it behaves rather randomly.
-> > 
-> The parameters have been well checked by clk_set_parent().  What
-> kind of extra checking are you expecting?
+Hi Russell,
 
-clk_set_parent checks whether valid clocks are passed as arguments, but
-not whether parent is a valid parent for this particular clock.
+On Thu, Jan 27, 2011 at 12:19:01PM +0000, Russell King - ARM Linux wrote:
+> FYI, I've now merged this into the ARM devel tree for the time being so
+> it doesn't get forgotten - which means it'll appear in linux-next at some
+> point if it isn't already there.  (Mainly so I don't have to keep on
+> adding the patch.)
+> 
+> Once you push it into mainline, I'll drop my copy.
 
-Sascha
+Okay.  Sent this to Linus yesterday, just waiting for him to pull.
+(It's been in linux-next for the last two weeks.)
+
+Thanks,
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
