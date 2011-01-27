@@ -1,40 +1,73 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 28 Jan 2011 07:15:58 +0800
-Subject: some i.MX23/28 patches
-In-Reply-To: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
-References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110127231557.GB14993@S2100-06.ap.freescale.net>
+Date: Fri, 28 Jan 2011 07:19:30 +0800
+Subject: [PATCH] ARM: mxs: fix clock base address missing
+In-Reply-To: <20110126155858.GP9041@pengutronix.de>
+References: <1296080796-10896-1-git-send-email-shawn.guo@freescale.com>
+	<20110126155858.GP9041@pengutronix.de>
+Message-ID: <20110127231929.GC14993@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Thu, Jan 27, 2011 at 12:40:09PM +0100, Sascha Hauer wrote:
-> The following contains some i.MX23/28 cleanup patches.
+On Wed, Jan 26, 2011 at 04:58:58PM +0100, Sascha Hauer wrote:
+> On Thu, Jan 27, 2011 at 06:26:36AM +0800, Shawn Guo wrote:
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/clock-mx23.c |    2 +-
+> >  arch/arm/mach-mxs/clock-mx28.c |    2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> > index b1a362e..a0296a4 100644
+> > --- a/arch/arm/mach-mxs/clock-mx23.c
+> > +++ b/arch/arm/mach-mxs/clock-mx23.c
+> > @@ -347,7 +347,7 @@ static int name##_set_parent(struct clk *clk, struct clk *parent)	\
+> >  {									\
+> >  	if (parent != clk->parent) {					\
+> >  		__raw_writel(BM_CLKCTRL_CLKSEQ_BYPASS_##bit,		\
+> > -			 HW_CLKCTRL_CLKSEQ_TOG);			\
+> > +			 CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_TOG);	\
+> >  		clk->parent = parent;					\
+> >  	}								\
+> >  									\
 > 
-> Sascha
+> While at it you could also add some parameter checking to this function.
+> Implemented like this it behaves rather randomly.
 > 
-> The following changes since commit 376e9c5848abef8c72c09bd89f2f7ee128caa104:
-> 
->   ARM: mxs: add initial pm support (2011-01-26 08:30:49 +0100)
-> 
-> are available in the git repository at:
->   none ..BRANCH.NOT.VERIFIED..
-> 
-> Sascha Hauer (4):
->       ARM i.MX23/28: deobfuscate gpio initialization
->       ARM i.MX23/28: do not use complicated macros if not necessary
->       ARM i.MX23: remove reserved register defines
->       ARM i.MX28: remove reserved register defines
-> 
->  arch/arm/mach-mxs/gpio.c              |   45 +++++----
->  arch/arm/mach-mxs/regs-clkctrl-mx23.h |  124 -----------------------
->  arch/arm/mach-mxs/regs-clkctrl-mx28.h |  177 ---------------------------------
->  3 files changed, 24 insertions(+), 322 deletions(-)
-> 
-All acked-by: Shawn Guo <shawn.guo@freescale.com>
-
-I do not understand word "deobfuscate".  Can you help me?
+The parameters have been well checked by clk_set_parent().  What
+kind of extra checking are you expecting?
 
 Regards,
 Shawn
+
+> Sascha
+> 
+> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> > index 56312c0..44c1754 100644
+> > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > @@ -483,7 +483,7 @@ static int name##_set_parent(struct clk *clk, struct clk *parent)	\
+> >  {									\
+> >  	if (parent != clk->parent) {					\
+> >  		__raw_writel(BM_CLKCTRL_CLKSEQ_BYPASS_##bit,		\
+> > -			 HW_CLKCTRL_CLKSEQ_TOG);			\
+> > +			 CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_TOG);	\
+> >  		clk->parent = parent;					\
+> >  	}								\
+> >  									\
+> > -- 
+> > 1.7.1
+> > 
+> > 
+> > 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
