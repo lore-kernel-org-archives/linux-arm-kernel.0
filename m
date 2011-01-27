@@ -1,137 +1,77 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 27 Jan 2011 17:30:44 +0800
-Subject: [PATCH 1/3] ARM: mach-mx5: Fix build for mx53_loco and mx53_smd
-In-Reply-To: <20110127073009.GR9041@pengutronix.de>
-References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
-	<20110127073009.GR9041@pengutronix.de>
-Message-ID: <20110127093044.GA30756@shlinux1.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 27 Jan 2011 02:52:55 -0700 (MST)
+Subject: [PATCH] OMAP2/3: PM: remove unnecessary wakeup/sleep dependency clear
+Message-ID: <alpine.DEB.2.00.1101270252010.16671@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
 
-Sorry I didn't see your patch. I just sent out a patch to include all pad
-configure for imx53_loco.
+The OMAP2 and OMAP3 PM code clears clockdomain wakeup and sleep
+dependencies.  This is unnecessary after commit
+6f7f63cc9adf3192e6fcac4e8bed5cc10fd924aa ("OMAP clockdomain:
+initialize clockdomain registers when the clockdomain layer starts")
+which clears these dependencies during clockdomain init.
 
-I have some comments below.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+---
+Full-chip retention idle entry tested on OMAP35xx Beagleboard.
 
-On Thu, Jan 27, 2011 at 08:30:09AM +0100, Sascha Hauer wrote:
-> Yong,
-> 
-> Can you ack these?
-> 
-> Sascha
-> 
-> On Tue, Jan 25, 2011 at 01:08:33PM -0200, Fabio Estevam wrote:
-> > Commit 816ad74 (ARM: i.MX53: Add full iomux support for mx53) renamed some of the pad names.
-> > 
-> > Make the changes accordingly so that mx53_loco and mx53_cmd can build without errors.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  arch/arm/mach-mx5/board-mx53_loco.c |   25 +++++++++++++------------
-> >  arch/arm/mach-mx5/board-mx53_smd.c  |   24 ++++++++++++------------
-> >  2 files changed, 25 insertions(+), 24 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> > index d1348e0..dadc856 100644
-> > --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> > +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> > @@ -39,20 +39,21 @@
-> >  #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
-> >  
-> >  static iomux_v3_cfg_t mx53_loco_pads[] = {
-> > -	MX53_PAD_CSI0_D10__UART1_TXD,
-> > -	MX53_PAD_CSI0_D11__UART1_RXD,
-> > -	MX53_PAD_ATA_DIOW__UART1_TXD,
-> > -	MX53_PAD_ATA_DMACK__UART1_RXD,
-> > -
-> > -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
-> > -	MX53_PAD_ATA_DMARQ__UART2_TXD,
-> > -	MX53_PAD_ATA_DIOR__UART2_RTS,
-> > -	MX53_PAD_ATA_INTRQ__UART2_CTS,
-> > -
-> > -	MX53_PAD_ATA_CS_0__UART3_TXD,
-> > -	MX53_PAD_ATA_CS_1__UART3_RXD,
-> > -	MX53_PAD_ATA_DA_1__UART3_CTS,
-> > -	MX53_PAD_ATA_DA_2__UART3_RTS,
-> > +	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
-> > +	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-> > +	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
-> > +	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
-So many Pad configured to uart1?
-> > +
-> > +	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
-> > +	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
-> > +	MX53_PAD_PATA_DIOR__UART2_RTS,
-> > +	MX53_PAD_PATA_INTRQ__UART2_CTS,
-> > +
-> > +	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
-> > +	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
-> > +	MX53_PAD_PATA_DA_1__UART3_CTS,
-> > +	MX53_PAD_PATA_DA_2__UART3_RTS,
-LoCo don't have uart2 and uart3.
-> > +
-> >  };
-> >  
-> >  static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
-> > diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
-> > index 7970f7a..06070c5 100644
-> > --- a/arch/arm/mach-mx5/board-mx53_smd.c
-> > +++ b/arch/arm/mach-mx5/board-mx53_smd.c
-> > @@ -39,20 +39,20 @@
-> >  #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
-> >  
-> >  static iomux_v3_cfg_t mx53_smd_pads[] = {
-> > -	MX53_PAD_CSI0_D10__UART1_TXD,
-> > -	MX53_PAD_CSI0_D11__UART1_RXD,
-> > -	MX53_PAD_ATA_DIOW__UART1_TXD,
-> > -	MX53_PAD_ATA_DMACK__UART1_RXD,
-> > -
-> > -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
-> > -	MX53_PAD_ATA_DMARQ__UART2_TXD,
-> > -	MX53_PAD_ATA_DIOR__UART2_RTS,
-> > -	MX53_PAD_ATA_INTRQ__UART2_CTS,
-> > -
-> > -	MX53_PAD_ATA_CS_0__UART3_TXD,
-> > -	MX53_PAD_ATA_CS_1__UART3_RXD,
-> > -	MX53_PAD_ATA_DA_1__UART3_CTS,
-> > -	MX53_PAD_ATA_DA_2__UART3_RTS,
-> > +	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
-> > +	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
-> > +	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
-> > +	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
-same as above.
+ arch/arm/mach-omap2/pm24xx.c |    8 +-------
+ arch/arm/mach-omap2/pm34xx.c |   15 ---------------
+ 2 files changed, 1 insertions(+), 22 deletions(-)
 
-Thanks
-Richard
-> > +
-> > +	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
-> > +	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
-> > +	MX53_PAD_PATA_DIOR__UART2_RTS,
-> > +	MX53_PAD_PATA_INTRQ__UART2_CTS,
-> > +
-> > +	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
-> > +	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
-> > +	MX53_PAD_PATA_DA_1__UART3_CTS,
-> > +	MX53_PAD_PATA_DA_2__UART3_RTS,
-> >  };
-> >  
-> >  static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
-> > -- 
-> > 1.6.0.4
-> > 
-> > 
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 97feb3a..10f8747 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -363,9 +363,6 @@ static const struct platform_suspend_ops __initdata omap_pm_ops;
+ /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
+ static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
+ {
+-	clkdm_clear_all_wkdeps(clkdm);
+-	clkdm_clear_all_sleepdeps(clkdm);
+-
+ 	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
+ 		omap2_clkdm_allow_idle(clkdm);
+ 	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
+@@ -411,10 +408,7 @@ static void __init prcm_setup_regs(void)
+ 	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
+ 	omap2_clkdm_sleep(gfx_clkdm);
+ 
+-	/*
+-	 * Clear clockdomain wakeup dependencies and enable
+-	 * hardware-supervised idle for all clkdms
+-	 */
++	/* Enable hardware-supervised idle for all clkdms */
+ 	clkdm_for_each(clkdms_setup, NULL);
+ 	clkdm_add_wkdep(mpu_clkdm, wkup_clkdm);
+ 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index a4aa192..0eb9738 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -694,21 +694,6 @@ static void __init prcm_setup_regs(void)
+ 	u32 omap3630_grpsel_uart4_mask = cpu_is_omap3630() ?
+ 					OMAP3630_GRPSEL_UART4_MASK : 0;
+ 
+-
+-	/* XXX Reset all wkdeps. This should be done when initializing
+-	 * powerdomains */
+-	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, PM_WKDEP);
+-	omap2_prm_write_mod_reg(0, MPU_MOD, PM_WKDEP);
+-	omap2_prm_write_mod_reg(0, OMAP3430_DSS_MOD, PM_WKDEP);
+-	omap2_prm_write_mod_reg(0, OMAP3430_NEON_MOD, PM_WKDEP);
+-	omap2_prm_write_mod_reg(0, OMAP3430_CAM_MOD, PM_WKDEP);
+-	omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD, PM_WKDEP);
+-	if (omap_rev() > OMAP3430_REV_ES1_0) {
+-		omap2_prm_write_mod_reg(0, OMAP3430ES2_SGX_MOD, PM_WKDEP);
+-		omap2_prm_write_mod_reg(0, OMAP3430ES2_USBHOST_MOD, PM_WKDEP);
+-	} else
+-		omap2_prm_write_mod_reg(0, GFX_MOD, PM_WKDEP);
+-
+ 	/*
+ 	 * Enable interface clock autoidle for all modules.
+ 	 * Note that in the long run this should be done by clockfw
+-- 
+1.7.2.3
