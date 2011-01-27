@@ -1,53 +1,64 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Jan 2011 14:23:12 +0100
-Subject: some i.MX23/28 patches
-In-Reply-To: <4D416FE1.3010409@ru.mvista.com>
-References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
-	<4D416FE1.3010409@ru.mvista.com>
-Message-ID: <20110127132311.GY9041@pengutronix.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 27 Jan 2011 16:26:32 +0300
+Subject: [PATCH 09/13] ARM i.MX51 mx51 3ds: remove
+	unnecessary	CONFIG_SERIAL_IMX ifdefs
+In-Reply-To: <1296133233-1062-10-git-send-email-s.hauer@pengutronix.de>
+References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
+	<1296133233-1062-10-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4D417288.6000108@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 04:15:13PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 27-01-2011 14:40, Sascha Hauer wrote:
-> 
-> >The following contains some i.MX23/28 cleanup patches.
-> 
-> >Sascha
-> 
-> >The following changes since commit 376e9c5848abef8c72c09bd89f2f7ee128caa104:
-> 
-> >   ARM: mxs: add initial pm support (2011-01-26 08:30:49 +0100)
-> 
-> >are available in the git repository at:
-> >   none ..BRANCH.NOT.VERIFIED..
-> 
->    Forgot to push?
+Hello.
 
-No, I didn't really wanted to push. git-request-pull is just handy to
-create an overall diffstat.
+On 27-01-2011 16:00, Sascha Hauer wrote:
 
-Sascha
+> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+> ---
+>   arch/arm/mach-mx5/board-mx51_3ds.c |   14 ++++----------
+>   1 files changed, 4 insertions(+), 10 deletions(-)
 
-> 
-> >Sascha Hauer (4):
-> >       ARM i.MX23/28: deobfuscate gpio initialization
-> >       ARM i.MX23/28: do not use complicated macros if not necessary
-> >       ARM i.MX23: remove reserved register defines
-> >       ARM i.MX28: remove reserved register defines
-> >
-> >  arch/arm/mach-mxs/gpio.c              |   45 +++++----
-> >  arch/arm/mach-mxs/regs-clkctrl-mx23.h |  124 -----------------------
-> >  arch/arm/mach-mxs/regs-clkctrl-mx28.h |  177 ---------------------------------
-> >  3 files changed, 24 insertions(+), 322 deletions(-)
-> 
-> WBR, Sergei
-> 
+> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+> index 8a0619b..feb2800 100644
+> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
+> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+> @@ -71,22 +71,13 @@ static iomux_v3_cfg_t mx51_3ds_pads[] = {
+>   };
+>
+>   /* Serial ports */
+> -#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+>   static const struct imxuart_platform_data uart_pdata __initconst = {
+>   	.flags = IMXUART_HAVE_RTSCTS,
+>   };
+>
+>   static inline void mxc_init_imx_uart(void)
+>   {
+> -	imx51_add_imx_uart(0, &uart_pdata);
+> -	imx51_add_imx_uart(1, &uart_pdata);
+> -	imx51_add_imx_uart(2, &uart_pdata);
+> -}
+> -#else /* !SERIAL_IMX */
+> -static inline void mxc_init_imx_uart(void)
+> -{
+>   }
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+    Why then leave the empty function?
+
+> -#endif /* SERIAL_IMX */
+>
+>   #if defined(CONFIG_KEYBOARD_IMX) || defined(CONFIG_KEYBOARD_IMX_MODULE)
+>   static int mx51_3ds_board_keymap[] = {
+> @@ -161,7 +152,10 @@ static void __init mxc_board_init(void)
+>   {
+>   	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
+>   					ARRAY_SIZE(mx51_3ds_pads));
+> -	mxc_init_imx_uart();
+> +
+> +	imx51_add_imx_uart(0, &uart_pdata);
+> +	imx51_add_imx_uart(1, &uart_pdata);
+> +	imx51_add_imx_uart(2, &uart_pdata);
+>
+>   	imx51_add_ecspi(1,&mx51_3ds_ecspi2_pdata);
+>   	spi_register_board_info(mx51_3ds_spi_nor_device,
+
+WBR, Sergei
