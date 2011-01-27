@@ -1,36 +1,40 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 28 Jan 2011 07:00:04 +0800
-Subject: [PATCH] ARM: mxs/imx28: remove now unused clock lookup "fec.0"
-In-Reply-To: <1296124114-16588-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1296124114-16588-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110127230003.GA14993@S2100-06.ap.freescale.net>
+Date: Fri, 28 Jan 2011 07:15:58 +0800
+Subject: some i.MX23/28 patches
+In-Reply-To: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110127231557.GB14993@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 11:28:34AM +0100, Uwe Kleine-K?nig wrote:
-> Commit b2878fa (ARM: mx28: update clock and device name for dual fec
-> support) added only the new lookups without removing the old one.
-> 
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-mxs/clock-mx28.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index 865ce83..5580a21 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -609,7 +609,6 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("duart", NULL, uart_clk)
->  	_REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
->  	_REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
-> -	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
->  	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
->  	_REGISTER_CLOCK("mxs-auart.1", NULL, uart_clk)
->  	_REGISTER_CLOCK("mxs-auart.2", NULL, uart_clk)
-> -- 
-> 1.7.2.3
-> 
+Hi Sascha,
 
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
+On Thu, Jan 27, 2011 at 12:40:09PM +0100, Sascha Hauer wrote:
+> The following contains some i.MX23/28 cleanup patches.
+> 
+> Sascha
+> 
+> The following changes since commit 376e9c5848abef8c72c09bd89f2f7ee128caa104:
+> 
+>   ARM: mxs: add initial pm support (2011-01-26 08:30:49 +0100)
+> 
+> are available in the git repository at:
+>   none ..BRANCH.NOT.VERIFIED..
+> 
+> Sascha Hauer (4):
+>       ARM i.MX23/28: deobfuscate gpio initialization
+>       ARM i.MX23/28: do not use complicated macros if not necessary
+>       ARM i.MX23: remove reserved register defines
+>       ARM i.MX28: remove reserved register defines
+> 
+>  arch/arm/mach-mxs/gpio.c              |   45 +++++----
+>  arch/arm/mach-mxs/regs-clkctrl-mx23.h |  124 -----------------------
+>  arch/arm/mach-mxs/regs-clkctrl-mx28.h |  177 ---------------------------------
+>  3 files changed, 24 insertions(+), 322 deletions(-)
+> 
+All acked-by: Shawn Guo <shawn.guo@freescale.com>
+
+I do not understand word "deobfuscate".  Can you help me?
+
+Regards,
+Shawn
