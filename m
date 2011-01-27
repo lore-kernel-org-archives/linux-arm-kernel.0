@@ -1,49 +1,38 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 27 Jan 2011 15:02:56 +0100
-Subject: [PATCH] mmci: calculate remaining bytes at error correctly
-Message-ID: <mailman.133.1296146619.1530.linux-arm-kernel@lists.infradead.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 27 Jan 2011 10:43:57 -0600
+Subject: [PATCH] ep93xx: add framebuffer support to edb93xx boards
+In-Reply-To: <AANLkTi=SDZ7EAw5Q=XAD3WtutwCHSgfiw-qQ5z4TcYCS@mail.gmail.com>
+References: <Acuuu5ny+zlvst9wTH+OPBMrDizm+g==>
+	<0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
+	<AANLkTi=SDZ7EAw5Q=XAD3WtutwCHSgfiw-qQ5z4TcYCS@mail.gmail.com>
+Message-ID: <0D753D10438DA54287A00B027084269764CECD9EA1@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMCIDATACNT register contain the number of byte left at error
-not the number of words, so loose the << 2 thing. Further if CRC
-fails on the first block, we may end up with a negative number
-of transferred bytes which is not good, and the formula was in
-wrong order.
+On Wednesday, January 26, 2011 10:29 PM, Martin Guy wrote:
+> On 7 January 2011 23:38, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
+>> The ep9307, ep9312, and ep9315 variants of the ep93xx processor include the
+>> raster engine needed for framebuffer support.
+>>
+>> This allows the EDB93xx boards with those processors to use the framebuffer
+>> driver.
+>>
+>> Tested on an EDB9307A with the following kernel parameters:
+>> ? ? ? ?video=640x480-16 at 60
+>> ? ? ? ?video=1024x768-16 at 60
+>
+> Hi. Sorry, I've been out of action for personal reasons.
+>
+> I don't have an edb to test this, but suggest you compare with the
+> simone.c board file, which has similar code to enable the fb.
+> Compared to the mainline code in 2.6.36, I use just one patch, which
+> defines the working video modes. I attach it for reference.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/mmc/host/mmci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+The edb boards _are_ development boards, as such I really don't wish to limit the
+modes that the framebuffer can be used with.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 2de12fe..1870e74 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -283,13 +283,13 @@ mmci_data_irq(struct mmci_host *host, struct
-mmc_data *data,
-                u32 remain, success;
+It's really up to the end user if the "twitching" at higher resolutions is an
+issue.  For the dev boards I don't want to enforce any limitations.
 
-                /* Calculate how far we are into the transfer */
--               remain =3D readl(host->base + MMCIDATACNT) << 2;
-+               remain =3D readl(host->base + MMCIDATACNT);
-                success =3D data->blksz * data->blocks - remain;
-
-                dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ (status
-%08x)\n", status);
-                if (status & MCI_DATACRCFAIL) {
-                        /* Last block was not successful */
--                       host->data_xfered =3D ((success / data->blksz) -
-1 * data->blksz);
-+                       host->data_xfered =3D ((success - 1) /
-data->blksz) * data->blksz;
-                        data->error =3D -EILSEQ;
-                } else if (status & MCI_DATATIMEOUT) {
-                        host->data_xfered =3D success;
---=20
-1.7.3.2
-
-I'll put it in the patch tracker for consideration...
-
-Thanks
-Linus Walleij
+Thanks,
+Hartley
