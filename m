@@ -1,43 +1,26 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 27 Jan 2011 15:00:19 -0200
-Subject: [PATCH] ARM: mach-mx3/mach-mx31_3ds: Remove unnecessary function for
-	IO mapping
-Message-ID: <1296147619-9600-1-git-send-email-fabio.estevam@freescale.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 27 Jan 2011 10:11:35 -0700
+Subject: [PATCH] scoop.c: use resource_size()
+Message-ID: <201101271011.35316.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx3/mach-mx31_3ds.c |   10 +---------
- 1 files changed, 1 insertions(+), 9 deletions(-)
+Use resource_size() instead of calculating the size by hand.
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 0d65db8..2f41430 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -320,14 +320,6 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+---
+
+diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
+index c11af1e..a07b0e7 100644
+--- a/arch/arm/common/scoop.c
++++ b/arch/arm/common/scoop.c
+@@ -193,7 +193,7 @@ static int __devinit scoop_probe(struct platform_device *pdev)
+ 	spin_lock_init(&devptr->scoop_lock);
  
--/*
-- * Set up static virtual mappings.
-- */
--static void __init mx31_3ds_map_io(void)
--{
--	mx31_map_io();
--}
--
- /*!
-  * Board specific initialization.
-  */
-@@ -382,7 +374,7 @@ static struct sys_timer mx31_3ds_timer = {
- MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
- 	/* Maintainer: Freescale Semiconductor, Inc. */
- 	.boot_params    = MX3x_PHYS_OFFSET + 0x100,
--	.map_io         = mx31_3ds_map_io,
-+	.map_io         = mx31_map_io,
- 	.init_irq       = mx31_init_irq,
- 	.init_machine   = mxc_board_init,
- 	.timer          = &mx31_3ds_timer,
--- 
-1.6.0.4
+ 	inf = pdev->dev.platform_data;
+-	devptr->base = ioremap(mem->start, mem->end - mem->start + 1);
++	devptr->base = ioremap(mem->start, resource_size(mem));
+ 
+ 	if (!devptr->base) {
+ 		ret = -ENOMEM;
