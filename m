@@ -1,36 +1,34 @@
-From: martinwguy@gmail.com (Martin Guy)
-Date: Thu, 27 Jan 2011 06:28:32 +0100
-Subject: [PATCH] ep93xx: add framebuffer support to edb93xx boards
-In-Reply-To: <0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
-References: <Acuuu5ny+zlvst9wTH+OPBMrDizm+g==>
-	<0D753D10438DA54287A00B027084269764C41240B9@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <AANLkTi=SDZ7EAw5Q=XAD3WtutwCHSgfiw-qQ5z4TcYCS@mail.gmail.com>
+From: ccross@google.com (Colin Cross)
+Date: Wed, 26 Jan 2011 21:41:40 -0800
+Subject: [GIT PULL] ARM Tegra fixes for 2.6.38
+Message-ID: <AANLkTim6zcdn8FgUTa7OO=_4B3x5CiHxWr_g=uR0m4zX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 January 2011 23:38, H Hartley Sweeten <hartleys@visionengravers.com> wrote:
-> The ep9307, ep9312, and ep9315 variants of the ep93xx processor include the
-> raster engine needed for framebuffer support.
->
-> This allows the EDB93xx boards with those processors to use the framebuffer
-> driver.
->
-> Tested on an EDB9307A with the following kernel parameters:
-> ? ? ? ?video=640x480-16 at 60
-> ? ? ? ?video=1024x768-16 at 60
+Hi Linus,
+Please pull fixes for the Tegra machine from:
 
-Hi. Sorry, I've been out of action for personal reasons.
+  http://android.git.kernel.org/kernel/tegra.git for-linus
 
-I don't have an edb to test this, but suggest you compare with the
-simone.c board file, which has similar code to enable the fb.
-Compared to the mainline code in 2.6.36, I use just one patch, which
-defines the working video modes. I attach it for reference.
+Thanks,
+Colin
 
-    M
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: simone-set-video-modes.patch
-Type: text/x-patch
-Size: 2038 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110127/7e1eba14/attachment.bin>
+The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
+
+  Linux 2.6.38-rc2 (2011-01-21 19:01:34 -0800)
+
+are available in the git repository at:
+  http://android.git.kernel.org/kernel/tegra.git for-linus
+
+Colin Cross (2):
+      ARM: tegra: irq: Rename gic pointers to avoid conflicts
+      ARM: tegra: clock: Add forward reference to struct clk
+
+Grant Likely (1):
+      arm/tegra: Fix tegra irq_data conversion
+
+ arch/arm/mach-tegra/gpio.c                |    4 ++--
+ arch/arm/mach-tegra/include/mach/clk.h    |    2 ++
+ arch/arm/mach-tegra/include/mach/clkdev.h |    2 ++
+ arch/arm/mach-tegra/irq.c                 |   18 +++++++++---------
+ 4 files changed, 15 insertions(+), 11 deletions(-)
