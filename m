@@ -1,50 +1,40 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Jan 2011 14:00:22 +0100
-Subject: [PATCH 02/13] ARM i.MX35 pcm043: put usbh1 outside CONFIG_USB_ULPI
+Date: Thu, 27 Jan 2011 14:00:23 +0100
+Subject: [PATCH 03/13] ARM i.MX31 mx31ads: remove unnecessary CONFIG_I2C ifdefs
 In-Reply-To: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
 References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1296133233-1062-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1296133233-1062-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usbh1 port of the pcm043 does not use ulpi, so put it outside
-the corresponding ifdefs.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx3/mach-pcm043.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mx3/mach-mx31ads.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-index a27022d..a515290 100644
---- a/arch/arm/mach-mx3/mach-pcm043.c
-+++ b/arch/arm/mach-mx3/mach-pcm043.c
-@@ -310,13 +310,13 @@ static struct mxc_usbh_platform_data otg_pdata __initdata = {
- 	.portsc	= MXC_EHCI_MODE_UTMI,
- 	.flags	= MXC_EHCI_INTERFACE_DIFF_UNI,
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index 88b97d6..f9a7109 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -476,7 +476,6 @@ static struct wm8350_platform_data __initdata mx31_wm8350_pdata = {
  };
-+#endif
+ #endif
  
- static const struct mxc_usbh_platform_data usbh1_pdata __initconst = {
- 	.portsc	= MXC_EHCI_MODE_SERIAL,
- 	.flags	= MXC_EHCI_INTERFACE_SINGLE_UNI | MXC_EHCI_INTERNAL_PHY |
- 		  MXC_EHCI_IPPUE_DOWN,
- };
+-#if defined(CONFIG_I2C_IMX) || defined(CONFIG_I2C_IMX_MODULE)
+ static struct i2c_board_info __initdata mx31ads_i2c1_devices[] = {
+ #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+ 	{
+@@ -497,11 +496,6 @@ static void mxc_init_i2c(void)
+ 
+ 	imx31_add_imx_i2c1(NULL);
+ }
+-#else
+-static void mxc_init_i2c(void)
+-{
+-}
 -#endif
  
- static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
- 	.operating_mode = FSL_USB2_DR_DEVICE,
-@@ -382,9 +382,9 @@ static void __init mxc_board_init(void)
- 
- 		imx35_add_mxc_ehci_otg(&otg_pdata);
- 	}
--
--	imx35_add_mxc_ehci_hs(&usbh1_pdata);
- #endif
-+	imx35_add_mxc_ehci_hs(&usbh1_pdata);
-+
- 	if (!otg_mode_host)
- 		imx35_add_fsl_usb2_udc(&otg_device_pdata);
- 
+ static unsigned int ssi_pins[] = {
+ 	MX31_PIN_SFS5__SFS5,
 -- 
 1.7.2.3
