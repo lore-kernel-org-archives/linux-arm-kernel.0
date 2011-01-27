@@ -1,66 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 13:49:30 +0000
-Subject: [PATCH 11/11] ARM: integrator: add Integrator/CP sched_clock support
-In-Reply-To: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-References: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-Message-ID: <E1PiSE6-0003pX-1O@rmk-PC.arm.linux.org.uk>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 27 Jan 2011 19:17:43 +0530
+Subject: [PATCH] ASoC: DaVinci: fix kernel panic due to uninitialized
+	platform_data
+Message-ID: <1296136063-31625-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Integrator/CP has the 24MHz counter which Versatile and later platforms
-also have, which we use for sched_clock support.  Allow this counter to
-be used when building a kernel targetting Integrator/CP alone.
-Integrator/AP does not have this counter, so we must exclude support
-for the Integrator family when this is enabled.
+This patch fixes the Kernel panic issue on accessing davinci_vc in
+cq93vc_probe function. struct davinci_vc is part of platform device's
+private driver data(codec->dev->p->driver_data) and this is populated
+by DaVinci Voice Codec MFD driver.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
 ---
- arch/arm/mach-integrator/integrator_cp.c |    7 +++++++
- arch/arm/plat-versatile/Kconfig          |    2 +-
- 2 files changed, 8 insertions(+), 1 deletions(-)
+This patch applies to Linus's tree at [1].
 
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 05da36f..9e3ce26 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -44,6 +44,7 @@
+[1] http://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+---
+ sound/soc/codecs/cq93vc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/sound/soc/codecs/cq93vc.c b/sound/soc/codecs/cq93vc.c
+index 46dbfd0..347a567 100644
+--- a/sound/soc/codecs/cq93vc.c
++++ b/sound/soc/codecs/cq93vc.c
+@@ -153,7 +153,7 @@ static int cq93vc_resume(struct snd_soc_codec *codec)
  
- #include <plat/clcd.h>
- #include <plat/fpga-irq.h>
-+#include <plat/sched_clock.h>
- 
- #include "common.h"
- 
-@@ -440,11 +441,17 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&clcd_device,
- };
- 
-+#define REFCOUNTER (__io_address(INTEGRATOR_HDR_BASE) + 0x28)
-+
- static void __init intcp_init_early(void)
+ static int cq93vc_probe(struct snd_soc_codec *codec)
  {
- 	clkdev_add_table(cp_lookups, ARRAY_SIZE(cp_lookups));
+-	struct davinci_vc *davinci_vc = codec->dev->platform_data;
++	struct davinci_vc *davinci_vc = snd_soc_codec_get_drvdata(codec);
  
- 	integrator_init_early();
-+
-+#ifdef CONFIG_PLAT_VERSATILE_SCHED_CLOCK
-+	versatile_sched_clock_init(REFCOUNTER, 24000000);
-+#endif
- }
- 
- static void __init intcp_init(void)
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-index 0b27500..52353be 100644
---- a/arch/arm/plat-versatile/Kconfig
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -11,7 +11,7 @@ config PLAT_VERSATILE_LEDS
- 	depends on ARCH_REALVIEW || ARCH_VERSATILE
- 
- config PLAT_VERSATILE_SCHED_CLOCK
--	def_bool y if !ARCH_INTEGRATOR
-+	def_bool y if !ARCH_INTEGRATOR_AP
- 	select HAVE_SCHED_CLOCK
- 
- endif
+ 	davinci_vc->cq93vc.codec = codec;
+ 	codec->control_data = davinci_vc;
 -- 
-1.6.2.5
+1.7.1
