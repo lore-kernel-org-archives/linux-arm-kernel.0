@@ -1,31 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 08:54:38 +0000
-Subject: Locking in the clk API
-In-Reply-To: <4D40F5CC.6080809@codeaurora.org>
-References: <201101111016.42819.jeremy.kerr@canonical.com>
-	<20110111091607.GI12552@n2100.arm.linux.org.uk>
-	<201101111744.59712.jeremy.kerr@canonical.com>
-	<20110111103929.GN24920@pengutronix.de>
-	<AANLkTinHL9X_bqMPR=W8Va01O4xngUnpGCkCiE3xEdiQ@mail.gmail.com>
-	<4D386ABF.9060908@fluff.org>
-	<20110120190822.GK6335@n2100.arm.linux.org.uk>
-	<4D3932B4.8010904@codeaurora.org>
-	<20110121094042.GD13235@n2100.arm.linux.org.uk>
-	<4D40F5CC.6080809@codeaurora.org>
-Message-ID: <20110127085438.GA25239@n2100.arm.linux.org.uk>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 27 Jan 2011 17:19:03 +0800
+Subject: [PATCH 1/2] ARM: imx53_loco: remove inavailable uart device and
+	remove rts/cts support
+Message-ID: <1296119944-30485-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 08:34:20PM -0800, Saravana Kannan wrote:
-> I'm not too familiar with serial/tty, does anyone know if the  
-> .set_termios needs to be atmoic? If not, we could just change  
-> cpm_uart/cpm_uart_core.c to use mutex instead of spinlock.
+imx53_loco board only have one uart and the uart don't export rts/cts lines.
 
-The locking is there to protect against the interrupt handler accessing
-the port->* stuff (which seems to have been forgotten by the cpm driver).
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_loco.c |   20 +-------------------
+ 1 files changed, 1 insertions(+), 19 deletions(-)
 
-I don't see any reason why clk_set_rate() needs to be under the spinlock
-there - we need the reprogramming of the baud rate within the spinlock
-on 8250 because of DLAB bit hiding the data registers.  It's also a good
-idea that it _is_ within the spinlock along with uart_update_timeout()
-to ensure timeouts and the baud rate are updated together.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index d1348e0..d0ca65b 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -41,29 +41,11 @@
+ static iomux_v3_cfg_t mx53_loco_pads[] = {
+ 	MX53_PAD_CSI0_D10__UART1_TXD,
+ 	MX53_PAD_CSI0_D11__UART1_RXD,
+-	MX53_PAD_ATA_DIOW__UART1_TXD,
+-	MX53_PAD_ATA_DMACK__UART1_RXD,
+-
+-	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
+-	MX53_PAD_ATA_DMARQ__UART2_TXD,
+-	MX53_PAD_ATA_DIOR__UART2_RTS,
+-	MX53_PAD_ATA_INTRQ__UART2_CTS,
+-
+-	MX53_PAD_ATA_CS_0__UART3_TXD,
+-	MX53_PAD_ATA_CS_1__UART3_RXD,
+-	MX53_PAD_ATA_DA_1__UART3_CTS,
+-	MX53_PAD_ATA_DA_2__UART3_RTS,
+-};
+-
+-static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
+-	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+ static inline void mx53_loco_init_uart(void)
+ {
+-	imx53_add_imx_uart(0, &mx53_loco_uart_data);
+-	imx53_add_imx_uart(1, &mx53_loco_uart_data);
+-	imx53_add_imx_uart(2, &mx53_loco_uart_data);
++	imx53_add_imx_uart(0, NULL);
+ }
+ 
+ static inline void mx53_loco_fec_reset(void)
+-- 
+1.6.3.3
