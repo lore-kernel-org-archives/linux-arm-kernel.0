@@ -1,48 +1,48 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 27 Jan 2011 12:05:13 -0800
-Subject: [PATCH 0/5] OMAP3EVM: Board bug fixes/enhancements
-In-Reply-To: <19F8576C6E063C45BE387C64729E739404BD7BE82E@dbde02.ent.ti.com>
-	(Vaibhav Hiremath's message of "Fri, 28 Jan 2011 00:16:07 +0530")
-References: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
-	<87pqrinq8x.fsf@ti.com>
-	<19F8576C6E063C45BE387C64729E739404BD7BE82E@dbde02.ent.ti.com>
-Message-ID: <87lj26kt8m.fsf@ti.com>
+Date: Thu, 27 Jan 2011 12:08:16 -0800
+Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+	in board_init
+In-Reply-To: <19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
+	(Vaibhav Hiremath's message of "Tue, 25 Jan 2011 20:58:44 +0530")
+References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
+	<19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
+Message-ID: <87d3nikt3j.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
-
 "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
 
-[...]
-
+>> -----Original Message-----
+>> From: Hiremath, Vaibhav
+>> Sent: Tuesday, January 25, 2011 8:53 PM
+>> To: linux-omap at vger.kernel.org
+>> Cc: Hiremath, Vaibhav; Varadarajan, Charulatha
+>> Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+>> in board_init
 >> 
->> >   OMAP3EVM: Made backlight GPIO default state to off
->> >   OMAP3EVM: Set TSC wakeup option in pad config
+>> With addition of hwmod support to gpio, the ethernet controller
+>> goes undetected for OMAP35xEVM. So explicitly assert the reset signal to
+>> ethernet controller smsc911x -
 >> 
->> And this one doesn't apply as it seems to apply on top of code that
->> doesn't exist upstream.
+>> 	- GPIO7 (>=RevG version of EVM's)
+>> 	- GPIO64 (<=RevD version of EVM's)
 >> 
+>> This patch is based on intial version from Charulatha V, reference
+>> to original discussion -
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
+>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>> Tested-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> Since Kevin reported that this patch doesn't get applied cleanly,
+>> so I am reposting it again after making sure that it gets applied cleanly.
+>> 
+> [Hiremath, Vaibhav] Oops, missed linux-arm-kernel list, adding here.
 >
-> You should first apply Ethernet-reset patch first, and then all
-> patches will get applied cleanly. I have tested it here at my end.
+> Not sure whether I need to repost keeping linux-arm-kernel?
+>
 
-OK, sorry to have missed that one.
-
-In the future, dependencies need to be clearly stated in the patch 0
-cover letter.  When reviewers/maintainers are looking at lots of
-patches, it is not easy to keep context for all the patches and series
-arriving on the list.  Additional information such as dependencies and
-change history are extremely valuable to reviewers & maintainers.
-
-> Since you already acked Ethernet patch, I thought it will make its way
-> to mainline before all these patches. And also while posting, I posted
-> Ethernet patch again first and then this series.
-
-It will likely make it's way upstream sooner since it's a regression
-fix, however, it is not yet queued anywhere so dependencies on it should
-be clearly stated here.
-
-Thanks,
+Also, did you post the smc911x driver fix yet that is needed for testing
+with newer kernels?
 
 Kevin
