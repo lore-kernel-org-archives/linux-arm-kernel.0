@@ -1,486 +1,256 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Jan 2011 12:40:13 +0100
-Subject: [PATCH 4/4] ARM i.MX28: remove reserved register defines
-In-Reply-To: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
-References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1296128413-20778-5-git-send-email-s.hauer@pengutronix.de>
+From: dave.martin@linaro.org (Dave P. Martin)
+Date: Thu, 27 Jan 2011 11:44:31 +0000
+Subject: [PATCH 03/14] ARM: v6k: remove CPU_32v6K dependencies in
+	asm/spinlock.h
+In-Reply-To: <alpine.LFD.2.00.1101261558470.8580@xanadu.home>
+References: <AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
+	<20110125165919.GD17286@n2100.arm.linux.org.uk>
+	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+	<20110125174636.GE17286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
+	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
+	<alpine.LFD.2.00.1101261023470.8580@xanadu.home>
+	<20110126155203.GA10141@n2100.arm.linux.org.uk>
+	<AANLkTikG4bPmesNPvLGt8G+Q8YWwRzyYL3i+uL1FE=K2@mail.gmail.com>
+	<alpine.LFD.2.00.1101261558470.8580@xanadu.home>
+Message-ID: <20110127114431.GA3194@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mxs/regs-clkctrl-mx28.h |  177 ---------------------------------
- 1 files changed, 0 insertions(+), 177 deletions(-)
+On Wed, Jan 26, 2011 at 04:06:40PM -0500, Nicolas Pitre wrote:
+> On Wed, 26 Jan 2011, Dave Martin wrote:
+> 
+> > On Wed, Jan 26, 2011 at 3:52 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > So I don't think weak symbols work like we want them to.
+> > >
+> > 
+> > That was the conclusion I came to also ... the linker seems to resolve
+> > references in each object before discarding sections, so the weak
+> > reference has already become concrete and section discard breaks it.
+> 
+> Well, I must add to the chorus.
+> 
+> And it seems to be impossible to obtain the name of the currently active 
+> section from gas either, which would have made the conditional omission 
+> of the fixup possible, or similar.
+> 
+> Bummer.
+> 
+> 
+> Nicolas
 
-diff --git a/arch/arm/mach-mxs/regs-clkctrl-mx28.h b/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-index 661df18..7d1b061 100644
---- a/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-+++ b/arch/arm/mach-mxs/regs-clkctrl-mx28.h
-@@ -31,10 +31,6 @@
- #define HW_CLKCTRL_PLL0CTRL0_CLR	(0x00000008)
- #define HW_CLKCTRL_PLL0CTRL0_TOG	(0x0000000c)
- 
--#define BP_CLKCTRL_PLL0CTRL0_RSRVD6	30
--#define BM_CLKCTRL_PLL0CTRL0_RSRVD6	0xC0000000
--#define BF_CLKCTRL_PLL0CTRL0_RSRVD6(v) \
--		(((v) << 30) & BM_CLKCTRL_PLL0CTRL0_RSRVD6)
- #define BP_CLKCTRL_PLL0CTRL0_LFR_SEL	28
- #define BM_CLKCTRL_PLL0CTRL0_LFR_SEL	0x30000000
- #define BF_CLKCTRL_PLL0CTRL0_LFR_SEL(v)  \
-@@ -43,10 +39,6 @@
- #define BV_CLKCTRL_PLL0CTRL0_LFR_SEL__TIMES_2   0x1
- #define BV_CLKCTRL_PLL0CTRL0_LFR_SEL__TIMES_05  0x2
- #define BV_CLKCTRL_PLL0CTRL0_LFR_SEL__UNDEFINED 0x3
--#define BP_CLKCTRL_PLL0CTRL0_RSRVD5	26
--#define BM_CLKCTRL_PLL0CTRL0_RSRVD5	0x0C000000
--#define BF_CLKCTRL_PLL0CTRL0_RSRVD5(v)  \
--		(((v) << 26) & BM_CLKCTRL_PLL0CTRL0_RSRVD5)
- #define BP_CLKCTRL_PLL0CTRL0_CP_SEL	24
- #define BM_CLKCTRL_PLL0CTRL0_CP_SEL	0x03000000
- #define BF_CLKCTRL_PLL0CTRL0_CP_SEL(v)  \
-@@ -55,10 +47,6 @@
- #define BV_CLKCTRL_PLL0CTRL0_CP_SEL__TIMES_2   0x1
- #define BV_CLKCTRL_PLL0CTRL0_CP_SEL__TIMES_05  0x2
- #define BV_CLKCTRL_PLL0CTRL0_CP_SEL__UNDEFINED 0x3
--#define BP_CLKCTRL_PLL0CTRL0_RSRVD4	22
--#define BM_CLKCTRL_PLL0CTRL0_RSRVD4	0x00C00000
--#define BF_CLKCTRL_PLL0CTRL0_RSRVD4(v)  \
--		(((v) << 22) & BM_CLKCTRL_PLL0CTRL0_RSRVD4)
- #define BP_CLKCTRL_PLL0CTRL0_DIV_SEL	20
- #define BM_CLKCTRL_PLL0CTRL0_DIV_SEL	0x00300000
- #define BF_CLKCTRL_PLL0CTRL0_DIV_SEL(v)  \
-@@ -67,22 +55,13 @@
- #define BV_CLKCTRL_PLL0CTRL0_DIV_SEL__LOWER     0x1
- #define BV_CLKCTRL_PLL0CTRL0_DIV_SEL__LOWEST    0x2
- #define BV_CLKCTRL_PLL0CTRL0_DIV_SEL__UNDEFINED 0x3
--#define BM_CLKCTRL_PLL0CTRL0_RSRVD3	0x00080000
- #define BM_CLKCTRL_PLL0CTRL0_EN_USB_CLKS	0x00040000
- #define BM_CLKCTRL_PLL0CTRL0_POWER	0x00020000
--#define BP_CLKCTRL_PLL0CTRL0_RSRVD1	0
--#define BM_CLKCTRL_PLL0CTRL0_RSRVD1	0x0001FFFF
--#define BF_CLKCTRL_PLL0CTRL0_RSRVD1(v)  \
--		(((v) << 0) & BM_CLKCTRL_PLL0CTRL0_RSRVD1)
- 
- #define HW_CLKCTRL_PLL0CTRL1	(0x00000010)
- 
- #define BM_CLKCTRL_PLL0CTRL1_LOCK	0x80000000
- #define BM_CLKCTRL_PLL0CTRL1_FORCE_LOCK	0x40000000
--#define BP_CLKCTRL_PLL0CTRL1_RSRVD1	16
--#define BM_CLKCTRL_PLL0CTRL1_RSRVD1	0x3FFF0000
--#define BF_CLKCTRL_PLL0CTRL1_RSRVD1(v)  \
--		(((v) << 16) & BM_CLKCTRL_PLL0CTRL1_RSRVD1)
- #define BP_CLKCTRL_PLL0CTRL1_LOCK_COUNT	0
- #define BM_CLKCTRL_PLL0CTRL1_LOCK_COUNT	0x0000FFFF
- #define BF_CLKCTRL_PLL0CTRL1_LOCK_COUNT(v)  \
-@@ -94,7 +73,6 @@
- #define HW_CLKCTRL_PLL1CTRL0_TOG	(0x0000002c)
- 
- #define BM_CLKCTRL_PLL1CTRL0_CLKGATEEMI	0x80000000
--#define BM_CLKCTRL_PLL1CTRL0_RSRVD6	0x40000000
- #define BP_CLKCTRL_PLL1CTRL0_LFR_SEL	28
- #define BM_CLKCTRL_PLL1CTRL0_LFR_SEL	0x30000000
- #define BF_CLKCTRL_PLL1CTRL0_LFR_SEL(v)  \
-@@ -103,10 +81,6 @@
- #define BV_CLKCTRL_PLL1CTRL0_LFR_SEL__TIMES_2   0x1
- #define BV_CLKCTRL_PLL1CTRL0_LFR_SEL__TIMES_05  0x2
- #define BV_CLKCTRL_PLL1CTRL0_LFR_SEL__UNDEFINED 0x3
--#define BP_CLKCTRL_PLL1CTRL0_RSRVD5	26
--#define BM_CLKCTRL_PLL1CTRL0_RSRVD5	0x0C000000
--#define BF_CLKCTRL_PLL1CTRL0_RSRVD5(v)  \
--		(((v) << 26) & BM_CLKCTRL_PLL1CTRL0_RSRVD5)
- #define BP_CLKCTRL_PLL1CTRL0_CP_SEL	24
- #define BM_CLKCTRL_PLL1CTRL0_CP_SEL	0x03000000
- #define BF_CLKCTRL_PLL1CTRL0_CP_SEL(v)  \
-@@ -115,10 +89,6 @@
- #define BV_CLKCTRL_PLL1CTRL0_CP_SEL__TIMES_2   0x1
- #define BV_CLKCTRL_PLL1CTRL0_CP_SEL__TIMES_05  0x2
- #define BV_CLKCTRL_PLL1CTRL0_CP_SEL__UNDEFINED 0x3
--#define BP_CLKCTRL_PLL1CTRL0_RSRVD4	22
--#define BM_CLKCTRL_PLL1CTRL0_RSRVD4	0x00C00000
--#define BF_CLKCTRL_PLL1CTRL0_RSRVD4(v)  \
--		(((v) << 22) & BM_CLKCTRL_PLL1CTRL0_RSRVD4)
- #define BP_CLKCTRL_PLL1CTRL0_DIV_SEL	20
- #define BM_CLKCTRL_PLL1CTRL0_DIV_SEL	0x00300000
- #define BF_CLKCTRL_PLL1CTRL0_DIV_SEL(v)  \
-@@ -127,22 +97,13 @@
- #define BV_CLKCTRL_PLL1CTRL0_DIV_SEL__LOWER     0x1
- #define BV_CLKCTRL_PLL1CTRL0_DIV_SEL__LOWEST    0x2
- #define BV_CLKCTRL_PLL1CTRL0_DIV_SEL__UNDEFINED 0x3
--#define BM_CLKCTRL_PLL1CTRL0_RSRVD3	0x00080000
- #define BM_CLKCTRL_PLL1CTRL0_EN_USB_CLKS	0x00040000
- #define BM_CLKCTRL_PLL1CTRL0_POWER	0x00020000
--#define BP_CLKCTRL_PLL1CTRL0_RSRVD1	0
--#define BM_CLKCTRL_PLL1CTRL0_RSRVD1	0x0001FFFF
--#define BF_CLKCTRL_PLL1CTRL0_RSRVD1(v)  \
--		(((v) << 0) & BM_CLKCTRL_PLL1CTRL0_RSRVD1)
- 
- #define HW_CLKCTRL_PLL1CTRL1	(0x00000030)
- 
- #define BM_CLKCTRL_PLL1CTRL1_LOCK	0x80000000
- #define BM_CLKCTRL_PLL1CTRL1_FORCE_LOCK	0x40000000
--#define BP_CLKCTRL_PLL1CTRL1_RSRVD1	16
--#define BM_CLKCTRL_PLL1CTRL1_RSRVD1	0x3FFF0000
--#define BF_CLKCTRL_PLL1CTRL1_RSRVD1(v)  \
--		(((v) << 16) & BM_CLKCTRL_PLL1CTRL1_RSRVD1)
- #define BP_CLKCTRL_PLL1CTRL1_LOCK_COUNT	0
- #define BM_CLKCTRL_PLL1CTRL1_LOCK_COUNT	0x0000FFFF
- #define BF_CLKCTRL_PLL1CTRL1_LOCK_COUNT(v)  \
-@@ -154,51 +115,31 @@
- #define HW_CLKCTRL_PLL2CTRL0_TOG	(0x0000004c)
- 
- #define BM_CLKCTRL_PLL2CTRL0_CLKGATE	0x80000000
--#define BM_CLKCTRL_PLL2CTRL0_RSRVD3	0x40000000
- #define BP_CLKCTRL_PLL2CTRL0_LFR_SEL	28
- #define BM_CLKCTRL_PLL2CTRL0_LFR_SEL	0x30000000
- #define BF_CLKCTRL_PLL2CTRL0_LFR_SEL(v)  \
- 		(((v) << 28) & BM_CLKCTRL_PLL2CTRL0_LFR_SEL)
--#define BM_CLKCTRL_PLL2CTRL0_RSRVD2	0x08000000
- #define BM_CLKCTRL_PLL2CTRL0_HOLD_RING_OFF_B	0x04000000
- #define BP_CLKCTRL_PLL2CTRL0_CP_SEL	24
- #define BM_CLKCTRL_PLL2CTRL0_CP_SEL	0x03000000
- #define BF_CLKCTRL_PLL2CTRL0_CP_SEL(v)  \
- 		(((v) << 24) & BM_CLKCTRL_PLL2CTRL0_CP_SEL)
- #define BM_CLKCTRL_PLL2CTRL0_POWER	0x00800000
--#define BP_CLKCTRL_PLL2CTRL0_RSRVD1	0
--#define BM_CLKCTRL_PLL2CTRL0_RSRVD1	0x007FFFFF
--#define BF_CLKCTRL_PLL2CTRL0_RSRVD1(v)  \
--		(((v) << 0) & BM_CLKCTRL_PLL2CTRL0_RSRVD1)
- 
- #define HW_CLKCTRL_CPU	(0x00000050)
- #define HW_CLKCTRL_CPU_SET	(0x00000054)
- #define HW_CLKCTRL_CPU_CLR	(0x00000058)
- #define HW_CLKCTRL_CPU_TOG	(0x0000005c)
- 
--#define BP_CLKCTRL_CPU_RSRVD5	30
--#define BM_CLKCTRL_CPU_RSRVD5	0xC0000000
--#define BF_CLKCTRL_CPU_RSRVD5(v) \
--		(((v) << 30) & BM_CLKCTRL_CPU_RSRVD5)
- #define BM_CLKCTRL_CPU_BUSY_REF_XTAL	0x20000000
- #define BM_CLKCTRL_CPU_BUSY_REF_CPU	0x10000000
--#define BM_CLKCTRL_CPU_RSRVD4	0x08000000
- #define BM_CLKCTRL_CPU_DIV_XTAL_FRAC_EN	0x04000000
- #define BP_CLKCTRL_CPU_DIV_XTAL	16
- #define BM_CLKCTRL_CPU_DIV_XTAL	0x03FF0000
- #define BF_CLKCTRL_CPU_DIV_XTAL(v)  \
- 		(((v) << 16) & BM_CLKCTRL_CPU_DIV_XTAL)
--#define BP_CLKCTRL_CPU_RSRVD3	13
--#define BM_CLKCTRL_CPU_RSRVD3	0x0000E000
--#define BF_CLKCTRL_CPU_RSRVD3(v)  \
--		(((v) << 13) & BM_CLKCTRL_CPU_RSRVD3)
- #define BM_CLKCTRL_CPU_INTERRUPT_WAIT	0x00001000
--#define BM_CLKCTRL_CPU_RSRVD2	0x00000800
- #define BM_CLKCTRL_CPU_DIV_CPU_FRAC_EN	0x00000400
--#define BP_CLKCTRL_CPU_RSRVD1	6
--#define BM_CLKCTRL_CPU_RSRVD1	0x000003C0
--#define BF_CLKCTRL_CPU_RSRVD1(v)  \
--		(((v) << 6) & BM_CLKCTRL_CPU_RSRVD1)
- #define BP_CLKCTRL_CPU_DIV_CPU	0
- #define BM_CLKCTRL_CPU_DIV_CPU	0x0000003F
- #define BF_CLKCTRL_CPU_DIV_CPU(v)  \
-@@ -212,7 +153,6 @@
- #define BM_CLKCTRL_HBUS_ASM_BUSY	0x80000000
- #define BM_CLKCTRL_HBUS_DCP_AS_ENABLE	0x40000000
- #define BM_CLKCTRL_HBUS_PXP_AS_ENABLE	0x20000000
--#define BM_CLKCTRL_HBUS_RSRVD2	0x10000000
- #define BM_CLKCTRL_HBUS_ASM_EMIPORT_AS_ENABLE	0x08000000
- #define BM_CLKCTRL_HBUS_APBHDMA_AS_ENABLE	0x04000000
- #define BM_CLKCTRL_HBUS_APBXDMA_AS_ENABLE	0x02000000
-@@ -232,10 +172,6 @@
- #define BV_CLKCTRL_HBUS_SLOW_DIV__BY8  0x3
- #define BV_CLKCTRL_HBUS_SLOW_DIV__BY16 0x4
- #define BV_CLKCTRL_HBUS_SLOW_DIV__BY32 0x5
--#define BP_CLKCTRL_HBUS_RSRVD1	6
--#define BM_CLKCTRL_HBUS_RSRVD1	0x0000FFC0
--#define BF_CLKCTRL_HBUS_RSRVD1(v)  \
--		(((v) << 6) & BM_CLKCTRL_HBUS_RSRVD1)
- #define BM_CLKCTRL_HBUS_DIV_FRAC_EN	0x00000020
- #define BP_CLKCTRL_HBUS_DIV	0
- #define BM_CLKCTRL_HBUS_DIV	0x0000001F
-@@ -245,10 +181,6 @@
- #define HW_CLKCTRL_XBUS	(0x00000070)
- 
- #define BM_CLKCTRL_XBUS_BUSY	0x80000000
--#define BP_CLKCTRL_XBUS_RSRVD1	12
--#define BM_CLKCTRL_XBUS_RSRVD1	0x7FFFF000
--#define BF_CLKCTRL_XBUS_RSRVD1(v)  \
--		(((v) << 12) & BM_CLKCTRL_XBUS_RSRVD1)
- #define BM_CLKCTRL_XBUS_AUTO_CLEAR_DIV_ENABLE	0x00000800
- #define BM_CLKCTRL_XBUS_DIV_FRAC_EN	0x00000400
- #define BP_CLKCTRL_XBUS_DIV	0
-@@ -263,19 +195,10 @@
- 
- #define BP_CLKCTRL_XTAL_UART_CLK_GATE	31
- #define BM_CLKCTRL_XTAL_UART_CLK_GATE	0x80000000
--#define BM_CLKCTRL_XTAL_RSRVD3	0x40000000
- #define BP_CLKCTRL_XTAL_PWM_CLK24M_GATE	29
- #define BM_CLKCTRL_XTAL_PWM_CLK24M_GATE	0x20000000
--#define BP_CLKCTRL_XTAL_RSRVD2	27
--#define BM_CLKCTRL_XTAL_RSRVD2	0x18000000
--#define BF_CLKCTRL_XTAL_RSRVD2(v)  \
--		(((v) << 27) & BM_CLKCTRL_XTAL_RSRVD2)
- #define BP_CLKCTRL_XTAL_TIMROT_CLK32K_GATE	26
- #define BM_CLKCTRL_XTAL_TIMROT_CLK32K_GATE	0x04000000
--#define BP_CLKCTRL_XTAL_RSRVD1	2
--#define BM_CLKCTRL_XTAL_RSRVD1	0x03FFFFFC
--#define BF_CLKCTRL_XTAL_RSRVD1(v)  \
--		(((v) << 2) & BM_CLKCTRL_XTAL_RSRVD1)
- #define BP_CLKCTRL_XTAL_DIV_UART	0
- #define BM_CLKCTRL_XTAL_DIV_UART	0x00000003
- #define BF_CLKCTRL_XTAL_DIV_UART(v)  \
-@@ -285,12 +208,7 @@
- 
- #define BP_CLKCTRL_SSP0_CLKGATE	31
- #define BM_CLKCTRL_SSP0_CLKGATE	0x80000000
--#define BM_CLKCTRL_SSP0_RSRVD2	0x40000000
- #define BM_CLKCTRL_SSP0_BUSY	0x20000000
--#define BP_CLKCTRL_SSP0_RSRVD1	10
--#define BM_CLKCTRL_SSP0_RSRVD1	0x1FFFFC00
--#define BF_CLKCTRL_SSP0_RSRVD1(v)  \
--		(((v) << 10) & BM_CLKCTRL_SSP0_RSRVD1)
- #define BM_CLKCTRL_SSP0_DIV_FRAC_EN	0x00000200
- #define BP_CLKCTRL_SSP0_DIV	0
- #define BM_CLKCTRL_SSP0_DIV	0x000001FF
-@@ -301,12 +219,7 @@
- 
- #define BP_CLKCTRL_SSP1_CLKGATE	31
- #define BM_CLKCTRL_SSP1_CLKGATE	0x80000000
--#define BM_CLKCTRL_SSP1_RSRVD2	0x40000000
- #define BM_CLKCTRL_SSP1_BUSY	0x20000000
--#define BP_CLKCTRL_SSP1_RSRVD1	10
--#define BM_CLKCTRL_SSP1_RSRVD1	0x1FFFFC00
--#define BF_CLKCTRL_SSP1_RSRVD1(v)  \
--		(((v) << 10) & BM_CLKCTRL_SSP1_RSRVD1)
- #define BM_CLKCTRL_SSP1_DIV_FRAC_EN	0x00000200
- #define BP_CLKCTRL_SSP1_DIV	0
- #define BM_CLKCTRL_SSP1_DIV	0x000001FF
-@@ -317,12 +230,7 @@
- 
- #define BP_CLKCTRL_SSP2_CLKGATE	31
- #define BM_CLKCTRL_SSP2_CLKGATE	0x80000000
--#define BM_CLKCTRL_SSP2_RSRVD2	0x40000000
- #define BM_CLKCTRL_SSP2_BUSY	0x20000000
--#define BP_CLKCTRL_SSP2_RSRVD1	10
--#define BM_CLKCTRL_SSP2_RSRVD1	0x1FFFFC00
--#define BF_CLKCTRL_SSP2_RSRVD1(v)  \
--		(((v) << 10) & BM_CLKCTRL_SSP2_RSRVD1)
- #define BM_CLKCTRL_SSP2_DIV_FRAC_EN	0x00000200
- #define BP_CLKCTRL_SSP2_DIV	0
- #define BM_CLKCTRL_SSP2_DIV	0x000001FF
-@@ -333,12 +241,7 @@
- 
- #define BP_CLKCTRL_SSP3_CLKGATE	31
- #define BM_CLKCTRL_SSP3_CLKGATE	0x80000000
--#define BM_CLKCTRL_SSP3_RSRVD2	0x40000000
- #define BM_CLKCTRL_SSP3_BUSY	0x20000000
--#define BP_CLKCTRL_SSP3_RSRVD1	10
--#define BM_CLKCTRL_SSP3_RSRVD1	0x1FFFFC00
--#define BF_CLKCTRL_SSP3_RSRVD1(v)  \
--		(((v) << 10) & BM_CLKCTRL_SSP3_RSRVD1)
- #define BM_CLKCTRL_SSP3_DIV_FRAC_EN	0x00000200
- #define BP_CLKCTRL_SSP3_DIV	0
- #define BM_CLKCTRL_SSP3_DIV	0x000001FF
-@@ -349,12 +252,7 @@
- 
- #define BP_CLKCTRL_GPMI_CLKGATE	31
- #define BM_CLKCTRL_GPMI_CLKGATE	0x80000000
--#define BM_CLKCTRL_GPMI_RSRVD2	0x40000000
- #define BM_CLKCTRL_GPMI_BUSY	0x20000000
--#define BP_CLKCTRL_GPMI_RSRVD1	11
--#define BM_CLKCTRL_GPMI_RSRVD1	0x1FFFF800
--#define BF_CLKCTRL_GPMI_RSRVD1(v)  \
--		(((v) << 11) & BM_CLKCTRL_GPMI_RSRVD1)
- #define BM_CLKCTRL_GPMI_DIV_FRAC_EN	0x00000400
- #define BP_CLKCTRL_GPMI_DIV	0
- #define BM_CLKCTRL_GPMI_DIV	0x000003FF
-@@ -365,10 +263,6 @@
- 
- #define BP_CLKCTRL_SPDIF_CLKGATE	31
- #define BM_CLKCTRL_SPDIF_CLKGATE	0x80000000
--#define BP_CLKCTRL_SPDIF_RSRVD	0
--#define BM_CLKCTRL_SPDIF_RSRVD	0x7FFFFFFF
--#define BF_CLKCTRL_SPDIF_RSRVD(v)  \
--		(((v) << 0) & BM_CLKCTRL_SPDIF_RSRVD)
- 
- #define HW_CLKCTRL_EMI	(0x000000f0)
- 
-@@ -379,24 +273,12 @@
- #define BM_CLKCTRL_EMI_BUSY_REF_EMI	0x10000000
- #define BM_CLKCTRL_EMI_BUSY_REF_CPU	0x08000000
- #define BM_CLKCTRL_EMI_BUSY_SYNC_MODE	0x04000000
--#define BP_CLKCTRL_EMI_RSRVD3	18
--#define BM_CLKCTRL_EMI_RSRVD3	0x03FC0000
--#define BF_CLKCTRL_EMI_RSRVD3(v)  \
--		(((v) << 18) & BM_CLKCTRL_EMI_RSRVD3)
- #define BM_CLKCTRL_EMI_BUSY_DCC_RESYNC	0x00020000
- #define BM_CLKCTRL_EMI_DCC_RESYNC_ENABLE	0x00010000
--#define BP_CLKCTRL_EMI_RSRVD2	12
--#define BM_CLKCTRL_EMI_RSRVD2	0x0000F000
--#define BF_CLKCTRL_EMI_RSRVD2(v)  \
--		(((v) << 12) & BM_CLKCTRL_EMI_RSRVD2)
- #define BP_CLKCTRL_EMI_DIV_XTAL	8
- #define BM_CLKCTRL_EMI_DIV_XTAL	0x00000F00
- #define BF_CLKCTRL_EMI_DIV_XTAL(v)  \
- 		(((v) << 8) & BM_CLKCTRL_EMI_DIV_XTAL)
--#define BP_CLKCTRL_EMI_RSRVD1	6
--#define BM_CLKCTRL_EMI_RSRVD1	0x000000C0
--#define BF_CLKCTRL_EMI_RSRVD1(v)  \
--		(((v) << 6) & BM_CLKCTRL_EMI_RSRVD1)
- #define BP_CLKCTRL_EMI_DIV_EMI	0
- #define BM_CLKCTRL_EMI_DIV_EMI	0x0000003F
- #define BF_CLKCTRL_EMI_DIV_EMI(v)  \
-@@ -406,12 +288,7 @@
- 
- #define BP_CLKCTRL_SAIF0_CLKGATE	31
- #define BM_CLKCTRL_SAIF0_CLKGATE	0x80000000
--#define BM_CLKCTRL_SAIF0_RSRVD2	0x40000000
- #define BM_CLKCTRL_SAIF0_BUSY	0x20000000
--#define BP_CLKCTRL_SAIF0_RSRVD1	17
--#define BM_CLKCTRL_SAIF0_RSRVD1	0x1FFE0000
--#define BF_CLKCTRL_SAIF0_RSRVD1(v)  \
--		(((v) << 17) & BM_CLKCTRL_SAIF0_RSRVD1)
- #define BM_CLKCTRL_SAIF0_DIV_FRAC_EN	0x00010000
- #define BP_CLKCTRL_SAIF0_DIV	0
- #define BM_CLKCTRL_SAIF0_DIV	0x0000FFFF
-@@ -422,12 +299,7 @@
- 
- #define BP_CLKCTRL_SAIF1_CLKGATE	31
- #define BM_CLKCTRL_SAIF1_CLKGATE	0x80000000
--#define BM_CLKCTRL_SAIF1_RSRVD2	0x40000000
- #define BM_CLKCTRL_SAIF1_BUSY	0x20000000
--#define BP_CLKCTRL_SAIF1_RSRVD1	17
--#define BM_CLKCTRL_SAIF1_RSRVD1	0x1FFE0000
--#define BF_CLKCTRL_SAIF1_RSRVD1(v)  \
--		(((v) << 17) & BM_CLKCTRL_SAIF1_RSRVD1)
- #define BM_CLKCTRL_SAIF1_DIV_FRAC_EN	0x00010000
- #define BP_CLKCTRL_SAIF1_DIV	0
- #define BM_CLKCTRL_SAIF1_DIV	0x0000FFFF
-@@ -438,12 +310,7 @@
- 
- #define BP_CLKCTRL_DIS_LCDIF_CLKGATE	31
- #define BM_CLKCTRL_DIS_LCDIF_CLKGATE	0x80000000
--#define BM_CLKCTRL_DIS_LCDIF_RSRVD2	0x40000000
- #define BM_CLKCTRL_DIS_LCDIF_BUSY	0x20000000
--#define BP_CLKCTRL_DIS_LCDIF_RSRVD1	14
--#define BM_CLKCTRL_DIS_LCDIF_RSRVD1	0x1FFFC000
--#define BF_CLKCTRL_DIS_LCDIF_RSRVD1(v)  \
--		(((v) << 14) & BM_CLKCTRL_DIS_LCDIF_RSRVD1)
- #define BM_CLKCTRL_DIS_LCDIF_DIV_FRAC_EN	0x00002000
- #define BP_CLKCTRL_DIS_LCDIF_DIV	0
- #define BM_CLKCTRL_DIS_LCDIF_DIV	0x00001FFF
-@@ -453,12 +320,7 @@
- #define HW_CLKCTRL_ETM	(0x00000130)
- 
- #define BM_CLKCTRL_ETM_CLKGATE	0x80000000
--#define BM_CLKCTRL_ETM_RSRVD2	0x40000000
- #define BM_CLKCTRL_ETM_BUSY	0x20000000
--#define BP_CLKCTRL_ETM_RSRVD1	8
--#define BM_CLKCTRL_ETM_RSRVD1	0x1FFFFF00
--#define BF_CLKCTRL_ETM_RSRVD1(v)  \
--		(((v) << 8) & BM_CLKCTRL_ETM_RSRVD1)
- #define BM_CLKCTRL_ETM_DIV_FRAC_EN	0x00000080
- #define BP_CLKCTRL_ETM_DIV	0
- #define BM_CLKCTRL_ETM_DIV	0x0000007F
-@@ -471,7 +333,6 @@
- #define BP_CLKCTRL_ENET_DISABLE	30
- #define BM_CLKCTRL_ENET_DISABLE	0x40000000
- #define BM_CLKCTRL_ENET_STATUS	0x20000000
--#define BM_CLKCTRL_ENET_RSRVD1	0x10000000
- #define BM_CLKCTRL_ENET_BUSY_TIME	0x08000000
- #define BP_CLKCTRL_ENET_DIV_TIME	21
- #define BM_CLKCTRL_ENET_DIV_TIME	0x07E00000
-@@ -493,37 +354,23 @@
- #define BM_CLKCTRL_ENET_CLK_OUT_EN	0x00040000
- #define BM_CLKCTRL_ENET_RESET_BY_SW_CHIP	0x00020000
- #define BM_CLKCTRL_ENET_RESET_BY_SW	0x00010000
--#define BP_CLKCTRL_ENET_RSRVD0	0
--#define BM_CLKCTRL_ENET_RSRVD0	0x0000FFFF
--#define BF_CLKCTRL_ENET_RSRVD0(v)  \
--		(((v) << 0) & BM_CLKCTRL_ENET_RSRVD0)
- 
- #define HW_CLKCTRL_HSADC	(0x00000150)
- 
--#define BM_CLKCTRL_HSADC_RSRVD2	0x80000000
- #define BM_CLKCTRL_HSADC_RESETB	0x40000000
- #define BP_CLKCTRL_HSADC_FREQDIV	28
- #define BM_CLKCTRL_HSADC_FREQDIV	0x30000000
- #define BF_CLKCTRL_HSADC_FREQDIV(v)  \
- 		(((v) << 28) & BM_CLKCTRL_HSADC_FREQDIV)
--#define BP_CLKCTRL_HSADC_RSRVD1	0
--#define BM_CLKCTRL_HSADC_RSRVD1	0x0FFFFFFF
--#define BF_CLKCTRL_HSADC_RSRVD1(v)  \
--		(((v) << 0) & BM_CLKCTRL_HSADC_RSRVD1)
- 
- #define HW_CLKCTRL_FLEXCAN	(0x00000160)
- 
--#define BM_CLKCTRL_FLEXCAN_RSRVD2	0x80000000
- #define BP_CLKCTRL_FLEXCAN_STOP_CAN0	30
- #define BM_CLKCTRL_FLEXCAN_STOP_CAN0	0x40000000
- #define BM_CLKCTRL_FLEXCAN_CAN0_STATUS	0x20000000
- #define BP_CLKCTRL_FLEXCAN_STOP_CAN1	28
- #define BM_CLKCTRL_FLEXCAN_STOP_CAN1	0x10000000
- #define BM_CLKCTRL_FLEXCAN_CAN1_STATUS	0x08000000
--#define BP_CLKCTRL_FLEXCAN_RSRVD1	0
--#define BM_CLKCTRL_FLEXCAN_RSRVD1	0x07FFFFFF
--#define BF_CLKCTRL_FLEXCAN_RSRVD1(v)  \
--		(((v) << 0) & BM_CLKCTRL_FLEXCAN_RSRVD1)
- 
- #define HW_CLKCTRL_FRAC0	(0x000001b0)
- #define HW_CLKCTRL_FRAC0_SET	(0x000001b4)
-@@ -564,10 +411,6 @@
- #define HW_CLKCTRL_FRAC1_CLR	(0x000001c8)
- #define HW_CLKCTRL_FRAC1_TOG	(0x000001cc)
- 
--#define BP_CLKCTRL_FRAC1_RSRVD2	24
--#define BM_CLKCTRL_FRAC1_RSRVD2	0xFF000000
--#define BF_CLKCTRL_FRAC1_RSRVD2(v) \
--		(((v) << 24) & BM_CLKCTRL_FRAC1_RSRVD2)
- #define BP_CLKCTRL_FRAC1_CLKGATEGPMI	23
- #define BM_CLKCTRL_FRAC1_CLKGATEGPMI	0x00800000
- #define BM_CLKCTRL_FRAC1_GPMI_STABLE	0x00400000
-@@ -595,22 +438,10 @@
- #define HW_CLKCTRL_CLKSEQ_CLR	(0x000001d8)
- #define HW_CLKCTRL_CLKSEQ_TOG	(0x000001dc)
- 
--#define BP_CLKCTRL_CLKSEQ_RSRVD0	19
--#define BM_CLKCTRL_CLKSEQ_RSRVD0	0xFFF80000
--#define BF_CLKCTRL_CLKSEQ_RSRVD0(v) \
--		(((v) << 19) & BM_CLKCTRL_CLKSEQ_RSRVD0)
- #define BM_CLKCTRL_CLKSEQ_BYPASS_CPU	0x00040000
--#define BP_CLKCTRL_CLKSEQ_RSRVD1	15
--#define BM_CLKCTRL_CLKSEQ_RSRVD1	0x00038000
--#define BF_CLKCTRL_CLKSEQ_RSRVD1(v)  \
--		(((v) << 15) & BM_CLKCTRL_CLKSEQ_RSRVD1)
- #define BM_CLKCTRL_CLKSEQ_BYPASS_DIS_LCDIF	0x00004000
- #define BV_CLKCTRL_CLKSEQ_BYPASS_DIS_LCDIF__BYPASS 0x1
- #define BV_CLKCTRL_CLKSEQ_BYPASS_DIS_LCDIF__PFD    0x0
--#define BP_CLKCTRL_CLKSEQ_RSRVD2	9
--#define BM_CLKCTRL_CLKSEQ_RSRVD2	0x00003E00
--#define BF_CLKCTRL_CLKSEQ_RSRVD2(v)  \
--		(((v) << 9) & BM_CLKCTRL_CLKSEQ_RSRVD2)
- #define BM_CLKCTRL_CLKSEQ_BYPASS_ETM	0x00000100
- #define BM_CLKCTRL_CLKSEQ_BYPASS_EMI	0x00000080
- #define BM_CLKCTRL_CLKSEQ_BYPASS_SSP3	0x00000040
-@@ -623,10 +454,6 @@
- 
- #define HW_CLKCTRL_RESET	(0x000001e0)
- 
--#define BP_CLKCTRL_RESET_RSRVD	6
--#define BM_CLKCTRL_RESET_RSRVD	0xFFFFFFC0
--#define BF_CLKCTRL_RESET_RSRVD(v) \
--		(((v) << 6) & BM_CLKCTRL_RESET_RSRVD)
- #define BM_CLKCTRL_RESET_WDOG_POR_DISABLE	0x00000020
- #define BM_CLKCTRL_RESET_EXTERNAL_RESET_ENABLE	0x00000010
- #define BM_CLKCTRL_RESET_THERMAL_RESET_ENABLE	0x00000008
-@@ -640,10 +467,6 @@
- #define BM_CLKCTRL_STATUS_CPU_LIMIT	0xC0000000
- #define BF_CLKCTRL_STATUS_CPU_LIMIT(v) \
- 		(((v) << 30) & BM_CLKCTRL_STATUS_CPU_LIMIT)
--#define BP_CLKCTRL_STATUS_RSRVD	0
--#define BM_CLKCTRL_STATUS_RSRVD	0x3FFFFFFF
--#define BF_CLKCTRL_STATUS_RSRVD(v)  \
--		(((v) << 0) & BM_CLKCTRL_STATUS_RSRVD)
- 
- #define HW_CLKCTRL_VERSION	(0x00000200)
- 
--- 
-1.7.2.3
+I've achieved this sort of thing in the past by wrapping the assmbler.
+It's not pretty though, and it's unlikely anyone would be interested
+in merging such a thing...
+
+The example below is really a hack and won't work well in the the
+presence of macros or conditional assembler.  However, since gcc output
+contains none of either except in inline asm, you can get away with
+a surprising amount.
+
+If it needed to be robust this could mostly be implemented in 
+assembler macros, but the need to hook things like .section, combined
+with gas's refusal to redefine existing directives, means that you
+would have a run a script over the input first, to translate .section
+and friends into something you can hook.
+
+And implementing anything non-trivial with assembler macros, while
+almost always possible (unlike crippled cpp) gets very painful and
+confusing...
+
+Cheers
+---Dave
+
+$ chmod +x gasfilter filt-as
+$ PATH=$PWD:$PATH
+$ arm-linux-gnueabi-gcc -wrapper $PWD/filt-as -c tst.s
+$ arm-linux-gnueabi-objdump -dsh tst.o
+
+tst.o:     file format elf32-littlearm
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         00000004  00000000  00000000  00000034  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .data         00000000  00000000  00000000  00000038  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .bss          00000000  00000000  00000000  00000038  2**0
+                  ALLOC
+  3 .text.fixup   00000004  00000000  00000000  00000038  2**0
+                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
+  4 .text.init    00000008  00000000  00000000  0000003c  2**0
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  5 .text.init.fixup 00000004  00000000  00000000  00000044  2**0
+                  CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
+  6 .ARM.attributes 00000021  00000000  00000000  00000048  2**0
+                  CONTENTS, READONLY
+Contents of section .text:
+ 0000 00f020e3                             .. .            
+Contents of section .text.fixup:
+ 0000 00000000                             ....            
+Contents of section .text.init:
+ 0000 00f020e3 00f020e3                    .. ... .        
+Contents of section .text.init.fixup:
+ 0000 04000000                             ....            
+Contents of section .ARM.attributes:
+ 0000 41200000 00616561 62690001 16000000  A ...aeabi......
+ 0010 05372d41 00060a07 41080109 020a042c  .7-A....A......,
+ 0020 01                                   .               
+
+Disassembly of section .text:
+
+00000000 <main>:
+   0:	e320f000 	nop	{0}
+
+Disassembly of section .text.fixup:
+
+00000000 <.text.fixup>:
+   0:	00000000 	.word	0x00000000
+
+Disassembly of section .text.init:
+
+00000000 <init>:
+   0:	e320f000 	nop	{0}
+
+00000004 <__fixup_3>:
+   4:	e320f000 	nop	{0}
+
+Disassembly of section .text.init.fixup:
+
+00000000 <.text.init.fixup>:
+   0:	00000004 	.word	0x00000004
+
+diff -Nur filt-as filt-as
+--- filt-as	1970-01-01 01:00:00.000000000 +0100
++++ filt-as	2011-01-27 11:30:11.858552002 +0000
+@@ -0,0 +1,30 @@
++#!/bin/sh
++
++case "$1" in
++	as|*/as|*-as) ;;
++	*) exec "$@"
++esac
++
++real_as=$1
++shift
++
++out=a.out
++in=-
++
++while [ $# != 0 ]; do
++	case "$1" in
++		-o)
++			out=$2
++			shift
++			;;
++		*.s)
++			in=$1
++			;;
++		*)
++			args=$args\ $1
++	esac
++	shift
++done
++
++gasfilter <"$in" \
++| "$real_as" $args -o "$out"
+diff -Nur gasfilter gasfilter
+--- gasfilter	1970-01-01 01:00:00.000000000 +0100
++++ gasfilter	2011-01-27 11:10:01.478552002 +0000
+@@ -0,0 +1,68 @@
++#!/usr/bin/perl
++
++use strict;
++
++my $xpushsection_defined;
++
++my @section_stack = ( undef );
++
++sub setsection ($$) {
++	my ($name, $line) = @_;
++
++	print ".purgem __xpushsection\n" if $xpushsection_defined;
++
++	print
++".macro __xpushsection name:req, flags
++	.pushsection \"$name.\\name\", \"\\flags\"
++.endm
++";
++
++	$section_stack[$#section_stack] = $name;
++
++	$xpushsection_defined = 1;
++
++	print $line
++}
++
++sub popsection ($)
++{
++	pop @section_stack;
++	setsection $section_stack[$#section_stack], $_[0];
++}
++
++sub pushsection ($$)
++{
++	my ($name, $line) = @_;
++
++	push @section_stack, $name;
++	setsection $name, $line;
++}
++
++sub xpushsection ($$) {
++	my ($name, $rest) = @_;
++
++	print "__xpushsection \"$name\"$rest\n"
++}
++
++sub process_line {
++	$_ = $_[0] if defined $_[0];
++
++	if (/^\s*(\.(text|data|bss))(\s|$)/) {
++		setsection $1, $_
++	} elsif (/^\s*\.section\s+([\$._0-9A-Za-z]+).*/) {
++		setsection $1, $_
++	} elsif (/^\s*\.pushsection\s+([\$._0-9A-Za-z]+).*/) {
++		pushsection $1, $_
++	} elsif (/^\s*\.popsection(\s|$)/) {
++		popsection $_
++	} elsif (/^\s*\.xpushsection\s+([\$._0-9A-Za-z]+)(.*)/) {
++		xpushsection $1, $2
++	} elsif (/^\s*\.xpopsection(\s|$)/) {
++		print ".popsection\n"
++	} else {
++		print
++	}
++}	
++
++process_line ".text\n";
++process_line while <>;
+diff -Nur tst.s tst.s
+--- tst.s	1970-01-01 01:00:00.000000000 +0100
++++ tst.s	2011-01-27 11:07:39.338552001 +0000
+@@ -0,0 +1,23 @@
++.macro fixup
++	_fixup \@
++.endm
++
++.macro _fixup num
++__fixup_\num :
++	.xpushsection fixup, "a"
++	.long __fixup_\num
++	.xpopsection
++.endm
++
++.globl main
++main:
++	fixup
++	nop
++
++.section .text.init, "ax"
++.globl init
++init:	nop
++
++	fixup
++	nop
++
