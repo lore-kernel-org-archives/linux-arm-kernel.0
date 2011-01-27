@@ -1,86 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 12:37:44 +0000
-Subject: [PATCH 2/2] DMA: PL08x: fix channel pausing to timeout rather
-	than lockup
-In-Reply-To: <20110127123253.GC25968@n2100.arm.linux.org.uk>
-References: <20110127123253.GC25968@n2100.arm.linux.org.uk>
-Message-ID: <20110127123744.GA28855@n2100.arm.linux.org.uk>
+From: x0075817@ti.com (Raghuveer Murthy)
+Date: Thu, 27 Jan 2011 18:19:21 +0530
+Subject: [PATCH v10 18/18] OMAP2, 3: DSS2: Get DSS IRQ from platform device
+In-Reply-To: <1295850125-21405-19-git-send-email-sumit.semwal@ti.com>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-19-git-send-email-sumit.semwal@ti.com>
+Message-ID: <4D4169D1.20001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a transfer is initiated from memory to a peripheral, then data is
-fetched and the channel is marked busy.  This busy status persists until
-the HALT bit is set and the queued data has been transfered to the
-peripheral.  Waiting indefinitely after setting the HALT bit results in
-system lockups.  Timeout this operation, and print an error when this
-happens.
+Hi Sumit,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-This happens when a M->P transfer is started, but the peripheral doesn't
-take the data.  The DMA controller will mark itself active and fetch data
-from memory, in anticipation of the peripheral wanting the data.  This
-advances the source address.
+On Monday 24 January 2011 11:52 AM, Sumit Semwal wrote:
+> From: Senthilvadivu Guruswamy<svadivu@ti.com>
+>
+> DSS IRQ number can be obtained from platform_get_irq().  This API in turn
+> picks the right IRQ number belonging to HW IP from the hwmod database.
+> So hardcoding of IRQ number could be removed.
+>
+> Reviewed-by: Paul Walmsley<paul@pwsan.com>
+> Reviewed-by: Kevin Hilman<khilman@ti.com>
+> Tested-by: Kevin Hilman<khilman@ti.com>
+> Signed-off-by: Senthilvadivu Guruswamy<svadivu@ti.com>
+> Signed-off-by: Sumit Semwal<sumit.semwal@ti.com>
+> ---
+>   drivers/video/omap2/dss/dss.c |   21 ++++++++++++++-------
+>   1 files changed, 14 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
+> index 4d7a816..f9390b4 100644
+> --- a/drivers/video/omap2/dss/dss.c
+> +++ b/drivers/video/omap2/dss/dss.c
+> @@ -563,7 +563,7 @@ void dss_set_dac_pwrdn_bgz(bool enable)
+>
+>   static int dss_init(bool skip_init)
+>   {
+> -	int r;
+> +	int r, dss_irq;
+>   	u32 rev;
+>   	struct resource *dss_mem;
+>
+> @@ -609,11 +609,18 @@ static int dss_init(bool skip_init)
+>   	REG_FLD_MOD(DSS_CONTROL, 0, 2, 2);	/* venc clock mode = normal */
+>   #endif
+>
+> -	r = request_irq(INT_24XX_DSS_IRQ,
+> -			cpu_is_omap24xx()
+> -			? dss_irq_handler_omap2
+> -			: dss_irq_handler_omap3,
+> -			0, "OMAP DSS", NULL);
+> +	dss_irq = platform_get_irq(dss.pdev, 0);
+> +	if (dss_irq<  0) {
+> +		DSSERR("omap2 dss: platform_get_irq failed\n");
+> +		r = -ENODEV;
+> +		goto fail1;
+> +	}
+> +
+> +	r = request_irq(dss_irq,
+> +		cpu_is_omap24xx()
+> +		? dss_irq_handler_omap2
+> +		: dss_irq_handler_omap3,
 
-An alternative approach here is to just set the HALT bit and return
-immediately, without waiting for the primecell to show that it is no
-longer active.  In any case, resuming the channel will allow the
-transfer to continue without data loss.
+it should be
 
- drivers/dma/amba-pl08x.c |   21 +++++++++++++++------
- 1 files changed, 15 insertions(+), 6 deletions(-)
+		cpu_is_omap24xx()
+		? dss_irq_handler_omap3
+		: dss_irq_handler_omap2,
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 8321a39..07bca49 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -79,6 +79,7 @@
- #include <linux/module.h>
- #include <linux/interrupt.h>
- #include <linux/slab.h>
-+#include <linux/delay.h>
- #include <linux/dmapool.h>
- #include <linux/dmaengine.h>
- #include <linux/amba/bus.h>
-@@ -235,16 +236,19 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
- }
- 
- /*
-- * Overall DMAC remains enabled always.
-+ * Pause the channel by setting the HALT bit.
-  *
-- * Disabling individual channels could lose data.
-+ * For M->P transfers, pause the DMAC first and then stop the peripheral -
-+ * the FIFO can only drain if the peripheral is still requesting data.
-+ * (note: this can still timeout if the DMAC FIFO never drains of data.)
-  *
-- * Disable the peripheral DMA after disabling the DMAC in order to allow
-- * the DMAC FIFO to drain, and hence allow the channel to show inactive
-+ * For P->M transfers, disable the peripheral first to stop it filling
-+ * the DMAC FIFO, and then pause the DMAC.
-  */
- static void pl08x_pause_phy_chan(struct pl08x_phy_chan *ch)
- {
- 	u32 val;
-+	int timeout;
- 
- 	/* Set the HALT bit and wait for the FIFO to drain */
- 	val = readl(ch->base + PL080_CH_CONFIG);
-@@ -252,8 +256,13 @@ static void pl08x_pause_phy_chan(struct pl08x_phy_chan *ch)
- 	writel(val, ch->base + PL080_CH_CONFIG);
- 
- 	/* Wait for channel inactive */
--	while (pl08x_phy_channel_busy(ch))
--		cpu_relax();
-+	for (timeout = 1000; timeout; timeout--) {
-+		if (!pl08x_phy_channel_busy(ch))
-+			break;
-+		udelay(1);
-+	}
-+	if (pl08x_phy_channel_busy(ch))
-+		pr_err("pl08x: channel%u timeout waiting for pause\n", ch->id);
- }
- 
- static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
--- 
-1.6.2.5
+I am seeing a crash on Panda, which gets rectified with this
+change. The root cause is access to DSS_IRQSTATUS register in the
+dss_irq_handler_omap3 handler, which is not valid for OMAP4.
+
+Regards,
+Raghuveer
+
+> +		0, "OMAP DSS", NULL);
+>
+>   	if (r<  0) {
+>   		DSSERR("omap2 dss: request_irq failed\n");
+> @@ -641,7 +648,7 @@ static int dss_init(bool skip_init)
+>   	return 0;
+>
+>   fail2:
+> -	free_irq(INT_24XX_DSS_IRQ, NULL);
+> +	free_irq(dss_irq, NULL);
+>   fail1:
+>   	iounmap(dss.base);
+>   fail0:
