@@ -1,26 +1,26 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 27 Jan 2011 10:11:35 -0700
-Subject: [PATCH] scoop.c: use resource_size()
-Message-ID: <201101271011.35316.hartleys@visionengravers.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 27 Jan 2011 18:13:31 +0100
+Subject: some i.MX23/28 patches
+In-Reply-To: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110127171331.GD26986@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use resource_size() instead of calculating the size by hand.
+On Thu, Jan 27, 2011 at 12:40:09PM +0100, Sascha Hauer wrote:
+> The following contains some i.MX23/28 cleanup patches.
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+All
 
----
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
-index c11af1e..a07b0e7 100644
---- a/arch/arm/common/scoop.c
-+++ b/arch/arm/common/scoop.c
-@@ -193,7 +193,7 @@ static int __devinit scoop_probe(struct platform_device *pdev)
- 	spin_lock_init(&devptr->scoop_lock);
- 
- 	inf = pdev->dev.platform_data;
--	devptr->base = ioremap(mem->start, mem->end - mem->start + 1);
-+	devptr->base = ioremap(mem->start, resource_size(mem));
- 
- 	if (!devptr->base) {
- 		ret = -ENOMEM;
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110127/eb333fa7/attachment.sig>
