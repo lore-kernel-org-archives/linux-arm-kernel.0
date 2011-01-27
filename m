@@ -1,210 +1,126 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 27 Jan 2011 12:48:10 +0100
-Subject: [PATCH] ARM: print FPGA info on plat-versatile variants
-Message-ID: <1296128890-18765-1-git-send-email-linus.walleij@stericsson.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 27 Jan 2011 09:48:50 -0200
+Subject: [PATCH 1/3] ARM: mach-mx5: Fix build for mx53_loco and mx53_smd
+In-Reply-To: <20110127093044.GA30756@shlinux1.ap.freescale.net>
+References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
+	<20110127073009.GR9041@pengutronix.de>
+	<20110127093044.GA30756@shlinux1.ap.freescale.net>
+Message-ID: <4D415BA2.2020207@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a small piece of code that displays some basic FPGA
-characteristics for the Integrator, Versatile, RealView and
-Versatile Express reference platforms. Tested on RealView
-variants.
+Hi Richard,
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/plat-versatile/Makefile  |    2 +-
- arch/arm/plat-versatile/fpga-id.c |  173 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 174 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/plat-versatile/fpga-id.c
+On 1/27/2011 7:30 AM, Richard Zhao wrote:
+....
+>>>  static iomux_v3_cfg_t mx53_loco_pads[] = {
+>>> -	MX53_PAD_CSI0_D10__UART1_TXD,
+>>> -	MX53_PAD_CSI0_D11__UART1_RXD,
+>>> -	MX53_PAD_ATA_DIOW__UART1_TXD,
+>>> -	MX53_PAD_ATA_DMACK__UART1_RXD,
+>>> -
+>>> -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
+>>> -	MX53_PAD_ATA_DMARQ__UART2_TXD,
+>>> -	MX53_PAD_ATA_DIOR__UART2_RTS,
+>>> -	MX53_PAD_ATA_INTRQ__UART2_CTS,
+>>> -
+>>> -	MX53_PAD_ATA_CS_0__UART3_TXD,
+>>> -	MX53_PAD_ATA_CS_1__UART3_RXD,
+>>> -	MX53_PAD_ATA_DA_1__UART3_CTS,
+>>> -	MX53_PAD_ATA_DA_2__UART3_RTS,
+>>> +	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+>>> +	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
+>>> +	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
+>>> +	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
+> So many Pad configured to uart1?
 
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 16dde08..2d4f8aa 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -1,4 +1,4 @@
--obj-y	:= clock.o
-+obj-y	:= clock.o fpga-id.o
- ifneq ($(CONFIG_ARCH_INTEGRATOR),y)
- obj-y	+= sched-clock.o
- endif
-diff --git a/arch/arm/plat-versatile/fpga-id.c b/arch/arm/plat-versatile/fpga-id.c
-new file mode 100644
-index 0000000..e541715
---- /dev/null
-+++ b/arch/arm/plat-versatile/fpga-id.c
-@@ -0,0 +1,173 @@
-+/*
-+ * Some simple code to read out the FPGA ID of the Integrator,
-+ * Versatile, RealView or RealView Express systems during boot
-+ * and print it to the console.
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ * Author: Linus Walleij <linus.walleij@stericsson.com>
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <asm/mach-types.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+
-+struct versatile_fpga_id {
-+	u8 man:4;
-+	u8 rev:4;
-+	u16 board:12;
-+	u8 var:4;
-+	u8 arch:4;
-+	u8 fpga_build;
-+};
-+
-+static struct versatile_fpga_id fpga_id;
-+
-+static inline bool machine_is_versatile(void)
-+{
-+	return machine_is_versatile_pb() ||
-+		machine_is_versatile_ab();
-+
-+}
-+
-+static inline bool machine_is_realview(void)
-+{
-+	return machine_is_realview_eb() ||
-+		machine_is_realview_pb11mp() ||
-+		machine_is_realview_pb1176() ||
-+		machine_is_realview_pba8() ||
-+		machine_is_realview_pbx();
-+}
-+
-+static inline bool integrator_or_versatile(void)
-+{
-+	return machine_is_integrator() ||
-+		machine_is_versatile();
-+}
-+
-+void __init versatile_fpga_probe(void)
-+{
-+	u32 val;
-+	void __iomem *sysid_reg;
-+
-+	/*
-+	 * The #ifdef statements here are for supporting multiarch
-+	 * builds gracefully.
-+	 */
-+	if (machine_is_integrator())
-+#ifdef CONFIG_ARCH_INTEGRATOR
-+		sysid_reg = __io_address(INTEGRATOR_SC_ID);
-+#else
-+		return;
-+#endif
-+	else if (machine_is_versatile())
-+#ifdef CONFIG_ARCH_VERSATILE
-+		sysid_reg = __io_address(VERSATILE_SYS_ID);
-+#else
-+		return;
-+#endif
-+	else if (machine_is_realview())
-+#ifdef CONFIG_ARCH_REALVIEW
-+		sysid_reg = __io_address(REALVIEW_SYS_ID);
-+#else
-+		return;
-+#endif
-+	else if (machine_is_vexpress())
-+#ifdef CONFIG_ARCH_VEXPRESS
-+		sysid_reg = MMIO_P2V(V2M_SYS_ID);
-+#else
-+		return;
-+#endif
-+	else
-+		return;
-+
-+	val = readl(sysid_reg);
-+	/* The Integrator and Versatile have an older register layout */
-+	if (machine_is_integrator()) {
-+		fpga_id.man = (val >> 24) & 0x0FU;
-+		fpga_id.board = (val >> 12) & 0x0FU;
-+		fpga_id.arch = (val >> 16) & 0x0FF;
-+		fpga_id.fpga_build = (val >> 4) & 0xFFU;
-+		fpga_id.rev = val & 0x0FU;
-+	} else if (machine_is_versatile()) {
-+		/* Versatile PB is for example 0x41007004 */
-+		fpga_id.man = (val >> 24) & 0x0FU;
-+		fpga_id.board = (val >> 12) & 0x0FU;
-+		fpga_id.arch = val & 0x0FU;
-+		fpga_id.fpga_build = (val >> 4) & 0xFFU;
-+	} else {
-+		/* RealView or Versatile Express */
-+		fpga_id.rev = (val >> 28) & 0x0FU;
-+		fpga_id.board = (val >> 16) & 0xFFFU;
-+		fpga_id.var = (val >> 12) & 0x0FU;
-+		fpga_id.arch = (val >> 8) & 0x0FU;
-+		fpga_id.fpga_build = val & 0xFFU;
-+	}
-+
-+	pr_info("RealView system FPGA\n");
-+
-+	/* Manufacturer */
-+	if (integrator_or_versatile())
-+		pr_info("    manufacturer: %02x\n", fpga_id.man);
-+
-+	/* Single letter revision */
-+	if (fpga_id.rev == 0x0F)
-+		pr_info("    revision: ALL\n");
-+	else
-+		pr_info("    revision: %c\n", 'A' + fpga_id.rev);
-+
-+	switch (fpga_id.board) {
-+	case 1:
-+		/* Integrator */
-+		pr_info("    board: XC4062\n");
-+		break;
-+	case 2:
-+		/* Integrator */
-+		pr_info("    board: XC4085\n");
-+		break;
-+	case 7:
-+		/* Versatile */
-+		pr_info("    board: XC2V2000\n");
-+		break;
-+	default:
-+		/*
-+		 * This is BCD-coded according to the PBX-A9 manual
-+		 * and examples, IDs used in RealView and Versatile
-+		 * Express.
-+		 */
-+		pr_info("    board: HBI-%03x\n", fpga_id.board);
-+		break;
-+	}
-+
-+	/* Single letter variant */
-+	if (!integrator_or_versatile()) {
-+		if (fpga_id.var == 0x0F)
-+			pr_info("    variant: ALL\n");
-+		else
-+			pr_info("    variant: %c\n", 'A' + fpga_id.rev);
-+	}
-+
-+	switch (fpga_id.arch) {
-+	case 0:
-+		pr_info("    architecture: ASB LE\n");
-+		break;
-+	case 1:
-+		pr_info("    architecture: AHB LE\n");
-+		break;
-+	case 4:
-+		pr_info("    architecture: AHB\n");
-+		break;
-+	case 5:
-+		pr_info("    architecture: AXI\n");
-+		break;
-+	default:
-+		pr_info("    architecture: %01x (unknown)\n", fpga_id.arch);
-+		break;
-+	}
-+
-+	/* This is BCD-coded according to the PBX-A9 manual */
-+	pr_info("    FPGA build %02x\n", fpga_id.fpga_build);
-+}
-+
-+arch_initcall(versatile_fpga_probe);
--- 
-1.7.3.2
+As per the subject the intention of this patch is to fix the build for mx53_loco and mx53_smd.
+
+In this patch I just changed the pad names to fix the build issue. 
+
+
+>>> +
+>>> +	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+>>> +	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+>>> +	MX53_PAD_PATA_DIOR__UART2_RTS,
+>>> +	MX53_PAD_PATA_INTRQ__UART2_CTS,
+>>> +
+>>> +	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
+>>> +	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
+>>> +	MX53_PAD_PATA_DA_1__UART3_CTS,
+>>> +	MX53_PAD_PATA_DA_2__UART3_RTS,
+> LoCo don't have uart2 and uart3.
+
+Right, these are removed later in my patch series.
+
+After my patch series is applied we have a working UART1 console.
+
+Can we apply them? 
+
+Regards,
+
+Fabio Estevam
+>>> +
+>>>  };
+>>>  
+>>>  static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
+>>> diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+>>> index 7970f7a..06070c5 100644
+>>> --- a/arch/arm/mach-mx5/board-mx53_smd.c
+>>> +++ b/arch/arm/mach-mx5/board-mx53_smd.c
+>>> @@ -39,20 +39,20 @@
+>>>  #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+>>>  
+>>>  static iomux_v3_cfg_t mx53_smd_pads[] = {
+>>> -	MX53_PAD_CSI0_D10__UART1_TXD,
+>>> -	MX53_PAD_CSI0_D11__UART1_RXD,
+>>> -	MX53_PAD_ATA_DIOW__UART1_TXD,
+>>> -	MX53_PAD_ATA_DMACK__UART1_RXD,
+>>> -
+>>> -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
+>>> -	MX53_PAD_ATA_DMARQ__UART2_TXD,
+>>> -	MX53_PAD_ATA_DIOR__UART2_RTS,
+>>> -	MX53_PAD_ATA_INTRQ__UART2_CTS,
+>>> -
+>>> -	MX53_PAD_ATA_CS_0__UART3_TXD,
+>>> -	MX53_PAD_ATA_CS_1__UART3_RXD,
+>>> -	MX53_PAD_ATA_DA_1__UART3_CTS,
+>>> -	MX53_PAD_ATA_DA_2__UART3_RTS,
+>>> +	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+>>> +	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
+>>> +	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
+>>> +	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
+> same as above.
+> 
+> Thanks
+> Richard
+>>> +
+>>> +	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+>>> +	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+>>> +	MX53_PAD_PATA_DIOR__UART2_RTS,
+>>> +	MX53_PAD_PATA_INTRQ__UART2_CTS,
+>>> +
+>>> +	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
+>>> +	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
+>>> +	MX53_PAD_PATA_DA_1__UART3_CTS,
+>>> +	MX53_PAD_PATA_DA_2__UART3_RTS,
+>>>  };
+>>>  
+>>>  static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+>>> -- 
+>>> 1.6.0.4
+>>>
+>>>
+>>>
+>>
+>> -- 
+>> Pengutronix e.K.                           |                             |
+>> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+>> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
