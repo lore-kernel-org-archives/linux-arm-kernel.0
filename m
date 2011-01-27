@@ -1,64 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 27 Jan 2011 16:26:32 +0300
-Subject: [PATCH 09/13] ARM i.MX51 mx51 3ds: remove
-	unnecessary	CONFIG_SERIAL_IMX ifdefs
-In-Reply-To: <1296133233-1062-10-git-send-email-s.hauer@pengutronix.de>
-References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
-	<1296133233-1062-10-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4D417288.6000108@ru.mvista.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 27 Jan 2011 18:58:36 +0530
+Subject: [PATCH] MFD: DaVinci: Fix voice codec device name
+Message-ID: <1296134916-25742-1-git-send-email-prakash.pm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Fix the device name in DaVinci Voice Codec MFD driver to load
+davinci-vcif and cq93vc codec client drivers.
 
-On 27-01-2011 16:00, Sascha Hauer wrote:
+Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+---
+This patch applies to Linus's tree at [1].
 
-> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
-> ---
->   arch/arm/mach-mx5/board-mx51_3ds.c |   14 ++++----------
->   1 files changed, 4 insertions(+), 10 deletions(-)
+[1] http://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+---
+ drivers/mfd/davinci_voicecodec.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-> index 8a0619b..feb2800 100644
-> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
-> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-> @@ -71,22 +71,13 @@ static iomux_v3_cfg_t mx51_3ds_pads[] = {
->   };
->
->   /* Serial ports */
-> -#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
->   static const struct imxuart_platform_data uart_pdata __initconst = {
->   	.flags = IMXUART_HAVE_RTSCTS,
->   };
->
->   static inline void mxc_init_imx_uart(void)
->   {
-> -	imx51_add_imx_uart(0, &uart_pdata);
-> -	imx51_add_imx_uart(1, &uart_pdata);
-> -	imx51_add_imx_uart(2, &uart_pdata);
-> -}
-> -#else /* !SERIAL_IMX */
-> -static inline void mxc_init_imx_uart(void)
-> -{
->   }
-
-    Why then leave the empty function?
-
-> -#endif /* SERIAL_IMX */
->
->   #if defined(CONFIG_KEYBOARD_IMX) || defined(CONFIG_KEYBOARD_IMX_MODULE)
->   static int mx51_3ds_board_keymap[] = {
-> @@ -161,7 +152,10 @@ static void __init mxc_board_init(void)
->   {
->   	mxc_iomux_v3_setup_multiple_pads(mx51_3ds_pads,
->   					ARRAY_SIZE(mx51_3ds_pads));
-> -	mxc_init_imx_uart();
-> +
-> +	imx51_add_imx_uart(0, &uart_pdata);
-> +	imx51_add_imx_uart(1, &uart_pdata);
-> +	imx51_add_imx_uart(2, &uart_pdata);
->
->   	imx51_add_ecspi(1,&mx51_3ds_ecspi2_pdata);
->   	spi_register_board_info(mx51_3ds_spi_nor_device,
-
-WBR, Sergei
+diff --git a/drivers/mfd/davinci_voicecodec.c b/drivers/mfd/davinci_voicecodec.c
+index 33c923d..fdd8a1b 100644
+--- a/drivers/mfd/davinci_voicecodec.c
++++ b/drivers/mfd/davinci_voicecodec.c
+@@ -118,12 +118,12 @@ static int __init davinci_vc_probe(struct platform_device *pdev)
+ 
+ 	/* Voice codec interface client */
+ 	cell = &davinci_vc->cells[DAVINCI_VC_VCIF_CELL];
+-	cell->name = "davinci_vcif";
++	cell->name = "davinci-vcif";
+ 	cell->driver_data = davinci_vc;
+ 
+ 	/* Voice codec CQ93VC client */
+ 	cell = &davinci_vc->cells[DAVINCI_VC_CQ93VC_CELL];
+-	cell->name = "cq93vc";
++	cell->name = "cq93vc-codec";
+ 	cell->driver_data = davinci_vc;
+ 
+ 	ret = mfd_add_devices(&pdev->dev, pdev->id, davinci_vc->cells,
+-- 
+1.7.1
