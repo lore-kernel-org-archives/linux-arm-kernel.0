@@ -1,42 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 17:37:16 +0000
-Subject: HIGHMEM is broken when working in SMP V6 mode
-In-Reply-To: <alpine.LFD.2.00.1101241010580.8580@xanadu.home>
-References: <AANLkTikjcgRgPd7oLjf0ESxeyC2BHpaaRi8DiMz3b+JQ@mail.gmail.com>
-	<20110123145639.GB30094@n2100.arm.linux.org.uk>
-	<AANLkTi=HtLjnOLGVVqWvqToiXdQAm_+cDdZf51M+ABV4@mail.gmail.com>
-	<20110123170830.GG30094@n2100.arm.linux.org.uk>
-	<AANLkTim3VVYTrWZX+UJUtK73bUkmSufW_4awhgQcVeNZ@mail.gmail.com>
-	<alpine.LFD.2.00.1101241010580.8580@xanadu.home>
-Message-ID: <20110127173716.GA605@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 27 Jan 2011 11:41:30 -0600
+Subject: [PATCH] ARM: map ATAGs when not in first 1MB of RAM
+In-Reply-To: <20110127163149.GF25968@n2100.arm.linux.org.uk>
+References: <1296143443-9442-1-git-send-email-robherring2@gmail.com>
+	<20110127163149.GF25968@n2100.arm.linux.org.uk>
+Message-ID: <4D41AE4A.1000105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 02:58:07PM -0500, Nicolas Pitre wrote:
->  /*
-> + * The reason for kmap_high_get() is to ensure that the currently kmap'd
-> + * page usage count does not decrease to zero while we're using its
-> + * existing virtual mapping in an atomic context.  With a VIVT cache this
-> + * is essential to do, but with a VIPT cache this is only an optimization
-> + * so not to pay the price of establishing a second mapping if an existing
-> + * one can be used.  However, on platforms without hardware TLB maintainence
-> + * broadcast, we simply cannot use ARCH_NEEDS_KMAP_HIGH_GET at all since
-> + * the locking involved must also disable IRQs which is incompatible with
-> + * the IPI mechanism used by global TLB operations.
-> + */
-> +#define ARCH_NEEDS_KMAP_HIGH_GET
-> +#if defined(CONFIG_SMP) && defined(CONFIG_CPU_TLB_V6)
-> +#undef ARCH_NEEDS_KMAP_HIGH_GET
-> +#if defined(CONFIG_HIGHMEM) && defined(CONFIG_CPU_CACHE_VIVT)
-> +#error "The sum of feature in your kernel config cannot be supported together"
-> +#endif
+Russell,
 
-This is wrong.  Take a moment to consider a kernel supporting an ARMv6
-VIPT aliasing cache CPU and ARMv7 SMP.  Don't we need kmap_high_get()
-for ARMv6 VIPT aliasing cache?
+On 01/27/2011 10:31 AM, Russell King - ARM Linux wrote:
+> On Thu, Jan 27, 2011 at 09:50:43AM -0600, Rob Herring wrote:
+>> +	/*
+>> +	 * Otherwise map the 1MB region r2 points to (atags or dtb)
+>> +	 */
+>> +1:	mov	r0, r2, lsr #20
+>> +	mov	r0, r0, lsl #20
+>> +	sub	r3, r0, #(PHYS_OFFSET&  0xff000000)
+>> +	.if	(PHYS_OFFSET&  0x00f00000)
+>> +	sub	r3, r3, #(PHYS_OFFSET&  0x00f00000)
+>
+> This introduces new PHYS_OFFSET uses which we're trying hard to get
+> rid of.  This will need to be reworked.
 
-The effect of this is that dma_cache_maint_page() will create new mappings
-which could be have the wrong colour - and therefore the subsequent cache
-maintainence will not have the desired effect.
+Yeah, I didn't really like that either. How about this? It's untested. 
+It replaces the whole section mapping the 1st 1MB and should make 
+replacing this instance of PHYS_OFFSET with a variable easier.
 
-I think this may break OMAP.
+	/*
+	 * Then map boot params address in r2 or
+	 * the first 1MB of ram if boot params address is not specified.
+	 */
+	ldr	r3, =PHYS_OFFSET
+	mov	r0, r2, lsr #20
+	movs	r0, r0, lsl #20
+	moveq	r0, r3
+	sub	r3, r0, r3
+	add	r3, r3, #PAGE_OFFSET
+	add	r3, r4, r3, lsr #18
+	orr	r6, r7, r0
+	str	r6, [r3]
+
+Rob
