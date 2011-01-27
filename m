@@ -1,32 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 21:40:22 +0000
-Subject: [PATCH] MMCI: don't read command response when invalid
-In-Reply-To: <20110127212814.GA21801@void.printf.net>
-References: <20110111163502.GJ11039@n2100.arm.linux.org.uk>
-	<20110111163556.GA18746@n2100.arm.linux.org.uk>
-	<20110111232025.GA25752@void.printf.net>
-	<20110127121901.GB25968@n2100.arm.linux.org.uk>
-	<20110127153332.GA14591@void.printf.net>
-	<20110127212814.GA21801@void.printf.net>
-Message-ID: <20110127214022.GE1597@n2100.arm.linux.org.uk>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 27 Jan 2011 13:51:13 -0800
+Subject: [PATCH v2 18/28] ARM: tegra: add CPU_IDLE driver
+In-Reply-To: <4D41D7C2.3080608@codeaurora.org>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-19-git-send-email-ccross@android.com>
+	<4D41D7C2.3080608@codeaurora.org>
+Message-ID: <AANLkTi=o5o2_4Ur2GTS=0XSoYqFMYqSF99aU9N_wxWuu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 09:28:14PM +0000, Chris Ball wrote:
-> On Thu, Jan 27, 2011 at 03:33:32PM +0000, Chris Ball wrote:
-> > Hi Russell,
-> > 
-> > On Thu, Jan 27, 2011 at 12:19:01PM +0000, Russell King - ARM Linux wrote:
-> > > FYI, I've now merged this into the ARM devel tree for the time being so
-> > > it doesn't get forgotten - which means it'll appear in linux-next at some
-> > > point if it isn't already there.  (Mainly so I don't have to keep on
-> > > adding the patch.)
-> > > 
-> > > Once you push it into mainline, I'll drop my copy.
-> > 
-> > Okay.  Sent this to Linus yesterday, just waiting for him to pull.
-> > (It's been in linux-next for the last two weeks.)
-> 
-> It's present in mainline now.
+On Thu, Jan 27, 2011 at 12:38 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/23/2011 06:01 PM, Colin Cross wrote:
+>>
+>> +static int __init tegra_cpuidle_debug_init(void)
+>> +{
+>> + ? ? struct dentry *dir;
+>> + ? ? struct dentry *d;
+>> +
+>> + ? ? dir = debugfs_create_dir("cpuidle", NULL);
+>> + ? ? if (!dir)
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> +
+>> + ? ? d = debugfs_create_file("lp2", S_IRUGO, dir, NULL,
+>> + ? ? ? ? ? ? &tegra_lp2_debug_ops);
+>> + ? ? if (!d)
+>> + ? ? ? ? ? ? return -ENOMEM;
+>> +
+>> + ? ? return 0;
+>> +}
+>> +#endif
+>> +
+>> +late_initcall(tegra_cpuidle_debug_init);
+>
+> Will this compile with CONFIG_DEBUG_FS=n?
 
-Thanks, dropped from my tree now.
+Yes.  All debugfs ops return ERR_PTR(-ENODEV) if CONFIG_DEBUG_FS=n, so
+tegra_cpuidle_debug_init will do nothing and return 0.
