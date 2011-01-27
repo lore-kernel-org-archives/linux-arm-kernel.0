@@ -1,47 +1,29 @@
-From: x0075817@ti.com (Raghuveer Murthy)
-Date: Thu, 27 Jan 2011 18:34:41 +0530
-Subject: [PATCH v10 18/18] OMAP2, 3: DSS2: Get DSS IRQ from platform	device
-In-Reply-To: <20110127125955.GC26418@n2100.arm.linux.org.uk>
-References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
-	<1295850125-21405-19-git-send-email-sumit.semwal@ti.com>
-	<4D4169D1.20001@ti.com>
-	<20110127125955.GC26418@n2100.arm.linux.org.uk>
-Message-ID: <4D416D69.6030200@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 27 Jan 2011 11:16:00 -0200
+Subject: [PATCH 11/13] ARM i.MX51 mx51 babbage: remove unnecessary
+	CONFIG_KEYBOARD_IMX ifdefs
+In-Reply-To: <1296133233-1062-12-git-send-email-s.hauer@pengutronix.de>
+References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
+	<1296133233-1062-12-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <AANLkTiknJta0rJSPaJH9=0oVEfmW0rSp1U1aXFs425sZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 January 2011 06:29 PM, Russell King - ARM Linux wrote:
-> On Thu, Jan 27, 2011 at 06:19:21PM +0530, Raghuveer Murthy wrote:
->>> +	r = request_irq(dss_irq,
->>> +		cpu_is_omap24xx()
->>> +		? dss_irq_handler_omap2
->>> +		: dss_irq_handler_omap3,
->>
->> it should be
->>
->> 		cpu_is_omap24xx()
->> 		? dss_irq_handler_omap3
->> 		: dss_irq_handler_omap2,
->>
->> I am seeing a crash on Panda, which gets rectified with this
->> change. The root cause is access to DSS_IRQSTATUS register in the
->> dss_irq_handler_omap3 handler, which is not valid for OMAP4.
->
-> That really doesn't look right.  Let me translate the code you've just
-> written:
->
-> 	if (cpu_is_omap24xx())
-> 		handler = dss_irq_handler_omap3;
-> 	else
-> 		handler = dss_irq_handler_omap2;
->
-> Which means: if we have an OMAP24xx device, use the OMAP3 handler,
-> otherwise use the OMAP2 handler.  That's got to be wrong.
->
-I agree, that the logic seems counter-intuitive. I was doing a quick test.
+Hi Sascha,
 
-However, to  keep the correct sequence, the logic inside the respective 
-handlers need to be looked at.
+On Thu, Jan 27, 2011 at 11:00 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+> ?arch/arm/mach-mx5/board-mx51_3ds.c | ? 13 +------------
+> ?1 files changed, 1 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+> index feb2800..58a2574 100644
+> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
+> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+
+In the subject field you should put MX51_3ds instead of Babbage.
 
 Regards,
-Raghuveer
+
+Fabio Estevam
