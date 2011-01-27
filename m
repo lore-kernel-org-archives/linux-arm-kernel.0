@@ -1,49 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 17:46:03 +0000
-Subject: [PATCH] ARM: map ATAGs when not in first 1MB of RAM
-In-Reply-To: <4D41AE4A.1000105@gmail.com>
-References: <1296143443-9442-1-git-send-email-robherring2@gmail.com>
-	<20110127163149.GF25968@n2100.arm.linux.org.uk>
-	<4D41AE4A.1000105@gmail.com>
-Message-ID: <20110127174603.GB605@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 27 Jan 2011 10:01:08 -0800
+Subject: [PATCH] omap2+: Fix omap_serial_early_init to work with
+	init_early hook
+In-Reply-To: <20110125022528.GI13589@atomide.com> (Tony Lindgren's message of
+	"Mon, 24 Jan 2011 18:25:28 -0800")
+References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
+	<20110123174814.GI30094@n2100.arm.linux.org.uk>
+	<20110124201731.GC13589@atomide.com>
+	<20110124202629.GE13589@atomide.com>
+	<20110124215213.GA27044@n2100.arm.linux.org.uk>
+	<20110125022119.GG13589@atomide.com>
+	<20110125022528.GI13589@atomide.com>
+Message-ID: <87ei7yp6or.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 11:41:30AM -0600, Rob Herring wrote:
-> Russell,
+Hi Tony,
+
+Tony Lindgren <tony@atomide.com> writes:
+
+> The new init_early hook happens at the end of setup_arch,
+> which is too early for kzalloc. However, there's no need
+> to call omap_serial_early_init that early, so fix this
+> by setting it up as a core_initcall.
 >
-> On 01/27/2011 10:31 AM, Russell King - ARM Linux wrote:
->> On Thu, Jan 27, 2011 at 09:50:43AM -0600, Rob Herring wrote:
->>> +	/*
->>> +	 * Otherwise map the 1MB region r2 points to (atags or dtb)
->>> +	 */
->>> +1:	mov	r0, r2, lsr #20
->>> +	mov	r0, r0, lsl #20
->>> +	sub	r3, r0, #(PHYS_OFFSET&  0xff000000)
->>> +	.if	(PHYS_OFFSET&  0x00f00000)
->>> +	sub	r3, r3, #(PHYS_OFFSET&  0x00f00000)
->>
->> This introduces new PHYS_OFFSET uses which we're trying hard to get
->> rid of.  This will need to be reworked.
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 >
-> Yeah, I didn't really like that either. How about this? It's untested.  
-> It replaces the whole section mapping the 1st 1MB and should make  
-> replacing this instance of PHYS_OFFSET with a variable easier.
 
-With the p2v patches, queued for the next merge window, PHYS_OFFSET
-becomes:
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-extern unsigned long __pv_phys_offset;
-#define PHYS_OFFSET __pv_phys_offset
+I boot tested these on 3430/n900, 3630/Zoom3 and 4430ES1.0/PAB.
 
-so using PHYS_OFFSET in any way in assembly isn't going to work too
-well.  Luckily, the p2v patches supply __create_page_tables with a
-value of PHYS_OFFSET in r8.
+Kevin
 
-What this means is that there's an fundamental interdependence between
-your patches and mine.  Your patches can work without the p2v patches.
-Or they can be made to work with the p2v patches applied.
 
-So I think this needs to wait until after the next merge window, or it
-needs to be prepared against the p2v patches (see my p2v branch) and
-applied there once everyone's happy with it.
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index 8f47609..5678c33 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -400,8 +400,6 @@ void __init omap2_init_common_infrastructure(void)
+>  void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
+>  				      struct omap_sdrc_params *sdrc_cs1)
+>  {
+> -	omap_serial_early_init();
+> -
+>  	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+>  		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
+>  		_omap2_init_reprogram_sdrc();
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index 302da74..539ec9c 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -655,7 +655,7 @@ static void serial_out_override(struct uart_port *up, int offset, int value)
+>  }
+>  #endif
+>  
+> -void __init omap_serial_early_init(void)
+> +static int __init omap_serial_early_init(void)
+>  {
+>  	int i = 0;
+>  
+> @@ -672,7 +672,7 @@ void __init omap_serial_early_init(void)
+>  
+>  		uart = kzalloc(sizeof(struct omap_uart_state), GFP_KERNEL);
+>  		if (WARN_ON(!uart))
+> -			return;
+> +			return -ENODEV;
+>  
+>  		uart->oh = oh;
+>  		uart->num = i++;
+> @@ -691,7 +691,10 @@ void __init omap_serial_early_init(void)
+>  		 */
+>  		uart->oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
+>  	} while (1);
+> +
+> +	return 0;
+>  }
+> +core_initcall(omap_serial_early_init);
+>  
+>  /**
+>   * omap_serial_init_port() - initialize single serial port
+> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
+> index cec5d56..a1a118d 100644
+> --- a/arch/arm/plat-omap/include/plat/serial.h
+> +++ b/arch/arm/plat-omap/include/plat/serial.h
+> @@ -96,7 +96,6 @@
+>  
+>  struct omap_board_data;
+>  
+> -extern void __init omap_serial_early_init(void);
+>  extern void omap_serial_init(void);
+>  extern void omap_serial_init_port(struct omap_board_data *bdata);
+>  extern int omap_uart_can_sleep(void);
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
