@@ -1,51 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 11:06:03 +0000
-Subject: [PATCH] mmci: fixup broken_blockend variant patch v2
-In-Reply-To: <AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-References: <1295275071-13146-1-git-send-email-linus.walleij@stericsson.com>
-	<AANLkTin67iTj34QBv3T-9+oMdo6q=EsYKf=5ca=6B69s@mail.gmail.com>
-	<4D346800.3070603@stericsson.com>
-	<20110118121455.GB9719@n2100.arm.linux.org.uk>
-	<AANLkTineFJhqMcJbg1YQbPymT537Ef=jVgXLC5uw7DOt@mail.gmail.com>
-	<20110119205158.GC6335@n2100.arm.linux.org.uk>
-	<AANLkTimGmGStr8wHbJhkOsPcrWQmLFFQQCpgizE8+joj@mail.gmail.com>
-	<AANLkTim4i8BibVFmn2C4ixRoMrX5mNU9HZjW2KGMXsYZ@mail.gmail.com>
-Message-ID: <20110127110603.GA25968@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 27 Jan 2011 12:40:10 +0100
+Subject: [PATCH 1/4] ARM i.MX23/28: deobfuscate gpio initialization
+In-Reply-To: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1296128413-20778-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 21, 2011 at 01:53:06PM +0100, Linus Walleij wrote:
-> 2011/1/20 Linus Walleij <linus.ml.walleij@gmail.com>:
-> > But if the transfer is complete, MCIDataCnt should be valid
-> > as well. I'll read the datasheet(s) closer and see if I get some
-> > useful clues about which one is more reliable in the error
-> > case.
-> 
-> I've looked into this. It appears AFAICT that the FIFOCNT is
-> reset to zero whenever Tx or Rx is not active, i.e. on an error. So
-> this register is not helpful for determining the number of blocks
-> left at an error, it will always be zero at that point.
-> 
-> MCIDATACNT on the other hand comes from the datapath
-> state machine which in turn controls the FIFO. It is a totally
-> separate counter inside the state machine, loaded from the
-> same length register, but updated from the datapath control
-> machinery.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mxs/gpio.c |   19 ++++++++++---------
+ 1 files changed, 10 insertions(+), 9 deletions(-)
 
-Something occurs to me - isn't DATACNT a byte counter rather than a word
-counter?  I think that's something which needs to be confirmed.  The TRM
-is a little confusing:
-
-| Data counter register, MCIDataCnt The MCIDataCnt register loads the value
-| from the data length register (see Data length register, MCIDataLength on
-| page 3-11) when the DPSM moves from the IDLE state to the WAIT_R or WAIT_S
-| state. As data is transferred, the counter decrements the value until it
-| reaches 0.
-
-The first sentence implies that the value which appears here initially
-is the value which was written to the data length register, which is a
-byte count.  The second sentence _could_ be interpreted as it decrementing
-by one each time data is transferred to/from the FIFO (which are 32-bit
-words).
-
-I think this requires some experimentation...
+diff --git a/arch/arm/mach-mxs/gpio.c b/arch/arm/mach-mxs/gpio.c
+index d7ad7a6..36df2d7 100644
+--- a/arch/arm/mach-mxs/gpio.c
++++ b/arch/arm/mach-mxs/gpio.c
+@@ -297,20 +297,17 @@ int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
+ 		.virtual_irq_start = MXS_GPIO_IRQ_START + (_id) * 32,	\
+ 	}
+ 
+-#define DEFINE_REGISTER_FUNCTION(prefix)				\
+-int __init prefix ## _register_gpios(void)				\
+-{									\
+-	return mxs_gpio_init(prefix ## _gpio_ports,			\
+-			ARRAY_SIZE(prefix ## _gpio_ports));		\
+-}
+-
+ #ifdef CONFIG_SOC_IMX23
+ static struct mxs_gpio_port mx23_gpio_ports[] = {
+ 	DEFINE_MXS_GPIO_PORT(MX23, 0),
+ 	DEFINE_MXS_GPIO_PORT(MX23, 1),
+ 	DEFINE_MXS_GPIO_PORT(MX23, 2),
+ };
+-DEFINE_REGISTER_FUNCTION(mx23)
++
++int __init mx23_register_gpios(void)
++{
++	return mxs_gpio_init(mx23_gpio_ports, ARRAY_SIZE(mx23_gpio_ports));
++}
+ #endif
+ 
+ #ifdef CONFIG_SOC_IMX28
+@@ -321,5 +318,9 @@ static struct mxs_gpio_port mx28_gpio_ports[] = {
+ 	DEFINE_MXS_GPIO_PORT(MX28, 3),
+ 	DEFINE_MXS_GPIO_PORT(MX28, 4),
+ };
+-DEFINE_REGISTER_FUNCTION(mx28)
++
++int __init mx28_register_gpios(void)
++{
++	return mxs_gpio_init(mx28_gpio_ports, ARRAY_SIZE(mx28_gpio_ports));
++}
+ #endif
+-- 
+1.7.2.3
