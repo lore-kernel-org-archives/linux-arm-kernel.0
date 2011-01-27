@@ -1,100 +1,82 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Jan 2011 16:20:53 -0800
-Subject: [PATCHv2 2/5] msm: clock: Remove 7x30 and pcom includes from clock.h
+Date: Wed, 26 Jan 2011 16:20:56 -0800
+Subject: [PATCHv2 5/5] msm: clock: Add support for more proc_comm clocks
 In-Reply-To: <1296087656-3693-1-git-send-email-sboyd@codeaurora.org>
 References: <1296087656-3693-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1296087656-3693-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1296087656-3693-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clock.h includes clock-pcom.h and clock-7x30.h when it really
-doesn't need to. Remove the includes and fixup breakages.
+Add support for the ce, codec_ssbi, uart clocks, and i2c clocks.
 
-Reviewed-By: Saravana Kannan <skannan@codeaurora.org>
+Reviewed-by: Saravana Kannan <skannan@codeaurora.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-pcom.c      |    1 +
- arch/arm/mach-msm/clock.c           |    1 +
- arch/arm/mach-msm/clock.h           |    3 ---
- arch/arm/mach-msm/devices-msm7x00.c |    1 +
- arch/arm/mach-msm/devices-msm7x30.c |    1 +
- arch/arm/mach-msm/devices-qsd8x50.c |    1 +
- 6 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-msm/clock-pcom.h      |    4 +++-
+ arch/arm/mach-msm/devices-msm7x30.c |    2 ++
+ arch/arm/mach-msm/devices-qsd8x50.c |    6 ++++++
+ 3 files changed, 11 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
-index a3b4562..8c4e867 100644
---- a/arch/arm/mach-msm/clock-pcom.c
-+++ b/arch/arm/mach-msm/clock-pcom.c
-@@ -20,6 +20,7 @@
+diff --git a/arch/arm/mach-msm/clock-pcom.h b/arch/arm/mach-msm/clock-pcom.h
+index 17d027b..2c813f1 100644
+--- a/arch/arm/mach-msm/clock-pcom.h
++++ b/arch/arm/mach-msm/clock-pcom.h
+@@ -132,8 +132,10 @@
+ #define P_CSI1_P_CLK		97
+ #define P_GSBI_CLK		98
+ #define P_GSBI_P_CLK		99
++#define P_CE_CLK		100 /* Crypto engine */
++#define P_CODEC_SSBI_CLK	101
  
- #include "proc_comm.h"
- #include "clock.h"
-+#include "clock-pcom.h"
+-#define P_NR_CLKS		100
++#define P_NR_CLKS		102
  
- /*
-  * glue for the proc_comm interface
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index b67498d..8f71f8d 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -29,6 +29,7 @@
- #include "clock.h"
- #include "proc_comm.h"
- #include "clock-7x30.h"
-+#include "clock-pcom.h"
- 
- static DEFINE_MUTEX(clocks_mutex);
- static DEFINE_SPINLOCK(clocks_lock);
-diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
-index db9a77a..6a0cade 100644
---- a/arch/arm/mach-msm/clock.h
-+++ b/arch/arm/mach-msm/clock.h
-@@ -20,9 +20,6 @@
- #include <linux/list.h>
- #include <mach/clk.h>
- 
--#include "clock-pcom.h"
--#include "clock-7x30.h"
--
- #define CLKFLAG_INVERT			0x00000001
- #define CLKFLAG_NOINVERT		0x00000002
- #define CLKFLAG_NONEST			0x00000004
-diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
-index 2549fb2..ed62806 100644
---- a/arch/arm/mach-msm/devices-msm7x00.c
-+++ b/arch/arm/mach-msm/devices-msm7x00.c
-@@ -26,6 +26,7 @@
- 
- 
- #include "clock.h"
-+#include "clock-pcom.h"
- #include <mach/mmc.h>
- 
- static struct resource resources_uart1[] = {
+ struct clk_ops;
+ extern struct clk_ops clk_ops_pcom;
 diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-index d4c7afc..e430fdd 100644
+index e430fdd..cd4343b 100644
 --- a/arch/arm/mach-msm/devices-msm7x30.c
 +++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -28,6 +28,7 @@
- #include <asm/mach/flash.h>
- 
- #include "clock-pcom.h"
-+#include "clock-7x30.h"
- 
- #include <mach/mmc.h>
- 
+@@ -134,6 +134,8 @@ struct clk msm_clocks_7x30[] = {
+ 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
+ 	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
+ 	CLK_PCOM("camif_pad_pclk",	CAMIF_PAD_P_CLK,	NULL, OFF),
++	CLK_PCOM("ce_clk",	CE_CLK,	NULL, 0),
++	CLK_PCOM("codec_ssbi_clk",	CODEC_SSBI_CLK,	NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
+ 	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
+ 	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
 diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
-index c9fa655..c5dad8f 100644
+index c5dad8f..bd545f9 100644
 --- a/arch/arm/mach-msm/devices-qsd8x50.c
 +++ b/arch/arm/mach-msm/devices-qsd8x50.c
-@@ -27,6 +27,7 @@
- #include <asm/mach/flash.h>
+@@ -316,12 +316,14 @@ int __init msm_add_sdcc(unsigned int controller,
  
- #include <mach/mmc.h>
-+#include "clock-pcom.h"
- 
- static struct resource resources_uart3[] = {
- 	{
+ struct clk msm_clocks_8x50[] = {
+ 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
++	CLK_PCOM("ce_clk",	CE_CLK,		NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
+ 	CLK_PCOM("ebi2_clk",	EBI2_CLK,	NULL, 0),
+ 	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
+ 	CLK_PCOM("emdh_clk",	EMDH_CLK,	NULL, OFF | CLK_MINMAX),
+ 	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
+ 	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
++	CLK_PCOM("i2c_clk",	I2C_CLK,	NULL, 0),
+ 	CLK_PCOM("icodec_rx_clk",	ICODEC_RX_CLK,	NULL, 0),
+ 	CLK_PCOM("icodec_tx_clk",	ICODEC_TX_CLK,	NULL, 0),
+ 	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
+@@ -347,7 +349,11 @@ struct clk msm_clocks_8x50[] = {
+ 	CLK_PCOM("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
+ 	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
+ 	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
++	CLK_PCOM("uart_clk",	UART1_CLK,	NULL, OFF),
++	CLK_PCOM("uart_clk",	UART2_CLK,	NULL, 0),
+ 	CLK_PCOM("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
++	CLK_PCOM("uartdm_clk",	UART1DM_CLK,	NULL, OFF),
++	CLK_PCOM("uartdm_clk",	UART2DM_CLK,	NULL, 0),
+ 	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	NULL, OFF),
+ 	CLK_PCOM("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
