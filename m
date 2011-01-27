@@ -1,59 +1,27 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Wed, 26 Jan 2011 16:49:39 -0800
-Subject: [PATCH] msm: smd: Add smd_pkt driver
-In-Reply-To: <20110126153240.9cc6c2e2.akpm@linux-foundation.org>
-References: <1292437675-11561-1-git-send-email-nvishwan@codeaurora.org>
-	<8yatygweqng.fsf@huya.qualcomm.com>
-	<20110126153240.9cc6c2e2.akpm@linux-foundation.org>
-Message-ID: <1296089379.29801.52.camel@c-dwalke-linux.qualcomm.com>
+From: ecc@cmu.edu (Eric Cooper)
+Date: Wed, 26 Jan 2011 22:00:24 -0500
+Subject: kexec on kirkwood kernels?
+Message-ID: <20110127030024.GF19307@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-01-26 at 15:32 -0800, Andrew Morton wrote:
-> On Tue, 25 Jan 2011 11:20:51 -0800
-> David Brown <davidb@codeaurora.org> wrote:
-> 
-> > On Wed, Dec 15 2010, Niranjana Vishwanathapura wrote:
-> > 
-> > > Add smd_pkt driver which provides device interface
-> > > to smd packet ports.
-> > >
-> > > Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
-> > > ---
-> > >  drivers/char/Kconfig       |    8 +
-> > >  drivers/char/Makefile      |    2 +
-> > >  drivers/char/msm_smd_pkt.c |  466 ++++++++++++++++++++++++++++++++++++++++++++
-> > >  3 files changed, 476 insertions(+), 0 deletions(-)
-> > >  create mode 100644 drivers/char/msm_smd_pkt.c
-> > 
-> > Andrew, what's the proper destination for this change?  Should this go
-> > into your tree?  Is there anything you want me to do with this change?
-> > 
-> 
-> Looks OK, I grabbed it.
-> 
-> I read the entire email trying to work out what an "SMD" is.  Failed. 
-> Oh well.
+Has anyone successfully used kexec to boot one kirkwood kernel from
+another?  I've been trying to do it on a Seagate DockStar, but
+all I see is this:
 
-+       bool "MSM Shared Memory Driver (SMD)"
-+       help
-+         Support for the shared memory interface between the apps
-+         processor and the baseband processor.  Provides access to
-+         the "shared heap", as well as virtual serial channels
-+         used to communicate with various services on the baseband
-+         processor.
+    # kexec -l --append="console=ttyS0,115200" zImage
+    # kexec -e
+    [   35.553632] Starting new kernel
+    Uncompressing Linux... done, booting the kernel.
 
-It's an an interface from the cpu running Linux, and the other processor
-that co-exists with the one running Linux. They need to communicate for
-certain reasons .. I _think_ something like sending a text message is
-sent by communicating over this interface, or getting the phone to dial
-a number, along with many other things.
-
-Thats my take on it anyway.
-
-Daniel
+and then nothing.  I've tried with both 2.6.35 and 2.6.38-rc1 kernels.
+I've tried modifying the kernel image to set the machine ID
+explicitly, but that makes no difference.  I wonder if the boot
+parameters are being passed correctly, but I don't know how to check
+without any console output. I do have a JTAG setup, but so far I've
+only used it cookbook-fashion to re-flash the u-boot NAND partition.
+I'm hoping someone can help me avoid having to use gdb over JTAG to
+resolve this.  Thanks.
 
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Eric Cooper             e c c @ c m u . e d u
