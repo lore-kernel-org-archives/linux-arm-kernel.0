@@ -1,58 +1,90 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 12:19:01 +0000
-Subject: [PATCH] MMCI: don't read command response when invalid
-In-Reply-To: <20110111232025.GA25752@void.printf.net>
-References: <20110111163502.GJ11039@n2100.arm.linux.org.uk>
-	<20110111163556.GA18746@n2100.arm.linux.org.uk>
-	<20110111232025.GA25752@void.printf.net>
-Message-ID: <20110127121901.GB25968@n2100.arm.linux.org.uk>
+Date: Thu, 27 Jan 2011 12:32:53 +0000
+Subject: [PATCH 1/2] DMA: PL08x: fix infinite wait when terminating transfers
+Message-ID: <20110127123253.GC25968@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 11, 2011 at 11:20:26PM +0000, Chris Ball wrote:
-> Hi,
-> 
-> On Tue, Jan 11, 2011 at 04:35:56PM +0000, Russell King - ARM Linux wrote:
-> > Don't read the command response from the registers when either the
-> > command timed out (because there was no response from the card) or
-> > the checksum on the response was invalid.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/mmc/host/mmci.c |   10 +++++-----
-> >  1 file changed, 5 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> > index 5630228..040de4f 100644
-> > --- a/drivers/mmc/host/mmci.c
-> > +++ b/drivers/mmc/host/mmci.c
-> > @@ -394,15 +394,15 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
-> >  
-> >  	host->cmd = NULL;
-> >  
-> > -	cmd->resp[0] = readl(base + MMCIRESPONSE0);
-> > -	cmd->resp[1] = readl(base + MMCIRESPONSE1);
-> > -	cmd->resp[2] = readl(base + MMCIRESPONSE2);
-> > -	cmd->resp[3] = readl(base + MMCIRESPONSE3);
-> > -
-> >  	if (status & MCI_CMDTIMEOUT) {
-> >  		cmd->error = -ETIMEDOUT;
-> >  	} else if (status & MCI_CMDCRCFAIL && cmd->flags & MMC_RSP_CRC) {
-> >  		cmd->error = -EILSEQ;
-> > +	} else {
-> > +		cmd->resp[0] = readl(base + MMCIRESPONSE0);
-> > +		cmd->resp[1] = readl(base + MMCIRESPONSE1);
-> > +		cmd->resp[2] = readl(base + MMCIRESPONSE2);
-> > +		cmd->resp[3] = readl(base + MMCIRESPONSE3);
-> >  	}
-> >  
-> >  	if (!cmd->data || cmd->error) {
-> 
-> Thanks, pushed to mmc-next and queued as a .38 fix.
+If we try to pause a channel when terminating a transfer, we could end
+up spinning for it to become inactive indefinitely, and can result in
+an uninterruptible wait requiring a reset to recover from.
 
-FYI, I've now merged this into the ARM devel tree for the time being so
-it doesn't get forgotten - which means it'll appear in linux-next at some
-point if it isn't already there.  (Mainly so I don't have to keep on
-adding the patch.)
+Terminating a transfer is supposed to take effect immediately, but may
+result in data loss.
 
-Once you push it into mainline, I'll drop my copy.
+To make this clear, rename the function to pl08x_terminate_phy_chan().
+Also, make sure it is always consistently called - with the spinlock
+held and IRQs disabled, and ensure that the TC and ERR interrupt status
+is always cleared.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/dma/amba-pl08x.c |   32 ++++++++++++++++++--------------
+ 1 files changed, 18 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 297f48b..8321a39 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -267,19 +267,24 @@ static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
+ }
+ 
+ 
+-/* Stops the channel */
+-static void pl08x_stop_phy_chan(struct pl08x_phy_chan *ch)
++/*
++ * pl08x_terminate_phy_chan() stops the channel, clears the FIFO and
++ * clears any pending interrupt status.  This should not be used for
++ * an on-going transfer, but as a method of shutting down a channel
++ * (eg, when it's no longer used) or terminating a transfer.
++ */
++static void pl08x_terminate_phy_chan(struct pl08x_driver_data *pl08x,
++	struct pl08x_phy_chan *ch)
+ {
+-	u32 val;
++	u32 val = readl(ch->base + PL080_CH_CONFIG);
+ 
+-	pl08x_pause_phy_chan(ch);
++	val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
++	         PL080_CONFIG_TC_IRQ_MASK);
+ 
+-	/* Disable channel */
+-	val = readl(ch->base + PL080_CH_CONFIG);
+-	val &= ~PL080_CONFIG_ENABLE;
+-	val &= ~PL080_CONFIG_ERR_IRQ_MASK;
+-	val &= ~PL080_CONFIG_TC_IRQ_MASK;
+ 	writel(val, ch->base + PL080_CH_CONFIG);
++
++	writel(1 << ch->id, pl08x->base + PL080_ERR_CLEAR);
++	writel(1 << ch->id, pl08x->base + PL080_TC_CLEAR);
+ }
+ 
+ static inline u32 get_bytes_in_cctl(u32 cctl)
+@@ -404,13 +409,12 @@ static inline void pl08x_put_phy_channel(struct pl08x_driver_data *pl08x,
+ {
+ 	unsigned long flags;
+ 
++	spin_lock_irqsave(&ch->lock, flags);
++
+ 	/* Stop the channel and clear its interrupts */
+-	pl08x_stop_phy_chan(ch);
+-	writel((1 << ch->id), pl08x->base + PL080_ERR_CLEAR);
+-	writel((1 << ch->id), pl08x->base + PL080_TC_CLEAR);
++	pl08x_terminate_phy_chan(pl08x, ch);
+ 
+ 	/* Mark it as free */
+-	spin_lock_irqsave(&ch->lock, flags);
+ 	ch->serving = NULL;
+ 	spin_unlock_irqrestore(&ch->lock, flags);
+ }
+@@ -1449,7 +1453,7 @@ static int pl08x_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		plchan->state = PL08X_CHAN_IDLE;
+ 
+ 		if (plchan->phychan) {
+-			pl08x_stop_phy_chan(plchan->phychan);
++			pl08x_terminate_phy_chan(pl08x, plchan->phychan);
+ 
+ 			/*
+ 			 * Mark physical channel as free and free any slave
+-- 
+1.6.2.5
