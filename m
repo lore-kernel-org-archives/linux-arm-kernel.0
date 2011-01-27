@@ -1,51 +1,49 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Jan 2011 14:00:26 +0100
-Subject: [PATCH 06/13] ARM i.MX27 pca100: remove unnecessary CONFIG_SPI_IMX
-	ifdefs
+Date: Thu, 27 Jan 2011 14:00:21 +0100
+Subject: [PATCH 01/13] ARM i.MX35 pcm043: remove unnecessary CONFIG_I2C ifdefs
 In-Reply-To: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
 References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1296133233-1062-7-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1296133233-1062-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/mach-pca100.c |    4 ----
+ arch/arm/mach-mx3/mach-pcm043.c |    4 ----
  1 files changed, 0 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index cccc0a0..faa4e04 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -187,7 +187,6 @@ static struct i2c_board_info pca100_i2c_devices[] = {
+diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
+index bcf83fc..a27022d 100644
+--- a/arch/arm/mach-mx3/mach-pcm043.c
++++ b/arch/arm/mach-mx3/mach-pcm043.c
+@@ -115,7 +115,6 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
+-#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
+ static const struct imxi2c_platform_data pcm043_i2c0_data __initconst = {
+ 	.bitrate = 50000,
+ };
+@@ -134,7 +133,6 @@ static struct i2c_board_info pcm043_i2c_devices[] = {
+ 		I2C_BOARD_INFO("pcf8563", 0x51),
  	}
  };
- 
--#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
- static struct spi_eeprom at25320 = {
- 	.name		= "at25320an",
- 	.byte_len	= 4096,
-@@ -211,7 +210,6 @@ static const struct spi_imx_master pca100_spi0_data __initconst = {
- 	.chipselect	= pca100_spi_cs,
- 	.num_chipselect = ARRAY_SIZE(pca100_spi_cs),
- };
 -#endif
  
- static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
- {
-@@ -389,13 +387,11 @@ static void __init pca100_init(void)
+ static struct platform_device *devices[] __initdata = {
+ 	&pcm043_flash,
+@@ -369,12 +367,10 @@ static void __init mxc_board_init(void)
  
- 	imx27_add_imx_i2c(1, &pca100_i2c1_data);
+ 	imx35_add_imx_uart1(&uart_pdata);
  
--#if defined(CONFIG_SPI_IMX) || defined(CONFIG_SPI_IMX_MODULE)
- 	mxc_gpio_mode(GPIO_PORTD | 28 | GPIO_GPIO | GPIO_IN);
- 	mxc_gpio_mode(GPIO_PORTD | 27 | GPIO_GPIO | GPIO_IN);
- 	spi_register_board_info(pca100_spi_board_info,
- 				ARRAY_SIZE(pca100_spi_board_info));
- 	imx27_add_spi_imx0(&pca100_spi0_data);
+-#if defined CONFIG_I2C_IMX || defined CONFIG_I2C_IMX_MODULE
+ 	i2c_register_board_info(0, pcm043_i2c_devices,
+ 			ARRAY_SIZE(pcm043_i2c_devices));
+ 
+ 	imx35_add_imx_i2c0(&pcm043_i2c0_data);
 -#endif
  
- 	gpio_request(OTG_PHY_CS_GPIO, "usb-otg-cs");
- 	gpio_direction_output(OTG_PHY_CS_GPIO, 1);
+ 	mxc_register_device(&mx3_ipu, &mx3_ipu_data);
+ 	mxc_register_device(&mx3_fb, &mx3fb_pdata);
 -- 
 1.7.2.3
