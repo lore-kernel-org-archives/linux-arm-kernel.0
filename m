@@ -1,67 +1,64 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 27 Jan 2011 00:43:54 -0500 (EST)
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-References: <4D2B4CE4.9080309@ahsoftware.de>
-	<alpine.LFD.2.00.1101101722470.9794@xanadu.home>
-	<4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1101270030220.8580@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 26 Jan 2011 23:02:03 -0700
+Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
+In-Reply-To: <AANLkTikdAB-scO=dRwhggZD--dJoWq_tFGL-ay1OdY9E@mail.gmail.com>
+References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
+	<20110116102158.GC15575@mail.wantstofly.org>
+	<AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
+	<AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
+	<AANLkTinitxQLUxFZoVW=oZcNkAWF5k4FLJh5-f6o5pt-@mail.gmail.com>
+	<AANLkTinTzT-UiVGdg2M99VpYQCyWONh_RDrwExsasv_d@mail.gmail.com>
+	<AANLkTikdAB-scO=dRwhggZD--dJoWq_tFGL-ay1OdY9E@mail.gmail.com>
+Message-ID: <AANLkTimg1YxUOGh3Gm1uoZABo8see99=1WOd34aFtQD=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Jan 2011, Sachin Verma wrote:
+On Wed, Jan 26, 2011 at 10:42 PM, Colin Cross <ccross@android.com> wrote:
+> On Wed, Jan 26, 2011 at 7:41 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Mon, Jan 17, 2011 at 3:49 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>> On Mon, Jan 17, 2011 at 3:17 PM, Colin Cross <ccross@android.com> wrote:
+>>>> On Sun, Jan 16, 2011 at 7:53 AM, Olof Johansson <olof@lixom.net> wrote:
+>>>>> On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
+>>>>> <buytenh@wantstofly.org> wrote:
+>>>>>> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
+>>>>>>
+>>>>>>> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
+>>>>>>> conversion." missed changing one reference to 'irq' in the function
+>>>>>>> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
+>>>>>>>
+>>>>>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>>>>>>
+>>>>>> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
+>>>>>
+>>>>> Acked-by: Olof Johansson <olof@lixom.net>
+>>>>>
+>>>>>> I built this queue against all defconfigs, but there doesn't seem to
+>>>>>> be one for tegra at the moment, which is why I missed this.
+>>>>>
+>>>>> Yep, planning on fixing this for .39.
+>>>>>
+>>>>>
+>>>>> -Olof
+>>>>>
+>>>>
+>>>> This should get fixed in .38. ?Has someone picked it up, or should I
+>>>> put it in through my tree?
+>>>
+>>> I don't think Olof picked it up (seeing as he only acked it and it's
+>>> not in Linus' tree). ?You should take it through your tree.
+>>
+>> Ping? ?I've not seen this hit Linus' tree yet. ?Do you want me to take
+>> care of it?
+>
+> I confused your previous request for the struct clk patch with this
+> patch. ?I just sent a pull request with both this and the struct clk
+> patch to Linus.
 
-> Hello,
-> 
-> On Thu, Jan 13, 2011 at 12:25 AM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
-> > On Wed, 12 Jan 2011, Russell King - ARM Linux wrote:
-> >
-> >> As the overall feeling at the time was "don't use large initrds" it's
-> >> something I've never really cared about - and I'm still of the opinion
-> >> that 16MB of compressed initrd/initramfs is rather silly.
-> >
-> > It is... but we have more than 32MB of RAM total now, and people are
-> > running standard distributions on ARM these days, such as Fedora or
-> > Ubuntu, including their corresponding initrd that may contain lots of
-> > modules, splashscreen data, etc. ?So it might be a good idea to think
-> > about fixing this limitation before it comes back again.
-> >
-> 
-> in fact it is not just the initrd/initramfs size, i am facing issues
-> with loading modules on MMU-less envt(Cortex M3).
-> I have 128MB of Physical RAM and i am using a 4MB initrd to boot my
-> system. when i try to load kernel modules i get relocation errors.
-> As MMU-less systems are allowing modules to be loaded anywhere from
-> RAM and not from any predefined limits of MODULES_VADDR and
-> MODULES_END.
-> 
-> Do you have any pointers on how to tackle this situation for MMU less
-> environments?
+Cool, thanks.
 
-The MMU-less kernel should still favor allocations close to the kernel 
-text for modules, and anything else away from the kernel going 
-downwards.
-
-Otherwise a veneer should be created by the module symbol resolver such 
-that if the branch distance to reach, say, printk is too large, then the 
-following code would have to be dynamically generated right next to the 
-module:
-
-	ldr	pc, [pc, #-4]
-	.word	<far_away_symbol>
-
-Then, in your module, you patch the branch relocation for printk so that 
-it branches to the code above instead, and then store the address of 
-printk at the location represented by the .word directive.
+g.
 
 
-Nicolas
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
