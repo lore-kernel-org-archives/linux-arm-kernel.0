@@ -1,86 +1,138 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 27 Jan 2011 14:45:52 -0500 (EST)
-Subject: HIGHMEM is broken when working in SMP V6 mode
-In-Reply-To: <20110127190411.GA1597@n2100.arm.linux.org.uk>
-References: <AANLkTikjcgRgPd7oLjf0ESxeyC2BHpaaRi8DiMz3b+JQ@mail.gmail.com>
-	<20110123145639.GB30094@n2100.arm.linux.org.uk>
-	<AANLkTi=HtLjnOLGVVqWvqToiXdQAm_+cDdZf51M+ABV4@mail.gmail.com>
-	<20110123170830.GG30094@n2100.arm.linux.org.uk>
-	<AANLkTim3VVYTrWZX+UJUtK73bUkmSufW_4awhgQcVeNZ@mail.gmail.com>
-	<alpine.LFD.2.00.1101241010580.8580@xanadu.home>
-	<20110127173716.GA605@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101271337410.8580@xanadu.home>
-	<20110127190411.GA1597@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1101271435410.8580@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 27 Jan 2011 11:58:33 -0800
+Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+	in board_init
+In-Reply-To: <19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
+	(Vaibhav Hiremath's message of "Tue, 25 Jan 2011 20:58:44 +0530")
+References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
+	<19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
+Message-ID: <874o8um846.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jan 2011, Russell King - ARM Linux wrote:
+"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
 
-> On Thu, Jan 27, 2011 at 01:40:37PM -0500, Nicolas Pitre wrote:
-> > On Thu, 27 Jan 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Mon, Jan 24, 2011 at 02:58:07PM -0500, Nicolas Pitre wrote:
-> > > >  /*
-> > > > + * The reason for kmap_high_get() is to ensure that the currently kmap'd
-> > > > + * page usage count does not decrease to zero while we're using its
-> > > > + * existing virtual mapping in an atomic context.  With a VIVT cache this
-> > > > + * is essential to do, but with a VIPT cache this is only an optimization
-> > > > + * so not to pay the price of establishing a second mapping if an existing
-> > > > + * one can be used.  However, on platforms without hardware TLB maintainence
-> > > > + * broadcast, we simply cannot use ARCH_NEEDS_KMAP_HIGH_GET at all since
-> > > > + * the locking involved must also disable IRQs which is incompatible with
-> > > > + * the IPI mechanism used by global TLB operations.
-> > > > + */
-> > > > +#define ARCH_NEEDS_KMAP_HIGH_GET
-> > > > +#if defined(CONFIG_SMP) && defined(CONFIG_CPU_TLB_V6)
-> > > > +#undef ARCH_NEEDS_KMAP_HIGH_GET
-> > > > +#if defined(CONFIG_HIGHMEM) && defined(CONFIG_CPU_CACHE_VIVT)
-> > > > +#error "The sum of feature in your kernel config cannot be supported together"
-> > > > +#endif
-> > > 
-> > > This is wrong.  Take a moment to consider a kernel supporting an ARMv6
-> > > VIPT aliasing cache CPU and ARMv7 SMP.  Don't we need kmap_high_get()
-> > > for ARMv6 VIPT aliasing cache?
-> > 
-> > We don't support highmem on aliasing VIPT.  Highmem gets disabled at run 
-> > time on aliasing VIPT platforms.
-> 
-> Correct.  But a kernel which has this configuration:
-> 
-> CONFIG_SMP=y
-> CONFIG_HIGHMEM=y
-> CONFIG_CPU_V6=y
-> CONFIG_CPU_V7=y
-> CONFIG_CPU_32v6=y
-> CONFIG_CPU_32v7=y
-> CONFIG_CPU_CACHE_V6=y
-> CONFIG_CPU_CACHE_VIPT=y
-> CONFIG_CPU_CACHE_V7=y
-> CONFIG_CPU_CACHE_VIPT=y
-> CONFIG_CPU_TLB_V6=y
-> CONFIG_CPU_TLB_V7=y
-> 
-> This disables ARCH_NEEDS_KMAP_HIGH_GET in this kernel, which can be used on
-> ARMv6 VIPT non-aliasing, VIPT aliasing, as well as SMP stuff.
+>> -----Original Message-----
+>> From: Hiremath, Vaibhav
+>> Sent: Tuesday, January 25, 2011 8:53 PM
+>> To: linux-omap at vger.kernel.org
+>> Cc: Hiremath, Vaibhav; Varadarajan, Charulatha
+>> Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+>> in board_init
+>> 
+>> With addition of hwmod support to gpio, the ethernet controller
+>> goes undetected for OMAP35xEVM. So explicitly assert the reset signal to
+>> ethernet controller smsc911x -
+>> 
+>> 	- GPIO7 (>=RevG version of EVM's)
+>> 	- GPIO64 (<=RevD version of EVM's)
+>> 
+>> This patch is based on intial version from Charulatha V, reference
+>> to original discussion -
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
+>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>> Tested-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> Since Kevin reported that this patch doesn't get applied cleanly,
+>> so I am reposting it again after making sure that it gets applied cleanly.
+>> 
+> [Hiremath, Vaibhav] Oops, missed linux-arm-kernel list, adding here.
+>
+> Not sure whether I need to repost keeping linux-arm-kernel?
 
-Yes.
+Yes, please repost.
 
-On a VIPT aliasing target, highmem gets disabled at run time.  So no 
-issue there.
+Kevin
 
-Otherwise, on VIPT, it is not essential to have 
-ARCH_NEEDS_KMAP_HIGH_GET.
-
-> If we don't need ARCH_NEEDS_KMAP_HIGH_GET on V6 and V7, we should just not
-> enable it for those at all.
-
-As I said in the patch comment, ARCH_NEEDS_KMAP_HIGH_GET is still a nice 
-optimization on VIPT. It avoids the creation of a second mapping and TLB 
-usage when an existing mapping from the pkmap array can be reused right 
-away.  But if our kernel config indicates that we might run on a target 
-lacking hw TLB broadcast then we have to compromize and give up on that 
-optimization.
-
-
-Nicolas
+>
+>>  arch/arm/mach-omap2/board-omap3evm.c |   39
+>> +++++++++++++++++++++++++++++++++-
+>>  1 files changed, 38 insertions(+), 1 deletions(-)
+>> 
+>> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+>> omap2/board-omap3evm.c
+>> index 323c380..97e0f65 100644
+>> --- a/arch/arm/mach-omap2/board-omap3evm.c
+>> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+>> @@ -58,6 +58,13 @@
+>>  #define OMAP3EVM_ETHR_ID_REV	0x50
+>>  #define OMAP3EVM_ETHR_GPIO_IRQ	176
+>>  #define OMAP3EVM_SMSC911X_CS	5
+>> +/*
+>> + * Eth Reset signal
+>> + *	64 = Generation 1 (<=RevD)
+>> + *	7 = Generation 2 (>=RevE)
+>> + */
+>> +#define OMAP3EVM_GEN1_ETHR_GPIO_RST	64
+>> +#define OMAP3EVM_GEN2_ETHR_GPIO_RST	7
+>> 
+>>  static u8 omap3_evm_version;
+>> 
+>> @@ -124,10 +131,15 @@ static struct platform_device
+>> omap3evm_smsc911x_device = {
+>> 
+>>  static inline void __init omap3evm_init_smsc911x(void)
+>>  {
+>> -	int eth_cs;
+>> +	int eth_cs, eth_rst;
+>>  	struct clk *l3ck;
+>>  	unsigned int rate;
+>> 
+>> +	if (get_omap3_evm_rev() == OMAP3EVM_BOARD_GEN_1)
+>> +		eth_rst = OMAP3EVM_GEN1_ETHR_GPIO_RST;
+>> +	else
+>> +		eth_rst = OMAP3EVM_GEN2_ETHR_GPIO_RST;
+>> +
+>>  	eth_cs = OMAP3EVM_SMSC911X_CS;
+>> 
+>>  	l3ck = clk_get(NULL, "l3_ck");
+>> @@ -136,6 +148,27 @@ static inline void __init
+>> omap3evm_init_smsc911x(void)
+>>  	else
+>>  		rate = clk_get_rate(l3ck);
+>> 
+>> +	/* Configure ethernet controller reset gpio */
+>> +	if (cpu_is_omap3430()) {
+>> +		if (gpio_request(eth_rst, "SMSC911x gpio") < 0) {
+>> +			pr_err(KERN_ERR "Failed to request %d for smsc911x\n",
+>> +					eth_rst);
+>> +			return;
+>> +		}
+>> +
+>> +		if (gpio_direction_output(eth_rst, 1) < 0) {
+>> +			pr_err(KERN_ERR "Failed to set direction of %d for" \
+>> +					" smsc911x\n", eth_rst);
+>> +			return;
+>> +		}
+>> +		/* reset pulse to ethernet controller*/
+>> +		usleep_range(150, 220);
+>> +		gpio_set_value(eth_rst, 0);
+>> +		usleep_range(150, 220);
+>> +		gpio_set_value(eth_rst, 1);
+>> +		usleep_range(1, 2);
+>> +	}
+>> +
+>>  	if (gpio_request(OMAP3EVM_ETHR_GPIO_IRQ, "SMSC911x irq") < 0) {
+>>  		printk(KERN_ERR "Failed to request GPIO%d for smsc911x IRQ\n",
+>>  			OMAP3EVM_ETHR_GPIO_IRQ);
+>> @@ -658,6 +691,10 @@ static struct omap_board_mux board_mux[] __initdata =
+>> {
+>>  				OMAP_PIN_OFF_WAKEUPENABLE),
+>>  	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+>>  				OMAP_PIN_OFF_INPUT_PULLUP |
+>> OMAP_PIN_OFF_OUTPUT_LOW),
+>> +	OMAP3_MUX(SYS_BOOT5, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+>> +				OMAP_PIN_OFF_NONE),
+>> +	OMAP3_MUX(GPMC_WAIT2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+>> +				OMAP_PIN_OFF_NONE),
+>>  	{ .reg_offset = OMAP_MUX_TERMINATOR },
+>>  };
+>>  #endif
+>> --
+>> 1.6.2.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
