@@ -1,69 +1,69 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 12:58:10 +0000
-Subject: [PATCH 01/10] ARM: versatile: support CLCD RGB565 layout with blue LSB
+Date: Thu, 27 Jan 2011 12:58:30 +0000
+Subject: [PATCH 02/10] ARM: integrator: support CLCD RGB5551 layout for 16bpp
 In-Reply-To: <20110127125714.GD25968@n2100.arm.linux.org.uk>
 References: <20110127125714.GD25968@n2100.arm.linux.org.uk>
-Message-ID: <E1PiRQQ-0003ma-4F@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PiRQk-0003me-8g@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RGB565 with blue in the LSB wasn't supported.  Add support for this
-layout.
+When the CLCD is in anything but RGB888 mode, its outputs are configured
+for RGB5551 output.  Integrator/CP supports RGB565 via an external
+multiplexer, which we configure for RGB5551 or RGB565 based only on the
+bits per pixel.  So when userspace asks for the RGB555 layout, the mux
+remains in RGB565 mode, and we produce incorrect colours.  Fix this.
+
+Note that Integrator doesn't support BGR565 mode, but does support
+BGR5551.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-versatile/core.c |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/mach-integrator/include/mach/cm.h |    4 ++--
+ arch/arm/mach-integrator/integrator_cp.c   |   14 ++++++++------
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 136c32e..2866c11 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -630,18 +630,22 @@ static void versatile_clcd_disable(struct clcd_fb *fb)
+diff --git a/arch/arm/mach-integrator/include/mach/cm.h b/arch/arm/mach-integrator/include/mach/cm.h
+index 1ab353e..445d57a 100644
+--- a/arch/arm/mach-integrator/include/mach/cm.h
++++ b/arch/arm/mach-integrator/include/mach/cm.h
+@@ -24,9 +24,9 @@ void cm_control(u32, u32);
+ #define CM_CTRL_LCDBIASDN		(1 << 10)
+ #define CM_CTRL_LCDMUXSEL_MASK		(7 << 11)
+ #define CM_CTRL_LCDMUXSEL_GENLCD	(1 << 11)
+-#define CM_CTRL_LCDMUXSEL_VGA_16BPP	(2 << 11)
++#define CM_CTRL_LCDMUXSEL_VGA565_TFT555	(2 << 11)
+ #define CM_CTRL_LCDMUXSEL_SHARPLCD	(3 << 11)
+-#define CM_CTRL_LCDMUXSEL_VGA_8421BPP	(4 << 11)
++#define CM_CTRL_LCDMUXSEL_VGA555_TFT555	(4 << 11)
+ #define CM_CTRL_LCDEN0			(1 << 14)
+ #define CM_CTRL_LCDEN1			(1 << 15)
+ #define CM_CTRL_STATIC1			(1 << 16)
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index e9327da..8600902 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -478,14 +478,16 @@ static struct clcd_panel vga = {
   */
- static void versatile_clcd_enable(struct clcd_fb *fb)
+ static void cp_clcd_enable(struct clcd_fb *fb)
  {
+-	u32 val;
 +	struct fb_var_screeninfo *var = &fb->fb.var;
- 	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
- 	u32 val;
++	u32 val = CM_CTRL_STATIC1 | CM_CTRL_STATIC2;
  
- 	val = readl(sys_clcd);
- 	val &= ~SYS_CLCD_MODE_MASK;
+-	if (fb->fb.var.bits_per_pixel <= 8)
+-		val = CM_CTRL_LCDMUXSEL_VGA_8421BPP;
++	if (var->bits_per_pixel <= 8 ||
++	    (var->bits_per_pixel == 16 && var->green.length == 5))
++		/* Pseudocolor, RGB555, BGR555 */
++		val |= CM_CTRL_LCDMUXSEL_VGA555_TFT555;
+ 	else if (fb->fb.var.bits_per_pixel <= 16)
+-		val = CM_CTRL_LCDMUXSEL_VGA_16BPP
+-			| CM_CTRL_LCDEN0 | CM_CTRL_LCDEN1
+-			| CM_CTRL_STATIC1 | CM_CTRL_STATIC2;
++		/* truecolor RGB565 */
++		val |= CM_CTRL_LCDMUXSEL_VGA565_TFT555;
+ 	else
+ 		val = 0; /* no idea for this, don't trust the docs */
  
--	switch (fb->fb.var.green.length) {
-+	switch (var->green.length) {
- 	case 5:
- 		val |= SYS_CLCD_MODE_5551;
- 		break;
- 	case 6:
--		val |= SYS_CLCD_MODE_565_RLSB;
-+		if (var->red.offset == 0)
-+			val |= SYS_CLCD_MODE_565_RLSB;
-+		else
-+			val |= SYS_CLCD_MODE_565_BLSB;
- 		break;
- 	case 8:
- 		val |= SYS_CLCD_MODE_888;
-@@ -709,10 +713,19 @@ static void versatile_clcd_remove(struct clcd_fb *fb)
- 			      fb->fb.screen_base, fb->fb.fix.smem_start);
- }
- 
-+static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
-+{
-+	clcdfb_decode(fb, regs);
-+
-+	/* Always clear BGR for RGB565: we do the routing externally */
-+	if (fb->fb.var.green.length == 6)
-+		regs->cntl &= ~CNTL_BGR;
-+}
-+
- static struct clcd_board clcd_plat_data = {
- 	.name		= "Versatile",
- 	.check		= clcdfb_check,
--	.decode		= clcdfb_decode,
-+	.decode		= versatile_clcd_decode,
- 	.disable	= versatile_clcd_disable,
- 	.enable		= versatile_clcd_enable,
- 	.setup		= versatile_clcd_setup,
 -- 
 1.6.2.5
