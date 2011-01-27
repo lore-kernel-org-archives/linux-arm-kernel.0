@@ -1,27 +1,27 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Thu, 27 Jan 2011 21:02:25 +0200
-Subject: [PATCH 1/2] arch/arm/mach-omap2/dma.c: Convert IS_ERR result to
-	PTR_ERR
-In-Reply-To: <1296143347-17508-1-git-send-email-julia@diku.dk>
-References: <1296143347-17508-1-git-send-email-julia@diku.dk>
-Message-ID: <20110127210225.07de155f.jhnikula@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Jan 2011 11:45:04 -0800
+Subject: [PATCH v2 15/28] ARM: tegra: irq: Add debugfs file to show wake
+	irqs
+In-Reply-To: <1295834493-5019-16-git-send-email-ccross@android.com>
+References: <1295834493-5019-1-git-send-email-ccross@android.com>
+	<1295834493-5019-16-git-send-email-ccross@android.com>
+Message-ID: <4D41CB40.20903@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jan 2011 16:49:06 +0100
-Julia Lawall <julia@diku.dk> wrote:
+On 01/23/2011 06:01 PM, Colin Cross wrote:
+>
+> +static int __init tegra_irq_debug_init(void)
+> +{
+> +	struct dentry *d;
+> +
+> +	d = debugfs_create_file("wake_irq", S_IRUGO, NULL, NULL,
+> +		&tegra_wake_irq_debug_fops);
+> +	if (!d) {
+> +		pr_info("Failed to create suspend_mode debug file\n");
 
-> diff -u -p a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> --- a/arch/arm/mach-omap2/dma.c
-> +++ b/arch/arm/mach-omap2/dma.c
-> @@ -264,7 +264,7 @@ static int __init omap2_system_dma_init_
->  	if (IS_ERR(od)) {
->  		pr_err("%s: Cant build omap_device for %s:%s.\n",
->  			__func__, name, oh->name);
-> -		return IS_ERR(od);
-> +		return PTR_ERR(od);
->  	}
->  
-FWIW,
+Does this want to be a pr_err()?
 
-Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
