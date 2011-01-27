@@ -1,99 +1,110 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 13:46:05 +0000
-Subject: [PATCH 01/11] ARM: integrator: use new init_early for clock tree init
+Date: Thu, 27 Jan 2011 13:46:26 +0000
+Subject: [PATCH 02/11] ARM: versatile: use new init_early for clock tree and
+	sched_clock init
 In-Reply-To: <20110127134532.GE25968@n2100.arm.linux.org.uk>
 References: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-Message-ID: <E1PiSAn-0003ot-Uc@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PiSB8-0003ox-Cm@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the clock tree early.
+Initialize the clock tree and our sched_clock() early.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-integrator/common.h        |    1 +
- arch/arm/mach-integrator/core.c          |    7 +++++--
- arch/arm/mach-integrator/integrator_ap.c |    3 ++-
- arch/arm/mach-integrator/integrator_cp.c |   11 +++++++++--
- 4 files changed, 17 insertions(+), 5 deletions(-)
+ arch/arm/mach-versatile/core.c         |   23 +++++++++++------------
+ arch/arm/mach-versatile/core.h         |    1 +
+ arch/arm/mach-versatile/versatile_ab.c |    1 +
+ arch/arm/mach-versatile/versatile_pb.c |    1 +
+ 4 files changed, 14 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
-index 5f96e15..a08f9b0 100644
---- a/arch/arm/mach-integrator/common.h
-+++ b/arch/arm/mach-integrator/common.h
-@@ -1 +1,2 @@
-+void integrator_init_early(void);
- void integrator_reserve(void);
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index b8e884b..77315b9 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -144,12 +144,15 @@ static struct clk_lookup lookups[] = {
- 	}
- };
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index b4f1f17..606e046 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -762,14 +762,21 @@ static void versatile_leds_event(led_event_t ledevt)
+ }
+ #endif	/* CONFIG_LEDS */
  
-+void __init integrator_init_early(void)
-+{
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+}
-+
- static int __init integrator_init(void)
+-void __init versatile_init(void)
++/* Early initializations */
++void __init versatile_init_early(void)
  {
- 	int i;
- 
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-	int i;
 -
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
- 		amba_device_register(d, &iomem_resource);
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index b666443..4f06b5d 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -499,8 +499,9 @@ static struct sys_timer ap_timer = {
- MACHINE_START(INTEGRATOR, "ARM-Integrator")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.boot_params	= 0x00000100,
--	.map_io		= ap_map_io,
- 	.reserve	= integrator_reserve,
-+	.map_io		= ap_map_io,
-+	.init_early	= integrator_init_early,
- 	.init_irq	= ap_init_irq,
- 	.timer		= &ap_timer,
- 	.init_machine	= ap_init,
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 9c02037..e6700aa 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -520,11 +520,17 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&clcd_device,
- };
+-	osc4_clk.vcoreg	= __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_OSCCLCD_OFFSET;
++	void __iomem *sys = __io_address(VERSATILE_SYS_BASE);
  
-+static void __init intcp_init_early(void)
-+{
-+	clkdev_add_table(cp_lookups, ARRAY_SIZE(cp_lookups));
-+
-+	integrator_init_early();
++	osc4_clk.vcoreg	= sys + VERSATILE_SYS_OSCCLCD_OFFSET;
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+ 
++	versatile_sched_clock_init(sys + VERSATILE_SYS_24MHz_OFFSET, 24000000);
 +}
 +
- static void __init intcp_init(void)
++void __init versatile_init(void)
++{
++	int i;
++
+ 	platform_device_register(&versatile_flash_device);
+ 	platform_device_register(&versatile_i2c_device);
+ 	platform_device_register(&smc91x_device);
+@@ -786,12 +793,6 @@ void __init versatile_init(void)
+ }
+ 
+ /*
+- * The sched_clock counter
+- */
+-#define REFCOUNTER		(__io_address(VERSATILE_SYS_BASE) + \
+-				 VERSATILE_SYS_24MHz_OFFSET)
+-
+-/*
+  * Where is the timer (VA)?
+  */
+ #define TIMER0_VA_BASE		 __io_address(VERSATILE_TIMER0_1_BASE)
+@@ -806,8 +807,6 @@ static void __init versatile_timer_init(void)
  {
- 	int i;
+ 	u32 val;
  
--	clkdev_add_table(cp_lookups, ARRAY_SIZE(cp_lookups));
- 	platform_add_devices(intcp_devs, ARRAY_SIZE(intcp_devs));
+-	versatile_sched_clock_init(REFCOUNTER, 24000000);
+-
+ 	/* 
+ 	 * set clock frequency: 
+ 	 *	VERSATILE_REFCLK is 32KHz
+diff --git a/arch/arm/mach-versatile/core.h b/arch/arm/mach-versatile/core.h
+index 9d39886..e04768a 100644
+--- a/arch/arm/mach-versatile/core.h
++++ b/arch/arm/mach-versatile/core.h
+@@ -25,6 +25,7 @@
+ #include <linux/amba/bus.h>
  
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
-@@ -554,8 +560,9 @@ static struct sys_timer cp_timer = {
- MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
+ extern void __init versatile_init(void);
++extern void __init versatile_init_early(void);
+ extern void __init versatile_init_irq(void);
+ extern void __init versatile_map_io(void);
+ extern struct sys_timer versatile_timer;
+diff --git a/arch/arm/mach-versatile/versatile_ab.c b/arch/arm/mach-versatile/versatile_ab.c
+index aa9730f..f8ae64b 100644
+--- a/arch/arm/mach-versatile/versatile_ab.c
++++ b/arch/arm/mach-versatile/versatile_ab.c
+@@ -37,6 +37,7 @@ MACHINE_START(VERSATILE_AB, "ARM-Versatile AB")
  	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
  	.boot_params	= 0x00000100,
--	.map_io		= intcp_map_io,
- 	.reserve	= integrator_reserve,
-+	.map_io		= intcp_map_io,
-+	.init_early	= intcp_init_early,
- 	.init_irq	= intcp_init_irq,
- 	.timer		= &cp_timer,
- 	.init_machine	= intcp_init,
+ 	.map_io		= versatile_map_io,
++	.init_early	= versatile_init_early,
+ 	.init_irq	= versatile_init_irq,
+ 	.timer		= &versatile_timer,
+ 	.init_machine	= versatile_init,
+diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
+index bf46964..97fb306 100644
+--- a/arch/arm/mach-versatile/versatile_pb.c
++++ b/arch/arm/mach-versatile/versatile_pb.c
+@@ -110,6 +110,7 @@ MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.boot_params	= 0x00000100,
+ 	.map_io		= versatile_map_io,
++	.init_early	= versatile_init_early,
+ 	.init_irq	= versatile_init_irq,
+ 	.timer		= &versatile_timer,
+ 	.init_machine	= versatile_pb_init,
 -- 
 1.6.2.5
