@@ -1,41 +1,116 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 27 Jan 2011 08:24:33 +0100
-Subject: kexec on kirkwood kernels?
-In-Reply-To: <20110127030024.GF19307@localhost>
-References: <20110127030024.GF19307@localhost>
-Message-ID: <20110127072433.GI1147@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 27 Jan 2011 08:30:09 +0100
+Subject: [PATCH 1/3] ARM: mach-mx5: Fix build for mx53_loco and mx53_smd
+In-Reply-To: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
+References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110127073009.GR9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo,
+Yong,
 
-On Wed, Jan 26, 2011 at 10:00:24PM -0500, Eric Cooper wrote:
-> Has anyone successfully used kexec to boot one kirkwood kernel from
-> another?  I've been trying to do it on a Seagate DockStar, but
-> all I see is this:
+Can you ack these?
+
+Sascha
+
+On Tue, Jan 25, 2011 at 01:08:33PM -0200, Fabio Estevam wrote:
+> Commit 816ad74 (ARM: i.MX53: Add full iomux support for mx53) renamed some of the pad names.
 > 
->     # kexec -l --append="console=ttyS0,115200" zImage
->     # kexec -e
->     [   35.553632] Starting new kernel
->     Uncompressing Linux... done, booting the kernel.
+> Make the changes accordingly so that mx53_loco and mx53_cmd can build without errors.
 > 
-> and then nothing.  I've tried with both 2.6.35 and 2.6.38-rc1 kernels.
-> I've tried modifying the kernel image to set the machine ID
-> explicitly, but that makes no difference.  I wonder if the boot
-> parameters are being passed correctly, but I don't know how to check
-> without any console output. I do have a JTAG setup, but so far I've
-> only used it cookbook-fashion to re-flash the u-boot NAND partition.
-> I'm hoping someone can help me avoid having to use gdb over JTAG to
-> resolve this.  Thanks.
-Try enabling DEBUG_LL and EARLY_PRINTK in the kernel to boot and pass 
-
-	earlyprintk
-
-as kernel parameter.
-
-Best regards
-Uwe
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mx5/board-mx53_loco.c |   25 +++++++++++++------------
+>  arch/arm/mach-mx5/board-mx53_smd.c  |   24 ++++++++++++------------
+>  2 files changed, 25 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+> index d1348e0..dadc856 100644
+> --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+> @@ -39,20 +39,21 @@
+>  #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+>  
+>  static iomux_v3_cfg_t mx53_loco_pads[] = {
+> -	MX53_PAD_CSI0_D10__UART1_TXD,
+> -	MX53_PAD_CSI0_D11__UART1_RXD,
+> -	MX53_PAD_ATA_DIOW__UART1_TXD,
+> -	MX53_PAD_ATA_DMACK__UART1_RXD,
+> -
+> -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
+> -	MX53_PAD_ATA_DMARQ__UART2_TXD,
+> -	MX53_PAD_ATA_DIOR__UART2_RTS,
+> -	MX53_PAD_ATA_INTRQ__UART2_CTS,
+> -
+> -	MX53_PAD_ATA_CS_0__UART3_TXD,
+> -	MX53_PAD_ATA_CS_1__UART3_RXD,
+> -	MX53_PAD_ATA_DA_1__UART3_CTS,
+> -	MX53_PAD_ATA_DA_2__UART3_RTS,
+> +	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+> +	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
+> +	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
+> +	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
+> +
+> +	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+> +	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+> +	MX53_PAD_PATA_DIOR__UART2_RTS,
+> +	MX53_PAD_PATA_INTRQ__UART2_CTS,
+> +
+> +	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
+> +	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
+> +	MX53_PAD_PATA_DA_1__UART3_CTS,
+> +	MX53_PAD_PATA_DA_2__UART3_RTS,
+> +
+>  };
+>  
+>  static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
+> diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+> index 7970f7a..06070c5 100644
+> --- a/arch/arm/mach-mx5/board-mx53_smd.c
+> +++ b/arch/arm/mach-mx5/board-mx53_smd.c
+> @@ -39,20 +39,20 @@
+>  #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+>  
+>  static iomux_v3_cfg_t mx53_smd_pads[] = {
+> -	MX53_PAD_CSI0_D10__UART1_TXD,
+> -	MX53_PAD_CSI0_D11__UART1_RXD,
+> -	MX53_PAD_ATA_DIOW__UART1_TXD,
+> -	MX53_PAD_ATA_DMACK__UART1_RXD,
+> -
+> -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
+> -	MX53_PAD_ATA_DMARQ__UART2_TXD,
+> -	MX53_PAD_ATA_DIOR__UART2_RTS,
+> -	MX53_PAD_ATA_INTRQ__UART2_CTS,
+> -
+> -	MX53_PAD_ATA_CS_0__UART3_TXD,
+> -	MX53_PAD_ATA_CS_1__UART3_RXD,
+> -	MX53_PAD_ATA_DA_1__UART3_CTS,
+> -	MX53_PAD_ATA_DA_2__UART3_RTS,
+> +	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+> +	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
+> +	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
+> +	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
+> +
+> +	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+> +	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+> +	MX53_PAD_PATA_DIOR__UART2_RTS,
+> +	MX53_PAD_PATA_INTRQ__UART2_CTS,
+> +
+> +	MX53_PAD_PATA_CS_0__UART3_TXD_MUX,
+> +	MX53_PAD_PATA_CS_1__UART3_RXD_MUX,
+> +	MX53_PAD_PATA_DA_1__UART3_CTS,
+> +	MX53_PAD_PATA_DA_2__UART3_RTS,
+>  };
+>  
+>  static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+> -- 
+> 1.6.0.4
+> 
+> 
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
