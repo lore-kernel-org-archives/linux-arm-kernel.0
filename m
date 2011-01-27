@@ -1,27 +1,49 @@
-From: ecc@cmu.edu (Eric Cooper)
-Date: Wed, 26 Jan 2011 22:00:24 -0500
-Subject: kexec on kirkwood kernels?
-Message-ID: <20110127030024.GF19307@localhost>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 26 Jan 2011 20:41:10 -0700
+Subject: [PATCH] arm/tegra: Fix tegra irq_data conversion
+In-Reply-To: <AANLkTinitxQLUxFZoVW=oZcNkAWF5k4FLJh5-f6o5pt-@mail.gmail.com>
+References: <20110116054127.1395.68849.stgit@localhost6.localdomain6>
+	<20110116102158.GC15575@mail.wantstofly.org>
+	<AANLkTi=CmtiM7jja2vxB8tUjZFVQEY739X3uREJD+MXk@mail.gmail.com>
+	<AANLkTin_D7VpX2yQAcTC-1d67iqRh+-yTX028MM8=Cto@mail.gmail.com>
+	<AANLkTinitxQLUxFZoVW=oZcNkAWF5k4FLJh5-f6o5pt-@mail.gmail.com>
+Message-ID: <AANLkTinTzT-UiVGdg2M99VpYQCyWONh_RDrwExsasv_d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anyone successfully used kexec to boot one kirkwood kernel from
-another?  I've been trying to do it on a Seagate DockStar, but
-all I see is this:
+On Mon, Jan 17, 2011 at 3:49 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, Jan 17, 2011 at 3:17 PM, Colin Cross <ccross@android.com> wrote:
+>> On Sun, Jan 16, 2011 at 7:53 AM, Olof Johansson <olof@lixom.net> wrote:
+>>> On Sun, Jan 16, 2011 at 2:21 AM, Lennert Buytenhek
+>>> <buytenh@wantstofly.org> wrote:
+>>>> On Sat, Jan 15, 2011 at 10:41:27PM -0700, Grant Likely wrote:
+>>>>
+>>>>> Commit 37337a8d5e68d6e19075dbdb3acf4f1011dae972, "ARM: tegra: irq_data
+>>>>> conversion." missed changing one reference to 'irq' in the function
+>>>>> tegra_gpio_irq_set_type(). ?This patch fixes the build error.
+>>>>>
+>>>>> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+>>>>
+>>>> Acked-by: Lennert Buytenhek <buytenh@secretlab.ca>
+>>>
+>>> Acked-by: Olof Johansson <olof@lixom.net>
+>>>
+>>>> I built this queue against all defconfigs, but there doesn't seem to
+>>>> be one for tegra at the moment, which is why I missed this.
+>>>
+>>> Yep, planning on fixing this for .39.
+>>>
+>>>
+>>> -Olof
+>>>
+>>
+>> This should get fixed in .38. ?Has someone picked it up, or should I
+>> put it in through my tree?
+>
+> I don't think Olof picked it up (seeing as he only acked it and it's
+> not in Linus' tree). ?You should take it through your tree.
 
-    # kexec -l --append="console=ttyS0,115200" zImage
-    # kexec -e
-    [   35.553632] Starting new kernel
-    Uncompressing Linux... done, booting the kernel.
+Ping?  I've not seen this hit Linus' tree yet.  Do you want me to take
+care of it?
 
-and then nothing.  I've tried with both 2.6.35 and 2.6.38-rc1 kernels.
-I've tried modifying the kernel image to set the machine ID
-explicitly, but that makes no difference.  I wonder if the boot
-parameters are being passed correctly, but I don't know how to check
-without any console output. I do have a JTAG setup, but so far I've
-only used it cookbook-fashion to re-flash the u-boot NAND partition.
-I'm hoping someone can help me avoid having to use gdb over JTAG to
-resolve this.  Thanks.
-
--- 
-Eric Cooper             e c c @ c m u . e d u
+g.
