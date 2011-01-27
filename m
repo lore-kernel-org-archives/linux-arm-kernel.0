@@ -1,115 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 13:47:27 +0000
-Subject: [PATCH 05/11] ARM: versatile: remove old AMBA device DMA definitions
-In-Reply-To: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-References: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-Message-ID: <E1PiSC7-0003p9-Ls@rmk-PC.arm.linux.org.uk>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 27 Jan 2011 14:48:25 +0100
+Subject: [PATCH 13/13] ARM i.MX51 efikamx: remove unnecessary
+	CONFIG_SERIAL_IMX ifdefs
+In-Reply-To: <1296133233-1062-14-git-send-email-s.hauer@pengutronix.de>
+	(Sascha Hauer's message of "Thu, 27 Jan 2011 14:00:33 +0100")
+References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
+	<1296133233-1062-14-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <87aaim8nkm.fsf@lechat.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AMBA DMA macro definitions are not used, and the AMBA Primecell DMA
-support makes no use of them either, so they can be removed.
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-versatile/core.c         |   18 ------------------
- arch/arm/mach-versatile/core.h         |    1 -
- arch/arm/mach-versatile/versatile_pb.c |    5 -----
- 3 files changed, 0 insertions(+), 24 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 606e046..630a1c9 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -634,53 +634,35 @@ static struct pl022_ssp_controller ssp0_plat_data = {
- };
- 
- #define AACI_IRQ	{ IRQ_AACI, NO_IRQ }
--#define AACI_DMA	{ 0x80, 0x81 }
- #define MMCI0_IRQ	{ IRQ_MMCI0A,IRQ_SIC_MMCI0B }
--#define MMCI0_DMA	{ 0x84, 0 }
- #define KMI0_IRQ	{ IRQ_SIC_KMI0, NO_IRQ }
--#define KMI0_DMA	{ 0, 0 }
- #define KMI1_IRQ	{ IRQ_SIC_KMI1, NO_IRQ }
--#define KMI1_DMA	{ 0, 0 }
- 
- /*
-  * These devices are connected directly to the multi-layer AHB switch
-  */
- #define SMC_IRQ		{ NO_IRQ, NO_IRQ }
--#define SMC_DMA		{ 0, 0 }
- #define MPMC_IRQ	{ NO_IRQ, NO_IRQ }
--#define MPMC_DMA	{ 0, 0 }
- #define CLCD_IRQ	{ IRQ_CLCDINT, NO_IRQ }
--#define CLCD_DMA	{ 0, 0 }
- #define DMAC_IRQ	{ IRQ_DMAINT, NO_IRQ }
--#define DMAC_DMA	{ 0, 0 }
- 
- /*
-  * These devices are connected via the core APB bridge
-  */
- #define SCTL_IRQ	{ NO_IRQ, NO_IRQ }
--#define SCTL_DMA	{ 0, 0 }
- #define WATCHDOG_IRQ	{ IRQ_WDOGINT, NO_IRQ }
--#define WATCHDOG_DMA	{ 0, 0 }
- #define GPIO0_IRQ	{ IRQ_GPIOINT0, NO_IRQ }
--#define GPIO0_DMA	{ 0, 0 }
- #define GPIO1_IRQ	{ IRQ_GPIOINT1, NO_IRQ }
--#define GPIO1_DMA	{ 0, 0 }
- #define RTC_IRQ		{ IRQ_RTCINT, NO_IRQ }
--#define RTC_DMA		{ 0, 0 }
- 
- /*
-  * These devices are connected via the DMA APB bridge
-  */
- #define SCI_IRQ		{ IRQ_SCIINT, NO_IRQ }
--#define SCI_DMA		{ 7, 6 }
- #define UART0_IRQ	{ IRQ_UARTINT0, NO_IRQ }
--#define UART0_DMA	{ 15, 14 }
- #define UART1_IRQ	{ IRQ_UARTINT1, NO_IRQ }
--#define UART1_DMA	{ 13, 12 }
- #define UART2_IRQ	{ IRQ_UARTINT2, NO_IRQ }
--#define UART2_DMA	{ 11, 10 }
- #define SSP_IRQ		{ IRQ_SSPINT, NO_IRQ }
--#define SSP_DMA		{ 9, 8 }
- 
- /* FPGA Primecells */
- AMBA_DEVICE(aaci,  "fpga:04", AACI,     NULL);
-diff --git a/arch/arm/mach-versatile/core.h b/arch/arm/mach-versatile/core.h
-index e04768a..fd6404e 100644
---- a/arch/arm/mach-versatile/core.h
-+++ b/arch/arm/mach-versatile/core.h
-@@ -45,7 +45,6 @@ static struct amba_device name##_device = {			\
- 	},							\
- 	.dma_mask	= ~0,					\
- 	.irq		= base##_IRQ,				\
--	/* .dma		= base##_DMA,*/				\
- }
- 
- #endif
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index 97fb306..37c23df 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -59,19 +59,14 @@ static struct pl061_platform_data gpio3_plat_data = {
- };
- 
- #define UART3_IRQ	{ IRQ_SIC_UART3, NO_IRQ }
--#define UART3_DMA	{ 0x86, 0x87 }
- #define SCI1_IRQ	{ IRQ_SIC_SCI3, NO_IRQ }
--#define SCI1_DMA	{ 0x88, 0x89 }
- #define MMCI1_IRQ	{ IRQ_MMCI1A, IRQ_SIC_MMCI1B }
--#define MMCI1_DMA	{ 0x85, 0 }
- 
- /*
-  * These devices are connected via the core APB bridge
-  */
- #define GPIO2_IRQ	{ IRQ_GPIOINT2, NO_IRQ }
--#define GPIO2_DMA	{ 0, 0 }
- #define GPIO3_IRQ	{ IRQ_GPIOINT3, NO_IRQ }
--#define GPIO3_DMA	{ 0, 0 }
- 
- /*
-  * These devices are connected via the DMA APB bridge
--- 
-1.6.2.5
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-mx5/board-mx51_efikamx.c |   17 +++--------------
+>  1 files changed, 3 insertions(+), 14 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> index b7946f8..e237040 100644
+> --- a/arch/arm/mach-mx5/board-mx51_efikamx.c
+> +++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+> @@ -121,23 +121,10 @@ static iomux_v3_cfg_t mx51efikamx_pads[] = {
+>  };
+>  
+>  /* Serial ports */
+> -#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
+>  static const struct imxuart_platform_data uart_pdata = {
+>  	.flags = IMXUART_HAVE_RTSCTS,
+>  };
+>  
+> -static inline void mxc_init_imx_uart(void)
+> -{
+> -	imx51_add_imx_uart(0, &uart_pdata);
+> -	imx51_add_imx_uart(1, &uart_pdata);
+> -	imx51_add_imx_uart(2, &uart_pdata);
+> -}
+> -#else /* !SERIAL_IMX */
+> -static inline void mxc_init_imx_uart(void)
+> -{
+> -}
+> -#endif /* SERIAL_IMX */
+> -
+>  /* This function is board specific as the bit mask for the plldiv will also
+>   * be different for other Freescale SoCs, thus a common bitmask is not
+>   * possible and cannot get place in /plat-mxc/ehci.c.
+> @@ -320,7 +307,9 @@ static void __init mxc_board_init(void)
+>  					ARRAY_SIZE(mx51efikamx_pads));
+>  	mx51_efikamx_board_id();
+>  	mxc_register_device(&mxc_usbdr_host_device, &dr_utmi_config);
+> -	mxc_init_imx_uart();
+> +	imx51_add_imx_uart(0, &uart_pdata);
+> +	imx51_add_imx_uart(1, &uart_pdata);
+> +	imx51_add_imx_uart(2, &uart_pdata);
+
+I'm even wondering if configuring uart 1 and 2 is necessary. afair only
+ttymxc0 is really used
+
+Arnaud
