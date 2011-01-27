@@ -1,58 +1,69 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 12:57:14 +0000
-Subject: [PATCH 00/10] Fix CLCD framebuffer formats and consolidate ARM
-	platform CLCD support
-Message-ID: <20110127125714.GD25968@n2100.arm.linux.org.uk>
+Date: Thu, 27 Jan 2011 12:58:10 +0000
+Subject: [PATCH 01/10] ARM: versatile: support CLCD RGB565 layout with blue LSB
+In-Reply-To: <20110127125714.GD25968@n2100.arm.linux.org.uk>
+References: <20110127125714.GD25968@n2100.arm.linux.org.uk>
+Message-ID: <E1PiRQQ-0003ma-4F@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes the framebuffer formatting for the various
-CLCD colour modes - including those which the CLCD doesn't actually
-support.
+RGB565 with blue in the LSB wasn't supported.  Add support for this
+layout.
 
-PL110 in TFT mode only supports 888 and 5551 connectivity.  Some ARM
-platforms have additional muxing on their outputs which rewire this
-to allow the 5551 output to be used in 565 mode:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-versatile/core.c |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
 
-FBMEM bit (RGB)	5551	565
-0		R0	R0
-1		R1	R1
-2		R2	R2
-3		R3	R3
-4		R4	R4
-5		G0	G0
-6		G1	G1
-7		G2	G2
-8		G3	G3
-9		G4	G4
-10		B0	G5
-11		B1	B0
-12		B2	B1
-13		B3	B2
-14		B4	B3
-15		I	B4
-
-This means that when BGR mode is selected, it in green mapping to bits
-0, 9, 8, 7, 6, 5 in the framebuffer, which is not sane.  There appears
-to be no external MUX selection for this format.
-
-PL111 on the other hand supports 888, 5551, 565 and 444 natively, so it
-can support RGB and BGR pixel formats directly.
-
-Introduce a set of capabilities one bit for each format (RGB888, BGR888,
-RGB5551, BGR5551 etc) describing what formats the panel itself can support,
-and also what the board can support.  These are combined, and from that
-we select the appropriate 16bpp pixel format which the panel and board can
-support.  Where a panel and board combination supports multiple 16bpp
-formats, pick the closest format to the requested format.
-
-Implementations which do not supply the capabilities fall back to the old
-way of doing things, which is based on the cntl register to indicate
-whether we should be using RGB or BGR mode.
-
-This then allows us to unify the CLCD support across Integrator, Versatile,
-Realview and Versatile Express.  This has been successfully tested on:
-
-Integrator/CP - RGB565, RGB5551, BGR5551.
-Versatile PB926 - RGB565, BGR565, RGB5551, BGR5551.
-Realview EB ARM11MPcore - RGB565, BGR565, RGB5551, BGR5551, RGB444, BGR444.
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 136c32e..2866c11 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -630,18 +630,22 @@ static void versatile_clcd_disable(struct clcd_fb *fb)
+  */
+ static void versatile_clcd_enable(struct clcd_fb *fb)
+ {
++	struct fb_var_screeninfo *var = &fb->fb.var;
+ 	void __iomem *sys_clcd = __io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_CLCD_OFFSET;
+ 	u32 val;
+ 
+ 	val = readl(sys_clcd);
+ 	val &= ~SYS_CLCD_MODE_MASK;
+ 
+-	switch (fb->fb.var.green.length) {
++	switch (var->green.length) {
+ 	case 5:
+ 		val |= SYS_CLCD_MODE_5551;
+ 		break;
+ 	case 6:
+-		val |= SYS_CLCD_MODE_565_RLSB;
++		if (var->red.offset == 0)
++			val |= SYS_CLCD_MODE_565_RLSB;
++		else
++			val |= SYS_CLCD_MODE_565_BLSB;
+ 		break;
+ 	case 8:
+ 		val |= SYS_CLCD_MODE_888;
+@@ -709,10 +713,19 @@ static void versatile_clcd_remove(struct clcd_fb *fb)
+ 			      fb->fb.screen_base, fb->fb.fix.smem_start);
+ }
+ 
++static void versatile_clcd_decode(struct clcd_fb *fb, struct clcd_regs *regs)
++{
++	clcdfb_decode(fb, regs);
++
++	/* Always clear BGR for RGB565: we do the routing externally */
++	if (fb->fb.var.green.length == 6)
++		regs->cntl &= ~CNTL_BGR;
++}
++
+ static struct clcd_board clcd_plat_data = {
+ 	.name		= "Versatile",
+ 	.check		= clcdfb_check,
+-	.decode		= clcdfb_decode,
++	.decode		= versatile_clcd_decode,
+ 	.disable	= versatile_clcd_disable,
+ 	.enable		= versatile_clcd_enable,
+ 	.setup		= versatile_clcd_setup,
+-- 
+1.6.2.5
