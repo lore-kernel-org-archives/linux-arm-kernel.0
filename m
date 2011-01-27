@@ -1,29 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 27 Jan 2011 11:16:00 -0200
-Subject: [PATCH 11/13] ARM i.MX51 mx51 babbage: remove unnecessary
-	CONFIG_KEYBOARD_IMX ifdefs
-In-Reply-To: <1296133233-1062-12-git-send-email-s.hauer@pengutronix.de>
-References: <1296133233-1062-1-git-send-email-s.hauer@pengutronix.de>
-	<1296133233-1062-12-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <AANLkTiknJta0rJSPaJH9=0oVEfmW0rSp1U1aXFs425sZ@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 27 Jan 2011 16:15:13 +0300
+Subject: some i.MX23/28 patches
+In-Reply-To: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+References: <1296128413-20778-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4D416FE1.3010409@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hello.
 
-On Thu, Jan 27, 2011 at 11:00 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> ?arch/arm/mach-mx5/board-mx51_3ds.c | ? 13 +------------
-> ?1 files changed, 1 insertions(+), 12 deletions(-)
+On 27-01-2011 14:40, Sascha Hauer wrote:
+
+> The following contains some i.MX23/28 cleanup patches.
+
+> Sascha
+
+> The following changes since commit 376e9c5848abef8c72c09bd89f2f7ee128caa104:
+
+>    ARM: mxs: add initial pm support (2011-01-26 08:30:49 +0100)
+
+> are available in the git repository at:
+>    none ..BRANCH.NOT.VERIFIED..
+
+    Forgot to push?
+
+> Sascha Hauer (4):
+>        ARM i.MX23/28: deobfuscate gpio initialization
+>        ARM i.MX23/28: do not use complicated macros if not necessary
+>        ARM i.MX23: remove reserved register defines
+>        ARM i.MX28: remove reserved register defines
 >
-> diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-> index feb2800..58a2574 100644
-> --- a/arch/arm/mach-mx5/board-mx51_3ds.c
-> +++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+>   arch/arm/mach-mxs/gpio.c              |   45 +++++----
+>   arch/arm/mach-mxs/regs-clkctrl-mx23.h |  124 -----------------------
+>   arch/arm/mach-mxs/regs-clkctrl-mx28.h |  177 ---------------------------------
+>   3 files changed, 24 insertions(+), 322 deletions(-)
 
-In the subject field you should put MX51_3ds instead of Babbage.
-
-Regards,
-
-Fabio Estevam
+WBR, Sergei
