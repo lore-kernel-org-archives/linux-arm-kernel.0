@@ -1,86 +1,45 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 27 Jan 2011 10:25:13 -0800
-Subject: [PATCH] OMAP2/3: PM: remove unnecessary wakeup/sleep dependency
-	clear
-In-Reply-To: <alpine.DEB.2.00.1101270252010.16671@utopia.booyaka.com> (Paul
-	Walmsley's message of "Thu, 27 Jan 2011 02:52:55 -0700 (MST)")
-References: <alpine.DEB.2.00.1101270252010.16671@utopia.booyaka.com>
-Message-ID: <871v3yp5km.fsf@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 27 Jan 2011 13:40:37 -0500 (EST)
+Subject: HIGHMEM is broken when working in SMP V6 mode
+In-Reply-To: <20110127173716.GA605@n2100.arm.linux.org.uk>
+References: <AANLkTikjcgRgPd7oLjf0ESxeyC2BHpaaRi8DiMz3b+JQ@mail.gmail.com>
+	<20110123145639.GB30094@n2100.arm.linux.org.uk>
+	<AANLkTi=HtLjnOLGVVqWvqToiXdQAm_+cDdZf51M+ABV4@mail.gmail.com>
+	<20110123170830.GG30094@n2100.arm.linux.org.uk>
+	<AANLkTim3VVYTrWZX+UJUtK73bUkmSufW_4awhgQcVeNZ@mail.gmail.com>
+	<alpine.LFD.2.00.1101241010580.8580@xanadu.home>
+	<20110127173716.GA605@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1101271337410.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+On Thu, 27 Jan 2011, Russell King - ARM Linux wrote:
 
-> The OMAP2 and OMAP3 PM code clears clockdomain wakeup and sleep
-> dependencies.  This is unnecessary after commit
-> 6f7f63cc9adf3192e6fcac4e8bed5cc10fd924aa ("OMAP clockdomain:
-> initialize clockdomain registers when the clockdomain layer starts")
-> which clears these dependencies during clockdomain init.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> ---
-> Full-chip retention idle entry tested on OMAP35xx Beagleboard.
+> On Mon, Jan 24, 2011 at 02:58:07PM -0500, Nicolas Pitre wrote:
+> >  /*
+> > + * The reason for kmap_high_get() is to ensure that the currently kmap'd
+> > + * page usage count does not decrease to zero while we're using its
+> > + * existing virtual mapping in an atomic context.  With a VIVT cache this
+> > + * is essential to do, but with a VIPT cache this is only an optimization
+> > + * so not to pay the price of establishing a second mapping if an existing
+> > + * one can be used.  However, on platforms without hardware TLB maintainence
+> > + * broadcast, we simply cannot use ARCH_NEEDS_KMAP_HIGH_GET at all since
+> > + * the locking involved must also disable IRQs which is incompatible with
+> > + * the IPI mechanism used by global TLB operations.
+> > + */
+> > +#define ARCH_NEEDS_KMAP_HIGH_GET
+> > +#if defined(CONFIG_SMP) && defined(CONFIG_CPU_TLB_V6)
+> > +#undef ARCH_NEEDS_KMAP_HIGH_GET
+> > +#if defined(CONFIG_HIGHMEM) && defined(CONFIG_CPU_CACHE_VIVT)
+> > +#error "The sum of feature in your kernel config cannot be supported together"
+> > +#endif
+> 
+> This is wrong.  Take a moment to consider a kernel supporting an ARMv6
+> VIPT aliasing cache CPU and ARMv7 SMP.  Don't we need kmap_high_get()
+> for ARMv6 VIPT aliasing cache?
 
-Also tested on 3630/Zoom3.
+We don't support highmem on aliasing VIPT.  Highmem gets disabled at run 
+time on aliasing VIPT platforms.
 
-Queueing for 2.6.39.  Thanks,
 
-Kevin
-
->  arch/arm/mach-omap2/pm24xx.c |    8 +-------
->  arch/arm/mach-omap2/pm34xx.c |   15 ---------------
->  2 files changed, 1 insertions(+), 22 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-> index 97feb3a..10f8747 100644
-> --- a/arch/arm/mach-omap2/pm24xx.c
-> +++ b/arch/arm/mach-omap2/pm24xx.c
-> @@ -363,9 +363,6 @@ static const struct platform_suspend_ops __initdata omap_pm_ops;
->  /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
->  static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
->  {
-> -	clkdm_clear_all_wkdeps(clkdm);
-> -	clkdm_clear_all_sleepdeps(clkdm);
-> -
->  	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
->  		omap2_clkdm_allow_idle(clkdm);
->  	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
-> @@ -411,10 +408,7 @@ static void __init prcm_setup_regs(void)
->  	pwrdm_set_next_pwrst(pwrdm, PWRDM_POWER_OFF);
->  	omap2_clkdm_sleep(gfx_clkdm);
->  
-> -	/*
-> -	 * Clear clockdomain wakeup dependencies and enable
-> -	 * hardware-supervised idle for all clkdms
-> -	 */
-> +	/* Enable hardware-supervised idle for all clkdms */
->  	clkdm_for_each(clkdms_setup, NULL);
->  	clkdm_add_wkdep(mpu_clkdm, wkup_clkdm);
->  
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index a4aa192..0eb9738 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -694,21 +694,6 @@ static void __init prcm_setup_regs(void)
->  	u32 omap3630_grpsel_uart4_mask = cpu_is_omap3630() ?
->  					OMAP3630_GRPSEL_UART4_MASK : 0;
->  
-> -
-> -	/* XXX Reset all wkdeps. This should be done when initializing
-> -	 * powerdomains */
-> -	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, PM_WKDEP);
-> -	omap2_prm_write_mod_reg(0, MPU_MOD, PM_WKDEP);
-> -	omap2_prm_write_mod_reg(0, OMAP3430_DSS_MOD, PM_WKDEP);
-> -	omap2_prm_write_mod_reg(0, OMAP3430_NEON_MOD, PM_WKDEP);
-> -	omap2_prm_write_mod_reg(0, OMAP3430_CAM_MOD, PM_WKDEP);
-> -	omap2_prm_write_mod_reg(0, OMAP3430_PER_MOD, PM_WKDEP);
-> -	if (omap_rev() > OMAP3430_REV_ES1_0) {
-> -		omap2_prm_write_mod_reg(0, OMAP3430ES2_SGX_MOD, PM_WKDEP);
-> -		omap2_prm_write_mod_reg(0, OMAP3430ES2_USBHOST_MOD, PM_WKDEP);
-> -	} else
-> -		omap2_prm_write_mod_reg(0, GFX_MOD, PM_WKDEP);
-> -
->  	/*
->  	 * Enable interface clock autoidle for all modules.
->  	 * Note that in the long run this should be done by clockfw
+Nicolas
