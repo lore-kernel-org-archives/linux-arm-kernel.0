@@ -1,271 +1,181 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jan 2011 12:59:51 +0000
-Subject: [PATCH 06/10] ARM: add versatile family consolidated CLCD support
+Date: Thu, 27 Jan 2011 13:00:11 +0000
+Subject: [PATCH 07/10] ARM: integrator: switch Integrator platforms to use
+	consolidated CLCD
 In-Reply-To: <20110127125714.GD25968@n2100.arm.linux.org.uk>
 References: <20110127125714.GD25968@n2100.arm.linux.org.uk>
-Message-ID: <E1PiRS3-0003mv-L3@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1PiRSN-0003mz-Oi@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This consolidates the CLCD panel definitions and memory allocation into
-one location.
-
-Rename the Sanyo 2.5in and Epson 2.2in displays after their respective
-part numbers.  Rather than using a general "Sanyo 2.5in" and "Epson
-2.2in" description of the display panel, use the manufacturers part
-number to be more specific.  This helps people identify what the timings
-actually refer to, which are panel specific.
-
-While here, add CLCD capability information to each panel definition,
-which has no effect until we add the board-level capabilities.
+This switches integrator platforms to use the consolidated CLCD
+panel support, including the display capabilities.  These capabilities
+prevent the unsupported BGR565 mode being selected, while still
+allowing RGB5551, BGR5551 and RGB565 modes.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig                            |    1 +
- arch/arm/plat-versatile/Kconfig             |    6 +
- arch/arm/plat-versatile/Makefile            |    1 +
- arch/arm/plat-versatile/clcd.c              |  182 +++++++++++++++++++++++++++
- arch/arm/plat-versatile/include/plat/clcd.h |    9 ++
- 5 files changed, 199 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-versatile/Kconfig
- create mode 100644 arch/arm/plat-versatile/clcd.c
- create mode 100644 arch/arm/plat-versatile/include/plat/clcd.h
+ arch/arm/mach-integrator/Kconfig         |    1 +
+ arch/arm/mach-integrator/impd1.c         |    5 ++
+ arch/arm/mach-integrator/integrator_cp.c |   65 ++++-------------------------
+ 3 files changed, 15 insertions(+), 56 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 70a0170..3087985 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1007,6 +1007,7 @@ source "arch/arm/mach-ux500/Kconfig"
- source "arch/arm/mach-versatile/Kconfig"
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index 769b0f1..d701d32 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -13,6 +13,7 @@ config ARCH_INTEGRATOR_CP
+ 	bool "Support Integrator/CP platform"
+ 	select ARCH_CINTEGRATOR
+ 	select ARM_TIMER_SP804
++	select PLAT_VERSATILE_CLCD
+ 	help
+ 	  Include support for the ARM(R) Integrator CP platform.
  
- source "arch/arm/mach-vexpress/Kconfig"
-+source "arch/arm/plat-versatile/Kconfig"
+diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
+index 5db574f..8cbb75a 100644
+--- a/arch/arm/mach-integrator/impd1.c
++++ b/arch/arm/mach-integrator/impd1.c
+@@ -121,6 +121,7 @@ static struct clcd_panel vga = {
+ 	.height		= -1,
+ 	.tim2		= TIM2_BCD | TIM2_IPC,
+ 	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
++	.caps		= CLCD_CAP_5551,
+ 	.connector	= IMPD1_CTRL_DISP_VGA,
+ 	.bpp		= 16,
+ 	.grayscale	= 0,
+@@ -149,6 +150,7 @@ static struct clcd_panel svga = {
+ 	.tim2		= TIM2_BCD,
+ 	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+ 	.connector	= IMPD1_CTRL_DISP_VGA,
++	.caps		= CLCD_CAP_5551,
+ 	.bpp		= 16,
+ 	.grayscale	= 0,
+ };
+@@ -175,6 +177,7 @@ static struct clcd_panel prospector = {
+ 	.height		= -1,
+ 	.tim2		= TIM2_BCD,
+ 	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
++	.caps		= CLCD_CAP_5551,
+ 	.fixedtimings	= 1,
+ 	.connector	= IMPD1_CTRL_DISP_LCD,
+ 	.bpp		= 16,
+@@ -206,6 +209,7 @@ static struct clcd_panel ltm10c209 = {
+ 	.height		= -1,
+ 	.tim2		= TIM2_BCD,
+ 	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
++	.caps		= CLCD_CAP_5551,
+ 	.fixedtimings	= 1,
+ 	.connector	= IMPD1_CTRL_DISP_LCD,
+ 	.bpp		= 16,
+@@ -279,6 +283,7 @@ static void impd1fb_clcd_remove(struct clcd_fb *fb)
  
- source "arch/arm/mach-w90x900/Kconfig"
+ static struct clcd_board impd1_clcd_data = {
+ 	.name		= "IM-PD/1",
++	.caps		= CLCD_CAP_5551 | CLCD_CAP_888,
+ 	.check		= clcdfb_check,
+ 	.decode		= clcdfb_decode,
+ 	.disable	= impd1fb_clcd_disable,
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 8600902..9c02037 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -42,6 +42,8 @@
  
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-new file mode 100644
-index 0000000..22540f5
---- /dev/null
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -0,0 +1,6 @@
-+if PLAT_VERSATILE
-+
-+config PLAT_VERSATILE_CLCD
-+	bool
-+
-+endif
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 16dde08..8b3341c 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -6,3 +6,4 @@ ifeq ($(CONFIG_LEDS_CLASS),y)
- obj-$(CONFIG_ARCH_REALVIEW) += leds.o
- obj-$(CONFIG_ARCH_VERSATILE) += leds.o
- endif
-+obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
-diff --git a/arch/arm/plat-versatile/clcd.c b/arch/arm/plat-versatile/clcd.c
-new file mode 100644
-index 0000000..6628cc2
---- /dev/null
-+++ b/arch/arm/plat-versatile/clcd.c
-@@ -0,0 +1,182 @@
-+#include <linux/device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/amba/bus.h>
-+#include <linux/amba/clcd.h>
+ #include <asm/hardware/timer-sp.h>
+ 
 +#include <plat/clcd.h>
 +
-+static struct clcd_panel vga = {
-+	.mode		= {
-+		.name		= "VGA",
-+		.refresh	= 60,
-+		.xres		= 640,
-+		.yres		= 480,
-+		.pixclock	= 39721,
-+		.left_margin	= 40,
-+		.right_margin	= 24,
-+		.upper_margin	= 32,
-+		.lower_margin	= 11,
-+		.hsync_len	= 96,
-+		.vsync_len	= 2,
-+		.sync		= 0,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+	},
-+	.width		= -1,
-+	.height		= -1,
-+	.tim2		= TIM2_BCD | TIM2_IPC,
-+	.cntl		= CNTL_LCDTFT | CNTL_BGR | CNTL_LCDVCOMP(1),
-+	.caps		= CLCD_CAP_5551 | CLCD_CAP_565 | CLCD_CAP_888,
-+	.bpp		= 16,
-+};
-+
-+static struct clcd_panel xvga = {
-+	.mode		= {
-+		.name		= "XVGA",
-+		.refresh	= 60,
-+		.xres		= 1024,
-+		.yres		= 768,
-+		.pixclock	= 15748,
-+		.left_margin	= 152,
-+		.right_margin	= 48,
-+		.upper_margin	= 23,
-+		.lower_margin	= 3,
-+		.hsync_len	= 104,
-+		.vsync_len	= 4,
-+		.sync		= 0,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+	},
-+	.width		= -1,
-+	.height		= -1,
-+	.tim2		= TIM2_BCD | TIM2_IPC,
-+	.cntl		= CNTL_LCDTFT | CNTL_BGR | CNTL_LCDVCOMP(1),
-+	.caps		= CLCD_CAP_5551 | CLCD_CAP_565 | CLCD_CAP_888,
-+	.bpp		= 16,
-+};
-+
-+/* Sanyo TM38QV67A02A - 3.8 inch QVGA (320x240) Color TFT */
-+static struct clcd_panel sanyo_tm38qv67a02a = {
-+	.mode		= {
-+		.name		= "Sanyo TM38QV67A02A",
-+		.refresh	= 116,
-+		.xres		= 320,
-+		.yres		= 240,
-+		.pixclock	= 100000,
-+		.left_margin	= 6,
-+		.right_margin	= 6,
-+		.upper_margin	= 5,
-+		.lower_margin	= 5,
-+		.hsync_len	= 6,
-+		.vsync_len	= 6,
-+		.sync		= 0,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+	},
-+	.width		= -1,
-+	.height		= -1,
-+	.tim2		= TIM2_BCD,
-+	.cntl		= CNTL_LCDTFT | CNTL_BGR | CNTL_LCDVCOMP(1),
-+	.caps		= CLCD_CAP_5551,
-+	.bpp		= 16,
-+};
-+
-+static struct clcd_panel sanyo_2_5_in = {
-+	.mode		= {
-+		.name		= "Sanyo QVGA Portrait",
-+		.refresh	= 116,
-+		.xres		= 240,
-+		.yres		= 320,
-+		.pixclock	= 100000,
-+		.left_margin	= 20,
-+		.right_margin	= 10,
-+		.upper_margin	= 2,
-+		.lower_margin	= 2,
-+		.hsync_len	= 10,
-+		.vsync_len	= 2,
-+		.sync		= FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+	},
-+	.width		= -1,
-+	.height		= -1,
-+	.tim2		= TIM2_IVS | TIM2_IHS | TIM2_IPC,
-+	.cntl		= CNTL_LCDTFT | CNTL_BGR | CNTL_LCDVCOMP(1),
-+	.caps		= CLCD_CAP_5551,
-+	.bpp		= 16,
-+};
-+
-+/* Epson L2F50113T00 - 2.2 inch 176x220 Color TFT */
-+static struct clcd_panel epson_l2f50113t00 = {
-+	.mode		= {
-+		.name		= "Epson L2F50113T00",
-+		.refresh	= 390,
-+		.xres		= 176,
-+		.yres		= 220,
-+		.pixclock	= 62500,
-+		.left_margin	= 3,
-+		.right_margin	= 2,
-+		.upper_margin	= 1,
-+		.lower_margin	= 0,
-+		.hsync_len	= 3,
-+		.vsync_len	= 2,
-+		.sync		= 0,
-+		.vmode		= FB_VMODE_NONINTERLACED,
-+	},
-+	.width		= -1,
-+	.height		= -1,
-+	.tim2		= TIM2_BCD | TIM2_IPC,
-+	.cntl		= CNTL_LCDTFT | CNTL_BGR | CNTL_LCDVCOMP(1),
-+	.caps		= CLCD_CAP_5551,
-+	.bpp		= 16,
-+};
-+
-+static struct clcd_panel *panels[] = {
-+	&vga,
-+	&xvga,
-+	&sanyo_tm38qv67a02a,
-+	&sanyo_2_5_in,
-+	&epson_l2f50113t00,
-+};
-+
-+struct clcd_panel *versatile_clcd_get_panel(const char *name)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(panels); i++)
-+		if (strcmp(panels[i]->mode.name, name) == 0)
-+			break;
-+
-+	if (i < ARRAY_SIZE(panels))
-+		return panels[i];
-+
-+	pr_err("CLCD: couldn't get parameters for panel %s\n", name);
-+
-+	return NULL;
-+}
-+
-+int versatile_clcd_setup_dma(struct clcd_fb *fb, unsigned long framesize)
-+{
-+	dma_addr_t dma;
-+
-+	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
-+						    &dma, GFP_KERNEL);
-+	if (!fb->fb.screen_base) {
-+		pr_err("CLCD: unable to map framebuffer\n");
-+		return -ENOMEM;
-+	}
-+
-+	fb->fb.fix.smem_start	= dma;
-+	fb->fb.fix.smem_len	= framesize;
-+
-+	return 0;
-+}
-+
-+int versatile_clcd_mmap_dma(struct clcd_fb *fb, struct vm_area_struct *vma)
-+{
-+	return dma_mmap_writecombine(&fb->dev->dev, vma,
-+				     fb->fb.screen_base,
-+				     fb->fb.fix.smem_start,
-+				     fb->fb.fix.smem_len);
-+}
-+
-+void versatile_clcd_remove_dma(struct clcd_fb *fb)
-+{
-+	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
-+			      fb->fb.screen_base, fb->fb.fix.smem_start);
-+}
-diff --git a/arch/arm/plat-versatile/include/plat/clcd.h b/arch/arm/plat-versatile/include/plat/clcd.h
-new file mode 100644
-index 0000000..6bb6a1d
---- /dev/null
-+++ b/arch/arm/plat-versatile/include/plat/clcd.h
-@@ -0,0 +1,9 @@
-+#ifndef PLAT_CLCD_H
-+#define PLAT_CLCD_H
-+
-+struct clcd_panel *versatile_clcd_get_panel(const char *);
-+int versatile_clcd_setup_dma(struct clcd_fb *, unsigned long);
-+int versatile_clcd_mmap_dma(struct clcd_fb *, struct vm_area_struct *);
-+void versatile_clcd_remove_dma(struct clcd_fb *);
-+
-+#endif
+ #include "common.h"
+ 
+ #define INTCP_PA_FLASH_BASE		0x24000000
+@@ -449,30 +451,6 @@ static struct amba_device aaci_device = {
+ /*
+  * CLCD support
+  */
+-static struct clcd_panel vga = {
+-	.mode		= {
+-		.name		= "VGA",
+-		.refresh	= 60,
+-		.xres		= 640,
+-		.yres		= 480,
+-		.pixclock	= 39721,
+-		.left_margin	= 40,
+-		.right_margin	= 24,
+-		.upper_margin	= 32,
+-		.lower_margin	= 11,
+-		.hsync_len	= 96,
+-		.vsync_len	= 2,
+-		.sync		= 0,
+-		.vmode		= FB_VMODE_NONINTERLACED,
+-	},
+-	.width		= -1,
+-	.height		= -1,
+-	.tim2		= TIM2_BCD | TIM2_IPC,
+-	.cntl		= CNTL_LCDTFT | CNTL_LCDVCOMP(1),
+-	.bpp		= 16,
+-	.grayscale	= 0,
+-};
+-
+ /*
+  * Ensure VGA is selected.
+  */
+@@ -500,49 +478,24 @@ static void cp_clcd_enable(struct clcd_fb *fb)
+ 		   CM_CTRL_n24BITEN, val);
+ }
+ 
+-static unsigned long framesize = SZ_1M;
+-
+ static int cp_clcd_setup(struct clcd_fb *fb)
+ {
+-	dma_addr_t dma;
+-
+-	fb->panel = &vga;
+-
+-	fb->fb.screen_base = dma_alloc_writecombine(&fb->dev->dev, framesize,
+-						    &dma, GFP_KERNEL);
+-	if (!fb->fb.screen_base) {
+-		printk(KERN_ERR "CLCD: unable to map framebuffer\n");
+-		return -ENOMEM;
+-	}
+-
+-	fb->fb.fix.smem_start	= dma;
+-	fb->fb.fix.smem_len	= framesize;
+-
+-	return 0;
+-}
+-
+-static int cp_clcd_mmap(struct clcd_fb *fb, struct vm_area_struct *vma)
+-{
+-	return dma_mmap_writecombine(&fb->dev->dev, vma,
+-				     fb->fb.screen_base,
+-				     fb->fb.fix.smem_start,
+-				     fb->fb.fix.smem_len);
+-}
++	fb->panel = versatile_clcd_get_panel("VGA");
++	if (!fb->panel)
++		return -EINVAL;
+ 
+-static void cp_clcd_remove(struct clcd_fb *fb)
+-{
+-	dma_free_writecombine(&fb->dev->dev, fb->fb.fix.smem_len,
+-			      fb->fb.screen_base, fb->fb.fix.smem_start);
++	return versatile_clcd_setup_dma(fb, SZ_1M);
+ }
+ 
+ static struct clcd_board clcd_data = {
+ 	.name		= "Integrator/CP",
++	.caps		= CLCD_CAP_5551 | CLCD_CAP_RGB565 | CLCD_CAP_888,
+ 	.check		= clcdfb_check,
+ 	.decode		= clcdfb_decode,
+ 	.enable		= cp_clcd_enable,
+ 	.setup		= cp_clcd_setup,
+-	.mmap		= cp_clcd_mmap,
+-	.remove		= cp_clcd_remove,
++	.mmap		= versatile_clcd_mmap_dma,
++	.remove		= versatile_clcd_remove_dma,
+ };
+ 
+ static struct amba_device clcd_device = {
 -- 
 1.6.2.5
