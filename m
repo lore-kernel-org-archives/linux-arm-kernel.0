@@ -1,48 +1,197 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 27 Jan 2011 12:08:16 -0800
-Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
-	in board_init
-In-Reply-To: <19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
-	(Vaibhav Hiremath's message of "Tue, 25 Jan 2011 20:58:44 +0530")
-References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
-	<19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
-Message-ID: <87d3nikt3j.fsf@ti.com>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Thu, 27 Jan 2011 12:12:07 -0800
+Subject: [PATCHv2] msm: serial: Add MSM8960 serial support
+In-Reply-To: <1295663921-32723-1-git-send-email-stepanm@codeaurora.org>
+References: <1295663921-32723-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <1296159127-13945-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+Add the device definitions and platform data to support
+the console serial port on MSM8960 Simulator and RUMI3
+targets.
 
->> -----Original Message-----
->> From: Hiremath, Vaibhav
->> Sent: Tuesday, January 25, 2011 8:53 PM
->> To: linux-omap at vger.kernel.org
->> Cc: Hiremath, Vaibhav; Varadarajan, Charulatha
->> Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
->> in board_init
->> 
->> With addition of hwmod support to gpio, the ethernet controller
->> goes undetected for OMAP35xEVM. So explicitly assert the reset signal to
->> ethernet controller smsc911x -
->> 
->> 	- GPIO7 (>=RevG version of EVM's)
->> 	- GPIO64 (<=RevD version of EVM's)
->> 
->> This patch is based on intial version from Charulatha V, reference
->> to original discussion -
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
->> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
->> Signed-off-by: Charulatha V <charu@ti.com>
->> Tested-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Since Kevin reported that this patch doesn't get applied cleanly,
->> so I am reposting it again after making sure that it gets applied cleanly.
->> 
-> [Hiremath, Vaibhav] Oops, missed linux-arm-kernel list, adding here.
->
-> Not sure whether I need to repost keeping linux-arm-kernel?
->
+Change-Id: I6681a446ed1e1fce62bb52af879110228e907c5e
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+---
+V2: Minor cosmetic changes
+* Change the order of some fields based on Russell's rules
+* Update copyright header
 
-Also, did you post the smc911x driver fix yet that is needed for testing
-with newer kernels?
+ arch/arm/mach-msm/Makefile          |    2 +-
+ arch/arm/mach-msm/board-msm8960.c   |   22 +++++++++
+ arch/arm/mach-msm/devices-msm8960.c |   85 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/devices.h         |    3 +
+ 4 files changed, 111 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-msm/devices-msm8960.c
 
-Kevin
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index e3e38064..57b3062 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -25,7 +25,7 @@ obj-$(CONFIG_MACH_HALIBUT) += board-halibut.o devices-msm7x00.o
+ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
+ obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
+ obj-$(CONFIG_ARCH_MSM8X60) += board-msm8x60.o
+-obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o
++obj-$(CONFIG_ARCH_MSM8960) += board-msm8960.o devices-msm8960.o
+
+ obj-$(CONFIG_ARCH_MSM7X30) += gpiomux-v1.o gpiomux.o
+ obj-$(CONFIG_ARCH_QSD8X50) += gpiomux-8x50.o gpiomux-v1.o gpiomux.o
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index 2b09573..ef80f46 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -27,6 +27,8 @@
+ #include <mach/board.h>
+ #include <mach/msm_iomap.h>
+
++#include "devices.h"
++
+ static void __init msm8960_map_io(void)
+ {
+ 	msm_map_msm8960_io();
+@@ -54,15 +56,35 @@ static void __init msm8960_init_irq(void)
+ 	}
+ }
+
++static struct platform_device *sim_devices[] __initdata = {
++	&msm8960_device_uart_gsbi2,
++};
++
++static struct platform_device *rumi3_devices[] __initdata = {
++	&msm8960_device_uart_gsbi5,
++};
++
++static void __init msm8960_sim_init(void)
++{
++	platform_add_devices(sim_devices, ARRAY_SIZE(sim_devices));
++}
++
++static void __init msm8960_rumi3_init(void)
++{
++	platform_add_devices(rumi3_devices, ARRAY_SIZE(rumi3_devices));
++}
++
+ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+ 	.map_io = msm8960_map_io,
+ 	.init_irq = msm8960_init_irq,
+ 	.timer = &msm_timer,
++	.init_machine = msm8960_sim_init,
+ MACHINE_END
+
+ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
+ 	.map_io = msm8960_map_io,
+ 	.init_irq = msm8960_init_irq,
+ 	.timer = &msm_timer,
++	.init_machine = msm8960_rumi3_init,
+ MACHINE_END
+
+diff --git a/arch/arm/mach-msm/devices-msm8960.c b/arch/arm/mach-msm/devices-msm8960.c
+new file mode 100644
+index 0000000..d9e1f26
+--- /dev/null
++++ b/arch/arm/mach-msm/devices-msm8960.c
+@@ -0,0 +1,85 @@
++/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ */
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++#include <linux/dma-mapping.h>
++#include <mach/irqs-8960.h>
++#include <mach/board.h>
++
++#include "devices.h"
++
++#define MSM_GSBI2_PHYS		0x16100000
++#define MSM_UART2DM_PHYS	(MSM_GSBI2_PHYS + 0x40000)
++
++#define MSM_GSBI5_PHYS		0x16400000
++#define MSM_UART5DM_PHYS	(MSM_GSBI5_PHYS + 0x40000)
++
++static struct resource resources_uart_gsbi2[] = {
++	{
++		.start	= GSBI2_UARTDM_IRQ,
++		.end	= GSBI2_UARTDM_IRQ,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= MSM_UART2DM_PHYS,
++		.end	= MSM_UART2DM_PHYS + PAGE_SIZE - 1,
++		.name	= "uart_resource",
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= MSM_GSBI2_PHYS,
++		.end	= MSM_GSBI2_PHYS + PAGE_SIZE - 1,
++		.name	= "gsbi_resource",
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++struct platform_device msm8960_device_uart_gsbi2 = {
++	.name	= "msm_serial",
++	.id	= 0,
++	.num_resources	= ARRAY_SIZE(resources_uart_gsbi2),
++	.resource	= resources_uart_gsbi2,
++};
++
++static struct resource resources_uart_gsbi5[] = {
++	{
++		.start	= GSBI5_UARTDM_IRQ,
++		.end	= GSBI5_UARTDM_IRQ,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= MSM_UART5DM_PHYS,
++		.end	= MSM_UART5DM_PHYS + PAGE_SIZE - 1,
++		.name	= "uart_resource",
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= MSM_GSBI5_PHYS,
++		.end	= MSM_GSBI5_PHYS + PAGE_SIZE - 1,
++		.name	= "gsbi_resource",
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++struct platform_device msm8960_device_uart_gsbi5 = {
++	.name	= "msm_serial",
++	.id	= 0,
++	.num_resources	= ARRAY_SIZE(resources_uart_gsbi5),
++	.resource	= resources_uart_gsbi5,
++};
+diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
+index 87c70bf..e2643b3 100644
+--- a/arch/arm/mach-msm/devices.h
++++ b/arch/arm/mach-msm/devices.h
+@@ -22,6 +22,9 @@ extern struct platform_device msm_device_uart1;
+ extern struct platform_device msm_device_uart2;
+ extern struct platform_device msm_device_uart3;
+
++extern struct platform_device msm8960_device_uart_gsbi2;
++extern struct platform_device msm8960_device_uart_gsbi5;
++
+ extern struct platform_device msm_device_sdc1;
+ extern struct platform_device msm_device_sdc2;
+ extern struct platform_device msm_device_sdc3;
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
