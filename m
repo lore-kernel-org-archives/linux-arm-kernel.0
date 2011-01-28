@@ -1,25 +1,32 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Fri, 28 Jan 2011 13:26:19 +0530
-Subject: [PATCH 1/5] OMAP:board-omap3evm: Change TWL related gpio API's to
-	gpio*_cansleep
-In-Reply-To: <1295977061-11086-2-git-send-email-hvaibhav@ti.com>
-References: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
-	<1295977061-11086-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <AANLkTinc2zfjfc5y6pURF-JEiwhK3FV29E+eS0Q-_GmJ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 28 Jan 2011 08:58:16 +0100
+Subject: [PATCH 1/2] mach-ux500: set sd/mmc clock rate to 100MHz
+Message-ID: <1296201496-22862-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 25, 2011 at 23:07, Vaibhav Hiremath <hvaibhav@ti.com> wrote:
-> Since TWL GPIO's can go into sleep, and using normal
-> gpio_get/set_value() API will lead to kernel dump (WARN_ON()).
-> So replacing standard gpio_get/set_value() to
-> gpio_get/set_value_cansleep().
->
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+From: Philippe Langlais <philippe.langlais@stericsson.com>
 
-Reviewed-by: Charulatha V <charu@ti.com>
+The clock speed for the SD/MMC clock was incorrect, rectify it.
 
-> ---
-> ?arch/arm/mach-omap2/board-omap3evm.c | ? 12 ++++++------
-> ?1 files changed, 6 insertions(+), 6 deletions(-)
->
+Signed-off-by: Philippe Langlais <philippe.langlais@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-ux500/clock.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/clock.c b/arch/arm/mach-ux500/clock.c
+index b2b0a3b..9a0a6ed 100644
+--- a/arch/arm/mach-ux500/clock.c
++++ b/arch/arm/mach-ux500/clock.c
+@@ -313,7 +313,7 @@ static DEFINE_PRCMU_CLK_RATE(uartclk,	0x0, 5, UARTCLK, 38400000);
+ static DEFINE_PRCMU_CLK(msp02clk,	0x0, 6, MSP02CLK);
+ static DEFINE_PRCMU_CLK(msp1clk,	0x0, 7, MSP1CLK); /* v1 */
+ static DEFINE_PRCMU_CLK_RATE(i2cclk,	0x0, 8, I2CCLK, 48000000);
+-static DEFINE_PRCMU_CLK_RATE(sdmmcclk,	0x0, 9, SDMMCCLK, 50000000);
++static DEFINE_PRCMU_CLK_RATE(sdmmcclk,	0x0, 9, SDMMCCLK, 100000000);
+ static DEFINE_PRCMU_CLK(slimclk,	0x0, 10, SLIMCLK);
+ static DEFINE_PRCMU_CLK(per1clk,	0x0, 11, PER1CLK);
+ static DEFINE_PRCMU_CLK(per2clk,	0x0, 12, PER2CLK);
+-- 
+1.7.3.2
