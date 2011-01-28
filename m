@@ -1,33 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Jan 2011 16:26:21 -0800
-Subject: [PATCH 1/2] arch/arm/mach-omap2/dma.c: Convert IS_ERR result
-	to PTR_ERR
-In-Reply-To: <20110127210225.07de155f.jhnikula@gmail.com>
-References: <1296143347-17508-1-git-send-email-julia@diku.dk>
-	<20110127210225.07de155f.jhnikula@gmail.com>
-Message-ID: <20110128002620.GR23412@atomide.com>
+From: ecc@cmu.edu (Eric Cooper)
+Date: Thu, 27 Jan 2011 22:24:54 -0500
+Subject: kexec on kirkwood kernels?
+In-Reply-To: <20110127072433.GI1147@pengutronix.de>
+References: <20110127030024.GF19307@localhost>
+	<20110127072433.GI1147@pengutronix.de>
+Message-ID: <20110128032454.GG22555@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [110127 11:03]:
-> On Thu, 27 Jan 2011 16:49:06 +0100
-> Julia Lawall <julia@diku.dk> wrote:
-> 
-> > diff -u -p a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-> > --- a/arch/arm/mach-omap2/dma.c
-> > +++ b/arch/arm/mach-omap2/dma.c
-> > @@ -264,7 +264,7 @@ static int __init omap2_system_dma_init_
-> >  	if (IS_ERR(od)) {
-> >  		pr_err("%s: Cant build omap_device for %s:%s.\n",
-> >  			__func__, name, oh->name);
-> > -		return IS_ERR(od);
-> > +		return PTR_ERR(od);
-> >  	}
-> >  
-> FWIW,
-> 
-> Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+On Thu, Jan 27, 2011 at 08:24:33AM +0100, Uwe Kleine-K?nig wrote:
+> Try enabling DEBUG_LL and EARLY_PRINTK in the kernel to boot and pass 
+> 	earlyprintk
+> as kernel parameter.
 
-Thanks, will queue as a fix during the -rc cycle.
+Thanks, that helped quite a bit.  After inserting various print
+statements, I found that the system is hanging in the readl call in
+orion_pcie_dev_id.  The call chain is:
 
-Tony
+    start_kernel
+    time_init
+    kirkwood_timer_init
+    kirkwood_find_tclk
+    kirkwood_pcie_id
+    orion_pcie_dev_id
+    readl
+
+The readl is attempting to access the address
+KIRKWOOD_REGS_VIRT_BASE + 0x40000.
+
+This same code gets executed successfully when the kernel is started
+from u-boot; I'm not sure what's different in the post-kexec
+environment.  Any suggestions on what to try next would be
+appreciated.
+
+-- 
+Eric Cooper             e c c @ c m u . e d u
