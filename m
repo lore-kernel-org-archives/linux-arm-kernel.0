@@ -1,49 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 28 Jan 2011 18:35:51 +0900
-Subject: [PATCH 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
-In-Reply-To: <1294419468-13700-4-git-send-email-s.nawrocki@samsung.com>
-References: <1294419468-13700-1-git-send-email-s.nawrocki@samsung.com>
-	<1294419468-13700-4-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <02e201cbbece$c4812710$4d837530$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Jan 2011 09:46:06 +0000
+Subject: [PATCH 11/14] ARM: v6k: use CPU domain feature if we include
+	support for arch < ARMv6K
+In-Reply-To: <20110127185935.GA1651@n2100.arm.linux.org.uk>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<E1Peuh2-0003Sx-5e@rmk-PC.arm.linux.org.uk>
+	<AANLkTimN8Gn5a-k4ai7EhMGpqbj_u4Y8fHvUh_actzd+@mail.gmail.com>
+	<20110127185935.GA1651@n2100.arm.linux.org.uk>
+Message-ID: <1296207966.1799.10.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On Thu, 2011-01-27 at 18:59 +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 27, 2011 at 06:14:56PM +0000, Catalin Marinas wrote:
+> > On 17 January 2011 19:24, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> > > Rather than turning off CPU domain switching when the build architecture
+> > > includes ARMv6K, thereby causing problems for ARMv6-supporting kernels,
+> > > turn it on when it's required to support a CPU architecture.
+> >
+> > (sorry, I'm well behind list messages, didn't reply earlier)
+> >
+> > Does it mean that we get domains enabled even for ARMv7 when ARMv6 is
+> > built in the same kernel? The side effect is that user read-only
+> > addresses are writable by the kernel and SWP emulation no longer
+> > works.
 > 
-> Increase virtual size of the frambuffer window 0
-> for the display panning support.
+> It means that a kernel with ARMv6 through to ARMv7 will have CPU
+> domains enabled.  So maybe we want:
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/mach-goni.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+> config CPU_32v6
+>         select CPU_USE_DOMAINS if !CPU_V6K && MMU
 > 
-> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-b/arch/arm/mach-s5pv210/mach-
-> goni.c
-> index 2051cee..ed06f20 100644
-> --- a/arch/arm/mach-s5pv210/mach-goni.c
-> +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -108,6 +108,8 @@ static struct s3c_fb_pd_win goni_fb_win0 = {
->  	},
->  	.max_bpp	= 32,
->  	.default_bpp	= 16,
-> +	.virtual_x	= 480,
-> +	.virtual_y	= 2 * 800,
->  };
-> 
->  static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
-> --
-> 1.7.3.5
+> instead?
 
-Looks ok...but I want to apply with your other 1/3 and 2/3 patches.
-Will apply this after getting your other patches.
+Does this mean that we could still configure a kernel to run on CPU_V6
+with domains disabled? The vectors page becomes read-only and setting
+the TLS would fail.
 
-Thanks.
+My point is that we may want SWP_EMULATE disabled (or depending on !
+CPU_USE_DOMAINS). With domains enabled every read-only user page is
+writeable by the kernel. This has the side-effect that SWP emulation
+using LDREX/STREX breaks COW.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+We could change early_trap_init() to always use the vectors_page rather
+than the high mapping and determine at run-time (patch the code) whether
+set_pte_ext sets R/W kernel permissions for RO user pages.
+
+-- 
+Catalin
