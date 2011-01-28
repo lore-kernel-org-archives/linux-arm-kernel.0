@@ -1,39 +1,33 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Jan 2011 16:34:42 +0530
-Subject: [PATCH 0/6] omap4: prcm: Few dpll, clockdomain and powerdomain updates
-Message-ID: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 28 Jan 2011 16:34:46 +0530
+Subject: [PATCH 4/6] omap4: dpll: Enable all DPLL autoidle at boot
+In-Reply-To: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series mainly contains dpll initialisation, CPUx clock
-domain offset fix, addiing INACTIVE power domain state and
-fixing logic flag for IVAHD and ABE power domains.
+From: Rajendra Nayak <rnayak@ti.com>
 
-The series is boot tested on OMAP4430 SDP.
+Enable all DPLL autoidle at boot on OMAP4.
 
-The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
-  Linus Torvalds (1):
-        Linux 2.6.38-rc2
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/clock44xx_data.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git omap4_prcm_misc
-
-Rajendra Nayak (3):
-  omap4: dpll: Enable all DPLL autoidle at boot
-  omap4: dpll: Add dpll api to control GATE_CTRL
-  omap4: dpll: Enable auto gate control for all MX postdividers
-
-Santosh Shilimkar (3):
-  omap4: powerdomain: Add supported INACTIVE power state
-  omap4: prcm: Fix the CPUx clockdomain offsets
-  omap4: powerdomain: Use intended PWRSTS_* flags instead of values
-
- arch/arm/mach-omap2/clock.h                 |    3 ++
- arch/arm/mach-omap2/clock44xx_data.c        |   24 +++++++++++++++
- arch/arm/mach-omap2/dpll3xxx.c              |   43 +++++++++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h           |   12 +++++++
- arch/arm/mach-omap2/powerdomains44xx_data.c |   30 +++++++++---------
- arch/arm/mach-omap2/prcm_mpu44xx.h          |    4 +-
- arch/arm/plat-omap/include/plat/clock.h     |    1 +
- 7 files changed, 100 insertions(+), 17 deletions(-)
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index e8cb32f..e5c59a0 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -3300,6 +3300,8 @@ int __init omap4xxx_clk_init(void)
+ 			clkdev_add(&c->lk);
+ 			clk_register(c->lk.clk);
+ 			omap2_init_clk_clkdm(c->lk.clk);
++			if (c->lk.clk->dpll_data)
++				omap3_dpll_allow_idle(c->lk.clk);
+ 		}
+ 
+ 	recalculate_root_clocks();
+-- 
+1.6.0.4
