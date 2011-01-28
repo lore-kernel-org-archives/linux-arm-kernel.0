@@ -1,46 +1,39 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Fri, 28 Jan 2011 13:45:10 +0530
-Subject: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
-In-Reply-To: <20110125165735.GL13589@atomide.com>
-References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
-	<1295443503-14515-4-git-send-email-s-ghorai@ti.com>
-	<20110121184020.GD11678@atomide.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B036A8DB549@dbde02.ent.ti.com>
-	<20110125165735.GL13589@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036AA2EC2E@dbde02.ent.ti.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Fri, 28 Jan 2011 09:28:48 +0100
+Subject: [PATCH 0/5] mmc: add double buffering for mmc block requests
+In-Reply-To: <AANLkTimjfO4Wb0f87X_sDugW=yU1=YEQn35uZnsKKwq2@mail.gmail.com>
+References: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
+	<4D34FC5D.5080605@samsung.com>
+	<AANLkTimjfO4Wb0f87X_sDugW=yU1=YEQn35uZnsKKwq2@mail.gmail.com>
+Message-ID: <AANLkTi=H71TQpuBnagMThcv-6NKJyqsD-xtg_eW8Pb_T@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jaehoon,
 
+Have you had the chance to test the patches on the Samsung Soc. I can
+sketch a implementation for sdhci if that helps? Unfortunately I don't
+have any hardware to test the SDHCI driver unless there is support in
+QEMU?
+I really think I need to test this on more hardware in order to get
+more results for the patchset and hopefully more attention as well.
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Tuesday, January 25, 2011 10:28 PM
-> To: Ghorai, Sukumar
-> Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
-> 
-> * Ghorai, Sukumar <s-ghorai@ti.com> [110122 09:53]:
-> > >
-> > > I think I've commented on this before, but why don't you make
-> gpmc_init
-> > > a subsys_initcall? There should be no reason to call this earlier.
-> > > If something does not work because of that, then that issue must be
-> > > fixed.
-> >
-> > [Ghorai] You suggested the same in previous v5 and v6; and I mentioned
-> > the issues [1] that - nand_init()called before
-> subsys_initcall(gpmc_init);
-> > Let me know if I am missing anything again.
-> 
-> There should not be any need to call nand_init early either. We want
-> to initialize as much as possible late so we have proper console
-> error messages.
+BR
+Per
 
-[Ghorai] thanks...
-changed to postcore_initcall() and it solved the problem I mentioned earlier. And it simplifies the overall modification in different board files.
-postcore_initcall(gpmc_init);
-
-> 
-> Tony
+On 18 January 2011 09:12, Per Forlin <per.forlin@linaro.org> wrote:
+> On 18 January 2011 03:35, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Hi Per..
+>>
+>> it is interesting approach..so
+>> we want to test your double buffering in our environment(Samsung SoC).
+>>
+>> Did you test with SDHCI?
+> So far I have only tested on mmci for board u5500 and u8500. I happily
+> test on a different board if I can get hold of one.
+>
+>> If you tested with SDHCI, i want to know how much increase the performance.
+>>
+>> Thanks,
+>> Jaehoon Chung
+>
