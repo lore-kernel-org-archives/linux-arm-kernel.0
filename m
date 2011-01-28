@@ -1,39 +1,26 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Fri, 28 Jan 2011 09:28:48 +0100
-Subject: [PATCH 0/5] mmc: add double buffering for mmc block requests
-In-Reply-To: <AANLkTimjfO4Wb0f87X_sDugW=yU1=YEQn35uZnsKKwq2@mail.gmail.com>
-References: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
-	<4D34FC5D.5080605@samsung.com>
-	<AANLkTimjfO4Wb0f87X_sDugW=yU1=YEQn35uZnsKKwq2@mail.gmail.com>
-Message-ID: <AANLkTi=H71TQpuBnagMThcv-6NKJyqsD-xtg_eW8Pb_T@mail.gmail.com>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 28 Jan 2011 00:46:11 -0800
+Subject: [GIT PULL] ARM Tegra fixes for 2.6.38
+In-Reply-To: <AANLkTino3tzfri0MiPpMArsB8VGiKZh2aP85tv+psBbZ@mail.gmail.com>
+References: <AANLkTim6zcdn8FgUTa7OO=_4B3x5CiHxWr_g=uR0m4zX@mail.gmail.com>
+	<AANLkTino3tzfri0MiPpMArsB8VGiKZh2aP85tv+psBbZ@mail.gmail.com>
+Message-ID: <AANLkTin899Md9s5-EiK9WH4-FZp4aTJpWF6-wcWhfR0T@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
-
-Have you had the chance to test the patches on the Samsung Soc. I can
-sketch a implementation for sdhci if that helps? Unfortunately I don't
-have any hardware to test the SDHCI driver unless there is support in
-QEMU?
-I really think I need to test this on more hardware in order to get
-more results for the patchset and hopefully more attention as well.
-
-BR
-Per
-
-On 18 January 2011 09:12, Per Forlin <per.forlin@linaro.org> wrote:
-> On 18 January 2011 03:35, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Hi Per..
+On Thu, Jan 27, 2011 at 12:42 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Thu, Jan 27, 2011 at 3:41 PM, Colin Cross <ccross@google.com> wrote:
 >>
->> it is interesting approach..so
->> we want to test your double buffering in our environment(Samsung SoC).
+>> Please pull fixes for the Tegra machine from:
 >>
->> Did you test with SDHCI?
-> So far I have only tested on mmci for board u5500 and u8500. I happily
-> test on a different board if I can get hold of one.
+>> ?http://android.git.kernel.org/kernel/tegra.git for-linus
 >
->> If you tested with SDHCI, i want to know how much increase the performance.
->>
->> Thanks,
->> Jaehoon Chung
+> I don't do http fetching. My life is too short. If there isn't a
+> native git server, make one.
 >
+> ? ? ? ? ? ? ? Linus
+>
+
+Sorry, the git server wasn't responding for me yesterday.  Please pull from:
+git://android.git.kernel.org/kernel/tegra.git for-linus
