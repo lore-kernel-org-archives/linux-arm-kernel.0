@@ -1,39 +1,57 @@
-From: justinmattock@gmail.com (Justin P. Mattock)
-Date: Fri, 28 Jan 2011 11:48:18 -0800
-Subject: [PATCH]drivers:dma:coh901318.c Change initate to initiate.
-Message-ID: <1296244098-3732-1-git-send-email-justinmattock@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 28 Jan 2011 13:03:16 -0800
+Subject: [RFC/PATCH] nohz/sched: delay going tickless when CPU is loaded
+Message-ID: <1296248596-22478-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not sure if this is a typo or not. if it is then feel free to take this.
+From: Nicole Chalhoub <n-chalhoub@ti.com>
 
-Signed-off-by: Justin P. Mattock <justinmattock@gmail.com>
+One criterion of C-states selection is based on the load factor.  High
+load prevents deep C-states.  The load is evaluated and updated at
+each scheduler tick, and thus not updated when in tickless mode.  As a
+result, the CPU load calculated on the tick just before entering
+tickless is used for idle decisions.
 
+When a high load is evaluated on a tick happening on a burst of
+activity, this load value is kept until the next tick, which could
+take few ms to happen if going tickless.
+
+This patch ensures that the load is taken into consideration before
+going tickless.  Rather than going tickless and entering a shallow
+sleep state, the decison to go tickless is slightly delayed so that
+the idle governor will tend to favor deeper sleep states.
+
+Delaying NOHZ decisions until the load is zero improved the load
+estimation on our ARM/OMAP4 platform where HZ =128 and increased the
+time spent in deep C-states (~50% of idle time in C-states deeper than
+C1).  A power saving of ~20mA at battery level is observed during MP3
+playback on OMAP4/Blaze board.
+
+Signed-off-by: Nicole Chalhoub <n-chalhoub@ti.com>
+Signed-off-by: Vincent Bour <v-bour@ti.com>
+Cc: Arjan van de Ven <arjan@linux.intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+[khilman at ti.com: minor edits/changes to changelog]
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/dma/coh901318.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Applies to v2.6.38-rc2
 
-diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-index a665683..00deabd 100644
---- a/drivers/dma/coh901318.c
-+++ b/drivers/dma/coh901318.c
-@@ -849,7 +849,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
+ kernel/time/tick-sched.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index 3e216e0..96cb512 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -325,7 +325,7 @@ void tick_nohz_stop_sched_tick(int inidle)
+ 	} while (read_seqretry(&xtime_lock, seq));
  
- 				/* Must clear TC interrupt before calling
- 				 * dma_tc_handle
--				 * in case tc_handle initate a new dma job
-+				 * in case tc_handle initiate a new dma job
- 				 */
- 				__set_bit(i, virtbase + COH901318_TC_INT_CLEAR1);
- 
-@@ -894,7 +894,7 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- 				}
- 				/* Must clear TC interrupt before calling
- 				 * dma_tc_handle
--				 * in case tc_handle initate a new dma job
-+				 * in case tc_handle initiate a new dma job
- 				 */
- 				__set_bit(i, virtbase + COH901318_TC_INT_CLEAR2);
- 
+ 	if (rcu_needs_cpu(cpu) || printk_needs_cpu(cpu) ||
+-	    arch_needs_cpu(cpu)) {
++	    arch_needs_cpu(cpu) || this_cpu_load()) {
+ 		next_jiffies = last_jiffies + 1;
+ 		delta_jiffies = 1;
+ 	} else {
 -- 
-1.6.5.GIT
+1.7.3.5
