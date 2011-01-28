@@ -1,26 +1,76 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 28 Jan 2011 00:46:11 -0800
-Subject: [GIT PULL] ARM Tegra fixes for 2.6.38
-In-Reply-To: <AANLkTino3tzfri0MiPpMArsB8VGiKZh2aP85tv+psBbZ@mail.gmail.com>
-References: <AANLkTim6zcdn8FgUTa7OO=_4B3x5CiHxWr_g=uR0m4zX@mail.gmail.com>
-	<AANLkTino3tzfri0MiPpMArsB8VGiKZh2aP85tv+psBbZ@mail.gmail.com>
-Message-ID: <AANLkTin899Md9s5-EiK9WH4-FZp4aTJpWF6-wcWhfR0T@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 28 Jan 2011 18:28:20 +0900
+Subject: [PATCH 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
+In-Reply-To: <1294419468-13700-2-git-send-email-s.nawrocki@samsung.com>
+References: <1294419468-13700-1-git-send-email-s.nawrocki@samsung.com>
+	<1294419468-13700-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <02e001cbbecd$b9aee0d0$2d0ca270$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 12:42 PM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Thu, Jan 27, 2011 at 3:41 PM, Colin Cross <ccross@google.com> wrote:
->>
->> Please pull fixes for the Tegra machine from:
->>
->> ?http://android.git.kernel.org/kernel/tegra.git for-linus
->
-> I don't do http fetching. My life is too short. If there isn't a
-> native git server, make one.
->
-> ? ? ? ? ? ? ? Linus
->
+Sylwester Nawrocki wrote:
+> 
+> Add I2C0 bus platform device for camera sensors.
+> 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/Kconfig     |    1 +
+>  arch/arm/mach-s5pv210/mach-goni.c |    4 ++++
+>  2 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+> index 53aabef..b0aa462 100644
+> --- a/arch/arm/mach-s5pv210/Kconfig
+> +++ b/arch/arm/mach-s5pv210/Kconfig
+> @@ -75,6 +75,7 @@ config MACH_GONI
+>  	bool "GONI"
+>  	select CPU_S5PV210
+>  	select S5P_GPIO_INT
+> +	select S3C_DEV_I2C0
 
-Sorry, the git server wasn't responding for me yesterday.  Please pull from:
-git://android.git.kernel.org/kernel/tegra.git for-linus
+NO...Where is S3C_DEV_I2C0?
+Basically, platform device of i2c0 which is in
+arch/arm/plat-samsung/dev-i2c0.c is always selected.
+
+>  	select S3C_DEV_FB
+>  	select S5P_DEV_FIMC0
+>  	select S5P_DEV_FIMC1
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index e22d511..fc34575 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -800,6 +800,7 @@ static struct platform_device *goni_devices[]
+__initdata
+> = {
+>  	&s5pv210_device_iis0,
+>  	&s3c_device_usb_hsotg,
+>  	&samsung_device_keypad,
+> +	&s3c_device_i2c0,
+>  	&s3c_device_i2c1,
+>  	&s3c_device_i2c2,
+>  	&wm8994_fixed_voltage0,
+> @@ -827,6 +828,9 @@ static void __init goni_machine_init(void)
+>  	/* Radio: call before I2C 1 registeration */
+>  	goni_radio_init();
+> 
+> +	/* I2C0 */
+> +	s3c_i2c0_set_platdata(NULL);
+> +
+>  	/* I2C1 */
+>  	s3c_i2c1_set_platdata(NULL);
+>  	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
+> --
+> 1.7.3.5
+
+Others, ok...please re-work this against on latest my for-next.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
