@@ -1,196 +1,176 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Jan 2011 16:34:48 +0530
-Subject: [PATCH 6/6] omap4: dpll: Enable auto gate control for all MX
-	postdividers
+Date: Fri, 28 Jan 2011 16:34:43 +0530
+Subject: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE power state
 In-Reply-To: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1296212688-21951-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+On OMAP4, one can explicitly program INACTIVE as the power state of
+the logic area inside the power domain. Techincally PD state programmed
+to ON and if all the clock domains within the PD are idled, is equivalent
+tp PD programmed to INACTIVE and all the clock domains within the PD are
+idled. There won't be any power difference in above two.
 
-Enable auto/hw gate control for all dpll MX postdividers.
-This requires the corresponding CLOCK_MX_IDLE_CONTROL to
-be populated for all respective clock nodes.
+Since the CPUIDLE C-states explicitly make use of INACTIVE as a PD
+targeted state and also there is some additional latancy involved
+with PD INACTIVE vs PD ON, it's better to support it as an explcit
+PD state.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+This patch adds the support to allow explicit PD INACTIVE
+programming if supported.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock44xx_data.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomain.h           |   12 ++++++++++++
+ arch/arm/mach-omap2/powerdomains44xx_data.c |   26 +++++++++++++-------------
+ 2 files changed, 25 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index e5c59a0..0f06dd2 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -329,6 +329,7 @@ static struct clk dpll_abe_m2x2_ck = {
- 	.clksel		= dpll_abe_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_ABE,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -396,6 +397,7 @@ static struct clk dpll_abe_m3x2_ck = {
- 	.clksel		= dpll_abe_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M3_DPLL_ABE,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUTHIF_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -466,6 +468,7 @@ static struct clk dpll_core_m6x2_ck = {
- 	.clksel		= dpll_core_m6x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M6_DPLL_CORE,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT3_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -496,6 +499,7 @@ static struct clk dpll_core_m2_ck = {
- 	.clksel		= dpll_core_m2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_CORE,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -516,6 +520,7 @@ static struct clk dpll_core_m5x2_ck = {
- 	.clksel		= dpll_core_m6x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M5_DPLL_CORE,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT2_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -582,6 +587,7 @@ static struct clk dpll_core_m4x2_ck = {
- 	.clksel		= dpll_core_m6x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M4_DPLL_CORE,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT1_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -607,6 +613,7 @@ static struct clk dpll_abe_m2_ck = {
- 	.clksel		= dpll_abe_m2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_ABE,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -633,6 +640,7 @@ static struct clk dpll_core_m7x2_ck = {
- 	.clksel		= dpll_core_m6x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M7_DPLL_CORE,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT4_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -705,6 +713,7 @@ static struct clk dpll_iva_m4x2_ck = {
- 	.clksel		= dpll_iva_m4x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M4_DPLL_IVA,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT1_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -717,6 +726,7 @@ static struct clk dpll_iva_m5x2_ck = {
- 	.clksel		= dpll_iva_m4x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M5_DPLL_IVA,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT2_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -765,6 +775,7 @@ static struct clk dpll_mpu_m2_ck = {
- 	.clksel		= dpll_mpu_m2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_MPU,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -838,6 +849,7 @@ static struct clk dpll_per_m2_ck = {
- 	.clksel		= dpll_per_m2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_PER,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -862,6 +874,7 @@ static struct clk dpll_per_m2x2_ck = {
- 	.clksel		= dpll_per_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_PER,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -888,6 +901,7 @@ static struct clk dpll_per_m4x2_ck = {
- 	.clksel		= dpll_per_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M4_DPLL_PER,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT1_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -900,6 +914,7 @@ static struct clk dpll_per_m5x2_ck = {
- 	.clksel		= dpll_per_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M5_DPLL_PER,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT2_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -912,6 +927,7 @@ static struct clk dpll_per_m6x2_ck = {
- 	.clksel		= dpll_per_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M6_DPLL_PER,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT3_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -924,6 +940,7 @@ static struct clk dpll_per_m7x2_ck = {
- 	.clksel		= dpll_per_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M7_DPLL_PER,
- 	.clksel_mask	= OMAP4430_HSDIVIDER_CLKOUT4_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -980,6 +997,7 @@ static struct clk dpll_unipro_m2x2_ck = {
- 	.clksel		= dpll_unipro_m2x2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_UNIPRO,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -1029,6 +1047,7 @@ static struct clk dpll_usb_ck = {
- static struct clk dpll_usb_clkdcoldo_ck = {
- 	.name		= "dpll_usb_clkdcoldo_ck",
- 	.parent		= &dpll_usb_ck,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &followparent_recalc,
- };
-@@ -1044,6 +1063,7 @@ static struct clk dpll_usb_m2_ck = {
- 	.clksel		= dpll_usb_m2_div,
- 	.clksel_reg	= OMAP4430_CM_DIV_M2_DPLL_USB,
- 	.clksel_mask	= OMAP4430_DPLL_CLKOUT_DIV_0_6_MASK,
-+	.flags		= CLOCK_MX_IDLE_CONTROL,
- 	.ops		= &clkops_null,
- 	.recalc		= &omap2_clksel_recalc,
- 	.round_rate	= &omap2_clksel_round_rate,
-@@ -3302,6 +3322,8 @@ int __init omap4xxx_clk_init(void)
- 			omap2_init_clk_clkdm(c->lk.clk);
- 			if (c->lk.clk->dpll_data)
- 				omap3_dpll_allow_idle(c->lk.clk);
-+			if (c->lk.clk->flags & CLOCK_MX_IDLE_CONTROL)
-+				omap4_dpllmx_allow_gatectrl(c->lk.clk);
- 		}
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index c66431e..0e15ca7 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -46,6 +46,18 @@
  
- 	recalculate_root_clocks();
+ #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | (1 << PWRDM_POWER_ON))
+ 
++#define PWRSTS_RET_INA_ON	((1 << PWRDM_POWER_RET) | \
++				 (1 << PWRDM_POWER_INACTIVE)  | \
++				 (1 << PWRDM_POWER_ON))
++
++#define PWRSTS_OFF_INA_ON	((1 << PWRDM_POWER_OFF) | \
++				 (1 << PWRDM_POWER_INACTIVE)  | \
++				 (1 << PWRDM_POWER_ON))
++
++#define PWRSTS_OFF_RET_INA_ON	((1 << PWRDM_POWER_OFF) | \
++				 (1 << PWRDM_POWER_RET) | \
++				 (1 << PWRDM_POWER_INACTIVE)  | \
++				 (1 << PWRDM_POWER_ON))
+ 
+ /* Powerdomain flags */
+ #define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore support */
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index 26d7641..96cde98 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -36,7 +36,7 @@ static struct powerdomain core_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_RET_ON,
++	.pwrsts		  = PWRSTS_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 5,
+ 	.pwrsts_mem_ret	= {
+@@ -62,7 +62,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_GFX_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_ON,
++	.pwrsts		  = PWRSTS_OFF_INA_ON,
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	= {
+ 		[0] = PWRDM_POWER_OFF,	/* gfx_mem */
+@@ -79,7 +79,7 @@ static struct powerdomain abe_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_ABE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRDM_POWER_OFF,
+ 	.banks		  = 2,
+ 	.pwrsts_mem_ret	= {
+@@ -99,7 +99,7 @@ static struct powerdomain dss_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_DSS_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF,
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	= {
+@@ -117,7 +117,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_TESLA_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 3,
+ 	.pwrsts_mem_ret	= {
+@@ -155,7 +155,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU0_INST,
+ 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	= {
+@@ -172,7 +172,7 @@ static struct powerdomain cpu1_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU1_INST,
+ 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	= {
+@@ -205,7 +205,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 3,
+ 	.pwrsts_mem_ret	= {
+@@ -226,7 +226,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_IVAHD_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRDM_POWER_OFF,
+ 	.banks		  = 4,
+ 	.pwrsts_mem_ret	= {
+@@ -250,7 +250,7 @@ static struct powerdomain cam_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_CAM_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_ON,
++	.pwrsts		  = PWRSTS_OFF_INA_ON,
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	= {
+ 		[0] = PWRDM_POWER_OFF,	/* cam_mem */
+@@ -267,7 +267,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_L3INIT_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_RET_ON,
++	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 1,
+ 	.pwrsts_mem_ret	= {
+@@ -285,7 +285,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_L4PER_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_RET_ON,
++	.pwrsts		  = PWRSTS_RET_INA_ON,
+ 	.pwrsts_logic_ret = PWRSTS_OFF_RET,
+ 	.banks		  = 2,
+ 	.pwrsts_mem_ret	= {
+@@ -317,7 +317,7 @@ static struct powerdomain cefuse_44xx_pwrdm = {
+ 	.prcm_offs	  = OMAP4430_PRM_CEFUSE_INST,
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+-	.pwrsts		  = PWRSTS_OFF_ON,
++	.pwrsts		  = PWRSTS_OFF_INA_ON,
+ };
+ 
+ /*
 -- 
 1.6.0.4
