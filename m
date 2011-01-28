@@ -1,57 +1,49 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 28 Jan 2011 13:03:16 -0800
-Subject: [RFC/PATCH] nohz/sched: delay going tickless when CPU is loaded
-Message-ID: <1296248596-22478-1-git-send-email-khilman@ti.com>
+Date: Fri, 28 Jan 2011 13:47:52 -0800
+Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs
+	numbers > 31
+In-Reply-To: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com> (Hirosh
+	Dabui's message of "Tue, 25 Jan 2011 23:05:26 +0100")
+References: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com>
+Message-ID: <8762t8d7jr.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicole Chalhoub <n-chalhoub@ti.com>
+Hirosh Dabui <hirosh.dabui@snom.com> writes:
 
-One criterion of C-states selection is based on the load factor.  High
-load prevents deep C-states.  The load is evaluated and updated at
-each scheduler tick, and thus not updated when in tickless mode.  As a
-result, the CPU load calculated on the tick just before entering
-tickless is used for idle decisions.
+> This patch fix a bug in the register indexing for GPIOs numbers >  31
+> to get the relevant hardware registers of tnetv107x to control the GPIOs.
+>
+> In the structure tnetv107x_gpio_regs:
+>
+> struct tnetv107x_gpio_regs {
+>             u32     idver;
+>             u32     data_in[3];
+>             u32     data_out[3];
+>             u32     direction[3];
+>             u32     enable[3];
+> };
+>
+> The GPIO hardware register addresses of tnetv107x are stored.
+> The chip implements 3 registers of each entity to serve 96 GPIOs,
+> each register provides a subset of 32 GPIOs.
+> The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
+> and gpio_reg_clear_bit.
+>
+> The bug implied the use of macros to access the relevant hardware
+> register e.g. the driver code used the macro like this:
+> 'gpio_reg_clear_bit(&reg->data_out, gpio)'
+>
+> But it has to be used like this:
+> 'gpio_reg_clear_bit(reg->data_out, gpio)'.
+>
+> The different results are shown here:
+> - &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
+> - reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
+>
+> Acked-by: Cyril Chemparathy <cyril@ti.com>
+> Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
 
-When a high load is evaluated on a tick happening on a burst of
-activity, this load value is kept until the next tick, which could
-take few ms to happen if going tickless.
+Thanks, applied and queuing for 2.6.39.
 
-This patch ensures that the load is taken into consideration before
-going tickless.  Rather than going tickless and entering a shallow
-sleep state, the decison to go tickless is slightly delayed so that
-the idle governor will tend to favor deeper sleep states.
-
-Delaying NOHZ decisions until the load is zero improved the load
-estimation on our ARM/OMAP4 platform where HZ =128 and increased the
-time spent in deep C-states (~50% of idle time in C-states deeper than
-C1).  A power saving of ~20mA at battery level is observed during MP3
-playback on OMAP4/Blaze board.
-
-Signed-off-by: Nicole Chalhoub <n-chalhoub@ti.com>
-Signed-off-by: Vincent Bour <v-bour@ti.com>
-Cc: Arjan van de Ven <arjan@linux.intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-[khilman at ti.com: minor edits/changes to changelog]
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Applies to v2.6.38-rc2
-
- kernel/time/tick-sched.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 3e216e0..96cb512 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -325,7 +325,7 @@ void tick_nohz_stop_sched_tick(int inidle)
- 	} while (read_seqretry(&xtime_lock, seq));
- 
- 	if (rcu_needs_cpu(cpu) || printk_needs_cpu(cpu) ||
--	    arch_needs_cpu(cpu)) {
-+	    arch_needs_cpu(cpu) || this_cpu_load()) {
- 		next_jiffies = last_jiffies + 1;
- 		delta_jiffies = 1;
- 	} else {
--- 
-1.7.3.5
+Kevin
