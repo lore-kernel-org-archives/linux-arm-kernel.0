@@ -1,79 +1,81 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 28 Jan 2011 07:34:02 +0800
-Subject: [PATCH 1/2] ARM: imx53_loco: remove inavailable uart device
-	and remove rts/cts support
-In-Reply-To: <20110127092317.GU9041@pengutronix.de>
-References: <1296119944-30485-1-git-send-email-richard.zhao@freescale.com>
-	<20110127092317.GU9041@pengutronix.de>
-Message-ID: <20110127233402.GA2239@richard-laptop>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 27 Jan 2011 16:18:41 -0800
+Subject: [PATCH] i2c: OMAP: fix static suspend vs. runtime suspend
+Message-ID: <1296173921-4832-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+When runtime PM is enabled, each OMAP i2c device is suspended after
+each i2c xfer.  However, there are two cases when the static suspend
+methods must be used to ensure the devices are suspended:
 
-On Thu, Jan 27, 2011 at 10:23:17AM +0100, Sascha Hauer wrote:
-> Richard,
-> 
-> Fabio posted a very similar patch. Please coordinate what should be done
-> here.
-Please merge Fabio patch first, I will send my second patch based on that again.
+1) runtime PM is disabled, either at compile time or dynamically
+    via /sys/devices/.../power/control.
+2) an i2c client driver uses i2c during it's suspend callback, thus
+   leaving the i2c driver active (NOTE: runtime suspend transitions are
+   disabled during system suspend, so i2c activity during system
+   suspend will runtime resume the device, but not runtime (re)suspend it.)
 
-Thanks
-Richard
-> 
-> Sascha
-> 
-> On Thu, Jan 27, 2011 at 05:19:03PM +0800, Richard Zhao wrote:
-> > imx53_loco board only have one uart and the uart don't export rts/cts lines.
-> > 
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > ---
-> >  arch/arm/mach-mx5/board-mx53_loco.c |   20 +-------------------
-> >  1 files changed, 1 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> > index d1348e0..d0ca65b 100644
-> > --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> > +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> > @@ -41,29 +41,11 @@
-> >  static iomux_v3_cfg_t mx53_loco_pads[] = {
-> >  	MX53_PAD_CSI0_D10__UART1_TXD,
-> >  	MX53_PAD_CSI0_D11__UART1_RXD,
-> > -	MX53_PAD_ATA_DIOW__UART1_TXD,
-> > -	MX53_PAD_ATA_DMACK__UART1_RXD,
-> > -
-> > -	MX53_PAD_ATA_BUFFER_EN__UART2_RXD,
-> > -	MX53_PAD_ATA_DMARQ__UART2_TXD,
-> > -	MX53_PAD_ATA_DIOR__UART2_RTS,
-> > -	MX53_PAD_ATA_INTRQ__UART2_CTS,
-> > -
-> > -	MX53_PAD_ATA_CS_0__UART3_TXD,
-> > -	MX53_PAD_ATA_CS_1__UART3_RXD,
-> > -	MX53_PAD_ATA_DA_1__UART3_CTS,
-> > -	MX53_PAD_ATA_DA_2__UART3_RTS,
-> > -};
-> > -
-> > -static const struct imxuart_platform_data mx53_loco_uart_data __initconst = {
-> > -	.flags = IMXUART_HAVE_RTSCTS,
-> >  };
-> >  
-> >  static inline void mx53_loco_init_uart(void)
-> >  {
-> > -	imx53_add_imx_uart(0, &mx53_loco_uart_data);
-> > -	imx53_add_imx_uart(1, &mx53_loco_uart_data);
-> > -	imx53_add_imx_uart(2, &mx53_loco_uart_data);
-> > +	imx53_add_imx_uart(0, NULL);
-> >  }
-> >  
-> >  static inline void mx53_loco_fec_reset(void)
-> > -- 
-> > 1.6.3.3
-> > 
-> > 
-> > 
-> 
-> -- 
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Since the actual work to suspend the device is handled by the
+subsytem, call the bus methods to take care of it.
+
+NOTE: This takes care of a known suspend problem on OMAP3 where the
+TWL RTC driver does i2c xfers during its suspend path leaving the i2c
+driver in an active state (since runtime suspend transistions are
+disabled.)
+
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Ben, this is a regression in 2.6.38 so hopefully this can be queued
+in the 2.6.38-rc cycle.  Thanks.
+
+ drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index b605ff3..0541df9 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1137,12 +1137,40 @@ omap_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_SUSPEND
++static int omap_i2c_suspend(struct device *dev)
++{
++	if (!pm_runtime_suspended(dev))
++		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_suspend)
++			dev->bus->pm->runtime_suspend(dev);
++
++	return 0;
++}
++
++static int omap_i2c_resume(struct device *dev)
++{
++	if (!pm_runtime_suspended(dev))
++		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_resume)
++			dev->bus->pm->runtime_resume(dev);
++
++	return 0;
++}
++
++static struct dev_pm_ops omap_i2c_pm_ops = {
++	.suspend = omap_i2c_suspend,
++	.resume = omap_i2c_resume,
++};
++#else
++#define omap_i2c_pm_ops NULL
++#endif
++
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+ 	.remove		= omap_i2c_remove,
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+ 		.owner	= THIS_MODULE,
++		.pm     = &omap_i2c_pm_ops,
+ 	},
+ };
+ 
+-- 
+1.7.3.5
