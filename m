@@ -1,34 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Jan 2011 13:22:08 +0000
-Subject: [PATCH 11/14] ARM: v6k: use CPU domain feature if we include
-	support for arch < ARMv6K
-In-Reply-To: <1296220256.1799.62.camel@e102109-lin.cambridge.arm.com>
-References: <E1Peuh2-0003Sx-5e@rmk-PC.arm.linux.org.uk>
-	<AANLkTimN8Gn5a-k4ai7EhMGpqbj_u4Y8fHvUh_actzd+@mail.gmail.com>
-	<20110127185935.GA1651@n2100.arm.linux.org.uk>
-	<1296207966.1799.10.camel@e102109-lin.cambridge.arm.com>
-	<20110128095953.GA13005@n2100.arm.linux.org.uk>
-	<1296211611.1799.15.camel@e102109-lin.cambridge.arm.com>
-	<20110128110629.GB13005@n2100.arm.linux.org.uk>
-	<1296217518.1799.59.camel@e102109-lin.cambridge.arm.com>
-	<20110128130532.GC13005@n2100.arm.linux.org.uk>
-	<1296220256.1799.62.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110128132208.GE13005@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 29 Jan 2011 05:32:15 +0800
+Subject: [PATCH] ARM: mxs: fix clock base address missing
+In-Reply-To: <20110127153124.GB9041@pengutronix.de>
+References: <1296080796-10896-1-git-send-email-shawn.guo@freescale.com>
+	<20110126155858.GP9041@pengutronix.de>
+	<20110127231929.GC14993@S2100-06.ap.freescale.net>
+	<20110127153124.GB9041@pengutronix.de>
+Message-ID: <20110128213214.GA554@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 28, 2011 at 01:10:56PM +0000, Catalin Marinas wrote:
-> On Fri, 2011-01-28 at 13:05 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 28, 2011 at 12:25:18PM +0000, Catalin Marinas wrote:
-> > > With your latest patches, do we use the TLS emulation on ARMv7 (UP) if
-> > > v6 is compiled in? If that's the case, we may have a problem - I talked
-> > > to the toolchain guys and it looks like code optimised for ARMv7 reads
-> > > the TLS register directly without going through the kuser helper.
-> > 
-> > That's not a problem, because you wouldn't run ARMv7 optimized userspace
-> > on an ARMv6 CPU.  That's not what this whole exercise is about.
+On Thu, Jan 27, 2011 at 04:31:24PM +0100, Sascha Hauer wrote:
+> On Fri, Jan 28, 2011 at 07:19:30AM +0800, Shawn Guo wrote:
+> > On Wed, Jan 26, 2011 at 04:58:58PM +0100, Sascha Hauer wrote:
+> > > On Thu, Jan 27, 2011 at 06:26:36AM +0800, Shawn Guo wrote:
+> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > > ---
+> > > >  arch/arm/mach-mxs/clock-mx23.c |    2 +-
+> > > >  arch/arm/mach-mxs/clock-mx28.c |    2 +-
+> > > >  2 files changed, 2 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> > > > index b1a362e..a0296a4 100644
+> > > > --- a/arch/arm/mach-mxs/clock-mx23.c
+> > > > +++ b/arch/arm/mach-mxs/clock-mx23.c
+> > > > @@ -347,7 +347,7 @@ static int name##_set_parent(struct clk *clk, struct clk *parent)	\
+> > > >  {									\
+> > > >  	if (parent != clk->parent) {					\
+> > > >  		__raw_writel(BM_CLKCTRL_CLKSEQ_BYPASS_##bit,		\
+> > > > -			 HW_CLKCTRL_CLKSEQ_TOG);			\
+> > > > +			 CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_TOG);	\
+> > > >  		clk->parent = parent;					\
+> > > >  	}								\
+> > > >  									\
+> > > 
+> > > While at it you could also add some parameter checking to this function.
+> > > Implemented like this it behaves rather randomly.
+> > > 
+> > The parameters have been well checked by clk_set_parent().  What
+> > kind of extra checking are you expecting?
 > 
-> But you can run ARMv7 optimised userspace on ARMv7 CPU with a kernel
-> image compiled for v6+v7.
+> clk_set_parent checks whether valid clocks are passed as arguments, but
+> not whether parent is a valid parent for this particular clock.
+> 
+OK. I will address it in another patch, as it's a different subject.
 
-Yes.
+Regards,
+Shawn
