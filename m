@@ -1,49 +1,51 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Jan 2011 08:49:44 -0800
-Subject: [PATCH 11/14] ARM: v6k: use CPU domain feature if we include
-	support for arch < ARMv6K
-In-Reply-To: <1296227465.1799.95.camel@e102109-lin.cambridge.arm.com>
-References: <E1Peuh2-0003Sx-5e@rmk-PC.arm.linux.org.uk>
-	<AANLkTimN8Gn5a-k4ai7EhMGpqbj_u4Y8fHvUh_actzd+@mail.gmail.com>
-	<20110127185935.GA1651@n2100.arm.linux.org.uk>
-	<1296207966.1799.10.camel@e102109-lin.cambridge.arm.com>
-	<20110128095953.GA13005@n2100.arm.linux.org.uk>
-	<1296211611.1799.15.camel@e102109-lin.cambridge.arm.com>
-	<20110128110629.GB13005@n2100.arm.linux.org.uk>
-	<1296217518.1799.59.camel@e102109-lin.cambridge.arm.com>
-	<20110128132134.GD13005@n2100.arm.linux.org.uk>
-	<1296227465.1799.95.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110128164944.GT23412@atomide.com>
+Date: Fri, 28 Jan 2011 08:51:58 -0800
+Subject: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B036AA2EC2E@dbde02.ent.ti.com>
+References: <1295443503-14515-1-git-send-email-s-ghorai@ti.com>
+	<1295443503-14515-4-git-send-email-s-ghorai@ti.com>
+	<20110121184020.GD11678@atomide.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B036A8DB549@dbde02.ent.ti.com>
+	<20110125165735.GL13589@atomide.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B036AA2EC2E@dbde02.ent.ti.com>
+Message-ID: <20110128165158.GU23412@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Catalin Marinas <catalin.marinas@arm.com> [110128 07:11]:
-> On Fri, 2011-01-28 at 13:21 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 28, 2011 at 12:25:18PM +0000, Catalin Marinas wrote:
-> > > With your latest patches, do we use the TLS emulation on ARMv7 (UP) if
-> > > v6 is compiled in? If that's the case, we may have a problem - I talked
-> > > to the toolchain guys and it looks like code optimised for ARMv7 reads
-> > > the TLS register directly without going through the kuser helper. So you
-> > > may have people taking an Ubuntu filesystem (v7 only) and a pre-built
-> > > OMAP image with TLS emulation even on Cortex-A8 and things won't work as
-> > > expected.
+* Ghorai, Sukumar <s-ghorai@ti.com> [110128 00:14]:
+> 
+> 
+> > -----Original Message-----
+> > From: Tony Lindgren [mailto:tony at atomide.com]
+> > Sent: Tuesday, January 25, 2011 10:28 PM
+> > To: Ghorai, Sukumar
+> > Cc: linux-omap at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH RESEND v8 3/7] omap: gpmc: enable irq mode in gpmc
 > > 
-> > You're really making a mountain out of TLS.
-> 
-> Not really, just asking for clarification as I haven't checked all your
-> patches recently.
-> 
-> > If we have a v6+v6k+v7 kernel, then the way the kernel TLS code is built,
-> > we will use the TLS register if that's available on the hardware.  If it
-> > isn't, we will write the TLS value directly to virtual 0xffff0ffc.
+> > * Ghorai, Sukumar <s-ghorai@ti.com> [110122 09:53]:
+> > > >
+> > > > I think I've commented on this before, but why don't you make
+> > gpmc_init
+> > > > a subsys_initcall? There should be no reason to call this earlier.
+> > > > If something does not work because of that, then that issue must be
+> > > > fixed.
+> > >
+> > > [Ghorai] You suggested the same in previous v5 and v6; and I mentioned
+> > > the issues [1] that - nand_init()called before
+> > subsys_initcall(gpmc_init);
+> > > Let me know if I am missing anything again.
 > > 
-> > So, a kernel built for v6+v6k+v7, when run on v7, will set the hardware
-> > TLS register, and your v7 optimized binaries which access the TLS register
-> > directly will work.  Same for v6k.
+> > There should not be any need to call nand_init early either. We want
+> > to initialize as much as possible late so we have proper console
+> > error messages.
 > 
-> Great.
+> [Ghorai] thanks...
+> changed to postcore_initcall() and it solved the problem I mentioned earlier. And it simplifies the overall modification in different board files.
+> postcore_initcall(gpmc_init);
 
-Yes AFAIK we sorted out the TLS issue already a while back for v6+v6k+v7.
+OK great. I will check the order of initcalls anyways over next few
+weeks, so whatever works for the initcall is fine for now.
 
 Regards,
 
