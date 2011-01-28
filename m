@@ -1,33 +1,44 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Jan 2011 16:34:46 +0530
-Subject: [PATCH 4/6] omap4: dpll: Enable all DPLL autoidle at boot
+Date: Fri, 28 Jan 2011 16:34:45 +0530
+Subject: [PATCH 3/6] omap4: powerdomain: Use intended PWRSTS_* flags instead
+	of values
 In-Reply-To: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1296212688-21951-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+IVAHD and ABE power domain logic state is populated using directly
+value instead of the capability flags.
 
-Enable all DPLL autoidle at boot on OMAP4.
+Fix the same.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/clock44xx_data.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomains44xx_data.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index e8cb32f..e5c59a0 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -3300,6 +3300,8 @@ int __init omap4xxx_clk_init(void)
- 			clkdev_add(&c->lk);
- 			clk_register(c->lk.clk);
- 			omap2_init_clk_clkdm(c->lk.clk);
-+			if (c->lk.clk->dpll_data)
-+				omap3_dpll_allow_idle(c->lk.clk);
- 		}
- 
- 	recalculate_root_clocks();
+diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
+index 96cde98..daee255 100644
+--- a/arch/arm/mach-omap2/powerdomains44xx_data.c
++++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
+@@ -80,7 +80,7 @@ static struct powerdomain abe_44xx_pwrdm = {
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ 	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+-	.pwrsts_logic_ret = PWRDM_POWER_OFF,
++	.pwrsts_logic_ret = PWRSTS_OFF,
+ 	.banks		  = 2,
+ 	.pwrsts_mem_ret	= {
+ 		[0] = PWRDM_POWER_RET,	/* aessmem */
+@@ -227,7 +227,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
+ 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ 	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
+-	.pwrsts_logic_ret = PWRDM_POWER_OFF,
++	.pwrsts_logic_ret = PWRSTS_OFF,
+ 	.banks		  = 4,
+ 	.pwrsts_mem_ret	= {
+ 		[0] = PWRDM_POWER_OFF,	/* hwa_mem */
 -- 
 1.6.0.4
