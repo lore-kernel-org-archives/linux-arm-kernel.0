@@ -1,52 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Jan 2011 11:06:29 +0000
-Subject: [PATCH 11/14] ARM: v6k: use CPU domain feature if we include
-	support for arch < ARMv6K
-In-Reply-To: <1296211611.1799.15.camel@e102109-lin.cambridge.arm.com>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1Peuh2-0003Sx-5e@rmk-PC.arm.linux.org.uk>
-	<AANLkTimN8Gn5a-k4ai7EhMGpqbj_u4Y8fHvUh_actzd+@mail.gmail.com>
-	<20110127185935.GA1651@n2100.arm.linux.org.uk>
-	<1296207966.1799.10.camel@e102109-lin.cambridge.arm.com>
-	<20110128095953.GA13005@n2100.arm.linux.org.uk>
-	<1296211611.1799.15.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110128110629.GB13005@n2100.arm.linux.org.uk>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Fri, 28 Jan 2011 20:49:15 +0900
+Subject: [PATCH 2/3] ARM: S5PV210: Add supplies for CIF camera on GONI
+	board
+In-Reply-To: <02e101cbbece$55a77790$00f666b0$%kim@samsung.com>
+References: <1294419468-13700-1-git-send-email-s.nawrocki@samsung.com>
+	<1294419468-13700-3-git-send-email-s.nawrocki@samsung.com>
+	<02e101cbbece$55a77790$00f666b0$%kim@samsung.com>
+Message-ID: <4D42AD3B.40005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 28, 2011 at 10:46:51AM +0000, Catalin Marinas wrote:
-> On Fri, 2011-01-28 at 09:59 +0000, Russell King - ARM Linux wrote:
-> > On Fri, Jan 28, 2011 at 09:46:06AM +0000, Catalin Marinas wrote:
-> > > My point is that we may want SWP_EMULATE disabled (or depending on !
-> > > CPU_USE_DOMAINS). With domains enabled every read-only user page is
-> > > writeable by the kernel. This has the side-effect that SWP emulation
-> > > using LDREX/STREX breaks COW.
-> > 
-> > Yes, and maybe we should instead just enable the SWP instruction by default
-> > on ARMv7, and if SWP emulation is built, disable it at that point.
+On 01/28/2011 06:32 PM, Kukjin Kim wrote:
+> Sylwester Nawrocki wrote:
+>>
+>> Add regulator supplies required for NOON010PC30 CIF sensor.
+>>
+>> Signed-off-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+>> ---
+>>   arch/arm/mach-s5pv210/mach-goni.c |   24 +++++++++++++++++++++---
+>>   1 files changed, 21 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+> b/arch/arm/mach-s5pv210/mach-
+>> goni.c
+>> index fc34575..2051cee 100644
+>> --- a/arch/arm/mach-s5pv210/mach-goni.c
+>> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+>> @@ -273,6 +273,18 @@ static struct regulator_consumer_supply
+>> goni_ldo5_consumers[] = {
+>>   	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+>>   };
+>>
+>> +static struct regulator_consumer_supply goni_ldo11_consumers[] = {
+>> +	REGULATOR_SUPPLY("vddio", "0-0030"), /* "CAM_IO_2.8V" */
+>> +};
 > 
-> We can't disable the SWP instruction as long as domains are enabled (COW
-> not working for in-kernel STREX).
+> Need array in goni_ldo11_consumers?
 > 
-> On ARMv7 we could always force R/O kernel/user pages in set_pte_ext
-> independent of the domains setting and have early_trap_init() use
-> vectors_page() if cpu_architecture() >= 7 (this would actually catch
-> ARM11MPCore as well because of the way we interpret CPUID).
+> +static struct regulator_consumer_supply goni_ldo11_consumers =
+> +	REGULATOR_SUPPLY("vddio", "0-0030"); /* "CAM_IO_2.8V" */
+> 
+>> +
+... 
+>> +
+>>   static struct regulator_init_data goni_ldo2_data = {
+>>   	.constraints	= {
+>>   		.name		= "VALIVE_1.1V",
+>> @@ -371,8 +383,10 @@ static struct regulator_init_data goni_ldo11_data = {
+>>   		.min_uV		= 2800000,
+>>   		.max_uV		= 2800000,
+>>   		.apply_uV	= 1,
+>> -		.always_on	= 1,
+>> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+>>   	},
+>> +	.num_consumer_supplies	= ARRAY_SIZE(goni_ldo11_consumers),
+>> +	.consumer_supplies	= goni_ldo11_consumers,
+> 
+> If you modify as per my suggestion, then need to change this like following.
+> 
+> +	.num_consumer_supplies	= 1,
+> +	.consumer_supplies	=&goni_ldo11_consumers,
+> 
+>>   };
 
-What about a kernel covering ARMv6 too?  Writing to an aliased mapping
-of the vectors page (as required for TLS emulation) will require
-additional cache maintainence on every context switch.
+Although the current state of this file is not reflecting it, there is
+more devices sharing the regulators I've added supply definitions for,
+e.g the second camera in the system.
+So the arrays are really needed. If I modify it as you as you are
+suggesting then it will have to be changed when the other supplies
+are added.
 
-1. SWP emulation requires domain support turned off
-2. We can't turn domains off without creating a vectors page alias
-3. We can't have a separate vectors alias with ARMv6 VIPT aliasing caches
-   without additional cache maintainence.
 
-I don't think overloading the context switch with yet more conditionals
-based on yet more TLS combinations is a practical solution.
-
-So, ARMv6 TLS emulation, and SWP emulation are incompatible with each
-other.
-
-So either we don't have the SWP instruction at all on ARMv6+, or we have
-it enabled in hardware, or we don't and use the emulation where possible.
+Thanks,
+Sylwester
