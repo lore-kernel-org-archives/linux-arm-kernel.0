@@ -1,49 +1,37 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 28 Jan 2011 13:47:52 -0800
-Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs
-	numbers > 31
-In-Reply-To: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com> (Hirosh
-	Dabui's message of "Tue, 25 Jan 2011 23:05:26 +0100")
-References: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com>
-Message-ID: <8762t8d7jr.fsf@ti.com>
+Date: Fri, 28 Jan 2011 14:15:25 -0800
+Subject: [PATCH] arm: mach-omap2: voltage: debugfs: fix memory leak
+In-Reply-To: <1296231851-20632-1-git-send-email-aaro.koskinen@nokia.com> (Aaro
+	Koskinen's message of "Fri, 28 Jan 2011 18:24:11 +0200")
+References: <1296231851-20632-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <87vd18ad4y.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hirosh Dabui <hirosh.dabui@snom.com> writes:
+Aaro Koskinen <aaro.koskinen@nokia.com> writes:
 
-> This patch fix a bug in the register indexing for GPIOs numbers >  31
-> to get the relevant hardware registers of tnetv107x to control the GPIOs.
+> The temporary string holding the directory name to be created should
+> be released.
 >
-> In the structure tnetv107x_gpio_regs:
->
-> struct tnetv107x_gpio_regs {
->             u32     idver;
->             u32     data_in[3];
->             u32     data_out[3];
->             u32     direction[3];
->             u32     enable[3];
-> };
->
-> The GPIO hardware register addresses of tnetv107x are stored.
-> The chip implements 3 registers of each entity to serve 96 GPIOs,
-> each register provides a subset of 32 GPIOs.
-> The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
-> and gpio_reg_clear_bit.
->
-> The bug implied the use of macros to access the relevant hardware
-> register e.g. the driver code used the macro like this:
-> 'gpio_reg_clear_bit(&reg->data_out, gpio)'
->
-> But it has to be used like this:
-> 'gpio_reg_clear_bit(reg->data_out, gpio)'.
->
-> The different results are shown here:
-> - &reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
-> - reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
->
-> Acked-by: Cyril Chemparathy <cyril@ti.com>
-> Signed-off-by: Hirosh Dabui <hirosh.dabui@snom.com>
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
 
-Thanks, applied and queuing for 2.6.39.
+Thanks, queuing in pm-fixes  for 2.6.38.
 
 Kevin
+
+> ---
+>  arch/arm/mach-omap2/voltage.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+> index ed6079c..12be525 100644
+> --- a/arch/arm/mach-omap2/voltage.c
+> +++ b/arch/arm/mach-omap2/voltage.c
+> @@ -471,6 +471,7 @@ static void __init vdd_debugfs_init(struct omap_vdd_info *vdd)
+>  	strcat(name, vdd->voltdm.name);
+>  
+>  	vdd->debug_dir = debugfs_create_dir(name, voltage_dir);
+> +	kfree(name);
+>  	if (IS_ERR(vdd->debug_dir)) {
+>  		pr_warning("%s: Unable to create debugfs directory for"
+>  			" vdd_%s\n", __func__, vdd->voltdm.name);
