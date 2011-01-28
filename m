@@ -1,81 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 27 Jan 2011 16:18:41 -0800
-Subject: [PATCH] i2c: OMAP: fix static suspend vs. runtime suspend
-Message-ID: <1296173921-4832-1-git-send-email-khilman@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 27 Jan 2011 16:26:21 -0800
+Subject: [PATCH 1/2] arch/arm/mach-omap2/dma.c: Convert IS_ERR result
+	to PTR_ERR
+In-Reply-To: <20110127210225.07de155f.jhnikula@gmail.com>
+References: <1296143347-17508-1-git-send-email-julia@diku.dk>
+	<20110127210225.07de155f.jhnikula@gmail.com>
+Message-ID: <20110128002620.GR23412@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When runtime PM is enabled, each OMAP i2c device is suspended after
-each i2c xfer.  However, there are two cases when the static suspend
-methods must be used to ensure the devices are suspended:
+* Jarkko Nikula <jhnikula@gmail.com> [110127 11:03]:
+> On Thu, 27 Jan 2011 16:49:06 +0100
+> Julia Lawall <julia@diku.dk> wrote:
+> 
+> > diff -u -p a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
+> > --- a/arch/arm/mach-omap2/dma.c
+> > +++ b/arch/arm/mach-omap2/dma.c
+> > @@ -264,7 +264,7 @@ static int __init omap2_system_dma_init_
+> >  	if (IS_ERR(od)) {
+> >  		pr_err("%s: Cant build omap_device for %s:%s.\n",
+> >  			__func__, name, oh->name);
+> > -		return IS_ERR(od);
+> > +		return PTR_ERR(od);
+> >  	}
+> >  
+> FWIW,
+> 
+> Acked-by: Jarkko Nikula <jhnikula@gmail.com>
 
-1) runtime PM is disabled, either at compile time or dynamically
-    via /sys/devices/.../power/control.
-2) an i2c client driver uses i2c during it's suspend callback, thus
-   leaving the i2c driver active (NOTE: runtime suspend transitions are
-   disabled during system suspend, so i2c activity during system
-   suspend will runtime resume the device, but not runtime (re)suspend it.)
+Thanks, will queue as a fix during the -rc cycle.
 
-Since the actual work to suspend the device is handled by the
-subsytem, call the bus methods to take care of it.
-
-NOTE: This takes care of a known suspend problem on OMAP3 where the
-TWL RTC driver does i2c xfers during its suspend path leaving the i2c
-driver in an active state (since runtime suspend transistions are
-disabled.)
-
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Ben, this is a regression in 2.6.38 so hopefully this can be queued
-in the 2.6.38-rc cycle.  Thanks.
-
- drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index b605ff3..0541df9 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1137,12 +1137,40 @@ omap_i2c_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_SUSPEND
-+static int omap_i2c_suspend(struct device *dev)
-+{
-+	if (!pm_runtime_suspended(dev))
-+		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_suspend)
-+			dev->bus->pm->runtime_suspend(dev);
-+
-+	return 0;
-+}
-+
-+static int omap_i2c_resume(struct device *dev)
-+{
-+	if (!pm_runtime_suspended(dev))
-+		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_resume)
-+			dev->bus->pm->runtime_resume(dev);
-+
-+	return 0;
-+}
-+
-+static struct dev_pm_ops omap_i2c_pm_ops = {
-+	.suspend = omap_i2c_suspend,
-+	.resume = omap_i2c_resume,
-+};
-+#else
-+#define omap_i2c_pm_ops NULL
-+#endif
-+
- static struct platform_driver omap_i2c_driver = {
- 	.probe		= omap_i2c_probe,
- 	.remove		= omap_i2c_remove,
- 	.driver		= {
- 		.name	= "omap_i2c",
- 		.owner	= THIS_MODULE,
-+		.pm     = &omap_i2c_pm_ops,
- 	},
- };
- 
--- 
-1.7.3.5
+Tony
