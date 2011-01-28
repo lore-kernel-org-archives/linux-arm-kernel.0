@@ -1,157 +1,198 @@
 From: s-ghorai@ti.com (Sukumar Ghorai)
-Date: Fri, 28 Jan 2011 15:42:07 +0530
-Subject: [PATCH v9 5/7] omap3: nand: configurable fifo threshold to gain the
-	throughput
+Date: Fri, 28 Jan 2011 15:42:05 +0530
+Subject: [PATCH v9 3/7] omap: gpmc: enable irq mode in gpmc
 In-Reply-To: <1296209529-22696-1-git-send-email-s-ghorai@ti.com>
 References: <1296209529-22696-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <1296209529-22696-6-git-send-email-s-ghorai@ti.com>
+Message-ID: <1296209529-22696-4-git-send-email-s-ghorai@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the FIFO THREASHOLD value different for read and write to keep busy
-both filling and to drain out of FIFO at reading and writing.
+add support the irq mode in GPMC.
+gpmc_init() function move after omap_init_irq() as it has dependecy on irq.
 
-Signed-off-by: Vimal Singh <vimalsingh@ti.com>
 Signed-off-by: Sukumar Ghorai <s-ghorai@ti.com>
 ---
- arch/arm/mach-omap2/gpmc.c             |   11 +++++++----
- arch/arm/plat-omap/include/plat/gpmc.h |    5 ++++-
- drivers/mtd/nand/omap2.c               |   22 ++++++++++++++--------
- 3 files changed, 25 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap2/gpmc.c             |   45 +++++++++++++++++++++++++++++--
+ arch/arm/mach-omap2/io.c               |    2 -
+ arch/arm/plat-omap/include/plat/gpmc.h |    5 +++-
+ arch/arm/plat-omap/include/plat/irqs.h |    9 +++++-
+ 4 files changed, 54 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 382dea8..6741743 100644
+index 1b7b3e7..382dea8 100644
 --- a/arch/arm/mach-omap2/gpmc.c
 +++ b/arch/arm/mach-omap2/gpmc.c
-@@ -60,7 +60,6 @@
- #define GPMC_CHUNK_SHIFT	24		/* 16 MB */
- #define GPMC_SECTION_SHIFT	28		/* 128 MB */
- 
--#define PREFETCH_FIFOTHRESHOLD	(0x40 << 8)
- #define CS_NUM_SHIFT		24
- #define ENABLE_PREFETCH		(0x1 << 7)
- #define DMA_MPU_MODE		2
-@@ -606,15 +605,19 @@ EXPORT_SYMBOL(gpmc_nand_write);
- /**
-  * gpmc_prefetch_enable - configures and starts prefetch transfer
-  * @cs: cs (chip select) number
-+ * @fifo_th: fifo threshold to be used for read/ write
-  * @dma_mode: dma mode enable (1) or disable (0)
-  * @u32_count: number of bytes to be transferred
-  * @is_write: prefetch read(0) or write post(1) mode
+@@ -14,6 +14,7 @@
   */
--int gpmc_prefetch_enable(int cs, int dma_mode,
-+int gpmc_prefetch_enable(int cs, int fifo_th, int dma_mode,
- 				unsigned int u32_count, int is_write)
+ #undef DEBUG
+ 
++#include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/err.h>
+@@ -22,6 +23,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/interrupt.h>
+ 
+ #include <asm/mach-types.h>
+ #include <plat/gpmc.h>
+@@ -100,6 +102,8 @@ static void __iomem *gpmc_base;
+ 
+ static struct clk *gpmc_l3_clk;
+ 
++static irqreturn_t gpmc_handle_irq(int irq, void *dev);
++
+ static void gpmc_write_reg(int idx, u32 val)
  {
+ 	__raw_writel(val, gpmc_base + idx);
+@@ -497,6 +501,10 @@ int gpmc_cs_configure(int cs, int cmd, int wval)
+ 	u32 regval = 0;
  
--	if (!(gpmc_read_reg(GPMC_PREFETCH_CONTROL))) {
-+	if (fifo_th > PREFETCH_FIFOTHRESHOLD_MAX) {
-+		pr_err("gpmc: fifo threshold is not supported\n");
-+		return -1;
-+	} else if (!(gpmc_read_reg(GPMC_PREFETCH_CONTROL))) {
- 		/* Set the amount of bytes to be prefetched */
- 		gpmc_write_reg(GPMC_PREFETCH_CONFIG2, u32_count);
+ 	switch (cmd) {
++	case GPMC_ENABLE_IRQ:
++		gpmc_write_reg(GPMC_IRQENABLE, wval);
++		break;
++
+ 	case GPMC_SET_IRQ_STATUS:
+ 		gpmc_write_reg(GPMC_IRQSTATUS, wval);
+ 		break;
+@@ -678,9 +686,10 @@ static void __init gpmc_mem_init(void)
+ 	}
+ }
  
-@@ -622,7 +625,7 @@ int gpmc_prefetch_enable(int cs, int dma_mode,
- 		 * enable the engine. Set which cs is has requested for.
- 		 */
- 		gpmc_write_reg(GPMC_PREFETCH_CONFIG1, ((cs << CS_NUM_SHIFT) |
--					PREFETCH_FIFOTHRESHOLD |
-+					PREFETCH_FIFOTHRESHOLD(fifo_th) |
- 					ENABLE_PREFETCH |
- 					(dma_mode << DMA_MPU_MODE) |
- 					(0x1 & is_write)));
+-void __init gpmc_init(void)
++static int __init gpmc_init(void)
+ {
+-	u32 l;
++	u32 l, irq;
++	int cs, ret = -EINVAL;
+ 	char *ck = NULL;
+ 
+ 	if (cpu_is_omap24xx()) {
+@@ -698,7 +707,7 @@ void __init gpmc_init(void)
+ 	}
+ 
+ 	if (WARN_ON(!ck))
+-		return;
++		return ret;
+ 
+ 	gpmc_l3_clk = clk_get(NULL, ck);
+ 	if (IS_ERR(gpmc_l3_clk)) {
+@@ -723,6 +732,36 @@ void __init gpmc_init(void)
+ 	l |= (0x02 << 3) | (1 << 0);
+ 	gpmc_write_reg(GPMC_SYSCONFIG, l);
+ 	gpmc_mem_init();
++
++	/* initalize the irq_chained */
++	irq = OMAP_GPMC_IRQ_BASE;
++	for (cs = 0; cs < GPMC_CS_NUM; cs++) {
++		set_irq_handler(irq, handle_simple_irq);
++		set_irq_flags(irq, IRQF_VALID);
++		irq++;
++	}
++
++	ret = request_irq(INT_34XX_GPMC_IRQ,
++			gpmc_handle_irq, IRQF_SHARED, "gpmc", gpmc_base);
++	if (ret)
++		pr_err("gpmc: irq-%d could not claim: err %d\n",
++						INT_34XX_GPMC_IRQ, ret);
++	return ret;
++}
++postcore_initcall(gpmc_init);
++
++static irqreturn_t gpmc_handle_irq(int irq, void *dev)
++{
++	u8 cs;
++
++	if (irq != INT_34XX_GPMC_IRQ)
++		return IRQ_HANDLED;
++	/* check cs to invoke the irq */
++	cs = ((gpmc_read_reg(GPMC_PREFETCH_CONFIG1)) >> CS_NUM_SHIFT) & 0x7;
++	if (OMAP_GPMC_IRQ_BASE+cs <= OMAP_GPMC_IRQ_END)
++		generic_handle_irq(OMAP_GPMC_IRQ_BASE+cs);
++
++	return IRQ_HANDLED;
+ }
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index e66687b..b60287c 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -30,7 +30,6 @@
+ 
+ #include <plat/sram.h>
+ #include <plat/sdrc.h>
+-#include <plat/gpmc.h>
+ #include <plat/serial.h>
+ 
+ #include "clock2xxx.h"
+@@ -408,7 +407,6 @@ void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
+ 		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
+ 		_omap2_init_reprogram_sdrc();
+ 	}
+-	gpmc_init();
+ 
+ 	omap_irq_base_init();
+ }
 diff --git a/arch/arm/plat-omap/include/plat/gpmc.h b/arch/arm/plat-omap/include/plat/gpmc.h
-index 9c060da..a243463 100644
+index 85ded59..9c060da 100644
 --- a/arch/arm/plat-omap/include/plat/gpmc.h
 +++ b/arch/arm/plat-omap/include/plat/gpmc.h
-@@ -83,6 +83,9 @@
- #define GPMC_IRQ_FIFOEVENTENABLE	0x01
- #define GPMC_IRQ_COUNT_EVENT		0x02
+@@ -41,6 +41,8 @@
+ #define GPMC_NAND_ADDRESS	0x0000000b
+ #define GPMC_NAND_DATA		0x0000000c
  
-+#define PREFETCH_FIFOTHRESHOLD_MAX	0x40
-+#define PREFETCH_FIFOTHRESHOLD(val)	((val) << 8)
++#define GPMC_ENABLE_IRQ		0x0000000d
 +
+ /* ECC commands */
+ #define GPMC_ECC_READ		0 /* Reset Hardware ECC for read */
+ #define GPMC_ECC_WRITE		1 /* Reset Hardware ECC for write */
+@@ -78,6 +80,8 @@
+ #define WR_RD_PIN_MONITORING		0x00600000
+ #define GPMC_PREFETCH_STATUS_FIFO_CNT(val)	((val >> 24) & 0x7F)
+ #define GPMC_PREFETCH_STATUS_COUNT(val)	(val & 0x00003fff)
++#define GPMC_IRQ_FIFOEVENTENABLE	0x01
++#define GPMC_IRQ_COUNT_EVENT		0x02
+ 
  /*
   * Note that all values in this struct are in nanoseconds except sync_clk
-  * (which is in picoseconds), while the register values are in gpmc_fck cycles.
-@@ -134,7 +137,7 @@ extern int gpmc_cs_request(int cs, unsigned long size, unsigned long *base);
- extern void gpmc_cs_free(int cs);
- extern int gpmc_cs_set_reserved(int cs, int reserved);
- extern int gpmc_cs_reserved(int cs);
--extern int gpmc_prefetch_enable(int cs, int dma_mode,
-+extern int gpmc_prefetch_enable(int cs, int fifo_th, int dma_mode,
- 					unsigned int u32_count, int is_write);
+@@ -135,7 +139,6 @@ extern int gpmc_prefetch_enable(int cs, int dma_mode,
  extern int gpmc_prefetch_reset(int cs);
  extern void omap3_gpmc_save_context(void);
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index fbe8414..f1648fd 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -244,7 +244,8 @@ static void omap_read_buf_pref(struct mtd_info *mtd, u_char *buf, int len)
- 	}
+ extern void omap3_gpmc_restore_context(void);
+-extern void gpmc_init(void);
+ extern int gpmc_read_status(int cmd);
+ extern int gpmc_cs_configure(int cs, int cmd, int wval);
+ extern int gpmc_nand_read(int cs, int cmd);
+diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+index 2910de9..1b91168 100644
+--- a/arch/arm/plat-omap/include/plat/irqs.h
++++ b/arch/arm/plat-omap/include/plat/irqs.h
+@@ -318,6 +318,7 @@
+ #define INT_34XX_PRCM_MPU_IRQ	11
+ #define INT_34XX_MCBSP1_IRQ	16
+ #define INT_34XX_MCBSP2_IRQ	17
++#define INT_34XX_GPMC_IRQ	20
+ #define INT_34XX_MCBSP3_IRQ	22
+ #define INT_34XX_MCBSP4_IRQ	23
+ #define INT_34XX_CAM_IRQ	24
+@@ -411,7 +412,13 @@
+ #define TWL_IRQ_END		TWL6030_IRQ_END
+ #endif
  
- 	/* configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX, 0x0, len, 0x0);
- 	if (ret) {
- 		/* PFPW engine is busy, use cpu copy method */
- 		if (info->nand.options & NAND_BUSWIDTH_16)
-@@ -289,7 +290,8 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
- 	}
+-#define NR_IRQS			TWL_IRQ_END
++/* GPMC related */
++#define OMAP_GPMC_IRQ_BASE	(TWL_IRQ_END)
++#define OMAP_GPMC_NR_IRQS	7
++#define OMAP_GPMC_IRQ_END	(OMAP_GPMC_IRQ_BASE + OMAP_GPMC_NR_IRQS)
++
++
++#define NR_IRQS			OMAP_GPMC_IRQ_END
  
- 	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX, 0x0, len, 0x1);
- 	if (ret) {
- 		/* PFPW engine is busy, use cpu copy method */
- 		if (info->nand.options & NAND_BUSWIDTH_16)
-@@ -345,8 +347,9 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- 	int ret;
- 	unsigned long tim, limit;
+ #define OMAP_IRQ_BIT(irq)	(1 << ((irq) % 32))
  
--	/* The fifo depth is 64 bytes. We have a sync at each frame and frame
--	 * length is 64 bytes.
-+	/* The fifo depth is 64 bytes max.
-+	 * But configure the FIFO-threahold to 32 to get a sync at each frame
-+	 * and frame length is 32 bytes.
- 	 */
- 	int buf_len = len >> 6;
- 
-@@ -387,7 +390,8 @@ static inline int omap_nand_dma_transfer(struct mtd_info *mtd, void *addr,
- 					OMAP24XX_DMA_GPMC, OMAP_DMA_SRC_SYNC);
- 	}
- 	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x1, len, is_write);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX, 0x1, len, is_write);
- 	if (ret)
- 		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
-@@ -522,7 +526,8 @@ static void omap_read_buf_irq_pref(struct mtd_info *mtd, u_char *buf, int len)
- 	init_completion(&info->comp);
- 
- 	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x0);
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			PREFETCH_FIFOTHRESHOLD_MAX/2, 0x0, len, 0x0);
- 	if (ret)
- 		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
-@@ -569,8 +574,9 @@ static void omap_write_buf_irq_pref(struct mtd_info *mtd,
- 	info->buf = (u_char *) buf;
- 	init_completion(&info->comp);
- 
--	/*  configure and start prefetch transfer */
--	ret = gpmc_prefetch_enable(info->gpmc_cs, 0x0, len, 0x1);
-+	/* configure and start prefetch transfer : size=24 */
-+	ret = gpmc_prefetch_enable(info->gpmc_cs,
-+			(PREFETCH_FIFOTHRESHOLD_MAX * 3) / 8, 0x0, len, 0x1);
- 	if (ret)
- 		/* PFPW engine is busy, use cpu copy method */
- 		goto out_copy;
 -- 
 1.7.0.4
