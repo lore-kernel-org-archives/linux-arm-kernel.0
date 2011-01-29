@@ -1,24 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 29 Jan 2011 10:01:48 +0100
-Subject: kernel headers not properly generated on platforms with a mach-
-	and a plat- (i.e. mach-mx5, plat-mxc etc.)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 29 Jan 2011 09:43:31 +0000
+Subject: kernel headers not properly generated on platforms with a
+	mach- and a plat- (i.e. mach-mx5, plat-mxc etc.)
 In-Reply-To: <AANLkTinUMqxuRADoJKQw93=2nn99-Snk=p0uiTTEUxaO@mail.gmail.com>
 References: <AANLkTinUMqxuRADoJKQw93=2nn99-Snk=p0uiTTEUxaO@mail.gmail.com>
-Message-ID: <201101291001.48413.arnd@arndb.de>
+Message-ID: <20110129094331.GB28403@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 29 January 2011 01:57:19 Matt Sealey wrote:
-> 
+On Fri, Jan 28, 2011 at 06:57:19PM -0600, Matt Sealey wrote:
 > Puzzling over this again, is there some deep dark reason that if I
 > create kernel headers (headers_install or headers_check) for MX51
 > processors, or anything with a mach- AND a plat-, that the
 > plat-foo/include/mach/* headers are not copied into the header tree?
 
-As far as I can tell, the mach/* files cannot possibly be exported,
-because the user space headers are by definition machine independent.
-Otherwise you would not be guaranteed that applications you build
-can run on all systems.
+headers_install does not install headers for building modules.  It
+installs headers for use by userspace - specifically your libc.  These
+headers purposely do not contain any platform specifics because those
+are not part of the userspace API.  They also have various kernel
+specific information stripped out of them.
+
+They are completely unsuitable for building anything kernel-related.
 
 > As a quick example, build any external module (compat-wireless is a
 > good example) or libc against the headers alone and not the full
@@ -26,11 +28,7 @@ can run on all systems.
 > mach/memory.h which does not exist. Doing a little hack to copy those
 > files across absolutely fixes it.
 
-memory.h is not exported by make headers_install.
-
-external modules are not built against the exported headers
-(linux-libc-dev*.dpkg), but are built against a sparse copy of the
-kernel source tree (linux-headers-*.dpkg)
+asm/memory.h is not part of headers_install.
 
 > I know there is a weirdness here: the root arch/arm/Kconfig in my tree
 > includes plat-mxc/Kconfig which includes mach-mx5/Kconfig. This is how
@@ -39,25 +37,9 @@ kernel source tree (linux-headers-*.dpkg)
 > place. They don't seem symlinked into the asm-arm/mach directory on a
 > kernel build.
 
-look for 'machdirs' in arch/arm/Makefile
+We don't use symlinks anymore when dealing with header file directories.
 
-> Has anyone even noticed this before (it's quite hard to search for the
-> exact situation in freeform text in Google or ML archives, sigh)? Or
-> is there a well known solution everyone uses but just never pushes to
-> the distribution packagers or so? Is the solution to use the full
-> Linux source code (kind of annoying for consumers that need to put
-> aside 400MB of disk space for an extracted Linux source when 8MB of
-> headers would do) rather than just headers as we have been doing for
-> the past few weeks, and off and on for years?
-
-The problem has mostly gone away now: All the important drivers that
-used to be external modules are now in the regular upstream kernel
-or at least in drivers/staging. In the few cases where the license
-prohibits this, you can still package the module to have a
-build-dependency on the full kernel sources and put the small
-burden of installing them on the packager, but not the end-user.
-
-Of course, if you find a packaging problem with the linux-headers
-package, submit a patch for that or open a bug report.
-
-	Arnd
+You can only build modules against the kernel source.  Building external
+modules is documented in Documentation/kbuild/modules.txt.  This requires
+more than just the kernel headers - it requires a preconfigured kernel
+tree, which if you're using modversions, has already been built.
