@@ -1,37 +1,37 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 28 Jan 2011 14:15:25 -0800
-Subject: [PATCH] arm: mach-omap2: voltage: debugfs: fix memory leak
-In-Reply-To: <1296231851-20632-1-git-send-email-aaro.koskinen@nokia.com> (Aaro
-	Koskinen's message of "Fri, 28 Jan 2011 18:24:11 +0200")
-References: <1296231851-20632-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <87vd18ad4y.fsf@ti.com>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Fri, 28 Jan 2011 18:21:17 -0600
+Subject: [RFC] add pwmlib support
+In-Reply-To: <20110128141216.GA6374@trinity.fluff.org>
+References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
+	<20110128141216.GA6374@trinity.fluff.org>
+Message-ID: <AANLkTincgZadM7hbb6dT+JkxcgUHwuEoragvjfFj+fJa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen <aaro.koskinen@nokia.com> writes:
-
-> The temporary string holding the directory name to be created should
-> be released.
+On Fri, Jan 28, 2011 at 8:12 AM, root <ben@fluff.org> wrote:
 >
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
-
-Thanks, queuing in pm-fixes  for 2.6.38.
-
-Kevin
-
-> ---
->  arch/arm/mach-omap2/voltage.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> On Fri, Jan 28, 2011 at 01:21:21PM +0100, Sascha Hauer wrote:
+>> Hi all,
+>>
+>> While implementing just another pwm driver I thought it's time to implement
+>> generic pwm support. The following series adds drivers/pwm/pwmlib.c and
+>> a i.MX23/28 pwm driver which serves as a usage example for pwmlib. The
+>> code is inspired by gpiolib support and tested using the backlight pwm
+>> driver by Eric Miao.
 >
-> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-> index ed6079c..12be525 100644
-> --- a/arch/arm/mach-omap2/voltage.c
-> +++ b/arch/arm/mach-omap2/voltage.c
-> @@ -471,6 +471,7 @@ static void __init vdd_debugfs_init(struct omap_vdd_info *vdd)
->  	strcat(name, vdd->voltdm.name);
->  
->  	vdd->debug_dir = debugfs_create_dir(name, voltage_dir);
-> +	kfree(name);
->  	if (IS_ERR(vdd->debug_dir)) {
->  		pr_warning("%s: Unable to create debugfs directory for"
->  			" vdd_%s\n", __func__, vdd->voltdm.name);
+> You know, I really wish driver cores like this where not called lib... it
+> is hardly as if they can be taken out of the kernel and usefully re-used
+> in another project.
+
+Well, I've never known a collection of code shared across multiple
+client applications with the specific intent of consolidating
+functonality under a single framework to be called many other things
+than a "library". It doesn't matter what address space it's in, it's a
+library of reusable code, so I think the name stands up.
+
+Sascha, this is awesome, BTW. I'm going to see if I can get PWM for
+MX5x and MC13892 under this..
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
