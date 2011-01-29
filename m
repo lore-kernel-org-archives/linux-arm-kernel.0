@@ -1,45 +1,161 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 29 Jan 2011 09:43:31 +0000
-Subject: kernel headers not properly generated on platforms with a
-	mach- and a plat- (i.e. mach-mx5, plat-mxc etc.)
-In-Reply-To: <AANLkTinUMqxuRADoJKQw93=2nn99-Snk=p0uiTTEUxaO@mail.gmail.com>
-References: <AANLkTinUMqxuRADoJKQw93=2nn99-Snk=p0uiTTEUxaO@mail.gmail.com>
-Message-ID: <20110129094331.GB28403@n2100.arm.linux.org.uk>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Sat, 29 Jan 2011 18:48:19 +0800
+Subject: [PATCH 1/1] ARM: imx53_loco: add all pad configure.
+Message-ID: <1296298099-16611-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 28, 2011 at 06:57:19PM -0600, Matt Sealey wrote:
-> Puzzling over this again, is there some deep dark reason that if I
-> create kernel headers (headers_install or headers_check) for MX51
-> processors, or anything with a mach- AND a plat-, that the
-> plat-foo/include/mach/* headers are not copied into the header tree?
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-headers_install does not install headers for building modules.  It
-installs headers for use by userspace - specifically your libc.  These
-headers purposely do not contain any platform specifics because those
-are not part of the userspace API.  They also have various kernel
-specific information stripped out of them.
-
-They are completely unsuitable for building anything kernel-related.
-
-> As a quick example, build any external module (compat-wireless is a
-> good example) or libc against the headers alone and not the full
-> source and they will complain about asm/memory.h trying to include
-> mach/memory.h which does not exist. Doing a little hack to copy those
-> files across absolutely fixes it.
-
-asm/memory.h is not part of headers_install.
-
-> I know there is a weirdness here: the root arch/arm/Kconfig in my tree
-> includes plat-mxc/Kconfig which includes mach-mx5/Kconfig. This is how
-> the magic happens, but I can't find any magic that modifies the
-> include paths to pick includes from these directories in the first
-> place. They don't seem symlinked into the asm-arm/mach directory on a
-> kernel build.
-
-We don't use symlinks anymore when dealing with header file directories.
-
-You can only build modules against the kernel source.  Building external
-modules is documented in Documentation/kbuild/modules.txt.  This requires
-more than just the kernel headers - it requires a preconfigured kernel
-tree, which if you're using modversions, has already been built.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 3aefd6d..d724ac8 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -39,8 +39,145 @@
+ #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+ 
+ static iomux_v3_cfg_t mx53_loco_pads[] = {
++	/* FEC */
++	MX53_PAD_FEC_MDC__FEC_MDC,
++	MX53_PAD_FEC_MDIO__FEC_MDIO,
++	MX53_PAD_FEC_REF_CLK__FEC_TX_CLK,
++	MX53_PAD_FEC_RX_ER__FEC_RX_ER,
++	MX53_PAD_FEC_CRS_DV__FEC_RX_DV,
++	MX53_PAD_FEC_RXD1__FEC_RDATA_1,
++	MX53_PAD_FEC_RXD0__FEC_RDATA_0,
++	MX53_PAD_FEC_TX_EN__FEC_TX_EN,
++	MX53_PAD_FEC_TXD1__FEC_TDATA_1,
++	MX53_PAD_FEC_TXD0__FEC_TDATA_0,
++	/* FEC_nRST */
++	MX53_PAD_PATA_DA_0__GPIO7_6,
++	/* FEC_nINT */
++	MX53_PAD_PATA_DATA4__GPIO2_4,
++	/* AUDMUX5 */
++	MX53_PAD_KEY_COL0__AUDMUX_AUD5_TXC,
++	MX53_PAD_KEY_ROW0__AUDMUX_AUD5_TXD,
++	MX53_PAD_KEY_COL1__AUDMUX_AUD5_TXFS,
++	MX53_PAD_KEY_ROW1__AUDMUX_AUD5_RXD,
++	/* I2C2 */
++	MX53_PAD_KEY_COL3__I2C2_SCL,
++	MX53_PAD_KEY_ROW3__I2C2_SDA,
++	/* SD1 */
++	MX53_PAD_SD1_CMD__ESDHC1_CMD,
++	MX53_PAD_SD1_CLK__ESDHC1_CLK,
++	MX53_PAD_SD1_DATA0__ESDHC1_DAT0,
++	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
++	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
++	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
++	/* SD3 */
++	MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
++	MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
++	MX53_PAD_PATA_DATA10__ESDHC3_DAT2,
++	MX53_PAD_PATA_DATA11__ESDHC3_DAT3,
++	MX53_PAD_PATA_DATA0__ESDHC3_DAT4,
++	MX53_PAD_PATA_DATA1__ESDHC3_DAT5,
++	MX53_PAD_PATA_DATA2__ESDHC3_DAT6,
++	MX53_PAD_PATA_DATA3__ESDHC3_DAT7,
++	MX53_PAD_PATA_IORDY__ESDHC3_CLK,
++	MX53_PAD_PATA_RESET_B__ESDHC3_CMD,
++	/* SD3_CD */
++	MX53_PAD_EIM_DA11__GPIO3_11,
++	/* SD3_WP */
++	MX53_PAD_EIM_DA12__GPIO3_12,
++	/* VGA */
++	MX53_PAD_EIM_OE__IPU_DI1_PIN7,
++	MX53_PAD_EIM_RW__IPU_DI1_PIN8,
++	/* DISPLB */
++	MX53_PAD_EIM_D20__IPU_SER_DISP0_CS,
++	MX53_PAD_EIM_D21__IPU_DISPB0_SER_CLK,
++	MX53_PAD_EIM_D22__IPU_DISPB0_SER_DIN,
++	MX53_PAD_EIM_D23__IPU_DI0_D0_CS,
++	/* DISP0_POWER_EN */
++	MX53_PAD_EIM_D24__GPIO3_24,
++	/* DISP0 DET INT */
++	MX53_PAD_EIM_D31__GPIO3_31,
++	/* LVDS */
++	MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3,
++	MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK,
++	MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2,
++	MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1,
++	MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0,
++	MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3,
++	MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2,
++	MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK,
++	MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1,
++	MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0,
++	/* I2C1 */
++	MX53_PAD_CSI0_DAT8__I2C1_SDA,
++	MX53_PAD_CSI0_DAT9__I2C1_SCL,
++	/* UART1 */
+ 	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+ 	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
++	/* CSI0 */
++	MX53_PAD_CSI0_DAT12__IPU_CSI0_D_12,
++	MX53_PAD_CSI0_DAT13__IPU_CSI0_D_13,
++	MX53_PAD_CSI0_DAT14__IPU_CSI0_D_14,
++	MX53_PAD_CSI0_DAT15__IPU_CSI0_D_15,
++	MX53_PAD_CSI0_DAT16__IPU_CSI0_D_16,
++	MX53_PAD_CSI0_DAT17__IPU_CSI0_D_17,
++	MX53_PAD_CSI0_DAT18__IPU_CSI0_D_18,
++	MX53_PAD_CSI0_DAT19__IPU_CSI0_D_19,
++	MX53_PAD_CSI0_VSYNC__IPU_CSI0_VSYNC,
++	MX53_PAD_CSI0_MCLK__IPU_CSI0_HSYNC,
++	MX53_PAD_CSI0_PIXCLK__IPU_CSI0_PIXCLK,
++	/* DISPLAY */
++	MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK,
++	MX53_PAD_DI0_PIN15__IPU_DI0_PIN15,
++	MX53_PAD_DI0_PIN2__IPU_DI0_PIN2,
++	MX53_PAD_DI0_PIN3__IPU_DI0_PIN3,
++	MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0,
++	MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1,
++	MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2,
++	MX53_PAD_DISP0_DAT3__IPU_DISP0_DAT_3,
++	MX53_PAD_DISP0_DAT4__IPU_DISP0_DAT_4,
++	MX53_PAD_DISP0_DAT5__IPU_DISP0_DAT_5,
++	MX53_PAD_DISP0_DAT6__IPU_DISP0_DAT_6,
++	MX53_PAD_DISP0_DAT7__IPU_DISP0_DAT_7,
++	MX53_PAD_DISP0_DAT8__IPU_DISP0_DAT_8,
++	MX53_PAD_DISP0_DAT9__IPU_DISP0_DAT_9,
++	MX53_PAD_DISP0_DAT10__IPU_DISP0_DAT_10,
++	MX53_PAD_DISP0_DAT11__IPU_DISP0_DAT_11,
++	MX53_PAD_DISP0_DAT12__IPU_DISP0_DAT_12,
++	MX53_PAD_DISP0_DAT13__IPU_DISP0_DAT_13,
++	MX53_PAD_DISP0_DAT14__IPU_DISP0_DAT_14,
++	MX53_PAD_DISP0_DAT15__IPU_DISP0_DAT_15,
++	MX53_PAD_DISP0_DAT16__IPU_DISP0_DAT_16,
++	MX53_PAD_DISP0_DAT17__IPU_DISP0_DAT_17,
++	MX53_PAD_DISP0_DAT18__IPU_DISP0_DAT_18,
++	MX53_PAD_DISP0_DAT19__IPU_DISP0_DAT_19,
++	MX53_PAD_DISP0_DAT20__IPU_DISP0_DAT_20,
++	MX53_PAD_DISP0_DAT21__IPU_DISP0_DAT_21,
++	MX53_PAD_DISP0_DAT22__IPU_DISP0_DAT_22,
++	MX53_PAD_DISP0_DAT23__IPU_DISP0_DAT_23,
++	/* Audio CLK*/
++	MX53_PAD_GPIO_0__CCM_SSI_EXT1_CLK,
++	/* PWM */
++	MX53_PAD_GPIO_1__PWM2_PWMO,
++	/* SPDIF */
++	MX53_PAD_GPIO_7__SPDIF_PLOCK,
++	MX53_PAD_GPIO_17__SPDIF_OUT1,
++	/* GPIO */
++	MX53_PAD_PATA_DA_1__GPIO7_7,
++	MX53_PAD_PATA_DA_2__GPIO7_8,
++	MX53_PAD_PATA_DATA5__GPIO2_5,
++	MX53_PAD_PATA_DATA6__GPIO2_6,
++	MX53_PAD_PATA_DATA14__GPIO2_14,
++	MX53_PAD_PATA_DATA15__GPIO2_15,
++	MX53_PAD_PATA_INTRQ__GPIO7_2,
++	MX53_PAD_EIM_WAIT__GPIO5_0,
++	MX53_PAD_NANDF_WP_B__GPIO6_9,
++	MX53_PAD_NANDF_RB0__GPIO6_10,
++	MX53_PAD_NANDF_CS1__GPIO6_14,
++	MX53_PAD_NANDF_CS2__GPIO6_15,
++	MX53_PAD_NANDF_CS3__GPIO6_16,
++	MX53_PAD_GPIO_5__GPIO1_5,
++	MX53_PAD_GPIO_16__GPIO7_11,
++	MX53_PAD_GPIO_8__GPIO1_8,
+ };
+ 
+ static inline void mx53_loco_fec_reset(void)
+-- 
+1.7.1
