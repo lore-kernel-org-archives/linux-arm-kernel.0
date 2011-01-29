@@ -1,53 +1,66 @@
-From: hirosh@dabui.de (Hirosh Dabui)
-Date: Sat, 29 Jan 2011 12:45:49 +0100
-Subject: [PATCH] davinci: tnetv107x: fix register indexing for GPIOs
-	numbers > 31
-In-Reply-To: <8762t8d7jr.fsf@ti.com>
-References: <1295993126-6841-1-git-send-email-hirosh.dabui@snom.com>
-	<8762t8d7jr.fsf@ti.com>
-Message-ID: <4D43FDED.7030008@dabui.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Sat, 29 Jan 2011 17:41:30 +0530
+Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet controller
+	in board_init
+In-Reply-To: <87d3nikt3j.fsf@ti.com>
+References: <1295968956-10166-1-git-send-email-hvaibhav@ti.com>
+	<19F8576C6E063C45BE387C64729E739404BD7BE3F4@dbde02.ent.ti.com>
+	<87d3nikt3j.fsf@ti.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404BD7BEB5C@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ok-super!
-On 01/28/2011 10:47 PM, Kevin Hilman wrote:
-> Hirosh Dabui<hirosh.dabui@snom.com>  writes:
->
->    
->> This patch fix a bug in the register indexing for GPIOs numbers>   31
->> to get the relevant hardware registers of tnetv107x to control the GPIOs.
->>
->> In the structure tnetv107x_gpio_regs:
->>
->> struct tnetv107x_gpio_regs {
->>              u32     idver;
->>              u32     data_in[3];
->>              u32     data_out[3];
->>              u32     direction[3];
->>              u32     enable[3];
->> };
->>
->> The GPIO hardware register addresses of tnetv107x are stored.
->> The chip implements 3 registers of each entity to serve 96 GPIOs,
->> each register provides a subset of 32 GPIOs.
->> The driver provides these macros: gpio_reg_set_bit, gpio_reg_get_bit
->> and gpio_reg_clear_bit.
->>
->> The bug implied the use of macros to access the relevant hardware
->> register e.g. the driver code used the macro like this:
->> 'gpio_reg_clear_bit(&reg->data_out, gpio)'
->>
->> But it has to be used like this:
->> 'gpio_reg_clear_bit(reg->data_out, gpio)'.
->>
->> The different results are shown here:
->> -&reg->data_out + 1 (it will add the full array size of data_out i.e. 12 bytes)
->> - reg->data_out + 1 (it will increment only the size of data_out i.e. only 4 bytes)
->>
->> Acked-by: Cyril Chemparathy<cyril@ti.com>
->> Signed-off-by: Hirosh Dabui<hirosh.dabui@snom.com>
->>      
-> Thanks, applied and queuing for 2.6.39.
->
+
+> -----Original Message-----
+> From: Hilman, Kevin
+> Sent: Friday, January 28, 2011 1:38 AM
+> To: Hiremath, Vaibhav
+> Cc: linux-omap at vger.kernel.org; Varadarajan, Charulatha; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet
+> controller in board_init
+> 
+> "Hiremath, Vaibhav" <hvaibhav@ti.com> writes:
+> 
+> >> -----Original Message-----
+> >> From: Hiremath, Vaibhav
+> >> Sent: Tuesday, January 25, 2011 8:53 PM
+> >> To: linux-omap at vger.kernel.org
+> >> Cc: Hiremath, Vaibhav; Varadarajan, Charulatha
+> >> Subject: [PATCH-V2] OMAP3EVM:FIX: Reset the smsc911x ethernet
+> controller
+> >> in board_init
+> >>
+> >> With addition of hwmod support to gpio, the ethernet controller
+> >> goes undetected for OMAP35xEVM. So explicitly assert the reset signal
+> to
+> >> ethernet controller smsc911x -
+> >>
+> >> 	- GPIO7 (>=RevG version of EVM's)
+> >> 	- GPIO64 (<=RevD version of EVM's)
+> >>
+> >> This patch is based on intial version from Charulatha V, reference
+> >> to original discussion -
+> >> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35784.html
+> >> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> >> Signed-off-by: Charulatha V <charu@ti.com>
+> >> Tested-by: Kevin Hilman <khilman@ti.com>
+> >> ---
+> >> Since Kevin reported that this patch doesn't get applied cleanly,
+> >> so I am reposting it again after making sure that it gets applied
+> cleanly.
+> >>
+> > [Hiremath, Vaibhav] Oops, missed linux-arm-kernel list, adding here.
+> >
+> > Not sure whether I need to repost keeping linux-arm-kernel?
+> >
+> 
+> Also, did you post the smc911x driver fix yet that is needed for testing
+> with newer kernels?
+> 
+[Hiremath, Vaibhav] Not yet. Got completely loaded with some high priority issues. I will try to post it sometime this week.
+
+Thanks,
+Vaibhav
+
 > Kevin
->    
