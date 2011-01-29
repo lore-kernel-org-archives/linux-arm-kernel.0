@@ -1,36 +1,45 @@
 From: matt@genesi-usa.com (Matt Sealey)
-Date: Fri, 28 Jan 2011 18:21:17 -0600
-Subject: [RFC] add pwmlib support
-In-Reply-To: <20110128141216.GA6374@trinity.fluff.org>
-References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
-	<20110128141216.GA6374@trinity.fluff.org>
-Message-ID: <AANLkTincgZadM7hbb6dT+JkxcgUHwuEoragvjfFj+fJa@mail.gmail.com>
+Date: Fri, 28 Jan 2011 18:57:19 -0600
+Subject: kernel headers not properly generated on platforms with a mach- and a
+	plat- (i.e. mach-mx5, plat-mxc etc.)
+Message-ID: <AANLkTinUMqxuRADoJKQw93=2nn99-Snk=p0uiTTEUxaO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 28, 2011 at 8:12 AM, root <ben@fluff.org> wrote:
->
-> On Fri, Jan 28, 2011 at 01:21:21PM +0100, Sascha Hauer wrote:
->> Hi all,
->>
->> While implementing just another pwm driver I thought it's time to implement
->> generic pwm support. The following series adds drivers/pwm/pwmlib.c and
->> a i.MX23/28 pwm driver which serves as a usage example for pwmlib. The
->> code is inspired by gpiolib support and tested using the backlight pwm
->> driver by Eric Miao.
->
-> You know, I really wish driver cores like this where not called lib... it
-> is hardly as if they can be taken out of the kernel and usefully re-used
-> in another project.
+Hey guys,
 
-Well, I've never known a collection of code shared across multiple
-client applications with the specific intent of consolidating
-functonality under a single framework to be called many other things
-than a "library". It doesn't matter what address space it's in, it's a
-library of reusable code, so I think the name stands up.
+Puzzling over this again, is there some deep dark reason that if I
+create kernel headers (headers_install or headers_check) for MX51
+processors, or anything with a mach- AND a plat-, that the
+plat-foo/include/mach/* headers are not copied into the header tree?
 
-Sascha, this is awesome, BTW. I'm going to see if I can get PWM for
-MX5x and MC13892 under this..
+As a quick example, build any external module (compat-wireless is a
+good example) or libc against the headers alone and not the full
+source and they will complain about asm/memory.h trying to include
+mach/memory.h which does not exist. Doing a little hack to copy those
+files across absolutely fixes it.
+
+I know there is a weirdness here: the root arch/arm/Kconfig in my tree
+includes plat-mxc/Kconfig which includes mach-mx5/Kconfig. This is how
+the magic happens, but I can't find any magic that modifies the
+include paths to pick includes from these directories in the first
+place. They don't seem symlinked into the asm-arm/mach directory on a
+kernel build.
+
+My first thought is to modify the Debian packaging so it manually
+hacks those files in to get it working, but my major concern is you
+would have to do this for every platform and machine combination where
+this occurs, and this is obviously a kernel problem not a packaging
+problem.
+
+Has anyone even noticed this before (it's quite hard to search for the
+exact situation in freeform text in Google or ML archives, sigh)? Or
+is there a well known solution everyone uses but just never pushes to
+the distribution packagers or so? Is the solution to use the full
+Linux source code (kind of annoying for consumers that need to put
+aside 400MB of disk space for an extracted Linux source when 8MB of
+headers would do) rather than just headers as we have been doing for
+the past few weeks, and off and on for years?
 
 -- 
 Matt Sealey <matt@genesi-usa.com>
