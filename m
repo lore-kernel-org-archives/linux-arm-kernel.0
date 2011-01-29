@@ -1,43 +1,46 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Sat, 29 Jan 2011 20:24:09 +0100
-Subject: [PATCH 1/2] v4l: soc-camera: start stream after queueing the
-	buffers
-In-Reply-To: <Pine.LNX.4.64.1101292015140.26696@axis700.grange>
-References: <1296031789-1721-1-git-send-email-agust@denx.de>
-	<1296031789-1721-2-git-send-email-agust@denx.de>
-	<Pine.LNX.4.64.1101292015140.26696@axis700.grange>
-Message-ID: <20110129202409.36307b2d@wker>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Sat, 29 Jan 2011 21:38:21 +0100
+Subject: [RFC] add pwmlib support
+In-Reply-To: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
+References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110129213821.0e51dc32@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 29 Jan 2011 20:16:42 +0100 (CET)
-Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-...
-> > --- a/drivers/media/video/soc_camera.c
-> > +++ b/drivers/media/video/soc_camera.c
-> > @@ -646,11 +646,11 @@ static int soc_camera_streamon(struct file *file, void *priv,
-> >  	if (icd->streamer != file)
-> >  		return -EBUSY;
-> >  
-> > -	v4l2_subdev_call(sd, video, s_stream, 1);
-> > -
-> >  	/* This calls buf_queue from host driver's videobuf_queue_ops */
-> >  	ret = videobuf_streamon(&icd->vb_vidq);
-> >  
-> > +	v4l2_subdev_call(sd, video, s_stream, 1);
-> > +
-> 
-> After a bit more testing I'll make this to
-> 
-> +	if (!ret)
-> +		v4l2_subdev_call(sd, video, s_stream, 1);
-> +
-> 
-> Ok? Or you can submit a v2 yourself, if you like - when you fix the 
-> comment in the other patch from this series.
+Hi Sascha,
 
-I'll submit a v2 patch since I have to resubmit the other patch, too.
+On Fri, 28 Jan 2011 13:21:21 +0100, Sascha Hauer wrote:
+> While implementing just another pwm driver I thought it's time to implement
+> generic pwm support. The following series adds drivers/pwm/pwmlib.c and
+> a i.MX23/28 pwm driver which serves as a usage example for pwmlib. The
+> code is inspired by gpiolib support and tested using the backlight pwm
+> driver by Eric Miao.
+> 
+> Currently the pwm_request, pwm_add, pwm_remove and pwm_free operations are
+> protected with a single mutex wherea the pwm_enable, pwm_disable and
+> pwm_config operations are unlocked. It is assumed that the owners of the
+> pwm handle the serialization of the pwm accesses. This may not be enough, so
+> i'd like to discuss the locking (and type of locking) here.
+> 
+> I Cced the people working with PWMs in the kernel in the hope that they can
+> give input on what's missing / wrong in this implementation
 
+I do not have the time to review your patches. But I think your
+introduction above lacks a fundamental point, which is: what are you
+trying to achieve? What would you be able to do with pwmlib, which you
+currently aren't?
 
-Thanks,
-Anatolij
+As far as hwmon driver are concerned, please understand that "PWM" is a
+misnomer for "fan speed control". Some hwmon drivers have pwm
+attributes which actually correspond to analog voltage outputs. In both
+cases (PWM and DC) these are outputs which are dedicated to fan
+control, and I've never seen any other use of these, so I doubt it
+would make much sense to register them as generic pwm outputs.
+
+So I believe that hwmon drivers are out of scope for pwmlib. Which
+makes me wonder what you intend to do with pwmlib (back to my first
+question...) as the only use I know of for PWM signals in computers is
+for fan control.
+
+-- 
+Jean Delvare
