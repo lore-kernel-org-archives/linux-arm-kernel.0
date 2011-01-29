@@ -1,92 +1,61 @@
-From: dima@android.com (Dima Zavin)
-Date: Sat, 29 Jan 2011 10:35:37 -0800
-Subject: [PATCH] ARM: mm: enforce pageblock alignment when freeing memmap
-	entries at init
-In-Reply-To: <AANLkTimrP4u5VJBVGCK0tXZo6G2S4tXJnJcqc0+oVeeF@mail.gmail.com>
-References: <1295567231-2384-1-git-send-email-dima@android.com>
-	<20110126082916.GM18984@csn.ul.ie>
-	<AANLkTimrP4u5VJBVGCK0tXZo6G2S4tXJnJcqc0+oVeeF@mail.gmail.com>
-Message-ID: <AANLkTikYVUbjaFg8Dx8-GrrThQPuoDxAgXwS0Kxqr8TO@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sat, 29 Jan 2011 20:16:42 +0100 (CET)
+Subject: [PATCH 1/2] v4l: soc-camera: start stream after queueing the
+	buffers
+In-Reply-To: <1296031789-1721-2-git-send-email-agust@denx.de>
+References: <1296031789-1721-1-git-send-email-agust@denx.de>
+	<1296031789-1721-2-git-send-email-agust@denx.de>
+Message-ID: <Pine.LNX.4.64.1101292015140.26696@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping?
+On Wed, 26 Jan 2011, Anatolij Gustschin wrote:
 
-On Wed, Jan 26, 2011 at 1:57 PM, Dima Zavin <dima@android.com> wrote:
-> On Wed, Jan 26, 2011 at 12:29 AM, Mel Gorman <mel@csn.ul.ie> wrote:
->> On Thu, Jan 20, 2011 at 03:47:11PM -0800, Dima Zavin wrote:
->>> On some machines, the nodes do not always start on pageblock
->>> boundaries. In these cases it is possible for free_unused_memmap
->>> to free mappings for pages inside a pageblock with otherwise
->>> valid pages. This presents problems for page migration since it
->>> operates on whole pageblocks at a time.
->>>
->>
->> This patch is not aligning on a pageblock boundary - it's aligning on
->> MAX_ORDER_NR_PAGES which is the boundary the buddy allocator works on.
->> This is a minor but important nit as different assumptions are made
->> about pageblocks and MAX_ORDER_NR_PAGES. Anyway;
->
-> Thank you for the nit. I'm kind of a VM noob so any insight is
-> appreciated. I naively equated the two in my head when writing the
-> description.
->
->> If the node is not starting on the MAX_ORDER boundary then node_start_pfn
->> should also not be on the same boundary but the patch does not imply
->> that this has been broken. If anything it appears at a glance that there
->> is memmap *not* being freed because it was allocated on the
->> MAX_ORDER_NR_PAGES boundary and only partially freed.
->>
->> The comment then is confusing because the function is freeing memmap but
->> rounding down to free more of it ensures that all pages get a mapping?
->> It's not clear at all to me what was broken or how this patch fixes it
->> but bear in mind that it's rare I look at how ARM is initialised.
->
-> The function frees the mappings *between* the nodes. So when the patch
-> rounds down the start of the node, it preserves (i.e. frees less) the
-> mappings from MAX_ORDER_NR_PAGES boundary to the actual first valid
-> page. Otherwise, I would have to define CONFIG_HOLES_IN_ZONE and pay
-> the penalty. Looking through the history, a similar patch was already
-> taken to roundup the previous bank end to MAX_ORDER_NR_PAGES. I'm
-> doing the same to the start.
->
-> Am I totally off base?
->
-> --Dima
->
->>
->>> Round down bank_start to pageblock boundary so that whole
->>> pageblocks always have valid mappings.
->>>
->>> Signed-off-by: Dima Zavin <dima@android.com>
->>> ---
->>> ?arch/arm/mm/init.c | ? ?6 +++++-
->>> ?1 files changed, 5 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
->>> index 5164069..98de5d8 100644
->>> --- a/arch/arm/mm/init.c
->>> +++ b/arch/arm/mm/init.c
->>> @@ -418,7 +418,11 @@ static void __init free_unused_memmap(struct meminfo *mi)
->>> ? ? ? for_each_bank(i, mi) {
->>> ? ? ? ? ? ? ? struct membank *bank = &mi->bank[i];
->>>
->>> - ? ? ? ? ? ? bank_start = bank_pfn_start(bank);
->>> + ? ? ? ? ? ? /* Round bank_start down to the start of a pageblock so that
->>> + ? ? ? ? ? ? ?* all pages in a pageblock always have a mapping.
->>> + ? ? ? ? ? ? ?*/
->>> + ? ? ? ? ? ? bank_start = round_down(bank_pfn_start(bank),
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? MAX_ORDER_NR_PAGES);
->>>
->>> ? ? ? ? ? ? ? /*
->>> ? ? ? ? ? ? ? ?* If we had a previous bank, and there is a space
->>> --
->>> 1.7.3.1
->>>
->>
->> --
->> Mel Gorman
->> Linux Technology Center
->> IBM Dublin Software Lab
->>
->
+> Some camera systems have strong requirement for capturing
+> an exact number of frames after starting the stream and do
+> not tolerate losing captured frames. By starting the stream
+> after the videobuf has queued the buffers, we ensure that
+> no frame will be lost.
+> 
+> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+> ---
+>  drivers/media/video/soc_camera.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/video/soc_camera.c b/drivers/media/video/soc_camera.c
+> index a66811b..7299de0 100644
+> --- a/drivers/media/video/soc_camera.c
+> +++ b/drivers/media/video/soc_camera.c
+> @@ -646,11 +646,11 @@ static int soc_camera_streamon(struct file *file, void *priv,
+>  	if (icd->streamer != file)
+>  		return -EBUSY;
+>  
+> -	v4l2_subdev_call(sd, video, s_stream, 1);
+> -
+>  	/* This calls buf_queue from host driver's videobuf_queue_ops */
+>  	ret = videobuf_streamon(&icd->vb_vidq);
+>  
+> +	v4l2_subdev_call(sd, video, s_stream, 1);
+> +
+
+After a bit more testing I'll make this to
+
++	if (!ret)
++		v4l2_subdev_call(sd, video, s_stream, 1);
++
+
+Ok? Or you can submit a v2 yourself, if you like - when you fix the 
+comment in the other patch from this series.
+
+>  	return ret;
+>  }
+>  
+> -- 
+> 1.7.1
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
