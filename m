@@ -1,47 +1,51 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Sun, 30 Jan 2011 10:09:40 +0800
-Subject: [PATCH 1/1] ARM: imx53_loco: add all pad configure.
-In-Reply-To: <AANLkTiktMZ6K1Vx1JFFyJOr6FmnEwaV8DPkAnHT=XMho@mail.gmail.com>
-References: <1296298099-16611-1-git-send-email-richard.zhao@freescale.com>
-	<AANLkTimZqS+WkxerdkH_dPBX9_=5qn=fwWP6u-y=xYer@mail.gmail.com>
-	<20110129141112.GA3483@richard-laptop>
-	<AANLkTiktMZ6K1Vx1JFFyJOr6FmnEwaV8DPkAnHT=XMho@mail.gmail.com>
-Message-ID: <20110130020939.GA16528@shlinux1.ap.freescale.net>
+From: arden.jay@gmail.com (arden jay)
+Date: Sun, 30 Jan 2011 11:49:32 +0800
+Subject: [RFC] add pwmlib support
+In-Reply-To: <20110129215141.GA3493@pengutronix.de>
+References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
+	<20110129213821.0e51dc32@endymion.delvare>
+	<20110129215141.GA3493@pengutronix.de>
+Message-ID: <AANLkTi=ppKZ96T3_1nYisHG9705OCHgZqkLnu2f47zq5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 29, 2011 at 03:05:50PM -0200, Fabio Estevam wrote:
-> On Sat, Jan 29, 2011 at 12:11 PM, Richard Zhao <linuxzsc@gmail.com> wrote:
-> > On Sat, Jan 29, 2011 at 11:31:38AM -0200, Fabio Estevam wrote:
-> >> Hi Richard,
-> >>
-> >> On Sat, Jan 29, 2011 at 8:48 AM, Richard Zhao <linuxzsc@gmail.com> wrote:
-> >> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> >> >
-> >> > diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> >> > index 3aefd6d..d724ac8 100644
-> >> > --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> >> > +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> >> > @@ -39,8 +39,145 @@
-> >> > ?#define LOCO_FEC_PHY_RST ? ? ? ? ? ? ? IMX_GPIO_NR(7, 6)
-> >>
-> >> Don?t you also need to define the PAD_CTRL settings for the different
-> >> peripherals in iomux-53.h?
-> > Dinh is doing the SoC level work. I don't think I need to repeat the effort.
-> 
-> Then don?t you think it is better to add the board level IOMUX after
-> Dinh?s work?
-I don't think so. We already have Dinh's initial version of iomux-mx53.h. It can
-pass build and work for current device added. 
-At least we have correct mux set, we can test on that. When we summit new device
-drivers, we can check the pad settings and fix it in case we don't have correct
-one yet.
-It's also the way we can upstream as fast as possible.
+Sorry, I'm confused about this.
+If it is for backlight control, why it don't go through led_class?
 
-Thanks
-Richard
-> 
+Do I miss anything?
+
+2011/1/30 Wolfram Sang <w.sang@pengutronix.de>:
+>
+>> > code is inspired by gpiolib support and tested using the backlight pwm
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^
+>> So I believe that hwmon drivers are out of scope for pwmlib. Which
+>> makes me wonder what you intend to do with pwmlib (back to my first
+>> question...) as the only use I know of for PWM signals in computers is
+>> for fan control.
+>
+> It was meant for backlight control (was mentioned very indirectly).
+> I also pointed him to Bill's implementation, too.
+>
 > Regards,
-> 
-> Fabio Estevam
-> 
+>
+> ? Wolfram
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Wolfram Sang ? ? ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+> -----BEGIN PGP SIGNATURE-----
+> Version: GnuPG v1.4.9 (GNU/Linux)
+>
+> iEYEARECAAYFAk1Ei+0ACgkQD27XaX1/VRvjkACeOhJonBEZQX8U+ihKtiMjQT/U
+> IfAAoMdZiOrAOvuH1Iv6ZKNYoT+VhhTM
+> =ROYN
+> -----END PGP SIGNATURE-----
+>
+>
+
+
+
+-- 
+cheers,
+jay
