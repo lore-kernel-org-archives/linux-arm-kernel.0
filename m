@@ -1,49 +1,63 @@
-From: weil@mail.berlios.de (Stefan Weil)
-Date: Sun, 30 Jan 2011 20:29:38 +0100
-Subject: [PATCH 19/23] arm: Fix possible null pointer read access
-Message-ID: <1296415778-4638-1-git-send-email-weil@mail.berlios.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 30 Jan 2011 11:57:06 -0800
+Subject: [PATCH] ARM:ucb1x00-ts: ucb1x00_ts - add BTN_TOUCH event
+In-Reply-To: <1296391256-2127-1-git-send-email-jochen@scram.de>
+References: <1296391256-2127-1-git-send-email-jochen@scram.de>
+Message-ID: <20110130195705.GA19871@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These errors were found by cppcheck:
-arch/arm/mach-omap2/smartreflex.c:784: error: Possible null pointer dereference: sr_info
-arch/arm/mach-omap2/smartreflex.c:799: error: Possible null pointer dereference: sr_info
+On Sun, Jan 30, 2011 at 01:40:56PM +0100, Jochen Friedrich wrote:
+> Add BTN_TOUCH event reporting to ucb1x00_ts touchscreen driver.
+> This will make this touchscreen driver behave consistently wrt.
+> BTN_TOUCH.
+> 
+> Signed-off-by: Jochen Friedrich <jochen@scram.de>
 
-Both conditional statements are executed when sr_info == NULL,
-so accessing sr_info->voltdm would fail.
+Acked-by: Dmitry Torokhov <dtor@mail.ru>
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Stefan Weil <weil@mail.berlios.de>
----
- arch/arm/mach-omap2/smartreflex.c |    6 ++----
- 1 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 77ecebf..af39d17 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -780,8 +780,7 @@ static int omap_sr_autocomp_show(void *data, u64 *val)
- 	struct omap_sr *sr_info = (struct omap_sr *) data;
+> ---
+>  drivers/mfd/ucb1x00-ts.c |    5 ++++-
+>  1 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mfd/ucb1x00-ts.c b/drivers/mfd/ucb1x00-ts.c
+> index 92b85e2..38ffbd5 100644
+> --- a/drivers/mfd/ucb1x00-ts.c
+> +++ b/drivers/mfd/ucb1x00-ts.c
+> @@ -60,6 +60,7 @@ static inline void ucb1x00_ts_evt_add(struct ucb1x00_ts *ts, u16 pressure, u16 x
+>  	input_report_abs(idev, ABS_X, x);
+>  	input_report_abs(idev, ABS_Y, y);
+>  	input_report_abs(idev, ABS_PRESSURE, pressure);
+> +	input_report_key(idev, BTN_TOUCH, 1);
+>  	input_sync(idev);
+>  }
+>  
+> @@ -68,6 +69,7 @@ static inline void ucb1x00_ts_event_release(struct ucb1x00_ts *ts)
+>  	struct input_dev *idev = ts->idev;
+>  
+>  	input_report_abs(idev, ABS_PRESSURE, 0);
+> +	input_report_key(idev, BTN_TOUCH, 0);
+>  	input_sync(idev);
+>  }
+>  
+> @@ -384,7 +386,8 @@ static int ucb1x00_ts_add(struct ucb1x00_dev *dev)
+>  	idev->open       = ucb1x00_ts_open;
+>  	idev->close      = ucb1x00_ts_close;
+>  
+> -	__set_bit(EV_ABS, idev->evbit);
+> +	idev->evbit[0]   = BIT_MASK(EV_ABS) | BIT_MASK(EV_KEY);
+> +	idev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+>  
+>  	input_set_drvdata(idev, ts);
+>  
+> -- 
+> 1.7.2.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-input" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
- 	if (!sr_info) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, sr_info->voltdm->name);
-+		pr_warning("%s: omap_sr struct not found\n", __func__);
- 		return -EINVAL;
- 	}
-
-@@ -795,8 +794,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
- 	struct omap_sr *sr_info = (struct omap_sr *) data;
-
- 	if (!sr_info) {
--		pr_warning("%s: omap_sr struct for sr_%s not found\n",
--			__func__, sr_info->voltdm->name);
-+		pr_warning("%s: omap_sr struct not found\n", __func__);
- 		return -EINVAL;
- 	}
-
---
-1.7.2.3
+-- 
+Dmitry
