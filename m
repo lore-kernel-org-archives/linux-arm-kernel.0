@@ -1,54 +1,53 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Sun, 30 Jan 2011 17:23:43 +0900
-Subject: [PATCH 0/5] mmc: add double buffering for mmc block requests
-In-Reply-To: <AANLkTi=H71TQpuBnagMThcv-6NKJyqsD-xtg_eW8Pb_T@mail.gmail.com>
-References: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
-	<4D34FC5D.5080605@samsung.com>
-	<AANLkTimjfO4Wb0f87X_sDugW=yU1=YEQn35uZnsKKwq2@mail.gmail.com>
-	<AANLkTi=H71TQpuBnagMThcv-6NKJyqsD-xtg_eW8Pb_T@mail.gmail.com>
-Message-ID: <4D45200F.9090007@samsung.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Sun, 30 Jan 2011 17:26:17 +0800
+Subject: [PATCH 1/1] ARM: imx53_loco: add i2c device support
+Message-ID: <1296379577-28474-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+It can i2cdetect sgtl5000 device.
 
-If you sketch a implementation for sdhci. i can test the patches on the Samsung Soc
-Your help is very nice for me :).i want to know how much improve the performance 
-after applied your patch.
+ arch/arm/mach-mx5/Kconfig           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c |    6 ++++++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
 
-Regards,
-Jaehoon Chung
-
-Per Forlin wrote:
-> Hi Jaehoon,
-> 
-> Have you had the chance to test the patches on the Samsung Soc. I can
-> sketch a implementation for sdhci if that helps? Unfortunately I don't
-> have any hardware to test the SDHCI driver unless there is support in
-> QEMU?
-> I really think I need to test this on more hardware in order to get
-> more results for the patchset and hopefully more attention as well.
-> 
-> BR
-> Per
-> 
-> On 18 January 2011 09:12, Per Forlin <per.forlin@linaro.org> wrote:
->> On 18 January 2011 03:35, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> Hi Per..
->>>
->>> it is interesting approach..so
->>> we want to test your double buffering in our environment(Samsung SoC).
->>>
->>> Did you test with SDHCI?
->> So far I have only tested on mmci for board u5500 and u8500. I happily
->> test on a different board if I can get hold of one.
->>
->>> If you tested with SDHCI, i want to know how much increase the performance.
->>>
->>> Thanks,
->>> Jaehoon Chung
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 10b6008..abea297 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -146,6 +146,7 @@ config MACH_MX53_LOCO
+ 	bool "Support MX53 LOCO platforms"
+ 	select SOC_IMX53
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	help
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index d724ac8..46da468 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -199,6 +199,10 @@ static struct fec_platform_data mx53_loco_fec_data = {
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
++static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
++	.bitrate = 100000,
++};
++
+ static void __init mx53_loco_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+@@ -206,6 +210,8 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_imx_uart(0, NULL);
+ 	mx53_loco_fec_reset();
+ 	imx53_add_fec(&mx53_loco_fec_data);
++	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
++	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
+-- 
+1.6.3.3
