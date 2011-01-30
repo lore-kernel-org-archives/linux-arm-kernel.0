@@ -1,77 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 30 Jan 2011 12:20:27 +0000
-Subject: [PATCH] ARM: Fix SMP_ON_UP for non ARM ltd. implementations
-In-Reply-To: <1296083052-20034-1-git-send-email-sboyd@codeaurora.org>
-References: <1296083052-20034-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110130122027.GA22677@n2100.arm.linux.org.uk>
+From: jochen@scram.de (Jochen Friedrich)
+Date: Sun, 30 Jan 2011 13:40:56 +0100
+Subject: [PATCH] ARM:ucb1x00-ts: ucb1x00_ts - add BTN_TOUCH event
+Message-ID: <1296391256-2127-1-git-send-email-jochen@scram.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 03:04:12PM -0800, Stephen Boyd wrote:
-> @@ -393,20 +393,25 @@ ENDPROC(__turn_mmu_on)
->  #ifdef CONFIG_SMP_ON_UP
->  __fixup_smp:
->  	mov	r4, #0x00070000
-> -	orr	r3, r4, #0xff000000	@ mask 0xff070000
-> -	orr	r4, r4, #0x41000000	@ val 0x41070000
-> -	and	r0, r9, r3
-> -	teq	r0, r4			@ ARM CPU and ARMv6/v7?
-> +	and	r0, r9, r4
-> +	teq	r0, r4			@ ARMv6/v7?
->  	bne	__fixup_smp_on_up	@ no, assume UP
->  
-> +	orr	r3, r4, #0xff000000	@ mask 0xff070000
->  	orr	r3, r3, #0x0000ff00
->  	orr	r3, r3, #0x000000f0	@ mask 0xff07fff0
-> +	orr	r4, r4, #0x41000000	@ val 0x41070000
->  	orr	r4, r4, #0x0000b000
->  	orr	r4, r4, #0x00000020	@ val 0x4107b020
->  	and	r0, r9, r3
->  	teq	r0, r4			@ ARM 11MPCore?
->  	moveq	pc, lr			@ yes, assume SMP
->  
-> +	mov	r4, #0x00070000
-> +	and	r0, r9, #0x000f0000
-> +	teq	r0, r4			@ ARMv6?
-> +	beq	__fixup_smp_on_up	@ yes, assume UP
-> +
+Add BTN_TOUCH event reporting to ucb1x00_ts touchscreen driver.
+This will make this touchscreen driver behave consistently wrt.
+BTN_TOUCH.
 
-Wouldn't it be better to check for CPUID presence first, then ARM11MPcore,
-and lastly preserve of MPIDR-flagged extensions?
+Signed-off-by: Jochen Friedrich <jochen@scram.de>
+---
+ drivers/mfd/ucb1x00-ts.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-Will - can you check whether the below is correct?
-
- arch/arm/kernel/head.S |   17 +++++++----------
- 1 files changed, 7 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 17a97b5..f6b31c4 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -390,19 +390,16 @@ ENDPROC(__turn_mmu_on)
+diff --git a/drivers/mfd/ucb1x00-ts.c b/drivers/mfd/ucb1x00-ts.c
+index 92b85e2..38ffbd5 100644
+--- a/drivers/mfd/ucb1x00-ts.c
++++ b/drivers/mfd/ucb1x00-ts.c
+@@ -60,6 +60,7 @@ static inline void ucb1x00_ts_evt_add(struct ucb1x00_ts *ts, u16 pressure, u16 x
+ 	input_report_abs(idev, ABS_X, x);
+ 	input_report_abs(idev, ABS_Y, y);
+ 	input_report_abs(idev, ABS_PRESSURE, pressure);
++	input_report_key(idev, BTN_TOUCH, 1);
+ 	input_sync(idev);
+ }
  
- #ifdef CONFIG_SMP_ON_UP
- __fixup_smp:
--	mov	r4, #0x00070000
--	orr	r3, r4, #0xff000000	@ mask 0xff070000
--	orr	r4, r4, #0x41000000	@ val 0x41070000
--	and	r0, r9, r3
--	teq	r0, r4			@ ARM CPU and ARMv6/v7?
-+	and	r3, r9, #0x000f0000	@ architecture version
-+	teq	r3, #0x000f00000	@ CPU ID supported?
- 	bne	__fixup_smp_on_up	@ no, assume UP
+@@ -68,6 +69,7 @@ static inline void ucb1x00_ts_event_release(struct ucb1x00_ts *ts)
+ 	struct input_dev *idev = ts->idev;
  
--	orr	r3, r3, #0x0000ff00
--	orr	r3, r3, #0x000000f0	@ mask 0xff07fff0
-+	bic	r3, r9, #0x00ff0000
-+	bic	r3, r3, #0x0000000f	@ mask 0xff00fff0
-+	mov	r4, #0x41000000
- 	orr	r4, r4, #0x0000b000
--	orr	r4, r4, #0x00000020	@ val 0x4107b020
--	and	r0, r9, r3
--	teq	r0, r4			@ ARM 11MPCore?
-+	orr	r4, r4, #0x00000020	@ val 0x4100b020
-+	teq	r3, r4			@ ARM 11MPCore?
- 	moveq	pc, lr			@ yes, assume SMP
+ 	input_report_abs(idev, ABS_PRESSURE, 0);
++	input_report_key(idev, BTN_TOUCH, 0);
+ 	input_sync(idev);
+ }
  
- 	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
+@@ -384,7 +386,8 @@ static int ucb1x00_ts_add(struct ucb1x00_dev *dev)
+ 	idev->open       = ucb1x00_ts_open;
+ 	idev->close      = ucb1x00_ts_close;
+ 
+-	__set_bit(EV_ABS, idev->evbit);
++	idev->evbit[0]   = BIT_MASK(EV_ABS) | BIT_MASK(EV_KEY);
++	idev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+ 
+ 	input_set_drvdata(idev, ts);
+ 
+-- 
+1.7.2.3
