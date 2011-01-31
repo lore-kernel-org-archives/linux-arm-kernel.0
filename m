@@ -1,67 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 31 Jan 2011 09:20:39 +0100
-Subject: [PATCH 3/9] Add a mfd IPUv3 driver
-In-Reply-To: <20110107120802.GA2354@sortiz-mobl>
-References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
-	<1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
-	<20110103154214.GB11033@pengutronix.de>
-	<20110107120802.GA2354@sortiz-mobl>
-Message-ID: <20110131082039.GK9041@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Jan 2011 09:22:51 +0000
+Subject: [PATCH V5 00/63] Updating SPEAr Support
+In-Reply-To: <4D463B01.4050004@st.com>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+	<4D463B01.4050004@st.com>
+Message-ID: <20110131092251.GA8729@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
-
-On Fri, Jan 07, 2011 at 01:08:03PM +0100, Samuel Ortiz wrote:
-> Hi Sascha,
+On Mon, Jan 31, 2011 at 10:00:57AM +0530, viresh kumar wrote:
+> On 01/20/2011 12:55 PM, Viresh KUMAR wrote:
+> > Following set of patches:
+> > - updates SPEAr3xx, 6xx support
+> > - Adds support for SPEAr13xx
+> > - Removes Multiple defconfigs per machine family
+> > 
+> > Changes since V4:
+> > - Following patch is added
+> >   SPEAr: Defining IOMEM(x) and updating declaration of MISC_BASE
+> > - variables referring to register now have type void __iomem *, instead of u32 *
+> > - using linux/gpio.h instead of mach/gpio.h in *evb files.
+> > - return value of clk_get(), and clk_get_sys are checked using IS_ERR().
+> > - unused routines removed from headsmp.S
+> > - spear13*_pcie_port_is_host routines are declared static
+> > - platsmp.c updated according to review comments.
+> > - Added clk_round_rate routine() and used it to check possible rate before
+> >   calling cpufreq_notify_transition in cpufreq.c
+> > - & removed before function names, while passing function pointer to other
+> >   routines.
+> > 
 > 
-> On Mon, Jan 03, 2011 at 04:42:14PM +0100, Sascha Hauer wrote:
-> > On Mon, Dec 20, 2010 at 11:48:41AM +0100, Sascha Hauer wrote:
-> > > The IPU is the Image Processing Unit found on i.MX50/51/53 SoCs. It
-> > > features several units for image processing, this patch adds support
-> > > for the units needed for Framebuffer support, namely:
-> > >
-> > > - Display Controller (dc)
-> > > - Display Interface (di)
-> > > - Display Multi Fifo Controller (dmfc)
-> > > - Display Processor (dp)
-> > > - Image DMA Controller (idmac)
-> > >
-> > > This patch is based on the Freescale driver, but follows a different
-> > > approach. The Freescale code implements logical idmac channels and
-> > > the handling of the subunits is hidden in common idmac code pathes
-> > > in big switch/case statements. This patch instead just provides code
-> > > and resource management for the different subunits. The user, in this
-> > > case the framebuffer driver, decides how the different units play
-> > > together.
-> > >
-> > > The IPU has other units missing in this patch:
-> > >
-> > > - CMOS Sensor Interface (csi)
-> > > - Video Deinterlacer (vdi)
-> > > - Sensor Multi FIFO Controler (smfc)
-> > > - Image Converter (ic)
-> > > - Image Rotator (irt)
-> > >
-> > > So expect more files to come in this directory.
-> > >
-> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > Hello Samuel,
-> > 
-> > I see no further comments on this series. Does this mean you are ok with
-> > the patch or didn't you find the time looking at it?
-> I'm coming back from my xmas holidays today, and haven't had time to look at
-> it yet. Hopefully next week.
+> Russell,
+> 
+> Should I push these patches to tracker now ?
 
-Ping. I'd like to get this into the next merge window. Right now there
-is still enough time for me to react on comments.
-
-Regards,
- Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I've not yet been through them.  I only got part way through v4 before you
+posted v5.
