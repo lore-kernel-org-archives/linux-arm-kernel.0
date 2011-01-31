@@ -1,391 +1,116 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jan 2011 10:10:32 +0000
-Subject: [PATCH 8/8] MTD: Remove integrator-flash
+Date: Mon, 31 Jan 2011 10:10:26 +0000
+Subject: [PATCH 2/8] ARM: Realview: Use physmap driver instead of
+	integrator-flash
 In-Reply-To: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
 References: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1296468632-30743-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1296468632-30743-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As there is now no in-tree user of integrator-flash, remove
-it completely.
+Tested on a PB11-MPCore.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- drivers/mtd/Kconfig                 |    3 +-
- drivers/mtd/maps/Kconfig            |    4 -
- drivers/mtd/maps/Makefile           |    1 -
- drivers/mtd/maps/integrator-flash.c |  319 -----------------------------------
- 4 files changed, 1 insertions(+), 326 deletions(-)
- delete mode 100644 drivers/mtd/maps/integrator-flash.c
+ arch/arm/configs/realview-smp_defconfig |    2 +-
+ arch/arm/configs/realview_defconfig     |    2 +-
+ arch/arm/mach-realview/core.c           |   31 ++++---------------------------
+ 3 files changed, 6 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/mtd/Kconfig b/drivers/mtd/Kconfig
-index 7741470..e38f64f 100644
---- a/drivers/mtd/Kconfig
-+++ b/drivers/mtd/Kconfig
-@@ -156,8 +156,7 @@ config MTD_AFS_PARTS
+diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
+index 5ca7a61..abe61bf 100644
+--- a/arch/arm/configs/realview-smp_defconfig
++++ b/arch/arm/configs/realview-smp_defconfig
+@@ -38,7 +38,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_MTD_PHYSMAP=y
+ CONFIG_ARM_CHARLCD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC_PHY=y
+diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
+index fcaa603..7079cbe 100644
+--- a/arch/arm/configs/realview_defconfig
++++ b/arch/arm/configs/realview_defconfig
+@@ -37,7 +37,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_MTD_PHYSMAP=y
+ CONFIG_ARM_CHARLCD=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC_PHY=y
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 1c6602c..805cadd 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -31,6 +31,7 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/gfp.h>
+ #include <linux/clkdev.h>
++#include <linux/mtd/physmap.h>
  
- 	  You will still need the parsing functions to be called by the driver
- 	  for your particular device. It won't happen automatically. The
--	  'armflash' map driver (CONFIG_MTD_ARM_INTEGRATOR) does this, for
--	  example.
-+	  'physmap' map driver (CONFIG_MTD_PHYSMAP) does this, for example.
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+@@ -41,7 +42,6 @@
+ #include <asm/hardware/icst.h>
  
- config MTD_OF_PARTS
- 	def_bool y
-diff --git a/drivers/mtd/maps/Kconfig b/drivers/mtd/maps/Kconfig
-index 5d37d31..96cff58 100644
---- a/drivers/mtd/maps/Kconfig
-+++ b/drivers/mtd/maps/Kconfig
-@@ -335,10 +335,6 @@ config MTD_SOLUTIONENGINE
- 	  This enables access to the flash chips on the Hitachi SolutionEngine and
- 	  similar boards. Say 'Y' if you are building a kernel for such a board.
- 
--config MTD_ARM_INTEGRATOR
--	tristate "CFI Flash device mapped on ARM Integrator/P720T"
--	depends on ARM && MTD_CFI
--
- config MTD_CDB89712
- 	tristate "Cirrus CDB89712 evaluation board mappings"
- 	depends on MTD_CFI && ARCH_CDB89712
-diff --git a/drivers/mtd/maps/Makefile b/drivers/mtd/maps/Makefile
-index c7869c7..8ac0c1a 100644
---- a/drivers/mtd/maps/Makefile
-+++ b/drivers/mtd/maps/Makefile
-@@ -8,7 +8,6 @@ endif
- 
- # Chip mappings
- obj-$(CONFIG_MTD_CDB89712)	+= cdb89712.o
--obj-$(CONFIG_MTD_ARM_INTEGRATOR)+= integrator-flash.o
- obj-$(CONFIG_MTD_CFI_FLAGADM)	+= cfi_flagadm.o
- obj-$(CONFIG_MTD_DC21285)	+= dc21285.o
- obj-$(CONFIG_MTD_DILNETPC)	+= dilnetpc.o
-diff --git a/drivers/mtd/maps/integrator-flash.c b/drivers/mtd/maps/integrator-flash.c
-deleted file mode 100644
-index 2aac41b..0000000
---- a/drivers/mtd/maps/integrator-flash.c
-+++ /dev/null
-@@ -1,319 +0,0 @@
--/*======================================================================
--
--    drivers/mtd/maps/integrator-flash.c: ARM Integrator flash map driver
--
--    Copyright (C) 2000 ARM Limited
--    Copyright (C) 2003 Deep Blue Solutions Ltd.
--
--   This program is free software; you can redistribute it and/or modify
--   it under the terms of the GNU General Public License as published by
--   the Free Software Foundation; either version 2 of the License, or
--   (at your option) any later version.
--
--   This program is distributed in the hope that it will be useful,
--   but WITHOUT ANY WARRANTY; without even the implied warranty of
--   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
--   GNU General Public License for more details.
--
--   You should have received a copy of the GNU General Public License
--   along with this program; if not, write to the Free Software
--   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
--
--   This is access code for flashes using ARM's flash partitioning
--   standards.
--
--======================================================================*/
--
--#include <linux/module.h>
--#include <linux/types.h>
--#include <linux/kernel.h>
--#include <linux/slab.h>
--#include <linux/ioport.h>
--#include <linux/platform_device.h>
--#include <linux/init.h>
--#include <linux/io.h>
--
--#include <linux/mtd/mtd.h>
--#include <linux/mtd/map.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mtd/concat.h>
--
+ #include <asm/mach/arch.h>
 -#include <asm/mach/flash.h>
--#include <mach/hardware.h>
--#include <asm/system.h>
--
--struct armflash_subdev_info {
--	char			*name;
--	struct mtd_info		*mtd;
--	struct map_info		map;
--	struct flash_platform_data *plat;
--};
--
--struct armflash_info {
--	struct resource		*res;
--	struct mtd_partition	*parts;
--	struct mtd_info		*mtd;
--	int			nr_subdev;
--	struct armflash_subdev_info subdev[0];
--};
--
--static void armflash_set_vpp(struct map_info *map, int on)
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ 
+@@ -76,27 +76,7 @@ void __init realview_adjust_zones(unsigned long *size, unsigned long *hole)
+ 
+ #define REALVIEW_FLASHCTRL    (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_FLASH_OFFSET)
+ 
+-static int realview_flash_init(void)
 -{
--	struct armflash_subdev_info *info =
--		container_of(map, struct armflash_subdev_info, map);
+-	u32 val;
 -
--	if (info->plat && info->plat->set_vpp)
--		info->plat->set_vpp(on);
--}
--
--static const char *probes[] = { "cmdlinepart", "RedBoot", "afs", NULL };
--
--static int armflash_subdev_probe(struct armflash_subdev_info *subdev,
--				 struct resource *res)
--{
--	struct flash_platform_data *plat = subdev->plat;
--	resource_size_t size = res->end - res->start + 1;
--	void __iomem *base;
--	int err = 0;
--
--	if (!request_mem_region(res->start, size, subdev->name)) {
--		err = -EBUSY;
--		goto out;
--	}
--
--	base = ioremap(res->start, size);
--	if (!base) {
--		err = -ENOMEM;
--		goto no_mem;
--	}
--
--	/*
--	 * look for CFI based flash parts fitted to this board
--	 */
--	subdev->map.size	= size;
--	subdev->map.bankwidth	= plat->width;
--	subdev->map.phys	= res->start;
--	subdev->map.virt	= base;
--	subdev->map.name	= subdev->name;
--	subdev->map.set_vpp	= armflash_set_vpp;
--
--	simple_map_init(&subdev->map);
--
--	/*
--	 * Also, the CFI layer automatically works out what size
--	 * of chips we have, and does the necessary identification
--	 * for us automatically.
--	 */
--	subdev->mtd = do_map_probe(plat->map_name, &subdev->map);
--	if (!subdev->mtd) {
--		err = -ENXIO;
--		goto no_device;
--	}
--
--	subdev->mtd->owner = THIS_MODULE;
--
--	/* Successful? */
--	if (err == 0)
--		return err;
--
--	if (subdev->mtd)
--		map_destroy(subdev->mtd);
-- no_device:
--	iounmap(base);
-- no_mem:
--	release_mem_region(res->start, size);
-- out:
--	return err;
--}
--
--static void armflash_subdev_remove(struct armflash_subdev_info *subdev)
--{
--	if (subdev->mtd)
--		map_destroy(subdev->mtd);
--	if (subdev->map.virt)
--		iounmap(subdev->map.virt);
--	kfree(subdev->name);
--	subdev->name = NULL;
--	release_mem_region(subdev->map.phys, subdev->map.size);
--}
--
--static int armflash_probe(struct platform_device *dev)
--{
--	struct flash_platform_data *plat = dev->dev.platform_data;
--	unsigned int size;
--	struct armflash_info *info;
--	int i, nr, err;
--
--	/* Count the number of devices */
--	for (nr = 0; ; nr++)
--		if (!platform_get_resource(dev, IORESOURCE_MEM, nr))
--			break;
--	if (nr == 0) {
--		err = -ENODEV;
--		goto out;
--	}
--
--	size = sizeof(struct armflash_info) +
--		sizeof(struct armflash_subdev_info) * nr;
--	info = kzalloc(size, GFP_KERNEL);
--	if (!info) {
--		err = -ENOMEM;
--		goto out;
--	}
--
--	if (plat && plat->init) {
--		err = plat->init();
--		if (err)
--			goto no_resource;
--	}
--
--	for (i = 0; i < nr; i++) {
--		struct armflash_subdev_info *subdev = &info->subdev[i];
--		struct resource *res;
--
--		res = platform_get_resource(dev, IORESOURCE_MEM, i);
--		if (!res)
--			break;
--
--		if (nr == 1)
--			/* No MTD concatenation, just use the default name */
--			subdev->name = kstrdup(dev_name(&dev->dev), GFP_KERNEL);
--		else
--			subdev->name = kasprintf(GFP_KERNEL, "%s-%d",
--						 dev_name(&dev->dev), i);
--		if (!subdev->name) {
--			err = -ENOMEM;
--			break;
--		}
--		subdev->plat = plat;
--
--		err = armflash_subdev_probe(subdev, res);
--		if (err) {
--			kfree(subdev->name);
--			subdev->name = NULL;
--			break;
--		}
--	}
--	info->nr_subdev = i;
--
--	if (err)
--		goto subdev_err;
--
--	if (info->nr_subdev == 1)
--		info->mtd = info->subdev[0].mtd;
--	else if (info->nr_subdev > 1) {
--#ifdef CONFIG_MTD_CONCAT
--		struct mtd_info *cdev[info->nr_subdev];
--
--		/*
--		 * We detected multiple devices.  Concatenate them together.
--		 */
--		for (i = 0; i < info->nr_subdev; i++)
--			cdev[i] = info->subdev[i].mtd;
--
--		info->mtd = mtd_concat_create(cdev, info->nr_subdev,
--					      dev_name(&dev->dev));
--		if (info->mtd == NULL)
--			err = -ENXIO;
--#else
--		printk(KERN_ERR "armflash: multiple devices found but "
--		       "MTD concat support disabled.\n");
--		err = -ENXIO;
--#endif
--	}
--
--	if (err < 0)
--		goto cleanup;
--
--	err = parse_mtd_partitions(info->mtd, probes, &info->parts, 0);
--	if (err > 0) {
--		err = add_mtd_partitions(info->mtd, info->parts, err);
--		if (err)
--			printk(KERN_ERR
--			       "mtd partition registration failed: %d\n", err);
--	}
--
--	if (err == 0) {
--		platform_set_drvdata(dev, info);
--		return err;
--	}
--
--	/*
--	 * We got an error, free all resources.
--	 */
-- cleanup:
--	if (info->mtd) {
--		del_mtd_partitions(info->mtd);
--#ifdef CONFIG_MTD_CONCAT
--		if (info->mtd != info->subdev[0].mtd)
--			mtd_concat_destroy(info->mtd);
--#endif
--	}
--	kfree(info->parts);
-- subdev_err:
--	for (i = info->nr_subdev - 1; i >= 0; i--)
--		armflash_subdev_remove(&info->subdev[i]);
-- no_resource:
--	if (plat && plat->exit)
--		plat->exit();
--	kfree(info);
-- out:
--	return err;
--}
--
--static int armflash_remove(struct platform_device *dev)
--{
--	struct armflash_info *info = platform_get_drvdata(dev);
--	struct flash_platform_data *plat = dev->dev.platform_data;
--	int i;
--
--	platform_set_drvdata(dev, NULL);
--
--	if (info) {
--		if (info->mtd) {
--			del_mtd_partitions(info->mtd);
--#ifdef CONFIG_MTD_CONCAT
--			if (info->mtd != info->subdev[0].mtd)
--				mtd_concat_destroy(info->mtd);
--#endif
--		}
--		kfree(info->parts);
--
--		for (i = info->nr_subdev - 1; i >= 0; i--)
--			armflash_subdev_remove(&info->subdev[i]);
--
--		if (plat && plat->exit)
--			plat->exit();
--
--		kfree(info);
--	}
+-	val = __raw_readl(REALVIEW_FLASHCTRL);
+-	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, REALVIEW_FLASHCTRL);
 -
 -	return 0;
 -}
 -
--static struct platform_driver armflash_driver = {
--	.probe		= armflash_probe,
--	.remove		= armflash_remove,
--	.driver		= {
--		.name	= "armflash",
--		.owner	= THIS_MODULE,
--	},
--};
--
--static int __init armflash_init(void)
+-static void realview_flash_exit(void)
 -{
--	return platform_driver_register(&armflash_driver);
+-	u32 val;
+-
+-	val = __raw_readl(REALVIEW_FLASHCTRL);
+-	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, REALVIEW_FLASHCTRL);
 -}
 -
--static void __exit armflash_exit(void)
--{
--	platform_driver_unregister(&armflash_driver);
--}
--
--module_init(armflash_init);
--module_exit(armflash_exit);
--
--MODULE_AUTHOR("ARM Ltd");
--MODULE_DESCRIPTION("ARM Integrator CFI map driver");
--MODULE_LICENSE("GPL");
--MODULE_ALIAS("platform:armflash");
+-static void realview_flash_set_vpp(int on)
++static void realview_flash_set_vpp(struct map_info *map, int on)
+ {
+ 	u32 val;
+ 
+@@ -108,16 +88,13 @@ static void realview_flash_set_vpp(int on)
+ 	__raw_writel(val, REALVIEW_FLASHCTRL);
+ }
+ 
+-static struct flash_platform_data realview_flash_data = {
+-	.map_name		= "cfi_probe",
++static struct physmap_flash_data realview_flash_data = {
+ 	.width			= 4,
+-	.init			= realview_flash_init,
+-	.exit			= realview_flash_exit,
+ 	.set_vpp		= realview_flash_set_vpp,
+ };
+ 
+ struct platform_device realview_flash_device = {
+-	.name			= "armflash",
++	.name			= "physmap-flash",
+ 	.id			= 0,
+ 	.dev			= {
+ 		.platform_data	= &realview_flash_data,
 -- 
 1.7.0.4
