@@ -1,37 +1,54 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 31 Jan 2011 08:09:12 -0800
-Subject: [linux-pm] [PATCH] i2c: OMAP: fix static suspend vs. runtime
-	suspend
-In-Reply-To: <Pine.LNX.4.44L0.1101311010580.1931-100000@iolanthe.rowland.org>
-	(Alan Stern's message of "Mon, 31 Jan 2011 10:13:13 -0500 (EST)")
-References: <Pine.LNX.4.44L0.1101311010580.1931-100000@iolanthe.rowland.org>
-Message-ID: <877hdl9hsn.fsf@ti.com>
+Date: Mon, 31 Jan 2011 08:20:55 -0800
+Subject: [PATCH] arm: Fix possible memory leak
+In-Reply-To: <1296415587-4524-1-git-send-email-weil@mail.berlios.de> (Stefan
+	Weil's message of "Sun, 30 Jan 2011 20:26:27 +0100")
+References: <1296415587-4524-1-git-send-email-weil@mail.berlios.de>
+Message-ID: <87zkqh82oo.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan Stern <stern@rowland.harvard.edu> writes:
+Stefan Weil <weil@mail.berlios.de> writes:
 
-> On Mon, 31 Jan 2011, Rajendra Nayak wrote:
+> sr_info was allocated and needs a kfree before returning.
 >
->> Can you elaborate a bit more on how/why runtime PM transitions
->> are disabled during system suspend, and how is it taken care
->> of that a runtime resume of a device works however a subsequent
->> runtime (re)suspend does not?
+> This error was reported by cppcheck:
+> arch/arm/mach-omap2/smartreflex.c:837: error: Memory leak: sr_info
 >
-> I'll answer for Kevin.  This is done by the PM core, in order to 
-> prevent runtime power transitions from interfering with a system power 
-> transition.  The PM core increments the device's usage_count; this 
-> prevents the device from being runtime-suspended but it allows 
-> runtime-resume calls to go through.
+> To: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Stefan Weil <weil@mail.berlios.de>
 
-I understand how this works, but frankly I'm still a bit fuzzy on why.
-
-I guess I'm still missing a good understanding of what "interfering with a
-system power transition" means, and why a runtime suspend qualifies as
-interfering but not a runtime resume.
-
-More specifically, the reason for $SUBJECT patch is precisely because a
-runtime resume is allowed, a runtime suspend is not, and thus a system
-power transititon is prevented.
+Thanks, will queue this for 2.6.38-rc in my pm-fixes branch.
 
 Kevin
+
+> ---
+>  arch/arm/mach-omap2/smartreflex.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index af39d17..07324607 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -832,7 +832,8 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+>
+>  	if (!pdata) {
+>  		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
+> -		return -EINVAL;
+> +		ret = -EINVAL;
+> +		goto err_free_devinfo;
+>  	}
+>
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> --
+> 1.7.2.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
