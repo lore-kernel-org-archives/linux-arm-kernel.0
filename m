@@ -1,22 +1,108 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 31 Jan 2011 12:04:19 +0100
-Subject: [PATCH] MFD: DaVinci: Fix voice codec device name
-In-Reply-To: <1296134916-25742-1-git-send-email-prakash.pm@ti.com>
-References: <1296134916-25742-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <20110131110418.GH5954@sortiz-mobl>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 31 Jan 2011 16:58:02 +0530
+Subject: [PATCH] i2c: OMAP: fix static suspend vs. runtime suspend
+In-Reply-To: <1296173921-4832-1-git-send-email-khilman@ti.com>
+References: <1296173921-4832-1-git-send-email-khilman@ti.com>
+Message-ID: <1a4ad626f3cb73267847e8ac7bd47545@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prakash,
+Hi Kevin,
 
-On Thu, Jan 27, 2011 at 06:58:36PM +0530, Manjunathappa, Prakash wrote:
-> Fix the device name in DaVinci Voice Codec MFD driver to load
-> davinci-vcif and cq93vc codec client drivers.
-Thanks, patch applied.
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Friday, January 28, 2011 5:49 AM
+> To: Ben Dooks; Rajendra Nayak; linux-i2c at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org; linux-pm at lists.linux-foundation.org;
+linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH] i2c: OMAP: fix static suspend vs. runtime suspend
+>
+> When runtime PM is enabled, each OMAP i2c device is suspended after
+> each i2c xfer.  However, there are two cases when the static suspend
+> methods must be used to ensure the devices are suspended:
+>
+> 1) runtime PM is disabled, either at compile time or dynamically
+>     via /sys/devices/.../power/control.
+> 2) an i2c client driver uses i2c during it's suspend callback, thus
+>    leaving the i2c driver active (NOTE: runtime suspend transitions are
+>    disabled during system suspend, so i2c activity during system
+>    suspend will runtime resume the device, but not runtime (re)suspend
+it.)
+>
+> Since the actual work to suspend the device is handled by the
+> subsytem, call the bus methods to take care of it.
 
-Cheers,
-Samuel.
+The patch looks good to me. Thanks for the fix.
+Validated suspend on OMAP4sdp with the patch.
+Can you elaborate a bit more on how/why runtime PM transitions
+are disabled during system suspend, and how is it taken care
+of that a runtime resume of a device works however a subsequent
+runtime (re)suspend does not?
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Regards,
+Rajendra
+
+>
+> NOTE: This takes care of a known suspend problem on OMAP3 where the
+> TWL RTC driver does i2c xfers during its suspend path leaving the i2c
+> driver in an active state (since runtime suspend transistions are
+> disabled.)
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Ben, this is a regression in 2.6.38 so hopefully this can be queued
+> in the 2.6.38-rc cycle.  Thanks.
+>
+>  drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++++++++++++++
+>  1 files changed, 28 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c
+b/drivers/i2c/busses/i2c-omap.c
+> index b605ff3..0541df9 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1137,12 +1137,40 @@ omap_i2c_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>
+> +#ifdef CONFIG_SUSPEND
+> +static int omap_i2c_suspend(struct device *dev)
+> +{
+> +	if (!pm_runtime_suspended(dev))
+> +		if (dev->bus && dev->bus->pm &&
+dev->bus->pm->runtime_suspend)
+> +			dev->bus->pm->runtime_suspend(dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int omap_i2c_resume(struct device *dev)
+> +{
+> +	if (!pm_runtime_suspended(dev))
+> +		if (dev->bus && dev->bus->pm &&
+dev->bus->pm->runtime_resume)
+> +			dev->bus->pm->runtime_resume(dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct dev_pm_ops omap_i2c_pm_ops = {
+> +	.suspend = omap_i2c_suspend,
+> +	.resume = omap_i2c_resume,
+> +};
+> +#else
+> +#define omap_i2c_pm_ops NULL
+> +#endif
+> +
+>  static struct platform_driver omap_i2c_driver = {
+>  	.probe		= omap_i2c_probe,
+>  	.remove		= omap_i2c_remove,
+>  	.driver		= {
+>  		.name	= "omap_i2c",
+>  		.owner	= THIS_MODULE,
+> +		.pm     = &omap_i2c_pm_ops,
+>  	},
+>  };
+>
+> --
+> 1.7.3.5
