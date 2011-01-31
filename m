@@ -1,115 +1,165 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 31 Jan 2011 20:35:05 +0200
-Subject: PXA270 overlay problem
-In-Reply-To: <20110131173929.GC32737@n2100.arm.linux.org.uk>
-References: <201101262246.01164.anarsoul@gmail.com>
-	<201101311908.49275.anarsoul@gmail.com>
-	<20110131173929.GC32737@n2100.arm.linux.org.uk>
-Message-ID: <201101312035.05681.anarsoul@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 31 Jan 2011 20:14:03 +0100
+Subject: [PATCH] ARM: add Versatile Express defconfig
+Message-ID: <1296501243-28917-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 January 2011 19:39:29 Russell King - ARM Linux wrote:
-> On Mon, Jan 31, 2011 at 07:08:48PM +0200, Vasily Khoruzhick wrote:
-> > On Monday 31 January 2011 15:04:14 Russell King - ARM Linux wrote:
-> > > On Wed, Jan 26, 2011 at 10:46:00PM +0200, Vasily Khoruzhick wrote:
-> > > > Hi, I'm experiencing problems with overlay1/overlay2 on PXA270 using
-> > > > pxafb driver. Main problem is overlays just don't work for some
-> > > > reason, and even more - after enabling any overlay something weird
-> > > > happens (LCD blinks for a 0.5 second, and then main plane comes
-> > > > back, no overlay plane is visible), I'm getting following messages
-> > > > on dmesg:
-> > > > 
-> > > > [   93.679574] overlay1fb_disable: timeout disabling overlay1
-> > > > [   95.601537] BUG: Bad page state in process sh  pfn:a1b60
-> > > > [   95.601645] page:c0456c00 count:0 mapcount:0 mapping:  (null)
-> > > > index:0x0 [   95.601698] page flags: 0x200(arch_1)
-> > > 
-> > > Ouch.  PG_arch_1 is our 'dcache clean' bit, which we set to indicate
-> > > that the page is clean.  This should never be set on a newly allocated
-> > > page.
-> > > 
-> > > It's cleared by generic code whenever a page enters the free lists, so
-> > > newly allocated pages should never have the bit set.
-> > > 
-> > > What your report means is that someone did DMA cache maintainence
-> > > (specifically, unmapping the page), copied the page as a result of
-> > > a COW fault, or called flush_dcache_page() on an already free'd page.
-> > > 
-> > > Maybe the pages were mapped into userspace, meanwhile someone free'd
-> > > the pages.
-> > > 
-> > > And yes, I can see one way that this could happen:
-> > > 
-> > > - open overlay
-> > > - map buffer
-> > > - set framebuffer parameters
-> > > 
-> > >    (free's mapped buffer, leaving the mapped one in place, creates new
-> > > 
-> > > buffer) - close overlay
-> > 
-> > But I map framebuffer only after FBIOPUT_VSCREENINFO ioctl.
-> > 
-> > > Maybe another way:
-> > > 
-> > > static int overlayfb_release(struct fb_info *info, int user)
-> > > {
-> > > 
-> > >         struct pxafb_layer *ofb = (struct pxafb_layer*) info;
-> > >         
-> > >         atomic_dec(&ofb->usage);
-> > >         ofb->ops->disable(ofb);
-> > >         
-> > >         free_pages_exact(ofb->video_mem, ofb->video_mem_size);
-> > > 
-> > > So if two users open the overlay, both map it, and then one closes, the
-> > > memory backing the overlay gets freed - meanwhile the other user still
-> > > has it mapped etc.
-> > 
-> > Again, there's only one user - my app.
-> 
-> I didn't look any deeper so I can't say - but it feels very much like this
-> kind of thing is responsible for your problem.
-> 
-> Things actually get worse if I look at the driver:
-> 
-> static int overlayfb_open(struct fb_info *info, int user)
-> {
->         /* allow only one user at a time */
->         if (atomic_inc_and_test(&ofb->usage))
->                 return -EBUSY;
-> 
-> This is rubbish.  atomic_inc_and_test(v) does:
-> 
-> 	val = *v;
-> 	val += 1;
-> 	*v = val;
-> 
-> 	return val == 0;
-> 
-> So this doesn't stop multiple opens (and arguably you _can't_ prevent
-> multiple opens anyway.)
-> 
-> Anyway, I think it would be worth fixing this, and seeing what the effect
-> is.  Note that one of the side effects of one of this changes is that you
-> only get one attempt at increasing the memory size in FBIOPUT_VSCREENINFO.
-> Once the buffer has been allocated, we never change it - as there is no
-> way of knowing whether it's mapped or not.
-> 
-> The other change is that we properly remove all references to the
-> allocated memory when closing the device - which ensures that an open()
-> followed by mmap() with no FBIOPUT_VSCREENINFO call will always fail.
-> 
-> Lastly, it does allow concurrent opens, but makes sure that we have the
-> necessary number of closes before freeing the buffer.
-> 
-> Please give this a try and see whether it makes any difference for you.
+Being able to compile a major reference platform is helpful for
+me when developing on other archs using the same e.g. PrimeCells.
+I bet this is useful to others as well.
 
-Overlay still does not work, but now it does not crash system. Driver 
-complains:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/vexpress_defconfig |  140 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 140 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/configs/vexpress_defconfig
 
-[   36.062235] overlay1fb_disable: timeout disabling overlay1
-
-Regards
-Vasily
+diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
+new file mode 100644
+index 0000000..f2de51f
+--- /dev/null
++++ b/arch/arm/configs/vexpress_defconfig
+@@ -0,0 +1,140 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_SYSVIPC=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CGROUPS=y
++CONFIG_CPUSETS=y
++# CONFIG_UTS_NS is not set
++# CONFIG_IPC_NS is not set
++# CONFIG_USER_NS is not set
++# CONFIG_PID_NS is not set
++# CONFIG_NET_NS is not set
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_VEXPRESS=y
++CONFIG_ARCH_VEXPRESS_CA9X4=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_SMP=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_HOTPLUG_CPU=y
++CONFIG_AEABI=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="root=/dev/nfs nfsroot=10.1.69.3:/work/nfsroot ip=dhcp console=ttyAMA0 mem=128M"
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_MISC_DEVICES=y
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_ATA=y
++# CONFIG_SATA_PMP is not set
++CONFIG_NETDEVICES=y
++CONFIG_NET_ETHERNET=y
++CONFIG_SMSC911X=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++# CONFIG_WLAN is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_SERIO_SERPORT is not set
++CONFIG_SERIO_AMBAKMI=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++CONFIG_FB=y
++CONFIG_FB_ARMCLCD=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_LOGO=y
++# CONFIG_LOGO_LINUX_MONO is not set
++# CONFIG_LOGO_LINUX_VGA16 is not set
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_MIXER_OSS=y
++CONFIG_SND_PCM_OSS=y
++# CONFIG_SND_DRIVERS is not set
++CONFIG_SND_ARMAACI=y
++CONFIG_HID_DRAGONRISE=y
++CONFIG_HID_GYRATION=y
++CONFIG_HID_TWINHAN=y
++CONFIG_HID_NTRIG=y
++CONFIG_HID_PANTHERLORD=y
++CONFIG_HID_PETALYNX=y
++CONFIG_HID_SAMSUNG=y
++CONFIG_HID_SONY=y
++CONFIG_HID_SUNPLUS=y
++CONFIG_HID_GREENASIA=y
++CONFIG_HID_SMARTJOYPLUS=y
++CONFIG_HID_TOPSEED=y
++CONFIG_HID_THRUSTMASTER=y
++CONFIG_HID_ZEROPLUS=y
++CONFIG_USB=y
++CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
++# CONFIG_USB_DEVICE_CLASS is not set
++CONFIG_USB_MON=y
++CONFIG_USB_ISP1760_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_MMC=y
++CONFIG_MMC_ARMMMCI=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_PL031=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++# CONFIG_EXT3_FS_XATTR is not set
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_CRAMFS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++CONFIG_ROOT_NFS=y
++# CONFIG_RPCSEC_GSS_KRB5 is not set
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_DEBUG_INFO=y
++# CONFIG_RCU_CPU_STALL_DETECTOR is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_ERRORS=y
++CONFIG_DEBUG_LL=y
++CONFIG_EARLY_PRINTK=y
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
+-- 
+1.7.3.2
