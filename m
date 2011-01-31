@@ -1,127 +1,92 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 31 Jan 2011 22:48:51 +0200
-Subject: PXA270 overlay problem
-In-Reply-To: <201101312035.05681.anarsoul@gmail.com>
-References: <201101262246.01164.anarsoul@gmail.com>
-	<20110131173929.GC32737@n2100.arm.linux.org.uk>
-	<201101312035.05681.anarsoul@gmail.com>
-Message-ID: <201101312248.52079.anarsoul@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 31 Jan 2011 14:03:50 -0700
+Subject: [PATCH v2 0/6] Basic ARM device support
+Message-ID: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 January 2011 20:35:05 Vasily Khoruzhick wrote:
-> On Monday 31 January 2011 19:39:29 Russell King - ARM Linux wrote:
-> > On Mon, Jan 31, 2011 at 07:08:48PM +0200, Vasily Khoruzhick wrote:
-> > > On Monday 31 January 2011 15:04:14 Russell King - ARM Linux wrote:
-> > > > On Wed, Jan 26, 2011 at 10:46:00PM +0200, Vasily Khoruzhick wrote:
-> > > > > Hi, I'm experiencing problems with overlay1/overlay2 on PXA270
-> > > > > using pxafb driver. Main problem is overlays just don't work for
-> > > > > some reason, and even more - after enabling any overlay something
-> > > > > weird happens (LCD blinks for a 0.5 second, and then main plane
-> > > > > comes back, no overlay plane is visible), I'm getting following
-> > > > > messages on dmesg:
-> > > > > 
-> > > > > [   93.679574] overlay1fb_disable: timeout disabling overlay1
-> > > > > [   95.601537] BUG: Bad page state in process sh  pfn:a1b60
-> > > > > [   95.601645] page:c0456c00 count:0 mapcount:0 mapping:  (null)
-> > > > > index:0x0 [   95.601698] page flags: 0x200(arch_1)
-> > > > 
-> > > > Ouch.  PG_arch_1 is our 'dcache clean' bit, which we set to indicate
-> > > > that the page is clean.  This should never be set on a newly
-> > > > allocated page.
-> > > > 
-> > > > It's cleared by generic code whenever a page enters the free lists,
-> > > > so newly allocated pages should never have the bit set.
-> > > > 
-> > > > What your report means is that someone did DMA cache maintainence
-> > > > (specifically, unmapping the page), copied the page as a result of
-> > > > a COW fault, or called flush_dcache_page() on an already free'd page.
-> > > > 
-> > > > Maybe the pages were mapped into userspace, meanwhile someone free'd
-> > > > the pages.
-> > > > 
-> > > > And yes, I can see one way that this could happen:
-> > > > 
-> > > > - open overlay
-> > > > - map buffer
-> > > > - set framebuffer parameters
-> > > > 
-> > > >    (free's mapped buffer, leaving the mapped one in place, creates
-> > > >    new
-> > > > 
-> > > > buffer) - close overlay
-> > > 
-> > > But I map framebuffer only after FBIOPUT_VSCREENINFO ioctl.
-> > > 
-> > > > Maybe another way:
-> > > > 
-> > > > static int overlayfb_release(struct fb_info *info, int user)
-> > > > {
-> > > > 
-> > > >         struct pxafb_layer *ofb = (struct pxafb_layer*) info;
-> > > >         
-> > > >         atomic_dec(&ofb->usage);
-> > > >         ofb->ops->disable(ofb);
-> > > >         
-> > > >         free_pages_exact(ofb->video_mem, ofb->video_mem_size);
-> > > > 
-> > > > So if two users open the overlay, both map it, and then one closes,
-> > > > the memory backing the overlay gets freed - meanwhile the other user
-> > > > still has it mapped etc.
-> > > 
-> > > Again, there's only one user - my app.
-> > 
-> > I didn't look any deeper so I can't say - but it feels very much like
-> > this kind of thing is responsible for your problem.
-> > 
-> > Things actually get worse if I look at the driver:
-> > 
-> > static int overlayfb_open(struct fb_info *info, int user)
-> > {
-> > 
-> >         /* allow only one user at a time */
-> >         if (atomic_inc_and_test(&ofb->usage))
-> >         
-> >                 return -EBUSY;
-> > 
-> > This is rubbish.  atomic_inc_and_test(v) does:
-> > 	val = *v;
-> > 	val += 1;
-> > 	*v = val;
-> > 	
-> > 	return val == 0;
-> > 
-> > So this doesn't stop multiple opens (and arguably you _can't_ prevent
-> > multiple opens anyway.)
-> > 
-> > Anyway, I think it would be worth fixing this, and seeing what the effect
-> > is.  Note that one of the side effects of one of this changes is that you
-> > only get one attempt at increasing the memory size in
-> > FBIOPUT_VSCREENINFO. Once the buffer has been allocated, we never change
-> > it - as there is no way of knowing whether it's mapped or not.
-> > 
-> > The other change is that we properly remove all references to the
-> > allocated memory when closing the device - which ensures that an open()
-> > followed by mmap() with no FBIOPUT_VSCREENINFO call will always fail.
-> > 
-> > Lastly, it does allow concurrent opens, but makes sure that we have the
-> > necessary number of closes before freeing the buffer.
-> > 
-> > Please give this a try and see whether it makes any difference for you.
-> 
-> Overlay still does not work, but now it does not crash system. Driver
-> complains:
-> 
-> [   36.062235] overlay1fb_disable: timeout disabling overlay1
-> 
-> Regards
-> Vasily
+Second posting.  v2 reworks the handling of the dtb during early init.
+Instead of trying to reserve the memory region containing the dtb,
+this version instead copies it into an allocated buffer because the
+dtb may have been loaded by firmware into an unsafe region (like the
+interrupt vectors at the base of RAM).  Nicolas, can you please
+take a look at patch #4 and commenting on whether or not I'm
+handling it safely?
 
-I got it working and now understand why this bug happens. pxafb driver tries 
-to enable overlay (and set its params, allocates memory) in fb_set_par 
-callback, but it will be called only if vscreeninfo is changed. But it 
-disables overlay (and frees memory) on release. I'll will send a patch as soon 
-as I fix it.
+Once again, I'm not looking to get these patches merged into mainline
+yet.
 
-Regards
-Vasily
+...
+
+This patch series allows CONFIG_OF to be enabled on ARM and allows the
+kernel to accept a dtb pointer from boot firmware instead of atags.
+If a dtb is passed, then the kernel will use the root 'compatible'
+property to find a matching machine_desc, and it will use it to obtain
+the memory layout, initrd location and kernel parameters string.
+
+Only limited device tree support is enabled here.  It does not perform
+any kind of device registration from device tree data.  That support
+will be enabled in a later patch set.  Rather, this series is a stable
+base that other engineers can use to start working on device tree
+support for their platforms.
+
+Tested on Versatile (qemu) and nVidia Tegra Harmony.  Kernel compiles
+an boot with CONFIG_OF both on and off, both with and without passing
+a device tree blob.
+
+This series is reflected in the following branch:
+
+ git://git.secretlab.ca/git/linux-2.6 devicetree/arm
+
+The 'clean' patches (rebased) can be found here:
+
+ git://git.secretlab.ca/git/linux-2.6 devicetree/test
+
+The way I've managed the devicetree/test branch in the past has made
+it hard for other engineers to work with the device tree support, so
+I'm changing the way I'm handling it.  I will *not* rebase this new
+branch.  My intention is to keep it in essentially 'merge-ready' state
+at all times.  ie. I'm only going to put patches into this branch that
+I consider complete and are required to enable arm device tree
+support.  ie. core dt infrastructure and dt board support.  Device
+drivers should be submitted directly to their respective
+lists/maintainers.  I'll also be soliciting acks from platform
+maintainers before I pick up board support patches into this branch.
+
+Cheers,
+g.
+
+
+---
+
+Grant Likely (5):
+      arm/dt: Make __vet_atags also accept a dtb image
+      arm/dt: consolidate atags setup into setup_machine_atags
+      arm/dt: probe for platforms via the device tree
+      arm/dt: Basic versatile devicetree support
+      arm/dt: Basic tegra devicetree support
+
+Jeremy Kerr (1):
+      arm/dt: Allow CONFIG_OF on ARM
+
+
+ arch/arm/Kconfig                       |    7 ++
+ arch/arm/include/asm/mach/arch.h       |    2 
+ arch/arm/include/asm/prom.h            |   36 +++++++++
+ arch/arm/include/asm/setup.h           |    3 +
+ arch/arm/kernel/Makefile               |    1 
+ arch/arm/kernel/devtree.c              |  134 ++++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-common.S          |   24 ++++--
+ arch/arm/kernel/head.S                 |    8 +-
+ arch/arm/kernel/setup.c                |   78 ++++++++++---------
+ arch/arm/mach-tegra/board-harmony.c    |    6 +
+ arch/arm/mach-tegra/gpio.c             |    4 -
+ arch/arm/mach-versatile/versatile_ab.c |    6 +
+ arch/arm/mach-versatile/versatile_pb.c |    6 +
+ arch/arm/mm/init.c                     |    8 ++
+ 14 files changed, 276 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/include/asm/prom.h
+ create mode 100644 arch/arm/kernel/devtree.c
+
+-- 
+Signature
