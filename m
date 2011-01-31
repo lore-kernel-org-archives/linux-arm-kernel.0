@@ -1,30 +1,49 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 31 Jan 2011 14:48:50 -0800
-Subject: [PATCH] [ARM] tegra: Add i2c support
-In-Reply-To: <AANLkTimYURYGix-0Xk3wdf1A-XEAJbBXR_JDn1BFw_uq@mail.gmail.com>
-References: <1283466103-20889-1-git-send-email-ccross@android.com>
-	<AANLkTimYURYGix-0Xk3wdf1A-XEAJbBXR_JDn1BFw_uq@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0310C8E2E6@HQMAIL01.nvidia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 31 Jan 2011 16:02:11 -0700 (MST)
+Subject: [PATCH] MAINTAINERS: add entry for OMAP powerdomain/clockdomain
+	per-SoC layer support
+Message-ID: <alpine.DEB.2.00.1101310955300.16671@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross wrote at Tuesday, December 21, 2010 5:12 PM:
-> 
-> On Thu, Sep 2, 2010 at 3:21 PM, Colin Cross <ccross@android.com> wrote:
-> > Signed-off-by: Colin Cross <ccross@android.com>
-> > ---
-> > ?drivers/i2c/busses/Kconfig ? ? | ? ?7 +
-> > ?drivers/i2c/busses/Makefile ? ?| ? ?1 +
-> > ?drivers/i2c/busses/i2c-tegra.c | ?665 ++++++++++++++++++++++++++++++++++++++++
-> > ?include/linux/i2c-tegra.h ? ? ?| ? 25 ++
-> > ?4 files changed, 698 insertions(+), 0 deletions(-)
-> > ?create mode 100644 drivers/i2c/busses/i2c-tegra.c
-> > ?create mode 100644 include/linux/i2c-tegra.h
-> >
-> Ben, this didn't make it into 2.6.37?  Can it go into next-i2c?
 
-I didn't see any response to this request, at least not in the linux-tegra
-archives.
+Add Rajendra Nayak and myself as maintainers for the OMAP
+powerdomain/clockdomain per-SoC layer code.
 
+Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Beno?t Cousson <b-cousson@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+---
+
+This patch is being sent for comment only; Tony will probably queue 
+this up with the rest of the OMAP patches in the .39 window.
+
+ MAINTAINERS |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 55592f8..d203d8b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4451,6 +4451,16 @@ L:	linux-omap at vger.kernel.org
+ S:	Maintained
+ F:	arch/arm/*omap*/*pm*
+ 
++OMAP POWERDOMAIN/CLOCKDOMAIN SOC ADAPTATION LAYER SUPPORT
++M:	Rajendra Nayak <rnayak@ti.com>
++M:	Paul Walmsley <paul@pwsan.com>
++L:	linux-omap at vger.kernel.org
++S:	Maintained
++F:	arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
++F:	arch/arm/mach-omap2/powerdomain44xx.c
++F:	arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
++F:	arch/arm/mach-omap2/clockdomain44xx.c
++
+ OMAP AUDIO SUPPORT
+ M:	Jarkko Nikula <jhnikula@gmail.com>
+ L:	alsa-devel at alsa-project.org (subscribers-only)
 -- 
-nvpublic
+1.7.2.3
