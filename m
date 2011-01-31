@@ -1,70 +1,37 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 31 Jan 2011 14:04:16 -0700
-Subject: [PATCH v2 5/6] arm/dt: Basic versatile devicetree support
-In-Reply-To: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
-References: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
-Message-ID: <20110131210416.15105.58045.stgit@localhost6.localdomain6>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 31 Jan 2011 13:12:22 -0800
+Subject: OMAP PM fixes for 2.6.38-rc3
+Message-ID: <87aaig93rd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds adds very basic support for booting versatile with a
-device tree.  It simply allows the existing machine_descs to match
-against the versatile ab & pb compatible values so that the kernel can
-boot.  Kernel parameters and the initrd pointer is read out of the
-tree instead of atags.
+Tony,
 
-This is not complete device tree support.  This change will be
-reverted when a new machine_desc is added that can populate the
-versatile device registrations directly from data in the tree instead
-of using hard coded data.  That change will be made in a future patch.
+Please pull the following small set of PM-related fixes for 2.6.38-rc.
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/mach-versatile/versatile_ab.c |    6 ++++++
- arch/arm/mach-versatile/versatile_pb.c |    6 ++++++
- 2 files changed, 12 insertions(+), 0 deletions(-)
+Kevin
 
-diff --git a/arch/arm/mach-versatile/versatile_ab.c b/arch/arm/mach-versatile/versatile_ab.c
-index aa9730f..62053df 100644
---- a/arch/arm/mach-versatile/versatile_ab.c
-+++ b/arch/arm/mach-versatile/versatile_ab.c
-@@ -33,6 +33,11 @@
- 
- #include "core.h"
- 
-+static const char *versatile_ab_match[] __initdata = {
-+	"arm,versatile-ab",
-+	NULL,
-+};
-+
- MACHINE_START(VERSATILE_AB, "ARM-Versatile AB")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.boot_params	= 0x00000100,
-@@ -40,4 +45,5 @@ MACHINE_START(VERSATILE_AB, "ARM-Versatile AB")
- 	.init_irq	= versatile_init_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_init,
-+	.dt_compat	= versatile_ab_match,
- MACHINE_END
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index bf46964..eba12fa 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -106,6 +106,11 @@ static void __init versatile_pb_init(void)
- 	}
- }
- 
-+static const char *versatile_pb_match[] __initdata = {
-+	"arm,versatile-pb",
-+	NULL,
-+};
-+
- MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.boot_params	= 0x00000100,
-@@ -113,4 +118,5 @@ MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
- 	.init_irq	= versatile_init_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_pb_init,
-+	.dt_compat	= versatile_pb_match,
- MACHINE_END
+The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
+
+  Linux 2.6.38-rc2 (2011-01-21 19:01:34 -0800)
+
+are available in the git repository at:
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.38/pm-fixes
+
+Aaro Koskinen (1):
+      arm: mach-omap2: voltage: debugfs: fix memory leak
+
+Julia Lawall (1):
+      OMAP: PM: SmartReflex: Add missing IS_ERR test
+
+Kevin Hilman (1):
+      OMAP3: PM: fix save secure RAM to restore MPU power state
+
+Stefan Weil (2):
+      OMAP: PM: SmartReflex: Fix possible memory leak
+      OMAP: PM: SmartReflex: Fix possible null pointer read access
+
+ arch/arm/mach-omap2/pm34xx.c      |    7 ++++---
+ arch/arm/mach-omap2/smartreflex.c |   11 +++++------
+ arch/arm/mach-omap2/voltage.c     |    1 +
+ 3 files changed, 10 insertions(+), 9 deletions(-)
