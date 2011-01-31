@@ -1,38 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Jan 2011 09:22:51 +0000
-Subject: [PATCH V5 00/63] Updating SPEAr Support
-In-Reply-To: <4D463B01.4050004@st.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<4D463B01.4050004@st.com>
-Message-ID: <20110131092251.GA8729@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 31 Jan 2011 10:10:24 +0000
+Subject: [PATCH v3 0/8] Switch ARM platforms from integrator-flash to physmap
+Message-ID: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 31, 2011 at 10:00:57AM +0530, viresh kumar wrote:
-> On 01/20/2011 12:55 PM, Viresh KUMAR wrote:
-> > Following set of patches:
-> > - updates SPEAr3xx, 6xx support
-> > - Adds support for SPEAr13xx
-> > - Removes Multiple defconfigs per machine family
-> > 
-> > Changes since V4:
-> > - Following patch is added
-> >   SPEAr: Defining IOMEM(x) and updating declaration of MISC_BASE
-> > - variables referring to register now have type void __iomem *, instead of u32 *
-> > - using linux/gpio.h instead of mach/gpio.h in *evb files.
-> > - return value of clk_get(), and clk_get_sys are checked using IS_ERR().
-> > - unused routines removed from headsmp.S
-> > - spear13*_pcie_port_is_host routines are declared static
-> > - platsmp.c updated according to review comments.
-> > - Added clk_round_rate routine() and used it to check possible rate before
-> >   calling cpufreq_notify_transition in cpufreq.c
-> > - & removed before function names, while passing function pointer to other
-> >   routines.
-> > 
-> 
-> Russell,
-> 
-> Should I push these patches to tracker now ?
+As the integrator-flash driver is mostly a duplicate of physmap,
+move all users of this driver to physmap and get rid of the
+then unused driver.
 
-I've not yet been through them.  I only got part way through v4 before you
-posted v5.
+Changes since v2:
+- Add integrator-flash's init()/exit() methods in order to control
+  write access to the various onboard programmable components, as
+  per RMK request.
+- Rebased against 2.6.38-rc2
+
+Changes since initial revision:
+- Rebased against linux-next (20110107). It should apply cleanly
+  on top of Linus' tree, except for a small conflict in the last
+  patch of the serie.
+
+Marc Zyngier (8):
+  MTD: Add integrator-flash feature to physmap
+  ARM: Realview: Use physmap driver instead of integrator-flash
+  ARM: Versatile: Use physmap driver instead of integrator-flash
+  ARM: VExpress: Use physmap driver instead of integrator-flash
+  ARM: Integrator/AP: Use physmap driver instead of integrator-flash
+  ARM: Integrator/CP: Use physmap driver instead of integrator-flash
+  ARM: aaec2000: Use physmap driver instead of integrator-flash
+  MTD: Remove integrator-flash
+
+ arch/arm/configs/realview-smp_defconfig  |    2 +-
+ arch/arm/configs/realview_defconfig      |    2 +-
+ arch/arm/configs/versatile_defconfig     |    2 +-
+ arch/arm/mach-aaec2000/core.c            |    7 +-
+ arch/arm/mach-integrator/integrator_ap.c |   13 +-
+ arch/arm/mach-integrator/integrator_cp.c |   13 +-
+ arch/arm/mach-realview/core.c            |   31 +---
+ arch/arm/mach-versatile/core.c           |   31 +---
+ arch/arm/mach-vexpress/v2m.c             |   22 +--
+ drivers/mtd/Kconfig                      |    3 +-
+ drivers/mtd/maps/Kconfig                 |    4 -
+ drivers/mtd/maps/Makefile                |    1 -
+ drivers/mtd/maps/integrator-flash.c      |  319 ------------------------------
+ drivers/mtd/maps/physmap.c               |   16 ++-
+ include/linux/mtd/physmap.h              |    2 +
+ 15 files changed, 48 insertions(+), 420 deletions(-)
+ delete mode 100644 drivers/mtd/maps/integrator-flash.c
