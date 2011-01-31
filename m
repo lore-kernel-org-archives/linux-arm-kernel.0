@@ -1,122 +1,49 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 31 Jan 2011 14:04:05 -0700
-Subject: [PATCH v2 3/6] arm/dt: consolidate atags setup into
-	setup_machine_atags
+Date: Mon, 31 Jan 2011 14:04:21 -0700
+Subject: [PATCH v2 6/6] arm/dt: Basic tegra devicetree support
 In-Reply-To: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
 References: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
-Message-ID: <20110131210405.15105.37881.stgit@localhost6.localdomain6>
+Message-ID: <20110131210421.15105.61900.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for adding device tree support, this patch consolidates
-all of the atag-specific setup into a single function.
+This patch adds adds very basic support for booting tegra with a
+device tree.  It simply allows the existing machine_descs to match
+against the tegra compatible values so that the kernel can boot.
+Kernel parameters and the initrd pointer is read out of the tree
+instead of atags.
+
+This is not complete device tree support.  This change will be
+reverted when a new machine_desc is added that can populate the
+device registrations directly from data in the tree instead of using
+hard coded data.  That change will be made in a future patch.
+
+v2: Fixed cut-and-paste error in commit text
 
 Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/kernel/setup.c |   68 ++++++++++++++++++++++++-----------------------
- 1 files changed, 35 insertions(+), 33 deletions(-)
+ arch/arm/mach-tegra/board-harmony.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d211609..cbc1836 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -424,25 +424,6 @@ void cpu_init(void)
- 	    : "r14");
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index b9dbdb1..99884e9 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -113,6 +113,11 @@ static void __init tegra_harmony_init(void)
+ 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
  }
  
--static struct machine_desc * __init setup_machine(unsigned int nr)
--{
--	struct machine_desc *list;
--
--	/*
--	 * locate machine in the list of supported machines.
--	 */
--	list = lookup_machine_type(nr);
--	if (!list) {
--		printk("Machine configuration botched (nr %d), unable "
--		       "to continue.\n", nr);
--		while (1);
--	}
--
--	printk("Machine: %s\n", list->name);
--
--	return list;
--}
--
- int __init arm_add_memory(unsigned long start, unsigned long size)
- {
- 	struct membank *bank = &meminfo.bank[meminfo.nr_banks];
-@@ -796,21 +777,23 @@ static void __init squash_mem_tags(struct tag *tag)
- 			tag->hdr.tag = ATAG_NONE;
- }
- 
--void __init setup_arch(char **cmdline_p)
-+static struct machine_desc * __init setup_machine_tags(unsigned int nr)
- {
- 	struct tag *tags = (struct tag *)&init_tags;
- 	struct machine_desc *mdesc;
- 	char *from = default_command_line;
- 
--	unwind_init();
--
--	setup_processor();
--	mdesc = setup_machine(machine_arch_type);
--	machine_desc = mdesc;
--	machine_name = mdesc->name;
-+	/*
-+	 * locate machine in the list of supported machines.
-+	 */
-+	mdesc = lookup_machine_type(nr);
-+	if (!mdesc) {
-+		printk("Machine configuration botched (nr %d), unable "
-+		       "to continue.\n", nr);
-+		while (1);
-+	}
- 
--	if (mdesc->soft_reboot)
--		reboot_setup("s");
-+	printk("Machine: %s\n", mdesc->name);
- 
- 	if (__atags_pointer)
- 		tags = phys_to_virt(__atags_pointer);
-@@ -838,16 +821,35 @@ void __init setup_arch(char **cmdline_p)
- 		parse_tags(tags);
- 	}
- 
--	init_mm.start_code = (unsigned long) _text;
--	init_mm.end_code   = (unsigned long) _etext;
--	init_mm.end_data   = (unsigned long) _edata;
--	init_mm.brk	   = (unsigned long) _end;
--
- 	/* parse_early_param needs a boot_command_line */
- 	strlcpy(boot_command_line, from, COMMAND_LINE_SIZE);
- 
- 	/* populate cmd_line too for later use, preserving boot_command_line */
- 	strlcpy(cmd_line, boot_command_line, COMMAND_LINE_SIZE);
++static const char * tegra_harmony_board_compat[] = {
++	"nvidia,harmony",
++	NULL
++};
 +
-+	return mdesc;
-+}
-+
-+
-+void __init setup_arch(char **cmdline_p)
-+{
-+	struct machine_desc *mdesc;
-+
-+	unwind_init();
-+
-+	setup_processor();
-+	mdesc = setup_machine_tags(machine_arch_type);
-+	machine_desc = mdesc;
-+	machine_name = mdesc->name;
-+
-+	if (mdesc->soft_reboot)
-+		reboot_setup("s");
-+
-+	init_mm.start_code = (unsigned long) _text;
-+	init_mm.end_code   = (unsigned long) _etext;
-+	init_mm.end_data   = (unsigned long) _edata;
-+	init_mm.brk	   = (unsigned long) _end;
-+
- 	*cmdline_p = cmd_line;
- 
- 	parse_early_param();
+ MACHINE_START(HARMONY, "harmony")
+ 	.boot_params  = 0x00000100,
+ 	.fixup		= tegra_harmony_fixup,
+@@ -120,4 +125,5 @@ MACHINE_START(HARMONY, "harmony")
+ 	.init_machine   = tegra_harmony_init,
+ 	.map_io         = tegra_map_common_io,
+ 	.timer          = &tegra_timer,
++	.dt_compat      = tegra_harmony_board_compat,
+ MACHINE_END
