@@ -1,48 +1,117 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 31 Jan 2011 16:17:25 -0700 (MST)
-Subject: [PATCH 4/6] omap4: dpll: Enable all DPLL autoidle at boot
-In-Reply-To: <1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
-References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1101311614570.16671@utopia.booyaka.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 31 Jan 2011 15:38:31 -0800
+Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
+In-Reply-To: <1296470024-26854-2-git-send-email-ohad@wizery.com>
+References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
+	<1296470024-26854-2-git-send-email-ohad@wizery.com>
+Message-ID: <20110131153831.dca62146.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys
+On Mon, 31 Jan 2011 12:33:41 +0200
+Ohad Ben-Cohen <ohad@wizery.com> wrote:
 
-On Fri, 28 Jan 2011, Santosh Shilimkar wrote:
-
-> From: Rajendra Nayak <rnayak@ti.com>
+> Add a platform-independent hwspinlock framework.
 > 
-> Enable all DPLL autoidle at boot on OMAP4.
-
-Is there some reason why we can't do this in the OMAP4 PM code?  At some 
-point, I think it would be good to essentially disable all PM at boot, and 
-then let the PM code specifically enable autoidle later in the boot 
-process, etc.  The idea being that !CONFIG_PM would result in a chip 
-programmed for lowest latency, etc.
-
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Hardware spinlock devices are needed, e.g., in order to access data
+> that is shared between remote processors, that otherwise have no
+> alternative mechanism to accomplish synchronization and mutual exclusion
+> operations.
+> 
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Hari Kanigeri <h-kanigeri2@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/mach-omap2/clock44xx_data.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-> index e8cb32f..e5c59a0 100644
-> --- a/arch/arm/mach-omap2/clock44xx_data.c
-> +++ b/arch/arm/mach-omap2/clock44xx_data.c
-> @@ -3300,6 +3300,8 @@ int __init omap4xxx_clk_init(void)
->  			clkdev_add(&c->lk);
->  			clk_register(c->lk.clk);
->  			omap2_init_clk_clkdm(c->lk.clk);
-> +			if (c->lk.clk->dpll_data)
-> +				omap3_dpll_allow_idle(c->lk.clk);
->  		}
->  
->  	recalculate_root_clocks();
-> -- 
-> 1.6.0.4
-> 
+>  Documentation/hwspinlock.txt         |  299 ++++++++++++++++++
+>  drivers/Kconfig                      |    2 +
+>  drivers/Makefile                     |    2 +
+>  drivers/hwspinlock/Kconfig           |   13 +
+>  drivers/hwspinlock/Makefile          |    5 +
+>  drivers/hwspinlock/hwspinlock.h      |   61 ++++
+>  drivers/hwspinlock/hwspinlock_core.c |  557 ++++++++++++++++++++++++++++++++++
+>  include/linux/hwspinlock.h           |  298 ++++++++++++++++++
+
+It's a little irritating having two hwspinlock.h's. 
+hwspinlock_internal.h wold be a conventional approach.  But it's not a
+big deal.
+
+>
+> ...
+>
+> +/*
+> + * A radix tree is used to maintain the available hwspinlock instances.
+> + * The tree associates hwspinlock pointers with their integer key id,
+> + * and provides easy-to-use API which makes the hwspinlock core code simple
+> + * and easy to read.
+> + *
+> + * Radix trees are quick on lookups, and reasonably efficient in terms of
+> + * storage, especially with high density usages such as this framework
+> + * requires (a continuous range of integer keys, beginning with zero, is
+> + * used as the ID's of the hwspinlock instances).
+> + *
+> + * The radix tree API supports tagging items in the tree, which this
+> + * framework uses to mark unused hwspinlock instances (see the
+> + * HWSPINLOCK_UNUSED tag above). As a result, the process of querying the
+> + * tree, looking for an unused hwspinlock instance, is now reduced to a
+> + * single radix tree API call.
+> + */
+
+Nice comment!
+
+> +static RADIX_TREE(hwspinlock_tree, GFP_KERNEL);
+> +
+>
+> ...
+>
+> +/**
+> + * __hwspin_lock_timeout() - lock an hwspinlock with timeout limit
+> + * @hwlock: the hwspinlock to be locked
+> + * @timeout: timeout value in jiffies
+
+hm, why in jiffies?
+
+The problem here is that lazy programmers will use
+
+	hwspin_lock_timeout(lock, 10, ...)
+
+and their code will work happily with HZ=100 but will explode with HZ=1000.
+
+IOW, this interface *requires* that all callers perform a
+seconds-to-jiffies conversion before calling hwspin_lock_timeout().  So
+why not reduce their effort and their ability to make mistakes by
+defining the API to take seconds?
 
 
-- Paul
+> + * @mode: mode which controls whether local interrupts are disabled or not
+> + * @flags: a pointer to where the caller's interrupt state will be saved at (if
+> + *         requested)
+> + *
+> + * This function locks the given @hwlock. If the @hwlock
+> + * is already taken, the function will busy loop waiting for it to
+> + * be released, but give up when @timeout jiffies have elapsed. If @timeout
+> + * is %MAX_SCHEDULE_TIMEOUT, the function will never give up (therefore if a
+> + * faulty remote core never releases the @hwlock, it will deadlock).
+> + *
+> + * Upon a successful return from this function, preemption is disabled
+> + * (and possibly local interrupts, too), so the caller must not sleep,
+> + * and is advised to release the hwspinlock as soon as possible.
+> + * This is required in order to minimize remote cores polling on the
+> + * hardware interconnect.
+> + *
+> + * The user decides whether local interrupts are disabled or not, and if yes,
+> + * whether he wants their previous state to be saved. It is up to the user
+> + * to choose the appropriate @mode of operation, exactly the same way users
+> + * should decide between spin_lock, spin_lock_irq and spin_lock_irqsave.
+> + *
+> + * Returns 0 when the @hwlock was successfully taken, and an appropriate
+> + * error code otherwise (most notably -ETIMEDOUT if the @hwlock is still
+> + * busy after @timeout meets jiffies). The function will never sleep.
+> + */
+>
+> ...
+>
