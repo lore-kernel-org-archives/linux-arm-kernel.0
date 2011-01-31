@@ -1,30 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 31 Jan 2011 21:25:45 +0100
-Subject: [PATCH] ARM: mx5/board-mx53_evk.c: Make UART1 functional
-In-Reply-To: <4D471351.8030807@freescale.com>
-References: <1296493974-3817-1-git-send-email-fabio.estevam@freescale.com>
-	<20110131193542.GU1147@pengutronix.de>
-	<4D471351.8030807@freescale.com>
-Message-ID: <20110131202545.GV1147@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 31 Jan 2011 21:27:56 +0100
+Subject: [PATCH] ARM: add Versatile Express defconfig
+In-Reply-To: <3093351151219722808@unknownmsgid>
+References: <1296501243-28917-1-git-send-email-linus.walleij@linaro.org>
+	<3093351151219722808@unknownmsgid>
+Message-ID: <AANLkTimzz5RAeuAWwss5krD_ogtN6u5ioQUS+e1ecyiB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Fabio,
+2011/1/31 Will Deacon <will.deacon@arm.com>:
 
-On Mon, Jan 31, 2011 at 05:53:53PM -0200, Fabio Estevam wrote:
-> > I cannot see a difference to the patch you sent ~5h earlier. ??
-> 
-> The first patch was targeted for MX53_SMD board. After having sent it
-> I noticed that the MX53_EVK board also had the same issue, then I sent
-> another one for fixing MX53_EVK console.
-Ah, I see.
+>> +CONFIG_SMP=y
+>> +CONFIG_VMSPLIT_2G=y
+>> +CONFIG_HOTPLUG_CPU=y
+>
+> This will probably cause a compile-time error with a mainline kernel
+> because the necessary hotplug functions aren't implemented for vexpress.
 
-> If you prefer I can combine the two patches into a single one.
-I don't care much.  I assume it's OK for Sascha as it is.
+Does compile for me on 2.6.38-rc1 (after I avoid an compiler ICE
+on the NOR flash driver by deselecting it, I don't blame the kernel
+for that one tho):
 
-Best regards and sorry for bothering,
-Uwe
+Image Name:   Linux-2.6.38-rc1
+Created:      Mon Jan 31 21:21:16 2011
+Image Type:   ARM Linux Kernel Image (uncompressed)
+Data Size:    4740192 Bytes = 4629.09 kB = 4.52 MB
+Load Address: 0x60008000
+Entry Point:  0x60008000
+  Image arch/arm/boot/uImage is ready
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Might this have something to do with it:
+
+git log arch/arm/mach-vexpress/hotplug.c
+commit e9882777d992b76e0b80deadd66ad886c25f5d1f
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Sun Dec 19 11:33:12 2010 +0000
+
+    ARM: CPU hotplug: add Versatile Express hotplug CPU support
+
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+I don't know if it boots tho, if you pack up a Vexpress and
+mail it to my place I promise I will make more than just
+compiletests ;-)
+
+Linus Walleij
