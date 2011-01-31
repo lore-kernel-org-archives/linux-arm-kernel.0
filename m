@@ -1,70 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 31 Jan 2011 13:33:30 -0800
-Subject: [PATCH] ARM: Fix SMP_ON_UP for non ARM ltd. implementations
-In-Reply-To: <20110130164007.GA27436@n2100.arm.linux.org.uk>
-References: <1296083052-20034-1-git-send-email-sboyd@codeaurora.org>
-	<20110130122027.GA22677@n2100.arm.linux.org.uk>
-	<1296404875.6192.10.camel@jazzbox>
-	<20110130164007.GA27436@n2100.arm.linux.org.uk>
-Message-ID: <4D472AAA.501@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 31 Jan 2011 22:39:40 +0100
+Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
+Message-ID: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2011 08:40 AM, Russell King - ARM Linux wrote:
-> Ok, so with that added, it becomes:
->
->  arch/arm/kernel/head.S |   22 ++++++++++------------
->  1 files changed, 10 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index f17d9a0..c0225da 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -392,24 +392,22 @@ ENDPROC(__turn_mmu_on)
->  
->  #ifdef CONFIG_SMP_ON_UP
->  __fixup_smp:
-> -	mov	r4, #0x00070000
-> -	orr	r3, r4, #0xff000000	@ mask 0xff070000
-> -	orr	r4, r4, #0x41000000	@ val 0x41070000
-> -	and	r0, r9, r3
-> -	teq	r0, r4			@ ARM CPU and ARMv6/v7?
-> +	and	r3, r9, #0x000f0000	@ architecture version
-> +	teq	r3, #0x000f0000		@ CPU ID supported?
->  	bne	__fixup_smp_on_up	@ no, assume UP
->  
-> -	orr	r3, r3, #0x0000ff00
-> -	orr	r3, r3, #0x000000f0	@ mask 0xff07fff0
-> +	bic	r3, r9, #0x00ff0000
-> +	bic	r3, r3, #0x0000000f	@ mask 0xff00fff0
-> +	mov	r4, #0x41000000
->  	orr	r4, r4, #0x0000b000
-> -	orr	r4, r4, #0x00000020	@ val 0x4107b020
-> -	and	r0, r9, r3
-> -	teq	r0, r4			@ ARM 11MPCore?
-> +	orr	r4, r4, #0x00000020	@ val 0x4100b020
-> +	teq	r3, r4			@ ARM 11MPCore?
->  	moveq	pc, lr			@ yes, assume SMP
->  
->  	mrc	p15, 0, r0, c0, c0, 5	@ read MPIDR
-> -	tst	r0, #1 << 31
-> -	movne	pc, lr			@ bit 31 => SMP
-> +	and	r0, r0, #0xc0000000	@ multiprocessing extensions and
-> +	teq	r0, #0x80000000		@ not part of a uniprocessor system?
-> +	moveq	pc, lr			@ yes, assume SMP
->  
->  __fixup_smp_on_up:
->  	adr	r0, 1f
+The DMA mode also needs to wait until the FIFO is drained before
+enabling the MCI_DATAEND IRQ.
 
-Great. Looks good to me too. If I had know that ARM 11MPCore had an 0xf
-in the architecture bits I would have suggested this fix instead.
+Cc: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mmc/host/mmci.c |   31 ++++++++++++++++++++++++++-----
+ 1 files changed, 26 insertions(+), 5 deletions(-)
 
-Also, I wasn't sure if we should send fixes for EXPERIMENTAL features to
-the stable tree. If its appropriate, please Cc stable when the patch
-goes in.
-
-Reported-and-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 800b69c..bac15a3 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -334,6 +334,24 @@ static void mmci_dma_data_error(struct mmci_host *host)
+ 	dmaengine_terminate_all(host->dma_current);
+ }
+ 
++static void mmci_dma_callback(void *arg)
++{
++	unsigned long flags;
++	struct mmci_host *host = arg;
++
++	dev_vdbg(mmc_dev(host->mmc), "DMA transfer done!\n");
++	spin_lock_irqsave(&host->lock, flags);
++	host->size = 0;
++	mmci_set_mask1(host, 0);
++	/*
++	 * This will make sure the DATAEND IRQ trigger after the DMA is
++	 * finished and not while we're still reading/writing the FIFO
++	 */
++	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
++	       host->base + MMCIMASK0);
++	spin_unlock_irqrestore(&host->lock, flags);
++}
++
+ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+ {
+ 	struct variant_data *variant = host->variant;
+@@ -373,9 +391,12 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+ 
+ 	dmaengine_slave_config(chan, &conf);
+ 	desc = device->device_prep_slave_sg(chan, data->sg, nr_sg,
+-					    conf.direction, DMA_CTRL_ACK);
++					    conf.direction,
++					    DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+ 	if (!desc)
+ 		goto unmap_exit;
++	desc->callback = mmci_dma_callback;
++	desc->callback_param = host;
+ 
+ 	/* Okay, go for it. */
+ 	host->dma_current = chan;
+@@ -393,11 +414,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+ 	writel(datactrl, host->base + MMCIDATACTRL);
+ 
+ 	/*
+-	 * Let the MMCI say when the data is ended and it's time
+-	 * to fire next DMA request. When that happens, MMCI will
+-	 * call mmci_data_end()
++	 * Mask off the MCI_DATAEND IRQ until the DMA has completed,
++	 * it will then be enabled by the callback so that the transfer
++	 * can complete through the interrupt handler.
+ 	 */
+-	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
++	writel(readl(host->base + MMCIMASK0) & ~MCI_DATAENDMASK,
+ 	       host->base + MMCIMASK0);
+ 	return 0;
+ 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.3.2
