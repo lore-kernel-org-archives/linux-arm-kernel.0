@@ -1,56 +1,50 @@
-From: s.neumann@raumfeld.com (Sven Neumann)
-Date: Mon, 31 Jan 2011 14:29:18 +0100
-Subject: [PATCH] ARM: pxa: fix suspend on PXA3XX
-In-Reply-To: <AANLkTimUg=y49H6THn5s7f7v418W68fhAsMLZGnDqabF@mail.gmail.com>
-References: <20110124101701.GE16202@n2100.arm.linux.org.uk>
-	<1295864750-1238-1-git-send-email-s.neumann@raumfeld.com>
-	<AANLkTinrxiHx6jX9jFzVzjq5FH-W=MLoDThAtRq2a1zZ@mail.gmail.com>
-	<1296029447.2013.8.camel@sven>
-	<AANLkTimUg=y49H6THn5s7f7v418W68fhAsMLZGnDqabF@mail.gmail.com>
-Message-ID: <1296480558.25696.2.camel@sven>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Jan 2011 14:00:09 +0000
+Subject: [PATCH] mmci: calculate remaining bytes at error correctly
+In-Reply-To: <AANLkTimTbn-rQik+PvC-GyLd3HBAuGi3f8kR-T2GcvK8@mail.gmail.com>
+References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
+	<20110130212856.GA32737@n2100.arm.linux.org.uk>
+	<AANLkTi=HzzOkVmD9z=9uRdzHsaixFAfOv9BmxoY=u7uf@mail.gmail.com>
+	<20110131102726.GA8948@n2100.arm.linux.org.uk>
+	<AANLkTinBbXN-fxppo1Pa33DxiS6QYSdwqFsadFDxmPPy@mail.gmail.com>
+	<20110131104009.GC8948@n2100.arm.linux.org.uk>
+	<AANLkTimTbn-rQik+PvC-GyLd3HBAuGi3f8kR-T2GcvK8@mail.gmail.com>
+Message-ID: <20110131140009.GA13918@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-27 at 22:46 +0800, Eric Miao wrote:
-> On Wed, Jan 26, 2011 at 4:10 PM, Sven Neumann <s.neumann@raumfeld.com> wrote:
-> > On Wed, 2011-01-26 at 05:06 +0800, Eric Miao wrote:
-> >> How about this instead?
-> >>
-> >> diff --git a/arch/arm/mach-pxa/pm.c b/arch/arm/mach-pxa/pm.c
-> >> index 978e1b2..1807c9a 100644
-> >> --- a/arch/arm/mach-pxa/pm.c
-> >> +++ b/arch/arm/mach-pxa/pm.c
-> >> @@ -33,7 +33,7 @@ int pxa_pm_enter(suspend_state_t state)
-> >>  #endif
-> >>
-> >>       /* skip registers saving for standby */
-> >> -     if (state != PM_SUSPEND_STANDBY) {
-> >> +     if (state != PM_SUSPEND_STANDBY && pxa_cpu_pm_fns->save) {
-> >>               pxa_cpu_pm_fns->save(sleep_save);
-> >>               /* before sleeping, calculate and save a checksum */
-> >>               for (i = 0; i < pxa_cpu_pm_fns->save_count - 1; i++)
-> >> @@ -44,7 +44,7 @@ int pxa_pm_enter(suspend_state_t state)
-> >>       pxa_cpu_pm_fns->enter(state);
-> >>       cpu_init();
-> >>
-> >> -     if (state != PM_SUSPEND_STANDBY) {
-> >> +     if (state != PM_SUSPEND_STANDBY && pxa_cpu_pm_fns->restore) {
-> >>               /* after sleeping, validate the checksum */
-> >>               for (i = 0; i < pxa_cpu_pm_fns->save_count - 1; i++)
-> >>                       checksum += sleep_save[i];
-> >>
+On Mon, Jan 31, 2011 at 02:53:32PM +0100, Linus Walleij wrote:
+> On Mon, Jan 31, 2011 at 11:40 AM, Russell King - ARM Linux <
+> linux at arm.linux.org.uk> wrote:
+> 
+> What can happen is you receive the DATAEND interrupt,
+> > which tears down the data side of the request, and starts the stop
+> > command.  Meanwhile there's still data left in the FIFO for the CPU
+> > to read.
 > >
-> > Not sure if that will work as well. With this change the code is
-> > skipping more than just the calls to pxa_cpu_pm_fns->save() and
-> > pxa_cpu_pm_fns->restore(). In particular it doesn't call
-> > pxa_cpu_pm_fns->enter(state).
+> > I suspect there's a similar race between DMA and the host CPU too as
+> > you leave the DATAEND interrupt on.  I suspect for reliability, we
+> > need to have the DMA controller callback function in place to enable
+> > the DATAEND interrupt.  Or something like that.
 > >
 > 
-> Nah, that ->enable() is called if the checksum is incorrect. Please compare
-> with the original code?
+> Yes I get it now, well, what we do is essentially create three state
+> variables that are all checked at end of DMA (by adding a
+> DMA termination callback), end of PIO or DATAEND IRQ arrival.
 
-I see. Well, I've tried your patch and it seems to work as well.
+There's no need, and you don't want to do it like that.  If you receive
+and ack the data end interrupt before you've completed the transfer,
+then you need additional complexity in the PIO data handler.
 
+Keep it simple.  Keep DATAEND masked until you've finished transfering
+the data and then enable it - you'll get the interrupt at the right point
+that way.
 
-Thanks,
-Sven
+> I'll cook up some patch ASAP, just need to backport some
+> stuff on top of your latest MMCI patches.
+
+I have a number of patches on top of just these two.  There's eight
+in total.  See the mmci-dma branch.  I want to discard the top patch
+as I still don't think the mmci imposes that requirement.
+
+PS, don't send me html encoded mail...
