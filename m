@@ -1,65 +1,38 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 31 Jan 2011 08:26:26 -0800
-Subject: [PATCH 19/23] arm: Fix possible null pointer read access
-In-Reply-To: <1296415778-4638-1-git-send-email-weil@mail.berlios.de> (Stefan
-	Weil's message of "Sun, 30 Jan 2011 20:29:38 +0100")
-References: <1296415778-4638-1-git-send-email-weil@mail.berlios.de>
-Message-ID: <87tygp82fh.fsf@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 31 Jan 2011 15:12:54 -0200
+Subject: [PATCH] ARM: mx5/board-mx53_evk.c: Make UART1 functional
+Message-ID: <1296493974-3817-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Weil <weil@mail.berlios.de> writes:
+Fix UART1 IOMUX settings and configure UART1 to work with only RX/TX pins.
 
-> These errors were found by cppcheck:
-> arch/arm/mach-omap2/smartreflex.c:784: error: Possible null pointer dereference: sr_info
-> arch/arm/mach-omap2/smartreflex.c:799: error: Possible null pointer dereference: sr_info
->
-> Both conditional statements are executed when sr_info == NULL,
-> so accessing sr_info->voltdm would fail.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Stefan Weil <weil@mail.berlios.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_evk.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-Thanks, queuing for 2.6.38-rc in my pm-fixes branch.
-
-Kevin
-
-> ---
->  arch/arm/mach-omap2/smartreflex.c |    6 ++----
->  1 files changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 77ecebf..af39d17 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -780,8 +780,7 @@ static int omap_sr_autocomp_show(void *data, u64 *val)
->  	struct omap_sr *sr_info = (struct omap_sr *) data;
->
->  	if (!sr_info) {
-> -		pr_warning("%s: omap_sr struct for sr_%s not found\n",
-> -			__func__, sr_info->voltdm->name);
-> +		pr_warning("%s: omap_sr struct not found\n", __func__);
->  		return -EINVAL;
->  	}
->
-> @@ -795,8 +794,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
->  	struct omap_sr *sr_info = (struct omap_sr *) data;
->
->  	if (!sr_info) {
-> -		pr_warning("%s: omap_sr struct for sr_%s not found\n",
-> -			__func__, sr_info->voltdm->name);
-> +		pr_warning("%s: omap_sr struct not found\n", __func__);
->  		return -EINVAL;
->  	}
->
-> --
-> 1.7.2.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
+index eba9df0..4ee9556 100644
+--- a/arch/arm/mach-mx5/board-mx53_evk.c
++++ b/arch/arm/mach-mx5/board-mx53_evk.c
+@@ -44,8 +44,6 @@
+ static iomux_v3_cfg_t mx53_evk_pads[] = {
+ 	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+ 	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
+-	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
+-	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
+ 
+ 	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+ 	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+@@ -72,7 +70,7 @@ static const struct imxuart_platform_data mx53_evk_uart_pdata __initconst = {
+ 
+ static inline void mx53_evk_init_uart(void)
+ {
+-	imx53_add_imx_uart(0, &mx53_evk_uart_pdata);
++	imx53_add_imx_uart(0, NULL);
+ 	imx53_add_imx_uart(1, &mx53_evk_uart_pdata);
+ 	imx53_add_imx_uart(2, &mx53_evk_uart_pdata);
+ }
+-- 
+1.6.0.4
