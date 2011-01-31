@@ -1,77 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jan 2011 22:39:40 +0100
-Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
-Message-ID: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 31 Jan 2011 17:27:20 -0500 (EST)
+Subject: [PATCH v2 4/6] arm/dt: probe for platforms via the device tree
+In-Reply-To: <20110131210410.15105.63595.stgit@localhost6.localdomain6>
+References: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
+	<20110131210410.15105.63595.stgit@localhost6.localdomain6>
+Message-ID: <alpine.LFD.2.00.1101311709280.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA mode also needs to wait until the FIFO is drained before
-enabling the MCI_DATAEND IRQ.
+On Mon, 31 Jan 2011, Grant Likely wrote:
 
-Cc: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mmc/host/mmci.c |   31 ++++++++++++++++++++++++++-----
- 1 files changed, 26 insertions(+), 5 deletions(-)
+> If a dtb is passed to the kernel then the kernel needs to iterate
+> through compiled-in mdescs looking for one that matches and move the
+> dtb data to a safe location before it gets accidentally overwritten by
+> the kernel.
+> 
+> This patch creates a new function, setup_machine_fdt() which is
+> analogous to the setup_machine_atags() created in the previous patch.
+> It does all the early setup needed to use a device tree machine
+> description.  It also creates arm_unflatten_device_tree() which copies
+> the dtb into an allocated buffer and unflattens it into the live-tree
+> representation.
+> 
+> v2: Changed to save the dtb by copying into an allocated buffer.
+>     - Since the dtb will very likely be passed in the first 16k of ram
+>       where the interrupt vectors live, memblock_reserve() is
+>       insufficient to protect the dtb data.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 800b69c..bac15a3 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -334,6 +334,24 @@ static void mmci_dma_data_error(struct mmci_host *host)
- 	dmaengine_terminate_all(host->dma_current);
- }
- 
-+static void mmci_dma_callback(void *arg)
-+{
-+	unsigned long flags;
-+	struct mmci_host *host = arg;
-+
-+	dev_vdbg(mmc_dev(host->mmc), "DMA transfer done!\n");
-+	spin_lock_irqsave(&host->lock, flags);
-+	host->size = 0;
-+	mmci_set_mask1(host, 0);
-+	/*
-+	 * This will make sure the DATAEND IRQ trigger after the DMA is
-+	 * finished and not while we're still reading/writing the FIFO
-+	 */
-+	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
-+	       host->base + MMCIMASK0);
-+	spin_unlock_irqrestore(&host->lock, flags);
-+}
-+
- static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- {
- 	struct variant_data *variant = host->variant;
-@@ -373,9 +391,12 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- 
- 	dmaengine_slave_config(chan, &conf);
- 	desc = device->device_prep_slave_sg(chan, data->sg, nr_sg,
--					    conf.direction, DMA_CTRL_ACK);
-+					    conf.direction,
-+					    DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	if (!desc)
- 		goto unmap_exit;
-+	desc->callback = mmci_dma_callback;
-+	desc->callback_param = host;
- 
- 	/* Okay, go for it. */
- 	host->dma_current = chan;
-@@ -393,11 +414,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- 	writel(datactrl, host->base + MMCIDATACTRL);
- 
- 	/*
--	 * Let the MMCI say when the data is ended and it's time
--	 * to fire next DMA request. When that happens, MMCI will
--	 * call mmci_data_end()
-+	 * Mask off the MCI_DATAEND IRQ until the DMA has completed,
-+	 * it will then be enabled by the callback so that the transfer
-+	 * can complete through the interrupt handler.
- 	 */
--	writel(readl(host->base + MMCIMASK0) | MCI_DATAENDMASK,
-+	writel(readl(host->base + MMCIMASK0) & ~MCI_DATAENDMASK,
- 	       host->base + MMCIMASK0);
- 	return 0;
- 
--- 
-1.7.3.2
+This is wrong.  The vector page can be allocated anywhere.  It is 
+currently allocated with memblock_alloc(), so if you memblock_reserve() 
+the dtb soon enough then it should be safe and the vector page or 
+whatever will be allocated somewhere else.
+
+What was the actual problem?
+
+
+Nicolas
