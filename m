@@ -1,86 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jan 2011 10:10:30 +0000
-Subject: [PATCH 6/8] ARM: Integrator/CP: Use physmap driver instead of
-	integrator-flash
-In-Reply-To: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
-References: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1296468632-30743-7-git-send-email-marc.zyngier@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 31 Jan 2011 11:17:42 +0100
+Subject: [PATCH] mmci: calculate remaining bytes at error correctly
+In-Reply-To: <20110130212856.GA32737@n2100.arm.linux.org.uk>
+References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
+	<20110130212856.GA32737@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=HzzOkVmD9z=9uRdzHsaixFAfOv9BmxoY=u7uf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested with an ARM-1136 core tile.
+2011/1/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mach-integrator/integrator_cp.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+> 8<----
+> Subject: [PATCH 1/2] ARM: mmci: complete the transaction on error
+>
+> When we encounter an error, make sure we complete the transaction
+> otherwise we'll leave the request dangling.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> ?drivers/mmc/host/mmci.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index b6fd6dc..175a623 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -319,7 +319,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+> ? ? ? ?if (status & MCI_DATABLOCKEND)
+> ? ? ? ? ? ? ? ?dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
+>
+> - ? ? ? if (status & MCI_DATAEND) {
+> + ? ? ? if (status & MCI_DATAEND || data->error) {
+> ? ? ? ? ? ? ? ?mmci_stop_data(host);
 
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index e9327da..d94fc45 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/gfp.h>
- #include <linux/clkdev.h>
-+#include <linux/mtd/physmap.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -35,7 +36,6 @@
- #include <mach/lm.h>
- 
- #include <asm/mach/arch.h>
--#include <asm/mach/flash.h>
- #include <asm/mach/irq.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -316,7 +316,7 @@ static struct clk_lookup cp_lookups[] = {
- /*
-  * Flash handling.
-  */
--static int intcp_flash_init(void)
-+static int intcp_flash_init(struct platform_device *dev)
- {
- 	u32 val;
- 
-@@ -327,7 +327,7 @@ static int intcp_flash_init(void)
- 	return 0;
- }
- 
--static void intcp_flash_exit(void)
-+static void intcp_flash_exit(struct platform_device *dev)
- {
- 	u32 val;
- 
-@@ -336,7 +336,7 @@ static void intcp_flash_exit(void)
- 	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
- }
- 
--static void intcp_flash_set_vpp(int on)
-+static void intcp_flash_set_vpp(struct map_info *map, int on)
- {
- 	u32 val;
- 
-@@ -348,8 +348,7 @@ static void intcp_flash_set_vpp(int on)
- 	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
- }
- 
--static struct flash_platform_data intcp_flash_data = {
--	.map_name	= "cfi_probe",
-+static struct physmap_flash_data intcp_flash_data = {
- 	.width		= 4,
- 	.init		= intcp_flash_init,
- 	.exit		= intcp_flash_exit,
-@@ -363,7 +362,7 @@ static struct resource intcp_flash_resource = {
- };
- 
- static struct platform_device intcp_flash_device = {
--	.name		= "armflash",
-+	.name		= "physmap-flash",
- 	.id		= 0,
- 	.dev		= {
- 		.platform_data	= &intcp_flash_data,
--- 
-1.7.0.4
+The hardware always sets the MCI_DATAEND bit if there is
+some error, so these flags always appear simultaneously, but
+it doesn't hurt to take some extra precaution, so
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+
+Linus Walleij
