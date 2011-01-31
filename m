@@ -1,235 +1,47 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 31 Jan 2011 08:49:16 +0100
-Subject: [PATCH 1/2] pwmlib: add pwm support
-In-Reply-To: <4D45CF96.1090100@bluewatersys.com>
+Date: Mon, 31 Jan 2011 08:54:08 +0100
+Subject: [RFC] add pwmlib support
+In-Reply-To: <F45880696056844FA6A73F415B568C6953739F1986@EXDCVYMBSTM006.EQ1STM.local>
 References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
-	<1296217283-14531-2-git-send-email-s.hauer@pengutronix.de>
-	<4D45CF96.1090100@bluewatersys.com>
-Message-ID: <20110131074916.GG9041@pengutronix.de>
+	<4D447E5E.6060007@metafoo.de>
+	<F45880696056844FA6A73F415B568C6953739F1986@EXDCVYMBSTM006.EQ1STM.local>
+Message-ID: <20110131075408.GH9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mon, Jan 31, 2011 at 09:52:38AM +1300, Ryan Mallon wrote:
-> On 01/29/2011 01:21 AM, Sascha Hauer wrote:
-> > The barebone pwm API is present in the kernel for longer.
-> > This patch adds pwmlib support to support dynamically registered
-> > pwms. Porions of this code are inspired by the gpiolib support.
-> 
+On Mon, Jan 31, 2011 at 04:35:33AM +0100, Arun MURTHY wrote:
 > Hi Sascha,
 > 
-> A couple of comments below. I have added Bill and Arun to the Cc list.
-> As somebody else pointed out there have been a couple of attempts to
-> create a generic pwm framework so far. It would be good to try and
-> consolidate the efforts.
+> > > I Cced the people working with PWMs in the kernel in the hope that
+> > they can
+> > > give input on what's missing / wrong in this implementation
+> > >
+> > > Sascha
+> > >
+> > 
+> > Hi
+> > 
+> > There have been two other proposals for a generic PWM api during the
+> > last year.
+> > You might want to take a look at them.
+> > 
+> > https://lkml.org/lkml/2010/2/9/275
+> > https://lkml.org/lkml/2010/9/28/107
+> > 
+> > I've added Bill Gatliff and Arun Murthy to Cc.
+> > 
+> 
+> As said by Lars, we already have developed the pwm core driver and
+> progressing towards aligning the existing pwm drivers to the pwm core
+> driver.
+> These set of patches are expected to be out in LKML by this week.
 
-Sorry, I was not aware of these attempts, otherwise I wouldn't have
-implemented this myself. So yes, we should consolidate the efforts.
-I will happily drop my patches and work on Bills version instead as
-his version is more advanced than mine.
+Nice, problem solved without me having to work on it ;). Please consider
+Ccing linux-arm-kernel as many of your potential users are following this
+list.
 
-> > +
-> > +/**
-> > + * pwmchip_reserve() - reserve range of pwms to use with platform code only
-> > + * @npwms: number of pwms to reserve
-> > + * Context: platform init
-> > + *
-> > + * Maybe called only once. It reserves the first pwm_ids for platform use so
-> > + * that they can refer to pwm_ids during compile time.
-> > + */
-> > +int __init pwmchip_reserve(int npwms)
-> > +{
-> 
-> This concept is a bit ugly.
-> 
-> > +	if (next_pwm_id)
-> > +		return -EBUSY;
-> > +
-> > +	next_pwm_id = npwms;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * pwmchip_add() - register a new pwm
-> > + * @chip: the pwm
-> > + *
-> > + * register a new pwm. pwm->pwm_id must be initialized. if pwm_id < 0 then
-> > + * a dynamically assigned id will be used, otherwise the id specified,
-> > + */
-> > +int pwmchip_add(struct pwm_chip *chip)
-> > +{
-> > +	struct pwm_device *pwm;
-> > +	int ret = 0;
-> > +
-> > +	mutex_lock(&pwm_lock);
-> > +
-> > +	if (chip->pwm_id >= 0 && find_pwm(chip->pwm_id)) {
-> > +		ret = -EBUSY;
-> > +		goto out;
-> > +	}
-> > +
-> > +	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
-> > +	if (!pwm) {
-> > +		ret = -ENOMEM;
-> > +		goto out;
-> > +	}
-> > +
-> > +	pwm->chip = chip;
-> > +
-> > +	if (chip->pwm_id < 0)
-> > +		chip->pwm_id = next_pwm_id++;
-> > +
-> > +	list_add_tail(&pwm->node, &pwm_list);
-> > +out:
-> > +	mutex_unlock(&pwm_lock);
-> 
-> The locking here is a little heavier than it needs to be. Only the list
-> lookup, incrementing next_pwm_id and the list add need to be protected.
-> The pwm allocation and assignment of chip do not need to be protected by
-> the mutex.
-> 
-> The performance difference is negligible, but it does make it more clear
-> what the lock actually protects.
-> 
-> > +	return ret;
-> > +}
-> > +EXPORT_SYMBOL_GPL(pwmchip_add);
-> > +
-> > +/**
-> > + * pwmchip_remove() - remove a pwm
-> > + * @chip: the pwm
-> > + *
-> > + * remove a pwm. This function may return busy if the pwm is still requested.
-> > + */
-> > +int pwmchip_remove(struct pwm_chip *chip)
-> > +{
-> > +	struct pwm_device *pwm;
-> > +	int ret = 0;
-> > +
-> > +	mutex_lock(&pwm_lock);
-> > +
-> > +	pwm = find_pwm(chip->pwm_id);
-> > +	if (!pwm) {
-> > +		ret = -ENOENT;
-> > +		goto out;
-> > +	}
-> > +
-> > +	if (test_bit(FLAG_REQUESTED, &pwm->flags)) {
-> > +		ret = -EBUSY;
-> > +		goto out;
-> > +	}
-> > +
-> > +	list_del(&pwm->node);
-> > +out:
-> > +	mutex_unlock(&pwm_lock);
-> > +
-> > +	return ret;
-> > +}
-> > +EXPORT_SYMBOL_GPL(pwmchip_remove);
-> > +
-> > +/*
-> > + * pwm_request - request a PWM device
-> > + */
-> > +struct pwm_device *pwm_request(int pwm_id, const char *label)
-> > +{
-> 
-> What purpose does the label serve? It gets assigned but never used.
-> Possibly it could be useful later in sysfs/debugfs output?
+Sascha
 
-Yes, it was intended for debugfs. Note that this part of the existing
-barebone pwm kernel API. I haven't changed it.
-
-> 
-> I think requesting pwm's by id is not particularly useful in practice.
-> Drivers which need to request a pwm would need to know what the id of
-> the correct pwm was, which may vary between platforms. A better approach
-> would be to either use device associations (similar to the clock api) or
-> to just use a string label for lookup.
-> 
-> > +	struct pwm_device *pwm;
-> > +	int ret;
-> > +
-> > +	mutex_lock(&pwm_lock);
-> > +
-> > +	pwm = find_pwm(pwm_id);
-> > +	if (!pwm) {
-> > +		pwm = ERR_PTR(-ENOENT);
-> > +		goto out;
-> > +	}
-> > +
-> > +	if (test_bit(FLAG_REQUESTED, &pwm->flags)) {
-> > +		pwm = ERR_PTR(-EBUSY);
-> > +		goto out;
-> > +	}
-> > +
-> > +	if (!try_module_get(pwm->chip->owner)) {
-> > +		pwm = ERR_PTR(-ENODEV);
-> > +		goto out;
-> > +	}
-> > +
-> > +	if (pwm->chip->ops->request) {
-> 
-> The pwm driver you have provide does not have a request callback. Based
-> on just the id/label why might a particular pwm driver refuse a request
-> if the pwm core would grant it?
-
-We can drop this and add later when we need it.
-
-> 
-> > +		ret = pwm->chip->ops->request(pwm->chip);
-> > +		if (ret) {
-> > +			pwm = ERR_PTR(ret);
-> > +			goto out_put;
-> > +		}
-> > +	}
-> > +
-> > +	pwm->label = label;
-> > +	set_bit(FLAG_REQUESTED, &pwm->flags);
-> > +
-> > +	goto out;
-> > +
-> > +out_put:
-> > +	module_put(pwm->chip->owner);
-> > +out:
-> > +	mutex_unlock(&pwm_lock);
-> > +
-> > +	return pwm;
-> > +}
-> > +EXPORT_SYMBOL_GPL(pwm_request);
-> > +
-> > +/*
-> > + * pwm_free - free a PWM device
-> > + */
-> > +void pwm_free(struct pwm_device *pwm)
-> > +{
-> > +	mutex_lock(&pwm_lock);
-> > +
-> > +	if (!test_and_clear_bit(FLAG_REQUESTED, &pwm->flags)) {
-> > +		pr_warning("PWM device already freed\n");
-> > +		goto out;
-> > +	}
-> > +
-> > +	pwm->label = NULL;
-> > +
-> > +	module_put(pwm->chip->owner);
-> > +out:
-> > +	mutex_unlock(&pwm_lock);
-> > +}
-> > +EXPORT_SYMBOL_GPL(pwm_free);
-> > +
-> > +/*
-> > + * pwm_config - change a PWM device configuration
-> > + */
-> > +int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> 
-> duty_ns/period_ns should probably be an unsigned type. Is 32 bits enough
-> for all pwms?
-
-Again, this is from the existing API. 32 bits is enough for 4 seconds
-which is enough for the use cases I have in mind (backlight for LCDs),
-but it is not enough to reflect the capabilities of some hardware which
-allows for very high dividers.
 
 -- 
 Pengutronix e.K.                           |                             |
