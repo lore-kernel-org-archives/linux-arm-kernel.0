@@ -1,7 +1,7 @@
-From: jorgesolla@gmail.com (Jorge S.)
-Date: Sun, 30 Jan 2011 19:37:36 +0100
-Subject: AT91SAM9260: Supported hardware questions.
-Message-ID: <AANLkTinVcEYOKmFxH=td41hHGZDEf6OdYCpZVKHQ_R6W@mail.gmail.com>
+From: jsolla@bitnia.com (Jorge Solla)
+Date: Mon, 31 Jan 2011 14:49:25 +0100
+Subject: AT91SAM9260. Supported hardware questions.
+Message-ID: <AANLkTimq=1f=bdFJ7+11mdN7f8GD10JHxcf-mWr3za-a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -68,8 +68,8 @@ Question: Are there any "erratas" or bad-supported things that must be taken
 into account before starting
 the hardware desing of a new board?
 
-
-Thank you all.
+Regards,
+Jorge.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110130/a1f6c46e/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110131/89414489/attachment.html>
