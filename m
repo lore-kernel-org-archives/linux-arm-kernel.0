@@ -1,165 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jan 2011 20:14:03 +0100
-Subject: [PATCH] ARM: add Versatile Express defconfig
-Message-ID: <1296501243-28917-1-git-send-email-linus.walleij@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Jan 2011 19:22:41 +0000
+Subject: [PATCH V3] ARM: S5PV310: Implement kernel timers using MCT
+In-Reply-To: <1296205364-30175-1-git-send-email-kgene.kim@samsung.com>
+References: <1296205364-30175-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110131192241.GD32737@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Being able to compile a major reference platform is helpful for
-me when developing on other archs using the same e.g. PrimeCells.
-I bet this is useful to others as well.
+On Fri, Jan 28, 2011 at 06:02:44PM +0900, Kukjin Kim wrote:
+> +irqreturn_t s5pv310_mct_comp_isr(int irq, void *dev_id)
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/vexpress_defconfig |  140 +++++++++++++++++++++++++++++++++++
- 1 files changed, 140 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/configs/vexpress_defconfig
+static?
 
-diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-new file mode 100644
-index 0000000..f2de51f
---- /dev/null
-+++ b/arch/arm/configs/vexpress_defconfig
-@@ -0,0 +1,140 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
-+CONFIG_CPUSETS=y
-+# CONFIG_UTS_NS is not set
-+# CONFIG_IPC_NS is not set
-+# CONFIG_USER_NS is not set
-+# CONFIG_PID_NS is not set
-+# CONFIG_NET_NS is not set
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_VEXPRESS=y
-+CONFIG_ARCH_VEXPRESS_CA9X4=y
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_SMP=y
-+CONFIG_VMSPLIT_2G=y
-+CONFIG_HOTPLUG_CPU=y
-+CONFIG_AEABI=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CMDLINE="root=/dev/nfs nfsroot=10.1.69.3:/work/nfsroot ip=dhcp console=ttyAMA0 mem=128M"
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_CONCAT=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_ARM_INTEGRATOR=y
-+CONFIG_MISC_DEVICES=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+CONFIG_ATA=y
-+# CONFIG_SATA_PMP is not set
-+CONFIG_NETDEVICES=y
-+CONFIG_NET_ETHERNET=y
-+CONFIG_SMSC911X=y
-+# CONFIG_NETDEV_1000 is not set
-+# CONFIG_NETDEV_10000 is not set
-+# CONFIG_WLAN is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_SERIO_SERPORT is not set
-+CONFIG_SERIO_AMBAKMI=y
-+CONFIG_SERIAL_AMBA_PL011=y
-+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+CONFIG_FB=y
-+CONFIG_FB_ARMCLCD=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_LOGO=y
-+# CONFIG_LOGO_LINUX_MONO is not set
-+# CONFIG_LOGO_LINUX_VGA16 is not set
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_MIXER_OSS=y
-+CONFIG_SND_PCM_OSS=y
-+# CONFIG_SND_DRIVERS is not set
-+CONFIG_SND_ARMAACI=y
-+CONFIG_HID_DRAGONRISE=y
-+CONFIG_HID_GYRATION=y
-+CONFIG_HID_TWINHAN=y
-+CONFIG_HID_NTRIG=y
-+CONFIG_HID_PANTHERLORD=y
-+CONFIG_HID_PETALYNX=y
-+CONFIG_HID_SAMSUNG=y
-+CONFIG_HID_SONY=y
-+CONFIG_HID_SUNPLUS=y
-+CONFIG_HID_GREENASIA=y
-+CONFIG_HID_SMARTJOYPLUS=y
-+CONFIG_HID_TOPSEED=y
-+CONFIG_HID_THRUSTMASTER=y
-+CONFIG_HID_ZEROPLUS=y
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+# CONFIG_USB_DEVICE_CLASS is not set
-+CONFIG_USB_MON=y
-+CONFIG_USB_ISP1760_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_MMC=y
-+CONFIG_MMC_ARMMMCI=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PL031=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3=y
-+CONFIG_ROOT_NFS=y
-+# CONFIG_RPCSEC_GSS_KRB5 is not set
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_DEBUG_KERNEL=y
-+CONFIG_DETECT_HUNG_TASK=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_RCU_CPU_STALL_DETECTOR is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_ERRORS=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_EARLY_PRINTK=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+# CONFIG_CRYPTO_HW is not set
--- 
-1.7.3.2
+> +{
+> +	struct clock_event_device *evt;
+
+	struct clock_event_device *evt = dev_id;
+
+> +
+> +	s5pv310_mct_write(0x1, S5PV310_MCT_G_INT_CSTAT);
+> +
+> +	evt = &mct_comp_device;
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct irqaction mct_comp_event_irq = {
+> +	.name		= "mct_comp_irq",
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> +	.handler	= s5pv310_mct_comp_isr,
+
+	.dev_id		= &mct_comp_device,
+
+
+> +static void s5pv310_mct_tick_init(struct clock_event_device *evt)
+> +{
+> +	unsigned int cpu = smp_processor_id();
+> +
+> +	evt = &mct_tick[cpu].evt;
+
+Why do you want to overwrite the already provided event device?
