@@ -1,70 +1,87 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 31 Jan 2011 19:08:48 +0200
-Subject: PXA270 overlay problem
-In-Reply-To: <20110131130414.GE8948@n2100.arm.linux.org.uk>
-References: <201101262246.01164.anarsoul@gmail.com>
-	<20110131130414.GE8948@n2100.arm.linux.org.uk>
-Message-ID: <201101311908.49275.anarsoul@gmail.com>
+From: therealbadguy@gmail.com (Chris)
+Date: Mon, 31 Jan 2011 10:37:52 -0700
+Subject: iMX31 MBX registers Porting problem
+In-Reply-To: <20110131154523.GB32737@n2100.arm.linux.org.uk>
+References: <AANLkTin+Mo9YXEfoDAa+btjX5VdiOz1QJp++ck0efPAk@mail.gmail.com>
+	<20110131003128.GD27436@n2100.arm.linux.org.uk>
+	<AANLkTi=EsCCwgiK5BtkKfaYEuzVUtnie-LU77cNJ4P4q@mail.gmail.com>
+	<20110131154523.GB32737@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin4fPo6pKWLCqb+BXNS-hDrWPLEK7QQErbuq15C@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 January 2011 15:04:14 Russell King - ARM Linux wrote:
-> On Wed, Jan 26, 2011 at 10:46:00PM +0200, Vasily Khoruzhick wrote:
-> > Hi, I'm experiencing problems with overlay1/overlay2 on PXA270 using
-> > pxafb driver. Main problem is overlays just don't work for some reason,
-> > and even more - after enabling any overlay something weird happens (LCD
-> > blinks for a 0.5 second, and then main plane comes back, no overlay
-> > plane is visible), I'm getting following messages on dmesg:
-> > 
-> > [   93.679574] overlay1fb_disable: timeout disabling overlay1
-> > [   95.601537] BUG: Bad page state in process sh  pfn:a1b60
-> > [   95.601645] page:c0456c00 count:0 mapcount:0 mapping:  (null)
-> > index:0x0 [   95.601698] page flags: 0x200(arch_1)
-> 
-> Ouch.  PG_arch_1 is our 'dcache clean' bit, which we set to indicate
-> that the page is clean.  This should never be set on a newly allocated
-> page.
-> 
-> It's cleared by generic code whenever a page enters the free lists, so
-> newly allocated pages should never have the bit set.
-> 
-> What your report means is that someone did DMA cache maintainence
-> (specifically, unmapping the page), copied the page as a result of
-> a COW fault, or called flush_dcache_page() on an already free'd page.
-> 
-> Maybe the pages were mapped into userspace, meanwhile someone free'd
-> the pages.
-> 
-> And yes, I can see one way that this could happen:
-> 
-> - open overlay
-> - map buffer
-> - set framebuffer parameters
->    (free's mapped buffer, leaving the mapped one in place, creates new
-> buffer) - close overlay
+On Mon, Jan 31, 2011 at 8:45 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jan 30, 2011 at 10:08:02PM -0700, Chris wrote:
+>> Ok, I did that and it inserts and removes an entry I am not sure about
+>> what would be wrong.
+>>
+>> 0x7f000000-0x7f002000 ? ?8192 module_alloc_update_bounds+0x18/0x68
+>> pages=1 vmalloc
+>> ...
+>> 0x848a0000-0x848a5000 ? 20480 reg_probe+0x94/0x12c [reg] ioremap
+>>
+>> 0x7f006000-0x7f008000 ? ?8192 module_alloc_update_bounds+0x18/0x68
+>> pages=1 vmalloc
+>> ...
+>> 0x848a8000-0x848ad000 ? 20480 reg_probe+0x94/0x12c [reg] ioremap
+>>
+>> here are two insertions, also showing the module bounds update, not
+>> sure what to make of this information.
+>
+> The 'module_alloc_update_bounds+0x18/0x68' entry is the space used for
+> your module. ?As it is free'd lazily, each time you insert it you'll
+> get different virtual addresses.
+>
+>> when I cat /proc/iomem I can see my entry:
+>> ? ?c0000000-c0003fff : mx3_mbx_regs.0
+>>
+>> how can I know that the mapping is pointing me to my location?
+>
+> ioremap() always gives you a cookie for use with readl() et.al. or NULL.
+> If it's successful, the mapping will have been created and pointing at
+> the requested bus address.
+>
 
-But I map framebuffer only after FBIOPUT_VSCREENINFO ioctl.
+Ok, understood, so no tool to currently view what memory is being pointed at
+is available in the filesystem?
 
-> Maybe another way:
-> 
-> static int overlayfb_release(struct fb_info *info, int user)
-> {
->         struct pxafb_layer *ofb = (struct pxafb_layer*) info;
-> 
->         atomic_dec(&ofb->usage);
->         ofb->ops->disable(ofb);
-> 
->         free_pages_exact(ofb->video_mem, ofb->video_mem_size);
-> 
-> So if two users open the overlay, both map it, and then one closes, the
-> memory backing the overlay gets freed - meanwhile the other user still
-> has it mapped etc.
+My final question to you if I could would be,
+I see dynamic returns on the mapped address on 2.6.30 - 2.6.38-rc2
+where on 2.6.19.2 I see the same address always gets mapped.
+can I get a brief explanation on this?
 
-Again, there's only one user - my app.
+I also notice that the address is within different ranges for a few kernels.
+I assume it is not relevant, but I have to turn over every rock here.
 
-> The alloc/free stuff in there just looks really dangerous to me.
+> I can't see anything wrong with your code, so I suspect you're missing
+> something with the hardware - maybe a clock which isn't running or an
+> enable bit somewhere?
+>
 
-Yep, it looks dangerous.
+  I have gone the extra distance in turning off support in the working kernel
+2.6.19.2, I have removed nearly everything. I am down to the gpio_port
+initialization code.
+and that is all I have left, I will continue to look for more running clocks.
 
-Regards
-Vasily
+ I cannot think of anyone who would be twiddling bits on this thing
+that I have not removed.
+anything is possible and I am still looking.
+
+for now I have paused moving forward, and am trying to break it on 2.6.19.2
+so far it turns out I don't need very much support to talk to this device.
+any suggested ways to turn off more stuff hidden somewhere perhaps?
+
+> I've no idea how MBX works on the MX platforms, so I can't really suggest
+> anything further.
+>
+
+Me neither! and that is making this really hard to figure out. trying
+to find any information is impossible I think.
+being a propriety chip from PowerVR with no available information
+aside from how it is connected to the iMX.
+
+Any tips for learning how to operate this device or one like it
+connected in this fashion would bring great happiness.
+
+Thank you for your comments.
