@@ -1,59 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Jan 2011 13:04:14 +0000
-Subject: PXA270 overlay problem
-In-Reply-To: <201101262246.01164.anarsoul@gmail.com>
-References: <201101262246.01164.anarsoul@gmail.com>
-Message-ID: <20110131130414.GE8948@n2100.arm.linux.org.uk>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Mon, 31 Jan 2011 13:20:00 +0000
+Subject: [PATCH v3 0/8] Switch ARM platforms from integrator-flash to
+	physmap
+In-Reply-To: <20110131123703.GD8948@n2100.arm.linux.org.uk>
+References: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
+	<20110131123703.GD8948@n2100.arm.linux.org.uk>
+Message-ID: <1296480000.12227.93.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 10:46:00PM +0200, Vasily Khoruzhick wrote:
-> Hi, I'm experiencing problems with overlay1/overlay2 on PXA270 using pxafb 
-> driver. Main problem is overlays just don't work for some reason, and even 
-> more - after enabling any overlay something weird happens (LCD blinks for a 
-> 0.5 second, and then main plane comes back, no overlay plane is visible), I'm 
-> getting following messages on dmesg:
+[adding David Woodhouse to the CC list]
+
+On Mon, 2011-01-31 at 12:37 +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 31, 2011 at 10:10:24AM +0000, Marc Zyngier wrote:
+> > As the integrator-flash driver is mostly a duplicate of physmap,
+> > move all users of this driver to physmap and get rid of the
+> > then unused driver.
 > 
-> [   93.679574] overlay1fb_disable: timeout disabling overlay1
-> [   95.601537] BUG: Bad page state in process sh  pfn:a1b60
-> [   95.601645] page:c0456c00 count:0 mapcount:0 mapping:  (null) index:0x0
-> [   95.601698] page flags: 0x200(arch_1)
+> With the exception of patch 7, this series looks fine.  Who's merging it?
 
-Ouch.  PG_arch_1 is our 'dcache clean' bit, which we set to indicate
-that the page is clean.  This should never be set on a newly allocated
-page.
+Do you want me to respin the series without patch 7?
 
-It's cleared by generic code whenever a page enters the free lists, so
-newly allocated pages should never have the bit set.
+David, could you please comment on this?
 
-What your report means is that someone did DMA cache maintainence
-(specifically, unmapping the page), copied the page as a result of
-a COW fault, or called flush_dcache_page() on an already free'd page.
+Thanks,
 
-Maybe the pages were mapped into userspace, meanwhile someone free'd
-the pages.
-
-And yes, I can see one way that this could happen:
-
-- open overlay
-- map buffer
-- set framebuffer parameters
-   (free's mapped buffer, leaving the mapped one in place, creates new buffer)
-- close overlay
-
-Maybe another way:
-
-static int overlayfb_release(struct fb_info *info, int user)
-{
-        struct pxafb_layer *ofb = (struct pxafb_layer*) info;
-
-        atomic_dec(&ofb->usage);
-        ofb->ops->disable(ofb);
-
-        free_pages_exact(ofb->video_mem, ofb->video_mem_size);
-
-So if two users open the overlay, both map it, and then one closes, the
-memory backing the overlay gets freed - meanwhile the other user still
-has it mapped etc.
-
-The alloc/free stuff in there just looks really dangerous to me.
+	M.
+-- 
+Reality is an implementation detail.
