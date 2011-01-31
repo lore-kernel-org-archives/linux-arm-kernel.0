@@ -1,33 +1,48 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 31 Jan 2011 16:14:12 -0700 (MST)
-Subject: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE power state
-In-Reply-To: <1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
+Date: Mon, 31 Jan 2011 16:17:25 -0700 (MST)
+Subject: [PATCH 4/6] omap4: dpll: Enable all DPLL autoidle at boot
+In-Reply-To: <1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
 References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1101311613230.16671@utopia.booyaka.com>
+	<1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1101311614570.16671@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Santosh,
+Hi guys
 
 On Fri, 28 Jan 2011, Santosh Shilimkar wrote:
 
-> On OMAP4, one can explicitly program INACTIVE as the power state of
-> the logic area inside the power domain. Techincally PD state programmed
-> to ON and if all the clock domains within the PD are idled, is equivalent
-> tp PD programmed to INACTIVE and all the clock domains within the PD are
-> idled. There won't be any power difference in above two.
+> From: Rajendra Nayak <rnayak@ti.com>
 > 
-> Since the CPUIDLE C-states explicitly make use of INACTIVE as a PD
-> targeted state and also there is some additional latancy involved
-> with PD INACTIVE vs PD ON, it's better to support it as an explcit
-> PD state.
-> 
-> This patch adds the support to allow explicit PD INACTIVE
-> programming if supported.
+> Enable all DPLL autoidle at boot on OMAP4.
 
-What does the hardware do when the powerdomain is programmed to INACTIVE?  
-Does it actually force the clockdomains idle?
+Is there some reason why we can't do this in the OMAP4 PM code?  At some 
+point, I think it would be good to essentially disable all PM at boot, and 
+then let the PM code specifically enable autoidle later in the boot 
+process, etc.  The idea being that !CONFIG_PM would result in a chip 
+programmed for lowest latency, etc.
+
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/mach-omap2/clock44xx_data.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+> index e8cb32f..e5c59a0 100644
+> --- a/arch/arm/mach-omap2/clock44xx_data.c
+> +++ b/arch/arm/mach-omap2/clock44xx_data.c
+> @@ -3300,6 +3300,8 @@ int __init omap4xxx_clk_init(void)
+>  			clkdev_add(&c->lk);
+>  			clk_register(c->lk.clk);
+>  			omap2_init_clk_clkdm(c->lk.clk);
+> +			if (c->lk.clk->dpll_data)
+> +				omap3_dpll_allow_idle(c->lk.clk);
+>  		}
+>  
+>  	recalculate_root_clocks();
+> -- 
+> 1.6.0.4
+> 
 
 
 - Paul
