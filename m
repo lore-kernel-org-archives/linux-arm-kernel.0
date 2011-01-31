@@ -1,58 +1,35 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Mon, 31 Jan 2011 11:06:47 -0700
-Subject: [PATCH 0/8] Basic ARM device tree support
-In-Reply-To: <20110131180512.GA15429@angua.secretlab.ca>
-References: <20110118195933.13011.56098.stgit@localhost6.localdomain6>
-	<00bcd596-2108-4c54-92d3-7fda39e333e3@VA3EHSMHS015.ehs.local>
-	<20110131180512.GA15429@angua.secretlab.ca>
-Message-ID: <89a3dcf3-ee44-428d-b248-ca1853a4fc6d@VA3EHSMHS004.ehs.local>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Mon, 31 Jan 2011 19:13:30 +0100
+Subject: [PATCH] ARM: print FPGA info on plat-versatile variants
+In-Reply-To: <20110130195934.GC27436@n2100.arm.linux.org.uk>
+References: <1296128890-18765-1-git-send-email-linus.walleij@stericsson.com>
+	<20110130195934.GC27436@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinqrTPhdFw+yr8Ryd_QAZJCi_OhTsyxfK6D_OCS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Grant Likely [mailto:glikely at secretlab.ca] On Behalf Of Grant
-Likely
-> Sent: Monday, January 31, 2011 11:05 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org; Nicolas Pitre; Russell King;
-Catalin Marinas; devicetree-
-> discuss at lists.ozlabs.org; linux-kernel at vger.kernel.org; Olof
-Johansson; Jeremy Kerr; Lennert
-> Buijtenhek
-> Subject: Re: [PATCH 0/8] Basic ARM device tree support
-> 
-> On Wed, Jan 26, 2011 at 01:04:39PM -0700, John Linn wrote:
-> > > -----Original Message-----
-> > > From: Grant Likely [mailto:glikely at secretlab.ca] On Behalf Of
-Grant Likely
-> > > Sent: Tuesday, January 18, 2011 1:29 PM
-> > > To: linux-arm-kernel at lists.infradead.org
-> > > Cc: Nicolas Pitre; Russell King; Catalin Marinas;
-devicetree-discuss at lists.ozlabs.org; linux-
-> > > kernel at vger.kernel.org; Olof Johansson; Jeremy Kerr; John Linn;
-Lennert Buijtenhek
-> > > Subject: [PATCH 0/8] Basic ARM device tree support
-> > >
-> >
-> > Thanks for this patch set.  Device tree on ARM will be a great help
-to Xilinx.
-> >
-> > Tested-by: John Linn <john.linn@xilinx.com>
-> 
-> Thanks John,
-> 
-> I've had to rework the early init code to be safer, but it turned out
-> to be a significant change, so I won't add your tested-by line to the
-> patch yet.  Would you mind retesting when I repost later today?
+2011/1/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Sure, will do.
+> I think it needs a few tweaks for Versatile Express:
+>
+> arch/arm/plat-versatile/fpga-id.c:14:27: error: mach/platform.h: No such file or directory
+> arch/arm/plat-versatile/fpga-id.c: In function ?versatile_fpga_probe?:
+> arch/arm/plat-versatile/fpga-id.c:78: error: implicit declaration of function ?MMIO_P2V?
 
-- John
+Aha, I figured out this is impossible to solve without falling
+back to either:
 
-> 
-> Thanks,
-> g.
-> 
+- The old patch approach adding hooks to each platform calling
+  here with the offset address or,
+- Rework the driver supplying some platform data and a
+  platform device for it feels like overkill.
+- Rearchitecture vexpress to use same macros as RealView
+  or so.
 
+Because MMIO_P2V is local in mach-vexpress/core.h
+and cannot be used outside the machine, e.g. in the platform.
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+This is not useful enough to keep hacking at, it was a little bit useful
+but let's just drop it for now, I'll take the patch out of the tracker.
+
+Linus Walleij
