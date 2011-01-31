@@ -1,37 +1,38 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 31 Jan 2011 15:21:32 +0300
-Subject: dmaengine: i.MX dma fixes
-In-Reply-To: <1296475248-29095-1-git-send-email-s.hauer@pengutronix.de>
-References: <1296475248-29095-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4D46A94C.7000700@ru.mvista.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Mon, 31 Jan 2011 10:32:27 -0200
+Subject: [PATCH] ARM: mx5/board-mx53_smd.c: Make UART1 functional
+Message-ID: <1296477147-7431-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Fix UART1 IOMUX settings and configure UART1 to work with only RX/TX pins.
 
-On 31-01-2011 15:00, Sascha Hauer wrote:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_smd.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-> The following contains fixes for the i.MX dma driver.
-
-> Sascha
-
-> The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
-
->    Linux 2.6.38-rc2 (2011-01-21 19:01:34 -0800)
-
-> are available in the git repository at:
->    git://git.pengutronix.de/git/imx/linux-2.6 dmaengine-imxdma
-
-> Sascha Hauer (4):
->        dmaengine i.MX dma: set maximum segment size for our device
->        dmaengine i.MX dma: check sg entries for valid addresses and lengths
->        dmaengine i.MX DMA: do not initialize chan_id field
->        dmaengine i.MX dma: initialize dma capabilities outside channel loop
-
->   drivers/dma/imx-dma.c |   26 ++++++++++++++++++++++----
->   1 files changed, 22 insertions(+), 4 deletions(-)
-
-    Actually, would have made sense to combine the analogous changes to SDMA 
-and DMA drivers into the single patch...
-
-WBR, Sergei
+diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+index 06070c5..c7b45d4 100644
+--- a/arch/arm/mach-mx5/board-mx53_smd.c
++++ b/arch/arm/mach-mx5/board-mx53_smd.c
+@@ -41,8 +41,6 @@
+ static iomux_v3_cfg_t mx53_smd_pads[] = {
+ 	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+ 	MX53_PAD_CSI0_DAT11__UART1_RXD_MUX,
+-	MX53_PAD_PATA_DIOW__UART1_TXD_MUX,
+-	MX53_PAD_PATA_DMACK__UART1_RXD_MUX,
+ 
+ 	MX53_PAD_PATA_BUFFER_EN__UART2_RXD_MUX,
+ 	MX53_PAD_PATA_DMARQ__UART2_TXD_MUX,
+@@ -61,7 +59,7 @@ static const struct imxuart_platform_data mx53_smd_uart_data __initconst = {
+ 
+ static inline void mx53_smd_init_uart(void)
+ {
+-	imx53_add_imx_uart(0, &mx53_smd_uart_data);
++	imx53_add_imx_uart(0, NULL);
+ 	imx53_add_imx_uart(1, &mx53_smd_uart_data);
+ 	imx53_add_imx_uart(2, &mx53_smd_uart_data);
+ }
+-- 
+1.6.0.4
