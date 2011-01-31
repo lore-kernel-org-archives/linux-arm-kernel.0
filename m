@@ -1,35 +1,42 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Mon, 31 Jan 2011 19:13:30 +0100
-Subject: [PATCH] ARM: print FPGA info on plat-versatile variants
-In-Reply-To: <20110130195934.GC27436@n2100.arm.linux.org.uk>
-References: <1296128890-18765-1-git-send-email-linus.walleij@stericsson.com>
-	<20110130195934.GC27436@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinqrTPhdFw+yr8Ryd_QAZJCi_OhTsyxfK6D_OCS@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Mon, 31 Jan 2011 19:19:48 +0100
+Subject: [linux-pm] [PATCH] i2c: OMAP: fix static suspend vs. runtime
+	suspend
+In-Reply-To: <Pine.LNX.4.44L0.1101311119190.1931-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1101311119190.1931-100000@iolanthe.rowland.org>
+Message-ID: <201101311919.49225.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Monday, January 31, 2011, Alan Stern wrote:
+> On Mon, 31 Jan 2011, Kevin Hilman wrote:
+> 
+> > I understand how this works, but frankly I'm still a bit fuzzy on why.
+> > 
+> > I guess I'm still missing a good understanding of what "interfering with a
+> > system power transition" means, and why a runtime suspend qualifies as
+> > interfering but not a runtime resume.
+> 
+> These are good questions.  Rafael implemented this design originally; 
+> my contribution was only to warn him of the potential for problems.  
+> Therefore he should explain the rationale for the design.
 
-> I think it needs a few tweaks for Versatile Express:
->
-> arch/arm/plat-versatile/fpga-id.c:14:27: error: mach/platform.h: No such file or directory
-> arch/arm/plat-versatile/fpga-id.c: In function ?versatile_fpga_probe?:
-> arch/arm/plat-versatile/fpga-id.c:78: error: implicit declaration of function ?MMIO_P2V?
+The reason why runtime resume is allowed during system power transitions is
+because in some cases during system suspend we simply have to resume devices
+that were previously runtime-suspended (for example, the PCI bus type does
+that).
 
-Aha, I figured out this is impossible to solve without falling
-back to either:
+The reason why runtime suspend is not allowed during system power transitions
+if the following race:
 
-- The old patch approach adding hooks to each platform calling
-  here with the offset address or,
-- Rework the driver supplying some platform data and a
-  platform device for it feels like overkill.
-- Rearchitecture vexpress to use same macros as RealView
-  or so.
+- A device has been suspended via a system suspend callback.
+- The runtime PM framework executes a (scheduled) suspend on that device,
+  not knowing that it's already been suspended, which potentially results in
+  accessing the device's registers in a low-power state.
 
-Because MMIO_P2V is local in mach-vexpress/core.h
-and cannot be used outside the machine, e.g. in the platform.
+Now, it can be avoided if every driver does the right thing and checks whether
+the device is already suspended in its runtime suspend callback, but that would
+kind of defeat the purpose of the runtime PM framework, at least partially.
 
-This is not useful enough to keep hacking at, it was a little bit useful
-but let's just drop it for now, I'll take the patch out of the tracker.
-
-Linus Walleij
+Thanks,
+Rafael
