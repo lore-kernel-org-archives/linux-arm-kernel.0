@@ -1,43 +1,47 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 31 Jan 2011 20:58:29 +0530
-Subject: [linux-pm] [PATCH] i2c: OMAP: fix static suspend vs. runtime
-	suspend
-In-Reply-To: <Pine.LNX.4.44L0.1101311010580.1931-100000@iolanthe.rowland.org>
-References: <1a4ad626f3cb73267847e8ac7bd47545@mail.gmail.com>
-	<Pine.LNX.4.44L0.1101311010580.1931-100000@iolanthe.rowland.org>
-Message-ID: <266a2f0ec446d693cf9583681ca346e0@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Jan 2011 15:45:23 +0000
+Subject: iMX31 MBX registers Porting problem
+In-Reply-To: <AANLkTi=EsCCwgiK5BtkKfaYEuzVUtnie-LU77cNJ4P4q@mail.gmail.com>
+References: <AANLkTin+Mo9YXEfoDAa+btjX5VdiOz1QJp++ck0efPAk@mail.gmail.com>
+	<20110131003128.GD27436@n2100.arm.linux.org.uk>
+	<AANLkTi=EsCCwgiK5BtkKfaYEuzVUtnie-LU77cNJ4P4q@mail.gmail.com>
+Message-ID: <20110131154523.GB32737@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Alan Stern [mailto:stern at rowland.harvard.edu]
-> Sent: Monday, January 31, 2011 8:43 PM
-> To: Rajendra Nayak
-> Cc: Kevin Hilman; Ben Dooks; linux-i2c at vger.kernel.org;
-linux-pm at lists.linux-foundation.org; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [linux-pm] [PATCH] i2c: OMAP: fix static suspend vs.
-runtime suspend
->
-> On Mon, 31 Jan 2011, Rajendra Nayak wrote:
->
-> > Can you elaborate a bit more on how/why runtime PM transitions
-> > are disabled during system suspend, and how is it taken care
-> > of that a runtime resume of a device works however a subsequent
-> > runtime (re)suspend does not?
->
-> I'll answer for Kevin.  This is done by the PM core, in order to
-> prevent runtime power transitions from interfering with a system power
-> transition.  The PM core increments the device's usage_count; this
-> prevents the device from being runtime-suspended but it allows
-> runtime-resume calls to go through.
+On Sun, Jan 30, 2011 at 10:08:02PM -0700, Chris wrote:
+> Ok, I did that and it inserts and removes an entry I am not sure about
+> what would be wrong.
+> 
+> 0x7f000000-0x7f002000    8192 module_alloc_update_bounds+0x18/0x68
+> pages=1 vmalloc
+> ...
+> 0x848a0000-0x848a5000   20480 reg_probe+0x94/0x12c [reg] ioremap
+> 
+> 0x7f006000-0x7f008000    8192 module_alloc_update_bounds+0x18/0x68
+> pages=1 vmalloc
+> ...
+> 0x848a8000-0x848ad000   20480 reg_probe+0x94/0x12c [reg] ioremap
+> 
+> here are two insertions, also showing the module bounds update, not
+> sure what to make of this information.
 
-Thanks, I did remember seeing the pm_runtime_get_noresume()
-in dpm_prepare(). Just did not correlate it was the same Kevin
-was trying to say.
+The 'module_alloc_update_bounds+0x18/0x68' entry is the space used for
+your module.  As it is free'd lazily, each time you insert it you'll
+get different virtual addresses.
 
-Regards,
-Rajendra
+> when I cat /proc/iomem I can see my entry:
+>    c0000000-c0003fff : mx3_mbx_regs.0
+> 
+> how can I know that the mapping is pointing me to my location?
 
->
-> Alan Stern
+ioremap() always gives you a cookie for use with readl() et.al. or NULL.
+If it's successful, the mapping will have been created and pointing at
+the requested bus address.
+
+I can't see anything wrong with your code, so I suspect you're missing
+something with the hardware - maybe a clock which isn't running or an
+enable bit somewhere?
+
+I've no idea how MBX works on the MX platforms, so I can't really suggest
+anything further.
