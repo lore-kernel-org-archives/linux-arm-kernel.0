@@ -1,84 +1,56 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 31 Jan 2011 15:31:28 +0300
-Subject: [PATCH] mmci: calculate remaining bytes at error correctly
-In-Reply-To: <20110131122520.GA11694@n2100.arm.linux.org.uk>
-References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
-	<20110130212856.GA32737@n2100.arm.linux.org.uk>
-	<4D46A44C.3030609@ru.mvista.com>
-	<20110131122520.GA11694@n2100.arm.linux.org.uk>
-Message-ID: <4D46ABA0.9010809@ru.mvista.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 31 Jan 2011 13:36:09 +0100
+Subject: [PATCH] ARM: pxa: fix suspend on PXA3XX
+In-Reply-To: <AANLkTimUg=y49H6THn5s7f7v418W68fhAsMLZGnDqabF@mail.gmail.com>
+References: <20110124101701.GE16202@n2100.arm.linux.org.uk>
+	<1296029447.2013.8.camel@sven>
+	<AANLkTimUg=y49H6THn5s7f7v418W68fhAsMLZGnDqabF@mail.gmail.com>
+Message-ID: <201101311336.09994.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thursday 27 January 2011 15:46:54 Eric Miao wrote:
+> On Wed, Jan 26, 2011 at 4:10 PM, Sven Neumann <s.neumann@raumfeld.com> wrote:
+> > On Wed, 2011-01-26 at 05:06 +0800, Eric Miao wrote:
+> >> How about this instead?
+> >> 
+> >> diff --git a/arch/arm/mach-pxa/pm.c b/arch/arm/mach-pxa/pm.c
+> >> index 978e1b2..1807c9a 100644
+> >> --- a/arch/arm/mach-pxa/pm.c
+> >> +++ b/arch/arm/mach-pxa/pm.c
+> >> @@ -33,7 +33,7 @@ int pxa_pm_enter(suspend_state_t state)
+> >>  #endif
+> >> 
+> >>       /* skip registers saving for standby */
+> >> -     if (state != PM_SUSPEND_STANDBY) {
+> >> +     if (state != PM_SUSPEND_STANDBY && pxa_cpu_pm_fns->save) {
+> >>               pxa_cpu_pm_fns->save(sleep_save);
+> >>               /* before sleeping, calculate and save a checksum */
+> >>               for (i = 0; i < pxa_cpu_pm_fns->save_count - 1; i++)
+> >> @@ -44,7 +44,7 @@ int pxa_pm_enter(suspend_state_t state)
+> >>       pxa_cpu_pm_fns->enter(state);
+> >>       cpu_init();
+> >> 
+> >> -     if (state != PM_SUSPEND_STANDBY) {
+> >> +     if (state != PM_SUSPEND_STANDBY && pxa_cpu_pm_fns->restore) {
+> >>               /* after sleeping, validate the checksum */
+> >>               for (i = 0; i < pxa_cpu_pm_fns->save_count - 1; i++)
+> >>                       checksum += sleep_save[i];
+> > 
+> > Not sure if that will work as well. With this change the code is
+> > skipping more than just the calls to pxa_cpu_pm_fns->save() and
+> > pxa_cpu_pm_fns->restore(). In particular it doesn't call
+> > pxa_cpu_pm_fns->enter(state).
+> 
+> Nah, that ->enable() is called if the checksum is incorrect. Please compare
+> with the original code?
 
-On 31-01-2011 15:25, Russell King - ARM Linux wrote:
-
->>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->>> index b6fd6dc..175a623 100644
->>> --- a/drivers/mmc/host/mmci.c
->>> +++ b/drivers/mmc/host/mmci.c
->>> @@ -319,7 +319,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->>>    	if (status&   MCI_DATABLOCKEND)
->>>    		dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
-
->>> -	if (status & MCI_DATAEND) {
->>> +	if (status & MCI_DATAEND
-
->>     Shouldn't 'status & MCI_DATAEND' be enclosed in parens?
-
-> No.  Only people who don't want to know operator precedence enclose
-> everything in parens.  Here's the grammar:
-
-> logical-OR-expression:
->                 logical-AND-expression
->                 logical-OR-expression || logical-AND-expression
-> logical-AND-expression:
->                 inclusive-OR-expression
->                 logical-AND-expression&&  inclusive-OR-expression
-> inclusive-OR-expression:
->                 exclusive-OR-expression
->                 inclusive-OR-expression | exclusive-OR-expression
-> exclusive-OR-expression:
->                 AND-expression
->                 exclusive-OR-expression ^ AND-expression
-> AND-expression:
->                 equality-expression
->                 AND-expression&  equality-expression
-
-> So, a & b || c gives:
-
-> logical-OR-expression := a & b || c
-> +-logical-OR-expression := a & b
-> | `-logical-AND-expression := a & b
-> |   `-inclusive-OR-expression := a & b
-> |     `-exclusive-OR-expression := a & b
-> |       `-AND-expression := a & b
-> |         +-AND-expression := a
-> |         | `-equality-expression := a
-> |         `-equality-expression := b
-> +-logical-AND-expression := c
->    `-inclusive-OR-expression := c
->      `-exclusive-OR-expression := c
->        `-AND-expression := c
->         `-equality-expression := c
-
-> So, a&  b || c is evaluated as ((a)&  (b)) || (c), which is exactly what
-> we want it to be.
-
-> If it were && and ||, then there is reason to use parens as people often
-> get the relative precedence of && and || mixed up.
-
-    Well, that's certainly not my case. :-)
-
-> If you insist on putting parens around a&  b there, then for the sake of
-> consistency, you should be putting parens around every sub-expression
-> involving || and &&  - as if you think that a & b || c could be incorrectly
-> evaluated, a < b || c falls into exactly the same category, as does
-> a < b || c < d.
-
-    I mainly noted about those parens because gcc tends to give warnings in 
-such cases, if I remember right.
-    Thanks for your elaborate reply. :-)
-
-WBR, Sergei
+I won't hesitate to Ack Eric's code. It looks to me as a much cleaner solution.
+> 
+> > Thanks,
+> > Sven
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
