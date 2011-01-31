@@ -1,110 +1,44 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 31 Jan 2011 12:33:44 +0200
-Subject: [PATCH v4 4/4] omap: add hwspinlock device
-In-Reply-To: <1296470024-26854-1-git-send-email-ohad@wizery.com>
-References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
-Message-ID: <1296470024-26854-5-git-send-email-ohad@wizery.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Jan 2011 10:40:09 +0000
+Subject: [PATCH] mmci: calculate remaining bytes at error correctly
+In-Reply-To: <AANLkTinBbXN-fxppo1Pa33DxiS6QYSdwqFsadFDxmPPy@mail.gmail.com>
+References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
+	<20110130212856.GA32737@n2100.arm.linux.org.uk>
+	<AANLkTi=HzzOkVmD9z=9uRdzHsaixFAfOv9BmxoY=u7uf@mail.gmail.com>
+	<20110131102726.GA8948@n2100.arm.linux.org.uk>
+	<AANLkTinBbXN-fxppo1Pa33DxiS6QYSdwqFsadFDxmPPy@mail.gmail.com>
+Message-ID: <20110131104009.GC8948@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Que <sque@ti.com>
+On Mon, Jan 31, 2011 at 11:31:11AM +0100, Linus Walleij wrote:
+> 2011/1/31 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> >> > - ? ? ? if (status & MCI_DATAEND) {
+> >> > + ? ? ? if (status & MCI_DATAEND || data->error) {
+> >> > ? ? ? ? ? ? ? ?mmci_stop_data(host);
+> >>
+> >> The hardware always sets the MCI_DATAEND bit if there is
+> >> some error, so these flags always appear simultaneously, but
+> >> it doesn't hurt to take some extra precaution, so
+> >
+> > The hardware may do, but you won't see that here. ?When we setup a
+> > transfer, we do this:
+> >
+> > ? ? ? ?writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
+> 
+> Ah! I get it.
+> 
+> We've actually played around with that, having MCI_DATAEND on all the
+> time, it's not necessary any more since we're not using the blockend IRQ
+> and they cannot race, so we can take a little bit of quirking out of it.
+> But I'll get back on that issue.
 
-Build and register an hwspinlock platform device.
+Wrong issue.  What can happen is you receive the DATAEND interrupt,
+which tears down the data side of the request, and starts the stop
+command.  Meanwhile there's still data left in the FIFO for the CPU
+to read.
 
-Although only OMAP4 supports the hardware spinlock module (for now),
-it is still safe to run this initcall on all omaps, because hwmod lookup
-will simply fail on hwspinlock-less platforms.
-
-Signed-off-by: Simon Que <sque@ti.com>
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Makefile     |    1 +
- arch/arm/mach-omap2/hwspinlock.c |   63 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/hwspinlock.c
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 1c0c2b0..7b9abe1 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -242,3 +242,4 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
- 
- smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
- obj-y					+= $(smsc911x-m) $(smsc911x-y)
-+obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
-diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
-new file mode 100644
-index 0000000..06d4a80
---- /dev/null
-+++ b/arch/arm/mach-omap2/hwspinlock.c
-@@ -0,0 +1,63 @@
-+/*
-+ * OMAP hardware spinlock device initialization
-+ *
-+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * Contact: Simon Que <sque@ti.com>
-+ *          Hari Kanigeri <h-kanigeri2@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+
-+#include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
-+
-+struct omap_device_pm_latency omap_spinlock_latency[] = {
-+	{
-+		.deactivate_func = omap_device_idle_hwmods,
-+		.activate_func   = omap_device_enable_hwmods,
-+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-+	}
-+};
-+
-+int __init hwspinlocks_init(void)
-+{
-+	int retval = 0;
-+	struct omap_hwmod *oh;
-+	struct omap_device *od;
-+	const char *oh_name = "spinlock";
-+	const char *dev_name = "omap_hwspinlock";
-+
-+	/*
-+	 * Hwmod lookup will fail in case our platform doesn't support the
-+	 * hardware spinlock module, so it is safe to run this initcall
-+	 * on all omaps
-+	 */
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (oh == NULL)
-+		return -EINVAL;
-+
-+	od = omap_device_build(dev_name, 0, oh, NULL, 0,
-+				omap_spinlock_latency,
-+				ARRAY_SIZE(omap_spinlock_latency), false);
-+	if (IS_ERR(od)) {
-+		pr_err("Can't build omap_device for %s:%s\n", dev_name,
-+								oh_name);
-+		retval = PTR_ERR(od);
-+	}
-+
-+	return retval;
-+}
-+/* early board code might need to reserve specific hwspinlock instances */
-+postcore_initcall(hwspinlocks_init);
--- 
-1.7.1
+I suspect there's a similar race between DMA and the host CPU too as
+you leave the DATAEND interrupt on.  I suspect for reliability, we
+need to have the DMA controller callback function in place to enable
+the DATAEND interrupt.  Or something like that.
