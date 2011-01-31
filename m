@@ -1,19 +1,18 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 31 Jan 2011 12:00:41 +0100
-Subject: [PATCH] ARM:ucb1x00-ts: ucb1x00_ts - add BTN_TOUCH event
-In-Reply-To: <1296391256-2127-1-git-send-email-jochen@scram.de>
-References: <1296391256-2127-1-git-send-email-jochen@scram.de>
-Message-ID: <20110131110040.GG5954@sortiz-mobl>
+Date: Mon, 31 Jan 2011 12:04:19 +0100
+Subject: [PATCH] MFD: DaVinci: Fix voice codec device name
+In-Reply-To: <1296134916-25742-1-git-send-email-prakash.pm@ti.com>
+References: <1296134916-25742-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <20110131110418.GH5954@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jochen,
+Hi Prakash,
 
-On Sun, Jan 30, 2011 at 01:40:56PM +0100, Jochen Friedrich wrote:
-> Add BTN_TOUCH event reporting to ucb1x00_ts touchscreen driver.
-> This will make this touchscreen driver behave consistently wrt.
-> BTN_TOUCH.
-Patch applied, with Dmitry's ACK.
+On Thu, Jan 27, 2011 at 06:58:36PM +0530, Manjunathappa, Prakash wrote:
+> Fix the device name in DaVinci Voice Codec MFD driver to load
+> davinci-vcif and cq93vc codec client drivers.
+Thanks, patch applied.
 
 Cheers,
 Samuel.
