@@ -1,72 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jan 2011 10:10:28 +0000
-Subject: [PATCH 4/8] ARM: VExpress: Use physmap driver instead of
+Date: Mon, 31 Jan 2011 10:10:27 +0000
+Subject: [PATCH 3/8] ARM: Versatile: Use physmap driver instead of
 	integrator-flash
 In-Reply-To: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
 References: <1296468632-30743-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1296468632-30743-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1296468632-30743-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mach-vexpress/v2m.c |   22 ++++------------------
- 1 files changed, 4 insertions(+), 18 deletions(-)
+ arch/arm/configs/versatile_defconfig |    2 +-
+ arch/arm/mach-versatile/core.c       |   31 ++++---------------------------
+ 2 files changed, 5 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index 1edae65..384dca5 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -12,9 +12,9 @@
- #include <linux/sysdev.h>
- #include <linux/usb/isp1760.h>
+diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
+index 0ce710f..cdd4d2b 100644
+--- a/arch/arm/configs/versatile_defconfig
++++ b/arch/arm/configs/versatile_defconfig
+@@ -32,7 +32,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+ CONFIG_MTD_CFI_INTELEXT=y
+-CONFIG_MTD_ARM_INTEGRATOR=y
++CONFIG_MTD_PHYSMAP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_EEPROM_LEGACY=m
+ CONFIG_NETDEVICES=y
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index 136c32e..22f8a8a 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -32,6 +32,7 @@
+ #include <linux/io.h>
+ #include <linux/gfp.h>
  #include <linux/clkdev.h>
 +#include <linux/mtd/physmap.h>
  
- #include <asm/sizes.h>
--#include <asm/mach/flash.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/hardware/arm_timer.h>
-@@ -205,27 +205,13 @@ static struct platform_device v2m_usb_device = {
- 	.dev.platform_data = &v2m_usb_config,
- };
+ #include <asm/system.h>
+ #include <asm/irq.h>
+@@ -42,7 +43,6 @@
+ #include <asm/mach-types.h>
  
--static int v2m_flash_init(void)
+ #include <asm/mach/arch.h>
+-#include <asm/mach/flash.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
+ #include <asm/mach/map.h>
+@@ -234,27 +234,7 @@ void __init versatile_map_io(void)
+ 
+ #define VERSATILE_FLASHCTRL    (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_FLASH_OFFSET)
+ 
+-static int versatile_flash_init(void)
 -{
--	writel(0, MMIO_P2V(V2M_SYS_FLASH));
+-	u32 val;
+-
+-	val = __raw_readl(VERSATILE_FLASHCTRL);
+-	val &= ~VERSATILE_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, VERSATILE_FLASHCTRL);
+-
 -	return 0;
 -}
 -
--static void v2m_flash_exit(void)
+-static void versatile_flash_exit(void)
 -{
--	writel(0, MMIO_P2V(V2M_SYS_FLASH));
+-	u32 val;
+-
+-	val = __raw_readl(VERSATILE_FLASHCTRL);
+-	val &= ~VERSATILE_FLASHPROG_FLVPPEN;
+-	__raw_writel(val, VERSATILE_FLASHCTRL);
 -}
 -
--static void v2m_flash_set_vpp(int on)
-+static void v2m_flash_set_vpp(struct map_info *map, int on)
+-static void versatile_flash_set_vpp(int on)
++static void versatile_flash_set_vpp(struct map_info *map, int on)
  {
- 	writel(on != 0, MMIO_P2V(V2M_SYS_FLASH));
+ 	u32 val;
+ 
+@@ -266,11 +246,8 @@ static void versatile_flash_set_vpp(int on)
+ 	__raw_writel(val, VERSATILE_FLASHCTRL);
  }
  
--static struct flash_platform_data v2m_flash_data = {
--	.map_name	= "cfi_probe",
-+static struct physmap_flash_data v2m_flash_data = {
- 	.width		= 4,
--	.init		= v2m_flash_init,
--	.exit		= v2m_flash_exit,
- 	.set_vpp	= v2m_flash_set_vpp,
+-static struct flash_platform_data versatile_flash_data = {
+-	.map_name		= "cfi_probe",
++static struct physmap_flash_data versatile_flash_data = {
+ 	.width			= 4,
+-	.init			= versatile_flash_init,
+-	.exit			= versatile_flash_exit,
+ 	.set_vpp		= versatile_flash_set_vpp,
  };
  
-@@ -242,7 +228,7 @@ static struct resource v2m_flash_resources[] = {
+@@ -281,7 +258,7 @@ static struct resource versatile_flash_resource = {
  };
  
- static struct platform_device v2m_flash_device = {
--	.name		= "armflash",
-+	.name		= "physmap-flash",
- 	.id		= -1,
- 	.resource	= v2m_flash_resources,
- 	.num_resources	= ARRAY_SIZE(v2m_flash_resources),
+ static struct platform_device versatile_flash_device = {
+-	.name			= "armflash",
++	.name			= "physmap-flash",
+ 	.id			= 0,
+ 	.dev			= {
+ 		.platform_data	= &versatile_flash_data,
 -- 
 1.7.0.4
