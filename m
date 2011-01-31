@@ -1,43 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 31 Jan 2011 13:00:48 +0100
-Subject: [PATCH 4/4] dmaengine i.MX dma: initialize dma capabilities outside
-	channel loop
-In-Reply-To: <1296475248-29095-1-git-send-email-s.hauer@pengutronix.de>
-References: <1296475248-29095-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1296475248-29095-5-git-send-email-s.hauer@pengutronix.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 31 Jan 2011 15:00:12 +0300
+Subject: [PATCH] mmci: calculate remaining bytes at error correctly
+In-Reply-To: <20110130212856.GA32737@n2100.arm.linux.org.uk>
+References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
+	<20110130212856.GA32737@n2100.arm.linux.org.uk>
+Message-ID: <4D46A44C.3030609@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The capabilities are device specific fields, not channel specific fields.
+Hello.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/dma/imx-dma.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+On 31-01-2011 0:28, Russell King - ARM Linux wrote:
 
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 8262708..e18eaab 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -345,6 +345,9 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 
- 	INIT_LIST_HEAD(&imxdma->dma_device.channels);
- 
-+	dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
-+
- 	/* Initialize channel parameters */
- 	for (i = 0; i < MAX_DMA_CHANNELS; i++) {
- 		struct imxdma_channel *imxdmac = &imxdma->channel[i];
-@@ -362,9 +365,6 @@ static int __init imxdma_probe(struct platform_device *pdev)
- 		imxdmac->imxdma = imxdma;
- 		spin_lock_init(&imxdmac->lock);
- 
--		dma_cap_set(DMA_SLAVE, imxdma->dma_device.cap_mask);
--		dma_cap_set(DMA_CYCLIC, imxdma->dma_device.cap_mask);
--
- 		imxdmac->chan.device = &imxdma->dma_device;
- 		imxdmac->channel = i;
- 
--- 
-1.7.2.3
+> Linus,
+
+> Here's another couple of fixes...
+
+> 8<----
+> Subject: [PATCH 1/2] ARM: mmci: complete the transaction on error
+
+> When we encounter an error, make sure we complete the transaction
+> otherwise we'll leave the request dangling.
+
+> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+[...]
+
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index b6fd6dc..175a623 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -319,7 +319,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+>   	if (status&  MCI_DATABLOCKEND)
+>   		dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
+>
+> -	if (status & MCI_DATAEND) {
+> +	if (status & MCI_DATAEND
+
+    Shouldn't 'status & MCI_DATAEND' be enclosed in parens?
+
+> || data->error) {
+
+WBR, Sergei
