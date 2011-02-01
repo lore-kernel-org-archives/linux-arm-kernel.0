@@ -1,63 +1,63 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  1 Feb 2011 12:18:39 +0100
-Subject: [PATCH 5/5] USB ehci-mxc: make phy clock optional on all i.MX SoCs
+Date: Tue,  1 Feb 2011 12:18:37 +0100
+Subject: [PATCH 3/5] USB ehci-mxc: make ahb clock optional on all i.MX SoCs
 In-Reply-To: <1296559119-7723-1-git-send-email-s.hauer@pengutronix.de>
 References: <1296559119-7723-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1296559119-7723-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1296559119-7723-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy clock is present on only some i.MX SoCs. Request
-it on every SoC, but use it only when present.
+The ahb clock is not present on all i.MX SoCs. So instead
+of requesting this clock on only some SoCs we can request
+them on all SoCs and use it when present.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/usb/host/ehci-mxc.c |   15 ++++-----------
- 1 files changed, 4 insertions(+), 11 deletions(-)
+ drivers/usb/host/ehci-mxc.c |   14 ++++----------
+ 1 files changed, 4 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index 2cec923..2bccc23 100644
+index 25c8c10..f5942ee 100644
 --- a/drivers/usb/host/ehci-mxc.c
 +++ b/drivers/usb/host/ehci-mxc.c
-@@ -177,15 +177,9 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 		clk_enable(priv->ahbclk);
+@@ -172,14 +172,9 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
+ 	}
+ 	clk_enable(priv->usbclk);
  
- 	/* "dr" device has its own clock */
--	if (pdev->id == 0) {
--		priv->phyclk = clk_get(dev, "usb_phy");
--		if (IS_ERR(priv->phyclk)) {
--			ret = PTR_ERR(priv->phyclk);
--			goto err_clk_phy;
+-	if (!cpu_is_mx35() && !cpu_is_mx25()) {
+-		priv->ahbclk = clk_get(dev, "usb_ahb");
+-		if (IS_ERR(priv->ahbclk)) {
+-			ret = PTR_ERR(priv->ahbclk);
+-			goto err_clk_ahb;
 -		}
-+	priv->phyclk = clk_get(dev, "usb_phy");
-+	if (!IS_ERR(priv->phyclk))
- 		clk_enable(priv->phyclk);
++	priv->ahbclk = clk_get(dev, "usb_ahb");
++	if (!IS_ERR(priv->ahbclk))
+ 		clk_enable(priv->ahbclk);
 -	}
--
  
- 	/* call platform specific init function */
- 	if (pdata->init) {
-@@ -257,11 +251,10 @@ err_add:
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
- err_init:
--	if (priv->phyclk) {
-+	if (!IS_ERR(priv->phyclk)) {
- 		clk_disable(priv->phyclk);
- 		clk_put(priv->phyclk);
+ 	/* "dr" device has its own clock on i.MX51 */
+ 	if (cpu_is_mx51() && (pdev->id == 0)) {
+@@ -267,11 +262,10 @@ err_init:
+ 		clk_put(priv->phy1clk);
  	}
--err_clk_phy:
- 	if (!IS_ERR(priv->ahbclk)) {
- 		clk_disable(priv->ahbclk);
- 		clk_put(priv->ahbclk);
-@@ -304,7 +297,7 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+ err_clk_phy:
+-	if (priv->ahbclk) {
++	if (!IS_ERR(priv->ahbclk)) {
  		clk_disable(priv->ahbclk);
  		clk_put(priv->ahbclk);
  	}
--	if (priv->phyclk) {
-+	if (!IS_ERR(priv->phyclk)) {
- 		clk_disable(priv->phyclk);
- 		clk_put(priv->phyclk);
+-err_clk_ahb:
+ 	clk_disable(priv->usbclk);
+ 	clk_put(priv->usbclk);
+ err_clk:
+@@ -306,7 +300,7 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
+ 
+ 	clk_disable(priv->usbclk);
+ 	clk_put(priv->usbclk);
+-	if (priv->ahbclk) {
++	if (!IS_ERR(priv->ahbclk)) {
+ 		clk_disable(priv->ahbclk);
+ 		clk_put(priv->ahbclk);
  	}
 -- 
 1.7.2.3
