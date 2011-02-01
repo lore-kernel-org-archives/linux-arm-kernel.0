@@ -1,93 +1,68 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  1 Feb 2011 12:18:38 +0100
-Subject: [PATCH 4/5] ARM i.MX51/53: register usb phy clock as usb_phy
-In-Reply-To: <1296559119-7723-1-git-send-email-s.hauer@pengutronix.de>
-References: <1296559119-7723-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1296559119-7723-5-git-send-email-s.hauer@pengutronix.de>
+Date: Tue,  1 Feb 2011 12:18:34 +0100
+Subject: i.MX ehci phy init cleanup
+Message-ID: <1296559119-7723-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-usb_phy1 is the wrong name as it is the one and only clock belonging
-to the usb phy. So rename it to usb_phy.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    2 +-
- drivers/usb/host/ehci-mxc.c         |   26 +++++++++++++-------------
- 2 files changed, 14 insertions(+), 14 deletions(-)
+The following series moves the i.MX usb phy setup from plat-mxc
+to their corresponding mach directories. Also, it moves the call
+to setup the phys from the ehci driver to the boards. With this
+we will be able to change the i.MX51/53 phy setup to reflect the
+additional flags for the phy in a later series.
+Also, it removes the calls to cpu_is_* in the ehci driver which
+allows us to use it on i.MX23/28 later.
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 0a19e75..2f2b46e 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1295,7 +1295,7 @@ static struct clk_lookup mx51_lookups[] = {
- 	_REGISTER_CLOCK("imx-i2c.2", NULL, hsi2c_clk)
- 	_REGISTER_CLOCK("mxc-ehci.0", "usb", usboh3_clk)
- 	_REGISTER_CLOCK("mxc-ehci.0", "usb_ahb", usb_ahb_clk)
--	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy1", usb_phy1_clk)
-+	_REGISTER_CLOCK("mxc-ehci.0", "usb_phy", usb_phy1_clk)
- 	_REGISTER_CLOCK("mxc-ehci.1", "usb", usboh3_clk)
- 	_REGISTER_CLOCK("mxc-ehci.1", "usb_ahb", usb_ahb_clk)
- 	_REGISTER_CLOCK("mxc-ehci.2", "usb", usboh3_clk)
-diff --git a/drivers/usb/host/ehci-mxc.c b/drivers/usb/host/ehci-mxc.c
-index f5942ee..2cec923 100644
---- a/drivers/usb/host/ehci-mxc.c
-+++ b/drivers/usb/host/ehci-mxc.c
-@@ -31,7 +31,7 @@
- #define ULPI_VIEWPORT_OFFSET	0x170
- 
- struct ehci_mxc_priv {
--	struct clk *usbclk, *ahbclk, *phy1clk;
-+	struct clk *usbclk, *ahbclk, *phyclk;
- 	struct usb_hcd *hcd;
- };
- 
-@@ -176,14 +176,14 @@ static int ehci_mxc_drv_probe(struct platform_device *pdev)
- 	if (!IS_ERR(priv->ahbclk))
- 		clk_enable(priv->ahbclk);
- 
--	/* "dr" device has its own clock on i.MX51 */
--	if (cpu_is_mx51() && (pdev->id == 0)) {
--		priv->phy1clk = clk_get(dev, "usb_phy1");
--		if (IS_ERR(priv->phy1clk)) {
--			ret = PTR_ERR(priv->phy1clk);
-+	/* "dr" device has its own clock */
-+	if (pdev->id == 0) {
-+		priv->phyclk = clk_get(dev, "usb_phy");
-+		if (IS_ERR(priv->phyclk)) {
-+			ret = PTR_ERR(priv->phyclk);
- 			goto err_clk_phy;
- 		}
--		clk_enable(priv->phy1clk);
-+		clk_enable(priv->phyclk);
- 	}
- 
- 
-@@ -257,9 +257,9 @@ err_add:
- 	if (pdata && pdata->exit)
- 		pdata->exit(pdev);
- err_init:
--	if (priv->phy1clk) {
--		clk_disable(priv->phy1clk);
--		clk_put(priv->phy1clk);
-+	if (priv->phyclk) {
-+		clk_disable(priv->phyclk);
-+		clk_put(priv->phyclk);
- 	}
- err_clk_phy:
- 	if (!IS_ERR(priv->ahbclk)) {
-@@ -304,9 +304,9 @@ static int __exit ehci_mxc_drv_remove(struct platform_device *pdev)
- 		clk_disable(priv->ahbclk);
- 		clk_put(priv->ahbclk);
- 	}
--	if (priv->phy1clk) {
--		clk_disable(priv->phy1clk);
--		clk_put(priv->phy1clk);
-+	if (priv->phyclk) {
-+		clk_disable(priv->phyclk);
-+		clk_put(priv->phyclk);
- 	}
- 
- 	kfree(priv);
--- 
-1.7.2.3
+Sascha
+
+Sascha Hauer (5):
+      ARM i.MX ehci: factor out soc specific functions
+      ARM i.MX ehci: do ehci init in board specific functions
+      USB ehci-mxc: make ahb clock optional on all i.MX SoCs
+      ARM i.MX51/53: register usb phy clock as usb_phy
+      USB ehci-mxc: make phy clock optional on all i.MX SoCs
+
+ arch/arm/mach-imx/Makefile                  |    4 +-
+ arch/arm/mach-imx/ehci-imx25.c              |   80 ++++++
+ arch/arm/mach-imx/ehci-imx27.c              |   82 ++++++
+ arch/arm/mach-imx/mach-cpuimx27.c           |   14 +-
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c    |   16 +-
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    7 +-
+ arch/arm/mach-imx/mach-mx25_3ds.c           |    7 +-
+ arch/arm/mach-imx/mach-mx27_3ds.c           |    6 +-
+ arch/arm/mach-imx/mach-pca100.c             |   12 +-
+ arch/arm/mach-imx/mach-pcm038.c             |    8 +-
+ arch/arm/mach-mx3/Makefile                  |    4 +-
+ arch/arm/mach-mx3/ehci-imx31.c              |   83 ++++++
+ arch/arm/mach-mx3/ehci-imx35.c              |   80 ++++++
+ arch/arm/mach-mx3/mach-armadillo5x0.c       |   10 +-
+ arch/arm/mach-mx3/mach-cpuimx35.c           |   16 +-
+ arch/arm/mach-mx3/mach-mx31_3ds.c           |   15 +-
+ arch/arm/mach-mx3/mach-mx31lilly.c          |   17 +-
+ arch/arm/mach-mx3/mach-mx31lite.c           |    6 +-
+ arch/arm/mach-mx3/mach-mx31moboard.c        |    6 +-
+ arch/arm/mach-mx3/mach-mx35_3ds.c           |   16 +-
+ arch/arm/mach-mx3/mach-pcm037.c             |   14 +-
+ arch/arm/mach-mx3/mach-pcm043.c             |   16 +-
+ arch/arm/mach-mx3/mx31moboard-devboard.c    |    7 +-
+ arch/arm/mach-mx3/mx31moboard-marxbot.c     |    6 +-
+ arch/arm/mach-mx3/mx31moboard-smartbot.c    |    7 +-
+ arch/arm/mach-mx5/Makefile                  |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51.c          |   13 +-
+ arch/arm/mach-mx5/board-cpuimx51sd.c        |   13 +-
+ arch/arm/mach-mx5/board-mx51_babbage.c      |   13 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c      |    6 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c         |    2 +-
+ arch/arm/mach-mx5/ehci.c                    |  156 +++++++++++
+ arch/arm/plat-mxc/Makefile                  |    1 -
+ arch/arm/plat-mxc/ehci.c                    |  369 ---------------------------
+ arch/arm/plat-mxc/include/mach/mxc_ehci.h   |    7 +-
+ drivers/usb/host/ehci-mxc.c                 |   48 +---
+ 36 files changed, 697 insertions(+), 472 deletions(-)
+ create mode 100644 arch/arm/mach-imx/ehci-imx25.c
+ create mode 100644 arch/arm/mach-imx/ehci-imx27.c
+ create mode 100644 arch/arm/mach-mx3/ehci-imx31.c
+ create mode 100644 arch/arm/mach-mx3/ehci-imx35.c
+ create mode 100644 arch/arm/mach-mx5/ehci.c
+ delete mode 100644 arch/arm/plat-mxc/ehci.c
