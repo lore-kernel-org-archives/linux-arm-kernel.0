@@ -1,47 +1,49 @@
-From: gadiyar@ti.com (Gadiyar, Anand)
-Date: Tue, 1 Feb 2011 11:09:52 +0530
-Subject: linux-next-20100201 - OMAP2+ defconfig broken with CONFIG_DEBUG_LL
-Message-ID: <AANLkTinF+dpKvuRztChBM01MAjgL-foGp_yVq3uC9ghu@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 1 Feb 2011 08:20:13 +0200
+Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
+In-Reply-To: <20110131153831.dca62146.akpm@linux-foundation.org>
+References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
+	<1296470024-26854-2-git-send-email-ohad@wizery.com>
+	<20110131153831.dca62146.akpm@linux-foundation.org>
+Message-ID: <AANLkTik-fgCF_W0-DBE6UVTpjqF6Jf=u7bQYkcweEegQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Feb 1, 2011 at 1:38 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> It's a little irritating having two hwspinlock.h's.
+> hwspinlock_internal.h wold be a conventional approach. ?But it's not a
+> big deal.
+...
 
-I tried to build linux-next as of 20100201 with omap2plus_defconfig. In addition
-I turned on CONFIG_DEBUG_LL and hit the following error.
+>> +/**
+>> + * __hwspin_lock_timeout() - lock an hwspinlock with timeout limit
+>> + * @hwlock: the hwspinlock to be locked
+>> + * @timeout: timeout value in jiffies
+>
+> hm, why in jiffies?
+>
+> The problem here is that lazy programmers will use
+>
+> ? ? ? ?hwspin_lock_timeout(lock, 10, ...)
+>
+> and their code will work happily with HZ=100 but will explode with HZ=1000.
+>
+> IOW, this interface *requires* that all callers perform a
+> seconds-to-jiffies conversion before calling hwspin_lock_timeout(). ?So
+> why not reduce their effort and their ability to make mistakes by
+> defining the API to take seconds?
 
-  AS      arch/arm/kernel/debug.o
-arch/arm/kernel/debug.S: Assembler messages:
-arch/arm/kernel/debug.S:174: Error: garbage following instruction --
-`ldreq r1,=
-__virt_to_phys(omap_uart_phys)'
-arch/arm/kernel/debug.S:174: Error: garbage following instruction --
-`ldrne r1,=
-__phys_to_virt((0x80000000+0x3ffc))'
-arch/arm/kernel/debug.S:174: Error: garbage following instruction --
-`ldreq r2,=
-__virt_to_phys(omap_uart_phys)'
-arch/arm/kernel/debug.S:174: Error: garbage following instruction --
-`ldreq r2,=
-__virt_to_phys(omap_uart_phys)'
-arch/arm/kernel/debug.S:178: Error: garbage following instruction --
-`ldreq r2,=
-__virt_to_phys(omap_uart_lsr)'
-arch/arm/kernel/debug.S:190: Error: garbage following instruction --
-`ldreq r1,=
-__virt_to_phys(omap_uart_phys)'
-arch/arm/kernel/debug.S:190: Error: garbage following instruction --
-`ldrne r1,=
-__phys_to_virt((0x80000000+0x3ffc))'
-arch/arm/kernel/debug.S:190: Error: garbage following instruction --
-`ldreq r2,=
-__virt_to_phys(omap_uart_phys)'
-arch/arm/kernel/debug.S:190: Error: garbage following instruction --
-`ldreq r2,=
-__virt_to_phys(omap_uart_phys)'
-make[1]: *** [arch/arm/kernel/debug.o] Error 1
-make: *** [arch/arm/kernel] Error 2
+I considered that, but then decided to use jiffies in order to be
+consistent with wait_event_timeout/schedule_timeout (although I don't
+return the remaining jiffies in case the lock is taken before the
+timeout elapses), and also to allow user-selected granularity.
 
-Will try and bisect this down later. Just reporting for now.
+But I do kind of like the idea of not using jiffies. We can probably
+even move to msecs, since anyway this is an error condition, and
+people who needs a quick check should just use the trylock() version.
 
-- Anand
+I'll do a quick respin of the patches with that and the
+hwspinlock_internal.h comment above.
+
+Thanks,
+Ohad.
