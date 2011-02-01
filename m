@@ -1,117 +1,40 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Mon, 31 Jan 2011 15:38:31 -0800
-Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
-In-Reply-To: <1296470024-26854-2-git-send-email-ohad@wizery.com>
-References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
-	<1296470024-26854-2-git-send-email-ohad@wizery.com>
-Message-ID: <20110131153831.dca62146.akpm@linux-foundation.org>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Mon, 31 Jan 2011 19:05:12 -0500
+Subject: [PATCH 0/4] davinci: Add SPI support for da8xx platforms
+Message-ID: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Jan 2011 12:33:41 +0200
-Ohad Ben-Cohen <ohad@wizery.com> wrote:
+This patch series adds the necessary SPI resources and registration
+routines for da850/OMAP-L138/AM18x and da830/OMAP-L137/AM17x devices.
+It also adds on-board SPI FLASH devices for the da830 evm, the da850
+evm, and the MityDSP-L138/MityARM-1808 platforms.
 
-> Add a platform-independent hwspinlock framework.
-> 
-> Hardware spinlock devices are needed, e.g., in order to access data
-> that is shared between remote processors, that otherwise have no
-> alternative mechanism to accomplish synchronization and mutual exclusion
-> operations.
-> 
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Hari Kanigeri <h-kanigeri2@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> ---
->  Documentation/hwspinlock.txt         |  299 ++++++++++++++++++
->  drivers/Kconfig                      |    2 +
->  drivers/Makefile                     |    2 +
->  drivers/hwspinlock/Kconfig           |   13 +
->  drivers/hwspinlock/Makefile          |    5 +
->  drivers/hwspinlock/hwspinlock.h      |   61 ++++
->  drivers/hwspinlock/hwspinlock_core.c |  557 ++++++++++++++++++++++++++++++++++
->  include/linux/hwspinlock.h           |  298 ++++++++++++++++++
+These patches are based on work done during testing of davinci SPI driver 
+submissions incorporated in version 2.6.38 of the kernel, at [1].
 
-It's a little irritating having two hwspinlock.h's. 
-hwspinlock_internal.h wold be a conventional approach.  But it's not a
-big deal.
+The da850 and da830 EVM portions of this patch need verification / ack.
 
->
-> ...
->
-> +/*
-> + * A radix tree is used to maintain the available hwspinlock instances.
-> + * The tree associates hwspinlock pointers with their integer key id,
-> + * and provides easy-to-use API which makes the hwspinlock core code simple
-> + * and easy to read.
-> + *
-> + * Radix trees are quick on lookups, and reasonably efficient in terms of
-> + * storage, especially with high density usages such as this framework
-> + * requires (a continuous range of integer keys, beginning with zero, is
-> + * used as the ID's of the hwspinlock instances).
-> + *
-> + * The radix tree API supports tagging items in the tree, which this
-> + * framework uses to mark unused hwspinlock instances (see the
-> + * HWSPINLOCK_UNUSED tag above). As a result, the process of querying the
-> + * tree, looking for an unused hwspinlock instance, is now reduced to a
-> + * single radix tree API call.
-> + */
+The MityDSP-L138 platform patch has been tested.
 
-Nice comment!
+The patch series is against commit 8fb837c158e342413d08d6f211b5b8f67d5adc2f
+of kevin's tree.
 
-> +static RADIX_TREE(hwspinlock_tree, GFP_KERNEL);
-> +
->
-> ...
->
-> +/**
-> + * __hwspin_lock_timeout() - lock an hwspinlock with timeout limit
-> + * @hwlock: the hwspinlock to be locked
-> + * @timeout: timeout value in jiffies
+[1] http://arago-project.org/git/projects/?p=linux-davinci.git;a=shortlog;h=refs/heads/davinci-spi-rewrite
 
-hm, why in jiffies?
+Michael Williamson (2):
+  davinci: da8xx/omap-l1: add support for SPI
+  davinci: add spi devices support for MityDSP-L138/MityARM-1808
+    platform
 
-The problem here is that lazy programmers will use
+Sekhar Nori (2):
+  davinci: add spi devices support for da850/omap-l138/am18x evm
+  davinci: add spi devices support for da830/omap-l137/am17x evm
 
-	hwspin_lock_timeout(lock, 10, ...)
-
-and their code will work happily with HZ=100 but will explode with HZ=1000.
-
-IOW, this interface *requires* that all callers perform a
-seconds-to-jiffies conversion before calling hwspin_lock_timeout().  So
-why not reduce their effort and their ability to make mistakes by
-defining the API to take seconds?
-
-
-> + * @mode: mode which controls whether local interrupts are disabled or not
-> + * @flags: a pointer to where the caller's interrupt state will be saved at (if
-> + *         requested)
-> + *
-> + * This function locks the given @hwlock. If the @hwlock
-> + * is already taken, the function will busy loop waiting for it to
-> + * be released, but give up when @timeout jiffies have elapsed. If @timeout
-> + * is %MAX_SCHEDULE_TIMEOUT, the function will never give up (therefore if a
-> + * faulty remote core never releases the @hwlock, it will deadlock).
-> + *
-> + * Upon a successful return from this function, preemption is disabled
-> + * (and possibly local interrupts, too), so the caller must not sleep,
-> + * and is advised to release the hwspinlock as soon as possible.
-> + * This is required in order to minimize remote cores polling on the
-> + * hardware interconnect.
-> + *
-> + * The user decides whether local interrupts are disabled or not, and if yes,
-> + * whether he wants their previous state to be saved. It is up to the user
-> + * to choose the appropriate @mode of operation, exactly the same way users
-> + * should decide between spin_lock, spin_lock_irq and spin_lock_irqsave.
-> + *
-> + * Returns 0 when the @hwlock was successfully taken, and an appropriate
-> + * error code otherwise (most notably -ETIMEDOUT if the @hwlock is still
-> + * busy after @timeout meets jiffies). The function will never sleep.
-> + */
->
-> ...
->
+ arch/arm/mach-davinci/board-da830-evm.c    |   82 ++++++++++++++++++++++
+ arch/arm/mach-davinci/board-da850-evm.c    |   88 +++++++++++++++++++++++
+ arch/arm/mach-davinci/board-mityomapl138.c |  104 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da850.c              |   16 ++++
+ arch/arm/mach-davinci/devices-da8xx.c      |   88 +++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
+ 6 files changed, 380 insertions(+), 0 deletions(-)
