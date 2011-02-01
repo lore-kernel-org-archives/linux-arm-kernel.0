@@ -1,85 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Feb 2011 13:30:36 +0000
-Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
-In-Reply-To: <AANLkTikLABG5yWDYcOe12mfy_Hco15k_ByqYX15GH9Cy@mail.gmail.com>
-References: <20101219195959.GA28157@n2100.arm.linux.org.uk>
-	<20101221135421.GS28157@n2100.arm.linux.org.uk>
-	<20101221155935.GV28157@n2100.arm.linux.org.uk>
-	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
-	<20110124160127.GA24104@n2100.arm.linux.org.uk>
-	<AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
-	<20110124212228.GN24104@n2100.arm.linux.org.uk>
-	<AANLkTimReBj7QGw08imBV2JWJGwh-TO5oA+3kiFQZLq4@mail.gmail.com>
-	<20110125102351.GA11507@n2100.arm.linux.org.uk>
-	<AANLkTikLABG5yWDYcOe12mfy_Hco15k_ByqYX15GH9Cy@mail.gmail.com>
-Message-ID: <20110201133036.GI31216@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 01 Feb 2011 13:34:59 +0000
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <20110201111821.GC31216@n2100.arm.linux.org.uk>
+References: <20110124133513.GL16202@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
+	<20110124162400.GC24104@n2100.arm.linux.org.uk>
+	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
+	<20110124165356.GG24104@n2100.arm.linux.org.uk>
+	<20110124170304.GH24104@n2100.arm.linux.org.uk>
+	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
+	<20110124180944.GK24104@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F432EF@GEORGE.Emea.Arm.com>
+	<20110124231050.GP24104@n2100.arm.linux.org.uk>
+	<20110201111821.GC31216@n2100.arm.linux.org.uk>
+Message-ID: <1296567299.2768.40.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 02:07:21PM +0100, Linus Walleij wrote:
-> 2011/1/25 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> 
-> > The DMA controller must be programmed with the right burst size for the
-> > peripheral, which in this case would be 8 words, otherwise the 'last'
-> > burst signalling goes wrong.
-> 
-> Now I think I found the real bug behind this...
-> 
-> In the Vendor data we set this:
-> 	.dmareg_enable		= 1 << 12, /* DMAREQCTRL */
-> 
-> This actually means:
-> 
-> DMAREQCTL: DMA requests control.
-> 0: SREQ are generated when data to be transferred is
-> less than 8 words.
-> 1: no SREQ is generated when data to be transferred
-> is less than 8 words, LBREQ is generated instead.
-> 
-> Which will work for all MMC card transfers I believe, since
-> these are even 512 byte multiples. No problem...
-> 
-> Then comes an SDIO request and it is 7 bytes so LBREQ
-> is emitted 7 times instead of 6 * SREQ + 1 LSREQ.
-> 
-> Which works if you set down the burst size to 1 byte,
-> firing 7 consecutive bursts each terminated with LBREQ
-> which the DMA controller is perfectly happy with.
-> 
-> So while setting the burstsize down to 1 byte works
-> since it matches the twisted logic of DMAREQCTL,
-> instead flipping the bit in DMAREQCTL to 0
-> if (size % 8 != 0) makes some more kind of sense.
-> 
-> This needs to be tested to see whether it works or
-> not, so I'll see what we can do.
+> And to prove the point, I have MMCI running at up to 4Mbps, an 8 fold
+> increase over what the current fixed upper-rate implementation does.
+> The adaptive rate implementation is just a proof of concept at the
+> moment and requires further work to improve the rate selection algorithm.
 
-I really can't see this making any difference.  In the case of a 7 word
-transfer, you've setup the DMA controller to transfer 7 * 4 = 28 bytes.
+Great, I've terribly glad you managed to have a go at this (I honestly
+wanted to, but simply had no time). I'm looking forward to see the
+patches and will be more than happy to backport them for the sake of the
+Linaro guys using 2.6.35 and 2.6.37 right now.
 
-1. If DMAREQCTL = 1, the MMCI issues a LBREQ.
+On our side we did extend the FIFO and performed some tests (not very
+extensive yet though). The change seems not to break anything and help
+in the pathological (heavy USB traffic) scenario.
 
-   If the DMA controller has a burst size of 32 bytes, if it fetches 32
-   bytes from the device, it is broken.  It doesn't matter what the
-   primecell does - it's the DMA controller misbehaving.  In that case,
-   the work-around needs to be in the DMA controller code to reduce the
-   bursting so that the DMA controller doesn't transfer more than the
-   requested size.
+When I get your changes and some official FPGA release, I'll try to push
+the bandwidth limits even further - hopefully changes will complement.
+Of course there is absolutely no need of using the modified version if
+one opts not to do so ;-) It's just a line in the board configuration
+file, selecting one FPGA image or the other - they have different
+"configuration value" in the peripheral ID so the driver can distinguish
+them.
 
-   This is not specific to MMCI as other devices will suffer the same
-   problem.  So it's wrong to put it into every primecell driver just
-   because someone has a broken DMA controller somewhere.
+> The real solution to this is for there to be proper working DMA support
+> implemented on ARM platforms,
 
-2. If DMAREQCTL = 0, the MMCI issues six SREQ plus one LSREQ.
+In case of VE this is all about getting an engine into the test chips,
+what didn't happen for A9 (the request lines are routed between the
+motherboard and the tile and IO FPGA can - theoretically - use the MMCI
+requests). As far as I'm told this cell is simply huge (silicon-wise)
+and therefore it's the first candidate to cut down when area is
+scarce... Anyway, I've spoken to guys around and asked them to keep the
+problem in mind, so we may get something with the next releases.
 
-   This reflects the behaviour of the ARM primecell, and SREQ should
-   result in the DMA controller performing one transfer per request.
+Cheers!
 
-So, the solutions as I see it are:
-
-1. If DMAREQCTL = 1, move the burst limiting work-around into the DMA
-   engine driver, if it really is a problem.
-
-2. Set DMAREQCTL = 0.
-
-(2) seems to be the most sane solution to me.
+Pawe?
