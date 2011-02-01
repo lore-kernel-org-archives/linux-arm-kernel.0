@@ -1,52 +1,61 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Tue, 01 Feb 2011 07:33:08 -0500
-Subject: [PATCH 2/4] davinci: add spi devices support for
-	MityDSP-L138/MityARM-1808 platform
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930248777A4B@dbde02.ent.ti.com>
-References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
-	<1296518716-5004-3-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB5930248777A4B@dbde02.ent.ti.com>
-Message-ID: <4D47FD84.4040302@criticallink.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 1 Feb 2011 13:39:30 +0100
+Subject: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE power state
+In-Reply-To: <30bccb5d133f92cdbf1a4aa75ba54e7b@mail.gmail.com>
+References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
+	<1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1101311613230.16671@utopia.booyaka.com>
+	<30bccb5d133f92cdbf1a4aa75ba54e7b@mail.gmail.com>
+Message-ID: <4D47FF02.9090709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
-
-On 2/1/2011 7:21 AM, Nori, Sekhar wrote:
-
-> Hi Mike,
-> 
-> On Tue, Feb 01, 2011 at 05:35:14, Michael Williamson wrote:
->> This patch adds support for accessing the on board SPI NOR FLASH
->> device for MityDSP-L138 and MityARM-1808 SoMs.
+On 2/1/2011 7:29 AM, Santosh Shilimkar wrote:
+>> From: Paul Walmsley [mailto:paul at pwsan.com]
+>> Sent: Tuesday, February 01, 2011 4:44 AM
 >>
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
->> ---
->>  arch/arm/mach-davinci/board-mityomapl138.c |  104 ++++++++++++++++++++++++++++
->>  1 files changed, 104 insertions(+), 0 deletions(-)
+>> Hello Santosh,
 >>
->> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-> 
-> 
->> +
->> +static struct davinci_spi_platform_data mityomapl138_spi1_pdata = {
->> +	.version	= SPI_VERSION_2,
->> +	.num_chipselect	= 1,
->> +	.intr_line	= 1,
->> +};
-> 
-> This platform data is better placed in devices-da8xx.c as most of
-> it is common across all DA8xx platforms. Only num_chipselect and
-> chip_sel array are expected to be board specific so only those should
-> be passed on from board files.
-> 
-> Thanks,
-> Sekhar
+>> On Fri, 28 Jan 2011, Santosh Shilimkar wrote:
+>>
+>>> On OMAP4, one can explicitly program INACTIVE as the power state
+>> of
+>>> the logic area inside the power domain. Techincally PD state
+>> programmed
+>>> to ON and if all the clock domains within the PD are idled, is
+>> equivalent
+>>> tp PD programmed to INACTIVE and all the clock domains within the
+>> PD are
+>>> idled. There won't be any power difference in above two.
+>>>
+>>> Since the CPUIDLE C-states explicitly make use of INACTIVE as a PD
+>>> targeted state and also there is some additional latancy involved
+>>> with PD INACTIVE vs PD ON, it's better to support it as an explcit
+>>> PD state.
+>>>
+>>> This patch adds the support to allow explicit PD INACTIVE
+>>> programming if supported.
+>>
+>> What does the hardware do when the powerdomain is programmed to
+>> INACTIVE?
+>> Does it actually force the clockdomains idle?
+>>
+> No. It doesn't force it. The power domain to hit INACTIVE, the
+> clockdomain within the power domain needs to idle and it is
+> still a prerequisite. With INACTIVE being programmed, we could
+> issue a sleep transition.
+>
+> PD_ON:
+> No power transition, only clocks are gated. Power domain stays ON.
+>
+> PD_INA:
+> Power domain transitions to INACTIVE state. All logic and
+> memory stay powered. This state allows for a voltage
+> sleep transition.
 
+Just a small note on the latest point:
+The voltage sleep transition can occur only if all power domains inside 
+a voltage domain are INACTIVE, RET or OFF.
 
-I will move this to devices-da8xx.c and create a placeholder for spi0.
-
-Thanks.
-
--Mike
+Regards,
+Benoit
