@@ -1,48 +1,96 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 Feb 2011 14:22:19 -0800
-Subject: [PATCH v2] arm: mach-omap2: potential NULL dereference
-In-Reply-To: <20110119125721.GA9203@albatros> (Vasiliy Kulikov's message of
-	"Wed, 19 Jan 2011 15:57:22 +0300")
-References: <1295258922-31242-1-git-send-email-segoon@openwall.com>
-	<4D341C35.80506@bfs.de> <20110119125721.GA9203@albatros>
-Message-ID: <87lj1zpf8k.fsf@ti.com>
+Date: Tue, 01 Feb 2011 14:24:29 -0800
+Subject: [PATCH] OMAP2+: remove unused UART base addresses from
+	omap_globals
+In-Reply-To: <1295649015-26348-1-git-send-email-khilman@ti.com> (Kevin
+	Hilman's message of "Fri, 21 Jan 2011 14:30:15 -0800")
+References: <1295649015-26348-1-git-send-email-khilman@ti.com>
+Message-ID: <87fws7pf4y.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasiliy Kulikov <segoon@openwall.com> writes:
+Kevin Hilman <khilman@ti.com> writes:
 
-> kzalloc() may fail, if so return -ENOMEM.  Also Walter Harms suggested
-> to use kasprintf() instead of kzalloc+strcpy+strcat.
+> Now that omap_hwmod + omap_device is used for OMAP UART device and
+> driver code, we no longer need the UART physical addresses in
+> omap_globals.
 >
-> Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+> Note that the #defines for the base addresses are still left in
+> <plat/serial.h> since they are used by DEBUG_LL and uncompress code.
+>
+> Build tested for OMAP1 (omap1_defconfig) and OMAP2+ (omap2plus_defconfig)
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 > ---
->  Cannot compile this driver, so it is not tested at all.
+> Applies on Tony's for-next branch.
 
-Boot tested on 3430/n900 and 3630/Zoom3.
-
-Queueing for 2.6.39 (branch: for_2.6.39/pm-misc)
+For the benefit of the archives, queuing for 2.6.39 (branch:
+for_2.6.39/pm-misc)
 
 Kevin
 
->  arch/arm/mach-omap2/smartreflex.c |    8 +++++---
->  1 files changed, 5 insertions(+), 3 deletions(-)
+>  arch/arm/mach-omap2/common.c             |   14 --------------
+>  arch/arm/plat-omap/include/plat/common.h |    4 ----
+>  2 files changed, 0 insertions(+), 18 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 77ecebf..697d8d4 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -260,9 +260,11 @@ static int sr_late_init(struct omap_sr *sr_info)
->  	if (sr_class->class_type == SR_CLASS2 &&
->  		sr_class->notify_flags && sr_info->irq) {
+> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
+> index d5eaee3..8044c8a 100644
+> --- a/arch/arm/mach-omap2/common.c
+> +++ b/arch/arm/mach-omap2/common.c
+> @@ -50,9 +50,6 @@ static struct omap_globals omap242x_globals = {
+>  	.ctrl	= OMAP242X_CTRL_BASE,
+>  	.prm	= OMAP2420_PRM_BASE,
+>  	.cm	= OMAP2420_CM_BASE,
+> -	.uart1_phys	= OMAP2_UART1_BASE,
+> -	.uart2_phys	= OMAP2_UART2_BASE,
+> -	.uart3_phys	= OMAP2_UART3_BASE,
+>  };
 >  
-> -		name = kzalloc(SMARTREFLEX_NAME_LEN + 1, GFP_KERNEL);
-> -		strcpy(name, "sr_");
-> -		strcat(name, sr_info->voltdm->name);
-> +		name = kasprintf(GFP_KERNEL, "sr_%s", sr_info->voltdm->name);
-> +		if (name == NULL) {
-> +			ret = -ENOMEM;
-> +			goto error;
-> +		}
->  		ret = request_irq(sr_info->irq, sr_interrupt,
->  				0, name, (void *)sr_info);
->  		if (ret)
+>  void __init omap2_set_globals_242x(void)
+> @@ -71,9 +68,6 @@ static struct omap_globals omap243x_globals = {
+>  	.ctrl	= OMAP243X_CTRL_BASE,
+>  	.prm	= OMAP2430_PRM_BASE,
+>  	.cm	= OMAP2430_CM_BASE,
+> -	.uart1_phys	= OMAP2_UART1_BASE,
+> -	.uart2_phys	= OMAP2_UART2_BASE,
+> -	.uart3_phys	= OMAP2_UART3_BASE,
+>  };
+>  
+>  void __init omap2_set_globals_243x(void)
+> @@ -92,10 +86,6 @@ static struct omap_globals omap3_globals = {
+>  	.ctrl	= OMAP343X_CTRL_BASE,
+>  	.prm	= OMAP3430_PRM_BASE,
+>  	.cm	= OMAP3430_CM_BASE,
+> -	.uart1_phys	= OMAP3_UART1_BASE,
+> -	.uart2_phys	= OMAP3_UART2_BASE,
+> -	.uart3_phys	= OMAP3_UART3_BASE,
+> -	.uart4_phys	= OMAP3_UART4_BASE,	/* Only on 3630 */
+>  };
+>  
+>  void __init omap2_set_globals_3xxx(void)
+> @@ -119,10 +109,6 @@ static struct omap_globals omap4_globals = {
+>  	.prm	= OMAP4430_PRM_BASE,
+>  	.cm	= OMAP4430_CM_BASE,
+>  	.cm2	= OMAP4430_CM2_BASE,
+> -	.uart1_phys	= OMAP4_UART1_BASE,
+> -	.uart2_phys	= OMAP4_UART2_BASE,
+> -	.uart3_phys	= OMAP4_UART3_BASE,
+> -	.uart4_phys	= OMAP4_UART4_BASE,
+>  };
+>  
+>  void __init omap2_set_globals_443x(void)
+> diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
+> index 29b2afb..1b8095b 100644
+> --- a/arch/arm/plat-omap/include/plat/common.h
+> +++ b/arch/arm/plat-omap/include/plat/common.h
+> @@ -56,10 +56,6 @@ struct omap_globals {
+>  	unsigned long   prm;            /* Power and Reset Management */
+>  	unsigned long   cm;             /* Clock Management */
+>  	unsigned long   cm2;
+> -	unsigned long	uart1_phys;
+> -	unsigned long	uart2_phys;
+> -	unsigned long	uart3_phys;
+> -	unsigned long	uart4_phys;
+>  };
+>  
+>  void omap2_set_globals_242x(void);
