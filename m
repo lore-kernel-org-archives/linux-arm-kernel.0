@@ -1,40 +1,192 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 1 Feb 2011 17:51:58 +0530
-Subject: [PATCH 2/4] davinci: add spi devices support for
-	MityDSP-L138/MityARM-1808 platform
-In-Reply-To: <1296518716-5004-3-git-send-email-michael.williamson@criticallink.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue, 01 Feb 2011 07:26:51 -0500
+Subject: [PATCH 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <4D47F203.5090502@mvista.com>
 References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
-	<1296518716-5004-3-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930248777A4B@dbde02.ent.ti.com>
+	<1296518716-5004-2-git-send-email-michael.williamson@criticallink.com>
+	<4D47F203.5090502@mvista.com>
+Message-ID: <4D47FC0B.80608@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Sergei,
 
-On Tue, Feb 01, 2011 at 05:35:14, Michael Williamson wrote:
-> This patch adds support for accessing the on board SPI NOR FLASH
-> device for MityDSP-L138 and MityARM-1808 SoMs.
+On 2/1/2011 6:44 AM, Sergei Shtylyov wrote:
+
+> Hello.
 > 
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
-> ---
->  arch/arm/mach-davinci/board-mityomapl138.c |  104 ++++++++++++++++++++++++++++
->  1 files changed, 104 insertions(+), 0 deletions(-)
+> On 01-02-2011 3:05, Michael Williamson wrote:
 > 
-> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+>> Add SPI registration routines, clocks, and driver resources for
+>> DA850/OMAP-L138/AM18x and DA830/OMAP-L137/AM17x platforms.
+> 
+>> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
+> [...]
+> 
+>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+>> index beda8a4..5f8ff96 100644
+>> --- a/arch/arm/mach-davinci/devices-da8xx.c
+>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+>> @@ -725,3 +725,91 @@ int __init da8xx_register_cpuidle(void)
+>>
+>>       return platform_device_register(&da8xx_cpuidle_device);
+>>   }
+>> +
+>> +static struct resource da8xx_spi0_resources[] = {
+>> +    [0] = {
+>> +        .start = 0x01c41000,
+>> +        .end   = 0x01c41fff,
+>> +        .flags = IORESOURCE_MEM,
+>> +    },
+>> +    [1] = {
+>> +        .start = IRQ_DA8XX_SPINT0,
+>> +        .start = IRQ_DA8XX_SPINT0,
+> 
+>    You mean '.end'?
+> 
 
 
-> +
-> +static struct davinci_spi_platform_data mityomapl138_spi1_pdata = {
-> +	.version	= SPI_VERSION_2,
-> +	.num_chipselect	= 1,
-> +	.intr_line	= 1,
-> +};
+Yes.  I will correct.
 
-This platform data is better placed in devices-da8xx.c as most of
-it is common across all DA8xx platforms. Only num_chipselect and
-chip_sel array are expected to be board specific so only those should
-be passed on from board files.
+>> +        .flags = IORESOURCE_IRQ,
+>> +    },
+>> +    [2] = {
+>> +        .start = EDMA_CTLR_CHAN(0, 14),
+>> +        .end = EDMA_CTLR_CHAN(0, 14),
+> 
+>    Could you align = uniformly with resource 0 -- preferably with a tab?
+> 
 
-Thanks,
-Sekhar
+
+Sure.
+
+>> +        .flags = IORESOURCE_DMA,
+>> +    },
+>> +    [3] = {
+>> +        .start = EDMA_CTLR_CHAN(0, 15),
+>> +        .end = EDMA_CTLR_CHAN(0, 15),
+> 
+>    Same here.
+> 
+>> +        .flags = IORESOURCE_DMA,
+>> +    },
+>> +    [4] = {
+>> +        .start = 0,
+>> +        .end = 0,
+> 
+>    There's no need to init to 0.
+> 
+
+
+OK.
+
+>> +        .flags = IORESOURCE_DMA,
+>> +    },
+>> +};
+>> +
+>> +static struct resource da8xx_spi1_resources[] = {
+>> +    [0] = {
+>> +        .start = 0x01f0e000,
+>> +        .end   = 0x01f0efff,
+>> +        .flags = IORESOURCE_MEM,
+>> +    },
+>> +    [1] = {
+>> +        .start = IRQ_DA8XX_SPINT1,
+>> +        .start = IRQ_DA8XX_SPINT1,
+> 
+>    You meand '.end'?
+> 
+
+
+I did, but I see that .end is not used by platform_get_irq(), only .start.
+[wondering why testing didn't catch this, and why no compiler warnings on
+ double assignment].  I will correct. Thanks.
+
+>> +        .flags = IORESOURCE_IRQ,
+>> +    },
+>> +    [2] = {
+>> +        .start = EDMA_CTLR_CHAN(0, 18),
+>> +        .end = EDMA_CTLR_CHAN(0, 18),
+> 
+>    Could you align = uniformly with resource 0 -- preferably with a tab?
+> 
+
+
+Sure.
+
+>> +        .flags = IORESOURCE_DMA,
+>> +    },
+>> +    [3] = {
+>> +        .start = EDMA_CTLR_CHAN(0, 19),
+>> +        .end = EDMA_CTLR_CHAN(0, 19),
+> 
+>    Same here.
+> 
+
+
+Got it.
+
+>> +        .flags = IORESOURCE_DMA,
+>> +    },
+>> +    [4] = {
+>> +        .start = 0,
+>> +        .end = 0,
+> 
+>    There's no need to init to 0.
+> 
+
+
+OK.
+
+>> +        .flags = IORESOURCE_DMA,
+>> +    },
+>> +};
+>> +
+>> +static struct platform_device da8xx_spi_device[] = {
+>> +    [0] = {
+>> +        .name = "spi_davinci",
+>> +        .id = 0,
+>> +        .num_resources = ARRAY_SIZE(da8xx_spi0_resources),
+>> +        .resource = da8xx_spi0_resources,
+>> +    },
+>> +    [1] = {
+>> +        .name = "spi_davinci",
+>> +        .id = 1,
+>> +        .num_resources = ARRAY_SIZE(da8xx_spi1_resources),
+>> +        .resource = da8xx_spi1_resources,
+>> +    },
+>> +};
+>> +
+>> +int __init da8xx_register_spi(int instance,
+>> +                  struct davinci_spi_platform_data *pdata)
+>> +{
+>> +    struct platform_device *pdev;
+>> +
+>> +    if (instance == 0)
+>> +        pdev =&da8xx_spi_device[0];
+>> +    else if (instance == 1)
+>> +        pdev =&da8xx_spi_device[1];
+> 
+>    Why not:
+> 
+>     if (instance == 0 || instance == 1)
+>         pdev = &da8xx_spi_device[instance];
+> 
+
+
+OK.
+
+>> +    else
+>> +        return -EINVAL;
+>> +
+>> +    pdev->dev.platform_data = pdata;
+>> +
+>> +    return platform_device_register(pdev);
+>> +}
+> 
+> WBR, Sergei
+
+
+Thanks for the review Sergei.
+
+-Mike
