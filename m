@@ -1,63 +1,47 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 1 Feb 2011 22:40:37 +0800
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201141837.GA1147@pengutronix.de>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-Message-ID: <201102012240.38100.jeremy.kerr@canonical.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Feb 2011 14:44:37 +0000
+Subject: [PATCH] mmci: restrict DMA usage to large, even multiblock
+	transfers
+In-Reply-To: <AANLkTimN=bxJzGFDc50-ZUMmCtXaGxVUd9-Zg1+QGfNf@mail.gmail.com>
+References: <1296556873-2730-1-git-send-email-linus.walleij@linaro.org>
+	<20110201105408.GA31216@n2100.arm.linux.org.uk>
+	<4D47EFB6.5090509@stericsson.com>
+	<20110201114522.GD31216@n2100.arm.linux.org.uk>
+	<20110201115832.GF31216@n2100.arm.linux.org.uk>
+	<AANLkTimN=bxJzGFDc50-ZUMmCtXaGxVUd9-Zg1+QGfNf@mail.gmail.com>
+Message-ID: <20110201144437.GL31216@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-Thanks for the feedback, I'm not sure I like the more complex approach though:
-
-> Right, but I thought it a bit further than you did.  Like the following:
+On Tue, Feb 01, 2011 at 03:07:12PM +0100, Linus Walleij wrote:
+> 2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 > 
-> int clk_prepare(struct clk *clk)
-> {
-> 	int ret = 0, first;
-> 	unsigned long flags;
+> > So... I think this patch will work fine on ST variants, returning the
+> > DMA request signals back to their classic meaning. ?That being LSREQ
+> > is only activated on the _final_ transfer rather than the last 8
+> > transfers, which as Linus describes makes your DMA controller complete
+> > on the 8th-to-last transfer.
 > 
-> 	spin_lock_irqsave(&clk->enable_lock, flags);
-> 	if (clk->flags & CLK_BUSY) {
-> 		/*
-> 		 * this must not happen, please serialize calls to
-> 		 * clk_prepare/clk_enable
-> 		 */
-> 		ret = -EBUSY;
-> 		goto out_unlock;
-
-Why is this an error? Two separate drivers may be clk_prepare()-ing at the 
-same time, which should be acceptable. Both calls should block until the 
-prepare is complete.
-
-> 	}
-> 	first = clk->prepare_count++ == 0;
-> 	if (first)
-> 		clk->flags |= CLK_BUSY;
-> 	spin_unlock_irqrestore(&clk->enable_lock, flags);
+> I've tested this patch on MMC and SD on U8500 and it works
+> fine, so
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> 	if (!first)
-> 		return 0;
-> 
-> 	if (clk->ops->prepare) {
-> 		might_sleep();
-> 		ret = clk->ops->prepare(clk);
-> 	}
-> 
-> 	spin_lock_irqsave(&clk->enable_lock, flags);
-> 	clk->flags &= ~CLK_BUSY;
-> 	if (ret)
-> 		clk->prepare_count--;
-> out_unlock:
-> 	spin_unlock_irqrestore(&clk->enable_lock, flags);
-> 
-> 	return ret;
-> }
+> However I think this weird bit turning off all single requests
+> is there for some reason and I still try to find out what the
+> usecase really is. I highly suspect that it's related to either
+> doing some SDIO usecase or pleasing some buggy DMA
+> controller.
 
-Cheers,
+We aren't turning off single requests - by clearing DMAREQCTL, we're
+actually turning them back on.
 
+What I think is going on is someone had an idea of using LBREQ to
+transfer the last one to seven transfers as a burst, rather than one
+to seven separate single transfers as an optimization.  However, this
+can only work if the DMA controller obeys the transfer count and doesn't
+try to transfer more than the remainder of the transfer in any burst.
+IOW, the DMAC has to truncate bursts to the smaller of the burst size
+and remainder.  If it can't, DMAREQCTL causes problems.
 
-Jeremy
+I assume that the U8500/U300 documentation isn't publically available...
+A quick google doesn't seem to help.
