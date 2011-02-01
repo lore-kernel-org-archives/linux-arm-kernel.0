@@ -1,42 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  1 Feb 2011 13:21:36 +0100
-Subject: [PATCH] mmci: don't try DMA on anything <= fifosize
-Message-ID: <1296562896-3729-1-git-send-email-linus.walleij@linaro.org>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 1 Feb 2011 17:51:58 +0530
+Subject: [PATCH 2/4] davinci: add spi devices support for
+	MityDSP-L138/MityARM-1808 platform
+In-Reply-To: <1296518716-5004-3-git-send-email-michael.williamson@criticallink.com>
+References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
+	<1296518716-5004-3-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930248777A4B@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no point in using DMA on anything that will fit just fine
-in the FIFO. Let's just read and retrieve it from the FIFO.
+Hi Mike,
 
-Cc: Ulf Hansson <ulf.hansson@stericsson.com>
-Cc: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This patch on top of the latest DMA code makes U8500 work again,
-without the need for any completion callback patches.
----
- drivers/mmc/host/mmci.c |    8 +++++---
- 1 files changed, 5 insertions(+), 3 deletions(-)
+On Tue, Feb 01, 2011 at 05:35:14, Michael Williamson wrote:
+> This patch adds support for accessing the on board SPI NOR FLASH
+> device for MityDSP-L138 and MityARM-1808 SoMs.
+> 
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+> ---
+>  arch/arm/mach-davinci/board-mityomapl138.c |  104 ++++++++++++++++++++++++++++
+>  1 files changed, 104 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 800b69c..c87a8d2 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -463,10 +463,12 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 		datactrl |= MCI_DPSM_DIRECTION;
- 
- 	/*
--	 * Attempt to use DMA operation mode, if this
--	 * should fail, fall back to PIO mode
-+	 * When we want to transfer something less than or equal to the FIFO
-+	 * depth, PIO works just fine, no risk of overrun. Else try DMA
-+	 * first and foremost.
- 	 */
--	if (!mmci_dma_start_data(host, datactrl))
-+	if (host->size > variant->fifosize &&
-+	    !mmci_dma_start_data(host, datactrl))
- 		return;
- 
- 	/* IRQ mode, map the SG list for CPU reading/writing */
--- 
-1.7.3.2
+
+> +
+> +static struct davinci_spi_platform_data mityomapl138_spi1_pdata = {
+> +	.version	= SPI_VERSION_2,
+> +	.num_chipselect	= 1,
+> +	.intr_line	= 1,
+> +};
+
+This platform data is better placed in devices-da8xx.c as most of
+it is common across all DA8xx platforms. Only num_chipselect and
+chip_sel array are expected to be board specific so only those should
+be passed on from board files.
+
+Thanks,
+Sekhar
