@@ -1,21 +1,62 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 01 Feb 2011 11:51:07 +0100
-Subject: [patch 1/1] t5325: add audio support
-In-Reply-To: <20110118072802.620728772@rtp-net.org> (Arnaud Patard's message
-	of "Tue, 18 Jan 2011 08:27:50 +0100")
-References: <20110118072802.620728772@rtp-net.org>
-Message-ID: <871v3s110k.fsf@lechat.rtp-net.org>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 1 Feb 2011 11:51:28 +0100
+Subject: [PATCH 3/9] Add a mfd IPUv3 driver
+In-Reply-To: <1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
+References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
+	<1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110201105127.GA10128@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
+Hi Sascha,
 
-Hi,
+On Mon, Dec 20, 2010 at 11:48:41AM +0100, Sascha Hauer wrote:
+> The IPU is the Image Processing Unit found on i.MX50/51/53 SoCs. It
+> features several units for image processing, this patch adds support
+> for the units needed for Framebuffer support, namely:
+> 
+> - Display Controller (dc)
+> - Display Interface (di)
+> - Display Multi Fifo Controller (dmfc)
+> - Display Processor (dp)
+> - Image DMA Controller (idmac)
+> 
+> This patch is based on the Freescale driver, but follows a different
+> approach. The Freescale code implements logical idmac channels and
+> the handling of the subunits is hidden in common idmac code pathes
+> in big switch/case statements. This patch instead just provides code
+> and resource management for the different subunits. The user, in this
+> case the framebuffer driver, decides how the different units play
+> together.
+> 
+> The IPU has other units missing in this patch:
+> 
+> - CMOS Sensor Interface (csi)
+> - Video Deinterlacer (vdi)
+> - Sensor Multi FIFO Controler (smfc)
+> - Image Converter (ic)
+> - Image Rotator (irt)
+> 
+> So expect more files to come in this directory.
+I couldn't look into details as the patch is huge, but it looks mostly good.
+One thing I don't really like is the
 
-> This patch declares the i2c audio codec and initialise audio.
-> It's adding the alc5621 codec in the i2c board info and is calling
-> kirkwood_audio_init() to initialize kirkwood audio.
++static struct device *ipu_dev;
++void __iomem *ipu_cm_reg;
++void __iomem *ipu_idmac_reg;
 
-Did this patch get lost in space ? :)
+part. I know there is currently no HW supporting more than one of those
+controllers, but as a general principle I find this is not a good programming
+habit.
 
-Arnaud
+Now, on a less technical note: I don't really see how this driver fits in the
+MFD category, unless the upcoming units support brings something new. If I
+were looking for the i.MX5x image processing unit, I would be looking under
+drivers/video/.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
