@@ -1,61 +1,52 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 1 Feb 2011 13:39:30 +0100
-Subject: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE power state
-In-Reply-To: <30bccb5d133f92cdbf1a4aa75ba54e7b@mail.gmail.com>
-References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1101311613230.16671@utopia.booyaka.com>
-	<30bccb5d133f92cdbf1a4aa75ba54e7b@mail.gmail.com>
-Message-ID: <4D47FF02.9090709@ti.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue, 01 Feb 2011 07:43:13 -0500
+Subject: [PATCH 4/4] davinci: add spi devices support for
+	da830/omap-l137/am17x evm
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930248777A33@dbde02.ent.ti.com>
+References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>	<1296518716-5004-5-git-send-email-michael.williamson@criticallink.com>
+	<4D47F74B.9060309@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930248777A33@dbde02.ent.ti.com>
+Message-ID: <4D47FFE1.6040901@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/1/2011 7:29 AM, Santosh Shilimkar wrote:
->> From: Paul Walmsley [mailto:paul at pwsan.com]
->> Sent: Tuesday, February 01, 2011 4:44 AM
->>
->> Hello Santosh,
->>
->> On Fri, 28 Jan 2011, Santosh Shilimkar wrote:
->>
->>> On OMAP4, one can explicitly program INACTIVE as the power state
->> of
->>> the logic area inside the power domain. Techincally PD state
->> programmed
->>> to ON and if all the clock domains within the PD are idled, is
->> equivalent
->>> tp PD programmed to INACTIVE and all the clock domains within the
->> PD are
->>> idled. There won't be any power difference in above two.
->>>
->>> Since the CPUIDLE C-states explicitly make use of INACTIVE as a PD
->>> targeted state and also there is some additional latancy involved
->>> with PD INACTIVE vs PD ON, it's better to support it as an explcit
->>> PD state.
->>>
->>> This patch adds the support to allow explicit PD INACTIVE
->>> programming if supported.
->>
->> What does the hardware do when the powerdomain is programmed to
->> INACTIVE?
->> Does it actually force the clockdomains idle?
->>
-> No. It doesn't force it. The power domain to hit INACTIVE, the
-> clockdomain within the power domain needs to idle and it is
-> still a prerequisite. With INACTIVE being programmed, we could
-> issue a sleep transition.
->
-> PD_ON:
-> No power transition, only clocks are gated. Power domain stays ON.
->
-> PD_INA:
-> Power domain transitions to INACTIVE state. All logic and
-> memory stay powered. This state allows for a voltage
-> sleep transition.
+Hi Sekhar,
 
-Just a small note on the latest point:
-The voltage sleep transition can occur only if all power domains inside 
-a voltage domain are INACTIVE, RET or OFF.
+On 2/1/2011 7:11 AM, Nori, Sekhar wrote:
 
-Regards,
-Benoit
+> On Tue, Feb 01, 2011 at 17:36:35, Sergei Shtylyov wrote:
+>> Hello.
+>>
+>> On 01-02-2011 3:05, Michael Williamson wrote:
+>>
+>>> From: Sekhar Nori<nsekhar@ti.com>
+>>
+>>> This patch adds the on-board SPI flash device to the
+>>> DA830/OMAP-L137/AM17x EVM. It also registers the SPI flash
+>>> device to the MTD subsystem.
+>>
+>>> Based on SPI flash device support for MityDSP-L138F platform.
+>>
+>>> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
+>>
+>>     Why Sekhar hasn't signed off on this patch?
+> 
+> I should have.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> 
+> Thanks,
+> Sekhar
+> 
+
+
+I need to move the da830evm_spi0_pdata structure into the common devices-da8xx.c
+based on your other comment to part 2/4 of this series.  
+
+For my clarification on patch submission, do I need to change the authorship if
+I touch it in anyway?  Or should I leave you the author (given you ack the mods, 
+and confirm your sign-off)?
+
+Thanks.
+
+-Mike
