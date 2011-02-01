@@ -1,51 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Feb 2011 21:43:31 +0100
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <4D486B59.6010106@codeaurora.org>
-References: <20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<20110201155344.GF1147@pengutronix.de>
-	<20110201170637.GR31216@n2100.arm.linux.org.uk>
-	<20110201193201.GH1147@pengutronix.de>
-	<20110201195604.GS31216@n2100.arm.linux.org.uk>
-	<4D486B59.6010106@codeaurora.org>
-Message-ID: <20110201204330.GJ1147@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 01 Feb 2011 12:53:42 -0800
+Subject: [PATCH 1/2 v1] davinci: support disabling modem status interrupts
+	on SOC UARTS
+In-Reply-To: <4D44803E.8000703@criticallink.com> (Michael Williamson's message
+	of "Sat, 29 Jan 2011 16:01:50 -0500")
+References: <1294230392-29564-1-git-send-email-michael.williamson@criticallink.com>
+	<4D44803E.8000703@criticallink.com>
+Message-ID: <871v3rwk6h.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Michael Williamson <michael.williamson@criticallink.com> writes:
 
-On Tue, Feb 01, 2011 at 12:21:45PM -0800, Saravana Kannan wrote:
-> If the driver is calling clk_prepare() right next to clk_enable()
-> knowing it's been already prepared and will hence be "atomic" (this
-> is actually not true), then by your description, it's pointless to
-> call clk_prepare().
-Well not completely, as it increases the reference count.  The advantage
-would be that clk_enable counts addionally as prepare, so it would be
-impossible to unprepare an enabled clock.  And the other way round an
-unprepared clock would never be enabled.
- 
-> If you want the driver to call clk_prepare() in atomic context
-> because it will be atomic in most cases -- well, that's wrong. It's
-> either atomic or is NOT atomic. There is no in between. If a call is
-> NOT atomic, it can't be called in atomic context. Long story short,
-> if you expect clk_prepare() to be atomic under any circumstance, it
-> beats the point of introducing clk_prepare().
-Well, with my suggestion it's atomic when certain precondions are given.
-IMHO that's better than "atomic in most cases" because the caller can
-assert that everything goes smooth.
-These preconditions are asserted when the driver writer is careful
-enough to stick to the API.
+> Hi Kevin...
+>
+> On 01/05/2011 07:26 AM, Michael Williamson wrote:
+>> On the da850/omap-l138/am18x family of SoCs, up to three on chip UARTS may be
+>> configured.  These peripherals support the standard Tx/Rx signals as well as
+>> CTS/RTS hardware flow control signals.  The pins on these SOC's associated with
+>> these signals are multiplexed; e.g., the pin providing UART0_TXD capability
+>> also provides SPI0 chip select line 5 output capability.  The configuration of
+>> the pin multiplexing occurs during platform initialization (or by earlier
+>> bootloader operations).
+>> 
+>> There is a problem with the multiplexing implementation on these SOCs.  Only
+>> the output and output enable portions of the I/O section of the pin are
+>> multiplexed.  All peripheral input functions remain connected to a given pin
+>> regardless of configuration.
+>> 
+>> In many configurations of these parts, providing a UART with Tx/Rx capability
+>> is needed, but the HW flow control capability is not.  Furthermore, the pins
+>> associated with the CTS inputs on these UARTS are often configured to support
+>> a different peripheral, and they may be active/toggling during runtime.  This
+>> can result in false modem status (CTS) interrupts being asserted to the 8250
+>> driver controlling the associated Tx/Rx pins, and will impact system
+>> performance.
+>> 
+>> The 8250 serial driver platform data does not provide a direct mechanism to
+>> tell the driver to disable modem status (i.e., CTS) interrupts for a given
+>> port.  As a work-around, intercept register writes to the IER and disable
+>> modem status interrupts.
+>> 
+>> This patch was tested using a MityDSP-L138 SOM having UART1 enabled with the
+>> associated CTS pin connected to a clock (configured for the AHCLKX function).
+>> 
+>> Background / problem reports related to this issue are captured in the links
+>> below:
+>> http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/t/36701.aspx
+>> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg19524.html
+>> 
+>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+>> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
+>> ---
+>> This is against the linux-davinci tree.
+>> 
+>> Changes from original proposed patch:
+>> - instead of overriding set_termios, now override serial_out driver hook
+>>   and intercept writes to the MSR.
+>> 
+>> An alternate patch was proposed that modified the serial core driver and added a UPF_NO_MSR
+>> flag.  There was resistance to this patch.  The reasoning is that the core 8250 driver code
+>> should not continue to get muddied by platform hacks.
+>> 
+>
+> I'd like to withdraw this patch.  It works, but it's inefficient and ugly, and 
+> I also get the feeling it isn't going to make it in it's current form anyway.
+>
+> I have another patch that is limited to just the mityomapl138 platform that 
+> I would like to submit in place of this.  No other board appears to have this
+> problem, so it makes sense to constrain the fix to platform file that does.
+>
 
-Either my idea is bad or I'm unable to sell it appropriately.  Be it as
-it is, I will stop to make a case for it.
+OK
 
-Best regards and thanks for your try,
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kevin
