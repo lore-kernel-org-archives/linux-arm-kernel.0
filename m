@@ -1,96 +1,43 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 Feb 2011 14:24:29 -0800
-Subject: [PATCH] OMAP2+: remove unused UART base addresses from
-	omap_globals
-In-Reply-To: <1295649015-26348-1-git-send-email-khilman@ti.com> (Kevin
-	Hilman's message of "Fri, 21 Jan 2011 14:30:15 -0800")
-References: <1295649015-26348-1-git-send-email-khilman@ti.com>
-Message-ID: <87fws7pf4y.fsf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 01 Feb 2011 16:42:34 -0600
+Subject: [RFC PATCH 3/5] of: add clock providers
+In-Reply-To: <20110126044416.16410.68942.stgit@localhost6.localdomain6>
+References: <20110126043338.16410.75019.stgit@localhost6.localdomain6>
+	<20110126044416.16410.68942.stgit@localhost6.localdomain6>
+Message-ID: <4D488C5A.7020107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+Grant,
 
-> Now that omap_hwmod + omap_device is used for OMAP UART device and
-> driver code, we no longer need the UART physical addresses in
-> omap_globals.
->
-> Note that the #defines for the base addresses are still left in
-> <plat/serial.h> since they are used by DEBUG_LL and uncompress code.
->
-> Build tested for OMAP1 (omap1_defconfig) and OMAP2+ (omap2plus_defconfig)
->
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Applies on Tony's for-next branch.
+On 01/25/2011 10:44 PM, Grant Likely wrote:
+> +struct clk *of_clk_get(struct device *dev, const char *id)
 
-For the benefit of the archives, queuing for 2.6.39 (branch:
-for_2.6.39/pm-misc)
+It would help if this took a struct device_node rather than struct 
+device. This would allow using of_clk_get directly for cases where you 
+don't have a struct device. This is fairly common in core platform core 
+which are not full drivers. The case I have run into is the timer init 
+code. To make clk_get work, I would have to create a dummy struct device.
 
-Kevin
+Alternatively, an of_clk_get_sys function is needed.
 
->  arch/arm/mach-omap2/common.c             |   14 --------------
->  arch/arm/plat-omap/include/plat/common.h |    4 ----
->  2 files changed, 0 insertions(+), 18 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-> index d5eaee3..8044c8a 100644
-> --- a/arch/arm/mach-omap2/common.c
-> +++ b/arch/arm/mach-omap2/common.c
-> @@ -50,9 +50,6 @@ static struct omap_globals omap242x_globals = {
->  	.ctrl	= OMAP242X_CTRL_BASE,
->  	.prm	= OMAP2420_PRM_BASE,
->  	.cm	= OMAP2420_CM_BASE,
-> -	.uart1_phys	= OMAP2_UART1_BASE,
-> -	.uart2_phys	= OMAP2_UART2_BASE,
-> -	.uart3_phys	= OMAP2_UART3_BASE,
->  };
->  
->  void __init omap2_set_globals_242x(void)
-> @@ -71,9 +68,6 @@ static struct omap_globals omap243x_globals = {
->  	.ctrl	= OMAP243X_CTRL_BASE,
->  	.prm	= OMAP2430_PRM_BASE,
->  	.cm	= OMAP2430_CM_BASE,
-> -	.uart1_phys	= OMAP2_UART1_BASE,
-> -	.uart2_phys	= OMAP2_UART2_BASE,
-> -	.uart3_phys	= OMAP2_UART3_BASE,
->  };
->  
->  void __init omap2_set_globals_243x(void)
-> @@ -92,10 +86,6 @@ static struct omap_globals omap3_globals = {
->  	.ctrl	= OMAP343X_CTRL_BASE,
->  	.prm	= OMAP3430_PRM_BASE,
->  	.cm	= OMAP3430_CM_BASE,
-> -	.uart1_phys	= OMAP3_UART1_BASE,
-> -	.uart2_phys	= OMAP3_UART2_BASE,
-> -	.uart3_phys	= OMAP3_UART3_BASE,
-> -	.uart4_phys	= OMAP3_UART4_BASE,	/* Only on 3630 */
->  };
->  
->  void __init omap2_set_globals_3xxx(void)
-> @@ -119,10 +109,6 @@ static struct omap_globals omap4_globals = {
->  	.prm	= OMAP4430_PRM_BASE,
->  	.cm	= OMAP4430_CM_BASE,
->  	.cm2	= OMAP4430_CM2_BASE,
-> -	.uart1_phys	= OMAP4_UART1_BASE,
-> -	.uart2_phys	= OMAP4_UART2_BASE,
-> -	.uart3_phys	= OMAP4_UART3_BASE,
-> -	.uart4_phys	= OMAP4_UART4_BASE,
->  };
->  
->  void __init omap2_set_globals_443x(void)
-> diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-> index 29b2afb..1b8095b 100644
-> --- a/arch/arm/plat-omap/include/plat/common.h
-> +++ b/arch/arm/plat-omap/include/plat/common.h
-> @@ -56,10 +56,6 @@ struct omap_globals {
->  	unsigned long   prm;            /* Power and Reset Management */
->  	unsigned long   cm;             /* Clock Management */
->  	unsigned long   cm2;
-> -	unsigned long	uart1_phys;
-> -	unsigned long	uart2_phys;
-> -	unsigned long	uart3_phys;
-> -	unsigned long	uart4_phys;
->  };
->  
->  void omap2_set_globals_242x(void);
+ > +{
+> +	struct device_node *provnode;
+> +	u32 provhandle;
+> +	int sz;
+> +	struct clk *clk;
+> +	char prop_name[32]; /* 32 is max size of property name */
+> +	const void *prop;
+> +
+> +	dev_dbg(dev, "Looking up %s-clock from device tree\n", id);
+> +
+> +	snprintf(prop_name, 32, "%s-clock", id ? id : "bus");
+
+Many times a module just has 1 clock and id will be NULL. Is "bus-clock" 
+really the best choice of name? A bus clock may exist, but be 
+transparent to s/w. How about allowing "clock" or "%s-clock"?
+
+If bus-clock is the default, then you should add this to the clock 
+binding wiki page.
+
+Rob
