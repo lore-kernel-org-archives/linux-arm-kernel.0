@@ -1,28 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 1 Feb 2011 16:34:54 +0100
-Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
-In-Reply-To: <1296470024-26854-2-git-send-email-ohad@wizery.com>
-References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
-	<1296470024-26854-2-git-send-email-ohad@wizery.com>
-Message-ID: <201102011634.54762.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 1 Feb 2011 16:53:44 +0100
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+In-Reply-To: <20110201152458.GP31216@n2100.arm.linux.org.uk>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<20110201105449.GY1147@pengutronix.de>
+	<20110201131512.GH31216@n2100.arm.linux.org.uk>
+	<20110201141837.GA1147@pengutronix.de>
+	<20110201143932.GK31216@n2100.arm.linux.org.uk>
+	<20110201151846.GD1147@pengutronix.de>
+	<20110201152458.GP31216@n2100.arm.linux.org.uk>
+Message-ID: <20110201155344.GF1147@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 January 2011, Ohad Ben-Cohen wrote:
-> Add a platform-independent hwspinlock framework.
+On Tue, Feb 01, 2011 at 03:24:58PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 01, 2011 at 04:18:46PM +0100, Uwe Kleine-K?nig wrote:
+> > yeah, didn't thought about multiple consumers, so (as Jeremy suggested)
+> > the right thing is to sleep until CLK_BUSY is cleared.
 > 
-> Hardware spinlock devices are needed, e.g., in order to access data
-> that is shared between remote processors, that otherwise have no
-> alternative mechanism to accomplish synchronization and mutual exclusion
-> operations.
+> A simpler way to write this is:
 > 
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Hari Kanigeri <h-kanigeri2@ti.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> int clk_prepare(struct clk *clk)
+> {
+> 	int ret = 0;
+> 
+> 	mutex_lock(&clk->mutex);
+> 	if (clk->prepared == 0)
+> 		ret = clk->ops->prepare(clk);
+> 	if (ret == 0)
+> 		clk->prepared++;
+> 	mutex_unlock(&clk->mutex);
+> 
+> 	return ret;
+> }
+But you cannot call this in atomic context when you know the clock is
+already prepared.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
