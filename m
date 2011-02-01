@@ -1,51 +1,46 @@
-From: therealbadguy@gmail.com (Chris)
-Date: Tue, 1 Feb 2011 14:29:54 -0700
-Subject: iMX31 MBX registers Porting problem
-In-Reply-To: <AANLkTin+gjAzT+PbQx1bm2wxao58oynMGfW4MxXd6K-D@mail.gmail.com>
-References: <AANLkTin+Mo9YXEfoDAa+btjX5VdiOz1QJp++ck0efPAk@mail.gmail.com>
-	<20110131003128.GD27436@n2100.arm.linux.org.uk>
-	<AANLkTi=EsCCwgiK5BtkKfaYEuzVUtnie-LU77cNJ4P4q@mail.gmail.com>
-	<20110131154523.GB32737@n2100.arm.linux.org.uk>
-	<AANLkTin4fPo6pKWLCqb+BXNS-hDrWPLEK7QQErbuq15C@mail.gmail.com>
-	<AANLkTin+gjAzT+PbQx1bm2wxao58oynMGfW4MxXd6K-D@mail.gmail.com>
-Message-ID: <AANLkTi=Y4qabbmM+8DRZ3KYZFkk_Chwa5gs80wTH_MSO@mail.gmail.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue,  1 Feb 2011 16:49:35 -0500
+Subject: [PATCH v1 0/4] davinci: Add SPI support for da8xx platforms
+Message-ID: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 1, 2011 at 2:05 PM, Chris <therealbadguy@gmail.com> wrote:
->> ?I have gone the extra distance in turning off support in the working kernel
->> 2.6.19.2, I have removed nearly everything. I am down to the gpio_port
->>
->
+This patch series adds the necessary SPI resources and registration
+routines for da850/OMAP-L138/AM18x and da830/OMAP-L137/AM17x devices.
+It also adds on-board SPI FLASH devices for the da830 evm, the da850
+evm, and the MityDSP-L138/MityARM-1808 platforms.
 
-I was finally able to get this device to stop working on 2.6.19.2
+These patches are based on work done during testing of davinci SPI driver 
+submissions incorporated in version 2.6.38 of the kernel, at [1].
 
-it seems that a mapping is being done to the peripheral port register.
+The da850 and da830 EVM portions of this patch need verification / ack.
 
-/* Setup Peripheral Port Remap register for AVIC */
-        asm("ldr r0, =0xC0000015                                \n\
-         mcr p15, 0, r0, c15, c2, 4");
+The MityDSP-L138 platform patch has been tested.
 
-once this code is disabled, speaking to my device no longer returns
-the expected results.
-however, simply pasting this code in the new kernel does not
-immediately bring me happiness.
-this is from a fixup routine used in kernel 2.6.19.2, so I cloned that
-logic and created a fixup routine.
-I think perhaps that some other things have gotten in the way.
+The patch series is against commit 8fb837c158e342413d08d6f211b5b8f67d5adc2f
+of kevin's tree.
 
-Are there any changes that would impact me here that anyone knows of?
-my concern is now that there is not the only code enabling this
-access, and I am trying to research that end of it.
-I am pretty confident this is not device specific any more, but more
-platform support.
+[1] http://arago-project.org/git/projects/?p=linux-davinci.git;a=shortlog;h=refs/heads/davinci-spi-rewrite
 
-I know noone is working on this device, but perhaps some experience
-with this register will help.
-I am amazed that all these chips are parked on the new kernel versions,
-does anyone have any plans to ever work with this stuff?
+---
+Changes since v0:
+   - fixed up issues in device stuctures pointed out by Sergei
+   - moved spi platform data structures to common array in devices-da8xx.c
+   - Added sign-off information for Sekhar's patches per comments.
 
-I think we need this working. at least bring the support as far
-forward as I can.
+Michael Williamson (2):
+  davinci: da8xx/omap-l1: add support for SPI
+  davinci: add spi devices support for MityDSP-L138/MityARM-1808
+    platform
 
-My Last post: Stupid fingers hit enter, so sorry guys. :(
+Sekhar Nori (2):
+  davinci: add spi devices support for da850/omap-l138/am18x evm
+  davinci: add spi devices support for da830/omap-l137/am17x evm
+
+ arch/arm/mach-davinci/board-da830-evm.c    |   78 ++++++++++++++++++++++
+ arch/arm/mach-davinci/board-da850-evm.c    |   84 +++++++++++++++++++++++
+ arch/arm/mach-davinci/board-mityomapl138.c |  100 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/da850.c              |   16 +++++
+ arch/arm/mach-davinci/devices-da8xx.c      |   96 ++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    3 +
+ 6 files changed, 377 insertions(+), 0 deletions(-)
