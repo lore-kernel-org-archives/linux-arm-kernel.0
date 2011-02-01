@@ -1,39 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Feb 2011 15:07:12 +0100
-Subject: [PATCH] mmci: restrict DMA usage to large,
-	even multiblock transfers
-In-Reply-To: <20110201115832.GF31216@n2100.arm.linux.org.uk>
-References: <1296556873-2730-1-git-send-email-linus.walleij@linaro.org>
-	<20110201105408.GA31216@n2100.arm.linux.org.uk>
-	<4D47EFB6.5090509@stericsson.com>
-	<20110201114522.GD31216@n2100.arm.linux.org.uk>
-	<20110201115832.GF31216@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimN=bxJzGFDc50-ZUMmCtXaGxVUd9-Zg1+QGfNf@mail.gmail.com>
+Date: Tue, 1 Feb 2011 15:11:00 +0100
+Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
+In-Reply-To: <20110201110348.GB31216@n2100.arm.linux.org.uk>
+References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
+	<20110201110348.GB31216@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik=HJELkKL3v8CsxCvX4-V-Y8evVc7zhgFkQNK+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jan 31, 2011 at 10:39:40PM +0100, Linus Walleij wrote:
+>> The DMA mode also needs to wait until the FIFO is drained before
+>> enabling the MCI_DATAEND IRQ.
+>
+> Hmm. ?This will cause attempted DMA usage on ARM MMCI primecells to get
+> stuck as we'll wait for the never-delivered callback.
+>
+> With the code I have in place, you'll notice I have:
+>
+> ? ? ? ?/* Wait up to 1ms for the DMA to complete */
+> ? ? ? ?for (i = 0; ; i++) {
+> ? ? ? ? ? ? ? ?status = readl(host->base + MMCISTATUS);
+> ? ? ? ? ? ? ? ?if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? ?udelay(10);
+> ? ? ? ?}
+>
+> This waits for the DMA controller to read the last data out of the FIFO
+> before allowing the request to complete. ?As it has a timeout, it is
+> able to detect ARMs broken DMA setup on their MMCI/DMAC, and disable DMA
+> support for this primecell rather than getting stuck.
+>
+> This may be sufficient without using the DMA callbacks.
 
-> So... I think this patch will work fine on ST variants, returning the
-> DMA request signals back to their classic meaning. ?That being LSREQ
-> is only activated on the _final_ transfer rather than the last 8
-> transfers, which as Linus describes makes your DMA controller complete
-> on the 8th-to-last transfer.
+Seems like so. When I try it with the last patch to use the FIFO
+for small xfers it works nicely.
 
-I've tested this patch on MMC and SD on U8500 and it works
-fine, so
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
+So we'll drop this approach for now.
 
-However I think this weird bit turning off all single requests
-is there for some reason and I still try to find out what the
-usecase really is. I highly suspect that it's related to either
-doing some SDIO usecase or pleasing some buggy DMA
-controller.
-
-Having it deactivated most likely works for all MMC/SD cards
-and then we have to think about having (ST-Specific)
-if (mmc_card_sdio()) clauses for SDIO usecases, which we
-can defer until we know what's going on.
-
-Yours,
 Linus Walleij
