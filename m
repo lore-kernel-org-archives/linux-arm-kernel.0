@@ -1,41 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Feb 2011 15:11:00 +0100
-Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
-In-Reply-To: <20110201110348.GB31216@n2100.arm.linux.org.uk>
-References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
-	<20110201110348.GB31216@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik=HJELkKL3v8CsxCvX4-V-Y8evVc7zhgFkQNK+@mail.gmail.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 1 Feb 2011 15:15:15 +0100
+Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
+In-Reply-To: <20110201133036.GI31216@n2100.arm.linux.org.uk>
+References: <20101219195959.GA28157@n2100.arm.linux.org.uk>
+	<20101221135421.GS28157@n2100.arm.linux.org.uk>
+	<20101221155935.GV28157@n2100.arm.linux.org.uk>
+	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
+	<20110124160127.GA24104@n2100.arm.linux.org.uk>
+	<AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
+	<20110124212228.GN24104@n2100.arm.linux.org.uk>
+	<AANLkTimReBj7QGw08imBV2JWJGwh-TO5oA+3kiFQZLq4@mail.gmail.com>
+	<20110125102351.GA11507@n2100.arm.linux.org.uk>
+	<AANLkTikLABG5yWDYcOe12mfy_Hco15k_ByqYX15GH9Cy@mail.gmail.com>
+	<20110201133036.GI31216@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=TB+5aw-Yo3-8es3PLFSY=cf1RU7ws=zwv2Gj5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Jan 31, 2011 at 10:39:40PM +0100, Linus Walleij wrote:
->> The DMA mode also needs to wait until the FIFO is drained before
->> enabling the MCI_DATAEND IRQ.
->
-> Hmm. ?This will cause attempted DMA usage on ARM MMCI primecells to get
-> stuck as we'll wait for the never-delivered callback.
->
-> With the code I have in place, you'll notice I have:
->
-> ? ? ? ?/* Wait up to 1ms for the DMA to complete */
-> ? ? ? ?for (i = 0; ; i++) {
-> ? ? ? ? ? ? ? ?status = readl(host->base + MMCISTATUS);
-> ? ? ? ? ? ? ? ?if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
-> ? ? ? ? ? ? ? ?udelay(10);
-> ? ? ? ?}
->
-> This waits for the DMA controller to read the last data out of the FIFO
-> before allowing the request to complete. ?As it has a timeout, it is
-> able to detect ARMs broken DMA setup on their MMCI/DMAC, and disable DMA
-> support for this primecell rather than getting stuck.
->
-> This may be sufficient without using the DMA callbacks.
 
-Seems like so. When I try it with the last patch to use the FIFO
-for small xfers it works nicely.
+> So, the solutions as I see it are:
+>
+> 1. If DMAREQCTL = 1, move the burst limiting work-around into the DMA
+> ? engine driver, if it really is a problem.
+>
+> 2. Set DMAREQCTL = 0.
+>
+> (2) seems to be the most sane solution to me.
 
-So we'll drop this approach for now.
+Let's go with that as indicated in other mail.
+
+However the DMAREQCTL is an odd beast and I just cannot
+wrap my head around it. It certainly isn't there to solve any
+software problems, so I need to find some usecase for it.
+
+Generating SDIO traffic with odd bytechunks isn't that easy
+though.
 
 Linus Walleij
