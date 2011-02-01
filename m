@@ -1,33 +1,54 @@
 From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue,  1 Feb 2011 20:17:45 +0530
-Subject: [PATCH v1 7/9] mfd: pruss CAN private data.
+Date: Tue,  1 Feb 2011 20:17:46 +0530
+Subject: [PATCH v1 8/9] da850: pruss CAN board specific changes for gpios.
 In-Reply-To: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
 References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <1296571667-12049-8-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <1296571667-12049-9-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PRUSS CAN data.
+This patch adds the GPIO modifications required for the pruss CAN.
 
 Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 ---
- include/linux/mfd/pruss/da8xx_pru.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/include/linux/mfd/pruss/da8xx_pru.h b/include/linux/mfd/pruss/da8xx_pru.h
-index 318dad8..2fa7ff5 100644
---- a/include/linux/mfd/pruss/da8xx_pru.h
-+++ b/include/linux/mfd/pruss/da8xx_pru.h
-@@ -74,6 +74,10 @@ struct da8xx_pruss_devices {
- 	int (*setup)(void);
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 285545f..737df73 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -45,6 +45,7 @@
+ 
+ #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
+ #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
++#define DA850_PRUSS_CAN_TRX_PIN	GPIO_TO_PIN(2, 0)
+ 
+ #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
+ 
+@@ -1055,7 +1056,7 @@ static __init int da850_evm_init_cpufreq(void) { return 0; }
+ 
+ const short da850_pruss_can_pins[] = {
+ 	DA850_PRUSS_PRU0_R31_0, DA850_PRUSS_PRU1_R30_15,
+-	DA850_PRUSS_PRU1_R31_18,
++	DA850_PRUSS_PRU1_R31_18, DA850_GPIO2_0,
+ 	-1
  };
  
-+struct da8xx_pruss_can_data {
-+	u32 version;
-+};
-+
- u32 pruss_get_clk_freq(struct device *dev);
+@@ -1076,6 +1077,14 @@ static int __init da850_evm_setup_pruss_can(void)
+ 	val |= BIT(3);
+ 	__raw_writel(val, cfg_chip3_base);
  
- u32 pruss_enable(struct device *dev, u8 pruss_num);
++	/* value = 0 to enable the CAN transceiver */
++	ret = gpio_request_one(DA850_PRUSS_CAN_TRX_PIN,
++					GPIOF_OUT_INIT_LOW, "pruss_can_en");
++	if (ret) {
++		pr_warning("Cannot setup GPIO %d\n", DA850_PRUSS_CAN_TRX_PIN);
++		gpio_free(DA850_PRUSS_CAN_TRX_PIN);
++	}
++
+ 	return ret;
+ }
+ 
 -- 
 1.7.2.3
