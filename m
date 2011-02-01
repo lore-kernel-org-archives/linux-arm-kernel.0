@@ -1,81 +1,55 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 1 Dec 2010 09:32:18 +0530
-Subject: [PATCH 53/54] ARM: plat-spear: irq_data conversion.
-In-Reply-To: <20101130134125.GB15575@mail.wantstofly.org>
-References: <cover.1291118519.git.buytenh@wantstofly.org>
-	<20101130134125.GB15575@mail.wantstofly.org>
-Message-ID: <4CF5C8CA.9000804@st.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 31 Jan 2011 22:38:59 -0800
+Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
+In-Reply-To: <AANLkTik-fgCF_W0-DBE6UVTpjqF6Jf=u7bQYkcweEegQ@mail.gmail.com>
+References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
+	<1296470024-26854-2-git-send-email-ohad@wizery.com>
+	<20110131153831.dca62146.akpm@linux-foundation.org>
+	<AANLkTik-fgCF_W0-DBE6UVTpjqF6Jf=u7bQYkcweEegQ@mail.gmail.com>
+Message-ID: <20110131223859.27169db0.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30/2010 07:11 PM, Lennert Buytenhek wrote:
-> Signed-off-by: Lennert Buytenhek <buytenh@secretlab.ca>
-> ---
->  arch/arm/plat-spear/shirq.c |   22 +++++++++++-----------
->  1 files changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/plat-spear/shirq.c b/arch/arm/plat-spear/shirq.c
-> index 2172d69..7818903 100644
-> --- a/arch/arm/plat-spear/shirq.c
-> +++ b/arch/arm/plat-spear/shirq.c
-> @@ -20,10 +20,10 @@
->  struct spear_shirq *shirq;
->  static DEFINE_SPINLOCK(lock);
->  
-> -static void shirq_irq_mask(unsigned irq)
-> +static void shirq_irq_mask(struct irq_data *d)
->  {
-> -	struct spear_shirq *shirq = get_irq_chip_data(irq);
-> -	u32 val, id = irq - shirq->dev_config[0].virq;
-> +	struct spear_shirq *shirq = irq_data_get_irq_chip_data(d);
-> +	u32 val, id = d->irq - shirq->dev_config[0].virq;
->  	unsigned long flags;
->  
->  	if ((shirq->regs.enb_reg == -1) || shirq->dev_config[id].enb_mask == -1)
-> @@ -39,10 +39,10 @@ static void shirq_irq_mask(unsigned irq)
->  	spin_unlock_irqrestore(&lock, flags);
->  }
->  
-> -static void shirq_irq_unmask(unsigned irq)
-> +static void shirq_irq_unmask(struct irq_data *d)
->  {
-> -	struct spear_shirq *shirq = get_irq_chip_data(irq);
-> -	u32 val, id = irq - shirq->dev_config[0].virq;
-> +	struct spear_shirq *shirq = irq_data_get_irq_chip_data(d);
-> +	u32 val, id = d->irq - shirq->dev_config[0].virq;
->  	unsigned long flags;
->  
->  	if ((shirq->regs.enb_reg == -1) || shirq->dev_config[id].enb_mask == -1)
-> @@ -60,9 +60,9 @@ static void shirq_irq_unmask(unsigned irq)
->  
->  static struct irq_chip shirq_chip = {
->  	.name		= "spear_shirq",
-> -	.ack		= shirq_irq_mask,
-> -	.mask		= shirq_irq_mask,
-> -	.unmask		= shirq_irq_unmask,
-> +	.irq_ack	= shirq_irq_mask,
-> +	.irq_mask	= shirq_irq_mask,
-> +	.irq_unmask	= shirq_irq_unmask,
->  };
->  
->  static void shirq_handler(unsigned irq, struct irq_desc *desc)
-> @@ -70,7 +70,7 @@ static void shirq_handler(unsigned irq, struct irq_desc *desc)
->  	u32 i, val, mask;
->  	struct spear_shirq *shirq = get_irq_data(irq);
->  
-> -	desc->chip->ack(irq);
-> +	desc->irq_data.chip->irq_ack(&desc->irq_data);
->  	while ((val = readl(shirq->regs.base + shirq->regs.status_reg) &
->  				shirq->regs.status_reg_mask)) {
->  		for (i = 0; (i < shirq->dev_count) && val; i++) {
-> @@ -92,7 +92,7 @@ static void shirq_handler(unsigned irq, struct irq_desc *desc)
->  			writel(mask, shirq->regs.base + shirq->regs.clear_reg);
->  		}
->  	}
-> -	desc->chip->unmask(irq);
-> +	desc->irq_data.chip->irq_unmask(&desc->irq_data);
->  }
->  
->  int spear_shirq_register(struct spear_shirq *shirq)
+On Tue, 1 Feb 2011 08:20:13 +0200 Ohad Ben-Cohen <ohad@wizery.com> wrote:
 
-Acked-by: Viresh Kumar <viresh.kumar@st.com>
+> On Tue, Feb 1, 2011 at 1:38 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> > It's a little irritating having two hwspinlock.h's.
+> > hwspinlock_internal.h wold be a conventional approach. __But it's not a
+> > big deal.
+> ...
+> 
+> >> +/**
+> >> + * __hwspin_lock_timeout() - lock an hwspinlock with timeout limit
+> >> + * @hwlock: the hwspinlock to be locked
+> >> + * @timeout: timeout value in jiffies
+> >
+> > hm, why in jiffies?
+> >
+> > The problem here is that lazy programmers will use
+> >
+> > __ __ __ __hwspin_lock_timeout(lock, 10, ...)
+> >
+> > and their code will work happily with HZ=100 but will explode with HZ=1000.
+> >
+> > IOW, this interface *requires* that all callers perform a
+> > seconds-to-jiffies conversion before calling hwspin_lock_timeout(). __So
+> > why not reduce their effort and their ability to make mistakes by
+> > defining the API to take seconds?
+> 
+> I considered that, but then decided to use jiffies in order to be
+> consistent with wait_event_timeout/schedule_timeout (although I don't
+> return the remaining jiffies in case the lock is taken before the
+> timeout elapses), and also to allow user-selected granularity.
+> 
+> But I do kind of like the idea of not using jiffies. We can probably
+> even move to msecs, since anyway this is an error condition, and
+> people who needs a quick check should just use the trylock() version.
+> 
+> I'll do a quick respin of the patches with that and the
+> hwspinlock_internal.h comment above.
+
+OK..
+
+The patch series looks OK to me.  But there isn't a lot of point in me
+putting them into my tree.  Maybe Tony or Russell or Greg can grab them
+if they like the look of it all?
