@@ -1,76 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 Feb 2011 12:53:42 -0800
-Subject: [PATCH 1/2 v1] davinci: support disabling modem status interrupts
-	on SOC UARTS
-In-Reply-To: <4D44803E.8000703@criticallink.com> (Michael Williamson's message
-	of "Sat, 29 Jan 2011 16:01:50 -0500")
-References: <1294230392-29564-1-git-send-email-michael.williamson@criticallink.com>
-	<4D44803E.8000703@criticallink.com>
-Message-ID: <871v3rwk6h.fsf@ti.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 01 Feb 2011 12:57:57 -0800
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+In-Reply-To: <20110201152820.GQ31216@n2100.arm.linux.org.uk>
+References: <201102011711.31258.jeremy.kerr@canonical.com>	<20110201105449.GY1147@pengutronix.de>	<AANLkTimayMAfr+zA6uO_yUmZqsOLmJ3fiiS696mL_evn@mail.gmail.com>	<20110201140024.GZ1147@pengutronix.de>	<20110201151418.GN31216@n2100.arm.linux.org.uk>	<20110201152203.GE1147@pengutronix.de>
+	<20110201152820.GQ31216@n2100.arm.linux.org.uk>
+Message-ID: <4D4873D5.70203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Williamson <michael.williamson@criticallink.com> writes:
+On 02/01/2011 07:28 AM, Russell King - ARM Linux wrote:
+> On Tue, Feb 01, 2011 at 04:22:03PM +0100, Uwe Kleine-K?nig wrote:
+>> Full ack.  (I wonder if you misunderstood me or wanted to put my
+>> statement into more words.  Jassi didn't like that a clk_enable without
+>> a previous clk_prepare worked on some platforms and on others it
+>> doesn't.  With BUG_ON(clk->ops->prepare&&  !clk->prepare_count) in
+>> clk_enable we have exactly this situation.)
+>
+> Even with a NULL clk->ops->prepare function, we still want drivers to
+> have called clk_prepare().  So we can do something like:
+>
+> 	if (WARN_ON(clk->prepare_count == 0))
+> 		return -EINVAL;
+>
+> in clk_enable() should be sufficient and noisy enough not to be missed.
 
-> Hi Kevin...
->
-> On 01/05/2011 07:26 AM, Michael Williamson wrote:
->> On the da850/omap-l138/am18x family of SoCs, up to three on chip UARTS may be
->> configured.  These peripherals support the standard Tx/Rx signals as well as
->> CTS/RTS hardware flow control signals.  The pins on these SOC's associated with
->> these signals are multiplexed; e.g., the pin providing UART0_TXD capability
->> also provides SPI0 chip select line 5 output capability.  The configuration of
->> the pin multiplexing occurs during platform initialization (or by earlier
->> bootloader operations).
->> 
->> There is a problem with the multiplexing implementation on these SOCs.  Only
->> the output and output enable portions of the I/O section of the pin are
->> multiplexed.  All peripheral input functions remain connected to a given pin
->> regardless of configuration.
->> 
->> In many configurations of these parts, providing a UART with Tx/Rx capability
->> is needed, but the HW flow control capability is not.  Furthermore, the pins
->> associated with the CTS inputs on these UARTS are often configured to support
->> a different peripheral, and they may be active/toggling during runtime.  This
->> can result in false modem status (CTS) interrupts being asserted to the 8250
->> driver controlling the associated Tx/Rx pins, and will impact system
->> performance.
->> 
->> The 8250 serial driver platform data does not provide a direct mechanism to
->> tell the driver to disable modem status (i.e., CTS) interrupts for a given
->> port.  As a work-around, intercept register writes to the IER and disable
->> modem status interrupts.
->> 
->> This patch was tested using a MityDSP-L138 SOM having UART1 enabled with the
->> associated CTS pin connected to a clock (configured for the AHCLKX function).
->> 
->> Background / problem reports related to this issue are captured in the links
->> below:
->> http://e2e.ti.com/support/dsp/omap_applications_processors/f/42/t/36701.aspx
->> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg19524.html
->> 
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> Tested-by: Michael Williamson <michael.williamson@criticallink.com>
->> ---
->> This is against the linux-davinci tree.
->> 
->> Changes from original proposed patch:
->> - instead of overriding set_termios, now override serial_out driver hook
->>   and intercept writes to the MSR.
->> 
->> An alternate patch was proposed that modified the serial core driver and added a UPF_NO_MSR
->> flag.  There was resistance to this patch.  The reasoning is that the core 8250 driver code
->> should not continue to get muddied by platform hacks.
->> 
->
-> I'd like to withdraw this patch.  It works, but it's inefficient and ugly, and 
-> I also get the feeling it isn't going to make it in it's current form anyway.
->
-> I have another patch that is limited to just the mityomapl138 platform that 
-> I would like to submit in place of this.  No other board appears to have this
-> problem, so it makes sense to constrain the fix to platform file that does.
->
+This code will only catch the error when it actually happens and will 
+even miss catching some of them (if timed right -- unprepare happens in 
+the other core after this check is executed).
 
-OK
+I really wish there was something better we could do to help driver devs 
+catch errors of calling enable without calling prepare(). Some thing 
+like spin lock debug, or the might_sleeps() inside mutexes, etc.
 
-Kevin
+Hmm... Jeremy, how about doing a similar check in the unprepare code? 
+You could WARN/BUG ON the prepare count going to zero when the enable 
+count is still non-zero?
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
