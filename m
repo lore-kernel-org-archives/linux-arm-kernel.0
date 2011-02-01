@@ -1,31 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Feb 2011 15:28:20 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201152203.GE1147@pengutronix.de>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<AANLkTimayMAfr+zA6uO_yUmZqsOLmJ3fiiS696mL_evn@mail.gmail.com>
-	<20110201140024.GZ1147@pengutronix.de>
-	<20110201151418.GN31216@n2100.arm.linux.org.uk>
-	<20110201152203.GE1147@pengutronix.de>
-Message-ID: <20110201152820.GQ31216@n2100.arm.linux.org.uk>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Tue,  1 Feb 2011 17:36:28 +0200
+Subject: [PATCH] arm: mach-omap2: board-rm680: fix rm680_vemmc regulator
+	constraints
+Message-ID: <1296574588-23588-1-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 04:22:03PM +0100, Uwe Kleine-K?nig wrote:
-> Full ack.  (I wonder if you misunderstood me or wanted to put my
-> statement into more words.  Jassi didn't like that a clk_enable without
-> a previous clk_prepare worked on some platforms and on others it
-> doesn't.  With BUG_ON(clk->ops->prepare && !clk->prepare_count) in
-> clk_enable we have exactly this situation.)
+With the commit 757902513019e6ee469791ff76f954b19ca8d036 fixed voltage
+regulator setup will fail if there are voltage constraints defined. This
+made MMC unusable on this board. Fix by just deleting those redundant
+constraints.
 
-Even with a NULL clk->ops->prepare function, we still want drivers to
-have called clk_prepare().  So we can do something like:
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+---
+ arch/arm/mach-omap2/board-rm680.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-	if (WARN_ON(clk->prepare_count == 0))
-		return -EINVAL;
-
-in clk_enable() should be sufficient and noisy enough not to be missed.
-
-I'd avoid BUG_ON() here as that will take the system down, which may
-increase the chances of getting useful bug reports.
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index cb77be7..39a71bb 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -40,9 +40,6 @@ static struct regulator_consumer_supply rm680_vemmc_consumers[] = {
+ static struct regulator_init_data rm680_vemmc = {
+ 	.constraints =	{
+ 		.name			= "rm680_vemmc",
+-		.min_uV			= 2900000,
+-		.max_uV			= 2900000,
+-		.apply_uV		= 1,
+ 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+ 					| REGULATOR_MODE_STANDBY,
+ 		.valid_ops_mask		= REGULATOR_CHANGE_STATUS
+-- 
+1.5.6.5
