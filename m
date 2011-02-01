@@ -1,66 +1,124 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Tue, 1 Feb 2011 10:41:59 +0200
-Subject: FW: [linux-cirrus] Fwd: Re: More about SD-Card problems
-In-Reply-To: <4D471F71.4010806@bluewatersys.com>
-References: <0D753D10438DA54287A00B027084269764CEE3A4FE@AUSP01VMBX24.collaborationhost.net>
-	<4D471F71.4010806@bluewatersys.com>
-Message-ID: <20110201084158.GA2463@acer>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 1 Feb 2011 17:11:29 +0800
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+Message-ID: <201102011711.31258.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 09:45:37AM +1300, Ryan Mallon wrote:
-> On 02/01/2011 05:45 AM, H Hartley Sweeten wrote:
-> > *From:* linux-cirrus-bounce at freelists.org
-> > [mailto:linux-cirrus-bounce at freelists.org] *On Behalf Of *Martin Guy
-> > *Sent:* Sunday, January 30, 2011 5:40 PM
-> > *To:* sim1 at googlegroups.com; linux-cirrus at freelists.org
-> > *Subject:* [linux-cirrus] Fwd: Re: More about SD-Card problems
-> 
-> The Cirrus mailing lists are effectively dead now. Can we please keep
-> EP93xx related discussions on the Linux ARM kernel list (Cc'ed).
+Hi all,
 
-I'm confused - how did a private email to Martin end up in some Cirrus related
-mailing list?
+> I suggested that clk_prepare() be callable only from non-atomic contexts,
+> and do whatever's required to ensure that the clock is available.  That
+> may end up enabling the clock as a result.
 
-> > Da: "Mika Westerberg" <mika.westerberg@iki.fi
-[...]
-> > 
-> > The M2M DMA patches are attached. Note that it is still in "hack" phase so
-> > error handling etc. are not finalized at all. M2M DMA currently only
-> > supports
-> > SPI but I'm going to add that memory-to-memory support and possibly IDE,
-> > let's
-> > see. It currently doesn't use double buffering but that is going to be
-> > added at
-> > some point.
-> > 
-> > I've been developing on .38-rc2 kernel but since these patches touch
-> > only ep93xx
-> > stuff I believe that they should apply pretty easily to .36.
-> 
-> It would be good to get these patches applied to mainline. Some comments
-> below. I also think we should look at integrating the EP93xx DMA into
-> the existing dmaengine framework if applicable. If not, is it at least
-> possible to reuse/combine some parts of the existing EP93xx M2P DMA code?
+I think that clk_prepare/clk_unprepare looks like the most promising solution, 
+so will try to get some preliminary patches done. Here's what I'm planning:
 
-Well this patch set wasn't meant for public review. It's just a hack I'm working
-on which was going to evolve into something which could be considered into
-mainline.
+-----
 
-I totally agree with you that we should try to use an existing framework. These
-are now in a separate source files and have different API but I had a plan to
-merge them later if they are similar enough. The patches which are attached are
-not there yet (not even close).
+The changes to the API are essentially:
 
-It is certainly possible to reuse the existing EP93XX M2P DMA code. Current set
-just implements everything on it's own because it was easier to me to get the
-thing working with the SPI driver.
+1) Document clk_enable/clk_disable as callable from atomic contexts, and
+   so clock implementations must not sleep within this function.
 
-Anyway thanks for the review, I'll make sure that the version I'm going to send
-to upstream incorporates your suggestions. And I'm hoping to either merge M2M
-code into M2P code or look how it could be implemented with dmaengine.
+2) For clock implementations that may sleep to turn on a clock, we add a
+   new pair of functions to the clock API: clk_prepare and clk_unprepare.
 
-Sorry for the noise.
+   These will provide hooks for the clock implmentation to do any sleepable
+   work (eg, wait for PLLs to settle) in preparation for a later clk_enable.
 
-Regards,
-MW
+   For the most common clock implemntation cases (where clocks can be enabled 
+   atomically), these functions will be a no-op, and all of the enable/disable
+   work can be done in clk_enable/clk_disable.
+
+   For implementations where clocks require blocking on enable/disable, most
+   of the work will be done in clk_prepare/clk_unprepare. The clk_enable
+   and clk_disable functions may be no-ops.
+
+For drivers, this means that clk_prepare must be called (and have returned) 
+before calling clk_enable.
+
+== Enable/Prepare counts ==
+
+I intend to do the enable and prepare "counting" in the core clock API, 
+meaning that that the clk_ops callbacks will only invoked on the first 
+prepare/enable and the last unprepare/disable.
+
+== Concurrency ==
+
+Splitting the prepare and enable stages introduces the concurrency 
+requirements:
+
+1) clk_enable must not return before the clock is outputting a valid clock 
+   signal.
+
+2) clk_prepare must not return before the clock is fully prepared (ie, it is 
+   safe to call clk_enable).
+
+It is not possible for clk_enable to wait for the clock to be prepared, 
+because that would require synchronisation with clk_prepare, which may then 
+require blocking. Therefore:
+
+3) The clock consumer *must* respect the proper ordering of clk_prepare and 
+   clk_enable. For example, drivers that call clk_enable during an interrupt 
+   must ensure that the interrupt handler will not be invoked until 
+   clk_prepare has returned.
+
+== Other considerations ==
+
+The time that a clock spends "prepared" is a superset of the the time that a 
+clock spends "enabled". Therefore, clocks that are switched on during 
+clk_prepare (ie, non-atomic clocks) will be running for a larger amount of 
+time. In some cases, this can be mitigated by moving some of the final 
+(atomic) switching functionality to the clk_enable function.
+
+== Implementation ==
+
+Basically:
+
+struct clk {
+	const struct clk_ops *ops
+	int                  enable_count;
+	spinlock_t           enable_lock;
+	int                  prepare_count;
+	struct mutex         prepare_lock;
+};
+
+int clk_enable(struct clk *clk)
+{
+	int ret = 0;
+
+	spin_lock(&clk->enable_lock);
+	if (!clk->enable_count)
+		ret = clk->ops->enable(clk);
+
+	if (!ret)
+		clk->enable_count++;
+	spin_unlock(&clk->enable_lock);
+
+	return ret;
+}
+
+int clk_prepare(struct clk *clk)
+{
+	int ret = 0;
+
+	mutex_lock(&clk->prepare_lock);
+	if (!clk->prepare_count)
+		ret = clk->ops->prepare(clk);
+
+	if (!ret)
+		clk->prepare_count++;
+	mutex_unlock(&clk->prepare_lock);
+
+	return ret;
+}
+
+-----
+
+Comments welcome, code coming soon.
+
+Cheers,
+
+
+Jeremy
