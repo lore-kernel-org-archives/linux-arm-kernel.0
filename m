@@ -1,30 +1,23 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 1 Feb 2011 19:18:45 +0100
-Subject: [PATCH] ARM: pxa: Properly configure PWM period for palm27x
-In-Reply-To: <1296511613-24406-1-git-send-email-marek.vasut@gmail.com>
-References: <1296511613-24406-1-git-send-email-marek.vasut@gmail.com>
-Message-ID: <201102011918.45662.marek.vasut@gmail.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Tue, 1 Feb 2011 20:27:25 +0200
+Subject: [PATCH] arm: mach-omap2: board-rm680: fix rm680_vemmc regulator
+	constraints
+In-Reply-To: <1296574588-23588-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1296574588-23588-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <20110201202725.804aa011.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 January 2011 23:06:53 Marek Vasut wrote:
-> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  arch/arm/mach-pxa/palm27x.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
-> index 7d1434a..4c9a938 100644
-> --- a/arch/arm/mach-pxa/palm27x.c
-> +++ b/arch/arm/mach-pxa/palm27x.c
-> @@ -322,7 +322,7 @@ static struct platform_pwm_backlight_data
-> palm27x_backlight_data = { .pwm_id		= 0,
->  	.max_brightness	= 0xfe,
->  	.dft_brightness	= 0x7e,
-> -	.pwm_period_ns	= 3500,
-> +	.pwm_period_ns	= 3500 * 1024,
->  	.init		= palm27x_backlight_init,
->  	.notify		= palm27x_backlight_notify,
->  	.exit		= palm27x_backlight_exit,
+On Tue,  1 Feb 2011 17:36:28 +0200
+Aaro Koskinen <aaro.koskinen@nokia.com> wrote:
 
-CC linux-arm-kernel, I mistyped, sorry
+> With the commit 757902513019e6ee469791ff76f954b19ca8d036 fixed voltage
+> regulator setup will fail if there are voltage constraints defined. This
+> made MMC unusable on this board. Fix by just deleting those redundant
+> constraints.
+> 
+True. Before there were a test min_uV == max_uV && ops->set_voltage and
+now min_uV == max_uV followed by test for ops->set_voltage that returns
+EINVAL if not set (NULL for fixed voltage regulator obviously).
+
+Reviewed-by: Jarkko Nikula <jhnikula@gmail.com>
