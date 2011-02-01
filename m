@@ -1,24 +1,30 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 01 Feb 2011 17:25:56 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <AANLkTimEBz6UK0X45cA2ihZddfcSTNqEPTJa=zGc+84S@mail.gmail.com>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-	<20110121215110.GD23151@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101211655110.8580@xanadu.home>
-	<20110121222930.GF23151@n2100.arm.linux.org.uk>
-	<AANLkTimEBz6UK0X45cA2ihZddfcSTNqEPTJa=zGc+84S@mail.gmail.com>
-Message-ID: <1296581156.2768.58.camel@hornet.cambridge.arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 1 Feb 2011 19:18:45 +0100
+Subject: [PATCH] ARM: pxa: Properly configure PWM period for palm27x
+In-Reply-To: <1296511613-24406-1-git-send-email-marek.vasut@gmail.com>
+References: <1296511613-24406-1-git-send-email-marek.vasut@gmail.com>
+Message-ID: <201102011918.45662.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Have you considered switching the ISP1761 handler to
-> request_threaded_irq() with IRQF_ONESHOT | IRQF_NO_SUSPEND
-> so it runs in process context with that IRQ masked off, until completion?
+On Monday 31 January 2011 23:06:53 Marek Vasut wrote:
+> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+>  arch/arm/mach-pxa/palm27x.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
+> index 7d1434a..4c9a938 100644
+> --- a/arch/arm/mach-pxa/palm27x.c
+> +++ b/arch/arm/mach-pxa/palm27x.c
+> @@ -322,7 +322,7 @@ static struct platform_pwm_backlight_data
+> palm27x_backlight_data = { .pwm_id		= 0,
+>  	.max_brightness	= 0xfe,
+>  	.dft_brightness	= 0x7e,
+> -	.pwm_period_ns	= 3500,
+> +	.pwm_period_ns	= 3500 * 1024,
+>  	.init		= palm27x_backlight_init,
+>  	.notify		= palm27x_backlight_notify,
+>  	.exit		= palm27x_backlight_exit,
 
-That's something that Will suggested, but no - I didn't try it. This may
-be worth discussing with the ISP1761 driver maintainer...
-
-Cheers!
-
-Pawe?
+CC linux-arm-kernel, I mistyped, sorry
