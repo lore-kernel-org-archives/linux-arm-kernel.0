@@ -1,41 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Feb 2011 17:06:37 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201155344.GF1147@pengutronix.de>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<20110201155344.GF1147@pengutronix.de>
-Message-ID: <20110201170637.GR31216@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 01 Feb 2011 17:25:51 +0000
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <20110201142845.GJ31216@n2100.arm.linux.org.uk>
+References: <20110124162400.GC24104@n2100.arm.linux.org.uk>
+	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
+	<20110124165356.GG24104@n2100.arm.linux.org.uk>
+	<20110124170304.GH24104@n2100.arm.linux.org.uk>
+	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
+	<20110124180944.GK24104@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA45911F432EF@GEORGE.Emea.Arm.com>
+	<20110124231050.GP24104@n2100.arm.linux.org.uk>
+	<20110201111821.GC31216@n2100.arm.linux.org.uk>
+	<1296567299.2768.40.camel@hornet.cambridge.arm.com>
+	<20110201142845.GJ31216@n2100.arm.linux.org.uk>
+Message-ID: <1296581151.2768.57.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 04:53:44PM +0100, Uwe Kleine-K?nig wrote:
-> On Tue, Feb 01, 2011 at 03:24:58PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 01, 2011 at 04:18:46PM +0100, Uwe Kleine-K?nig wrote:
-> > > yeah, didn't thought about multiple consumers, so (as Jeremy suggested)
-> > > the right thing is to sleep until CLK_BUSY is cleared.
-> > 
-> > A simpler way to write this is:
-> > 
-> > int clk_prepare(struct clk *clk)
-> > {
-> > 	int ret = 0;
-> > 
-> > 	mutex_lock(&clk->mutex);
-> > 	if (clk->prepared == 0)
-> > 		ret = clk->ops->prepare(clk);
-> > 	if (ret == 0)
-> > 		clk->prepared++;
-> > 	mutex_unlock(&clk->mutex);
-> > 
-> > 	return ret;
-> > }
-> But you cannot call this in atomic context when you know the clock is
-> already prepared.
+> So, I do hope that someone decides to implement something more reasonable
+> if Versatile Express were to get a DMA controller.  If it's another PL08x
+> then it isn't worth it - it won't work.
 
-So?  You're not _supposed_ to call it from any atomic context ever.
+More likely it will be DMA-330 formerly known as PL330. But as I said -
+it's about the chip that Core Tile carries (whether it's feasible to
+squeeze it inside).
+
+Alternatively one could use Logic Tile (FPGA based) in the second
+daughterboard site with an engine implementation, but I don't expect
+many users willing to pay $$$$ just for this reason :-)
+
+Cheers!
+
+Pawe?
