@@ -1,40 +1,64 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Tue, 1 Feb 2011 15:15:15 +0100
-Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
-In-Reply-To: <20110201133036.GI31216@n2100.arm.linux.org.uk>
-References: <20101219195959.GA28157@n2100.arm.linux.org.uk>
-	<20101221135421.GS28157@n2100.arm.linux.org.uk>
-	<20101221155935.GV28157@n2100.arm.linux.org.uk>
-	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
-	<20110124160127.GA24104@n2100.arm.linux.org.uk>
-	<AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
-	<20110124212228.GN24104@n2100.arm.linux.org.uk>
-	<AANLkTimReBj7QGw08imBV2JWJGwh-TO5oA+3kiFQZLq4@mail.gmail.com>
-	<20110125102351.GA11507@n2100.arm.linux.org.uk>
-	<AANLkTikLABG5yWDYcOe12mfy_Hco15k_ByqYX15GH9Cy@mail.gmail.com>
-	<20110201133036.GI31216@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=TB+5aw-Yo3-8es3PLFSY=cf1RU7ws=zwv2Gj5@mail.gmail.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 1 Feb 2011 06:17:25 -0800
+Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
+In-Reply-To: <20110131223859.27169db0.akpm@linux-foundation.org>
+References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
+	<1296470024-26854-2-git-send-email-ohad@wizery.com>
+	<20110131153831.dca62146.akpm@linux-foundation.org>
+	<AANLkTik-fgCF_W0-DBE6UVTpjqF6Jf=u7bQYkcweEegQ@mail.gmail.com>
+	<20110131223859.27169db0.akpm@linux-foundation.org>
+Message-ID: <20110201141725.GB28833@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Mon, Jan 31, 2011 at 10:38:59PM -0800, Andrew Morton wrote:
+> On Tue, 1 Feb 2011 08:20:13 +0200 Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> 
+> > On Tue, Feb 1, 2011 at 1:38 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> > > It's a little irritating having two hwspinlock.h's.
+> > > hwspinlock_internal.h wold be a conventional approach. __But it's not a
+> > > big deal.
+> > ...
+> > 
+> > >> +/**
+> > >> + * __hwspin_lock_timeout() - lock an hwspinlock with timeout limit
+> > >> + * @hwlock: the hwspinlock to be locked
+> > >> + * @timeout: timeout value in jiffies
+> > >
+> > > hm, why in jiffies?
+> > >
+> > > The problem here is that lazy programmers will use
+> > >
+> > > __ __ __ __hwspin_lock_timeout(lock, 10, ...)
+> > >
+> > > and their code will work happily with HZ=100 but will explode with HZ=1000.
+> > >
+> > > IOW, this interface *requires* that all callers perform a
+> > > seconds-to-jiffies conversion before calling hwspin_lock_timeout(). __So
+> > > why not reduce their effort and their ability to make mistakes by
+> > > defining the API to take seconds?
+> > 
+> > I considered that, but then decided to use jiffies in order to be
+> > consistent with wait_event_timeout/schedule_timeout (although I don't
+> > return the remaining jiffies in case the lock is taken before the
+> > timeout elapses), and also to allow user-selected granularity.
+> > 
+> > But I do kind of like the idea of not using jiffies. We can probably
+> > even move to msecs, since anyway this is an error condition, and
+> > people who needs a quick check should just use the trylock() version.
+> > 
+> > I'll do a quick respin of the patches with that and the
+> > hwspinlock_internal.h comment above.
+> 
+> OK..
+> 
+> The patch series looks OK to me.  But there isn't a lot of point in me
+> putting them into my tree.  Maybe Tony or Russell or Greg can grab them
+> if they like the look of it all?
 
-> So, the solutions as I see it are:
->
-> 1. If DMAREQCTL = 1, move the burst limiting work-around into the DMA
-> ? engine driver, if it really is a problem.
->
-> 2. Set DMAREQCTL = 0.
->
-> (2) seems to be the most sane solution to me.
+As it's an arm-specific thing, it should probably go through Russell's
+tree.
 
-Let's go with that as indicated in other mail.
+thanks,
 
-However the DMAREQCTL is an odd beast and I just cannot
-wrap my head around it. It certainly isn't there to solve any
-software problems, so I need to find some usecase for it.
-
-Generating SDIO traffic with odd bytechunks isn't that easy
-though.
-
-Linus Walleij
+greg k-h
