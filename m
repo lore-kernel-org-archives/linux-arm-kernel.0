@@ -1,68 +1,47 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 1 Feb 2011 10:54:58 +0530
-Subject: [PATCH 4/6] omap4: dpll: Enable all DPLL autoidle at boot
-In-Reply-To: <alpine.DEB.2.00.1101311614570.16671@utopia.booyaka.com>
-References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296212688-21951-5-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1101311614570.16671@utopia.booyaka.com>
-Message-ID: <f8e27368d1e145b19c1d5c6e607a0043@mail.gmail.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Tue, 1 Feb 2011 11:09:52 +0530
+Subject: linux-next-20100201 - OMAP2+ defconfig broken with CONFIG_DEBUG_LL
+Message-ID: <AANLkTinF+dpKvuRztChBM01MAjgL-foGp_yVq3uC9ghu@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi all,
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Tuesday, February 01, 2011 4:47 AM
-> To: rnayak at ti.com; Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; khilman at ti.com; b-cousson at ti.com;
-linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 4/6] omap4: dpll: Enable all DPLL autoidle at boot
->
-> Hi guys
->
-> On Fri, 28 Jan 2011, Santosh Shilimkar wrote:
->
-> > From: Rajendra Nayak <rnayak@ti.com>
-> >
-> > Enable all DPLL autoidle at boot on OMAP4.
->
-> Is there some reason why we can't do this in the OMAP4 PM code?  At some
-> point, I think it would be good to essentially disable all PM at boot,
-and
-> then let the PM code specifically enable autoidle later in the boot
-> process, etc.  The idea being that !CONFIG_PM would result in a chip
-> programmed for lowest latency, etc.
+I tried to build linux-next as of 20100201 with omap2plus_defconfig. In addition
+I turned on CONFIG_DEBUG_LL and hit the following error.
 
-I guess it makes sense to do this late in boot and only if CONFIG_PM
-is enabled. Will make the necessary changes and repost.
+  AS      arch/arm/kernel/debug.o
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:174: Error: garbage following instruction --
+`ldreq r1,=
+__virt_to_phys(omap_uart_phys)'
+arch/arm/kernel/debug.S:174: Error: garbage following instruction --
+`ldrne r1,=
+__phys_to_virt((0x80000000+0x3ffc))'
+arch/arm/kernel/debug.S:174: Error: garbage following instruction --
+`ldreq r2,=
+__virt_to_phys(omap_uart_phys)'
+arch/arm/kernel/debug.S:174: Error: garbage following instruction --
+`ldreq r2,=
+__virt_to_phys(omap_uart_phys)'
+arch/arm/kernel/debug.S:178: Error: garbage following instruction --
+`ldreq r2,=
+__virt_to_phys(omap_uart_lsr)'
+arch/arm/kernel/debug.S:190: Error: garbage following instruction --
+`ldreq r1,=
+__virt_to_phys(omap_uart_phys)'
+arch/arm/kernel/debug.S:190: Error: garbage following instruction --
+`ldrne r1,=
+__phys_to_virt((0x80000000+0x3ffc))'
+arch/arm/kernel/debug.S:190: Error: garbage following instruction --
+`ldreq r2,=
+__virt_to_phys(omap_uart_phys)'
+arch/arm/kernel/debug.S:190: Error: garbage following instruction --
+`ldreq r2,=
+__virt_to_phys(omap_uart_phys)'
+make[1]: *** [arch/arm/kernel/debug.o] Error 1
+make: *** [arch/arm/kernel] Error 2
 
-Regards,
-Rajendra
+Will try and bisect this down later. Just reporting for now.
 
->
-> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/clock44xx_data.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/clock44xx_data.c
-b/arch/arm/mach-omap2/clock44xx_data.c
-> > index e8cb32f..e5c59a0 100644
-> > --- a/arch/arm/mach-omap2/clock44xx_data.c
-> > +++ b/arch/arm/mach-omap2/clock44xx_data.c
-> > @@ -3300,6 +3300,8 @@ int __init omap4xxx_clk_init(void)
-> >  			clkdev_add(&c->lk);
-> >  			clk_register(c->lk.clk);
-> >  			omap2_init_clk_clkdm(c->lk.clk);
-> > +			if (c->lk.clk->dpll_data)
-> > +				omap3_dpll_allow_idle(c->lk.clk);
-> >  		}
-> >
-> >  	recalculate_root_clocks();
-> > --
-> > 1.6.0.4
-> >
->
->
-> - Paul
+- Anand
