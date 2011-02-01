@@ -1,110 +1,59 @@
-From: thomas.weber.linux@googlemail.com (Thomas Weber)
-Date: Tue, 1 Feb 2011 22:24:15 +0100
-Subject: [PATCHv5] OMAP3: Devkit8000: Change lcd power pin
-In-Reply-To: <1295538108-26451-1-git-send-email-weber@corscience.de>
-References: <1295538108-26451-1-git-send-email-weber@corscience.de>
-Message-ID: <AANLkTi=mbJrNSfRqRzqAvKmhU-LgRiYq0KDC2zekWdqm@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Feb 2011 21:24:09 +0000
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+In-Reply-To: <4D48741F.8060006@codeaurora.org>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<20110201105449.GY1147@pengutronix.de>
+	<20110201131512.GH31216@n2100.arm.linux.org.uk>
+	<20110201141837.GA1147@pengutronix.de>
+	<20110201143932.GK31216@n2100.arm.linux.org.uk>
+	<20110201151846.GD1147@pengutronix.de>
+	<20110201152458.GP31216@n2100.arm.linux.org.uk>
+	<4D48741F.8060006@codeaurora.org>
+Message-ID: <20110201212409.GU31216@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 4:41 PM, Thomas Weber <weber@corscience.de> wrote:
-> This patch fixes a wrongly used lcd enable pin.
->
-> The Devkit8000 uses twl4030_ledA configured as output gpio only for
-> the lcd enable line. twl4030_gpio.1 is used through the generic
-> gpio functions while ledA is used via low level twl4030 calls.
->
-> This patch removes the low level calls and use the generic gpio functions
-> for initialization and use of ledA. This patch also fixes a bug where the
-> lcd would not power down when blanking.
->
-> Further this patch fixes an indentation issue. The comment line uses
-> eight whitespace and is replaced with a hard tab.
->
-> gpio_request + gpio_direction_output are replaced with gpio_request_one.
-> The return value of gpio_request_one is used to set the value of the
-> gpio to -EINVAL when unsuccessful, so that gpio_is_valid can detect the
-> unsuccessful request. But already successful requested gpios are not freed.
->
-> Reported-by: Daniel Morsing <daniel.morsing@gmail.com>
-> Signed-off-by: Thomas Weber <weber@corscience.de>
-> ---
-> Changes from v4:
-> ? ? ? ?Merge of two patches
-> ? ? ? ?Use of gpio_request_one instead of gpio_request + gpio_direction_output
-> Changes from v3:
-> ? ? ? ?Use return value of gpio_request
-> Changes from v2:
-> ? ? ? ?Fix indention => indentation
-> ? ? ? ?Better comment for removing low level functions used for twl4030 gpio
-> Changes from v1:
-> ? ? ? ?Pull the indentation fix into this patch
-> ? ? ? ?Change the pin for lcd pwren
->
-> ?arch/arm/mach-omap2/board-devkit8000.c | ? 27 ++++++++++++++++-----------
-> ?1 files changed, 16 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-> index a5eb955..e4c12fe 100644
-> --- a/arch/arm/mach-omap2/board-devkit8000.c
-> +++ b/arch/arm/mach-omap2/board-devkit8000.c
-> @@ -115,9 +115,6 @@ static struct omap2_hsmmc_info mmc[] = {
->
-> ?static int devkit8000_panel_enable_lcd(struct omap_dss_device *dssdev)
-> ?{
-> - ? ? ? twl_i2c_write_u8(TWL4030_MODULE_GPIO, 0x80, REG_GPIODATADIR1);
-> - ? ? ? twl_i2c_write_u8(TWL4030_MODULE_LED, 0x0, 0x0);
-> -
-> ? ? ? ?if (gpio_is_valid(dssdev->reset_gpio))
-> ? ? ? ? ? ? ? ?gpio_set_value_cansleep(dssdev->reset_gpio, 1);
-> ? ? ? ?return 0;
-> @@ -247,6 +244,8 @@ static struct gpio_led gpio_leds[];
-> ?static int devkit8000_twl_gpio_setup(struct device *dev,
-> ? ? ? ? ? ? ? ?unsigned gpio, unsigned ngpio)
-> ?{
-> + ? ? ? int ret;
-> +
-> ? ? ? ?omap_mux_init_gpio(29, OMAP_PIN_INPUT);
-> ? ? ? ?/* gpio + 0 is "mmc0_cd" (input/IRQ) */
-> ? ? ? ?mmc[0].gpio_cd = gpio + 0;
-> @@ -255,17 +254,23 @@ static int devkit8000_twl_gpio_setup(struct device *dev,
-> ? ? ? ?/* TWL4030_GPIO_MAX + 1 == ledB, PMU_STAT (out, active low LED) */
-> ? ? ? ?gpio_leds[2].gpio = gpio + TWL4030_GPIO_MAX + 1;
->
-> - ? ? ? ?/* gpio + 1 is "LCD_PWREN" (out, active high) */
-> - ? ? ? devkit8000_lcd_device.reset_gpio = gpio + 1;
-> - ? ? ? gpio_request(devkit8000_lcd_device.reset_gpio, "LCD_PWREN");
-> - ? ? ? /* Disable until needed */
-> - ? ? ? gpio_direction_output(devkit8000_lcd_device.reset_gpio, 0);
-> + ? ? ? /* TWL4030_GPIO_MAX + 0 is "LCD_PWREN" (out, active high) */
-> + ? ? ? devkit8000_lcd_device.reset_gpio = gpio + TWL4030_GPIO_MAX + 0;
-> + ? ? ? ret = gpio_request_one(devkit8000_lcd_device.reset_gpio,
-> + ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_OUT | GPIOF_INIT_LOW, "LCD_PWREN");
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? devkit8000_lcd_device.reset_gpio = -EINVAL;
-> + ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO for LCD_PWRN\n");
-> + ? ? ? }
->
-> ? ? ? ?/* gpio + 7 is "DVI_PD" (out, active low) */
-> ? ? ? ?devkit8000_dvi_device.reset_gpio = gpio + 7;
-> - ? ? ? gpio_request(devkit8000_dvi_device.reset_gpio, "DVI PowerDown");
-> - ? ? ? /* Disable until needed */
-> - ? ? ? gpio_direction_output(devkit8000_dvi_device.reset_gpio, 0);
-> + ? ? ? ret = gpio_request_one(devkit8000_dvi_device.reset_gpio,
-> + ? ? ? ? ? ? ? ? ? ? ? GPIOF_DIR_OUT | GPIOF_INIT_LOW, "DVI PowerDown");
-> + ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? devkit8000_dvi_device.reset_gpio = -EINVAL;
-> + ? ? ? ? ? ? ? printk(KERN_ERR "Failed to request GPIO for DVI PowerDown\n");
-> + ? ? ? }
->
-> ? ? ? ?return 0;
-> ?}
-> --
-> 1.7.4.rc2
->
-> --
+On Tue, Feb 01, 2011 at 12:59:11PM -0800, Stephen Boyd wrote:
+> On 02/01/2011 07:24 AM, Russell King - ARM Linux wrote:
+> > I'd also be tempted at this stage to build-in a no-op dummy clock,
+> > that being the NULL clk:
+> >
+> > int clk_prepare(struct clk *clk)
+> > {
+> > 	int ret = 0;
+> >
+> > 	if (clk) {
+> > 		mutex_lock(&clk->mutex);
+> > 		if (clk->prepared == 0)
+> > 			ret = clk->ops->prepare(clk);
+> > 		if (ret == 0)
+> > 			clk->prepared++;
+> > 		mutex_unlock(&clk->mutex);
+> > 	}
+> >
+> > 	return ret;
+> > }
+> 
+> I'm afraid this will hide enable/disable imbalances on some targets and
+> then expose them on others. Maybe its not a big problem though since
+> this also elegantly handles the root(s) of the tree.
 
-Hello Tony,
-can you apply this patch?
+You can't catch enable/disable imbalances in the prepare code, and you
+can't really catch them in the unprepare code either.
 
-Thomas
+Consider two drivers sharing the same struct clk.  When the second driver
+prepares the clock, the enable count could well be non-zero, caused by
+the first driver.  Ditto for when the second driver is removed, and it
+calls unprepare - the enable count may well be non-zero.
+
+The only thing you can check is that when the prepare count is zero,
+the enable count is also zero.  You can also check in clk_enable() and
+clk_disable() that the prepare count is non-zero.
+
+If you want tigher checking than that, you need to somehow identify and
+match up the clk_prepare/clk_enable/clk_disable/clk_unprepare calls from
+a particular driver instance.  Addresses of the functions don't work as
+you can't be certain that driver code will be co-located within a certain
+range.  Adding an additional argument to these functions which is driver
+instance specific seems to be horrible too.
