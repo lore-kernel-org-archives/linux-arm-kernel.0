@@ -1,76 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 1 Feb 2011 11:59:09 +0100
-Subject: [PATCH 3/9] Add a mfd IPUv3 driver
-In-Reply-To: <20110201105127.GA10128@sortiz-mobl>
-References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
-	<1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
-	<20110201105127.GA10128@sortiz-mobl>
-Message-ID: <20110201105909.GS9041@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Feb 2011 11:03:48 +0000
+Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
+In-Reply-To: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
+References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20110201110348.GB31216@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 11:51:28AM +0100, Samuel Ortiz wrote:
-> Hi Sascha,
-> 
-> On Mon, Dec 20, 2010 at 11:48:41AM +0100, Sascha Hauer wrote:
-> > The IPU is the Image Processing Unit found on i.MX50/51/53 SoCs. It
-> > features several units for image processing, this patch adds support
-> > for the units needed for Framebuffer support, namely:
-> > 
-> > - Display Controller (dc)
-> > - Display Interface (di)
-> > - Display Multi Fifo Controller (dmfc)
-> > - Display Processor (dp)
-> > - Image DMA Controller (idmac)
-> > 
-> > This patch is based on the Freescale driver, but follows a different
-> > approach. The Freescale code implements logical idmac channels and
-> > the handling of the subunits is hidden in common idmac code pathes
-> > in big switch/case statements. This patch instead just provides code
-> > and resource management for the different subunits. The user, in this
-> > case the framebuffer driver, decides how the different units play
-> > together.
-> > 
-> > The IPU has other units missing in this patch:
-> > 
-> > - CMOS Sensor Interface (csi)
-> > - Video Deinterlacer (vdi)
-> > - Sensor Multi FIFO Controler (smfc)
-> > - Image Converter (ic)
-> > - Image Rotator (irt)
-> > 
-> > So expect more files to come in this directory.
-> I couldn't look into details as the patch is huge, but it looks mostly good.
-> One thing I don't really like is the
-> 
-> +static struct device *ipu_dev;
-> +void __iomem *ipu_cm_reg;
-> +void __iomem *ipu_idmac_reg;
-> 
-> part. I know there is currently no HW supporting more than one of those
-> controllers, but as a general principle I find this is not a good programming
-> habit.
+On Mon, Jan 31, 2011 at 10:39:40PM +0100, Linus Walleij wrote:
+> The DMA mode also needs to wait until the FIFO is drained before
+> enabling the MCI_DATAEND IRQ.
 
-Ok, will look into it.
+Hmm.  This will cause attempted DMA usage on ARM MMCI primecells to get
+stuck as we'll wait for the never-delivered callback.
 
-> 
-> Now, on a less technical note: I don't really see how this driver fits in the
-> MFD category, unless the upcoming units support brings something new. If I
-> were looking for the i.MX5x image processing unit, I would be looking under
-> drivers/video/.
+With the code I have in place, you'll notice I have:
 
-The ipu unit also supports cameras which would go to drivers/media/video.
-This is the original reason for putting it into drivers/mfd. That said,
-I'm not very comfortable with putting it there, mostly because it
-contains a lot of code to which a mfd maintainer can hardly say anything
-to and because it's one framework more which has to synchronized when
-changes to the IPU come.
+        /* Wait up to 1ms for the DMA to complete */
+        for (i = 0; ; i++) {
+                status = readl(host->base + MMCISTATUS);
+                if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
+                        break;
+                udelay(10);
+        }
 
-Thanks,
- Sascha
+This waits for the DMA controller to read the last data out of the FIFO
+before allowing the request to complete.  As it has a timeout, it is
+able to detect ARMs broken DMA setup on their MMCI/DMAC, and disable DMA
+support for this primecell rather than getting stuck.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This may be sufficient without using the DMA callbacks.
