@@ -1,85 +1,148 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 1 Feb 2011 12:44:54 +0100
-Subject: [PATCH 3/9] Add a mfd IPUv3 driver
-In-Reply-To: <20110201105909.GS9041@pengutronix.de>
-References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
-	<1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
-	<20110201105127.GA10128@sortiz-mobl>
-	<20110201105909.GS9041@pengutronix.de>
-Message-ID: <20110201114453.GC10128@sortiz-mobl>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 01 Feb 2011 14:44:03 +0300
+Subject: [PATCH 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <1296518716-5004-2-git-send-email-michael.williamson@criticallink.com>
+References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
+	<1296518716-5004-2-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <4D47F203.5090502@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 11:59:09AM +0100, Sascha Hauer wrote:
-> On Tue, Feb 01, 2011 at 11:51:28AM +0100, Samuel Ortiz wrote:
-> > Hi Sascha,
-> > 
-> > On Mon, Dec 20, 2010 at 11:48:41AM +0100, Sascha Hauer wrote:
-> > > The IPU is the Image Processing Unit found on i.MX50/51/53 SoCs. It
-> > > features several units for image processing, this patch adds support
-> > > for the units needed for Framebuffer support, namely:
-> > > 
-> > > - Display Controller (dc)
-> > > - Display Interface (di)
-> > > - Display Multi Fifo Controller (dmfc)
-> > > - Display Processor (dp)
-> > > - Image DMA Controller (idmac)
-> > > 
-> > > This patch is based on the Freescale driver, but follows a different
-> > > approach. The Freescale code implements logical idmac channels and
-> > > the handling of the subunits is hidden in common idmac code pathes
-> > > in big switch/case statements. This patch instead just provides code
-> > > and resource management for the different subunits. The user, in this
-> > > case the framebuffer driver, decides how the different units play
-> > > together.
-> > > 
-> > > The IPU has other units missing in this patch:
-> > > 
-> > > - CMOS Sensor Interface (csi)
-> > > - Video Deinterlacer (vdi)
-> > > - Sensor Multi FIFO Controler (smfc)
-> > > - Image Converter (ic)
-> > > - Image Rotator (irt)
-> > > 
-> > > So expect more files to come in this directory.
-> > I couldn't look into details as the patch is huge, but it looks mostly good.
-> > One thing I don't really like is the
-> > 
-> > +static struct device *ipu_dev;
-> > +void __iomem *ipu_cm_reg;
-> > +void __iomem *ipu_idmac_reg;
-> > 
-> > part. I know there is currently no HW supporting more than one of those
-> > controllers, but as a general principle I find this is not a good programming
-> > habit.
-> 
-> Ok, will look into it.
-> 
-> > 
-> > Now, on a less technical note: I don't really see how this driver fits in the
-> > MFD category, unless the upcoming units support brings something new. If I
-> > were looking for the i.MX5x image processing unit, I would be looking under
-> > drivers/video/.
-> 
-> The ipu unit also supports cameras which would go to drivers/media/video.
-> This is the original reason for putting it into drivers/mfd. 
-Ok, makes a bit more sense.
+Hello.
 
-> That said,
-> I'm not very comfortable with putting it there, mostly because it
-> contains a lot of code to which a mfd maintainer can hardly say anything
-> to 
-I won't argue with that :)
-I'm not really confortable with it neither, even though the code looks nice
-and I'm quite sure you're committed to maintaining it in the long term.
+On 01-02-2011 3:05, Michael Williamson wrote:
 
-> and because it's one framework more which has to synchronized when
-> changes to the IPU come.
-Ok, so would moving it do drivers/video/ make sense ?
+> Add SPI registration routines, clocks, and driver resources for
+> DA850/OMAP-L138/AM18x and DA830/OMAP-L137/AM17x platforms.
 
-Cheers,
-Samuel.
+> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
+[...]
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index beda8a4..5f8ff96 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -725,3 +725,91 @@ int __init da8xx_register_cpuidle(void)
+>
+>   	return platform_device_register(&da8xx_cpuidle_device);
+>   }
+> +
+> +static struct resource da8xx_spi0_resources[] = {
+> +	[0] = {
+> +		.start = 0x01c41000,
+> +		.end   = 0x01c41fff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start = IRQ_DA8XX_SPINT0,
+> +		.start = IRQ_DA8XX_SPINT0,
+
+    You mean '.end'?
+
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[2] = {
+> +		.start = EDMA_CTLR_CHAN(0, 14),
+> +		.end = EDMA_CTLR_CHAN(0, 14),
+
+    Could you align = uniformly with resource 0 -- preferably with a tab?
+
+> +		.flags = IORESOURCE_DMA,
+> +	},
+> +	[3] = {
+> +		.start = EDMA_CTLR_CHAN(0, 15),
+> +		.end = EDMA_CTLR_CHAN(0, 15),
+
+    Same here.
+
+> +		.flags = IORESOURCE_DMA,
+> +	},
+> +	[4] = {
+> +		.start = 0,
+> +		.end = 0,
+
+    There's no need to init to 0.
+
+> +		.flags = IORESOURCE_DMA,
+> +	},
+> +};
+> +
+> +static struct resource da8xx_spi1_resources[] = {
+> +	[0] = {
+> +		.start = 0x01f0e000,
+> +		.end   = 0x01f0efff,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start = IRQ_DA8XX_SPINT1,
+> +		.start = IRQ_DA8XX_SPINT1,
+
+    You meand '.end'?
+
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +	[2] = {
+> +		.start = EDMA_CTLR_CHAN(0, 18),
+> +		.end = EDMA_CTLR_CHAN(0, 18),
+
+    Could you align = uniformly with resource 0 -- preferably with a tab?
+
+> +		.flags = IORESOURCE_DMA,
+> +	},
+> +	[3] = {
+> +		.start = EDMA_CTLR_CHAN(0, 19),
+> +		.end = EDMA_CTLR_CHAN(0, 19),
+
+    Same here.
+
+> +		.flags = IORESOURCE_DMA,
+> +	},
+> +	[4] = {
+> +		.start = 0,
+> +		.end = 0,
+
+    There's no need to init to 0.
+
+> +		.flags = IORESOURCE_DMA,
+> +	},
+> +};
+> +
+> +static struct platform_device da8xx_spi_device[] = {
+> +	[0] = {
+> +		.name = "spi_davinci",
+> +		.id = 0,
+> +		.num_resources = ARRAY_SIZE(da8xx_spi0_resources),
+> +		.resource = da8xx_spi0_resources,
+> +	},
+> +	[1] = {
+> +		.name = "spi_davinci",
+> +		.id = 1,
+> +		.num_resources = ARRAY_SIZE(da8xx_spi1_resources),
+> +		.resource = da8xx_spi1_resources,
+> +	},
+> +};
+> +
+> +int __init da8xx_register_spi(int instance,
+> +			      struct davinci_spi_platform_data *pdata)
+> +{
+> +	struct platform_device *pdev;
+> +
+> +	if (instance == 0)
+> +		pdev =&da8xx_spi_device[0];
+> +	else if (instance == 1)
+> +		pdev =&da8xx_spi_device[1];
+
+    Why not:
+
+	if (instance == 0 || instance == 1)
+		pdev = &da8xx_spi_device[instance];
+
+> +	else
+> +		return -EINVAL;
+> +
+> +	pdev->dev.platform_data = pdata;
+> +
+> +	return platform_device_register(pdev);
+> +}
+
+WBR, Sergei
