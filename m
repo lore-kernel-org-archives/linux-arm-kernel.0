@@ -1,39 +1,84 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 1 Feb 2011 13:51:29 +0100
-Subject: [PATCH 3/9] Add a mfd IPUv3 driver
-In-Reply-To: <87wrlkyn3s.fsf@lechat.rtp-net.org>
-References: <1292842127-21406-1-git-send-email-s.hauer@pengutronix.de>
-	<1292842127-21406-4-git-send-email-s.hauer@pengutronix.de>
-	<20110201105127.GA10128@sortiz-mobl>
-	<20110201105909.GS9041@pengutronix.de>
-	<20110201114453.GC10128@sortiz-mobl>
-	<20110201115125.GE31216@n2100.arm.linux.org.uk>
-	<87wrlkyn3s.fsf@lechat.rtp-net.org>
-Message-ID: <20110201125129.GA2027@pengutronix.de>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Tue, 1 Feb 2011 18:25:59 +0530
+Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP boot
+	failure)
+In-Reply-To: <20110111231611.GX4957@atomide.com>
+References: <20110106170805.GE1198@n2100.arm.linux.org.uk>
+	<20110106180030.GA8249@n2100.arm.linux.org.uk>
+	<20110106182023.GV7771@atomide.com>
+	<20110106203238.GH1198@n2100.arm.linux.org.uk>
+	<20110106204053.GA7771@atomide.com>
+	<20110107161230.GR1198@n2100.arm.linux.org.uk>
+	<20110110185209.GC4957@atomide.com> <20110111231611.GX4957@atomide.com>
+Message-ID: <3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 01:07:35PM +0100, Arnaud Patard wrote:
-> Hi,
-> 
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> 
-> > On Tue, Feb 01, 2011 at 12:44:54PM +0100, Samuel Ortiz wrote:
-> >> Ok, so would moving it do drivers/video/ make sense ?
-> >
-> > Isn't that for framebuffer drivers?
-> 
-> For now, the ipu driver is used for framebuffer on imx5.
+Tony Lindgren wrote:
 
-But it will hopefully be used for camera aswell.
+> Here's one more es1.0 fix after the recent USB changes.
+>
+> Regards,
+>
+> Tony
+>
+>
+> Author: Tony Lindgren <tony@atomide.com>
+> Date:   Tue Jan 11 15:03:03 2011 -0800
+>
+>     omap4: Fix ULPI PHY init for ES1.0 SDP
+>
+>     Commit 6aa85a5ae610106d89e50c7e1f760c56d12f9bc4 (omap4: 4430sdp:
+>     enable the ehci port on 4430SDP) added code to enable EHCI
+>     support on 4430sdp board.
+>
+>     Looks like the ULPI pin does not seem to be muxed properly on ES1.0
+>     SDP and this causes the system to reboot when the ULPI PHY is
+>     enabled.
+>
+>     Fix this by muxing the pin, this is the same setting for
+>     both ES1.0 and ES2.0. Also add checking for gpio_request.
+>
+>     Cc: Keshava Munegowda <keshava_mgowda@ti.com
+>     Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -554,6 +554,7 @@ static void __init omap_sfh7741prox_init(void)
+>
+>  #ifdef CONFIG_OMAP_MUX
+>  static struct omap_board_mux board_mux[] __initdata = {
+> +	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+>  	{ .reg_offset = OMAP_MUX_TERMINATOR },
+>  };
+>  #else
 
-How about arch/arm/plat-mxc?
+Tony,
 
-Sascha
+I believe this fix is fixing your reboot issue, but it's breaking
+EHCI support on the SDP.
 
+The MODE4 above should really be MODE3 - all GPIOs are on MODE3.
+By changing
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The patch snippet below fixes EHCI on the SDP, but I believe that
+making this change will reintroduce the "board reboots" issue
+you originally reported. Could you check and tell me if this
+is the case?
+
+Just curious - is your board a Blaze, or an SDP?
+
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c
+b/arch/arm/mach-omap2/board-4430sdp.c
+index 07d1b20..ab9fb4d 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -554,7 +554,7 @@ static void __init omap_sfh7741prox_init(void)
+
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
+-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
++	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #else
