@@ -1,115 +1,114 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Mon, 31 Jan 2011 19:05:14 -0500
-Subject: [PATCH 2/4] davinci: add spi devices support for
-	MityDSP-L138/MityARM-1808 platform
+Date: Mon, 31 Jan 2011 19:05:15 -0500
+Subject: [PATCH 3/4] davinci: add spi devices support for
+	da850/omap-l138/am18x evm
 In-Reply-To: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
 References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <1296518716-5004-3-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <1296518716-5004-4-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for accessing the on board SPI NOR FLASH
-device for MityDSP-L138 and MityARM-1808 SoMs.
+From: Sekhar Nori <nsekhar@ti.com>
+
+This patch adds the on-board SPI flash device to the
+DA850/OMAP-L138/AM18x EVM. It also registers the SPI flash
+device to the MTD subsystem.
+
+Based on SPI flash device support for MityDSP-L138F platform.
 
 Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
-Tested-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
- arch/arm/mach-davinci/board-mityomapl138.c |  104 ++++++++++++++++++++++++++++
- 1 files changed, 104 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c |   88 +++++++++++++++++++++++++++++++
+ 1 files changed, 88 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 0ea5932..9dd88d7 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -17,6 +17,8 @@
- #include <linux/i2c.h>
- #include <linux/i2c/at24.h>
- #include <linux/etherdevice.h>
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 11f986b..6eb6cf2 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -29,6 +29,8 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/tps6507x.h>
+ #include <linux/input/tps6507x-ts.h>
 +#include <linux/spi/spi.h>
 +#include <linux/spi/flash.h>
  
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -25,6 +27,7 @@
- #include <mach/da8xx.h>
+@@ -38,6 +40,7 @@
  #include <mach/nand.h>
  #include <mach/mux.h>
+ #include <mach/aemif.h>
 +#include <mach/spi.h>
  
- #define MITYOMAPL138_PHY_ID		"0:03"
+ #define DA850_EVM_PHY_ID		"0:00"
+ #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
+@@ -48,6 +51,89 @@
  
-@@ -294,6 +297,104 @@ static int __init pmic_tps65023_init(void)
- }
+ #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
  
- /*
-+ * SPI Devices:
-+ *	SPI1_CS0: 8M Flash ST-M25P64-VME6G
-+ */
-+static struct mtd_partition spi_flash_partitions[] = {
++static struct davinci_spi_platform_data da850evm_spi1_pdata = {
++	.version	= SPI_VERSION_2,
++	.num_chipselect = 1,
++	.intr_line      = 1,
++};
++
++static struct mtd_partition da850evm_spiflash_part[] = {
 +	[0] = {
-+		.name		= "ubl",
-+		.offset		= 0,
-+		.size		= SZ_64K,
-+		.mask_flags	= MTD_WRITEABLE,
++		.name = "UBL",
++		.offset = 0,
++		.size = SZ_64K,
++		.mask_flags = MTD_WRITEABLE,
 +	},
 +	[1] = {
-+		.name		= "u-boot",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_512K,
-+		.mask_flags	= MTD_WRITEABLE,
++		.name = "U-Boot",
++		.offset = MTDPART_OFS_APPEND,
++		.size = SZ_512K,
++		.mask_flags = MTD_WRITEABLE,
 +	},
 +	[2] = {
-+		.name		= "u-boot-env",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_64K,
-+		.mask_flags	= MTD_WRITEABLE,
++		.name = "U-Boot-Env",
++		.offset = MTDPART_OFS_APPEND,
++		.size = SZ_64K,
++		.mask_flags = MTD_WRITEABLE,
 +	},
 +	[3] = {
-+		.name		= "periph-config",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_64K,
-+		.mask_flags	= MTD_WRITEABLE,
++		.name = "Kernel",
++		.offset = MTDPART_OFS_APPEND,
++		.size = SZ_2M + SZ_512K,
++		.mask_flags = 0,
 +	},
 +	[4] = {
-+		.name		= "reserved",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_256K + SZ_64K,
++		.name = "Filesystem",
++		.offset = MTDPART_OFS_APPEND,
++		.size = SZ_4M,
++		.mask_flags = 0,
 +	},
 +	[5] = {
-+		.name		= "kernel",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_2M + SZ_1M,
-+	},
-+	[6] = {
-+		.name		= "fpga",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= SZ_2M,
-+	},
-+	[7] = {
-+		.name		= "spare",
-+		.offset		= MTDPART_OFS_APPEND,
-+		.size		= MTDPART_SIZ_FULL,
++		.name = "MAC-Address",
++		.offset = SZ_8M - SZ_64K,
++		.size = SZ_64K,
++		.mask_flags = MTD_WRITEABLE,
 +	},
 +};
 +
-+static struct flash_platform_data mityomapl138_spi_flash_data = {
++static struct flash_platform_data da850evm_spiflash_data = {
 +	.name		= "m25p80",
-+	.parts		= spi_flash_partitions,
-+	.nr_parts	= ARRAY_SIZE(spi_flash_partitions),
-+	.type		= "m24p64",
++	.parts		= da850evm_spiflash_part,
++	.nr_parts	= ARRAY_SIZE(da850evm_spiflash_part),
++	.type		= "m25p64",
 +};
 +
-+static struct davinci_spi_config spi_eprom_config = {
++static struct davinci_spi_config da850evm_spiflash_cfg = {
 +	.io_type	= SPI_IO_TYPE_DMA,
 +	.c2tdelay	= 8,
 +	.t2cdelay	= 8,
 +};
 +
-+static struct spi_board_info mityomapl138_spi_flash_info[] = {
++static struct spi_board_info da850evm_spi_info[] = {
 +	{
 +		.modalias		= "m25p80",
-+		.platform_data		= &mityomapl138_spi_flash_data,
-+		.controller_data	= &spi_eprom_config,
++		.platform_data		= &da850evm_spiflash_data,
++		.controller_data	= &da850evm_spiflash_cfg,
 +		.mode			= SPI_MODE_0,
 +		.max_speed_hz		= 30000000,
 +		.bus_num		= 1,
@@ -117,41 +116,30 @@ index 0ea5932..9dd88d7 100644
 +	},
 +};
 +
-+static struct davinci_spi_platform_data mityomapl138_spi1_pdata = {
-+	.version	= SPI_VERSION_2,
-+	.num_chipselect	= 1,
-+	.intr_line	= 1,
-+};
-+
-+static void __init mityomapl138_init_spi1(struct spi_board_info *info,
-+					  unsigned len)
++static void __init da850evm_init_spi1(struct spi_board_info *info, unsigned len)
 +{
 +	int ret;
 +
 +	ret = spi_register_board_info(info, len);
 +	if (ret)
-+		pr_warning("%s: failed to register board info : %d\n",
-+				__func__, ret);
++		pr_warning("failed to register board info : %d\n", ret);
 +
-+	ret = da8xx_register_spi(1, &mityomapl138_spi1_pdata);
++	ret = da8xx_register_spi(1, &da850evm_spi1_pdata);
 +	if (ret)
-+		pr_warning("%s: failed to register spi 1 device : %d\n",
-+				__func__, ret);
++		pr_warning("failed to register spi 1 device : %d\n", ret);
 +}
 +
-+/*
-  * MityDSP-L138 includes a 256 MByte large-page NAND flash
-  * (128K blocks).
-  */
-@@ -448,6 +549,9 @@ static void __init mityomapl138_init(void)
- 
- 	mityomapl138_setup_nand();
- 
-+	mityomapl138_init_spi1(mityomapl138_spi_flash_info,
-+			       ARRAY_SIZE(mityomapl138_spi_flash_info));
+ static struct mtd_partition da850_evm_norflash_partition[] = {
+ 	{
+ 		.name           = "bootloaders + env",
+@@ -1167,6 +1253,8 @@ static __init void da850_evm_init(void)
+ 	if (ret)
+ 		pr_warning("da850_evm_init: suspend registration failed: %d\n",
+ 				ret);
 +
- 	mityomapl138_config_emac();
++	da850evm_init_spi1(da850evm_spi_info, ARRAY_SIZE(da850evm_spi_info));
+ }
  
- 	ret = da8xx_register_rtc();
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
 -- 
 1.7.0.4
