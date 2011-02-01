@@ -1,59 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Feb 2011 21:24:09 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <4D48741F.8060006@codeaurora.org>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<4D48741F.8060006@codeaurora.org>
-Message-ID: <20110201212409.GU31216@n2100.arm.linux.org.uk>
+From: therealbadguy@gmail.com (Chris)
+Date: Tue, 1 Feb 2011 14:29:54 -0700
+Subject: iMX31 MBX registers Porting problem
+In-Reply-To: <AANLkTin+gjAzT+PbQx1bm2wxao58oynMGfW4MxXd6K-D@mail.gmail.com>
+References: <AANLkTin+Mo9YXEfoDAa+btjX5VdiOz1QJp++ck0efPAk@mail.gmail.com>
+	<20110131003128.GD27436@n2100.arm.linux.org.uk>
+	<AANLkTi=EsCCwgiK5BtkKfaYEuzVUtnie-LU77cNJ4P4q@mail.gmail.com>
+	<20110131154523.GB32737@n2100.arm.linux.org.uk>
+	<AANLkTin4fPo6pKWLCqb+BXNS-hDrWPLEK7QQErbuq15C@mail.gmail.com>
+	<AANLkTin+gjAzT+PbQx1bm2wxao58oynMGfW4MxXd6K-D@mail.gmail.com>
+Message-ID: <AANLkTi=Y4qabbmM+8DRZ3KYZFkk_Chwa5gs80wTH_MSO@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 12:59:11PM -0800, Stephen Boyd wrote:
-> On 02/01/2011 07:24 AM, Russell King - ARM Linux wrote:
-> > I'd also be tempted at this stage to build-in a no-op dummy clock,
-> > that being the NULL clk:
-> >
-> > int clk_prepare(struct clk *clk)
-> > {
-> > 	int ret = 0;
-> >
-> > 	if (clk) {
-> > 		mutex_lock(&clk->mutex);
-> > 		if (clk->prepared == 0)
-> > 			ret = clk->ops->prepare(clk);
-> > 		if (ret == 0)
-> > 			clk->prepared++;
-> > 		mutex_unlock(&clk->mutex);
-> > 	}
-> >
-> > 	return ret;
-> > }
-> 
-> I'm afraid this will hide enable/disable imbalances on some targets and
-> then expose them on others. Maybe its not a big problem though since
-> this also elegantly handles the root(s) of the tree.
+On Tue, Feb 1, 2011 at 2:05 PM, Chris <therealbadguy@gmail.com> wrote:
+>> ?I have gone the extra distance in turning off support in the working kernel
+>> 2.6.19.2, I have removed nearly everything. I am down to the gpio_port
+>>
+>
 
-You can't catch enable/disable imbalances in the prepare code, and you
-can't really catch them in the unprepare code either.
+I was finally able to get this device to stop working on 2.6.19.2
 
-Consider two drivers sharing the same struct clk.  When the second driver
-prepares the clock, the enable count could well be non-zero, caused by
-the first driver.  Ditto for when the second driver is removed, and it
-calls unprepare - the enable count may well be non-zero.
+it seems that a mapping is being done to the peripheral port register.
 
-The only thing you can check is that when the prepare count is zero,
-the enable count is also zero.  You can also check in clk_enable() and
-clk_disable() that the prepare count is non-zero.
+/* Setup Peripheral Port Remap register for AVIC */
+        asm("ldr r0, =0xC0000015                                \n\
+         mcr p15, 0, r0, c15, c2, 4");
 
-If you want tigher checking than that, you need to somehow identify and
-match up the clk_prepare/clk_enable/clk_disable/clk_unprepare calls from
-a particular driver instance.  Addresses of the functions don't work as
-you can't be certain that driver code will be co-located within a certain
-range.  Adding an additional argument to these functions which is driver
-instance specific seems to be horrible too.
+once this code is disabled, speaking to my device no longer returns
+the expected results.
+however, simply pasting this code in the new kernel does not
+immediately bring me happiness.
+this is from a fixup routine used in kernel 2.6.19.2, so I cloned that
+logic and created a fixup routine.
+I think perhaps that some other things have gotten in the way.
+
+Are there any changes that would impact me here that anyone knows of?
+my concern is now that there is not the only code enabling this
+access, and I am trying to research that end of it.
+I am pretty confident this is not device specific any more, but more
+platform support.
+
+I know noone is working on this device, but perhaps some experience
+with this register will help.
+I am amazed that all these chips are parked on the new kernel versions,
+does anyone have any plans to ever work with this stuff?
+
+I think we need this working. at least bring the support as far
+forward as I can.
+
+My Last post: Stupid fingers hit enter, so sorry guys. :(
