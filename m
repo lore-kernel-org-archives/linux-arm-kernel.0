@@ -1,40 +1,171 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Mon, 31 Jan 2011 19:05:12 -0500
-Subject: [PATCH 0/4] davinci: Add SPI support for da8xx platforms
-Message-ID: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
+Date: Mon, 31 Jan 2011 19:05:13 -0500
+Subject: [PATCH 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
+References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <1296518716-5004-2-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds the necessary SPI resources and registration
-routines for da850/OMAP-L138/AM18x and da830/OMAP-L137/AM17x devices.
-It also adds on-board SPI FLASH devices for the da830 evm, the da850
-evm, and the MityDSP-L138/MityARM-1808 platforms.
+Add SPI registration routines, clocks, and driver resources for
+DA850/OMAP-L138/AM18x and DA830/OMAP-L137/AM17x platforms.
 
-These patches are based on work done during testing of davinci SPI driver 
-submissions incorporated in version 2.6.38 of the kernel, at [1].
-
-The da850 and da830 EVM portions of this patch need verification / ack.
-
-The MityDSP-L138 platform patch has been tested.
-
-The patch series is against commit 8fb837c158e342413d08d6f211b5b8f67d5adc2f
-of kevin's tree.
-
-[1] http://arago-project.org/git/projects/?p=linux-davinci.git;a=shortlog;h=refs/heads/davinci-spi-rewrite
-
-Michael Williamson (2):
-  davinci: da8xx/omap-l1: add support for SPI
-  davinci: add spi devices support for MityDSP-L138/MityARM-1808
-    platform
-
-Sekhar Nori (2):
-  davinci: add spi devices support for da850/omap-l138/am18x evm
-  davinci: add spi devices support for da830/omap-l137/am17x evm
-
- arch/arm/mach-davinci/board-da830-evm.c    |   82 ++++++++++++++++++++++
- arch/arm/mach-davinci/board-da850-evm.c    |   88 +++++++++++++++++++++++
- arch/arm/mach-davinci/board-mityomapl138.c |  104 ++++++++++++++++++++++++++++
- arch/arm/mach-davinci/da850.c              |   16 ++++
- arch/arm/mach-davinci/devices-da8xx.c      |   88 +++++++++++++++++++++++
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+---
+ arch/arm/mach-davinci/da850.c              |   16 +++++
+ arch/arm/mach-davinci/devices-da8xx.c      |   88 ++++++++++++++++++++++++++++
  arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
- 6 files changed, 380 insertions(+), 0 deletions(-)
+ 3 files changed, 106 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 3443d97..68fe4c2 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -359,6 +359,20 @@ static struct clk usb20_clk = {
+ 	.gpsc		= 1,
+ };
+ 
++static struct clk spi0_clk = {
++	.name		= "spi0",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC0_SPI0,
++};
++
++static struct clk spi1_clk = {
++	.name		= "spi1",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC1_SPI1,
++	.gpsc		= 1,
++	.flags		= DA850_CLK_ASYNC3,
++};
++
+ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"ref",		&ref_clk),
+ 	CLK(NULL,		"pll0",		&pll0_clk),
+@@ -403,6 +417,8 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"aemif",	&aemif_clk),
+ 	CLK(NULL,		"usb11",	&usb11_clk),
+ 	CLK(NULL,		"usb20",	&usb20_clk),
++	CLK("spi_davinci.0",	NULL,		&spi0_clk),
++	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK(NULL,		NULL,		NULL),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index beda8a4..5f8ff96 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -725,3 +725,91 @@ int __init da8xx_register_cpuidle(void)
+ 
+ 	return platform_device_register(&da8xx_cpuidle_device);
+ }
++
++static struct resource da8xx_spi0_resources[] = {
++	[0] = {
++		.start = 0x01c41000,
++		.end   = 0x01c41fff,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_DA8XX_SPINT0,
++		.start = IRQ_DA8XX_SPINT0,
++		.flags = IORESOURCE_IRQ,
++	},
++	[2] = {
++		.start = EDMA_CTLR_CHAN(0, 14),
++		.end = EDMA_CTLR_CHAN(0, 14),
++		.flags = IORESOURCE_DMA,
++	},
++	[3] = {
++		.start = EDMA_CTLR_CHAN(0, 15),
++		.end = EDMA_CTLR_CHAN(0, 15),
++		.flags = IORESOURCE_DMA,
++	},
++	[4] = {
++		.start = 0,
++		.end = 0,
++		.flags = IORESOURCE_DMA,
++	},
++};
++
++static struct resource da8xx_spi1_resources[] = {
++	[0] = {
++		.start = 0x01f0e000,
++		.end   = 0x01f0efff,
++		.flags = IORESOURCE_MEM,
++	},
++	[1] = {
++		.start = IRQ_DA8XX_SPINT1,
++		.start = IRQ_DA8XX_SPINT1,
++		.flags = IORESOURCE_IRQ,
++	},
++	[2] = {
++		.start = EDMA_CTLR_CHAN(0, 18),
++		.end = EDMA_CTLR_CHAN(0, 18),
++		.flags = IORESOURCE_DMA,
++	},
++	[3] = {
++		.start = EDMA_CTLR_CHAN(0, 19),
++		.end = EDMA_CTLR_CHAN(0, 19),
++		.flags = IORESOURCE_DMA,
++	},
++	[4] = {
++		.start = 0,
++		.end = 0,
++		.flags = IORESOURCE_DMA,
++	},
++};
++
++static struct platform_device da8xx_spi_device[] = {
++	[0] = {
++		.name = "spi_davinci",
++		.id = 0,
++		.num_resources = ARRAY_SIZE(da8xx_spi0_resources),
++		.resource = da8xx_spi0_resources,
++	},
++	[1] = {
++		.name = "spi_davinci",
++		.id = 1,
++		.num_resources = ARRAY_SIZE(da8xx_spi1_resources),
++		.resource = da8xx_spi1_resources,
++	},
++};
++
++int __init da8xx_register_spi(int instance,
++			      struct davinci_spi_platform_data *pdata)
++{
++	struct platform_device *pdev;
++
++	if (instance == 0)
++		pdev = &da8xx_spi_device[0];
++	else if (instance == 1)
++		pdev = &da8xx_spi_device[1];
++	else
++		return -EINVAL;
++
++	pdev->dev.platform_data = pdata;
++
++	return platform_device_register(pdev);
++}
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index cfcb223..1f4cf5f 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -23,6 +23,7 @@
+ #include <mach/mmc.h>
+ #include <mach/usb.h>
+ #include <mach/pm.h>
++#include <mach/spi.h>
+ 
+ extern void __iomem *da8xx_syscfg0_base;
+ extern void __iomem *da8xx_syscfg1_base;
+@@ -77,6 +78,7 @@ void __init da850_init(void);
+ int da830_register_edma(struct edma_rsv_info *rsv);
+ int da850_register_edma(struct edma_rsv_info *rsv[2]);
+ int da8xx_register_i2c(int instance, struct davinci_i2c_platform_data *pdata);
++int da8xx_register_spi(int instance, struct davinci_spi_platform_data *pdata);
+ int da8xx_register_watchdog(void);
+ int da8xx_register_usb20(unsigned mA, unsigned potpgt);
+ int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
+-- 
+1.7.0.4
