@@ -1,51 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Feb 2011 09:52:13 -0000
-Subject: [PATCH] ARM: add Versatile Express defconfig
-In-Reply-To: <AANLkTimzz5RAeuAWwss5krD_ogtN6u5ioQUS+e1ecyiB@mail.gmail.com>
-References: <1296501243-28917-1-git-send-email-linus.walleij@linaro.org>	<3093351151219722808@unknownmsgid>
-	<AANLkTimzz5RAeuAWwss5krD_ogtN6u5ioQUS+e1ecyiB@mail.gmail.com>
-Message-ID: <002a01cbc1f5$b3ea0dc0$1bbe2940$@deacon@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 1 Feb 2011 11:01:51 +0100
+Subject: i.MX Pull request for -rc
+Message-ID: <20110201100151.GP9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Linus,
+Hi Russell,
 
-> > This will probably cause a compile-time error with a mainline kernel
-> > because the necessary hotplug functions aren't implemented for vexpress.
-> 
-> Does compile for me on 2.6.38-rc1 (after I avoid an compiler ICE
-> on the NOR flash driver by deselecting it, I don't blame the kernel
-> for that one tho):
+Please pull the following for -rc.
 
-Is the ICE similar to this? :
+Sascha
 
-drivers/mtd/maps/integrator-flash.c: In function 'armflash_probe':
-drivers/mtd/maps/integrator-flash.c:262: internal compiler error: in remove_insn, at emit-rtl.c:3803
-Please submit a full bug report,
-with preprocessed source if appropriate.
+The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
 
-If so, I reported that to the compiler guys in ARM and I think it
-got fixed in the 2010q3 codesourcery toolchain (not sure where it
-is upstream).
- 
-> Might this have something to do with it:
-> 
-> git log arch/arm/mach-vexpress/hotplug.c
-> commit e9882777d992b76e0b80deadd66ad886c25f5d1f
-> Author: Russell King <rmk+kernel@arm.linux.org.uk>
-> Date:   Sun Dec 19 11:33:12 2010 +0000
-> 
->     ARM: CPU hotplug: add Versatile Express hotplug CPU support
-> 
->     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+  Linux 2.6.38-rc2 (2011-01-21 19:01:34 -0800)
 
-Great, I missed that! Feel free to hotplug away in your defconfig.
- 
-> I don't know if it boots tho, if you pack up a Vexpress and
-> mail it to my place I promise I will make more than just
-> compiletests ;-)
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
 
-I'd swap one for one of your boards with the funky PMU, but I think
-some people might not be too happy about that.
+Fabio Estevam (2):
+      ARM: imx: Add VPR200 and MX51_3DS entries to uncompress.h
+      ARM: mach-imx/mach-mx25_3ds: Fix section type
 
-Will
+Sascha Hauer (4):
+      ARM i.MX28: fix bit operation
+      ARM i.MX28: use correct register for setting the rate
+      ARM i.MX23/28: remove secondary field from struct clk. It's unused
+      ARM i.MX23: use correct register for setting the rate
+
+Shawn Guo (1):
+      ARM: mxs: fix clock base address missing
+
+Uwe Kleine-K?nig (2):
+      ARM: mxs: acknowledge gpio irq
+      ARM: mxs/imx28: remove now unused clock lookup "fec.0"
+
+ arch/arm/mach-imx/mach-mx25_3ds.c           |    2 +-
+ arch/arm/mach-mxs/clock-mx23.c              |    4 ++--
+ arch/arm/mach-mxs/clock-mx28.c              |    7 +++----
+ arch/arm/mach-mxs/clock.c                   |    2 --
+ arch/arm/mach-mxs/gpio.c                    |    2 ++
+ arch/arm/mach-mxs/include/mach/clock.h      |    2 --
+ arch/arm/plat-mxc/include/mach/uncompress.h |    2 ++
+ 7 files changed, 10 insertions(+), 11 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
