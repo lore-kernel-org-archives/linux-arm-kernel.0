@@ -1,77 +1,85 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Feb 2011 13:15:12 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201105449.GY1147@pengutronix.de>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-Message-ID: <20110201131512.GH31216@n2100.arm.linux.org.uk>
+Date: Tue, 1 Feb 2011 13:30:36 +0000
+Subject: [PATCH] ARM: add PrimeCell generic DMA to MMCI/PL180
+In-Reply-To: <AANLkTikLABG5yWDYcOe12mfy_Hco15k_ByqYX15GH9Cy@mail.gmail.com>
+References: <20101219195959.GA28157@n2100.arm.linux.org.uk>
+	<20101221135421.GS28157@n2100.arm.linux.org.uk>
+	<20101221155935.GV28157@n2100.arm.linux.org.uk>
+	<AANLkTin2fBLsq2YJHjZ=e+gmwWXWezH0t38bzsjiJ+i=@mail.gmail.com>
+	<20110124160127.GA24104@n2100.arm.linux.org.uk>
+	<AANLkTi=GmYoDYhKGpvzt2vHWSEb2b72cQbQfVc4PANdH@mail.gmail.com>
+	<20110124212228.GN24104@n2100.arm.linux.org.uk>
+	<AANLkTimReBj7QGw08imBV2JWJGwh-TO5oA+3kiFQZLq4@mail.gmail.com>
+	<20110125102351.GA11507@n2100.arm.linux.org.uk>
+	<AANLkTikLABG5yWDYcOe12mfy_Hco15k_ByqYX15GH9Cy@mail.gmail.com>
+Message-ID: <20110201133036.GI31216@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 11:54:49AM +0100, Uwe Kleine-K?nig wrote:
-> Alternatively don't force the sleep in clk_prepare (e.g. by protecting
-> prepare_count by a spinlock (probably enable_lock)) and call clk_prepare
-> before calling clk->ops->enable?
+On Thu, Jan 27, 2011 at 02:07:21PM +0100, Linus Walleij wrote:
+> 2011/1/25 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> 
+> > The DMA controller must be programmed with the right burst size for the
+> > peripheral, which in this case would be 8 words, otherwise the 'last'
+> > burst signalling goes wrong.
+> 
+> Now I think I found the real bug behind this...
+> 
+> In the Vendor data we set this:
+> 	.dmareg_enable		= 1 << 12, /* DMAREQCTRL */
+> 
+> This actually means:
+> 
+> DMAREQCTL: DMA requests control.
+> 0: SREQ are generated when data to be transferred is
+> less than 8 words.
+> 1: no SREQ is generated when data to be transferred
+> is less than 8 words, LBREQ is generated instead.
+> 
+> Which will work for all MMC card transfers I believe, since
+> these are even 512 byte multiples. No problem...
+> 
+> Then comes an SDIO request and it is 7 bytes so LBREQ
+> is emitted 7 times instead of 6 * SREQ + 1 LSREQ.
+> 
+> Which works if you set down the burst size to 1 byte,
+> firing 7 consecutive bursts each terminated with LBREQ
+> which the DMA controller is perfectly happy with.
+> 
+> So while setting the burstsize down to 1 byte works
+> since it matches the twisted logic of DMAREQCTL,
+> instead flipping the bit in DMAREQCTL to 0
+> if (size % 8 != 0) makes some more kind of sense.
+> 
+> This needs to be tested to see whether it works or
+> not, so I'll see what we can do.
 
-That's a completely bad idea.  I assume you haven't thought about this
-very much.
+I really can't see this making any difference.  In the case of a 7 word
+transfer, you've setup the DMA controller to transfer 7 * 4 = 28 bytes.
 
-There's two ways I can think of doing what you're suggesting:
+1. If DMAREQCTL = 1, the MMCI issues a LBREQ.
 
-int clk_prepare(struct clk *clk)
-{
-	unsigned long flags;
-	int ret = 0;
+   If the DMA controller has a burst size of 32 bytes, if it fetches 32
+   bytes from the device, it is broken.  It doesn't matter what the
+   primecell does - it's the DMA controller misbehaving.  In that case,
+   the work-around needs to be in the DMA controller code to reduce the
+   bursting so that the DMA controller doesn't transfer more than the
+   requested size.
 
-	might_sleep();
+   This is not specific to MMCI as other devices will suffer the same
+   problem.  So it's wrong to put it into every primecell driver just
+   because someone has a broken DMA controller somewhere.
 
-	spin_lock_irqsave(&clk->enable_lock, flags);
-	if (clk->prepare_count++ == 0)
-		ret = clk->ops->prepare(clk);
-	spin_unlock_irqrestore(&clk->enable_clock, flags);
+2. If DMAREQCTL = 0, the MMCI issues six SREQ plus one LSREQ.
 
-	return ret;
-}
+   This reflects the behaviour of the ARM primecell, and SREQ should
+   result in the DMA controller performing one transfer per request.
 
-The problem is that clk->ops->prepare() is called in a non-sleepable
-context.  So this breaks the whole idea of clk_prepare(), and so isn't
-a solution.
+So, the solutions as I see it are:
 
-The other solution is:
+1. If DMAREQCTL = 1, move the burst limiting work-around into the DMA
+   engine driver, if it really is a problem.
 
-int clk_prepare(struct clk *clk)
-{
-	unsigned long flags;
-	int ret = 0;
-	bool first;
+2. Set DMAREQCTL = 0.
 
-	might_sleep();
-
-	spin_lock_irqsave(clk->enable_lock, flags);
-	first = clk->prepare_count++ == 0;
-	spin_unlock_irqrestore(clk->enable_clock, flags);
-
-	if (first)
-		ret = clk->ops->prepare(clk);
-
-	return ret;
-}
-
-The problem with this is that you now don't have any sane locking on
-the prepare callback, and the circumstances under which it's called
-are very indefinite.  For example, consider a preempt-enabled system:
-
-	thread 1		thread 2		prepare_count
-	clk_prepare					0
-	clk->prepare_count++				1
-	<thread switch>
-				clk_prepare		1
-				clk->prepare_count++	2
-				clk_prepare returns	2
-
-				clk_enable		2
-				<explodes as clock is not prepared>
-				<thread switch>
-	clk->ops->prepare(clk)
-
-So really, what you're suggesting is completely broken.
+(2) seems to be the most sane solution to me.
