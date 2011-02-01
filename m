@@ -1,35 +1,42 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 1 Feb 2011 17:41:37 +0530
-Subject: [PATCH 4/4] davinci: add spi devices support for
-	da830/omap-l137/am17x evm
-In-Reply-To: <4D47F74B.9060309@mvista.com>
-References: <1296518716-5004-1-git-send-email-michael.williamson@criticallink.com>
-	<1296518716-5004-5-git-send-email-michael.williamson@criticallink.com>
-	<4D47F74B.9060309@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930248777A33@dbde02.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  1 Feb 2011 13:21:36 +0100
+Subject: [PATCH] mmci: don't try DMA on anything <= fifosize
+Message-ID: <1296562896-3729-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 17:36:35, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 01-02-2011 3:05, Michael Williamson wrote:
-> 
-> > From: Sekhar Nori<nsekhar@ti.com>
-> 
-> > This patch adds the on-board SPI flash device to the
-> > DA830/OMAP-L137/AM17x EVM. It also registers the SPI flash
-> > device to the MTD subsystem.
-> 
-> > Based on SPI flash device support for MityDSP-L138F platform.
-> 
-> > Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
-> 
->     Why Sekhar hasn't signed off on this patch?
+There is no point in using DMA on anything that will fit just fine
+in the FIFO. Let's just read and retrieve it from the FIFO.
 
-I should have.
+Cc: Ulf Hansson <ulf.hansson@stericsson.com>
+Cc: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This patch on top of the latest DMA code makes U8500 work again,
+without the need for any completion callback patches.
+---
+ drivers/mmc/host/mmci.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-
-Thanks,
-Sekhar
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 800b69c..c87a8d2 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -463,10 +463,12 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 		datactrl |= MCI_DPSM_DIRECTION;
+ 
+ 	/*
+-	 * Attempt to use DMA operation mode, if this
+-	 * should fail, fall back to PIO mode
++	 * When we want to transfer something less than or equal to the FIFO
++	 * depth, PIO works just fine, no risk of overrun. Else try DMA
++	 * first and foremost.
+ 	 */
+-	if (!mmci_dma_start_data(host, datactrl))
++	if (host->size > variant->fifosize &&
++	    !mmci_dma_start_data(host, datactrl))
+ 		return;
+ 
+ 	/* IRQ mode, map the SG list for CPU reading/writing */
+-- 
+1.7.3.2
