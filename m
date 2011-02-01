@@ -1,37 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Feb 2011 11:18:21 +0000
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <20110124231050.GP24104@n2100.arm.linux.org.uk>
-References: <20110124133513.GL16202@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F43295@GEORGE.Emea.Arm.com>
-	<20110124162400.GC24104@n2100.arm.linux.org.uk>
-	<000101cbbbe5$45d47ed0$d17d7c70$@moll@arm.com>
-	<20110124165356.GG24104@n2100.arm.linux.org.uk>
-	<20110124170304.GH24104@n2100.arm.linux.org.uk>
-	<000201cbbbef$bcec4610$36c4d230$@moll@arm.com>
-	<20110124180944.GK24104@n2100.arm.linux.org.uk>
-	<F01D8B85CFF58440B2A13965FBA90CA45911F432EF@GEORGE.Emea.Arm.com>
-	<20110124231050.GP24104@n2100.arm.linux.org.uk>
-Message-ID: <20110201111821.GC31216@n2100.arm.linux.org.uk>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 1 Feb 2011 12:34:14 +0100
+Subject: [PATCH] mmci: restrict DMA usage to large,
+	even multiblock	transfers
+In-Reply-To: <20110201105408.GA31216@n2100.arm.linux.org.uk>
+References: <1296556873-2730-1-git-send-email-linus.walleij@linaro.org>
+	<20110201105408.GA31216@n2100.arm.linux.org.uk>
+Message-ID: <4D47EFB6.5090509@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 11:10:50PM +0000, Russell King - ARM Linux wrote:
-> I guess you haven't thought about moving MMCI to an adaptive clocking
-> solution?  What I'm suggesting is halve the clock rate on FIFO error
-> and retry.  Increase the clock rate on each successful transfer up
-> to the maximum provided by the core MMC code.
+>> On Tue, Feb 01, 2011 at 11:41:13AM +0100, Linus Walleij wrote:
+>> This will restrict the use of DMA to only cover multi-block
+>> transfers of blocks that are evenly divisible with the FIFO
+>> halfsize (8 4-byte words, 32 bytes). This will be true for any
+>> normal, large MMC file transfer, falling back to PIO mode for
+>> any smallish reads.
+
+
+> Russell King - ARM Linux wrote:
+> That's a very bad idea.  If it's an ARM primecell, and we (by some magical
+> reason) are using DMA, we want to always use DMA for transfers larger than
+> the FIFO depth.  If we switch to PIO mode, we will see FIFO overruns/
+> underruns if the CPU can't keep up with the data rate.
 > 
-> That should _significantly_ increase the achievable PIO data rate
-> way beyond what a deeper FIFO could ever hope to achieve, and will
-> allow it to adapt to situations where you load the system up beyond
-> the maximum latency which the MMCI can stand.
+> So I think you actually want:
+> 
+> 	if (host->size >= variant->fifosize &&
+> 	    !mmci_dma_start_data(host, datactrl))
+> 		return;
 
-And to prove the point, I have MMCI running at up to 4Mbps, an 8 fold
-increase over what the current fixed upper-rate implementation does.
-The adaptive rate implementation is just a proof of concept at the
-moment and requires further work to improve the rate selection algorithm.
+Getting FIFO overrun/underruns is then as of today already the case when 
+running PIO for ARM primecell. To prevent this; you probably now that 
+already, hardware flow control is implemented in ST version of the ARM 
+primecell.
 
-The real solution to this is for there to be proper working DMA support
-implemented on ARM platforms, rather than requiring every peripheral to
-be driven via CPU intensive PIO all the time.
+For performance gain I think the threshold should probably not be less 
+than a 512 bytes block, but of course performance test needs to verify this.
+
+Maybe a better option would be to specify a dma_threshold value in the 
+variant struct. Thus the value can differ between what version of the 
+ARM primcell we are using.
+
+Finally I would prefer to move this "threshold" check into the
+mmci_dma_start_data function instead, since there anyway can be other 
+reasons to why we want to fall back to PIO mode. Better to do that from 
+one place.
+
+/Ulf Hansson
