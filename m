@@ -1,74 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Feb 2011 15:18:37 +0100
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201131512.GH31216@n2100.arm.linux.org.uk>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<20110201131512.GH31216@n2100.arm.linux.org.uk>
-Message-ID: <20110201141837.GA1147@pengutronix.de>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Tue, 1 Feb 2011 15:29:06 +0100
+Subject: [PATCH] arm: Improve MMC performance on Versatile Express
+In-Reply-To: <20110121222930.GF23151@n2100.arm.linux.org.uk>
+References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
+	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
+	<20110121215110.GD23151@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101211655110.8580@xanadu.home>
+	<20110121222930.GF23151@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimEBz6UK0X45cA2ihZddfcSTNqEPTJa=zGc+84S@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 01:15:12PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 01, 2011 at 11:54:49AM +0100, Uwe Kleine-K?nig wrote:
-> > Alternatively don't force the sleep in clk_prepare (e.g. by protecting
-> > prepare_count by a spinlock (probably enable_lock)) and call clk_prepare
-> > before calling clk->ops->enable?
-> 
-> That's a completely bad idea.  I assume you haven't thought about this
-> very much.
-Right, but I thought it a bit further than you did.  Like the following:
- 
-int clk_prepare(struct clk *clk)
-{
-	int ret = 0, first;
-	unsigned long flags;
+2011/1/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Jan 21, 2011 at 05:20:57PM -0500, Nicolas Pitre wrote:
+>> The only solution in that case is to give top priority to the FIFO IRQ
+>> and never disable IRQs when in interrupt context, except for that FIFO
+>> servicing handler which should keep IRQs masked out throughout. ?In any
+>> case this would certainly be only a hack for badly misdesigned hardware.
+>
+> Not possible anymore. ?The kernel's IRQ handling has changed such that
+> generic code now ensures that IRQs are disabled irrespective of the
+> IRQF_DISABLED flag. ?All IRQ handlers are called with IRQs disabled,
+> and they remain that way until they call local_irq_enable().
 
-	spin_lock_irqsave(&clk->enable_lock, flags);
-	if (clk->flags & CLK_BUSY) {
-		/* 
-		 * this must not happen, please serialize calls to
-		 * clk_prepare/clk_enable
-		 */
-		ret = -EBUSY;
-		goto out_unlock;
-	}
-	first = clk->prepare_count++ == 0;
-	if (first)
-		clk->flags |= CLK_BUSY;
-	spin_unlock_irqrestore(&clk->enable_lock, flags);
+Then the only way of assuring low latency on this one IRQ would
+be to convert the IRQ handlers for all the *other* hardware in the
+Vexpress to request_threaded_irq(), and that's what the RealTime
+folks do all the time I believe.
 
-	if (!first)
-		return 0;
+[Pawel Moll]
+> (...) so far the only time when problem happens is the timeout caused
+> by ISP1761 handler.
 
-	if (clk->ops->prepare) {
-		might_sleep();
-		ret = clk->ops->prepare(clk);
-	}
+Have you considered switching the ISP1761 handler to
+request_threaded_irq() with IRQF_ONESHOT | IRQF_NO_SUSPEND
+so it runs in process context with that IRQ masked off, until completion?
 
-	spin_lock_irqsave(&clk->enable_lock, flags);
-	clk->flags &= ~CLK_BUSY;
-	if (ret)
-		clk->prepare_count--;
-out_unlock:
-	spin_unlock_irqrestore(&clk->enable_lock, flags);
-
-	return ret;
-}
-
-If you now find a problem with that you can blame me not having thought
-it to an end.
-
-And note, this is only a suggestion.  I.e. I don't know what is the best
-to do in the case where I implemented returning -EBUSY above.  BUG?
-Wait for CLK_BUSY to be cleared?
-
-I'm not sure I like "clk_prepare sleeps iff unprepared but preparable".
-Still I think the approach is worth to be discussed.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Linus Walleij
