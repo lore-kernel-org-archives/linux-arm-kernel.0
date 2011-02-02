@@ -1,37 +1,50 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 02 Feb 2011 13:59:54 -0800 (PST)
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <20110202214522.GG31043@n2100.arm.linux.org.uk>
-References: <20110202163702.GA23240@n2100.arm.linux.org.uk>
-	<20110202.133831.193702414.davem@davemloft.net>
-	<20110202214522.GG31043@n2100.arm.linux.org.uk>
-Message-ID: <20110202.135954.189712480.davem@davemloft.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 02 Feb 2011 17:10:37 -0500 (EST)
+Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
+In-Reply-To: <20110202210925.GD31043@n2100.arm.linux.org.uk>
+References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20110202210925.GD31043@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102021704580.8212@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Wed, 2 Feb 2011 21:45:22 +0000
+On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
 
-> On Wed, Feb 02, 2011 at 01:38:31PM -0800, David Miller wrote:
->> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
->> Date: Wed, 2 Feb 2011 16:37:02 +0000
->> 
->> > 1. there's no way to tell GCC that the inline assembly is a load
->> >    instruction and therefore it needs to schedule the following
->> >    instructions appropriately.
->> 
->> Just add a dummy '"m" (pointer)' asm input argument to the inline asm
->> statement.  Just make sure "typeof(pointer)" has a size matching the
->> size of the load your are performing.
+> On Wed, Feb 02, 2011 at 03:43:29PM +0100, Per Fransson wrote:
+> > When restarting using the kernel kexec functionality the MMU
+> > needs to be turned off. Any code which does this needs to use
+> > identity mapped addresses to get reliable results. In the ARM
+> > kexec case this identity mapping is done:
+> > 
+> > - using the page table of the current task
+> > 
+> > - for all addresses normally used by user space,
+> >   i.e. 0x00000000-PAGE_OFFSET
+> > 
+> > If kexec is used at a kernel crash to collect a core dump this
+> > means that we lose important information.
+> > 
+> > This is what this patches does:
+> > 
+> > * Actually turns off the MMU, which has been omitted by mistake
+> > 
+> > * Sets up a more selective identity mapping
+> > 
+> > * Restores the old mapping once the MMU is off
+> > 
+> > Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+> > ---
+> > v2 changes:
+> > 
+> > * now uses (modified versions of) the identity mapping functions in idmap.c
+> >   as they look in 2.6.38-rc1. Some pud-level code has been added there in
+> >   linux-next.
 > 
-> That involves this problematical cast from a packed struct pointer to
-> an unsigned long pointer, which according to the C standard and GCC
-> folk is undefined.
+> Thanks.  As this been tested with ARMv4/v5 CPUs as well?
 
-It's alignment may be undefined, but it's size definitely is well
-defined and that's what matters here.
+I have doubts about the effectiveness of setup_mm_for_reboot() on any 
+machine where physical RAM starts at 0xc0000000 or above, such as on 
+SA1100.
 
-> Practice over the last 15 years on ARM has also shown that this is not
-> necessary.
 
-Sorry oh big super man, little ole' me is only a kernel newbie.
+Nicolas
