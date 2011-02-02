@@ -1,153 +1,101 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed,  2 Feb 2011 12:03:28 +0000
-Subject: [PATCHv4 09/13] picoxcell: add support for pm
+Date: Wed,  2 Feb 2011 12:03:29 +0000
+Subject: [PATCHv4 10/13] picoxcell: add chained GPIO IRQ handlers
 In-Reply-To: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
 References: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1296648212-5284-10-git-send-email-jamie@jamieiles.com>
+Message-ID: <1296648212-5284-11-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PC3X3 devices support clock gating so provide support for PM on these
-devices. We only support standby modes as we can't gate the ARM clock or
-memory controllers.
+The 8 bits of port A on the ARM GPIO of all devices are capable of
+generating interrupts. Provide chained handlers so that these pins can
+be used as interrupts and the sensitivity and polarity can be set.
 
 v2:
-	- move to an initcall and cleanup to remove uses of ebi and tzpc
-	  clks.
+	- Use the generic IRQ handlers rather than using the irq_desc.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/Makefile |    1 +
- arch/arm/mach-picoxcell/pm.c     |  112 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 113 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/pm.c
+ arch/arm/mach-picoxcell/include/mach/gpio.h |    2 +
+ arch/arm/mach-picoxcell/picoxcell_core.c    |   39 +++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index c0bbb25..f122a84 100644
---- a/arch/arm/mach-picoxcell/Makefile
-+++ b/arch/arm/mach-picoxcell/Makefile
-@@ -5,3 +5,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
- 				   clk.o \
- 				   devices.o
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
-+obj-$(CONFIG_PM)		+= pm.o
-diff --git a/arch/arm/mach-picoxcell/pm.c b/arch/arm/mach-picoxcell/pm.c
-new file mode 100644
-index 0000000..489bba4
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/pm.c
-@@ -0,0 +1,112 @@
-+/*
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * All enquiries to support at picochip.com
-+ */
-+#define pr_fmt(fmt) "picoxcell_pm: " fmt
-+#include <linux/init.h>
-+#include <linux/suspend.h>
+diff --git a/arch/arm/mach-picoxcell/include/mach/gpio.h b/arch/arm/mach-picoxcell/include/mach/gpio.h
+index 113d675..62c7eba 100644
+--- a/arch/arm/mach-picoxcell/include/mach/gpio.h
++++ b/arch/arm/mach-picoxcell/include/mach/gpio.h
+@@ -151,6 +151,8 @@ enum {
+ 
+ #ifdef __KERNEL__
+ 
++extern struct irq_chip armgpio_irqchip;
 +
-+#include <mach/hardware.h>
-+
-+#include "picoxcell_core.h"
-+#include "soc.h"
-+
-+static int picoxcell_pm_valid(suspend_state_t state)
+ static inline int gpio_get_value(unsigned gpio)
+ {
+ 	return __gpio_get_value(gpio);
+diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
+index c422b51..b020b87 100644
+--- a/arch/arm/mach-picoxcell/picoxcell_core.c
++++ b/arch/arm/mach-picoxcell/picoxcell_core.c
+@@ -24,6 +24,18 @@
+ #include "picoxcell_core.h"
+ #include "soc.h"
+ 
++static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 +{
++	unsigned real_irq = (irq - IRQ_GPIO0 + __IRQ_GPIO0);
 +	/*
-+	 * We only support standby mode. There is no point in doing anything
-+	 * for PM_SUSPEND_MEM as we can't power down the core or the memory
-+	 * interfaces.
++	 * We have 8 GPIO pins that can generate interrupts and each one has
++	 * it's own interrupt bit in the VIC. All we need to do is do a
++	 * one-to-one translation from the virtual IRQ number to the real one
++	 * and call the handler.
++	 */
++	generic_handle_irq(real_irq);
++}
++
+ struct picoxcell_soc *picoxcell_get_soc(void)
+ {
+ 	unsigned long device_id =
+@@ -37,6 +49,11 @@ struct picoxcell_soc *picoxcell_get_soc(void)
+ 
+ void __init picoxcell_init_irq(void)
+ {
++#define GPIO_INT_EN_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
++				       GPIO_INT_EN_REG_OFFSET)
++#define GPIO_EOI_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
++				       GPIO_PORT_A_EOI_REG_OFFSET)
++	unsigned i;
+ 	u32 vic0_resume_sources =
+ 		(1 << (IRQ_AXI2PICO8 & 31)) |
+ 		(1 << (IRQ_EMAC & 31)) |
+@@ -45,6 +62,28 @@ void __init picoxcell_init_irq(void)
+ 	vic_init(IO_ADDRESS(PICOXCELL_VIC0_BASE), 32, 0xFFFFFFFE,
+ 		 vic0_resume_sources);
+ 	vic_init(IO_ADDRESS(PICOXCELL_VIC1_BASE), 0, 0x7FF, 0);
++
++	/*
++	 * We want to enable/disable interrupts for the GPIO pins through the
++	 * GPIO block itself. To do this we install a chained handler. If a
++	 * user requests one of the __IRQ_GPIOn interrupts then the GPIO block
++	 * won't get configured.  We provide these interrupts below as virtual
++	 * ones that will configure the GPIO block and enable the source in
++	 * the VIC.
 +	 *
-+	 * When we enter standby, the only thing we can do is power down some
-+	 * of the peripherals.
++	 * The chained handler simply converts from the virtual IRQ handler to
++	 * the real interrupt source and calls the GPIO IRQ handler.
 +	 */
-+	return (state == PM_SUSPEND_ON || state == PM_SUSPEND_STANDBY);
-+}
-+
-+static void wait_for_event(void)
-+{
-+	pr_debug("entering sleep - wait for interrupt\n");
-+	/*
-+	 * Drain the writebuffer and wait for an interrupt.
-+	 */
-+	dsb();
-+	asm volatile("mcr   p15, 0, %0, c7, c0, 4\n" : : "r"(0));
-+}
-+
-+#ifdef CONFIG_PC3X3_STOP_WDT_IN_SUSPEND
-+static inline void picoxcell_pm_stop_wdt(void)
-+{
-+	syscfg_update(1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX,
-+		      1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX);
-+}
-+
-+static inline int picoxcell_pm_restore_wdt(void)
-+{
-+	syscfg_update(1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX, 0);
-+
-+	return 0;
-+}
-+#else /* CONFIG_PC3X3_STOP_WDT_IN_SUSPEND */
-+static inline void picoxcell_pm_stop_wdt(void) {}
-+
-+static inline int picoxcell_pm_restore_wdt(void)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_PC3X3_STOP_WDT_IN_SUSPEND */
-+
-+static int picoxcell_pm_enter(suspend_state_t state)
-+{
-+	int err = 0;
-+
-+	pr_debug("entering suspend state\n");
-+
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		/*
-+		 * Disable any clocks that aren't controlled by drivers but
-+		 * need to be enabled. This includes the EBI, TZPC etc.
-+		 */
-+		picoxcell_pm_stop_wdt();
-+		wait_for_event();
-+		/*
-+		 * Reenable any clcoks that aren't controlled by drivers.
-+		 */
-+		err = picoxcell_pm_restore_wdt();
-+
-+		break;
-+
-+	case PM_SUSPEND_ON:
-+		wait_for_event();
-+		break;
-+
-+	default:
-+		err = -EOPNOTSUPP;
++	__raw_writel(0, GPIO_INT_EN_REG);
++	__raw_writel(~0, GPIO_EOI_REG);
++	for (i = IRQ_GPIO0; i <= IRQ_GPIO7; ++i) {
++		set_irq_chip(i, &armgpio_irqchip);
++		set_irq_handler(i, handle_level_irq);
++		set_irq_flags(i, IRQF_VALID);
 +	}
 +
-+	pr_debug("resumed\n");
-+
-+	return 0;
-+}
-+
-+static struct platform_suspend_ops picoxcell_pm_ops = {
-+	.valid	    = picoxcell_pm_valid,
-+	.enter	    = picoxcell_pm_enter,
-+};
-+
-+static int __init picoxcell_pm_init(void)
-+{
-+	if (!picoxcell_has_feature(PICOXCELL_FEATURE_PM))
-+		return 0;
-+
-+	suspend_set_ops(&picoxcell_pm_ops);
-+
-+	return 0;
-+}
-+device_initcall(picoxcell_pm_init);
++	for (i = __IRQ_GPIO0; i <= __IRQ_GPIO7; ++i)
++		set_irq_chained_handler(i, gpio_irq_handler);
+ }
+ 
+ static const char *picoxcell_get_partname(void)
 -- 
 1.7.3.4
