@@ -1,67 +1,114 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 02 Feb 2011 17:27:40 -0500 (EST)
-Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
-In-Reply-To: <20110202221937.GI31043@n2100.arm.linux.org.uk>
-References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20110202210925.GD31043@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102021704580.8212@xanadu.home>
-	<20110202221937.GI31043@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1102021723330.8212@xanadu.home>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Wed, 2 Feb 2011 22:45:56 +0000
+Subject: [PATCHv2] [ARM] orion5x: accelerate NAND on the TS-78xx
+In-Reply-To: <20110108115525.GN12386@chipmunk>
+References: <20110108115525.GN12386@chipmunk>
+Message-ID: <20110202224556.GH12386@chipmunk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
+Hi,
 
-> On Wed, Feb 02, 2011 at 05:10:37PM -0500, Nicolas Pitre wrote:
-> > On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Wed, Feb 02, 2011 at 03:43:29PM +0100, Per Fransson wrote:
-> > > > When restarting using the kernel kexec functionality the MMU
-> > > > needs to be turned off. Any code which does this needs to use
-> > > > identity mapped addresses to get reliable results. In the ARM
-> > > > kexec case this identity mapping is done:
-> > > > 
-> > > > - using the page table of the current task
-> > > > 
-> > > > - for all addresses normally used by user space,
-> > > >   i.e. 0x00000000-PAGE_OFFSET
-> > > > 
-> > > > If kexec is used at a kernel crash to collect a core dump this
-> > > > means that we lose important information.
-> > > > 
-> > > > This is what this patches does:
-> > > > 
-> > > > * Actually turns off the MMU, which has been omitted by mistake
-> > > > 
-> > > > * Sets up a more selective identity mapping
-> > > > 
-> > > > * Restores the old mapping once the MMU is off
-> > > > 
-> > > > Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
-> > > > ---
-> > > > v2 changes:
-> > > > 
-> > > > * now uses (modified versions of) the identity mapping functions in idmap.c
-> > > >   as they look in 2.6.38-rc1. Some pud-level code has been added there in
-> > > >   linux-next.
-> > > 
-> > > Thanks.  As this been tested with ARMv4/v5 CPUs as well?
-> > 
-> > I have doubts about the effectiveness of setup_mm_for_reboot() on any 
-> > machine where physical RAM starts at 0xc0000000 or above, such as on 
-> > SA1100.
+No grumblings from anyone?
+
+Cheers
+
+* Alexander Clouter <alex@digriz.org.uk> [2011-01-08 11:55:25+0000]:
+>
+> The NAND supports 32bit reads and writes so lets stop shunting 8bit
+> chunks across the bus.
 > 
-> It's known to work on Assabet.  It works on SA1100 because the kernel
-> mapping is already a 1:1 mapping.
-D'oh.
+> Doing a dumb 'dd' benchmark, this increases performance roughly like so:
+>  * read: 1.3MB/s to 3.4MB/s
+>  * write: 614kB/s to 882kB/s
+> 
+> Changelog:
+>  v2: used approach suggested by Russell King instead
+> 	<20110105003316.GJ24935@n2100.arm.linux.org.uk>
+>  v1: initial release <20110104235158.GQ12386@chipmunk>
+> 
+> Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+> ---
+>  arch/arm/mach-orion5x/ts78xx-setup.c |   56 ++++++++++++++++++++++++++++++++++
+>  1 files changed, 56 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+> index c1c1cd0..89682e1 100644
+> --- a/arch/arm/mach-orion5x/ts78xx-setup.c
+> +++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+> @@ -191,6 +191,60 @@ static int ts78xx_ts_nand_dev_ready(struct mtd_info *mtd)
+>  	return readb(TS_NAND_CTRL) & 0x20;
+>  }
+>  
+> +static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
+> +			const uint8_t *buf, int len)
+> +{
+> +	struct nand_chip *chip = mtd->priv;
+> +	void __iomem *io_base = chip->IO_ADDR_W;
+> +	unsigned long off = ((unsigned long)buf & 3);
+> +	int sz;
+> +
+> +	if (off) {
+> +		sz = min(4 - off, len);
+> +		writesb(io_base, buf, sz);
+> +		buf += sz;
+> +		len -= sz;
+> +	}
+> +
+> +	sz = len >> 2;
+> +	if (sz) {
+> +		u32 *buf32 = (u32 *)buf;
+> +		writesl(io_base, buf32, sz);
+> +		buf += sz << 2;
+> +		len -= sz << 2;
+> +	}
+> +
+> +	if (len)
+> +		writesb(io_base, buf, len);
+> +}
+> +
+> +static void ts78xx_ts_nand_read_buf(struct mtd_info *mtd,
+> +			uint8_t *buf, int len)
+> +{
+> +	struct nand_chip *chip = mtd->priv;
+> +	void __iomem *io_base = chip->IO_ADDR_R;
+> +	unsigned long off = ((unsigned long)buf & 3);
+> +	int sz;
+> +
+> +	if (off) {
+> +		sz = min(4 - off, len);
+> +		readsb(io_base, buf, sz);
+> +		buf += sz;
+> +		len -= sz;
+> +	}
+> +
+> +	sz = len >> 2;
+> +	if (sz) {
+> +		u32 *buf32 = (u32 *)buf;
+> +		readsl(io_base, buf32, sz);
+> +		buf += sz << 2;
+> +		len -= sz << 2;
+> +	}
+> +
+> +	if (len)
+> +		readsb(io_base, buf, len);
+> +}
+> +
+>  const char *ts_nand_part_probes[] = { "cmdlinepart", NULL };
+>  
+>  static struct mtd_partition ts78xx_ts_nand_parts[] = {
+> @@ -233,6 +287,8 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
+>  		 */
+>  		.cmd_ctrl		= ts78xx_ts_nand_cmd_ctrl,
+>  		.dev_ready		= ts78xx_ts_nand_dev_ready,
+> +		.write_buf		= ts78xx_ts_nand_write_buf,
+> +		.read_buf		= ts78xx_ts_nand_read_buf,
+>  	},
+>  };
+>  
+>
 
-> What setup_mm_for_reboot() is doing on Assabet though is making the
-> flash available for cpu_reset(0) to be able to call, not making the
-> kernel code for cpu_reset() available for calling.
-
-Right.  So if RAM is located at 0xd0000000 instead then this won't work 
-as intended.  And overwriting the entire user space is not the best 
-thing to do for kexec anyway.
-
-
-Nicolas
+-- 
+Alexander Clouter
+.sigmonster says: TV is chewing gum for the eyes.
+                  		-- Frank Lloyd Wright
