@@ -1,39 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Feb 2011 22:47:45 +0000
-Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
-In-Reply-To: <alpine.LFD.2.00.1102021723330.8212@xanadu.home>
-References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20110202210925.GD31043@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102021704580.8212@xanadu.home>
-	<20110202221937.GI31043@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102021723330.8212@xanadu.home>
-Message-ID: <20110202224745.GK31043@n2100.arm.linux.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 Feb 2011 15:23:50 -0800 (PST)
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <yw1xei7qm3vy.fsf@unicorn.mansr.com>
+References: <20110202163702.GA23240@n2100.arm.linux.org.uk>
+	<20110202.133831.193702414.davem@davemloft.net>
+	<yw1xei7qm3vy.fsf@unicorn.mansr.com>
+Message-ID: <20110202.152350.28800670.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 05:27:40PM -0500, Nicolas Pitre wrote:
-> On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
-> 
-> > It's known to work on Assabet.  It works on SA1100 because the kernel
-> > mapping is already a 1:1 mapping.
-> D'oh.
-> 
-> > What setup_mm_for_reboot() is doing on Assabet though is making the
-> > flash available for cpu_reset(0) to be able to call, not making the
-> > kernel code for cpu_reset() available for calling.
-> 
-> Right.  So if RAM is located at 0xd0000000 instead then this won't work 
-> as intended.
+From: M?ns Rullg?rd <mans@mansr.com>
+Date: Wed, 02 Feb 2011 23:08:01 +0000
 
-It'll work as intended for cpu resetting, except for v6 and v7 as they
-don't have the necessary code in their cpu_reset() function to work,
-and secondly perversely, v6 and v7 CPUs stall the pipeline when turning
-the MMU off, while previous CPUs didn't.  Meanwhile, many other
-instructions which did stall the pipeline no longer do.
+> David Miller <davem@davemloft.net> writes:
+> 
+>> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+>> Date: Wed, 2 Feb 2011 16:37:02 +0000
+>>
+>>> 1. there's no way to tell GCC that the inline assembly is a load
+>>>    instruction and therefore it needs to schedule the following
+>>>    instructions appropriately.
+>>
+>> Just add a dummy '"m" (pointer)' asm input argument to the inline asm
+>> statement.  Just make sure "typeof(pointer)" has a size matching the
+>> size of the load your are performing.
+> 
+> That should be "m"(*pointer).
 
-> And overwriting the entire user space is not the best thing to do for
-> kexec anyway.
+Right, thanks for the correction.
 
-Probably not.  As I see it, having RAM located above PAGE_OFFSET in phys
-address space, but not being a 1:1 mapping, will always be a problem.
-What if it ends up overwriting the L2 cache controller mapping?
+>> But you really need that memory clobber there whether you like it or
+>> not, see above.
+> 
+> I don't know of any device where the side-effects are not explicitly
+> indicated by other means in the code triggering them, so it probably
+> is safe without the clobber as Russel says.
+
+You're probably right.
