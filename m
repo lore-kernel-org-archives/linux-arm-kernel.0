@@ -1,9 +1,9 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed,  2 Feb 2011 20:00:01 +0300
-Subject: [PATCH 4/6] tosa: switch to using gpio-vbus transceiver
+Date: Wed,  2 Feb 2011 20:00:00 +0300
+Subject: [PATCH 3/6] PalmTC: switch to using gpio-vbus transceiver
 In-Reply-To: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
 References: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1296666003-31647-5-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1296666003-31647-4-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,59 +11,61 @@ Switch from handling gpio-vbus in pxa25x_udc to using standard gpio-vbus
 tranceiver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Cc: Marek Vasut <marek.vasut@gmail.com>
 ---
- arch/arm/mach-pxa/tosa.c |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/mach-pxa/palmtc.c |   14 ++++++++++++--
+ 1 files changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 0ee1df4..df35813 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -33,6 +33,7 @@
- #include <linux/pda_power.h>
- #include <linux/spi/spi.h>
- #include <linux/input/matrix_keypad.h>
+diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+index 2131d58..fcc4490 100644
+--- a/arch/arm/mach-pxa/palmtc.c
++++ b/arch/arm/mach-pxa/palmtc.c
+@@ -25,6 +25,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/mtd/physmap.h>
 +#include <linux/usb/gpio_vbus.h>
  
- #include <asm/setup.h>
  #include <asm/mach-types.h>
-@@ -239,12 +240,20 @@ static struct scoop_pcmcia_config tosa_pcmcia_config = {
- /*
-  * USB Device Controller
-  */
--static struct pxa2xx_udc_mach_info udc_info __initdata = {
-+static struct gpio_vbus_mach_info tosa_udc_info = {
- 	.gpio_pullup		= TOSA_GPIO_USB_PULLUP,
- 	.gpio_vbus		= TOSA_GPIO_USB_IN,
+ #include <asm/mach/arch.h>
+@@ -294,12 +295,21 @@ static struct platform_device palmtc_keyboard = {
+ /******************************************************************************
+  * UDC
+  ******************************************************************************/
+-static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
++static struct gpio_vbus_mach_info palmtc_udc_info = {
+ 	.gpio_vbus		= GPIO_NR_PALMTC_USB_DETECT_N,
  	.gpio_vbus_inverted	= 1,
+ 	.gpio_pullup		= GPIO_NR_PALMTC_USB_POWER,
  };
  
-+static struct platform_device tosa_gpio_vbus = {
++static struct platform_device palmtc_gpio_vbus = {
 +	.name	= "gpio-vbus",
 +	.id	= -1,
 +	.dev	= {
-+		.platform_data	= &tosa_udc_info,
++		.platform_data	= &palmtc_udc_info,
 +	},
 +};
 +
- /*
-  * MMC/SD Device
-  */
-@@ -884,6 +893,7 @@ static struct platform_device *devices[] __initdata = {
- 	&tosaled_device,
- 	&tosa_bt_device,
- 	&sharpsl_rom_device,
-+	&tosa_gpio_vbus,
++
+ /******************************************************************************
+  * Touchscreen / Battery / GPIO-extender
+  ******************************************************************************/
+@@ -391,6 +401,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&palmtc_keyboard,
+ 	&palmtc_pxa_keys,
+ 	&palmtc_flash,
++	&palmtc_gpio_vbus,
  };
  
- static void tosa_poweroff(void)
-@@ -928,7 +938,6 @@ static void __init tosa_init(void)
- 	dummy = gpiochip_reserve(TOSA_TC6393XB_GPIO_BASE, 16);
+ static void __init palmtc_init(void)
+@@ -404,7 +415,6 @@ static void __init palmtc_init(void)
  
- 	pxa_set_mci_info(&tosa_mci_platform_data);
--	pxa_set_udc_info(&udc_info);
- 	pxa_set_ficp_info(&tosa_ficp_platform_data);
- 	pxa_set_i2c_info(NULL);
+ 	set_pxa_fb_info(&palmtc_lcd_screen);
+ 	pxa_set_mci_info(&palmtc_mci_platform_data);
+-	pxa_set_udc_info(&palmtc_udc_info);
  	pxa_set_ac97_info(NULL);
+ 	pxa_set_ficp_info(&palmtc_ficp_platform_data);
+ 
 -- 
 1.7.2.3
