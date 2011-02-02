@@ -1,9 +1,9 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed,  2 Feb 2011 19:59:59 +0300
-Subject: [PATCH 2/6] gumstix: switch to using gpio-vbus transceiver
+Date: Wed,  2 Feb 2011 20:00:01 +0300
+Subject: [PATCH 4/6] tosa: switch to using gpio-vbus transceiver
 In-Reply-To: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
 References: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1296666003-31647-3-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1296666003-31647-5-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,47 +11,59 @@ Switch from handling gpio-vbus in pxa25x_udc to using standard gpio-vbus
 tranceiver.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: Steve Sakoman <sakoman@gmail.com>
 ---
- arch/arm/mach-pxa/gumstix.c |   13 +++++++++++--
+ arch/arm/mach-pxa/tosa.c |   13 +++++++++++--
  1 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/gumstix.c b/arch/arm/mach-pxa/gumstix.c
-index 1e2a9a1..c74d7c1 100644
---- a/arch/arm/mach-pxa/gumstix.c
-+++ b/arch/arm/mach-pxa/gumstix.c
-@@ -26,6 +26,7 @@
- #include <linux/gpio.h>
- #include <linux/err.h>
- #include <linux/clk.h>
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index 0ee1df4..df35813 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -33,6 +33,7 @@
+ #include <linux/pda_power.h>
+ #include <linux/spi/spi.h>
+ #include <linux/input/matrix_keypad.h>
 +#include <linux/usb/gpio_vbus.h>
  
  #include <asm/setup.h>
- #include <asm/memory.h>
-@@ -106,14 +107,22 @@ static void __init gumstix_mmc_init(void)
- #endif
- 
- #ifdef CONFIG_USB_GADGET_PXA25X
--static struct pxa2xx_udc_mach_info gumstix_udc_info __initdata = {
-+static struct gpio_vbus_mach_info gumstix_udc_info = {
- 	.gpio_vbus		= GPIO_GUMSTIX_USB_GPIOn,
- 	.gpio_pullup		= GPIO_GUMSTIX_USB_GPIOx,
+ #include <asm/mach-types.h>
+@@ -239,12 +240,20 @@ static struct scoop_pcmcia_config tosa_pcmcia_config = {
+ /*
+  * USB Device Controller
+  */
+-static struct pxa2xx_udc_mach_info udc_info __initdata = {
++static struct gpio_vbus_mach_info tosa_udc_info = {
+ 	.gpio_pullup		= TOSA_GPIO_USB_PULLUP,
+ 	.gpio_vbus		= TOSA_GPIO_USB_IN,
+ 	.gpio_vbus_inverted	= 1,
  };
  
-+static struct platform_device gumstix_gpio_vbus = {
++static struct platform_device tosa_gpio_vbus = {
 +	.name	= "gpio-vbus",
 +	.id	= -1,
 +	.dev	= {
-+		.platform_data	= &gumstix_udc_info,
++		.platform_data	= &tosa_udc_info,
 +	},
 +};
 +
- static void __init gumstix_udc_init(void)
- {
--	pxa_set_udc_info(&gumstix_udc_info);
-+	platform_device_register(&gumstix_gpio_vbus);
- }
- #else
- static void gumstix_udc_init(void)
+ /*
+  * MMC/SD Device
+  */
+@@ -884,6 +893,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&tosaled_device,
+ 	&tosa_bt_device,
+ 	&sharpsl_rom_device,
++	&tosa_gpio_vbus,
+ };
+ 
+ static void tosa_poweroff(void)
+@@ -928,7 +938,6 @@ static void __init tosa_init(void)
+ 	dummy = gpiochip_reserve(TOSA_TC6393XB_GPIO_BASE, 16);
+ 
+ 	pxa_set_mci_info(&tosa_mci_platform_data);
+-	pxa_set_udc_info(&udc_info);
+ 	pxa_set_ficp_info(&tosa_ficp_platform_data);
+ 	pxa_set_i2c_info(NULL);
+ 	pxa_set_ac97_info(NULL);
 -- 
 1.7.2.3
