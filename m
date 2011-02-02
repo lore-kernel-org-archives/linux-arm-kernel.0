@@ -1,51 +1,76 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 2 Feb 2011 11:31:53 +0900
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201152820.GQ31216@n2100.arm.linux.org.uk>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<AANLkTimayMAfr+zA6uO_yUmZqsOLmJ3fiiS696mL_evn@mail.gmail.com>
-	<20110201140024.GZ1147@pengutronix.de>
-	<20110201151418.GN31216@n2100.arm.linux.org.uk>
-	<20110201152203.GE1147@pengutronix.de>
-	<20110201152820.GQ31216@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTik_QFqas7yTWDpWhMfxfdOvKNh--DDFxY8x8v51@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 1 Feb 2011 20:26:03 -0700
+Subject: [PATCH] ARM: map ATAGs when not in first 1MB of RAM
+In-Reply-To: <1296143443-9442-1-git-send-email-robherring2@gmail.com>
+References: <1296143443-9442-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20110202032603.GA29148@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Feb 01, 2011 at 04:22:03PM +0100, Uwe Kleine-K?nig wrote:
->> Full ack. ?(I wonder if you misunderstood me or wanted to put my
->> statement into more words. ?Jassi didn't like that a clk_enable without
->> a previous clk_prepare worked on some platforms and on others it
->> doesn't. ?With BUG_ON(clk->ops->prepare && !clk->prepare_count) in
->> clk_enable we have exactly this situation.)
->
-> Even with a NULL clk->ops->prepare function, we still want drivers to
-> have called clk_prepare(). ?So we can do something like:
->
-> ? ? ? ?if (WARN_ON(clk->prepare_count == 0))
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> in clk_enable() should be sufficient and noisy enough not to be missed.
->
-> I'd avoid BUG_ON() here as that will take the system down, which may
-> increase the chances of getting useful bug reports.
+On Thu, Jan 27, 2011 at 09:50:43AM -0600, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> If ATAGs or DTB pointer is not within first 1MB of RAM, then the boot params
+> will not be mapped early enough, so map the 1MB region that r2 points to. Only
+> map the first 1MB when r2 is 0.
+> 
+> Some assembly improvements from Nicolas Pitre.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-Having thought about it, I think it's not necessary to immediately catch
-drivers that work on some platforms and not on others -- a mere comment
-'please add clk_prepare' during code review or a patch adding 'clk_prepare'
-later upon stumbling across a platform on which the driver doesn't work,
-should be OK. Let us not fret about it.
+I'll try temporarily picking this one up into my devicetree/test
+branch until Russell's p2v patches get merged into mainline.
 
-That leaves us with only having to ensure that :-
-a) No two calls to clk_prepare/unprepare _hooks_ are consecutive.
-b) clk_prepare is done on the clock (not necessarily by the driver
-    under consideration) before calls to clk_enable.
+Thanks!
+g.
 
-I think (a) is already easily managed by having the prepare_count,
-and (b) can be reasonably managed by what Russell suggests above.
-
-So, FWIW, I am for the idea.
-
-Njoi!
+> ---
+>  arch/arm/kernel/head.S |   19 ++++++++++++++++++-
+>  1 files changed, 18 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> index 65d9489..9c688bf 100644
+> --- a/arch/arm/kernel/head.S
+> +++ b/arch/arm/kernel/head.S
+> @@ -205,15 +205,32 @@ __create_page_tables:
+>  #endif
+>  
+>  	/*
+> -	 * Then map first 1MB of ram in case it contains our boot params.
+> +	 * Then map first 1MB of ram if boot params address is not specified.
+>  	 */
+> +	cmp	r2, #0
+> +	bne	1f
+>  	add	r0, r4, #PAGE_OFFSET >> 18
+>  	orr	r6, r7, #(PHYS_OFFSET & 0xff000000)
+>  	.if	(PHYS_OFFSET & 0x00f00000)
+>  	orr	r6, r6, #(PHYS_OFFSET & 0x00f00000)
+>  	.endif
+>  	str	r6, [r0]
+> +	b	2f
+>  
+> +	/*
+> +	 * Otherwise map the 1MB region r2 points to (atags or dtb)
+> +	 */
+> +1:	mov	r0, r2, lsr #20
+> +	mov	r0, r0, lsl #20
+> +	sub	r3, r0, #(PHYS_OFFSET & 0xff000000)
+> +	.if	(PHYS_OFFSET & 0x00f00000)
+> +	sub	r3, r3, #(PHYS_OFFSET & 0x00f00000)
+> +	.endif
+> +	add	r3, r3, #PAGE_OFFSET
+> +	add	r3, r4, r3, lsr #18
+> +	orr	r6, r7, r0
+> +	str	r6, [r3]
+> +2:
+>  #ifdef CONFIG_DEBUG_LL
+>  #ifndef CONFIG_DEBUG_ICEDCC
+>  	/*
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
