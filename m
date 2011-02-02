@@ -1,90 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Feb 2011 21:24:49 +0000
-Subject: [PATCH] ARM: bitops: Fix low-level code to be Thumb-2 compatible
-In-Reply-To: <alpine.LFD.2.00.1102021421160.8580@xanadu.home>
-References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
-Message-ID: <20110202212449.GF31043@n2100.arm.linux.org.uk>
+From: eric@eukrea.com (=?ISO-8859-1?Q?Eric_B=E9nard?=)
+Date: Wed, 02 Feb 2011 22:26:17 +0100
+Subject: i.MX & IRQF_ONESHOT
+In-Reply-To: <20110202212000.GA30452@pengutronix.de>
+References: <20110113091355.GP24920@pengutronix.de>
+	<4D2EDE10.3040809@atmel.com>
+	<alpine.LFD.2.00.1101131839010.2678@localhost6.localdomain6>
+	<4D2F6AB7.30800@eukrea.com> <20110113212401.GZ24920@pengutronix.de>
+	<4D2FFCBE.3010704@eukrea.com>
+	<alpine.LFD.2.00.1101141138480.2678@localhost6.localdomain6>
+	<20110114130821.GA1434@pengutronix.de>
+	<20110202212000.GA30452@pengutronix.de>
+Message-ID: <4D49CBF9.6000904@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 02:33:55PM -0500, Nicolas Pitre wrote:
-> On Wed, 2 Feb 2011, Dave Martin wrote:
-> 
-> > The new bitops code cunningly str <Rt>, [r1, -r1] to trigger
-> > a fault by attempting to store to address zero.
-> > 
-> > This code doesn't assemble in Thumb-2, since Thumb-2 doesn't
-> > allow negative register offsets at all for loads and stores.
-> > 
-> > The patch loads 0 into r2 and uses that as a base register
-> > instead for the Thumb-2 case: r2 seems non-live at every
-> > instance of this problem.
-> > 
-> > The ARM case is unaffected.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> 
-> Russell proposed a better solution already:
-> 
-> http://mid.gmane.org/alpine.LFD.2.00.1101181312360.8580 at xanadu.home
-> 
-> No idea why this wasn't folded in his series yet though.
+Hi Uwe,
 
-Now added, and original tested-by's dropped.  It now needs re-testing.
+On 02/02/2011 22:20, Uwe Kleine-K?nig wrote:
+> On Fri, Jan 14, 2011 at 02:08:21PM +0100, Uwe Kleine-K?nig wrote:
+>> Hello,
+>>
+>> On Fri, Jan 14, 2011 at 11:57:34AM +0100, Thomas Gleixner wrote:
+>>> So there are several things wrong here:
+>>>
+>>> 1) Using handle_level_irq for an edge interrupt is wrong. That's not
+>>>     restricted to the TS driver problem at hand. That's wrong in
+>>>     general. Other set_type() functions adjust the handler as well when
+>>>     they switch the edge/level types.
+>> That was introduced by 060d20d32ae7c6a20a8eac465795ed5bc9b37f7c.
+>> As a quick test you can try to revert that.  If that helps I can look
+>> deeper into it.  That won't help on at91 though.
+> Eric, did you resolve the problem, did reverting 060d20d32ae7c6 help?
+>
+Sorry, I didn't have the time to test yet.
+I'll try to test this and provide feedback before the end of the week.
 
-8<----
-Subject: [PATCH] ARM: bitops: ensure set/clear/change bitops take a word-aligned pointer
-
-Add additional instructions to our assembly bitops functions to ensure
-that they only operate on word-aligned pointers.  This will be necessary
-when we switch these operations to use the word-based exclusive
-operations.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/lib/bitops.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-index d422529..bd00551 100644
---- a/arch/arm/lib/bitops.h
-+++ b/arch/arm/lib/bitops.h
-@@ -1,6 +1,8 @@
- 
- #if __LINUX_ARM_ARCH__ >= 6 && defined(CONFIG_CPU_32v6K)
- 	.macro	bitop, instr
-+	ands	ip, r1, #3
-+	strneb	r1, [ip]		@ assert word-aligned
- 	mov	r2, #1
- 	and	r3, r0, #7		@ Get bit offset
- 	add	r1, r1, r0, lsr #3	@ Get byte offset
-@@ -14,6 +16,8 @@
- 	.endm
- 
- 	.macro	testop, instr, store
-+	ands	ip, r1, #3
-+	strneb	r1, [ip]		@ assert word-aligned
- 	and	r3, r0, #7		@ Get bit offset
- 	mov	r2, #1
- 	add	r1, r1, r0, lsr #3	@ Get byte offset
-@@ -32,6 +36,8 @@
- 	.endm
- #else
- 	.macro	bitop, instr
-+	ands	ip, r1, #3
-+	strneb	r1, [ip]		@ assert word-aligned
- 	and	r2, r0, #7
- 	mov	r3, #1
- 	mov	r3, r3, lsl r2
-@@ -52,6 +58,8 @@
-  * to avoid dirtying the data cache.
-  */
- 	.macro	testop, instr, store
-+	ands	ip, r1, #3
-+	strneb	r1, [ip]		@ assert word-aligned
- 	add	r1, r1, r0, lsr #3
- 	and	r3, r0, #7
- 	mov	r0, #1
--- 
-1.6.2.5
+Best regards,
+Eric
