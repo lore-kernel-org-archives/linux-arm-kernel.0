@@ -1,40 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 01 Feb 2011 23:11:50 -0500 (EST)
-Subject: advice needed on how best to fix kirkwood kexec
-In-Reply-To: <20110201215059.GC7547@localhost>
-References: <20110201215059.GC7547@localhost>
-Message-ID: <alpine.LFD.2.00.1102012252520.8580@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 1 Feb 2011 21:16:23 -0700
+Subject: [PATCH v2 2/6] arm/dt: Allow CONFIG_OF on ARM
+In-Reply-To: <20110201103830.19083l8sqoyibqf4@v1539.ncsrv.de>
+References: <20110131203626.15105.64302.stgit@localhost6.localdomain6>
+	<20110131210400.15105.70374.stgit@localhost6.localdomain6>
+	<20110201103830.19083l8sqoyibqf4@v1539.ncsrv.de>
+Message-ID: <20110202041623.GE29148@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Feb 2011, Eric Cooper wrote:
-
-> I found the problem with kexec'ing kirkwood kernels:
+On Tue, Feb 01, 2011 at 10:38:30AM +0100, Hendrik Sattler wrote:
+> Zitat von "Grant Likely" <grant.likely@secretlab.ca>:
+> >+config USE_OF
+> >+	bool "Flattened Device Tree support"
+> >+	select OF
+> >+	select OF_EARLY_FLATTREE
+> >+	help
+> >+	  Include support for flattened device tree machine descriptions.
+> >+
 > 
-> During late initialization, the kirkwood_clock_gate function powers
-> down unused units, including the PCIe.  But the early initialization
-> (kirkwood_timer_init) relies on reading the device ID register, which
-> is in the PCIe space, so it will hang when started by kexec.
-> 
-> My question is, should I patch the kexec code or the initialization code?
-> 
-> Patching the kexec code is much more useful, because it allows
-> kexec'ing the existing kirkwood kernels that are already "out there",
-> in distros, etc.  But it requires a kirkwood-specific operation in the
-> otherwise generic machine_kexec().
-> 
-> Patching just the kirkwood initialization is better from an
-> "information hiding" perspective, but won't provide any benefit until
-> it makes its way into the kernels that people might want to kexec.
+> Arm doesn't have something called OpenFirmware, still new config
+> entries that refer to that name are added. Why no keep _one_ name
+> for what you add? I find the random mix of "OF" and "Device Tree"
+> rather confusing.
 
-I think that both should be patched.  The first one will let you kexec 
-old kernels, while the later will let you be kexec'd by old kernels as 
-well as be less dependent on whatever the bootloader might have done 
-with the clock.
+*some* arm platforms have OpenFirmware.  The new OLPC for one.  :-)
 
-And machine_kexec() should probably call a machine specific hook if set 
-by machine specific code, similar to pm_power_off in 
-machine_power_off().
+But you're right, the OF naming convention is horrid and everyone
+hates it, even the OpenFirmware users.  Michael Ellerman has been
+working on renaming all the OF* references to DT* or DEVTREE*.
 
+However, until that point, all of the device tree config options are
+still named CONFIG_OF*, and I want to maintain commonality until
+everything can be renamed all at once.
 
-Nicolas
+g.
