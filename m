@@ -1,223 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 Feb 2011 13:28:28 -0800
-Subject: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE power state
-In-Reply-To: <bcc7ec64222e616309287af8eb23d659@mail.gmail.com> (Rajendra
-	Nayak's message of "Wed, 2 Feb 2011 09:49:16 +0530")
-References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
-	<87pqrbmdwx.fsf@ti.com>
-	<bcc7ec64222e616309287af8eb23d659@mail.gmail.com>
-Message-ID: <87aaieazyb.fsf@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 02 Feb 2011 13:38:31 -0800 (PST)
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <20110202163702.GA23240@n2100.arm.linux.org.uk>
+References: <201102021700.20683.arnd@arndb.de>
+	<20110202163702.GA23240@n2100.arm.linux.org.uk>
+Message-ID: <20110202.133831.193702414.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Date: Wed, 2 Feb 2011 16:37:02 +0000
 
-> Hi Kevin,
->
->> -----Original Message-----
->> From: Kevin Hilman [mailto:khilman at ti.com]
->> Sent: Wednesday, February 02, 2011 6:49 AM
->> To: Santosh Shilimkar
->> Cc: linux-omap at vger.kernel.org; paul at pwsan.com; b-cousson at ti.com;
-> rnayak at ti.com; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE
-> power state
->>
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->> > On OMAP4, one can explicitly program INACTIVE as the power state of
->> > the logic area inside the power domain. Techincally PD state
-> programmed
->> > to ON and if all the clock domains within the PD are idled, is
-> equivalent
->> > tp PD programmed to INACTIVE and all the clock domains within the PD
-> are
->> > idled. There won't be any power difference in above two.
->> >
->> > Since the CPUIDLE C-states explicitly make use of INACTIVE as a PD
->> > targeted state
->>
->> I think you're referring to code that is not upstream here.  I'm not
->> aware of any C-states targetting INACTIVE.
->
-> On OMAP3, C2/3/4 have target state as CORE inactive, while C1 is
-> CORE active.
+> 1. there's no way to tell GCC that the inline assembly is a load
+>    instruction and therefore it needs to schedule the following
+>    instructions appropriately.
 
-I see what you're saying now.
+Just add a dummy '"m" (pointer)' asm input argument to the inline asm
+statement.  Just make sure "typeof(pointer)" has a size matching the
+size of the load your are performing.
 
-However, from a code point of view, all of those C-states are programmed
-to PWRDM_POWER_ON.
+> 2. GCC will needlessly reload pointers from structures and other such
+>    behaviour because it can't be told clearly what the inline assembly
+>    is doing, so the inline asm needs to have a "memory" clobber.
 
-Therefore the changelog is not accurate.  Specifically the use of
-"explicitly" is wrong, because the use of INACTIVE is most certainly not
-explicit.
+This behavior is correct, and in fact needed.  Writing to chip registers
+can trigger changes to arbitrary main memory locations.
 
-Kevin
+> 3. It seems to misses out using the pre-index addressing, prefering to
+>    create add/sub instructions prior to each inline assembly load/store.
 
->>
->> Kevin
->>
->> > and also there is some additional latancy involved
->> > with PD INACTIVE vs PD ON, it's better to support it as an explcit
->> > PD state.
->> >
->> > This patch adds the support to allow explicit PD INACTIVE
->> > programming if supported.
->> >
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > Cc: Paul Walmsley <paul@pwsan.com>
->> > ---
->> >  arch/arm/mach-omap2/powerdomain.h           |   12 ++++++++++++
->> >  arch/arm/mach-omap2/powerdomains44xx_data.c |   26
-> +++++++++++++-------------
->> >  2 files changed, 25 insertions(+), 13 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-omap2/powerdomain.h
-> b/arch/arm/mach-omap2/powerdomain.h
->> > index c66431e..0e15ca7 100644
->> > --- a/arch/arm/mach-omap2/powerdomain.h
->> > +++ b/arch/arm/mach-omap2/powerdomain.h
->> > @@ -46,6 +46,18 @@
->> >
->> >  #define PWRSTS_OFF_RET_ON	(PWRSTS_OFF_RET | (1 << PWRDM_POWER_ON))
->> >
->> > +#define PWRSTS_RET_INA_ON	((1 << PWRDM_POWER_RET) | \
->> > +				 (1 << PWRDM_POWER_INACTIVE)  | \
->> > +				 (1 << PWRDM_POWER_ON))
->> > +
->> > +#define PWRSTS_OFF_INA_ON	((1 << PWRDM_POWER_OFF) | \
->> > +				 (1 << PWRDM_POWER_INACTIVE)  | \
->> > +				 (1 << PWRDM_POWER_ON))
->> > +
->> > +#define PWRSTS_OFF_RET_INA_ON	((1 << PWRDM_POWER_OFF) | \
->> > +				 (1 << PWRDM_POWER_RET) | \
->> > +				 (1 << PWRDM_POWER_INACTIVE)  | \
->> > +				 (1 << PWRDM_POWER_ON))
->> >
->> >  /* Powerdomain flags */
->> >  #define PWRDM_HAS_HDWR_SAR	(1 << 0) /* hardware save-and-restore
-> support */
->> > diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c
-> b/arch/arm/mach-omap2/powerdomains44xx_data.c
->> > index 26d7641..96cde98 100644
->> > --- a/arch/arm/mach-omap2/powerdomains44xx_data.c
->> > +++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
->> > @@ -36,7 +36,7 @@ static struct powerdomain core_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_CORE_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_RET_ON,
->> > +	.pwrsts		  = PWRSTS_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 5,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -62,7 +62,7 @@ static struct powerdomain gfx_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_GFX_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_INA_ON,
->> >  	.banks		  = 1,
->> >  	.pwrsts_mem_ret	= {
->> >  		[0] = PWRDM_POWER_OFF,	/* gfx_mem */
->> > @@ -79,7 +79,7 @@ static struct powerdomain abe_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_ABE_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRDM_POWER_OFF,
->> >  	.banks		  = 2,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -99,7 +99,7 @@ static struct powerdomain dss_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_DSS_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF,
->> >  	.banks		  = 1,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -117,7 +117,7 @@ static struct powerdomain tesla_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_TESLA_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 3,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -155,7 +155,7 @@ static struct powerdomain cpu0_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU0_INST,
->> >  	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 1,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -172,7 +172,7 @@ static struct powerdomain cpu1_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRCM_MPU_CPU1_INST,
->> >  	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 1,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -205,7 +205,7 @@ static struct powerdomain mpu_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_MPU_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 3,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -226,7 +226,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_IVAHD_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRDM_POWER_OFF,
->> >  	.banks		  = 4,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -250,7 +250,7 @@ static struct powerdomain cam_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_CAM_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_INA_ON,
->> >  	.banks		  = 1,
->> >  	.pwrsts_mem_ret	= {
->> >  		[0] = PWRDM_POWER_OFF,	/* cam_mem */
->> > @@ -267,7 +267,7 @@ static struct powerdomain l3init_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_L3INIT_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_RET_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 1,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -285,7 +285,7 @@ static struct powerdomain l4per_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_L4PER_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_RET_ON,
->> > +	.pwrsts		  = PWRSTS_RET_INA_ON,
->> >  	.pwrsts_logic_ret = PWRSTS_OFF_RET,
->> >  	.banks		  = 2,
->> >  	.pwrsts_mem_ret	= {
->> > @@ -317,7 +317,7 @@ static struct powerdomain cefuse_44xx_pwrdm = {
->> >  	.prcm_offs	  = OMAP4430_PRM_CEFUSE_INST,
->> >  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->> >  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> > -	.pwrsts		  = PWRSTS_OFF_ON,
->> > +	.pwrsts		  = PWRSTS_OFF_INA_ON,
->> >  };
->> >
->> >  /*
+Yes, this is indeed a problem.
+
+But you really need that memory clobber there whether you like it or
+not, see above.
