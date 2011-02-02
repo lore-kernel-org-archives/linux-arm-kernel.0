@@ -1,281 +1,283 @@
-From: per.xx.fransson@stericsson.com (Per Fransson)
-Date: Wed, 2 Feb 2011 15:43:29 +0100
-Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
-Message-ID: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Wed,  2 Feb 2011 15:45:35 +0100
+Subject: [PATCH] omap: use fncpy to copy the PM code functions to SRAM
+Message-ID: <1296657935-22615-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When restarting using the kernel kexec functionality the MMU
-needs to be turned off. Any code which does this needs to use
-identity mapped addresses to get reliable results. In the ARM
-kexec case this identity mapping is done:
+From: Jean Pihet <j-pihet@ti.com>
 
-- using the page table of the current task
+The new fncpy API is better suited* for copying some
+code to SRAM at runtime. This patch changes the ad-hoc
+code to the more generic fncpy API.
 
-- for all addresses normally used by user space,
-  i.e. 0x00000000-PAGE_OFFSET
+*: 1. fncpy ensures that the thumb mode bit is propagated,
+   2. fncpy provides the security of type safety between the
+     original function and the sram function pointer.
 
-If kexec is used at a kernel crash to collect a core dump this
-means that we lose important information.
+Tested OK on OMAP3 in low power modes (RET/OFF)
+using omap2plus_defconfig with !CONFIG_THUMB2_KERNEL.
+Compile tested on OMAP1/2 using omap1_defconfig.
 
-This is what this patches does:
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+Acked-by: Kevin Hilman <khilman@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-* Actually turns off the MMU, which has been omitted by mistake
+Boot tested on OMAP1 & OMAP2
+Tested OK with suspend/resume on OMAP2420/n810
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-* Sets up a more selective identity mapping
-
-* Restores the old mapping once the MMU is off
-
-Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+Boots fine on osk5912 and n800
+Tested-by: Tony Lindgren <tony@atomide.com>
 ---
-v2 changes:
+ arch/arm/mach-omap1/pm.h               |    6 +++---
+ arch/arm/mach-omap1/sleep.S            |    3 +++
+ arch/arm/mach-omap1/sram.S             |    1 +
+ arch/arm/mach-omap2/pm.h               |    2 +-
+ arch/arm/mach-omap2/sleep24xx.S        |    2 ++
+ arch/arm/mach-omap2/sleep34xx.S        |    2 ++
+ arch/arm/mach-omap2/sram242x.S         |    3 +++
+ arch/arm/mach-omap2/sram243x.S         |    3 +++
+ arch/arm/mach-omap2/sram34xx.S         |    1 +
+ arch/arm/plat-omap/include/plat/sram.h |   14 +++++++++++++-
+ arch/arm/plat-omap/sram.c              |   14 +++++++++-----
+ 11 files changed, 41 insertions(+), 10 deletions(-)
 
-* now uses (modified versions of) the identity mapping functions in idmap.c
-  as they look in 2.6.38-rc1. Some pud-level code has been added there in
-  linux-next.
-
- arch/arm/include/asm/pgtable.h    |    4 +++-
- arch/arm/kernel/machine_kexec.c   |   26 +++++++++++++++++++++-----
- arch/arm/kernel/relocate_kernel.S |   23 +++++++++++++++++++++++
- arch/arm/kernel/smp.c             |    7 ++++---
- arch/arm/mm/idmap.c               |   20 +++++++++++++++-----
- arch/arm/mm/proc-v7.S             |    4 ++++
- include/linux/kexec.h             |    6 +++++-
- 7 files changed, 75 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index ebcb643..08dd591 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -458,6 +458,7 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
- #define kern_addr_valid(addr)	(1)
+diff --git a/arch/arm/mach-omap1/pm.h b/arch/arm/mach-omap1/pm.h
+index 56a6479..cd926dc 100644
+--- a/arch/arm/mach-omap1/pm.h
++++ b/arch/arm/mach-omap1/pm.h
+@@ -123,9 +123,9 @@ extern void allow_idle_sleep(void);
+ extern void omap1_pm_idle(void);
+ extern void omap1_pm_suspend(void);
  
- #include <asm-generic/pgtable.h>
-+#include <linux/kexec.h>
+-extern void omap7xx_cpu_suspend(unsigned short, unsigned short);
+-extern void omap1510_cpu_suspend(unsigned short, unsigned short);
+-extern void omap1610_cpu_suspend(unsigned short, unsigned short);
++extern void omap7xx_cpu_suspend(unsigned long, unsigned long);
++extern void omap1510_cpu_suspend(unsigned long, unsigned long);
++extern void omap1610_cpu_suspend(unsigned long, unsigned long);
+ extern void omap7xx_idle_loop_suspend(void);
+ extern void omap1510_idle_loop_suspend(void);
+ extern void omap1610_idle_loop_suspend(void);
+diff --git a/arch/arm/mach-omap1/sleep.S b/arch/arm/mach-omap1/sleep.S
+index ef771ce..c875bdc 100644
+--- a/arch/arm/mach-omap1/sleep.S
++++ b/arch/arm/mach-omap1/sleep.S
+@@ -58,6 +58,7 @@
+  */
  
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
++	.align	3
+ ENTRY(omap7xx_cpu_suspend)
+ 
+ 	@ save registers on stack
+@@ -137,6 +138,7 @@ ENTRY(omap7xx_cpu_suspend_sz)
+ #endif /* CONFIG_ARCH_OMAP730 || CONFIG_ARCH_OMAP850 */
+ 
+ #ifdef CONFIG_ARCH_OMAP15XX
++	.align	3
+ ENTRY(omap1510_cpu_suspend)
+ 
+ 	@ save registers on stack
+@@ -211,6 +213,7 @@ ENTRY(omap1510_cpu_suspend_sz)
+ #endif /* CONFIG_ARCH_OMAP15XX */
+ 
+ #if defined(CONFIG_ARCH_OMAP16XX)
++	.align	3
+ ENTRY(omap1610_cpu_suspend)
+ 
+ 	@ save registers on stack
+diff --git a/arch/arm/mach-omap1/sram.S b/arch/arm/mach-omap1/sram.S
+index 7724e52..692587d 100644
+--- a/arch/arm/mach-omap1/sram.S
++++ b/arch/arm/mach-omap1/sram.S
+@@ -18,6 +18,7 @@
  /*
-  * We provide our own arch_get_unmapped_area to cope with VIPT caches.
-@@ -473,7 +474,8 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+  * Reprograms ULPD and CKCTL.
+  */
++	.align	3
+ ENTRY(omap1_sram_reprogram_clock)
+ 	stmfd	sp!, {r0 - r12, lr}		@ save registers on stack
  
- #define pgtable_cache_init() do { } while (0)
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index 1c1b0ab..39580e6 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -92,7 +92,7 @@ extern void omap24xx_idle_loop_suspend(void);
+ extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
+ 					void __iomem *sdrc_power);
+ extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
+-extern void save_secure_ram_context(u32 *addr);
++extern int save_secure_ram_context(u32 *addr);
+ extern void omap3_save_scratchpad_contents(void);
  
--void identity_mapping_add(pgd_t *, unsigned long, unsigned long);
-+void identity_mapping_add(pgd_t *, unsigned long, unsigned long,
-+			  struct kexec_mmu_ent *);
- void identity_mapping_del(pgd_t *, unsigned long, unsigned long);
+ extern unsigned int omap24xx_idle_loop_suspend_sz;
+diff --git a/arch/arm/mach-omap2/sleep24xx.S b/arch/arm/mach-omap2/sleep24xx.S
+index c7780cc..b5071a4 100644
+--- a/arch/arm/mach-omap2/sleep24xx.S
++++ b/arch/arm/mach-omap2/sleep24xx.S
+@@ -47,6 +47,7 @@
+  * Note: This code get's copied to internal SRAM at boot. When the OMAP
+  *	 wakes up it continues execution at the point it went to sleep.
+  */
++	.align	3
+ ENTRY(omap24xx_idle_loop_suspend)
+ 	stmfd	sp!, {r0, lr}		@ save registers on stack
+ 	mov	r0, #0			@ clear for mcr setup
+@@ -82,6 +83,7 @@ ENTRY(omap24xx_idle_loop_suspend_sz)
+  * The DLL load value is not kept in RETENTION or OFF.	It needs to be restored
+  * at wake
+  */
++	.align	3
+ ENTRY(omap24xx_cpu_suspend)
+ 	stmfd	sp!, {r0 - r12, lr}	@ save registers on stack
+ 	mov	r3, #0x0		@ clear for mcr call
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 98d8232..951a0be 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -118,6 +118,7 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
  
- #endif /* !__ASSEMBLY__ */
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 30ead13..bd53684 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -16,8 +16,6 @@
- extern const unsigned char relocate_new_kernel[];
- extern const unsigned int relocate_new_kernel_size;
+ 	.text
+ /* Function to call rom code to save secure ram context */
++	.align	3
+ ENTRY(save_secure_ram_context)
+ 	stmfd	sp!, {r1-r12, lr}	@ save registers on stack
+ 	adr	r3, api_params		@ r3 points to parameters
+@@ -169,6 +170,7 @@ ENTRY(save_secure_ram_context_sz)
+  *   depending on the low power mode (non-OFF vs OFF modes),
+  *   cf. 'Resume path for xxx mode' comments.
+  */
++	.align	3
+ ENTRY(omap34xx_cpu_suspend)
+ 	stmfd	sp!, {r0-r12, lr}	@ save registers on stack
  
--extern void setup_mm_for_reboot(char mode);
--
- extern unsigned long kexec_start_address;
- extern unsigned long kexec_indirection_page;
- extern unsigned long kexec_mach_type;
-@@ -79,9 +77,9 @@ void machine_kexec(struct kimage *image)
+diff --git a/arch/arm/mach-omap2/sram242x.S b/arch/arm/mach-omap2/sram242x.S
+index 055310c..ff9b9db 100644
+--- a/arch/arm/mach-omap2/sram242x.S
++++ b/arch/arm/mach-omap2/sram242x.S
+@@ -39,6 +39,7 @@
+ 
+ 	.text
+ 
++	.align	3
+ ENTRY(omap242x_sram_ddr_init)
+ 	stmfd	sp!, {r0 - r12, lr}	@ save registers on stack
+ 
+@@ -143,6 +144,7 @@ ENTRY(omap242x_sram_ddr_init_sz)
+  * r0 = [PRCM_FULL | PRCM_HALF] r1 = SDRC_DLLA_CTRL value r2 = [DDR | SDR]
+  * PRCM_FULL = 2, PRCM_HALF = 1, DDR = 1, SDR = 0
+  */
++	.align	3
+ ENTRY(omap242x_sram_reprogram_sdrc)
+ 	stmfd	sp!, {r0 - r10, lr}	@ save registers on stack
+ 	mov	r3, #0x0		@ clear for mrc call
+@@ -238,6 +240,7 @@ ENTRY(omap242x_sram_reprogram_sdrc_sz)
+ /*
+  * Set dividers and pll. Also recalculate DLL value for DDR and unlock mode.
+  */
++	.align	3
+ ENTRY(omap242x_sram_set_prcm)
+ 	stmfd	sp!, {r0-r12, lr}	@ regs to stack
+ 	adr	r4, pbegin		@ addr of preload start
+diff --git a/arch/arm/mach-omap2/sram243x.S b/arch/arm/mach-omap2/sram243x.S
+index f900758..7673020 100644
+--- a/arch/arm/mach-omap2/sram243x.S
++++ b/arch/arm/mach-omap2/sram243x.S
+@@ -39,6 +39,7 @@
+ 
+ 	.text
+ 
++	.align	3
+ ENTRY(omap243x_sram_ddr_init)
+ 	stmfd	sp!, {r0 - r12, lr}	@ save registers on stack
+ 
+@@ -143,6 +144,7 @@ ENTRY(omap243x_sram_ddr_init_sz)
+  * r0 = [PRCM_FULL | PRCM_HALF] r1 = SDRC_DLLA_CTRL value r2 = [DDR | SDR]
+  * PRCM_FULL = 2, PRCM_HALF = 1, DDR = 1, SDR = 0
+  */
++	.align	3
+ ENTRY(omap243x_sram_reprogram_sdrc)
+ 	stmfd	sp!, {r0 - r10, lr}	@ save registers on stack
+ 	mov	r3, #0x0		@ clear for mrc call
+@@ -238,6 +240,7 @@ ENTRY(omap243x_sram_reprogram_sdrc_sz)
+ /*
+  * Set dividers and pll. Also recalculate DLL value for DDR and unlock mode.
+  */
++	.align	3
+ ENTRY(omap243x_sram_set_prcm)
+ 	stmfd	sp!, {r0-r12, lr}	@ regs to stack
+ 	adr	r4, pbegin		@ addr of preload start
+diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
+index 7f893a2..25011ca 100644
+--- a/arch/arm/mach-omap2/sram34xx.S
++++ b/arch/arm/mach-omap2/sram34xx.S
+@@ -111,6 +111,7 @@
+  * since it will cause the ARM MMU to attempt to walk the page tables.
+  * These crashes may be intermittent.
+  */
++	.align	3
+ ENTRY(omap3_sram_configure_core_dpll)
+ 	stmfd	sp!, {r1-r12, lr}	@ store regs to stack
+ 
+diff --git a/arch/arm/plat-omap/include/plat/sram.h b/arch/arm/plat-omap/include/plat/sram.h
+index 9967d5e..f500fc3 100644
+--- a/arch/arm/plat-omap/include/plat/sram.h
++++ b/arch/arm/plat-omap/include/plat/sram.h
+@@ -12,7 +12,19 @@
+ #define __ARCH_ARM_OMAP_SRAM_H
+ 
+ #ifndef __ASSEMBLY__
+-extern void * omap_sram_push(void * start, unsigned long size);
++#include <asm/fncpy.h>
++
++extern void *omap_sram_push_address(unsigned long size);
++
++/* Macro to push a function to the internal SRAM, using the fncpy API */
++#define omap_sram_push(funcp, size) ({				\
++	typeof(&(funcp)) _res = NULL;				\
++	void *_sram_address = omap_sram_push_address(size);	\
++	if (_sram_address)					\
++		_res = fncpy(_sram_address, &(funcp), size);	\
++	_res;							\
++})
++
+ extern void omap_sram_reprogram_clock(u32 dpllctl, u32 ckctl);
+ 
+ extern void omap2_sram_ddr_init(u32 *slow_dll_ctrl, u32 fast_dll_ctrl,
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index aedcb3b..916c662 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -242,7 +242,14 @@ static void __init omap_map_sram(void)
+ 	       omap_sram_size - SRAM_BOOTLOADER_SZ);
+ }
+ 
+-void * omap_sram_push(void * start, unsigned long size)
++/*
++ * Memory allocator for SRAM: calculates the new ceiling address
++ * for pushing a function using the fncpy API.
++ *
++ * Note that fncpy requires the returned address to be aligned
++ * to an 8-byte boundary.
++ */
++void *omap_sram_push_address(unsigned long size)
  {
- 	unsigned long page_list;
- 	unsigned long reboot_code_buffer_phys;
-+	unsigned long cpu_reset_phys;
- 	void *reboot_code_buffer;
- 
--
- 	page_list = image->head & PAGE_MASK;
- 
- 	/* we need both effective and real address here */
-@@ -95,18 +93,36 @@ void machine_kexec(struct kimage *image)
- 	kexec_mach_type = machine_arch_type;
- 	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
- 
-+	/* Identity map the code which turns off the mmu (cpu_reset) and
-+	   the code which will be executed immediately afterwards
-+	   (relocate_new_kernel).
-+	   Store the old entries so they can be restored. */
-+	/* cpu_reset cannot be used directly when MULTI_CPU is true, see
-+	   cpu-multi32.h, instead processor.reset will have to be used */
-+#ifdef MULTI_CPU
-+	cpu_reset_phys = virt_to_phys(processor.reset);
-+#else
-+	cpu_reset_phys = virt_to_phys(cpu_reset);
-+#endif
-+
-+	identity_mapping_add(current->active_mm->pgd, cpu_reset_phys,
-+			     ALIGN(cpu_reset_phys, PGDIR_SIZE)+PGDIR_SIZE,
-+			     &kexec_mmu_ents[0]);
-+	identity_mapping_add(current->active_mm->pgd, reboot_code_buffer_phys,
-+			     ALIGN(reboot_code_buffer_phys, PGDIR_SIZE)
-+			     + PGDIR_SIZE, &kexec_mmu_ents[2]);
-+	local_flush_tlb_all();
-+
- 	/* copy our kernel relocation code to the control code page */
- 	memcpy(reboot_code_buffer,
- 	       relocate_new_kernel, relocate_new_kernel_size);
- 
--
- 	flush_icache_range((unsigned long) reboot_code_buffer,
- 			   (unsigned long) reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
- 	printk(KERN_INFO "Bye!\n");
- 
- 	local_irq_disable();
- 	local_fiq_disable();
--	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
- 	flush_cache_all();
- 	outer_flush_all();
- 	outer_disable();
-diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-index 9cf4cbf..a5e155e 100644
---- a/arch/arm/kernel/relocate_kernel.S
-+++ b/arch/arm/kernel/relocate_kernel.S
-@@ -7,6 +7,24 @@
- 	.globl relocate_new_kernel
- relocate_new_kernel:
- 
-+	/* We get here when the MMU is in a transitional state.
-+	   Wait for the virtual address mapping to wear off before
-+	   overwriting the identity mappings (set up for the sake
-+	   of MMU disabling) with the previous mappings. */
-+	ldr	r0, =100
-+0:
-+	subs	r0, r0, #1
-+	beq	0b
-+
-+	adr	r0, kexec_mmu_ents
-+	.rept 4
-+	ldr	r1, [r0], #4
-+	ldr	r2, [r0], #4
-+	str	r2, [r1], #4
-+	ldr	r2, [r0], #4
-+	str	r2, [r1], #4
-+	.endr
-+
- 	ldr	r0,kexec_indirection_page
- 	ldr	r1,kexec_start_address
- 
-@@ -69,6 +87,11 @@ kexec_start_address:
- kexec_indirection_page:
- 	.long	0x0
- 
-+	.globl kexec_mmu_ents
-+kexec_mmu_ents:
-+	.space 4*12, 0
-+
-+
- 	.globl kexec_mach_type
- kexec_mach_type:
- 	.long	0x0
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 4539ebc..607b6a8 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -93,10 +93,11 @@ int __cpuinit __cpu_up(unsigned int cpu)
- 
- 	if (PHYS_OFFSET != PAGE_OFFSET) {
- #ifndef CONFIG_HOTPLUG_CPU
--		identity_mapping_add(pgd, __pa(__init_begin), __pa(__init_end));
-+		identity_mapping_add(pgd, __pa(__init_begin), __pa(__init_end),
-+				     NULL);
- #endif
--		identity_mapping_add(pgd, __pa(_stext), __pa(_etext));
--		identity_mapping_add(pgd, __pa(_sdata), __pa(_edata));
-+		identity_mapping_add(pgd, __pa(_stext), __pa(_etext), NULL);
-+		identity_mapping_add(pgd, __pa(_sdata), __pa(_edata), NULL);
+ 	if (size > (omap_sram_ceil - (omap_sram_base + SRAM_BOOTLOADER_SZ))) {
+ 		printk(KERN_ERR "Not enough space in SRAM\n");
+@@ -250,10 +257,7 @@ void * omap_sram_push(void * start, unsigned long size)
  	}
  
- 	/*
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 5729944..d5d313d 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -1,14 +1,19 @@
- #include <linux/kernel.h>
-+#include <linux/kexec.h>
+ 	omap_sram_ceil -= size;
+-	omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
+-	memcpy((void *)omap_sram_ceil, start, size);
+-	flush_icache_range((unsigned long)omap_sram_ceil,
+-		(unsigned long)(omap_sram_ceil + size));
++	omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, FNCPY_ALIGN);
  
- #include <asm/cputype.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
- 
- static void idmap_add_pmd(pgd_t *pgd, unsigned long addr, unsigned long end,
--	unsigned long prot)
-+			  unsigned long prot, struct kexec_mmu_ent *store)
- {
- 	pmd_t *pmd = pmd_offset(pgd, addr);
--
-+	if (store) {
-+		pmd_t *pmd_store = pmd_offset(&store->store, addr);
-+		pmd_store[0] = pmd[0];
-+		pmd_store[1] = pmd[1];
-+	}
- 	addr = (addr & PMD_MASK) | prot;
- 	pmd[0] = __pmd(addr);
- 	addr += SECTION_SIZE;
-@@ -16,7 +21,8 @@ static void idmap_add_pmd(pgd_t *pgd, unsigned long addr, unsigned long end,
- 	flush_pmd_entry(pmd);
+ 	return (void *)omap_sram_ceil;
  }
- 
--void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
-+void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end,
-+			  struct kexec_mmu_ent *store)
- {
- 	unsigned long prot, next;
- 
-@@ -27,7 +33,11 @@ void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
- 	pgd += pgd_index(addr);
- 	do {
- 		next = pgd_addr_end(addr, end);
--		idmap_add_pmd(pgd, addr, next, prot);
-+		idmap_add_pmd(pgd, addr, next, prot, store);
-+		if (store) {
-+			store->ptr = (pgd_t *)virt_to_phys(pgd);
-+			store++;
-+		}
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-@@ -62,6 +72,6 @@ void setup_mm_for_reboot(char mode)
- 	 * we don't have any user-mode mappings so we use the context that we
- 	 * "borrowed".
- 	 */
--	identity_mapping_add(current->active_mm->pgd, 0, TASK_SIZE);
-+	identity_mapping_add(current->active_mm->pgd, 0, TASK_SIZE, NULL);
- 	local_flush_tlb_all();
- }
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 0c1172b..762bb43 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -61,6 +61,10 @@ ENDPROC(cpu_v7_proc_fin)
-  */
- 	.align	5
- ENTRY(cpu_v7_reset)
-+	sub	pc, pc, #PAGE_OFFSET+4		@ go to physical addresses
-+	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-+	bic	ip, ip, #0x0001			@ ...............m
-+	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
- 	mov	pc, r0
- ENDPROC(cpu_v7_reset)
- 
-diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index 03e8e8d..6a1345b 100644
---- a/include/linux/kexec.h
-+++ b/include/linux/kexec.h
-@@ -106,7 +106,11 @@ struct kimage {
- #endif
- };
- 
--
-+struct kexec_mmu_ent {
-+	pgd_t *ptr;
-+	pgd_t store;
-+};
-+extern struct kexec_mmu_ent kexec_mmu_ents[4];
- 
- /* kexec interface functions */
- extern void machine_kexec(struct kimage *image);
 -- 
-1.7.3.2
+1.7.2.3
