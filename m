@@ -1,38 +1,72 @@
-From: subaparts@yandex.ru (Alexander Sverdlin)
-Date: Wed, 02 Feb 2011 16:26:51 +0300
-Subject: [PATCH] EDB93xx: Add support for CS4271 CODEC on EDB93xx boards
-In-Reply-To: <20110202125327.GO12743@opensource.wolfsonmicro.com>
-References: <1296603653.1504.9.camel@r60e>
-	<0D753D10438DA54287A00B027084269764CEF59B2B@AUSP01VMBX24.collaborationhost.net>
-	<1296643688.1504.23.camel@r60e>
-	<20110202104943.GN12743@opensource.wolfsonmicro.com>
-	<1296645167.1504.31.camel@r60e>
-	<20110202125327.GO12743@opensource.wolfsonmicro.com>
-Message-ID: <1296653211.1504.40.camel@r60e>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 2 Feb 2011 19:03:16 +0530
+Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <4D49543A.1070302@criticallink.com>
+References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>
+	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
+	<4D494C6A.30507@mvista.com> <4D49543A.1070302@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302487782C9@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark, Dear Hartley,
+On Wed, Feb 02, 2011 at 18:25:22, Michael Williamson wrote:
 
-On Wed, 2011-02-02 at 12:53 +0000, Mark Brown wrote:
-> > Now Hartley suggested to move GPIO handling to platform code. This makes
-> > sense, as SPI-enable will be managed automatically, and reset is also
-> > more related to platform (depending on schematics, inversion and so on).
+> >> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> >> index beda8a4..f421f97 100644
+> >> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> >> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> >> @@ -725,3 +725,99 @@ int __init da8xx_register_cpuidle(void)
+> >>
+> >>       return platform_device_register(&da8xx_cpuidle_device);
+> >>   }
+> >> +
+> >> +static struct resource da8xx_spi0_resources[] = {
+> >> +    [0] = {
+> >> +        .start    = 0x01c41000,
+> >> +        .end    = 0x01c41fff,
+> >> +        .flags    = IORESOURCE_MEM,
+> >> +    },
+> >> +    [1] = {
+> >> +        .start    = IRQ_DA8XX_SPINT0,
+> >> +        .end    = IRQ_DA8XX_SPINT0,
+> >> +        .flags    = IORESOURCE_IRQ,
+> >> +    },
+> >> +    [2] = {
+> >> +        .start    = EDMA_CTLR_CHAN(0, 14),
+> >> +        .end    = EDMA_CTLR_CHAN(0, 14),
+> >> +        .flags    = IORESOURCE_DMA,
+> >> +    },
+> >> +    [3] = {
+> >> +        .start    = EDMA_CTLR_CHAN(0, 15),
+> >> +        .end    = EDMA_CTLR_CHAN(0, 15),
+> >> +        .flags    = IORESOURCE_DMA,
+> >> +    },
+> > 
+> >    We have DA830_DMACH_SPI0_[RT]X defined for SPI0 DMA channels...
+> > 
 > 
-> What is the advantage of this?  The GPIO management has to be done
-> somewhere and replicating it in every platform seems like a complete
-> waste of time.  Given that one of the GPIOs is a power control it'll
-> also mean that it's not possible to manage the power dynamically at
-> runtime.
+> 
+> Right.  The current routines/structures were designed to support either da830 or
+> da850.  They work because the interrupts and the DMA channels are fortunately
+> the same for the SPI devices between the platforms.  I can use the DA830 enums, 
+> but I had preferred the clarity of the EDMA_CTRL_CHAN macro, and it would 
+> remove confusion that this might only apply for DA830 and not DA850.  It would
+> be nice to rename that DA8XX_DMAC_SPI_[RT]X if the enums were used...
+> 
+> Can I leave this, or do you really want me to use the enums?
 > 
 
-I think we can leave reset management in CODEC (as it will be almost the
-same for all platforms), leave enable pin management in CODEC unused,
-but attach enable GPIO to spi_board_info in platform to enable other SPI
-devices on bus.
+Looks like a bunch of cleaning-up needs to happen in this area.
+The DA830_DMACH_* are not used anywhere at all. Instead most of
+devices-da8xx.c uses DMA channel numbers directly (except for ASP,
+which has them defined in asp.h).
 
-Hartley, in this case we cannot use existing cs4271_platform_data and
-have to leave long if-else statemens as is. Would it be ok?
+Since all the platform device definitions for DA8XX devices happens
+in devices-da8xx.c, it makes sense to get rid of the DA830_DMACH_*
+enum altogether and instead just define the channel numbers used in
+devices-da8xx.c above the actual usage.
 
-Best regards,
-	Alexander.
+Mike, is that something you are willing take-up?
+
+Thanks,
+Sekhar
