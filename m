@@ -1,101 +1,51 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed,  2 Feb 2011 12:03:29 +0000
-Subject: [PATCHv4 10/13] picoxcell: add chained GPIO IRQ handlers
-In-Reply-To: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
-References: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1296648212-5284-11-git-send-email-jamie@jamieiles.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 02 Feb 2011 15:03:35 +0300
+Subject: [PATCH v1 6/9] da850: pruss CAN platform specific additions.
+In-Reply-To: <1296571667-12049-7-git-send-email-subhasish@mistralsolutions.com>
+References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
+	<1296571667-12049-7-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <4D494817.4030204@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 8 bits of port A on the ARM GPIO of all devices are capable of
-generating interrupts. Provide chained handlers so that these pins can
-be used as interrupts and the sensitivity and polarity can be set.
+Hello.
 
-v2:
-	- Use the generic IRQ handlers rather than using the irq_desc.
+On 01-02-2011 17:47, Subhasish Ghosh wrote:
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-picoxcell/include/mach/gpio.h |    2 +
- arch/arm/mach-picoxcell/picoxcell_core.c    |   39 +++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+), 0 deletions(-)
+> This patch adds the necessary pins for the pruss CAN.
 
-diff --git a/arch/arm/mach-picoxcell/include/mach/gpio.h b/arch/arm/mach-picoxcell/include/mach/gpio.h
-index 113d675..62c7eba 100644
---- a/arch/arm/mach-picoxcell/include/mach/gpio.h
-+++ b/arch/arm/mach-picoxcell/include/mach/gpio.h
-@@ -151,6 +151,8 @@ enum {
- 
- #ifdef __KERNEL__
- 
-+extern struct irq_chip armgpio_irqchip;
-+
- static inline int gpio_get_value(unsigned gpio)
- {
- 	return __gpio_get_value(gpio);
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index c422b51..b020b87 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.c
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -24,6 +24,18 @@
- #include "picoxcell_core.h"
- #include "soc.h"
- 
-+static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	unsigned real_irq = (irq - IRQ_GPIO0 + __IRQ_GPIO0);
-+	/*
-+	 * We have 8 GPIO pins that can generate interrupts and each one has
-+	 * it's own interrupt bit in the VIC. All we need to do is do a
-+	 * one-to-one translation from the virtual IRQ number to the real one
-+	 * and call the handler.
-+	 */
-+	generic_handle_irq(real_irq);
-+}
-+
- struct picoxcell_soc *picoxcell_get_soc(void)
- {
- 	unsigned long device_id =
-@@ -37,6 +49,11 @@ struct picoxcell_soc *picoxcell_get_soc(void)
- 
- void __init picoxcell_init_irq(void)
- {
-+#define GPIO_INT_EN_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
-+				       GPIO_INT_EN_REG_OFFSET)
-+#define GPIO_EOI_REG	    IO_ADDRESS(PICOXCELL_GPIO_BASE + \
-+				       GPIO_PORT_A_EOI_REG_OFFSET)
-+	unsigned i;
- 	u32 vic0_resume_sources =
- 		(1 << (IRQ_AXI2PICO8 & 31)) |
- 		(1 << (IRQ_EMAC & 31)) |
-@@ -45,6 +62,28 @@ void __init picoxcell_init_irq(void)
- 	vic_init(IO_ADDRESS(PICOXCELL_VIC0_BASE), 32, 0xFFFFFFFE,
- 		 vic0_resume_sources);
- 	vic_init(IO_ADDRESS(PICOXCELL_VIC1_BASE), 0, 0x7FF, 0);
-+
-+	/*
-+	 * We want to enable/disable interrupts for the GPIO pins through the
-+	 * GPIO block itself. To do this we install a chained handler. If a
-+	 * user requests one of the __IRQ_GPIOn interrupts then the GPIO block
-+	 * won't get configured.  We provide these interrupts below as virtual
-+	 * ones that will configure the GPIO block and enable the source in
-+	 * the VIC.
-+	 *
-+	 * The chained handler simply converts from the virtual IRQ handler to
-+	 * the real interrupt source and calls the GPIO IRQ handler.
-+	 */
-+	__raw_writel(0, GPIO_INT_EN_REG);
-+	__raw_writel(~0, GPIO_EOI_REG);
-+	for (i = IRQ_GPIO0; i <= IRQ_GPIO7; ++i) {
-+		set_irq_chip(i, &armgpio_irqchip);
-+		set_irq_handler(i, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+	}
-+
-+	for (i = __IRQ_GPIO0; i <= __IRQ_GPIO7; ++i)
-+		set_irq_chained_handler(i, gpio_irq_handler);
- }
- 
- static const char *picoxcell_get_partname(void)
--- 
-1.7.3.4
+> Signed-off-by: Subhasish Ghosh<subhasish@mistralsolutions.com>
+[...]
+
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 341d836..11ce7ba 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -565,6 +565,10 @@ static const struct mux_config da850_pins[] = {
+>   	MUX_CFG(DA850, EMA_CLK,		6,	0,	15,	1,	false)
+>   	MUX_CFG(DA850, EMA_WAIT_1,	6,	24,	15,	1,	false)
+>   	MUX_CFG(DA850, NEMA_CS_2,	7,	0,	15,	1,	false)
+> +	/* PRU functions for soft CAN */
+> +	MUX_CFG(DA850, PRUSS_PRU0_R31_0,	7,	28,	15,	0,	false)
+> +	MUX_CFG(DA850, PRUSS_PRU1_R30_15,	12,	0,	15,	4,	false)
+> +	MUX_CFG(DA850, PRUSS_PRU1_R31_18,	11,	20,	15,	0,	false)
+>   	/* GPIO function */
+>   	MUX_CFG(DA850, GPIO2_4,		6,	12,	15,	8,	false)
+>   	MUX_CFG(DA850, GPIO2_6,		6,	4,	15,	8,	false)
+> diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
+> index 5d4e0fe..10f49f2 100644
+> --- a/arch/arm/mach-davinci/include/mach/mux.h
+> +++ b/arch/arm/mach-davinci/include/mach/mux.h
+> @@ -906,6 +906,10 @@ enum davinci_da850_index {
+>   	DA850_EMA_CLK,
+>   	DA850_EMA_WAIT_1,
+>   	DA850_NEMA_CS_2,
+> +	/* PRU I/O */
+> +	DA850_PRUSS_PRU0_R31_0,
+> +	DA850_PRUSS_PRU1_R30_15,
+> +	DA850_PRUSS_PRU1_R31_18,
+
+    Again, this patch should precede the patch 5/9 due to PinMux dependencies. 
+I thought it must be pretty clear...
+
+WBR, Sergei
