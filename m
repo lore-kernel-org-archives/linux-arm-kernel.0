@@ -1,15 +1,15 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 02 Feb 2011 07:56:22 -0500
+Date: Wed, 02 Feb 2011 07:59:30 -0500
 Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
-In-Reply-To: <4D4953D4.7080204@mvista.com>
+In-Reply-To: <4D494E0D.4090207@mvista.com>
 References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>
 	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
-	<4D4953D4.7080204@mvista.com>
-Message-ID: <4D495476.1040002@criticallink.com>
+	<4D494E0D.4090207@mvista.com>
+Message-ID: <4D495532.7020205@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/2/2011 7:53 AM, Sergei Shtylyov wrote:
+On 2/2/2011 7:29 AM, Sergei Shtylyov wrote:
 
 > Hello.
 > 
@@ -21,34 +21,28 @@ On 2/2/2011 7:53 AM, Sergei Shtylyov wrote:
 >> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
 > [...]
 > 
->> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
->> index beda8a4..f421f97 100644
->> --- a/arch/arm/mach-davinci/devices-da8xx.c
->> +++ b/arch/arm/mach-davinci/devices-da8xx.c
->> @@ -725,3 +725,99 @@ int __init da8xx_register_cpuidle(void)
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index 3443d97..68fe4c2 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+> [...]
+>> @@ -403,6 +417,8 @@ static struct clk_lookup da850_clks[] = {
+>>       CLK(NULL,        "aemif",    &aemif_clk),
+>>       CLK(NULL,        "usb11",    &usb11_clk),
+>>       CLK(NULL,        "usb20",    &usb20_clk),
+>> +    CLK("spi_davinci.0",    NULL,        &spi0_clk),
+>> +    CLK("spi_davinci.1",    NULL,        &spi1_clk),
+> 
+>    BTW, da830.c has "dm_spi.[01]" instead -- which should be fixed (by yet another patch).
+> 
+
+
+As I am going around the loop again, I will add a separate patch to the series to rename
+this clock to spi_davinci.[01].  Thanks for the close look.  I clearly missed some of the
+da830 details.
+
+>>       CLK(NULL,        NULL,        NULL),
+>>   };
 >>
->>       return platform_device_register(&da8xx_cpuidle_device);
->>   }
->> +
->> +static struct resource da8xx_spi0_resources[] = {
->> +    [0] = {
->> +        .start    = 0x01c41000,
->> +        .end    = 0x01c41fff,
 > 
->    BTW, I suggest to declare DA8XX_SPI0_BASE, not to deviate from the tradition developed in this file...
-> 
-
-
-OK. Thanks.
-
->> +static struct resource da8xx_spi1_resources[] = {
->> +    [0] = {
->> +        .start    = 0x01f0e000,
->> +        .end    = 0x01f0efff,
-> 
->    The same about DA8XX_SPI1_BASE...
-> 
-
-Thanks.
-
 > WBR, Sergei
