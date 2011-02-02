@@ -1,16 +1,11 @@
 From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 02 Feb 2011 12:21:04 +0100
-Subject: [patch 0/5] Genesi Efika MX/SB support improvements
-Message-ID: <20110202112104.380352125@rtp-net.org>
+Date: Wed, 02 Feb 2011 12:21:08 +0100
+Subject: [patch 4/5] efika: enable cpufreq
+References: <20110202112104.380352125@rtp-net.org>
+Message-ID: <20110202112126.554091215@rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-This patch series aims at improving current efika mx support and adds support
-for efika smartbook. Given the similarities between the two systems, the first
-patch moves mx some code into a new file which will contain code shared by both
-systems and the last patch adds support for efika smartbook.
-
-
-Arnaud
+An embedded and charset-unspecified text was scrubbed...
+Name: efikamx_tst_cpufreq.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110202/310b716d/attachment.ksh>
