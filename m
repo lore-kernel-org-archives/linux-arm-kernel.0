@@ -1,46 +1,42 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 Feb 2011 15:08:12 +0300
-Subject: [PATCH v1 9/9] da850: pruss CAN platform specific changes for
-	gpios.
-In-Reply-To: <1296571667-12049-10-git-send-email-subhasish@mistralsolutions.com>
-References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
-	<1296571667-12049-10-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <4D49492C.1000303@mvista.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Feb 2011 12:11:47 +0000
+Subject: [PATCH v4 1/4] drivers: hwspinlock: add framework
+In-Reply-To: <AANLkTi=zOO_vDQ4+LWQs38xjo+VaRG0jfgo6ifvh=L-M@mail.gmail.com>
+References: <1296470024-26854-1-git-send-email-ohad@wizery.com>
+	<1296470024-26854-2-git-send-email-ohad@wizery.com>
+	<20110131153831.dca62146.akpm@linux-foundation.org>
+	<AANLkTik-fgCF_W0-DBE6UVTpjqF6Jf=u7bQYkcweEegQ@mail.gmail.com>
+	<20110131223859.27169db0.akpm@linux-foundation.org>
+	<AANLkTinJLAT0B61Eu1Chn9k9rmbHXa1ZNcedo_m8TZp3@mail.gmail.com>
+	<20110131234028.8744b5fd.akpm@linux-foundation.org>
+	<AANLkTi=zOO_vDQ4+LWQs38xjo+VaRG0jfgo6ifvh=L-M@mail.gmail.com>
+Message-ID: <20110202121147.GA24993@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-02-2011 17:47, Subhasish Ghosh wrote:
+On Tue, Feb 01, 2011 at 10:12:38AM +0200, Ohad Ben-Cohen wrote:
+> On Tue, Feb 1, 2011 at 9:40 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> > On Tue, 1 Feb 2011 09:36:22 +0200 Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> >
+> >> On Tue, Feb 1, 2011 at 8:38 AM, Andrew Morton <akpm@linux-foundation.org> wrote:
+> >> >> I'll do a quick respin of the patches with that and the
+> >> >> hwspinlock_internal.h comment above.
+> >> >
+> >> > OK..
+> >> >
+> >> > The patch series looks OK to me.
+> >>
+> >> Can I add your Acked-by on the non-omap parts when I respin the series ?
+> >
+> > spose so. ?I don't normally do acked-by's. ?I think it's my way of
+> > avoiding getting blamed when it all blows up.
+> 
+> I don't want to be breaking old habits then :)
+> 
+> >> > Maybe Tony or Russell or Greg can grab them
+> >> > if they like the look of it all?
+> 
+> Let's just wait a bit for Tony's or Russell's or Greg's answer.
 
-> This patch adds the GPIOs for the pruss CAN device.
-
-> Signed-off-by: Subhasish Ghosh<subhasish@mistralsolutions.com>
-[...]
-
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 11ce7ba..9382b4f 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -570,6 +570,7 @@ static const struct mux_config da850_pins[] = {
->   	MUX_CFG(DA850, PRUSS_PRU1_R30_15,	12,	0,	15,	4,	false)
->   	MUX_CFG(DA850, PRUSS_PRU1_R31_18,	11,	20,	15,	0,	false)
->   	/* GPIO function */
-> +	MUX_CFG(DA850, GPIO2_0,		6,	28,	15,	8,	false)
->   	MUX_CFG(DA850, GPIO2_4,		6,	12,	15,	8,	false)
->   	MUX_CFG(DA850, GPIO2_6,		6,	4,	15,	8,	false)
->   	MUX_CFG(DA850, GPIO2_8,		5,	28,	15,	8,	false)
-> diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
-> index 10f49f2..85b3a0d 100644
-> --- a/arch/arm/mach-davinci/include/mach/mux.h
-> +++ b/arch/arm/mach-davinci/include/mach/mux.h
-> @@ -912,6 +912,7 @@ enum davinci_da850_index {
->   	DA850_PRUSS_PRU1_R31_18,
->
->   	/* GPIO function */
-> +	DA850_GPIO2_0,
->   	DA850_GPIO2_4,
->   	DA850_GPIO2_6,
->   	DA850_GPIO2_8,
-
-    Should again precede the previous patch. I thought that must be obvious...
-
-WBR, Sergei
+As it touches OMAP code, it makes sense to merge it through Tony's tree
+as that should reduce the number of possible conflicts.
