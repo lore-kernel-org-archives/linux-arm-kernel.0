@@ -1,50 +1,42 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed,  2 Feb 2011 12:03:26 +0000
-Subject: [PATCHv4 07/13] picoxcell: add common SoC devices
+Date: Wed,  2 Feb 2011 12:03:27 +0000
+Subject: [PATCHv4 08/13] picoxcell: add cpufreq support
 In-Reply-To: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
 References: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1296648212-5284-8-git-send-email-jamie@jamieiles.com>
+Message-ID: <1296648212-5284-9-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devices common to all picoXcell variants (UART and PMU). Other
-peripherals such as DMA, SPI, fuses and EMAC will be added later
-with driver support.
-
-v3:
-	- move device registration to an arch_initcall
-	- mark common_devices with __initdata
+PC3X3 devices have a PLL to control the ARM core speed. Add a cpufreq
+driver so that we can run at optimum speed and power.
 
 v2:
-	- split the UARTs into two separate platform devices and use
-	  PLAT8250_* as the IDs
+	- move to a module initcall
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/Makefile  |    3 +-
- arch/arm/mach-picoxcell/devices.c |  126 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 128 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/devices.c
+ arch/arm/mach-picoxcell/Makefile  |    1 +
+ arch/arm/mach-picoxcell/cpufreq.c |  146 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 147 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-picoxcell/cpufreq.c
 
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index 71a6523..f71a33e 100644
+index f71a33e..c0bbb25 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -2,4 +2,5 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
- 				   time.o \
- 				   mux.o \
+@@ -4,3 +4,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
  				   gpio.o \
--				   clk.o
-+				   clk.o \
-+				   devices.o
-diff --git a/arch/arm/mach-picoxcell/devices.c b/arch/arm/mach-picoxcell/devices.c
+ 				   clk.o \
+ 				   devices.o
++obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+diff --git a/arch/arm/mach-picoxcell/cpufreq.c b/arch/arm/mach-picoxcell/cpufreq.c
 new file mode 100644
-index 0000000..46c2310
+index 0000000..ecb5d96
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/devices.c
-@@ -0,0 +1,126 @@
++++ b/arch/arm/mach-picoxcell/cpufreq.c
+@@ -0,0 +1,146 @@
 +/*
-+ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
++ * Copyright (c) 2010 picoChip Designs Ltd., Jamie Iles
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -52,122 +44,142 @@ index 0000000..46c2310
 + *
 + * All enquiries to support at picochip.com
 + */
-+#include <linux/serial_8250.h>
-+#include <linux/serial_reg.h>
-+#include <linux/platform_device.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <mach/hardware.h>
-+#include <mach/irqs.h>
++#define pr_fmt(fmt) "picoxcell_cpufreq: " fmt
 +
-+#include <asm/pmu.h>
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/cpufreq.h>
++
++#include <mach/hardware.h>
 +
 +#include "picoxcell_core.h"
 +#include "soc.h"
 +
-+#define UART_USR_REG_OFFSET			0x7C
-+static struct plat_serial8250_port serial1_platform_data[] = {
-+	{
-+		.membase	= IO_ADDRESS(PICOXCELL_UART1_BASE),
-+		.mapbase	= PICOXCELL_UART1_BASE,
-+		.irq		= IRQ_UART1,
-+		.flags		= UPF_BOOT_AUTOCONF,
-+		.iotype		= UPIO_DWAPB32,
-+		.regshift	= 2,
-+		.uartclk	= PICOXCELL_BASE_BAUD,
-+		.private_data	= (void *)(PHYS_TO_IO(PICOXCELL_UART1_BASE +
-+						      UART_USR_REG_OFFSET)),
-+	},
-+	{},
-+};
++static struct {
++	struct clk  *arm_clk;
++} cpufreq;
 +
-+static struct resource serial1_resources[] = {
-+	{
-+		.start		= PICOXCELL_UART1_BASE,
-+		.end		= PICOXCELL_UART1_BASE + 0xFFFF,
-+		.flags		= IORESOURCE_MEM,
-+	},
-+	{
-+		.start		= IRQ_UART1,
-+		.end		= IRQ_UART2,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
++/* The minimum frequency that we'll allow the ARM to run at (in KHz). */
++#define PC3X3_PLL_MIN_KHZ			    140000
++/* The maximum frequency that we'll allow the ARM to run at (in KHz). */
++#define PC3X3_PLL_MAX_KHZ			    700000
++/* The step between frequencies that the PLL can generate. */
++#define PC3X3_PLL_STEP				    5000
 +
-+static struct platform_device serial1_device = {
-+	.name			= "serial8250",
-+	.id			= PLAT8250_DEV_PLATFORM1,
-+	.dev.platform_data	= serial1_platform_data,
-+	.resource		= serial1_resources,
-+	.num_resources		= ARRAY_SIZE(serial1_resources),
-+};
-+
-+static struct plat_serial8250_port serial2_platform_data[] = {
-+	{
-+		.membase	= IO_ADDRESS(PICOXCELL_UART2_BASE),
-+		.mapbase	= PICOXCELL_UART2_BASE,
-+		.irq		= IRQ_UART2,
-+		.flags		= UPF_BOOT_AUTOCONF,
-+		.iotype		= UPIO_DWAPB32,
-+		.regshift	= 2,
-+		.uartclk	= PICOXCELL_BASE_BAUD,
-+		.private_data	= (void *)(PHYS_TO_IO(PICOXCELL_UART2_BASE +
-+						      UART_USR_REG_OFFSET)),
-+	},
-+	{},
-+};
-+
-+static struct resource serial2_resources[] = {
-+	{
-+		.start		= PICOXCELL_UART2_BASE,
-+		.end		= PICOXCELL_UART2_BASE + 0xFFFF,
-+		.flags		= IORESOURCE_MEM,
-+	},
-+	{
-+		.start		= IRQ_UART2,
-+		.end		= IRQ_UART2,
-+		.flags		= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device serial2_device = {
-+	.name			= "serial8250",
-+	.id			= PLAT8250_DEV_PLATFORM2,
-+	.dev.platform_data	= serial2_platform_data,
-+	.resource		= serial2_resources,
-+	.num_resources		= ARRAY_SIZE(serial2_resources),
-+};
-+
-+static struct resource pmu_resource = {
-+	.start			= IRQ_NPMUIRQ,
-+	.end			= IRQ_NPMUIRQ,
-+	.flags			= IORESOURCE_IRQ,
-+};
-+
-+static struct platform_device pmu_device = {
-+	.name			= "arm-pmu",
-+	.id			= ARM_PMU_DEVICE_CPU,
-+	.num_resources		= 1,
-+	.resource		= &pmu_resource,
-+};
-+
-+static struct __initdata platform_device *common_devices[] __initdata = {
-+	&serial1_device,
-+	&serial2_device,
-+	&pmu_device,
-+};
-+
-+static int __init picoxcell_add_devices(void)
++/*
++ * The fuse block contains an 8 bit number which is the maximum clkf value
++ * that we can program. If this isn't programmed then allow 700Mhz operation.
++ * If not, limit the maximum speed to whatever this value corresponds to.
++ */
++static unsigned int picoxcell_cpufreq_max_clkf(void)
 +{
-+	struct picoxcell_soc *soc = picoxcell_get_soc();
++#define MAX_CLKF_FUSE	904
++#define MAX_CLKF_REG	IO_ADDRESS(PICOXCELL_FUSE_BASE + 904 / 8)
++	u8 max_clkf = readb(MAX_CLKF_REG);
 +
-+	platform_add_devices(common_devices, ARRAY_SIZE(common_devices));
-+	if (soc->add_devices)
-+		soc->add_devices();
++	return max_clkf ? ((max_clkf + 1) * 5) / 1000 : PC3X3_PLL_MAX_KHZ;
++}
++
++/*
++ * Initialise the new policy. We allow the PLL to go to the minimum speed but
++ * limit it to either 700Mhz or the frequency that corresponds to the clkf
++ * value in ARM_PLL_M_NUMBER fuses in the fuse block (if nonzero), whichever
++ * is smallest.
++ *
++ * A change of 20% should take ~2uS so we specify the transition latency as
++ * 50uS. This should allow jumps from 400MHz->700MHz within this period.
++ */
++static int picoxcell_cpufreq_init_policy(struct cpufreq_policy *policy)
++{
++	policy->cpuinfo.min_freq		= PC3X3_PLL_MIN_KHZ;
++	policy->cpuinfo.max_freq		= picoxcell_cpufreq_max_clkf();
++	policy->cpuinfo.transition_latency	= 50000;
++	policy->cur				= clk_get_rate(cpufreq.arm_clk);
++	policy->min				= PC3X3_PLL_MIN_KHZ;
++	policy->max				= picoxcell_cpufreq_max_clkf();
 +
 +	return 0;
 +}
-+arch_initcall(picoxcell_add_devices);
++
++static int picoxcell_cpufreq_verify(struct cpufreq_policy *policy)
++{
++	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
++				     policy->cpuinfo.max_freq);
++
++	policy->min = clk_round_rate(cpufreq.arm_clk, policy->min);
++	policy->max = clk_round_rate(cpufreq.arm_clk, policy->max);
++
++	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
++				     policy->cpuinfo.max_freq);
++
++	return 0;
++}
++
++static int picoxcell_cpufreq_target(struct cpufreq_policy *policy,
++				    unsigned int target_freq,
++				    unsigned int relation)
++{
++	int ret = 0;
++	struct cpufreq_freqs freqs;
++
++	if (target_freq > policy->max)
++		target_freq = policy->max;
++	if (target_freq < policy->min)
++		target_freq = policy->min;
++
++	target_freq = clk_round_rate(cpufreq.arm_clk, target_freq);
++
++	freqs.old = clk_get_rate(cpufreq.arm_clk);
++	freqs.new = target_freq;
++	freqs.cpu = policy->cpu;
++
++	if (freqs.new == freqs.old)
++		return 0;
++
++	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++
++	ret = clk_set_rate(cpufreq.arm_clk, target_freq);
++	if (ret) {
++		pr_err("unable to set cpufreq rate to %u\n", target_freq);
++		freqs.new = freqs.old;
++	}
++
++	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++
++	return ret;
++}
++
++static unsigned int picoxcell_cpufreq_get(unsigned int cpu)
++{
++	return (unsigned int)clk_get_rate(cpufreq.arm_clk);
++}
++
++static struct cpufreq_driver picoxcell_cpufreq_driver = {
++	.owner		= THIS_MODULE,
++	.flags		= CPUFREQ_STICKY,
++	.name		= "picoxcell",
++	.init		= picoxcell_cpufreq_init_policy,
++	.verify		= picoxcell_cpufreq_verify,
++	.target		= picoxcell_cpufreq_target,
++	.get		= picoxcell_cpufreq_get,
++};
++
++static int __init picoxcell_cpufreq_init(void)
++{
++	if (!picoxcell_has_feature(PICOXCELL_FEATURE_CPUFREQ))
++		return 0;
++
++	cpufreq.arm_clk = clk_get(NULL, "arm");
++
++	if (IS_ERR(cpufreq.arm_clk)) {
++		pr_info("cpufreq: no arm clock available - disabling scaling\n");
++		return PTR_ERR(cpufreq.arm_clk);
++	}
++
++	return cpufreq_register_driver(&picoxcell_cpufreq_driver);
++}
++module_init(picoxcell_cpufreq_init);
 -- 
 1.7.3.4
