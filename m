@@ -1,27 +1,40 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 2 Feb 2011 22:06:47 +0530
-Subject: [PATCH v1 0/9] pruss mfd drivers
-In-Reply-To: <20110202162048.GF9810@sirena.org.uk>
-References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302487783A6@dbde02.ent.ti.com>
-	<20110202162048.GF9810@sirena.org.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302487783CA@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Feb 2011 16:37:02 +0000
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <201102021700.20683.arnd@arndb.de>
+References: <201102021700.20683.arnd@arndb.de>
+Message-ID: <20110202163702.GA23240@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 21:50:48, Mark Brown wrote:
-> On Wed, Feb 02, 2011 at 09:43:51PM +0530, Nori, Sekhar wrote:
+On Wed, Feb 02, 2011 at 05:00:20PM +0100, Arnd Bergmann wrote:
+> I would suggest fixing this by:
 > 
-> > To automate copying the right folks on each patch, please use:
+> 1. auditing all uses of __attribute__((packed)) in the Linux USB code
+> and other drivers, removing the ones that are potentially harmful.
 > 
-> > git-send-email --to <davinci list> --cc-cmd=scripts/get_maintainer.pl  [...]
+> 2. Changing the ARM MMIO functions to use inline assembly instead of
+> direct pointer dereference.
 > 
-> Please don't use get_maintainer.pl directly like this - you need to
-> apply some thought and consideration to the results as it generates both
-> false positives and false negatives.
+> 3. Documenting the gcc behavior as undefined.
 
-Point taken. I usually do a --dry-run before actually sending
-just to verify the results.
+We used to use inline assembly at one point, but that got chucked out.
+The problem is that using asm() for this causes GCC to generate horrid
+code.
 
-Thanks,
-Sekhar
+1. there's no way to tell GCC that the inline assembly is a load
+   instruction and therefore it needs to schedule the following
+   instructions appropriately.
+
+2. GCC will needlessly reload pointers from structures and other such
+   behaviour because it can't be told clearly what the inline assembly
+   is doing, so the inline asm needs to have a "memory" clobber.
+
+3. It seems to misses out using the pre-index addressing, prefering to
+   create add/sub instructions prior to each inline assembly load/store.
+
+4. There are no (documented) constraints in GCC to allow you to represent
+   the offset format for the half-word instructions.
+
+Overall, it means greater register pressure, more instructions, larger
+functions, greater instruction cache pressure, etc.
