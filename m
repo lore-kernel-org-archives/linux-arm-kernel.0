@@ -1,54 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 2 Feb 2011 10:24:09 +0100
-Subject: [PATCH 2/6] omap4: prcm: Fix the CPUx clockdomain offsets
-In-Reply-To: <87ipx3mduj.fsf@ti.com>
-References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>	<1296212688-21951-3-git-send-email-santosh.shilimkar@ti.com>
-	<87ipx3mduj.fsf@ti.com>
-Message-ID: <4D4922B9.30501@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Feb 2011 10:34:32 +0100
+Subject: [PATCH] mmci: restrict DMA usage to large,
+	even multiblock transfers
+In-Reply-To: <20110201150542.GM31216@n2100.arm.linux.org.uk>
+References: <1296556873-2730-1-git-send-email-linus.walleij@linaro.org>
+	<20110201105408.GA31216@n2100.arm.linux.org.uk>
+	<4D47EFB6.5090509@stericsson.com>
+	<20110201114522.GD31216@n2100.arm.linux.org.uk>
+	<20110201115832.GF31216@n2100.arm.linux.org.uk>
+	<AANLkTimN=bxJzGFDc50-ZUMmCtXaGxVUd9-Zg1+QGfNf@mail.gmail.com>
+	<20110201150542.GM31216@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinE+v88NP8ZzNPSfhiBpV+=h+WcxQr+i-z1Rx4e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/2/2011 2:20 AM, Hilman, Kevin wrote:
-> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
->
->> CPU0 and CPU1 clockdomain is at the offset of 0x18 from the LPRM base.
->> The header file has set it wrongly to 0x0. Offset 0x0 is for CPUx power
->> domain control register
+2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Feb 01, 2011 at 03:07:12PM +0100, Linus Walleij wrote:
+>> 2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 >>
->> Fix the same.
+>> > So... I think this patch will work fine on ST variants, returning the
+>> > DMA request signals back to their classic meaning. ?That being LSREQ
+>> > is only activated on the _final_ transfer rather than the last 8
+>> > transfers, which as Linus describes makes your DMA controller complete
+>> > on the 8th-to-last transfer.
+>>
+>> I've tested this patch on MMC and SD on U8500 and it works
+>> fine, so
+>> Tested-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Has this also been updated in the autogen scripts?
->
-> Benoit?
+> Thanks. ?Can I apply that to the DMA patch too (and combine this with the
+> main MMCI DMA patch) ?
 
-No, I didn't see any patch to update that yet.
+Yes I've tested it and it works for MMC/SD cards with the above additions.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-Santosh or Rajendra,
-Did you already fix it?
-
-Benoit
-
->
-> Kevin
->
->> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Cc: Paul Walmsley<paul@pwsan.com>
->> ---
->>   arch/arm/mach-omap2/prcm_mpu44xx.h |    4 ++--
->>   1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
->> index 729a644..3300ff6 100644
->> --- a/arch/arm/mach-omap2/prcm_mpu44xx.h
->> +++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
->> @@ -38,8 +38,8 @@
->>   #define OMAP4430_PRCM_MPU_CPU1_INST		0x0800
->>
->>   /* PRCM_MPU clockdomain register offsets (from instance start) */
->> -#define OMAP4430_PRCM_MPU_CPU0_MPU_CDOFFS	0x0000
->> -#define OMAP4430_PRCM_MPU_CPU1_MPU_CDOFFS	0x0000
->> +#define OMAP4430_PRCM_MPU_CPU0_MPU_CDOFFS	0x0018
->> +#define OMAP4430_PRCM_MPU_CPU1_MPU_CDOFFS	0x0018
->>
->>
->>   /*
+Thanks,
+Linus Walleij
