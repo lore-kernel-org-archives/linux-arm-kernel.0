@@ -1,96 +1,106 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 2 Feb 2011 14:33:55 -0500 (EST)
-Subject: [PATCH] ARM: bitops: Fix low-level code to be Thumb-2 compatible
-In-Reply-To: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
-References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1102021421160.8580@xanadu.home>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Wed,  2 Feb 2011 13:27:21 -0600
+Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
+In-Reply-To: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1296674843-12718-4-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Feb 2011, Dave Martin wrote:
+From: Benoit Cousson <b-cousson@ti.com>
 
-> The new bitops code cunningly str <Rt>, [r1, -r1] to trigger
-> a fault by attempting to store to address zero.
-> 
-> This code doesn't assemble in Thumb-2, since Thumb-2 doesn't
-> allow negative register offsets at all for loads and stores.
-> 
-> The patch loads 0 into r2 and uses that as a base register
-> instead for the Thumb-2 case: r2 seems non-live at every
-> instance of this problem.
-> 
-> The ARM case is unaffected.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Mailbox hwmod data for omap4.
 
-Russell proposed a better solution already:
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   67 ++++++++++++++++++++++++++++
+ 1 files changed, 67 insertions(+), 0 deletions(-)
 
-http://mid.gmane.org/alpine.LFD.2.00.1101181312360.8580 at xanadu.home
-
-No idea why this wasn't folded in his series yet though.
-
-
-Nicolas
-
-
-> ---
->  arch/arm/lib/bitops.h |   16 ++++++++++++----
->  1 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> index f8a2bd3..87d6b17 100644
-> --- a/arch/arm/lib/bitops.h
-> +++ b/arch/arm/lib/bitops.h
-> @@ -1,7 +1,9 @@
->  #if __LINUX_ARM_ARCH__ >= 6
->  	.macro	bitop, instr
->  	tst	r1, #3
-> -	strne	r1, [r1, -r1]		@ assert word-aligned
-> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
-> + THUMB(	movne	r2, #0		)
-> + THUMB(	strne	r1, [r2]	)
->  	mov	r2, #1
->  	and	r3, r0, #31		@ Get bit offset
->  	mov	r0, r0, lsr #5
-> @@ -17,7 +19,9 @@
->  
->  	.macro	testop, instr, store
->  	tst	r1, #3
-> -	strne	r1, [r1, -r1]		@ assert word-aligned
-> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
-> + THUMB(	movne	r2, #0		)
-> + THUMB(	strne	r1, [r2]	)
->  	mov	r2, #1
->  	and	r3, r0, #31		@ Get bit offset
->  	mov	r0, r0, lsr #5
-> @@ -38,7 +42,9 @@
->  #else
->  	.macro	bitop, instr
->  	tst	r1, #3
-> -	strne	r1, [r1, -r1]		@ assert word-aligned
-> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
-> + THUMB(	movne	r2, #0		)
-> + THUMB(	strne	r1, [r2]	)
->  	and	r2, r0, #31
->  	mov	r0, r0, lsr #5
->  	mov	r3, #1
-> @@ -61,7 +67,9 @@
->   */
->  	.macro	testop, instr, store
->  	tst	r1, #3
-> -	strne	r1, [r1, -r1]		@ assert word-aligned
-> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
-> + THUMB(	movne	r2, #0		)
-> + THUMB(	strne	r1, [r2]	)
->  	and	r3, r0, #31
->  	mov	r0, r0, lsr #5
->  	save_and_disable_irqs ip
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index c2806bd..c495669 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2001,6 +2001,70 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ };
+ 
++/*
++ * 'mailbox' class
++ * mailbox module allowing communication between the on-chip processors
++ * using a queued mailbox-interrupt mechanism.
++ */
++
++static struct omap_hwmod_class_sysconfig omap44xx_mailbox_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_offs	= 0x0010,
++	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
++			   SYSC_HAS_SOFTRESET),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
++	.sysc_fields	= &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class omap44xx_mailbox_hwmod_class = {
++	.name = "mailbox",
++	.sysc = &omap44xx_mailbox_sysc,
++};
++
++/* mailbox */
++static struct omap_hwmod omap44xx_mailbox_hwmod;
++static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
++	{ .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
++};
++
++static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
++	{
++		.pa_start	= 0x4a0f4000,
++		.pa_end		= 0x4a0f41ff,
++		.flags		= ADDR_TYPE_RT,
++	},
++};
++
++/* l4_cfg -> mailbox */
++static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mailbox = {
++	.master		= &omap44xx_l4_cfg_hwmod,
++	.slave		= &omap44xx_mailbox_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_mailbox_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_mailbox_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* mailbox slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_mailbox_slaves[] = {
++	&omap44xx_l4_cfg__mailbox,
++};
++
++static struct omap_hwmod omap44xx_mailbox_hwmod = {
++	.name		= "mailbox",
++	.class		= &omap44xx_mailbox_hwmod_class,
++	.mpu_irqs	= omap44xx_mailbox_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mailbox_irqs),
++	.prcm		= {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4CFG_MAILBOX_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_mailbox_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_mailbox_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
+ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 
+ 	/* dmm class */
+@@ -2068,6 +2132,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 	&omap44xx_wd_timer2_hwmod,
+ 	&omap44xx_wd_timer3_hwmod,
+ 
++	/* mailbox class */
++	&omap44xx_mailbox_hwmod,
++
+ 	NULL,
+ };
+ 
+-- 
+1.7.1
