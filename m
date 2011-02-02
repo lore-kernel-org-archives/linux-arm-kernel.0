@@ -1,76 +1,40 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 1 Feb 2011 20:26:03 -0700
-Subject: [PATCH] ARM: map ATAGs when not in first 1MB of RAM
-In-Reply-To: <1296143443-9442-1-git-send-email-robherring2@gmail.com>
-References: <1296143443-9442-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20110202032603.GA29148@angua.secretlab.ca>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 01 Feb 2011 23:11:50 -0500 (EST)
+Subject: advice needed on how best to fix kirkwood kexec
+In-Reply-To: <20110201215059.GC7547@localhost>
+References: <20110201215059.GC7547@localhost>
+Message-ID: <alpine.LFD.2.00.1102012252520.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 09:50:43AM -0600, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> If ATAGs or DTB pointer is not within first 1MB of RAM, then the boot params
-> will not be mapped early enough, so map the 1MB region that r2 points to. Only
-> map the first 1MB when r2 is 0.
-> 
-> Some assembly improvements from Nicolas Pitre.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+On Tue, 1 Feb 2011, Eric Cooper wrote:
 
-I'll try temporarily picking this one up into my devicetree/test
-branch until Russell's p2v patches get merged into mainline.
+> I found the problem with kexec'ing kirkwood kernels:
+> 
+> During late initialization, the kirkwood_clock_gate function powers
+> down unused units, including the PCIe.  But the early initialization
+> (kirkwood_timer_init) relies on reading the device ID register, which
+> is in the PCIe space, so it will hang when started by kexec.
+> 
+> My question is, should I patch the kexec code or the initialization code?
+> 
+> Patching the kexec code is much more useful, because it allows
+> kexec'ing the existing kirkwood kernels that are already "out there",
+> in distros, etc.  But it requires a kirkwood-specific operation in the
+> otherwise generic machine_kexec().
+> 
+> Patching just the kirkwood initialization is better from an
+> "information hiding" perspective, but won't provide any benefit until
+> it makes its way into the kernels that people might want to kexec.
 
-Thanks!
-g.
+I think that both should be patched.  The first one will let you kexec 
+old kernels, while the later will let you be kexec'd by old kernels as 
+well as be less dependent on whatever the bootloader might have done 
+with the clock.
 
-> ---
->  arch/arm/kernel/head.S |   19 ++++++++++++++++++-
->  1 files changed, 18 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 65d9489..9c688bf 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -205,15 +205,32 @@ __create_page_tables:
->  #endif
->  
->  	/*
-> -	 * Then map first 1MB of ram in case it contains our boot params.
-> +	 * Then map first 1MB of ram if boot params address is not specified.
->  	 */
-> +	cmp	r2, #0
-> +	bne	1f
->  	add	r0, r4, #PAGE_OFFSET >> 18
->  	orr	r6, r7, #(PHYS_OFFSET & 0xff000000)
->  	.if	(PHYS_OFFSET & 0x00f00000)
->  	orr	r6, r6, #(PHYS_OFFSET & 0x00f00000)
->  	.endif
->  	str	r6, [r0]
-> +	b	2f
->  
-> +	/*
-> +	 * Otherwise map the 1MB region r2 points to (atags or dtb)
-> +	 */
-> +1:	mov	r0, r2, lsr #20
-> +	mov	r0, r0, lsl #20
-> +	sub	r3, r0, #(PHYS_OFFSET & 0xff000000)
-> +	.if	(PHYS_OFFSET & 0x00f00000)
-> +	sub	r3, r3, #(PHYS_OFFSET & 0x00f00000)
-> +	.endif
-> +	add	r3, r3, #PAGE_OFFSET
-> +	add	r3, r4, r3, lsr #18
-> +	orr	r6, r7, r0
-> +	str	r6, [r3]
-> +2:
->  #ifdef CONFIG_DEBUG_LL
->  #ifndef CONFIG_DEBUG_ICEDCC
->  	/*
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+And machine_kexec() should probably call a machine specific hook if set 
+by machine specific code, similar to pm_power_off in 
+machine_power_off().
+
+
+Nicolas
