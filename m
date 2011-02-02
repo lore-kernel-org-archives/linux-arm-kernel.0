@@ -1,41 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Feb 2011 12:20:26 -0800
-Subject: [PATCH 2/2] arm: Kconfig: allow OMAP to use sparse IRQ numbering
-In-Reply-To: <1296664315-32108-3-git-send-email-balbi@ti.com>
-References: <1296664315-32108-1-git-send-email-balbi@ti.com>
-	<1296664315-32108-3-git-send-email-balbi@ti.com>
-Message-ID: <20110202202026.GH3322@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 2 Feb 2011 15:39:13 -0500 (EST)
+Subject: [PATCH] ARM: bitops: Fix low-level code to be Thumb-2 compatible
+In-Reply-To: <20110202195052.GB31043@n2100.arm.linux.org.uk>
+References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
+	<20110202195052.GB31043@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102021537290.8212@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [110202 08:31]:
-> Select HAVE_SPARSE_IRQ to allow OMAP to use
-> sparse IRQ numbering scheme. The main difference
-> is that irq_descs will be added to a radix tree
-> instead of a static array.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
 
-Assuming these two will go through Russell's tree:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> ---
->  arch/arm/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> On Wed, Feb 02, 2011 at 02:33:55PM -0500, Nicolas Pitre wrote:
+> > On Wed, 2 Feb 2011, Dave Martin wrote:
+> > 
+> > > The new bitops code cunningly str <Rt>, [r1, -r1] to trigger
+> > > a fault by attempting to store to address zero.
+> > > 
+> > > This code doesn't assemble in Thumb-2, since Thumb-2 doesn't
+> > > allow negative register offsets at all for loads and stores.
+> > > 
+> > > The patch loads 0 into r2 and uses that as a base register
+> > > instead for the Thumb-2 case: r2 seems non-live at every
+> > > instance of this problem.
+> > > 
+> > > The ARM case is unaffected.
+> > > 
+> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > 
+> > Russell proposed a better solution already:
+> > 
+> > http://mid.gmane.org/alpine.LFD.2.00.1101181312360.8580 at xanadu.home
+> > 
+> > No idea why this wasn't folded in his series yet though.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 09a5c11..2ca24ad 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -857,6 +857,7 @@ config ARCH_DAVINCI
->  config ARCH_OMAP
->  	bool "TI OMAP"
->  	select HAVE_CLK
-> +	select HAVE_SPARSE_IRQ
->  	select ARCH_REQUIRE_GPIOLIB
->  	select ARCH_HAS_CPUFREQ
->  	select GENERIC_CLOCKEVENTS
-> -- 
-> 1.7.4.rc2
+> Because I haven't got a round tuit.
 > 
+> http://www.quantumenterprises.co.uk/roundtuit/traditional_round_tuits.htm
+
+LOL!  No problem, here's a virtual one.  :-)
+
+
+Nicolas
