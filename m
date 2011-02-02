@@ -1,86 +1,58 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 02 Feb 2011 17:01:30 +0100
-Subject: [patch 1/5] Introduce EFIKA_COMMON
-In-Reply-To: <20110202154357.GY9041@pengutronix.de> (Sascha Hauer's message of
-	"Wed, 2 Feb 2011 16:43:57 +0100")
-References: <20110202112104.380352125@rtp-net.org>
-	<20110202112119.373997404@rtp-net.org>
-	<20110202154357.GY9041@pengutronix.de>
-Message-ID: <87oc6uzaqt.fsf@lechat.rtp-net.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 2 Feb 2011 17:00:20 +0100
+Subject: ARM unaligned MMIO access with attribute((packed))
+Message-ID: <201102021700.20683.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+As noticed by Peter Maydell, the EHCI device driver in Linux gets
+miscompiled by some versions of arm-gcc (still need to find out which)
+due to a combination of problems:
 
-> On Wed, Feb 02, 2011 at 12:21:05PM +0100, Arnaud Patard wrote:
->> The Genesi EFIKA MX and EFIKA Smartbook are sharing a lot of things
->> so it makes sense to create a common file for both devices and a specific
->> file for each. No functionnal change except dropping uart 1 & 2.
->> 
->> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> 
->> +
->> +/* Serial ports */
->> +#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
->> +static const struct imxuart_platform_data uart_pdata = {
->> +	.flags = IMXUART_HAVE_RTSCTS,
->> +};
->> +
->> +static inline void mxc_init_imx_uart(void)
->> +{
->> +	imx51_add_imx_uart(0, &uart_pdata);
->> +	imx51_add_imx_uart(1, &uart_pdata);
->> +	imx51_add_imx_uart(2, &uart_pdata);
->> +}
->> +#else /* !SERIAL_IMX */
->> +static inline void mxc_init_imx_uart(void)
->> +{
->> +}
->> +#endif /* SERIAL_IMX */
->
-> Please remove the ifdefs around the serial port initialization. Also, I
-> remember that the efikamx only has one serial port connected.
->
-
-doh. It's dead code. I've modified the code in init() to use only one
-uart but forgot to kill that :(
-
->> +
->> +/* This function is board specific as the bit mask for the plldiv will also
->> + * be different for other Freescale SoCs, thus a common bitmask is not
->> + * possible and cannot get place in /plat-mxc/ehci.c.
->> + */
->> +static int initialize_otg_port(struct platform_device *pdev)
->> +{
->> +	u32 v;
->> +	void __iomem *usb_base;
->> +	void __iomem *usbother_base;
->> +	usb_base = ioremap(MX51_OTG_BASE_ADDR, SZ_4K);
->> +	if (!usb_base)
->> +		return -ENOMEM;
->> +	usbother_base = (void __iomem *)(usb_base + MX5_USBOTHER_REGS_OFFSET);
->> +
->> +	/* Set the PHY clock to 19.2MHz */
->> +	v = __raw_readl(usbother_base + MXC_USB_PHY_CTR_FUNC2_OFFSET);
->> +	v &= ~MX5_USB_UTMI_PHYCTRL1_PLLDIV_MASK;
->> +	v |= MX51_USB_PLL_DIV_24_MHZ;
->> +	__raw_writel(v, usbother_base + MXC_USB_PHY_CTR_FUNC2_OFFSET);
->> +	iounmap(usb_base);
->> +	return 0;
->> +}
->> +
->> +static struct mxc_usbh_platform_data dr_utmi_config = {
->> +	.init   = initialize_otg_port,
->> +	.portsc = MXC_EHCI_UTMI_16BIT,
->> +	.flags  = MXC_EHCI_INTERNAL_PHY,
->> +};
->
-> Could you rebase this on the ehci cleanup patches I recently sent and
-> thereby also test the patches for your board?
-
-I was wondering how to handle my patches vs your ehci cleanup. Nice to
-know how you want to handle it. Will test and report if anything goes
-wrong.
+1. In include/linux/usb/ehci_def.h, struct ehci_caps is defined
+with __attribute__((packed)), for no good reason. This is clearly
+a bug and needs to get fixed, but other drivers have the same bug
+and it used to work. The attribute forces byte access on all members
+accessed through pointer dereference, which is not allowed on
+MMIO accesses in general. The specific code triggering the problem
+in Peter's case is in ehci-omap.c:
+        omap->ehci->regs = hcd->regs
+                + HC_LENGTH(readl(&omap->ehci->caps->hc_capbase));
 
 
-Arnaud
+2. The ARM version of the readl() function is implemented as a macro
+doing a direct pointer dereference with a typecast:
+
+#define __raw_readl(a)          (__chk_io_ptr(a), *(volatile unsigned int __force   *)(a))
+#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32) \
+                                        __raw_readl(__mem_pci(c))); __v; })
+#define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+
+On other architectures, readl() is implemented using an inline assembly
+specifically to prevent gcc from issuing anything but a single 32-bit
+load instruction. readl() only makes sense on aligned memory, so in case
+of a misaligned pointer argument, it should cause a trap anyway.
+
+3. gcc does not seem to clearly define what happens during a cast between
+aligned an packed pointers. In this case, the original pointer is packed
+(byte aligned), while the access is done through a 32-bit aligned
+volatile unsigned int pointer. In gcc-4.4, casting from "unsigned int
+__attribute__((packed))" to "volatile unsigned int" resulted in a 32-bit
+aligned access, while casting to "unsigned int" (without volatile) resulted
+in four byte accesses. gcc-4.5 seems to have changed this to always do
+a byte access in both cases, but still does not document the behavior.
+(need to confirm this).
+
+I would suggest fixing this by:
+
+1. auditing all uses of __attribute__((packed)) in the Linux USB code
+and other drivers, removing the ones that are potentially harmful.
+
+2. Changing the ARM MMIO functions to use inline assembly instead of
+direct pointer dereference.
+
+3. Documenting the gcc behavior as undefined.
+
+Other suggestions?
+
+	Arnd
