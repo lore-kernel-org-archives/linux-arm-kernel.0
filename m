@@ -1,8 +1,8 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Feb 2011 11:48:56 -0800
+Date: Wed, 2 Feb 2011 11:50:20 -0800
 Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
 	boot failure)
-In-Reply-To: <81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
+In-Reply-To: <3d41cb89c4a3a3fa93ded7aa9dfaa14d@mail.gmail.com>
 References: <20110106180030.GA8249@n2100.arm.linux.org.uk>
 	<20110106182023.GV7771@atomide.com>
 	<20110106203238.GH1198@n2100.arm.linux.org.uk>
@@ -12,22 +12,48 @@ References: <20110106180030.GA8249@n2100.arm.linux.org.uk>
 	<20110111231611.GX4957@atomide.com>
 	<3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
 	<20110202011006.GP3358@atomide.com>
-	<81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
-Message-ID: <20110202194855.GA3322@atomide.com>
+	<3d41cb89c4a3a3fa93ded7aa9dfaa14d@mail.gmail.com>
+Message-ID: <20110202195019.GB3322@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110201 22:04]:
+* Anand Gadiyar <gadiyar@ti.com> [110202 10:51]:
+> Tony Lindgren wrote:
+> > * Anand Gadiyar <gadiyar@ti.com> [110201 04:54]:
+> > >
+> > > I believe this fix is fixing your reboot issue, but it's breaking
+> > > EHCI support on the SDP.
+> > >
+> > > The MODE4 above should really be MODE3 - all GPIOs are on MODE3.
+> > > By changing
+> > >
+> > > The patch snippet below fixes EHCI on the SDP, but I believe that
+> > > making this change will reintroduce the "board reboots" issue
+> > > you originally reported. Could you check and tell me if this
+> > > is the case?
+> >
+> > Hmm sorry looks like I made a typo there. That should be fixed.
+> >
+> > > Just curious - is your board a Blaze, or an SDP?
 > >
 > > It's a ES1.0 blaze, with the patch below it reboots early
 > > during the boot. I also have to disable omap_l2_cache_init
 > > on this board to get it to boot.
 > >
-> Do you still get this problem with 'omap_l2_cache_init' ?
-> As reported earlier, we don't see this issue on ES1.0
-> SDP.
+> 
+> ...
+> 
+> > Maybe there should be a check for ES1.0 for the USB also?
+> 
+> Looks like a bug on the Blaze boards. There's a large capacitor
+> on the rails that starts charging when we try to power the USB PHY.
+> The inrush current is quite high and this causes the reboot.
+> 
+> The capacitor is on the big motherboard called the application
+> board, so it's independent of the silicon rev. I'm not sure
+> which revs are affected - I'll try and find out more about the
+> issue to see if I can come up with a better fix.
 
-Yeah I do, it rarely makes it to the userspace. Works reliably
-if I disable omap_l2_cache_init.
+OK thanks.
 
 Tony
