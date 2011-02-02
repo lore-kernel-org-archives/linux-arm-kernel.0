@@ -1,35 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 02 Feb 2011 13:38:31 -0800 (PST)
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <20110202163702.GA23240@n2100.arm.linux.org.uk>
-References: <201102021700.20683.arnd@arndb.de>
-	<20110202163702.GA23240@n2100.arm.linux.org.uk>
-Message-ID: <20110202.133831.193702414.davem@davemloft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 2 Feb 2011 14:40:55 -0700 (MST)
+Subject: [PATCH 1/6] omap4: powerdomain: Add supported INACTIVE power state
+In-Reply-To: <30bccb5d133f92cdbf1a4aa75ba54e7b@mail.gmail.com>
+References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
+	<1296212688-21951-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1101311613230.16671@utopia.booyaka.com>
+	<30bccb5d133f92cdbf1a4aa75ba54e7b@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102021430460.7672@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Wed, 2 Feb 2011 16:37:02 +0000
+On Tue, 1 Feb 2011, Santosh Shilimkar wrote:
 
-> 1. there's no way to tell GCC that the inline assembly is a load
->    instruction and therefore it needs to schedule the following
->    instructions appropriately.
+> > -----Original Message-----
+> > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > Sent: Tuesday, February 01, 2011 4:44 AM
+> >
+> > What does the hardware do when the powerdomain is programmed to
+> > INACTIVE?
+> > Does it actually force the clockdomains idle?
+> 
+> No. It doesn't force it. The power domain to hit INACTIVE, the
+> clockdomain within the power domain needs to idle and it is
+> still a prerequisite. With INACTIVE being programmed, we could
+> issue a sleep transition.
+> 
+> PD_ON:
+> No power transition, only clocks are gated. Power domain stays ON.
+> 
+> PD_INA:
+> Power domain transitions to INACTIVE state. All logic and
+> memory stay powered. This state allows for a voltage
+> sleep transition.
 
-Just add a dummy '"m" (pointer)' asm input argument to the inline asm
-statement.  Just make sure "typeof(pointer)" has a size matching the
-size of the load your are performing.
+Okay.  So programming an OMAP4 powerdomain to INACTIVE is equivalent to 
+programming an OMAP3 powerdomain to ON with the PRM_VOLTCTRL.AUTO_SLEEP 
+bit to 1?
 
-> 2. GCC will needlessly reload pointers from structures and other such
->    behaviour because it can't be told clearly what the inline assembly
->    is doing, so the inline asm needs to have a "memory" clobber.
+Are there any other dependencies with the PRM_VOLTCTRL_AUTO_CTRL_VDD* 
+registers, e.g., does the appropriate VDD bitfield there need to be set to 
+0x1 also to allow the sleep transition to occur?
 
-This behavior is correct, and in fact needed.  Writing to chip registers
-can trigger changes to arbitrary main memory locations.
 
-> 3. It seems to misses out using the pre-index addressing, prefering to
->    create add/sub instructions prior to each inline assembly load/store.
 
-Yes, this is indeed a problem.
-
-But you really need that memory clobber there whether you like it or
-not, see above.
+- Paul
