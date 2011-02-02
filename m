@@ -1,130 +1,52 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed,  2 Feb 2011 11:25:17 +0530
-Subject: [PATCH v2] OMAP: hwmod: Do not expect an entry in clkdev for opt_clks
-Message-ID: <1296626117-31716-1-git-send-email-rnayak@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 2 Feb 2011 11:35:41 +0530
+Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP boot
+	failure)
+In-Reply-To: <20110202011006.GP3358@atomide.com>
+References: <20110106170805.GE1198@n2100.arm.linux.org.uk>
+	<20110106180030.GA8249@n2100.arm.linux.org.uk>
+	<20110106182023.GV7771@atomide.com>
+	<20110106203238.GH1198@n2100.arm.linux.org.uk>
+	<20110106204053.GA7771@atomide.com>
+	<20110107161230.GR1198@n2100.arm.linux.org.uk>
+	<20110110185209.GC4957@atomide.com> <20110111231611.GX4957@atomide.com>
+	<3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
+	<20110202011006.GP3358@atomide.com>
+Message-ID: <81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The _add_optional_clock_alias function expects an entry
-already existing in the clkdev table in the form of
-<dev-id=NULL, con-id=role> which might not be the case
-always.
-
-Instead, just check if an entry already exists in clkdev
-in the <dev-id=dev_name, con-id=role> form, else go ahead
-and add one.
-
-Remove any assumption of an entry already existing in clkdev
-table in any form.
-
-Since this means, adding a new entry in clkdev if it does
-not already exist, and not really adding an 'alias',
-also rename the function name
-(s/_add_optional_clock_alias/_add_optional_clock_clkdev)
-to reflect this.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Reported-by: Sumit Semwal <sumit.semwal@ti.com>
-Cc: Sumit Semwal <sumit.semwal@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Partha Basak <p-basak2@ti.com>
----
-Applies on 2.6.38-rc3
-Changes in v2:
--1- (s/_add_optional_clock_alias/_add_optional_clock_clkdev)
--2- pr_err added when clkdev_alloc fails
-
- arch/arm/plat-omap/omap_device.c |   36 ++++++++++++++++++++++++++----------
- 1 files changed, 26 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 57adb27..9bbda9a 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -83,9 +83,11 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/clk.h>
-+#include <linux/clkdev.h>
- 
- #include <plat/omap_device.h>
- #include <plat/omap_hwmod.h>
-+#include <plat/clock.h>
- 
- /* These parameters are passed to _omap_device_{de,}activate() */
- #define USE_WAKEUP_LAT			0
-@@ -239,12 +241,12 @@ static inline struct omap_device *_find_by_pdev(struct platform_device *pdev)
- }
- 
- /**
-- * _add_optional_clock_alias - Add clock alias for hwmod optional clocks
-+ * _add_optional_clock_clkdev - Add clkdev entry for hwmod optional clocks
-  * @od: struct omap_device *od
-  *
-  * For every optional clock present per hwmod per omap_device, this function
-- * adds an entry in the clocks list of the form <dev-id=dev_name, con-id=role>
-- * if an entry is already present in it with the form <dev-id=NULL, con-id=role>
-+ * adds an entry in the clkdev table of the form <dev-id=dev_name, con-id=role>
-+ * if it does not exist already.
-  *
-  * The function is called from inside omap_device_build_ss(), after
-  * omap_device_register.
-@@ -254,25 +256,39 @@ static inline struct omap_device *_find_by_pdev(struct platform_device *pdev)
-  *
-  * No return value.
-  */
--static void _add_optional_clock_alias(struct omap_device *od,
-+static void _add_optional_clock_clkdev(struct omap_device *od,
- 				      struct omap_hwmod *oh)
- {
- 	int i;
- 
- 	for (i = 0; i < oh->opt_clks_cnt; i++) {
- 		struct omap_hwmod_opt_clk *oc;
--		int r;
-+		struct clk *r;
-+		struct clk_lookup *l;
- 
- 		oc = &oh->opt_clks[i];
- 
- 		if (!oc->_clk)
- 			continue;
- 
--		r = clk_add_alias(oc->role, dev_name(&od->pdev.dev),
--				  (char *)oc->clk, &od->pdev.dev);
--		if (r)
--			pr_err("omap_device: %s: clk_add_alias for %s failed\n",
-+		r = clk_get_sys(dev_name(&od->pdev.dev), oc->role);
-+		if (!IS_ERR(r))
-+			continue; /* clkdev entry exists */
-+
-+		r = omap_clk_get_by_name((char *)oc->clk);
-+		if (IS_ERR(r)) {
-+			pr_err("omap_device: %s: omap_clk_get_by_name for %s failed\n",
-+			       dev_name(&od->pdev.dev), oc->clk);
-+			continue;
-+		}
-+
-+		l = clkdev_alloc(r, oc->role, dev_name(&od->pdev.dev));
-+		if (!l) {
-+			pr_err("omap_device: %s: clkdev_alloc for %s failed\n",
- 			       dev_name(&od->pdev.dev), oc->role);
-+			return;
-+		}
-+		clkdev_add(l);
- 	}
- }
- 
-@@ -480,7 +496,7 @@ struct omap_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
- 
- 	for (i = 0; i < oh_cnt; i++) {
- 		hwmods[i]->od = od;
--		_add_optional_clock_alias(od, hwmods[i]);
-+		_add_optional_clock_clkdev(od, hwmods[i]);
- 	}
- 
- 	if (ret)
--- 
-1.7.0.4
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Wednesday, February 02, 2011 6:40 AM
+> To: Anand Gadiyar
+> Cc: Russell King - ARM Linux; linux-arm-kernel at lists.infradead.org;
+> linux-omap at vger.kernel.org; Keshava Munegowda; Santosh Shilimkar;
+> Felipe Balbi
+> Subject: Re: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
+> 4430SDP boot failure)
+>
+> * Anand Gadiyar <gadiyar@ti.com> [110201 04:54]:
+> >
+> > I believe this fix is fixing your reboot issue, but it's breaking
+> > EHCI support on the SDP.
+> >
+> > The MODE4 above should really be MODE3 - all GPIOs are on MODE3.
+> > By changing
+> >
+> > The patch snippet below fixes EHCI on the SDP, but I believe that
+> > making this change will reintroduce the "board reboots" issue
+> > you originally reported. Could you check and tell me if this
+> > is the case?
+>
+> Hmm sorry looks like I made a typo there. That should be fixed.
+>
+> > Just curious - is your board a Blaze, or an SDP?
+>
+> It's a ES1.0 blaze, with the patch below it reboots early
+> during the boot. I also have to disable omap_l2_cache_init
+> on this board to get it to boot.
+>
+Do you still get this problem with 'omap_l2_cache_init' ?
+As reported earlier, we don't see this issue on ES1.0
+SDP.
