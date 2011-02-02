@@ -1,55 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 Feb 2011 17:21:51 -0800
-Subject: [PATCH 3/6] omap4: powerdomain: Use intended PWRSTS_* flags
-	instead of values
-In-Reply-To: <1296212688-21951-4-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Fri, 28 Jan 2011 16:34:45 +0530")
-References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296212688-21951-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87aaifmdsg.fsf@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 2 Feb 2011 11:31:53 +0900
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+In-Reply-To: <20110201152820.GQ31216@n2100.arm.linux.org.uk>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<20110201105449.GY1147@pengutronix.de>
+	<AANLkTimayMAfr+zA6uO_yUmZqsOLmJ3fiiS696mL_evn@mail.gmail.com>
+	<20110201140024.GZ1147@pengutronix.de>
+	<20110201151418.GN31216@n2100.arm.linux.org.uk>
+	<20110201152203.GE1147@pengutronix.de>
+	<20110201152820.GQ31216@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik_QFqas7yTWDpWhMfxfdOvKNh--DDFxY8x8v51@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-
-> IVAHD and ABE power domain logic state is populated using directly
-> value instead of the capability flags.
+2011/2/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Feb 01, 2011 at 04:22:03PM +0100, Uwe Kleine-K?nig wrote:
+>> Full ack. ?(I wonder if you misunderstood me or wanted to put my
+>> statement into more words. ?Jassi didn't like that a clk_enable without
+>> a previous clk_prepare worked on some platforms and on others it
+>> doesn't. ?With BUG_ON(clk->ops->prepare && !clk->prepare_count) in
+>> clk_enable we have exactly this situation.)
 >
-> Fix the same.
-
-Again, has this been fixed in the scripts?
-
-For future reference,  It will be helpful to note in the changelog that
-this kind of thing has been fixed in the autogen scripts.
-
-Thanks,
-
-Kevin
-
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/powerdomains44xx_data.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> Even with a NULL clk->ops->prepare function, we still want drivers to
+> have called clk_prepare(). ?So we can do something like:
 >
-> diff --git a/arch/arm/mach-omap2/powerdomains44xx_data.c b/arch/arm/mach-omap2/powerdomains44xx_data.c
-> index 96cde98..daee255 100644
-> --- a/arch/arm/mach-omap2/powerdomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/powerdomains44xx_data.c
-> @@ -80,7 +80,7 @@ static struct powerdomain abe_44xx_pwrdm = {
->  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->  	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
-> -	.pwrsts_logic_ret = PWRDM_POWER_OFF,
-> +	.pwrsts_logic_ret = PWRSTS_OFF,
->  	.banks		  = 2,
->  	.pwrsts_mem_ret	= {
->  		[0] = PWRDM_POWER_RET,	/* aessmem */
-> @@ -227,7 +227,7 @@ static struct powerdomain ivahd_44xx_pwrdm = {
->  	.prcm_partition	  = OMAP4430_PRM_PARTITION,
->  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->  	.pwrsts		  = PWRSTS_OFF_RET_INA_ON,
-> -	.pwrsts_logic_ret = PWRDM_POWER_OFF,
-> +	.pwrsts_logic_ret = PWRSTS_OFF,
->  	.banks		  = 4,
->  	.pwrsts_mem_ret	= {
->  		[0] = PWRDM_POWER_OFF,	/* hwa_mem */
+> ? ? ? ?if (WARN_ON(clk->prepare_count == 0))
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> in clk_enable() should be sufficient and noisy enough not to be missed.
+>
+> I'd avoid BUG_ON() here as that will take the system down, which may
+> increase the chances of getting useful bug reports.
+
+Having thought about it, I think it's not necessary to immediately catch
+drivers that work on some platforms and not on others -- a mere comment
+'please add clk_prepare' during code review or a patch adding 'clk_prepare'
+later upon stumbling across a platform on which the driver doesn't work,
+should be OK. Let us not fret about it.
+
+That leaves us with only having to ensure that :-
+a) No two calls to clk_prepare/unprepare _hooks_ are consecutive.
+b) clk_prepare is done on the clock (not necessarily by the driver
+    under consideration) before calls to clk_enable.
+
+I think (a) is already easily managed by having the prepare_count,
+and (b) can be reasonably managed by what Russell suggests above.
+
+So, FWIW, I am for the idea.
+
+Njoi!
