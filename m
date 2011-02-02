@@ -1,35 +1,40 @@
-From: joseph@codesourcery.com (Joseph S. Myers)
-Date: Wed, 2 Feb 2011 17:39:32 +0000 (UTC)
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <AANLkTin6qEeN7XZuwePNWqS8i_aDY586V+sOqgD5pPQA@mail.gmail.com>
-References: <201102021700.20683.arnd@arndb.de>
-	<AANLkTin6qEeN7XZuwePNWqS8i_aDY586V+sOqgD5pPQA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1102021728350.18796@digraph.polyomino.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 2 Feb 2011 11:48:01 -0600
+Subject: [PATCH] EDB93xx: Add support for CS4271 CODEC on EDB93xx boards
+In-Reply-To: <1296667999.1504.44.camel@r60e>
+References: <1296603653.1504.9.camel@r60e>
+	<0D753D10438DA54287A00B027084269764CEF59B2B@AUSP01VMBX24.collaborationhost.net>
+	<1296643688.1504.23.camel@r60e>
+	<20110202104943.GN12743@opensource.wolfsonmicro.com>
+	<1296645167.1504.31.camel@r60e>
+	<20110202125327.GO12743@opensource.wolfsonmicro.com>
+	<1296653211.1504.40.camel@r60e>
+	<0D753D10438DA54287A00B027084269764CEFD45C8@AUSP01VMBX24.collaborationhost.net>
+	<20110202165959.GT12743@opensource.wolfsonmicro.com>
+	<1296667999.1504.44.camel@r60e>
+Message-ID: <0D753D10438DA54287A00B027084269764CEFD473E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Feb 2011, Richard Guenther wrote:
+On Wednesday, February 02, 2011 10:33 AM, Alexander Sverdlin wrote:
+> It's a chip select. The way I've managed it in CODEC it's because Cirrus
+> boards do not have any other SPI devices. Supported by current mainline,
+> at least.
 
-> The pointer conversions already invoke undefined behavior as specified by the
-> C standard (6.3.2.3/7).
+All the EDB93xx boards also have an spi flash device.  And there are a
+couple drivers in mainline that can be used.  Depending on the actual spi
+flash device: drivers/mtd/m25p80.c, drivers/mtd/sst25l.c, or 
+/drivers/misc/eeprom/at25.c.
 
-I would say: the conversions are undefined if the pointer is 
-insufficiently aligned for any of the pointer types involved (source, 
-destination or intermediate), where the appropriate alignment for a packed 
-type is 1.  Thus, the conversion from packed to non-packed is OK iff the 
-pointer target is sufficiently aligned for the non-packed type.
+There are a couple patches floating around to add the spi flash support
+to the edb93xx platform init but nothing is merged yet.
 
-In general from a sequence of casts the compiler is permitted to deduce 
-that the pointer is sufficiently aligned for whatever type in the sequence 
-has the greatest alignment requirement (the middle-end may not have that 
-information at present, but the front end could insert some form of 
-alignment assertion if useful for optimization).  *But* that is what is 
-permitted in standards terms; it is not necessarily safe in practice.  In 
-particular, on non-strict-alignment targets such as x86 people do in 
-practice assume that unaligned accesses are OK at the C level, not just 
-the assembly level (glibc does so, for example), so it might be a bad idea 
-to assume alignment in a way that would cause that to break.
+BTW, you really should remove the or-gate's that Cirrus used with the spi
+chip-selects to logically-and the SFRM and GPIO signals.  The SFRM signal
+deasserts when the spi fifo's empty which could cause a chip-select 
+deassertion to the chip in the middle of a transfer.  For the spi flash,
+this breaks any read's from the device.  Just connect the gpio line
+directly to the chip-select of the device.
 
--- 
-Joseph S. Myers
-joseph at codesourcery.com
+Regards,
+Hartley
