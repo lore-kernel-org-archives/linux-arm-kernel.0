@@ -1,19 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 Feb 2011 10:49:43 +0000
-Subject: [PATCH] EDB93xx: Add support for CS4271 CODEC on EDB93xx boards
-In-Reply-To: <1296643688.1504.23.camel@r60e>
+Date: Wed, 2 Feb 2011 10:51:47 +0000
+Subject: [alsa-devel] [PATCH] EDB93xx: Add support for CS4271 CODEC on
+	EDB93xx boards
+In-Reply-To: <1296603653.1504.9.camel@r60e>
 References: <1296603653.1504.9.camel@r60e>
-	<0D753D10438DA54287A00B027084269764CEF59B2B@AUSP01VMBX24.collaborationhost.net>
-	<1296643688.1504.23.camel@r60e>
-Message-ID: <20110202104943.GN12743@opensource.wolfsonmicro.com>
+Message-ID: <20110202105146.GA9810@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 01:48:08PM +0300, Alexander Sverdlin wrote:
+On Wed, Feb 02, 2011 at 02:40:53AM +0300, Alexander Sverdlin wrote:
 
-> I'm really confused now, where should it be? If I will init
-> cs4271_platform_data with GPIO values, CODEC driver will manage it.
-> Otherwise CODEC driver should be rewritten without GPIO support and I
-> can add it to platform code.
+> +	err = gpio_request(gpio_nreset, spi->modalias);
+> +	if (err)
+> +		return err;
+> +	err = gpio_request(EP93XX_GPIO_LINE_EGPIO6, spi->modalias);
+> +	if (err)
+> +		return err;
+> +
+> +	gpio_direction_output(EP93XX_GPIO_LINE_EGPIO6, 1);
 
-What is the problem?
+Why is this stuff in the arch/arm code?  I'd expect driver to deal with
+all this sequencing.
