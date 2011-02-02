@@ -1,27 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 Feb 2011 12:53:27 +0000
-Subject: [PATCH] EDB93xx: Add support for CS4271 CODEC on EDB93xx boards
-In-Reply-To: <1296645167.1504.31.camel@r60e>
-References: <1296603653.1504.9.camel@r60e>
-	<0D753D10438DA54287A00B027084269764CEF59B2B@AUSP01VMBX24.collaborationhost.net>
-	<1296643688.1504.23.camel@r60e>
-	<20110202104943.GN12743@opensource.wolfsonmicro.com>
-	<1296645167.1504.31.camel@r60e>
-Message-ID: <20110202125327.GO12743@opensource.wolfsonmicro.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 02 Feb 2011 15:53:40 +0300
+Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
+References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>
+	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <4D4953D4.7080204@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 02:12:47PM +0300, Alexander Sverdlin wrote:
+Hello.
 
-> On 07 OCT 2010 you advised to integrate GPIO handling (reset and
-> SPI-enable) into CODEC code flow.
+On 02-02-2011 0:49, Michael Williamson wrote:
 
-> Now Hartley suggested to move GPIO handling to platform code. This makes
-> sense, as SPI-enable will be managed automatically, and reset is also
-> more related to platform (depending on schematics, inversion and so on).
+> Add SPI registration routines, clocks, and driver resources for
+> DA850/OMAP-L138/AM18x and DA830/OMAP-L137/AM17x platforms.
 
-What is the advantage of this?  The GPIO management has to be done
-somewhere and replicating it in every platform seems like a complete
-waste of time.  Given that one of the GPIOs is a power control it'll
-also mean that it's not possible to manage the power dynamically at
-runtime.
+> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
+[...]
+
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index beda8a4..f421f97 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -725,3 +725,99 @@ int __init da8xx_register_cpuidle(void)
+>
+>   	return platform_device_register(&da8xx_cpuidle_device);
+>   }
+> +
+> +static struct resource da8xx_spi0_resources[] = {
+> +	[0] = {
+> +		.start	= 0x01c41000,
+> +		.end	= 0x01c41fff,
+
+    BTW, I suggest to declare DA8XX_SPI0_BASE, not to deviate from the 
+tradition developed in this file...
+
+> +static struct resource da8xx_spi1_resources[] = {
+> +	[0] = {
+> +		.start	= 0x01f0e000,
+> +		.end	= 0x01f0efff,
+
+    The same about DA8XX_SPI1_BASE...
+
+WBR, Sergei
