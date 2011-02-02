@@ -1,106 +1,144 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Wed,  2 Feb 2011 13:27:21 -0600
-Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
+Date: Wed,  2 Feb 2011 13:27:22 -0600
+Subject: [PATCH v5 4/5] OMAP: mailbox: build device using
+	omap_device/omap_hwmod
 In-Reply-To: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
 References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1296674843-12718-4-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1296674843-12718-5-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+From: Felipe Contreras <felipe.contreras@gmail.com>
 
-Mailbox hwmod data for omap4.
+Remove static platform_device and resource data within
+omap mailbox driver; use the one defined in the hwmod
+database along with omap_device framework for device
+build and registration.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Add device latency functions to be used, so clock can be
+enabled and sysconfig is configured.
+
+Signed-off-by: Felipe Contreras <felipe.contreras@gmail.com>
 Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   67 ++++++++++++++++++++++++++++
- 1 files changed, 67 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/devices.c |   98 +++++++----------------------------------
+ 1 files changed, 16 insertions(+), 82 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index c2806bd..c495669 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2001,6 +2001,70 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 2c9c912..826bea0 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -142,95 +142,29 @@ static inline void omap_init_camera(void)
+ #endif
+ 
+ #if defined(CONFIG_OMAP_MBOX_FWK) || defined(CONFIG_OMAP_MBOX_FWK_MODULE)
+-
+-#define MBOX_REG_SIZE   0x120
+-
+-#ifdef CONFIG_ARCH_OMAP2
+-static struct resource omap2_mbox_resources[] = {
+-	{
+-		.start		= OMAP24XX_MAILBOX_BASE,
+-		.end		= OMAP24XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-	{
+-		.start		= INT_24XX_MAIL_U0_MPU,
+-		.flags		= IORESOURCE_IRQ,
+-		.name		= "dsp",
+-	},
+-	{
+-		.start		= INT_24XX_MAIL_U3_MPU,
+-		.flags		= IORESOURCE_IRQ,
+-		.name		= "iva",
+-	},
+-};
+-static int omap2_mbox_resources_sz = ARRAY_SIZE(omap2_mbox_resources);
+-#else
+-#define omap2_mbox_resources		NULL
+-#define omap2_mbox_resources_sz		0
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP3
+-static struct resource omap3_mbox_resources[] = {
+-	{
+-		.start		= OMAP34XX_MAILBOX_BASE,
+-		.end		= OMAP34XX_MAILBOX_BASE + MBOX_REG_SIZE - 1,
+-		.flags		= IORESOURCE_MEM,
+-	},
+-	{
+-		.start		= INT_24XX_MAIL_U0_MPU,
+-		.flags		= IORESOURCE_IRQ,
+-		.name		= "dsp",
+-	},
+-};
+-static int omap3_mbox_resources_sz = ARRAY_SIZE(omap3_mbox_resources);
+-#else
+-#define omap3_mbox_resources		NULL
+-#define omap3_mbox_resources_sz		0
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP4
+-
+-#define OMAP4_MBOX_REG_SIZE	0x130
+-static struct resource omap4_mbox_resources[] = {
+-	{
+-		.start          = OMAP44XX_MAILBOX_BASE,
+-		.end            = OMAP44XX_MAILBOX_BASE +
+-					OMAP4_MBOX_REG_SIZE - 1,
+-		.flags          = IORESOURCE_MEM,
+-	},
+-	{
+-		.start          = OMAP44XX_IRQ_MAIL_U0,
+-		.flags          = IORESOURCE_IRQ,
+-		.name		= "mbox",
++static struct omap_device_pm_latency mbox_latencies[] = {
++	[0] = {
++		.activate_func = omap_device_enable_hwmods,
++		.deactivate_func = omap_device_idle_hwmods,
++		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+ 	},
  };
+-static int omap4_mbox_resources_sz = ARRAY_SIZE(omap4_mbox_resources);
+-#else
+-#define omap4_mbox_resources		NULL
+-#define omap4_mbox_resources_sz		0
+-#endif
+-
+-static struct platform_device mbox_device = {
+-	.name		= "omap-mailbox",
+-	.id		= -1,
+-};
  
-+/*
-+ * 'mailbox' class
-+ * mailbox module allowing communication between the on-chip processors
-+ * using a queued mailbox-interrupt mechanism.
-+ */
+ static inline void omap_init_mbox(void)
+ {
+-	if (cpu_is_omap24xx()) {
+-		mbox_device.resource = omap2_mbox_resources;
+-		mbox_device.num_resources = omap2_mbox_resources_sz;
+-	} else if (cpu_is_omap34xx()) {
+-		mbox_device.resource = omap3_mbox_resources;
+-		mbox_device.num_resources = omap3_mbox_resources_sz;
+-	} else if (cpu_is_omap44xx()) {
+-		mbox_device.resource = omap4_mbox_resources;
+-		mbox_device.num_resources = omap4_mbox_resources_sz;
+-	} else {
+-		pr_err("%s: platform not supported\n", __func__);
++	struct omap_hwmod *oh;
++	struct omap_device *od;
 +
-+static struct omap_hwmod_class_sysconfig omap44xx_mailbox_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type2,
-+};
++	oh = omap_hwmod_lookup("mailbox");
++	if (!oh) {
++		pr_err("%s: unable to find hwmod\n", __func__);
+ 		return;
+ 	}
+-	platform_device_register(&mbox_device);
 +
-+static struct omap_hwmod_class omap44xx_mailbox_hwmod_class = {
-+	.name = "mailbox",
-+	.sysc = &omap44xx_mailbox_sysc,
-+};
-+
-+/* mailbox */
-+static struct omap_hwmod omap44xx_mailbox_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
-+	{ .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_mailbox_addrs[] = {
-+	{
-+		.pa_start	= 0x4a0f4000,
-+		.pa_end		= 0x4a0f41ff,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+};
-+
-+/* l4_cfg -> mailbox */
-+static struct omap_hwmod_ocp_if omap44xx_l4_cfg__mailbox = {
-+	.master		= &omap44xx_l4_cfg_hwmod,
-+	.slave		= &omap44xx_mailbox_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_mailbox_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_mailbox_addrs),
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
-+/* mailbox slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_mailbox_slaves[] = {
-+	&omap44xx_l4_cfg__mailbox,
-+};
-+
-+static struct omap_hwmod omap44xx_mailbox_hwmod = {
-+	.name		= "mailbox",
-+	.class		= &omap44xx_mailbox_hwmod_class,
-+	.mpu_irqs	= omap44xx_mailbox_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mailbox_irqs),
-+	.prcm		= {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_L4CFG_MAILBOX_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_mailbox_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_mailbox_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
- static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 
- 	/* dmm class */
-@@ -2068,6 +2132,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_wd_timer2_hwmod,
- 	&omap44xx_wd_timer3_hwmod,
- 
-+	/* mailbox class */
-+	&omap44xx_mailbox_hwmod,
-+
- 	NULL,
- };
- 
++	od = omap_device_build("omap-mailbox", -1, oh, NULL, 0,
++				mbox_latencies, ARRAY_SIZE(mbox_latencies), 0);
++	WARN(IS_ERR(od), "%s: could not build device, err %ld\n",
++						__func__, PTR_ERR(od));
+ }
+ #else
+ static inline void omap_init_mbox(void) { }
 -- 
 1.7.1
