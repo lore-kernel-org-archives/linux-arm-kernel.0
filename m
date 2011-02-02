@@ -1,39 +1,76 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 02 Feb 2011 15:23:50 -0800 (PST)
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <yw1xei7qm3vy.fsf@unicorn.mansr.com>
-References: <20110202163702.GA23240@n2100.arm.linux.org.uk>
-	<20110202.133831.193702414.davem@davemloft.net>
-	<yw1xei7qm3vy.fsf@unicorn.mansr.com>
-Message-ID: <20110202.152350.28800670.davem@davemloft.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 3 Feb 2011 00:59:08 +0100
+Subject: [PATCH 3/6] PalmTC: switch to using gpio-vbus transceiver
+In-Reply-To: <1296666003-31647-4-git-send-email-dbaryshkov@gmail.com>
+References: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
+	<1296666003-31647-4-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <201102030059.08589.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: M?ns Rullg?rd <mans@mansr.com>
-Date: Wed, 02 Feb 2011 23:08:01 +0000
-
-> David Miller <davem@davemloft.net> writes:
+On Wednesday 02 February 2011 18:00:00 Dmitry Eremin-Solenikov wrote:
+> Switch from handling gpio-vbus in pxa25x_udc to using standard gpio-vbus
+> tranceiver.
 > 
->> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
->> Date: Wed, 2 Feb 2011 16:37:02 +0000
->>
->>> 1. there's no way to tell GCC that the inline assembly is a load
->>>    instruction and therefore it needs to schedule the following
->>>    instructions appropriately.
->>
->> Just add a dummy '"m" (pointer)' asm input argument to the inline asm
->> statement.  Just make sure "typeof(pointer)" has a size matching the
->> size of the load your are performing.
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Cc: Marek Vasut <marek.vasut@gmail.com>
+
+Looks good
+
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+> ---
+>  arch/arm/mach-pxa/palmtc.c |   14 ++++++++++++--
+>  1 files changed, 12 insertions(+), 2 deletions(-)
 > 
-> That should be "m"(*pointer).
-
-Right, thanks for the correction.
-
->> But you really need that memory clobber there whether you like it or
->> not, see above.
+> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
+> index 2131d58..fcc4490 100644
+> --- a/arch/arm/mach-pxa/palmtc.c
+> +++ b/arch/arm/mach-pxa/palmtc.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/power_supply.h>
+>  #include <linux/gpio_keys.h>
+>  #include <linux/mtd/physmap.h>
+> +#include <linux/usb/gpio_vbus.h>
 > 
-> I don't know of any device where the side-effects are not explicitly
-> indicated by other means in the code triggering them, so it probably
-> is safe without the clobber as Russel says.
-
-You're probably right.
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/arch.h>
+> @@ -294,12 +295,21 @@ static struct platform_device palmtc_keyboard = {
+>  /*************************************************************************
+> ***** * UDC
+>  
+> **************************************************************************
+> ****/ -static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
+> +static struct gpio_vbus_mach_info palmtc_udc_info = {
+>  	.gpio_vbus		= GPIO_NR_PALMTC_USB_DETECT_N,
+>  	.gpio_vbus_inverted	= 1,
+>  	.gpio_pullup		= GPIO_NR_PALMTC_USB_POWER,
+>  };
+> 
+> +static struct platform_device palmtc_gpio_vbus = {
+> +	.name	= "gpio-vbus",
+> +	.id	= -1,
+> +	.dev	= {
+> +		.platform_data	= &palmtc_udc_info,
+> +	},
+> +};
+> +
+> +
+>  /*************************************************************************
+> ***** * Touchscreen / Battery / GPIO-extender
+>  
+> **************************************************************************
+> ****/ @@ -391,6 +401,7 @@ static struct platform_device *devices[]
+> __initdata = { &palmtc_keyboard,
+>  	&palmtc_pxa_keys,
+>  	&palmtc_flash,
+> +	&palmtc_gpio_vbus,
+>  };
+> 
+>  static void __init palmtc_init(void)
+> @@ -404,7 +415,6 @@ static void __init palmtc_init(void)
+> 
+>  	set_pxa_fb_info(&palmtc_lcd_screen);
+>  	pxa_set_mci_info(&palmtc_mci_platform_data);
+> -	pxa_set_udc_info(&palmtc_udc_info);
+>  	pxa_set_ac97_info(NULL);
+>  	pxa_set_ficp_info(&palmtc_ficp_platform_data);
