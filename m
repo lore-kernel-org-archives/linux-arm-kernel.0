@@ -1,419 +1,153 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed,  2 Feb 2011 17:52:14 +0530
-Subject: [PATCH v6 5/6] OMAP: devices: Modify McSPI device to adapt to hwmod
-	framework
-In-Reply-To: <1296649335-31756-1-git-send-email-govindraj.raja@ti.com>
-References: <1296649335-31756-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1296649335-31756-6-git-send-email-govindraj.raja@ti.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed,  2 Feb 2011 12:03:28 +0000
+Subject: [PATCHv4 09/13] picoxcell: add support for pm
+In-Reply-To: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
+References: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <1296648212-5284-10-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+PC3X3 devices support clock gating so provide support for PM on these
+devices. We only support standby modes as we can't gate the ARM clock or
+memory controllers.
 
-Cleans up all base address definitions for omap_mcspi
-and adapts the device registration and driver to hwmod framework.
-Changes involves:
-1) Removing all base address macro defines.
-2) Using omap-device layer to register device and utilizing data from
-   hwmod data file for base address, dma channel number, Irq_number,
-   device attribute(number of chipselect).
-3) Appending base address with pdata reg_offset for omap4 boards.
-   For omap4 all regs used in driver deviate with reg_offset_macros
-   defined with an value of 0x100. So pass this offset through pdata
-   and append the same to base address retrieved from hwmod data file
-   and we are not mapping *_HL_* regs which are not used in driver.
+v2:
+	- move to an initcall and cleanup to remove uses of ebi and tzpc
+	  clks.
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Reviewed-by: Partha Basak <p-basak2@ti.com>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-omap2/devices.c           |  187 +++++++------------------------
- arch/arm/plat-omap/include/plat/mcspi.h |    3 +
- drivers/spi/omap2_mcspi.c               |  110 +++++--------------
- 3 files changed, 71 insertions(+), 229 deletions(-)
+ arch/arm/mach-picoxcell/Makefile |    1 +
+ arch/arm/mach-picoxcell/pm.c     |  112 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 113 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-picoxcell/pm.c
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 2c9c912..4bd3eae 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/err.h>
-+#include <linux/slab.h>
- 
- #include <mach/hardware.h>
- #include <mach/irqs.h>
-@@ -279,163 +280,55 @@ static inline void omap_init_audio(void) {}
- 
- #include <plat/mcspi.h>
- 
--#define OMAP2_MCSPI1_BASE		0x48098000
--#define OMAP2_MCSPI2_BASE		0x4809a000
--#define OMAP2_MCSPI3_BASE		0x480b8000
--#define OMAP2_MCSPI4_BASE		0x480ba000
--
--#define OMAP4_MCSPI1_BASE		0x48098100
--#define OMAP4_MCSPI2_BASE		0x4809a100
--#define OMAP4_MCSPI3_BASE		0x480b8100
--#define OMAP4_MCSPI4_BASE		0x480ba100
--
--static struct omap2_mcspi_platform_config omap2_mcspi1_config = {
--	.num_cs		= 4,
--};
--
--static struct resource omap2_mcspi1_resources[] = {
--	{
--		.start		= OMAP2_MCSPI1_BASE,
--		.end		= OMAP2_MCSPI1_BASE + 0xff,
--		.flags		= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device omap2_mcspi1 = {
--	.name		= "omap2_mcspi",
--	.id		= 1,
--	.num_resources	= ARRAY_SIZE(omap2_mcspi1_resources),
--	.resource	= omap2_mcspi1_resources,
--	.dev		= {
--		.platform_data = &omap2_mcspi1_config,
--	},
--};
--
--static struct omap2_mcspi_platform_config omap2_mcspi2_config = {
--	.num_cs		= 2,
--};
--
--static struct resource omap2_mcspi2_resources[] = {
--	{
--		.start		= OMAP2_MCSPI2_BASE,
--		.end		= OMAP2_MCSPI2_BASE + 0xff,
--		.flags		= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device omap2_mcspi2 = {
--	.name		= "omap2_mcspi",
--	.id		= 2,
--	.num_resources	= ARRAY_SIZE(omap2_mcspi2_resources),
--	.resource	= omap2_mcspi2_resources,
--	.dev		= {
--		.platform_data = &omap2_mcspi2_config,
--	},
--};
--
--#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
--	defined(CONFIG_ARCH_OMAP4)
--static struct omap2_mcspi_platform_config omap2_mcspi3_config = {
--	.num_cs		= 2,
--};
--
--static struct resource omap2_mcspi3_resources[] = {
--	{
--	.start		= OMAP2_MCSPI3_BASE,
--	.end		= OMAP2_MCSPI3_BASE + 0xff,
--	.flags		= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device omap2_mcspi3 = {
--	.name		= "omap2_mcspi",
--	.id		= 3,
--	.num_resources	= ARRAY_SIZE(omap2_mcspi3_resources),
--	.resource	= omap2_mcspi3_resources,
--	.dev		= {
--		.platform_data = &omap2_mcspi3_config,
--	},
--};
--#endif
--
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
--static struct omap2_mcspi_platform_config omap2_mcspi4_config = {
--	.num_cs		= 1,
--};
--
--static struct resource omap2_mcspi4_resources[] = {
--	{
--		.start		= OMAP2_MCSPI4_BASE,
--		.end		= OMAP2_MCSPI4_BASE + 0xff,
--		.flags		= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device omap2_mcspi4 = {
--	.name		= "omap2_mcspi",
--	.id		= 4,
--	.num_resources	= ARRAY_SIZE(omap2_mcspi4_resources),
--	.resource	= omap2_mcspi4_resources,
--	.dev		= {
--		.platform_data = &omap2_mcspi4_config,
-+struct omap_device_pm_latency omap_mcspi_latency[] = {
-+	[0] = {
-+		.deactivate_func = omap_device_idle_hwmods,
-+		.activate_func   = omap_device_enable_hwmods,
-+		.flags		 = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
- 	},
- };
--#endif
- 
--#ifdef CONFIG_ARCH_OMAP4
--static inline void omap4_mcspi_fixup(void)
-+static int omap_mcspi_init(struct omap_hwmod *oh, void *unused)
- {
--	omap2_mcspi1_resources[0].start	= OMAP4_MCSPI1_BASE;
--	omap2_mcspi1_resources[0].end	= OMAP4_MCSPI1_BASE + 0xff;
--	omap2_mcspi2_resources[0].start	= OMAP4_MCSPI2_BASE;
--	omap2_mcspi2_resources[0].end	= OMAP4_MCSPI2_BASE + 0xff;
--	omap2_mcspi3_resources[0].start	= OMAP4_MCSPI3_BASE;
--	omap2_mcspi3_resources[0].end	= OMAP4_MCSPI3_BASE + 0xff;
--	omap2_mcspi4_resources[0].start	= OMAP4_MCSPI4_BASE;
--	omap2_mcspi4_resources[0].end	= OMAP4_MCSPI4_BASE + 0xff;
--}
--#else
--static inline void omap4_mcspi_fixup(void)
--{
--}
--#endif
-+	struct omap_device *od;
-+	char *name = "omap2_mcspi";
-+	struct omap2_mcspi_platform_config *pdata;
-+	static int spi_num;
-+	struct omap2_mcspi_dev_attr *mcspi_attrib = oh->dev_attr;
+diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
+index c0bbb25..f122a84 100644
+--- a/arch/arm/mach-picoxcell/Makefile
++++ b/arch/arm/mach-picoxcell/Makefile
+@@ -5,3 +5,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
+ 				   clk.o \
+ 				   devices.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
++obj-$(CONFIG_PM)		+= pm.o
+diff --git a/arch/arm/mach-picoxcell/pm.c b/arch/arm/mach-picoxcell/pm.c
+new file mode 100644
+index 0000000..489bba4
+--- /dev/null
++++ b/arch/arm/mach-picoxcell/pm.c
+@@ -0,0 +1,112 @@
++/*
++ * Copyright (c) 2010 Picochip Ltd., Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * All enquiries to support at picochip.com
++ */
++#define pr_fmt(fmt) "picoxcell_pm: " fmt
++#include <linux/init.h>
++#include <linux/suspend.h>
 +
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		pr_err("Memory allocation for McSPI device failed\n");
-+		return -ENOMEM;
-+	}
- 
--#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
--	defined(CONFIG_ARCH_OMAP4)
--static inline void omap2_mcspi3_init(void)
--{
--	platform_device_register(&omap2_mcspi3);
--}
--#else
--static inline void omap2_mcspi3_init(void)
--{
--}
--#endif
-+	pdata->num_cs = mcspi_attrib->num_chipselect;
-+	switch (oh->class->rev) {
-+	case OMAP2_MCSPI_REV:
-+	case OMAP3_MCSPI_REV:
-+			pdata->regs_offset = 0;
-+			break;
-+	case OMAP4_MCSPI_REV:
-+			pdata->regs_offset = OMAP4_MCSPI_REG_OFFSET;
-+			break;
-+	default:
-+			pr_err("Invalid McSPI Revision value\n");
-+			return -EINVAL;
-+	}
- 
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
--static inline void omap2_mcspi4_init(void)
--{
--	platform_device_register(&omap2_mcspi4);
--}
--#else
--static inline void omap2_mcspi4_init(void)
--{
-+	spi_num++;
-+	od = omap_device_build(name, spi_num, oh, pdata,
-+				sizeof(*pdata),	omap_mcspi_latency,
-+				ARRAY_SIZE(omap_mcspi_latency), 0);
-+	WARN(IS_ERR(od), "Cant build omap_device for %s:%s\n",
-+				name, oh->name);
-+	kfree(pdata);
++#include <mach/hardware.h>
++
++#include "picoxcell_core.h"
++#include "soc.h"
++
++static int picoxcell_pm_valid(suspend_state_t state)
++{
++	/*
++	 * We only support standby mode. There is no point in doing anything
++	 * for PM_SUSPEND_MEM as we can't power down the core or the memory
++	 * interfaces.
++	 *
++	 * When we enter standby, the only thing we can do is power down some
++	 * of the peripherals.
++	 */
++	return (state == PM_SUSPEND_ON || state == PM_SUSPEND_STANDBY);
++}
++
++static void wait_for_event(void)
++{
++	pr_debug("entering sleep - wait for interrupt\n");
++	/*
++	 * Drain the writebuffer and wait for an interrupt.
++	 */
++	dsb();
++	asm volatile("mcr   p15, 0, %0, c7, c0, 4\n" : : "r"(0));
++}
++
++#ifdef CONFIG_PC3X3_STOP_WDT_IN_SUSPEND
++static inline void picoxcell_pm_stop_wdt(void)
++{
++	syscfg_update(1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX,
++		      1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX);
++}
++
++static inline int picoxcell_pm_restore_wdt(void)
++{
++	syscfg_update(1 << AXI2CFG_SYS_CONFIG_WDG_PAUSE_IDX, 0);
++
 +	return 0;
- }
--#endif
- 
- static void omap_init_mcspi(void)
- {
--	if (cpu_is_omap44xx())
--		omap4_mcspi_fixup();
--
--	platform_device_register(&omap2_mcspi1);
--	platform_device_register(&omap2_mcspi2);
--
--	if (cpu_is_omap2430() || cpu_is_omap343x() || cpu_is_omap44xx())
--		omap2_mcspi3_init();
--
--	if (cpu_is_omap343x() || cpu_is_omap44xx())
--		omap2_mcspi4_init();
-+	omap_hwmod_for_each_by_class("mcspi", omap_mcspi_init, NULL);
- }
- 
- #else
-diff --git a/arch/arm/plat-omap/include/plat/mcspi.h b/arch/arm/plat-omap/include/plat/mcspi.h
-index 560e266..3d51b18 100644
---- a/arch/arm/plat-omap/include/plat/mcspi.h
-+++ b/arch/arm/plat-omap/include/plat/mcspi.h
-@@ -5,8 +5,11 @@
- #define OMAP3_MCSPI_REV 1
- #define OMAP4_MCSPI_REV 2
- 
-+#define OMAP4_MCSPI_REG_OFFSET 0x100
++}
++#else /* CONFIG_PC3X3_STOP_WDT_IN_SUSPEND */
++static inline void picoxcell_pm_stop_wdt(void) {}
 +
- struct omap2_mcspi_platform_config {
- 	unsigned short	num_cs;
-+	unsigned int regs_offset;
- };
- 
- struct omap2_mcspi_dev_attr {
-diff --git a/drivers/spi/omap2_mcspi.c b/drivers/spi/omap2_mcspi.c
-index abb1ffb..38b6f66 100644
---- a/drivers/spi/omap2_mcspi.c
-+++ b/drivers/spi/omap2_mcspi.c
-@@ -1087,91 +1087,14 @@ static int __init omap2_mcspi_reset(struct omap2_mcspi *mcspi)
- 	return 0;
- }
- 
--static u8 __initdata spi1_rxdma_id [] = {
--	OMAP24XX_DMA_SPI1_RX0,
--	OMAP24XX_DMA_SPI1_RX1,
--	OMAP24XX_DMA_SPI1_RX2,
--	OMAP24XX_DMA_SPI1_RX3,
--};
--
--static u8 __initdata spi1_txdma_id [] = {
--	OMAP24XX_DMA_SPI1_TX0,
--	OMAP24XX_DMA_SPI1_TX1,
--	OMAP24XX_DMA_SPI1_TX2,
--	OMAP24XX_DMA_SPI1_TX3,
--};
--
--static u8 __initdata spi2_rxdma_id[] = {
--	OMAP24XX_DMA_SPI2_RX0,
--	OMAP24XX_DMA_SPI2_RX1,
--};
--
--static u8 __initdata spi2_txdma_id[] = {
--	OMAP24XX_DMA_SPI2_TX0,
--	OMAP24XX_DMA_SPI2_TX1,
--};
--
--#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) \
--	|| defined(CONFIG_ARCH_OMAP4)
--static u8 __initdata spi3_rxdma_id[] = {
--	OMAP24XX_DMA_SPI3_RX0,
--	OMAP24XX_DMA_SPI3_RX1,
--};
--
--static u8 __initdata spi3_txdma_id[] = {
--	OMAP24XX_DMA_SPI3_TX0,
--	OMAP24XX_DMA_SPI3_TX1,
--};
--#endif
--
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
--static u8 __initdata spi4_rxdma_id[] = {
--	OMAP34XX_DMA_SPI4_RX0,
--};
--
--static u8 __initdata spi4_txdma_id[] = {
--	OMAP34XX_DMA_SPI4_TX0,
--};
--#endif
- 
- static int __init omap2_mcspi_probe(struct platform_device *pdev)
- {
- 	struct spi_master	*master;
-+	struct omap2_mcspi_platform_config *pdata = pdev->dev.platform_data;
- 	struct omap2_mcspi	*mcspi;
- 	struct resource		*r;
- 	int			status = 0, i;
--	const u8		*rxdma_id, *txdma_id;
--	unsigned		num_chipselect;
--
--	switch (pdev->id) {
--	case 1:
--		rxdma_id = spi1_rxdma_id;
--		txdma_id = spi1_txdma_id;
--		num_chipselect = 4;
--		break;
--	case 2:
--		rxdma_id = spi2_rxdma_id;
--		txdma_id = spi2_txdma_id;
--		num_chipselect = 2;
--		break;
--#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) \
--	|| defined(CONFIG_ARCH_OMAP4)
--	case 3:
--		rxdma_id = spi3_rxdma_id;
--		txdma_id = spi3_txdma_id;
--		num_chipselect = 2;
--		break;
--#endif
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
--	case 4:
--		rxdma_id = spi4_rxdma_id;
--		txdma_id = spi4_txdma_id;
--		num_chipselect = 1;
--		break;
--#endif
--	default:
--		return -EINVAL;
--	}
- 
- 	master = spi_alloc_master(&pdev->dev, sizeof *mcspi);
- 	if (master == NULL) {
-@@ -1188,7 +1111,7 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
- 	master->setup = omap2_mcspi_setup;
- 	master->transfer = omap2_mcspi_transfer;
- 	master->cleanup = omap2_mcspi_cleanup;
--	master->num_chipselect = num_chipselect;
-+	master->num_chipselect = pdata->num_cs;
- 
- 	dev_set_drvdata(&pdev->dev, master);
- 
-@@ -1206,6 +1129,8 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
- 		goto err1;
- 	}
- 
-+	r->start += pdata->regs_offset;
-+	r->end += pdata->regs_offset;
- 	mcspi->phys = r->start;
- 	mcspi->base = ioremap(r->start, r->end - r->start + 1);
- 	if (!mcspi->base) {
-@@ -1240,11 +1165,32 @@ static int __init omap2_mcspi_probe(struct platform_device *pdev)
- 	if (mcspi->dma_channels == NULL)
- 		goto err3;
- 
--	for (i = 0; i < num_chipselect; i++) {
-+	for (i = 0; i < master->num_chipselect; i++) {
-+		char dma_ch_name[14];
-+		struct resource *dma_res;
++static inline int picoxcell_pm_restore_wdt(void)
++{
++	return 0;
++}
++#endif /* CONFIG_PC3X3_STOP_WDT_IN_SUSPEND */
 +
-+		sprintf(dma_ch_name, "rx%d", i);
-+		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
-+							dma_ch_name);
-+		if (!dma_res) {
-+			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
-+			status = -ENODEV;
-+			break;
-+		}
++static int picoxcell_pm_enter(suspend_state_t state)
++{
++	int err = 0;
 +
- 		mcspi->dma_channels[i].dma_rx_channel = -1;
--		mcspi->dma_channels[i].dma_rx_sync_dev = rxdma_id[i];
-+		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
-+		sprintf(dma_ch_name, "tx%d", i);
-+		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
-+							dma_ch_name);
-+		if (!dma_res) {
-+			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
-+			status = -ENODEV;
-+			break;
-+		}
++	pr_debug("entering suspend state\n");
 +
- 		mcspi->dma_channels[i].dma_tx_channel = -1;
--		mcspi->dma_channels[i].dma_tx_sync_dev = txdma_id[i];
-+		mcspi->dma_channels[i].dma_tx_sync_dev = dma_res->start;
- 	}
- 
- 	if (omap2_mcspi_reset(mcspi) < 0)
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		/*
++		 * Disable any clocks that aren't controlled by drivers but
++		 * need to be enabled. This includes the EBI, TZPC etc.
++		 */
++		picoxcell_pm_stop_wdt();
++		wait_for_event();
++		/*
++		 * Reenable any clcoks that aren't controlled by drivers.
++		 */
++		err = picoxcell_pm_restore_wdt();
++
++		break;
++
++	case PM_SUSPEND_ON:
++		wait_for_event();
++		break;
++
++	default:
++		err = -EOPNOTSUPP;
++	}
++
++	pr_debug("resumed\n");
++
++	return 0;
++}
++
++static struct platform_suspend_ops picoxcell_pm_ops = {
++	.valid	    = picoxcell_pm_valid,
++	.enter	    = picoxcell_pm_enter,
++};
++
++static int __init picoxcell_pm_init(void)
++{
++	if (!picoxcell_has_feature(PICOXCELL_FEATURE_PM))
++		return 0;
++
++	suspend_set_ops(&picoxcell_pm_ops);
++
++	return 0;
++}
++device_initcall(picoxcell_pm_init);
 -- 
-1.7.1
+1.7.3.4
