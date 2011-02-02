@@ -1,173 +1,189 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed,  2 Feb 2011 19:59:58 +0300
-Subject: [PATCH 1/6] eseries: switch to using gpio-vbus transceiver
+Date: Wed,  2 Feb 2011 20:00:02 +0300
+Subject: [PATCH 5/6] pxa25x_udc: stop handling gpio-vbus internally
 In-Reply-To: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
 References: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1296666003-31647-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1296666003-31647-6-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch from handling gpio-vbus in pxa25x_udc to using standard gpio-vbus
-tranceiver.
+Stop handling gpio-vbus internally. All boards that depended on this
+functionality have been converted to use gpio-vbus tranceiver. All
+new boards can use it right from the start. Drop unused code.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: Ian Molton <spyro@f2s.com>
 ---
- arch/arm/mach-pxa/eseries.c |   34 ++++++++++++++++++++++++++--------
- 1 files changed, 26 insertions(+), 8 deletions(-)
+ drivers/usb/gadget/pxa25x_udc.c |   76 ++++-----------------------------------
+ 1 files changed, 7 insertions(+), 69 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/eseries.c b/arch/arm/mach-pxa/eseries.c
-index b25690c..2b30be6 100644
---- a/arch/arm/mach-pxa/eseries.c
-+++ b/arch/arm/mach-pxa/eseries.c
-@@ -20,6 +20,7 @@
- #include <linux/mfd/t7l66xb.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/usb/gpio_vbus.h>
+diff --git a/drivers/usb/gadget/pxa25x_udc.c b/drivers/usb/gadget/pxa25x_udc.c
+index b37f92c..444b60a 100644
+--- a/drivers/usb/gadget/pxa25x_udc.c
++++ b/drivers/usb/gadget/pxa25x_udc.c
+@@ -139,24 +139,6 @@ static const char ep0name [] = "ep0";
+ static void pxa25x_ep_fifo_flush (struct usb_ep *ep);
+ static void nuke (struct pxa25x_ep *, int status);
  
- #include <video/w100fb.h>
+-/* one GPIO should be used to detect VBUS from the host */
+-static int is_vbus_present(void)
+-{
+-	struct pxa2xx_udc_mach_info		*mach = the_controller->mach;
+-
+-	if (gpio_is_valid(mach->gpio_vbus)) {
+-		int value = gpio_get_value(mach->gpio_vbus);
+-
+-		if (mach->gpio_vbus_inverted)
+-			return !value;
+-		else
+-			return !!value;
+-	}
+-	if (mach->udc_is_connected)
+-		return mach->udc_is_connected();
+-	return 1;
+-}
+-
+ /* one GPIO should control a D+ pullup, so host sees this device (or not) */
+ static void pullup_off(void)
+ {
+@@ -1055,7 +1037,7 @@ udc_seq_show(struct seq_file *m, void *_d)
+ 		"%s version: %s\nGadget driver: %s\nHost %s\n\n",
+ 		driver_name, DRIVER_VERSION SIZE_STR "(pio)",
+ 		dev->driver ? dev->driver->driver.name : "(none)",
+-		is_vbus_present() ? "full speed" : "disconnected");
++		dev->gadget.speed == USB_SPEED_FULL ? "full speed" : "disconnected");
  
-@@ -51,12 +52,20 @@ void __init eseries_fixup(struct machine_desc *desc,
- 		mi->bank[0].size = (64*1024*1024);
- }
+ 	/* registers for device and ep0 */
+ 	seq_printf(m,
+@@ -1094,7 +1076,7 @@ udc_seq_show(struct seq_file *m, void *_d)
+ 			(tmp & UDCCFR_ACM) ? " acm" : "");
+ 	}
  
--struct pxa2xx_udc_mach_info e7xx_udc_mach_info = {
-+struct gpio_vbus_mach_info e7xx_udc_info = {
- 	.gpio_vbus   = GPIO_E7XX_USB_DISC,
- 	.gpio_pullup = GPIO_E7XX_USB_PULLUP,
- 	.gpio_pullup_inverted = 1
- };
+-	if (!is_vbus_present() || !dev->driver)
++	if (dev->gadget.speed != USB_SPEED_FULL || !dev->driver)
+ 		goto done;
  
-+static struct platform_device e7xx_gpio_vbus = {
-+	.name	= "gpio-vbus",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &e7xx_udc_info,
-+	},
-+};
-+
- struct pxaficp_platform_data e7xx_ficp_platform_data = {
- 	.gpio_pwdown		= GPIO_E7XX_IR_OFF,
- 	.transceiver_cap	= IR_SIRMODE | IR_OFF,
-@@ -165,6 +174,7 @@ static struct platform_device e330_tc6387xb_device = {
+ 	seq_printf(m, "ep0 IN %lu/%lu, OUT %lu/%lu\nirqs %lu\n\n",
+@@ -1435,14 +1417,6 @@ lubbock_vbus_irq(int irq, void *_dev)
  
- static struct platform_device *e330_devices[] __initdata = {
- 	&e330_tc6387xb_device,
-+	&e7xx_gpio_vbus,
- };
+ #endif
  
- static void __init e330_init(void)
-@@ -175,7 +185,6 @@ static void __init e330_init(void)
- 	eseries_register_clks();
- 	eseries_get_tmio_gpios();
- 	platform_add_devices(ARRAY_AND_SIZE(e330_devices));
--	pxa_set_udc_info(&e7xx_udc_mach_info);
- }
+-static irqreturn_t udc_vbus_irq(int irq, void *_dev)
+-{
+-	struct pxa25x_udc	*dev = _dev;
+-
+-	pxa25x_udc_vbus_session(&dev->gadget, is_vbus_present());
+-	return IRQ_HANDLED;
+-}
+-
  
- MACHINE_START(E330, "Toshiba e330")
-@@ -214,6 +223,7 @@ static struct platform_device e350_t7l66xb_device = {
+ /*-------------------------------------------------------------------------*/
  
- static struct platform_device *e350_devices[] __initdata = {
- 	&e350_t7l66xb_device,
-+	&e7xx_gpio_vbus,
- };
+@@ -1766,12 +1740,9 @@ pxa25x_udc_irq(int irq, void *_dev)
+ 		if (unlikely(udccr & UDCCR_SUSIR)) {
+ 			udc_ack_int_UDCCR(UDCCR_SUSIR);
+ 			handled = 1;
+-			DBG(DBG_VERBOSE, "USB suspend%s\n", is_vbus_present()
+-				? "" : "+disconnect");
++			DBG(DBG_VERBOSE, "USB suspend\n");
  
- static void __init e350_init(void)
-@@ -224,7 +234,6 @@ static void __init e350_init(void)
- 	eseries_register_clks();
- 	eseries_get_tmio_gpios();
- 	platform_add_devices(ARRAY_AND_SIZE(e350_devices));
--	pxa_set_udc_info(&e7xx_udc_mach_info);
- }
+-			if (!is_vbus_present())
+-				stop_activity(dev, dev->driver);
+-			else if (dev->gadget.speed != USB_SPEED_UNKNOWN
++			if (dev->gadget.speed != USB_SPEED_UNKNOWN
+ 					&& dev->driver
+ 					&& dev->driver->suspend)
+ 				dev->driver->suspend(&dev->gadget);
+@@ -1786,8 +1757,7 @@ pxa25x_udc_irq(int irq, void *_dev)
  
- MACHINE_START(E350, "Toshiba e350")
-@@ -333,6 +342,7 @@ static struct platform_device e400_t7l66xb_device = {
+ 			if (dev->gadget.speed != USB_SPEED_UNKNOWN
+ 					&& dev->driver
+-					&& dev->driver->resume
+-					&& is_vbus_present())
++					&& dev->driver->resume)
+ 				dev->driver->resume(&dev->gadget);
+ 		}
  
- static struct platform_device *e400_devices[] __initdata = {
- 	&e400_t7l66xb_device,
-+	&e7xx_gpio_vbus,
- };
+@@ -2137,7 +2107,7 @@ static struct pxa25x_udc memory = {
+ static int __init pxa25x_udc_probe(struct platform_device *pdev)
+ {
+ 	struct pxa25x_udc *dev = &memory;
+-	int retval, vbus_irq, irq;
++	int retval, irq;
+ 	u32 chiprev;
  
- static void __init e400_init(void)
-@@ -346,7 +356,6 @@ static void __init e400_init(void)
- 	eseries_get_tmio_gpios();
- 	set_pxa_fb_info(&e400_pxafb_mach_info);
- 	platform_add_devices(ARRAY_AND_SIZE(e400_devices));
--	pxa_set_udc_info(&e7xx_udc_mach_info);
- }
+ 	/* insist on Intel/ARM/XScale */
+@@ -2199,19 +2169,6 @@ static int __init pxa25x_udc_probe(struct platform_device *pdev)
  
- MACHINE_START(E400, "Toshiba e400")
-@@ -519,6 +528,7 @@ static struct platform_device e740_t7l66xb_device = {
- static struct platform_device *e740_devices[] __initdata = {
- 	&e740_fb_device,
- 	&e740_t7l66xb_device,
-+	&e7xx_gpio_vbus,
- };
+ 	dev->transceiver = otg_get_transceiver();
  
- static void __init e740_init(void)
-@@ -532,7 +542,6 @@ static void __init e740_init(void)
- 			"UDCCLK", &pxa25x_device_udc.dev),
- 	eseries_get_tmio_gpios();
- 	platform_add_devices(ARRAY_AND_SIZE(e740_devices));
--	pxa_set_udc_info(&e7xx_udc_mach_info);
- 	pxa_set_ac97_info(NULL);
- 	pxa_set_ficp_info(&e7xx_ficp_platform_data);
- }
-@@ -711,6 +720,7 @@ static struct platform_device e750_tc6393xb_device = {
- static struct platform_device *e750_devices[] __initdata = {
- 	&e750_fb_device,
- 	&e750_tc6393xb_device,
-+	&e7xx_gpio_vbus,
- };
+-	if (gpio_is_valid(dev->mach->gpio_vbus)) {
+-		if ((retval = gpio_request(dev->mach->gpio_vbus,
+-				"pxa25x_udc GPIO VBUS"))) {
+-			dev_dbg(&pdev->dev,
+-				"can't get vbus gpio %d, err: %d\n",
+-				dev->mach->gpio_vbus, retval);
+-			goto err_gpio_vbus;
+-		}
+-		gpio_direction_input(dev->mach->gpio_vbus);
+-		vbus_irq = gpio_to_irq(dev->mach->gpio_vbus);
+-	} else
+-		vbus_irq = 0;
+-
+ 	if (gpio_is_valid(dev->mach->gpio_pullup)) {
+ 		if ((retval = gpio_request(dev->mach->gpio_pullup,
+ 				"pca25x_udc GPIO PULLUP"))) {
+@@ -2237,7 +2194,7 @@ static int __init pxa25x_udc_probe(struct platform_device *pdev)
+ 	udc_disable(dev);
+ 	udc_reinit(dev);
  
- static void __init e750_init(void)
-@@ -723,7 +733,6 @@ static void __init e750_init(void)
- 			"GPIO11_CLK", NULL),
- 	eseries_get_tmio_gpios();
- 	platform_add_devices(ARRAY_AND_SIZE(e750_devices));
--	pxa_set_udc_info(&e7xx_udc_mach_info);
- 	pxa_set_ac97_info(NULL);
- 	pxa_set_ficp_info(&e7xx_ficp_platform_data);
- }
-@@ -873,12 +882,21 @@ static struct platform_device e800_fb_device = {
+-	dev->vbus = !!is_vbus_present();
++	dev->vbus = 0;
  
- /* --------------------------- UDC definitions --------------------------- */
+ 	/* irq setup after old hardware state is cleaned up */
+ 	retval = request_irq(irq, pxa25x_udc_irq,
+@@ -2273,22 +2230,10 @@ lubbock_fail0:
+ 		}
+ 	} else
+ #endif
+-	if (vbus_irq) {
+-		retval = request_irq(vbus_irq, udc_vbus_irq,
+-				IRQF_DISABLED | IRQF_SAMPLE_RANDOM |
+-				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+-				driver_name, dev);
+-		if (retval != 0) {
+-			pr_err("%s: can't get irq %i, err %d\n",
+-				driver_name, vbus_irq, retval);
+-			goto err_vbus_irq;
+-		}
+-	}
+ 	create_debug_files(dev);
  
--static struct pxa2xx_udc_mach_info e800_udc_mach_info = {
-+static struct gpio_vbus_mach_info e800_udc_info = {
- 	.gpio_vbus   = GPIO_E800_USB_DISC,
- 	.gpio_pullup = GPIO_E800_USB_PULLUP,
- 	.gpio_pullup_inverted = 1
- };
+ 	return 0;
  
-+static struct platform_device e800_gpio_vbus = {
-+	.name	= "gpio-vbus",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &e800_udc_info,
-+	},
-+};
-+
-+
- /* ----------------- e800 tc6393xb parameters ------------------ */
- 
- static struct tc6393xb_platform_data e800_tc6393xb_info = {
-@@ -907,6 +925,7 @@ static struct platform_device e800_tc6393xb_device = {
- static struct platform_device *e800_devices[] __initdata = {
- 	&e800_fb_device,
- 	&e800_tc6393xb_device,
-+	&e800_gpio_vbus,
- };
- 
- static void __init e800_init(void)
-@@ -919,7 +938,6 @@ static void __init e800_init(void)
- 			"GPIO11_CLK", NULL),
- 	eseries_get_tmio_gpios();
- 	platform_add_devices(ARRAY_AND_SIZE(e800_devices));
--	pxa_set_udc_info(&e800_udc_mach_info);
- 	pxa_set_ac97_info(NULL);
- }
+- err_vbus_irq:
+ #ifdef	CONFIG_ARCH_LUBBOCK
+ 	free_irq(LUBBOCK_USB_DISC_IRQ, dev);
+  err_irq_lub:
+@@ -2298,9 +2243,6 @@ lubbock_fail0:
+ 	if (gpio_is_valid(dev->mach->gpio_pullup))
+ 		gpio_free(dev->mach->gpio_pullup);
+  err_gpio_pullup:
+-	if (gpio_is_valid(dev->mach->gpio_vbus))
+-		gpio_free(dev->mach->gpio_vbus);
+- err_gpio_vbus:
+ 	if (dev->transceiver) {
+ 		otg_put_transceiver(dev->transceiver);
+ 		dev->transceiver = NULL;
+@@ -2337,10 +2279,6 @@ static int __exit pxa25x_udc_remove(struct platform_device *pdev)
+ 		free_irq(LUBBOCK_USB_IRQ, dev);
+ 	}
+ #endif
+-	if (gpio_is_valid(dev->mach->gpio_vbus)) {
+-		free_irq(gpio_to_irq(dev->mach->gpio_vbus), dev);
+-		gpio_free(dev->mach->gpio_vbus);
+-	}
+ 	if (gpio_is_valid(dev->mach->gpio_pullup))
+ 		gpio_free(dev->mach->gpio_pullup);
  
 -- 
 1.7.2.3
