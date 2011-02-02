@@ -1,24 +1,10 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 Feb 2011 17:00:00 +0000
-Subject: [PATCH] EDB93xx: Add support for CS4271 CODEC on EDB93xx boards
-In-Reply-To: <0D753D10438DA54287A00B027084269764CEFD45C8@AUSP01VMBX24.collaborationhost.net>
-References: <1296603653.1504.9.camel@r60e>
-	<0D753D10438DA54287A00B027084269764CEF59B2B@AUSP01VMBX24.collaborationhost.net>
-	<1296643688.1504.23.camel@r60e>
-	<20110202104943.GN12743@opensource.wolfsonmicro.com>
-	<1296645167.1504.31.camel@r60e>
-	<20110202125327.GO12743@opensource.wolfsonmicro.com>
-	<1296653211.1504.40.camel@r60e>
-	<0D753D10438DA54287A00B027084269764CEFD45C8@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110202165959.GT12743@opensource.wolfsonmicro.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed,  2 Feb 2011 19:59:57 +0300
+Subject: [PATCH 0/6] Switch pxa25x_udc devices to use gpio-vbus tranceiver
+Message-ID: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 10:53:15AM -0600, H Hartley Sweeten wrote:
-
-> I don't have any problem with leaving the reset management in the codec.
-> The enable (chip-select) should be handled in the platform code.  But,
-> gpio_disable should be removed from struct cs4271_platform_data to avoid
-> any confusion.
-
-Is that really a chip select or is it a power control?
+pxa25x_udc driver contains functionality duplicating gpio-vbus tranceiver
+functions. Switch all devices, that depend on it, to use gpio-vbus
+and (in the last patches) drop related code from pxa25x_udc.
