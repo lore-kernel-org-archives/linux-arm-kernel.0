@@ -1,283 +1,87 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Wed,  2 Feb 2011 15:45:35 +0100
-Subject: [PATCH] omap: use fncpy to copy the PM code functions to SRAM
-Message-ID: <1296657935-22615-1-git-send-email-j-pihet@ti.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Wed, 02 Feb 2011 09:48:39 -0500
+Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302487782C9@dbde02.ent.ti.com>
+References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>	<4D494C6A.30507@mvista.com>
+	<4D49543A.1070302@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302487782C9@dbde02.ent.ti.com>
+Message-ID: <4D496EC7.1010808@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On 2/2/2011 8:33 AM, Nori, Sekhar wrote:
 
-The new fncpy API is better suited* for copying some
-code to SRAM at runtime. This patch changes the ad-hoc
-code to the more generic fncpy API.
+> On Wed, Feb 02, 2011 at 18:25:22, Michael Williamson wrote:
+> 
+>>>> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+>>>> index beda8a4..f421f97 100644
+>>>> --- a/arch/arm/mach-davinci/devices-da8xx.c
+>>>> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+>>>> @@ -725,3 +725,99 @@ int __init da8xx_register_cpuidle(void)
+>>>>
+>>>>       return platform_device_register(&da8xx_cpuidle_device);
+>>>>   }
+>>>> +
+>>>> +static struct resource da8xx_spi0_resources[] = {
+>>>> +    [0] = {
+>>>> +        .start    = 0x01c41000,
+>>>> +        .end    = 0x01c41fff,
+>>>> +        .flags    = IORESOURCE_MEM,
+>>>> +    },
+>>>> +    [1] = {
+>>>> +        .start    = IRQ_DA8XX_SPINT0,
+>>>> +        .end    = IRQ_DA8XX_SPINT0,
+>>>> +        .flags    = IORESOURCE_IRQ,
+>>>> +    },
+>>>> +    [2] = {
+>>>> +        .start    = EDMA_CTLR_CHAN(0, 14),
+>>>> +        .end    = EDMA_CTLR_CHAN(0, 14),
+>>>> +        .flags    = IORESOURCE_DMA,
+>>>> +    },
+>>>> +    [3] = {
+>>>> +        .start    = EDMA_CTLR_CHAN(0, 15),
+>>>> +        .end    = EDMA_CTLR_CHAN(0, 15),
+>>>> +        .flags    = IORESOURCE_DMA,
+>>>> +    },
+>>>
+>>>    We have DA830_DMACH_SPI0_[RT]X defined for SPI0 DMA channels...
+>>>
+>>
+>>
+>> Right.  The current routines/structures were designed to support either da830 or
+>> da850.  They work because the interrupts and the DMA channels are fortunately
+>> the same for the SPI devices between the platforms.  I can use the DA830 enums, 
+>> but I had preferred the clarity of the EDMA_CTRL_CHAN macro, and it would 
+>> remove confusion that this might only apply for DA830 and not DA850.  It would
+>> be nice to rename that DA8XX_DMAC_SPI_[RT]X if the enums were used...
+>>
+>> Can I leave this, or do you really want me to use the enums?
+>>
+> 
+> Looks like a bunch of cleaning-up needs to happen in this area.
+> The DA830_DMACH_* are not used anywhere at all. Instead most of
+> devices-da8xx.c uses DMA channel numbers directly (except for ASP,
+> which has them defined in asp.h).
+> 
 
-*: 1. fncpy ensures that the thumb mode bit is propagated,
-   2. fncpy provides the security of type safety between the
-     original function and the sram function pointer.
 
-Tested OK on OMAP3 in low power modes (RET/OFF)
-using omap2plus_defconfig with !CONFIG_THUMB2_KERNEL.
-Compile tested on OMAP1/2 using omap1_defconfig.
+I did a quick check, a large volume of the #defines in the asp.h file
+are only used in the platform setup.  Wondering if they should really
+be in that file at all...
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
-Acked-by: Kevin Hilman <khilman@ti.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
+> Since all the platform device definitions for DA8XX devices happens
+> in devices-da8xx.c, it makes sense to get rid of the DA830_DMACH_*
+> enum altogether and instead just define the channel numbers used in
+> devices-da8xx.c above the actual usage.
+> 
+> Mike, is that something you are willing take-up?
+> 
 
-Boot tested on OMAP1 & OMAP2
-Tested OK with suspend/resume on OMAP2420/n810
-Tested-by: Kevin Hilman <khilman@ti.com>
 
-Boots fine on osk5912 and n800
-Tested-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap1/pm.h               |    6 +++---
- arch/arm/mach-omap1/sleep.S            |    3 +++
- arch/arm/mach-omap1/sram.S             |    1 +
- arch/arm/mach-omap2/pm.h               |    2 +-
- arch/arm/mach-omap2/sleep24xx.S        |    2 ++
- arch/arm/mach-omap2/sleep34xx.S        |    2 ++
- arch/arm/mach-omap2/sram242x.S         |    3 +++
- arch/arm/mach-omap2/sram243x.S         |    3 +++
- arch/arm/mach-omap2/sram34xx.S         |    1 +
- arch/arm/plat-omap/include/plat/sram.h |   14 +++++++++++++-
- arch/arm/plat-omap/sram.c              |   14 +++++++++-----
- 11 files changed, 41 insertions(+), 10 deletions(-)
+I can take this up as a separate patch series. I'd like to keep the 
+spi platform support series isolated to that subject matter, if that's
+OK.
 
-diff --git a/arch/arm/mach-omap1/pm.h b/arch/arm/mach-omap1/pm.h
-index 56a6479..cd926dc 100644
---- a/arch/arm/mach-omap1/pm.h
-+++ b/arch/arm/mach-omap1/pm.h
-@@ -123,9 +123,9 @@ extern void allow_idle_sleep(void);
- extern void omap1_pm_idle(void);
- extern void omap1_pm_suspend(void);
- 
--extern void omap7xx_cpu_suspend(unsigned short, unsigned short);
--extern void omap1510_cpu_suspend(unsigned short, unsigned short);
--extern void omap1610_cpu_suspend(unsigned short, unsigned short);
-+extern void omap7xx_cpu_suspend(unsigned long, unsigned long);
-+extern void omap1510_cpu_suspend(unsigned long, unsigned long);
-+extern void omap1610_cpu_suspend(unsigned long, unsigned long);
- extern void omap7xx_idle_loop_suspend(void);
- extern void omap1510_idle_loop_suspend(void);
- extern void omap1610_idle_loop_suspend(void);
-diff --git a/arch/arm/mach-omap1/sleep.S b/arch/arm/mach-omap1/sleep.S
-index ef771ce..c875bdc 100644
---- a/arch/arm/mach-omap1/sleep.S
-+++ b/arch/arm/mach-omap1/sleep.S
-@@ -58,6 +58,7 @@
-  */
- 
- #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
-+	.align	3
- ENTRY(omap7xx_cpu_suspend)
- 
- 	@ save registers on stack
-@@ -137,6 +138,7 @@ ENTRY(omap7xx_cpu_suspend_sz)
- #endif /* CONFIG_ARCH_OMAP730 || CONFIG_ARCH_OMAP850 */
- 
- #ifdef CONFIG_ARCH_OMAP15XX
-+	.align	3
- ENTRY(omap1510_cpu_suspend)
- 
- 	@ save registers on stack
-@@ -211,6 +213,7 @@ ENTRY(omap1510_cpu_suspend_sz)
- #endif /* CONFIG_ARCH_OMAP15XX */
- 
- #if defined(CONFIG_ARCH_OMAP16XX)
-+	.align	3
- ENTRY(omap1610_cpu_suspend)
- 
- 	@ save registers on stack
-diff --git a/arch/arm/mach-omap1/sram.S b/arch/arm/mach-omap1/sram.S
-index 7724e52..692587d 100644
---- a/arch/arm/mach-omap1/sram.S
-+++ b/arch/arm/mach-omap1/sram.S
-@@ -18,6 +18,7 @@
- /*
-  * Reprograms ULPD and CKCTL.
-  */
-+	.align	3
- ENTRY(omap1_sram_reprogram_clock)
- 	stmfd	sp!, {r0 - r12, lr}		@ save registers on stack
- 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 1c1b0ab..39580e6 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -92,7 +92,7 @@ extern void omap24xx_idle_loop_suspend(void);
- extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
- 					void __iomem *sdrc_power);
- extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
--extern void save_secure_ram_context(u32 *addr);
-+extern int save_secure_ram_context(u32 *addr);
- extern void omap3_save_scratchpad_contents(void);
- 
- extern unsigned int omap24xx_idle_loop_suspend_sz;
-diff --git a/arch/arm/mach-omap2/sleep24xx.S b/arch/arm/mach-omap2/sleep24xx.S
-index c7780cc..b5071a4 100644
---- a/arch/arm/mach-omap2/sleep24xx.S
-+++ b/arch/arm/mach-omap2/sleep24xx.S
-@@ -47,6 +47,7 @@
-  * Note: This code get's copied to internal SRAM at boot. When the OMAP
-  *	 wakes up it continues execution at the point it went to sleep.
-  */
-+	.align	3
- ENTRY(omap24xx_idle_loop_suspend)
- 	stmfd	sp!, {r0, lr}		@ save registers on stack
- 	mov	r0, #0			@ clear for mcr setup
-@@ -82,6 +83,7 @@ ENTRY(omap24xx_idle_loop_suspend_sz)
-  * The DLL load value is not kept in RETENTION or OFF.	It needs to be restored
-  * at wake
-  */
-+	.align	3
- ENTRY(omap24xx_cpu_suspend)
- 	stmfd	sp!, {r0 - r12, lr}	@ save registers on stack
- 	mov	r3, #0x0		@ clear for mcr call
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index 98d8232..951a0be 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -118,6 +118,7 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
- 
- 	.text
- /* Function to call rom code to save secure ram context */
-+	.align	3
- ENTRY(save_secure_ram_context)
- 	stmfd	sp!, {r1-r12, lr}	@ save registers on stack
- 	adr	r3, api_params		@ r3 points to parameters
-@@ -169,6 +170,7 @@ ENTRY(save_secure_ram_context_sz)
-  *   depending on the low power mode (non-OFF vs OFF modes),
-  *   cf. 'Resume path for xxx mode' comments.
-  */
-+	.align	3
- ENTRY(omap34xx_cpu_suspend)
- 	stmfd	sp!, {r0-r12, lr}	@ save registers on stack
- 
-diff --git a/arch/arm/mach-omap2/sram242x.S b/arch/arm/mach-omap2/sram242x.S
-index 055310c..ff9b9db 100644
---- a/arch/arm/mach-omap2/sram242x.S
-+++ b/arch/arm/mach-omap2/sram242x.S
-@@ -39,6 +39,7 @@
- 
- 	.text
- 
-+	.align	3
- ENTRY(omap242x_sram_ddr_init)
- 	stmfd	sp!, {r0 - r12, lr}	@ save registers on stack
- 
-@@ -143,6 +144,7 @@ ENTRY(omap242x_sram_ddr_init_sz)
-  * r0 = [PRCM_FULL | PRCM_HALF] r1 = SDRC_DLLA_CTRL value r2 = [DDR | SDR]
-  * PRCM_FULL = 2, PRCM_HALF = 1, DDR = 1, SDR = 0
-  */
-+	.align	3
- ENTRY(omap242x_sram_reprogram_sdrc)
- 	stmfd	sp!, {r0 - r10, lr}	@ save registers on stack
- 	mov	r3, #0x0		@ clear for mrc call
-@@ -238,6 +240,7 @@ ENTRY(omap242x_sram_reprogram_sdrc_sz)
- /*
-  * Set dividers and pll. Also recalculate DLL value for DDR and unlock mode.
-  */
-+	.align	3
- ENTRY(omap242x_sram_set_prcm)
- 	stmfd	sp!, {r0-r12, lr}	@ regs to stack
- 	adr	r4, pbegin		@ addr of preload start
-diff --git a/arch/arm/mach-omap2/sram243x.S b/arch/arm/mach-omap2/sram243x.S
-index f900758..7673020 100644
---- a/arch/arm/mach-omap2/sram243x.S
-+++ b/arch/arm/mach-omap2/sram243x.S
-@@ -39,6 +39,7 @@
- 
- 	.text
- 
-+	.align	3
- ENTRY(omap243x_sram_ddr_init)
- 	stmfd	sp!, {r0 - r12, lr}	@ save registers on stack
- 
-@@ -143,6 +144,7 @@ ENTRY(omap243x_sram_ddr_init_sz)
-  * r0 = [PRCM_FULL | PRCM_HALF] r1 = SDRC_DLLA_CTRL value r2 = [DDR | SDR]
-  * PRCM_FULL = 2, PRCM_HALF = 1, DDR = 1, SDR = 0
-  */
-+	.align	3
- ENTRY(omap243x_sram_reprogram_sdrc)
- 	stmfd	sp!, {r0 - r10, lr}	@ save registers on stack
- 	mov	r3, #0x0		@ clear for mrc call
-@@ -238,6 +240,7 @@ ENTRY(omap243x_sram_reprogram_sdrc_sz)
- /*
-  * Set dividers and pll. Also recalculate DLL value for DDR and unlock mode.
-  */
-+	.align	3
- ENTRY(omap243x_sram_set_prcm)
- 	stmfd	sp!, {r0-r12, lr}	@ regs to stack
- 	adr	r4, pbegin		@ addr of preload start
-diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
-index 7f893a2..25011ca 100644
---- a/arch/arm/mach-omap2/sram34xx.S
-+++ b/arch/arm/mach-omap2/sram34xx.S
-@@ -111,6 +111,7 @@
-  * since it will cause the ARM MMU to attempt to walk the page tables.
-  * These crashes may be intermittent.
-  */
-+	.align	3
- ENTRY(omap3_sram_configure_core_dpll)
- 	stmfd	sp!, {r1-r12, lr}	@ store regs to stack
- 
-diff --git a/arch/arm/plat-omap/include/plat/sram.h b/arch/arm/plat-omap/include/plat/sram.h
-index 9967d5e..f500fc3 100644
---- a/arch/arm/plat-omap/include/plat/sram.h
-+++ b/arch/arm/plat-omap/include/plat/sram.h
-@@ -12,7 +12,19 @@
- #define __ARCH_ARM_OMAP_SRAM_H
- 
- #ifndef __ASSEMBLY__
--extern void * omap_sram_push(void * start, unsigned long size);
-+#include <asm/fncpy.h>
-+
-+extern void *omap_sram_push_address(unsigned long size);
-+
-+/* Macro to push a function to the internal SRAM, using the fncpy API */
-+#define omap_sram_push(funcp, size) ({				\
-+	typeof(&(funcp)) _res = NULL;				\
-+	void *_sram_address = omap_sram_push_address(size);	\
-+	if (_sram_address)					\
-+		_res = fncpy(_sram_address, &(funcp), size);	\
-+	_res;							\
-+})
-+
- extern void omap_sram_reprogram_clock(u32 dpllctl, u32 ckctl);
- 
- extern void omap2_sram_ddr_init(u32 *slow_dll_ctrl, u32 fast_dll_ctrl,
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index aedcb3b..916c662 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -242,7 +242,14 @@ static void __init omap_map_sram(void)
- 	       omap_sram_size - SRAM_BOOTLOADER_SZ);
- }
- 
--void * omap_sram_push(void * start, unsigned long size)
-+/*
-+ * Memory allocator for SRAM: calculates the new ceiling address
-+ * for pushing a function using the fncpy API.
-+ *
-+ * Note that fncpy requires the returned address to be aligned
-+ * to an 8-byte boundary.
-+ */
-+void *omap_sram_push_address(unsigned long size)
- {
- 	if (size > (omap_sram_ceil - (omap_sram_base + SRAM_BOOTLOADER_SZ))) {
- 		printk(KERN_ERR "Not enough space in SRAM\n");
-@@ -250,10 +257,7 @@ void * omap_sram_push(void * start, unsigned long size)
- 	}
- 
- 	omap_sram_ceil -= size;
--	omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, sizeof(void *));
--	memcpy((void *)omap_sram_ceil, start, size);
--	flush_icache_range((unsigned long)omap_sram_ceil,
--		(unsigned long)(omap_sram_ceil + size));
-+	omap_sram_ceil = ROUND_DOWN(omap_sram_ceil, FNCPY_ALIGN);
- 
- 	return (void *)omap_sram_ceil;
- }
--- 
-1.7.2.3
+> Thanks,
+> Sekhar
+> 
