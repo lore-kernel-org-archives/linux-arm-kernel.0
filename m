@@ -1,110 +1,36 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed,  2 Feb 2011 14:04:37 +0200
-Subject: [PATCH v5 4/4] omap: add hwspinlock device
-In-Reply-To: <1296648277-20128-1-git-send-email-ohad@wizery.com>
-References: <1296648277-20128-1-git-send-email-ohad@wizery.com>
-Message-ID: <1296648277-20128-5-git-send-email-ohad@wizery.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 02 Feb 2011 15:05:09 +0300
+Subject: [PATCH v1 7/9] mfd: pruss CAN private data.
+In-Reply-To: <1296571667-12049-8-git-send-email-subhasish@mistralsolutions.com>
+References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
+	<1296571667-12049-8-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <4D494875.50002@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Que <sque@ti.com>
+Hello.
 
-Build and register an hwspinlock platform device.
+On 01-02-2011 17:47, Subhasish Ghosh wrote:
 
-Although only OMAP4 supports the hardware spinlock module (for now),
-it is still safe to run this initcall on all omaps, because hwmod lookup
-will simply fail on hwspinlock-less platforms.
+> This patch adds the PRUSS CAN data.
 
-Signed-off-by: Simon Que <sque@ti.com>
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Acked-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Makefile     |    1 +
- arch/arm/mach-omap2/hwspinlock.c |   63 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/hwspinlock.c
+> Signed-off-by: Subhasish Ghosh<subhasish@mistralsolutions.com>
+[...]
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 1c0c2b0..7b9abe1 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -242,3 +242,4 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
- 
- smsc911x-$(CONFIG_SMSC911X)		:= gpmc-smsc911x.o
- obj-y					+= $(smsc911x-m) $(smsc911x-y)
-+obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlock.o
-diff --git a/arch/arm/mach-omap2/hwspinlock.c b/arch/arm/mach-omap2/hwspinlock.c
-new file mode 100644
-index 0000000..06d4a80
---- /dev/null
-+++ b/arch/arm/mach-omap2/hwspinlock.c
-@@ -0,0 +1,63 @@
-+/*
-+ * OMAP hardware spinlock device initialization
-+ *
-+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ * Contact: Simon Que <sque@ti.com>
-+ *          Hari Kanigeri <h-kanigeri2@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+
-+#include <plat/omap_hwmod.h>
-+#include <plat/omap_device.h>
-+
-+struct omap_device_pm_latency omap_spinlock_latency[] = {
-+	{
-+		.deactivate_func = omap_device_idle_hwmods,
-+		.activate_func   = omap_device_enable_hwmods,
-+		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-+	}
-+};
-+
-+int __init hwspinlocks_init(void)
-+{
-+	int retval = 0;
-+	struct omap_hwmod *oh;
-+	struct omap_device *od;
-+	const char *oh_name = "spinlock";
-+	const char *dev_name = "omap_hwspinlock";
-+
-+	/*
-+	 * Hwmod lookup will fail in case our platform doesn't support the
-+	 * hardware spinlock module, so it is safe to run this initcall
-+	 * on all omaps
-+	 */
-+	oh = omap_hwmod_lookup(oh_name);
-+	if (oh == NULL)
-+		return -EINVAL;
-+
-+	od = omap_device_build(dev_name, 0, oh, NULL, 0,
-+				omap_spinlock_latency,
-+				ARRAY_SIZE(omap_spinlock_latency), false);
-+	if (IS_ERR(od)) {
-+		pr_err("Can't build omap_device for %s:%s\n", dev_name,
-+								oh_name);
-+		retval = PTR_ERR(od);
-+	}
-+
-+	return retval;
-+}
-+/* early board code might need to reserve specific hwspinlock instances */
-+postcore_initcall(hwspinlocks_init);
--- 
-1.7.1
+> diff --git a/include/linux/mfd/pruss/da8xx_pru.h b/include/linux/mfd/pruss/da8xx_pru.h
+> index 318dad8..2fa7ff5 100644
+> --- a/include/linux/mfd/pruss/da8xx_pru.h
+> +++ b/include/linux/mfd/pruss/da8xx_pru.h
+> @@ -74,6 +74,10 @@ struct da8xx_pruss_devices {
+>   	int (*setup)(void);
+>   };
+>
+> +struct da8xx_pruss_can_data {
+> +	u32 version;
+> +};
+> +
+
+    This patch too should precede the patch 5/9 as it defines the stucture 
+used there...
+
+WBR, Sergei
