@@ -1,19 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 2 Feb 2011 16:20:48 +0000
-Subject: [PATCH v1 0/9] pruss mfd drivers
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302487783A6@dbde02.ent.ti.com>
-References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302487783A6@dbde02.ent.ti.com>
-Message-ID: <20110202162048.GF9810@sirena.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 2 Feb 2011 10:27:35 -0600
+Subject: [alsa-devel] [PATCH] EDB93xx: Add support for CS4271 CODEC on
+	EDB93xx boards
+In-Reply-To: <20110202075434.GA2445@acer>
+References: <1296603653.1504.9.camel@r60e> <20110202075434.GA2445@acer>
+Message-ID: <0D753D10438DA54287A00B027084269764CEFD4529@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 09:43:51PM +0530, Nori, Sekhar wrote:
+On Wednesday, February 02, 2011 12:55 AM, Mika Westerberg wrote:
+>>  /*************************************************************************
+>> + * EDB93xx SPI peripheral handling
+>> + *************************************************************************/
+>> +static int edb93xx_cs4271_hw_setup(struct spi_device *spi)
+>> +{
+>> +	int gpio_nreset;
+>> +	int err;
+>> +
+>> +	if (machine_is_edb9301() || machine_is_edb9302()) {
+>> +		gpio_nreset = EP93XX_GPIO_LINE_EGPIO1;
+>> +	} else if (machine_is_edb9302a() || machine_is_edb9307a()) {
+>> +		ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_HONIDE);
+>> +		gpio_nreset = EP93XX_GPIO_LINE_DD2;
+>> +	} else if (machine_is_edb9315a()) {
+>> +		gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
+>> +	} else {
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	err = gpio_request(gpio_nreset, spi->modalias);
+>> +	if (err)
+>> +		return err;
+>> +	err = gpio_request(EP93XX_GPIO_LINE_EGPIO6, spi->modalias);
+>> +	if (err)
+>
+> Should you call gpio_free() for gpio_nreset here?
 
-> To automate copying the right folks on each patch, please use:
+Yes.  If the second gpio_request fails, the first gpio should be freed.
 
-> git-send-email --to <davinci list> --cc-cmd=scripts/get_maintainer.pl  [...]
+A cleaner way of handling the gpios would be to use gpio_request_array()
+and remove the gpio knowledge from the codec driver completely.
 
-Please don't use get_maintainer.pl directly like this - you need to
-apply some thought and consideration to the results as it generates both
-false positives and false negatives.
+Hartley
