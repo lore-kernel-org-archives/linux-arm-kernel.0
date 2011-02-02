@@ -1,33 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed,  2 Feb 2011 18:31:55 +0200
-Subject: [PATCH 2/2] arm: Kconfig: allow OMAP to use sparse IRQ numbering
-In-Reply-To: <1296664315-32108-1-git-send-email-balbi@ti.com>
-References: <1296664315-32108-1-git-send-email-balbi@ti.com>
-Message-ID: <1296664315-32108-3-git-send-email-balbi@ti.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 2 Feb 2011 22:06:47 +0530
+Subject: [PATCH v1 0/9] pruss mfd drivers
+In-Reply-To: <20110202162048.GF9810@sirena.org.uk>
+References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302487783A6@dbde02.ent.ti.com>
+	<20110202162048.GF9810@sirena.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302487783CA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select HAVE_SPARSE_IRQ to allow OMAP to use
-sparse IRQ numbering scheme. The main difference
-is that irq_descs will be added to a radix tree
-instead of a static array.
+On Wed, Feb 02, 2011 at 21:50:48, Mark Brown wrote:
+> On Wed, Feb 02, 2011 at 09:43:51PM +0530, Nori, Sekhar wrote:
+> 
+> > To automate copying the right folks on each patch, please use:
+> 
+> > git-send-email --to <davinci list> --cc-cmd=scripts/get_maintainer.pl  [...]
+> 
+> Please don't use get_maintainer.pl directly like this - you need to
+> apply some thought and consideration to the results as it generates both
+> false positives and false negatives.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Point taken. I usually do a --dry-run before actually sending
+just to verify the results.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 09a5c11..2ca24ad 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -857,6 +857,7 @@ config ARCH_DAVINCI
- config ARCH_OMAP
- 	bool "TI OMAP"
- 	select HAVE_CLK
-+	select HAVE_SPARSE_IRQ
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_HAS_CPUFREQ
- 	select GENERIC_CLOCKEVENTS
--- 
-1.7.4.rc2
+Thanks,
+Sekhar
