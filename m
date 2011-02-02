@@ -1,61 +1,71 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed,  2 Feb 2011 12:03:30 +0000
-Subject: [PATCHv4 11/13] picoxcell: add support for pc3x2 devices
+Date: Wed,  2 Feb 2011 12:03:32 +0000
+Subject: [PATCHv4 13/13] picoxcell: add support for the PC7302 development
+	board
 In-Reply-To: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
 References: <1296648212-5284-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1296648212-5284-12-git-send-email-jamie@jamieiles.com>
+Message-ID: <1296648212-5284-14-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PC3X2 is the first supported device family of picoXcell and this patch
-defines the virtual clocks to allow drivers to work, the pin muxing
-options, timer locations and the GPIO definitions.
+The PC7302 development board is capable of taking both PC3X2 and PC3X3
+devices and features NOR flash, NAND flash, SPI NOR flash a serial
+console, 100Mb Ethernet and a number of picoArray peripherals.
 
-v2: remove redundant include of asm/mach/map.h
-v3: update to use new clk lookups and muxing peripheral return types
+This patch provides initial support for running on the PC7302 board.
+
+v3:
+	- remove redundant __init declarations.
+v2:
+	- multiplex the NAND CLE pin by pad name.
+	- convert to __raw_ io accessors.
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/Kconfig          |    7 +
- arch/arm/mach-picoxcell/Makefile         |    1 +
- arch/arm/mach-picoxcell/pc3x2.c          |  442 ++++++++++++++++++++++++++++++
- arch/arm/mach-picoxcell/picoxcell_core.c |   13 +-
- arch/arm/mach-picoxcell/soc.h            |    1 +
- 5 files changed, 463 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/pc3x2.c
+ arch/arm/mach-picoxcell/Kconfig        |    9 ++
+ arch/arm/mach-picoxcell/Makefile       |    1 +
+ arch/arm/mach-picoxcell/board_pc7302.c |  206 ++++++++++++++++++++++++++++++++
+ 3 files changed, 216 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-picoxcell/board_pc7302.c
 
 diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
-index 3daba53..5141202 100644
+index 671cadc..e00e14b 100644
 --- a/arch/arm/mach-picoxcell/Kconfig
 +++ b/arch/arm/mach-picoxcell/Kconfig
-@@ -1,4 +1,11 @@
- menu "PICOXCELL platform type"
- 	depends on ARCH_PICOXCELL
+@@ -16,6 +16,15 @@ config PICOXCELL_PC3X3
+ 	  Include support for picoChip PC3x3 family of devices. This includes
+ 	  PC313, PC323 and PC333.
  
-+config PICOXCELL_PC3X2
-+	bool "Support PC3x2 devices"
++config BOARD_PC7302
++	bool "Support PC7302 Board"
++	depends on PICOXCELL_PC3X2 || PICOXCELL_PC3X3
 +	default y
 +	help
-+	  Include support for picoChip PC3x2 family of devices. This
-+	  includes PC302 and PC312.
++          Include support for the picoChip PC7302 platform. This platform is
++	  can take any of the PC3X2 or PC3X3 devices and includes SPI NOR
++	  flash, parallel NOR flash and NAND flash.
 +
- endmenu
+ config PC3X3_STOP_WDT_IN_SUSPEND
+ 	bool "Stop WDT in PM suspend"
+ 	depends on PICOCHIP_PC3X3
 diff --git a/arch/arm/mach-picoxcell/Makefile b/arch/arm/mach-picoxcell/Makefile
-index f122a84..bc2dc75 100644
+index 7ed0d7c..40b22c3 100644
 --- a/arch/arm/mach-picoxcell/Makefile
 +++ b/arch/arm/mach-picoxcell/Makefile
-@@ -6,3 +6,4 @@ obj-y				:= picoxcell_core.o io.o axi2cfg.o \
- 				   devices.o
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+@@ -8,3 +8,4 @@ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
  obj-$(CONFIG_PM)		+= pm.o
-+obj-$(CONFIG_PICOXCELL_PC3X2)	+= pc3x2.o
-diff --git a/arch/arm/mach-picoxcell/pc3x2.c b/arch/arm/mach-picoxcell/pc3x2.c
+ obj-$(CONFIG_PICOXCELL_PC3X2)	+= pc3x2.o
+ obj-$(CONFIG_PICOXCELL_PC3X3)	+= pc3x3.o
++obj-$(CONFIG_BOARD_PC7302)	+= board_pc7302.o
+diff --git a/arch/arm/mach-picoxcell/board_pc7302.c b/arch/arm/mach-picoxcell/board_pc7302.c
 new file mode 100644
-index 0000000..b74f556
+index 0000000..9ee5218
 --- /dev/null
-+++ b/arch/arm/mach-picoxcell/pc3x2.c
-@@ -0,0 +1,442 @@
++++ b/arch/arm/mach-picoxcell/board_pc7302.c
+@@ -0,0 +1,206 @@
 +/*
++ * linux/arch/arm/mach-picoxcell/board_pc7302.c
++ *
 + * Copyright (c) 2010 Picochip Ltd., Jamie Iles
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -65,480 +75,199 @@ index 0000000..b74f556
 + * All enquiries to support at picochip.com
 + */
 +#include <linux/gpio.h>
++#include <linux/interrupt.h>
 +#include <linux/io.h>
-+#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/mtd/nand-gpio.h>
++#include <linux/mtd/physmap.h>
++#include <linux/spi/flash.h>
 +
-+#include <mach/clkdev.h>
 +#include <mach/hardware.h>
++#include <asm/leds.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
 +
 +#include "mux.h"
 +#include "picoxcell_core.h"
-+#include "soc.h"
 +
-+FIXED_CLK(dummy,	CLOCK_TICK_RATE, -1);
-+
-+static struct clk_lookup pc3x2_clk_lookup[] = {
-+	CLK_LOOKUP("dw_spi_mmio.0",	NULL,		&dummy_clk),
-+	CLK_LOOKUP("dw_dmac.0",		NULL,		&dummy_clk),
-+	CLK_LOOKUP("dw_dmac.1",		NULL,		&dummy_clk),
-+	CLK_LOOKUP(NULL,		"ebi",		&dummy_clk),
-+	CLK_LOOKUP(NULL,		"tzprot_ctrl",	&dummy_clk),
-+	CLK_LOOKUP("picoxcell-ipsec",	NULL,		&dummy_clk),
-+	CLK_LOOKUP("picoxcell-l2",	NULL,		&dummy_clk),
-+	CLK_LOOKUP("picoxcell-fuse",	NULL,		&dummy_clk),
-+	CLK_LOOKUP("dw_wdt",		NULL,		&dummy_clk),
-+};
-+
-+static void pc3x2_clk_init(void)
++static long pc7302_panic_blink(int state)
 +{
-+	picoxcell_clk_add(&dummy_clk);
-+	clkdev_add_table(pc3x2_clk_lookup, ARRAY_SIZE(pc3x2_clk_lookup));
-+}
-+
-+static ssize_t pc3x2_get_boot_mode(char *buf)
-+{
-+	unsigned long syscfg = syscfg_read();
-+	const char *boot_mode;
-+
-+	switch (syscfg & 0x3) {
-+	case 0x0:
-+		boot_mode = "parallel";
-+		break;
-+	case 0x1:
-+		boot_mode = "ssi";
-+		break;
-+	case 0x2:
-+		boot_mode = "mii";
-+		break;
-+	default:
-+		boot_mode = "unknown";
-+	}
-+
-+	return snprintf(buf, PAGE_SIZE, "%s\n", boot_mode);
-+}
-+
-+static int
-+pai_get_mux(struct muxed_pin *pin)
-+{
-+#define PAI_GPIO_PIN_ARM_4	0xB
-+#define PAI_GPIO_PIN_ARM_5	0xA
-+#define PAI_GPIO_PIN_ARM_6	0x9
-+#define PAI_GPIO_PIN_ARM_7	0x8
-+#define PAI_GPIO_PIN_SDGPIO_4	0x7
-+#define PAI_GPIO_PIN_SDGPIO_5	0x6
-+#define PAI_GPIO_PIN_SDGPIO_6	0x5
-+#define PAI_GPIO_PIN_SDGPIO_7	0x4
-+#define PICOXCELL_PAI_CAEID		0x8080
-+#define PAI_SLEEP_REG		0xA060
-+#define PAI_IO_CTRL_REG		0x0009
-+
-+	/* Make sure that the PAI block is awake. */
-+	u16 data = 0, sd_mask = 0, arm_mask = 0;
-+	int ret;
-+
-+	axi2cfg_config_write(PICOXCELL_PAI_CAEID, PAI_SLEEP_REG, &data, 1);
-+	/* Get the current PAI muxing configuration. */
-+	ret = axi2cfg_config_read(PICOXCELL_PAI_CAEID, PAI_IO_CTRL_REG,
-+				  &data, 1);
-+	if (1 != ret) {
-+		pr_warning("unable to read PAI I/O control reg\n");
-+		return -EIO;
-+	}
-+
-+	if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_4) {
-+		sd_mask |= PAI_GPIO_PIN_SDGPIO_4;
-+	} else if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_5) {
-+		sd_mask |= PAI_GPIO_PIN_SDGPIO_5;
-+	} else if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_6) {
-+		sd_mask |= PAI_GPIO_PIN_SDGPIO_6;
-+	} else if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_7) {
-+		sd_mask |= PAI_GPIO_PIN_SDGPIO_7;
-+	} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_4) {
-+		arm_mask |= PAI_GPIO_PIN_ARM_4;
-+	} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_5) {
-+		arm_mask |= PAI_GPIO_PIN_ARM_5;
-+	} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_6) {
-+		arm_mask |= PAI_GPIO_PIN_ARM_6;
-+	} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_7) {
-+		arm_mask |= PAI_GPIO_PIN_ARM_7;
-+	} else {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	if (data & sd_mask)
-+		ret = MUX_SD;
-+	else if (data & arm_mask)
-+		ret = MUX_ARM;
-+	else
-+		ret = MUX_PERIPHERAL_PAI;
-+
-+out:
-+	return ret;
-+}
-+
-+static int
-+pai_set_mux(struct muxed_pin *pin,
-+	    enum mux_setting setting)
-+{
-+	/* Make sure that the PAI block is awake. */
-+	u16 data = 0;
-+	int err;
-+
-+	axi2cfg_config_write(PICOXCELL_PAI_CAEID, PAI_SLEEP_REG, &data, 1);
-+
-+	/* Get the current PAI muxing configuration. */
-+	err = axi2cfg_config_read(PICOXCELL_PAI_CAEID, PAI_IO_CTRL_REG,
-+				  &data, 1);
-+	if (1 != err) {
-+		pr_warning("unable to read PAI I/O control reg\n");
-+		return -EIO;
-+	}
-+
-+	if (MUX_SD == setting) {
-+		if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_4) {
-+			data |= PAI_GPIO_PIN_SDGPIO_4;
-+		} else if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_5) {
-+			data |= PAI_GPIO_PIN_SDGPIO_5;
-+		} else if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_6) {
-+			data |= PAI_GPIO_PIN_SDGPIO_6;
-+		} else if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_7) {
-+			data |= PAI_GPIO_PIN_SDGPIO_7;
-+		} else {
-+			err = -EINVAL;
-+			goto out;
-+		}
-+	} else if (MUX_ARM == setting) {
-+		if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_4) {
-+			data |= PAI_GPIO_PIN_ARM_4;
-+		} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_5) {
-+			data |= PAI_GPIO_PIN_ARM_5;
-+		} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_6) {
-+			data |= PAI_GPIO_PIN_ARM_6;
-+		} else if (pin->arm_pin == PC3X2_GPIO_PIN_ARM_7) {
-+			data |= PAI_GPIO_PIN_ARM_7;
-+		} else {
-+			err = -EINVAL;
-+			goto out;
-+		}
-+	} else if (MUX_PERIPHERAL_PAI == setting) {
-+		/*
-+		 * We don't do anything here. The PAI is only driven by the
-+		 * picoArray so this will be automatically set in the loadfile
-+		 * when the design is next loaded.
-+		 */
-+		err = 0;
-+	} else {
-+		/* This can't be changed at run-time! */
-+		return -EINVAL;
-+	}
-+
-+	axi2cfg_config_write(PICOXCELL_PAI_CAEID, PAI_IO_CTRL_REG, &data, 1);
-+	err = 0;
-+
-+out:
-+	return err;
-+}
-+
-+static struct muxed_pin pai_pins[] = {
-+PIN(sdgpio4, PC3X2_GPIO_PIN_SDGPIO_4, -1, pai_set_mux, pai_get_mux),
-+PIN(sdgpio5, PC3X2_GPIO_PIN_SDGPIO_5, -1, pai_set_mux, pai_get_mux),
-+PIN(sdgpio6, PC3X2_GPIO_PIN_SDGPIO_6, -1, pai_set_mux, pai_get_mux),
-+PIN(sdgpio7, PC3X2_GPIO_PIN_SDGPIO_7, -1, pai_set_mux, pai_get_mux),
-+PIN(arm4, -1, PC3X2_GPIO_PIN_ARM_4, pai_set_mux, pai_get_mux),
-+PIN(arm5, -1, PC3X2_GPIO_PIN_ARM_5, pai_set_mux, pai_get_mux),
-+PIN(arm6, -1, PC3X2_GPIO_PIN_ARM_6, pai_set_mux, pai_get_mux),
-+PIN(arm7, -1, PC3X2_GPIO_PIN_ARM_7, pai_set_mux, pai_get_mux),
-+};
-+
-+static struct pin_group pai_group = {
-+	.nr_pins    = ARRAY_SIZE(pai_pins),
-+	.name	    = "pai/ebi",
-+	.pins	    = pai_pins,
-+};
-+
-+static int
-+shd_get_mux(struct muxed_pin *pin)
-+{
-+	unsigned bit;
-+	unsigned long syscfg = syscfg_read();
-+
-+	if (0 == (syscfg & 0x3) && pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_15)
-+		return MUX_PERIPHERAL_EBI;
-+
-+	if (pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_0) {
-+		if (syscfg & AXI2CFG_SYSCFG_FREQ_SYNTH_MUX_MASK)
-+			return MUX_PERIPHERAL_FRACN;
-+		else
-+			return MUX_SD;
-+	}
-+
-+	bit = 1 << (AXI2CFG_SYSCFG_SD_ARM_GPIO_SEL_LO +
-+			pin->sd_pin - PC3X2_GPIO_PIN_SDGPIO_8);
-+
-+	return syscfg & bit ? MUX_ARM : MUX_SD;
-+}
-+
-+static int
-+shd_set_mux(struct muxed_pin *pin,
-+	    enum mux_setting setting)
-+{
-+	unsigned bit;
-+	unsigned long syscfg = syscfg_read();
-+
-+	/*
-+	 * In parallel boot mode, shared pin 7 can't be used as it is always
-+	 * on the EBI.
-+	 */
-+	if (0 == (syscfg & 0x3) && pin->sd_pin == PC3X2_GPIO_PIN_SDGPIO_15)
-+		return -EBUSY;
-+
-+	switch (setting) {
-+	case MUX_PERIPHERAL_FRACN:
-+		/*
-+		 * SDGPIO pin 0 is shared with the Frac-N.
-+		 */
-+		if (PC3X2_GPIO_PIN_SDGPIO_0 == pin->sd_pin) {
-+			syscfg_update(AXI2CFG_SYSCFG_FREQ_SYNTH_MUX_MASK,
-+				      AXI2CFG_SYSCFG_FREQ_SYNTH_MUX_MASK);
-+			break;
-+		}
-+		return -EIO;
-+
-+	case MUX_SD:
-+		syscfg_update(AXI2CFG_SYSCFG_FREQ_SYNTH_MUX_MASK, 0);
-+		bit = 1 << (AXI2CFG_SYSCFG_SD_ARM_GPIO_SEL_LO +
-+			    pin->sd_pin - PC3X2_GPIO_PIN_SDGPIO_8);
-+		syscfg_update(bit, 0);
-+		break;
-+
-+	case MUX_ARM:
-+		if (PC3X2_GPIO_PIN_SDGPIO_0 == pin->sd_pin)
-+			return -EINVAL;
-+		syscfg_update(AXI2CFG_SYSCFG_FREQ_SYNTH_MUX_MASK, 0);
-+		bit = 1 << (AXI2CFG_SYSCFG_SD_ARM_GPIO_SEL_LO +
-+			    pin->arm_pin - PC3X2_GPIO_PIN_ARM_8);
-+		syscfg_update(bit, bit);
-+		break;
-+
-+	default:
-+		return -EINVAL;
-+	}
-+
++	__raw_writel(state ? 0xFF : 0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
++					    GPIO_SW_PORT_C_DR_REG_OFFSET));
 +	return 0;
 +}
 +
-+static struct muxed_pin shared_pins[] = {
-+GPIO(shared0, PC3X2_GPIO_PIN_SDGPIO_8, PC3X2_GPIO_PIN_ARM_8, shd_set_mux,
-+     shd_get_mux),
-+GPIO(shared1, PC3X2_GPIO_PIN_SDGPIO_9, PC3X2_GPIO_PIN_ARM_9, shd_set_mux,
-+     shd_get_mux),
-+GPIO(shared2, PC3X2_GPIO_PIN_SDGPIO_10, PC3X2_GPIO_PIN_ARM_10, shd_set_mux,
-+     shd_get_mux),
-+GPIO(shared3, PC3X2_GPIO_PIN_SDGPIO_11, PC3X2_GPIO_PIN_ARM_11, shd_set_mux,
-+     shd_get_mux),
-+GPIO(shared4, PC3X2_GPIO_PIN_SDGPIO_12, PC3X2_GPIO_PIN_ARM_12, shd_set_mux,
-+     shd_get_mux),
-+GPIO(shared5, PC3X2_GPIO_PIN_SDGPIO_13, PC3X2_GPIO_PIN_ARM_13, shd_set_mux,
-+     shd_get_mux),
-+GPIO(shared6, PC3X2_GPIO_PIN_SDGPIO_14, PC3X2_GPIO_PIN_ARM_14, shd_set_mux,
-+     shd_get_mux),
-+PIN(shared7, PC3X2_GPIO_PIN_SDGPIO_15, PC3X2_GPIO_PIN_ARM_15, shd_set_mux,
-+    shd_get_mux),
-+};
-+
-+static struct pin_group shd_group = {
-+	.nr_pins    = ARRAY_SIZE(shared_pins),
-+	.name	    = "shared/ebi",
-+	.pins	    = shared_pins,
-+};
-+
-+static struct muxed_pin fracn_pins[] = {
-+PIN(sdgpio0, PC3X2_GPIO_PIN_SDGPIO_0, -1, shd_set_mux, shd_get_mux),
-+};
-+
-+static struct pin_group fracn_group = {
-+	.nr_pins    = ARRAY_SIZE(fracn_pins),
-+	.name	    = "fracn/sdgpio0",
-+	.pins	    = fracn_pins,
-+};
-+
-+static struct pin_group *pc3x2_groups[] = {
-+	&shd_group,
-+	&pai_group,
-+	&fracn_group,
-+};
-+
-+static int armgpio_number(int pin)
-+{
-+	if (pin >= PC3X2_GPIO_PIN_ARM_0 && pin <= PC3X2_GPIO_PIN_ARM_15)
-+		return pin;
-+
-+	return -1;
-+}
-+
-+static int sdgpio_number(int pin)
-+{
-+	if (pin >= PC3X2_GPIO_PIN_SDGPIO_0 &&
-+	    pin <= PC3X2_GPIO_PIN_SDGPIO_15)
-+		return pin - PC3X2_GPIO_PIN_SDGPIO_0;
-+
-+	return -1;
-+}
-+
-+static void pc3x2_init_muxing(void)
-+{
-+	picoxcell_mux_register(pc3x2_groups, ARRAY_SIZE(pc3x2_groups),
-+			       armgpio_number, sdgpio_number);
-+}
-+
-+static const char * const pc3x2_armgpio_pins[] = {
-+	"arm0",
-+	"arm1",
-+	"arm2",
-+	"arm3",
-+	"arm4",
-+	"arm5",
-+	"arm6",
-+	"arm7",
-+	"arm8",
-+	"arm9",
-+	"arm10",
-+	"arm11",
-+	"arm12",
-+	"arm13",
-+	"arm14",
-+	"arm15",
-+};
-+
-+static const char * const pc3x2_sdgpio_pins[] = {
-+	"sdgpio0",
-+	"sdgpio1",
-+	"sdgpio2",
-+	"sdgpio3",
-+	"sdgpio4",
-+	"sdgpio5",
-+	"sdgpio6",
-+	"sdgpio7",
-+	"sdgpio8",
-+	"sdgpio9",
-+	"sdgpio10",
-+	"sdgpio11",
-+	"sdgpio12",
-+	"sdgpio13",
-+	"sdgpio14",
-+	"sdgpio15",
-+};
-+
-+static const struct picoxcell_timer pc3x2_timers[] = {
-+	{
-+		.name	= "timer0",
-+		.type	= TIMER_TYPE_TIMER,
-+		.base	= PICOXCELL_TIMER_BASE + 0 * TIMER_SPACING,
-+		.irq	= IRQ_TIMER0,
-+	},
-+	{
-+		.name	= "timer1",
-+		.type	= TIMER_TYPE_TIMER,
-+		.base	= PICOXCELL_TIMER_BASE + 1 * TIMER_SPACING,
-+		.irq	= IRQ_TIMER1,
-+	},
-+	{
-+		.name	= "timer2",
-+		.type	= TIMER_TYPE_TIMER,
-+		.base	= PICOXCELL_TIMER_BASE + 2 * TIMER_SPACING,
-+		.irq	= IRQ_TIMER2,
-+	},
-+	{
-+		.name	= "timer3",
-+		.type	= TIMER_TYPE_TIMER,
-+		.base	= PICOXCELL_TIMER_BASE + 3 * TIMER_SPACING,
-+		.irq	= IRQ_TIMER3,
-+	},
-+	{
-+		.name	= "rtc",
-+		.type	= TIMER_TYPE_RTC,
-+		.base	= PICOXCELL_RTCLK_BASE,
-+		.irq	= IRQ_RTC,
-+	},
-+};
-+
-+static void pc3x2_add_devices(void)
-+{
-+}
-+
-+static void pc3x2_init(void);
-+
-+struct picoxcell_soc pc3x2_soc = {
-+	.init		= pc3x2_init,
-+	.init_clocks	= pc3x2_clk_init,
-+	.init_muxing	= pc3x2_init_muxing,
-+	.add_devices	= pc3x2_add_devices,
-+	.get_boot_mode	= pc3x2_get_boot_mode,
-+	.armgpio_pins	= pc3x2_armgpio_pins,
-+	.nr_armgpio	= ARRAY_SIZE(pc3x2_armgpio_pins),
-+	.armgpio_base	= PC3X2_GPIO_PIN_ARM_0,
-+	.sdgpio_pins	= pc3x2_sdgpio_pins,
-+	.nr_sdgpio	= ARRAY_SIZE(pc3x2_sdgpio_pins),
-+	.sdgpio_base	= PC3X2_GPIO_PIN_SDGPIO_0,
-+	.timers		= pc3x2_timers,
-+	.nr_timers	= ARRAY_SIZE(pc3x2_timers),
-+};
-+
-+static void pc3x2_init(void)
++static void pc7302_panic_init(void)
 +{
 +	/*
-+	 * If we booted in parallel nor mode then we can continue to use the
-+	 * EBI. If not then we only have a few bits of the EBI - just enough
-+	 * to drive a NAND flash.
++	 * We have a BOOT_ERROR pin on PC7302. Reuse that for signalling when
++	 * the kernel panics. There is only 1 bit wired up to port C but it
++	 * won't hurt to configure all of them.
 +	 */
-+	if (syscfg_read() & 0x3)
-+		set_bit(PICOXCELL_FEATURE_SW_NAND, pc3x2_soc.features);
-+	else
-+		set_bit(PICOXCELL_FEATURE_EBI, pc3x2_soc.features);
++	__raw_writel(0xF, IO_ADDRESS(PICOXCELL_GPIO_BASE +
++			       GPIO_SW_PORT_C_DDR_REG_OFFSET));
++	__raw_writel(0x0, IO_ADDRESS(PICOXCELL_GPIO_BASE +
++			       GPIO_SW_PORT_C_CTL_REG_OFFSET));
++
++	panic_blink = pc7302_panic_blink;
 +}
-diff --git a/arch/arm/mach-picoxcell/picoxcell_core.c b/arch/arm/mach-picoxcell/picoxcell_core.c
-index b020b87..7f21169 100644
---- a/arch/arm/mach-picoxcell/picoxcell_core.c
-+++ b/arch/arm/mach-picoxcell/picoxcell_core.c
-@@ -42,6 +42,10 @@ struct picoxcell_soc *picoxcell_get_soc(void)
- 		__raw_readl(IO_ADDRESS(PICOXCELL_AXI2CFG_BASE +
- 				       AXI2CFG_DEVICE_ID_REG_OFFSET));
- 	switch (device_id) {
-+	case 0x8003:
-+	case 0x8007:
-+		return &pc3x2_soc;
 +
- 	default:
- 		panic("unsupported device type %lx", device_id);
- 	}
-@@ -89,7 +93,14 @@ void __init picoxcell_init_irq(void)
- static const char *picoxcell_get_partname(void)
- {
- 	unsigned long dev_id = axi2cfg_readl(AXI2CFG_DEVICE_ID_REG_OFFSET);
--	const char *part = "<unknown>";
-+	const char *part;
++static struct mtd_partition pc7302_nor_partitions[] = {
++	{
++		.name		= "Boot",
++		.size		= SZ_128K,
++		.offset		= 0,
++	},
++	{
++		.name		= "Boot Environment",
++		.size		= SZ_128K,
++		.offset		= MTDPART_OFS_APPEND,
++	},
++	{
++		.name		= "Kernel",
++		.size		= SZ_4M,
++		.offset		= MTDPART_OFS_APPEND,
++	},
++	{
++		.name		= "Application",
++		.size		= MTDPART_SIZ_FULL,
++		.offset		= MTDPART_OFS_APPEND,
++	},
++};
 +
-+	if (0x8003 == dev_id)
-+		part = "pc302";
-+	else if (0x8007 == dev_id)
-+		part = "pc312";
-+	else
-+		part = "<unknown>";
- 
- 	return part;
- }
-diff --git a/arch/arm/mach-picoxcell/soc.h b/arch/arm/mach-picoxcell/soc.h
-index 95e9113..38304d3 100644
---- a/arch/arm/mach-picoxcell/soc.h
-+++ b/arch/arm/mach-picoxcell/soc.h
-@@ -49,6 +49,7 @@ struct picoxcell_soc {
- };
- 
- extern struct picoxcell_soc *picoxcell_get_soc(void);
-+extern struct picoxcell_soc pc3x2_soc;
- 
- static inline int picoxcell_has_feature(enum picoxcell_features feat)
- {
++static struct physmap_flash_data pc7302_nor_flash_data = {
++	.width		= 1,
++	.parts		= pc7302_nor_partitions,
++	.nr_parts	= ARRAY_SIZE(pc7302_nor_partitions)
++};
++
++static struct resource pc7302_nor_resource = {
++	.start	= PICOXCELL_FLASH_BASE,
++	.end	= PICOXCELL_FLASH_BASE + SZ_128M - 1,
++	.flags	= IORESOURCE_MEM,
++};
++
++static struct platform_device pc7302_nor = {
++	.name		    = "physmap-flash",
++	.id		    = -1,
++	.dev.platform_data  = &pc7302_nor_flash_data,
++	.resource	    = &pc7302_nor_resource,
++	.num_resources	    = 1,
++};
++
++static void pc7302_init_nor(void)
++{
++	platform_device_register(&pc7302_nor);
++}
++
++static struct resource pc7302_nand_resource = {
++	.start = EBI_CS2_BASE,
++	.end   = EBI_CS2_BASE + 2 * SZ_1K,
++	.flags = IORESOURCE_MEM,
++};
++
++static struct mtd_partition pc7302_nand_parts[] = {
++	{
++		.name	= "Boot",
++		.size	= 4 * SZ_128K,
++		.offset	= 0,
++	},
++	{
++		.name	= "Redundant Boot",
++		.size	= 4 * SZ_128K,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++	{
++		.name	= "Boot Environment",
++		.size	= SZ_128K,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++	{
++		.name	= "Redundant Boot Environment",
++		.size	= SZ_128K,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++	{
++		.name	= "Kernel",
++		.size	= 8 * SZ_1M,
++		.offset	= (12 * SZ_128K),
++	},
++	{
++		.name	= "File System",
++		.size	= MTDPART_SIZ_FULL,
++		.offset	= MTDPART_OFS_APPEND,
++	},
++};
++
++static struct gpio_nand_platdata pc7302_nand_platdata = {
++	.gpio_rdy   = PC3X2_GPIO_PIN_ARM_1,
++	.gpio_nce   = PC3X2_GPIO_PIN_ARM_2,
++	.gpio_ale   = PC3X2_GPIO_PIN_ARM_3,
++	.gpio_cle   = PC3X2_GPIO_PIN_ARM_4,
++	.gpio_nwp   = -1,
++	.parts	    = pc7302_nand_parts,
++	.num_parts  = ARRAY_SIZE(pc7302_nand_parts),
++};
++
++static struct platform_device pc7302_nand = {
++	.name		    = "gpio-nand",
++	.num_resources	    = 1,
++	.resource	    = &pc7302_nand_resource,
++	.id		    = -1,
++	.dev.platform_data  = &pc7302_nand_platdata,
++};
++
++static void pc7302_init_nand(void)
++{
++	platform_device_register(&pc7302_nand);
++}
++
++static void __init pc7302_init(void)
++{
++	unsigned long device_id =
++		__raw_readl(IO_ADDRESS(PICOXCELL_AXI2CFG_BASE +
++				       AXI2CFG_DEVICE_ID_REG_OFFSET));
++
++	picoxcell_core_init();
++
++	/*
++	 * If we haven't booted in parallel mode, then allow ARM.4 GPIO pin to
++	 * be used as GPIO to drive the NAND. We can't do this by GPIO number
++	 * as ARM GPIO 4 can go to two different pads. Specify the pad by
++	 * name.
++	 */
++	if (picoxcell_has_feature(PICOXCELL_FEATURE_SW_NAND)) {
++		const char *pad = NULL;
++
++		switch (device_id) {
++		case 0x8003:
++		case 0x8007:
++			pad = "arm4";
++			break;
++
++		case 0x20:
++		case 0x21:
++		case 0x22:
++			pad = "ebi_addr22";
++			break;
++
++		default:
++			break;
++		}
++		WARN_ON(picoxcell_pin_set_mux_byname(pad, MUX_ARM));
++		pc7302_init_nand();
++	} else
++		pc7302_init_nor();
++
++	pc7302_panic_init();
++}
++
++MACHINE_START(PC7302, "PC7302")
++	.map_io		= picoxcell_map_io,
++	.init_irq	= picoxcell_init_irq,
++	.init_early	= picoxcell_init_early,
++	.timer		= &picoxcell_sys_timer,
++	.init_machine	= pc7302_init,
++MACHINE_END
 -- 
 1.7.3.4
