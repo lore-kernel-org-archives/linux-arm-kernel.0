@@ -1,49 +1,103 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Feb 2011 21:45:22 +0000
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <20110202.133831.193702414.davem@davemloft.net>
-References: <201102021700.20683.arnd@arndb.de>
-	<20110202163702.GA23240@n2100.arm.linux.org.uk>
-	<20110202.133831.193702414.davem@davemloft.net>
-Message-ID: <20110202214522.GG31043@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 2 Feb 2011 16:54:52 -0500 (EST)
+Subject: [PATCH] ARM: bitops: Fix low-level code to be Thumb-2 compatible
+In-Reply-To: <20110202212449.GF31043@n2100.arm.linux.org.uk>
+References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
+	<20110202212449.GF31043@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102021650040.8212@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 02, 2011 at 01:38:31PM -0800, David Miller wrote:
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Date: Wed, 2 Feb 2011 16:37:02 +0000
+On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
+
+> On Wed, Feb 02, 2011 at 02:33:55PM -0500, Nicolas Pitre wrote:
+> > On Wed, 2 Feb 2011, Dave Martin wrote:
+> > 
+> > > The new bitops code cunningly str <Rt>, [r1, -r1] to trigger
+> > > a fault by attempting to store to address zero.
+> > > 
+> > > This code doesn't assemble in Thumb-2, since Thumb-2 doesn't
+> > > allow negative register offsets at all for loads and stores.
+> > > 
+> > > The patch loads 0 into r2 and uses that as a base register
+> > > instead for the Thumb-2 case: r2 seems non-live at every
+> > > instance of this problem.
+> > > 
+> > > The ARM case is unaffected.
+> > > 
+> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > 
+> > Russell proposed a better solution already:
+> > 
+> > http://mid.gmane.org/alpine.LFD.2.00.1101181312360.8580 at xanadu.home
+> > 
+> > No idea why this wasn't folded in his series yet though.
 > 
-> > 1. there's no way to tell GCC that the inline assembly is a load
-> >    instruction and therefore it needs to schedule the following
-> >    instructions appropriately.
+> Now added, and original tested-by's dropped.  It now needs re-testing.
 > 
-> Just add a dummy '"m" (pointer)' asm input argument to the inline asm
-> statement.  Just make sure "typeof(pointer)" has a size matching the
-> size of the load your are performing.
-
-That involves this problematical cast from a packed struct pointer to
-an unsigned long pointer, which according to the C standard and GCC
-folk is undefined.
-
-> > 2. GCC will needlessly reload pointers from structures and other such
-> >    behaviour because it can't be told clearly what the inline assembly
-> >    is doing, so the inline asm needs to have a "memory" clobber.
+> 8<----
+> Subject: [PATCH] ARM: bitops: ensure set/clear/change bitops take a word-aligned pointer
 > 
-> This behavior is correct, and in fact needed.  Writing to chip registers
-> can trigger changes to arbitrary main memory locations.
+> Add additional instructions to our assembly bitops functions to ensure
+> that they only operate on word-aligned pointers.  This will be necessary
+> when we switch these operations to use the word-based exclusive
+> operations.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-That is really not an argument which stands up to analysis.
+Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-When does main memory locations change as a result of a write to a chip
-register?  The answer is: when DMA is performed - which could be
-many microseconds or even milliseconds after you've written the
-register, which would be long after you've exited the function doing
-the writing.
+And this has been tested by many people already as this is the version 
+I've been carrying in the Linaro kernel tree for a while.
 
-Not only that, but we have the DMA API to deal with the implications of
-that.  On ARM, that's a function call, and GCC can't make any assumptions
-about memory contents across function calls where it doesn't know what
-the function does.
 
-Practice over the last 15 years on ARM has also shown that this is not
-necessary.
+
+
+> ---
+>  arch/arm/lib/bitops.h |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+> index d422529..bd00551 100644
+> --- a/arch/arm/lib/bitops.h
+> +++ b/arch/arm/lib/bitops.h
+> @@ -1,6 +1,8 @@
+>  
+>  #if __LINUX_ARM_ARCH__ >= 6 && defined(CONFIG_CPU_32v6K)
+>  	.macro	bitop, instr
+> +	ands	ip, r1, #3
+> +	strneb	r1, [ip]		@ assert word-aligned
+>  	mov	r2, #1
+>  	and	r3, r0, #7		@ Get bit offset
+>  	add	r1, r1, r0, lsr #3	@ Get byte offset
+> @@ -14,6 +16,8 @@
+>  	.endm
+>  
+>  	.macro	testop, instr, store
+> +	ands	ip, r1, #3
+> +	strneb	r1, [ip]		@ assert word-aligned
+>  	and	r3, r0, #7		@ Get bit offset
+>  	mov	r2, #1
+>  	add	r1, r1, r0, lsr #3	@ Get byte offset
+> @@ -32,6 +36,8 @@
+>  	.endm
+>  #else
+>  	.macro	bitop, instr
+> +	ands	ip, r1, #3
+> +	strneb	r1, [ip]		@ assert word-aligned
+>  	and	r2, r0, #7
+>  	mov	r3, #1
+>  	mov	r3, r3, lsl r2
+> @@ -52,6 +58,8 @@
+>   * to avoid dirtying the data cache.
+>   */
+>  	.macro	testop, instr, store
+> +	ands	ip, r1, #3
+> +	strneb	r1, [ip]		@ assert word-aligned
+>  	add	r1, r1, r0, lsr #3
+>  	and	r3, r0, #7
+>  	mov	r0, #1
+> -- 
+> 1.6.2.5
+> 
