@@ -1,10 +1,10 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 Feb 2011 14:55:17 +0300
-Subject: [PATCH v1 3/9] da850: pruss platform specific additions.
-In-Reply-To: <1296571667-12049-4-git-send-email-subhasish@mistralsolutions.com>
+Date: Wed, 02 Feb 2011 15:01:34 +0300
+Subject: [PATCH v1 5/9] da850: pruss CAN board specific additions.
+In-Reply-To: <1296571667-12049-6-git-send-email-subhasish@mistralsolutions.com>
 References: <1296571667-12049-1-git-send-email-subhasish@mistralsolutions.com>
-	<1296571667-12049-4-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <4D494625.4030503@mvista.com>
+	<1296571667-12049-6-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <4D49479E.3010008@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,56 +12,71 @@ Hello.
 
 On 01-02-2011 17:47, Subhasish Ghosh wrote:
 
-> This patch adds the platform device and assignes the platform resources
-> for the PRUSS mfd driver.
+> This patch adds the pruss CAN pin mux and registers the device
+> with the pruss mfd driver.
 
 > Signed-off-by: Subhasish Ghosh<subhasish@mistralsolutions.com>
 [...]
 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 3443d97..341d836 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -238,6 +238,12 @@ static struct clk tptc2_clk = {
->   	.flags		= ALWAYS_ENABLED,
->   };
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 7938c6d..285545f 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -1053,8 +1053,46 @@ static __init int da850_evm_init_cpufreq(void)
+>   static __init int da850_evm_init_cpufreq(void) { return 0; }
+>   #endif
 >
-> +static struct clk pruss_clk = {
-> +	.name		= "pruss",
-> +	.parent		= &pll0_sysclk2,
-> +	.lpsc		= DA8XX_LPSC0_DMAX,
+> +const short da850_pruss_can_pins[] = {
 
-    IIRC, you were asked to change/add a new name for what is known as 
-DA8XX_LPSC0_DMAX...
+    Only da850_evm_pruss_can_pins[].
 
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index beda8a4..562882c 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> +	DA850_PRUSS_PRU0_R31_0, DA850_PRUSS_PRU1_R30_15,
+> +	DA850_PRUSS_PRU1_R31_18,
+> +	-1
+> +};
+> +
+> +static int __init da850_evm_setup_pruss_can(void)
+> +{
+> +	int ret, val = 0;
+> +	void __iomem *cfg_chip3_base;
 
-> +struct platform_device da8xx_pruss_dev = {
-> +	.name			=	"da8xx_pruss",
-> +	.id				=	-1,
-> +	.num_resources	=	ARRAY_SIZE(da8xx_pruss_resources),
-> +	.resource		=	da8xx_pruss_resources,
+    CFGCHIP3 is a signle register, so it doesn't make sense to talk about its 
+base...
 
-    Please align = uniformly.
+> +	if (!machine_is_davinci_da850_evm())
+> +		return 0;
 
-> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-> index cfcb223..e5c178a 100644
-> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
-> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-[...]
-> @@ -81,6 +82,7 @@ int da8xx_register_watchdog(void);
->  int da8xx_register_usb20(unsigned mA, unsigned potpgt);
->  int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
->  int da8xx_register_emac(void);
-> +int da8xx_register_pruss(struct da8xx_pruss_devices *);
->  int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
->  int da8xx_register_mmcsd0(struct davinci_mmc_config *config);
->  int da850_register_mmcsd1(struct davinci_mmc_config *config);
+    This check doesn't make sense as this function is not declared as 
+*_initcall(). It will only be called on this machine anyway.
 
-    This patch should clearly precede the patch 2/9 as it defines 
-da8xx_register_pruss() which 2/9 uses.
+> +	ret = davinci_cfg_reg_list(da850_pruss_can_pins);
+> +	if (ret)
+> +		pr_warning("%s: da850_pruss_can_pins mux setup "
+> +					"failed:%d\n", __func__, ret);
+> +	cfg_chip3_base = DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG);
+> +	val = __raw_readl(cfg_chip3_base);
+> +	val |= BIT(3);
+> +	__raw_writel(val, cfg_chip3_base);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct da8xx_pruss_can_data can_data = {
+> +	.version	= 1,
+> +};
+> +
+>   static struct da8xx_pruss_devices pruss_devices[] = {
+> -	{.dev_name = NULL,},
+> +	{
+> +		.dev_name	= "da8xx_pruss_can",
+> +		.pdata		= &can_data,
+> +		.pdata_size	= sizeof(can_data),
+> +		.setup		= da850_evm_setup_pruss_can,
+> +	},
+> +	{
+> +		.dev_name	= NULL,
+> +	},
+
+    Why you need a dummy lst element in this array?
 
 WBR, Sergei
