@@ -1,50 +1,42 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 02 Feb 2011 17:10:37 -0500 (EST)
-Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
-In-Reply-To: <20110202210925.GD31043@n2100.arm.linux.org.uk>
-References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20110202210925.GD31043@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1102021704580.8212@xanadu.home>
+From: ecc@cmu.edu (Eric Cooper)
+Date: Wed,  2 Feb 2011 17:16:09 -0500
+Subject: [PATCH v2 1/3] add machine-specific hook to machine_kexec
+Message-ID: <1296684971-10577-1-git-send-email-ecc@cmu.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Feb 2011, Russell King - ARM Linux wrote:
+Provide the option to call a machine-specific function
+before kexec'ing a new kernel.
 
-> On Wed, Feb 02, 2011 at 03:43:29PM +0100, Per Fransson wrote:
-> > When restarting using the kernel kexec functionality the MMU
-> > needs to be turned off. Any code which does this needs to use
-> > identity mapped addresses to get reliable results. In the ARM
-> > kexec case this identity mapping is done:
-> > 
-> > - using the page table of the current task
-> > 
-> > - for all addresses normally used by user space,
-> >   i.e. 0x00000000-PAGE_OFFSET
-> > 
-> > If kexec is used at a kernel crash to collect a core dump this
-> > means that we lose important information.
-> > 
-> > This is what this patches does:
-> > 
-> > * Actually turns off the MMU, which has been omitted by mistake
-> > 
-> > * Sets up a more selective identity mapping
-> > 
-> > * Restores the old mapping once the MMU is off
-> > 
-> > Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
-> > ---
-> > v2 changes:
-> > 
-> > * now uses (modified versions of) the identity mapping functions in idmap.c
-> >   as they look in 2.6.38-rc1. Some pud-level code has been added there in
-> >   linux-next.
-> 
-> Thanks.  As this been tested with ARMv4/v5 CPUs as well?
+Signed-off-by: Eric Cooper <ecc@cmu.edu>
+---
+ arch/arm/kernel/machine_kexec.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-I have doubts about the effectiveness of setup_mm_for_reboot() on any 
-machine where physical RAM starts at 0xc0000000 or above, such as on 
-SA1100.
-
-
-Nicolas
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index 30ead13..e59bbd4 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -75,6 +75,11 @@ void machine_crash_shutdown(struct pt_regs *regs)
+ 	printk(KERN_INFO "Loading crashdump kernel...\n");
+ }
+ 
++/*
++ * Function pointer to optional machine-specific reinitialization
++ */
++void (*kexec_reinit)(void);
++
+ void machine_kexec(struct kimage *image)
+ {
+ 	unsigned long page_list;
+@@ -104,6 +109,8 @@ void machine_kexec(struct kimage *image)
+ 			   (unsigned long) reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
+ 	printk(KERN_INFO "Bye!\n");
+ 
++	if (kexec_reinit)
++		kexec_reinit();
+ 	local_irq_disable();
+ 	local_fiq_disable();
+ 	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
+-- 
+1.7.2.3
