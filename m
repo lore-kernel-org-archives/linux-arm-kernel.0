@@ -1,40 +1,85 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 Feb 2011 15:29:01 +0300
-Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
-In-Reply-To: <1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
-References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>
-	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <4D494E0D.4090207@mvista.com>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Wed, 2 Feb 2011 18:13:33 +0530
+Subject: [PATCHv8 07/12] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <eb8f43235c8ff2816ada7b56ffe371ea6140cae8.1292443200.git.m.nazarewicz@samsung.com>
+References: <cover.1292443200.git.m.nazarewicz@samsung.com>
+	<eb8f43235c8ff2816ada7b56ffe371ea6140cae8.1292443200.git.m.nazarewicz@samsung.com>
+Message-ID: <20110202124333.GB26396@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Michal,
 
-On 02-02-2011 0:49, Michael Williamson wrote:
+On Wed, Dec 15, 2010 at 09:34:27PM +0100, Michal Nazarewicz wrote:
+> The Contiguous Memory Allocator is a set of functions that lets
+> one initialise a region of memory which then can be used to perform
+> allocations of contiguous memory chunks from.
+> 
+> CMA allows for creation of private and non-private contexts.
+> The former is reserved for CMA and no other kernel subsystem can
+> use it.  The latter allows for movable pages to be allocated within
+> CMA's managed memory so that it can be used for page cache when
+> CMA devices do not use it.
+> 
+> Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> 
 
-> Add SPI registration routines, clocks, and driver resources for
-> DA850/OMAP-L138/AM18x and DA830/OMAP-L137/AM17x platforms.
+<snip>
 
-> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
-[...]
+> +/************************* Initialise CMA *************************/
+> +
+> +unsigned long cma_reserve(unsigned long start, unsigned long size,
+> +			  unsigned long alignment)
+> +{
+> +	pr_debug("%s(%p+%p/%p)\n", __func__, (void *)start, (void *)size,
+> +		 (void *)alignment);
+> +
+> +	/* Sanity checks */
+> +	if (!size || (alignment & (alignment - 1)))
+> +		return (unsigned long)-EINVAL;
+> +
+> +	/* Sanitise input arguments */
+> +	start = PAGE_ALIGN(start);
+> +	size  = PAGE_ALIGN(size);
+> +	if (alignment < PAGE_SIZE)
+> +		alignment = PAGE_SIZE;
+> +
+> +	/* Reserve memory */
+> +	if (start) {
+> +		if (memblock_is_region_reserved(start, size) ||
+> +		    memblock_reserve(start, size) < 0)
+> +			return (unsigned long)-EBUSY;
+> +	} else {
+> +		/*
+> +		 * Use __memblock_alloc_base() since
+> +		 * memblock_alloc_base() panic()s.
+> +		 */
+> +		u64 addr = __memblock_alloc_base(size, alignment, 0);
+> +		if (!addr) {
+> +			return (unsigned long)-ENOMEM;
+> +		} else if (addr + size > ~(unsigned long)0) {
+> +			memblock_free(addr, size);
+> +			return (unsigned long)-EOVERFLOW;
+> +		} else {
+> +			start = addr;
+> +		}
+> +	}
+> +
 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 3443d97..68fe4c2 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-[...]
-> @@ -403,6 +417,8 @@ static struct clk_lookup da850_clks[] = {
->   	CLK(NULL,		"aemif",	&aemif_clk),
->   	CLK(NULL,		"usb11",	&usb11_clk),
->   	CLK(NULL,		"usb20",	&usb20_clk),
-> +	CLK("spi_davinci.0",	NULL,		&spi0_clk),
-> +	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+Reserving the areas of memory belonging to CMA using memblock_reserve,
+would preclude that range from the zones, due to which it would not be
+available for buddy allocations right ?
 
-    BTW, da830.c has "dm_spi.[01]" instead -- which should be fixed (by yet 
-another patch).
+> +	return start;
+> +}
+> +
+> +
 
->   	CLK(NULL,		NULL,		NULL),
->   };
->
-
-WBR, Sergei
+-- 
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
