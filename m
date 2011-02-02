@@ -1,74 +1,96 @@
-From: iant@google.com (Ian Lance Taylor)
-Date: Wed, 02 Feb 2011 11:14:45 -0800
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <201102021839.17223.arnd@arndb.de> (Arnd Bergmann's message of
-	"Wed, 2 Feb 2011 18:39:17 +0100")
-References: <201102021700.20683.arnd@arndb.de>
-	<20110202163702.GA23240@n2100.arm.linux.org.uk>
-	<201102021839.17223.arnd@arndb.de>
-Message-ID: <mcrpqrafdui.fsf@google.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 2 Feb 2011 14:33:55 -0500 (EST)
+Subject: [PATCH] ARM: bitops: Fix low-level code to be Thumb-2 compatible
+In-Reply-To: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
+References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1102021421160.8580@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Wed, 2 Feb 2011, Dave Martin wrote:
 
-> On Wednesday 02 February 2011 17:37:02 Russell King - ARM Linux wrote:
->> We used to use inline assembly at one point, but that got chucked out.
->> The problem is that using asm() for this causes GCC to generate horrid
->> code.
->> 
->> 1. there's no way to tell GCC that the inline assembly is a load
->>    instruction and therefore it needs to schedule the following
->>    instructions appropriately.
->> 
->> 2. GCC will needlessly reload pointers from structures and other such
->>    behaviour because it can't be told clearly what the inline assembly
->>    is doing, so the inline asm needs to have a "memory" clobber.
->> 
->> 3. It seems to misses out using the pre-index addressing, prefering to
->>    create add/sub instructions prior to each inline assembly load/store.
->> 
->> 4. There are no (documented) constraints in GCC to allow you to represent
->>    the offset format for the half-word instructions.
->> 
->> Overall, it means greater register pressure, more instructions, larger
->> functions, greater instruction cache pressure, etc.
->
-> Another solution would be to declare the readl function extern and define
-> it out of line, but I assume that this would be at least as bad as an
-> inline assembly for all the points you brought up, right?
->
-> Would it be possible to add the proper constraints for defining readl
-> in an efficient way to a future version of gcc? That wouldn't help us
-> in the near future, but we could at some points use those in a number
-> of places.
+> The new bitops code cunningly str <Rt>, [r1, -r1] to trigger
+> a fault by attempting to store to address zero.
+> 
+> This code doesn't assemble in Thumb-2, since Thumb-2 doesn't
+> allow negative register offsets at all for loads and stores.
+> 
+> The patch loads 0 into r2 and uses that as a base register
+> instead for the Thumb-2 case: r2 seems non-live at every
+> instance of this problem.
+> 
+> The ARM case is unaffected.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-I think it would be quite difficult to implement item 1 above in a way
-that was actually usable.  It would require some way to describe the
-scheduling requirements of an asm.  But the details of scheduling are
-backend specific.  Internally there are define_insn_reservation
-structures which have names, but the names are processor specific which
-is not what you want in source code (by processor specific I mean
-specific to particular CPUs within a family).  There are define_cpu_unit
-structures which also have names, but are again processor specific.
-What you want here is some non-processor-specific way to describe the
-characteristics of an instruction.  gcc does not have that today.
+Russell proposed a better solution already:
 
-Even if somebody implemented all that, most inline asms are not a single
-instructions and thus would find it difficult to take advantage of it.
-I don't see this as paying off in the long run.
+http://mid.gmane.org/alpine.LFD.2.00.1101181312360.8580 at xanadu.home
 
-A more likely payoff would be to develop builtin functions for whatever
-functionality is required that can not expressed in source code.
+No idea why this wasn't folded in his series yet though.
 
-Item 2 above can be done.  It is possible to describe precisely which
-areas of memory are clobbered.
 
-Item 3 above seems impossible to me.  There is no way to combine
-compiler generated instructions with user written inline asm such that
-pre-index addressing can be used.  Perhaps I misunderstand.
+Nicolas
 
-Item 4 can be implemented; please consider opening a feature request in
-bugzilla.
 
-Ian
+> ---
+>  arch/arm/lib/bitops.h |   16 ++++++++++++----
+>  1 files changed, 12 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+> index f8a2bd3..87d6b17 100644
+> --- a/arch/arm/lib/bitops.h
+> +++ b/arch/arm/lib/bitops.h
+> @@ -1,7 +1,9 @@
+>  #if __LINUX_ARM_ARCH__ >= 6
+>  	.macro	bitop, instr
+>  	tst	r1, #3
+> -	strne	r1, [r1, -r1]		@ assert word-aligned
+> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
+> + THUMB(	movne	r2, #0		)
+> + THUMB(	strne	r1, [r2]	)
+>  	mov	r2, #1
+>  	and	r3, r0, #31		@ Get bit offset
+>  	mov	r0, r0, lsr #5
+> @@ -17,7 +19,9 @@
+>  
+>  	.macro	testop, instr, store
+>  	tst	r1, #3
+> -	strne	r1, [r1, -r1]		@ assert word-aligned
+> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
+> + THUMB(	movne	r2, #0		)
+> + THUMB(	strne	r1, [r2]	)
+>  	mov	r2, #1
+>  	and	r3, r0, #31		@ Get bit offset
+>  	mov	r0, r0, lsr #5
+> @@ -38,7 +42,9 @@
+>  #else
+>  	.macro	bitop, instr
+>  	tst	r1, #3
+> -	strne	r1, [r1, -r1]		@ assert word-aligned
+> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
+> + THUMB(	movne	r2, #0		)
+> + THUMB(	strne	r1, [r2]	)
+>  	and	r2, r0, #31
+>  	mov	r0, r0, lsr #5
+>  	mov	r3, #1
+> @@ -61,7 +67,9 @@
+>   */
+>  	.macro	testop, instr, store
+>  	tst	r1, #3
+> -	strne	r1, [r1, -r1]		@ assert word-aligned
+> + ARM(	strne	r1, [r1, -r1]	)	@ assert word-aligned
+> + THUMB(	movne	r2, #0		)
+> + THUMB(	strne	r1, [r2]	)
+>  	and	r3, r0, #31
+>  	mov	r0, r0, lsr #5
+>  	save_and_disable_irqs ip
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
