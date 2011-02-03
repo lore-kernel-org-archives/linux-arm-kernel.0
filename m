@@ -1,23 +1,39 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Thu, 03 Feb 2011 09:56:32 +0000
-Subject: [PATCH] ASoC: CS4271: Move Chip Select control out of the
-	CODEC code.
-In-Reply-To: <1296691905.1504.47.camel@r60e>
-References: <1296691905.1504.47.camel@r60e>
-Message-ID: <1296726992.3456.17.camel@odin>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Feb 2011 11:58:45 +0200
+Subject: [PATCHv2 2/2] Input: ads7846 - configure pendown gpio as input
+In-Reply-To: <1296726530-32199-1-git-send-email-sourav.poddar@ti.com>
+References: <1296726530-32199-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20110203095845.GK23561@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-02-03 at 03:11 +0300, Alexander Sverdlin wrote:
-> From: Alexander Sverdlin <subaparts@yandex.ru>
+On Thu, Feb 03, 2011 at 03:18:50PM +0530, Sourav Poddar wrote:
+> The ads7846 driver requests a gpio to detect pendown events,
+> but does not configure its direction. Configure this gpio
+> as an input after requesting it.
 > 
-> Move Chip Select control out of the CODEC code for CS4271.
->         
-> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
 > ---
+> changes between v2 and v1: Added return error support in v2. 
+>  
+> drivers/input/touchscreen/ads7846.c |    7 +++++++
+> 1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+> index 036f245..f30768b 100644
+> --- a/drivers/input/touchscreen/ads7846.c
+> +++ b/drivers/input/touchscreen/ads7846.c
+> @@ -962,6 +962,13 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+>  		return err;
+>  	}
+>  
+> +	err = gpio_direction_input(pdata->gpio_pendown);
+> +	if (err) {
+> +		dev_err(&spi->dev, "failed to configure pendown GPIO input direction %d\n",
+> +			pdata->gpio_pendown);
+> +		return err;
 
-Acked-by: Liam Girdwood <lrg@slimlogic.co.uk>
+and now you miss a gpio_free().
+
 -- 
-Freelance Developer, SlimLogic Ltd
-ASoC and Voltage Regulator Maintainer.
-http://www.slimlogic.co.uk
+balbi
