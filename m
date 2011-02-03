@@ -1,87 +1,63 @@
-From: s-ghorai@ti.com (Ghorai, Sukumar)
-Date: Fri, 4 Feb 2011 01:06:34 +0530
-Subject: [PATCH v9 0/7] nand prefetch-irq support and ecc layout chanage
-In-Reply-To: <1296209529-22696-1-git-send-email-s-ghorai@ti.com>
-References: <1296209529-22696-1-git-send-email-s-ghorai@ti.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B036AB6B036@dbde02.ent.ti.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Thu,  3 Feb 2011 15:11:59 -0500
+Subject: [PATCH] davinci: remove unused DA830_edma_ch enum
+Message-ID: <1296763920-4165-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The DA830_edma_ch enum set is not used.  Remove it.
+
+Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+---
+ arch/arm/mach-davinci/include/mach/edma.h |   36 -----------------------------
+ 1 files changed, 0 insertions(+), 36 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/include/mach/edma.h b/arch/arm/mach-davinci/include/mach/edma.h
+index dc10ef6..20c77f2 100644
+--- a/arch/arm/mach-davinci/include/mach/edma.h
++++ b/arch/arm/mach-davinci/include/mach/edma.h
+@@ -151,42 +151,6 @@ struct edmacc_param {
+ #define DA830_DMACH2EVENT_MAP1		0x00000000u
+ #define DA830_EDMA_ARM_OWN		0x30FFCCFFu
  
-> -----Original Message-----
-> From: Ghorai, Sukumar
-> Sent: Friday, January 28, 2011 3:42 PM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org;
-> Ghorai, Sukumar
-> Subject: [PATCH v9 0/7] nand prefetch-irq support and ecc layout chanage
-> 
-> The following set of patches applies on linux-2.6.
-> 
-> The main motivations behind this patch series are -
->         1. support NAND I/O in irq mode.
->         2. support of different ECC schema.
->         3. also add support ecc layout as like in romcode ecc layout, but
-> not enabled
-> 
-> v9: gpmc_init() changed to postcore_initcall(gpmc_init);
-> 
-> v8: free_irq() added; used timeout for while(tight loop)
-> And resend of http://www.mail-archive.com/linux-
-> omap at vger.kernel.org/msg41614.html
-> 
-> v7: NAND type (x16 or x8) is board specific and not omap specific; this
-> passed form board file.
->     http://www.mail-archive.com/linux-omap at vger.kernel.org/msg41469.html
-> 
-> v6: configurable transfer type from board file;
->     #define irq number used for nand-irq
->     http://www.mail-archive.com/linux-omap at vger.kernel.org/msg39397.html
-> 
-> v5: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35860.html
-> This address the input as to support the irq_chained in GPMC.
-> And resend of
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg35848.html
-> 
-> v4: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg34882.html
-> and resend of
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32689.html
-> 
-> v3: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg32071.html
-> Rebase on latest codebase and previous patch(posted).
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31963.html
-> 
-> v2: Rebase on latest codebase and previous patch(posted).
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg31471.html
-> 
-> v1: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg26666.html
-> 
-> Sukumar Ghorai (7):
->   omap3630: nand: fix device size to work in polled mode
->   omap3: nand: configurable transfer type per board
->   omap: gpmc: enable irq mode in gpmc
->   omap3: nand: prefetch in irq mode support
->   omap3: nand: configurable fifo threshold to gain the throughput
->   omap3: nand: ecc layout select from board file
->   omap3: nand: making ecc layout as compatible with romcode ecc
-> 
->  arch/arm/mach-omap2/board-3430sdp.c    |    2 +-
->  arch/arm/mach-omap2/board-3630sdp.c    |    3 +-
->  arch/arm/mach-omap2/board-flash.c      |   13 +-
->  arch/arm/mach-omap2/board-flash.h      |    4 +-
->  arch/arm/mach-omap2/board-ldp.c        |    2 +-
->  arch/arm/mach-omap2/board-zoom.c       |    5 +-
->  arch/arm/mach-omap2/gpmc-nand.c        |    7 +-
->  arch/arm/mach-omap2/gpmc.c             |   56 +++++-
->  arch/arm/mach-omap2/io.c               |    2 -
->  arch/arm/plat-omap/include/plat/gpmc.h |   18 ++-
->  arch/arm/plat-omap/include/plat/irqs.h |    9 +-
->  arch/arm/plat-omap/include/plat/nand.h |   11 +
->  drivers/mtd/nand/Kconfig               |   17 --
->  drivers/mtd/nand/omap2.c               |  367 ++++++++++++++++++++++++---
-> -----
->  14 files changed, 386 insertions(+), 130 deletions(-)
-Tony,
-In this version I have addressed all inputs on previous versions.
-Please check if it's possible to push all theses in any of your testing
-branch!
+-/* DA830 specific EDMA3 Events Information */
+-enum DA830_edma_ch {
+-	DA830_DMACH_MCASP0_RX,
+-	DA830_DMACH_MCASP0_TX,
+-	DA830_DMACH_MCASP1_RX,
+-	DA830_DMACH_MCASP1_TX,
+-	DA830_DMACH_MCASP2_RX,
+-	DA830_DMACH_MCASP2_TX,
+-	DA830_DMACH_GPIO_BNK0INT,
+-	DA830_DMACH_GPIO_BNK1INT,
+-	DA830_DMACH_UART0_RX,
+-	DA830_DMACH_UART0_TX,
+-	DA830_DMACH_TMR64P0_EVTOUT12,
+-	DA830_DMACH_TMR64P0_EVTOUT34,
+-	DA830_DMACH_UART1_RX,
+-	DA830_DMACH_UART1_TX,
+-	DA830_DMACH_SPI0_RX,
+-	DA830_DMACH_SPI0_TX,
+-	DA830_DMACH_MMCSD_RX,
+-	DA830_DMACH_MMCSD_TX,
+-	DA830_DMACH_SPI1_RX,
+-	DA830_DMACH_SPI1_TX,
+-	DA830_DMACH_DMAX_EVTOUT6,
+-	DA830_DMACH_DMAX_EVTOUT7,
+-	DA830_DMACH_GPIO_BNK2INT,
+-	DA830_DMACH_GPIO_BNK3INT,
+-	DA830_DMACH_I2C0_RX,
+-	DA830_DMACH_I2C0_TX,
+-	DA830_DMACH_I2C1_RX,
+-	DA830_DMACH_I2C1_TX,
+-	DA830_DMACH_GPIO_BNK4INT,
+-	DA830_DMACH_GPIO_BNK5INT,
+-	DA830_DMACH_UART2_RX,
+-	DA830_DMACH_UART2_TX
+-};
+-
+ /*ch_status paramater of callback function possible values*/
+ #define DMA_COMPLETE 1
+ #define DMA_CC_ERROR 2
+-- 
+1.7.0.4
