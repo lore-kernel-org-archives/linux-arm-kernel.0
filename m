@@ -1,51 +1,79 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 3 Feb 2011 11:10:33 +0100
-Subject: [PATCHv2 2/2] Input: ads7846 - configure pendown gpio as input
-In-Reply-To: <20110203095845.GK23561@legolas.emea.dhcp.ti.com>
-References: <1296726530-32199-1-git-send-email-sourav.poddar@ti.com>
-	<20110203095845.GK23561@legolas.emea.dhcp.ti.com>
-Message-ID: <20110203100528.GA6508@pengutronix.de>
+From: per.fransson.ml@gmail.com (Per Fransson)
+Date: Thu, 3 Feb 2011 11:14:45 +0100
+Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
+In-Reply-To: <20110203073232.GA2708@acer>
+References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
+	<20110203073232.GA2708@acer>
+Message-ID: <AANLkTi=ft4rvX4RmNr1veiWR7ED1aLp94hm0Ky8q4-OW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 03, 2011 at 11:58:45AM +0200, Felipe Balbi wrote:
-> On Thu, Feb 03, 2011 at 03:18:50PM +0530, Sourav Poddar wrote:
-> > The ads7846 driver requests a gpio to detect pendown events,
-> > but does not configure its direction. Configure this gpio
-> > as an input after requesting it.
-> > 
-> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> > ---
-> > changes between v2 and v1: Added return error support in v2. 
-> >  
-> > drivers/input/touchscreen/ads7846.c |    7 +++++++
-> > 1 files changed, 7 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
-> > index 036f245..f30768b 100644
-> > --- a/drivers/input/touchscreen/ads7846.c
-> > +++ b/drivers/input/touchscreen/ads7846.c
-> > @@ -962,6 +962,13 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
-> >  		return err;
-> >  	}
-> >  
-> > +	err = gpio_direction_input(pdata->gpio_pendown);
-> > +	if (err) {
-> > +		dev_err(&spi->dev, "failed to configure pendown GPIO input direction %d\n",
-> > +			pdata->gpio_pendown);
-> > +		return err;
-> 
-> and now you miss a gpio_free().
+Hi,
 
-Better use gpio_request_one()?
+Ok, I've tried to summarize your comments:
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110203/1d4304b4/attachment.sig>
+* Break out turning off the MMU.
+
+  - Not sure about this one, the changes rely on each other anyway.
+But if you insist...
+
+* Don't add a kexec specific structure as argument to identity_mapping_add().
+
+  - How about a separate 'store_mapping_for(<address to store for>,
+<where to store>)' function?
+    Could it be placed idmap.c as well?
+
+* Always use processor.reset, regardless of #ifdef MULTI_CPU
+
+  - Yes
+
+* beq -> bneq in relocate_new_kernel()
+
+  - errare humanum est =o)
+
+* better way to check for the MMU actually being off?
+
+  - Will reading the M bit of the System Control Register do?
+
+* Prettier, more general copy lists for restoring the page table entries.
+
+  - Are there any such pre-existing types, e.g.
+
+        struct {
+            size_t howmuch;
+            void * towhere;
+            char what[0];
+        }
+
+    or something similar?
+
+* The old 0x0-PAGE_OFFSET 1-1 mapping doesn't cover the physical
+addresses needed if these are
+  higher, e.g. 0xd0000000--. Thus it will never work.
+
+  - My patch will identity map the needed addresses regardless of
+whether they are located in the
+    user or kernel space ranges. This at least *could* work, if we are
+lucky and it doesn't coincide
+    with the mappings for the code we still need to run before turning
+off the MMU.
+
+* The jump to physical addresses in cpu_reset() needs to account for
+PHYS_OFFSET!=0
+
+  - Yes
+
+* Move ARM specific struct definitions to ARM specific header
+
+  - Yes
+
+* Tested on ARMv4/v5 CPUs?
+
+  - No, sorry, there are none available to me. They should work like
+they used to if they don't use
+    any other code than the cpu_reset() and relocate_new_kernel()
+functions once the MMU has been
+    turned off.
+
+Regards,
+Per
