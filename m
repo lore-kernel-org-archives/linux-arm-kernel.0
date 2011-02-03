@@ -1,83 +1,27 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  3 Feb 2011 18:02:40 +0000
-Subject: [PATCH v2 4/5] ARM: omap3: Thumb-2 compatibility for sram34xx.S
-In-Reply-To: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
-References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1296756161-26092-5-git-send-email-dave.martin@linaro.org>
+Date: Thu, 3 Feb 2011 18:06:59 +0000
+Subject: [PATCH REPOST] ARM: bitops: Use BX instead of MOV PC,LR
+In-Reply-To: <AANLkTinC_+3We3pSffhry6K3VqzZc6Db7DL=eDfjtNMp@mail.gmail.com>
+References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
+	<20110202212449.GF31043@n2100.arm.linux.org.uk>
+	<20110203104420.GA2666@arm.com> <20110203104751.GB2666@arm.com>
+	<AANLkTinC_+3We3pSffhry6K3VqzZc6Db7DL=eDfjtNMp@mail.gmail.com>
+Message-ID: <AANLkTi=MG2XJBxFhrQjJMT1PZVKQJwmzYH9k1Fr1JfkL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- * Remove deprecated/undefined PC-relative stores
- * Add the required ENDPROC() directive for each ENTRY().
- * .align before data words
+On Thu, Feb 3, 2011 at 4:27 PM, Rabin Vincent <rabin@rab.in> wrote:
+> On Thu, Feb 3, 2011 at 16:17, Dave Martin <dave.martin@linaro.org> wrote:
+>> BX is appropriate here because this code is predicated on
+>> __LINUX_ARM_ARCH__ >= 6.
+>
+> But you're modifying the #else portion too?
+>
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/mach-omap2/sram34xx.S |   28 ++++++++++++++++++++--------
- 1 files changed, 20 insertions(+), 8 deletions(-)
+Darn, you're quite right... thanks for spotting that!
 
-diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
-index 7f893a2..829d235 100644
---- a/arch/arm/mach-omap2/sram34xx.S
-+++ b/arch/arm/mach-omap2/sram34xx.S
-@@ -116,24 +116,34 @@ ENTRY(omap3_sram_configure_core_dpll)
- 
- 					@ pull the extra args off the stack
- 					@  and store them in SRAM
-+
-+@ PC-relative stores lead to undefined behaviour in Thumb-2: use a r7 as a
-+@ base instead.
-+@ Be careful not to clobber r7 when maintaing this file.
-+ THUMB(	adr	r7, omap3_sram_configure_core_dpll			)
-+	.macro strtext Rt:req, label:req
-+ ARM(	str	\Rt, \label						)
-+ THUMB(	str	\Rt, [r7, \label - omap3_sram_configure_core_dpll]	)
-+	.endm
-+
- 	ldr	r4, [sp, #52]
--	str     r4, omap_sdrc_rfr_ctrl_0_val
-+	strtext	r4, omap_sdrc_rfr_ctrl_0_val
- 	ldr	r4, [sp, #56]
--	str     r4, omap_sdrc_actim_ctrl_a_0_val
-+	strtext	r4, omap_sdrc_actim_ctrl_a_0_val
- 	ldr	r4, [sp, #60]
--	str     r4, omap_sdrc_actim_ctrl_b_0_val
-+	strtext	r4, omap_sdrc_actim_ctrl_b_0_val
- 	ldr	r4, [sp, #64]
--	str     r4, omap_sdrc_mr_0_val
-+	strtext	r4, omap_sdrc_mr_0_val
- 	ldr	r4, [sp, #68]
--	str     r4, omap_sdrc_rfr_ctrl_1_val
-+	strtext	r4, omap_sdrc_rfr_ctrl_1_val
- 	cmp	r4, #0			@ if SDRC_RFR_CTRL_1 is 0,
- 	beq	skip_cs1_params		@  do not use cs1 params
- 	ldr	r4, [sp, #72]
--	str     r4, omap_sdrc_actim_ctrl_a_1_val
-+	strtext	r4, omap_sdrc_actim_ctrl_a_1_val
- 	ldr	r4, [sp, #76]
--	str     r4, omap_sdrc_actim_ctrl_b_1_val
-+	strtext	r4, omap_sdrc_actim_ctrl_b_1_val
- 	ldr	r4, [sp, #80]
--	str     r4, omap_sdrc_mr_1_val
-+	strtext	r4, omap_sdrc_mr_1_val
- skip_cs1_params:
- 	mrc	p15, 0, r8, c1, c0, 0	@ read ctrl register
- 	bic	r10, r8, #0x800		@ clear Z-bit, disable branch prediction
-@@ -271,6 +281,7 @@ skip_cs1_prog:
- 	ldr	r12, [r11]		@ posted-write barrier for SDRC
- 	bx	lr
- 
-+	.align
- omap3_sdrc_power:
- 	.word OMAP34XX_SDRC_REGADDR(SDRC_POWER)
- omap3_cm_clksel1_pll:
-@@ -319,6 +330,7 @@ omap3_sdrc_dlla_ctrl:
- 	.word OMAP34XX_SDRC_REGADDR(SDRC_DLLA_CTRL)
- core_m2_mask_val:
- 	.word 0x07FFFFFF
-+ENDPROC(omap3_sram_configure_core_dpll)
- 
- ENTRY(omap3_sram_configure_core_dpll_sz)
- 	.word	. - omap3_sram_configure_core_dpll
--- 
-1.7.1
+Will repost.
+
+Cheers
+---Dave
