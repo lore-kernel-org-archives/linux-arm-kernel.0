@@ -1,406 +1,111 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 3 Feb 2011 09:25:30 +0000
-Subject: [PATCH 1/2] ARM: QQ2440 machine architecture
-In-Reply-To: <20110202220530.GB2808@dandreoli.com>
-References: <20110202220359.GA2808@dandreoli.com>
-	<20110202220530.GB2808@dandreoli.com>
-Message-ID: <20110203092530.GA3141@pulham.picochip.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 Feb 2011 10:26:51 +0100
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <yw1xei7qm3vy.fsf@unicorn.mansr.com>
+References: <201102021700.20683.arnd@arndb.de>
+	<20110202.133831.193702414.davem@davemloft.net>
+	<yw1xei7qm3vy.fsf@unicorn.mansr.com>
+Message-ID: <201102031026.52113.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Domenico,
-
-A couple of minor comments inline, otherwise looks good to me.
-
-Jamie
-
-On Wed, Feb 02, 2011 at 10:05:30PM +0000, Domenico Andreoli wrote:
-> From: Domenico Andreoli <cavokz@gmail.com>
+On Thursday 03 February 2011 00:08:01 M?ns Rullg?rd wrote:
+> > But you really need that memory clobber there whether you like it or
+> > not, see above.
 > 
-> Add core architecture support for QQ2440.
-> 
-> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
-[...]
-> Index: arm-2.6.git/arch/arm/mach-s3c2440/mach-qq2440.c
-> ===================================================================
-> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-> +++ arm-2.6.git/arch/arm/mach-s3c2440/mach-qq2440.c	2011-02-02 21:59:39.000000000 +0000
-> @@ -0,0 +1,358 @@
-> +/* linux/arch/arm/mach-s3c2440/mach-qq2440.c
-> + *
-> + * Copyright (c) 2011 Domenico Andreoli <cavokz@gmail.com>
-> + *      Based on mach-mini2440.c by Ramax Lo <ramaxlo@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/list.h>
-> +#include <linux/timer.h>
-> +#include <linux/init.h>
-> +#include <linux/gpio.h>
-> +#include <linux/input.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/serial_core.h>
-> +#include <linux/i2c/at24.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/gpio_keys.h>
-> +#include <linux/i2c.h>
-> +#include <linux/mmc/host.h>
-> +
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include <plat/regs-serial.h>
-> +#include <mach/regs-gpio.h>
-> +#include <mach/leds-gpio.h>
-> +#include <mach/regs-mem.h>
-> +#include <mach/irqs.h>
-> +#include <plat/nand.h>
-> +#include <plat/iic.h>
-> +#include <plat/mci.h>
-> +#include <plat/udc.h>
-> +
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/mtd/nand_ecc.h>
-> +#include <linux/mtd/partitions.h>
-> +
-> +#include <plat/gpio-cfg.h>
-> +#include <plat/clock.h>
-> +#include <plat/devs.h>
-> +#include <plat/cpu.h>
-> +
-> +#include <sound/s3c24xx_uda134x.h>
-> +
-> +static struct map_desc qq2440_iodesc[] __initdata = {
-> +	/* nothing to declare, move along */
-> +};
-> +
-> +#define UCON S3C2410_UCON_DEFAULT
-> +#define ULCON (S3C2410_LCON_CS8 | S3C2410_LCON_PNONE | S3C2410_LCON_STOPB)
-> +#define UFCON (S3C2410_UFCON_RXTRIG8 | S3C2410_UFCON_FIFOMODE)
-> +
-> +static struct s3c2410_uartcfg qq2440_uartcfgs[] __initdata = {
-> +	[0] = {
-> +	       .hwport = 0,
-> +	       .flags = 0,
-> +	       .ucon = UCON,
-> +	       .ulcon = ULCON,
-> +	       .ufcon = UFCON,
-> +	       },
-> +	[1] = {
-> +	       .hwport = 1,
-> +	       .flags = 0,
-> +	       .ucon = UCON,
-> +	       .ulcon = ULCON,
-> +	       .ufcon = UFCON,
-> +	       },
-> +	[2] = {
-> +	       .hwport = 2,
-> +	       .flags = 0,
-> +	       .ucon = UCON,
-> +	       .ulcon = ULCON,
-> +	       .ufcon = UFCON,
-> +	       },
-> +};
+> I don't know of any device where the side-effects are not explicitly
+> indicated by other means in the code triggering them, so it probably
+> is safe without the clobber as Russel says.
 
-The alignment appears to be off here with the closing braces.  It would 
-be nice if the '=' were all tab aligned too.  There are a few other 
-places throughout the code like this.
+On configurations that have CONFIG_ARM_DMA_MEM_BUFFERABLE set, this is
+definitely true, since they use the rmb() and wmb() that include
+both an IO memory barrier instruction where required and a compiler barrier
+(i.e. __asm__ __volatile__ ("" : : : "memory")):
 
-> +
-> +/* UDC */
-> +
-> +static void qq2440_udc_pullup(enum s3c2410_udc_cmd_e cmd)
-> +{
-> +	pr_debug("udc: pullup(%d)\n", cmd);
-> +
-> +	switch (cmd) {
-> +	case S3C2410_UDC_P_ENABLE:
-> +		gpio_set_value(S3C2410_GPG(12), 1);
-> +		break;
-> +	case S3C2410_UDC_P_DISABLE:
-> +		gpio_set_value(S3C2410_GPG(12), 0);
-> +		break;
-> +	case S3C2410_UDC_P_RESET:
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +}
-> +
-> +static struct s3c2410_udc_mach_info qq2440_udc_cfg __initdata = {
-> +	.udc_command = qq2440_udc_pullup,
-> +};
-> +
-> +/* MMC/SD  */
-> +
-> +static struct s3c24xx_mci_pdata qq2440_mmc_cfg __initdata = {
-> +	.gpio_detect = S3C2410_GPG(8),
-> +	.gpio_wprotect = S3C2410_GPH(8),
-> +	.set_power = NULL,
-> +	.ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34,
-> +};
-> +
-> +/* NAND */
-> +
-> +static struct mtd_partition qq2440_default_nand_part[] __initdata = {
-> +	[0] = {
-> +	       .name = "vivi",
-> +	       .size = SZ_128K,
-> +	       .offset = 0,
-> +	       },
-> +	[1] = {
-> +	       .name = "eboot",
-> +	       .size = SZ_128K,
-> +	       .offset = SZ_128K,
-> +	       },
-> +	[2] = {
-> +	       .name = "param",
-> +	       .size = SZ_64K,
-> +	       .offset = SZ_256K,
-> +	       },
-> +	[3] = {
-> +	       .name = "kernel",
-> +	       .size = 0x00200000,
-> +	       .offset = SZ_256K + SZ_64K,
-> +	       },
-> +	[4] = {
-> +	       .name = "root",
-> +	       .size = MTDPART_SIZ_FULL,
-> +	       .offset = SZ_256K + SZ_64K + 0x00200000,
-> +	       },
-> +};
+8<-------------- from arch/arm/include/asm/io.h
 
-It looks like each partition starts immediately after the previous with 
-the exception of the rootfs so for these you can use an offset of 
-MTDPART_OFS_APPEND.
+#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+#define __iormb()               rmb()
+#define __iowmb()               wmb()
+#else
+#define __iormb()               do { } while (0)
+#define __iowmb()               do { } while (0)
+#endif
 
-> +
-> +static struct s3c2410_nand_set qq2440_nand_sets[] __initdata = {
-> +	[0] = {
-> +	       .name = "nand",
-> +	       .nr_chips = 1,
-> +	       .nr_partitions = ARRAY_SIZE(qq2440_default_nand_part),
-> +	       .partitions = qq2440_default_nand_part,
-> +	       },
-> +};
-> +
-> +static struct s3c2410_platform_nand qq2440_nand_info __initdata = {
-> +	.tacls = 0,
-> +	.twrph0 = 25,
-> +	.twrph1 = 15,
-> +	.nr_sets = ARRAY_SIZE(qq2440_nand_sets),
-> +	.sets = qq2440_nand_sets,
-> +	.ignore_unset_ecc = 1,
-> +};
-> +
-> +/* KEYS */
-> +
-> +static struct gpio_keys_button qq2440_buttons[] = {
-> +	{
-> +	 .gpio = S3C2410_GPG(11),   /* K1 */
-> +	 .code = KEY_F1,
-> +	 .desc = "Button 1",
-> +	 .active_low = 1,
-> +	 },
-> +	{
-> +	 .gpio = S3C2410_GPG(3),    /* K2 */
-> +	 .code = KEY_F2,
-> +	 .desc = "Button 2",
-> +	 .active_low = 1,
-> +	 },
-> +	{
-> +	 .gpio = S3C2410_GPF(2),    /* K3 */
-> +	 .code = KEY_F3,
-> +	 .desc = "Button 3",
-> +	 .active_low = 1,
-> +	 },
-> +	{
-> +	 .gpio = S3C2410_GPF(0),    /* K4 */
-> +	 .code = KEY_F4,
-> +	 .desc = "Button 4",
-> +	 .active_low = 1,
-> +	 },
-> +};
-> +
-> +static struct gpio_keys_platform_data qq2440_button_data = {
-> +	.buttons = qq2440_buttons,
-> +	.nbuttons = ARRAY_SIZE(qq2440_buttons),
-> +};
-> +
-> +static struct platform_device qq2440_button_device = {
-> +	.name = "gpio-keys",
-> +	.id = -1,
-> +	.dev = {
-> +		.platform_data = &qq2440_button_data,
-> +		}
-> +};
-> +
-> +/* LEDS */
-> +
-> +static struct s3c24xx_led_platdata qq2440_led1_pdata = {
-> +	.name = "led1",
-> +	.gpio = S3C2410_GPB(5),
-> +	.flags = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> +	.def_trigger = "heartbeat",
-> +};
-> +
-> +static struct s3c24xx_led_platdata qq2440_led2_pdata = {
-> +	.name = "led2",
-> +	.gpio = S3C2410_GPB(6),
-> +	.flags = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> +	.def_trigger = "nand-disk",
-> +};
-> +
-> +static struct s3c24xx_led_platdata qq2440_led3_pdata = {
-> +	.name = "led3",
-> +	.gpio = S3C2410_GPB(7),
-> +	.flags = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> +	.def_trigger = "mmc0",
-> +};
-> +
-> +static struct s3c24xx_led_platdata qq2440_led4_pdata = {
-> +	.name = "led4",
-> +	.gpio = S3C2410_GPB(8),
-> +	.flags = S3C24XX_LEDF_ACTLOW | S3C24XX_LEDF_TRISTATE,
-> +	.def_trigger = "",
-> +};
-> +
-> +static struct platform_device qq2440_led1 = {
-> +	.name = "s3c24xx_led",
-> +	.id = 1,
-> +	.dev = {
-> +		.platform_data = &qq2440_led1_pdata,
-> +		},
-> +};
-> +
-> +static struct platform_device qq2440_led2 = {
-> +	.name = "s3c24xx_led",
-> +	.id = 2,
-> +	.dev = {
-> +		.platform_data = &qq2440_led2_pdata,
-> +		},
-> +};
-> +
-> +static struct platform_device qq2440_led3 = {
-> +	.name = "s3c24xx_led",
-> +	.id = 3,
-> +	.dev = {
-> +		.platform_data = &qq2440_led3_pdata,
-> +		},
-> +};
-> +
-> +static struct platform_device qq2440_led4 = {
-> +	.name = "s3c24xx_led",
-> +	.id = 4,
-> +	.dev = {
-> +		.platform_data = &qq2440_led4_pdata,
-> +		},
-> +};
-> +
-> +/* AUDIO */
-> +
-> +static struct s3c24xx_uda134x_platform_data qq2440_audio_pins = {
-> +	.l3_clk   = S3C2410_GPB(4),
-> +	.l3_mode  = S3C2410_GPB(2),
-> +	.l3_data  = S3C2410_GPB(3),
-> +	.model    = UDA134X_UDA1341
-> +};
-> +
-> +static struct platform_device qq2440_audio = {
-> +	.name = "s3c24xx_uda134x",
-> +	.id = 0,
-> +	.dev = {
-> +		.platform_data = &qq2440_audio_pins,
-> +		},
-> +};
-> +
-> +/* I2C */
-> +
-> +static struct at24_platform_data at24c08 = {
-> +	.byte_len = SZ_8K / 8,
-> +	.page_size = 16,
-> +};
-> +
-> +static struct i2c_board_info qq2440_i2c_devs[] __initdata = {
-> +	{
-> +	 I2C_BOARD_INFO("24c08", 0x50),
-> +	 .platform_data = &at24c08,
-> +	 },
-> +};
-> +
-> +static struct platform_device *qq2440_devices[] __initdata = {
-> +	&s3c_device_ohci,
-> +	&s3c_device_wdt,
-> +	&s3c_device_i2c0,
-> +	&s3c_device_rtc,
-> +	&s3c_device_usbgadget,
-> +	&qq2440_led1,
-> +	&qq2440_led2,
-> +	&qq2440_led3,
-> +	&qq2440_led4,
-> +	&qq2440_button_device,
-> +	&s3c_device_nand,
-> +	&s3c_device_sdi,
-> +	&s3c_device_iis,
-> +	&qq2440_audio,
-> +};
-> +
-> +static void __init qq2440_map_io(void)
-> +{
-> +	s3c24xx_init_io(qq2440_iodesc, ARRAY_SIZE(qq2440_iodesc));
-> +	s3c24xx_init_clocks(12000000);
-> +	s3c24xx_init_uarts(qq2440_uartcfgs, ARRAY_SIZE(qq2440_uartcfgs));
-> +}
-> +
-> +static void __init qq2440_init(void)
-> +{
-> +	int i;
-> +
-> +	/* Make sure the D+ pullup pin is output */
-> +	WARN_ON(gpio_request(S3C2410_GPG(12), "udc pup"));
-> +	gpio_direction_output(S3C2410_GPG(12), 0);
+#define readb(c)                ({ u8  __v = readb_relaxed(c); __iormb(); __v; })
+#define readw(c)                ({ u16 __v = readw_relaxed(c); __iormb(); __v; })
+#define readl(c)                ({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+        
+#define writeb(v,c)             ({ __iowmb(); writeb_relaxed(v,c); })
+#define writew(v,c)             ({ __iowmb(); writew_relaxed(v,c); })
+#define writel(v,c)             ({ __iowmb(); writel_relaxed(v,c); })
 
-You should only really set the direction if the request was successfull.  
-You could do something like:
+8<---------------
 
-	if (!WARN_ON(gpio_request(S3C2410_GPG(12), "udc pup")))
-		gpio_direction_output(S3C2410_GPG(12), 0);
+Also, as Russell mentioned, anything using the streaming DMA mapping API
+is fine because of the barriers included in the function calls there.
 
-or put the return of gpio_request() into a var first and check.  If it 
-fails then is it safe to register the usb gadget device?
+However, I would think that this fictional piece of code would be valid
+for a possible PCI device driver (though inefficient) and not require
+any additional synchronizing operations:
 
-> +
-> +	/* mark the key as input, without pullups (there is one on the board) */
-> +	for (i = 0; i < ARRAY_SIZE(qq2440_buttons); i++) {
-> +		s3c_gpio_setpull(qq2440_buttons[i].gpio, S3C_GPIO_PULL_UP);
-> +		s3c_gpio_cfgpin(qq2440_buttons[i].gpio, S3C2410_GPIO_INPUT);
-> +	}
-> +
-> +	s3c24xx_udc_set_platdata(&qq2440_udc_cfg);
-> +	s3c24xx_mci_set_platdata(&qq2440_mmc_cfg);
-> +	s3c_nand_set_platdata(&qq2440_nand_info);
-> +	s3c_i2c0_set_platdata(NULL);
-> +
-> +	i2c_register_board_info(0, qq2440_i2c_devs, ARRAY_SIZE(qq2440_i2c_devs));
-> +
-> +	platform_add_devices(qq2440_devices, ARRAY_SIZE(qq2440_devices));
-> +}
-> +
-> +MACHINE_START(QQ2440, "QQ2440")
-> +	.boot_params   = S3C2410_SDRAM_PA + 0x100,
-> +	.map_io        = qq2440_map_io,
-> +	.init_machine  = qq2440_init,
-> +	.init_irq      = s3c24xx_init_irq,
-> +	.timer         = &s3c24xx_timer,
-> +MACHINE_END
+void foo_perform_operation(struct foo_dev *d, u32 in, u32 *out)
+{
+	dma_addr_t dma_addr;
+	u32 *cpu_addr;
+
+	/* 
+	 * get memory from the consistent DMA mapping API, typically
+	 * uncached memory on ARM, but could be anywhere if the DMA
+	 * is coherent.
+	 */
+	cpu_addr = dma_alloc_coherent(&d->dev, sizeof (*cpu_addr),
+					&dma_addr, GFP_KERNEL);
+
+	/* lock the device, not required for the example, but normally
+	 * needed in practice for SMP operation.
+	 */
+	spin_lock(&d->lock);
+
+	/* initialize the DMA data */
+	*cpu_addr = in;
+
+	/*
+	 * send a posted 32 bit write to the device, triggering the
+	 * start of the DMA read from *cpu_addr, which is followed by
+	 * a DMA write to *cpu_addr. writel includes a barrier that
+	 * makes sure that the previous store to *cpu_addr is visible
+	 * to the DMA, but does not block until the completion like
+	 * outl() would.
+	 */
+	writel(dma_addr, d->mmio_addr);
+
+	/*
+	 * synchronize the outbound posted write, wait for the device
+	 * to complete the DMA and synchronize the DMA data on its
+	 * inbound path.
+	 */
+	(void)readl(d->mmio_addr);
+
+	/*
+	 * *cpu_addr contains data just written to by the device, and
+	 * the readl includes all the necessary barriers to ensure
+	 * it's really there when we access it.
+	 */
+	*out = *cpu_addr;
+
+	/* unlock the device */
+	spin_unlock(&d->lock);
+
+	/* free the DMA memory */
+	dma_free_coherent(&d->dev, sizeof (*cpu_addr), cpu_addr, dma_addr);
+}
+
+However, when readl contains no explicit or implicit synchronization, the
+load from *cpu_addr might get pulled in front of the load from mmio_addr,
+resulting in invalid output data. If this is the case, it is be a problem
+on almost all architectures (not x86, powerpc or sparc64).
+
+Am I missing something here?
+
+	Arnd
