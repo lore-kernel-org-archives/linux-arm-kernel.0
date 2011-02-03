@@ -1,25 +1,57 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 3 Feb 2011 13:52:18 +0100
-Subject: [PATCH 04/19] ab3100: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110202200302.0e05c3d0@queued.net>
-References: <20110202195417.228e2656@queued.net>
-	<20110202200302.0e05c3d0@queued.net>
-Message-ID: <4D4AA502.4000001@stericsson.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Feb 2011 14:54:03 +0200
+Subject: [PATCH v2 1/2] omap3sdp: Fix regulator mapping for ads7846 TS
+	controller
+In-Reply-To: <1296737122-20765-2-git-send-email-rnayak@ti.com>
+References: <1296737122-20765-1-git-send-email-rnayak@ti.com>
+	<1296737122-20765-2-git-send-email-rnayak@ti.com>
+Message-ID: <20110203125403.GB28607@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2011 05:03 AM, Andres Salomon wrote:
-> No need to explicitly set the cell's platform_data/data_size.
->
-> In this case, move the ab3100_platform_data pointer from platform_data
-> to driver_data.  The only client who makes use of it is also changed.
->
-> Signed-off-by: Andres Salomon<dilinger@queued.net>
->    
+On Thu, Feb 03, 2011 at 06:15:21PM +0530, Rajendra Nayak wrote:
+> On the OMAP3430SDP board, the ads7846 touchscreen controller
+> is powered by VAUX3 regulator (supplying 2.8v).
+> Fix this mapping in the board file, and hence prevent
+> the ads7846 driver init to fail with the below error..
+> 
+> ads7846 spi1.0: unable to get regulator: -19
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-Looks good, thanks Andres,
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Yours,
-Linus Walleij
+> ---
+>  arch/arm/mach-omap2/board-3430sdp.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+> index d4e41ef..8e18f21 100644
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -427,6 +427,11 @@ static struct twl4030_madc_platform_data sdp3430_madc_data = {
+>  	.irq_line	= 1,
+>  };
+>  
+> +/* ads7846 on SPI */
+> +static struct regulator_consumer_supply sdp3430_vaux3_supplies[] = {
+> +	REGULATOR_SUPPLY("vcc", "spi1.0"),
+> +};
+> +
+>  /*
+>   * Apply all the fixed voltages since most versions of U-Boot
+>   * don't bother with that initialization.
+> @@ -469,6 +474,8 @@ static struct regulator_init_data sdp3430_vaux3 = {
+>  		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+>  					| REGULATOR_CHANGE_STATUS,
+>  	},
+> +	.num_consumer_supplies		= ARRAY_SIZE(sdp3430_vaux3_supplies),
+> +	.consumer_supplies		= sdp3430_vaux3_supplies,
+>  };
+>  
+>  /* VAUX4 for OMAP VDD_CSI2 (camera) */
+> -- 
+> 1.7.0.4
+
+-- 
+balbi
