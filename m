@@ -1,28 +1,23 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 2 Feb 2011 17:38:22 -0700
-Subject: [PATCH] ep93xx: fix build error in edb93xx framebuffer support
-Message-ID: <201102021738.22717.hartleys@visionengravers.com>
+From: smuckle@codeaurora.org (Steve Muckle)
+Date: Wed, 02 Feb 2011 18:05:46 -0800
+Subject: barriers in mutexes?
+Message-ID: <4D4A0D7A.9090005@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing semicolon to fix a build error.
+Hello,
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Reported-by: Alexander Sverdlin <subaparts@yandex.ru>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
+Looking at kernel/mutex.c and arch/arm/include/asm/mutex.h, it appears
+there aren't any memory barriers in the fast path of mutexes. I see this
+was discussed here a long time back:
 
----
+http://patchwork.kernel.org/patch/25856/
 
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 9b00bee..3f37567 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -126,7 +126,7 @@ static int __init edb93xx_has_fb(void)
- 	/* These platforms have an ep93xx with video capability */
- 	return (machine_is_edb9307() || machine_is_edb9307a() ||
- 		machine_is_edb9312() || machine_is_edb9315() ||
--		machine_is_edb9315a())
-+		machine_is_edb9315a());
- }
- 
- static void __init edb93xx_register_fb(void)
+How was this resolved?
+
+thanks,
+Steve
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
