@@ -1,44 +1,100 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 3 Feb 2011 15:34:56 +0530
-Subject: [PATCHv2 2/2] Input: ads7846 - configure pendown gpio as input
-In-Reply-To: <20110203095845.GK23561@legolas.emea.dhcp.ti.com>
-References: <1296726530-32199-1-git-send-email-sourav.poddar@ti.com>
-	<20110203095845.GK23561@legolas.emea.dhcp.ti.com>
-Message-ID: <AANLkTi=J5dJ4N4_57fh0_HKmqfyo6C_tMs3BrnXHWQjq@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 3 Feb 2011 10:08:16 +0000
+Subject: [PATCH] ARM: bitops: Fix low-level code to be Thumb-2 compatible
+In-Reply-To: <20110202212449.GF31043@n2100.arm.linux.org.uk>
+References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
+	<20110202212449.GF31043@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimSe=ohBFnb+Vpz-fTAXJHFmaO9fsOuANTwFRKd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sourav,
-
-On Thu, Feb 3, 2011 at 15:28, Felipe Balbi <balbi@ti.com> wrote:
-> On Thu, Feb 03, 2011 at 03:18:50PM +0530, Sourav Poddar wrote:
->> The ads7846 driver requests a gpio to detect pendown events,
->> but does not configure its direction. Configure this gpio
->> as an input after requesting it.
+On Wed, Feb 2, 2011 at 9:24 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 02, 2011 at 02:33:55PM -0500, Nicolas Pitre wrote:
+>> On Wed, 2 Feb 2011, Dave Martin wrote:
 >>
->> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> ---
->> changes between v2 and v1: Added return error support in v2.
+>> > The new bitops code cunningly str <Rt>, [r1, -r1] to trigger
+>> > a fault by attempting to store to address zero.
+>> >
+>> > This code doesn't assemble in Thumb-2, since Thumb-2 doesn't
+>> > allow negative register offsets at all for loads and stores.
+>> >
+>> > The patch loads 0 into r2 and uses that as a base register
+>> > instead for the Thumb-2 case: r2 seems non-live at every
+>> > instance of this problem.
+>> >
+>> > The ARM case is unaffected.
+>> >
+>> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 >>
->> drivers/input/touchscreen/ads7846.c | ? ?7 +++++++
->> 1 files changed, 7 insertions(+), 0 deletions(-)
+>> Russell proposed a better solution already:
 >>
->> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
->> index 036f245..f30768b 100644
->> --- a/drivers/input/touchscreen/ads7846.c
->> +++ b/drivers/input/touchscreen/ads7846.c
->> @@ -962,6 +962,13 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
->> ? ? ? ? ? ? ? return err;
->> ? ? ? }
+>> http://mid.gmane.org/alpine.LFD.2.00.1101181312360.8580 at xanadu.home
 >>
->> + ? ? err = gpio_direction_input(pdata->gpio_pendown);
->> + ? ? if (err) {
->> + ? ? ? ? ? ? dev_err(&spi->dev, "failed to configure pendown GPIO input direction %d\n",
->> + ? ? ? ? ? ? ? ? ? ? pdata->gpio_pendown);
->> + ? ? ? ? ? ? return err;
+>> No idea why this wasn't folded in his series yet though.
 >
-> and now you miss a gpio_free().
+> Now added, and original tested-by's dropped. ?It now needs re-testing.
+>
+> 8<----
+> Subject: [PATCH] ARM: bitops: ensure set/clear/change bitops take a word-aligned pointer
+>
+> Add additional instructions to our assembly bitops functions to ensure
+> that they only operate on word-aligned pointers. ?This will be necessary
+> when we switch these operations to use the word-based exclusive
+> operations.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> ?arch/arm/lib/bitops.h | ? ?8 ++++++++
+> ?1 files changed, 8 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
+> index d422529..bd00551 100644
+> --- a/arch/arm/lib/bitops.h
+> +++ b/arch/arm/lib/bitops.h
+> @@ -1,6 +1,8 @@
+>
+> ?#if __LINUX_ARM_ARCH__ >= 6 && defined(CONFIG_CPU_32v6K)
+> ? ? ? ?.macro ?bitop, instr
+> + ? ? ? ands ? ?ip, r1, #3
+> + ? ? ? strneb ?r1, [ip] ? ? ? ? ? ? ? ?@ assert word-aligned
+> ? ? ? ?mov ? ? r2, #1
+> ? ? ? ?and ? ? r3, r0, #7 ? ? ? ? ? ? ?@ Get bit offset
+> ? ? ? ?add ? ? r1, r1, r0, lsr #3 ? ? ?@ Get byte offset
+> @@ -14,6 +16,8 @@
+> ? ? ? ?.endm
+>
+> ? ? ? ?.macro ?testop, instr, store
+> + ? ? ? ands ? ?ip, r1, #3
+> + ? ? ? strneb ?r1, [ip] ? ? ? ? ? ? ? ?@ assert word-aligned
+> ? ? ? ?and ? ? r3, r0, #7 ? ? ? ? ? ? ?@ Get bit offset
+> ? ? ? ?mov ? ? r2, #1
+> ? ? ? ?add ? ? r1, r1, r0, lsr #3 ? ? ?@ Get byte offset
+> @@ -32,6 +36,8 @@
+> ? ? ? ?.endm
+> ?#else
+> ? ? ? ?.macro ?bitop, instr
+> + ? ? ? ands ? ?ip, r1, #3
+> + ? ? ? strneb ?r1, [ip] ? ? ? ? ? ? ? ?@ assert word-aligned
+> ? ? ? ?and ? ? r2, r0, #7
+> ? ? ? ?mov ? ? r3, #1
+> ? ? ? ?mov ? ? r3, r3, lsl r2
+> @@ -52,6 +58,8 @@
+> ?* to avoid dirtying the data cache.
+> ?*/
+> ? ? ? ?.macro ?testop, instr, store
+> + ? ? ? ands ? ?ip, r1, #3
+> + ? ? ? strneb ?r1, [ip] ? ? ? ? ? ? ? ?@ assert word-aligned
+> ? ? ? ?add ? ? r1, r1, r0, lsr #3
+> ? ? ? ?and ? ? r3, r0, #7
+> ? ? ? ?mov ? ? r0, #1
+> --
+> 1.6.2.5
+>
+>
 
-My question to your previous version is still unanswered.
-Would it be relevant to add gpio_set_debounce() for this
-gpio?
+Heh, yes, that's a nicer fix.  I'll give it a try.
+
+Thanks
+---Dave
