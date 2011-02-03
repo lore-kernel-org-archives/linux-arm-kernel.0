@@ -1,241 +1,66 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 3 Feb 2011 09:41:23 +0000
-Subject: [PATCH 2/2] ARM: QQ2440 networking support
-In-Reply-To: <20110202220637.GC2808@dandreoli.com>
-References: <20110202220359.GA2808@dandreoli.com>
-	<20110202220530.GB2808@dandreoli.com>
-	<20110202220637.GC2808@dandreoli.com>
-Message-ID: <20110203094123.GB3141@pulham.picochip.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Thu,  3 Feb 2011 15:18:34 +0530
+Subject: [PATCHv2 1/2] ads7846: OMAP3: Removal of warnings backtrace in bootup
+Message-ID: <1296726514-32146-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Domenico,
+gpio_pendown in ads7846_probe is not getting initalized (defaulted to 0)
+resulting in gpio_free to be called without a gpio_request. This
+results in the following backtrace in bootup.
 
-This should probably also go to the netdev mailing list: 
-netdev at vger.kernel.org.  A couple of other minor comments inline.
+------------[ cut here ]------------
+WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
+Modules linked in:
+[<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>]
+	(warn_slowpath_common+0x4c/0x64)
+[<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>]
+	(warn_slowpath_null+0x18/0x1c)
+[<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>]
+	(gpio_free+0x100/0x12c)
+[<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>]
+	(ads7846_probe+0xa38/0xc5c)
+[<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>]
+	(spi_drv_probe+0x18/0x1c)
+[<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>]
+	(driver_probe_device+0xc8/0x184)
+[<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>]
+	(__driver_attach+0x68/0x8c)
+[<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>]
+	(bus_for_each_dev+0x48/0x74)
+[<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>]
+	(bus_add_driver+0xa0/0x220)
+[<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>]
+	(driver_register+0xa8/0x134)
+[<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>]
+	(do_one_initcall+0xcc/0x1a4)
+[<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>]
+	(kernel_init+0x14c/0x214)
+[<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>]
+	(kernel_thread_exit+0x0/0x8)
+---[ end trace 4053287f8a5ec18f ]---
 
-Jamie
+Initializing gpio_pendown in ads7846_probe to -1 before
+ads7846_setup_pendown function removes the above backtrace
+warning.
 
-On Wed, Feb 02, 2011 at 10:06:37PM +0000, Domenico Andreoli wrote:
-> From: Domenico Andreoli <cavokz@gmail.com>
-> 
-> Add networking support for QQ2440.
-> 
-> Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
-> 
-> ---
->  arch/arm/mach-s3c2440/include/mach/qq2440.h |   22 ++++++++++++
->  arch/arm/mach-s3c2440/mach-qq2440.c         |   16 ++++++++
->  drivers/net/Kconfig                         |    4 +-
->  drivers/net/cs89x0.c                        |   33 ++++++++++++------
->  4 files changed, 61 insertions(+), 14 deletions(-)
-> 
-> Index: arm-2.6.git/arch/arm/mach-s3c2440/include/mach/qq2440.h
-> ===================================================================
-> --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-> +++ arm-2.6.git/arch/arm/mach-s3c2440/include/mach/qq2440.h	2011-02-02 18:32:38.000000000 +0000
-> @@ -0,0 +1,22 @@
-> +/*
-> + * arch/arm/mach-s3c2440/include/mach/qq2440.h
-> + *
-> + * Copyright (c) 2011 Domenico Andreoli <cavokz@gmail.com>
-> + *
-> + * QQ2440 - platform definitions
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +#ifndef __ASM_MACH_QQ2440_H
-> +#define __ASM_MACH_QQ2440_H
-> +
-> +#define QQ2440_CS8900_IRQ         IRQ_EINT9
-> +
-> +#define QQ2440_CS8900_VIRT_BASE   S3C_ADDR(0x00500000)
-> +#define QQ2440_CS8900_PA          (S3C2410_CS3 + 0x1000000)
-> +#define QQ2440_CS8900_SZ          SZ_1M
-> +
-> +#endif /* __ASM_MACH_QQ2440_H */
-> Index: arm-2.6.git/drivers/net/cs89x0.c
-> ===================================================================
-> --- arm-2.6.git.orig/drivers/net/cs89x0.c	2011-02-02 18:28:01.000000000 +0000
-> +++ arm-2.6.git/drivers/net/cs89x0.c	2011-02-02 18:32:38.000000000 +0000
-> @@ -95,6 +95,9 @@
->    Dmitry Pervushin  : dpervushin at ru.mvista.com
->                      : PNX010X platform support
->  
-> +  Domenico Andreoli : cavokz at gmail.com
-> +                    : QQ2440 platform support
-> +
->  */
->  
->  /* Always include 'config.h' first in case the user wants to turn on
-> @@ -117,7 +120,7 @@
->   * Set this to zero to remove all the debug statements via
->   * dead code elimination
->   */
-> -#define DEBUGGING	1
-> +#define DEBUGGING	0
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/input/touchscreen/ads7846.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-This is probably best split out as a separate patch.
-
->  
->  /*
->    Sources:
-> @@ -173,6 +176,10 @@
->  #if defined(CONFIG_MACH_IXDP2351)
->  static unsigned int netcard_portlist[] __used __initdata = {IXDP2351_VIRT_CS8900_BASE, 0};
->  static unsigned int cs8900_irq_map[] = {IRQ_IXDP2351_CS8900, 0, 0, 0};
-> +#elif defined(CONFIG_MACH_QQ2440)
-> +#include <mach/qq2440.h>
-> +static unsigned int netcard_portlist[] __used __initdata = {QQ2440_CS8900_VIRT_BASE + 0x300, 0};
-> +static unsigned int cs8900_irq_map[] = {QQ2440_CS8900_IRQ, 0, 0, 0};
->  #elif defined(CONFIG_ARCH_IXDP2X01)
->  static unsigned int netcard_portlist[] __used __initdata = {IXDP2X01_CS8900_VIRT_BASE, 0};
->  static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
-> @@ -521,6 +528,10 @@
->  #endif
->  		lp->force = g_cs89x0_media__force;
->  #endif
-> +
-> +#if defined(CONFIG_MACH_QQ2440)
-> +		lp->force |= FORCE_RJ45 | FORCE_FULL;
-> +#endif
->          }
->  
->  	/* Grab the region so we can find another board if autoIRQ fails. */
-> @@ -608,7 +619,7 @@
->  		        dev->dev_addr[i*2+1] = Addr >> 8;
->  		}
->  
-> -	   	/* Load the Adapter Configuration.
-> +		/* Load the Adapter Configuration.
->  		   Note:  Barring any more specific information from some
->  		   other source (ie EEPROM+Schematics), we would not know
->  		   how to operate a 10Base2 interface on the AUI port.
-> @@ -655,7 +666,7 @@
->  	if ((readreg(dev, PP_SelfST) & EEPROM_PRESENT) == 0)
->  		printk(KERN_WARNING "cs89x0: No EEPROM, relying on command line....\n");
->  	else if (get_eeprom_data(dev, START_EEPROM_DATA,CHKSUM_LEN,eeprom_buff) < 0) {
-> -		printk(KERN_WARNING "\ncs89x0: EEPROM read failed, relying on command line.\n");
-> +		printk(KERN_WARNING "cs89x0: EEPROM read failed, relying on command line.\n");
->          } else if (get_eeprom_cksum(START_EEPROM_DATA,CHKSUM_LEN,eeprom_buff) < 0) {
->  		/* Check if the chip was able to read its own configuration starting
->  		   at 0 in the EEPROM*/
-> @@ -709,7 +720,7 @@
->          /* FIXME: we don't set the Ethernet address on the command line.  Use
->             ifconfig IFACE hw ether AABBCCDDEEFF */
->  
-> -	printk(KERN_INFO "cs89x0 media %s%s%s",
-> +	printk(KERN_INFO "cs89x0: media %s%s%s",
->  	       (lp->adapter_cnf & A_CNF_10B_T)?"RJ-45,":"",
->  	       (lp->adapter_cnf & A_CNF_AUI)?"AUI,":"",
->  	       (lp->adapter_cnf & A_CNF_10B_2)?"BNC,":"");
-
-Splitting these cleanups into a cleanup patch would be handly so you can 
-see the real changes easier.
-
-> @@ -943,7 +954,7 @@
->  static void __init reset_chip(struct net_device *dev)
->  {
->  #if !defined(CONFIG_MACH_MX31ADS)
-> -#if !defined(CONFIG_MACH_IXDP2351) && !defined(CONFIG_ARCH_IXDP2X01)
-> +#if !defined(CS89x0_NONISA_IRQ)
->  	struct net_local *lp = netdev_priv(dev);
->  	int ioaddr = dev->base_addr;
->  #endif
-> @@ -954,18 +965,18 @@
->  	/* wait 30 ms */
->  	msleep(30);
->  
-> -#if !defined(CONFIG_MACH_IXDP2351) && !defined(CONFIG_ARCH_IXDP2X01)
-> +#if !defined(CS89x0_NONISA_IRQ)
->  	if (lp->chip_type != CS8900) {
->  		/* Hardware problem requires PNP registers to be reconfigured after a reset */
->  		writeword(ioaddr, ADD_PORT, PP_CS8920_ISAINT);
-> -		outb(dev->irq, ioaddr + DATA_PORT);
-> -		outb(0,      ioaddr + DATA_PORT + 1);
-> +		writeword(ioaddr, DATA_PORT, dev->irq);
-> +		writeword(ioaddr, DATA_PORT + 1, 0);
->  
->  		writeword(ioaddr, ADD_PORT, PP_CS8920_ISAMemB);
-> -		outb((dev->mem_start >> 16) & 0xff, ioaddr + DATA_PORT);
-> -		outb((dev->mem_start >> 8) & 0xff,   ioaddr + DATA_PORT + 1);
-> +		writeword(ioaddr, DATA_PORT, (dev->mem_start >> 16) & 0xff);
-> +		writeword(ioaddr, DATA_PORT + 1, (dev->mem_start >> 8) & 0xff);
->  	}
-> -#endif	/* IXDP2x01 */
-> +#endif
->  
->  	/* Wait until the chip is reset */
->  	reset_start_time = jiffies;
-> Index: arm-2.6.git/drivers/net/Kconfig
-> ===================================================================
-> --- arm-2.6.git.orig/drivers/net/Kconfig	2011-02-02 18:28:01.000000000 +0000
-> +++ arm-2.6.git/drivers/net/Kconfig	2011-02-02 18:32:38.000000000 +0000
-> @@ -1498,7 +1498,7 @@
->  config CS89x0
->  	tristate "CS89x0 support"
->  	depends on NET_ETHERNET && (ISA || EISA || MACH_IXDP2351 \
-> -		|| ARCH_IXDP2X01 || MACH_MX31ADS)
-> +		|| ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440)
->  	---help---
->  	  Support for CS89x0 chipset based Ethernet cards. If you have a
->  	  network (Ethernet) card of this type, say Y and read the
-> @@ -1512,7 +1512,7 @@
->  config CS89x0_NONISA_IRQ
->  	def_bool y
->  	depends on CS89x0 != n
-> -	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS
-> +	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440
->  
->  config TC35815
->  	tristate "TOSHIBA TC35815 Ethernet support"
-> Index: arm-2.6.git/arch/arm/mach-s3c2440/mach-qq2440.c
-> ===================================================================
-> --- arm-2.6.git.orig/arch/arm/mach-s3c2440/mach-qq2440.c	2011-02-02 18:29:48.000000000 +0000
-> +++ arm-2.6.git/arch/arm/mach-s3c2440/mach-qq2440.c	2011-02-02 18:32:38.000000000 +0000
-> @@ -36,6 +36,7 @@
->  #include <mach/leds-gpio.h>
->  #include <mach/regs-mem.h>
->  #include <mach/irqs.h>
-> +#include <mach/qq2440.h>
->  #include <plat/nand.h>
->  #include <plat/iic.h>
->  #include <plat/mci.h>
-> @@ -54,7 +55,12 @@
->  #include <sound/s3c24xx_uda134x.h>
->  
->  static struct map_desc qq2440_iodesc[] __initdata = {
-> -	/* nothing to declare, move along */
-> +	{
-> +		.virtual  = QQ2440_CS8900_VIRT_BASE,
-> +		.pfn      = __phys_to_pfn(QQ2440_CS8900_PA),
-> +		.length   = QQ2440_CS8900_SZ,
-> +		.type     = MT_DEVICE
-> +	}
->  };
->  
->  #define UCON S3C2410_UCON_DEFAULT
-> @@ -325,10 +331,18 @@
->  	s3c24xx_init_uarts(qq2440_uartcfgs, ARRAY_SIZE(qq2440_uartcfgs));
->  }
->  
-> +#define QQ2440_CS8900_BANKCON  (S3C2410_BANKCON_Tacp6 | S3C2410_BANKCON_Tcah4 | S3C2410_BANKCON_Tcoh1 | \
-> +                                S3C2410_BANKCON_Tacc14 | S3C2410_BANKCON_Tcos4)
-> +
->  static void __init qq2440_init(void)
->  {
->  	int i;
->  
-> +	/* Ethernet */
-> +	__raw_writel(__raw_readl(S3C2410_BWSCON) | S3C2410_BWSCON_WS3 | S3C2410_BWSCON_ST3, S3C2410_BWSCON);
-> +	__raw_writel(QQ2440_CS8900_BANKCON, S3C2410_BANKCON3);
-> +	set_irq_type(QQ2440_CS8900_IRQ, IRQ_TYPE_EDGE_RISING);
-> +
->  	/* Make sure the D+ pullup pin is output */
->  	WARN_ON(gpio_request(S3C2410_GPG(12), "udc pup"));
->  	gpio_direction_output(S3C2410_GPG(12), 0);
-
-This arch stuff should really be a separate patch too.
+diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+index 14ea54b..036f245 100644
+--- a/drivers/input/touchscreen/ads7846.c
++++ b/drivers/input/touchscreen/ads7846.c
+@@ -1221,6 +1221,7 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+ 	ts->input = input_dev;
+ 	ts->vref_mv = pdata->vref_mv;
+ 	ts->swap_xy = pdata->swap_xy;
++	ts->gpio_pendown = -1;
+ 
+ 	mutex_init(&ts->lock);
+ 	init_waitqueue_head(&ts->wait);
+-- 
+1.7.0.4
