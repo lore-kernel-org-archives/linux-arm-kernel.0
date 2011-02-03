@@ -1,32 +1,32 @@
-From: smuckle@codeaurora.org (Steve Muckle)
-Date: Thu, 03 Feb 2011 08:56:15 -0800
-Subject: barriers in mutexes?
-In-Reply-To: <20110203110837.GA14627@n2100.arm.linux.org.uk>
-References: <4D4A0D7A.9090005@codeaurora.org>
-	<20110203110837.GA14627@n2100.arm.linux.org.uk>
-Message-ID: <4D4ADE2F.50105@codeaurora.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 3 Feb 2011 18:05:07 +0100
+Subject: [PATCH v3 2/2] Input: ads7846: use gpio_request_one to
+	configure pendown_gpio
+In-Reply-To: <1296746506-12221-1-git-send-email-sourav.poddar@ti.com>
+References: <1296746506-12221-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20110203170507.GG6508@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/11 03:08, Russell King - ARM Linux wrote:
-> On Wed, Feb 02, 2011 at 06:05:46PM -0800, Steve Muckle wrote:
->> Looking at kernel/mutex.c and arch/arm/include/asm/mutex.h, it appears
->> there aren't any memory barriers in the fast path of mutexes. I see this
->> was discussed here a long time back:
->>
->> http://patchwork.kernel.org/patch/25856/
->>
->> How was this resolved?
+On Thu, Feb 03, 2011 at 08:51:46PM +0530, Sourav Poddar wrote:
+> The ads7846 driver requests a gpio but does not currently
+> configure it explicitly as an input. Use gpio_request_one
+> to request and configure it at one shot.
 > 
-> bac4e96 ([ARM] barriers: improve xchg, bitops and atomic SMP barriers)
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> Cc: Dmitry Torokhov <dtor@mail.ru>
 
-The fast path of mutexes on ARM >= v6 doesn't seem to use these
-operations - it's just ldrex/strex. Looking at the v7 ARM ARM it seems
-barriers are still required with ldrex/strex.
+Since the two are won't be merged
 
-thanks,
-Steve
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110203/5006f063/attachment.sig>
