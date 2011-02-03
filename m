@@ -1,63 +1,70 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Thu,  3 Feb 2011 15:11:59 -0500
-Subject: [PATCH] davinci: remove unused DA830_edma_ch enum
-Message-ID: <1296763920-4165-1-git-send-email-michael.williamson@criticallink.com>
+Date: Thu,  3 Feb 2011 15:12:00 -0500
+Subject: [PATCH] davinci: da8xx: clean up magic numbers in devices-da8xx.c
+In-Reply-To: <1296763920-4165-1-git-send-email-michael.williamson@criticallink.com>
+References: <1296763920-4165-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <1296763920-4165-2-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DA830_edma_ch enum set is not used.  Remove it.
+Extract magic numbers from DMA resource initializers to #defines.
 
 Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
- arch/arm/mach-davinci/include/mach/edma.h |   36 -----------------------------
- 1 files changed, 0 insertions(+), 36 deletions(-)
+ arch/arm/mach-davinci/devices-da8xx.c |   21 +++++++++++++--------
+ 1 files changed, 13 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/include/mach/edma.h b/arch/arm/mach-davinci/include/mach/edma.h
-index dc10ef6..20c77f2 100644
---- a/arch/arm/mach-davinci/include/mach/edma.h
-+++ b/arch/arm/mach-davinci/include/mach/edma.h
-@@ -151,42 +151,6 @@ struct edmacc_param {
- #define DA830_DMACH2EVENT_MAP1		0x00000000u
- #define DA830_EDMA_ARM_OWN		0x30FFCCFFu
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index beda8a4..119d46e 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -44,6 +44,11 @@
+ #define DA8XX_EMAC_RAM_OFFSET		0x0000
+ #define DA8XX_EMAC_CTRL_RAM_SIZE	SZ_8K
  
--/* DA830 specific EDMA3 Events Information */
--enum DA830_edma_ch {
--	DA830_DMACH_MCASP0_RX,
--	DA830_DMACH_MCASP0_TX,
--	DA830_DMACH_MCASP1_RX,
--	DA830_DMACH_MCASP1_TX,
--	DA830_DMACH_MCASP2_RX,
--	DA830_DMACH_MCASP2_TX,
--	DA830_DMACH_GPIO_BNK0INT,
--	DA830_DMACH_GPIO_BNK1INT,
--	DA830_DMACH_UART0_RX,
--	DA830_DMACH_UART0_TX,
--	DA830_DMACH_TMR64P0_EVTOUT12,
--	DA830_DMACH_TMR64P0_EVTOUT34,
--	DA830_DMACH_UART1_RX,
--	DA830_DMACH_UART1_TX,
--	DA830_DMACH_SPI0_RX,
--	DA830_DMACH_SPI0_TX,
--	DA830_DMACH_MMCSD_RX,
--	DA830_DMACH_MMCSD_TX,
--	DA830_DMACH_SPI1_RX,
--	DA830_DMACH_SPI1_TX,
--	DA830_DMACH_DMAX_EVTOUT6,
--	DA830_DMACH_DMAX_EVTOUT7,
--	DA830_DMACH_GPIO_BNK2INT,
--	DA830_DMACH_GPIO_BNK3INT,
--	DA830_DMACH_I2C0_RX,
--	DA830_DMACH_I2C0_TX,
--	DA830_DMACH_I2C1_RX,
--	DA830_DMACH_I2C1_TX,
--	DA830_DMACH_GPIO_BNK4INT,
--	DA830_DMACH_GPIO_BNK5INT,
--	DA830_DMACH_UART2_RX,
--	DA830_DMACH_UART2_TX
--};
--
- /*ch_status paramater of callback function possible values*/
- #define DMA_COMPLETE 1
- #define DMA_CC_ERROR 2
++#define DA8XX_DMA_MMCSD0_RX	EDMA_CTLR_CHAN(0, 16)
++#define DA8XX_DMA_MMCSD0_TX	EDMA_CTLR_CHAN(0, 17)
++#define DA850_DMA_MMCSD1_RX	EDMA_CTLR_CHAN(1, 28)
++#define DA850_DMA_MMCSD1_TX	EDMA_CTLR_CHAN(1, 29)
++
+ void __iomem *da8xx_syscfg0_base;
+ void __iomem *da8xx_syscfg1_base;
+ 
+@@ -573,13 +578,13 @@ static struct resource da8xx_mmcsd0_resources[] = {
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{		/* DMA RX */
+-		.start	= EDMA_CTLR_CHAN(0, 16),
+-		.end	= EDMA_CTLR_CHAN(0, 16),
++		.start	= DA8XX_DMA_MMCSD0_RX,
++		.end	= DA8XX_DMA_MMCSD0_RX,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ 	{		/* DMA TX */
+-		.start	= EDMA_CTLR_CHAN(0, 17),
+-		.end	= EDMA_CTLR_CHAN(0, 17),
++		.start	= DA8XX_DMA_MMCSD0_TX,
++		.end	= DA8XX_DMA_MMCSD0_TX,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ };
+@@ -610,13 +615,13 @@ static struct resource da850_mmcsd1_resources[] = {
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{		/* DMA RX */
+-		.start	= EDMA_CTLR_CHAN(1, 28),
+-		.end	= EDMA_CTLR_CHAN(1, 28),
++		.start	= DA850_DMA_MMCSD1_RX,
++		.end	= DA850_DMA_MMCSD1_RX,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ 	{		/* DMA TX */
+-		.start	= EDMA_CTLR_CHAN(1, 29),
+-		.end	= EDMA_CTLR_CHAN(1, 29),
++		.start	= DA850_DMA_MMCSD1_TX,
++		.end	= DA850_DMA_MMCSD1_TX,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ };
 -- 
 1.7.0.4
