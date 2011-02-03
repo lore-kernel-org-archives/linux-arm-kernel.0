@@ -1,79 +1,103 @@
-From: per.fransson.ml@gmail.com (Per Fransson)
-Date: Thu, 3 Feb 2011 11:14:45 +0100
-Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
-In-Reply-To: <20110203073232.GA2708@acer>
-References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
-	<20110203073232.GA2708@acer>
-Message-ID: <AANLkTi=ft4rvX4RmNr1veiWR7ED1aLp94hm0Ky8q4-OW@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 03 Feb 2011 12:17:55 +0200
+Subject: [PATCHv2 1/2] ads7846: OMAP3: Removal of warnings backtrace in
+	bootup
+In-Reply-To: <4D4A7F13.8080502@compulab.co.il>
+References: <1296726514-32146-1-git-send-email-sourav.poddar@ti.com>
+	<4D4A7F13.8080502@compulab.co.il>
+Message-ID: <4D4A80D3.2060407@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi again,
 
-Ok, I've tried to summarize your comments:
+On 02/03/11 12:10, Igor Grinberg wrote:
 
-* Break out turning off the MMU.
+> Hi,
+>
+> On 02/03/11 11:48, Sourav Poddar wrote:
+>
+>> gpio_pendown in ads7846_probe is not getting initalized (defaulted to 0)
+>> resulting in gpio_free to be called without a gpio_request. This
+>> results in the following backtrace in bootup.
+>>
+>> ------------[ cut here ]------------
+>> WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
+>> Modules linked in:
+>> [<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>]
+>> 	(warn_slowpath_common+0x4c/0x64)
+>> [<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>]
+>> 	(warn_slowpath_null+0x18/0x1c)
+>> [<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>]
+>> 	(gpio_free+0x100/0x12c)
+>> [<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>]
+>> 	(ads7846_probe+0xa38/0xc5c)
+>> [<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>]
+>> 	(spi_drv_probe+0x18/0x1c)
+>> [<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>]
+>> 	(driver_probe_device+0xc8/0x184)
+>> [<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>]
+>> 	(__driver_attach+0x68/0x8c)
+>> [<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>]
+>> 	(bus_for_each_dev+0x48/0x74)
+>> [<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>]
+>> 	(bus_add_driver+0xa0/0x220)
+>> [<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>]
+>> 	(driver_register+0xa8/0x134)
+>> [<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>]
+>> 	(do_one_initcall+0xcc/0x1a4)
+>> [<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>]
+>> 	(kernel_init+0x14c/0x214)
+>> [<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>]
+>> 	(kernel_thread_exit+0x0/0x8)
+>> ---[ end trace 4053287f8a5ec18f ]---
+>>
+>> Initializing gpio_pendown in ads7846_probe to -1 before
+>> ads7846_setup_pendown function removes the above backtrace
+>> warning.
+>>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>  drivers/input/touchscreen/ads7846.c |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+>> index 14ea54b..036f245 100644
+>> --- a/drivers/input/touchscreen/ads7846.c
+>> +++ b/drivers/input/touchscreen/ads7846.c
+>> @@ -1221,6 +1221,7 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+>>  	ts->input = input_dev;
+>>  	ts->vref_mv = pdata->vref_mv;
+>>  	ts->swap_xy = pdata->swap_xy;
+>> +	ts->gpio_pendown = -1;
+> Wouldn't it be better putting this into ads7846_setup_pendown() function?
+> This will keep the whole gpio_pendown initialization code close together.
+> Something like:
+>
+> if (pdata->get_pendown_state) {
+> <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/input/touchscreen/ads7846.c;h=14ea54b78e4648b0ac8a3403440f6f5d120dfdd9;hb=HEAD#l954>        ts->get_pendown_state = pdata->get_pendown_state;
+>         ts->gpio_pendown = -1;
+> <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/input/touchscreen/ads7846.c;h=14ea54b78e4648b0ac8a3403440f6f5d120dfdd9;hb=HEAD#l955>        return 0;
+> <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/input/touchscreen/ads7846.c;h=14ea54b78e4648b0ac8a3403440f6f5d120dfdd9;hb=HEAD#l956>}
 
-  - Not sure about this one, the changes rely on each other anyway.
-But if you insist...
+Sorry for the above links (this is embarrassing, but I've got played by my email client),
+I meant of course:
 
-* Don't add a kexec specific structure as argument to identity_mapping_add().
+if (pdata->get_pendown_state) {
+        ts->get_pendown_state = pdata->get_pendown_state;
+        ts->gpio_pendown = -1;
+        return 0;
+}
 
-  - How about a separate 'store_mapping_for(<address to store for>,
-<where to store>)' function?
-    Could it be placed idmap.c as well?
 
-* Always use processor.reset, regardless of #ifdef MULTI_CPU
+>
+> Also, why don't we use -EINVAL for the invalid gpio number instead of -1 constant?
+>
+>>  
+>>  	mutex_init(&ts->lock);
+>>  	init_waitqueue_head(&ts->wait);
 
-  - Yes
-
-* beq -> bneq in relocate_new_kernel()
-
-  - errare humanum est =o)
-
-* better way to check for the MMU actually being off?
-
-  - Will reading the M bit of the System Control Register do?
-
-* Prettier, more general copy lists for restoring the page table entries.
-
-  - Are there any such pre-existing types, e.g.
-
-        struct {
-            size_t howmuch;
-            void * towhere;
-            char what[0];
-        }
-
-    or something similar?
-
-* The old 0x0-PAGE_OFFSET 1-1 mapping doesn't cover the physical
-addresses needed if these are
-  higher, e.g. 0xd0000000--. Thus it will never work.
-
-  - My patch will identity map the needed addresses regardless of
-whether they are located in the
-    user or kernel space ranges. This at least *could* work, if we are
-lucky and it doesn't coincide
-    with the mappings for the code we still need to run before turning
-off the MMU.
-
-* The jump to physical addresses in cpu_reset() needs to account for
-PHYS_OFFSET!=0
-
-  - Yes
-
-* Move ARM specific struct definitions to ARM specific header
-
-  - Yes
-
-* Tested on ARMv4/v5 CPUs?
-
-  - No, sorry, there are none available to me. They should work like
-they used to if they don't use
-    any other code than the cpu_reset() and relocate_new_kernel()
-functions once the MMU has been
-    turned off.
-
+-- 
 Regards,
-Per
+Igor.
