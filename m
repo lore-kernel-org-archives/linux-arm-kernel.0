@@ -1,67 +1,25 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Thu, 03 Feb 2011 07:23:37 -0500
-Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024877837A@dbde02.ent.ti.com>
-References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>	<4D494C6A.30507@mvista.com>
-	<4D49543A.1070302@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302487782C9@dbde02.ent.ti.com>
-	<4D496EC7.1010808@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024877837A@dbde02.ent.ti.com>
-Message-ID: <4D4A9E49.60606@criticallink.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu,  3 Feb 2011 18:15:20 +0530
+Subject: [PATCH v2 0/2] Fix/Clean regulator consumer mapping for 3430sdp
+Message-ID: <1296737122-20765-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+This is a short series to fix some, and clean the
+existing regulator consumer supply mappings for
+the OMAP3430sdp board.
 
-On 2/2/2011 10:37 AM, Nori, Sekhar wrote:
+The series is boot tested on the 3430sdp board
+and applies on 2.6.38-rc3.
 
-> Hi Mike,
-> 
-> On Wed, Feb 02, 2011 at 20:18:39, Michael Williamson wrote:
->  
->>> Since all the platform device definitions for DA8XX devices happens
->>> in devices-da8xx.c, it makes sense to get rid of the DA830_DMACH_*
->>> enum altogether and instead just define the channel numbers used in
->>> devices-da8xx.c above the actual usage.
->>>
->>> Mike, is that something you are willing take-up?
->>>
->>
->>
->> I can take this up as a separate patch series. I'd like to keep the 
->> spi platform support series isolated to that subject matter, if that's
->> OK.
-> 
-> Yes, the clean-up can be a separate series - but it will have to
-> precede the SPI series.
+Changes in v2:
+Define regulator_consumer_supply as array's
+and use ARRAY_SIZE macro to define
+num_consumer_supplies
 
-> 
+Rajendra Nayak (2):
+  omap3sdp: Fix regulator mapping for ads7846 TS controller
+  omap3sdp: clean regulator supply mapping in board file
 
-
-Quick question:
-
-In addition to cleaning up the enums in edma.h, are you also asking to 
-pull the channel / base resources for ASP currently defined in asp.h 
-into devices-da8xx.c as well?  Or should that be left alone? E.G., 
-these defines look like they should go in devices-da8xx and come out 
-of asp.h:
-
-DAVINCI_DA8XX_MCASP0_REG_BASE
-DAVINCI_DA830_MCASP1_REG_BASE
-DAVINCI_DA8XX_DMA_MCASP0_AREVT
-DAVINCI_DA8XX_DMA_MCASP0_AXEVT
-DAVINCI_DA830_DMA_MCASP1_AREVT
-DAVINCI_DA830_DMA_MCASP1_AXEVT
-
-If moved, there are other #defines that should then be shuffled out of asp.h
-to other files for other chips/platforms for completeness, E.G.
-
-DAVINCI_DM646X_DMA_MCASP0_AXEVT0 should go to dm646x.c.
-
-I'm not too keen on shuffling stuff around like that if I can't test it beyond
-compiling.  Especially if it's not adding any functionality.  But, I will submit
-it if it's necessary to get the SPI support in.
-
-Thanks.
-
--Mike
+ arch/arm/mach-omap2/board-3430sdp.c |   78 +++++++++++++++++------------------
+ 1 files changed, 38 insertions(+), 40 deletions(-)
