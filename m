@@ -1,162 +1,40 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu,  3 Feb 2011 18:15:22 +0530
-Subject: [PATCH v2 2/2] omap3sdp: clean regulator supply mapping in board file
-In-Reply-To: <1296737122-20765-2-git-send-email-rnayak@ti.com>
-References: <1296737122-20765-1-git-send-email-rnayak@ti.com>
-	<1296737122-20765-2-git-send-email-rnayak@ti.com>
-Message-ID: <1296737122-20765-3-git-send-email-rnayak@ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 3 Feb 2011 13:51:26 +0100
+Subject: [PATCH 2/6] omap4: prcm: Fix the CPUx clockdomain offsets
+In-Reply-To: <4D4922B9.30501@ti.com>
+References: <1296212688-21951-1-git-send-email-santosh.shilimkar@ti.com>	<1296212688-21951-3-git-send-email-santosh.shilimkar@ti.com>
+	<87ipx3mduj.fsf@ti.com> <4D4922B9.30501@ti.com>
+Message-ID: <4D4AA4CE.2020306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clean the regulator supply mapping data in the 3430sdp
-board file (which is spread all over) by moving all
-of them together.
-Also use the REGULATOR_SUPPLY macro and remove instances
-of mapping dev pointers at run time.
-Additonally define all regulator_consumer_supply as
-array's and use ARRAY_SIZE macro to define
-num_consumer_supplies.
+Hi Kevin,
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+On 2/2/2011 10:24 AM, Cousson, Benoit wrote:
+> On 2/2/2011 2:20 AM, Hilman, Kevin wrote:
+>> Santosh Shilimkar<santosh.shilimkar@ti.com>   writes:
+>>
+>>> CPU0 and CPU1 clockdomain is at the offset of 0x18 from the LPRM base.
+>>> The header file has set it wrongly to 0x0. Offset 0x0 is for CPUx power
+>>> domain control register
+>>>
+>>> Fix the same.
+>>
+>> Has this also been updated in the autogen scripts?
+>>
+>> Benoit?
+> 
+> No, I didn't see any patch to update that yet.
+> 
+> Santosh or Rajendra,
+> Did you already fix it?
+
+I updated the scripts with Santosh fixes and found a register name issue in this file.
+
+The fix is inlined at the end. 
+Santosh will include it in a new revision of the series.
+
+Regards,
+Benoit
+
 ---
- arch/arm/mach-omap2/board-3430sdp.c |   71 +++++++++++++++-------------------
- 1 files changed, 31 insertions(+), 40 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 8e18f21..7ffac52 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -315,11 +315,6 @@ static struct platform_device sdp3430_dss_device = {
- 	},
- };
- 
--static struct regulator_consumer_supply sdp3430_vdda_dac_supply = {
--	.supply		= "vdda_dac",
--	.dev		= &sdp3430_dss_device.dev,
--};
--
- static struct platform_device *sdp3430_devices[] __initdata = {
- 	&sdp3430_dss_device,
- };
-@@ -370,18 +365,6 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{}	/* Terminator */
- };
- 
--static struct regulator_consumer_supply sdp3430_vmmc1_supply = {
--	.supply			= "vmmc",
--};
--
--static struct regulator_consumer_supply sdp3430_vsim_supply = {
--	.supply			= "vmmc_aux",
--};
--
--static struct regulator_consumer_supply sdp3430_vmmc2_supply = {
--	.supply			= "vmmc",
--};
--
- static int sdp3430_twl_gpio_setup(struct device *dev,
- 		unsigned gpio, unsigned ngpio)
- {
-@@ -392,13 +375,6 @@ static int sdp3430_twl_gpio_setup(struct device *dev,
- 	mmc[1].gpio_cd = gpio + 1;
- 	omap2_hsmmc_init(mmc);
- 
--	/* link regulators to MMC adapters ... we "know" the
--	 * regulators will be set up only *after* we return.
--	 */
--	sdp3430_vmmc1_supply.dev = mmc[0].dev;
--	sdp3430_vsim_supply.dev = mmc[0].dev;
--	sdp3430_vmmc2_supply.dev = mmc[1].dev;
--
- 	/* gpio + 7 is "sub_lcd_en_bkl" (output/PWM1) */
- 	gpio_request(gpio + 7, "sub_lcd_en_bkl");
- 	gpio_direction_output(gpio + 7, 0);
-@@ -427,11 +403,34 @@ static struct twl4030_madc_platform_data sdp3430_madc_data = {
- 	.irq_line	= 1,
- };
- 
-+/* regulator consumer mappings */
-+
- /* ads7846 on SPI */
- static struct regulator_consumer_supply sdp3430_vaux3_supplies[] = {
- 	REGULATOR_SUPPLY("vcc", "spi1.0"),
- };
- 
-+static struct regulator_consumer_supply sdp3430_vdda_dac_supplies[] = {
-+	REGULATOR_SUPPLY("vdda_dac", "omapdss"),
-+};
-+
-+/* VPLL2 for digital video outputs */
-+static struct regulator_consumer_supply sdp3430_vpll2_supplies[] = {
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-+};
-+
-+static struct regulator_consumer_supply sdp3430_vmmc1_supplies[] = {
-+	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.0"),
-+};
-+
-+static struct regulator_consumer_supply sdp3430_vsim_supplies[] = {
-+	REGULATOR_SUPPLY("vmmc_aux", "mmci-omap-hs.0"),
-+};
-+
-+static struct regulator_consumer_supply sdp3430_vmmc2_supplies[] = {
-+	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.1"),
-+};
-+
- /*
-  * Apply all the fixed voltages since most versions of U-Boot
-  * don't bother with that initialization.
-@@ -502,8 +501,8 @@ static struct regulator_init_data sdp3430_vmmc1 = {
- 					| REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
--	.num_consumer_supplies	= 1,
--	.consumer_supplies	= &sdp3430_vmmc1_supply,
-+	.num_consumer_supplies	= ARRAY_SIZE(sdp3430_vmmc1_supplies),
-+	.consumer_supplies	= sdp3430_vmmc1_supplies,
- };
- 
- /* VMMC2 for MMC2 card */
-@@ -517,8 +516,8 @@ static struct regulator_init_data sdp3430_vmmc2 = {
- 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
--	.num_consumer_supplies	= 1,
--	.consumer_supplies	= &sdp3430_vmmc2_supply,
-+	.num_consumer_supplies	= ARRAY_SIZE(sdp3430_vmmc2_supplies),
-+	.consumer_supplies	= sdp3430_vmmc2_supplies,
- };
- 
- /* VSIM for OMAP VDD_MMC1A (i/o for DAT4..DAT7) */
-@@ -532,8 +531,8 @@ static struct regulator_init_data sdp3430_vsim = {
- 					| REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
--	.num_consumer_supplies	= 1,
--	.consumer_supplies	= &sdp3430_vsim_supply,
-+	.num_consumer_supplies	= ARRAY_SIZE(sdp3430_vsim_supplies),
-+	.consumer_supplies	= sdp3430_vsim_supplies,
- };
- 
- /* VDAC for DSS driving S-Video */
-@@ -547,16 +546,8 @@ static struct regulator_init_data sdp3430_vdac = {
- 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
--	.num_consumer_supplies	= 1,
--	.consumer_supplies	= &sdp3430_vdda_dac_supply,
--};
--
--/* VPLL2 for digital video outputs */
--static struct regulator_consumer_supply sdp3430_vpll2_supplies[] = {
--	{
--		.supply		= "vdds_dsi",
--		.dev		= &sdp3430_dss_device.dev,
--	}
-+	.num_consumer_supplies	= ARRAY_SIZE(sdp3430_vdda_dac_supplies),
-+	.consumer_supplies	= sdp3430_vdda_dac_supplies,
- };
- 
- static struct regulator_init_data sdp3430_vpll2 = {
--- 
-1.7.0.4
