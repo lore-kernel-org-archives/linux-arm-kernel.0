@@ -1,11 +1,12 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 3 Feb 2011 10:44:21 +0000
-Subject: [PATCH] ARM: bitops: Use BX instead of MOV PC,LR
-In-Reply-To: <20110202212449.GF31043@n2100.arm.linux.org.uk>
+Date: Thu, 3 Feb 2011 10:47:51 +0000
+Subject: [PATCH REPOST] ARM: bitops: Use BX instead of MOV PC,LR
+In-Reply-To: <20110203104420.GA2666@arm.com>
 References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
 	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
 	<20110202212449.GF31043@n2100.arm.linux.org.uk>
-Message-ID: <20110203104420.GA2666@arm.com>
+	<20110203104420.GA2666@arm.com>
+Message-ID: <20110203104751.GB2666@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,19 +15,12 @@ wherever appropriate will help educate people into good assembler
 coding habits.
 
 BX is appropriate here because this code is predicated on
+__LINUX_ARM_ARCH__ >= 6.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
 
-A bit of a pedantic one, but is there any chance of switching
-to using BX here?
-
-I spend a significant amount of my life trying to educate people
-not to do things like mov pc,lr ... though in interworking userspace
-is admittedly a different world from the kernel.
-
-Cheers
-Dave
+Reposting ... git ate my commit message :/
 
  arch/arm/lib/bitops.h |    8 ++++----
  1 files changed, 4 insertions(+), 4 deletions(-)
