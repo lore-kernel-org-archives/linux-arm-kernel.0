@@ -1,25 +1,49 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu,  3 Feb 2011 18:15:20 +0530
-Subject: [PATCH v2 0/2] Fix/Clean regulator consumer mapping for 3430sdp
-Message-ID: <1296737122-20765-1-git-send-email-rnayak@ti.com>
+Date: Thu,  3 Feb 2011 18:15:21 +0530
+Subject: [PATCH v2 1/2] omap3sdp: Fix regulator mapping for ads7846 TS
+	controller
+In-Reply-To: <1296737122-20765-1-git-send-email-rnayak@ti.com>
+References: <1296737122-20765-1-git-send-email-rnayak@ti.com>
+Message-ID: <1296737122-20765-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a short series to fix some, and clean the
-existing regulator consumer supply mappings for
-the OMAP3430sdp board.
+On the OMAP3430SDP board, the ads7846 touchscreen controller
+is powered by VAUX3 regulator (supplying 2.8v).
+Fix this mapping in the board file, and hence prevent
+the ads7846 driver init to fail with the below error..
 
-The series is boot tested on the 3430sdp board
-and applies on 2.6.38-rc3.
+ads7846 spi1.0: unable to get regulator: -19
 
-Changes in v2:
-Define regulator_consumer_supply as array's
-and use ARRAY_SIZE macro to define
-num_consumer_supplies
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/board-3430sdp.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Rajendra Nayak (2):
-  omap3sdp: Fix regulator mapping for ads7846 TS controller
-  omap3sdp: clean regulator supply mapping in board file
-
- arch/arm/mach-omap2/board-3430sdp.c |   78 +++++++++++++++++------------------
- 1 files changed, 38 insertions(+), 40 deletions(-)
+diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+index d4e41ef..8e18f21 100644
+--- a/arch/arm/mach-omap2/board-3430sdp.c
++++ b/arch/arm/mach-omap2/board-3430sdp.c
+@@ -427,6 +427,11 @@ static struct twl4030_madc_platform_data sdp3430_madc_data = {
+ 	.irq_line	= 1,
+ };
+ 
++/* ads7846 on SPI */
++static struct regulator_consumer_supply sdp3430_vaux3_supplies[] = {
++	REGULATOR_SUPPLY("vcc", "spi1.0"),
++};
++
+ /*
+  * Apply all the fixed voltages since most versions of U-Boot
+  * don't bother with that initialization.
+@@ -469,6 +474,8 @@ static struct regulator_init_data sdp3430_vaux3 = {
+ 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+ 					| REGULATOR_CHANGE_STATUS,
+ 	},
++	.num_consumer_supplies		= ARRAY_SIZE(sdp3430_vaux3_supplies),
++	.consumer_supplies		= sdp3430_vaux3_supplies,
+ };
+ 
+ /* VAUX4 for OMAP VDD_CSI2 (camera) */
+-- 
+1.7.0.4
