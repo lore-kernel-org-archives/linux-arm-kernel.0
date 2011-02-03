@@ -1,183 +1,67 @@
-From: arve@android.com (=?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?=)
-Date: Wed,  2 Feb 2011 18:54:23 -0800
-Subject: [PATCH 5/5] ARM: etm: Configure data tracing
-In-Reply-To: <1296701663-12168-1-git-send-email-arve@android.com>
-References: <1296701663-12168-1-git-send-email-arve@android.com>
-Message-ID: <1296701663-12168-5-git-send-email-arve@android.com>
+From: dilinger@queued.net (Andres Salomon)
+Date: Wed, 2 Feb 2011 20:01:39 -0800
+Subject: [PATCH 03/19] ab3550: mfd_cell is now implicitly available to drivers
+In-Reply-To: <20110202195417.228e2656@queued.net>
+References: <20110202195417.228e2656@queued.net>
+Message-ID: <20110202200139.7391044f@queued.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old code enabled data tracing, but did not configure the
-range. We now configure it to trace all data addresses by default,
-and add a trace_data_range attribute to change the range or disable
-data tracing.
 
-Signed-off-by: Arve Hj?nnev?g <arve@android.com>
+No need to explicitly set the cell's platform_data/data_size.
+
+This wasn't actually used anywhere by the ab3550 stuff; dev_data
+in mach-u300's i2c code was empty.
+
+Signed-off-by: Andres Salomon <dilinger@queued.net>
 ---
- arch/arm/include/asm/hardware/coresight.h |   10 +++-
- arch/arm/kernel/etm.c                     |   76 +++++++++++++++++++++++++++-
- 2 files changed, 82 insertions(+), 4 deletions(-)
+ arch/arm/mach-u300/i2c.c   |    2 --
+ drivers/mfd/ab3550-core.c  |    6 ------
+ include/linux/mfd/abx500.h |    2 --
+ 3 files changed, 0 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/include/asm/hardware/coresight.h b/arch/arm/include/asm/hardware/coresight.h
-index 7ecd793..b95a6f0 100644
---- a/arch/arm/include/asm/hardware/coresight.h
-+++ b/arch/arm/include/asm/hardware/coresight.h
-@@ -17,9 +17,11 @@
- #define TRACER_ACCESSED_BIT	0
- #define TRACER_RUNNING_BIT	1
- #define TRACER_CYCLE_ACC_BIT	2
-+#define TRACER_TRACE_DATA_BIT	3
- #define TRACER_ACCESSED		BIT(TRACER_ACCESSED_BIT)
- #define TRACER_RUNNING		BIT(TRACER_RUNNING_BIT)
- #define TRACER_CYCLE_ACC	BIT(TRACER_CYCLE_ACC_BIT)
-+#define TRACER_TRACE_DATA	BIT(TRACER_TRACE_DATA_BIT)
+diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
+index f0394ba..1ff7a82 100644
+--- a/arch/arm/mach-u300/i2c.c
++++ b/arch/arm/mach-u300/i2c.c
+@@ -291,8 +291,6 @@ static struct ab3550_platform_data ab3550_plf_data = {
+ 		.base = IRQ_AB3550_BASE,
+ 		.count = (IRQ_AB3550_END - IRQ_AB3550_BASE + 1),
+ 	},
+-	.dev_data = {
+-	},
+ 	.init_settings = ab3550_init_settings,
+ 	.init_settings_sz = ARRAY_SIZE(ab3550_init_settings),
+ };
+diff --git a/drivers/mfd/ab3550-core.c b/drivers/mfd/ab3550-core.c
+index 5fbca34..47625b9 100644
+--- a/drivers/mfd/ab3550-core.c
++++ b/drivers/mfd/ab3550-core.c
+@@ -1319,12 +1319,6 @@ static int __init ab3550_probe(struct i2c_client *client,
+ 	if (err)
+ 		goto exit_no_ops;
  
- #define TRACER_TIMEOUT 10000
- 
-@@ -113,8 +115,14 @@
- #define ETMR_TRACEENCTRL	0x24
- #define ETMTE_INCLEXCL		BIT(24)
- #define ETMR_TRACEENEVT		0x20
-+
-+#define ETMR_VIEWDATAEVT	0x30
-+#define ETMR_VIEWDATACTRL1	0x34
-+#define ETMR_VIEWDATACTRL2	0x38
-+#define ETMR_VIEWDATACTRL3	0x3c
-+#define ETMVDC3_EXCLONLY	(1 << 16)
-+
- #define ETMCTRL_OPTS		(ETMCTRL_DO_CPRT | \
--				ETMCTRL_DATA_DO_ADDR | \
- 				ETMCTRL_BRANCH_OUTPUT | \
- 				ETMCTRL_DO_CONTEXTID)
- 
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 6ff1004..ccd6d12 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -42,6 +42,8 @@ struct tracectx {
- 	int		etm_portsz;
- 	unsigned long	range_start;
- 	unsigned long	range_end;
-+	unsigned long	data_range_start;
-+	unsigned long	data_range_end;
- 	struct device	*dev;
- 	struct clk	*emu_clk;
- 	struct mutex	mutex;
-@@ -83,8 +85,15 @@ static int etm_setup_address_range(struct tracectx *t, int n,
- 	etm_writel(t, flags, ETMR_COMP_ACC_TYPE(n * 2 + 1));
- 	etm_writel(t, end, ETMR_COMP_VAL(n * 2 + 1));
- 
--	flags = exclude ? ETMTE_INCLEXCL : 0;
--	etm_writel(t, flags | (1 << n), ETMR_TRACEENCTRL);
-+	if (data) {
-+		flags = exclude ? ETMVDC3_EXCLONLY : 0;
-+		if (exclude)
-+			n += 8;
-+		etm_writel(t, flags | BIT(n), ETMR_VIEWDATACTRL3);
-+	} else {
-+		flags = exclude ? ETMTE_INCLEXCL : 0;
-+		etm_writel(t, flags | (1 << n), ETMR_TRACEENCTRL);
-+	}
- 
- 	return 0;
- }
-@@ -107,6 +116,9 @@ static int trace_start(struct tracectx *t)
- 	if (t->flags & TRACER_CYCLE_ACC)
- 		v |= ETMCTRL_CYCLEACCURATE;
- 
-+	if (t->flags & TRACER_TRACE_DATA)
-+		v |= ETMCTRL_DATA_DO_ADDR;
-+
- 	etm_unlock(t);
- 
- 	etm_writel(t, v, ETMR_CTRL);
-@@ -129,6 +141,17 @@ static int trace_start(struct tracectx *t)
- 	etm_writel(t, 0, ETMR_TRACESSCTRL);
- 	etm_writel(t, 0x6f, ETMR_TRACEENEVT);
- 
-+	etm_writel(t, 0, ETMR_VIEWDATACTRL1);
-+	etm_writel(t, 0, ETMR_VIEWDATACTRL2);
-+
-+	if (t->data_range_start || t->data_range_end)
-+		etm_setup_address_range(t, 2, t->data_range_start,
-+					t->data_range_end, 0, 1);
-+	else
-+		etm_writel(t, ETMVDC3_EXCLONLY, ETMR_VIEWDATACTRL3);
-+
-+	etm_writel(t, 0x6f, ETMR_VIEWDATAEVT);
-+
- 	v &= ~ETMCTRL_PROGRAM;
- 	v |= ETMCTRL_PORTSEL;
- 
-@@ -570,6 +593,48 @@ static ssize_t trace_range_store(struct kobject *kobj,
- static struct kobj_attribute trace_range_attr =
- 	__ATTR(trace_range, 0644, trace_range_show, trace_range_store);
- 
-+static ssize_t trace_data_range_show(struct kobject *kobj,
-+				  struct kobj_attribute *attr,
-+				  char *buf)
-+{
-+	unsigned long range_start;
-+	u64 range_end;
-+	mutex_lock(&tracer.mutex);
-+	range_start = tracer.data_range_start;
-+	range_end = tracer.data_range_end;
-+	if (!range_end && (tracer.flags & TRACER_TRACE_DATA))
-+		range_end = 0x100000000ULL;
-+	mutex_unlock(&tracer.mutex);
-+	return sprintf(buf, "%08lx %08llx\n", range_start, range_end);
-+}
-+
-+static ssize_t trace_data_range_store(struct kobject *kobj,
-+				   struct kobj_attribute *attr,
-+				   const char *buf, size_t n)
-+{
-+	unsigned long range_start;
-+	u64 range_end;
-+
-+	if (sscanf(buf, "%lx %llx", &range_start, &range_end) != 2)
-+		return -EINVAL;
-+
-+	mutex_lock(&tracer.mutex);
-+	tracer.data_range_start = range_start;
-+	tracer.data_range_end = (unsigned long)range_end;
-+	if (range_end)
-+		tracer.flags |= TRACER_TRACE_DATA;
-+	else
-+		tracer.flags &= ~TRACER_TRACE_DATA;
-+	mutex_unlock(&tracer.mutex);
-+
-+	return n;
-+}
-+
-+
-+static struct kobj_attribute trace_data_range_attr =
-+	__ATTR(trace_data_range, 0644,
-+		trace_data_range_show, trace_data_range_store);
-+
- static int __init etm_probe(struct amba_device *dev, struct amba_id *id)
- {
- 	struct tracectx *t = &tracer;
-@@ -595,7 +660,7 @@ static int __init etm_probe(struct amba_device *dev, struct amba_id *id)
- 
- 	mutex_init(&t->mutex);
- 	t->dev = &dev->dev;
--	t->flags = TRACER_CYCLE_ACC;
-+	t->flags = TRACER_CYCLE_ACC | TRACER_TRACE_DATA;
- 	t->etm_portsz = 1;
- 
- 	etm_unlock(t);
-@@ -625,6 +690,11 @@ static int __init etm_probe(struct amba_device *dev, struct amba_id *id)
- 	if (ret)
- 		dev_dbg(&dev->dev, "Failed to create trace_range in sysfs\n");
- 
-+	ret = sysfs_create_file(&dev->dev.kobj, &trace_data_range_attr.attr);
-+	if (ret)
-+		dev_dbg(&dev->dev,
-+			"Failed to create trace_data_range in sysfs\n");
-+
- 	dev_dbg(t->dev, "ETM AMBA driver initialized.\n");
- 
- out:
+-	/* Set up and register the platform devices. */
+-	for (i = 0; i < AB3550_NUM_DEVICES; i++) {
+-		ab3550_devs[i].platform_data = ab3550_plf_data->dev_data[i];
+-		ab3550_devs[i].data_size = ab3550_plf_data->dev_data_sz[i];
+-	}
+-
+ 	err = mfd_add_devices(&client->dev, 0, ab3550_devs,
+ 		ARRAY_SIZE(ab3550_devs), NULL,
+ 		ab3550_plf_data->irq.base);
+diff --git a/include/linux/mfd/abx500.h b/include/linux/mfd/abx500.h
+index 67bd6f7..a735210 100644
+--- a/include/linux/mfd/abx500.h
++++ b/include/linux/mfd/abx500.h
+@@ -185,8 +185,6 @@ struct abx500_init_settings {
+  */
+ struct ab3550_platform_data {
+ 	struct {unsigned int base; unsigned int count; } irq;
+-	void *dev_data[AB3550_NUM_DEVICES];
+-	size_t dev_data_sz[AB3550_NUM_DEVICES];
+ 	struct abx500_init_settings *init_settings;
+ 	unsigned int init_settings_sz;
+ };
 -- 
-1.7.3.1
+1.7.2.3
