@@ -1,24 +1,67 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 3 Feb 2011 14:04:01 +0200
-Subject: PXA270 Random Hangs at Low Core Freq
-In-Reply-To: <A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
-References: <471CD45F-4531-4C87-B292-411CE519D0A5@prograde.net>
-	<AANLkTi=Y-JYQ_eZ4EdNirPrm_xkiduSZP19BPWckP2iW@mail.gmail.com>
-	<A6E7D305-39A1-42B3-8A2B-0D2CDBBE5EEE@prograde.net>
-Message-ID: <201102031404.02387.anarsoul@gmail.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Thu, 03 Feb 2011 07:23:37 -0500
+Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024877837A@dbde02.ent.ti.com>
+References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>	<4D494C6A.30507@mvista.com>
+	<4D49543A.1070302@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302487782C9@dbde02.ent.ti.com>
+	<4D496EC7.1010808@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024877837A@dbde02.ent.ti.com>
+Message-ID: <4D4A9E49.60606@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 26 October 2010 20:06:36 Michael Cashwell wrote:
+Hi Sekhar,
 
-> Voltage slewing is an area I had been working on. The TPS65023 driver has
-> some problems (like failing to actually command a voltage change!). I'm
-> going to submit patches for this but it's not involved in the problem it's
-> disabled in my kernel config. The Verdex Pro PMIC is strapped to come out
-> of reset at a core voltage of 1.55VDC (verified on a scope). That's high
-> enough to support all core speeds.
+On 2/2/2011 10:37 AM, Nori, Sekhar wrote:
 
-Hi, Michael, can you share your patches for TPS65023?
+> Hi Mike,
+> 
+> On Wed, Feb 02, 2011 at 20:18:39, Michael Williamson wrote:
+>  
+>>> Since all the platform device definitions for DA8XX devices happens
+>>> in devices-da8xx.c, it makes sense to get rid of the DA830_DMACH_*
+>>> enum altogether and instead just define the channel numbers used in
+>>> devices-da8xx.c above the actual usage.
+>>>
+>>> Mike, is that something you are willing take-up?
+>>>
+>>
+>>
+>> I can take this up as a separate patch series. I'd like to keep the 
+>> spi platform support series isolated to that subject matter, if that's
+>> OK.
+> 
+> Yes, the clean-up can be a separate series - but it will have to
+> precede the SPI series.
 
-Regards
-Vasily
+> 
+
+
+Quick question:
+
+In addition to cleaning up the enums in edma.h, are you also asking to 
+pull the channel / base resources for ASP currently defined in asp.h 
+into devices-da8xx.c as well?  Or should that be left alone? E.G., 
+these defines look like they should go in devices-da8xx and come out 
+of asp.h:
+
+DAVINCI_DA8XX_MCASP0_REG_BASE
+DAVINCI_DA830_MCASP1_REG_BASE
+DAVINCI_DA8XX_DMA_MCASP0_AREVT
+DAVINCI_DA8XX_DMA_MCASP0_AXEVT
+DAVINCI_DA830_DMA_MCASP1_AREVT
+DAVINCI_DA830_DMA_MCASP1_AXEVT
+
+If moved, there are other #defines that should then be shuffled out of asp.h
+to other files for other chips/platforms for completeness, E.G.
+
+DAVINCI_DM646X_DMA_MCASP0_AXEVT0 should go to dm646x.c.
+
+I'm not too keen on shuffling stuff around like that if I can't test it beyond
+compiling.  Especially if it's not adding any functionality.  But, I will submit
+it if it's necessary to get the SPI support in.
+
+Thanks.
+
+-Mike
