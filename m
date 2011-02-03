@@ -1,62 +1,58 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 3 Feb 2011 09:32:32 +0200
-Subject: [PATCH v2] ARM: kexec: selective MMU identity mapping
-In-Reply-To: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
-References: <1296657809-1589-1-git-send-email-per.xx.fransson@stericsson.com>
-Message-ID: <20110203073232.GA2708@acer>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Feb 2011 08:56:23 +0100
+Subject: [patch 6/8] arm: ns9xxx: Remove private irq flow handler
+In-Reply-To: <20110202212552.299898447@linutronix.de>
+References: <20110202212258.546660886@linutronix.de>
+	<20110202212552.299898447@linutronix.de>
+Message-ID: <20110203075623.GB30452@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas,
 
-Few questions, see below.
+On Wed, Feb 02, 2011 at 09:41:27PM -0000, Thomas Gleixner wrote:
+> handle_prio_irq is almost identical with handle_fasteoi_irq. The
+> subtle differences are
+> 
+> 1) The handler checks for IRQ_DISABLED after the device handler has
+>    been called. In case it's set it masks the interrupt.
+> 
+> 2) When the handler sees IRQ_DISABLED on entry it masks the interupt
+>    in the same way as handle_fastoei_irq, but does not set the
+>    IRQ_PENDING flag.
+> 
+> 3) Instead of gracefully handling a recursive interrupt it crashes the
+>    kernel.
+> 
+> #1 is just relevant when a device handler calls disable_irq_nosync()
+>    and it does not matter whether we mask the interrupt right away or
+>    not. We handle lazy masking for disable_irq anyway, so there is no
+>    real reason to have this extra mask in place.
+> 
+> #2 will prevent the resend of a pending interrupt, which can result in
+>    lost interrupts for edge type interrupts. For level type interrupts
+>    the resend is a noop in the generic code. According to the
+>    datasheet all interrupts are level type, so marking them as such
+>    will result in the exact same behaviour as the private
+>    handle_prio_irq implementation.
+> 
+> #3 is just stupid. Crashing the kernel instead of handling a problem
+>    gracefully is just wrong. With the current semantics- all handlers
+>    run with interrupts disabled - this is even more wrong.
+> 
+> Rename ack to eoi, remove the unused mask_ack, switch to
+> handle_fasteoi_irq and remove the private function.
+> 
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+I have no access to a ns9xxx machine, but this looks sane.
 
-On Wed, Feb 02, 2011 at 03:43:29PM +0100, Per Fransson wrote:
-> When restarting using the kernel kexec functionality the MMU
-> needs to be turned off. Any code which does this needs to use
-> identity mapped addresses to get reliable results. In the ARM
-> kexec case this identity mapping is done:
+Acked-by: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
 
-[...]
+Thanks
+Uwe
 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 0c1172b..762bb43 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -61,6 +61,10 @@ ENDPROC(cpu_v7_proc_fin)
->   */
->  	.align	5
->  ENTRY(cpu_v7_reset)
-> +	sub	pc, pc, #PAGE_OFFSET+4		@ go to physical addresses
-
-How the above is going to work if PHYS_OFFSET is something else than zero? Also
-does this work with Thumb-2 kernels?
-
-> +	mrc	p15, 0, ip, c1, c0, 0		@ ctrl register
-> +	bic	ip, ip, #0x0001			@ ...............m
-> +	mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
->  	mov	pc, r0
->  ENDPROC(cpu_v7_reset)
->  
-> diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-> index 03e8e8d..6a1345b 100644
-> --- a/include/linux/kexec.h
-> +++ b/include/linux/kexec.h
-> @@ -106,7 +106,11 @@ struct kimage {
->  #endif
->  };
->  
-> -
-> +struct kexec_mmu_ent {
-> +	pgd_t *ptr;
-> +	pgd_t store;
-> +};
-> +extern struct kexec_mmu_ent kexec_mmu_ents[4];
->  
->  /* kexec interface functions */
->  extern void machine_kexec(struct kimage *image);
-
-Is it good idea to place these in a generic header as they are only used in ARM?
-
-Thanks,
-MW
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
