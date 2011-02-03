@@ -1,47 +1,60 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu,  3 Feb 2011 17:01:44 +0530
-Subject: [PATCH 1/2] omap3sdp: Fix regulator mapping for ads7846 TS controller
-In-Reply-To: <1296732705-12818-1-git-send-email-rnayak@ti.com>
-References: <1296732705-12818-1-git-send-email-rnayak@ti.com>
-Message-ID: <1296732705-12818-2-git-send-email-rnayak@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 3 Feb 2011 12:32:38 +0100
+Subject: [PATCHv2 1/2] ads7846: OMAP3: Removal of warnings backtrace in
+	bootup
+In-Reply-To: <4D4A8DA0.1010806@compulab.co.il>
+References: <1296726514-32146-1-git-send-email-sourav.poddar@ti.com>
+	<4D4A7F13.8080502@compulab.co.il> <4D4A80D3.2060407@compulab.co.il>
+	<AANLkTi=U1qo=udB=tMyuA2HcnCS4EmreaVDbw2vQ9dY8@mail.gmail.com>
+	<4D4A8DA0.1010806@compulab.co.il>
+Message-ID: <19786.37462.662253.3644@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the OMAP3430SDP board, the ads7846 touchscreen controller
-is powered by VAUX3 regulator (supplying 2.8v).
-Fix this mapping in the board file, and hence prevent
-the ads7846 driver init to fail with the below error..
+Hi,
 
-ads7846 spi1.0: unable to get regulator: -19
+Igor Grinberg writes:
+> 
+> 
+> On 02/03/11 13:00, Poddar, Sourav wrote:
+> 
+> > On Thu, Feb 3, 2011 at 3:47 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> >> if (pdata->get_pendown_state) {
+> >>        ts->get_pendown_state = pdata->get_pendown_state;
+> >>        ts->gpio_pendown = -1;
+> >>        return 0;
+> >> }
+> > Yes we can do so .I initialise it at a place where other variables
+> >  where initialised.
+> >
+> >>> Also, why don't we use -EINVAL for the invalid gpio number instead of -1 constant?
+> >>>
+> >  I used -1 because conditional check done in probe ads7846_probe function
+> >  used this value.
+> >
+> >   err_free_gpio:
+> >         if (ts->gpio_pendown != -1)
+> >                 gpio_free(ts->gpio_pendown);
+> >
+> 
+> Well I understand that and that's why in my proposal I used -1 also, but
+> I thought we can make it even better if we switch to -EINVAL
+> (though wanted to check if there are any reasonable objections)
+> and while you are at this, may be you are willing also to submit a patch for this?
+> 
+Since ts->gpio_pendown is used as a GPIO number, the check with
+gpio_is_valid(), as suggested by Felipe Balbi, would be the most
+sensible thing to do here.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/board-3430sdp.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index d4e41ef..dcdc718 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -427,6 +427,10 @@ static struct twl4030_madc_platform_data sdp3430_madc_data = {
- 	.irq_line	= 1,
- };
- 
-+/* ads7846 on SPI */
-+static struct regulator_consumer_supply sdp3430_vaux3_supply =
-+	REGULATOR_SUPPLY("vcc", "spi1.0");
-+
- /*
-  * Apply all the fixed voltages since most versions of U-Boot
-  * don't bother with that initialization.
-@@ -469,6 +473,8 @@ static struct regulator_init_data sdp3430_vaux3 = {
- 		.valid_ops_mask		= REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
-+	.num_consumer_supplies		= 1,
-+	.consumer_supplies		= &sdp3430_vaux3_supply,
- };
- 
- /* VAUX4 for OMAP VDD_CSI2 (camera) */
+Lothar Wa?mann
 -- 
-1.7.0.4
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
