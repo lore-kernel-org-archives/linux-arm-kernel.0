@@ -1,92 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 3 Feb 2011 16:03:51 +0100
-Subject: ARM unaligned MMIO access with attribute((packed))
-In-Reply-To: <20110202163702.GA23240@n2100.arm.linux.org.uk>
-References: <201102021700.20683.arnd@arndb.de>
-	<20110202163702.GA23240@n2100.arm.linux.org.uk>
-Message-ID: <201102031603.51628.arnd@arndb.de>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Thu,  3 Feb 2011 20:51:26 +0530
+Subject: [PATCH v3 1/2] ads7846: fix gpio free without requesting
+Message-ID: <1296746486-12168-1-git-send-email-sourav.poddar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 February 2011, Russell King - ARM Linux wrote:
-> On Wed, Feb 02, 2011 at 05:00:20PM +0100, Arnd Bergmann wrote:
-> > I would suggest fixing this by:
-> >
-> > 2. Changing the ARM MMIO functions to use inline assembly instead of
-> > direct pointer dereference.
->
-> We used to use inline assembly at one point, but that got chucked out.
-> The problem is that using asm() for this causes GCC to generate horrid
-> code.
+gpio_pendown in ads7846_probe is not getting initalized (defaulted to 0)
+resulting in gpio_free being called without a gpio_request. This
+results in the following backtrace in bootup (at least on an OMAP3430 SDP).
 
-Here is an alternative suggestion, would that work?
+------------[ cut here ]------------
+WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
+Modules linked in:
+[<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>](warn_slowpath_common+0x4c/0x64)
+[<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>](warn_slowpath_null+0x18/0x1c)
+[<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>](gpio_free+0x100/0x12c)
+[<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>](ads7846_probe+0xa38/0xc5c)
+[<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>](spi_drv_probe+0x18/0x1c)
+[<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>](driver_probe_device+0xc8/0x184)
+[<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>](__driver_attach+0x68/0x8c)
+[<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>](bus_for_each_dev+0x48/0x74)
+[<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>](bus_add_driver+0xa0/0x220)
+[<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>](driver_register+0xa8/0x134)
+[<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>](do_one_initcall+0xcc/0x1a4)
+[<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>](kernel_init+0x14c/0x214)
+[<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>](kernel_thread_exit+0x0/0x8)
+---[ end trace 4053287f8a5ec18f ]---
 
-8<-----------
-arm: avoid unaligned arguments to MMIO functions
+Initialize gpio_pendown in ads7846_probe to -EINVAL before
+ads7846_setup_pendown function and using gpio_is_valid function
+in conditional check removes the above backtrace
+warning.
 
-The readw/writew/readl/writel functions require aligned naturally arguments
-which are accessed only using atomic load and store instructions, never
-using byte or read-modify-write write accesses.
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Dmitry Torokhov <dtor@mail.ru>
 
-At least one driver (ehci-hcd) annotates its MMIO registers as
-__attribute__((packed)), which causes some versions of gcc to generate
-byte accesses due to an undefined behavior when casting a packed u32
-to an aligned u32 variable.
-
-There does not seem to be an efficient way to force gcc to do word
-accesses, but we can detect the problem and refuse to build broken
-code: This adds a check in these functions to ensure that their arguments
-are either naturally aligned or they are void pointers.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
+ Links related to the previous discussions:
+ http://www.spinics.net/lists/linux-omap/msg45093.html
+ http://www.mail-archive.com/linux-omap at vger.kernel.org/msg43506.html
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 20e0f7c..b98f0bc 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -180,17 +180,36 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
-  * IO port primitives for more information.
-  */
- #ifdef __mem_pci
-+
-+/*
-+ * Ensure natural alignment of arguments:
-+ * It is not allowed to pass a pointer to a packed variable into
-+ * the readl/writel family of functions, because gcc may decide
-+ * to create byte accesses that are illegal on multi-byte MMIO
-+ * registers.
-+ * A lot of code uses void pointers, which is fine.
-+ */
-+#define __checkalign(p) BUILD_BUG_ON(				\
-+	!__builtin_types_compatible_p(__typeof__(p), void *) &&	\
-+	(__alignof__ (*(p)) < sizeof (*(p))))
-+
- #define readb_relaxed(c) ({ u8  __v = __raw_readb(__mem_pci(c)); __v; })
--#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16) \
--					__raw_readw(__mem_pci(c))); __v; })
--#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32) \
--					__raw_readl(__mem_pci(c))); __v; })
-+#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16)    \
-+					__raw_readw(__mem_pci(c)));   \
-+					__checkalign(c); __v; })
-+#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32)    \
-+					__raw_readl(__mem_pci(c)));   \
-+					__checkalign(c); __v; })
+ drivers/input/touchscreen/ads7846.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+index 14ea54b..ce5baee 100644
+--- a/drivers/input/touchscreen/ads7846.c
++++ b/drivers/input/touchscreen/ads7846.c
+@@ -952,6 +952,7 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
  
- #define writeb_relaxed(v,c)	((void)__raw_writeb(v,__mem_pci(c)))
--#define writew_relaxed(v,c)	((void)__raw_writew((__force u16) \
--					cpu_to_le16(v),__mem_pci(c)))
--#define writel_relaxed(v,c)	((void)__raw_writel((__force u32) \
--					cpu_to_le32(v),__mem_pci(c)))
-+#define writew_relaxed(v,c)	do { (void)__raw_writew((__force u16) \
-+					cpu_to_le16(v),__mem_pci(c)); \
-+					 __checkalign(c);	      \
-+				} while (0);
-+#define writel_relaxed(v,c)	do { (void)__raw_writel((__force u32) \
-+					cpu_to_le32(v),__mem_pci(c)); \
-+					__checkalign(c);	      \
-+				} while (0);
+ 	if (pdata->get_pendown_state) {
+ 		ts->get_pendown_state = pdata->get_pendown_state;
++		ts->gpio_pendown = -EINVAL;
+ 		return 0;
+ 	}
  
- #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
- #define __iormb()		rmb()
+@@ -1353,7 +1354,7 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+  err_put_regulator:
+ 	regulator_put(ts->reg);
+  err_free_gpio:
+-	if (ts->gpio_pendown != -1)
++	if (gpio_is_valid(ts->gpio_pendown))
+ 		gpio_free(ts->gpio_pendown);
+  err_cleanup_filter:
+ 	if (ts->filter_cleanup)
+-- 
+1.7.0.4
