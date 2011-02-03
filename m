@@ -1,49 +1,33 @@
 From: arve@android.com (=?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?=)
-Date: Wed,  2 Feb 2011 18:54:19 -0800
-Subject: [PATCH 1/5] ARM: etm: Don't require clock control
-Message-ID: <1296701663-12168-1-git-send-email-arve@android.com>
+Date: Wed,  2 Feb 2011 18:54:20 -0800
+Subject: [PATCH 2/5] ARM: etm: Don't limit tracing to only non-secure code.
+In-Reply-To: <1296701663-12168-1-git-send-email-arve@android.com>
+References: <1296701663-12168-1-git-send-email-arve@android.com>
+Message-ID: <1296701663-12168-2-git-send-email-arve@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_get fail, assume the etb does not need a separate clock.
+On some systems kernel code is considered secure, and this code
+already limits tracing to the kernel text segment which results
+in no trace data.
 
 Signed-off-by: Arve Hj?nnev?g <arve@android.com>
 ---
- arch/arm/kernel/etm.c |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/kernel/etm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 11db628..308b733 100644
+index 308b733..2ea0b7c 100644
 --- a/arch/arm/kernel/etm.c
 +++ b/arch/arm/kernel/etm.c
-@@ -362,12 +362,10 @@ static int __init etb_probe(struct amba_device *dev, struct amba_id *id)
- 		goto out_unmap;
+@@ -55,7 +55,7 @@ static inline bool trace_isrunning(struct tracectx *t)
+ static int etm_setup_address_range(struct tracectx *t, int n,
+ 		unsigned long start, unsigned long end, int exclude, int data)
+ {
+-	u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_NSONLY | \
++	u32 flags = ETMAAT_ARM | ETMAAT_IGNCONTEXTID | ETMAAT_IGNSECURITY |
+ 		    ETMAAT_NOVALCMP;
  
- 	t->emu_clk = clk_get(&dev->dev, "emu_src_ck");
--	if (IS_ERR(t->emu_clk)) {
-+	if (IS_ERR(t->emu_clk))
- 		dev_dbg(&dev->dev, "Failed to obtain emu_src_ck.\n");
--		return -EFAULT;
--	}
--
--	clk_enable(t->emu_clk);
-+	else
-+		clk_enable(t->emu_clk);
- 
- 	etb_unlock(t);
- 	t->etb_bufsz = etb_readl(t, ETBR_DEPTH);
-@@ -402,8 +400,10 @@ static int etb_remove(struct amba_device *dev)
- 	iounmap(t->etb_regs);
- 	t->etb_regs = NULL;
- 
--	clk_disable(t->emu_clk);
--	clk_put(t->emu_clk);
-+	if (!IS_ERR(t->emu_clk)) {
-+		clk_disable(t->emu_clk);
-+		clk_put(t->emu_clk);
-+	}
- 
- 	amba_release_regions(dev);
- 
+ 	if (n < 1 || n > t->ncmppairs)
 -- 
 1.7.3.1
