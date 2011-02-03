@@ -1,70 +1,34 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Thu,  3 Feb 2011 15:12:00 -0500
-Subject: [PATCH] davinci: da8xx: clean up magic numbers in devices-da8xx.c
-In-Reply-To: <1296763920-4165-1-git-send-email-michael.williamson@criticallink.com>
-References: <1296763920-4165-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <1296763920-4165-2-git-send-email-michael.williamson@criticallink.com>
+From: jj@chaosbits.net (Jesper Juhl)
+Date: Thu, 3 Feb 2011 22:58:18 +0100 (CET)
+Subject: [PATCH][trivial] ARM, OMAP, timer: Remove duplicate inclusion of
+	linux/sched.h from arch/arm/mach-omap1/time.c
+Message-ID: <alpine.LNX.2.00.1102032255090.1369@swampdragon.chaosbits.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extract magic numbers from DMA resource initializers to #defines.
+arch/arm/mach-omap1/time.c includes linux/sched.h twice - it's enough to 
+do it once. This removes the duplicate.
 
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Signed-off-by: Jesper Juhl <jj@chaosbits.net>
 ---
- arch/arm/mach-davinci/devices-da8xx.c |   21 +++++++++++++--------
- 1 files changed, 13 insertions(+), 8 deletions(-)
+ time.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index beda8a4..119d46e 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -44,6 +44,11 @@
- #define DA8XX_EMAC_RAM_OFFSET		0x0000
- #define DA8XX_EMAC_CTRL_RAM_SIZE	SZ_8K
+diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+index f83fc33..6885d2f 100644
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -44,7 +44,6 @@
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
+ #include <linux/io.h>
+-#include <linux/sched.h>
  
-+#define DA8XX_DMA_MMCSD0_RX	EDMA_CTLR_CHAN(0, 16)
-+#define DA8XX_DMA_MMCSD0_TX	EDMA_CTLR_CHAN(0, 17)
-+#define DA850_DMA_MMCSD1_RX	EDMA_CTLR_CHAN(1, 28)
-+#define DA850_DMA_MMCSD1_TX	EDMA_CTLR_CHAN(1, 29)
-+
- void __iomem *da8xx_syscfg0_base;
- void __iomem *da8xx_syscfg1_base;
- 
-@@ -573,13 +578,13 @@ static struct resource da8xx_mmcsd0_resources[] = {
- 		.flags	= IORESOURCE_IRQ,
- 	},
- 	{		/* DMA RX */
--		.start	= EDMA_CTLR_CHAN(0, 16),
--		.end	= EDMA_CTLR_CHAN(0, 16),
-+		.start	= DA8XX_DMA_MMCSD0_RX,
-+		.end	= DA8XX_DMA_MMCSD0_RX,
- 		.flags	= IORESOURCE_DMA,
- 	},
- 	{		/* DMA TX */
--		.start	= EDMA_CTLR_CHAN(0, 17),
--		.end	= EDMA_CTLR_CHAN(0, 17),
-+		.start	= DA8XX_DMA_MMCSD0_TX,
-+		.end	= DA8XX_DMA_MMCSD0_TX,
- 		.flags	= IORESOURCE_DMA,
- 	},
- };
-@@ -610,13 +615,13 @@ static struct resource da850_mmcsd1_resources[] = {
- 		.flags	= IORESOURCE_IRQ,
- 	},
- 	{		/* DMA RX */
--		.start	= EDMA_CTLR_CHAN(1, 28),
--		.end	= EDMA_CTLR_CHAN(1, 28),
-+		.start	= DA850_DMA_MMCSD1_RX,
-+		.end	= DA850_DMA_MMCSD1_RX,
- 		.flags	= IORESOURCE_DMA,
- 	},
- 	{		/* DMA TX */
--		.start	= EDMA_CTLR_CHAN(1, 29),
--		.end	= EDMA_CTLR_CHAN(1, 29),
-+		.start	= DA850_DMA_MMCSD1_TX,
-+		.end	= DA850_DMA_MMCSD1_TX,
- 		.flags	= IORESOURCE_DMA,
- 	},
- };
+ #include <asm/system.h>
+ #include <mach/hardware.h>
+
+
 -- 
-1.7.0.4
+Jesper Juhl <jj@chaosbits.net>            http://www.chaosbits.net/
+Don't top-post http://www.catb.org/~esr/jargon/html/T/top-post.html
+Plain text mails only, please.
