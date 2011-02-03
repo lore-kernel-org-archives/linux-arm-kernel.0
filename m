@@ -1,82 +1,67 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 3 Feb 2011 18:29:22 +0530
-Subject: [PATCH v1 1/4] davinci: da8xx/omap-l1: add support for SPI
-In-Reply-To: <4D4A9E49.60606@criticallink.com>
-References: <1296596979-18524-1-git-send-email-michael.williamson@criticallink.com>
-	<1296596979-18524-2-git-send-email-michael.williamson@criticallink.com>
-	<4D494C6A.30507@mvista.com> <4D49543A.1070302@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302487782C9@dbde02.ent.ti.com>
-	<4D496EC7.1010808@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024877837A@dbde02.ent.ti.com>
-	<4D4A9E49.60606@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024880B1D9@dbde02.ent.ti.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 03 Feb 2011 15:00:45 +0200
+Subject: [PATCHv2 1/2] ads7846: OMAP3: Removal of warnings backtrace in
+	bootup
+In-Reply-To: <AANLkTikgJck30XBMJN-8v2Di0pykHkxP8d_mRrZnYUs_@mail.gmail.com>
+References: <1296726514-32146-1-git-send-email-sourav.poddar@ti.com>	<4D4A7F13.8080502@compulab.co.il>
+	<4D4A80D3.2060407@compulab.co.il>	<AANLkTi=U1qo=udB=tMyuA2HcnCS4EmreaVDbw2vQ9dY8@mail.gmail.com>	<4D4A8DA0.1010806@compulab.co.il>
+	<AANLkTikgJck30XBMJN-8v2Di0pykHkxP8d_mRrZnYUs_@mail.gmail.com>
+Message-ID: <4D4AA6FD.1010405@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi,
 
-On Thu, Feb 03, 2011 at 17:53:37, Michael Williamson wrote:
-> Hi Sekhar,
-> 
-> On 2/2/2011 10:37 AM, Nori, Sekhar wrote:
-> 
-> > Hi Mike,
-> > 
-> > On Wed, Feb 02, 2011 at 20:18:39, Michael Williamson wrote:
-> >  
-> >>> Since all the platform device definitions for DA8XX devices happens
-> >>> in devices-da8xx.c, it makes sense to get rid of the DA830_DMACH_*
-> >>> enum altogether and instead just define the channel numbers used in
-> >>> devices-da8xx.c above the actual usage.
-> >>>
-> >>> Mike, is that something you are willing take-up?
-> >>>
-> >>
-> >>
-> >> I can take this up as a separate patch series. I'd like to keep the 
-> >> spi platform support series isolated to that subject matter, if that's
-> >> OK.
-> > 
-> > Yes, the clean-up can be a separate series - but it will have to
-> > precede the SPI series.
-> 
-> > 
-> 
-> 
-> Quick question:
-> 
-> In addition to cleaning up the enums in edma.h, are you also asking to 
-> pull the channel / base resources for ASP currently defined in asp.h 
-> into devices-da8xx.c as well?  Or should that be left alone? E.G., 
-> these defines look like they should go in devices-da8xx and come out 
-> of asp.h:
-> 
-> DAVINCI_DA8XX_MCASP0_REG_BASE
-> DAVINCI_DA830_MCASP1_REG_BASE
-> DAVINCI_DA8XX_DMA_MCASP0_AREVT
-> DAVINCI_DA8XX_DMA_MCASP0_AXEVT
-> DAVINCI_DA830_DMA_MCASP1_AREVT
-> DAVINCI_DA830_DMA_MCASP1_AXEVT
-> 
-> If moved, there are other #defines that should then be shuffled out of asp.h
-> to other files for other chips/platforms for completeness, E.G.
-> 
-> DAVINCI_DM646X_DMA_MCASP0_AXEVT0 should go to dm646x.c.
-> 
-> I'm not too keen on shuffling stuff around like that if I can't test it beyond
-> compiling.  Especially if it's not adding any functionality.  But, I will submit
-> it if it's necessary to get the SPI support in.
+On 02/03/11 13:28, ABRAHAM, KISHON VIJAY wrote:
 
-I don't think cleaning up all this ASP stuff is necessary to get SPI in.
-Just do:
+> On Thu, Feb 3, 2011 at 4:42 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>>
+>> On 02/03/11 13:00, Poddar, Sourav wrote:
+>>
+>>> On Thu, Feb 3, 2011 at 3:47 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+>>>> if (pdata->get_pendown_state) {
+>>>>        ts->get_pendown_state = pdata->get_pendown_state;
+>>>>        ts->gpio_pendown = -1;
+>>>>        return 0;
+>>>> }
+>>> Yes we can do so .I initialise it at a place where other variables
+>>>  where initialised.
+>>>
+>>>>> Also, why don't we use -EINVAL for the invalid gpio number instead of -1 constant?
+>>>>>
+>>>  I used -1 because conditional check done in probe ads7846_probe function
+>>>  used this value.
+>>>
+>>>   err_free_gpio:
+>>>         if (ts->gpio_pendown != -1)
+>>>                 gpio_free(ts->gpio_pendown);
+>>>
+>> Well I understand that and that's why in my proposal I used -1 also, but
+>> I thought we can make it even better if we switch to -EINVAL
+>> (though wanted to check if there are any reasonable objections)
+>> and while you are at this, may be you are willing also to submit a patch for this?
+>   I guess instead of -EINVAL, -EIO should be initialized to
+> ts->gpio_pendown since that
+>   would be more appropriate for gpio
 
-1) Get rid of the DA830 DMA event enum in edma.h
-2) define local macros in devices-da8xx.c for the DMA events used in that 
-   file.
+Well, the common practice is to use -EINVAL for gpio _numbers_,
+I have not seen anyone using -EIO for this.
 
-The ASP clean-up can be taken-up at a later time.
+>  and as Balbi suggested it would
+> be better to use
+>   gpio_is_valid() for checking this error condition.
 
-Thanks for your efforts on this.
+Of course gpio_is_valid() should be used for testing the gpio.
+The -EINVAL in turn should be used for _setting_ the invalid value for that gpio.
+My suggestion for -EINVAL is related to the initialization:
 
-Best Regards,
-Sekhar
+if (pdata->get_pendown_state) {
+       ts->get_pendown_state = pdata->get_pendown_state;
+       ts->gpio_pendown = -EINVAL;
+       return 0;
+}
+
+
+-- 
+Regards,
+Igor.
