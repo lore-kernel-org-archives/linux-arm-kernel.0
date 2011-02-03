@@ -1,57 +1,65 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Feb 2011 08:56:23 +0100
-Subject: [patch 6/8] arm: ns9xxx: Remove private irq flow handler
-In-Reply-To: <20110202212552.299898447@linutronix.de>
-References: <20110202212258.546660886@linutronix.de>
-	<20110202212552.299898447@linutronix.de>
-Message-ID: <20110203075623.GB30452@pengutronix.de>
+Date: Thu, 3 Feb 2011 09:15:08 +0100
+Subject: [PATCH] ARM: omap1/nokia770: mark some functions __init
+In-Reply-To: <1283408230-22652-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20100902054630.GB14214@pengutronix.de>
+	<1283408230-22652-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110203081508.GC30452@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hey Tony,
 
-On Wed, Feb 02, 2011 at 09:41:27PM -0000, Thomas Gleixner wrote:
-> handle_prio_irq is almost identical with handle_fasteoi_irq. The
-> subtle differences are
-> 
-> 1) The handler checks for IRQ_DISABLED after the device handler has
->    been called. In case it's set it masks the interrupt.
-> 
-> 2) When the handler sees IRQ_DISABLED on entry it masks the interupt
->    in the same way as handle_fastoei_irq, but does not set the
->    IRQ_PENDING flag.
-> 
-> 3) Instead of gracefully handling a recursive interrupt it crashes the
->    kernel.
-> 
-> #1 is just relevant when a device handler calls disable_irq_nosync()
->    and it does not matter whether we mask the interrupt right away or
->    not. We handle lazy masking for disable_irq anyway, so there is no
->    real reason to have this extra mask in place.
-> 
-> #2 will prevent the resend of a pending interrupt, which can result in
->    lost interrupts for edge type interrupts. For level type interrupts
->    the resend is a noop in the generic code. According to the
->    datasheet all interrupts are level type, so marking them as such
->    will result in the exact same behaviour as the private
->    handle_prio_irq implementation.
-> 
-> #3 is just stupid. Crashing the kernel instead of handling a problem
->    gracefully is just wrong. With the current semantics- all handlers
->    run with interrupts disabled - this is even more wrong.
-> 
-> Rename ack to eoi, remove the unused mask_ack, switch to
-> handle_fasteoi_irq and remove the private function.
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-I have no access to a ns9xxx machine, but this looks sane.
+this patch below is now 4 months old and I didn't get any feedback.  (Though I
+somehow missed to cc linux-omap at vger.kernel.org before, sorry for that.)
 
-Acked-by: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+There are two more patches in this thread that are not yet
+applied/commented.  Should I resend?
 
-Thanks
+Best regards
 Uwe
+
+On Thu, Sep 02, 2010 at 08:17:10AM +0200, Uwe Kleine-K?nig wrote:
+> These are only called from omap_nokia770_init which is in .init.text, too.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-omap1/board-nokia770.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+> index 51a4539..09b3f46 100644
+> --- a/arch/arm/mach-omap1/board-nokia770.c
+> +++ b/arch/arm/mach-omap1/board-nokia770.c
+> @@ -112,7 +112,7 @@ static struct mipid_platform_data nokia770_mipid_platform_data = {
+>  	.shutdown = mipid_shutdown,
+>  };
+>  
+> -static void mipid_dev_init(void)
+> +static void __init mipid_dev_init(void)
+>  {
+>  	const struct omap_lcd_config *conf;
+>  
+> @@ -123,7 +123,7 @@ static void mipid_dev_init(void)
+>  	}
+>  }
+>  
+> -static void ads7846_dev_init(void)
+> +static void __init ads7846_dev_init(void)
+>  {
+>  	if (gpio_request(ADS7846_PENDOWN_GPIO, "ADS7846 pendown") < 0)
+>  		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
+> @@ -167,7 +167,7 @@ static struct hwa742_platform_data nokia770_hwa742_platform_data = {
+>  	.te_connected		= 1,
+>  };
+>  
+> -static void hwa742_dev_init(void)
+> +static void __init hwa742_dev_init(void)
+>  {
+>  	clk_add_alias("hwa_sys_ck", NULL, "bclk", NULL);
+>  	omapfb_set_ctrl_platform_data(&nokia770_hwa742_platform_data);
+> -- 
+> 1.7.1
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
