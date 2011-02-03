@@ -1,69 +1,48 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 3 Feb 2011 15:15:25 +0100
-Subject: [PATCH] arm: Improve MMC performance on Versatile Express
-In-Reply-To: <20110124133513.GL16202@n2100.arm.linux.org.uk>
-References: <1295618352-26432-1-git-send-email-pawel.moll@arm.com>
-	<alpine.LFD.2.00.1101211456200.8580@xanadu.home>
-	<20110124133513.GL16202@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinqauiy4RcWsAZqk8JoAE8+WqL6rakKsb-9nakt@mail.gmail.com>
+From: schen@mvista.com (Steve Chen)
+Date: Thu, 3 Feb 2011 08:31:04 -0600
+Subject: "Porting the Linux Kernel to a New ARM Platform", updated...?
+In-Reply-To: <87a7d0$e7q8m3@out1.ip07ir2.opaltelecom.net>
+References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
+	<20110127073009.GR9041@pengutronix.de>
+	<20110127093044.GA30756@shlinux1.ap.freescale.net>
+	<4D415BA2.2020207@freescale.com>
+	<20110127121928.GA1948@richard-laptop>
+	<87a7d0$e7q8m3@out1.ip07ir2.opaltelecom.net>
+Message-ID: <AANLkTikWsU2V+1ohAaiFfRneLjsGRWx7ee5X655mAa18@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following up on this:
-
-2011/1/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Jan 24, 2011 at 12:27:16PM -0000, Pawel Moll wrote:
->> So - we'll try to enlarge FIFO. For the moment - playing with interrupts
->> affinity seem to be a viable workaround.
+On Thu, Jan 27, 2011 at 6:58 AM, Nick Pelling <nickpelling@nanodome.com> wrote:
+> Hi everyone,
 >
-> I don't think enlarging the FIFO will help too much. ?The issue is
-> whether the CPU can keep up with the data rate coming off the card.
-> If it can't, then no matter how large the FIFO is, it will eventually
-> overflow.
+> I've been looking for a good source of information on getting Linux working
+> on a new ARM target, including a checklist of things to cover such as
+> putc(), arch_decomp_setup(), etc. So far, pretty much the best source of
+> information I've found is Wookey & Tak-Shing's "Porting the Linux Kernel to
+> a New ARM Platform"...
+> ? ? ? ?http://www.glomationinc.com/PortingLinuxKernel.pdf
+> ...but I can't help but notice that this is from 2002.
 >
-> The real answer is to avoid PIO mode, and use DMA support. ?However,
-> I've had problems using DMA on the ARM development boards. ?You can
-> find details my DMA issues internally within ARM by talking to Catalin.
+> Is there an updated version of this document (or perhaps a book chapter
+> covering this) you would recommend?
+>
+> Cheers, ....Nick Pelling....
 
-I fully agree with Russell, MMC by nature begs to be used with DMA.
-Hopefully PL330 does not have all the basic problems found in
-PL080/PL081, yet Samsung (som version) and ST-Ericsson Nomadik
-does use the PL080, albeit in modified versions.
+Hello,
 
-> The alternative answer, I believe implemented by some of ARMs silicon
-> partners, is to turn the card clock off when the FIFO becomes full/empty
-> to stop it sending more data. ?I think this violates some of the MMC/SD
-> requirements, but it seems to work for the silicon partners just fine.
+I took a quick look at the document.  Much of the information still
+applies to the latest kernel.  The biggest change that I can see is
+that the directories were moved and files renames.  For example
 
-One of these fixes does not exclude the other.
+arch/arm/deconfigs/ is now arch/arm/configs
+config.in is now Kconfig
+include/asm-arm/arch-xxx is moved to arch/arm/mach-xxx/include
 
-We have this "hardware flow control" in U300, Nomadik and Ux500.
-Basically the clock to the card is simply gated if the FIFO risk
-to over/underflow.
+By the way, include/asm is a symlink points to
+include/asm-arm/arch-xxxx in the older kernels.  The link is created
+by the make.  If I were to get Linux to boot on a new board, I would
+start by looking at code for a similar target with the same SoC.
 
-To be precise, it gates the MCIFBCLK, MCICLKOUT and
-MCICLK to the card when either RX FIFO is full and DPSM
-is enabled, or TX FIFO is empty and DPSM is enabled.
-We do not mess with the internal MCLK clock.
+I hope that helps.
 
-We have some experience in not even DMA being quick enough to
-avoid overflows under all conditions, making it necessary to clock
-down the host undesirably low. Increasing FIFO depth will
-actually help to some extent in this case.
-
-For example: the SD spec permits us to clock the card at something
-like 23 MHz and with 4 data lines and a standard 64 byte (16 word)
-FIFO this will fill up in 2.8 microseconds. So that, or rather half of
-it 1.3 us, is the maximum allowed interupt latency, unless you clock
-down the card.
-
-The system IRQ latency is a swamp of heuristics unless you have
-things like FIQ or realtime patches as mentioned.
-
-And as mentioned by Russell one way to mitigate the effect
-that would also benefit current Versatiles and RealViews would
-be to dynamically recalibrate the card clock with some
-error-feedback loop. (Would be pretty cool actually!)
-
-Yours,
-Linus Walleij
+Steve
