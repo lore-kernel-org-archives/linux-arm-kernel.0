@@ -1,57 +1,51 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 03 Feb 2011 18:29:03 +0200
-Subject: [PATCH v3 1/2] ads7846: fix gpio free without requesting
-In-Reply-To: <20110203154705.GE6508@pengutronix.de>
-References: <1296746486-12168-1-git-send-email-sourav.poddar@ti.com>
-	<20110203154705.GE6508@pengutronix.de>
-Message-ID: <4D4AD7CF.7040103@compulab.co.il>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 3 Feb 2011 08:35:16 -0800
+Subject: [PATCH RFC] ARM: Make VMALLOC_END a variable
+In-Reply-To: <AANLkTinadBvmnjN=kUt82e=hmM0xumFs8WP_ca8V-e8Y@mail.gmail.com>
+References: <AANLkTinadBvmnjN=kUt82e=hmM0xumFs8WP_ca8V-e8Y@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0310C8E8E3@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Eric Miao wrote at Tuesday, January 25, 2011 2:01 PM:
+> 
+> VMALLOC_END is machine specific and is preventing multiple SoCs from
+> being built together. This patch makes it into a global variable and
+> is initially defined in 'struct machine_desc' (.vmalloc_end).  Each board
+> file must define this. As a result, machine specific vmalloc.h are
+> no longer needed and thus are removed.
 
-On 02/03/11 17:47, Wolfram Sang wrote:
+> --- a/arch/arm/mach-tegra/board-harmony.c
+> +++ b/arch/arm/mach-tegra/board-harmony.c
+> @@ -118,6 +118,7 @@ MACHINE_START(HARMONY, "harmony")
+>  	.fixup		= tegra_harmony_fixup,
+>  	.init_irq       = tegra_init_irq,
+>  	.init_machine   = tegra_harmony_init,
+> +	.vmalloc_end	= 0xfe000000UL,
+>  	.map_io         = tegra_map_common_io,
+>  	.timer          = &tegra_timer,
+>  MACHINE_END
 
-> On Thu, Feb 03, 2011 at 08:51:26PM +0530, Sourav Poddar wrote:
->> gpio_pendown in ads7846_probe is not getting initalized (defaulted to 0)
->> resulting in gpio_free being called without a gpio_request. This
->> results in the following backtrace in bootup (at least on an OMAP3430 SDP).
-> I wonder if it makes sense to merge both patches under the name of "fix
-> gpio-handling" or similar. Not sure, though...
+It seems slightly unfortunate to replace a single define per SoC with a
+cut/paste copy of the value in every machine description. At least for Tegra,
+there's only a single machine description right now, but I can foresee a great
+many more in the future.
 
-I'd rather not do that, because this patch fixes the request/free problem
-and the second is changing the functionality (e.g. configures the gpio as input)
+Instead, perhaps instead of deleting .../include/mach/vmalloc.h, it could be
+moved from arch/arm/mach-tegra/include/mach to arch/arm/mach-tegra (i.e. made
+into a "private" header), and the machine/board files could include it to get
+the define (or merge the value into some other pre-existing header if there is
+an appropriate one).
 
->> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
->> index 14ea54b..ce5baee 100644
->> --- a/drivers/input/touchscreen/ads7846.c
->> +++ b/drivers/input/touchscreen/ads7846.c
->> @@ -952,6 +952,7 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
->>  
->>  	if (pdata->get_pendown_state) {
->>  		ts->get_pendown_state = pdata->get_pendown_state;
->> +		ts->gpio_pendown = -EINVAL;
->>  		return 0;
->>  	}
-> Will probably work, but maybe it is better to reorganize the code to
-> just have one success-exit-point. That would be mean adding an else
-> branch to this if-block.
+Alternatively, can tegra_harmony_init (which calls tegra_common_init) set
+this up during initialization, or is the value needed earlier than that?
 
-This is something that can be done, though I fear the code readability
-will suffer. Is it worth?
+Alternatively, perhaps there should be a SoC definition similar to the machine
+Definition, which defines this, and the machine definitions point at the SoC
+definition? I don't know if this is worth it; is there other information that
+could usefully be placed in such a SoC definition?
 
->>  
->> @@ -1353,7 +1354,7 @@ static int __devinit ads7846_probe(struct spi_device *spi)
->>   err_put_regulator:
->>  	regulator_put(ts->reg);
->>   err_free_gpio:
->> -	if (ts->gpio_pendown != -1)
->> +	if (gpio_is_valid(ts->gpio_pendown))
-> You could do the same in the remove-path.
-
-You mean, _should_... ;)
-Otherwise, the patch is not complete.
+Either way, I won't object strongly to this, but just some food for thought.
 
 -- 
-Regards,
-Igor.
+nvpublic
