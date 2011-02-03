@@ -1,151 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Feb 2011 17:56:57 +0000
-Subject: [PATCH v4 09/19] ARM: LPAE: Page table maintenance for the
-	3-level format
-In-Reply-To: <1295891761-18366-10-git-send-email-catalin.marinas@arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-10-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20110203175657.GD14627@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  3 Feb 2011 18:02:36 +0000
+Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+Message-ID: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 05:55:51PM +0000, Catalin Marinas wrote:
-> The patch also introduces the L_PGD_SWAPPER flag to mark pgd entries
-> pointing to pmd tables pre-allocated in the swapper_pg_dir and avoid
-> trying to free them at run-time. This flag is 0 with the classic page
-> table format.
+This set of patches, along with some other patches under
+discussion on alkml, should enable omap3 and omap4 kernels to be
+built with CONFIG_THUMB2_KERNEL.
 
-This shouldn't be necessary.
+This patch set builds on recent cleanup done by the omap
+maintainers.
 
-> diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
-> index 709244c..003587d 100644
-> --- a/arch/arm/mm/pgd.c
-> +++ b/arch/arm/mm/pgd.c
-> @@ -10,6 +10,7 @@
->  #include <linux/mm.h>
->  #include <linux/gfp.h>
->  #include <linux/highmem.h>
-> +#include <linux/slab.h>
->  
->  #include <asm/pgalloc.h>
->  #include <asm/page.h>
-> @@ -17,6 +18,14 @@
->  
->  #include "mm.h"
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +#define __pgd_alloc()	kmalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL)
-> +#define __pgd_free(pgd)	kfree(pgd)
-> +#else
-> +#define __pgd_alloc()	(pgd_t *)__get_free_pages(GFP_KERNEL, 2)
-> +#define __pgd_free(pgd)	free_pages((unsigned long)pgd, 2)
-> +#endif
-> +
->  /*
->   * need to get a 16k page for level 1
->   */
-> @@ -26,7 +35,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
->  	pmd_t *new_pmd, *init_pmd;
->  	pte_t *new_pte, *init_pte;
->  
-> -	new_pgd = (pgd_t *)__get_free_pages(GFP_KERNEL, 2);
-> +	new_pgd = __pgd_alloc();
->  	if (!new_pgd)
->  		goto no_pgd;
->  
-> @@ -41,12 +50,21 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
->  
->  	clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
->  
-> +#ifdef CONFIG_ARM_LPAE
-> +	/*
-> +	 * Allocate PMD table for modules and pkmap mappings.
-> +	 */
-> +	new_pmd = pmd_alloc(mm, new_pgd + pgd_index(MODULES_VADDR), 0);
-> +	if (!new_pmd)
-> +		goto no_pmd;
+It is also more aggressive than my last post: all affected
+low-level code is now built in Thumb-2.  At least some of this
+code definitely works, but whether the Secure firmware can talk
+to Thumb-2 code properly is unproven:
+in particular, I could use some help/advice from the omap
+community for validating that the low-level power management
+interactions actually work with this patch set.
 
-This should be a copy of the same page tables found in swapper_pg_dir -
-that's what the memcpy() above is doing.
+I've done simple "does it boot?" testing by building a single
+kernel with CONFIG_SMP_ON_UP and CONFIG_THUMB2_KERNEL enabled
+which works on Beagle xM A2 and Panda A1.
 
-> +#endif
-> +
->  	if (!vectors_high()) {
->  		/*
->  		 * On ARM, first page must always be allocated since it
->  		 * contains the machine vectors.
->  		 */
-> -		new_pmd = pmd_alloc(mm, new_pgd, 0);
-> +		new_pmd = pmd_alloc(mm, new_pgd + pgd_index(0), 0);
+Details below.
 
-However, the first pmd table, and the first pte table only need to be
-present for the reason stated in the comment, and these need to be
-allocated.
+Cheers,
+Dave
 
->  		if (!new_pmd)
->  			goto no_pmd;
->  
-> @@ -66,7 +84,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
->  no_pte:
->  	pmd_free(mm, new_pmd);
->  no_pmd:
-> -	free_pages((unsigned long)new_pgd, 2);
-> +	__pgd_free(new_pgd);
->  no_pgd:
->  	return NULL;
->  }
-> @@ -80,20 +98,36 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd_base)
->  	if (!pgd_base)
->  		return;
->  
-> -	pgd = pgd_base + pgd_index(0);
-> -	if (pgd_none_or_clear_bad(pgd))
-> -		goto no_pgd;
-> +	if (!vectors_high()) {
 
-No, that's wrong.  As FIRST_USER_ADDRESS is nonzero, the first pmd and
-pte table will remain allocated in spite of free_pgtables(), so this
-results in a memory leak.
+The patches can be found, along with a buildable working tree,
+in the following repo:
 
-> +		pgd = pgd_base + pgd_index(0);
-> +		if (pgd_none_or_clear_bad(pgd))
-> +			goto no_pgd;
->  
-> -	pmd = pmd_offset(pgd, 0);
-> -	if (pmd_none_or_clear_bad(pmd))
-> -		goto no_pmd;
-> +		pmd = pmd_offset(pgd, 0);
-> +		if (pmd_none_or_clear_bad(pmd))
-> +			goto no_pmd;
->  
-> -	pte = pmd_pgtable(*pmd);
-> -	pmd_clear(pmd);
-> -	pte_free(mm, pte);
-> +		pte = pmd_pgtable(*pmd);
-> +		pmd_clear(pmd);
-> +		pte_free(mm, pte);
->  no_pmd:
-> -	pgd_clear(pgd);
-> -	pmd_free(mm, pmd);
-> +		pgd_clear(pgd);
-> +		pmd_free(mm, pmd);
-> +	}
->  no_pgd:
-> -	free_pages((unsigned long) pgd_base, 2);
-> +#ifdef CONFIG_ARM_LPAE
-> +	/*
-> +	 * Free modules/pkmap or identity pmd tables.
-> +	 */
-> +	for (pgd = pgd_base; pgd < pgd_base + PTRS_PER_PGD; pgd++) {
-> +		if (pgd_none_or_clear_bad(pgd))
-> +			continue;
-> +		if (pgd_val(*pgd) & L_PGD_SWAPPER)
-> +			continue;
-> +		pmd = pmd_offset(pgd, 0);
-> +		pgd_clear(pgd);
-> +		pmd_free(mm, pmd);
-> +	}
-> +#endif
+git://git.linaro.org/people/dmart/linux-2.6-arm.git
 
-And as kernel mappings in the pgd above TASK_SIZE are supposed to be
-identical across all page tables, this shouldn't be necessary.
+ * arm/omap-thumb2: has the patches proposed here
+ * arm/omap-thumb2+merged: additionally has some patches cherry-
+        picked from other trees which are needed in order for the
+        patches on arm/omap-thumb2 to work usefully.
+ * dirty/arm/omap-thumb2+merged: buildable test tree, which adds
+        2 local patches to work around a toolchain bug.
+
+A working kernel config for this tree is here:
+http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config :
+
+  CONFIG_SMP_ON_UP=y
+  CONFIG_THUMB2_KERNEL=y
+  CONFIG_SERIAL_OMAP=n (to avoid garbage on xM; for Panda use console=ttyS2)
+
+(The config is derived from the linaro omap config and so turns on
+loads of modules -- don't feel you have to build them all...)
+
+
+Cherry-picked patches originated from Russell's devel tree
+and Tony Lindgren's omap-testing tree:
+
+http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git devel
+
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-testing
+
+
+Dave Martin (5):
+  ARM: omap4: Correct definition of do_wfi() for CONFIG_THUMB2_KERNEL
+  ARM: omap4: Convert END() to ENDPROC() for correct linkage with
+    CONFIG_THUMB2_KERNEL
+  ARM: omap3: Remove hand-encoded SMC instructions
+  ARM: omap3: Thumb-2 compatibility for sram34xx.S
+  ARM: omap3: Thumb-2 compatibility for sleep34xx.S
+
+ arch/arm/mach-omap2/include/mach/omap4-common.h |    5 ++
+ arch/arm/mach-omap2/omap-headsmp.S              |    2 +-
+ arch/arm/mach-omap2/omap44xx-smc.S              |    8 ++--
+ arch/arm/mach-omap2/sleep34xx.S                 |   56 ++++++++++++++++-------
+ arch/arm/mach-omap2/sram34xx.S                  |   28 ++++++++---
+ 5 files changed, 69 insertions(+), 30 deletions(-)
