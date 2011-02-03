@@ -1,325 +1,134 @@
-From: dilinger@queued.net (Andres Salomon)
-Date: Wed, 2 Feb 2011 20:20:15 -0800
-Subject: [PATCH 15/19] mc13xxx: mfd_cell is now implicitly available to drivers
-In-Reply-To: <20110202195417.228e2656@queued.net>
-References: <20110202195417.228e2656@queued.net>
-Message-ID: <20110202202015.0fe392a9@queued.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 2 Feb 2011 22:49:45 -0700
+Subject: Updates to devicetree/arm branch
+Message-ID: <AANLkTikOe21SPAtUY+5KhgpCFaK8g3mRS1GkG4uaDXL=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
-No need to explicitly set the cell's platform_data/data_size.
+I've just push a few more commits out to devicetree/arm which picks up
+the removal of early machine_type lookup, picks up Rob's
+atags-anywhere patch (an earlier version, not the one rebased on
+Russell's p2v branch; I'll update to Rob's latest in the 2.6.39
+timeframe), and fixes the dtb corruption issue that I ran into (Thanks
+to John Bonesio for the debug help).  I was trying to use
+memblock_alloc() for early memory allocation when I should have been
+using alloc_bootmem_align().  Oops.
 
-In this case, move the various platform_data pointers
-to driver_data.  All of the clients which make use of it
-are also changed.
+Anyway, it seems to be working well for me, but it needs more testing.
+Give it a try if you're interested.  The tree details are below:
 
-Mfd-core makes a copy of platform_data, but driver_data keeps a pointer
-to the original data.  Because each cell's platform_data previously
-pointed to a local (stack) variable, the various ARM mach types that set
-the pdata are updated to keep the memory around.
+John, hopefully this will solve all the dtb base address issues you
+were having.  You *should* be able to locate the dtb anywhere in ram
+now, except in a region used by the kernel and it cannot be based at
+physical address 0.
 
-Signed-off-by: Andres Salomon <dilinger@queued.net>
----
- arch/arm/mach-imx/mach-mx27_3ds.c     |    8 ++++++--
- arch/arm/mach-imx/mach-pcm038.c       |    6 +++++-
- arch/arm/mach-mx3/mach-mx31_3ds.c     |    6 +++++-
- arch/arm/mach-mx3/mach-mx31moboard.c  |    6 +++++-
- drivers/leds/leds-mc13783.c           |   15 +++++++++------
- drivers/mfd/mc13xxx-core.c            |   20 ++++++--------------
- drivers/regulator/mc13783-regulator.c |    6 +++---
- drivers/regulator/mc13892-regulator.c |    6 +++---
- drivers/regulator/mc13xxx.h           |    1 +
- include/linux/mfd/mc13xxx.h           |    3 +--
- 10 files changed, 44 insertions(+), 33 deletions(-)
+I'll leave it out there for a day or two and clean some stuff up
+before posting the rebased series for a 3rd round of review.
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 1643315..edcecaa 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -226,10 +226,14 @@ static struct mc13783_regulator_init_data mx27_3ds_regulators[] = {
- 	},
- };
- 
--/* MC13783 */
--static struct mc13783_platform_data mc13783_pdata __initdata = {
-+static struct mc13783_regulator_platform_data mx27_regs = {
- 	.regulators = mx27_3ds_regulators,
- 	.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
-+};
-+
-+/* MC13783 */
-+static struct mc13783_platform_data mc13783_pdata __initdata = {
-+	.regulators = &mx27_regs,
- 	.flags  = MC13783_USE_REGULATOR,
- };
- 
-diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-index 5056148..b5ae8cc 100644
---- a/arch/arm/mach-imx/mach-pcm038.c
-+++ b/arch/arm/mach-imx/mach-pcm038.c
-@@ -262,9 +262,13 @@ static struct mc13783_regulator_init_data pcm038_regulators[] = {
- 	},
- };
- 
--static struct mc13783_platform_data pcm038_pmic = {
-+static struct mc13783_regulator_platform_data pcm038_regs = {
- 	.regulators = pcm038_regulators,
- 	.num_regulators = ARRAY_SIZE(pcm038_regulators),
-+};
-+
-+static struct mc13783_platform_data pcm038_pmic = {
-+	.regulators = &pcm038_regs,
- 	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
- 		 MC13783_USE_TOUCHSCREEN,
- };
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 0d65db8..3e613ee 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -156,9 +156,13 @@ static struct mc13783_regulator_init_data mx31_3ds_regulators[] = {
- };
- 
- /* MC13783 */
--static struct mc13783_platform_data mc13783_pdata __initdata = {
-+static struct mc13783_regulator_platform_data mc13783_regs = {
- 	.regulators = mx31_3ds_regulators,
- 	.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
-+};
-+
-+static struct mc13783_platform_data mc13783_pdata __initdata = {
-+	.regulators = &mc13783_regs,
- 	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
- };
- 
-diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-index 1aa8d65..424fbd9 100644
---- a/arch/arm/mach-mx3/mach-mx31moboard.c
-+++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-@@ -267,9 +267,13 @@ static struct mc13783_leds_platform_data moboard_leds = {
- 	.tc2_period = MC13783_LED_PERIOD_10MS,
- };
- 
--static struct mc13783_platform_data moboard_pmic = {
-+static struct mc13783_regulator_platform_data moboard_regs = {
- 	.regulators = moboard_regulators,
- 	.num_regulators = ARRAY_SIZE(moboard_regulators),
-+};
-+
-+static struct mc13783_platform_data moboard_pmic = {
-+	.regulators = &moboard_regs,
- 	.leds = &moboard_leds,
- 	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
- 		MC13783_USE_ADC | MC13783_USE_LED,
-diff --git a/drivers/leds/leds-mc13783.c b/drivers/leds/leds-mc13783.c
-index f05bb08..687fb13 100644
---- a/drivers/leds/leds-mc13783.c
-+++ b/drivers/leds/leds-mc13783.c
-@@ -30,6 +30,7 @@ struct mc13783_led {
- 	struct mc13783		*master;
- 	enum led_brightness	new_brightness;
- 	int			id;
-+	int			num_leds;
- };
- 
- #define MC13783_REG_LED_CONTROL_0	51
-@@ -181,9 +182,9 @@ static int __devinit mc13783_led_setup(struct mc13783_led *led, int max_current)
- 	return ret;
- }
- 
--static int __devinit mc13783_leds_prepare(struct platform_device *pdev)
-+static int __devinit mc13783_leds_prepare(struct platform_device *pdev,
-+		struct mc13783_leds_platform_data *pdata)
- {
--	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
- 	struct mc13783 *dev = dev_get_drvdata(pdev->dev.parent);
- 	int ret = 0;
- 	int reg = 0;
-@@ -264,7 +265,7 @@ out:
- 
- static int __devinit mc13783_led_probe(struct platform_device *pdev)
- {
--	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
-+	struct mc13783_leds_platform_data *pdata = platform_get_drvdata(pdev);
- 	struct mc13783_led_platform_data *led_cur;
- 	struct mc13783_led *led, *led_dat;
- 	int ret, i;
-@@ -286,12 +287,15 @@ static int __devinit mc13783_led_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	ret = mc13783_leds_prepare(pdev);
-+	ret = mc13783_leds_prepare(pdev, pdata);
- 	if (ret) {
- 		dev_err(&pdev->dev, "unable to init led driver\n");
- 		goto err_free;
- 	}
- 
-+	/* no need to save the num of LEDs for any other elements of 'led' */
-+	led[0].num_leds = pdata->num_leds;
-+
- 	for (i = 0; i < pdata->num_leds; i++) {
- 		led_dat = &led[i];
- 		led_cur = &pdata->led[i];
-@@ -351,12 +355,11 @@ err_free:
- 
- static int __devexit mc13783_led_remove(struct platform_device *pdev)
- {
--	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
- 	struct mc13783_led *led = platform_get_drvdata(pdev);
- 	struct mc13783 *dev = dev_get_drvdata(pdev->dev.parent);
- 	int i;
- 
--	for (i = 0; i < pdata->num_leds; i++) {
-+	for (i = 0; i < led[0].num_leds; i++) {
- 		led_classdev_unregister(&led[i].cdev);
- 		cancel_work_sync(&led[i].work);
- 	}
-diff --git a/drivers/mfd/mc13xxx-core.c b/drivers/mfd/mc13xxx-core.c
-index b9fcaf0..96842d9 100644
---- a/drivers/mfd/mc13xxx-core.c
-+++ b/drivers/mfd/mc13xxx-core.c
-@@ -683,14 +683,13 @@ out:
- EXPORT_SYMBOL_GPL(mc13783_adc_do_conversion);
- 
- static int mc13xxx_add_subdevice_pdata(struct mc13xxx *mc13xxx,
--		const char *format, void *pdata, size_t pdata_size)
-+		const char *format, void *pdata)
- {
- 	char buf[30];
- 	const char *name = mc13xxx_get_chipname(mc13xxx);
- 
- 	struct mfd_cell cell = {
--		.platform_data = pdata,
--		.data_size = pdata_size,
-+		.driver_data = pdata,
- 	};
- 
- 	/* there is no asnprintf in the kernel :-( */
-@@ -706,7 +705,7 @@ static int mc13xxx_add_subdevice_pdata(struct mc13xxx *mc13xxx,
- 
- static int mc13xxx_add_subdevice(struct mc13xxx *mc13xxx, const char *format)
- {
--	return mc13xxx_add_subdevice_pdata(mc13xxx, format, NULL, 0);
-+	return mc13xxx_add_subdevice_pdata(mc13xxx, format, NULL);
- }
- 
- static int mc13xxx_probe(struct spi_device *spi)
-@@ -764,13 +763,8 @@ err_revision:
- 		mc13xxx_add_subdevice(mc13xxx, "%s-codec");
- 
- 	if (pdata->flags & MC13XXX_USE_REGULATOR) {
--		struct mc13xxx_regulator_platform_data regulator_pdata = {
--			.num_regulators = pdata->num_regulators,
--			.regulators = pdata->regulators,
--		};
--
- 		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-regulator",
--				&regulator_pdata, sizeof(regulator_pdata));
-+				pdata->regulators);
- 	}
- 
- 	if (pdata->flags & MC13XXX_USE_RTC)
-@@ -779,10 +773,8 @@ err_revision:
- 	if (pdata->flags & MC13XXX_USE_TOUCHSCREEN)
- 		mc13xxx_add_subdevice(mc13xxx, "%s-ts");
- 
--	if (pdata->flags & MC13XXX_USE_LED) {
--		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led",
--					pdata->leds, sizeof(*pdata->leds));
--	}
-+	if (pdata->flags & MC13XXX_USE_LED)
-+		mc13xxx_add_subdevice_pdata(mc13xxx, "%s-led", pdata->leds);
- 
- 	return 0;
- }
-diff --git a/drivers/regulator/mc13783-regulator.c b/drivers/regulator/mc13783-regulator.c
-index 3e5d0c3..40748b7 100644
---- a/drivers/regulator/mc13783-regulator.c
-+++ b/drivers/regulator/mc13783-regulator.c
-@@ -337,7 +337,7 @@ static int __devinit mc13783_regulator_probe(struct platform_device *pdev)
- 	struct mc13xxx_regulator_priv *priv;
- 	struct mc13xxx *mc13783 = dev_get_drvdata(pdev->dev.parent);
- 	struct mc13783_regulator_platform_data *pdata =
--		dev_get_platdata(&pdev->dev);
-+			platform_get_drvdata(pdev);
- 	struct mc13783_regulator_init_data *init_data;
- 	int i, ret;
- 
-@@ -351,6 +351,7 @@ static int __devinit mc13783_regulator_probe(struct platform_device *pdev)
- 
- 	priv->mc13xxx_regulators = mc13783_regulators;
- 	priv->mc13xxx = mc13783;
-+	priv->pdata = pdata;
- 
- 	for (i = 0; i < pdata->num_regulators; i++) {
- 		init_data = &pdata->regulators[i];
-@@ -381,8 +382,7 @@ err:
- static int __devexit mc13783_regulator_remove(struct platform_device *pdev)
- {
- 	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
--	struct mc13783_regulator_platform_data *pdata =
--		dev_get_platdata(&pdev->dev);
-+	struct mc13783_regulator_platform_data *pdata = priv->pdata;
- 	int i;
- 
- 	platform_set_drvdata(pdev, NULL);
-diff --git a/drivers/regulator/mc13892-regulator.c b/drivers/regulator/mc13892-regulator.c
-index 1b8f739..4b3490b 100644
---- a/drivers/regulator/mc13892-regulator.c
-+++ b/drivers/regulator/mc13892-regulator.c
-@@ -521,7 +521,7 @@ static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
- 	struct mc13xxx_regulator_priv *priv;
- 	struct mc13xxx *mc13892 = dev_get_drvdata(pdev->dev.parent);
- 	struct mc13xxx_regulator_platform_data *pdata =
--		dev_get_platdata(&pdev->dev);
-+			platform_get_drvdata(pdev);
- 	struct mc13xxx_regulator_init_data *init_data;
- 	int i, ret;
- 	u32 val;
-@@ -534,6 +534,7 @@ static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
- 
- 	priv->mc13xxx_regulators = mc13892_regulators;
- 	priv->mc13xxx = mc13892;
-+	priv->pdata = pdata;
- 
- 	mc13xxx_lock(mc13892);
- 	ret = mc13xxx_reg_read(mc13892, MC13892_REVISION, &val);
-@@ -595,8 +596,7 @@ err_free:
- static int __devexit mc13892_regulator_remove(struct platform_device *pdev)
- {
- 	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
--	struct mc13xxx_regulator_platform_data *pdata =
--		dev_get_platdata(&pdev->dev);
-+	struct mc13xxx_regulator_platform_data *pdata = priv->pdata;
- 	int i;
- 
- 	platform_set_drvdata(pdev, NULL);
-diff --git a/drivers/regulator/mc13xxx.h b/drivers/regulator/mc13xxx.h
-index 2775826..5430177 100644
---- a/drivers/regulator/mc13xxx.h
-+++ b/drivers/regulator/mc13xxx.h
-@@ -28,6 +28,7 @@ struct mc13xxx_regulator {
- struct mc13xxx_regulator_priv {
- 	struct mc13xxx *mc13xxx;
- 	u32 powermisc_pwgt_state;
-+	struct mc13xxx_regulator_platform_data *pdata;
- 	struct mc13xxx_regulator *mc13xxx_regulators;
- 	struct regulator_dev *regulators[];
- };
-diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-index a1d391b..052b133 100644
---- a/include/linux/mfd/mc13xxx.h
-+++ b/include/linux/mfd/mc13xxx.h
-@@ -146,8 +146,7 @@ struct mc13xxx_platform_data {
- #define MC13XXX_USE_LED		(1 << 5)
- 	unsigned int flags;
- 
--	int num_regulators;
--	struct mc13xxx_regulator_init_data *regulators;
-+	struct mc13xxx_regulator_platform_data *regulators;
- 	struct mc13xxx_leds_platform_data *leds;
- };
- 
--- 
-1.7.2.3
+Cheers,
+g.
+
+The following changes since commit ebf53826e105f488f4f628703a108e98940d1dc5:
+
+  Linux 2.6.38-rc3 (2011-02-01 13:05:49 +1000)
+
+are available in the git repository at:
+  git://git.secretlab.ca/git/linux-2.6.git devicetree/arm
+
+Grant Likely (14):
+      arm/dt: Make __vet_atags also accept a dtb image
+      arm/dt: allow bootmem reservation for device tree blob and initrd
+      arm/dt: consolidate atags setup into setup_machine_atags
+      arm/dt: probe for platforms via the device tree
+      arm/dt: Basic versatile devicetree support
+      arm/tegra: Fix tegra irq_data conversion
+      arm/dt: Basic tegra devicetree support
+      arm/dt: Fixup bugs in device tree __vet_atags changes
+      Merge v2.6.38-rc1 into devicetree/arm
+      Merge v2.6.38-rc2 into devicetree/arm
+      dt/arm: Save dtb in allocated buffer instead of reserved region
+      Merge commit 'v2.6.38-rc3' into devicetree/arm
+      arm/dt: Fixed memory allocation and missing of_fdt.h header
+      Revert "dt/arm: Save dtb in allocated buffer instead of reserved region"
+
+Jeremy Kerr (1):
+      arm/dt: Allow CONFIG_OF on ARM
+
+Rob Herring (1):
+      ARM/dt: map ATAGs when not in first 1MB of RAM
+
+Russell King (1):
+      arm: Defer lookup of machine_type and vet of atags to setup.c
+
+ arch/arm/Kconfig                       |    7 ++
+ arch/arm/include/asm/mach/arch.h       |    2 +
+ arch/arm/include/asm/prom.h            |   34 +++++++++
+ arch/arm/include/asm/setup.h           |    4 +
+ arch/arm/kernel/Makefile               |    1 +
+ arch/arm/kernel/devtree.c              |  107 +++++++++++++++++++++++++++++
+ arch/arm/kernel/head-common.S          |  114 +++++--------------------------
+ arch/arm/kernel/head-nommu.S           |    3 -
+ arch/arm/kernel/head.S                 |   36 +++++++---
+ arch/arm/kernel/setup.c                |  117 ++++++++++++++++++++++----------
+ arch/arm/mach-tegra/board-harmony.c    |    6 ++
+ arch/arm/mach-versatile/versatile_ab.c |    6 ++
+ arch/arm/mach-versatile/versatile_pb.c |    6 ++
+ arch/arm/mm/init.c                     |   22 ++++++
+ 14 files changed, 318 insertions(+), 147 deletions(-)
+ create mode 100644 arch/arm/include/asm/prom.h
+ create mode 100644 arch/arm/kernel/devtree.c
+
+
+On Tue, Feb 1, 2011 at 11:21 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> [restored cc: list]
+>
+> On Tue, Feb 01, 2011 at 08:11:15AM -0700, John Linn wrote:
+>> OK, I see your changes don't really help the problem with device
+>> trees up higher.
+>>
+>> The problem is that in setup_machine_fdt the kernel can't get to the
+>> memory where the device tree is located if it's up higher.
+>
+> No, there is another patch to solve that problem from Rob Herring.
+> I've not yet picked it up into my tree, but I will be doing so soon.
+> For now the dtb needs to be located inside the first 16k of ram.
+>
+> However, it can no longer be based at 0 either. ?I discovered that if
+> the dt is based at zero, then the kernel is unable to tell the
+> different between no atags/dtb passed and a dtb passed at physical
+> address 0. ?At the very least it needs to be offset about 16 bytes.
+> Since it is common to put atags at address 0x100, it is also
+> reasonable to use 0x100 as the dtb base address too.
+>
+> This problem doesn't exist for machines with ram based at physical
+> address != 0.
+>
+> Sorry I wasn't clear when I posted this. ?There is still a bit of flux
+> to get the interface correct and I accidentally glossed over this
+> detail.
+>
+>> The new stuff you added doesn't run early enough to take care of this problem.
+>
+> The problem I was trying to solve is that I was seeing device tree
+> corruption later in the boot process, but it now seems that I might
+> have misdiagnosed it. ?I'm still investigation, but I may end up
+> reverting the memblock_reserve() change.
+>
+>>
+>> I probably should have reviewed the patches instead of testing as I
+>> would have realized that.
+>>
+>> I'm looking to see if I can understand how to help the problem.
+>>
+>> Should I really just respond to the mailing list instead of this
+>> back channel? ?I don't know good behavior from bad sometimes.
+>
+> Yes, please feel totally free to respond on the mailing list (I went
+> ahead and restored the cc list on this reply). ?Just remember to
+> bottom post when replying on-list.
+>
+> g.
+>
+>>
