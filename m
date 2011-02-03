@@ -1,68 +1,108 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 3 Feb 2011 10:47:51 +0000
-Subject: [PATCH REPOST] ARM: bitops: Use BX instead of MOV PC,LR
-In-Reply-To: <20110203104420.GA2666@arm.com>
-References: <1296672824-22743-1-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1102021421160.8580@xanadu.home>
-	<20110202212449.GF31043@n2100.arm.linux.org.uk>
-	<20110203104420.GA2666@arm.com>
-Message-ID: <20110203104751.GB2666@arm.com>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Thu, 3 Feb 2011 16:30:29 +0530
+Subject: [PATCHv2 1/2] ads7846: OMAP3: Removal of warnings backtrace in
+	bootup
+In-Reply-To: <4D4A80D3.2060407@compulab.co.il>
+References: <1296726514-32146-1-git-send-email-sourav.poddar@ti.com>
+	<4D4A7F13.8080502@compulab.co.il> <4D4A80D3.2060407@compulab.co.il>
+Message-ID: <AANLkTi=U1qo=udB=tMyuA2HcnCS4EmreaVDbw2vQ9dY8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel doesn't officially need to interwork, but using BX
-wherever appropriate will help educate people into good assembler
-coding habits.
+On Thu, Feb 3, 2011 at 3:47 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> Hi again,
+>
+> On 02/03/11 12:10, Igor Grinberg wrote:
+>
+>> Hi,
+>>
+>> On 02/03/11 11:48, Sourav Poddar wrote:
+>>
+>>> gpio_pendown in ads7846_probe is not getting initalized (defaulted to 0)
+>>> resulting in gpio_free to be called without a gpio_request. This
+>>> results in the following backtrace in bootup.
+>>>
+>>> ------------[ cut here ]------------
+>>> WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
+>>> Modules linked in:
+>>> [<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>]
+>>> ? ? ?(warn_slowpath_common+0x4c/0x64)
+>>> [<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>]
+>>> ? ? ?(warn_slowpath_null+0x18/0x1c)
+>>> [<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>]
+>>> ? ? ?(gpio_free+0x100/0x12c)
+>>> [<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>]
+>>> ? ? ?(ads7846_probe+0xa38/0xc5c)
+>>> [<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>]
+>>> ? ? ?(spi_drv_probe+0x18/0x1c)
+>>> [<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>]
+>>> ? ? ?(driver_probe_device+0xc8/0x184)
+>>> [<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>]
+>>> ? ? ?(__driver_attach+0x68/0x8c)
+>>> [<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>]
+>>> ? ? ?(bus_for_each_dev+0x48/0x74)
+>>> [<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>]
+>>> ? ? ?(bus_add_driver+0xa0/0x220)
+>>> [<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>]
+>>> ? ? ?(driver_register+0xa8/0x134)
+>>> [<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>]
+>>> ? ? ?(do_one_initcall+0xcc/0x1a4)
+>>> [<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>]
+>>> ? ? ?(kernel_init+0x14c/0x214)
+>>> [<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>]
+>>> ? ? ?(kernel_thread_exit+0x0/0x8)
+>>> ---[ end trace 4053287f8a5ec18f ]---
+>>>
+>>> Initializing gpio_pendown in ads7846_probe to -1 before
+>>> ads7846_setup_pendown function removes the above backtrace
+>>> warning.
+>>>
+>>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>> ?drivers/input/touchscreen/ads7846.c | ? ?1 +
+>>> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+>>> index 14ea54b..036f245 100644
+>>> --- a/drivers/input/touchscreen/ads7846.c
+>>> +++ b/drivers/input/touchscreen/ads7846.c
+>>> @@ -1221,6 +1221,7 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+>>> ? ? ?ts->input = input_dev;
+>>> ? ? ?ts->vref_mv = pdata->vref_mv;
+>>> ? ? ?ts->swap_xy = pdata->swap_xy;
+>>> + ? ?ts->gpio_pendown = -1;
+>> Wouldn't it be better putting this into ads7846_setup_pendown() function?
+>> This will keep the whole gpio_pendown initialization code close together.
+>> Something like:
+>>
+>> if (pdata->get_pendown_state) {
+>> <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/input/touchscreen/ads7846.c;h=14ea54b78e4648b0ac8a3403440f6f5d120dfdd9;hb=HEAD#l954> ? ? ? ?ts->get_pendown_state = pdata->get_pendown_state;
+>> ? ? ? ? ts->gpio_pendown = -1;
+>> <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/input/touchscreen/ads7846.c;h=14ea54b78e4648b0ac8a3403440f6f5d120dfdd9;hb=HEAD#l955> ? ? ? ?return 0;
+>> <http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=drivers/input/touchscreen/ads7846.c;h=14ea54b78e4648b0ac8a3403440f6f5d120dfdd9;hb=HEAD#l956>}
+>
+> Sorry for the above links (this is embarrassing, but I've got played by my email client),
+> I meant of course:
+>
+> if (pdata->get_pendown_state) {
+> ? ? ? ?ts->get_pendown_state = pdata->get_pendown_state;
+> ? ? ? ?ts->gpio_pendown = -1;
+> ? ? ? ?return 0;
+> }
+>
 
-BX is appropriate here because this code is predicated on
-__LINUX_ARM_ARCH__ >= 6.
+Yes we can do so .I initialise it at a place where other variables
+ where initialised.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
 
-Reposting ... git ate my commit message :/
+>>
+>> Also, why don't we use -EINVAL for the invalid gpio number instead of -1 constant?
+>>
 
- arch/arm/lib/bitops.h |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ I used -1 because conditional check done in probe ads7846_probe function
+ used this value.
 
-diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-index a9d9d15..5527e23 100644
---- a/arch/arm/lib/bitops.h
-+++ b/arch/arm/lib/bitops.h
-@@ -12,7 +12,7 @@
- 	strex	r0, r2, [r1]
- 	cmp	r0, #0
- 	bne	1b
--	mov	pc, lr
-+	bx	lr
- 	.endm
- 
- 	.macro	testop, instr, store
-@@ -33,7 +33,7 @@
- 	smp_dmb
- 	cmp	r0, #0
- 	movne	r0, #1
--2:	mov	pc, lr
-+2:	bx	lr
- 	.endm
- #else
- 	.macro	bitop, instr
-@@ -48,7 +48,7 @@
- 	\instr	r2, r2, r3
- 	str	r2, [r1, r0, lsl #2]
- 	restore_irqs ip
--	mov	pc, lr
-+	bx	lr
- 	.endm
- 
- /**
-@@ -72,6 +72,6 @@
- 	\store	r2, [r1]
- 	moveq	r0, #0
- 	restore_irqs ip
--	mov	pc, lr
-+	bx	lr
- 	.endm
- #endif
--- 
-1.7.1
+  err_free_gpio:
+        if (ts->gpio_pendown != -1)
+                gpio_free(ts->gpio_pendown);
