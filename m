@@ -1,45 +1,53 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Thu, 3 Feb 2011 17:12:56 +0530
-Subject: [PATCHv2 2/2] Input: ads7846 - configure pendown gpio as input
-In-Reply-To: <20110203100528.GA6508@pengutronix.de>
-References: <1296726530-32199-1-git-send-email-sourav.poddar@ti.com>
-	<20110203095845.GK23561@legolas.emea.dhcp.ti.com>
-	<20110203100528.GA6508@pengutronix.de>
-Message-ID: <AANLkTi=dkNkqtBiUm-BJKw+RS2wFZ_mTSc9PFW+MrP05@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 3 Feb 2011 13:56:13 +0200
+Subject: [PATCH 1/2] omap3sdp: Fix regulator mapping for ads7846 TS
+	controller
+In-Reply-To: <1296732705-12818-2-git-send-email-rnayak@ti.com>
+References: <1296732705-12818-1-git-send-email-rnayak@ti.com>
+	<1296732705-12818-2-git-send-email-rnayak@ti.com>
+Message-ID: <20110203115613.GK23561@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 3, 2011 at 3:40 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Thu, Feb 03, 2011 at 11:58:45AM +0200, Felipe Balbi wrote:
->> On Thu, Feb 03, 2011 at 03:18:50PM +0530, Sourav Poddar wrote:
->> > The ads7846 driver requests a gpio to detect pendown events,
->> > but does not configure its direction. Configure this gpio
->> > as an input after requesting it.
->> >
->> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> > ---
->> > changes between v2 and v1: Added return error support in v2.
->> >
->> > drivers/input/touchscreen/ads7846.c | ? ?7 +++++++
->> > 1 files changed, 7 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
->> > index 036f245..f30768b 100644
->> > --- a/drivers/input/touchscreen/ads7846.c
->> > +++ b/drivers/input/touchscreen/ads7846.c
->> > @@ -962,6 +962,13 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
->> > ? ? ? ? ? ? return err;
->> > ? ? }
->> >
->> > + ? err = gpio_direction_input(pdata->gpio_pendown);
->> > + ? if (err) {
->> > + ? ? ? ? ? dev_err(&spi->dev, "failed to configure pendown GPIO input direction %d\n",
->> > + ? ? ? ? ? ? ? ? ? pdata->gpio_pendown);
->> > + ? ? ? ? ? return err;
->>
->> and now you miss a gpio_free().
->
-> Better use gpio_request_one()?
+Hi,
 
-Totally agreed,using gpio_request_one seems to be the better option.
-Will post a patch for it.
+On Thu, Feb 03, 2011 at 05:01:44PM +0530, Rajendra Nayak wrote:
+> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+> index d4e41ef..dcdc718 100644
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -427,6 +427,10 @@ static struct twl4030_madc_platform_data sdp3430_madc_data = {
+>  	.irq_line	= 1,
+>  };
+>  
+> +/* ads7846 on SPI */
+> +static struct regulator_consumer_supply sdp3430_vaux3_supply =
+> +	REGULATOR_SUPPLY("vcc", "spi1.0");
+> +
+>  /*
+>   * Apply all the fixed voltages since most versions of U-Boot
+>   * don't bother with that initialization.
+> @@ -469,6 +473,8 @@ static struct regulator_init_data sdp3430_vaux3 = {
+>  		.valid_ops_mask		= REGULATOR_CHANGE_MODE
+>  					| REGULATOR_CHANGE_STATUS,
+>  	},
+> +	.num_consumer_supplies		= 1,
+> +	.consumer_supplies		= &sdp3430_vaux3_supply,
+>  };
+
+this is not the expected way of using the regulator framework, you
+should have:
+
+static struct regulator_consumer_supply sdp3430_vaux3_supplies[] =
+	{ REGULATOR_SUPPLY("vcc", "spi1.0"), },
+};
+
+...
+
+.num_consume_supplies	= ARRAY_SIZE(sdp3430_vaux3_supplies),
+.consumer_supplies	= sdp3430_vaux3_supplies,
+
+or something similar. (completely untested though).
+
+-- 
+balbi
