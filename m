@@ -1,76 +1,88 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Thu, 3 Feb 2011 00:59:08 +0100
-Subject: [PATCH 3/6] PalmTC: switch to using gpio-vbus transceiver
-In-Reply-To: <1296666003-31647-4-git-send-email-dbaryshkov@gmail.com>
-References: <1296666003-31647-1-git-send-email-dbaryshkov@gmail.com>
-	<1296666003-31647-4-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <201102030059.08589.marek.vasut@gmail.com>
+From: subaparts@yandex.ru (Alexander Sverdlin)
+Date: Thu, 03 Feb 2011 03:11:45 +0300
+Subject: [PATCH] ASoC: CS4271: Move Chip Select control out of the CODEC code.
+Message-ID: <1296691905.1504.47.camel@r60e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 February 2011 18:00:00 Dmitry Eremin-Solenikov wrote:
-> Switch from handling gpio-vbus in pxa25x_udc to using standard gpio-vbus
-> tranceiver.
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: Marek Vasut <marek.vasut@gmail.com>
+From: Alexander Sverdlin <subaparts@yandex.ru>
 
-Looks good
+Move Chip Select control out of the CODEC code for CS4271.
+        
+Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
+---
+ include/sound/cs4271.h    |    1 -
+ sound/soc/codecs/cs4271.c |   22 +++-------------------
+ 2 files changed, 3 insertions(+), 20 deletions(-)
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> ---
->  arch/arm/mach-pxa/palmtc.c |   14 ++++++++++++--
->  1 files changed, 12 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-> index 2131d58..fcc4490 100644
-> --- a/arch/arm/mach-pxa/palmtc.c
-> +++ b/arch/arm/mach-pxa/palmtc.c
-> @@ -25,6 +25,7 @@
->  #include <linux/power_supply.h>
->  #include <linux/gpio_keys.h>
->  #include <linux/mtd/physmap.h>
-> +#include <linux/usb/gpio_vbus.h>
-> 
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -294,12 +295,21 @@ static struct platform_device palmtc_keyboard = {
->  /*************************************************************************
-> ***** * UDC
->  
-> **************************************************************************
-> ****/ -static struct pxa2xx_udc_mach_info palmtc_udc_info __initdata = {
-> +static struct gpio_vbus_mach_info palmtc_udc_info = {
->  	.gpio_vbus		= GPIO_NR_PALMTC_USB_DETECT_N,
->  	.gpio_vbus_inverted	= 1,
->  	.gpio_pullup		= GPIO_NR_PALMTC_USB_POWER,
->  };
-> 
-> +static struct platform_device palmtc_gpio_vbus = {
-> +	.name	= "gpio-vbus",
-> +	.id	= -1,
-> +	.dev	= {
-> +		.platform_data	= &palmtc_udc_info,
-> +	},
-> +};
-> +
-> +
->  /*************************************************************************
-> ***** * Touchscreen / Battery / GPIO-extender
->  
-> **************************************************************************
-> ****/ @@ -391,6 +401,7 @@ static struct platform_device *devices[]
-> __initdata = { &palmtc_keyboard,
->  	&palmtc_pxa_keys,
->  	&palmtc_flash,
-> +	&palmtc_gpio_vbus,
->  };
-> 
->  static void __init palmtc_init(void)
-> @@ -404,7 +415,6 @@ static void __init palmtc_init(void)
-> 
->  	set_pxa_fb_info(&palmtc_lcd_screen);
->  	pxa_set_mci_info(&palmtc_mci_platform_data);
-> -	pxa_set_udc_info(&palmtc_udc_info);
->  	pxa_set_ac97_info(NULL);
->  	pxa_set_ficp_info(&palmtc_ficp_platform_data);
+diff --git a/include/sound/cs4271.h b/include/sound/cs4271.h
+index 16f8d32..50a059e 100644
+--- a/include/sound/cs4271.h
++++ b/include/sound/cs4271.h
+@@ -19,7 +19,6 @@
+ 
+ struct cs4271_platform_data {
+ 	int gpio_nreset;	/* GPIO driving Reset pin, if any */
+-	int gpio_disable;	/* GPIO that disable serial bus, if any */
+ };
+ 
+ #endif /* __CS4271_H */
+diff --git a/sound/soc/codecs/cs4271.c b/sound/soc/codecs/cs4271.c
+index 9c5b7db..1791796 100644
+--- a/sound/soc/codecs/cs4271.c
++++ b/sound/soc/codecs/cs4271.c
+@@ -441,22 +441,11 @@ static int cs4271_probe(struct snd_soc_codec *codec)
+ 	struct cs4271_platform_data *cs4271plat = codec->dev->platform_data;
+ 	int ret;
+ 	int gpio_nreset = -EINVAL;
+-	int gpio_disable = -EINVAL;
+ 
+ 	codec->control_data = cs4271->control_data;
+ 
+-	if (cs4271plat) {
+-		if (gpio_is_valid(cs4271plat->gpio_nreset))
+-			gpio_nreset = cs4271plat->gpio_nreset;
+-		if (gpio_is_valid(cs4271plat->gpio_disable))
+-			gpio_disable = cs4271plat->gpio_disable;
+-	}
+-
+-	if (gpio_disable >= 0)
+-		if (gpio_request(gpio_disable, "CS4271 Disable"))
+-			gpio_disable = -EINVAL;
+-	if (gpio_disable >= 0)
+-		gpio_direction_output(gpio_disable, 0);
++	if (cs4271plat && gpio_is_valid(cs4271plat->gpio_nreset))
++		gpio_nreset = cs4271plat->gpio_nreset;
+ 
+ 	if (gpio_nreset >= 0)
+ 		if (gpio_request(gpio_nreset, "CS4271 Reset"))
+@@ -471,7 +460,6 @@ static int cs4271_probe(struct snd_soc_codec *codec)
+ 	}
+ 
+ 	cs4271->gpio_nreset = gpio_nreset;
+-	cs4271->gpio_disable = gpio_disable;
+ 
+ 	/*
+ 	 * In case of I2C, chip address specified in board data.
+@@ -509,10 +497,9 @@ static int cs4271_probe(struct snd_soc_codec *codec)
+ static int cs4271_remove(struct snd_soc_codec *codec)
+ {
+ 	struct cs4271_private *cs4271 = snd_soc_codec_get_drvdata(codec);
+-	int gpio_nreset, gpio_disable;
++	int gpio_nreset;
+ 
+ 	gpio_nreset = cs4271->gpio_nreset;
+-	gpio_disable = cs4271->gpio_disable;
+ 
+ 	if (gpio_is_valid(gpio_nreset)) {
+ 		/* Set codec to the reset state */
+@@ -520,9 +507,6 @@ static int cs4271_remove(struct snd_soc_codec *codec)
+ 		gpio_free(gpio_nreset);
+ 	}
+ 
+-	if (gpio_is_valid(gpio_disable))
+-		gpio_free(gpio_disable);
+-
+ 	return 0;
+ };
+ 
