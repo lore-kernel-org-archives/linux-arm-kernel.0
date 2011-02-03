@@ -1,25 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Feb 2011 14:36:30 +0000
-Subject: "Porting the Linux Kernel to a New ARM Platform", updated...?
-In-Reply-To: <AANLkTikWsU2V+1ohAaiFfRneLjsGRWx7ee5X655mAa18@mail.gmail.com>
-References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
-	<20110127073009.GR9041@pengutronix.de>
-	<20110127093044.GA30756@shlinux1.ap.freescale.net>
-	<4D415BA2.2020207@freescale.com>
-	<20110127121928.GA1948@richard-laptop>
-	<87a7d0$e7q8m3@out1.ip07ir2.opaltelecom.net>
-	<AANLkTikWsU2V+1ohAaiFfRneLjsGRWx7ee5X655mAa18@mail.gmail.com>
-Message-ID: <20110203143630.GC14627@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 3 Feb 2011 16:03:51 +0100
+Subject: ARM unaligned MMIO access with attribute((packed))
+In-Reply-To: <20110202163702.GA23240@n2100.arm.linux.org.uk>
+References: <201102021700.20683.arnd@arndb.de>
+	<20110202163702.GA23240@n2100.arm.linux.org.uk>
+Message-ID: <201102031603.51628.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 03, 2011 at 08:31:04AM -0600, Steve Chen wrote:
-> By the way, include/asm is a symlink points to
-> include/asm-arm/arch-xxxx in the older kernels.
+On Wednesday 02 February 2011, Russell King - ARM Linux wrote:
+> On Wed, Feb 02, 2011 at 05:00:20PM +0100, Arnd Bergmann wrote:
+> > I would suggest fixing this by:
+> >
+> > 2. Changing the ARM MMIO functions to use inline assembly instead of
+> > direct pointer dereference.
+>
+> We used to use inline assembly at one point, but that got chucked out.
+> The problem is that using asm() for this causes GCC to generate horrid
+> code.
 
-In old kernels, include/asm was pointed at include/asm-arm.  We had a
-second symlink for include/asm-arm/arch which pointed at
-include/asm-arm/arch-xxx.  Even older kernels had another symlink for
-include/asm-arm/proc pointing at either include/asm-arm/proc-armv or
-.../proc-armo depending on whether we were building for 32-bit or 26-bit
-ARMs.
+Here is an alternative suggestion, would that work?
+
+8<-----------
+arm: avoid unaligned arguments to MMIO functions
+
+The readw/writew/readl/writel functions require aligned naturally arguments
+which are accessed only using atomic load and store instructions, never
+using byte or read-modify-write write accesses.
+
+At least one driver (ehci-hcd) annotates its MMIO registers as
+__attribute__((packed)), which causes some versions of gcc to generate
+byte accesses due to an undefined behavior when casting a packed u32
+to an aligned u32 variable.
+
+There does not seem to be an efficient way to force gcc to do word
+accesses, but we can detect the problem and refuse to build broken
+code: This adds a check in these functions to ensure that their arguments
+are either naturally aligned or they are void pointers.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 20e0f7c..b98f0bc 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -180,17 +180,36 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+  * IO port primitives for more information.
+  */
+ #ifdef __mem_pci
++
++/*
++ * Ensure natural alignment of arguments:
++ * It is not allowed to pass a pointer to a packed variable into
++ * the readl/writel family of functions, because gcc may decide
++ * to create byte accesses that are illegal on multi-byte MMIO
++ * registers.
++ * A lot of code uses void pointers, which is fine.
++ */
++#define __checkalign(p) BUILD_BUG_ON(				\
++	!__builtin_types_compatible_p(__typeof__(p), void *) &&	\
++	(__alignof__ (*(p)) < sizeof (*(p))))
++
+ #define readb_relaxed(c) ({ u8  __v = __raw_readb(__mem_pci(c)); __v; })
+-#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16) \
+-					__raw_readw(__mem_pci(c))); __v; })
+-#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32) \
+-					__raw_readl(__mem_pci(c))); __v; })
++#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16)    \
++					__raw_readw(__mem_pci(c)));   \
++					__checkalign(c); __v; })
++#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32)    \
++					__raw_readl(__mem_pci(c)));   \
++					__checkalign(c); __v; })
+ 
+ #define writeb_relaxed(v,c)	((void)__raw_writeb(v,__mem_pci(c)))
+-#define writew_relaxed(v,c)	((void)__raw_writew((__force u16) \
+-					cpu_to_le16(v),__mem_pci(c)))
+-#define writel_relaxed(v,c)	((void)__raw_writel((__force u32) \
+-					cpu_to_le32(v),__mem_pci(c)))
++#define writew_relaxed(v,c)	do { (void)__raw_writew((__force u16) \
++					cpu_to_le16(v),__mem_pci(c)); \
++					 __checkalign(c);	      \
++				} while (0);
++#define writel_relaxed(v,c)	do { (void)__raw_writel((__force u32) \
++					cpu_to_le32(v),__mem_pci(c)); \
++					__checkalign(c);	      \
++				} while (0);
+ 
+ #ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+ #define __iormb()		rmb()
