@@ -1,87 +1,33 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 4 Feb 2011 20:51:15 +0900
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110204111841.GG14627@n2100.arm.linux.org.uk>
-References: <20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<4D48741F.8060006@codeaurora.org>
-	<20110201212409.GU31216@n2100.arm.linux.org.uk>
-	<20110204095424.GB2347@richard-laptop>
-	<20110204104832.GE14627@n2100.arm.linux.org.uk>
-	<AANLkTi=sfBTHLXejWxAWGa=Tcw+LoQfw6sUtcn6L+JeM@mail.gmail.com>
-	<20110204111841.GG14627@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinB7jin5jDyNdTJYN2DZdTA3iJFvGJtsmtCUNsE@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 4 Feb 2011 12:01:21 +0000
+Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on
+	!CONFIG_THUMB2_KERNEL
+In-Reply-To: <20110204110342.GE15004@n2100.arm.linux.org.uk>
+References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
+	<1291895982-4775-3-git-send-email-dave.martin@linaro.org>
+	<20110204110342.GE15004@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik5A0nKtOvV=Ga4mtUasJ0vhHem+nx00Rpo3JV2@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 4, 2011 at 8:18 PM, Russell King - ARM Linux
+On Fri, Feb 4, 2011 at 11:03 AM, Russell King - ARM Linux
 <linux@arm.linux.org.uk> wrote:
-> On Fri, Feb 04, 2011 at 08:04:03PM +0900, Jassi Brar wrote:
->> On Fri, Feb 4, 2011 at 7:48 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
+> On Thu, Dec 09, 2010 at 11:59:42AM +0000, Dave Martin wrote:
+>> Because the nwfpe support is unlikely to be used on new platforms
+>> and requires CONFIG_OABI_COMPAT, which is not generally used with
+>> ARMv7+, we shouldn't expect to build nwfpe support into a Thumb-2
+>> kernel.
 >>
->> > int clk_enable(struct clk *clk)
->> > {
->> > ? ? ? ?unsigned long flags;
->> > ? ? ? ?int ret = 0;
->> >
->> > ? ? ? ?if (clk) {
->> > ? ? ? ? ? ? ? ?if (WARN_ON(!clk->prepare_count))
->> > ? ? ? ? ? ? ? ? ? ? ? ?return -EINVAL;
->> >
->> > ? ? ? ? ? ? ? ?spin_lock_irqsave(&clk->lock, flags);
->> > ? ? ? ? ? ? ? ?if (clk->enable_count++ == 0)
->> > ? ? ? ? ? ? ? ? ? ? ? ?ret = clk->ops->enable(clk);
->> > ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&clk->lock, flags);
->> > ? ? ? ?}
->> > ? ? ? ?return ret;
->> > }
->> >
->> > is entirely sufficient to catch the case of a single-use clock not being
->> > prepared before clk_enable() is called.
->> >
->> > We're after detecting drivers missing calls to clk_prepare(), we're not
->> > after detecting concurrent calls to clk_prepare()/clk_unprepare().
->>
->> I hope you mean 'making sure the clock is prepared before it's enabled
->> ' rather than
->> 'catching a driver that doesn't do clk_prepare before clk_enable'.
->> Because, the above implementation still doesn't catch a driver that
->> doesn't call clk_prepare
->> but simply uses a clock that happens to have been already prepare'd by
->> some other
->> driver or the platform.
+>> At present, nwfpe contains assembly code which isn't Thumb-2
+>> compatible, and for now it doesn't appear useful to port this
+>> code.
 >
-> No, I mean what I said.
-Then, how does that function catch a driver that, say, doesn't do clk_prepare
-but share the clk with another already active driver?
-Because you said - "We're after detecting drivers missing calls to
-clk_prepare()"
+> You might as well make OABI_COMPAT depend on !THUMB2_KERNEL. ?OABI
+> userland is useless without FPA support.
+>
 
-The point is, there is difference between detecting drivers that miss
-the clk_prepare
-and ensuring clk_prepare has been called before any call to
-clk_enable. And making
-that clear helps get rid of lots of confusion/misunderstanding. Uwe
-seems to have
-had similar confusions.
+Sure.  The original patch is already upstream, but I can roll a
+supplementary patch for this.
 
-
-> The only way to do what you're asking is to attach a list of identifiers
-> which have prepared a clock to the struct clk, where each identifier is
-> unique to each driver instance.
-I am not asking what you think.
-In my second last post, I am rather asking the other way around - that
-let us not worry
-about drivers missing the clk_prepare and not try to catch those by the new API.
-
-
-> I think that's going completely over the top, and adds needless complexity
-> to drivers, which now have to pass an instance specific cookie into every
-> clk API call.
-Exactly.
-All we need is to ensure clk_prepare has been called atleast once before
-any call to clk_enable.
+Cheers
+---Dave
