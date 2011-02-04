@@ -1,120 +1,104 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 11:18:41 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <AANLkTi=sfBTHLXejWxAWGa=Tcw+LoQfw6sUtcn6L+JeM@mail.gmail.com>
-References: <20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<4D48741F.8060006@codeaurora.org>
-	<20110201212409.GU31216@n2100.arm.linux.org.uk>
-	<20110204095424.GB2347@richard-laptop>
-	<20110204104832.GE14627@n2100.arm.linux.org.uk>
-	<AANLkTi=sfBTHLXejWxAWGa=Tcw+LoQfw6sUtcn6L+JeM@mail.gmail.com>
-Message-ID: <20110204111841.GG14627@n2100.arm.linux.org.uk>
+Date: Fri, 4 Feb 2011 11:30:53 +0000
+Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
+In-Reply-To: <c703383234131695d040a1e5b8a79413@mail.gmail.com>
+References: <20110125114635.GB13300@n2100.arm.linux.org.uk>
+	<236d45e400a960cc3b32db538b3a79ae@mail.gmail.com>
+	<20110125121655.GD13300@n2100.arm.linux.org.uk>
+	<4534e82bf14eeea9f96769df760df5ae@mail.gmail.com>
+	<20110125125656.GG13300@n2100.arm.linux.org.uk>
+	<20110125130422.GH13300@n2100.arm.linux.org.uk>
+	<20110125130611.GA15663@n2100.arm.linux.org.uk>
+	<627ff975140c8e4afbad281105b29d35@mail.gmail.com>
+	<20110204104113.GD15004@n2100.arm.linux.org.uk>
+	<c703383234131695d040a1e5b8a79413@mail.gmail.com>
+Message-ID: <20110204113053.GF15004@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 08:04:03PM +0900, Jassi Brar wrote:
-> On Fri, Feb 4, 2011 at 7:48 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> 
-> > int clk_enable(struct clk *clk)
-> > {
-> > ? ? ? ?unsigned long flags;
-> > ? ? ? ?int ret = 0;
+On Fri, Feb 04, 2011 at 04:16:07PM +0530, Santosh Shilimkar wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Friday, February 04, 2011 4:11 PM
+> > To: Santosh Shilimkar
+> > Cc: catalin.marinas at arm.com; linus.ml.walleij at gmail.com; linux-
+> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > ccross at android.com
+> > Subject: Re: [PATCH 4/5] ARM: scu: Move register defines to header
+> > file
 > >
-> > ? ? ? ?if (clk) {
-> > ? ? ? ? ? ? ? ?if (WARN_ON(!clk->prepare_count))
-> > ? ? ? ? ? ? ? ? ? ? ? ?return -EINVAL;
+> > On Tue, Jan 25, 2011 at 11:53:35PM +0530, Santosh Shilimkar wrote:
+> > > After fixing the 3rd version for base address break, I was able to
+> > > use this patch and test it. Seems to work. SMC related stuff can
+> > > be ignored because OMAP4 ES1.0 doesn't have functional PM hardware
+> > > support.
 > >
-> > ? ? ? ? ? ? ? ?spin_lock_irqsave(&clk->lock, flags);
-> > ? ? ? ? ? ? ? ?if (clk->enable_count++ == 0)
-> > ? ? ? ? ? ? ? ? ? ? ? ?ret = clk->ops->enable(clk);
-> > ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&clk->lock, flags);
-> > ? ? ? ?}
-> > ? ? ? ?return ret;
-> > }
-> >
-> > is entirely sufficient to catch the case of a single-use clock not being
-> > prepared before clk_enable() is called.
-> >
-> > We're after detecting drivers missing calls to clk_prepare(), we're not
-> > after detecting concurrent calls to clk_prepare()/clk_unprepare().
-> 
-> I hope you mean 'making sure the clock is prepared before it's enabled
-> ' rather than
-> 'catching a driver that doesn't do clk_prepare before clk_enable'.
-> Because, the above implementation still doesn't catch a driver that
-> doesn't call clk_prepare
-> but simply uses a clock that happens to have been already prepare'd by
-> some other
-> driver or the platform.
+> > I think I'd prefer to do as the other functions do, and pass in the
+> > scu base address from the platform code.  It's potentially more
+> > efficient for platforms which have a fixed SCU base address.
+> Ok. I can fix that
 
-No, I mean what I said.
+8<------
+Subject: [PATCH] ARM: smp: add function to set WFI low-power mode for SMP CPUs
 
-The only way to do what you're asking is to attach a list of identifiers
-which have prepared a clock to the struct clk, where each identifier is
-unique to each driver instance.
+Add a function to set the SCU low-power mode for SMP CPUs.  This
+centralizes this functionality rather than having to expose the
+SCU register definitions to each platform.
 
-So what that becomes is:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/smp_scu.h |    5 +++++
+ arch/arm/kernel/smp_scu.c      |   24 ++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-struct prepared_instance {
-	struct list_head node;
-	void *driver_id;
-};
-
-int clk_prepare(struct clk *clk, void *driver_id)
-{
-	struct prepared_instance *inst;
-	int ret = 0;
-
-	if (clk) {
-		inst = kmalloc(sizeof(*inst), GFP_KERNEL);
-		if (!inst)
-			return -ENOMEM;
-
-		inst->driver_id = driver_id;
-
-		mutex_lock(&clk->mutex);
-		if (clk->prepare_count++ == 0)
-			ret = clk->ops->prepare(clk);
-
-		if (ret == 0) {
-			spin_lock_irqsave(&clk->lock, flags);
-			list_add(&inst->node, &clk->prepare_list);
-			spin_unlock_irqrestore(&clk->lock, flags);
-		} else
-			clk->prepare_count--;
-		mutex_unlock(&clk->mutex);
-	}
-	return ret;
-}
-
-int clk_enable(struct clk *clk, void *driver_id)
-{
-	unsigned long flags;
-	int ret = 0;
-
-	if (clk) {
-		struct prepare_instance *inst;
-
-		spin_lock_irqsave(&clk->lock, flags);
-		list_for_each_entry(inst, &clk->prepare_list, node)
-			if (inst == driver_id)
-				ret = -EINVAL;
-
-		if (ret == 0 && clk->enable_count++ == 0) {
-			ret = clk->ops->enable(clk);
-			if (ret)
-				clk->enable_count--;
-		}
-		spin_unlock_irqrestore(&clk->lock, flags);
-	}
-	return ret;
-}
-
-I think that's going completely over the top, and adds needless complexity
-to drivers, which now have to pass an instance specific cookie into every
-clk API call.
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index 2376835..800860d 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -1,7 +1,12 @@
+ #ifndef __ASMARM_ARCH_SCU_H
+ #define __ASMARM_ARCH_SCU_H
+ 
++#define SCU_PM_NORMAL	0
++#define SCU_PM_DORMANT	2
++#define SCU_PM_POWEROFF	3
++
+ unsigned int scu_get_core_count(void __iomem *);
+ void scu_enable(void __iomem *);
++int scu_power_mode(void __iomem *, unsigned int);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 9ab4149..0ba329a 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -50,3 +50,27 @@ void __init scu_enable(void __iomem *scu_base)
+ 	 */
+ 	flush_cache_all();
+ }
++
++/*
++ * Set the executing CPUs power mode as defined.  This will be in
++ * preparation for it executing a WFI instruction.
++ *
++ * This function must be called with preemption disabled, and as it
++ * has the side effect of disabling coherency, caches must have been
++ * flushed.  Interrupts must also have been disabled.
++ */
++int scu_power_mode(void __iomem *scu_base, unsigned int mode)
++{
++	unsigned int val;
++	int cpu = smp_processor_id();
++	int shift;
++
++	if (mode > 3 || mode == 1 || cpu > 3)
++		return -EINVAL;
++
++	val = __raw_readb(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
++	val |= mode;
++	__raw_writeb(val, scu_base + SCU_CPU_STATUS + cpu);
++
++	return 0;
++}
+-- 
+1.6.2.5
