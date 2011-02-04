@@ -1,46 +1,141 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 12:32:20 +0000
-Subject: [PATCH 1/2] ARM: Add inituart macro to initialize DEBUG_LL
-	serial port based on the machine ID
-In-Reply-To: <20110204083934.GB15004@n2100.arm.linux.org.uk>
-References: <20110204012008.26298.16341.stgit@baageli.muru.com>
-	<20110204012207.26298.16649.stgit@baageli.muru.com>
-	<20110204083934.GB15004@n2100.arm.linux.org.uk>
-Message-ID: <20110204123220.GG15004@n2100.arm.linux.org.uk>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Fri, 4 Feb 2011 20:45:34 +0800
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+In-Reply-To: <201102011711.31258.jeremy.kerr@canonical.com>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+Message-ID: <20110204124534.GA2597@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 08:39:34AM +0000, Russell King - ARM Linux wrote:
-> Can't we just hard-configure the virtual/physical address at build
-> time and be done with it?
+On Tue, Feb 01, 2011 at 05:11:29PM +0800, Jeremy Kerr wrote:
+> Hi all,
 > 
-> I've given up with the current state of affairs which tries to use the
-> platform ID to select the UART to use as it never seems to work, and I
-> have a couple of patches which hard-code the address at compile time -
-> one for the SDP4430 board and one for the LDP3430 board.
+> > I suggested that clk_prepare() be callable only from non-atomic contexts,
+> > and do whatever's required to ensure that the clock is available.  That
+> > may end up enabling the clock as a result.
 > 
-> If it's complicated, then it probably won't work.  Keep it simple.
-> That's especially true for debugging code, otherwise you need extra
-> debugging code to debug why the debugging code doesn't work.
+> I think that clk_prepare/clk_unprepare looks like the most promising solution, 
+> so will try to get some preliminary patches done. Here's what I'm planning:
+> 
+> -----
+> 
+> The changes to the API are essentially:
+> 
+> 1) Document clk_enable/clk_disable as callable from atomic contexts, and
+>    so clock implementations must not sleep within this function.
+> 
+> 2) For clock implementations that may sleep to turn on a clock, we add a
+>    new pair of functions to the clock API: clk_prepare and clk_unprepare.
+> 
+>    These will provide hooks for the clock implmentation to do any sleepable
+>    work (eg, wait for PLLs to settle) in preparation for a later clk_enable.
+> 
+>    For the most common clock implemntation cases (where clocks can be enabled 
+>    atomically), these functions will be a no-op, and all of the enable/disable
+>    work can be done in clk_enable/clk_disable.
+> 
+>    For implementations where clocks require blocking on enable/disable, most
+>    of the work will be done in clk_prepare/clk_unprepare. The clk_enable
+>    and clk_disable functions may be no-ops.
+> 
+> For drivers, this means that clk_prepare must be called (and have returned) 
+> before calling clk_enable.
+> 
+> == Enable/Prepare counts ==
+> 
+> I intend to do the enable and prepare "counting" in the core clock API, 
+> meaning that that the clk_ops callbacks will only invoked on the first 
+> prepare/enable and the last unprepare/disable.
+> 
+> == Concurrency ==
+> 
+> Splitting the prepare and enable stages introduces the concurrency 
+> requirements:
+> 
+> 1) clk_enable must not return before the clock is outputting a valid clock 
+>    signal.
+> 
+> 2) clk_prepare must not return before the clock is fully prepared (ie, it is 
+>    safe to call clk_enable).
+> 
+> It is not possible for clk_enable to wait for the clock to be prepared, 
+> because that would require synchronisation with clk_prepare, which may then 
+> require blocking. Therefore:
+> 
+> 3) The clock consumer *must* respect the proper ordering of clk_prepare and 
+>    clk_enable. For example, drivers that call clk_enable during an interrupt 
+>    must ensure that the interrupt handler will not be invoked until 
+>    clk_prepare has returned.
+> 
+> == Other considerations ==
+> 
+> The time that a clock spends "prepared" is a superset of the the time that a 
+> clock spends "enabled". Therefore, clocks that are switched on during 
+> clk_prepare (ie, non-atomic clocks) will be running for a larger amount of 
+> time. In some cases, this can be mitigated by moving some of the final 
+> (atomic) switching functionality to the clk_enable function.
+> 
+> == Implementation ==
+> 
+> Basically:
+> 
+> struct clk {
+> 	const struct clk_ops *ops
+> 	int                  enable_count;
+> 	spinlock_t           enable_lock;
+> 	int                  prepare_count;
+> 	struct mutex         prepare_lock;
+> };
+> 
+> int clk_enable(struct clk *clk)
+> {
+> 	int ret = 0;
+> 
+> 	spin_lock(&clk->enable_lock);
+> 	if (!clk->enable_count)
+> 		ret = clk->ops->enable(clk);
+> 
+> 	if (!ret)
+> 		clk->enable_count++;
+> 	spin_unlock(&clk->enable_lock);
+> 
+> 	return ret;
+> }
+Why do we not call parent's clk_enable in this function? For flexible? How many
+different cases is causing us to move the effert to platform clock driver?
+> 
+> int clk_prepare(struct clk *clk)
+> {
+> 	int ret = 0;
+> 
+> 	mutex_lock(&clk->prepare_lock);
+> 	if (!clk->prepare_count)
+> 		ret = clk->ops->prepare(clk);
+> 
+> 	if (!ret)
+> 		clk->prepare_count++;
+> 	mutex_unlock(&clk->prepare_lock);
+> 
+> 	return ret;
+> }
+Same as above.
+And for most clocks, prepare/unprepare may be NULL. So in such case, is it
+better to call parent's prepare and increase its own prepare_count here?
 
-There's another good reason to hard-configure the UART port rather
-than select it by ID.
-
-The common usage scenario: you're bringing up a new board.  You know
-you're going to have your console connected to UART2.  So, no matter
-what you want your debug messages to come out of UART2 even if the
-machine ID is wrong.
-
-By detecting the UART port from the machine number, you immediately
-lose that ability, and therefore the confidence, that "if I build the
-kernel for X with LL debug enabled, and monitor port Y, I will get
-messages out of port Y, and not some other random port Z which I'd to
-solder wires to to monitor."
-
-In other words, no messages on the monitored port changes from "we didn't
-get into the kernel, or something early in the kernel boot before the C
-code went wrong" to "... or maybe the debugging code failed to get the
-right port too."
-
-It is invaluable to know that the debugging code will always talk to
-the same UART which you're monitoring.
+Thanks
+Richard
+> 
+> -----
+> 
+> Comments welcome, code coming soon.
+> 
+> Cheers,
+> 
+> 
+> Jeremy
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
