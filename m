@@ -1,93 +1,46 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Fri, 04 Feb 2011 07:27:16 -0500
-Subject: [PATCH 1/3] davinci: spi: move event_q parameter to platform data
-In-Reply-To: <4D4BEB1F.6060200@mvista.com>
-References: <1296779690-9723-1-git-send-email-michael.williamson@criticallink.com>
-	<1296779690-9723-2-git-send-email-michael.williamson@criticallink.com>
-	<4D4BEB1F.6060200@mvista.com>
-Message-ID: <4D4BF0A4.9010509@criticallink.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Feb 2011 12:32:20 +0000
+Subject: [PATCH 1/2] ARM: Add inituart macro to initialize DEBUG_LL
+	serial port based on the machine ID
+In-Reply-To: <20110204083934.GB15004@n2100.arm.linux.org.uk>
+References: <20110204012008.26298.16341.stgit@baageli.muru.com>
+	<20110204012207.26298.16649.stgit@baageli.muru.com>
+	<20110204083934.GB15004@n2100.arm.linux.org.uk>
+Message-ID: <20110204123220.GG15004@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On 2/4/2011 7:03 AM, Sergei Shtylyov wrote:
-
-> Hello.
+On Fri, Feb 04, 2011 at 08:39:34AM +0000, Russell King - ARM Linux wrote:
+> Can't we just hard-configure the virtual/physical address at build
+> time and be done with it?
 > 
-> On 04-02-2011 3:34, Michael Williamson wrote:
+> I've given up with the current state of affairs which tries to use the
+> platform ID to select the UART to use as it never seems to work, and I
+> have a couple of patches which hard-code the address at compile time -
+> one for the SDP4430 board and one for the LDP3430 board.
 > 
->> For DMA operation, the davinci spi driver needs an eventq number.
->> Currently, this number is passed as a IORESOURCE_DMA.  This is not
->> correct, as the eventq is not a DMA channel.  Pass the eventq
->> via the platform data structure instead.
-> 
->> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
-> [...]
-> 
->> diff --git a/arch/arm/mach-davinci/include/mach/spi.h b/arch/arm/mach-davinci/include/mach/spi.h
->> index 38f4da5..0853a5f 100644
->> --- a/arch/arm/mach-davinci/include/mach/spi.h
->> +++ b/arch/arm/mach-davinci/include/mach/spi.h
-> [...]
->> @@ -39,13 +41,16 @@ enum {
->>    *        to populate if all chip-selects are internal.
->>    * @cshold_bug:    set this to true if the SPI controller on your chip requires
->>    *        a write to CSHOLD bit in between transfers (like in DM355).
->> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
-> 
->    s/event_q/event queue/?
-> 
->> + *        on the bus.
->>    */
->>   struct davinci_spi_platform_data {
->> -    u8    version;
->> -    u8    num_chipselect;
->> -    u8    intr_line;
->> -    u8    *chip_sel;
->> -    bool    cshold_bug;
->> +    u8            version;
->> +    u8            num_chipselect;
->> +    u8            intr_line;
->> +    u8            *chip_sel;
->> +    bool            cshold_bug;
->> +    enum dma_event_q    dma_event_q;
->>   };
->>
->>   /**
->> diff --git a/drivers/spi/davinci_spi.c b/drivers/spi/davinci_spi.c
->> index 6beab99..166a879 100644
->> --- a/drivers/spi/davinci_spi.c
->> +++ b/drivers/spi/davinci_spi.c
-> [...]
->> @@ -878,17 +877,13 @@ static int davinci_spi_probe(struct platform_device *pdev)
->>       r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
->>       if (r)
->>           dma_tx_chan = r->start;
->> -    r = platform_get_resource(pdev, IORESOURCE_DMA, 2);
->> -    if (r)
->> -        dma_eventq = r->start;
->>
->>       dspi->bitbang.txrx_bufs = davinci_spi_bufs;
->>       if (dma_rx_chan != SPI_NO_RESOURCE&&
->> -        dma_tx_chan != SPI_NO_RESOURCE&&
->> -        dma_eventq != SPI_NO_RESOURCE) {
->> +        dma_tx_chan != SPI_NO_RESOURCE) {
->>           dspi->dma.rx_channel = dma_rx_chan;
->>           dspi->dma.tx_channel = dma_tx_chan;
->> -        dspi->dma.eventq = dma_eventq;
->> +        dspi->dma.eventq = pdata->dma_event_q;
-> 
->    It makes sense to merge this patch with the patches 2 and 3 as otherwise the bisectability is prevented for DM3[56]5 -- their 'dma_event_q' field will be anonymously initialized to 0 after this patch but should be 1 and 3 instead correspondingly. Although, this doesn't seem to be a fatal defect, so the patches can be kept separate... Don't know what's better.
-> 
+> If it's complicated, then it probably won't work.  Keep it simple.
+> That's especially true for debugging code, otherwise you need extra
+> debugging code to debug why the debugging code doesn't work.
 
+There's another good reason to hard-configure the UART port rather
+than select it by ID.
 
-Barring any other comments, I will collapse the patches and resend.  
-I will correct the typo you mentioned above as well.
+The common usage scenario: you're bringing up a new board.  You know
+you're going to have your console connected to UART2.  So, no matter
+what you want your debug messages to come out of UART2 even if the
+machine ID is wrong.
 
-Thanks.
+By detecting the UART port from the machine number, you immediately
+lose that ability, and therefore the confidence, that "if I build the
+kernel for X with LL debug enabled, and monitor port Y, I will get
+messages out of port Y, and not some other random port Z which I'd to
+solder wires to to monitor."
 
--Mike
+In other words, no messages on the monitored port changes from "we didn't
+get into the kernel, or something early in the kernel boot before the C
+code went wrong" to "... or maybe the debugging code failed to get the
+right port too."
 
-
-> WBR, Sergei
+It is invaluable to know that the debugging code will always talk to
+the same UART which you're monitoring.
