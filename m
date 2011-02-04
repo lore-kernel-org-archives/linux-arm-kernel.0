@@ -1,36 +1,43 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri,  4 Feb 2011 14:20:10 +0000
-Subject: [PATCH] ARM: Thumb-2: Make CONFIG_OABI_COMPAT depend on
-	!CONFIG_THUMB2_KERNEL
-Message-ID: <1296829210-21259-1-git-send-email-dave.martin@linaro.org>
+Date: Fri,  4 Feb 2011 14:20:43 +0000
+Subject: [PATCH] ARM: Define wfi(), wfe(), sev() macros for pre-v7 processors
+Message-ID: <1296829243-21313-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rmk says: "You might as well make OABI_COMPAT depend on !THUMB2_KERNEL.
-OABI userland is useless without FPA support."
+Pre-v7 processors don't have wfe/sev, so these are defined for
+consistency as empty barrier asms.
 
-nwfpe doesn't work with Thumb-2 anyway and will probably never get
-ported, so I can't argue with that.
+For v6, wfi is architected as a defined MCR instruction, so
+use that definition.
 
-This patch implements the dependency change.
+Doing a no-op instead of wfi() is probably bad, so for older
+processors than v6, wfi() is not defined.  If needed, some CPU-
+specific wfi() will have to be defined elsewhere.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/system.h |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5cff165..26d45e5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1391,7 +1391,7 @@ config AEABI
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 97f6d60..0e1cae3 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -129,7 +129,14 @@ extern unsigned int user_debug;
+ #define sev()	__asm__ __volatile__ ("sev" : : : "memory")
+ #define wfe()	__asm__ __volatile__ ("wfe" : : : "memory")
+ #define wfi()	__asm__ __volatile__ ("wfi" : : : "memory")
++#else /* __LINUX_ARM_ARCH__ < 7 */
++#define sev()	__asm__ __volatile__ ("" : : : "memory")
++#define wfe()	__asm__ __volatile__ ("" : : : "memory")
++#if __LINUX_ARM_ARCH__ == 6
++#define wfi()	__asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++					: : "r" (0) : "memory")
+ #endif
++#endif /* __LINUX_ARM_ARCH__ < 7 */
  
- config OABI_COMPAT
- 	bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
--	depends on AEABI && EXPERIMENTAL
-+	depends on AEABI && EXPERIMENTAL && !THUMB2_KERNEL
- 	default y
- 	help
- 	  This option preserves the old syscall interface along with the
+ #if __LINUX_ARM_ARCH__ >= 7
+ #define isb() __asm__ __volatile__ ("isb" : : : "memory")
 -- 
 1.7.1
