@@ -1,99 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 12:05:25 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <AANLkTinB7jin5jDyNdTJYN2DZdTA3iJFvGJtsmtCUNsE@mail.gmail.com>
-References: <20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<4D48741F.8060006@codeaurora.org>
-	<20110201212409.GU31216@n2100.arm.linux.org.uk>
-	<20110204095424.GB2347@richard-laptop>
-	<20110204104832.GE14627@n2100.arm.linux.org.uk>
-	<AANLkTi=sfBTHLXejWxAWGa=Tcw+LoQfw6sUtcn6L+JeM@mail.gmail.com>
-	<20110204111841.GG14627@n2100.arm.linux.org.uk>
-	<AANLkTinB7jin5jDyNdTJYN2DZdTA3iJFvGJtsmtCUNsE@mail.gmail.com>
-Message-ID: <20110204120525.GH14627@n2100.arm.linux.org.uk>
+From: segoon@openwall.com (Vasiliy Kulikov)
+Date: Fri, 4 Feb 2011 15:22:29 +0300
+Subject: [PATCH 00/20] world-writable files in sysfs and debugfs
+Message-ID: <cover.1296818921.git.segoon@openwall.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 08:51:15PM +0900, Jassi Brar wrote:
-> On Fri, Feb 4, 2011 at 8:18 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Feb 04, 2011 at 08:04:03PM +0900, Jassi Brar wrote:
-> >> On Fri, Feb 4, 2011 at 7:48 PM, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >>
-> >> > int clk_enable(struct clk *clk)
-> >> > {
-> >> > ? ? ? ?unsigned long flags;
-> >> > ? ? ? ?int ret = 0;
-> >> >
-> >> > ? ? ? ?if (clk) {
-> >> > ? ? ? ? ? ? ? ?if (WARN_ON(!clk->prepare_count))
-> >> > ? ? ? ? ? ? ? ? ? ? ? ?return -EINVAL;
-> >> >
-> >> > ? ? ? ? ? ? ? ?spin_lock_irqsave(&clk->lock, flags);
-> >> > ? ? ? ? ? ? ? ?if (clk->enable_count++ == 0)
-> >> > ? ? ? ? ? ? ? ? ? ? ? ?ret = clk->ops->enable(clk);
-> >> > ? ? ? ? ? ? ? ?spin_unlock_irqrestore(&clk->lock, flags);
-> >> > ? ? ? ?}
-> >> > ? ? ? ?return ret;
-> >> > }
-> >> >
-> >> > is entirely sufficient to catch the case of a single-use clock not being
-> >> > prepared before clk_enable() is called.
-> >> >
-> >> > We're after detecting drivers missing calls to clk_prepare(), we're not
-> >> > after detecting concurrent calls to clk_prepare()/clk_unprepare().
-> >>
-> >> I hope you mean 'making sure the clock is prepared before it's enabled
-> >> ' rather than
-> >> 'catching a driver that doesn't do clk_prepare before clk_enable'.
-> >> Because, the above implementation still doesn't catch a driver that
-> >> doesn't call clk_prepare
-> >> but simply uses a clock that happens to have been already prepare'd by
-> >> some other
-> >> driver or the platform.
-> >
-> > No, I mean what I said.
-> Then, how does that function catch a driver that, say, doesn't do clk_prepare
-> but share the clk with another already active driver?
+The search was made with trivial shell commands:
 
-As per the code I just supplied!
+find | xargs grep S_IWUGO
+find | xargs grep S_IWOTH
 
-> Because you said - "We're after detecting drivers missing calls to
-> clk_prepare()"
-> 
-> The point is, there is difference between detecting drivers that miss
-> the clk_prepare
-> and ensuring clk_prepare has been called before any call to
-> clk_enable. And making
-> that clear helps get rid of lots of confusion/misunderstanding. Uwe
-> seems to have
-> had similar confusions.
+I didn't precisely investigate how exactly one may damage the
+system/hardware because of issues number, maybe the harm is very limited
+in case of some of these drivers.
 
-As I said on the 1st February.
+One suspicious file is ./staging/speakup/speakup.h, but it explitly calls
+macros as world-writable.  I didn't check what speakup's world-writable
+files provide because it requires some knowledge about the hardware.
 
-> > The only way to do what you're asking is to attach a list of identifiers
-> > which have prepared a clock to the struct clk, where each identifier is
-> > unique to each driver instance.
-> I am not asking what you think.
-> In my second last post, I am rather asking the other way around - that
-> let us not worry
-> about drivers missing the clk_prepare and not try to catch those by the
-> new API.
 
-No.  That means we have no way to flag a call to clk_enable on an
-unprepared clock, and will lead to unexplained system lockups.  What
-I've been suggesting all along is the "best efforts" approach.  I'm
-sorry you can't see that, but that's really not my problem.
+Vasiliy Kulikov (20):
+  mach-omap2: mux: world-writable debugfs files
+  mach-omap2: pm: world-writable debugfs timer files
+  mach-omap2: smartreflex: world-writable debugfs voltage files
+  mach-ux500: mbox-db5500: world-writable sysfs fifo file
+  leds: lp5521: world-writable sysfs engine* files
+  leds: lp5523: world-writable engine* sysfs files
+  video: sn9c102: world-wirtable sysfs files
+  mfd: ab3100: world-writable debugfs *_priv files
+  mfd: ab3500: world-writable debugfs register-* files
+  mfd: ab8500: world-writable debugfs register-* files
+  misc: ep93xx_pwm: world-writable sysfs files
+  net: can: at91_can: world-writable sysfs files
+  net: can: janz-ican3: world-writable sysfs termination file
+  platform: x86: acer-wmi: world-writable sysfs threeg file
+  platform: x86: asus_acpi: world-writable procfs files
+  platform: x86: tc1100-wmi: world-writable sysfs wireless and jogdial files
+  rtc: rtc-ds1511: world-writable sysfs nvram file
+  scsi: aic94xx: world-writable sysfs update_bios file
+  scsi: iscsi: world-writable sysfs priv_sess file
+  fs: ubifs: world-writable debugfs dump_* files
 
-> > I think that's going completely over the top, and adds needless complexity
-> > to drivers, which now have to pass an instance specific cookie into every
-> > clk API call.
-> Exactly.
-> All we need is to ensure clk_prepare has been called atleast once before
-> any call to clk_enable.
+ arch/arm/mach-omap2/mux.c                  |    2 +-
+ arch/arm/mach-omap2/pm-debug.c             |    8 ++++----
+ arch/arm/mach-omap2/smartreflex.c          |    4 ++--
+ arch/arm/mach-ux500/mbox-db5500.c          |    2 +-
+ drivers/leds/leds-lp5521.c                 |   14 +++++++-------
+ drivers/leds/leds-lp5523.c                 |   20 ++++++++++----------
+ drivers/media/video/sn9c102/sn9c102_core.c |    6 +++---
+ drivers/mfd/ab3100-core.c                  |    4 ++--
+ drivers/mfd/ab3550-core.c                  |    6 +++---
+ drivers/mfd/ab8500-debugfs.c               |    6 +++---
+ drivers/misc/ep93xx_pwm.c                  |    6 +++---
+ drivers/net/can/at91_can.c                 |    2 +-
+ drivers/net/can/janz-ican3.c               |    2 +-
+ drivers/platform/x86/acer-wmi.c            |    2 +-
+ drivers/platform/x86/asus_acpi.c           |    8 +-------
+ drivers/platform/x86/tc1100-wmi.c          |    2 +-
+ drivers/rtc/rtc-ds1511.c                   |    2 +-
+ drivers/scsi/aic94xx/aic94xx_init.c        |    2 +-
+ drivers/scsi/scsi_transport_iscsi.c        |    2 +-
+ fs/ubifs/debug.c                           |    6 +++---
+ 20 files changed, 50 insertions(+), 56 deletions(-)
 
-I described this fully in my reply to Stephen Boyd on 1st February,
-which is a parent to this sub-thread.
+--
+Vasiliy Kulikov
+http://www.openwall.com - bringing security into open computing environments
