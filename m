@@ -1,30 +1,20 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Fri,  4 Feb 2011 19:34:55 +0200
-Subject: [PATCH] ep93xx: correct the end address of the AC97 memory resource
-Message-ID: <1296840895-21410-1-git-send-email-mika.westerberg@iki.fi>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 4 Feb 2011 11:39:42 -0600
+Subject: [PATCH] ep93xx: correct the end address of the AC97 memory
+	resource
+In-Reply-To: <1296840895-21410-1-git-send-email-mika.westerberg@iki.fi>
+References: <1296840895-21410-1-git-send-email-mika.westerberg@iki.fi>
+Message-ID: <0D753D10438DA54287A00B027084269764CF0C45E3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last register is at offset 0xa8 making the resource end to be 0xac - 1
-instead of 0xb0 - 1.
+On Friday, February 04, 2011 10:35 AM, Mika Westerberg wrote:
+>
+> The last register is at offset 0xa8 making the resource end to be 0xac - 1
+> instead of 0xb0 - 1.
+>
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
----
- arch/arm/mach-ep93xx/core.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Verified.  Thanks for fixing this.
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index ffdf87b..8207954 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -838,7 +838,7 @@ EXPORT_SYMBOL(ep93xx_i2s_release);
- static struct resource ep93xx_ac97_resources[] = {
- 	{
- 		.start	= EP93XX_AAC_PHYS_BASE,
--		.end	= EP93XX_AAC_PHYS_BASE + 0xb0 - 1,
-+		.end	= EP93XX_AAC_PHYS_BASE + 0xac - 1,
- 		.flags	= IORESOURCE_MEM,
- 	},
- 	{
--- 
-1.7.2.3
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
