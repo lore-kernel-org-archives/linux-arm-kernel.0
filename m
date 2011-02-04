@@ -1,43 +1,33 @@
 From: segoon@openwall.com (Vasiliy Kulikov)
-Date: Fri,  4 Feb 2011 15:23:20 +0300
-Subject: [PATCH 03/20] mach-omap2: smartreflex: world-writable debugfs voltage
-	files
+Date: Fri,  4 Feb 2011 15:23:23 +0300
+Subject: [PATCH 04/20] mach-ux500: mbox-db5500: world-writable sysfs fifo file
 In-Reply-To: <cover.1296818921.git.segoon@openwall.com>
 References: <cover.1296818921.git.segoon@openwall.com>
-Message-ID: <96a2b24548af3a68fde712c68b49e856e53ea1fc.1296818921.git.segoon@openwall.com>
+Message-ID: <9c62a32115db2dd9aec1d5b078a2a77e53dfafeb.1296818921.git.segoon@openwall.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't allow everybody to change voltage settings.
+Don't allow everybody to use a modem.
 
 Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
 ---
  Cannot compile the driver, so it is not tested at all.
 
- arch/arm/mach-omap2/smartreflex.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-ux500/mbox-db5500.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index c37e823..95ac336 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -900,7 +900,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		return PTR_ERR(dbg_dir);
- 	}
+diff --git a/arch/arm/mach-ux500/mbox-db5500.c b/arch/arm/mach-ux500/mbox-db5500.c
+index cbf1571..402c00d 100644
+--- a/arch/arm/mach-ux500/mbox-db5500.c
++++ b/arch/arm/mach-ux500/mbox-db5500.c
+@@ -168,7 +168,7 @@ static ssize_t mbox_read_fifo(struct device *dev,
+ 	return sprintf(buf, "0x%X\n", mbox_value);
+ }
  
--	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUGO, dbg_dir,
-+	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR, dbg_dir,
- 				(void *)sr_info, &pm_sr_fops);
- 	(void) debugfs_create_x32("errweight", S_IRUGO, dbg_dir,
- 			&sr_info->err_weight);
-@@ -939,7 +939,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 		strcpy(name, "volt_");
- 		sprintf(volt_name, "%d", volt_data[i].volt_nominal);
- 		strcat(name, volt_name);
--		(void) debugfs_create_x32(name, S_IRUGO | S_IWUGO, nvalue_dir,
-+		(void) debugfs_create_x32(name, S_IRUGO | S_IWUSR, nvalue_dir,
- 				&(sr_info->nvalue_table[i].nvalue));
- 	}
+-static DEVICE_ATTR(fifo, S_IWUGO | S_IRUGO, mbox_read_fifo, mbox_write_fifo);
++static DEVICE_ATTR(fifo, S_IWUSR | S_IRUGO, mbox_read_fifo, mbox_write_fifo);
  
+ static int mbox_show(struct seq_file *s, void *data)
+ {
 -- 
 1.7.0.4
