@@ -1,141 +1,67 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 4 Feb 2011 20:45:34 +0800
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <201102011711.31258.jeremy.kerr@canonical.com>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-Message-ID: <20110204124534.GA2597@richard-laptop>
+From: sourav.poddar@ti.com (Poddar, Sourav)
+Date: Fri, 4 Feb 2011 18:29:23 +0530
+Subject: [PATCH v3 2/2] Input: ads7846: use gpio_request_one to configure
+	pendown_gpio
+In-Reply-To: <20110203171953.GA13997@core.coreip.homeip.net>
+References: <1296746506-12221-1-git-send-email-sourav.poddar@ti.com>
+	<20110203165405.GB12802@core.coreip.homeip.net>
+	<20110203171953.GA13997@core.coreip.homeip.net>
+Message-ID: <AANLkTi=xhKxLooW2BraibKYv=0Ju_so1P2UyW5YFUOVY@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 05:11:29PM +0800, Jeremy Kerr wrote:
-> Hi all,
-> 
-> > I suggested that clk_prepare() be callable only from non-atomic contexts,
-> > and do whatever's required to ensure that the clock is available.  That
-> > may end up enabling the clock as a result.
-> 
-> I think that clk_prepare/clk_unprepare looks like the most promising solution, 
-> so will try to get some preliminary patches done. Here's what I'm planning:
-> 
-> -----
-> 
-> The changes to the API are essentially:
-> 
-> 1) Document clk_enable/clk_disable as callable from atomic contexts, and
->    so clock implementations must not sleep within this function.
-> 
-> 2) For clock implementations that may sleep to turn on a clock, we add a
->    new pair of functions to the clock API: clk_prepare and clk_unprepare.
-> 
->    These will provide hooks for the clock implmentation to do any sleepable
->    work (eg, wait for PLLs to settle) in preparation for a later clk_enable.
-> 
->    For the most common clock implemntation cases (where clocks can be enabled 
->    atomically), these functions will be a no-op, and all of the enable/disable
->    work can be done in clk_enable/clk_disable.
-> 
->    For implementations where clocks require blocking on enable/disable, most
->    of the work will be done in clk_prepare/clk_unprepare. The clk_enable
->    and clk_disable functions may be no-ops.
-> 
-> For drivers, this means that clk_prepare must be called (and have returned) 
-> before calling clk_enable.
-> 
-> == Enable/Prepare counts ==
-> 
-> I intend to do the enable and prepare "counting" in the core clock API, 
-> meaning that that the clk_ops callbacks will only invoked on the first 
-> prepare/enable and the last unprepare/disable.
-> 
-> == Concurrency ==
-> 
-> Splitting the prepare and enable stages introduces the concurrency 
-> requirements:
-> 
-> 1) clk_enable must not return before the clock is outputting a valid clock 
->    signal.
-> 
-> 2) clk_prepare must not return before the clock is fully prepared (ie, it is 
->    safe to call clk_enable).
-> 
-> It is not possible for clk_enable to wait for the clock to be prepared, 
-> because that would require synchronisation with clk_prepare, which may then 
-> require blocking. Therefore:
-> 
-> 3) The clock consumer *must* respect the proper ordering of clk_prepare and 
->    clk_enable. For example, drivers that call clk_enable during an interrupt 
->    must ensure that the interrupt handler will not be invoked until 
->    clk_prepare has returned.
-> 
-> == Other considerations ==
-> 
-> The time that a clock spends "prepared" is a superset of the the time that a 
-> clock spends "enabled". Therefore, clocks that are switched on during 
-> clk_prepare (ie, non-atomic clocks) will be running for a larger amount of 
-> time. In some cases, this can be mitigated by moving some of the final 
-> (atomic) switching functionality to the clk_enable function.
-> 
-> == Implementation ==
-> 
-> Basically:
-> 
-> struct clk {
-> 	const struct clk_ops *ops
-> 	int                  enable_count;
-> 	spinlock_t           enable_lock;
-> 	int                  prepare_count;
-> 	struct mutex         prepare_lock;
-> };
-> 
-> int clk_enable(struct clk *clk)
-> {
-> 	int ret = 0;
-> 
-> 	spin_lock(&clk->enable_lock);
-> 	if (!clk->enable_count)
-> 		ret = clk->ops->enable(clk);
-> 
-> 	if (!ret)
-> 		clk->enable_count++;
-> 	spin_unlock(&clk->enable_lock);
-> 
-> 	return ret;
-> }
-Why do we not call parent's clk_enable in this function? For flexible? How many
-different cases is causing us to move the effert to platform clock driver?
-> 
-> int clk_prepare(struct clk *clk)
-> {
-> 	int ret = 0;
-> 
-> 	mutex_lock(&clk->prepare_lock);
-> 	if (!clk->prepare_count)
-> 		ret = clk->ops->prepare(clk);
-> 
-> 	if (!ret)
-> 		clk->prepare_count++;
-> 	mutex_unlock(&clk->prepare_lock);
-> 
-> 	return ret;
-> }
-Same as above.
-And for most clocks, prepare/unprepare may be NULL. So in such case, is it
-better to call parent's prepare and increase its own prepare_count here?
+On Thu, Feb 3, 2011 at 10:49 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Thu, Feb 03, 2011 at 08:54:05AM -0800, Dmitry Torokhov wrote:
+>> On Thu, Feb 03, 2011 at 08:51:46PM +0530, Sourav Poddar wrote:
+>> > The ads7846 driver requests a gpio but does not currently
+>> > configure it explicitly as an input. Use gpio_request_one
+>> > to request and configure it at one shot.
+>> >
+>> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> > Cc: Dmitry Torokhov <dtor@mail.ru>
+>>
+>> Will apply this one, the other one is a bit messy IMO, will have to
+>> think about it.
+>>
+>
+> Something like below should do I think.
+>
+> --
+> Dmitry
+>
+>
+> Input: ads7846 - check proper condition when freeing gpio
+>
+> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> When driver uses custom pendown detection method gpio_pendown is not
+> set up and so we should not try to free it, otherwise we are presented
+> with:
+>
+> ------------[ cut here ]------------
+> WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
+> Modules linked in:
+> [<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>](warn_slowpath_common+0x4c/0x64)
+> [<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>](warn_slowpath_null+0x18/0x1c)
+> [<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>](gpio_free+0x100/0x12c)
+> [<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>](ads7846_probe+0xa38/0xc5c)
+> [<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>](spi_drv_probe+0x18/0x1c)
+> [<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>](driver_probe_device+0xc8/0x184)
+> [<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>](__driver_attach+0x68/0x8c)
+> [<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>](bus_for_each_dev+0x48/0x74)
+> [<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>](bus_add_driver+0xa0/0x220)
+> [<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>](driver_register+0xa8/0x134)
+> [<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>](do_one_initcall+0xcc/0x1a4)
+> [<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>](kernel_init+0x14c/0x214)
+> [<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>](kernel_thread_exit+0x0/0x8)
+> ---[ end trace 4053287f8a5ec18f ]---
+>
+> Also rearrange ads7846_setup_pendown() to have only one exit point
+> returning success.
+>
+> Reported-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+> ---
 
-Thanks
-Richard
-> 
-> -----
-> 
-> Comments welcome, code coming soon.
-> 
-> Cheers,
-> 
-> 
-> Jeremy
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Sourav Poddar <sourav.poddar@ti.com>
