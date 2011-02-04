@@ -1,69 +1,103 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri,  4 Feb 2011 15:29:04 +0530
-Subject: [PATCH v2 9/9] omap4: clockdomain: Fix the CPUx domain name
+Date: Fri,  4 Feb 2011 15:29:00 +0530
+Subject: [PATCH v2 5/9] omap: clocks: Add allow_idle/deny_idle support in
+	clkops
 In-Reply-To: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1296813544-25170-10-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1296813544-25170-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benoit Cousson <b-cousson@ti.com>
+From: Rajendra Nayak <rnayak@ti.com>
 
-The register naming convention for clock domain control inside
-power domain instance is:
-OMAPXXXX_<partition>_<power_domain>_<clock_domain>_CDOFFS
+On OMAP various clock nodes (dpll's, mx post dividers, interface clocks)
+support hardware level autogating which can be controlled from
+software.
+Support such functionality by adding two new function pointer
+allow_idle and deny_idle in the clkops structure.
 
-Both CPU0 and CPU1 use MPU as clock domain name instead of CPU0
-and CPU1.
+These function pointers can be populated for any clock
+node which supports hardware level autogating.
 
-Change the name to stick to the convention.
-The autogen scripts are updated accordingly.
+Also add 2 new functions (omap_clk_enable_auotidle and
+omap_clk_disable_autoidle) which can be called from
+architecture specific PM core code, if hardware level
+autogating (for all supported clock nodes) is to be
+enabled or disabled.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/clockdomains44xx_data.c |    4 ++--
- arch/arm/mach-omap2/prcm_mpu44xx.h          |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/plat-omap/clock.c              |   26 ++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/clock.h |    6 ++++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-index 51920fc..db1f442 100644
---- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-@@ -152,7 +152,7 @@ static struct clockdomain mpu0_44xx_clkdm = {
- 	.pwrdm		  = { .name = "cpu0_pwrdm" },
- 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
- 	.cm_inst	  = OMAP4430_PRCM_MPU_CPU0_INST,
--	.clkdm_offs	  = OMAP4430_PRCM_MPU_CPU0_MPU_CDOFFS,
-+	.clkdm_offs	  = OMAP4430_PRCM_MPU_CPU0_CPU0_CDOFFS,
- 	.flags		  = CLKDM_CAN_FORCE_WAKEUP | CLKDM_CAN_HWSUP,
- 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
- };
-@@ -162,7 +162,7 @@ static struct clockdomain mpu1_44xx_clkdm = {
- 	.pwrdm		  = { .name = "cpu1_pwrdm" },
- 	.prcm_partition	  = OMAP4430_PRCM_MPU_PARTITION,
- 	.cm_inst	  = OMAP4430_PRCM_MPU_CPU1_INST,
--	.clkdm_offs	  = OMAP4430_PRCM_MPU_CPU1_MPU_CDOFFS,
-+	.clkdm_offs	  = OMAP4430_PRCM_MPU_CPU1_CPU1_CDOFFS,
- 	.flags		  = CLKDM_CAN_FORCE_WAKEUP | CLKDM_CAN_HWSUP,
- 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
- };
-diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
-index 3300ff6..d22d1b4 100644
---- a/arch/arm/mach-omap2/prcm_mpu44xx.h
-+++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
-@@ -38,8 +38,8 @@
- #define OMAP4430_PRCM_MPU_CPU1_INST		0x0800
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index fc62fb5..6889c5a 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -335,6 +335,32 @@ struct clk *omap_clk_get_by_name(const char *name)
+ 	return ret;
+ }
  
- /* PRCM_MPU clockdomain register offsets (from instance start) */
--#define OMAP4430_PRCM_MPU_CPU0_MPU_CDOFFS	0x0018
--#define OMAP4430_PRCM_MPU_CPU1_MPU_CDOFFS	0x0018
-+#define OMAP4430_PRCM_MPU_CPU0_CPU0_CDOFFS	0x0018
-+#define OMAP4430_PRCM_MPU_CPU1_CPU1_CDOFFS	0x0018
- 
- 
++void omap_clk_enable_autoidle(void)
++{
++	struct clk *c;
++
++	mutex_lock(&clocks_mutex);
++
++	list_for_each_entry(c, &clocks, node)
++		if (c->ops->allow_idle)
++			c->ops->allow_idle(c);
++
++	mutex_unlock(&clocks_mutex);
++}
++
++void omap_clk_disable_autoidle(void)
++{
++	struct clk *c;
++
++	mutex_lock(&clocks_mutex);
++
++	list_for_each_entry(c, &clocks, node)
++		if (c->ops->deny_idle)
++			c->ops->deny_idle(c);
++
++	mutex_unlock(&clocks_mutex);
++}
++
  /*
+  * Low level helpers
+  */
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 8eb0ada..167f1e0 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -25,6 +25,8 @@ struct clockdomain;
+  * @disable: fn ptr that enables the current clock in hardware
+  * @find_idlest: function returning the IDLEST register for the clock's IP blk
+  * @find_companion: function returning the "companion" clk reg for the clock
++ * @allow_idle: fn ptr that enables autoidle for the current clock in hardware
++ * @deny_idle: fn ptr that disables autoidle for the current clock in hardware
+  *
+  * A "companion" clk is an accompanying clock to the one being queried
+  * that must be enabled for the IP module connected to the clock to
+@@ -42,6 +44,8 @@ struct clkops {
+ 					       u8 *, u8 *);
+ 	void			(*find_companion)(struct clk *, void __iomem **,
+ 						  u8 *);
++	void			(*allow_idle)(struct clk *);
++	void			(*deny_idle)(struct clk *);
+ };
+ 
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+@@ -292,6 +296,8 @@ extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
+ extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
+ #endif
+ extern struct clk *omap_clk_get_by_name(const char *name);
++extern void omap_clk_enable_autoidle(void);
++extern void omap_clk_disable_autoidle(void);
+ 
+ extern const struct clkops clkops_null;
+ 
 -- 
 1.6.0.4
