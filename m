@@ -1,57 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 4 Feb 2011 16:17:07 +0530
-Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on
-	!CONFIG_THUMB2_KERNEL
-In-Reply-To: <1291895982-4775-3-git-send-email-dave.martin@linaro.org>
-References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
-	<1291895982-4775-3-git-send-email-dave.martin@linaro.org>
-Message-ID: <80d490aede945bdbb95cbf073cb9d846@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Feb 2011 10:48:32 +0000
+Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
+In-Reply-To: <20110204095424.GB2347@richard-laptop>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<20110201105449.GY1147@pengutronix.de>
+	<20110201131512.GH31216@n2100.arm.linux.org.uk>
+	<20110201141837.GA1147@pengutronix.de>
+	<20110201143932.GK31216@n2100.arm.linux.org.uk>
+	<20110201151846.GD1147@pengutronix.de>
+	<20110201152458.GP31216@n2100.arm.linux.org.uk>
+	<4D48741F.8060006@codeaurora.org>
+	<20110201212409.GU31216@n2100.arm.linux.org.uk>
+	<20110204095424.GB2347@richard-laptop>
+Message-ID: <20110204104832.GE14627@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Dave Martin [mailto:dave.martin at linaro.org]
-> Sent: Thursday, December 09, 2010 5:30 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Dave Martin; Santosh Shilimkar; linux-omap at vger.kernel.org
-> Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on
-> !CONFIG_THUMB2_KERNEL
+On Fri, Feb 04, 2011 at 05:54:24PM +0800, Richard Zhao wrote:
+> On Tue, Feb 01, 2011 at 09:24:09PM +0000, Russell King - ARM Linux wrote:
+> > You can't catch enable/disable imbalances in the prepare code, and you
+> > can't really catch them in the unprepare code either.
+> > 
+> > Consider two drivers sharing the same struct clk.  When the second driver
+> > prepares the clock, the enable count could well be non-zero, caused by
+> > the first driver.  Ditto for when the second driver is removed, and it
+> > calls unprepare - the enable count may well be non-zero.
+> > 
+> > The only thing you can check is that when the prepare count is zero,
+> > the enable count is also zero.  You can also check in clk_enable() and
+> > clk_disable() that the prepare count is non-zero.
 >
-> Because the nwfpe support is unlikely to be used on new platforms
-> and requires CONFIG_OABI_COMPAT, which is not generally used with
-> ARMv7+, we shouldn't expect to build nwfpe support into a Thumb-2
-> kernel.
->
-> At present, nwfpe contains assembly code which isn't Thumb-2
-> compatible, and for now it doesn't appear useful to port this
-> code.
->
-> All ARMv7-A/R platforms necessarily have VFPv3 hardware floating-
-> point natively, making emulation unnecessary.
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>`
+> but how can we check prepare count without mutex lock? Even if prepare count
+> is atomic_t, it can not guarantee the clock is actually prepared or unprepared.
+> So it's important for driver writer to maintain the call sequence.
 
->  arch/arm/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f9ca7f3..7e825c3 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1759,7 +1759,7 @@ comment "At least one emulation must be
-> selected"
->
->  config FPE_NWFPE
->  	bool "NWFPE math emulation"
-> -	depends on !AEABI || OABI_COMPAT
-> +	depends on (!AEABI || OABI_COMPAT) && !THUMB2_KERNEL
->  	---help---
->  	  Say Y to include the NWFPE floating point emulator in the
-> kernel.
->  	  This is necessary to run most binaries. Linux does not
-> currently
-> --
-> 1.7.1
+Forget atomic_t - it's the most abused type in the kernel.  Just because
+something says its atomic doesn't make it so.  In a use like this,
+atomic_t just buys you additional needless complexity with no benefit.
+
+Of course we can check the prepared count.  What we can't do is check
+that it doesn't change concurrently - but that's something we can't do
+anyway.
+
+int clk_enable(struct clk *clk)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	if (clk) {
+		if (WARN_ON(!clk->prepare_count))
+			return -EINVAL;
+
+		spin_lock_irqsave(&clk->lock, flags);
+		if (clk->enable_count++ == 0)
+			ret = clk->ops->enable(clk);
+		spin_unlock_irqrestore(&clk->lock, flags);
+	}
+	return ret;
+}
+
+is entirely sufficient to catch the case of a single-use clock not being
+prepared before clk_enable() is called.
+
+We're after detecting drivers missing calls to clk_prepare(), we're not
+after detecting concurrent calls to clk_prepare()/clk_unprepare().
