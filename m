@@ -1,52 +1,109 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 04 Feb 2011 15:33:52 -0500 (EST)
-Subject: [PATCH 3/5] omap: Add support for CONFIG_AUTO_ZRELADDR for
-	DEBUG_LL
-In-Reply-To: <20110204202411.GA20795@atomide.com>
-References: <20110204012317.26410.55157.stgit@baageli.muru.com>
-	<20110204012709.26410.78100.stgit@baageli.muru.com>
-	<alpine.LFD.2.00.1102032205140.12104@xanadu.home>
-	<20110204170249.GV3322@atomide.com>
-	<alpine.LFD.2.00.1102041445360.12104@xanadu.home>
-	<20110204202411.GA20795@atomide.com>
-Message-ID: <alpine.LFD.2.00.1102041529250.12104@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 04 Feb 2011 14:28:49 -0800
+Subject: [PATCH v6 0/6] OMAP: McSPI: Hwmod adaptation + runtime conversion
+In-Reply-To: <1296649335-31756-1-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Wed, 2 Feb 2011 17:52:09 +0530")
+References: <1296649335-31756-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <878vxvl9i6.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Feb 2011, Tony Lindgren wrote:
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-> * Nicolas Pitre <nico@fluxnic.net> [110204 12:14]:
-> > 
-> > Just create a get_config_ptr macro or similar and the trickery will be 
-> > nicely encapsulated.  You'd have:
-> > 
-> > 	.macro get_config_ptr ptr, tmp
-> > 	b	9002f
-> > 	.align
-> > 9001:	.long	.
-> > 	.long	uart_param_storage
-> > 9002:	adr	\ptr, 9001b
-> > 	ldr	\tmp, [\ptr]
-> > 	sub	\tmp, \tmp, \ptr
-> > 	ldr	\ptr, [\ptr, #4]
-> > 	sub	\ptr, \ptr, \tmp
-> > 	.endm
-> > 
-> > 	.macro addruart rp, rv
-> > 	get_config_ptr \rv
-> > 	ldr	\rp, [\rv]
-> > 	ldr	\rv, [\rv, #4]
-> > 	.endm
-> > 
-> > And for the other macros, you get the hardware address to use already, 
-> > but you can still use get_config_ptr for extra config values you 
-> > need if necessary.
-> 
-> Thanks, will try that out next week. That might run into problems with
-> busyuart as it only has rd register to play with.
+> Changes invloves:
+> ----------------
+> 1) Addition of hwmod data for omap2/3/4.
+> 2) McSPI driver hwmod adaptation with cleanup of base address
+>    macros and using omap-device API's.
+> 3) Runtime Conversion of McSPI driver.
+>
+> Changes from v5:
+> ---------------
+> Rebased on top of 2.6.38-rc3 as per Kevin's comments.
+> http://www.spinics.net/lists/arm-kernel/msg112112.html
 
-With some code auditing we could declare ip as being callee clobberable 
-with those macros.
+Thanks.
+
+Reviewed-by: Kevin Hilman <khilman@ti.com>
 
 
-Nicolas
+> Changes from v4:
+
+> 1) 4430 hwmod file alignment based on Benoit's comments.
+>    http://www.spinics.net/lists/arm-kernel/msg111215.html
+>    4430 Hwmod file now aligned based on:
+>    http://gitorious.org/omap-pm/linux/blobs/pm-wip/
+>    hwmods-omap4-full/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>
+> Changes from v3:
+> ---------------
+> 1) Updated proper Author for all patches which was missed
+>    in v2. 
+> 2) Modified 4430 hwmod data file so that mcspi data gets
+>    updated in proper alphabetical order.
+> 3) Update omap2/3 hwmod dat files with SYSS_HAS_RESET_STATUS
+>    flag.
+>
+> Changes from v2:
+> ---------------
+> 1) Fixing minor comments and adding ack from Grant Likely.
+> 	https://patchwork.kernel.org/patch/371321/
+> 	https://patchwork.kernel.org/patch/371331/
+>
+> Changes from v1:
+> ---------------
+> 1) Fixing patch 5/5 comments for hwmod+runtime
+>   Split the patch 5/5 to hwmod adaptation
+>   and then runtime conversion
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg33387.html
+>
+> Testing Updates:
+> ----------------
+> Was tested using data transfer test module available at:
+> http://dev.omapzoom.org/?p=richo/device_driver_test.git;a=blob;f=mcspi/test_code/
+> utils/mcspi_modules/omap_mcspi_datatest.c;
+> h=e42ec10c5c844abdde6a7175a268b379fbbdb655;
+> hb=5d9a755d50e58de861c5e8991f2f607bc49b5dc3
+> This test basically involves MISO <--> MOSI lines looped and data transfer test
+> done using the above test module.
+> System wide suspend and ret/off counts observation, ensured that no behavioral
+> difference with and without this patch series.
+>
+> Testing procedure involves:
+> ---------------------------
+> Loopback test based on SPI interface available from
+> board expansion connector.
+> MISO <---> MOSI
+>
+> Platforms used where:
+> --------------------
+> Using the above mentioned test module we had done some
+> data transfer tests.
+> 1) OMAP2430 SDP.
+> 2) OMAP3 (OMAP3430/3630SDP, ZOOM boards zoom2/3).
+> 3) OMAP4430 SDP.
+>    [Along with loopback test basic Ethernet functionality
+>    was checked which is over SPI interface].
+>    Blaze-Board(OMAP4430) Boot tested with ethernet interface.
+> 4) Boot tested on 2420/n800.
+>
+> Benoit Cousson (1):
+>   OMAP4: hwmod data: Add McSPI
+>
+> Charulatha V (4):
+>   OMAP2420: hwmod data: Add McSPI
+>   OMAP2430: hwmod data: Add McSPI
+>   OMAP3: hwmod data: Add McSPI
+>   OMAP: devices: Modify McSPI device to adapt to hwmod framework
+>
+> Govindraj.R (1):
+>   OMAP: runtime: McSPI driver runtime conversion
+>
+>  arch/arm/mach-omap2/devices.c              |  187 ++++---------------
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c |  156 ++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |  219 ++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  280 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  267 ++++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/mcspi.h    |   11 +
+>  drivers/spi/omap2_mcspi.c                  |  220 +++++++---------------
+>  7 files changed, 1040 insertions(+), 300 deletions(-)
