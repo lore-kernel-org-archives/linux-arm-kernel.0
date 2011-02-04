@@ -1,19 +1,26 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 4 Feb 2011 12:22:27 -0600
-Subject: [PATCH] EDB93xx: Add support for CS4271 SPI-connected CODEC
-In-Reply-To: <1296843601.14577.14.camel@r60e>
-References: <1296843601.14577.14.camel@r60e>
-Message-ID: <0D753D10438DA54287A00B027084269764CF0C46CF@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Feb 2011 10:36:02 -0800
+Subject: [PATCH 3/5] omap: Add support for CONFIG_AUTO_ZRELADDR for
+	DEBUG_LL
+In-Reply-To: <20110204171526.GA8821@n2100.arm.linux.org.uk>
+References: <20110204012317.26410.55157.stgit@baageli.muru.com>
+	<20110204012709.26410.78100.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1102032205140.12104@xanadu.home>
+	<20110204171526.GA8821@n2100.arm.linux.org.uk>
+Message-ID: <20110204183602.GW3322@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 04, 2011 11:20 AM, Alexander Sverdlin wrote:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110204 09:14]:
+> 
+> The other point to make is that for every machine in OMAP1, the
+> serial port is located at 0xffXXXXXX virtual, 0xfeXXXXXX physical.
+> For OMAP2, that's 0xfaXXXXXX virtual and 0x48XXXXXX physical.
 >
-> Add support for CS4271 SPI-connected CODEC to EDB93xx.
-> Modified according to latest comments by H Hartley Sweeten.
- >       
-> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
+> So it's pointless storing both the virtual and physical addresses
+> as we can compute one from the other with a single instruction.
+> That gets rid of some of the complexity found in the debugging code.
 
-Thanks!
+OK. The zoom boards have external 8250 on the GPMC bus.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tony
