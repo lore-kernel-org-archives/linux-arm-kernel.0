@@ -1,191 +1,266 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 4 Feb 2011 10:34:58 +0100
-Subject: [PATCH 15/19] mc13xxx: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110202202015.0fe392a9@queued.net>
-References: <20110202195417.228e2656@queued.net>
-	<20110202202015.0fe392a9@queued.net>
-Message-ID: <20110204093458.GH30452@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 4 Feb 2011 10:37:33 +0100 (CET)
+Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
+	in the irq handler
+In-Reply-To: <4D4BC4A7.2070905@tqsc.de>
+References: <1296031789-1721-3-git-send-email-agust@denx.de>
+	<1296476549-10421-1-git-send-email-agust@denx.de>
+	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
+	<4D4BC4A7.2070905@tqsc.de>
+Message-ID: <Pine.LNX.4.64.1102041035250.14717@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andres,
+Hi Markus
 
-On Wed, Feb 02, 2011 at 08:20:15PM -0800, Andres Salomon wrote:
+On Fri, 4 Feb 2011, Markus Niebel wrote:
+
+> Hello Guennadi, hello Anatolij
 > 
-> No need to explicitly set the cell's platform_data/data_size.
+> I've tried that with my setup:
 > 
-> In this case, move the various platform_data pointers
-> to driver_data.  All of the clients which make use of it
-> are also changed.
+> Hardware: i.MX35, special CCD camera over FPGA
+> Kernel: 2.6.34
 > 
-> Mfd-core makes a copy of platform_data, but driver_data keeps a pointer
-> to the original data.  Because each cell's platform_data previously
-> pointed to a local (stack) variable, the various ARM mach types that set
-> the pdata are updated to keep the memory around.
-I didn't get this even after reading it 5 times.  You wrote in the
-subject that drivers now have access to mfd_cell.  I don't see where
-e.g. drivers/leds/leds-mc13783.c uses that?!  Does this depend on some
-mfd-changes I don't see and this is just a first step?
+> patch v4l: soc-camera: start stream after queueing the buffers is applied and
+> our camera driver handles streamon / streamoff so that no sync signal / clock
+> is provided, when not streaming.
+> 
+> Our setup works with 4 buffers
+> 
+> What we see is as we would expect plus no difference with 1st buffer:
 
-After reading the changes I think I understood:
+But you haven't applied the patch, that my reply was actually referring to 
+- the change to ipu_idmac.c? I think, that's the one, killing the 
+double-buffering. But thanks for testing the streamon patch too!
 
- - You made things that were passed as platform_data before available
-   via driver_data.
- - Because platform_data is copied and driver_data is not at register
-   time, the data being platform_data cannot be __initdata or stack
-   local anymore, so this needs fixing.
+Thanks
+Guennadi
 
-In sum this results in .data becoming bigger (which is bad).
+> 
+> [  206.770000] i5ccdhb i5ccdhb.0: soc_i5ccdhb_s_stream - enable 1
+> [  207.350000] i5ccdhb i5ccdhb.0: i5ccdhb_streamon: fps (29.412)
+> [  207.370000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  207.410000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  207.440000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  207.470000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  207.540000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  207.580000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  207.610000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  207.650000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  207.680000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  207.710000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  207.750000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  207.780000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> ...
+> [  241.370000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  241.410000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  241.440000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  241.470000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  241.510000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  241.540000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  241.580000] idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> [  241.610000] idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> [  257.190000] i5ccdhb i5ccdhb.0: soc_i5ccdhb_s_stream - enable 0
+> 
+> 
+> 
+> Am 03.02.2011 11:09, schrieb Guennadi Liakhovetski:
+> > Hi Anatolij
+> > 
+> > On Mon, 31 Jan 2011, Anatolij Gustschin wrote:
+> > 
+> > I'm afraid there seems to be a problem with your patch. I have no idea
+> > what is causing it, but I'm just observing some wrong behaviour, that is
+> > not there without it. Namely, I added a debug print to the IDMAC interrupt
+> > handler
+> > 
+> >   	curbuf	= idmac_read_ipureg(&ipu_data, IPU_CHA_CUR_BUF);
+> >   	err	= idmac_read_ipureg(&ipu_data, IPU_INT_STAT_4);
+> > 
+> > +	printk(KERN_DEBUG "%s(): IDMAC irq %d, buf %d, current %d\n",
+> > __func__,
+> > +	       irq, ichan->active_buffer, (curbuf>>  chan_id)&  1);
+> > 
+> >   	if (err&  (1<<  chan_id)) {
+> >   		idmac_write_ipureg(&ipu_data, 1<<  chan_id, IPU_INT_STAT_4);
+> > 
+> > and without your patch I see buffer numbers correctly toggling all the
+> > time like
+> > 
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 1
+> > idmac_interrupt(): IDMAC irq 177, buf 1, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 1
+> > idmac_interrupt(): IDMAC irq 177, buf 1, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 1
+> > ...
+> > 
+> > Yes, the first interrupt is different, that's where I'm dropping /
+> > postponing it. With your patch only N (equal to the number of buffers
+> > used, I think) first interrupts toggle, then always only one buffer is
+> > used:
+> > 
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 1, current 1
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > idmac_interrupt(): IDMAC irq 177, buf 0, current 0
+> > ...
+> > 
+> > Verified with both capture.c and mplayer. Could you, please, verify
+> > whether you get the same behaviour and what the problem could be?
+> > 
+> > Thanks
+> > Guennadi
+> > 
+> > > Currently when two or more buffers are queued by the camera driver
+> > > and so the double buffering is enabled in the idmac, we lose one
+> > > frame comming from CSI since the reporting of arrival of the first
+> > > frame is deferred by the DMAIC_7_EOF interrupt handler and reporting
+> > > of the arrival of the last frame is not done at all. So when requesting
+> > > N frames from the image sensor we actually receive N - 1 frames in
+> > > user space.
+> > > 
+> > > The reason for this behaviour is that the DMAIC_7_EOF interrupt
+> > > handler misleadingly assumes that the CUR_BUF flag is pointing to the
+> > > buffer used by the IDMAC. Actually it is not the case since the
+> > > CUR_BUF flag will be flipped by the FSU when the FSU is sending the
+> > > <TASK>_NEW_FRM_RDY signal when new frame data is delivered by the CSI.
+> > > When sending this singal, FSU updates the DMA_CUR_BUF and the
+> > > DMA_BUFx_RDY flags: the DMA_CUR_BUF is flipped, the DMA_BUFx_RDY
+> > > is cleared, indicating that the frame data is beeing written by
+> > > the IDMAC to the pointed buffer. DMA_BUFx_RDY is supposed to be
+> > > set to the ready state again by the MCU, when it has handled the
+> > > received data. DMAIC_7_CUR_BUF flag won't be flipped here by the
+> > > IPU, so waiting for this event in the EOF interrupt handler is wrong.
+> > > Actually there is no spurious interrupt as described in the comments,
+> > > this is the valid DMAIC_7_EOF interrupt indicating reception of the
+> > > frame from CSI.
+> > > 
+> > > The patch removes code that waits for flipping of the DMAIC_7_CUR_BUF
+> > > flag in the DMAIC_7_EOF interrupt handler. As the comment in the
+> > > current code denotes, this waiting doesn't help anyway. As a result
+> > > of this removal the reporting of the first arrived frame is not
+> > > deferred to the time of arrival of the next frame and the drivers
+> > > software flag 'ichan->active_buffer' is in sync with DMAIC_7_CUR_BUF
+> > > flag, so the reception of all requested frames works.
+> > > 
+> > > This has been verified on the hardware which is triggering the
+> > > image sensor by the programmable state machine, allowing to
+> > > obtain exact number of frames. On this hardware we do not tolerate
+> > > losing frames.
+> > > 
+> > > This patch also removes resetting the DMA_BUFx_RDY flags of
+> > > all channels in ipu_disable_channel() since transfers on other
+> > > DMA channels might be triggered by other running tasks and the
+> > > buffers should always be ready for data sending or reception.
+> > > 
+> > > Signed-off-by: Anatolij Gustschin<agust@denx.de>
+> > > ---
+> > > v2:
+> > >      Revise the commit message to provide more and correct
+> > >      information about the observed problem and proposed fix
+> > > 
+> > >   drivers/dma/ipu/ipu_idmac.c |   50
+> > > -------------------------------------------
+> > >   1 files changed, 0 insertions(+), 50 deletions(-)
+> > > 
+> > > diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+> > > index cb26ee9..c1a125e 100644
+> > > --- a/drivers/dma/ipu/ipu_idmac.c
+> > > +++ b/drivers/dma/ipu/ipu_idmac.c
+> > > @@ -1145,29 +1145,6 @@ static int ipu_disable_channel(struct idmac *idmac,
+> > > struct idmac_channel *ichan,
+> > >   	reg = idmac_read_icreg(ipu, IDMAC_CHA_EN);
+> > >   	idmac_write_icreg(ipu, reg&  ~chan_mask, IDMAC_CHA_EN);
+> > > 
+> > > -	/*
+> > > -	 * Problem (observed with channel DMAIC_7): after enabling the channel
+> > > -	 * and initialising buffers, there comes an interrupt with current
+> > > still
+> > > -	 * pointing at buffer 0, whereas it should use buffer 0 first and only
+> > > -	 * generate an interrupt when it is done, then current should already
+> > > -	 * point to buffer 1. This spurious interrupt also comes on channel
+> > > -	 * DMASDC_0. With DMAIC_7 normally, is we just leave the ISR after the
+> > > -	 * first interrupt, there comes the second with current correctly
+> > > -	 * pointing to buffer 1 this time. But sometimes this second interrupt
+> > > -	 * doesn't come and the channel hangs. Clearing BUFx_RDY when
+> > > disabling
+> > > -	 * the channel seems to prevent the channel from hanging, but it
+> > > doesn't
+> > > -	 * prevent the spurious interrupt. This might also be unsafe. Think
+> > > -	 * about the IDMAC controller trying to switch to a buffer, when we
+> > > -	 * clear the ready bit, and re-enable it a moment later.
+> > > -	 */
+> > > -	reg = idmac_read_ipureg(ipu, IPU_CHA_BUF0_RDY);
+> > > -	idmac_write_ipureg(ipu, 0, IPU_CHA_BUF0_RDY);
+> > > -	idmac_write_ipureg(ipu, reg&  ~(1UL<<  channel), IPU_CHA_BUF0_RDY);
+> > > -
+> > > -	reg = idmac_read_ipureg(ipu, IPU_CHA_BUF1_RDY);
+> > > -	idmac_write_ipureg(ipu, 0, IPU_CHA_BUF1_RDY);
+> > > -	idmac_write_ipureg(ipu, reg&  ~(1UL<<  channel), IPU_CHA_BUF1_RDY);
+> > > -
+> > >   	spin_unlock_irqrestore(&ipu->lock, flags);
+> > > 
+> > >   	return 0;
+> > > @@ -1246,33 +1223,6 @@ static irqreturn_t idmac_interrupt(int irq, void
+> > > *dev_id)
+> > > 
+> > >   	/* Other interrupts do not interfere with this channel */
+> > >   	spin_lock(&ichan->lock);
+> > > -	if (unlikely(chan_id != IDMAC_SDC_0&&  chan_id != IDMAC_SDC_1&&
+> > > -		     ((curbuf>>  chan_id)&  1) == ichan->active_buffer&&
+> > > -		     !list_is_last(ichan->queue.next,&ichan->queue))) {
+> > > -		int i = 100;
+> > > -
+> > > -		/* This doesn't help. See comment in ipu_disable_channel() */
+> > > -		while (--i) {
+> > > -			curbuf = idmac_read_ipureg(&ipu_data,
+> > > IPU_CHA_CUR_BUF);
+> > > -			if (((curbuf>>  chan_id)&  1) != ichan->active_buffer)
+> > > -				break;
+> > > -			cpu_relax();
+> > > -		}
+> > > -
+> > > -		if (!i) {
+> > > -			spin_unlock(&ichan->lock);
+> > > -			dev_dbg(dev,
+> > > -				"IRQ on active buffer on channel %x, active "
+> > > -				"%d, ready %x, %x, current %x!\n", chan_id,
+> > > -				ichan->active_buffer, ready0, ready1, curbuf);
+> > > -			return IRQ_NONE;
+> > > -		} else
+> > > -			dev_dbg(dev,
+> > > -				"Buffer deactivated on channel %x, active "
+> > > -				"%d, ready %x, %x, current %x, rest %d!\n",
+> > > chan_id,
+> > > -				ichan->active_buffer, ready0, ready1, curbuf,
+> > > i);
+> > > -	}
+> > > -
+> > >   	if (unlikely((ichan->active_buffer&&  (ready1>>  chan_id)&  1) ||
+> > >   		     (!ichan->active_buffer&&  (ready0>>  chan_id)&  1)
+> > >   		     )) {
+> > > --
+> > > 1.7.1
+> > > 
+> > 
+> > ---
+> > Guennadi Liakhovetski, Ph.D.
+> > Freelance Open-Source Software Developer
+> > http://www.open-technology.de/
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-And I think this patch has a conceptual problem, too.  In my opionion
-platform_data is the point to hand over platform specific data to a
-driver.  driver_data is something that is private to the driver and has
-to be considered opaque for the platform.  The driver was sort of OK
-before ...
-
-> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-> index 1643315..edcecaa 100644
-> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -226,10 +226,14 @@ static struct mc13783_regulator_init_data mx27_3ds_regulators[] = {
->  	},
->  };
->  
-> -/* MC13783 */
-> -static struct mc13783_platform_data mc13783_pdata __initdata = {
-> +static struct mc13783_regulator_platform_data mx27_regs = {
-The prefix mx27 is misleading. If you want to take the machine name
-into account use mx27_3ds, otherwise just use mc13783_regulator_pdata or
-similar. (And note that "regs" isn't that good IMHO, too, as it might
-stand for registers, too. And even mx27_3ds_regulators would be too
-general. This applies to the changes below, too.)
-
->  	.regulators = mx27_3ds_regulators,
->  	.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
-> +};
-> +
-> +/* MC13783 */
-a very minor nitpick is you moved the comment for mx27_3ds, but not for
-e.g. mx31_3ds.
-
-> +static struct mc13783_platform_data mc13783_pdata __initdata = {
-> +	.regulators = &mx27_regs,
->  	.flags  = MC13783_USE_REGULATOR,
->  };
->  
-> diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
-> index 5056148..b5ae8cc 100644
-> --- a/arch/arm/mach-imx/mach-pcm038.c
-> +++ b/arch/arm/mach-imx/mach-pcm038.c
-> @@ -262,9 +262,13 @@ static struct mc13783_regulator_init_data pcm038_regulators[] = {
->  	},
->  };
->  
-> -static struct mc13783_platform_data pcm038_pmic = {
-> +static struct mc13783_regulator_platform_data pcm038_regs = {
->  	.regulators = pcm038_regulators,
->  	.num_regulators = ARRAY_SIZE(pcm038_regulators),
-> +};
-> +
-> +static struct mc13783_platform_data pcm038_pmic = {
-> +	.regulators = &pcm038_regs,
->  	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
->  		 MC13783_USE_TOUCHSCREEN,
->  };
-> diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> index 0d65db8..3e613ee 100644
-> --- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-> @@ -156,9 +156,13 @@ static struct mc13783_regulator_init_data mx31_3ds_regulators[] = {
->  };
->  
->  /* MC13783 */
-> -static struct mc13783_platform_data mc13783_pdata __initdata = {
-> +static struct mc13783_regulator_platform_data mc13783_regs = {
->  	.regulators = mx31_3ds_regulators,
->  	.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
-> +};
-> +
-> +static struct mc13783_platform_data mc13783_pdata __initdata = {
-> +	.regulators = &mc13783_regs,
->  	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
->  };
->  
-> diff --git a/arch/arm/mach-mx3/mach-mx31moboard.c b/arch/arm/mach-mx3/mach-mx31moboard.c
-> index 1aa8d65..424fbd9 100644
-> --- a/arch/arm/mach-mx3/mach-mx31moboard.c
-> +++ b/arch/arm/mach-mx3/mach-mx31moboard.c
-> @@ -267,9 +267,13 @@ static struct mc13783_leds_platform_data moboard_leds = {
->  	.tc2_period = MC13783_LED_PERIOD_10MS,
->  };
->  
-> -static struct mc13783_platform_data moboard_pmic = {
-> +static struct mc13783_regulator_platform_data moboard_regs = {
->  	.regulators = moboard_regulators,
->  	.num_regulators = ARRAY_SIZE(moboard_regulators),
-> +};
-> +
-> +static struct mc13783_platform_data moboard_pmic = {
-> +	.regulators = &moboard_regs,
->  	.leds = &moboard_leds,
->  	.flags = MC13783_USE_REGULATOR | MC13783_USE_RTC |
->  		MC13783_USE_ADC | MC13783_USE_LED,
-> diff --git a/drivers/leds/leds-mc13783.c b/drivers/leds/leds-mc13783.c
-> index f05bb08..687fb13 100644
-> --- a/drivers/leds/leds-mc13783.c
-> +++ b/drivers/leds/leds-mc13783.c
-> @@ -30,6 +30,7 @@ struct mc13783_led {
->  	struct mc13783		*master;
->  	enum led_brightness	new_brightness;
->  	int			id;
-> +	int			num_leds;
->  };
->  
->  #define MC13783_REG_LED_CONTROL_0	51
-> @@ -181,9 +182,9 @@ static int __devinit mc13783_led_setup(struct mc13783_led *led, int max_current)
->  	return ret;
->  }
->  
-> -static int __devinit mc13783_leds_prepare(struct platform_device *pdev)
-> +static int __devinit mc13783_leds_prepare(struct platform_device *pdev,
-> +		struct mc13783_leds_platform_data *pdata)
->  {
-> -	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
->  	struct mc13783 *dev = dev_get_drvdata(pdev->dev.parent);
->  	int ret = 0;
->  	int reg = 0;
-> @@ -264,7 +265,7 @@ out:
->  
->  static int __devinit mc13783_led_probe(struct platform_device *pdev)
->  {
-> -	struct mc13783_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> +	struct mc13783_leds_platform_data *pdata = platform_get_drvdata(pdev);
->  	struct mc13783_led_platform_data *led_cur;
->  	struct mc13783_led *led, *led_dat;
->  	int ret, i;
-> @@ -286,12 +287,15 @@ static int __devinit mc13783_led_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> -	ret = mc13783_leds_prepare(pdev);
-> +	ret = mc13783_leds_prepare(pdev, pdata);
->  	if (ret) {
->  		dev_err(&pdev->dev, "unable to init led driver\n");
->  		goto err_free;
->  	}
->  
-> +	/* no need to save the num of LEDs for any other elements of 'led' */
-> +	led[0].num_leds = pdata->num_leds;
-> +
-So for n leds you introduced n-1 useless ints.
-
-So all in all, I don't like that change, maybe just because I don't
-understand your motivation.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
