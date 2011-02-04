@@ -1,58 +1,103 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri,  4 Feb 2011 15:28:55 +0530
-Subject: [PATCH v2 0/9] omap4: prcm: Few dpll,
-	clockdomain and powerdomain updates
-Message-ID: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri,  4 Feb 2011 15:29:02 +0530
+Subject: [PATCH v2 7/9] omap4: dpll: Add dpll api to control GATE_CTRL
+In-Reply-To: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1296813544-25170-8-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series mainly contains dpll initialisation, CPUx clock
-domain offset fix, addiing INACTIVE power domain state and
-fixing logic flag for IVAHD and ABE power domains.
+From: Rajendra Nayak <rnayak@ti.com>
 
-Changes in v2:
--	All dpll autoidling moved late in boot, (as part of
-	PM core init) and is done only with CONFIG_PM.
--	The autogen script update is added in changelog for
-	related patches
--	CPUx renaming patch is added to be consistent with
-	the database names
+On OMAP4, the dpll post divider outputs (MX outputs)
+provide a way to allow/deny hardware level autogating.
+Allowing autoidle would mean that the hw would autogate
+this clock when there is no dependency for it.
+Denying idle would mean that this clock output will be
+forced to stay enabled.
 
-The series is boot tested on OMAP4430/3430 SDP.
+Add dpll api's to read/allow/deny idle control
+for these dpll mx postdividers.
 
-The following changes since commit 1bae4ce27c9c90344f23c65ea6966c50ffeae2f5:
-  Linus Torvalds (1):
-        Linux 2.6.38-rc2
+NOTE: The gatectrl bit set to 0 allows gatectrl,
+and the bit set to 1 denies gatectrl.
 
-are available in the git repository at:
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/clock.h    |    3 ++
+ arch/arm/mach-omap2/dpll3xxx.c |   42 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 0 deletions(-)
 
-  git://dev.omapzoom.org/pub/scm/santosh/kernel-omap4-base.git omap4_prcm_misc_v2
-
-Benoit Cousson (1):
-      omap4: clockdomain: Fix the CPUx domain name
-
-Rajendra Nayak (5):
-      omap: clocks: Add checks to see if enable/disable ops are supported
-      omap: clocks: Add allow_idle/deny_idle support in clkops
-      omap: dpll: Add allow_idle/deny_idle support for all DPLL's
-      omap4: dpll: Add dpll api to control GATE_CTRL
-      omap4: dpll: Enable auto gate control for all MX postdividers
-
-Santosh Shilimkar (3):
-      omap4: powerdomain: Add supported INACTIVE power state
-      omap4: prcm: Fix the CPUx clockdomain offsets
-      omap4: powerdomain: Use intended PWRSTS_* flags instead of values
-
- arch/arm/mach-omap2/clock.c                 |   25 +++++++++++++---
- arch/arm/mach-omap2/clock.h                 |    5 +++
- arch/arm/mach-omap2/clock3xxx_data.c        |    2 +-
- arch/arm/mach-omap2/clock44xx_data.c        |   42 +++++++++++++-------------
- arch/arm/mach-omap2/clockdomains44xx_data.c |    4 +-
- arch/arm/mach-omap2/dpll3xxx.c              |   42 +++++++++++++++++++++++++++
- arch/arm/mach-omap2/pm44xx.c                |    4 ++
- arch/arm/mach-omap2/powerdomain.h           |   12 +++++++
- arch/arm/mach-omap2/powerdomains44xx_data.c |   30 +++++++++---------
- arch/arm/mach-omap2/prcm_mpu44xx.h          |    4 +-
- arch/arm/plat-omap/clock.c                  |   26 ++++++++++++++++
- arch/arm/plat-omap/include/plat/clock.h     |    6 ++++
- 12 files changed, 156 insertions(+), 46 deletions(-)
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 2a939e5..c450d69 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -65,6 +65,9 @@ u32 omap3_dpll_autoidle_read(struct clk *clk);
+ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate);
+ int omap3_noncore_dpll_enable(struct clk *clk);
+ void omap3_noncore_dpll_disable(struct clk *clk);
++int omap4_dpllmx_gatectrl_read(struct clk *clk);
++void omap4_dpllmx_allow_gatectrl(struct clk *clk);
++void omap4_dpllmx_deny_gatectrl(struct clk *clk);
+ 
+ #ifdef CONFIG_OMAP_RESET_CLOCKS
+ void omap2_clk_disable_unused(struct clk *clk);
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index f77022b..4571e94 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -34,6 +34,7 @@
+ #include "clock.h"
+ #include "cm2xxx_3xxx.h"
+ #include "cm-regbits-34xx.h"
++#include "cm-regbits-44xx.h"
+ 
+ /* CM_AUTOIDLE_PLL*.AUTO_* bit values */
+ #define DPLL_AUTOIDLE_DISABLE			0x0
+@@ -612,3 +613,44 @@ unsigned long omap3_clkoutx2_recalc(struct clk *clk)
+ 		rate = clk->parent->rate * 2;
+ 	return rate;
+ }
++
++/* Supported only on OMAP4 */
++int omap4_dpllmx_gatectrl_read(struct clk *clk)
++{
++	u32 v;
++
++	if (!clk || !clk->clksel_reg || !cpu_is_omap44xx())
++		return -EINVAL;
++
++	v = __raw_readl(clk->clksel_reg);
++	v &= OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
++	v >>= __ffs(OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK);
++
++	return v;
++}
++
++void omap4_dpllmx_allow_gatectrl(struct clk *clk)
++{
++	u32 v;
++
++	if (!clk || !clk->clksel_reg || !cpu_is_omap44xx())
++		return;
++
++	v = __raw_readl(clk->clksel_reg);
++	/* Clear the bit to allow gatectrl */
++	v &= ~OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
++	__raw_writel(v, clk->clksel_reg);
++}
++
++void omap4_dpllmx_deny_gatectrl(struct clk *clk)
++{
++	u32 v;
++
++	if (!clk || !clk->clksel_reg || !cpu_is_omap44xx())
++		return;
++
++	v = __raw_readl(clk->clksel_reg);
++	/* Set the bit to deny gatectrl */
++	v |= OMAP4430_DPLL_CLKOUT_GATE_CTRL_MASK;
++	__raw_writel(v, clk->clksel_reg);
++}
+-- 
+1.6.0.4
