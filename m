@@ -1,66 +1,101 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 10:48:32 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110204095424.GB2347@richard-laptop>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<4D48741F.8060006@codeaurora.org>
-	<20110201212409.GU31216@n2100.arm.linux.org.uk>
-	<20110204095424.GB2347@richard-laptop>
-Message-ID: <20110204104832.GE14627@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 4 Feb 2011 10:58:06 +0000
+Subject: [PATCH v2 1/5] ARM: omap4: Correct definition of do_wfi()
+	forCONFIG_THUMB2_KERNEL
+In-Reply-To: <d813cf9e0b404d0243c3973841baa6dc@mail.gmail.com>
+References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
+	<1296756161-26092-2-git-send-email-dave.martin@linaro.org>
+	<b0242fa556f17e47222fa7f30a36d75b@mail.gmail.com>
+	<20110203190758.GA15004@n2100.arm.linux.org.uk>
+	<d813cf9e0b404d0243c3973841baa6dc@mail.gmail.com>
+Message-ID: <AANLkTin_mc2e=xaotifjix_ii5iaugVFo1RuAkzZEWwF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 05:54:24PM +0800, Richard Zhao wrote:
-> On Tue, Feb 01, 2011 at 09:24:09PM +0000, Russell King - ARM Linux wrote:
-> > You can't catch enable/disable imbalances in the prepare code, and you
-> > can't really catch them in the unprepare code either.
-> > 
-> > Consider two drivers sharing the same struct clk.  When the second driver
-> > prepares the clock, the enable count could well be non-zero, caused by
-> > the first driver.  Ditto for when the second driver is removed, and it
-> > calls unprepare - the enable count may well be non-zero.
-> > 
-> > The only thing you can check is that when the prepare count is zero,
-> > the enable count is also zero.  You can also check in clk_enable() and
-> > clk_disable() that the prepare count is non-zero.
->
-> but how can we check prepare count without mutex lock? Even if prepare count
-> is atomic_t, it can not guarantee the clock is actually prepared or unprepared.
-> So it's important for driver writer to maintain the call sequence.
+On Thu, Feb 3, 2011 at 7:30 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+>> Sent: Friday, February 04, 2011 12:38 AM
+>> To: Santosh Shilimkar
+>> Cc: Dave Martin; linux-arm-kernel at lists.infradead.org; Tony
+>> Lindgren; Nicolas Pitre; linux-omap at vger.kernel.org; Jean Pihet-XID
+>> Subject: Re: [PATCH v2 1/5] ARM: omap4: Correct definition of
+>> do_wfi() forCONFIG_THUMB2_KERNEL
+>>
+>> On Fri, Feb 04, 2011 at 12:09:34AM +0530, Santosh Shilimkar wrote:
+>> > > -----Original Message-----
+>> > > From: Dave Martin [mailto:dave.martin at linaro.org]
+>> > > Sent: Thursday, February 03, 2011 11:33 PM
+>> > > To: linux-arm-kernel at lists.infradead.org
+>> > > Cc: Dave Martin; Tony Lindgren; Santosh Shilimkar; Jean Pihet;
+>> > > linux-omap at vger.kernel.org; Nicolas Pitre
+>> > > Subject: [PATCH v2 1/5] ARM: omap4: Correct definition of
+>> do_wfi()
+>> > > for CONFIG_THUMB2_KERNEL
+>> > >
+>> > > For the Thumb-2 case, the "wfi" mnemonic is used, since in this
+>> > > case the tools will necessarily be new enough to support it.
+>> > >
+>> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> >
+>> > I guess, we discussed this patch in your previous post.
+>> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> >
+>> > > ---
+>> > > ?arch/arm/mach-omap2/include/mach/omap4-common.h | ? ?5 +++++
+>> > > ?1 files changed, 5 insertions(+), 0 deletions(-)
+>> > >
+>> > > diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h
+>> > > b/arch/arm/mach-omap2/include/mach/omap4-common.h
+>> > > index 5b0270b..68ce058 100644
+>> > > --- a/arch/arm/mach-omap2/include/mach/omap4-common.h
+>> > > +++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+>> > > @@ -17,8 +17,13 @@
+>> > > ? * wfi used in low power code. Directly opcode is used instead
+>> > > ? * of instruction to avoid mulit-omap build break
+>> > > ? */
+>> > > +#ifdef CONFIG_THUMB2_KERNEL
+>> > > +#define do_wfi() ? ? ? ? ? ? ? ? \
+>> > > + ? ? ? ? __asm__ __volatile__ ("wfi" : : : "memory")
+>> > > +#else
+>> > > ?#define do_wfi() ? ? ? ? ? ? ? ? \
+>> > > ? ? ? ? ? __asm__ __volatile__ (".word ? ?0xe320f003" : : :
+>> > > "memory")
+>> > > +#endif
+>>
+>> We actually have this:
+>>
+>> #if __LINUX_ARM_ARCH__ >= 7 || ? ? ? ? ?\
+>> ? ? ? ? (__LINUX_ARM_ARCH__ == 6 && defined(CONFIG_CPU_32v6K))
+>> #define sev() ? __asm__ __volatile__ ("sev" : : : "memory")
+>> #define wfe() ? __asm__ __volatile__ ("wfe" : : : "memory")
+>> #define wfi() ? __asm__ __volatile__ ("wfi" : : : "memory")
+>> #endif
+>>
+>> in asm/system.h, so maybe it should be using wfe() from asm/system.h
+>> ?
+> I assume you mean wfi here.
+> The problem is, omap2plus build breaks because it builds
+> CPU_32v6 and CPU_32v7 as well which doesn't support the wfi
+> instruction. Hence I used opcode directly to keep build
+> working.
 
-Forget atomic_t - it's the most abused type in the kernel.  Just because
-something says its atomic doesn't make it so.  In a use like this,
-atomic_t just buys you additional needless complexity with no benefit.
+I guess that's right, OMAP2 is ARM1136 and doesn't have the K extensions.
 
-Of course we can check the prepared count.  What we can't do is check
-that it doesn't change concurrently - but that's something we can't do
-anyway.
+Would it make sense to have the v6 MCR equivalent as an altetnative?
+Something like:
 
-int clk_enable(struct clk *clk)
-{
-	unsigned long flags;
-	int ret = 0;
+#elseif __LINUX_ARM_ARCH__ >= 6
+#define wfi()   __asm__ __volatile__ ( \
+    "mov     r0, #0\n\t" \
+    "mcr     p15, 0, r0, c7, c0, 4\n\t" \
+    ::: "r0"
+)
+#endif
 
-	if (clk) {
-		if (WARN_ON(!clk->prepare_count))
-			return -EINVAL;
+This MCR is a mandatory part of the architecture for v6, but it's not
+mandatory for older processors.
 
-		spin_lock_irqsave(&clk->lock, flags);
-		if (clk->enable_count++ == 0)
-			ret = clk->ops->enable(clk);
-		spin_unlock_irqrestore(&clk->lock, flags);
-	}
-	return ret;
-}
-
-is entirely sufficient to catch the case of a single-use clock not being
-prepared before clk_enable() is called.
-
-We're after detecting drivers missing calls to clk_prepare(), we're not
-after detecting concurrent calls to clk_prepare()/clk_unprepare().
+Cheers
+---Dave
