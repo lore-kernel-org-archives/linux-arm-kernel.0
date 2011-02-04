@@ -1,46 +1,93 @@
-From: segoon@openwall.com (Vasiliy Kulikov)
-Date: Fri,  4 Feb 2011 15:23:43 +0300
-Subject: [PATCH 10/20] mfd: ab8500: world-writable debugfs register-* files
-In-Reply-To: <cover.1296818921.git.segoon@openwall.com>
-References: <cover.1296818921.git.segoon@openwall.com>
-Message-ID: <c8f28aeecd5f4d05b9ae0b110831aa128754f172.1296818921.git.segoon@openwall.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Fri, 04 Feb 2011 07:27:16 -0500
+Subject: [PATCH 1/3] davinci: spi: move event_q parameter to platform data
+In-Reply-To: <4D4BEB1F.6060200@mvista.com>
+References: <1296779690-9723-1-git-send-email-michael.williamson@criticallink.com>
+	<1296779690-9723-2-git-send-email-michael.williamson@criticallink.com>
+	<4D4BEB1F.6060200@mvista.com>
+Message-ID: <4D4BF0A4.9010509@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't allow everybody to interact with hardware registers.
+Hi Sergei,
 
-Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
----
- Compile tested only.
+On 2/4/2011 7:03 AM, Sergei Shtylyov wrote:
 
- drivers/mfd/ab8500-debugfs.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+> Hello.
+> 
+> On 04-02-2011 3:34, Michael Williamson wrote:
+> 
+>> For DMA operation, the davinci spi driver needs an eventq number.
+>> Currently, this number is passed as a IORESOURCE_DMA.  This is not
+>> correct, as the eventq is not a DMA channel.  Pass the eventq
+>> via the platform data structure instead.
+> 
+>> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
+> [...]
+> 
+>> diff --git a/arch/arm/mach-davinci/include/mach/spi.h b/arch/arm/mach-davinci/include/mach/spi.h
+>> index 38f4da5..0853a5f 100644
+>> --- a/arch/arm/mach-davinci/include/mach/spi.h
+>> +++ b/arch/arm/mach-davinci/include/mach/spi.h
+> [...]
+>> @@ -39,13 +41,16 @@ enum {
+>>    *        to populate if all chip-selects are internal.
+>>    * @cshold_bug:    set this to true if the SPI controller on your chip requires
+>>    *        a write to CSHOLD bit in between transfers (like in DM355).
+>> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
+> 
+>    s/event_q/event queue/?
+> 
+>> + *        on the bus.
+>>    */
+>>   struct davinci_spi_platform_data {
+>> -    u8    version;
+>> -    u8    num_chipselect;
+>> -    u8    intr_line;
+>> -    u8    *chip_sel;
+>> -    bool    cshold_bug;
+>> +    u8            version;
+>> +    u8            num_chipselect;
+>> +    u8            intr_line;
+>> +    u8            *chip_sel;
+>> +    bool            cshold_bug;
+>> +    enum dma_event_q    dma_event_q;
+>>   };
+>>
+>>   /**
+>> diff --git a/drivers/spi/davinci_spi.c b/drivers/spi/davinci_spi.c
+>> index 6beab99..166a879 100644
+>> --- a/drivers/spi/davinci_spi.c
+>> +++ b/drivers/spi/davinci_spi.c
+> [...]
+>> @@ -878,17 +877,13 @@ static int davinci_spi_probe(struct platform_device *pdev)
+>>       r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+>>       if (r)
+>>           dma_tx_chan = r->start;
+>> -    r = platform_get_resource(pdev, IORESOURCE_DMA, 2);
+>> -    if (r)
+>> -        dma_eventq = r->start;
+>>
+>>       dspi->bitbang.txrx_bufs = davinci_spi_bufs;
+>>       if (dma_rx_chan != SPI_NO_RESOURCE&&
+>> -        dma_tx_chan != SPI_NO_RESOURCE&&
+>> -        dma_eventq != SPI_NO_RESOURCE) {
+>> +        dma_tx_chan != SPI_NO_RESOURCE) {
+>>           dspi->dma.rx_channel = dma_rx_chan;
+>>           dspi->dma.tx_channel = dma_tx_chan;
+>> -        dspi->dma.eventq = dma_eventq;
+>> +        dspi->dma.eventq = pdata->dma_event_q;
+> 
+>    It makes sense to merge this patch with the patches 2 and 3 as otherwise the bisectability is prevented for DM3[56]5 -- their 'dma_event_q' field will be anonymously initialized to 0 after this patch but should be 1 and 3 instead correspondingly. Although, this doesn't seem to be a fatal defect, so the patches can be kept separate... Don't know what's better.
+> 
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 3c1541a..64748e4 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -585,18 +585,18 @@ static int __devinit ab8500_debug_probe(struct platform_device *plf)
- 		goto exit_destroy_dir;
- 
- 	ab8500_bank_file = debugfs_create_file("register-bank",
--		(S_IRUGO | S_IWUGO), ab8500_dir, &plf->dev, &ab8500_bank_fops);
-+		(S_IRUGO | S_IWUSR), ab8500_dir, &plf->dev, &ab8500_bank_fops);
- 	if (!ab8500_bank_file)
- 		goto exit_destroy_reg;
- 
- 	ab8500_address_file = debugfs_create_file("register-address",
--		(S_IRUGO | S_IWUGO), ab8500_dir, &plf->dev,
-+		(S_IRUGO | S_IWUSR), ab8500_dir, &plf->dev,
- 		&ab8500_address_fops);
- 	if (!ab8500_address_file)
- 		goto exit_destroy_bank;
- 
- 	ab8500_val_file = debugfs_create_file("register-value",
--		(S_IRUGO | S_IWUGO), ab8500_dir, &plf->dev, &ab8500_val_fops);
-+		(S_IRUGO | S_IWUSR), ab8500_dir, &plf->dev, &ab8500_val_fops);
- 	if (!ab8500_val_file)
- 		goto exit_destroy_address;
- 
--- 
-1.7.0.4
+
+Barring any other comments, I will collapse the patches and resend.  
+I will correct the typo you mentioned above as well.
+
+Thanks.
+
+-Mike
+
+
+> WBR, Sergei
