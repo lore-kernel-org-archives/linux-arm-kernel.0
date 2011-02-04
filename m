@@ -1,102 +1,82 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Feb 2011 21:16:02 -0500 (EST)
-Subject: [PATCH 1/2] ARM: Add inituart macro to initialize DEBUG_LL serial
-	port based on the machine ID
-In-Reply-To: <20110204012207.26298.16649.stgit@baageli.muru.com>
+Date: Thu, 03 Feb 2011 21:20:51 -0500 (EST)
+Subject: [PATCH 2/2] ARM: Add empty inituart macros
+In-Reply-To: <20110204012209.26298.75402.stgit@baageli.muru.com>
 References: <20110204012008.26298.16341.stgit@baageli.muru.com>
-	<20110204012207.26298.16649.stgit@baageli.muru.com>
-Message-ID: <alpine.LFD.2.00.1102032105090.12104@xanadu.home>
+	<20110204012209.26298.75402.stgit@baageli.muru.com>
+Message-ID: <alpine.LFD.2.00.1102032116091.12104@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 3 Feb 2011, Tony Lindgren wrote:
 
-> Allow machine specific init of the DEBUG_LL serial port. This is needed
-> to debug kernels built with support for multiple machines compiled in
-> without recompiling the kernel.
-> 
-> As some SoCs need to use variables to store the port address and LSR
-> register configuration, we must call inituart again after clearing
-> the BSS.
-> 
-> If variables are being used for for inituart and addruart, this setup
-> won't work properly for debugging the uncompress code without patching
-> arch/arm/boot/compressed/head.S for the machine in question.
-> 
-> For adding DEBUG_LL support for new machines, only two lines are needed
-> in debug-macro.S:
-> 
-> 	.macro	inituart, id, a, v
-> 	...
-> 	ldr	\v, =MACH_TYPE_SOMETHING1
-> 	cmp	\id, \v
-> 	ldrne	\v, =MACH_TYPE_SOMETHING2
-> 	cmpne	\id, \v
-> 	ldrne	\v, =MACH_TYPE_SOMETHING3
-> 	cmpne	\id, \v
-> 	...
-> 	.endm
-> 
-> Note that this patch depends on a patch to add empty inituart macro for
-> each debug-macro.S file.
+> Add empty inituart macros. These can be used to initialize
+> the debug serial port based on the machine ID.
 > 
 > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/kernel/head-common.S |    7 +++++++
->  arch/arm/kernel/head.S        |    5 +++++
->  2 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
-> index c84b57d..0b66d6b 100644
-> --- a/arch/arm/kernel/head-common.S
-> +++ b/arch/arm/kernel/head-common.S
-> @@ -63,6 +63,9 @@ ENDPROC(__vet_atags)
->   *  r1  = machine ID
->   *  r2  = atags pointer
->   *  r9  = processor ID
-> + *
-> + * Note that if the machine uses BSS to store the debug UART configuration,
-> + * debug_ll code will not work after clear BSS until inituart is called again.
->   */
+>  arch/arm/mach-aaec2000/include/mach/debug-macro.S  |    4 ++++
+>  arch/arm/mach-at91/include/mach/debug-macro.S      |    3 +++
+>  arch/arm/mach-clps711x/include/mach/debug-macro.S  |    3 +++
+>  arch/arm/mach-cns3xxx/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-davinci/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-dove/include/mach/debug-macro.S      |    3 +++
+>  arch/arm/mach-ebsa110/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-ep93xx/include/mach/debug-macro.S    |    3 +++
+>  .../arm/mach-footbridge/include/mach/debug-macro.S |    4 ++++
+>  arch/arm/mach-gemini/include/mach/debug-macro.S    |    3 +++
+>  .../arm/mach-integrator/include/mach/debug-macro.S |    3 +++
+>  arch/arm/mach-iop13xx/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-iop32x/include/mach/debug-macro.S    |    3 +++
+>  arch/arm/mach-iop33x/include/mach/debug-macro.S    |    3 +++
+>  arch/arm/mach-ixp23xx/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-kirkwood/include/mach/debug-macro.S  |    3 +++
+>  arch/arm/mach-ks8695/include/mach/debug-macro.S    |    3 +++
+>  arch/arm/mach-l7200/include/mach/debug-macro.S     |    3 +++
+>  arch/arm/mach-loki/include/mach/debug-macro.S      |    3 +++
+>  arch/arm/mach-lpc32xx/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-mmp/include/mach/debug-macro.S       |    3 +++
+>  arch/arm/mach-msm/include/mach/debug-macro.S       |    4 ++++
+>  arch/arm/mach-mv78xx0/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-mxs/include/mach/debug-macro.S       |    3 +++
+>  arch/arm/mach-netx/include/mach/debug-macro.S      |    3 +++
+>  arch/arm/mach-nomadik/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-ns9xxx/include/mach/debug-macro.S    |    3 +++
+>  arch/arm/mach-omap1/include/mach/debug-macro.S     |    3 +++
+>  arch/arm/mach-omap2/include/mach/debug-macro.S     |    3 +++
+>  arch/arm/mach-pnx4008/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-pxa/include/mach/debug-macro.S       |    3 +++
+>  arch/arm/mach-realview/include/mach/debug-macro.S  |    3 +++
+>  arch/arm/mach-rpc/include/mach/debug-macro.S       |    3 +++
+>  arch/arm/mach-s3c2410/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s3c24a0/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s5p6442/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s5p64x0/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s5pc100/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s5pv210/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-s5pv310/include/mach/debug-macro.S   |    3 +++
+>  arch/arm/mach-sa1100/include/mach/debug-macro.S    |    3 +++
+>  arch/arm/mach-shark/include/mach/debug-macro.S     |    3 +++
+>  arch/arm/mach-u300/include/mach/debug-macro.S      |    3 +++
+>  arch/arm/mach-ux500/include/mach/debug-macro.S     |    3 +++
+>  arch/arm/mach-versatile/include/mach/debug-macro.S |    3 +++
+>  arch/arm/mach-vexpress/include/mach/debug-macro.S  |    3 +++
+>  arch/arm/plat-mxc/include/mach/debug-macro.S       |    3 +++
+>  arch/arm/plat-spear/include/plat/debug-macro.S     |    3 +++
+>  arch/arm/plat-stmp3xxx/include/mach/debug-macro.S  |    3 +++
+>  arch/arm/plat-tcc/include/mach/debug-macro.S       |    3 +++
+>  51 files changed, 156 insertions(+), 0 deletions(-)
 
-Please make sure that inituart always uses .data to store its needed 
-configuration instead.
+A better way would be to define the empty inituart macro in a common 
+place, and use the following in the machine specific header file:
 
->  	__INIT
->  __mmap_switched:
-> @@ -80,6 +83,10 @@ __mmap_switched:
->  	strcc	fp, [r6],#4
->  	bcc	1b
->  
-> +#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
-> +	inituart r1, r4, r5
-> +#endif
-> +
->   ARM(	ldmia	r3, {r4, r5, r6, r7, sp})
->   THUMB(	ldmia	r3, {r4, r5, r6, r7}	)
->   THUMB(	ldr	sp, [r3, #16]		)
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 591a2ea..be64264 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -75,6 +75,11 @@
->  ENTRY(stext)
->  	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
->  						@ and irqs disabled
-> +
-> +#if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
-> +	inituart r1, r3, r4
-> +#endif
-> +
+	.purgem inituart
+	.macro inituart ...
+	...
+	.endm
 
-Here you have two calls, one which is performed when the MMU is off, and 
-the other one (after .bss is cleared) when the MMU is on.  Did you 
-consider the implications of accessing that .bss variable in those two 
-circumstances?  This is also true for when printascii is called.
-
-Ensuring that .data is used instead of .bss would eliminate one of those 
-calls which is a good thing to do.  But extra cleverness is needed to 
-retrieve the config data in a position independent way.
+This way you won't need to add empty inituart all over the place.
 
 
 Nicolas
