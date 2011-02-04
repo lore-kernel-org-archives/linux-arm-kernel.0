@@ -1,89 +1,28 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri,  4 Feb 2011 14:21:45 +0000
-Subject: [PATCH v3 3/5] ARM: omap3: Remove hand-encoded SMC instructions
-In-Reply-To: <1296829307-21439-1-git-send-email-dave.martin@linaro.org>
-References: <1296829307-21439-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1296829307-21439-4-git-send-email-dave.martin@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 4 Feb 2011 14:31:35 +0000
+Subject: [PATCH 1/5] ARM: etm: Don't require clock control
+In-Reply-To: <AANLkTikybaV-jBo-q4Xb_POC5QRG9RRRV1RCDOnX9riG@mail.gmail.com>
+References: <1296701663-12168-1-git-send-email-arve@android.com>
+	<20110203124521.GK9810@sirena.org.uk>
+	<AANLkTikybaV-jBo-q4Xb_POC5QRG9RRRV1RCDOnX9riG@mail.gmail.com>
+Message-ID: <20110204143134.GE5393@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For various reasons, Linux now only officially supports being built
-with tools which are new enough to understand the SMC instruction.
+On Thu, Feb 03, 2011 at 04:30:46PM -0800, Arve Hj?nnev?g wrote:
+> On Thu, Feb 3, 2011 at 4:45 AM, Mark Brown
 
-Replacing the hand-encoded instructions when the mnemonic also
-allows for correct assembly in Thumb-2 (otherwise, the result is
-random data in the middle of the code).
+> > Would it not be cleaner for the affected platforms to ensure that
+> > clk_get() does the right thing here, for example by returning a dummy
+> > clock? ?Otherwise we'll just silently carry on if we can't get a clock
+> > we were supposed to which doesn't seem ideal.
 
-The Makefile already ensures that this file is built with a high
-enough gcc -march= flag (armv7-a).
+> This clock seem to be an omap specific virtual clock that switches the
+> clock source of the etb. It is not used to enable the clock when the
+> etb is in use, and it does not seem to have a failure case other than
+> not existing. So, I don't know that requiring this clock would cause
+> fewer problems than making it optional.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/sleep34xx.S |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index 98d8232..2c4671f 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -133,7 +133,7 @@ ENTRY(save_secure_ram_context)
- 	mov	r6, #0xff
- 	mcr	p15, 0, r0, c7, c10, 4	@ data write barrier
- 	mcr	p15, 0, r0, c7, c10, 5	@ data memory barrier
--	.word	0xE1600071		@ call SMI monitor (smi #1)
-+	smc	1			@ call SMI monitor (smi #1)
- 	nop
- 	nop
- 	nop
-@@ -408,7 +408,7 @@ skipl2dis:
- 	adr	r3, l2_inv_api_params	@ r3 points to dummy parameters
- 	mcr	p15, 0, r0, c7, c10, 4	@ data write barrier
- 	mcr	p15, 0, r0, c7, c10, 5	@ data memory barrier
--	.word	0xE1600071		@ call SMI monitor (smi #1)
-+	smc	#1			@ call SMI monitor (smi #1)
- 	/* Write to Aux control register to set some bits */
- 	mov	r0, #42			@ set service ID for PPA
- 	mov	r12, r0			@ copy secure Service ID in r12
-@@ -419,7 +419,7 @@ skipl2dis:
- 	ldr	r3, [r4, #0xBC]		@ r3 points to parameters
- 	mcr	p15, 0, r0, c7, c10, 4	@ data write barrier
- 	mcr	p15, 0, r0, c7, c10, 5	@ data memory barrier
--	.word	0xE1600071		@ call SMI monitor (smi #1)
-+	smc	#1			@ call SMI monitor (smi #1)
- 
- #ifdef CONFIG_OMAP3_L2_AUX_SECURE_SAVE_RESTORE
- 	/* Restore L2 aux control register */
-@@ -434,7 +434,7 @@ skipl2dis:
- 	adds	r3, r3, #8		@ r3 points to parameters
- 	mcr	p15, 0, r0, c7, c10, 4	@ data write barrier
- 	mcr	p15, 0, r0, c7, c10, 5	@ data memory barrier
--	.word	0xE1600071		@ call SMI monitor (smi #1)
-+	smc	#1			@ call SMI monitor (smi #1)
- #endif
- 	b	logic_l1_restore
- 
-@@ -443,18 +443,18 @@ l2_inv_api_params:
- l2_inv_gp:
- 	/* Execute smi to invalidate L2 cache */
- 	mov r12, #0x1			@ set up to invalidate L2
--	.word 0xE1600070		@ Call SMI monitor (smieq)
-+	smc	#0			@ Call SMI monitor (smieq)
- 	/* Write to Aux control register to set some bits */
- 	ldr	r4, scratchpad_base
- 	ldr	r3, [r4,#0xBC]
- 	ldr	r0, [r3,#4]
- 	mov	r12, #0x3
--	.word	0xE1600070		@ Call SMI monitor (smieq)
-+	smc	#0			@ Call SMI monitor (smieq)
- 	ldr	r4, scratchpad_base
- 	ldr	r3, [r4,#0xBC]
- 	ldr	r0, [r3,#12]
- 	mov	r12, #0x2
--	.word	0xE1600070		@ Call SMI monitor (smieq)
-+	smc	#0			@ Call SMI monitor (smieq)
- logic_l1_restore:
- 	ldr	r1, l2dis_3630
- 	cmp	r1, #0x1		@ Test if L2 re-enable needed on 3630
--- 
-1.7.1
+That doesn't seem unreasonable, but in that case it'd be good to explain
+why things are this way in the code (and the changelog) so someone
+doesn't change the code back.
