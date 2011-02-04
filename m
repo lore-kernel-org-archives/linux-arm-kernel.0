@@ -1,155 +1,73 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 4 Feb 2011 10:53:02 -0600
-Subject: [PATCH] EDB93xx: Add support for CS4271 SPI-connected CODEC
-In-Reply-To: <1296770466.14577.8.camel@r60e>
-References: <1296770466.14577.8.camel@r60e>
-Message-ID: <0D753D10438DA54287A00B027084269764CF0C44AA@AUSP01VMBX24.collaborationhost.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Feb 2011 09:02:50 -0800
+Subject: [PATCH 3/5] omap: Add support for CONFIG_AUTO_ZRELADDR for
+	DEBUG_LL
+In-Reply-To: <alpine.LFD.2.00.1102032205140.12104@xanadu.home>
+References: <20110204012317.26410.55157.stgit@baageli.muru.com>
+	<20110204012709.26410.78100.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1102032205140.12104@xanadu.home>
+Message-ID: <20110204170249.GV3322@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 03, 2011 3:01 PM, Alexander Sverdlin wrote:
->
-> Add support for CS4271 SPI-connected CODEC to EDB93xx
->
-> Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
-> ---
->  arch/arm/mach-ep93xx/edb93xx.c |   85 ++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 85 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-> index 3f37567..c1e73ee 100644
-> --- a/arch/arm/mach-ep93xx/edb93xx.c
-> +++ b/arch/arm/mach-ep93xx/edb93xx.c
-> @@ -30,13 +30,17 @@
->  #include <linux/gpio.h>
->  #include <linux/i2c.h>
->  #include <linux/i2c-gpio.h>
-> +#include <linux/spi/spi.h>
+* Nicolas Pitre <nico@fluxnic.net> [110203 19:32]:
+> On Thu, 3 Feb 2011, Tony Lindgren wrote:
 > 
->  #include <mach/hardware.h>
->  #include <mach/fb.h>
-> +#include <mach/ep93xx_spi.h>
->
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
+> > This way we can have the debug-macro.S be common for omap1 and omap2+
+> > and get sensible error messages booting the wrong zImage with
+> > CONFIG_AUTO_ZRELADDR selected. Note that this does not seem to work
+> > with u-boot and uImage.
+...
+ 
+> Gaaaaah!  This is horrible.
+
+-ENOREGISTERS :)
+ 
+> OK, you do want to store data in memory, right?  So the best way to 
+> always be position independent, even cross section, is to do the 
+> following (inspired by RMK's trick in the p2v series):
 > 
-> +#include <sound/cs4271.h>
-> +
-
-Nitpick... Please move this include to before the <mach/*> includes.
-
+> 	.data
 > 
->  static void __init edb93xx_register_flash(void)
->  {
-> @@ -94,6 +98,85 @@ static void __init edb93xx_register_i2c(void)
+> foo:	.word	0	@ value for sput
+> 	.word	0	@ value for nik
 > 
+> 	.text
 > 
->  /*************************************************************************
-> + * EDB93xx SPI peripheral handling
-> + *************************************************************************/
-> +static struct cs4271_platform_data edb93xx_cs4271_data = {
-> +	.gpio_nreset	= -EINVAL,	/* filled in later */
-> +};
-> +
-> +static int edb93xx_cs4271_hw_setup(struct spi_device *spi)
-> +{
-> +	return gpio_request_one(EP93XX_GPIO_LINE_EGPIO6,
-> +				GPIOF_OUT_INIT_HIGH, spi->modalias);
-> +}
-> +
-> +static void edb93xx_cs4271_hw_cleanup(struct spi_device *spi)
-> +{
-> +	gpio_free(EP93XX_GPIO_LINE_EGPIO6);
-> +}
-> +
-> +static void edb93xx_cs4271_hw_cs_control(struct spi_device *spi, int value)
-> +{
-> +	gpio_set_value(EP93XX_GPIO_LINE_EGPIO6, value);
-> +}
-> +
-> +static struct ep93xx_spi_chip_ops edb93xx_cs4271_hw = {
-> +	.setup		= edb93xx_cs4271_hw_setup,
-> +	.cleanup	= edb93xx_cs4271_hw_cleanup,
-> +	.cs_control	= edb93xx_cs4271_hw_cs_control,
-> +};
+> bar:	.word	.
+> 	.word	foo
+> 
+> sputnik:
+> 
+> 	adr	r0, bar		@ get relative address of bar
+> 	ldr	r1, [r0]	@ get absolute address of bar
+> 	sub	r1, r1, r0	@ difference between abs and rel address
+> 	ldr	r0, [r0, #4]	@ get absolute address of foo
+> 	sub	r0, r0, r1	@ turn that into a relative address
+> 
+> 	ldmia	r0, {r1, r2}	@ retrieve sput and nik
+> 	add	r0, r1, r2
+> 	mov	pc, lr
+> 
+> This code is totally position independent, so it works whether or not 
+> the MMU is active.  Therefore a similar technique in your macro (you 
+> could even put it into a macro for it) would allow you to get rid of the 
+> mrc and test for MMU active, get rid of the #ifdef, and not be limited 
+> to a 128 MB mask, etc.  And it is just one word longer than your 
+> shortest version i.e. 2 constants + 5 instructions vs 4 instructions + 2 
+> literal pool entries.
 
-This all looks good!  Thanks.
+I think if we keep the address of the memory location in rx instead of
+the port address value, then this could be done.
 
-> +
-> +static struct spi_board_info edb93xx_spi_board_info[] __initdata = {
-> +	{
-> +		.modalias		= "cs4271",
-> +		.platform_data		= &edb93xx_cs4271_data,
-> +		.controller_data	= &edb93xx_cs4271_hw,
-> +		.max_speed_hz		= 6000000,
-> +		.bus_num		= 0,
-> +		.chip_select		= 0,
-> +		.mode			= SPI_MODE_3,
-> +	},
-> +};
-> +
-> +static struct ep93xx_spi_info edb93xx_spi_info __initdata = {
-> +	.num_chipselect	= ARRAY_SIZE(edb93xx_spi_board_info),
-> +};
-> +
-> +static void __init edb93xx_register_spi(void)
-> +{
-> +	if (machine_is_edb9301() || machine_is_edb9302())
-> +		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO1;
-> +	else if (machine_is_edb9302a() || machine_is_edb9307a())
-> +		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_H(2);
-> +	else if (machine_is_edb9315a())
-> +		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
-> +	else
-> +		return;
+That would limit all the trickery to inituart only. Then addruart and
+busyuart could just do ldr from the memory location to get the port
+data without any trickery.
 
-You might want to just remove the last else test.
+In that case the mapping of IO space for the serial port in head.S
+would have to be changed as that relies on rx containing the port
+IO address..
 
-When the spi flash finally gets added it will exist on all edb93xx boards
-and the call below will need to happen regardless of the tests above.
+Regards,
 
-For the edb93xx boards that don't have the cs4271 codec, it will still be
-registered but it will not _do_ anything because the 12s driver will not
-be registered below.
-
-> +
-> +	ep93xx_register_spi(&edb93xx_spi_info, edb93xx_spi_board_info,
-> +			    ARRAY_SIZE(edb93xx_spi_board_info));
-> +}
-> +
-> +
-> +/*************************************************************************
-> + * EDB93xx I2S
-> + *************************************************************************/
-> +static int __init edb93xx_has_audio(void)
-> +{
-> +	return (machine_is_edb9301() || machine_is_edb9302() ||
-> +		machine_is_edb9302a() || machine_is_edb9307a() ||
-> +		machine_is_edb9315a());
-> +}
-> +
-> +static void __init edb93xx_register_i2s(void)
-> +{
-> +	if (edb93xx_has_audio()) {
-> +		ep93xx_register_i2s();
-> +	}
-> +}
-> +
-> +
-> +/*************************************************************************
->   * EDB93xx pwm
->   *************************************************************************/
->  static void __init edb93xx_register_pwm(void)
-> @@ -149,6 +232,8 @@ static void __init edb93xx_init_machine(void)
->  	edb93xx_register_flash();
->  	ep93xx_register_eth(&edb93xx_eth_data, 1);
->  	edb93xx_register_i2c();
-> +	edb93xx_register_spi();
-> +	edb93xx_register_i2s();
->  	edb93xx_register_pwm();
->  	edb93xx_register_fb();
->  }
-
-Other than the comments above this looks good.
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tony
