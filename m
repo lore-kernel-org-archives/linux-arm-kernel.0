@@ -1,32 +1,40 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 4 Feb 2011 11:59:38 -0800
-Subject: linux-next-20100201 - OMAP2+ defconfig broken with CONFIG_DEBUG_LL
-In-Reply-To: <7f99b6fa52967d67bf45d4e8aa7db1e8@mail.gmail.com>
-References: <AANLkTinF+dpKvuRztChBM01MAjgL-foGp_yVq3uC9ghu@mail.gmail.com>
-	<4af2a35f6d08ddcb33eb86aa3c784fb5@mail.gmail.com>
-	<7f99b6fa52967d67bf45d4e8aa7db1e8@mail.gmail.com>
-Message-ID: <20110204195938.GA3322@atomide.com>
+Date: Fri, 4 Feb 2011 12:09:47 -0800
+Subject: [PATCH 01/20] mach-omap2: mux: world-writable debugfs files
+In-Reply-To: <1aa2fe44c18b9f24eb52a1be98d017f1f568e6bb.1296818921.git.segoon@openwall.com>
+References: <cover.1296818921.git.segoon@openwall.com>
+	<1aa2fe44c18b9f24eb52a1be98d017f1f568e6bb.1296818921.git.segoon@openwall.com>
+Message-ID: <20110204200947.GB3322@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110201 01:25]:
-> > -----Original Message-----
-> > From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
-> > arm-kernel-bounces at lists.infradead.org] On Behalf Of Anand Gadiyar
-> > Sent: Tuesday, February 01, 2011 2:54 PM
-> > To: linux-arm-kernel at lists.infradead.org; linux-
-> > next at vger.kernel.org; Russell King - ARM Linux
-> > Subject: RE: linux-next-20100201 - OMAP2+ defconfig broken with
-> > CONFIG_DEBUG_LL
-> >
-> > Gadiyar, Anand wrote:
-> > > Hi all,
-> > >
-> > > I tried to build linux-next as of 20100201 with
-> > > omap2plus_defconfig. In addition
-> > > I turned on CONFIG_DEBUG_LL and hit the following error.
+* Vasiliy Kulikov <segoon@openwall.com> [110204 04:21]:
+> Do not create mux debugfs files as world-writable.
+> 
+> Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
+> ---
+>  Cannot compile the driver, so it is not tested at all.
 
-Posted a fix for that yesterday. Will upload it into Russell's
-patch system for the p2v branch.
+Thanks, will queue this as a fix for the -rc cycle.
 
 Tony
+ 
+>  arch/arm/mach-omap2/mux.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+> index 98148b6..6c84659 100644
+> --- a/arch/arm/mach-omap2/mux.c
+> +++ b/arch/arm/mach-omap2/mux.c
+> @@ -605,7 +605,7 @@ static void __init omap_mux_dbg_create_entry(
+>  	list_for_each_entry(e, &partition->muxmodes, node) {
+>  		struct omap_mux *m = &e->mux;
+>  
+> -		(void)debugfs_create_file(m->muxnames[0], S_IWUGO, mux_dbg_dir,
+> +		(void)debugfs_create_file(m->muxnames[0], S_IWUSR, mux_dbg_dir,
+>  					  m, &omap_mux_dbg_signal_fops);
+>  	}
+>  }
+> -- 
+> 1.7.0.4
+> 
