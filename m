@@ -1,72 +1,54 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 4 Feb 2011 17:54:24 +0800
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110201212409.GU31216@n2100.arm.linux.org.uk>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110201105449.GY1147@pengutronix.de>
-	<20110201131512.GH31216@n2100.arm.linux.org.uk>
-	<20110201141837.GA1147@pengutronix.de>
-	<20110201143932.GK31216@n2100.arm.linux.org.uk>
-	<20110201151846.GD1147@pengutronix.de>
-	<20110201152458.GP31216@n2100.arm.linux.org.uk>
-	<4D48741F.8060006@codeaurora.org>
-	<20110201212409.GU31216@n2100.arm.linux.org.uk>
-Message-ID: <20110204095424.GB2347@richard-laptop>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri,  4 Feb 2011 15:28:59 +0530
+Subject: [PATCH v2 4/9] omap: clocks: Add checks to see if enable/disable ops
+	are supported
+In-Reply-To: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1296813544-25170-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 01, 2011 at 09:24:09PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 01, 2011 at 12:59:11PM -0800, Stephen Boyd wrote:
-> > On 02/01/2011 07:24 AM, Russell King - ARM Linux wrote:
-> > > I'd also be tempted at this stage to build-in a no-op dummy clock,
-> > > that being the NULL clk:
-> > >
-> > > int clk_prepare(struct clk *clk)
-> > > {
-> > > 	int ret = 0;
-> > >
-> > > 	if (clk) {
-> > > 		mutex_lock(&clk->mutex);
-> > > 		if (clk->prepared == 0)
-> > > 			ret = clk->ops->prepare(clk);
-> > > 		if (ret == 0)
-> > > 			clk->prepared++;
-> > > 		mutex_unlock(&clk->mutex);
-> > > 	}
-> > >
-> > > 	return ret;
-> > > }
-> > 
-> > I'm afraid this will hide enable/disable imbalances on some targets and
-> > then expose them on others. Maybe its not a big problem though since
-> > this also elegantly handles the root(s) of the tree.
-> 
-> You can't catch enable/disable imbalances in the prepare code, and you
-> can't really catch them in the unprepare code either.
-> 
-> Consider two drivers sharing the same struct clk.  When the second driver
-> prepares the clock, the enable count could well be non-zero, caused by
-> the first driver.  Ditto for when the second driver is removed, and it
-> calls unprepare - the enable count may well be non-zero.
-> 
-> The only thing you can check is that when the prepare count is zero,
-> the enable count is also zero.  You can also check in clk_enable() and
-> clk_disable() that the prepare count is non-zero.
-but how can we check prepare count without mutex lock? Even if prepare count
-is atomic_t, it can not guarantee the clock is actually prepared or unprepared.
-So it's important for driver writer to maintain the call sequence.
+From: Rajendra Nayak <rnayak@ti.com>
 
-Thanks
-Richard
-> 
-> If you want tigher checking than that, you need to somehow identify and
-> match up the clk_prepare/clk_enable/clk_disable/clk_unprepare calls from
-> a particular driver instance.  Addresses of the functions don't work as
-> you can't be certain that driver code will be co-located within a certain
-> range.  Adding an additional argument to these functions which is driver
-> instance specific seems to be horrible too.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Check if enable/disable operations are supported for a given
+clock node before attempting to call them.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/clock.c |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 2a2f152..5c08c18 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -261,7 +261,8 @@ void omap2_clk_disable(struct clk *clk)
+ 
+ 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
+ 
+-	clk->ops->disable(clk);
++	if (clk->ops && clk->ops->enable)
++		clk->ops->disable(clk);
+ 
+ 	if (clk->clkdm)
+ 		omap2_clkdm_clk_disable(clk->clkdm, clk);
+@@ -312,10 +313,13 @@ int omap2_clk_enable(struct clk *clk)
+ 		}
+ 	}
+ 
+-	ret = clk->ops->enable(clk);
+-	if (ret) {
+-		WARN(1, "clock: %s: could not enable: %d\n", clk->name, ret);
+-		goto oce_err3;
++	if (clk->ops && clk->ops->enable) {
++		ret = clk->ops->enable(clk);
++		if (ret) {
++			WARN(1, "clock: %s: could not enable: %d\n",
++			     clk->name, ret);
++			goto oce_err3;
++		}
+ 	}
+ 
+ 	return 0;
+-- 
+1.6.0.4
