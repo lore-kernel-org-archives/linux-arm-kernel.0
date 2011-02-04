@@ -1,81 +1,62 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 4 Feb 2011 16:41:49 +0000
-Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <9ae36f6f04c9c1cf58fb4938dc78d6bf@mail.gmail.com>
-References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
-	<36192288611a2912eca9abc99a4353ff@mail.gmail.com>
-	<AANLkTi=sPeQPfcGzrLSB=9-V805y6pnU4gA5QgqMSwWe@mail.gmail.com>
-	<9ae36f6f04c9c1cf58fb4938dc78d6bf@mail.gmail.com>
-Message-ID: <20110204164149.GB21122@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 4 Feb 2011 08:44:37 -0800
+Subject: [PATCH 1/2] ARM: Add inituart macro to initialize DEBUG_LL
+	serial port based on the machine ID
+In-Reply-To: <20110204123220.GG15004@n2100.arm.linux.org.uk>
+References: <20110204012008.26298.16341.stgit@baageli.muru.com>
+	<20110204012207.26298.16649.stgit@baageli.muru.com>
+	<20110204083934.GB15004@n2100.arm.linux.org.uk>
+	<20110204123220.GG15004@n2100.arm.linux.org.uk>
+Message-ID: <20110204164436.GT3322@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 04:46:57PM +0530, Santosh Shilimkar wrote:
-> > -----Original Message-----
-> > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > Sent: Friday, February 04, 2011 4:33 PM
-> > To: Santosh Shilimkar
-> > Cc: linux-arm-kernel at lists.infradead.org; Tony Lindgren; Jean Pihet-
-> > XID; linux-omap at vger.kernel.org; Nicolas Pitre
-> > Subject: Re: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility
-> > fixes
-> >
-> > On Fri, Feb 4, 2011 at 10:45 AM, Santosh Shilimkar
-> > <santosh.shilimkar@ti.com> wrote:
-> > > Dave,
-> > >> -----Original Message-----
-> > >> From: Dave Martin [mailto:dave.martin at linaro.org]
-> > >> Sent: Thursday, February 03, 2011 11:33 PM
-> > >> To: linux-arm-kernel at lists.infradead.org
-> > >> Cc: Dave Martin; Tony Lindgren; Santosh Shilimkar; Jean Pihet;
-> > >> linux-omap at vger.kernel.org; Nicolas Pitre
-> > >> Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility
-> > fixes
-> > >>
-> > >> This set of patches, along with some other patches under
-> > >> discussion on alkml, should enable omap3 and omap4 kernels to be
-> > >> built with CONFIG_THUMB2_KERNEL.
-> > >>
-> > >> This patch set builds on recent cleanup done by the omap
-> > >> maintainers.
-> > >>
-> > >> It is also more aggressive than my last post: all affected
-> > >> low-level code is now built in Thumb-2. ?At least some of this
-> > >> code definitely works, but whether the Secure firmware can talk
-> > >> to Thumb-2 code properly is unproven:
-> > >> in particular, I could use some help/advice from the omap
-> > >> community for validating that the low-level power management
-> > >> interactions actually work with this patch set.
-> > >>
-> > >> I've done simple "does it boot?" testing by building a single
-> > >> kernel with CONFIG_SMP_ON_UP and CONFIG_THUMB2_KERNEL enabled
-> > >> which works on Beagle xM A2 and Panda A1.
-> > >
-> > > I have boot tested this series on OMAP3430 and OMAP4430. Also
-> > > tested the RETENTION and OFF mode in suspend on OMAP3.
-> >
-> > Which tree did you use to test this?  It didn't seem to work for me
-> > --
-> > sometimes the system wouldn't suspend, complaining about USB suspend
-> > errors; and other times I couldn't bring it out of suspend (by
-> > poking
-> > a USB input device).
-> >
-> > I might be doing something wrong...
-> >
-> I should have mentioned this.
-> Used Kevins pm branch to test these features.
-> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110204 04:31]:
+> On Fri, Feb 04, 2011 at 08:39:34AM +0000, Russell King - ARM Linux wrote:
+> > Can't we just hard-configure the virtual/physical address at build
+> > time and be done with it?
+> > 
+> > I've given up with the current state of affairs which tries to use the
+> > platform ID to select the UART to use as it never seems to work, and I
+> > have a couple of patches which hard-code the address at compile time -
+> > one for the SDP4430 board and one for the LDP3430 board.
+> > 
+> > If it's complicated, then it probably won't work.  Keep it simple.
+> > That's especially true for debugging code, otherwise you need extra
+> > debugging code to debug why the debugging code doesn't work.
+> 
+> There's another good reason to hard-configure the UART port rather
+> than select it by ID.
+> 
+> The common usage scenario: you're bringing up a new board.  You know
+> you're going to have your console connected to UART2.  So, no matter
+> what you want your debug messages to come out of UART2 even if the
+> machine ID is wrong.
 
-Have you tried this kernel on Beagle xM with CONFIG_SMP and
-CONFIG_SMP_ON_UP enabled?  For me it hangs just after
-"Uncompressing Linux ... ok, booting the kernel".
+Yes that's an important debugging case too. Another common use
+case is "this kernel boots on machines a and b, but fails to boot
+on c and d".
+ 
+> By detecting the UART port from the machine number, you immediately
+> lose that ability, and therefore the confidence, that "if I build the
+> kernel for X with LL debug enabled, and monitor port Y, I will get
+> messages out of port Y, and not some other random port Z which I'd to
+> solder wires to to monitor."
 
-I haven't worked out why this happens as yet.
+True, but that easily also leads to confusion on why some kernel only
+boots on one machine. So maybe we can do something that can easily be
+selected in Kconfig for forcing certain port?
+ 
+> In other words, no messages on the monitored port changes from "we didn't
+> get into the kernel, or something early in the kernel boot before the C
+> code went wrong" to "... or maybe the debugging code failed to get the
+> right port too."
+> 
+> It is invaluable to know that the debugging code will always talk to
+> the same UART which you're monitoring.
 
-Also, I'm still not sure I'm testing the power management
-features correctly.  Do you know what config options I need to poke?
-Also, how do I resume after echo mem >/sys/power/state?
+I'll take a look how we can allow forcing the uart easily.
 
-Cheers
----Dave
+Regards,
+
+Tony
