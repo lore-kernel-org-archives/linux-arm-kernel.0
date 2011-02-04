@@ -1,30 +1,58 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 4 Feb 2011 11:15:17 -0600
-Subject: [PATCH] ep93xx: fix build error in edb93xx framebuffer support
-In-Reply-To: <20110204170753.GA8732@n2100.arm.linux.org.uk>
-References: <201102021738.22717.hartleys@visionengravers.com>
-	<0D753D10438DA54287A00B027084269764CF0C44E3@AUSP01VMBX24.collaborationhost.net>
-	<20110204170753.GA8732@n2100.arm.linux.org.uk>
-Message-ID: <0D753D10438DA54287A00B027084269764CF0C4546@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Feb 2011 17:15:26 +0000
+Subject: [PATCH 3/5] omap: Add support for CONFIG_AUTO_ZRELADDR for
+	DEBUG_LL
+In-Reply-To: <alpine.LFD.2.00.1102032205140.12104@xanadu.home>
+References: <20110204012317.26410.55157.stgit@baageli.muru.com>
+	<20110204012709.26410.78100.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1102032205140.12104@xanadu.home>
+Message-ID: <20110204171526.GA8821@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 04, 2011 10:08 AM, Russell King wrote:
-> On Fri, Feb 04, 2011 at 11:03:12AM -0600, H Hartley Sweeten wrote:
->> Russell,
->> 
->> The patch below is needed to fix a build error introduced by:
->> 
->> ARM: 6643/1: ep93xx: add framebuffer support to edb93xx boards
->> 
->> This patch is in linux-next now (commit 6491e80bbb830a593649be9fce83c6b2a520e8d7)
->> but has not reached Linus tree.
->> 
->> Should I add it to your patch tracking system?
->
-> It's probably just as easy to roll it into the existing patch.
-> I'll do that in a bit.
+On Thu, Feb 03, 2011 at 10:33:42PM -0500, Nicolas Pitre wrote:
+> On Thu, 3 Feb 2011, Tony Lindgren wrote:
+> 
+> > This way we can have the debug-macro.S be common for omap1 and omap2+
+> > and get sensible error messages booting the wrong zImage with
+> > CONFIG_AUTO_ZRELADDR selected. Note that this does not seem to work
+> > with u-boot and uImage.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > ---
+> >  arch/arm/mach-omap1/include/mach/debug-macro.S |   36 ++++++++++++++++++++----
+> >  arch/arm/mach-omap2/include/mach/debug-macro.S |   27 +++++++++++++++++-
+> >  2 files changed, 56 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
+> > index 80dcf18..bae924e 100644
+> > --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
+> > +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
+> > @@ -27,7 +27,15 @@
+> >  		.macro	inituart, id, a, v
+> >  		mrc	p15, 0, \a, c1, c0
+> >  		tst	\a, #1			@ MMU enabled?
+> > +#ifdef CONFIG_AUTO_ZRELADDR
+> > +		ldreq	\a, =omap_uart_phys
+> > +		biceq	\a, \a, #0xf8000000	@ clear top bits of virt addr
+> > +		moveq	\v, pc			@ copy pc
+> > +		andeq	\v, \v, #0xf8000000	@ clear lower bits
+> > +		orreq	\a, \v			@ combile to get phys addr
+> > +#else
+> >  		ldreq	\a, =omap_uart_v2p(omap_uart_phys)
+> > +#endif
+> >  		ldrne	\a, =omap_uart_phys
+> 
+> Gaaaaah!  This is horrible.
+> 
+> OK, you do want to store data in memory, right?  So the best way to 
+> always be position independent, even cross section, is to do the 
+> following (inspired by RMK's trick in the p2v series):
 
-Thanks!  Sorry for the trouble.
+The other point to make is that for every machine in OMAP1, the
+serial port is located at 0xffXXXXXX virtual, 0xfeXXXXXX physical.
+For OMAP2, that's 0xfaXXXXXX virtual and 0x48XXXXXX physical.
 
-Hartley
+So it's pointless storing both the virtual and physical addresses
+as we can compute one from the other with a single instruction.
+That gets rid of some of the complexity found in the debugging code.
