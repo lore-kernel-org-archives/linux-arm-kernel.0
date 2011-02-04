@@ -1,58 +1,83 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 3 Feb 2011 19:42:00 -0500 (EST)
-Subject: [PATCH v2] ARM: bitops: Use BX instead of MOV PC,LR
-In-Reply-To: <1296756434-26221-1-git-send-email-dave.martin@linaro.org>
-References: <1296756434-26221-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1102031940590.12104@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 03 Feb 2011 17:22:03 -0800
+Subject: [PATCH 0/2] Allow using machine ID for DEBUG_LL macros
+Message-ID: <20110204012008.26298.16341.stgit@baageli.muru.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Feb 2011, Dave Martin wrote:
+Hi all,
 
-> The kernel doesn't officially need to interwork, but using BX
-> wherever appropriate will help educate people into good assembler
-> coding habits.
-> 
-> BX is appropriate here because this code is predicated on
-> __LINUX_ARM_ARCH__ >= 6
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Here are two patches that allow using machine ID for DEBUG_LL
+macros by adding a new macro inituart.
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Will post the related omap changes separately.
+
+Regards,
+
+Tony
 
 
-> ---
->  arch/arm/lib/bitops.h |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/lib/bitops.h b/arch/arm/lib/bitops.h
-> index a9d9d15..5527e23 100644
-> --- a/arch/arm/lib/bitops.h
-> +++ b/arch/arm/lib/bitops.h
-> @@ -12,7 +12,7 @@
->  	strex	r0, r2, [r1]
->  	cmp	r0, #0
->  	bne	1b
-> -	mov	pc, lr
-> +	bx	lr
->  	.endm
->  
->  	.macro	testop, instr, store
-> @@ -33,7 +33,7 @@
->  	smp_dmb
->  	cmp	r0, #0
->  	movne	r0, #1
-> -2:	mov	pc, lr
-> +2:	bx	lr
->  	.endm
->  #else
->  	.macro	bitop, instr
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+---
+
+Tony Lindgren (2):
+      ARM: Add inituart macro to initialize DEBUG_LL serial port based on the machine ID
+      ARM: Add empty inituart macros
+
+
+ arch/arm/kernel/head-common.S                      |    7 +++++++
+ arch/arm/kernel/head.S                             |    5 +++++
+ arch/arm/mach-aaec2000/include/mach/debug-macro.S  |    4 ++++
+ arch/arm/mach-at91/include/mach/debug-macro.S      |    3 +++
+ arch/arm/mach-clps711x/include/mach/debug-macro.S  |    3 +++
+ arch/arm/mach-cns3xxx/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-davinci/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-dove/include/mach/debug-macro.S      |    3 +++
+ arch/arm/mach-ebsa110/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-ep93xx/include/mach/debug-macro.S    |    3 +++
+ .../arm/mach-footbridge/include/mach/debug-macro.S |    4 ++++
+ arch/arm/mach-gemini/include/mach/debug-macro.S    |    3 +++
+ .../arm/mach-integrator/include/mach/debug-macro.S |    3 +++
+ arch/arm/mach-iop13xx/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-iop32x/include/mach/debug-macro.S    |    3 +++
+ arch/arm/mach-iop33x/include/mach/debug-macro.S    |    3 +++
+ arch/arm/mach-ixp23xx/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-kirkwood/include/mach/debug-macro.S  |    3 +++
+ arch/arm/mach-ks8695/include/mach/debug-macro.S    |    3 +++
+ arch/arm/mach-l7200/include/mach/debug-macro.S     |    3 +++
+ arch/arm/mach-loki/include/mach/debug-macro.S      |    3 +++
+ arch/arm/mach-lpc32xx/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-mmp/include/mach/debug-macro.S       |    3 +++
+ arch/arm/mach-msm/include/mach/debug-macro.S       |    4 ++++
+ arch/arm/mach-mv78xx0/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-mxs/include/mach/debug-macro.S       |    3 +++
+ arch/arm/mach-netx/include/mach/debug-macro.S      |    3 +++
+ arch/arm/mach-nomadik/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-ns9xxx/include/mach/debug-macro.S    |    3 +++
+ arch/arm/mach-omap1/include/mach/debug-macro.S     |    3 +++
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |    3 +++
+ arch/arm/mach-pnx4008/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-pxa/include/mach/debug-macro.S       |    3 +++
+ arch/arm/mach-realview/include/mach/debug-macro.S  |    3 +++
+ arch/arm/mach-rpc/include/mach/debug-macro.S       |    3 +++
+ arch/arm/mach-s3c2410/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s3c24a0/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s3c64xx/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s5p6442/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s5p64x0/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s5pc100/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s5pv210/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-s5pv310/include/mach/debug-macro.S   |    3 +++
+ arch/arm/mach-sa1100/include/mach/debug-macro.S    |    3 +++
+ arch/arm/mach-shark/include/mach/debug-macro.S     |    3 +++
+ arch/arm/mach-u300/include/mach/debug-macro.S      |    3 +++
+ arch/arm/mach-ux500/include/mach/debug-macro.S     |    3 +++
+ arch/arm/mach-versatile/include/mach/debug-macro.S |    3 +++
+ arch/arm/mach-vexpress/include/mach/debug-macro.S  |    3 +++
+ arch/arm/plat-mxc/include/mach/debug-macro.S       |    3 +++
+ arch/arm/plat-spear/include/plat/debug-macro.S     |    3 +++
+ arch/arm/plat-stmp3xxx/include/mach/debug-macro.S  |    3 +++
+ arch/arm/plat-tcc/include/mach/debug-macro.S       |    3 +++
+ 53 files changed, 168 insertions(+), 0 deletions(-)
+
+-- 
+Signature
