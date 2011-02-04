@@ -1,185 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 18:17:49 +0000
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
-	<1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110204181749.GB8732@n2100.arm.linux.org.uk>
+From: subaparts@yandex.ru (Alexander Sverdlin)
+Date: Fri, 04 Feb 2011 21:20:01 +0300
+Subject: [PATCH] EDB93xx: Add support for CS4271 SPI-connected CODEC
+Message-ID: <1296843601.14577.14.camel@r60e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 05, 2011 at 10:08:12AM +0800, Shawn Guo wrote:
-> +struct mxs_dma_ccw_bits {
-> +	unsigned int	command:2;
-> +#define MXS_DMA_NO_XFER	0x00
-> +#define MXS_DMA_WRITE	0x01
-> +#define MXS_DMA_READ	0x02
-> +#define MXS_DMA_SENSE	0x03			/* not implemented */
-> +	unsigned int	chain:1;
-> +	unsigned int	irq:1;
-> +	unsigned int	nand_lock:1;		/* not implemented */
-> +	unsigned int	nand_wait4ready:1;	/* not implemented */
-> +	unsigned int	dec_sem:1;
-> +	unsigned int	wait4end:1;
-> +	unsigned int	halt_on_terminate:1;
-> +	unsigned int	terminate_flush:1;
-> +	unsigned int	reserved:2;
-> +	unsigned int	pio_num:4;
-> +	unsigned int	xfer_bytes:16;
-> +#define MAX_XFER_BYTES	0xffff
-> +};
+From: Alexander Sverdlin <subaparts@yandex.ru>
 
-Bitfields are subject to endianness issues.  Are you sure this is a good
-idea?
+Add support for CS4271 SPI-connected CODEC to EDB93xx.
+Modified according to latest comments by H Hartley Sweeten.
+        
+Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
+---
+ arch/arm/mach-ep93xx/edb93xx.c |   83 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 83 insertions(+), 0 deletions(-)
 
-> +static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> +{
-> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> +	dma_cookie_t cookie;
-> +
-> +	spin_lock_irq(&mxs_chan->lock);
-> +
-> +	cookie = mxs_dma_assign_cookie(mxs_chan);
-> +
-> +	mxs_dma_enable_chan(mxs_chan);
-> +
-> +	spin_unlock_irq(&mxs_chan->lock);
-
-Do you know that you'll always be called from an IRQs-enabled context?
-If not, you should use the irqsave/irqrestore versions.
-
-> +
-> +	return cookie;
-> +}
-> +
-> +static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = dev_id;
-> +	u32 stat1, stat2;
-> +
-> +	/* completion status */
-> +	stat1 = __raw_readl(mxs_dma->base + HW_APBHX_CTRL1);
-> +	stat1 &= 0xffff;
-> +	__mxs_clrl(stat1, mxs_dma->base + HW_APBHX_CTRL1);
-> +
-> +	/* error status */
-> +	stat2 = __raw_readl(mxs_dma->base + HW_APBHX_CTRL2);
-> +	__mxs_clrl(stat2, mxs_dma->base + HW_APBHX_CTRL2);
-
-Would it be useful to report error status when it happens?
-
-> +
-> +	/*
-> +	 * When both completion and error of termination bits set at the
-> +	 * same time, we do not take it as an error.  IOW, it only becomes
-> +	 * an error we need to handler here in case of ether it's an bus
-> +	 * error or a termination error with no completion.
-> +	 */
-> +	stat2 = ((stat2 >> 16) & stat2) |	   /* bus error */
-> +		(~(stat2 >> 16) & stat2 & ~stat1); /* termination with no completion */
-> +
-> +	/* combine error and completion status for checking */
-> +	stat1 = (stat2 << 16) | stat1;
-> +	while (stat1) {
-> +		int channel = fls(stat1) - 1;
-> +		struct mxs_dma_chan *mxs_chan =
-> +				&mxs_dma->mxs_chans[channel % 16];
-> +
-> +		if (channel >= 16) {
-> +			dev_dbg(mxs_dma->dev, "%s: error in channel %d\n",
-> +						__func__, channel - 16);
-> +			mxs_dma_reset_chan(mxs_chan);
-> +			mxs_chan->status = DMA_ERROR;
-> +		} else {
-> +			if (mxs_chan->flags & MXS_DMA_SG_LOOP)
-> +				mxs_chan->status = DMA_IN_PROGRESS;
-> +			else
-> +				mxs_chan->status = DMA_SUCCESS;
-> +		}
-> +
-> +		stat1 &= ~(1 << channel);
-> +
-> +		if (mxs_chan->desc.callback)
-> +			mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-
-Callbacks are supposed to happen from tasklet context, not irq context.
-
-> +
-> +		if (mxs_chan->status == DMA_SUCCESS)
-> +			mxs_chan->last_completed = mxs_chan->desc.cookie;
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> +	struct mxs_dma_data *data = chan->private;
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	static unsigned long flags;
-> +	int ret;
-> +
-> +	if (!data)
-> +		return -EINVAL;
-> +
-> +	mxs_chan->chan_irq = data->chan_irq;
-> +
-> +	mxs_chan->ccw = dma_alloc_coherent(NULL, PAGE_SIZE,
-> +				&mxs_chan->ccw_phys, GFP_KERNEL);
-
-Don't you have a struct device for this?  Without a struct device,
-dma_alloc_coherent() can only assume that it must give you something
-suitable for the smallest DMA mask in your system.  That seems
-to be mxs_dma->dev.
-
-> +	if (!mxs_chan->ccw) {
-> +		ret = -ENOMEM;
-> +		goto err_alloc;
-> +	}
-> +
-> +	memset(mxs_chan->ccw, 0, PAGE_SIZE);
-> +
-> +	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
-> +				flags, "mxs-dma", mxs_dma);
-> +	if (ret)
-> +		goto err_irq;
-> +
-> +	flags = IRQF_SHARED;
-
-Initialization of flags after use?
-
-> +
-> +	clk_enable(mxs_dma->clk);
-
-Error checking?
-
-> +
-> +	mxs_dma_reset_chan(mxs_chan);
-> +
-> +	dma_async_tx_descriptor_init(&mxs_chan->desc, chan);
-> +	mxs_chan->desc.tx_submit = mxs_dma_tx_submit;
-> +
-> +	/* the descriptor is ready */
-> +	async_tx_ack(&mxs_chan->desc);
-> +
-> +	return 0;
-> +
-> +err_irq:
-> +	dma_free_coherent(NULL, PAGE_SIZE, mxs_chan->ccw, mxs_chan->ccw_phys);
-> +err_alloc:
-> +	return ret;
-> +}
-> +
-> +static void mxs_dma_free_chan_resources(struct dma_chan *chan)
-> +{
-> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +
-> +	mxs_dma_disable_chan(mxs_chan);
-> +
-> +	free_irq(mxs_chan->chan_irq, mxs_dma);
-> +
-> +	dma_free_coherent(NULL, PAGE_SIZE, mxs_chan->ccw, mxs_chan->ccw_phys);
-
-Same comment about struct device.
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index 3f37567..2c2f84d 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -30,9 +30,13 @@
+ #include <linux/gpio.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
++#include <linux/spi/spi.h>
++
++#include <sound/cs4271.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
++#include <mach/ep93xx_spi.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -94,6 +98,83 @@ static void __init edb93xx_register_i2c(void)
+ 
+ 
+ /*************************************************************************
++ * EDB93xx SPI peripheral handling
++ *************************************************************************/
++static struct cs4271_platform_data edb93xx_cs4271_data = {
++	.gpio_nreset	= -EINVAL,	/* filled in later */
++};
++
++static int edb93xx_cs4271_hw_setup(struct spi_device *spi)
++{
++	return gpio_request_one(EP93XX_GPIO_LINE_EGPIO6,
++				GPIOF_OUT_INIT_HIGH, spi->modalias);
++}
++
++static void edb93xx_cs4271_hw_cleanup(struct spi_device *spi)
++{
++	gpio_free(EP93XX_GPIO_LINE_EGPIO6);
++}
++
++static void edb93xx_cs4271_hw_cs_control(struct spi_device *spi, int value)
++{
++	gpio_set_value(EP93XX_GPIO_LINE_EGPIO6, value);
++}
++
++static struct ep93xx_spi_chip_ops edb93xx_cs4271_hw = {
++	.setup		= edb93xx_cs4271_hw_setup,
++	.cleanup	= edb93xx_cs4271_hw_cleanup,
++	.cs_control	= edb93xx_cs4271_hw_cs_control,
++};
++
++static struct spi_board_info edb93xx_spi_board_info[] __initdata = {
++	{
++		.modalias		= "cs4271",
++		.platform_data		= &edb93xx_cs4271_data,
++		.controller_data	= &edb93xx_cs4271_hw,
++		.max_speed_hz		= 6000000,
++		.bus_num		= 0,
++		.chip_select		= 0,
++		.mode			= SPI_MODE_3,
++	},
++};
++
++static struct ep93xx_spi_info edb93xx_spi_info __initdata = {
++	.num_chipselect	= ARRAY_SIZE(edb93xx_spi_board_info),
++};
++
++static void __init edb93xx_register_spi(void)
++{
++	if (machine_is_edb9301() || machine_is_edb9302())
++		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO1;
++	else if (machine_is_edb9302a() || machine_is_edb9307a())
++		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_H(2);
++	else if (machine_is_edb9315a())
++		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
++
++	ep93xx_register_spi(&edb93xx_spi_info, edb93xx_spi_board_info,
++			    ARRAY_SIZE(edb93xx_spi_board_info));
++}
++
++
++/*************************************************************************
++ * EDB93xx I2S
++ *************************************************************************/
++static int __init edb93xx_has_audio(void)
++{
++	return (machine_is_edb9301() || machine_is_edb9302() ||
++		machine_is_edb9302a() || machine_is_edb9307a() ||
++		machine_is_edb9315a());
++}
++
++static void __init edb93xx_register_i2s(void)
++{
++	if (edb93xx_has_audio()) {
++		ep93xx_register_i2s();
++	}
++}
++
++
++/*************************************************************************
+  * EDB93xx pwm
+  *************************************************************************/
+ static void __init edb93xx_register_pwm(void)
+@@ -149,6 +230,8 @@ static void __init edb93xx_init_machine(void)
+ 	edb93xx_register_flash();
+ 	ep93xx_register_eth(&edb93xx_eth_data, 1);
+ 	edb93xx_register_i2c();
++	edb93xx_register_spi();
++	edb93xx_register_i2s();
+ 	edb93xx_register_pwm();
+ 	edb93xx_register_fb();
+ }
