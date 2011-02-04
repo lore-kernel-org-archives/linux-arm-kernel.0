@@ -1,293 +1,287 @@
-From: nvishwan@codeaurora.org (Niranjana Vishwanathapura)
-Date: Wed,  9 Feb 2011 11:16:34 -0800
-Subject: [PATCH v2] tty: Add msm_smd_tty driver
-Message-ID: <1297278994-22155-1-git-send-email-nvishwan@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 3 Feb 2011 21:59:38 -0700
+Subject: [RFC 2/2] ARM:boot:device tree: Merge specific atags into the
+	device tree
+In-Reply-To: <alpine.LFD.2.00.1102032342320.12104@xanadu.home>
+References: <20110126212220.6723.28773.stgit@riker>
+	<20110126212324.6723.25307.stgit@riker>
+	<alpine.LFD.2.00.1102032342320.12104@xanadu.home>
+Message-ID: <AANLkTik5M_82RCaPemn2_KaqJ6cH8RoGG1=cGx_1NqrH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msm_smd_tty driver provides tty device interface
-to 'DS' and 'GPSNMEA' streaming SMD ports.
+On Feb 3, 2011 9:44 PM, "Nicolas Pitre" <nico@fluxnic.net> wrote:
+>
+> On Wed, 26 Jan 2011, John Bonesio wrote:
+>
+> > This patch is to merge in key atags into the appended device tree.  An
+appended
+> > device tree is where the zImage has a dtb binary appended at the end of
+it. The
+> > boot code looks for an appended device tree, then looks for a few key
+atags
+> > passed in by the bootloader.
+> >
+> > The bootargs and memory size settings, if they exist, override existing
+values
+> > in the appended device tree. If these values don't currently exist in
+the
+> > appended device tree, they are added.
+> >
+> > Signed-off-by: John Bonesio <bones@secretlab.ca>
+> > Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>
+> This is just for testing/evaluation purpose and not intended to be
+> merged upstream at some point, right?
 
-Cc: Brian Swetland <swetland@google.com>
-Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
----
- drivers/tty/serial/Kconfig       |    9 ++
- drivers/tty/serial/Makefile      |    1 +
- drivers/tty/serial/msm_smd_tty.c |  236 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 246 insertions(+), 0 deletions(-)
- create mode 100644 drivers/tty/serial/msm_smd_tty.c
+Correct.
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index b1682d7..33cbc89 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1595,4 +1595,13 @@ config SERIAL_PCH_UART
- 	  This driver is for PCH(Platform controller Hub) UART of Intel EG20T
- 	  which is an IOH(Input/Output Hub) for x86 embedded processor.
- 	  Enabling PCH_DMA, this PCH UART works as DMA mode.
-+
-+config SERIAL_MSM_SMD
-+	bool "Enable tty device interface for some SMD ports"
-+	default n
-+	depends on MSM_SMD
-+	help
-+	  Enables userspace clients to read and write to some streaming SMD
-+	  ports via tty device interface for MSM chipset.
-+
- endmenu
-diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index 8ea92e9..0c6aefb 100644
---- a/drivers/tty/serial/Makefile
-+++ b/drivers/tty/serial/Makefile
-@@ -92,3 +92,4 @@ obj-$(CONFIG_SERIAL_MRST_MAX3110)	+= mrst_max3110.o
- obj-$(CONFIG_SERIAL_MFD_HSU)	+= mfd.o
- obj-$(CONFIG_SERIAL_IFX6X60)  	+= ifx6x60.o
- obj-$(CONFIG_SERIAL_PCH_UART)	+= pch_uart.o
-+obj-$(CONFIG_SERIAL_MSM_SMD)	+= msm_smd_tty.o
-diff --git a/drivers/tty/serial/msm_smd_tty.c b/drivers/tty/serial/msm_smd_tty.c
-new file mode 100644
-index 0000000..beeff1e
---- /dev/null
-+++ b/drivers/tty/serial/msm_smd_tty.c
-@@ -0,0 +1,236 @@
-+/* drivers/tty/serial/msm_smd_tty.c
-+ *
-+ * Copyright (C) 2007 Google, Inc.
-+ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
-+ * Author: Brian Swetland <swetland@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/fs.h>
-+#include <linux/cdev.h>
-+#include <linux/device.h>
-+#include <linux/wait.h>
-+
-+#include <linux/tty.h>
-+#include <linux/tty_driver.h>
-+#include <linux/tty_flip.h>
-+
-+#include <mach/msm_smd.h>
-+
-+#define MAX_SMD_TTYS 32
-+
-+struct smd_tty_info {
-+	struct tty_port port;
-+	smd_channel_t *ch;
-+};
-+
-+struct smd_tty_channel_desc {
-+	int id;
-+	const char *name;
-+};
-+
-+static struct smd_tty_info smd_tty[MAX_SMD_TTYS];
-+
-+static const struct smd_tty_channel_desc smd_default_tty_channels[] = {
-+	{ .id = 0, .name = "SMD_DS" },
-+	{ .id = 27, .name = "SMD_GPSNMEA" },
-+};
-+
-+static const struct smd_tty_channel_desc *smd_tty_channels =
-+		smd_default_tty_channels;
-+static int smd_tty_channels_len = ARRAY_SIZE(smd_default_tty_channels);
-+
-+static void smd_tty_notify(void *priv, unsigned event)
-+{
-+	unsigned char *ptr;
-+	int avail;
-+	struct smd_tty_info *info = priv;
-+	struct tty_struct *tty;
-+
-+	if (event != SMD_EVENT_DATA)
-+		return;
-+
-+	tty = tty_port_tty_get(&info->port);
-+	if (!tty)
-+		return;
-+
-+	for (;;) {
-+		if (test_bit(TTY_THROTTLED, &tty->flags))
-+			break;
-+		avail = smd_read_avail(info->ch);
-+		if (avail == 0)
-+			break;
-+
-+		avail = tty_prepare_flip_string(tty, &ptr, avail);
-+
-+		if (smd_read(info->ch, ptr, avail) != avail) {
-+			/* shouldn't be possible since we're in interrupt
-+			** context here and nobody else could 'steal' our
-+			** characters.
-+			*/
-+			pr_err("OOPS - smd_tty_buffer mismatch?!");
-+		}
-+
-+		tty_flip_buffer_push(tty);
-+	}
-+
-+	/* XXX only when writable and necessary */
-+	tty_wakeup(tty);
-+	tty_kref_put(tty);
-+}
-+
-+static int smd_tty_port_activate(struct tty_port *tport, struct tty_struct *tty)
-+{
-+	int i, res = 0;
-+	int n = tty->index;
-+	const char *name = NULL;
-+	struct smd_tty_info *info = smd_tty + n;
-+
-+	for (i = 0; i < smd_tty_channels_len; i++) {
-+		if (smd_tty_channels[i].id == n) {
-+			name = smd_tty_channels[i].name;
-+			break;
-+		}
-+	}
-+	if (!name)
-+		return -ENODEV;
-+
-+	if (info->ch)
-+		smd_kick(info->ch);
-+	else
-+		res = smd_open(name, &info->ch, info, smd_tty_notify);
-+
-+	if (!res)
-+		tty->driver_data = info;
-+
-+	return res;
-+}
-+
-+static void smd_tty_port_shutdown(struct tty_port *tport)
-+{
-+	struct smd_tty_info *info;
-+	struct tty_struct *tty = tty_port_tty_get(tport);
-+
-+	info = tty->driver_data;
-+	if (info->ch) {
-+		smd_close(info->ch);
-+		info->ch = 0;
-+	}
-+
-+	tty->driver_data = 0;
-+	tty_kref_put(tty);
-+}
-+
-+static int smd_tty_open(struct tty_struct *tty, struct file *f)
-+{
-+	struct smd_tty_info *info = smd_tty + tty->index;
-+
-+	return tty_port_open(&info->port, tty, f);
-+}
-+
-+static void smd_tty_close(struct tty_struct *tty, struct file *f)
-+{
-+	struct smd_tty_info *info = tty->driver_data;
-+
-+	tty_port_close(&info->port, tty, f);
-+}
-+
-+static int smd_tty_write(struct tty_struct *tty,
-+			 const unsigned char *buf, int len)
-+{
-+	struct smd_tty_info *info = tty->driver_data;
-+	int avail;
-+
-+	/* if we're writing to a packet channel we will
-+	** never be able to write more data than there
-+	** is currently space for
-+	*/
-+	avail = smd_write_avail(info->ch);
-+	if (len > avail)
-+		len = avail;
-+
-+	return smd_write(info->ch, buf, len);
-+}
-+
-+static int smd_tty_write_room(struct tty_struct *tty)
-+{
-+	struct smd_tty_info *info = tty->driver_data;
-+	return smd_write_avail(info->ch);
-+}
-+
-+static int smd_tty_chars_in_buffer(struct tty_struct *tty)
-+{
-+	struct smd_tty_info *info = tty->driver_data;
-+	return smd_read_avail(info->ch);
-+}
-+
-+static void smd_tty_unthrottle(struct tty_struct *tty)
-+{
-+	struct smd_tty_info *info = tty->driver_data;
-+	smd_kick(info->ch);
-+}
-+
-+static const struct tty_port_operations smd_tty_port_ops = {
-+	.shutdown = smd_tty_port_shutdown,
-+	.activate = smd_tty_port_activate,
-+};
-+
-+static const struct tty_operations smd_tty_ops = {
-+	.open = smd_tty_open,
-+	.close = smd_tty_close,
-+	.write = smd_tty_write,
-+	.write_room = smd_tty_write_room,
-+	.chars_in_buffer = smd_tty_chars_in_buffer,
-+	.unthrottle = smd_tty_unthrottle,
-+};
-+
-+static struct tty_driver *smd_tty_driver;
-+
-+static int __init smd_tty_init(void)
-+{
-+	int ret, i;
-+
-+	smd_tty_driver = alloc_tty_driver(MAX_SMD_TTYS);
-+	if (smd_tty_driver == 0)
-+		return -ENOMEM;
-+
-+	smd_tty_driver->owner = THIS_MODULE;
-+	smd_tty_driver->driver_name = "smd_tty_driver";
-+	smd_tty_driver->name = "smd";
-+	smd_tty_driver->major = 0;
-+	smd_tty_driver->minor_start = 0;
-+	smd_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
-+	smd_tty_driver->subtype = SERIAL_TYPE_NORMAL;
-+	smd_tty_driver->init_termios = tty_std_termios;
-+	smd_tty_driver->init_termios.c_iflag = 0;
-+	smd_tty_driver->init_termios.c_oflag = 0;
-+	smd_tty_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
-+	smd_tty_driver->init_termios.c_lflag = 0;
-+	smd_tty_driver->flags = TTY_DRIVER_RESET_TERMIOS |
-+		TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
-+	tty_set_operations(smd_tty_driver, &smd_tty_ops);
-+
-+	ret = tty_register_driver(smd_tty_driver);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < smd_tty_channels_len; i++) {
-+		tty_port_init(&smd_tty[smd_tty_channels[i].id].port);
-+		smd_tty[smd_tty_channels[i].id].port.ops = &smd_tty_port_ops;
-+		tty_register_device(smd_tty_driver, smd_tty_channels[i].id, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+module_init(smd_tty_init);
--- 
-1.5.6.3
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+> > ---
+> >
+> >  arch/arm/boot/compressed/Makefile |   31 +++++++++++++++++---
+> >  arch/arm/boot/compressed/atags.c  |   50
+++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/compressed/head.S   |    7 ++++
+> >  arch/arm/boot/compressed/misc.c   |   58
+++++++++++++++++++++++++++++++++++++-
+> >  4 files changed, 139 insertions(+), 7 deletions(-)
+> >  create mode 100644 arch/arm/boot/compressed/atags.c
+> >
+> > diff --git a/arch/arm/boot/compressed/Makefile
+b/arch/arm/boot/compressed/Makefile
+> > index 0a8f748..7978a39 100644
+> > --- a/arch/arm/boot/compressed/Makefile
+> > +++ b/arch/arm/boot/compressed/Makefile
+> > @@ -49,6 +49,10 @@ ifeq ($(CONFIG_ARCH_SHMOBILE),y)
+> >  OBJS         += head-shmobile.o
+> >  endif
+> >
+> > +ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
+> > +OBJS         += atags.o libfdt.a
+> > +endif
+> > +
+> >  #
+> >  # We now have a PIC decompressor implementation.  Decompressors running
+> >  # from RAM should not define ZTEXTADDR.  Decompressors running directly
+> > @@ -80,7 +84,9 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+> >  KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+> >  endif
+> >
+> > -EXTRA_CFLAGS  := -fpic -fno-builtin
+> > +fdttree      := $(srctree)/scripts/dtc/libfdt
+> > +
+> > +EXTRA_CFLAGS  := -fpic -fno-builtin -I$(fdttree) -I$(obj)
+> >  EXTRA_AFLAGS  := -Wa,-march=all
+> >
+> >  # Supply ZRELADDR to the decompressor via a linker symbol.
+> > @@ -100,13 +106,28 @@ LDFLAGS_vmlinux += -X
+> >  LDFLAGS_vmlinux += -T
+> >
+> >  # For __aeabi_uidivmod
+> > -lib1funcs = $(obj)/lib1funcs.o
+> > +libfuncs = $(obj)/lib1funcs.o
+> >
+> > -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
+> > -     $(call cmd,shipped)
+> > +ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
+> > +# For memchr, memmove, etc
+> > +libfuncs += $(obj)/memchr.o $(obj)/strchr.o $(obj)/memmove.o
+$(obj)/memzero.o
+> > +endif
+> > +
+> > +
+> > +libfdtheader := $(fdttree)/fdt.h $(fdttree)/libfdt.h
+$(fdttree)/libfdt_internal.h
+> > +libfdtobj    := $(obj)/fdt.o $(obj)/fdt_ro.o $(obj)/fdt_wip.o
+$(obj)/fdt_sw.o $(obj)/fdt_rw.o $(obj)/fdt_strerror.o
+> > +
+> > +$(libfdtobj): $(obj)/%.o: $(srctree)/scripts/dtc/libfdt/%.c
+$(libfdtheader)
+> > +     $(call cmd_cc_o_c)
+> > +
+> > +$(obj)/libfdt.a: $(libfdtobj)
+> > +     $(AR) rcs $@ $^
+> > +
+> > +$(libfuncs): $(obj)/%.o: $(srctree)/arch/$(SRCARCH)/lib/%.S
+> > +     $(call cmd_as_o_S)
+> >
+> >  $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD)
+$(obj)/piggy.$(suffix_y).o \
+> > -             $(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
+> > +             $(addprefix $(obj)/, $(OBJS)) $(libfuncs) FORCE
+> >       $(call if_changed,ld)
+> >       @:
+> >
+> > diff --git a/arch/arm/boot/compressed/atags.c
+b/arch/arm/boot/compressed/atags.c
+> > new file mode 100644
+> > index 0000000..e37d8de
+> > --- /dev/null
+> > +++ b/arch/arm/boot/compressed/atags.c
+> > @@ -0,0 +1,50 @@
+> > +#include <stddef.h>
+> > +#include <asm/byteorder.h>
+> > +#include <asm/setup.h>
+> > +#include <fdt.h>
+> > +#include <libfdt.h>
+> > +
+> > +
+> > +int dt_setprop(void *fdt, const char *node_path, const char *property,
+> > +               uint32_t *val_array, int size)
+> > +{
+> > +     int offset;
+> > +
+> > +     offset = fdt_path_offset(fdt, node_path);
+> > +     if (offset < 0)
+> > +             return offset;
+> > +
+> > +     return fdt_setprop(fdt, offset, property, val_array, size);
+> > +}
+> > +
+> > +int dt_setprop_string(void *fdt, const char *node_path,
+> > +                      const char *property, const char *string)
+> > +{
+> > +     int offset;
+> > +
+> > +     offset = fdt_path_offset(fdt, node_path);
+> > +     if (offset < 0)
+> > +             return offset;
+> > +
+> > +     return fdt_setprop_string(fdt, offset, property, string);
+> > +}
+> > +
+> > +void dt_merge_atags(void *dt,  void *ataglist)
+> > +{
+> > +     struct tag *atag = ataglist;
+> > +     uint32_t mem_reg_property[2];
+> > +
+> > +     while (atag && atag->hdr.tag != 0) {
+> > +             if (atag->hdr.tag == ATAG_CMDLINE) {
+> > +                     dt_setprop_string(dt, "/chosen", "bootargs",
+> > +                                       atag->u.cmdline.cmdline);
+> > +             } else if (atag->hdr.tag == ATAG_MEM) {
+> > +                     mem_reg_property[0] =
+cpu_to_fdt32(atag->u.mem.start);
+> > +                     mem_reg_property[1] =
+cpu_to_fdt32(atag->u.mem.size);
+> > +                     dt_setprop(dt, "/memory", "reg", mem_reg_property,
+> > +                                sizeof(mem_reg_property));
+> > +             }
+> > +             atag = tag_next(atag);
+> > +     }
+> > +}
+> > +
+> > diff --git a/arch/arm/boot/compressed/head.S
+b/arch/arm/boot/compressed/head.S
+> > index db860b3..09e659d 100644
+> > --- a/arch/arm/boot/compressed/head.S
+> > +++ b/arch/arm/boot/compressed/head.S
+> > @@ -257,6 +257,13 @@ not_relocated:
+> >               cmp     r1, r9
+> >               bne     keep_atags
+> >
+> > +             /* Merge some of the atags into the device tree */
+> > +             push    {r2, r3, r10, r11}
+> > +             mov     r0, r2
+> > +             mov     r1, r8
+> > +             bl      dt_merge_atags
+> > +             pop     {r2, r3, r10, r11}
+> > +
+> >               /* copy the device tree binary to 0x0 */
+> >               ldr     r9, [r10, #4]   @ device tree size
+> >
+> > diff --git a/arch/arm/boot/compressed/misc.c
+b/arch/arm/boot/compressed/misc.c
+> > index e653a6d..2d4da4c 100644
+> > --- a/arch/arm/boot/compressed/misc.c
+> > +++ b/arch/arm/boot/compressed/misc.c
+> > @@ -29,7 +29,7 @@ unsigned int __machine_arch_type;
+> >  #include <asm/unaligned.h>
+> >
+> >
+> > -static void putstr(const char *ptr);
+> > +void putstr(const char *ptr);
+> >  extern void error(char *x);
+> >
+> >  #include <mach/uncompress.h>
+> > @@ -100,7 +100,7 @@ static void icedcc_putc(int ch)
+> >  #define putc(ch)     icedcc_putc(ch)
+> >  #endif
+> >
+> > -static void putstr(const char *ptr)
+> > +void putstr(const char *ptr)
+> >  {
+> >       char c;
+> >
+> > @@ -114,6 +114,60 @@ static void putstr(const char *ptr)
+> >  }
+> >
+> >
+> > +#ifdef CONFIG_ARM_APPENDED_DTB
+> > +/**
+> > + * strlen - Find the length of a string
+> > + * @s: The string to be sized
+> > + */
+> > +size_t strlen(const char *s)
+> > +{
+> > +        const char *sc;
+> > +
+> > +        for (sc = s; *sc != '\0'; ++sc)
+> > +                /* nothing */;
+> > +        return sc - s;
+> > +}
+> > +
+> > +/**
+> > + * strcmp - Compare two strings
+> > + * @cs: One string
+> > + * @ct: Another string
+> > + */
+> > +#undef strcmp
+> > +int strcmp(const char *cs, const char *ct)
+> > +{
+> > +     unsigned char c1, c2;
+> > +
+> > +     while (1) {
+> > +             c1 = *cs++;
+> > +             c2 = *ct++;
+> > +             if (c1 != c2)
+> > +                     return c1 < c2 ? -1 : 1;
+> > +             if (!c1)
+> > +                     break;
+> > +     }
+> > +     return 0;
+> > +}
+> > +
+> > +/**
+> > + * memcmp - Compare two areas of memory
+> > + * @cs: One area of memory
+> > + * @ct: Another area of memory
+> > + * @count: The size of the area.
+> > + */
+> > +#undef memcmp
+> > +int memcmp(const void *cs, const void *ct, size_t count)
+> > +{
+> > +     const unsigned char *su1, *su2;
+> > +     int res = 0;
+> > +
+> > +     for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
+> > +             if ((res = *su1 - *su2) != 0)
+> > +                     break;
+> > +     return res;
+> > +}
+> > +#endif
+> > +
+> >  void *memcpy(void *__dest, __const void *__src, size_t __n)
+> >  {
+> >       int i = 0;
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110203/60251662/attachment-0001.html>
