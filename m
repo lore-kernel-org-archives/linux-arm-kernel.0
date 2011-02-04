@@ -1,57 +1,52 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Fri, 4 Feb 2011 12:29:25 -0800
-Subject: Question about ARM function graph tracing
-In-Reply-To: <AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
-References: <4D4B3D63.4090207@am.sony.com>
-	<AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
-Message-ID: <4D4C61A5.4050403@am.sony.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 04 Feb 2011 15:33:52 -0500 (EST)
+Subject: [PATCH 3/5] omap: Add support for CONFIG_AUTO_ZRELADDR for
+	DEBUG_LL
+In-Reply-To: <20110204202411.GA20795@atomide.com>
+References: <20110204012317.26410.55157.stgit@baageli.muru.com>
+	<20110204012709.26410.78100.stgit@baageli.muru.com>
+	<alpine.LFD.2.00.1102032205140.12104@xanadu.home>
+	<20110204170249.GV3322@atomide.com>
+	<alpine.LFD.2.00.1102041445360.12104@xanadu.home>
+	<20110204202411.GA20795@atomide.com>
+Message-ID: <alpine.LFD.2.00.1102041529250.12104@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rabin,
+On Fri, 4 Feb 2011, Tony Lindgren wrote:
 
-For a quick update, see below.
-
-On 02/03/2011 08:07 PM, Rabin Vincent wrote:
-> On Fri, Feb 4, 2011 at 05:12, Tim Bird <tim.bird@am.sony.com> wrote:
->> I sheepishly admit that I haven't been following mainline very
->> well. ?I was happily surprised to see you have mainlined ARMj
->> function graph tracing. ?I gave it a test on my old OMAP
->> OSK board, with the results shown below.
+> * Nicolas Pitre <nico@fluxnic.net> [110204 12:14]:
+> > 
+> > Just create a get_config_ptr macro or similar and the trickery will be 
+> > nicely encapsulated.  You'd have:
+> > 
+> > 	.macro get_config_ptr ptr, tmp
+> > 	b	9002f
+> > 	.align
+> > 9001:	.long	.
+> > 	.long	uart_param_storage
+> > 9002:	adr	\ptr, 9001b
+> > 	ldr	\tmp, [\ptr]
+> > 	sub	\tmp, \tmp, \ptr
+> > 	ldr	\ptr, [\ptr, #4]
+> > 	sub	\ptr, \ptr, \tmp
+> > 	.endm
+> > 
+> > 	.macro addruart rp, rv
+> > 	get_config_ptr \rv
+> > 	ldr	\rp, [\rv]
+> > 	ldr	\rv, [\rv, #4]
+> > 	.endm
+> > 
+> > And for the other macros, you get the hardware address to use already, 
+> > but you can still use get_config_ptr for extra config values you 
+> > need if necessary.
 > 
-> OMAP is missing a notrace annotation on omap_readl():
-> 
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38911.html
-> 
-> Part of that patch was merged through rmk's work, but the
-> omap_readl() annotation seems to have been missed.
-Yep.  It's missing in 2.6.38-rc3.
+> Thanks, will try that out next week. That might run into problems with
+> busyuart as it only has rd register to play with.
 
-> Also, if this is OMAP1 and not latest mainline, I think you
-> will need  a notrace on omap_rev() also (called from inside
-> omap_readl() until recently).
+With some code auditing we could declare ip as being callee clobberable 
+with those macros.
 
-I couldn't find that in the sched_clock code paths, but
-I 'notrace'd it anyways.
 
-> 
-> I think this is most probably what is wrong, since IIRC I saw
-> crashes like this on BeagleBoard before I added the notrace on
-> omap_readl.  Could you please try with these changes?
-
-I have sprinkled 'notrace's liberally throughout the sched_clock
-code (including omap_readl() and omap_rev()), and I'm still
-seeing problems.  I put a recursion guard in
-prepare_ftrace_return, and I'm seeing lots of recursion.  So
-there's still a notrace missing somewhere.
-
-I'm sure this is the problem, so thanks for pointing me in the
-right direction.  I'll keep trying to pin it down, and let
-you know what I find.
- -- Tim
-
-=============================
-Tim Bird
-Architecture Group Chair, CE Linux Forum
-Senior Staff Engineer, Sony Network Entertainment
-=============================
+Nicolas
