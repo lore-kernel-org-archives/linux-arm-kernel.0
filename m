@@ -1,160 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 Feb 2011 21:26:52 +0100
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <201102042126.52701.arnd@arndb.de>
+From: tim.bird@am.sony.com (Tim Bird)
+Date: Fri, 4 Feb 2011 12:29:25 -0800
+Subject: Question about ARM function graph tracing
+In-Reply-To: <AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
+References: <4D4B3D63.4090207@am.sony.com>
+	<AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
+Message-ID: <4D4C61A5.4050403@am.sony.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 05 February 2011 03:18:41 Shawn Guo wrote:
-> This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
-> The driver calls into mxs-dma via generic dmaengine api for both pio
-> and data transfer.
+Rabin,
 
-Hi Shawn,
+For a quick update, see below.
 
-The driver looks good coding-style wise, but it's my impression that
-you do some thing less efficient or more complex than necessary. To
-be more specific:
+On 02/03/2011 08:07 PM, Rabin Vincent wrote:
+> On Fri, Feb 4, 2011 at 05:12, Tim Bird <tim.bird@am.sony.com> wrote:
+>> I sheepishly admit that I haven't been following mainline very
+>> well. ?I was happily surprised to see you have mainlined ARMj
+>> function graph tracing. ?I gave it a test on my old OMAP
+>> OSK board, with the results shown below.
+> 
+> OMAP is missing a notrace annotation on omap_readl():
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38911.html
+> 
+> Part of that patch was merged through rmk's work, but the
+> omap_readl() annotation seems to have been missed.
+Yep.  It's missing in 2.6.38-rc3.
 
-> +struct mxs_mmc_host {
+> Also, if this is OMAP1 and not latest mainline, I think you
+> will need  a notrace on omap_rev() also (called from inside
+> omap_readl() until recently).
 
-It seems you have a number of members in this struct that only
-add confusion but are not actually needed, so just get rid of
-them:
+I couldn't find that in the sched_clock code paths, but
+I 'notrace'd it anyways.
 
-> +	struct device			*dev;
+> 
+> I think this is most probably what is wrong, since IIRC I saw
+> crashes like this on BeagleBoard before I added the notrace on
+> omap_readl.  Could you please try with these changes?
 
-mmc_host->parent ?
+I have sprinkled 'notrace's liberally throughout the sched_clock
+code (including omap_readl() and omap_rev()), and I'm still
+seeing problems.  I put a recursion guard in
+prepare_ftrace_return, and I'm seeing lots of recursion.  So
+there's still a notrace missing somewhere.
 
-> +	struct resource			*res;
-> +	struct resource			*dma_res;
-> +	struct clk			*clk;
+I'm sure this is the problem, so thanks for pointing me in the
+right direction.  I'll keep trying to pin it down, and let
+you know what I find.
+ -- Tim
 
-are visible in the parent.
-
-> +	unsigned int			version;
-
-unused
-
-> +	struct mmc_command		*cmd;
-
-mrq->cmd ?
-
-> +	struct mmc_data			*data;
-
-unused
-
-> +	unsigned			present:1;
-
-Your card detection by polling through this variable is
-really bad for power management. Is there really no interrupt
-that gets triggered when installing or removing a card?
-
-Also, please try to avoid bit fields. 'bool' variables are
-fine for flags.
-
-> +	unsigned int			dma_dir;
-
-not needed, a local variable would be just fine.
-
-> +	struct mxs_dma_data		dma_data;
-
-Why do you need host specific DMA structures? Please stick to
-the generic dma-engine API if possible.
-
-> +	struct completion 		done;
-
-The mmc layer already comes with a generic completion that you
-can and should use, mainly for performance reasons. Adding your
-own completion forces every single request to go through an
-additional context switch, compared to just returning from
-the request function when you have scheduled the command, and
-calling mmc_request_done from the interrupt handler.
-
-> +	u32				status;
-
-Won't be needed any more when you complete the requests at
-interrupt time.
-
-> +#define SSP_PIO_NUM	3
-> +static u32 ssp_pio_words[SSP_PIO_NUM];
-
-I don't think this is safe: This is a global variable, so if you have
-multiple controllers, they would access the same data. Why not integrate
-it into the host data structure?
-
-> +
-> +static void mxs_mmc_reset(struct mxs_mmc_host *host)
-> +{
-> +	u32 ctrl0, ctrl1;
-> +
-> +	mxs_reset_block(host->base);
-> +
-> +	ctrl0 = BM_SSP_CTRL0_IGNORE_CRC;
-> +	ctrl1 = BF_SSP(0x3, SSP_CTRL1_SSP_MODE) |
-> +		BF_SSP(0x7, SSP_CTRL1_WORD_LENGTH) |
-> +		BM_SSP_CTRL1_DMA_ENABLE |
-> +		BM_SSP_CTRL1_POLARITY |
-> +		BM_SSP_CTRL1_RECV_TIMEOUT_IRQ_EN |
-> +		BM_SSP_CTRL1_DATA_CRC_IRQ_EN |
-> +		BM_SSP_CTRL1_DATA_TIMEOUT_IRQ_EN |
-> +		BM_SSP_CTRL1_RESP_TIMEOUT_IRQ_EN |
-> +		BM_SSP_CTRL1_RESP_ERR_IRQ_EN;
-> +
-> +	__raw_writel(BF_SSP(0xffff, SSP_TIMING_TIMEOUT) |
-> +		     BF_SSP(2, SSP_TIMING_CLOCK_DIVIDE) |
-> +		     BF_SSP(0, SSP_TIMING_CLOCK_RATE),
-> +		     host->base + HW_SSP_TIMING);
-
-Please use proper MMIO accessors like writel() and readl() that
-are known to be safe here. The __raw_ variants are not really
-meant for device drivers, which can lead to very subtle bugs.
-
-> +static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
-> +{
-> +	struct mxs_mmc_host *host = dev_id;
-> +	u32 stat;
-> +
-> +	stat = __raw_readl(host->base + HW_SSP_CTRL1);
-> +	__mxs_clrl(stat & MXS_MMC_IRQ_BITS, host->base + HW_SSP_CTRL1);
-> +
-> +	if (host->cmd && (stat & MXS_MMC_ERR_BITS))
-> +		host->status = __raw_readl(host->base + HW_SSP_STATUS);
-> +
-> +	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
-> +		mmc_signal_sdio_irq(host->mmc);
-> +
-> +	return IRQ_HANDLED;
-> +}
-
-You use spin_lock_irqsave in mxs_mmc_enable_sdio_irq, but don't
-actually use the spinlock in the interrupt handler. This means
-that either your interrupt handler is broken because it doesn't
-lock, or that you don't actually need the _irqsave part.
-
-> +static void mxs_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
-> +{
-> +	struct mxs_mmc_host *host = mmc_priv(mmc);
-> +
-> +	BUG_ON(host->mrq != NULL);
-> +
-> +	host->mrq = mrq;
-> +	mxs_mmc_start_cmd(host, mrq->cmd);
-> +
-> +	if (mrq->data && mrq->data->stop) {
-> +		dev_dbg(host->dev, "Stop opcode is %u\n",
-> +				mrq->data->stop->opcode);
-> +		mxs_mmc_start_cmd(host, mrq->data->stop);
-> +	}
-> +
-> +	host->mrq = NULL;
-> +	mmc_request_done(mmc, mrq);
-> +}
-
-As mentioned above, the mmc_request_done() shouldn't really be needed here,
-it's more efficient to do it in the interrupt handler.
-
-	Arnd
+=============================
+Tim Bird
+Architecture Group Chair, CE Linux Forum
+Senior Staff Engineer, Sony Network Entertainment
+=============================
