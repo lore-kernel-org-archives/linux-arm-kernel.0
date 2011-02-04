@@ -1,31 +1,33 @@
-From: arve@android.com (=?ISO-8859-1?Q?Arve_Hj=F8nnev=E5g?=)
-Date: Thu, 3 Feb 2011 16:30:46 -0800
-Subject: [PATCH 1/5] ARM: etm: Don't require clock control
-In-Reply-To: <20110203124521.GK9810@sirena.org.uk>
-References: <1296701663-12168-1-git-send-email-arve@android.com>
-	<20110203124521.GK9810@sirena.org.uk>
-Message-ID: <AANLkTikybaV-jBo-q4Xb_POC5QRG9RRRV1RCDOnX9riG@mail.gmail.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Thu,  3 Feb 2011 19:34:47 -0500
+Subject: [PATCH 0/3] spi: davinci: move eventq parameter to platform data 
+Message-ID: <1296779690-9723-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 3, 2011 at 4:45 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Feb 02, 2011 at 06:54:19PM -0800, Arve Hj??nnev??g wrote:
->> If clk_get fail, assume the etb does not need a separate clock.
->>
->> Signed-off-by: Arve Hj??nnev??g <arve@android.com>
->
-> Would it not be cleaner for the affected platforms to ensure that
-> clk_get() does the right thing here, for example by returning a dummy
-> clock? ?Otherwise we'll just silently carry on if we can't get a clock
-> we were supposed to which doesn't seem ideal.
->
+For DMA operation, the davinci spi driver needs an eventq number.
+Currently, this number is passed as a IORESOURCE_DMA.  This is not
+correct, as the eventq is not a DMA channel.  Pass the eventq
+via the platform data structure instead as is done with davinci
+devices such as the McASP.
 
-This clock seem to be an omap specific virtual clock that switches the
-clock source of the etb. It is not used to enable the clock when the
-etb is in use, and it does not seem to have a failure case other than
-not existing. So, I don't know that requiring this clock would cause
-fewer problems than making it optional.
+Two platforms (dm355 and dm365) are using the davinci spi driver 
+with DMA's enabled, move the eventq parameter out of the resources
+and into the platform data.
 
---
-Arve Hj?nnev?g
+I have tested this patch with an OMAP-L138 (patch submission for this
+platform is in progress).  I do not have a dm355 or dm365, so these
+platforms have not been tested.
+
+Michael Williamson (3):
+  davinci: spi: move event_q parameter to platform data
+  davinci: dm355: move spi0 eventq assignment from resources to
+    platform data
+  davinci: dm365: move spi0 eventq assignment from resources to
+    platform data
+
+ arch/arm/mach-davinci/dm355.c            |    5 +----
+ arch/arm/mach-davinci/dm365.c            |    5 +----
+ arch/arm/mach-davinci/include/mach/spi.h |   15 ++++++++++-----
+ drivers/spi/davinci_spi.c                |   11 +++--------
+ 4 files changed, 15 insertions(+), 21 deletions(-)
