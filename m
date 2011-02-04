@@ -1,31 +1,43 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 4 Feb 2011 14:11:36 +0100
-Subject: [rtc-linux] [PATCH 00/20] world-writable files in sysfs and
-	debugfs
-In-Reply-To: <cover.1296818921.git.segoon@openwall.com>
-References: <cover.1296818921.git.segoon@openwall.com>
-Message-ID: <AANLkTik9FkP==O7athEugN4gLrnh7qyg_pPRR3MZ0La7@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 04 Feb 2011 16:16:42 +0300
+Subject: [PATCH v2 2/3] Kirkwood: enable PCIe before reading device ID
+	register
+In-Reply-To: <1296684971-10577-2-git-send-email-ecc@cmu.edu>
+References: <1296684971-10577-1-git-send-email-ecc@cmu.edu>
+	<1296684971-10577-2-git-send-email-ecc@cmu.edu>
+Message-ID: <4D4BFC3A.9060505@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/4 Vasiliy Kulikov <segoon@openwall.com>:
+Hello.
 
-> The search was made with trivial shell commands:
+On 03-02-2011 1:16, Eric Cooper wrote:
+
+> PCIe may have been disabled (by kirkwood_clock_gate)
+> if this kernel was started by kexec.  Make sure PCIe
+> is enabled before attempting to access the device ID
+> register, otherwise the system will hang.
+
+> Signed-off-by: Eric Cooper<ecc@cmu.edu>
+[...]
+
+> diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+> index 513ad31..ca294ff 100644
+> --- a/arch/arm/mach-kirkwood/pcie.c
+> +++ b/arch/arm/mach-kirkwood/pcie.c
+> @@ -18,8 +18,16 @@
+>   #include<mach/bridge-regs.h>
+>   #include "common.h"
 >
-> find | xargs grep S_IWUGO
-> find | xargs grep S_IWOTH
+> +void kirkwood_enable_pcie(void)
+> +{
+> +	u32 curr = readl(CLOCK_GATING_CTRL);
 
-We only use our debugfs entries as root so it shouldn't matter much, this
-is way better, thanks for fixing.
+    An empty line wouldn't hurt here...
 
-> ?mach-ux500: mbox-db5500: world-writable sysfs fifo file
-> ?mfd: ab3100: world-writable debugfs *_priv files
-> ?mfd: ab3500: world-writable debugfs register-* files
-> ?mfd: ab8500: world-writable debugfs register-* files
+> +	if (!(curr&  CGC_PEX0))
+> +		writel(curr | CGC_PEX0, CLOCK_GATING_CTRL);
+> +}
+> +
 
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
-
-For these.
-
-Yours,
-Linus Walleij
+WBR, Sergei
