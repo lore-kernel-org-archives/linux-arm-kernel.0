@@ -1,39 +1,31 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Feb 2011 22:39:33 -0500 (EST)
-Subject: [PATCH 0/2] Allow using machine ID for DEBUG_LL macros
-In-Reply-To: <20110204031307.GS3322@atomide.com>
-References: <20110204012008.26298.16341.stgit@baageli.muru.com>
-	<alpine.LFD.2.00.1102032057070.12104@xanadu.home>
-	<20110204031307.GS3322@atomide.com>
-Message-ID: <alpine.LFD.2.00.1102032235150.12104@xanadu.home>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 4 Feb 2011 09:37:54 +0530
+Subject: Question about ARM function graph tracing
+In-Reply-To: <4D4B3D63.4090207@am.sony.com>
+References: <4D4B3D63.4090207@am.sony.com>
+Message-ID: <AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Feb 2011, Tony Lindgren wrote:
+On Fri, Feb 4, 2011 at 05:12, Tim Bird <tim.bird@am.sony.com> wrote:
+> I sheepishly admit that I haven't been following mainline very
+> well. ?I was happily surprised to see you have mainlined ARM
+> function graph tracing. ?I gave it a test on my old OMAP
+> OSK board, with the results shown below.
 
-> * Nicolas Pitre <nico@fluxnic.net> [110203 18:01]:
-> > On Thu, 3 Feb 2011, Tony Lindgren wrote:
-> > 
-> > > Hi all,
-> > > 
-> > > Here are two patches that allow using machine ID for DEBUG_LL
-> > > macros by adding a new macro inituart.
-> > 
-> > This won't work with the device tree support as the machine ID is then 
-> > replaced with a catch-it-all-with-dt-support machine ID.
-> 
-> Hmm, maybe for device tree we could only have it initialized later
-> on by setting up custom early_printk in early_printk.c based on the
-> device tree data or machine ID?
-> 
-> It won't work very early then though.. If we want it to work early
-> we could allocate some fixed memory chunk for addruart etc functions
-> for which the bootloader just passes addresses.
+OMAP is missing a notrace annotation on omap_readl():
 
-Nah... Let's keep relationship between the kernel and bootloaders to a 
-strict minimum.  If necessary we'll find a way to extract that info from 
-the dtb in assembly.  I'd suggest just continuing this excellent cleanup 
-for the time being.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38911.html
 
+Part of that patch was merged through rmk's work, but the
+omap_readl() annotation seems to have been missed.
 
-Nicolas
+Also, if this is OMAP1 and not latest mainline, I think you
+will need  a notrace on omap_rev() also (called from inside
+omap_readl() until recently).
+
+I think this is most probably what is wrong, since IIRC I saw
+crashes like this on BeagleBoard before I added the notrace on
+omap_readl.  Could you please try with these changes?
+
+Rabin
