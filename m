@@ -1,28 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 4 Feb 2011 14:24:41 +0100
-Subject: [PATCH] mmci: calculate remaining bytes at error correctly
-In-Reply-To: <20110203140031.GB14627@n2100.arm.linux.org.uk>
-References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
-	<20110130212856.GA32737@n2100.arm.linux.org.uk>
-	<20110130212939.GA384@n2100.arm.linux.org.uk>
-	<AANLkTi=yj716us6bHFfGRwm2Q_iPEAJeQHDjB=3_pTe5@mail.gmail.com>
-	<20110203003054.GA7068@n2100.arm.linux.org.uk>
-	<20110203140031.GB14627@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=GKzkA_53Vo_=pc4fMhXCFpc088jcqe4AOgOSS@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 04 Feb 2011 16:31:40 +0300
+Subject: [PATCH] arm: mach-omap2: board-rm680: fix rm680_vemmc regulator
+	constraints
+In-Reply-To: <1296574588-23588-1-git-send-email-aaro.koskinen@nokia.com>
+References: <1296574588-23588-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <4D4BFFBC.4040606@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Thu, Feb 03, 2011 at 12:30:54AM +0000, Russell King - ARM Linux wrote:
->> It looks to me like the data counter decrements according to bytes
->> transferred on the MMC bus.
+Hello.
 
-Looks like that to me as well.
+On 01-02-2011 18:36, Aaro Koskinen wrote:
 
-> Right, this is what I've presently got, which appears to resolve
-> the issue for me. ?Ack?
+> With the commit 757902513019e6ee469791ff76f954b19ca8d036 fixed voltage
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+    Please also specify the commit summary in parens, as asked by Linus.
 
-Yours,
-Linus Walleij
+> regulator setup will fail if there are voltage constraints defined. This
+> made MMC unusable on this board. Fix by just deleting those redundant
+> constraints.
+
+> Signed-off-by: Aaro Koskinen<aaro.koskinen@nokia.com>
+
+WBR, Sergei
