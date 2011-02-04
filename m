@@ -1,41 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 13:20:40 +0000
-Subject: Locking in the clk API, part 2: clk_prepare/clk_unprepare
-In-Reply-To: <20110204124534.GA2597@richard-laptop>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<20110204124534.GA2597@richard-laptop>
-Message-ID: <20110204132040.GI14627@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 4 Feb 2011 14:24:41 +0100
+Subject: [PATCH] mmci: calculate remaining bytes at error correctly
+In-Reply-To: <20110203140031.GB14627@n2100.arm.linux.org.uk>
+References: <1296137666-30906-1-git-send-email-linus.walleij@stericsson.com>
+	<20110130212856.GA32737@n2100.arm.linux.org.uk>
+	<20110130212939.GA384@n2100.arm.linux.org.uk>
+	<AANLkTi=yj716us6bHFfGRwm2Q_iPEAJeQHDjB=3_pTe5@mail.gmail.com>
+	<20110203003054.GA7068@n2100.arm.linux.org.uk>
+	<20110203140031.GB14627@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=GKzkA_53Vo_=pc4fMhXCFpc088jcqe4AOgOSS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 08:45:34PM +0800, Richard Zhao wrote:
-> > == Implementation ==
-> > 
-> > Basically:
-> > 
-> > struct clk {
-> > 	const struct clk_ops *ops
-> > 	int                  enable_count;
-> > 	spinlock_t           enable_lock;
-> > 	int                  prepare_count;
-> > 	struct mutex         prepare_lock;
-> > };
-> > 
-> > int clk_enable(struct clk *clk)
-> > {
-> > 	int ret = 0;
-> > 
-> > 	spin_lock(&clk->enable_lock);
-> > 	if (!clk->enable_count)
-> > 		ret = clk->ops->enable(clk);
-> > 
-> > 	if (!ret)
-> > 		clk->enable_count++;
-> > 	spin_unlock(&clk->enable_lock);
-> > 
-> > 	return ret;
-> > }
-> Why do we not call parent's clk_enable in this function? For flexible? How many
-> different cases is causing us to move the effert to platform clock driver?
+2011/2/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Feb 03, 2011 at 12:30:54AM +0000, Russell King - ARM Linux wrote:
+>> It looks to me like the data counter decrements according to bytes
+>> transferred on the MMC bus.
 
-You may notice that struct clk above doesn't have a parent.
+Looks like that to me as well.
+
+> Right, this is what I've presently got, which appears to resolve
+> the issue for me. ?Ack?
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
