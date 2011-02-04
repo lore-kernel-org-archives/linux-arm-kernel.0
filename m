@@ -1,52 +1,66 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Fri, 4 Feb 2011 16:29:44 +0530
-Subject: [PATCH RFC] arm: omap3evm: Add support for an MT9M032 based
-	camera board.
-In-Reply-To: <1295389936-3238-1-git-send-email-martin@neutronstar.dyndns.org>
-References: <1295389936-3238-1-git-send-email-martin@neutronstar.dyndns.org>
-Message-ID: <AANLkTi=8tsm+MumkYhDdefJO1ZQannthfVpaz3MEN26T@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 4 Feb 2011 11:02:48 +0000
+Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <36192288611a2912eca9abc99a4353ff@mail.gmail.com>
+References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
+	<36192288611a2912eca9abc99a4353ff@mail.gmail.com>
+Message-ID: <AANLkTi=sPeQPfcGzrLSB=9-V805y6pnU4gA5QgqMSwWe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 19, 2011 at 04:02, Martin Hostettler
-<martin@neutronstar.dyndns.org> wrote:
-> Adds board support for an MT9M032 based camera to omap3evm.
+On Fri, Feb 4, 2011 at 10:45 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> Dave,
+>> -----Original Message-----
+>> From: Dave Martin [mailto:dave.martin at linaro.org]
+>> Sent: Thursday, February 03, 2011 11:33 PM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Cc: Dave Martin; Tony Lindgren; Santosh Shilimkar; Jean Pihet;
+>> linux-omap at vger.kernel.org; Nicolas Pitre
+>> Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+>>
+>> This set of patches, along with some other patches under
+>> discussion on alkml, should enable omap3 and omap4 kernels to be
+>> built with CONFIG_THUMB2_KERNEL.
+>>
+>> This patch set builds on recent cleanup done by the omap
+>> maintainers.
+>>
+>> It is also more aggressive than my last post: all affected
+>> low-level code is now built in Thumb-2. ?At least some of this
+>> code definitely works, but whether the Secure firmware can talk
+>> to Thumb-2 code properly is unproven:
+>> in particular, I could use some help/advice from the omap
+>> community for validating that the low-level power management
+>> interactions actually work with this patch set.
+>>
+>> I've done simple "does it boot?" testing by building a single
+>> kernel with CONFIG_SMP_ON_UP and CONFIG_THUMB2_KERNEL enabled
+>> which works on Beagle xM A2 and Panda A1.
 >
-> Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
-> ---
-> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/mach-omap2/board-omap3evm-camera.c | ?177 +++++++++++++++++++++++++++
-> ?2 files changed, 178 insertions(+), 0 deletions(-)
-> ?create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+> I have boot tested this series on OMAP3430 and OMAP4430. Also
+> tested the RETENTION and OFF mode in suspend on OMAP3.
+
+Which tree did you use to test this?  It didn't seem to work for me --
+sometimes the system wouldn't suspend, complaining about USB suspend
+errors; and other times I couldn't bring it out of suspend (by poking
+a USB input device).
+
+I might be doing something wrong...
+
+> I couldn't test the DVFS because it isn't in mainline yet
+> but the changes doesn't looks to break anything.
+>
+> So if you like, you can add
+> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >
 
-<<snip>>
+Thanks, that's great.
 
-> diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c b/arch/arm/mach-omap2/board-omap3evm-camera.c
-> new file mode 100644
-> index 0000000..ea82a49
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
-> @@ -0,0 +1,177 @@
-> +/*
-> + * Copyright (C) 2010-2011 Lund Engineering
-> + * Contact: Gil Lund <gwlund@lundeng.com>
-> + * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
-> + *
+If there some other tree with DVFS working which I could try?  Even if
+these patches don't apply, I may be able to test whether the changes
+should work.
 
-It would be good to provide one line description of the file.
-
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + */
+Cheers
+---Dave
