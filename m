@@ -1,58 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Feb 2011 17:15:26 +0000
-Subject: [PATCH 3/5] omap: Add support for CONFIG_AUTO_ZRELADDR for
-	DEBUG_LL
-In-Reply-To: <alpine.LFD.2.00.1102032205140.12104@xanadu.home>
-References: <20110204012317.26410.55157.stgit@baageli.muru.com>
-	<20110204012709.26410.78100.stgit@baageli.muru.com>
-	<alpine.LFD.2.00.1102032205140.12104@xanadu.home>
-Message-ID: <20110204171526.GA8821@n2100.arm.linux.org.uk>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Fri,  4 Feb 2011 19:34:55 +0200
+Subject: [PATCH] ep93xx: correct the end address of the AC97 memory resource
+Message-ID: <1296840895-21410-1-git-send-email-mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 03, 2011 at 10:33:42PM -0500, Nicolas Pitre wrote:
-> On Thu, 3 Feb 2011, Tony Lindgren wrote:
-> 
-> > This way we can have the debug-macro.S be common for omap1 and omap2+
-> > and get sensible error messages booting the wrong zImage with
-> > CONFIG_AUTO_ZRELADDR selected. Note that this does not seem to work
-> > with u-boot and uImage.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap1/include/mach/debug-macro.S |   36 ++++++++++++++++++++----
-> >  arch/arm/mach-omap2/include/mach/debug-macro.S |   27 +++++++++++++++++-
-> >  2 files changed, 56 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > index 80dcf18..bae924e 100644
-> > --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > @@ -27,7 +27,15 @@
-> >  		.macro	inituart, id, a, v
-> >  		mrc	p15, 0, \a, c1, c0
-> >  		tst	\a, #1			@ MMU enabled?
-> > +#ifdef CONFIG_AUTO_ZRELADDR
-> > +		ldreq	\a, =omap_uart_phys
-> > +		biceq	\a, \a, #0xf8000000	@ clear top bits of virt addr
-> > +		moveq	\v, pc			@ copy pc
-> > +		andeq	\v, \v, #0xf8000000	@ clear lower bits
-> > +		orreq	\a, \v			@ combile to get phys addr
-> > +#else
-> >  		ldreq	\a, =omap_uart_v2p(omap_uart_phys)
-> > +#endif
-> >  		ldrne	\a, =omap_uart_phys
-> 
-> Gaaaaah!  This is horrible.
-> 
-> OK, you do want to store data in memory, right?  So the best way to 
-> always be position independent, even cross section, is to do the 
-> following (inspired by RMK's trick in the p2v series):
+The last register is at offset 0xa8 making the resource end to be 0xac - 1
+instead of 0xb0 - 1.
 
-The other point to make is that for every machine in OMAP1, the
-serial port is located at 0xffXXXXXX virtual, 0xfeXXXXXX physical.
-For OMAP2, that's 0xfaXXXXXX virtual and 0x48XXXXXX physical.
+Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+---
+ arch/arm/mach-ep93xx/core.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-So it's pointless storing both the virtual and physical addresses
-as we can compute one from the other with a single instruction.
-That gets rid of some of the complexity found in the debugging code.
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index ffdf87b..8207954 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -838,7 +838,7 @@ EXPORT_SYMBOL(ep93xx_i2s_release);
+ static struct resource ep93xx_ac97_resources[] = {
+ 	{
+ 		.start	= EP93XX_AAC_PHYS_BASE,
+-		.end	= EP93XX_AAC_PHYS_BASE + 0xb0 - 1,
++		.end	= EP93XX_AAC_PHYS_BASE + 0xac - 1,
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-- 
+1.7.2.3
