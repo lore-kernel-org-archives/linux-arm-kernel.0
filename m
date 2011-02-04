@@ -1,82 +1,87 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 04 Feb 2011 15:03:43 +0300
-Subject: [PATCH 1/3] davinci: spi: move event_q parameter to platform data
-In-Reply-To: <1296779690-9723-2-git-send-email-michael.williamson@criticallink.com>
-References: <1296779690-9723-1-git-send-email-michael.williamson@criticallink.com>
-	<1296779690-9723-2-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <4D4BEB1F.6060200@mvista.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Fri, 4 Feb 2011 14:04:57 +0200
+Subject: [PATCH 2/5] omap: Use inituart to configure the debug serial port
+	based on machine ID
+In-Reply-To: <20110204012707.26410.28508.stgit@baageli.muru.com>
+References: <20110204012317.26410.55157.stgit@baageli.muru.com>
+	<20110204012707.26410.28508.stgit@baageli.muru.com>
+Message-ID: <AANLkTik7ommf_4HuahAxhMdaY-h-1JGsFfDzt2826d95@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 04-02-2011 3:34, Michael Williamson wrote:
-
-> For DMA operation, the davinci spi driver needs an eventq number.
-> Currently, this number is passed as a IORESOURCE_DMA.  This is not
-> correct, as the eventq is not a DMA channel.  Pass the eventq
-> via the platform data structure instead.
-
-> Signed-off-by: Michael Williamson<michael.williamson@criticallink.com>
-[...]
-
-> diff --git a/arch/arm/mach-davinci/include/mach/spi.h b/arch/arm/mach-davinci/include/mach/spi.h
-> index 38f4da5..0853a5f 100644
-> --- a/arch/arm/mach-davinci/include/mach/spi.h
-> +++ b/arch/arm/mach-davinci/include/mach/spi.h
-[...]
-> @@ -39,13 +41,16 @@ enum {
->    *		to populate if all chip-selects are internal.
->    * @cshold_bug:	set this to true if the SPI controller on your chip requires
->    *		a write to CSHOLD bit in between transfers (like in DM355).
-> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
-
-    s/event_q/event queue/?
-
-> + *		on the bus.
->    */
->   struct davinci_spi_platform_data {
-> -	u8	version;
-> -	u8	num_chipselect;
-> -	u8	intr_line;
-> -	u8	*chip_sel;
-> -	bool	cshold_bug;
-> +	u8			version;
-> +	u8			num_chipselect;
-> +	u8			intr_line;
-> +	u8			*chip_sel;
-> +	bool			cshold_bug;
-> +	enum dma_event_q	dma_event_q;
->   };
+On Fri, Feb 4, 2011 at 3:27 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Set the debug serial port based on machine ID. Note that most
+> of the patch is just trivial checking for the machine ID.
 >
->   /**
-> diff --git a/drivers/spi/davinci_spi.c b/drivers/spi/davinci_spi.c
-> index 6beab99..166a879 100644
-> --- a/drivers/spi/davinci_spi.c
-> +++ b/drivers/spi/davinci_spi.c
-[...]
-> @@ -878,17 +877,13 @@ static int davinci_spi_probe(struct platform_device *pdev)
->   	r = platform_get_resource(pdev, IORESOURCE_DMA, 1);
->   	if (r)
->   		dma_tx_chan = r->start;
-> -	r = platform_get_resource(pdev, IORESOURCE_DMA, 2);
-> -	if (r)
-> -		dma_eventq = r->start;
+> Also note that this code won't work for debugging the uncompress code.
 >
->   	dspi->bitbang.txrx_bufs = davinci_spi_bufs;
->   	if (dma_rx_chan != SPI_NO_RESOURCE&&
-> -	    dma_tx_chan != SPI_NO_RESOURCE&&
-> -	    dma_eventq != SPI_NO_RESOURCE) {
-> +	    dma_tx_chan != SPI_NO_RESOURCE) {
->   		dspi->dma.rx_channel = dma_rx_chan;
->   		dspi->dma.tx_channel = dma_tx_chan;
-> -		dspi->dma.eventq = dma_eventq;
-> +		dspi->dma.eventq = pdata->dma_event_q;
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
 
-    It makes sense to merge this patch with the patches 2 and 3 as otherwise 
-the bisectability is prevented for DM3[56]5 -- their 'dma_event_q' field will 
-be anonymously initialized to 0 after this patch but should be 1 and 3 instead 
-correspondingly. Although, this doesn't seem to be a fatal defect, so the 
-patches can be kept separate... Don't know what's better.
+<snip>
+> diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
+> index 336a838..45c29e3 100644
+> --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
+> +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
+<snip>
 
-WBR, Sergei
+> +
+> + ? ? ? ? ? ? ? /* omap3 based boards using uart3 */
+> + ? ? ? ? ? ? ? ldr ? ? \v, =MACH_TYPE_CM_T35
+> + ? ? ? ? ? ? ? cmp ? ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_CM_T3517
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_CRANEBOARD
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_DEVKIT8000
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_IGEP0020
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_IGEP0030
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_NOKIA_RM680
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_NOKIA_RX51
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_OMAP3517EVM
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_OMAP3_BEAGLE
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_OMAP3_PANDORA
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_OMAP_LDP
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_OVERO
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldrne ? \v, =MACH_TYPE_TOUCHBOOK
+> + ? ? ? ? ? ? ? cmpne ? \id, \v
+> + ? ? ? ? ? ? ? ldreq ? \v, =OMAP3_UART3_BASE
+> + ? ? ? ? ? ? ? streq ? \v, [\a, #0] ? ? ? ? ? ?@ save port phys addr
+> + ? ? ? ? ? ? ? ldreq ? \v, =(OMAP3_UART3_BASE + OMAP2_L4_IO_OFFSET)
+> + ? ? ? ? ? ? ? streq ? \v, [\a, #4] ? ? ? ? ? ?@ save port virt addr
+> + ? ? ? ? ? ? ? beq ? ? 999f
+
+This looks a bit wasteful not only because of repeated CMPs, but also
+LDRs are generating a large literal pool. Maybe something like that be
+better:
+
+    adr     r0, uart3_machines
+0:
+    ldrh    \v, [r0], #2
+    tst     \v, \v
+    beq     999f                    @ end of list
+    cmp     \id, \v
+    bne     0b
+    ldr     \v, =OMAP3_UART3_BASE
+    str     \v, [\a, #0]            @ save port phys addr
+    ldr     \v, =(OMAP3_UART3_BASE + OMAP2_L4_IO_OFFSET)
+    str     \v, [\a, #4]            @ save port virt addr
+    b       999f
+
+    uart3_machines:
+    .short MACH_TYPE_CM_T35
+    .short MACH_TYPE_CM_T3517
+    ...
+    .short 0
+
+of course this needs an extra register..
