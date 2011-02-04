@@ -1,78 +1,35 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Fri, 4 Feb 2011 09:20:36 +0100
-Subject: [PATCH 03/19] ab3550: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110202200139.7391044f@queued.net>
-References: <20110202195417.228e2656@queued.net>
-	<20110202200139.7391044f@queued.net>
-Message-ID: <4D4BB6D4.8070607@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Feb 2011 08:39:34 +0000
+Subject: [PATCH 1/2] ARM: Add inituart macro to initialize DEBUG_LL
+	serial port based on the machine ID
+In-Reply-To: <20110204012207.26298.16649.stgit@baageli.muru.com>
+References: <20110204012008.26298.16341.stgit@baageli.muru.com>
+	<20110204012207.26298.16649.stgit@baageli.muru.com>
+Message-ID: <20110204083934.GB15004@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andres,
-Thanks for your input on ab3550. You are absolutely right the platform 
-data is not used in mainline right now. However we have a few ab3550 
-drivers (regulator, gpadc..) that uses the platform data. They have been 
-lying on the shelf for a while now but I at least plan to mainline them 
-at some point.
+On Thu, Feb 03, 2011 at 05:22:07PM -0800, Tony Lindgren wrote:
+> Allow machine specific init of the DEBUG_LL serial port. This is needed
+> to debug kernels built with support for multiple machines compiled in
+> without recompiling the kernel.
+> 
+> As some SoCs need to use variables to store the port address and LSR
+> register configuration, we must call inituart again after clearing
+> the BSS.
+> 
+> If variables are being used for for inituart and addruart, this setup
+> won't work properly for debugging the uncompress code without patching
+> arch/arm/boot/compressed/head.S for the machine in question.
 
-BR,
-/Mattias Wallin
+Can't we just hard-configure the virtual/physical address at build
+time and be done with it?
 
-On 02/03/2011 05:01 AM, Andres Salomon wrote:
->
-> No need to explicitly set the cell's platform_data/data_size.
->
-> This wasn't actually used anywhere by the ab3550 stuff; dev_data
-> in mach-u300's i2c code was empty.
->
-> Signed-off-by: Andres Salomon<dilinger@queued.net>
-> ---
->   arch/arm/mach-u300/i2c.c   |    2 --
->   drivers/mfd/ab3550-core.c  |    6 ------
->   include/linux/mfd/abx500.h |    2 --
->   3 files changed, 0 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm/mach-u300/i2c.c b/arch/arm/mach-u300/i2c.c
-> index f0394ba..1ff7a82 100644
-> --- a/arch/arm/mach-u300/i2c.c
-> +++ b/arch/arm/mach-u300/i2c.c
-> @@ -291,8 +291,6 @@ static struct ab3550_platform_data ab3550_plf_data = {
->   		.base = IRQ_AB3550_BASE,
->   		.count = (IRQ_AB3550_END - IRQ_AB3550_BASE + 1),
->   	},
-> -	.dev_data = {
-> -	},
->   	.init_settings = ab3550_init_settings,
->   	.init_settings_sz = ARRAY_SIZE(ab3550_init_settings),
->   };
-> diff --git a/drivers/mfd/ab3550-core.c b/drivers/mfd/ab3550-core.c
-> index 5fbca34..47625b9 100644
-> --- a/drivers/mfd/ab3550-core.c
-> +++ b/drivers/mfd/ab3550-core.c
-> @@ -1319,12 +1319,6 @@ static int __init ab3550_probe(struct i2c_client *client,
->   	if (err)
->   		goto exit_no_ops;
->
-> -	/* Set up and register the platform devices. */
-> -	for (i = 0; i<  AB3550_NUM_DEVICES; i++) {
-> -		ab3550_devs[i].platform_data = ab3550_plf_data->dev_data[i];
-> -		ab3550_devs[i].data_size = ab3550_plf_data->dev_data_sz[i];
-> -	}
-> -
->   	err = mfd_add_devices(&client->dev, 0, ab3550_devs,
->   		ARRAY_SIZE(ab3550_devs), NULL,
->   		ab3550_plf_data->irq.base);
-> diff --git a/include/linux/mfd/abx500.h b/include/linux/mfd/abx500.h
-> index 67bd6f7..a735210 100644
-> --- a/include/linux/mfd/abx500.h
-> +++ b/include/linux/mfd/abx500.h
-> @@ -185,8 +185,6 @@ struct abx500_init_settings {
->    */
->   struct ab3550_platform_data {
->   	struct {unsigned int base; unsigned int count; } irq;
-> -	void *dev_data[AB3550_NUM_DEVICES];
-> -	size_t dev_data_sz[AB3550_NUM_DEVICES];
->   	struct abx500_init_settings *init_settings;
->   	unsigned int init_settings_sz;
->   };
+I've given up with the current state of affairs which tries to use the
+platform ID to select the UART to use as it never seems to work, and I
+have a couple of patches which hard-code the address at compile time -
+one for the SDP4430 board and one for the LDP3430 board.
+
+If it's complicated, then it probably won't work.  Keep it simple.
+That's especially true for debugging code, otherwise you need extra
+debugging code to debug why the debugging code doesn't work.
