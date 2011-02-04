@@ -1,66 +1,23 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 4 Feb 2011 11:02:48 +0000
-Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <36192288611a2912eca9abc99a4353ff@mail.gmail.com>
-References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
-	<36192288611a2912eca9abc99a4353ff@mail.gmail.com>
-Message-ID: <AANLkTi=sPeQPfcGzrLSB=9-V805y6pnU4gA5QgqMSwWe@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Feb 2011 11:03:42 +0000
+Subject: [PATCH 2/2] ARM: Make CONFIG_FPE_NWFPE depend on
+	!CONFIG_THUMB2_KERNEL
+In-Reply-To: <1291895982-4775-3-git-send-email-dave.martin@linaro.org>
+References: <1291895982-4775-1-git-send-email-dave.martin@linaro.org>
+	<1291895982-4775-3-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110204110342.GE15004@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 4, 2011 at 10:45 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Dave,
->> -----Original Message-----
->> From: Dave Martin [mailto:dave.martin at linaro.org]
->> Sent: Thursday, February 03, 2011 11:33 PM
->> To: linux-arm-kernel at lists.infradead.org
->> Cc: Dave Martin; Tony Lindgren; Santosh Shilimkar; Jean Pihet;
->> linux-omap at vger.kernel.org; Nicolas Pitre
->> Subject: [PATCH v2 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
->>
->> This set of patches, along with some other patches under
->> discussion on alkml, should enable omap3 and omap4 kernels to be
->> built with CONFIG_THUMB2_KERNEL.
->>
->> This patch set builds on recent cleanup done by the omap
->> maintainers.
->>
->> It is also more aggressive than my last post: all affected
->> low-level code is now built in Thumb-2. ?At least some of this
->> code definitely works, but whether the Secure firmware can talk
->> to Thumb-2 code properly is unproven:
->> in particular, I could use some help/advice from the omap
->> community for validating that the low-level power management
->> interactions actually work with this patch set.
->>
->> I've done simple "does it boot?" testing by building a single
->> kernel with CONFIG_SMP_ON_UP and CONFIG_THUMB2_KERNEL enabled
->> which works on Beagle xM A2 and Panda A1.
->
-> I have boot tested this series on OMAP3430 and OMAP4430. Also
-> tested the RETENTION and OFF mode in suspend on OMAP3.
+On Thu, Dec 09, 2010 at 11:59:42AM +0000, Dave Martin wrote:
+> Because the nwfpe support is unlikely to be used on new platforms
+> and requires CONFIG_OABI_COMPAT, which is not generally used with
+> ARMv7+, we shouldn't expect to build nwfpe support into a Thumb-2
+> kernel.
+> 
+> At present, nwfpe contains assembly code which isn't Thumb-2
+> compatible, and for now it doesn't appear useful to port this
+> code.
 
-Which tree did you use to test this?  It didn't seem to work for me --
-sometimes the system wouldn't suspend, complaining about USB suspend
-errors; and other times I couldn't bring it out of suspend (by poking
-a USB input device).
-
-I might be doing something wrong...
-
-> I couldn't test the DVFS because it isn't in mainline yet
-> but the changes doesn't looks to break anything.
->
-> So if you like, you can add
-> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-
-Thanks, that's great.
-
-If there some other tree with DVFS working which I could try?  Even if
-these patches don't apply, I may be able to test whether the changes
-should work.
-
-Cheers
----Dave
+You might as well make OABI_COMPAT depend on !THUMB2_KERNEL.  OABI
+userland is useless without FPA support.
