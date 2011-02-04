@@ -1,260 +1,147 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 03 Feb 2011 23:44:31 -0500 (EST)
-Subject: [RFC 2/2] ARM:boot:device tree: Merge specific atags into the
-	device tree
-In-Reply-To: <20110126212324.6723.25307.stgit@riker>
-References: <20110126212220.6723.28773.stgit@riker>
-	<20110126212324.6723.25307.stgit@riker>
-Message-ID: <alpine.LFD.2.00.1102032342320.12104@xanadu.home>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Fri, 4 Feb 2011 13:35:10 +0530
+Subject: [PATCH v3 2/2] Input: ads7846: use gpio_request_one to configure
+	pendown_gpio
+In-Reply-To: <20110203171953.GA13997@core.coreip.homeip.net>
+References: <1296746506-12221-1-git-send-email-sourav.poddar@ti.com>
+	<20110203165405.GB12802@core.coreip.homeip.net>
+	<20110203171953.GA13997@core.coreip.homeip.net>
+Message-ID: <AANLkTi=oYC8gbXrKodXvjdV-NHLCjM6Oz79Oob+MrP_8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jan 2011, John Bonesio wrote:
+On Thu, Feb 3, 2011 at 22:49, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> On Thu, Feb 03, 2011 at 08:54:05AM -0800, Dmitry Torokhov wrote:
+>> On Thu, Feb 03, 2011 at 08:51:46PM +0530, Sourav Poddar wrote:
+>> > The ads7846 driver requests a gpio but does not currently
+>> > configure it explicitly as an input. Use gpio_request_one
+>> > to request and configure it at one shot.
+>> >
+>> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> > Cc: Dmitry Torokhov <dtor@mail.ru>
+>>
+>> Will apply this one, the other one is a bit messy IMO, will have to
+>> think about it.
+>>
+>
+> Something like below should do I think.
+>
+> --
+> Dmitry
+>
+>
+> Input: ads7846 - check proper condition when freeing gpio
+>
+> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> When driver uses custom pendown detection method gpio_pendown is not
+> set up and so we should not try to free it, otherwise we are presented
+> with:
+>
+> ------------[ cut here ]------------
+> WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
+> Modules linked in:
+> [<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>](warn_slowpath_common+0x4c/0x64)
+> [<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>](warn_slowpath_null+0x18/0x1c)
+> [<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>](gpio_free+0x100/0x12c)
+> [<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>](ads7846_probe+0xa38/0xc5c)
+> [<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>](spi_drv_probe+0x18/0x1c)
+> [<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>](driver_probe_device+0xc8/0x184)
+> [<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>](__driver_attach+0x68/0x8c)
+> [<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>](bus_for_each_dev+0x48/0x74)
+> [<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>](bus_add_driver+0xa0/0x220)
+> [<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>](driver_register+0xa8/0x134)
+> [<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>](do_one_initcall+0xcc/0x1a4)
+> [<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>](kernel_init+0x14c/0x214)
+> [<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>](kernel_thread_exit+0x0/0x8)
+> ---[ end trace 4053287f8a5ec18f ]---
+>
+> Also rearrange ads7846_setup_pendown() to have only one exit point
+> returning success.
+>
+> Reported-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
 
-> This patch is to merge in key atags into the appended device tree.  An appended
-> device tree is where the zImage has a dtb binary appended at the end of it. The
-> boot code looks for an appended device tree, then looks for a few key atags
-> passed in by the bootloader.
-> 
-> The bootargs and memory size settings, if they exist, override existing values
-> in the appended device tree. If these values don't currently exist in the
-> appended device tree, they are added.
-> 
-> Signed-off-by: John Bonesio <bones@secretlab.ca>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-This is just for testing/evaluation purpose and not intended to be 
-merged upstream at some point, right?
+Reviewed-by: Charulatha V <charu@ti.com>
 
 > ---
-> 
->  arch/arm/boot/compressed/Makefile |   31 +++++++++++++++++---
->  arch/arm/boot/compressed/atags.c  |   50 ++++++++++++++++++++++++++++++++
->  arch/arm/boot/compressed/head.S   |    7 ++++
->  arch/arm/boot/compressed/misc.c   |   58 ++++++++++++++++++++++++++++++++++++-
->  4 files changed, 139 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm/boot/compressed/atags.c
-> 
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 0a8f748..7978a39 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -49,6 +49,10 @@ ifeq ($(CONFIG_ARCH_SHMOBILE),y)
->  OBJS		+= head-shmobile.o
->  endif
->  
-> +ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
-> +OBJS		+= atags.o libfdt.a 
-> +endif
+>
+> ?drivers/input/touchscreen/ads7846.c | ? 39 ++++++++++++++++++++---------------
+> ?1 files changed, 22 insertions(+), 17 deletions(-)
+>
+>
+> diff --git a/drivers/input/touchscreen/ads7846.c b/drivers/input/touchscreen/ads7846.c
+> index 0e9492d..b1217e1 100644
+> --- a/drivers/input/touchscreen/ads7846.c
+> +++ b/drivers/input/touchscreen/ads7846.c
+> @@ -946,30 +946,30 @@ static int __devinit ads7846_setup_pendown(struct spi_device *spi, struct ads784
+> ? ? ? ?struct ads7846_platform_data *pdata = spi->dev.platform_data;
+> ? ? ? ?int err;
+>
+> - ? ? ? /* REVISIT when the irq can be triggered active-low, or if for some
+> + ? ? ? /*
+> + ? ? ? ?* REVISIT when the irq can be triggered active-low, or if for some
+> ? ? ? ? * reason the touchscreen isn't hooked up, we don't need to access
+> ? ? ? ? * the pendown state.
+> ? ? ? ? */
+> - ? ? ? if (!pdata->get_pendown_state && !gpio_is_valid(pdata->gpio_pendown)) {
+> - ? ? ? ? ? ? ? dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
+> - ? ? ? ? ? ? ? return -EINVAL;
+> - ? ? ? }
+>
+> ? ? ? ?if (pdata->get_pendown_state) {
+> ? ? ? ? ? ? ? ?ts->get_pendown_state = pdata->get_pendown_state;
+> - ? ? ? ? ? ? ? return 0;
+> - ? ? ? }
+> + ? ? ? } else if (gpio_is_valid(pdata->gpio_pendown)) {
 > +
->  #
->  # We now have a PIC decompressor implementation.  Decompressors running
->  # from RAM should not define ZTEXTADDR.  Decompressors running directly
-> @@ -80,7 +84,9 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
->  KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
->  endif
->  
-> -EXTRA_CFLAGS  := -fpic -fno-builtin
-> +fdttree      := $(srctree)/scripts/dtc/libfdt
-> +
-> +EXTRA_CFLAGS  := -fpic -fno-builtin -I$(fdttree) -I$(obj)
->  EXTRA_AFLAGS  := -Wa,-march=all
->  
->  # Supply ZRELADDR to the decompressor via a linker symbol.
-> @@ -100,13 +106,28 @@ LDFLAGS_vmlinux += -X
->  LDFLAGS_vmlinux += -T
->  
->  # For __aeabi_uidivmod
-> -lib1funcs = $(obj)/lib1funcs.o
-> +libfuncs = $(obj)/lib1funcs.o
->  
-> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-> -	$(call cmd,shipped)
-> +ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
-> +# For memchr, memmove, etc
-> +libfuncs += $(obj)/memchr.o $(obj)/strchr.o $(obj)/memmove.o $(obj)/memzero.o
-> +endif
-> +
-> +
-> +libfdtheader := $(fdttree)/fdt.h $(fdttree)/libfdt.h $(fdttree)/libfdt_internal.h
-> +libfdtobj    := $(obj)/fdt.o $(obj)/fdt_ro.o $(obj)/fdt_wip.o $(obj)/fdt_sw.o $(obj)/fdt_rw.o $(obj)/fdt_strerror.o
-> +
-> +$(libfdtobj): $(obj)/%.o: $(srctree)/scripts/dtc/libfdt/%.c $(libfdtheader)
-> +	$(call cmd_cc_o_c)
-> +
-> +$(obj)/libfdt.a: $(libfdtobj)
-> +	$(AR) rcs $@ $^
-> +
-> +$(libfuncs): $(obj)/%.o: $(srctree)/arch/$(SRCARCH)/lib/%.S
-> +	$(call cmd_as_o_S)
->  
->  $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
-> -	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
-> +	 	$(addprefix $(obj)/, $(OBJS)) $(libfuncs) FORCE
->  	$(call if_changed,ld)
->  	@:
->  
-> diff --git a/arch/arm/boot/compressed/atags.c b/arch/arm/boot/compressed/atags.c
-> new file mode 100644
-> index 0000000..e37d8de
-> --- /dev/null
-> +++ b/arch/arm/boot/compressed/atags.c
-> @@ -0,0 +1,50 @@
-> +#include <stddef.h>
-> +#include <asm/byteorder.h>
-> +#include <asm/setup.h>
-> +#include <fdt.h>
-> +#include <libfdt.h>
-> +
-> +
-> +int dt_setprop(void *fdt, const char *node_path, const char *property,
-> +               uint32_t *val_array, int size)
-> +{
-> +	int offset;
-> +
-> +	offset = fdt_path_offset(fdt, node_path);
-> +	if (offset < 0)
-> +		return offset;
-> +
-> +	return fdt_setprop(fdt, offset, property, val_array, size);
-> +}
-> +
-> +int dt_setprop_string(void *fdt, const char *node_path,
-> +                      const char *property, const char *string)
-> +{
-> +	int offset;
-> +		
-> +	offset = fdt_path_offset(fdt, node_path);
-> +	if (offset < 0)
-> +		return offset;
-> +			
-> +	return fdt_setprop_string(fdt, offset, property, string);
-> +}
-> +
-> +void dt_merge_atags(void *dt,  void *ataglist)
-> +{
-> +	struct tag *atag = ataglist;
-> +	uint32_t mem_reg_property[2];
-> +
-> +	while (atag && atag->hdr.tag != 0) {
-> +		if (atag->hdr.tag == ATAG_CMDLINE) {
-> +			dt_setprop_string(dt, "/chosen", "bootargs",
-> +			                  atag->u.cmdline.cmdline);
-> +		} else if (atag->hdr.tag == ATAG_MEM) {
-> +			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
-> +			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
-> +			dt_setprop(dt, "/memory", "reg", mem_reg_property,
-> +			           sizeof(mem_reg_property));
-> +		}
-> +		atag = tag_next(atag);
-> +	}
-> +}
-> +
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index db860b3..09e659d 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -257,6 +257,13 @@ not_relocated:
->  		cmp	r1, r9
->  		bne	keep_atags
->  
-> +		/* Merge some of the atags into the device tree */
-> +		push	{r2, r3, r10, r11}
-> +		mov	r0, r2
-> +		mov	r1, r8
-> +		bl	dt_merge_atags
-> +		pop	{r2, r3, r10, r11}
-> +
->  		/* copy the device tree binary to 0x0 */
->  		ldr	r9, [r10, #4]	@ device tree size
->  
-> diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-> index e653a6d..2d4da4c 100644
-> --- a/arch/arm/boot/compressed/misc.c
-> +++ b/arch/arm/boot/compressed/misc.c
-> @@ -29,7 +29,7 @@ unsigned int __machine_arch_type;
->  #include <asm/unaligned.h>
->  
->  
-> -static void putstr(const char *ptr);
-> +void putstr(const char *ptr);
->  extern void error(char *x);
->  
->  #include <mach/uncompress.h>
-> @@ -100,7 +100,7 @@ static void icedcc_putc(int ch)
->  #define putc(ch)	icedcc_putc(ch)
->  #endif
->  
-> -static void putstr(const char *ptr)
-> +void putstr(const char *ptr)
->  {
->  	char c;
->  
-> @@ -114,6 +114,60 @@ static void putstr(const char *ptr)
->  }
->  
->  
-> +#ifdef CONFIG_ARM_APPENDED_DTB
-> +/**
-> + * strlen - Find the length of a string
-> + * @s: The string to be sized
-> + */
-> +size_t strlen(const char *s)
-> +{
-> +        const char *sc;
-> +
-> +        for (sc = s; *sc != '\0'; ++sc)
-> +                /* nothing */;
-> +        return sc - s;
-> +}
-> +
-> +/**
-> + * strcmp - Compare two strings
-> + * @cs: One string
-> + * @ct: Another string
-> + */
-> +#undef strcmp
-> +int strcmp(const char *cs, const char *ct)
-> +{
-> +	unsigned char c1, c2;
-> +
-> +	while (1) {
-> +		c1 = *cs++;
-> +		c2 = *ct++;
-> +		if (c1 != c2)
-> +			return c1 < c2 ? -1 : 1;
-> +		if (!c1)
-> +			break;
-> +	}
-> +	return 0;
-> +}
-> +
-> +/**
-> + * memcmp - Compare two areas of memory
-> + * @cs: One area of memory
-> + * @ct: Another area of memory
-> + * @count: The size of the area.
-> + */
-> +#undef memcmp
-> +int memcmp(const void *cs, const void *ct, size_t count)
-> +{
-> +	const unsigned char *su1, *su2;
-> +	int res = 0;
-> +
-> +	for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
-> +		if ((res = *su1 - *su2) != 0)
-> +			break;
-> +	return res;
-> +}
-> +#endif
-> +
->  void *memcpy(void *__dest, __const void *__src, size_t __n)
->  {
->  	int i = 0;
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> + ? ? ? ? ? ? ? err = gpio_request_one(pdata->gpio_pendown, GPIOF_DIR_IN,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "ads7846_pendown");
+> + ? ? ? ? ? ? ? if (err) {
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(&spi->dev, "failed to request pendown GPIO%d\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdata->gpio_pendown);
+> + ? ? ? ? ? ? ? ? ? ? ? return err;
+> + ? ? ? ? ? ? ? }
+>
+> - ? ? ? err = gpio_request_one(pdata->gpio_pendown, GPIOF_DIR_IN,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "ads7846_pendown");
+> - ? ? ? if (err) {
+> - ? ? ? ? ? ? ? dev_err(&spi->dev, "failed to request pendown GPIO%d\n",
+> - ? ? ? ? ? ? ? ? ? ? ? pdata->gpio_pendown);
+> - ? ? ? ? ? ? ? return err;
+> + ? ? ? ? ? ? ? ts->gpio_pendown = pdata->gpio_pendown;
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
+> + ? ? ? ? ? ? ? return -EINVAL;
+> ? ? ? ?}
+>
+> - ? ? ? ts->gpio_pendown = pdata->gpio_pendown;
+> -
+> ? ? ? ?return 0;
+> ?}
+>
+> @@ -1359,7 +1359,7 @@ static int __devinit ads7846_probe(struct spi_device *spi)
+> ?err_put_regulator:
+> ? ? ? ?regulator_put(ts->reg);
+> ?err_free_gpio:
+> - ? ? ? if (ts->gpio_pendown != -1)
+> + ? ? ? if (!ts->get_pendown_state)
+> ? ? ? ? ? ? ? ?gpio_free(ts->gpio_pendown);
+> ?err_cleanup_filter:
+> ? ? ? ?if (ts->filter_cleanup)
+> @@ -1389,8 +1389,13 @@ static int __devexit ads7846_remove(struct spi_device *spi)
+> ? ? ? ?regulator_disable(ts->reg);
+> ? ? ? ?regulator_put(ts->reg);
+>
+> - ? ? ? if (ts->gpio_pendown != -1)
+> + ? ? ? if (!ts->get_pendown_state) {
+> + ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ?* If we are not using specialized pendown method we must
+> + ? ? ? ? ? ? ? ?* have been relying on gpio we set up ourselves.
+> + ? ? ? ? ? ? ? ?*/
+> ? ? ? ? ? ? ? ?gpio_free(ts->gpio_pendown);
+> + ? ? ? }
+>
+> ? ? ? ?if (ts->filter_cleanup)
+> ? ? ? ? ? ? ? ?ts->filter_cleanup(ts->filter_data);
+>
