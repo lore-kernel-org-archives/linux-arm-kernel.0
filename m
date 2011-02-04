@@ -1,67 +1,31 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Fri, 4 Feb 2011 18:29:23 +0530
-Subject: [PATCH v3 2/2] Input: ads7846: use gpio_request_one to configure
-	pendown_gpio
-In-Reply-To: <20110203171953.GA13997@core.coreip.homeip.net>
-References: <1296746506-12221-1-git-send-email-sourav.poddar@ti.com>
-	<20110203165405.GB12802@core.coreip.homeip.net>
-	<20110203171953.GA13997@core.coreip.homeip.net>
-Message-ID: <AANLkTi=xhKxLooW2BraibKYv=0Ju_so1P2UyW5YFUOVY@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 4 Feb 2011 14:11:36 +0100
+Subject: [rtc-linux] [PATCH 00/20] world-writable files in sysfs and
+	debugfs
+In-Reply-To: <cover.1296818921.git.segoon@openwall.com>
+References: <cover.1296818921.git.segoon@openwall.com>
+Message-ID: <AANLkTik9FkP==O7athEugN4gLrnh7qyg_pPRR3MZ0La7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 3, 2011 at 10:49 PM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Thu, Feb 03, 2011 at 08:54:05AM -0800, Dmitry Torokhov wrote:
->> On Thu, Feb 03, 2011 at 08:51:46PM +0530, Sourav Poddar wrote:
->> > The ads7846 driver requests a gpio but does not currently
->> > configure it explicitly as an input. Use gpio_request_one
->> > to request and configure it at one shot.
->> >
->> > Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
->> > Cc: Dmitry Torokhov <dtor@mail.ru>
->>
->> Will apply this one, the other one is a bit messy IMO, will have to
->> think about it.
->>
->
-> Something like below should do I think.
->
-> --
-> Dmitry
->
->
-> Input: ads7846 - check proper condition when freeing gpio
->
-> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->
-> When driver uses custom pendown detection method gpio_pendown is not
-> set up and so we should not try to free it, otherwise we are presented
-> with:
->
-> ------------[ cut here ]------------
-> WARNING: at drivers/gpio/gpiolib.c:1258 gpio_free+0x100/0x12c()
-> Modules linked in:
-> [<c0061208>] (unwind_backtrace+0x0/0xe4) from [<c0091f58>](warn_slowpath_common+0x4c/0x64)
-> [<c0091f58>] (warn_slowpath_common+0x4c/0x64) from [<c0091f88>](warn_slowpath_null+0x18/0x1c)
-> [<c0091f88>] (warn_slowpath_null+0x18/0x1c) from [<c024e610>](gpio_free+0x100/0x12c)
-> [<c024e610>] (gpio_free+0x100/0x12c) from [<c03e9fbc>](ads7846_probe+0xa38/0xc5c)
-> [<c03e9fbc>] (ads7846_probe+0xa38/0xc5c) from [<c02cff14>](spi_drv_probe+0x18/0x1c)
-> [<c02cff14>] (spi_drv_probe+0x18/0x1c) from [<c028bca4>](driver_probe_device+0xc8/0x184)
-> [<c028bca4>] (driver_probe_device+0xc8/0x184) from [<c028bdc8>](__driver_attach+0x68/0x8c)
-> [<c028bdc8>] (__driver_attach+0x68/0x8c) from [<c028b4c8>](bus_for_each_dev+0x48/0x74)
-> [<c028b4c8>] (bus_for_each_dev+0x48/0x74) from [<c028ae08>](bus_add_driver+0xa0/0x220)
-> [<c028ae08>] (bus_add_driver+0xa0/0x220) from [<c028c0c0>](driver_register+0xa8/0x134)
-> [<c028c0c0>] (driver_register+0xa8/0x134) from [<c0050550>](do_one_initcall+0xcc/0x1a4)
-> [<c0050550>] (do_one_initcall+0xcc/0x1a4) from [<c00084e4>](kernel_init+0x14c/0x214)
-> [<c00084e4>] (kernel_init+0x14c/0x214) from [<c005b494>](kernel_thread_exit+0x0/0x8)
-> ---[ end trace 4053287f8a5ec18f ]---
->
-> Also rearrange ads7846_setup_pendown() to have only one exit point
-> returning success.
->
-> Reported-by: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
-> ---
+2011/2/4 Vasiliy Kulikov <segoon@openwall.com>:
 
-Acked-by: Sourav Poddar <sourav.poddar@ti.com>
+> The search was made with trivial shell commands:
+>
+> find | xargs grep S_IWUGO
+> find | xargs grep S_IWOTH
+
+We only use our debugfs entries as root so it shouldn't matter much, this
+is way better, thanks for fixing.
+
+> ?mach-ux500: mbox-db5500: world-writable sysfs fifo file
+> ?mfd: ab3100: world-writable debugfs *_priv files
+> ?mfd: ab3500: world-writable debugfs register-* files
+> ?mfd: ab8500: world-writable debugfs register-* files
+
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+
+For these.
+
+Yours,
+Linus Walleij
