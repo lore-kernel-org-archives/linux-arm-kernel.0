@@ -1,47 +1,96 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 5 Feb 2011 10:08:11 +0800
-Subject: Add dma support for i.MX23/28
-Message-ID: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
+Date: Sat, 5 Feb 2011 10:08:13 +0800
+Subject: [PATCH 2/5] ARM: mxs: add dma channel definitions
+In-Reply-To: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
+References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1296871696-21008-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is to add dma support for i.MX23/28, including
-apbh-dma and apbx-dma.  The apbh-dma was tested with mxs-mmc driver
-on mx23evk and mx28evk boards.  And mxs-mmc driver will be posted
-for review later.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-mxs/include/mach/mx23.h |   24 +++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/mx28.h |   37 +++++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+), 0 deletions(-)
 
-It's based on Sascha's imx-for-2.6.39 tree since commit:
-
-    22cbba1b82de458028f4aa270e88492b622c1ea8
-    ARM: mxs: dynamically register flexcan devices for mx28
-
-Thanks for review.
-
-Regards,
-Shawn
-
-Shawn Guo (5):
- [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
- [PATCH 2/5] ARM: mxs: add dma channel definitions
- [PATCH 3/5] ARM: mxs: dynamically allocate dma device for mx23/28
- [PATCH 4/5] ARM: mxs/mx23evk: add dma device
- [PATCH 5/5] ARM: mxs/mx28evk: add dma device
-
- arch/arm/mach-mxs/Kconfig                       |    2 +
- arch/arm/mach-mxs/clock-mx23.c                  |    3 +-
- arch/arm/mach-mxs/clock-mx28.c                  |    4 +-
- arch/arm/mach-mxs/devices-mx23.h                |    6 +
- arch/arm/mach-mxs/devices-mx28.h                |    6 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-dma.c        |   50 ++
- arch/arm/mach-mxs/include/mach/devices-common.h |    7 +
- arch/arm/mach-mxs/include/mach/dma.h            |   16 +
- arch/arm/mach-mxs/include/mach/mx23.h           |   24 +
- arch/arm/mach-mxs/include/mach/mx28.h           |   37 ++
- arch/arm/mach-mxs/mach-mx23evk.c                |    8 +
- arch/arm/mach-mxs/mach-mx28evk.c                |    8 +
- drivers/dma/Kconfig                             |    8 +
- drivers/dma/Makefile                            |    1 +
- drivers/dma/mxs-dma.c                           |  702 +++++++++++++++++++++++
- 17 files changed, 883 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
+index 9edd02e..1730c9c 100644
+--- a/arch/arm/mach-mxs/include/mach/mx23.h
++++ b/arch/arm/mach-mxs/include/mach/mx23.h
+@@ -142,4 +142,28 @@
+ #define MX23_INT_VDD5V_DROOP		64
+ #define MX23_INT_DCDC4P2_BO		65
+ 
++/*
++ * APBH DMA
++ */
++#define MX23_DMA_SSP1			1
++#define MX23_DMA_SSP2			2
++#define MX23_DMA_GPMI0			4
++#define MX23_DMA_GPMI1			5
++#define MX23_DMA_GPMI2			6
++#define MX23_DMA_GPMI3			7
++
++/*
++ * APBX DMA
++ */
++#define MX23_DMA_ADC			0
++#define MX23_DMA_DAC			1
++#define MX23_DMA_SPDIF			2
++#define MX23_DMA_I2C			3
++#define MX23_DMA_SAIF0			4
++#define MX23_DMA_UART0_RX		6
++#define MX23_DMA_UART0_TX		7
++#define MX23_DMA_UART1_RX		8
++#define MX23_DMA_UART1_TX		9
++#define MX23_DMA_SAIF1			10
++
+ #endif /* __MACH_MX23_H__ */
+diff --git a/arch/arm/mach-mxs/include/mach/mx28.h b/arch/arm/mach-mxs/include/mach/mx28.h
+index 0716745..3f3485a 100644
+--- a/arch/arm/mach-mxs/include/mach/mx28.h
++++ b/arch/arm/mach-mxs/include/mach/mx28.h
+@@ -185,4 +185,41 @@
+ #define MX28_INT_GPIO1			126
+ #define MX28_INT_GPIO0			127
+ 
++/*
++ * APBH DMA
++ */
++#define MX28_DMA_SSP0			0
++#define MX28_DMA_SSP1			1
++#define MX28_DMA_SSP2			2
++#define MX28_DMA_SSP3			3
++#define MX28_DMA_GPMI0			4
++#define MX28_DMA_GPMI1			5
++#define MX28_DMA_GPMI2			6
++#define MX28_DMA_GPMI3			7
++#define MX28_DMA_GPMI4			8
++#define MX28_DMA_GPMI5			9
++#define MX28_DMA_GPMI6			10
++#define MX28_DMA_GPMI7			11
++#define MX28_DMA_HSADC			12
++#define MX28_DMA_LCDIF			13
++
++/*
++ * APBX DMA
++ */
++#define MX28_DMA_AUART4_RX		0
++#define MX28_DMA_AUART4_TX		1
++#define MX28_DMA_SPDIF_TX		2
++#define MX28_DMA_SAIF0			4
++#define MX28_DMA_SAIF1			5
++#define MX28_DMA_I2C0			6
++#define MX28_DMA_I2C1			7
++#define MX28_DMA_AUART0_RX		8
++#define MX28_DMA_AUART0_TX		9
++#define MX28_DMA_AUART1_RX		10
++#define MX28_DMA_AUART1_TX		11
++#define MX28_DMA_AUART2_RX		12
++#define MX28_DMA_AUART2_TX		13
++#define MX28_DMA_AUART3_RX		14
++#define MX28_DMA_AUART3_TX		15
++
+ #endif /* __MACH_MX28_H__ */
+-- 
+1.7.1
