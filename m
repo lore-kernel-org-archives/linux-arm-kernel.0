@@ -1,609 +1,315 @@
 From: John.Linn@xilinx.com (John Linn)
-Date: Sat, 5 Feb 2011 10:12:27 -0700
-Subject: [PATCH 3/4] ARM: Xilinx: Adding timer support to the platform
-In-Reply-To: <20110205163609.GD29411@n2100.arm.linux.org.uk>
+Date: Sat, 5 Feb 2011 10:19:07 -0700
+Subject: [PATCH 4/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <20110205164325.GE29411@n2100.arm.linux.org.uk>
 References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
 	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
 	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
-	<7803ac06-421f-455a-86af-ea9d480be64d@VA3EHSMHS012.ehs.local>
-	<20110205163609.GD29411@n2100.arm.linux.org.uk>
-Message-ID: <e07c4a40-470d-40ec-8d37-becc4e705e9b@VA3EHSMHS002.ehs.local>
+	<1296922124-23379-4-git-send-email-john.linn@xilinx.com>
+	<a45cf64b-c91a-4f8b-a121-5a675daee4ca@VA3EHSMHS006.ehs.local>
+	<20110205164325.GE29411@n2100.arm.linux.org.uk>
+Message-ID: <ce28f160-814e-406d-9da7-3d9dba7c2c1c@VA3EHSMHS010.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Saturday, February 05, 2011 9:36 AM
+> Sent: Saturday, February 05, 2011 9:43 AM
 > To: John Linn
 > Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-glikely at secretlab.ca; Kiran
-> Sutariya
-> Subject: Re: [PATCH 3/4] ARM: Xilinx: Adding timer support to the
-platform
+glikely at secretlab.ca
+> Subject: Re: [PATCH 4/4] ARM: Xilinx: base header files and assembly
+macros
 > 
-> On Sat, Feb 05, 2011 at 09:08:43AM -0700, John Linn wrote:
-> > diff --git a/arch/arm/mach-xilinx/timer.c
-b/arch/arm/mach-xilinx/timer.c
+> On Sat, Feb 05, 2011 at 09:08:44AM -0700, John Linn wrote:
+> > diff --git a/arch/arm/mach-xilinx/include/mach/entry-macro.S
+b/arch/arm/mach-
+> xilinx/include/mach/entry-macro.S
 > > new file mode 100644
-> > index 0000000..c713e3c
+> > index 0000000..becb4cd
 > > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/timer.c
-> > @@ -0,0 +1,452 @@
-> > +/* arch/arm/mach-xilinx/timer.c
+> > +++ b/arch/arm/mach-xilinx/include/mach/entry-macro.S
+> > @@ -0,0 +1,87 @@
+> > +/*
+> > + * arch/arm/mach-xilinx/include/mach/entry-macro.S
 > > + *
-> > + * This file contains driver for the Xilinx PS Timer Counter IP.
+> > + * Low-level IRQ helper macros
 > > + *
 > > + *  Copyright (C) 2011 Xilinx
 > > + *
-> > + * based on arch\mips\kernel\time.c timer driver
-> 
-> Unix directory separators are / not \.
-> 
-
-Yes, will fix those.
-
+> > + * based on arch/plat-mxc/include/mach/entry-macro.S
+> > + *
+> > + *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
+> > + *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights
+Reserved.
 > > + *
 > > + * This program is free software; you can redistribute it and/or
-modify it under
-> > + * the terms of the GNU General Public License version 2 as
-published by the
-> > + * Free Software Foundation; either version 2 of the License, or
-(at your
-> > + * option) any later version.
+modify
+> > + * it under the terms of the GNU General Public License as
+published by
+> > + * the Free Software Foundation; either version 2 of the License,
+or
+> > + * (at your option) any later version.
 > > + *
 > > + * You should have received a copy of the GNU General Public
-License along with
-> > + * this program; if not, write to the Free Software Foundation,
-Inc., 59 Temple
-> > + * Place, Suite 330, Boston, MA  02111-1307  USA
+License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307  USA
+> > + */
+> > +#include <mach/hardware.h>
+> > +#include <asm/hardware/gic.h>
+> > +
+> > +		.macro	disable_fiq
+> > +		.endm
+> > +
+> > +		.macro  get_irqnr_preamble, base, tmp
+> > +		ldr	\base, =gic_cpu_base_addr
+> > +		ldr	\base, [\base]
+> > +		.endm
+> > +
+> > +		.macro  arch_ret_to_user, tmp1, tmp2
+> > +		.endm
+> > +
+> > +		/*
+> > +		 * The interrupt numbering scheme is defined in the
+> > +		 * interrupt controller spec.
+> > +		 *
+> > +		 * Interrupts 0-15 are SFI and are filtered
+> > +		 * Interrupts 31-1019 are normal and should be processed
+> > +		 * 1020-1021 are reserved and are filtered
+> > +		 * 1022 is not needed and filtered
+> > +		 * 1023 is "spurious" (no interrupt) and is filtered
+> > +		 *
+> > +		 * A simple read from the controller will tell us the
+number
+> > +		 * of the highest priority enabled interrupt.  We then
+just
+> > +		 * need to check whether it is in the valid range for an
+IRQ
+> > +		 * (16-1019 inclusive). If a valid interrupt, Z = 0 on
+return.
+> > +		 */
+> > +
+> > +		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+> > +
+> > +		/* bits 12-10 = src CPU, 9-0 = int # */
+> > +
+> > +		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+> > +		ldr	\tmp, =1020
+> > +
+> > +		bic     \irqnr, \irqstat, #0x1c00
+> > +
+> > +		cmp     \irqnr, #31
+> > +		cmpcc	\irqnr, \irqnr
+> > +		cmpne	\irqnr, \tmp
+> > +		cmpcs	\irqnr, \irqnr
+> > +
+> > +		.endm
+> > +
+> > +		.macro test_for_ipi, irqnr, irqstat, base, tmp
+> > +		bic	\irqnr, \irqstat, #0x1c00
+> > +		cmp	\irqnr, #16
+> > +		it	cc
+> > +		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+> > +		it	cs
+> > +		cmpcs	\irqnr, \irqnr
+> > +		.endm
+> > +
+> > +		/* As above, this assumes irqstat and base are preserved
+*/
+> > +
+> > +		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+> > +		bic	\irqnr, \irqstat, #0x1c00
+> > +		mov 	\tmp, #0
+> > +		cmp	\irqnr, #29
+> > +		itt	eq
+> > +		moveq	\tmp, #1
+> > +		streq	\irqstat, [\base, #GIC_CPU_EOI]
+> > +		cmp	\tmp, #0
+> > +		.endm
+> 
+> Would arch/arm/include/asm/hardware/entry-macro-gic.S be suitable for
+> use here?
+
+Looks like it could be, I'll give it a try.
+
+> 
+> > diff --git a/arch/arm/mach-xilinx/include/mach/hardware.h
+b/arch/arm/mach-
+> xilinx/include/mach/hardware.h
+> > new file mode 100644
+> > index 0000000..a635322
+> > --- /dev/null
+> > +++ b/arch/arm/mach-xilinx/include/mach/hardware.h
+> > @@ -0,0 +1,44 @@
+> > +/* arch/arm/mach-xilinx/include/mach/hardware.h
+> > + *
+> > + *  Copyright (C) 2011 Xilinx
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+modify
+> > + * it under the terms of the GNU General Public License as
+published by
+> > + * the Free Software Foundation; either version 2 of the License,
+or
+> > + * (at your option) any later version.
+> > + *
+> > + * You should have received a copy of the GNU General Public
+License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307  USA
 > > + */
 > > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/init.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/types.h>
-> > +#include <linux/clocksource.h>
-> > +#include <linux/clockchips.h>
-> > +#include <linux/io.h>
-> > +#include <asm/mach/time.h>
+> > +#ifndef __MACH_HARDWARE_H__
+> > +#define __MACH_HARDWARE_H__
+> > +
+> > +#include <mach/memory.h>
+> > +#include <mach/irqs.h>
+> > +
+> > +#define PERIPHERAL_CLOCK_RATE	2500000
+> > +
+> > +#define IO_BASE			0xE0000000
+> > +#define UART0_BASE		(IO_BASE)
+> > +
+> > +#define PERIPH_BASE		0xF8000000
+> > +#define TTC0_BASE		(PERIPH_BASE + 0x1000)
+> > +
+> > +#define SCU_PERIPH_BASE		0xF8F00000
+> > +#define SCU_GIC_CPU_BASE	(SCU_PERIPH_BASE + 0x100)
+> > +#define SCU_GLOBAL_TIMER_BASE	(SCU_PERIPH_BASE + 0x200)
+> > +#define SCU_CPU_TIMER_BASE	(SCU_PERIPH_BASE + 0x600)
+> > +#define SCU_WDT_BASE		(SCU_PERIPH_BASE + 0x620)
+> > +#define SCU_GIC_DIST_BASE	(SCU_PERIPH_BASE + 0x1000)
+> > +
+> > +#define PL310_L2CC_BASE		0xF8F02000
+> > +
+> > +/*
+> > + * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
+> > + */
+> > +#define LL_UART_PADDR	UART0_BASE
+> > +#define LL_UART_VADDR	UART0_BASE
+> > +
+> > +#endif
+> 
+> This file is included by much of the kernel build, so symbol conflicts
+> tend to be a concern.  It may be better to move most of this to a
+> private header instead.
+> 
+
+Sure. Makes sense.
+
+> You may also like to consider using something like this:
+> 
+> #ifndef __ASSEMBLER__
+> #define IOMEM(a)	((void __force __iomem *)(a))
+> #else
+> #define IOMEM(a)	a
+> #endif
+> 
+> #define SCU_PERIPH_BASE	IOMEM(0xF8F00000)
+> 
+> which means it's typed correctly for most of the kernel.  The only
+place
+> where you have to use casts is in the map_desc array - that's pretty
+> much unavoidable though.
+
+OK. 
+
+> 
+> > diff --git a/arch/arm/mach-xilinx/include/mach/io.h
+b/arch/arm/mach-xilinx/include/mach/io.h
+> > new file mode 100644
+> > index 0000000..2e69db7
+> > --- /dev/null
+> > +++ b/arch/arm/mach-xilinx/include/mach/io.h
+> > @@ -0,0 +1,27 @@
+> > +/* arch/arm/mach-xilinx/include/mach/io.h
+> > + *
+> > + *  Copyright (C) 2011 Xilinx
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+modify
+> > + * it under the terms of the GNU General Public License as
+published by
+> > + * the Free Software Foundation; either version 2 of the License,
+or
+> > + * (at your option) any later version.
+> > + *
+> > + * You should have received a copy of the GNU General Public
+License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307  USA
+> > + */
+> > +
+> > +#ifndef __MACH_IO_H__
+> > +#define __MACH_IO_H__
+> > +
+> > +/* Allow IO space to be anywhere in the memory */
+> > +
+> > +#define IO_SPACE_LIMIT 0xffffffff
+> 
+> Probably should be 0xffff as that's the standard PCI/ISA IO window.
+
+Makes sense. Now that you say that I realize how it's used.
+
+> 
+> > +
+> > +/* IO address mapping macros, nothing special at this time but
+required */
+> > +
+> > +#define __io(a)			((void __iomem *)(a))
+> 
+> #define io(a)			__typesafe_io(a)
+> 
+> gives a nice, simple, typesafe solution.
+
+Ok, good.
+
+> 
+> > diff --git a/arch/arm/mach-xilinx/include/mach/memory.h
+b/arch/arm/mach-xilinx/include/mach/memory.h
+> > new file mode 100644
+> > index 0000000..2b6d1eb
+> > --- /dev/null
+> > +++ b/arch/arm/mach-xilinx/include/mach/memory.h
+> > @@ -0,0 +1,23 @@
+> > +/* arch/arm/mach-xilinx/include/mach/memory.h
+> > + *
+> > + *  Copyright (C) 2011 Xilinx
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+modify
+> > + * it under the terms of the GNU General Public License as
+published by
+> > + * the Free Software Foundation; either version 2 of the License,
+or
+> > + * (at your option) any later version.
+> > + *
+> > + * You should have received a copy of the GNU General Public
+License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307  USA
+> > + */
+> > +
+> > +#ifndef __MACH_MEMORY_H__
+> > +#define __MACH_MEMORY_H__
+> > +
 > > +#include <mach/hardware.h>
 > > +
-> > +/*
-> > + * This driver configures the 2 16-bit count-up timers as follows:
-> > + *
-> > + * T1: Timer 1, clocksource for generic timekeeping
-> > + * T2: Timer 2, clockevent source for hrtimers
-> > + * T3: Timer 3, <unused>
-> > + *
-> > + * The input frequency to the timer module is 200MHz which is
-common to all the
-> > + * timer channel (T1, T2, and T3)
+> > +#define PHYS_OFFSET             0x0
 > 
-> You should probably mention that you clock the counters themselves at
-> 6.25MHz due to the pre-scaler setting of 32.  200MHz and 16-bit
-counters
-> didn't look too clever when I first read through this code.
+> Eventually this will need to become PLAT_PHYS_OFFSET during the next
+> merge window.
 
-Sure.
+Yes, for now I'm assuming keep it the same. 
 
-> 
-> > + * Clocksource timer resolution is 160ns
-> > + * Clockevent timer resolution is 160ns
-> > + */
-> > +#define XTTCPSS_CLOCKSOURCE	0	/* Timer 1 as a generic
-timekeeping */
-> > +#define XTTCPSS_CLOCKEVENT	1	/* Timer 2 as a clock event */
-> > +
-> > +#define XTTCPSS_TIMER_BASE	TTC0_BASE
-> > +
-> > +/*
-> > + * Timer Register Offset Definitions of Timer 1, Increment base
-address by 4
-> > + * and use same offsets for Timer 2
-> > + */
-> > +#define XTTCPSS_CLK_CNTRL_OFFSET	0x00 /* Clock Control Reg, RW */
-> > +#define XTTCPSS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW
-*/
-> > +#define XTTCPSS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
-> > +#define XTTCPSS_INTR_VAL_OFFSET		0x24 /* Interval Count
-Reg, RW */
-> > +#define XTTCPSS_MATCH_1_OFFSET		0x30 /* Match 1 Value
-Reg, RW */
-> > +#define XTTCPSS_MATCH_2_OFFSET		0x3C /* Match 2 Value
-Reg, RW */
-> > +#define XTTCPSS_MATCH_3_OFFSET		0x48 /* Match 3 Value
-Reg, RW */
-> > +#define XTTCPSS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO
-*/
-> > +#define XTTCPSS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW
-*/
-> > +
-> > +/*
-> > + * Bit mask to enable/disable the timer
-> > + */
-> > +#define XTTCPSS_CNT_CNTRL_ENABLE_MASK	0xFFFFFFFE
-> > +
-> > +/*
-> > + * Definitions of the timer read/write macro
-> > + */
-> > +#define xttcpss_read(addr)	__raw_readl((void __iomem *)addr)
-> > +#define xttcpss_write(addr, val) __raw_writel(val, (void __iomem
-*)(addr))
-> > +
-> > +
-> > +/**
-> > + * struct xttcpss_timer - This definition defines local timer
-structure
-> > + *
-> > + * @name:	Name of Timer
-> > + * @base_addr:	Base address of timer
-> > + * @timer_irq:	irqaction structure for the timer device
-> > + * @mode:       only valid for an clock event, periodic or one-shot
-> > + **/
-> > +struct xttcpss_timer {
-> > +	char *name;
-> 
-> const?
+I'm really hoping to get into the next merge window if possible.
 
-Yep looks like it can be. I'll add it.
-
-> 
-> > +	unsigned long base_addr;
-> > +	struct irqaction timer_irq;
-> 
-> irqaction also has a const char *name pointer - is it necessary to
-duplicate
-> it above?
-> 
-
-I see your point. 
-
-> > +	enum clock_event_mode mode;
-> > +};
-> > +
-> > +
-> > +static struct xttcpss_timer timers[];
-> > +static struct clock_event_device xttcpss_clockevent;
-> > +
-> > +/*
-> > + * xttcpss_timer_irqs - Timers IRQ number
-> > + */
-> > +static int xttcpss_timer_irqs[2] = {
-> > +	IRQ_TIMERCOUNTER0,	/* Timer 1 IRQ number */
-> > +	IRQ_TIMERCOUNTER0 + 1,	/* Timer 2 IRQ number */
-> > +};
-> > +
-> > +/**
-> > + * xttcpss_set_interval - Set the timer interval value
-> > + *
-> > + * @timer:	Pointer to the timer instance
-> > + * @cycles:	Timer interval ticks
-> > + **/
-> > +static void xttcpss_set_interval(struct xttcpss_timer *timer,
-> > +					unsigned long cycles)
-> > +{
-> > +	u32 ctrl_reg;
-> > +
-> > +	/* Disable the counter, set the counter value  and re-enable
-counter */
-> > +	ctrl_reg = xttcpss_read(timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET);
-> > +	ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
-> > +	xttcpss_write(timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
-ctrl_reg);
-> > +
-> > +	pr_debug("set_interval, name = %s, period = %08X\n",
-> > +			timer->name, (unsigned int)cycles);
-> > +
-> > +	xttcpss_write(timer->base_addr + XTTCPSS_INTR_VAL_OFFSET,
-cycles);
-> > +
-> > +	/* Reset the counter (0x10) so that it starts from 0, one-shot
-> > +	   mode makes this needed for timing to be right. */
-> > +	ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
-> > +	ctrl_reg |= 0x10;
-> > +	xttcpss_write(timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
-ctrl_reg);
-> > +}
-> > +
-> > +/**
-> > + * xttcpss_clock_source_interrupt - Clock source timer interrupt
-handler
-> > + *
-> > + * @irq:	IRQ number of the Timer
-> > + * @dev_id:	void pointer to the xttcpss_timer instance
-> > + *
-> > + * This will be called when 16-bit clock source counter wraps
-> > + *
-> > + * returns: Always IRQ_HANDLED - success
-> > + **/
-> > +static irqreturn_t xttcpss_clock_source_interrupt(int irq, void
-*dev_id)
-> > +{
-> > +	struct xttcpss_timer *timer = dev_id;
-> > +
-> > +	/* Acknowledge the interrupt */
-> > +	xttcpss_write(timer->base_addr + XTTCPSS_ISR_OFFSET,
-> > +		xttcpss_read(timer->base_addr + XTTCPSS_ISR_OFFSET));
-> 
-> Hmm.  Is it necessary to do this to keep the counter running?  If the
-> counter stops then it's not a good clock source.
-
-I'm going to have to study this a bit more. I see your point. The
-interrupt doesn't 
-really do anything.  I'll look to see if we can just disable the
-interrupt.
-
-> 
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +/**
-> > + * xttcpss_clock_event_interrupt - Clock event timer interrupt
-handler
-> > + *
-> > + * @irq:	IRQ number of the Timer
-> > + * @dev_id:	void pointer to the xttcpss_timer instance
-> > + *
-> > + * returns: Always IRQ_HANDLED - success
-> > + **/
-> > +static irqreturn_t xttcpss_clock_event_interrupt(int irq, void
-*dev_id)
-> > +{
-> > +	struct clock_event_device *evt = &xttcpss_clockevent;
-> > +	struct xttcpss_timer *timer = dev_id;
-> > +	u32 ctrl_reg;
-> > +
-> > +	/* Acknowledge the interrupt and call event handler */
-> > +	xttcpss_write(timer->base_addr + XTTCPSS_ISR_OFFSET,
-> > +		xttcpss_read(timer->base_addr + XTTCPSS_ISR_OFFSET));
-> > +
-> > +	if (timer->mode == CLOCK_EVT_MODE_ONESHOT) {
-> > +
-> > +		/* Disable the counter as it would keep running. */
-> > +		ctrl_reg = xttcpss_read(timer->base_addr +
-> > +					XTTCPSS_CNT_CNTRL_OFFSET);
-> > +		ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
-> > +		xttcpss_write(timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +	}
-> > +
-> > +	evt->event_handler(evt);
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +/*
-> > + * struct xttcpss_timer timers - This definition defines local
-timers
-> > + */
-> > +static struct xttcpss_timer timers[] = {
-> > +	[XTTCPSS_CLOCKSOURCE] = {
-> > +		.name = "xttcpss clocksource",
-> > +		.timer_irq = {
-> > +			.flags = IRQF_DISABLED | IRQF_TIMER,
-> > +			.handler = xttcpss_clock_source_interrupt,
-> > +		}
-> > +	},
-> > +	[XTTCPSS_CLOCKEVENT] = {
-> > +		.name = "xttcpss clockevent",
-> > +		.timer_irq = {
-> > +			.flags = IRQF_DISABLED | IRQF_TIMER,
-> > +			.handler = xttcpss_clock_event_interrupt,
-> > +		}
-> > +	},
-> > +};
-> > +
-> > +
-> > +/**
-> > + * xttcpss_timer_hardware_init - Initialize the timer hardware
-> > + *
-> > + * Initialize the hardware, registers the timer interrupts, set the
-clock source
-> > + * timer interval and enable the clock source timer
-> > + **/
-> > +static void __init xttcpss_timer_hardware_init(void)
-> > +{
-> > +	int timer_id;
-> > +	struct xttcpss_timer *timer;
-> > +
-> > +	for (timer_id = 0; timer_id < ARRAY_SIZE(timers); timer_id++) {
-> > +		timer = &timers[timer_id];
-> > +
-> > +		if (!(timer->name))
-> > +			continue;
-> > +
-> > +		timer->base_addr = XTTCPSS_TIMER_BASE + (4*timer_id);
-> > +
-> > +		/* Disable counter, Enable Interval mode, Count up
-timer,
-> > +		 * Disable Match mode, Internal Clock source select, set
-> > +		 * prescalar to 32, and Enable the Interval interrupt */
-> 
-> Isn't it "pre-scaler" ?
-
-Ok, easy to fix.
-
-> 
-> > +		xttcpss_write(timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				0x23);
-> > +		xttcpss_write(timer->base_addr +
-XTTCPSS_CLK_CNTRL_OFFSET, 0x9);
-> > +		xttcpss_write(timer->base_addr + XTTCPSS_IER_OFFSET,
-0x1);
-> > +
-> > +		/* Setup IRQ */
-> > +		timer->timer_irq.name = timer->name;
-> > +		timer->timer_irq.dev_id = (void *)timer;
-> > +		if (timer->timer_irq.handler != NULL) {
-> > +			setup_irq(xttcpss_timer_irqs[timer_id],
-> > +				&timer->timer_irq);
-> > +		}
-> > +		if (timer_id == XTTCPSS_CLOCKSOURCE)
-> > +			xttcpss_set_interval(timer, ~0);
-> > +	}
-> > +}
-> > +
-> > +/**
-> > + * xttcpss_read_cycles - Reads the timer counter register
-> > + *
-> > + * returns: Current timer counter register value
-> > + **/
-> > +static cycle_t xttcpss_read_cycles(struct clocksource *cs)
-> > +{
-> > +	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKSOURCE];
-> > +
-> > +	return (cycle_t)xttcpss_read(timer->base_addr +
-> > +				XTTCPSS_COUNT_VAL_OFFSET);
-> > +}
-> > +
-> > +
-> > +/*
-> > + * Instantiate and initialize the clock source structure
-> > + */
-> > +static struct clocksource clocksource_xttcpss = {
-> > +	.name		= "xttcpss_timer1",
-> > +	.rating		= 200,			/* Reasonable clock
-source */
-> > +	.read		= xttcpss_read_cycles,
-> > +	.mask		= CLOCKSOURCE_MASK(16),
-> > +	.shift		= 0,			/* Initialized to zero
-*/
-> > +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> > +};
-> > +
-> > +
-> > +/**
-> > + * xttcpss_set_next_event - Sets the time interval for next event
-> > + *
-> > + * @cycles:	Timer interval ticks
-> > + * @evt:	Address of clock event instance
-> > + *
-> > + * returns: Always 0 - success
-> > + **/
-> > +static int xttcpss_set_next_event(unsigned long cycles,
-> > +					struct clock_event_device *evt)
-> > +{
-> > +	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
-> > +
-> > +	xttcpss_set_interval(timer, cycles);
-> > +	return 0;
-> > +}
-> > +
-> > +/**
-> > + * xttcpss_set_mode - Sets the mode of timer
-> > + *
-> > + * @mode:	Mode to be set
-> > + * @evt:	Address of clock event instance
-> > + **/
-> > +static void xttcpss_set_mode(enum clock_event_mode mode,
-> > +					struct clock_event_device *evt)
-> > +{
-> > +	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
-> > +	u32 ctrl_reg;
-> > +
-> > +	timer->mode = mode;
-> > +
-> > +	switch (mode) {
-> > +	case CLOCK_EVT_MODE_PERIODIC:
-> > +		xttcpss_set_interval(timer, CLOCK_TICK_RATE / HZ);
-> > +		break;
-> > +	case CLOCK_EVT_MODE_ONESHOT:
-> > +	case CLOCK_EVT_MODE_UNUSED:
-> > +	case CLOCK_EVT_MODE_SHUTDOWN:
-> > +		ctrl_reg = xttcpss_read(timer->base_addr +
-> > +					XTTCPSS_CNT_CNTRL_OFFSET);
-> > +		ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
-> > +		xttcpss_write(timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +		break;
-> > +	case CLOCK_EVT_MODE_RESUME:
-> > +		ctrl_reg = xttcpss_read(timer->base_addr +
-> > +					XTTCPSS_CNT_CNTRL_OFFSET);
-> > +		ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
-> > +		xttcpss_write(timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +		break;
-> > +	}
-> > +}
-> > +
-> > +/*
-> > + * Instantiate and initialize the clock event structure
-> > + */
-> > +static struct clock_event_device xttcpss_clockevent = {
-> > +	.name		= "xttcpss_timer2",
-> > +	.features	= CLOCK_EVT_FEAT_PERIODIC |
-CLOCK_EVT_FEAT_ONESHOT,
-> > +	.shift		= 0,		/* Initialized to zero */
-> > +	.set_next_event	= xttcpss_set_next_event,
-> > +	.set_mode	= xttcpss_set_mode,
-> > +	.rating		= 200,
-> > +};
-> > +
-> > +/**
-> > + * xttcpss_timer_init - Initialize the timer
-> > + *
-> > + * Initializes the timer hardware and registers the clock source
-and clock event
-> > + * timers with Linux kernal timer framework
-> > + **/
-> > +static void __init xttcpss_timer_init(void)
-> > +{
-> > +	u32 shift;
-> > +	u64 temp;
-> > +
-> > +	xttcpss_timer_hardware_init();
-> > +
-> > +	/* Calculate the nanoseconds to cycles divisor value for clock
-source
-> > +	 * timer */
-> > +	for (shift = 16; shift > 0; shift--) {
-> > +		temp = (u64) NSEC_PER_SEC << shift;
-> > +		do_div(temp, CLOCK_TICK_RATE);
-> > +		if ((temp >> 32) == 0)
-> > +			break;
-> > +	}
-> > +
-> > +	/* Setup clocksource */
-> > +	clocksource_xttcpss.shift = shift;
-> > +	clocksource_xttcpss.mult =
-> > +		clocksource_hz2mult(CLOCK_TICK_RATE,
-clocksource_xttcpss.shift);
-> > +
-> > +	if (clocksource_register(&clocksource_xttcpss))
-> > +		printk(KERN_ERR "xttcpss_timer_init: can't register
-clocksource"
-> > +				" for %s\n", clocksource_xttcpss.name);
-> 
-> There's code to calculate the shift and multipler for you.  All you
-> need do is replace the above with clocksource_register_hz() or
-> clocksource_register_khz().
-> 
-
-Ok, will look at that.
-
-> > +	/* Calculate the nanoseconds to cycles divisor value for clock
-event
-> > +	 * timer */
-> > +	for (shift = 16; shift > 0; shift--) {
-> > +		temp = (u64) CLOCK_TICK_RATE << shift;
-> > +		do_div(temp, NSEC_PER_SEC);
-> > +		if ((temp >> 32) == 0)
-> > +			break;
-> > +	}
-> > +
-> > +	/* Setup clockevent */
-> > +	xttcpss_clockevent.shift = shift;
-> > +	xttcpss_clockevent.mult = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC,
-> > +
-xttcpss_clockevent.shift);
-> 
-> clockevents_calc_mult_shift(&xttcpss_clockevent, freq, minsec) should
-> do away with all the above, here freq is the clock rate for the
-> actual counter itself (after the pre-scaler.)
-> 
-
-Sounds good.
-
-> > +
-> > +	xttcpss_clockevent.max_delta_ns =
-> > +		clockevent_delta2ns(0xfffe, &xttcpss_clockevent);
-> > +	xttcpss_clockevent.min_delta_ns =
-> > +		clockevent_delta2ns(1, &xttcpss_clockevent);
-> > +
-> > +	xttcpss_clockevent.cpumask = cpumask_of(0);
-> > +	clockevents_register_device(&xttcpss_clockevent);
-> > +}
-> > +
-> > +#ifdef CONFIG_PM
-> > +/**
-> > + * xttcpss_timer_suspend - Suspend the timer
-> > + *
-> > + * Disables all (clock source and clock event) the timers
-> > + **/
-> > +static void xttcpss_timer_suspend(void)
-> > +{
-> > +	struct xttcpss_timer *source_timer =
-&timers[XTTCPSS_CLOCKSOURCE];
-> > +	struct xttcpss_timer *event_timer = &timers[XTTCPSS_CLOCKEVENT];
-> > +	u32 ctrl_reg;
-> > +
-> > +	/* Disable clocksource timer */
-> > +	ctrl_reg = xttcpss_read(source_timer->base_addr +
-> > +				XTTCPSS_CNT_CNTRL_OFFSET);
-> > +	ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
-> > +	xttcpss_write(source_timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +
-> > +	/* Disable clockevent timer */
-> > +	ctrl_reg = xttcpss_read(event_timer->base_addr +
-> > +				XTTCPSS_CNT_CNTRL_OFFSET);
-> > +	ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
-> > +	xttcpss_write(event_timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +}
-> > +
-> > +/**
-> > + * xttcpss_timer_resume - Resume the timer
-> > + *
-> > + * Enables  all (clock source and clock event) the timers
-> > + **/
-> > +static void xttcpss_timer_resume(void)
-> > +{
-> > +	struct xttcpss_timer *source_timer =
-&timers[XTTCPSS_CLOCKSOURCE];
-> > +	struct xttcpss_timer *event_timer = &timers[XTTCPSS_CLOCKEVENT];
-> > +	u32 ctrl_reg;
-> > +
-> > +	/* Enable clocksource timer */
-> > +	ctrl_reg = xttcpss_read(source_timer->base_addr +
-> > +				XTTCPSS_CNT_CNTRL_OFFSET);
-> > +	ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
-> > +	xttcpss_write(source_timer->base_addr +
-XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +
-> > +	/* Enable clockevent timer */
-> > +	ctrl_reg = xttcpss_read(event_timer->base_addr +
-> > +				XTTCPSS_CNT_CNTRL_OFFSET);
-> > +	ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
-> > +	xttcpss_write(event_timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
-> > +				ctrl_reg);
-> > +}
-> 
-> The generic time code should do PM for you.  In fact, if you're using
-> generic time code, these callbacks will never be used, as the code
-> which calls them is surrounded by:
-> 
-> #if defined(CONFIG_PM) && !defined(CONFIG_GENERIC_CLOCKEVENTS)
-> 
-
-Ok, will remove.
-
-Thanks, will update based on these.
-
--- John
-
-> > +#else
-> > +#define xttcpss_timer_suspend NULL
-> > +#define xttcpss_timer_resume NULL
-> > +#endif
-> > +
-> > +/*
-> > + * Instantiate and initialize the system timer structure
-> > + */
-> > +struct sys_timer xttcpss_sys_timer = {
-> > +	.init		= xttcpss_timer_init,
-> > +	.suspend	= xttcpss_timer_suspend,
-> > +	.resume		= xttcpss_timer_resume,
-> > +};
-
+Thanks again for your time,
+John
 
 This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
