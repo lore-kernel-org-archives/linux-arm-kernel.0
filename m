@@ -1,1125 +1,609 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Feb 2011 17:02:55 +0000
-Subject: [PATCH 0/5] mmc: add double buffering for mmc block requests
-In-Reply-To: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
-References: <1294856043-13447-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <20110205170255.GG29411@n2100.arm.linux.org.uk>
+From: John.Linn@xilinx.com (John Linn)
+Date: Sat, 5 Feb 2011 10:12:27 -0700
+Subject: [PATCH 3/4] ARM: Xilinx: Adding timer support to the platform
+In-Reply-To: <20110205163609.GD29411@n2100.arm.linux.org.uk>
+References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
+	<7803ac06-421f-455a-86af-ea9d480be64d@VA3EHSMHS012.ehs.local>
+	<20110205163609.GD29411@n2100.arm.linux.org.uk>
+Message-ID: <e07c4a40-470d-40ec-8d37-becc4e705e9b@VA3EHSMHS002.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 12, 2011 at 07:13:58PM +0100, Per Forlin wrote:
-> Add support to prepare one MMC request while another is active on
-> the host. This is done by making the issue_rw_rq() asynchronous.
-> The increase in throughput is proportional to the time it takes to
-> prepare a request and how fast the memory is. The faster the MMC/SD is
-> the more significant the prepare request time becomes. Measurements on U5500
-> and U8500 on eMMC shows significant performance gain for DMA on MMC for large
-> reads. In the PIO case there is some gain in performance for large reads too.
-> There seems to be no or small performance gain for write, don't have a good
-> explanation for this yet.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Saturday, February 05, 2011 9:36 AM
+> To: John Linn
+> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+glikely at secretlab.ca; Kiran
+> Sutariya
+> Subject: Re: [PATCH 3/4] ARM: Xilinx: Adding timer support to the
+platform
+> 
+> On Sat, Feb 05, 2011 at 09:08:43AM -0700, John Linn wrote:
+> > diff --git a/arch/arm/mach-xilinx/timer.c
+b/arch/arm/mach-xilinx/timer.c
+> > new file mode 100644
+> > index 0000000..c713e3c
+> > --- /dev/null
+> > +++ b/arch/arm/mach-xilinx/timer.c
+> > @@ -0,0 +1,452 @@
+> > +/* arch/arm/mach-xilinx/timer.c
+> > + *
+> > + * This file contains driver for the Xilinx PS Timer Counter IP.
+> > + *
+> > + *  Copyright (C) 2011 Xilinx
+> > + *
+> > + * based on arch\mips\kernel\time.c timer driver
+> 
+> Unix directory separators are / not \.
+> 
 
-It might be worth seeing what effect the following patch has.  This
-moves the dsb out of the cache operations into a separate function,
-so we only do one dsb per DMA mapping/unmapping operation.  That's
-particularly significant for the scattergather code.
+Yes, will fix those.
 
-I don't remember the reason why this was dropped as a candidate for
-merging - could that be because the dsb needs to be before the outer
-cache maintainence?  Adding Catalin for comment on that.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+modify it under
+> > + * the terms of the GNU General Public License version 2 as
+published by the
+> > + * Free Software Foundation; either version 2 of the License, or
+(at your
+> > + * option) any later version.
+> > + *
+> > + * You should have received a copy of the GNU General Public
+License along with
+> > + * this program; if not, write to the Free Software Foundation,
+Inc., 59 Temple
+> > + * Place, Suite 330, Boston, MA  02111-1307  USA
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/init.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/types.h>
+> > +#include <linux/clocksource.h>
+> > +#include <linux/clockchips.h>
+> > +#include <linux/io.h>
+> > +#include <asm/mach/time.h>
+> > +#include <mach/hardware.h>
+> > +
+> > +/*
+> > + * This driver configures the 2 16-bit count-up timers as follows:
+> > + *
+> > + * T1: Timer 1, clocksource for generic timekeeping
+> > + * T2: Timer 2, clockevent source for hrtimers
+> > + * T3: Timer 3, <unused>
+> > + *
+> > + * The input frequency to the timer module is 200MHz which is
+common to all the
+> > + * timer channel (T1, T2, and T3)
+> 
+> You should probably mention that you clock the counters themselves at
+> 6.25MHz due to the pre-scaler setting of 32.  200MHz and 16-bit
+counters
+> didn't look too clever when I first read through this code.
 
- arch/arm/include/asm/cacheflush.h  |    4 ++++
- arch/arm/include/asm/dma-mapping.h |    8 ++++++++
- arch/arm/mm/cache-fa.S             |   13 +++++++------
- arch/arm/mm/cache-v3.S             |    3 +++
- arch/arm/mm/cache-v4.S             |    3 +++
- arch/arm/mm/cache-v4wb.S           |    9 +++++++--
- arch/arm/mm/cache-v4wt.S           |    3 +++
- arch/arm/mm/cache-v6.S             |   13 +++++++------
- arch/arm/mm/cache-v7.S             |    9 ++++++---
- arch/arm/mm/dma-mapping.c          |   12 ++++++++++++
- arch/arm/mm/proc-arm1020e.S        |   10 +++++++---
- arch/arm/mm/proc-arm1022.S         |   10 +++++++---
- arch/arm/mm/proc-arm1026.S         |   10 +++++++---
- arch/arm/mm/proc-arm920.S          |   10 +++++++---
- arch/arm/mm/proc-arm922.S          |   10 +++++++---
- arch/arm/mm/proc-arm925.S          |   10 +++++++---
- arch/arm/mm/proc-arm926.S          |   10 +++++++---
- arch/arm/mm/proc-arm940.S          |   10 +++++++---
- arch/arm/mm/proc-arm946.S          |   10 +++++++---
- arch/arm/mm/proc-feroceon.S        |   13 ++++++++-----
- arch/arm/mm/proc-mohawk.S          |   10 +++++++---
- arch/arm/mm/proc-xsc3.S            |   10 +++++++---
- arch/arm/mm/proc-xscale.S          |   10 +++++++---
- 23 files changed, 152 insertions(+), 58 deletions(-)
+Sure.
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index e290885..5928e78 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -223,6 +223,7 @@ struct cpu_cache_fns {
- 
- 	void (*dma_map_area)(const void *, size_t, int);
- 	void (*dma_unmap_area)(const void *, size_t, int);
-+	void (*dma_barrier)(void);
- 
- 	void (*dma_flush_range)(const void *, const void *);
- };
-@@ -250,6 +251,7 @@ extern struct cpu_cache_fns cpu_cache;
-  */
- #define dmac_map_area			cpu_cache.dma_map_area
- #define dmac_unmap_area		cpu_cache.dma_unmap_area
-+#define dmac_barrier			cpu_cache.dma_barrier
- #define dmac_flush_range		cpu_cache.dma_flush_range
- 
- #else
-@@ -278,10 +280,12 @@ extern void __cpuc_flush_dcache_area(void *, size_t);
-  */
- #define dmac_map_area			__glue(_CACHE,_dma_map_area)
- #define dmac_unmap_area		__glue(_CACHE,_dma_unmap_area)
-+#define dmac_barrier			__glue(_CACHE,_dma_barrier)
- #define dmac_flush_range		__glue(_CACHE,_dma_flush_range)
- 
- extern void dmac_map_area(const void *, size_t, int);
- extern void dmac_unmap_area(const void *, size_t, int);
-+extern void dmac_barrier(void);
- extern void dmac_flush_range(const void *, const void *);
- 
- #endif
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 256ee1c..1371db7 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -115,6 +115,8 @@ static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
- 		___dma_page_dev_to_cpu(page, off, size, dir);
- }
- 
-+extern void __dma_barrier(enum dma_data_direction);
-+
- /*
-  * Return whether the given device DMA address mask can be supported
-  * properly.  For example, if your device can only drive the low 24-bits
-@@ -378,6 +380,7 @@ static inline dma_addr_t dma_map_single(struct device *dev, void *cpu_addr,
- 	BUG_ON(!valid_dma_direction(dir));
- 
- 	addr = __dma_map_single(dev, cpu_addr, size, dir);
-+	__dma_barrier(dir);
- 	debug_dma_map_page(dev, virt_to_page(cpu_addr),
- 			(unsigned long)cpu_addr & ~PAGE_MASK, size,
- 			dir, addr, true);
-@@ -407,6 +410,7 @@ static inline dma_addr_t dma_map_page(struct device *dev, struct page *page,
- 	BUG_ON(!valid_dma_direction(dir));
- 
- 	addr = __dma_map_page(dev, page, offset, size, dir);
-+	__dma_barrier(dir);
- 	debug_dma_map_page(dev, page, offset, size, dir, addr, false);
- 
- 	return addr;
-@@ -431,6 +435,7 @@ static inline void dma_unmap_single(struct device *dev, dma_addr_t handle,
- {
- 	debug_dma_unmap_page(dev, handle, size, dir, true);
- 	__dma_unmap_single(dev, handle, size, dir);
-+	__dma_barrier(dir);
- }
- 
- /**
-@@ -452,6 +457,7 @@ static inline void dma_unmap_page(struct device *dev, dma_addr_t handle,
- {
- 	debug_dma_unmap_page(dev, handle, size, dir, false);
- 	__dma_unmap_page(dev, handle, size, dir);
-+	__dma_barrier(dir);
- }
- 
- /**
-@@ -484,6 +490,7 @@ static inline void dma_sync_single_range_for_cpu(struct device *dev,
- 		return;
- 
- 	__dma_single_dev_to_cpu(dma_to_virt(dev, handle) + offset, size, dir);
-+	__dma_barrier(dir);
- }
- 
- static inline void dma_sync_single_range_for_device(struct device *dev,
-@@ -498,6 +505,7 @@ static inline void dma_sync_single_range_for_device(struct device *dev,
- 		return;
- 
- 	__dma_single_cpu_to_dev(dma_to_virt(dev, handle) + offset, size, dir);
-+	__dma_barrier(dir);
- }
- 
- static inline void dma_sync_single_for_cpu(struct device *dev,
-diff --git a/arch/arm/mm/cache-fa.S b/arch/arm/mm/cache-fa.S
-index 7148e53..cdcfae2 100644
---- a/arch/arm/mm/cache-fa.S
-+++ b/arch/arm/mm/cache-fa.S
-@@ -179,8 +179,6 @@ fa_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -197,8 +195,6 @@ fa_dma_clean_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mov	r0, #0	
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -212,8 +208,6 @@ ENTRY(fa_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mov	r0, #0	
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -240,6 +234,12 @@ ENTRY(fa_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(fa_dma_unmap_area)
- 
-+ENTRY(fa_dma_barrier)
-+	mov	r0, #0	
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-+	mov	pc, lr
-+ENDPROC(fa_dma_barrier)
-+
- 	__INITDATA
- 
- 	.type	fa_cache_fns, #object
-@@ -253,5 +253,6 @@ ENTRY(fa_cache_fns)
- 	.long	fa_flush_kern_dcache_area
- 	.long	fa_dma_map_area
- 	.long	fa_dma_unmap_area
-+	.long	fa_dma_barrier
- 	.long	fa_dma_flush_range
- 	.size	fa_cache_fns, . - fa_cache_fns
-diff --git a/arch/arm/mm/cache-v3.S b/arch/arm/mm/cache-v3.S
-index c2ff3c5..df34458 100644
---- a/arch/arm/mm/cache-v3.S
-+++ b/arch/arm/mm/cache-v3.S
-@@ -123,9 +123,11 @@ ENTRY(v3_dma_unmap_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v3_dma_map_area)
-+ENTRY(v3_dma_barrier)
- 	mov	pc, lr
- ENDPROC(v3_dma_unmap_area)
- ENDPROC(v3_dma_map_area)
-+ENDPROC(v3_dma_barrier)
- 
- 	__INITDATA
- 
-@@ -140,5 +142,6 @@ ENTRY(v3_cache_fns)
- 	.long	v3_flush_kern_dcache_area
- 	.long	v3_dma_map_area
- 	.long	v3_dma_unmap_area
-+	.long	v3_dma_barrier
- 	.long	v3_dma_flush_range
- 	.size	v3_cache_fns, . - v3_cache_fns
-diff --git a/arch/arm/mm/cache-v4.S b/arch/arm/mm/cache-v4.S
-index 4810f7e..20260b1 100644
---- a/arch/arm/mm/cache-v4.S
-+++ b/arch/arm/mm/cache-v4.S
-@@ -135,9 +135,11 @@ ENTRY(v4_dma_unmap_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v4_dma_map_area)
-+ENTRY(v4_dma_barrier)
- 	mov	pc, lr
- ENDPROC(v4_dma_unmap_area)
- ENDPROC(v4_dma_map_area)
-+ENDPROC(v4_dma_barrier)
- 
- 	__INITDATA
- 
-@@ -152,5 +154,6 @@ ENTRY(v4_cache_fns)
- 	.long	v4_flush_kern_dcache_area
- 	.long	v4_dma_map_area
- 	.long	v4_dma_unmap_area
-+	.long	v4_dma_barrier
- 	.long	v4_dma_flush_range
- 	.size	v4_cache_fns, . - v4_cache_fns
-diff --git a/arch/arm/mm/cache-v4wb.S b/arch/arm/mm/cache-v4wb.S
-index df8368a..9c9c875 100644
---- a/arch/arm/mm/cache-v4wb.S
-+++ b/arch/arm/mm/cache-v4wb.S
-@@ -194,7 +194,6 @@ v4wb_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -211,7 +210,6 @@ v4wb_dma_clean_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -251,6 +249,12 @@ ENTRY(v4wb_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(v4wb_dma_unmap_area)
- 
-+ENTRY(v4wb_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-+	mov	pc, lr
-+ENDPROC(v4wb_dma_barrier)
-+
- 	__INITDATA
- 
- 	.type	v4wb_cache_fns, #object
-@@ -264,5 +268,6 @@ ENTRY(v4wb_cache_fns)
- 	.long	v4wb_flush_kern_dcache_area
- 	.long	v4wb_dma_map_area
- 	.long	v4wb_dma_unmap_area
-+	.long	v4wb_dma_barrier
- 	.long	v4wb_dma_flush_range
- 	.size	v4wb_cache_fns, . - v4wb_cache_fns
-diff --git a/arch/arm/mm/cache-v4wt.S b/arch/arm/mm/cache-v4wt.S
-index 45c7031..223eea4 100644
---- a/arch/arm/mm/cache-v4wt.S
-+++ b/arch/arm/mm/cache-v4wt.S
-@@ -191,9 +191,11 @@ ENTRY(v4wt_dma_unmap_area)
-  *	- dir	- DMA direction
-  */
- ENTRY(v4wt_dma_map_area)
-+ENTRY(v4wt_dma_barrier)
- 	mov	pc, lr
- ENDPROC(v4wt_dma_unmap_area)
- ENDPROC(v4wt_dma_map_area)
-+ENDPROC(v4wt_dma_barrier)
- 
- 	__INITDATA
- 
-@@ -208,5 +210,6 @@ ENTRY(v4wt_cache_fns)
- 	.long	v4wt_flush_kern_dcache_area
- 	.long	v4wt_dma_map_area
- 	.long	v4wt_dma_unmap_area
-+	.long	v4wt_dma_barrier
- 	.long	v4wt_dma_flush_range
- 	.size	v4wt_cache_fns, . - v4wt_cache_fns
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 9d89c67..b294854 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -238,8 +238,6 @@ v6_dma_inv_range:
- 	strlo	r2, [r0]			@ write for ownership
- #endif
- 	blo	1b
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -261,8 +259,6 @@ v6_dma_clean_range:
- 	add	r0, r0, #D_CACHE_LINE_SIZE
- 	cmp	r0, r1
- 	blo	1b
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -289,8 +285,6 @@ ENTRY(v6_dma_flush_range)
- 	strlob	r2, [r0]			@ write for ownership
- #endif
- 	blo	1b
--	mov	r0, #0
--	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
- 	mov	pc, lr
- 
- /*
-@@ -327,6 +321,12 @@ ENTRY(v6_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(v6_dma_unmap_area)
- 
-+ENTRY(v6_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-+	mov	pc, lr
-+ENDPROC(v6_dma_barrier)
-+
- 	__INITDATA
- 
- 	.type	v6_cache_fns, #object
-@@ -340,5 +340,6 @@ ENTRY(v6_cache_fns)
- 	.long	v6_flush_kern_dcache_area
- 	.long	v6_dma_map_area
- 	.long	v6_dma_unmap_area
-+	.long	v6_dma_barrier
- 	.long	v6_dma_flush_range
- 	.size	v6_cache_fns, . - v6_cache_fns
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index bcd64f2..d89d55a 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -255,7 +255,6 @@ v7_dma_inv_range:
- 	add	r0, r0, r2
- 	cmp	r0, r1
- 	blo	1b
--	dsb
- 	mov	pc, lr
- ENDPROC(v7_dma_inv_range)
- 
-@@ -273,7 +272,6 @@ v7_dma_clean_range:
- 	add	r0, r0, r2
- 	cmp	r0, r1
- 	blo	1b
--	dsb
- 	mov	pc, lr
- ENDPROC(v7_dma_clean_range)
- 
-@@ -291,7 +289,6 @@ ENTRY(v7_dma_flush_range)
- 	add	r0, r0, r2
- 	cmp	r0, r1
- 	blo	1b
--	dsb
- 	mov	pc, lr
- ENDPROC(v7_dma_flush_range)
- 
-@@ -321,6 +318,11 @@ ENTRY(v7_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(v7_dma_unmap_area)
- 
-+ENTRY(v7_dma_barrier)
-+	dsb
-+	mov	pc, lr
-+ENDPROC(v7_dma_barrier)
-+
- 	__INITDATA
- 
- 	.type	v7_cache_fns, #object
-@@ -334,5 +336,6 @@ ENTRY(v7_cache_fns)
- 	.long	v7_flush_kern_dcache_area
- 	.long	v7_dma_map_area
- 	.long	v7_dma_unmap_area
-+	.long	v7_dma_barrier
- 	.long	v7_dma_flush_range
- 	.size	v7_cache_fns, . - v7_cache_fns
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 64daef2..d807f38 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -97,6 +97,7 @@ static struct page *__dma_alloc_buffer(struct device *dev, size_t size, gfp_t gf
- 	memset(ptr, 0, size);
- 	dmac_flush_range(ptr, ptr + size);
- 	outer_flush_range(__pa(ptr), __pa(ptr) + size);
-+	dmac_barrier();
- 
- 	return page;
- }
-@@ -542,6 +543,12 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
- }
- EXPORT_SYMBOL(___dma_page_dev_to_cpu);
- 
-+void __dma_barrier(enum dma_data_direction dir)
-+{
-+	dmac_barrier();
-+}
-+EXPORT_SYMBOL(__dma_barrier);
-+
- /**
-  * dma_map_sg - map a set of SG buffers for streaming mode DMA
-  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
-@@ -572,6 +579,7 @@ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		if (dma_mapping_error(dev, s->dma_address))
- 			goto bad_mapping;
- 	}
-+	__dma_barrier(dir);
- 	debug_dma_map_sg(dev, sg, nents, nents, dir);
- 	return nents;
- 
-@@ -602,6 +610,8 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 
- 	for_each_sg(sg, s, nents, i)
- 		__dma_unmap_page(dev, sg_dma_address(s), sg_dma_len(s), dir);
-+
-+	__dma_barrier(dir);
- }
- EXPORT_SYMBOL(dma_unmap_sg);
- 
-@@ -627,6 +637,7 @@ void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
- 				      s->length, dir);
- 	}
- 
-+	__dma_barrier(dir);
- 	debug_dma_sync_sg_for_cpu(dev, sg, nents, dir);
- }
- EXPORT_SYMBOL(dma_sync_sg_for_cpu);
-@@ -653,6 +664,7 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
- 				      s->length, dir);
- 	}
- 
-+	__dma_barrier(dir);
-	debug_dma_sync_sg_for_device(dev, sg, nents, dir);
- }
- EXPORT_SYMBOL(dma_sync_sg_for_device);
-diff --git a/arch/arm/mm/proc-arm1020e.S b/arch/arm/mm/proc-arm1020e.S
-index d278298..fea33c9 100644
---- a/arch/arm/mm/proc-arm1020e.S
-+++ b/arch/arm/mm/proc-arm1020e.S
-@@ -281,7 +281,6 @@ arm1020e_dma_inv_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -303,7 +302,6 @@ arm1020e_dma_clean_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -323,7 +321,6 @@ ENTRY(arm1020e_dma_flush_range)
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -350,6 +347,12 @@ ENTRY(arm1020e_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm1020e_dma_unmap_area)
- 
-+ENTRY(arm1020e_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm1020e_dma_barrier)
-+
- ENTRY(arm1020e_cache_fns)
- 	.long	arm1020e_flush_icache_all
- 	.long	arm1020e_flush_kern_cache_all
-@@ -360,6 +363,7 @@ ENTRY(arm1020e_cache_fns)
- 	.long	arm1020e_flush_kern_dcache_area
- 	.long	arm1020e_dma_map_area
- 	.long	arm1020e_dma_unmap_area
-+	.long	arm1020e_dma_barrier
- 	.long	arm1020e_dma_flush_range
- 
- 	.align	5
-diff --git a/arch/arm/mm/proc-arm1022.S b/arch/arm/mm/proc-arm1022.S
-index ce13e4a..ba1a7df 100644
---- a/arch/arm/mm/proc-arm1022.S
-+++ b/arch/arm/mm/proc-arm1022.S
-@@ -270,7 +270,6 @@ arm1022_dma_inv_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -292,7 +291,6 @@ arm1022_dma_clean_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -312,7 +310,6 @@ ENTRY(arm1022_dma_flush_range)
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -339,6 +336,12 @@ ENTRY(arm1022_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm1022_dma_unmap_area)
- 
-+ENTRY(arm1022_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm1022_dma_barrier)
-+
- ENTRY(arm1022_cache_fns)
- 	.long	arm1022_flush_icache_all
- 	.long	arm1022_flush_kern_cache_all
-@@ -349,6 +352,7 @@ ENTRY(arm1022_cache_fns)
- 	.long	arm1022_flush_kern_dcache_area
- 	.long	arm1022_dma_map_area
- 	.long	arm1022_dma_unmap_area
-+	.long	arm1022_dma_barrier
- 	.long	arm1022_dma_flush_range
- 
- 	.align	5
-diff --git a/arch/arm/mm/proc-arm1026.S b/arch/arm/mm/proc-arm1026.S
-index 636672a..de648f1 100644
---- a/arch/arm/mm/proc-arm1026.S
-+++ b/arch/arm/mm/proc-arm1026.S
-@@ -264,7 +264,6 @@ arm1026_dma_inv_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -286,7 +285,6 @@ arm1026_dma_clean_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -306,7 +304,6 @@ ENTRY(arm1026_dma_flush_range)
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -333,6 +330,12 @@ ENTRY(arm1026_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm1026_dma_unmap_area)
- 
-+ENTRY(arm1026_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm1026_dma_barrier)
-+
- ENTRY(arm1026_cache_fns)
- 	.long	arm1026_flush_icache_all
- 	.long	arm1026_flush_kern_cache_all
-@@ -343,6 +346,7 @@ ENTRY(arm1026_cache_fns)
- 	.long	arm1026_flush_kern_dcache_area
- 	.long	arm1026_dma_map_area
- 	.long	arm1026_dma_unmap_area
-+	.long	arm1026_dma_barrier
- 	.long	arm1026_dma_flush_range
- 
- 	.align	5
-diff --git a/arch/arm/mm/proc-arm920.S b/arch/arm/mm/proc-arm920.S
-index 8be8199..ec74093 100644
---- a/arch/arm/mm/proc-arm920.S
-+++ b/arch/arm/mm/proc-arm920.S
-@@ -252,7 +252,6 @@ arm920_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -271,7 +270,6 @@ arm920_dma_clean_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -288,7 +286,6 @@ ENTRY(arm920_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -315,6 +312,12 @@ ENTRY(arm920_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm920_dma_unmap_area)
- 
-+ENTRY(arm920_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm920_dma_barrier)
-+
- ENTRY(arm920_cache_fns)
- 	.long	arm920_flush_icache_all
- 	.long	arm920_flush_kern_cache_all
-@@ -325,6 +328,7 @@ ENTRY(arm920_cache_fns)
- 	.long	arm920_flush_kern_dcache_area
- 	.long	arm920_dma_map_area
- 	.long	arm920_dma_unmap_area
-+	.long	arm920_dma_barrier
- 	.long	arm920_dma_flush_range
- 
- #endif
-diff --git a/arch/arm/mm/proc-arm922.S b/arch/arm/mm/proc-arm922.S
-index c0ff8e4..474d4c6 100644
---- a/arch/arm/mm/proc-arm922.S
-+++ b/arch/arm/mm/proc-arm922.S
-@@ -254,7 +254,6 @@ arm922_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -273,7 +272,6 @@ arm922_dma_clean_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -290,7 +288,6 @@ ENTRY(arm922_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -317,6 +314,12 @@ ENTRY(arm922_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm922_dma_unmap_area)
- 
-+ENTRY(arm922_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm922_dma_barrier)
-+
- ENTRY(arm922_cache_fns)
- 	.long	arm922_flush_icache_all
- 	.long	arm922_flush_kern_cache_all
-@@ -327,6 +330,7 @@ ENTRY(arm922_cache_fns)
- 	.long	arm922_flush_kern_dcache_area
- 	.long	arm922_dma_map_area
- 	.long	arm922_dma_unmap_area
-+	.long	arm922_dma_barrier
- 	.long	arm922_dma_flush_range
- 
- #endif
-diff --git a/arch/arm/mm/proc-arm925.S b/arch/arm/mm/proc-arm925.S
-index 3c6cffe..0336ae3 100644
---- a/arch/arm/mm/proc-arm925.S
-+++ b/arch/arm/mm/proc-arm925.S
-@@ -302,7 +302,6 @@ arm925_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -323,7 +322,6 @@ arm925_dma_clean_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -345,7 +343,6 @@ ENTRY(arm925_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -372,6 +369,12 @@ ENTRY(arm925_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm925_dma_unmap_area)
- 
-+ENTRY(arm925_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm925_dma_barrier)
-+
- ENTRY(arm925_cache_fns)
- 	.long	arm925_flush_icache_all
- 	.long	arm925_flush_kern_cache_all
-@@ -382,6 +385,7 @@ ENTRY(arm925_cache_fns)
- 	.long	arm925_flush_kern_dcache_area
- 	.long	arm925_dma_map_area
- 	.long	arm925_dma_unmap_area
-+	.long	arm925_dma_barrier
- 	.long	arm925_dma_flush_range
- 
- ENTRY(cpu_arm925_dcache_clean_area)
-diff --git a/arch/arm/mm/proc-arm926.S b/arch/arm/mm/proc-arm926.S
-index 75b707c..473bbe6 100644
---- a/arch/arm/mm/proc-arm926.S
-+++ b/arch/arm/mm/proc-arm926.S
-@@ -265,7 +265,6 @@ arm926_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -286,7 +285,6 @@ arm926_dma_clean_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -308,7 +306,6 @@ ENTRY(arm926_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -335,6 +332,12 @@ ENTRY(arm926_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm926_dma_unmap_area)
- 
-+ENTRY(arm926_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm926_dma_barrier)
-+
- ENTRY(arm926_cache_fns)
- 	.long	arm926_flush_icache_all
- 	.long	arm926_flush_kern_cache_all
-@@ -345,6 +348,7 @@ ENTRY(arm926_cache_fns)
- 	.long	arm926_flush_kern_dcache_area
- 	.long	arm926_dma_map_area
- 	.long	arm926_dma_unmap_area
-+	.long	arm926_dma_barrier
- 	.long	arm926_dma_flush_range
- 
- ENTRY(cpu_arm926_dcache_clean_area)
-diff --git a/arch/arm/mm/proc-arm940.S b/arch/arm/mm/proc-arm940.S
-index 1af1657..c44c963 100644
---- a/arch/arm/mm/proc-arm940.S
-+++ b/arch/arm/mm/proc-arm940.S
-@@ -187,7 +187,6 @@ arm940_dma_inv_range:
- 	bcs	2b				@ entries 63 to 0
- 	subs	r1, r1, #1 << 4
- 	bcs	1b				@ segments 7 to 0
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -211,7 +210,6 @@ ENTRY(cpu_arm940_dcache_clean_area)
- 	subs	r1, r1, #1 << 4
- 	bcs	1b				@ segments 7 to 0
- #endif
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -237,7 +235,6 @@ ENTRY(arm940_dma_flush_range)
- 	bcs	2b				@ entries 63 to 0
- 	subs	r1, r1, #1 << 4
- 	bcs	1b				@ segments 7 to 0
--	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -264,6 +261,12 @@ ENTRY(arm940_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm940_dma_unmap_area)
- 
-+ENTRY(arm940_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, ip, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm940_dma_barrier)
-+
- ENTRY(arm940_cache_fns)
- 	.long	arm940_flush_icache_all
- 	.long	arm940_flush_kern_cache_all
-@@ -274,6 +277,7 @@ ENTRY(arm940_cache_fns)
- 	.long	arm940_flush_kern_dcache_area
- 	.long	arm940_dma_map_area
- 	.long	arm940_dma_unmap_area
-+	.long	arm940_dma_barrier
- 	.long	arm940_dma_flush_range
- 
- 	__CPUINIT
-diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
-index 1664b6a..11e9ad7 100644
---- a/arch/arm/mm/proc-arm946.S
-+++ b/arch/arm/mm/proc-arm946.S
-@@ -234,7 +234,6 @@ arm946_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -255,7 +254,6 @@ arm946_dma_clean_range:
- 	cmp	r0, r1
- 	blo	1b
- #endif
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -279,7 +277,6 @@ ENTRY(arm946_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -306,6 +303,12 @@ ENTRY(arm946_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(arm946_dma_unmap_area)
- 
-+ENTRY(arm946_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(arm946_dma_barrier)
-+
- ENTRY(arm946_cache_fns)
- 	.long	arm946_flush_icache_all
- 	.long	arm946_flush_kern_cache_all
-@@ -316,6 +319,7 @@ ENTRY(arm946_cache_fns)
- 	.long	arm946_flush_kern_dcache_area
- 	.long	arm946_dma_map_area
- 	.long	arm946_dma_unmap_area
-+	.long	arm946_dma_barrier
- 	.long	arm946_dma_flush_range
- 
- 
-diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-index 53e6323..50a309e 100644
---- a/arch/arm/mm/proc-feroceon.S
-+++ b/arch/arm/mm/proc-feroceon.S
-@@ -290,7 +290,6 @@ feroceon_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- 	.align	5
-@@ -326,7 +325,6 @@ feroceon_dma_clean_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- 	.align	5
-@@ -339,7 +337,6 @@ feroceon_range_dma_clean_range:
- 	mcr	p15, 5, r0, c15, c13, 0		@ D clean range start
- 	mcr	p15, 5, r1, c15, c13, 1		@ D clean range top
- 	msr	cpsr_c, r2			@ restore interrupts
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -357,7 +354,6 @@ ENTRY(feroceon_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- 	.align	5
-@@ -370,7 +366,6 @@ ENTRY(feroceon_range_dma_flush_range)
- 	mcr	p15, 5, r0, c15, c15, 0		@ D clean/inv range start
- 	mcr	p15, 5, r1, c15, c15, 1		@ D clean/inv range top
- 	msr	cpsr_c, r2			@ restore interrupts
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -411,6 +406,12 @@ ENTRY(feroceon_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(feroceon_dma_unmap_area)
- 
-+ENTRY(feroceon_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(feroceon_dma_barrier)
-+
- ENTRY(feroceon_cache_fns)
- 	.long	feroceon_flush_icache_all
- 	.long	feroceon_flush_kern_cache_all
-@@ -421,6 +422,7 @@ ENTRY(feroceon_cache_fns)
- 	.long	feroceon_flush_kern_dcache_area
- 	.long	feroceon_dma_map_area
- 	.long	feroceon_dma_unmap_area
-+	.long	feroceon_dma_barrier
- 	.long	feroceon_dma_flush_range
- 
- ENTRY(feroceon_range_cache_fns)
-@@ -433,6 +435,7 @@ ENTRY(feroceon_range_cache_fns)
- 	.long	feroceon_range_flush_kern_dcache_area
- 	.long	feroceon_range_dma_map_area
- 	.long	feroceon_dma_unmap_area
-+	.long	feroceon_dma_barrier
- 	.long	feroceon_range_dma_flush_range
- 
- 	.align	5
-diff --git a/arch/arm/mm/proc-mohawk.S b/arch/arm/mm/proc-mohawk.S
-index caa3115..09e8883 100644
---- a/arch/arm/mm/proc-mohawk.S
-+++ b/arch/arm/mm/proc-mohawk.S
-@@ -224,7 +224,6 @@ mohawk_dma_inv_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -243,7 +242,6 @@ mohawk_dma_clean_range:
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -261,7 +259,6 @@ ENTRY(mohawk_dma_flush_range)
- 	add	r0, r0, #CACHE_DLINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
- 	mov	pc, lr
- 
- /*
-@@ -288,6 +285,12 @@ ENTRY(mohawk_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(mohawk_dma_unmap_area)
- 
-+ENTRY(mohawk_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-+	mov	pc, lr
-+ENDPROC(mohawk_dma_barrier)
-+
- ENTRY(mohawk_cache_fns)
- 	.long	mohawk_flush_kern_cache_all
- 	.long	mohawk_flush_user_cache_all
-@@ -297,6 +300,7 @@ ENTRY(mohawk_cache_fns)
- 	.long	mohawk_flush_kern_dcache_area
- 	.long	mohawk_dma_map_area
- 	.long	mohawk_dma_unmap_area
-+	.long	mohawk_dma_barrier
- 	.long	mohawk_dma_flush_range
- 
- ENTRY(cpu_mohawk_dcache_clean_area)
-diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-index 046b3d8..d033ed4 100644
---- a/arch/arm/mm/proc-xsc3.S
-+++ b/arch/arm/mm/proc-xsc3.S
-@@ -274,7 +274,6 @@ xsc3_dma_inv_range:
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ data write barrier
- 	mov	pc, lr
- 
- /*
-@@ -291,7 +290,6 @@ xsc3_dma_clean_range:
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ data write barrier
- 	mov	pc, lr
- 
- /*
-@@ -308,7 +306,6 @@ ENTRY(xsc3_dma_flush_range)
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ data write barrier
- 	mov	pc, lr
- 
- /*
-@@ -335,6 +332,12 @@ ENTRY(xsc3_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(xsc3_dma_unmap_area)
- 
-+ENTRY(xsc3_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ data write barrier
-+	mov	pc, lr
-+ENDPROC(xsc3_dma_barrier)
-+
- ENTRY(xsc3_cache_fns)
- 	.long	xsc3_flush_icache_all
- 	.long	xsc3_flush_kern_cache_all
-@@ -345,6 +348,7 @@ ENTRY(xsc3_cache_fns)
- 	.long	xsc3_flush_kern_dcache_area
- 	.long	xsc3_dma_map_area
- 	.long	xsc3_dma_unmap_area
-+	.long	xsc3_dma_barrier
- 	.long	xsc3_dma_flush_range
- 
- ENTRY(cpu_xsc3_dcache_clean_area)
-diff --git a/arch/arm/mm/proc-xscale.S b/arch/arm/mm/proc-xscale.S
-index 63037e2..e390ae6 100644
---- a/arch/arm/mm/proc-xscale.S
-+++ b/arch/arm/mm/proc-xscale.S
-@@ -332,7 +332,6 @@ xscale_dma_inv_range:
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
- 	mov	pc, lr
- 
- /*
-@@ -349,7 +348,6 @@ xscale_dma_clean_range:
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
- 	mov	pc, lr
- 
- /*
-@@ -367,7 +365,6 @@ ENTRY(xscale_dma_flush_range)
- 	add	r0, r0, #CACHELINESIZE
- 	cmp	r0, r1
- 	blo	1b
--	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
- 	mov	pc, lr
- 
- /*
-@@ -407,6 +404,12 @@ ENTRY(xscale_dma_unmap_area)
- 	mov	pc, lr
- ENDPROC(xscale_dma_unmap_area)
- 
-+ENTRY(xscale_dma_barrier)
-+	mov	r0, #0
-+	mcr	p15, 0, r0, c7, c10, 4		@ Drain Write (& Fill) Buffer
-+	mov	pc, lr
-+ENDPROC(xscsale_dma_barrier)
-+
- ENTRY(xscale_cache_fns)
- 	.long	xscale_flush_icache_all
- 	.long	xscale_flush_kern_cache_all
-@@ -417,6 +420,7 @@ ENTRY(xscale_cache_fns)
- 	.long	xscale_flush_kern_dcache_area
- 	.long	xscale_dma_map_area
- 	.long	xscale_dma_unmap_area
-+	.long	xscale_dma_barrier
- 	.long	xscale_dma_flush_range
- 
- /*
+> 
+> > + * Clocksource timer resolution is 160ns
+> > + * Clockevent timer resolution is 160ns
+> > + */
+> > +#define XTTCPSS_CLOCKSOURCE	0	/* Timer 1 as a generic
+timekeeping */
+> > +#define XTTCPSS_CLOCKEVENT	1	/* Timer 2 as a clock event */
+> > +
+> > +#define XTTCPSS_TIMER_BASE	TTC0_BASE
+> > +
+> > +/*
+> > + * Timer Register Offset Definitions of Timer 1, Increment base
+address by 4
+> > + * and use same offsets for Timer 2
+> > + */
+> > +#define XTTCPSS_CLK_CNTRL_OFFSET	0x00 /* Clock Control Reg, RW */
+> > +#define XTTCPSS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW
+*/
+> > +#define XTTCPSS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
+> > +#define XTTCPSS_INTR_VAL_OFFSET		0x24 /* Interval Count
+Reg, RW */
+> > +#define XTTCPSS_MATCH_1_OFFSET		0x30 /* Match 1 Value
+Reg, RW */
+> > +#define XTTCPSS_MATCH_2_OFFSET		0x3C /* Match 2 Value
+Reg, RW */
+> > +#define XTTCPSS_MATCH_3_OFFSET		0x48 /* Match 3 Value
+Reg, RW */
+> > +#define XTTCPSS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO
+*/
+> > +#define XTTCPSS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW
+*/
+> > +
+> > +/*
+> > + * Bit mask to enable/disable the timer
+> > + */
+> > +#define XTTCPSS_CNT_CNTRL_ENABLE_MASK	0xFFFFFFFE
+> > +
+> > +/*
+> > + * Definitions of the timer read/write macro
+> > + */
+> > +#define xttcpss_read(addr)	__raw_readl((void __iomem *)addr)
+> > +#define xttcpss_write(addr, val) __raw_writel(val, (void __iomem
+*)(addr))
+> > +
+> > +
+> > +/**
+> > + * struct xttcpss_timer - This definition defines local timer
+structure
+> > + *
+> > + * @name:	Name of Timer
+> > + * @base_addr:	Base address of timer
+> > + * @timer_irq:	irqaction structure for the timer device
+> > + * @mode:       only valid for an clock event, periodic or one-shot
+> > + **/
+> > +struct xttcpss_timer {
+> > +	char *name;
+> 
+> const?
+
+Yep looks like it can be. I'll add it.
+
+> 
+> > +	unsigned long base_addr;
+> > +	struct irqaction timer_irq;
+> 
+> irqaction also has a const char *name pointer - is it necessary to
+duplicate
+> it above?
+> 
+
+I see your point. 
+
+> > +	enum clock_event_mode mode;
+> > +};
+> > +
+> > +
+> > +static struct xttcpss_timer timers[];
+> > +static struct clock_event_device xttcpss_clockevent;
+> > +
+> > +/*
+> > + * xttcpss_timer_irqs - Timers IRQ number
+> > + */
+> > +static int xttcpss_timer_irqs[2] = {
+> > +	IRQ_TIMERCOUNTER0,	/* Timer 1 IRQ number */
+> > +	IRQ_TIMERCOUNTER0 + 1,	/* Timer 2 IRQ number */
+> > +};
+> > +
+> > +/**
+> > + * xttcpss_set_interval - Set the timer interval value
+> > + *
+> > + * @timer:	Pointer to the timer instance
+> > + * @cycles:	Timer interval ticks
+> > + **/
+> > +static void xttcpss_set_interval(struct xttcpss_timer *timer,
+> > +					unsigned long cycles)
+> > +{
+> > +	u32 ctrl_reg;
+> > +
+> > +	/* Disable the counter, set the counter value  and re-enable
+counter */
+> > +	ctrl_reg = xttcpss_read(timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET);
+> > +	ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
+> > +	xttcpss_write(timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
+ctrl_reg);
+> > +
+> > +	pr_debug("set_interval, name = %s, period = %08X\n",
+> > +			timer->name, (unsigned int)cycles);
+> > +
+> > +	xttcpss_write(timer->base_addr + XTTCPSS_INTR_VAL_OFFSET,
+cycles);
+> > +
+> > +	/* Reset the counter (0x10) so that it starts from 0, one-shot
+> > +	   mode makes this needed for timing to be right. */
+> > +	ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
+> > +	ctrl_reg |= 0x10;
+> > +	xttcpss_write(timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
+ctrl_reg);
+> > +}
+> > +
+> > +/**
+> > + * xttcpss_clock_source_interrupt - Clock source timer interrupt
+handler
+> > + *
+> > + * @irq:	IRQ number of the Timer
+> > + * @dev_id:	void pointer to the xttcpss_timer instance
+> > + *
+> > + * This will be called when 16-bit clock source counter wraps
+> > + *
+> > + * returns: Always IRQ_HANDLED - success
+> > + **/
+> > +static irqreturn_t xttcpss_clock_source_interrupt(int irq, void
+*dev_id)
+> > +{
+> > +	struct xttcpss_timer *timer = dev_id;
+> > +
+> > +	/* Acknowledge the interrupt */
+> > +	xttcpss_write(timer->base_addr + XTTCPSS_ISR_OFFSET,
+> > +		xttcpss_read(timer->base_addr + XTTCPSS_ISR_OFFSET));
+> 
+> Hmm.  Is it necessary to do this to keep the counter running?  If the
+> counter stops then it's not a good clock source.
+
+I'm going to have to study this a bit more. I see your point. The
+interrupt doesn't 
+really do anything.  I'll look to see if we can just disable the
+interrupt.
+
+> 
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +/**
+> > + * xttcpss_clock_event_interrupt - Clock event timer interrupt
+handler
+> > + *
+> > + * @irq:	IRQ number of the Timer
+> > + * @dev_id:	void pointer to the xttcpss_timer instance
+> > + *
+> > + * returns: Always IRQ_HANDLED - success
+> > + **/
+> > +static irqreturn_t xttcpss_clock_event_interrupt(int irq, void
+*dev_id)
+> > +{
+> > +	struct clock_event_device *evt = &xttcpss_clockevent;
+> > +	struct xttcpss_timer *timer = dev_id;
+> > +	u32 ctrl_reg;
+> > +
+> > +	/* Acknowledge the interrupt and call event handler */
+> > +	xttcpss_write(timer->base_addr + XTTCPSS_ISR_OFFSET,
+> > +		xttcpss_read(timer->base_addr + XTTCPSS_ISR_OFFSET));
+> > +
+> > +	if (timer->mode == CLOCK_EVT_MODE_ONESHOT) {
+> > +
+> > +		/* Disable the counter as it would keep running. */
+> > +		ctrl_reg = xttcpss_read(timer->base_addr +
+> > +					XTTCPSS_CNT_CNTRL_OFFSET);
+> > +		ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
+> > +		xttcpss_write(timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +	}
+> > +
+> > +	evt->event_handler(evt);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +/*
+> > + * struct xttcpss_timer timers - This definition defines local
+timers
+> > + */
+> > +static struct xttcpss_timer timers[] = {
+> > +	[XTTCPSS_CLOCKSOURCE] = {
+> > +		.name = "xttcpss clocksource",
+> > +		.timer_irq = {
+> > +			.flags = IRQF_DISABLED | IRQF_TIMER,
+> > +			.handler = xttcpss_clock_source_interrupt,
+> > +		}
+> > +	},
+> > +	[XTTCPSS_CLOCKEVENT] = {
+> > +		.name = "xttcpss clockevent",
+> > +		.timer_irq = {
+> > +			.flags = IRQF_DISABLED | IRQF_TIMER,
+> > +			.handler = xttcpss_clock_event_interrupt,
+> > +		}
+> > +	},
+> > +};
+> > +
+> > +
+> > +/**
+> > + * xttcpss_timer_hardware_init - Initialize the timer hardware
+> > + *
+> > + * Initialize the hardware, registers the timer interrupts, set the
+clock source
+> > + * timer interval and enable the clock source timer
+> > + **/
+> > +static void __init xttcpss_timer_hardware_init(void)
+> > +{
+> > +	int timer_id;
+> > +	struct xttcpss_timer *timer;
+> > +
+> > +	for (timer_id = 0; timer_id < ARRAY_SIZE(timers); timer_id++) {
+> > +		timer = &timers[timer_id];
+> > +
+> > +		if (!(timer->name))
+> > +			continue;
+> > +
+> > +		timer->base_addr = XTTCPSS_TIMER_BASE + (4*timer_id);
+> > +
+> > +		/* Disable counter, Enable Interval mode, Count up
+timer,
+> > +		 * Disable Match mode, Internal Clock source select, set
+> > +		 * prescalar to 32, and Enable the Interval interrupt */
+> 
+> Isn't it "pre-scaler" ?
+
+Ok, easy to fix.
+
+> 
+> > +		xttcpss_write(timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				0x23);
+> > +		xttcpss_write(timer->base_addr +
+XTTCPSS_CLK_CNTRL_OFFSET, 0x9);
+> > +		xttcpss_write(timer->base_addr + XTTCPSS_IER_OFFSET,
+0x1);
+> > +
+> > +		/* Setup IRQ */
+> > +		timer->timer_irq.name = timer->name;
+> > +		timer->timer_irq.dev_id = (void *)timer;
+> > +		if (timer->timer_irq.handler != NULL) {
+> > +			setup_irq(xttcpss_timer_irqs[timer_id],
+> > +				&timer->timer_irq);
+> > +		}
+> > +		if (timer_id == XTTCPSS_CLOCKSOURCE)
+> > +			xttcpss_set_interval(timer, ~0);
+> > +	}
+> > +}
+> > +
+> > +/**
+> > + * xttcpss_read_cycles - Reads the timer counter register
+> > + *
+> > + * returns: Current timer counter register value
+> > + **/
+> > +static cycle_t xttcpss_read_cycles(struct clocksource *cs)
+> > +{
+> > +	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKSOURCE];
+> > +
+> > +	return (cycle_t)xttcpss_read(timer->base_addr +
+> > +				XTTCPSS_COUNT_VAL_OFFSET);
+> > +}
+> > +
+> > +
+> > +/*
+> > + * Instantiate and initialize the clock source structure
+> > + */
+> > +static struct clocksource clocksource_xttcpss = {
+> > +	.name		= "xttcpss_timer1",
+> > +	.rating		= 200,			/* Reasonable clock
+source */
+> > +	.read		= xttcpss_read_cycles,
+> > +	.mask		= CLOCKSOURCE_MASK(16),
+> > +	.shift		= 0,			/* Initialized to zero
+*/
+> > +	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+> > +};
+> > +
+> > +
+> > +/**
+> > + * xttcpss_set_next_event - Sets the time interval for next event
+> > + *
+> > + * @cycles:	Timer interval ticks
+> > + * @evt:	Address of clock event instance
+> > + *
+> > + * returns: Always 0 - success
+> > + **/
+> > +static int xttcpss_set_next_event(unsigned long cycles,
+> > +					struct clock_event_device *evt)
+> > +{
+> > +	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
+> > +
+> > +	xttcpss_set_interval(timer, cycles);
+> > +	return 0;
+> > +}
+> > +
+> > +/**
+> > + * xttcpss_set_mode - Sets the mode of timer
+> > + *
+> > + * @mode:	Mode to be set
+> > + * @evt:	Address of clock event instance
+> > + **/
+> > +static void xttcpss_set_mode(enum clock_event_mode mode,
+> > +					struct clock_event_device *evt)
+> > +{
+> > +	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
+> > +	u32 ctrl_reg;
+> > +
+> > +	timer->mode = mode;
+> > +
+> > +	switch (mode) {
+> > +	case CLOCK_EVT_MODE_PERIODIC:
+> > +		xttcpss_set_interval(timer, CLOCK_TICK_RATE / HZ);
+> > +		break;
+> > +	case CLOCK_EVT_MODE_ONESHOT:
+> > +	case CLOCK_EVT_MODE_UNUSED:
+> > +	case CLOCK_EVT_MODE_SHUTDOWN:
+> > +		ctrl_reg = xttcpss_read(timer->base_addr +
+> > +					XTTCPSS_CNT_CNTRL_OFFSET);
+> > +		ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
+> > +		xttcpss_write(timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +		break;
+> > +	case CLOCK_EVT_MODE_RESUME:
+> > +		ctrl_reg = xttcpss_read(timer->base_addr +
+> > +					XTTCPSS_CNT_CNTRL_OFFSET);
+> > +		ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
+> > +		xttcpss_write(timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +		break;
+> > +	}
+> > +}
+> > +
+> > +/*
+> > + * Instantiate and initialize the clock event structure
+> > + */
+> > +static struct clock_event_device xttcpss_clockevent = {
+> > +	.name		= "xttcpss_timer2",
+> > +	.features	= CLOCK_EVT_FEAT_PERIODIC |
+CLOCK_EVT_FEAT_ONESHOT,
+> > +	.shift		= 0,		/* Initialized to zero */
+> > +	.set_next_event	= xttcpss_set_next_event,
+> > +	.set_mode	= xttcpss_set_mode,
+> > +	.rating		= 200,
+> > +};
+> > +
+> > +/**
+> > + * xttcpss_timer_init - Initialize the timer
+> > + *
+> > + * Initializes the timer hardware and registers the clock source
+and clock event
+> > + * timers with Linux kernal timer framework
+> > + **/
+> > +static void __init xttcpss_timer_init(void)
+> > +{
+> > +	u32 shift;
+> > +	u64 temp;
+> > +
+> > +	xttcpss_timer_hardware_init();
+> > +
+> > +	/* Calculate the nanoseconds to cycles divisor value for clock
+source
+> > +	 * timer */
+> > +	for (shift = 16; shift > 0; shift--) {
+> > +		temp = (u64) NSEC_PER_SEC << shift;
+> > +		do_div(temp, CLOCK_TICK_RATE);
+> > +		if ((temp >> 32) == 0)
+> > +			break;
+> > +	}
+> > +
+> > +	/* Setup clocksource */
+> > +	clocksource_xttcpss.shift = shift;
+> > +	clocksource_xttcpss.mult =
+> > +		clocksource_hz2mult(CLOCK_TICK_RATE,
+clocksource_xttcpss.shift);
+> > +
+> > +	if (clocksource_register(&clocksource_xttcpss))
+> > +		printk(KERN_ERR "xttcpss_timer_init: can't register
+clocksource"
+> > +				" for %s\n", clocksource_xttcpss.name);
+> 
+> There's code to calculate the shift and multipler for you.  All you
+> need do is replace the above with clocksource_register_hz() or
+> clocksource_register_khz().
+> 
+
+Ok, will look at that.
+
+> > +	/* Calculate the nanoseconds to cycles divisor value for clock
+event
+> > +	 * timer */
+> > +	for (shift = 16; shift > 0; shift--) {
+> > +		temp = (u64) CLOCK_TICK_RATE << shift;
+> > +		do_div(temp, NSEC_PER_SEC);
+> > +		if ((temp >> 32) == 0)
+> > +			break;
+> > +	}
+> > +
+> > +	/* Setup clockevent */
+> > +	xttcpss_clockevent.shift = shift;
+> > +	xttcpss_clockevent.mult = div_sc(CLOCK_TICK_RATE, NSEC_PER_SEC,
+> > +
+xttcpss_clockevent.shift);
+> 
+> clockevents_calc_mult_shift(&xttcpss_clockevent, freq, minsec) should
+> do away with all the above, here freq is the clock rate for the
+> actual counter itself (after the pre-scaler.)
+> 
+
+Sounds good.
+
+> > +
+> > +	xttcpss_clockevent.max_delta_ns =
+> > +		clockevent_delta2ns(0xfffe, &xttcpss_clockevent);
+> > +	xttcpss_clockevent.min_delta_ns =
+> > +		clockevent_delta2ns(1, &xttcpss_clockevent);
+> > +
+> > +	xttcpss_clockevent.cpumask = cpumask_of(0);
+> > +	clockevents_register_device(&xttcpss_clockevent);
+> > +}
+> > +
+> > +#ifdef CONFIG_PM
+> > +/**
+> > + * xttcpss_timer_suspend - Suspend the timer
+> > + *
+> > + * Disables all (clock source and clock event) the timers
+> > + **/
+> > +static void xttcpss_timer_suspend(void)
+> > +{
+> > +	struct xttcpss_timer *source_timer =
+&timers[XTTCPSS_CLOCKSOURCE];
+> > +	struct xttcpss_timer *event_timer = &timers[XTTCPSS_CLOCKEVENT];
+> > +	u32 ctrl_reg;
+> > +
+> > +	/* Disable clocksource timer */
+> > +	ctrl_reg = xttcpss_read(source_timer->base_addr +
+> > +				XTTCPSS_CNT_CNTRL_OFFSET);
+> > +	ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
+> > +	xttcpss_write(source_timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +
+> > +	/* Disable clockevent timer */
+> > +	ctrl_reg = xttcpss_read(event_timer->base_addr +
+> > +				XTTCPSS_CNT_CNTRL_OFFSET);
+> > +	ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
+> > +	xttcpss_write(event_timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +}
+> > +
+> > +/**
+> > + * xttcpss_timer_resume - Resume the timer
+> > + *
+> > + * Enables  all (clock source and clock event) the timers
+> > + **/
+> > +static void xttcpss_timer_resume(void)
+> > +{
+> > +	struct xttcpss_timer *source_timer =
+&timers[XTTCPSS_CLOCKSOURCE];
+> > +	struct xttcpss_timer *event_timer = &timers[XTTCPSS_CLOCKEVENT];
+> > +	u32 ctrl_reg;
+> > +
+> > +	/* Enable clocksource timer */
+> > +	ctrl_reg = xttcpss_read(source_timer->base_addr +
+> > +				XTTCPSS_CNT_CNTRL_OFFSET);
+> > +	ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
+> > +	xttcpss_write(source_timer->base_addr +
+XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +
+> > +	/* Enable clockevent timer */
+> > +	ctrl_reg = xttcpss_read(event_timer->base_addr +
+> > +				XTTCPSS_CNT_CNTRL_OFFSET);
+> > +	ctrl_reg &= XTTCPSS_CNT_CNTRL_ENABLE_MASK;
+> > +	xttcpss_write(event_timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET,
+> > +				ctrl_reg);
+> > +}
+> 
+> The generic time code should do PM for you.  In fact, if you're using
+> generic time code, these callbacks will never be used, as the code
+> which calls them is surrounded by:
+> 
+> #if defined(CONFIG_PM) && !defined(CONFIG_GENERIC_CLOCKEVENTS)
+> 
+
+Ok, will remove.
+
+Thanks, will update based on these.
+
+-- John
+
+> > +#else
+> > +#define xttcpss_timer_suspend NULL
+> > +#define xttcpss_timer_resume NULL
+> > +#endif
+> > +
+> > +/*
+> > + * Instantiate and initialize the system timer structure
+> > + */
+> > +struct sys_timer xttcpss_sys_timer = {
+> > +	.init		= xttcpss_timer_init,
+> > +	.suspend	= xttcpss_timer_suspend,
+> > +	.resume		= xttcpss_timer_resume,
+> > +};
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
