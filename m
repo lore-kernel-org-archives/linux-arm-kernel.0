@@ -1,62 +1,35 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Sat, 5 Feb 2011 10:25:45 -0700
-Subject: [PATCH 2/4] ARM: Xilinx: Adding Xilinx board support
-In-Reply-To: <20110205161853.GC29411@n2100.arm.linux.org.uk>
-References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
-	<eee52c43-76da-4e47-9f40-4a2d7ee963b6@VA3EHSMHS032.ehs.local>
-	<20110205161853.GC29411@n2100.arm.linux.org.uk>
-Message-ID: <284f6d9c-4df2-4ca3-be6d-27655d7cdb12@VA3EHSMHS015.ehs.local>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Sat, 5 Feb 2011 21:04:57 +0100
+Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
+	in the irq handler
+In-Reply-To: <Pine.LNX.4.64.1102051735270.11500@axis700.grange>
+References: <1296031789-1721-3-git-send-email-agust@denx.de>
+	<1296476549-10421-1-git-send-email-agust@denx.de>
+	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
+	<20110205143505.0b300a3a@wker>
+	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
+Message-ID: <20110205210457.7218ecdc@wker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Saturday, February 05, 2011 9:19 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org; kernel at vger.kernel.org;
-catalin.marinas at arm.com;
-> glikely at secretlab.ca
-> Subject: Re: [PATCH 2/4] ARM: Xilinx: Adding Xilinx board support
+On Sat, 5 Feb 2011 17:36:37 +0100 (CET)
+Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+...
+> > > Verified with both capture.c and mplayer. Could you, please, verify 
+> > > whether you get the same behaviour and what the problem could be?
+> > 
+> > Now I did some further testing with idmac patch applied and with
+> > added debug print in the IDMAC interrupt handler. There is no problem.
+> > Testing with capture.c (4 buffers used as default) shows that buffer
+> > numbers toggle correctly for all 100 captured frames:
 > 
-> On Sat, Feb 05, 2011 at 09:08:42AM -0700, John Linn wrote:
-> > +void __init irq_init(void)
-> > +{
-> > +	gic_cpu_base_addr = (void __iomem *)SCU_GIC_CPU_BASE;
-> 
-> Just pass this address into gic_init - there's no need to initialize
-> this variable yourself anymore.
-> 
-> > +	gic_init(0, 29, (void __iomem *)SCU_GIC_DIST_BASE,
-gic_cpu_base_addr);
-> ...
-> > +static struct map_desc io_desc[] __initdata = {
-> ...
-> > +#ifdef CONFIG_DEBUG_LL
-> > +	{
-> > +		.virtual	= UART0_BASE,
-> > +		.pfn		= __phys_to_pfn(UART0_BASE),
-> > +		.length		= SZ_4K,
-> > +		.type		= MT_DEVICE,
-> > +	},
-> > +#endif
-> 
-> You shouldn't need to do this if your addruart macro in
-mach/debug-macros.S
-> is correctly returning the virtual and physical addresses in rp and
-rv.
+> Hm, interesting, I'll have to look at my testing in more detail then 
+> (once back from FOSDEM). Could you maybe try mplayer too?
 
-I'm sure there's something I'm overlooking here.
+I can't try mplayer since I don't have mplayer setup for this.
+But looking at the mplayer source I don't see why it should
+behave differently. Depending on mode mplayer queues 2 or 6
+buffers. Testing with my test app with 6 queued buffers shows
+no issues, here the buffer numbers toggle correctly, too.
 
-I'm seeing that when I remove that I get I/O just for a bit, then it
-stops. I think
-that means my addruart macro is working correctly.
- 
-I know the UART gets an early mapping in the MMU in head.S.  But does
-that mapping
-stay when the map_io function is ran?  
-
-Thanks,
-John
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Anatolij
