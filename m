@@ -1,96 +1,48 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 5 Feb 2011 10:08:13 +0800
-Subject: [PATCH 2/5] ARM: mxs: add dma channel definitions
+Date: Sat, 5 Feb 2011 10:08:15 +0800
+Subject: [PATCH 4/5] ARM: mxs/mx23evk: add dma device
 In-Reply-To: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
 References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1296871696-21008-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1296871696-21008-5-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/mx23.h |   24 +++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/mx28.h |   37 +++++++++++++++++++++++++++++++++
- 2 files changed, 61 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/Kconfig        |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c |    8 ++++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
-index 9edd02e..1730c9c 100644
---- a/arch/arm/mach-mxs/include/mach/mx23.h
-+++ b/arch/arm/mach-mxs/include/mach/mx23.h
-@@ -142,4 +142,28 @@
- #define MX23_INT_VDD5V_DROOP		64
- #define MX23_INT_DCDC4P2_BO		65
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index cd2fbdf..0b9bb03 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -19,6 +19,7 @@ config MACH_MX23EVK
+ 	bool "Support MX23EVK Platform"
+ 	select SOC_IMX23
+ 	select MXS_HAVE_AMBA_DUART
++	select MXS_HAVE_PLATFORM_DMA
+ 	default y
+ 	help
+ 	  Include support for MX23EVK platform. This includes specific
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index aa06400..13c22a0 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -37,6 +37,14 @@ static void __init mx23evk_init(void)
+ 	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
  
-+/*
-+ * APBH DMA
-+ */
-+#define MX23_DMA_SSP1			1
-+#define MX23_DMA_SSP2			2
-+#define MX23_DMA_GPMI0			4
-+#define MX23_DMA_GPMI1			5
-+#define MX23_DMA_GPMI2			6
-+#define MX23_DMA_GPMI3			7
+ 	mx23_add_duart();
 +
-+/*
-+ * APBX DMA
-+ */
-+#define MX23_DMA_ADC			0
-+#define MX23_DMA_DAC			1
-+#define MX23_DMA_SPDIF			2
-+#define MX23_DMA_I2C			3
-+#define MX23_DMA_SAIF0			4
-+#define MX23_DMA_UART0_RX		6
-+#define MX23_DMA_UART0_TX		7
-+#define MX23_DMA_UART1_RX		8
-+#define MX23_DMA_UART1_TX		9
-+#define MX23_DMA_SAIF1			10
-+
- #endif /* __MACH_MX23_H__ */
-diff --git a/arch/arm/mach-mxs/include/mach/mx28.h b/arch/arm/mach-mxs/include/mach/mx28.h
-index 0716745..3f3485a 100644
---- a/arch/arm/mach-mxs/include/mach/mx28.h
-+++ b/arch/arm/mach-mxs/include/mach/mx28.h
-@@ -185,4 +185,41 @@
- #define MX28_INT_GPIO1			126
- #define MX28_INT_GPIO0			127
++	/*
++	 * the order of adding dma device matters here, otherwise
++	 * dma_device.dev_id may differ from mxs_dma_engine.dev_id,
++	 * in which case mxs-dma will fail to probe.
++	 */
++	mx23_add_apbh_dma();
++	mx23_add_apbx_dma();
+ }
  
-+/*
-+ * APBH DMA
-+ */
-+#define MX28_DMA_SSP0			0
-+#define MX28_DMA_SSP1			1
-+#define MX28_DMA_SSP2			2
-+#define MX28_DMA_SSP3			3
-+#define MX28_DMA_GPMI0			4
-+#define MX28_DMA_GPMI1			5
-+#define MX28_DMA_GPMI2			6
-+#define MX28_DMA_GPMI3			7
-+#define MX28_DMA_GPMI4			8
-+#define MX28_DMA_GPMI5			9
-+#define MX28_DMA_GPMI6			10
-+#define MX28_DMA_GPMI7			11
-+#define MX28_DMA_HSADC			12
-+#define MX28_DMA_LCDIF			13
-+
-+/*
-+ * APBX DMA
-+ */
-+#define MX28_DMA_AUART4_RX		0
-+#define MX28_DMA_AUART4_TX		1
-+#define MX28_DMA_SPDIF_TX		2
-+#define MX28_DMA_SAIF0			4
-+#define MX28_DMA_SAIF1			5
-+#define MX28_DMA_I2C0			6
-+#define MX28_DMA_I2C1			7
-+#define MX28_DMA_AUART0_RX		8
-+#define MX28_DMA_AUART0_TX		9
-+#define MX28_DMA_AUART1_RX		10
-+#define MX28_DMA_AUART1_TX		11
-+#define MX28_DMA_AUART2_RX		12
-+#define MX28_DMA_AUART2_TX		13
-+#define MX28_DMA_AUART3_RX		14
-+#define MX28_DMA_AUART3_TX		15
-+
- #endif /* __MACH_MX28_H__ */
+ static void __init mx23evk_timer_init(void)
 -- 
 1.7.1
