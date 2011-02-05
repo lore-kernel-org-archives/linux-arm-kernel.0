@@ -1,96 +1,52 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Sat, 5 Feb 2011 16:08:43 +0000
-Subject: [PATCH] i2c: OMAP: fix static suspend vs. runtime suspend
-In-Reply-To: <1296173921-4832-1-git-send-email-khilman@ti.com>
-References: <1296173921-4832-1-git-send-email-khilman@ti.com>
-Message-ID: <20110205160843.GD15795@trinity.fluff.org>
+From: john.linn@xilinx.com (John Linn)
+Date: Sat, 5 Feb 2011 09:08:40 -0700
+Subject: [PATCH 0/4] ARM: Basic Xilinx Support
+Message-ID: <eab51420-2be9-429a-8c59-76b3206bc15e@VA3EHSMHS033.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 04:18:41PM -0800, Kevin Hilman wrote:
-> When runtime PM is enabled, each OMAP i2c device is suspended after
-> each i2c xfer.  However, there are two cases when the static suspend
-> methods must be used to ensure the devices are suspended:
-> 
-> 1) runtime PM is disabled, either at compile time or dynamically
->     via /sys/devices/.../power/control.
-> 2) an i2c client driver uses i2c during it's suspend callback, thus
->    leaving the i2c driver active (NOTE: runtime suspend transitions are
->    disabled during system suspend, so i2c activity during system
->    suspend will runtime resume the device, but not runtime (re)suspend it.)
-> 
-> Since the actual work to suspend the device is handled by the
-> subsytem, call the bus methods to take care of it.
-> 
-> NOTE: This takes care of a known suspend problem on OMAP3 where the
-> TWL RTC driver does i2c xfers during its suspend path leaving the i2c
-> driver in an active state (since runtime suspend transistions are
-> disabled.)
-> 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Ben, this is a regression in 2.6.38 so hopefully this can be queued
-> in the 2.6.38-rc cycle.  Thanks.
 
-Ok, after all the discussions should I keep it in my -rc queue?
- 
->  drivers/i2c/busses/i2c-omap.c |   28 ++++++++++++++++++++++++++++
->  1 files changed, 28 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index b605ff3..0541df9 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1137,12 +1137,40 @@ omap_i2c_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_SUSPEND
-> +static int omap_i2c_suspend(struct device *dev)
-> +{
-> +	if (!pm_runtime_suspended(dev))
-> +		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_suspend)
-> +			dev->bus->pm->runtime_suspend(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int omap_i2c_resume(struct device *dev)
-> +{
-> +	if (!pm_runtime_suspended(dev))
-> +		if (dev->bus && dev->bus->pm && dev->bus->pm->runtime_resume)
-> +			dev->bus->pm->runtime_resume(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct dev_pm_ops omap_i2c_pm_ops = {
-> +	.suspend = omap_i2c_suspend,
-> +	.resume = omap_i2c_resume,
-> +};
-> +#else
-> +#define omap_i2c_pm_ops NULL
-> +#endif
-> +
->  static struct platform_driver omap_i2c_driver = {
->  	.probe		= omap_i2c_probe,
->  	.remove		= omap_i2c_remove,
->  	.driver		= {
->  		.name	= "omap_i2c",
->  		.owner	= THIS_MODULE,
-> +		.pm     = &omap_i2c_pm_ops,
->  	},
->  };
->  
-> -- 
-> 1.7.3.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+This patch series adds very basic support for the Xilinx ARM platform.
+The entire patch set must be used. I only broke it up into logical 
+pieces to make the review easier (I hope). 
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+I would like to get the review feedback and make any changes, but after
+that I would like to change mach-xilinx to the real product name. 
+The real product name is expected to be released by marketing very soon.
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+There's always the option of keeping mach-xilinx and then only 
+documenting the product name in the Kconfig. I'm less in favor of that
+but it could be ok.
+
+This code has been tested against 2.6.38-rc2, r3, and against head. The
+only checkpatch warnings are about volatile in the uncompress.h file
+and this method I used seems normal.
+
+Thanks,
+John
+
+ arch/arm/Kconfig                                |   13 
+ arch/arm/Makefile                               |    1 
+ arch/arm/mach-xilinx/Kconfig                    |   14 
+ arch/arm/mach-xilinx/Makefile                   |    6 
+ arch/arm/mach-xilinx/Makefile.boot              |    3 
+ arch/arm/mach-xilinx/board_ep107.c              |   81 ++++
+ arch/arm/mach-xilinx/common.c                   |  132 +++++++
+ arch/arm/mach-xilinx/common.h                   |   32 +
+ arch/arm/mach-xilinx/include/mach/clkdev.h      |   33 +
+ arch/arm/mach-xilinx/include/mach/debug-macro.S |   36 +
+ arch/arm/mach-xilinx/include/mach/entry-macro.S |   87 ++++
+ arch/arm/mach-xilinx/include/mach/hardware.h    |   44 ++
+ arch/arm/mach-xilinx/include/mach/io.h          |   27 +
+ arch/arm/mach-xilinx/include/mach/irqs.h        |   28 +
+ arch/arm/mach-xilinx/include/mach/memory.h      |   23 +
+ arch/arm/mach-xilinx/include/mach/system.h      |   28 +
+ arch/arm/mach-xilinx/include/mach/timex.h       |   22 +
+ arch/arm/mach-xilinx/include/mach/uart.h        |   30 +
+ arch/arm/mach-xilinx/include/mach/uncompress.h  |   46 ++
+ arch/arm/mach-xilinx/include/mach/vmalloc.h     |   20 +
+ arch/arm/mach-xilinx/timer.c                    |  452 ++++++++++++++++++++++++
+ arch/arm/mm/Kconfig                             |    4 
+ 22 files changed, 1160 insertions(+), 2 deletions(-)
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
