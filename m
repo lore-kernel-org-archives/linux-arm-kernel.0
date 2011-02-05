@@ -1,49 +1,44 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 5 Feb 2011 10:18:43 +0800
-Subject: [PATCH 3/7] ARM: mxs: make ssp error irq definition consistent
+Date: Sat, 5 Feb 2011 10:18:42 +0800
+Subject: [PATCH 2/7] ARM: mxs/clock: fix base address missing in
+	name##_set_parent
 In-Reply-To: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
 References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1296872327-21166-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1296872327-21166-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/mx23.h |    2 +-
- arch/arm/mach-mxs/include/mach/mx28.h |    8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-mxs/clock-mx23.c |    2 +-
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
-index 1730c9c..e858692 100644
---- a/arch/arm/mach-mxs/include/mach/mx23.h
-+++ b/arch/arm/mach-mxs/include/mach/mx23.h
-@@ -93,7 +93,7 @@
- #define MX23_INT_USB_WAKEUP		12
- #define MX23_INT_GPMI_DMA		13
- #define MX23_INT_SSP1_DMA		14
--#define MX23_INT_SSP_ERROR		15
-+#define MX23_INT_SSP1_ERROR		15
- #define MX23_INT_GPIO0			16
- #define MX23_INT_GPIO1			17
- #define MX23_INT_GPIO2			18
-diff --git a/arch/arm/mach-mxs/include/mach/mx28.h b/arch/arm/mach-mxs/include/mach/mx28.h
-index 3f3485a..75d8611 100644
---- a/arch/arm/mach-mxs/include/mach/mx28.h
-+++ b/arch/arm/mach-mxs/include/mach/mx28.h
-@@ -163,10 +163,10 @@
- #define MX28_INT_USB0			93
- #define MX28_INT_USB1_WAKEUP		94
- #define MX28_INT_USB0_WAKEUP		95
--#define MX28_INT_SSP0			96
--#define MX28_INT_SSP1			97
--#define MX28_INT_SSP2			98
--#define MX28_INT_SSP3			99
-+#define MX28_INT_SSP0_ERROR		96
-+#define MX28_INT_SSP1_ERROR		97
-+#define MX28_INT_SSP2_ERROR		98
-+#define MX28_INT_SSP3_ERROR		99
- #define MX28_INT_ENET_SWI		100
- #define MX28_INT_ENET_MAC0		101
- #define MX28_INT_ENET_MAC1		102
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index 350b28c..c19b69a 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -347,7 +347,7 @@ static int name##_set_parent(struct clk *clk, struct clk *parent)	\
+ {									\
+ 	if (parent != clk->parent) {					\
+ 		__raw_writel(BM_CLKCTRL_CLKSEQ_BYPASS_##bit,		\
+-			 HW_CLKCTRL_CLKSEQ_TOG);			\
++			CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_TOG);	\
+ 		clk->parent = parent;					\
+ 	}								\
+ 									\
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index a3b4787..9f4ee36 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -483,7 +483,7 @@ static int name##_set_parent(struct clk *clk, struct clk *parent)	\
+ {									\
+ 	if (parent != clk->parent) {					\
+ 		__raw_writel(BM_CLKCTRL_CLKSEQ_BYPASS_##bit,		\
+-			 HW_CLKCTRL_CLKSEQ_TOG);			\
++			CLKCTRL_BASE_ADDR + HW_CLKCTRL_CLKSEQ_TOG);	\
+ 		clk->parent = parent;					\
+ 	}								\
+ 									\
 -- 
 1.7.1
