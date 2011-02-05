@@ -1,125 +1,158 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Sat, 5 Feb 2011 14:35:05 +0100
-Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
-	in the irq handler
-In-Reply-To: <Pine.LNX.4.64.1102031104090.21719@axis700.grange>
-References: <1296031789-1721-3-git-send-email-agust@denx.de>
-	<1296476549-10421-1-git-send-email-agust@denx.de>
-	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
-Message-ID: <20110205143505.0b300a3a@wker>
+From: John.Linn@xilinx.com (John Linn)
+Date: Sat, 5 Feb 2011 07:03:44 -0700
+Subject: Updates to devicetree/arm branch
+In-Reply-To: <AANLkTikOe21SPAtUY+5KhgpCFaK8g3mRS1GkG4uaDXL=@mail.gmail.com>
+References: <AANLkTikOe21SPAtUY+5KhgpCFaK8g3mRS1GkG4uaDXL=@mail.gmail.com>
+Message-ID: <fe42a8b2-2161-4216-84f2-b31f756bffdc@VA3EHSMHS029.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+> -----Original Message-----
+> From: glikely at secretlab.ca [mailto:glikely at secretlab.ca] On Behalf Of Grant Likely
+> Sent: Wednesday, February 02, 2011 10:50 PM
+> To: devicetree-discuss
+> Cc: nicolas.pitre at linaro.org; linux-kernel at vger.kernel.org; buytenh at wantstofly.org; Olof Johansson;
+> linux-arm-kernel at lists.infradead.org; John Bonesio; Jeremy Kerr; Rob Herring; John Linn; Thomas
+> Abraham
+> Subject: Updates to devicetree/arm branch
+> 
+> Hi all,
+> 
+> I've just push a few more commits out to devicetree/arm which picks up
+> the removal of early machine_type lookup, picks up Rob's
+> atags-anywhere patch (an earlier version, not the one rebased on
+> Russell's p2v branch; I'll update to Rob's latest in the 2.6.39
+> timeframe), and fixes the dtb corruption issue that I ran into (Thanks
+> to John Bonesio for the debug help).  I was trying to use
+> memblock_alloc() for early memory allocation when I should have been
+> using alloc_bootmem_align().  Oops.
+> 
+> Anyway, it seems to be working well for me, but it needs more testing.
+> Give it a try if you're interested.  The tree details are below:
+> 
+> John, hopefully this will solve all the dtb base address issues you
+> were having.  You *should* be able to locate the dtb anywhere in ram
+> now, except in a region used by the kernel and it cannot be based at
+> physical address 0.
 
-On Thu, 3 Feb 2011 11:09:54 +0100 (CET)
-Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+I pulled your new tree into mine and retested.  I retested with a dtb at 0x1000, 
+0x400000, 0x1000000, and 0x8000000 successfully.  No issues booting with 
+the device tree.
 
-> Hi Anatolij
-> 
-> On Mon, 31 Jan 2011, Anatolij Gustschin wrote:
-> 
-> I'm afraid there seems to be a problem with your patch. I have no idea 
-> what is causing it, but I'm just observing some wrong behaviour, that is 
-> not there without it. Namely, I added a debug print to the IDMAC interrupt 
-> handler
-> 
->  	curbuf	= idmac_read_ipureg(&ipu_data, IPU_CHA_CUR_BUF);
->  	err	= idmac_read_ipureg(&ipu_data, IPU_INT_STAT_4);
->  
-> +	printk(KERN_DEBUG "%s(): IDMAC irq %d, buf %d, current %d\n", __func__,
-> +	       irq, ichan->active_buffer, (curbuf >> chan_id) & 1);
->  
->  	if (err & (1 << chan_id)) {
->  		idmac_write_ipureg(&ipu_data, 1 << chan_id, IPU_INT_STAT_4);
-> 
-> and without your patch I see buffer numbers correctly toggling all the 
-> time like
-> 
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 1
-> idmac_interrupt(): IDMAC irq 177, buf 1, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 1
-> idmac_interrupt(): IDMAC irq 177, buf 1, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 1
-> ...
-> 
-> Yes, the first interrupt is different, that's where I'm dropping / 
-> postponing it. With your patch only N (equal to the number of buffers 
-> used, I think) first interrupts toggle, then always only one buffer is 
-> used:
-> 
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-> ...
-> 
-> Verified with both capture.c and mplayer. Could you, please, verify 
-> whether you get the same behaviour and what the problem could be?
+I think this patch set would help us transition to device tree easily.
 
-Now I did some further testing with idmac patch applied and with
-added debug print in the IDMAC interrupt handler. There is no problem.
-Testing with capture.c (4 buffers used as default) shows that buffer
-numbers toggle correctly for all 100 captured frames:
-...
-mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-...
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
+Thanks,
+John
 
-Also testing with my test application didn't show any problem.
-When using more than 1 buffer (tested with 2, 3 and 4 queued
-buffers) double buffering works as expected and frame numbers
-toggle correctly. Capturing 30 frames produce:
+> 
+> I'll leave it out there for a day or two and clean some stuff up
+> before posting the rebased series for a 3rd round of review.
+> 
+> Cheers,
+> g.
+> 
+> The following changes since commit ebf53826e105f488f4f628703a108e98940d1dc5:
+> 
+>   Linux 2.6.38-rc3 (2011-02-01 13:05:49 +1000)
+> 
+> are available in the git repository at:
+>   git://git.secretlab.ca/git/linux-2.6.git devicetree/arm
+> 
+> Grant Likely (14):
+>       arm/dt: Make __vet_atags also accept a dtb image
+>       arm/dt: allow bootmem reservation for device tree blob and initrd
+>       arm/dt: consolidate atags setup into setup_machine_atags
+>       arm/dt: probe for platforms via the device tree
+>       arm/dt: Basic versatile devicetree support
+>       arm/tegra: Fix tegra irq_data conversion
+>       arm/dt: Basic tegra devicetree support
+>       arm/dt: Fixup bugs in device tree __vet_atags changes
+>       Merge v2.6.38-rc1 into devicetree/arm
+>       Merge v2.6.38-rc2 into devicetree/arm
+>       dt/arm: Save dtb in allocated buffer instead of reserved region
+>       Merge commit 'v2.6.38-rc3' into devicetree/arm
+>       arm/dt: Fixed memory allocation and missing of_fdt.h header
+>       Revert "dt/arm: Save dtb in allocated buffer instead of reserved region"
+> 
+> Jeremy Kerr (1):
+>       arm/dt: Allow CONFIG_OF on ARM
+> 
+> Rob Herring (1):
+>       ARM/dt: map ATAGs when not in first 1MB of RAM
+> 
+> Russell King (1):
+>       arm: Defer lookup of machine_type and vet of atags to setup.c
+> 
+>  arch/arm/Kconfig                       |    7 ++
+>  arch/arm/include/asm/mach/arch.h       |    2 +
+>  arch/arm/include/asm/prom.h            |   34 +++++++++
+>  arch/arm/include/asm/setup.h           |    4 +
+>  arch/arm/kernel/Makefile               |    1 +
+>  arch/arm/kernel/devtree.c              |  107 +++++++++++++++++++++++++++++
+>  arch/arm/kernel/head-common.S          |  114 +++++--------------------------
+>  arch/arm/kernel/head-nommu.S           |    3 -
+>  arch/arm/kernel/head.S                 |   36 +++++++---
+>  arch/arm/kernel/setup.c                |  117 ++++++++++++++++++++++----------
+>  arch/arm/mach-tegra/board-harmony.c    |    6 ++
+>  arch/arm/mach-versatile/versatile_ab.c |    6 ++
+>  arch/arm/mach-versatile/versatile_pb.c |    6 ++
+>  arch/arm/mm/init.c                     |   22 ++++++
+>  14 files changed, 318 insertions(+), 147 deletions(-)
+>  create mode 100644 arch/arm/include/asm/prom.h
+>  create mode 100644 arch/arm/kernel/devtree.c
+> 
+> 
+> On Tue, Feb 1, 2011 at 11:21 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > [restored cc: list]
+> >
+> > On Tue, Feb 01, 2011 at 08:11:15AM -0700, John Linn wrote:
+> >> OK, I see your changes don't really help the problem with device
+> >> trees up higher.
+> >>
+> >> The problem is that in setup_machine_fdt the kernel can't get to the
+> >> memory where the device tree is located if it's up higher.
+> >
+> > No, there is another patch to solve that problem from Rob Herring.
+> > I've not yet picked it up into my tree, but I will be doing so soon.
+> > For now the dtb needs to be located inside the first 16k of ram.
+> >
+> > However, it can no longer be based at 0 either. ?I discovered that if
+> > the dt is based at zero, then the kernel is unable to tell the
+> > different between no atags/dtb passed and a dtb passed at physical
+> > address 0. ?At the very least it needs to be offset about 16 bytes.
+> > Since it is common to put atags at address 0x100, it is also
+> > reasonable to use 0x100 as the dtb base address too.
+> >
+> > This problem doesn't exist for machines with ram based at physical
+> > address != 0.
+> >
+> > Sorry I wasn't clear when I posted this. ?There is still a bit of flux
+> > to get the interface correct and I accidentally glossed over this
+> > detail.
+> >
+> >> The new stuff you added doesn't run early enough to take care of this problem.
+> >
+> > The problem I was trying to solve is that I was seeing device tree
+> > corruption later in the boot process, but it now seems that I might
+> > have misdiagnosed it. ?I'm still investigation, but I may end up
+> > reverting the memblock_reserve() change.
+> >
+> >>
+> >> I probably should have reviewed the patches instead of testing as I
+> >> would have realized that.
+> >>
+> >> I'm looking to see if I can understand how to help the problem.
+> >>
+> >> Should I really just respond to the mailing list instead of this
+> >> back channel? ?I don't know good behavior from bad sometimes.
+> >
+> > Yes, please feel totally free to respond on the mailing list (I went
+> > ahead and restored the cc list on this reply). ?Just remember to
+> > bottom post when replying on-list.
+> >
+> > g.
+> >
+> >>
 
-mx3-camera mx3-camera.0: MX3 Camera driver attached to camera 0
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-idmac_interrupt(): IDMAC irq 177, buf 0, current 0
-idmac_interrupt(): IDMAC irq 177, buf 1, current 1
-mx3-camera mx3-camera.0: MX3 Camera driver detached from camera 0
 
-Anatolij
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
