@@ -1,45 +1,58 @@
-From: nickpelling@nanodome.com (Nick Pelling)
-Date: Sat, 05 Feb 2011 09:59:35 +0000
-Subject: "Porting the Linux Kernel to a New ARM Platform",
-  updated...?
-In-Reply-To: <AANLkTikWsU2V+1ohAaiFfRneLjsGRWx7ee5X655mAa18@mail.gmail.c
- om>
-References: <1295968115-11447-1-git-send-email-fabio.estevam@freescale.com>
-	<20110127073009.GR9041@pengutronix.de>
-	<20110127093044.GA30756@shlinux1.ap.freescale.net>
-	<4D415BA2.2020207@freescale.com>
-	<20110127121928.GA1948@richard-laptop>
-	<87a7d0$e7q8m3@out1.ip07ir2.opaltelecom.net>
-	<AANLkTikWsU2V+1ohAaiFfRneLjsGRWx7ee5X655mAa18@mail.gmail.com>
-Message-ID: <9fl3fn$dtqe5n@out1.ip09ir2.opaltelecom.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 5 Feb 2011 16:11:20 +0530
+Subject: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support forre-enabling
+	l2x0
+In-Reply-To: <20110205094730.GA23965@n2100.arm.linux.org.uk>
+References: <1295834493-5019-5-git-send-email-ccross@android.com>
+	<1295968464.10109.264.camel@e102109-lin.cambridge.arm.com>
+	<20110125154133.GB17280@n2100.arm.linux.org.uk>
+	<1295979242.10109.308.camel@e102109-lin.cambridge.arm.com>
+	<2f97ec8a084e590220e1548fc927b60e@mail.gmail.com>
+	<-8932138696981683633@unknownmsgid>
+	<AANLkTi=cTXmQFm_s5OL2pGyyaFv5UR_f9MV=S5Ajx0tu@mail.gmail.com>
+	<20110204234331.GF8732@n2100.arm.linux.org.uk>
+	<AANLkTi=fHnivHXHnYrQvdP6JWbEA3t1X3DuBxj5gN3H0@mail.gmail.com>
+	<1bebe4b5c8590059b70a146d5486fa6a@mail.gmail.com>
+	<20110205094730.GA23965@n2100.arm.linux.org.uk>
+Message-ID: <cb528285e8aa8cdda01d7ced0121b2cf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
-
-At 08:31 03/02/2011 -0600, Steve Chen wrote:
->I took a quick look at the document.  Much of the information still
->applies to the latest kernel.  The biggest change that I can see is
->that the directories were moved and files renames.  For example
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Saturday, February 05, 2011 3:18 PM
+> To: Santosh Shilimkar
+> Cc: Colin Cross; Will Deacon; Catalin Marinas; Linus Walleij;
+> konkers at android.com; Tony Lindgren; linux-kernel at vger.kernel.org;
+> linux-tegra at vger.kernel.org; olof at lixom.net; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 04/28] ARM: mm: cache-l2x0: Add support
+> forre-enabling l2x0
 >
->arch/arm/deconfigs/ is now arch/arm/configs
->config.in is now Kconfig
->include/asm-arm/arch-xxx is moved to arch/arm/mach-xxx/include
+> On Sat, Feb 05, 2011 at 01:21:24PM +0530, Santosh Shilimkar wrote:
+> > GIC save/restore on OMAP follows different strategy. There is a
+> > Predefined layout to save content and restore is done atomically
+> > by boot ROM code.
+> > L2 cache also same case. Only AUXCTRL needs to be programmed on
+> > wakeup from low power mode and that too with secure call. Rest
+> > of the registers are managed by boot ROM code.
+> >
+> > TWD is already managed through framework. Othe CPU low power
+> > sequence is very small and OMAP has restrictions on the last
+> > core to go down and first to wakeup.
+> >
+> > So at least I don't see any use of common notifiers for GIC
+> > and L2 will help OMAP lower power code.
 >
->By the way, include/asm is a symlink points to
->include/asm-arm/arch-xxxx in the older kernels.  The link is created
->by the make.  If I were to get Linux to boot on a new board, I would
->start by looking at code for a similar target with the same SoC.
+> What this means is that we're going to end up littering things like
+> GIC
+> and other stuff with lots of individual SoC specific code to save
+> state
+> into individual SoC specific structures.  This is not sane, and
+> we're
+> not going to corrupt generic code with SoC specific code.
 
-Thanks, Steve, very helpful. I also got an off-list message from 
-Wookey, who said of his document that...
+Fully agree and hence flagged it early.
 
-"more recent docs have been written superseding much of what is in 
-there (e.g Vince Sanders' booting the kernel doc: 
-http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html#
-but which is about to be finally outdated by devicetree possibilities)"
-
-He also suggested http://free-electrons.com/doc/kernel-porting.pdf as 
-likely to be useful.
-
-Cheers, ....Nick Pelling.... 
+Regards,
+Santosh
