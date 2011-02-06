@@ -1,42 +1,31 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 6 Feb 2011 13:42:23 -0700 (MST)
-Subject: [PATCH v2 1/9] omap4: powerdomain: Add supported INACTIVE power
-	state
-In-Reply-To: <1296813544-25170-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296813544-25170-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1102061335400.7672@utopia.booyaka.com>
+From: ecc@cmu.edu (Eric Cooper)
+Date: Sun, 6 Feb 2011 18:24:36 -0500
+Subject: more kexec problems on kirkwood
+Message-ID: <20110206232436.GD3288@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Using a minimal kernel with a built-in initramfs, I've been able to
+successfully kexec a ~1M kernel with a ~2.7M initrd.  But if I then
+use *that* kernel to try to kexec itself (for example, using "reboot"
+when the kexec-tools package is installed), it fails during the
+"Uncompressing the kernel" code.
 
-On Fri, 4 Feb 2011, Santosh Shilimkar wrote:
+It fails with both gzip and lzma compressed images.  The precise
+failure seems to depend on the size of the kernel -- sometimes it
+complains about a corrupt image, sometimes it just hangs.  I added
+some print statements to the decompress-inflate code, and I've seen
+all sorts of error messages.
 
-> On OMAP4, one can explicitly program INACTIVE as the power state of
-> the logic area inside the power domain. Techincally PD state programmed
-> to ON and if all the clock domains within the PD are idled, is equivalent
-> tp PD programmed to INACTIVE and all the clock domains within the PD are
-> idled. There won't be any power difference in above two.
-> 
-> This patch adds the support to allow power domain INACTIVE programming
-> which is supported on OMAP4.
-> 
-> The powerdomain autogen script is updated accordingly.
+I then found the same failure-during-decompression occurs if I try to
+use the minimal kernel to kexec itself, or the bigger kernel to kexec
+anything.
 
-Continuing the discussion here:
+So the successful kexec seems to be a lucky fluke, and there's still
+something not set up correctly in the post-kexec environment.
 
-   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg43509.html
+Any suggestions on where to look or how to debug this would be very
+welcome.
 
-1. It appears that the OMAP4 powerdomain ON-ACTIVE state is a new state 
-for OMAP4, and does not exist as such on previous chips (unless the 
-PRM_VOLTCTRL.AUTO_* bits are all disabled)
-
-2. It also appears that the OMAP4 powerdomain ON-INACTIVE state 
-is equivalent to the OMAP3 powerdomain ON state (again, assuming that the 
-PRM_VOLTCTRL.AUTO_SLEEP bit is set on OMAP3).
-
-Could you please comment on whether these statements are true or false?
-
-
-- Paul
+-- 
+Eric Cooper             e c c @ c m u . e d u
