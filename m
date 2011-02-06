@@ -1,27 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 6 Feb 2011 14:22:09 +0100
-Subject: [RFC] add pwmlib support
-In-Reply-To: <20110131075803.GI9041@pengutronix.de>
-References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
-	<20110129213821.0e51dc32@endymion.delvare>
-	<20110129215141.GA3493@pengutronix.de>
-	<AANLkTi=ppKZ96T3_1nYisHG9705OCHgZqkLnu2f47zq5@mail.gmail.com>
-	<20110131075803.GI9041@pengutronix.de>
-Message-ID: <AANLkTi=nDkuevMqY6v_K_Lkoi6wDowcL7AN_a=tb72t5@mail.gmail.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Sun, 06 Feb 2011 20:09:35 +0100
+Subject: [PULL REQ] IXP4xx: a couple of fixes
+Message-ID: <m34o8hou8g.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/1/31 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Sun, Jan 30, 2011 at 11:49:32AM +0800, arden jay wrote:
->> Sorry, I'm confused about this.
->> If it is for backlight control, why it don't go through led_class?
->
-> PWMs are not limited to backlight. As Jean pointed out they can be used
-> for fans (or more generally motors) aswell. Have a look at
-> drivers/leds/leds-pwm.c, it is a user of this pwm API.
+Linus,
 
-Low-frequency PWM is used for vibrators of the type found in
-silent mode cellphones, to mention another use case.
+the following changes since commit ebf53826e105f488f4f628703a108e98940d1dc5:
 
-Yours,
-Linus Walleij
+  Linux 2.6.38-rc3 (2011-02-01 13:05:49 +1000)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/chris/linux-2.6.git ixp4xx
+
+Ben Hutchings (1):
+      arm/ixp4xx: Rename FREQ macro to avoid collisions
+
+Krzysztof Ha?asa (1):
+      IXP4xx: Fix qmgr_release_queue() flushing unexpected queue entries.
+
+Please pull. Thanks.
+
+ arch/arm/mach-ixp4xx/common.c             |    4 ++--
+ arch/arm/mach-ixp4xx/include/mach/timex.h |    5 +++--
+ arch/arm/mach-ixp4xx/ixp4xx_qmgr.c        |    9 +++++----
+ drivers/input/misc/ixp4xx-beeper.c        |    6 +-----
+ 4 files changed, 11 insertions(+), 13 deletions(-)
+-- 
+Krzysztof Halasa
