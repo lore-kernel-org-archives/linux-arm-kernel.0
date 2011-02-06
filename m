@@ -1,30 +1,27 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 06 Feb 2011 14:37:51 +0200
-Subject: [PATCH] Clean up set_pxa_fb_info
-In-Reply-To: <20110206115254.GA13084@n2100.arm.linux.org.uk>
-References: <20110206115254.GA13084@n2100.arm.linux.org.uk>
-Message-ID: <4D4E961F.9020709@compulab.co.il>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 6 Feb 2011 14:22:09 +0100
+Subject: [RFC] add pwmlib support
+In-Reply-To: <20110131075803.GI9041@pengutronix.de>
+References: <1296217283-14531-1-git-send-email-s.hauer@pengutronix.de>
+	<20110129213821.0e51dc32@endymion.delvare>
+	<20110129215141.GA3493@pengutronix.de>
+	<AANLkTi=ppKZ96T3_1nYisHG9705OCHgZqkLnu2f47zq5@mail.gmail.com>
+	<20110131075803.GI9041@pengutronix.de>
+Message-ID: <AANLkTi=nDkuevMqY6v_K_Lkoi6wDowcL7AN_a=tb72t5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> set_pxa_fb_info() has been a long-standing wart in the naming scheme
-> of the pxa_set_xxx_info() functions.  This renames the function, and
-> combines set_pxa_fb_parent() with set_pxa_fb_info().
+2011/1/31 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Sun, Jan 30, 2011 at 11:49:32AM +0800, arden jay wrote:
+>> Sorry, I'm confused about this.
+>> If it is for backlight control, why it don't go through led_class?
 >
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> PWMs are not limited to backlight. As Jean pointed out they can be used
+> for fans (or more generally motors) aswell. Have a look at
+> drivers/leds/leds-pwm.c, it is a user of this pwm API.
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Low-frequency PWM is used for vibrators of the type found in
+silent mode cellphones, to mention another use case.
 
-For:
-
->  arch/arm/mach-pxa/cm-x2xx.c               |    2 +-
->  arch/arm/mach-pxa/cm-x300.c               |    2 +-
->  arch/arm/mach-pxa/em-x270.c               |    2 +-
->
-
-
--- 
-Regards,
-Igor.
+Yours,
+Linus Walleij
