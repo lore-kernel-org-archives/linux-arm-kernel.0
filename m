@@ -1,39 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 5 Feb 2011 08:24:50 -0700
-Subject: Updates to devicetree/arm branch
-In-Reply-To: <fe42a8b2-2161-4216-84f2-b31f756bffdc@VA3EHSMHS029.ehs.local>
-References: <AANLkTikOe21SPAtUY+5KhgpCFaK8g3mRS1GkG4uaDXL=@mail.gmail.com>
-	<fe42a8b2-2161-4216-84f2-b31f756bffdc@VA3EHSMHS029.ehs.local>
-Message-ID: <AANLkTi=rvjoX8EPDf9ihA+K25iBS0zQpC-75UewjcS3d@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Mon, 07 Feb 2011 10:26:32 +1100
+Subject: [PATCH] sched: provide scheduler_ipi() callback in response to
+	smp_send_reschedule()
+In-Reply-To: <1295262433.30950.53.camel@laptop>
+References: <1295262433.30950.53.camel@laptop>
+Message-ID: <1297034792.14982.10.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Feb 5, 2011 7:03 AM, "John Linn" <John.Linn@xilinx.com> wrote:
->
-> > -----Original Message-----
-> > From: glikely at secretlab.ca [mailto:glikely at secretlab.ca] On Behalf Of
-Grant Likely
-> > Sent: Wednesday, February 02, 2011 10:50 PM
-> > To: devicetree-discuss
-> > Cc: nicolas.pitre at linaro.org; linux-kernel at vger.kernel.org;
-buytenh at wantstofly.org; Olof Johansson;
-> > linux-arm-kernel at lists.infradead.org; John Bonesio; Jeremy Kerr; Rob
-Herring; John Linn; Thomas
-> > Abraham
-> > Subject: Updates to devicetree/arm branch
-> >
-[...]
->
-> I pulled your new tree into mine and retested.  I retested with a dtb at
-0x1000,
-> 0x400000, 0x1000000, and 0x8000000 successfully.  No issues booting with
-> the device tree.
->
-> I think this patch set would help us transition to device tree easily.
+On Mon, 2011-01-17 at 12:07 +0100, Peter Zijlstra wrote:
+> diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+> index 68034bb..7ee0fc3 100644
+> --- a/arch/powerpc/kernel/smp.c
+> +++ b/arch/powerpc/kernel/smp.c
+> @@ -128,6 +128,7 @@ static irqreturn_t call_function_action(int irq, void *data)
+>  static irqreturn_t reschedule_action(int irq, void *data)
+>  {
+>         /* we just need the return path side effect of checking need_resched */
+> +       scheduler_ipi();
+>         return IRQ_HANDLED;
+>  }
+>   
 
-Thanks John.
+You missed:
 
-g.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110205/afb83992/attachment-0001.html>
+diff --git a/arch/powerpc/kernel/smp.c b/arch/powerpc/kernel/smp.c
+index 9813605..467d122 100644
+--- a/arch/powerpc/kernel/smp.c
++++ b/arch/powerpc/kernel/smp.c
+@@ -98,6 +98,7 @@ void smp_message_recv(int msg)
+                break;
+        case PPC_MSG_RESCHEDULE:
+                /* we notice need_resched on exit */
++               scheduler_ipi();
+                break;
+        case PPC_MSG_CALL_FUNC_SINGLE:
+                generic_smp_call_function_single_interrupt();
+
+Fold that in and add:
+
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+
+(We have two variants of the IPIs)
+
+Cheers,
+Ben.
