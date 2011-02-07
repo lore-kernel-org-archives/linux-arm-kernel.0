@@ -1,47 +1,73 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Feb 2011 12:35:44 +0100 (CET)
-Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
-	in the irq handler
-In-Reply-To: <20110207122147.4081f47d@wker>
-References: <1296031789-1721-3-git-send-email-agust@denx.de>
-	<1296476549-10421-1-git-send-email-agust@denx.de>
-	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
-	<20110205143505.0b300a3a@wker>
-	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
-	<20110205210457.7218ecdc@wker>
-	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
-	<20110207122147.4081f47d@wker>
-Message-ID: <Pine.LNX.4.64.1102071232440.29036@axis700.grange>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Feb 2011 11:39:18 -0000
+Subject: [PATCH] RFC: ux500: add PMU resources
+In-Reply-To: <AANLkTi=atjR8-gDU-9=3o5GLjj+S50-7k_myP199tp0G@mail.gmail.com>
+References: <1295391579-9166-1-git-send-email-linus.walleij@stericsson.com>
+	<-2131964397930844736@unknownmsgid>
+	<AANLkTi=atjR8-gDU-9=3o5GLjj+S50-7k_myP199tp0G@mail.gmail.com>
+Message-ID: <000601cbc6bb$a7cf8450$f76e8cf0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Feb 2011, Anatolij Gustschin wrote:
+> Here's the IPI version as well, for comparison with the other
+> approach.  The IRQ handling code will mask the interrupt before
+> handling it, so it can't nest, can it?
 
-> On Mon, 7 Feb 2011 12:09:15 +0100 (CET)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> ...
-> > > I can't try mplayer since I don't have mplayer setup for this.
-> > > But looking at the mplayer source I don't see why it should
-> > > behave differently. Depending on mode mplayer queues 2 or 6
-> > > buffers. Testing with my test app with 6 queued buffers shows
-> > > no issues, here the buffer numbers toggle correctly, too.
-> > 
-> > Ok, I've done a couple more tests. With larger frames, and, therefore 
-> > lower fps - yes, with your patch buffers toggle correctly. Whereas in my 
-> > tests with smaller frames and higher fps either only one buffer is used, 
-> > or one is used much more often, than the other, e.g., 0 0 0 1 0 0 0 1 0... 
-> > Could you try to verify? Without your patch with any fps buffers toggle 
-> > consistently.
-> 
-> How small are the frames in you test? What is the highest fps value in
-> your test?
+It's not safe to cross-call from an IRQ handler with interrupts disabled
+though as you're asking for deadlock. I think you'll need to schedule the
+IPI for later, which is why you end up being nested.
+ 
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 5efa264..a97e50f 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/uaccess.h>
+> +#include <linux/smp.h>
 
-QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
-Just try different frams sizes, go down to 64x48 or something.
+[...]
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> +static irqreturn_t armpmu_core2_irqret;
+> +
+> +/* Called via IPI on the second core */
+> +static void armpmu_kick(void *data)
+> +{
+> +	int irq = (int) data;
+> +
+> +	armpmu_core2_irqret = armpmu->handle_irq(irq, NULL);
+> +	smp_wmb();
+> +}
+
+That barrier isn't going to do much. If you want to make the value
+visible, you'll need a dsb().
+
+> +static irqreturn_t armpmu_single_interrupt(int irq, void *dev)
+> +{
+> +	irqreturn_t irqret = armpmu->handle_irq(irq, dev);
+> +	int err;
+> +
+> +	if (irqret != IRQ_NONE)
+> +		return irqret;
+> +
+> +	local_irq_enable();
+> +	err = smp_call_function_single(1, armpmu_kick, (void *) irq, true);
+> +	local_irq_disable();
+
+Ah, I'd not considered re-enabling interrupts from the handler. I think that will
+work, but this code doesn't belong in the main perf stuff as it's too platform
+dependent.
+
+> +	if (err)
+> +		return irqret;
+> +
+> +	smp_rmb();
+> +	return armpmu_core2_irqret;
+> +}
+
+This read barrier won't help either because there's only one shared variable.
+The visibility of the return value should be guaranteed by the cross-call code
+(see csd_{un}lock) so you can probably lose the barriers altogether.
+
+Will
