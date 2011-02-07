@@ -1,164 +1,123 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Mon, 7 Feb 2011 08:37:14 +0100
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
-	<1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <19791.41258.797893.562643@ipc1.ka-ro>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 07 Feb 2011 07:55:03 +0000
+Subject: [PATCH] RFC: ux500: add PMU resources
+In-Reply-To: <AANLkTi=atjR8-gDU-9=3o5GLjj+S50-7k_myP199tp0G@mail.gmail.com>
+References: <1295391579-9166-1-git-send-email-linus.walleij@stericsson.com>
+	<-2131964397930844736@unknownmsgid>
+	<AANLkTi=atjR8-gDU-9=3o5GLjj+S50-7k_myP199tp0G@mail.gmail.com>
+Message-ID: <4D4FA557.9090805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Linus and I have already added our SoBs.
 
-Shawn Guo writes:
-> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> including apbh-dma and apbx-dma.
-> 
-> * apbh-dma and apbx-dma are supported in the driver as two instances,
->   and have to be filtered by dma clients via device id.  It becomes
->   the convention that apbh-dma always gets registered prior to
->   apbx-dma.
-> 
-> * apbh-dma is different between mx23 and mx28, hardware version
->   register is used to handle the differences.
-> 
-> * Every the mxs dma channel is statically assigned to client device
->   by soc design with fixed irq.  The irq number is being passed by
->   alloc_chan function with mxs_dma_data, and client driver has to
->   filter the correct channel by its channel id.
-> 
-> * mxs-dma supports pio function besides data transfer.  The driver
->   uses dma_data_direction DMA_NONE to identify the pio mode, and
->   steals sgl and sg_len to get pio words and numbers from clients.
-> 
-> * mxs dmaengine has some very specific features, like sense function
->   and the special NAND support (nand_lock, nand_wait4ready).  These
->   are too specific to implemented in generic dmaengine driver.
-> 
-> * The parameter "flags" of prep functions is currently being used to
->   pass wait4end flag from clients.
-> 
-> * The driver refers to imx-sdma and only a single descriptor is
->   statically assigned to each channel.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+
+On 07/02/11 05:56, Rabin Vincent wrote:
+> On Wed, Jan 19, 2011 at 17:09, Will Deacon <will.deacon@arm.com> wrote:
+>> 2.) Use IPI to cross-call the IRQ handler when the interrupted CPU doesn't
+>>    have an interrupt asserted on its PMU. You'll need to sort out problems
+>>    with re-enabling interrupts for the cross-call and also nesting of the
+>>    PMU interrupt (because it could fire as a result of another PMU overflowing
+>>    before you've completed the cross-call).
+> Here's the IPI version as well, for comparison with the other
+> approach.  The IRQ handling code will mask the interrupt before
+> handling it, so it can't nest, can it?
+>
+> 8<----------
+> From 84e5936f9285fb03845ac04801430762c1c9b60d Mon Sep 17 00:00:00 2001
+> From: Rabin Vincent <rabin.vincent@stericsson.com>
+> Date: Fri, 4 Feb 2011 11:59:26 +0530
+> Subject: [PATCH] ARM: perf_event: support dual-core with single PMU IRQ
+>
+> DB8500 (dual-core) has the PMU interrupts of both cores ORed into one.  Support
+> this by keeping the interrupt directed at Core0 and IPIing Core1 when Core0
+> receives the interrupt and finds that its counter has not overflowed.
+>
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 > ---
->  arch/arm/mach-mxs/include/mach/dma.h |   16 +
->  drivers/dma/Kconfig                  |    8 +
->  drivers/dma/Makefile                 |    1 +
->  drivers/dma/mxs-dma.c                |  702 ++++++++++++++++++++++++++++++++++
->  4 files changed, 727 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
->  create mode 100644 drivers/dma/mxs-dma.c
-> 
-> diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
-> new file mode 100644
-> index 0000000..429f431
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/dma.h
-> @@ -0,0 +1,16 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __MACH_MXS_DMA_H__
-> +#define __MACH_MXS_DMA_H__
-> +
-> +struct mxs_dma_data {
-> +	int chan_irq;
-> +};
-> +
-> +#endif /* __MACH_MXS_DMA_H__ */
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 1c28816..0b9a5b1 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -227,6 +227,14 @@ config IMX_DMA
->  	  Support the i.MX DMA engine. This engine is integrated into
->  	  Freescale i.MX1/21/27 chips.
->  
-> +config MXS_DMA
-> +	tristate "MXS DMA support"
+>  arch/arm/kernel/perf_event.c |   48 +++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 47 insertions(+), 1 deletions(-)
 >
-Does it make any sense to build this driver as a module, given the
-fact that it does not even support to be removed?
-
-> +	depends on SOC_IMX23 || SOC_MX28
+> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> index 5efa264..a97e50f 100644
+> --- a/arch/arm/kernel/perf_event.c
+> +++ b/arch/arm/kernel/perf_event.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/uaccess.h>
+> +#include <linux/smp.h>
 >
-SOC_IMX28?
-
-> diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-> new file mode 100644
-> index 0000000..8d1e811
-> --- /dev/null
-> +++ b/drivers/dma/mxs-dma.c
-> @@ -0,0 +1,702 @@
-[...]
-> +struct mxs_dma_engine {
-> +	struct device			*dev;
-> +	int				dev_id;
-> +	unsigned int			version;
-> +	void __iomem			*base;
-> +	struct clk			*clk;
-> +	struct dma_device		dma_device;
-> +	struct device_dma_parameters 	dma_parms;
-                                    ^^^^
-mixed space/tab indentation.
-
-[...]
-> +static int mxs_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> +		unsigned long arg)
+>  #include <asm/cputype.h>
+>  #include <asm/irq.h>
+> @@ -377,9 +378,40 @@ validate_group(struct perf_event *event)
+>  	return 0;
+>  }
+>
+> +static irqreturn_t armpmu_core2_irqret;
+> +
+> +/* Called via IPI on the second core */
+> +static void armpmu_kick(void *data)
 > +{
-> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+> +	int irq = (int) data;
 > +
-> +	switch (cmd) {
-> +	case DMA_TERMINATE_ALL:
-> +		mxs_dma_disable_chan(mxs_chan);
-> +		return 0;
-> +	case DMA_PAUSE:
-> +		mxs_dma_pause_chan(mxs_chan);
-> +		return 0;
-> +	case DMA_RESUME:
-> +		mxs_dma_resume_chan(mxs_chan);
-> +		return 0;
-> +	default:
-> +		return -ENOSYS;
+> +	armpmu_core2_irqret = armpmu->handle_irq(irq, NULL);
+> +	smp_wmb();
+> +}
+> +
+> +static irqreturn_t armpmu_single_interrupt(int irq, void *dev)
+> +{
+> +	irqreturn_t irqret = armpmu->handle_irq(irq, dev);
+> +	int err;
+> +
+> +	if (irqret != IRQ_NONE)
+> +		return irqret;
+> +
+> +	local_irq_enable();
+> +	err = smp_call_function_single(1, armpmu_kick, (void *) irq, true);
+> +	local_irq_disable();
+> +
+> +	if (err)
+> +		return irqret;
+> +
+> +	smp_rmb();
+> +	return armpmu_core2_irqret;
+> +}
+> +
+>  static int
+>  armpmu_reserve_hardware(void)
+>  {
+> +	irq_handler_t irq_handler = armpmu->handle_irq;
+>  	int i, err = -ENODEV, irq;
+>
+>  	pmu_device = reserve_pmu(ARM_PMU_DEVICE_CPU);
+> @@ -395,12 +427,26 @@ armpmu_reserve_hardware(void)
+>  		return -ENODEV;
+>  	}
+>
+> +	/*
+> +	 * Some SoCs have the PMU IRQ lines of two cores wired together into a
+> +	 * single interrupt.  Support these by poking the second core with an
+> +	 * IPI when its counters overflow.
+> +	 */
+> +	if (pmu_device->num_resources < num_online_cpus()) {
+> +		if (num_online_cpus() > 2) {
+> +			pr_err(">2 cpus not supported for single-irq workaround");
+> +			return -ENODEV;
+> +		}
+> +
+> +		irq_handler = armpmu_single_interrupt;
 > +	}
 > +
-> +	return -EINVAL;
-        ^^^^^^^^^^^^^^
-This can never be reached. IMO:
-|	int ret = 0;
-|	switch(cmd) {
-|	case DMA_TERMINATE_ALL:
-|		mxs_dma_disable_chan(mxs_chan);
-|		break;
-|	case DMA_PAUSE:
-|		mxs_dma_pause_chan(mxs_chan);
-|		break;
-|	case DMA_RESUME:
-|		mxs_dma_resume_chan(mxs_chan);
-|		break;
-|	default:
-|		ret = -ENOSYS;
-|	}
-|
-|	return ret;
-would be cleaner (and effectively generates the same code).
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+>  	for (i = 0; i < pmu_device->num_resources; ++i) {
+>  		irq = platform_get_irq(pmu_device, i);
+>  		if (irq < 0)
+>  			continue;
+>
+> -		err = request_irq(irq, armpmu->handle_irq,
+> +		err = request_irq(irq, irq_handler,
+>  				  IRQF_DISABLED | IRQF_NOBALANCING,
+>  				  "armpmu", NULL);
+>  		if (err) {
