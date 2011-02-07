@@ -1,35 +1,39 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Mon, 7 Feb 2011 11:03:15 +0530
-Subject: [PATCH 03/20] mach-omap2: smartreflex: world-writable debugfs
-	voltage files
-In-Reply-To: <87zkqbjtrd.fsf@ti.com>
-References: <cover.1296818921.git.segoon@openwall.com>
-	<96a2b24548af3a68fde712c68b49e856e53ea1fc.1296818921.git.segoon@openwall.com>
-	<87zkqbjtrd.fsf@ti.com>
-Message-ID: <AANLkTinMBQZa+-_T4O1dOZcUGjOM4748J+m_WmEV=LXW@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 07 Feb 2011 14:42:15 +0900
+Subject: [RFC] Generic CPU save/restore PM support
+In-Reply-To: <20110206191117.GA17808@n2100.arm.linux.org.uk>
+References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
+Message-ID: <000101cbc689$cceb8f40$66c2adc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 5, 2011 at 04:24, Kevin Hilman <khilman@ti.com> wrote:
-> Vasiliy Kulikov <segoon@openwall.com> writes:
->
->> Don't allow everybody to change voltage settings.
->>
->> Signed-off-by: Vasiliy Kulikov <segoon@openwall.com>
->> ---
->> ?Cannot compile the driver, so it is not tested at all.
->
-> Acked-by: Kevin Hilman <khilman@ti.com>
-Also fixes the checkpatch warning:
-scripts/checkpatch.pl -f arch/arm/mach-omap2/smartreflex.c
-WARNING: Exporting world writable files is usually an error. Consider
-more restrictive permissions.
-#903: FILE: arm/mach-omap2/smartreflex.c:903:
-+	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUGO, dbg_dir,
+Russell King - ARM Linux wrote:
+> 
+> The following patch series implements infrastructure to save/restore
+> CPU state on suspend/resume PM events, and updates SA11x0, PXA and
+> Samsung platforms to use this.
+> 
+> Not all CPU support files are updated with the necessary changes -
+> currently only ARM920, ARM926, SA11x0, XScale, XScale3, V6 and V7
+> CPUs are supported.
+> 
+> I've build-tested this for Assabet, PXA, and S3C2410, but not boot
+> tested it yet.
+> 
+Hi Russell,
 
-total: 0 errors, 1 warnings, 1028 lines checked
+Occurs following build error with s5pv210_defconfig.
+(I applied your patches into my some branch which is based on 38-rc3 for
+test)
 
-Acked-by: Nishanth Menon <nm@ti.com>
+arch/arm/mm/proc-v7.S:207: error: unterminated #ifdef
 
-Regards,
-Nishanth Menon
+Let you know the test result on my board after fixing it.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
