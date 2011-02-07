@@ -1,41 +1,27 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 7 Feb 2011 09:24:58 -0500 (EST)
-Subject: [RFC, PATCH 3/3] clk: add warnings for incorrect enable/prepare
-	semantics
-In-Reply-To: <201102071608.42855.jeremy.kerr@canonical.com>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<1297058877.800990.238556019385.3.gpush@pororo>
-	<20110207080555.GC27982@pengutronix.de>
-	<201102071608.42855.jeremy.kerr@canonical.com>
-Message-ID: <alpine.LFD.2.00.1102070908120.14920@xanadu.home>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 7 Feb 2011 16:27:34 +0200
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110207141734.GG31929@n2100.arm.linux.org.uk>
+References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
+	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207121052.GD31929@n2100.arm.linux.org.uk>
+	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Feb 2011, Jeremy Kerr wrote:
+> As I've said, there's not much other choice here. ?We _have_ to have an
+> identity mapping in place to bring the MMU back online, or we'll crash.
+> That's non-optional. ?So if this is a problem for cpuidle, cpuidle needs
+> to ensure that a page table switch has happened prior to the CPU going
+> down which _can_ be safely modified.
+I fully agree with you, but what I was suggesting is to create
+temporary identity page table at boot time, the resume code will load
+that page table (Context ID will be loaded with unique ASID), enable
+mmu, then the original page table and Context ID will be restored.
 
-> Hi Uwe,
-> 
-> > This implies the warning is only issued on clocks that have a prepare
-> > callback.  If we want to enforce the new API the warning here shouldn't
-> > depend on clk->ops->prepare.  (clk_prepare and clk_unprepare need to
-> > be changed then to adapt the prepare_count even in the absence of
-> > clk->ops->prepare.)
-> 
-> Yeah, it's a decision about either adding a small cost to all clk_prepare()s 
-> (ie, adding cost when there is no prepare callback), or checking for the 
-> correct prepare/enable semantics for all clocks (even when it doesn't matter 
-> for that particular clock). I chose the first as more important, but happy to 
-> go either way here.
-
-The prepare method being called from non-atomic context cannot be 
-considered to be in a speed critical path.  Most of the time, this is 
-going to be called on driver initialization or the like, and that's a 
-relatively rare event. Therefore this really small cost to clk_prepare() 
-is definitively worth it to help proper usage of the API.  If this ever 
-becomes a problem then this could be confined to some CONFIG_CLK_DEBUG 
-or the like.  But when introducing a new API it is best to be more 
-strict to help people get its usage right (without going overboard with 
-it of course).
-
-
-Nicolas
+saeed
