@@ -1,43 +1,25 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 07 Feb 2011 14:42:15 +0900
-Subject: [PATCH] ARM: SAMSUNG: Ensure struct sys_device is declared in
-	plat/pm.h
-In-Reply-To: <1296741328-29435-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1296741328-29435-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <000201cbc689$cd0a88f0$671f9ad0$%kim@samsung.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 7 Feb 2011 11:18:50 +0530
+Subject: [PATCH] RFC: ux500: add PMU resources
+In-Reply-To: <-2131964397930844736@unknownmsgid>
+References: <1295391579-9166-1-git-send-email-linus.walleij@stericsson.com>
+	<-2131964397930844736@unknownmsgid>
+Message-ID: <AANLkTimYwi4P=nGTQsibvxe9e1weYS9TLCCUg2BidbRx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> Previously we were relying on it being pulled in by other headers for
-> the prototype of s3c24xx_irq_suspend() and s3c24xx_irq_resume().
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/plat-samsung/include/plat/pm.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
-> samsung/include/plat/pm.h
-> index d9025e3..30518cc 100644
-> --- a/arch/arm/plat-samsung/include/plat/pm.h
-> +++ b/arch/arm/plat-samsung/include/plat/pm.h
-> @@ -17,6 +17,8 @@
-> 
->  #include <linux/irq.h>
-> 
-> +struct sys_device;
-> +
->  #ifdef CONFIG_PM
-> 
->  extern __init int s3c_pm_init(void);
-> --
+On Wed, Jan 19, 2011 at 17:09, Will Deacon <will.deacon@arm.com> wrote:
+> Ah yes, I have some hazy memories of this conversation! I think you
+> have three options:
 
-Ok..applied, Thanks :)
+Here's the implementation of a different approach which bounces the
+IRQ to the other CPU by setting the affinity when the current CPU
+would return IRQ_NONE.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+It has the advantage over the IPI method that Core0 does not need
+to spin (in the interrupt handler) waiting for Core1 to handle
+the IPI:
+
+(patch attached as well, since it will probably be mangled)
+
+8<------------
