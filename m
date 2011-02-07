@@ -1,30 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Feb 2011 07:57:17 -0800
-Subject: [RFC 1/5] ARM: P2V: separate PHYS_OFFSET from platform definitions
-In-Reply-To: <AANLkTi=qtRP1tAs1wPnGugE2rGBTERgHuUKKBWhbs=ST@mail.gmail.com>
+Date: Mon, 7 Feb 2011 07:59:16 -0800
+Subject: [RFC 2/5] ARM: P2V: avoid initializers and assembly using
+	PHYS_OFFSET
+In-Reply-To: <20110106090855.GR8638@n2100.arm.linux.org.uk>
 References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
-	<AANLkTi=qtRP1tAs1wPnGugE2rGBTERgHuUKKBWhbs=ST@mail.gmail.com>
-Message-ID: <20110207155717.GE20795@atomide.com>
+	<E1PaDOv-00023d-Gi@rmk-PC.arm.linux.org.uk>
+	<20110106085145.GB26617@pengutronix.de>
+	<20110106090855.GR8638@n2100.arm.linux.org.uk>
+Message-ID: <20110207155916.GF20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Magnus Damm <magnus.damm@gmail.com> [110105 21:10]:
-> On Wed, Jan 5, 2011 at 5:22 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > This uncouple PHYS_OFFSET from the platform definitions, thereby
-> > facilitating run-time computation of the physical memory offset.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> > ?arch/arm/include/asm/memory.h ? ? ? ? ? ? ? ? ?| ? ?2 ++
-> > ?arch/arm/kernel/tcm.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> ...
-> > ?arch/arm/mach-shmobile/include/mach/memory.h ? | ? ?2 +-
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110106 01:16]:
+> On Thu, Jan 06, 2011 at 09:51:45AM +0100, Sascha Hauer wrote:
+> > As Russell noted this conflicts with the current i.MX branch. In current
+> > i.MX branch we have:
+> > 
+> > -       .boot_params = PHYS_OFFSET + 0x100,
+> > +       .boot_params = MX51_PHYS_OFFSET + 0x100,
+> > 
+> > PLAT_PHYS_OFFSET should be defined to MX51_PHYS_OFFSET, so it shouldn't
+> > matter which solution to the conflict we choose.
 > 
-> Applied on top of sh-2.6 git c422a5992e9ca072e8e472ee8f518649fb07470e
-> and successfully booted on a sh7372-based Mackerel board.
-> 
-> Acked-by: Magnus Damm <damm@opensource.se>
+> I've actually dropped my modifications to this files as your change
+> to them makes more sense longer term.
 
 Acked-by: Tony Lindgren <tony@atomide.com>
