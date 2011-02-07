@@ -1,40 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Feb 2011 13:34:57 +0000
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
-	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
-	<20110207120103.GC31929@n2100.arm.linux.org.uk>
-	<20110207121052.GD31929@n2100.arm.linux.org.uk>
-	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-Message-ID: <20110207133457.GE31929@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 7 Feb 2011 14:35:04 +0100 (CET)
+Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
+	in the irq handler
+In-Reply-To: <m24o8g80cj.fsf@ohwell.denx.de>
+References: <1296031789-1721-3-git-send-email-agust@denx.de>
+	<1296476549-10421-1-git-send-email-agust@denx.de>
+	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
+	<20110205143505.0b300a3a@wker>
+	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
+	<20110205210457.7218ecdc@wker>
+	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
+	<20110207122147.4081f47d@wker>
+	<Pine.LNX.4.64.1102071232440.29036@axis700.grange>
+	<m24o8g80cj.fsf@ohwell.denx.de>
+Message-ID: <Pine.LNX.4.64.1102071428470.29036@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-http://en.wikipedia.org/wiki/Posting_style#Trimming_and_reformatting
+Hi Detlev
 
-It's really not nice to page down and down and down to find out the one
-or two lines that actually contain something useful - or in my case
-scroll through the first three pages, then go to the bottom and start
-scrolling up.  It wastes time.
+On Mon, 7 Feb 2011, Detlev Zundel wrote:
 
-Please *always* trim the quoted text down to the context that's relevant
-for your reply, like this:
+> Hi Guennadi,
+> 
+> >> How small are the frames in you test? What is the highest fps value in
+> >> your test?
+> >
+> > QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
+> > Just try different frams sizes, go down to 64x48 or something.
+> 
+> Is this a "real" usage scenario?  It feels that this is not what most
+> users will do and it certainly is not relevant for our application.  
 
-On Mon, Feb 07, 2011 at 03:21:51PM +0200, saeed bishara wrote:
-> On Mon, Feb 7, 2011 at 2:10 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > +ENTRY(cpu_resume_mmu)
-> > + ? ? ? adr ? ? r4, cpu_resume_turn_mmu_on
-> > + ? ? ? mov ? ? r4, r4, lsr #20
-> > + ? ? ? orr ? ? r3, r3, r4, lsl #20
-> > + ? ? ? ldr ? ? r5, [r2, r4, lsl #2] ? ?@ save old mapping
-> > + ? ? ? str ? ? r3, [r2, r4, lsl #2] ? ?@ setup 1:1 mapping for mmu code
-> this code doesn't look smp save, it modifies page table that could be
-> used by another cpu. I suggest to create (at  boot time) identity page
-> table and use it in order to do mmu on.
+QVGA at 25 / 50 / 60 fps is _certainly_ very much a real-life scenario.
 
-When you suspend/resume, the other CPUs will be hot-unplugged before
-suspend, and hot-plugged after resume.  SMP issues really don't come
-in here, and there's not really many other ways to solve the inherent
-races involved with turning on the MMU.
+> Is it possible that if you are interested in such a scenario that you do
+> the testing?  We have spent quite a lot of time to fix the driver for
+> real (well full frame) capturing already and I am relucatant to spend
+> more time for corner cases.  Maybe we should document this as "known
+> limitations" of the setup?  What do you think?  I'll much rather have a
+> driver working for real world scenarios than for marginal test cases.
+
+I am interested in avoiding regressions. In principle, this is a DMA 
+driver, which I am not maintaining. Dan asked for my ack, so, I tested it 
+and found an issue, which I would prefer to have resolved before 
+committing. Of course, I don't have a decisive voice in this matter, so, 
+the patch can also be merged without my ack. Otherwise - of course you 
+don't have to continue testing, I will try to look at the issue as the 
+time permits, and Dan will have to decide, whether he is prepared to 
+commit this patch in its present form, or he would prefer this issue to be 
+clarified.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
