@@ -1,36 +1,40 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
 Date: Mon, 07 Feb 2011 14:42:15 +0900
-Subject: [RFC] Generic CPU save/restore PM support
-In-Reply-To: <20110206191117.GA17808@n2100.arm.linux.org.uk>
-References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
-Message-ID: <000101cbc689$cceb8f40$66c2adc0$%kim@samsung.com>
+Subject: [PATCH] ARM: SAMSUNG: Ensure struct sys_device is declared in
+	plat/pm.h
+In-Reply-To: <1296741328-29435-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1296741328-29435-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <000201cbc689$cd0a88f0$671f9ad0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Mark Brown wrote:
 > 
-> The following patch series implements infrastructure to save/restore
-> CPU state on suspend/resume PM events, and updates SA11x0, PXA and
-> Samsung platforms to use this.
+> Previously we were relying on it being pulled in by other headers for
+> the prototype of s3c24xx_irq_suspend() and s3c24xx_irq_resume().
 > 
-> Not all CPU support files are updated with the necessary changes -
-> currently only ARM920, ARM926, SA11x0, XScale, XScale3, V6 and V7
-> CPUs are supported.
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/pm.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> I've build-tested this for Assabet, PXA, and S3C2410, but not boot
-> tested it yet.
+> diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-
+> samsung/include/plat/pm.h
+> index d9025e3..30518cc 100644
+> --- a/arch/arm/plat-samsung/include/plat/pm.h
+> +++ b/arch/arm/plat-samsung/include/plat/pm.h
+> @@ -17,6 +17,8 @@
 > 
-Hi Russell,
+>  #include <linux/irq.h>
+> 
+> +struct sys_device;
+> +
+>  #ifdef CONFIG_PM
+> 
+>  extern __init int s3c_pm_init(void);
+> --
 
-Occurs following build error with s5pv210_defconfig.
-(I applied your patches into my some branch which is based on 38-rc3 for
-test)
-
-arch/arm/mm/proc-v7.S:207: error: unterminated #ifdef
-
-Let you know the test result on my board after fixing it.
-
-Thanks.
+Ok..applied, Thanks :)
 
 Best regards,
 Kgene.
