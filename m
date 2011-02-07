@@ -1,35 +1,73 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 7 Feb 2011 16:04:09 +0200
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <20110207133457.GE31929@n2100.arm.linux.org.uk>
-References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
-	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
-	<20110207120103.GC31929@n2100.arm.linux.org.uk>
-	<20110207121052.GD31929@n2100.arm.linux.org.uk>
-	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-	<20110207133457.GE31929@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+From: aaro.koskinen@nokia.com (Aaro Koskinen)
+Date: Mon,  7 Feb 2011 16:08:04 +0200
+Subject: [PATCHv2] arm: mach-omap2: smartreflex: fix another memory leak
+Message-ID: <1297087684-19967-1-git-send-email-aaro.koskinen@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It's really not nice to page down and down and down to find out the one
-> or two lines that actually contain something useful - or in my case
-> scroll through the first three pages, then go to the bottom and start
-> scrolling up. ?It wastes time.
-sorry
->
->> this code doesn't look smp save, it modifies page table that could be
->> used by another cpu. I suggest to create (at ?boot time) identity page
->> table and use it in order to do mmu on.
->
-> When you suspend/resume, the other CPUs will be hot-unplugged before
-> suspend, and hot-plugged after resume. ?SMP issues really don't come
-> in here, and there's not really many other ways to solve the inherent
-> races involved with turning on the MMU.
-that's right, but in the future this code can be used also for
-cpuidle, so please take that into account.
-also,  I think cpu_resume_after_mmu  needs to invalidates the TLB
-after restoring the old mapping.
-one more comment, don't you need to restore the context ID cp15 register?
-saeed
->
+Temporary strings with volt_* file names should be released after the
+debugfs entries are created. While at it, also simplify the string
+allocation, and use just snprintf() to create the name.
+
+The patch eliminates kmemleak reports with the following stack trace
+(multiple objects depending on HW):
+
+unreferenced object 0xcedbc5a0 (size 64):
+  comm "swapper", pid 1, jiffies 4294929375 (age 423.734s)
+  hex dump (first 32 bytes):
+    76 6f 6c 74 5f 39 37 35 30 30 30 00 00 00 00 00  volt_975000.....
+    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+  backtrace:
+    [<c012fee0>] create_object+0x104/0x208
+    [<c012dbc8>] kmem_cache_alloc_trace+0xf0/0x17c
+    [<c0013f64>] omap_sr_probe+0x314/0x420
+    [<c02a1724>] platform_drv_probe+0x18/0x1c
+    [<c02a088c>] driver_probe_device+0xc8/0x188
+    [<c02a09b4>] __driver_attach+0x68/0x8c
+    [<c02a00ac>] bus_for_each_dev+0x44/0x74
+    [<c029f9e0>] bus_add_driver+0xa0/0x228
+    [<c02a0cac>] driver_register+0xa8/0x130
+    [<c02a1b2c>] platform_driver_probe+0x18/0x8c
+    [<c0013c1c>] sr_init+0x40/0x74
+    [<c005a554>] do_one_initcall+0xc8/0x1a0
+    [<c00084f4>] kernel_init+0x150/0x218
+    [<c0065d64>] kernel_thread_exit+0x0/0x8
+    [<ffffffff>] 0xffffffff
+
+Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+---
+
+v2: Get rid of kmalloc().
+
+ arch/arm/mach-omap2/smartreflex.c |   15 +++------------
+ 1 files changed, 3 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index 77ecebf..e54db84 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -927,19 +927,10 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	for (i = 0; i < sr_info->nvalue_count; i++) {
+-		char *name;
+-		char volt_name[32];
+-
+-		name = kzalloc(NVALUE_NAME_LEN + 1, GFP_KERNEL);
+-		if (!name) {
+-			dev_err(&pdev->dev, "%s: Unable to allocate memory"
+-				" for n-value directory name\n",  __func__);
+-			return -ENOMEM;
+-		}
++		char name[NVALUE_NAME_LEN + 1];
+ 
+-		strcpy(name, "volt_");
+-		sprintf(volt_name, "%d", volt_data[i].volt_nominal);
+-		strcat(name, volt_name);
++		snprintf(name, sizeof(name), "volt_%d",
++			 volt_data[i].volt_nominal);
+ 		(void) debugfs_create_x32(name, S_IRUGO | S_IWUGO, nvalue_dir,
+ 				&(sr_info->nvalue_table[i].nvalue));
+ 	}
+-- 
+1.5.6.5
