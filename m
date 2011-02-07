@@ -1,36 +1,58 @@
 From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon,  7 Feb 2011 02:51:56 +0100
-Subject: [PATCH 04/09] ARM: s3c2440: gta02: Select missing S3C_DEV_USB_HOST
+Date: Mon,  7 Feb 2011 02:51:57 +0100
+Subject: [PATCH 05/09] ARM: s3c2440: gta02: Fix regulator valid_modes_ops
 In-Reply-To: <1297043521-21903-1-git-send-email-lars@metafoo.de>
 References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-Message-ID: <1297043521-21903-4-git-send-email-lars@metafoo.de>
+Message-ID: <1297043521-21903-5-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gta02 mach file references the ohci device.
-So we need to select S3C_DEV_USB_HOST to have the device available.
-
-This fixes the following linker errors:
-	arch/arm/mach-s3c2440/built-in.o: In function `gta02_machine_init':
-	mach-gta02.c:(.init.text+0x370): undefined reference to `s3c_ohci_set_platdata'
-	arch/arm/mach-s3c2440/built-in.o:(.init.data+0xac): undefined reference to `s3c_device_ohci'
+The REGULATOR_CHANGE_STATUS flag needs to be set on valid_ops_mask, otherwise it
+a driver wont be able to turn the regulator on or off.
 
 Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 ---
- arch/arm/mach-s3c2440/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2440/mach-gta02.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2440/Kconfig b/arch/arm/mach-s3c2440/Kconfig
-index a0cb258..50825a3 100644
---- a/arch/arm/mach-s3c2440/Kconfig
-+++ b/arch/arm/mach-s3c2440/Kconfig
-@@ -99,6 +99,7 @@ config MACH_NEO1973_GTA02
- 	select POWER_SUPPLY
- 	select MACH_NEO1973
- 	select S3C2410_PWM
-+	select S3C_DEV_USB_HOST
- 	help
- 	   Say Y here if you are using the Openmoko GTA02 / Freerunner GSM Phone
- 
+diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
+index 6629998..e57c4d8 100644
+--- a/arch/arm/mach-s3c2440/mach-gta02.c
++++ b/arch/arm/mach-s3c2440/mach-gta02.c
+@@ -314,8 +314,8 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
+ 				.min_uV = 2000000,
+ 				.max_uV = 3300000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
+-				.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+-				.always_on = 1,
++				.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
++						REGULATOR_CHANGE_STATUS,
+ 			},
+ 		},
+ 		[PCF50633_REGULATOR_LDO1] = {
+@@ -323,6 +323,7 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
+ 				.min_uV = 3300000,
+ 				.max_uV = 3300000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 				.apply_uV = 1,
+ 				.state_mem = {
+ 					.enabled = 0,
+@@ -350,6 +351,7 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
+ 				.min_uV = 3200000,
+ 				.max_uV = 3200000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 				.apply_uV = 1,
+ 			},
+ 		},
+@@ -358,6 +360,7 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
+ 				.min_uV = 3000000,
+ 				.max_uV = 3000000,
+ 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
++				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+ 				.apply_uV = 1,
+ 				.state_mem = {
+ 					.enabled = 1,
 -- 
 1.7.2.3
