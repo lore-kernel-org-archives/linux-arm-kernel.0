@@ -1,36 +1,43 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Mon, 07 Feb 2011 09:36:20 -0800
-Subject: [PATCH 0/7] Nexus One Support
-In-Reply-To: <20110204133556.GA2803@ucw.cz>
-References: <1295555565-21563-1-git-send-email-dwalker@codeaurora.org>
-	<20110204133556.GA2803@ucw.cz>
-Message-ID: <1297100180.11955.1.camel@c-dwalke-linux.qualcomm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 7 Feb 2011 09:45:01 -0800
+Subject: [PATCH] [ARM] tegra: Add i2c support
+References: <1283466103-20889-1-git-send-email-ccross@android.com>
+	<AANLkTimYURYGix-0Xk3wdf1A-XEAJbBXR_JDn1BFw_uq@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0310F5FC90@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-02-04 at 14:36 +0100, Pavel Machek wrote:
-> On Thu 2011-01-20 12:32:38, Daniel Walker wrote:
-> > This series adds basic Nexus One support which includes a booting
-> > kernel, and functional MMC .
-> > 
-> > Most people won't be able to use this yet unfortunately because
-> > you need a serial cable to get any output. However, it's a start.
+Stephen Warren wrote at Sent: Monday, January 31, 2011 3:49 PM:
 > 
-> >   msm: mahimahi: add mahimahi board file
-> >   msm: mahimahi: add in mmc support code
-> >   msm: mahimahi: add gpio pin muxing code
-> >   msm: mahimahi: initialize mmc at start up
+> Colin Cross wrote at Tuesday, December 21, 2010 5:12 PM:
+> >
+> > On Thu, Sep 2, 2010 at 3:21 PM, Colin Cross <ccross@android.com> wrote:
+> > > Signed-off-by: Colin Cross <ccross@android.com>
+> > > ---
+> > > ?drivers/i2c/busses/Kconfig ? ? | ? ?7 +
+> > > ?drivers/i2c/busses/Makefile ? ?| ? ?1 +
+> > > ?drivers/i2c/busses/i2c-tegra.c | ?665 ++++++++++++++++++++++++++++++++++++++++
+> > > ?include/linux/i2c-tegra.h ? ? ?| ? 25 ++
+> > > ?4 files changed, 698 insertions(+), 0 deletions(-)
+> > > ?create mode 100644 drivers/i2c/busses/i2c-tegra.c
+> > > ?create mode 100644 include/linux/i2c-tegra.h
+> > >
+> > Ben, this didn't make it into 2.6.37?  Can it go into next-i2c?
 > 
-> Even you call the machine Nexus One... can  you be a tiny bit more
-> consistent with it?
+> I didn't see any response to this request, at least not in the linux-tegra
+> archives.
 
-I tried to call it Nexus One in this release note cause no one knows
-what a "mahimahi" is .. I would like to call it Nexus One all over, but
-I can't because Google uses the name mahimahi..
+Ben, did Colin's latest patch look good; could it be applied?
 
-Daniel
+Colin, perhaps you could repost the patch in case it's fallen out of Ben's
+inbox.
+
+As background, I'd really like this patch to show up in 2.6.39; the ASoC
+driver I've upstreamed for Tegra Harmony (and which will be in 2.6.39) relies
+on this I2C driver to provide communication with the audio codec. Hence, the
+ASoC driver is useless without the I2C driver also merged.
+
+Thanks.
 
 -- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+nvpublic
