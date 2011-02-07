@@ -1,13 +1,32 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Mon, 7 Feb 2011 19:38:28 +0000
-Subject: [PATCH 00/20] world-writable files in sysfs and debugfs
-In-Reply-To: <20110204140033.GA31184@albatros>
-References: <20110204140033.GA31184@albatros>
-Message-ID: <20110207193828.GB19838@srcf.ucam.org>
+From: ccross@google.com (Colin Cross)
+Date: Mon, 7 Feb 2011 11:59:26 -0800
+Subject: [RFC,PATCH 1/3] Add a common struct clk
+In-Reply-To: <1297058877.800158.458894385837.1.gpush@pororo>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<1297058877.800158.458894385837.1.gpush@pororo>
+Message-ID: <AANLkTi=5FNvWKQf6cRt4wNejC7u4XKsqLp9Pwc2Z45_3@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, I've applied the x86 platform driver ones.
+On Sun, Feb 6, 2011 at 10:07 PM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
+<snip>
 
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> new file mode 100644
+> index 0000000..12e0daf
+> --- /dev/null
+> +++ b/drivers/clk/clk.c
+
+<snip>
+
+> +int clk_enable(struct clk *clk)
+> +{
+> + ? ? ? int ret = 0;
+> +
+> + ? ? ? if (!clk->ops->enable)
+> + ? ? ? ? ? ? ? return 0;
+> +
+> + ? ? ? spin_lock(&clk->enable_lock);
+
+spin_lock_irqsave/spin_unlock_irqrestore.  This could get called with
+irqs on or off.
