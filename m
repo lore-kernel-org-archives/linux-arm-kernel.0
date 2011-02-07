@@ -1,24 +1,69 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 7 Feb 2011 17:36:04 +0100
-Subject: [RFC 1/5] ARM: P2V: separate PHYS_OFFSET from platform definitions
-In-Reply-To: <E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110207163604.GJ26656@game.jcrosoft.org>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 7 Feb 2011 17:49:10 +0100 (CET)
+Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
+	in the irq handler
+In-Reply-To: <20110207144530.70d9dab1@wker>
+References: <1296031789-1721-3-git-send-email-agust@denx.de>
+	<1296476549-10421-1-git-send-email-agust@denx.de>
+	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
+	<20110205143505.0b300a3a@wker>
+	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
+	<20110205210457.7218ecdc@wker>
+	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
+	<20110207122147.4081f47d@wker>
+	<Pine.LNX.4.64.1102071232440.29036@axis700.grange>
+	<20110207144530.70d9dab1@wker>
+Message-ID: <Pine.LNX.4.64.1102071740380.31738@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:22 Tue 04 Jan     , Russell King - ARM Linux wrote:
-> This uncouple PHYS_OFFSET from the platform definitions, thereby
-> facilitating run-time computation of the physical memory offset.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/include/asm/memory.h                  |    2 ++
->  arch/arm/kernel/tcm.c                          |    2 +-
->  arch/arm/mach-aaec2000/include/mach/memory.h   |    2 +-
->  arch/arm/mach-at91/include/mach/memory.h       |    2 +-
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Mon, 7 Feb 2011, Anatolij Gustschin wrote:
 
-Best Regards,
-J.
+> On Mon, 7 Feb 2011 12:35:44 +0100 (CET)
+> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> 
+> > On Mon, 7 Feb 2011, Anatolij Gustschin wrote:
+> > 
+> > > On Mon, 7 Feb 2011 12:09:15 +0100 (CET)
+> > > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > > ...
+> > > > > I can't try mplayer since I don't have mplayer setup for this.
+> > > > > But looking at the mplayer source I don't see why it should
+> > > > > behave differently. Depending on mode mplayer queues 2 or 6
+> > > > > buffers. Testing with my test app with 6 queued buffers shows
+> > > > > no issues, here the buffer numbers toggle correctly, too.
+> > > > 
+> > > > Ok, I've done a couple more tests. With larger frames, and, therefore 
+> > > > lower fps - yes, with your patch buffers toggle correctly. Whereas in my 
+> > > > tests with smaller frames and higher fps either only one buffer is used, 
+> > > > or one is used much more often, than the other, e.g., 0 0 0 1 0 0 0 1 0... 
+> > > > Could you try to verify? Without your patch with any fps buffers toggle 
+> > > > consistently.
+> > > 
+> > > How small are the frames in you test? What is the highest fps value in
+> > > your test?
+> > 
+> > QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
+> > Just try different frams sizes, go down to 64x48 or something.
+> 
+> Testing of 960x243 frames at 30 fps has been done during all my previous
+> tests. I didn't see any issues at 30 fps.
+
+Ok, I've found the reason. Buffer number repeats, when there is an 
+underrun, which is happening in my tests, when frames are arriving quickly 
+enough, but the user-space is not fast enough to process them, e.g., when 
+it is writing them to files over NFS or even just displaying on the LCD. 
+Without your patch these underruns happen just as well, they just don't 
+get recognised, because there's always one buffer delayed, so, the queue 
+is never empty.
+
+Dan, please add my
+
+Reviewed-(and-tested-)by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
