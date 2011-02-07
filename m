@@ -1,8 +1,8 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Feb 2011 14:35:04 +0100 (CET)
+From: agust@denx.de (Anatolij Gustschin)
+Date: Mon, 7 Feb 2011 14:45:30 +0100
 Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
 	in the irq handler
-In-Reply-To: <m24o8g80cj.fsf@ohwell.denx.de>
+In-Reply-To: <Pine.LNX.4.64.1102071232440.29036@axis700.grange>
 References: <1296031789-1721-3-git-send-email-agust@denx.de>
 	<1296476549-10421-1-git-send-email-agust@denx.de>
 	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
@@ -12,48 +12,38 @@ References: <1296031789-1721-3-git-send-email-agust@denx.de>
 	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
 	<20110207122147.4081f47d@wker>
 	<Pine.LNX.4.64.1102071232440.29036@axis700.grange>
-	<m24o8g80cj.fsf@ohwell.denx.de>
-Message-ID: <Pine.LNX.4.64.1102071428470.29036@axis700.grange>
+Message-ID: <20110207144530.70d9dab1@wker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Detlev
+On Mon, 7 Feb 2011 12:35:44 +0100 (CET)
+Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
 
-On Mon, 7 Feb 2011, Detlev Zundel wrote:
-
-> Hi Guennadi,
+> On Mon, 7 Feb 2011, Anatolij Gustschin wrote:
 > 
-> >> How small are the frames in you test? What is the highest fps value in
-> >> your test?
-> >
-> > QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
-> > Just try different frams sizes, go down to 64x48 or something.
+> > On Mon, 7 Feb 2011 12:09:15 +0100 (CET)
+> > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > ...
+> > > > I can't try mplayer since I don't have mplayer setup for this.
+> > > > But looking at the mplayer source I don't see why it should
+> > > > behave differently. Depending on mode mplayer queues 2 or 6
+> > > > buffers. Testing with my test app with 6 queued buffers shows
+> > > > no issues, here the buffer numbers toggle correctly, too.
+> > > 
+> > > Ok, I've done a couple more tests. With larger frames, and, therefore 
+> > > lower fps - yes, with your patch buffers toggle correctly. Whereas in my 
+> > > tests with smaller frames and higher fps either only one buffer is used, 
+> > > or one is used much more often, than the other, e.g., 0 0 0 1 0 0 0 1 0... 
+> > > Could you try to verify? Without your patch with any fps buffers toggle 
+> > > consistently.
+> > 
+> > How small are the frames in you test? What is the highest fps value in
+> > your test?
 > 
-> Is this a "real" usage scenario?  It feels that this is not what most
-> users will do and it certainly is not relevant for our application.  
+> QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
+> Just try different frams sizes, go down to 64x48 or something.
 
-QVGA at 25 / 50 / 60 fps is _certainly_ very much a real-life scenario.
+Testing of 960x243 frames at 30 fps has been done during all my previous
+tests. I didn't see any issues at 30 fps.
 
-> Is it possible that if you are interested in such a scenario that you do
-> the testing?  We have spent quite a lot of time to fix the driver for
-> real (well full frame) capturing already and I am relucatant to spend
-> more time for corner cases.  Maybe we should document this as "known
-> limitations" of the setup?  What do you think?  I'll much rather have a
-> driver working for real world scenarios than for marginal test cases.
-
-I am interested in avoiding regressions. In principle, this is a DMA 
-driver, which I am not maintaining. Dan asked for my ack, so, I tested it 
-and found an issue, which I would prefer to have resolved before 
-committing. Of course, I don't have a decisive voice in this matter, so, 
-the patch can also be merged without my ack. Otherwise - of course you 
-don't have to continue testing, I will try to look at the issue as the 
-time permits, and Dan will have to decide, whether he is prepared to 
-commit this patch in its present form, or he would prefer this issue to be 
-clarified.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Anatolij
