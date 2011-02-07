@@ -1,44 +1,113 @@
-From: dzu@denx.de (Detlev Zundel)
-Date: Mon, 07 Feb 2011 14:01:48 +0100
-Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data in
-	the irq handler
-In-Reply-To: <Pine.LNX.4.64.1102071232440.29036@axis700.grange> (Guennadi
-	Liakhovetski's message of "Mon, 7 Feb 2011 12:35:44 +0100 (CET)")
-References: <1296031789-1721-3-git-send-email-agust@denx.de>
-	<1296476549-10421-1-git-send-email-agust@denx.de>
-	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
-	<20110205143505.0b300a3a@wker>
-	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
-	<20110205210457.7218ecdc@wker>
-	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
-	<20110207122147.4081f47d@wker>
-	<Pine.LNX.4.64.1102071232440.29036@axis700.grange>
-Message-ID: <m24o8g80cj.fsf@ohwell.denx.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon,  7 Feb 2011 18:47:11 +0530
+Subject: [PATCH 3/3] OMAP4: clockdomain: Add wkup/sleep dependency support
+In-Reply-To: <1297084631-27474-3-git-send-email-rnayak@ti.com>
+References: <1297084631-27474-1-git-send-email-rnayak@ti.com>
+	<1297084631-27474-2-git-send-email-rnayak@ti.com>
+	<1297084631-27474-3-git-send-email-rnayak@ti.com>
+Message-ID: <1297084631-27474-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Add OMAP4 platform specific implementation to support clkdm
+wkup and sleep dependencies a.k.a static dependencies.
 
->> How small are the frames in you test? What is the highest fps value in
->> your test?
->
-> QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
-> Just try different frams sizes, go down to 64x48 or something.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/clockdomain44xx.c |   59 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/cm44xx.h          |    1 +
+ 2 files changed, 60 insertions(+), 0 deletions(-)
 
-Is this a "real" usage scenario?  It feels that this is not what most
-users will do and it certainly is not relevant for our application.  
-
-Is it possible that if you are interested in such a scenario that you do
-the testing?  We have spent quite a lot of time to fix the driver for
-real (well full frame) capturing already and I am relucatant to spend
-more time for corner cases.  Maybe we should document this as "known
-limitations" of the setup?  What do you think?  I'll much rather have a
-driver working for real world scenarios than for marginal test cases.
-
-Thanks
-  Detlev
-
---
-DENX Software Engineering GmbH,      MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich,  Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-40 Fax: (+49)-8142-66989-80 Email: dzu at denx.de
+diff --git a/arch/arm/mach-omap2/clockdomain44xx.c b/arch/arm/mach-omap2/clockdomain44xx.c
+index c0ccc47..87e690f 100644
+--- a/arch/arm/mach-omap2/clockdomain44xx.c
++++ b/arch/arm/mach-omap2/clockdomain44xx.c
+@@ -12,8 +12,59 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/kernel.h>
+ #include "clockdomain.h"
+ #include "cminst44xx.h"
++#include "cm44xx.h"
++
++static int omap4_clkdm_add_wkup_sleep_dep(struct clockdomain *clkdm1,
++					struct clockdomain *clkdm2)
++{
++	omap4_cminst_set_inst_reg_bits((1 << clkdm2->dep_bit),
++					clkdm1->prcm_partition,
++					clkdm1->cm_inst, clkdm1->clkdm_offs +
++					OMAP4_CM_STATICDEP);
++	return 0;
++}
++
++static int omap4_clkdm_del_wkup_sleep_dep(struct clockdomain *clkdm1,
++					struct clockdomain *clkdm2)
++{
++	omap4_cminst_clear_inst_reg_bits((1 << clkdm2->dep_bit),
++					clkdm1->prcm_partition,
++					clkdm1->cm_inst, clkdm1->clkdm_offs +
++					OMAP4_CM_STATICDEP);
++	return 0;
++}
++
++static int omap4_clkdm_read_wkup_sleep_dep(struct clockdomain *clkdm1,
++					struct clockdomain *clkdm2)
++{
++	return omap4_cminst_read_inst_reg_bits(clkdm1->prcm_partition,
++					clkdm1->cm_inst, clkdm1->clkdm_offs +
++					OMAP4_CM_STATICDEP,
++					(1 << clkdm2->dep_bit));
++}
++
++static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
++{
++	struct clkdm_dep *cd;
++	u32 mask = 0;
++
++	for (cd = clkdm->wkdep_srcs; cd && cd->clkdm; cd++) {
++		if (!omap_chip_is(cd->omap_chip))
++			continue;
++
++		/* PRM accesses are slow, so minimize them */
++		mask |= 1 << cd->clkdm->dep_bit;
++		atomic_set(&cd->wkdep_usecount, 0);
++	}
++
++	omap4_cminst_clear_inst_reg_bits(mask, clkdm->prcm_partition,
++					clkdm->cm_inst, clkdm->clkdm_offs +
++					OMAP4_CM_STATICDEP);
++	return 0;
++}
+ 
+ static int omap4_clkdm_sleep(struct clockdomain *clkdm)
+ {
+@@ -68,6 +119,14 @@ static int omap4_clkdm_clk_disable(struct clockdomain *clkdm)
+ }
+ 
+ struct clkdm_ops omap4_clkdm_operations = {
++	.clkdm_add_wkdep	= omap4_clkdm_add_wkup_sleep_dep,
++	.clkdm_del_wkdep	= omap4_clkdm_del_wkup_sleep_dep,
++	.clkdm_read_wkdep	= omap4_clkdm_read_wkup_sleep_dep,
++	.clkdm_clear_all_wkdeps	= omap4_clkdm_clear_all_wkup_sleep_deps,
++	.clkdm_add_sleepdep	= omap4_clkdm_add_wkup_sleep_dep,
++	.clkdm_del_sleepdep	= omap4_clkdm_del_wkup_sleep_dep,
++	.clkdm_read_sleepdep	= omap4_clkdm_read_wkup_sleep_dep,
++	.clkdm_clear_all_sleepdeps	= omap4_clkdm_clear_all_wkup_sleep_deps,
+ 	.clkdm_sleep		= omap4_clkdm_sleep,
+ 	.clkdm_wakeup		= omap4_clkdm_wakeup,
+ 	.clkdm_allow_idle	= omap4_clkdm_allow_idle,
+diff --git a/arch/arm/mach-omap2/cm44xx.h b/arch/arm/mach-omap2/cm44xx.h
+index 48fc3f4..4d0cfd3 100644
+--- a/arch/arm/mach-omap2/cm44xx.h
++++ b/arch/arm/mach-omap2/cm44xx.h
+@@ -21,6 +21,7 @@
+ #include "cm.h"
+ 
+ #define OMAP4_CM_CLKSTCTRL				0x0000
++#define OMAP4_CM_STATICDEP				0x4
+ 
+ /* Function prototypes */
+ # ifndef __ASSEMBLER__
+-- 
+1.7.0.4
