@@ -1,69 +1,67 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 7 Feb 2011 17:49:10 +0100 (CET)
-Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
-	in the irq handler
-In-Reply-To: <20110207144530.70d9dab1@wker>
-References: <1296031789-1721-3-git-send-email-agust@denx.de>
-	<1296476549-10421-1-git-send-email-agust@denx.de>
-	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
-	<20110205143505.0b300a3a@wker>
-	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
-	<20110205210457.7218ecdc@wker>
-	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
-	<20110207122147.4081f47d@wker>
-	<Pine.LNX.4.64.1102071232440.29036@axis700.grange>
-	<20110207144530.70d9dab1@wker>
-Message-ID: <Pine.LNX.4.64.1102071740380.31738@axis700.grange>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Feb 2011 08:50:25 -0800
+Subject: [GIT PULL] omap fixes for v2.6.38-rc3
+Message-ID: <20110207165024.GL20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 7 Feb 2011, Anatolij Gustschin wrote:
+Hi Linus,
 
-> On Mon, 7 Feb 2011 12:35:44 +0100 (CET)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> 
-> > On Mon, 7 Feb 2011, Anatolij Gustschin wrote:
-> > 
-> > > On Mon, 7 Feb 2011 12:09:15 +0100 (CET)
-> > > Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > > ...
-> > > > > I can't try mplayer since I don't have mplayer setup for this.
-> > > > > But looking at the mplayer source I don't see why it should
-> > > > > behave differently. Depending on mode mplayer queues 2 or 6
-> > > > > buffers. Testing with my test app with 6 queued buffers shows
-> > > > > no issues, here the buffer numbers toggle correctly, too.
-> > > > 
-> > > > Ok, I've done a couple more tests. With larger frames, and, therefore 
-> > > > lower fps - yes, with your patch buffers toggle correctly. Whereas in my 
-> > > > tests with smaller frames and higher fps either only one buffer is used, 
-> > > > or one is used much more often, than the other, e.g., 0 0 0 1 0 0 0 1 0... 
-> > > > Could you try to verify? Without your patch with any fps buffers toggle 
-> > > > consistently.
-> > > 
-> > > How small are the frames in you test? What is the highest fps value in
-> > > your test?
-> > 
-> > QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
-> > Just try different frams sizes, go down to 64x48 or something.
-> 
-> Testing of 960x243 frames at 30 fps has been done during all my previous
-> tests. I didn't see any issues at 30 fps.
+Please pull omap fixes from:
 
-Ok, I've found the reason. Buffer number repeats, when there is an 
-underrun, which is happening in my tests, when frames are arriving quickly 
-enough, but the user-space is not fast enough to process them, e.g., when 
-it is writing them to files over NFS or even just displaying on the LCD. 
-Without your patch these underruns happen just as well, they just don't 
-get recognised, because there's always one buffer delayed, so, the queue 
-is never empty.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
 
-Dan, please add my
+This is mostly board specific and PM related fixes.
 
-Reviewed-(and-tested-)by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Regards,
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Tony
+
+
+The following changes since commit ebf53826e105f488f4f628703a108e98940d1dc5:
+
+  Linux 2.6.38-rc3 (2011-02-01 13:05:49 +1000)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Aaro Koskinen (3):
+      arm: mach-omap2: voltage: debugfs: fix memory leak
+      arm: mach-omap2: board-rm680: fix rm680_vemmc regulator constraints
+      arm: mach-omap2: mux: free allocated memory on error exit
+
+Huang Weiyi (1):
+      omap1: remove duplicated #include
+
+Julia Lawall (1):
+      OMAP: PM: SmartReflex: Add missing IS_ERR test
+
+Kevin Hilman (1):
+      OMAP3: PM: fix save secure RAM to restore MPU power state
+
+Marek Vasut (1):
+      OMAP1: Fix non-working LCD on OMAP310
+
+Ming Lei (1):
+      arm: omap4: panda: remove usb_nop_xceiv_register(v1)
+
+Stefan Weil (2):
+      OMAP: PM: SmartReflex: Fix possible memory leak
+      OMAP: PM: SmartReflex: Fix possible null pointer read access
+
+Thomas Weber (1):
+      OMAP3: Devkit8000: Change lcd power pin
+
+Tony Lindgren (1):
+      Merge branch 'for_2.6.38/pm-fixes' of ssh://master.kernel.org/.../khilman/linux-omap-pm into devel-fixes
+
+ arch/arm/mach-omap1/lcd_dma.c          |   24 ++++++++++++------------
+ arch/arm/mach-omap1/time.c             |    1 -
+ arch/arm/mach-omap2/board-devkit8000.c |   27 ++++++++++++++++-----------
+ arch/arm/mach-omap2/board-omap4panda.c |    2 --
+ arch/arm/mach-omap2/board-rm680.c      |    3 ---
+ arch/arm/mach-omap2/mux.c              |    1 +
+ arch/arm/mach-omap2/pm34xx.c           |    7 ++++---
+ arch/arm/mach-omap2/smartreflex.c      |   11 +++++------
+ arch/arm/mach-omap2/voltage.c          |    1 +
+ 9 files changed, 39 insertions(+), 38 deletions(-)
