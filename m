@@ -1,64 +1,28 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Mon,  7 Feb 2011 21:38:47 +0530
-Subject: [PATCH] OMAP2: add regulator for MMC1
-Message-ID: <1297094927-727-1-git-send-email-balajitk@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 7 Feb 2011 08:12:57 -0800
+Subject: [RFC 3/5] ARM: P2V: make head.S use PLAT_PHYS_OFFSET
+In-Reply-To: <alpine.LFD.2.00.1101041612480.22191@xanadu.home>
+References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
+	<E1PaDPF-00023h-V5@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101041612480.22191@xanadu.home>
+Message-ID: <20110207161257.GG20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add regulator VMMC1 used by SD/MMC card slot1 in 2430sdp.
+* Nicolas Pitre <nico@fluxnic.net> [110104 13:32]:
+> On Tue, 4 Jan 2011, Russell King - ARM Linux wrote:
+> 
+> > head.S makes use of PHYS_OFFSET.  When it becomes a variable, the
+> > assembler won't understand this.  Switch it to use PLAT_PHYS_OFFSET
+> > for the time being, until this code is properly updated.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Right...  One thing at a time.
+> 
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
----
-Tested on OMAP2430 SDP with busybox filesystem mounted on MMC1
+With the omap DEBUG_LL fix the version of this in the p2v
+branch works for omaps:
 
- arch/arm/mach-omap2/board-2430sdp.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index e066177..361f6cb 100644
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -22,6 +22,7 @@
- #include <linux/mmc/host.h>
- #include <linux/delay.h>
- #include <linux/i2c/twl.h>
-+#include <linux/regulator/machine.h>
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-@@ -148,6 +149,25 @@ static void __init omap_2430sdp_init_irq(void)
- 	omap_init_irq();
- }
- 
-+static struct regulator_consumer_supply sdp2430_vmmc1_supplies[] = {
-+	REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.0"),
-+};
-+
-+/* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
-+static struct regulator_init_data sdp2430_vmmc1 = {
-+	.constraints = {
-+		.min_uV			= 1850000,
-+		.max_uV			= 3150000,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE
-+					| REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(sdp2430_vmmc1_supplies),
-+	.consumer_supplies	= &sdp2430_vmmc1_supplies[0],
-+};
-+
- static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
- 	.gpio_base	= OMAP_MAX_GPIO_LINES,
- 	.irq_base	= TWL4030_GPIO_IRQ_BASE,
-@@ -160,6 +180,7 @@ static struct twl4030_platform_data sdp2430_twldata = {
- 
- 	/* platform_data for children goes here */
- 	.gpio		= &sdp2430_gpio_data,
-+	.vmmc1		= &sdp2430_vmmc1,
- };
- 
- static struct i2c_board_info __initdata sdp2430_i2c_boardinfo[] = {
--- 
-1.7.0.4
+Tested-by: Tony Lindgren <tony@atomide.com>
