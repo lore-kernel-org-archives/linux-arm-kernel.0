@@ -1,76 +1,50 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon,  7 Feb 2011 12:53:05 +0200
-Subject: [PATCH RESEND] s3c2410_udc: Add handling for S3C244X dual-packet mode
-In-Reply-To: <20110207023247.GB16614@kroah.com>
-References: <20110207023247.GB16614@kroah.com>
-Message-ID: <1297075985-12743-1-git-send-email-anarsoul@gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 7 Feb 2011 12:09:15 +0100 (CET)
+Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data
+	in the irq handler
+In-Reply-To: <20110205210457.7218ecdc@wker>
+References: <1296031789-1721-3-git-send-email-agust@denx.de>
+	<1296476549-10421-1-git-send-email-agust@denx.de>
+	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
+	<20110205143505.0b300a3a@wker>
+	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
+	<20110205210457.7218ecdc@wker>
+Message-ID: <Pine.LNX.4.64.1102071205570.29036@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabian Godehardt <fg@emlix.com>
+On Sat, 5 Feb 2011, Anatolij Gustschin wrote:
 
-This is a patch that seems to make the USB hangs on the S3C244X go away.
-At least a good amount of ping torture didn't make them come back so far.
+> On Sat, 5 Feb 2011 17:36:37 +0100 (CET)
+> Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> ...
+> > > > Verified with both capture.c and mplayer. Could you, please, verify 
+> > > > whether you get the same behaviour and what the problem could be?
+> > > 
+> > > Now I did some further testing with idmac patch applied and with
+> > > added debug print in the IDMAC interrupt handler. There is no problem.
+> > > Testing with capture.c (4 buffers used as default) shows that buffer
+> > > numbers toggle correctly for all 100 captured frames:
+> > 
+> > Hm, interesting, I'll have to look at my testing in more detail then 
+> > (once back from FOSDEM). Could you maybe try mplayer too?
+> 
+> I can't try mplayer since I don't have mplayer setup for this.
+> But looking at the mplayer source I don't see why it should
+> behave differently. Depending on mode mplayer queues 2 or 6
+> buffers. Testing with my test app with 6 queued buffers shows
+> no issues, here the buffer numbers toggle correctly, too.
 
-The issue is that, if there are several back-to-back packets, sometimes no
-interrupt is generated for one of them. This seems to be caused by the
-mysterious dual packet mode, which the USB hardware enters automatically
-if the endpoint size is half that of the FIFO. (On the 244X, this is the
-normal situation for bulk data endpoints.)
+Ok, I've done a couple more tests. With larger frames, and, therefore 
+lower fps - yes, with your patch buffers toggle correctly. Whereas in my 
+tests with smaller frames and higher fps either only one buffer is used, 
+or one is used much more often, than the other, e.g., 0 0 0 1 0 0 0 1 0... 
+Could you try to verify? Without your patch with any fps buffers toggle 
+consistently.
 
-There is also a timing factor in this. It seems that what happens is that
-the USB hardware automatically sends an acknowledgement if there is only one 
-packet in the FIFO (the FIFO has space for two). If another packet arrives
-before the host has retrieved and acknowledged the previous one, no interrupt
-is generated for that second one.
-
-However, there may be an indication. There is one undocumented bit (none
-of the 244x manuals document it), OUT_CRS1_REG[1], that seems to be set
-suspiciously often when this condition occurs. There is also
-CLR_DATA_TOGGLE, OUT_CRS1_REG[7], which may have a function related to
-this. (The Samsung manual is rather terse on that, as usual.)
-
-This needs to be examined further. For now, the patch seems to do the
-trick.
-
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Thanks
+Guennadi
 ---
- drivers/usb/gadget/s3c2410_udc.c |   16 +++++++++++++++-
- 1 files changed, 15 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index ea2b3c7..fed323c 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -902,7 +902,7 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void *_dev)
- 	int pwr_reg;
- 	int ep0csr;
- 	int i;
--	u32 idx;
-+	u32 idx, idx2;
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&dev->lock, flags);
-@@ -1017,6 +1017,20 @@ static irqreturn_t s3c2410_udc_irq(int dummy, void *_dev)
- 		}
- 	}
- 
-+	/* what else causes this interrupt? a receive! who is it? */
-+	if (!usb_status && !usbd_status && !pwr_reg && !ep0csr) {
-+		for (i = 1; i < S3C2410_ENDPOINTS; i++) {
-+			idx2 = udc_read(S3C2410_UDC_INDEX_REG);
-+			udc_write(i, S3C2410_UDC_INDEX_REG);
-+
-+			if (udc_read(S3C2410_UDC_OUT_CSR1_REG) & 0x1)
-+				s3c2410_udc_handle_ep(&dev->ep[i]);
-+
-+			/* restore index */
-+			udc_write(idx2, S3C2410_UDC_INDEX_REG);
-+		}
-+	}
-+
- 	dprintk(DEBUG_VERBOSE, "irq: %d s3c2410_udc_done.\n", IRQ_USBD);
- 
- 	/* Restore old index */
--- 
-1.7.2
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
