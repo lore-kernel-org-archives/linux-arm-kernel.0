@@ -1,33 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Feb 2011 12:01:04 +0000
-Subject: [PATCH v2 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+Date: Mon, 7 Feb 2011 12:10:52 +0000
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110207120103.GC31929@n2100.arm.linux.org.uk>
 References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
 	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+Message-ID: <20110207121052.GD31929@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 06, 2011 at 07:12:28PM +0000, Russell King - ARM Linux wrote:
-> This adds core support for saving and restoring CPU coprocessor
-> registers for suspend/resume support.  This contains support for suspend
-> with ARM920, ARM926, SA11x0, PXA25x, PXA27x, PXA3xx and V6 CPUs.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
+On Mon, Feb 07, 2011 at 12:01:04PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Feb 06, 2011 at 07:12:28PM +0000, Russell King - ARM Linux wrote:
+> > This adds core support for saving and restoring CPU coprocessor
+> > registers for suspend/resume support.  This contains support for suspend
+> > with ARM920, ARM926, SA11x0, PXA25x, PXA27x, PXA3xx and V6 CPUs.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
 
-Here's v2 of this patch.  I've moved the MMU handling code into
-arch/arm/kernel/sleep.S, so everyone can benefit from having this handled
-in the same way, much like we do in head.S.  I've also added a full
-cache flush after the MMU is turned on to ensure that we don't leak
-any cache lines into userspace for the MMU resume code.  This should
-make things a little more robust.
+Gah.  No sooner than v2, than there's a v3 of this patch, replacing a
+typo'd sub rather than mov instruction, and adding a .ltorg to avoid
+.text wastage.
 
  arch/arm/include/asm/glue-proc.h |    3 +
  arch/arm/include/asm/proc-fns.h  |    7 ++
  arch/arm/kernel/Makefile         |    1 +
  arch/arm/kernel/asm-offsets.c    |    9 +++
- arch/arm/kernel/sleep.S          |  109 ++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/sleep.S          |  110 ++++++++++++++++++++++++++++++++++++
  arch/arm/mm/proc-arm1020.S       |    3 +
  arch/arm/mm/proc-arm1020e.S      |    3 +
  arch/arm/mm/proc-arm1022.S       |    3 +
@@ -52,7 +51,7 @@ make things a little more robust.
  arch/arm/mm/proc-v7.S            |  114 ++++++++++++++++++++++++++++----------
  arch/arm/mm/proc-xsc3.S          |   48 ++++++++++++++++-
  arch/arm/mm/proc-xscale.S        |   45 ++++++++++++++-
- 29 files changed, 518 insertions(+), 33 deletions(-)
+ 29 files changed, 519 insertions(+), 33 deletions(-)
 
 diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
 index e3bf443..6469521 100644
@@ -134,10 +133,10 @@ index 5302a91..927522c 100644
    DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
 diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
 new file mode 100644
-index 0000000..ebe9ee8
+index 0000000..9f106fa
 --- /dev/null
 +++ b/arch/arm/kernel/sleep.S
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,110 @@
 +#include <linux/linkage.h>
 +#include <asm/asm-offsets.h>
 +#include <asm/assembler.h>
@@ -208,13 +207,14 @@ index 0000000..ebe9ee8
 +	ldr	r3, =cpu_resume_after_mmu
 +	b	cpu_resume_turn_mmu_on
 +ENDPROC(cpu_resume_mmu)
++	.ltorg
 +	.align	5
 +cpu_resume_turn_mmu_on:
 +	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, caches, etc
 +	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
 +	mov	r0, r0
 +	mov	r0, r0
-+	sub	pc, r3			@ jump to virtual address
++	mov	pc, r3			@ jump to virtual address
 +ENDPROC(cpu_resume_turn_mmu_on)
 +cpu_resume_after_mmu:
 +	str	r5, [r2, r4, lsl #2]	@ restore old mapping
