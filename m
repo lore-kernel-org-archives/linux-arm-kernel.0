@@ -1,28 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Feb 2011 08:12:57 -0800
-Subject: [RFC 3/5] ARM: P2V: make head.S use PLAT_PHYS_OFFSET
-In-Reply-To: <alpine.LFD.2.00.1101041612480.22191@xanadu.home>
+Date: Mon, 7 Feb 2011 08:15:28 -0800
+Subject: [RFC 4/5] ARM: P2V: introduce phys_to_virt/virt_to_phys
+	runtime patching
+In-Reply-To: <20110105000810.GG24935@n2100.arm.linux.org.uk>
 References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDPF-00023h-V5@rmk-PC.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101041612480.22191@xanadu.home>
-Message-ID: <20110207161257.GG20795@atomide.com>
+	<E1PaDPa-00023l-CR@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101041614090.22191@xanadu.home>
+	<20110105000810.GG24935@n2100.arm.linux.org.uk>
+Message-ID: <20110207161527.GH20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [110104 13:32]:
-> On Tue, 4 Jan 2011, Russell King - ARM Linux wrote:
-> 
-> > head.S makes use of PHYS_OFFSET.  When it becomes a variable, the
-> > assembler won't understand this.  Switch it to use PLAT_PHYS_OFFSET
-> > for the time being, until this code is properly updated.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110104 16:12]:
+> On Tue, Jan 04, 2011 at 04:27:37PM -0500, Nicolas Pitre wrote:
+> > On Tue, 4 Jan 2011, Russell King - ARM Linux wrote:
+> > > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > > index f67e682..7c5499d 100644
+> > > --- a/arch/arm/kernel/setup.c
+> > > +++ b/arch/arm/kernel/setup.c
+> > > @@ -804,7 +804,7 @@ void __init setup_arch(char **cmdline_p)
+> > >  	struct machine_desc *mdesc;
+> > >  	char *from = default_command_line;
+> > >  
+> > > -	tags->mem.start = PHYS_OFFSET;
+> > > +	init_tags.mem.start = PHYS_OFFSET;
 > > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Doesn't this belong in 2/5 instead?
 > 
-> Right...  One thing at a time.
-> 
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> It's actually the result of using interdiff with the original patch...
+> It'll get killed shortly.
 
-With the omap DEBUG_LL fix the version of this in the p2v
-branch works for omaps:
+For the version in p2v branch:
 
 Tested-by: Tony Lindgren <tony@atomide.com>
