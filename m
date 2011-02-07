@@ -1,92 +1,33 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Mon, 7 Feb 2011 08:01:37 -0700
-Subject: [PATCH 3/4] ARM: Xilinx: Adding timer support to the platform
-In-Reply-To: <20110207145858.GC24893@pulham.picochip.com>
-References: <1296922637-24662-1-git-send-email-john.linn@xilinx.com>
-	<1296922637-24662-2-git-send-email-john.linn@xilinx.com>
-	<1296922637-24662-3-git-send-email-john.linn@xilinx.com>
-	<66f1ca90-76f5-4571-b10e-8b79f62e5275@VA3EHSMHS020.ehs.local>
-	<20110206010343.GB5563@pulham.picochip.com>
-	<a58cfb3f-31d6-4120-a961-694aed8b7486@VA3EHSMHS006.ehs.local>
-	<20110207145858.GC24893@pulham.picochip.com>
-Message-ID: <74e0d395-ca75-4ac0-8dcc-fdb55d3deeb3@VA3EHSMHS004.ehs.local>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Feb 2011 15:02:33 +0000
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
+References: <E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207121052.GD31929@n2100.arm.linux.org.uk>
+	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
+	<20110207143351.GH31929@n2100.arm.linux.org.uk>
+	<AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
+Message-ID: <20110207150233.GI31929@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jamie Iles [mailto:jamie at jamieiles.com]
-> Sent: Monday, February 07, 2011 7:59 AM
-> To: John Linn
-> Cc: Jamie Iles; linux-arm-kernel at lists.infradead.org;
-linux-kernel at vger.kernel.org;
-> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
-Kiran Sutariya
-> Subject: Re: [PATCH 3/4] ARM: Xilinx: Adding timer support to the
-platform
-> 
-> On Mon, Feb 07, 2011 at 07:16:01AM -0700, John Linn wrote:
-> > > -----Original Message-----
-> > > From: Jamie Iles [mailto:jamie at jamieiles.com]
-> > > Sent: Saturday, February 05, 2011 6:04 PM
-> > > To: John Linn
-> > > Cc: linux-arm-kernel at lists.infradead.org;
-> > linux-kernel at vger.kernel.org; linux at arm.linux.org.uk;
-> > > catalin.marinas at arm.com; glikely at secretlab.ca; Kiran Sutariya
-> > > Subject: Re: [PATCH 3/4] ARM: Xilinx: Adding timer support to the
-> > platform
-> > >
-> > > Hi John,
-> > >
-> > > A couple more nitpicks.
-> > >
-> > > Jamie
-> > >
-> > > On Sat, Feb 05, 2011 at 09:17:16AM -0700, John Linn wrote:
-> > > > +static irqreturn_t xttcpss_clock_event_interrupt(int irq, void
-> > *dev_id)
-> > > > +{
-> > > > +	struct clock_event_device *evt = &xttcpss_clockevent;
-> > > > +	struct xttcpss_timer *timer = dev_id;
-> > > > +	u32 ctrl_reg;
-> > > > +
-> > > > +	/* Acknowledge the interrupt and call event handler */
-> > > > +	xttcpss_write(timer->base_addr + XTTCPSS_ISR_OFFSET,
-> > > > +		xttcpss_read(timer->base_addr +
-XTTCPSS_ISR_OFFSET));
-> > > > +
-> > > > +	if (timer->mode == CLOCK_EVT_MODE_ONESHOT) {
-> > > > +
-> > > > +		/* Disable the counter as it would keep running.
-*/
-> > > > +		ctrl_reg = xttcpss_read(timer->base_addr +
-> > > > +
-XTTCPSS_CNT_CNTRL_OFFSET);
-> > > > +		ctrl_reg |= ~(XTTCPSS_CNT_CNTRL_ENABLE_MASK);
-> > >
-> > > The clock events framework should reprogram the next event so you
-> > don't
-> > > actually need to disable the timer here.  Once the event handler
-has
-> > > been called the timer will be reenabled with a new period, and as
-> > we're
-> > > running with interrupts disabled here we don't need to stop the
-timer.
-> > >
-> >
-> > What about if there's not another event to be started?
-> 
-> Then the clockevents code can set the mode to CLOCK_EVT_MODE_SHUTDOWN
-> and this should disable the timer.  For NOHZ, AFAICT the
-> clockevents/tick code will make sure that the next tick always falls
-> within your max_delta_ns.
-> 
-> Jamie
+On Mon, Feb 07, 2011 at 04:58:05PM +0200, saeed bishara wrote:
+> well, the allocation of the identity page table doesn't need to be
+> done in assembly code. this is the similar to what you did in
+> __cpu_up.
+> for example, this allocation can be done in arch/arm/kernel/setup.c.
+> the assembly code only need to know the offset of this page table.
+> looks that there are several usages for the identity page table (smp
+> boot, kexec, pm), maybe all those clients can share the same one.
 
-Thanks, appreciate that help as I'm still learning more on the clock
-mgmt.
+We don't want to allocate this at boot time, because it will require
+additional maintainence when L1 page tables are added for ioremap() etc.
 
-Sounds good, I can stop it and test that.
-
--- John
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+I feel that it's best to leave it as-is, as this is the method everyone
+has been using to date.  When it becomes a problem, we can then look at
+resolving it.
