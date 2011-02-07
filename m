@@ -1,123 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 07 Feb 2011 07:55:03 +0000
-Subject: [PATCH] RFC: ux500: add PMU resources
-In-Reply-To: <AANLkTi=atjR8-gDU-9=3o5GLjj+S50-7k_myP199tp0G@mail.gmail.com>
-References: <1295391579-9166-1-git-send-email-linus.walleij@stericsson.com>
-	<-2131964397930844736@unknownmsgid>
-	<AANLkTi=atjR8-gDU-9=3o5GLjj+S50-7k_myP199tp0G@mail.gmail.com>
-Message-ID: <4D4FA557.9090805@linaro.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 7 Feb 2011 09:05:55 +0100
+Subject: [RFC, PATCH 3/3] clk: add warnings for incorrect
+	enable/prepare semantics
+In-Reply-To: <1297058877.800990.238556019385.3.gpush@pororo>
+References: <201102011711.31258.jeremy.kerr@canonical.com>
+	<1297058877.800990.238556019385.3.gpush@pororo>
+Message-ID: <20110207080555.GC27982@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus and I have already added our SoBs.
+Hello Jeremy,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-
-On 07/02/11 05:56, Rabin Vincent wrote:
-> On Wed, Jan 19, 2011 at 17:09, Will Deacon <will.deacon@arm.com> wrote:
->> 2.) Use IPI to cross-call the IRQ handler when the interrupted CPU doesn't
->>    have an interrupt asserted on its PMU. You'll need to sort out problems
->>    with re-enabling interrupts for the cross-call and also nesting of the
->>    PMU interrupt (because it could fire as a result of another PMU overflowing
->>    before you've completed the cross-call).
-> Here's the IPI version as well, for comparison with the other
-> approach.  The IRQ handling code will mask the interrupt before
-> handling it, so it can't nest, can it?
->
-> 8<----------
-> From 84e5936f9285fb03845ac04801430762c1c9b60d Mon Sep 17 00:00:00 2001
-> From: Rabin Vincent <rabin.vincent@stericsson.com>
-> Date: Fri, 4 Feb 2011 11:59:26 +0530
-> Subject: [PATCH] ARM: perf_event: support dual-core with single PMU IRQ
->
-> DB8500 (dual-core) has the PMU interrupts of both cores ORed into one.  Support
-> this by keeping the interrupt directed at Core0 and IPIing Core1 when Core0
-> receives the interrupt and finds that its counter has not overflowed.
->
-> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+On Mon, Feb 07, 2011 at 02:07:57PM +0800, Jeremy Kerr wrote:
+> This change adds warnings to check for:
+> 
+>  1) enabling a clock that hasn't been prepared; and
+> 
+>  2) unpreparing a clock that is still enabled
+> 
+> While the correctness can't be guaranteed, these warnings should cover
+> most situations.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
 > ---
->  arch/arm/kernel/perf_event.c |   48 +++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 47 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> index 5efa264..a97e50f 100644
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -19,6 +19,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/uaccess.h>
-> +#include <linux/smp.h>
->
->  #include <asm/cputype.h>
->  #include <asm/irq.h>
-> @@ -377,9 +378,40 @@ validate_group(struct perf_event *event)
->  	return 0;
->  }
->
-> +static irqreturn_t armpmu_core2_irqret;
+>  drivers/clk/clk.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 51dbd33..2369959 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -35,6 +35,8 @@ void clk_unprepare(struct clk *clk)
+>  	if (!clk->ops->unprepare)
+>  		return;
+>  
+> +	WARN_ON(clk->enable_count);
 > +
-> +/* Called via IPI on the second core */
-> +static void armpmu_kick(void *data)
-> +{
-> +	int irq = (int) data;
+>  	mutex_lock(&clk->prepare_lock);
+>  	if (--clk->prepare_count == 0)
+>  		clk->ops->unprepare(clk);
+> @@ -50,6 +52,8 @@ int clk_enable(struct clk *clk)
+>  	if (!clk->ops->enable)
+>  		return 0;
+>  
+> +	WARN_ON(clk->ops->prepare && clk->prepare_count);
 > +
-> +	armpmu_core2_irqret = armpmu->handle_irq(irq, NULL);
-> +	smp_wmb();
-> +}
-> +
-> +static irqreturn_t armpmu_single_interrupt(int irq, void *dev)
-> +{
-> +	irqreturn_t irqret = armpmu->handle_irq(irq, dev);
-> +	int err;
-> +
-> +	if (irqret != IRQ_NONE)
-> +		return irqret;
-> +
-> +	local_irq_enable();
-> +	err = smp_call_function_single(1, armpmu_kick, (void *) irq, true);
-> +	local_irq_disable();
-> +
-> +	if (err)
-> +		return irqret;
-> +
-> +	smp_rmb();
-> +	return armpmu_core2_irqret;
-> +}
-> +
->  static int
->  armpmu_reserve_hardware(void)
->  {
-> +	irq_handler_t irq_handler = armpmu->handle_irq;
->  	int i, err = -ENODEV, irq;
->
->  	pmu_device = reserve_pmu(ARM_PMU_DEVICE_CPU);
-> @@ -395,12 +427,26 @@ armpmu_reserve_hardware(void)
->  		return -ENODEV;
->  	}
->
-> +	/*
-> +	 * Some SoCs have the PMU IRQ lines of two cores wired together into a
-> +	 * single interrupt.  Support these by poking the second core with an
-> +	 * IPI when its counters overflow.
-> +	 */
-> +	if (pmu_device->num_resources < num_online_cpus()) {
-> +		if (num_online_cpus() > 2) {
-> +			pr_err(">2 cpus not supported for single-irq workaround");
-> +			return -ENODEV;
-> +		}
-> +
-> +		irq_handler = armpmu_single_interrupt;
-> +	}
-> +
->  	for (i = 0; i < pmu_device->num_resources; ++i) {
->  		irq = platform_get_irq(pmu_device, i);
->  		if (irq < 0)
->  			continue;
->
-> -		err = request_irq(irq, armpmu->handle_irq,
-> +		err = request_irq(irq, irq_handler,
->  				  IRQF_DISABLED | IRQF_NOBALANCING,
->  				  "armpmu", NULL);
->  		if (err) {
+This implies the warning is only issued on clocks that have a prepare
+callback.  If we want to enforce the new API the warning here shouldn't
+depend on clk->ops->prepare.  (clk_prepare and clk_unprepare need to
+be changed then to adapt the prepare_count even in the absence of
+clk->ops->prepare.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
