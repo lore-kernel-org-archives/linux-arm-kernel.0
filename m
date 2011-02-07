@@ -1,76 +1,38 @@
-From: dzu@denx.de (Detlev Zundel)
-Date: Mon, 07 Feb 2011 15:43:47 +0100
-Subject: [PATCH 2/2 v2] dma: ipu_idmac: do not lose valid received data in
-	the irq handler
-In-Reply-To: <Pine.LNX.4.64.1102071428470.29036@axis700.grange> (Guennadi
-	Liakhovetski's message of "Mon, 7 Feb 2011 14:35:04 +0100 (CET)")
-References: <1296031789-1721-3-git-send-email-agust@denx.de>
-	<1296476549-10421-1-git-send-email-agust@denx.de>
-	<Pine.LNX.4.64.1102031104090.21719@axis700.grange>
-	<20110205143505.0b300a3a@wker>
-	<Pine.LNX.4.64.1102051735270.11500@axis700.grange>
-	<20110205210457.7218ecdc@wker>
-	<Pine.LNX.4.64.1102071205570.29036@axis700.grange>
-	<20110207122147.4081f47d@wker>
-	<Pine.LNX.4.64.1102071232440.29036@axis700.grange>
-	<m24o8g80cj.fsf@ohwell.denx.de>
-	<Pine.LNX.4.64.1102071428470.29036@axis700.grange>
-Message-ID: <m2zkq77vmk.fsf@ohwell.denx.de>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 7 Feb 2011 16:58:05 +0200
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110207143351.GH31929@n2100.arm.linux.org.uk>
+References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
+	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207121052.GD31929@n2100.arm.linux.org.uk>
+	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
+	<20110207143351.GH31929@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-> Hi Detlev
+>> I fully agree with you, but what I was suggesting is to create
+>> temporary identity page table at boot time, the resume code will load
+>> that page table (Context ID will be loaded with unique ASID), enable
+>> mmu, then the original page table and Context ID will be restored.
 >
-> On Mon, 7 Feb 2011, Detlev Zundel wrote:
->
->> Hi Guennadi,
->> 
->> >> How small are the frames in you test? What is the highest fps value in
->> >> your test?
->> >
->> > QVGA, don't know fps exactly, pretty high, between 20 and 60fps, I think. 
->> > Just try different frams sizes, go down to 64x48 or something.
->> 
->> Is this a "real" usage scenario?  It feels that this is not what most
->> users will do and it certainly is not relevant for our application.  
->
-> QVGA at 25 / 50 / 60 fps is _certainly_ very much a real-life scenario.
+> That's much easier to do in C code than in the assembly code. ?Let's
+> keep the assembly code as simple as possible...
+well, the allocation of the identity page table doesn't need to be
+done in assembly code. this is the similar to what you did in
+__cpu_up.
+for example, this allocation can be done in arch/arm/kernel/setup.c.
+the assembly code only need to know the offset of this page table.
+looks that there are several usages for the identity page table (smp
+boot, kexec, pm), maybe all those clients can share the same one.
 
-Yes, sure.  It was the 64x48 pixel you suggested which I believe to be
-of doubtful value here.
-
->> Is it possible that if you are interested in such a scenario that you do
->> the testing?  We have spent quite a lot of time to fix the driver for
->> real (well full frame) capturing already and I am relucatant to spend
->> more time for corner cases.  Maybe we should document this as "known
->> limitations" of the setup?  What do you think?  I'll much rather have a
->> driver working for real world scenarios than for marginal test cases.
->
-> I am interested in avoiding regressions. In principle, this is a DMA 
-> driver, which I am not maintaining. Dan asked for my ack, so, I tested it 
-> and found an issue, which I would prefer to have resolved before 
-> committing. Of course, I don't have a decisive voice in this matter, so, 
-> the patch can also be merged without my ack. Otherwise - of course you 
-> don't have to continue testing, I will try to look at the issue as the 
-> time permits, and Dan will have to decide, whether he is prepared to 
-> commit this patch in its present form, or he would prefer this issue to be 
-> clarified.
-
-I'm fully in line with not wanting any regressions.  But is it a
-regression if two independent testers report that the patch _improves_
-the current situation?  As was shown by Anatolijs log, the current
-driver certainly has a bug with respect to the handling of individual
-frames.  This buggy behaviour only never showed up because nobody used
-the driver on such a granularity.
-
-We certainly appreciate if you can look into your scenario.
-
-Thanks
-  Detlev
-
---
-DENX Software Engineering GmbH,      MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich,  Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-40 Fax: (+49)-8142-66989-80 Email: dzu at denx.de
+you may also consider loading this identity page table before calling
+suspend flow, thus saving all the v:p stuff, and the resume code will
+take care for restoring the original page table after enabling the
+mmu.
+saeed
