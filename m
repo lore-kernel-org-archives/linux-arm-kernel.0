@@ -1,74 +1,63 @@
 From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon,  7 Feb 2011 02:51:58 +0100
-Subject: [PATCH 06/09] ARM: s3c2440: gta02: Remove state_mem constraints for
-	the pcf50633 regulators
+Date: Mon,  7 Feb 2011 02:52:00 +0100
+Subject: [PATCH 08/09] ARM: s3c2440: gta02: Request usb pullup pin before
+	using it
 In-Reply-To: <1297043521-21903-1-git-send-email-lars@metafoo.de>
 References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-Message-ID: <1297043521-21903-6-git-send-email-lars@metafoo.de>
+Message-ID: <1297043521-21903-8-git-send-email-lars@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pcf50633 regulator driver does not use the state_mem constraints, so there
-is no use in setting them.
+Request the gpio pin used to control the usb pullup before using it to avoid a
+runtime warning about an auto-requested gpio.
 
 Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 ---
- arch/arm/mach-s3c2440/mach-gta02.c |   15 ---------------
- 1 files changed, 0 insertions(+), 15 deletions(-)
+ arch/arm/mach-s3c2440/mach-gta02.c |   17 +++++++++++++++--
+ 1 files changed, 15 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
-index e57c4d8..01e0930 100644
+index 1396639..94456fa 100644
 --- a/arch/arm/mach-s3c2440/mach-gta02.c
 +++ b/arch/arm/mach-s3c2440/mach-gta02.c
-@@ -283,9 +283,6 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
- 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
- 				.always_on = 1,
- 				.apply_uV = 1,
--				.state_mem = {
--					.enabled = 1,
--				},
- 			},
- 		},
- 		[PCF50633_REGULATOR_DOWN1] = {
-@@ -304,9 +301,6 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
- 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
- 				.apply_uV = 1,
- 				.always_on = 1,
--				.state_mem = {
--					.enabled = 1,
--				},
- 			},
- 		},
- 		[PCF50633_REGULATOR_HCLDO] = {
-@@ -325,9 +319,6 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
- 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
- 				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
- 				.apply_uV = 1,
--				.state_mem = {
--					.enabled = 0,
--				},
- 			},
- 		},
- 		[PCF50633_REGULATOR_LDO2] = {
-@@ -362,9 +353,6 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
- 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
- 				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
- 				.apply_uV = 1,
--				.state_mem = {
--					.enabled = 1,
--				},
- 			},
- 		},
- 		[PCF50633_REGULATOR_LDO6] = {
-@@ -379,9 +367,6 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
- 				.min_uV = 1800000,
- 				.max_uV = 1800000,
- 				.valid_modes_mask = REGULATOR_MODE_NORMAL,
--				.state_mem = {
--					.enabled = 1,
--				},
- 			},
- 		},
+@@ -451,11 +451,11 @@ static void gta02_udc_command(enum s3c2410_udc_cmd_e cmd)
+ 	switch (cmd) {
+ 	case S3C2410_UDC_P_ENABLE:
+ 		pr_debug("%s S3C2410_UDC_P_ENABLE\n", __func__);
+-		gpio_direction_output(GTA02_GPIO_USB_PULLUP, 1);
++		gpio_set_value(GTA02_GPIO_USB_PULLUP, 1);
+ 		break;
+ 	case S3C2410_UDC_P_DISABLE:
+ 		pr_debug("%s S3C2410_UDC_P_DISABLE\n", __func__);
+-		gpio_direction_output(GTA02_GPIO_USB_PULLUP, 0);
++		gpio_set_value(GTA02_GPIO_USB_PULLUP, 0);
+ 		break;
+ 	case S3C2410_UDC_P_RESET:
+ 		pr_debug("%s S3C2410_UDC_P_RESET\n", __func__);
+@@ -572,11 +572,24 @@ static void gta02_poweroff(void)
+ 	pcf50633_reg_set_bit_mask(gta02_pcf, PCF50633_REG_OOCSHDWN, 1, 1);
+ }
  
++static void gta02_request_gpios(void)
++{
++	int ret;
++	ret = gpio_request_one(GTA02_GPIO_USB_PULLUP, GPIOF_OUT_INIT_LOW,
++				"USB pullup");
++	if (ret) {
++		printk(KERN_ERR "Failed to request USB pullup gpio pin: %d\n",
++			ret);
++	}
++}
++
+ static void __init gta02_machine_init(void)
+ {
+ 	/* Set the panic callback to turn AUX LED on or off. */
+ 	panic_blink = gta02_panic_blink;
+ 
++	gta02_request_gpios();
++
+ 	s3c_pm_init();
+ 
+ #ifdef CONFIG_CHARGER_PCF50633
 -- 
 1.7.2.3
