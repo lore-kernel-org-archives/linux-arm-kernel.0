@@ -1,68 +1,66 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 8 Feb 2011 13:03:55 +0100
-Subject: [PATCH 4/4] spi/pl022: minor kerneldoc updates
-Message-ID: <1297166635-5205-1-git-send-email-linus.walleij@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 08 Feb 2011 21:05:25 +0900
+Subject: [PATCH V3] ARM: S5PV310: Implement kernel timers using MCT
+In-Reply-To: <20110131192241.GD32737@n2100.arm.linux.org.uk>
+References: <1296205364-30175-1-git-send-email-kgene.kim@samsung.com>
+	<20110131192241.GD32737@n2100.arm.linux.org.uk>
+Message-ID: <007001cbc788$7a7e0530$6f7a0f90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/amba-pl022.c |   25 ++++++++++++++++---------
- 1 files changed, 16 insertions(+), 9 deletions(-)
+Russell King - ARM Linux wrote:
+> 
+> On Fri, Jan 28, 2011 at 06:02:44PM +0900, Kukjin Kim wrote:
+> > +irqreturn_t s5pv310_mct_comp_isr(int irq, void *dev_id)
+> 
+Oops, I missed your reply :(
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 2b591f0..4cd05cc 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -329,15 +329,16 @@ struct vendor_data {
- /**
-  * struct pl022 - This is the private SSP driver data structure
-  * @adev: AMBA device model hookup
-- * @vendor: Vendor data for the IP block
-- * @phybase: The physical memory where the SSP device resides
-- * @virtbase: The virtual memory where the SSP is mapped
-+ * @vendor: vendor data for the IP block
-+ * @phybase: the physical memory where the SSP device resides
-+ * @virtbase: the virtual memory where the SSP is mapped
-+ * @clk: outgoing clock "SPICLK" for the SPI bus
-  * @master: SPI framework hookup
-  * @master_info: controller-specific data from machine setup
-- * @regs: SSP controller register's virtual address
-- * @pump_messages: Work struct for scheduling work to the workqueue
-- * @lock: spinlock to syncronise access to driver data
-  * @workqueue: a workqueue on which any spi_message request is queued
-+ * @pump_messages: work struct for scheduling work to the workqueue
-+ * @queue_lock: spinlock to syncronise access to message queue
-+ * @queue: message queue
-  * @busy: workqueue is busy
-  * @running: workqueue is running
-  * @pump_transfers: Tasklet used in Interrupt Transfer mode
-@@ -348,8 +349,14 @@ struct vendor_data {
-  * @tx_end: end position in TX buffer to be read
-  * @rx: current position in RX buffer to be written
-  * @rx_end: end position in RX buffer to be written
-- * @readingtype: the type of read currently going on
-- * @writingtype: the type or write currently going on
-+ * @read: the type of read currently going on
-+ * @write: the type of write currently going on
-+ * @exp_fifo_level: expected FIFO level
-+ * @dma_rx_channel: optional channel for RX DMA
-+ * @dma_tx_channel: optional channel for TX DMA
-+ * @sgt_rx: scattertable for the RX transfer
-+ * @sgt_tx: scattertable for the TX transfer
-+ * @dummypage: a dummy page used for driving data on the bus with DMA
-  */
- struct pl022 {
- 	struct amba_device		*adev;
-@@ -397,8 +404,8 @@ struct pl022 {
-  * @cpsr: Value of Clock prescale register
-  * @n_bytes: how many bytes(power of 2) reqd for a given data width of client
-  * @enable_dma: Whether to enable DMA or not
-- * @write: function ptr to be used to write when doing xfer for this chip
-  * @read: function ptr to be used to read when doing xfer for this chip
-+ * @write: function ptr to be used to write when doing xfer for this chip
-  * @cs_control: chip select callback provided by chip
-  * @xfer_type: polling/interrupt/DMA
-  *
--- 
-1.7.3.2
+> static?
+> 
+> > +{
+> > +	struct clock_event_device *evt;
+> 
+> 	struct clock_event_device *evt = dev_id;
+> 
+> > +
+> > +	s5pv310_mct_write(0x1, S5PV310_MCT_G_INT_CSTAT);
+> > +
+> > +	evt = &mct_comp_device;
+> > +	evt->event_handler(evt);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static struct irqaction mct_comp_event_irq = {
+> > +	.name		= "mct_comp_irq",
+> > +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> > +	.handler	= s5pv310_mct_comp_isr,
+> 
+> 	.dev_id		= &mct_comp_device,
+> 
+Ok...will address comments from you :-)
+
+> 
+> > +static void s5pv310_mct_tick_init(struct clock_event_device *evt)
+> > +{
+> > +	unsigned int cpu = smp_processor_id();
+> > +
+> > +	evt = &mct_tick[cpu].evt;
+> 
+> Why do you want to overwrite the already provided event device?
+
+Hmm...couldn't use just 'already provided event device' because can't get
+'mct_clock_event_device' structure like following.
+
++	struct mct_clock_event_device *mevt =
++		container_of(evt, struct mct_clock_event_device, evt);
+
+Do you have any idea for it?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
