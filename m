@@ -1,51 +1,61 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue,  8 Feb 2011 15:40:32 +0530
-Subject: [PATCH 1/7] omap: clock: Check for enable/disable ops support
-In-Reply-To: <1297159838-30282-1-git-send-email-rnayak@ti.com>
-References: <1297159838-30282-1-git-send-email-rnayak@ti.com>
-Message-ID: <1297159838-30282-2-git-send-email-rnayak@ti.com>
+Date: Tue,  8 Feb 2011 15:40:31 +0530
+Subject: [PATCH 0/7] clock/dpll autoidle support
+Message-ID: <1297159838-30282-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check if enable/disable operations are supported for a given
-clock node before attempting to call them.
+OMAP has various clock nodes and dpll's
+which support hardware level autoidle.
+Enabling hardware level autoidle provides
+better power savings without much software
+intervention.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/clock.c |   14 +++++++++-----
- 1 files changed, 9 insertions(+), 5 deletions(-)
+This series does the following to help enable
+hardware level autoidling using clock framework
+for some of these nodes on OMAP3 and OMAP4
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 2a2f152..e0f017d 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -261,7 +261,8 @@ void omap2_clk_disable(struct clk *clk)
- 
- 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
- 
--	clk->ops->disable(clk);
-+	if (clk->ops && clk->ops->disable)
-+		clk->ops->disable(clk);
- 
- 	if (clk->clkdm)
- 		omap2_clkdm_clk_disable(clk->clkdm, clk);
-@@ -312,10 +313,13 @@ int omap2_clk_enable(struct clk *clk)
- 		}
- 	}
- 
--	ret = clk->ops->enable(clk);
--	if (ret) {
--		WARN(1, "clock: %s: could not enable: %d\n", clk->name, ret);
--		goto oce_err3;
-+	if (clk->ops && clk->ops->enable) {
-+		ret = clk->ops->enable(clk);
-+		if (ret) {
-+			WARN(1, "clock: %s: could not enable: %d\n",
-+			     clk->name, ret);
-+			goto oce_err3;
-+		}
- 	}
- 
- 	return 0;
--- 
-1.7.0.4
+-1- Adds support for providing function pointers
+for enabling/disabling autoidle in clkops
+-2- Populates these in clkops for all OMAP3/4 dplls
+-3- Enables all dpll autoidle late in boot on OMAP3 and OMAP4
+-4- Adds support for mx postdivider autoidle (present
+only on OMAP4) and enables it late in OMAP4 boot
+
+Some of the patches in this series were earlier posted
+and discussed as part of another series here
+http://marc.info/?l=linux-omap&m=129681356402594&w=2
+They are now posted as a seperate series as discussed
+here
+http://marc.info/?l=linux-omap&m=129713867702170&w=2
+
+The patches are boot tested on OMAP3430sdp and
+OMAP4430sdp.
+
+The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
+  Linus Torvalds (1):
+        Linux 2.6.38-rc4
+
+are available in the git repository at:
+
+ git://gitorious.org/omap-pm/linux.git dpll-autoidle
+
+Rajendra Nayak (7):
+  omap: clock: Check for enable/disable ops support
+  omap3: dpll: Populate clkops for dpll1_ck
+  omap: clock: Add allow_idle/deny_idle support in clkops
+  omap: dpll: Add allow_idle/deny_idle support for all DPLL's
+  omap: dpll: Enable all OMAP3/4 dpll autoidle late at boot
+  omap4: dpll: Add dpll api to control GATE_CTRL
+  omap4: dpll: Enable auto gate control for all MX postdividers
+
+ arch/arm/mach-omap2/clock.c             |   25 ++++++++++++++---
+ arch/arm/mach-omap2/clock.h             |    5 +++
+ arch/arm/mach-omap2/clock3xxx_data.c    |    4 +-
+ arch/arm/mach-omap2/clock44xx_data.c    |   42 +++++++++++++++---------------
+ arch/arm/mach-omap2/dpll3xxx.c          |   42 +++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm34xx.c            |   18 +++----------
+ arch/arm/mach-omap2/pm44xx.c            |    4 +++
+ arch/arm/plat-omap/clock.c              |   26 +++++++++++++++++++
+ arch/arm/plat-omap/include/plat/clock.h |    6 ++++
+ 9 files changed, 130 insertions(+), 42 deletions(-)
