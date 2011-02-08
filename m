@@ -1,55 +1,37 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Tue, 8 Feb 2011 12:06:57 +0000
-Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <4D511FA7.4040207@samsung.com>
-References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
-	<20101208115510.GD10998@console-pimps.org>
-	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
-	<20101211192320.GA24430@void.printf.net>
-	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
-	<4D354752.3030401@samsung.com>
-	<AANLkTi=SEXYk9B6N6RGmLKAx_QF6sybgHMVVpEo8mcp8@mail.gmail.com>
-	<4D50E4DD.4030500@samsung.com>
-	<AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
-	<4D511FA7.4040207@samsung.com>
-Message-ID: <AANLkTimuC1yu6ggeM3TEwzdsfGV8+=_=y5JzSEfRmBwU@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Feb 2011 13:11:51 +0100
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <20110208110808.GA22877@n2100.arm.linux.org.uk>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<20110208110808.GA22877@n2100.arm.linux.org.uk>
+Message-ID: <201102081311.52004.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 8, 2011 at 10:49 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Will
->
-> I'm probing dw_mmc on Samsung SoC...
->
-> So i have some board specific data..
->
-> But i didn't want to add board specific data in dw_mmc.c
-> I want to use get_cd()/get_wd()/init()...So i asked to you..:)
+On Tuesday 08 February 2011, Russell King - ARM Linux wrote:
+> On Tue, Feb 08, 2011 at 11:01:25AM +0000, Dave Martin wrote:
+> > For v6, wfi is architected as a defined MCR instruction, so
+> > use that definition.
+> > 
+> > Doing a no-op instead of wfi() is probably bad, so for older
+> > processors than v6, wfi() is not defined.  If needed, some CPU-
+> > specific wfi() will have to be defined elsewhere.
+> 
+> This is something we kind-of already handle in a different way - see
+> the individual processor idle function in arch/arm/mm/proc*.S.
+> 
+> There's various errata work-arounds older CPUs need for wfi (or rather
+> its mcr equivalent) so maybe wfi() should just be an alias for a call
+> to that function.  Or maybe we shouldn't have a wfi() macro at all.
 
-It may be possible to use your board specific data in your callbacks
-directly rather than passing the board data to the driver and passing
-it back, although it depends on the structure of your code.
+I don't see any users of the sev/wfe/wfi macros in the current kernel,
+so removing them seems like a good strategy to avoid people from
+using them incorrectly.
 
-> If i need not the data information, i will not append them..
-> you're right, maybe "struct dw_mci" need not..(just example)
->
-> And i think that need card_detect irq-handler function..if we use pdata->init..isn't? :)
+If the definitions differ between v5/v6/v7 CPUs, any common code
+using them would need to do either binary patching of some sort
+or abstract the difference between the CPU in some other way.
 
-I think the use of pdata->init should be made optional, as it doesn't
-seem to be needed on most SoCs.
+Dave, what code do you have in mind as a possible user?
 
-> In future, if i need your help, can i ask to you?
-
-Yes, certainly. We continue to work on the driver and would be happy
-to have our bugs fixed! ;-)
-
-> Onemore...Did you test the dw_mmc..?
-> If you can answer, i want to know the performance..
-
-We have tested it, unfortunately I don't have any accurate performance
-figures to hand. The perform seems to be in the expected range though.
+	Arnd
