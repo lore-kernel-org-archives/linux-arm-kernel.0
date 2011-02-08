@@ -1,28 +1,53 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 08 Feb 2011 16:50:42 +0300
-Subject: [PATCH 6/9] plat-nomadik: type secondary IRQ correctly
-In-Reply-To: <1297156854-32295-7-git-send-email-linus.walleij@stericsson.com>
-References: <1297156854-32295-1-git-send-email-linus.walleij@stericsson.com>
-	<1297156854-32295-7-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4D514A32.7070202@ru.mvista.com>
+From: John.Linn@xilinx.com (John Linn)
+Date: Tue, 8 Feb 2011 07:08:14 -0700
+Subject: [PATCH 4/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <20110208082725.GA20822@n2100.arm.linux.org.uk>
+References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-4-git-send-email-john.linn@xilinx.com>
+	<a45cf64b-c91a-4f8b-a121-5a675daee4ca@VA3EHSMHS006.ehs.local>
+	<20110205164325.GE29411@n2100.arm.linux.org.uk>
+	<8718a09f-604a-41b0-8b5a-856bacac9e9a@VA3EHSMHS025.ehs.local>
+	<20110208082725.GA20822@n2100.arm.linux.org.uk>
+Message-ID: <735942c6-d2d5-4ef0-96e7-37a477507abc@VA3EHSMHS023.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, February 08, 2011 1:27 AM
+> To: John Linn
+> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+glikely at secretlab.ca
+> Subject: Re: [PATCH 4/4] ARM: Xilinx: base header files and assembly
+macros
+> 
+> On Mon, Feb 07, 2011 at 05:14:13PM -0700, John Linn wrote:
+> > I'm assuming you meant to change all addresses of devices (#defines)
+to
+> > use the IOMEM.
+> >
+> > I did that and it's ok. You also have to cast them to ints when
+putting
+> > the addresses into
+> > the resource for a platform device.
+> 
+> Hang on.  The reason I mentioned it was because you were passing some
+> of these into readl() et.al.  readl() takes the mapped cookie, not the
+> physical address.
+> 
+> Physical addresses should be integer like, virtual addresses should be
+> pointer like.
 
-On 08-02-2011 12:20, Linus Walleij wrote:
+Thanks for clarifying.
 
-> From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
+It seems like it's better to leave the #defines without IOMEM, then use
+IOMEM where a variable, 
+such as the address of the timer, is initialized with the #define.
 
-> Coverity found that we were checking an unsigned variable for
-> greater than zero. Type it correctly.
+I see what you mean with regard to readl taking the cookie but yet
+physical addresses are also
+needed.
 
-    There's nothing criminal in checking unsigned for > 0. Perhaps you meant >= 0?
-
-> Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-
-    Twice?
-
-WBR, Sergei
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
