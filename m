@@ -1,51 +1,76 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Feb 2011 20:24:00 +0530
-Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
-In-Reply-To: <AANLkTi=+2VN53gs=ZDr-M0V3mG5A0iMPRL-RdUugXxUy@mail.gmail.com>
-References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org><201102081311.52004.arnd@arndb.de><20110208121334.GB22877@n2100.arm.linux.org.uk><201102081353.20390.arnd@arndb.de>
-	<AANLkTi=+2VN53gs=ZDr-M0V3mG5A0iMPRL-RdUugXxUy@mail.gmail.com>
-Message-ID: <19a3630aad67b496a4e36354abc63c4a@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue,  8 Feb 2011 14:54:10 +0000
+Subject: [PATCH] arm: Place correctly notes section in the linker script
+Message-ID: <1297176850-30144-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave,
+Commit 18991197b4b588255ccabf472ebc84db7b66a19c added --build-id
+linker option when toolchain supports it. ARM one does, but for some
+reason places the section at 0 when linker script doesn't mention it
+explicitly.
 
-> -----Original Message-----
-> From: Dave Martin [mailto:dave.martin at linaro.org]
-> Sent: Tuesday, February 08, 2011 8:16 PM
-> To: Arnd Bergmann
-> Cc: linux-arm-kernel at lists.infradead.org; Russell King - ARM Linux;
-> Nicolas Pitre; Tony Lindgren; Santosh Shilimkar; linux-
-> omap at vger.kernel.org; Jean Pihet
-> Subject: Re: [PATCH v2] ARM: Define wfi() macro for v6 processors
->
-[....]
+The 1e621a8e3752367d4aae78a8ab00a18fb2793f34 worked around the problem
+removing this section from binary image with explicit objcopy options,
+but it still exists in vmlinux, confusing tools like debuggers and perf.
 
-> For (2), I think the best approach is to use the actual "wfi"
-> instruction and build the affected files with the appropriate -
-> march=
-> flag (omap already does that) - since those CPU-specific files
-> should
-> by definition never be run if running on another CPU.  We only
-> support
-> new enough tools these days that this should be supported; so "wfi"
-> should be preferable to ".long 0xdeadbeef" - otherwise we need lots
-> of
-> #ifdef CONFIG_THUMB2_KERNEL, or a macro.  If we have a macro, it
-> would
-> be better for that to be generically implemented somewhere, becasue
-> the requirements are the same for every BSP supporting v7.
->
-> I don't like the practice of pre-assembling bits of code with .long,
-> in order to allow a file to be built with wrong -march= flags, and I
-> would favour migrating away from this where possible ... but I
-> accept
-> it's a pragmatic solution to a problem for which gcc/binutils
-> provide
-> no good alternative.
->
-How about C files where 'wfi' used using inline assembly.
-Can we also specify the " -march=" for the C files as well ?
+This problem was discussed here:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015994.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/015994.html
+but the proposed changes to the linker script were substantial.
 
-Regards,
-Santosh
+This patch simply places NOTES (36 bytes long, at least when compiled
+with CodeSourcery toolchain) between data and bss, which seem to be
+the right place (and suggested by the sample linker script in
+include/asm-generic/vmlinux.lds.h).
+
+It is enough to place it correctly in vmlinux (so debuggers are happy):
+
+Section Headers:
+  [11] .data             PROGBITS        c07ce000 7ce000 020fc0 00  WA  0   0 32
+  [12] .notes            NOTE            c07eefc0 7eefc0 000024 00  AX  0   0  4
+  [13] .bss              NOBITS          c07ef000 7eefe4 01e628 00  WA  0   0 32
+Program Headers:
+  LOAD           0x008000 0xc0008000 0xc0008000 0x7e6fe4 0x805628 RWE 0x8000
+  NOTE           0x7eefc0 0xc07eefc0 0xc07eefc0 0x00024 0x00024 R E 0x4
+Section to Segment mapping:
+  Segment Sections...
+   00     <...> .data .notes .bss
+   01     .notes
+
+and to get it exposed as /sys/kernel/notes used by perf tools.
+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/Makefile             |    2 +-
+ arch/arm/kernel/vmlinux.lds.S |    2 ++
+ 2 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index c22c1ad..6f7b292 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -15,7 +15,7 @@ ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+ LDFLAGS_vmlinux	+= --be8
+ endif
+ 
+-OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
++OBJCOPYFLAGS	:=-O binary -R .comment -S
+ GZFLAGS		:=-9
+ #KBUILD_CFLAGS	+=-pipe
+ # Explicitly specifiy 32-bit ARM ISA since toolchain default can be -mthumb:
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 86b66f3..558bd81 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -247,6 +247,8 @@ SECTIONS
+ 	}
+ #endif
+ 
++	NOTES
++
+ 	BSS_SECTION(0, 0, 0)
+ 	_end = .;
+ 
+-- 
+1.6.3.3
