@@ -1,49 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 08 Feb 2011 10:21:52 +0000
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <20110207150233.GI31929@n2100.arm.linux.org.uk>
-References: <E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
-	<20110207120103.GC31929@n2100.arm.linux.org.uk>
-	<20110207121052.GD31929@n2100.arm.linux.org.uk>
-	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-	<20110207133457.GE31929@n2100.arm.linux.org.uk>
-	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
-	<20110207141734.GG31929@n2100.arm.linux.org.uk>
-	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
-	<20110207143351.GH31929@n2100.arm.linux.org.uk>
-	<AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
-	<20110207150233.GI31929@n2100.arm.linux.org.uk>
-Message-ID: <1297160512.31587.17.camel@e102568-lin.cambridge.arm.com>
+From: will.newton@gmail.com (Will Newton)
+Date: Tue, 8 Feb 2011 10:29:06 +0000
+Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <4D50E4DD.4030500@samsung.com>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
+	<20101211192320.GA24430@void.printf.net>
+	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
+	<4D354752.3030401@samsung.com>
+	<AANLkTi=SEXYk9B6N6RGmLKAx_QF6sybgHMVVpEo8mcp8@mail.gmail.com>
+	<4D50E4DD.4030500@samsung.com>
+Message-ID: <AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, Feb 8, 2011 at 6:38 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Will..
+>
+> I need your help for your code..
+>
+> In dw_mmc.h, exist some function pointer..
+>
+> int *get_ro(u32 slot_id);
+> int *get_cd(u32 slot_id);
+> ...
+>
+> Just only need slot_id??
+> If i need the "struct dw_mci", could i append the parameter?
 
-On Mon, 2011-02-07 at 15:02 +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 07, 2011 at 04:58:05PM +0200, saeed bishara wrote:
-> > well, the allocation of the identity page table doesn't need to be
-> > done in assembly code. this is the similar to what you did in
-> > __cpu_up.
-> > for example, this allocation can be done in arch/arm/kernel/setup.c.
-> > the assembly code only need to know the offset of this page table.
-> > looks that there are several usages for the identity page table (smp
-> > boot, kexec, pm), maybe all those clients can share the same one.
-> 
-> We don't want to allocate this at boot time, because it will require
-> additional maintainence when L1 page tables are added for ioremap() etc.
-> 
-> I feel that it's best to leave it as-is, as this is the method everyone
-> has been using to date.  When it becomes a problem, we can then look at
-> resolving it.
-> 
+Yes, that should be possible. However I would like to reduce the
+number of places the whole struct dw_mci
+is passed around if possible, as the whole struct is usually not
+needed and it exposes some driver internals.
 
-For v7 MP cpuidle it is already critical, we do need to have a page
-table copy for the resume path to be MP safe. The same goes for the
-stack pointer global variable which should be per cpu.
-Maybe we can just provide an API to pass the page table pointer, then
-see how to allocate it and when.
-In which branch do these patches live in order to test them and 
-provide feedback ?
-
-Many thanks,
-Lorenzo
+Which part of struct dw_mci do you need in the callback?
