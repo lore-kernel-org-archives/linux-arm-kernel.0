@@ -1,31 +1,34 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 8 Feb 2011 16:31:02 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Feb 2011 16:32:29 +0000
 Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
-In-Reply-To: <20110208162515.GB6188@n2100.arm.linux.org.uk>
+In-Reply-To: <201102081617.59092.arnd@arndb.de>
 References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
-	<201102081353.20390.arnd@arndb.de>
-	<AANLkTi=+2VN53gs=ZDr-M0V3mG5A0iMPRL-RdUugXxUy@mail.gmail.com>
-	<201102081615.15713.arnd@arndb.de>
-	<20110208162515.GB6188@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinD=jVXWdzH_LwbFy=En3LYrZ-Byu0JiFDAxNxd@mail.gmail.com>
+	<19a3630aad67b496a4e36354abc63c4a@mail.gmail.com>
+	<AANLkTim90DF1pE0As_vNO-c4dn7S=2jVq+hkRo8CYsx4@mail.gmail.com>
+	<201102081617.59092.arnd@arndb.de>
+Message-ID: <20110208163229.GC6188@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 8, 2011 at 4:25 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 08, 2011 at 04:15:15PM +0100, Arnd Bergmann wrote:
->> But that doesn't work if you build a combined v5/v6/v7 kernel, because
->> v5 supports neither form, right? I think to do that, it needs the
->> same kind of abstraction that we have for a number of other things
->> like cache management in arch/arm/mm/.
->
-> The options are kernels which support v3-v5 or v6-v7. ?There's too big
-> a change between v5 and v6 to combine those into one kernel.
->
+On Tue, Feb 08, 2011 at 04:17:58PM +0100, Arnd Bergmann wrote:
+> On Tuesday 08 February 2011, Dave Martin wrote:
+> > CFLAGS_cpu_specific_object.o        += -march=armv7-a
+> > 
+> > Whether it's safe to do it depends on whether code from that file
+> > could ever get run on other processors.  I'm not so sure of the answer
+> > to that..., but perhaps someone else has a better idea.
+> 
+> We already do this a lot from arch/arm/mm/Makefile, and those
+> files are typically just one function per file, so they can easily
+> be proven to be safe that way.
 
-Indeed... wfi() is a good example of where being generic gets hard...
-some v5 processors (typically those with caches) implement the same
-MCR supported by v6, but it's not universal.  Typically v4 processors
-have no WFI capability.
+No, we do that with assembly files.  It doesn't work soo well with
+C files as we really don't want GCC itself to generate v7 instructions
+unless we explicitly ask for them.
 
----Dave
+The other issue here is that somtimes generating code with different
+-march options leads to the linker refusing to link them together...
+
+Unfortunately, ARM toolchains have been developed with the assumption
+that you're only building a program for one specific CPU, not
+targetting multiple CPUs.
