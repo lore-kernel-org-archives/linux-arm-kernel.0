@@ -1,67 +1,49 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 08 Feb 2011 19:49:11 +0900
-Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
-References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
-	<20101208115510.GD10998@console-pimps.org>
-	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
-	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
-	<20101209064751.GA21128@void.printf.net>
-	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
-	<20101209160157.GA28586@void.printf.net>
-	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
-	<20101211192320.GA24430@void.printf.net>
-	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
-	<4D354752.3030401@samsung.com>
-	<AANLkTi=SEXYk9B6N6RGmLKAx_QF6sybgHMVVpEo8mcp8@mail.gmail.com>
-	<4D50E4DD.4030500@samsung.com>
-	<AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
-Message-ID: <4D511FA7.4040207@samsung.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue,  8 Feb 2011 11:01:25 +0000
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+Message-ID: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will
+For v6, wfi is architected as a defined MCR instruction, so
+use that definition.
 
-I'm probing dw_mmc on Samsung SoC...
+Doing a no-op instead of wfi() is probably bad, so for older
+processors than v6, wfi() is not defined.  If needed, some CPU-
+specific wfi() will have to be defined elsewhere.
 
-So i have some board specific data..
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+--------------------------------------------------------------------
+v2 notes:
 
-But i didn't want to add board specific data in dw_mmc.c
-I want to use get_cd()/get_wd()/init()...So i asked to you..:)
+The first version of this patch incorrectly specified the write
+buffer drain MCR (c7, c5, 4) instead of WFI (c7, c0, 5).  Now fixed.
+I hang my head in shame!
 
-If i need not the data information, i will not append them..
-you're right, maybe "struct dw_mci" need not..(just example)
+The first version of this patch attempted to define wfe() and sev()
+to empty asms also for pre-v6K processors.  Having thought about
+this some more, I think that it may be better to wait until this
+is actually needed before attempting to define these to anything.
+Having no definition (giving a build error) seems safer than
+having a wrong definition.
 
-And i think that need card_detect irq-handler function..if we use pdata->init..isn't? :)
+ arch/arm/include/asm/system.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-In future, if i need your help, can i ask to you?
-
-Onemore...Did you test the dw_mmc..?
-If you can answer, i want to know the performance..
-
-Will Newton wrote:
-> On Tue, Feb 8, 2011 at 6:38 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Hi Will..
->>
->> I need your help for your code..
->>
->> In dw_mmc.h, exist some function pointer..
->>
->> int *get_ro(u32 slot_id);
->> int *get_cd(u32 slot_id);
->> ...
->>
->> Just only need slot_id??
->> If i need the "struct dw_mci", could i append the parameter?
-> 
-> Yes, that should be possible. However I would like to reduce the
-> number of places the whole struct dw_mci
-> is passed around if possible, as the whole struct is usually not
-> needed and it exposes some driver internals.
-> 
-> Which part of struct dw_mci do you need in the callback?
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 97f6d60..f39cf09 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -129,6 +129,9 @@ extern unsigned int user_debug;
+ #define sev()	__asm__ __volatile__ ("sev" : : : "memory")
+ #define wfe()	__asm__ __volatile__ ("wfe" : : : "memory")
+ #define wfi()	__asm__ __volatile__ ("wfi" : : : "memory")
++#elif __LINUX_ARM_ARCH__ == 6
++#define wfi() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c0, 4" \
++				    : : "r" (0) : "memory")
+ #endif
+ 
+ #if __LINUX_ARM_ARCH__ >= 7
+-- 
+1.7.1
