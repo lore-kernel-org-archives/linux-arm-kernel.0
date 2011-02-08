@@ -1,32 +1,24 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 8 Feb 2011 09:40:32 +0800
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <AANLkTi=5FNvWKQf6cRt4wNejC7u4XKsqLp9Pwc2Z45_3@mail.gmail.com>
-References: <201102011711.31258.jeremy.kerr@canonical.com>
-	<1297058877.800158.458894385837.1.gpush@pororo>
-	<AANLkTi=5FNvWKQf6cRt4wNejC7u4XKsqLp9Pwc2Z45_3@mail.gmail.com>
-Message-ID: <201102080940.33251.jeremy.kerr@canonical.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 7 Feb 2011 18:45:31 -0700 (MST)
+Subject: [PATCH v2 3/9] omap4: powerdomain: Use intended PWRSTS_* flags
+	instead of values
+In-Reply-To: <1296813544-25170-4-git-send-email-santosh.shilimkar@ti.com>
+References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+	<1296813544-25170-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1102071845140.21991@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+On Fri, 4 Feb 2011, Santosh Shilimkar wrote:
 
-> > +int clk_enable(struct clk *clk)
-> > +{
-> > +       int ret = 0;
-> > +
-> > +       if (!clk->ops->enable)
-> > +               return 0;
-> > +
-> > +       spin_lock(&clk->enable_lock);
+> IVAHD and ABE power domain logic state is populated using directly
+> value instead of the capability flags.
 > 
-> spin_lock_irqsave/spin_unlock_irqrestore.  This could get called with
-> irqs on or off.
+> Fix the same.
+> 
+> This was getting generated due to a bug 'gen_logicst' macro
+> in powerdomain autogen script bug which is fixed as well.
 
-Ah, I had planned to change this but (obviously) didn't get to it. Thanks for 
-the reminder, I'll include this in the next revision.
+Should we try to get this one into the -rc series, since it is a bug-fix ?
 
-Cheers,
-
-
-Jeremy
+- Paul
