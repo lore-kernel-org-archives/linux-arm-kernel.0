@@ -1,203 +1,92 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Mon, 7 Feb 2011 17:14:13 -0700
-Subject: [PATCH 4/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <20110205164325.GE29411@n2100.arm.linux.org.uk>
-References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-4-git-send-email-john.linn@xilinx.com>
-	<a45cf64b-c91a-4f8b-a121-5a675daee4ca@VA3EHSMHS006.ehs.local>
-	<20110205164325.GE29411@n2100.arm.linux.org.uk>
-Message-ID: <8718a09f-604a-41b0-8b5a-856bacac9e9a@VA3EHSMHS025.ehs.local>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 7 Feb 2011 18:32:26 -0700 (MST)
+Subject: [PATCH v2 1/9] omap4: powerdomain: Add supported INACTIVE power
+	state
+In-Reply-To: <9cb5f3c283cc93d27be0c727f6f3bafa@mail.gmail.com>
+References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+	<1296813544-25170-2-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1102061335400.7672@utopia.booyaka.com>
+	<9cb5f3c283cc93d27be0c727f6f3bafa@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102071801540.21991@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Saturday, February 05, 2011 9:43 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-glikely at secretlab.ca
-> Subject: Re: [PATCH 4/4] ARM: Xilinx: base header files and assembly
-macros
-> 
+On Mon, 7 Feb 2011, Santosh Shilimkar wrote:
 
-<snip>
+> > -----Original Message-----
+> > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > Sent: Monday, February 07, 2011 2:12 AM
+> >
+> > Continuing the discussion here:
+> >
+> >    http://www.mail-archive.com/linux-
+> > omap at vger.kernel.org/msg43509.html
+> >
+> > 1. It appears that the OMAP4 powerdomain ON-ACTIVE state is a new
+> > state
+> > for OMAP4, and does not exist as such on previous chips (unless the
+> > PRM_VOLTCTRL.AUTO_* bits are all disabled)
+> >
+> Actually it's not new state but more of convention change. ON-ACTIVE
+> is like ON in OMAP3.
 
-> 
-> > diff --git a/arch/arm/mach-xilinx/include/mach/hardware.h
-b/arch/arm/mach-
-> xilinx/include/mach/hardware.h
-> > new file mode 100644
-> > index 0000000..a635322
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/hardware.h
-> > @@ -0,0 +1,44 @@
-> > +/* arch/arm/mach-xilinx/include/mach/hardware.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-modify
-> > + * it under the terms of the GNU General Public License as
-published by
-> > + * the Free Software Foundation; either version 2 of the License,
-or
-> > + * (at your option) any later version.
-> > + *
-> > + * You should have received a copy of the GNU General Public
-License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-02111-1307  USA
-> > + */
-> > +
-> > +#ifndef __MACH_HARDWARE_H__
-> > +#define __MACH_HARDWARE_H__
-> > +
-> > +#include <mach/memory.h>
-> > +#include <mach/irqs.h>
-> > +
-> > +#define PERIPHERAL_CLOCK_RATE	2500000
-> > +
-> > +#define IO_BASE			0xE0000000
-> > +#define UART0_BASE		(IO_BASE)
-> > +
-> > +#define PERIPH_BASE		0xF8000000
-> > +#define TTC0_BASE		(PERIPH_BASE + 0x1000)
-> > +
-> > +#define SCU_PERIPH_BASE		0xF8F00000
-> > +#define SCU_GIC_CPU_BASE	(SCU_PERIPH_BASE + 0x100)
-> > +#define SCU_GLOBAL_TIMER_BASE	(SCU_PERIPH_BASE + 0x200)
-> > +#define SCU_CPU_TIMER_BASE	(SCU_PERIPH_BASE + 0x600)
-> > +#define SCU_WDT_BASE		(SCU_PERIPH_BASE + 0x620)
-> > +#define SCU_GIC_DIST_BASE	(SCU_PERIPH_BASE + 0x1000)
-> > +
-> > +#define PL310_L2CC_BASE		0xF8F02000
-> > +
-> > +/*
-> > + * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
-> > + */
-> > +#define LL_UART_PADDR	UART0_BASE
-> > +#define LL_UART_VADDR	UART0_BASE
-> > +
-> > +#endif
-> 
-> This file is included by much of the kernel build, so symbol conflicts
-> tend to be a concern.  It may be better to move most of this to a
-> private header instead.
-> 
-> You may also like to consider using something like this:
-> 
-> #ifndef __ASSEMBLER__
-> #define IOMEM(a)	((void __force __iomem *)(a))
-> #else
-> #define IOMEM(a)	a
-> #endif
-> 
-> #define SCU_PERIPH_BASE	IOMEM(0xF8F00000)
-> 
-> which means it's typed correctly for most of the kernel.  The only
-place
-> where you have to use casts is in the map_desc array - that's pretty
-> much unavoidable though.
+Hmm, based on our earlier list mails, that seems confusing.  Setting an 
+OMAP3 powerdomain next-power-state to 'ON' in OMAP3 allows voltage domain 
+transitions to the SLEEP level.  But setting an OMAP4 powerdomain 
+next-power-state to 'ON-ACTIVE' does not allow voltage domain 
+transitions to the SLEEP level.  And setting an OMAP4 powerdomain 
+next-power-state to 'ON-INACTIVE' does allow voltage domain transitions to 
+the SLEEP level.  Is that correct?
 
-Hi Russell,
+If that's correct, then OMAP4 ON-ACTIVE is a functionally new powerdomain 
+next-power-state setting, and OMAP4 ON-INACTIVE is the same state as OMAP3 
+ON.  Unless there's something obvious that I'm missing?
 
-I'm assuming you meant to change all addresses of devices (#defines) to
-use the IOMEM.
+> > 2. It also appears that the OMAP4 powerdomain ON-INACTIVE state
+> > is equivalent to the OMAP3 powerdomain ON state (again, assuming
+> > that the
+> > PRM_VOLTCTRL.AUTO_SLEEP bit is set on OMAP3).
+> >
+> This is correct.
+> 
+> > Could you please comment on whether these statements are true or
+> > false?
+> >
+> 
+> Just to summarise my undertsnaing of this here.
+> On OMAP3 too, we had possibility of being in a one of the
+> Two state when programmed to PD ON state.
+> ON-ACTIVE or ON-INACTIVE. The PD status registers just
+> says INACTIVE or ON based on the clodomains states within PD.
 
-I did that and it's ok. You also have to cast them to ints when putting
-the addresses into
-the resource for a platform device.
+Right, but when 'ON' is written into an OMAP3 powerdomain's 
+next-power-state bits, voltage domain transitions are allowed.  So I'm 
+just trying to confirm that OMAP3 ON state is functionally equivalent to 
+the OMAP4 ON-INACTIVE state, and not functionally equivalent to the OMAP4 
+ON-ACTIVE state.
 
-It makes sense that the typing is now better in general.
+We have to ensure that the core code-internal meaning of the (ON, 
+INACTIVE, RET, OFF) states doesn't vary across SoC types.  Otherwise "ON" 
+on OMAP4 won't mean "ON" on OMAP3, and the goal is for the core code to be 
+SoC-independent.
 
-Thanks,
-John
+One way to do that would be to add a small mapping layer for the 
+powerdomain set-next-power-state code to:
+
+- allow programming INACTIVE on OMAP3, by ensuring that, when all 
+  powerdomains in a voltage domain are in INACTIVE, that AUTO_SLEEP
+  is set to 1, and then setting the hardware next-power-state to ON; and
+
+- allow programming ON on OMAP3, by ensuring that AUTO_SLEEP is set 
+  to 0, and setting the hardware next-power-state to ON.
+
+On OMAP4, presumably it wouldn't be needed to mess with the AUTO_SLEEP 
+bit.
+
+Probably to make that work cleanly, either clockdomains or powerdomains 
+would need to be associated with voltage domains; and some kind of counter 
+would need to be implemented in the voltage domains to indicate when it is 
+appropriate to write to the AUTO_SLEEP bit.
 
 
-> 
-> > diff --git a/arch/arm/mach-xilinx/include/mach/io.h
-b/arch/arm/mach-xilinx/include/mach/io.h
-> > new file mode 100644
-> > index 0000000..2e69db7
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/io.h
-> > @@ -0,0 +1,27 @@
-> > +/* arch/arm/mach-xilinx/include/mach/io.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-modify
-> > + * it under the terms of the GNU General Public License as
-published by
-> > + * the Free Software Foundation; either version 2 of the License,
-or
-> > + * (at your option) any later version.
-> > + *
-> > + * You should have received a copy of the GNU General Public
-License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-02111-1307  USA
-> > + */
-> > +
-> > +#ifndef __MACH_IO_H__
-> > +#define __MACH_IO_H__
-> > +
-> > +/* Allow IO space to be anywhere in the memory */
-> > +
-> > +#define IO_SPACE_LIMIT 0xffffffff
-> 
-> Probably should be 0xffff as that's the standard PCI/ISA IO window.
-> 
-> > +
-> > +/* IO address mapping macros, nothing special at this time but
-required */
-> > +
-> > +#define __io(a)			((void __iomem *)(a))
-> 
-> #define io(a)			__typesafe_io(a)
-> 
-> gives a nice, simple, typesafe solution.
-> 
-> > diff --git a/arch/arm/mach-xilinx/include/mach/memory.h
-b/arch/arm/mach-xilinx/include/mach/memory.h
-> > new file mode 100644
-> > index 0000000..2b6d1eb
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/memory.h
-> > @@ -0,0 +1,23 @@
-> > +/* arch/arm/mach-xilinx/include/mach/memory.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-modify
-> > + * it under the terms of the GNU General Public License as
-published by
-> > + * the Free Software Foundation; either version 2 of the License,
-or
-> > + * (at your option) any later version.
-> > + *
-> > + * You should have received a copy of the GNU General Public
-License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
-02111-1307  USA
-> > + */
-> > +
-> > +#ifndef __MACH_MEMORY_H__
-> > +#define __MACH_MEMORY_H__
-> > +
-> > +#include <mach/hardware.h>
-> > +
-> > +#define PHYS_OFFSET             0x0
-> 
-> Eventually this will need to become PLAT_PHYS_OFFSET during the next
-> merge window.
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+- Paul
