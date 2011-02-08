@@ -1,98 +1,42 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 9 Feb 2011 07:38:25 +0800
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <19792.552.77000.702221@ipc1.ka-ro>
-References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
-	<1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<19792.552.77000.702221@ipc1.ka-ro>
-Message-ID: <20110208233824.GE6963@S2100-06.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Feb 2011 16:42:52 +0100
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <AANLkTim6aBUJtkQHZBWfTWsjh2+ijFqOgf9cPGSrRtMD@mail.gmail.com>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<201102081615.15713.arnd@arndb.de>
+	<AANLkTim6aBUJtkQHZBWfTWsjh2+ijFqOgf9cPGSrRtMD@mail.gmail.com>
+Message-ID: <201102081642.52774.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 07, 2011 at 03:31:04PM +0100, Lothar Wa?mann wrote:
-> Hi,
+On Tuesday 08 February 2011, Dave Martin wrote:
+> Why not have macros for these cases?  (Which kinda brings the
+> discussion full-circle...)
 > 
-> Shawn Guo writes:
-> > This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> > including apbh-dma and apbx-dma.
-> > 
-> > * apbh-dma and apbx-dma are supported in the driver as two instances,
-> >   and have to be filtered by dma clients via device id.  It becomes
-> >   the convention that apbh-dma always gets registered prior to
-> >   apbx-dma.
-> > 
-> > * apbh-dma is different between mx23 and mx28, hardware version
-> >   register is used to handle the differences.
-> > 
-> > * Every the mxs dma channel is statically assigned to client device
-> >   by soc design with fixed irq.  The irq number is being passed by
-> >   alloc_chan function with mxs_dma_data, and client driver has to
-> >   filter the correct channel by its channel id.
-> > 
-> > * mxs-dma supports pio function besides data transfer.  The driver
-> >   uses dma_data_direction DMA_NONE to identify the pio mode, and
-> >   steals sgl and sg_len to get pio words and numbers from clients.
-> > 
-> > * mxs dmaengine has some very specific features, like sense function
-> >   and the special NAND support (nand_lock, nand_wait4ready).  These
-> >   are too specific to implemented in generic dmaengine driver.
-> > 
-> > * The parameter "flags" of prep functions is currently being used to
-> >   pass wait4end flag from clients.
-> > 
-> > * The driver refers to imx-sdma and only a single descriptor is
-> >   statically assigned to each channel.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/include/mach/dma.h |   16 +
-> >  drivers/dma/Kconfig                  |    8 +
-> >  drivers/dma/Makefile                 |    1 +
-> >  drivers/dma/mxs-dma.c                |  702 ++++++++++++++++++++++++++++++++++
-> >  4 files changed, 727 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
-> >  create mode 100644 drivers/dma/mxs-dma.c
-> > 
-> > diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
-> > new file mode 100644
-> > index 0000000..429f431
-> > --- /dev/null
-> > +++ b/arch/arm/mach-mxs/include/mach/dma.h
-> > @@ -0,0 +1,16 @@
-> > +/*
-> > + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#ifndef __MACH_MXS_DMA_H__
-> > +#define __MACH_MXS_DMA_H__
-> > +
-> > +struct mxs_dma_data {
-> > +	int chan_irq;
-> > +};
-> >
-> There is a name clash of this structure with the name of a different
-> structure defined in arch/arm/mach-mxs/include/mach/devices-common.h
-> (your patch 3/5):
-> |diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-> |index e7aefb4..acd74b4 100644
-> |--- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> |+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> |@@ -40,6 +40,13 @@ struct mxs_auart_data {
-> | struct platform_device *__init mxs_add_auart(
-> | 		const struct mxs_auart_data *data);
-> | 
-> |+/* dma */
-> |+struct mxs_dma_data {
-> |+	const char *devid;
-> |+	resource_size_t iobase;
-> |+};
-> |+struct platform_device *__init mxs_add_dma(const struct mxs_dma_data *data);
-> 
-Good catch.  Thanks.
+> My immediate concern is that too often, the Thumb-2 case will be
+> handled incorrectly or not at all ... and the kernel will silently
+> build without flagging any error.  Macros would allow the fragile
+> definitions to go in one place.
 
-Regards,
-Shawn
+A macro to handle the thumb2 case and weird toolchains sounds good,
+but if we want to build code for multiple CPUs, we need multiple
+macros, not one macro that works on a specific CPU.
+
+We could put all those macros unconditionally into a arch
+specific header, e.g.
+
+arch/arm/include/asm/system-v7.h:
+#define wfi() __asm__ __volatile__ ("wfi" : : : "memory")
+
+
+arch/arm/include/asm/system-v6k.h:
+#define wfi() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c0, 4" \
+		: : "r" (0) : "memory")
+
+And then have each C file using them be CPU specific and include
+only one (you get an gcc warning if you try to include both).
+This should work fine, but it's different again from how we handle
+other things like spinlocks or cache management across multiple
+CPUs.
+
+	Arnd
