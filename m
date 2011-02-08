@@ -1,7 +1,7 @@
-From: will.newton@gmail.com (Will Newton)
-Date: Tue, 8 Feb 2011 10:29:06 +0000
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 08 Feb 2011 19:49:11 +0900
 Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
-In-Reply-To: <4D50E4DD.4030500@samsung.com>
+In-Reply-To: <AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
 References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
 	<20101208115510.GD10998@console-pimps.org>
 	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
@@ -15,27 +15,53 @@ References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
 	<4D354752.3030401@samsung.com>
 	<AANLkTi=SEXYk9B6N6RGmLKAx_QF6sybgHMVVpEo8mcp8@mail.gmail.com>
 	<4D50E4DD.4030500@samsung.com>
-Message-ID: <AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
+	<AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
+Message-ID: <4D511FA7.4040207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 8, 2011 at 6:38 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Will..
->
-> I need your help for your code..
->
-> In dw_mmc.h, exist some function pointer..
->
-> int *get_ro(u32 slot_id);
-> int *get_cd(u32 slot_id);
-> ...
->
-> Just only need slot_id??
-> If i need the "struct dw_mci", could i append the parameter?
+Hi Will
 
-Yes, that should be possible. However I would like to reduce the
-number of places the whole struct dw_mci
-is passed around if possible, as the whole struct is usually not
-needed and it exposes some driver internals.
+I'm probing dw_mmc on Samsung SoC...
 
-Which part of struct dw_mci do you need in the callback?
+So i have some board specific data..
+
+But i didn't want to add board specific data in dw_mmc.c
+I want to use get_cd()/get_wd()/init()...So i asked to you..:)
+
+If i need not the data information, i will not append them..
+you're right, maybe "struct dw_mci" need not..(just example)
+
+And i think that need card_detect irq-handler function..if we use pdata->init..isn't? :)
+
+In future, if i need your help, can i ask to you?
+
+Onemore...Did you test the dw_mmc..?
+If you can answer, i want to know the performance..
+
+Will Newton wrote:
+> On Tue, Feb 8, 2011 at 6:38 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Hi Will..
+>>
+>> I need your help for your code..
+>>
+>> In dw_mmc.h, exist some function pointer..
+>>
+>> int *get_ro(u32 slot_id);
+>> int *get_cd(u32 slot_id);
+>> ...
+>>
+>> Just only need slot_id??
+>> If i need the "struct dw_mci", could i append the parameter?
+> 
+> Yes, that should be possible. However I would like to reduce the
+> number of places the whole struct dw_mci
+> is passed around if possible, as the whole struct is usually not
+> needed and it exposes some driver internals.
+> 
+> Which part of struct dw_mci do you need in the callback?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
