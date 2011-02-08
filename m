@@ -1,59 +1,38 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  8 Feb 2011 21:08:59 +0100
-Subject: [PATCH] spi/imx: select master mode for all channels
-Message-ID: <1297195739-24951-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Tue,  8 Feb 2011 21:17:21 +0100
+Subject: [PATCH] ARM: imx/eukrea_mbimx27: fix compile warnings about unused
+	variables
+Message-ID: <1297196241-26564-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
-
-The hardware seems to have a race condition when the inactive
-channels are in slave mode. We support master mode only, so
-we can just switch all channels to master mode.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-[ukleinek: add more verbose comment about the race]
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
-Hello,
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-maybe one of our friends at Freescale can comment?
-
-Best regards
-Uwe
-
- drivers/spi/spi_imx.c |   12 +++++++++---
- 1 files changed, 9 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-index 1cf9d5f..69d6dba 100644
---- a/drivers/spi/spi_imx.c
-+++ b/drivers/spi/spi_imx.c
-@@ -174,7 +174,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
- #define SPI_IMX2_3_CTRL		0x08
- #define SPI_IMX2_3_CTRL_ENABLE		(1 <<  0)
- #define SPI_IMX2_3_CTRL_XCH		(1 <<  2)
--#define SPI_IMX2_3_CTRL_MODE(cs)	(1 << ((cs) +  4))
-+#define SPI_IMX2_3_CTRL_MODE_MASK	(0xf << 4)
- #define SPI_IMX2_3_CTRL_POSTDIV_OFFSET	8
- #define SPI_IMX2_3_CTRL_PREDIV_OFFSET	12
- #define SPI_IMX2_3_CTRL_CS(cs)		((cs) << 18)
-@@ -253,8 +253,14 @@ static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index 275c858..9ac5348 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -249,7 +249,7 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 
+ #define ADS7846_PENDOWN (GPIO_PORTD | 25)
+ 
+-static void ads7846_dev_init(void)
++static void __maybe_unused ads7846_dev_init(void)
  {
- 	u32 ctrl = SPI_IMX2_3_CTRL_ENABLE, cfg = 0;
+ 	if (gpio_request(ADS7846_PENDOWN, "ADS7846 pendown") < 0) {
+ 		printk(KERN_ERR "can't get ads746 pen down GPIO\n");
+@@ -268,7 +268,8 @@ static struct ads7846_platform_data ads7846_config __initdata = {
+ 	.keep_vref_on		= 1,
+ };
  
--	/* set master mode */
--	ctrl |= SPI_IMX2_3_CTRL_MODE(config->cs);
-+	/*
-+	 * The hardware seems to have a race condition when changing modes. The
-+	 * current assumption is that the selection of the channel arrives
-+	 * earlier in the hardware than the mode bits when they are written at
-+	 * the same time.
-+	 * So set master mode for all channels as we do not support slave mode.
-+	 */
-+	ctrl |= SPI_IMX2_3_CTRL_MODE_MASK;
- 
- 	/* set clock speed */
- 	ctrl |= spi_imx2_3_clkdiv(spi_imx->spi_clk, config->speed_hz);
+-static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
++static struct spi_board_info __maybe_unused
++eukrea_mbimx27_spi_board_info[] __initdata = {
+ 	[0] = {
+ 		.modalias	= "ads7846",
+ 		.bus_num	= 0,
 -- 
 1.7.2.3
