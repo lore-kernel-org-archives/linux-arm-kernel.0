@@ -1,127 +1,56 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Feb 2011 12:11:38 +0530
-Subject: [PATCH v2 1/9] omap4: powerdomain: Add supported INACTIVE power
-	state
-In-Reply-To: <alpine.DEB.2.00.1102071801540.21991@utopia.booyaka.com>
-References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296813544-25170-2-git-send-email-santosh.shilimkar@ti.com>
-	<alpine.DEB.2.00.1102061335400.7672@utopia.booyaka.com>
-	<9cb5f3c283cc93d27be0c727f6f3bafa@mail.gmail.com>
-	<alpine.DEB.2.00.1102071801540.21991@utopia.booyaka.com>
-Message-ID: <eeb0b3adcb43ef0e79ab2ef160f2090c@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 8 Feb 2011 15:28:26 +0800
+Subject: [RFC,PATCH 1/3] Add a common struct clk
+In-Reply-To: <4D50B8C0.7050701@bluewatersys.com>
+References: <1297058877.800158.458894385837.1.gpush@pororo>
+	<201102081054.58005.jeremy.kerr@canonical.com>
+	<4D50B8C0.7050701@bluewatersys.com>
+Message-ID: <201102081528.27108.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Tuesday, February 08, 2011 7:02 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; Kevin Hilman; Benoit Cousson;
-> Rajendra Nayak; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH v2 1/9] omap4: powerdomain: Add supported
-> INACTIVE power state
->
-> On Mon, 7 Feb 2011, Santosh Shilimkar wrote:
->
-> > > -----Original Message-----
-> > > From: Paul Walmsley [mailto:paul at pwsan.com]
-> > > Sent: Monday, February 07, 2011 2:12 AM
-> > >
-> > > Continuing the discussion here:
-> > >
-> > >    http://www.mail-archive.com/linux-
-> > > omap at vger.kernel.org/msg43509.html
-> > >
-> > > 1. It appears that the OMAP4 powerdomain ON-ACTIVE state is a
-> new
-> > > state
-> > > for OMAP4, and does not exist as such on previous chips (unless
-> the
-> > > PRM_VOLTCTRL.AUTO_* bits are all disabled)
-> > >
-> > Actually it's not new state but more of convention change. ON-
-> ACTIVE
-> > is like ON in OMAP3.
->
-> Hmm, based on our earlier list mails, that seems confusing.  Setting
-> an
-> OMAP3 powerdomain next-power-state to 'ON' in OMAP3 allows voltage
-> domain
-> transitions to the SLEEP level.  But setting an OMAP4 powerdomain
-> next-power-state to 'ON-ACTIVE' does not allow voltage domain
-> transitions to the SLEEP level.  And setting an OMAP4 powerdomain
-> next-power-state to 'ON-INACTIVE' does allow voltage domain
-> transitions to
-> the SLEEP level.  Is that correct?
->
-You have point. And you are absolutely correct.
+Hi Ryan,
 
-> If that's correct, then OMAP4 ON-ACTIVE is a functionally new
-> powerdomain
-> next-power-state setting, and OMAP4 ON-INACTIVE is the same state as
-> OMAP3
-> ON.  Unless there's something obvious that I'm missing?
->
-> > > 2. It also appears that the OMAP4 powerdomain ON-INACTIVE state
-> > > is equivalent to the OMAP3 powerdomain ON state (again, assuming
-> > > that the
-> > > PRM_VOLTCTRL.AUTO_SLEEP bit is set on OMAP3).
-> > >
-> > This is correct.
-> >
-> > > Could you please comment on whether these statements are true or
-> > > false?
-> > >
-> >
-> > Just to summarise my undertsnaing of this here.
-> > On OMAP3 too, we had possibility of being in a one of the
-> > Two state when programmed to PD ON state.
-> > ON-ACTIVE or ON-INACTIVE. The PD status registers just
-> > says INACTIVE or ON based on the clodomains states within PD.
->
-> Right, but when 'ON' is written into an OMAP3 powerdomain's
-> next-power-state bits, voltage domain transitions are allowed.  So
-> I'm
-> just trying to confirm that OMAP3 ON state is functionally
-> equivalent to
-> the OMAP4 ON-INACTIVE state, and not functionally equivalent to the
-> OMAP4
-> ON-ACTIVE state.
->
-Yep. This is indeed the case.
+> If a platform does not provide ops->get_rate and a driver writer does
+> not know this, they could naively use the 0 return from clk_get_rate in
+> calculations, which is especially bad if they ever divide by the rate.
 
-> We have to ensure that the core code-internal meaning of the (ON,
-> INACTIVE, RET, OFF) states doesn't vary across SoC types.  Otherwise
-> "ON"
-> on OMAP4 won't mean "ON" on OMAP3, and the goal is for the core code
-> to be SoC-independent.
->
-Agree.
+This would be fairly evident on first boot though :)
 
-> One way to do that would be to add a small mapping layer for the
-> powerdomain set-next-power-state code to:
->
-> - allow programming INACTIVE on OMAP3, by ensuring that, when all
->   powerdomains in a voltage domain are in INACTIVE, that AUTO_SLEEP
->   is set to 1, and then setting the hardware next-power-state to ON;
-> and
->
-> - allow programming ON on OMAP3, by ensuring that AUTO_SLEEP is set
->   to 0, and setting the hardware next-power-state to ON.
->
-> On OMAP4, presumably it wouldn't be needed to mess with the
-> AUTO_SLEEP
-> bit.
->
-> Probably to make that work cleanly, either clockdomains or
-> powerdomains
-> would need to be associated with voltage domains; and some kind of
-> counter
-> would need to be implemented in the voltage domains to indicate when
-> it is
-> appropriate to write to the AUTO_SLEEP bit.
->
-Sounds right approach.
+> At the very least the documentation for clk_get_rate should state that
+> the return value needs to be checked and that 0 means the rate is unknown.
 
-Regards,
-Santosh
+Yes, sounds good. I was hesitant to change the documentation for parts of the 
+API that are unchanged, but since we're formalising this 'return 0' behaviour, 
+it seems reasonable to update the comment in this case.
+
+> We do currently have the slightly indirect route to getting a clock of
+> doing: clk_get -> __clk_get -> clk->ops->get. I'm guessing that the long
+> term goal is to remove the middle step once everything is using the
+> common clock api?
+
+That may never happen; I imagine that some platforms won't be converted at 
+all.
+
+ __clk_get has previously been used as a platform-specific hook to do 
+refcounting, which is exactly what we're doing here (via ops->get), so thought 
+it was best to use the existing __clk_get name to do this.
+
+> Also, how come you decided to keep the clk_get -> __clk_get call in
+> clkdev.c, but ifdef'ed clk_put? If you just leave clk_put as is in
+> clkdev.c and change clk_put to __clk_put in the generic clock code then
+> you need zero changes to clkdev.c
+
+Yep, makes sense, I'll look at doing this.
+
+> Okay. Should we document for the implementer that clk_enable/disable
+> must not sleep then? I don't think atomically is necessarily the right
+> word to use here. For example Documentation/serial/driver uses "This
+> call must not sleep".
+
+OK, I'll clarify the comment.
+
+Cheers,
+
+
+Jeremy
