@@ -1,24 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 8 Feb 2011 10:59:31 +0100
-Subject: [PATCH] ARM: omap1/nokia770: mark some functions __init
-In-Reply-To: <20110203081508.GC30452@pengutronix.de>
-References: <20100902054630.GB14214@pengutronix.de>
-	<1283408230-22652-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110203081508.GC30452@pengutronix.de>
-Message-ID: <20110208095931.GL27982@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue,  8 Feb 2011 15:40:32 +0530
+Subject: [PATCH 1/7] omap: clock: Check for enable/disable ops support
+In-Reply-To: <1297159838-30282-1-git-send-email-rnayak@ti.com>
+References: <1297159838-30282-1-git-send-email-rnayak@ti.com>
+Message-ID: <1297159838-30282-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 03, 2011 at 09:15:08AM +0100, Uwe Kleine-K?nig wrote:
-> Hey Tony,
-> 
-> this patch below is now 4 months old and I didn't get any feedback.  (Though I
-> somehow missed to cc linux-omap at vger.kernel.org before, sorry for that.)
-> 
-> There are two more patches in this thread that are not yet
-> applied/commented.  Should I resend?
-ping
+Check if enable/disable operations are supported for a given
+clock node before attempting to call them.
 
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/clock.c |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 2a2f152..e0f017d 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -261,7 +261,8 @@ void omap2_clk_disable(struct clk *clk)
+ 
+ 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
+ 
+-	clk->ops->disable(clk);
++	if (clk->ops && clk->ops->disable)
++		clk->ops->disable(clk);
+ 
+ 	if (clk->clkdm)
+ 		omap2_clkdm_clk_disable(clk->clkdm, clk);
+@@ -312,10 +313,13 @@ int omap2_clk_enable(struct clk *clk)
+ 		}
+ 	}
+ 
+-	ret = clk->ops->enable(clk);
+-	if (ret) {
+-		WARN(1, "clock: %s: could not enable: %d\n", clk->name, ret);
+-		goto oce_err3;
++	if (clk->ops && clk->ops->enable) {
++		ret = clk->ops->enable(clk);
++		if (ret) {
++			WARN(1, "clock: %s: could not enable: %d\n",
++			     clk->name, ret);
++			goto oce_err3;
++		}
+ 	}
+ 
+ 	return 0;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.0.4
