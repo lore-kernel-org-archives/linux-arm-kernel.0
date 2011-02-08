@@ -1,34 +1,35 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 7 Feb 2011 21:58:57 -0700 (MST)
-Subject: [PATCH v2 9/9] omap4: clockdomain: Fix the CPUx domain name
-In-Reply-To: <1296813544-25170-10-git-send-email-santosh.shilimkar@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 8 Feb 2011 12:07:10 +0530
+Subject: [PATCH v2 3/9] omap4: powerdomain: Use intended PWRSTS_* flags
+	instead of values
+In-Reply-To: <alpine.DEB.2.00.1102071845140.21991@utopia.booyaka.com>
 References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
-	<1296813544-25170-10-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <alpine.DEB.2.00.1102072157030.21991@utopia.booyaka.com>
+	<1296813544-25170-4-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1102071845140.21991@utopia.booyaka.com>
+Message-ID: <8dcdd90dcde5ddefc02b08dc2faf9169@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 4 Feb 2011, Santosh Shilimkar wrote:
-
-> From: Benoit Cousson <b-cousson@ti.com>
-> 
-> The register naming convention for clock domain control inside
-> power domain instance is:
-> OMAPXXXX_<partition>_<power_domain>_<clock_domain>_CDOFFS
-> 
-> Both CPU0 and CPU1 use MPU as clock domain name instead of CPU0
-> and CPU1.
-> 
-> Change the name to stick to the convention.
-> The autogen scripts are updated accordingly.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
-
-Thanks, queued for 2.6.39 in the 'pwrdm_clkdm_b_2.6.39' branch of 
-git://git.pwsan.com/linux-2.6 (along with patch 2/9).
-
-
-- Paul
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Tuesday, February 08, 2011 7:16 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; khilman at ti.com; b-cousson at ti.com;
+> rnayak at ti.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 3/9] omap4: powerdomain: Use intended
+> PWRSTS_* flags instead of values
+>
+> On Fri, 4 Feb 2011, Santosh Shilimkar wrote:
+>
+> > IVAHD and ABE power domain logic state is populated using directly
+> > value instead of the capability flags.
+> >
+> > Fix the same.
+> >
+> > This was getting generated due to a bug 'gen_logicst' macro
+> > in powerdomain autogen script bug which is fixed as well.
+>
+> Should we try to get this one into the -rc series, since it is a
+> bug-fix ?
+>
+Make sense.
