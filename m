@@ -1,51 +1,66 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 8 Feb 2011 09:46:41 +0530
-Subject: [PATCH] ARM: perf/oprofile: fix off-by-one in stack check
-Message-ID: <1297138601-29895-1-git-send-email-rabin.vincent@stericsson.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 8 Feb 2011 09:47:54 +0530
+Subject: [PATCH v2 6/9] omap: dpll: Add allow_idle/deny_idle support for
+	all DPLL's
+In-Reply-To: <alpine.DEB.2.00.1102072037530.21991@utopia.booyaka.com>
+References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+	<1296813544-25170-7-git-send-email-santosh.shilimkar@ti.com>
+	<alpine.DEB.2.00.1102071952300.21991@utopia.booyaka.com>
+	<1eea151edf0ed021258c202c6d9b5bc2@mail.gmail.com>
+	<alpine.DEB.2.00.1102072037530.21991@utopia.booyaka.com>
+Message-ID: <972f3f2e6c362ecdd1f00b412e79ad5d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since it's fp - 1 that gets passed back in as tail in the next iteration, we
-need to ensure that fp - 1 is not the same as tail in order to avoid a
-potential infinite loop in the perf interrupt handler (which has been observed
-to occur).  A similar fix seems to be needed in the OProfile code.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Tuesday, February 08, 2011 9:11 AM
+> To: Rajendra Nayak
+> Cc: Santosh Shilimkar; linux-omap at vger.kernel.org; Kevin Hilman; Benoit
+Cousson; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH v2 6/9] omap: dpll: Add allow_idle/deny_idle support
+for all DPLL's
+>
+> On Tue, 8 Feb 2011, Rajendra Nayak wrote:
+>
+> > > -----Original Message-----
+> > > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > > Sent: Tuesday, February 08, 2011 8:27 AM
+> > >
+> > > >  arch/arm/mach-omap2/clock.c          |    8 +++++++-
+> > > >  arch/arm/mach-omap2/clock.h          |    1 +
+> > > >  arch/arm/mach-omap2/clock3xxx_data.c |    2 +-
+> > > >  arch/arm/mach-omap2/clock44xx_data.c |    2 +-
+> > > >  arch/arm/mach-omap2/pm44xx.c         |    4 ++++
+> > >
+> > > Looks like you add the allow_idle/deny_idle functions for the OMAP3
+CORE
+> > > DPLL, but you don't change mach-omap2/pm34xx.c.  Any reason for
+this?
+> >
+> > Nothing specifically. My initial patchset was enabling these only for
+> > OMAP4, So I thought will keep it that way.
+>
+> That's fine with me, but you might want to drop the OMAP3 part of the
+> changes, or put them into a separate patch.
 
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
+Ok, will add a separate patch for OMAP3 and remove the register
+writes from mach-omap2/pm34xx.c.
 
-Do we need to  explicitly check for overflow (buftail.fp - 1 > buftail.fp)
-also?  Though this should be already caught by the access check in the next
-iteration of the loop.
+>
+> Also, when you resend the autoidle patches, could you put them into a
+> separate series?  There's an autoidle series that I've been working on
+> here, and I will add those into that series, and keep the other patch
+> series separate.
 
- arch/arm/kernel/perf_event.c |    2 +-
- arch/arm/oprofile/common.c   |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Ok, will repost these patches as a separate series.
 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 5efa264..dc885f0 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -700,7 +700,7 @@ user_backtrace(struct frame_tail __user *tail,
- 	 * Frame pointers should strictly progress back up the stack
- 	 * (towards higher addresses).
- 	 */
--	if (tail >= buftail.fp)
-+	if (tail >= buftail.fp - 1)
- 		return NULL;
- 
- 	return buftail.fp - 1;
-diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
-index 8aa9744..67b6b87 100644
---- a/arch/arm/oprofile/common.c
-+++ b/arch/arm/oprofile/common.c
-@@ -85,7 +85,7 @@ static struct frame_tail* user_backtrace(struct frame_tail *tail)
- 
- 	/* frame pointers should strictly progress back up the stack
- 	 * (towards higher addresses) */
--	if (tail >= buftail[0].fp)
-+	if (tail >= buftail[0].fp - 1)
- 		return NULL;
- 
- 	return buftail[0].fp-1;
--- 
-1.7.2.dirty
+Regards,
+Rajendra
+
+>
+>
+> thanks,
+>
+> - Paul
