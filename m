@@ -1,63 +1,16 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Feb 2011 11:23:23 +0000
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <1297160512.31587.17.camel@e102568-lin.cambridge.arm.com>
-References: <20110207121052.GD31929@n2100.arm.linux.org.uk>
-	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-	<20110207133457.GE31929@n2100.arm.linux.org.uk>
-	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
-	<20110207141734.GG31929@n2100.arm.linux.org.uk>
-	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
-	<20110207143351.GH31929@n2100.arm.linux.org.uk>
-	<AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
-	<20110207150233.GI31929@n2100.arm.linux.org.uk>
-	<1297160512.31587.17.camel@e102568-lin.cambridge.arm.com>
-Message-ID: <20110208112323.GA22592@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 8 Feb 2011 11:26:42 +0000
+Subject: [PATCH] ASoC: CS4271: Move Chip Select control out of the
+	CODEC code.
+In-Reply-To: <1296691905.1504.47.camel@r60e>
+References: <1296691905.1504.47.camel@r60e>
+Message-ID: <20110208112642.GB29850@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 08, 2011 at 10:21:52AM +0000, Lorenzo Pieralisi wrote:
-> Hi Russell,
+On Thu, Feb 03, 2011 at 03:11:45AM +0300, Alexander Sverdlin wrote:
+> From: Alexander Sverdlin <subaparts@yandex.ru>
 > 
-> On Mon, 2011-02-07 at 15:02 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Feb 07, 2011 at 04:58:05PM +0200, saeed bishara wrote:
-> > > well, the allocation of the identity page table doesn't need to be
-> > > done in assembly code. this is the similar to what you did in
-> > > __cpu_up.
-> > > for example, this allocation can be done in arch/arm/kernel/setup.c.
-> > > the assembly code only need to know the offset of this page table.
-> > > looks that there are several usages for the identity page table (smp
-> > > boot, kexec, pm), maybe all those clients can share the same one.
-> > 
-> > We don't want to allocate this at boot time, because it will require
-> > additional maintainence when L1 page tables are added for ioremap() etc.
-> > 
-> > I feel that it's best to leave it as-is, as this is the method everyone
-> > has been using to date.  When it becomes a problem, we can then look at
-> > resolving it.
-> > 
-> 
-> For v7 MP cpuidle it is already critical, we do need to have a page
-> table copy for the resume path to be MP safe.
-> Maybe we can just provide an API to pass the page table pointer, then
-> see how to allocate it and when.
+> Move Chip Select control out of the CODEC code for CS4271.
 
-As I already said - allocate a page table before hand and switch to it,
-free it afterwards.  This code does not need to have the complexities
-of page table allocation mixed into it.
-
-> The same goes for the stack pointer global variable which should be
-> per cpu.
-
-Yes, but this is what is currently done, so at the present time I'm
-just sorting out what's already in the kernel.  If we need further
-changes, then that needs to be built on top of this.
-
-> In which branch do these patches live in order to test them and 
-> provide feedback ?
-
-They're not published yet as I'm waiting for feedback on them, etc.
-They're still receiving the odd tweak as comments are received.
-
-Let's get this so that the current suspend/resume code can use it, and
-has been tested with it, and then think about adding other uses to it.
+Applied, thanks.
