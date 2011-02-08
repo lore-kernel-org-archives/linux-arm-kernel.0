@@ -1,131 +1,83 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 8 Feb 2011 15:41:55 +0100
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <19793.22067.960689.669543@ipc1.ka-ro>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 8 Feb 2011 14:45:51 +0000
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <201102081353.20390.arnd@arndb.de>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<201102081311.52004.arnd@arndb.de>
+	<20110208121334.GB22877@n2100.arm.linux.org.uk>
+	<201102081353.20390.arnd@arndb.de>
+Message-ID: <AANLkTi=+2VN53gs=ZDr-M0V3mG5A0iMPRL-RdUugXxUy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> On Sat, Feb 05, 2011 at 10:08:12AM +0800, Shawn Guo wrote:
->> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
->> including apbh-dma and apbx-dma.
->> 
->> * apbh-dma and apbx-dma are supported in the driver as two instances,
->>   and have to be filtered by dma clients via device id.  It becomes
->>   the convention that apbh-dma always gets registered prior to
->>   apbx-dma.
->> 
->> * apbh-dma is different between mx23 and mx28, hardware version
->>   register is used to handle the differences.
->> 
->> * Every the mxs dma channel is statically assigned to client device
->>   by soc design with fixed irq.  The irq number is being passed by
->>   alloc_chan function with mxs_dma_data, and client driver has to
->>   filter the correct channel by its channel id.
->> 
->> * mxs-dma supports pio function besides data transfer.  The driver
->>   uses dma_data_direction DMA_NONE to identify the pio mode, and
->>   steals sgl and sg_len to get pio words and numbers from clients.
->> 
->> * mxs dmaengine has some very specific features, like sense function
->>   and the special NAND support (nand_lock, nand_wait4ready).  These
->>   are too specific to implemented in generic dmaengine driver.
->> 
->> * The parameter "flags" of prep functions is currently being used to
->>   pass wait4end flag from clients.
->> 
->> * The driver refers to imx-sdma and only a single descriptor is
->>   statically assigned to each channel.
->> 
->> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
->> ---
->>  arch/arm/mach-mxs/include/mach/dma.h |   16 +
->>  drivers/dma/Kconfig                  |    8 +
->>  drivers/dma/Makefile                 |    1 +
->>  drivers/dma/mxs-dma.c                |  702 ++++++++++++++++++++++++++++++++++
->>  4 files changed, 727 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
->>  create mode 100644 drivers/dma/mxs-dma.c
->> 
->> diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
->> new file mode 100644
->> index 0000000..429f431
->> --- /dev/null
->> +++ b/arch/arm/mach-mxs/include/mach/dma.h
->> +
->> +static struct dma_async_tx_descriptor *mxs_dma_prep_slave_sg(
->> +		struct dma_chan *chan, struct scatterlist *sgl,
->> +		unsigned int sg_len, enum dma_data_direction direction,
->> +		unsigned long flags)
->> +{
->> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
->> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
->> +	struct mxs_dma_ccw *ccw;
->> +	struct scatterlist *sg;
->> +	int ret, i, j;
->> +	u32 *pio;
->> +
->> +	dev_dbg(mxs_dma->dev, "%s: channel %d\n", __func__, chan->chan_id);
->> +
->> +	if (mxs_chan->status == DMA_IN_PROGRESS)
->> +		return NULL;
->> +
->> +	mxs_chan->status = DMA_IN_PROGRESS;
->> +	mxs_chan->flags = 0;
->> +
->> +	dev_dbg(mxs_dma->dev, "%s: setting up %d entries\n", __func__, sg_len);
->> +
->> +	if (sg_len > ((direction == DMA_NONE) ? MXS_PIO_WORDS : NUM_CCW)) {
->> +		dev_err(mxs_dma->dev, "maximum number of sg exceeded: %d > %d\n",
->> +				sg_len, NUM_CCW);
->> +		ret = -EINVAL;
->> +		goto err_out;
->> +	}
->> +
->> +	if (direction == DMA_NONE) {
->> +		ccw = &mxs_chan->ccw[0];
->> +		pio = (u32 *) sgl;
->> +
->> +		for (j = 0; j < sg_len;)
->> +			ccw->pio_words[j++] = *pio++;
->> +
->> +		ccw->next = 0;
->> +		ccw->bits.chain = 0;
->> +		ccw->bits.irq = 1;
->> +		ccw->bits.dec_sem = 1;
->> +		ccw->bits.wait4end = flags;
->> +		ccw->bits.halt_on_terminate = 1;
->> +		ccw->bits.terminate_flush = 1;
->> +		ccw->bits.pio_num = sg_len;
->> +		ccw->bits.command = MXS_DMA_NO_XFER;
+On Tue, Feb 8, 2011 at 12:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 February 2011, Russell King - ARM Linux wrote:
+>> > I don't see any users of the sev/wfe/wfi macros in the current kernel,
+>> > so removing them seems like a good strategy to avoid people from
+>> > using them incorrectly.
+>>
+>> That's because they've only just been added. ?See the massive 63-patch set
+>> from Viresh which has been posting to this mailing list.
 >
-> Does this have a valid usecase? I would just return some error code
-> here. pio_num and pio_words are unused in the driver and I don't think
-> a dmaengine driver should have some kind of PIO fallback.
+> Ok, I see. At least that version seems ok because the code is cpu
+> specific already.
 >
-Actually 'PIO' is a misnomer here. It's the free scaled way of
-implementing a simple feature (chained DMA with mixed transfer modes)
-in a complicated and obfuscated way.
+> The omap do_wfi macro is specifically meant to avoid the multi-cpu
+> case by using the hexadecimal notation, so it can still be used while
+> building a kernel for ARMv6 or lower. Dave's version seems to have
+> the opposite intention here (choosing one version per arch level),
+> so it wouldn't be a replacement.
 
-What's behinde the 'PIO' transfers is programming controller registers
-via DMA along with the actual DMA data transfer. DMA_NONE simply
-means, that the DMA transfer does only the register programming but
-does not transfer any payload. The 'pio_words' are the values that are
-being written to consecutive locations of e.g. the SPI controller
-register address space.
-The programming is actually done by DMA, in any case.
+I guess there are two problems we're trying to solve here:
+
+1) a lowest-common denominator implementation of things like wfi(),
+for use in common code.  This must be based on __LINUX_ARM_ARCH__
+(which IIUC gives the lowest arch supported by all the CPUs being
+built for -- am I correct?)
+2) definitions for specific CPUs, for non-generic code which may be
+bundled together in a single kernel build.
+
+For (1), We can sensibly try to define a generic macro.  If building
+for ARMv6 and ARMv7 CPUs in the same kernel, then we have to use the
+lowest-common-denominator definition, i.e., the MCR form.  For ARMv7,
+we can use WFI.
+For (2), I think the best approach is to use the actual "wfi"
+instruction and build the affected files with the appropriate -march=
+flag (omap already does that) - since those CPU-specific files should
+by definition never be run if running on another CPU.  We only support
+new enough tools these days that this should be supported; so "wfi"
+should be preferable to ".long 0xdeadbeef" - otherwise we need lots of
+#ifdef CONFIG_THUMB2_KERNEL, or a macro.  If we have a macro, it would
+be better for that to be generically implemented somewhere, becasue
+the requirements are the same for every BSP supporting v7.
+
+I don't like the practice of pre-assembling bits of code with .long,
+in order to allow a file to be built with wrong -march= flags, and I
+would favour migrating away from this where possible ... but I accept
+it's a pragmatic solution to a problem for which gcc/binutils provide
+no good alternative.
+
+As to exactly what macros should be defined and where, I don't have a
+strong view--- other people's guess is probably better than mine.
 
 
-Lothar Wa?mann
--- 
-___________________________________________________________
+I believe that my wfi() modification gets defined suitably for both
+cases, with one exception:
 
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+If support for a v6K processor is included, we have no way to know
+from preprocessor definitions whether a plain v6 processor is also to
+be supported.  My proposed definition is incorrect in that we still
+get wfi() == WFI, whereas we really want the MCR for this case.
+Likewise, the definitions of wfe() and sev() may not execute on a
+plain v6 processor (though actually, I think they will execute as
+NOPs)
 
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+So, for v6K we should either always use MCR for wfi(), or we need to
+define wfi() using ALT_SMP(wfi) ALT_UP(mcr).  But whether that's a
+common enough case to care about, I can't say.
+
+
+Any thoughts on all that?
+
+Cheers
+---Dave
