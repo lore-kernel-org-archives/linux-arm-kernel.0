@@ -1,44 +1,59 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 08 Feb 2011 10:31:41 -0800
-Subject: [PATCH] i2c: OMAP: fix static suspend vs. runtime suspend
-In-Reply-To: <20110205160843.GD15795@trinity.fluff.org> (Ben Dooks's message
-	of "Sat, 5 Feb 2011 16:08:43 +0000")
-References: <1296173921-4832-1-git-send-email-khilman@ti.com>
-	<20110205160843.GD15795@trinity.fluff.org>
-Message-ID: <87d3n2nzsi.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Tue,  8 Feb 2011 21:08:59 +0100
+Subject: [PATCH] spi/imx: select master mode for all channels
+Message-ID: <1297195739-24951-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Dooks <ben-i2c@fluff.org> writes:
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-> On Thu, Jan 27, 2011 at 04:18:41PM -0800, Kevin Hilman wrote:
->> When runtime PM is enabled, each OMAP i2c device is suspended after
->> each i2c xfer.  However, there are two cases when the static suspend
->> methods must be used to ensure the devices are suspended:
->> 
->> 1) runtime PM is disabled, either at compile time or dynamically
->>     via /sys/devices/.../power/control.
->> 2) an i2c client driver uses i2c during it's suspend callback, thus
->>    leaving the i2c driver active (NOTE: runtime suspend transitions are
->>    disabled during system suspend, so i2c activity during system
->>    suspend will runtime resume the device, but not runtime (re)suspend it.)
->> 
->> Since the actual work to suspend the device is handled by the
->> subsytem, call the bus methods to take care of it.
->> 
->> NOTE: This takes care of a known suspend problem on OMAP3 where the
->> TWL RTC driver does i2c xfers during its suspend path leaving the i2c
->> driver in an active state (since runtime suspend transistions are
->> disabled.)
->> 
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Ben, this is a regression in 2.6.38 so hopefully this can be queued
->> in the 2.6.38-rc cycle.  Thanks.
->
-> Ok, after all the discussions should I keep it in my -rc queue?
->  
+The hardware seems to have a race condition when the inactive
+channels are in slave mode. We support master mode only, so
+we can just switch all channels to master mode.
 
-Yes, please.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+[ukleinek: add more verbose comment about the race]
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-Kevin
+maybe one of our friends at Freescale can comment?
+
+Best regards
+Uwe
+
+ drivers/spi/spi_imx.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+index 1cf9d5f..69d6dba 100644
+--- a/drivers/spi/spi_imx.c
++++ b/drivers/spi/spi_imx.c
+@@ -174,7 +174,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+ #define SPI_IMX2_3_CTRL		0x08
+ #define SPI_IMX2_3_CTRL_ENABLE		(1 <<  0)
+ #define SPI_IMX2_3_CTRL_XCH		(1 <<  2)
+-#define SPI_IMX2_3_CTRL_MODE(cs)	(1 << ((cs) +  4))
++#define SPI_IMX2_3_CTRL_MODE_MASK	(0xf << 4)
+ #define SPI_IMX2_3_CTRL_POSTDIV_OFFSET	8
+ #define SPI_IMX2_3_CTRL_PREDIV_OFFSET	12
+ #define SPI_IMX2_3_CTRL_CS(cs)		((cs) << 18)
+@@ -253,8 +253,14 @@ static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
+ {
+ 	u32 ctrl = SPI_IMX2_3_CTRL_ENABLE, cfg = 0;
+ 
+-	/* set master mode */
+-	ctrl |= SPI_IMX2_3_CTRL_MODE(config->cs);
++	/*
++	 * The hardware seems to have a race condition when changing modes. The
++	 * current assumption is that the selection of the channel arrives
++	 * earlier in the hardware than the mode bits when they are written at
++	 * the same time.
++	 * So set master mode for all channels as we do not support slave mode.
++	 */
++	ctrl |= SPI_IMX2_3_CTRL_MODE_MASK;
+ 
+ 	/* set clock speed */
+ 	ctrl |= spi_imx2_3_clkdiv(spi_imx->spi_clk, config->speed_hz);
+-- 
+1.7.2.3
