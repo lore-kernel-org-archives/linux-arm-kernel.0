@@ -1,58 +1,56 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Feb 2011 22:28:33 +0530
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <20110208164747.GD6188@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-Message-ID: <78d0134576ace6be5874871076cf0c10@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 8 Feb 2011 17:00:26 +0000
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <20110208165537.GE6188@n2100.arm.linux.org.uk>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<201102081615.15713.arnd@arndb.de>
+	<20110208162515.GB6188@n2100.arm.linux.org.uk>
+	<201102081747.18674.arnd@arndb.de>
+	<20110208165537.GE6188@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=vCOShfeLN7_WRor4C5bQ6zVzBMO1XsWtt8=WH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Tuesday, February 08, 2011 10:18 PM
-> To: Santosh Shilimkar
-> Cc: linux-arm-kernel at lists.infradead.org; linux-omap at vger.kernel.org
-> Subject: Re: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
+On Tue, Feb 8, 2011 at 4:55 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 08, 2011 at 05:47:18PM +0100, Arnd Bergmann wrote:
+>> On Tuesday 08 February 2011 17:25:16 Russell King - ARM Linux wrote:
+>> > On Tue, Feb 08, 2011 at 04:15:15PM +0100, Arnd Bergmann wrote:
+>> > > But that doesn't work if you build a combined v5/v6/v7 kernel, because
+>> > > v5 supports neither form, right? I think to do that, it needs the
+>> > > same kind of abstraction that we have for a number of other things
+>> > > like cache management in arch/arm/mm/.
+>> >
+>> > The options are kernels which support v3-v5 or v6-v7. ?There's too big
+>> > a change between v5 and v6 to combine those into one kernel.
+>>
+>> Ah, good to know. I never realized this with the common binary discussions.
+>> Building for the versatile/realview platform makes it possible to select
+>> any of ARM926 and the v6/v6k/v7 CPUs, as well as ARM7TDMI in the same
+>> kernel config, so I assumed that this was actually a valid configuration
+>> aside from bugs.
+>>
+>> Would an attempt to make a combined v5/v6 kernel result in unacceptably
+>> bad code, or is this just too much work for anyone to be bothered with
+>> and little practical value?
 >
-> On Tue, Feb 08, 2011 at 10:06:20PM +0530, Santosh Shilimkar wrote:
-> > Have tested this series on OMAP4430 and OMAP3430.
-> > Don't know if it helps to push some of these patches to be part
-> > of rc cycles. At least the SMP specific fixes should get merged
-> > otherwise, builds like omap2plus_defconfig won't be running
-> > right configuration on SMP machine.
+> If you build for anything less than v6, you lose all barriers, the icache
+> synchronization, and proper atomic operations. ?Just to name a few.
 >
-> It's _too_ _late_ in the rc cycle for a fix of this size.  As I've
-> said
-> (several times) it was only possible for rc1.  That boat has been
-> missed
-> as we're now on rc4.  We could see 2.6.38 in as little as two weeks
-> time.
->
->  27 files changed, 183 insertions(+), 197 deletions(-)
->
-> is too big.
->
-Ok. Sorry about delay in testing out these patches.
 
-> There's still the outstanding question over:
->
->   ARM: v6k: use CPU domain feature if we include support for arch <
-> ARMv6K
->
-> which remains unsettled.
->
-> I think it's probably going to be better to _purposely_ break the
-> OMAP
-> build when it covers v6 and v7 CPUs in these kernels as I don't
-> think it's
-> sanely fixable given where we are.  Again, that's something I _did_
-> point out at the time.
->
-Any alternative possible other than breaking the omap2plus build?
-It's quite useful to have one build which covers majority of the
-omap machines.
+Can we represent the restriction in Kconfig somehow?
 
-Regards,
-Santosh
+For example:
+
+CPU_V6 depends on CPU_COMMON_V6PLUS
+CPU_V7 depends on CPU_COMMON_V6PLUS
+CPU_V5 depends on CPU_COMMON_V3_TO_V5
+CPU_V4 depends on CPU_COMMON_V3_TO_V5
+CPU_V3 depends on CPU_COMMON_V3_TO_V5
+
+CPU_COMMON_V6PLUS depends on !CPU_COMMON_V3_TO_V5
+CPU_COMMON_V3_TO_V5 depends on !CPU_COMMON_V6PLUS
+
+...or something like that.
+
+---Dave
