@@ -1,29 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Feb 2011 08:27:25 +0000
-Subject: [PATCH 4/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <8718a09f-604a-41b0-8b5a-856bacac9e9a@VA3EHSMHS025.ehs.local>
-References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-4-git-send-email-john.linn@xilinx.com>
-	<a45cf64b-c91a-4f8b-a121-5a675daee4ca@VA3EHSMHS006.ehs.local>
-	<20110205164325.GE29411@n2100.arm.linux.org.uk>
-	<8718a09f-604a-41b0-8b5a-856bacac9e9a@VA3EHSMHS025.ehs.local>
-Message-ID: <20110208082725.GA20822@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 8 Feb 2011 09:32:00 +0100
+Subject: [PATCH] arm: Use generic accessor in irq_set_flags()
+In-Reply-To: <alpine.LFD.2.00.1102072349050.31804@localhost6.localdomain6>
+References: <alpine.LFD.2.00.1102072349050.31804@localhost6.localdomain6>
+Message-ID: <20110208083200.GJ27982@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 07, 2011 at 05:14:13PM -0700, John Linn wrote:
-> I'm assuming you meant to change all addresses of devices (#defines) to
-> use the IOMEM.
+Hi Thomas,
+
+On Mon, Feb 07, 2011 at 11:56:47PM +0100, Thomas Gleixner wrote:
+> The generic irq code provides an accessor function to manipulate
+> status flags in the irq descriptor. Replace the open coded variant.
 > 
-> I did that and it's ok. You also have to cast them to ints when putting
-> the addresses into
-> the resource for a platform device.
+> Neccecary to let the core code rearrange the internal representation.
+s/Neccecary/Necessary/
 
-Hang on.  The reason I mentioned it was because you were passing some
-of these into readl() et.al.  readl() takes the mapped cookie, not the
-physical address.
+Best regards
+Uwe
 
-Physical addresses should be integer like, virtual addresses should be
-pointer like.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
