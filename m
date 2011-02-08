@@ -1,58 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Feb 2011 14:30:32 +0000
-Subject: [PATCH 4/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <735942c6-d2d5-4ef0-96e7-37a477507abc@VA3EHSMHS023.ehs.local>
+Date: Tue, 8 Feb 2011 14:35:14 +0000
+Subject: [PATCH 3/4] ARM: Xilinx: Adding timer support to the platform
+In-Reply-To: <7803ac06-421f-455a-86af-ea9d480be64d@VA3EHSMHS012.ehs.local>
 References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
 	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
 	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
-	<1296922124-23379-4-git-send-email-john.linn@xilinx.com>
-	<a45cf64b-c91a-4f8b-a121-5a675daee4ca@VA3EHSMHS006.ehs.local>
-	<20110205164325.GE29411@n2100.arm.linux.org.uk>
-	<8718a09f-604a-41b0-8b5a-856bacac9e9a@VA3EHSMHS025.ehs.local>
-	<20110208082725.GA20822@n2100.arm.linux.org.uk>
-	<735942c6-d2d5-4ef0-96e7-37a477507abc@VA3EHSMHS023.ehs.local>
-Message-ID: <20110208143032.GA27521@n2100.arm.linux.org.uk>
+	<7803ac06-421f-455a-86af-ea9d480be64d@VA3EHSMHS012.ehs.local>
+Message-ID: <20110208143514.GB27521@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 08, 2011 at 07:08:14AM -0700, John Linn wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Sent: Tuesday, February 08, 2011 1:27 AM
-> > To: John Linn
-> > Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
-> glikely at secretlab.ca
-> > Subject: Re: [PATCH 4/4] ARM: Xilinx: base header files and assembly
-> macros
-> > 
-> > On Mon, Feb 07, 2011 at 05:14:13PM -0700, John Linn wrote:
-> > > I'm assuming you meant to change all addresses of devices (#defines)
-> to
-> > > use the IOMEM.
-> > >
-> > > I did that and it's ok. You also have to cast them to ints when
-> putting
-> > > the addresses into
-> > > the resource for a platform device.
-> > 
-> > Hang on.  The reason I mentioned it was because you were passing some
-> > of these into readl() et.al.  readl() takes the mapped cookie, not the
-> > physical address.
-> > 
-> > Physical addresses should be integer like, virtual addresses should be
-> > pointer like.
-> 
-> Thanks for clarifying.
-> 
-> It seems like it's better to leave the #defines without IOMEM, then use
-> IOMEM where a variable, 
-> such as the address of the timer, is initialized with the #define.
-> 
-> I see what you mean with regard to readl taking the cookie but yet
-> physical addresses are also needed.
+On Sat, Feb 05, 2011 at 09:08:43AM -0700, John Linn wrote:
+> +/*
+> + * Definitions of the timer read/write macro
+> + */
+> +#define xttcpss_read(addr)	__raw_readl((void __iomem *)addr)
+> +#define xttcpss_write(addr, val) __raw_writel(val, (void __iomem *)(addr))
 
-readl does not take physical addresses. Ever.
+Get rid of these casts.  You should never need to cast to void __iomem *.
 
-I can't work out what's going on here at the moment, and until I do I don't
-see any justification to merging this as long as there is confusion between
-what is a physical address and what isn't.
+> +
+> +
+> +/**
+> + * struct xttcpss_timer - This definition defines local timer structure
+> + *
+> + * @name:	Name of Timer
+> + * @base_addr:	Base address of timer
+> + * @timer_irq:	irqaction structure for the timer device
+> + * @mode:       only valid for an clock event, periodic or one-shot
+> + **/
+> +struct xttcpss_timer {
+> +	char *name;
+> +	unsigned long base_addr;
+
+Replace this with void __iomem *base_addr.
+
+> +		timer->base_addr = XTTCPSS_TIMER_BASE + (4*timer_id);
+
+Right, so XTTCPSS_TIMER_BASE should be typed as void __iomem *.
+
+> +#define XTTCPSS_TIMER_BASE	TTC0_BASE
+
+which means TTC0_BASE should be void __iomem * as well as this is an
+iomem cookie, not a physical address.
