@@ -1,56 +1,50 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 8 Feb 2011 15:28:26 +0800
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <4D50B8C0.7050701@bluewatersys.com>
-References: <1297058877.800158.458894385837.1.gpush@pororo>
-	<201102081054.58005.jeremy.kerr@canonical.com>
-	<4D50B8C0.7050701@bluewatersys.com>
-Message-ID: <201102081528.27108.jeremy.kerr@canonical.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 8 Feb 2011 13:23:58 +0530
+Subject: [PATCH v1] davinci: spi: move event queue parameter to platform
+	data
+In-Reply-To: <1296828552-11765-1-git-send-email-michael.williamson@criticallink.com>
+References: <1296828552-11765-1-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302488B9AFA@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+On Fri, Feb 04, 2011 at 19:39:12, Michael Williamson wrote:
+> For DMA operation, the davinci spi driver needs an event queue number.
+> Currently, this number is passed as a IORESOURCE_DMA.  This is not
+> correct, as the event queue is not a DMA channel.  Pass the event queue
+> via the platform data structure instead.
+> 
+> On dm355 and dm365, move the eventq assignment for spi0 out of resources
+> array and into platform data.
+> 
+> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 
-> If a platform does not provide ops->get_rate and a driver writer does
-> not know this, they could naively use the 0 return from clk_get_rate in
-> calculations, which is especially bad if they ever divide by the rate.
+Tested this on DM355 and DM365 EVMs. Event queue numbers show up
+properly in the logs and DMA transfers to on-board SPI EEPROMs
+happen correctly.
 
-This would be fairly evident on first boot though :)
+> ---
+> Changes since v0:
+>   - combined separate platform patches with driver patch to avoid
+>     potential regression if doing a bissect.
+>   - fixed up typo per comments.
 
-> At the very least the documentation for clk_get_rate should state that
-> the return value needs to be checked and that 0 means the rate is unknown.
+This typo doesn't seem fixed?
 
-Yes, sounds good. I was hesitant to change the documentation for parts of the 
-API that are unchanged, but since we're formalising this 'return 0' behaviour, 
-it seems reasonable to update the comment in this case.
+> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
+> + *		on the bus.
 
-> We do currently have the slightly indirect route to getting a clock of
-> doing: clk_get -> __clk_get -> clk->ops->get. I'm guessing that the long
-> term goal is to remove the middle step once everything is using the
-> common clock api?
+On 2/4/2011 7:03 AM, Sergei Shtylyov wrote:
+>> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
+> 
+>    s/event_q/event queue/?
 
-That may never happen; I imagine that some platforms won't be converted at 
-all.
+Can you please re-spin with this fixed and my ack included:
 
- __clk_get has previously been used as a platform-specific hook to do 
-refcounting, which is exactly what we're doing here (via ops->get), so thought 
-it was best to use the existing __clk_get name to do this.
+Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-> Also, how come you decided to keep the clk_get -> __clk_get call in
-> clkdev.c, but ifdef'ed clk_put? If you just leave clk_put as is in
-> clkdev.c and change clk_put to __clk_put in the generic clock code then
-> you need zero changes to clkdev.c
+With Grant's ack this should probably get merged through
+DaVinci tree (since it touches mach-davinci).
 
-Yep, makes sense, I'll look at doing this.
-
-> Okay. Should we document for the implementer that clk_enable/disable
-> must not sleep then? I don't think atomically is necessarily the right
-> word to use here. For example Documentation/serial/driver uses "This
-> call must not sleep".
-
-OK, I'll clarify the comment.
-
-Cheers,
-
-
-Jeremy
+Thanks,
+Sekhar
