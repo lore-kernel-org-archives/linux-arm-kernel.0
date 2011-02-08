@@ -1,79 +1,36 @@
-From: kishorek.kadiyala@gmail.com (Kishore Kadiyala)
-Date: Wed, 9 Feb 2011 02:26:16 +0530
-Subject: [PATCH] OMAP2: add regulator for MMC1
-In-Reply-To: <1297094927-727-1-git-send-email-balajitk@ti.com>
-References: <1297094927-727-1-git-send-email-balajitk@ti.com>
-Message-ID: <AANLkTinGOQ6-FmVG=LbQHjYPZ_tm3yDtVdDLx7EqhHpw@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Tue, 8 Feb 2011 15:22:59 -0600
+Subject: MMC quirks relating to performance/lifetime.
+Message-ID: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 7, 2011 at 9:38 PM, Balaji T K <balajitk@ti.com> wrote:
-> Add regulator VMMC1 used by SD/MMC card slot1 in 2430sdp.
->
-> Signed-off-by: Balaji T K <balajitk@ti.com>
+Hi,
 
-Tested-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
+I'm not sure if this is the best place to bring this up, but Russel's
+name is on a fair share of drivers/mmc code, and there does seem to be
+quite a bit of MMC-related discussions. Excuse me in advance if this
+isn't the right forum :-).
 
-Regards,
-Kishore
+Certain MMC vendors (maybe even quite a bit of them) use a pretty
+rigid buffering scheme when it comes to handling writes. There is
+usually a buffer A for random accesses, and a buffer B for sequential
+accesses. For certain Toshiba parts, it looks like buffer A is 8KB
+wide, with buffer B being 4MB wide, and all accesses larger than 8KB
+effectively equating to 4MB accesses. Worse, consecutive small (8k)
+writes are treated as one large sequential access, once again ending
+up in buffer B, thus necessitating out-of-order writing to work around
+this.
 
-> ---
-> Tested on OMAP2430 SDP with busybox filesystem mounted on MMC1
->
-> ?arch/arm/mach-omap2/board-2430sdp.c | ? 21 +++++++++++++++++++++
-> ?1 files changed, 21 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-> index e066177..361f6cb 100644
-> --- a/arch/arm/mach-omap2/board-2430sdp.c
-> +++ b/arch/arm/mach-omap2/board-2430sdp.c
-> @@ -22,6 +22,7 @@
-> ?#include <linux/mmc/host.h>
-> ?#include <linux/delay.h>
-> ?#include <linux/i2c/twl.h>
-> +#include <linux/regulator/machine.h>
-> ?#include <linux/err.h>
-> ?#include <linux/clk.h>
-> ?#include <linux/io.h>
-> @@ -148,6 +149,25 @@ static void __init omap_2430sdp_init_irq(void)
-> ? ? ? ?omap_init_irq();
-> ?}
->
-> +static struct regulator_consumer_supply sdp2430_vmmc1_supplies[] = {
-> + ? ? ? REGULATOR_SUPPLY("vmmc", "mmci-omap-hs.0"),
-> +};
-> +
-> +/* VMMC1 for OMAP VDD_MMC1 (i/o) and MMC1 card */
-> +static struct regulator_init_data sdp2430_vmmc1 = {
-> + ? ? ? .constraints = {
-> + ? ? ? ? ? ? ? .min_uV ? ? ? ? ? ? ? ? = 1850000,
-> + ? ? ? ? ? ? ? .max_uV ? ? ? ? ? ? ? ? = 3150000,
-> + ? ? ? ? ? ? ? .valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | REGULATOR_MODE_STANDBY,
-> + ? ? ? ? ? ? ? .valid_ops_mask ? ? ? ? = REGULATOR_CHANGE_VOLTAGE
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | REGULATOR_CHANGE_MODE
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | REGULATOR_CHANGE_STATUS,
-> + ? ? ? },
-> + ? ? ? .num_consumer_supplies ?= ARRAY_SIZE(sdp2430_vmmc1_supplies),
-> + ? ? ? .consumer_supplies ? ? ?= &sdp2430_vmmc1_supplies[0],
-> +};
-> +
-> ?static struct twl4030_gpio_platform_data sdp2430_gpio_data = {
-> ? ? ? ?.gpio_base ? ? ?= OMAP_MAX_GPIO_LINES,
-> ? ? ? ?.irq_base ? ? ? = TWL4030_GPIO_IRQ_BASE,
-> @@ -160,6 +180,7 @@ static struct twl4030_platform_data sdp2430_twldata = {
->
-> ? ? ? ?/* platform_data for children goes here */
-> ? ? ? ?.gpio ? ? ? ? ? = &sdp2430_gpio_data,
-> + ? ? ? .vmmc1 ? ? ? ? ?= &sdp2430_vmmc1,
-> ?};
->
-> ?static struct i2c_board_info __initdata sdp2430_i2c_boardinfo[] = {
-> --
-> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+What this means is decreased life span for the parts, and it also
+means a performance impact on small writes, but the first item is much
+more crucial, especially for smaller parts.
+
+As I've mentioned, probably more vendors are affected. How about a
+generic MMC_BLOCK quirk that splits the requests (and optionally
+reorders) them? The thresholds would then be adjustable as
+module/kernel parameters based on manfid. I'm asking because I have a
+patch now, but its ugly and hardcoded against a specific manufacturer.
+
+Thanks,
+A
