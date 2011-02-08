@@ -1,86 +1,30 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 8 Feb 2011 13:01:26 +0100
-Subject: [PATCH 1/4] spi/pl022: use dmaengine helper macros
-Message-ID: <1297166486-4922-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 8 Feb 2011 13:02:07 +0100
+Subject: [PATCH 3/4] spi/pl022: remove dangling status check
+Message-ID: <1297166527-5006-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This simplifies the DMA code a bit by using the dmaengine helpers.
-The cookie from descriptor submission can be ignored in this case
-as has been established in review of the MMCI/PL180 driver.
+From: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Virupax Sadashivpetimath <virupax.sadashivpetimath@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/spi/amba-pl022.c |   27 ++++++++++-----------------
- 1 files changed, 10 insertions(+), 17 deletions(-)
+ drivers/spi/amba-pl022.c |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 71a1219..4220aad 100644
+index 8fdf530..2b591f0 100644
 --- a/drivers/spi/amba-pl022.c
 +++ b/drivers/spi/amba-pl022.c
-@@ -917,7 +917,6 @@ static int configure_dma(struct pl022 *pl022)
- 	struct dma_chan *txchan = pl022->dma_tx_channel;
- 	struct dma_async_tx_descriptor *rxdesc;
- 	struct dma_async_tx_descriptor *txdesc;
--	dma_cookie_t cookie;
- 
- 	/* Check that the channels are available */
- 	if (!rxchan || !txchan)
-@@ -962,10 +961,8 @@ static int configure_dma(struct pl022 *pl022)
- 		tx_conf.dst_addr_width = rx_conf.src_addr_width;
- 	BUG_ON(rx_conf.src_addr_width != tx_conf.dst_addr_width);
- 
--	rxchan->device->device_control(rxchan, DMA_SLAVE_CONFIG,
--				       (unsigned long) &rx_conf);
--	txchan->device->device_control(txchan, DMA_SLAVE_CONFIG,
--				       (unsigned long) &tx_conf);
-+	dmaengine_slave_config(rxchan, &rx_conf);
-+	dmaengine_slave_config(txchan, &tx_conf);
- 
- 	/* Create sglists for the transfers */
- 	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
-@@ -1018,23 +1015,19 @@ static int configure_dma(struct pl022 *pl022)
- 	rxdesc->callback_param = pl022;
- 
- 	/* Submit and fire RX and TX with TX last so we're ready to read! */
--	cookie = rxdesc->tx_submit(rxdesc);
--	if (dma_submit_error(cookie))
--		goto err_submit_rx;
--	cookie = txdesc->tx_submit(txdesc);
--	if (dma_submit_error(cookie))
--		goto err_submit_tx;
--	rxchan->device->device_issue_pending(rxchan);
--	txchan->device->device_issue_pending(txchan);
-+	dmaengine_submit(rxdesc);
-+	dmaengine_submit(txdesc);
-+	dma_async_issue_pending(rxchan);
-+	dma_async_issue_pending(txchan);
- 
- 	return 0;
- 
- err_submit_tx:
- err_submit_rx:
- err_txdesc:
--	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
-+	dmaengine_terminate_all(txchan);
- err_rxdesc:
--	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
-+	dmaengine_terminate_all(rxchan);
- 	dma_unmap_sg(txchan->device->dev, pl022->sgt_tx.sgl,
- 		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
- err_tx_sgmap:
-@@ -1101,8 +1094,8 @@ static void terminate_dma(struct pl022 *pl022)
- 	struct dma_chan *rxchan = pl022->dma_rx_channel;
- 	struct dma_chan *txchan = pl022->dma_tx_channel;
- 
--	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
--	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
-+	dmaengine_terminate_all(rxchan);
-+	dmaengine_terminate_all(txchan);
- 	unmap_free_dma_scatter(pl022);
- }
- 
+@@ -1906,8 +1906,6 @@ static int pl022_setup(struct spi_device *spi)
+ 	    && ((pl022->master_info)->enable_dma)) {
+ 		chip->enable_dma = true;
+ 		dev_dbg(&spi->dev, "DMA mode set in controller state\n");
+-		if (status < 0)
+-			goto err_config_params;
+ 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_ENABLED,
+ 			       SSP_DMACR_MASK_RXDMAE, 0);
+ 		SSP_WRITE_BITS(chip->dmacr, SSP_DMA_ENABLED,
 -- 
 1.7.3.2
