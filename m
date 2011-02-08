@@ -1,32 +1,65 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 08 Feb 2011 16:29:52 +0100
-Subject: [PATCH 2/2] ARM: iMX5 BBG: add cpuidle driver parameters
-In-Reply-To: <1297178084-28363-3-git-send-email-yong.shen@linaro.org> (yong
-	shen's message of "Tue, 8 Feb 2011 16:14:44 +0100")
-References: <1297178084-28363-1-git-send-email-yong.shen@linaro.org>
-	<1297178084-28363-3-git-send-email-yong.shen@linaro.org>
-Message-ID: <87pqr2v91r.fsf@lechat.rtp-net.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 8 Feb 2011 15:30:32 +0000
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <201102081615.15713.arnd@arndb.de>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<201102081353.20390.arnd@arndb.de>
+	<AANLkTi=+2VN53gs=ZDr-M0V3mG5A0iMPRL-RdUugXxUy@mail.gmail.com>
+	<201102081615.15713.arnd@arndb.de>
+Message-ID: <AANLkTim6aBUJtkQHZBWfTWsjh2+ijFqOgf9cPGSrRtMD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-yong.shen at linaro.org writes:
-
-Hi,
-
-> From: Yong Shen <yong.shen@freescale.com>
+On Tue, Feb 8, 2011 at 3:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 February 2011, Dave Martin wrote:
+>> I guess there are two problems we're trying to solve here:
+>>
+>> 1) a lowest-common denominator implementation of things like wfi(),
+>> for use in common code. ?This must be based on __LINUX_ARM_ARCH__
+>> (which IIUC gives the lowest arch supported by all the CPUs being
+>> built for -- am I correct?)
+>> 2) definitions for specific CPUs, for non-generic code which may be
+>> bundled together in a single kernel build.
+>>
+>> For (1), We can sensibly try to define a generic macro. ?If building
+>> for ARMv6 and ARMv7 CPUs in the same kernel, then we have to use the
+>> lowest-common-denominator definition, i.e., the MCR form. ?For ARMv7,
+>> we can use WFI.
 >
-> Add cpuidle parameters to make cpuidle driver workable, but these
-> parameters need further tuning
+> But that doesn't work if you build a combined v5/v6/v7 kernel, because
+> v5 supports neither form, right? I think to do that, it needs the
+> same kind of abstraction that we have for a number of other things
+> like cache management in arch/arm/mm/.
 >
-> Signed-off-by: Yong Shen <yong.shen@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx51_babbage.c |  114 ++++++++++++++++++++++++++++++++
->  arch/arm/mach-mx5/devices.c            |    4 +
->  arch/arm/mach-mx5/devices.h            |    1 +
->  3 files changed, 119 insertions(+), 0 deletions(-)
+>> For (2), I think the best approach is to use the actual "wfi"
+>> instruction and build the affected files with the appropriate -march=
+>> flag (omap already does that) - since those CPU-specific files should
+>> by definition never be run if running on another CPU. ?We only support
+>> new enough tools these days that this should be supported; so "wfi"
+>> should be preferable to ".long 0xdeadbeef" - otherwise we need lots of
+>> #ifdef CONFIG_THUMB2_KERNEL, or a macro. ?If we have a macro, it would
+>> be better for that to be generically implemented somewhere, becasue
+>> the requirements are the same for every BSP supporting v7.
+>
+> Makes sense.
+>
+>> I don't like the practice of pre-assembling bits of code with .long,
+>> in order to allow a file to be built with wrong -march= flags, and I
+>> would favour migrating away from this where possible ... but I accept
+>> it's a pragmatic solution to a problem for which gcc/binutils provide
+>> no good alternative.
+>
+> Yes. Moreover, new instructions may always have to be that way for
+> a while, before they can be moved over to the proper inline
+> assembly.
 
-I didn't look at how it's working nor did a review but from a very quick
-look, I'm wondering why it's in board-mx51_babbage.c. Can you explain to
-me what makes this code specific to babbage ?
+Why not have macros for these cases?  (Which kinda brings the
+discussion full-circle...)
 
-Arnaud
+My immediate concern is that too often, the Thumb-2 case will be
+handled incorrectly or not at all ... and the kernel will silently
+build without flagging any error.  Macros would allow the fragile
+definitions to go in one place.
+
+Cheers
+---Dave
