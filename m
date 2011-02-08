@@ -1,56 +1,42 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 8 Feb 2011 16:56:38 +0000
-Subject: [PATCH] ARM: Correct WFE() in asm/spinlock.h for Thumb-2
-In-Reply-To: <20110208164009.GD27521@n2100.arm.linux.org.uk>
-References: <1297178414-20983-1-git-send-email-dave.martin@linaro.org>
-	<20110208164009.GD27521@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=XfBjite-xtR8z_+5ATxSb4a9XDNAXdLBowWKY@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 8 Feb 2011 17:58:14 +0100
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <20110208163229.GC6188@n2100.arm.linux.org.uk>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<201102081617.59092.arnd@arndb.de>
+	<20110208163229.GC6188@n2100.arm.linux.org.uk>
+Message-ID: <201102081758.14606.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 8, 2011 at 4:40 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 08, 2011 at 03:20:14PM +0000, Dave Martin wrote:
->> The content for ALT_SMP() in the definition of WFE() expands to 6
->> bytes (IT cc ; WFEcc.W), which breaks the assumptions of the fixup
->> code, leading to lockups when the affected code gets run.
+On Tuesday 08 February 2011 17:32:29 Russell King - ARM Linux wrote:
+> On Tue, Feb 08, 2011 at 04:17:58PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 08 February 2011, Dave Martin wrote:
+> > > CFLAGS_cpu_specific_object.o        += -march=armv7-a
+> > > 
+> > > Whether it's safe to do it depends on whether code from that file
+> > > could ever get run on other processors.  I'm not so sure of the answer
+> > > to that..., but perhaps someone else has a better idea.
+> > 
+> > We already do this a lot from arch/arm/mm/Makefile, and those
+> > files are typically just one function per file, so they can easily
+> > be proven to be safe that way.
+> 
+> No, we do that with assembly files.  It doesn't work soo well with
+> C files as we really don't want GCC itself to generate v7 instructions
+> unless we explicitly ask for them.
 >
-> Why does it? ?My understanding is that the .w suffix forces the assembler
-> to use the ARM encoding for the instruction.
+> The other issue here is that somtimes generating code with different
+> -march options leads to the linker refusing to link them together...
 
-The .w suffix forces a 32-bit encoding of Thumb-2 instructions for
-which a 16-bit encoding is available.  Unfortunately, the 32-bit
-Thumb-2 encodings are different from the ARM encodings (though there
-are some odd similarities ... for example, all MCR and MRC encodings
-are the same ... but with the halfwords swapped (!))
+Ok, I see. Is that a bug in existing toolchains, or something more
+fundamental?
 
-Like the 16-bit forms, most 32-bit Thumb-2 instructions don't contain
-a condition field, so the assembler -mimplicit-it feature will need
-insert an IT instruction if you write something conditional.  This
-applies to everything except branches.
+I would have expected that you could at least mix all compiler options
+that don't impact the ABI or the instruction set like -mthumb.
 
-wfe: wfene.w becomes:
+Also, I think we can still build with e.g. "-march=armv6 -Wa,-march=armv7",
+which should tell the compiler to only emit armv6 instructions, but make
+the assembler more permissive for inline assembly.
 
-00000000 <wfe>:
-   0:	bf18      	it	ne
-   2:	f3af 8002 	wfene.w
-
-Fortunately, wfe also has a 16-bit form, so we can squeeze the IT and
-the WFE into the 4 bytes expected by ALT_SMP().  For safety, I write
-it out explicitly: ALT_SMP("wfene", ...) would work sometimes but
-might not work as expected if the previous instruction has an EQ or NE
-condition, because then the assembler wouldn't need to insert an extra
-IT when it generates its output...
-
-> Thumb2 is just far too weird to understand. ?I think I'll just stick to
-> writing good ARM code and let people sort out the Thumb2 weirdnesses.
-
-Certainly life is much easier in ARM-land :)
-
-I'm hoping that getting this working for OMAP will allow more people
-to play with it though.
-
-Cheers
----Dave
+	Arnd
