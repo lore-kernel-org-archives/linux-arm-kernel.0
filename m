@@ -1,65 +1,119 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 8 Feb 2011 15:30:32 +0000
-Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
-In-Reply-To: <201102081615.15713.arnd@arndb.de>
-References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
-	<201102081353.20390.arnd@arndb.de>
-	<AANLkTi=+2VN53gs=ZDr-M0V3mG5A0iMPRL-RdUugXxUy@mail.gmail.com>
-	<201102081615.15713.arnd@arndb.de>
-Message-ID: <AANLkTim6aBUJtkQHZBWfTWsjh2+ijFqOgf9cPGSrRtMD@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 9 Feb 2011 07:30:37 +0800
+Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <19791.65054.702709.553133@ipc1.ka-ro>
+References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
+	<1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
+	<19791.65054.702709.553133@ipc1.ka-ro>
+Message-ID: <20110208233037.GD6963@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 8, 2011 at 3:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 08 February 2011, Dave Martin wrote:
->> I guess there are two problems we're trying to solve here:
->>
->> 1) a lowest-common denominator implementation of things like wfi(),
->> for use in common code. ?This must be based on __LINUX_ARM_ARCH__
->> (which IIUC gives the lowest arch supported by all the CPUs being
->> built for -- am I correct?)
->> 2) definitions for specific CPUs, for non-generic code which may be
->> bundled together in a single kernel build.
->>
->> For (1), We can sensibly try to define a generic macro. ?If building
->> for ARMv6 and ARMv7 CPUs in the same kernel, then we have to use the
->> lowest-common-denominator definition, i.e., the MCR form. ?For ARMv7,
->> we can use WFI.
->
-> But that doesn't work if you build a combined v5/v6/v7 kernel, because
-> v5 supports neither form, right? I think to do that, it needs the
-> same kind of abstraction that we have for a number of other things
-> like cache management in arch/arm/mm/.
->
->> For (2), I think the best approach is to use the actual "wfi"
->> instruction and build the affected files with the appropriate -march=
->> flag (omap already does that) - since those CPU-specific files should
->> by definition never be run if running on another CPU. ?We only support
->> new enough tools these days that this should be supported; so "wfi"
->> should be preferable to ".long 0xdeadbeef" - otherwise we need lots of
->> #ifdef CONFIG_THUMB2_KERNEL, or a macro. ?If we have a macro, it would
->> be better for that to be generically implemented somewhere, becasue
->> the requirements are the same for every BSP supporting v7.
->
-> Makes sense.
->
->> I don't like the practice of pre-assembling bits of code with .long,
->> in order to allow a file to be built with wrong -march= flags, and I
->> would favour migrating away from this where possible ... but I accept
->> it's a pragmatic solution to a problem for which gcc/binutils provide
->> no good alternative.
->
-> Yes. Moreover, new instructions may always have to be that way for
-> a while, before they can be moved over to the proper inline
-> assembly.
+Hi Lothar,
 
-Why not have macros for these cases?  (Which kinda brings the
-discussion full-circle...)
+On Mon, Feb 07, 2011 at 03:13:50PM +0100, Lothar Wa?mann wrote:
+> Hi,
+> 
+> Shawn Guo writes:
+> [...]
+> > diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+> > new file mode 100644
+> > index 0000000..8d1e811
+> > --- /dev/null
+> > +++ b/drivers/dma/mxs-dma.c
+> > @@ -0,0 +1,702 @@
+> [...]
+> > +static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+> > +{
+> > +	struct mxs_dma_engine *mxs_dma = dev_id;
+> > +	u32 stat1, stat2;
+> > +
+> > +	/* completion status */
+> > +	stat1 = __raw_readl(mxs_dma->base + HW_APBHX_CTRL1);
+> > +	stat1 &= 0xffff;
+> > +	__mxs_clrl(stat1, mxs_dma->base + HW_APBHX_CTRL1);
+> > +
+> > +	/* error status */
+> > +	stat2 = __raw_readl(mxs_dma->base + HW_APBHX_CTRL2);
+> > +	__mxs_clrl(stat2, mxs_dma->base + HW_APBHX_CTRL2);
+> > +
+> > +	/*
+> > +	 * When both completion and error of termination bits set at the
+> > +	 * same time, we do not take it as an error.  IOW, it only becomes
+> > +	 * an error we need to handler here in case of ether it's an bus
+> > +	 * error or a termination error with no completion.
+> > +	 */
+> > +	stat2 = ((stat2 >> 16) & stat2) |	   /* bus error */
+> > +		(~(stat2 >> 16) & stat2 & ~stat1); /* termination with no completion */
+> > +
+> > +	/* combine error and completion status for checking */
+> > +	stat1 = (stat2 << 16) | stat1;
+> > +	while (stat1) {
+> > +		int channel = fls(stat1) - 1;
+> > +		struct mxs_dma_chan *mxs_chan =
+> > +				&mxs_dma->mxs_chans[channel % 16];
+> > +
+> > +		if (channel >= 16) {
+> > +			dev_dbg(mxs_dma->dev, "%s: error in channel %d\n",
+> > +						__func__, channel - 16);
+> > +			mxs_dma_reset_chan(mxs_chan);
+> > +			mxs_chan->status = DMA_ERROR;
+> > +		} else {
+> > +			if (mxs_chan->flags & MXS_DMA_SG_LOOP)
+> > +				mxs_chan->status = DMA_IN_PROGRESS;
+> > +			else
+> > +				mxs_chan->status = DMA_SUCCESS;
+> > +		}
+> > +
+> > +		stat1 &= ~(1 << channel);
+> > +
+> > +		if (mxs_chan->desc.callback)
+> > +			mxs_chan->desc.callback(mxs_chan->desc.callback_param);
+> > +
+> > +		if (mxs_chan->status == DMA_SUCCESS)
+> > +			mxs_chan->last_completed = mxs_chan->desc.cookie;
+> > +	}
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+> > +{
+> > +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
+> > +	struct mxs_dma_data *data = chan->private;
+> > +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> > +	static unsigned long flags;
+> > +	int ret;
+> > +
+> > +	if (!data)
+> > +		return -EINVAL;
+> > +
+> > +	mxs_chan->chan_irq = data->chan_irq;
+> > +
+> > +	mxs_chan->ccw = dma_alloc_coherent(NULL, PAGE_SIZE,
+> > +				&mxs_chan->ccw_phys, GFP_KERNEL);
+> > +	if (!mxs_chan->ccw) {
+> > +		ret = -ENOMEM;
+> > +		goto err_alloc;
+> > +	}
+> > +
+> > +	memset(mxs_chan->ccw, 0, PAGE_SIZE);
+> > +
+> > +	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
+> > +				flags, "mxs-dma", mxs_dma);
+> > +	if (ret)
+> > +		goto err_irq;
+> > +
+> > +	flags = IRQF_SHARED;
+> > +
+> Apart from the fact, that this is initilized after use, the use of
+> IRQF_SHARED is wrong here. Shared interrupt handlers are for
+> multiple handlers sharing a single interrupt source, not for multiple
+> interrupt sources sharing the same handler!
+> A shared handler must return IRQ_NONE, if it detects that the
+> interrupt was from a source it does not handle.
+> 
+My bad.  Thanks for pointing this out.
 
-My immediate concern is that too often, the Thumb-2 case will be
-handled incorrectly or not at all ... and the kernel will silently
-build without flagging any error.  Macros would allow the fragile
-definitions to go in one place.
-
-Cheers
----Dave
+Regards,
+Shawn
