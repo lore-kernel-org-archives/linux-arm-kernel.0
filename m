@@ -1,71 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 08 Feb 2011 14:25:15 +0000
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <20110208123322.GB22592@n2100.arm.linux.org.uk>
-References: <AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-	<20110207133457.GE31929@n2100.arm.linux.org.uk>
-	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
-	<20110207141734.GG31929@n2100.arm.linux.org.uk>
-	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
-	<20110207143351.GH31929@n2100.arm.linux.org.uk>
-	<AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
-	<20110207150233.GI31929@n2100.arm.linux.org.uk>
-	<1297160512.31587.17.camel@e102568-lin.cambridge.arm.com>
-	<20110208112323.GA22592@n2100.arm.linux.org.uk>
-	<20110208123322.GB22592@n2100.arm.linux.org.uk>
-Message-ID: <1297175115.31587.94.camel@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Feb 2011 14:30:32 +0000
+Subject: [PATCH 4/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <735942c6-d2d5-4ef0-96e7-37a477507abc@VA3EHSMHS023.ehs.local>
+References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-2-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-3-git-send-email-john.linn@xilinx.com>
+	<1296922124-23379-4-git-send-email-john.linn@xilinx.com>
+	<a45cf64b-c91a-4f8b-a121-5a675daee4ca@VA3EHSMHS006.ehs.local>
+	<20110205164325.GE29411@n2100.arm.linux.org.uk>
+	<8718a09f-604a-41b0-8b5a-856bacac9e9a@VA3EHSMHS025.ehs.local>
+	<20110208082725.GA20822@n2100.arm.linux.org.uk>
+	<735942c6-d2d5-4ef0-96e7-37a477507abc@VA3EHSMHS023.ehs.local>
+Message-ID: <20110208143032.GA27521@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-02-08 at 12:33 +0000, Russell King - ARM Linux wrote:
-
-<snip>
-
-> > Yes, but this is what is currently done, so at the present time I'm
-> > just sorting out what's already in the kernel.  If we need further
-> > changes, then that needs to be built on top of this.
+On Tue, Feb 08, 2011 at 07:08:14AM -0700, John Linn wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Tuesday, February 08, 2011 1:27 AM
+> > To: John Linn
+> > Cc: linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+> glikely at secretlab.ca
+> > Subject: Re: [PATCH 4/4] ARM: Xilinx: base header files and assembly
+> macros
+> > 
+> > On Mon, Feb 07, 2011 at 05:14:13PM -0700, John Linn wrote:
+> > > I'm assuming you meant to change all addresses of devices (#defines)
+> to
+> > > use the IOMEM.
+> > >
+> > > I did that and it's ok. You also have to cast them to ints when
+> putting
+> > > the addresses into
+> > > the resource for a platform device.
+> > 
+> > Hang on.  The reason I mentioned it was because you were passing some
+> > of these into readl() et.al.  readl() takes the mapped cookie, not the
+> > physical address.
+> > 
+> > Physical addresses should be integer like, virtual addresses should be
+> > pointer like.
 > 
-> Like this:
+> Thanks for clarifying.
 > 
->  arch/arm/kernel/sleep.S |   26 +++++++++++++++++++++++++-
->  1 files changed, 25 insertions(+), 1 deletions(-)
+> It seems like it's better to leave the #defines without IOMEM, then use
+> IOMEM where a variable, 
+> such as the address of the timer, is initialized with the #define.
 > 
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index 9f106fa..e10618f 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -25,7 +25,14 @@ ENTRY(cpu_suspend)
->  	stmfd	sp!, {r1, r2, r3, ip}	@ save v:p, virt SP, retfn, phys resume fn
->  	ldr	r3, =sleep_save_sp
->  	add	r2, sp, r1		@ convert SP to phys
-> +#ifdef CONFIG_SMP
-> +	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
-> +	ALT_UP(mov lr, #0)
-> +	and	lr, lr, #15
-> +	str	r2, [r3, lr, lsl #2]	@ save phys SP
-> +#else
->  	str	r2, [r3]		@ save phys SP
-> +#endif
+> I see what you mean with regard to readl taking the cookie but yet
+> physical addresses are also needed.
 
-<snip>
-	
->  sleep_save_sp:
-> -	.word	0				@ preserve stack phys ptr here
-> +	.rept	CONFIG_NR_CPUS
-> +	.long	0				@ preserve stack phys ptr here
-> +	.endr
-> 
+readl does not take physical addresses. Ever.
 
-Yes Russell, thanks that's what we are currently doing for MP, it looks 
-ok. As for the page tables, I know you already replied and I took your
-point. It is on the cpuidle path so page tables should be created in C,
-beforehand as you pointed out (with the 1:1 map required), once for all.
-I just wanted to say, maybe we can save the pgd pointer (with the
-required 1:1 for MMU on) in a pc-relative addressable location that you
-can retrieve on resume, eliminating the code changing the original page
-table and replacing it with pgd switching.
-But again it is just a suggestion, I understand your point, no need to
-comment further.
-
-Many thanks,
-Lorenzo
+I can't work out what's going on here at the moment, and until I do I don't
+see any justification to merging this as long as there is confusion between
+what is a physical address and what isn't.
