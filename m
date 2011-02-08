@@ -1,66 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 08 Feb 2011 21:05:25 +0900
-Subject: [PATCH V3] ARM: S5PV310: Implement kernel timers using MCT
-In-Reply-To: <20110131192241.GD32737@n2100.arm.linux.org.uk>
-References: <1296205364-30175-1-git-send-email-kgene.kim@samsung.com>
-	<20110131192241.GD32737@n2100.arm.linux.org.uk>
-Message-ID: <007001cbc788$7a7e0530$6f7a0f90$%kim@samsung.com>
+From: will.newton@gmail.com (Will Newton)
+Date: Tue, 8 Feb 2011 12:06:57 +0000
+Subject: [PATCH v4] dw_mmc: Add Synopsys DesignWare mmc host driver.
+In-Reply-To: <4D511FA7.4040207@samsung.com>
+References: <AANLkTi=0RtvsGX+Q3goL3mdG6oKeNidYtiudTZ8ZTpRP@mail.gmail.com>
+	<20101208115510.GD10998@console-pimps.org>
+	<AANLkTi=KqOa-MRQiptCtZGvoafRCgULfE3QFs=hmGpdi@mail.gmail.com>
+	<AANLkTi=PpTi1_JO9Q=ph7w9Jim8iXMf9LbCfmEkWuo-h@mail.gmail.com>
+	<20101209064751.GA21128@void.printf.net>
+	<AANLkTimMgrawcndvUTYYjq9BGFqs-sbRsZkwVQ0Uvhvb@mail.gmail.com>
+	<20101209160157.GA28586@void.printf.net>
+	<AANLkTim3Rj2tTbqvT8nM4L=p=Wx8bdOnGq=EDv+cs02g@mail.gmail.com>
+	<20101211192320.GA24430@void.printf.net>
+	<AANLkTik7cMwgwXR1zK44HXC+1YtzpU3_zW2GUjcBMi8X@mail.gmail.com>
+	<4D354752.3030401@samsung.com>
+	<AANLkTi=SEXYk9B6N6RGmLKAx_QF6sybgHMVVpEo8mcp8@mail.gmail.com>
+	<4D50E4DD.4030500@samsung.com>
+	<AANLkTikTxjbkA9d9WjVNm9bC3bPLQDndwSXCxp3jOLKS@mail.gmail.com>
+	<4D511FA7.4040207@samsung.com>
+Message-ID: <AANLkTimuC1yu6ggeM3TEwzdsfGV8+=_=y5JzSEfRmBwU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Fri, Jan 28, 2011 at 06:02:44PM +0900, Kukjin Kim wrote:
-> > +irqreturn_t s5pv310_mct_comp_isr(int irq, void *dev_id)
-> 
-Oops, I missed your reply :(
+On Tue, Feb 8, 2011 at 10:49 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Will
+>
+> I'm probing dw_mmc on Samsung SoC...
+>
+> So i have some board specific data..
+>
+> But i didn't want to add board specific data in dw_mmc.c
+> I want to use get_cd()/get_wd()/init()...So i asked to you..:)
 
-> static?
-> 
-> > +{
-> > +	struct clock_event_device *evt;
-> 
-> 	struct clock_event_device *evt = dev_id;
-> 
-> > +
-> > +	s5pv310_mct_write(0x1, S5PV310_MCT_G_INT_CSTAT);
-> > +
-> > +	evt = &mct_comp_device;
-> > +	evt->event_handler(evt);
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +static struct irqaction mct_comp_event_irq = {
-> > +	.name		= "mct_comp_irq",
-> > +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
-> > +	.handler	= s5pv310_mct_comp_isr,
-> 
-> 	.dev_id		= &mct_comp_device,
-> 
-Ok...will address comments from you :-)
+It may be possible to use your board specific data in your callbacks
+directly rather than passing the board data to the driver and passing
+it back, although it depends on the structure of your code.
 
-> 
-> > +static void s5pv310_mct_tick_init(struct clock_event_device *evt)
-> > +{
-> > +	unsigned int cpu = smp_processor_id();
-> > +
-> > +	evt = &mct_tick[cpu].evt;
-> 
-> Why do you want to overwrite the already provided event device?
+> If i need not the data information, i will not append them..
+> you're right, maybe "struct dw_mci" need not..(just example)
+>
+> And i think that need card_detect irq-handler function..if we use pdata->init..isn't? :)
 
-Hmm...couldn't use just 'already provided event device' because can't get
-'mct_clock_event_device' structure like following.
+I think the use of pdata->init should be made optional, as it doesn't
+seem to be needed on most SoCs.
 
-+	struct mct_clock_event_device *mevt =
-+		container_of(evt, struct mct_clock_event_device, evt);
+> In future, if i need your help, can i ask to you?
 
-Do you have any idea for it?
+Yes, certainly. We continue to work on the driver and would be happy
+to have our bugs fixed! ;-)
 
-Thanks.
+> Onemore...Did you test the dw_mmc..?
+> If you can answer, i want to know the performance..
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+We have tested it, unfortunately I don't have any accurate performance
+figures to hand. The perform seems to be in the expected range though.
