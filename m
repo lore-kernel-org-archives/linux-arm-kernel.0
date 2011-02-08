@@ -1,45 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Feb 2011 22:42:39 +0000
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-Message-ID: <20110208224239.GA31937@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue,  8 Feb 2011 17:09:53 -0600
+Subject: [PATCH] ARM: amba: make amba_bustype non-static
+Message-ID: <1297206593-1188-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 08, 2011 at 03:22:59PM -0600, Andrei Warkentin wrote:
-> I'm not sure if this is the best place to bring this up, but Russel's
-> name is on a fair share of drivers/mmc code, and there does seem to be
-> quite a bit of MMC-related discussions. Excuse me in advance if this
-> isn't the right forum :-).
+From: Rob Herring <rob.herring@calxeda.com>
 
-I dropped out of MMC stuff once we had a functional infrastructure
-in place in the kernel - before that, there were various competing
-implementations around.
+Export amba_bustype struct so it can be used for things like registering
+bus notifiers.
 
-The implementation that's there was based off what meager information
-was available on the MMC protocol, as published by some of the card
-manufacturers.  Certainly no one had the backing to be able to get the
-official specifications and such like, nor to approach the various
-companies to get the sort of details you're talking about.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ drivers/amba/bus.c       |    2 +-
+ include/linux/amba/bus.h |    2 ++
+ 2 files changed, 3 insertions(+), 1 deletions(-)
 
-So, what's there is basically a best-effort to provide something usable
-and which works (most of the time.)  And to reflect that, error handling
-is almost non-existent.
-
-As part of trying to get better performance out of PIO-based interfaces,
-I've recently been putting some effort into making the mmc block driver
-a little more rugged in the face of various communication errors.
-
-That's not to say that I'm now taking an active interest in MMC - I'm
-not.  I'm just fixing the occasional issue which causes me problem.
-
-As for what you're talking about (controlling the coalescing of requests),
-I think you're better off sorting that out with the higher block layers
-to restrict the amount of coalescing that happens there.  I think there
-are some hooks already in place which allow you to define the maximum
-size of any request, but this doesn't take account of read/write
-properties.  Maybe that's something the higher block layer should be
-extended with?
-
-If so, you'll have to discuss it with the block layer folk.
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index e753fa9..0729294 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -110,7 +110,7 @@ static struct device_attribute amba_dev_attrs[] = {
+  * Primecells are part of the Advanced Microcontroller Bus Architecture,
+  * so we call the bus "amba".
+  */
+-static struct bus_type amba_bustype = {
++struct bus_type amba_bustype = {
+ 	.name		= "amba",
+ 	.dev_attrs	= amba_dev_attrs,
+ 	.match		= amba_match,
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index 4baa4cf..a6c1e9c 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -56,6 +56,8 @@ enum amba_vendor {
+ 	AMBA_VENDOR_ST = 0x80,
+ };
+ 
++extern struct bus_type amba_bustype;
++
+ #define amba_get_drvdata(d)	dev_get_drvdata(&d->dev)
+ #define amba_set_drvdata(d,p)	dev_set_drvdata(&d->dev, p)
+ 
+-- 
+1.7.1
