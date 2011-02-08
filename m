@@ -1,50 +1,85 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 8 Feb 2011 13:23:58 +0530
-Subject: [PATCH v1] davinci: spi: move event queue parameter to platform
-	data
-In-Reply-To: <1296828552-11765-1-git-send-email-michael.williamson@criticallink.com>
-References: <1296828552-11765-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302488B9AFA@dbde02.ent.ti.com>
+From: ccross@google.com (Colin Cross)
+Date: Tue, 8 Feb 2011 02:08:36 -0600
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110207141734.GG31929@n2100.arm.linux.org.uk>
+References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
+	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207121052.GD31929@n2100.arm.linux.org.uk>
+	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinu+ydG0frSeGf9=8PX2A1DLXma1Zfvds6+nws+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 04, 2011 at 19:39:12, Michael Williamson wrote:
-> For DMA operation, the davinci spi driver needs an event queue number.
-> Currently, this number is passed as a IORESOURCE_DMA.  This is not
-> correct, as the event queue is not a DMA channel.  Pass the event queue
-> via the platform data structure instead.
-> 
-> On dm355 and dm365, move the eventq assignment for spi0 out of resources
-> array and into platform data.
-> 
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+On Mon, Feb 7, 2011 at 8:17 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Tested this on DM355 and DM365 EVMs. Event queue numbers show up
-properly in the logs and DMA transfers to on-board SPI EEPROMs
-happen correctly.
+<snip>
 
-> ---
-> Changes since v0:
->   - combined separate platform patches with driver patch to avoid
->     potential regression if doing a bissect.
->   - fixed up typo per comments.
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> new file mode 100644
+> index 0000000..9f106fa
+> --- /dev/null
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -0,0 +1,110 @@
+> +#include <linux/linkage.h>
+> +#include <asm/asm-offsets.h>
+> +#include <asm/assembler.h>
+> +#include <asm/glue-cache.h>
+> +#include <asm/glue-proc.h>
+> + ? ? ? .text
+> +
+> +/*
+> + * Save CPU state for a suspend
+> + * ?r1 = v:p offset
+> + * ?r3 = virtual return function
+> + * Note: sp is decremented to allocate space for CPU state on stack
+> + * r0-r3,r9,r10,lr corrupted
+> + */
+> +ENTRY(cpu_suspend)
+> + ? ? ? mov ? ? r9, lr
+> +#ifdef MULTI_CPU
+> + ? ? ? ldr ? ? r10, =processor
+> + ? ? ? mov ? ? r2, sp ? ? ? ? ? ? ? ? ?@ current virtual SP
+> + ? ? ? ldr ? ? r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
+> + ? ? ? ldr ? ? ip, [r10, #CPU_DO_RESUME] @ virtual resume function
+> + ? ? ? sub ? ? sp, sp, r0 ? ? ? ? ? ? ?@ allocate CPU state on stack
+> + ? ? ? mov ? ? r0, sp ? ? ? ? ? ? ? ? ?@ save pointer
+> + ? ? ? add ? ? ip, ip, r1 ? ? ? ? ? ? ?@ convert resume fn to phys
+> + ? ? ? stmfd ? sp!, {r1, r2, r3, ip} ? @ save v:p, virt SP, retfn, phys resume fn
+> + ? ? ? ldr ? ? r3, =sleep_save_sp
+The global variable will prevent using this function to save the state
+of multiple CPUs during idle.
 
-This typo doesn't seem fixed?
+<snip>
 
-> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
-> + *		on the bus.
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 0c1172b..a5187dd 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
 
-On 2/4/2011 7:03 AM, Sergei Shtylyov wrote:
->> + * @dma_event_q: DMA event_q to use if SPI_IO_TYPE_DMA is used for any device
-> 
->    s/event_q/event queue/?
+<snip>
 
-Can you please re-spin with this fixed and my ack included:
+> +/* Suspend/resume support: derived from arch/arm/mach-s5pv210/sleep.S */
+> +.globl cpu_v7_suspend_size
+> +.equ ? cpu_v7_suspend_size, 4 * 8
+> +#ifdef CONFIG_PM
+> +ENTRY(cpu_v7_do_suspend)
+> + ? ? ? stmfd ? sp!, {r4 - r11, lr}
+> + ? ? ? mrc ? ? p15, 0, r4, c13, c0, 0 ?@ FCSE/PID
+> + ? ? ? mrc ? ? p15, 0, r5, c13, c0, 1 ?@ Context ID
+> + ? ? ? mrc ? ? p15, 0, r6, c3, c0, 0 ? @ Domain ID
+> + ? ? ? mrc ? ? p15, 0, r7, c2, c0, 0 ? @ TTB 0
+> + ? ? ? mrc ? ? p15, 0, r8, c2, c0, 1 ? @ TTB 1
+> + ? ? ? mrc ? ? p15, 0, r9, c1, c0, 0 ? @ Control register
+> + ? ? ? mrc ? ? p15, 0, r10, c1, c0, 1 ?@ Auxiliary control register
+> + ? ? ? mrc ? ? p15, 0, r11, c1, c0, 2 ?@ Co-processor access control
+> + ? ? ? stmia ? r0, {r4 - r11}
+> + ? ? ? ldmfd ? sp!, {r4 - r11, pc}
+> +ENDPROC(cpu_v7_do_suspend)
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-With Grant's ack this should probably get merged through
-DaVinci tree (since it touches mach-davinci).
-
-Thanks,
-Sekhar
+Should the FIQ banked registers be saved in here, or by the driver
+that set them?
