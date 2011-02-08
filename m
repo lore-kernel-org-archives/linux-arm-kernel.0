@@ -1,86 +1,49 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue,  8 Feb 2011 15:40:35 +0530
-Subject: [PATCH 4/7] omap: dpll: Add allow_idle/deny_idle support for all
-	DPLL's
-In-Reply-To: <1297159838-30282-4-git-send-email-rnayak@ti.com>
-References: <1297159838-30282-1-git-send-email-rnayak@ti.com>
-	<1297159838-30282-2-git-send-email-rnayak@ti.com>
-	<1297159838-30282-3-git-send-email-rnayak@ti.com>
-	<1297159838-30282-4-git-send-email-rnayak@ti.com>
-Message-ID: <1297159838-30282-5-git-send-email-rnayak@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 08 Feb 2011 10:21:52 +0000
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110207150233.GI31929@n2100.arm.linux.org.uk>
+References: <E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207121052.GD31929@n2100.arm.linux.org.uk>
+	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
+	<20110207143351.GH31929@n2100.arm.linux.org.uk>
+	<AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
+	<20110207150233.GI31929@n2100.arm.linux.org.uk>
+Message-ID: <1297160512.31587.17.camel@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All OMAP3/4 dpll's support hardware level autogating.
-Populate allow_idle/deny_idle function pointers for all
-DPLL's in clkops.
+Hi Russell,
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/clock.c          |    8 +++++++-
- arch/arm/mach-omap2/clock.h          |    1 +
- arch/arm/mach-omap2/clock3xxx_data.c |    2 +-
- arch/arm/mach-omap2/clock44xx_data.c |    2 +-
- 4 files changed, 10 insertions(+), 3 deletions(-)
+On Mon, 2011-02-07 at 15:02 +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 07, 2011 at 04:58:05PM +0200, saeed bishara wrote:
+> > well, the allocation of the identity page table doesn't need to be
+> > done in assembly code. this is the similar to what you did in
+> > __cpu_up.
+> > for example, this allocation can be done in arch/arm/kernel/setup.c.
+> > the assembly code only need to know the offset of this page table.
+> > looks that there are several usages for the identity page table (smp
+> > boot, kexec, pm), maybe all those clients can share the same one.
+> 
+> We don't want to allocate this at boot time, because it will require
+> additional maintainence when L1 page tables are added for ioremap() etc.
+> 
+> I feel that it's best to leave it as-is, as this is the method everyone
+> has been using to date.  When it becomes a problem, we can then look at
+> resolving it.
+> 
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index e0f017d..909e3c5 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -377,10 +377,16 @@ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent)
- const struct clkops clkops_omap3_noncore_dpll_ops = {
- 	.enable		= omap3_noncore_dpll_enable,
- 	.disable	= omap3_noncore_dpll_disable,
-+	.allow_idle	= omap3_dpll_allow_idle,
-+	.deny_idle	= omap3_dpll_deny_idle,
- };
- 
--#endif
-+const struct clkops clkops_omap3_core_dpll_ops = {
-+	.allow_idle	= omap3_dpll_allow_idle,
-+	.deny_idle	= omap3_dpll_deny_idle,
-+};
- 
-+#endif
- 
- /*
-  * OMAP2+ clock reset and init functions
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 896584e..2a939e5 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -146,5 +146,6 @@ extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
- #endif
- 
- extern const struct clkops clkops_omap3_noncore_dpll_ops;
-+extern const struct clkops clkops_omap3_core_dpll_ops;
- 
- #endif
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 3e9d721..7cf89f8 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -429,7 +429,7 @@ static struct dpll_data dpll3_dd = {
- 
- static struct clk dpll3_ck = {
- 	.name		= "dpll3_ck",
--	.ops		= &clkops_null,
-+	.ops		= &clkops_omap3_core_dpll_ops,
- 	.parent		= &sys_ck,
- 	.dpll_data	= &dpll3_dd,
- 	.round_rate	= &omap2_dpll_round_rate,
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index de9ec8d..b843b6e 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -443,7 +443,7 @@ static struct clk dpll_core_ck = {
- 	.parent		= &sys_clkin_ck,
- 	.dpll_data	= &dpll_core_dd,
- 	.init		= &omap2_init_dpll_parent,
--	.ops		= &clkops_null,
-+	.ops		= &clkops_omap3_core_dpll_ops,
- 	.recalc		= &omap3_dpll_recalc,
- };
- 
--- 
-1.7.0.4
+For v7 MP cpuidle it is already critical, we do need to have a page
+table copy for the resume path to be MP safe. The same goes for the
+stack pointer global variable which should be per cpu.
+Maybe we can just provide an API to pass the page table pointer, then
+see how to allocate it and when.
+In which branch do these patches live in order to test them and 
+provide feedback ?
+
+Many thanks,
+Lorenzo
