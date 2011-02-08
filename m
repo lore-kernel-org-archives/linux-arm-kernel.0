@@ -1,64 +1,82 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Tue, 8 Feb 2011 10:11:06 -0700
-Subject: [PATCH 3/4] ARM: Xilinx: Adding timer support to the platform
-In-Reply-To: <201102081625.57049.arnd@arndb.de>
-References: <1296922124-23379-1-git-send-email-john.linn@xilinx.com>
-	<20110208143514.GB27521@n2100.arm.linux.org.uk>
-	<f3101c62-0bd1-4ad5-8ace-d81a1fd58890@VA3EHSMHS005.ehs.local>
-	<201102081625.57049.arnd@arndb.de>
-Message-ID: <76dc00d0-89c9-4ae4-a34d-d1045117b08e@VA3EHSMHS016.ehs.local>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 8 Feb 2011 17:15:40 +0000
+Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
+In-Reply-To: <201102081758.14606.arnd@arndb.de>
+References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
+	<201102081617.59092.arnd@arndb.de>
+	<20110208163229.GC6188@n2100.arm.linux.org.uk>
+	<201102081758.14606.arnd@arndb.de>
+Message-ID: <AANLkTi=G2h0cV-iLczCtcUzWn7vpa0GDOhr=PArhFQLy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Tuesday, February 08, 2011 8:26 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: John Linn; Russell King - ARM Linux; catalin.marinas at arm.com;
-glikely at secretlab.ca; Kiran Sutariya
-> Subject: Re: [PATCH 3/4] ARM: Xilinx: Adding timer support to the
-platform
-> 
-> On Tuesday 08 February 2011, John Linn wrote:
-> > > > +#define PERIPH_BASE            0xF8000000
-> > >
-> > > should be:
-> > >
-> > > #define PERIPH_BASE            IOMEM(0xF8000000)
-> > >
-> > > But then in a different patch you do:
-> > > +               .virtual        = TTC0_BASE,
-> > > +               .pfn            = __phys_to_pfn(TTC0_BASE),
-> > >
-> > > So it's also used as a physical address.  Yuck.
-> >
-> > I have been mapping everything flat (virt = phys) and I should have
-been
-> > clearer on that.
-> >
-> > It seems like there are two sets of #defines expected, virtual and
-> > physical, even if they are the same.
-> 
-> Yes, it quickly gets messy otherwise. Normally, you only need to
-specify
-> very few physical addresses, e.g. the start of each register window.
-> When you have separate defines for your virtual bases, you can also
-> make them type safe right away, like:
-> 
-> #define PERIPH_BASE_PHYS 0xf800000
-> #define PERIPH_BASE     IOMEM(PERIPH_BASE_PHYS)
-> 
-> #define TCC0_BASE 	(PERIPH_BASE + 0xA0000)
-> #define TCC1_BASE	(PERIPH_BASE + 0xB0000)
-> 
-> This way, you don't need to convert the types in driver code.
-> 
+On Tue, Feb 8, 2011 at 4:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 08 February 2011 17:32:29 Russell King - ARM Linux wrote:
+>> On Tue, Feb 08, 2011 at 04:17:58PM +0100, Arnd Bergmann wrote:
+>> > On Tuesday 08 February 2011, Dave Martin wrote:
+>> > > CFLAGS_cpu_specific_object.o ? ? ? ?+= -march=armv7-a
+>> > >
+>> > > Whether it's safe to do it depends on whether code from that file
+>> > > could ever get run on other processors. ?I'm not so sure of the answer
+>> > > to that..., but perhaps someone else has a better idea.
+>> >
+>> > We already do this a lot from arch/arm/mm/Makefile, and those
+>> > files are typically just one function per file, so they can easily
+>> > be proven to be safe that way.
+>>
+>> No, we do that with assembly files. ?It doesn't work soo well with
+>> C files as we really don't want GCC itself to generate v7 instructions
+>> unless we explicitly ask for them.
+>>
+>> The other issue here is that somtimes generating code with different
+>> -march options leads to the linker refusing to link them together...
+>
+> Ok, I see. Is that a bug in existing toolchains, or something more
+> fundamental?
+>
+> I would have expected that you could at least mix all compiler options
+> that don't impact the ABI or the instruction set like -mthumb.
+>
+> Also, I think we can still build with e.g. "-march=armv6 -Wa,-march=armv7",
+> which should tell the compiler to only emit armv6 instructions, but make
+> the assembler more permissive for inline assembly.
 
-Thanks for clarification Arnd.  Appreciate the help.
+I think you can usually mix options provided the ABI isn't affected.
+It could be interesting to try it just to see what happens...
 
--- John
+I've seen this work, but I haven't tried it on a large scale such as
+building the kernel...
 
-> 	Arnd
+I think the major problems in the past have usually between
+OABI<->EABI, non-interworking<->interworking, non-PIC<->PIC and
+floating-point ABI clashes, particularly regarding compiler helper
+libs like libgcc.  I expect none of these are likely to affect the
+kernel, particularly since the kernel has its own libgcc (I think).
 
+Possibly EABI toolchains are better at handling this than the for old
+ABI, but it's still not ideal: for example, if you build this with
+-march=armv6
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+void fancy() {
+    if(have_arch_v7()) {
+        asm(".arch v7-a\n\t"
+               /* ... fancy stuff ... */
+               ".arch v6");
+    } else {
+        /* C implementation of fancy stuff */
+    }
+}
+
+... the object is marked as requiring v7, since some v7 instructions
+were emitted.  Really, the object only requires v6, but that
+conclusion requires knowledge the tools don't have.  (Note that tools
+guys I've talked to don't much like changing .arch mid-file, but from
+my PoV it should be reasonable except for the problem of knowing what
+.arch to restore to afterwards.)
+
+If vmlinux ends up stamped as requiring v7, that has no effect
+whatsoever on whether the kernel works.  That's down to what the
+actual code does, as in the above example.
+
+Cheers
+---Dave
