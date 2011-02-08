@@ -1,51 +1,89 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 8 Feb 2011 18:01:20 +0530
-Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
-In-Reply-To: <20110208122205.GA5903@arm.com>
-References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
-	<20110208110808.GA22877@n2100.arm.linux.org.uk>
-	<201102081311.52004.arnd@arndb.de> <20110208122205.GA5903@arm.com>
-Message-ID: <99745ad4c4f07cc2eb0ac9241cf23956@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Feb 2011 12:33:22 +0000
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110208112323.GA22592@n2100.arm.linux.org.uk>
+References: <AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+	<AANLkTi=JCQBH4sjJzWajYJx6VuUTgdB76nxXbvKTrcwc@mail.gmail.com>
+	<20110207143351.GH31929@n2100.arm.linux.org.uk>
+	<AANLkTikVQG1ngkT7VwvjiSJjSfNsSMw=msfhc44emx6B@mail.gmail.com>
+	<20110207150233.GI31929@n2100.arm.linux.org.uk>
+	<1297160512.31587.17.camel@e102568-lin.cambridge.arm.com>
+	<20110208112323.GA22592@n2100.arm.linux.org.uk>
+Message-ID: <20110208123322.GB22592@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Dave Martin [mailto:dave.martin at linaro.org]
-> Sent: Tuesday, February 08, 2011 5:52 PM
-> To: Arnd Bergmann
-> Cc: linux-arm-kernel at lists.infradead.org; Russell King - ARM Linux;
-> Nicolas Pitre; Tony Lindgren; Santosh Shilimkar; linux-
-> omap at vger.kernel.org; Jean Pihet
-> Subject: Re: [PATCH v2] ARM: Define wfi() macro for v6 processors
->
-> > > On Tue, Feb 08, 2011 at 11:01:25AM +0000, Dave Martin wrote:
-> > > > For v6, wfi is architected as a defined MCR instruction, so
-> > > > use that definition.
->
-> [...]
->
-> On Tue, Feb 08, 2011 at 01:11:51PM +0100, Arnd Bergmann wrote:
-> > I don't see any users of the sev/wfe/wfi macros in the current
-> kernel,
-> > so removing them seems like a good strategy to avoid people from
-> > using them incorrectly.
-> >
-> > If the definitions differ between v5/v6/v7 CPUs, any common code
-> > using them would need to do either binary patching of some sort
-> > or abstract the difference between the CPU in some other way.
-> >
-> > Dave, what code do you have in mind as a possible user?
->
-> The OMAP BSP has its own version of this, which I'm suggesting
-> to port to the more generic macros in system.h, now that they
-> exist.
->
-Omap 'sev' version is removed some time back. We were keeping
-WFI opcode version because of V6 and V7 compatibility issue. With
-resent CPU_32v6K from Russell, that should also get addressed.
+On Tue, Feb 08, 2011 at 11:23:23AM +0000, Russell King - ARM Linux wrote:
+> > The same goes for the stack pointer global variable which should be
+> > per cpu.
+> 
+> Yes, but this is what is currently done, so at the present time I'm
+> just sorting out what's already in the kernel.  If we need further
+> changes, then that needs to be built on top of this.
 
-I shall remove the omap wfi version as soon as RMK's series is
-merged.
+Like this:
 
-Regards,
-Santosh
+ arch/arm/kernel/sleep.S |   26 +++++++++++++++++++++++++-
+ 1 files changed, 25 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 9f106fa..e10618f 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -25,7 +25,14 @@ ENTRY(cpu_suspend)
+ 	stmfd	sp!, {r1, r2, r3, ip}	@ save v:p, virt SP, retfn, phys resume fn
+ 	ldr	r3, =sleep_save_sp
+ 	add	r2, sp, r1		@ convert SP to phys
++#ifdef CONFIG_SMP
++	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
++	ALT_UP(mov lr, #0)
++	and	lr, lr, #15
++	str	r2, [r3, lr, lsl #2]	@ save phys SP
++#else
+ 	str	r2, [r3]		@ save phys SP
++#endif
+ 	mov	lr, pc
+ 	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
+ #else
+@@ -36,7 +43,14 @@ ENTRY(cpu_suspend)
+ 	stmfd	sp!, {r1, r2, r3}	@ save v:p, virt SP, return fn
+ 	ldr	r3, =sleep_save_sp
+ 	add	r2, sp, r1		@ convert SP to phys
++#ifdef CONFIG_SMP
++	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
++	ALT_UP(mov lr, #0)
++	and	lr, lr, #15
++	str	r2, [r3, lr, lsl #2]	@ save phys SP
++#else
+ 	str	r2, [r3]		@ save phys SP
++#endif
+ 	bl	cpu_do_suspend
+ #endif
+ 
+@@ -96,7 +110,15 @@ cpu_resume_after_mmu:
+ 	.data
+ 	.align
+ ENTRY(cpu_resume)
++#ifdef CONFIG_SMP
++	adr	r0, sleep_save_sp
++	ALT_SMP(mrc p15, 0, r1, c0, c0, 5)
++	ALT_UP(mov r1, #0)
++	and	r1, r1, #15
++	ldr	r0, [r0, r1, lsl #2]	@ stack phys addr
++#else
+ 	ldr	r0, sleep_save_sp	@ stack phys addr
++#endif
+ 	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
+ #ifdef MULTI_CPU
+ 	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
+@@ -107,4 +129,6 @@ ENTRY(cpu_resume)
+ ENDPROC(cpu_resume)
+ 
+ sleep_save_sp:
+-	.word	0				@ preserve stack phys ptr here
++	.rept	CONFIG_NR_CPUS
++	.long	0				@ preserve stack phys ptr here
++	.endr
