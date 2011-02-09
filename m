@@ -1,27 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 8 Feb 2011 16:35:37 -0800
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <alpine.LFD.2.00.1102081537010.14920@xanadu.home>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
-	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
-Message-ID: <20110209003537.GQ20795@atomide.com>
+From: R49496@freescale.com (Estevam Fabio-R49496)
+Date: Wed, 9 Feb 2011 00:40:51 +0000
+Subject: [PATCH] mmc: mmc_mxc: Allow selection only for the correct
+	platforms
+In-Reply-To: <20110121103517.GD9041@pengutronix.de>
+References: <1295542979-10329-1-git-send-email-fabio.estevam@freescale.com>
+	<20110121103517.GD9041@pengutronix.de>
+Message-ID: <F09210E57DF486449C294B7BFB86534713C019@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [110208 12:41]:
-> On Tue, 8 Feb 2011, Santosh Shilimkar wrote:
-> 
-> > > I think it's probably going to be better to _purposely_ break the 
-> > > OMAP build when it covers v6 and v7 CPUs in these kernels as I don't 
-> > > think it's sanely fixable given where we are.
-> 
-> Agreed.  At least making SMP unavailable when both v6 and v7 are 
-> configured should be small and good enough for 2.6.38-rc5.
+Chris?
 
-That's probably the best solution as then we can still do boot
-testing on all omap2plus_defconfig boards.
+-----Original Message-----
+From: Sascha Hauer [mailto:s.hauer at pengutronix.de] 
+Sent: Friday, January 21, 2011 8:35 AM
+To: Estevam Fabio-R49496
+Cc: linux-mmc at vger.kernel.org; cjb at laptop.org; kernel at pengutronix.de; u.kleine-koenig at pengutronix.de; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH] mmc: mmc_mxc: Allow selection only for the correct platforms
 
-Tony
+On Thu, Jan 20, 2011 at 03:02:59PM -0200, Fabio Estevam wrote:
+> Currently MMC_MXC driver can be selected by all i.MX devices.
+> 
+> Restrict its use only for the appropriate processors.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+> ---
+>  drivers/mmc/host/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig index 
+> d618e86..a3a9ec1 100644
+> --- a/drivers/mmc/host/Kconfig
+> +++ b/drivers/mmc/host/Kconfig
+> @@ -288,7 +288,7 @@ config MMC_MSM
+>  
+>  config MMC_MXC
+>  	tristate "Freescale i.MX2/3 Multimedia Card Interface support"
+> -	depends on ARCH_MXC
+> +	depends on MACH_MX21 || MACH_MX27 || ARCH_MX31
+>  	help
+>  	  This selects the Freescale i.MX2/3 Multimedia card Interface.
+>  	  If you have a i.MX platform with a Multimedia Card slot,
+> --
+> 1.6.0.4
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
