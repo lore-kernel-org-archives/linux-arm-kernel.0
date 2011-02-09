@@ -1,76 +1,44 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  9 Feb 2011 15:01:20 +0000
-Subject: [PATCH v4 2/5] ARM: omap4: Convert END() to ENDPROC() for correct
-	linkage with CONFIG_THUMB2_KERNEL
-In-Reply-To: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
-References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1297263683-10621-3-git-send-email-dave.martin@linaro.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 9 Feb 2011 23:07:42 +0800
+Subject: [PATCH] ARM: pxa: Properly configure PWM period for palm27x
+In-Reply-To: <201102011918.45662.marek.vasut@gmail.com>
+References: <1296511613-24406-1-git-send-email-marek.vasut@gmail.com>
+	<201102011918.45662.marek.vasut@gmail.com>
+Message-ID: <AANLkTi=y76tTMGLokfZqsFRn469Qmbhhd9h9ZfUJ59jS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Code marked with ENTRY() also needs a matching ENDPROC() directive,
-in order to ensure that the type and instruction set of the
-symbol are correctly annotated.
+Note: it's eric.y.miao at gmail.com
 
-ENDPROC() tags the affected symbol as a function symbol, which will
-ensure that link-time fixups don't accidentally switch to the
-wrong instruction set.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/omap-headsmp.S |    2 +-
- arch/arm/mach-omap2/omap44xx-smc.S |    8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+On Wed, Feb 2, 2011 at 2:18 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Monday 31 January 2011 23:06:53 Marek Vasut wrote:
+>> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
 
-diff --git a/arch/arm/mach-omap2/omap-headsmp.S b/arch/arm/mach-omap2/omap-headsmp.S
-index 6ae937a..4ee6aec 100644
---- a/arch/arm/mach-omap2/omap-headsmp.S
-+++ b/arch/arm/mach-omap2/omap-headsmp.S
-@@ -45,5 +45,5 @@ hold:	ldr	r12,=0x103
- 	 * should now contain the SVC stack for this core
- 	 */
- 	b	secondary_startup
--END(omap_secondary_startup)
-+ENDPROC(omap_secondary_startup)
- 
-diff --git a/arch/arm/mach-omap2/omap44xx-smc.S b/arch/arm/mach-omap2/omap44xx-smc.S
-index 1980dc3..e69d37d 100644
---- a/arch/arm/mach-omap2/omap44xx-smc.S
-+++ b/arch/arm/mach-omap2/omap44xx-smc.S
-@@ -29,7 +29,7 @@ ENTRY(omap_smc1)
- 	dsb
- 	smc	#0
- 	ldmfd   sp!, {r2-r12, pc}
--END(omap_smc1)
-+ENDPROC(omap_smc1)
- 
- ENTRY(omap_modify_auxcoreboot0)
- 	stmfd   sp!, {r1-r12, lr}
-@@ -37,7 +37,7 @@ ENTRY(omap_modify_auxcoreboot0)
- 	dsb
- 	smc	#0
- 	ldmfd   sp!, {r1-r12, pc}
--END(omap_modify_auxcoreboot0)
-+ENDPROC(omap_modify_auxcoreboot0)
- 
- ENTRY(omap_auxcoreboot_addr)
- 	stmfd   sp!, {r2-r12, lr}
-@@ -45,7 +45,7 @@ ENTRY(omap_auxcoreboot_addr)
- 	dsb
- 	smc	#0
- 	ldmfd   sp!, {r2-r12, pc}
--END(omap_auxcoreboot_addr)
-+ENDPROC(omap_auxcoreboot_addr)
- 
- ENTRY(omap_read_auxcoreboot0)
- 	stmfd   sp!, {r2-r12, lr}
-@@ -54,4 +54,4 @@ ENTRY(omap_read_auxcoreboot0)
- 	smc	#0
- 	mov	r0, r0, lsr #9
- 	ldmfd   sp!, {r2-r12, pc}
--END(omap_read_auxcoreboot0)
-+ENDPROC(omap_read_auxcoreboot0)
--- 
-1.7.1
+Applied.
+
+>> ---
+>> ?arch/arm/mach-pxa/palm27x.c | ? ?2 +-
+>> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
+>> index 7d1434a..4c9a938 100644
+>> --- a/arch/arm/mach-pxa/palm27x.c
+>> +++ b/arch/arm/mach-pxa/palm27x.c
+>> @@ -322,7 +322,7 @@ static struct platform_pwm_backlight_data
+>> palm27x_backlight_data = { .pwm_id ? ? ? ? ? ?= 0,
+>> ? ? ? .max_brightness = 0xfe,
+>> ? ? ? .dft_brightness = 0x7e,
+>> - ? ? .pwm_period_ns ?= 3500,
+>> + ? ? .pwm_period_ns ?= 3500 * 1024,
+>> ? ? ? .init ? ? ? ? ? = palm27x_backlight_init,
+>> ? ? ? .notify ? ? ? ? = palm27x_backlight_notify,
+>> ? ? ? .exit ? ? ? ? ? = palm27x_backlight_exit,
+>
+> CC linux-arm-kernel, I mistyped, sorry
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
