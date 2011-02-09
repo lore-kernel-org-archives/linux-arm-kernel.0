@@ -1,48 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 9 Feb 2011 21:57:43 +0530
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <20110209162421.GU20795@atomide.com>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
-	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
-	<20110209003537.GQ20795@atomide.com>
-	<54f225541194205f01fe9f03b5110d16@mail.gmail.com>
-	<AANLkTin2zB32YVPZkr48gSOjm0N-WDnZFScysKC8ZTiv@mail.gmail.com>
-	<80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
-	<20110209162421.GU20795@atomide.com>
-Message-ID: <d655d7259563a3bb47fd877c66b0269f@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Feb 2011 17:31:07 +0100
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <20110209153716.GN9041@pengutronix.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102091547.12131.arnd@arndb.de>
+	<20110209153716.GN9041@pengutronix.de>
+Message-ID: <201102091731.07794.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Wednesday, February 09, 2011 9:54 PM
-> To: Santosh Shilimkar
-> Cc: Dave Martin; Nicolas Pitre; linux-omap at vger.kernel.org; Russell
-> King - ARM Linux; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
->
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110209 01:59]:
-> > > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > >
-> > > You could also have a "v7+" unified kernel -- i.e., supporting
-> > > OMAP3+4+SMP.
-> > > This is what we currently do in Linaro, since we're focusing on
-> v7
-> > > and above.
-> > >
-> > This sounds good way forward considering future OMAP architectures
-> > as well.
-> >
-> > But I let Tony comment on this idea.
->
-> AFAIK these issues will be hopefully sorted out by the time the
-> next merge window opens. For the -rc cycle, disabling SMP in
-> config if ARMv6 is selected should do the trick.
->
-Ok.
+On Wednesday 09 February 2011, Sascha Hauer wrote:
 
-Regards,
-Santosh
+> The driver patch itself is Cced to linux-fbdev, only the introductory
+> mail is not.
+
+Ok, I see.
+
+> > Did you consider making the driver a KMS driver instead of
+> > a frame buffer? I think the recommendation these days is
+> > to start out with KMS for new drivers, which will be somewhat
+> > simpler and give you a frame buffer device as well. I don't
+> > think that there is a need to change over any drivers from
+> > fb to kms though, since you've already done the work.
+> 
+> I tried doing so for the i.MX51 which supports multiple displays on dvi
+> and vga outputs and thus could make good use of KMS and friends. Anyway,
+> I got stuck quite fast. The KMS stuff is tightly coupled with DRM/DRI
+> and needs many many callbacks to implement. Additionally the userspace
+> tools expect a nvidia/amd/intel driver and do not have a generic
+> fallback. I think this stuff is good for implementing a full blown
+> graphics driver, but is lacking support for simple framebuffer grapics.
+> I'd love to go this way but it still requires a lot of work.
+
+Ok. This sounds like a lot of upfront work indeed, to make KMS more
+generic, though I think a number of driver would benefit from it
+eventually. It could be something for the Linaro graphics working
+group to look at in the following 11.11 release, depending on how
+many other people are interested in getting there.
+
+	Arnd
