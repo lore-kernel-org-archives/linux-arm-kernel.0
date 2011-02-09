@@ -1,38 +1,31 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 9 Feb 2011 14:13:04 +0100
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <20110209204223.GA7417@S2100-06.ap.freescale.net>
-References: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<19793.22067.960689.669543@ipc1.ka-ro>
-	<20110209001710.GF6963@S2100-06.ap.freescale.net>
-	<19794.19192.351501.395360@ipc1.ka-ro>
-	<20110209204223.GA7417@S2100-06.ap.freescale.net>
-Message-ID: <19794.37600.437618.46182@ipc1.ka-ro>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed,  9 Feb 2011 14:20:49 +0100
+Subject: [PATCH] i.MX23/28 framebuffer driver
+Message-ID: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-Shawn Guo writes:
-> On Wed, Feb 09, 2011 at 09:06:16AM +0100, Lothar Wa?mann wrote:
-[...]
-> > You could use the SSP IRQ as well.
-> > 
-> No, I could not.  The SSP IRQ (e.g. MX28_INT_SSP0_ERROR) is designed
-> to indicate an error condition than the completion of mmc command.
-> 
-Ah, ok. That's the 'advantage' of not having a dedicated MMC/SD
-controller, but adding some MMC capabilities to the SSP controller.
+The following patches add framebuffer support for Freescale i.MX23/28
+processors.
 
+Sascha Hauer (2):
+      video: Add i.MX23/28 framebuffer driver
+      ARM i.MX23/28: Add framebuffer device support
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+ arch/arm/mach-mxs/clock-mx23.c             |    2 +-
+ arch/arm/mach-mxs/clock-mx28.c             |    1 +
+ arch/arm/mach-mxs/devices-mx23.h           |    4 +
+ arch/arm/mach-mxs/devices-mx28.h           |    4 +
+ arch/arm/mach-mxs/devices/Kconfig          |    4 +
+ arch/arm/mach-mxs/devices/Makefile         |    1 +
+ arch/arm/mach-mxs/devices/platform-mxsfb.c |   46 ++
+ arch/arm/mach-mxs/include/mach/fb.h        |   48 ++
+ drivers/video/Kconfig                      |    9 +
+ drivers/video/Makefile                     |    1 +
+ drivers/video/mxsfb.c                      |  914 ++++++++++++++++++++++++++++
+ 11 files changed, 1033 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-mxsfb.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/fb.h
+ create mode 100644 drivers/video/mxsfb.c
