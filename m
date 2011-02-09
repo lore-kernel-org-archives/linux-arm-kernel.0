@@ -1,61 +1,68 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 9 Feb 2011 11:45:30 -0500 (EST)
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <20110209163204.GB11460@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
-	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
-	<20110209003537.GQ20795@atomide.com>
-	<54f225541194205f01fe9f03b5110d16@mail.gmail.com>
-	<AANLkTin2zB32YVPZkr48gSOjm0N-WDnZFScysKC8ZTiv@mail.gmail.com>
-	<80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
-	<20110209162421.GU20795@atomide.com>
-	<20110209163204.GB11460@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1102091143020.14920@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 09 Feb 2011 10:55:06 -0600
+Subject: [RFC PATCH] ARM: pmu: add OF match support
+In-Reply-To: <4D529E82.1000102@gmail.com>
+References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
+	<001b01cbc83e$ec0a59e0$c41f0da0$@deacon@arm.com>
+	<4D529E82.1000102@gmail.com>
+Message-ID: <4D52C6EA.1030600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Feb 2011, Russell King - ARM Linux wrote:
+Grant,
 
-> On Wed, Feb 09, 2011 at 08:24:21AM -0800, Tony Lindgren wrote:
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110209 01:59]:
-> > > > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > > >
-> > > > You could also have a "v7+" unified kernel -- i.e., supporting
-> > > > OMAP3+4+SMP.
-> > > > This is what we currently do in Linaro, since we're focusing on v7
-> > > > and above.
-> > > >
-> > > This sounds good way forward considering future OMAP architectures
-> > > as well.
-> > > 
-> > > But I let Tony comment on this idea.
-> > 
-> > AFAIK these issues will be hopefully sorted out by the time the
-> > next merge window opens. For the -rc cycle, disabling SMP in
-> > config if ARMv6 is selected should do the trick.
-> 
-> That's not soo easy - as we don't know in the Kconfig whether we include
-> ARMv6 rather than ARMv6K.  It's exactly the same problem I ran into which
-> inflated the v6v7 patchset.
-> 
-> Maybe the best thing to do is:
-> 
-> config CPU_32v6K
->         bool "Support ARM V6K processor extensions" if !SMP
->         depends on CPU_V6 || CPU_V7
->         default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
-> 
-> drop the ' && !(ARCH_MX3 || ARCH_OMAP2)' and just let people run into the
-> resulting undefined instruction traps if they try to run the kernel on
-> V6 non-K hardware.  Not ideal, but I don't see any other 'simple' solution
-> to this.
+On 02/09/2011 08:02 AM, Rob Herring wrote:
+> Will,
+>
+> On 02/09/2011 03:51 AM, Will Deacon wrote:
+>> Hi Rob,
+>>
+>>> Add OF match table to enable OF style driver binding. The dts entry
+>>> is like
+>>> this:
+>>>
+>>> pmu {
+>>> compatible = "arm,pmu";
+>>> interrupts =<100 101>;
+>>> };
+>>>
+>>> The use of pdev->id as an index breaks with OF device binding. Change
+>>> to use
+>>> a counter instead. If more than 1 pmu device is ever really supported, a
+>>> better solution to match users with particular pmu is probably needed.
+>>
+>> We will want to support multiple PMU devices in the near future but
+>> this is currently blocked on userspace issues. One such device would
+>> be the event counters on the PL310, which could be used to complement
+>> the CPU PMU on the Cortex-A9.
+>>
+>> I don't like the idea of a counter as it forces platforms to register
+>> their devices in a specific order. Is it possible to separate different
+>> types of PMU in the device tree and then have pmu.c work out what to do
+>> with them?
+>
+> Yes, they are easily distinguished by the compatible strings. Adding a
+> pmu_get function which returns the device based on a string or
+> capabilities may be a better solution. If you had 2 pmu's of the same
+> type, the current code would break.
+>
+> In any case, how about this:
+>
+> static int __devinit pmu_device_probe(struct platform_device *pdev)
+> {
+> enum arm_pmu_type type = pdev->id;
+>
+> if (of_device_is_compatible(pdev->dev.of_node, "arm,pmu"))
+> type = ARM_PMU_DEVICE_CPU;
 
-This should be good enough.  We're looking for a temporary stopgate 
-solution to prevent people from corrupting their data, and the real fix 
-will be available in the next kernel.
+Actually, this needs to be:
 
+#ifdef CONFIG_OF
+	if (of_device_is_compatible(pdev->dev.of_node, "arm,pmu"))
+		type = ARM_PMU_DEVICE_CPU;
+#endif
 
-Nicolas
+Seems fixing the struct device conditional is just the tip of the 
+iceberg. Should we do empty functions for all driver accessed OF functions?
+
+Rob
