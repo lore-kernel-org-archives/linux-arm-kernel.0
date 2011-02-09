@@ -1,33 +1,262 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 09 Feb 2011 16:57:18 +0300
-Subject: [PATCH] ARM: imx/eukrea_mbimx27: fix compile warnings about unused
-	variables
-In-Reply-To: <1297196241-26564-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1297196241-26564-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4D529D3E.5090405@ru.mvista.com>
+From: raghuveer.murthy@ti.com (Raghuveer Murthy)
+Date: Wed,  9 Feb 2011 19:25:27 +0530
+Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
+Message-ID: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Adding DVI support to OMAP4 PandaBoard.
 
-On 08-02-2011 23:17, Uwe Kleine-K?nig wrote:
+PandaBoard uses TFP410 DVI Framer chip
+http://focus.ti.com/lit/ds/symlink/tfp410.pdf
 
-> Signed-off-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
-[...]
+The TFP410 gets its power enable and display data over GPIO lines muxed
+in from OMAP4430. PandaBoard supports other LCD displays through expansion
+connectors, following board rework. This will disable the DVI interface.
+However, the existing mux settings remain the same
 
-> diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-> index 275c858..9ac5348 100644
-> --- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-> +++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-[...]
-> @@ -268,7 +268,8 @@ static struct ads7846_platform_data ads7846_config __initdata = {
->   	.keep_vref_on		= 1,
->   };
->
-> -static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
-> +static struct spi_board_info __maybe_unused
-> +eukrea_mbimx27_spi_board_info[] __initdata = {
+PandaBoard additionally supports display over HDMI interface. It is
+mutually exclusive to display over DVI. Hence the mux settings need to be
+configured seperately, as and when HDMI is enabled
 
-    I think the second line should be somewhat indented.
+Also, I2C3 bus used for reading EDID data from DVI Monitors is
+registered here. Since the design is similar to BeagleBoard, the code
+for the same is taken from the kernel.org commit e3333f48dd5cb21
+(omap: Adding beagle i2c eeprom driver to read EDID)
 
-WBR, Sergei
+Reviewed-by: Manjunath G Kondaiah <manjugk@ti.com>
+Reviewed-by: Anand Gadiyar <gadiyar@ti.com> 
+Reviewed-by: Nishanth Menon <nm@ti.com>
+Reviewed-by: Sumit Semwal <sumit.semwal@ti.com>
+Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
+---
+
+Base
+====
+url =
+git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+branch "master"
+commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d
+tag 2.6.38-rc4
+
+Applies over:
+=============
+1.
+v10 of OMAP2,3 DSS2 HWMOD
+https://patchwork.kernel.org/patch/500191/
+
+2.
+v3 of DSS2: Generalize clock names
+https://patchwork.kernel.org/patch/520191/
+
+3.
+v3 of DSS2: OMAP4 DSS HWMOD :
+https://patchwork.kernel.org/patch/511211/
+
+4.
+OMAP: DSS2: Common IRQ handler for all OMAPs
+https://patchwork.kernel.org/patch/526241/
+
+5.
+OMAP4: DSS2: Adding fclk support for DPI interface
+https://patchwork.kernel.org/patch/529381/
+
+6.
+OMAP: DSS2: Adding dss_features for independent core clk divider
+https://patchwork.kernel.org/patch/529561/
+=================================================================
+
+ arch/arm/mach-omap2/board-omap4panda.c |  137 +++++++++++++++++++++++++++++++-
+ 1 files changed, 136 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index e944025..b09d239 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -37,6 +37,7 @@
+ #include <plat/common.h>
+ #include <plat/usb.h>
+ #include <plat/mmc.h>
++#include <plat/panel-generic-dpi.h>
+ #include "timer-gp.h"
+ 
+ #include "hsmmc.h"
+@@ -76,6 +77,60 @@ static struct platform_device *panda_devices[] __initdata = {
+ 	&leds_gpio,
+ };
+ 
++/* Display DVI */
++#define PANDA_DVI_TFP410_POWER_DOWN_GPIO	0
++
++static int panda_enable_dvi(struct omap_dss_device *dssdev)
++{
++	gpio_set_value(dssdev->reset_gpio, 1);
++	return 0;
++}
++
++static void panda_disable_dvi(struct omap_dss_device *dssdev)
++{
++	gpio_set_value(dssdev->reset_gpio, 0);
++}
++
++/* Using generic display panel */
++static struct panel_generic_dpi_data dvi_panel = {
++	.name			= "generic",
++	.platform_enable	= panda_enable_dvi,
++	.platform_disable	= panda_disable_dvi,
++};
++
++struct omap_dss_device panda_dvi_device = {
++	.type			= OMAP_DISPLAY_TYPE_DPI,
++	.name			= "dvi",
++	.driver_name		= "generic_dpi_panel",
++	.data			= &dvi_panel,
++	.phy.dpi.data_lines	= 24,
++	.reset_gpio		= PANDA_DVI_TFP410_POWER_DOWN_GPIO,
++	.channel		= OMAP_DSS_CHANNEL_LCD2,
++};
++
++int __init panda_dvi_init(void)
++{
++	int r;
++
++	/* Requesting TFP410 DVI GPIO and disabling it, at bootup */
++	r = gpio_request_one(panda_dvi_device.reset_gpio,
++				GPIOF_OUT_INIT_LOW, "DVI PD");
++	if (r)
++		pr_err("Failed to get DVI powerdown GPIO\n");
++
++	return r;
++}
++
++static struct omap_dss_device *panda_dss_devices[] = {
++	&panda_dvi_device,
++};
++
++static struct omap_dss_board_info panda_dss_data = {
++	.num_devices	= ARRAY_SIZE(panda_dss_devices),
++	.devices	= panda_dss_devices,
++	.default_device	= &panda_dvi_device,
++};
++
+ static void __init omap4_panda_init_irq(void)
+ {
+ 	omap2_init_common_infrastructure();
+@@ -375,6 +430,17 @@ static struct i2c_board_info __initdata omap4_panda_i2c_boardinfo[] = {
+ 		.platform_data = &omap4_panda_twldata,
+ 	},
+ };
++
++/*
++ * Display monitor features are burnt in their EEPROM as EDID data. The EEPROM
++ * is connected as I2C slave device, and can be accessed at address 0x50
++ */
++static struct i2c_board_info __initdata panda_i2c_eeprom[] = {
++	{
++		I2C_BOARD_INFO("eeprom", 0x50),
++	},
++};
++
+ static int __init omap4_panda_i2c_init(void)
+ {
+ 	/*
+@@ -384,13 +450,76 @@ static int __init omap4_panda_i2c_init(void)
+ 	omap_register_i2c_bus(1, 400, omap4_panda_i2c_boardinfo,
+ 			ARRAY_SIZE(omap4_panda_i2c_boardinfo));
+ 	omap_register_i2c_bus(2, 400, NULL, 0);
+-	omap_register_i2c_bus(3, 400, NULL, 0);
++	/*
++	 * Bus 3 is attached to the DVI port where devices like the pico DLP
++	 * projector don't work reliably with 400kHz
++	 */
++	omap_register_i2c_bus(3, 100, panda_i2c_eeprom,
++					ARRAY_SIZE(panda_i2c_eeprom));
+ 	omap_register_i2c_bus(4, 400, NULL, 0);
+ 	return 0;
+ }
+ 
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
++	/* gpio 0 - TFP410 PD */
++	OMAP4_MUX(KPD_COL1, OMAP_PIN_OUTPUT | OMAP_MUX_MODE3),
++	/* dispc2_data23 */
++	OMAP4_MUX(USBB2_ULPITLL_STP, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data22 */
++	OMAP4_MUX(USBB2_ULPITLL_DIR, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data21 */
++	OMAP4_MUX(USBB2_ULPITLL_NXT, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data20 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT0, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data19 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT1, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data18 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT2, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data15 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT3, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data14 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT4, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data13 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT5, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data12 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT6, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data11 */
++	OMAP4_MUX(USBB2_ULPITLL_DAT7, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data10 */
++	OMAP4_MUX(DPM_EMU3, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data9 */
++	OMAP4_MUX(DPM_EMU4, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data16 */
++	OMAP4_MUX(DPM_EMU5, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data17 */
++	OMAP4_MUX(DPM_EMU6, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_hsync */
++	OMAP4_MUX(DPM_EMU7, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_pclk */
++	OMAP4_MUX(DPM_EMU8, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_vsync */
++	OMAP4_MUX(DPM_EMU9, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_de */
++	OMAP4_MUX(DPM_EMU10, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data8 */
++	OMAP4_MUX(DPM_EMU11, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data7 */
++	OMAP4_MUX(DPM_EMU12, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data6 */
++	OMAP4_MUX(DPM_EMU13, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data5 */
++	OMAP4_MUX(DPM_EMU14, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data4 */
++	OMAP4_MUX(DPM_EMU15, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data3 */
++	OMAP4_MUX(DPM_EMU16, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data2 */
++	OMAP4_MUX(DPM_EMU17, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data1 */
++	OMAP4_MUX(DPM_EMU18, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
++	/* dispc2_data0 */
++	OMAP4_MUX(DPM_EMU19, OMAP_PIN_OUTPUT | OMAP_MUX_MODE5),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #else
+@@ -400,6 +529,7 @@ static struct omap_board_mux board_mux[] __initdata = {
+ static void __init omap4_panda_init(void)
+ {
+ 	int package = OMAP_PACKAGE_CBS;
++	int err;
+ 
+ 	if (omap_rev() == OMAP4430_REV_ES1_0)
+ 		package = OMAP_PACKAGE_CBL;
+@@ -411,6 +541,11 @@ static void __init omap4_panda_init(void)
+ 	omap4_twl6030_hsmmc_init(mmc);
+ 	omap4_ehci_init();
+ 	usb_musb_init(&musb_board_data);
++
++	/* Enabling DVI Display */
++	err = panda_dvi_init();
++	if (!err)
++		omap_display_init(&panda_dss_data);
+ }
+ 
+ static void __init omap4_panda_map_io(void)
+-- 
+1.7.0.4
