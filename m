@@ -1,44 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Feb 2011 11:07:54 +0100
-Subject: [PATCH v2] ARM: Define wfi() macro for v6 processors
-In-Reply-To: <AANLkTimDTVypBFCoO9G72TzKToAThdXm_aEi56O+w9nY@mail.gmail.com>
-References: <1297162885-2975-1-git-send-email-dave.martin@linaro.org>
-	<201102081642.52774.arnd@arndb.de>
-	<AANLkTimDTVypBFCoO9G72TzKToAThdXm_aEi56O+w9nY@mail.gmail.com>
-Message-ID: <201102091107.54917.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Feb 2011 10:10:42 -0000
+Subject: [PATCHv2] ARM: perf/oprofile: fix off-by-one in stack check
+In-Reply-To: <1297223767-12827-1-git-send-email-rabin.vincent@stericsson.com>
+References: <001401cbc7a8$f5dee5d0$e19cb170$@deacon@arm.com>
+	<1297223767-12827-1-git-send-email-rabin.vincent@stericsson.com>
+Message-ID: <001c01cbc841$9c1d33a0$d4579ae0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 February 2011, Dave Martin wrote:
-> I have a (possibly silly) question ... are the definitions in
-> arm/system.h intended to be fully generic, or not?  Some features
-> suggest an attempt at genericness, but not everything there is
-> generic.  Maybe I have misconstrued the purpose of this header.
+Hi Rabin,
 
-asm/system.h contains an ill-defined set of random stuff derived
-from what used to be in there in the old days Linux-1.x and
-whatever the individual architectures added to it.
+> Since tail is the previous fp - 1, we need to compare the new fp with tail + 1
+> to ensure that we don't end up passing in the same tail again, in order to
+> avoid a potential infinite loop in the perf interrupt handler (which has been
+> observed to occur).  A similar fix seems to be needed in the OProfile code.
+> 
+> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+> ---
+> v2: refined check as per Will's comment
+> 
+>  arch/arm/kernel/perf_event.c |    2 +-
+>  arch/arm/oprofile/common.c   |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 
-There have been previous attempts to reduce the common stuff
-and leave only architecture-specific definitions in there, but
-it still contains for all architectures at least:
+Looks good, thanks.
 
-* switch_to()
-* mb() and friends
-* cmpxchg() and friends
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-These are hard to change, because each architecture has slightly
-different rules for recursive header file inclusion, so you end
-up breaking stuff when you touch them.
-
-The other declarations and macros are arch specific, so we could
-move them to a different place or change them if there is a good
-reason to do that.
-
-I personally think it would be good to have at least cmpxchg and
-everything related to it in a separate header, like a few
-architectures do (x86, sh, alpha, mips), but I don't see too
-much value in doing that just on ARM while leaving the other
-architectures alone.
-
-	Arnd
+Will
