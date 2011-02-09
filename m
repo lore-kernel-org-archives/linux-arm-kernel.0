@@ -1,457 +1,92 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 09 Feb 2011 14:41:33 +0800
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <1297233693.241680.897691111624.0.gpush@pororo>
-Message-ID: <1297233693.242364.862698430999.1.gpush@pororo>
+From: fabio.giovagnini@aurion-tech.com (Fabio Giovagnini)
+Date: Wed, 9 Feb 2011 07:58:17 +0100
+Subject: [RFC,PATCH 2/3] clk: Generic support for fixed-rate clocks
+In-Reply-To: <1297233693.242725.820672531799.2.gpush@pororo>
+References: <1297233693.242725.820672531799.2.gpush@pororo>
+Message-ID: <201102090758.21020.fabio.giovagnini@aurion-tech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have ~21 definitions of struct clk in the ARM architecture,
-each defined on a per-platform basis. This makes it difficult to define
-platform- (or architecture-) independent clock sources without making
-assumptions about struct clk, and impossible to compile two
-platforms with different struct clks into a single image.
+Hi, guys,
+is there a documentation about clk framework?
+Or only to read the sources?
 
-This change is an effort to unify struct clk where possible, by defining
-a common struct clk, containing a set of clock operations. Different
-clock implementations can set their own operations, and have a standard
-interface for generic code. The callback interface is exposed to the
-kernel proper, while the clock implementations only need to be seen by
-the platform internals.
+Thanks a lot, and best regards
 
-This allows us to share clock code among platforms, and makes it
-possible to dynamically create clock devices in platform-independent
-code.
 
-Platforms can enable the generic struct clock through
-CONFIG_USE_COMMON_STRUCT_CLK. In this case, the clock infrastructure
-consists of a common struct clk:
+On Wednesday 09 February 2011 07:41:33 Jeremy Kerr wrote:
+> Since most platforms will need a fixed-rate clock, add one. This will
+> also serve as a basic example of an implementation of struct clk.
+> 
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> ---
+>  drivers/clk/clk.c   |   14 ++++++++++++++
+>  include/linux/clk.h |   16 ++++++++++++++++
+>  2 files changed, 30 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index c35478a..bbbdb0d 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -124,3 +124,17 @@ void __clk_put(struct clk *clk)
+>  	if (clk->ops->put)
+>  		clk->ops->put(clk);
+>  }
+> +
+> +/* clk_fixed support */
+> +
+> +#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
+> +
+> +static unsigned long clk_fixed_get_rate(struct clk *clk)
+> +{
+> +	return to_clk_fixed(clk)->rate;
+> +}
+> +
+> +struct clk_ops clk_fixed_ops = {
+> +	.get_rate = clk_fixed_get_rate,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_fixed_ops);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index fe806b7..e67fdb0 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -185,6 +185,22 @@ static inline void clk_common_init(struct clk *clk)
+>  	mutex_init(&clk->prepare_lock);
+>  }
+> 
+> +/* Simple fixed-rate clock */
+> +struct clk_fixed {
+> +	struct clk	clk;
+> +	unsigned long	rate;
+> +};
+> +
+> +extern struct clk_ops clk_fixed_ops;
+> +
+> +#define INIT_CLK_FIXED(name, r) { \
+> +	.clk = INIT_CLK(name.clk, clk_fixed_ops), \
+> +	.rate = (r) \
+> +}
+> +
+> +#define DEFINE_CLK_FIXED(name, r) \
+> +	struct clk_fixed name = INIT_CLK_FIXED(name, r)
+> +
+>  #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
+> 
+>  /*
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-struct clk {
-	const struct clk_ops	*ops;
-	unsigned int		enable_count;
-	unsigned int		prepare_count;
-	spinlock_t		enable_lock;
-	struct mutex		prepare_lock;
-};
+-- 
+Ing. Fabio Giovagnini
 
-And a set of clock operations (defined per type of clock):
-
-struct clk_ops {
-	int             (*enable)(struct clk *);
-	void            (*disable)(struct clk *);
-	unsigned long   (*get_rate)(struct clk *);
-	[...]
-};
-
-To define a hardware-specific clock, machine code can "subclass" the
-struct clock into a new struct (adding any device-specific data), and
-provide a set of operations:
-
-struct clk_foo {
-	struct clk	clk;
-	void __iomem	*some_register;
-};
-
-struct clk_ops clk_foo_ops = {
-	.get_rate = clk_foo_get_rate,
-};
-
-The common clock definitions are based on a development patch from Ben
-Herrenschmidt <benh@kernel.crashing.org>.
-
-Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-
----
- drivers/clk/Kconfig  |    3 
- drivers/clk/Makefile |    1 
- drivers/clk/clk.c    |  126 +++++++++++++++++++++++++++
- include/linux/clk.h  |  194 +++++++++++++++++++++++++++++++++++++++++--
- 4 files changed, 315 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 4168c88..6e3ae54 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -2,3 +2,6 @@
- config CLKDEV_LOOKUP
- 	bool
- 	select HAVE_CLK
-+
-+config USE_COMMON_STRUCT_CLK
-+	bool
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 07613fa..a1a06d3 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -1,2 +1,3 @@
- 
- obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
-+obj-$(CONFIG_USE_COMMON_STRUCT_CLK) += clk.o
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-new file mode 100644
-index 0000000..c35478a
---- /dev/null
-+++ b/drivers/clk/clk.c
-@@ -0,0 +1,126 @@
-+/*
-+ * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Standard functionality for the common clock API.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/module.h>
-+
-+int clk_prepare(struct clk *clk)
-+{
-+	int ret = 0;
-+
-+	mutex_lock(&clk->prepare_lock);
-+	if (clk->prepare_count == 0 && clk->ops->prepare)
-+		ret = clk->ops->prepare(clk);
-+
-+	if (!ret)
-+		clk->prepare_count++;
-+	mutex_unlock(&clk->prepare_lock);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_prepare);
-+
-+void clk_unprepare(struct clk *clk)
-+{
-+	mutex_lock(&clk->prepare_lock);
-+
-+	WARN_ON(clk->prepare_count == 0);
-+
-+	if (--clk->prepare_count == 0 && clk->ops->unprepare)
-+		clk->ops->unprepare(clk);
-+
-+	mutex_unlock(&clk->prepare_lock);
-+}
-+EXPORT_SYMBOL_GPL(clk_unprepare);
-+
-+int clk_enable(struct clk *clk)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	spin_lock_irqsave(&clk->enable_lock, flags);
-+	if (clk->enable_count == 0 && clk->ops->enable)
-+		ret = clk->ops->enable(clk);
-+
-+	if (!ret)
-+		clk->enable_count++;
-+	spin_unlock_irqrestore(&clk->enable_lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(clk_enable);
-+
-+void clk_disable(struct clk *clk)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clk->enable_lock, flags);
-+
-+	WARN_ON(clk->enable_count == 0);
-+
-+	if (!--clk->enable_count == 0 && clk->ops->disable)
-+		clk->ops->disable(clk);
-+
-+	spin_unlock_irqrestore(&clk->enable_lock, flags);
-+}
-+EXPORT_SYMBOL_GPL(clk_disable);
-+
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	if (clk->ops->get_rate)
-+		return clk->ops->get_rate(clk);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(clk_get_rate);
-+
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	if (clk->ops->round_rate)
-+		return clk->ops->round_rate(clk, rate);
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(clk_round_rate);
-+
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	if (clk->ops->set_rate)
-+		return clk->ops->set_rate(clk, rate);
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(clk_set_rate);
-+
-+int clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	if (clk->ops->set_parent)
-+		return clk->ops->set_parent(clk, parent);
-+	return -ENOSYS;
-+}
-+EXPORT_SYMBOL_GPL(clk_set_parent);
-+
-+struct clk *clk_get_parent(struct clk *clk)
-+{
-+	if (clk->ops->get_parent)
-+		return clk->ops->get_parent(clk);
-+	return ERR_PTR(-ENOSYS);
-+}
-+EXPORT_SYMBOL_GPL(clk_get_parent);
-+
-+int __clk_get(struct clk *clk)
-+{
-+	if (clk->ops->get)
-+		return clk->ops->get(clk);
-+	return 1;
-+}
-+
-+void __clk_put(struct clk *clk)
-+{
-+	if (clk->ops->put)
-+		clk->ops->put(clk);
-+}
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 1d37f42..fe806b7 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -3,6 +3,7 @@
-  *
-  *  Copyright (C) 2004 ARM Limited.
-  *  Written by Deep Blue Solutions Limited.
-+ *  Copyright (c) 2010-2011 Jeremy Kerr <jeremy.kerr@canonical.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -11,18 +12,198 @@
- #ifndef __LINUX_CLK_H
- #define __LINUX_CLK_H
- 
-+#include <linux/err.h>
-+#include <linux/mutex.h>
-+#include <linux/spinlock.h>
-+
- struct device;
- 
--/*
-- * The base API.
-+#ifdef CONFIG_USE_COMMON_STRUCT_CLK
-+
-+/* If we're using the common struct clk, we define the base clk object here */
-+
-+/**
-+ * struct clk - hardware independent clock structure
-+ * @ops:		implementation-specific ops for this clock
-+ * @enable_count:	count of clk_enable() calls active on this clock
-+ * @enable_lock:	lock for atomic enable
-+ * @prepare_count:	count of clk_prepare() calls active on this clock
-+ * @prepare_lock:	lock for sleepable prepare
-+ *
-+ * The base clock object, used by drivers for hardware-independent manipulation
-+ * of clock lines. This will be 'subclassed' by device-specific implementations,
-+ * which add device-specific data to struct clk. For example:
-+ *
-+ *  struct clk_foo {
-+ *      struct clk;
-+ *      [device specific fields]
-+ *  };
-+ *
-+ * The clock driver code will manage the device-specific data, and pass
-+ * clk_foo.clk to the common clock code. The clock driver will be called
-+ * through the @ops callbacks.
-+ *
-+ * The @enable_lock and @prepare_lock members are used to serialise accesses
-+ * to the ops->enable and ops->prepare functions (and the corresponding
-+ * ops->disable and ops->unprepare functions).
-+ */
-+struct clk {
-+	const struct clk_ops	*ops;
-+	unsigned int		enable_count;
-+	unsigned int		prepare_count;
-+	spinlock_t		enable_lock;
-+	struct mutex		prepare_lock;
-+};
-+
-+/* static initialiser for clocks */
-+#define INIT_CLK(name, o) {						\
-+	.ops		= &o,						\
-+	.enable_count	= 0,						\
-+	.prepare_count	= 0,						\
-+	.enable_lock	= __SPIN_LOCK_UNLOCKED(name.enable_lock),	\
-+	.prepare_lock	= __MUTEX_INITIALIZER(name.prepare_lock),	\
-+}
-+
-+/**
-+ * struct clk_ops -  Callback operations for clocks; these are to be provided
-+ * by the clock implementation, and will be called by drivers through the clk_*
-+ * API.
-+ *
-+ * @prepare:	Prepare the clock for enabling. This must not return until
-+ *		the clock is fully prepared, and it's safe to call clk_enable.
-+ *		This callback is intended to allow clock implementations to
-+ *		do any initialisation that may block. Called with
-+ *		clk->prepare_lock held.
-+ *
-+ * @unprepare:	Release the clock from its prepared state. This will typically
-+ *		undo any work done in the @prepare callback. Called with
-+ *		clk->prepare_lock held.
-+ *
-+ * @enable:	Enable the clock atomically. This must not return until the
-+ *		clock is generating a valid clock signal, usable by consumer
-+ *		devices. Called with clk->enable_lock held. This function
-+ *		must not sleep.
-+ *
-+ * @disable:	Disable the clock atomically. Called with clk->enable_lock held.
-+ *		This function must not sleep.
-+ *
-+ * @get:	Called by the core clock code when a device driver acquires a
-+ *		clock via clk_get(). Optional.
-+ *
-+ * @put:	Called by the core clock code when a devices driver releases a
-+ *		clock via clk_put(). Optional.
-+ *
-+ * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-+ * implementations to split any work between atomic (enable) and sleepable
-+ * (prepare) contexts.  If a clock requires blocking code to be turned on, this
-+ * should be done in clk_prepare. Switching that will not block should be done
-+ * in clk_enable.
-+ *
-+ * Typically, drivers will call clk_prepare when a clock may be needed later
-+ * (eg. when a device is opened), and clk_enable when the clock is actually
-+ * required (eg. from an interrupt). Note that clk_prepare *must* have been
-+ * called before clk_enable.
-+ *
-+ * For other callbacks, see the corresponding clk_* functions. Parameters and
-+ * return values are passed directly from/to these API functions, or
-+ * -ENOSYS (or zero, in the case of clk_get_rate) is returned if the callback
-+ * is NULL, see kernel/clk.c for implementation details. All are optional.
-+ */
-+struct clk_ops {
-+	int		(*prepare)(struct clk *);
-+	void		(*unprepare)(struct clk *);
-+	int		(*enable)(struct clk *);
-+	void		(*disable)(struct clk *);
-+	int		(*get)(struct clk *);
-+	void		(*put)(struct clk *);
-+	unsigned long	(*get_rate)(struct clk *);
-+	long		(*round_rate)(struct clk *, unsigned long);
-+	int		(*set_rate)(struct clk *, unsigned long);
-+	int		(*set_parent)(struct clk *, struct clk *);
-+	struct clk *	(*get_parent)(struct clk *);
-+};
-+
-+/**
-+ * __clk_get - acquire a reference to a clock
-+ *
-+ * @clk: The clock to refcount
-+ *
-+ * Before a clock is returned from clk_get, this function should be called
-+ * to update any clock-specific refcounting.
-+ *
-+ * Returns non-zero on success, zero on failure.
-+ *
-+ * Drivers should not need this function, it is called by the common clock
-+ * infrastructure.
-+ */
-+int __clk_get(struct clk *clk);
-+
-+/**
-+ * __clk_put - release reference to a clock
-+ *
-+ * @clk: The clock to release
-+ *
-+ * Called by clock infrastructure code to indicate that a clock consumer
-+ * has released a clock, to update any clock-specific refcounting.
-+ *
-+ * Drivers should not need this function, it is called by the common clock
-+ * infrastructure.
-+ */
-+void __clk_put(struct clk *clk);
-+
-+/**
-+ * clk_prepare - prepare clock for atomic enabling.
-+ *
-+ * @clk: The clock to prepare
-+ *
-+ * Do any blocking initialisation on @clk, allowing the clock to be later
-+ * enabled atomically (via clk_enable). This function may sleep.
-+ */
-+int clk_prepare(struct clk *clk);
-+
-+/**
-+ * clk_unprepare - release clock from prepared state
-+ *
-+ * @clk: The clock to release
-+ *
-+ * Do any (possbly blocking) cleanup on clk. This function may sleep.
-  */
-+void clk_unprepare(struct clk *clk);
- 
-+/**
-+ * clk_common_init - initialise a clock for driver usage
-+ *
-+ * @clk: The clock to initialise
-+ *
-+ * Used for runtime intialization of clocks; you don't need to call this
-+ * if your clock has been (statically) initialized with INIT_CLK.
-+ */
-+static inline void clk_common_init(struct clk *clk)
-+{
-+	clk->enable_count = clk->prepare_count = 0;
-+	spin_lock_init(&clk->enable_lock);
-+	mutex_init(&clk->prepare_lock);
-+}
-+
-+#else /* !CONFIG_USE_COMMON_STRUCT_CLK */
- 
- /*
-- * struct clk - an machine class defined object / cookie.
-+ * Global clock object, actual structure is declared per-machine
-  */
- struct clk;
- 
-+static inline void clk_common_init(struct clk *clk) { }
-+
-+/*
-+ * For !CONFIG_USE_COMMON_STRUCT_CLK, we don't enforce any atomicity
-+ * requirements for clk_enable/clk_disable, so the prepare and unprepare
-+ * functions are no-ops
-+ */
-+int clk_prepare(struct clk *clk) { return 0; }
-+void clk_unprepare(struct clk *clk) { }
-+
-+#endif /* !CONFIG_USE_COMMON_STRUCT_CLK */
-+
- /**
-  * clk_get - lookup and obtain a reference to a clock producer.
-  * @dev: device for clock "consumer"
-@@ -67,6 +248,7 @@ void clk_disable(struct clk *clk);
- /**
-  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-  *		  This is only valid once the clock source has been enabled.
-+ *		  Returns zero if the clock rate is unknown.
-  * @clk: clock source
-  */
- unsigned long clk_get_rate(struct clk *clk);
-@@ -83,12 +265,6 @@ unsigned long clk_get_rate(struct clk *clk);
-  */
- void clk_put(struct clk *clk);
- 
--
--/*
-- * The remaining APIs are optional for machine class support.
-- */
--
--
- /**
-  * clk_round_rate - adjust a rate to the exact rate a clock can provide
-  * @clk: clock source
+Aurion s.r.l.
+P.I e C.F.
+00885711200
+skype: aurion.giovagnini
+Tel. +39.051.594.78.24
+Fax. +39.051.082.14.49
+Cell. +39.335.83.50.919
+www.aurion-tech.com
