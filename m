@@ -1,71 +1,245 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 9 Feb 2011 09:06:16 +0100
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <20110209001710.GF6963@S2100-06.ap.freescale.net>
-References: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<19793.22067.960689.669543@ipc1.ka-ro>
-	<20110209001710.GF6963@S2100-06.ap.freescale.net>
-Message-ID: <19794.19192.351501.395360@ipc1.ka-ro>
+From: premi@ti.com (Sanjeev Premi)
+Date: Wed,  9 Feb 2011 13:40:10 +0530
+Subject: [PATCHv5] omap3: Add basic support for 720MHz part
+Message-ID: <1297239010-29683-1-git-send-email-premi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+This patch adds support for speed enhanced variant of OMAP35x
+processors. These parts allow ARM and IVA running at 720MHz
+and 520MHz respectively.
 
-Shawn Guo writes:
-> On Tue, Feb 08, 2011 at 03:41:55PM +0100, Lothar Wa?mann wrote:
-[...]
-> > What's behinde the 'PIO' transfers is programming controller registers
-> > via DMA along with the actual DMA data transfer. DMA_NONE simply
-> > means, that the DMA transfer does only the register programming but
-> > does not transfer any payload. The 'pio_words' are the values that are
-> > being written to consecutive locations of e.g. the SPI controller
-> > register address space.
-> > The programming is actually done by DMA, in any case.
-> > 
-> I'm waiting for this reply ;)
-> 
-> i.MX23/28 Reference Manual uses word "PIO" for the working mode that
-> Lothar has explained.  It seems that "PIO" in mxs-dma needs some more
-> documents.
-> 
-> It's true that mxs dma hardware is designed to program peripheral
-> registers along with data transfer with ccw chain.  But it's hard
-> for generic dmaengine model to implement that.  The client device
-> driver gets the data in scatter-gather list to transfer.  It requires
-> client driver to manipulate the sgl to get pio ccw inserted properly
-> to get the "along with" implemented.  This is not a reasonable
-> implementation to me.
-> 
-> I still chose to keep the pio mode in the implementation in "single
-> step" rather than "along with" way.  That means client driver has to
-> issue one dma request to program client device registers, and issue
-> another one to transfer data.  The natural thought is that the pio
->
-which defeats the purpose of the whole thing. If the software has to
-issue a single request for DMA to program the registers it could as
-well directly write the registers without any DMA. The purpose of the
-embedded 'PIO' transfers is, that you can set up a whole chain of
-commands and associated data transfers and have that executed
-without any further software intervention.
+These parts can be detected at runtime by reading contents of
+PRODID.SKUID[3:0] at 0x4830A20C [1].
 
-> support can totally be saved with cpu programming.  But looking at
-> any mxs dma client device in reference manual, you will find it gets
-> two irq lines, irq_dma and irq_error.  For ssp (mmc) example, when
-> one mmc command is issued and completed without error, you have to
-> either polling ssp status register or use pio dma and irq_dma
-> interrupt to know the completion.  That's to say I keep the pio
->
-You could use the SSP IRQ as well.
+This patch specifically does following:
+ * Add new OPP to omap34xx_opp_def_list[] - disabled by default.
+ * Detect devices capable of running at new OPP.
+ * Enable new OPP only if device supports it.
+ * Check for presence of IVA before attempting to enable the
+   corresponding OPP.
+
+  [1] http://focus.ti.com/lit/ug/spruff1d/spruff1d.pdf
+
+It appears from discussions (on this patch) that a variant of
+OMAP3430 supports this OPP but lacks runtime detection. This
+OPP can be enabled for these device by either:
+ 1) Setting the bit corresponding to OMAP3_HAS_720MHZ
+    in 'omap3_features'. (Refer changes to id.c)
+ 2) Removing check for omap3_has_720mhz() before enabling
+    the OPP. (Refer changes to opp3xxx_data.c)
+ 3) Calling opp_enable() for 720MHz/VDD1 and 520MHz/VDD2 in
+    the board file. (Refer changes to opp3xxx_data.c).
+    This should, ideally, be done before omap3_opp_init() is
+    called during device_initcall().
+
+CAUTION: This should be done for identified parts only.
+         Else, the device could be damaged permanently.
+
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+Reviewed-by: G, Manjunath Kondaiah <manjugk@ti.com>
+---
+
+Since v4:
+  Updated the commit text addressing comments from
+  Kevin Hilman (khilman at ti.com).
+
+Since v3:
+1) Minor changes to comments and braces.
+   
+Since v2:
+1) pr_xxx() -> dev_xxx() functions - suggested by 
+   Manjunath (manjugk at ti.com)
+2) Add check for presense of IVA - earlier planned to
+   be in a separate patch; but we multiple discussions
+   on optimizations.
+3) Do look-up for hwmod corresponding for iva only if
+   iva is present. Should save multiple strcmp()s in
+   _lookup().
+
+Since v1:
+1) Using opp_enable() to enable the OPP after the OPP
+   table has been initialized.
+2) Starting at 3 levels of indent, the statements had
+   be broken into multiple lines for most of the code.
+   So, opted to create a new static that enables the
+   OPPs corresponding to 720MHz.
+3) I have only build tested this patch - will be able
+   to confirm working tomorrow. With any further change,
+   if needed. (However, functionally nothing has changed.)
 
 
-Lothar Wa?mann
+ arch/arm/mach-omap2/control.h         |    6 +++
+ arch/arm/mach-omap2/id.c              |    5 +++
+ arch/arm/mach-omap2/opp3xxx_data.c    |   63 ++++++++++++++++++++++++++++++++-
+ arch/arm/plat-omap/include/plat/cpu.h |    2 +
+ 4 files changed, 75 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index f0629ae..c338466 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -365,6 +365,12 @@
+ #define		FEAT_NEON		0
+ #define		FEAT_NEON_NONE		1
+ 
++/* Product ID register */
++#define OMAP3_PRODID			0x020C
++
++/* Mask to extract SKU ID from Product ID */
++#define OMAP3_SKUID_MASK		0x0f
++#define		OMAP3_SKUID_720MHZ	0x08
+ 
+ #ifndef __ASSEMBLY__
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 5f9086c..8c4500f 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -191,6 +191,10 @@ static void __init omap3_check_features(void)
+ 	if (!cpu_is_omap3505() && !cpu_is_omap3517())
+ 		omap3_features |= OMAP3_HAS_IO_WAKEUP;
+ 
++	status = (OMAP3_SKUID_MASK & read_tap_reg(OMAP3_PRODID));
++	if (status & OMAP3_SKUID_720MHZ)
++		omap3_features |= OMAP3_HAS_720MHZ;
++
+ 	/*
+ 	 * TODO: Get additional info (where applicable)
+ 	 *       e.g. Size of L2 cache.
+@@ -445,6 +449,7 @@ static void __init omap3_cpuinfo(void)
+ 	OMAP3_SHOW_FEATURE(neon);
+ 	OMAP3_SHOW_FEATURE(isp);
+ 	OMAP3_SHOW_FEATURE(192mhz_clk);
++	OMAP3_SHOW_FEATURE(720mhz);
+ 
+ 	printk(")\n");
+ }
+diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
+index 0486fce..cba17f7 100644
+--- a/arch/arm/mach-omap2/opp3xxx_data.c
++++ b/arch/arm/mach-omap2/opp3xxx_data.c
+@@ -17,8 +17,10 @@
+  * GNU General Public License for more details.
+  */
+ #include <linux/module.h>
++#include <linux/opp.h>
+ 
+ #include <plat/cpu.h>
++#include <plat/omap_device.h>
+ 
+ #include "omap_opp_data.h"
+ 
+@@ -33,6 +35,8 @@ static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
+ 	OPP_INITIALIZER("mpu", true, 550000000, 1270000),
+ 	/* MPU OPP5 */
+ 	OPP_INITIALIZER("mpu", true, 600000000, 1350000),
++	/* MPU OPP6 */
++	OPP_INITIALIZER("mpu", false, 720000000, 1350000),
+ 
+ 	/*
+ 	 * L3 OPP1 - 41.5 MHz is disabled because: The voltage for that OPP is
+@@ -58,6 +62,8 @@ static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
+ 	OPP_INITIALIZER("iva", true, 400000000, 1270000),
+ 	/* DSP OPP5 */
+ 	OPP_INITIALIZER("iva", true, 430000000, 1350000),
++	/* DSP OPP6 */
++	OPP_INITIALIZER("iva", false, 520000000, 1350000),
+ };
+ 
+ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
+@@ -85,6 +91,57 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
+ 	OPP_INITIALIZER("iva", false, 800000000, 1375000),
+ };
+ 
++
++/**
++ * omap3_opp_enable_720Mhz() - Enable the OPP corresponding to 720MHz
++ *
++ * This function would be executed only if the silicon is capable of
++ * running at the 720MHz.
++ */
++static int __init omap3_opp_enable_720Mhz(void)
++{
++	int r = -ENODEV;
++	struct omap_hwmod *oh_mpu = omap_hwmod_lookup("mpu");
++	struct omap_hwmod *oh_iva;
++	struct platform_device *pdev;
++
++	if (!oh_mpu || !oh_mpu->od) {
++		goto err;
++	} else {
++		pdev = &oh_mpu->od->pdev;
++
++		r = opp_enable(&pdev->dev, 720000000);
++		if (r < 0) {
++			dev_err(&pdev->dev,
++				"opp_enable() failed for mpu at 720MHz");
++			goto err;
++		}
++	}
++
++	if (omap3_has_iva()) {
++		oh_iva = omap_hwmod_lookup("iva");
++
++		if (!oh_iva || !oh_iva->od) {
++			r = -ENODEV;
++			goto err;
++		} else {
++			pdev = &oh_iva->od->pdev;
++
++			r = opp_enable(&pdev->dev, 520000000);
++			if (r < 0) {
++				dev_err(&pdev->dev,
++					"opp_enable() failed for iva at 520MHz");
++				goto err;
++			}
++		}
++	}
++
++	dev_info(&pdev->dev, "Enabled OPP corresponding to 720MHz\n");
++
++err:
++	return r;
++}
++
+ /**
+  * omap3_opp_init() - initialize omap3 opp table
+  */
+@@ -98,10 +155,14 @@ static int __init omap3_opp_init(void)
+ 	if (cpu_is_omap3630())
+ 		r = omap_init_opp_table(omap36xx_opp_def_list,
+ 			ARRAY_SIZE(omap36xx_opp_def_list));
+-	else
++	else {
+ 		r = omap_init_opp_table(omap34xx_opp_def_list,
+ 			ARRAY_SIZE(omap34xx_opp_def_list));
+ 
++		if (omap3_has_720mhz())
++			r = omap3_opp_enable_720Mhz();
++	}
++
+ 	return r;
+ }
+ device_initcall(omap3_opp_init);
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index 73d91ee..e624ee1 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -455,6 +455,7 @@ extern u32 omap3_features;
+ #define OMAP3_HAS_ISP			BIT(4)
+ #define OMAP3_HAS_192MHZ_CLK		BIT(5)
+ #define OMAP3_HAS_IO_WAKEUP		BIT(6)
++#define OMAP3_HAS_720MHZ		BIT(7)
+ 
+ #define OMAP3_HAS_FEATURE(feat,flag)			\
+ static inline unsigned int omap3_has_ ##feat(void)	\
+@@ -469,5 +470,6 @@ OMAP3_HAS_FEATURE(neon, NEON)
+ OMAP3_HAS_FEATURE(isp, ISP)
+ OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
+ OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
++OMAP3_HAS_FEATURE(720mhz, 720MHZ)
+ 
+ #endif
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.2.2
