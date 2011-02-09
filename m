@@ -1,591 +1,635 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Wed, 9 Feb 2011 16:06:50 +0530
-Subject: [PATCH V4 resend] rtc: Adding support for spear rtc
-Message-ID: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  9 Feb 2011 10:42:55 +0000
+Subject: [PATCH v2] ARM: ptrace: remove single-step emulation code
+Message-ID: <1297248175-11952-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+PTRACE_SINGLESTEP is a ptrace request designed to offer single-stepping
+support to userspace when the underlying architecture has hardware
+support for this operation.
 
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+On ARM, we set arch_has_single_step() to 1 and attempt to emulate hardware
+single-stepping by disassembling the current instruction to determine the
+next pc and placing a software breakpoint on that location.
+
+Unfortunately this has the following problems:
+
+1.) Only a subset of ARMv7 instructions are supported
+2.) Thumb-2 is unsupported
+3.) The code is not SMP safe
+
+We could try to fix this code, but it turns out that because of the above
+issues it is rarely used in practice.  GDB, for example, uses PTRACE_POKETEXT
+and PTRACE_PEEKTEXT to manage breakpoints itself and does not require any
+kernel assistance.
+
+This patch removes the single-step emulation code from ptrace meaning that
+the PTRACE_SINGLESTEP request will return -EIO on ARM. Portable code must
+check the return value from a ptrace call and handle the failure gracefully.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/rtc/Kconfig     |    8 +
- drivers/rtc/Makefile    |    1 +
- drivers/rtc/rtc-spear.c |  534 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 543 insertions(+), 0 deletions(-)
- create mode 100644 drivers/rtc/rtc-spear.c
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 2883428..4dc0801 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -636,6 +636,14 @@ config RTC_DRV_WM8350
- 	  This driver can also be built as a module. If so, the module
- 	  will be called "rtc-wm8350".
+The comments I received about v1 suggest that:
+
+ - If emulation is required, it is plausible to do it from userspace
+ - ltrace uses the SINGLESTEP call (conditionally at compile-time since
+   other architectures, such as mips, do not support this request) but
+   does not check the return value from ptrace. This is a bug in ltrace.
+ - strace does not use SINGLESTEP
+
+Further feedback welcome.
+
+ arch/arm/include/asm/processor.h |   12 --
+ arch/arm/include/asm/ptrace.h    |    2 -
+ arch/arm/include/asm/traps.h     |    1 +
+ arch/arm/kernel/ptrace.c         |  383 +-------------------------------------
+ arch/arm/kernel/ptrace.h         |   37 ----
+ arch/arm/kernel/signal.c         |    9 -
+ arch/arm/kernel/traps.c          |    2 +-
+ 7 files changed, 3 insertions(+), 443 deletions(-)
+ delete mode 100644 arch/arm/kernel/ptrace.h
+
+diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
+index 67357ba..b439b41 100644
+--- a/arch/arm/include/asm/processor.h
++++ b/arch/arm/include/asm/processor.h
+@@ -29,19 +29,7 @@
+ #define STACK_TOP_MAX	TASK_SIZE
+ #endif
  
-+config RTC_DRV_SPEAR
-+	tristate "SPEAR ST RTC"
-+	depends on PLAT_SPEAR
-+	default y
-+	help
-+	 If you say Y here you will get support for the RTC found on
-+	 spear
-+
- config RTC_DRV_PCF50633
- 	depends on MFD_PCF50633
- 	tristate "NXP PCF50633 RTC"
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 4c2832d..8dddb8e 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -88,6 +88,7 @@ obj-$(CONFIG_RTC_DRV_S35390A)	+= rtc-s35390a.o
- obj-$(CONFIG_RTC_DRV_S3C)	+= rtc-s3c.o
- obj-$(CONFIG_RTC_DRV_SA1100)	+= rtc-sa1100.o
- obj-$(CONFIG_RTC_DRV_SH)	+= rtc-sh.o
-+obj-$(CONFIG_RTC_DRV_SPEAR)	+= rtc-spear.o
- obj-$(CONFIG_RTC_DRV_STARFIRE)	+= rtc-starfire.o
- obj-$(CONFIG_RTC_DRV_STK17TA8)	+= rtc-stk17ta8.o
- obj-$(CONFIG_RTC_DRV_STMP)	+= rtc-stmp3xxx.o
-diff --git a/drivers/rtc/rtc-spear.c b/drivers/rtc/rtc-spear.c
-new file mode 100644
-index 0000000..893bac2
---- /dev/null
-+++ b/drivers/rtc/rtc-spear.c
-@@ -0,0 +1,534 @@
-+/*
-+ * drivers/rtc/rtc-spear.c
-+ *
-+ * Copyright (C) 2010 ST Microelectronics
-+ * Rajeev Kumar<rajeev-dlh.kumar@st.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/bcd.h>
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/rtc.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+/* RTC registers */
-+#define TIME_REG		0x00
-+#define DATE_REG		0x04
-+#define ALARM_TIME_REG		0x08
-+#define ALARM_DATE_REG		0x0C
-+#define CTRL_REG		0x10
-+#define STATUS_REG		0x14
-+
-+/* TIME_REG & ALARM_TIME_REG */
-+#define SECONDS_UNITS		(0xf<<0)	/* seconds units position */
-+#define SECONDS_TENS		(0x7<<4)	/* seconds tens position */
-+#define MINUTES_UNITS		(0xf<<8)	/* minutes units position */
-+#define MINUTES_TENS		(0x7<<12)	/* minutes tens position */
-+#define HOURS_UNITS		(0xf<<16)	/* hours units position */
-+#define HOURS_TENS		(0x3<<20)	/* hours tens position */
-+
-+/* DATE_REG & ALARM_DATE_REG */
-+#define DAYS_UNITS		(0xf<<0)	/* days units position */
-+#define DAYS_TENS		(0x3<<4)	/* days tens position */
-+#define MONTHS_UNITS		(0xf<<8)	/* months units position */
-+#define MONTHS_TENS		(0x1<<12)	/* months tens position */
-+#define YEARS_UNITS		(0xf<<16)	/* years units position */
-+#define YEARS_TENS		(0xf<<20)	/* years tens position */
-+#define YEARS_HUNDREDS		(0xf<<24)	/* years hundereds position */
-+#define YEARS_MILLENIUMS	(0xf<<28)	/* years millenium position */
-+
-+/* MASK SHIFT TIME_REG & ALARM_TIME_REG*/
-+#define SECOND_SHIFT		0x00		/* seconds units */
-+#define MINUTE_SHIFT		0x08		/* minutes units position */
-+#define HOUR_SHIFT		0x10		/* hours units position */
-+#define MDAY_SHIFT		0x00		/* Month day shift */
-+#define MONTH_SHIFT		0x08		/* Month shift */
-+#define YEAR_SHIFT		0x10		/* Year shift */
-+
-+#define SECOND_MASK		0x7F
-+#define MIN_MASK		0x7F
-+#define HOUR_MASK		0x3F
-+#define DAY_MASK		0x3F
-+#define MONTH_MASK		0x7F
-+#define YEAR_MASK		0xFFFF
-+
-+/* date reg equal to time reg, for debug only */
-+#define TIME_BYP		(1<<9)
-+#define INT_ENABLE		(1<<31)		/* interrupt enable */
-+
-+/* STATUS_REG */
-+#define CLK_UNCONNECTED		(1<<0)
-+#define PEND_WR_TIME		(1<<2)
-+#define PEND_WR_DATE		(1<<3)
-+#define LOST_WR_TIME		(1<<4)
-+#define LOST_WR_DATE		(1<<5)
-+#define RTC_INT_MASK		(1<<31)
-+#define STATUS_BUSY		(PEND_WR_TIME | PEND_WR_DATE)
-+#define STATUS_FAIL		(LOST_WR_TIME | LOST_WR_DATE)
-+
-+struct spear_rtc_config {
-+	struct clk *clk;
-+	spinlock_t lock;
-+	void __iomem *ioaddr;
-+};
-+
-+static inline void spear_rtc_clear_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	val = readl(config->ioaddr + STATUS_REG);
-+	val |= RTC_INT_MASK;
-+	writel(val, config->ioaddr + STATUS_REG);
-+	spin_unlock_irqrestore(&config->lock, flags);
-+}
-+
-+static inline void spear_rtc_enable_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+
-+	val = readl(config->ioaddr + CTRL_REG);
-+	if (!(val & INT_ENABLE)) {
-+		spear_rtc_clear_interrupt(config);
-+		val |= INT_ENABLE;
-+		writel(val, config->ioaddr + CTRL_REG);
-+	}
-+}
-+
-+static inline void spear_rtc_disable_interrupt(struct spear_rtc_config *config)
-+{
-+	unsigned int val;
-+
-+	val = readl(config->ioaddr + CTRL_REG);
-+	if (val & INT_ENABLE) {
-+		val &= ~INT_ENABLE;
-+		writel(val, config->ioaddr + CTRL_REG);
-+	}
-+}
-+
-+static inline int is_write_complete(struct spear_rtc_config *config)
-+{
-+	int ret = 0;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	if ((readl(config->ioaddr + STATUS_REG)) & STATUS_FAIL)
-+		ret = -EIO;
-+	spin_unlock_irqrestore(&config->lock, flags);
-+
-+	return ret;
-+}
-+
-+static void rtc_wait_not_busy(struct spear_rtc_config *config)
-+{
-+	int status, count = 0;
-+	unsigned long flags;
-+
-+	/* Assuming BUSY may stay active for 80 msec) */
-+	for (count = 0; count < 80; count++) {
-+		spin_lock_irqsave(&config->lock, flags);
-+		status = readl(config->ioaddr + STATUS_REG);
-+		spin_unlock_irqrestore(&config->lock, flags);
-+		if ((status & STATUS_BUSY) == 0)
-+			break;
-+		/* check status busy, after each msec */
-+		msleep(1);
-+	}
-+}
-+
-+static irqreturn_t spear_rtc_irq(int irq, void *dev_id)
-+{
-+	struct rtc_device *rtc = (struct rtc_device *)dev_id;
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned long flags, events = 0;
-+	unsigned int irq_data;
-+
-+	spin_lock_irqsave(&config->lock, flags);
-+	irq_data = readl(config->ioaddr + STATUS_REG);
-+	spin_unlock_irqrestore(&config->lock, flags);
-+
-+	if ((irq_data & RTC_INT_MASK)) {
-+		spear_rtc_clear_interrupt(config);
-+		events = RTC_IRQF | RTC_AF;
-+		rtc_update_irq(rtc, 1, events);
-+		return IRQ_HANDLED;
-+	} else
-+		return IRQ_NONE;
-+
-+}
-+
-+static int tm2bcd(struct rtc_time *tm)
-+{
-+	if (rtc_valid_tm(tm) != 0)
-+		return -EINVAL;
-+	tm->tm_sec = bin2bcd(tm->tm_sec);
-+	tm->tm_min = bin2bcd(tm->tm_min);
-+	tm->tm_hour = bin2bcd(tm->tm_hour);
-+	tm->tm_mday = bin2bcd(tm->tm_mday);
-+	tm->tm_mon = bin2bcd(tm->tm_mon + 1);
-+	tm->tm_year = bin2bcd(tm->tm_year);
-+
-+	return 0;
-+}
-+
-+static void bcd2tm(struct rtc_time *tm)
-+{
-+	tm->tm_sec = bcd2bin(tm->tm_sec);
-+	tm->tm_min = bcd2bin(tm->tm_min);
-+	tm->tm_hour = bcd2bin(tm->tm_hour);
-+	tm->tm_mday = bcd2bin(tm->tm_mday);
-+	tm->tm_mon = bcd2bin(tm->tm_mon) - 1;
-+	/* epoch == 1900 */
-+	tm->tm_year = bcd2bin(tm->tm_year);
-+}
-+
-+/*
-+ * spear_rtc_read_time - set the time
-+ * @dev: rtc device in use
-+ * @tm: holds date and time
-+ *
-+ * This function read time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date;
-+
-+	/* we don't report wday/yday/isdst ... */
-+	rtc_wait_not_busy(config);
-+
-+	time = readl(config->ioaddr + TIME_REG);
-+	date = readl(config->ioaddr + DATE_REG);
-+	tm->tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-+	tm->tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-+	tm->tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-+	tm->tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-+	tm->tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-+	tm->tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-+
-+	bcd2tm(tm);
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_set_time - set the time
-+ * @dev: rtc device in use
-+ * @tm: holds date and time
-+ *
-+ * This function set time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date, err = 0;
-+
-+	if (tm2bcd(tm) < 0)
-+		return -EINVAL;
-+
-+	rtc_wait_not_busy(config);
-+	time = (tm->tm_sec << SECOND_SHIFT) | (tm->tm_min << MINUTE_SHIFT) |
-+		(tm->tm_hour << HOUR_SHIFT);
-+	date = (tm->tm_mday << MDAY_SHIFT) | (tm->tm_mon << MONTH_SHIFT) |
-+		(tm->tm_year << YEAR_SHIFT);
-+	writel(time, config->ioaddr + TIME_REG);
-+	writel(date, config->ioaddr + DATE_REG);
-+	err = is_write_complete(config);
-+	if (err < 0)
-+		return err;
-+
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_read_alarm - read the alarm time
-+ * @dev: rtc device in use
-+ * @alm: holds alarm date and time
-+ *
-+ * This function read alarm time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date;
-+
-+	rtc_wait_not_busy(config);
-+
-+	time = readl(config->ioaddr + ALARM_TIME_REG);
-+	date = readl(config->ioaddr + ALARM_DATE_REG);
-+	alm->time.tm_sec = (time >> SECOND_SHIFT) & SECOND_MASK;
-+	alm->time.tm_min = (time >> MINUTE_SHIFT) & MIN_MASK;
-+	alm->time.tm_hour = (time >> HOUR_SHIFT) & HOUR_MASK;
-+	alm->time.tm_mday = (date >> MDAY_SHIFT) & DAY_MASK;
-+	alm->time.tm_mon = (date >> MONTH_SHIFT) & MONTH_MASK;
-+	alm->time.tm_year = (date >> YEAR_SHIFT) & YEAR_MASK;
-+
-+	bcd2tm(&alm->time);
-+	alm->enabled = readl(config->ioaddr + CTRL_REG) & INT_ENABLE;
-+
-+	return 0;
-+}
-+
-+/*
-+ * spear_rtc_set_alarm - set the alarm time
-+ * @dev: rtc device in use
-+ * @alm: holds alarm date and time
-+ *
-+ * This function set alarm time and date. On success it will return 0
-+ * otherwise -ve error is returned.
-+ */
-+static int spear_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	unsigned int time, date, err = 0;
-+
-+	if (tm2bcd(&alm->time) < 0)
-+		return -EINVAL;
-+
-+	rtc_wait_not_busy(config);
-+
-+	time = (alm->time.tm_sec << SECOND_SHIFT) | (alm->time.tm_min <<
-+			MINUTE_SHIFT) |	(alm->time.tm_hour << HOUR_SHIFT);
-+	date = (alm->time.tm_mday << MDAY_SHIFT) | (alm->time.tm_mon <<
-+			MONTH_SHIFT) | (alm->time.tm_year << YEAR_SHIFT);
-+
-+	writel(time, config->ioaddr + ALARM_TIME_REG);
-+	writel(date, config->ioaddr + ALARM_DATE_REG);
-+	err = is_write_complete(config);
-+	if (err < 0)
-+		return err;
-+
-+	if (alm->enabled)
-+		spear_rtc_enable_interrupt(config);
-+	else
-+		spear_rtc_disable_interrupt(config);
-+
-+	return 0;
-+}
-+static struct rtc_class_ops spear_rtc_ops = {
-+	.read_time = spear_rtc_read_time,
-+	.set_time = spear_rtc_set_time,
-+	.read_alarm = spear_rtc_read_alarm,
-+	.set_alarm = spear_rtc_set_alarm,
-+};
-+
-+static int __devinit spear_rtc_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	struct rtc_device *rtc;
-+	struct spear_rtc_config *config;
-+	unsigned int status = 0;
-+	int irq;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "no resource defined\n");
-+		return -EBUSY;
-+	}
-+	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
-+		dev_err(&pdev->dev, "rtc region already claimed\n");
-+		return -EBUSY;
-+	}
-+
-+	config = kzalloc(sizeof(*config), GFP_KERNEL);
-+	if (!config) {
-+		dev_err(&pdev->dev, "out of memory\n");
-+		status = -ENOMEM;
-+		goto err_release_region;
-+	}
-+
-+	config->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(config->clk)) {
-+		status = PTR_ERR(config->clk);
-+		goto err_kfree;
-+	}
-+
-+	status = clk_enable(config->clk);
-+	if (status < 0)
-+		goto err_clk_put;
-+
-+	config->ioaddr = ioremap(res->start, resource_size(res));
-+	if (!config->ioaddr) {
-+		dev_err(&pdev->dev, "ioremap fail\n");
-+		status = -ENOMEM;
-+		goto err_disable_clock;
-+	}
-+
-+	spin_lock_init(&config->lock);
-+
-+	rtc = rtc_device_register(pdev->name, &pdev->dev, &spear_rtc_ops,
-+			THIS_MODULE);
-+	if (IS_ERR(rtc)) {
-+		dev_err(&pdev->dev, "can't register RTC device, err %ld\n",
-+				PTR_ERR(rtc));
-+		status = PTR_ERR(rtc);
-+		goto err_iounmap;
-+	}
-+
-+	platform_set_drvdata(pdev, rtc);
-+	dev_set_drvdata(&rtc->dev, config);
-+
-+	/* alarm irqs */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "no update irq?\n");
-+		status = irq;
-+		goto err_clear_platdata;
-+	}
-+
-+	status = request_irq(irq, spear_rtc_irq, 0, pdev->name, rtc);
-+	if (status) {
-+		dev_err(&pdev->dev, "Alarm interrupt IRQ%d already \
-+				claimed\n", irq);
-+		goto err_clear_platdata;
-+	}
-+
-+	if (!device_can_wakeup(&pdev->dev))
-+		device_init_wakeup(&pdev->dev, 1);
-+
-+	return 0;
-+
-+err_clear_platdata:
-+	platform_set_drvdata(pdev, NULL);
-+	dev_set_drvdata(&rtc->dev, NULL);
-+	rtc_device_unregister(rtc);
-+err_iounmap:
-+	iounmap(config->ioaddr);
-+err_disable_clock:
-+	clk_disable(config->clk);
-+err_clk_put:
-+	clk_put(config->clk);
-+err_kfree:
-+	kfree(config);
-+err_release_region:
-+	release_mem_region(res->start, resource_size(res));
-+
-+	return status;
-+}
-+
-+static int __devexit spear_rtc_remove(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+	struct resource *res;
-+
-+	/* leave rtc running, but disable irqs */
-+	spear_rtc_disable_interrupt(config);
-+	device_init_wakeup(&pdev->dev, 0);
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq)
-+		free_irq(irq, pdev);
-+	clk_disable(config->clk);
-+	clk_put(config->clk);
-+	iounmap(config->ioaddr);
-+	kfree(config);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res)
-+		release_mem_region(res->start, resource_size(res));
-+	platform_set_drvdata(pdev, NULL);
-+	dev_set_drvdata(&rtc->dev, NULL);
-+	rtc_device_unregister(rtc);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+
-+static int spear_rtc_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (device_may_wakeup(&pdev->dev))
-+		enable_irq_wake(irq);
-+	else {
-+		spear_rtc_disable_interrupt(config);
-+		clk_disable(config->clk);
-+	}
-+
-+	return 0;
-+}
-+
-+static int spear_rtc_resume(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+	int irq;
-+
-+	irq = platform_get_irq(pdev, 0);
-+
-+	if (device_may_wakeup(&pdev->dev))
-+		disable_irq_wake(irq);
-+	else {
-+		clk_enable(config->clk);
-+		spear_rtc_enable_interrupt(config);
-+	}
-+
-+	return 0;
-+}
-+
-+#else
-+#define spear_rtc_suspend	NULL
-+#define spear_rtc_resume	NULL
-+#endif
-+
-+static void spear_rtc_shutdown(struct platform_device *pdev)
-+{
-+	struct rtc_device *rtc = platform_get_drvdata(pdev);
-+	struct spear_rtc_config *config = dev_get_drvdata(&rtc->dev);
-+
-+	spear_rtc_disable_interrupt(config);
-+	clk_disable(config->clk);
-+}
-+
-+static struct platform_driver spear_rtc_driver = {
-+	.probe = spear_rtc_probe,
-+	.remove = __devexit_p(spear_rtc_remove),
-+	.suspend = spear_rtc_suspend,
-+	.resume = spear_rtc_resume,
-+	.shutdown = spear_rtc_shutdown,
-+	.driver = {
-+		.name = "rtc-spear",
-+	},
-+};
-+
-+static int __init rtc_init(void)
-+{
-+	return platform_driver_register(&spear_rtc_driver);
-+}
-+module_init(rtc_init);
-+
-+static void __exit rtc_exit(void)
-+{
-+	platform_driver_unregister(&spear_rtc_driver);
-+}
-+module_exit(rtc_exit);
-+
-+MODULE_ALIAS("platform:rtc-spear");
-+MODULE_AUTHOR("Rajeev Kumar <rajeev-dlh.kumar@st.com>");
-+MODULE_DESCRIPTION("ST SPEAr Realtime Clock Driver (RTC)");
-+MODULE_LICENSE("GPL");
+-union debug_insn {
+-	u32	arm;
+-	u16	thumb;
+-};
+-
+-struct debug_entry {
+-	u32			address;
+-	union debug_insn	insn;
+-};
+-
+ struct debug_info {
+-	int			nsaved;
+-	struct debug_entry	bp[2];
+ #ifdef CONFIG_HAVE_HW_BREAKPOINT
+ 	struct perf_event	*hbp[ARM_MAX_HBP_SLOTS];
+ #endif
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 783d50f..a8ff22b 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -130,8 +130,6 @@ struct pt_regs {
+ 
+ #ifdef __KERNEL__
+ 
+-#define arch_has_single_step()	(1)
+-
+ #define user_mode(regs)	\
+ 	(((regs)->ARM_cpsr & 0xf) == 0)
+ 
+diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
+index 1b960d5..f90756d 100644
+--- a/arch/arm/include/asm/traps.h
++++ b/arch/arm/include/asm/traps.h
+@@ -45,6 +45,7 @@ static inline int in_exception_text(unsigned long ptr)
+ 
+ extern void __init early_trap_init(void);
+ extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
++extern void ptrace_break(struct task_struct *tsk, struct pt_regs *regs);
+ 
+ extern void *vectors_page;
+ 
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 19c6816..eace844 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -26,8 +26,6 @@
+ #include <asm/system.h>
+ #include <asm/traps.h>
+ 
+-#include "ptrace.h"
+-
+ #define REG_PC	15
+ #define REG_PSR	16
+ /*
+@@ -184,389 +182,12 @@ put_user_reg(struct task_struct *task, int offset, long data)
+ 	return ret;
+ }
+ 
+-static inline int
+-read_u32(struct task_struct *task, unsigned long addr, u32 *res)
+-{
+-	int ret;
+-
+-	ret = access_process_vm(task, addr, res, sizeof(*res), 0);
+-
+-	return ret == sizeof(*res) ? 0 : -EIO;
+-}
+-
+-static inline int
+-read_instr(struct task_struct *task, unsigned long addr, u32 *res)
+-{
+-	int ret;
+-
+-	if (addr & 1) {
+-		u16 val;
+-		ret = access_process_vm(task, addr & ~1, &val, sizeof(val), 0);
+-		ret = ret == sizeof(val) ? 0 : -EIO;
+-		*res = val;
+-	} else {
+-		u32 val;
+-		ret = access_process_vm(task, addr & ~3, &val, sizeof(val), 0);
+-		ret = ret == sizeof(val) ? 0 : -EIO;
+-		*res = val;
+-	}
+-	return ret;
+-}
+-
+-/*
+- * Get value of register `rn' (in the instruction)
+- */
+-static unsigned long
+-ptrace_getrn(struct task_struct *child, unsigned long insn)
+-{
+-	unsigned int reg = (insn >> 16) & 15;
+-	unsigned long val;
+-
+-	val = get_user_reg(child, reg);
+-	if (reg == 15)
+-		val += 8;
+-
+-	return val;
+-}
+-
+-/*
+- * Get value of operand 2 (in an ALU instruction)
+- */
+-static unsigned long
+-ptrace_getaluop2(struct task_struct *child, unsigned long insn)
+-{
+-	unsigned long val;
+-	int shift;
+-	int type;
+-
+-	if (insn & 1 << 25) {
+-		val = insn & 255;
+-		shift = (insn >> 8) & 15;
+-		type = 3;
+-	} else {
+-		val = get_user_reg (child, insn & 15);
+-
+-		if (insn & (1 << 4))
+-			shift = (int)get_user_reg (child, (insn >> 8) & 15);
+-		else
+-			shift = (insn >> 7) & 31;
+-
+-		type = (insn >> 5) & 3;
+-	}
+-
+-	switch (type) {
+-	case 0:	val <<= shift;	break;
+-	case 1:	val >>= shift;	break;
+-	case 2:
+-		val = (((signed long)val) >> shift);
+-		break;
+-	case 3:
+- 		val = (val >> shift) | (val << (32 - shift));
+-		break;
+-	}
+-	return val;
+-}
+-
+-/*
+- * Get value of operand 2 (in a LDR instruction)
+- */
+-static unsigned long
+-ptrace_getldrop2(struct task_struct *child, unsigned long insn)
+-{
+-	unsigned long val;
+-	int shift;
+-	int type;
+-
+-	val = get_user_reg(child, insn & 15);
+-	shift = (insn >> 7) & 31;
+-	type = (insn >> 5) & 3;
+-
+-	switch (type) {
+-	case 0:	val <<= shift;	break;
+-	case 1:	val >>= shift;	break;
+-	case 2:
+-		val = (((signed long)val) >> shift);
+-		break;
+-	case 3:
+- 		val = (val >> shift) | (val << (32 - shift));
+-		break;
+-	}
+-	return val;
+-}
+-
+-#define OP_MASK	0x01e00000
+-#define OP_AND	0x00000000
+-#define OP_EOR	0x00200000
+-#define OP_SUB	0x00400000
+-#define OP_RSB	0x00600000
+-#define OP_ADD	0x00800000
+-#define OP_ADC	0x00a00000
+-#define OP_SBC	0x00c00000
+-#define OP_RSC	0x00e00000
+-#define OP_ORR	0x01800000
+-#define OP_MOV	0x01a00000
+-#define OP_BIC	0x01c00000
+-#define OP_MVN	0x01e00000
+-
+-static unsigned long
+-get_branch_address(struct task_struct *child, unsigned long pc, unsigned long insn)
+-{
+-	u32 alt = 0;
+-
+-	switch (insn & 0x0e000000) {
+-	case 0x00000000:
+-	case 0x02000000: {
+-		/*
+-		 * data processing
+-		 */
+-		long aluop1, aluop2, ccbit;
+-
+-	        if ((insn & 0x0fffffd0) == 0x012fff10) {
+-		        /*
+-			 * bx or blx
+-			 */
+-			alt = get_user_reg(child, insn & 15);
+-			break;
+-		}
+-
+-
+-		if ((insn & 0xf000) != 0xf000)
+-			break;
+-
+-		aluop1 = ptrace_getrn(child, insn);
+-		aluop2 = ptrace_getaluop2(child, insn);
+-		ccbit  = get_user_reg(child, REG_PSR) & PSR_C_BIT ? 1 : 0;
+-
+-		switch (insn & OP_MASK) {
+-		case OP_AND: alt = aluop1 & aluop2;		break;
+-		case OP_EOR: alt = aluop1 ^ aluop2;		break;
+-		case OP_SUB: alt = aluop1 - aluop2;		break;
+-		case OP_RSB: alt = aluop2 - aluop1;		break;
+-		case OP_ADD: alt = aluop1 + aluop2;		break;
+-		case OP_ADC: alt = aluop1 + aluop2 + ccbit;	break;
+-		case OP_SBC: alt = aluop1 - aluop2 + ccbit;	break;
+-		case OP_RSC: alt = aluop2 - aluop1 + ccbit;	break;
+-		case OP_ORR: alt = aluop1 | aluop2;		break;
+-		case OP_MOV: alt = aluop2;			break;
+-		case OP_BIC: alt = aluop1 & ~aluop2;		break;
+-		case OP_MVN: alt = ~aluop2;			break;
+-		}
+-		break;
+-	}
+-
+-	case 0x04000000:
+-	case 0x06000000:
+-		/*
+-		 * ldr
+-		 */
+-		if ((insn & 0x0010f000) == 0x0010f000) {
+-			unsigned long base;
+-
+-			base = ptrace_getrn(child, insn);
+-			if (insn & 1 << 24) {
+-				long aluop2;
+-
+-				if (insn & 0x02000000)
+-					aluop2 = ptrace_getldrop2(child, insn);
+-				else
+-					aluop2 = insn & 0xfff;
+-
+-				if (insn & 1 << 23)
+-					base += aluop2;
+-				else
+-					base -= aluop2;
+-			}
+-			read_u32(child, base, &alt);
+-		}
+-		break;
+-
+-	case 0x08000000:
+-		/*
+-		 * ldm
+-		 */
+-		if ((insn & 0x00108000) == 0x00108000) {
+-			unsigned long base;
+-			unsigned int nr_regs;
+-
+-			if (insn & (1 << 23)) {
+-				nr_regs = hweight16(insn & 65535) << 2;
+-
+-				if (!(insn & (1 << 24)))
+-					nr_regs -= 4;
+-			} else {
+-				if (insn & (1 << 24))
+-					nr_regs = -4;
+-				else
+-					nr_regs = 0;
+-			}
+-
+-			base = ptrace_getrn(child, insn);
+-
+-			read_u32(child, base + nr_regs, &alt);
+-			break;
+-		}
+-		break;
+-
+-	case 0x0a000000: {
+-		/*
+-		 * bl or b
+-		 */
+-		signed long displ;
+-		/* It's a branch/branch link: instead of trying to
+-		 * figure out whether the branch will be taken or not,
+-		 * we'll put a breakpoint@both locations.  This is
+-		 * simpler, more reliable, and probably not a whole lot
+-		 * slower than the alternative approach of emulating the
+-		 * branch.
+-		 */
+-		displ = (insn & 0x00ffffff) << 8;
+-		displ = (displ >> 6) + 8;
+-		if (displ != 0 && displ != 4)
+-			alt = pc + displ;
+-	    }
+-	    break;
+-	}
+-
+-	return alt;
+-}
+-
+-static int
+-swap_insn(struct task_struct *task, unsigned long addr,
+-	  void *old_insn, void *new_insn, int size)
+-{
+-	int ret;
+-
+-	ret = access_process_vm(task, addr, old_insn, size, 0);
+-	if (ret == size)
+-		ret = access_process_vm(task, addr, new_insn, size, 1);
+-	return ret;
+-}
+-
+-static void
+-add_breakpoint(struct task_struct *task, struct debug_info *dbg, unsigned long addr)
+-{
+-	int nr = dbg->nsaved;
+-
+-	if (nr < 2) {
+-		u32 new_insn = BREAKINST_ARM;
+-		int res;
+-
+-		res = swap_insn(task, addr, &dbg->bp[nr].insn, &new_insn, 4);
+-
+-		if (res == 4) {
+-			dbg->bp[nr].address = addr;
+-			dbg->nsaved += 1;
+-		}
+-	} else
+-		printk(KERN_ERR "ptrace: too many breakpoints\n");
+-}
+-
+-/*
+- * Clear one breakpoint in the user program.  We copy what the hardware
+- * does and use bit 0 of the address to indicate whether this is a Thumb
+- * breakpoint or an ARM breakpoint.
+- */
+-static void clear_breakpoint(struct task_struct *task, struct debug_entry *bp)
+-{
+-	unsigned long addr = bp->address;
+-	union debug_insn old_insn;
+-	int ret;
+-
+-	if (addr & 1) {
+-		ret = swap_insn(task, addr & ~1, &old_insn.thumb,
+-				&bp->insn.thumb, 2);
+-
+-		if (ret != 2 || old_insn.thumb != BREAKINST_THUMB)
+-			printk(KERN_ERR "%s:%d: corrupted Thumb breakpoint at "
+-				"0x%08lx (0x%04x)\n", task->comm,
+-				task_pid_nr(task), addr, old_insn.thumb);
+-	} else {
+-		ret = swap_insn(task, addr & ~3, &old_insn.arm,
+-				&bp->insn.arm, 4);
+-
+-		if (ret != 4 || old_insn.arm != BREAKINST_ARM)
+-			printk(KERN_ERR "%s:%d: corrupted ARM breakpoint at "
+-				"0x%08lx (0x%08x)\n", task->comm,
+-				task_pid_nr(task), addr, old_insn.arm);
+-	}
+-}
+-
+-void ptrace_set_bpt(struct task_struct *child)
+-{
+-	struct pt_regs *regs;
+-	unsigned long pc;
+-	u32 insn;
+-	int res;
+-
+-	regs = task_pt_regs(child);
+-	pc = instruction_pointer(regs);
+-
+-	if (thumb_mode(regs)) {
+-		printk(KERN_WARNING "ptrace: can't handle thumb mode\n");
+-		return;
+-	}
+-
+-	res = read_instr(child, pc, &insn);
+-	if (!res) {
+-		struct debug_info *dbg = &child->thread.debug;
+-		unsigned long alt;
+-
+-		dbg->nsaved = 0;
+-
+-		alt = get_branch_address(child, pc, insn);
+-		if (alt)
+-			add_breakpoint(child, dbg, alt);
+-
+-		/*
+-		 * Note that we ignore the result of setting the above
+-		 * breakpoint since it may fail.  When it does, this is
+-		 * not so much an error, but a forewarning that we may
+-		 * be receiving a prefetch abort shortly.
+-		 *
+-		 * If we don't set this breakpoint here, then we can
+-		 * lose control of the thread during single stepping.
+-		 */
+-		if (!alt || predicate(insn) != PREDICATE_ALWAYS)
+-			add_breakpoint(child, dbg, pc + 4);
+-	}
+-}
+-
+-/*
+- * Ensure no single-step breakpoint is pending.  Returns non-zero
+- * value if child was being single-stepped.
+- */
+-void ptrace_cancel_bpt(struct task_struct *child)
+-{
+-	int i, nsaved = child->thread.debug.nsaved;
+-
+-	child->thread.debug.nsaved = 0;
+-
+-	if (nsaved > 2) {
+-		printk("ptrace_cancel_bpt: bogus nsaved: %d!\n", nsaved);
+-		nsaved = 2;
+-	}
+-
+-	for (i = 0; i < nsaved; i++)
+-		clear_breakpoint(child, &child->thread.debug.bp[i]);
+-}
+-
+-void user_disable_single_step(struct task_struct *task)
+-{
+-	task->ptrace &= ~PT_SINGLESTEP;
+-	ptrace_cancel_bpt(task);
+-}
+-
+-void user_enable_single_step(struct task_struct *task)
+-{
+-	task->ptrace |= PT_SINGLESTEP;
+-}
+-
+ /*
+  * Called by kernel/ptrace.c when detaching..
+  */
+ void ptrace_disable(struct task_struct *child)
+ {
+-	user_disable_single_step(child);
++	/* Nothing to do. */
+ }
+ 
+ /*
+@@ -576,8 +197,6 @@ void ptrace_break(struct task_struct *tsk, struct pt_regs *regs)
+ {
+ 	siginfo_t info;
+ 
+-	ptrace_cancel_bpt(tsk);
+-
+ 	info.si_signo = SIGTRAP;
+ 	info.si_errno = 0;
+ 	info.si_code  = TRAP_BRKPT;
+diff --git a/arch/arm/kernel/ptrace.h b/arch/arm/kernel/ptrace.h
+deleted file mode 100644
+index 3926605..0000000
+--- a/arch/arm/kernel/ptrace.h
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- *  linux/arch/arm/kernel/ptrace.h
+- *
+- *  Copyright (C) 2000-2003 Russell King
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/ptrace.h>
+-
+-extern void ptrace_cancel_bpt(struct task_struct *);
+-extern void ptrace_set_bpt(struct task_struct *);
+-extern void ptrace_break(struct task_struct *, struct pt_regs *);
+-
+-/*
+- * Send SIGTRAP if we're single-stepping
+- */
+-static inline void single_step_trap(struct task_struct *task)
+-{
+-	if (task->ptrace & PT_SINGLESTEP) {
+-		ptrace_cancel_bpt(task);
+-		send_sig(SIGTRAP, task, 1);
+-	}
+-}
+-
+-static inline void single_step_clear(struct task_struct *task)
+-{
+-	if (task->ptrace & PT_SINGLESTEP)
+-		ptrace_cancel_bpt(task);
+-}
+-
+-static inline void single_step_set(struct task_struct *task)
+-{
+-	if (task->ptrace & PT_SINGLESTEP)
+-		ptrace_set_bpt(task);
+-}
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 907d5a6..7709668 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -20,7 +20,6 @@
+ #include <asm/unistd.h>
+ #include <asm/vfp.h>
+ 
+-#include "ptrace.h"
+ #include "signal.h"
+ 
+ #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
+@@ -348,8 +347,6 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
+ 	if (restore_sigframe(regs, frame))
+ 		goto badframe;
+ 
+-	single_step_trap(current);
+-
+ 	return regs->ARM_r0;
+ 
+ badframe:
+@@ -383,8 +380,6 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
+ 	if (do_sigaltstack(&frame->sig.uc.uc_stack, NULL, regs->ARM_sp) == -EFAULT)
+ 		goto badframe;
+ 
+-	single_step_trap(current);
+-
+ 	return regs->ARM_r0;
+ 
+ badframe:
+@@ -704,8 +699,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
+ 	if (try_to_freeze())
+ 		goto no_signal;
+ 
+-	single_step_clear(current);
+-
+ 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+ 	if (signr > 0) {
+ 		sigset_t *oldset;
+@@ -724,7 +717,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
+ 			if (test_thread_flag(TIF_RESTORE_SIGMASK))
+ 				clear_thread_flag(TIF_RESTORE_SIGMASK);
+ 		}
+-		single_step_set(current);
+ 		return;
+ 	}
+ 
+@@ -770,7 +762,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
+ 			sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
+ 		}
+ 	}
+-	single_step_set(current);
+ }
+ 
+ asmlinkage void
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index ee57640..439e107 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -23,6 +23,7 @@
+ #include <linux/kexec.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
++#include <linux/sched.h>
+ 
+ #include <asm/atomic.h>
+ #include <asm/cacheflush.h>
+@@ -32,7 +33,6 @@
+ #include <asm/unwind.h>
+ #include <asm/tls.h>
+ 
+-#include "ptrace.h"
+ #include "signal.h"
+ 
+ static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
 -- 
-1.7.2.2
+1.7.0.4
