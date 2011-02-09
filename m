@@ -1,26 +1,22 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Feb 2011 13:04:59 +0000
-Subject: [PATCH] ARM: Correct WFE() in asm/spinlock.h for Thumb-2
-In-Reply-To: <001d01cbc842$fa1aacc0$ee500640$@deacon@arm.com>
-References: <1297178414-20983-1-git-send-email-dave.martin@linaro.org>
-	<20110208164009.GD27521@n2100.arm.linux.org.uk>
-	<AANLkTi=XfBjite-xtR8z_+5ATxSb4a9XDNAXdLBowWKY@mail.gmail.com>
-	<001d01cbc842$fa1aacc0$ee500640$@deacon@arm.com>
-Message-ID: <20110209130459.GB5544@n2100.arm.linux.org.uk>
+Date: Wed, 9 Feb 2011 13:06:45 +0000
+Subject: [RFC 4/5] ARM: P2V: introduce phys_to_virt/virt_to_phys
+	runtime patching
+In-Reply-To: <20110209121701.GD2818@pulham.picochip.com>
+References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
+	<E1PaDPa-00023l-CR@rmk-PC.arm.linux.org.uk>
+	<20110209121701.GD2818@pulham.picochip.com>
+Message-ID: <20110209130645.GC5544@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 10:20:29AM -0000, Will Deacon wrote:
-> > the WFE into the 4 bytes expected by ALT_SMP().  For safety, I write
-> > it out explicitly: ALT_SMP("wfene", ...) would work sometimes but
-> > might not work as expected if the previous instruction has an EQ or NE
-> > condition, because then the assembler wouldn't need to insert an extra
-> > IT when it generates its output...
-> 
-> That's really horrible! It might be worth commenting the explicit
-> IT in your WFE macro to explain why we can't rely on the assembler
-> to generate it for us.
+On Wed, Feb 09, 2011 at 12:17:01PM +0000, Jamie Iles wrote:
+> I haven't been using the runtime patching, but building picoxcell based 
+> off of todays next I'm seeing a pretty harmless warning.  Fixup below.
 
-Yes, it's really really horrible.  As I say, I think in future I'm just
-going to stick to writing good ARM code and let others worry about how
-to make it work properly on T2.
+One of the reasons I've not done this is that it turns out that we
+need to do the smp-on-up fixups on modules when running with certain
+configs.  That means we need this function in other circumstances too.
+
+It's probably going to be better to mark it with __maybe_unused than
+to surround stuff with complex ifdefs.
