@@ -1,97 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 9 Feb 2011 11:09:37 -0700
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <3399156206431206254@unknownmsgid>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
-	<3399156206431206254@unknownmsgid>
-Message-ID: <AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 9 Feb 2011 10:12:41 -0800
+Subject: [PATCH] ARM: vfp: Fix up exception location in Thumb mode
+In-Reply-To: <AANLkTinFvzSjT66kj5uU1YkLEaJNCyy2JV1H7Li_cSxi@mail.gmail.com>
+References: <1295014231.7901.41.camel@e102109-lin.cambridge.arm.com>
+	<20110114154919.GE15996@n2100.arm.linux.org.uk>
+	<1295022193.7901.56.camel@e102109-lin.cambridge.arm.com>
+	<20110114163520.GH15996@n2100.arm.linux.org.uk>
+	<1295024327.7901.70.camel@e102109-lin.cambridge.arm.com>
+	<20110114173050.GJ15996@n2100.arm.linux.org.uk>
+	<20110114184759.GN15996@n2100.arm.linux.org.uk>
+	<AANLkTi=J2A1Qv6NGB1bsMr6d+1VFV26KEBQ=NJ=791s0@mail.gmail.com>
+	<AANLkTimd44_FjnJUCNwz412Ned5S_+YcyHjfitus3vLQ@mail.gmail.com>
+	<AANLkTimZ9itumf=QZPD55+JA5cUOWKgwuA1_5=XsdPsP@mail.gmail.com>
+	<20110126112624.GC2562@n2100.arm.linux.org.uk>
+	<AANLkTim2fPySEMFn+ckrVAvJj8ZXEvBoZpgmZAKOWf=9@mail.gmail.com>
+	<AANLkTindtGzxnCRK7XZW1jtXRAeBz9cTshqCtTr3qnL7@mail.gmail.com>
+	<AANLkTinFvzSjT66kj5uU1YkLEaJNCyy2JV1H7Li_cSxi@mail.gmail.com>
+Message-ID: <AANLkTi=H19ZO1pntoUKrWhXt8BVQ=upivsL1TMUhB8Fo@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 9, 2011 at 10:17 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Grant, Rob,
+On Wed, Jan 26, 2011 at 11:30 PM, Colin Cross <ccross@android.com> wrote:
+> This patch is on top of your first patch that cleans up the comments,
+> but not the second patch that fixes the PC in the VFP exception case.
+> Compiled but not run tested, and I can't test crunch or iwmmxt.
+> vfpmodule.c may be able to be simplified (right now its both adding
+> and subtracting 4 from regs->ARM_pc).
 >
->> On Tue, Feb 8, 2011 at 8:53 PM, Rob Herring <robherring2@gmail.com> wrote:
->> > From: Rob Herring <rob.herring@calxeda.com>
->> >
->> > Add OF match table to enable OF style driver binding. The dts entry is like
->> > this:
->> >
->> > pmu {
->> > ? ? ? ?compatible = "arm,pmu";
->> > ? ? ? ?interrupts = <100 101>;
->> > };
->> >
->> > The use of pdev->id as an index breaks with OF device binding. Change to use
->> > a counter instead. If more than 1 pmu device is ever really supported, a
->> > better solution to match users with particular pmu is probably needed.
->> >
->> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> > ---
->> > ?arch/arm/kernel/pmu.c | ? 13 ++++++++++---
->> > ?1 files changed, 10 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
->> > index b8af96e..7084057 100644
->> > --- a/arch/arm/kernel/pmu.c
->> > +++ b/arch/arm/kernel/pmu.c
->> > @@ -24,30 +24,37 @@
->> > ?static volatile long pmu_lock;
->> >
->> > ?static struct platform_device *pmu_devices[ARM_NUM_PMU_DEVICES];
->> > +static int pmu_device_count;
->> >
->> > ?static int __devinit pmu_device_probe(struct platform_device *pdev)
->> > ?{
->> >
->> > - ? ? ? if (pdev->id < 0 || pdev->id >= ARM_NUM_PMU_DEVICES) {
->> > + ? ? ? if (pmu_device_count >= ARM_NUM_PMU_DEVICES) {
->> > ? ? ? ? ? ? ? ?pr_warning("received registration request for unknown "
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"device %d\n", pdev->id);
->> > ? ? ? ? ? ? ? ?return -EINVAL;
->> > ? ? ? ?}
->> >
->> > - ? ? ? if (pmu_devices[pdev->id])
->> > + ? ? ? if (pmu_devices[pmu_device_count])
->> > ? ? ? ? ? ? ? ?pr_warning("registering new PMU device type %d overwrites "
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"previous registration!\n", pdev->id);
->> > ? ? ? ?else
->> > ? ? ? ? ? ? ? ?pr_info("registered new PMU device of type %d\n",
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pdev->id);
->> >
->> > - ? ? ? pmu_devices[pdev->id] = pdev;
->> > + ? ? ? pmu_devices[pmu_device_count++] = pdev;
->> > ? ? ? ?return 0;
->> > ?}
->> >
->> > +static struct of_device_id pmu_device_ids[] = {
->> > + ? ? ? { .compatible = "arm,pmu" },
->>
->> This is a pretty generic compatible string and it doesn't account for
->> the possibility that the implementation behaviour will change with
->> newer devices. ?Is there any form of versioning on the pmu that would
->> be appropriate to encode here?
->
-> Following on from Rob's update, it would be nice if you could specify that
-> the PMU is a CPU PMU (as opposed to L2-cache, bus, gpu etc) in the string.
-> That way adding different PMUs in the future seems more natural and it accounts
-> for your concerns above. Is that ok, or does the compatible string have to
-> match that used by the platform bus?
+> ?arch/arm/kernel/crunch-bits.S | ? ?3 ---
+> ?arch/arm/kernel/entry-armv.S ?| ? 38 ++++++++++++++++++++------------------
+> ?arch/arm/kernel/iwmmxt.S ? ? ?| ? ?3 ---
+> ?arch/arm/nwfpe/entry.S ? ? ? ?| ? ?1 +
+> ?arch/arm/vfp/vfphw.S ? ? ? ? ?| ? ?5 -----
+> ?arch/arm/vfp/vfpmodule.c ? ? ?| ? ?6 ++++++
+> ?6 files changed, 27 insertions(+), 29 deletions(-)
 
-It does make sense to encode the specific implementation into the
-compatible string.  A single device driver can bind against multiple
-compatible strings.  ie. the match table could include {.compatible =
-"arm,cortex-a9-pmu"},{.compatible = "arm,cortex-a9-l2cache-pmu"}...
-
-> As for versioning, the PMU detection is done dynamically at runtime,
-> so knowing that we're poking a CPU is enough.
-
-Fair enough.  It is still good practice in the compatible list to
-encode the specific PMU implementation (maybe arm,cortex-a9-pmu?)
-instead of trying to define a 'generic' or wildcard compatible value.
-Newer implementations can always claim compatibility with an older
-implementation so that the kernel doesn't have to be modified to find
-the new devices.  "arm,pmu" is probably too generic.
-
-g.
+Finally got a chance to do some quick testing on this, it needs one
+more change to drop the correction in do_undefinstr in traps.c, and
+fix one register in entry-armv.S.  Russell, do you have any interest
+in this solution?  Alternatively, a one line change to store the
+corrected PC into the stack in vfphw.S instead of entry-armv.S will
+fix the original problem (VFP_bounce from thumb mode returning to the
+wrong address) without causing the problem introduced by your second
+patch (undefined NEON or VFP-D32 instructions in thumb mode returning
+to the wrong address).
