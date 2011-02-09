@@ -1,75 +1,334 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 09 Feb 2011 17:00:48 -0600
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <AANLkTikrBx1Y7MFGCJe=Gx-9fUxhwuYq-BZ4stGBGav6@mail.gmail.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
-	<3399156206431206254@unknownmsgid>
-	<AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
-	<-4919269306841091192@unknownmsgid>
-	<AANLkTikrBx1Y7MFGCJe=Gx-9fUxhwuYq-BZ4stGBGav6@mail.gmail.com>
-Message-ID: <4D531CA0.8050402@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 9 Feb 2011 15:29:26 -0800
+Subject: [PATCH V3 1/1] ST SPEAr: PCIE gadget suppport
+In-Reply-To: <1296742149-18102-1-git-send-email-pratyush.anand@st.com>
+References: <1296742149-18102-1-git-send-email-pratyush.anand@st.com>
+Message-ID: <20110209152926.0126ac97.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2011 01:03 PM, Grant Likely wrote:
-> On Wed, Feb 9, 2011 at 11:53 AM, Will Deacon<will.deacon@arm.com>  wrote:
->> Grant,
->>
->>>> Following on from Rob's update, it would be nice if you could specify that
->>>> the PMU is a CPU PMU (as opposed to L2-cache, bus, gpu etc) in the string.
->>>> That way adding different PMUs in the future seems more natural and it accounts
->>>> for your concerns above. Is that ok, or does the compatible string have to
->>>> match that used by the platform bus?
->>>
->>> It does make sense to encode the specific implementation into the
->>> compatible string.  A single device driver can bind against multiple
->>> compatible strings.  ie. the match table could include {.compatible =
->>> "arm,cortex-a9-pmu"},{.compatible = "arm,cortex-a9-l2cache-pmu"}...
->>
->> Ok - that's great! Specifying the CPU is probably a little verbose, but
->> something like "arm,armv7pmu" would be really helpful when it comes to
->> multiple devices.
->>
->>>> As for versioning, the PMU detection is done dynamically at runtime,
->>>> so knowing that we're poking a CPU is enough.
->>>
->>> Fair enough.  It is still good practice in the compatible list to
->>> encode the specific PMU implementation (maybe arm,cortex-a9-pmu?)
->>> instead of trying to define a 'generic' or wildcard compatible value.
->>> Newer implementations can always claim compatibility with an older
->>> implementation so that the kernel doesn't have to be modified to find
->>> the new devices.  "arm,pmu" is probably too generic.
->>
->> "arm,pmu" is definitely too generic. If it's good practice to specify
->> as much as possible, then go for it - I just feel a little uneasy having
->> to add lots of redundant kernel code but it sounds like you'll hopefully
->> prove me wrong on that :)
+On Thu, 3 Feb 2011 19:39:09 +0530
+Pratyush Anand <pratyush.anand@st.com> wrote:
+
+> This is a configurable gadget. can be configured by configfs interface. Any
+> IP available at PCIE bus can be programmed to be used by host
+> controller.It supoorts both INTX and MSI.
+> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
+> with size 0x1000
+> 
 >
-> Shouldn't be any redundant kernel code.  It's just a list of match
-> values, and the driver code already knows how to handle it.  The
-> advantage of being specific is that if the driver ever does need
-> information about the specific implementation (say, because the
-> hardware reported value is buggy), then the data is available.
+> ...
+>
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/configfs-spear-pcie-gadget
+> @@ -0,0 +1,30 @@
+> +What:		/config/pcie-gadget
+> +Date:		Feb 2011
+> +KernelVersion:	2.6.37
+> +Contact:	Pratyush Anand <pratyush.anand@st.com>
+> +Description:
+> +
+> +	Interface is used to configure selected dual mode pcie controller
+> +	as device and then program its various registers to configure it
+> +	as a particular device type.
+> +	This interfaces can be used to show spear's pcie device capability.
+> +
+> +	Nodes are only visible when configfs is mounted. To mount configfs
+> +	in /config directory use:
+> +	# mount -t configfs none /config/
+> +
+> +	/config/pcie-gadget/
+> +		link ... used to enable ltssm and read its status.
+> +		int_type ...used to configure and read type of supported
+> +			interrupt
+> +		no_of_msi ... used to configure number of MSI vector needed and
+> +			to read no of MSI granted.
+> +		inta ... write 1 to assert INTA and 0 to de-assert.
+> +		send_msi ... write MSI vector to be sent.
+> +		vendor_id ... used to write and read vendor id (hex)
+> +		device_id ... used to write and read device id (hex)
+> +		bar0_size ... used to write and read bar0_size
+> +		bar0_address ... used to write and read bar0 mapped area in hex.
+> +		bar0_rw_offset ... used to write and read offset of bar0 where
+> +			bar0_data will be written or read.
+> +		bar0_data ... used to write and read data at bar0_rw_offset.
 
-By that argument, we should use "<vendor>,cortex-a9-rXpX-pmu." As a 
-particular rev of the A9 PMU or vendor's SOC could be buggy. That would 
-quickly grow into a long list. Just with cpu models, we would have:
+This interface implies that there will only ever be one device in the
+machine, yes?  Seems a bit short-sighted?
 
-cortex-a9
-cortex-a8
-cortex-a15
-cortex-a5
-arm1136
-arm1176
-l210
-l220
-pl310
-various xscale flavors
-Qualcomm SMP
+>
+> ...
+>
+> +Node programming example
+> +===========================
+> +Program all PCIE registers in such a way that when this device is connected
+> +to the pcie host, then host sees this device as 1MB RAM.
+> +#mount -t configfs none /Config
+> +# cd /config/pcie_gadget/
+> +Now you have all the nodes in this directory.
+> +program vendor id as 0x104a
+> +# echo 104A >> vendor_id
+> +
+> +program device id as 0xCD80
+> +# echo CD80 >> device_id
+> +
+> +program BAR0 size as 1MB
+> +# echo 100000 >> bar0_size
 
-Keep in mind that the whole point of this platform device is just to 
-specify the interrupt connection which is the only part that varies by 
-SOC (and is not probe-able).
+I'd be more comfortable if all the hex inputs and outputs had a leading
+0x.
 
-Rob
+>
+> ...
+>
+> +static void spear_dbi_read_reg(struct spear_pcie_gadget_config *config,
+> +		int where, int size, u32 *val)
+> +{
+> +	struct pcie_app_reg __iomem *app_reg
+> +		= (struct pcie_app_reg __iomem *) config->va_app_base;
+> +	u32 va_address;
+> +
+> +	/* Enable DBI access */
+> +	enable_dbi_access(app_reg);
+> +
+> +	va_address = (u32)config->va_dbi_base + (where & ~0x3);
+
+This will be buggy on 64-bit machines.
+
+> +	*val = readl(va_address);
+
+I guess the code won't be running on 64-bit machines ;)
+
+Still, it would be good to minimise the obvious portability problems.
+
+> +	if (size == 1)
+> +		*val = (*val >> (8 * (where & 3))) & 0xff;
+> +	else if (size == 2)
+> +		*val = (*val >> (8 * (where & 3))) & 0xffff;
+> +
+> +	/* Disable DBI access */
+> +	disable_dbi_access(app_reg);
+> +}
+> +
+> +static void spear_dbi_write_reg(struct spear_pcie_gadget_config *config,
+> +		int where, int size, u32 val)
+> +{
+> +	struct pcie_app_reg __iomem *app_reg
+> +		= (struct pcie_app_reg __iomem *) config->va_app_base;
+
+Is the typecast needed?  We shouldn't *need* to cast a void **iomem *
+in this manner.  If we do need the cast then something is broken.
+
+> +	u32 va_address;
+> +
+> +	/* Enable DBI access */
+> +	enable_dbi_access(app_reg);
+> +
+> +	va_address = (u32)config->va_dbi_base + (where & ~0x3);
+> +
+> +	if (size == 4)
+> +		writel(val, va_address);
+> +	else if (size == 2)
+> +		writew(val, va_address + (where & 2));
+> +	else if (size == 1)
+> +		writeb(val, va_address + (where & 3));
+> +
+> +	/* Disable DBI access */
+> +	disable_dbi_access(app_reg);
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_link(
+> +		struct spear_pcie_gadget_config *config,
+> +		const char *buf, size_t count)
+> +{
+> +	struct pcie_app_reg __iomem *app_reg =
+> +		(struct pcie_app_reg __iomem *) config->va_app_base;
+> +	char link[10];
+> +
+> +	if (strlen(buf) >= 10)
+> +		return -EINVAL;
+> +
+> +	if (sscanf(buf, "%s", link) != 1)
+> +		return -EINVAL;
+> +
+> +	if (!strcmp(link, "UP"))
+> +		writel(readl(&app_reg->app_ctrl_0) | (1 << APP_LTSSM_ENABLE_ID),
+> +			&app_reg->app_ctrl_0);
+> +	else
+> +		writel(readl(&app_reg->app_ctrl_0)
+> +				& ~(1 << APP_LTSSM_ENABLE_ID),
+> +				&app_reg->app_ctrl_0);
+> +	return count;
+> +}
+
+This function looks unnecessarily complex.  Why not do something like
+
+	if (sysfs_streq(buf, "UP"))
+		...
+	else if (sysfs_streq(buf, "UP"))
+		...
+	else
+		fail;
+
+And note that the code at present is sloppily treating all input other
+than "UP" as "DOWN".  Don't do that.
+
+
+> +static ssize_t pcie_gadget_show_int_type(
+> +		struct spear_pcie_gadget_config *config,
+> +		char *buf)
+> +{
+> +	return sprintf(buf, "%s", config->int_type);
+> +}
+> +
+> +static ssize_t pcie_gadget_store_int_type(
+> +		struct spear_pcie_gadget_config *config,
+> +		const char *buf, size_t count)
+> +{
+> +	char int_type[10];
+> +	u32 cap, vec, flags;
+> +	unsigned long vector;
+> +
+> +	if (strlen(buf) >= 10)
+> +		return -EINVAL;
+> +
+> +	if (sscanf(buf, "%s", int_type) != 1)
+> +		return -EINVAL;
+
+Similarly, the local copy of the string isn't needed.
+
+> +	if (!strcmp(int_type, "INTA"))
+> +		spear_dbi_write_reg(config, PCI_INTERRUPT_LINE, 1, 1);
+> +
+> +	else if (!strcmp(int_type, "MSI")) {
+> +		vector = config->requested_msi;
+> +		vec = 0;
+> +		while (vector > 1) {
+> +			vector /= 2;
+> +			vec++;
+> +		}
+> +		spear_dbi_write_reg(config, PCI_INTERRUPT_LINE, 1, 0);
+> +		cap = pci_find_own_capability(config, PCI_CAP_ID_MSI);
+> +		spear_dbi_read_reg(config, cap + PCI_MSI_FLAGS, 1, &flags);
+> +		flags &= ~PCI_MSI_FLAGS_QMASK;
+> +		flags |= vec << 1;
+> +		spear_dbi_write_reg(config, cap + PCI_MSI_FLAGS, 1, flags);
+> +	} else
+> +		return -EINVAL;
+> +
+> +	strcpy(config->int_type, int_type);
+> +
+> +	return count;
+> +}
+> +
+> +static ssize_t pcie_gadget_show_no_of_msi(
+> +		struct spear_pcie_gadget_config *config,
+> +		char *buf)
+> +{
+> +	struct pcie_app_reg __iomem *app_reg =
+> +		(struct pcie_app_reg __iomem *)config->va_app_base;
+> +	u32 cap, vector, vec, flags;
+> +
+> +	if ((readl(&app_reg->msg_status) & (1 << CFG_MSI_EN_ID))
+> +			!= (1 << CFG_MSI_EN_ID))
+> +		vector = 0;
+> +	else {
+> +		cap = pci_find_own_capability(config, PCI_CAP_ID_MSI);
+> +		spear_dbi_read_reg(config, cap + PCI_MSI_FLAGS, 1, &flags);
+> +		flags &= ~PCI_MSI_FLAGS_QSIZE;
+> +		vec = flags >> 4;
+> +		vector = 1;
+> +		while (vec--)
+> +			vector *= 2;
+> +	}
+> +	config->configured_msi = vector;
+
+Wait.  A "show" function is modifying kernel state?!?!?
+
+> +
+> +	return sprintf(buf, "%u", vector);
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_send_msi(
+> +		struct spear_pcie_gadget_config *config,
+> +		const char *buf, size_t count)
+> +{
+> +	struct pcie_app_reg __iomem *app_reg =
+> +		(struct pcie_app_reg __iomem *)config->va_app_base;
+> +	unsigned long vector;
+> +	u32 ven_msi;
+> +
+> +	if (strict_strtoul(buf, 0, &vector))
+> +		return -EINVAL;
+> +
+> +	if (!config->configured_msi)
+> +		return -EINVAL;
+
+This is racy, isn't it?  Some other thread could be concurrently
+modifying ->configured_msi?  (It's a minor issue IMO).
+
+> +	if (vector >= config->configured_msi)
+> +		return -EINVAL;
+> +
+> +	ven_msi = readl(&app_reg->ven_msi_1);
+> +	ven_msi &= ~VEN_MSI_FUN_NUM_MASK;
+> +	ven_msi |= 0 << VEN_MSI_FUN_NUM_ID;
+> +	ven_msi &= ~VEN_MSI_TC_MASK;
+> +	ven_msi |= 0 << VEN_MSI_TC_ID;
+> +	ven_msi &= ~VEN_MSI_VECTOR_MASK;
+> +	ven_msi |= vector << VEN_MSI_VECTOR_ID;
+> +
+> +	/*generating interrupt for msi vector*/
+> +	ven_msi |= VEN_MSI_REQ_EN;
+> +	writel(ven_msi, &app_reg->ven_msi_1);
+> +	/*need to wait till this bit is cleared, it is not cleared
+> +	 * autometically[Bug RTL] TBD*/
+> +	udelay(1);
+> +	ven_msi &= ~VEN_MSI_REQ_EN;
+> +	writel(ven_msi, &app_reg->ven_msi_1);
+> +
+> +	return count;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t pcie_gadget_store_bar0_address(
+> +		struct spear_pcie_gadget_config *config,
+> +		const char *buf, size_t count)
+> +{
+> +	struct pcie_app_reg __iomem *app_reg =
+> +		(struct pcie_app_reg __iomem *)config->va_app_base;
+> +	unsigned long address;
+> +
+> +	if (strict_strtoul(buf, 0, &address))
+> +		return -EINVAL;
+> +
+> +	address &= ~(config->bar0_size - 1);
+> +	if (config->va_bar0_address)
+> +		iounmap((void *)config->va_bar0_address);
+
+`void __iomem *' would be a more accurate cast and might avoid sparse
+warnings.
+
+Even better would be to avoid the cast all together.  Does
+va_bar0_address have the correct type?
+
+> +	config->va_bar0_address = (u32)ioremap(address, config->bar0_size);
+> +	if (!config->va_bar0_address)
+> +		return -ENOMEM;
+> +
+> +	writel(address, &app_reg->pim0_mem_addr_start);
+> +
+> +	return count;
+> +}
+> +
+>
+> ...
+>
