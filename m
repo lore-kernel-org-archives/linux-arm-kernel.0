@@ -1,62 +1,42 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed,  9 Feb 2011 15:26:13 +0100
-Subject: [PATCH v2] atmel_serial: enable PPS support
-In-Reply-To: <1297257973-11173-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1297257973-11173-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1297261573-17244-1-git-send-email-plagnioj@jcrosoft.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 9 Feb 2011 12:33:34 -0200
+Subject: [PATCH 2/2] ARM i.MX23/28: Add framebuffer device support
+In-Reply-To: <1297257651-8002-3-git-send-email-s.hauer@pengutronix.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<1297257651-8002-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <AANLkTimX7HHC5XuJbbCRu=u7cSC9s3B_und_T2z2S0AX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Viktar Palstsiuk <viktar.palstsiuk@promwad.com>
+Hi Sascha,
 
-Enables PPS support in atmel serial driver to make PPS API working.
+On Wed, Feb 9, 2011 at 11:20 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> ?arch/arm/mach-mxs/clock-mx23.c ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-mxs/clock-mx28.c ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mxs/devices-mx23.h ? ? ? ? ? | ? ?4 ++
+> ?arch/arm/mach-mxs/devices-mx28.h ? ? ? ? ? | ? ?4 ++
+> ?arch/arm/mach-mxs/devices/Kconfig ? ? ? ? ?| ? ?4 ++
+> ?arch/arm/mach-mxs/devices/Makefile ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mxs/devices/platform-mxsfb.c | ? 46 ++++++++++++++++++++++++++++
+> ?7 files changed, 61 insertions(+), 1 deletions(-)
+> ?create mode 100644 arch/arm/mach-mxs/devices/platform-mxsfb.c
+>
+> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> index ca72a05..bfc7f27 100644
+> --- a/arch/arm/mach-mxs/clock-mx23.c
+> +++ b/arch/arm/mach-mxs/clock-mx23.c
+> @@ -446,7 +446,7 @@ static struct clk_lookup lookups[] = {
+> ? ? ? ?_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+> ? ? ? ?_REGISTER_CLOCK(NULL, "usb", usb_clk)
+> ? ? ? ?_REGISTER_CLOCK(NULL, "audio", audio_clk)
+> - ? ? ? _REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> + ? ? ? _REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
 
-Signed-off-by: Viktar Palstsiuk <viktar.palstsiuk@promwad.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
-v2:
+Is the removal of the pwm clock intended here?
 
-	forget to update the prototype when rebase to upstream
+Regards,
 
-Best Regards,
-J.
- drivers/tty/serial/atmel_serial.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 2a1d52f..f119d17 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1240,6 +1240,21 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 	spin_unlock_irqrestore(&port->lock, flags);
- }
- 
-+static void atmel_set_ldisc(struct uart_port *port, int new)
-+{
-+	int line = port->line;
-+
-+	if (line >= port->state->port.tty->driver->num)
-+		return;
-+
-+	if (port->state->port.tty->ldisc->ops->num == N_PPS) {
-+		port->flags |= UPF_HARDPPS_CD;
-+		atmel_enable_ms(port);
-+	} else {
-+		port->flags &= ~UPF_HARDPPS_CD;
-+	}
-+}
-+
- /*
-  * Return string describing the specified port
-  */
-@@ -1380,6 +1395,7 @@ static struct uart_ops atmel_pops = {
- 	.shutdown	= atmel_shutdown,
- 	.flush_buffer	= atmel_flush_buffer,
- 	.set_termios	= atmel_set_termios,
-+	.set_ldisc	= atmel_set_ldisc,
- 	.type		= atmel_type,
- 	.release_port	= atmel_release_port,
- 	.request_port	= atmel_request_port,
--- 
-1.7.2.3
+Fabio Estevam
