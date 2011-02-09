@@ -1,51 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 9 Feb 2011 15:44:11 +0100
-Subject: [PATCH 1/2] atmel/macb: fix device name when SOFT/HARD_IRQ enabled
-In-Reply-To: <4D529992.7050502@ru.mvista.com>
-References: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
-	<4D529992.7050502@ru.mvista.com>
-Message-ID: <20110209144411.GB11255@game.jcrosoft.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Feb 2011 15:47:11 +0100
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <201102091547.12131.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:41 Wed 09 Feb     , Sergei Shtylyov wrote:
-> Hello.
+On Wednesday 09 February 2011, Sascha Hauer wrote:
+> Hi all,
 > 
-> On 09-02-2011 15:43, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> >From: Paul Chavent<paul.chavent@fnac.net>
-> 
-> >When listing processes on a system with SOFT/HARD_IRQ enabled,
-> >the name of the ethernet device is [irq/eth%d] (instead of [irq/eth0] for example).
-> 
-> >This patch call the request_irq function after having initialized the name of the device.
-> 
-> >Signed-off-by: Paul Chavent<paul.chavent@fnac.net>
-> >Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
-> [...]
-> 
-> >diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-> >index f69e73e..d642e08 100644
-> >--- a/drivers/net/macb.c
-> >+++ b/drivers/net/macb.c
-> [...]
-> >@@ -1219,13 +1209,23 @@ static int __init macb_probe(struct platform_device *pdev)
-> >  	err = register_netdev(dev);
-> >  	if (err) {
-> >  		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
-> >-		goto err_out_free_irq;
-> >+		goto err_out_iounmap;
-> >  	}
-> >
-> >-	if (macb_mii_init(bp) != 0) {
-> >+	dev->irq = platform_get_irq(pdev, 0);
-> 
->    platform_get_irq() can fail...
-request_irq will fail too so do we really need to check it?
-> 
-> >+	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
-> >+			  dev->name, dev);
+> The following patches add framebuffer support for Freescale i.MX23/28
+> processors.
 
-Best Regards,
-J.
+Hi Sascha,
+
+The driver looks good as far as I can tell, but I'd recommend
+submitting it to linux-fbdev at vger.kernel.org for review in
+addition to linux-arm-kernel. The frame buffer layer is largely
+unmaintained these days, but there are still people on that
+list that care.
+
+Did you consider making the driver a KMS driver instead of
+a frame buffer? I think the recommendation these days is
+to start out with KMS for new drivers, which will be somewhat
+simpler and give you a frame buffer device as well. I don't
+think that there is a need to change over any drivers from
+fb to kms though, since you've already done the work.
+
+	Arnd
