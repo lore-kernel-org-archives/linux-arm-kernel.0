@@ -1,88 +1,41 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  9 Feb 2011 15:01:18 +0000
-Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-Message-ID: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+Date: Wed,  9 Feb 2011 15:01:19 +0000
+Subject: [PATCH v4 1/5] ARM: omap4: Provide do_wfi() for Thumb-2
+In-Reply-To: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1297263683-10621-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches, along with some other patches under
-discussion on alkml, should enable omap3 and omap4 kernels to be
-built with CONFIG_THUMB2_KERNEL.
+For CONFIG_THUMB2_KERNEL, the existing definition of do_wfi() will
+insert invalid code into the instruction stream.
 
-This patch set builds on recent cleanup done by the omap
-maintainers.
+Any assembler which can assemble Thumb-2 is guaranteed to accept
+the "wfi" mnemonic, so for the Thumb-2 case, just use the mnemonic.
 
-All affected low-level code is now built in Thumb-2.  At least some
-of this code definitely works, most features have been tested
-successfully.  Further testing, especially of Thumb-2 behaviour, is
-still welcome.
+The ARM case is left as-is.
 
-Seems to work with CONFIG_SMP_ON_UP and CONFIG_THUMB2_KERNEL
-enabled on Beagle xM A2 and Panda A1.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/mach-omap2/include/mach/omap4-common.h |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Thanks also to Santosh Shilimkar <santosh.shilimkar@ti.com>
-for his help with testing.
-
-v3:
-    * make SMC instruction syntax more consistent
-    * remove do_wfi() in favour of the generic wfi() macro
-
-v4:
-    * revert to the OMAP-specific do_wfi() implementation, pending
-      discussion of how generic macros can/should be provided
-
-Details below.
-
-Cheers,
-Dave
-
-
-The patches can be found, along with a buildable working tree,
-in the following repo:
-
-git://git.linaro.org/people/dmart/linux-2.6-arm.git
-
- * arm/omap-thumb2: has the patches proposed here
- * arm/omap-thumb2+merged: additionally has some patches cherry-
-        picked from other trees which are needed in order for the
-        patches on arm/omap-thumb2 to work usefully.
- * dirty/arm/omap-thumb2+merged: buildable test tree, which adds
-        2 local patches to work around a toolchain bug.
-
-A working kernel config for this tree is here:
-http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config :
-
-  CONFIG_SMP_ON_UP=y
-  CONFIG_THUMB2_KERNEL=y
-  CONFIG_SERIAL_OMAP=n (to avoid garbage on xM; for Panda use console=ttyS2)
-
-(The config is derived from the linaro omap config and so turns on
-loads of modules -- don't feel you have to build them all...)
-
-
-Cherry-picked patches originated from Russell's devel tree
-and Tony Lindgren's omap-testing tree:
-
-http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git devel
-
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-testing
-
-This series also depends on one un-merged patch to generic-ise
-the wfi() macro:
-
-git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/wfi-macro
-
-Dave Martin (5):
-  ARM: omap4: Provide do_wfi() for Thumb-2
-  ARM: omap4: Convert END() to ENDPROC() for correct linkage with
-    CONFIG_THUMB2_KERNEL
-  ARM: omap3: Remove hand-encoded SMC instructions
-  ARM: omap3: Thumb-2 compatibility for sram34xx.S
-  ARM: omap3: Thumb-2 compatibility for sleep34xx.S
-
- arch/arm/mach-omap2/include/mach/omap4-common.h |    4 ++
- arch/arm/mach-omap2/omap-headsmp.S              |    2 +-
- arch/arm/mach-omap2/omap44xx-smc.S              |    8 ++--
- arch/arm/mach-omap2/sleep34xx.S                 |   56 ++++++++++++++++-------
- arch/arm/mach-omap2/sram34xx.S                  |   28 ++++++++---
- 5 files changed, 68 insertions(+), 30 deletions(-)
+diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
+index 5b0270b..de441c0 100644
+--- a/arch/arm/mach-omap2/include/mach/omap4-common.h
++++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+@@ -17,8 +17,12 @@
+  * wfi used in low power code. Directly opcode is used instead
+  * of instruction to avoid mulit-omap build break
+  */
++#ifdef CONFIG_THUMB2_KERNEL
++#define do_wfi() __asm__ __volatile__ ("wfi" : : : "memory")
++#else
+ #define do_wfi()			\
+ 		__asm__ __volatile__ (".word	0xe320f003" : : : "memory")
++#endif
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ extern void __iomem *l2cache_base;
+-- 
+1.7.1
