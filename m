@@ -1,69 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 09 Feb 2011 08:02:42 -0600
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <001b01cbc83e$ec0a59e0$c41f0da0$@deacon@arm.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<001b01cbc83e$ec0a59e0$c41f0da0$@deacon@arm.com>
-Message-ID: <4D529E82.1000102@gmail.com>
+From: gadiyar@ti.com (Gadiyar, Anand)
+Date: Wed, 9 Feb 2011 19:38:54 +0530
+Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
+In-Reply-To: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
+References: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
+Message-ID: <AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-On 02/09/2011 03:51 AM, Will Deacon wrote:
-> Hi Rob,
+On Wed, Feb 9, 2011 at 7:25 PM, Raghuveer Murthy
+<raghuveer.murthy@ti.com> wrote:
+> Adding DVI support to OMAP4 PandaBoard.
 >
->> Add OF match table to enable OF style driver binding. The dts entry is like
->> this:
->>
->> pmu {
->> 	compatible = "arm,pmu";
->> 	interrupts =<100 101>;
->> };
->>
->> The use of pdev->id as an index breaks with OF device binding. Change to use
->> a counter instead. If more than 1 pmu device is ever really supported, a
->> better solution to match users with particular pmu is probably needed.
+> PandaBoard uses TFP410 DVI Framer chip
+> http://focus.ti.com/lit/ds/symlink/tfp410.pdf
 >
-> We will want to support multiple PMU devices in the near future but
-> this is currently blocked on userspace issues. One such device would
-> be the event counters on the PL310, which could be used to complement
-> the CPU PMU on the Cortex-A9.
+> The TFP410 gets its power enable and display data over GPIO lines muxed
+> in from OMAP4430. PandaBoard supports other LCD displays through expansion
+> connectors, following board rework. This will disable the DVI interface.
+> However, the existing mux settings remain the same
 >
-> I don't like the idea of a counter as it forces platforms to register
-> their devices in a specific order. Is it possible to separate different
-> types of PMU in the device tree and then have pmu.c work out what to do
-> with them?
+> PandaBoard additionally supports display over HDMI interface. It is
+> mutually exclusive to display over DVI. Hence the mux settings need to be
+> configured seperately, as and when HDMI is enabled
+>
+> Also, I2C3 bus used for reading EDID data from DVI Monitors is
+> registered here. Since the design is similar to BeagleBoard, the code
+> for the same is taken from the kernel.org commit e3333f48dd5cb21
+> (omap: Adding beagle i2c eeprom driver to read EDID)
+>
+> Reviewed-by: Manjunath G Kondaiah <manjugk@ti.com>
+> Reviewed-by: Anand Gadiyar <gadiyar@ti.com>
 
-Yes, they are easily distinguished by the compatible strings. Adding a 
-pmu_get function which returns the device based on a string or 
-capabilities may be a better solution. If you had 2 pmu's of the same 
-type, the current code would break.
+I've also tested it on the Panda, and gone through this and most
+of the other patches in the series. So if you like, you could
+consider this an:
 
-In any case, how about this:
+Acked-by: Anand Gadiyar <gadiyar@ti.com>
 
-static int __devinit pmu_device_probe(struct platform_device *pdev)
-{
-	enum arm_pmu_type type = pdev->id;
+> Reviewed-by: Nishanth Menon <nm@ti.com>
+> Reviewed-by: Sumit Semwal <sumit.semwal@ti.com>
+> Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
+> ---
+>
+> Base
+> ====
+> url =
+> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+> branch "master"
+> commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d
+> tag 2.6.38-rc4
+>
 
-	if (of_device_is_compatible(pdev->dev.of_node, "arm,pmu"))
-		type = ARM_PMU_DEVICE_CPU;
+To make it easier for someone to test, I've extracted this
+and the 6 dependent series from patchwork, and hosted
+them in a branch on my devel tree. They are available
+against v2.6.38-rc4 here:
 
-	if (type < 0 || type >= ARM_NUM_PMU_DEVICES) {
-		pr_warning("received registration request for unknown "
-				"device %d\n", pdev->id);
-		return -EINVAL;
-	}
+git://dev.omapzoom.org/pub/scm/anand/linux-omap-usb.git
 
-	if (pmu_devices[type])
-		pr_warning("registering new PMU device type %d overwrites "
-				"previous registration!\n", type);
-	else
-		pr_info("registered new PMU device of type %d\n",
-				type);
+in the display-patches-for-v2.6.38-rc4 branch if someone
+wants to take a look.
 
-	pmu_devices[type] = pdev;
-	return 0;
-}
-
-Rob
+- Anand
