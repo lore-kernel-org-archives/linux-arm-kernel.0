@@ -1,126 +1,66 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 9 Feb 2011 12:17:01 +0000
-Subject: [RFC 4/5] ARM: P2V: introduce phys_to_virt/virt_to_phys runtime
-	patching
-In-Reply-To: <E1PaDPa-00023l-CR@rmk-PC.arm.linux.org.uk>
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDPa-00023l-CR@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110209121701.GD2818@pulham.picochip.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 Feb 2011 04:42:24 +0800
+Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <19794.19192.351501.395360@ipc1.ka-ro>
+References: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
+	<19793.22067.960689.669543@ipc1.ka-ro>
+	<20110209001710.GF6963@S2100-06.ap.freescale.net>
+	<19794.19192.351501.395360@ipc1.ka-ro>
+Message-ID: <20110209204223.GA7417@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Feb 09, 2011 at 09:06:16AM +0100, Lothar Wa?mann wrote:
+> Hi Shawn,
+> 
+> Shawn Guo writes:
+> > On Tue, Feb 08, 2011 at 03:41:55PM +0100, Lothar Wa?mann wrote:
+> [...]
+> > > What's behinde the 'PIO' transfers is programming controller registers
+> > > via DMA along with the actual DMA data transfer. DMA_NONE simply
+> > > means, that the DMA transfer does only the register programming but
+> > > does not transfer any payload. The 'pio_words' are the values that are
+> > > being written to consecutive locations of e.g. the SPI controller
+> > > register address space.
+> > > The programming is actually done by DMA, in any case.
+> > > 
+> > I'm waiting for this reply ;)
+> > 
+> > i.MX23/28 Reference Manual uses word "PIO" for the working mode that
+> > Lothar has explained.  It seems that "PIO" in mxs-dma needs some more
+> > documents.
+> > 
+> > It's true that mxs dma hardware is designed to program peripheral
+> > registers along with data transfer with ccw chain.  But it's hard
+> > for generic dmaengine model to implement that.  The client device
+> > driver gets the data in scatter-gather list to transfer.  It requires
+> > client driver to manipulate the sgl to get pio ccw inserted properly
+> > to get the "along with" implemented.  This is not a reasonable
+> > implementation to me.
+> > 
+> > I still chose to keep the pio mode in the implementation in "single
+> > step" rather than "along with" way.  That means client driver has to
+> > issue one dma request to program client device registers, and issue
+> > another one to transfer data.  The natural thought is that the pio
+> >
+> which defeats the purpose of the whole thing. If the software has to
+> issue a single request for DMA to program the registers it could as
+> well directly write the registers without any DMA. The purpose of the
+> embedded 'PIO' transfers is, that you can set up a whole chain of
+> commands and associated data transfers and have that executed
+> without any further software intervention.
+> 
+> > support can totally be saved with cpu programming.  But looking at
+> > any mxs dma client device in reference manual, you will find it gets
+> > two irq lines, irq_dma and irq_error.  For ssp (mmc) example, when
+> > one mmc command is issued and completed without error, you have to
+> > either polling ssp status register or use pio dma and irq_dma
+> > interrupt to know the completion.  That's to say I keep the pio
+> >
+> You could use the SSP IRQ as well.
+> 
+No, I could not.  The SSP IRQ (e.g. MX28_INT_SSP0_ERROR) is designed
+to indicate an error condition than the completion of mmc command.
 
-I haven't been using the runtime patching, but building picoxcell based 
-off of todays next I'm seeing a pretty harmless warning.  Fixup below.
-
-Jamie
-
-On Tue, Jan 04, 2011 at 08:23:18PM +0000, Russell King - ARM Linux wrote:
-> This idea came from Nicolas, Eric Miao produced an initial version,
-> which was then rewritten into this.
-> 
-> Patch the physical to virtual translations at runtime.  As we modify
-> the code, this makes it incompatible with XIP kernels, but on allows
-> is to achieve this with minimal loss of performance.
-> 
-> As many translations are of the form:
-> 
-> 	physical = virtual + (PHYS_OFFSET - PAGE_OFFSET)
-> 	virtual = physical - (PHYS_OFFSET - PAGE_OFFSET)
-> 
-> we generate an 'add' instruction for __virt_to_phys(), and a 'sub'
-> instruction for __phys_to_virt().  We calculate at run time (PHYS_OFFSET
-> - PAGE_OFFSET) by comparing the address prior to MMU initialization with
-> where it should be once the MMU has been initialized, and place this
-> constant into the above add/sub instructions.
-> 
-> Once we have (PHYS_OFFSET - PAGE_OFFSET), we can calcuate the real
-> PHYS_OFFSET as PAGE_OFFSET is a build-time constant, and save this for
-> the C-mode PHYS_OFFSET variable definition to use.
-> 
-> At present, we are unable to support Realview with Sparsemem enabled
-> as this uses a complex mapping function, and MSM as this requires a
-> constant which will not fit in our math instruction.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/Kconfig              |   14 +++++++++
->  arch/arm/include/asm/memory.h |   55 ++++++++++++++++++++++++++++--------
->  arch/arm/kernel/head.S        |   63 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/module.c      |   23 ++++++++++++++-
->  arch/arm/kernel/setup.c       |    2 +-
->  arch/arm/kernel/vmlinux.lds.S |    4 ++
->  6 files changed, 147 insertions(+), 14 deletions(-)
-> 
-[...]
-> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-> index 0c1bb68..6a42e17 100644
-> --- a/arch/arm/kernel/module.c
-> +++ b/arch/arm/kernel/module.c
-> @@ -276,12 +276,28 @@ struct mod_unwind_map {
->  	const Elf_Shdr *txt_sec;
->  };
->  
-> +static const Elf_Shdr *find_mod_section(const Elf32_Ehdr *hdr,
-> +	const Elf_Shdr *sechdrs, const char *name)
-> +{
-> +	const Elf_Shdr *s, *se;
-> +	const char *secstrs = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
-> +
-> +	for (s = sechdrs, se = sechdrs + hdr->e_shnum; s < se; s++)
-> +		if (strcmp(name, secstrs + s->sh_name) == 0)
-> +			return s;
-> +
-> +	return NULL;
-> +}
-> +
-> +extern void fixup_pv_table(const void *, unsigned long);
-> +
->  int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
->  		    struct module *mod)
->  {
-> +	const Elf_Shdr *s = NULL;
->  #ifdef CONFIG_ARM_UNWIND
->  	const char *secstrs = (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
-> -	const Elf_Shdr *s, *sechdrs_end = sechdrs + hdr->e_shnum;
-> +	const Elf_Shdr *sechdrs_end = sechdrs + hdr->e_shnum;
->  	struct mod_unwind_map maps[ARM_SEC_MAX];
->  	int i;
->  
-> @@ -323,6 +339,11 @@ int module_finalize(const Elf32_Ehdr *hdr, const Elf_Shdr *sechdrs,
->  					         maps[i].txt_sec->sh_addr,
->  					         maps[i].txt_sec->sh_size);
->  #endif
-> +#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
-> +	s = find_mod_section(hdr, sechdrs, ".pv_table");
-> +	if (s)
-> +		fixup_pv_table((void *)s->sh_addr, s->sh_size);
-> +#endif
-
-If we don't have CONFIG_ARM_PATCH_PHYS_VIRT defined then we get:
-
-arch/arm/kernel/module.c:272: warning: ?find_mod_section? defined but not used
-
-8<------
-
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 74e25ab..ba65805 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -269,6 +269,7 @@ struct mod_unwind_map {
- 	const Elf_Shdr *txt_sec;
- };
- 
-+#ifdef CONFIG_ARM_PATCH_PHYS_VIRT
- static const Elf_Shdr *find_mod_section(const Elf32_Ehdr *hdr,
- 	const Elf_Shdr *sechdrs, const char *name)
- {
-@@ -281,6 +282,7 @@ static const Elf_Shdr *find_mod_section(const Elf32_Ehdr *hdr,
- 
- 	return NULL;
- }
-+#endif
- 
- extern void fixup_pv_table(const void *, unsigned long);
- 
+Regards,
+Shawn
