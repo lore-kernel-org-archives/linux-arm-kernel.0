@@ -1,56 +1,293 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 09 Feb 2011 19:13:10 +0000
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <AANLkTikrBx1Y7MFGCJe=Gx-9fUxhwuYq-BZ4stGBGav6@mail.gmail.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
-	<3399156206431206254@unknownmsgid>
-	<AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
-	<-4919269306841091192@unknownmsgid>
-	<AANLkTikrBx1Y7MFGCJe=Gx-9fUxhwuYq-BZ4stGBGav6@mail.gmail.com>
-Message-ID: <1297278790.13362.18.camel@e102568-lin.cambridge.arm.com>
+From: nvishwan@codeaurora.org (Niranjana Vishwanathapura)
+Date: Wed,  9 Feb 2011 11:16:34 -0800
+Subject: [PATCH v2] tty: Add msm_smd_tty driver
+Message-ID: <1297278994-22155-1-git-send-email-nvishwan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-02-09 at 12:03 -0700, Grant Likely wrote:
+msm_smd_tty driver provides tty device interface
+to 'DS' and 'GPSNMEA' streaming SMD ports.
 
-<snip>
+Cc: Brian Swetland <swetland@google.com>
+Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
+---
+ drivers/tty/serial/Kconfig       |    9 ++
+ drivers/tty/serial/Makefile      |    1 +
+ drivers/tty/serial/msm_smd_tty.c |  236 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 246 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/tty/serial/msm_smd_tty.c
 
-> >> It does make sense to encode the specific implementation into the
-> >> compatible string.  A single device driver can bind against multiple
-> >> compatible strings.  ie. the match table could include {.compatible =
-> >> "arm,cortex-a9-pmu"},{.compatible = "arm,cortex-a9-l2cache-pmu"}...
-> >
-> > Ok - that's great! Specifying the CPU is probably a little verbose, but
-> > something like "arm,armv7pmu" would be really helpful when it comes to
-> > multiple devices.
-> >
-> >> > As for versioning, the PMU detection is done dynamically at runtime,
-> >> > so knowing that we're poking a CPU is enough.
-> >>
-> >> Fair enough.  It is still good practice in the compatible list to
-> >> encode the specific PMU implementation (maybe arm,cortex-a9-pmu?)
-> >> instead of trying to define a 'generic' or wildcard compatible value.
-> >> Newer implementations can always claim compatibility with an older
-> >> implementation so that the kernel doesn't have to be modified to find
-> >> the new devices.  "arm,pmu" is probably too generic.
-> >
-> > "arm,pmu" is definitely too generic. If it's good practice to specify
-> > as much as possible, then go for it - I just feel a little uneasy having
-> > to add lots of redundant kernel code but it sounds like you'll hopefully
-> > prove me wrong on that :)
-> 
-> Shouldn't be any redundant kernel code.  It's just a list of match
-> values, and the driver code already knows how to handle it.  The
-> advantage of being specific is that if the driver ever does need
-> information about the specific implementation (say, because the
-> hardware reported value is buggy), then the data is available.
-> 
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index b1682d7..33cbc89 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1595,4 +1595,13 @@ config SERIAL_PCH_UART
+ 	  This driver is for PCH(Platform controller Hub) UART of Intel EG20T
+ 	  which is an IOH(Input/Output Hub) for x86 embedded processor.
+ 	  Enabling PCH_DMA, this PCH UART works as DMA mode.
++
++config SERIAL_MSM_SMD
++	bool "Enable tty device interface for some SMD ports"
++	default n
++	depends on MSM_SMD
++	help
++	  Enables userspace clients to read and write to some streaming SMD
++	  ports via tty device interface for MSM chipset.
++
+ endmenu
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 8ea92e9..0c6aefb 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -92,3 +92,4 @@ obj-$(CONFIG_SERIAL_MRST_MAX3110)	+= mrst_max3110.o
+ obj-$(CONFIG_SERIAL_MFD_HSU)	+= mfd.o
+ obj-$(CONFIG_SERIAL_IFX6X60)  	+= ifx6x60.o
+ obj-$(CONFIG_SERIAL_PCH_UART)	+= pch_uart.o
++obj-$(CONFIG_SERIAL_MSM_SMD)	+= msm_smd_tty.o
+diff --git a/drivers/tty/serial/msm_smd_tty.c b/drivers/tty/serial/msm_smd_tty.c
+new file mode 100644
+index 0000000..beeff1e
+--- /dev/null
++++ b/drivers/tty/serial/msm_smd_tty.c
+@@ -0,0 +1,236 @@
++/* drivers/tty/serial/msm_smd_tty.c
++ *
++ * Copyright (C) 2007 Google, Inc.
++ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ * Author: Brian Swetland <swetland@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/fs.h>
++#include <linux/cdev.h>
++#include <linux/device.h>
++#include <linux/wait.h>
++
++#include <linux/tty.h>
++#include <linux/tty_driver.h>
++#include <linux/tty_flip.h>
++
++#include <mach/msm_smd.h>
++
++#define MAX_SMD_TTYS 32
++
++struct smd_tty_info {
++	struct tty_port port;
++	smd_channel_t *ch;
++};
++
++struct smd_tty_channel_desc {
++	int id;
++	const char *name;
++};
++
++static struct smd_tty_info smd_tty[MAX_SMD_TTYS];
++
++static const struct smd_tty_channel_desc smd_default_tty_channels[] = {
++	{ .id = 0, .name = "SMD_DS" },
++	{ .id = 27, .name = "SMD_GPSNMEA" },
++};
++
++static const struct smd_tty_channel_desc *smd_tty_channels =
++		smd_default_tty_channels;
++static int smd_tty_channels_len = ARRAY_SIZE(smd_default_tty_channels);
++
++static void smd_tty_notify(void *priv, unsigned event)
++{
++	unsigned char *ptr;
++	int avail;
++	struct smd_tty_info *info = priv;
++	struct tty_struct *tty;
++
++	if (event != SMD_EVENT_DATA)
++		return;
++
++	tty = tty_port_tty_get(&info->port);
++	if (!tty)
++		return;
++
++	for (;;) {
++		if (test_bit(TTY_THROTTLED, &tty->flags))
++			break;
++		avail = smd_read_avail(info->ch);
++		if (avail == 0)
++			break;
++
++		avail = tty_prepare_flip_string(tty, &ptr, avail);
++
++		if (smd_read(info->ch, ptr, avail) != avail) {
++			/* shouldn't be possible since we're in interrupt
++			** context here and nobody else could 'steal' our
++			** characters.
++			*/
++			pr_err("OOPS - smd_tty_buffer mismatch?!");
++		}
++
++		tty_flip_buffer_push(tty);
++	}
++
++	/* XXX only when writable and necessary */
++	tty_wakeup(tty);
++	tty_kref_put(tty);
++}
++
++static int smd_tty_port_activate(struct tty_port *tport, struct tty_struct *tty)
++{
++	int i, res = 0;
++	int n = tty->index;
++	const char *name = NULL;
++	struct smd_tty_info *info = smd_tty + n;
++
++	for (i = 0; i < smd_tty_channels_len; i++) {
++		if (smd_tty_channels[i].id == n) {
++			name = smd_tty_channels[i].name;
++			break;
++		}
++	}
++	if (!name)
++		return -ENODEV;
++
++	if (info->ch)
++		smd_kick(info->ch);
++	else
++		res = smd_open(name, &info->ch, info, smd_tty_notify);
++
++	if (!res)
++		tty->driver_data = info;
++
++	return res;
++}
++
++static void smd_tty_port_shutdown(struct tty_port *tport)
++{
++	struct smd_tty_info *info;
++	struct tty_struct *tty = tty_port_tty_get(tport);
++
++	info = tty->driver_data;
++	if (info->ch) {
++		smd_close(info->ch);
++		info->ch = 0;
++	}
++
++	tty->driver_data = 0;
++	tty_kref_put(tty);
++}
++
++static int smd_tty_open(struct tty_struct *tty, struct file *f)
++{
++	struct smd_tty_info *info = smd_tty + tty->index;
++
++	return tty_port_open(&info->port, tty, f);
++}
++
++static void smd_tty_close(struct tty_struct *tty, struct file *f)
++{
++	struct smd_tty_info *info = tty->driver_data;
++
++	tty_port_close(&info->port, tty, f);
++}
++
++static int smd_tty_write(struct tty_struct *tty,
++			 const unsigned char *buf, int len)
++{
++	struct smd_tty_info *info = tty->driver_data;
++	int avail;
++
++	/* if we're writing to a packet channel we will
++	** never be able to write more data than there
++	** is currently space for
++	*/
++	avail = smd_write_avail(info->ch);
++	if (len > avail)
++		len = avail;
++
++	return smd_write(info->ch, buf, len);
++}
++
++static int smd_tty_write_room(struct tty_struct *tty)
++{
++	struct smd_tty_info *info = tty->driver_data;
++	return smd_write_avail(info->ch);
++}
++
++static int smd_tty_chars_in_buffer(struct tty_struct *tty)
++{
++	struct smd_tty_info *info = tty->driver_data;
++	return smd_read_avail(info->ch);
++}
++
++static void smd_tty_unthrottle(struct tty_struct *tty)
++{
++	struct smd_tty_info *info = tty->driver_data;
++	smd_kick(info->ch);
++}
++
++static const struct tty_port_operations smd_tty_port_ops = {
++	.shutdown = smd_tty_port_shutdown,
++	.activate = smd_tty_port_activate,
++};
++
++static const struct tty_operations smd_tty_ops = {
++	.open = smd_tty_open,
++	.close = smd_tty_close,
++	.write = smd_tty_write,
++	.write_room = smd_tty_write_room,
++	.chars_in_buffer = smd_tty_chars_in_buffer,
++	.unthrottle = smd_tty_unthrottle,
++};
++
++static struct tty_driver *smd_tty_driver;
++
++static int __init smd_tty_init(void)
++{
++	int ret, i;
++
++	smd_tty_driver = alloc_tty_driver(MAX_SMD_TTYS);
++	if (smd_tty_driver == 0)
++		return -ENOMEM;
++
++	smd_tty_driver->owner = THIS_MODULE;
++	smd_tty_driver->driver_name = "smd_tty_driver";
++	smd_tty_driver->name = "smd";
++	smd_tty_driver->major = 0;
++	smd_tty_driver->minor_start = 0;
++	smd_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
++	smd_tty_driver->subtype = SERIAL_TYPE_NORMAL;
++	smd_tty_driver->init_termios = tty_std_termios;
++	smd_tty_driver->init_termios.c_iflag = 0;
++	smd_tty_driver->init_termios.c_oflag = 0;
++	smd_tty_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
++	smd_tty_driver->init_termios.c_lflag = 0;
++	smd_tty_driver->flags = TTY_DRIVER_RESET_TERMIOS |
++		TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
++	tty_set_operations(smd_tty_driver, &smd_tty_ops);
++
++	ret = tty_register_driver(smd_tty_driver);
++	if (ret)
++		return ret;
++
++	for (i = 0; i < smd_tty_channels_len; i++) {
++		tty_port_init(&smd_tty[smd_tty_channels[i].id].port);
++		smd_tty[smd_tty_channels[i].id].port.ops = &smd_tty_port_ops;
++		tty_register_device(smd_tty_driver, smd_tty_channels[i].id, 0);
++	}
++
++	return 0;
++}
++
++module_init(smd_tty_init);
+-- 
+1.5.6.3
 
-Just to mention that this is ok as long as the platform device id 
-is not used when we probe from DT (eg release_pmu ?).
-If it is used for any reason it has to be initialized in the DT layer
-since, as Grant brought up before, it cannot be changed after device
-registration (ie @ dt_probe() ).
-
-Lorenzo
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
