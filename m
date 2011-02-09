@@ -1,69 +1,59 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 10 Feb 2011 05:42:22 +0800
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <20110209083400.GK9041@pengutronix.de>
-References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
-	<1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<20110207082521.GI9041@pengutronix.de>
-	<20110208232833.GC6963@S2100-06.ap.freescale.net>
-	<20110209083400.GK9041@pengutronix.de>
-Message-ID: <20110209214221.GC7417@S2100-06.ap.freescale.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 09 Feb 2011 16:41:38 +0300
+Subject: [PATCH 1/2] atmel/macb: fix device name when SOFT/HARD_IRQ enabled
+In-Reply-To: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4D529992.7050502@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 09:34:00AM +0100, Sascha Hauer wrote:
-> Shawn,
-> 
-> On Wed, Feb 09, 2011 at 07:28:34AM +0800, Shawn Guo wrote:
-> > > > +
-> > > > +     if (direction == DMA_NONE) {
-> > > > +             ccw = &mxs_chan->ccw[0];
-> > > > +             pio = (u32 *) sgl;
-> > > > +
-> > > > +             for (j = 0; j < sg_len;)
-> > > > +                     ccw->pio_words[j++] = *pio++;
-> > > > +
-> > > > +             ccw->next = 0;
-> > > > +             ccw->bits.chain = 0;
-> > > > +             ccw->bits.irq = 1;
-> > > > +             ccw->bits.dec_sem = 1;
-> > > > +             ccw->bits.wait4end = flags;
-> > > > +             ccw->bits.halt_on_terminate = 1;
-> > > > +             ccw->bits.terminate_flush = 1;
-> > > > +             ccw->bits.pio_num = sg_len;
-> > > > +             ccw->bits.command = MXS_DMA_NO_XFER;
-> > > 
-> > > Does this have a valid usecase? I would just return some error code
-> > > here. pio_num and pio_words are unused in the driver and I don't think
-> > > a dmaengine driver should have some kind of PIO fallback.
-> > > 
-> > If you happen to have a look at mxs-mmc patch set, you could find it.
-> 
-> As Russell already pointed out, the (mmc-) driver should handle this.
-> 
-> > > > +
-> > > > +     /*
-> > > > +      * dmaengine clients have to use dma_device.dev_id to filter
-> > > > +      * dma device between apbh and apbx, so need to ensure it is
-> > > > +      * identical to mxs_dma_engine.dev_id.
-> > > > +      */
-> > > > +     if (mxs_dma->dma_device.dev_id != mxs_dma->dev_id) {
-> > > > +             dev_err(&pdev->dev, "dev_id of dma_device %d differs from mxs_dma_engine %d\n",
-> > > > +                             mxs_dma->dma_device.dev_id, mxs_dma->dev_id);
-> > > > +             goto err_init;
-> > > > +     }
-> > > 
-> > > I think it makes more sense to match against device names (apbh vs.
-> > > apbx) in the client's filter function than to rely on exact numbering.
-> > > 
-> > I agree, if there is already a member like dev_name in dma_device.
-> > There is dev_id but no dev_name.  Suggestion on how to use device
-> > name for matching?
-> 
-> Have a look at the implementation of imx_dma_is_general_purpose() and
-> imx_dma_is_ipu().
-> 
-Great example.  Thanks.
+Hello.
 
-Regards
-Shawn
+On 09-02-2011 15:43, Jean-Christophe PLAGNIOL-VILLARD wrote:
+
+> From: Paul Chavent<paul.chavent@fnac.net>
+
+> When listing processes on a system with SOFT/HARD_IRQ enabled,
+> the name of the ethernet device is [irq/eth%d] (instead of [irq/eth0] for example).
+
+> This patch call the request_irq function after having initialized the name of the device.
+
+> Signed-off-by: Paul Chavent<paul.chavent@fnac.net>
+> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+[...]
+
+> diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+> index f69e73e..d642e08 100644
+> --- a/drivers/net/macb.c
+> +++ b/drivers/net/macb.c
+[...]
+> @@ -1219,13 +1209,23 @@ static int __init macb_probe(struct platform_device *pdev)
+>   	err = register_netdev(dev);
+>   	if (err) {
+>   		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
+> -		goto err_out_free_irq;
+> +		goto err_out_iounmap;
+>   	}
+>
+> -	if (macb_mii_init(bp) != 0) {
+> +	dev->irq = platform_get_irq(pdev, 0);
+
+    platform_get_irq() can fail...
+
+> +	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
+> +			  dev->name, dev);
+> +	if (err) {
+> +		printk(KERN_ERR
+> +		       "%s: Unable to request IRQ %d (error %d)\n",
+> +		       dev->name, dev->irq, err);
+>   		goto err_out_unregister_netdev;
+>   	}
+>
+> +	if (macb_mii_init(bp) != 0) {
+> +		goto err_out_free_irq;
+> +	}
+
+    {} not needed here. I think checkpatch.pl should notice this.
+
+WBR, Sergei
