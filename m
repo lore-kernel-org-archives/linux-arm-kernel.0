@@ -1,66 +1,83 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 10 Feb 2011 04:42:24 +0800
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <19794.19192.351501.395360@ipc1.ka-ro>
-References: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<19793.22067.960689.669543@ipc1.ka-ro>
-	<20110209001710.GF6963@S2100-06.ap.freescale.net>
-	<19794.19192.351501.395360@ipc1.ka-ro>
-Message-ID: <20110209204223.GA7417@S2100-06.ap.freescale.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed,  9 Feb 2011 13:43:36 +0100
+Subject: [PATCH 1/2] atmel/macb: fix device name when SOFT/HARD_IRQ enabled
+Message-ID: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 09:06:16AM +0100, Lothar Wa?mann wrote:
-> Hi Shawn,
-> 
-> Shawn Guo writes:
-> > On Tue, Feb 08, 2011 at 03:41:55PM +0100, Lothar Wa?mann wrote:
-> [...]
-> > > What's behinde the 'PIO' transfers is programming controller registers
-> > > via DMA along with the actual DMA data transfer. DMA_NONE simply
-> > > means, that the DMA transfer does only the register programming but
-> > > does not transfer any payload. The 'pio_words' are the values that are
-> > > being written to consecutive locations of e.g. the SPI controller
-> > > register address space.
-> > > The programming is actually done by DMA, in any case.
-> > > 
-> > I'm waiting for this reply ;)
-> > 
-> > i.MX23/28 Reference Manual uses word "PIO" for the working mode that
-> > Lothar has explained.  It seems that "PIO" in mxs-dma needs some more
-> > documents.
-> > 
-> > It's true that mxs dma hardware is designed to program peripheral
-> > registers along with data transfer with ccw chain.  But it's hard
-> > for generic dmaengine model to implement that.  The client device
-> > driver gets the data in scatter-gather list to transfer.  It requires
-> > client driver to manipulate the sgl to get pio ccw inserted properly
-> > to get the "along with" implemented.  This is not a reasonable
-> > implementation to me.
-> > 
-> > I still chose to keep the pio mode in the implementation in "single
-> > step" rather than "along with" way.  That means client driver has to
-> > issue one dma request to program client device registers, and issue
-> > another one to transfer data.  The natural thought is that the pio
-> >
-> which defeats the purpose of the whole thing. If the software has to
-> issue a single request for DMA to program the registers it could as
-> well directly write the registers without any DMA. The purpose of the
-> embedded 'PIO' transfers is, that you can set up a whole chain of
-> commands and associated data transfers and have that executed
-> without any further software intervention.
-> 
-> > support can totally be saved with cpu programming.  But looking at
-> > any mxs dma client device in reference manual, you will find it gets
-> > two irq lines, irq_dma and irq_error.  For ssp (mmc) example, when
-> > one mmc command is issued and completed without error, you have to
-> > either polling ssp status register or use pio dma and irq_dma
-> > interrupt to know the completion.  That's to say I keep the pio
-> >
-> You could use the SSP IRQ as well.
-> 
-No, I could not.  The SSP IRQ (e.g. MX28_INT_SSP0_ERROR) is designed
-to indicate an error condition than the completion of mmc command.
+From: Paul Chavent <paul.chavent@fnac.net>
 
-Regards,
-Shawn
+When listing processes on a system with SOFT/HARD_IRQ enabled,
+the name of the ethernet device is [irq/eth%d] (instead of [irq/eth0] for example).
+
+This patch call the request_irq function after having initialized the name of the device.
+
+Signed-off-by: Paul Chavent <paul.chavent@fnac.net>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/net/macb.c |   28 ++++++++++++++--------------
+ 1 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+index f69e73e..d642e08 100644
+--- a/drivers/net/macb.c
++++ b/drivers/net/macb.c
+@@ -1170,16 +1170,6 @@ static int __init macb_probe(struct platform_device *pdev)
+ 		goto err_out_disable_clocks;
+ 	}
+ 
+-	dev->irq = platform_get_irq(pdev, 0);
+-	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
+-			  dev->name, dev);
+-	if (err) {
+-		printk(KERN_ERR
+-		       "%s: Unable to request IRQ %d (error %d)\n",
+-		       dev->name, dev->irq, err);
+-		goto err_out_iounmap;
+-	}
+-
+ 	dev->netdev_ops = &macb_netdev_ops;
+ 	netif_napi_add(dev, &bp->napi, macb_poll, 64);
+ 	dev->ethtool_ops = &macb_ethtool_ops;
+@@ -1219,13 +1209,23 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	err = register_netdev(dev);
+ 	if (err) {
+ 		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
+-		goto err_out_free_irq;
++		goto err_out_iounmap;
+ 	}
+ 
+-	if (macb_mii_init(bp) != 0) {
++	dev->irq = platform_get_irq(pdev, 0);
++	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
++			  dev->name, dev);
++	if (err) {
++		printk(KERN_ERR
++		       "%s: Unable to request IRQ %d (error %d)\n",
++		       dev->name, dev->irq, err);
+ 		goto err_out_unregister_netdev;
+ 	}
+ 
++	if (macb_mii_init(bp) != 0) {
++		goto err_out_free_irq;
++	}
++
+ 	platform_set_drvdata(pdev, dev);
+ 
+ 	printk(KERN_INFO "%s: Atmel MACB at 0x%08lx irq %d (%pM)\n",
+@@ -1238,10 +1238,10 @@ static int __init macb_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-err_out_unregister_netdev:
+-	unregister_netdev(dev);
+ err_out_free_irq:
+ 	free_irq(dev->irq, dev);
++err_out_unregister_netdev:
++	unregister_netdev(dev);
+ err_out_iounmap:
+ 	iounmap(bp->regs);
+ err_out_disable_clocks:
+-- 
+1.7.2.3
