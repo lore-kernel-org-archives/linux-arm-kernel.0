@@ -1,43 +1,47 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Wed, 9 Feb 2011 21:33:23 +0300
-Subject: [PATCH] DaVinci: fix compilation warnings in <mach/clkdev.h>
-Message-ID: <201102092133.23765.sshtylyov@ru.mvista.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Feb 2011 18:53:04 -0000
+Subject: [RFC PATCH] ARM: pmu: add OF match support
+In-Reply-To: <AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
+References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
+	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
+	<3399156206431206254@unknownmsgid>
+	<AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
+Message-ID: <002801cbc88a$95555270$bffff750$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6d803ba736abb5e122dede70a4720e4843dd6df4 (ARM: 6483/1: arm & sh:
-factorised duplicated clkdev.c) caused the following warnings:
+Grant,
 
-In file included from /home/headless/src/kernel.org/linux-davinci/arch/arm/
-include/asm/clkdev.h:17,
-                 from include/linux/clkdev.h:15,
-                 from arch/arm/mach-davinci/clock.h:71,
-                 from arch/arm/mach-davinci/common.c:22:
-arch/arm/mach-davinci/include/mach/clkdev.h:4: warning: `struct clk' declared
-inside parameter list
-arch/arm/mach-davinci/include/mach/clkdev.h:4: warning: its scope is only this
-definition or declaration, which is probably not what you want
-arch/arm/mach-davinci/include/mach/clkdev.h:9: warning: `struct clk' declared
-inside parameter list
+> > Following on from Rob's update, it would be nice if you could specify that
+> > the PMU is a CPU PMU (as opposed to L2-cache, bus, gpu etc) in the string.
+> > That way adding different PMUs in the future seems more natural and it accounts
+> > for your concerns above. Is that ok, or does the compatible string have to
+> > match that used by the platform bus?
+> 
+> It does make sense to encode the specific implementation into the
+> compatible string.  A single device driver can bind against multiple
+> compatible strings.  ie. the match table could include {.compatible =
+> "arm,cortex-a9-pmu"},{.compatible = "arm,cortex-a9-l2cache-pmu"}...
 
-Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+Ok - that's great! Specifying the CPU is probably a little verbose, but
+something like "arm,armv7pmu" would be really helpful when it comes to
+multiple devices.
 
----
-The patch is against the recent DaVinci tree.
+> > As for versioning, the PMU detection is done dynamically at runtime,
+> > so knowing that we're poking a CPU is enough.
+> 
+> Fair enough.  It is still good practice in the compatible list to
+> encode the specific PMU implementation (maybe arm,cortex-a9-pmu?)
+> instead of trying to define a 'generic' or wildcard compatible value.
+> Newer implementations can always claim compatibility with an older
+> implementation so that the kernel doesn't have to be modified to find
+> the new devices.  "arm,pmu" is probably too generic.
 
- arch/arm/mach-davinci/include/mach/clkdev.h |    2 ++
- 1 file changed, 2 insertions(+)
+"arm,pmu" is definitely too generic. If it's good practice to specify
+as much as possible, then go for it - I just feel a little uneasy having
+to add lots of redundant kernel code but it sounds like you'll hopefully
+prove me wrong on that :)
 
-Index: linux-davinci/arch/arm/mach-davinci/include/mach/clkdev.h
-===================================================================
---- linux-davinci.orig/arch/arm/mach-davinci/include/mach/clkdev.h
-+++ linux-davinci/arch/arm/mach-davinci/include/mach/clkdev.h
-@@ -1,6 +1,8 @@
- #ifndef __MACH_CLKDEV_H
- #define __MACH_CLKDEV_H
- 
-+struct clk;
-+
- static inline int __clk_get(struct clk *clk)
- {
- 	return 1;
+Cheers,
+
+Will
