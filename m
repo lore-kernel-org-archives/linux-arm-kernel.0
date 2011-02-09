@@ -1,29 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 9 Feb 2011 21:39:00 +0100
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <4D52F73A.4010707@bluewatersys.com>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<4D52F73A.4010707@bluewatersys.com>
-Message-ID: <20110209203900.GT27982@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  9 Feb 2011 21:40:07 +0100
+Subject: [PATCH 1/4] ARM: omap1/nokia770: mark some functions __init
+In-Reply-To: <20110209192727.GC20795@atomide.com>
+References: <20110209192727.GC20795@atomide.com>
+Message-ID: <1297284010-2286-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+These are only called from omap_nokia770_init which is in .init.text, too.
 
-On Thu, Feb 10, 2011 at 09:21:14AM +1300, Ryan Mallon wrote:
-> > +int clk_enable(struct clk *clk)
-> > +{
-> > +	unsigned long flags;
-> > +	int ret = 0;
-> > +
-> > +	spin_lock_irqsave(&clk->enable_lock, flags);
-> 
-> 	WARN_ON(clk->prepare_count == 0); ?
-This is added in patch 3/3
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-omap1/board-nokia770.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-omap1/board-nokia770.c b/arch/arm/mach-omap1/board-nokia770.c
+index d21f09d..cfd0849 100644
+--- a/arch/arm/mach-omap1/board-nokia770.c
++++ b/arch/arm/mach-omap1/board-nokia770.c
+@@ -115,7 +115,7 @@ static struct mipid_platform_data nokia770_mipid_platform_data = {
+ 	.shutdown = mipid_shutdown,
+ };
+ 
+-static void mipid_dev_init(void)
++static void __init mipid_dev_init(void)
+ {
+ 	const struct omap_lcd_config *conf;
+ 
+@@ -126,7 +126,7 @@ static void mipid_dev_init(void)
+ 	}
+ }
+ 
+-static void ads7846_dev_init(void)
++static void __init ads7846_dev_init(void)
+ {
+ 	if (gpio_request(ADS7846_PENDOWN_GPIO, "ADS7846 pendown") < 0)
+ 		printk(KERN_ERR "can't get ads7846 pen down GPIO\n");
+@@ -170,7 +170,7 @@ static struct hwa742_platform_data nokia770_hwa742_platform_data = {
+ 	.te_connected		= 1,
+ };
+ 
+-static void hwa742_dev_init(void)
++static void __init hwa742_dev_init(void)
+ {
+ 	clk_add_alias("hwa_sys_ck", NULL, "bclk", NULL);
+ 	omapfb_set_ctrl_platform_data(&nokia770_hwa742_platform_data);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.2.3
