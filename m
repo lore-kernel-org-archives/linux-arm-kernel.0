@@ -1,34 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Feb 2011 14:22:11 +0000
-Subject: [PATCH] ARM: Avoid discarding sections that might have
-	SMP_ON_UP fixups
-In-Reply-To: <20110126172535.GA15983@arm.com>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
-	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
-	<20110125165919.GD17286@n2100.arm.linux.org.uk>
-	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
-	<20110125174636.GE17286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
-	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
-	<20110126124452.GB4232@n2100.arm.linux.org.uk>
-	<20110126172535.GA15983@arm.com>
-Message-ID: <20110209142211.GA11460@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed,  9 Feb 2011 15:26:13 +0100
+Subject: [PATCH v2] atmel_serial: enable PPS support
+In-Reply-To: <1297257973-11173-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1297257973-11173-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1297261573-17244-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 26, 2011 at 05:25:35PM +0000, Dave P. Martin wrote:
-> SMP_ON_UP fixups lead to vmlinux link errors if those sections are
-> discarded at link-time.  In particular this may happen for built-in
-> __exit stuff.
-> 
-> This patch modifies the vmlinux linker script to reduce the amount
-> of discarded sections, and tries to make sure that __exit sections
-> are kept in.
-> 
-> This is a hack and probably wrong!  Further discussion is needed.  
+From: Viktar Palstsiuk <viktar.palstsiuk@promwad.com>
 
-Can you send the configuration which you see this problem with?
-I've tried to build a kernel which inlines the spinlocks, but I find
-that's not possible, so I'm doubting whether any fix is required for
-mainline.
+Enables PPS support in atmel serial driver to make PPS API working.
+
+Signed-off-by: Viktar Palstsiuk <viktar.palstsiuk@promwad.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+v2:
+
+	forget to update the prototype when rebase to upstream
+
+Best Regards,
+J.
+ drivers/tty/serial/atmel_serial.c |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 2a1d52f..f119d17 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1240,6 +1240,21 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	spin_unlock_irqrestore(&port->lock, flags);
+ }
+ 
++static void atmel_set_ldisc(struct uart_port *port, int new)
++{
++	int line = port->line;
++
++	if (line >= port->state->port.tty->driver->num)
++		return;
++
++	if (port->state->port.tty->ldisc->ops->num == N_PPS) {
++		port->flags |= UPF_HARDPPS_CD;
++		atmel_enable_ms(port);
++	} else {
++		port->flags &= ~UPF_HARDPPS_CD;
++	}
++}
++
+ /*
+  * Return string describing the specified port
+  */
+@@ -1380,6 +1395,7 @@ static struct uart_ops atmel_pops = {
+ 	.shutdown	= atmel_shutdown,
+ 	.flush_buffer	= atmel_flush_buffer,
+ 	.set_termios	= atmel_set_termios,
++	.set_ldisc	= atmel_set_ldisc,
+ 	.type		= atmel_type,
+ 	.release_port	= atmel_release_port,
+ 	.request_port	= atmel_request_port,
+-- 
+1.7.2.3
