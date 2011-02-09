@@ -1,23 +1,28 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Wed, 9 Feb 2011 21:07:19 +0000
-Subject: [PATCH v2] tty: Add msm_smd_tty driver
-In-Reply-To: <1297278994-22155-1-git-send-email-nvishwan@codeaurora.org>
-References: <1297278994-22155-1-git-send-email-nvishwan@codeaurora.org>
-Message-ID: <20110209210719.185834c1@lxorguk.ukuu.org.uk>
+From: John.Linn@xilinx.com (John Linn)
+Date: Wed, 9 Feb 2011 14:23:07 -0700
+Subject: Machine ID question
+Message-ID: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  9 Feb 2011 11:16:34 -0800
-Niranjana Vishwanathapura <nvishwan@codeaurora.org> wrote:
+I used the form to create a new machine ID for the new Xilinx platform
+in anticipation of 
+the code making it into the mainline sometime in the future.
 
-> msm_smd_tty driver provides tty device interface
-> to 'DS' and 'GPSNMEA' streaming SMD ports.
-> 
-> Cc: Brian Swetland <swetland@google.com>
-> Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
+The proposed patches are using ARCH_XILINX in the Kconfig.
 
-Acked-by: Alan Cox <alan@linux.intel.com>
+Below is the line that it created when I clicked on this link:
+http://www.arm.linux.org.uk/developer/machines/download.php
 
-Thanks for reworking it for the current refcount/port stuff
+xilinx			MACH_XILINX		XILINX
+3343
 
-Alan
+Did I hose it up as the form wasn't completely clear to me (if I needed
+to enter ARCH_XILINX)?
+
+Thanks,
+John
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
