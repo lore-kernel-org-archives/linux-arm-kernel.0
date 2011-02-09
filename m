@@ -1,101 +1,65 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 09 Feb 2011 20:40:59 +0300
-Subject: [PATCH] ARM: Add writethrough dcache support for ARM926EJS
-	processor
-In-Reply-To: <4CFFD048.9030605@ru.mvista.com>
-References: <20090909165035.GA31462@mag.az.mvista.com>
-	<4CFFD048.9030605@ru.mvista.com>
-Message-ID: <4D52D1AB.4080204@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Feb 2011 09:48:53 -0800
+Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
+In-Reply-To: <alpine.LFD.2.00.1102091143020.14920@xanadu.home>
+References: <20110208164747.GD6188@n2100.arm.linux.org.uk>
+	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
+	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
+	<20110209003537.GQ20795@atomide.com>
+	<54f225541194205f01fe9f03b5110d16@mail.gmail.com>
+	<AANLkTin2zB32YVPZkr48gSOjm0N-WDnZFScysKC8ZTiv@mail.gmail.com>
+	<80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
+	<20110209162421.GU20795@atomide.com>
+	<20110209163204.GB11460@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102091143020.14920@xanadu.home>
+Message-ID: <20110209174853.GV20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110209 08:44]:
+> On Wed, 9 Feb 2011, Russell King - ARM Linux wrote:
+> 
+> > On Wed, Feb 09, 2011 at 08:24:21AM -0800, Tony Lindgren wrote:
+> > > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110209 01:59]:
+> > > > > From: Dave Martin [mailto:dave.martin at linaro.org]
+> > > > >
+> > > > > You could also have a "v7+" unified kernel -- i.e., supporting
+> > > > > OMAP3+4+SMP.
+> > > > > This is what we currently do in Linaro, since we're focusing on v7
+> > > > > and above.
+> > > > >
+> > > > This sounds good way forward considering future OMAP architectures
+> > > > as well.
+> > > > 
+> > > > But I let Tony comment on this idea.
+> > > 
+> > > AFAIK these issues will be hopefully sorted out by the time the
+> > > next merge window opens. For the -rc cycle, disabling SMP in
+> > > config if ARMv6 is selected should do the trick.
+> > 
+> > That's not soo easy - as we don't know in the Kconfig whether we include
+> > ARMv6 rather than ARMv6K.  It's exactly the same problem I ran into which
+> > inflated the v6v7 patchset.
+> > 
+> > Maybe the best thing to do is:
+> > 
+> > config CPU_32v6K
+> >         bool "Support ARM V6K processor extensions" if !SMP
+> >         depends on CPU_V6 || CPU_V7
+> >         default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
+> > 
+> > drop the ' && !(ARCH_MX3 || ARCH_OMAP2)' and just let people run into the
+> > resulting undefined instruction traps if they try to run the kernel on
+> > V6 non-K hardware.  Not ideal, but I don't see any other 'simple' solution
+> > to this.
+> 
+> This should be good enough.  We're looking for a temporary stopgate 
+> solution to prevent people from corrupting their data, and the real fix 
+> will be available in the next kernel.
 
-I wrote:
+OK. This patch will be needed anyways for the real fixes. And no temporary
+apply-undo type patching needed. The only drawback is that omap2420 and
+2430 won't boot with omap2plus_defconfig, but that will be only for a
+few weeks.
 
->> From: Mark A. Greer <mgreer@mvista.com>
-
->> The ARM kernel supports writethrough data cache via the
->> CONFIG_CPU_DCACHE_WRITETHROUGH option.  However, that
->> functionality wasn't implemented in the arch/arm/boot/compressed
->> code.  It is now necessary due to a new ARM926EJS processor
->> that has an issue with writeback data cache.
-
->> Signed-off-by: Mark A. Greer <mgreer@mvista.com>
->> ---
->> This patch was motivated by a dcache writeback bug in some revisions
->> of TI's DA830/OMAP-L137 (ARM926EJS) SoC.  It has been tested using
->> Kevin Hilman's DaVinci tree where that SoC is supported.  Compile
->> tested only in the linux-2.6 ARM kernel.
-
->> I submitted this patch a while back,
->>     http://marc.info/?l=linux-arm-kernel&m=124208189923479&w=4
->> and Russell responded with,
->>     http://marc.info/?l=linux-arm-kernel&m=124277262417440&w=4
->> to which both George Davis and I responded but Russell has been too
->> busy to continue the conversation.
-
->> So, I'm resubmitting in the hope that this patch gets accepted or I
->> can get some more feedback as to what needs to be done to make it
->> acceptable.
-
->> Many thanks to George Davis for helping me with the low-level ARM-ese.
-
->>  arch/arm/boot/compressed/head.S |   16 ++++++++++++++++
->>  1 files changed, 16 insertions(+), 0 deletions(-)
-
->> diff --git a/arch/arm/boot/compressed/head.S 
->> b/arch/arm/boot/compressed/head.S
->> index fa6fbf4..70806c1 100644
->> --- a/arch/arm/boot/compressed/head.S
->> +++ b/arch/arm/boot/compressed/head.S
->> @@ -412,7 +412,11 @@ __setup_mmu:    sub    r3, r4, #16384        @ 
->> Page directory size
->>          orr    r1, r1, #3 << 10
->>          add    r2, r3, #16384
->>  1:        cmp    r1, r9            @ if virt > start of RAM
->> +#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
->> +        orrhs    r1, r1, #0x08        @ set cacheable
->> +#else
->>          orrhs    r1, r1, #0x0c        @ set cacheable, bufferable
->> +#endif
->>          cmp    r1, r10            @ if virt > end of RAM
->>          bichs    r1, r1, #0x0c        @ clear cacheable, bufferable
->>          str    r1, [r0], #4        @ 1:1 mapping
->> @@ -436,6 +440,12 @@ __setup_mmu:    sub    r3, r4, #16384        @ 
->> Page directory size
->>          mov    pc, lr
->>  ENDPROC(__setup_mmu)
->>  
->> +__arm926ejs_mmu_cache_on:
->> +#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
->> +        mov    r0, #4            @ put dcache in WT mode
->> +        mcr    p15, 7, r0, c15, c0, 0
->> +#endif
->> +
->>  __armv4_mmu_cache_on:
->>          mov    r12, lr
->>  #ifdef CONFIG_MMU
->> @@ -655,6 +665,12 @@ proc_types:
->>          W(b)    __armv4_mpu_cache_off
->>          W(b)    __armv4_mpu_cache_flush
->>  
->> +        .word    0x41069260        @ ARM926EJ-S (v5TEJ)
->> +        .word    0xff0ffff0
->> +        b    __arm926ejs_mmu_cache_on
->> +        b    __armv4_mmu_cache_off
->> +        b    __armv5tej_mmu_cache_flush
->> +
->>          .word    0x00007000        @ ARM7 IDs
->>          .word    0x0000f000
->>          mov    pc, lr
->> -- 
->> 1.6.2.5.182.ga808d
-
->    I'd like to know when this will be accepted?
->    DA830/OMAP-L137 are still not bootable in mainline without this 
-> patch... :-(
-
-    Russell, I don't see this patch in the patch system. Perhaps, I can add it?
-
-WBR, Sergei
+Acked-by: Tony Lindgren <tony@atomide.com>
