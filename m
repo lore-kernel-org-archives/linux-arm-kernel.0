@@ -1,85 +1,101 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Feb 2011 17:17:12 -0000
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
-Message-ID: <001f01cbc87d$314b3270$93e19750$@deacon@arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 09 Feb 2011 20:40:59 +0300
+Subject: [PATCH] ARM: Add writethrough dcache support for ARM926EJS
+	processor
+In-Reply-To: <4CFFD048.9030605@ru.mvista.com>
+References: <20090909165035.GA31462@mag.az.mvista.com>
+	<4CFFD048.9030605@ru.mvista.com>
+Message-ID: <4D52D1AB.4080204@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Rob,
+Hello.
 
-> On Tue, Feb 8, 2011 at 8:53 PM, Rob Herring <robherring2@gmail.com> wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> >
-> > Add OF match table to enable OF style driver binding. The dts entry is like
-> > this:
-> >
-> > pmu {
-> >        compatible = "arm,pmu";
-> >        interrupts = <100 101>;
-> > };
-> >
-> > The use of pdev->id as an index breaks with OF device binding. Change to use
-> > a counter instead. If more than 1 pmu device is ever really supported, a
-> > better solution to match users with particular pmu is probably needed.
-> >
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > ---
-> >  arch/arm/kernel/pmu.c |   13 ++++++++++---
-> >  1 files changed, 10 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-> > index b8af96e..7084057 100644
-> > --- a/arch/arm/kernel/pmu.c
-> > +++ b/arch/arm/kernel/pmu.c
-> > @@ -24,30 +24,37 @@
-> >  static volatile long pmu_lock;
-> >
-> >  static struct platform_device *pmu_devices[ARM_NUM_PMU_DEVICES];
-> > +static int pmu_device_count;
-> >
-> >  static int __devinit pmu_device_probe(struct platform_device *pdev)
-> >  {
-> >
-> > -       if (pdev->id < 0 || pdev->id >= ARM_NUM_PMU_DEVICES) {
-> > +       if (pmu_device_count >= ARM_NUM_PMU_DEVICES) {
-> >                pr_warning("received registration request for unknown "
-> >                                "device %d\n", pdev->id);
-> >                return -EINVAL;
-> >        }
-> >
-> > -       if (pmu_devices[pdev->id])
-> > +       if (pmu_devices[pmu_device_count])
-> >                pr_warning("registering new PMU device type %d overwrites "
-> >                                "previous registration!\n", pdev->id);
-> >        else
-> >                pr_info("registered new PMU device of type %d\n",
-> >                                pdev->id);
-> >
-> > -       pmu_devices[pdev->id] = pdev;
-> > +       pmu_devices[pmu_device_count++] = pdev;
-> >        return 0;
-> >  }
-> >
-> > +static struct of_device_id pmu_device_ids[] = {
-> > +       { .compatible = "arm,pmu" },
-> 
-> This is a pretty generic compatible string and it doesn't account for
-> the possibility that the implementation behaviour will change with
-> newer devices.  Is there any form of versioning on the pmu that would
-> be appropriate to encode here?
+I wrote:
 
-Following on from Rob's update, it would be nice if you could specify that
-the PMU is a CPU PMU (as opposed to L2-cache, bus, gpu etc) in the string.
-That way adding different PMUs in the future seems more natural and it accounts
-for your concerns above. Is that ok, or does the compatible string have to
-match that used by the platform bus?
+>> From: Mark A. Greer <mgreer@mvista.com>
 
-As for versioning, the PMU detection is done dynamically at runtime,
-so knowing that we're poking a CPU is enough.
+>> The ARM kernel supports writethrough data cache via the
+>> CONFIG_CPU_DCACHE_WRITETHROUGH option.  However, that
+>> functionality wasn't implemented in the arch/arm/boot/compressed
+>> code.  It is now necessary due to a new ARM926EJS processor
+>> that has an issue with writeback data cache.
 
-Cheers,
+>> Signed-off-by: Mark A. Greer <mgreer@mvista.com>
+>> ---
+>> This patch was motivated by a dcache writeback bug in some revisions
+>> of TI's DA830/OMAP-L137 (ARM926EJS) SoC.  It has been tested using
+>> Kevin Hilman's DaVinci tree where that SoC is supported.  Compile
+>> tested only in the linux-2.6 ARM kernel.
 
-Will
+>> I submitted this patch a while back,
+>>     http://marc.info/?l=linux-arm-kernel&m=124208189923479&w=4
+>> and Russell responded with,
+>>     http://marc.info/?l=linux-arm-kernel&m=124277262417440&w=4
+>> to which both George Davis and I responded but Russell has been too
+>> busy to continue the conversation.
+
+>> So, I'm resubmitting in the hope that this patch gets accepted or I
+>> can get some more feedback as to what needs to be done to make it
+>> acceptable.
+
+>> Many thanks to George Davis for helping me with the low-level ARM-ese.
+
+>>  arch/arm/boot/compressed/head.S |   16 ++++++++++++++++
+>>  1 files changed, 16 insertions(+), 0 deletions(-)
+
+>> diff --git a/arch/arm/boot/compressed/head.S 
+>> b/arch/arm/boot/compressed/head.S
+>> index fa6fbf4..70806c1 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -412,7 +412,11 @@ __setup_mmu:    sub    r3, r4, #16384        @ 
+>> Page directory size
+>>          orr    r1, r1, #3 << 10
+>>          add    r2, r3, #16384
+>>  1:        cmp    r1, r9            @ if virt > start of RAM
+>> +#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+>> +        orrhs    r1, r1, #0x08        @ set cacheable
+>> +#else
+>>          orrhs    r1, r1, #0x0c        @ set cacheable, bufferable
+>> +#endif
+>>          cmp    r1, r10            @ if virt > end of RAM
+>>          bichs    r1, r1, #0x0c        @ clear cacheable, bufferable
+>>          str    r1, [r0], #4        @ 1:1 mapping
+>> @@ -436,6 +440,12 @@ __setup_mmu:    sub    r3, r4, #16384        @ 
+>> Page directory size
+>>          mov    pc, lr
+>>  ENDPROC(__setup_mmu)
+>>  
+>> +__arm926ejs_mmu_cache_on:
+>> +#ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
+>> +        mov    r0, #4            @ put dcache in WT mode
+>> +        mcr    p15, 7, r0, c15, c0, 0
+>> +#endif
+>> +
+>>  __armv4_mmu_cache_on:
+>>          mov    r12, lr
+>>  #ifdef CONFIG_MMU
+>> @@ -655,6 +665,12 @@ proc_types:
+>>          W(b)    __armv4_mpu_cache_off
+>>          W(b)    __armv4_mpu_cache_flush
+>>  
+>> +        .word    0x41069260        @ ARM926EJ-S (v5TEJ)
+>> +        .word    0xff0ffff0
+>> +        b    __arm926ejs_mmu_cache_on
+>> +        b    __armv4_mmu_cache_off
+>> +        b    __armv5tej_mmu_cache_flush
+>> +
+>>          .word    0x00007000        @ ARM7 IDs
+>>          .word    0x0000f000
+>>          mov    pc, lr
+>> -- 
+>> 1.6.2.5.182.ga808d
+
+>    I'd like to know when this will be accepted?
+>    DA830/OMAP-L137 are still not bootable in mainline without this 
+> patch... :-(
+
+    Russell, I don't see this patch in the patch system. Perhaps, I can add it?
+
+WBR, Sergei
