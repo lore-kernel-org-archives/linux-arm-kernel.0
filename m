@@ -1,92 +1,53 @@
-From: fabio.giovagnini@aurion-tech.com (Fabio Giovagnini)
-Date: Wed, 9 Feb 2011 07:58:17 +0100
-Subject: [RFC,PATCH 2/3] clk: Generic support for fixed-rate clocks
-In-Reply-To: <1297233693.242725.820672531799.2.gpush@pororo>
-References: <1297233693.242725.820672531799.2.gpush@pororo>
-Message-ID: <201102090758.21020.fabio.giovagnini@aurion-tech.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 9 Feb 2011 08:46:18 +0100
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <19794.17994.381937.158944@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, guys,
-is there a documentation about clk framework?
-Or only to read the sources?
+Hi Shawn,
 
-Thanks a lot, and best regards
-
-
-On Wednesday 09 February 2011 07:41:33 Jeremy Kerr wrote:
-> Since most platforms will need a fixed-rate clock, add one. This will
-> also serve as a basic example of an implementation of struct clk.
+Shawn Guo writes:
+> This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
+> The driver calls into mxs-dma via generic dmaengine api for both pio
+> and data transfer.
 > 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
->  drivers/clk/clk.c   |   14 ++++++++++++++
->  include/linux/clk.h |   16 ++++++++++++++++
->  2 files changed, 30 insertions(+)
+>  arch/arm/mach-mxs/include/mach/mmc.h |   15 +
+>  drivers/mmc/host/Kconfig             |    9 +
+>  drivers/mmc/host/Makefile            |    1 +
+>  drivers/mmc/host/mxs-mmc.c           |  884 ++++++++++++++++++++++++++++++++++
+>  4 files changed, 909 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/include/mach/mmc.h
+>  create mode 100644 drivers/mmc/host/mxs-mmc.c
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index c35478a..bbbdb0d 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -124,3 +124,17 @@ void __clk_put(struct clk *clk)
->  	if (clk->ops->put)
->  		clk->ops->put(clk);
->  }
-> +
-> +/* clk_fixed support */
-> +
-> +#define to_clk_fixed(clk) (container_of(clk, struct clk_fixed, clk))
-> +
-> +static unsigned long clk_fixed_get_rate(struct clk *clk)
-> +{
-> +	return to_clk_fixed(clk)->rate;
-> +}
-> +
-> +struct clk_ops clk_fixed_ops = {
-> +	.get_rate = clk_fixed_get_rate,
-> +};
-> +EXPORT_SYMBOL_GPL(clk_fixed_ops);
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index fe806b7..e67fdb0 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -185,6 +185,22 @@ static inline void clk_common_init(struct clk *clk)
->  	mutex_init(&clk->prepare_lock);
->  }
-> 
-> +/* Simple fixed-rate clock */
-> +struct clk_fixed {
-> +	struct clk	clk;
-> +	unsigned long	rate;
-> +};
-> +
-> +extern struct clk_ops clk_fixed_ops;
-> +
-> +#define INIT_CLK_FIXED(name, r) { \
-> +	.clk = INIT_CLK(name.clk, clk_fixed_ops), \
-> +	.rate = (r) \
-> +}
-> +
-> +#define DEFINE_CLK_FIXED(name, r) \
-> +	struct clk_fixed name = INIT_CLK_FIXED(name, r)
-> +
->  #else /* !CONFIG_USE_COMMON_STRUCT_CLK */
-> 
->  /*
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I've run the mmc-test kernel module with this driver on our TX28
+module which fails in the following tests:
+|mmc0: Test case 15. Correct xfer_size at write (start failure)...
+|mmc0: Result: ERROR (-110)
+|mmc0: Test case 16. Correct xfer_size at read (start failure)...
+|mmc0: Result: ERROR (-110)
+|mmc0: Test case 17. Correct xfer_size at write (midway failure)...
+|mmc0: Result: ERROR (-110)
+|mmc0: Test case 18. Correct xfer_size at read (midway failure)...
+|mmc0: Result: ERROR (-110)
 
+Could you try the test on your hardware?
+
+
+Best regards,
+Lothar Wa?mann
 -- 
-Ing. Fabio Giovagnini
+___________________________________________________________
 
-Aurion s.r.l.
-P.I e C.F.
-00885711200
-skype: aurion.giovagnini
-Tel. +39.051.594.78.24
-Fax. +39.051.082.14.49
-Cell. +39.335.83.50.919
-www.aurion-tech.com
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
