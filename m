@@ -1,31 +1,30 @@
-From: dima@android.com (Dima Zavin)
-Date: Wed, 9 Feb 2011 13:39:15 -0800
-Subject: [PATCH] ARM: mm: enforce pageblock alignment when freeing memmap
-	entries at init
-In-Reply-To: <20110203133053.GG11958@csn.ul.ie>
-References: <1295567231-2384-1-git-send-email-dima@android.com>
-	<20110126082916.GM18984@csn.ul.ie>
-	<AANLkTimrP4u5VJBVGCK0tXZo6G2S4tXJnJcqc0+oVeeF@mail.gmail.com>
-	<20110203133053.GG11958@csn.ul.ie>
-Message-ID: <AANLkTi=eZizF2Wu-4D8MWM-8qi00S_sm4ke5LM6jaoaA@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 09 Feb 2011 13:54:17 -0800
+Subject: [PATCH] msm: Remove arch-specific gpiomux tables
+In-Reply-To: <AANLkTimOAOirgH7haDJjf265zdbvoei=f=GGxQEh+5dh@mail.gmail.com>
+	(Dima Zavin's message of "Wed, 9 Feb 2011 12:59:33 -0800")
+References: <4D4CAB63.4050301@codeaurora.org>
+	<AANLkTimOAOirgH7haDJjf265zdbvoei=f=GGxQEh+5dh@mail.gmail.com>
+Message-ID: <8yaei7gq3g6.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mel,
+On Wed, Feb 09 2011, Dima Zavin wrote:
 
-> Sorry for the long delay. I'm in the process of changing jobs at the
-> moment and my schedule is heavily disrupted. It's likely to be a mess
-> for at least a month.
+> I don't like this solution of putting the magicly named array into the
+> board file. What if I want multiple boards to be built into the same
+> kernel? What if I want multiple tables in case I have different
+> revisions of the board?
 
-I totally understand. Good luck with the new job :)
+Especially since there is a push by some to be able to build everything
+into a single kernel.
 
-> No, the description and patch comment is just misleading. Clarify that
-> you are catching the situation where a node boundary is in the middle of a
-> MAX_ORDER_NR_PAGES block of pages and you are preventing memmap belonging
-> to another node being freed and it's fine.
+> The more correct way would be to add a function to gpiomux.c to be
+> able to apply a list of gpiomux configs, something like:
+>
+> int msm_gpiomux_config_table(struct msm_gpiomux_cfg *table, int num);
 
-Will resend with new description.
+Good idea.  Although, I think a name like msm_gpiomux_add_configs()
+might fit better with other namings.
 
-Thanks
-
---Dima
+David
