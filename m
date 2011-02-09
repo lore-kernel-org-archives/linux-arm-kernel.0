@@ -1,54 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Feb 2011 16:37:16 +0100
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <201102091547.12131.arnd@arndb.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091547.12131.arnd@arndb.de>
-Message-ID: <20110209153716.GN9041@pengutronix.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 9 Feb 2011 11:19:40 -0500 (EST)
+Subject: [PATCH v4 1/5] ARM: omap4: Provide do_wfi() for Thumb-2
+In-Reply-To: <1297263683-10621-2-git-send-email-dave.martin@linaro.org>
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+	<1297263683-10621-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1102091118390.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, 9 Feb 2011, Dave Martin wrote:
 
-On Wed, Feb 09, 2011 at 03:47:11PM +0100, Arnd Bergmann wrote:
-> On Wednesday 09 February 2011, Sascha Hauer wrote:
-> > Hi all,
-> > 
-> > The following patches add framebuffer support for Freescale i.MX23/28
-> > processors.
+> For CONFIG_THUMB2_KERNEL, the existing definition of do_wfi() will
+> insert invalid code into the instruction stream.
 > 
-> Hi Sascha,
+> Any assembler which can assemble Thumb-2 is guaranteed to accept
+> the "wfi" mnemonic, so for the Thumb-2 case, just use the mnemonic.
 > 
-> The driver looks good as far as I can tell, but I'd recommend
-> submitting it to linux-fbdev at vger.kernel.org for review in
-> addition to linux-arm-kernel. The frame buffer layer is largely
-> unmaintained these days, but there are still people on that
-> list that care.
-
-The driver patch itself is Cced to linux-fbdev, only the introductory
-mail is not.
-
+> The ARM case is left as-is.
 > 
-> Did you consider making the driver a KMS driver instead of
-> a frame buffer? I think the recommendation these days is
-> to start out with KMS for new drivers, which will be somewhat
-> simpler and give you a frame buffer device as well. I don't
-> think that there is a need to change over any drivers from
-> fb to kms though, since you've already done the work.
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+>  arch/arm/mach-omap2/include/mach/omap4-common.h |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
+> index 5b0270b..de441c0 100644
+> --- a/arch/arm/mach-omap2/include/mach/omap4-common.h
+> +++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+> @@ -17,8 +17,12 @@
+>   * wfi used in low power code. Directly opcode is used instead
+>   * of instruction to avoid mulit-omap build break
 
-I tried doing so for the i.MX51 which supports multiple displays on dvi
-and vga outputs and thus could make good use of KMS and friends. Anyway,
-I got stuck quite fast. The KMS stuff is tightly coupled with DRM/DRI
-and needs many many callbacks to implement. Additionally the userspace
-tools expect a nvidia/amd/intel driver and do not have a generic
-fallback. I think this stuff is good for implementing a full blown
-graphics driver, but is lacking support for simple framebuffer grapics.
-I'd love to go this way but it still requires a lot of work.
+Might be a good idea to fix the typo above while at it.
 
-Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define do_wfi() __asm__ __volatile__ ("wfi" : : : "memory")
+> +#else
+>  #define do_wfi()			\
+>  		__asm__ __volatile__ (".word	0xe320f003" : : : "memory")
+> +#endif
+>  
+>  #ifdef CONFIG_CACHE_L2X0
+>  extern void __iomem *l2cache_base;
+> -- 
+> 1.7.1
+> 
