@@ -1,44 +1,33 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 9 Feb 2011 23:07:42 +0800
-Subject: [PATCH] ARM: pxa: Properly configure PWM period for palm27x
-In-Reply-To: <201102011918.45662.marek.vasut@gmail.com>
-References: <1296511613-24406-1-git-send-email-marek.vasut@gmail.com>
-	<201102011918.45662.marek.vasut@gmail.com>
-Message-ID: <AANLkTi=y76tTMGLokfZqsFRn469Qmbhhd9h9ZfUJ59jS@mail.gmail.com>
+Date: Wed, 9 Feb 2011 23:22:30 +0800
+Subject: [GIT PULL] pxa: fixes for v2.6.38-rc4
+Message-ID: <AANLkTinNTEGikc87pwKMgEzQvoFyR3kgpU0aihKw3py=@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note: it's eric.y.miao at gmail.com
+The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
 
+  Linux 2.6.38-rc4 (2011-02-07 16:03:55 -0800)
 
-On Wed, Feb 2, 2011 at 2:18 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On Monday 31 January 2011 23:06:53 Marek Vasut wrote:
->> Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
 
-Applied.
+Bj?rn Forsman (1):
+      ARM: pxa/colibri: use correct SD detect pin
 
->> ---
->> ?arch/arm/mach-pxa/palm27x.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
->> index 7d1434a..4c9a938 100644
->> --- a/arch/arm/mach-pxa/palm27x.c
->> +++ b/arch/arm/mach-pxa/palm27x.c
->> @@ -322,7 +322,7 @@ static struct platform_pwm_backlight_data
->> palm27x_backlight_data = { .pwm_id ? ? ? ? ? ?= 0,
->> ? ? ? .max_brightness = 0xfe,
->> ? ? ? .dft_brightness = 0x7e,
->> - ? ? .pwm_period_ns ?= 3500,
->> + ? ? .pwm_period_ns ?= 3500 * 1024,
->> ? ? ? .init ? ? ? ? ? = palm27x_backlight_init,
->> ? ? ? .notify ? ? ? ? = palm27x_backlight_notify,
->> ? ? ? .exit ? ? ? ? ? = palm27x_backlight_exit,
->
-> CC linux-arm-kernel, I mistyped, sorry
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Eric Miao (1):
+      ARM: pxa: only save/restore registers when pm functions are defined
+
+Marek Vasut (1):
+      ARM: pxa: Properly configure PWM period for palm27x
+
+Yu Tang (1):
+      ARM: pxa: fix mfpr_sync to read from valid offset
+
+ arch/arm/mach-pxa/colibri-evalboard.c    |    2 +-
+ arch/arm/mach-pxa/colibri-pxa300.c       |    2 +-
+ arch/arm/mach-pxa/include/mach/colibri.h |    2 +-
+ arch/arm/mach-pxa/palm27x.c              |    2 +-
+ arch/arm/mach-pxa/pm.c                   |    4 ++--
+ arch/arm/plat-pxa/mfp.c                  |    8 ++++++--
+ 6 files changed, 12 insertions(+), 8 deletions(-)
