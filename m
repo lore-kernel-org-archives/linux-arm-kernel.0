@@ -1,147 +1,100 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 9 Feb 2011 10:09:15 +0100
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <19793.22067.960689.669543@ipc1.ka-ro>
-References: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<19793.22067.960689.669543@ipc1.ka-ro>
-Message-ID: <20110209090915.GL9041@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Feb 2011 10:13:56 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTimjQfuNU-_rZTjAPrjxJhb=3kReVysBKoPE6Q4o@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<AANLkTimjQfuNU-_rZTjAPrjxJhb=3kReVysBKoPE6Q4o@mail.gmail.com>
+Message-ID: <201102091013.56670.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 08, 2011 at 03:41:55PM +0100, Lothar Wa?mann wrote:
-> Hi,
+On Wednesday 09 February 2011 09:37:40 Linus Walleij wrote:
+> [Quoting in verbatin so the orginal mail hits linux-mmc, this is very
+> interesting!]
 > 
-> > On Sat, Feb 05, 2011 at 10:08:12AM +0800, Shawn Guo wrote:
-> >> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> >> including apbh-dma and apbx-dma.
-> >> 
-> >> * apbh-dma and apbx-dma are supported in the driver as two instances,
-> >>   and have to be filtered by dma clients via device id.  It becomes
-> >>   the convention that apbh-dma always gets registered prior to
-> >>   apbx-dma.
-> >> 
-> >> * apbh-dma is different between mx23 and mx28, hardware version
-> >>   register is used to handle the differences.
-> >> 
-> >> * Every the mxs dma channel is statically assigned to client device
-> >>   by soc design with fixed irq.  The irq number is being passed by
-> >>   alloc_chan function with mxs_dma_data, and client driver has to
-> >>   filter the correct channel by its channel id.
-> >> 
-> >> * mxs-dma supports pio function besides data transfer.  The driver
-> >>   uses dma_data_direction DMA_NONE to identify the pio mode, and
-> >>   steals sgl and sg_len to get pio words and numbers from clients.
-> >> 
-> >> * mxs dmaengine has some very specific features, like sense function
-> >>   and the special NAND support (nand_lock, nand_wait4ready).  These
-> >>   are too specific to implemented in generic dmaengine driver.
-> >> 
-> >> * The parameter "flags" of prep functions is currently being used to
-> >>   pass wait4end flag from clients.
-> >> 
-> >> * The driver refers to imx-sdma and only a single descriptor is
-> >>   statically assigned to each channel.
-> >> 
-> >> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> >> ---
-> >>  arch/arm/mach-mxs/include/mach/dma.h |   16 +
-> >>  drivers/dma/Kconfig                  |    8 +
-> >>  drivers/dma/Makefile                 |    1 +
-> >>  drivers/dma/mxs-dma.c                |  702 ++++++++++++++++++++++++++++++++++
-> >>  4 files changed, 727 insertions(+), 0 deletions(-)
-> >>  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
-> >>  create mode 100644 drivers/dma/mxs-dma.c
-> >> 
-> >> diff --git a/arch/arm/mach-mxs/include/mach/dma.h b/arch/arm/mach-mxs/include/mach/dma.h
-> >> new file mode 100644
-> >> index 0000000..429f431
-> >> --- /dev/null
-> >> +++ b/arch/arm/mach-mxs/include/mach/dma.h
-> >> +
-> >> +static struct dma_async_tx_descriptor *mxs_dma_prep_slave_sg(
-> >> +		struct dma_chan *chan, struct scatterlist *sgl,
-> >> +		unsigned int sg_len, enum dma_data_direction direction,
-> >> +		unsigned long flags)
-> >> +{
-> >> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(chan);
-> >> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> >> +	struct mxs_dma_ccw *ccw;
-> >> +	struct scatterlist *sg;
-> >> +	int ret, i, j;
-> >> +	u32 *pio;
-> >> +
-> >> +	dev_dbg(mxs_dma->dev, "%s: channel %d\n", __func__, chan->chan_id);
-> >> +
-> >> +	if (mxs_chan->status == DMA_IN_PROGRESS)
-> >> +		return NULL;
-> >> +
-> >> +	mxs_chan->status = DMA_IN_PROGRESS;
-> >> +	mxs_chan->flags = 0;
-> >> +
-> >> +	dev_dbg(mxs_dma->dev, "%s: setting up %d entries\n", __func__, sg_len);
-> >> +
-> >> +	if (sg_len > ((direction == DMA_NONE) ? MXS_PIO_WORDS : NUM_CCW)) {
-> >> +		dev_err(mxs_dma->dev, "maximum number of sg exceeded: %d > %d\n",
-> >> +				sg_len, NUM_CCW);
-> >> +		ret = -EINVAL;
-> >> +		goto err_out;
-> >> +	}
-> >> +
-> >> +	if (direction == DMA_NONE) {
-> >> +		ccw = &mxs_chan->ccw[0];
-> >> +		pio = (u32 *) sgl;
-> >> +
-> >> +		for (j = 0; j < sg_len;)
-> >> +			ccw->pio_words[j++] = *pio++;
-> >> +
-> >> +		ccw->next = 0;
-> >> +		ccw->bits.chain = 0;
-> >> +		ccw->bits.irq = 1;
-> >> +		ccw->bits.dec_sem = 1;
-> >> +		ccw->bits.wait4end = flags;
-> >> +		ccw->bits.halt_on_terminate = 1;
-> >> +		ccw->bits.terminate_flush = 1;
-> >> +		ccw->bits.pio_num = sg_len;
-> >> +		ccw->bits.command = MXS_DMA_NO_XFER;
+> 2011/2/8 Andrei Warkentin <andreiw@motorola.com>:
+> > Hi,
 > >
-> > Does this have a valid usecase? I would just return some error code
-> > here. pio_num and pio_words are unused in the driver and I don't think
-> > a dmaengine driver should have some kind of PIO fallback.
+> > I'm not sure if this is the best place to bring this up, but Russel's
+> > name is on a fair share of drivers/mmc code, and there does seem to be
+> > quite a bit of MMC-related discussions. Excuse me in advance if this
+> > isn't the right forum :-).
 > >
-> Actually 'PIO' is a misnomer here. It's the free scaled way of
-> implementing a simple feature (chained DMA with mixed transfer modes)
-> in a complicated and obfuscated way.
+> > Certain MMC vendors (maybe even quite a bit of them) use a pretty
+> > rigid buffering scheme when it comes to handling writes. There is
+> > usually a buffer A for random accesses, and a buffer B for sequential
+> > accesses. For certain Toshiba parts, it looks like buffer A is 8KB
+> > wide, with buffer B being 4MB wide, and all accesses larger than 8KB
+> > effectively equating to 4MB accesses. Worse, consecutive small (8k)
+> > writes are treated as one large sequential access, once again ending
+> > up in buffer B, thus necessitating out-of-order writing to work around
+> > this.
+
+It's more complex, but I now have a pretty good understanding of
+what the flash media actually do, after doing a lot of benchmarking.
+Most of my results so far are documented on
+
+https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Projects/FlashCardSurvey
+
+but I still need to write about the more recent discoveries.
+
+What you describe as buffer A is the "page size" of the underlying
+flash. It depends on the size and brand of the NAND flash chip and
+can be anywhere between 2 KB and 16 KB for modern cards, depending
+on how they combine multiple chips and planes within the chips.
+
+What you describe as buffer B is sometime called an "erase block
+group" or an "allocation unit". This is the smallest unit that
+gets kept in a global lookup table in the medium and can be anywhere
+between 1 MB and 8 MB for cards larger than 4 GB, or as small as
+128 KB (a single erase block) for smaller media, as far as I have
+seen. When you don't write full aligned allocation units, the
+card will have to eventually do garbage collection on the allocation
+unit, which can take a long time (many milliseconds).
+
+Most cards have a third size, typically somewhere between 32 and 128 KB,
+which is the optimimum size for writes. While you can do linear
+writes to the card in page size units (writing an allocation unit
+from start to finish), doing random access within the allocation unit
+will be much faster doing larger writes.
+
+> > What this means is decreased life span for the parts, and it also
+> > means a performance impact on small writes, but the first item is much
+> > more crucial, especially for smaller parts.
+> >
+> > As I've mentioned, probably more vendors are affected. How about a
+> > generic MMC_BLOCK quirk that splits the requests (and optionally
+> > reorders) them? The thresholds would then be adjustable as
+> > module/kernel parameters based on manfid. I'm asking because I have a
+> > patch now, but its ugly and hardcoded against a specific manufacturer.
+
+It's not just MMC specific: USB flash drives, CF cards and even cheap
+PATA or SATA SSDs have the same patterns. I think this will need
+to be solved on a higher level, in the block device elevator code
+and in the file systems.
+
+> There is a quirk API so that specific quirks can be flagged for certain
+> vendors and cards, e.g. some Toshibas in this case. e.g. grep the
+> kernel source for MMC_QUIRK_BLKSZ_FOR_BYTE_MODE.
 > 
-> What's behinde the 'PIO' transfers is programming controller registers
-> via DMA along with the actual DMA data transfer. DMA_NONE simply
-> means, that the DMA transfer does only the register programming but
-> does not transfer any payload. The 'pio_words' are the values that are
-> being written to consecutive locations of e.g. the SPI controller
-> register address space.
-> The programming is actually done by DMA, in any case.
+> But as Russell says this probably needs to be signalled up to the
+> block layer to be handled properly.
+> 
+> Why don't you post the code you have today as an RFC: patch,
+> I think many will be interested?
 
-OK, got it now.
+Yes, I agree, that would be good. Also, I'd be interested to see the
+output of 'head /sys/block/mmcblk0/device/*' on that card. I'm guessing
+that the manufacturer ID of 0x0002 is Toshiba, and these are indeed
+the worst cards that I have seen so far, because they can not do
+random access within an allocation unit, and they can not write to
+multiple allocation units alternating (# open AUs linear is "1" in
+my wiki table), while most cards can do at least two.
 
-The NAND programming example in the reference manual looks...
-interesting. So it's possible to program the DMA engine in a way that it
-autonomously sends commands to the NAND controller, reads blocks from
-NAND, polls for status, make branches depending on status bits...
-This looks more like a DMA programming language.
+Andrei, I'm certainly interested in working with you on this.
+The point you brought up about the toshiba cards being especially
+bad is certainly vald, even if we do something better in the block
+layer, we need to have a way to detect the worst-case scenario,
+so we can work around that.
 
-I think it does not make much sense to try to implement these features
-in the dmaengine API. What the dmaengine offers is only a special
-usecase of what the controller provides. Also these features are so
-hardware specific that it won't make sense to extend the dmaengine API
-for them.
-
-So what should we do? Not use these features at all? Create a bypass to
-the dmaengine API? Make the dmaengine driver a user of another, i.MX28
-specific driver which provides the additional features?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
