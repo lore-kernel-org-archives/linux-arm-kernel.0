@@ -1,34 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Feb 2011 09:51:27 -0000
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-Message-ID: <001b01cbc83e$ec0a59e0$c41f0da0$@deacon@arm.com>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Wed,  9 Feb 2011 10:54:01 +0100
+Subject: [PATCH] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD declaration
+Message-ID: <1297245241-9864-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-> Add OF match table to enable OF style driver binding. The dts entry is like
-> this:
-> 
-> pmu {
-> 	compatible = "arm,pmu";
-> 	interrupts = <100 101>;
-> };
-> 
-> The use of pdev->id as an index breaks with OF device binding. Change to use
-> a counter instead. If more than 1 pmu device is ever really supported, a
-> better solution to match users with particular pmu is probably needed.
 
-We will want to support multiple PMU devices in the near future but
-this is currently blocked on userspace issues. One such device would
-be the event counters on the PL310, which could be used to complement
-the CPU PMU on the Cortex-A9.
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I don't like the idea of a counter as it forces platforms to register
-their devices in a specific order. Is it possible to separate different
-types of PMU in the device tree and then have pmu.c work out what to do
-with them?
-
-Will
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index b6767f9..df531aa 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -473,7 +473,7 @@
+ #define _MX51_PAD_UART2_RXD__UART2_RXD		IOMUX_PAD(0x628, 0x238, 0, 0x09ec, 2, 0)
+ #define _MX51_PAD_UART2_TXD__FIRI_RXD		IOMUX_PAD(0x62c, 0x23c, 1, 0x0000, 0, 0)
+ #define _MX51_PAD_UART2_TXD__GPIO1_21		IOMUX_PAD(0x62c, 0x23c, 3, 0x0000, 0, 0)
+-#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x09ec, 3, 0)
++#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__CSI1_D0		IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__GPIO1_22		IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__UART1_DTR		IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
+-- 
+1.6.0.4
