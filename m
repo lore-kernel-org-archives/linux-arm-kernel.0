@@ -1,48 +1,37 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 9 Feb 2011 11:19:40 -0500 (EST)
-Subject: [PATCH v4 1/5] ARM: omap4: Provide do_wfi() for Thumb-2
-In-Reply-To: <1297263683-10621-2-git-send-email-dave.martin@linaro.org>
-References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
-	<1297263683-10621-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1102091118390.14920@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Feb 2011 08:24:21 -0800
+Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
+In-Reply-To: <80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
+	<20110208164747.GD6188@n2100.arm.linux.org.uk>
+	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
+	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
+	<20110209003537.GQ20795@atomide.com>
+	<54f225541194205f01fe9f03b5110d16@mail.gmail.com>
+	<AANLkTin2zB32YVPZkr48gSOjm0N-WDnZFScysKC8ZTiv@mail.gmail.com>
+	<80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
+Message-ID: <20110209162421.GU20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Feb 2011, Dave Martin wrote:
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [110209 01:59]:
+> > From: Dave Martin [mailto:dave.martin at linaro.org]
+> >
+> > You could also have a "v7+" unified kernel -- i.e., supporting
+> > OMAP3+4+SMP.
+> > This is what we currently do in Linaro, since we're focusing on v7
+> > and above.
+> >
+> This sounds good way forward considering future OMAP architectures
+> as well.
+> 
+> But I let Tony comment on this idea.
 
-> For CONFIG_THUMB2_KERNEL, the existing definition of do_wfi() will
-> insert invalid code into the instruction stream.
-> 
-> Any assembler which can assemble Thumb-2 is guaranteed to accept
-> the "wfi" mnemonic, so for the Thumb-2 case, just use the mnemonic.
-> 
-> The ARM case is left as-is.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
->  arch/arm/mach-omap2/include/mach/omap4-common.h |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
-> index 5b0270b..de441c0 100644
-> --- a/arch/arm/mach-omap2/include/mach/omap4-common.h
-> +++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
-> @@ -17,8 +17,12 @@
->   * wfi used in low power code. Directly opcode is used instead
->   * of instruction to avoid mulit-omap build break
+AFAIK these issues will be hopefully sorted out by the time the
+next merge window opens. For the -rc cycle, disabling SMP in
+config if ARMv6 is selected should do the trick.
 
-Might be a good idea to fix the typo above while at it.
+Regards,
 
-
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +#define do_wfi() __asm__ __volatile__ ("wfi" : : : "memory")
-> +#else
->  #define do_wfi()			\
->  		__asm__ __volatile__ (".word	0xe320f003" : : : "memory")
-> +#endif
->  
->  #ifdef CONFIG_CACHE_L2X0
->  extern void __iomem *l2cache_base;
-> -- 
-> 1.7.1
-> 
+Tony
