@@ -1,57 +1,69 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 9 Feb 2011 14:35:26 +0100
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <19794.38942.679388.812321@ipc1.ka-ro>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 10 Feb 2011 05:42:22 +0800
+Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <20110209083400.GK9041@pengutronix.de>
+References: <1296871696-21008-1-git-send-email-shawn.guo@freescale.com>
+	<1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
+	<20110207082521.GI9041@pengutronix.de>
+	<20110208232833.GC6963@S2100-06.ap.freescale.net>
+	<20110209083400.GK9041@pengutronix.de>
+Message-ID: <20110209214221.GC7417@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-Sascha Hauer writes:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-mxs/include/mach/fb.h |   48 ++
->  drivers/video/Kconfig               |    9 +
->  drivers/video/Makefile              |    1 +
->  drivers/video/mxsfb.c               |  914 +++++++++++++++++++++++++++++++++++
->  4 files changed, 972 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/fb.h
->  create mode 100644 drivers/video/mxsfb.c
+On Wed, Feb 09, 2011 at 09:34:00AM +0100, Sascha Hauer wrote:
+> Shawn,
 > 
-[...]
-> diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-> new file mode 100644
-> index 0000000..92a5804
-> --- /dev/null
-> +++ b/drivers/video/mxsfb.c
-[...]
-> +static int __devexit mxsfb_remove(struct platform_device *pdev)
-> +{
-> +	struct fb_info *fb_info = platform_get_drvdata(pdev);
-> +	struct mxsfb_info *host = to_imxfb_host(fb_info);
-> +	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +	mxsfb_disable_controller(fb_info);
->
-IMO this should also be guarded by an:
-|	if (host->enabled)
-otherwise it may lead to an unbalanced clk_disable() call.
+> On Wed, Feb 09, 2011 at 07:28:34AM +0800, Shawn Guo wrote:
+> > > > +
+> > > > +     if (direction == DMA_NONE) {
+> > > > +             ccw = &mxs_chan->ccw[0];
+> > > > +             pio = (u32 *) sgl;
+> > > > +
+> > > > +             for (j = 0; j < sg_len;)
+> > > > +                     ccw->pio_words[j++] = *pio++;
+> > > > +
+> > > > +             ccw->next = 0;
+> > > > +             ccw->bits.chain = 0;
+> > > > +             ccw->bits.irq = 1;
+> > > > +             ccw->bits.dec_sem = 1;
+> > > > +             ccw->bits.wait4end = flags;
+> > > > +             ccw->bits.halt_on_terminate = 1;
+> > > > +             ccw->bits.terminate_flush = 1;
+> > > > +             ccw->bits.pio_num = sg_len;
+> > > > +             ccw->bits.command = MXS_DMA_NO_XFER;
+> > > 
+> > > Does this have a valid usecase? I would just return some error code
+> > > here. pio_num and pio_words are unused in the driver and I don't think
+> > > a dmaengine driver should have some kind of PIO fallback.
+> > > 
+> > If you happen to have a look at mxs-mmc patch set, you could find it.
+> 
+> As Russell already pointed out, the (mmc-) driver should handle this.
+> 
+> > > > +
+> > > > +     /*
+> > > > +      * dmaengine clients have to use dma_device.dev_id to filter
+> > > > +      * dma device between apbh and apbx, so need to ensure it is
+> > > > +      * identical to mxs_dma_engine.dev_id.
+> > > > +      */
+> > > > +     if (mxs_dma->dma_device.dev_id != mxs_dma->dev_id) {
+> > > > +             dev_err(&pdev->dev, "dev_id of dma_device %d differs from mxs_dma_engine %d\n",
+> > > > +                             mxs_dma->dma_device.dev_id, mxs_dma->dev_id);
+> > > > +             goto err_init;
+> > > > +     }
+> > > 
+> > > I think it makes more sense to match against device names (apbh vs.
+> > > apbx) in the client's filter function than to rely on exact numbering.
+> > > 
+> > I agree, if there is already a member like dev_name in dma_device.
+> > There is dev_id but no dev_name.  Suggestion on how to use device
+> > name for matching?
+> 
+> Have a look at the implementation of imx_dma_is_general_purpose() and
+> imx_dma_is_ipu().
+> 
+Great example.  Thanks.
 
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Regards
+Shawn
