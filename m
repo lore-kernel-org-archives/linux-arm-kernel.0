@@ -1,42 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Feb 2011 10:20:29 -0000
-Subject: [PATCH] ARM: Correct WFE() in asm/spinlock.h for Thumb-2
-In-Reply-To: <AANLkTi=XfBjite-xtR8z_+5ATxSb4a9XDNAXdLBowWKY@mail.gmail.com>
-References: <1297178414-20983-1-git-send-email-dave.martin@linaro.org>	<20110208164009.GD27521@n2100.arm.linux.org.uk>
-	<AANLkTi=XfBjite-xtR8z_+5ATxSb4a9XDNAXdLBowWKY@mail.gmail.com>
-Message-ID: <001d01cbc842$fa1aacc0$ee500640$@deacon@arm.com>
+Date: Wed,  9 Feb 2011 10:34:11 +0000
+Subject: [PATCH] ARM: hw_breakpoint: avoid UNPREDICTABLE behaviour when
+	reading DBGDSCR
+Message-ID: <1297247651-11701-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Reading baseline CP14 registers, other than DBGDIDR, when the OS Lock
+is set leads to UNPREDICTABLE behaviour.
 
-> On Tue, Feb 8, 2011 at 4:40 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Feb 08, 2011 at 03:20:14PM +0000, Dave Martin wrote:
-> >> The content for ALT_SMP() in the definition of WFE() expands to 6
-> >> bytes (IT cc ; WFEcc.W), which breaks the assumptions of the fixup
-> >> code, leading to lockups when the affected code gets run.
-> >
-> > Why does it?  My understanding is that the .w suffix forces the assembler
-> > to use the ARM encoding for the instruction.
-> 
-> The .w suffix forces a 32-bit encoding of Thumb-2 instructions for
-> which a 16-bit encoding is available.  Unfortunately, the 32-bit
+This patch ensures that we clear the OS lock before accessing anything
+other than the DBGDIDR, thereby avoiding this behaviour.
 
-[...]
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-> the WFE into the 4 bytes expected by ALT_SMP().  For safety, I write
-> it out explicitly: ALT_SMP("wfene", ...) would work sometimes but
-> might not work as expected if the previous instruction has an EQ or NE
-> condition, because then the assembler wouldn't need to insert an extra
-> IT when it generates its output...
-
-That's really horrible! It might be worth commenting the explicit
-IT in your WFE macro to explain why we can't rely on the assembler
-to generate it for us.
-
-With that minor change:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index c9f3f04..19bedab 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -899,18 +899,18 @@ static int __init arch_hw_breakpoint_init(void)
+ 		pr_info("%d breakpoint(s) reserved for watchpoint "
+ 				"single-step.\n", core_num_reserved_brps);
+ 
++	/*
++	 * Reset the breakpoint resources. We assume that a halting
++	 * debugger will leave the world in a nice state for us.
++	 */
++	on_each_cpu(reset_ctrl_regs, NULL, 1);
++
+ 	ARM_DBG_READ(c1, 0, dscr);
+ 	if (dscr & ARM_DSCR_HDBGEN) {
++		max_watchpoint_len = 4;
+ 		pr_warning("halting debug mode enabled. Assuming maximum "
+-				"watchpoint size of 4 bytes.");
++			   "watchpoint size of %u bytes.", max_watchpoint_len);
+ 	} else {
+-		/*
+-		 * Reset the breakpoint resources. We assume that a halting
+-		 * debugger will leave the world in a nice state for us.
+-		 */
+-		smp_call_function(reset_ctrl_regs, NULL, 1);
+-		reset_ctrl_regs(NULL);
+-
+ 		/* Work out the maximum supported watchpoint length. */
+ 		max_watchpoint_len = get_max_wp_len();
+ 		pr_info("maximum watchpoint size is %u bytes.\n",
+-- 
+1.7.0.4
