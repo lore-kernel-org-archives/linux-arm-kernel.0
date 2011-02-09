@@ -1,51 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 9 Feb 2011 16:32:04 +0000
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <20110209162421.GU20795@atomide.com>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
-	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
-	<20110209003537.GQ20795@atomide.com>
-	<54f225541194205f01fe9f03b5110d16@mail.gmail.com>
-	<AANLkTin2zB32YVPZkr48gSOjm0N-WDnZFScysKC8ZTiv@mail.gmail.com>
-	<80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
-	<20110209162421.GU20795@atomide.com>
-Message-ID: <20110209163204.GB11460@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 9 Feb 2011 11:38:45 -0500 (EST)
+Subject: [PATCH] ARM: Correct WFE() in asm/spinlock.h for Thumb-2
+In-Reply-To: <1297178414-20983-1-git-send-email-dave.martin@linaro.org>
+References: <1297178414-20983-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1102091133050.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 08:24:21AM -0800, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110209 01:59]:
-> > > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > >
-> > > You could also have a "v7+" unified kernel -- i.e., supporting
-> > > OMAP3+4+SMP.
-> > > This is what we currently do in Linaro, since we're focusing on v7
-> > > and above.
-> > >
-> > This sounds good way forward considering future OMAP architectures
-> > as well.
-> > 
-> > But I let Tony comment on this idea.
+On Tue, 8 Feb 2011, Dave Martin wrote:
+
+> The content for ALT_SMP() in the definition of WFE() expands to 6
+> bytes (IT cc ; WFEcc.W), which breaks the assumptions of the fixup
+> code, leading to lockups when the affected code gets run.
 > 
-> AFAIK these issues will be hopefully sorted out by the time the
-> next merge window opens. For the -rc cycle, disabling SMP in
-> config if ARMv6 is selected should do the trick.
+> This patch works around the problem by explicitly using an
+> IT + WFEcc.N pair.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+>  arch/arm/include/asm/spinlock.h |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index da1af52..7cba79c 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -18,7 +18,12 @@
+>  
+>  #ifdef CONFIG_THUMB2_KERNEL
+>  #define SEV		ALT_SMP("sev.w", "nop.w")
+> -#define WFE(cond)	ALT_SMP("wfe" cond ".w", "nop.w")
+> +#define WFE(cond)	ALT_SMP(		\
+> +	"it " cond "\n\t"			\
+> +	"wfe" cond ".n",			\
+> +						\
+> +	"nop.w"					\
+> +)
 
-That's not soo easy - as we don't know in the Kconfig whether we include
-ARMv6 rather than ARMv6K.  It's exactly the same problem I ran into which
-inflated the v6v7 patchset.
+In addition to a comment inline for this as others have suggested 
+already, I'd write it differently to save some realestate:
 
-Maybe the best thing to do is:
+#define WFE(cond)	ALT_SMP("it " cond " ; wfe" cond ".n", "nop.w")
 
-config CPU_32v6K
-        bool "Support ARM V6K processor extensions" if !SMP
-        depends on CPU_V6 || CPU_V7
-        default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
 
-drop the ' && !(ARCH_MX3 || ARCH_OMAP2)' and just let people run into the
-resulting undefined instruction traps if they try to run the kernel on
-V6 non-K hardware.  Not ideal, but I don't see any other 'simple' solution
-to this.
+Nicolas
