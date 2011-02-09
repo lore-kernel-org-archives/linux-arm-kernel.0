@@ -1,33 +1,54 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 9 Feb 2011 23:22:30 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.38-rc4
-Message-ID: <AANLkTinNTEGikc87pwKMgEzQvoFyR3kgpU0aihKw3py=@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 9 Feb 2011 16:37:16 +0100
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <201102091547.12131.arnd@arndb.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102091547.12131.arnd@arndb.de>
+Message-ID: <20110209153716.GN9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
+Hi Arnd,
 
-  Linux 2.6.38-rc4 (2011-02-07 16:03:55 -0800)
+On Wed, Feb 09, 2011 at 03:47:11PM +0100, Arnd Bergmann wrote:
+> On Wednesday 09 February 2011, Sascha Hauer wrote:
+> > Hi all,
+> > 
+> > The following patches add framebuffer support for Freescale i.MX23/28
+> > processors.
+> 
+> Hi Sascha,
+> 
+> The driver looks good as far as I can tell, but I'd recommend
+> submitting it to linux-fbdev at vger.kernel.org for review in
+> addition to linux-arm-kernel. The frame buffer layer is largely
+> unmaintained these days, but there are still people on that
+> list that care.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+The driver patch itself is Cced to linux-fbdev, only the introductory
+mail is not.
 
-Bj?rn Forsman (1):
-      ARM: pxa/colibri: use correct SD detect pin
+> 
+> Did you consider making the driver a KMS driver instead of
+> a frame buffer? I think the recommendation these days is
+> to start out with KMS for new drivers, which will be somewhat
+> simpler and give you a frame buffer device as well. I don't
+> think that there is a need to change over any drivers from
+> fb to kms though, since you've already done the work.
 
-Eric Miao (1):
-      ARM: pxa: only save/restore registers when pm functions are defined
+I tried doing so for the i.MX51 which supports multiple displays on dvi
+and vga outputs and thus could make good use of KMS and friends. Anyway,
+I got stuck quite fast. The KMS stuff is tightly coupled with DRM/DRI
+and needs many many callbacks to implement. Additionally the userspace
+tools expect a nvidia/amd/intel driver and do not have a generic
+fallback. I think this stuff is good for implementing a full blown
+graphics driver, but is lacking support for simple framebuffer grapics.
+I'd love to go this way but it still requires a lot of work.
 
-Marek Vasut (1):
-      ARM: pxa: Properly configure PWM period for palm27x
+Sascha
 
-Yu Tang (1):
-      ARM: pxa: fix mfpr_sync to read from valid offset
-
- arch/arm/mach-pxa/colibri-evalboard.c    |    2 +-
- arch/arm/mach-pxa/colibri-pxa300.c       |    2 +-
- arch/arm/mach-pxa/include/mach/colibri.h |    2 +-
- arch/arm/mach-pxa/palm27x.c              |    2 +-
- arch/arm/mach-pxa/pm.c                   |    4 ++--
- arch/arm/plat-pxa/mfp.c                  |    8 ++++++--
- 6 files changed, 12 insertions(+), 8 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
