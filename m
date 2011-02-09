@@ -1,44 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Feb 2011 10:01:33 +0000
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <20110208164747.GD6188@n2100.arm.linux.org.uk>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimGa-Y6ddHknGe9Gar7+mWPuA_T2+6VL6ecfgxD@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Wed, 9 Feb 2011 11:07:48 +0100
+Subject: [PATCH 1/2] ARM: QQ2440 machine architecture
+In-Reply-To: <AANLkTinR1-WBGjybS17zyf0PmPdPUDCdBx+nM9YL9qyk@mail.gmail.com>
+References: <20110202220359.GA2808@dandreoli.com>
+	<20110202220530.GB2808@dandreoli.com>
+	<AANLkTinR1-WBGjybS17zyf0PmPdPUDCdBx+nM9YL9qyk@mail.gmail.com>
+Message-ID: <20110209100748.GA6327@vixen>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2011 16:47, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 08, 2011 at 10:06:20PM +0530, Santosh Shilimkar wrote:
->> Have tested this series on OMAP4430 and OMAP3430.
->> Don't know if it helps to push some of these patches to be part
->> of rc cycles. At least the SMP specific fixes should get merged
->> otherwise, builds like omap2plus_defconfig won't be running
->> right configuration on SMP machine.
->
-> It's _too_ _late_ in the rc cycle for a fix of this size. ?As I've said
-> (several times) it was only possible for rc1. ?That boat has been missed
-> as we're now on rc4. ?We could see 2.6.38 in as little as two weeks time.
->
-> ?27 files changed, 183 insertions(+), 197 deletions(-)
->
-> is too big.
->
-> There's still the outstanding question over:
->
-> ?ARM: v6k: use CPU domain feature if we include support for arch < ARMv6K
+On Sun, Feb 06, 2011 at 08:12:00PM +0800, ext Ramax Lo wrote:
+> Hi Domenico,
 
-Could we make the domains usage a run-time feature based on the
-architecture version? For ARMv7, we need to have the vectors page
-read-only anyway if the SWP emulation is enabled (and I posted a
-simple patch in a reply to your email).
+Hi Ramax,
 
-The issue I see is that ARM11MPCore is reported as v7 though we still
-use domains on this processor (we could always remove the domains if
-TLS register is available or use some more precise architecture
-version identification).
+> 2011/2/3 Domenico Andreoli <cavokz@gmail.com>:
+> >
+> > --- /dev/null ? 1970-01-01 00:00:00.000000000 +0000
+> > +++ arm-2.6.git/arch/arm/mach-s3c2440/mach-qq2440.c ? ? 2011-02-02 21:59:39.000000000 +0000
+> > @@ -0,0 +1,358 @@
+> > +/* linux/arch/arm/mach-s3c2440/mach-qq2440.c
+> > + *
+> > + * Copyright (c) 2011 Domenico Andreoli <cavokz@gmail.com>
+> > + * ? ? ?Based on mach-mini2440.c by Ramax Lo <ramaxlo@gmail.com>
+> > + *
+> 
+> The original author that added mini2440 support is Michel Pollet, not me,
+> although his partial work is based on mine.
 
--- 
-Catalin
+ok, addressed in the next patchset. thank you.
+
+Regards,
+Domenico
