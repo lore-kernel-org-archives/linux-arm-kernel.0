@@ -1,65 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Feb 2011 09:48:53 -0800
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <alpine.LFD.2.00.1102091143020.14920@xanadu.home>
-References: <20110208164747.GD6188@n2100.arm.linux.org.uk>
-	<78d0134576ace6be5874871076cf0c10@mail.gmail.com>
-	<alpine.LFD.2.00.1102081537010.14920@xanadu.home>
-	<20110209003537.GQ20795@atomide.com>
-	<54f225541194205f01fe9f03b5110d16@mail.gmail.com>
-	<AANLkTin2zB32YVPZkr48gSOjm0N-WDnZFScysKC8ZTiv@mail.gmail.com>
-	<80a27c86473cf29a9fa5e68aa29eef46@mail.gmail.com>
-	<20110209162421.GU20795@atomide.com>
-	<20110209163204.GB11460@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102091143020.14920@xanadu.home>
-Message-ID: <20110209174853.GV20795@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 9 Feb 2011 11:09:37 -0700
+Subject: [RFC PATCH] ARM: pmu: add OF match support
+In-Reply-To: <3399156206431206254@unknownmsgid>
+References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
+	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
+	<3399156206431206254@unknownmsgid>
+Message-ID: <AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110209 08:44]:
-> On Wed, 9 Feb 2011, Russell King - ARM Linux wrote:
-> 
-> > On Wed, Feb 09, 2011 at 08:24:21AM -0800, Tony Lindgren wrote:
-> > > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110209 01:59]:
-> > > > > From: Dave Martin [mailto:dave.martin at linaro.org]
-> > > > >
-> > > > > You could also have a "v7+" unified kernel -- i.e., supporting
-> > > > > OMAP3+4+SMP.
-> > > > > This is what we currently do in Linaro, since we're focusing on v7
-> > > > > and above.
-> > > > >
-> > > > This sounds good way forward considering future OMAP architectures
-> > > > as well.
-> > > > 
-> > > > But I let Tony comment on this idea.
-> > > 
-> > > AFAIK these issues will be hopefully sorted out by the time the
-> > > next merge window opens. For the -rc cycle, disabling SMP in
-> > > config if ARMv6 is selected should do the trick.
-> > 
-> > That's not soo easy - as we don't know in the Kconfig whether we include
-> > ARMv6 rather than ARMv6K.  It's exactly the same problem I ran into which
-> > inflated the v6v7 patchset.
-> > 
-> > Maybe the best thing to do is:
-> > 
-> > config CPU_32v6K
-> >         bool "Support ARM V6K processor extensions" if !SMP
-> >         depends on CPU_V6 || CPU_V7
-> >         default y if SMP && !(ARCH_MX3 || ARCH_OMAP2)
-> > 
-> > drop the ' && !(ARCH_MX3 || ARCH_OMAP2)' and just let people run into the
-> > resulting undefined instruction traps if they try to run the kernel on
-> > V6 non-K hardware.  Not ideal, but I don't see any other 'simple' solution
-> > to this.
-> 
-> This should be good enough.  We're looking for a temporary stopgate 
-> solution to prevent people from corrupting their data, and the real fix 
-> will be available in the next kernel.
+On Wed, Feb 9, 2011 at 10:17 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Grant, Rob,
+>
+>> On Tue, Feb 8, 2011 at 8:53 PM, Rob Herring <robherring2@gmail.com> wrote:
+>> > From: Rob Herring <rob.herring@calxeda.com>
+>> >
+>> > Add OF match table to enable OF style driver binding. The dts entry is like
+>> > this:
+>> >
+>> > pmu {
+>> > ? ? ? ?compatible = "arm,pmu";
+>> > ? ? ? ?interrupts = <100 101>;
+>> > };
+>> >
+>> > The use of pdev->id as an index breaks with OF device binding. Change to use
+>> > a counter instead. If more than 1 pmu device is ever really supported, a
+>> > better solution to match users with particular pmu is probably needed.
+>> >
+>> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> > ---
+>> > ?arch/arm/kernel/pmu.c | ? 13 ++++++++++---
+>> > ?1 files changed, 10 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+>> > index b8af96e..7084057 100644
+>> > --- a/arch/arm/kernel/pmu.c
+>> > +++ b/arch/arm/kernel/pmu.c
+>> > @@ -24,30 +24,37 @@
+>> > ?static volatile long pmu_lock;
+>> >
+>> > ?static struct platform_device *pmu_devices[ARM_NUM_PMU_DEVICES];
+>> > +static int pmu_device_count;
+>> >
+>> > ?static int __devinit pmu_device_probe(struct platform_device *pdev)
+>> > ?{
+>> >
+>> > - ? ? ? if (pdev->id < 0 || pdev->id >= ARM_NUM_PMU_DEVICES) {
+>> > + ? ? ? if (pmu_device_count >= ARM_NUM_PMU_DEVICES) {
+>> > ? ? ? ? ? ? ? ?pr_warning("received registration request for unknown "
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"device %d\n", pdev->id);
+>> > ? ? ? ? ? ? ? ?return -EINVAL;
+>> > ? ? ? ?}
+>> >
+>> > - ? ? ? if (pmu_devices[pdev->id])
+>> > + ? ? ? if (pmu_devices[pmu_device_count])
+>> > ? ? ? ? ? ? ? ?pr_warning("registering new PMU device type %d overwrites "
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"previous registration!\n", pdev->id);
+>> > ? ? ? ?else
+>> > ? ? ? ? ? ? ? ?pr_info("registered new PMU device of type %d\n",
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pdev->id);
+>> >
+>> > - ? ? ? pmu_devices[pdev->id] = pdev;
+>> > + ? ? ? pmu_devices[pmu_device_count++] = pdev;
+>> > ? ? ? ?return 0;
+>> > ?}
+>> >
+>> > +static struct of_device_id pmu_device_ids[] = {
+>> > + ? ? ? { .compatible = "arm,pmu" },
+>>
+>> This is a pretty generic compatible string and it doesn't account for
+>> the possibility that the implementation behaviour will change with
+>> newer devices. ?Is there any form of versioning on the pmu that would
+>> be appropriate to encode here?
+>
+> Following on from Rob's update, it would be nice if you could specify that
+> the PMU is a CPU PMU (as opposed to L2-cache, bus, gpu etc) in the string.
+> That way adding different PMUs in the future seems more natural and it accounts
+> for your concerns above. Is that ok, or does the compatible string have to
+> match that used by the platform bus?
 
-OK. This patch will be needed anyways for the real fixes. And no temporary
-apply-undo type patching needed. The only drawback is that omap2420 and
-2430 won't boot with omap2plus_defconfig, but that will be only for a
-few weeks.
+It does make sense to encode the specific implementation into the
+compatible string.  A single device driver can bind against multiple
+compatible strings.  ie. the match table could include {.compatible =
+"arm,cortex-a9-pmu"},{.compatible = "arm,cortex-a9-l2cache-pmu"}...
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+> As for versioning, the PMU detection is done dynamically at runtime,
+> so knowing that we're poking a CPU is enough.
+
+Fair enough.  It is still good practice in the compatible list to
+encode the specific PMU implementation (maybe arm,cortex-a9-pmu?)
+instead of trying to define a 'generic' or wildcard compatible value.
+Newer implementations can always claim compatibility with an older
+implementation so that the kernel doesn't have to be modified to find
+the new devices.  "arm,pmu" is probably too generic.
+
+g.
