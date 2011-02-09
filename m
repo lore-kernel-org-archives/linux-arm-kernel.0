@@ -1,28 +1,31 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Wed, 9 Feb 2011 14:23:07 -0700
-Subject: Machine ID question
-Message-ID: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
+From: dima@android.com (Dima Zavin)
+Date: Wed, 9 Feb 2011 13:39:15 -0800
+Subject: [PATCH] ARM: mm: enforce pageblock alignment when freeing memmap
+	entries at init
+In-Reply-To: <20110203133053.GG11958@csn.ul.ie>
+References: <1295567231-2384-1-git-send-email-dima@android.com>
+	<20110126082916.GM18984@csn.ul.ie>
+	<AANLkTimrP4u5VJBVGCK0tXZo6G2S4tXJnJcqc0+oVeeF@mail.gmail.com>
+	<20110203133053.GG11958@csn.ul.ie>
+Message-ID: <AANLkTi=eZizF2Wu-4D8MWM-8qi00S_sm4ke5LM6jaoaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I used the form to create a new machine ID for the new Xilinx platform
-in anticipation of 
-the code making it into the mainline sometime in the future.
+Mel,
 
-The proposed patches are using ARCH_XILINX in the Kconfig.
+> Sorry for the long delay. I'm in the process of changing jobs at the
+> moment and my schedule is heavily disrupted. It's likely to be a mess
+> for at least a month.
 
-Below is the line that it created when I clicked on this link:
-http://www.arm.linux.org.uk/developer/machines/download.php
+I totally understand. Good luck with the new job :)
 
-xilinx			MACH_XILINX		XILINX
-3343
+> No, the description and patch comment is just misleading. Clarify that
+> you are catching the situation where a node boundary is in the middle of a
+> MAX_ORDER_NR_PAGES block of pages and you are preventing memmap belonging
+> to another node being freed and it's fine.
 
-Did I hose it up as the form wasn't completely clear to me (if I needed
-to enter ARCH_XILINX)?
+Will resend with new description.
 
-Thanks,
-John
+Thanks
 
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+--Dima
