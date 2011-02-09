@@ -1,59 +1,33 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 09 Feb 2011 16:41:38 +0300
-Subject: [PATCH 1/2] atmel/macb: fix device name when SOFT/HARD_IRQ enabled
-In-Reply-To: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4D529992.7050502@ru.mvista.com>
+Date: Wed, 09 Feb 2011 16:57:18 +0300
+Subject: [PATCH] ARM: imx/eukrea_mbimx27: fix compile warnings about unused
+	variables
+In-Reply-To: <1297196241-26564-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1297196241-26564-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <4D529D3E.5090405@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 09-02-2011 15:43, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On 08-02-2011 23:17, Uwe Kleine-K?nig wrote:
 
-> From: Paul Chavent<paul.chavent@fnac.net>
-
-> When listing processes on a system with SOFT/HARD_IRQ enabled,
-> the name of the ethernet device is [irq/eth%d] (instead of [irq/eth0] for example).
-
-> This patch call the request_irq function after having initialized the name of the device.
-
-> Signed-off-by: Paul Chavent<paul.chavent@fnac.net>
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> Signed-off-by: Uwe Kleine-K?nig<u.kleine-koenig@pengutronix.de>
 [...]
 
-> diff --git a/drivers/net/macb.c b/drivers/net/macb.c
-> index f69e73e..d642e08 100644
-> --- a/drivers/net/macb.c
-> +++ b/drivers/net/macb.c
+> diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> index 275c858..9ac5348 100644
+> --- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+> +++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
 [...]
-> @@ -1219,13 +1209,23 @@ static int __init macb_probe(struct platform_device *pdev)
->   	err = register_netdev(dev);
->   	if (err) {
->   		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
-> -		goto err_out_free_irq;
-> +		goto err_out_iounmap;
->   	}
+> @@ -268,7 +268,8 @@ static struct ads7846_platform_data ads7846_config __initdata = {
+>   	.keep_vref_on		= 1,
+>   };
 >
-> -	if (macb_mii_init(bp) != 0) {
-> +	dev->irq = platform_get_irq(pdev, 0);
+> -static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
+> +static struct spi_board_info __maybe_unused
+> +eukrea_mbimx27_spi_board_info[] __initdata = {
 
-    platform_get_irq() can fail...
-
-> +	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
-> +			  dev->name, dev);
-> +	if (err) {
-> +		printk(KERN_ERR
-> +		       "%s: Unable to request IRQ %d (error %d)\n",
-> +		       dev->name, dev->irq, err);
->   		goto err_out_unregister_netdev;
->   	}
->
-> +	if (macb_mii_init(bp) != 0) {
-> +		goto err_out_free_irq;
-> +	}
-
-    {} not needed here. I think checkpatch.pl should notice this.
+    I think the second line should be somewhat indented.
 
 WBR, Sergei
