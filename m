@@ -1,68 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 09 Feb 2011 10:55:06 -0600
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <4D529E82.1000102@gmail.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<001b01cbc83e$ec0a59e0$c41f0da0$@deacon@arm.com>
-	<4D529E82.1000102@gmail.com>
-Message-ID: <4D52C6EA.1030600@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 9 Feb 2011 17:00:48 +0000
+Subject: [PATCH] ARM: Correct WFE() in asm/spinlock.h for Thumb-2
+In-Reply-To: <alpine.LFD.2.00.1102091133050.14920@xanadu.home>
+References: <1297178414-20983-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1102091133050.14920@xanadu.home>
+Message-ID: <AANLkTi=U=EhzFT1+VPG-sYsTj8yrnaRNfvA=qsmwgvr9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
-
-On 02/09/2011 08:02 AM, Rob Herring wrote:
-> Will,
+On Wed, Feb 9, 2011 at 4:38 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 8 Feb 2011, Dave Martin wrote:
 >
-> On 02/09/2011 03:51 AM, Will Deacon wrote:
->> Hi Rob,
+>> The content for ALT_SMP() in the definition of WFE() expands to 6
+>> bytes (IT cc ; WFEcc.W), which breaks the assumptions of the fixup
+>> code, leading to lockups when the affected code gets run.
 >>
->>> Add OF match table to enable OF style driver binding. The dts entry
->>> is like
->>> this:
->>>
->>> pmu {
->>> compatible = "arm,pmu";
->>> interrupts =<100 101>;
->>> };
->>>
->>> The use of pdev->id as an index breaks with OF device binding. Change
->>> to use
->>> a counter instead. If more than 1 pmu device is ever really supported, a
->>> better solution to match users with particular pmu is probably needed.
+>> This patch works around the problem by explicitly using an
+>> IT + WFEcc.N pair.
 >>
->> We will want to support multiple PMU devices in the near future but
->> this is currently blocked on userspace issues. One such device would
->> be the event counters on the PL310, which could be used to complement
->> the CPU PMU on the Cortex-A9.
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> ---
+>> ?arch/arm/include/asm/spinlock.h | ? ?7 ++++++-
+>> ?1 files changed, 6 insertions(+), 1 deletions(-)
 >>
->> I don't like the idea of a counter as it forces platforms to register
->> their devices in a specific order. Is it possible to separate different
->> types of PMU in the device tree and then have pmu.c work out what to do
->> with them?
+>> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+>> index da1af52..7cba79c 100644
+>> --- a/arch/arm/include/asm/spinlock.h
+>> +++ b/arch/arm/include/asm/spinlock.h
+>> @@ -18,7 +18,12 @@
+>>
+>> ?#ifdef CONFIG_THUMB2_KERNEL
+>> ?#define SEV ? ? ? ? ?ALT_SMP("sev.w", "nop.w")
+>> -#define WFE(cond) ? ?ALT_SMP("wfe" cond ".w", "nop.w")
+>> +#define WFE(cond) ? ?ALT_SMP( ? ? ? ? ? ? ? ?\
+>> + ? ? "it " cond "\n\t" ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? "wfe" cond ".n", ? ? ? ? ? ? ? ? ? ? ? ?\
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> + ? ? "nop.w" ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> +)
 >
-> Yes, they are easily distinguished by the compatible strings. Adding a
-> pmu_get function which returns the device based on a string or
-> capabilities may be a better solution. If you had 2 pmu's of the same
-> type, the current code would break.
+> In addition to a comment inline for this as others have suggested
+> already, I'd write it differently to save some realestate:
 >
-> In any case, how about this:
->
-> static int __devinit pmu_device_probe(struct platform_device *pdev)
-> {
-> enum arm_pmu_type type = pdev->id;
->
-> if (of_device_is_compatible(pdev->dev.of_node, "arm,pmu"))
-> type = ARM_PMU_DEVICE_CPU;
+> #define WFE(cond) ? ? ? ALT_SMP("it " cond " ; wfe" cond ".n", "nop.w")
 
-Actually, this needs to be:
+Because of the subtlety of this, I wanted it to be presented in as
+clear a way as possible.
 
-#ifdef CONFIG_OF
-	if (of_device_is_compatible(pdev->dev.of_node, "arm,pmu"))
-		type = ARM_PMU_DEVICE_CPU;
-#endif
+Russell, the patch is in your patch system--- if you prefer the
+shortened form, fell free to reject the existing patch and I'll
+repost.
 
-Seems fixing the struct device conditional is just the tip of the 
-iceberg. Should we do empty functions for all driver accessed OF functions?
-
-Rob
+Cheers
+---Dave
