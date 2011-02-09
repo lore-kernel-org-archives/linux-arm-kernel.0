@@ -1,650 +1,273 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 09 Feb 2011 14:28:41 -0500 (EST)
-Subject: [PATCH v2] ARM: ptrace: remove single-step emulation code
-In-Reply-To: <1297248175-11952-1-git-send-email-will.deacon@arm.com>
-References: <1297248175-11952-1-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1102091427200.14920@xanadu.home>
+From: nvishwan@codeaurora.org (Niranjana Vishwanathapura)
+Date: Wed,  9 Feb 2011 11:32:41 -0800
+Subject: [PATCH v2] msm: rmnet: msm rmnet smd virtual network driver
+Message-ID: <1297279961-22386-1-git-send-email-nvishwan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 9 Feb 2011, Will Deacon wrote:
+Virtual network interface for MSM RMNET SMD transport.
+This driver creates network devices which use underlying
+SMD ports as transport.  This driver enables sending and
+receving IP packets to baseband processor in MSM chipsets.
 
-> PTRACE_SINGLESTEP is a ptrace request designed to offer single-stepping
-> support to userspace when the underlying architecture has hardware
-> support for this operation.
-> 
-> On ARM, we set arch_has_single_step() to 1 and attempt to emulate hardware
-> single-stepping by disassembling the current instruction to determine the
-> next pc and placing a software breakpoint on that location.
-> 
-> Unfortunately this has the following problems:
-> 
-> 1.) Only a subset of ARMv7 instructions are supported
-> 2.) Thumb-2 is unsupported
-> 3.) The code is not SMP safe
-> 
-> We could try to fix this code, but it turns out that because of the above
-> issues it is rarely used in practice.  GDB, for example, uses PTRACE_POKETEXT
-> and PTRACE_PEEKTEXT to manage breakpoints itself and does not require any
-> kernel assistance.
-> 
-> This patch removes the single-step emulation code from ptrace meaning that
-> the PTRACE_SINGLESTEP request will return -EIO on ARM. Portable code must
-> check the return value from a ptrace call and handle the failure gracefully.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Cc: Brian Swetland <swetland@google.com>
+Signed-off-by: Niranjana Vishwanathapura <nvishwan@codeaurora.org>
+---
+ drivers/net/Kconfig         |   10 ++
+ drivers/net/Makefile        |    1 +
+ drivers/net/msm_rmnet_smd.c |  213 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 224 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/net/msm_rmnet_smd.c
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+index 0382332..b4f39bb 100644
+--- a/drivers/net/Kconfig
++++ b/drivers/net/Kconfig
+@@ -3422,4 +3422,14 @@ config VMXNET3
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called vmxnet3.
+ 
++config MSM_RMNET_SMD
++	bool "MSM RMNET Virtual Network Device over SMD transport"
++	depends on MSM_SMD
++	default n
++	help
++	  Virtual network interface for MSM RMNET SMD transport.
++	  This driver creates network devices which use underlying
++	  SMD ports as transport.  This driver enables sending and
++	  receving IP packets to baseband processor in MSM chipsets.
++
+ endif # NETDEVICES
+diff --git a/drivers/net/Makefile b/drivers/net/Makefile
+index b90738d..2bb4025 100644
+--- a/drivers/net/Makefile
++++ b/drivers/net/Makefile
+@@ -302,3 +302,4 @@ obj-$(CONFIG_CAIF) += caif/
+ obj-$(CONFIG_OCTEON_MGMT_ETHERNET) += octeon/
+ obj-$(CONFIG_PCH_GBE) += pch_gbe/
+ obj-$(CONFIG_TILE_NET) += tile/
++obj-$(CONFIG_MSM_RMNET_SMD) += msm_rmnet_smd.o
+diff --git a/drivers/net/msm_rmnet_smd.c b/drivers/net/msm_rmnet_smd.c
+new file mode 100644
+index 0000000..03a0d14
+--- /dev/null
++++ b/drivers/net/msm_rmnet_smd.c
+@@ -0,0 +1,213 @@
++/* drivers/net/msm_rmnet_smd.c
++ *
++ * Virtual Ethernet Interface for MSM7K Networking
++ *
++ * Copyright (C) 2007 Google, Inc.
++ * Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ * Author: Brian Swetland <swetland@google.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/string.h>
++#include <linux/delay.h>
++#include <linux/errno.h>
++#include <linux/interrupt.h>
++#include <linux/init.h>
++#include <linux/netdevice.h>
++#include <linux/etherdevice.h>
++#include <linux/skbuff.h>
++
++#include <mach/msm_smd.h>
++
++struct rmnet_private {
++	smd_channel_t *ch;
++	const char *chname;
++};
++
++static int count_this_packet(void *_hdr, int len)
++{
++	struct ethhdr *hdr = _hdr;
++
++	if (len >= ETH_HLEN && hdr->h_proto == htons(ETH_P_ARP))
++		return 0;
++
++	return 1;
++}
++
++/* Called in soft-irq context */
++static void smd_net_data_handler(unsigned long arg)
++{
++	struct net_device *dev = (struct net_device *) arg;
++	struct rmnet_private *p = netdev_priv(dev);
++	struct sk_buff *skb;
++	void *ptr = 0;
++	int sz;
++
++	for (;;) {
++		sz = smd_cur_packet_size(p->ch);
++		if (sz == 0)
++			break;
++		if (smd_read_avail(p->ch) < sz)
++			break;
++
++		if (sz > 1514) {
++			pr_err("rmnet_recv() discarding %d len\n", sz);
++			ptr = 0;
++		} else {
++			skb = dev_alloc_skb(sz + NET_IP_ALIGN);
++			if (skb == NULL) {
++				pr_err("rmnet_recv() cannot allocate skb\n");
++			} else {
++				skb->dev = dev;
++				skb_reserve(skb, NET_IP_ALIGN);
++				ptr = skb_put(skb, sz);
++				if (smd_read(p->ch, ptr, sz) != sz) {
++					pr_err("rmnet_recv() smd read fail\n");
++					ptr = 0;
++					dev_kfree_skb_irq(skb);
++				} else {
++					skb->protocol = eth_type_trans(skb,
++								       dev);
++					if (count_this_packet(ptr, skb->len)) {
++						dev->stats.rx_packets++;
++						dev->stats.rx_bytes += skb->len;
++					}
++					netif_receive_skb(skb);
++				}
++				continue;
++			}
++		}
++		if (smd_read(p->ch, ptr, sz) != sz)
++			pr_err("rmnet_recv() smd lied about avail?!");
++	}
++}
++
++static DECLARE_TASKLET(smd_net_data_tasklet, smd_net_data_handler, 0);
++
++static void smd_net_notify(void *_dev, unsigned event)
++{
++	if (event != SMD_EVENT_DATA)
++		return;
++
++	smd_net_data_tasklet.data = (unsigned long) _dev;
++
++	tasklet_schedule(&smd_net_data_tasklet);
++}
++
++static int rmnet_open(struct net_device *dev)
++{
++	int r;
++	struct rmnet_private *p = netdev_priv(dev);
++
++	pr_info("rmnet_open()\n");
++	if (!p->ch) {
++		r = smd_open(p->chname, &p->ch, dev, smd_net_notify);
++
++		if (r < 0)
++			return -ENODEV;
++	}
++
++	netif_start_queue(dev);
++	return 0;
++}
++
++static int rmnet_stop(struct net_device *dev)
++{
++	pr_info("rmnet_stop()\n");
++	netif_stop_queue(dev);
++	return 0;
++}
++
++static int rmnet_xmit(struct sk_buff *skb, struct net_device *dev)
++{
++	struct rmnet_private *p = netdev_priv(dev);
++	smd_channel_t *ch = p->ch;
++
++	if (smd_write_atomic(ch, skb->data, skb->len) != skb->len) {
++		pr_err("rmnet fifo full, dropping packet\n");
++	} else {
++		if (count_this_packet(skb->data, skb->len)) {
++			dev->stats.tx_packets++;
++			dev->stats.tx_bytes += skb->len;
++		}
++	}
++
++	dev_kfree_skb_irq(skb);
++	return 0;
++}
++
++static void rmnet_set_multicast_list(struct net_device *dev)
++{
++}
++
++static void rmnet_tx_timeout(struct net_device *dev)
++{
++	pr_info("rmnet_tx_timeout()\n");
++}
++
++static struct net_device_ops rmnet_ops = {
++	.ndo_open = rmnet_open,
++	.ndo_stop = rmnet_stop,
++	.ndo_start_xmit = rmnet_xmit,
++	.ndo_set_multicast_list = rmnet_set_multicast_list,
++	.ndo_tx_timeout = rmnet_tx_timeout,
++};
++
++static void __init rmnet_setup(struct net_device *dev)
++{
++	dev->netdev_ops = &rmnet_ops;
++
++	dev->watchdog_timeo = 20;
++
++	ether_setup(dev);
++
++	random_ether_addr(dev->dev_addr);
++}
++
++
++static const char *ch_name[3] = {
++	"SMD_DATA5",
++	"SMD_DATA6",
++	"SMD_DATA7",
++};
++
++static int __init rmnet_init(void)
++{
++	int ret;
++	struct device *d;
++	struct net_device *dev;
++	struct rmnet_private *p;
++	unsigned n;
++
++	for (n = 0; n < 3; n++) {
++		dev = alloc_netdev(sizeof(struct rmnet_private),
++				   "rmnet%d", rmnet_setup);
++
++		if (!dev)
++			return -ENOMEM;
++
++		d = &(dev->dev);
++		p = netdev_priv(dev);
++		p->chname = ch_name[n];
++
++		ret = register_netdev(dev);
++		if (ret) {
++			free_netdev(dev);
++			return ret;
++		}
++	}
++	return 0;
++}
++
++module_init(rmnet_init);
+-- 
+1.5.6.3
 
-> ---
-> 
-> The comments I received about v1 suggest that:
-> 
->  - If emulation is required, it is plausible to do it from userspace
->  - ltrace uses the SINGLESTEP call (conditionally at compile-time since
->    other architectures, such as mips, do not support this request) but
->    does not check the return value from ptrace. This is a bug in ltrace.
->  - strace does not use SINGLESTEP
-> 
-> Further feedback welcome.
-> 
->  arch/arm/include/asm/processor.h |   12 --
->  arch/arm/include/asm/ptrace.h    |    2 -
->  arch/arm/include/asm/traps.h     |    1 +
->  arch/arm/kernel/ptrace.c         |  383 +-------------------------------------
->  arch/arm/kernel/ptrace.h         |   37 ----
->  arch/arm/kernel/signal.c         |    9 -
->  arch/arm/kernel/traps.c          |    2 +-
->  7 files changed, 3 insertions(+), 443 deletions(-)
->  delete mode 100644 arch/arm/kernel/ptrace.h
-> 
-> diff --git a/arch/arm/include/asm/processor.h b/arch/arm/include/asm/processor.h
-> index 67357ba..b439b41 100644
-> --- a/arch/arm/include/asm/processor.h
-> +++ b/arch/arm/include/asm/processor.h
-> @@ -29,19 +29,7 @@
->  #define STACK_TOP_MAX	TASK_SIZE
->  #endif
->  
-> -union debug_insn {
-> -	u32	arm;
-> -	u16	thumb;
-> -};
-> -
-> -struct debug_entry {
-> -	u32			address;
-> -	union debug_insn	insn;
-> -};
-> -
->  struct debug_info {
-> -	int			nsaved;
-> -	struct debug_entry	bp[2];
->  #ifdef CONFIG_HAVE_HW_BREAKPOINT
->  	struct perf_event	*hbp[ARM_MAX_HBP_SLOTS];
->  #endif
-> diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-> index 783d50f..a8ff22b 100644
-> --- a/arch/arm/include/asm/ptrace.h
-> +++ b/arch/arm/include/asm/ptrace.h
-> @@ -130,8 +130,6 @@ struct pt_regs {
->  
->  #ifdef __KERNEL__
->  
-> -#define arch_has_single_step()	(1)
-> -
->  #define user_mode(regs)	\
->  	(((regs)->ARM_cpsr & 0xf) == 0)
->  
-> diff --git a/arch/arm/include/asm/traps.h b/arch/arm/include/asm/traps.h
-> index 1b960d5..f90756d 100644
-> --- a/arch/arm/include/asm/traps.h
-> +++ b/arch/arm/include/asm/traps.h
-> @@ -45,6 +45,7 @@ static inline int in_exception_text(unsigned long ptr)
->  
->  extern void __init early_trap_init(void);
->  extern void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame);
-> +extern void ptrace_break(struct task_struct *tsk, struct pt_regs *regs);
->  
->  extern void *vectors_page;
->  
-> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-> index 19c6816..eace844 100644
-> --- a/arch/arm/kernel/ptrace.c
-> +++ b/arch/arm/kernel/ptrace.c
-> @@ -26,8 +26,6 @@
->  #include <asm/system.h>
->  #include <asm/traps.h>
->  
-> -#include "ptrace.h"
-> -
->  #define REG_PC	15
->  #define REG_PSR	16
->  /*
-> @@ -184,389 +182,12 @@ put_user_reg(struct task_struct *task, int offset, long data)
->  	return ret;
->  }
->  
-> -static inline int
-> -read_u32(struct task_struct *task, unsigned long addr, u32 *res)
-> -{
-> -	int ret;
-> -
-> -	ret = access_process_vm(task, addr, res, sizeof(*res), 0);
-> -
-> -	return ret == sizeof(*res) ? 0 : -EIO;
-> -}
-> -
-> -static inline int
-> -read_instr(struct task_struct *task, unsigned long addr, u32 *res)
-> -{
-> -	int ret;
-> -
-> -	if (addr & 1) {
-> -		u16 val;
-> -		ret = access_process_vm(task, addr & ~1, &val, sizeof(val), 0);
-> -		ret = ret == sizeof(val) ? 0 : -EIO;
-> -		*res = val;
-> -	} else {
-> -		u32 val;
-> -		ret = access_process_vm(task, addr & ~3, &val, sizeof(val), 0);
-> -		ret = ret == sizeof(val) ? 0 : -EIO;
-> -		*res = val;
-> -	}
-> -	return ret;
-> -}
-> -
-> -/*
-> - * Get value of register `rn' (in the instruction)
-> - */
-> -static unsigned long
-> -ptrace_getrn(struct task_struct *child, unsigned long insn)
-> -{
-> -	unsigned int reg = (insn >> 16) & 15;
-> -	unsigned long val;
-> -
-> -	val = get_user_reg(child, reg);
-> -	if (reg == 15)
-> -		val += 8;
-> -
-> -	return val;
-> -}
-> -
-> -/*
-> - * Get value of operand 2 (in an ALU instruction)
-> - */
-> -static unsigned long
-> -ptrace_getaluop2(struct task_struct *child, unsigned long insn)
-> -{
-> -	unsigned long val;
-> -	int shift;
-> -	int type;
-> -
-> -	if (insn & 1 << 25) {
-> -		val = insn & 255;
-> -		shift = (insn >> 8) & 15;
-> -		type = 3;
-> -	} else {
-> -		val = get_user_reg (child, insn & 15);
-> -
-> -		if (insn & (1 << 4))
-> -			shift = (int)get_user_reg (child, (insn >> 8) & 15);
-> -		else
-> -			shift = (insn >> 7) & 31;
-> -
-> -		type = (insn >> 5) & 3;
-> -	}
-> -
-> -	switch (type) {
-> -	case 0:	val <<= shift;	break;
-> -	case 1:	val >>= shift;	break;
-> -	case 2:
-> -		val = (((signed long)val) >> shift);
-> -		break;
-> -	case 3:
-> - 		val = (val >> shift) | (val << (32 - shift));
-> -		break;
-> -	}
-> -	return val;
-> -}
-> -
-> -/*
-> - * Get value of operand 2 (in a LDR instruction)
-> - */
-> -static unsigned long
-> -ptrace_getldrop2(struct task_struct *child, unsigned long insn)
-> -{
-> -	unsigned long val;
-> -	int shift;
-> -	int type;
-> -
-> -	val = get_user_reg(child, insn & 15);
-> -	shift = (insn >> 7) & 31;
-> -	type = (insn >> 5) & 3;
-> -
-> -	switch (type) {
-> -	case 0:	val <<= shift;	break;
-> -	case 1:	val >>= shift;	break;
-> -	case 2:
-> -		val = (((signed long)val) >> shift);
-> -		break;
-> -	case 3:
-> - 		val = (val >> shift) | (val << (32 - shift));
-> -		break;
-> -	}
-> -	return val;
-> -}
-> -
-> -#define OP_MASK	0x01e00000
-> -#define OP_AND	0x00000000
-> -#define OP_EOR	0x00200000
-> -#define OP_SUB	0x00400000
-> -#define OP_RSB	0x00600000
-> -#define OP_ADD	0x00800000
-> -#define OP_ADC	0x00a00000
-> -#define OP_SBC	0x00c00000
-> -#define OP_RSC	0x00e00000
-> -#define OP_ORR	0x01800000
-> -#define OP_MOV	0x01a00000
-> -#define OP_BIC	0x01c00000
-> -#define OP_MVN	0x01e00000
-> -
-> -static unsigned long
-> -get_branch_address(struct task_struct *child, unsigned long pc, unsigned long insn)
-> -{
-> -	u32 alt = 0;
-> -
-> -	switch (insn & 0x0e000000) {
-> -	case 0x00000000:
-> -	case 0x02000000: {
-> -		/*
-> -		 * data processing
-> -		 */
-> -		long aluop1, aluop2, ccbit;
-> -
-> -	        if ((insn & 0x0fffffd0) == 0x012fff10) {
-> -		        /*
-> -			 * bx or blx
-> -			 */
-> -			alt = get_user_reg(child, insn & 15);
-> -			break;
-> -		}
-> -
-> -
-> -		if ((insn & 0xf000) != 0xf000)
-> -			break;
-> -
-> -		aluop1 = ptrace_getrn(child, insn);
-> -		aluop2 = ptrace_getaluop2(child, insn);
-> -		ccbit  = get_user_reg(child, REG_PSR) & PSR_C_BIT ? 1 : 0;
-> -
-> -		switch (insn & OP_MASK) {
-> -		case OP_AND: alt = aluop1 & aluop2;		break;
-> -		case OP_EOR: alt = aluop1 ^ aluop2;		break;
-> -		case OP_SUB: alt = aluop1 - aluop2;		break;
-> -		case OP_RSB: alt = aluop2 - aluop1;		break;
-> -		case OP_ADD: alt = aluop1 + aluop2;		break;
-> -		case OP_ADC: alt = aluop1 + aluop2 + ccbit;	break;
-> -		case OP_SBC: alt = aluop1 - aluop2 + ccbit;	break;
-> -		case OP_RSC: alt = aluop2 - aluop1 + ccbit;	break;
-> -		case OP_ORR: alt = aluop1 | aluop2;		break;
-> -		case OP_MOV: alt = aluop2;			break;
-> -		case OP_BIC: alt = aluop1 & ~aluop2;		break;
-> -		case OP_MVN: alt = ~aluop2;			break;
-> -		}
-> -		break;
-> -	}
-> -
-> -	case 0x04000000:
-> -	case 0x06000000:
-> -		/*
-> -		 * ldr
-> -		 */
-> -		if ((insn & 0x0010f000) == 0x0010f000) {
-> -			unsigned long base;
-> -
-> -			base = ptrace_getrn(child, insn);
-> -			if (insn & 1 << 24) {
-> -				long aluop2;
-> -
-> -				if (insn & 0x02000000)
-> -					aluop2 = ptrace_getldrop2(child, insn);
-> -				else
-> -					aluop2 = insn & 0xfff;
-> -
-> -				if (insn & 1 << 23)
-> -					base += aluop2;
-> -				else
-> -					base -= aluop2;
-> -			}
-> -			read_u32(child, base, &alt);
-> -		}
-> -		break;
-> -
-> -	case 0x08000000:
-> -		/*
-> -		 * ldm
-> -		 */
-> -		if ((insn & 0x00108000) == 0x00108000) {
-> -			unsigned long base;
-> -			unsigned int nr_regs;
-> -
-> -			if (insn & (1 << 23)) {
-> -				nr_regs = hweight16(insn & 65535) << 2;
-> -
-> -				if (!(insn & (1 << 24)))
-> -					nr_regs -= 4;
-> -			} else {
-> -				if (insn & (1 << 24))
-> -					nr_regs = -4;
-> -				else
-> -					nr_regs = 0;
-> -			}
-> -
-> -			base = ptrace_getrn(child, insn);
-> -
-> -			read_u32(child, base + nr_regs, &alt);
-> -			break;
-> -		}
-> -		break;
-> -
-> -	case 0x0a000000: {
-> -		/*
-> -		 * bl or b
-> -		 */
-> -		signed long displ;
-> -		/* It's a branch/branch link: instead of trying to
-> -		 * figure out whether the branch will be taken or not,
-> -		 * we'll put a breakpoint at both locations.  This is
-> -		 * simpler, more reliable, and probably not a whole lot
-> -		 * slower than the alternative approach of emulating the
-> -		 * branch.
-> -		 */
-> -		displ = (insn & 0x00ffffff) << 8;
-> -		displ = (displ >> 6) + 8;
-> -		if (displ != 0 && displ != 4)
-> -			alt = pc + displ;
-> -	    }
-> -	    break;
-> -	}
-> -
-> -	return alt;
-> -}
-> -
-> -static int
-> -swap_insn(struct task_struct *task, unsigned long addr,
-> -	  void *old_insn, void *new_insn, int size)
-> -{
-> -	int ret;
-> -
-> -	ret = access_process_vm(task, addr, old_insn, size, 0);
-> -	if (ret == size)
-> -		ret = access_process_vm(task, addr, new_insn, size, 1);
-> -	return ret;
-> -}
-> -
-> -static void
-> -add_breakpoint(struct task_struct *task, struct debug_info *dbg, unsigned long addr)
-> -{
-> -	int nr = dbg->nsaved;
-> -
-> -	if (nr < 2) {
-> -		u32 new_insn = BREAKINST_ARM;
-> -		int res;
-> -
-> -		res = swap_insn(task, addr, &dbg->bp[nr].insn, &new_insn, 4);
-> -
-> -		if (res == 4) {
-> -			dbg->bp[nr].address = addr;
-> -			dbg->nsaved += 1;
-> -		}
-> -	} else
-> -		printk(KERN_ERR "ptrace: too many breakpoints\n");
-> -}
-> -
-> -/*
-> - * Clear one breakpoint in the user program.  We copy what the hardware
-> - * does and use bit 0 of the address to indicate whether this is a Thumb
-> - * breakpoint or an ARM breakpoint.
-> - */
-> -static void clear_breakpoint(struct task_struct *task, struct debug_entry *bp)
-> -{
-> -	unsigned long addr = bp->address;
-> -	union debug_insn old_insn;
-> -	int ret;
-> -
-> -	if (addr & 1) {
-> -		ret = swap_insn(task, addr & ~1, &old_insn.thumb,
-> -				&bp->insn.thumb, 2);
-> -
-> -		if (ret != 2 || old_insn.thumb != BREAKINST_THUMB)
-> -			printk(KERN_ERR "%s:%d: corrupted Thumb breakpoint at "
-> -				"0x%08lx (0x%04x)\n", task->comm,
-> -				task_pid_nr(task), addr, old_insn.thumb);
-> -	} else {
-> -		ret = swap_insn(task, addr & ~3, &old_insn.arm,
-> -				&bp->insn.arm, 4);
-> -
-> -		if (ret != 4 || old_insn.arm != BREAKINST_ARM)
-> -			printk(KERN_ERR "%s:%d: corrupted ARM breakpoint at "
-> -				"0x%08lx (0x%08x)\n", task->comm,
-> -				task_pid_nr(task), addr, old_insn.arm);
-> -	}
-> -}
-> -
-> -void ptrace_set_bpt(struct task_struct *child)
-> -{
-> -	struct pt_regs *regs;
-> -	unsigned long pc;
-> -	u32 insn;
-> -	int res;
-> -
-> -	regs = task_pt_regs(child);
-> -	pc = instruction_pointer(regs);
-> -
-> -	if (thumb_mode(regs)) {
-> -		printk(KERN_WARNING "ptrace: can't handle thumb mode\n");
-> -		return;
-> -	}
-> -
-> -	res = read_instr(child, pc, &insn);
-> -	if (!res) {
-> -		struct debug_info *dbg = &child->thread.debug;
-> -		unsigned long alt;
-> -
-> -		dbg->nsaved = 0;
-> -
-> -		alt = get_branch_address(child, pc, insn);
-> -		if (alt)
-> -			add_breakpoint(child, dbg, alt);
-> -
-> -		/*
-> -		 * Note that we ignore the result of setting the above
-> -		 * breakpoint since it may fail.  When it does, this is
-> -		 * not so much an error, but a forewarning that we may
-> -		 * be receiving a prefetch abort shortly.
-> -		 *
-> -		 * If we don't set this breakpoint here, then we can
-> -		 * lose control of the thread during single stepping.
-> -		 */
-> -		if (!alt || predicate(insn) != PREDICATE_ALWAYS)
-> -			add_breakpoint(child, dbg, pc + 4);
-> -	}
-> -}
-> -
-> -/*
-> - * Ensure no single-step breakpoint is pending.  Returns non-zero
-> - * value if child was being single-stepped.
-> - */
-> -void ptrace_cancel_bpt(struct task_struct *child)
-> -{
-> -	int i, nsaved = child->thread.debug.nsaved;
-> -
-> -	child->thread.debug.nsaved = 0;
-> -
-> -	if (nsaved > 2) {
-> -		printk("ptrace_cancel_bpt: bogus nsaved: %d!\n", nsaved);
-> -		nsaved = 2;
-> -	}
-> -
-> -	for (i = 0; i < nsaved; i++)
-> -		clear_breakpoint(child, &child->thread.debug.bp[i]);
-> -}
-> -
-> -void user_disable_single_step(struct task_struct *task)
-> -{
-> -	task->ptrace &= ~PT_SINGLESTEP;
-> -	ptrace_cancel_bpt(task);
-> -}
-> -
-> -void user_enable_single_step(struct task_struct *task)
-> -{
-> -	task->ptrace |= PT_SINGLESTEP;
-> -}
-> -
->  /*
->   * Called by kernel/ptrace.c when detaching..
->   */
->  void ptrace_disable(struct task_struct *child)
->  {
-> -	user_disable_single_step(child);
-> +	/* Nothing to do. */
->  }
->  
->  /*
-> @@ -576,8 +197,6 @@ void ptrace_break(struct task_struct *tsk, struct pt_regs *regs)
->  {
->  	siginfo_t info;
->  
-> -	ptrace_cancel_bpt(tsk);
-> -
->  	info.si_signo = SIGTRAP;
->  	info.si_errno = 0;
->  	info.si_code  = TRAP_BRKPT;
-> diff --git a/arch/arm/kernel/ptrace.h b/arch/arm/kernel/ptrace.h
-> deleted file mode 100644
-> index 3926605..0000000
-> --- a/arch/arm/kernel/ptrace.h
-> +++ /dev/null
-> @@ -1,37 +0,0 @@
-> -/*
-> - *  linux/arch/arm/kernel/ptrace.h
-> - *
-> - *  Copyright (C) 2000-2003 Russell King
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -#include <linux/ptrace.h>
-> -
-> -extern void ptrace_cancel_bpt(struct task_struct *);
-> -extern void ptrace_set_bpt(struct task_struct *);
-> -extern void ptrace_break(struct task_struct *, struct pt_regs *);
-> -
-> -/*
-> - * Send SIGTRAP if we're single-stepping
-> - */
-> -static inline void single_step_trap(struct task_struct *task)
-> -{
-> -	if (task->ptrace & PT_SINGLESTEP) {
-> -		ptrace_cancel_bpt(task);
-> -		send_sig(SIGTRAP, task, 1);
-> -	}
-> -}
-> -
-> -static inline void single_step_clear(struct task_struct *task)
-> -{
-> -	if (task->ptrace & PT_SINGLESTEP)
-> -		ptrace_cancel_bpt(task);
-> -}
-> -
-> -static inline void single_step_set(struct task_struct *task)
-> -{
-> -	if (task->ptrace & PT_SINGLESTEP)
-> -		ptrace_set_bpt(task);
-> -}
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 907d5a6..7709668 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -20,7 +20,6 @@
->  #include <asm/unistd.h>
->  #include <asm/vfp.h>
->  
-> -#include "ptrace.h"
->  #include "signal.h"
->  
->  #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-> @@ -348,8 +347,6 @@ asmlinkage int sys_sigreturn(struct pt_regs *regs)
->  	if (restore_sigframe(regs, frame))
->  		goto badframe;
->  
-> -	single_step_trap(current);
-> -
->  	return regs->ARM_r0;
->  
->  badframe:
-> @@ -383,8 +380,6 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
->  	if (do_sigaltstack(&frame->sig.uc.uc_stack, NULL, regs->ARM_sp) == -EFAULT)
->  		goto badframe;
->  
-> -	single_step_trap(current);
-> -
->  	return regs->ARM_r0;
->  
->  badframe:
-> @@ -704,8 +699,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
->  	if (try_to_freeze())
->  		goto no_signal;
->  
-> -	single_step_clear(current);
-> -
->  	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
->  	if (signr > 0) {
->  		sigset_t *oldset;
-> @@ -724,7 +717,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
->  			if (test_thread_flag(TIF_RESTORE_SIGMASK))
->  				clear_thread_flag(TIF_RESTORE_SIGMASK);
->  		}
-> -		single_step_set(current);
->  		return;
->  	}
->  
-> @@ -770,7 +762,6 @@ static void do_signal(struct pt_regs *regs, int syscall)
->  			sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
->  		}
->  	}
-> -	single_step_set(current);
->  }
->  
->  asmlinkage void
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index ee57640..439e107 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -23,6 +23,7 @@
->  #include <linux/kexec.h>
->  #include <linux/delay.h>
->  #include <linux/init.h>
-> +#include <linux/sched.h>
->  
->  #include <asm/atomic.h>
->  #include <asm/cacheflush.h>
-> @@ -32,7 +33,6 @@
->  #include <asm/unwind.h>
->  #include <asm/tls.h>
->  
-> -#include "ptrace.h"
->  #include "signal.h"
->  
->  static const char *handler[]= { "prefetch abort", "data abort", "address exception", "interrupt" };
-> -- 
-> 1.7.0.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
