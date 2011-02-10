@@ -1,51 +1,55 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Feb 2011 21:55:07 +0100
-Subject: [PATCH] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD
-	declaration
-In-Reply-To: <4D53EE2C.2030209@free.fr>
-References: <1297245241-9864-1-git-send-email-julien.boibessot@free.fr>
-	<20110210131051.GU9041@pengutronix.de> <4D53EE2C.2030209@free.fr>
-Message-ID: <20110210205507.GC2027@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 10 Feb 2011 13:12:52 -0800
+Subject: [PATCH v5 0/5] omap: mailbox: hwmod support
+In-Reply-To: <AANLkTimah86Mj37rCMYnuprUfeP1XwmxcNBD9S=8g6_N@mail.gmail.com>
+	(Sourav Poddar's message of "Thu, 10 Feb 2011 11:04:41 +0530")
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+	<AANLkTimah86Mj37rCMYnuprUfeP1XwmxcNBD9S=8g6_N@mail.gmail.com>
+Message-ID: <8739nvioff.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 10, 2011 at 02:54:52PM +0100, Julien Boibessot wrote:
-> Hi Sascha,
-> 
-> Sascha Hauer a ?crit :
-> > The patch is probably fine. Can you provide a better commit log,
-> > something like 'fixes uart3 on $myboard'?
-> >   
-> yes, I will try :-)
-> > >From looking at the datasheet it is not clear to me how the current pin
-> > configuration bahaves. It looks like a uart tx loopback in the iomuxer.
-> > Is this correct?
-> >   
-> Well I just reverted the setting back to what it was on 2.6.36, before
-> the recent MX51 iomux reorganisation.
-> IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT register (0x09ec) shouldn't
-> be used to configure UART2_TXD PAD, otherwise you overwrite current
-> UART2_RXD PAD config.
-> Current pin configuration seems to act as a kind of Tx->Rx loopback, yes.
+"Poddar, Sourav" <sourav.poddar@ti.com> writes:
 
-Ok, would be good to have this in the commit log aswell.
+> On Thu, Feb 3, 2011 at 12:57 AM, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
+>> Mailbox hwmod support for OMAP 2,3,4.
+>>
+>> This was tested on OMAP3 (3430, 3630), minor testing
+>> was made on OMAP4.
+>>
+>> No testing on OMAP2 since I don't have the hardware.
+>>
+>> Highlights from v5 include the comments received from
+>> previous version v4[1].
+>>
+>> Benoit Cousson (1):
+>> ?OMAP4: hwmod data: add mailbox data
+>>
+>> Felipe Contreras (2):
+>> ?OMAP3: hwmod data: add mailbox data
+>> ?OMAP: mailbox: build device using omap_device/omap_hwmod
+>>
+>> Omar Ramirez Luna (1):
+>> ?OMAP: mailbox: use runtime pm for clk and sysc handling
+>>
+>> omar ramirez (1):
+>> ?OMAP2: hwmod data: add mailbox data
+>>
+>> ?arch/arm/mach-omap2/devices.c ? ? ? ? ? ? ?| ? 98 +++++-----------------------
+>> ?arch/arm/mach-omap2/mailbox.c ? ? ? ? ? ? ?| ? 67 ++-----------------
+>> ?arch/arm/mach-omap2/omap_hwmod_2420_data.c | ? 74 +++++++++++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ? 73 +++++++++++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? 72 ++++++++++++++++++++
+>> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? 67 +++++++++++++++++++
+>> ?6 files changed, 308 insertions(+), 143 deletions(-)
+>
+> Boot tested mainline v2.6.38-rc4 along with this 5 patch series on
+> Omap 2420,2430 SDPs.
+>
+> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
 
-Sascha
+Boot testing is a start, but I'm pretty sure that bootup does not use
+the mailbox on any of these platforms.  This needs to be tested with
+something that actually uses the mailbox.
 
-> 
-> Without my patch, my board (not mainlined yet) can't receive anything on
-> UART2 (used as console).
-> 
-> Julien
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Kevin
