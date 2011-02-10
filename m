@@ -1,78 +1,56 @@
-From: B20596@freescale.com (Li Frank-B20596)
-Date: Thu, 10 Feb 2011 10:37:51 +0000
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <201102101052.10958.jbe@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102100951.10977.jbe@pengutronix.de>
-	<09EC74FE2C9E8444BF2FF67BD36E1D691678C9@039-SN1MPN1-003.039d.mgd.msft.net>
-	<201102101052.10958.jbe@pengutronix.de>
-Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D69167988@039-SN1MPN1-003.039d.mgd.msft.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 10 Feb 2011 11:44:01 +0100 (CET)
+Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
+In-Reply-To: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <Pine.LNX.4.64.1102101136320.15087@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This kind of macro encryption _may_ help when you are coding the driver
-> the
-> first time. But after reading and reading it again (while testing and
-> debugging) all these prefixes and suffixes do not add any valuable
-> information. They only fill up your lines, enlarges your source code and
-> make
-> you blind for the real bug...
-> 
-> Everyone who wants to see how source code looks that uses these longs
-> macros I
-> can recommend reading the so called 'bootlets' source code. :-))
+On Thu, 10 Feb 2011, Alexander Stein wrote:
 
-The complex of bootlets is not long macro, but the work around to make sure
-Chip PMU work safely. If there are not such macro, power_prep will become
-more difficult to understand.
+> h_end_width and v_end_width should only contain the front porches.
+> Otherwise, SCREEN_WIDTH (pixel clocks between HSYNC) in SDC_HOR_CONF
+> and SCREEN_HEIGHT (rows between VSYNC) in SDC_VER_CONF get false values.
+
+Hm, no, this corrupts image on my pcm990 test-board. What makes you think 
+this patch is needed? How do you see, that current values are "false?"
+
+Thanks
+Guennadi
 
 > 
-> > Developer needn't look up register header file when coding, just
+> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+> ---
+>  drivers/video/mx3fb.c |    7 +++----
+>  1 files changed, 3 insertions(+), 4 deletions(-)
 > 
-> That's why I add these macros into the source file instead into a header
-> file.
+> diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+> index ef71e56..9040833 100644
+> --- a/drivers/video/mx3fb.c
+> +++ b/drivers/video/mx3fb.c
+> @@ -881,12 +881,11 @@ static int __set_par(struct fb_info *fbi, bool lock)
+>  				   IPU_PIX_FMT_BGR666 : IPU_PIX_FMT_RGB666,
+>  				   fbi->var.left_margin,
+>  				   fbi->var.hsync_len,
+> -				   fbi->var.right_margin +
+> -				   fbi->var.hsync_len,
+> +				   fbi->var.right_margin,
+>  				   fbi->var.upper_margin,
+>  				   fbi->var.vsync_len,
+> -				   fbi->var.lower_margin +
+> -				   fbi->var.vsync_len, sig_cfg) != 0) {
+> +				   fbi->var.lower_margin,
+> +				   sig_cfg) != 0) {
+>  			dev_err(fbi->device,
+>  				"mx3fb: Error initializing panel.\n");
+>  			return -EINVAL;
+> -- 
+> 1.7.3.4
 > 
-> > write down Register name or bit name according to mx23/mx28 spec.
 > 
-> And sometimes the spec is incomplete or just wrong and so on. Independent
-> of
-> any macro naming policy.
 
-Not at all. Mx23/mx28 can keep spec, header file and RTL consistent just
-because using one source and multiple output. During Freescale mx28 BSP
-develop, never happen bit and register definition error.  
- 
-> 
-> > If you still think it is too long, I suggest keep HW_ and BM_ prefix to
-> > distinguish Which one is register name, which one is bit mask.
-> 
-> The used macro in the address part of the writel() must be an offset,
-> while
-> the macro used in the value part must be a bit definition. Anything else
-> is
-> redundant.
-
-If name is too short, there are possible to cause name pollution. 
-BM_, BP_, BF_ have their implication.
-
-VDCTRL4_SET_DOTCLK_DLY(x), according to our macro policy, it should be
-BF_VDCTRL4_SET_DOTCLK_DLY(x). 
-
-Generally, you need 
-Reg = readl(offset+VDCTRL4);
-Reg &=~ ((0x7)<<29);
-Reg |= VDCTRL4_SET_DOTCLK_DLY(value)
-Writel(reg, offset+VDCTRL4)
-
-Compared with our macro policy.
-
-Reg = readl(offset+HW_VDCTRL4);
-Reg &=~ BM_VDCTRL4_SET_DOTCLK_DLY;
-Reg |= BF_VDCTRL4_SET_DOTCLK_DLY(value)
-Writel(reg, offset+HW_VDCTRL4)
-
-
-> 
-> Regards,
-> Juergen
-> 
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
