@@ -1,83 +1,120 @@
 From: ccross@android.com (Colin Cross)
-Date: Wed,  9 Feb 2011 22:43:21 -0800
-Subject: [PATCH v4 12/15] ARM: tegra: Allow overriding arch_reset
+Date: Wed,  9 Feb 2011 22:43:10 -0800
+Subject: [PATCH v4 01/15] ARM: tegra: Centralize macros to define debug uart
+	base
 In-Reply-To: <1297320204-31882-1-git-send-email-ccross@android.com>
 References: <1297320204-31882-1-git-send-email-ccross@android.com>
-Message-ID: <1297320204-31882-13-git-send-email-ccross@android.com>
+Message-ID: <1297320204-31882-2-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/board.h               |    2 ++
- arch/arm/mach-tegra/common.c              |   13 +++++++++++++
- arch/arm/mach-tegra/include/mach/system.h |   10 ++--------
- 3 files changed, 17 insertions(+), 8 deletions(-)
+ arch/arm/mach-tegra/include/mach/debug-macro.S |   25 ++++-------------------
+ arch/arm/mach-tegra/include/mach/iomap.h       |   14 +++++++++++++
+ arch/arm/mach-tegra/include/mach/uncompress.h  |   18 +---------------
+ 3 files changed, 21 insertions(+), 36 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board.h b/arch/arm/mach-tegra/board.h
-index 0de565c..b3f9c94 100644
---- a/arch/arm/mach-tegra/board.h
-+++ b/arch/arm/mach-tegra/board.h
-@@ -23,6 +23,8 @@
+diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
+index a0e7c12..e0ebe65 100644
+--- a/arch/arm/mach-tegra/include/mach/debug-macro.S
++++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
+@@ -19,30 +19,15 @@
+  */
  
- #include <linux/types.h>
+ #include <mach/io.h>
++#include <mach/iomap.h>
  
-+void tegra_assert_system_reset(char mode, const char *cmd);
+ 	.macro  addruart, rp, rv
+         ldr     \rp, =IO_APB_PHYS       @ physical
+         ldr     \rv, =IO_APB_VIRT        @ virtual
+-#if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
+-#error "A debug UART must be selected in the kernel config to use DEBUG_LL"
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
+-        orr     \rp, \rp, #0x6000
+-        orr     \rv, \rv, #0x6000
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+-        orr     \rp, \rp, #0x6000
+-	orr	\rp, \rp, #0x40
+-        orr     \rv, \rv, #0x6000
+-	orr	\rv, \rv, #0x40
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+-        orr     \rp, \rp, #0x6200
+-        orr     \rv, \rv, #0x6200
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+-        orr     \rp, \rp, #0x6300
+-        orr     \rv, \rv, #0x6300
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+-        orr     \rp, \rp, #0x6400
+-        orr     \rv, \rv, #0x6400
+-#endif
++	orr	\rp, \rp, #(TEGRA_DEBUG_UART_BASE & 0xFF)
++	orr	\rp, \rp, #(TEGRA_DEBUG_UART_BASE & 0xFF00)
++	orr	\rv, \rv, #(TEGRA_DEBUG_UART_BASE & 0xFF)
++	orr	\rv, \rv, #(TEGRA_DEBUG_UART_BASE & 0xFF00)
+ 	.endm
+ 
+ #define UART_SHIFT	2
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index 44a4f4b..325eca3 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -221,4 +221,18 @@
+ #define TEGRA_SDMMC4_BASE		0xC8000600
+ #define TEGRA_SDMMC4_SIZE		SZ_512
+ 
++#if defined(CONFIG_TEGRA_DEBUG_UART_NONE)
++# define TEGRA_DEBUG_UART_BASE 0
++#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTA_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTB_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTC_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTD_BASE
++#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
++# define TEGRA_DEBUG_UART_BASE TEGRA_UARTE_BASE
++#endif
 +
- void __init tegra_common_init(void);
- void __init tegra_map_common_io(void);
- void __init tegra_init_irq(void);
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 7c91e2b..84a7197 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -26,11 +26,24 @@
- 
- #include <mach/iomap.h>
- #include <mach/dma.h>
-+#include <mach/system.h>
- 
- #include "board.h"
- #include "clock.h"
- #include "fuse.h"
- 
-+void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
-+
-+void tegra_assert_system_reset(char mode, const char *cmd)
-+{
-+	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
-+	u32 reg;
-+
-+	reg = readl(reset);
-+	reg |= 0x04;
-+	writel(reg, reset);
-+}
-+
- static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
- 	/* name		parent		rate		enabled */
- 	{ "clk_m",	NULL,		0,		true },
-diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
-index 84d5d46..d0183d8 100644
---- a/arch/arm/mach-tegra/include/mach/system.h
-+++ b/arch/arm/mach-tegra/include/mach/system.h
-@@ -24,16 +24,10 @@
- #include <mach/hardware.h>
- #include <mach/iomap.h>
- 
--static inline void arch_idle(void)
--{
--}
-+extern void (*arch_reset)(char mode, const char *cmd);
- 
--static inline void arch_reset(char mode, const char *cmd)
-+static inline void arch_idle(void)
- {
--	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
--	u32 reg = readl(reset);
--	reg |= 0x04;
--	writel(reg, reset);
- }
- 
  #endif
+diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
+index 6c4dd81..4e83237 100644
+--- a/arch/arm/mach-tegra/include/mach/uncompress.h
++++ b/arch/arm/mach-tegra/include/mach/uncompress.h
+@@ -26,23 +26,9 @@
+ 
+ #include <mach/iomap.h>
+ 
+-#if defined(CONFIG_TEGRA_DEBUG_UARTA)
+-#define DEBUG_UART_BASE TEGRA_UARTA_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+-#define DEBUG_UART_BASE TEGRA_UARTB_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+-#define DEBUG_UART_BASE TEGRA_UARTC_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+-#define DEBUG_UART_BASE TEGRA_UARTD_BASE
+-#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+-#define DEBUG_UART_BASE TEGRA_UARTE_BASE
+-#else
+-#define DEBUG_UART_BASE NULL
+-#endif
+-
+ static void putc(int c)
+ {
+-	volatile u8 *uart = (volatile u8 *)DEBUG_UART_BASE;
++	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 	int shift = 2;
+ 
+ 	if (uart == NULL)
+@@ -59,7 +45,7 @@ static inline void flush(void)
+ 
+ static inline void arch_decomp_setup(void)
+ {
+-	volatile u8 *uart = (volatile u8 *)DEBUG_UART_BASE;
++	volatile u8 *uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
+ 	int shift = 2;
+ 
+ 	if (uart == NULL)
 -- 
 1.7.3.1
