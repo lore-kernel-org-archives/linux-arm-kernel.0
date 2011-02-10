@@ -1,61 +1,59 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 10 Feb 2011 18:03:19 +0800
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <4D52F73A.4010707@bluewatersys.com>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<4D52F73A.4010707@bluewatersys.com>
-Message-ID: <20110210100319.GB24710@b20223-02.ap.freescale.net>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 10 Feb 2011 11:07:27 +0100
+Subject: [PATCH] ARM: imx/eukrea_mbimx27: fix compile warnings about unused
+	variables
+In-Reply-To: <4D52F566.1070009@ru.mvista.com>
+References: <4D52F566.1070009@ru.mvista.com>
+Message-ID: <1297332447-23532-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 10, 2011 at 09:21:14AM +1300, Ryan Mallon wrote:
-> On 02/09/2011 07:41 PM, Jeremy Kerr wrote:
-> 
-> Hi Jeremy,
-> 
-> Couple more comments below.
-> 
-> ~Ryan
-> 
-[...]
-> > +int clk_enable(struct clk *clk)
-> > +{
-> > +     unsigned long flags;
-> > +     int ret = 0;
-> > +
-> > +     spin_lock_irqsave(&clk->enable_lock, flags);
-> 
->         WARN_ON(clk->prepare_count == 0); ?
-> 
-> > +     if (clk->enable_count == 0 && clk->ops->enable)
-> > +             ret = clk->ops->enable(clk);
-> 
-> Does it make sense to have a clock with no enable function which still
-> returns success from clk_enable? Do we have any platforms which have
-> NULL clk_enable functions?
-> 
-> I think that for enable/disable at least we should require platforms to
-> provide functions and oops if they have failed to do so. In the rare
-> case that a platform doesn't need to do anything for enable/disable they
-> can just supply empty functions.
-It's possible to be NULL. So are set_rate/get_rate.
-Ideally, if it's NULL: 
-prepare/unprepare: only call parent's prepare/unprepare
-enable/disable: only call parent's enable/disable
-set_rate: fail
-get_rate: reture parent's get_rate
-set_parent: fail
-get_parent: fail
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-Thanks
-Richard
+On Wed, Feb 09, 2011 at 11:13:26PM +0300, Sergei Shtylyov wrote:
+> >>>-static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
+> >>>+static struct spi_board_info __maybe_unused
+> >>>+eukrea_mbimx27_spi_board_info[] __initdata = {
+>
+> >>   I think the second line should be somewhat indented.
 > 
-> > +
-> > +     if (!ret)
-> > +             clk->enable_count++;
-> > +     spin_unlock_irqrestore(&clk->enable_lock, flags);
-> > +
-> > +     return ret;
-> > +}
-> > +EXPORT_SYMBOL_GPL(clk_enable);
-> > +
+> >I like it as it is.  There are no rules for that, no?
+> 
+>    Documentation/CodingStyle, chapter 2.
+hmm, this is how vim indents and checkpatch doesn't diagnose a style problem.
+Though I prefer it unindented, too, I don't care enough.  So here's a patch
+with the 2nd line having 2 tabs.  Up to Sascha which to include ...
+
+Best regards and thanks,
+Uwe
+
+ arch/arm/mach-imx/eukrea_mbimx27-baseboard.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+index 275c858..d12815d 100644
+--- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
++++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
+@@ -249,7 +249,7 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 
+ #define ADS7846_PENDOWN (GPIO_PORTD | 25)
+ 
+-static void ads7846_dev_init(void)
++static void __maybe_unused ads7846_dev_init(void)
+ {
+ 	if (gpio_request(ADS7846_PENDOWN, "ADS7846 pendown") < 0) {
+ 		printk(KERN_ERR "can't get ads746 pen down GPIO\n");
+@@ -268,7 +268,8 @@ static struct ads7846_platform_data ads7846_config __initdata = {
+ 	.keep_vref_on		= 1,
+ };
+ 
+-static struct spi_board_info eukrea_mbimx27_spi_board_info[] __initdata = {
++static struct spi_board_info __maybe_unused
++		eukrea_mbimx27_spi_board_info[] __initdata = {
+ 	[0] = {
+ 		.modalias	= "ads7846",
+ 		.bus_num	= 0,
+-- 
+1.7.2.3
