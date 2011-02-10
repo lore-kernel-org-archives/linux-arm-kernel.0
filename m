@@ -1,23 +1,46 @@
-From: B20596@freescale.com (Li Frank-B20596)
-Date: Thu, 10 Feb 2011 03:23:00 +0000
-Subject: [PATCH 2/2] ARM i.MX23/28: Add framebuffer device support
-In-Reply-To: <1297257651-8002-3-git-send-email-s.hauer@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D6916778B@039-SN1MPN1-003.039d.mgd.msft.net>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 09 Feb 2011 20:26:44 -0800
+Subject: [RFC, PATCH 3/3] clk: add warnings for incorrect enable/prepare
+	semantics
+In-Reply-To: <alpine.LFD.2.00.1102070908120.14920@xanadu.home>
+References: <201102011711.31258.jeremy.kerr@canonical.com>	<1297058877.800990.238556019385.3.gpush@pororo>	<20110207080555.GC27982@pengutronix.de>	<201102071608.42855.jeremy.kerr@canonical.com>
+	<alpine.LFD.2.00.1102070908120.14920@xanadu.home>
+Message-ID: <4D536904.5080708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-
-> mx23.c
-> index ca72a05..bfc7f27 100644
-> --- a/arch/arm/mach-mxs/clock-mx23.c
-> +++ b/arch/arm/mach-mxs/clock-mx23.c
-> @@ -446,7 +446,7 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
->  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
->  	_REGISTER_CLOCK(NULL, "audio", audio_clk)
-> -	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
-> +	_REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
->  };
-Why remove mx23 pwm clk here?
+On 02/07/2011 06:24 AM, Nicolas Pitre wrote:
+> On Mon, 7 Feb 2011, Jeremy Kerr wrote:
+>
+>> Hi Uwe,
+>>
+>>> This implies the warning is only issued on clocks that have a prepare
+>>> callback.  If we want to enforce the new API the warning here shouldn't
+>>> depend on clk->ops->prepare.  (clk_prepare and clk_unprepare need to
+>>> be changed then to adapt the prepare_count even in the absence of
+>>> clk->ops->prepare.)
+>>
+>> Yeah, it's a decision about either adding a small cost to all clk_prepare()s
+>> (ie, adding cost when there is no prepare callback), or checking for the
+>> correct prepare/enable semantics for all clocks (even when it doesn't matter
+>> for that particular clock). I chose the first as more important, but happy to
+>> go either way here.
+>
+> The prepare method being called from non-atomic context cannot be
+> considered to be in a speed critical path.  Most of the time, this is
+> going to be called on driver initialization or the like, and that's a
+> relatively rare event. Therefore this really small cost to clk_prepare()
+> is definitively worth it to help proper usage of the API.  If this ever
+> becomes a problem then this could be confined to some CONFIG_CLK_DEBUG
+> or the like.  But when introducing a new API it is best to be more
+> strict to help people get its usage right (without going overboard with
+> it of course).
+>
+
+Agree with Nicholas and Uwe. +1 for this request.
+
+-Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
