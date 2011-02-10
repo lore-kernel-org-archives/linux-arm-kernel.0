@@ -1,56 +1,289 @@
 From: ccross@android.com (Colin Cross)
-Date: Thu, 10 Feb 2011 13:31:24 -0800
-Subject: [RFC PATCH 0/3] CPU PM notifiers
-Message-ID: <1297373487-23902-1-git-send-email-ccross@android.com>
+Date: Thu, 10 Feb 2011 13:31:25 -0800
+Subject: [RFC PATCH 1/3] ARM: Add cpu power management notifiers
+In-Reply-To: <1297373487-23902-1-git-send-email-ccross@android.com>
+References: <1297373487-23902-1-git-send-email-ccross@android.com>
+Message-ID: <1297373487-23902-2-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set tries to address Russell's concerns with platform
-pm code calling into the driver for every block in the Cortex A9s
-during idle, hotplug, and suspend.  The first patch adds cpu pm
-notifiers that can be called by platform code, the second uses
-the notifier to save and restore the GIC state, and the third
-saves the VFP state.
+During some CPU power modes entered during idle, hotplug and
+suspend, peripherals located in the CPU power domain, such as
+the GIC, localtimers, and VFP, may be powered down.  Add a
+notifier chain that allows drivers for those peripherals to
+be notified before and after they may be reset.
 
-The notifiers are used for two types of events, CPU PM events and
-CPU complex PM events.  CPU PM events are used to save per-cpu
-context when a single CPU is preparing to enter or has just exited
-a low power state.  For example, the VFP saves the last thread
-context, and the GIC saves banked CPU registers.
-
-CPU complex events are used after all the CPUs in a power domain
-have been prepared for the low power state.  The GIC uses these
-events to save global register state.
-
-What is not included:
-   * Multiple power states - it is assumed that if the platform
-     code calls cpu_pm_enter(), every listener needs to save
-     its context.
-   * L2 cache - The L2 cache will need very different behavior
-     depending on the HW implementation and power mode being
-     entered.
-
-Both problems could be solved be defining a set of power states
-shared by all platforms, if an agreeable set exists.  For example:
-   * CPU reset (TWD, GIC, VFP), L1 retention, L2 untouched
-   * CPU reset + L1 lost, L2 retention
-   * CPU reset, L1 + L2 lost
-
-Santosh previously mentioned that the GIC is not reset in the first
-two states on OMAP, which starts to make the list complicated.  Does
-disabling the GIC cause a problem in these states?
-
-An alternate solution is to pass a set of flags instead of a power state:
-CPU_PM_LOCALTIMERS_RESET
-CPU_PM_INTERRUPTS_RESET
-CPU_PM_L1_RETENTION
-CPU_PM_L1_RESET
-CPU_PM_L2_RETENTION
-CPU_PM_L2_RESET
-
- arch/arm/common/gic.c         |  204 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/cpu_pm.h |  123 +++++++++++++++++++++++++
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/include/asm/cpu_pm.h |  123 +++++++++++++++++++++++++++++++++++++++++
  arch/arm/kernel/Makefile      |    1 +
- arch/arm/kernel/cpu_pm.c      |  116 +++++++++++++++++++++++
- arch/arm/vfp/vfpmodule.c      |   24 +++++
- 5 files changed, 468 insertions(+), 0 deletions(-)
+ arch/arm/kernel/cpu_pm.c      |  116 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 240 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/cpu_pm.h
+ create mode 100644 arch/arm/kernel/cpu_pm.c
+
+diff --git a/arch/arm/include/asm/cpu_pm.h b/arch/arm/include/asm/cpu_pm.h
+new file mode 100644
+index 0000000..07b1b6e
+--- /dev/null
++++ b/arch/arm/include/asm/cpu_pm.h
+@@ -0,0 +1,123 @@
++/*
++ * Copyright (C) 2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef _ASMARM_CPU_PM_H
++#define _ASMARM_CPU_PM_H
++
++#include <linux/kernel.h>
++#include <linux/notifier.h>
++
++/*
++ * When a CPU goes to a low power state that turns off power to the CPU's
++ * power domain, the contents of some blocks (floating point coprocessors,
++ * interrutp controllers, caches, timers) in the same power domain can
++ * be lost.  The cpm_pm notifiers provide a method for platform idle, suspend,
++ * and hotplug implementations to notify the drivers for these blocks that
++ * they may be reset.
++ *
++ * All cpu_pm notifications must be called with interrupts disabled.
++ *
++ * The notifications are split into two classes, CPU notifications and CPU
++ * complex notifications.
++ *
++ * CPU notifications apply to a single CPU, and must be called on the affected
++ * CPU.  They are used to save per-cpu context for affected blocks.
++ *
++ * CPU complex notifications apply to all CPUs in a single power domain. They
++ * are used to save any global context for affected blocks, and must be called
++ * after all the CPUs in the power domain have been notified of the low power
++ * state.
++ *
++ */
++
++/*
++ * Event codes passed as unsigned long val to notifier calls
++ */
++enum cpu_pm_event {
++	/* A single cpu is entering a low power state */
++	CPU_PM_ENTER,
++
++	/* A single cpu failed to enter a low power state */
++	CPU_PM_ENTER_FAILED,
++
++	/* A single cpu is exiting a low power state */
++	CPU_PM_EXIT,
++
++	/* A cpu power domain is entering a low power state */
++	CPU_COMPLEX_PM_ENTER,
++
++	/* A cpu power domain failed to enter a low power state */
++	CPU_COMPLEX_PM_ENTER_FAILED,
++
++	/* A cpu power domain is exiting a low power state */
++	CPU_COMPLEX_PM_EXIT,
++};
++
++int cpu_pm_register_notifier(struct notifier_block *nb);
++int cpu_pm_unregister_notifier(struct notifier_block *nb);
++
++/*
++ * cpm_pm_enter
++ *
++ * Notifies listeners that a single cpu is entering a low power state that may
++ * cause some blocks in the same power domain as the cpu to reset.
++ *
++ * Must be called on the affected cpu with interrupts disabled.  Platform is
++ * responsible for ensuring that cpu_pm_enter is not called twice on the same
++ * cpu before cpu_pm_exit is called.
++ */
++int cpu_pm_enter(void);
++
++/*
++ * cpm_pm_exit
++ *
++ * Notifies listeners that a single cpu is exiting a low power state that may
++ * have caused some blocks in the same power domain as the cpu to reset.
++ *
++ * Must be called on the affected cpu with interrupts disabled.
++ */
++int cpu_pm_exit(void);
++
++/*
++ * cpm_complex_pm_enter
++ *
++ * Notifies listeners that all cpus in a power domain are entering a low power
++ * state that may cause some blocks in the same power domain to reset.
++ *
++ * Must be called after cpu_pm_enter has been called on all cpus in the power
++ * domain, and before cpu_pm_exit has been called on any cpu in the power
++ * domain.
++ *
++ * Must be called with interrupts disabled.
++ */
++int cpu_complex_pm_enter(void);
++
++/*
++ * cpm_pm_enter
++ *
++ * Notifies listeners that a single cpu is entering a low power state that may
++ * cause some blocks in the same power domain as the cpu to reset.
++ *
++ * Must be called after cpu_pm_enter has been called on all cpus in the power
++ * domain, and before cpu_pm_exit has been called on any cpu in the power
++ * domain.
++ *
++ * Must be called with interrupts disabled.
++ */
++int cpu_complex_pm_exit(void);
++
++#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 185ee82..b0f25cb 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -58,6 +58,7 @@ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
++obj-$(CONFIG_CPU_IDLE)		+= cpu_pm.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+diff --git a/arch/arm/kernel/cpu_pm.c b/arch/arm/kernel/cpu_pm.c
+new file mode 100644
+index 0000000..9a04ba1
+--- /dev/null
++++ b/arch/arm/kernel/cpu_pm.c
+@@ -0,0 +1,116 @@
++/*
++ * Copyright (C) 2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/kernel.h>
++#include <linux/notifier.h>
++#include <linux/smp.h>
++
++#include <asm/cpu_pm.h>
++
++static DEFINE_SPINLOCK(idle_notifier_lock);
++static RAW_NOTIFIER_HEAD(idle_notifier_chain);
++
++int cpu_pm_register_notifier(struct notifier_block *nb)
++{
++	unsigned long flags;
++	int ret;
++
++	spin_lock_irqsave(&idle_notifier_lock, flags);
++	ret = raw_notifier_chain_register(&idle_notifier_chain, nb);
++	spin_unlock_irqrestore(&idle_notifier_lock, flags);
++
++	return ret;
++}
++
++int cpu_pm_unregister_notifier(struct notifier_block *nb)
++{
++	unsigned long flags;
++	int ret;
++
++	spin_lock_irqsave(&idle_notifier_lock, flags);
++	ret = raw_notifier_chain_unregister(&idle_notifier_chain, nb);
++	spin_unlock_irqrestore(&idle_notifier_lock, flags);
++
++	return ret;
++}
++
++static int __idle_notify(enum cpu_pm_event event, int nr_to_call,
++	int *nr_calls)
++{
++	int ret;
++
++	ret = __raw_notifier_call_chain(&idle_notifier_chain, event, NULL,
++		nr_to_call, nr_calls);
++
++	return notifier_to_errno(ret);
++}
++
++int cpu_pm_enter(void)
++{
++	int nr_calls;
++	int ret;
++
++	spin_lock(&idle_notifier_lock);
++	ret = __idle_notify(CPU_PM_ENTER, -1, &nr_calls);
++	if (ret) {
++		__idle_notify(CPU_PM_ENTER_FAILED, nr_calls - 1, NULL);
++		spin_unlock(&idle_notifier_lock);
++		return ret;
++	}
++	spin_unlock(&idle_notifier_lock);
++
++	return 0;
++}
++
++int cpu_pm_exit(void)
++{
++	int ret;
++
++	spin_lock(&idle_notifier_lock);
++	ret = __idle_notify(CPU_PM_EXIT, -1, NULL);
++	spin_unlock(&idle_notifier_lock);
++
++	return ret;
++}
++
++int cpu_complex_pm_enter(void)
++{
++	int nr_calls;
++	int ret;
++
++	spin_lock(&idle_notifier_lock);
++	ret = __idle_notify(CPU_COMPLEX_PM_ENTER, -1, &nr_calls);
++	if (ret) {
++		__idle_notify(CPU_COMPLEX_PM_ENTER_FAILED, nr_calls - 1, NULL);
++		spin_unlock(&idle_notifier_lock);
++		return ret;
++	}
++	spin_unlock(&idle_notifier_lock);
++
++	return 0;
++}
++
++int cpu_complex_pm_exit(void)
++{
++	int ret;
++
++	spin_lock(&idle_notifier_lock);
++	ret = __idle_notify(CPU_COMPLEX_PM_EXIT, -1, NULL);
++	spin_unlock(&idle_notifier_lock);
++
++	return ret;
++}
+-- 
+1.7.3.1
