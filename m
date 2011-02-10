@@ -1,79 +1,33 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 9 Feb 2011 19:13:54 -0600
-Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
-In-Reply-To: <AANLkTi=h8oyJGcBAXercT9OeKae9PiDhu_ta+7EAC++J@mail.gmail.com>
-References: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
-	<AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
-	<AANLkTi=h8oyJGcBAXercT9OeKae9PiDhu_ta+7EAC++J@mail.gmail.com>
-Message-ID: <AANLkTinGQZUncqbb2nkpi+9g5ZNUst-_J_v32eiE-hRW@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 10 Feb 2011 10:21:12 +0800
+Subject: ARM: mmp: add Trizeps6 board support
+In-Reply-To: <42563.88.65.119.194.1297298342.squirrel@88.65.119.194>
+References: <42563.88.65.119.194.1297298342.squirrel@88.65.119.194>
+Message-ID: <AANLkTi=AMOifp3nQqohk5fW0JTWPp7VNRgutp0h7bBxH@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 9, 2011 at 1:07 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> On Wed, Feb 9, 2011 at 8:08 AM, Gadiyar, Anand <gadiyar@ti.com> wrote:
->> On Wed, Feb 9, 2011 at 7:25 PM, Raghuveer Murthy
->> <raghuveer.murthy@ti.com> wrote:
->>> Adding DVI support to OMAP4 PandaBoard.
->>>
->>> PandaBoard uses TFP410 DVI Framer chip
->>> http://focus.ti.com/lit/ds/symlink/tfp410.pdf
->>>
->>> The TFP410 gets its power enable and display data over GPIO lines muxed
->>> in from OMAP4430. PandaBoard supports other LCD displays through expansion
->>> connectors, following board rework. This will disable the DVI interface.
->>> However, the existing mux settings remain the same
->>>
->>> PandaBoard additionally supports display over HDMI interface. It is
->>> mutually exclusive to display over DVI. Hence the mux settings need to be
->>> configured seperately, as and when HDMI is enabled
->>>
->>> Also, I2C3 bus used for reading EDID data from DVI Monitors is
->>> registered here. Since the design is similar to BeagleBoard, the code
->>> for the same is taken from the kernel.org commit e3333f48dd5cb21
->>> (omap: Adding beagle i2c eeprom driver to read EDID)
->>>
->>> Reviewed-by: Manjunath G Kondaiah <manjugk@ti.com>
->>> Reviewed-by: Anand Gadiyar <gadiyar@ti.com>
->>
->> I've also tested it on the Panda, and gone through this and most
->> of the other patches in the series. So if you like, you could
->> consider this an:
->>
->> Acked-by: Anand Gadiyar <gadiyar@ti.com>
->>
->>> Reviewed-by: Nishanth Menon <nm@ti.com>
->>> Reviewed-by: Sumit Semwal <sumit.semwal@ti.com>
->>> Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
->>> ---
->>>
->>> Base
->>> ====
->>> url =
->>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
->>> branch "master"
->>> commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d
->>> tag 2.6.38-rc4
->>>
->>
->> To make it easier for someone to test, I've extracted this
->> and the 6 dependent series from patchwork, and hosted
->> them in a branch on my devel tree. They are available
->> against v2.6.38-rc4 here:
->>
->> git://dev.omapzoom.org/pub/scm/anand/linux-omap-usb.git
->>
->> in the display-patches-for-v2.6.38-rc4 branch if someone
->> wants to take a look.
+On Thu, Feb 10, 2011 at 8:39 AM, Yupeng Schneider
+<yupeng.schneider@ipms.fraunhofer.de> wrote:
+> Hello Eric,
 >
-> These work great on my Panda A1, (mainline 2.6.38-rc4 base) haven't
-> seen any regressions on my Beagle C4 with the same patchset/image..
+> i have made a BSP for the Trizeps6 Modul based on pxa168 Processor. Here
+> is just a part of it, which now could be published, the other part could
+> not because of NDA. Now i have a question:
+>
+> The Trizeps6 uses the same baseboard (ConXS) as the Trizeps4. Where would
+> u to place the file conxs.c to make it accessible for mach-pxa und
+> mach-mmp?
+>
 
-for the panda patches:
+I would recommend arch/arm/plat-pxa/ or arch/arm/common/ at this moment.
 
-Tested-by: Robert Nelson <robertcnelson@gmail.com>
-
-
-
--- 
-Robert Nelson
-http://www.rcn-ee.com/
+> yours,
+> Y.
+>
+>
+>
+>
+>
+>
+>
