@@ -1,36 +1,87 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Thu, 10 Feb 2011 18:09:36 +0100
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <201102091731.07794.arnd@arndb.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091547.12131.arnd@arndb.de>
-	<20110209153716.GN9041@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-Message-ID: <20110210170936.GI22009@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Feb 2011 18:17:41 +0100
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110211003533.GA9151@S2100-06.ap.freescale.net>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<201102042126.52701.arnd@arndb.de>
+	<20110211003533.GA9151@S2100-06.ap.freescale.net>
+Message-ID: <201102101817.42099.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 05:31:07PM +0100, Arnd Bergmann wrote:
-> Ok. This sounds like a lot of upfront work indeed, to make KMS more
-> generic, though I think a number of driver would benefit from it
-> eventually. It could be something for the Linaro graphics working
-> group to look at in the following 11.11 release, depending on how
-> many other people are interested in getting there.
+On Friday 11 February 2011, Shawn Guo wrote:
+> 
+> > > +	struct resource			*res;
+> > > +	struct resource			*dma_res;
+> > > +	struct clk			*clk;
+> > 
+> > are visible in the parent.
+> > 
+> It seems this is a generally used approach, seen in mxcmmc and pxamci.
 
-There is already a blueprint at linaro:
-https://blueprints.launchpad.net/linaro-graphics-wg/+spec/multimedia-linaro-dri-1105
+Just because someone else is doing it, it doesn't have to be a good
+idea ;-)
 
-We have recently tested the state of Qt acceleration on the MX51, in
-order to find out which is the best way to make use of the
-possibilities. However, at least at the moment this requires highly
-experimental Qt sceenegraph git branches, and even then it results in
-lower perfomance than with software rendering ...
+But you're right, it seems to be done this way almost everywhere.
+Unless Chris has a more definite opinion here, I don't mind if
+you follow the same pattern.
 
-But for the long term, the linaro blueprint looks like the way to go.
+If someone decides that it's really a bad idea, we should change
+all drivers at once.
 
-rsc
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> > > +	struct mxs_dma_data		dma_data;
+> > 
+> > Why do you need host specific DMA structures? Please stick to
+> > the generic dma-engine API if possible.
+> > 
+> I'm sticking to the generic dmaengine api.  The mxs dma hardware
+> has separate irq line for every single dma channel, which needs to
+> be told by client driver.
+
+I'm not convinced, it still sounds like a layering violation to
+have specific information about the DMA controller in the
+platform data of a driver using the dma engine API.
+
+Why can't you put the interrupt number into the platform data of
+the dma engine device? Your filter function already identifies
+the number of the DMA channel.
+
+> > > +static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
+> > > +{
+> > > +	struct mxs_mmc_host *host = dev_id;
+> > > +	u32 stat;
+> > > +
+> > > +	stat = __raw_readl(host->base + HW_SSP_CTRL1);
+> > > +	__mxs_clrl(stat & MXS_MMC_IRQ_BITS, host->base + HW_SSP_CTRL1);
+> > > +
+> > > +	if (host->cmd && (stat & MXS_MMC_ERR_BITS))
+> > > +		host->status = __raw_readl(host->base + HW_SSP_STATUS);
+> > > +
+> > > +	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
+> > > +		mmc_signal_sdio_irq(host->mmc);
+> > > +
+> > > +	return IRQ_HANDLED;
+> > > +}
+> > 
+> > You use spin_lock_irqsave in mxs_mmc_enable_sdio_irq, but don't
+> > actually use the spinlock in the interrupt handler. This means
+> > that either your interrupt handler is broken because it doesn't
+> > lock, or that you don't actually need the _irqsave part.
+> > 
+> I do not understand this one.  I'm seeing mxcmmc and pxamci use
+> spin_lock_irqsave/irqrestore in the similar way.
+
+The difference is that e.g. mxcmci_irq() takes the spinlock that is
+used to protect the host->use_sdio flag, serializing the the
+code that initializes sdio with the code that uses it.
+
+[Actually, mxcmci_irq() also looks wrong, because it releases the
+spinlock before calling mmc_signal_sdio_irq(), so sdio may be
+disabled by then, but that is a slightly different bug]
+
+What I meant is that you take care to avoid getting into the
+interrupt handler while holding the spinlock, but in the handler,
+you don't check if the lock is held. It can't be correct to
+serialize just half the cases.
+
+	Arnd
