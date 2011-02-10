@@ -1,43 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 10 Feb 2011 12:51:09 +0100
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <20110210104725.GC2206@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-	<09EC74FE2C9E8444BF2FF67BD36E1D69167919@039-SN1MPN1-003.039d.mgd.msft.net>
-	<201102101046.33994.jbe@pengutronix.de>
-	<20110210104725.GC2206@pengutronix.de>
-Message-ID: <20110210115109.GR9041@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Feb 2011 11:59:09 -0000
+Subject: [PATCH v2] ARM: ptrace: remove single-step emulation code
+In-Reply-To: <alpine.LFD.2.00.1102091427200.14920@xanadu.home>
+References: <1297248175-11952-1-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1102091427200.14920@xanadu.home>
+Message-ID: <002c01cbc919$ed44b720$c7ce2560$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 10, 2011 at 11:47:25AM +0100, Wolfram Sang wrote:
-> > But I would prefer:
-> > #define SET 4
-> > #define CLEAR 8
-> > [...]
-> > writel(CTRL_DOTCLK_MODE, host->base + CTRL + SET)
-
-For this we already have __mxs_setl.
-
+> > PTRACE_SINGLESTEP is a ptrace request designed to offer single-stepping
+> > support to userspace when the underlying architecture has hardware
+> > support for this operation.
+> >
+> > On ARM, we set arch_has_single_step() to 1 and attempt to emulate hardware
+> > single-stepping by disassembling the current instruction to determine the
+> > next pc and placing a software breakpoint on that location.
+> >
+> > Unfortunately this has the following problems:
+> >
+> > 1.) Only a subset of ARMv7 instructions are supported
+> > 2.) Thumb-2 is unsupported
+> > 3.) The code is not SMP safe
+> >
+> > We could try to fix this code, but it turns out that because of the above
+> > issues it is rarely used in practice.  GDB, for example, uses PTRACE_POKETEXT
+> > and PTRACE_PEEKTEXT to manage breakpoints itself and does not require any
+> > kernel assistance.
+> >
+> > This patch removes the single-step emulation code from ptrace meaning that
+> > the PTRACE_SINGLESTEP request will return -EIO on ARM. Portable code must
+> > check the return value from a ptrace call and handle the failure gracefully.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> NACK.
-> 
-> This will indeed not be caught by the compiler.
-> 
-> And while I like the shorter macros better as well, an MXSFB_ prefix
-> should be added IMO. Macros like CTRL and TIMING are not too well
-> protected.
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-+1 for a prefix, be it MXSFB_ or LCDIF_, will change this.
+Thanks Nicolas. I'll leave this over the weekend to see if it
+attracts further comment before putting it into the patch system.
 
-Otherwise can we please stop about arguing about register defines? It's
-too much a matter of taste and there is no perfect way to solve this.
+Cheers,
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Will
