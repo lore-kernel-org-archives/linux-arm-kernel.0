@@ -1,60 +1,68 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 10 Feb 2011 16:58:18 +0300
-Subject: [PATCH 1/2] atmel/macb: fix device name when SOFT/HARD_IRQ enabled
-In-Reply-To: <20110209144411.GB11255@game.jcrosoft.org>
-References: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
-	<4D529992.7050502@ru.mvista.com>
-	<20110209144411.GB11255@game.jcrosoft.org>
-Message-ID: <4D53EEFA.3030801@ru.mvista.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 10 Feb 2011 14:11:34 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have SMP_ON_UP
+	fixups
+In-Reply-To: <20110210125624.GA3652@n2100.arm.linux.org.uk>
+References: <E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
+	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
+	<20110125165919.GD17286@n2100.arm.linux.org.uk>
+	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+	<20110125174636.GE17286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
+	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
+	<20110126124452.GB4232@n2100.arm.linux.org.uk>
+	<20110126172535.GA15983@arm.com>
+	<20110209142211.GA11460@n2100.arm.linux.org.uk>
+	<20110210125624.GA3652@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Feb 10, 2011 at 12:56 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Feb 09, 2011 at 02:22:11PM +0000, Russell King - ARM Linux wrote:
+>> On Wed, Jan 26, 2011 at 05:25:35PM +0000, Dave P. Martin wrote:
+>> > SMP_ON_UP fixups lead to vmlinux link errors if those sections are
+>> > discarded at link-time. ?In particular this may happen for built-in
+>> > __exit stuff.
+>> >
+>> > This patch modifies the vmlinux linker script to reduce the amount
+>> > of discarded sections, and tries to make sure that __exit sections
+>> > are kept in.
+>> >
+>> > This is a hack and probably wrong! ?Further discussion is needed.
+>>
+>> Can you send the configuration which you see this problem with?
+>> I've tried to build a kernel which inlines the spinlocks, but I find
+>> that's not possible, so I'm doubting whether any fix is required for
+>> mainline.
+>
+> Any news on this, or can it not be reproduced?
+>
 
-On 09-02-2011 17:44, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Hi, apologies-- didn't see my mail for a bit.
 
->>> From: Paul Chavent<paul.chavent@fnac.net>
+I get the problem with this tree and config (which builds with
+SMP_ON_UP and THUMB2_KERNEL for omap3/4):
 
->>> When listing processes on a system with SOFT/HARD_IRQ enabled,
->>> the name of the ethernet device is [irq/eth%d] (instead of [irq/eth0] for example).
+Tree: git://git.linaro.org/people/dmart/linux-2.6-arm.git
+dirty/arm/omap-thumb2+merged
+Config: http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config
 
->>> This patch call the request_irq function after having initialized the name of the device.
+I haven't identified the precise combination of options which causes
+the problem, and I don't really understand what the clean solution
+would be -- it's on my list of stuff to look at, but not at the top.
 
->>> Signed-off-by: Paul Chavent<paul.chavent@fnac.net>
->>> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
->> [...]
+Other people not enabling THUMB2_KERNEL have also had the problem
+(though I guess that shouldn't make a difference anyway).
 
->>> diff --git a/drivers/net/macb.c b/drivers/net/macb.c
->>> index f69e73e..d642e08 100644
->>> --- a/drivers/net/macb.c
->>> +++ b/drivers/net/macb.c
->> [...]
->>> @@ -1219,13 +1209,23 @@ static int __init macb_probe(struct platform_device *pdev)
->>>   	err = register_netdev(dev);
->>>   	if (err) {
->>>   		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
->>> -		goto err_out_free_irq;
->>> +		goto err_out_iounmap;
->>>   	}
->>>
->>> -	if (macb_mii_init(bp) != 0) {
->>> +	dev->irq = platform_get_irq(pdev, 0);
+I suggested a patch on the binutils mailing list to add a way for
+putting fixups in separate, sensibly-named sections which would allow
+for a proper fix to this class of problem, but I haven't had any
+significant feedback on that ... anyway, that would not be available
+on most people's toolchains for a while even if it got accepted --
+see:
+http://cygwin.com/ml/binutils/2011-02/msg00004.html
 
->>     platform_get_irq() can fail...
-
-> request_irq will fail too so do we really need to check it?
-
-    You then will get the following printed:
-
-macb: Unable to request IRQ -6 (error -22)
-
-    If this is acceptable, then platfrom_get_irq()'s result can be ignored indeed.
-
->>> +	err = request_irq(dev->irq, macb_interrupt, IRQF_SAMPLE_RANDOM,
->>> +			  dev->name, dev);
-
-> Best Regards,
-> J.
-
-WBR, Sergei
+Cheers
+---Dave
