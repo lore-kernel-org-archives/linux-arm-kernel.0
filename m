@@ -1,55 +1,78 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 10 Feb 2011 23:10:52 +1300
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <20110210100319.GB24710@b20223-02.ap.freescale.net>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<4D52F73A.4010707@bluewatersys.com>
-	<20110210100319.GB24710@b20223-02.ap.freescale.net>
-Message-ID: <4D53B9AC.8020609@bluewatersys.com>
+From: B20596@freescale.com (Li Frank-B20596)
+Date: Thu, 10 Feb 2011 10:37:51 +0000
+Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
+In-Reply-To: <201102101052.10958.jbe@pengutronix.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102100951.10977.jbe@pengutronix.de>
+	<09EC74FE2C9E8444BF2FF67BD36E1D691678C9@039-SN1MPN1-003.039d.mgd.msft.net>
+	<201102101052.10958.jbe@pengutronix.de>
+Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D69167988@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/11 23:03, Richard Zhao wrote:
-> On Thu, Feb 10, 2011 at 09:21:14AM +1300, Ryan Mallon wrote:
->> On 02/09/2011 07:41 PM, Jeremy Kerr wrote:
->>
->> Hi Jeremy,
->>
->> Couple more comments below.
->>
->> ~Ryan
->>
-> [...]
->>> +int clk_enable(struct clk *clk)
->>> +{
->>> +     unsigned long flags;
->>> +     int ret = 0;
->>> +
->>> +     spin_lock_irqsave(&clk->enable_lock, flags);
->>          WARN_ON(clk->prepare_count == 0); ?
->>
->>> +     if (clk->enable_count == 0&&  clk->ops->enable)
->>> +             ret = clk->ops->enable(clk);
->> Does it make sense to have a clock with no enable function which still
->> returns success from clk_enable? Do we have any platforms which have
->> NULL clk_enable functions?
->>
->> I think that for enable/disable at least we should require platforms to
->> provide functions and oops if they have failed to do so. In the rare
->> case that a platform doesn't need to do anything for enable/disable they
->> can just supply empty functions.
-> It's possible to be NULL. So are set_rate/get_rate.
-> Ideally, if it's NULL:
-> prepare/unprepare: only call parent's prepare/unprepare
-> enable/disable: only call parent's enable/disable
+> This kind of macro encryption _may_ help when you are coding the driver
+> the
+> first time. But after reading and reading it again (while testing and
+> debugging) all these prefixes and suffixes do not add any valuable
+> information. They only fill up your lines, enlarges your source code and
+> make
+> you blind for the real bug...
+> 
+> Everyone who wants to see how source code looks that uses these longs
+> macros I
+> can recommend reading the so called 'bootlets' source code. :-))
 
-No, the whole point of the generic framework is that _all_ clock users 
-must call prepare/enable and disable/unprepare. Drivers, etc should not 
-rely on underlying knowledge of a platform. This is why, for instance, 
-clk_enable will warn if prepare count is zero.
+The complex of bootlets is not long macro, but the work around to make sure
+Chip PMU work safely. If there are not such macro, power_prep will become
+more difficult to understand.
 
-However, I can see that a clock may be fully enabled by its prepare 
-function and so the enable function is a no-op. User must still call 
-both prepare and enable though. Perhaps this is what you meant?
+> 
+> > Developer needn't look up register header file when coding, just
+> 
+> That's why I add these macros into the source file instead into a header
+> file.
+> 
+> > write down Register name or bit name according to mx23/mx28 spec.
+> 
+> And sometimes the spec is incomplete or just wrong and so on. Independent
+> of
+> any macro naming policy.
 
-~Ryan
+Not at all. Mx23/mx28 can keep spec, header file and RTL consistent just
+because using one source and multiple output. During Freescale mx28 BSP
+develop, never happen bit and register definition error.  
+ 
+> 
+> > If you still think it is too long, I suggest keep HW_ and BM_ prefix to
+> > distinguish Which one is register name, which one is bit mask.
+> 
+> The used macro in the address part of the writel() must be an offset,
+> while
+> the macro used in the value part must be a bit definition. Anything else
+> is
+> redundant.
+
+If name is too short, there are possible to cause name pollution. 
+BM_, BP_, BF_ have their implication.
+
+VDCTRL4_SET_DOTCLK_DLY(x), according to our macro policy, it should be
+BF_VDCTRL4_SET_DOTCLK_DLY(x). 
+
+Generally, you need 
+Reg = readl(offset+VDCTRL4);
+Reg &=~ ((0x7)<<29);
+Reg |= VDCTRL4_SET_DOTCLK_DLY(value)
+Writel(reg, offset+VDCTRL4)
+
+Compared with our macro policy.
+
+Reg = readl(offset+HW_VDCTRL4);
+Reg &=~ BM_VDCTRL4_SET_DOTCLK_DLY;
+Reg |= BF_VDCTRL4_SET_DOTCLK_DLY(value)
+Writel(reg, offset+HW_VDCTRL4)
+
+
+> 
+> Regards,
+> Juergen
+> 
