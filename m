@@ -1,63 +1,43 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Thu, 10 Feb 2011 14:01:17 +0100
-Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
-In-Reply-To: <Pine.LNX.4.64.1102101337310.18510@axis700.grange>
-References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
-	<201102101227.26949.alexander.stein@systec-electronic.com>
-	<Pine.LNX.4.64.1102101337310.18510@axis700.grange>
-Message-ID: <201102101401.18331.alexander.stein@systec-electronic.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Feb 2011 13:04:30 +0000
+Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
+In-Reply-To: <AANLkTimGa-Y6ddHknGe9Gar7+mWPuA_T2+6VL6ecfgxD@mail.gmail.com>
+References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
+	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
+	<20110208164747.GD6188@n2100.arm.linux.org.uk>
+	<AANLkTimGa-Y6ddHknGe9Gar7+mWPuA_T2+6VL6ecfgxD@mail.gmail.com>
+Message-ID: <20110210130430.GB3652@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 February 2011, 13:48:23 Guennadi Liakhovetski wrote:
-> > Ok, i will just write about HSYNC the problem about VSYNC is similar.
-> > Let's assume we have a display with the following properties.
-> > left_margin   = 38
-> > right_margin  = 32
-> > hsync_len     = 20
-> > width         = 800
-> > 
-> > Without the patch we get the following arguments on sdc_init_panel
-> > width           = 800
-> > h_start_width   = 38 (left_margin)
-> > h_sync_width    = 20 (hsync_len)
-> > h_end_width     = 52 = 32 + 20 (right_margin + hsync_len)
-> > 
-> > So we will write into SDC_HOR_CONF:
-> > 
-> > reg = ((h_sync_width - 1) << 26) |
-> > 
-> >     ((width + h_start_width + h_end_width - 1) << 16);
-> > 
-> > reg = ((20 - 1) << 26) |
-> > 
-> >     ((800 + 38 + 52 - 1) << 16);
-> > 
-> > So the value SCREEN_WIDTH get written is
-> > width + left_margin + right_margin + hsync_len
-> > 
-> > which is IMO wrong. The description in the reference manual states:
-> > > Screen width minus 1. Specifies the number of pixel clock periods
-> > > between the last HSYNC and the new HSYNC.
-> > 
-> > It should just be: width + left_margin + right_margin
-> > I fell accross it, as I have a display with 800 px width and rather big
-> > left_margin. The sum got greater than 1023 which is what SCREEN_WIDTH can
-> > hold at maximum.
-> > 
-> > I don't know which display you used, but I guess your right_margin (and
-> > lower_margin) needs to be adjusted.
+On Wed, Feb 09, 2011 at 10:01:33AM +0000, Catalin Marinas wrote:
+> Could we make the domains usage a run-time feature based on the
+> architecture version? For ARMv7, we need to have the vectors page
+> read-only anyway if the SWP emulation is enabled (and I posted a
+> simple patch in a reply to your email).
 > 
-> Ok, agree. But then you need to adjust all current users and have them
-> tested... Otherwise, of course, you can just adjust your platform panel
-> data to work with the current calculations, even though in principle your
-> patch seems to be doing the right thing (tm), according to the manual. But
-> if applied as is without fixing all the users, it can very well break
-> them...
+> The issue I see is that ARM11MPCore is reported as v7 though we still
+> use domains on this processor (we could always remove the domains if
+> TLS register is available or use some more precise architecture
+> version identification).
 
-Ok, I've just seen there are some model defines in mx3fb.c which would also be 
-affected.
-I'll try to find all mx3fb users and fix their videomodes and repost a new 
-patch.
+We could also do the below, which I think is more logical - SWP emulation
+requires that CPU domains aren't enabled, so let's make that explicit
+in the Kconfig.
 
-Alexander
+ arch/arm/mm/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c9d2d56..7ea482b 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -644,7 +644,7 @@ config ARM_THUMBEE
+ 
+ config SWP_EMULATE
+ 	bool "Emulate SWP/SWPB instructions"
+-	depends on CPU_V7 && !CPU_V6
++	depends on !CPU_USE_DOMAINS && CPU_V7 && !CPU_V6
+ 	select HAVE_PROC_CPU if PROC_FS
+ 	default y if SMP
+ 	help
