@@ -1,44 +1,67 @@
-From: B20596@freescale.com (Li Frank-B20596)
-Date: Thu, 10 Feb 2011 12:32:43 +0000
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <20110210115109.GR9041@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-	<09EC74FE2C9E8444BF2FF67BD36E1D69167919@039-SN1MPN1-003.039d.mgd.msft.net>
-	<201102101046.33994.jbe@pengutronix.de>
-	<20110210104725.GC2206@pengutronix.de>
-	<20110210115109.GR9041@pengutronix.de>
-Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D69167A0C@039-SN1MPN1-003.039d.mgd.msft.net>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Thu, 10 Feb 2011 20:45:43 +0800
+Subject: [RFC,PATCH 1/3] Add a common struct clk
+In-Reply-To: <4D53B9AC.8020609@bluewatersys.com>
+References: <1297233693.242364.862698430999.1.gpush@pororo>
+	<4D52F73A.4010707@bluewatersys.com>
+	<20110210100319.GB24710@b20223-02.ap.freescale.net>
+	<4D53B9AC.8020609@bluewatersys.com>
+Message-ID: <20110210124543.GA3316@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Feb 10, 2011 at 11:47:25AM +0100, Wolfram Sang wrote:
-> > > But I would prefer:
-> > > #define SET 4
-> > > #define CLEAR 8
-> > > [...]
-> > > writel(CTRL_DOTCLK_MODE, host->base + CTRL + SET)
+On Thu, Feb 10, 2011 at 11:10:52PM +1300, Ryan Mallon wrote:
+> On 10/02/11 23:03, Richard Zhao wrote:
+> >On Thu, Feb 10, 2011 at 09:21:14AM +1300, Ryan Mallon wrote:
+> >>On 02/09/2011 07:41 PM, Jeremy Kerr wrote:
+> >>
+> >>Hi Jeremy,
+> >>
+> >>Couple more comments below.
+> >>
+> >>~Ryan
+> >>
+> >[...]
+> >>>+int clk_enable(struct clk *clk)
+> >>>+{
+> >>>+     unsigned long flags;
+> >>>+     int ret = 0;
+> >>>+
+> >>>+     spin_lock_irqsave(&clk->enable_lock, flags);
+> >>         WARN_ON(clk->prepare_count == 0); ?
+> >>
+> >>>+     if (clk->enable_count == 0&&  clk->ops->enable)
+> >>>+             ret = clk->ops->enable(clk);
+> >>Does it make sense to have a clock with no enable function which still
+> >>returns success from clk_enable? Do we have any platforms which have
+> >>NULL clk_enable functions?
+> >>
+> >>I think that for enable/disable at least we should require platforms to
+> >>provide functions and oops if they have failed to do so. In the rare
+> >>case that a platform doesn't need to do anything for enable/disable they
+> >>can just supply empty functions.
+> >It's possible to be NULL. So are set_rate/get_rate.
+> >Ideally, if it's NULL:
+> >prepare/unprepare: only call parent's prepare/unprepare
+> >enable/disable: only call parent's enable/disable
 > 
-> For this we already have __mxs_setl.
+> No, the whole point of the generic framework is that _all_ clock
+> users must call prepare/enable and disable/unprepare. Drivers, etc
+> should not rely on underlying knowledge of a platform. This is why,
+> for instance, clk_enable will warn if prepare count is zero.
 > 
-> >
-> > NACK.
-> >
-> > This will indeed not be caught by the compiler.
-> >
-> > And while I like the shorter macros better as well, an MXSFB_ prefix
-> > should be added IMO. Macros like CTRL and TIMING are not too well
-> > protected.
-> 
-> +1 for a prefix, be it MXSFB_ or LCDIF_, will change this.
-> 
-> Otherwise can we please stop about arguing about register defines? It's
-> too much a matter of taste and there is no perfect way to solve this.
-> 
-> Sascha
-> 
+> However, I can see that a clock may be fully enabled by its prepare
+> function and so the enable function is a no-op. User must still call
+> both prepare and enable though. Perhaps this is what you meant?
+I mean prepare/unprepare, enable/disable and get_rate ops null can be handled
+in the common clock code. But it needs parent clock pointer.
 
-Guo Shawn mmc driver's patch is good example to use mx23/mx28 register macro. 
-
-Best regards
-Frank Li
+Thanks
+Richard
+> 
+> ~Ryan
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
