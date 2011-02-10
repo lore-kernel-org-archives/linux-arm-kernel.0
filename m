@@ -1,135 +1,168 @@
 From: ccross@android.com (Colin Cross)
-Date: Wed,  9 Feb 2011 22:43:19 -0800
-Subject: [PATCH v4 10/15] ARM: tegra: iomap: Add missing devices,
-	fix use of SZ_8, SZ_64
+Date: Wed,  9 Feb 2011 22:43:20 -0800
+Subject: [PATCH v4 11/15] ARM: tegra: cpufreq: Disable cpufreq during suspend
 In-Reply-To: <1297320204-31882-1-git-send-email-ccross@android.com>
 References: <1297320204-31882-1-git-send-email-ccross@android.com>
-Message-ID: <1297320204-31882-11-git-send-email-ccross@android.com>
+Message-ID: <1297320204-31882-12-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gary King <gking@nvidia.com>
+On Tegra, calling clk_set_rate on the CPU clock may call into the
+regulator API.  If the regulator driver that controls the CPU
+voltage rail has been suspended, this can lead to attempted
+communication with a hardware block that has already been turned
+off.
 
-Adds gart, hdmi, avp, host1x, and pwm controllers to mach/iomap.h
-There is no SZ_8 or SZ_64, replace them with constants
+Adds a SUSPEND_PREPARE notification hook to drop the frequency to
+the lowest possible during suspend.
 
-Signed-off-by: Gary King <gking@nvidia.com>
+Also adds 216MHz (off of PLLP) as the lowest CPU frequency, which
+allows PLLX to be turned off.
+
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/include/mach/iomap.h |   55 ++++++++++++++++++++++++------
- 1 files changed, 44 insertions(+), 11 deletions(-)
+ arch/arm/mach-tegra/cpu-tegra.c |   75 +++++++++++++++++++++++++++++++--------
+ 1 files changed, 60 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
-index 325eca3..26f2363 100644
---- a/arch/arm/mach-tegra/include/mach/iomap.h
-+++ b/arch/arm/mach-tegra/include/mach/iomap.h
-@@ -26,6 +26,9 @@
- #define TEGRA_IRAM_BASE			0x40000000
- #define TEGRA_IRAM_SIZE			SZ_256K
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index fea5719..ad26a9f 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -28,6 +28,7 @@
+ #include <linux/err.h>
+ #include <linux/clk.h>
+ #include <linux/io.h>
++#include <linux/suspend.h>
  
-+#define TEGRA_HOST1X_BASE		0x50000000
-+#define TEGRA_HOST1X_SIZE		0x24000
+ #include <asm/system.h>
+ 
+@@ -36,14 +37,15 @@
+ 
+ /* Frequency table index must be sequential starting at 0 */
+ static struct cpufreq_frequency_table freq_table[] = {
+-	{ 0, 312000 },
+-	{ 1, 456000 },
+-	{ 2, 608000 },
+-	{ 3, 760000 },
+-	{ 4, 816000 },
+-	{ 5, 912000 },
+-	{ 6, 1000000 },
+-	{ 7, CPUFREQ_TABLE_END },
++	{ 0, 216000 },
++	{ 1, 312000 },
++	{ 2, 456000 },
++	{ 3, 608000 },
++	{ 4, 760000 },
++	{ 5, 816000 },
++	{ 6, 912000 },
++	{ 7, 1000000 },
++	{ 8, CPUFREQ_TABLE_END },
+ };
+ 
+ #define NUM_CPUS	2
+@@ -51,6 +53,8 @@ static struct cpufreq_frequency_table freq_table[] = {
+ static struct clk *cpu_clk;
+ 
+ static unsigned long target_cpu_speed[NUM_CPUS];
++static DEFINE_MUTEX(tegra_cpu_lock);
++static bool is_suspended;
+ 
+ int tegra_verify_speed(struct cpufreq_policy *policy)
+ {
+@@ -68,16 +72,11 @@ unsigned int tegra_getspeed(unsigned int cpu)
+ 	return rate;
+ }
+ 
+-static int tegra_update_cpu_speed(void)
++static int tegra_update_cpu_speed(unsigned long rate)
+ {
+-	int i;
+-	unsigned long rate = 0;
+ 	int ret = 0;
+ 	struct cpufreq_freqs freqs;
+ 
+-	for_each_online_cpu(i)
+-		rate = max(rate, target_cpu_speed[i]);
+-
+ 	freqs.old = tegra_getspeed(0);
+ 	freqs.new = rate;
+ 
+@@ -105,12 +104,30 @@ static int tegra_update_cpu_speed(void)
+ 	return 0;
+ }
+ 
++static unsigned long tegra_cpu_highest_speed(void)
++{
++	unsigned long rate = 0;
++	int i;
 +
- #define TEGRA_ARM_PERIF_BASE		0x50040000
- #define TEGRA_ARM_PERIF_SIZE		SZ_8K
- 
-@@ -35,38 +38,56 @@
- #define TEGRA_ARM_INT_DIST_BASE		0x50041000
- #define TEGRA_ARM_INT_DIST_SIZE		SZ_4K
- 
-+#define TEGRA_MPE_BASE			0x54040000
-+#define TEGRA_MPE_SIZE			SZ_256K
++	for_each_online_cpu(i)
++		rate = max(rate, target_cpu_speed[i]);
++	return rate;
++}
 +
-+#define TEGRA_VI_BASE			0x54080000
-+#define TEGRA_VI_SIZE			SZ_256K
+ static int tegra_target(struct cpufreq_policy *policy,
+ 		       unsigned int target_freq,
+ 		       unsigned int relation)
+ {
+ 	int idx;
+ 	unsigned int freq;
++	int ret = 0;
 +
-+#define TEGRA_ISP_BASE			0x54100000
-+#define TEGRA_ISP_SIZE			SZ_256K
++	mutex_lock(&tegra_cpu_lock);
 +
- #define TEGRA_DISPLAY_BASE		0x54200000
- #define TEGRA_DISPLAY_SIZE		SZ_256K
++	if (is_suspended) {
++		ret = -EBUSY;
++		goto out;
++	}
  
- #define TEGRA_DISPLAY2_BASE		0x54240000
- #define TEGRA_DISPLAY2_SIZE		SZ_256K
+ 	cpufreq_frequency_table_target(policy, freq_table, target_freq,
+ 		relation, &idx);
+@@ -119,9 +136,34 @@ static int tegra_target(struct cpufreq_policy *policy,
  
-+#define TEGRA_HDMI_BASE			0x54280000
-+#define TEGRA_HDMI_SIZE			SZ_256K
+ 	target_cpu_speed[policy->cpu] = freq;
+ 
+-	return tegra_update_cpu_speed();
++	ret = tegra_update_cpu_speed(tegra_cpu_highest_speed());
 +
-+#define TEGRA_GART_BASE			0x58000000
-+#define TEGRA_GART_SIZE			SZ_32M
++out:
++	mutex_unlock(&tegra_cpu_lock);
++	return ret;
+ }
+ 
++static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
++	void *dummy)
++{
++	mutex_lock(&tegra_cpu_lock);
++	if (event == PM_SUSPEND_PREPARE) {
++		is_suspended = true;
++		pr_info("Tegra cpufreq suspend: setting frequency to %d kHz\n",
++			freq_table[0].frequency);
++		tegra_update_cpu_speed(freq_table[0].frequency);
++	} else if (event == PM_POST_SUSPEND) {
++		is_suspended = false;
++	}
++	mutex_unlock(&tegra_cpu_lock);
 +
-+#define TEGRA_RES_SEMA_BASE		0x60001000
-+#define TEGRA_RES_SEMA_SIZE		SZ_4K
++	return NOTIFY_OK;
++}
 +
- #define TEGRA_PRIMARY_ICTLR_BASE	0x60004000
--#define TEGRA_PRIMARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_PRIMARY_ICTLR_SIZE	64
- 
- #define TEGRA_SECONDARY_ICTLR_BASE	0x60004100
--#define TEGRA_SECONDARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_SECONDARY_ICTLR_SIZE	64
- 
- #define TEGRA_TERTIARY_ICTLR_BASE	0x60004200
--#define TEGRA_TERTIARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_TERTIARY_ICTLR_SIZE	64
- 
- #define TEGRA_QUATERNARY_ICTLR_BASE	0x60004300
--#define TEGRA_QUATERNARY_ICTLR_SIZE	SZ_64
-+#define TEGRA_QUATERNARY_ICTLR_SIZE	64
- 
- #define TEGRA_TMR1_BASE			0x60005000
--#define TEGRA_TMR1_SIZE			SZ_8
-+#define TEGRA_TMR1_SIZE			8
- 
- #define TEGRA_TMR2_BASE			0x60005008
--#define TEGRA_TMR2_SIZE			SZ_8
-+#define TEGRA_TMR2_SIZE			8
- 
- #define TEGRA_TMRUS_BASE		0x60005010
--#define TEGRA_TMRUS_SIZE		SZ_64
-+#define TEGRA_TMRUS_SIZE		64
- 
- #define TEGRA_TMR3_BASE			0x60005050
--#define TEGRA_TMR3_SIZE			SZ_8
-+#define TEGRA_TMR3_SIZE			8
- 
- #define TEGRA_TMR4_BASE			0x60005058
--#define TEGRA_TMR4_SIZE			SZ_8
-+#define TEGRA_TMR4_SIZE			8
- 
- #define TEGRA_CLK_RESET_BASE		0x60006000
- #define TEGRA_CLK_RESET_SIZE		SZ_4K
-@@ -114,10 +135,10 @@
- #define TEGRA_I2S2_SIZE			SZ_256
- 
- #define TEGRA_UARTA_BASE		0x70006000
--#define TEGRA_UARTA_SIZE		SZ_64
-+#define TEGRA_UARTA_SIZE		64
- 
- #define TEGRA_UARTB_BASE		0x70006040
--#define TEGRA_UARTB_SIZE		SZ_64
-+#define TEGRA_UARTB_SIZE		64
- 
- #define TEGRA_UARTC_BASE		0x70006200
- #define TEGRA_UARTC_SIZE		SZ_256
-@@ -140,6 +161,18 @@
- #define TEGRA_PWFM_BASE			0x7000A000
- #define TEGRA_PWFM_SIZE			SZ_256
- 
-+#define TEGRA_PWFM0_BASE		0x7000A000
-+#define TEGRA_PWFM0_SIZE		4
++static struct notifier_block tegra_cpu_pm_notifier = {
++	.notifier_call = tegra_pm_notify,
++};
 +
-+#define TEGRA_PWFM1_BASE		0x7000A010
-+#define TEGRA_PWFM1_SIZE		4
+ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	if (policy->cpu >= NUM_CPUS)
+@@ -142,6 +184,9 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ 	policy->shared_type = CPUFREQ_SHARED_TYPE_ALL;
+ 	cpumask_copy(policy->related_cpus, cpu_possible_mask);
+ 
++	if (policy->cpu == 0)
++		register_pm_notifier(&tegra_cpu_pm_notifier);
 +
-+#define TEGRA_PWFM2_BASE		0x7000A020
-+#define TEGRA_PWFM2_SIZE		4
-+
-+#define TEGRA_PWFM3_BASE		0x7000A030
-+#define TEGRA_PWFM3_SIZE		4
-+
- #define TEGRA_MIPI_BASE			0x7000B000
- #define TEGRA_MIPI_SIZE			SZ_256
+ 	return 0;
+ }
  
 -- 
 1.7.3.1
