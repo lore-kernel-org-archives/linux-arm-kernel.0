@@ -1,37 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Feb 2011 12:56:24 +0000
-Subject: [PATCH] ARM: Avoid discarding sections that might have
-	SMP_ON_UP fixups
-In-Reply-To: <20110209142211.GA11460@n2100.arm.linux.org.uk>
-References: <E1PeueP-0003SR-03@rmk-PC.arm.linux.org.uk>
-	<AANLkTinnhivretaRHpYwCYouk-_jWKZQEo7x4sbheJVL@mail.gmail.com>
-	<20110125165919.GD17286@n2100.arm.linux.org.uk>
-	<AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
-	<20110125174636.GE17286@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
-	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
-	<20110126124452.GB4232@n2100.arm.linux.org.uk>
-	<20110126172535.GA15983@arm.com>
-	<20110209142211.GA11460@n2100.arm.linux.org.uk>
-Message-ID: <20110210125624.GA3652@n2100.arm.linux.org.uk>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Thu, 10 Feb 2011 14:01:17 +0100
+Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
+In-Reply-To: <Pine.LNX.4.64.1102101337310.18510@axis700.grange>
+References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
+	<201102101227.26949.alexander.stein@systec-electronic.com>
+	<Pine.LNX.4.64.1102101337310.18510@axis700.grange>
+Message-ID: <201102101401.18331.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 02:22:11PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 26, 2011 at 05:25:35PM +0000, Dave P. Martin wrote:
-> > SMP_ON_UP fixups lead to vmlinux link errors if those sections are
-> > discarded at link-time.  In particular this may happen for built-in
-> > __exit stuff.
+On Thursday 10 February 2011, 13:48:23 Guennadi Liakhovetski wrote:
+> > Ok, i will just write about HSYNC the problem about VSYNC is similar.
+> > Let's assume we have a display with the following properties.
+> > left_margin   = 38
+> > right_margin  = 32
+> > hsync_len     = 20
+> > width         = 800
 > > 
-> > This patch modifies the vmlinux linker script to reduce the amount
-> > of discarded sections, and tries to make sure that __exit sections
-> > are kept in.
+> > Without the patch we get the following arguments on sdc_init_panel
+> > width           = 800
+> > h_start_width   = 38 (left_margin)
+> > h_sync_width    = 20 (hsync_len)
+> > h_end_width     = 52 = 32 + 20 (right_margin + hsync_len)
 > > 
-> > This is a hack and probably wrong!  Further discussion is needed.  
+> > So we will write into SDC_HOR_CONF:
+> > 
+> > reg = ((h_sync_width - 1) << 26) |
+> > 
+> >     ((width + h_start_width + h_end_width - 1) << 16);
+> > 
+> > reg = ((20 - 1) << 26) |
+> > 
+> >     ((800 + 38 + 52 - 1) << 16);
+> > 
+> > So the value SCREEN_WIDTH get written is
+> > width + left_margin + right_margin + hsync_len
+> > 
+> > which is IMO wrong. The description in the reference manual states:
+> > > Screen width minus 1. Specifies the number of pixel clock periods
+> > > between the last HSYNC and the new HSYNC.
+> > 
+> > It should just be: width + left_margin + right_margin
+> > I fell accross it, as I have a display with 800 px width and rather big
+> > left_margin. The sum got greater than 1023 which is what SCREEN_WIDTH can
+> > hold at maximum.
+> > 
+> > I don't know which display you used, but I guess your right_margin (and
+> > lower_margin) needs to be adjusted.
 > 
-> Can you send the configuration which you see this problem with?
-> I've tried to build a kernel which inlines the spinlocks, but I find
-> that's not possible, so I'm doubting whether any fix is required for
-> mainline.
+> Ok, agree. But then you need to adjust all current users and have them
+> tested... Otherwise, of course, you can just adjust your platform panel
+> data to work with the current calculations, even though in principle your
+> patch seems to be doing the right thing (tm), according to the manual. But
+> if applied as is without fixing all the users, it can very well break
+> them...
 
-Any news on this, or can it not be reproduced?
+Ok, I've just seen there are some model defines in mx3fb.c which would also be 
+affected.
+I'll try to find all mx3fb users and fix their videomodes and repost a new 
+patch.
+
+Alexander
