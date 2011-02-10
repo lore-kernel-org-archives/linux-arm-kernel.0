@@ -1,86 +1,51 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 10 Feb 2011 14:46:37 +0530
-Subject: [PATCH v2 4/7] omap: dpll: Add allow_idle/deny_idle support for all
-	DPLL's
-In-Reply-To: <1297329400-5936-4-git-send-email-rnayak@ti.com>
+Date: Thu, 10 Feb 2011 14:46:34 +0530
+Subject: [PATCH v2 1/7] omap: clock: Check for enable/disable ops support
+In-Reply-To: <1297329400-5936-1-git-send-email-rnayak@ti.com>
 References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
-	<1297329400-5936-2-git-send-email-rnayak@ti.com>
-	<1297329400-5936-3-git-send-email-rnayak@ti.com>
-	<1297329400-5936-4-git-send-email-rnayak@ti.com>
-Message-ID: <1297329400-5936-5-git-send-email-rnayak@ti.com>
+Message-ID: <1297329400-5936-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All OMAP3/4 dpll's support hardware level autogating.
-Populate allow_idle/deny_idle function pointers for all
-DPLL's in clkops.
+Check if enable/disable operations are supported for a given
+clock node before attempting to call them.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/clock.c          |    8 +++++++-
- arch/arm/mach-omap2/clock.h          |    1 +
- arch/arm/mach-omap2/clock3xxx_data.c |    2 +-
- arch/arm/mach-omap2/clock44xx_data.c |    2 +-
- 4 files changed, 10 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/clock.c |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index e0f017d..909e3c5 100644
+index 2a2f152..e0f017d 100644
 --- a/arch/arm/mach-omap2/clock.c
 +++ b/arch/arm/mach-omap2/clock.c
-@@ -377,10 +377,16 @@ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent)
- const struct clkops clkops_omap3_noncore_dpll_ops = {
- 	.enable		= omap3_noncore_dpll_enable,
- 	.disable	= omap3_noncore_dpll_disable,
-+	.allow_idle	= omap3_dpll_allow_idle,
-+	.deny_idle	= omap3_dpll_deny_idle,
- };
+@@ -261,7 +261,8 @@ void omap2_clk_disable(struct clk *clk)
  
--#endif
-+const struct clkops clkops_omap3_core_dpll_ops = {
-+	.allow_idle	= omap3_dpll_allow_idle,
-+	.deny_idle	= omap3_dpll_deny_idle,
-+};
+ 	pr_debug("clock: %s: disabling in hardware\n", clk->name);
  
-+#endif
+-	clk->ops->disable(clk);
++	if (clk->ops && clk->ops->disable)
++		clk->ops->disable(clk);
  
- /*
-  * OMAP2+ clock reset and init functions
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 896584e..2a939e5 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -146,5 +146,6 @@ extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
- #endif
+ 	if (clk->clkdm)
+ 		omap2_clkdm_clk_disable(clk->clkdm, clk);
+@@ -312,10 +313,13 @@ int omap2_clk_enable(struct clk *clk)
+ 		}
+ 	}
  
- extern const struct clkops clkops_omap3_noncore_dpll_ops;
-+extern const struct clkops clkops_omap3_core_dpll_ops;
+-	ret = clk->ops->enable(clk);
+-	if (ret) {
+-		WARN(1, "clock: %s: could not enable: %d\n", clk->name, ret);
+-		goto oce_err3;
++	if (clk->ops && clk->ops->enable) {
++		ret = clk->ops->enable(clk);
++		if (ret) {
++			WARN(1, "clock: %s: could not enable: %d\n",
++			     clk->name, ret);
++			goto oce_err3;
++		}
+ 	}
  
- #endif
-diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 3e9d721..7cf89f8 100644
---- a/arch/arm/mach-omap2/clock3xxx_data.c
-+++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -429,7 +429,7 @@ static struct dpll_data dpll3_dd = {
- 
- static struct clk dpll3_ck = {
- 	.name		= "dpll3_ck",
--	.ops		= &clkops_null,
-+	.ops		= &clkops_omap3_core_dpll_ops,
- 	.parent		= &sys_ck,
- 	.dpll_data	= &dpll3_dd,
- 	.round_rate	= &omap2_dpll_round_rate,
-diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-index de9ec8d..b843b6e 100644
---- a/arch/arm/mach-omap2/clock44xx_data.c
-+++ b/arch/arm/mach-omap2/clock44xx_data.c
-@@ -443,7 +443,7 @@ static struct clk dpll_core_ck = {
- 	.parent		= &sys_clkin_ck,
- 	.dpll_data	= &dpll_core_dd,
- 	.init		= &omap2_init_dpll_parent,
--	.ops		= &clkops_null,
-+	.ops		= &clkops_omap3_core_dpll_ops,
- 	.recalc		= &omap3_dpll_recalc,
- };
- 
+ 	return 0;
 -- 
 1.7.0.4
