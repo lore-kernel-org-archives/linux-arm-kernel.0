@@ -1,62 +1,131 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 10 Feb 2011 15:43:22 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <alpine.LFD.2.00.1101270030220.8580@xanadu.home>
-References: <4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
-Message-ID: <20110210154322.GE1742@n2100.arm.linux.org.uk>
+From: premi@ti.com (Sanjeev Premi)
+Date: Thu, 10 Feb 2011 21:32:03 +0530
+Subject: [PATCH 0/1] omap3: pm: CM_AUTOIDLE_PLL isn't restored on wakeup from
+	off state
+Message-ID: <1297353724-11665-1-git-send-email-premi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 27, 2011 at 12:43:54AM -0500, Nicolas Pitre wrote:
-> The MMU-less kernel should still favor allocations close to the kernel 
-> text for modules, and anything else away from the kernel going 
-> downwards.
-> 
-> Otherwise a veneer should be created by the module symbol resolver such 
-> that if the branch distance to reach, say, printk is too large, then the 
-> following code would have to be dynamically generated right next to the 
-> module:
-> 
-> 	ldr	pc, [pc, #-4]
-> 	.word	<far_away_symbol>
-> 
-> Then, in your module, you patch the branch relocation for printk so that 
-> it branches to the code above instead, and then store the address of 
-> printk at the location represented by the .word directive.
+The value of AUTO_PERIPH_DPLL is being lost after resuming from
+the off state. More details on problem and cause in PATCH 1/1.
 
-What you're suggesting is what we used to do with the old user-space
-module tools, which would've been nice to carry forwards to the new
-module code.  I never found a way to do it.
+The problem was found recently in 2.6.32 kernel version and exists
+on the latest pm branch at:
+    commit 448e9a675e2cfb173fc47083058cf254ccc114a0
+    Merge: c1e460d f11bdd3
+    Author: Kevin Hilman <khilman@ti.com>
+    Date:   Fri Jan 28 14:38:47 2011 -0800
 
-The problems:
-1. Where do you create those veneers?
-2. How many veneers do you allocate space for?
-3. How do you determine that you need a veneer?
+        rebuild PM from branches
 
-While you can say "next to the module" for (1), you can only do that at
-the point in time when the space for the module is allocated, and you
-need to know at that point how much space you require.
+The shell script below was used to validate the patch on 2.6.32 for
+over 8hrs on OMAP3EVM. The same script has been running after the
+patch for past 1 hour on the same EVM.
 
-For (2), you could always allocate space for one veneer per symbol present
-in the module, but that's very wasteful.
+**** test.sh ****
 
-(3) is almost impossible to know ahead of time as you don't have the
-relocations, realistically you have to allocate one veneer per symbol,
-and as you don't know whether it's a data or code symbol, you'll have
-to allocate one veneer for every symbol in a module.
+#!/bin/sh
 
-I really don't like it, and I don't see that this is sanely solvable
-without giving architectures much more control over module loading,
-which I don't think will ever happen.  It's probably simpler to build
-modules with whatever that magic option is to tell GCC to always generate
-'far call' veneers for everything rather than trying to 'fix' the kernel
-module loader.
+if [ ! -d /dbg ]; then
+	mkdir /dbg
+fi
+
+mount -t debugfs debugfs /dbg
+
+echo 1 > /dbg/pm_debug/enable_off_mode
+echo 1 > /dbg/pm_debug/sleep_while_idle
+echo 5 > /dbg/pm_debug/wakeup_timer_seconds
+
+while :
+do
+	before=`devmem 0x48004D30`
+	echo mem > /sys/power/state
+	after=`devmem 0x48004D30`
+
+	sleep 2
+	echo ""
+	echo "CM_AUTOIDLE_PLL: before=$before after=$after"
+	echo ""
+	sleep 1
+done
+
+**** Before ****
+
+[root at OMAP3EVM /]# ./test.sh
+[   48.089172] PM: Syncing filesystems ... done.
+[   48.110656] Freezing user space processes ... (elapsed 0.01 seconds) done.
+[   48.135009] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
+[   48.175598] ------------[ cut here ]------------
+    [snip]...removing warning text. Not related to current context...[/snip]
+[   48.421356] ---[ end trace 16d570308536c978 ]---
+[   48.532165] PM: suspend of devices complete after 361.805 msecs
+    [snip]...removed more verbose text...[/snip]
+[   55.311767] PM: resume of devices complete after 501.922 msecs
+[   55.321807] Restarting tasks ... done.
+
+CM_AUTOIDLE_PLL: before=0x00000009 after=0x00000001
+
+[   59.374603] PM: Syncing filesystems ... done.
+[   59.380798] Freezing user space processes ... (elapsed 0.01 seconds) done.
+    [snip]...removed more verbose text...[/snip]
+[   65.085968] PM: resume of devices complete after 501.953 msecs
+[   65.095642] Restarting tasks ... done.
+
+CM_AUTOIDLE_PLL: before=0x00000001 after=0x00000001
+
+[   69.148101] PM: Syncing filesystems ... done.
+[   69.154235] Freezing user space processes ... (elapsed 0.01 seconds) done.
+    [snip]...removed more verbose text...[/snip]
+[   74.860839] PM: resume of devices complete after 501.922 msecs
+[   74.870544] Restarting tasks ... done.
+
+CM_AUTOIDLE_PLL: before=0x00000001 after=0x00000001
+
+**** After ****
+
+[root at OMAP3EVM /]# ./test.sh
+[   60.737579] PM: Syncing filesystems ... done.
+[   60.758941] Freezing user space processes ... (elapsed 0.01 seconds) done.
+[   60.783233] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
+[   60.819396] omap_device: omap_i2c.1: new worst case activate latency 0: 152587
+[   60.831573] ------------[ cut here ]------------
+[   60.836547] WARNING: at arch/arm/plat-omap/omap-pm-noop.c:326 omap_pm_get_dev_context_loss_count+0x64/0xb8()
+    [snip]...removing warning text. Not related to current context...[/snip]
+[   61.077392] ---[ end trace 79ed0d21d6b0de0a ]---
+[   61.187927] omap_device: omap_i2c.1: new worst case deactivate latency 0: 61035
+[   61.196136] PM: suspend of devices complete after 377.311 msecs
+[   61.204650] PM: late suspend of devices complete after 2.258 msecs
+[   61.211639] PM: Resume timer in 5.000 secs (163840 ticks at 32768 ticks/sec.)
+[   61.219299] omap_device: omap_uart.2: new worst case deactivate latency 0: 91552
+[   66.214691] Successfully put all powerdomains to target state
+[   66.222106] PM: early resume of devices complete after 1.220 msecs
+[   66.730926] PM: resume of devices complete after 501.983 msecs
+[   66.740997] Restarting tasks ... done.
+[   66.782165] omap_device: omap_uart.0: new worst case activate latency 0: 61035
+
+CM_AUTOIDLE_PLL: before=0x00000009 after=0x00000009
+
+[   70.794433] PM: Syncing filesystems ... done.
+[   70.800598] Freezing user space processes ... (elapsed 0.01 seconds) done.
+    [snip]...removed more verbose text...[/snip]
+[   76.505432] PM: resume of devices complete after 501.892 msecs
+[   76.515197] Restarting tasks ... done.
+
+CM_AUTOIDLE_PLL: before=0x00000009 after=0x00000009
+
+[   80.567687] PM: Syncing filesystems ... done.
+[   80.573822] Freezing user space processes ... (elapsed 0.01 seconds) done.
+    [snip]...removed more verbose text...[/snip]
+[   86.272399] PM: resume of devices complete after 501.953 msecs
+[   86.282165] Restarting tasks ... done.
+
+
+Sanjeev Premi (1):
+  omap3: Save and restore CM_AUTOIDLE_PLL across off mode
+
+ arch/arm/mach-omap2/cm2xxx_3xxx.c |   13 +++++++++++++
+ arch/arm/mach-omap2/pm34xx.c      |   25 ++++++++++++++++++++++++-
+ 2 files changed, 37 insertions(+), 1 deletions(-)
+
+-- 
+1.7.2.2
