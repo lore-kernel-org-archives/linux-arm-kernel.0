@@ -1,68 +1,78 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 10 Feb 2011 20:14:50 +0100
-Subject: [PATCH 4/5] arm: mach-mx3: pcm043: add write-protect and card-detect
-	for SD1
-In-Reply-To: <1297365291-1038-1-git-send-email-w.sang@pengutronix.de>
+Date: Thu, 10 Feb 2011 20:18:21 +0100
+Subject: [PATCH 2/5] mmc: sdhci-esdhc: broken card detection is not a
+	default quirk
+In-Reply-To: <1297365291-1038-3-git-send-email-w.sang@pengutronix.de>
 References: <1297365291-1038-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1297365291-1038-5-git-send-email-w.sang@pengutronix.de>
+	<1297365291-1038-3-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20110210191821.GD2206@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- arch/arm/mach-mx3/mach-pcm043.c |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-index bcf83fc..26b686c 100644
---- a/arch/arm/mach-mx3/mach-pcm043.c
-+++ b/arch/arm/mach-mx3/mach-pcm043.c
-@@ -40,6 +40,7 @@
- #include <mach/mx3fb.h>
- #include <mach/ulpi.h>
- #include <mach/audmux.h>
-+#include <mach/esdhc.h>
- 
- #include "devices-imx35.h"
- #include "devices.h"
-@@ -219,12 +220,17 @@ static iomux_v3_cfg_t pcm043_pads[] = {
- 	MX35_PAD_SD1_DATA1__ESDHC1_DAT1,
- 	MX35_PAD_SD1_DATA2__ESDHC1_DAT2,
- 	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
-+	MX35_PAD_ATA_DATA10__GPIO2_23, /* WriteProtect */
-+	MX35_PAD_ATA_DATA11__GPIO2_24, /* CardDetect */
- };
- 
- #define AC97_GPIO_TXFS	(1 * 32 + 31)
- #define AC97_GPIO_TXD	(1 * 32 + 28)
- #define AC97_GPIO_RESET	(1 * 32 + 0)
- 
-+#define SD1_GPIO_WP	(1 * 32 + 23)
-+#define SD1_GPIO_CD	(1 * 32 + 24)
-+
- static void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
- {
- 	iomux_v3_cfg_t txfs_gpio = MX35_PAD_STXFS4__GPIO2_31;
-@@ -307,6 +313,11 @@ pcm037_nand_board_info __initconst = {
- 	.hw_ecc = 1,
- };
- 
-+static struct esdhc_platform_data sd1_pdata = {
-+	.wp_gpio = SD1_GPIO_WP,
-+	.cd_gpio = SD1_GPIO_CD,
-+};
-+
- #if defined(CONFIG_USB_ULPI)
- static struct mxc_usbh_platform_data otg_pdata __initdata = {
- 	.portsc	= MXC_EHCI_MODE_UTMI,
-@@ -393,7 +404,7 @@ static void __init mxc_board_init(void)
- 		imx35_add_fsl_usb2_udc(&otg_device_pdata);
- 
- 	imx35_add_flexcan1(NULL);
--	imx35_add_sdhci_esdhc_imx(0, NULL);
-+	imx35_add_sdhci_esdhc_imx(0, &sd1_pdata);
- }
- 
- static void __init pcm043_timer_init(void)
+Adding Anton to Cc...
+
+On Thu, Feb 10, 2011 at 08:14:48PM +0100, Wolfram Sang wrote:
+> It can be worked around using a GPIO which will be done for i.MX later.
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+>  drivers/mmc/host/sdhci-esdhc-imx.c |    3 ++-
+>  drivers/mmc/host/sdhci-esdhc.h     |    1 -
+>  drivers/mmc/host/sdhci-of-esdhc.c  |    3 ++-
+>  3 files changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> index 83d178b..e0fa1f3 100644
+> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> @@ -170,7 +170,8 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
+>  }
+>  
+>  struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+> -	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
+> +	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
+> +			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
+>  	/* ADMA has issues. Might be fixable */
+>  	.ops = &sdhci_esdhc_ops,
+>  	.init = esdhc_pltfm_init,
+> diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+> index afaf1bc..c55aae8 100644
+> --- a/drivers/mmc/host/sdhci-esdhc.h
+> +++ b/drivers/mmc/host/sdhci-esdhc.h
+> @@ -19,7 +19,6 @@
+>   */
+>  
+>  #define ESDHC_DEFAULT_QUIRKS	(SDHCI_QUIRK_FORCE_BLK_SZ_2048 | \
+> -				SDHCI_QUIRK_BROKEN_CARD_DETECTION | \
+>  				SDHCI_QUIRK_NO_BUSY_IRQ | \
+>  				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
+>  				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+> index fcd0e1f..08161f6 100644
+> --- a/drivers/mmc/host/sdhci-of-esdhc.c
+> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
+> @@ -73,7 +73,8 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
+>  }
+>  
+>  struct sdhci_of_data sdhci_esdhc = {
+> -	.quirks = ESDHC_DEFAULT_QUIRKS,
+> +	/* card detection could be handled via GPIO */
+> +	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION,
+>  	.ops = {
+>  		.read_l = sdhci_be32bs_readl,
+>  		.read_w = esdhc_readw,
+> -- 
+> 1.7.2.3
+> 
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110210/398800b4/attachment-0001.sig>
