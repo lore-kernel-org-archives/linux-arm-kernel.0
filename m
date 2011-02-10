@@ -1,65 +1,56 @@
 From: ccross@android.com (Colin Cross)
-Date: Thu, 10 Feb 2011 13:31:27 -0800
-Subject: [RFC PATCH 3/3] ARM: vfp: Use cpu pm notifiers to save vfp state
-In-Reply-To: <1297373487-23902-1-git-send-email-ccross@android.com>
-References: <1297373487-23902-1-git-send-email-ccross@android.com>
-Message-ID: <1297373487-23902-4-git-send-email-ccross@android.com>
+Date: Thu, 10 Feb 2011 13:31:24 -0800
+Subject: [RFC PATCH 0/3] CPU PM notifiers
+Message-ID: <1297373487-23902-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
- arch/arm/vfp/vfpmodule.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+This patch set tries to address Russell's concerns with platform
+pm code calling into the driver for every block in the Cortex A9s
+during idle, hotplug, and suspend.  The first patch adds cpu pm
+notifiers that can be called by platform code, the second uses
+the notifier to save and restore the GIC state, and the third
+saves the VFP state.
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 0797cb5..8b27c18 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -21,6 +21,7 @@
- #include <asm/cputype.h>
- #include <asm/thread_notify.h>
- #include <asm/vfp.h>
-+#include <asm/cpu_pm.h>
- 
- #include "vfpinstr.h"
- #include "vfp.h"
-@@ -149,6 +150,28 @@ static struct notifier_block vfp_notifier_block = {
- 	.notifier_call	= vfp_notifier,
- };
- 
-+static int vfp_idle_notifier(struct notifier_block *self, unsigned long cmd,
-+	void *v)
-+{
-+	u32 fpexc = fmrx(FPEXC);
-+	unsigned int cpu = smp_processor_id();
-+
-+	if (cmd != CPU_PM_ENTER)
-+		return NOTIFY_OK;
-+
-+	/* The VFP may be reset in idle, save the state */
-+	if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
-+		vfp_save_state(last_VFP_context[cpu], fpexc);
-+		last_VFP_context[cpu]->hard.cpu = cpu;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block vfp_idle_notifier_block = {
-+	.notifier_call = vfp_idle_notifier,
-+};
-+
- /*
-  * Raise a SIGFPE for the current process.
-  * sicode describes the signal being raised.
-@@ -549,6 +572,7 @@ static int __init vfp_init(void)
- 		vfp_vector = vfp_support_entry;
- 
- 		thread_register_notifier(&vfp_notifier_block);
-+		cpu_pm_register_notifier(&vfp_idle_notifier_block);
- 		vfp_pm_init();
- 
- 		/*
--- 
-1.7.3.1
+The notifiers are used for two types of events, CPU PM events and
+CPU complex PM events.  CPU PM events are used to save per-cpu
+context when a single CPU is preparing to enter or has just exited
+a low power state.  For example, the VFP saves the last thread
+context, and the GIC saves banked CPU registers.
+
+CPU complex events are used after all the CPUs in a power domain
+have been prepared for the low power state.  The GIC uses these
+events to save global register state.
+
+What is not included:
+   * Multiple power states - it is assumed that if the platform
+     code calls cpu_pm_enter(), every listener needs to save
+     its context.
+   * L2 cache - The L2 cache will need very different behavior
+     depending on the HW implementation and power mode being
+     entered.
+
+Both problems could be solved be defining a set of power states
+shared by all platforms, if an agreeable set exists.  For example:
+   * CPU reset (TWD, GIC, VFP), L1 retention, L2 untouched
+   * CPU reset + L1 lost, L2 retention
+   * CPU reset, L1 + L2 lost
+
+Santosh previously mentioned that the GIC is not reset in the first
+two states on OMAP, which starts to make the list complicated.  Does
+disabling the GIC cause a problem in these states?
+
+An alternate solution is to pass a set of flags instead of a power state:
+CPU_PM_LOCALTIMERS_RESET
+CPU_PM_INTERRUPTS_RESET
+CPU_PM_L1_RETENTION
+CPU_PM_L1_RESET
+CPU_PM_L2_RETENTION
+CPU_PM_L2_RESET
+
+ arch/arm/common/gic.c         |  204 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/cpu_pm.h |  123 +++++++++++++++++++++++++
+ arch/arm/kernel/Makefile      |    1 +
+ arch/arm/kernel/cpu_pm.c      |  116 +++++++++++++++++++++++
+ arch/arm/vfp/vfpmodule.c      |   24 +++++
+ 5 files changed, 468 insertions(+), 0 deletions(-)
