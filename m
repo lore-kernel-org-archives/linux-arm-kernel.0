@@ -1,62 +1,53 @@
 From: ccross@android.com (Colin Cross)
-Date: Wed,  9 Feb 2011 22:43:18 -0800
-Subject: [PATCH v4 09/15] ARM: tegra: irq: Implement retrigger
+Date: Wed,  9 Feb 2011 22:43:12 -0800
+Subject: [PATCH v4 03/15] ARM: tegra: irqs: Update irq list
 In-Reply-To: <1297320204-31882-1-git-send-email-ccross@android.com>
 References: <1297320204-31882-1-git-send-email-ccross@android.com>
-Message-ID: <1297320204-31882-10-git-send-email-ccross@android.com>
+Message-ID: <1297320204-31882-4-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fixes typo in INT_CPU1_PMU_INTR (original fix from Will Deacon)
+Adds board irqs
+
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/irq.c |   17 ++++++++++++++++-
- 1 files changed, 16 insertions(+), 1 deletions(-)
+ arch/arm/mach-tegra/include/mach/irqs.h |   14 +++++++++++---
+ 1 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 7fb7349..dfbc219 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -48,6 +48,7 @@ static u32 tegra_lp0_wake_level_any;
+diff --git a/arch/arm/mach-tegra/include/mach/irqs.h b/arch/arm/mach-tegra/include/mach/irqs.h
+index 71bbf34..73265af 100644
+--- a/arch/arm/mach-tegra/include/mach/irqs.h
++++ b/arch/arm/mach-tegra/include/mach/irqs.h
+@@ -88,7 +88,7 @@
+ #define INT_SYS_STATS_MON		(INT_SEC_BASE + 22)
+ #define INT_GPIO5			(INT_SEC_BASE + 23)
+ #define INT_CPU0_PMU_INTR		(INT_SEC_BASE + 24)
+-#define INT_CPU2_PMU_INTR		(INT_SEC_BASE + 25)
++#define INT_CPU1_PMU_INTR		(INT_SEC_BASE + 25)
+ #define INT_SEC_RES_26			(INT_SEC_BASE + 26)
+ #define INT_S_LINK1			(INT_SEC_BASE + 27)
+ #define INT_APB_DMA_COP			(INT_SEC_BASE + 28)
+@@ -166,10 +166,18 @@
+ #define INT_QUAD_RES_30			(INT_QUAD_BASE + 30)
+ #define INT_QUAD_RES_31			(INT_QUAD_BASE + 31)
  
- static void (*tegra_gic_mask_irq)(struct irq_data *d);
- static void (*tegra_gic_unmask_irq)(struct irq_data *d);
-+static void (*tegra_gic_ack_irq)(struct irq_data *d);
- 
- /* ensures that sufficient time is passed for a register write to
-  * serialize into the 32KHz domain */
-@@ -112,10 +113,24 @@ static void tegra_unmask(struct irq_data *d)
- 	tegra_legacy_unmask_irq(d->irq);
- }
- 
-+static void tegra_ack(struct irq_data *d)
-+{
-+	tegra_legacy_force_irq_clr(d->irq);
-+	tegra_gic_ack_irq(d);
-+}
+-#define INT_GPIO_BASE			(INT_QUAD_BASE + 32)
++#define INT_MAIN_NR			(INT_QUAD_BASE + 32 - INT_PRI_BASE)
 +
-+static int tegra_retrigger(struct irq_data *d)
-+{
-+	tegra_legacy_force_irq_set(d->irq);
-+	return 1;
-+}
++#define INT_GPIO_BASE			(INT_PRI_BASE + INT_MAIN_NR)
 +
- static struct irq_chip tegra_irq = {
- 	.name			= "PPI",
-+	.irq_ack		= tegra_ack,
- 	.irq_mask		= tegra_mask,
- 	.irq_unmask		= tegra_unmask,
-+	.irq_retrigger		= tegra_retrigger,
- };
+ #define INT_GPIO_NR			(28 * 8)
  
- void __init tegra_init_irq(void)
-@@ -132,7 +147,7 @@ void __init tegra_init_irq(void)
- 	gic = get_irq_chip(29);
- 	tegra_gic_unmask_irq = gic->irq_unmask;
- 	tegra_gic_mask_irq = gic->irq_mask;
--	tegra_irq.irq_ack = gic->irq_ack;
-+	tegra_gic_ack_irq = gic->irq_ack;
- #ifdef CONFIG_SMP
- 	tegra_irq.irq_set_affinity = gic->irq_set_affinity;
+-#define NR_IRQS				(INT_GPIO_BASE + INT_GPIO_NR)
++#define TEGRA_NR_IRQS			(INT_GPIO_BASE + INT_GPIO_NR)
++
++#define INT_BOARD_BASE			TEGRA_NR_IRQS
++#define NR_BOARD_IRQS			32
++
++#define NR_IRQS				(INT_BOARD_BASE + NR_BOARD_IRQS)
+ #endif
+ 
  #endif
 -- 
 1.7.3.1
