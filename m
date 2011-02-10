@@ -1,80 +1,62 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 10 Feb 2011 20:19:19 +0530
-Subject: [PATCH 4/5] ARM: scu: Move register defines to header file
-In-Reply-To: <20110207101829.GA32431@n2100.arm.linux.org.uk>
-References: <20110125121655.GD13300@n2100.arm.linux.org.uk>
-	<4534e82bf14eeea9f96769df760df5ae@mail.gmail.com>
-	<20110125125656.GG13300@n2100.arm.linux.org.uk>
-	<20110125130422.GH13300@n2100.arm.linux.org.uk>
-	<20110125130611.GA15663@n2100.arm.linux.org.uk>
-	<627ff975140c8e4afbad281105b29d35@mail.gmail.com>
-	<20110204104113.GD15004@n2100.arm.linux.org.uk>
-	<c703383234131695d040a1e5b8a79413@mail.gmail.com>
-	<20110204113053.GF15004@n2100.arm.linux.org.uk>
-	<247f9ef444eeb8ca59de74837a3e9c62@mail.gmail.com>
-	<20110207101829.GA32431@n2100.arm.linux.org.uk>
-Message-ID: <06aa531b67f240da586a7b56238d56b2@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 10 Feb 2011 15:43:22 +0000
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <alpine.LFD.2.00.1101270030220.8580@xanadu.home>
+References: <4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
+	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
+	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
+Message-ID: <20110210154322.GE1742@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Monday, February 07, 2011 3:48 PM
-> To: Santosh Shilimkar
-> Cc: catalin.marinas at arm.com; linus.ml.walleij at gmail.com; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> ccross at android.com
-> Subject: Re: [PATCH 4/5] ARM: scu: Move register defines to header
-> file
->
-[....]
+On Thu, Jan 27, 2011 at 12:43:54AM -0500, Nicolas Pitre wrote:
+> The MMU-less kernel should still favor allocations close to the kernel 
+> text for modules, and anything else away from the kernel going 
+> downwards.
+> 
+> Otherwise a veneer should be created by the module symbol resolver such 
+> that if the branch distance to reach, say, printk is too large, then the 
+> following code would have to be dynamically generated right next to the 
+> module:
+> 
+> 	ldr	pc, [pc, #-4]
+> 	.word	<far_away_symbol>
+> 
+> Then, in your module, you patch the branch relocation for printk so that 
+> it branches to the code above instead, and then store the address of 
+> printk at the location represented by the .word directive.
 
-> > > 8<------
-> > > Subject: [PATCH] ARM: smp: add function to set WFI low-power
-> mode
-> > > for SMP CPUs
-> > >
-> > > Add a function to set the SCU low-power mode for SMP CPUs.  This
-> > > centralizes this functionality rather than having to expose the
-> > > SCU register definitions to each platform.
-> > >
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > >  arch/arm/include/asm/smp_scu.h |    5 +++++
-> > >  arch/arm/kernel/smp_scu.c      |   24 ++++++++++++++++++++++++
-> > >  2 files changed, 29 insertions(+), 0 deletions(-)
-> > >
-[...]
+What you're suggesting is what we used to do with the old user-space
+module tools, which would've been nice to carry forwards to the new
+module code.  I never found a way to do it.
 
-> > > +int scu_power_mode(void __iomem *scu_base, unsigned int mode)
-> > > +{
-> > > +	unsigned int val;
-> > > +	int cpu = smp_processor_id();
-> > > +	int shift;
-> > shift is unused with this version now so I am removing it.
->
-> Yes, I noticed that - it's gone in the version I merged into my
-> tree.
+The problems:
+1. Where do you create those veneers?
+2. How many veneers do you allocate space for?
+3. How do you determine that you need a veneer?
 
-This patch will need below update so that the smp_scu.h
-header can be included from assembly files. Will you
-fold this into your patch or you want me to
-send below as separate patch ?
+While you can say "next to the module" for (1), you can only do that at
+the point in time when the space for the module is allocated, and you
+need to know at that point how much space you require.
 
-diff --git a/arch/arm/include/asm/smp_scu.h
-b/arch/arm/include/asm/smp_scu.h
-index 800860d..8895c6c 100644
---- a/arch/arm/include/asm/smp_scu.h
-+++ b/arch/arm/include/asm/smp_scu.h
-@@ -5,8 +5,11 @@
- #define SCU_PM_DORMANT	2
- #define SCU_PM_POWEROFF	3
+For (2), you could always allocate space for one veneer per symbol present
+in the module, but that's very wasteful.
 
-+#ifndef __ASSEMBLER__
-+
- unsigned int scu_get_core_count(void __iomem *);
- void scu_enable(void __iomem *);
- int scu_power_mode(void __iomem *, unsigned int);
+(3) is almost impossible to know ahead of time as you don't have the
+relocations, realistically you have to allocate one veneer per symbol,
+and as you don't know whether it's a data or code symbol, you'll have
+to allocate one veneer for every symbol in a module.
 
- #endif
-+#endif
+I really don't like it, and I don't see that this is sanely solvable
+without giving architectures much more control over module loading,
+which I don't think will ever happen.  It's probably simpler to build
+modules with whatever that magic option is to tell GCC to always generate
+'far call' veneers for everything rather than trying to 'fix' the kernel
+module loader.
