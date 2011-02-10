@@ -1,60 +1,88 @@
-From: B20596@freescale.com (Li Frank-B20596)
-Date: Thu, 10 Feb 2011 09:15:54 +0000
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <201102100951.10977.jbe@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-	<09EC74FE2C9E8444BF2FF67BD36E1D6916776E@039-SN1MPN1-003.039d.mgd.msft.net>
-	<201102100951.10977.jbe@pengutronix.de>
-Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D691678C9@039-SN1MPN1-003.039d.mgd.msft.net>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 10 Feb 2011 14:46:38 +0530
+Subject: [PATCH v2 5/7] omap: dpll: Enable all OMAP3/4 dpll autoidle late at
+	boot
+In-Reply-To: <1297329400-5936-5-git-send-email-rnayak@ti.com>
+References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
+	<1297329400-5936-2-git-send-email-rnayak@ti.com>
+	<1297329400-5936-3-git-send-email-rnayak@ti.com>
+	<1297329400-5936-4-git-send-email-rnayak@ti.com>
+	<1297329400-5936-5-git-send-email-rnayak@ti.com>
+Message-ID: <1297329400-5936-6-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +#define VDCTRL1				0x80
-> > > +#define VDCTRL2				0x90
-> > > +#define VDCTRL3				0xa0
-> > > +#define VDCTRL4				0xb0
-> >
-> > Why you give up mx23/mx28 register define role, which generate from SOC
-> > xml.
-> 
-> Your macros prevent me from writing short and compact code. If you need
-> more
-> than one of these macros you always have to split each line to follow the
-> 80
-> columns rule. Unreadable.
-> 
-> > There is a set header files for each mx23/mx28 module, which generate
-> > from xml. I know original header files affect run time one Image.
-> > But I think we can copy common part of such register definition because
-> > That keep consistent with mx23/mx28 data sheet. Data sheet and header
-> file
-> > generate from one source xml.
-> >
-> > HW_<Module name>_<Register name>.
-> > BM_<Module name>_<Register name>_Bit name.
-> 
-> IMHO when I define the macros where they belong to, there is not need for
-> this
-> redundant HW_<Module name> or BW__<Module name> prefixes. They are just
-> needless.
+Enable all dpll autoidle for OMAP4 and OMAP3 (OMAP3
+already had dpll autoidle turned on, but was done
+using low level cm accessor apis).
+On OMAP3, replace the cm accessor apis doing this
+with the now available support for doing this in
+clock framework, using omap_clk_enable_autoidle().
 
-At first, someone complain name is longer. But during mx23/mx28 developing,
-Everyone start enjoy such definition because there are not error happen about
-register and bit position definition and identical map to silicon spec. 
-Developer needn't look up register header file when coding, just write down
-Register name or bit name according to mx23/mx28 spec. 
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |   18 ++++--------------
+ arch/arm/mach-omap2/pm44xx.c |    4 ++++
+ 2 files changed, 8 insertions(+), 14 deletions(-)
 
-If you still think it is too long, I suggest keep HW_ and BM_ prefix to distinguish
-Which one is register name, which one is bit mask. 
-
-Imx23/imx28 register have consistent convention. 
-HW_ is register name
-BM_ is bit mask
-BP_ is bit position.
-BF_(x) is   ((x<<BP)&BM_)
-
-> 
-> Regards,
-> Juergen
-> 
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 2f864e4..5a101fa 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -38,6 +38,7 @@
+ #include <plat/prcm.h>
+ #include <plat/gpmc.h>
+ #include <plat/dma.h>
++#include <plat/clock.h>
+ 
+ #include <asm/tlbflush.h>
+ 
+@@ -814,21 +815,10 @@ static void __init prcm_setup_regs(void)
+ 	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
+ 
+ 	/*
+-	 * Set all plls to autoidle. This is needed until autoidle is
+-	 * enabled by clockfw
++	 * Set all plls to autoidle.
++	 * TODO: Add all the iclk autoidles in here as well.
+ 	 */
+-	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_IVA2_DPLL_SHIFT,
+-			 OMAP3430_IVA2_MOD, CM_AUTOIDLE2);
+-	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_MPU_DPLL_SHIFT,
+-			 MPU_MOD,
+-			 CM_AUTOIDLE2);
+-	omap2_cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
+-			 (1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+-			 PLL_MOD,
+-			 CM_AUTOIDLE);
+-	omap2_cm_write_mod_reg(1 << OMAP3430ES2_AUTO_PERIPH2_DPLL_SHIFT,
+-			 PLL_MOD,
+-			 CM_AUTOIDLE2);
++	omap_clk_enable_autoidle();
+ 
+ 	/*
+ 	 * Enable control of expternal oscillator through
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 76cfff2..8431d41 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -15,6 +15,7 @@
+ #include <linux/list.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
++#include <plat/clock.h>
+ 
+ #include "powerdomain.h"
+ #include <mach/omap4-common.h>
+@@ -111,6 +112,9 @@ static int __init omap4_pm_init(void)
+ 		pr_err("Failed to setup powerdomains\n");
+ 		goto err2;
+ 	}
++
++	/* Enable autoidle for all clks which support it*/
++	omap_clk_enable_autoidle();
+ #endif
+ 
+ #ifdef CONFIG_SUSPEND
+-- 
+1.7.0.4
