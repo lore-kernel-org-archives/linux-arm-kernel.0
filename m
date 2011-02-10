@@ -1,36 +1,86 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 10 Feb 2011 14:46:35 +0530
-Subject: [PATCH v2 2/7] omap3: dpll: Populate clkops for dpll1_ck
-In-Reply-To: <1297329400-5936-2-git-send-email-rnayak@ti.com>
+Date: Thu, 10 Feb 2011 14:46:37 +0530
+Subject: [PATCH v2 4/7] omap: dpll: Add allow_idle/deny_idle support for all
+	DPLL's
+In-Reply-To: <1297329400-5936-4-git-send-email-rnayak@ti.com>
 References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
 	<1297329400-5936-2-git-send-email-rnayak@ti.com>
-Message-ID: <1297329400-5936-3-git-send-email-rnayak@ti.com>
+	<1297329400-5936-3-git-send-email-rnayak@ti.com>
+	<1297329400-5936-4-git-send-email-rnayak@ti.com>
+Message-ID: <1297329400-5936-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DPLL1 on omap3 is very similar to the rest of
-the non-core dpll's.
-Hence populate clkops_omap3_noncore_dpll_ops
-as the clkops for it, instead of the
-currently populated clkops_null.
+All OMAP3/4 dpll's support hardware level autogating.
+Populate allow_idle/deny_idle function pointers for all
+DPLL's in clkops.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
+ arch/arm/mach-omap2/clock.c          |    8 +++++++-
+ arch/arm/mach-omap2/clock.h          |    1 +
  arch/arm/mach-omap2/clock3xxx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/clock44xx_data.c |    2 +-
+ 4 files changed, 10 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index e0f017d..909e3c5 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -377,10 +377,16 @@ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent)
+ const struct clkops clkops_omap3_noncore_dpll_ops = {
+ 	.enable		= omap3_noncore_dpll_enable,
+ 	.disable	= omap3_noncore_dpll_disable,
++	.allow_idle	= omap3_dpll_allow_idle,
++	.deny_idle	= omap3_dpll_deny_idle,
+ };
+ 
+-#endif
++const struct clkops clkops_omap3_core_dpll_ops = {
++	.allow_idle	= omap3_dpll_allow_idle,
++	.deny_idle	= omap3_dpll_deny_idle,
++};
+ 
++#endif
+ 
+ /*
+  * OMAP2+ clock reset and init functions
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 896584e..2a939e5 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -146,5 +146,6 @@ extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
+ #endif
+ 
+ extern const struct clkops clkops_omap3_noncore_dpll_ops;
++extern const struct clkops clkops_omap3_core_dpll_ops;
+ 
+ #endif
 diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-index 403a4a1..3e9d721 100644
+index 3e9d721..7cf89f8 100644
 --- a/arch/arm/mach-omap2/clock3xxx_data.c
 +++ b/arch/arm/mach-omap2/clock3xxx_data.c
-@@ -296,7 +296,7 @@ static struct dpll_data dpll1_dd = {
+@@ -429,7 +429,7 @@ static struct dpll_data dpll3_dd = {
  
- static struct clk dpll1_ck = {
- 	.name		= "dpll1_ck",
+ static struct clk dpll3_ck = {
+ 	.name		= "dpll3_ck",
 -	.ops		= &clkops_null,
-+	.ops		= &clkops_omap3_noncore_dpll_ops,
++	.ops		= &clkops_omap3_core_dpll_ops,
  	.parent		= &sys_ck,
- 	.dpll_data	= &dpll1_dd,
+ 	.dpll_data	= &dpll3_dd,
  	.round_rate	= &omap2_dpll_round_rate,
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index de9ec8d..b843b6e 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -443,7 +443,7 @@ static struct clk dpll_core_ck = {
+ 	.parent		= &sys_clkin_ck,
+ 	.dpll_data	= &dpll_core_dd,
+ 	.init		= &omap2_init_dpll_parent,
+-	.ops		= &clkops_null,
++	.ops		= &clkops_omap3_core_dpll_ops,
+ 	.recalc		= &omap3_dpll_recalc,
+ };
+ 
 -- 
 1.7.0.4
