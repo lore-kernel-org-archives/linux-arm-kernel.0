@@ -1,7 +1,7 @@
 From: ccross@android.com (Colin Cross)
 Date: Thu, 10 Feb 2011 02:04:45 -0800
 Subject: [PATCH 1/5] cpu_pm: Add cpu power management notifiers
-Message-ID: <mailman.127.1315803743.20020.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.132.1315982732.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -379,4 +379,5 @@ index 3744c59..80a8597 100644
 1.7.4.1
 
 
---------------030209040405090402060508--
+
+--------------050304080702050405070807--
