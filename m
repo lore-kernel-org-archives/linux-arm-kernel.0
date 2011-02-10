@@ -1,87 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Feb 2011 18:17:41 +0100
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110211003533.GA9151@S2100-06.ap.freescale.net>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<201102042126.52701.arnd@arndb.de>
-	<20110211003533.GA9151@S2100-06.ap.freescale.net>
-Message-ID: <201102101817.42099.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 10 Feb 2011 18:29:41 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have SMP_ON_UP
+	fixups
+In-Reply-To: <20110210144617.GD3652@n2100.arm.linux.org.uk>
+References: <AANLkTimK06nJPtQoym3HxXeDD-s4nUrN0vWjp_JcgTjx@mail.gmail.com>
+	<20110125174636.GE17286@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101251618230.8580@xanadu.home>
+	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
+	<20110126124452.GB4232@n2100.arm.linux.org.uk>
+	<20110126172535.GA15983@arm.com>
+	<20110209142211.GA11460@n2100.arm.linux.org.uk>
+	<20110210125624.GA3652@n2100.arm.linux.org.uk>
+	<AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
+	<AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 February 2011, Shawn Guo wrote:
-> 
-> > > +	struct resource			*res;
-> > > +	struct resource			*dma_res;
-> > > +	struct clk			*clk;
-> > 
-> > are visible in the parent.
-> > 
-> It seems this is a generally used approach, seen in mxcmmc and pxamci.
+On Thu, Feb 10, 2011 at 2:46 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Feb 10, 2011 at 02:13:13PM +0000, Dave Martin wrote:
+>> On Thu, Feb 10, 2011 at 2:11 PM, Dave Martin <dave.martin@linaro.org> wrote:
+>> > Hi, apologies-- didn't see my mail for a bit.
+>> >
+>> > I get the problem with this tree and config (which builds with
+>> > SMP_ON_UP and THUMB2_KERNEL for omap3/4):
+>> >
+>> > Tree: git://git.linaro.org/people/dmart/linux-2.6-arm.git
+>> > dirty/arm/omap-thumb2+merged
+>> > Config: http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config
+>
+> Thanks for the config.
+>
+>> Note that this tree contains some extra patches (though I believe
+>> nothing is there which should cause the problem), and does not contain
+>> everything from rmk/devel -- so it's possible this has been fixed in
+>> the meantime or no longer occurs for some other reason...
+>
+> No need - I now have some modules which contain SMP alternatives, so we
+> do need to fix the module loader for this, and keep the SMP alternatives
+> replacement code around. ?It's not worth eliminating the code as if we
+> include an informative printk() to say why we're refusing to load the
+> module, the string would be larger than the code it eliminates. ?So, I
+> think we need to merge the patch below to avoid run-time problems.
 
-Just because someone else is doing it, it doesn't have to be a good
-idea ;-)
+I thought the problem was not caused by removal of the fixup code, but
+rather by the removal of code referenced by fixups?
 
-But you're right, it seems to be done this way almost everywhere.
-Unless Chris has a more definite opinion here, I don't mind if
-you follow the same pattern.
-
-If someone decides that it's really a bad idea, we should change
-all drivers at once.
-
-> > > +	struct mxs_dma_data		dma_data;
-> > 
-> > Why do you need host specific DMA structures? Please stick to
-> > the generic dma-engine API if possible.
-> > 
-> I'm sticking to the generic dmaengine api.  The mxs dma hardware
-> has separate irq line for every single dma channel, which needs to
-> be told by client driver.
-
-I'm not convinced, it still sounds like a layering violation to
-have specific information about the DMA controller in the
-platform data of a driver using the dma engine API.
-
-Why can't you put the interrupt number into the platform data of
-the dma engine device? Your filter function already identifies
-the number of the DMA channel.
-
-> > > +static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
-> > > +{
-> > > +	struct mxs_mmc_host *host = dev_id;
-> > > +	u32 stat;
-> > > +
-> > > +	stat = __raw_readl(host->base + HW_SSP_CTRL1);
-> > > +	__mxs_clrl(stat & MXS_MMC_IRQ_BITS, host->base + HW_SSP_CTRL1);
-> > > +
-> > > +	if (host->cmd && (stat & MXS_MMC_ERR_BITS))
-> > > +		host->status = __raw_readl(host->base + HW_SSP_STATUS);
-> > > +
-> > > +	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
-> > > +		mmc_signal_sdio_irq(host->mmc);
-> > > +
-> > > +	return IRQ_HANDLED;
-> > > +}
-> > 
-> > You use spin_lock_irqsave in mxs_mmc_enable_sdio_irq, but don't
-> > actually use the spinlock in the interrupt handler. This means
-> > that either your interrupt handler is broken because it doesn't
-> > lock, or that you don't actually need the _irqsave part.
-> > 
-> I do not understand this one.  I'm seeing mxcmmc and pxamci use
-> spin_lock_irqsave/irqrestore in the similar way.
-
-The difference is that e.g. mxcmci_irq() takes the spinlock that is
-used to protect the host->use_sdio flag, serializing the the
-code that initializes sdio with the code that uses it.
-
-[Actually, mxcmci_irq() also looks wrong, because it releases the
-spinlock before calling mmc_signal_sdio_irq(), so sdio may be
-disabled by then, but that is a slightly different bug]
-
-What I meant is that you take care to avoid getting into the
-interrupt handler while holding the spinlock, but in the handler,
-you don't check if the lock is held. It can't be correct to
-serialize just half the cases.
-
-	Arnd
+Cheers
+---Dave
