@@ -1,74 +1,87 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 10 Feb 2011 12:00:09 +0100 (CET)
-Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
-In-Reply-To: <Pine.LNX.4.64.1102101136320.15087@axis700.grange>
-References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
-	<Pine.LNX.4.64.1102101136320.15087@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1102101158510.17898@axis700.grange>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 10 Feb 2011 13:03:15 +0200
+Subject: [PXA] A question about PXA310 cpufreq for 806Mhz
+In-Reply-To: <1297329771.21848.6.camel@mola>
+References: <1297329771.21848.6.camel@mola>
+Message-ID: <4D53C5F3.9050100@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Feb 2011, Guennadi Liakhovetski wrote:
+Hi,
 
-> On Thu, 10 Feb 2011, Alexander Stein wrote:
-> 
-> > h_end_width and v_end_width should only contain the front porches.
-> > Otherwise, SCREEN_WIDTH (pixel clocks between HSYNC) in SDC_HOR_CONF
-> > and SCREEN_HEIGHT (rows between VSYNC) in SDC_VER_CONF get false values.
-> 
-> Hm, no, this corrupts image on my pcm990 test-board. What makes you think 
-> this patch is needed? How do you see, that current values are "false?"
-> 
-> Thanks
-> Guennadi
-> 
-> > 
-> > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> > ---
-> >  drivers/video/mx3fb.c |    7 +++----
-> >  1 files changed, 3 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
-> > index ef71e56..9040833 100644
-> > --- a/drivers/video/mx3fb.c
-> > +++ b/drivers/video/mx3fb.c
-> > @@ -881,12 +881,11 @@ static int __set_par(struct fb_info *fbi, bool lock)
+On 02/10/11 11:22, Axel Lin wrote:
 
-Also just occurred to me - your offset of 881 lines is 100 lines below my 
-offset for the same code - against what tree is this patch, or do you have 
-some local changes there? Can it be, that that's the reason for your 
-problem?
+> hi,
+>
+> I have a device equipped with 806Mhz PXA310 cpu.
+> After bootup, the system shows it is running with 624Mhz.
+>
+> # cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
+> 624000
+> # cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
+> 624000
+>
+> # cat /proc/cpuinfo
+> Processor       : XScale-V3 based processor rev 2 (v5l)
+> BogoMIPS        : 623.00
+> Features        : swp half thumb fastmult edsp iwmmxt 
+> CPU implementer : 0x69
+> CPU architecture: 5TE
+> CPU variant     : 0x0
+> CPU part        : 0x689
+> CPU revision    : 2
+>
+> Hardware        : Getac PS236 Handheld Platform
+> Revision        : 0000
+> Serial          : 0000000000000000
+>
+> I fix it by below patch and it looks ok on my device.
+> I'm not sure if this is a proper way to fix it, I appreciate to see your comments.
+>
+> It is strange that I cannot find 806Mhz PXA31x CPU 
+> in the datasheet Section 6.1 PXA3XX Processor Differences.
 
-Thanks
-Guennadi
+I think the reason for this is that it is not true for all PXA31x SoCs.
+PXA3xx Specification Update document states, that the 806MHz
+operating points were added for PXA31x processors A2 stepping.
+This means that it is not true at least for A1 and A0 stepping and
+Also, there is nothing stated about the B0 and B1 stepping.
 
-> >  				   IPU_PIX_FMT_BGR666 : IPU_PIX_FMT_RGB666,
-> >  				   fbi->var.left_margin,
-> >  				   fbi->var.hsync_len,
-> > -				   fbi->var.right_margin +
-> > -				   fbi->var.hsync_len,
-> > +				   fbi->var.right_margin,
-> >  				   fbi->var.upper_margin,
-> >  				   fbi->var.vsync_len,
-> > -				   fbi->var.lower_margin +
-> > -				   fbi->var.vsync_len, sig_cfg) != 0) {
-> > +				   fbi->var.lower_margin,
-> > +				   sig_cfg) != 0) {
-> >  			dev_err(fbi->device,
-> >  				"mx3fb: Error initializing panel.\n");
-> >  			return -EINVAL;
-> > -- 
-> > 1.7.3.4
-> > 
-> > 
-> 
-> ---
-> Guennadi Liakhovetski, Ph.D.
-> Freelance Open-Source Software Developer
-> http://www.open-technology.de/
-> 
+> But in Section 6.7, Table 55: PXA31x Core PLL, Turbo and Run Mode Output Frequencies,
+> I do see 806Mhz support on the table.
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+But no details regarding stepping... Marvell's mess...
+
+> diff --git a/arch/arm/mach-pxa/cpufreq-pxa3xx.c b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+> index 88fbec0..abf7d7a 100644
+> --- a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+> +++ b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+> @@ -210,15 +210,14 @@ static int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
+>  
+>  	/* set default policy and cpuinfo */
+>  	policy->cpuinfo.min_freq = 104000;
+> -	policy->cpuinfo.max_freq = (cpu_is_pxa320()) ? 806000 : 624000;
+> +	policy->cpuinfo.max_freq = (cpu_is_pxa300()) ? 624000 : 806000;
+>  	policy->cpuinfo.transition_latency = 1000; /* FIXME: 1 ms, assumed */
+>  	policy->max = pxa3xx_get_clk_frequency_khz(0);
+>  	policy->cur = policy->min = policy->max;
+>  
+> -	if (cpu_is_pxa300() || cpu_is_pxa310())
+> +	if (cpu_is_pxa300())
+>  		ret = setup_freqs_table(policy, ARRAY_AND_SIZE(pxa300_freqs));
+> -
+> -	if (cpu_is_pxa320())
+> +	else if (cpu_is_pxa310() || cpu_is_pxa320())
+>  		ret = setup_freqs_table(policy, ARRAY_AND_SIZE(pxa320_freqs));
+>  
+>  	if (ret) {
+>
+
+It is obviously, not a good patch in light of what I've said above.
+May be we should build the pxa3xx_freqs table dynamically according
+to cpu type and stepping? And set the policy->cpuinfo on the way?
+
+
+-- 
+Regards,
+Igor.
