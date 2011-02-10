@@ -1,35 +1,23 @@
 From: B20596@freescale.com (Li Frank-B20596)
-Date: Thu, 10 Feb 2011 03:16:16 +0000
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 10 Feb 2011 03:23:00 +0000
+Subject: [PATCH 2/2] ARM i.MX23/28: Add framebuffer device support
+In-Reply-To: <1297257651-8002-3-git-send-email-s.hauer@pengutronix.de>
 References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D6916776E@039-SN1MPN1-003.039d.mgd.msft.net>
+	<1297257651-8002-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D6916778B@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +#define CTRL				0x00
-> +#define CTRL1				0x10
-> +#define MX28_CTRL2			0x20
-> +#define MX23_TRANSFER_COUNT		0x20
-> +#define MX28_TRANSFER_COUNT		0x30
-> +#define MX28_CUR_BUF			0x40
-> +#define MX28_NEXT_BUF			0x50
-> +#define MX23_CUR_BUF			0x30
-> +#define MX23_NEXT_BUF			0x40
-> +#define TIMING				0x60
-> +#define VDCTRL0				0x70
-> +#define VDCTRL1				0x80
-> +#define VDCTRL2				0x90
-> +#define VDCTRL3				0xa0
-> +#define VDCTRL4				0xb0
-
-Why you give up mx23/mx28 register define role, which generate from SOC xml. 
-There is a set header files for each mx23/mx28 module, which generate from xml.  
-I know original header files affect run time one Image. 
-But I think we can copy common part of such register definition because
-That keep consistent with mx23/mx28 data sheet. Data sheet and header file generate
-from one source xml.
-
-HW_<Module name>_<Register name>.
-BM_<Module name>_<Register name>_Bit name. 
+> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-
+> mx23.c
+> index ca72a05..bfc7f27 100644
+> --- a/arch/arm/mach-mxs/clock-mx23.c
+> +++ b/arch/arm/mach-mxs/clock-mx23.c
+> @@ -446,7 +446,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+>  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+>  	_REGISTER_CLOCK(NULL, "audio", audio_clk)
+> -	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> +	_REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
+>  };
+Why remove mx23 pwm clk here?
