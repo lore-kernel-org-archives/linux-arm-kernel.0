@@ -1,75 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Feb 2011 11:49:26 +0000
-Subject: [PATCH] ARM: hw_breakpoint: fix ptrace breakpoint advertising on
-	unsupported arch
-Message-ID: <1297338566-19947-1-git-send-email-will.deacon@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 10 Feb 2011 12:51:09 +0100
+Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
+In-Reply-To: <20110210104725.GC2206@pengutronix.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
+	<09EC74FE2C9E8444BF2FF67BD36E1D69167919@039-SN1MPN1-003.039d.mgd.msft.net>
+	<201102101046.33994.jbe@pengutronix.de>
+	<20110210104725.GC2206@pengutronix.de>
+Message-ID: <20110210115109.GR9041@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ptrace debug information register was advertising breakpoint and
-watchpoint resources for unsupported debug architectures. This meant
-that setting breakpoints on these architectures would appear to succeed,
-although they would never fire in reality.
+On Thu, Feb 10, 2011 at 11:47:25AM +0100, Wolfram Sang wrote:
+> > But I would prefer:
+> > #define SET 4
+> > #define CLEAR 8
+> > [...]
+> > writel(CTRL_DOTCLK_MODE, host->base + CTRL + SET)
 
-This patch fixes the breakpoint slot probing so that it returns 0 when
-running on an unsupported debug architecture.
+For this we already have __mxs_setl.
 
-Reported-by: Ulrich Weigand <ulrich.weigand@de.ibm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/hw_breakpoint.c |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+> 
+> NACK.
+> 
+> This will indeed not be caught by the compiler.
+> 
+> And while I like the shorter macros better as well, an MXSFB_ prefix
+> should be added IMO. Macros like CTRL and TIMING are not too well
+> protected.
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index ab02d8a..d600bd3 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -137,11 +137,10 @@ static u8 get_debug_arch(void)
- 	u32 didr;
- 
- 	/* Do we implement the extended CPUID interface? */
--	if (((read_cpuid_id() >> 16) & 0xf) != 0xf) {
--		pr_warning("CPUID feature registers not supported. "
--				"Assuming v6 debug is present.\n");
-+	if (WARN_ONCE((((read_cpuid_id() >> 16) & 0xf) != 0xf),
-+	    "CPUID feature registers not supported. "
-+	    "Assuming v6 debug is present.\n"))
- 		return ARM_DEBUG_ARCH_V6;
--	}
- 
- 	ARM_DBG_READ(c0, 0, didr);
- 	return (didr >> 16) & 0xf;
-@@ -152,6 +151,12 @@ u8 arch_get_debug_arch(void)
- 	return debug_arch;
- }
- 
-+static int debug_arch_supported(void)
-+{
-+	u8 arch = get_debug_arch();
-+	return arch >= ARM_DEBUG_ARCH_V6 && arch <= ARM_DEBUG_ARCH_V7_ECP14;
-+}
-+
- /* Determine number of BRP register available. */
- static int get_num_brp_resources(void)
- {
-@@ -268,6 +273,9 @@ out:
- 
- int hw_breakpoint_slots(int type)
- {
-+	if (!debug_arch_supported())
-+		return 0;
-+
- 	/*
- 	 * We can be called early, so don't rely on
- 	 * our static variables being initialised.
-@@ -882,7 +890,7 @@ static int __init arch_hw_breakpoint_init(void)
- 
- 	debug_arch = get_debug_arch();
- 
--	if (debug_arch > ARM_DEBUG_ARCH_V7_ECP14) {
-+	if (!debug_arch_supported()) {
- 		pr_info("debug architecture 0x%x unsupported.\n", debug_arch);
- 		return 0;
- 	}
++1 for a prefix, be it MXSFB_ or LCDIF_, will change this.
+
+Otherwise can we please stop about arguing about register defines? It's
+too much a matter of taste and there is no perfect way to solve this.
+
+Sascha
+
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
