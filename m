@@ -1,40 +1,74 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 10 Feb 2011 11:47:25 +0100
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <201102101046.33994.jbe@pengutronix.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-	<09EC74FE2C9E8444BF2FF67BD36E1D69167919@039-SN1MPN1-003.039d.mgd.msft.net>
-	<201102101046.33994.jbe@pengutronix.de>
-Message-ID: <20110210104725.GC2206@pengutronix.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 10 Feb 2011 12:00:09 +0100 (CET)
+Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
+In-Reply-To: <Pine.LNX.4.64.1102101136320.15087@axis700.grange>
+References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
+	<Pine.LNX.4.64.1102101136320.15087@axis700.grange>
+Message-ID: <Pine.LNX.4.64.1102101158510.17898@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> But I would prefer:
-> #define SET 4
-> #define CLEAR 8
-> [...]
-> writel(CTRL_DOTCLK_MODE, host->base + CTRL + SET)
+On Thu, 10 Feb 2011, Guennadi Liakhovetski wrote:
 
-NACK.
+> On Thu, 10 Feb 2011, Alexander Stein wrote:
+> 
+> > h_end_width and v_end_width should only contain the front porches.
+> > Otherwise, SCREEN_WIDTH (pixel clocks between HSYNC) in SDC_HOR_CONF
+> > and SCREEN_HEIGHT (rows between VSYNC) in SDC_VER_CONF get false values.
+> 
+> Hm, no, this corrupts image on my pcm990 test-board. What makes you think 
+> this patch is needed? How do you see, that current values are "false?"
+> 
+> Thanks
+> Guennadi
+> 
+> > 
+> > Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+> > ---
+> >  drivers/video/mx3fb.c |    7 +++----
+> >  1 files changed, 3 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+> > index ef71e56..9040833 100644
+> > --- a/drivers/video/mx3fb.c
+> > +++ b/drivers/video/mx3fb.c
+> > @@ -881,12 +881,11 @@ static int __set_par(struct fb_info *fbi, bool lock)
 
-This will indeed not be caught by the compiler.
+Also just occurred to me - your offset of 881 lines is 100 lines below my 
+offset for the same code - against what tree is this patch, or do you have 
+some local changes there? Can it be, that that's the reason for your 
+problem?
 
-And while I like the shorter macros better as well, an MXSFB_ prefix
-should be added IMO. Macros like CTRL and TIMING are not too well
-protected.
+Thanks
+Guennadi
 
-Regards,
+> >  				   IPU_PIX_FMT_BGR666 : IPU_PIX_FMT_RGB666,
+> >  				   fbi->var.left_margin,
+> >  				   fbi->var.hsync_len,
+> > -				   fbi->var.right_margin +
+> > -				   fbi->var.hsync_len,
+> > +				   fbi->var.right_margin,
+> >  				   fbi->var.upper_margin,
+> >  				   fbi->var.vsync_len,
+> > -				   fbi->var.lower_margin +
+> > -				   fbi->var.vsync_len, sig_cfg) != 0) {
+> > +				   fbi->var.lower_margin,
+> > +				   sig_cfg) != 0) {
+> >  			dev_err(fbi->device,
+> >  				"mx3fb: Error initializing panel.\n");
+> >  			return -EINVAL;
+> > -- 
+> > 1.7.3.4
+> > 
+> > 
+> 
+> ---
+> Guennadi Liakhovetski, Ph.D.
+> Freelance Open-Source Software Developer
+> http://www.open-technology.de/
+> 
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110210/d36ddd33/attachment.sig>
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
