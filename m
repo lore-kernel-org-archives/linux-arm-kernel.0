@@ -1,189 +1,228 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 10 Feb 2011 22:41:25 +0100
-Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
-In-Reply-To: <1297372554-19527-1-git-send-email-GNUtoo@no-log.org>
-References: <1297372554-19527-1-git-send-email-GNUtoo@no-log.org>
-Message-ID: <4D545B85.8010706@pengutronix.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 10 Feb 2011 14:17:13 -0800
+Subject: [PATCH v2 5/5] ARM: omap3: Thumb-2 compatibility for sleep34xx.S
+In-Reply-To: <1296756161-26092-6-git-send-email-dave.martin@linaro.org> (Dave
+	Martin's message of "Thu, 3 Feb 2011 18:02:41 +0000")
+References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
+	<1296756161-26092-6-git-send-email-dave.martin@linaro.org>
+Message-ID: <87d3mzh6vq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Dave Martin <dave.martin@linaro.org> writes:
 
-(sorry if this mail is sent twice..)
+>  * Use BSYM() to get the correct Thumb branch address
+>    for adr <Rd>, <label>
+>
+>  * Fix an out-of-range ADR when building for ARM
+>
+>  * Correctly call es3_sdrc_fix as Thumb when copied to SRAM.
+>
+>  * Remove deprecated/undefined PC-relative stores
+>
+>  * Add the required ENDPROC() directive for each ENTRY().
+>
+>  * .align before data words
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-On 02/10/2011 10:15 PM, Denis 'GNUtoo' Carikli wrote:
-> This work was based on bug-linux-2.6.30.patch that can be found
->   in buglabs's svn here:
->   svn://bugcamp.net/bug/branches/izzy/experimental
-> 
-> Note that the hardware schematics and documentations can be obtained
->   here: http://www.bugcommunity.com/wiki/index.php/BUGbase
+I'm attempting to test this series with OMAP PM, but some changes here
+don't compile for me.
 
-some nitpicking inside:
+My toolchain is: gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) 
 
-> 
-> Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
+First, I merged your arm/omap-thumb2+merged branch with my pm branch
+from git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+
+There were some minor conflicts here, but they looked simple enough and
+I just resolved in favor of your branch.
+
+Trying to build with CONFIG_THUMB2_KERNEL=y, I ran into a compile
+problem...
+
+
 > ---
->  arch/arm/mach-mx3/Kconfig            |    9 +++
->  arch/arm/mach-mx3/Makefile           |    1 +
->  arch/arm/mach-mx3/mach-mx31bugbase.c |   97 ++++++++++++++++++++++++++++++++++
->  3 files changed, 107 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx3/mach-mx31bugbase.c
-> 
-> diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
-> index de80d98..4f57f13 100644
-> --- a/arch/arm/mach-mx3/Kconfig
-> +++ b/arch/arm/mach-mx3/Kconfig
-> @@ -199,6 +199,15 @@ config MACH_KZM_ARM11_01
->  	  Include support for KZM-ARM11-01. This includes specific
->  	  configurations for the board and its peripherals.
+>  arch/arm/mach-omap2/sleep34xx.S |   42 +++++++++++++++++++++++++++++---------
+>  1 files changed, 32 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index 4032a8e..ef73429 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -80,8 +80,10 @@
+>  /* Function call to get the restore pointer for resume from OFF */
+>  ENTRY(get_restore_pointer)
+>  	stmfd	sp!, {lr}	@ save registers on stack
+> -	adr	r0, restore
+> +	adr	r0, BSYM(restore)
+>  	ldmfd	sp!, {pc}	@ restore regs and return
+> +ENDPROC(get_restore_pointer)
+> +	.align
+>  ENTRY(get_restore_pointer_sz)
+>  	.word	. - get_restore_pointer
 >  
-> +config MACH_BUG
-> +	bool "Support Buglabs BUGBase platform"
-> +	select SOC_IMX31
-> +	select IMX_HAVE_PLATFORM_IMX_UART
-> +	default y
-> +	help
-> +	  Include support for BUGBase 1.3 platform. This includes specific
-> +	  configurations for the board and its peripherals.
-> +
->  config MACH_EUKREA_CPUIMX35
->  	bool "Support Eukrea CPUIMX35 Platform"
->  	select SOC_IMX35
-> diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
-> index bc7294f..98e5eb3 100644
-> --- a/arch/arm/mach-mx3/Makefile
-> +++ b/arch/arm/mach-mx3/Makefile
-> @@ -20,6 +20,7 @@ obj-$(CONFIG_MACH_PCM043)	+= mach-pcm043.o
->  obj-$(CONFIG_MACH_ARMADILLO5X0) += mach-armadillo5x0.o
->  obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35_3ds.o
->  obj-$(CONFIG_MACH_KZM_ARM11_01)	+= mach-kzm_arm11_01.o
-> +obj-$(CONFIG_MACH_BUG)          += mach-mx31bugbase.o
->  obj-$(CONFIG_MACH_EUKREA_CPUIMX35)	+= mach-cpuimx35.o
->  obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD)	+= eukrea_mbimxsd-baseboard.o
->  obj-$(CONFIG_MACH_VPR200)	+= mach-vpr200.o
-> diff --git a/arch/arm/mach-mx3/mach-mx31bugbase.c b/arch/arm/mach-mx3/mach-mx31bugbase.c
-> new file mode 100644
-> index 0000000..e0ad0f0
-> --- /dev/null
-> +++ b/arch/arm/mach-mx3/mach-mx31bugbase.c
-> @@ -0,0 +1,97 @@
-> +/*
-> + *  Copyright (C) 2000 Deep Blue Solutions Ltd
-> + *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
-> + *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> @@ -89,8 +91,10 @@ ENTRY(get_restore_pointer_sz)
+>  /* Function call to get the restore pointer for 3630 resume from OFF */
+>  ENTRY(get_omap3630_restore_pointer)
+>  	stmfd	sp!, {lr}	@ save registers on stack
+> -	adr	r0, restore_3630
+> +	adr	r0, BSYM(restore_3630)
+>  	ldmfd	sp!, {pc}	@ restore regs and return
+> +ENDPROC(get_omap3630_restore_pointer)
+> +	.align
+>  ENTRY(get_omap3630_restore_pointer_sz)
+>  	.word	. - get_omap3630_restore_pointer
+>  
+> @@ -98,8 +102,10 @@ ENTRY(get_omap3630_restore_pointer_sz)
+>  /* Function call to get the restore pointer for ES3 to resume from OFF */
+>  ENTRY(get_es3_restore_pointer)
+>  	stmfd	sp!, {lr}	@ save registers on stack
+> -	adr	r0, restore_es3
+> +	adr	r0, BSYM(restore_es3)
+>  	ldmfd	sp!, {pc}	@ restore regs and return
+> +ENDPROC(get_es3_restore_pointer)
+> +	.align
+>  ENTRY(get_es3_restore_pointer_sz)
+>  	.word	. - get_es3_restore_pointer
+>  
+> @@ -113,8 +119,11 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
+>  	stmfd	sp!, {lr}	@ save registers on stack
+>  	/* Setup so that we will disable and enable l2 */
+>  	mov	r1, #0x1
+> -	str	r1, l2dis_3630
+> + ARM(	adrl	r2, l2dis_3630	)	@ may be out of range for adr in ARM
+> + THUMB(	adr	r2, l2dis_3630	)	@ Thumb has more range, but not adrl
+> +	str	r1, [r2]
+>  	ldmfd	sp!, {pc}	@ restore regs and return
+> +ENDPROC(enable_omap3630_toggle_l2_on_restore)
+>  
+>  	.text
+>  /* Function to call rom code to save secure ram context */
+> @@ -139,12 +148,14 @@ ENTRY(save_secure_ram_context)
+>  	nop
+>  	nop
+>  	ldmfd	sp!, {r1-r12, pc}
+> +	.align
+>  sram_phy_addr_mask:
+>  	.word	SRAM_BASE_P
+>  high_mask:
+>  	.word	0xffff
+>  api_params:
+>  	.word	0x4, 0x0, 0x0, 0x1, 0x1
+> +ENDPROC(save_secure_ram_context)
+>  ENTRY(save_secure_ram_context_sz)
+>  	.word	. - save_secure_ram_context
+>  
+> @@ -279,8 +290,7 @@ clean_l2:
+>  	 *  - 'might' have to copy address, load and jump to it
+>  	 */
+>  	ldr	r1, kernel_flush
+> -	mov	lr, pc
+> -	bx	r1
+> +	blx	r1
+>  
+>  omap3_do_wfi:
+>  	ldr	r4, sdrc_power		@ read the SDRC_POWER register
+> @@ -346,8 +356,8 @@ restore_es3:
+>  	and	r4, r4, #0x3
+>  	cmp	r4, #0x0	@ Check if previous power state of CORE is OFF
+>  	bne	restore
+> -	adr	r0, es3_sdrc_fix
+> -	ldr	r1, sram_base
+> +	adr	r0, es3_sdrc_fix	@ Not using BSYM clears the Thumb bit.
 
-The address isn't correct anymore, just remove the paragraph, see commit
-aa71251c5b8c673361281fbfd8be5a9ee8b9f4cc.
+This fails to compile:
 
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <mach/iomux-mx3.h>
-> +#include <mach/imx-uart.h>
-> +#include <mach/hardware.h>
-> +#include <mach/common.h>
-> +
-> +#include <asm/mach/time.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach-types.h>
-> +
-> +#include "devices-imx31.h"
-> +
-> +/*!
-> + * @file mx31bugbase.c
-> + *
-> + * @brief This file contains the board-specific initialization routines.
-> + *
-> + * @ingroup System
-> + */
-> +
-> +#if defined(CONFIG_SERIAL_IMX) || defined(CONFIG_SERIAL_IMX_MODULE)
-> +static struct imxuart_platform_data uart_pdata = {
-> +	.flags = IMXUART_HAVE_RTSCTS,
-> +};
-> +
-> +static unsigned int uart5_pins[] = {
-> +	MX31_PIN_PC_RST__CTS5,
-> +	MX31_PIN_PC_VS2__RTS5,
-> +	MX31_PIN_PC_BVD2__TXD5,
-> +	MX31_PIN_PC_BVD1__RXD5
+/work/kernel/omap/pm/arch/arm/mach-omap2/sleep34xx.S: Assembler messages:
+/work/kernel/omap/pm/arch/arm/mach-omap2/sleep34xx.S:361: Error: invalid immediate for address calculation (value = 0x00000004)
 
-please add a ","
+Kevin
 
-> +};
+> +	ldr	r1, sram_base	@ Must be 8-byte aligned to preserve alignment.
+>  	ldr	r2, es3_sdrc_fix_sz
+>  	mov	r2, r2, ror #2
+>  copy_to_sram:
+> @@ -356,6 +366,7 @@ copy_to_sram:
+>  	subs	r2, r2, #0x1	@ num_words--
+>  	bne	copy_to_sram
+>  	ldr	r1, sram_base
+> + THUMB(	orr	r1, r1, #BSYM(es3_sdrc_fix) & 1 )
+>  	blx	r1
+>  	b	restore
+>  
+> @@ -438,6 +449,7 @@ skipl2dis:
+>  #endif
+>  	b	logic_l1_restore
+>  
+> +	.align
+>  l2_inv_api_params:
+>  	.word	0x1, 0x00
+>  l2_inv_gp:
+> @@ -607,6 +619,7 @@ usettbr0:
+>  
+>  /* This function implements the erratum ID i443 WA, applies to 34xx >= ES3.0 */
+>  	.text
+> +	.align	3
+>  ENTRY(es3_sdrc_fix)
+>  	ldr	r4, sdrc_syscfg		@ get config addr
+>  	ldr	r5, [r4]		@ get value
+> @@ -634,6 +647,7 @@ ENTRY(es3_sdrc_fix)
+>  	str	r5, [r4]		@ kick off refreshes
+>  	bx	lr
+>  
+> +	.align
+>  sdrc_syscfg:
+>  	.word	SDRC_SYSCONFIG_P
+>  sdrc_mr_0:
+> @@ -648,6 +662,7 @@ sdrc_emr2_1:
+>  	.word	SDRC_EMR2_1_P
+>  sdrc_manual_1:
+>  	.word	SDRC_MANUAL_1_P
+> +ENDPROC(es3_sdrc_fix)
+>  ENTRY(es3_sdrc_fix_sz)
+>  	.word	. - es3_sdrc_fix
+>  
+> @@ -682,6 +697,10 @@ wait_sdrc_ready:
+>  	bic	r5, r5, #0x40
+>  	str	r5, [r4]
+>  
+> +@ PC-relative stores lead to undefined behaviour in Thumb-2: use a r7 as a
+> +@ base instead.
+> +@ Be careful not to clobber r7 when maintaing this code.
 > +
-> +static inline void mxc_init_imx_uart(void)
-> +{
-> +	mxc_iomux_setup_multiple_pins(uart5_pins,
-> +				ARRAY_SIZE(uart5_pins), "uart-4");
-> +	imx31_add_imx_uart4(&uart_pdata);
-> +}
-> +#else /* !SERIAL_IMX */
-> +static inline void mxc_init_imx_uart(void)
-> +{
-> +}
-> +#endif /* !SERIAL_IMX */
-> +
-> +/*!
-> + * Board specific initialization.
-> + */
-> +static void __init mxc_board_init(void)
-> +{
-> +	mxc_init_imx_uart();
-> +}
-> +
-> +
-> +static void __init mx31bug_timer_init(void)
-> +{
-> +	mx31_clocks_init(26000000);
-> +}
-> +
-> +static struct sys_timer mx31bug_timer = {
-> +	.init	= mx31bug_timer_init,
-> +};
-> +
-> +/*
-> + * The following uses standard kernel macros defined in arch.h in order to
-> + * initialize __mach_desc_MX31BUG data structure.
-> + */
-> +
-> +MACHINE_START(BUG, "BugLabs BUGBase")
-> +	.boot_params    = PHYS_OFFSET + 0x100,
-> +	.timer          = &mx31bug_timer,
-> +	.map_io         = mx31_map_io,
-> +	.init_irq       = mx31_init_irq,
-> +	.init_machine   = mxc_board_init,
-> +MACHINE_END
-
-cheers, Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110210/79462723/attachment.sig>
+>  is_dll_in_lock_mode:
+>  	/* Is dll in lock mode? */
+>  	ldr	r4, sdrc_dlla_ctrl
+> @@ -689,10 +708,11 @@ is_dll_in_lock_mode:
+>  	tst	r5, #0x4
+>  	bxne	lr			@ Return if locked
+>  	/* wait till dll locks */
+> +	adr	r7, kick_counter
+>  wait_dll_lock_timed:
+>  	ldr	r4, wait_dll_lock_counter
+>  	add	r4, r4, #1
+> -	str	r4, wait_dll_lock_counter
+> +	str	r4, [r7, #wait_dll_lock_counter - kick_counter]
+>  	ldr	r4, sdrc_dlla_status
+>  	/* Wait 20uS for lock */
+>  	mov	r6, #8
+> @@ -718,9 +738,10 @@ kick_dll:
+>  	dsb
+>  	ldr	r4, kick_counter
+>  	add	r4, r4, #1
+> -	str	r4, kick_counter
+> +	str	r4, [r7]		@ kick_counter
+>  	b	wait_dll_lock_timed
+>  
+> +	.align
+>  cm_idlest1_core:
+>  	.word	CM_IDLEST1_CORE_V
+>  cm_idlest_ckgen:
+> @@ -763,6 +784,7 @@ kick_counter:
+>  	.word	0
+>  wait_dll_lock_counter:
+>  	.word	0
+> +ENDPROC(omap34xx_cpu_suspend)
+>  
+>  ENTRY(omap34xx_cpu_suspend_sz)
+>  	.word	. - omap34xx_cpu_suspend
