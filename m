@@ -1,56 +1,93 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Thu, 10 Feb 2011 09:51:10 +0100
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <09EC74FE2C9E8444BF2FF67BD36E1D6916776E@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<1297257651-8002-2-git-send-email-s.hauer@pengutronix.de>
-	<09EC74FE2C9E8444BF2FF67BD36E1D6916776E@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <201102100951.10977.jbe@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 10 Feb 2011 14:29:22 +0530
+Subject: [PATCH 0/7] clock/dpll autoidle support
+In-Reply-To: <1297159838-30282-1-git-send-email-rnayak@ti.com>
+References: <1297159838-30282-1-git-send-email-rnayak@ti.com>
+Message-ID: <c9745c3f3f10e74f98c8f3055db96a91@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Li Frank-B20596 wrote:
-> > +#define CTRL				0x00
-> > +#define CTRL1				0x10
-> > +#define MX28_CTRL2			0x20
-> > +#define MX23_TRANSFER_COUNT		0x20
-> > +#define MX28_TRANSFER_COUNT		0x30
-> > +#define MX28_CUR_BUF			0x40
-> > +#define MX28_NEXT_BUF			0x50
-> > +#define MX23_CUR_BUF			0x30
-> > +#define MX23_NEXT_BUF			0x40
-> > +#define TIMING				0x60
-> > +#define VDCTRL0				0x70
-> > +#define VDCTRL1				0x80
-> > +#define VDCTRL2				0x90
-> > +#define VDCTRL3				0xa0
-> > +#define VDCTRL4				0xb0
+> -----Original Message-----
+> From: Rajendra Nayak [mailto:rnayak at ti.com]
+> Sent: Tuesday, February 08, 2011 3:41 PM
+> To: linux-omap at vger.kernel.org
+> Cc: paul at pwsan.com; b-cousson at ti.com; khilman at ti.com;
+santosh.shilimkar at ti.com; linux-arm-
+> kernel at lists.infradead.org; Rajendra Nayak
+> Subject: [PATCH 0/7] clock/dpll autoidle support
 >
-> Why you give up mx23/mx28 register define role, which generate from SOC
-> xml.
-
-Your macros prevent me from writing short and compact code. If you need more 
-than one of these macros you always have to split each line to follow the 80 
-columns rule. Unreadable.
-
-> There is a set header files for each mx23/mx28 module, which generate 
-> from xml. I know original header files affect run time one Image.
-> But I think we can copy common part of such register definition because
-> That keep consistent with mx23/mx28 data sheet. Data sheet and header file
-> generate from one source xml.
+> OMAP has various clock nodes and dpll's
+> which support hardware level autoidle.
+> Enabling hardware level autoidle provides
+> better power savings without much software
+> intervention.
 >
-> HW_<Module name>_<Register name>.
-> BM_<Module name>_<Register name>_Bit name.
+> This series does the following to help enable
+> hardware level autoidling using clock framework
+> for some of these nodes on OMAP3 and OMAP4
+>
+> -1- Adds support for providing function pointers
+> for enabling/disabling autoidle in clkops
+> -2- Populates these in clkops for all OMAP3/4 dplls
+> -3- Enables all dpll autoidle late in boot on OMAP3 and OMAP4
+> -4- Adds support for mx postdivider autoidle (present
+> only on OMAP4) and enables it late in OMAP4 boot
 
-IMHO when I define the macros where they belong to, there is not need for this 
-redundant HW_<Module name> or BW__<Module name> prefixes. They are just 
-needless.
+Some more testing with this patch series to get OMAP4
+to sleep showed a few issues, mainly with the patches
+adding gate ctrl support for MX postdividers, listed below..
+[PATCH 6/7] omap4: dpll: Add dpll api to control GATE_CTRL
+[PATCH 7/7] omap4: dpll: Enable auto gate control for all MX postdividers
+
+Will fix the following issues..
+-1- Autogating support for clkout_x2 nodes (for PER
+and ABE DPLL) was'nt addressed
+-2- The clkdcoldo output (dpll_usb_clkdcoldo_ck)
+of USB dpll did not have the clksel populated and
+hence gate ctrl for it was'nt getting programmed.
+... and post a respin of this series shortly.
 
 Regards,
-Juergen
+Rajendra
 
--- 
-Pengutronix e.K.                              | Juergen Beisert             |
-Linux Solutions for Science and Industry      | Phone: +49-8766-939 228     |
-Vertretung Sued/Muenchen, Germany             | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
+>
+> Some of the patches in this series were earlier posted
+> and discussed as part of another series here
+> http://marc.info/?l=linux-omap&m=129681356402594&w=2
+> They are now posted as a seperate series as discussed
+> here
+> http://marc.info/?l=linux-omap&m=129713867702170&w=2
+>
+> The patches are boot tested on OMAP3430sdp and
+> OMAP4430sdp.
+>
+> The following changes since commit
+100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
+>   Linus Torvalds (1):
+>         Linux 2.6.38-rc4
+>
+> are available in the git repository at:
+>
+>  git://gitorious.org/omap-pm/linux.git dpll-autoidle
+>
+> Rajendra Nayak (7):
+>   omap: clock: Check for enable/disable ops support
+>   omap3: dpll: Populate clkops for dpll1_ck
+>   omap: clock: Add allow_idle/deny_idle support in clkops
+>   omap: dpll: Add allow_idle/deny_idle support for all DPLL's
+>   omap: dpll: Enable all OMAP3/4 dpll autoidle late at boot
+>   omap4: dpll: Add dpll api to control GATE_CTRL
+>   omap4: dpll: Enable auto gate control for all MX postdividers
+>
+>  arch/arm/mach-omap2/clock.c             |   25 ++++++++++++++---
+>  arch/arm/mach-omap2/clock.h             |    5 +++
+>  arch/arm/mach-omap2/clock3xxx_data.c    |    4 +-
+>  arch/arm/mach-omap2/clock44xx_data.c    |   42
++++++++++++++++---------------
+>  arch/arm/mach-omap2/dpll3xxx.c          |   42
++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/pm34xx.c            |   18 +++----------
+>  arch/arm/mach-omap2/pm44xx.c            |    4 +++
+>  arch/arm/plat-omap/clock.c              |   26 +++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/clock.h |    6 ++++
+>  9 files changed, 130 insertions(+), 42 deletions(-)
