@@ -1,43 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Feb 2011 11:59:09 -0000
-Subject: [PATCH v2] ARM: ptrace: remove single-step emulation code
-In-Reply-To: <alpine.LFD.2.00.1102091427200.14920@xanadu.home>
-References: <1297248175-11952-1-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1102091427200.14920@xanadu.home>
-Message-ID: <002c01cbc919$ed44b720$c7ce2560$@deacon@arm.com>
+From: B20596@freescale.com (Li Frank-B20596)
+Date: Thu, 10 Feb 2011 12:23:21 +0000
+Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
+In-Reply-To: <201102101212.17370.jbe@pengutronix.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102101052.10958.jbe@pengutronix.de>
+	<09EC74FE2C9E8444BF2FF67BD36E1D69167988@039-SN1MPN1-003.039d.mgd.msft.net>
+	<201102101212.17370.jbe@pengutronix.de>
+Message-ID: <09EC74FE2C9E8444BF2FF67BD36E1D691679E4@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > PTRACE_SINGLESTEP is a ptrace request designed to offer single-stepping
-> > support to userspace when the underlying architecture has hardware
-> > support for this operation.
-> >
-> > On ARM, we set arch_has_single_step() to 1 and attempt to emulate hardware
-> > single-stepping by disassembling the current instruction to determine the
-> > next pc and placing a software breakpoint on that location.
-> >
-> > Unfortunately this has the following problems:
-> >
-> > 1.) Only a subset of ARMv7 instructions are supported
-> > 2.) Thumb-2 is unsupported
-> > 3.) The code is not SMP safe
-> >
-> > We could try to fix this code, but it turns out that because of the above
-> > issues it is rarely used in practice.  GDB, for example, uses PTRACE_POKETEXT
-> > and PTRACE_PEEKTEXT to manage breakpoints itself and does not require any
-> > kernel assistance.
-> >
-> > This patch removes the single-step emulation code from ptrace meaning that
-> > the PTRACE_SINGLESTEP request will return -EIO on ARM. Portable code must
-> > check the return value from a ptrace call and handle the failure gracefully.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+
 > 
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> What about?
+> > Reg &= ~VDCTRL4_SET_DOTCLK_DLY(0x7);
+> Or?
+> > Reg &= ~VDCTRL4_SET_DOTCLK_DLY_MASK;
+> Okay, the even get longer and longer.
 
-Thanks Nicolas. I'll leave this over the weekend to see if it
-attracts further comment before putting it into the patch system.
+If use 0x7, you have to take care bit width. 
+If use VDCTRL4_SET_DOTCLK_DLY_MASK, I think BF_ and BM_ is better. 
 
-Cheers,
+> > Reg |= VDCTRL4_SET_DOTCLK_DLY(value)
+> > Writel(reg, offset+VDCTRL4)
+> >
+> > Compared with our macro policy.
+> >
+> > Reg = readl(offset+HW_VDCTRL4);
+> > Reg &=~ BM_VDCTRL4_SET_DOTCLK_DLY;
+> > Reg |= BF_VDCTRL4_SET_DOTCLK_DLY(value)
+> > Writel(reg, offset+HW_VDCTRL4)
+> 
+> Anywhere else such naming policy in the kernel? I have to deal with all
+> kind
+> of CPUs, not only i.MX23/28.
 
-Will
+This driver is for mx23/mx28. 
+I have not found such policy in the kernel, otherwise I have generated that at beginning. 
+It is better if all of mx23/mx28 driver follow the same role. 
