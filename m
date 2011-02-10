@@ -1,22 +1,36 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 10 Feb 2011 08:45:21 -0800
-Subject: [PATCH v4 10/15] ARM: tegra: iomap: Add missing devices, fix
-	use of SZ_8, SZ_64
-In-Reply-To: <1297320204-31882-11-git-send-email-ccross@android.com>
-References: <1297320204-31882-1-git-send-email-ccross@android.com>
-	<1297320204-31882-11-git-send-email-ccross@android.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0310F60414@HQMAIL01.nvidia.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 10 Feb 2011 18:09:36 +0100
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <201102091731.07794.arnd@arndb.de>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102091547.12131.arnd@arndb.de>
+	<20110209153716.GN9041@pengutronix.de>
+	<201102091731.07794.arnd@arndb.de>
+Message-ID: <20110210170936.GI22009@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross wrote at Wednesday, February 09, 2011 11:43 PM:
-> 
-> From: Gary King <gking@nvidia.com>
-> 
-> Adds gart, hdmi, avp, host1x, and pwm controllers to mach/iomap.h
-> There is no SZ_8 or SZ_64, replace them with constants
+On Wed, Feb 09, 2011 at 05:31:07PM +0100, Arnd Bergmann wrote:
+> Ok. This sounds like a lot of upfront work indeed, to make KMS more
+> generic, though I think a number of driver would benefit from it
+> eventually. It could be something for the Linaro graphics working
+> group to look at in the following 11.11 release, depending on how
+> many other people are interested in getting there.
 
-Can't we add those SZ_* constants?
+There is already a blueprint at linaro:
+https://blueprints.launchpad.net/linaro-graphics-wg/+spec/multimedia-linaro-dri-1105
 
+We have recently tested the state of Qt acceleration on the MX51, in
+order to find out which is the best way to make use of the
+possibilities. However, at least at the moment this requires highly
+experimental Qt sceenegraph git branches, and even then it results in
+lower perfomance than with software rendering ...
+
+But for the long term, the linaro blueprint looks like the way to go.
+
+rsc
 -- 
-nvpublic
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
