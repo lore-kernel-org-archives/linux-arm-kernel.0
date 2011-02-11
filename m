@@ -1,23 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 11 Feb 2011 11:30:20 +0100
-Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
-In-Reply-To: <20110211101056.GB23404@n2100.arm.linux.org.uk>
-References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
-	<20110201110348.GB31216@n2100.arm.linux.org.uk>
-	<AANLkTi=jP1G=foehWYNai5H=_F372FwpkLEO4wSkmqBc@mail.gmail.com>
-	<20110211101056.GB23404@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikOArp9y4bTsvKCxtShoTzzsQeABfPn0z+dGneL@mail.gmail.com>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Fri, 11 Feb 2011 11:41:56 +0100
+Subject: [PATCH v2] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD
+	declaration
+Message-ID: <1297420916-14505-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/11 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-> Maybe a solution to this is to use the DMA callback to signal that the
-> data path has completed, but still have the data end interrupt in place
-> so that it can trigger the stop command. ?That shouldn't result in
-> additional delays or even the requirement for a timeout.
+Fixes a regression of recent iomux changes: current MX51_PAD_UART2_TXD__UART2_TXD
+declaration overwrites IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT register
+(0x09ec) and prevent UART2 Rx from working properly.
+(Tested on my custom i.MX51 board where UART2 is used as console)
 
-That should be possible, I'll try to fix up a patch like that.
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
+Changes since v1:
+    - Improve patch description as requested by Sascha Hauer
 
-Thanks,
-Linus Walleij
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index b6767f9..df531aa 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -473,7 +473,7 @@
+ #define _MX51_PAD_UART2_RXD__UART2_RXD		IOMUX_PAD(0x628, 0x238, 0, 0x09ec, 2, 0)
+ #define _MX51_PAD_UART2_TXD__FIRI_RXD		IOMUX_PAD(0x62c, 0x23c, 1, 0x0000, 0, 0)
+ #define _MX51_PAD_UART2_TXD__GPIO1_21		IOMUX_PAD(0x62c, 0x23c, 3, 0x0000, 0, 0)
+-#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x09ec, 3, 0)
++#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__CSI1_D0		IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__GPIO1_22		IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__UART1_DTR		IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
+-- 
+1.6.0.4
