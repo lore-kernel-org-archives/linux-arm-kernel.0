@@ -1,52 +1,35 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Fri, 11 Feb 2011 23:20:45 +0800
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 11 Feb 2011 16:25:13 +0100
 Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102111551.15508.arnd@arndb.de>
+In-Reply-To: <AANLkTimS-1CxkSHDChqX1K8bt-89T=8SDoSdmKeZ4PXG@mail.gmail.com>
 References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<20110211144139.GC3920@ucw.cz> <201102111551.15508.arnd@arndb.de>
-Message-ID: <AANLkTimS-1CxkSHDChqX1K8bt-89T=8SDoSdmKeZ4PXG@mail.gmail.com>
+	<201102111551.15508.arnd@arndb.de>
+	<AANLkTimS-1CxkSHDChqX1K8bt-89T=8SDoSdmKeZ4PXG@mail.gmail.com>
+Message-ID: <201102111625.14226.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 10:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 11 February 2011, Pavel Machek wrote:
->> Hi!
->>
->> > I'm not sure if this is the best place to bring this up, but Russel's
->> > name is on a fair share of drivers/mmc code, and there does seem to be
->> > quite a bit of MMC-related discussions. Excuse me in advance if this
->> > isn't the right forum :-).
->> >
->> > Certain MMC vendors (maybe even quite a bit of them) use a pretty
->> > rigid buffering scheme when it comes to handling writes. There is
->> > usually a buffer A for random accesses, and a buffer B for sequential
->> > accesses. For certain Toshiba parts, it looks like buffer A is 8KB
->> > wide, with buffer B being 4MB wide, and all accesses larger than 8KB
->> > effectively equating to 4MB accesses. Worse, consecutive small (8k)
->> > writes are treated as one large sequential access, once again ending
->> > up in buffer B, thus necessitating out-of-order writing to work around
->> > this.
->>
->> Hmmmm, I somehow assumed MMCs would be much more cleverr than this.
->
-> No, these devices are incredibly stupid, or extremely optimized to
-> a specific use case (writing large video files to FAT32), depending on how
-> you look at them.
->
->> > reorders) them? The thresholds would then be adjustable as
->> > module/kernel parameters based on manfid. I'm asking because I have a
->> > patch now, but its ugly and hardcoded against a specific manufacturer.
->>
->> How big is performance difference?
->
-> Several orders of magnitude. It is very easy to get a card that can write
-> 12 MB/s into a case where it writes no more than 30 KB/s, doing only
-> things that happen frequently with ext3.
->
+On Friday 11 February 2011, Lei Wen wrote:
+> > Several orders of magnitude. It is very easy to get a card that can write
+> > 12 MB/s into a case where it writes no more than 30 KB/s, doing only
+> > things that happen frequently with ext3.
+> >
+> 
+> Maybe we could get that case into mmc_test code, so that we could track
+> that in latter whether it already be fixed or not? Or in other word, to prove
+> the firmware in sd card is stupid or not. :)
+ 
+There are many kinds of stupid, and a lot of cards are. I've actually had
+excellent success with simply measuring from user space, which is
+much easier than in mmc_test.
 
-Maybe we could get that case into mmc_test code, so that we could track
-that in latter whether it already be fixed or not? Or in other word, to prove
-the firmware in sd card is stupid or not. :)
+Unfortunately, you have to write to the card to do that, which may destroy
+the data even if you write the same data that is already on it.
 
-Best regards,
-Lei
+See
+https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Projects/FlashCardSurvey
+for most of my results. I'm about to write up a better paper with all the
+measurements, and will make my tools available soon.
+
+
+	Arnd
