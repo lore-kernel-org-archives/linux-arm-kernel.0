@@ -1,49 +1,54 @@
-From: premi@ti.com (Sanjeev Premi)
-Date: Fri, 11 Feb 2011 14:35:00 +0530
-Subject: [PATCH] omap3: fix compile-time warnings
-Message-ID: <1297415100-15912-1-git-send-email-premi@ti.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 11 Feb 2011 10:21:09 +0100
+Subject: [PATCH 3/3] ARM: mx3/mx31ads: fix comments of irq callbacks
+In-Reply-To: <20110211081050.GD27982@pengutronix.de>
+References: <20110211081050.GD27982@pengutronix.de>
+Message-ID: <1297416069-6861-3-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes these warnings when building kernel for OMAP3EVM
-only.
+The arguments to these callbacks were changed in
 
-  CC      arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.o
-arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c:95: warning:
- 'dsp_24xx_wkdeps' defined but not used
-arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c:119: warning:
- 'mpu_24xx_wkdeps' defined but not used
-arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c:147: warning:
- 'core_24xx_wkdeps' defined but not used
+	e981a30 (ARM: mx3: irq_data conversion.)
 
-The problem should be noticed when building for other OMAP3
-platforms (only) as well.
+but the comments were not adapted.
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
+Cc: Lennert Buytenhek <buytenh@secretlab.ca>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx3/mach-mx31ads.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-index e6f0d18..8134bb3 100644
---- a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-@@ -89,6 +89,8 @@ static struct clkdm_dep gfx_sgx_wkdeps[] = {
+diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
+index 14e7671..4e4b780 100644
+--- a/arch/arm/mach-mx3/mach-mx31ads.c
++++ b/arch/arm/mach-mx3/mach-mx31ads.c
+@@ -144,7 +144,7 @@ static void mx31ads_expio_irq_handler(u32 irq, struct irq_desc *desc)
  
- /* 24XX-specific possible dependencies */
+ /*
+  * Disable an expio pin's interrupt by setting the bit in the imr.
+- * @param irq           an expio virtual irq number
++ * @param d	an expio virtual irq description
+  */
+ static void expio_mask_irq(struct irq_data *d)
+ {
+@@ -156,7 +156,7 @@ static void expio_mask_irq(struct irq_data *d)
  
-+#ifdef CONFIG_ARCH_OMAP2
-+
- /* Wakeup dependency source arrays */
+ /*
+  * Acknowledge an expanded io pin's interrupt by clearing the bit in the isr.
+- * @param irq           an expanded io virtual irq number
++ * @param d	an expio virtual irq description
+  */
+ static void expio_ack_irq(struct irq_data *d)
+ {
+@@ -167,7 +167,7 @@ static void expio_ack_irq(struct irq_data *d)
  
- /* 2420/2430 PM_WKDEP_DSP: CORE, MPU, WKUP */
-@@ -168,6 +170,7 @@ static struct clkdm_dep core_24xx_wkdeps[] = {
- 	{ NULL },
- };
- 
-+#endif /* CONFIG_ARCH_OMAP2 */
- 
- /* 2430-specific possible wakeup dependencies */
- 
+ /*
+  * Enable a expio pin's interrupt by clearing the bit in the imr.
+- * @param irq           a expio virtual irq number
++ * @param d	an expio virtual irq description
+  */
+ static void expio_unmask_irq(struct irq_data *d)
+ {
 -- 
-1.7.2.2
+1.7.2.3
