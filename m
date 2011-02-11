@@ -1,74 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Feb 2011 11:58:53 +0000
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <AANLkTimCtaSZ=CHT5snWZ496_bi4sH=0LU7vJ-Jfh=dP@mail.gmail.com>
-References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
-	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
-	<20110207120103.GC31929@n2100.arm.linux.org.uk>
-	<20110207121052.GD31929@n2100.arm.linux.org.uk>
-	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-	<20110207133457.GE31929@n2100.arm.linux.org.uk>
-	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
-	<20110207141734.GG31929@n2100.arm.linux.org.uk>
-	<AANLkTimCtaSZ=CHT5snWZ496_bi4sH=0LU7vJ-Jfh=dP@mail.gmail.com>
-Message-ID: <20110211115853.GC23404@n2100.arm.linux.org.uk>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Fri, 11 Feb 2011 20:00:27 +0800
+Subject: [PATCH 1/2] arm: mx50_rdp: add fec support
+In-Reply-To: <20110211102459.GG27982@pengutronix.de>
+References: <1297419731-16441-1-git-send-email-richard.zhao@freescale.com>
+	<20110211102459.GG27982@pengutronix.de>
+Message-ID: <20110211120027.GA1866@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 07:15:25PM -0800, Colin Cross wrote:
-> The diagnostic register also needs to be saved to keep the errata bits
-> set in __v7_setup.
-
-Saving I've no problem with.  Restoring gets hairy with kernels running
-in non-secure mode, as we can't just write the register - we don't know
-whether we are running in secure or non-secure mode.  A write to the
-register in NS mode will crash.
-
-Santosh: is the diagnostic register on OMAP4 re-initialized by the secure
-code on OMAP?
-
-> > + ? ? ? stmia ? r0, {r4 - r11}
-> > + ? ? ? ldmfd ? sp!, {r4 - r11, pc}
-> > +ENDPROC(cpu_v7_do_suspend)
+On Fri, Feb 11, 2011 at 11:24:59AM +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Feb 11, 2011 at 06:22:10PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > 
+> > diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+> > index dedf7f2..505513c 100644
+> > --- a/arch/arm/mach-mx5/board-mx50_rdp.c
+> > +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
+> > @@ -40,6 +40,9 @@
+> >  #define FEC_EN		IMX_GPIO_NR(6, 23)
+> >  #define FEC_RESET_B	IMX_GPIO_NR(4, 12)
+> >  
+> > +#define FEC_EN		IMX_GPIO_NR(6, 23)
+> > +#define FEC_RESET_B	IMX_GPIO_NR(4, 12)
 > > +
-> > +ENTRY(cpu_v7_do_resume)
-> > + ? ? ? mov ? ? ip, #0
-> > + ? ? ? mcr ? ? p15, 0, ip, c8, c7, 0 ? @ invalidate TLBs
-> > + ? ? ? mcr ? ? p15, 0, ip, c7, c5, 0 ? @ invalidate I cache
+> I think this is a left-over of a rebase.  The #defines are already
+> present and they alone don't justify saying "add fec support".
+Yes, Sorry for that. Please review the second patch.
+
+Thanks
+Richard
 > 
-> Does this need the same ALT_SMP/ALT_UP combo as v7_flush_icache_all?
-
-That depends whether you the CPU which is resuming is part of a coherent
-SMP system at that point.  This instruction will invalidate the I-cache
-for the local CPU only, whereas the c7, c1 variant will invalidate the
-instruction caches of all CPUs within the inner sharable domain.
-
-Has anything changed in the other CPUs as a result of this CPU resuming
-at this point?  I don't think so, so I think we just need to ensure that
-the local CPU instruction cache is invalidated at this point.
-
-> Tegra2 suspend and cpuidle works on top of this patch and the patch
-> that adds SMP support to sleep_save_sp.  Tegra seems to need to
-> invalidate the entire l1 data cache before enabling it,
-
-As it's undefined what state the data cache is in on resume, I'm surprised
-the s5pv210 code doesn't also need a D-cache invalidate too.  Maybe Samsung
-folk can answer that.
-
-> so I'm using a
-> custom reset vector that branches to cpu_resume, and I'm handling the
-> TLB invalidate in the function cpu_resume returns to.
+> Best regards
+> Uwe
 > 
-> Tested-by: Colin Cross <ccross@android.com>
-> 
-> Are you targeting 2.6.39 with these patches?  They replace a few
-> hundred lines of code in the Tegra2 suspend, hotplug, and idle
-> patches, so I'd like to wait until this is in before pushing mine.
-
-Undecided at the moment.  It's great that you've tested it, and I've
-also tested it on Assabet, but PXA and Samsung stuff hasn't been
-tested yet.  I guess I could just push the generic and sa1100 bits for
-2.6.39, unless the remainder gets tested.
-
-Once the above issues have answers, I'll see about posting a new set of
-patches.
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
