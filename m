@@ -1,53 +1,33 @@
-From: yong.shen@linaro.org (yong.shen at linaro.org)
-Date: Fri, 11 Feb 2011 10:36:13 +0100
-Subject: [PATCH v2 2/2] ARM: IMX5 bbg: add cpuidle parameters
-In-Reply-To: <1297416973-32740-1-git-send-email-yong.shen@linaro.org>
-References: <1297416973-32740-1-git-send-email-yong.shen@linaro.org>
-Message-ID: <1297416973-32740-3-git-send-email-yong.shen@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Feb 2011 09:38:53 +0000
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
+References: <4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
+	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
+	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
+	<20110210154322.GE1742@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
+	<AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
+Message-ID: <20110211093853.GA23404@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@freescale.com>
+On Fri, Feb 11, 2011 at 09:31:04AM +0000, Dave Martin wrote:
+> You could probably cook up a good upper bound based on the size of the
+> kernel and the number of symbols in the module: i.e., assume that
+> every undefined symbol in the module needs to be fixed up to point at
+> the most distant symbol in the kernel.
+> 
+> For people with normal-sized kernels, this bound will probably work
+> out as zero most of the time (i.e., the current situation).  For
+> people with big kernels, or when many modules are already loaded, it
+> may work out at 100% -- but that's the price to pay for guaranteed
+> preallocation of the space required for the veneers.  And anyway, you
+> may really need a substantial chunk of those veneers in such cases.
 
-This parameters are workable, but need further tuning.
-
-Signed-off-by: Yong Shen <yong.shen@freescale.com>
----
- arch/arm/mach-mx5/board-mx51_babbage.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index d9d402e..168b09c 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -37,6 +37,7 @@
- #include "devices-imx51.h"
- #include "devices.h"
- #include "cpu_op-mx51.h"
-+#include "cpuidle.h"
- 
- #define BABBAGE_USB_HUB_RESET	IMX_GPIO_NR(1, 7)
- #define BABBAGE_USBH1_STP	IMX_GPIO_NR(1, 27)
-@@ -333,6 +334,11 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
- 	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
- };
- 
-+static struct imx_cpuidle_params babage_cpuidle_params[] = {
-+	{100,},
-+	{150,},
-+	{1000,},
-+};
- /*
-  * Board specific initialization.
-  */
-@@ -383,6 +389,8 @@ static void __init mxc_board_init(void)
- 		ARRAY_SIZE(mx51_babbage_spi_board_info));
- 	imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
- 	imx51_add_imx2_wdt(0, NULL);
-+
-+	imx_cpuidle_board_params(babage_cpuidle_params);
- }
- 
- static void __init mx51_babbage_timer_init(void)
--- 
-1.7.1
+I think it's going to be easier just to re-order the kernel image link
+order to solve that problem.  That just leaves uclinux...
