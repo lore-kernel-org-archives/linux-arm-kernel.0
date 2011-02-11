@@ -1,41 +1,97 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 11 Feb 2011 15:35:17 -0800
-Subject: [PATCH 2/3] msm: iommu: Generalize platform data for multiple
-	targets
-In-Reply-To: <8ya1v3ekvqg.fsf@huya.qualcomm.com>
-References: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
-	<1297456098-3241-2-git-send-email-stepanm@codeaurora.org>
-	<1297462350.4852.31.camel@m0nster> <8ya7hd6kxk1.fsf@huya.qualcomm.com>
-	<1297464456.4852.34.camel@m0nster> <8ya1v3ekvqg.fsf@huya.qualcomm.com>
-Message-ID: <1297467317.4852.36.camel@m0nster>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Feb 2011 15:45:23 -0800
+Subject: [PATCH] PM: Allow pm_runtime_suspend() to succeed during system
+	suspend
+In-Reply-To: <201102112225.54140.rjw@sisk.pl> (Rafael J. Wysocki's message of
+	"Fri, 11 Feb 2011 22:25:53 +0100")
+References: <Pine.LNX.4.44L0.1101311119190.1931-100000@iolanthe.rowland.org>
+	<201102112100.23996.rjw@sisk.pl> <87ei7e9uhy.fsf@ti.com>
+	<201102112225.54140.rjw@sisk.pl>
+Message-ID: <87aai26sq4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-02-11 at 15:16 -0800, David Brown wrote:
-> On Fri, Feb 11 2011, Daniel Walker wrote:
-> 
-> > On Fri, 2011-02-11 at 14:37 -0800, David Brown wrote:
-> 
-> >> It is functionality that will be shared across multiple socs.  Putting
-> >> the name of a specific soc would just be misleading.  Currently, it's
-> >> our only iommu.  Support for another family that uses a different iommu
-> >> could perhaps call it iommu2.
-> >
-> > Your missing my point. I'm saying it doesn't look flexible enough to
-> > allow support for multiple SoCs .. Is everything going to be identical
-> > across all the supported socs ?
-> 
-> It wouldn't help, though.  If the addresses differ across targets, we
-> don't want defines that are conditionally defined, so we would need
-> multiple tables, giving the address for specific targets.  Still no
-> reason to have an indirection on the names.
+"Rafael J. Wysocki" <rjw@sisk.pl> writes:
 
-I'm talking about the whole deal here, this whole patch series. It
-doesn't seem like this has been thought out too well. 
+> On Friday, February 11, 2011, Kevin Hilman wrote:
+>> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
+>> 
+>> > On Monday, January 31, 2011, Rafael J. Wysocki wrote:
+>> >> On Monday, January 31, 2011, Alan Stern wrote:
+>> >> > On Mon, 31 Jan 2011, Kevin Hilman wrote:
+>> >> > 
+>> >> > > I understand how this works, but frankly I'm still a bit fuzzy on why.
+>> >> > > 
+>> >> > > I guess I'm still missing a good understanding of what "interfering with a
+>> >> > > system power transition" means, and why a runtime suspend qualifies as
+>> >> > > interfering but not a runtime resume.
+>> >> > 
+>> >> > These are good questions.  Rafael implemented this design originally; 
+>> >> > my contribution was only to warn him of the potential for problems.  
+>> >> > Therefore he should explain the rationale for the design.
+>> >> 
+>> >> The reason why runtime resume is allowed during system power transitions is
+>> >> because in some cases during system suspend we simply have to resume devices
+>> >> that were previously runtime-suspended (for example, the PCI bus type does
+>> >> that).
+>> >> 
+>> >> The reason why runtime suspend is not allowed during system power transitions
+>> >> if the following race:
+>> >> 
+>> >> - A device has been suspended via a system suspend callback.
+>> >> - The runtime PM framework executes a (scheduled) suspend on that device,
+>> >>   not knowing that it's already been suspended, which potentially results in
+>> >>   accessing the device's registers in a low-power state.
+>> >> 
+>> >> Now, it can be avoided if every driver does the right thing and checks whether
+>> >> the device is already suspended in its runtime suspend callback, but that would
+>> >> kind of defeat the purpose of the runtime PM framework, at least partially.
+>> >
+>> > In fact, I've just realized that the above race cannot really occur, because
+>> > pm_wq is freezable, so I'm proposing the following change.
+>> >
+>> > Of course, it still doesn't prevent user space from disabling the runtime PM
+>> > framework's helpers via /sys/devices/.../power/control.
+>> >
+>> > Thanks,
+>> > Rafael
+>> >
+>> >
+>> > ---
+>> > From: Rafael J. Wysocki <rjw@sisk.pl>
+>> > Subject: PM: Allow pm_runtime_suspend() to succeed during system suspend
+>> >
+>> > The dpm_prepare() function increments the runtime PM reference
+>> > counters of all devices to prevent pm_runtime_suspend() from
+>> > executing subsystem-level callbacks.  However, this was supposed to
+>> > guard against a specific race condition that cannot happen, because
+>> > the power management workqueue is freezable, so pm_runtime_suspend()
+>> > can only be called synchronously during system suspend and we can
+>> > rely on subsystems and device drivers to avoid doing that
+>> > unnecessarily.
+>> >
+>> > Make dpm_prepare() drop the runtime PM reference to each device
+>> > after making sure that runtime resume is not pending for it.
+>> >
+>> > Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+>> > ---
+>> 
+>> Yes!
+>> 
+>> Acked-by: Kevin Hilman <khilman@ti.com>
+>
+> Well, I hope you realize that it doesn't help you a lot?
+>
 
-Daniel
+If you mean that because we still have to implement system PM methods
+because of /sys/devices/.../power/control, I agree.
 
--- 
-Sent by an consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
+If something else, please explain.
+
+But to me it is still very helpful in terms of consistency and what
+driver writers would expect to happen if they used pm_runtime_suspend()
+in their system suspend method.
+
+Thanks,
+
+Kevin
