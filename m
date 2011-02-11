@@ -1,84 +1,113 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 11 Feb 2011 16:38:55 +0100
-Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
-In-Reply-To: <AANLkTimQxC3HgaRs-bBOGChLhvAK69XHCPEGyOcKeOz6@mail.gmail.com>
-References: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
-	<AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
-	<AANLkTimQxC3HgaRs-bBOGChLhvAK69XHCPEGyOcKeOz6@mail.gmail.com>
-Message-ID: <F55C15BA-2C89-4DB7-9930-5176AA72C2A7@dominion.thruhere.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 12 Feb 2011 07:48:44 +0800
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <19797.19780.128209.60173@ipc1.ka-ro>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
+	<19794.17994.381937.158944@ipc1.ka-ro>
+	<20110211220821.GA9289@S2100-06.ap.freescale.net>
+	<19797.19780.128209.60173@ipc1.ka-ro>
+Message-ID: <20110211234843.GD9289@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Op 11 feb 2011, om 13:12 heeft Bryan Wu het volgende geschreven:
-
-> On Wed, Feb 9, 2011 at 10:08 PM, Gadiyar, Anand <gadiyar@ti.com> wrote:
->> On Wed, Feb 9, 2011 at 7:25 PM, Raghuveer Murthy
->> <raghuveer.murthy@ti.com> wrote:
->>> Adding DVI support to OMAP4 PandaBoard.
->>> 
->>> PandaBoard uses TFP410 DVI Framer chip
->>> http://focus.ti.com/lit/ds/symlink/tfp410.pdf
->>> 
->>> The TFP410 gets its power enable and display data over GPIO lines muxed
->>> in from OMAP4430. PandaBoard supports other LCD displays through expansion
->>> connectors, following board rework. This will disable the DVI interface.
->>> However, the existing mux settings remain the same
->>> 
->>> PandaBoard additionally supports display over HDMI interface. It is
->>> mutually exclusive to display over DVI. Hence the mux settings need to be
->>> configured seperately, as and when HDMI is enabled
->>> 
->>> Also, I2C3 bus used for reading EDID data from DVI Monitors is
->>> registered here. Since the design is similar to BeagleBoard, the code
->>> for the same is taken from the kernel.org commit e3333f48dd5cb21
->>> (omap: Adding beagle i2c eeprom driver to read EDID)
->>> 
->>> Reviewed-by: Manjunath G Kondaiah <manjugk@ti.com>
->>> Reviewed-by: Anand Gadiyar <gadiyar@ti.com>
->> 
->> I've also tested it on the Panda, and gone through this and most
->> of the other patches in the series. So if you like, you could
->> consider this an:
->> 
->> Acked-by: Anand Gadiyar <gadiyar@ti.com>
->> 
->>> Reviewed-by: Nishanth Menon <nm@ti.com>
->>> Reviewed-by: Sumit Semwal <sumit.semwal@ti.com>
->>> Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
->>> ---
->>> 
->>> Base
->>> ====
->>> url =
->>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
->>> branch "master"
->>> commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d
->>> tag 2.6.38-rc4
->>> 
->> 
->> To make it easier for someone to test, I've extracted this
->> and the 6 dependent series from patchwork, and hosted
->> them in a branch on my devel tree. They are available
->> against v2.6.38-rc4 here:
->> 
->> git://dev.omapzoom.org/pub/scm/anand/linux-omap-usb.git
->> 
->> in the display-patches-for-v2.6.38-rc4 branch if someone
->> wants to take a look.
+On Fri, Feb 11, 2011 at 03:52:52PM +0100, Lothar Wa?mann wrote:
+> Hi,
 > 
-> I fetched this branch which contains 35 patches on top of 2.6.38-rc4.
-> After fixing some conflict, I applied these 35 patches on our Ubuntu
-> ti-omap-dev kernel. With built-in the DSS2 driver and GENERIC_DPI
-> driver, kernel boots fine on my Panda with Ubuntu GUI. But I have to
-> set the kernel boot command args with omapfb.mode=dvi:1024x768MR-24 at 60
-> omapdss.def_disp=dvi, pointed out by Sebastien. Without this bootargs,
-> no graphic at all. so as Robert concerned, EDID detection doesn't
-> work. Does that related to I2C driver? I2C driver always tell me
-> timeout in dmesg.
+> Shawn Guo writes:
+> > Hi Lothar,
+> > 
+> > On Wed, Feb 09, 2011 at 08:46:18AM +0100, Lothar Wa?mann wrote:
+> > > Hi Shawn,
+> > > 
+> > > Shawn Guo writes:
+> > > > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
+> > > > The driver calls into mxs-dma via generic dmaengine api for both pio
+> > > > and data transfer.
+> > > > 
+> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > > ---
+> > > >  arch/arm/mach-mxs/include/mach/mmc.h |   15 +
+> > > >  drivers/mmc/host/Kconfig             |    9 +
+> > > >  drivers/mmc/host/Makefile            |    1 +
+> > > >  drivers/mmc/host/mxs-mmc.c           |  884 ++++++++++++++++++++++++++++++++++
+> > > >  4 files changed, 909 insertions(+), 0 deletions(-)
+> > > >  create mode 100644 arch/arm/mach-mxs/include/mach/mmc.h
+> > > >  create mode 100644 drivers/mmc/host/mxs-mmc.c
+> > > > 
+> > > I've run the mmc-test kernel module with this driver on our TX28
+> > > module which fails in the following tests:
+> > > |mmc0: Test case 15. Correct xfer_size at write (start failure)...
+> > > |mmc0: Result: ERROR (-110)
+> > > |mmc0: Test case 16. Correct xfer_size at read (start failure)...
+> > > |mmc0: Result: ERROR (-110)
+> > > |mmc0: Test case 17. Correct xfer_size at write (midway failure)...
+> > > |mmc0: Result: ERROR (-110)
+> > > |mmc0: Test case 18. Correct xfer_size at read (midway failure)...
+> > > |mmc0: Result: ERROR (-110)
+> > > 
+> > > Could you try the test on your hardware?
+> > > 
+> > I'm new to this test.  I enabled MMC_TEST but did not see "test"
+> > under /sys for mmc.  Can you please elaborate how to launch this
+> > test?  Thanks.
+> > 
+> You need debugfs mounted and the mmc-test module loaded.
+> An inserted card will normally be grabbed by the mmc-block driver. You
+> can 'unbind' the driver and 'bind' it to the mmc-test driver using the
+> corresponding entries in sysfs. The mmc-test driver can be controlled
+> via debugfs.
+> 
+> The following script steals an inserted card from the mmc-block driver
+> and performs all mmc-test testcases (TRASHING THE CONTENTS OF THE
+> CARD!).
+> <--------
+> #!/bin/bash
+> drv_path=/sys/bus/mmc/drivers
+> dbg_path=/sys/kernel/debug
+> testdrv=mmc_test
+> 
+> shopt -s nullglob
+> card=""
+> 
+> cleanup() {
+>     if [ -n "$card" -a -n "$driver" -a "$driver" != "$testdrv" ];then
+> 	echo "Restoring driver $driver"
+> 	echo "$card" > "$drv_path/$testdrv/unbind"
+> 	echo "$card" > "$drv_path/$driver/bind"
+>     fi
+> }
+> 
+> trap cleanup 0
+> set -e
+> cd "$drv_path"
+> for d in *;do
+>     for l in "$d/"*;do
+> 	[ -h "$l" ] || continue
+> 	card="$(basename "$l")"
+> 	driver="$(dirname "$l")"
+> 	break
+>     done
+>     [ -n "$card" ] && break
+> done
+> if [ -z "$card" ];then
+>     echo "No MMC/SD card found"
+>     exit 1
+> fi
+> if [ "$driver" != "$testdrv" ];then
+>     echo "Trying to claim card $card from driver $driver"
+>     echo "$card" > "$drv_path/$driver/unbind"
+>     echo "$card" > "$drv_path/$testdrv/bind"
+> fi
+> echo "WARNING: Card $card will be overwritten!"
+> echo "Hit <ENTER> to continue; <CTRL-C> to abort"
+> read
+> # perform all testcases (> 0 for individual tests)
+> echo 0 > "$dbg_path/${card%:*}/$card/test"
+> >--------
+> 
+Thanks a lot for the test script.  Yes, I'm seeing the same problem
+here.  I will try to get it fixed in v2.
 
-AIUI the i2c bus is only hooked up to the HDMI port, so unless you plug in something there, no dice.
-
-regards,
-
-Koen
+Regards,
+Shawn
