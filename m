@@ -1,55 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Feb 2011 10:10:56 +0000
-Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
-In-Reply-To: <AANLkTi=jP1G=foehWYNai5H=_F372FwpkLEO4wSkmqBc@mail.gmail.com>
-References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
-	<20110201110348.GB31216@n2100.arm.linux.org.uk>
-	<AANLkTi=jP1G=foehWYNai5H=_F372FwpkLEO4wSkmqBc@mail.gmail.com>
-Message-ID: <20110211101056.GB23404@n2100.arm.linux.org.uk>
+Date: Fri, 11 Feb 2011 10:13:45 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have
+	SMP_ON_UP fixups
+In-Reply-To: <AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
+References: <20110126124452.GB4232@n2100.arm.linux.org.uk>
+	<20110126172535.GA15983@arm.com>
+	<20110209142211.GA11460@n2100.arm.linux.org.uk>
+	<20110210125624.GA3652@n2100.arm.linux.org.uk>
+	<AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
+	<AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
+	<20110210191125.GA12582@n2100.arm.linux.org.uk>
+	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
+Message-ID: <20110211101345.GA23785@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 10:46:46AM +0100, Linus Walleij wrote:
-> After discussing this with Ulf I think something like this is
-> still needed...
-> 
-> 2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > With the code I have in place, you'll notice I have:
-> >
-> > ? ? ? ?/* Wait up to 1ms for the DMA to complete */
-> > ? ? ? ?for (i = 0; ; i++) {
-> > ? ? ? ? ? ? ? ?status = readl(host->base + MMCISTATUS);
-> > ? ? ? ? ? ? ? ?if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
-> > ? ? ? ? ? ? ? ? ? ? ? ?break;
-> > ? ? ? ? ? ? ? ?udelay(10);
-> > ? ? ? ?}
-> >
-> > This waits for the DMA controller to read the last data out of the FIFO
-> > before allowing the request to complete. ?As it has a timeout, it is
-> > able to detect ARMs broken DMA setup on their MMCI/DMAC, and disable DMA
-> > support for this primecell rather than getting stuck.
-> >
-> > This may be sufficient without using the DMA callbacks.
-> 
-> According to our tests this does not really cut it on
-> Ux500. Sometimes we get the DMA completion before the
-> MCI_DATAEND IRQ, and sometimes after.
-> 
-> When  we get the callback *after* the MCI_DATAEND irq
-> this does not work properly, since we still don't know if the DMA
-> job is complete, so the DMA engine is not in sync and we mess up
-> the channels by issuing a new job, hammering the DMA engine
-> while it's still busy on the channel.
+On Fri, Feb 11, 2011 at 09:33:56AM +0000, Dave Martin wrote:
+> Agreed -- actually, I suspected we might need to support this.  But I
+> don't think solving this problem (= keeping the fixup implementation
+> in memory and enhancing the module loader) solved the
+> fixups-referencing-sections-discarded-from-vmlinux problem.  These
+> seem to be two separate issues.  I am filing to understand something?
 
-That may be a problem if the channel is still busy, but it in any case
-it shouldn't result in the DMA engine being hammered.  The DMA
-engine API is a queue based API - you submit requests to it and it
-deals with them one after each other.  If you submit two requests in
-succession, it should process the first request, complete that, before
-it starts to process the second request.  I'd suggest fixing this in
-any case.
-
-Maybe a solution to this is to use the DMA callback to signal that the
-data path has completed, but still have the data end interrupt in place
-so that it can trigger the stop command.  That shouldn't result in
-additional delays or even the requirement for a timeout.
+They are separate, but related issues.  They both ultimately have the
+same cause - the placement of the spinlock code inline rather than
+out of line, resulting in fixups appearing all over the place rather
+than just in kernel/spinlock.o.
