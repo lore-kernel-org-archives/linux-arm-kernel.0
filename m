@@ -1,142 +1,91 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri, 11 Feb 2011 10:21:08 +0100
-Subject: [PATCH 2/3] ARM: mx3: remove some useless comments
-In-Reply-To: <20110211081050.GD27982@pengutronix.de>
-References: <20110211081050.GD27982@pengutronix.de>
-Message-ID: <1297416069-6861-2-git-send-email-u.kleine-koenig@pengutronix.de>
+From: amit.kachhap@linaro.org (Amit Kachhap)
+Date: Fri, 11 Feb 2011 04:22:23 -0500
+Subject: [PATCH] ARM: SAMSUNG: Removing dependency on CONFIG_PM_DEBUG for
+	clock debugging
+In-Reply-To: <AANLkTinjhPP9NxLsOMovETAZLzFO70zmVWtPQ+E4PZj9@mail.gmail.com>
+References: <1297530374-32635-1-git-send-email-amit.kachhap@linaro.org>
+	<AANLkTinjhPP9NxLsOMovETAZLzFO70zmVWtPQ+E4PZj9@mail.gmail.com>
+Message-ID: <AANLkTinPP5Qi5KbQSwPbQoBVdNdkOV-mDMiTkJvzrcS8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-mx3/mach-mx31_3ds.c |    8 --------
- arch/arm/mach-mx3/mach-mx31ads.c  |   14 +-------------
- arch/arm/mach-mx3/mach-qong.c     |    9 ---------
- arch/arm/mach-mx3/mm.c            |    9 ---------
- 4 files changed, 1 insertions(+), 39 deletions(-)
+yes this is a temporary patch untill all the PM
+components(sleep/resume) are mainlined.
+The exact compilation error is,
 
-diff --git a/arch/arm/mach-mx3/mach-mx31_3ds.c b/arch/arm/mach-mx3/mach-mx31_3ds.c
-index 1360fe4..817a275 100644
---- a/arch/arm/mach-mx3/mach-mx31_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx31_3ds.c
-@@ -42,10 +42,6 @@
- /* CPLD IRQ line for external uart, external ethernet etc */
- #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_1)
- 
--/*
-- * This file contains the board-specific initialization routines.
-- */
--
- static int mx31_3ds_pins[] = {
- 	/* UART1 */
- 	MX31_PIN_CTS1__CTS1,
-@@ -364,10 +360,6 @@ static struct sys_timer mx31_3ds_timer = {
- 	.init	= mx31_3ds_timer_init,
- };
- 
--/*
-- * The following uses standard kernel macros defined in arch.h in order to
-- * initialize __mach_desc_MX31_3DS data structure.
-- */
- MACHINE_START(MX31_3DS, "Freescale MX31PDK (3DS)")
- 	/* Maintainer: Freescale Semiconductor, Inc. */
- 	.boot_params = MX3x_PHYS_OFFSET + 0x100,
-diff --git a/arch/arm/mach-mx3/mach-mx31ads.c b/arch/arm/mach-mx3/mach-mx31ads.c
-index cb80b96..14e7671 100644
---- a/arch/arm/mach-mx3/mach-mx31ads.c
-+++ b/arch/arm/mach-mx3/mach-mx31ads.c
-@@ -69,9 +69,6 @@
- #define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
- 
- #define MXC_MAX_EXP_IO_LINES	16
--/*
-- * This file contains the board-specific initialization routines.
-- */
- 
- /*
-  * The serial port definition structure.
-@@ -497,9 +494,7 @@ static void mxc_init_audio(void)
- 	mxc_iomux_setup_multiple_pins(ssi_pins, ARRAY_SIZE(ssi_pins), "ssi");
- }
- 
--/*!
-- * This structure defines static mappings for the i.MX31ADS board.
-- */
-+/* static mappings */
- static struct map_desc mx31ads_io_desc[] __initdata = {
- 	{
- 		.virtual	= MX31_CS4_BASE_ADDR_VIRT,
-@@ -509,9 +504,6 @@ static struct map_desc mx31ads_io_desc[] __initdata = {
- 	},
- };
- 
--/*!
-- * Set up static virtual mappings.
-- */
- static void __init mx31ads_map_io(void)
- {
- 	mx31_map_io();
-@@ -541,10 +533,6 @@ static struct sys_timer mx31ads_timer = {
- 	.init	= mx31ads_timer_init,
- };
- 
--/*
-- * The following uses standard kernel macros defined in arch.h in order to
-- * initialize __mach_desc_MX31ADS data structure.
-- */
- MACHINE_START(MX31ADS, "Freescale MX31ADS")
- 	/* Maintainer: Freescale Semiconductor, Inc. */
- 	.boot_params = MX3x_PHYS_OFFSET + 0x100,
-diff --git a/arch/arm/mach-mx3/mach-qong.c b/arch/arm/mach-mx3/mach-qong.c
-index 0028163..17f758b 100644
---- a/arch/arm/mach-mx3/mach-qong.c
-+++ b/arch/arm/mach-mx3/mach-qong.c
-@@ -54,10 +54,6 @@
- 
- #define QONG_FPGA_IRQ		IOMUX_TO_IRQ(MX31_PIN_DTR_DCE1)
- 
--/*
-- * This file contains the board-specific initialization routines.
-- */
--
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -263,11 +259,6 @@ static struct sys_timer qong_timer = {
- 	.init	= qong_timer_init,
- };
- 
--/*
-- * The following uses standard kernel macros defined in arch.h in order to
-- * initialize __mach_desc_QONG data structure.
-- */
--
- MACHINE_START(QONG, "Dave/DENX QongEVB-LITE")
- 	/* Maintainer: DENX Software Engineering GmbH */
- 	.boot_params = MX3x_PHYS_OFFSET + 0x100,
-diff --git a/arch/arm/mach-mx3/mm.c b/arch/arm/mach-mx3/mm.c
-index 3387319..eefd4cf 100644
---- a/arch/arm/mach-mx3/mm.c
-+++ b/arch/arm/mach-mx3/mm.c
-@@ -28,14 +28,6 @@
- #include <mach/hardware.h>
- #include <mach/iomux-v3.h>
- 
--/*!
-- * @file mm.c
-- *
-- * @brief This file creates static virtual to physical mappings, common to all MX3 boards.
-- *
-- * @ingroup Memory
-- */
--
- #ifdef CONFIG_SOC_IMX31
- static struct map_desc mx31_io_desc[] __initdata = {
- 	imx_map_entry(MX31, X_MEMC, MT_DEVICE),
-@@ -135,4 +127,3 @@ static int mxc_init_l2x0(void)
- 
- arch_initcall(mxc_init_l2x0);
- #endif
--
--- 
-1.7.2.3
+ CC      arch/arm/plat-samsung/pm.o
+arch/arm/plat-samsung/pm.c:32: fatal error: mach/pm-core.h: No such
+file or directory
+compilation terminated.
+make[1]: *** [arch/arm/plat-samsung/pm.o] Error 1
+
+Thanks,
+Amit Daniel
+
+
+On 11 February 2011 02:57, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+>
+> On Sat, Feb 12, 2011 at 7:06 PM, Amit Daniel Kachhap
+> <amit.kachhap@linaro.org> wrote:
+> > Enabling the macro CONFIG_PM_DEBUG is causing compilation error as all PM components
+> > are included which is not in mainline for samsung V310 platform, therefore, this patch
+> > removes the dependency on macro CONFIG_PM_DEBUG for clock debugging through debugfs
+> > interface.
+>
+> What is the exact error? Might be helpful to have it in the patch description.
+>
+> Presumably, this is a temporary patch until PM components
+> (suspend/resume hooks?) are mainlined and then we can put all this
+> back under PM_DEBUG? In that case, it might be a good idea to mark it
+> as such.
+>
+> Regards,
+> Amit
+>
+> > Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> > ---
+> > ?arch/arm/plat-samsung/clock.c ? ? ? ? ? ? ?| ? ?4 ++--
+> > ?arch/arm/plat-samsung/include/plat/clock.h | ? ?2 +-
+> > ?2 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+> > index 7728928..aca5a25 100644
+> > --- a/arch/arm/plat-samsung/clock.c
+> > +++ b/arch/arm/plat-samsung/clock.c
+> > @@ -450,7 +450,7 @@ int __init s3c24xx_register_baseclocks(unsigned long xtal)
+> > ? ? ? ?return 0;
+> > ?}
+> >
+> > -#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+> > +#if defined(CONFIG_DEBUG_FS)
+> > ?/* debugfs support to trace clock tree hierarchy and attributes */
+> >
+> > ?static struct dentry *clk_debugfs_root;
+> > @@ -538,4 +538,4 @@ err_out:
+> > ?}
+> > ?late_initcall(clk_debugfs_init);
+> >
+> > -#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
+> > +#endif /* defined(CONFIG_DEBUG_FS) */
+> > diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+> > index 9a82b88..f6180ab 100644
+> > --- a/arch/arm/plat-samsung/include/plat/clock.h
+> > +++ b/arch/arm/plat-samsung/include/plat/clock.h
+> > @@ -47,7 +47,7 @@ struct clk {
+> >
+> > ? ? ? ?struct clk_ops ? ? ? ? ?*ops;
+> > ? ? ? ?int ? ? ? ? ? ? ? ? (*enable)(struct clk *, int enable);
+> > -#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+> > +#if defined(CONFIG_DEBUG_FS)
+> > ? ? ? ?struct dentry ? ? ? ? ? *dent; ?/* For visible tree hierarchy */
+> > ?#endif
+> > ?};
+> > --
+> > 1.7.1
+> >
+> >
+> > _______________________________________________
+> > linaro-dev mailing list
+> > linaro-dev at lists.linaro.org
+> > http://lists.linaro.org/mailman/listinfo/linaro-dev
+> >
