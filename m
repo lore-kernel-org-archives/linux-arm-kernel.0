@@ -1,30 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Feb 2011 10:13:45 +0000
-Subject: [PATCH] ARM: Avoid discarding sections that might have
-	SMP_ON_UP fixups
-In-Reply-To: <AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
-References: <20110126124452.GB4232@n2100.arm.linux.org.uk>
-	<20110126172535.GA15983@arm.com>
-	<20110209142211.GA11460@n2100.arm.linux.org.uk>
-	<20110210125624.GA3652@n2100.arm.linux.org.uk>
-	<AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
-	<AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
-	<20110210144617.GD3652@n2100.arm.linux.org.uk>
-	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
-	<20110210191125.GA12582@n2100.arm.linux.org.uk>
-	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
-Message-ID: <20110211101345.GA23785@n2100.arm.linux.org.uk>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 11 Feb 2011 18:22:10 +0800
+Subject: [PATCH 1/2] arm: mx50_rdp: add fec support
+Message-ID: <1297419731-16441-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 09:33:56AM +0000, Dave Martin wrote:
-> Agreed -- actually, I suspected we might need to support this.  But I
-> don't think solving this problem (= keeping the fixup implementation
-> in memory and enhancing the module loader) solved the
-> fixups-referencing-sections-discarded-from-vmlinux problem.  These
-> seem to be two separate issues.  I am filing to understand something?
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-They are separate, but related issues.  They both ultimately have the
-same cause - the placement of the spinlock code inline rather than
-out of line, resulting in fixups appearing all over the place rather
-than just in kernel/spinlock.o.
+diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
+index dedf7f2..505513c 100644
+--- a/arch/arm/mach-mx5/board-mx50_rdp.c
++++ b/arch/arm/mach-mx5/board-mx50_rdp.c
+@@ -40,6 +40,9 @@
+ #define FEC_EN		IMX_GPIO_NR(6, 23)
+ #define FEC_RESET_B	IMX_GPIO_NR(4, 12)
+ 
++#define FEC_EN		IMX_GPIO_NR(6, 23)
++#define FEC_RESET_B	IMX_GPIO_NR(4, 12)
++
+ static iomux_v3_cfg_t mx50_rdp_pads[] __initdata = {
+ 	/* SD1 */
+ 	MX50_PAD_ECSPI2_SS0__GPIO_4_19,
+-- 
+1.7.1
