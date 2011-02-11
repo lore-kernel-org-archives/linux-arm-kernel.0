@@ -1,90 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Feb 2011 16:33:58 -0000
-Subject: [PATCHv2 1/2] ARM: perf_event: allow platform-specific interrupt
-	handler
-In-Reply-To: <1297137277-26889-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1297137277-26889-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <000801cbca09$7bc956a0$735c03e0$@deacon@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Feb 2011 08:37:04 -0800
+Subject: [PATCH v5 0/5] omap: mailbox: hwmod support
+In-Reply-To: <20110210.080134.54852186899891738.Hiroshi.DOYU@nokia.com>
+	(Hiroshi DOYU's message of "Thu, 10 Feb 2011 08:01:34 +0200 (EET)")
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+	<20110209183219.GA20795@atomide.com>
+	<20110210.080134.54852186899891738.Hiroshi.DOYU@nokia.com>
+Message-ID: <87zkq2bk9b.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rabin,
+Hi Hiroshi,
 
-> Allow a platform-specific IRQ handler to be specified via platform data.  This
-> will be used to implement the single-irq workaround for the DB8500.
-> 
-> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
-> ---
->  arch/arm/include/asm/pmu.h   |   14 ++++++++++++++
->  arch/arm/kernel/perf_event.c |   17 ++++++++++++++++-
->  2 files changed, 30 insertions(+), 1 deletions(-)
+Hiroshi DOYU <Hiroshi.DOYU@nokia.com> writes:
 
-If you're happy with this as a workaround for your platform, then
-it looks alright to me.
+> From: ext Tony Lindgren <tony@atomide.com>
+> Subject: Re: [PATCH v5 0/5] omap: mailbox: hwmod support
+> Date: Wed, 9 Feb 2011 10:32:19 -0800
+>
+>> * Omar Ramirez Luna <omar.ramirez@ti.com> [110202 11:37]:
+>>> Mailbox hwmod support for OMAP 2,3,4.
+>> 
+>> Hiroshi, any comments on these?
+>
+> Well, I haven't followed hwmod much. If Kevin is ok, ok for me.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Do you have any simple standalone tests for mailbox (e.g. without
+bridge/syslink) that can be used to so some sanity checking on these
+driver changes?
 
-One thing you could try is using the GIC patch I posted the other day:
+Thanks,
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041496.html
-
-If you then do:
-
-    ARM: gic: allow per-cpu SPIs to be affine to multiple CPUs
-    
-    The concept of a per-cpu SPI is somewhat a contradiction, but can occur in
-    systems where SPIs from different CPUs are ORd together into a single line.
-    
-    An example of this is the PMU interrupt on the u8500 platform.
-    
-    This patch allows SPIs with the IRQF_PERCPU flag to be affine to multiple
-    CPUs in a CPU mask. This, of course, assumes that the driver knows what it
-    is doing and can handle such a configuration.
-    
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 9def30b..512f55f 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -145,7 +145,7 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
- {
-        void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
-        unsigned int shift = (d->irq % 4) * 8;
--       unsigned int cpu = cpumask_first(mask_val);
-+       unsigned int cpu_map, cpu = cpumask_first(mask_val);
-        u32 val;
-        struct irq_desc *desc;
- 
-@@ -155,9 +155,19 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
-                spin_unlock(&irq_controller_lock);
-                return -EINVAL;
-        }
-+
-        d->node = cpu;
-+
-+       if (CHECK_IRQ_PER_CPU(desc->status)) {
-+               cpu_map = 0;
-+               for_each_cpu(cpu, mask_val)
-+                       cpu_map |= 1 << (cpu + shift);
-+       } else {
-+               cpu_map = 1 << (cpu + shift);
-+       }
-+
-        val = readl(reg) & ~(0xff << shift);
--       val |= 1 << (cpu + shift);
-+       val |= cpu_map;
-        writel(val, reg);
-        spin_unlock(&irq_controller_lock);
- 
-
-You'll be able to target the PMU IRQ to both CPUs and avoid the need for
-ping-ponging the affinity. This is a bit weird though as usually you'd have
-a PPI for a percpu interrupt so this might be better off staying inside
-platform code and leaving the GIC code alone. I also think this approach
-is more invasive from the perf point of view.
-
-Unless this approach gives markedly better profiling results than your
-proposal, I think we should go with what you've got.
-
-Will
+Kevin
