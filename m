@@ -1,33 +1,38 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri, 11 Feb 2011 12:28:18 -0800
-Subject: [PATCH 3/3] msm: iommu: Enable IOMMU support for MSM8960
-In-Reply-To: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
-References: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <1297456098-3241-3-git-send-email-stepanm@codeaurora.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 11 Feb 2011 15:36:15 -0500 (EST)
+Subject: [PATCH] PM: Allow pm_runtime_suspend() to succeed during system
+	suspend
+In-Reply-To: <201102112100.23996.rjw@sisk.pl>
+Message-ID: <Pine.LNX.4.44L0.1102111514180.2048-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow IOMMU to be selected for MSM8960 now that the
-platform data has been generalized.
+On Fri, 11 Feb 2011, Rafael J. Wysocki wrote:
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
- arch/arm/mach-msm/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> > The reason why runtime suspend is not allowed during system power transitions
+> > if the following race:
+> > 
+> > - A device has been suspended via a system suspend callback.
+> > - The runtime PM framework executes a (scheduled) suspend on that device,
+> >   not knowing that it's already been suspended, which potentially results in
+> >   accessing the device's registers in a low-power state.
+> > 
+> > Now, it can be avoided if every driver does the right thing and checks whether
+> > the device is already suspended in its runtime suspend callback, but that would
+> > kind of defeat the purpose of the runtime PM framework, at least partially.
+> 
+> In fact, I've just realized that the above race cannot really occur, because
+> pm_wq is freezable, so I'm proposing the following change.
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 32b9d1f..997c5bd 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -150,7 +150,7 @@ endmenu
+Yes, I had reached essentially the same conclusion.  Of course, there 
+may still be other kernel threads running or interrupt handlers that 
+can interfere.  It's probably okay to assume that drivers will handle 
+these things.
 
- config MSM_IOMMU
- 	bool "MSM IOMMU Support"
--	depends on ARCH_MSM8X60
-+	depends on ARCH_MSM8X60 || ARCH_MSM8960
- 	select IOMMU_API
- 	default n
- 	help
---
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> Of course, it still doesn't prevent user space from disabling the runtime PM
+> framework's helpers via /sys/devices/.../power/control.
+
+True.  So in the end this won't make much difference, but we might as 
+well do it.
+
+Alan Stern
