@@ -1,130 +1,25 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 12 Feb 2011 08:55:07 +0800
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <201102111651.35530.arnd@arndb.de>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<201102101817.42099.arnd@arndb.de>
-	<20110211231417.GC9289@S2100-06.ap.freescale.net>
-	<201102111651.35530.arnd@arndb.de>
-Message-ID: <20110212005506.GE9289@S2100-06.ap.freescale.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 11 Feb 2011 21:41:21 +0300
+Subject: [PATCH v2 02/13] da850: pruss platform specific additions.
+In-Reply-To: <1297435892-28278-3-git-send-email-subhasish@mistralsolutions.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-3-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <4D5582D1.9040005@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 04:51:35PM +0100, Arnd Bergmann wrote:
-> On Saturday 12 February 2011, Shawn Guo wrote:
-> > On Thu, Feb 10, 2011 at 06:17:41PM +0100, Arnd Bergmann wrote:
-> > > On Friday 11 February 2011, Shawn Guo wrote:
-> > > > 
-> > > > > > +	struct mxs_dma_data		dma_data;
-> > > > > 
-> > > > > Why do you need host specific DMA structures? Please stick to
-> > > > > the generic dma-engine API if possible.
-> > > > > 
-> > > > I'm sticking to the generic dmaengine api.  The mxs dma hardware
-> > > > has separate irq line for every single dma channel, which needs to
-> > > > be told by client driver.
-> > > 
-> > > I'm not convinced, it still sounds like a layering violation to
-> > > have specific information about the DMA controller in the
-> > > platform data of a driver using the dma engine API.
-> > > 
-> > It sounds like something about the dma controller, but it really
-> > belongs to dma client device e.g. ssp here.  Every single dma client
-> > device has two dma related resources, dma channel and dma irq, which
-> > should be defined in client device data.
-> 
-> That is true for the DMA controller you use, but it doesn't have
-> to be that way for all other DMA controllers, right? My point is
-> that the MMC driver should not make any assumptions about what
-> DMA controller is used, because a future SoC might combine it
-> with a different DMA controller, e.g. one that just just a single
-> interrupt for all channels.
-> 
-Your thought is right.  But the fact is, from hw design point of
-view, all client peripherals are coupled with mxs dma.  As a real
-example, gpmi (mxs nand controller) is one mxs dma client device.
-When gpmi is integrated into i.MX50 to replace nfc (original i.mx
-nand controller), dma-aphb has to be brought into mx50 together,
-though mx50 already gets sdma there.
+Hello.
 
-I tried hard to decouple client driver from mxs dmaengine driver, but
-it can not be that thorough. As dma peripheral only trigger error irq,
-mxs dma "pio" mode and dma irq need to be handled by client and dma
-driver in a coupled way.
+Subhasish Ghosh wrote:
 
-> > > Why can't you put the interrupt number into the platform data of
-> > > the dma engine device? Your filter function already identifies
-> > > the number of the DMA channel.
-> > > 
-> > We have 16 channels for dma-apbh and dma-apbx respectively.  And each
-> > channel has fixed peripheral device and irq.  You think we can define
-> > 2 x 16 x (channel number + channel irq) in dma engine driver?  I'm
-> > afraid not.  The channel number can be identified in filter function
-> > because dmaengine core code and mxs dma hw are indexing the channel
-> > in the same way, so that the sw channel id can be used to address hw
-> > channel, otherwise we have to pass hw channel id to dma driver just
-> > like what we do with irq.
-> 
-> I don't understand. The sw channel id should be something that is
-> defined in an arbitrary way for each machine, and it should be the
-> only thing that a driver needs, right?
-> 
-Yes, the sw channel id can be defined in an arbitrary way by
-dmaengine, but in that case dmaegine can not use sw channel id to
-access hw channel, because each mxs dma client device gets a specific
-hw channel.  Of course, we can give device an arbitrary channel with
-a fixed hw channel id attached on, and use hw id to access hw channel.
-But in that case, we have one more info in device data to pass besides
-irq.
+> This patch adds the platform device and assignes the platform resources
+> for the PRUSS mfd driver.
 
+    You also add the PRUSS clock (and I would have done that as a separate patch).
 
-> I have not looked much at other dmaengine drivers, but I'd be
-> surprised if they require the device driver to be written
-> for a specific implementation. If that was the case, you would
-> not even need a dmaengine API but could just as well write
-> to the DMA controller registers from the device driver directly.
-> 
-We need a specific implementation, but it's not so specific that we
-have to access dma controller directly.  Even it is, we still need
-an API/interface, as there are so many client devices need to do the
-same thing, right? ;)
+> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 
-> > > What I meant is that you take care to avoid getting into the
-> > > interrupt handler while holding the spinlock, but in the handler,
-> > > you don't check if the lock is held. It can't be correct to
-> > > serialize just half the cases.
-> > > 
-> > Thanks for the explanation.  Please help review the fix below to see
-> > if I understand the comment correctly.
-> > 
-> >         if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN)) {
-> >                 spin_lock_irqsave(&host->lock, flags);
-> >                 mmc_signal_sdio_irq(host->mmc);
-> >                 spin_unlock_irqrestore(&host->lock, flags);
-> >         }
-> 
-> This is still wrong for two reasons:
-> 
-> * You now don't hold the lock while reading the 'stat' variable. The point of the
->   lock is to make sure that sdio doesn't get turned off after reading stat but
->   before signaling the sdio, so you have to hold it across both.
-> * In an interrupt controller, you should not disable interrupts again.
->   It's harmless, but slow and confusing to the reader.
-> 
-Sorry for the dumb.  So it should be something like the following?
+    You should have noted the patch dependency here -- this patch depends on the 
+one nenaming DA8XX_LPSC0_DMAX.
 
-        spin_lock(&host->lock);
-
-        stat = readl(host->base + HW_SSP_CTRL1);
-        writel(stat & MXS_MMC_IRQ_BITS,
-                host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
-
-	[...]
-
-        if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
-                mmc_signal_sdio_irq(host->mmc);
-
-        spin_unlock(&host->lock);
-
-Regards,
-Shawn
+WBR, Sergei
