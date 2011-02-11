@@ -1,43 +1,54 @@
 From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Fri, 11 Feb 2011 20:21:26 +0530
-Subject: [PATCH v2 07/13] da850: pruss CAN platform specific changes for gpios.
+Date: Fri, 11 Feb 2011 20:21:27 +0530
+Subject: [PATCH v2 08/13] da850: pruss CAN board specific changes for gpios.
 In-Reply-To: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
 References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <1297435892-28278-8-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <1297435892-28278-9-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the GPIOs for the pruss CAN device.
+This patch adds the GPIO modifications required for the pruss CAN.
 
 Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 ---
- arch/arm/mach-davinci/da850.c            |    1 +
- arch/arm/mach-davinci/include/mach/mux.h |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 4862c28..a15571d 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -570,6 +570,7 @@ static const struct mux_config da850_pins[] = {
- 	MUX_CFG(DA850, PRUSS_PRU1_R30_15,	12,	0,	15,	4,	false)
- 	MUX_CFG(DA850, PRUSS_PRU1_R31_18,	11,	20,	15,	0,	false)
- 	/* GPIO function */
-+	MUX_CFG(DA850, GPIO2_0,		6,	28,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_4,		6,	12,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_6,		6,	4,	15,	8,	false)
- 	MUX_CFG(DA850, GPIO2_8,		5,	28,	15,	8,	false)
-diff --git a/arch/arm/mach-davinci/include/mach/mux.h b/arch/arm/mach-davinci/include/mach/mux.h
-index 10f49f2..85b3a0d 100644
---- a/arch/arm/mach-davinci/include/mach/mux.h
-+++ b/arch/arm/mach-davinci/include/mach/mux.h
-@@ -912,6 +912,7 @@ enum davinci_da850_index {
- 	DA850_PRUSS_PRU1_R31_18,
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 2ce5536..f9c38f8 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -45,6 +45,7 @@
  
- 	/* GPIO function */
-+	DA850_GPIO2_0,
- 	DA850_GPIO2_4,
- 	DA850_GPIO2_6,
- 	DA850_GPIO2_8,
+ #define DA850_MMCSD_CD_PIN		GPIO_TO_PIN(4, 0)
+ #define DA850_MMCSD_WP_PIN		GPIO_TO_PIN(4, 1)
++#define DA850_PRUSS_CAN_TRX_PIN	GPIO_TO_PIN(2, 0)
+ 
+ #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
+ 
+@@ -1055,7 +1056,7 @@ static __init int da850_evm_init_cpufreq(void) { return 0; }
+ 
+ const short da850_evm_pruss_can_pins[] = {
+ 	DA850_PRUSS_PRU0_R31_0, DA850_PRUSS_PRU1_R30_15,
+-	DA850_PRUSS_PRU1_R31_18,
++	DA850_PRUSS_PRU1_R31_18, DA850_GPIO2_0,
+ 	-1
+ };
+ 
+@@ -1073,6 +1074,14 @@ static int __init da850_evm_setup_pruss_can(void)
+ 	val |= BIT(3);
+ 	__raw_writel(val, cfg_chip3_reg);
+ 
++	/* value = 0 to enable the CAN transceiver */
++	ret = gpio_request_one(DA850_PRUSS_CAN_TRX_PIN,
++					GPIOF_OUT_INIT_LOW, "pruss_can_en");
++	if (ret) {
++		pr_warning("Cannot setup GPIO %d\n", DA850_PRUSS_CAN_TRX_PIN);
++		gpio_free(DA850_PRUSS_CAN_TRX_PIN);
++	}
++
+ 	return ret;
+ }
+ 
 -- 
 1.7.2.3
