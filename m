@@ -1,379 +1,677 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Thu, 10 Feb 2011 22:09:16 -0600
-Subject: [PATCH] picoxcell_crypto: add support for the picoxcell crypto
-	engines
-In-Reply-To: <1297180576-11581-1-git-send-email-jamie@jamieiles.com>
-References: <1297180576-11581-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110210220916.aac2b545.kim.phillips@freescale.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 11 Feb 2011 09:41:53 +0530
+Subject: [PATCH v2 2/5] OMAP: clockdomain: Arch specific funcs to handle
+	deps
+In-Reply-To: <alpine.DEB.2.00.1102101908540.21991@utopia.booyaka.com>
+References: <1295956308-23860-1-git-send-email-rnayak@ti.com>
+	<1295956308-23860-2-git-send-email-rnayak@ti.com>
+	<1295956308-23860-3-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1102101840200.21991@utopia.booyaka.com>
+	<alpine.DEB.2.00.1102101908540.21991@utopia.booyaka.com>
+Message-ID: <c691112212f446c45663eb0bcdfaaeeb@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Feb 2011 15:56:16 +0000
-Jamie Iles <jamie@jamieiles.com> wrote:
-
-> Picochip picoXcell devices have two crypto engines, one targeted
-> at IPSEC offload and the other at WCDMA layer 2 ciphering.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Friday, February 11, 2011 7:40 AM
+> To: Rajendra Nayak
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+khilman at ti.com; b-cousson at ti.com
+> Subject: Re: [PATCH v2 2/5] OMAP: clockdomain: Arch specific funcs to
+handle deps
 >
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+>
+> One other minor change; also modified the wkdep_src/sleepdep_src clkdm
+> resolve loops in clkdm_init() to avoid re-resolving clockdomains that
+have
+> already been looked up.  Updated patch follows.
+
+Thanks, looks good.
+
+>
+>
+> - Paul
+>
+>
+> From 22e63ae70ee061de0171c99ee336957b5e9a11ea Mon Sep 17 00:00:00 2001
+> From: Rajendra Nayak <rnayak@ti.com>
+> Date: Tue, 8 Feb 2011 14:25:34 -0700
+> Subject: [PATCH] OMAP: clockdomain: Arch specific funcs to handle deps
+>
+> Define the following architecture specific funtions for omap2/3
+> .clkdm_add_wkdep
+> .clkdm_del_wkdep
+> .clkdm_read_wkdep
+> .clkdm_clear_all_wkdeps
+> .clkdm_add_sleepdep
+> .clkdm_del_sleepdep
+> .clkdm_read_sleepdep
+> .clkdm_clear_all_sleepdeps
+>
+> Convert the platform-independent framework to call these functions.
+> With this also move the clkdm lookups for all wkdep_srcs and
+> sleepdep_srcs at clkdm_init.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> [paul at pwsan.com: fixed loop termination conditions in
+omap*_clkdm_clear_all_*();
+>  thanks to Kevin Hilman for finding and helping fix those bugs; also
+>  avoid re-resolving clockdomains during init]
+> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
 > ---
-
-nice driver ;).  Have a couple of comments though.
-
-> +     help
-> +       This option enables support for the hardware offload engines in the
-> +       Picochip picoXcell SoC devices. Select this for IPSEC ESP offload
-> +       and for 3gpp Layer 2 ciphering support.
-
-it'd be nice to mention what name the module will have.
-
-> +#define SPACC_CRYPTO_AES_MAX_KEY_LEN 32
-> +#define SPACC_CRYPTO_AES_IV_LEN              16
-> +#define SPACC_CRYPTO_DES_IV_LEN              8
-
-these are identical to algorithm-generic symbolic constants
-AES_MAX_KEY_SIZE, [AD]ES_BLOCK_SIZE - why not use them instead?
-
-> +struct spacc_generic_ctx;
-
-this declaration isn't used prior to its definition, so it's not needed.
-
-> +/* DDT format. This must match the hardware DDT format exactly. */
-> +struct spacc_ddt {
-> +     u32 p, len;
-
-type-consistency: p should be a dma_addr_t
-
-> +     /* AEAD specifc bits. */
-
-specific
-
-> +static inline struct spacc_ablk_ctx *
-> +to_spacc_ablk_ctx(struct spacc_generic_ctx *ctx)
-> +{
-> +     return ctx ? container_of(ctx, struct spacc_ablk_ctx, generic) : NULL;
-> +}
+>  arch/arm/mach-omap2/Makefile                     |    2 +
+>  arch/arm/mach-omap2/clockdomain.c                |  164
++++++++++++----------
+>  arch/arm/mach-omap2/clockdomain.h                |    6 +-
+>  arch/arm/mach-omap2/clockdomain2xxx_3xxx.c       |  126
++++++++++++++++++
+>  arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    9 +-
+>  arch/arm/mach-omap2/io.c                         |    6 +-
+>  6 files changed, 229 insertions(+), 84 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+>
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 1c0c2b0..6b2824d 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -102,8 +102,10 @@ obj-$(CONFIG_ARCH_OMAP4)		+=
+$(powerdomain-common) \
+>
+>  # PRCM clockdomain control
+>  obj-$(CONFIG_ARCH_OMAP2)		+= clockdomain.o \
+> +					   clockdomain2xxx_3xxx.o \
+>  					   clockdomains2xxx_3xxx_data.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= clockdomain.o \
+> +					   clockdomain2xxx_3xxx.o \
+>  					   clockdomains2xxx_3xxx_data.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= clockdomain.o \
+>  					   clockdomains44xx_data.o
+> diff --git a/arch/arm/mach-omap2/clockdomain.c
+b/arch/arm/mach-omap2/clockdomain.c
+> index f70b06a..ee73927 100644
+> --- a/arch/arm/mach-omap2/clockdomain.c
+> +++ b/arch/arm/mach-omap2/clockdomain.c
+> @@ -308,6 +308,7 @@ void clkdm_init(struct clockdomain **clkdms,
+>  	struct clockdomain **c = NULL;
+>  	struct clockdomain *clkdm;
+>  	struct clkdm_autodep *autodep = NULL;
+> +	struct clkdm_dep *cd;
+>
+>  	if (!custom_funcs)
+>  		WARN(1, "No custom clkdm functions registered\n");
+> @@ -333,7 +334,22 @@ void clkdm_init(struct clockdomain **clkdms,
+>  		else if (clkdm->flags & CLKDM_CAN_DISABLE_AUTO)
+>  			omap2_clkdm_deny_idle(clkdm);
+>
+> +		for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
+> +			if (!omap_chip_is(cd->omap_chip))
+> +				continue;
+> +			if (cd->clkdm)
+> +				continue;
+> +			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
+> +		}
+>  		clkdm_clear_all_wkdeps(clkdm);
 > +
-> +static inline struct spacc_aead_ctx *
-> +to_spacc_aead_ctx(struct spacc_generic_ctx *ctx)
-> +{
-> +     return ctx ? container_of(ctx, struct spacc_aead_ctx, generic) : NULL;
-> +}
-
-these aren't being used anywhere.
-
-> +static inline struct spacc_alg *to_spacc_alg(struct crypto_alg *alg);
-
-define it here - forward declarations should only be necessary when
-dealing with circular dependencies.
-
+> +		for (cd = clkdm->sleepdep_srcs; cd && cd->clkdm_name;
+cd++) {
+> +			if (!omap_chip_is(cd->omap_chip))
+> +				continue;
+> +			if (cd->clkdm)
+> +				continue;
+> +			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
+> +		}
+>  		clkdm_clear_all_sleepdeps(clkdm);
+>  	}
+>  }
+> @@ -430,6 +446,7 @@ struct powerdomain *clkdm_get_pwrdm(struct
+clockdomain *clkdm)
+>  int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain
+*clkdm2)
+>  {
+>  	struct clkdm_dep *cd;
+> +	int ret = 0;
+>
+>  	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+>  		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
+> @@ -441,21 +458,26 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  		return -EINVAL;
+>
+>  	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
+> -	if (IS_ERR(cd)) {
+> +	if (IS_ERR(cd))
+> +		ret = PTR_ERR(cd);
+> +
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_add_wkdep)
+> +		ret = -EINVAL;
+> +
+> +	if (ret) {
+>  		pr_debug("clockdomain: hardware cannot set/clear wake up
+of "
+>  			 "%s when %s wakes up\n", clkdm1->name,
+clkdm2->name);
+> -		return PTR_ERR(cd);
+> +		return ret;
+>  	}
+>
+>  	if (atomic_inc_return(&cd->wkdep_usecount) == 1) {
+>  		pr_debug("clockdomain: hardware will wake up %s when %s
+wakes "
+>  			 "up\n", clkdm1->name, clkdm2->name);
+>
+> -		omap2_prm_set_mod_reg_bits((1 << clkdm2->dep_bit),
+> -				     clkdm1->pwrdm.ptr->prcm_offs,
+PM_WKDEP);
+> +		ret = arch_clkdm->clkdm_add_wkdep(clkdm1, clkdm2);
+>  	}
+>
+> -	return 0;
+> +	return ret;
+>  }
+>
+>  /**
+> @@ -471,6 +493,7 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain
+*clkdm2)
+>  {
+>  	struct clkdm_dep *cd;
+> +	int ret = 0;
+>
+>  	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+>  		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
+> @@ -482,21 +505,26 @@ int clkdm_del_wkdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  		return -EINVAL;
+>
+>  	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
+> -	if (IS_ERR(cd)) {
+> +	if (IS_ERR(cd))
+> +		ret = PTR_ERR(cd);
+> +
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_del_wkdep)
+> +		ret = -EINVAL;
+> +
+> +	if (ret) {
+>  		pr_debug("clockdomain: hardware cannot set/clear wake up
+of "
+>  			 "%s when %s wakes up\n", clkdm1->name,
+clkdm2->name);
+> -		return PTR_ERR(cd);
+> +		return ret;
+>  	}
+>
+>  	if (atomic_dec_return(&cd->wkdep_usecount) == 0) {
+>  		pr_debug("clockdomain: hardware will no longer wake up %s
+"
+>  			 "after %s wakes up\n", clkdm1->name,
+clkdm2->name);
+>
+> -		omap2_prm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
+> -				       clkdm1->pwrdm.ptr->prcm_offs,
+PM_WKDEP);
+> +		ret = arch_clkdm->clkdm_del_wkdep(clkdm1, clkdm2);
+>  	}
+>
+> -	return 0;
+> +	return ret;
+>  }
+>
+>  /**
+> @@ -516,6 +544,7 @@ int clkdm_del_wkdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain
+*clkdm2)
+>  {
+>  	struct clkdm_dep *cd;
+> +	int ret = 0;
+>
+>  	if (!clkdm1 || !clkdm2)
+>  		return -EINVAL;
+> @@ -527,15 +556,20 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  	}
+>
+>  	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
+> -	if (IS_ERR(cd)) {
+> +	if (IS_ERR(cd))
+> +		ret = PTR_ERR(cd);
+> +
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_read_wkdep)
+> +		ret = -EINVAL;
+> +
+> +	if (ret) {
+>  		pr_debug("clockdomain: hardware cannot set/clear wake up
+of "
+>  			 "%s when %s wakes up\n", clkdm1->name,
+clkdm2->name);
+> -		return PTR_ERR(cd);
+> +		return ret;
+>  	}
+>
+>  	/* XXX It's faster to return the atomic wkdep_usecount */
+> -	return omap2_prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs,
+PM_WKDEP,
+> -				       (1 << clkdm2->dep_bit));
+> +	return arch_clkdm->clkdm_read_wkdep(clkdm1, clkdm2);
+>  }
+>
+>  /**
+> @@ -550,9 +584,6 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>   */
+>  int clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
+>  {
+> -	struct clkdm_dep *cd;
+> -	u32 mask = 0;
+> -
+>  	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+>  		pr_err("clockdomain: %s: %s: not yet implemented\n",
+>  		       clkdm->name, __func__);
+> @@ -562,21 +593,10 @@ int clkdm_clear_all_wkdeps(struct clockdomain
+*clkdm)
+>  	if (!clkdm)
+>  		return -EINVAL;
+>
+> -	for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
+> -		if (!omap_chip_is(cd->omap_chip))
+> -			continue;
+> -
+> -		if (!cd->clkdm && cd->clkdm_name)
+> -			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
+> -
+> -		/* PRM accesses are slow, so minimize them */
+> -		mask |= 1 << cd->clkdm->dep_bit;
+> -		atomic_set(&cd->wkdep_usecount, 0);
+> -	}
+> -
+> -	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
+PM_WKDEP);
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_clear_all_wkdeps)
+> +		return -EINVAL;
+>
+> -	return 0;
+> +	return arch_clkdm->clkdm_clear_all_wkdeps(clkdm);
+>  }
+>
+>  /**
+> @@ -594,31 +614,33 @@ int clkdm_clear_all_wkdeps(struct clockdomain
+*clkdm)
+>  int clkdm_add_sleepdep(struct clockdomain *clkdm1, struct clockdomain
+*clkdm2)
+>  {
+>  	struct clkdm_dep *cd;
+> -
+> -	if (!cpu_is_omap34xx())
+> -		return -EINVAL;
+> +	int ret = 0;
+>
+>  	if (!clkdm1 || !clkdm2)
+>  		return -EINVAL;
+>
+>  	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
+> -	if (IS_ERR(cd)) {
+> +	if (IS_ERR(cd))
+> +		ret = PTR_ERR(cd);
+> +
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_add_sleepdep)
+> +		ret = -EINVAL;
+> +
+> +	if (ret) {
+>  		pr_debug("clockdomain: hardware cannot set/clear sleep "
+>  			 "dependency affecting %s from %s\n",
+clkdm1->name,
+>  			 clkdm2->name);
+> -		return PTR_ERR(cd);
+> +		return ret;
+>  	}
+>
+>  	if (atomic_inc_return(&cd->sleepdep_usecount) == 1) {
+>  		pr_debug("clockdomain: will prevent %s from sleeping if %s
+"
+>  			 "is active\n", clkdm1->name, clkdm2->name);
+>
+> -		omap2_cm_set_mod_reg_bits((1 << clkdm2->dep_bit),
+> -				    clkdm1->pwrdm.ptr->prcm_offs,
+> -				    OMAP3430_CM_SLEEPDEP);
+> +		ret = arch_clkdm->clkdm_add_sleepdep(clkdm1, clkdm2);
+>  	}
+>
+> -	return 0;
+> +	return ret;
+>  }
+>
+>  /**
+> @@ -636,19 +658,23 @@ int clkdm_add_sleepdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  int clkdm_del_sleepdep(struct clockdomain *clkdm1, struct clockdomain
+*clkdm2)
+>  {
+>  	struct clkdm_dep *cd;
+> -
+> -	if (!cpu_is_omap34xx())
+> -		return -EINVAL;
+> +	int ret = 0;
+>
+>  	if (!clkdm1 || !clkdm2)
+>  		return -EINVAL;
+>
+>  	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
+> -	if (IS_ERR(cd)) {
+> +	if (IS_ERR(cd))
+> +		ret = PTR_ERR(cd);
+> +
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_del_sleepdep)
+> +		ret = -EINVAL;
+> +
+> +	if (ret) {
+>  		pr_debug("clockdomain: hardware cannot set/clear sleep "
+>  			 "dependency affecting %s from %s\n",
+clkdm1->name,
+>  			 clkdm2->name);
+> -		return PTR_ERR(cd);
+> +		return ret;
+>  	}
+>
+>  	if (atomic_dec_return(&cd->sleepdep_usecount) == 0) {
+> @@ -656,12 +682,10 @@ int clkdm_del_sleepdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  			 "sleeping if %s is active\n", clkdm1->name,
+>  			 clkdm2->name);
+>
+> -		omap2_cm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
+> -				      clkdm1->pwrdm.ptr->prcm_offs,
+> -				      OMAP3430_CM_SLEEPDEP);
+> +		ret = arch_clkdm->clkdm_del_sleepdep(clkdm1, clkdm2);
+>  	}
+>
+> -	return 0;
+> +	return ret;
+>  }
+>
+>  /**
+> @@ -683,25 +707,27 @@ int clkdm_del_sleepdep(struct clockdomain *clkdm1,
+struct clockdomain *clkdm2)
+>  int clkdm_read_sleepdep(struct clockdomain *clkdm1, struct clockdomain
+*clkdm2)
+>  {
+>  	struct clkdm_dep *cd;
+> -
+> -	if (!cpu_is_omap34xx())
+> -		return -EINVAL;
+> +	int ret = 0;
+>
+>  	if (!clkdm1 || !clkdm2)
+>  		return -EINVAL;
+>
+>  	cd = _clkdm_deps_lookup(clkdm2, clkdm1->sleepdep_srcs);
+> -	if (IS_ERR(cd)) {
+> +	if (IS_ERR(cd))
+> +		ret = PTR_ERR(cd);
+> +
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_read_sleepdep)
+> +		ret = -EINVAL;
+> +
+> +	if (ret) {
+>  		pr_debug("clockdomain: hardware cannot set/clear sleep "
+>  			 "dependency affecting %s from %s\n",
+clkdm1->name,
+>  			 clkdm2->name);
+> -		return PTR_ERR(cd);
+> +		return ret;
+>  	}
+>
+>  	/* XXX It's faster to return the atomic sleepdep_usecount */
+> -	return omap2_prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs,
+> -				       OMAP3430_CM_SLEEPDEP,
+> -				       (1 << clkdm2->dep_bit));
+> +	return arch_clkdm->clkdm_read_sleepdep(clkdm1, clkdm2);
+>  }
+>
+>  /**
+> @@ -716,31 +742,13 @@ int clkdm_read_sleepdep(struct clockdomain
+*clkdm1, struct clockdomain *clkdm2)
+>   */
+>  int clkdm_clear_all_sleepdeps(struct clockdomain *clkdm)
+>  {
+> -	struct clkdm_dep *cd;
+> -	u32 mask = 0;
+> -
+> -	if (!cpu_is_omap34xx())
+> -		return -EINVAL;
+> -
+>  	if (!clkdm)
+>  		return -EINVAL;
+>
+> -	for (cd = clkdm->sleepdep_srcs; cd && cd->clkdm_name; cd++) {
+> -		if (!omap_chip_is(cd->omap_chip))
+> -			continue;
+> -
+> -		if (!cd->clkdm && cd->clkdm_name)
+> -			cd->clkdm = _clkdm_lookup(cd->clkdm_name);
+> -
+> -		/* PRM accesses are slow, so minimize them */
+> -		mask |= 1 << cd->clkdm->dep_bit;
+> -		atomic_set(&cd->sleepdep_usecount, 0);
+> -	}
+> -
+> -	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
+> -			       OMAP3430_CM_SLEEPDEP);
+> +	if (!arch_clkdm || !arch_clkdm->clkdm_clear_all_sleepdeps)
+> +		return -EINVAL;
+>
+> -	return 0;
+> +	return arch_clkdm->clkdm_clear_all_sleepdeps(clkdm);
+>  }
+>
+>  /**
+> diff --git a/arch/arm/mach-omap2/clockdomain.h
+b/arch/arm/mach-omap2/clockdomain.h
+> index 71ad265..90b6d6a 100644
+> --- a/arch/arm/mach-omap2/clockdomain.h
+> +++ b/arch/arm/mach-omap2/clockdomain.h
+> @@ -176,7 +176,11 @@ int omap2_clkdm_sleep(struct clockdomain *clkdm);
+>  int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk);
+>  int omap2_clkdm_clk_disable(struct clockdomain *clkdm, struct clk
+*clk);
+>
+> -extern void __init omap2_clockdomains_init(void);
+> +extern void __init omap2xxx_clockdomains_init(void);
+> +extern void __init omap3xxx_clockdomains_init(void);
+>  extern void __init omap44xx_clockdomains_init(void);
+>
+> +extern struct clkdm_ops omap2_clkdm_operations;
+> +extern struct clkdm_ops omap3_clkdm_operations;
+> +
+>  #endif
+> diff --git a/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> new file mode 100644
+> index 0000000..38dd903
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+> @@ -0,0 +1,126 @@
 > +/*
-> + * Take a crypto request and scatterlists for the data and turn them into DDTs
-> + * for passing to the crypto engines. This also DMA maps the data so that the
-> + * crypto engines can DMA to/from them.
+> + * OMAP2 and OMAP3 clockdomain control
+> + *
+> + * Copyright (C) 2008-2010 Texas Instruments, Inc.
+> + * Copyright (C) 2008-2010 Nokia Corporation
+> + *
+> + * Derived from mach-omap2/clockdomain.c written by Paul Walmsley
+> + * Rajendra Nayak <rnayak@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
 > + */
-> +static struct spacc_ddt *spacc_sg_to_ddt(struct spacc_engine *engine,
-> +                                      struct scatterlist *payload,
-> +                                      unsigned nbytes,
-> +                                      enum dma_data_direction dir,
-> +                                      dma_addr_t *ddt_phys)
+> +
+> +#include <linux/types.h>
+> +#include <plat/prcm.h>
+> +#include "prm.h"
+> +#include "prm2xxx_3xxx.h"
+> +#include "cm.h"
+> +#include "cm2xxx_3xxx.h"
+> +#include "cm-regbits-24xx.h"
+> +#include "cm-regbits-34xx.h"
+> +#include "clockdomain.h"
+> +
+> +static int omap2_clkdm_add_wkdep(struct clockdomain *clkdm1,
+> +						struct clockdomain
+*clkdm2)
 > +{
-> +     unsigned nents, mapped_ents;
-> +     struct scatterlist *cur;
-> +     struct spacc_ddt *ddt;
-> +     int i;
-> +
-> +     nents = sg_count(payload, nbytes);
-> +     mapped_ents = dma_map_sg(engine->dev, payload, nents, dir);
-> +
-> +     if (mapped_ents + 1 > MAX_DDT_LEN) {
-> +             dma_unmap_sg(engine->dev, payload, nents, dir);
-> +             return NULL;
-> +     }
-> +
-> +     ddt = dma_pool_alloc(engine->req_pool, GFP_ATOMIC, ddt_phys);
-> +     if (ddt) {
-> +             for_each_sg(payload, cur, mapped_ents, i) {
-> +                     ddt[i].p = sg_dma_address(cur);
-> +                     ddt[i].len = sg_dma_len(cur);
-> +             }
-> +
-> +             ddt[mapped_ents].p = 0;
-> +             ddt[mapped_ents].len = 0;
-> +     } else {
-> +             dma_unmap_sg(engine->dev, payload, nents, dir);
-> +             ddt = NULL;
-> +     }
-> +
-> +     return ddt;
+> +	omap2_prm_set_mod_reg_bits((1 << clkdm2->dep_bit),
+> +				clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
+> +	return 0;
 > +}
-
-easier to read would be:
-
-        if (mapped_ents + 1 > MAX_DDT_LEN)
-                goto out;
-
-        ddt = dma_pool_alloc(engine->req_pool, GFP_ATOMIC, ddt_phys);
-        if (!ddt)
-                goto out;
-
-        for_each_sg(payload, cur, mapped_ents, i) {
-                ddt[i].p = sg_dma_address(cur);
-                ddt[i].len = sg_dma_len(cur);
-        }
-        ddt[mapped_ents].p = 0;
-        ddt[mapped_ents].len = 0;
-
-        return ddt;
-
-out:
-        dma_unmap_sg(engine->dev, payload, nents, dir);
-        return NULL;
-}
-
-even more so by moving ddt_set() above it, and then using ddt_set() to
-assign the p, len pairs.
-
-> +static inline void ddt_set(struct spacc_ddt *ddt, unsigned long phys,
-
-phys should be dma_addr_t
-
-> +static int spacc_aead_make_ddts(struct spacc_req *req, u8 *giv)
+> +
+> +static int omap2_clkdm_del_wkdep(struct clockdomain *clkdm1,
+> +						 struct clockdomain
+*clkdm2)
 > +{
-> +     struct aead_request *areq = container_of(req->req, struct aead_request,
-> +                                              base);
-> +     struct spacc_alg *alg = to_spacc_alg(req->req->tfm->__crt_alg);
-> +     struct spacc_engine *engine = req->engine;
-> +     struct spacc_ddt *src_ddt, *dst_ddt;
-> +     unsigned ivsize = alg->alg.cra_aead.ivsize;
-
-no need to go through all those hoops to get to the ivsize - use helper
-fns crypto_aead_reqtfm() and crypto_aead_ivsize(), as is done at the
-callsite, or just pass it in from there.
-
-> +static int spacc_aead_des_setkey(struct crypto_aead *aead, const u8 *key,
-> +                              unsigned int len)
+> +	omap2_prm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
+> +				clkdm1->pwrdm.ptr->prcm_offs, PM_WKDEP);
+> +	return 0;
+> +}
+> +
+> +static int omap2_clkdm_read_wkdep(struct clockdomain *clkdm1,
+> +						 struct clockdomain
+*clkdm2)
 > +{
-> +     struct crypto_tfm *tfm = crypto_aead_tfm(aead);
-> +     struct spacc_aead_ctx *ctx = crypto_tfm_ctx(tfm);
-> +     int err = 0;
-> +     u32 tmp[DES_EXPKEY_WORDS];
+> +	return omap2_prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs,
+> +				PM_WKDEP, (1 << clkdm2->dep_bit));
+> +}
 > +
-> +     err = des_ekey(tmp, key);
-> +     if (unlikely(!err) &&
-
-might want to change the name of the variable err here to something
-like ret or is_weak so as to not mislead the reader.
-
-> +         (crypto_aead_get_flags(aead)) & CRYPTO_TFM_REQ_WEAK_KEY) {
-> +             tfm->crt_flags |= CRYPTO_TFM_RES_WEAK_KEY;
-> +             return -EINVAL;
-> +     }
-> +     err = 0;
-> +
-> +     memcpy(ctx->cipher_key, key, len);
-> +     ctx->cipher_key_len = len;
-> +
-> +     return err;
-
-actually, it doesn't look like this fn needs a return variable
-at all.
-
-> +/* Set the key for the AES block cipher component of the AEAD transform. */
-> +static int spacc_aead_aes_setkey(struct crypto_aead *aead, const u8 *key,
-> +                              unsigned int len)
+> +static int omap2_clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
 > +{
-> +     struct crypto_tfm *tfm = crypto_aead_tfm(aead);
-> +     struct spacc_aead_ctx *ctx = crypto_tfm_ctx(tfm);
-> +     int err;
+> +	struct clkdm_dep *cd;
+> +	u32 mask = 0;
 > +
-> +     /*
-> +      * IPSec engine only supports 128 and 256 bit AES keys. If we get a
-> +      * request for any other size (192 bits) then we need to do a software
-> +      * fallback.
-> +      */
-> +     if (!(16 == len || 32 == len)) {
-
-if (len != AES_KEYSIZE_128 && len != AES_KEYSIZE_256)
-
-> +             /*
-> +              * Set the fallback transform to use the same request flags as
-> +              * the hardware transform.
-> +              */
-> +             ctx->sw_cipher->base.crt_flags &= ~CRYPTO_TFM_REQ_MASK;
-> +             ctx->sw_cipher->base.crt_flags |=
-> +                     (tfm->crt_flags & CRYPTO_TFM_REQ_MASK);
-
-parens not needed.
-
-> +             err = crypto_aead_setkey(ctx->sw_cipher, key, len);
-> +     } else {
-> +             memcpy(ctx->cipher_key, key, len);
-> +             ctx->cipher_key_len = len;
-> +             err = 0;
-> +     }
+> +	for (cd = clkdm->wkdep_srcs; cd && cd->clkdm_name; cd++) {
+> +		if (!omap_chip_is(cd->omap_chip))
+> +			continue;
 > +
-> +     return err;
-
-	return crypto_aead_setkey(ctx->sw_cipher, key, len);
-}
-memcpy(ctx->cipher_key, key, len);
-ctx->cipher_key_len = len;
-
-return 0;
-
-> +static int spacc_aead_setkey(struct crypto_aead *tfm, const u8 *key,
-> +                          unsigned int keylen)
+> +		/* PRM accesses are slow, so minimize them */
+> +		mask |= 1 << cd->clkdm->dep_bit;
+> +		atomic_set(&cd->wkdep_usecount, 0);
+> +	}
+> +
+> +	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
+> +				 PM_WKDEP);
+> +	return 0;
+> +}
+> +
+> +static int omap3_clkdm_add_sleepdep(struct clockdomain *clkdm1,
+> +						 struct clockdomain
+*clkdm2)
 > +{
-> +     struct spacc_aead_ctx *ctx = crypto_aead_ctx(tfm);
-> +     struct spacc_alg *alg = to_spacc_alg(tfm->base.__crt_alg);
-> +     struct rtattr *rta = (void *)key;
-> +     struct crypto_authenc_key_param *param;
-> +     unsigned int authkeylen, enckeylen;
-> +     int err = -EINVAL;
+> +	omap2_cm_set_mod_reg_bits((1 << clkdm2->dep_bit),
+> +				clkdm1->pwrdm.ptr->prcm_offs,
+> +				OMAP3430_CM_SLEEPDEP);
+> +	return 0;
+> +}
 > +
-> +     if (!RTA_OK(rta, keylen))
-> +             goto badkey;
-> +
-> +     if (rta->rta_type != CRYPTO_AUTHENC_KEYA_PARAM)
-> +             goto badkey;
-> +
-> +     if (RTA_PAYLOAD(rta) < sizeof(*param))
-> +             goto badkey;
-
-I'm not sure, but it should be safe to remove the above three checks -
-they cause a false badkey failure if the keys aren't within an rtattr
-struct, which, e.g., something like testmgr.c wouldn't do.
-
-> +     param = RTA_DATA(rta);
-> +     enckeylen = be32_to_cpu(param->enckeylen);
-> +
-> +     key += RTA_ALIGN(rta->rta_len);
-> +     keylen -= RTA_ALIGN(rta->rta_len);
-
-actually, I doubt crypto drivers should be including rtnetlink.h at
-all...but it's probably ok for now - talitos still does :)
-
-> +     if ((spacc_alg->ctrl_default & SPACC_CRYPTO_ALG_MASK) ==
-> +         SPA_CTRL_CIPH_ALG_AES &&
-> +         !(16 == ctx->cipher_key_len || 32 == ctx->cipher_key_len))
-
-as above, please use symbolic equivalents
-
-> +static void spacc_aead_complete(struct spacc_req *req)
+> +static int omap3_clkdm_del_sleepdep(struct clockdomain *clkdm1,
+> +						 struct clockdomain
+*clkdm2)
 > +{
-> +     spacc_aead_free_ddts(req);
+> +	omap2_cm_clear_mod_reg_bits((1 << clkdm2->dep_bit),
+> +				clkdm1->pwrdm.ptr->prcm_offs,
+> +				OMAP3430_CM_SLEEPDEP);
+> +	return 0;
+> +}
 > +
-> +     if (req->req->complete)
-> +             req->req->complete(req->req, req->result);
-
-when is there not a completion function?
-
-> +     /* Set the source and destination DDT pointers. */
-> +     writel((u32)req->src_addr, engine->regs + SPA_SRC_PTR_REG_OFFSET);
-> +     writel((u32)req->dst_addr, engine->regs + SPA_DST_PTR_REG_OFFSET);
-
-cast necessary?
-
-> +     ctrl = spacc_alg->ctrl_default;
-> +     ctrl |= ((req->ctx_id << SPA_CTRL_CTX_IDX) |
-> +              (1 << SPA_CTRL_ICV_APPEND) |
-> +              (req->is_encrypt ? (1 << SPA_CTRL_ENCRYPT_IDX) : 0) |
-> +              (req->is_encrypt ? (1 << SPA_CTRL_AAD_COPY) : 0));
-> +     if (!req->is_encrypt)
-> +             ctrl |= (1 << SPA_CTRL_KEY_EXP);
-
-ctrl = spacc_alg->ctrl_default | (req->ctx_id << SPA_CTRL_CTX_IDX) |
-       (1 << SPA_CTRL_ICV_APPEND);
-
-if (req->is_encrypt)
-	ctrl |= (1 << SPA_CTRL_ENCRYPT_IDX) | (1 << SPA_CTRL_AAD_COPY);
-else
-	ctrl |= (1 << SPA_CTRL_KEY_EXP);
-
-> +static int spacc_des_setkey(struct crypto_ablkcipher *cipher, const u8 *key,
-> +                         unsigned int len)
+> +static int omap3_clkdm_read_sleepdep(struct clockdomain *clkdm1,
+> +						 struct clockdomain
+*clkdm2)
 > +{
-> +     struct crypto_tfm *tfm = crypto_ablkcipher_tfm(cipher);
-> +     struct spacc_ablk_ctx *ctx = crypto_tfm_ctx(tfm);
-> +     int err;
-> +     u32 tmp[DES_EXPKEY_WORDS];
+> +	return omap2_prm_read_mod_bits_shift(clkdm1->pwrdm.ptr->prcm_offs,
+> +				OMAP3430_CM_SLEEPDEP, (1 <<
+clkdm2->dep_bit));
+> +}
 > +
-> +     if (len > SPACC_CRYPTO_AES_MAX_KEY_LEN) {
-
-AES left overs in a DES setkey
-
-> +static int spacc_aes_setkey(struct crypto_ablkcipher *cipher, const u8 *key,
-> +                         unsigned int len)
+> +static int omap3_clkdm_clear_all_sleepdeps(struct clockdomain *clkdm)
 > +{
-> +     struct crypto_tfm *tfm = crypto_ablkcipher_tfm(cipher);
-> +     struct spacc_ablk_ctx *ctx = crypto_tfm_ctx(tfm);
-> +     int err = 0;
+> +	struct clkdm_dep *cd;
+> +	u32 mask = 0;
 > +
-> +     if (len > SPACC_CRYPTO_AES_MAX_KEY_LEN) {
-> +             crypto_ablkcipher_set_flags(cipher, CRYPTO_TFM_RES_BAD_KEY_LEN);
-> +             return -EINVAL;
-> +     }
+> +	for (cd = clkdm->sleepdep_srcs; cd && cd->clkdm_name; cd++) {
+> +		if (!omap_chip_is(cd->omap_chip))
+> +			continue;
 > +
-> +     /*
-> +      * IPSec engine only supports 128 and 256 bit AES keys. If we get a
-> +      * request for any other size (192 bits) then we need to do a software
-> +      * fallback.
-> +      */
-> +     if (!(16 == len || 32 == len) && ctx->sw_cipher) {
-
-symbolic constants
-
-> +             /*
-> +              * Set the fallback transform to use the same request flags as
-> +              * the hardware transform.
-> +              */
-> +             ctx->sw_cipher->base.crt_flags &= ~CRYPTO_TFM_REQ_MASK;
-> +             ctx->sw_cipher->base.crt_flags |=
-> +                 (cipher->base.crt_flags & CRYPTO_TFM_REQ_MASK);
-
-parens not necessary
-
-> +static int spacc_ablk_need_fallback(struct spacc_req *req)
+> +		/* PRM accesses are slow, so minimize them */
+> +		mask |= 1 << cd->clkdm->dep_bit;
+> +		atomic_set(&cd->sleepdep_usecount, 0);
+> +	}
+> +	omap2_prm_clear_mod_reg_bits(mask, clkdm->pwrdm.ptr->prcm_offs,
+> +				OMAP3430_CM_SLEEPDEP);
+> +	return 0;
+> +}
+> +
+> +struct clkdm_ops omap2_clkdm_operations = {
+> +	.clkdm_add_wkdep	= omap2_clkdm_add_wkdep,
+> +	.clkdm_del_wkdep	= omap2_clkdm_del_wkdep,
+> +	.clkdm_read_wkdep	= omap2_clkdm_read_wkdep,
+> +	.clkdm_clear_all_wkdeps	= omap2_clkdm_clear_all_wkdeps,
+> +};
+> +
+> +struct clkdm_ops omap3_clkdm_operations = {
+> +	.clkdm_add_wkdep	= omap2_clkdm_add_wkdep,
+> +	.clkdm_del_wkdep	= omap2_clkdm_del_wkdep,
+> +	.clkdm_read_wkdep	= omap2_clkdm_read_wkdep,
+> +	.clkdm_clear_all_wkdeps	= omap2_clkdm_clear_all_wkdeps,
+> +	.clkdm_add_sleepdep	= omap3_clkdm_add_sleepdep,
+> +	.clkdm_del_sleepdep	= omap3_clkdm_del_sleepdep,
+> +	.clkdm_read_sleepdep	= omap3_clkdm_read_sleepdep,
+> +	.clkdm_clear_all_sleepdeps	= omap3_clkdm_clear_all_sleepdeps,
+> +};
+> diff --git a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+b/arch/arm/mach-
+> omap2/clockdomains2xxx_3xxx_data.c
+> index 8cab07a..f85de72 100644
+> --- a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+> @@ -854,7 +854,12 @@ static struct clockdomain *clockdomains_omap2[]
+__initdata = {
+>  	NULL,
+>  };
+>
+> -void __init omap2_clockdomains_init(void)
+> +void __init omap2xxx_clockdomains_init(void)
+>  {
+> -	clkdm_init(clockdomains_omap2, clkdm_autodeps, NULL);
+> +	clkdm_init(clockdomains_omap2, clkdm_autodeps,
+&omap2_clkdm_operations);
+> +}
+> +
+> +void __init omap3xxx_clockdomains_init(void)
 > +{
-> +     struct spacc_ablk_ctx *ctx;
-> +     struct crypto_tfm *tfm = req->req->tfm;
-> +     struct crypto_alg *alg = req->req->tfm->__crt_alg;
-> +     struct spacc_alg *spacc_alg = to_spacc_alg(alg);
-> +
-> +     ctx = crypto_tfm_ctx(tfm);
-> +
-> +     return (spacc_alg->ctrl_default & SPACC_CRYPTO_ALG_MASK) ==
-> +                     SPA_CTRL_CIPH_ALG_AES &&
-> +             !(16 == ctx->key_len || 32 == ctx->key_len);
-
-symbolic constants
-
-> +static ssize_t spacc_stat_irq_thresh_store(struct device *dev,
-> +                                        struct device_attribute *attr,
-> +                                        const char *buf, size_t len)
-> +{
-> +     struct spacc_engine *engine = spacc_dev_to_engine(dev);
-> +     unsigned thresh = simple_strtoul(buf, NULL, 0);
-
-consider using strict_strtoul (checkpatch)
-
-> +static struct spacc_alg ipsec_engine_algs[] = {
-> +     {
-> +             .ctrl_default = SPA_CTRL_CIPH_ALG_AES | SPA_CTRL_CIPH_MODE_CBC,
-> +             .key_offs = 0,
-> +             .iv_offs = SPACC_CRYPTO_AES_MAX_KEY_LEN,
-> +             .alg = {
-> +                     .cra_name = "cbc(aes)",
-> +                     .cra_driver_name = "cbc-aes-picoxcell",
-> +                     .cra_priority = SPACC_CRYPTO_ALG_PRIORITY,
-> +                     .cra_flags = CRYPTO_ALG_TYPE_ABLKCIPHER |
-> +                                  CRYPTO_ALG_ASYNC |
-> +                                  CRYPTO_ALG_NEED_FALLBACK,
-> +                     .cra_blocksize = 16,
-
-symbolic constant, here and throughout the rest of this section.
-
-Thanks,
-
-Kim
+> +	clkdm_init(clockdomains_omap2, clkdm_autodeps,
+&omap3_clkdm_operations);
+>  }
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index c203204..89cbba2 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -337,15 +337,15 @@ void __init omap2_init_common_infrastructure(void)
+>
+>  	if (cpu_is_omap242x()) {
+>  		omap2xxx_powerdomains_init();
+> -		omap2_clockdomains_init();
+> +		omap2xxx_clockdomains_init();
+>  		omap2420_hwmod_init();
+>  	} else if (cpu_is_omap243x()) {
+>  		omap2xxx_powerdomains_init();
+> -		omap2_clockdomains_init();
+> +		omap2xxx_clockdomains_init();
+>  		omap2430_hwmod_init();
+>  	} else if (cpu_is_omap34xx()) {
+>  		omap3xxx_powerdomains_init();
+> -		omap2_clockdomains_init();
+> +		omap3xxx_clockdomains_init();
+>  		omap3xxx_hwmod_init();
+>  	} else if (cpu_is_omap44xx()) {
+>  		omap44xx_powerdomains_init();
+> --
+> 1.7.2.3
