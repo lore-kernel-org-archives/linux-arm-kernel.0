@@ -1,33 +1,44 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Fri, 11 Feb 2011 17:53:42 -0500
-Subject: [PATCH RFC] ARM: MPCore v6_early_abort enhancement
-In-Reply-To: <20110211223844.GB31356@n2100.arm.linux.org.uk>
-References: <20110211215421.GA29361@mvista.com>
-	<20110211223844.GB31356@n2100.arm.linux.org.uk>
-Message-ID: <20110211225342.GD236@mvista.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Feb 2011 15:01:21 -0800
+Subject: [PATCH v5 0/5] omap: mailbox: hwmod support
+In-Reply-To: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com> (Omar
+	Ramirez Luna's message of "Wed, 2 Feb 2011 13:27:18 -0600")
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <87ipwq89by.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Omar Ramirez Luna <omar.ramirez@ti.com> writes:
 
-On Fri, Feb 11, 2011 at 10:38:44PM +0000, Russell King - ARM Linux wrote:
-> On Sat, Feb 12, 2011 at 12:54:21AM +0300, Valentine Barshak wrote:
-> > SWP instruction sets bit 11 in DFSR, in case of data fault on SMP MPCore.
-> > So v6_early_abort doesn't need erratum 326103 workaround for MPCore.
-> 
-> NAK.  When building a SMP kernel which also supports v6 CPUs, this will
-> cause v6 CPUs to break.
+> Mailbox hwmod support for OMAP 2,3,4.
+>
+> This was tested on OMAP3 (3430, 3630), minor testing
+> was made on OMAP4.
+>
+> No testing on OMAP2 since I don't have the hardware.
 
-Since the SWP erratum only affects ARM1136 (UP) processors, how will this
-break ARM11 MPCore (v6) processors?  Are you referring to unified kernels
-which support both UP and SMP machines?  I reckon that's a recent feature
-to be able to boot SMP kernels on UP machines.  Perhaps if that's
-why you're against this, then we need to have a separate config
-option to specifically enable this ARM1136 erratum workaround?  Or
-at least only perform the workaround for certain processor IDs?
+To help in testing, I wrote a simple mailbox loopback test module for
+OMAP2/3/4 that I used to do send and receive messages on the MPU.  This
+can be used to test the mailbox without any DSP software.
 
-Thanks!
+I tested it against l-o master branch and found a couple bugs in the
+mailbox driver (patches posted earlier today.)  
 
---
-Regards,
-George
+With those patches plus my test I can send & receieve a series of
+messages on the MPU, which is enough to sanity test the basic sending
+and receiving messages on the MPU.
+
+I've tested the master branch, now it's your turn to use this test
+module to validate this hmod conversion series.
+
+The test module is available here:
+
+    git://gitorious.org/omap-test/mailbox.git
+
+Note that the current mailbox driver has hard-coded settings for the
+receiver of messages.  While this should be configurable at runtime, I'm
+not an expert on the mailbox IP so my test module includes a kernel
+patch that changes these hard-coded settings of the first mbox (dsp on
+OMAP2/3, mailbox-1 on OMAP4) so that my loopback tester will work.
+
+Kevin
