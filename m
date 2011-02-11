@@ -1,38 +1,33 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Fri, 11 Feb 2011 20:00:27 +0800
-Subject: [PATCH 1/2] arm: mx50_rdp: add fec support
-In-Reply-To: <20110211102459.GG27982@pengutronix.de>
-References: <1297419731-16441-1-git-send-email-richard.zhao@freescale.com>
-	<20110211102459.GG27982@pengutronix.de>
-Message-ID: <20110211120027.GA1866@richard-laptop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Feb 2011 12:03:05 +0000
+Subject: reboot not working on linux-2.6.37 for ARMv7
+In-Reply-To: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
+References: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
+Message-ID: <20110211120305.GD23404@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 11:24:59AM +0100, Uwe Kleine-K?nig wrote:
-> On Fri, Feb 11, 2011 at 06:22:10PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> > 
-> > diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
-> > index dedf7f2..505513c 100644
-> > --- a/arch/arm/mach-mx5/board-mx50_rdp.c
-> > +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
-> > @@ -40,6 +40,9 @@
-> >  #define FEC_EN		IMX_GPIO_NR(6, 23)
-> >  #define FEC_RESET_B	IMX_GPIO_NR(4, 12)
-> >  
-> > +#define FEC_EN		IMX_GPIO_NR(6, 23)
-> > +#define FEC_RESET_B	IMX_GPIO_NR(4, 12)
-> > +
-> I think this is a left-over of a rebase.  The #defines are already
-> present and they alone don't justify saying "add fec support".
-Yes, Sorry for that. Please review the second patch.
+On Fri, Feb 11, 2011 at 05:01:06PM +0530, shiraz hashim wrote:
+> Hi,
+> 
+> I am using linux-2.6.37 on our ARM Cortex A9 (dual core) SMP platform
+> with PL310 as Level 2 cache. We observe that on reboot the control
+> is not able to reach to the arch_reset.
+> 
+> The problem happens when L1 cache is disabled in
+> arm_machine_restart, through cpu_proc_fin() and L2 cache is flushed.
 
-Thanks
-Richard
-> 
-> Best regards
-> Uwe
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Where's the L2 cache flush?  The sequence is:
+
+        /* Clean and invalidate caches */
+        flush_cache_all();
+        /* Turn off caching */
+        cpu_proc_fin();
+        /* Push out any further dirty data, and ensure cache is empty */
+        flush_cache_all();
+
+and flush_cache_all() calls v7_flush_kern_cache_all() in
+arch/arm/mm/cache-v7.S.
+
+I do hope you're not modifying flush_cache_all() to also call the L2
+cache functions because that's wrong.
