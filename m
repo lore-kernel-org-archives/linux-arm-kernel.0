@@ -1,14 +1,14 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 11 Feb 2011 22:30:13 +0100
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 11 Feb 2011 22:33:48 +0100
 Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
 In-Reply-To: <1297458388-23361-1-git-send-email-GNUtoo@no-log.org>
 References: <20110211081050.GD27982@pengutronix.de>
 	<1297458388-23361-1-git-send-email-GNUtoo@no-log.org>
-Message-ID: <4D55AA65.2020101@pengutronix.de>
+Message-ID: <20110211213348.GJ27982@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2011 10:06 PM, Denis 'GNUtoo' Carikli wrote:
+On Fri, Feb 11, 2011 at 10:06:28PM +0100, Denis 'GNUtoo' Carikli wrote:
 > This work was based on bug-linux-2.6.30.patch that can be found
 >   in buglabs's svn here:
 >   svn://bugcamp.net/bug/branches/izzy/experimental
@@ -54,6 +54,9 @@ On 02/11/2011 10:06 PM, Denis 'GNUtoo' Carikli wrote:
 >  obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35_3ds.o
 >  obj-$(CONFIG_MACH_KZM_ARM11_01)	+= mach-kzm_arm11_01.o
 > +obj-$(CONFIG_MACH_BUG)          += mach-mx31bugbase.o
+I'd like to have the file name matching the MACH variable.  That is
+mach-bug.c
+
 >  obj-$(CONFIG_MACH_EUKREA_CPUIMX35)	+= mach-cpuimx35.o
 >  obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD)	+= eukrea_mbimxsd-baseboard.o
 >  obj-$(CONFIG_MACH_VPR200)	+= mach-vpr200.o
@@ -97,6 +100,8 @@ On 02/11/2011 10:06 PM, Denis 'GNUtoo' Carikli wrote:
 > +static struct imxuart_platform_data uart_pdata = {
 > +	.flags = IMXUART_HAVE_RTSCTS,
 > +};
+can be const and __initconst and lacks a prefix
+
 > +
 > +static unsigned int uart5_pins[] = {
 > +	MX31_PIN_PC_RST__CTS5,
@@ -104,6 +109,8 @@ On 02/11/2011 10:06 PM, Denis 'GNUtoo' Carikli wrote:
 > +	MX31_PIN_PC_BVD2__TXD5,
 > +	MX31_PIN_PC_BVD1__RXD5,
 > +};
+can be const and __initconst and lacks a prefix, but see below.
+
 > +
 > +static inline void mx31bug_init_imx_uart(void)
 > +{
@@ -111,16 +118,29 @@ On 02/11/2011 10:06 PM, Denis 'GNUtoo' Carikli wrote:
 > +				ARRAY_SIZE(uart5_pins), "uart-4");
 > +	imx31_add_imx_uart4(&uart_pdata);
 > +}
+can be __init. I'd prefer a prefix of bug, not mx31bug, because that
+matches the machine id.
+
 > +
 > +/*!
+no doxygen style comments in the kernel please
+
 > + * Board specific initialization.
 > + */
 > +static void __init mx31bug_board_init(void)
 > +{
 > +	mx31bug_init_imx_uart();
+I assume your machine doesn't only have an uart. If so, I'd suggest to
+rename uart5_pins (which lacks a prefix btw) to mx31bug_pins and put the
+mxc_iomux_setup_multiple_pins into mx31bug_board_init.  Then
+mx31bug_init_imx_uart only has imx31_add_imx_uart4 which then can better
+go directly into mx31bug_board_init, too.
+
 > +}
 > +
 > +
+You can remove one of these two empty lines.
+
 > +static void __init mx31bug_timer_init(void)
 > +{
 > +	mx31_clocks_init(26000000);
@@ -132,14 +152,17 @@ On 02/11/2011 10:06 PM, Denis 'GNUtoo' Carikli wrote:
 > +
 > +MACHINE_START(BUG, "BugLabs BUGBase")
 > +	.boot_params = MX3x_PHYS_OFFSET + 0x100,
+BTW, if you have a decent bootloader, you don't need this line.
+
 > +	.map_io = mx31_map_io,
 > +        .init_early = imx31_init_early,
-here slipped some spaces in
 > +	.init_irq = mx31_init_irq,
 > +        .timer = &mx31bug_timer,
-
-dito
 > +	.init_machine = mx31bug_board_init,
+please use tabs consistently for indention.  And if you use a single
+space before the = here (which is totally ok, even prefered by me), then
+do the same in mx31bug_timer, please.
+
 > +MACHINE_END
 > diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
 > index e634d6c..b45f534 100644
@@ -163,18 +186,10 @@ dito
 >  	case MACH_TYPE_MX51_BABBAGE:
 >  	case MACH_TYPE_EUKREA_CPUIMX51SD:
 >  	case MACH_TYPE_MX51_3DS:
+> -- 
+Thanks
+Uwe
 
-Marc
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 262 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110211/d522a02e/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
