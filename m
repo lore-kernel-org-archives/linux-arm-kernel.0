@@ -1,82 +1,77 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Feb 2011 09:31:04 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <alpine.LFD.2.00.1102101405010.14920@xanadu.home>
-References: <4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
-	<20110210154322.GE1742@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
-Message-ID: <AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
+Date: Fri, 11 Feb 2011 09:33:56 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have SMP_ON_UP
+	fixups
+In-Reply-To: <20110210191125.GA12582@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1101251618230.8580@xanadu.home>
+	<AANLkTi=zVsr8G=eYfp7v_QQvBBDCX+Es+T-4c4Fu=QVF@mail.gmail.com>
+	<20110126124452.GB4232@n2100.arm.linux.org.uk>
+	<20110126172535.GA15983@arm.com>
+	<20110209142211.GA11460@n2100.arm.linux.org.uk>
+	<20110210125624.GA3652@n2100.arm.linux.org.uk>
+	<AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
+	<AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
+	<20110210191125.GA12582@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 10, 2011 at 7:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 10 Feb 2011, Russell King - ARM Linux wrote:
->
->> On Thu, Jan 27, 2011 at 12:43:54AM -0500, Nicolas Pitre wrote:
->> > The MMU-less kernel should still favor allocations close to the kernel
->> > text for modules, and anything else away from the kernel going
->> > downwards.
+On Thu, Feb 10, 2011 at 7:11 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Feb 10, 2011 at 06:29:41PM +0000, Dave Martin wrote:
+>> On Thu, Feb 10, 2011 at 2:46 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, Feb 10, 2011 at 02:13:13PM +0000, Dave Martin wrote:
+>> >> Note that this tree contains some extra patches (though I believe
+>> >> nothing is there which should cause the problem), and does not contain
+>> >> everything from rmk/devel -- so it's possible this has been fixed in
+>> >> the meantime or no longer occurs for some other reason...
 >> >
->> > Otherwise a veneer should be created by the module symbol resolver such
->> > that if the branch distance to reach, say, printk is too large, then the
->> > following code would have to be dynamically generated right next to the
->> > module:
->> >
->> > ? ? ldr ? ? pc, [pc, #-4]
->> > ? ? .word ? <far_away_symbol>
->> >
->> > Then, in your module, you patch the branch relocation for printk so that
->> > it branches to the code above instead, and then store the address of
->> > printk at the location represented by the .word directive.
+>> > No need - I now have some modules which contain SMP alternatives, so we
+>> > do need to fix the module loader for this, and keep the SMP alternatives
+>> > replacement code around. ?It's not worth eliminating the code as if we
+>> > include an informative printk() to say why we're refusing to load the
+>> > module, the string would be larger than the code it eliminates. ?So, I
+>> > think we need to merge the patch below to avoid run-time problems.
 >>
->> What you're suggesting is what we used to do with the old user-space
->> module tools, which would've been nice to carry forwards to the new
->> module code. ?I never found a way to do it.
->>
->> The problems:
->> 1. Where do you create those veneers?
->> 2. How many veneers do you allocate space for?
->> 3. How do you determine that you need a veneer?
->>
->> While you can say "next to the module" for (1), you can only do that at
->> the point in time when the space for the module is allocated, and you
->> need to know at that point how much space you require.
+>> I thought the problem was not caused by removal of the fixup code, but
+>> rather by the removal of code referenced by fixups?
 >
-> You would have to guess of course. ?Having a guess of 1/2 the module
-> size should be pretty safe. ?So allocating 3/2 the space in
-> module_alloc(), and then suffice to free the unused portion in
-> module_finalize().
+> It is. ?But:
 >
->> For (2), you could always allocate space for one veneer per symbol present
->> in the module, but that's very wasteful.
->>
->> (3) is almost impossible to know ahead of time as you don't have the
->> relocations, realistically you have to allocate one veneer per symbol,
->> and as you don't know whether it's a data or code symbol, you'll have
->> to allocate one veneer for every symbol in a module.
+> arm-linux-objdump -h sound/core/snd-timer.ko
 >
-> I don't think you may know the number of symbols in advance either
-> anyway.
+> sound/core/snd-timer.ko: ? ? file format elf32-littlearm
+>
+> Sections:
+> Idx Name ? ? ? ? ?Size ? ? ?VMA ? ? ? LMA ? ? ? File off ?Algn
+> ?0 .text ? ? ? ? 00002f34 ?00000000 ?00000000 ?00000034 ?2**2
+> ? ? ? ? ? ? ? ? ?CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
+> ?1 .exit.text ? ?00000070 ?00000000 ?00000000 ?00002f68 ?2**2
+> ? ? ? ? ? ? ? ? ?CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
+> ?2 .init.text ? ?000001b4 ?00000000 ?00000000 ?00002fd8 ?2**2
+> ? ? ? ? ? ? ? ? ?CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
+> ?3 .rodata ? ? ? 000000bc ?00000000 ?00000000 ?0000318c ?2**2
+> ? ? ? ? ? ? ? ? ?CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
+> ?4 .rodata.str1.1 00000156 ?00000000 ?00000000 ?00003248 ?2**0
+> ? ? ? ? ? ? ? ? ?CONTENTS, ALLOC, LOAD, READONLY, DATA
+> ?5 .alt.smp.init 00000088 ?00000000 ?00000000 ?0000339e ?2**0
+> ? ? ? ? ? ? ? ? ?CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
+> ...
+>
+> Here we have a module which contains the spin_unlock assembly, which
+> contains the SMP alternatives. ?If we insert that into a kernel also
+> built with SMP alternatives support, but which is running on a UP
+> system, we need to run these fixups as well when the module is loaded.
+>
 
-You could probably cook up a good upper bound based on the size of the
-kernel and the number of symbols in the module: i.e., assume that
-every undefined symbol in the module needs to be fixed up to point at
-the most distant symbol in the kernel.
+Agreed -- actually, I suspected we might need to support this.  But I
+don't think solving this problem (= keeping the fixup implementation
+in memory and enhancing the module loader) solved the
+fixups-referencing-sections-discarded-from-vmlinux problem.  These
+seem to be two separate issues.  I am filing to understand something?
 
-For people with normal-sized kernels, this bound will probably work
-out as zero most of the time (i.e., the current situation).  For
-people with big kernels, or when many modules are already loaded, it
-may work out at 100% -- but that's the price to pay for guaranteed
-preallocation of the space required for the veneers.  And anyway, you
-may really need a substantial chunk of those veneers in such cases.
-
+Cheers
 ---Dave
