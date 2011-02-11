@@ -1,45 +1,118 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Feb 2011 15:51:15 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <20110211144139.GC3920@ucw.cz>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<20110211144139.GC3920@ucw.cz>
-Message-ID: <201102111551.15508.arnd@arndb.de>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 11 Feb 2011 15:52:52 +0100
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110211220821.GA9289@S2100-06.ap.freescale.net>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
+	<19794.17994.381937.158944@ipc1.ka-ro>
+	<20110211220821.GA9289@S2100-06.ap.freescale.net>
+Message-ID: <19797.19780.128209.60173@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 February 2011, Pavel Machek wrote:
-> Hi!
+Hi,
+
+Shawn Guo writes:
+> Hi Lothar,
 > 
-> > I'm not sure if this is the best place to bring this up, but Russel's
-> > name is on a fair share of drivers/mmc code, and there does seem to be
-> > quite a bit of MMC-related discussions. Excuse me in advance if this
-> > isn't the right forum :-).
+> On Wed, Feb 09, 2011 at 08:46:18AM +0100, Lothar Wa?mann wrote:
+> > Hi Shawn,
 > > 
-> > Certain MMC vendors (maybe even quite a bit of them) use a pretty
-> > rigid buffering scheme when it comes to handling writes. There is
-> > usually a buffer A for random accesses, and a buffer B for sequential
-> > accesses. For certain Toshiba parts, it looks like buffer A is 8KB
-> > wide, with buffer B being 4MB wide, and all accesses larger than 8KB
-> > effectively equating to 4MB accesses. Worse, consecutive small (8k)
-> > writes are treated as one large sequential access, once again ending
-> > up in buffer B, thus necessitating out-of-order writing to work around
-> > this.
+> > Shawn Guo writes:
+> > > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
+> > > The driver calls into mxs-dma via generic dmaengine api for both pio
+> > > and data transfer.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/mach-mxs/include/mach/mmc.h |   15 +
+> > >  drivers/mmc/host/Kconfig             |    9 +
+> > >  drivers/mmc/host/Makefile            |    1 +
+> > >  drivers/mmc/host/mxs-mmc.c           |  884 ++++++++++++++++++++++++++++++++++
+> > >  4 files changed, 909 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/mach-mxs/include/mach/mmc.h
+> > >  create mode 100644 drivers/mmc/host/mxs-mmc.c
+> > > 
+> > I've run the mmc-test kernel module with this driver on our TX28
+> > module which fails in the following tests:
+> > |mmc0: Test case 15. Correct xfer_size at write (start failure)...
+> > |mmc0: Result: ERROR (-110)
+> > |mmc0: Test case 16. Correct xfer_size at read (start failure)...
+> > |mmc0: Result: ERROR (-110)
+> > |mmc0: Test case 17. Correct xfer_size at write (midway failure)...
+> > |mmc0: Result: ERROR (-110)
+> > |mmc0: Test case 18. Correct xfer_size at read (midway failure)...
+> > |mmc0: Result: ERROR (-110)
+> > 
+> > Could you try the test on your hardware?
+> > 
+> I'm new to this test.  I enabled MMC_TEST but did not see "test"
+> under /sys for mmc.  Can you please elaborate how to launch this
+> test?  Thanks.
 > 
-> Hmmmm, I somehow assumed MMCs would be much more cleverr than this.
+You need debugfs mounted and the mmc-test module loaded.
+An inserted card will normally be grabbed by the mmc-block driver. You
+can 'unbind' the driver and 'bind' it to the mmc-test driver using the
+corresponding entries in sysfs. The mmc-test driver can be controlled
+via debugfs.
 
-No, these devices are incredibly stupid, or extremely optimized to
-a specific use case (writing large video files to FAT32), depending on how
-you look at them.
+The following script steals an inserted card from the mmc-block driver
+and performs all mmc-test testcases (TRASHING THE CONTENTS OF THE
+CARD!).
+<--------
+#!/bin/bash
+drv_path=/sys/bus/mmc/drivers
+dbg_path=/sys/kernel/debug
+testdrv=mmc_test
 
-> > reorders) them? The thresholds would then be adjustable as
-> > module/kernel parameters based on manfid. I'm asking because I have a
-> > patch now, but its ugly and hardcoded against a specific manufacturer.
-> 
-> How big is performance difference?
+shopt -s nullglob
+card=""
 
-Several orders of magnitude. It is very easy to get a card that can write
-12 MB/s into a case where it writes no more than 30 KB/s, doing only
-things that happen frequently with ext3.
+cleanup() {
+    if [ -n "$card" -a -n "$driver" -a "$driver" != "$testdrv" ];then
+	echo "Restoring driver $driver"
+	echo "$card" > "$drv_path/$testdrv/unbind"
+	echo "$card" > "$drv_path/$driver/bind"
+    fi
+}
 
-	Arnd
+trap cleanup 0
+set -e
+cd "$drv_path"
+for d in *;do
+    for l in "$d/"*;do
+	[ -h "$l" ] || continue
+	card="$(basename "$l")"
+	driver="$(dirname "$l")"
+	break
+    done
+    [ -n "$card" ] && break
+done
+if [ -z "$card" ];then
+    echo "No MMC/SD card found"
+    exit 1
+fi
+if [ "$driver" != "$testdrv" ];then
+    echo "Trying to claim card $card from driver $driver"
+    echo "$card" > "$drv_path/$driver/unbind"
+    echo "$card" > "$drv_path/$testdrv/bind"
+fi
+echo "WARNING: Card $card will be overwritten!"
+echo "Hit <ENTER> to continue; <CTRL-C> to abort"
+read
+# perform all testcases (> 0 for individual tests)
+echo 0 > "$dbg_path/${card%:*}/$card/test"
+>--------
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
