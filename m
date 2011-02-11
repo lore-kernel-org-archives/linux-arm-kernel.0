@@ -1,52 +1,106 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Feb 2011 13:49:03 +0000
-Subject: [PATCH v2 5/5] ARM: omap3: Thumb-2 compatibility for sleep34xx.S
-In-Reply-To: <87ei7fe8mk.fsf@ti.com>
-References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
-	<1296756161-26092-6-git-send-email-dave.martin@linaro.org>
-	<87d3mzh6vq.fsf@ti.com> <87ei7fe8mk.fsf@ti.com>
-Message-ID: <AANLkTi=0ikmWaVSoerb71ZK=_fBETO54nTvYu-hGAPBR@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 11 Feb 2011 08:51:34 -0500 (EST)
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
+References: <4D2BFA08.5030104@ahsoftware.de>
+	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
+	<20110111155930.GH11039@n2100.arm.linux.org.uk>
+	<4D2D1942.4050905@ahsoftware.de>
+	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
+	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
+	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
+	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
+	<20110210154322.GE1742@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
+	<AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1102110838430.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 12:07 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Kevin Hilman <khilman@ti.com> writes:
->
->> Dave Martin <dave.martin@linaro.org> writes:
->>
->>> ?* Use BSYM() to get the correct Thumb branch address
->>> ? ?for adr <Rd>, <label>
->>>
->>> ?* Fix an out-of-range ADR when building for ARM
->>>
->>> ?* Correctly call es3_sdrc_fix as Thumb when copied to SRAM.
->>>
->>> ?* Remove deprecated/undefined PC-relative stores
->>>
->>> ?* Add the required ENDPROC() directive for each ENTRY().
->>>
->>> ?* .align before data words
->>>
->>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
->>
->> I'm attempting to test this series with OMAP PM, but some changes here
->> don't compile for me.
->>
->> My toolchain is: gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50)
->>
->> First, I merged your arm/omap-thumb2+merged branch with my pm branch
->> from git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
->
-> Sorry for the confusion, this patch should've been in reply to your v4
-> version, since I merged with your 'arm/omap-thumb2+merged' branch from
-> today.
+On Fri, 11 Feb 2011, Dave Martin wrote:
 
-If you are able to test off mode with CONFIG_THUMB2_KERNEL enabled,
-that would be great.
+> On Thu, Feb 10, 2011 at 7:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Thu, 10 Feb 2011, Russell King - ARM Linux wrote:
+> >
+> >> On Thu, Jan 27, 2011 at 12:43:54AM -0500, Nicolas Pitre wrote:
+> >> > The MMU-less kernel should still favor allocations close to the kernel
+> >> > text for modules, and anything else away from the kernel going
+> >> > downwards.
+> >> >
+> >> > Otherwise a veneer should be created by the module symbol resolver such
+> >> > that if the branch distance to reach, say, printk is too large, then the
+> >> > following code would have to be dynamically generated right next to the
+> >> > module:
+> >> >
+> >> > ? ? ldr ? ? pc, [pc, #-4]
+> >> > ? ? .word ? <far_away_symbol>
+> >> >
+> >> > Then, in your module, you patch the branch relocation for printk so that
+> >> > it branches to the code above instead, and then store the address of
+> >> > printk at the location represented by the .word directive.
+> >>
+> >> What you're suggesting is what we used to do with the old user-space
+> >> module tools, which would've been nice to carry forwards to the new
+> >> module code. ?I never found a way to do it.
+> >>
+> >> The problems:
+> >> 1. Where do you create those veneers?
+> >> 2. How many veneers do you allocate space for?
+> >> 3. How do you determine that you need a veneer?
+> >>
+> >> While you can say "next to the module" for (1), you can only do that at
+> >> the point in time when the space for the module is allocated, and you
+> >> need to know at that point how much space you require.
+> >
+> > You would have to guess of course. ?Having a guess of 1/2 the module
+> > size should be pretty safe. ?So allocating 3/2 the space in
+> > module_alloc(), and then suffice to free the unused portion in
+> > module_finalize().
+> >
+> >> For (2), you could always allocate space for one veneer per symbol present
+> >> in the module, but that's very wasteful.
+> >>
+> >> (3) is almost impossible to know ahead of time as you don't have the
+> >> relocations, realistically you have to allocate one veneer per symbol,
+> >> and as you don't know whether it's a data or code symbol, you'll have
+> >> to allocate one veneer for every symbol in a module.
+> >
+> > I don't think you may know the number of symbols in advance either
+> > anyway.
+> 
+> You could probably cook up a good upper bound based on the size of the
+> kernel and the number of symbols in the module: i.e., assume that
+> every undefined symbol in the module needs to be fixed up to point at
+> the most distant symbol in the kernel.
 
-I have some evidence that the resume path may be working in Thumb-2,
-but I think I'm being bitten by erratum i583 (I have to disable the
-workaround to even attempt to test off mode on Beagle xM)
+Sure... It is just that the memory allocation is currently done before 
+the number of symbols in the module is known.  Changing that would 
+require non trivial changes in the generic module loading code which 
+potentially would affect all architectures, and therefore I don't think 
+we want to go there.
 
-Cheers
----Dave
+The other solution would be to determine the number of objects in need 
+of a veneer in apply_relocate(), allocate a replacement area for the 
+module, copy everything over, and then create the veneers close to the 
+module.  But 1) the second allocation may fail, and 2) this will change 
+the distance from the kernel potentially requiring more veneers than 
+initially determined, and 3) the generic module code might still have 
+pointer references into the old allocation area (didn't check but that 
+can be expected).  That's just too messy.
+
+> For people with normal-sized kernels, this bound will probably work
+> out as zero most of the time (i.e., the current situation).  For
+> people with big kernels, or when many modules are already loaded, it
+> may work out at 100% -- but that's the price to pay for guaranteed
+> preallocation of the space required for the veneers.  And anyway, you
+> may really need a substantial chunk of those veneers in such cases.
+
+I still think that compiling modules with -mlong-calls, and making that 
+conditional on a kernel config option so only those who need it will 
+have it, is the simplest solution.  Nothing in the kernel code would 
+need to be changed.
+
+
+Nicolas
