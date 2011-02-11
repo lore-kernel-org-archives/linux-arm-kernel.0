@@ -1,38 +1,36 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 11 Feb 2011 17:15:07 +0300
-Subject: [PATCH] arm: update gitignore file
-In-Reply-To: <1297387616-29390-1-git-send-email-rklein@nvidia.com>
-References: <1297387616-29390-1-git-send-email-rklein@nvidia.com>
-Message-ID: <4D55446B.4030605@ru.mvista.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Feb 2011 19:54:46 +0530
+Subject: [PATCH 0/5] ARM: Few patches for PM enablement.
+In-Reply-To: <f804b2179a222189b71c9429285de723@mail.gmail.com>
+References: <1295859080-15259-1-git-send-email-santosh.shilimkar@ti.com>
+	<f804b2179a222189b71c9429285de723@mail.gmail.com>
+Message-ID: <d6a3825e4669b02ddf62ebcc768a500c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Russell,
+> -----Original Message-----
+> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> Sent: Friday, February 04, 2011 3:49 PM
+> To: Russell King - ARM Linux
+> Cc: linux-omap at vger.kernel.org; ccross at android.com;
+> catalin.marinas at arm.com; linus.ml.walleij at gmail.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH 0/5] ARM: Few patches for PM enablement.
+>
 
-On 11-02-2011 4:26, rklein at nvidia.com wrote:
+> ARM: gic: Add hooks for architecture specific extensions
+> ARM: gic: Add distributor and interface enable/disable accessory api
+I plan to submit below to patches to your patch system.
 
-> From: Rhyland Klein<rklein@nvidia.com>
+> ARM: twd: Add context save restore support
+> ARM: scu: Move register defines to header file
+Alternate for these two are already in you tree, so I drop them.
 
-> Updating the .gitignore file to ignore 3 files that are always created in
-> manual builds to cleanup git status results.
+> ARM: smp: Skip secondary cpu calibration to speed-up boot
+This one we still haven't agree. So I postpone this one till you
+find any other better way to handle this though I really hate that
+~ 200 ms in this path.
 
-> Signed-off-by: Rhyland Klein<rklein@nvidia.com>
-> ---
->   arch/arm/boot/compressed/.gitignore |    3 +++
->   1 files changed, 3 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-> index ab204db..c52a6dd 100644
-> --- a/arch/arm/boot/compressed/.gitignore
-> +++ b/arch/arm/boot/compressed/.gitignore
-> @@ -1,3 +1,6 @@
->   font.c
->   piggy.gz
->   vmlinux.lds
-> +lib1funcs.S
-> +piggy.gzip
-> +vmlinux
-
-    Similar patch has already been submitted several times by Sergio Aguirre...
-
-WBR, Sergei
+Regards,
+Santosh
