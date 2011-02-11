@@ -1,36 +1,50 @@
-From: vbarshak@mvista.com (Valentine Barshak)
-Date: Sat, 12 Feb 2011 00:54:21 +0300
-Subject: [PATCH RFC] ARM: MPCore v6_early_abort enhancement
-Message-ID: <20110211215421.GA29361@mvista.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 11 Feb 2011 13:53:39 -0800
+Subject: [PATCH 2/3] msm: iommu: Generalize platform data for multiple
+	targets
+In-Reply-To: <1297458889.4852.24.camel@m0nster> (Daniel Walker's message of
+	"Fri, 11 Feb 2011 13:14:49 -0800")
+References: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
+	<1297456098-3241-2-git-send-email-stepanm@codeaurora.org>
+	<1297456934.4852.11.camel@m0nster> <4D55A16A.7030300@codeaurora.org>
+	<8yaipwql1wf.fsf@huya.qualcomm.com> <1297458889.4852.24.camel@m0nster>
+Message-ID: <8yad3mykzks.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SWP instruction sets bit 11 in DFSR, in case of data fault on SMP MPCore.
-So v6_early_abort doesn't need erratum 326103 workaround for MPCore.
-    
-Signed-off-by: Valentine Barshak <vbarshak@mvista.com>
+On Fri, Feb 11 2011, Daniel Walker wrote:
 
-diff --git a/arch/arm/mm/abort-ev6.S b/arch/arm/mm/abort-ev6.S
-index f332df7..590d061 100644
---- a/arch/arm/mm/abort-ev6.S
-+++ b/arch/arm/mm/abort-ev6.S
-@@ -30,8 +30,10 @@ ENTRY(v6_early_abort)
- 	mrc	p15, 0, r0, c6, c0, 0		@ get FAR
- /*
-  * Faulty SWP instruction on 1136 doesn't set bit 11 in DFSR (erratum 326103).
-- * The test below covers all the write situations, including Java bytecodes
-+ * The test below covers all the write situations, including Java bytecodes.
-+ * However SMP MPCore doesn't have this erratum.
-  */
-+#ifndef CONFIG_SMP
- 	bic	r1, r1, #1 << 11		@ clear bit 11 of FSR
- 	tst	r3, #PSR_J_BIT			@ Java?
- 	movne	pc, lr
-@@ -43,6 +45,7 @@ ENTRY(v6_early_abort)
- 	do_ldrd_abort
- 	tst	r3, #1 << 20			@ L = 0 -> write
- 	orreq	r1, r1, #1 << 11		@ yes.
-+#endif	/* !CONFIG_SMP */
- 	mov	pc, lr
- 
- 
+> On Fri, 2011-02-11 at 13:03 -0800, David Brown wrote:
+>> On Fri, Feb 11 2011, Steve Muckle wrote:
+
+>> If they were used in more than one place, we could justify the
+>> definition, but in this case, the definition just obscures the code
+>> slightly.
+
+Someone debugging it will look at the constant.  In fact, in general,
+the only person looking at this structure will want to know the value in
+the table.  Indirecting it through a pointer only serves to hide it from
+the person who wants to know the value.
+
+> A good example might be if all these constants are enumerated in a
+> header file, but aren't all used. In that case it would be fairly easy
+> to add a new resource without even know what the constant is just by
+> following the pattern.
+
+This I definitely want to avoid.  I have seen header files with hundreds
+of thousands of register definitions, where only a few were used.
+
+> I think in general this series just makes this iommu code very much
+> 8660/8960 only code, but what about the potential next iteration of SoC
+> that uses very similar code to this with all new constants. So this
+> doesn't seem forward thinking to me.
+
+The table would have the different addresses in it.  My point is that
+the resource table _is_ the definition of the addres.  Nothing is gained
+by inventing yet another name and putting that somewhere else.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
