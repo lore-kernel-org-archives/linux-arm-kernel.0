@@ -1,18 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Feb 2011 16:16:26 +0000
-Subject: [PATCH] Generic CPU save/restore PM support
-Message-ID: <20110211161626.GA31356@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 11 Feb 2011 16:17:48 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have SMP_ON_UP
+	fixups
+In-Reply-To: <20110211160500.GA31529@n2100.arm.linux.org.uk>
+References: <20110209142211.GA11460@n2100.arm.linux.org.uk>
+	<20110210125624.GA3652@n2100.arm.linux.org.uk>
+	<AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
+	<AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
+	<20110210191125.GA12582@n2100.arm.linux.org.uk>
+	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
+	<20110211101345.GA23785@n2100.arm.linux.org.uk>
+	<AANLkTikFkZH6KK_KUgXaaKyQM6eZOh-ki3xdtS2fk8zN@mail.gmail.com>
+	<20110211160500.GA31529@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTik1T_RDb_MVw9WWY_BX75isoGq2k1L+uVCN-bbq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch series implements infrastructure to save/restore
-CPU state on suspend/resume PM events, and updates SA11x0, PXA and
-Samsung platforms to use this.
+On Fri, Feb 11, 2011 at 4:05 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Feb 11, 2011 at 10:52:17AM +0000, Dave Martin wrote:
+>> On Fri, Feb 11, 2011 at 10:13 AM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > On Fri, Feb 11, 2011 at 09:33:56AM +0000, Dave Martin wrote:
+>> >> Agreed -- actually, I suspected we might need to support this. ?But I
+>> >> don't think solving this problem (= keeping the fixup implementation
+>> >> in memory and enhancing the module loader) solved the
+>> >> fixups-referencing-sections-discarded-from-vmlinux problem. ?These
+>> >> seem to be two separate issues. ?I am filing to understand something?
+>> >
+>> > They are separate, but related issues. ?They both ultimately have the
+>> > same cause - the placement of the spinlock code inline rather than
+>> > out of line, resulting in fixups appearing all over the place rather
+>> > than just in kernel/spinlock.o.
+>>
+>> I guess what I want to understand is whether I (or someone) still
+>> need(s) to sort out the vmlinux.lds issue.
+>
+> Yes we do - if you build your kernel you should find that your link
+> fails because of discarded sections being referenced.
 
-Only only ARM920, ARM926, SA11x0, XScale, XScale3, V6 and V7 CPUs are
-supported.
+Yep -- I'm still applying my original patch to work around that, but
+it sounds like I need to tidy that up.  Can you elaborate on what you
+meant by defining a "KEEP_EXIT" macro to handle this?
 
-I've build-tested this for Assabet, PXA, and S3C2410, and boot tested
-on Assabet.
+>
+>> If we're keeping inline spinlocks (I currently assume "yes"), then the
+>> vmlinux.lds issue still needs fixing. ?Is that correct? ?However, if
+>> we get rid of inline spinlocks we won't have the problem, though there
+>> may be some performance impact -- hard to judge how significant.
+>
+> I don't see that we can get rid of inline spinlocks - it's controlled
+> by stuff external to the arch.
 
-Please send your acks/tested bys etc.
+That's fine -- just wanted to make sure I had the right understanding.
+
+Cheers
+---Dave
