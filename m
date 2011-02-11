@@ -1,34 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Feb 2011 12:55:59 +0000
-Subject: [RFC PATCH 3/3] ARM: vfp: Use cpu pm notifiers to save vfp state
-In-Reply-To: <20110211122410.GF23404@n2100.arm.linux.org.uk>
-References: <1297373487-23902-1-git-send-email-ccross@android.com>
-	<1297373487-23902-4-git-send-email-ccross@android.com>
-	<1297426345.17584.99.camel@e102109-lin.cambridge.arm.com>
-	<20110211122410.GF23404@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTiksKEZzYwkh1DzoGYRmhq=XLm9Yh+DMGys7aE0S@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 11 Feb 2011 14:05:21 +0100
+Subject: [PATCH v2] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD
+	declaration
+In-Reply-To: <20110211122505.GB1866@richard-laptop>
+References: <1297420916-14505-1-git-send-email-julien.boibessot@free.fr>
+	<20110211122505.GB1866@richard-laptop>
+Message-ID: <19797.13329.366998.503112@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2011 12:24, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Feb 11, 2011 at 12:12:25PM +0000, Catalin Marinas wrote:
->> On SMP systems, we save the VFP at every context switch to deal with the
->> thread migration (though I have a plan to make this lazily on SMP as
->> well).
->
-> I'm not sure it's worth the complexity. ?You'd have to do an IPI to the
-> old CPU to provoke it to save the context from its VFP unit. ?You'd have
-> to do that in some kind of atomic way as the old CPU may be in the middle
-> of already saving it. ?You're also going to have to add locking to the
-> last_VFP_context[] array as other CPUs will be accessing non-local
-> entries, and that means doing locking in assembly. ?Yuck.
+Hi,
 
-I wasn't thinking about that, too complex indeed. But it may be easier
-to detect thread migration, possibly with some hooks into generic
-scheduler and only save the VFP state at that point. I haven't looked
-in detail but I heard the x86 people have patches for something
-similar.
+Richard Zhao writes:
+> Hi Julien,
+> 
+> #define _MX51_PAD_USBH1_DATA2__UART2_TXD	IOMUX_PAD(0x690, 0x290, 1, 0x09ec, 5, 0)
+> 
+> Will you change the above line too?
+> 
+Seems like a general copy/paste error in the i.MX51 Ref Manual.
+For all pads that can have an UART RXD or TXD function the manual
+states that the UART*_IPP_UART_RXD_MUX_SELECT_INPUT register must be
+configured, while this is obviously only sensible for the RXD
+function.
 
+
+Lothar Wa?mann
 -- 
-Catalin
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
