@@ -1,101 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 11 Feb 2011 15:45:51 -0500 (EST)
-Subject: [PATCH 00/14] Fix issues with ARMv6+v6k+v7 kernels
-In-Reply-To: <1297343555.9306.9.camel@e102109-lin.cambridge.arm.com>
-References: <20110117192050.GE23331@n2100.arm.linux.org.uk>
-	<0557426516de482c1769a50fa0b5f17a@mail.gmail.com>
-	<20110208164747.GD6188@n2100.arm.linux.org.uk>
-	<AANLkTimGa-Y6ddHknGe9Gar7+mWPuA_T2+6VL6ecfgxD@mail.gmail.com>
-	<20110210130430.GB3652@n2100.arm.linux.org.uk>
-	<1297343555.9306.9.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1102111543010.14920@xanadu.home>
+From: smuckle@codeaurora.org (Steve Muckle)
+Date: Fri, 11 Feb 2011 12:51:54 -0800
+Subject: [PATCH 2/3] msm: iommu: Generalize platform data for multiple
+	targets
+In-Reply-To: <1297456934.4852.11.camel@m0nster>
+References: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>	
+	<1297456098-3241-2-git-send-email-stepanm@codeaurora.org>
+	<1297456934.4852.11.camel@m0nster>
+Message-ID: <4D55A16A.7030300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Feb 2011, Catalin Marinas wrote:
+On 02/11/11 12:42, Daniel Walker wrote:
+>>  static struct resource msm_iommu_jpegd_resources[] = {
+>>  	{
+>> -		.start = MSM_IOMMU_JPEGD_PHYS,
+>> -		.end   = MSM_IOMMU_JPEGD_PHYS + MSM_IOMMU_JPEGD_SIZE - 1,
+>> +		.start = 0x07300000,
+>> +		.end   = 0x07300000 + SZ_1M - 1,
+> 
+> Looks worse .. Just put the macros into a static header file for both.
 
-> On Thu, 2011-02-10 at 13:04 +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 09, 2011 at 10:01:33AM +0000, Catalin Marinas wrote:
-> > > Could we make the domains usage a run-time feature based on the
-> > > architecture version? For ARMv7, we need to have the vectors page
-> > > read-only anyway if the SWP emulation is enabled (and I posted a
-> > > simple patch in a reply to your email).
-> > >
-> > > The issue I see is that ARM11MPCore is reported as v7 though we still
-> > > use domains on this processor (we could always remove the domains if
-> > > TLS register is available or use some more precise architecture
-> > > version identification).
-> > 
-> > We could also do the below, which I think is more logical - SWP emulation
-> > requires that CPU domains aren't enabled, so let's make that explicit
-> > in the Kconfig.
-> 
-> This may work but it is to restrictive IMHO. SWP emulation only requires
-> that RO user pages are also RO for the kernel. And there is a simple fix
-> for this:
-> 
+Why bother defining macros for these if they only appear here? I don't
+think that adds any value or readability - these addresses are clearly
+the physical area for the msm_iommu_jpegd. It just makes it more
+annoying to have to look up the values in a separate file if you are
+wondering what they are.
 
-The patch below is making the code more straight forward regardless of 
-any swp emulation issues.
+thanks,
+Steve
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index ee57640..6e0b349 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -758,17 +758,21 @@ static void __init kuser_get_tls_init(unsigned long vectors)
->  
->  void __init early_trap_init(void)
->  {
-> -#if defined(CONFIG_CPU_USE_DOMAINS)
-> -	unsigned long vectors = CONFIG_VECTORS_BASE;
-> -#else
-> -	unsigned long vectors = (unsigned long)vectors_page;
-> -#endif
-> +	unsigned long vectors;
->  	extern char __stubs_start[], __stubs_end[];
->  	extern char __vectors_start[], __vectors_end[];
->  	extern char __kuser_helper_start[], __kuser_helper_end[];
->  	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
->  
->  	/*
-> +	 * On ARMv7, user RO pages are mapped as kernel RO.
-> +	 */
-> +	if (cpu_architecture() >= 7)
-> +		vectors = (unsigned long)vectors_page;
-> +	else
-> +		vectors = CONFIG_VECTORS_BASE;
-> +
-> +	/*
->  	 * Copy the vectors, stubs and kuser helpers (in entry-armv.S)
->  	 * into the vector page, mapped at 0xffff0000, and ensure these
->  	 * are visible to the instruction stream.
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 0c1172b..5f51592 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -146,11 +146,6 @@ ENTRY(cpu_v7_set_pte_ext)
->  
->  	tst	r1, #L_PTE_USER
->  	orrne	r3, r3, #PTE_EXT_AP1
-> -#ifdef CONFIG_CPU_USE_DOMAINS
-> -	@ allow kernel read/write access to read-only user pages
-> -	tstne	r3, #PTE_EXT_APX
-> -	bicne	r3, r3, #PTE_EXT_APX | PTE_EXT_AP0
-> -#endif
->  
->  	tst	r1, #L_PTE_XN
->  	orrne	r3, r3, #PTE_EXT_XN
-> 
-> 
-> -- 
-> Catalin
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
