@@ -1,61 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Feb 2011 21:04:23 +0100
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110212005506.GE9289@S2100-06.ap.freescale.net>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<201102111651.35530.arnd@arndb.de>
-	<20110212005506.GE9289@S2100-06.ap.freescale.net>
-Message-ID: <201102112104.23643.arnd@arndb.de>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Fri, 11 Feb 2011 12:28:16 -0800
+Subject: [PATCH 1/3] msm: iommu: Create a Kconfig item for the IOMMU driver
+Message-ID: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 February 2011 01:55:07 Shawn Guo wrote:
-> On Fri, Feb 11, 2011 at 04:51:35PM +0100, Arnd Bergmann wrote:
-> > I have not looked much at other dmaengine drivers, but I'd be
-> > surprised if they require the device driver to be written
-> > for a specific implementation. If that was the case, you would
-> > not even need a dmaengine API but could just as well write
-> > to the DMA controller registers from the device driver directly.
-> > 
-> We need a specific implementation, but it's not so specific that we
-> have to access dma controller directly.  Even it is, we still need
-> an API/interface, as there are so many client devices need to do the
-> same thing, right? ;)
+Break the IOMMU driver out as a Kconfig item. Initially it
+was decided to always build this in for 8x60, but this
+driver is not strictly necessary and should be optionally
+selectable.
 
-I looked at all mmc drivers that use the dmaengine API: 
-atmel-mci.c does the same as what you propose here, while sh_mmcif.c
-and tmio_mmc.c more or less do what I'm suggesting you do instead.
+Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+---
+ arch/arm/mach-msm/Kconfig  |   13 ++++++++++++-
+ arch/arm/mach-msm/Makefile |    3 ++-
+ 2 files changed, 14 insertions(+), 2 deletions(-)
 
-Looking at sh_mmcif:
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index df9d74e..32b9d1f 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -45,7 +45,6 @@ config ARCH_MSM8X60
+ 	select CPU_V7
+ 	select MSM_V2_TLMM
+ 	select MSM_GPIOMUX
+-	select IOMMU_API
+ 	select MSM_SCM if SMP
 
-      host->chan_tx = dma_request_channel(mask, sh_mmcif_filter,
-                                          &pdata->dma->chan_priv_tx);
+ config ARCH_MSM8960
+@@ -149,6 +148,18 @@ config MACH_MSM8960_RUMI3
 
+ endmenu
 
-This is the only place where dma engine specific data is used
-in the driver, and chan_priv_tx is part of the platform data, so the
-mmc driver can simply pass it down as a void pointer without knowing
-the type. The platform data as defined in the machine file ties
-both the dma controller and the mmc device together, but neither
-of the two drivers needs to know anything about the implementation
-of the other.
++config MSM_IOMMU
++	bool "MSM IOMMU Support"
++	depends on ARCH_MSM8X60
++	select IOMMU_API
++	default n
++	help
++	  Support for the IOMMUs found on certain Qualcomm SOCs.
++	  These IOMMUs allow virtualization of the address space used by most
++	  cores within the multimedia subsystem.
++
++	  If unsure, say N here.
++
+ config IOMMU_PGTABLES_L2
+ 	def_bool y
+ 	depends on ARCH_MSM8X60 && MMU && SMP && CPU_DCACHE_DISABLE=n
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index ea8c74f..81f4811 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -4,11 +4,12 @@ obj-$(CONFIG_DEBUG_FS) += clock-debug.o
+ endif
 
-> So it should be something like the following?
-> 
->         spin_lock(&host->lock);
-> 
->         stat = readl(host->base + HW_SSP_CTRL1);
->         writel(stat & MXS_MMC_IRQ_BITS,
->                 host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
-> 
->         [...]
-> 
->         if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
->                 mmc_signal_sdio_irq(host->mmc);
-> 
->         spin_unlock(&host->lock);
-> 
+ obj-$(CONFIG_MSM_VIC) += irq-vic.o
++obj-$(CONFIG_MSM_IOMMU) += iommu.o iommu_dev.o
 
-Yes, this looks correct to me now.
+ obj-$(CONFIG_ARCH_MSM7X00A) += dma.o irq.o acpuclock-arm11.o
+ obj-$(CONFIG_ARCH_MSM7X30) += dma.o
+ obj-$(CONFIG_ARCH_QSD8X50) += dma.o sirc.o
+-obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o iommu.o iommu_dev.o devices-msm8x60-iommu.o
++obj-$(CONFIG_ARCH_MSM8X60) += clock-dummy.o devices-msm8x60-iommu.o
+ obj-$(CONFIG_ARCH_MSM8960) += clock-dummy.o
 
-	Arnd
+ obj-$(CONFIG_MSM_PROC_COMM) += proc_comm.o clock-pcom.o vreg.o
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
