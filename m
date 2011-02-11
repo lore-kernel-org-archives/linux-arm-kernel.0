@@ -1,25 +1,51 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 10 Feb 2011 17:44:31 -0800
-Subject: [PATCH v4 10/15] ARM: tegra: iomap: Add missing devices, fix use
-	of SZ_8, SZ_64
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0310F60414@HQMAIL01.nvidia.com>
-References: <1297320204-31882-1-git-send-email-ccross@android.com>
-	<1297320204-31882-11-git-send-email-ccross@android.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0310F60414@HQMAIL01.nvidia.com>
-Message-ID: <AANLkTi=ZrTsvLoocLeztqzGK4TUgt1pFnHR-0MBUmOc0@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 11 Feb 2011 10:56:57 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.38-rc5
+Message-ID: <01b701cbc98e$fa196b60$ee4c4220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 10, 2011 at 8:45 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Colin Cross wrote at Wednesday, February 09, 2011 11:43 PM:
->>
->> From: Gary King <gking@nvidia.com>
->>
->> Adds gart, hdmi, avp, host1x, and pwm controllers to mach/iomap.h
->> There is no SZ_8 or SZ_64, replace them with constants
->
-> Can't we add those SZ_* constants?
+Hi Linus,
 
-Sure, you already added SZ_64, and nothing depends on the SZ_8 defines
-right now, so I'll drop that part of the change and send a patch that
-completes the SZ_* defines.
+Please pull Samsung fixes from:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+These things are for small fix on 2.6.38-rc5.
+If any problems, please let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
+
+  Linux 2.6.38-rc4 (2011-02-07 16:03:17 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+Kukjin Kim (1):
+      ARM: S5PV310: Cleanup System MMU
+
+Mark Brown (1):
+      ARM: SAMSUNG: Ensure struct sys_device is declared in plat/pm.h
+
+Thomas Abraham (1):
+      ARM: S5PV310: Add support System MMU on SMDKV310
+
+ arch/arm/mach-s5pv310/Kconfig               |    1 +
+ arch/arm/mach-s5pv310/include/mach/map.h    |    2 --
+ arch/arm/mach-s5pv310/include/mach/sysmmu.h |    5 ++++-
+ arch/arm/plat-s5p/Kconfig                   |   24 ++++++++----------------
+ arch/arm/plat-s5p/Makefile                  |    2 +-
+ arch/arm/plat-s5p/include/plat/sysmmu.h     |   23 -----------------------
+ arch/arm/plat-s5p/sysmmu.c                  |    4 +---
+ arch/arm/plat-samsung/include/plat/pm.h     |    2 ++
+ 8 files changed, 17 insertions(+), 46 deletions(-)
