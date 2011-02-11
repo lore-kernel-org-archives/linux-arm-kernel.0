@@ -1,117 +1,42 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Fri, 11 Feb 2011 16:33:42 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102091013.56670.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<AANLkTimjQfuNU-_rZTjAPrjxJhb=3kReVysBKoPE6Q4o@mail.gmail.com>
-	<201102091013.56670.arnd@arndb.de>
-Message-ID: <AANLkTinaY2RM86tX4ex+zsMwFKUdBNVpdZ8fFrt-e12_@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 11 Feb 2011 14:37:18 -0800
+Subject: [PATCH 2/3] msm: iommu: Generalize platform data for multiple
+	targets
+In-Reply-To: <1297462350.4852.31.camel@m0nster> (Daniel Walker's message of
+	"Fri, 11 Feb 2011 14:12:30 -0800")
+References: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
+	<1297456098-3241-2-git-send-email-stepanm@codeaurora.org>
+	<1297462350.4852.31.camel@m0nster>
+Message-ID: <8ya7hd6kxk1.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 9, 2011 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 February 2011 09:37:40 Linus Walleij wrote:
->> [Quoting in verbatin so the orginal mail hits linux-mmc, this is very
->> interesting!]
->>
->> 2011/2/8 Andrei Warkentin <andreiw@motorola.com>:
->> > Hi,
->> >
->> > I'm not sure if this is the best place to bring this up, but Russel's
->> > name is on a fair share of drivers/mmc code, and there does seem to be
->> > quite a bit of MMC-related discussions. Excuse me in advance if this
->> > isn't the right forum :-).
->> >
->> > Certain MMC vendors (maybe even quite a bit of them) use a pretty
->> > rigid buffering scheme when it comes to handling writes. There is
->> > usually a buffer A for random accesses, and a buffer B for sequential
->> > accesses. For certain Toshiba parts, it looks like buffer A is 8KB
->> > wide, with buffer B being 4MB wide, and all accesses larger than 8KB
->> > effectively equating to 4MB accesses. Worse, consecutive small (8k)
->> > writes are treated as one large sequential access, once again ending
->> > up in buffer B, thus necessitating out-of-order writing to work around
->> > this.
->
-> It's more complex, but I now have a pretty good understanding of
-> what the flash media actually do, after doing a lot of benchmarking.
-> Most of my results so far are documented on
->
-> https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Projects/FlashCardSurvey
->
-> but I still need to write about the more recent discoveries.
->
-> What you describe as buffer A is the "page size" of the underlying
-> flash. It depends on the size and brand of the NAND flash chip and
-> can be anywhere between 2 KB and 16 KB for modern cards, depending
-> on how they combine multiple chips and planes within the chips.
->
-> What you describe as buffer B is sometime called an "erase block
-> group" or an "allocation unit". This is the smallest unit that
-> gets kept in a global lookup table in the medium and can be anywhere
-> between 1 MB and 8 MB for cards larger than 4 GB, or as small as
-> 128 KB (a single erase block) for smaller media, as far as I have
-> seen. When you don't write full aligned allocation units, the
-> card will have to eventually do garbage collection on the allocation
-> unit, which can take a long time (many milliseconds).
->
-> Most cards have a third size, typically somewhere between 32 and 128 KB,
-> which is the optimimum size for writes. While you can do linear
-> writes to the card in page size units (writing an allocation unit
-> from start to finish), doing random access within the allocation unit
-> will be much faster doing larger writes.
->
->> > What this means is decreased life span for the parts, and it also
->> > means a performance impact on small writes, but the first item is much
->> > more crucial, especially for smaller parts.
->> >
->> > As I've mentioned, probably more vendors are affected. How about a
->> > generic MMC_BLOCK quirk that splits the requests (and optionally
->> > reorders) them? The thresholds would then be adjustable as
->> > module/kernel parameters based on manfid. I'm asking because I have a
->> > patch now, but its ugly and hardcoded against a specific manufacturer.
->
-> It's not just MMC specific: USB flash drives, CF cards and even cheap
-> PATA or SATA SSDs have the same patterns. I think this will need
-> to be solved on a higher level, in the block device elevator code
-> and in the file systems.
->
->> There is a quirk API so that specific quirks can be flagged for certain
->> vendors and cards, e.g. some Toshibas in this case. e.g. grep the
->> kernel source for MMC_QUIRK_BLKSZ_FOR_BYTE_MODE.
->>
->> But as Russell says this probably needs to be signalled up to the
->> block layer to be handled properly.
->>
->> Why don't you post the code you have today as an RFC: patch,
->> I think many will be interested?
->
-> Yes, I agree, that would be good. Also, I'd be interested to see the
-> output of 'head /sys/block/mmcblk0/device/*' on that card. I'm guessing
-> that the manufacturer ID of 0x0002 is Toshiba, and these are indeed
-> the worst cards that I have seen so far, because they can not do
-> random access within an allocation unit, and they can not write to
-> multiple allocation units alternating (# open AUs linear is "1" in
-> my wiki table), while most cards can do at least two.
->
-> Andrei, I'm certainly interested in working with you on this.
-> The point you brought up about the toshiba cards being especially
-> bad is certainly vald, even if we do something better in the block
-> layer, we need to have a way to detect the worst-case scenario,
-> so we can work around that.
->
-> ? ? ? ?Arnd
->
+On Fri, Feb 11 2011, Daniel Walker wrote:
 
-Arnd,
+> On Fri, 2011-02-11 at 12:28 -0800, Stepan Moskovchenko wrote:
+>> Make the IOMMU platform data target-independent in
+>> preparation for adding MSM8960 IOMMU support. The IOMMU
+>> configuration on MSM8x60 and MSM8960 is identical and the
+>> same platform data can be used for both.
+>> 
+>> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+>> ---
+>>  arch/arm/mach-msm/Makefile                         |    4 +-
+>>  .../{devices-msm8x60-iommu.c => devices-iommu.c}   |   54 +++++++++----------
+>>  arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |   36 -------------
+>>  3 files changed, 28 insertions(+), 66 deletions(-)
+>>  rename arch/arm/mach-msm/{devices-msm8x60-iommu.c => devices-iommu.c} (93%)
+>
+> If it's like what you and David are suggesting I think you would need a
+> SoC designation in the filename ..
 
-Yes, this is a Toshiba card. I've sent the patch as a reply to Linus' email.
+It is functionality that will be shared across multiple socs.  Putting
+the name of a specific soc would just be misleading.  Currently, it's
+our only iommu.  Support for another family that uses a different iommu
+could perhaps call it iommu2.
 
-cid - 02010053454d3332479070cc51451d00
-csd - d00f00320f5903ffffffffff92404000
-erase_size - 524288
-fwrev - 0x0
-hwrev - 0x0
-manfid - 0x000002
-name - SEM32G
-oemid - 0x0100
-preferred_erase_size - 2097152
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
