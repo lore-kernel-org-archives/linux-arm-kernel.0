@@ -1,115 +1,127 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Feb 2011 14:25:28 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <alpine.LFD.2.00.1102110838430.14920@xanadu.home>
-References: <4D2BFA08.5030104@ahsoftware.de>
-	<AANLkTinR7ih2ZMRMbXmSvoh-rS3LVv+UCvd0rRH_ESzf@mail.gmail.com>
-	<20110111155930.GH11039@n2100.arm.linux.org.uk>
-	<4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
-	<20110210154322.GE1742@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
-	<AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
-	<alpine.LFD.2.00.1102110838430.14920@xanadu.home>
-Message-ID: <AANLkTimW9zQ3EcEo8+gcxnS72Wa9VZELvrqdY+jP0B7W@mail.gmail.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Fri, 11 Feb 2011 20:21:19 +0530
+Subject: [PATCH v2 00/13] pruss mfd drivers
+Message-ID: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 1:51 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Fri, 11 Feb 2011, Dave Martin wrote:
->
->> On Thu, Feb 10, 2011 at 7:41 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > On Thu, 10 Feb 2011, Russell King - ARM Linux wrote:
->> >
->> >> On Thu, Jan 27, 2011 at 12:43:54AM -0500, Nicolas Pitre wrote:
->> >> > The MMU-less kernel should still favor allocations close to the kernel
->> >> > text for modules, and anything else away from the kernel going
->> >> > downwards.
->> >> >
->> >> > Otherwise a veneer should be created by the module symbol resolver such
->> >> > that if the branch distance to reach, say, printk is too large, then the
->> >> > following code would have to be dynamically generated right next to the
->> >> > module:
->> >> >
->> >> > ? ? ldr ? ? pc, [pc, #-4]
->> >> > ? ? .word ? <far_away_symbol>
->> >> >
->> >> > Then, in your module, you patch the branch relocation for printk so that
->> >> > it branches to the code above instead, and then store the address of
->> >> > printk at the location represented by the .word directive.
->> >>
->> >> What you're suggesting is what we used to do with the old user-space
->> >> module tools, which would've been nice to carry forwards to the new
->> >> module code. ?I never found a way to do it.
->> >>
->> >> The problems:
->> >> 1. Where do you create those veneers?
->> >> 2. How many veneers do you allocate space for?
->> >> 3. How do you determine that you need a veneer?
->> >>
->> >> While you can say "next to the module" for (1), you can only do that at
->> >> the point in time when the space for the module is allocated, and you
->> >> need to know at that point how much space you require.
->> >
->> > You would have to guess of course. ?Having a guess of 1/2 the module
->> > size should be pretty safe. ?So allocating 3/2 the space in
->> > module_alloc(), and then suffice to free the unused portion in
->> > module_finalize().
->> >
->> >> For (2), you could always allocate space for one veneer per symbol present
->> >> in the module, but that's very wasteful.
->> >>
->> >> (3) is almost impossible to know ahead of time as you don't have the
->> >> relocations, realistically you have to allocate one veneer per symbol,
->> >> and as you don't know whether it's a data or code symbol, you'll have
->> >> to allocate one veneer for every symbol in a module.
->> >
->> > I don't think you may know the number of symbols in advance either
->> > anyway.
->>
->> You could probably cook up a good upper bound based on the size of the
->> kernel and the number of symbols in the module: i.e., assume that
->> every undefined symbol in the module needs to be fixed up to point at
->> the most distant symbol in the kernel.
->
-> Sure... It is just that the memory allocation is currently done before
-> the number of symbols in the module is known. ?Changing that would
-> require non trivial changes in the generic module loading code which
-> potentially would affect all architectures, and therefore I don't think
-> we want to go there.
->
-> The other solution would be to determine the number of objects in need
-> of a veneer in apply_relocate(), allocate a replacement area for the
-> module, copy everything over, and then create the veneers close to the
-> module. ?But 1) the second allocation may fail, and 2) this will change
-> the distance from the kernel potentially requiring more veneers than
-> initially determined, and 3) the generic module code might still have
-> pointer references into the old allocation area (didn't check but that
-> can be expected). ?That's just too messy.
->
->> For people with normal-sized kernels, this bound will probably work
->> out as zero most of the time (i.e., the current situation). ?For
->> people with big kernels, or when many modules are already loaded, it
->> may work out at 100% -- but that's the price to pay for guaranteed
->> preallocation of the space required for the veneers. ?And anyway, you
->> may really need a substantial chunk of those veneers in such cases.
->
-> I still think that compiling modules with -mlong-calls, and making that
-> conditional on a kernel config option so only those who need it will
-> have it, is the simplest solution. ?Nothing in the kernel code would
-> need to be changed.
 
-Yes, this sounds like a reasonable solution for now ... since most
-people don't need this turned on anyway, and those that do need it
-know who they are.
+                           PRUSS Functional Block Diagram
+               /----------------------------------------------------\
+               |                                                    |
+               |                      |------|                      |
+     32GPO<------->PRU CORE-0 <------>|      |<------> DRAM 0       |
+     30GPI<------->(4KB IRAM)         |  S   |       (512 Bytes)    |
+               |                      |      |                      |
+     32GPO<------->PRU CORE-1 <------>|  C   |<------> DRAM 1       |
+     30GPI<------->(4KB IRAM)         |      |       (512 Bytes)    |
+               |                      |  R   |                      |
+               |                      |      |                      |
+ Ints to ARM/  |    Interrupt <------>|      |-------------------------> Master I/F (to SCR2)
+ DSP INTC <------->Controller         |      |<------------------------- Slave I/F (from SCR2)
+ Events from   |     (INTC)           |------|                      |
+ Periph + PRUs |                                                    |
+               \----------------------------------------------------/
 
- if we can also move the initramfs somewhere less obstructive in the
-future, then so much the better.
+Programmable Realtime Unit (PRU) is basically a 32-bit RISC
+processor available within TI's DA8XX SOCs. It consists of local
+instruction and data RAM and also has access to SOC resources
+via a Switched Central Resource (SCR).
 
-Cheers
----Dave
+There are two PRU's available within DA8XX SOC's PRUSS, hence providing
+two execution cores. Devices/Protocols can be emulated on these utilizing
+either both or only one of the PRUs independently.
+
+The rational behind the MFD driver being the fact that multiple devices can
+be implemented on the cores independently.
+It's also possible, as in our case, to implement a single device on both
+the PRU's resulting in improved load sharing.
+
+A detailed description is also available here:
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+
+version 2:
+==========
+* added pruss TTY Soft-UART driver.
+* added pruss Soft-UART board and platform changes.
+* fixed previous review comments.
+* reordered patch sequence.
+
+version 1:
+==========
+* added pruss mfd driver.
+* added pruss mfd board and platform changes.
+* added pruss SocketCAN driver.
+* added pruss SocketCAN board and platform changes.
+* added pruss SocketCAN GPIOs.
+* added previous review comments.
+
+Subhasish Ghosh (13):
+  mfd: pruss mfd driver.
+  da850: pruss platform specific additions.
+  da850: pruss board specific additions.
+  mfd: pruss CAN private data.
+  da850: pruss CAN platform specific additions.
+  da850: pruss CAN board specific additions.
+  da850: pruss CAN platform specific changes for gpios.
+  da850: pruss CAN board specific changes for gpios.
+  can: pruss CAN driver.
+  mfd: pruss SUART private data.
+  da850: pruss SUART board specific additions.
+  da850: pruss SUART platform specific additions.
+  tty: pruss SUART driver
+
+ arch/arm/mach-davinci/board-da850-evm.c            |  105 +
+ arch/arm/mach-davinci/da850.c                      |   12 +
+ arch/arm/mach-davinci/devices-da8xx.c              |   76 +
+ arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +
+ arch/arm/mach-davinci/include/mach/mux.h           |    5 +
+ drivers/mfd/Kconfig                                |   10 +
+ drivers/mfd/Makefile                               |    1 +
+ drivers/mfd/da8xx_pru.c                            |  446 ++++
+ drivers/net/can/Kconfig                            |    1 +
+ drivers/net/can/Makefile                           |    1 +
+ drivers/net/can/da8xx_pruss/Kconfig                |   73 +
+ drivers/net/can/da8xx_pruss/Makefile               |    7 +
+ drivers/net/can/da8xx_pruss/pruss_can.c            |  758 +++++++
+ drivers/net/can/da8xx_pruss/pruss_can_api.c        | 1227 ++++++++++
+ drivers/net/can/da8xx_pruss/pruss_can_api.h        |  290 +++
+ drivers/tty/serial/Kconfig                         |    2 +
+ drivers/tty/serial/Makefile                        |    1 +
+ drivers/tty/serial/da8xx_pruss/Kconfig             |   19 +
+ drivers/tty/serial/da8xx_pruss/Makefile            |    9 +
+ drivers/tty/serial/da8xx_pruss/pruss_suart.c       | 1014 +++++++++
+ drivers/tty/serial/da8xx_pruss/pruss_suart_api.c   | 2350 ++++++++++++++++++++
+ drivers/tty/serial/da8xx_pruss/pruss_suart_api.h   |  345 +++
+ drivers/tty/serial/da8xx_pruss/pruss_suart_board.h |   58 +
+ drivers/tty/serial/da8xx_pruss/pruss_suart_err.h   |   48 +
+ drivers/tty/serial/da8xx_pruss/pruss_suart_mcasp.h |  526 +++++
+ drivers/tty/serial/da8xx_pruss/pruss_suart_regs.h  |  153 ++
+ drivers/tty/serial/da8xx_pruss/pruss_suart_utils.c |  384 ++++
+ drivers/tty/serial/da8xx_pruss/pruss_suart_utils.h |   63 +
+ include/linux/mfd/pruss/da8xx_pru.h                |  131 ++
+ include/linux/mfd/pruss/da8xx_prucore.h            |   74 +
+ include/linux/serial_core.h                        |    2 +
+ 31 files changed, 8193 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mfd/da8xx_pru.c
+ create mode 100644 drivers/net/can/da8xx_pruss/Kconfig
+ create mode 100644 drivers/net/can/da8xx_pruss/Makefile
+ create mode 100644 drivers/net/can/da8xx_pruss/pruss_can.c
+ create mode 100644 drivers/net/can/da8xx_pruss/pruss_can_api.c
+ create mode 100644 drivers/net/can/da8xx_pruss/pruss_can_api.h
+ create mode 100644 drivers/tty/serial/da8xx_pruss/Kconfig
+ create mode 100644 drivers/tty/serial/da8xx_pruss/Makefile
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart.c
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_api.h
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_board.h
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_err.h
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_mcasp.h
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_regs.h
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_utils.c
+ create mode 100644 drivers/tty/serial/da8xx_pruss/pruss_suart_utils.h
+ create mode 100644 include/linux/mfd/pruss/da8xx_pru.h
+ create mode 100644 include/linux/mfd/pruss/da8xx_prucore.h
+
+-- 
+1.7.2.3
