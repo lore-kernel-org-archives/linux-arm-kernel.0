@@ -1,32 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 11 Feb 2011 11:24:59 +0100
-Subject: [PATCH 1/2] arm: mx50_rdp: add fec support
-In-Reply-To: <1297419731-16441-1-git-send-email-richard.zhao@freescale.com>
-References: <1297419731-16441-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20110211102459.GG27982@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Feb 2011 11:30:20 +0100
+Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
+In-Reply-To: <20110211101056.GB23404@n2100.arm.linux.org.uk>
+References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
+	<20110201110348.GB31216@n2100.arm.linux.org.uk>
+	<AANLkTi=jP1G=foehWYNai5H=_F372FwpkLEO4wSkmqBc@mail.gmail.com>
+	<20110211101056.GB23404@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikOArp9y4bTsvKCxtShoTzzsQeABfPn0z+dGneL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 06:22:10PM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx50_rdp.c b/arch/arm/mach-mx5/board-mx50_rdp.c
-> index dedf7f2..505513c 100644
-> --- a/arch/arm/mach-mx5/board-mx50_rdp.c
-> +++ b/arch/arm/mach-mx5/board-mx50_rdp.c
-> @@ -40,6 +40,9 @@
->  #define FEC_EN		IMX_GPIO_NR(6, 23)
->  #define FEC_RESET_B	IMX_GPIO_NR(4, 12)
->  
-> +#define FEC_EN		IMX_GPIO_NR(6, 23)
-> +#define FEC_RESET_B	IMX_GPIO_NR(4, 12)
-> +
-I think this is a left-over of a rebase.  The #defines are already
-present and they alone don't justify saying "add fec support".
+2011/2/11 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-Best regards
-Uwe
+> Maybe a solution to this is to use the DMA callback to signal that the
+> data path has completed, but still have the data end interrupt in place
+> so that it can trigger the stop command. ?That shouldn't result in
+> additional delays or even the requirement for a timeout.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+That should be possible, I'll try to fix up a patch like that.
+
+Thanks,
+Linus Walleij
