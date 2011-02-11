@@ -1,52 +1,38 @@
-From: julien.boibessot@free.fr (julien.boibessot at free.fr)
-Date: Fri, 11 Feb 2011 15:15:30 +0100
-Subject: [PATCH v3] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD &
-	MX51_PAD_USBH1_DATA2__UART2_TXD declarations
-Message-ID: <1297433730-26017-1-git-send-email-julien.boibessot@free.fr>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 11 Feb 2011 17:15:07 +0300
+Subject: [PATCH] arm: update gitignore file
+In-Reply-To: <1297387616-29390-1-git-send-email-rklein@nvidia.com>
+References: <1297387616-29390-1-git-send-email-rklein@nvidia.com>
+Message-ID: <4D55446B.4030605@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Boibessot <julien.boibessot@armadeus.com>
+Hello.
 
-Fixes 2 small regressions of recent iomux changes:
- - current MX51_PAD_UART2_TXD__UART2_TXD declaration overwrites
-   IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT register (0x09ec) and prevent
-   UART2 Rx from working properly.
-   (Tested on my custom i.MX51 board where UART2 is used as console)
- - current MX51_PAD_USBH1_DATA2__UART2_TXD declaration also has the same problem.
-   (Not tested)
+On 11-02-2011 4:26, rklein at nvidia.com wrote:
 
-Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
----
-Changes since v2:
- - Also correct MX51_PAD_USBH1_DATA2__UART2_TXD as pointed by Richard Zhao
-Changes since v1:
- - Improve patch description as requested by Sascha Hauer
+> From: Rhyland Klein<rklein@nvidia.com>
 
- arch/arm/plat-mxc/include/mach/iomux-mx51.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+> Updating the .gitignore file to ignore 3 files that are always created in
+> manual builds to cleanup git status results.
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-index b6767f9..6056cf2 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
-@@ -473,7 +473,7 @@
- #define _MX51_PAD_UART2_RXD__UART2_RXD		IOMUX_PAD(0x628, 0x238, 0, 0x09ec, 2, 0)
- #define _MX51_PAD_UART2_TXD__FIRI_RXD		IOMUX_PAD(0x62c, 0x23c, 1, 0x0000, 0, 0)
- #define _MX51_PAD_UART2_TXD__GPIO1_21		IOMUX_PAD(0x62c, 0x23c, 3, 0x0000, 0, 0)
--#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x09ec, 3, 0)
-+#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x0000, 0, 0)
- #define _MX51_PAD_UART3_RXD__CSI1_D0		IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
- #define _MX51_PAD_UART3_RXD__GPIO1_22		IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
- #define _MX51_PAD_UART3_RXD__UART1_DTR		IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
-@@ -528,7 +528,7 @@
- #define _MX51_PAD_USBH1_DATA1__UART2_RXD	IOMUX_PAD(0x68c, 0x28c, 1, 0x09ec, 4, 0)
- #define _MX51_PAD_USBH1_DATA1__USBH1_DATA1	IOMUX_PAD(0x68c, 0x28c, 0, 0x0000, 0, 0)
- #define _MX51_PAD_USBH1_DATA2__GPIO1_13		IOMUX_PAD(0x690, 0x290, 2, 0x0000, 0, 0)
--#define _MX51_PAD_USBH1_DATA2__UART2_TXD	IOMUX_PAD(0x690, 0x290, 1, 0x09ec, 5, 0)
-+#define _MX51_PAD_USBH1_DATA2__UART2_TXD	IOMUX_PAD(0x690, 0x290, 1, 0x0000, 0, 0)
- #define _MX51_PAD_USBH1_DATA2__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, 0, 0x0000, 0, 0)
- #define _MX51_PAD_USBH1_DATA3__GPIO1_14		IOMUX_PAD(0x694, 0x294, 2, 0x0000, 0, 0)
- #define _MX51_PAD_USBH1_DATA3__UART2_RTS	IOMUX_PAD(0x694, 0x294, 1, 0x09e8, 5, 0)
--- 
-1.6.0.4
+> Signed-off-by: Rhyland Klein<rklein@nvidia.com>
+> ---
+>   arch/arm/boot/compressed/.gitignore |    3 +++
+>   1 files changed, 3 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+> index ab204db..c52a6dd 100644
+> --- a/arch/arm/boot/compressed/.gitignore
+> +++ b/arch/arm/boot/compressed/.gitignore
+> @@ -1,3 +1,6 @@
+>   font.c
+>   piggy.gz
+>   vmlinux.lds
+> +lib1funcs.S
+> +piggy.gzip
+> +vmlinux
+
+    Similar patch has already been submitted several times by Sergio Aguirre...
+
+WBR, Sergei
