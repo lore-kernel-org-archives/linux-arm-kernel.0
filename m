@@ -1,43 +1,81 @@
-From: meador_inge@mentor.com (Meador Inge)
-Date: Fri, 11 Feb 2011 15:19:51 -0600
-Subject: [RFC] Inter-processor Mailboxes Drivers
-Message-ID: <4D55A7F7.5090700@mentor.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 11 Feb 2011 22:25:53 +0100
+Subject: [PATCH] PM: Allow pm_runtime_suspend() to succeed during system
+	suspend
+In-Reply-To: <87ei7e9uhy.fsf@ti.com>
+References: <Pine.LNX.4.44L0.1101311119190.1931-100000@iolanthe.rowland.org>
+	<201102112100.23996.rjw@sisk.pl> <87ei7e9uhy.fsf@ti.com>
+Message-ID: <201102112225.54140.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Friday, February 11, 2011, Kevin Hilman wrote:
+> "Rafael J. Wysocki" <rjw@sisk.pl> writes:
+> 
+> > On Monday, January 31, 2011, Rafael J. Wysocki wrote:
+> >> On Monday, January 31, 2011, Alan Stern wrote:
+> >> > On Mon, 31 Jan 2011, Kevin Hilman wrote:
+> >> > 
+> >> > > I understand how this works, but frankly I'm still a bit fuzzy on why.
+> >> > > 
+> >> > > I guess I'm still missing a good understanding of what "interfering with a
+> >> > > system power transition" means, and why a runtime suspend qualifies as
+> >> > > interfering but not a runtime resume.
+> >> > 
+> >> > These are good questions.  Rafael implemented this design originally; 
+> >> > my contribution was only to warn him of the potential for problems.  
+> >> > Therefore he should explain the rationale for the design.
+> >> 
+> >> The reason why runtime resume is allowed during system power transitions is
+> >> because in some cases during system suspend we simply have to resume devices
+> >> that were previously runtime-suspended (for example, the PCI bus type does
+> >> that).
+> >> 
+> >> The reason why runtime suspend is not allowed during system power transitions
+> >> if the following race:
+> >> 
+> >> - A device has been suspended via a system suspend callback.
+> >> - The runtime PM framework executes a (scheduled) suspend on that device,
+> >>   not knowing that it's already been suspended, which potentially results in
+> >>   accessing the device's registers in a low-power state.
+> >> 
+> >> Now, it can be avoided if every driver does the right thing and checks whether
+> >> the device is already suspended in its runtime suspend callback, but that would
+> >> kind of defeat the purpose of the runtime PM framework, at least partially.
+> >
+> > In fact, I've just realized that the above race cannot really occur, because
+> > pm_wq is freezable, so I'm proposing the following change.
+> >
+> > Of course, it still doesn't prevent user space from disabling the runtime PM
+> > framework's helpers via /sys/devices/.../power/control.
+> >
+> > Thanks,
+> > Rafael
+> >
+> >
+> > ---
+> > From: Rafael J. Wysocki <rjw@sisk.pl>
+> > Subject: PM: Allow pm_runtime_suspend() to succeed during system suspend
+> >
+> > The dpm_prepare() function increments the runtime PM reference
+> > counters of all devices to prevent pm_runtime_suspend() from
+> > executing subsystem-level callbacks.  However, this was supposed to
+> > guard against a specific race condition that cannot happen, because
+> > the power management workqueue is freezable, so pm_runtime_suspend()
+> > can only be called synchronously during system suspend and we can
+> > rely on subsystems and device drivers to avoid doing that
+> > unnecessarily.
+> >
+> > Make dpm_prepare() drop the runtime PM reference to each device
+> > after making sure that runtime resume is not pending for it.
+> >
+> > Signed-off-by: Rafael J. Wysocki <rjw@sisk.pl>
+> > ---
+> 
+> Yes!
+> 
+> Acked-by: Kevin Hilman <khilman@ti.com>
 
-I am currently working on building AMP systems using OpenMCAPI
-(https://bitbucket.org/hollisb/openmcapi/wiki/Home) as the
-inter-processor communication mechanism.  With OpenMCAPI we, of course,
-need a way to send messages to various cores.  On some Freescale PPC
-platforms (e.g. P1022DS, MPC8572DS), we have been using message
-registers to do this work.  Recently, I was looking at the OMAP4
-mailboxes to gear up for moving into ARM based platforms.
+Well, I hope you realize that it doesn't help you a lot?
 
-With that, I noticed 'arch/arm/plat-omap/mailbox.c'.  This is very
-specific to the OMAP4 boards.  I am looking at designing a new set of
-drivers to expose a mailbox service to userspace that will be used
-for inter-processor communication.  This would entail the traditional
-generic/specific driver split:
-
-     1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
-        for the MPIC message registers on Power and OMAP4 mailboxes, for
-        example.
-     2. A higher level driver under '.../drivers/mailbox/*'.  That the
-        pieces in (1) would register with.  This piece would expose the
-        main kernel API.
-     3. Userspace interfaces for accessing the mailboxes.  A
-        '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
-
-Now I have the following questions:
-
-     1. Do others see value in this?
-     2. Does something like this already exist?
-     3. Is someone else already working on this?
-
-Any feedback will be greatly appreciated.
-
--- 
-Meador Inge     | meador_inge AT mentor.com
-Mentor Embedded | http://www.mentor.com/embedded-software
+Rafael
