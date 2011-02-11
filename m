@@ -1,86 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Feb 2011 16:51:35 +0100
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110211231417.GC9289@S2100-06.ap.freescale.net>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<201102101817.42099.arnd@arndb.de>
-	<20110211231417.GC9289@S2100-06.ap.freescale.net>
-Message-ID: <201102111651.35530.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 11 Feb 2011 16:05:00 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have
+	SMP_ON_UP fixups
+In-Reply-To: <AANLkTikFkZH6KK_KUgXaaKyQM6eZOh-ki3xdtS2fk8zN@mail.gmail.com>
+References: <20110209142211.GA11460@n2100.arm.linux.org.uk>
+	<20110210125624.GA3652@n2100.arm.linux.org.uk>
+	<AANLkTin3+4pwxQRz1J_1B6dJxJm0_5ou0OWteDFZNbo9@mail.gmail.com>
+	<AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
+	<20110210191125.GA12582@n2100.arm.linux.org.uk>
+	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
+	<20110211101345.GA23785@n2100.arm.linux.org.uk>
+	<AANLkTikFkZH6KK_KUgXaaKyQM6eZOh-ki3xdtS2fk8zN@mail.gmail.com>
+Message-ID: <20110211160500.GA31529@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 February 2011, Shawn Guo wrote:
-> On Thu, Feb 10, 2011 at 06:17:41PM +0100, Arnd Bergmann wrote:
-> > On Friday 11 February 2011, Shawn Guo wrote:
-> > > 
-> > > > > +	struct mxs_dma_data		dma_data;
-> > > > 
-> > > > Why do you need host specific DMA structures? Please stick to
-> > > > the generic dma-engine API if possible.
-> > > > 
-> > > I'm sticking to the generic dmaengine api.  The mxs dma hardware
-> > > has separate irq line for every single dma channel, which needs to
-> > > be told by client driver.
-> > 
-> > I'm not convinced, it still sounds like a layering violation to
-> > have specific information about the DMA controller in the
-> > platform data of a driver using the dma engine API.
-> > 
-> It sounds like something about the dma controller, but it really
-> belongs to dma client device e.g. ssp here.  Every single dma client
-> device has two dma related resources, dma channel and dma irq, which
-> should be defined in client device data.
-
-That is true for the DMA controller you use, but it doesn't have
-to be that way for all other DMA controllers, right? My point is
-that the MMC driver should not make any assumptions about what
-DMA controller is used, because a future SoC might combine it
-with a different DMA controller, e.g. one that just just a single
-interrupt for all channels.
-
-> > Why can't you put the interrupt number into the platform data of
-> > the dma engine device? Your filter function already identifies
-> > the number of the DMA channel.
-> > 
-> We have 16 channels for dma-apbh and dma-apbx respectively.  And each
-> channel has fixed peripheral device and irq.  You think we can define
-> 2 x 16 x (channel number + channel irq) in dma engine driver?  I'm
-> afraid not.  The channel number can be identified in filter function
-> because dmaengine core code and mxs dma hw are indexing the channel
-> in the same way, so that the sw channel id can be used to address hw
-> channel, otherwise we have to pass hw channel id to dma driver just
-> like what we do with irq.
-
-I don't understand. The sw channel id should be something that is
-defined in an arbitrary way for each machine, and it should be the
-only thing that a driver needs, right?
-
-I have not looked much at other dmaengine drivers, but I'd be
-surprised if they require the device driver to be written
-for a specific implementation. If that was the case, you would
-not even need a dmaengine API but could just as well write
-to the DMA controller registers from the device driver directly.
-
-> > What I meant is that you take care to avoid getting into the
-> > interrupt handler while holding the spinlock, but in the handler,
-> > you don't check if the lock is held. It can't be correct to
-> > serialize just half the cases.
-> > 
-> Thanks for the explanation.  Please help review the fix below to see
-> if I understand the comment correctly.
+On Fri, Feb 11, 2011 at 10:52:17AM +0000, Dave Martin wrote:
+> On Fri, Feb 11, 2011 at 10:13 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Feb 11, 2011 at 09:33:56AM +0000, Dave Martin wrote:
+> >> Agreed -- actually, I suspected we might need to support this. ?But I
+> >> don't think solving this problem (= keeping the fixup implementation
+> >> in memory and enhancing the module loader) solved the
+> >> fixups-referencing-sections-discarded-from-vmlinux problem. ?These
+> >> seem to be two separate issues. ?I am filing to understand something?
+> >
+> > They are separate, but related issues. ?They both ultimately have the
+> > same cause - the placement of the spinlock code inline rather than
+> > out of line, resulting in fixups appearing all over the place rather
+> > than just in kernel/spinlock.o.
 > 
->         if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN)) {
->                 spin_lock_irqsave(&host->lock, flags);
->                 mmc_signal_sdio_irq(host->mmc);
->                 spin_unlock_irqrestore(&host->lock, flags);
->         }
+> I guess what I want to understand is whether I (or someone) still
+> need(s) to sort out the vmlinux.lds issue.
 
-This is still wrong for two reasons:
+Yes we do - if you build your kernel you should find that your link
+fails because of discarded sections being referenced.
 
-* You now don't hold the lock while reading the 'stat' variable. The point of the
-  lock is to make sure that sdio doesn't get turned off after reading stat but
-  before signaling the sdio, so you have to hold it across both.
-* In an interrupt controller, you should not disable interrupts again.
-  It's harmless, but slow and confusing to the reader.
+> If we're keeping inline spinlocks (I currently assume "yes"), then the
+> vmlinux.lds issue still needs fixing.  Is that correct?  However, if
+> we get rid of inline spinlocks we won't have the problem, though there
+> may be some performance impact -- hard to judge how significant.
 
-	Arnd
+I don't see that we can get rid of inline spinlocks - it's controlled
+by stuff external to the arch.
