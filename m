@@ -1,78 +1,177 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Feb 2011 16:19:15 +0000
-Subject: [PATCH 6/6] ARM: pm: allow generic sleep code to be used with SMP CPU
-	idle
-In-Reply-To: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-Message-ID: <E1PnviF-0002yt-EC@rmk-PC.arm.linux.org.uk>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Fri, 11 Feb 2011 16:28:14 +0000
+Subject: [PATCH v2 13/13] tty: pruss SUART driver
+In-Reply-To: <1297435892-28278-14-git-send-email-subhasish@mistralsolutions.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-14-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <20110211162814.6ff274f1@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the generic sleep code to be used with SMP CPU idle by storing
-N CPU stack pointers rather than just one.
+Don't see why it needs its own sub-directory
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/sleep.S |   26 +++++++++++++++++++++++++-
- 1 files changed, 25 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 9f106fa..e10618f 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -25,7 +25,14 @@ ENTRY(cpu_suspend)
- 	stmfd	sp!, {r1, r2, r3, ip}	@ save v:p, virt SP, retfn, phys resume fn
- 	ldr	r3, =sleep_save_sp
- 	add	r2, sp, r1		@ convert SP to phys
-+#ifdef CONFIG_SMP
-+	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
-+	ALT_UP(mov lr, #0)
-+	and	lr, lr, #15
-+	str	r2, [r3, lr, lsl #2]	@ save phys SP
-+#else
- 	str	r2, [r3]		@ save phys SP
-+#endif
- 	mov	lr, pc
- 	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
- #else
-@@ -36,7 +43,14 @@ ENTRY(cpu_suspend)
- 	stmfd	sp!, {r1, r2, r3}	@ save v:p, virt SP, return fn
- 	ldr	r3, =sleep_save_sp
- 	add	r2, sp, r1		@ convert SP to phys
-+#ifdef CONFIG_SMP
-+	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
-+	ALT_UP(mov lr, #0)
-+	and	lr, lr, #15
-+	str	r2, [r3, lr, lsl #2]	@ save phys SP
-+#else
- 	str	r2, [r3]		@ save phys SP
-+#endif
- 	bl	cpu_do_suspend
- #endif
- 
-@@ -96,7 +110,15 @@ cpu_resume_after_mmu:
- 	.data
- 	.align
- ENTRY(cpu_resume)
-+#ifdef CONFIG_SMP
-+	adr	r0, sleep_save_sp
-+	ALT_SMP(mrc p15, 0, r1, c0, c0, 5)
-+	ALT_UP(mov r1, #0)
-+	and	r1, r1, #15
-+	ldr	r0, [r0, r1, lsl #2]	@ stack phys addr
-+#else
- 	ldr	r0, sleep_save_sp	@ stack phys addr
-+#endif
- 	msr	cpsr_c, #PSR_I_BIT | PSR_F_BIT | SVC_MODE @ set SVC, irqs off
- #ifdef MULTI_CPU
- 	ldmia	r0!, {r1, sp, lr, pc}	@ load v:p, stack, return fn, resume fn
-@@ -107,4 +129,6 @@ ENTRY(cpu_resume)
- ENDPROC(cpu_resume)
- 
- sleep_save_sp:
--	.word	0				@ preserve stack phys ptr here
-+	.rept	CONFIG_NR_CPUS
-+	.long	0				@ preserve stack phys ptr here
-+	.endr
--- 
-1.6.2.5
+
+> +#ifdef __SUART_DEBUG
+> +#define __suart_debug(fmt, args...) \
+> +		printk(KERN_DEBUG "suart_debug: " fmt, ## args)
+> +#else
+> +#define __suart_debug(fmt, args...)
+> +#endif
+> +
+> +#define  __suart_err(fmt, args...) printk(KERN_ERR "suart_err: " fmt, ## args)
+
+Use dev_dbg/dev_err/pr_debug/pr_err
+
+
+> +static void omapl_pru_tx_chars(struct omapl_pru_suart *soft_uart, u32 uart_no)
+> +{
+> +	struct circ_buf *xmit = &soft_uart->port[uart_no].state->xmit;
+> +	struct device *dev = soft_uart->dev;
+> +	s32 count = 0;
+> +
+> +	if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_TX))
+> +		return;
+> +
+> +	if (down_trylock(&soft_uart->port_sem[uart_no]))
+> +		return;
+
+Please use a mutex not a semaphore. We are trying to get almost all the
+kernel using mutexes as it is needed for hard real time.
+
+
+> +		pru_softuart_read_data(dev, &soft_uart->suart_hdl[uart_no],
+> +				       suart_data, data_len + 1,
+> +				       &data_len_read);
+> +
+> +		for (i = 0; i <= data_len_read; i++) {
+> +			soft_uart->port[uart_no].icount.rx++;
+> +			/* check for sys rq */
+> +			if (uart_handle_sysrq_char
+> +			    (&soft_uart->port[uart_no], suart_data))
+> +				continue;
+> +		}
+> +		/* update the tty data structure */
+> +		tty_insert_flip_string(tty, suart_data, data_len_read);
+
+You can avoid a copy here by using tty_prepare_flip_string()
+
+Also please use the tty_port_tty_get/tty_kref_put interfaces so the tty
+refcounting is right
+
+
+> +static void pruss_suart_set_termios(struct uart_port *port,
+> +				  struct ktermios *termios,
+> +				  struct ktermios *old)
+> +{
+> +	struct omapl_pru_suart *soft_uart =
+> +	    container_of(port, struct omapl_pru_suart, port[port->line]);
+> +	struct device *dev = soft_uart->dev;
+> +	u8 cval = 0;
+> +	unsigned long flags = 0;
+> +	u32 baud = 0;
+> +	u32 old_csize = old ? old->c_cflag & CSIZE : CS8;
+> +
+> +/*
+> + * Do not allow unsupported configurations to be set
+> + */
+> +	if (1) {
+> +		termios->c_cflag &= ~(HUPCL | CRTSCTS | CMSPAR | CSTOPB
+> +				      | PARENB | PARODD | CMSPAR);
+> +		termios->c_cflag |= CLOCAL;
+
+No. CLOCAL and HUPCL are user side flags. Apps expect to able to set them
+even if in fact they have no effect, so leave those two alone. The rest
+is fine.
+
+
+> +/*
+> + * Characteres to ignore
+
+Typo
+
+
+
+> diff --git a/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c b/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
+> new file mode 100644
+> index 0000000..d809dd3
+> --- /dev/null
+> +++ b/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
+> @@ -0,0 +1,2350 @@
+> +/*
+> + * Copyright (C) 2010 Texas Instruments Incorporated
+> + * Author: Jitendra Kumar <jitendra@mistralsolutions.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License as  published by the
+> + * Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
+> + * whether express or implied; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + */
+> +
+> +#include <linux/types.h>
+> +#include <linux/mfd/pruss/da8xx_pru.h>
+> +#include <linux/io.h>
+> +#include <mach/hardware.h>
+> +#include "pruss_suart_api.h"
+> +#include "pruss_suart_regs.h"
+> +#include "pruss_suart_board.h"
+> +#include "pruss_suart_utils.h"
+> +#include "pruss_suart_err.h"
+> +
+> +static u8 g_uart_statu_table[8];
+Can you lose the g_, its  a windows naming convention we dont use
+
+
+> +s16 pru_softuart_open(suart_handle h_suart)
+> +{
+
+If you just used normal integers you could surely make this routine
+trivial and remove all the duplication in the switches
+
+> +	s16 status = PRU_SUART_SUCCESS;
+
+And please stick to Linux error codes
+
+
+> +/* suart instance close routine */
+> +s16 pru_softuart_close(suart_handle h_uart)
+> +{
+> +	s16 status = SUART_SUCCESS;
+> +
+> +	if (h_uart == NULL) {
+> +		return PRU_SUART_ERR_HANDLE_INVALID;
+
+Which is never checked. Far better to use WARN_ON and the like for such
+cases - or if like this one they don't appear to be possible to simply
+delete them
+
+> +	if ((tx_clk_divisor > 385) || (tx_clk_divisor == 0))
+> +		return SUART_INVALID_CLKDIVISOR;
+> +	if ((rx_clk_divisor > 385) || (rx_clk_divisor == 0))
+> +		return SUART_INVALID_CLKDIVISOR;
+
+[minor] Lots of excess brackets
+
+
+> +		u32offset = (u32) (PRUSS_INTC_CHANMAP9 & 0xFFFF);
+> +		u32value = PRU_INTC_CHAN_34_SYSEVT_36_39;
+> +		s16retval = pruss_writel(dev, u32offset, (u32 *)&u32value, 1);
+> +		if (-1 == s16retval)
+> +			return -1;
+
+If you fixed the API here you'd be able to just write
+
+		if (pruss_writel(dev, PRUSS_INTC_CHANMAP9 & 0xFFFF,
+				PRU_INTC_BLAH)
+
+or similar which would clean up a lot of messy code and shrink it
+dramatically. Given you have lots of series of writes some kind of
+
+	pruss_writel_multi(dev, array, len)
+
+that took an array of addr/value pairs might also clean up a ton of code
+and turn it into trivial tables
