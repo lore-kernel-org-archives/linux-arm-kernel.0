@@ -1,99 +1,84 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Fri, 11 Feb 2011 10:26:27 -0500
-Subject: [PATCH v2 11/13] da850: pruss SUART board specific additions.
-In-Reply-To: <1297435892-28278-12-git-send-email-subhasish@mistralsolutions.com>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-12-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <4D555523.7040507@criticallink.com>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri, 11 Feb 2011 16:38:55 +0100
+Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
+In-Reply-To: <AANLkTimQxC3HgaRs-bBOGChLhvAK69XHCPEGyOcKeOz6@mail.gmail.com>
+References: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
+	<AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
+	<AANLkTimQxC3HgaRs-bBOGChLhvAK69XHCPEGyOcKeOz6@mail.gmail.com>
+Message-ID: <F55C15BA-2C89-4DB7-9930-5176AA72C2A7@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subhasish,
 
-On 2/11/2011 9:51 AM, Subhasish Ghosh wrote:
+Op 11 feb 2011, om 13:12 heeft Bryan Wu het volgende geschreven:
 
-> This patch adds the pruss SUART pin mux and registers the device
-> with the pruss mfd driver.
+> On Wed, Feb 9, 2011 at 10:08 PM, Gadiyar, Anand <gadiyar@ti.com> wrote:
+>> On Wed, Feb 9, 2011 at 7:25 PM, Raghuveer Murthy
+>> <raghuveer.murthy@ti.com> wrote:
+>>> Adding DVI support to OMAP4 PandaBoard.
+>>> 
+>>> PandaBoard uses TFP410 DVI Framer chip
+>>> http://focus.ti.com/lit/ds/symlink/tfp410.pdf
+>>> 
+>>> The TFP410 gets its power enable and display data over GPIO lines muxed
+>>> in from OMAP4430. PandaBoard supports other LCD displays through expansion
+>>> connectors, following board rework. This will disable the DVI interface.
+>>> However, the existing mux settings remain the same
+>>> 
+>>> PandaBoard additionally supports display over HDMI interface. It is
+>>> mutually exclusive to display over DVI. Hence the mux settings need to be
+>>> configured seperately, as and when HDMI is enabled
+>>> 
+>>> Also, I2C3 bus used for reading EDID data from DVI Monitors is
+>>> registered here. Since the design is similar to BeagleBoard, the code
+>>> for the same is taken from the kernel.org commit e3333f48dd5cb21
+>>> (omap: Adding beagle i2c eeprom driver to read EDID)
+>>> 
+>>> Reviewed-by: Manjunath G Kondaiah <manjugk@ti.com>
+>>> Reviewed-by: Anand Gadiyar <gadiyar@ti.com>
+>> 
+>> I've also tested it on the Panda, and gone through this and most
+>> of the other patches in the series. So if you like, you could
+>> consider this an:
+>> 
+>> Acked-by: Anand Gadiyar <gadiyar@ti.com>
+>> 
+>>> Reviewed-by: Nishanth Menon <nm@ti.com>
+>>> Reviewed-by: Sumit Semwal <sumit.semwal@ti.com>
+>>> Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
+>>> ---
+>>> 
+>>> Base
+>>> ====
+>>> url =
+>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+>>> branch "master"
+>>> commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d
+>>> tag 2.6.38-rc4
+>>> 
+>> 
+>> To make it easier for someone to test, I've extracted this
+>> and the 6 dependent series from patchwork, and hosted
+>> them in a branch on my devel tree. They are available
+>> against v2.6.38-rc4 here:
+>> 
+>> git://dev.omapzoom.org/pub/scm/anand/linux-omap-usb.git
+>> 
+>> in the display-patches-for-v2.6.38-rc4 branch if someone
+>> wants to take a look.
 > 
-> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
-> ---
->  arch/arm/mach-davinci/board-da850-evm.c |   36 +++++++++++++++++++++++++++++++
->  1 files changed, 36 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index f9c38f8..3858516 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -1060,6 +1060,25 @@ const short da850_evm_pruss_can_pins[] = {
->  	-1
->  };
->  
-> +const short da850_evm_pruss_suart_pins[] = {
-> +	DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
-> +	DA850_AHCLKR, DA850_ACLKR, DA850_AFSR,
-> +	DA850_AXR_13, DA850_AXR_9, DA850_AXR_7,
-> +	DA850_AXR_14, DA850_AXR_10, DA850_AXR_8,
-> +	-1
-> +};
-> +
+> I fetched this branch which contains 35 patches on top of 2.6.38-rc4.
+> After fixing some conflict, I applied these 35 patches on our Ubuntu
+> ti-omap-dev kernel. With built-in the DSS2 driver and GENERIC_DPI
+> driver, kernel boots fine on my Panda with Ubuntu GUI. But I have to
+> set the kernel boot command args with omapfb.mode=dvi:1024x768MR-24 at 60
+> omapdss.def_disp=dvi, pointed out by Sebastien. Without this bootargs,
+> no graphic at all. so as Robert concerned, EDID detection doesn't
+> work. Does that related to I2C driver? I2C driver always tell me
+> timeout in dmesg.
 
+AIUI the i2c bus is only hooked up to the HDMI port, so unless you plug in something there, no dice.
 
-Shouldn't this pins select PRU[0,1]_XXX type functions and not McASP functions?
-E.G.: PRU0_R31[17] instead of AHCLKX, PRU0_R31[18] instead of AHCLKR, etc.
+regards,
 
-> +static int __init da850_evm_setup_pruss_suart(void)
-> +{
-> +	int ret;
-> +
-> +	ret = davinci_cfg_reg_list(da850_evm_pruss_suart_pins);
-> +	if (ret)
-> +		pr_warning("%s: da850_evm_pruss_suart_pins "
-> +			"mux setup failed: %d\n", __func__, ret);
-> +	return ret;
-> +}
-> +
->  static int __init da850_evm_setup_pruss_can(void)
->  {
->  	int ret, val = 0;
-> @@ -1085,6 +1104,17 @@ static int __init da850_evm_setup_pruss_can(void)
->  	return ret;
->  }
->  
-> +static struct da850_evm_pruss_suart_data suart_data = {
-> +	.version	= 1,
-> +	.resource	= {
-> +			.name	= "da8xx_mcasp0_iomem",
-> +			.start	= DAVINCI_DA8XX_MCASP0_REG_BASE,
-> +			.end	= DAVINCI_DA8XX_MCASP0_REG_BASE +
-> +					(SZ_1K * 12) - 1,
-> +			.flags	= IORESOURCE_MEM,
-> +		},
-> +};
-> +
->  static struct da8xx_pruss_can_data can_data = {
->  	.version	= 1,
->  };
-> @@ -1094,6 +1124,12 @@ static struct da8xx_pruss_devices pruss_devices[] = {
->  		.dev_name	= "da8xx_pruss_can",
->  		.pdata		= &can_data,
->  		.pdata_size	= sizeof(can_data),
-> +		.setup		= da850_evm_setup_pruss_suart,
-
-
-Should this be da850_evm_setup_pruss_can instead?
-
-> +	},
-> +	{
-> +		.dev_name	= "da8xx_pruss_uart",
-> +		.pdata		= &suart_data,
-> +		.pdata_size	= sizeof(suart_data),
->  		.setup		= da850_evm_setup_pruss_can,
-
-
-Should this be da850_evm_setup_pruss_suart instead?
-
->  	},
->  	{
-
-
--Mike
+Koen
