@@ -1,27 +1,35 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Fri, 11 Feb 2011 19:07:23 +0200
-Subject: [PATCH] omap3: cpuidle: Add description field to each C-state.
-In-Reply-To: <1297437132-1005-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297437132-1005-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110211190723.b93bcb60.jhnikula@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 11 Feb 2011 18:27:50 +0100
+Subject: [PATCH v2] ARM: S5PV210: Add GONI board setup for CIF camera support
+Message-ID: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Feb 2011 20:42:12 +0530
-Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Hello,
 
-> Add a description field to each idle C-state. This helps to give
-> better data with PowerTop and one don't have to refer to the code
-> to link what Cx means from system point of view while analysing
-> PowerTop data.
-> 
-> No functional change.
-> 
-Out of curiosity what powertop version is required to get these handy
-descriptions visible?
+the following patch series introduces changes in GONI board setup file
+required for the CIF camera sensor driver.
+The first patch adds the I2C0 bus driver, the second one adds the regulator
+supply definitions and the third one just increases virtual size
+of the framebuffer window 0 to enable double-buffering.
+The added regulator supplies are also a subset of the supplies of the high
+resolution camera which that reference board is equipped with.
 
-As I see these in /sys/devices/system/cpu/cpu0/cpuidle/stateX/desc it's
-fair to give my tested by
+Changes since v1:
+ - removed unnecessary "select CONFIG_S3C_DEV_I2C0"
 
-Tested-by: Jarkko Nikula <jhnikula@gmail.com>
+
+The patch series contains:
+
+[PATCH 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
+[PATCH 2/3] ARM: S5PV210: Add supplies for CIF camera on GONI board
+[PATCH 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
+
+Created against for-next branch at:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+
+
+Regards,
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
