@@ -1,35 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 11 Feb 2011 16:25:13 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTimS-1CxkSHDChqX1K8bt-89T=8SDoSdmKeZ4PXG@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102111551.15508.arnd@arndb.de>
-	<AANLkTimS-1CxkSHDChqX1K8bt-89T=8SDoSdmKeZ4PXG@mail.gmail.com>
-Message-ID: <201102111625.14226.arnd@arndb.de>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Fri, 11 Feb 2011 10:26:27 -0500
+Subject: [PATCH v2 11/13] da850: pruss SUART board specific additions.
+In-Reply-To: <1297435892-28278-12-git-send-email-subhasish@mistralsolutions.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-12-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <4D555523.7040507@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 11 February 2011, Lei Wen wrote:
-> > Several orders of magnitude. It is very easy to get a card that can write
-> > 12 MB/s into a case where it writes no more than 30 KB/s, doing only
-> > things that happen frequently with ext3.
-> >
+Hi Subhasish,
+
+On 2/11/2011 9:51 AM, Subhasish Ghosh wrote:
+
+> This patch adds the pruss SUART pin mux and registers the device
+> with the pruss mfd driver.
 > 
-> Maybe we could get that case into mmc_test code, so that we could track
-> that in latter whether it already be fixed or not? Or in other word, to prove
-> the firmware in sd card is stupid or not. :)
- 
-There are many kinds of stupid, and a lot of cards are. I've actually had
-excellent success with simply measuring from user space, which is
-much easier than in mmc_test.
+> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+> ---
+>  arch/arm/mach-davinci/board-da850-evm.c |   36 +++++++++++++++++++++++++++++++
+>  1 files changed, 36 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index f9c38f8..3858516 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -1060,6 +1060,25 @@ const short da850_evm_pruss_can_pins[] = {
+>  	-1
+>  };
+>  
+> +const short da850_evm_pruss_suart_pins[] = {
+> +	DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+> +	DA850_AHCLKR, DA850_ACLKR, DA850_AFSR,
+> +	DA850_AXR_13, DA850_AXR_9, DA850_AXR_7,
+> +	DA850_AXR_14, DA850_AXR_10, DA850_AXR_8,
+> +	-1
+> +};
+> +
 
-Unfortunately, you have to write to the card to do that, which may destroy
-the data even if you write the same data that is already on it.
 
-See
-https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Projects/FlashCardSurvey
-for most of my results. I'm about to write up a better paper with all the
-measurements, and will make my tools available soon.
+Shouldn't this pins select PRU[0,1]_XXX type functions and not McASP functions?
+E.G.: PRU0_R31[17] instead of AHCLKX, PRU0_R31[18] instead of AHCLKR, etc.
+
+> +static int __init da850_evm_setup_pruss_suart(void)
+> +{
+> +	int ret;
+> +
+> +	ret = davinci_cfg_reg_list(da850_evm_pruss_suart_pins);
+> +	if (ret)
+> +		pr_warning("%s: da850_evm_pruss_suart_pins "
+> +			"mux setup failed: %d\n", __func__, ret);
+> +	return ret;
+> +}
+> +
+>  static int __init da850_evm_setup_pruss_can(void)
+>  {
+>  	int ret, val = 0;
+> @@ -1085,6 +1104,17 @@ static int __init da850_evm_setup_pruss_can(void)
+>  	return ret;
+>  }
+>  
+> +static struct da850_evm_pruss_suart_data suart_data = {
+> +	.version	= 1,
+> +	.resource	= {
+> +			.name	= "da8xx_mcasp0_iomem",
+> +			.start	= DAVINCI_DA8XX_MCASP0_REG_BASE,
+> +			.end	= DAVINCI_DA8XX_MCASP0_REG_BASE +
+> +					(SZ_1K * 12) - 1,
+> +			.flags	= IORESOURCE_MEM,
+> +		},
+> +};
+> +
+>  static struct da8xx_pruss_can_data can_data = {
+>  	.version	= 1,
+>  };
+> @@ -1094,6 +1124,12 @@ static struct da8xx_pruss_devices pruss_devices[] = {
+>  		.dev_name	= "da8xx_pruss_can",
+>  		.pdata		= &can_data,
+>  		.pdata_size	= sizeof(can_data),
+> +		.setup		= da850_evm_setup_pruss_suart,
 
 
-	Arnd
+Should this be da850_evm_setup_pruss_can instead?
+
+> +	},
+> +	{
+> +		.dev_name	= "da8xx_pruss_uart",
+> +		.pdata		= &suart_data,
+> +		.pdata_size	= sizeof(suart_data),
+>  		.setup		= da850_evm_setup_pruss_can,
+
+
+Should this be da850_evm_setup_pruss_suart instead?
+
+>  	},
+>  	{
+
+
+-Mike
