@@ -1,35 +1,41 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 11 Feb 2011 18:27:50 +0100
-Subject: [PATCH v2] ARM: S5PV210: Add GONI board setup for CIF camera support
-Message-ID: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
+Date: Fri, 11 Feb 2011 18:27:51 +0100
+Subject: [PATCH v2 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
+In-Reply-To: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
+References: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1297445273-3829-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add I2C0 bus platform device for camera sensors.
 
-the following patch series introduces changes in GONI board setup file
-required for the CIF camera sensor driver.
-The first patch adds the I2C0 bus driver, the second one adds the regulator
-supply definitions and the third one just increases virtual size
-of the framebuffer window 0 to enable double-buffering.
-The added regulator supplies are also a subset of the supplies of the high
-resolution camera which that reference board is equipped with.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <@samsung.com>
+---
+ arch/arm/mach-s5pv210/mach-goni.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Changes since v1:
- - removed unnecessary "select CONFIG_S3C_DEV_I2C0"
-
-
-The patch series contains:
-
-[PATCH 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
-[PATCH 2/3] ARM: S5PV210: Add supplies for CIF camera on GONI board
-[PATCH 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
-
-Created against for-next branch at:
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-
-
-Regards,
---
-Sylwester Nawrocki
-Samsung Poland R&D Center
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index db16d72..7a7cf6a 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -773,6 +773,7 @@ static struct platform_device *goni_devices[] __initdata = {
+ 	&goni_i2c_gpio5,
+ 	&mmc2_fixed_voltage,
+ 	&goni_device_gpiokeys,
++	&s3c_device_i2c0,
+ 	&s5p_device_fimc0,
+ 	&s5p_device_fimc1,
+ 	&s5p_device_fimc2,
+@@ -809,6 +810,9 @@ static void __init goni_machine_init(void)
+ 	/* Radio: call before I2C 1 registeration */
+ 	goni_radio_init();
+ 
++	/* I2C0 */
++	s3c_i2c0_set_platdata(NULL);
++
+ 	/* I2C1 */
+ 	s3c_i2c1_set_platdata(NULL);
+ 	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
+-- 
+1.7.4
