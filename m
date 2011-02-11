@@ -1,50 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 12 Feb 2011 06:08:23 +0800
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <19794.17994.381937.158944@ipc1.ka-ro>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
-	<19794.17994.381937.158944@ipc1.ka-ro>
-Message-ID: <20110211220821.GA9289@S2100-06.ap.freescale.net>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Fri, 11 Feb 2011 15:15:30 +0100
+Subject: [PATCH v3] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD &
+	MX51_PAD_USBH1_DATA2__UART2_TXD declarations
+Message-ID: <1297433730-26017-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar,
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-On Wed, Feb 09, 2011 at 08:46:18AM +0100, Lothar Wa?mann wrote:
-> Hi Shawn,
-> 
-> Shawn Guo writes:
-> > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
-> > The driver calls into mxs-dma via generic dmaengine api for both pio
-> > and data transfer.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > ---
-> >  arch/arm/mach-mxs/include/mach/mmc.h |   15 +
-> >  drivers/mmc/host/Kconfig             |    9 +
-> >  drivers/mmc/host/Makefile            |    1 +
-> >  drivers/mmc/host/mxs-mmc.c           |  884 ++++++++++++++++++++++++++++++++++
-> >  4 files changed, 909 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-mxs/include/mach/mmc.h
-> >  create mode 100644 drivers/mmc/host/mxs-mmc.c
-> > 
-> I've run the mmc-test kernel module with this driver on our TX28
-> module which fails in the following tests:
-> |mmc0: Test case 15. Correct xfer_size at write (start failure)...
-> |mmc0: Result: ERROR (-110)
-> |mmc0: Test case 16. Correct xfer_size at read (start failure)...
-> |mmc0: Result: ERROR (-110)
-> |mmc0: Test case 17. Correct xfer_size at write (midway failure)...
-> |mmc0: Result: ERROR (-110)
-> |mmc0: Test case 18. Correct xfer_size at read (midway failure)...
-> |mmc0: Result: ERROR (-110)
-> 
-> Could you try the test on your hardware?
-> 
-I'm new to this test.  I enabled MMC_TEST but did not see "test"
-under /sys for mmc.  Can you please elaborate how to launch this
-test?  Thanks.
+Fixes 2 small regressions of recent iomux changes:
+ - current MX51_PAD_UART2_TXD__UART2_TXD declaration overwrites
+   IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT register (0x09ec) and prevent
+   UART2 Rx from working properly.
+   (Tested on my custom i.MX51 board where UART2 is used as console)
+ - current MX51_PAD_USBH1_DATA2__UART2_TXD declaration also has the same problem.
+   (Not tested)
 
-Regards,
-Shawn
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
+Changes since v2:
+ - Also correct MX51_PAD_USBH1_DATA2__UART2_TXD as pointed by Richard Zhao
+Changes since v1:
+ - Improve patch description as requested by Sascha Hauer
+
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx51.h b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+index b6767f9..6056cf2 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx51.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx51.h
+@@ -473,7 +473,7 @@
+ #define _MX51_PAD_UART2_RXD__UART2_RXD		IOMUX_PAD(0x628, 0x238, 0, 0x09ec, 2, 0)
+ #define _MX51_PAD_UART2_TXD__FIRI_RXD		IOMUX_PAD(0x62c, 0x23c, 1, 0x0000, 0, 0)
+ #define _MX51_PAD_UART2_TXD__GPIO1_21		IOMUX_PAD(0x62c, 0x23c, 3, 0x0000, 0, 0)
+-#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x09ec, 3, 0)
++#define _MX51_PAD_UART2_TXD__UART2_TXD		IOMUX_PAD(0x62c, 0x23c, 0, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__CSI1_D0		IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__GPIO1_22		IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
+ #define _MX51_PAD_UART3_RXD__UART1_DTR		IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
+@@ -528,7 +528,7 @@
+ #define _MX51_PAD_USBH1_DATA1__UART2_RXD	IOMUX_PAD(0x68c, 0x28c, 1, 0x09ec, 4, 0)
+ #define _MX51_PAD_USBH1_DATA1__USBH1_DATA1	IOMUX_PAD(0x68c, 0x28c, 0, 0x0000, 0, 0)
+ #define _MX51_PAD_USBH1_DATA2__GPIO1_13		IOMUX_PAD(0x690, 0x290, 2, 0x0000, 0, 0)
+-#define _MX51_PAD_USBH1_DATA2__UART2_TXD	IOMUX_PAD(0x690, 0x290, 1, 0x09ec, 5, 0)
++#define _MX51_PAD_USBH1_DATA2__UART2_TXD	IOMUX_PAD(0x690, 0x290, 1, 0x0000, 0, 0)
+ #define _MX51_PAD_USBH1_DATA2__USBH1_DATA2	IOMUX_PAD(0x690, 0x290, 0, 0x0000, 0, 0)
+ #define _MX51_PAD_USBH1_DATA3__GPIO1_14		IOMUX_PAD(0x694, 0x294, 2, 0x0000, 0, 0)
+ #define _MX51_PAD_USBH1_DATA3__UART2_RTS	IOMUX_PAD(0x694, 0x294, 1, 0x09e8, 5, 0)
+-- 
+1.6.0.4
