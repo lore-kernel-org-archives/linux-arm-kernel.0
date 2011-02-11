@@ -1,35 +1,60 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 12 Feb 2011 00:23:37 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102091013.56670.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<AANLkTimjQfuNU-_rZTjAPrjxJhb=3kReVysBKoPE6Q4o@mail.gmail.com>
-	<201102091013.56670.arnd@arndb.de>
-Message-ID: <AANLkTimZb-hxz-31nGmycdtU-i=t=9wBoDJ-chAXUmD6@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 11 Feb 2011 15:31:20 -0800
+Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <1297263683-10621-1-git-send-email-dave.martin@linaro.org> (Dave
+	Martin's message of "Wed, 9 Feb 2011 15:01:18 +0000")
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <87pqqy6tdj.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/9 Arnd Bergmann <arnd@arndb.de>:
+Hi Dave,
 
-> Most of my results so far are documented on
-> https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Projects/FlashCardSurvey
+Dave Martin <dave.martin@linaro.org> writes:
 
-H'm! That's an interesting resource indeed. When you write
-"From measurements, it appears that the size in which data is
-managed is typically 64 kb on SD cards" and "the size of the
-medium is always a multiple of entire allocation groups, and
-the most common size today is 4 MB" and then list
-Size, Allocation Unit, Write Size, Page Size, FAT Location,
-open AUs linear, open AUs random, Algorithm.
+> This set of patches, along with some other patches under
+> discussion on alkml, should enable omap3 and omap4 kernels to be
+> built with CONFIG_THUMB2_KERNEL.
 
-How exactly do you measure that?
+OK, I tried some more testing with your 'dirty' branch merged with my PM
+branch.
 
-I'm sort of smelling a card-probe.git with this tool that you
-can run on your device and get out data like that listed
-in your table. We have a rather large stash of cards we can
-probe for you to get that kind of data out if it is useful, and
-I believe other Linaro members may have such stuff too,
-if empirical data is usefult to your work.
+Compiled in ARM mode, everything worked as expected on my 3530/omap3evm,
+including off-mode (in suspend and idle).  My 3630 (Zoom3) also can't do
+CORE off due to i583, but MPU, PER etc. all can hit off.
 
-Yours,
-Linus Walleij
+To rebuild in Thumb-2 mode, I disabled OMAP2 support and added Thumb-2
+mode:
+
+   CONFIG_ARCH_OMAP2=n
+   CONFIG_THUMB2_KERNEL=y
+
+then tested on 3530/omap3evm.  Testing suspend/resume to retention
+seemed to work fine.  However, enabling retention during idle[1] hung
+someplace (didn't debug further.)
+
+I also tried off-mode, and suspend/resume to off didn't even work.
+
+I didn't have time to debug this any further, so this is just to report
+raw test results.
+
+Hope that helps,
+
+Kevin
+
+
+[1] Here's what's needed to attempt low-power states during idle
+
+# UART timeouts: omap-serial (4th UART only on OMAP36xx and OMAP4)
+echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout 
+echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout 
+echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout 
+echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout 
+
+# enable low-power states during idle
+echo 1 > /debug/pm_debug/sleep_while_idle  
+
+
+[2] to enable off-mode
+
+echo 1 > /debug/pm_debug/enable_off_mode
