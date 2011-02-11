@@ -1,44 +1,52 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 11 Feb 2011 15:01:21 -0800
-Subject: [PATCH v5 0/5] omap: mailbox: hwmod support
-In-Reply-To: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com> (Omar
-	Ramirez Luna's message of "Wed, 2 Feb 2011 13:27:18 -0600")
-References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <87ipwq89by.fsf@ti.com>
+From: GNUtoo@no-log.org (Denis 'GNUtoo' Carikli)
+Date: Sat, 12 Feb 2011 00:06:56 +0100
+Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
+In-Reply-To: <20110211213954.GK27982@pengutronix.de>
+References: <20110211081050.GD27982@pengutronix.de>
+	<1297458388-23361-1-git-send-email-GNUtoo@no-log.org>
+	<1297458816.18578.5.camel@gnutoo-laptop>
+	<20110211213954.GK27982@pengutronix.de>
+Message-ID: <1297465616.18578.8.camel@gnutoo-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Omar Ramirez Luna <omar.ramirez@ti.com> writes:
+On Fri, 2011-02-11 at 22:39 +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Feb 11, 2011 at 10:13:36PM +0100, Denis 'GNUtoo' Carikli wrote:
+> > > diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+> > > index e634d6c..b45f534 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/uncompress.h
+> > > +++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+> > > @@ -62,6 +62,7 @@ static inline void flush(void)
+> > >  #define MX2X_UART1_BASE_ADDR	0x1000a000
+> > >  #define MX3X_UART1_BASE_ADDR	0x43F90000
+> > >  #define MX3X_UART2_BASE_ADDR	0x43F94000
+> > > +#define MX3X_UART5_BASE_ADDR	0x43FB4000
+> > >  #define MX51_UART1_BASE_ADDR	0x73fbc000
+> > >  #define MX50_UART1_BASE_ADDR	0x53fbc000
+> > >  #define MX53_UART1_BASE_ADDR	0x53fbc000
+> > > @@ -102,6 +103,9 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+> > >  	case MACH_TYPE_MAGX_ZN5:
+> > >  		uart_base = MX3X_UART2_BASE_ADDR;
+> > >  		break;
+> > > +	case MACH_TYPE_BUG:
+> > > +		uart_base = MX3X_UART5_BASE_ADDR;
+> > > +		break;
+> > >  	case MACH_TYPE_MX51_BABBAGE:
+> > >  	case MACH_TYPE_EUKREA_CPUIMX51SD:
+> > >  	case MACH_TYPE_MX51_3DS:
+> > That seem not to crash, but I wonder if it's really useful:
+> > Basically I see u-boot loading the kernel, then I have
+> > > Uncompressing Linux... 
+> > Then I wait some seconds
+> > Then I see that line beeing complretted with:
+> > > done, booting the kernel.
+> > Then the rest of the messages are displayed very fast,
+> > along with initramfs loading messages and I finally get a shell.
+> That means you'd prefer no output? 
+I should have misunderstood something, but I believed that that
+uncompress.h was for early printk.
+And so I expected printk to be printed on serial console immediately,
+not waiting for the serial port to be initialized again(as it is already
+initialized by the u-boot bootloader).
 
-> Mailbox hwmod support for OMAP 2,3,4.
->
-> This was tested on OMAP3 (3430, 3630), minor testing
-> was made on OMAP4.
->
-> No testing on OMAP2 since I don't have the hardware.
-
-To help in testing, I wrote a simple mailbox loopback test module for
-OMAP2/3/4 that I used to do send and receive messages on the MPU.  This
-can be used to test the mailbox without any DSP software.
-
-I tested it against l-o master branch and found a couple bugs in the
-mailbox driver (patches posted earlier today.)  
-
-With those patches plus my test I can send & receieve a series of
-messages on the MPU, which is enough to sanity test the basic sending
-and receiving messages on the MPU.
-
-I've tested the master branch, now it's your turn to use this test
-module to validate this hmod conversion series.
-
-The test module is available here:
-
-    git://gitorious.org/omap-test/mailbox.git
-
-Note that the current mailbox driver has hard-coded settings for the
-receiver of messages.  While this should be configurable at runtime, I'm
-not an expert on the mailbox IP so my test module includes a kernel
-patch that changes these hard-coded settings of the first mbox (dsp on
-OMAP2/3, mailbox-1 on OMAP4) so that my loopback tester will work.
-
-Kevin
+Denis.
