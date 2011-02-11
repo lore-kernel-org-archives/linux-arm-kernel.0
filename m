@@ -1,54 +1,50 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Fri, 11 Feb 2011 19:51:28 +0530
-Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
-Message-ID: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 12 Feb 2011 06:08:23 +0800
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <19794.17994.381937.158944@ipc1.ka-ro>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<1296872327-21166-2-git-send-email-shawn.guo@freescale.com>
+	<19794.17994.381937.158944@ipc1.ka-ro>
+Message-ID: <20110211220821.GA9289@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the sram allocator to allocate memory
-from the DA8XX shared RAM.
+Hi Lothar,
 
-Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
----
- arch/arm/mach-davinci/da850.c              |    6 +++---
- arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
- 2 files changed, 4 insertions(+), 3 deletions(-)
+On Wed, Feb 09, 2011 at 08:46:18AM +0100, Lothar Wa?mann wrote:
+> Hi Shawn,
+> 
+> Shawn Guo writes:
+> > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
+> > The driver calls into mxs-dma via generic dmaengine api for both pio
+> > and data transfer.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/include/mach/mmc.h |   15 +
+> >  drivers/mmc/host/Kconfig             |    9 +
+> >  drivers/mmc/host/Makefile            |    1 +
+> >  drivers/mmc/host/mxs-mmc.c           |  884 ++++++++++++++++++++++++++++++++++
+> >  4 files changed, 909 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-mxs/include/mach/mmc.h
+> >  create mode 100644 drivers/mmc/host/mxs-mmc.c
+> > 
+> I've run the mmc-test kernel module with this driver on our TX28
+> module which fails in the following tests:
+> |mmc0: Test case 15. Correct xfer_size at write (start failure)...
+> |mmc0: Result: ERROR (-110)
+> |mmc0: Test case 16. Correct xfer_size at read (start failure)...
+> |mmc0: Result: ERROR (-110)
+> |mmc0: Test case 17. Correct xfer_size at write (midway failure)...
+> |mmc0: Result: ERROR (-110)
+> |mmc0: Test case 18. Correct xfer_size at read (midway failure)...
+> |mmc0: Result: ERROR (-110)
+> 
+> Could you try the test on your hardware?
+> 
+I'm new to this test.  I enabled MMC_TEST but did not see "test"
+under /sys for mmc.  Can you please elaborate how to launch this
+test?  Thanks.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 3443d97..8a4de97 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -711,7 +711,7 @@ static struct map_desc da850_io_desc[] = {
- 	},
- 	{
- 		.virtual	= SRAM_VIRT,
--		.pfn		= __phys_to_pfn(DA8XX_ARM_RAM_BASE),
-+		.pfn		= __phys_to_pfn(DA8XX_SHARED_RAM_BASE),
- 		.length		= SZ_8K,
- 		.type		= MT_DEVICE
- 	},
-@@ -1083,8 +1083,8 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.gpio_irq		= IRQ_DA8XX_GPIO0,
- 	.serial_dev		= &da8xx_serial_device,
- 	.emac_pdata		= &da8xx_emac_pdata,
--	.sram_dma		= DA8XX_ARM_RAM_BASE,
--	.sram_len		= SZ_8K,
-+	.sram_dma		= DA8XX_SHARED_RAM_BASE,
-+	.sram_len		= SZ_128K,
- 	.reset_device		= &da8xx_wdt_device,
- };
- 
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index cfcb223..c3c3339 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -70,6 +70,7 @@ extern unsigned int da850_max_speed;
- #define DA8XX_AEMIF_CTL_BASE	0x68000000
- #define DA8XX_DDR2_CTL_BASE	0xb0000000
- #define DA8XX_ARM_RAM_BASE	0xffff0000
-+#define DA8XX_SHARED_RAM_BASE	0x80000000
- 
- void __init da830_init(void);
- void __init da850_init(void);
--- 
-1.7.2.3
+Regards,
+Shawn
