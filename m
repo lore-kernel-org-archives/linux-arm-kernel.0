@@ -1,50 +1,71 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 11 Feb 2011 10:42:48 +0100
-Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add support for write
-	protect on custom GPIO
-In-Reply-To: <201102110924.38338.marc@cpdesign.com.au>
-References: <1297365291-1038-1-git-send-email-w.sang@pengutronix.de>
-	<1297365291-1038-2-git-send-email-w.sang@pengutronix.de>
-	<201102110924.38338.marc@cpdesign.com.au>
-Message-ID: <20110211094248.GA2264@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 11 Feb 2011 09:43:45 +0000
+Subject: [PATCH v2 5/5] ARM: omap3: Thumb-2 compatibility for sleep34xx.S
+In-Reply-To: <87d3mzh6vq.fsf@ti.com>
+References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
+	<1296756161-26092-6-git-send-email-dave.martin@linaro.org>
+	<87d3mzh6vq.fsf@ti.com>
+Message-ID: <AANLkTimMdFPpjdO_A1yyYUpSnSbo9gkn_-D5132KWKyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+On Thu, Feb 10, 2011 at 10:17 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Dave Martin <dave.martin@linaro.org> writes:
+>
+>> ?* Use BSYM() to get the correct Thumb branch address
+>> ? ?for adr <Rd>, <label>
+>>
+>> ?* Fix an out-of-range ADR when building for ARM
+>>
+>> ?* Correctly call es3_sdrc_fix as Thumb when copied to SRAM.
+>>
+>> ?* Remove deprecated/undefined PC-relative stores
+>>
+>> ?* Add the required ENDPROC() directive for each ENTRY().
+>>
+>> ?* .align before data words
+>>
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>
+> I'm attempting to test this series with OMAP PM, but some changes here
+> don't compile for me.
+>
+> My toolchain is: gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50)
+>
+> First, I merged your arm/omap-thumb2+merged branch with my pm branch
+> from git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+>
+> There were some minor conflicts here, but they looked simple enough and
+> I just resolved in favor of your branch.
 
-On Fri, Feb 11, 2011 at 09:24:38AM +1100, Marc Reilly wrote:
+Thanks for giving it a try.
 
-> Tested-by: Marc Reilly <marc@cpdesign.com.au> 
+>
+> Trying to build with CONFIG_THUMB2_KERNEL=y, I ran into a compile
+> problem...
+>
+>
 
-Thanks a lot!
+[...]
 
-> > +	if (boarddata) {
-> 
-> Perhaps (boarddata && gpio_is_valid(boarddata->wp_gpio) as above?
-> 
-> For example what if someone sets up the boarddata for a card detect, but not 
-> write protect.
+>> + ? ? adr ? ? r0, es3_sdrc_fix ? ? ? ?@ Not using BSYM clears the Thumb bit.
+>
+> This fails to compile:
+>
+> /work/kernel/omap/pm/arch/arm/mach-omap2/sleep34xx.S: Assembler messages:
+> /work/kernel/omap/pm/arch/arm/mach-omap2/sleep34xx.S:361: Error: invalid immediate for address calculation (value = 0x00000004)
 
-Well, I couldn't do this here, because later the cd_pin-stuff will also
-be added to the if-block. However, I see what you mean and that could
-still be added before the gpio_request below. That would add another
-level of indentation, though, for a case I'd consider to be more
-theoretical (and definately not recommended). Maybe I will adjust the
-warning message to be also understandable for the case a GPIO is preset
-with an invalid number. I think the warning itself is justified.
+Unfortunately, this is caused by a bug in the assembler.
+arch/arm/kernel/relocate_kernel.S also suffers from the same bug when
+built with CONFIG_THUMB2_KERNEL.
 
-> 
-> > +		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
-> > +		if (err) {
-> > +			dev_warn(mmc_dev(host->mmc), "can't get wp_pin!\n");
-> > +			boarddata->wp_gpio = err;
-> > +		}
-> > +	}
+If you had got as far a linking, it's likely you would hit a
+'reference to discarded section problem' error in the linker, due to
+discarding of some sections referenced by SMP_ON_UP fixups.
 
-Regards,
+If you merge the 3 extra patches from dirty/arm/omap-thumb2+merged it
+should resolve these issues, but how to fix these things upstream is
+still under discussion.
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers
+---Dave
