@@ -1,40 +1,74 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 10 Feb 2011 23:31:00 -0800
-Subject: [PATCH V3 1/1] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <4D54E39C.6070306@st.com>
-References: <1296742149-18102-1-git-send-email-pratyush.anand@st.com>
-	<20110209152926.0126ac97.akpm@linux-foundation.org>
-	<4D53B4C1.5080804@st.com>
-	<20110210125256.609a1143.akpm@linux-foundation.org>
-	<4D54E39C.6070306@st.com>
-Message-ID: <20110210233100.e12e8f6a.akpm@linux-foundation.org>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Fri, 11 Feb 2011 09:57:13 +0200
+Subject: [PATCH] ARM: SAMSUNG: Removing dependency on CONFIG_PM_DEBUG for
+	clock debugging
+In-Reply-To: <1297530374-32635-1-git-send-email-amit.kachhap@linaro.org>
+References: <1297530374-32635-1-git-send-email-amit.kachhap@linaro.org>
+Message-ID: <AANLkTinjhPP9NxLsOMovETAZLzFO70zmVWtPQ+E4PZj9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Feb 2011 12:52:04 +0530 pratyush <pratyush.anand@st.com> wrote:
+On Sat, Feb 12, 2011 at 7:06 PM, Amit Daniel Kachhap
+<amit.kachhap@linaro.org> wrote:
+> Enabling the macro CONFIG_PM_DEBUG is causing compilation error as all PM components
+> are included which is not in mainline for samsung V310 platform, therefore, this patch
+> removes the dependency on macro CONFIG_PM_DEBUG for clock debugging through debugfs
+> interface.
 
-> >>> This interface implies that there will only ever be one device in the
-> >>> machine, yes?  Seems a bit short-sighted?
-> >>>
-> >>
-> >> This device supports only one BAR in EP mode.
-> > 
-> > I don't understand that.
-> > 
-> > What happens if someone builds a computer with three of these devices
-> > in it?
-> > 
-> 
-> I understood it. I will modify the code to work with multiple instances of
-> pcie device.
+What is the exact error? Might be helpful to have it in the patch description.
 
-I don't think you need to go that far, unless you see a significant
-likelihood think that such a computer might be created one day.  This
-depends on how hard and risky such a change is, of course.
+Presumably, this is a temporary patch until PM components
+(suspend/resume hooks?) are mainlined and then we can put all this
+back under PM_DEBUG? In that case, it might be a good idea to mark it
+as such.
 
-But the current driver's userspace interface should at least
-anticipate the possibility, so you aren't trapped into a weird or
-non-back-compatible interface in the future.
+Regards,
+Amit
 
-So for now you might choose to do something as simple as renaming
-/config/pcie-gadget to /config/pcie-gadget0 and leave it at that.
+> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+> ---
+> ?arch/arm/plat-samsung/clock.c ? ? ? ? ? ? ?| ? ?4 ++--
+> ?arch/arm/plat-samsung/include/plat/clock.h | ? ?2 +-
+> ?2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+> index 7728928..aca5a25 100644
+> --- a/arch/arm/plat-samsung/clock.c
+> +++ b/arch/arm/plat-samsung/clock.c
+> @@ -450,7 +450,7 @@ int __init s3c24xx_register_baseclocks(unsigned long xtal)
+> ? ? ? ?return 0;
+> ?}
+>
+> -#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+> +#if defined(CONFIG_DEBUG_FS)
+> ?/* debugfs support to trace clock tree hierarchy and attributes */
+>
+> ?static struct dentry *clk_debugfs_root;
+> @@ -538,4 +538,4 @@ err_out:
+> ?}
+> ?late_initcall(clk_debugfs_init);
+>
+> -#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
+> +#endif /* defined(CONFIG_DEBUG_FS) */
+> diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+> index 9a82b88..f6180ab 100644
+> --- a/arch/arm/plat-samsung/include/plat/clock.h
+> +++ b/arch/arm/plat-samsung/include/plat/clock.h
+> @@ -47,7 +47,7 @@ struct clk {
+>
+> ? ? ? ?struct clk_ops ? ? ? ? ?*ops;
+> ? ? ? ?int ? ? ? ? ? ? ? ? (*enable)(struct clk *, int enable);
+> -#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
+> +#if defined(CONFIG_DEBUG_FS)
+> ? ? ? ?struct dentry ? ? ? ? ? *dent; ?/* For visible tree hierarchy */
+> ?#endif
+> ?};
+> --
+> 1.7.1
+>
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
+>
