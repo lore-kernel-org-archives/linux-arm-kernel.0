@@ -1,100 +1,95 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 11 Feb 2011 20:42:12 +0530
-Subject: [PATCH] omap3: cpuidle: Add description field to each C-state.
-In-Reply-To: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1297437132-1005-2-git-send-email-santosh.shilimkar@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 12 Feb 2011 07:14:18 +0800
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <201102101817.42099.arnd@arndb.de>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<201102042126.52701.arnd@arndb.de>
+	<20110211003533.GA9151@S2100-06.ap.freescale.net>
+	<201102101817.42099.arnd@arndb.de>
+Message-ID: <20110211231417.GC9289@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a description field to each idle C-state. This helps to give
-better data with PowerTop and one don't have to refer to the code
-to link what Cx means from system point of view while analysing
-PowerTop data.
+On Thu, Feb 10, 2011 at 06:17:41PM +0100, Arnd Bergmann wrote:
+> On Friday 11 February 2011, Shawn Guo wrote:
+> > 
+> > > > +	struct mxs_dma_data		dma_data;
+> > > 
+> > > Why do you need host specific DMA structures? Please stick to
+> > > the generic dma-engine API if possible.
+> > > 
+> > I'm sticking to the generic dmaengine api.  The mxs dma hardware
+> > has separate irq line for every single dma channel, which needs to
+> > be told by client driver.
+> 
+> I'm not convinced, it still sounds like a layering violation to
+> have specific information about the DMA controller in the
+> platform data of a driver using the dma engine API.
+> 
+It sounds like something about the dma controller, but it really
+belongs to dma client device e.g. ssp here.  Every single dma client
+device has two dma related resources, dma channel and dma irq, which
+should be defined in client device data.
 
-No functional change.
+> Why can't you put the interrupt number into the platform data of
+> the dma engine device? Your filter function already identifies
+> the number of the DMA channel.
+> 
+We have 16 channels for dma-apbh and dma-apbx respectively.  And each
+channel has fixed peripheral device and irq.  You think we can define
+2 x 16 x (channel number + channel irq) in dma engine driver?  I'm
+afraid not.  The channel number can be identified in filter function
+because dmaengine core code and mxs dma hw are indexing the channel
+in the same way, so that the sw channel id can be used to address hw
+channel, otherwise we have to pass hw channel id to dma driver just
+like what we do with irq.
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/cpuidle34xx.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+> > > > +static irqreturn_t mxs_mmc_irq_handler(int irq, void *dev_id)
+> > > > +{
+> > > > +	struct mxs_mmc_host *host = dev_id;
+> > > > +	u32 stat;
+> > > > +
+> > > > +	stat = __raw_readl(host->base + HW_SSP_CTRL1);
+> > > > +	__mxs_clrl(stat & MXS_MMC_IRQ_BITS, host->base + HW_SSP_CTRL1);
+> > > > +
+> > > > +	if (host->cmd && (stat & MXS_MMC_ERR_BITS))
+> > > > +		host->status = __raw_readl(host->base + HW_SSP_STATUS);
+> > > > +
+> > > > +	if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
+> > > > +		mmc_signal_sdio_irq(host->mmc);
+> > > > +
+> > > > +	return IRQ_HANDLED;
+> > > > +}
+> > > 
+> > > You use spin_lock_irqsave in mxs_mmc_enable_sdio_irq, but don't
+> > > actually use the spinlock in the interrupt handler. This means
+> > > that either your interrupt handler is broken because it doesn't
+> > > lock, or that you don't actually need the _irqsave part.
+> > > 
+> > I do not understand this one.  I'm seeing mxcmmc and pxamci use
+> > spin_lock_irqsave/irqrestore in the similar way.
+> 
+> The difference is that e.g. mxcmci_irq() takes the spinlock that is
+> used to protect the host->use_sdio flag, serializing the the
+> code that initializes sdio with the code that uses it.
+> 
+> [Actually, mxcmci_irq() also looks wrong, because it releases the
+> spinlock before calling mmc_signal_sdio_irq(), so sdio may be
+> disabled by then, but that is a slightly different bug]
+> 
+> What I meant is that you take care to avoid getting into the
+> interrupt handler while holding the spinlock, but in the handler,
+> you don't check if the lock is held. It can't be correct to
+> serialize just half the cases.
+> 
+Thanks for the explanation.  Please help review the fix below to see
+if I understand the comment correctly.
 
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index f7b22a1..3e4ec31 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -58,6 +58,7 @@ struct omap3_processor_cx {
- 	u32 core_state;
- 	u32 threshold;
- 	u32 flags;
-+	const char *desc;
- };
- 
- struct omap3_processor_cx omap3_power_states[OMAP3_MAX_STATES];
-@@ -365,6 +366,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C1].mpu_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C1].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
-+	omap3_power_states[OMAP3_STATE_C1].desc = "MPU ON + CORE ON";
- 
- 	/* C2 . MPU WFI + Core inactive */
- 	omap3_power_states[OMAP3_STATE_C2].valid =
-@@ -380,6 +382,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C2].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+	omap3_power_states[OMAP3_STATE_C2].desc = "MPU ON + CORE ON";
- 
- 	/* C3 . MPU CSWR + Core inactive */
- 	omap3_power_states[OMAP3_STATE_C3].valid =
-@@ -395,6 +398,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+	omap3_power_states[OMAP3_STATE_C3].desc = "MPU RET + CORE ON";
- 
- 	/* C4 . MPU OFF + Core inactive */
- 	omap3_power_states[OMAP3_STATE_C4].valid =
-@@ -410,6 +414,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C4].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C4].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+	omap3_power_states[OMAP3_STATE_C4].desc = "MPU OFF + CORE ON";
- 
- 	/* C5 . MPU CSWR + Core CSWR*/
- 	omap3_power_states[OMAP3_STATE_C5].valid =
-@@ -425,6 +430,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C5].core_state = PWRDM_POWER_RET;
- 	omap3_power_states[OMAP3_STATE_C5].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+	omap3_power_states[OMAP3_STATE_C5].desc = "MPU RET + CORE RET";
- 
- 	/* C6 . MPU OFF + Core CSWR */
- 	omap3_power_states[OMAP3_STATE_C6].valid =
-@@ -440,6 +446,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C6].core_state = PWRDM_POWER_RET;
- 	omap3_power_states[OMAP3_STATE_C6].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+	omap3_power_states[OMAP3_STATE_C6].desc = "MPU OFF + CORE RET";
- 
- 	/* C7 . MPU OFF + Core OFF */
- 	omap3_power_states[OMAP3_STATE_C7].valid =
-@@ -455,6 +462,7 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C7].core_state = PWRDM_POWER_OFF;
- 	omap3_power_states[OMAP3_STATE_C7].flags = CPUIDLE_FLAG_TIME_VALID |
- 				CPUIDLE_FLAG_CHECK_BM;
-+	omap3_power_states[OMAP3_STATE_C7].desc = "MPU OFF + CORE OFF";
- 
- 	/*
- 	 * Erratum i583: implementation for ES rev < Es1.2 on 3630. We cannot
-@@ -512,6 +520,7 @@ int __init omap3_idle_init(void)
- 		if (cx->type == OMAP3_STATE_C1)
- 			dev->safe_state = state;
- 		sprintf(state->name, "C%d", count+1);
-+		strncpy(state->desc, cx->desc, CPUIDLE_DESC_LEN);
- 		count++;
- 	}
- 
--- 
-1.6.0.4
+        if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN)) {
+                spin_lock_irqsave(&host->lock, flags);
+                mmc_signal_sdio_irq(host->mmc);
+                spin_unlock_irqrestore(&host->lock, flags);
+        }
+
+Regards,
+Shawn
