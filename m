@@ -1,33 +1,28 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 11 Feb 2011 18:27:53 +0100
-Subject: [PATCH v2 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
-In-Reply-To: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
-References: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1297445273-3829-4-git-send-email-s.nawrocki@samsung.com>
+Date: Fri, 11 Feb 2011 19:07:44 +0100
+Subject: [PATCH/RFC] ARM: S5P: Add platform helpers for camera GPIO
+	configuration
+Message-ID: <1297447665-19492-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase virtual size of the frambuffer window 0
-for display panning support.
+Hello,
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/mach-goni.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+the following patch introduces platform helpers for the peripheral 
+parallel camera bus configuration in S5PV210 and S5PV310 SoCs.
+In those SoCs multiple camera host interface IP's are available and
+can be attached to any of two ITU-R parrallel bus for external sensor.
+That's why I didn't try to pass any platform device as a pointer to those
+helpers. This is an initial proposal and any comments are appreciated.
 
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 53b3b96..6432189 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -108,6 +108,8 @@ static struct s3c_fb_pd_win goni_fb_win0 = {
- 	},
- 	.max_bpp	= 32,
- 	.default_bpp	= 16,
-+	.virtual_x	= 480,
-+	.virtual_y	= 2 * 800,
- };
- 
- static struct s3c_fb_platdata goni_lcd_pdata __initdata = {
--- 
-1.7.4
+
+[PATCH] ARM: S5P: Add platform helpers for camera GPIO configuration
+
+Created against for-next branch at:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+
+
+Regards,
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
