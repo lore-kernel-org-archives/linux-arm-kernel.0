@@ -1,44 +1,30 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 10 Feb 2011 16:07:47 -0800
-Subject: [PATCH v2 5/5] ARM: omap3: Thumb-2 compatibility for sleep34xx.S
-In-Reply-To: <87d3mzh6vq.fsf@ti.com> (Kevin Hilman's message of "Thu, 10 Feb
-	2011 14:17:13 -0800")
-References: <1296756161-26092-1-git-send-email-dave.martin@linaro.org>
-	<1296756161-26092-6-git-send-email-dave.martin@linaro.org>
-	<87d3mzh6vq.fsf@ti.com>
-Message-ID: <87ei7fe8mk.fsf@ti.com>
+From: rklein@nvidia.com (rklein at nvidia.com)
+Date: Thu, 10 Feb 2011 17:26:56 -0800
+Subject: [PATCH] arm: update gitignore file
+Message-ID: <1297387616-29390-1-git-send-email-rklein@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+From: Rhyland Klein <rklein@nvidia.com>
 
-> Dave Martin <dave.martin@linaro.org> writes:
->
->>  * Use BSYM() to get the correct Thumb branch address
->>    for adr <Rd>, <label>
->>
->>  * Fix an out-of-range ADR when building for ARM
->>
->>  * Correctly call es3_sdrc_fix as Thumb when copied to SRAM.
->>
->>  * Remove deprecated/undefined PC-relative stores
->>
->>  * Add the required ENDPROC() directive for each ENTRY().
->>
->>  * .align before data words
->>
->> Signed-off-by: Dave Martin <dave.martin@linaro.org>
->
-> I'm attempting to test this series with OMAP PM, but some changes here
-> don't compile for me.
->
-> My toolchain is: gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) 
->
-> First, I merged your arm/omap-thumb2+merged branch with my pm branch
-> from git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+Updating the .gitignore file to ignore 3 files that are always created in
+manual builds to cleanup git status results.
 
-Sorry for the confusion, this patch should've been in reply to your v4
-version, since I merged with your 'arm/omap-thumb2+merged' branch from
-today.
+Signed-off-by: Rhyland Klein <rklein@nvidia.com>
+---
+ arch/arm/boot/compressed/.gitignore |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Kevin
+diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
+index ab204db..c52a6dd 100644
+--- a/arch/arm/boot/compressed/.gitignore
++++ b/arch/arm/boot/compressed/.gitignore
+@@ -1,3 +1,6 @@
+ font.c
+ piggy.gz
+ vmlinux.lds
++lib1funcs.S
++piggy.gzip
++vmlinux
+-- 
+1.7.0.4
