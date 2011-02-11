@@ -1,78 +1,45 @@
-From: kurt.van.dijck@eia.be (Kurt Van Dijck)
-Date: Fri, 11 Feb 2011 16:06:02 +0100
-Subject: [PATCH v2 09/13] can: pruss CAN driver.
-In-Reply-To: <1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <20110211150602.GB373@e-circ.dyndns.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 11 Feb 2011 20:42:11 +0530
+Subject: [PATCH] omap3: pm: Use exported set_cr() instead of a custom one.
+Message-ID: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 08:21:28PM +0530, Subhasish Ghosh wrote:
-> +config DA8XX_PRU_CANID_MBX0
-> +	hex "CANID for mailbox 0"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 0
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX1
-> +	hex "CANID for mailbox 1"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	 ---help---
-> +	Enter the CANID for mailbox 1
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX2
-> +	hex "CANID for mailbox 2"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 2
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX3
-> +	hex "CANID for mailbox 3"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 3
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX4
-> +	hex "CANID for mailbox 4"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 4
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX5
-> +	hex "CANID for mailbox 5"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 5
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX6
-> +	hex "CANID for mailbox 6"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 6
-> +	Default value is set to 0x123, change this as required.
-> +
-> +config DA8XX_PRU_CANID_MBX7
-> +	hex "CANID for mailbox 7"
-> +	depends on CAN_TI_DA8XX_PRU
-> +	default "0x123"
-> +	---help---
-> +	Enter the CANID for mailbox 7
-> +	Default value is set to 0x123, change this as required.
-Why is filling the mailboxes the job of kernel config?
+Remove the custom restore_control_register() and use the exported
+set_cr() instead to set the system control register(SCTRL) value.
 
-Regards,
-Kurt
+No functional change.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |    7 +------
+ 1 files changed, 1 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 2f864e4..63a3e1d 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -311,11 +311,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void restore_control_register(u32 val)
+-{
+-	__asm__ __volatile__ ("mcr p15, 0, %0, c1, c0, 0" : : "r" (val));
+-}
+-
+ /* Function to restore the table entry that was modified for enabling MMU */
+ static void restore_table_entry(void)
+ {
+@@ -337,7 +332,7 @@ static void restore_table_entry(void)
+ 	control_reg_value = __raw_readl(scratchpad_address
+ 					+ OMAP343X_CONTROL_REG_VALUE_OFFSET);
+ 	/* This will enable caches and prediction */
+-	restore_control_register(control_reg_value);
++	set_cr(control_reg_value);
+ }
+ 
+ void omap_sram_idle(void)
+-- 
+1.6.0.4
