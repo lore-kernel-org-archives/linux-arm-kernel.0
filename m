@@ -1,57 +1,82 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Feb 2011 12:12:25 +0000
-Subject: [RFC PATCH 3/3] ARM: vfp: Use cpu pm notifiers to save vfp state
-In-Reply-To: <1297373487-23902-4-git-send-email-ccross@android.com>
-References: <1297373487-23902-1-git-send-email-ccross@android.com>
-	<1297373487-23902-4-git-send-email-ccross@android.com>
-Message-ID: <1297426345.17584.99.camel@e102109-lin.cambridge.arm.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Fri, 11 Feb 2011 20:12:11 +0800
+Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
+In-Reply-To: <AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
+References: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
+	<AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
+Message-ID: <AANLkTimQxC3HgaRs-bBOGChLhvAK69XHCPEGyOcKeOz6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin,
+On Wed, Feb 9, 2011 at 10:08 PM, Gadiyar, Anand <gadiyar@ti.com> wrote:
+> On Wed, Feb 9, 2011 at 7:25 PM, Raghuveer Murthy
+> <raghuveer.murthy@ti.com> wrote:
+>> Adding DVI support to OMAP4 PandaBoard.
+>>
+>> PandaBoard uses TFP410 DVI Framer chip
+>> http://focus.ti.com/lit/ds/symlink/tfp410.pdf
+>>
+>> The TFP410 gets its power enable and display data over GPIO lines muxed
+>> in from OMAP4430. PandaBoard supports other LCD displays through expansion
+>> connectors, following board rework. This will disable the DVI interface.
+>> However, the existing mux settings remain the same
+>>
+>> PandaBoard additionally supports display over HDMI interface. It is
+>> mutually exclusive to display over DVI. Hence the mux settings need to be
+>> configured seperately, as and when HDMI is enabled
+>>
+>> Also, I2C3 bus used for reading EDID data from DVI Monitors is
+>> registered here. Since the design is similar to BeagleBoard, the code
+>> for the same is taken from the kernel.org commit e3333f48dd5cb21
+>> (omap: Adding beagle i2c eeprom driver to read EDID)
+>>
+>> Reviewed-by: Manjunath G Kondaiah <manjugk@ti.com>
+>> Reviewed-by: Anand Gadiyar <gadiyar@ti.com>
+>
+> I've also tested it on the Panda, and gone through this and most
+> of the other patches in the series. So if you like, you could
+> consider this an:
+>
+> Acked-by: Anand Gadiyar <gadiyar@ti.com>
+>
+>> Reviewed-by: Nishanth Menon <nm@ti.com>
+>> Reviewed-by: Sumit Semwal <sumit.semwal@ti.com>
+>> Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
+>> ---
+>>
+>> Base
+>> ====
+>> url =
+>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+>> branch "master"
+>> commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d
+>> tag 2.6.38-rc4
+>>
+>
+> To make it easier for someone to test, I've extracted this
+> and the 6 dependent series from patchwork, and hosted
+> them in a branch on my devel tree. They are available
+> against v2.6.38-rc4 here:
+>
+> git://dev.omapzoom.org/pub/scm/anand/linux-omap-usb.git
+>
+> in the display-patches-for-v2.6.38-rc4 branch if someone
+> wants to take a look.
 
-On Thu, 2011-02-10 at 21:31 +0000, Colin Cross wrote:
-> +static int vfp_idle_notifier(struct notifier_block *self, unsigned long cmd,
-> +       void *v)
-> +{
-> +       u32 fpexc = fmrx(FPEXC);
-> +       unsigned int cpu = smp_processor_id();
-> +
-> +       if (cmd != CPU_PM_ENTER)
-> +               return NOTIFY_OK;
-> +
-> +       /* The VFP may be reset in idle, save the state */
-> +       if ((fpexc & FPEXC_EN) && last_VFP_context[cpu]) {
-> +               vfp_save_state(last_VFP_context[cpu], fpexc);
-> +               last_VFP_context[cpu]->hard.cpu = cpu;
-> +       }
+I fetched this branch which contains 35 patches on top of 2.6.38-rc4.
+After fixing some conflict, I applied these 35 patches on our Ubuntu
+ti-omap-dev kernel. With built-in the DSS2 driver and GENERIC_DPI
+driver, kernel boots fine on my Panda with Ubuntu GUI. But I have to
+set the kernel boot command args with omapfb.mode=dvi:1024x768MR-24 at 60
+omapdss.def_disp=dvi, pointed out by Sebastien. Without this bootargs,
+no graphic at all. so as Robert concerned, EDID detection doesn't
+work. Does that related to I2C driver? I2C driver always tell me
+timeout in dmesg.
 
-Should we only handle the case where the VFP is enabled? At context
-switch we disable the VFP and re-enable it when an application tries to
-use it but it will remain disabled even the application hasn't used the
-VFP. So switching to the idle thread would cause the VFP to be disabled
-but the state not necessarily saved.
-
-On SMP systems, we save the VFP at every context switch to deal with the
-thread migration (though I have a plan to make this lazily on SMP as
-well). On UP however, we don't save the VFP registers at context switch,
-we just disable it and save it lazily if used later in a different task
-
-Something like below (untested):
-
-	if (last_VFP_context[cpu]) {
-		vfp_save_state(last_VFP_context[cpu], fpexc);
-		/* force a reload when coming back from idle */
-		last_VFP_context[cpu] = NULL;
-		fmxr(FPEXC, fpexc & ~FPEXC_EN);
-	}
-
-The last line (disabling) may not be necessary if we know that it comes
-back from idle as disabled.
-
-I wonder whether the current vfp_pm_suspend() function needs fixing for
-UP systems as well. It is find if the hardware preserves the VFP
-registers (which may not be the case).
-
+Thanks a lot,
 -- 
-Catalin
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
