@@ -1,33 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Feb 2011 09:38:53 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
-References: <4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
-	<20110210154322.GE1742@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
-	<AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
-Message-ID: <20110211093853.GA23404@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 11 Feb 2011 10:42:48 +0100
+Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add support for write
+	protect on custom GPIO
+In-Reply-To: <201102110924.38338.marc@cpdesign.com.au>
+References: <1297365291-1038-1-git-send-email-w.sang@pengutronix.de>
+	<1297365291-1038-2-git-send-email-w.sang@pengutronix.de>
+	<201102110924.38338.marc@cpdesign.com.au>
+Message-ID: <20110211094248.GA2264@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 09:31:04AM +0000, Dave Martin wrote:
-> You could probably cook up a good upper bound based on the size of the
-> kernel and the number of symbols in the module: i.e., assume that
-> every undefined symbol in the module needs to be fixed up to point at
-> the most distant symbol in the kernel.
-> 
-> For people with normal-sized kernels, this bound will probably work
-> out as zero most of the time (i.e., the current situation).  For
-> people with big kernels, or when many modules are already loaded, it
-> may work out at 100% -- but that's the price to pay for guaranteed
-> preallocation of the space required for the veneers.  And anyway, you
-> may really need a substantial chunk of those veneers in such cases.
+Marc,
 
-I think it's going to be easier just to re-order the kernel image link
-order to solve that problem.  That just leaves uclinux...
+On Fri, Feb 11, 2011 at 09:24:38AM +1100, Marc Reilly wrote:
+
+> Tested-by: Marc Reilly <marc@cpdesign.com.au> 
+
+Thanks a lot!
+
+> > +	if (boarddata) {
+> 
+> Perhaps (boarddata && gpio_is_valid(boarddata->wp_gpio) as above?
+> 
+> For example what if someone sets up the boarddata for a card detect, but not 
+> write protect.
+
+Well, I couldn't do this here, because later the cd_pin-stuff will also
+be added to the if-block. However, I see what you mean and that could
+still be added before the gpio_request below. That would add another
+level of indentation, though, for a case I'd consider to be more
+theoretical (and definately not recommended). Maybe I will adjust the
+warning message to be also understandable for the case a GPIO is preset
+with an invalid number. I think the warning itself is justified.
+
+> 
+> > +		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
+> > +		if (err) {
+> > +			dev_warn(mmc_dev(host->mmc), "can't get wp_pin!\n");
+> > +			boarddata->wp_gpio = err;
+> > +		}
+> > +	}
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
