@@ -1,45 +1,91 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 11 Feb 2011 09:45:53 +0000
-Subject: ARM: relocation out of range (when loading a module)
-In-Reply-To: <20110211093853.GA23404@n2100.arm.linux.org.uk>
-References: <4D2D1942.4050905@ahsoftware.de>
-	<AANLkTimAFp7ORrJLw2d8-i5pK0MZGTyAN5kmRR37ky1v@mail.gmail.com>
-	<alpine.LFD.2.00.1101121314470.25498@xanadu.home>
-	<20110112184258.GH11039@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
-	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
-	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
-	<20110210154322.GE1742@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
-	<AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
-	<20110211093853.GA23404@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTikBJw4tS6cGjUMSPjCGCkURBUdZCfwvmMtsDcG4@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Feb 2011 10:46:46 +0100
+Subject: [PATCH] mmci: make sure DMA transfers wait for FIFO drain
+In-Reply-To: <20110201110348.GB31216@n2100.arm.linux.org.uk>
+References: <1296509980-29987-1-git-send-email-linus.walleij@linaro.org>
+	<20110201110348.GB31216@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=jP1G=foehWYNai5H=_F372FwpkLEO4wSkmqBc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 9:38 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Feb 11, 2011 at 09:31:04AM +0000, Dave Martin wrote:
->> You could probably cook up a good upper bound based on the size of the
->> kernel and the number of symbols in the module: i.e., assume that
->> every undefined symbol in the module needs to be fixed up to point at
->> the most distant symbol in the kernel.
->>
->> For people with normal-sized kernels, this bound will probably work
->> out as zero most of the time (i.e., the current situation). ?For
->> people with big kernels, or when many modules are already loaded, it
->> may work out at 100% -- but that's the price to pay for guaranteed
->> preallocation of the space required for the veneers. ?And anyway, you
->> may really need a substantial chunk of those veneers in such cases.
->
-> I think it's going to be easier just to re-order the kernel image link
-> order to solve that problem. ?That just leaves uclinux...
->
+After discussing this with Ulf I think something like this is
+still needed...
 
-But if the kernel is big, or there are many modules, changing the
-order can't solve the problem surely?  Or is the problem purely caused
-by having the initramfs in the way, and we think the amount of actual
-code will never be big enough to cause a problem?
+2011/2/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Jan 31, 2011 at 10:39:40PM +0100, Linus Walleij wrote:
+>> The DMA mode also needs to wait until the FIFO is drained before
+>> enabling the MCI_DATAEND IRQ.
+>
+> Hmm. ?This will cause attempted DMA usage on ARM MMCI primecells to get
+> stuck as we'll wait for the never-delivered callback.
 
-Cheers
----Dave
+I don' know if we have semantics for the DMA completion callback,
+either:
+
+A) it's to be called whenever the transaction is complete without
+ errors - in this case the driver using it must supply some timeout
+ mechanism to avoid hanging on DMA or:
+
+B) It's supposed to be called whenever the DMA stops working
+ no matter whether this was due to errors or not.
+
+Since the callback isn't supplying any status indication I
+assume it's case (A). But if we're allowed to call
+.device_tx_status() on the channel in callback context, we can
+get the status here and determine whether the transaction was
+OK or not, and then it's case (B).
+
+So I should either reconsider this patch to either do:
+
+(A) a timeout that terminates the DMA if too much time passes
+   (which will in turn have to be caclulated from the xfer size and
+   MCLK frequency) or
+
+(B) a call to device_tx_status() and check whether there was an
+  error and set data->error accordingly in the error case.
+  (This may in turn require changed to amba-pl08x to e.g. timeout
+  and report such errors properly.) or
+
+(C) (Dan) will dma_sync_wait(chan, cookie) on the descriptor
+  in the MCI_DATAEND IRQ path suffice? If that happens we
+  may have a bug in the DMA engine(s) in that it doesn't
+  timeout or error out if a DMA job locks up.
+  I don't particularly like dma_sync_wait() since it is hardwired
+  to wait 5 seconds, which seems arbitrarily chosen. If that is
+  the approach, a new sync wait function taking timeout as
+  argument will likely be needed.
+
+My current assumption is something like (A)...
+
+> With the code I have in place, you'll notice I have:
+>
+> ? ? ? ?/* Wait up to 1ms for the DMA to complete */
+> ? ? ? ?for (i = 0; ; i++) {
+> ? ? ? ? ? ? ? ?status = readl(host->base + MMCISTATUS);
+> ? ? ? ? ? ? ? ?if (!(status & MCI_RXDATAAVLBLMASK) || i >= 100)
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? ?udelay(10);
+> ? ? ? ?}
+>
+> This waits for the DMA controller to read the last data out of the FIFO
+> before allowing the request to complete. ?As it has a timeout, it is
+> able to detect ARMs broken DMA setup on their MMCI/DMAC, and disable DMA
+> support for this primecell rather than getting stuck.
+>
+> This may be sufficient without using the DMA callbacks.
+
+According to our tests this does not really cut it on
+Ux500. Sometimes we get the DMA completion before the
+MCI_DATAEND IRQ, and sometimes after.
+
+When  we get the callback *after* the MCI_DATAEND irq
+this does not work properly, since we still don't know if the DMA
+job is complete, so the DMA engine is not in sync and we mess up
+the channels by issuing a new job, hammering the DMA engine
+while it's still busy on the channel.
+
+We either have to sync in the DMA engine or timeout
+on the DMA job as far as I can tell. One of A thru C.
+
+Yours,
+Linus Walleij
