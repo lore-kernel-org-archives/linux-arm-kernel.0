@@ -1,35 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Feb 2011 19:22:22 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTikxMKm-Xy5du2+MzrD2eLuvfO9hXrSzBKmAkdBm@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102121805.47311.arnd@arndb.de>
-	<AANLkTikxMKm-Xy5du2+MzrD2eLuvfO9hXrSzBKmAkdBm@mail.gmail.com>
-Message-ID: <201102121922.22055.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 12 Feb 2011 13:32:48 -0500 (EST)
+Subject: The p2v branch
+Message-ID: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 February 2011 18:33:10 Andrei Warkentin wrote:
-> On Sat, Feb 12, 2011 at 11:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 11 February 2011 23:33:42 Andrei Warkentin wrote:
-> >> On Wed, Feb 9, 2011 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> >> Yes, this is a Toshiba card. I've sent the patch as a reply to Linus' email.
-> >>
-> >> cid - 02010053454d3332479070cc51451d00
-> >> csd - d00f 0032 0f59 03ff ffffffff92404000
-> >> erase_size - 524288
-> >> fwrev - 0x0
-> >> hwrev - 0x0
-> >> manfid - 0x000002
-> >> name - SEM32G
-> >> oemid - 0x0100
-> >> preferred_erase_size - 2097152
-> >
-> 
-> This is a Toshiba eMMC part. It is 32GB as far as the OS can see and access.
 
-Ah, right, that explains all the values, which make sense for eMMC4
-but not for SDHC ;-)
+I finally was able to complete this series and test it satisfactorily.  
+This required some hacking to the OMAP UART debugging code so it would 
+stop fighting against me and forcefully collaborate.
 
-	Arnd
+Now that I've got a PandaBoard I'm getting rather grumpy with some of 
+that code...  Some patches touching that area from me are to be expected 
+in the near future.
+
+But in the mean time I think you can complete the p2v branch with the 
+following:
+
+3ecf8ba5 ARM: P2V: eliminate head.S use of PHYS_OFFSET for !XIP_KERNEL
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+5e8e98cd ARM: P2V: introduce phys_to_virt/virt_to_phys runtime patching
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+1929d11e ARM: P2V: extend to 16-bit translation offsets
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+(forced it on with non-msm targets for testing)
+
+b7a0fbb4 ARM: 6648/1: map ATAGs when not in first 1MB of RAM
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+I also have 2 additional patches for this branch to follow:
+
+[PATCH 1/2] ARM: ignore mdesc->boot_params if out of range
+[PATCH 2/2] ARM: P2V: Thumb2 support
+
+
+Nicolas
