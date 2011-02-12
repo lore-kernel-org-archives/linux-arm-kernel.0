@@ -1,18 +1,17 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Feb 2011 09:48:25 +0000
-Subject: [PATCH 1/6] ARM: move cache/processor/fault glue to separate
-	include files
-In-Reply-To: <AANLkTimZOGkgjudvxeaOMJz=p2peZAt6Zf-sFjrz66YL@mail.gmail.com>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-	<E1Pnvgc-0002yU-Gr@rmk-PC.arm.linux.org.uk>
-	<AANLkTimZOGkgjudvxeaOMJz=p2peZAt6Zf-sFjrz66YL@mail.gmail.com>
-Message-ID: <20110212094825.GA15837@n2100.arm.linux.org.uk>
+Date: Sat, 12 Feb 2011 09:56:17 +0000
+Subject: [PATCH v4 02/19] ARM: LPAE: Fix early_pte_alloc() assumption
+	about the Linux PTE
+In-Reply-To: <1295891761-18366-3-git-send-email-catalin.marinas@arm.com>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110212095617.GA15616@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 06:52:14PM -0800, Colin Cross wrote:
-> Acked-by: Colin Cross <ccross@android.com>
-> 
-> Tested on Tegra 2.
+On Mon, Jan 24, 2011 at 05:55:44PM +0000, Catalin Marinas wrote:
+> With LPAE we no longer have software bits in a separate Linux PTE and
+> the early_pte_alloc() function should pass PTE_HWTABLE_OFF +
+> PTE_HWTABLE_SIZE to early_alloc() to avoid allocating extra memory.
 
-Thanks, I'll take these as Tested-by's.
+This one can also go to the patch system too.
