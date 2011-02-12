@@ -1,61 +1,46 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Feb 2011 20:39:57 +0530
-Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <20110212145010.GK15616@n2100.arm.linux.org.uk>
-References: <E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
-	<20110207120103.GC31929@n2100.arm.linux.org.uk>
-	<20110207121052.GD31929@n2100.arm.linux.org.uk>
-	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
-	<20110207133457.GE31929@n2100.arm.linux.org.uk>
-	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
-	<20110207141734.GG31929@n2100.arm.linux.org.uk>
-	<AANLkTimCtaSZ=CHT5snWZ496_bi4sH=0LU7vJ-Jfh=dP@mail.gmail.com>
-	<20110211115853.GC23404@n2100.arm.linux.org.uk>
-	<998315b4ab88b66cc0e32e73d10a0015@mail.gmail.com>
-	<20110212145010.GK15616@n2100.arm.linux.org.uk>
-Message-ID: <3f574626437da8db9f7844d5bb031046@mail.gmail.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Sat, 12 Feb 2011 21:45:45 +0530
+Subject: reboot not working on linux-2.6.37 for ARMv7
+In-Reply-To: <20110211120305.GD23404@n2100.arm.linux.org.uk>
+References: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
+	<20110211120305.GD23404@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTikvBRJyDJb4=puFzbTCXNYGSEXDRkAZ=1PZuneD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Saturday, February 12, 2011 8:20 PM
-> To: Santosh Shilimkar
-> Cc: Colin Cross; Kukjin Kim; saeed bishara; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume
-> support
+On 2/11/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Fri, Feb 11, 2011 at 05:01:06PM +0530, shiraz hashim wrote:
+>> I am using linux-2.6.37 on our ARM Cortex A9 (dual core) SMP platform
+>> with PL310 as Level 2 cache. We observe that on reboot the control
+>> is not able to reach to the arch_reset.
+>>
+>> The problem happens when L1 cache is disabled in
+>> arm_machine_restart, through cpu_proc_fin() and L2 cache is flushed.
 >
-> On Fri, Feb 11, 2011 at 05:37:04PM +0530, Santosh Shilimkar wrote:
-> > There is a Monitor secure API, needs to be called from non-secure
-> > software to set this diagnostic registers in resume path.
+> Where's the L2 cache flush?  The sequence is:
 >
-> It would be an idea to get the OMAP sleep code up to date so that I
-> can
-> look at OMAPs requirements for this to be useful.
+>         /* Clean and invalidate caches */
+>         flush_cache_all();
+>         /* Turn off caching */
+>         cpu_proc_fin();
+>         /* Push out any further dirty data, and ensure cache is empty */
+>         flush_cache_all();
 >
-> As the current code stands, I don't see any reason why the sleep34xx
-> code
-> can't use this infrastructure, but I'm loathed to start modifying
-> that if there's outstanding code changes in that area.
+> and flush_cache_all() calls v7_flush_kern_cache_all() in
+> arch/arm/mm/cache-v7.S.
+>
+> I do hope you're not modifying flush_cache_all() to also call the L2
+> cache functions because that's wrong.
+>
 
-Yep. There are few issues out there with sleep34xx code.
-	- Secure APIs
-	- Current code needs to be cleaned up to remove
-	unwanted registers save restore
-	- Some part of the code on OMAP3 must be run from
-	SRAM. It can't run from DDR
-	- AUXCTLR, Diagnostic registers aren't accessible
-	in secure mode.
-	- L2 cache needs to be handled with secure APIs.
-	- Code sequence needs to handle errata's handling
-	which accesses OMAP PM registers.
+Russell,
 
-Few of the above are getting addressed for this merge window.
+We are not modifying flush_cache_all. L2 cache is not flushed from there.
+Actually as soon as L1 Cache is flushed and disabled, spin_lock is taken from
+some other thread. This creates problem for our platform, as we do not have
+monitors support at L2 thus failing strex instruction.
 
-So my plan was to take a look at generic suspend after the
-merge window. By that time your generic stuff and omap
-cleanup would have got merged hopefully.
+If we disable L2 then reboot works fine, as expected.
 
-Regards,
-Santosh
+--
+viresh
