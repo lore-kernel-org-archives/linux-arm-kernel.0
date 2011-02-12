@@ -1,225 +1,130 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 11 Feb 2011 19:07:45 +0100
-Subject: [PATCH] ARM: S5P: Add platform helpers for camera GPIO configuration
-In-Reply-To: <1297447665-19492-1-git-send-email-s.nawrocki@samsung.com>
-References: <1297447665-19492-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1297447665-19492-2-git-send-email-s.nawrocki@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 12 Feb 2011 08:55:07 +0800
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <201102111651.35530.arnd@arndb.de>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<201102101817.42099.arnd@arndb.de>
+	<20110211231417.GC9289@S2100-06.ap.freescale.net>
+	<201102111651.35530.arnd@arndb.de>
+Message-ID: <20110212005506.GE9289@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add functions for the parallel camera GPIO interface
-configuration on S5PV210 and S5PV310 SoCs.
+On Fri, Feb 11, 2011 at 04:51:35PM +0100, Arnd Bergmann wrote:
+> On Saturday 12 February 2011, Shawn Guo wrote:
+> > On Thu, Feb 10, 2011 at 06:17:41PM +0100, Arnd Bergmann wrote:
+> > > On Friday 11 February 2011, Shawn Guo wrote:
+> > > > 
+> > > > > > +	struct mxs_dma_data		dma_data;
+> > > > > 
+> > > > > Why do you need host specific DMA structures? Please stick to
+> > > > > the generic dma-engine API if possible.
+> > > > > 
+> > > > I'm sticking to the generic dmaengine api.  The mxs dma hardware
+> > > > has separate irq line for every single dma channel, which needs to
+> > > > be told by client driver.
+> > > 
+> > > I'm not convinced, it still sounds like a layering violation to
+> > > have specific information about the DMA controller in the
+> > > platform data of a driver using the dma engine API.
+> > > 
+> > It sounds like something about the dma controller, but it really
+> > belongs to dma client device e.g. ssp here.  Every single dma client
+> > device has two dma related resources, dma channel and dma irq, which
+> > should be defined in client device data.
+> 
+> That is true for the DMA controller you use, but it doesn't have
+> to be that way for all other DMA controllers, right? My point is
+> that the MMC driver should not make any assumptions about what
+> DMA controller is used, because a future SoC might combine it
+> with a different DMA controller, e.g. one that just just a single
+> interrupt for all channels.
+> 
+Your thought is right.  But the fact is, from hw design point of
+view, all client peripherals are coupled with mxs dma.  As a real
+example, gpmi (mxs nand controller) is one mxs dma client device.
+When gpmi is integrated into i.MX50 to replace nfc (original i.mx
+nand controller), dma-aphb has to be brought into mx50 together,
+though mx50 already gets sdma there.
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <s.nawrocki@samsung.com>
----
- arch/arm/mach-s5pv210/Kconfig           |    5 +++
- arch/arm/mach-s5pv210/Makefile          |    1 +
- arch/arm/mach-s5pv210/setup-camera.c    |   53 +++++++++++++++++++++++++++++++
- arch/arm/mach-s5pv310/Kconfig           |    5 +++
- arch/arm/mach-s5pv310/Makefile          |    1 +
- arch/arm/mach-s5pv310/setup-camera.c    |   43 +++++++++++++++++++++++++
- arch/arm/plat-s5p/include/plat/camera.h |   26 +++++++++++++++
- 7 files changed, 134 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5pv210/setup-camera.c
- create mode 100644 arch/arm/mach-s5pv310/setup-camera.c
- create mode 100644 arch/arm/plat-s5p/include/plat/camera.h
+I tried hard to decouple client driver from mxs dmaengine driver, but
+it can not be that thorough. As dma peripheral only trigger error irq,
+mxs dma "pio" mode and dma irq need to be handled by client and dma
+driver in a coupled way.
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 53aabef..300993a 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -53,6 +53,11 @@ config S5PV210_SETUP_SDHCI_GPIO
- 	help
- 	  Common setup code for SDHCI gpio.
- 
-+config S5PV210_SETUP_CAMERA
-+	bool
-+	help
-+	  Common setup code for the camera interfaces.
-+
- menu "S5PC110 Machines"
- 
- config MACH_AQUILA
-diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-index ff1a0db..d6c9f0d 100644
---- a/arch/arm/mach-s5pv210/Makefile
-+++ b/arch/arm/mach-s5pv210/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_MACH_TORBRECK)	+= mach-torbreck.o
- obj-y				+= dev-audio.o
- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
- 
-+obj-$(CONFIG_S5PV210_SETUP_CAMERA)	+= setup-camera.o
- obj-$(CONFIG_S5PV210_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
- obj-$(CONFIG_S5PV210_SETUP_I2C1) 	+= setup-i2c1.o
- obj-$(CONFIG_S5PV210_SETUP_I2C2) 	+= setup-i2c2.o
-diff --git a/arch/arm/mach-s5pv210/setup-camera.c b/arch/arm/mach-s5pv210/setup-camera.c
-new file mode 100644
-index 0000000..e13c354
---- /dev/null
-+++ b/arch/arm/mach-s5pv210/setup-camera.c
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright (C) 2011 Samsung Electronics Co., Ltd.
-+ *
-+ * S5PV310 camera interface GPIO configuration.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/gpio.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/camera.h>
-+
-+/*
-+ * Configure the camera parallel bus pins. The parallel bus can be multiplexed
-+ * with any FIMC entity. Even multiple FIMC entities are allowed to be attached
-+ * to a particular (A or B) gpio interface. This function should be called from
-+ * a board setup code.
-+ */
-+int s5pv210_camif_cfg_gpio(enum s5p_camif_id id)
-+{
-+	u32 gpio8, gpio5;
-+	int ret;
-+	int i = 5;
-+
-+	switch (id) {
-+	case S5P_CAMIF_A:
-+		gpio8 = S5PV210_GPE0(0);
-+		gpio5 = S5PV210_GPE1(0);
-+		break;
-+	case S5P_CAMIF_B:
-+		gpio8 = S5PV210_GPJ0(0);
-+		gpio5 = S5PV210_GPJ1(0);
-+		break;
-+	default:
-+		WARN(1, "id: %d\n", id);
-+		return -EINVAL;
-+	}
-+
-+	ret = s3c_gpio_cfgall_range(gpio8, 8, S3C_GPIO_SFN(2),
-+				    S3C_GPIO_PULL_UP);
-+	if (ret)
-+		return ret;
-+
-+	ret = s3c_gpio_cfgall_range(gpio5, 5, S3C_GPIO_SFN(2),
-+				    S3C_GPIO_PULL_UP);
-+
-+	while (i-- && !ret)
-+		ret = s5p_gpio_set_drvstr(S5PV210_GPE1(i),
-+					  S5P_GPIO_DRVSTR_LV4);
-+	return ret;
-+}
-diff --git a/arch/arm/mach-s5pv310/Kconfig b/arch/arm/mach-s5pv310/Kconfig
-index b2a9acc..ccd1dc4 100644
---- a/arch/arm/mach-s5pv310/Kconfig
-+++ b/arch/arm/mach-s5pv310/Kconfig
-@@ -71,6 +71,11 @@ config S5PV310_DEV_SYSMMU
- 	help
- 	  Common setup code for SYSTEM MMU in S5PV310
- 
-+config S5PV310_SETUP_CAMERA
-+	bool
-+	help
-+	  Common setup code for the camera interfaces.
-+
- # machine support
- 
- menu "S5PC210 Machines"
-diff --git a/arch/arm/mach-s5pv310/Makefile b/arch/arm/mach-s5pv310/Makefile
-index 036fb38..c1d6577 100644
---- a/arch/arm/mach-s5pv310/Makefile
-+++ b/arch/arm/mach-s5pv310/Makefile
-@@ -32,6 +32,7 @@ obj-y					+= dev-audio.o
- obj-$(CONFIG_S5PV310_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_S5PV310_DEV_SYSMMU)	+= dev-sysmmu.o
- 
-+obj-$(CONFIG_S5PV310_SETUP_CAMERA)	+= setup-camera.o
- obj-$(CONFIG_S5PV310_SETUP_I2C1)	+= setup-i2c1.o
- obj-$(CONFIG_S5PV310_SETUP_I2C2)	+= setup-i2c2.o
- obj-$(CONFIG_S5PV310_SETUP_I2C3)	+= setup-i2c3.o
-diff --git a/arch/arm/mach-s5pv310/setup-camera.c b/arch/arm/mach-s5pv310/setup-camera.c
-new file mode 100644
-index 0000000..8ab239e
---- /dev/null
-+++ b/arch/arm/mach-s5pv310/setup-camera.c
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (C) 2011 Samsung Electronics Co., Ltd.
-+ *
-+ * S5PV310 camera interface GPIO configuration.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/gpio.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/camera.h>
-+
-+/* Configure the camera parallel bus pins. */
-+int s5pv310_camif_cfg_gpio(enum s5p_camif_id id)
-+{
-+	u32 gpio8, gpio5;
-+	u32 sfn;
-+	int ret;
-+
-+	switch (id) {
-+	case S5P_CAMIF_A:
-+		gpio8 = S5PV310_GPJ0(0); /* PCLK, VSYNC, HREF, DATA[0:4] */
-+		gpio5 = S5PV310_GPJ1(0); /* DATA[5:7], CLKOUT, FIELD */
-+		sfn = S3C_GPIO_SFN(2);
-+		break;
-+	case S5P_CAMIF_B:
-+		gpio8 = S5PV310_GPE0(0); /* DATA[0:7] */
-+		gpio5 = S5PV310_GPE1(0); /* PCLK, VSYNC, HREF, CLKOUT, FIELD */
-+		sfn = S3C_GPIO_SFN(3);
-+		break;
-+	default:
-+		WARN(1, "id: %d\n", id);
-+		return -EINVAL;
-+	}
-+
-+	ret = s3c_gpio_cfgall_range(gpio8, 8, sfn, S3C_GPIO_PULL_UP);
-+	if (ret)
-+		return ret;
-+
-+	return s3c_gpio_cfgall_range(gpio5, 5, sfn, S3C_GPIO_PULL_UP);
-+}
-diff --git a/arch/arm/plat-s5p/include/plat/camera.h b/arch/arm/plat-s5p/include/plat/camera.h
-new file mode 100644
-index 0000000..f7c66ec
---- /dev/null
-+++ b/arch/arm/plat-s5p/include/plat/camera.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (C) 2011 Samsung Electronics Co., Ltd.
-+ *
-+ * S5P series camera interface helper functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef PLAT_S5P_CAMERA_H_
-+#define PLAT_S5P_CAMERA_H_ __FILE__
-+
-+enum s5p_camif_id {
-+	S5P_CAMIF_A,
-+	S5P_CAMIF_B,
-+};
-+
-+/**
-+ * s5pvX10_camif_cfg_gpio - configure IO pins of the camera A/B interface
-+ * @id: id of a camera gpio interface
-+ */
-+int s5pv210_camif_cfg_gpio(enum s5p_camif_id id);
-+int s5pv310_camif_cfg_gpio(enum s5p_camif_id id);
-+
-+#endif /* PLAT_S5P_CAMERA_H_ */
--- 
-1.7.4
+> > > Why can't you put the interrupt number into the platform data of
+> > > the dma engine device? Your filter function already identifies
+> > > the number of the DMA channel.
+> > > 
+> > We have 16 channels for dma-apbh and dma-apbx respectively.  And each
+> > channel has fixed peripheral device and irq.  You think we can define
+> > 2 x 16 x (channel number + channel irq) in dma engine driver?  I'm
+> > afraid not.  The channel number can be identified in filter function
+> > because dmaengine core code and mxs dma hw are indexing the channel
+> > in the same way, so that the sw channel id can be used to address hw
+> > channel, otherwise we have to pass hw channel id to dma driver just
+> > like what we do with irq.
+> 
+> I don't understand. The sw channel id should be something that is
+> defined in an arbitrary way for each machine, and it should be the
+> only thing that a driver needs, right?
+> 
+Yes, the sw channel id can be defined in an arbitrary way by
+dmaengine, but in that case dmaegine can not use sw channel id to
+access hw channel, because each mxs dma client device gets a specific
+hw channel.  Of course, we can give device an arbitrary channel with
+a fixed hw channel id attached on, and use hw id to access hw channel.
+But in that case, we have one more info in device data to pass besides
+irq.
+
+
+> I have not looked much at other dmaengine drivers, but I'd be
+> surprised if they require the device driver to be written
+> for a specific implementation. If that was the case, you would
+> not even need a dmaengine API but could just as well write
+> to the DMA controller registers from the device driver directly.
+> 
+We need a specific implementation, but it's not so specific that we
+have to access dma controller directly.  Even it is, we still need
+an API/interface, as there are so many client devices need to do the
+same thing, right? ;)
+
+> > > What I meant is that you take care to avoid getting into the
+> > > interrupt handler while holding the spinlock, but in the handler,
+> > > you don't check if the lock is held. It can't be correct to
+> > > serialize just half the cases.
+> > > 
+> > Thanks for the explanation.  Please help review the fix below to see
+> > if I understand the comment correctly.
+> > 
+> >         if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN)) {
+> >                 spin_lock_irqsave(&host->lock, flags);
+> >                 mmc_signal_sdio_irq(host->mmc);
+> >                 spin_unlock_irqrestore(&host->lock, flags);
+> >         }
+> 
+> This is still wrong for two reasons:
+> 
+> * You now don't hold the lock while reading the 'stat' variable. The point of the
+>   lock is to make sure that sdio doesn't get turned off after reading stat but
+>   before signaling the sdio, so you have to hold it across both.
+> * In an interrupt controller, you should not disable interrupts again.
+>   It's harmless, but slow and confusing to the reader.
+> 
+Sorry for the dumb.  So it should be something like the following?
+
+        spin_lock(&host->lock);
+
+        stat = readl(host->base + HW_SSP_CTRL1);
+        writel(stat & MXS_MMC_IRQ_BITS,
+                host->base + HW_SSP_CTRL1 + MXS_CLR_ADDR);
+
+	[...]
+
+        if ((stat & BM_SSP_CTRL1_SDIO_IRQ) && (stat & BM_SSP_CTRL1_SDIO_IRQ_EN))
+                mmc_signal_sdio_irq(host->mmc);
+
+        spin_unlock(&host->lock);
+
+Regards,
+Shawn
