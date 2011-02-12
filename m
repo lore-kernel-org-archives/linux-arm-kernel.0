@@ -1,52 +1,31 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Feb 2011 16:59:44 +0530
-Subject: [PATCH 2/5] omap4: Enable ARM local timers with OMAP4430 es1.0
-	exception
+Date: Sat, 12 Feb 2011 16:59:46 +0530
+Subject: [PATCH 4/5] omap2plus: omap4: Set NR_CPU to 2 instead of default 4
 In-Reply-To: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1297510187-31547-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1297510187-31547-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP4430 ES1.0 the local timers are gated by security. Enable the
-CONFIG_LOCAL_TIMERS for omap2plus build and handle the OMAP4430 es1.0
-exception case.
-
-This patch has dependency on the first patch in this series.
-	ARM: smp: Select local timers vs dummy timer support runtime
+The omap2plus_defconfig picks default NR_CPU value as 4 which isn't
+correct for OMAP4430. Available CPUs are ony 2, so fix the same.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/Kconfig     |    1 +
- arch/arm/mach-omap2/timer-mpu.c |    4 ++++
- 2 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/configs/omap2plus_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 1a2cf62..f285dd7 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	select CPU_V7
- 	select ARM_GIC
-+	select LOCAL_TIMERS
- 	select PL310_ERRATA_588369
- 	select ARM_ERRATA_720789
- 	select ARCH_HAS_OPP
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-index 09c73dc..31c0ac4 100644
---- a/arch/arm/mach-omap2/timer-mpu.c
-+++ b/arch/arm/mach-omap2/timer-mpu.c
-@@ -28,6 +28,10 @@
-  */
- int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
-+	/* Local timers are not supprted on OMAP4430 ES1.0 */
-+	if (omap_rev() == OMAP4430_REV_ES1_0)
-+		return -ENXIO;
-+
- 	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
- 	twd_timer_setup(evt);
- 	return 0;
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index ae890ca..019fb7c 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -58,6 +58,7 @@ CONFIG_ARM_ERRATA_411920=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
++CONFIG_NR_CPUS=2
+ # CONFIG_LOCAL_TIMERS is not set
+ CONFIG_AEABI=y
+ CONFIG_LEDS=y
 -- 
 1.6.0.4
