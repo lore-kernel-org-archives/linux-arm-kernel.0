@@ -1,27 +1,40 @@
-From: GNUtoo@no-log.org (Denis 'GNUtoo' Carikli)
-Date: Sat, 12 Feb 2011 21:15:20 +0100
-Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
-In-Reply-To: <4D55AA65.2020101@pengutronix.de>
-References: <20110211081050.GD27982@pengutronix.de>
-	<1297458388-23361-1-git-send-email-GNUtoo@no-log.org>
-	<4D55AA65.2020101@pengutronix.de>
-Message-ID: <1297541720.2942.3.camel@gnutoo-laptop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 12 Feb 2011 16:01:14 -0500 (EST)
+Subject: The p2v branch
+In-Reply-To: <20110212184138.GD22402@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
+	<20110212184138.GD22402@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102121556330.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-02-11 at 22:30 +0100, Marc Kleine-Budde wrote:
-> here slipped some spaces in
-> > +     .init_irq = mx31_init_irq,
-> > +        .timer = &mx31bug_timer,
+On Sat, 12 Feb 2011, Russell King - ARM Linux wrote:
+
+> On Sat, Feb 12, 2011 at 01:32:48PM -0500, Nicolas Pitre wrote:
 > 
-> dito 
-Sorry, I looked carefully after such errors at first,
-before sending the first patch,
-but then I forgot to look after it when fixing what the comments pointed
-out.
+> > 3ecf8ba5 ARM: P2V: eliminate head.S use of PHYS_OFFSET for !XIP_KERNEL
+> > Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > 5e8e98cd ARM: P2V: introduce phys_to_virt/virt_to_phys runtime patching
+> > Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > 1929d11e ARM: P2V: extend to 16-bit translation offsets
+> > Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > (forced it on with non-msm targets for testing)
+> > 
+> > b7a0fbb4 ARM: 6648/1: map ATAGs when not in first 1MB of RAM
+> > Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> Added.
 
-I'll fix it in the new patch I'll resend, I'll try to find how to make
-git-send-email send a v3 too(last time I failed, because I looked for
-some command that did it on some wiki that was not very up to date)
+I've rebased my 2 patches on top of your latest p2v branch.  You may 
+pull them from:
 
-Denis.
+	git://git.linaro.org/people/nico/linux p2v
+
+Or if you prefer I can put them in the patch system.
+
+
+Nicolas
