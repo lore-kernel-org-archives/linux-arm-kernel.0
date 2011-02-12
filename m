@@ -1,26 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 12 Feb 2011 18:30:32 +0100
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110212183726.GC9821@S2100-06.ap.freescale.net>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<201102121107.17779.arnd@arndb.de>
-	<20110212183726.GC9821@S2100-06.ap.freescale.net>
-Message-ID: <201102121830.32387.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 Feb 2011 17:32:16 +0000
+Subject: reboot not working on linux-2.6.37 for ARMv7
+In-Reply-To: <AANLkTimbQMrYqKj_FcfiOaYV=MJGpX=HvSvt-AVMdv0G@mail.gmail.com>
+References: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
+	<20110211120305.GD23404@n2100.arm.linux.org.uk>
+	<AANLkTikvBRJyDJb4=puFzbTCXNYGSEXDRkAZ=1PZuneD@mail.gmail.com>
+	<20110212162148.GA22402@n2100.arm.linux.org.uk>
+	<AANLkTimbQMrYqKj_FcfiOaYV=MJGpX=HvSvt-AVMdv0G@mail.gmail.com>
+Message-ID: <20110212173216.GC22402@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 12 February 2011 19:37:27 Shawn Guo wrote:
-> > If you use a flattened device tree, you can avoid the need for
-> > platform data by adding the phandle of the dma engine device to
-> > a property of the mmc driver, along with the channel number inside
-> > of that device. I think that would be the cleanest approach, but
-> > some people still need to be convinced that changing drivers to
-> > use fdt data is the right direction for ARM.
-> > 
-> Could we keep the current the approach for now and go to the cleanest
-> way directly when Grant's dt patches get merged?
+On Sat, Feb 12, 2011 at 10:53:54PM +0530, shiraz hashim wrote:
+> Thanks, we got it. This was missing in linux-2.6.37 where the code was
+> 
+>  void smp_send_stop(void)
+>  {
+>          cpumask_t mask = cpu_online_map;
+>          cpu_clear(smp_processor_id(), mask);
+>          if (!cpus_empty(mask))
+>                  send_ipi_message(&mask, IPI_CPU_STOP);
+>  }
+> 
+> I would try this change and see if it works for me.
 
-Sounds good to me. If you are planning to use device trees anyway,
-I don't have a problem with leaving it your way in the meantime.
+Probably best to pull the patch out of latest git, which is:
 
-	Arnd
+28e18293cf0f8d23a0950d7b1d2212d11af494dc
