@@ -1,91 +1,75 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Sat, 12 Feb 2011 13:47:17 +0800
-Subject: [PATCH v2] i.MX51 iomux: Fixes MX51_PAD_UART2_TXD__UART2_TXD
-	declaration
-In-Reply-To: <19797.16490.726250.924375@ipc1.ka-ro>
-References: <1297420916-14505-1-git-send-email-julien.boibessot@free.fr>
-	<20110211122505.GB1866@richard-laptop>
-	<19797.13329.366998.503112@ipc1.ka-ro>
-	<20110211133945.GA2282@richard-laptop>
-	<19797.16490.726250.924375@ipc1.ka-ro>
-Message-ID: <20110212054716.GA2124@b20223-02.ap.freescale.net>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 12 Feb 2011 22:04:19 +0800
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <201102112104.23643.arnd@arndb.de>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<201102111651.35530.arnd@arndb.de>
+	<20110212005506.GE9289@S2100-06.ap.freescale.net>
+	<201102112104.23643.arnd@arndb.de>
+Message-ID: <20110212140417.GA9821@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 02:58:02PM +0100, Lothar Wa?mann wrote:
-> Hi,
-> 
-> Richard Zhao writes:
-> > On Fri, Feb 11, 2011 at 02:05:21PM +0100, Lothar Wa?mann wrote:
-> > > Hi,
+On Fri, Feb 11, 2011 at 09:04:23PM +0100, Arnd Bergmann wrote:
+> On Saturday 12 February 2011 01:55:07 Shawn Guo wrote:
+> > On Fri, Feb 11, 2011 at 04:51:35PM +0100, Arnd Bergmann wrote:
+> > > I have not looked much at other dmaengine drivers, but I'd be
+> > > surprised if they require the device driver to be written
+> > > for a specific implementation. If that was the case, you would
+> > > not even need a dmaengine API but could just as well write
+> > > to the DMA controller registers from the device driver directly.
 > > > 
-> > > Richard Zhao writes:
-> > > > Hi Julien,
-> > > > 
-> > > > #define _MX51_PAD_USBH1_DATA2__UART2_TXD	IOMUX_PAD(0x690, 0x290, 1, 0x09ec, 5, 0)
-> > > > 
-> > > > Will you change the above line too?
-> > > > 
-> > > Seems like a general copy/paste error in the i.MX51 Ref Manual.
-> > > For all pads that can have an UART RXD or TXD function the manual
-> > > states that the UART*_IPP_UART_RXD_MUX_SELECT_INPUT register must be
-> > > configured, while this is obviously only sensible for the RXD
-> > > function.
-> > Yes, it's for RXD. RXD can also select input from TXD.
-> > 
-> The RXD function can be routed to the TXD pads via
-> RXD_MUX_SELECT_INPUT, but IMO setting the INPUT_MUX for an OUTPUT
-> function (TXD) is nonsense.
+> > We need a specific implementation, but it's not so specific that we
+> > have to access dma controller directly.  Even it is, we still need
+> > an API/interface, as there are so many client devices need to do the
+> > same thing, right? ;)
 > 
-> E.g.:
-> |Table A-1271. Register: IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT
-> |
-> |010: Selecting Pad: UART2_RXD for Mode: ALT0.
-> |011: Selecting Pad: UART2_TXD for Mode: ALT0.
-> so, the input path for the RXD function can be routed to either the
-> UART2_RXD or UART2_TXD pad.
-Right. I double checked with IC guys. 011 means UART2_TXD/RXD swapped. When
-changing mode of DCE/DTE, TXD/RXD and RTS/CTS may need swapped. Using this
-setting, you don't need to swap the physical wires.
+> I looked at all mmc drivers that use the dmaengine API: 
+> atmel-mci.c does the same as what you propose here, while sh_mmcif.c
 
-Thanks
-Richard
+Actually, it's not me who propose the implementation.  Sascha sent a
+patch (under review) to change mxcmmc.c to use generic damengine api
+several weeks ago.  I followed that as the example.
+
+> and tmio_mmc.c more or less do what I'm suggesting you do instead.
 > 
-> |Table A-286. Register IOMUXC_SW_MUX_CTL_PAD_UART2_RXD Bits Description
-> |000: Select mux mode: ALT0 mux port: RXD_MUX of instance: uart2.
-> |NOTE: Pad UART2_RXD is involved in Daisy Chain.
-> |- Config Register IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT for mode
-> |ALT0.
-> This is OK. RXD_MUX is an input whose source is defined by the
-> RXD_MUX_SELECT_INPUT register.
+> Looking at sh_mmcif:
 > 
-> But:
-> |Table A-288. Register IOMUXC_SW_MUX_CTL_PAD_UART2_TXD Bits Description
-> |000: Select mux mode: ALT0 mux port: TXD_MUX of instance: uart2.
-> |
-> |NOTE: Pad UART2_TXD is involved in Daisy Chain.
-> |- Config Register IOMUXC_UART2_IPP_UART_RXD_MUX_SELECT_INPUT for mode
-> |ALT0.
-> IMO does not make any sense. TXD_MUX is an OUTPUT function.
-> How can the INPUT MUX route an OUTPUT PAD?
-> 
-> Also, the table Table 4-3. i.MX51 Daisy Chain Settings only mentions
-> the uart_rxd_mux pins, but not uart_txd_mux.
+>       host->chan_tx = dma_request_channel(mask, sh_mmcif_filter,
+>                                           &pdata->dma->chan_priv_tx);
 > 
 > 
-> Lothar Wa?mann
-> -- 
-> ___________________________________________________________
+> This is the only place where dma engine specific data is used
+> in the driver, and chan_priv_tx is part of the platform data, so the
+> mmc driver can simply pass it down as a void pointer without knowing
+> the type. The platform data as defined in the machine file ties
+> both the dma controller and the mmc device together, but neither
+> of the two drivers needs to know anything about the implementation
+> of the other.
 > 
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-> 
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Not really.  Though mmc does not need to know anything about dma
+driver, dma knows that mmc driver has to pass .slave_id via
+chan->private.  The snippet below is copied from shdma.
+
+	struct sh_dmae_slave_config {
+		unsigned int                    slave_id;
+		dma_addr_t                      addr;
+		u32                             chcr;
+		char                            mid_rid;
+	};
+---
+        if (chan->private) {
+                /* The caller is holding dma_list_mutex */
+                struct sh_dmae_slave *param = chan->private;
+                clear_bit(param->slave_id, sh_dmae_slave_used);
+        }
+
+And it only works when slave_id is the first member of
+sh_dmae_slave_config.
+
+For me, it's more natural to define device's dma related things like
+dma channel id and irq as its resources than platform data.  So I
+still maintain the current approach.
+
+Regards,
+Shawn
