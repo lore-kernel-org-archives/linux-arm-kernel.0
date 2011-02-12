@@ -1,29 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Feb 2011 17:32:16 +0000
-Subject: reboot not working on linux-2.6.37 for ARMv7
-In-Reply-To: <AANLkTimbQMrYqKj_FcfiOaYV=MJGpX=HvSvt-AVMdv0G@mail.gmail.com>
-References: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
-	<20110211120305.GD23404@n2100.arm.linux.org.uk>
-	<AANLkTikvBRJyDJb4=puFzbTCXNYGSEXDRkAZ=1PZuneD@mail.gmail.com>
-	<20110212162148.GA22402@n2100.arm.linux.org.uk>
-	<AANLkTimbQMrYqKj_FcfiOaYV=MJGpX=HvSvt-AVMdv0G@mail.gmail.com>
-Message-ID: <20110212173216.GC22402@n2100.arm.linux.org.uk>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Sat, 12 Feb 2011 11:33:10 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102121805.47311.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102091013.56670.arnd@arndb.de>
+	<AANLkTinaY2RM86tX4ex+zsMwFKUdBNVpdZ8fFrt-e12_@mail.gmail.com>
+	<201102121805.47311.arnd@arndb.de>
+Message-ID: <AANLkTikxMKm-Xy5du2+MzrD2eLuvfO9hXrSzBKmAkdBm@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 12, 2011 at 10:53:54PM +0530, shiraz hashim wrote:
-> Thanks, we got it. This was missing in linux-2.6.37 where the code was
-> 
->  void smp_send_stop(void)
->  {
->          cpumask_t mask = cpu_online_map;
->          cpu_clear(smp_processor_id(), mask);
->          if (!cpus_empty(mask))
->                  send_ipi_message(&mask, IPI_CPU_STOP);
->  }
-> 
-> I would try this change and see if it works for me.
+On Sat, Feb 12, 2011 at 11:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 11 February 2011 23:33:42 Andrei Warkentin wrote:
+>> On Wed, Feb 9, 2011 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> Yes, this is a Toshiba card. I've sent the patch as a reply to Linus' email.
+>>
+>> cid - 02010053454d3332479070cc51451d00
+>> csd - d00f00320f5903ffffffffff92404000
+>> erase_size - 524288
+>> fwrev - 0x0
+>> hwrev - 0x0
+>> manfid - 0x000002
+>> name - SEM32G
+>> oemid - 0x0100
+>> preferred_erase_size - 2097152
+>
+> Very interesting. So the manfid is the same as on most Kingston cards,
+> but the oemid is different. Most cards have a two-letter ASCII code
+> in there, 0x544d ("TM") on Kingston cards, and I always assumed that
+> this stood for "Toshiba Memory".
+>
+> What is even stranger is the size value (among other fields) in the CSD,
+> the card claims a size of exactly 32GB, which I find hard to believe,
+> given that there are always some bad and reserved blocks.
+>
+> Are you sure that the card you have is authentic? I've heard a lot about
+> fake USB sticks advertising a size that is much larger than the actual
+> flash inside of them.
+>
+> Also this is the first card that I see advertise an allocation unit
+> size of 2MB (preferred_erase_size), all other cards seem to advertise
+> 4 MB these days, even if they actually have 2 or 8 MB.
+>
+> ? ? ? ?Arnd
+>
 
-Probably best to pull the patch out of latest git, which is:
-
-28e18293cf0f8d23a0950d7b1d2212d11af494dc
+This is a Toshiba eMMC part. It is 32GB as far as the OS can see and access.
