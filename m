@@ -1,50 +1,48 @@
 From: dilinger@queued.net (Andres Salomon)
-Date: Fri, 11 Feb 2011 18:04:12 -0800
-Subject: [PATCH 04/17] ab3550: mfd_cell is now implicitly available to drivers
-Message-ID: <20110211180412.53a19d01@queued.net>
+Date: Fri, 11 Feb 2011 18:05:20 -0800
+Subject: [PATCH 05/17] ab3100: mfd_cell is now implicitly available to drivers
+Message-ID: <20110211180520.75666fae@queued.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-No clients (in mainline kernel, I'm told that drivers exist in external
-trees that are planned for mainline inclusion) make use of this, nor
-do they make use of platform_data, so nothing really had to change here.
-
-The .data_size field is unused, so its usage gets removed.
+The cell's platform_data is now accessed with a helper function;
+change clients to use that, and remove the now-unused data_size.
 
 Signed-off-by: Andres Salomon <dilinger@queued.net>
 ---
- drivers/mfd/ab3550-core.c  |    4 +---
- include/linux/mfd/abx500.h |    1 -
- 2 files changed, 1 insertions(+), 4 deletions(-)
+ drivers/mfd/ab3100-core.c  |    4 +---
+ drivers/regulator/ab3100.c |    2 +-
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mfd/ab3550-core.c b/drivers/mfd/ab3550-core.c
-index 5fbca34..d849087 100644
---- a/drivers/mfd/ab3550-core.c
-+++ b/drivers/mfd/ab3550-core.c
-@@ -1320,10 +1320,8 @@ static int __init ab3550_probe(struct i2c_client *client,
+diff --git a/drivers/mfd/ab3100-core.c b/drivers/mfd/ab3100-core.c
+index 4193af5..b44c3d9 100644
+--- a/drivers/mfd/ab3100-core.c
++++ b/drivers/mfd/ab3100-core.c
+@@ -949,10 +949,8 @@ static int __devinit ab3100_probe(struct i2c_client *client,
  		goto exit_no_ops;
  
  	/* Set up and register the platform devices. */
--	for (i = 0; i < AB3550_NUM_DEVICES; i++) {
-+	for (i = 0; i < AB3550_NUM_DEVICES; i++)
- 		ab3550_devs[i].platform_data = ab3550_plf_data->dev_data[i];
--		ab3550_devs[i].data_size = ab3550_plf_data->dev_data_sz[i];
+-	for (i = 0; i < ARRAY_SIZE(ab3100_devs); i++) {
++	for (i = 0; i < ARRAY_SIZE(ab3100_devs); i++)
+ 		ab3100_devs[i].platform_data = ab3100_plf_data;
+-		ab3100_devs[i].data_size = sizeof(struct ab3100_platform_data);
 -	}
  
- 	err = mfd_add_devices(&client->dev, 0, ab3550_devs,
- 		ARRAY_SIZE(ab3550_devs), NULL,
-diff --git a/include/linux/mfd/abx500.h b/include/linux/mfd/abx500.h
-index 67bd6f7..7d9b6ae 100644
---- a/include/linux/mfd/abx500.h
-+++ b/include/linux/mfd/abx500.h
-@@ -186,7 +186,6 @@ struct abx500_init_settings {
- struct ab3550_platform_data {
- 	struct {unsigned int base; unsigned int count; } irq;
- 	void *dev_data[AB3550_NUM_DEVICES];
--	size_t dev_data_sz[AB3550_NUM_DEVICES];
- 	struct abx500_init_settings *init_settings;
- 	unsigned int init_settings_sz;
- };
+ 	err = mfd_add_devices(&client->dev, 0, ab3100_devs,
+ 		ARRAY_SIZE(ab3100_devs), NULL, 0);
+diff --git a/drivers/regulator/ab3100.c b/drivers/regulator/ab3100.c
+index ed6feaf..c204f6b 100644
+--- a/drivers/regulator/ab3100.c
++++ b/drivers/regulator/ab3100.c
+@@ -576,7 +576,7 @@ ab3100_regulator_desc[AB3100_NUM_REGULATORS] = {
+ 
+ static int __devinit ab3100_regulators_probe(struct platform_device *pdev)
+ {
+-	struct ab3100_platform_data *plfdata = pdev->dev.platform_data;
++	struct ab3100_platform_data *plfdata = mfd_get_data(pdev);
+ 	int err = 0;
+ 	u8 data;
+ 	int i;
 -- 
 1.7.2.3
