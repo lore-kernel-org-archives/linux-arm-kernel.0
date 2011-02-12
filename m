@@ -1,32 +1,40 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 12 Feb 2011 13:50:44 -0500 (EST)
-Subject: The p2v branch
-In-Reply-To: <20110212184138.GD22402@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
-	<20110212184138.GD22402@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1102121347120.14920@xanadu.home>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sat, 12 Feb 2011 14:52:34 -0500 (EST)
+Subject: ARM: relocation out of range (when loading a module)
+In-Reply-To: <20110211144207.GJ23404@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1101121314470.25498@xanadu.home>
+	<20110112184258.GH11039@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1101121350350.25498@xanadu.home>
+	<AANLkTikLwTdV2B5Dyp_adCxgWcE-+Wb6uiN5MBfnA1_K@mail.gmail.com>
+	<alpine.LFD.2.00.1101270030220.8580@xanadu.home>
+	<20110210154322.GE1742@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102101405010.14920@xanadu.home>
+	<AANLkTi=KtFf5BU-iH-sUUL=Q30S90bk608JR4zFz2CKf@mail.gmail.com>
+	<alpine.LFD.2.00.1102110838430.14920@xanadu.home>
+	<AANLkTimW9zQ3EcEo8+gcxnS72Wa9VZELvrqdY+jP0B7W@mail.gmail.com>
+	<20110211144207.GJ23404@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102121435470.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 12 Feb 2011, Russell King - ARM Linux wrote:
+On Fri, 11 Feb 2011, Russell King - ARM Linux wrote:
 
-> On Sat, Feb 12, 2011 at 01:32:48PM -0500, Nicolas Pitre wrote:
-> > I finally was able to complete this series and test it satisfactorily.  
-> > This required some hacking to the OMAP UART debugging code so it would 
-> > stop fighting against me and forcefully collaborate.
+> On Fri, Feb 11, 2011 at 02:25:28PM +0000, Dave Martin wrote:
+> >  if we can also move the initramfs somewhere less obstructive in the
+> > future, then so much the better.
 > 
-> It should at least build with 6651/1 in place.
+> This may do it, and it might even work.  Not particularly well tested
+> yet.  It'd be loads easier if we didn't have to worry about XIP.
 
-Not if you do try to load the kernel somewhere else in memory to 
-exercize its ability to live with a different phys offset.
+Is anyone actually still using XIP these days?  Now that NOR flash is 
+not that much used anymore, if maintaining XIP support is more trouble 
+than it is worth we could simply deprecate it.  The linker script has 
+become quite more hairy than it used to be, and from a quick look I'm 
+not even sure if all the stuff in there is properly located for XIP.
 
-> The only fight
-> remaining is against the (imho misguided) attempt to select the debug
-> port based on the machine ID.  I normally end up hard-coding the
-> addresses.
+Otherwise, for the __init stuff move:
 
-That's what I ended up doing too, but something better and IMHO simpler 
-could be done, which would also be fully position independent.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 
 Nicolas
