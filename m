@@ -1,39 +1,31 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Sat, 12 Feb 2011 12:02:29 +0200
-Subject: [PATCH] omap iommu: print module name on error messages
-Message-ID: <1297504949-26233-1-git-send-email-dacohen@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Feb 2011 11:07:17 +0100
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110212172357.GB9821@S2100-06.ap.freescale.net>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<201102120959.22707.arnd@arndb.de>
+	<20110212172357.GB9821@S2100-06.ap.freescale.net>
+Message-ID: <201102121107.17779.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP IOMMU generic layer doesn't need ot print function name during
-error messages. Print module name instead which is more useful.
+On Saturday 12 February 2011 18:23:58 Shawn Guo wrote:
+> Well, we are removing inclusion of mach/dma.h from mmc driver, but
+> adding it to every mxs based machine code.  This makes mmc driver
+> clean but machine code becomes not.  For some dma client devices
+> coming later, the platform data could be saved at all, if they do not
+> have any.  But with the approach you are suggesting, every single
+> client device will have to get platform data.
 
-Signed-off-by: David Cohen <dacohen@gmail.com>
----
- arch/arm/plat-omap/iommu.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Right, unless there is a way to encode it exlusively in the resources,
+which is what I was suggesting at first: If the dma engine driver
+knows about all the channels, you only need to pass the channel number.
 
-diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-index b1107c0..f55f458 100644
---- a/arch/arm/plat-omap/iommu.c
-+++ b/arch/arm/plat-omap/iommu.c
-@@ -806,7 +806,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
- 	iopgd = iopgd_offset(obj, da);
- 
- 	if (!iopgd_is_table(*iopgd)) {
--		dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", __func__,
-+		dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", obj->name,
- 			da, iopgd, *iopgd);
- 		return IRQ_NONE;
- 	}
-@@ -814,7 +814,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
- 	iopte = iopte_offset(iopgd, da);
- 
- 	dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x pte:%p *pte:%08x\n",
--		__func__, da, iopgd, *iopgd, iopte, *iopte);
-+		obj->name, da, iopgd, *iopgd, iopte, *iopte);
- 
- 	return IRQ_NONE;
- }
--- 
-1.7.1
+If you use a flattened device tree, you can avoid the need for
+platform data by adding the phandle of the dma engine device to
+a property of the mmc driver, along with the channel number inside
+of that device. I think that would be the cleanest approach, but
+some people still need to be convinced that changing drivers to
+use fdt data is the right direction for ARM.
+
+	Arnd
