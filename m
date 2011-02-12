@@ -1,41 +1,65 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 12 Feb 2011 13:32:48 -0500 (EST)
-Subject: The p2v branch
-Message-ID: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
+Date: Sat, 12 Feb 2011 13:33:10 -0500 (EST)
+Subject: [PATCH 1/2] ARM: ignore mdesc->boot_params if out of range
+Message-ID: <alpine.LFD.2.00.1102121330490.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-I finally was able to complete this series and test it satisfactorily.  
-This required some hacking to the OMAP UART debugging code so it would 
-stop fighting against me and forcefully collaborate.
+The initial MMU table created in head.S contains a 1 MB mapping at the
+start of memory to let the early kernel boot code access the boot params
+specified by mdesc->boot_params.
 
-Now that I've got a PandaBoard I'm getting rather grumpy with some of 
-that code...  Some patches touching that area from me are to be expected 
-in the near future.
+When using CONFIG_ARM_PATCH_PHYS_VIRT it is possible for the kernel to
+have a different idea of where the start of memory is at run time, making
+the compile-time determined mdesc->boot_params pointing to a memory area
+which is not mapped.  Any access to the boot params in that case will
+fault and silently hang the kernel at that point.  It is therefore a
+better idea to simply ignore mdesc->boot_params in that case and give
+the kernel a chance to print some diagnostic on the console later.
 
-But in the mean time I think you can complete the p2v branch with the 
-following:
+If the bootloader provides a valid pointer in r2 to the kernel then this
+is used instead of mdesc->boot_params, and an explicit mapping is already
+created in the initial MMU table for it.  It is therefore a good idea to
+use that facility when using a relocated kernel.
 
-3ecf8ba5 ARM: P2V: eliminate head.S use of PHYS_OFFSET for !XIP_KERNEL
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/kernel/setup.c |   21 +++++++++++++++++++--
+ 1 files changed, 19 insertions(+), 2 deletions(-)
 
-5e8e98cd ARM: P2V: introduce phys_to_virt/virt_to_phys runtime patching
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-1929d11e ARM: P2V: extend to 16-bit translation offsets
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Tested-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-(forced it on with non-msm targets for testing)
-
-b7a0fbb4 ARM: 6648/1: map ATAGs when not in first 1MB of RAM
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-I also have 2 additional patches for this branch to follow:
-
-[PATCH 1/2] ARM: ignore mdesc->boot_params if out of range
-[PATCH 2/2] ARM: P2V: Thumb2 support
-
-
-Nicolas
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 056bf18..729994c 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -853,8 +853,25 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	if (__atags_pointer)
+ 		tags = phys_to_virt(__atags_pointer);
+-	else if (mdesc->boot_params)
+-		tags = phys_to_virt(mdesc->boot_params);
++	else if (mdesc->boot_params) {
++#ifdef CONFIG_MMU
++		/*
++		 * We still are executing with a minimal MMU mapping created
++		 * with the presumption that the machine default for this
++		 * is located in the first MB of RAM.  Anything else will
++		 * fault and silently hang the kernel at this point.
++		 */
++		if (mdesc->boot_params < PHYS_OFFSET ||
++		    mdesc->boot_params >= PHYS_OFFSET + SZ_1M) {
++			printk(KERN_WARNING
++			       "Default boot params at physical 0x%08lx out of reach\n", 
++			       mdesc->boot_params);
++		} else
++#endif
++		{
++			tags = phys_to_virt(mdesc->boot_params);
++		}
++	}
+ 
+ #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
+ 	/*
+-- 
+1.7.4
