@@ -1,46 +1,35 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 12 Feb 2011 23:29:29 +0530
-Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
-	cause data corruption
-In-Reply-To: <AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com>
-References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com><1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com>
-	<AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com>
-Message-ID: <13596bec9184b117d6a1d02da8e017bf@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Feb 2011 19:22:22 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTikxMKm-Xy5du2+MzrD2eLuvfO9hXrSzBKmAkdBm@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102121805.47311.arnd@arndb.de>
+	<AANLkTikxMKm-Xy5du2+MzrD2eLuvfO9hXrSzBKmAkdBm@mail.gmail.com>
+Message-ID: <201102121922.22055.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Andrei Warkentin [mailto:andreiw at motorola.com]
-> Sent: Saturday, February 12, 2011 11:20 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
-> linux-arm-kernel at lists.infradead.org; Catalin Marinas
-> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
-> operation can cause data corruption
->
-[....]
+On Saturday 12 February 2011 18:33:10 Andrei Warkentin wrote:
+> On Sat, Feb 12, 2011 at 11:05 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 11 February 2011 23:33:42 Andrei Warkentin wrote:
+> >> On Wed, Feb 9, 2011 at 3:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> >> Yes, this is a Toshiba card. I've sent the patch as a reply to Linus' email.
+> >>
+> >> cid - 02010053454d3332479070cc51451d00
+> >> csd - d00f 0032 0f59 03ff ffffffff92404000
+> >> erase_size - 524288
+> >> fwrev - 0x0
+> >> hwrev - 0x0
+> >> manfid - 0x000002
+> >> name - SEM32G
+> >> oemid - 0x0100
+> >> preferred_erase_size - 2097152
+> >
+> 
+> This is a Toshiba eMMC part. It is 32GB as far as the OS can see and access.
 
->
-> Can these PL310 errata fixes be made more generic? PL310 is present
-> in
-> non-OMAP platforms too, which lack the TI hypervisor. And these
-> platforms might have the same PL310 rev, and suffer the same
-> glitches.
-> While ideally there is some kind of hypervisor_ops to modify the
-> protected register, at the very least there should be the generic
-> debug_write handling the  "I  can write all PL310 regs" case. If
-> you're interested I have a patch someplace that tried to do this,
-> hopefully I can still find it.
+Ah, right, that explains all the values, which make sense for eMMC4
+but not for SDHC ;-)
 
-They are kind of generic. If you look at it, the only change
-Which is arch specific is the implementation of "debug_writel" function.
-Today this code is not in generic PL310 code, but
-OMAP specific.
-
-May be we can make this as exported function pointer, which
-arch's can populate.
-
-Will that work for you ?
-
-Regards,
-Santosh
+	Arnd
