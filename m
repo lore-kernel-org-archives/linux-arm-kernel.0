@@ -1,27 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Feb 2011 09:59:43 +0000
-Subject: [PATCH v4 03/19] ARM: LPAE: use long long format when printing
-	physical addresses and ptes
-In-Reply-To: <1295891761-18366-4-git-send-email-catalin.marinas@arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-4-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20110212095943.GB15616@n2100.arm.linux.org.uk>
+From: dacohen@gmail.com (David Cohen)
+Date: Sat, 12 Feb 2011 12:02:29 +0200
+Subject: [PATCH] omap iommu: print module name on error messages
+Message-ID: <1297504949-26233-1-git-send-email-dacohen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 05:55:45PM +0000, Catalin Marinas wrote:
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 5ea4fb7..3d23f0f 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -449,7 +449,7 @@ static int __init arm_add_memory(unsigned long start, unsigned long size)
->  
->  	if (meminfo.nr_banks >= NR_BANKS) {
->  		printk(KERN_CRIT "NR_BANKS too low, "
-> -			"ignoring memory at %#lx\n", start);
-> +			"ignoring memory at %#08llx\n", (long long)start);
+OMAP IOMMU generic layer doesn't need ot print function name during
+error messages. Print module name instead which is more useful.
 
-This is not equivalent.  %#lx produces '0x0'.  %#08llx produces '0x000000'
-not '0x00000000' - the '0x' is included in the field width.  So you want
-'%#010llx' or '0x%08llx' - there's no real advantage to either.  Or just
-convert '%#lx' to '%#llx'.
+Signed-off-by: David Cohen <dacohen@gmail.com>
+---
+ arch/arm/plat-omap/iommu.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
+index b1107c0..f55f458 100644
+--- a/arch/arm/plat-omap/iommu.c
++++ b/arch/arm/plat-omap/iommu.c
+@@ -806,7 +806,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
+ 	iopgd = iopgd_offset(obj, da);
+ 
+ 	if (!iopgd_is_table(*iopgd)) {
+-		dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", __func__,
++		dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", obj->name,
+ 			da, iopgd, *iopgd);
+ 		return IRQ_NONE;
+ 	}
+@@ -814,7 +814,7 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
+ 	iopte = iopte_offset(iopgd, da);
+ 
+ 	dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x pte:%p *pte:%08x\n",
+-		__func__, da, iopgd, *iopgd, iopte, *iopte);
++		obj->name, da, iopgd, *iopgd, iopte, *iopte);
+ 
+ 	return IRQ_NONE;
+ }
+-- 
+1.7.1
