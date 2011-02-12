@@ -1,86 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Feb 2011 16:21:48 +0000
-Subject: reboot not working on linux-2.6.37 for ARMv7
-In-Reply-To: <AANLkTikvBRJyDJb4=puFzbTCXNYGSEXDRkAZ=1PZuneD@mail.gmail.com>
-References: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
-	<20110211120305.GD23404@n2100.arm.linux.org.uk>
-	<AANLkTikvBRJyDJb4=puFzbTCXNYGSEXDRkAZ=1PZuneD@mail.gmail.com>
-Message-ID: <20110212162148.GA22402@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 12 Feb 2011 17:28:32 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <20110212105918.GG15616@n2100.arm.linux.org.uk>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102121145.42053.arnd@arndb.de>
+	<20110212105918.GG15616@n2100.arm.linux.org.uk>
+Message-ID: <201102121728.32585.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 12, 2011 at 09:45:45PM +0530, viresh kumar wrote:
-> On 2/11/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Fri, Feb 11, 2011 at 05:01:06PM +0530, shiraz hashim wrote:
-> >> I am using linux-2.6.37 on our ARM Cortex A9 (dual core) SMP platform
-> >> with PL310 as Level 2 cache. We observe that on reboot the control
-> >> is not able to reach to the arch_reset.
-> >>
-> >> The problem happens when L1 cache is disabled in
-> >> arm_machine_restart, through cpu_proc_fin() and L2 cache is flushed.
-> >
-> > Where's the L2 cache flush?  The sequence is:
-> >
-> >         /* Clean and invalidate caches */
-> >         flush_cache_all();
-> >         /* Turn off caching */
-> >         cpu_proc_fin();
-> >         /* Push out any further dirty data, and ensure cache is empty */
-> >         flush_cache_all();
-> >
-> > and flush_cache_all() calls v7_flush_kern_cache_all() in
-> > arch/arm/mm/cache-v7.S.
-> >
-> > I do hope you're not modifying flush_cache_all() to also call the L2
-> > cache functions because that's wrong.
-> >
+On Saturday 12 February 2011 11:59:18 Russell King - ARM Linux wrote:
+> On Sat, Feb 12, 2011 at 11:45:41AM +0100, Arnd Bergmann wrote:
+> > * The FAT location is clearly visible in a number of tests
+> >   done inside of an allocation unit. It's normally slower for
+> >   linear access, but faster for random access. Sometimes
+> >   reading the FAT is also slower than reading elsewhere.
 > 
-> Russell,
+> I wouldn't also be surprised if there's some cards out there which parse
+> the FAT being written, and start activities (such as erasing clusters)
+> based upon changes therein.  Such cards would be unsuitable for use with
+> non-FAT filesystems.
 > 
-> We are not modifying flush_cache_all. L2 cache is not flushed from there.
-> Actually as soon as L1 Cache is flushed and disabled, spin_lock is taken from
-> some other thread. This creates problem for our platform, as we do not have
-> monitors support at L2 thus failing strex instruction.
-> 
-> If we disable L2 then reboot works fine, as expected.
+> It might be worth devising some sort of check for this kind of behaviour.
 
-Again, this should not be happening:
+Possible, but doesn't seem to happen with any of the cards I have
+tested, the controllers in there appear to be too simplistic.
+Also, the recommendations for SD cards are to issue explicit erase
+requests, which would make this unnecessary.
 
-void smp_send_stop(void)
-{
-        unsigned long timeout;
+OTOH, SD cards do specify exactly where the FAT should be stored on
+the medium, so it would be possible to make this kind of assumption.
 
-        if (num_online_cpus() > 1) {
-                cpumask_t mask = cpu_online_map;
-                cpu_clear(smp_processor_id(), mask);
+USB sticks and CF cards might be smart enough to actually do it,
+some of them have more sophisticated logic than SD cards (most
+do not), and there is no usb mass storage command for erase.
 
-                smp_cross_call(&mask, IPI_CPU_STOP);
-        }
+> Unrelated, I have a USB based device which provides an emulated FAT
+> filesystem - all files except one on this filesystem are read-only.
+> The writable file is a textual configuration file.  It can be reliably
+> updated by Windows based systems, but updates from Linux based systems
+> are ignored - presumably because updates to the FAT/directory/data
+> clusters are occuring in a different order.
 
-        /* Wait up to one second for other CPUs to stop */
-        timeout = USEC_PER_SEC;
-        while (num_online_cpus() > 1 && timeout--)
-                udelay(1);
+Fun. I think qemu also comes with one of these FAT emulation layers,
+as do some mp3 players, but from what I have heard, they are not as
+broken.
 
-        if (num_online_cpus() > 1)
-                pr_warning("SMP: failed to stop secondary CPUs\n");
-}
-
-void machine_shutdown(void)
-{
-#ifdef CONFIG_SMP
-        smp_send_stop();
-#endif
-}
-
-void machine_restart(char *cmd)
-{
-        machine_shutdown();
-        arm_pm_restart(reboot_mode, cmd);
-}
-
-smp_send_stop() brings the other CPUs down to a quiescent state, waits for
-up to one second for that to happen, and then starts flushing caches etc.
-No other CPU should be active at the point where arm_pm_restart() is
-called.  There should be no other threads active on either this or any
-other CPU.
+	Arnd
