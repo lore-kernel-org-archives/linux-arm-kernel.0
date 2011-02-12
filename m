@@ -1,34 +1,58 @@
-From: lamiaposta71@gmail.com (Raffaele Recalcati)
-Date: Sat, 12 Feb 2011 15:02:17 +0100
-Subject: TI DaVinci support under new maintainer: Sekhar Nori
-In-Reply-To: <87pqr2kx9d.fsf@ti.com>
-References: <87pqr2kx9d.fsf@ti.com>
-Message-ID: <AANLkTinhOXBkQ+Tg+Tt5PSx6fKgTq5cAR84CLUH7ESys@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 12 Feb 2011 15:30:00 +0100
+Subject: [PATCH 1/2] atmel/macb: fix device name when SOFT/HARD_IRQ enabled
+In-Reply-To: <4D53EEFA.3030801@ru.mvista.com>
+References: <1297255416-6920-1-git-send-email-plagnioj@jcrosoft.com>
+	<4D529992.7050502@ru.mvista.com>
+	<20110209144411.GB11255@game.jcrosoft.org>
+	<4D53EEFA.3030801@ru.mvista.com>
+Message-ID: <20110212143000.GH11255@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On 16:58 Thu 10 Feb     , Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 09-02-2011 17:44, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> >>>From: Paul Chavent<paul.chavent@fnac.net>
+> 
+> >>>When listing processes on a system with SOFT/HARD_IRQ enabled,
+> >>>the name of the ethernet device is [irq/eth%d] (instead of [irq/eth0] for example).
+> 
+> >>>This patch call the request_irq function after having initialized the name of the device.
+> 
+> >>>Signed-off-by: Paul Chavent<paul.chavent@fnac.net>
+> >>>Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+> >>>Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+> >>[...]
+> 
+> >>>diff --git a/drivers/net/macb.c b/drivers/net/macb.c
+> >>>index f69e73e..d642e08 100644
+> >>>--- a/drivers/net/macb.c
+> >>>+++ b/drivers/net/macb.c
+> >>[...]
+> >>>@@ -1219,13 +1209,23 @@ static int __init macb_probe(struct platform_device *pdev)
+> >>>  	err = register_netdev(dev);
+> >>>  	if (err) {
+> >>>  		dev_err(&pdev->dev, "Cannot register net device, aborting.\n");
+> >>>-		goto err_out_free_irq;
+> >>>+		goto err_out_iounmap;
+> >>>  	}
+> >>>
+> >>>-	if (macb_mii_init(bp) != 0) {
+> >>>+	dev->irq = platform_get_irq(pdev, 0);
+> 
+> >>    platform_get_irq() can fail...
+> 
+> >request_irq will fail too so do we really need to check it?
+> 
+>    You then will get the following printed:
+> 
+> macb: Unable to request IRQ -6 (error -22)
+> 
+>    If this is acceptable, then platfrom_get_irq()'s result can be ignored indeed.
+yes it's
 
-On Tue, Feb 8, 2011 at 10:54 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Hello,
->
-> I will be stepping aside as maintainer of the TI DaVinci family of
-> SoCs and Sekhar Nori from TI will be taking over these responsibilities.
->
-> Sekhar has long been an active developer, primary contributor and
-> reviewer so taking over the maintainer role is a logical next step for
-> him.
->
-> I will aid in the transition for a couple merge windows to help make a
-> smooth transition, but will be fading away from an active role in
-> davinci.
-
-Your help has been very useful in the past to guide me to achieve a
-small community role..
-I can understand that you have new interests.
-I think that Nori Sekhar has a deep experience and I'm happy for this decision.
-See you in some other ml.
-
-bye,
-Raffaele
-Raffaele
+Best Regards,
+J.
