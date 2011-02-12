@@ -1,33 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 12 Feb 2011 10:28:03 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+Date: Sat, 12 Feb 2011 10:34:13 +0000
+Subject: [PATCH v4 16/19] ARM: LPAE: Use generic dma_addr_t type definition
+In-Reply-To: <1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20110212102803.GC15616@n2100.arm.linux.org.uk>
+	<1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110212103413.GD15616@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 24, 2011 at 05:55:57PM +0000, Catalin Marinas wrote:
->  arch/arm/include/asm/memory.h     |   17 +++++++++--------
->  arch/arm/include/asm/outercache.h |   14 ++++++++------
->  arch/arm/include/asm/pgtable.h    |    2 +-
->  arch/arm/include/asm/setup.h      |    2 +-
->  arch/arm/kernel/setup.c           |    5 +++--
->  arch/arm/mm/init.c                |    6 +++---
->  arch/arm/mm/mmu.c                 |    7 ++++---
->  7 files changed, 29 insertions(+), 24 deletions(-)
+On Mon, Jan 24, 2011 at 05:55:58PM +0000, Catalin Marinas wrote:
+> From: Will Deacon <will.deacon@arm.com>
+> 
+> This patch uses the types.h implementation in asm-generic to define the
+> dma_addr_t type as the same width as phys_addr_t.
+> 
+> NOTE: this is a temporary patch until the corresponding patches unifying
+> the dma_addr_t and removing the dma64_addr_t are merged into mainline.
 
-If this is split up into four separate patches, we can probably sort out
-merging this for the upcoming window.
+I'm not too sure about this patch.  All of the DMA devices we have only
+take 32-bit addresses for their DMA, so making dma_addr_t 64-bit seems
+wrong as we'll implicitly truncate these addresses.
 
-asm/memory.h will conflict non-trivially with p2v patch set, but I think
-we can merge the changes to everything but __virt_to_phys/__phys_to_virt.
-
-asm/outercache.h changes are stand-alone.
-
-asm/pgtable.h looks like it could use __pfn_to_phys(pfn) rather than
-adding the cast, and can be combined with mm/init.c and mm/mmu.c.
-
-asm/setup.h and arch/arm/kernel/setup.c form another logical group.
+As ARM platforms don't (sanely) support DMA, I think dropping this patch
+for the time being would be a good idea, and stick with 32-bit dma_addr_t,
+especially as we need to first do a sweep for dma_addr_t usage in device
+driver structures (such as dma engine scatter lists.)  These really should
+use __le32/__be32/u32 depending on whether they're little endian, big
+endian or native endian.
