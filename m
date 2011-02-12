@@ -1,37 +1,90 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 13 Feb 2011 02:37:27 +0800
-Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <201102121107.17779.arnd@arndb.de>
-References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
-	<201102120959.22707.arnd@arndb.de>
-	<20110212172357.GB9821@S2100-06.ap.freescale.net>
-	<201102121107.17779.arnd@arndb.de>
-Message-ID: <20110212183726.GC9821@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 12 Feb 2011 10:44:00 +0000
+Subject: [PATCH v4 12/19] ARM: LPAE: Add context switching support
+In-Reply-To: <1295891761-18366-13-git-send-email-catalin.marinas@arm.com>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-13-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110212104400.GF15616@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 12, 2011 at 11:07:17AM +0100, Arnd Bergmann wrote:
-> On Saturday 12 February 2011 18:23:58 Shawn Guo wrote:
-> > Well, we are removing inclusion of mach/dma.h from mmc driver, but
-> > adding it to every mxs based machine code.  This makes mmc driver
-> > clean but machine code becomes not.  For some dma client devices
-> > coming later, the platform data could be saved at all, if they do not
-> > have any.  But with the approach you are suggesting, every single
-> > client device will have to get platform data.
-> 
-> Right, unless there is a way to encode it exlusively in the resources,
-> which is what I was suggesting at first: If the dma engine driver
-> knows about all the channels, you only need to pass the channel number.
-> 
-> If you use a flattened device tree, you can avoid the need for
-> platform data by adding the phandle of the dma engine device to
-> a property of the mmc driver, along with the channel number inside
-> of that device. I think that would be the cleanest approach, but
-> some people still need to be convinced that changing drivers to
-> use fdt data is the right direction for ARM.
-> 
-Could we keep the current the approach for now and go to the cleanest
-way directly when Grant's dt patches get merged?
+On Mon, Jan 24, 2011 at 05:55:54PM +0000, Catalin Marinas wrote:
+> +#ifdef CONFIG_ARM_LPAE
+> +#define cpu_set_asid(asid) {						\
+> +	unsigned long ttbl, ttbh;					\
+> +	asm("	mrrc	p15, 0, %0, %1, c2		@ read TTBR0\n"	\
+> +	    "	mov	%1, %1, lsl #(48 - 32)		@ set ASID\n"	\
+> +	    "	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"	\
+> +	    : "=r" (ttbl), "=r" (ttbh)					\
+> +	    : "r" (asid & ~ASID_MASK));					\
 
-Regards,
-Shawn
+This is wrong:
+1. It does nothing with %2 (the new asid)
+2. it shifts the high address bits of TTBR0 left 16 places each time its
+   called.
+
+> +}
+> +#else
+> +#define cpu_set_asid(asid) \
+> +	asm("	mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (asid))
+> +#endif
+> +
+>  /*
+>   * We fork()ed a process, and we need a new context for the child
+>   * to run in.  We reserve version 0 for initial tasks so we will
+> @@ -37,7 +51,7 @@ void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+>  static void flush_context(void)
+>  {
+>  	/* set the reserved ASID before flushing the TLB */
+> -	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (0));
+> +	cpu_set_asid(0);
+>  	isb();
+>  	local_flush_tlb_all();
+>  	if (icache_is_vivt_asid_tagged()) {
+> @@ -99,7 +113,7 @@ static void reset_context(void *info)
+>  	set_mm_context(mm, asid);
+>  
+>  	/* set the new ASID */
+> -	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (mm->context.id));
+> +	cpu_set_asid(mm->context.id);
+>  	isb();
+>  }
+>  
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index a22b89f..ed4f3cb 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -117,6 +117,11 @@ ENTRY(cpu_v7_switch_mm)
+>  #ifdef CONFIG_MMU
+>  	mov	r2, #0
+>  	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
+
+How about swapping the order here to avoid r1 being referenced in the very
+next instruction?
+
+> +#ifdef CONFIG_ARM_LPAE
+> +	and	r3, r1, #0xff
+> +	mov	r3, r3, lsl #(48 - 32)		@ ASID
+> +	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
+> +#else	/* !CONFIG_ARM_LPAE */
+>  	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
+>  	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
+>  #ifdef CONFIG_ARM_ERRATA_430973
+> @@ -124,9 +129,10 @@ ENTRY(cpu_v7_switch_mm)
+>  #endif
+>  	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
+>  	isb
+> -1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
+> +	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
+>  	isb
+>  	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
+> +#endif	/* CONFIG_ARM_LPAE */
+>  	isb
+>  #endif
+>  	mov	pc, lr
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
