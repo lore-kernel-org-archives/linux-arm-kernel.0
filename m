@@ -1,59 +1,53 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 11 Feb 2011 10:51:37 +0530
-Subject: [PATCH 3/3] OMAP4: clockdomain: Add wkup/sleep dependency support
-In-Reply-To: <alpine.DEB.2.00.1102102209080.21991@utopia.booyaka.com>
-References: <1297084631-27474-1-git-send-email-rnayak@ti.com>
-	<1297084631-27474-2-git-send-email-rnayak@ti.com>
-	<1297084631-27474-3-git-send-email-rnayak@ti.com>
-	<1297084631-27474-4-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1102101905160.21991@utopia.booyaka.com>
-	<3754d10e94217aa81846aa1d41fe0a9d@mail.gmail.com>
-	<alpine.DEB.2.00.1102102135220.21991@utopia.booyaka.com>
-	<74b7dfbe67e19da4358f7df0bc4dd8f1@mail.gmail.com>
-	<alpine.DEB.2.00.1102102209080.21991@utopia.booyaka.com>
-Message-ID: <478620b0abf7ff99cb41192dd4ee9e6d@mail.gmail.com>
+From: amit.kachhap@linaro.org (Amit Daniel Kachhap)
+Date: Sat, 12 Feb 2011 12:06:14 -0500
+Subject: [PATCH] ARM: SAMSUNG: Removing dependency on CONFIG_PM_DEBUG for
+	clock debugging
+Message-ID: <1297530374-32635-1-git-send-email-amit.kachhap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Friday, February 11, 2011 10:44 AM
-> To: Rajendra Nayak
-> Cc: linux-omap at vger.kernel.org; Kevin Hilman; Benoit Cousson;
-linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 3/3] OMAP4: clockdomain: Add wkup/sleep dependency
-support
->
-> Hi Rajendra
->
-> On Fri, 11 Feb 2011, Rajendra Nayak wrote:
->
-> > Failing silently is going to make it more difficult to identify and
-fix.
-> > Maybe a WARN in else?
-> >
-> > 	if (cd->clkdm) {
-> > 		...
-> > 	} else
-> > 		WARN()
->
-> I was thinking it might be nice to put it right next to the
-> _clkdm_lookup()s in clkdm_init(), since the _clkdm_lookup is what is
-> actually failing.  Then we could do a
->
-> if (!cd->clkdm)
-> 	continue;
->
-> in the SoC-specific *_all_wkdep/sleepdep* code, just to keep the system
-> from crashing...
->
-> Does that sound okay to you?
+Enabling the macro CONFIG_PM_DEBUG is causing compilation error as all PM components
+are included which is not in mainline for samsung V310 platform, therefore, this patch
+removes the dependency on macro CONFIG_PM_DEBUG for clock debugging through debugfs
+interface.
 
-Yep, that sounds better.
+Signed-off-by: Amit Daniel Kachhap <amit.kachhap@linaro.org>
+---
+ arch/arm/plat-samsung/clock.c              |    4 ++--
+ arch/arm/plat-samsung/include/plat/clock.h |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Thanks,
-Rajendra
-
->
->
-> - Paul
+diff --git a/arch/arm/plat-samsung/clock.c b/arch/arm/plat-samsung/clock.c
+index 7728928..aca5a25 100644
+--- a/arch/arm/plat-samsung/clock.c
++++ b/arch/arm/plat-samsung/clock.c
+@@ -450,7 +450,7 @@ int __init s3c24xx_register_baseclocks(unsigned long xtal)
+ 	return 0;
+ }
+ 
+-#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
++#if defined(CONFIG_DEBUG_FS)
+ /* debugfs support to trace clock tree hierarchy and attributes */
+ 
+ static struct dentry *clk_debugfs_root;
+@@ -538,4 +538,4 @@ err_out:
+ }
+ late_initcall(clk_debugfs_init);
+ 
+-#endif /* defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS) */
++#endif /* defined(CONFIG_DEBUG_FS) */
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index 9a82b88..f6180ab 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -47,7 +47,7 @@ struct clk {
+ 
+ 	struct clk_ops		*ops;
+ 	int		    (*enable)(struct clk *, int enable);
+-#if defined(CONFIG_PM_DEBUG) && defined(CONFIG_DEBUG_FS)
++#if defined(CONFIG_DEBUG_FS)
+ 	struct dentry		*dent;	/* For visible tree hierarchy */
+ #endif
+ };
+-- 
+1.7.1
