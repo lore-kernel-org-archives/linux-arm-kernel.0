@@ -1,49 +1,20 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 12 Feb 2011 01:14:58 -0700
-Subject: [PATCH v3 6/6] arm/dt: Basic tegra devicetree support
-In-Reply-To: <20110212080634.15682.21141.stgit@localhost6.localdomain6>
-References: <20110212080634.15682.21141.stgit@localhost6.localdomain6>
-Message-ID: <20110212081458.15682.96060.stgit@localhost6.localdomain6>
+Date: Sat, 12 Feb 2011 01:40:35 -0700
+Subject: mc13xxx-core, support for i2c, V4
+In-Reply-To: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
+References: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
+Message-ID: <20110212084035.GB17755@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds adds very basic support for booting tegra with a
-device tree.  It simply allows the existing machine_descs to match
-against the tegra compatible values so that the kernel can boot.
-Kernel parameters and the initrd pointer is read out of the tree
-instead of atags.
+On Tue, Jan 04, 2011 at 04:34:55PM +1100, Marc Reilly wrote:
+> Hi,
+> 
+> These patches add i2c support for the mc13xxx-core drive. For v4 I've tried to take
+> in all previous comments, hopefully making it better to follow, and bisectable.
 
-This is not complete device tree support.  This change will be
-reverted when a new machine_desc is added that can populate the
-device registrations directly from data in the tree instead of using
-hard coded data.  That change will be made in a future patch.
+This series looks okay to me.  Since this is audio drivers, I expect
+that it would best be taken via the ASoC tree?  Have you sent it to
+Mark Brown and the ALSA list for review?
 
-v2: Fixed cut-and-paste error in commit text
-
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/mach-tegra/board-harmony.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index b9dbdb1..99884e9 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -113,6 +113,11 @@ static void __init tegra_harmony_init(void)
- 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
- }
- 
-+static const char * tegra_harmony_board_compat[] = {
-+	"nvidia,harmony",
-+	NULL
-+};
-+
- MACHINE_START(HARMONY, "harmony")
- 	.boot_params  = 0x00000100,
- 	.fixup		= tegra_harmony_fixup,
-@@ -120,4 +125,5 @@ MACHINE_START(HARMONY, "harmony")
- 	.init_machine   = tegra_harmony_init,
- 	.map_io         = tegra_map_common_io,
- 	.timer          = &tegra_timer,
-+	.dt_compat      = tegra_harmony_board_compat,
- MACHINE_END
+g.
