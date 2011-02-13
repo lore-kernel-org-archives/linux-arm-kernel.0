@@ -1,96 +1,172 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 13 Feb 2011 01:40:13 -0800
-Subject: [PATCH 01/21] ARM: tegra: clock: enable clk reset for non-peripheral
-	clocks
+Date: Sun, 13 Feb 2011 01:40:16 -0800
+Subject: [PATCH 04/21] ARM: tegra: clock: Don't use PLL lock bits
 In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
 References: <1297590033-15035-1-git-send-email-ccross@android.com>
-Message-ID: <1297590033-15035-2-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-5-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dima Zavin <dima@android.com>
+The PLL lock bits are not reliable, use per-PLL timeouts instead.
 
-Add a new 'reset' clk op. This can be provided for any clock,
-not just peripherals.
-
-Signed-off-by: Dima Zavin <dima@android.com>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/clock.h         |    1 +
- arch/arm/mach-tegra/tegra2_clocks.c |   29 ++++++++++++++++++-----------
- 2 files changed, 19 insertions(+), 11 deletions(-)
+ arch/arm/mach-tegra/clock.h         |    2 +-
+ arch/arm/mach-tegra/tegra2_clocks.c |   31 +++++++++----------------------
+ 2 files changed, 10 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
-index 083a4cf..42f00c0 100644
+index 42f00c0..b76d33d 100644
 --- a/arch/arm/mach-tegra/clock.h
 +++ b/arch/arm/mach-tegra/clock.h
-@@ -86,6 +86,7 @@ struct clk_ops {
- 	int		(*set_parent)(struct clk *, struct clk *);
- 	int		(*set_rate)(struct clk *, unsigned long);
- 	long		(*round_rate)(struct clk *, unsigned long);
-+	void		(*reset)(struct clk *, bool);
+@@ -53,7 +53,6 @@ struct dvfs_process_id_table {
+ 	struct dvfs_table *table;
  };
- 
- enum clk_state {
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 7a2926a..240f921 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -263,6 +263,18 @@ static struct clk_ops tegra_clk_m_ops = {
- 	.disable	= tegra2_clk_m_disable,
- };
- 
-+void tegra2_periph_reset_assert(struct clk *c)
-+{
-+	BUG_ON(!c->ops->reset);
-+	c->ops->reset(c, true);
-+}
-+
-+void tegra2_periph_reset_deassert(struct clk *c)
-+{
-+	BUG_ON(!c->ops->reset);
-+	c->ops->reset(c, false);
-+}
-+
- /* super clock functions */
- /* "super clocks" on tegra have two-stage muxes and a clock skipping
-  * super divider.  We will ignore the clock skipping divider, since we
-@@ -895,23 +907,17 @@ static void tegra2_periph_clk_disable(struct clk *c)
- 		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
- }
- 
--void tegra2_periph_reset_deassert(struct clk *c)
-+static void tegra2_periph_clk_reset(struct clk *c, bool assert)
- {
--	pr_debug("%s on clock %s\n", __func__, c->name);
--	if (!(c->flags & PERIPH_NO_RESET))
--		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
--			RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
--}
-+	unsigned long base = assert ? RST_DEVICES_SET : RST_DEVICES_CLR;
- 
--void tegra2_periph_reset_assert(struct clk *c)
--{
--	pr_debug("%s on clock %s\n", __func__, c->name);
-+	pr_debug("%s %s on clock %s\n", __func__,
-+		 assert ? "assert" : "deassert", c->name);
- 	if (!(c->flags & PERIPH_NO_RESET))
- 		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
--			RST_DEVICES_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
-+			   base + PERIPH_CLK_TO_ENB_SET_REG(c));
- }
  
 -
- static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
+ struct dvfs {
+ 	struct regulator *reg;
+ 	struct dvfs_table *table;
+@@ -128,6 +127,7 @@ struct clk {
+ 	unsigned long			vco_min;
+ 	unsigned long			vco_max;
+ 	const struct clk_pll_table	*pll_table;
++	int				pll_lock_delay;
+ 
+ 	/* DIV */
+ 	u32				div;
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index db27e59..36da2e8 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -79,7 +79,6 @@
+ #define PLL_BASE_ENABLE			(1<<30)
+ #define PLL_BASE_REF_ENABLE		(1<<29)
+ #define PLL_BASE_OVERRIDE		(1<<28)
+-#define PLL_BASE_LOCK			(1<<27)
+ #define PLL_BASE_DIVP_MASK		(0x7<<20)
+ #define PLL_BASE_DIVP_SHIFT		20
+ #define PLL_BASE_DIVN_MASK		(0x3FF<<8)
+@@ -94,7 +93,6 @@
+ #define PLL_OUT_RESET_DISABLE		(1<<0)
+ 
+ #define PLL_MISC(c)			(((c)->flags & PLL_ALT_MISC_REG) ? 0x4 : 0xc)
+-#define PLL_MISC_LOCK_ENABLE(c)		(((c)->flags & PLLU) ? (1<<22) : (1<<18))
+ 
+ #define PLL_MISC_DCCON_SHIFT		20
+ #define PLL_MISC_CPCON_SHIFT		8
+@@ -546,17 +544,7 @@ static struct clk_ops tegra_blink_clk_ops = {
+ /* PLL Functions */
+ static int tegra2_pll_clk_wait_for_lock(struct clk *c)
  {
- 	u32 val;
-@@ -1002,6 +1008,7 @@ static struct clk_ops tegra_periph_clk_ops = {
- 	.set_parent		= &tegra2_periph_clk_set_parent,
- 	.set_rate		= &tegra2_periph_clk_set_rate,
- 	.round_rate		= &tegra2_periph_clk_round_rate,
-+	.reset			= &tegra2_periph_clk_reset,
+-	ktime_t before;
+-
+-	before = ktime_get();
+-
+-	while (!(clk_readl(c->reg + PLL_BASE) & PLL_BASE_LOCK)) {
+-		if (ktime_us_delta(ktime_get(), before) > 5000) {
+-			pr_err("Timed out waiting for lock bit on pll %s",
+-				c->name);
+-			return -1;
+-		}
+-	}
++	udelay(c->pll_lock_delay);
+ 
+ 	return 0;
+ }
+@@ -594,10 +582,6 @@ static int tegra2_pll_clk_enable(struct clk *c)
+ 	val |= PLL_BASE_ENABLE;
+ 	clk_writel(val, c->reg + PLL_BASE);
+ 
+-	val = clk_readl(c->reg + PLL_MISC(c));
+-	val |= PLL_MISC_LOCK_ENABLE(c);
+-	clk_writel(val, c->reg + PLL_MISC(c));
+-
+ 	tegra2_pll_clk_wait_for_lock(c);
+ 
+ 	return 0;
+@@ -1177,6 +1161,7 @@ static struct clk tegra_pll_s = {
+ 	.vco_max   = 26000000,
+ 	.pll_table = tegra_pll_s_table,
+ 	.max_rate  = 26000000,
++	.pll_lock_delay = 300,
  };
  
- /* Clock doubler ops */
+ static struct clk_mux_sel tegra_clk_m_sel[] = {
+@@ -1213,6 +1198,7 @@ static struct clk tegra_pll_c = {
+ 	.vco_max   = 1400000000,
+ 	.pll_table = tegra_pll_c_table,
+ 	.max_rate  = 600000000,
++	.pll_lock_delay = 300,
+ };
+ 
+ static struct clk tegra_pll_c_out1 = {
+@@ -1251,6 +1237,7 @@ static struct clk tegra_pll_m = {
+ 	.vco_max   = 1200000000,
+ 	.pll_table = tegra_pll_m_table,
+ 	.max_rate  = 800000000,
++	.pll_lock_delay = 300,
+ };
+ 
+ static struct clk tegra_pll_m_out1 = {
+@@ -1289,6 +1276,7 @@ static struct clk tegra_pll_p = {
+ 	.vco_max   = 1400000000,
+ 	.pll_table = tegra_pll_p_table,
+ 	.max_rate  = 432000000,
++	.pll_lock_delay = 300,
+ };
+ 
+ static struct clk tegra_pll_p_out1 = {
+@@ -1354,6 +1342,7 @@ static struct clk tegra_pll_a = {
+ 	.vco_max   = 1400000000,
+ 	.pll_table = tegra_pll_a_table,
+ 	.max_rate  = 56448000,
++	.pll_lock_delay = 300,
+ };
+ 
+ static struct clk tegra_pll_a_out0 = {
+@@ -1399,6 +1388,7 @@ static struct clk tegra_pll_d = {
+ 	.vco_max   = 1000000000,
+ 	.pll_table = tegra_pll_d_table,
+ 	.max_rate  = 1000000000,
++	.pll_lock_delay = 1000,
+ };
+ 
+ static struct clk tegra_pll_d_out0 = {
+@@ -1431,6 +1421,7 @@ static struct clk tegra_pll_u = {
+ 	.vco_max   = 960000000,
+ 	.pll_table = tegra_pll_u_table,
+ 	.max_rate  = 480000000,
++	.pll_lock_delay = 1000,
+ };
+ 
+ static struct clk_pll_table tegra_pll_x_table[] = {
+@@ -1493,6 +1484,7 @@ static struct clk tegra_pll_x = {
+ 	.vco_max   = 1200000000,
+ 	.pll_table = tegra_pll_x_table,
+ 	.max_rate  = 1000000000,
++	.pll_lock_delay = 300,
+ };
+ 
+ static struct clk_pll_table tegra_pll_e_table[] = {
+@@ -1966,7 +1958,6 @@ static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
+ void tegra_clk_suspend(void)
+ {
+ 	unsigned long off, i;
+-	u32 pllx_misc;
+ 	u32 *ctx = clk_rst_suspend;
+ 
+ 	*ctx++ = clk_readl(OSC_CTRL) & OSC_CTRL_MASK;
+@@ -2007,10 +1998,6 @@ void tegra_clk_suspend(void)
+ 
+ 	*ctx++ = clk_readl(MISC_CLK_ENB);
+ 	*ctx++ = clk_readl(CLK_MASK_ARM);
+-
+-	pllx_misc = clk_readl(tegra_pll_x.reg + PLL_MISC(&tegra_pll_x));
+-	pllx_misc &= ~PLL_MISC_LOCK_ENABLE(&tegra_pll_x);
+-	clk_writel(pllx_misc, tegra_pll_x.reg + PLL_MISC(&tegra_pll_x));
+ }
+ 
+ void tegra_clk_resume(void)
 -- 
 1.7.3.1
