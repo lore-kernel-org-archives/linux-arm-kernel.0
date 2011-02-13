@@ -1,38 +1,51 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Mon, 14 Feb 2011 06:36:16 +0800
-Subject: [PATCH] OMAP: IOMMU: add missing function declaration
-In-Reply-To: <1297508987-9193-1-git-send-email-dacohen@gmail.com>
-References: <1297508987-9193-1-git-send-email-dacohen@gmail.com>
-Message-ID: <AANLkTikUMURq-=okRju5YJroMEShHH6_eEMSvrg11UxC@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 13 Feb 2011 15:13:33 -0800
+Subject: [PATCH] ARM: vfp: Always save VFP state in vfp_pm_suspend
+Message-ID: <1297638813-1315-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 12, 2011 at 19:09, David Cohen <dacohen@gmail.com> wrote:
-> Function declaration 'iopgtable_lookup_entry' is missing from header
-> file.
+vfp_pm_suspend should save the VFP state any time there is
+a last_VFP_context.  If it only saves when the VFP is enabled,
+the state can get lost when, on a UP system:
+   Thread 1 uses the VFP
+   Context switch occurs to thread 2, VFP is disabled but the
+      VFP context is not saved to allow lazy save and restore
+   Thread 2 initiates suspend
+   vfp_pm_suspend is called with the VFP disabled, but the
+      context has not been saved.
 
-Is this done because of any error?
-You may add a comment on why this is required.
+Modify vfp_pm_suspend to save the VFP context whenever
+last_VFP_context is set.
 
->
-> Signed-off-by: David Cohen <dacohen@gmail.com>
-> ---
-> ?arch/arm/plat-omap/include/plat/iommu.h | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-> index 9e8c104..5a2475f 100644
-> --- a/arch/arm/plat-omap/include/plat/iommu.h
-> +++ b/arch/arm/plat-omap/include/plat/iommu.h
-> @@ -163,6 +163,8 @@ extern void flush_iotlb_range(struct iommu *obj, u32 start, u32 end);
-> ?extern void flush_iotlb_all(struct iommu *obj);
->
-> ?extern int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e);
-> +extern void iopgtable_lookup_entry(struct iommu *obj, u32 da, u32 **ppgd,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 **ppte);
-> ?extern size_t iopgtable_clear_entry(struct iommu *obj, u32 iova);
->
-> ?extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
-> --
-> 1.7.1
->
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/vfp/vfpmodule.c |   11 +++++------
+ 1 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 66bf8d1..7aea616 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -415,13 +415,12 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
+ 	struct thread_info *ti = current_thread_info();
+ 	u32 fpexc = fmrx(FPEXC);
+ 
+-	/* if vfp is on, then save state for resumption */
+-	if (fpexc & FPEXC_EN) {
++	/* save state for resume */
++	if (last_VFP_context[ti->cpu]) {
+ 		printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+-		vfp_save_state(&ti->vfpstate, fpexc);
+-
+-		/* disable, just in case */
+-		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
++		fmxr(FPEXC, fpexc | FPEXC_EN);
++		vfp_save_state(last_VFP_context[ti->cpu], fpexc);
++		fmxr(FPEXC, fpexc & ~FPEXC_EN);
+ 	}
+ 
+ 	/* clear any information we had about last context state */
+-- 
+1.7.3.1
