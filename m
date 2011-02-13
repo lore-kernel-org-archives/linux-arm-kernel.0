@@ -1,83 +1,97 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Feb 2011 08:16:10 +0800
-Subject: [PATCH 1/5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <19794.19192.351501.395360@ipc1.ka-ro>
-References: <1296871696-21008-2-git-send-email-shawn.guo@freescale.com>
-	<19793.22067.960689.669543@ipc1.ka-ro>
-	<20110209001710.GF6963@S2100-06.ap.freescale.net>
-	<19794.19192.351501.395360@ipc1.ka-ro>
-Message-ID: <20110214001610.GB10397@S2100-06.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 13 Feb 2011 18:39:08 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTikGvUZ2sWfox9Ws+gbuCw1JiykO=y-rk9QjL8xJ@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102121937.24933.arnd@arndb.de>
+	<AANLkTikGvUZ2sWfox9Ws+gbuCw1JiykO=y-rk9QjL8xJ@mail.gmail.com>
+Message-ID: <201102131839.08517.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 09:06:16AM +0100, Lothar Wa?mann wrote:
-> Hi Shawn,
-> 
-> Shawn Guo writes:
-> > On Tue, Feb 08, 2011 at 03:41:55PM +0100, Lothar Wa?mann wrote:
-> [...]
-> > > What's behinde the 'PIO' transfers is programming controller registers
-> > > via DMA along with the actual DMA data transfer. DMA_NONE simply
-> > > means, that the DMA transfer does only the register programming but
-> > > does not transfer any payload. The 'pio_words' are the values that are
-> > > being written to consecutive locations of e.g. the SPI controller
-> > > register address space.
-> > > The programming is actually done by DMA, in any case.
-> > > 
-> > I'm waiting for this reply ;)
-> > 
-> > i.MX23/28 Reference Manual uses word "PIO" for the working mode that
-> > Lothar has explained.  It seems that "PIO" in mxs-dma needs some more
-> > documents.
-> > 
-> > It's true that mxs dma hardware is designed to program peripheral
-> > registers along with data transfer with ccw chain.  But it's hard
-> > for generic dmaengine model to implement that.  The client device
-> > driver gets the data in scatter-gather list to transfer.  It requires
-> > client driver to manipulate the sgl to get pio ccw inserted properly
-> > to get the "along with" implemented.  This is not a reasonable
-> > implementation to me.
-> > 
-> > I still chose to keep the pio mode in the implementation in "single
-> > step" rather than "along with" way.  That means client driver has to
-> > issue one dma request to program client device registers, and issue
-> > another one to transfer data.  The natural thought is that the pio
+On Sunday 13 February 2011 01:10:09 Andrei Warkentin wrote:
+> On Sat, Feb 12, 2011 at 12:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> > This part might make sense in general, though it's hard to know the
+> > page size in the general case. For many SD cards, writing naturally
+> > aligned 64 KB blocks was the ideal case in my testing, but some need
+> > larger alignment or can deal well with smaller blocks.
 > >
-> which defeats the purpose of the whole thing. If the software has to
-> issue a single request for DMA to program the registers it could as
-> well directly write the registers without any DMA. The purpose of the
-> embedded 'PIO' transfers is, that you can set up a whole chain of
-> commands and associated data transfers and have that executed
-> without any further software intervention.
 > 
+> ...which is why I believe this should be a boot per-card parameter,
+> and that it really only makes sense for embedded parts, where you know
+> nothing else is going to be used as, say, mmcblk0.
 
-I'm redefining the flags of dma prep function as whether the current
-sg list should be appended to the last one in the ccw chain, so that
-data transfer can be done along with pio controller register.  Please
-see mxs-dma v2 coming soon for details.
+I don't think it needs to be boot-time, it can easily be run-time
+tuneable using sysfs, where you can configure it using an init script
+or some other logic from user space.
 
-Regards,
-Shawn
-
-> > support can totally be saved with cpu programming.  But looking at
-> > any mxs dma client device in reference manual, you will find it gets
-> > two irq lines, irq_dma and irq_error.  For ssp (mmc) example, when
-> > one mmc command is issued and completed without error, you have to
-> > either polling ssp status register or use pio dma and irq_dma
-> > interrupt to know the completion.  That's to say I keep the pio
+> > I could imagine that this will cause problems on your eMMC once you
+> > write small blocks to more than erase block group, because that probably
+> > causes it to start garbage collection -- it makes sense for the cards
+> > to know that something is a directory, but it can only know about
+> > a small number of directories, so it will turn the segment into a regular
+> > one as soon something else becomes a directory.
 > >
-> You could use the SSP IRQ as well.
 > 
+> It's difficult for me to argue one way or another. The code provided
+> is implementing Toshiba's suggestions for mitigating excessive wear.
+> Basically, as far as certain Android products are concerned, Motorola
+> created some "typical usage" cases, and collected data logs. These
+> logs were analyzed by Toshiba, which reported an approx x16
+> multiplication factor for writes.
+
+Yes, I've seen similar numbers in my measurements. My experience with
+the Kingston/Toshiba cards is that they combine two unfortunate
+problems:
+
+* Only one 4 MB AU can be open, writing to a different AU waits for
+garbage collection on the old one. Other cards typically have
+five buffers for open AUs, which makes them much easier to work with.
+
+* Only linear access within one AU is fast. Writing to a block with
+a lower address in the same AU causes garbage collection of the AU.
+
+> Analysis of data written showed that there were many random accesses
+> with 16KB or 32KB, meaning they go into buffer B. 
+
+I have started a remapping layer that should be able to deal with
+this independent of the card, see
+https://wiki.linaro.org/WorkingGroups/KernelConsolidation/Projects/FlashDeviceMapper
+It's still in the early stages, but maybe something like that will
+help you as well.
+
+The real solution would be to have a file system that knows what
+accesses are fast and reorders file data accordingly. Right now,
+the only thing that is normally fast is FAT32 using 32KB clusters,
+and only if the file system is aligned properly.
+
+> According to T, that
+> means extra GC and PE cycle. I'm guessing per write.
+
+Yes.
+
+What is "PE" here?
+
+> So T suggested for random data to better go into buffer A. How? Two suggestions.
+> 1) Split smaller accesses into 8KB and write with reliable write.
+> 2) Split smaller accesses into 8KB and write in reverse.
 > 
-> Lothar Wa?mann
-> -- 
-> ___________________________________________________________
-> 
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-> 
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
-> 
+> The patch does both and I am verifying if that is really necessary. I
+> need to go see the mmc spec and what it says about reliable write.
+
+I should add this to my test tool once I can reproduce it. If it turns
+out that other media do the same, we can also trigger the same behavior
+for those.
+
+> Basically, whatever behavior you choose is going to be wrong some set
+> of cards. Which is why tuning it probably only makes sense for eMMC
+> parts, and should be a set of runtime/compile-time quirks. What do you
+> think?
+
+Your explanation makes sense, but I'd definitely favor a run-time solution
+over compile-time or boot-time, because it would be much more flexible.
+We should also be able to find some optimizations that are universally
+good so we can always use them.
+
+	Arnd
