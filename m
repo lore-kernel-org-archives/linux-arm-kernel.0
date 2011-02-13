@@ -1,70 +1,72 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 13 Feb 2011 01:40:30 -0800
-Subject: [PATCH 18/21] ARM: tegra: cpufreq: Adjust memory frequency with cpu
-	frequency
+Date: Sun, 13 Feb 2011 01:40:25 -0800
+Subject: [PATCH 13/21] ARM: tegra: clock: Remove unnecessary uses of #ifdef
+	CONFIG_DEBUG_FS
 In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
 References: <1297590033-15035-1-git-send-email-ccross@android.com>
-Message-ID: <1297590033-15035-19-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-14-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/cpu-tegra.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/clock.c         |    6 ++----
+ arch/arm/mach-tegra/clock.h         |    2 +-
+ arch/arm/mach-tegra/tegra2_clocks.c |    4 +---
+ 3 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index f02ba60..0e1016a 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -51,6 +51,7 @@ static struct cpufreq_frequency_table freq_table[] = {
- #define NUM_CPUS	2
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index 34a1f8d..2d9ddfd 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -134,7 +134,7 @@ void clk_init(struct clk *c)
  
- static struct clk *cpu_clk;
-+static struct clk *emc_clk;
+ 	if (!c->ops || !c->ops->enable) {
+ 		c->refcnt++;
+-		c->set = 1;
++		c->set = true;
+ 		if (c->parent)
+ 			c->state = c->parent->state;
+ 		else
+@@ -168,9 +168,7 @@ int clk_enable(struct clk *c)
+ 				goto out;
+ 			}
+ 			c->state = ON;
+-#ifdef CONFIG_DEBUG_FS
+-			c->set = 1;
+-#endif
++			c->set = true;
+ 		}
+ 	}
+ 	c->refcnt++;
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+index b460f17..ba8e64f 100644
+--- a/arch/arm/mach-tegra/clock.h
++++ b/arch/arm/mach-tegra/clock.h
+@@ -80,8 +80,8 @@ struct clk {
  
- static unsigned long target_cpu_speed[NUM_CPUS];
- static DEFINE_MUTEX(tegra_cpu_lock);
-@@ -83,6 +84,17 @@ static int tegra_update_cpu_speed(unsigned long rate)
- 	if (freqs.old == freqs.new)
- 		return ret;
+ #ifdef CONFIG_DEBUG_FS
+ 	struct dentry		*dent;
+-	bool			set;
+ #endif
++	bool			set;
+ 	struct clk_ops		*ops;
+ 	unsigned long		rate;
+ 	unsigned long		max_rate;
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 10b9f63..6905bd0 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1214,9 +1214,7 @@ static void tegra_clk_shared_bus_init(struct clk *c)
+ 	c->max_rate = c->parent->max_rate;
+ 	c->u.shared_bus_user.rate = c->parent->max_rate;
+ 	c->state = OFF;
+-#ifdef CONFIG_DEBUG_FS
+-	c->set = 1;
+-#endif
++	c->set = true;
  
-+	/*
-+	 * Vote on memory bus frequency based on cpu frequency
-+	 * This sets the minimum frequency, display or avp may request higher
-+	 */
-+	if (rate >= 816000)
-+		clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
-+	else if (rate >= 456000)
-+		clk_set_rate(emc_clk, 300000000); /* cpu 456 MHz, emc 150Mhz */
-+	else
-+		clk_set_rate(emc_clk, 100000000);  /* emc 50Mhz */
-+
- 	for_each_online_cpu(freqs.cpu)
- 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
- 
-@@ -173,6 +185,13 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 	if (IS_ERR(cpu_clk))
- 		return PTR_ERR(cpu_clk);
- 
-+	emc_clk = clk_get_sys("cpu", "emc");
-+	if (IS_ERR(emc_clk)) {
-+		clk_put(cpu_clk);
-+		return PTR_ERR(emc_clk);
-+	}
-+
-+	clk_enable(emc_clk);
- 	clk_enable(cpu_clk);
- 
- 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
-@@ -195,6 +214,8 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- static int tegra_cpu_exit(struct cpufreq_policy *policy)
- {
- 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
-+	clk_disable(emc_clk);
-+	clk_put(emc_clk);
- 	clk_put(cpu_clk);
- 	return 0;
- }
+ 	list_add_tail(&c->u.shared_bus_user.node,
+ 		&c->parent->shared_bus_list);
 -- 
 1.7.3.1
