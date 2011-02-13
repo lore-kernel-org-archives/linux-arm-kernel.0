@@ -1,218 +1,357 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 14 Feb 2011 10:32:24 +0800
-Subject: [PATCH v2 5/7] ARM: mxs: fix typo "GPO" in iomux-mx23.h
-In-Reply-To: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1297650746-12841-6-git-send-email-shawn.guo@freescale.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 13 Feb 2011 11:06:35 -0800
+Subject: [PATCH 2/2] ARM: tegra: add TrimSlice board
+In-Reply-To: <4D57BBC7.4070306@compulab.co.il>
+References: <cover.1297063443.git.mike@compulab.co.il>
+	<c61e1816027e51acfb5bda1e498225a4da37d92d.1297063443.git.mike@compulab.co.il>
+	<AANLkTim5-dmpF8r9uZp8iDsT6p61D0iaJZuHvRLfUL6Y@mail.gmail.com>
+	<4D57BBC7.4070306@compulab.co.il>
+Message-ID: <AANLkTimU9tpeY3-5yisqOAKBeAtz684gtM2ieYb62zO-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-mxs/include/mach/iomux-mx23.h |  190 +++++++++++++-------------
- 1 files changed, 95 insertions(+), 95 deletions(-)
+On Sun, Feb 13, 2011 at 3:08 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+> On 02/11/11 04:43, Colin Cross wrote:
+>> On Mon, Feb 7, 2011 at 12:10 AM, Mike Rapoport <mike@compulab.co.il> wrote:
+>>> Add basic support for CompuLab TrimSlice platform
+>>>
+>>> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+>>> ---
+>>> ?arch/arm/mach-tegra/Kconfig ? ? ? ? ? ? ? ? ?| ? ?6 +
+>>> ?arch/arm/mach-tegra/Makefile ? ? ? ? ? ? ? ? | ? ?3 +
+>>> ?arch/arm/mach-tegra/board-trimslice-pinmux.c | ?145 ++++++++++++++++++++++++++
+>>> ?arch/arm/mach-tegra/board-trimslice.c ? ? ? ?| ?104 ++++++++++++++++++
+>>> ?arch/arm/mach-tegra/board-trimslice.h ? ? ? ?| ? 22 ++++
+>>> ?5 files changed, 280 insertions(+), 0 deletions(-)
+>>> ?create mode 100644 arch/arm/mach-tegra/board-trimslice-pinmux.c
+>>> ?create mode 100644 arch/arm/mach-tegra/board-trimslice.c
+>>> ?create mode 100644 arch/arm/mach-tegra/board-trimslice.h
+>>>
+>>> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+>>> index acd9552..f0fda77 100644
+>>> --- a/arch/arm/mach-tegra/Kconfig
+>>> +++ b/arch/arm/mach-tegra/Kconfig
+>>> @@ -27,6 +27,12 @@ config MACH_HARMONY
+>>> ? ? ? ?help
+>>> ? ? ? ? ?Support for nVidia Harmony development platform
+>>>
+>>> +config MACH_TRIMSLICE
+>>> + ? ? ? bool "TrimSlice board"
+>>> + ? ? ? select TEGRA_PCI
+>>> + ? ? ? help
+>>> + ? ? ? ? Support for CompuLab TrimSlice platform
+>>> +
+>>> ?choice
+>>> ? ? ? ? prompt "Low-level debug console UART"
+>>> ? ? ? ? default TEGRA_DEBUG_UART_NONE
+>>> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+>>> index cdbc68e..0e1844b 100644
+>>> --- a/arch/arm/mach-tegra/Makefile
+>>> +++ b/arch/arm/mach-tegra/Makefile
+>>> @@ -19,3 +19,6 @@ obj-$(CONFIG_TEGRA_PCI) ? ? ? ? ? ? ? ? ? ? ? += pcie.o
+>>> ?obj-${CONFIG_MACH_HARMONY} ? ? ? ? ? ? ?+= board-harmony.o
+>>> ?obj-${CONFIG_MACH_HARMONY} ? ? ? ? ? ? ?+= board-harmony-pinmux.o
+>>> ?obj-${CONFIG_MACH_HARMONY} ? ? ? ? ? ? ?+= board-harmony-pcie.o
+>>> +
+>>> +obj-${CONFIG_MACH_TRIMSLICE} ? ? ? ? ? ?+= board-trimslice.o
+>>> +obj-${CONFIG_MACH_TRIMSLICE} ? ? ? ? ? ?+= board-trimslice-pinmux.o
+>>> diff --git a/arch/arm/mach-tegra/board-trimslice-pinmux.c b/arch/arm/mach-tegra/board-trimslice-pinmux.c
+>>> new file mode 100644
+>>> index 0000000..6d4fc9f
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-tegra/board-trimslice-pinmux.c
+>>> @@ -0,0 +1,145 @@
+>>> +/*
+>>> + * arch/arm/mach-tegra/board-trimslice-pinmux.c
+>>> + *
+>>> + * Copyright (C) 2011 CompuLab, Ltd.
+>>> + *
+>>> + * This software is licensed under the terms of the GNU General Public
+>>> + * License version 2, as published by the Free Software Foundation, and
+>>> + * may be copied, distributed, and modified under those terms.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + */
+>>> +
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/init.h>
+>>> +#include <mach/pinmux.h>
+>>> +
+>>> +#include "board-trimslice.h"
+>>> +
+>>> +static __initdata struct tegra_pingroup_config trimslice_pinmux[] = {
+>>> + ? ? ? {TEGRA_PINGROUP_ATA, ? TEGRA_MUX_IDE, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_ATB, ? TEGRA_MUX_SDIO4, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_ATC, ? TEGRA_MUX_NAND, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_ATD, ? TEGRA_MUX_GMI, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_ATE, ? TEGRA_MUX_GMI, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_CDEV1, TEGRA_MUX_OSC, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_CDEV2, TEGRA_MUX_PLLP_OUT4, ? ? TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_CRTP, ?TEGRA_MUX_CRT, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_CSUS, ?TEGRA_MUX_VI_SENSOR_CLK, TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DAP1, ?TEGRA_MUX_DAP1, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_DAP2, ?TEGRA_MUX_DAP2, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DAP3, ?TEGRA_MUX_DAP3, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_DAP4, ?TEGRA_MUX_DAP4, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DDC, ? TEGRA_MUX_I2C2, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_DTA, ? TEGRA_MUX_VI, ? ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DTB, ? TEGRA_MUX_VI, ? ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DTC, ? TEGRA_MUX_VI, ? ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DTD, ? TEGRA_MUX_VI, ? ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DTE, ? TEGRA_MUX_VI, ? ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_DTF, ? TEGRA_MUX_I2C3, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_GMA, ? TEGRA_MUX_SDIO4, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_GMB, ? TEGRA_MUX_NAND, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_GMC, ? TEGRA_MUX_SFLASH, ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_GMD, ? TEGRA_MUX_SFLASH, ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_GME, ? TEGRA_MUX_GMI, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_GPU, ? TEGRA_MUX_UARTA, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_GPU7, ?TEGRA_MUX_RTCK, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_GPV, ? TEGRA_MUX_PCIE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_HDINT, TEGRA_MUX_HDMI, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_I2CP, ?TEGRA_MUX_I2C, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_IRRX, ?TEGRA_MUX_UARTB, ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_IRTX, ?TEGRA_MUX_UARTB, ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_KBCA, ?TEGRA_MUX_KBC, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_KBCB, ?TEGRA_MUX_KBC, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_KBCC, ?TEGRA_MUX_KBC, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_KBCD, ?TEGRA_MUX_KBC, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_KBCE, ?TEGRA_MUX_KBC, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_KBCF, ?TEGRA_MUX_KBC, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LCSN, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LD0, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD1, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD2, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD3, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD4, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD5, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD6, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD7, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD8, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD9, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD10, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD11, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD12, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD13, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD14, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD15, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD16, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LD17, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LDC, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LDI, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LHP0, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LHP1, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LHP2, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LHS, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LM0, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LM1, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LPP, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LPW0, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LPW1, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LPW2, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LSC0, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LSC1, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LSCK, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LSDA, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LSDI, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LSPI, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LVP0, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_LVP1, ?TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_LVS, ? TEGRA_MUX_DISPLAYA, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_OWC, ? TEGRA_MUX_RSVD2, ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_PMC, ? TEGRA_MUX_PWR_ON, ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_PTA, ? TEGRA_MUX_RSVD3, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_RM, ? ?TEGRA_MUX_I2C, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SDB, ? TEGRA_MUX_PWM, ? ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SDC, ? TEGRA_MUX_PWM, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SDD, ? TEGRA_MUX_PWM, ? ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SDIO1, TEGRA_MUX_SDIO1, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SLXA, ?TEGRA_MUX_PCIE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SLXC, ?TEGRA_MUX_SDIO3, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SLXD, ?TEGRA_MUX_SDIO3, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SLXK, ?TEGRA_MUX_PCIE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_SPDI, ?TEGRA_MUX_SPDIF, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPDO, ?TEGRA_MUX_SPDIF, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIA, ?TEGRA_MUX_SPI2, ? ? ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIB, ?TEGRA_MUX_SPI2, ? ? ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIC, ?TEGRA_MUX_SPI2, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPID, ?TEGRA_MUX_SPI1, ? ? ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIE, ?TEGRA_MUX_SPI1, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIF, ?TEGRA_MUX_SPI1, ? ? ? ? ?TEGRA_PUPD_PULL_DOWN, ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIG, ?TEGRA_MUX_SPI2_ALT, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_SPIH, ?TEGRA_MUX_SPI2_ALT, ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UAA, ? TEGRA_MUX_ULPI, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UAB, ? TEGRA_MUX_ULPI, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UAC, ? TEGRA_MUX_RSVD2, ? ? ? ? TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UAD, ? TEGRA_MUX_IRDA, ? ? ? ? ?TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UCA, ? TEGRA_MUX_UARTC, ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UCB, ? TEGRA_MUX_UARTC, ? ? ? ? TEGRA_PUPD_PULL_UP, ? ? TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_UDA, ? TEGRA_MUX_ULPI, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_TRISTATE},
+>>> + ? ? ? {TEGRA_PINGROUP_CK32, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_DDRC, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_PMCA, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_PMCB, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_PMCC, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_PMCD, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_PMCE, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_XM2C, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> + ? ? ? {TEGRA_PINGROUP_XM2D, ?TEGRA_MUX_NONE, ? ? ? ? ?TEGRA_PUPD_NORMAL, ? ? ?TEGRA_TRI_NORMAL},
+>>> +};
+>>> +
+>>> +void __init trimslice_pinmux_init(void)
+>>> +{
+>>> + ? ? ? tegra_pinmux_config_table(trimslice_pinmux, ARRAY_SIZE(trimslice_pinmux));
+>>> +}
+>>> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+>>> new file mode 100644
+>>> index 0000000..ef233b2
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-tegra/board-trimslice.c
+>>> @@ -0,0 +1,104 @@
+>>> +/*
+>>> + * arch/arm/mach-tegra/board-trimslice.c
+>>> + *
+>>> + * Copyright (C) 2011 CompuLab, Ltd.
+>>> + * Author: Mike Rapoport <mike@compulab.co.il>
+>>> + *
+>>> + * Based on board-harmony.c
+>>> + * Copyright (C) 2010 Google, Inc.
+>>> + *
+>>> + * This software is licensed under the terms of the GNU General Public
+>>> + * License version 2, as published by the Free Software Foundation, and
+>>> + * may be copied, distributed, and modified under those terms.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + */
+>>> +
+>>> +#include <linux/kernel.h>
+>>> +#include <linux/init.h>
+>>> +#include <linux/platform_device.h>
+>>> +#include <linux/serial_8250.h>
+>>> +#include <linux/io.h>
+>>> +
+>>> +#include <asm/mach-types.h>
+>>> +#include <asm/mach/arch.h>
+>>> +#include <asm/setup.h>
+>>> +
+>>> +#include <mach/iomap.h>
+>>> +
+>>> +#include "board.h"
+>>> +#include "clock.h"
+>>> +
+>>> +#include "board-trimslice.h"
+>>> +
+>>> +static struct plat_serial8250_port debug_uart_platform_data[] = {
+>>> + ? ? ? {
+>>> + ? ? ? ? ? ? ? .membase ? ? ? ?= IO_ADDRESS(TEGRA_UARTA_BASE),
+>>> + ? ? ? ? ? ? ? .mapbase ? ? ? ?= TEGRA_UARTA_BASE,
+>>> + ? ? ? ? ? ? ? .irq ? ? ? ? ? ?= INT_UARTA,
+>>> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= UPF_BOOT_AUTOCONF,
+>>> + ? ? ? ? ? ? ? .iotype ? ? ? ? = UPIO_MEM,
+>>> + ? ? ? ? ? ? ? .regshift ? ? ? = 2,
+>>> + ? ? ? ? ? ? ? .uartclk ? ? ? ?= 216000000,
+>>> + ? ? ? }, {
+>>> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= 0
+>>> + ? ? ? }
+>>> +};
+>>> +
+>>> +static struct platform_device debug_uart = {
+>>> + ? ? ? .name ? = "serial8250",
+>>> + ? ? ? .id ? ? = PLAT8250_DEV_PLATFORM,
+>>> + ? ? ? .dev ? ?= {
+>>> + ? ? ? ? ? ? ? .platform_data ?= debug_uart_platform_data,
+>>> + ? ? ? },
+>>> +};
+>>> +
+>>> +static struct platform_device *trimslice_devices[] __initdata = {
+>>> + ? ? ? &debug_uart,
+>>> +};
+>>> +
+>>> +static void __init tegra_trimslice_fixup(struct machine_desc *desc,
+>>> + ? ? ? struct tag *tags, char **cmdline, struct meminfo *mi)
+>>> +{
+>>> + ? ? ? mi->nr_banks = 2;
+>>> + ? ? ? mi->bank[0].start = PHYS_OFFSET;
+>>> + ? ? ? mi->bank[0].size = 448 * SZ_1M;
+>>> + ? ? ? mi->bank[1].start = SZ_512M;
+>>> + ? ? ? mi->bank[1].size = SZ_512M;
+>>> +}
+>>> +
+>>> +static __initdata struct tegra_clk_init_table trimslice_clk_init_table[] = {
+>>> + ? ? ? /* name ? ? ? ? parent ? ? ? ? ?rate ? ? ? ? ? ?enabled */
+>>> + ? ? ? { "uarta", ? ? ?"pll_p", ? ? ? ?216000000, ? ? ?true },
+>>> + ? ? ? { NULL, ? ? ? ? NULL, ? ? ? ? ? 0, ? ? ? ? ? ? ?0},
+>>> +};
+>>> +
+>>> +static int __init tegra_trimslice_pci_init(void)
+>>> +{
+>>> + ? ? ? return tegra_pcie_init(true, true);
+>>> +}
+>>> +subsys_initcall(tegra_trimslice_pci_init);
+>>> +
+>>> +static void __init tegra_trimslice_init(void)
+>>> +{
+>>> + ? ? ? tegra_common_init();
+>>> +
+>>> + ? ? ? tegra_clk_init_from_table(trimslice_clk_init_table);
+>>> +
+>>> + ? ? ? trimslice_pinmux_init();
+>>> +
+>>> + ? ? ? platform_add_devices(trimslice_devices, ARRAY_SIZE(trimslice_devices));
+>>> +}
+>>> +
+>>> +MACHINE_START(TRIMSLICE, "trimslice")
+>>> + ? ? ? .boot_params ? ?= 0x00000100,
+>>> + ? ? ? .fixup ? ? ? ? ?= tegra_trimslice_fixup,
+>>> + ? ? ? .init_irq ? ? ? = tegra_init_irq,
+>>> + ? ? ? .init_machine ? = tegra_trimslice_init,
+>>> + ? ? ? .map_io ? ? ? ? = tegra_map_common_io,
+>>> + ? ? ? .timer ? ? ? ? ?= &tegra_timer,
+>>> +MACHINE_END
+>>> diff --git a/arch/arm/mach-tegra/board-trimslice.h b/arch/arm/mach-tegra/board-trimslice.h
+>>> new file mode 100644
+>>> index 0000000..16ec0f0
+>>> --- /dev/null
+>>> +++ b/arch/arm/mach-tegra/board-trimslice.h
+>>> @@ -0,0 +1,22 @@
+>>> +/*
+>>> + * arch/arm/mach-tegra/board-trimslice.h
+>>> + *
+>>> + * Copyright (C) 2011 CompuLab, Ltd.
+>>> + *
+>>> + * This software is licensed under the terms of the GNU General Public
+>>> + * License version 2, as published by the Free Software Foundation, and
+>>> + * may be copied, distributed, and modified under those terms.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + */
+>>> +
+>>> +#ifndef _MACH_TEGRA_BOARD_TRIMSLICE_H
+>>> +#define _MACH_TEGRA_BOARD_TRIMSLICE_H
+>>> +
+>>> +void trimslice_pinmux_init(void);
+>>> +
+>>> +#endif
+>>> --
+>>> 1.7.3.1
+>>
+>> Ack, the machine type is merged so I'll put this in for-next. ?Do you
+>> want it enabled in tegra_defconfig?
+>
+> If 'select TEGRA_PCI' does not trouble you, I'd be glad to have the TrimSlice in
+> tegra_defconfig :)
 
-diff --git a/arch/arm/mach-mxs/include/mach/iomux-mx23.h b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-index 94e5dd8..b0190a4 100644
---- a/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-+++ b/arch/arm/mach-mxs/include/mach/iomux-mx23.h
-@@ -254,102 +254,102 @@
- #define MX23_PAD_ROTARYB__GPMI_CE3N		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_2)
- 
- /* MUXSEL_GPIO */
--#define MX23_PAD_GPMI_D00__GPO_0_0		MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D01__GPO_0_1		MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D02__GPO_0_2		MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D03__GPO_0_3		MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D04__GPO_0_4		MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D05__GPO_0_5		MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D06__GPO_0_6		MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D07__GPO_0_7		MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D08__GPO_0_8		MXS_IOMUX_PAD_NAKED(0,  8, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D09__GPO_0_9		MXS_IOMUX_PAD_NAKED(0,  9, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D10__GPO_0_10		MXS_IOMUX_PAD_NAKED(0, 10, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D11__GPO_0_11		MXS_IOMUX_PAD_NAKED(0, 11, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D12__GPO_0_12		MXS_IOMUX_PAD_NAKED(0, 12, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D13__GPO_0_13		MXS_IOMUX_PAD_NAKED(0, 13, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D14__GPO_0_14		MXS_IOMUX_PAD_NAKED(0, 14, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_D15__GPO_0_15		MXS_IOMUX_PAD_NAKED(0, 15, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_CLE__GPO_0_16		MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_ALE__GPO_0_17		MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_CE2N__GPO_0_18		MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_RDY0__GPO_0_19		MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_RDY1__GPO_0_20		MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_RDY2__GPO_0_21		MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_RDY3__GPO_0_22		MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_WPN__GPO_0_23		MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_WRN__GPO_0_24		MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_RDN__GPO_0_25		MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_GPIO)
--#define MX23_PAD_AUART1_CTS__GPO_0_26		MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_GPIO)
--#define MX23_PAD_AUART1_RTS__GPO_0_27		MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_GPIO)
--#define MX23_PAD_AUART1_RX__GPO_0_28		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_GPIO)
--#define MX23_PAD_AUART1_TX__GPO_0_29		MXS_IOMUX_PAD_NAKED(0, 29, PAD_MUXSEL_GPIO)
--#define MX23_PAD_I2C_SCL__GPO_0_30		MXS_IOMUX_PAD_NAKED(0, 30, PAD_MUXSEL_GPIO)
--#define MX23_PAD_I2C_SDA__GPO_0_31		MXS_IOMUX_PAD_NAKED(0, 31, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D00__GPIO_0_0		MXS_IOMUX_PAD_NAKED(0,  0, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D01__GPIO_0_1		MXS_IOMUX_PAD_NAKED(0,  1, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D02__GPIO_0_2		MXS_IOMUX_PAD_NAKED(0,  2, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D03__GPIO_0_3		MXS_IOMUX_PAD_NAKED(0,  3, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D04__GPIO_0_4		MXS_IOMUX_PAD_NAKED(0,  4, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D05__GPIO_0_5		MXS_IOMUX_PAD_NAKED(0,  5, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D06__GPIO_0_6		MXS_IOMUX_PAD_NAKED(0,  6, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D07__GPIO_0_7		MXS_IOMUX_PAD_NAKED(0,  7, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D08__GPIO_0_8		MXS_IOMUX_PAD_NAKED(0,  8, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D09__GPIO_0_9		MXS_IOMUX_PAD_NAKED(0,  9, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D10__GPIO_0_10		MXS_IOMUX_PAD_NAKED(0, 10, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D11__GPIO_0_11		MXS_IOMUX_PAD_NAKED(0, 11, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D12__GPIO_0_12		MXS_IOMUX_PAD_NAKED(0, 12, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D13__GPIO_0_13		MXS_IOMUX_PAD_NAKED(0, 13, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D14__GPIO_0_14		MXS_IOMUX_PAD_NAKED(0, 14, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_D15__GPIO_0_15		MXS_IOMUX_PAD_NAKED(0, 15, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_CLE__GPIO_0_16		MXS_IOMUX_PAD_NAKED(0, 16, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_ALE__GPIO_0_17		MXS_IOMUX_PAD_NAKED(0, 17, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_CE2N__GPIO_0_18		MXS_IOMUX_PAD_NAKED(0, 18, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_RDY0__GPIO_0_19		MXS_IOMUX_PAD_NAKED(0, 19, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_RDY1__GPIO_0_20		MXS_IOMUX_PAD_NAKED(0, 20, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_RDY2__GPIO_0_21		MXS_IOMUX_PAD_NAKED(0, 21, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_RDY3__GPIO_0_22		MXS_IOMUX_PAD_NAKED(0, 22, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_WPN__GPIO_0_23		MXS_IOMUX_PAD_NAKED(0, 23, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_WRN__GPIO_0_24		MXS_IOMUX_PAD_NAKED(0, 24, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_RDN__GPIO_0_25		MXS_IOMUX_PAD_NAKED(0, 25, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_AUART1_CTS__GPIO_0_26		MXS_IOMUX_PAD_NAKED(0, 26, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_AUART1_RTS__GPIO_0_27		MXS_IOMUX_PAD_NAKED(0, 27, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_AUART1_RX__GPIO_0_28		MXS_IOMUX_PAD_NAKED(0, 28, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_AUART1_TX__GPIO_0_29		MXS_IOMUX_PAD_NAKED(0, 29, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_I2C_SCL__GPIO_0_30		MXS_IOMUX_PAD_NAKED(0, 30, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_I2C_SDA__GPIO_0_31		MXS_IOMUX_PAD_NAKED(0, 31, PAD_MUXSEL_GPIO)
- 
--#define MX23_PAD_LCD_D00__GPO_1_0		MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D01__GPO_1_1		MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D02__GPO_1_2		MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D03__GPO_1_3		MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D04__GPO_1_4		MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D05__GPO_1_5		MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D06__GPO_1_6		MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D07__GPO_1_7		MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D08__GPO_1_8		MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D09__GPO_1_9		MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D10__GPO_1_10		MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D11__GPO_1_11		MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D12__GPO_1_12		MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D13__GPO_1_13		MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D14__GPO_1_14		MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D15__GPO_1_15		MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D16__GPO_1_16		MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_D17__GPO_1_17		MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_RESET__GPO_1_18		MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_RS__GPO_1_19		MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_WR__GPO_1_20		MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_CS__GPO_1_21		MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_DOTCK__GPO_1_22		MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_ENABLE__GPO_1_23		MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_HSYNC__GPO_1_24		MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_GPIO)
--#define MX23_PAD_LCD_VSYNC__GPO_1_25		MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_GPIO)
--#define MX23_PAD_PWM0__GPO_1_26			MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_GPIO)
--#define MX23_PAD_PWM1__GPO_1_27			MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_GPIO)
--#define MX23_PAD_PWM2__GPO_1_28			MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_GPIO)
--#define MX23_PAD_PWM3__GPO_1_29			MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_GPIO)
--#define MX23_PAD_PWM4__GPO_1_30			MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D00__GPIO_1_0		MXS_IOMUX_PAD_NAKED(1,  0, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D01__GPIO_1_1		MXS_IOMUX_PAD_NAKED(1,  1, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D02__GPIO_1_2		MXS_IOMUX_PAD_NAKED(1,  2, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D03__GPIO_1_3		MXS_IOMUX_PAD_NAKED(1,  3, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D04__GPIO_1_4		MXS_IOMUX_PAD_NAKED(1,  4, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D05__GPIO_1_5		MXS_IOMUX_PAD_NAKED(1,  5, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D06__GPIO_1_6		MXS_IOMUX_PAD_NAKED(1,  6, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D07__GPIO_1_7		MXS_IOMUX_PAD_NAKED(1,  7, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D08__GPIO_1_8		MXS_IOMUX_PAD_NAKED(1,  8, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D09__GPIO_1_9		MXS_IOMUX_PAD_NAKED(1,  9, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D10__GPIO_1_10		MXS_IOMUX_PAD_NAKED(1, 10, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D11__GPIO_1_11		MXS_IOMUX_PAD_NAKED(1, 11, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D12__GPIO_1_12		MXS_IOMUX_PAD_NAKED(1, 12, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D13__GPIO_1_13		MXS_IOMUX_PAD_NAKED(1, 13, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D14__GPIO_1_14		MXS_IOMUX_PAD_NAKED(1, 14, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D15__GPIO_1_15		MXS_IOMUX_PAD_NAKED(1, 15, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D16__GPIO_1_16		MXS_IOMUX_PAD_NAKED(1, 16, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_D17__GPIO_1_17		MXS_IOMUX_PAD_NAKED(1, 17, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_RESET__GPIO_1_18		MXS_IOMUX_PAD_NAKED(1, 18, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_RS__GPIO_1_19		MXS_IOMUX_PAD_NAKED(1, 19, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_WR__GPIO_1_20		MXS_IOMUX_PAD_NAKED(1, 20, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_CS__GPIO_1_21		MXS_IOMUX_PAD_NAKED(1, 21, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_DOTCK__GPIO_1_22		MXS_IOMUX_PAD_NAKED(1, 22, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_ENABLE__GPIO_1_23		MXS_IOMUX_PAD_NAKED(1, 23, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_HSYNC__GPIO_1_24		MXS_IOMUX_PAD_NAKED(1, 24, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_LCD_VSYNC__GPIO_1_25		MXS_IOMUX_PAD_NAKED(1, 25, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_PWM0__GPIO_1_26		MXS_IOMUX_PAD_NAKED(1, 26, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_PWM1__GPIO_1_27		MXS_IOMUX_PAD_NAKED(1, 27, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_PWM2__GPIO_1_28		MXS_IOMUX_PAD_NAKED(1, 28, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_PWM3__GPIO_1_29		MXS_IOMUX_PAD_NAKED(1, 29, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_PWM4__GPIO_1_30		MXS_IOMUX_PAD_NAKED(1, 30, PAD_MUXSEL_GPIO)
- 
--#define MX23_PAD_SSP1_CMD__GPO_2_0		MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_GPIO)
--#define MX23_PAD_SSP1_DETECT__GPO_2_1		MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_GPIO)
--#define MX23_PAD_SSP1_DATA0__GPO_2_2		MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_GPIO)
--#define MX23_PAD_SSP1_DATA1__GPO_2_3		MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_GPIO)
--#define MX23_PAD_SSP1_DATA2__GPO_2_4		MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_GPIO)
--#define MX23_PAD_SSP1_DATA3__GPO_2_5		MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_GPIO)
--#define MX23_PAD_SSP1_SCK__GPO_2_6		MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_GPIO)
--#define MX23_PAD_ROTARYA__GPO_2_7		MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_GPIO)
--#define MX23_PAD_ROTARYB__GPO_2_8		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A00__GPO_2_9		MXS_IOMUX_PAD_NAKED(2,  9, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A01__GPO_2_10		MXS_IOMUX_PAD_NAKED(2, 10, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A02__GPO_2_11		MXS_IOMUX_PAD_NAKED(2, 11, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A03__GPO_2_12		MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A04__GPO_2_13		MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A05__GPO_2_14		MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A06__GPO_2_15		MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A07__GPO_2_16		MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A08__GPO_2_17		MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A09__GPO_2_18		MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A10__GPO_2_19		MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A11__GPO_2_20		MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_A12__GPO_2_21		MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_BA0__GPO_2_22		MXS_IOMUX_PAD_NAKED(2, 22, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_BA1__GPO_2_23		MXS_IOMUX_PAD_NAKED(2, 23, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_CASN__GPO_2_24		MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_CE0N__GPO_2_25		MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_CE1N__GPO_2_26		MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_CE1N__GPO_2_27		MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_GPIO)
--#define MX23_PAD_GPMI_CE0N__GPO_2_28		MXS_IOMUX_PAD_NAKED(2, 28, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_CKE__GPO_2_29		MXS_IOMUX_PAD_NAKED(2, 29, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_RASN__GPO_2_30		MXS_IOMUX_PAD_NAKED(2, 30, PAD_MUXSEL_GPIO)
--#define MX23_PAD_EMI_WEN__GPO_2_31		MXS_IOMUX_PAD_NAKED(2, 31, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_CMD__GPIO_2_0		MXS_IOMUX_PAD_NAKED(2,  0, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_DETECT__GPIO_2_1		MXS_IOMUX_PAD_NAKED(2,  1, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_DATA0__GPIO_2_2		MXS_IOMUX_PAD_NAKED(2,  2, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_DATA1__GPIO_2_3		MXS_IOMUX_PAD_NAKED(2,  3, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_DATA2__GPIO_2_4		MXS_IOMUX_PAD_NAKED(2,  4, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_DATA3__GPIO_2_5		MXS_IOMUX_PAD_NAKED(2,  5, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_SSP1_SCK__GPIO_2_6		MXS_IOMUX_PAD_NAKED(2,  6, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_ROTARYA__GPIO_2_7		MXS_IOMUX_PAD_NAKED(2,  7, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_ROTARYB__GPIO_2_8		MXS_IOMUX_PAD_NAKED(2,  8, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A00__GPIO_2_9		MXS_IOMUX_PAD_NAKED(2,  9, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A01__GPIO_2_10		MXS_IOMUX_PAD_NAKED(2, 10, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A02__GPIO_2_11		MXS_IOMUX_PAD_NAKED(2, 11, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A03__GPIO_2_12		MXS_IOMUX_PAD_NAKED(2, 12, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A04__GPIO_2_13		MXS_IOMUX_PAD_NAKED(2, 13, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A05__GPIO_2_14		MXS_IOMUX_PAD_NAKED(2, 14, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A06__GPIO_2_15		MXS_IOMUX_PAD_NAKED(2, 15, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A07__GPIO_2_16		MXS_IOMUX_PAD_NAKED(2, 16, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A08__GPIO_2_17		MXS_IOMUX_PAD_NAKED(2, 17, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A09__GPIO_2_18		MXS_IOMUX_PAD_NAKED(2, 18, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A10__GPIO_2_19		MXS_IOMUX_PAD_NAKED(2, 19, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A11__GPIO_2_20		MXS_IOMUX_PAD_NAKED(2, 20, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_A12__GPIO_2_21		MXS_IOMUX_PAD_NAKED(2, 21, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_BA0__GPIO_2_22		MXS_IOMUX_PAD_NAKED(2, 22, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_BA1__GPIO_2_23		MXS_IOMUX_PAD_NAKED(2, 23, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_CASN__GPIO_2_24		MXS_IOMUX_PAD_NAKED(2, 24, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_CE0N__GPIO_2_25		MXS_IOMUX_PAD_NAKED(2, 25, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_CE1N__GPIO_2_26		MXS_IOMUX_PAD_NAKED(2, 26, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_CE1N__GPIO_2_27		MXS_IOMUX_PAD_NAKED(2, 27, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_GPMI_CE0N__GPIO_2_28		MXS_IOMUX_PAD_NAKED(2, 28, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_CKE__GPIO_2_29		MXS_IOMUX_PAD_NAKED(2, 29, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_RASN__GPIO_2_30		MXS_IOMUX_PAD_NAKED(2, 30, PAD_MUXSEL_GPIO)
-+#define MX23_PAD_EMI_WEN__GPIO_2_31		MXS_IOMUX_PAD_NAKED(2, 31, PAD_MUXSEL_GPIO)
- 
- #endif /* __MACH_IOMUX_MX23_H__ */
--- 
-1.7.1
+My board without PCI doesn't boot if CONFIG_TEGRA_PCI is selected, so
+I guess it should stay off for now.  Any idea why it wouldn't boot?
