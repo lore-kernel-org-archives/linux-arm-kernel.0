@@ -1,117 +1,105 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 13 Feb 2011 01:40:32 -0800
-Subject: [PATCH 20/21] ARM: tegra: clock: Fix clock issues in suspend
+Date: Sun, 13 Feb 2011 01:40:27 -0800
+Subject: [PATCH 15/21] ARM: tegra: clock: Round rate before setting rate
 In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
 References: <1297590033-15035-1-git-send-email-ccross@android.com>
-Message-ID: <1297590033-15035-21-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-16-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PLLP registers are now being restored by the low-level resume code,
-and the CPU may be running off PLLP, so don't touch them during clock
-resume.
+Call the clock's round_rate op, if it exists, before calling
+the set_rate op.  This will help later when dvfs is added,
+dvfs needs to know what the final rate will be before the
+frequency changes.
 
-Save plld, plls, pllu, and audio clock during suspend (originally
-fixed by Mayuresh Kulkarni <mkulkarni@nvidia.com>)
+Also requires fixes to the round rate functions to ensure
+calling round rate and then set rate will not cause the
+frequency to be rounded down twice.  When picking clock
+divider values, the clock framework picks the closest
+frequency that is lower than the requested frequency.  If
+the new frequency calculated from the divider value is
+rounded down, and then passed to set_rate, it will get
+rounded down again, possibly resulting in a frequency two
+steps lower than the original requested frequency.
 
-The lock time for plld is 1000 us, so increase the delay after
-setting the PLLs.
-
-Add a BUG_ON to ensure the size of the suspend context area is
-correct.
+Fix the problem by rounding up when calculating the frequency
+coming out of a clock divider, so if that frequency is
+requested again, the same divider value will be picked.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/tegra2_clocks.c |   30 ++++++++++++++++++++----------
- 1 files changed, 20 insertions(+), 10 deletions(-)
+ arch/arm/mach-tegra/clock.c         |   13 +++++++++++++
+ arch/arm/mach-tegra/tegra2_clocks.c |    8 ++++----
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index 2d9ddfd..4865bb4 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -85,6 +85,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
+ 
+ 	if (c->mul != 0 && c->div != 0) {
+ 		rate *= c->mul;
++		rate += c->div / 2; /* round up */
+ 		do_div(rate, c->div);
+ 	}
+ 
+@@ -242,6 +243,7 @@ int clk_set_rate(struct clk *c, unsigned long rate)
+ 	int ret = 0;
+ 	unsigned long flags;
+ 	unsigned long old_rate;
++	long new_rate;
+ 
+ 	spin_lock_irqsave(&c->spinlock, flags);
+ 
+@@ -255,6 +257,17 @@ int clk_set_rate(struct clk *c, unsigned long rate)
+ 	if (rate > c->max_rate)
+ 		rate = c->max_rate;
+ 
++	if (c->ops && c->ops->round_rate) {
++		new_rate = c->ops->round_rate(c, rate);
++
++		if (new_rate < 0) {
++			ret = new_rate;
++			goto out;
++		}
++
++		rate = new_rate;
++	}
++
+ 	ret = c->ops->set_rate(c, rate);
+ 	if (ret)
+ 		goto out;
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index bfc9792..00e348a 100644
+index 2f79128..96b2490 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -2215,7 +2215,7 @@ void __init tegra2_init_clocks(void)
- 
- #ifdef CONFIG_PM
- static u32 clk_rst_suspend[RST_DEVICES_NUM + CLK_OUT_ENB_NUM +
--			   PERIPH_CLK_SOURCE_NUM + 19];
-+			   PERIPH_CLK_SOURCE_NUM + 22];
- 
- void tegra_clk_suspend(void)
- {
-@@ -2223,16 +2223,18 @@ void tegra_clk_suspend(void)
- 	u32 *ctx = clk_rst_suspend;
- 
- 	*ctx++ = clk_readl(OSC_CTRL) & OSC_CTRL_MASK;
--	*ctx++ = clk_readl(tegra_pll_p.reg + PLL_BASE);
--	*ctx++ = clk_readl(tegra_pll_p.reg + PLL_MISC(&tegra_pll_p));
- 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_BASE);
- 	*ctx++ = clk_readl(tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
- 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_BASE);
- 	*ctx++ = clk_readl(tegra_pll_a.reg + PLL_MISC(&tegra_pll_a));
-+	*ctx++ = clk_readl(tegra_pll_s.reg + PLL_BASE);
-+	*ctx++ = clk_readl(tegra_pll_s.reg + PLL_MISC(&tegra_pll_s));
-+	*ctx++ = clk_readl(tegra_pll_d.reg + PLL_BASE);
-+	*ctx++ = clk_readl(tegra_pll_d.reg + PLL_MISC(&tegra_pll_d));
-+	*ctx++ = clk_readl(tegra_pll_u.reg + PLL_BASE);
-+	*ctx++ = clk_readl(tegra_pll_u.reg + PLL_MISC(&tegra_pll_u));
- 
- 	*ctx++ = clk_readl(tegra_pll_m_out1.reg);
--	*ctx++ = clk_readl(tegra_pll_p_out1.reg);
--	*ctx++ = clk_readl(tegra_pll_p_out3.reg);
- 	*ctx++ = clk_readl(tegra_pll_a_out0.reg);
- 	*ctx++ = clk_readl(tegra_pll_c_out1.reg);
- 
-@@ -2243,6 +2245,8 @@ void tegra_clk_suspend(void)
- 	*ctx++ = clk_readl(tegra_clk_sclk.reg + SUPER_CLK_DIVIDER);
- 	*ctx++ = clk_readl(tegra_clk_pclk.reg);
- 
-+	*ctx++ = clk_readl(tegra_clk_audio.reg);
-+
- 	for (off = PERIPH_CLK_SOURCE_I2S1; off <= PERIPH_CLK_SOURCE_OSC;
- 			off += 4) {
- 		if (off == PERIPH_CLK_SOURCE_EMC)
-@@ -2260,6 +2264,8 @@ void tegra_clk_suspend(void)
- 
- 	*ctx++ = clk_readl(MISC_CLK_ENB);
- 	*ctx++ = clk_readl(CLK_MASK_ARM);
-+
-+	BUG_ON(ctx - clk_rst_suspend != ARRAY_SIZE(clk_rst_suspend));
+@@ -866,9 +866,9 @@ static long tegra2_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
+ 		divider = clk_div71_get_divider(parent_rate, rate);
+ 		if (divider < 0)
+ 			return divider;
+-		return parent_rate * 2 / (divider + 2);
++		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
+ 	} else if (c->flags & DIV_2) {
+-		return parent_rate / 2;
++		return DIV_ROUND_UP(parent_rate, 2);
+ 	}
+ 	return -EINVAL;
  }
+@@ -1058,12 +1058,12 @@ static long tegra2_periph_clk_round_rate(struct clk *c,
+ 		if (divider < 0)
+ 			return divider;
  
- void tegra_clk_resume(void)
-@@ -2272,17 +2278,19 @@ void tegra_clk_resume(void)
- 	val |= *ctx++;
- 	clk_writel(val, OSC_CTRL);
- 
--	clk_writel(*ctx++, tegra_pll_p.reg + PLL_BASE);
--	clk_writel(*ctx++, tegra_pll_p.reg + PLL_MISC(&tegra_pll_p));
- 	clk_writel(*ctx++, tegra_pll_c.reg + PLL_BASE);
- 	clk_writel(*ctx++, tegra_pll_c.reg + PLL_MISC(&tegra_pll_c));
- 	clk_writel(*ctx++, tegra_pll_a.reg + PLL_BASE);
- 	clk_writel(*ctx++, tegra_pll_a.reg + PLL_MISC(&tegra_pll_a));
--	udelay(300);
-+	clk_writel(*ctx++, tegra_pll_s.reg + PLL_BASE);
-+	clk_writel(*ctx++, tegra_pll_s.reg + PLL_MISC(&tegra_pll_s));
-+	clk_writel(*ctx++, tegra_pll_d.reg + PLL_BASE);
-+	clk_writel(*ctx++, tegra_pll_d.reg + PLL_MISC(&tegra_pll_d));
-+	clk_writel(*ctx++, tegra_pll_u.reg + PLL_BASE);
-+	clk_writel(*ctx++, tegra_pll_u.reg + PLL_MISC(&tegra_pll_u));
-+	udelay(1000);
- 
- 	clk_writel(*ctx++, tegra_pll_m_out1.reg);
--	clk_writel(*ctx++, tegra_pll_p_out1.reg);
--	clk_writel(*ctx++, tegra_pll_p_out3.reg);
- 	clk_writel(*ctx++, tegra_pll_a_out0.reg);
- 	clk_writel(*ctx++, tegra_pll_c_out1.reg);
- 
-@@ -2293,6 +2301,8 @@ void tegra_clk_resume(void)
- 	clk_writel(*ctx++, tegra_clk_sclk.reg + SUPER_CLK_DIVIDER);
- 	clk_writel(*ctx++, tegra_clk_pclk.reg);
- 
-+	clk_writel(*ctx++, tegra_clk_audio.reg);
-+
- 	/* enable all clocks before configuring clock sources */
- 	clk_writel(0xbffffff9ul, CLK_OUT_ENB);
- 	clk_writel(0xfefffff7ul, CLK_OUT_ENB + 4);
+-		return parent_rate * 2 / (divider + 2);
++		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
+ 	} else if (c->flags & DIV_U16) {
+ 		divider = clk_div16_get_divider(parent_rate, rate);
+ 		if (divider < 0)
+ 			return divider;
+-		return parent_rate / (divider + 1);
++		return DIV_ROUND_UP(parent_rate, divider + 1);
+ 	}
+ 	return -EINVAL;
+ }
 -- 
 1.7.3.1
