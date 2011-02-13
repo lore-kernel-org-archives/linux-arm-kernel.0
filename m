@@ -1,38 +1,45 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 13 Feb 2011 09:23:42 -0500 (EST)
-Subject: The p2v branch
-In-Reply-To: <20110213114050.GB4799@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
-	<20110212184138.GD22402@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102121556330.14920@xanadu.home>
-	<20110213114050.GB4799@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1102130915120.14920@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 13 Feb 2011 16:34:40 +0100
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110213175300.GA10271@S2100-06.ap.freescale.net>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<20110211003533.GA9151@S2100-06.ap.freescale.net>
+	<20110213175300.GA10271@S2100-06.ap.freescale.net>
+Message-ID: <201102131634.40468.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 Feb 2011, Russell King - ARM Linux wrote:
-
-> On Sat, Feb 12, 2011 at 04:01:14PM -0500, Nicolas Pitre wrote:
-> > I've rebased my 2 patches on top of your latest p2v branch.  You may 
-> > pull them from:
+On Sunday 13 February 2011 18:53:02 Shawn Guo wrote:
+> On Fri, Feb 11, 2011 at 08:35:34AM +0800, Shawn Guo wrote:
 > > 
-> > 	git://git.linaro.org/people/nico/linux p2v
+> > > > + unsigned                        present:1;
+> > > 
+> > > Your card detection by polling through this variable is
+> > > really bad for power management. Is there really no interrupt
+> > > that gets triggered when installing or removing a card?
+> > > 
+> > Good point.  Will try to use interrupt.
 > > 
-> > Or if you prefer I can put them in the patch system.
+> I'm trying to use interrupt for card detection.  But unfortunately,
+> I got stuck for some reason.
 > 
-> I'd like to wait for Catalin to respond on the phys_addr_t patch - which
-> allows 64-bit phys addresses.  Obviously that's going to have an impact
-> on the p2v code and I'd rather someone else had the job of working out
-> what to do about the T2 code.
+> There is a known issue that mx28 gpio interrupt from bank0 can not
+> work, because the pin bank0 irq number 127 was used in
+> get_irqnr_and_base (entry-macro.S) to tell there is no pending
+> interrupt any more.
+> 
+> The mmc0 cd pin has no problem to trigger interrupt, as it's GPIO_2_9.
+> But mmc1 cd pin can not, because it's GPIO_0_20.
+> 
+> So I probably have to stay with polling.
 
-OK.
+I'm not sure if I understand completely. Is this a fundamental restriction,
+or something that only happens on a specific board?
 
-Thinking ahead a bit, what changes would be needed? Obviously, there 
-can't be a machine with all its RAM above the 4G limit or it wouldn't be 
-able to run without the MMU on.  And the p2v/v2p conversion macros can 
-only be used on the direct mapped memory i.e. the non highmem memory 
-which is likely to be all located below that 4G limit.  In that case the 
-fixup code shouldn't be affected, right?
+Maybe you can do both polling and interrupt driven card detection in
+the driver, and make it depend on a board-specific quirk. E.g. if you
+pass an interrupt number in the platform data, it should just use the
+interrupt, but if the interrupt is missing, you can fall back to
+polling.
 
-
-Nicolas
+	Arnd
