@@ -1,107 +1,117 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 13 Feb 2011 01:40:31 -0800
-Subject: [PATCH 19/21] ARM: tegra: clock: Add function to set SDMMC tap delay
+Date: Sun, 13 Feb 2011 01:40:29 -0800
+Subject: [PATCH 17/21] ARM: tegra: clocks: Add emc scaling
 In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
 References: <1297590033-15035-1-git-send-email-ccross@android.com>
-Message-ID: <1297590033-15035-20-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-18-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDMMC controllers have extra bits in the clock source
-register that adjust the delay between the clock and data
-to compenstate for delays on the PCB.  The values need to
-be set from the clock code so the clock can be locked
-during the read-modify-write on the clock source register.
-
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/clock.c            |   12 ++++++++++++
- arch/arm/mach-tegra/clock.h            |    1 +
- arch/arm/mach-tegra/include/mach/clk.h |    2 ++
- arch/arm/mach-tegra/tegra2_clocks.c    |   19 +++++++++++++++++++
- 4 files changed, 34 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/tegra2_clocks.c |   62 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 61 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index 4865bb4..2bca01c 100644
---- a/arch/arm/mach-tegra/clock.c
-+++ b/arch/arm/mach-tegra/clock.c
-@@ -434,6 +434,18 @@ int __init tegra_disable_boot_clocks(void)
- late_initcall(tegra_disable_boot_clocks);
- #endif
- 
-+/* The SDMMC controllers have extra bits in the clock source register that
-+ * adjust the delay between the clock and data to compenstate for delays
-+ * on the PCB. */
-+void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&c->spinlock, flags);
-+	tegra2_sdmmc_tap_delay(c, delay);
-+	spin_unlock_irqrestore(&c->spinlock, flags);
-+}
-+
- #ifdef CONFIG_DEBUG_FS
- 
- static int __clk_lock_all_spinlocks(void)
-diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
-index ba8e64f..2aac9a2 100644
---- a/arch/arm/mach-tegra/clock.h
-+++ b/arch/arm/mach-tegra/clock.h
-@@ -154,5 +154,6 @@ unsigned long clk_measure_input_freq(void);
- int clk_reparent(struct clk *c, struct clk *parent);
- void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
- unsigned long clk_get_rate_locked(struct clk *c);
-+void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
- 
- #endif
-diff --git a/arch/arm/mach-tegra/include/mach/clk.h b/arch/arm/mach-tegra/include/mach/clk.h
-index fa7f9ca..c8baf8f 100644
---- a/arch/arm/mach-tegra/include/mach/clk.h
-+++ b/arch/arm/mach-tegra/include/mach/clk.h
-@@ -26,4 +26,6 @@ void tegra_periph_reset_deassert(struct clk *c);
- void tegra_periph_reset_assert(struct clk *c);
- 
- unsigned long clk_get_rate_all_locked(struct clk *c);
-+void tegra_sdmmc_tap_delay(struct clk *c, int delay);
-+
- #endif
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index f4173ec..bfc9792 100644
+index 96b2490..f4173ec 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -74,6 +74,10 @@
- #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
- #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
+@@ -31,6 +31,7 @@
  
-+#define SDMMC_CLK_INT_FB_SEL		(1 << 23)
-+#define SDMMC_CLK_INT_FB_DLY_SHIFT	16
-+#define SDMMC_CLK_INT_FB_DLY_MASK	(0xF << SDMMC_CLK_INT_FB_DLY_SHIFT)
-+
- #define PLL_BASE			0x0
- #define PLL_BASE_BYPASS			(1<<31)
- #define PLL_BASE_ENABLE			(1<<30)
-@@ -1079,6 +1083,21 @@ static struct clk_ops tegra_periph_clk_ops = {
+ #include "clock.h"
+ #include "fuse.h"
++#include "tegra2_emc.h"
+ 
+ #define RST_DEVICES			0x004
+ #define RST_DEVICES_SET			0x300
+@@ -1078,6 +1079,53 @@ static struct clk_ops tegra_periph_clk_ops = {
  	.reset			= &tegra2_periph_clk_reset,
  };
  
-+/* The SDMMC controllers have extra bits in the clock source register that
-+ * adjust the delay between the clock and data to compenstate for delays
-+ * on the PCB. */
-+void tegra2_sdmmc_tap_delay(struct clk *c, int delay)
++/* External memory controller clock ops */
++static void tegra2_emc_clk_init(struct clk *c)
 +{
-+	u32 reg;
-+
-+	delay = clamp(delay, 0, 15);
-+	reg = clk_readl(c->reg);
-+	reg &= ~SDMMC_CLK_INT_FB_DLY_MASK;
-+	reg |= SDMMC_CLK_INT_FB_SEL;
-+	reg |= delay << SDMMC_CLK_INT_FB_DLY_SHIFT;
-+	clk_writel(reg, c->reg);
++	tegra2_periph_clk_init(c);
++	c->max_rate = clk_get_rate_locked(c);
 +}
 +
- /* External memory controller clock ops */
- static void tegra2_emc_clk_init(struct clk *c)
++static long tegra2_emc_clk_round_rate(struct clk *c, unsigned long rate)
++{
++	long new_rate = rate;
++
++	new_rate = tegra_emc_round_rate(new_rate);
++	if (new_rate < 0)
++		return c->max_rate;
++
++	BUG_ON(new_rate != tegra2_periph_clk_round_rate(c, new_rate));
++
++	return new_rate;
++}
++
++static int tegra2_emc_clk_set_rate(struct clk *c, unsigned long rate)
++{
++	int ret;
++	/* The Tegra2 memory controller has an interlock with the clock
++	 * block that allows memory shadowed registers to be updated,
++	 * and then transfer them to the main registers at the same
++	 * time as the clock update without glitches. */
++	ret = tegra_emc_set_rate(rate);
++	if (ret < 0)
++		return ret;
++
++	ret = tegra2_periph_clk_set_rate(c, rate);
++	udelay(1);
++
++	return ret;
++}
++
++static struct clk_ops tegra_emc_clk_ops = {
++	.init			= &tegra2_emc_clk_init,
++	.enable			= &tegra2_periph_clk_enable,
++	.disable		= &tegra2_periph_clk_disable,
++	.set_parent		= &tegra2_periph_clk_set_parent,
++	.set_rate		= &tegra2_emc_clk_set_rate,
++	.round_rate		= &tegra2_emc_clk_round_rate,
++	.reset			= &tegra2_periph_clk_reset,
++};
++
+ /* Clock doubler ops */
+ static void tegra2_clk_double_init(struct clk *c)
  {
+@@ -1934,6 +1982,18 @@ static struct clk_mux_sel mux_clk_32k[] = {
+ 	{ 0, 0},
+ };
+ 
++static struct clk tegra_clk_emc = {
++	.name = "emc",
++	.ops = &tegra_emc_clk_ops,
++	.reg = 0x19c,
++	.max_rate = 800000000,
++	.inputs = mux_pllm_pllc_pllp_clkm,
++	.flags = MUX | DIV_U71 | PERIPH_EMC_ENB,
++	.u.periph = {
++		.clk_num = 57,
++	},
++};
++
+ #define PERIPH_CLK(_name, _dev, _con, _clk_num, _reg, _max, _inputs, _flags) \
+ 	{						\
+ 		.name      = _name,			\
+@@ -2020,7 +2080,6 @@ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("usbd",	"fsl-tegra-udc",	NULL,	22,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
+ 	PERIPH_CLK("usb2",	"tegra-ehci.1",		NULL,	58,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
+ 	PERIPH_CLK("usb3",	"tegra-ehci.2",		NULL,	59,	0,	480000000, mux_clk_m,			0), /* requires min voltage */
+-	PERIPH_CLK("emc",	"emc",			NULL,	57,	0x19c,	800000000, mux_pllm_pllc_pllp_clkm,	MUX | DIV_U71 | PERIPH_EMC_ENB),
+ 	PERIPH_CLK("dsi",	"dsi",			NULL,	48,	0,	500000000, mux_plld,			0), /* scales with voltage */
+ 	PERIPH_CLK("csi",	"tegra_camera",		"csi",	52,	0,	72000000,  mux_pllp_out3,		0),
+ 	PERIPH_CLK("isp",	"tegra_camera",		"isp",	23,	0,	150000000, mux_clk_m,			0), /* same frequency as VI */
+@@ -2096,6 +2155,7 @@ struct clk *tegra_ptr_clks[] = {
+ 	&tegra_dev2_clk,
+ 	&tegra_clk_virtual_cpu,
+ 	&tegra_clk_blink,
++	&tegra_clk_emc,
+ };
+ 
+ static void tegra2_init_one_clock(struct clk *c)
 -- 
 1.7.3.1
