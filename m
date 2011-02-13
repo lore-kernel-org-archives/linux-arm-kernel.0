@@ -1,96 +1,162 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 12 Feb 2011 23:23:25 -0700
-Subject: [RFC PATCH] ARM: pmu: add OF match support
-In-Reply-To: <4D531CA0.8050402@gmail.com>
-References: <1297223617-19173-1-git-send-email-robherring2@gmail.com>
-	<AANLkTi=7azYw8+sYrbDsLOfF1aZynBDo+ub37O9j+k49@mail.gmail.com>
-	<3399156206431206254@unknownmsgid>
-	<AANLkTin5aA0tq-PYBmRKh6tLv6bHRaK5ymjhsj9T4-Ah@mail.gmail.com>
-	<-4919269306841091192@unknownmsgid>
-	<AANLkTikrBx1Y7MFGCJe=Gx-9fUxhwuYq-BZ4stGBGav6@mail.gmail.com>
-	<4D531CA0.8050402@gmail.com>
-Message-ID: <20110213062325.GE17375@angua.secretlab.ca>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 13 Feb 2011 01:40:24 -0800
+Subject: [PATCH 12/21] ARM: tegra: clock: Add shared bus clock type
+In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
+References: <1297590033-15035-1-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-13-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 09, 2011 at 05:00:48PM -0600, Rob Herring wrote:
-> On 02/09/2011 01:03 PM, Grant Likely wrote:
-> >On Wed, Feb 9, 2011 at 11:53 AM, Will Deacon<will.deacon@arm.com>  wrote:
-> >>Grant,
-> >>
-> >>>>Following on from Rob's update, it would be nice if you could specify that
-> >>>>the PMU is a CPU PMU (as opposed to L2-cache, bus, gpu etc) in the string.
-> >>>>That way adding different PMUs in the future seems more natural and it accounts
-> >>>>for your concerns above. Is that ok, or does the compatible string have to
-> >>>>match that used by the platform bus?
-> >>>
-> >>>It does make sense to encode the specific implementation into the
-> >>>compatible string.  A single device driver can bind against multiple
-> >>>compatible strings.  ie. the match table could include {.compatible =
-> >>>"arm,cortex-a9-pmu"},{.compatible = "arm,cortex-a9-l2cache-pmu"}...
-> >>
-> >>Ok - that's great! Specifying the CPU is probably a little verbose, but
-> >>something like "arm,armv7pmu" would be really helpful when it comes to
-> >>multiple devices.
-> >>
-> >>>>As for versioning, the PMU detection is done dynamically at runtime,
-> >>>>so knowing that we're poking a CPU is enough.
-> >>>
-> >>>Fair enough.  It is still good practice in the compatible list to
-> >>>encode the specific PMU implementation (maybe arm,cortex-a9-pmu?)
-> >>>instead of trying to define a 'generic' or wildcard compatible value.
-> >>>Newer implementations can always claim compatibility with an older
-> >>>implementation so that the kernel doesn't have to be modified to find
-> >>>the new devices.  "arm,pmu" is probably too generic.
-> >>
-> >>"arm,pmu" is definitely too generic. If it's good practice to specify
-> >>as much as possible, then go for it - I just feel a little uneasy having
-> >>to add lots of redundant kernel code but it sounds like you'll hopefully
-> >>prove me wrong on that :)
-> >
-> >Shouldn't be any redundant kernel code.  It's just a list of match
-> >values, and the driver code already knows how to handle it.  The
-> >advantage of being specific is that if the driver ever does need
-> >information about the specific implementation (say, because the
-> >hardware reported value is buggy), then the data is available.
-> 
-> By that argument, we should use "<vendor>,cortex-a9-rXpX-pmu." As a
-> particular rev of the A9 PMU or vendor's SOC could be buggy. That
-> would quickly grow into a long list. Just with cpu models, we would
-> have:
-> 
-> cortex-a9
-> cortex-a8
-> cortex-a15
-> cortex-a5
-> arm1136
-> arm1176
-> l210
-> l220
-> pl310
-> various xscale flavors
-> Qualcomm SMP
+Some clocks may have multiple downstream users that need to request a
+higher clock rate.  Shared bus clocks provide a unique shared_bus_user
+clock to each user.  The frequency of the bus is set to the highest
+enabled shared_bus_user clock, with a minimum value set by the
+shared bus.  Drivers can use clk_enable and clk_disable to enable
+or disable their requirement, and clk_set_rate to set the minimum rate.
 
-This is not even remotely an unreasonable list.  Also remember that
-newer revisions can (and should!) claim compatibility with an older
-version if it is indeed compatible.
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/mach-tegra/clock.h         |    8 ++++
+ arch/arm/mach-tegra/tegra2_clocks.c |   80 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 0 deletions(-)
 
-Typically what happens is one particular implementation ends up
-becoming the defacto standard implementation.  So instead of each
-implementation claiming compatibility with a loosely defined "arm,pmu"
-(a definition that can end up changing over time), each of the above
-implementation may end up claiming "arm,cortex-a8-pmu" compatibility.
-In essence the string "arm,cortex-a8-pmu" *becomes* the generic
-version without the ambiguity of what to do if/when arm invents an
-incompatible PMU.
-
-> Keep in mind that the whole point of this platform device is just to
-> specify the interrupt connection which is the only part that varies
-> by SOC (and is not probe-able).
-
-That's tangential to the argument.  There is very good reason to
-anchor compatible values to specific implementations.  Doing it this
-way costs nothing.  Not doing it causes ambiguity down the road that
-is hard to recover from.
-
-g.
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+index dd5c029..b460f17 100644
+--- a/arch/arm/mach-tegra/clock.h
++++ b/arch/arm/mach-tegra/clock.h
+@@ -85,6 +85,7 @@ struct clk {
+ 	struct clk_ops		*ops;
+ 	unsigned long		rate;
+ 	unsigned long		max_rate;
++	unsigned long		min_rate;
+ 	u32			flags;
+ 	const char		*name;
+ 
+@@ -98,6 +99,8 @@ struct clk {
+ 	u32				reg;
+ 	u32				reg_shift;
+ 
++	struct list_head		shared_bus_list;
++
+ 	union {
+ 		struct {
+ 			unsigned int			clk_num;
+@@ -120,6 +123,11 @@ struct clk {
+ 			struct clk			*main;
+ 			struct clk			*backup;
+ 		} cpu;
++		struct {
++			struct list_head		node;
++			bool				enabled;
++			unsigned long			rate;
++		} shared_bus_user;
+ 	} u;
+ 
+ 	spinlock_t spinlock;
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index a1c86d8..10b9f63 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1188,6 +1188,74 @@ static struct clk_ops tegra_cdev_clk_ops = {
+ 	.disable		= &tegra2_cdev_clk_disable,
+ };
+ 
++/* shared bus ops */
++/*
++ * Some clocks may have multiple downstream users that need to request a
++ * higher clock rate.  Shared bus clocks provide a unique shared_bus_user
++ * clock to each user.  The frequency of the bus is set to the highest
++ * enabled shared_bus_user clock, with a minimum value set by the
++ * shared bus.
++ */
++static void tegra_clk_shared_bus_update(struct clk *bus)
++{
++	struct clk *c;
++	unsigned long rate = bus->min_rate;
++
++	list_for_each_entry(c, &bus->shared_bus_list, u.shared_bus_user.node)
++		if (c->u.shared_bus_user.enabled)
++			rate = max(c->u.shared_bus_user.rate, rate);
++
++	if (rate != clk_get_rate(bus))
++		clk_set_rate(bus, rate);
++};
++
++static void tegra_clk_shared_bus_init(struct clk *c)
++{
++	c->max_rate = c->parent->max_rate;
++	c->u.shared_bus_user.rate = c->parent->max_rate;
++	c->state = OFF;
++#ifdef CONFIG_DEBUG_FS
++	c->set = 1;
++#endif
++
++	list_add_tail(&c->u.shared_bus_user.node,
++		&c->parent->shared_bus_list);
++}
++
++static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
++{
++	c->u.shared_bus_user.rate = rate;
++	tegra_clk_shared_bus_update(c->parent);
++	return 0;
++}
++
++static long tegra_clk_shared_bus_round_rate(struct clk *c, unsigned long rate)
++{
++	return clk_round_rate(c->parent, rate);
++}
++
++static int tegra_clk_shared_bus_enable(struct clk *c)
++{
++	c->u.shared_bus_user.enabled = true;
++	tegra_clk_shared_bus_update(c->parent);
++	return 0;
++}
++
++static void tegra_clk_shared_bus_disable(struct clk *c)
++{
++	c->u.shared_bus_user.enabled = false;
++	tegra_clk_shared_bus_update(c->parent);
++}
++
++static struct clk_ops tegra_clk_shared_bus_ops = {
++	.init = tegra_clk_shared_bus_init,
++	.enable = tegra_clk_shared_bus_enable,
++	.disable = tegra_clk_shared_bus_disable,
++	.set_rate = tegra_clk_shared_bus_set_rate,
++	.round_rate = tegra_clk_shared_bus_round_rate,
++};
++
++
+ /* Clock definitions */
+ static struct clk tegra_clk_32k = {
+ 	.name = "clk_32k",
+@@ -1858,6 +1926,17 @@ static struct clk_mux_sel mux_clk_32k[] = {
+ 		},					\
+ 	}
+ 
++#define SHARED_CLK(_name, _dev, _con, _parent)		\
++	{						\
++		.name      = _name,			\
++		.lookup    = {				\
++			.dev_id    = _dev,		\
++			.con_id    = _con,		\
++		},					\
++		.ops       = &tegra_clk_shared_bus_ops,	\
++		.parent = _parent,			\
++	}
++
+ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("rtc",	"rtc-tegra",		NULL,	4,	0,	32768,     mux_clk_32k,			PERIPH_NO_RESET),
+ 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
+@@ -2001,6 +2080,7 @@ struct clk *tegra_ptr_clks[] = {
+ static void tegra2_init_one_clock(struct clk *c)
+ {
+ 	clk_init(c);
++	INIT_LIST_HEAD(&c->shared_bus_list);
+ 	if (!c->lookup.dev_id && !c->lookup.con_id)
+ 		c->lookup.con_id = c->name;
+ 	c->lookup.clk = c;
+-- 
+1.7.3.1
