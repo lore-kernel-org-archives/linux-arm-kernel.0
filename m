@@ -1,149 +1,118 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 12 Feb 2011 17:04:59 -0700 (MST)
-Subject: [PATCH v2 3/7] omap: clock: Add allow_idle/deny_idle support in
-	clkops
-In-Reply-To: <1297329400-5936-4-git-send-email-rnayak@ti.com>
-References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
-	<1297329400-5936-2-git-send-email-rnayak@ti.com>
-	<1297329400-5936-3-git-send-email-rnayak@ti.com>
-	<1297329400-5936-4-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1102121643250.21991@utopia.booyaka.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Sat, 12 Feb 2011 18:10:09 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102121937.24933.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<AANLkTimjQfuNU-_rZTjAPrjxJhb=3kReVysBKoPE6Q4o@mail.gmail.com>
+	<AANLkTi=a1SbU4cn-m7r2BH2KhNoad3H9e41AcXoViMm7@mail.gmail.com>
+	<201102121937.24933.arnd@arndb.de>
+Message-ID: <AANLkTikGvUZ2sWfox9Ws+gbuCw1JiykO=y-rk9QjL8xJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra
-
-On Thu, 10 Feb 2011, Rajendra Nayak wrote:
-
-> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-> index fc62fb5..6889c5a 100644
-> --- a/arch/arm/plat-omap/clock.c
-> +++ b/arch/arm/plat-omap/clock.c
-> @@ -335,6 +335,32 @@ struct clk *omap_clk_get_by_name(const char *name)
->  	return ret;
->  }
+On Sat, Feb 12, 2011 at 12:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 11 February 2011 23:27:51 Andrei Warkentin wrote:
+>>
+>> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+>> index 7054fd5..3b32329 100644
+>> --- a/drivers/mmc/card/block.c
+>> +++ b/drivers/mmc/card/block.c
+>> @@ -312,6 +316,157 @@ out:
+>> ? ? ? return err ? 0 : 1;
+>> ?}
+>>
+>> +/*
+>> + * Workaround for Toshiba eMMC performance. ?If the request is less than two
+>> + * flash pages in size, then we want to split the write into one or two
+>> + * page-aligned writes to take advantage of faster buffering. ?Here we can
+>> + * adjust the size of the MMC request and let the block layer request handler
+>> + * deal with generating another MMC request.
+>> + */
+>> +#define TOSHIBA_MANFID 0x11
+>> +#define TOSHIBA_PAGE_SIZE 16 ? ? ? ? /* sectors */
+>> +#define TOSHIBA_ADJUST_THRESHOLD 24 ?/* sectors */
+>> +static bool mmc_adjust_toshiba_write(struct mmc_card *card,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
+>> +{
+>> + ? ? if (mmc_card_mmc(card) && card->cid.manfid == TOSHIBA_MANFID &&
+>> + ? ? ? ? mrq->data->blocks <= TOSHIBA_ADJUST_THRESHOLD) {
+>> + ? ? ? ? ? ? int sectors_in_page = TOSHIBA_PAGE_SIZE -
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (mrq->cmd->arg % TOSHIBA_PAGE_SIZE);
+>> + ? ? ? ? ? ? if (mrq->data->blocks > sectors_in_page) {
+>> + ? ? ? ? ? ? ? ? ? ? mrq->data->blocks = sectors_in_page;
+>> + ? ? ? ? ? ? ? ? ? ? return true;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> +
+>> + ? ? return false;
+>> +}
 >
-> +void omap_clk_enable_autoidle(void)
-> +{
-> +	struct clk *c;
-> +
-> +	mutex_lock(&clocks_mutex);
+> This part might make sense in general, though it's hard to know the
+> page size in the general case. For many SD cards, writing naturally
+> aligned 64 KB blocks was the ideal case in my testing, but some need
+> larger alignment or can deal well with smaller blocks.
+>
 
-With the current OMAP clock code, it isn't sufficient to use a mutex here.  
-Your underlying functions have to read, modify, and write a register that 
-is also touched by clock functions like clk_set_rate(), which take the 
-clockfw spinlock and not the mutex.  This is potentially racy and could 
-result in inconsistencies between the internal clock tree data and the 
-hardware settings.
-
-While it is true that these functions are currently only called during PM 
-init, I'd rather not commit code that is subject to known races into the 
-tree.
-
-So, before applying this patch, the mutexes have been converted into 
-spinlocks.  I would appreciate it if you could help test this.  Updated 
-patch follows, which has been queued for 2.6.39 as part of the 
-'clk_autoidle_a_2.6.39' branch of git://git.pwsan.com/linux-2.6.
+...which is why I believe this should be a boot per-card parameter,
+and that it really only makes sense for embedded parts, where you know
+nothing else is going to be used as, say, mmcblk0.
 
 
-- Paul
+>> +/*
+>> + * This is another strange workaround to try to close the gap on Toshiba eMMC
+>> + * performance when compared to other vendors. ?In order to take advantage
+>> + * of certain optimizations and assumptions in those cards, we will look for
+>> + * multiblock write transfers below a certain size and we do the following:
+>> + *
+>> + * - Break them up into seperate page-aligned (8k flash pages) transfers.
+>> + * - Execute the transfers in reverse order.
+>> + * - Use "reliable write" transfer mode.
+>> + *
+>> + * Neither the block I/O layer nor the scatterlist design seem to lend them-
+>> + * selves well to executing a block request out of order. ?So instead we let
+>> + * mmc_blk_issue_rq() setup the MMC request for the entire transfer and then
+>> + * break it up and reorder it here. ?This also requires that we put the data
+>> + * into a bounce buffer and send it as individual sg's.
+>> + */
+>
+> A lot of the SD cards I've seen will react very badly to reverse order,
+> so that is definitely a dangerous thing to put into the code.
+>
+> Also, the "reliable write" seems like a really interesting thing to
+> rely on for performance. I believe what the card is trying to do here
+> is to optimize FAT32 directory updates. By using the small blocks in
+> unpredictable order (anything but linear), you tell the card to treat
+> this as part of a directory, so it probably gets written in a different
+> way, but that might mean that it will try to turn the current erase
+> block group into a special small write mode.
+>
+> I could imagine that this will cause problems on your eMMC once you
+> write small blocks to more than erase block group, because that probably
+> causes it to start garbage collection -- it makes sense for the cards
+> to know that something is a directory, but it can only know about
+> a small number of directories, so it will turn the segment into a regular
+> one as soon something else becomes a directory.
+>
 
-From: Rajendra Nayak <rnayak@ti.com>
-Date: Thu, 10 Feb 2011 14:46:36 +0530
-Subject: [PATCH] omap: clock: Add allow_idle/deny_idle support in clkops
+It's difficult for me to argue one way or another. The code provided
+is implementing Toshiba's suggestions for mitigating excessive wear.
+Basically, as far as certain Android products are concerned, Motorola
+created some "typical usage" cases, and collected data logs. These
+logs were analyzed by Toshiba, which reported an approx x16
+multiplication factor for writes.
 
-On OMAP various clock nodes (dpll's, mx post dividers, interface clocks)
-support hardware level autogating which can be controlled from
-software.
-Support such functionality by adding two new function pointer
-allow_idle and deny_idle in the clkops structure.
+Analysis of data written showed that there were many random accesses
+with 16KB or 32KB, meaning they go into buffer B. According to T, that
+means extra GC and PE cycle. I'm guessing per write.
 
-These function pointers can be populated for any clock
-node which supports hardware level autogating.
+So T suggested for random data to better go into buffer A. How? Two suggestions.
+1) Split smaller accesses into 8KB and write with reliable write.
+2) Split smaller accesses into 8KB and write in reverse.
 
-Also add 2 new functions (omap_clk_enable_auotidle and
-omap_clk_disable_autoidle) which can be called from
-architecture specific PM core code, if hardware level
-autogating (for all supported clock nodes) is to be
-enabled or disabled.
+The patch does both and I am verifying if that is really necessary. I
+need to go see the mmc spec and what it says about reliable write.
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-[paul at pwsan.com: use spinlock rather than mutex due to race]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/plat-omap/clock.c              |   28 ++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/clock.h |    6 ++++++
- 2 files changed, 34 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index fc62fb5..0cdac8d 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -335,6 +335,34 @@ struct clk *omap_clk_get_by_name(const char *name)
- 	return ret;
- }
- 
-+void omap_clk_enable_autoidle(void)
-+{
-+	struct clk *c;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+
-+	list_for_each_entry(c, &clocks, node)
-+		if (c->ops->allow_idle)
-+			c->ops->allow_idle(c);
-+
-+	spin_lock_irqrestore(&clockfw_lock, flags);
-+}
-+
-+void omap_clk_disable_autoidle(void)
-+{
-+	struct clk *c;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&clockfw_lock, flags);
-+
-+	list_for_each_entry(c, &clocks, node)
-+		if (c->ops->deny_idle)
-+			c->ops->deny_idle(c);
-+
-+	spin_lock_irqrestore(&clockfw_lock, flags);
-+}
-+
- /*
-  * Low level helpers
-  */
-diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
-index 8eb0ada..167f1e0f 100644
---- a/arch/arm/plat-omap/include/plat/clock.h
-+++ b/arch/arm/plat-omap/include/plat/clock.h
-@@ -25,6 +25,8 @@ struct clockdomain;
-  * @disable: fn ptr that enables the current clock in hardware
-  * @find_idlest: function returning the IDLEST register for the clock's IP blk
-  * @find_companion: function returning the "companion" clk reg for the clock
-+ * @allow_idle: fn ptr that enables autoidle for the current clock in hardware
-+ * @deny_idle: fn ptr that disables autoidle for the current clock in hardware
-  *
-  * A "companion" clk is an accompanying clock to the one being queried
-  * that must be enabled for the IP module connected to the clock to
-@@ -42,6 +44,8 @@ struct clkops {
- 					       u8 *, u8 *);
- 	void			(*find_companion)(struct clk *, void __iomem **,
- 						  u8 *);
-+	void			(*allow_idle)(struct clk *);
-+	void			(*deny_idle)(struct clk *);
- };
- 
- #ifdef CONFIG_ARCH_OMAP2PLUS
-@@ -292,6 +296,8 @@ extern void clk_init_cpufreq_table(struct cpufreq_frequency_table **table);
- extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table **table);
- #endif
- extern struct clk *omap_clk_get_by_name(const char *name);
-+extern void omap_clk_enable_autoidle(void);
-+extern void omap_clk_disable_autoidle(void);
- 
- extern const struct clkops clkops_null;
- 
--- 
-1.7.2.3
+Basically, whatever behavior you choose is going to be wrong some set
+of cards. Which is why tuning it probably only makes sense for eMMC
+parts, and should be a set of runtime/compile-time quirks. What do you
+think?
