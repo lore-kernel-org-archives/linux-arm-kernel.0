@@ -1,44 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 13 Feb 2011 22:18:55 +0100
-Subject: [PATCHv3] mx31: add support for the bugbase 1.3 from buglabs
-In-Reply-To: <1297545419-31181-1-git-send-email-GNUtoo@no-log.org>
-References: <20110211213348.GJ27982@pengutronix.de>
-	<1297545419-31181-1-git-send-email-GNUtoo@no-log.org>
-Message-ID: <20110213211855.GC13279@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 13 Feb 2011 22:24:38 +0100
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <4D55A7F7.5090700@mentor.com>
+References: <4D55A7F7.5090700@mentor.com>
+Message-ID: <AANLkTin+ZSNHX2iv=XwWCgxy330UJwhkf1T=4BMXZ22s@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Denis,
+2011/2/11 Meador Inge <meador_inge@mentor.com>:
 
-On Sat, Feb 12, 2011 at 10:16:59PM +0100, Denis 'GNUtoo' Carikli wrote:
-> This work was based on bug-linux-2.6.30.patch that can be found
->   in buglabs's svn here:
->   svn://bugcamp.net/bug/branches/izzy/experimental
-> 
-> Note that the hardware schematics and documentations can be obtained
->   here: http://www.bugcommunity.com/wiki/index.php/BUGbase
-> 
-> Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
-The patch looks good to me now.  If you want to make me still more
-happy, there are still two minor things to optimize:
+>?This would entail the traditional
+> generic/specific driver split:
+>
+> ? ?1. Hardware specific bits somewhere under '.../arch/*'. ?Drivers
+> ? ? ? for the MPIC message registers on Power and OMAP4 mailboxes, for
+> ? ? ? example.
 
- - don't reference the history of the patch in the commit log.  This is
-   quite useless once the commit made it into Linus' tree.  (The info
-   might still be interesting, but then put it after the tripple dash
-   below.  Then it won't make it into git.)
- - there is a trailing empty line in bug_board_init()
+Having any drivers under arch/* is no good tradition IMO.
+Better move the whole shebang down to drivers/mailbox so
+that the subsystem maintainer get the complete overview
+of her/his driver family.
 
-Maybe Sascha can fix this up when taking the patch?  (Assuming the
-others are happy now, too of course.)
+> ? ?2. A higher level driver under '.../drivers/mailbox/*'. ?That the
+> ? ? ? pieces in (1) would register with. ?This piece would expose the
+> ? ? ? main kernel API.
 
-And I wonder there is no copyright statement by you in
-arch/arm/mach-mx3/mach-bug.c, maybe because you consider your changes
-too minor to be relevant?  (INAL and I don't know who to value your
-contribution.)
+Cool...
 
-Best regards
-Uwe
+> ? ?3. Userspace interfaces for accessing the mailboxes. ?A
+> ? ? ? '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+What kind of business does userspace have with directly using
+mailboxes? Enlighten me so I get it... in our system these are
+used by protocols, such as net/caif/* thru drivers/net/caif/*, and
+we have similar kernelspace functionality for Phonet.
+
+CAIF and Phonet on the other hand, have custom openings
+down to the thing that exists on the other end of the mailbox.
+Most of these systems tend to talk some funny protocol that
+is often better handled by the kernel than by any userspace.
+
+So is this for the situation when you have no intermediate
+protocol between your userpace and the other CPU's
+subsystem? Or are you thinking about handling that
+protocol in userspace? That is generally not such a good idea
+for efficiency reasons.
+
+Yoursm
+Linus Walleij
