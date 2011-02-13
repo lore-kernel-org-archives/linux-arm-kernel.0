@@ -1,50 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 13 Feb 2011 22:24:38 +0100
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <4D55A7F7.5090700@mentor.com>
-References: <4D55A7F7.5090700@mentor.com>
-Message-ID: <AANLkTin+ZSNHX2iv=XwWCgxy330UJwhkf1T=4BMXZ22s@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 13 Feb 2011 13:25:05 -0800
+Subject: [RFC PATCH 3/3] ARM: vfp: Use cpu pm notifiers to save vfp state
+In-Reply-To: <AANLkTinYf3G+b8n6okeZk44xvO0xP0dw8S_dfE2C4E1-@mail.gmail.com>
+References: <1297373487-23902-1-git-send-email-ccross@android.com>
+	<1297373487-23902-4-git-send-email-ccross@android.com>
+	<1297426345.17584.99.camel@e102109-lin.cambridge.arm.com>
+	<AANLkTinYf3G+b8n6okeZk44xvO0xP0dw8S_dfE2C4E1-@mail.gmail.com>
+Message-ID: <AANLkTik=RgXyy-RR2aPy4bVeE5XjYTsiHO7OML3ZbU7S@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/11 Meador Inge <meador_inge@mentor.com>:
+On Fri, Feb 11, 2011 at 11:50 AM, Colin Cross <ccross@android.com> wrote:
+>> Something like below (untested):
+>>
+>> ? ? ? ?if (last_VFP_context[cpu]) {
+>> ? ? ? ? ? ? ? ?vfp_save_state(last_VFP_context[cpu], fpexc);
+>> ? ? ? ? ? ? ? ?/* force a reload when coming back from idle */
+>> ? ? ? ? ? ? ? ?last_VFP_context[cpu] = NULL;
+>> ? ? ? ? ? ? ? ?fmxr(FPEXC, fpexc & ~FPEXC_EN);
+>> ? ? ? ?}
+One more fix is necessary, the VFP will usually not be enabled when
+this is called.  The VFP needs to be enabled before vfp_save_state,
+and then disabled after.
 
->?This would entail the traditional
-> generic/specific driver split:
+> ? ? ? ?/* save state for resumption */
+> ? ? ? ?if (last_VFP_context[ti->cpu]) {
+> ? ? ? ? ? ? ? ?printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+> ? ? ? ? ? ? ? ?vfp_save_state(last_VFP_context[ti->cpu], fpexc);
 >
-> ? ?1. Hardware specific bits somewhere under '.../arch/*'. ?Drivers
-> ? ? ? for the MPIC message registers on Power and OMAP4 mailboxes, for
-> ? ? ? example.
-
-Having any drivers under arch/* is no good tradition IMO.
-Better move the whole shebang down to drivers/mailbox so
-that the subsystem maintainer get the complete overview
-of her/his driver family.
-
-> ? ?2. A higher level driver under '.../drivers/mailbox/*'. ?That the
-> ? ? ? pieces in (1) would register with. ?This piece would expose the
-> ? ? ? main kernel API.
-
-Cool...
-
-> ? ?3. Userspace interfaces for accessing the mailboxes. ?A
-> ? ? ? '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
-
-What kind of business does userspace have with directly using
-mailboxes? Enlighten me so I get it... in our system these are
-used by protocols, such as net/caif/* thru drivers/net/caif/*, and
-we have similar kernelspace functionality for Phonet.
-
-CAIF and Phonet on the other hand, have custom openings
-down to the thing that exists on the other end of the mailbox.
-Most of these systems tend to talk some funny protocol that
-is often better handled by the kernel than by any userspace.
-
-So is this for the situation when you have no intermediate
-protocol between your userpace and the other CPU's
-subsystem? Or are you thinking about handling that
-protocol in userspace? That is generally not such a good idea
-for efficiency reasons.
-
-Yoursm
-Linus Walleij
+> ? ? ? ? ? ? ? ?/* disable, just in case */
+> ? ? ? ? ? ? ? ?fmxr(FPEXC, fpexc & ~FPEXC_EN);
+> ? ? ? ?}
+Same fix is needed here.
