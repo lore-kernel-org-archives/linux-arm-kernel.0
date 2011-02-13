@@ -1,80 +1,79 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 13 Feb 2011 01:40:17 -0800
-Subject: [PATCH 05/21] ARM: tegra: clock: Disable clocks left on by bootloader
+Date: Sun, 13 Feb 2011 01:40:23 -0800
+Subject: [PATCH 11/21] ARM: tegra: cpufreq: Take an extra reference to pllx
 In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
 References: <1297590033-15035-1-git-send-email-ccross@android.com>
-Message-ID: <1297590033-15035-6-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-12-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS that iterates
-through all clocks, disabling any for which the refcount
-is 0 but the clock init detected the bootloader left the
-clock on.
+During cpu frequency changes, take an extra reference to pllx so
+that it doesn't turn off and on while the cpu is temporarily on
+pllp.  If the cpu is moved to pllp permanently, pllx will be
+turned off.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/Kconfig |    6 ++++++
- arch/arm/mach-tegra/clock.c |   30 ++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/cpu-tegra.c     |    2 ++
+ arch/arm/mach-tegra/tegra2_clocks.c |   15 +++++++++++----
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index f0fda77..9f4fc6b 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -57,6 +57,12 @@ config TEGRA_DEBUG_UARTE
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index cda03f1..f02ba60 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -173,6 +173,8 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ 	if (IS_ERR(cpu_clk))
+ 		return PTR_ERR(cpu_clk);
  
- endchoice
++	clk_enable(cpu_clk);
++
+ 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
+ 	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+ 	policy->cur = tegra_getspeed(policy->cpu);
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index ab013b1..a1c86d8 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -385,10 +385,16 @@ static void tegra2_cpu_clk_disable(struct clk *c)
+ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
+ {
+ 	int ret;
++	/*
++	 * Take an extra reference to the main pll so it doesn't turn
++	 * off when we move the cpu off of it
++	 */
++	clk_enable(c->u.cpu.main);
++
+ 	ret = clk_set_parent(c->parent, c->u.cpu.backup);
+ 	if (ret) {
+ 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.backup->name);
+-		return ret;
++		goto out;
+ 	}
  
-+config TEGRA_DISABLE_BOOTLOADER_CLOCKS
-+	bool "Disable clocks left on by bootloader"
-+	help
-+	  Disables clocks that are detected to be on but haven't
-+	  been requested by a kernel driver.
-+
- config TEGRA_SYSTEM_DMA
- 	bool "Enable system DMA driver for NVIDIA Tegra SoCs"
- 	default y
-diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index f55bb83..0ea5d92 100644
---- a/arch/arm/mach-tegra/clock.c
-+++ b/arch/arm/mach-tegra/clock.c
-@@ -511,6 +511,36 @@ int __init tegra_init_dvfs(void)
+ 	if (rate == clk_get_rate(c->u.cpu.backup))
+@@ -397,17 +403,18 @@ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
+ 	ret = clk_set_rate(c->u.cpu.main, rate);
+ 	if (ret) {
+ 		pr_err("Failed to change cpu pll to %lu\n", rate);
+-		return ret;
++		goto out;
+ 	}
  
- late_initcall(tegra_init_dvfs);
+ 	ret = clk_set_parent(c->parent, c->u.cpu.main);
+ 	if (ret) {
+ 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.main->name);
+-		return ret;
++		goto out;
+ 	}
  
-+/*
-+ * Iterate through all clocks, disabling any for which the refcount is 0
-+ * but the clock init detected the bootloader left the clock on.
-+ */
-+#ifdef CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS
-+int __init tegra_disable_boot_clocks(void)
-+{
-+	unsigned long flags;
-+
-+	struct clk *c;
-+
-+	spin_lock_irqsave(&clock_lock, flags);
-+
-+	list_for_each_entry(c, &clocks, node) {
-+		if (c->refcnt == 0 && c->state == ON &&
-+				c->ops && c->ops->disable) {
-+			pr_warning("Disabling clock %s left on by bootloader\n",
-+				c->name);
-+			c->ops->disable(c);
-+			c->state = OFF;
-+		}
-+	}
-+
-+	spin_unlock_irqrestore(&clock_lock, flags);
-+
-+	return 0;
-+}
-+late_initcall(tegra_disable_boot_clocks);
-+#endif
-+
- #ifdef CONFIG_DEBUG_FS
- static struct dentry *clk_debugfs_root;
+ out:
+-	return 0;
++	clk_disable(c->u.cpu.main);
++	return ret;
+ }
  
+ static struct clk_ops tegra_cpu_ops = {
 -- 
 1.7.3.1
