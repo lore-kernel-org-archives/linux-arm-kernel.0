@@ -1,52 +1,80 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun, 13 Feb 2011 01:40:12 -0800
-Subject: [PATCH 00/21] Tegra clock updates for 2.6.39
-Message-ID: <1297590033-15035-1-git-send-email-ccross@android.com>
+Date: Sun, 13 Feb 2011 01:40:17 -0800
+Subject: [PATCH 05/21] ARM: tegra: clock: Disable clocks left on by bootloader
+In-Reply-To: <1297590033-15035-1-git-send-email-ccross@android.com>
+References: <1297590033-15035-1-git-send-email-ccross@android.com>
+Message-ID: <1297590033-15035-6-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series brings the Tegra clock subsystem closer to the
-proposed common struct clk design, which should make converting
-easier.  It also fixes a few bugs and adds new features including
-memory bus scaling, disabling clocks left on by the bootloader,
-and shared clocks.
+Adds CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS that iterates
+through all clocks, disabling any for which the refcount
+is 0 but the clock init detected the bootloader left the
+clock on.
 
-Colin Cross (20):
-      ARM: tegra: clock: Don't BUG on changing an enabled PLL
-      ARM: tegra: clock: Drop debugging
-      ARM: tegra: clock: Don't use PLL lock bits
-      ARM: tegra: clock: Disable clocks left on by bootloader
-      ARM: tegra: clock: Initialize clocks that have no enable
-      ARM: tegra: clock: Drop CPU dvfs
-      ARM: tegra: clock: Rearrange static clock tables
-      ARM: tegra: clock: Move unshared clk struct members into union
-      ARM: tegra: clock: Convert global lock to a lock per clock
-      ARM: tegra: cpufreq: Take an extra reference to pllx
-      ARM: tegra: clock: Add shared bus clock type
-      ARM: tegra: clock: Remove unnecessary uses of #ifdef CONFIG_DEBUG_FS
-      ARM: tegra: clock: Refcount periph clock enables
-      ARM: tegra: clock: Round rate before setting rate
-      ARM: tegra: Add external memory controller driver
-      ARM: tegra: clocks: Add emc scaling
-      ARM: tegra: cpufreq: Adjust memory frequency with cpu frequency
-      ARM: tegra: clock: Add function to set SDMMC tap delay
-      ARM: tegra: clock: Fix clock issues in suspend
-      ARM: tegra: clock: Miscellaneous clock updates
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/mach-tegra/Kconfig |    6 ++++++
+ arch/arm/mach-tegra/clock.c |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 0 deletions(-)
 
-Dima Zavin (1):
-      ARM: tegra: clock: enable clk reset for non-peripheral clocks
-
- arch/arm/mach-tegra/Kconfig                        |   10 +
- arch/arm/mach-tegra/Makefile                       |    2 +-
- arch/arm/mach-tegra/clock.c                        |  572 +++++++-------
- arch/arm/mach-tegra/clock.h                        |  128 ++--
- arch/arm/mach-tegra/cpu-tegra.c                    |   25 +-
- arch/arm/mach-tegra/include/mach/clk.h             |    6 +-
- arch/arm/mach-tegra/tegra2_clocks.c                |  829 +++++++++++++-------
- arch/arm/mach-tegra/tegra2_dvfs.c                  |   86 --
- arch/arm/mach-tegra/tegra2_emc.c                   |  172 ++++
- .../arm/mach-tegra/{tegra2_dvfs.h => tegra2_emc.h} |   13 +-
- 10 files changed, 1123 insertions(+), 720 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/tegra2_dvfs.c
- create mode 100644 arch/arm/mach-tegra/tegra2_emc.c
- rename arch/arm/mach-tegra/{tegra2_dvfs.h => tegra2_emc.h} (66%)
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index f0fda77..9f4fc6b 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -57,6 +57,12 @@ config TEGRA_DEBUG_UARTE
+ 
+ endchoice
+ 
++config TEGRA_DISABLE_BOOTLOADER_CLOCKS
++	bool "Disable clocks left on by bootloader"
++	help
++	  Disables clocks that are detected to be on but haven't
++	  been requested by a kernel driver.
++
+ config TEGRA_SYSTEM_DMA
+ 	bool "Enable system DMA driver for NVIDIA Tegra SoCs"
+ 	default y
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index f55bb83..0ea5d92 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -511,6 +511,36 @@ int __init tegra_init_dvfs(void)
+ 
+ late_initcall(tegra_init_dvfs);
+ 
++/*
++ * Iterate through all clocks, disabling any for which the refcount is 0
++ * but the clock init detected the bootloader left the clock on.
++ */
++#ifdef CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS
++int __init tegra_disable_boot_clocks(void)
++{
++	unsigned long flags;
++
++	struct clk *c;
++
++	spin_lock_irqsave(&clock_lock, flags);
++
++	list_for_each_entry(c, &clocks, node) {
++		if (c->refcnt == 0 && c->state == ON &&
++				c->ops && c->ops->disable) {
++			pr_warning("Disabling clock %s left on by bootloader\n",
++				c->name);
++			c->ops->disable(c);
++			c->state = OFF;
++		}
++	}
++
++	spin_unlock_irqrestore(&clock_lock, flags);
++
++	return 0;
++}
++late_initcall(tegra_disable_boot_clocks);
++#endif
++
+ #ifdef CONFIG_DEBUG_FS
+ static struct dentry *clk_debugfs_root;
+ 
+-- 
+1.7.3.1
