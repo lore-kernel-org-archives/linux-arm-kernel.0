@@ -1,103 +1,76 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Sun, 13 Feb 2011 23:46:05 +0800
-Subject: [PATCH V3 2/6] pxa3xx_nand: rework irq logic
-In-Reply-To: <AANLkTinPyB-gUQg00kFg6SnsCpnfJRcD2PtgwfkjrUUh@mail.gmail.com>
-References: <1287742484-4276-1-git-send-email-leiwen@marvell.com>
-	<1287742484-4276-3-git-send-email-leiwen@marvell.com>
-	<AANLkTinPyB-gUQg00kFg6SnsCpnfJRcD2PtgwfkjrUUh@mail.gmail.com>
-Message-ID: <AANLkTikRp4mdcAcGPaJ8QVXOcYMvUOA5g6azhCSYXn9M@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 14 Feb 2011 07:52:08 +0800
+Subject: [PATCH 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <201102131634.40468.arnd@arndb.de>
+References: <1296872327-21166-1-git-send-email-shawn.guo@freescale.com>
+	<20110211003533.GA9151@S2100-06.ap.freescale.net>
+	<20110213175300.GA10271@S2100-06.ap.freescale.net>
+	<201102131634.40468.arnd@arndb.de>
+Message-ID: <20110213235207.GA10397@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Sun, Feb 13, 2011 at 04:34:40PM +0100, Arnd Bergmann wrote:
+> On Sunday 13 February 2011 18:53:02 Shawn Guo wrote:
+> > On Fri, Feb 11, 2011 at 08:35:34AM +0800, Shawn Guo wrote:
+> > > 
+> > > > > + unsigned                        present:1;
+> > > > 
+> > > > Your card detection by polling through this variable is
+> > > > really bad for power management. Is there really no interrupt
+> > > > that gets triggered when installing or removing a card?
+> > > > 
+> > > Good point.  Will try to use interrupt.
+> > > 
+> > I'm trying to use interrupt for card detection.  But unfortunately,
+> > I got stuck for some reason.
+> > 
+> > There is a known issue that mx28 gpio interrupt from bank0 can not
+> > work, because the pin bank0 irq number 127 was used in
+> > get_irqnr_and_base (entry-macro.S) to tell there is no pending
+> > interrupt any more.
+> > 
+> > The mmc0 cd pin has no problem to trigger interrupt, as it's GPIO_2_9.
+> > But mmc1 cd pin can not, because it's GPIO_0_20.
+> > 
+> > So I probably have to stay with polling.
+> 
+> I'm not sure if I understand completely. Is this a fundamental restriction,
+> or something that only happens on a specific board?
+> 
+This is a fundamental restriction.
 
-On Sun, Feb 13, 2011 at 5:46 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> Hi Lei,
->
-> I like this idea very much. There are several places for improvement,
-> though, you mind take a look?
->
->> ?static int pxa3xx_nand_dev_ready(struct mtd_info *mtd)
->> @@ -580,14 +582,12 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
->> ?{
->> ? ? ? ?struct pxa3xx_nand_info *info = mtd->priv;
->> ? ? ? ?const struct pxa3xx_nand_cmdset *cmdset = info->cmdset;
->> - ? ? ? int ret;
->> + ? ? ? int ret, exec_cmd = 0;
->>
->> ? ? ? ?info->use_dma = (use_dma) ? 1 : 0;
->> ? ? ? ?info->use_ecc = 0;
->> ? ? ? ?info->data_size = 0;
->> - ? ? ? info->state = STATE_READY;
->> -
->> - ? ? ? init_completion(&info->cmd_complete);
->> + ? ? ? info->state = 0;
->>
->> ? ? ? ?switch (command) {
->> ? ? ? ?case NAND_CMD_READOOB:
->> @@ -596,14 +596,12 @@ static void pxa3xx_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
->> ? ? ? ? ? ? ? ?info->buf_start = mtd->writesize + column;
->> ? ? ? ? ? ? ? ?memset(info->data_buff, 0xFF, info->buf_count);
->>
->> - ? ? ? ? ? ? ? if (prepare_read_prog_cmd(info, cmdset->read1, column, page_addr))
->> - ? ? ? ? ? ? ? ? ? ? ? break;
->> -
->> - ? ? ? ? ? ? ? pxa3xx_nand_do_cmd(info, NDSR_RDDREQ | NDSR_DBERR | NDSR_SBERR);
->> -
->> + ? ? ? ? ? ? ? prepare_read_prog_cmd(info, cmdset->read1, column, page_addr);
->> ? ? ? ? ? ? ? ?/* We only are OOB, so if the data has error, does not matter */
->> ? ? ? ? ? ? ? ?if (info->retcode == ERR_DBERR)
->> ? ? ? ? ? ? ? ? ? ? ? ?info->retcode = ERR_NONE;
->
-> Note the above statement is executed after a do_cmd() is done, so
-> info->retcode contains a valid return code. While the actual code
-> to perform the command has been moved to below.
+> Maybe you can do both polling and interrupt driven card detection in
+> the driver, and make it depend on a board-specific quirk. E.g. if you
+> pass an interrupt number in the platform data, it should just use the
+> interrupt, but if the interrupt is missing, you can fall back to
+> polling.
+> 
+I rewriting the code to use mmc core card detect polling framework.
 
-It is my fault not delete those line here...
-In my following 0004 patch, I would unify the prepare step into one function.
-BTW, for OOB data, I think we also shouldn't omit the DB error.
-Like BCH crc algorithm, it also protect the oob area, so it is reasonable to
-be aware that area...
->
-> For each transaction, there are three steps:
->
-> ?1. prepare/fill the command
-> ?2. perform the command
-> ?3. handle the return status
->
-> I actually though of merging steps 2) and 3) together, but step
-> 3) could be different, and that the timeout for different type of
-> commands might be different, that's why I introduced the do_cmd()
-> function.
+static int mxs_mmc_get_cd(struct mmc_host *mmc)
+{
+        struct mxs_mmc_host *host = mmc_priv(mmc);
 
-I agree. :)
-That is what I want to do in this patch set, unify the prepare behavior
-into one function, and then execute it.
+        return !(readl(host->base + HW_SSP_STATUS) &
+                        BM_SSP_STATUS_CARD_DETECT);
+}
 
->
->> +
->> + ? ? ? ? ? ? ? exec_cmd = 1;
->
-> Maybe for those cases where commands are not executed, just simply
-> return will avoid introducing this exec_cmd variable.
+static const struct mmc_host_ops mxs_mmc_ops = {
+	...
+        .get_cd = mxs_mmc_get_cd,
+};
 
-For I unify the prepare process into one function according to different
-command, simply return would be unable to notify the execute action...
-The exec_cmd would be made as the return value for the prepare function.
+static int mxs_mmc_probe(struct platform_device *pdev)
+{
+	...
+	mmc_caps |= MMC_CAP_NEEDS_POLL;
+	...
+}
 
->
-> .....
->
->> @@ -807,10 +795,7 @@ static int __readid(struct pxa3xx_nand_info *info, uint32_t *id)
->> ? ? ? ?uint32_t ndcr;
->> ? ? ? ?uint8_t ?id_buff[8];
->>
->
-> I saw __readid() is replaced by pxa3xx_nand_cmdfunc(NAND_CMD_READID)
-> in the code below. ?Is it possible to completely remove this function
-> now??
+It looks pretty simple and mmc core code has taken care of the case
+of power management.  So if this looks fine to you, I will go for it
+in v2 of the patch set.
 
-I made the remove behavior in the patch 0003. :)
-
-Thanks,
-Lei
+Regards,
+Shawn
