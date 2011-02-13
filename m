@@ -1,146 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 13 Feb 2011 22:16:12 +0100
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <AANLkTikP0P9S1VgiU_yT53f-kZq0JMLBJoVWigAy8YWB@mail.gmail.com>
-References: <4D55A7F7.5090700@mentor.com>
-	<AANLkTikP0P9S1VgiU_yT53f-kZq0JMLBJoVWigAy8YWB@mail.gmail.com>
-Message-ID: <AANLkTikoExk30pqdcHXCA2K_oJB=VJ5_AnCkoYUrEt3X@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 13 Feb 2011 22:18:55 +0100
+Subject: [PATCHv3] mx31: add support for the bugbase 1.3 from buglabs
+In-Reply-To: <1297545419-31181-1-git-send-email-GNUtoo@no-log.org>
+References: <20110211213348.GJ27982@pengutronix.de>
+	<1297545419-31181-1-git-send-email-GNUtoo@no-log.org>
+Message-ID: <20110213211855.GC13279@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/12 Sundar <sunder.svit@gmail.com>:
+Hi Denis,
 
-> At least I would like this; I wanted to generalize such mailbox IPCs
-> right from the day when I was working on one, but coudnt really
-> work on that.
->
->> ? ?2. Does something like this already exist?
->
-> Not generic as you say; but apart from the OMAP platforms,
-> you could refer to arch/arm/mach-ux500/prcmu for a mailbox based
-> IPC on the U8500 platform.
+On Sat, Feb 12, 2011 at 10:16:59PM +0100, Denis 'GNUtoo' Carikli wrote:
+> This work was based on bug-linux-2.6.30.patch that can be found
+>   in buglabs's svn here:
+>   svn://bugcamp.net/bug/branches/izzy/experimental
+> 
+> Note that the hardware schematics and documentations can be obtained
+>   here: http://www.bugcommunity.com/wiki/index.php/BUGbase
+> 
+> Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
+The patch looks good to me now.  If you want to make me still more
+happy, there are still two minor things to optimize:
 
-We also have this thing:
-arch/arm/mach-ux500/mbox-db5500.c
+ - don't reference the history of the patch in the commit log.  This is
+   quite useless once the commit made it into Linus' tree.  (The info
+   might still be interesting, but then put it after the tripple dash
+   below.  Then it won't make it into git.)
+ - there is a trailing empty line in bug_board_init()
 
-It's another mailbox driver, this one talks to the modem in the
-U5500 (basically a physical transport for the CAIF protocol).
-(For the U8500 I think modem IPC is instead handled with
-a high-speed hardware FIFO, a bit different.)
+Maybe Sascha can fix this up when taking the patch?  (Assuming the
+others are happy now, too of course.)
 
->> ? ?3. Is someone else already working on this?
->
-> Not sure of that too :), but I am CCing Linus W, the maintainer
-> of U8500 if he thinks it is a good idea to come up with a mailbox IPC
-> framework
+And I wonder there is no copyright statement by you in
+arch/arm/mach-mx3/mach-bug.c, maybe because you consider your changes
+too minor to be relevant?  (INAL and I don't know who to value your
+contribution.)
 
-I don't know too much about the subject actually, I've not been
-deeply into any such code. I don't think anyone is working
-on something general from ST-Ericsson or Linaro.
+Best regards
+Uwe
 
-Recently I saw that Texas Instruments are posting a "hardware
-spinlock" framework though, this would be on a related tone,
-but I think it's for shared data structures (control path) rather
-than buffer passing (data path). I'm guessing this works like
-that one CPU gets to spin waiting for another one to release
-the lock.
-
-Given that we may have a framework for hardware spinlock
-and that we don't want to stockpile drivers into arch/*
-or drivers/misc/* I would say it's intuitively a good idea,
-but the question is what data types you would pass in?
-In arch/arm/mach-ux500/include/mach/mbox-db5500.h
-we have a struct like this:
-
-/**
-  * struct mbox - Mailbox instance struct
-  * @list:              Linked list head.
-  * @pdev:              Pointer to device struct.
-  * @cb:                Callback function. Will be called
-  *                     when new data is received.
-  * @client_data:       Clients private data. Will be sent back
-  *                     in the callback function.
-  * @virtbase_peer:     Virtual address for outgoing mailbox.
-  * @virtbase_local:    Virtual address for incoming mailbox.
-  * @buffer:            Then internal queue for outgoing messages.
-  * @name:              Name of this mailbox.
-  * @buffer_available:  Completion variable to achieve "blocking send".
-  *                     This variable will be signaled when there is
-  *                     internal buffer space available.
-  * @client_blocked:    To keep track if any client is currently
-  *                     blocked.
-  * @lock:              Spinlock to protect this mailbox instance.
-  * @write_index:       Index in internal buffer to write to.
-  * @read_index:        Index in internal buffer to read from.
-  * @allocated:         Indicates whether this particular mailbox
-  *                     id has been allocated by someone.
-  */
-struct mbox {
-        struct list_head list;
-        struct platform_device *pdev;
-        mbox_recv_cb_t *cb;
-        void *client_data;
-        void __iomem *virtbase_peer;
-        void __iomem *virtbase_local;
-        u32 buffer[MBOX_BUF_SIZE];
-        char name[MBOX_NAME_SIZE];
-        struct completion buffer_available;
-        u8 client_blocked;
-        spinlock_t lock;
-        u8 write_index;
-        u8 read_index;
-        bool allocated;
-};
-
-Compare OMAPs mailboxes in
-arch/arm/plat-omap/include/plat/mailbox.h:
-
-typedef u32 mbox_msg_t;
-
-truct omap_mbox_ops {
-        omap_mbox_type_t        type;
-        int             (*startup)(struct omap_mbox *mbox);
-        void            (*shutdown)(struct omap_mbox *mbox);
-        /* fifo */
-        mbox_msg_t      (*fifo_read)(struct omap_mbox *mbox);
-        void            (*fifo_write)(struct omap_mbox *mbox, mbox_msg_t msg);
-        int             (*fifo_empty)(struct omap_mbox *mbox);
-        int             (*fifo_full)(struct omap_mbox *mbox);
-        /* irq */
-        void            (*enable_irq)(struct omap_mbox *mbox,
-                                                omap_mbox_irq_t irq);
-        void            (*disable_irq)(struct omap_mbox *mbox,
-                                                omap_mbox_irq_t irq);
-        void            (*ack_irq)(struct omap_mbox *mbox, omap_mbox_irq_t irq);
-        int             (*is_irq)(struct omap_mbox *mbox, omap_mbox_irq_t irq);
-        /* ctx */
-        void            (*save_ctx)(struct omap_mbox *mbox);
-        void            (*restore_ctx)(struct omap_mbox *mbox);
-};
-
-struct omap_mbox_queue {
-        spinlock_t              lock;
-        struct kfifo            fifo;
-        struct work_struct      work;
-        struct tasklet_struct   tasklet;
-        struct omap_mbox        *mbox;
-        bool full;
-};
-
-struct omap_mbox {
-        char                    *name;
-        unsigned int            irq;
-        struct omap_mbox_queue  *txq, *rxq;
-        struct omap_mbox_ops    *ops;
-        struct device           *dev;
-        void                    *priv;
-        int                     use_count;
-        struct blocking_notifier_head   notifier;
-};
-
-Some of this may be generalized? I dunno, they look quite
-different but maybe queueing etc can actually be made general
-enough to form a framework.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
