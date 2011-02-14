@@ -1,50 +1,115 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon, 14 Feb 2011 18:45:17 +0530
-Subject: [PATCH v2 09/13] can: pruss CAN driver.
-In-Reply-To: <4D58F77B.9080005@pengutronix.de>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
-	<20110211150602.GB373@e-circ.dyndns.org>
-	<C1C4300CE90A406FBDA2388D5491FAD5@subhasishg>
-	<4D58D854.5090503@grandegger.com>
-	<1F33D30F9B2D47ECA80CEC807A6C0727@subhasishg>
-	<4D58F77B.9080005@pengutronix.de>
-Message-ID: <8CB9F2C8F75C4041B9F0691D209DDAFD@subhasishg>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 14 Feb 2011 13:17:51 +0000
+Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <87pqqy6tdj.fsf@ti.com>
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+	<87pqqy6tdj.fsf@ti.com>
+Message-ID: <20110214131750.GA2869@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Feb 11, 2011 at 03:31:20PM -0800, Kevin Hilman wrote:
+> Hi Dave,
+> 
+> Dave Martin <dave.martin@linaro.org> writes:
+> 
+> > This set of patches, along with some other patches under
+> > discussion on alkml, should enable omap3 and omap4 kernels to be
+> > built with CONFIG_THUMB2_KERNEL.
+> 
+> OK, I tried some more testing with your 'dirty' branch merged with my PM
+> branch.
+> 
+> Compiled in ARM mode, everything worked as expected on my 3530/omap3evm,
+> including off-mode (in suspend and idle).  My 3630 (Zoom3) also can't do
+> CORE off due to i583, but MPU, PER etc. all can hit off.
+> 
+> To rebuild in Thumb-2 mode, I disabled OMAP2 support and added Thumb-2
+> mode:
+> 
+>    CONFIG_ARCH_OMAP2=n
+>    CONFIG_THUMB2_KERNEL=y
+> 
+> then tested on 3530/omap3evm.  Testing suspend/resume to retention
+> seemed to work fine.  However, enabling retention during idle[1] hung
+> someplace (didn't debug further.)
+> 
+> I also tried off-mode, and suspend/resume to off didn't even work.
+> 
+> I didn't have time to debug this any further, so this is just to report
+> raw test results.
 
-The problem with the "all" implementation is that it hogs the ARM/DSP 
-heavily and that's the reason why we specifically avoided this in our 
-firmware design.
-Hence, implementing this condition spoils the whole purpose of the PRU!!
+Thanks, that's a useful step forward anyhow.
 
---------------------------------------------------
-From: "Marc Kleine-Budde" <mkl@pengutronix.de>
-Sent: Monday, February 14, 2011 3:05 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Cc: "Wolfgang Grandegger" <wg@grandegger.com>; "Kurt Van Dijck" 
-<kurt.van.dijck@eia.be>; <davinci-linux-open-source@linux.davincidsp.com>; 
-<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
-<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "open list:CAN NETWORK 
-DRIVERS" <socketcan-core@lists.berlios.de>; "open list:CAN NETWORK DRIVERS" 
-<netdev@vger.kernel.org>; "open list" <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2 09/13] can: pruss CAN driver.
+A possibility is that the Secure firmware can't cope with
+interoperating with Thumb-2 code in the kernel, so that wakeup
+entry points the SMC call sites may need to be ARM code.
 
-Hello,
+If you get a moment, if would be interesting to see if this
+patch makes a difference ... in the meantime, I'll see if
+I can get my hands on an EVM from somewhere.
 
-On 02/14/2011 09:45 AM, Subhasish Ghosh wrote:
-> That is correct, we receive only pre-programmed CAN ids and "all" or
-> "range" implementation is not there in the PRU firmware.
+Cheers
+---Dave
 
-I'd really like to see that you add a "all" implementation to the
-firmware. Or even better use the standard id/mask approach.
-
-cheers, Marc
-
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index a204c78..ee1edb1 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -32,6 +32,14 @@
+ #include "sdrc.h"
+ #include "control.h"
+ 
++#undef ARM
++#undef THUMB
++#undef BSYM
++#define ARM(x...) x
++#define THUMB(x...)
++#define BSYM(x) (x)
++	.arm
++
+ /*
+  * Registers access definitions
+  */
+@@ -289,8 +297,20 @@ clean_l2:
+ 	 *  - should be faster and will change with kernel
+ 	 *  - 'might' have to copy address, load and jump to it
+ 	 */
++#ifdef CONFIG_THUMB2_KERNEL
++	/* kernel is non-interworking : must do this from Thumb */
++	adr	r1, . + 1
++	bx	r1
++	.thumb
++#endif
+ 	ldr	r1, kernel_flush
+ 	blx	r1
++#ifdef CONFIG_THUMB2_KERNEL
++	.align
++	bx	pc
++	nop
++	.arm
++#endif
+ 
+ omap3_do_wfi:
+ 	ldr	r4, sdrc_power		@ read the SDRC_POWER register
+diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
+index 829d235..64faab8 100644
+--- a/arch/arm/mach-omap2/sram34xx.S
++++ b/arch/arm/mach-omap2/sram34xx.S
+@@ -34,6 +34,14 @@
+ #include "sdrc.h"
+ #include "cm2xxx_3xxx.h"
+ 
++#undef ARM
++#undef THUMB
++#undef BSYM
++#define ARM(x...) x
++#define THUMB(x...)
++#define BSYM(x) (x)
++	.arm
++
+ 	.text
+ 
+ /* r1 parameters */
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   | 
+1.7.1
