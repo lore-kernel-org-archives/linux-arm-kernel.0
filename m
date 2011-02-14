@@ -1,97 +1,55 @@
-From: sumit.semwal@ti.com (Semwal, Sumit)
-Date: Tue, 15 Feb 2011 00:05:10 +0530
-Subject: [PATCH v10 18/18] OMAP2, 3: DSS2: Get DSS IRQ from platform device
-In-Reply-To: <1297692573.2951.16.camel@deskari>
-References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
-	<1295850125-21405-19-git-send-email-sumit.semwal@ti.com>
-	<1297692573.2951.16.camel@deskari>
-Message-ID: <AANLkTimMhZgen-QMguBOs1rNpNqrg68FP_NUTmO1+Ucd@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 14 Feb 2011 10:35:37 -0800
+Subject: [PATCH] ARM: vfp: Always save VFP state in vfp_pm_suspend
+In-Reply-To: <1297683742.30092.11.camel@e102109-lin.cambridge.arm.com>
+References: <1297638813-1315-1-git-send-email-ccross@android.com>
+	<1297683742.30092.11.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <AANLkTik_Jey_PtRmr530FVckA6RXHESeX+CyoJC=ZTkR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 14, 2011 at 3:42 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Sun, 2011-02-13 at 23:13 +0000, Colin Cross wrote:
+>> vfp_pm_suspend should save the VFP state any time there is
+>> a last_VFP_context. ?If it only saves when the VFP is enabled,
+>> the state can get lost when, on a UP system:
+>> ? ?Thread 1 uses the VFP
+>> ? ?Context switch occurs to thread 2, VFP is disabled but the
+>> ? ? ? VFP context is not saved to allow lazy save and restore
+>> ? ?Thread 2 initiates suspend
+>> ? ?vfp_pm_suspend is called with the VFP disabled, but the
+>> ? ? ? context has not been saved.
+>
+> At this point is it guaranteed that the thread won't migrate to another
+> CPU? If not, we should use get/put_cpu.
 
-On Mon, Feb 14, 2011 at 7:39 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> Hi,
->
-> On Mon, 2011-01-24 at 11:52 +0530, ext Sumit Semwal wrote:
->> From: Senthilvadivu Guruswamy <svadivu@ti.com>
->>
->> DSS IRQ number can be obtained from platform_get_irq(). ?This API in turn
->> picks the right IRQ number belonging to HW IP from the hwmod database.
->> So hardcoding of IRQ number could be removed.
->>
->> Reviewed-by: Paul Walmsley <paul@pwsan.com>
->> Reviewed-by: Kevin Hilman <khilman@ti.com>
->> Tested-by: Kevin Hilman <khilman@ti.com>
->> Signed-off-by: Senthilvadivu Guruswamy <svadivu@ti.com>
->> Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
->> ---
->> ?drivers/video/omap2/dss/dss.c | ? 21 ++++++++++++++-------
->> ?1 files changed, 14 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
->> index 4d7a816..f9390b4 100644
->> --- a/drivers/video/omap2/dss/dss.c
->> +++ b/drivers/video/omap2/dss/dss.c
->> @@ -563,7 +563,7 @@ void dss_set_dac_pwrdn_bgz(bool enable)
->>
->> ?static int dss_init(bool skip_init)
->> ?{
->> - ? ? int r;
->> + ? ? int r, dss_irq;
->> ? ? ? u32 rev;
->> ? ? ? struct resource *dss_mem;
->>
->> @@ -609,11 +609,18 @@ static int dss_init(bool skip_init)
->> ? ? ? REG_FLD_MOD(DSS_CONTROL, 0, 2, 2); ? ? ?/* venc clock mode = normal */
->> ?#endif
->>
->> - ? ? r = request_irq(INT_24XX_DSS_IRQ,
->> - ? ? ? ? ? ? ? ? ? ? cpu_is_omap24xx()
->> - ? ? ? ? ? ? ? ? ? ? ? dss_irq_handler_omap2
->> - ? ? ? ? ? ? ? ? ? ? : dss_irq_handler_omap3,
->> - ? ? ? ? ? ? ? ? ? ? 0, "OMAP DSS", NULL);
->> + ? ? dss_irq = platform_get_irq(dss.pdev, 0);
->> + ? ? if (dss_irq < 0) {
->> + ? ? ? ? ? ? DSSERR("omap2 dss: platform_get_irq failed\n");
->> + ? ? ? ? ? ? r = -ENODEV;
->> + ? ? ? ? ? ? goto fail1;
->> + ? ? }
->> +
->> + ? ? r = request_irq(dss_irq,
->> + ? ? ? ? ? ? cpu_is_omap24xx()
->> + ? ? ? ? ? ? ? dss_irq_handler_omap2
->> + ? ? ? ? ? ? : dss_irq_handler_omap3,
->> + ? ? ? ? ? ? 0, "OMAP DSS", NULL);
->>
->> ? ? ? if (r < 0) {
->> ? ? ? ? ? ? ? DSSERR("omap2 dss: request_irq failed\n");
->> @@ -641,7 +648,7 @@ static int dss_init(bool skip_init)
->> ? ? ? return 0;
->>
->> ?fail2:
->> - ? ? free_irq(INT_24XX_DSS_IRQ, NULL);
->> + ? ? free_irq(dss_irq, NULL);
->
-> You change this free_irq, as you should, but you missed another a few
-> lines later.
->
-> Archit fixes it in his "OMAP: DSS2: Common IRQ handler for all OMAPs"
-> patch silently, but I think it should be fixed here already, as the
-> patches haven't been pulled to anywhere yet.
->
-> Perhaps you could use the same method as Archit used, create a new field
-> "irq" in the dss struct which can be used in the dss_exit's free_irq
-> call.
-Yes, you're right; I guess since it was already in your tree by the
-time we noticed this oversight, we assumed Archit could submit a new
-one. I can send you an updated one tomorrow for this.
+Yes, VFP suspend is implemented with a sysdev, which is suspended
+after disable_nonboot_cpus.
 
-Regards,
-~Sumit.
+>> --- a/arch/arm/vfp/vfpmodule.c
+>> +++ b/arch/arm/vfp/vfpmodule.c
+>> @@ -415,13 +415,12 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
+>> ? ? ? ? struct thread_info *ti = current_thread_info();
+>> ? ? ? ? u32 fpexc = fmrx(FPEXC);
+>>
+>> - ? ? ? /* if vfp is on, then save state for resumption */
+>> - ? ? ? if (fpexc & FPEXC_EN) {
+>> + ? ? ? /* save state for resume */
+>> + ? ? ? if (last_VFP_context[ti->cpu]) {
+>> ? ? ? ? ? ? ? ? printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+>> - ? ? ? ? ? ? ? vfp_save_state(&ti->vfpstate, fpexc);
+>> -
+>> - ? ? ? ? ? ? ? /* disable, just in case */
+>> - ? ? ? ? ? ? ? fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+>> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
+>> + ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[ti->cpu], fpexc);
+>> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc & ~FPEXC_EN);
+>> ? ? ? ? }
 >
-> ?Tomi
->
->
->
+> We may want to set the last_VFP_context to NULL so that after resuming
+> (to the same thread) we force the VFP reload from the vfpstate
+> structure. The vfp_support_entry code ignores the reloading if the
+> last_VFP_context is the same as vfpstate.
+
+Right, will fix.
