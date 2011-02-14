@@ -1,42 +1,41 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 14 Feb 2011 02:26:30 -0800
-Subject: [PATCH 0/6] A few fixes on imx-sdma
-In-Reply-To: <20110131120328.GL9041@pengutronix.de>
-References: <1295473840-17295-1-git-send-email-shawn.guo@freescale.com>
-	<20110131120328.GL9041@pengutronix.de>
-Message-ID: <AANLkTi=guhXU9pV4pK17Y0c0nRMcy4oXC9PAKxD27jDj@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 14 Feb 2011 11:26:46 +0100
+Subject: [PATCH v2 7/7] ARM: mxs/mx28evk: add mmc device
+In-Reply-To: <1297650746-12841-8-git-send-email-shawn.guo@freescale.com>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-8-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110214102646.GB30100@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 31, 2011 at 4:03 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Jan 20, 2011 at 05:50:34AM +0800, Shawn Guo wrote:
->> The patch set is to address the concerns discussed on thread below.
->> And it's been tested on mx51 babbage board with sound driver.
->>
->> "A few questions on imx-sdma"
->> http://article.gmane.org/gmane.linux.ports.arm.kernel/103001/
->>
->> Shawn Guo (6)
->> ?drivers/dma/imx-sdma.c | ? 31 +++++++++++++++++++------------
->> ?1 files changed, 19 insertions(+), 12 deletions(-)
->>
->> ?[PATCH 1/6] dmaengine: imx-sdma: remove IMX_DMA_SG_LOOP handling in sdma_prep_slave_sg()
->> ?[PATCH 2/6] dmaengine: imx-sdma: set sdmac->status to DMA_ERROR in err_out of sdma_prep_slave_sg()
->> ?[PATCH 3/6] dmaengine: imx-sdma: return sdmac->status in sdma_tx_status()
->> ?[PATCH 4/6] dmaengine: imxs-sdma: correct sdmac->status in sdma_handle_channel_loop()
->> ?[PATCH 5/6] dmaengine: imx-sdma: fix up param for the last BD in sdma_prep_slave_sg()
->
-> Patches 1/6 - 5/6:
->
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
->
-> Dan,
->
-> For your convenience I've set up a branch containing Shawns patches and
-> the ones just posted here:
+Shawn,
 
-Thanks, I'll take this.  One nit please try to avoid
-one-line/subject-only commit messages.
+> +/* mmc */
+> +static void __init mx28evk_mmc_slot_poweron(int gpio)
+> +{
+> +	int ret;
+> +
+> +	ret = gpio_request(gpio, "mmc-slot-power");
+> +	if (ret) {
+> +		pr_err("Failed to request gpio mmc-slot-power: %d\n", ret);
+> +		return;
+> +	}
+> +
+> +	ret = gpio_direction_output(gpio, 0);
+> +	if (ret) {
+> +		pr_err("Failed to drive gpio mmc-slot-power: %d\n", ret);
+> +		return;
+> +	}
+> +}
 
---
-Dan
+Minor nit: You could use gpio_request_one(), and doing so maybe even get rid of
+this function and simply do it the init-function. The advantage would be, that
+you can name the two GPIOs independently.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
