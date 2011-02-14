@@ -1,48 +1,59 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Sun, 13 Feb 2011 22:56:22 -0800
-Subject: [PATCH 2/2] mach-mmp: Support for SD/MMC clock adjustment in
-	brownstone
-Message-ID: <9C2307EC-8314-40D5-A33B-38834F0F4698@marvell.com>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Mon, 14 Feb 2011 09:21:56 +0200 (EET)
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <4D55A7F7.5090700@mentor.com>
+References: <4D55A7F7.5090700@mentor.com>
+Message-ID: <20110214.092156.806824256640411558.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Meador,
 
-Set timing for brownstone for SD/MMC cards to enable detection
-timing adjustments are needed when speed > 25MHz
-remove limitation on maximum speed of 25MHz
+From: ext Meador Inge <meador_inge@mentor.com>
+Subject: [RFC] Inter-processor Mailboxes Drivers
+Date: Fri, 11 Feb 2011 15:19:51 -0600
 
-Signed-off-by: Philip Rakity <prakity@marvell.com>
----
- arch/arm/mach-mmp/brownstone.c |   10 +++++++++-
- 1 files changed, 9 insertions(+), 1 deletions(-)
+> Hi All,
+> 
+> I am currently working on building AMP systems using OpenMCAPI
+> (https://bitbucket.org/hollisb/openmcapi/wiki/Home) as the
+> inter-processor communication mechanism.  With OpenMCAPI we, of
+> course,
+> need a way to send messages to various cores.  On some Freescale PPC
+> platforms (e.g. P1022DS, MPC8572DS), we have been using message
+> registers to do this work.  Recently, I was looking at the OMAP4
+> mailboxes to gear up for moving into ARM based platforms.
+> 
+> With that, I noticed 'arch/arm/plat-omap/mailbox.c'.  This is very
+> specific to the OMAP4 boards.  I am looking at designing a new set of
+> drivers to expose a mailbox service to userspace that will be used
+> for inter-processor communication.  This would entail the traditional
+> generic/specific driver split:
+> 
+>     1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
+>        for the MPIC message registers on Power and OMAP4 mailboxes, for
+>        example.
+>     2. A higher level driver under '.../drivers/mailbox/*'.  That the
+>        pieces in (1) would register with.  This piece would expose the
+>        main kernel API.
+>     3. Userspace interfaces for accessing the mailboxes.  A
+>        '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
+> 
+> Now I have the following questions:
+> 
+>     1. Do others see value in this?
 
-diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
-index 0e92fd7..35afe60 100644
---- a/arch/arm/mach-mmp/brownstone.c
-+++ b/arch/arm/mach-mmp/brownstone.c
-@@ -178,14 +178,22 @@ static struct i2c_board_info brownstone_twsi1_info[] = {
- };
- 
- static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
--	.max_speed	= 25000000,
-+	.adjust_clocks	= 1,
-+	.clk_select	= 1,
-+	.clk_delay	= 31,
- };
- 
- static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
-+	.adjust_clocks	= 1,
-+	.clk_select	= 1,
-+	.clk_delay	= 15,
- 	.flags		= PXA_FLAG_CARD_PERMANENT,
- };
- 
- static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
-+	.adjust_clocks	= 1,
-+	.clk_select	= 1,
-+	.clk_delay	= 31,
- 	.flags		= PXA_FLAG_CARD_PERMANENT |
- 				PXA_FLAG_SD_8_BIT_CAPABLE_SLOT,
- };
--- 
-1.7.0.4
+Yes.
+
+I discussed this with TI(Hari) long time ago, but it didn't proceed
+with some reason, not techinical one.
+
+>     2. Does something like this already exist?
+>     3. Is someone else already working on this?
+> 
+> Any feedback will be greatly appreciated.
+
+Now the basic concpet can be devided into 3 parts, (1)HW dependent,
+(2) generic driver, (3) character device interface. I guess that it
+might be good to have one _pseudo_ H/W instance, then easier for
+verification without real H/W and firmwares, across multiplatforms.
