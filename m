@@ -1,30 +1,17 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Feb 2011 15:10:47 +0100
-Subject: [PATCH 5/5] arm: mach-mmp: brownstone.c support multiple sd slots
-In-Reply-To: <23C25DE3-86A5-4115-8539-D9837268F63F@marvell.com>
-References: <23C25DE3-86A5-4115-8539-D9837268F63F@marvell.com>
-Message-ID: <201102141510.48137.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 14 Feb 2011 14:39:49 +0000
+Subject: mc13xxx-core, support for i2c, V4
+In-Reply-To: <201102141121.34676.philippe.retornaz@epfl.ch>
+References: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
+	<20110212084035.GB17755@angua.secretlab.ca>
+	<201102141121.34676.philippe.retornaz@epfl.ch>
+Message-ID: <20110214143949.GB32596@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 February 2011, Philip Rakity wrote:
-> +
-> +       gpio_direction_output(poweron, 1);
-> +       mdelay (20);
-> +       gpio_direction_output(reset, 0);
-> +       mdelay (20);
-> +       gpio_direction_output(reset, 1);
-> +       gpio_free(reset);
-> +       gpio_free(poweron);
+On Mon, Feb 14, 2011 at 11:21:34AM +0100, Philippe R?tornaz wrote:
 
-mdelay is not nice, especially in boot code, because a lot of people
-are interested in reducing boot times, and 40 miliseconds is definitely
-in the range that people notice.
+> AFAIK the audio part of the mc13783 has still not been merged.
 
-At the very least, change it from mdelay() to msleep(), to allow other
-processes to continue.
-
-Ideally, you can run the function in the background using schedule_work(),
-but there may be better ways to do that for the entire platform code.
-
-	Arnd
+No, it hasn't.  Sacha posted something ages ago but it had a lot of
+problems and I've not seen any subsequent spins.
