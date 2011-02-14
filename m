@@ -1,39 +1,93 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Feb 2011 15:45:20 -0800
-Subject: [PATCH] ARM: OMAP2: use early init hook
-In-Reply-To: <20110124201731.GC13589@atomide.com>
+Date: Mon, 14 Feb 2011 15:52:39 -0800
+Subject: [PATCH] omap: Move omap2_check_revision and omap_sram_init out of
+	map_io
+In-Reply-To: <20110214234520.GT20795@atomide.com>
 References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
 	<20110123174814.GI30094@n2100.arm.linux.org.uk>
 	<20110124201731.GC13589@atomide.com>
-Message-ID: <20110214234520.GT20795@atomide.com>
+	<20110214234520.GT20795@atomide.com>
+Message-ID: <20110214235238.GU20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110124 12:16]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110123 09:47]:
-> > On Sun, Jan 23, 2011 at 05:13:44PM +0000, Russell King - ARM Linux wrote:
-> > > Move non-mapping and non-irq initialization code out of .map_io and
-> > > .init_irq respectively into the new init_early hook.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > ---
-> > > I think I've updated this patch correctly for the new platforms merged
-> > > into mainline.
-> > 
-> > Grr, this breaks on OMAP because some of this stuff wants to do ioremap()
-> > and therefore wants the kmem allocators initialized.  That's rather
-> > annoying...
-> 
-> So far tested on zoom3 only, but the following gets it booting
-> on top of your patch.
-> 
-> Want to take this one into your series?  
+With the early init changes we just want to map IO in map_io.
+Both omap2_check_revision and omap_sram_init can be moved to
+happen later in omap2_init_common_infrastructure.
 
-Russell, I'll queue your patch for the upcoming merge window into
-devel-early-init branch along with my changes.
+Note that now we can now remove _omap2_map_common_io and remove
+the extra flushes too as devicemaps_init will take care of it.
 
-Will also post one more clean-up patch.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Regards,
+---
 
-Tony
+This is on top of the other early init related patches:
+
+omap: hwmod: Populate _mpu_rt_va later on in omap_hwmod_late_init
+omap2+: Fix omap_serial_early_init to work with init_early hook
+omap2+: Make omap_hwmod_late_init into core_initcall
+ARM: OMAP2: use early init hook
+
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -228,25 +228,11 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
+ };
+ #endif
+ 
+-static void __init _omap2_map_common_io(void)
+-{
+-	/* Normally devicemaps_init() would flush caches and tlb after
+-	 * mdesc->map_io(), but we must also do it here because of the CPU
+-	 * revision check below.
+-	 */
+-	local_flush_tlb_all();
+-	flush_cache_all();
+-
+-	omap2_check_revision();
+-	omap_sram_init();
+-}
+-
+ #ifdef CONFIG_ARCH_OMAP2420
+ void __init omap242x_map_common_io(void)
+ {
+ 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
+ 	iotable_init(omap242x_io_desc, ARRAY_SIZE(omap242x_io_desc));
+-	_omap2_map_common_io();
+ }
+ #endif
+ 
+@@ -255,7 +241,6 @@ void __init omap243x_map_common_io(void)
+ {
+ 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
+ 	iotable_init(omap243x_io_desc, ARRAY_SIZE(omap243x_io_desc));
+-	_omap2_map_common_io();
+ }
+ #endif
+ 
+@@ -263,7 +248,6 @@ void __init omap243x_map_common_io(void)
+ void __init omap34xx_map_common_io(void)
+ {
+ 	iotable_init(omap34xx_io_desc, ARRAY_SIZE(omap34xx_io_desc));
+-	_omap2_map_common_io();
+ }
+ #endif
+ 
+@@ -271,7 +255,6 @@ void __init omap34xx_map_common_io(void)
+ void __init omap44xx_map_common_io(void)
+ {
+ 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
+-	_omap2_map_common_io();
+ }
+ #endif
+ 
+@@ -335,6 +318,9 @@ void __init omap2_init_common_infrastructure(void)
+ {
+ 	u8 postsetup_state;
+ 
++	omap2_check_revision();
++	omap_sram_init();
++
+ 	if (cpu_is_omap242x()) {
+ 		omap2xxx_powerdomains_init();
+ 		omap2_clockdomains_init();
