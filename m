@@ -1,37 +1,73 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 14 Feb 2011 00:25:24 +0000
-Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <201102132335.54868.arnd@arndb.de>
-References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
-	<20110213192609.GA21429@void.printf.net>
-	<201102132335.54868.arnd@arndb.de>
-Message-ID: <20110214002524.GA24047@void.printf.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 Feb 2011 09:27:51 +0900
+Subject: [PATCH v3 2/5] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110211115853.GC23404@n2100.arm.linux.org.uk>
+References: <20110206191117.GA17808@n2100.arm.linux.org.uk>
+	<E1PmA28-0000AC-2t@rmk-PC.arm.linux.org.uk>
+	<20110207120103.GC31929@n2100.arm.linux.org.uk>
+	<20110207121052.GD31929@n2100.arm.linux.org.uk>
+	<AANLkTintBD2Gfb3pkPZPe2mreU5EatUnNwUqR-id7q+M@mail.gmail.com>
+	<20110207133457.GE31929@n2100.arm.linux.org.uk>
+	<AANLkTi=B45PuOErxR49Gfhfq6-=y_NugbWBLBo0MEoCt@mail.gmail.com>
+	<20110207141734.GG31929@n2100.arm.linux.org.uk>
+	<AANLkTimCtaSZ=CHT5snWZ496_bi4sH=0LU7vJ-Jfh=dP@mail.gmail.com>
+	<20110211115853.GC23404@n2100.arm.linux.org.uk>
+Message-ID: <000001cbcbde$0e69bce0$2b3d36a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Sun, Feb 13, 2011 at 11:35:54PM +0100, Arnd Bergmann wrote:
-> > Please add a Reviewed-by: from Arnd and a Tested-by: from Lothar.
-> > Could you add a MODULE_AUTHOR() field, too?
+Russell King - ARM Linux wrote:
 > 
-> In general, these tags should not simply be added by the author without
-> having the person who did the reviewing or testing specifically provide
-> them!
+> On Wed, Feb 09, 2011 at 07:15:25PM -0800, Colin Cross wrote:
+> > The diagnostic register also needs to be saved to keep the errata bits
+> > set in __v7_setup.
 > 
-> In this particular case, I'm happy with the driver in version 2, good job!
-> Please do add my
+> Saving I've no problem with.  Restoring gets hairy with kernels running
+> in non-secure mode, as we can't just write the register - we don't know
+> whether we are running in secure or non-secure mode.  A write to the
+> register in NS mode will crash.
 > 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> Santosh: is the diagnostic register on OMAP4 re-initialized by the secure
+> code on OMAP?
+> 
+> > > +       stmia   r0, {r4 - r11}
+> > > +       ldmfd   sp!, {r4 - r11, pc}
+> > > +ENDPROC(cpu_v7_do_suspend)
+> > > +
+> > > +ENTRY(cpu_v7_do_resume)
+> > > +       mov     ip, #0
+> > > +       mcr     p15, 0, ip, c8, c7, 0   @ invalidate TLBs
+> > > +       mcr     p15, 0, ip, c7, c5, 0   @ invalidate I cache
+> >
+> > Does this need the same ALT_SMP/ALT_UP combo as v7_flush_icache_all?
+> 
+> That depends whether you the CPU which is resuming is part of a coherent
+> SMP system at that point.  This instruction will invalidate the I-cache
+> for the local CPU only, whereas the c7, c1 variant will invalidate the
+> instruction caches of all CPUs within the inner sharable domain.
+> 
+> Has anything changed in the other CPUs as a result of this CPU resuming
+> at this point?  I don't think so, so I think we just need to ensure that
+> the local CPU instruction cache is invalidated at this point.
+> 
+> > Tegra2 suspend and cpuidle works on top of this patch and the patch
+> > that adds SMP support to sleep_save_sp.  Tegra seems to need to
+> > invalidate the entire l1 data cache before enabling it,
+> 
+> As it's undefined what state the data cache is in on resume, I'm surprised
+> the s5pv210 code doesn't also need a D-cache invalidate too.  Maybe Samsung
+> folk can answer that.
+> 
 
-Ah, okay, sorry.  I do behave that way with S-o-b, but in this case I
-wanted to make sure people who put effort into reviewing/testing didn't
-go uncredited -- next time I'll send mail to the reviewer/tester
-reminding them to add a tag if they're happy.
+Now, it works fine with omission D-cache invalidate on S5PV210. Basically, Samsung S5P SoCs have some kind of hardware initialization code. So I'm not sure it has something for it, will/need to check it to hardware guys soon :) Then let you know about that ;)
 
-Thanks,
+As a note, I will test your updated generic CPU suspend/resume support on Samsung SoCs also, if any available branch which has p2v patches for it, please let me know. Anyway sorry for late testing on board.
 
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Have a nice weekend.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
