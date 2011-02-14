@@ -1,50 +1,151 @@
-From: Hollis_Blanchard@mentor.com (Blanchard, Hollis)
-Date: Mon, 14 Feb 2011 15:05:00 -0800
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <AANLkTin+ZSNHX2iv=XwWCgxy330UJwhkf1T=4BMXZ22s@mail.gmail.com>
-References: <4D55A7F7.5090700@mentor.com>
-	<AANLkTin+ZSNHX2iv=XwWCgxy330UJwhkf1T=4BMXZ22s@mail.gmail.com>
-Message-ID: <DD7A9A95166BF4418C4C1EB2033B6EE2038FAADB@na3-mail.mgc.mentorg.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 14 Feb 2011 15:15:31 -0800
+Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <20110214153726.GA20144@arm.com> (Dave Martin's message of "Mon,
+	14 Feb 2011 15:37:26 +0000")
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+	<87pqqy6tdj.fsf@ti.com> <20110214131750.GA2869@arm.com>
+	<alpine.LFD.2.00.1102140950580.14920@xanadu.home>
+	<20110214153726.GA20144@arm.com>
+Message-ID: <87zkpyxl64.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2011 01:24 PM, Linus Walleij wrote:
->> >      3. Userspace interfaces for accessing the mailboxes.  A
->> >         '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
-> What kind of business does userspace have with directly using
-> mailboxes? Enlighten me so I get it... in our system these are
-> used by protocols, such as net/caif/* thru drivers/net/caif/*, and
-> we have similar kernelspace functionality for Phonet.
+Hi Dave,
+
+Dave Martin <dave.martin@linaro.org> writes:
+
+> On Mon, Feb 14, 2011 at 10:00:23AM -0500, Nicolas Pitre wrote:
+>> On Mon, 14 Feb 2011, Dave Martin wrote:
+>> 
+>> > @@ -289,8 +297,20 @@ clean_l2:
+>> >  	 *  - should be faster and will change with kernel
+>> >  	 *  - 'might' have to copy address, load and jump to it
+>> >  	 */
+>> > +#ifdef CONFIG_THUMB2_KERNEL
+>> > +	/* kernel is non-interworking : must do this from Thumb */
+>> > +	adr	r1, . + 1
+>> > +	bx	r1
+>> > +	.thumb
+>> > +#endif
+>> >  	ldr	r1, kernel_flush
+>> 
+>> Didn't you mean this instead:
+>> 
+>> 	/* kernel is non-interworking : must do this from Thumb */
+>> 	adr	r1, 1f + 1
+>> 	bx	r1
+>> 	.thumb
+>> 1:	ldr	r1, kernel_flush
+>> 	...
 >
-> CAIF and Phonet on the other hand, have custom openings
-> down to the thing that exists on the other end of the mailbox.
-> Most of these systems tend to talk some funny protocol that
-> is often better handled by the kernel than by any userspace.
+> Note that this is intended as an experimental hack, not a real patch
+> (apologies if I didn't make that clear...)
 >
-> So is this for the situation when you have no intermediate
-> protocol between your userpace and the other CPU's
-> subsystem? Or are you thinking about handling that
-> protocol in userspace? That is generally not such a good idea
-> for efficiency reasons.
-OpenMCAPI (http://openmcapi.org) implements the MCAPI specification, 
-which is a simple application-level communication API that uses shared 
-memory. The API could be layered over any protocol, but was more or less 
-designed for simple shared-memory systems, e.g. fixed topology, no 
-retransmission, etc.
+> Well, actually I meant "add r1, pc, #1" ... which means I was too
+> busy trying to be clever... oops!
+>
+> That is of course exactly equivalent to your code...
+>
+>> 
+>> ?
+>> 
+>> >  	blx	r1
+>> > +#ifdef CONFIG_THUMB2_KERNEL
+>> > +	.align
+>> > +	bx	pc
+>> > +	nop
+>> > +	.arm
+>> 
+>> Also here, the .align has the potential to introduce a zero halfword in 
+>> the instruction stream before the bx.  What about:
+>> 
+>> 	adr	r3, 1f
+>> 	bx	r3
+>> 	.align
+>> 	.arm
+>> 1:	...
+>
+> .align inserts a 16-bit nop when misaligned in Thumb in a text section,
+> and a word-aligned bx pc is a specific architecturally allowed way
+> to do an inline switch to ARM.  The linker uses this trick for PLT
+> veneers etc.
+>
+> A nicer fix for doing this sort of call from low-level code which
+> might be ARM is to convert arch/arm/mm/*-v7.S to use "bx lr" to return.
+>
+> Generally, we can do this for all arches >= v5, without any
+> incompatibility.  However, since the need for it will be rare and it
+> will generate patch noise for not much real benefit,
+> I haven't proposed this.
+>
+> Updated patch below.
 
-Currently, we implement almost all of this as a shared library, plus a 
-very small kernel driver. The only requirements on the kernel are to 
-allow userspace to map the shared memory area, and provide an IPI 
-mechanism (and allow the process to sleep while waiting). Applications 
-sync with each other using normal atomic memory operations.
+I tested the updated patch on top of your "dirty" branch I tested with
+last week, and now see off-mode working just fine.
 
-We're now trying to optimize the transfer of scalars on platforms that 
-provide mailboxes (beyond simple IPIs), which is why we're looking at 
-defining a user-facing API to such hardware.
+Kevin
 
-I'll add that we haven't done serious optimization yet, but the numbers 
-we do have seem reasonable. What are the "efficiency" issues you're 
-worried about?
-
-Hollis Blanchard
-Mentor Graphics, Embedded Systems Division
+> Cheers
+> ---Dave
+>
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index a204c78..6ae8a92 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -32,6 +32,14 @@
+>  #include "sdrc.h"
+>  #include "control.h"
+>  
+> +#undef ARM
+> +#undef THUMB
+> +#undef BSYM
+> +#define ARM(x...) x
+> +#define THUMB(x...)
+> +#define BSYM(x) (x)
+> +	.arm
+> +
+>  /*
+>   * Registers access definitions
+>   */
+> @@ -289,8 +297,20 @@ clean_l2:
+>  	 *  - should be faster and will change with kernel
+>  	 *  - 'might' have to copy address, load and jump to it
+>  	 */
+> -	ldr	r1, kernel_flush
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +	/* kernel is non-interworking : must do this from Thumb */
+> +	adr	r1, 1f + 1
+> +	bx	r1
+> +	.thumb
+> +#endif
+> +1:	ldr	r1, kernel_flush
+>  	blx	r1
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +	.align
+> +	bx	pc
+> +	nop
+> +	.arm
+> +#endif
+>  
+>  omap3_do_wfi:
+>  	ldr	r4, sdrc_power		@ read the SDRC_POWER register
+> diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
+> index 829d235..64faab8 100644
+> --- a/arch/arm/mach-omap2/sram34xx.S
+> +++ b/arch/arm/mach-omap2/sram34xx.S
+> @@ -34,6 +34,14 @@
+>  #include "sdrc.h"
+>  #include "cm2xxx_3xxx.h"
+>  
+> +#undef ARM
+> +#undef THUMB
+> +#undef BSYM
+> +#define ARM(x...) x
+> +#define THUMB(x...)
+> +#define BSYM(x) (x)
+> +	.arm
+> +
+>  	.text
+>  
+>  /* r1 parameters */
