@@ -1,32 +1,35 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Feb 2011 09:50:11 -0700 (MST)
-Subject: [PATCH v2 3/7] omap: clock: Add allow_idle/deny_idle support in
-	clkops
-In-Reply-To: <ab30a208ca55e9295e25b8c3495dfa31@mail.gmail.com>
+Date: Mon, 14 Feb 2011 09:51:10 -0700 (MST)
+Subject: [PATCH v2 4/7] omap: dpll: Add allow_idle/deny_idle support for
+	all DPLL's
+In-Reply-To: <813a909da6bafa7ce0c15fa77d9d25b9@mail.gmail.com>
 References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
 	<1297329400-5936-2-git-send-email-rnayak@ti.com>
 	<1297329400-5936-3-git-send-email-rnayak@ti.com>
 	<1297329400-5936-4-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1102121643250.21991@utopia.booyaka.com>
-	<ab30a208ca55e9295e25b8c3495dfa31@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1102140949120.21991@utopia.booyaka.com>
+	<1297329400-5936-5-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1102121727140.21991@utopia.booyaka.com>
+	<813a909da6bafa7ce0c15fa77d9d25b9@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102140950300.21991@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 14 Feb 2011, Rajendra Nayak wrote:
 
-> A couple of issues on the clk_autoidle_a_2.6.39 branch:
-> -1- There seems to be a missing fix which causes an abort
-> at boot on omap4
-> http://marc.info/?l=linux-omap&m=129768574027232&w=2
+> Yes, the autogen scripts are updated, however they are
+> currently in a separate branch (dpll-gatectrl).
+> Will merge them into master soon.
 
-This should be fixed now that this branch is rebased on your first two 
-clock patches.
+OK, great.
 
-> -2- There is a trivial fix (Patch below) needed which otherwise
-> breaks build
+> No real reason for not adding OMAP2 dpll autoidle support.
+> Its just that I started off trying to do this for OMAP4, and
+> then found me touching some omap3 stuff and hence
+> also did it for OMAP3.(For some reason I thought there
+> were no DPLL's in OMAP2).
 
-Thanks for this, I've folded this fix into the original patch.
+That's fine, I have some patches in progress that enable this for the 
+OMAP2 DPLL and APLLs.
 
 
 - Paul
