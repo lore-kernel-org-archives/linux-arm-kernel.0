@@ -1,100 +1,84 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon, 14 Feb 2011 10:24:48 +0530
-Subject: [PATCH v2 09/13] can: pruss CAN driver.
-In-Reply-To: <20110211150602.GB373@e-circ.dyndns.org>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
-	<20110211150602.GB373@e-circ.dyndns.org>
-Message-ID: <C1C4300CE90A406FBDA2388D5491FAD5@subhasishg>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 14 Feb 2011 10:38:34 +0530
+Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
+	cause data corruption
+In-Reply-To: <AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com>
+References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com><1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com><AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com><13596bec9184b117d6a1d02da8e017bf@mail.gmail.com>
+	<AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com>
+Message-ID: <33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-I had a discussion regarding this with Wolfgang:
-
-http://www.mail-archive.com/socketcan-users at lists.berlios.de/msg00324.html
-
-The problem here is that we must configure the mailbox ID's and this support 
-is not available in the socketCan sub-system.
-
---------------------------------------------------
-From: "Kurt Van Dijck" <kurt.van.dijck@eia.be>
-Sent: Friday, February 11, 2011 8:36 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
-<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
-<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "Wolfgang Grandegger" 
-<wg@grandegger.com>; "open list:CAN NETWORK DRIVERS" 
-<socketcan-core@lists.berlios.de>; "open list:CAN NETWORK DRIVERS" 
-<netdev@vger.kernel.org>; "open list" <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2 09/13] can: pruss CAN driver.
-
-> On Fri, Feb 11, 2011 at 08:21:28PM +0530, Subhasish Ghosh wrote:
->> +config DA8XX_PRU_CANID_MBX0
->> + hex "CANID for mailbox 0"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 0
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX1
->> + hex "CANID for mailbox 1"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 1
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX2
->> + hex "CANID for mailbox 2"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 2
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX3
->> + hex "CANID for mailbox 3"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 3
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX4
->> + hex "CANID for mailbox 4"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 4
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX5
->> + hex "CANID for mailbox 5"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 5
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX6
->> + hex "CANID for mailbox 6"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 6
->> + Default value is set to 0x123, change this as required.
->> +
->> +config DA8XX_PRU_CANID_MBX7
->> + hex "CANID for mailbox 7"
->> + depends on CAN_TI_DA8XX_PRU
->> + default "0x123"
->> + ---help---
->> + Enter the CANID for mailbox 7
->> + Default value is set to 0x123, change this as required.
-> Why is filling the mailboxes the job of kernel config?
+> -----Original Message-----
+> From: Andrei Warkentin [mailto:andreiw at motorola.com]
+> Sent: Sunday, February 13, 2011 4:48 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; Kevin Hilman; tony at atomide.com;
+> linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
+> operation can cause data corruption
 >
-> Regards,
-> Kurt 
+> On Sat, Feb 12, 2011 at 11:59 AM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> >> -----Original Message-----
+> >> From: Andrei Warkentin [mailto:andreiw at motorola.com]
+> >> Sent: Saturday, February 12, 2011 11:20 PM
+> >> To: Santosh Shilimkar
+> >> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
+> >> linux-arm-kernel at lists.infradead.org; Catalin Marinas
+> >> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
+> >> operation can cause data corruption
+> >>
+> > [....]
+> >
+> >>
+> >> Can these PL310 errata fixes be made more generic? PL310 is
+> present
+> >> in
+> >> non-OMAP platforms too, which lack the TI hypervisor. And these
+> >> platforms might have the same PL310 rev, and suffer the same
+> >> glitches.
+> >> While ideally there is some kind of hypervisor_ops to modify the
+> >> protected register, at the very least there should be the generic
+> >> debug_write handling the ?"I ?can write all PL310 regs" case. If
+> >> you're interested I have a patch someplace that tried to do this,
+> >> hopefully I can still find it.
+> >
+> > They are kind of generic. If you look at it, the only change
+> > Which is arch specific is the implementation of "debug_writel"
+> function.
+> > Today this code is not in generic PL310 code, but
+> > OMAP specific.
+> >
+> > May be we can make this as exported function pointer, which
+> > arch's can populate.
+> >
+> > Will that work for you ?
+> >
+> > Regards,
+> > Santosh
+> >
+>
+> Ie something like the following.... what do you think???
+>
+> #define L2X0_DCR (0xF40)
+>
+> static void debug_writel(unsigned long val)
+> {
+> #ifdef CONFIG_ARCH_OMAP4
+>        omap_smc1(0x100, val);
+> #else
+>        writel_relaxed(val, l2x0_base + L2X0_DCR);
+> #endif
+> }
+> ...
+I understood that from first comment. But I am not in favor
+of polluting common ARM files with SOC specific #ifdeffery.
+We have gone over this when first errata support
+was added for PL310
+
+I have a better way to handle this scenario.
+Expect an updated patch for this.
+
+Regards,
+Santosh
