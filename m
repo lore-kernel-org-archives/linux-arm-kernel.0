@@ -1,50 +1,80 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Feb 2011 11:42:22 +0000
-Subject: [PATCH] ARM: vfp: Always save VFP state in vfp_pm_suspend
-In-Reply-To: <1297638813-1315-1-git-send-email-ccross@android.com>
-References: <1297638813-1315-1-git-send-email-ccross@android.com>
-Message-ID: <1297683742.30092.11.camel@e102109-lin.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 14 Feb 2011 17:36:05 +0530
+Subject: [PATCH] OMAP4: clockdomain: Remove pr_errs' stating unsupported wkdep
+Message-ID: <1297685165-25489-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-02-13 at 23:13 +0000, Colin Cross wrote:
-> vfp_pm_suspend should save the VFP state any time there is
-> a last_VFP_context.  If it only saves when the VFP is enabled,
-> the state can get lost when, on a UP system:
->    Thread 1 uses the VFP
->    Context switch occurs to thread 2, VFP is disabled but the
->       VFP context is not saved to allow lazy save and restore
->    Thread 2 initiates suspend
->    vfp_pm_suspend is called with the VFP disabled, but the
->       context has not been saved.
+Now that wkup and sleep dependencies are supported (in the
+form of static deps) for OMAP4, remove all instances of
+pr_errs' stating dependencies are still unsupported
+on OMAP4.
 
-At this point is it guaranteed that the thread won't migrate to another
-CPU? If not, we should use get/put_cpu.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+Patch applies on the integration-2.6.39 of 
+git://git.pwsan.com/linux-integration which
+has the dependency support for omap4 queued
+up.
 
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -415,13 +415,12 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
->         struct thread_info *ti = current_thread_info();
->         u32 fpexc = fmrx(FPEXC);
-> 
-> -       /* if vfp is on, then save state for resumption */
-> -       if (fpexc & FPEXC_EN) {
-> +       /* save state for resume */
-> +       if (last_VFP_context[ti->cpu]) {
->                 printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
-> -               vfp_save_state(&ti->vfpstate, fpexc);
-> -
-> -               /* disable, just in case */
-> -               fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-> +               fmxr(FPEXC, fpexc | FPEXC_EN);
-> +               vfp_save_state(last_VFP_context[ti->cpu], fpexc);
-> +               fmxr(FPEXC, fpexc & ~FPEXC_EN);
->         }
+ arch/arm/mach-omap2/clockdomain.c |   24 ------------------------
+ 1 files changed, 0 insertions(+), 24 deletions(-)
 
-We may want to set the last_VFP_context to NULL so that after resuming
-(to the same thread) we force the VFP reload from the vfpstate
-structure. The vfp_support_entry code ignores the reloading if the
-last_VFP_context is the same as vfpstate.
-
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 70d2420..a0341de 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -400,12 +400,6 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 	struct clkdm_dep *cd;
+ 	int ret = 0;
+ 
+-	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+-		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
+-		       clkdm1->name, clkdm2->name, __func__);
+-		return -EINVAL;
+-	}
+-
+ 	if (!clkdm1 || !clkdm2)
+ 		return -EINVAL;
+ 
+@@ -447,12 +441,6 @@ int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 	struct clkdm_dep *cd;
+ 	int ret = 0;
+ 
+-	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+-		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
+-		       clkdm1->name, clkdm2->name, __func__);
+-		return -EINVAL;
+-	}
+-
+ 	if (!clkdm1 || !clkdm2)
+ 		return -EINVAL;
+ 
+@@ -501,12 +489,6 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+ 	if (!clkdm1 || !clkdm2)
+ 		return -EINVAL;
+ 
+-	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+-		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
+-		       clkdm1->name, clkdm2->name, __func__);
+-		return -EINVAL;
+-	}
+-
+ 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
+ 	if (IS_ERR(cd))
+ 		ret = PTR_ERR(cd);
+@@ -536,12 +518,6 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
+  */
+ int clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
+ {
+-	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
+-		pr_err("clockdomain: %s: %s: not yet implemented\n",
+-		       clkdm->name, __func__);
+-		return -EINVAL;
+-	}
+-
+ 	if (!clkdm)
+ 		return -EINVAL;
+ 
 -- 
-Catalin
+1.7.0.4
