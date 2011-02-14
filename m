@@ -1,43 +1,21 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 14 Feb 2011 10:55:53 +0200 (EET)
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Feb 2011 10:00:38 +0100
 Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <AANLkTimnHHhYKnvUgsMo_jsKaYdY+XuABZ+FV0p25JLi@mail.gmail.com>
+In-Reply-To: <20110214.105553.296482686007701595.Hiroshi.DOYU@nokia.com>
 References: <AANLkTikoExk30pqdcHXCA2K_oJB=VJ5_AnCkoYUrEt3X@mail.gmail.com>
 	<20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
 	<AANLkTimnHHhYKnvUgsMo_jsKaYdY+XuABZ+FV0p25JLi@mail.gmail.com>
-Message-ID: <20110214.105553.296482686007701595.Hiroshi.DOYU@nokia.com>
+	<20110214.105553.296482686007701595.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTikdNW1k9ym9kHbMxRTEmOfTsvCTYzKp8ypqrWG+@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ext Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [RFC] Inter-processor Mailboxes Drivers
-Date: Mon, 14 Feb 2011 09:39:32 +0100
+On Mon, Feb 14, 2011 at 9:55 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
 
-> On Mon, Feb 14, 2011 at 8:32 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
-> 
->> OMAP mailbox is the interrupt driven 32bit unit H/W FIFO to other
->> cores.
-> 
-> How is it used? Is it a low-traffic (like single 32bit words etc) signal
-> control-path link while the actual high-throughput data-path is done
-> with shared memory? (That is how the db5500 mbox works anyways.)
+> Does db5500 use IOMMU for mapping shared memories?
 
-Yes, maybe quite similar.
+Nope, it's a fixed physical allocation from the modem side
+of the world.
 
-maibox is not single 32 bit but is 32 bit x 4(or 8?) slots fifo, IIRC,
-and mainly it is used as notification between cores. And big amount of
-data is transftered with sahred memory, which has been mapped onto the
-virtual address space of the other side of core, in advance.
-
-For example, typical usage of DSP, mp3 decoding,
-
-1, ARM maps 2 shared memory area(input/output) onto DSP virtual
-   address space.
-2, ARM fills mp3 data in input buffer.
-3, ARM notifies DSP that data is ready in input buffer.
-4, DSP decodes input data and put output data on output buffer.
-5, DSP notifies that output buffer is ready.
-
-Roughly something like the above. DSP S/W is multi-tasking, though.
-
-Does db5500 use IOMMU for mapping shared memories?
+Yours,
+Linus Walleij
