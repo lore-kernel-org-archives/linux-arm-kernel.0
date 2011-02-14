@@ -1,43 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 14 Feb 2011 12:12:05 -0000
-Subject: [PATCH 1/2] ARM: Introduce THREAD_NOTIFY_COPY for copy_thread()
-	hooks
-In-Reply-To: <20110214103738.5796.44268.stgit@e102109-lin.cambridge.arm.com>
-References: <20110214103528.5796.99616.stgit@e102109-lin.cambridge.arm.com>
-	<20110214103738.5796.44268.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <000201cbcc40$6571c840$305558c0$@deacon@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 14 Feb 2011 17:45:36 +0530
+Subject: [PATCH 1/7] omap: clock: Check for enable/disable ops support
+In-Reply-To: <alpine.DEB.2.00.1102121615130.21991@utopia.booyaka.com>
+References: <1297159838-30282-1-git-send-email-rnayak@ti.com>
+	<1297159838-30282-2-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1102121615130.21991@utopia.booyaka.com>
+Message-ID: <61921a70b7d31d38192210257bca3c0e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi Paul,
 
-> Subject: [PATCH 1/2] ARM: Introduce THREAD_NOTIFY_COPY for copy_thread() hooks
-> 
-> This patch adds THREAD_NOTIFY_COPY for colling registered handlers
-> during the copy_thread() function call. It also changes the VFP handler
-> to use a switch statement rather than if..else and ignore this event.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/include/asm/thread_notify.h |    1 +
->  arch/arm/kernel/process.c            |    2 ++
->  arch/arm/vfp/vfpmodule.c             |   22 +++++++++++++++-------
->  3 files changed, 18 insertions(+), 7 deletions(-)
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Sunday, February 13, 2011 4:48 AM
+> To: Rajendra Nayak
+> Cc: linux-omap at vger.kernel.org; b-cousson at ti.com; khilman at ti.com;
+santosh.shilimkar at ti.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/7] omap: clock: Check for enable/disable ops
+support
+>
+> On Tue, 8 Feb 2011, Rajendra Nayak wrote:
+>
+> > Check if enable/disable operations are supported for a given
+> > clock node before attempting to call them.
+> >
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>
+> Thanks, queued in branch 'clk_a_2.6.39' of
+git://git.pwsan.com/linux-2.6.
 
-This would be useful for the hw-breakpoint code, where we need to clear
-(memset 0) the breakpoint structures in the child so that they don't get
-unregistered later on.
+This patch seems to be needed in clk_autoidle_a_2.6.39 too,
+without which there is an abort at boot on OMAP4.
 
-However, we also need to flush (unregister) breakpoints in flush_thread
-so that they don't persist across an exec. Ideally, we'd have a single
-notifier block and act on THREAD_NOTIFY_{FLUSH,COPY} accordingly, but
-the problem is that THREAD_NOTIFY_FLUSH is only notified *after* zeroing
-most of the thread structure, so the call is currently inlined into
-flush_thread and we don't use a notifier.
+Regards,
+Rajendra
 
-This could be solved by either notifying the FLUSH before zeroing the
-various thread structures or by moving the zeroing of the debug struct
-into the hw-breakpoint notifier. The latter probably makes more sense
-once we've removed the single-step functionality from ptrace.
-
-Will
+>
+> This patch is integrated as part of the tag
+> 'tmp-integration-2.6.39-20110212-003' and the branch
+'integration-2.6.39'
+> of git://git.pwsan.com/linux-integration.
+>
+>
+> - Paul
