@@ -1,22 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Feb 2011 09:39:32 +0100
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
-References: <4D55A7F7.5090700@mentor.com>
-	<AANLkTikP0P9S1VgiU_yT53f-kZq0JMLBJoVWigAy8YWB@mail.gmail.com>
-	<AANLkTikoExk30pqdcHXCA2K_oJB=VJ5_AnCkoYUrEt3X@mail.gmail.com>
-	<20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
-Message-ID: <AANLkTimnHHhYKnvUgsMo_jsKaYdY+XuABZ+FV0p25JLi@mail.gmail.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Mon, 14 Feb 2011 14:15:06 +0530
+Subject: [PATCH v2 09/13] can: pruss CAN driver.
+In-Reply-To: <4D58D854.5090503@grandegger.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
+	<20110211150602.GB373@e-circ.dyndns.org>
+	<C1C4300CE90A406FBDA2388D5491FAD5@subhasishg>
+	<4D58D854.5090503@grandegger.com>
+Message-ID: <1F33D30F9B2D47ECA80CEC807A6C0727@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 8:32 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+That is correct, we receive only pre-programmed CAN ids and "all" or "range" 
+implementation is not there in the PRU firmware.
+Will check the sysfs option and update.
 
-> OMAP mailbox is the interrupt driven 32bit unit H/W FIFO to other
-> cores.
+--------------------------------------------------
+From: "Wolfgang Grandegger" <wg@grandegger.com>
+Sent: Monday, February 14, 2011 12:53 PM
+To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
+Cc: "Kurt Van Dijck" <kurt.van.dijck@eia.be>; 
+<davinci-linux-open-source@linux.davincidsp.com>; 
+<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
+<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "open list:CAN NETWORK 
+DRIVERS" <socketcan-core@lists.berlios.de>; "open list:CAN NETWORK DRIVERS" 
+<netdev@vger.kernel.org>; "open list" <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH v2 09/13] can: pruss CAN driver.
 
-How is it used? Is it a low-traffic (like single 32bit words etc) signal
-control-path link while the actual high-throughput data-path is done
-with shared memory? (That is how the db5500 mbox works anyways.)
-
-Linus Walleij
+> On 02/14/2011 05:54 AM, Subhasish Ghosh wrote:
+>> Hello,
+>>
+>> I had a discussion regarding this with Wolfgang:
+>>
+>> http://www.mail-archive.com/socketcan-users at lists.berlios.de/msg00324.html
+>>
+>> The problem here is that we must configure the mailbox ID's and this
+>> support is not available in the socketCan sub-system.
+>
+> To understand you correctly. A mailbox (or message object) can *only*
+> receive messages with the pre-programmed CAN id? Isn't there a chance to
+> receive all or a range of CAN ids? That's a very unusual piece of
+> hardware. Anyway, using kernel configuration parameters to define the
+> CAN id's would be the less flexible method. The user will not have a
+> chance to change them at run-time. Using SysFS files would already be
+> much better.
+>
+> Wolfgang. 
