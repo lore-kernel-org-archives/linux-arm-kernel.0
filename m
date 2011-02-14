@@ -1,28 +1,34 @@
-From: kurt.van.dijck@eia.be (Kurt Van Dijck)
-Date: Mon, 14 Feb 2011 08:42:07 +0100
-Subject: [PATCH v2 09/13] can: pruss CAN driver.
-In-Reply-To: <4D58D854.5090503@grandegger.com>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
-	<20110211150602.GB373@e-circ.dyndns.org>
-	<C1C4300CE90A406FBDA2388D5491FAD5@subhasishg>
-	<4D58D854.5090503@grandegger.com>
-Message-ID: <20110214074206.GA374@e-circ.dyndns.org>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Mon, 14 Feb 2011 08:46:46 +0100
+Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
+In-Reply-To: <201102101401.18331.alexander.stein@systec-electronic.com>
+References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
+	<Pine.LNX.4.64.1102101337310.18510@axis700.grange>
+	<201102101401.18331.alexander.stein@systec-electronic.com>
+Message-ID: <201102140846.47249.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 08:23:00AM +0100, Wolfgang Grandegger wrote:
-> On 02/14/2011 05:54 AM, Subhasish Ghosh wrote:
-> > Hello,
+On Thursday 10 February 2011, 14:01:17 Alexander Stein wrote:
+> On Thursday 10 February 2011, 13:48:23 Guennadi Liakhovetski wrote:
+> > > I don't know which display you used, but I guess your right_margin (and
+> > > lower_margin) needs to be adjusted.
 > > 
-> > I had a discussion regarding this with Wolfgang:
-> > 
-> > http://www.mail-archive.com/socketcan-users at lists.berlios.de/msg00324.html
-> > 
-> > The problem here is that we must configure the mailbox ID's and this
-> > support is not available in the socketCan sub-system.
+> > Ok, agree. But then you need to adjust all current users and have them
+> > tested... Otherwise, of course, you can just adjust your platform panel
+> > data to work with the current calculations, even though in principle your
+> > patch seems to be doing the right thing (tm), according to the manual.
+> > But if applied as is without fixing all the users, it can very well
+> > break them...
 > 
-> Using SysFS files would already be much better.
-Ack.
+> Ok, I've just seen there are some model defines in mx3fb.c which would also
+> be affected.
+> I'll try to find all mx3fb users and fix their videomodes and repost a new
+> patch.
 
-Kurt
+Uh, this seems next to impossible for me to handle it my own. I checked some 
+users of the mx3fb but I cant say which ones will be affected and which ones 
+not (e.g. without any hsync/vsync, on data enable).
+I've not idea how to fix it then.
+
+Alexander
