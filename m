@@ -1,33 +1,25 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 14 Feb 2011 13:36:42 +0300
-Subject: [PATCH] tosa-bt: drop setting LED trigger name,
-	as it's unsupported now
-Message-ID: <1297679802-24669-1-git-send-email-dbaryshkov@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Feb 2011 10:37:33 +0000
+Subject: [PATCH 0/2] Preserve the VFP state across the fork() call
+Message-ID: <20110214103528.5796.99616.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 2e48928d8a0f38c1b5c81eb3f1294de8a6382c68 it's no longer possible to set
-the name of the LED trigger for RFKILL events. Drop respective code from tosa-bt.c
+The VFP state should be copied to the child process during the fork()
+system call. This is important because the d16-d31 registers are callee
+saved and the compiler may use them for preserving data across function
+calls.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: Stephen Hemminger <shemminger@vyatta.com>
-Cc: John W. Linville <linville@tuxdriver.com>
----
- arch/arm/mach-pxa/tosa-bt.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/tosa-bt.c b/arch/arm/mach-pxa/tosa-bt.c
-index c31e601..b9b1e5c 100644
---- a/arch/arm/mach-pxa/tosa-bt.c
-+++ b/arch/arm/mach-pxa/tosa-bt.c
-@@ -81,8 +81,6 @@ static int tosa_bt_probe(struct platform_device *dev)
- 		goto err_rfk_alloc;
- 	}
- 
--	rfkill_set_led_trigger_name(rfk, "tosa-bt");
--
- 	rc = rfkill_register(rfk);
- 	if (rc)
- 		goto err_rfkill;
+Catalin Marinas (2):
+      ARM: Introduce THREAD_NOTIFY_COPY for copy_thread() hooks
+      ARM: Preserve the VFP state during fork
+
+
+ arch/arm/include/asm/thread_notify.h |    1 +
+ arch/arm/kernel/process.c            |    2 ++
+ arch/arm/vfp/vfpmodule.c             |   34 +++++++++++++++++++++++++++-------
+ 3 files changed, 30 insertions(+), 7 deletions(-)
+
 -- 
-1.7.2.3
+Catalin
