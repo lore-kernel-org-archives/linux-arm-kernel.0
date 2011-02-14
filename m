@@ -1,22 +1,22 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 14 Feb 2011 14:01:42 +0530
-Subject: [PATCH V5 00/63] Updating SPEAr Support
-In-Reply-To: <20110131092251.GA8729@n2100.arm.linux.org.uk>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<4D463B01.4050004@st.com>
-	<20110131092251.GA8729@n2100.arm.linux.org.uk>
-Message-ID: <4D58E86E.3040100@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Feb 2011 09:39:32 +0100
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
+References: <4D55A7F7.5090700@mentor.com>
+	<AANLkTikP0P9S1VgiU_yT53f-kZq0JMLBJoVWigAy8YWB@mail.gmail.com>
+	<AANLkTikoExk30pqdcHXCA2K_oJB=VJ5_AnCkoYUrEt3X@mail.gmail.com>
+	<20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
+Message-ID: <AANLkTimnHHhYKnvUgsMo_jsKaYdY+XuABZ+FV0p25JLi@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2011 02:52 PM, Russell King - ARM Linux wrote:
->> > Should I push these patches to tracker now ?
-> I've not yet been through them.  I only got part way through v4 before you
-> posted v5.
+On Mon, Feb 14, 2011 at 8:32 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
 
-Russell,
+> OMAP mailbox is the interrupt driven 32bit unit H/W FIFO to other
+> cores.
 
-Is there any further feedback on this patchset?
+How is it used? Is it a low-traffic (like single 32bit words etc) signal
+control-path link while the actual high-throughput data-path is done
+with shared memory? (That is how the db5500 mbox works anyways.)
 
--- 
-viresh
+Linus Walleij
