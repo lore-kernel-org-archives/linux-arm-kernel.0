@@ -1,27 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 14 Feb 2011 09:52:10 -0700 (MST)
-Subject: [PATCH v2 5/7] omap: dpll: Enable all OMAP3/4 dpll autoidle late
-	at boot
-In-Reply-To: <ee3e93f406daf1a283b8d551f57933e3@mail.gmail.com>
-References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
-	<1297329400-5936-2-git-send-email-rnayak@ti.com>
-	<1297329400-5936-3-git-send-email-rnayak@ti.com>
-	<1297329400-5936-4-git-send-email-rnayak@ti.com>
-	<1297329400-5936-5-git-send-email-rnayak@ti.com>
-	<1297329400-5936-6-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1102121741340.21991@utopia.booyaka.com>
-	<ee3e93f406daf1a283b8d551f57933e3@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1102140951560.21991@utopia.booyaka.com>
+From: iws@ovro.caltech.edu (Ira W. Snyder)
+Date: Mon, 14 Feb 2011 08:53:27 -0800
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <AANLkTinu9VMuFgHeFZGXptDYZyJL6P4qxAA9MA8UewpU@mail.gmail.com>
+References: <4D55A7F7.5090700@mentor.com>
+	<20110214100104.GC4371@pulham.picochip.com>
+	<AANLkTinu9VMuFgHeFZGXptDYZyJL6P4qxAA9MA8UewpU@mail.gmail.com>
+Message-ID: <20110214165327.GB13271@ovro.caltech.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Feb 2011, Rajendra Nayak wrote:
+On Mon, Feb 14, 2011 at 12:03:59PM +0200, Ohad Ben-Cohen wrote:
+> On Mon, Feb 14, 2011 at 12:01 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> > On Fri, Feb 11, 2011 at 03:19:51PM -0600, Meador Inge wrote:
+> >> ? ? 1. Hardware specific bits somewhere under '.../arch/*'. ?Drivers
+> >> ? ? ? ?for the MPIC message registers on Power and OMAP4 mailboxes, for
+> >> ? ? ? ?example.
+> >> ? ? 2. A higher level driver under '.../drivers/mailbox/*'. ?That the
+> >> ? ? ? ?pieces in (1) would register with. ?This piece would expose the
+> >> ? ? ? ?main kernel API.
+> >> ? ? 3. Userspace interfaces for accessing the mailboxes. ?A
+> >> ? ? ? ?'/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
+> >
+> > How about using virtio for all of this and having the mailbox as a
+> > notification/message passing driver for the virtio backend?
+> 
+> This is exactly what we are doing now, and it looks promising. expect
+> patches soon.
 
-> Since I already tested the clk_autoidle_a_2.6.39 branch
-> which also has this patch included, you can add a
-> Tested-by: Rajendra Nayak <rnayak@ti.com>
+I'll be happy to examine the feasibility of doing a port to mpc83xx as
+soon as I see the code. :-) I have been using the message registers to
+create a software "network card" over PCI (between a host system and an
+mpc83xx in a PCI slot). I have wanted to use virtio for this task for a
+long time.
 
-Thanks, added.
+I think a uniform interface for the mailbox registers would be a very
+useful API.
 
-
-- Paul
+Thanks,
+Ira
