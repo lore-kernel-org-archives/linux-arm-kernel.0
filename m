@@ -1,66 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Feb 2011 21:22:54 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTin=bkzvdQXoWUKRfX8Xs=4bXnxWf88TUG+VvjPD@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102131839.08517.arnd@arndb.de>
-	<AANLkTin=bkzvdQXoWUKRfX8Xs=4bXnxWf88TUG+VvjPD@mail.gmail.com>
-Message-ID: <201102142122.54766.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Feb 2011 15:10:18 -0500 (EST)
+Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <20110214153726.GA20144@arm.com>
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+	<87pqqy6tdj.fsf@ti.com> <20110214131750.GA2869@arm.com>
+	<alpine.LFD.2.00.1102140950580.14920@xanadu.home>
+	<20110214153726.GA20144@arm.com>
+Message-ID: <alpine.LFD.2.00.1102141110500.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 February 2011 20:29:59 Andrei Warkentin wrote:
-> On Sun, Feb 13, 2011 at 11:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> Ah sorry, I had to look that one up myself, I thought it was the local
-> jargon associated with the problem space :-). Program/Erase cycle.
+On Mon, 14 Feb 2011, Dave Martin wrote:
 
-Ok, makes sense.
-
-> >> So T suggested for random data to better go into buffer A. How? Two suggestions.
-> >> 1) Split smaller accesses into 8KB and write with reliable write.
-> >> 2) Split smaller accesses into 8KB and write in reverse.
-> >>
-> >> The patch does both and I am verifying if that is really necessary. I
-> >> need to go see the mmc spec and what it says about reliable write.
-> >
-> > I should add this to my test tool once I can reproduce it. If it turns
-> > out that other media do the same, we can also trigger the same behavior
-> > for those.
-> >
+> On Mon, Feb 14, 2011 at 10:00:23AM -0500, Nicolas Pitre wrote:
+> > > +#ifdef CONFIG_THUMB2_KERNEL
+> > > +	.align
+> > > +	bx	pc
+> > > +	nop
+> > > +	.arm
+> > 
+> > Also here, the .align has the potential to introduce a zero halfword in 
+> > the instruction stream before the bx.  What about:
+> > 
+> > 	adr	r3, 1f
+> > 	bx	r3
+> > 	.align
+> > 	.arm
+> > 1:	...
 > 
-> As I mentioned, I am checking with T right now on whether we can use
-> suggestion (1) or
-> suggestion (2) or if they need to be combined. The documentation we
-> got was open to interpretation and the patch created from that did
-> both.
-> You mentioned that writing in reverse is not a good idea. Could you
-> elaborate why? I would guess because you're always causing a write
-> into a different AU (on these Toshiba cards), causing extra GC on
-> every write?
+> .align inserts a 16-bit nop when misaligned in Thumb in a text section,
 
-Probably both the reliable write and writing small blocks in reverse
-order will cause any card to do something that is different from
-what it does on normal 64kb (or larger) aligned accesses.
+Ah, OK then.  I didn't know about that. In ARM mode the all-zero bits 
+decode to an instruction that sort of does nothing, but this isn't an 
+eleguant nop, and that's what .align (used to?) insert as padding.
 
-There are multiple ways how this could be implemented:
+> and a word-aligned bx pc is a specific architecturally allowed way
+> to do an inline switch to ARM.  The linker uses this trick for PLT
+> veneers etc.
 
-1. Have one exception cache for all "special" blocks. This would normally
-   be for FAT32 subdirectory updates, which always write to the same
-   few blocks. This means you can do small writes efficiently anywhere
-   on the card, but only up to a (small) fixed number of block addresses.
-   If you overflow the table, the card still needs to go through an
-   extra PE for each new entry you write, in order to free up an entry.
+Yep.  It's just that with my suggestion the bx wasn't necessarily 
+aligned.
 
-2. Have a small number of AUs that can be in a special mode with efficient
-   small writes but inefficient large writes. This means that when you
-   alternate between small and large writes in the same AU, it has to go
-   through a PE on every switch. Similarly, if you do small writes to
-   more than the maximum number of AUs that can be held in this mode, you
-   get the same effect. This number can be as small as one, because that
-   is what FAT32 requires.
+> A nicer fix for doing this sort of call from low-level code which
+> might be ARM is to convert arch/arm/mm/*-v7.S to use "bx lr" to return.
+> 
+> Generally, we can do this for all arches >= v5, without any
+> incompatibility.  However, since the need for it will be rare and it
+> will generate patch noise for not much real benefit,
+> I haven't proposed this.
 
-In both cases, you don't actually have a solution for the problem, you just
-make it less likely for specific workloads.
+This can be done in those places where this might be needed without 
+having to convert them all.
 
-	Arnd
+
+Nicolas
