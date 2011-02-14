@@ -1,28 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 14 Feb 2011 17:22:56 +0900
-Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
-	ARCH_EXYNOS4 from ARCH_S5PV310
-Message-ID: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+Date: Mon, 14 Feb 2011 17:23:05 +0900
+Subject: [PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
+In-Reply-To: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1297671787-10571-10-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting Samsung's
-new brand name EXYNOS. Samsung officially announced about the brand name of EXYNOS
-at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor with several
-other peripherals to support features such as multimedai, storage, graphics and gaming.
-Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be used in
-products such as Mobile devices.
+This patch updates EXYNOS4 OneNAND support according to the change of
+ARCH name, EXYNOS4.
 
-This patch set consists of the following patches.
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/mtd/onenand/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-[PATCH 01/11] ARM: EXYNOS4: Add EXYNOS4 CPU initialization support
-[PATCH 02/11] ARM: EXYNOS4: Update Clock part
-[PATCH 03/11] ARM: EXYNOS4: Update IRQ part
-[PATCH 04/11] ARM: EXYNOS4: Update Timer part
-[PATCH 05/11] ARM: EXYNOS4: Update device support
-[PATCH 06/11] ARM: EXYNOS4: Moved board support files
-[PATCH 07/11] ARM: EXYNOS4: Update Kconfig and Makefile for the new ARCH_EXYNOS4
-[PATCH 08/11] ARM: exynos4_defconfig: Add defconfig for EXYNOS4
-[PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
-[PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
-[PATCH 11/11] tty: Change dependency of ARCH_EXYNOS4
+diff --git a/drivers/mtd/onenand/Kconfig b/drivers/mtd/onenand/Kconfig
+index 4dbd0f5..4f42619 100644
+--- a/drivers/mtd/onenand/Kconfig
++++ b/drivers/mtd/onenand/Kconfig
+@@ -32,7 +32,7 @@ config MTD_ONENAND_OMAP2
+ 
+ config MTD_ONENAND_SAMSUNG
+         tristate "OneNAND on Samsung SOC controller support"
+-        depends on ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5PV310
++        depends on ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4
+         help
+           Support for a OneNAND flash device connected to an Samsung SOC.
+           S3C64XX/S5PC100 use command mapping method.
+-- 
+1.7.1
