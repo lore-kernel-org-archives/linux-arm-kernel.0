@@ -1,80 +1,42 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 14 Feb 2011 17:36:05 +0530
-Subject: [PATCH] OMAP4: clockdomain: Remove pr_errs' stating unsupported wkdep
-Message-ID: <1297685165-25489-1-git-send-email-rnayak@ti.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Mon, 14 Feb 2011 13:06:43 +0100
+Subject: [PATCH] mx3fb: Fix parameter to sdc_init_panel
+In-Reply-To: <Pine.LNX.4.64.1102140856070.7331@axis700.grange>
+References: <1297332330-21964-1-git-send-email-alexander.stein@systec-electronic.com>
+	<201102140846.47249.alexander.stein@systec-electronic.com>
+	<Pine.LNX.4.64.1102140856070.7331@axis700.grange>
+Message-ID: <201102141306.43739.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that wkup and sleep dependencies are supported (in the
-form of static deps) for OMAP4, remove all instances of
-pr_errs' stating dependencies are still unsupported
-on OMAP4.
+On Monday 14 February 2011, 08:57:04 Guennadi Liakhovetski wrote:
+> On Mon, 14 Feb 2011, Alexander Stein wrote:
+> > On Thursday 10 February 2011, 14:01:17 Alexander Stein wrote:
+> > > On Thursday 10 February 2011, 13:48:23 Guennadi Liakhovetski wrote:
+> > > > > I don't know which display you used, but I guess your right_margin
+> > > > > (and lower_margin) needs to be adjusted.
+> > > > 
+> > > > Ok, agree. But then you need to adjust all current users and have
+> > > > them tested... Otherwise, of course, you can just adjust your
+> > > > platform panel data to work with the current calculations, even
+> > > > though in principle your patch seems to be doing the right thing
+> > > > (tm), according to the manual. But if applied as is without fixing
+> > > > all the users, it can very well break them...
+> > > 
+> > > Ok, I've just seen there are some model defines in mx3fb.c which would
+> > > also be affected.
+> > > I'll try to find all mx3fb users and fix their videomodes and repost a
+> > > new patch.
+> > 
+> > Uh, this seems next to impossible for me to handle it my own. I checked
+> > some users of the mx3fb but I cant say which ones will be affected and
+> > which ones not (e.g. without any hsync/vsync, on data enable).
+> > I've not idea how to fix it then.
+> 
+> Well, you can, of course, adjust parameters for your platform to be able
+> to run with this incorrect parameter definition...
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
-Patch applies on the integration-2.6.39 of 
-git://git.pwsan.com/linux-integration which
-has the dependency support for omap4 queued
-up.
+This is just an ugly work-around. Depending on the settings you may even get 
+an overflow resulting in a not-working display at all.
 
- arch/arm/mach-omap2/clockdomain.c |   24 ------------------------
- 1 files changed, 0 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 70d2420..a0341de 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -400,12 +400,6 @@ int clkdm_add_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- 	struct clkdm_dep *cd;
- 	int ret = 0;
- 
--	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
--		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
--		       clkdm1->name, clkdm2->name, __func__);
--		return -EINVAL;
--	}
--
- 	if (!clkdm1 || !clkdm2)
- 		return -EINVAL;
- 
-@@ -447,12 +441,6 @@ int clkdm_del_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- 	struct clkdm_dep *cd;
- 	int ret = 0;
- 
--	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
--		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
--		       clkdm1->name, clkdm2->name, __func__);
--		return -EINVAL;
--	}
--
- 	if (!clkdm1 || !clkdm2)
- 		return -EINVAL;
- 
-@@ -501,12 +489,6 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
- 	if (!clkdm1 || !clkdm2)
- 		return -EINVAL;
- 
--	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
--		pr_err("clockdomain: %s/%s: %s: not yet implemented\n",
--		       clkdm1->name, clkdm2->name, __func__);
--		return -EINVAL;
--	}
--
- 	cd = _clkdm_deps_lookup(clkdm2, clkdm1->wkdep_srcs);
- 	if (IS_ERR(cd))
- 		ret = PTR_ERR(cd);
-@@ -536,12 +518,6 @@ int clkdm_read_wkdep(struct clockdomain *clkdm1, struct clockdomain *clkdm2)
-  */
- int clkdm_clear_all_wkdeps(struct clockdomain *clkdm)
- {
--	if (!cpu_is_omap24xx() && !cpu_is_omap34xx()) {
--		pr_err("clockdomain: %s: %s: not yet implemented\n",
--		       clkdm->name, __func__);
--		return -EINVAL;
--	}
--
- 	if (!clkdm)
- 		return -EINVAL;
- 
--- 
-1.7.0.4
+Alexander
