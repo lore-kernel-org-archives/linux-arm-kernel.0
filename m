@@ -1,26 +1,33 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 14 Feb 2011 16:12:16 +0100
-Subject: Machine ID question
-In-Reply-To: <20110210082915.GV27982@pengutronix.de>
-References: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
-	<20110210082915.GV27982@pengutronix.de>
-Message-ID: <201102141612.17340.alexander.stein@systec-electronic.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 14 Feb 2011 08:19:06 -0700
+Subject: [git pull] Revert arm/dt documentation change that shouldn't have
+	been merged yet
+Message-ID: <AANLkTi=dX4EjrF6qxw3oPOEJoV1PgrpiQimB=mSEzkBa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 10 February 2011, 09:29:15 Uwe Kleine-K?nig wrote:
-> On Wed, Feb 09, 2011 at 02:23:07PM -0700, John Linn wrote:
-> > I used the form to create a new machine ID for the new Xilinx platform
-> > in anticipation of
-> > the code making it into the mainline sometime in the future.
-> > 
-> > The proposed patches are using ARCH_XILINX in the Kconfig.
-> 
-> You should use MACH_XILINX in the patches.  There are some ARCH_... in
-> the machine db, but I think nowadays you cannot (and should not) create
-> them there.
+Hi Linus,
 
-Uhm, the last entry in the db was created today (14th Feb). Is there a reason 
-why there no new entries should be created?
+I included a patch I shouldn't have in my last pull req.  This pull
+req reverts it.  Thanks to Russell for pointing it out to me.
 
-Alexander
+g.
+
+
+The following changes since commit 795abaf1e4e188c4171e3cd3dbb11a9fcacaf505:
+
+  klist: Fix object alignment on 64-bit. (2011-02-13 16:54:24 -0800)
+
+are available in the git repository at:
+  git://git.secretlab.ca/git/linux-2.6 devicetree/merge
+
+Grant Likely (1):
+      Revert "dt: add documentation of ARM dt boot interface"
+
+ Documentation/arm/Booting                       |   33 ++----------------
+ Documentation/devicetree/booting-without-of.txt |   40 -----------------------
+ 2 files changed, 4 insertions(+), 69 deletions(-)
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
