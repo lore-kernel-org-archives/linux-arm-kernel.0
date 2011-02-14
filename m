@@ -1,58 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Feb 2011 13:08:39 -0800
-Subject: [PATCH 2/5] omap4: Enable ARM local timers with OMAP4430 es1.0
-	exception
-In-Reply-To: <1297510187-31547-3-git-send-email-santosh.shilimkar@ti.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Mon, 14 Feb 2011 15:06:32 -0600
+Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
+	cause data corruption
+In-Reply-To: <AANLkTinfx3eEgvPpeUAAxcrDOtQ+G_PkkoQH4V9E+N=7@mail.gmail.com>
 References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297510187-31547-3-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110214210838.GI20795@atomide.com>
+	<1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com>
+	<AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com>
+	<13596bec9184b117d6a1d02da8e017bf@mail.gmail.com>
+	<AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com>
+	<33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
+	<AANLkTinfx3eEgvPpeUAAxcrDOtQ+G_PkkoQH4V9E+N=7@mail.gmail.com>
+Message-ID: <AANLkTimaH=Gw4xZC4o_kfMyvx6cYTDEZ=gYkpiRfLyd0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110212 03:28]:
-> On OMAP4430 ES1.0 the local timers are gated by security. Enable the
-> CONFIG_LOCAL_TIMERS for omap2plus build and handle the OMAP4430 es1.0
-> exception case.
-> 
-> This patch has dependency on the first patch in this series.
-> 	ARM: smp: Select local timers vs dummy timer support runtime
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Mon, Feb 14, 2011 at 1:33 PM, Andrei Warkentin <andreiw@motorola.com> wrote:
+>
+> Fair enough, but you're doing it right now :-). I believe the smarter
+> approach would be to start abstracting all accesses to secure-only
+> resources (like the DCR reg). This would be your "hypervisor"
+> interface. Then provide an implementation for your TI secure monitor.
+> Obviously over time :).
+>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Santosh,
 
-> ---
->  arch/arm/mach-omap2/Kconfig     |    1 +
->  arch/arm/mach-omap2/timer-mpu.c |    4 ++++
->  2 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 1a2cf62..f285dd7 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -44,6 +44,7 @@ config ARCH_OMAP4
->  	depends on ARCH_OMAP2PLUS
->  	select CPU_V7
->  	select ARM_GIC
-> +	select LOCAL_TIMERS
->  	select PL310_ERRATA_588369
->  	select ARM_ERRATA_720789
->  	select ARCH_HAS_OPP
-> diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-> index 09c73dc..31c0ac4 100644
-> --- a/arch/arm/mach-omap2/timer-mpu.c
-> +++ b/arch/arm/mach-omap2/timer-mpu.c
-> @@ -28,6 +28,10 @@
->   */
->  int __cpuinit local_timer_setup(struct clock_event_device *evt)
->  {
-> +	/* Local timers are not supprted on OMAP4430 ES1.0 */
-> +	if (omap_rev() == OMAP4430_REV_ES1_0)
-> +		return -ENXIO;
-> +
->  	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
->  	twd_timer_setup(evt);
->  	return 0;
-> -- 
-> 1.6.0.4
-> 
+Maybe this can influence you in some ways. I have this old patch
+sitting around, although it does #ifdef around the TI stuff, simply
+because I wasn't really interested in moving it out.
+I group the errata by revs so it's simpler to see what you need and
+what you don't. Obviously there aren't that many, but it does provide
+a pattern to follow...
+
+Thanks,
+A
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-PL310-Cleanup-errata-handling-for-cache-controll.patch
+Type: text/x-diff
+Size: 9798 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110214/842681d4/attachment-0001.bin>
