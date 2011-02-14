@@ -1,181 +1,51 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 14 Feb 2011 14:06:53 -0800
-Subject: [PATCH v2] OMAP: PM: DMA: Enable runtime pm
-References: <1297082286-8449-1-git-send-email-manjugk@ti.com>
-Message-ID: <87ipwm1daa.fsf@ti.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Mon, 14 Feb 2011 16:25:48 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102142122.54766.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102131839.08517.arnd@arndb.de>
+	<AANLkTin=bkzvdQXoWUKRfX8Xs=4bXnxWf88TUG+VvjPD@mail.gmail.com>
+	<201102142122.54766.arnd@arndb.de>
+Message-ID: <AANLkTinPtiwXmtRy9qS2zZXwuhQDOyO-H8-wmF=fSNnJ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"G, Manjunath Kondaiah" <manjugk@ti.com> writes:
-
-> From: Manjunath G Kondaiah <manjugk@ti.com>
+On Mon, Feb 14, 2011 at 2:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> As I mentioned, I am checking with T right now on whether we can use
+>> suggestion (1) or
+>> suggestion (2) or if they need to be combined. The documentation we
+>> got was open to interpretation and the patch created from that did
+>> both.
+>> You mentioned that writing in reverse is not a good idea. Could you
+>> elaborate why? I would guess because you're always causing a write
+>> into a different AU (on these Toshiba cards), causing extra GC on
+>> every write?
 >
-> Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put_autosuspend
-> for OMAP DMA driver.
+> Probably both the reliable write and writing small blocks in reverse
+> order will cause any card to do something that is different from
+> what it does on normal 64kb (or larger) aligned accesses.
 >
-> The DMA driver uses auto suspend feature of runtime pm framework through
-> which the clock gets disabled automatically if there is no activity for
-> more than one second.
+> There are multiple ways how this could be implemented:
 >
-> Testing:
-> Compile: omap1_defconfig and omap2plus_defconfig
-> Boot: OMAP1710(H3), OMAP2420(H4), OMAP3630(Zoom3), OMAP4(Blaze)
-
-The normal DMA tests should also be run on these platforms.  Based on
-the above, I can't tell any DMA tests were run.   Based on my tests,
-this isn't working for chained xfers.
-
-Using the runtime PM sysfs interface, you can check the runtime status
-of the device:
-
-# cat /sys/devices/platform/omap/omap_dma_system.0/power/runtime_status          
-
-It should show 'active' during transfer, and after timeout expires it
-will show 'suspended'.
-
-Doing some tests using my dmatest module:
-
-  git://gitorious.org/omap-test/dmatest.git
-
-I noticed that it gets stuck in 'active' and never gets suspended when I
-used DMA channel linking (load module using 'linking=1' as load-time option)
-
-I'm not sure exactly why, but I will guess that the reason is that there
-is an imbalance in get/put calls when using chaining, since 'get' is
-only called once upon omap_start_dma() but 'put' is called for every
-channel in the callback.
-
-> On zoom3 core retention is tested with following steps:
-> echo 1 > /debug/pm_debug/sleep_while_idle
-> echo 1 > /debug/pm_debug/enable_off_mode
-> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
+> 1. Have one exception cache for all "special" blocks. This would normally
+> ? be for FAT32 subdirectory updates, which always write to the same
+> ? few blocks. This means you can do small writes efficiently anywhere
+> ? on the card, but only up to a (small) fixed number of block addresses.
+> ? If you overflow the table, the card still needs to go through an
+> ? extra PE for each new entry you write, in order to free up an entry.
 >
-> It is observed that(on pm branch), core retention count gets increasing if the
-> board is left idle for more than 5 seconds. However, it doesnot enter off mode
-> (even without DMA runtime changes).
-
-What silicon rev is on your Zoom3?  Mainline kernels now disable core
-off-mode for 3630 revs < ES2.1 due to erratum i583.
-
-If this happens, you should see something like this on the console:
-
-           Core OFF disabled due to errata i583
-
-Kevin
-
-> Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> ---
->  arch/arm/plat-omap/dma.c |   27 +++++++++++++++++++++++++++
->  1 files changed, 27 insertions(+), 0 deletions(-)
+> 2. Have a small number of AUs that can be in a special mode with efficient
+> ? small writes but inefficient large writes. This means that when you
+> ? alternate between small and large writes in the same AU, it has to go
+> ? through a PE on every switch. Similarly, if you do small writes to
+> ? more than the maximum number of AUs that can be held in this mode, you
+> ? get the same effect. This number can be as small as one, because that
+> ? is what FAT32 requires.
 >
-> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> index 2ec3b5d..6bfe25c 100644
-> --- a/arch/arm/plat-omap/dma.c
-> +++ b/arch/arm/plat-omap/dma.c
-> @@ -35,6 +35,7 @@
->  #include <linux/io.h>
->  #include <linux/slab.h>
->  #include <linux/delay.h>
-> +#include <linux/pm_runtime.h>
->  
->  #include <asm/system.h>
->  #include <mach/hardware.h>
-> @@ -59,6 +60,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
->  
->  static struct omap_system_dma_plat_info *p;
->  static struct omap_dma_dev_attr *d;
-> +static struct device *dev;
->  
->  static int enable_1510_mode;
->  static u32 errata;
-> @@ -676,6 +678,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->  	unsigned long flags;
->  	struct omap_dma_lch *chan;
->  
-> +	pm_runtime_get_sync(dev);
->  	spin_lock_irqsave(&dma_chan_lock, flags);
->  	for (ch = 0; ch < dma_chan_count; ch++) {
->  		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
-> @@ -686,6 +689,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->  	}
->  	if (free_ch == -1) {
->  		spin_unlock_irqrestore(&dma_chan_lock, flags);
-> +		pm_runtime_put_autosuspend(dev);
->  		return -EBUSY;
->  	}
->  	chan = dma_chan + free_ch;
-> @@ -743,6 +747,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
->  	}
->  
->  	*dma_ch_out = free_ch;
-> +	pm_runtime_put_autosuspend(dev);
->  
->  	return 0;
->  }
-> @@ -871,6 +876,8 @@ void omap_start_dma(int lch)
->  {
->  	u32 l;
->  
-> +	pm_runtime_get_sync(dev);
-> +
->  	/*
->  	 * The CPC/CDAC register needs to be initialized to zero
->  	 * before starting dma transfer.
-> @@ -1805,6 +1812,8 @@ static int omap1_dma_handle_ch(int ch)
->  	if (likely(dma_chan[ch].callback != NULL))
->  		dma_chan[ch].callback(ch, csr, dma_chan[ch].data);
->  
-> +	pm_runtime_mark_last_busy(dev);
-> +	pm_runtime_put_autosuspend(dev);
->  	return 1;
->  }
->  
-> @@ -1899,6 +1908,8 @@ static int omap2_dma_handle_ch(int ch)
->  	if (likely(dma_chan[ch].callback != NULL))
->  		dma_chan[ch].callback(ch, status, dma_chan[ch].data);
->  
-> +	pm_runtime_mark_last_busy(dev);
-> +	pm_runtime_put_autosuspend(dev);
->  	return 0;
->  }
->  
-> @@ -1978,6 +1989,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> +	dev			= &pdev->dev;
->  	d			= p->dma_attr;
->  	errata			= p->errata;
->  
-> @@ -1999,6 +2011,11 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	pm_runtime_use_autosuspend(dev);
-> +	pm_runtime_set_autosuspend_delay(dev, 1000);
-> +	pm_runtime_enable(dev);
-> +	pm_runtime_get_sync(dev);
-> +
->  	spin_lock_init(&dma_chan_lock);
->  	for (ch = 0; ch < dma_chan_count; ch++) {
->  		omap_clear_dma(ch);
-> @@ -2064,6 +2081,16 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
->  		dma_chan[1].dev_id = 1;
->  	}
->  	p->show_dma_caps();
-> +
-> +	/*
-> +	 * Note: If dma channels are reserved through boot paramters,
-> +	 * then dma device is always enabled.
-> +	 */
-> +	if (omap_dma_reserve_channels)
-> +		pm_runtime_get(dev);
-> +
-> +	pm_runtime_put_autosuspend(dev);
-> +
->  	return 0;
->  
->  exit_dma_irq_fail:
+> In both cases, you don't actually have a solution for the problem, you just
+> make it less likely for specific workloads.
+
+Aha, ok. By the way, I did find out that either suggestion works. So
+I'll pull out the reversing portion of the patch. No need to
+overcomplicate :).
