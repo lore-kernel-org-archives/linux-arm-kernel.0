@@ -1,48 +1,28 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon, 14 Feb 2011 14:15:06 +0530
-Subject: [PATCH v2 09/13] can: pruss CAN driver.
-In-Reply-To: <4D58D854.5090503@grandegger.com>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
-	<20110211150602.GB373@e-circ.dyndns.org>
-	<C1C4300CE90A406FBDA2388D5491FAD5@subhasishg>
-	<4D58D854.5090503@grandegger.com>
-Message-ID: <1F33D30F9B2D47ECA80CEC807A6C0727@subhasishg>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 Feb 2011 17:22:56 +0900
+Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
+	ARCH_EXYNOS4 from ARCH_S5PV310
+Message-ID: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That is correct, we receive only pre-programmed CAN ids and "all" or "range" 
-implementation is not there in the PRU firmware.
-Will check the sysfs option and update.
+This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting Samsung's
+new brand name EXYNOS. Samsung officially announced about the brand name of EXYNOS
+at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor with several
+other peripherals to support features such as multimedai, storage, graphics and gaming.
+Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be used in
+products such as Mobile devices.
 
---------------------------------------------------
-From: "Wolfgang Grandegger" <wg@grandegger.com>
-Sent: Monday, February 14, 2011 12:53 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Cc: "Kurt Van Dijck" <kurt.van.dijck@eia.be>; 
-<davinci-linux-open-source@linux.davincidsp.com>; 
-<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
-<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "open list:CAN NETWORK 
-DRIVERS" <socketcan-core@lists.berlios.de>; "open list:CAN NETWORK DRIVERS" 
-<netdev@vger.kernel.org>; "open list" <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2 09/13] can: pruss CAN driver.
+This patch set consists of the following patches.
 
-> On 02/14/2011 05:54 AM, Subhasish Ghosh wrote:
->> Hello,
->>
->> I had a discussion regarding this with Wolfgang:
->>
->> http://www.mail-archive.com/socketcan-users at lists.berlios.de/msg00324.html
->>
->> The problem here is that we must configure the mailbox ID's and this
->> support is not available in the socketCan sub-system.
->
-> To understand you correctly. A mailbox (or message object) can *only*
-> receive messages with the pre-programmed CAN id? Isn't there a chance to
-> receive all or a range of CAN ids? That's a very unusual piece of
-> hardware. Anyway, using kernel configuration parameters to define the
-> CAN id's would be the less flexible method. The user will not have a
-> chance to change them at run-time. Using SysFS files would already be
-> much better.
->
-> Wolfgang. 
+[PATCH 01/11] ARM: EXYNOS4: Add EXYNOS4 CPU initialization support
+[PATCH 02/11] ARM: EXYNOS4: Update Clock part
+[PATCH 03/11] ARM: EXYNOS4: Update IRQ part
+[PATCH 04/11] ARM: EXYNOS4: Update Timer part
+[PATCH 05/11] ARM: EXYNOS4: Update device support
+[PATCH 06/11] ARM: EXYNOS4: Moved board support files
+[PATCH 07/11] ARM: EXYNOS4: Update Kconfig and Makefile for the new ARCH_EXYNOS4
+[PATCH 08/11] ARM: exynos4_defconfig: Add defconfig for EXYNOS4
+[PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
+[PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
+[PATCH 11/11] tty: Change dependency of ARCH_EXYNOS4
