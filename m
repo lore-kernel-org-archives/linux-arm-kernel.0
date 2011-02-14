@@ -1,29 +1,28 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Mon, 14 Feb 2011 08:18:07 +0200
-Subject: [PATCH 2/2] ARM: tegra: add TrimSlice board
-In-Reply-To: <AANLkTimU9tpeY3-5yisqOAKBeAtz684gtM2ieYb62zO-@mail.gmail.com>
-References: <cover.1297063443.git.mike@compulab.co.il>	<c61e1816027e51acfb5bda1e498225a4da37d92d.1297063443.git.mike@compulab.co.il>	<AANLkTim5-dmpF8r9uZp8iDsT6p61D0iaJZuHvRLfUL6Y@mail.gmail.com>	<4D57BBC7.4070306@compulab.co.il>
-	<AANLkTimU9tpeY3-5yisqOAKBeAtz684gtM2ieYb62zO-@mail.gmail.com>
-Message-ID: <4D58C91F.9030303@compulab.co.il>
+From: prakity@marvell.com (Philip Rakity)
+Date: Sun, 13 Feb 2011 22:42:14 -0800
+Subject: [PATCH 0/4] arm: mach-mmp: Allow correct PXA Selections
+Message-ID: <1FB4110A-A461-4F8B-9425-44005824005C@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/11 21:06, Colin Cross wrote:
->>>
->>> Ack, the machine type is merged so I'll put this in for-next.  Do you
->>> want it enabled in tegra_defconfig?
->>
->> If 'select TEGRA_PCI' does not trouble you, I'd be glad to have the TrimSlice in
->> tegra_defconfig :)
-> 
-> My board without PCI doesn't boot if CONFIG_TEGRA_PCI is selected, so
-> I guess it should stay off for now.  Any idea why it wouldn't boot?
 
-The PCI subsystem should be re-gated, otherwise any access to PCI hangs the
-system. Besides, on Harmony you need to enable two additional voltage supplies
-to provide PEX_CLK voltage.
-I'll send the patches that handle it, hopefully in the next few days.
+Patch Set 1/12
 
--- 
-Sincerely yours,
-Mike.
+a) inconsistent behavior when board is selected and if
+menu item is reselected board has disappeard
+
+b) Ability to select options that will not build
+	MMP2 and say PXA168
+
+The behavior maps what is done by the mach-omap
+(thanks to Anrd Bergmann for his help and suggestions)
+
+Mach-MMP is (as now) the sytem type.  Once selected
+the user can then select the SoC on the board and
+only the boards that support that SoC are shown.
+
+[PATCH 2/4] arm: configs: update mmp2 defconfig for brownstone and SoC Selection
+[PATCH 3/4] arm: configs: update pxa168 defconfig for SoC Selection
+[PATCH 4/4] arm: configs: update pxa910 defconfig for SoC Selection
+
+update defconfig to reflect the changes made in Patch 1.
