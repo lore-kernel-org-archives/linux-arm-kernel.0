@@ -1,59 +1,178 @@
 From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 14 Feb 2011 09:21:56 +0200 (EET)
+Date: Mon, 14 Feb 2011 09:32:57 +0200 (EET)
 Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <4D55A7F7.5090700@mentor.com>
+In-Reply-To: <AANLkTikoExk30pqdcHXCA2K_oJB=VJ5_AnCkoYUrEt3X@mail.gmail.com>
 References: <4D55A7F7.5090700@mentor.com>
-Message-ID: <20110214.092156.806824256640411558.Hiroshi.DOYU@nokia.com>
+	<AANLkTikP0P9S1VgiU_yT53f-kZq0JMLBJoVWigAy8YWB@mail.gmail.com>
+	<AANLkTikoExk30pqdcHXCA2K_oJB=VJ5_AnCkoYUrEt3X@mail.gmail.com>
+Message-ID: <20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Meador,
+From: ext Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [RFC] Inter-processor Mailboxes Drivers
+Date: Sun, 13 Feb 2011 22:16:12 +0100
 
-From: ext Meador Inge <meador_inge@mentor.com>
-Subject: [RFC] Inter-processor Mailboxes Drivers
-Date: Fri, 11 Feb 2011 15:19:51 -0600
+> 2011/2/12 Sundar <sunder.svit@gmail.com>:
+> 
+>> At least I would like this; I wanted to generalize such mailbox IPCs
+>> right from the day when I was working on one, but coudnt really
+>> work on that.
+>>
+>>> ? ?2. Does something like this already exist?
+>>
+>> Not generic as you say; but apart from the OMAP platforms,
+>> you could refer to arch/arm/mach-ux500/prcmu for a mailbox based
+>> IPC on the U8500 platform.
+> 
+> We also have this thing:
+> arch/arm/mach-ux500/mbox-db5500.c
+> 
+> It's another mailbox driver, this one talks to the modem in the
+> U5500 (basically a physical transport for the CAIF protocol).
+> (For the U8500 I think modem IPC is instead handled with
+> a high-speed hardware FIFO, a bit different.)
+> 
+>>> ? ?3. Is someone else already working on this?
+>>
+>> Not sure of that too :), but I am CCing Linus W, the maintainer
+>> of U8500 if he thinks it is a good idea to come up with a mailbox IPC
+>> framework
+> 
+> I don't know too much about the subject actually, I've not been
+> deeply into any such code. I don't think anyone is working
+> on something general from ST-Ericsson or Linaro.
+> 
+> Recently I saw that Texas Instruments are posting a "hardware
+> spinlock" framework though, this would be on a related tone,
+> but I think it's for shared data structures (control path) rather
+> than buffer passing (data path). I'm guessing this works like
+> that one CPU gets to spin waiting for another one to release
+> the lock.
+> 
+> Given that we may have a framework for hardware spinlock
+> and that we don't want to stockpile drivers into arch/*
+> or drivers/misc/* I would say it's intuitively a good idea,
+> but the question is what data types you would pass in?
+> In arch/arm/mach-ux500/include/mach/mbox-db5500.h
+> we have a struct like this:
+> 
+> /**
+>   * struct mbox - Mailbox instance struct
+>   * @list:              Linked list head.
+>   * @pdev:              Pointer to device struct.
+>   * @cb:                Callback function. Will be called
+>   *                     when new data is received.
+>   * @client_data:       Clients private data. Will be sent back
+>   *                     in the callback function.
+>   * @virtbase_peer:     Virtual address for outgoing mailbox.
+>   * @virtbase_local:    Virtual address for incoming mailbox.
+>   * @buffer:            Then internal queue for outgoing messages.
+>   * @name:              Name of this mailbox.
+>   * @buffer_available:  Completion variable to achieve "blocking send".
+>   *                     This variable will be signaled when there is
+>   *                     internal buffer space available.
+>   * @client_blocked:    To keep track if any client is currently
+>   *                     blocked.
+>   * @lock:              Spinlock to protect this mailbox instance.
+>   * @write_index:       Index in internal buffer to write to.
+>   * @read_index:        Index in internal buffer to read from.
+>   * @allocated:         Indicates whether this particular mailbox
+>   *                     id has been allocated by someone.
+>   */
+> struct mbox {
+>         struct list_head list;
+>         struct platform_device *pdev;
+>         mbox_recv_cb_t *cb;
+>         void *client_data;
+>         void __iomem *virtbase_peer;
+>         void __iomem *virtbase_local;
+>         u32 buffer[MBOX_BUF_SIZE];
+>         char name[MBOX_NAME_SIZE];
+>         struct completion buffer_available;
+>         u8 client_blocked;
+>         spinlock_t lock;
+>         u8 write_index;
+>         u8 read_index;
+>         bool allocated;
+> };
+> 
+> Compare OMAPs mailboxes in
+> arch/arm/plat-omap/include/plat/mailbox.h:
+> 
+> typedef u32 mbox_msg_t;
+> 
+> truct omap_mbox_ops {
+>         omap_mbox_type_t        type;
+>         int             (*startup)(struct omap_mbox *mbox);
+>         void            (*shutdown)(struct omap_mbox *mbox);
+>         /* fifo */
+>         mbox_msg_t      (*fifo_read)(struct omap_mbox *mbox);
+>         void            (*fifo_write)(struct omap_mbox *mbox, mbox_msg_t msg);
+>         int             (*fifo_empty)(struct omap_mbox *mbox);
+>         int             (*fifo_full)(struct omap_mbox *mbox);
+>         /* irq */
+>         void            (*enable_irq)(struct omap_mbox *mbox,
+>                                                 omap_mbox_irq_t irq);
+>         void            (*disable_irq)(struct omap_mbox *mbox,
+>                                                 omap_mbox_irq_t irq);
+>         void            (*ack_irq)(struct omap_mbox *mbox, omap_mbox_irq_t irq);
+>         int             (*is_irq)(struct omap_mbox *mbox, omap_mbox_irq_t irq);
+>         /* ctx */
+>         void            (*save_ctx)(struct omap_mbox *mbox);
+>         void            (*restore_ctx)(struct omap_mbox *mbox);
+> };
+> 
+> struct omap_mbox_queue {
+>         spinlock_t              lock;
+>         struct kfifo            fifo;
+>         struct work_struct      work;
+>         struct tasklet_struct   tasklet;
+>         struct omap_mbox        *mbox;
+>         bool full;
+> };
+> 
+> struct omap_mbox {
+>         char                    *name;
+>         unsigned int            irq;
+>         struct omap_mbox_queue  *txq, *rxq;
+>         struct omap_mbox_ops    *ops;
+>         struct device           *dev;
+>         void                    *priv;
+>         int                     use_count;
+>         struct blocking_notifier_head   notifier;
+> };
+> 
+> Some of this may be generalized? I dunno, they look quite
+> different but maybe queueing etc can actually be made general
+> enough to form a framework.
 
-> Hi All,
-> 
-> I am currently working on building AMP systems using OpenMCAPI
-> (https://bitbucket.org/hollisb/openmcapi/wiki/Home) as the
-> inter-processor communication mechanism.  With OpenMCAPI we, of
-> course,
-> need a way to send messages to various cores.  On some Freescale PPC
-> platforms (e.g. P1022DS, MPC8572DS), we have been using message
-> registers to do this work.  Recently, I was looking at the OMAP4
-> mailboxes to gear up for moving into ARM based platforms.
-> 
-> With that, I noticed 'arch/arm/plat-omap/mailbox.c'.  This is very
-> specific to the OMAP4 boards.  I am looking at designing a new set of
-> drivers to expose a mailbox service to userspace that will be used
-> for inter-processor communication.  This would entail the traditional
-> generic/specific driver split:
-> 
->     1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
->        for the MPIC message registers on Power and OMAP4 mailboxes, for
->        example.
->     2. A higher level driver under '.../drivers/mailbox/*'.  That the
->        pieces in (1) would register with.  This piece would expose the
->        main kernel API.
->     3. Userspace interfaces for accessing the mailboxes.  A
->        '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
-> 
-> Now I have the following questions:
-> 
->     1. Do others see value in this?
+OMAP mailbox is the interrupt driven 32bit unit H/W FIFO to other
+cores.
 
-Yes.
+"struct omap_mbox_ops" was provided mainly to absorb the difference
+between OMAP1 and OMAP2+ from H/W POV. So generally the layer could
+be:
 
-I discussed this with TI(Hari) long time ago, but it didn't proceed
-with some reason, not techinical one.
+	-----------------------
+	character device driver
+	-----------------------
+	generic mailbox driver
+	-----------------------
+	   H/W registration
+	-----------------------
 
->     2. Does something like this already exist?
->     3. Is someone else already working on this?
-> 
-> Any feedback will be greatly appreciated.
+In OMAP case, in addition to the above, it could be exceptionally:
 
-Now the basic concpet can be devided into 3 parts, (1)HW dependent,
-(2) generic driver, (3) character device interface. I guess that it
-might be good to have one _pseudo_ H/W instance, then easier for
-verification without real H/W and firmwares, across multiplatforms.
+	-----------------------
+	character device driver
+	-----------------------
+	generic mailbox driver
+	-----------------------
+	   H/W registration
+	-----------------------
+	   OMAP 1  | OMAP2+
+	-----------------------
+
+So "character device driver"(interface) and "generic mailbox
+driver"(queuing) may be able to abstructed/generalized.
