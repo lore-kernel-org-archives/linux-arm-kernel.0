@@ -1,121 +1,41 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 14 Feb 2011 18:02:02 +0530
-Subject: [PATCH v2 5/7] omap: dpll: Enable all OMAP3/4 dpll autoidle late
-	at boot
-In-Reply-To: <alpine.DEB.2.00.1102121741340.21991@utopia.booyaka.com>
-References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
-	<1297329400-5936-2-git-send-email-rnayak@ti.com>
-	<1297329400-5936-3-git-send-email-rnayak@ti.com>
-	<1297329400-5936-4-git-send-email-rnayak@ti.com>
-	<1297329400-5936-5-git-send-email-rnayak@ti.com>
-	<1297329400-5936-6-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1102121741340.21991@utopia.booyaka.com>
-Message-ID: <ee3e93f406daf1a283b8d551f57933e3@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 14 Feb 2011 12:51:02 +0000
+Subject: [PATCH 2/2] P2V: Thumb2 support
+In-Reply-To: <alpine.LFD.2.00.1102130841240.14920@xanadu.home>
+References: <alpine.LFD.2.00.1102121331220.14920@xanadu.home>
+	<20110213114243.GC4799@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102130841240.14920@xanadu.home>
+Message-ID: <AANLkTinO58TS+YuhV2uL2LFtKcqLYtrcn-Gb_qmRNMs4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Sun, Feb 13, 2011 at 1:56 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Sun, 13 Feb 2011, Russell King - ARM Linux wrote:
+>
+>> On Sat, Feb 12, 2011 at 01:33:42PM -0500, Nicolas Pitre wrote:
+>> > ?__fixup_a_pv_table:
+>> > +#ifdef CONFIG_THUMB2_KERNEL
+>> > +#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
+>> > + ? lsls ? ?r0, r6, #24
+>> > + ? lsr ? ? r6, #8
+>> > + ? beq ? ? 1f
+>> > + ? clz ? ? r7, r0
+>> > + ? lsrs ? ?r0, #24
+>> > + ? lsls ? ?r0, r7
+>>
+>> Why do these instructions need to update the PSR?
+>
+> Strictly speaking they don't. ?It's just a size optimization. ?There is
+> a 16-bit encoding for them while their non-PSR-updating counterparts
+> have only a 32-bit encoding.
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Sunday, February 13, 2011 6:13 AM
-> To: Rajendra Nayak
-> Cc: linux-omap at vger.kernel.org; b-cousson at ti.com; khilman at ti.com;
-santosh.shilimkar at ti.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 5/7] omap: dpll: Enable all OMAP3/4 dpll autoidle
-late at boot
->
-> On Thu, 10 Feb 2011, Rajendra Nayak wrote:
->
-> > Enable all dpll autoidle for OMAP4 and OMAP3 (OMAP3
-> > already had dpll autoidle turned on, but was done
-> > using low level cm accessor apis).
-> > On OMAP3, replace the cm accessor apis doing this
-> > with the now available support for doing this in
-> > clock framework, using omap_clk_enable_autoidle().
->
-> I propose this patch instead.  What do you think?  Care to reply with a
-> Reviewed-by: and/or Tested-by: ?
+More optimisations are available, but in general I'd advise against
+this kind of optimisation for hand-written assembler -- it's unlikely
+to help performance and impacts readability.
 
-I agree, this is a better approach than what I proposed
-in my patch.
-Since I already tested the clk_autoidle_a_2.6.39 branch
-which also has this patch included, you can add a
-Tested-by: Rajendra Nayak <rnayak@ti.com>
+Using a low register in place of ip would shrink most of the loads and
+stores to 16 bits for free though, if a suitable register is available
+(r0?).
 
-Regards,
-Rajendra
-
->
->
-> - Paul
->
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Sat, 12 Feb 2011 17:36:38 -0600
-> Subject: [PATCH] OMAP2+: clock: autoidle as many clocks as possible in
-OMAP2+-common PM code
->
-> Attempt to enable autoidle for as many clocks as possible in the
-> OMAP2+-common PM code.  Currently, this only enables DPLL autoidle for
-> OMAP3/4 DPLLs; but it should also eventually enable autoidle for other
-> clocks and the OMAP2 DPLL/APLLs.
->
-> Based on a patch by Rajendra Nayak <rnayak@ti.com> that did this in
-> the pm34xx.c/pm44xx.c code, rather than the common PM code.
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/pm.c     |    8 ++++++++
->  arch/arm/mach-omap2/pm34xx.c |   17 -----------------
->  2 files changed, 8 insertions(+), 17 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index d5a102c..b507702 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -262,6 +262,14 @@ static int __init omap2_common_pm_late_init(void)
->  	/* Smartreflex device init */
->  	omap_devinit_smartreflex();
->
-> +	/*
-> +	 * Set all OMAP3/4 DPLLs to autoidle.
-> +	 * XXX TODO: Add all the iclk autoidles in here as well,
-> +	 * the OMAP2 DPLL, the OMAP2 APLLs, and the AUTOEXTCLKMODE
-> +	 * control here too.
-> +	 */
-> +	omap_clk_enable_autoidle_all();
-> +
->  	return 0;
->  }
->  late_initcall(omap2_common_pm_late_init);
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 2f864e4..1fe2e73 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -814,23 +814,6 @@ static void __init prcm_setup_regs(void)
->  	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
->
->  	/*
-> -	 * Set all plls to autoidle. This is needed until autoidle is
-> -	 * enabled by clockfw
-> -	 */
-> -	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_IVA2_DPLL_SHIFT,
-> -			 OMAP3430_IVA2_MOD, CM_AUTOIDLE2);
-> -	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_MPU_DPLL_SHIFT,
-> -			 MPU_MOD,
-> -			 CM_AUTOIDLE2);
-> -	omap2_cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
-> -			 (1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
-> -			 PLL_MOD,
-> -			 CM_AUTOIDLE);
-> -	omap2_cm_write_mod_reg(1 << OMAP3430ES2_AUTO_PERIPH2_DPLL_SHIFT,
-> -			 PLL_MOD,
-> -			 CM_AUTOIDLE2);
-> -
-> -	/*
->  	 * Enable control of expternal oscillator through
->  	 * sys_clkreq. In the long run clock framework should
->  	 * take care of this.
-> --
-> 1.7.2.3
+Cheers
+---Dave
