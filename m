@@ -1,143 +1,48 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 14 Feb 2011 12:51:12 +0000
-Subject: [PATCH 2/2] P2V: Thumb2 support
-In-Reply-To: <alpine.LFD.2.00.1102121331220.14920@xanadu.home>
-References: <alpine.LFD.2.00.1102121331220.14920@xanadu.home>
-Message-ID: <AANLkTinK9JkCMJ4B1vZVMpCmROJK4NyEcFCL5+tNP0mW@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Feb 2011 13:01:30 +0000
+Subject: [PATCH v4 16/19] ARM: LPAE: Use generic dma_addr_t type definition
+In-Reply-To: <20110212103413.GD15616@n2100.arm.linux.org.uk>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
+	<20110212103413.GD15616@n2100.arm.linux.org.uk>
+Message-ID: <1297688490.31111.38.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 12, 2011 at 6:33 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> Adding Thumb2 support to the runtime patching of the virt_to_phys and
-> phys_to_virt opcodes.
->
-> Tested both the 8-bit and the 16-bit fixups, using different placements
-> in memory to exercize all code paths.
->
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
-> ?arch/arm/Kconfig ? ? ? | ? ?4 ++--
-> ?arch/arm/kernel/head.S | ? 48 +++++++++++++++++++++++++++++++++++++++++++++++-
-> ?2 files changed, 49 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d5eb308..8d5643d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -194,13 +194,13 @@ config VECTORS_BASE
-> ?config ARM_PATCH_PHYS_VIRT
-> ? ? ? ?bool "Patch physical to virtual translations at runtime (EXPERIMENTAL)"
-> ? ? ? ?depends on EXPERIMENTAL
-> - ? ? ? depends on !XIP_KERNEL && !THUMB2_KERNEL && MMU
-> + ? ? ? depends on !XIP_KERNEL && MMU
-> ? ? ? ?depends on !ARCH_REALVIEW || !SPARSEMEM
-> ? ? ? ?help
-> ? ? ? ? ?Patch phys-to-virt translation functions at runtime according to
-> ? ? ? ? ?the position of the kernel in system memory.
->
-> - ? ? ? ? This can only be used with non-XIP, non-Thumb2, MMU kernels where
-> + ? ? ? ? This can only be used with non-XIP with MMU kernels where
-> ? ? ? ? ?the base of physical memory is at a 16MB boundary.
->
-> ?config ARM_PATCH_PHYS_VIRT_16BIT
-> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-> index 8f96ca0..575bb3e 100644
-> --- a/arch/arm/kernel/head.S
-> +++ b/arch/arm/kernel/head.S
-> @@ -475,7 +475,8 @@ __fixup_pv_table:
-> ? ? ? ?sub ? ? r3, r0, r3 ? ? ?@ PHYS_OFFSET - PAGE_OFFSET
-> ? ? ? ?add ? ? r4, r4, r3 ? ? ?@ adjust table start address
-> ? ? ? ?add ? ? r5, r5, r3 ? ? ?@ adjust table end address
-> - ? ? ? str ? ? r8, [r7, r3]! ? @ save computed PHYS_OFFSET to __pv_phys_offset
-> + ? ? ? add ? ? r7, r7, r3 ? ? ?@ adjust __pv_phys_offset address
-> + ? ? ? str ? ? r8, [r7] ? ? ? ?@ save computed PHYS_OFFSET to __pv_phys_offset
-> ?#ifndef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
-> ? ? ? ?mov ? ? r6, r3, lsr #24 @ constant for add/sub instructions
-> ? ? ? ?teq ? ? r3, r6, lsl #24 @ must be 16MiB aligned
-> @@ -483,6 +484,7 @@ __fixup_pv_table:
-> ? ? ? ?mov ? ? r6, r3, lsr #16 @ constant for add/sub instructions
-> ? ? ? ?teq ? ? r3, r6, lsl #16 @ must be 64kiB aligned
-> ?#endif
-> +THUMB( it ? ? ?ne ? ? ? ? ? ? ?@ cross section branch )
-> ? ? ? ?bne ? ? __error
-> ? ? ? ?str ? ? r6, [r7, #4] ? ?@ save to __pv_offset
-> ? ? ? ?b ? ? ? __fixup_a_pv_table
-> @@ -496,6 +498,49 @@ ENDPROC(__fixup_pv_table)
->
-> ? ? ? ?.text
-> ?__fixup_a_pv_table:
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
-> + ? ? ? lsls ? ?r0, r6, #24
-> + ? ? ? lsr ? ? r6, #8
-> + ? ? ? beq ? ? 1f
-> + ? ? ? clz ? ? r7, r0
-> + ? ? ? lsrs ? ?r0, #24
-> + ? ? ? lsls ? ?r0, r7
-> + ? ? ? bic ? ? r0, 0x0080
-> + ? ? ? lsrs ? ?r7, #1
-> + ? ? ? orrcs ? r0, #0x0080
-> + ? ? ? orr ? ? r0, r0, r7, lsl #12
-> +#endif
-> +1: ? ? lsls ? ?r6, #24
-> + ? ? ? beq ? ? 4f
-> + ? ? ? clz ? ? r7, r6
-> + ? ? ? lsrs ? ?r6, #24
-> + ? ? ? lsls ? ?r6, r7
-> + ? ? ? bic ? ? r6, #0x0080
-> + ? ? ? lsrs ? ?r7, #1
-> + ? ? ? orrcs ? r6, #0x0080
-> + ? ? ? orr ? ? r6, r6, r7, lsl #12
-> + ? ? ? orr ? ? r6, #0x4000
-> + ? ? ? b ? ? ? 4f
+On Sat, 2011-02-12 at 10:34 +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 24, 2011 at 05:55:58PM +0000, Catalin Marinas wrote:
+> > From: Will Deacon <will.deacon@arm.com>
+> >
+> > This patch uses the types.h implementation in asm-generic to define the
+> > dma_addr_t type as the same width as phys_addr_t.
+> >
+> > NOTE: this is a temporary patch until the corresponding patches unifying
+> > the dma_addr_t and removing the dma64_addr_t are merged into mainline.
+> 
+> I'm not too sure about this patch.  All of the DMA devices we have only
+> take 32-bit addresses for their DMA, so making dma_addr_t 64-bit seems
+> wrong as we'll implicitly truncate these addresses.
 
-We do almost the same, complex, operation twice here ... can it be
-factorised with a macro or something?  This may also help readability.
- Not essential though.
+If we don't enable LPAE, the dma_addr_t is 32-bit, so existing platforms
+are not affected. With Cortex-A15, new platforms may have PCIe and be
+able to access memory beyond 32-bit (if they don't support >32-bit DMA
+at least for some critical devices, I'm not sure why they would use
+A15).
 
-> +2: ? ? add ? ? r7, r3
-> +#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
-> + ? ? ? ldrh ? ?ip, [r7]
-> + ? ? ? tst ? ? ip, 0x0400 ? ? ?@ the i bit tells us LS or MS byte
+For things like hard drives for example, it becomes problematic as pages
+are allocated by the VFS layer from highmem and passed to the driver for
+DMA. If we keep dma_addr_t to 32-bit you would need to use DMA bounce
+even if the PCIe device supports >32-bit physical addresses.
 
-Might be helpful to comment that we rely on TST resetting the C flag?
+> As ARM platforms don't (sanely) support DMA, I think dropping this patch
+> for the time being would be a good idea, and stick with 32-bit dma_addr_t,
+> especially as we need to first do a sweep for dma_addr_t usage in device
+> driver structures (such as dma engine scatter lists.)  These really should
+> use __le32/__be32/u32 depending on whether they're little endian, big
+> endian or native endian.
 
-> + ? ? ? beq ? ? 3f
-> + ? ? ? cmp ? ? r0, #0 ? ? ? ? ?@ set C flag, and ...
-> + ? ? ? biceq ? ip, 0x0400 ? ? ?@ immediate zero value has a special encoding
-> + ? ? ? streqh ?ip, [r7] ? ? ? ?@ that requires the i bit cleared
-> +#endif
-> +3: ? ? ldrh ? ?ip, [r7, #2]
-> + ? ? ? and ? ? ip, 0x8f00
-> + ? ? ? orrcc ? ip, r6 ?@ mask in offset bits 31-24
-> + ? ? ? orrcs ? ip, r0 ?@ mask in offset bits 23-16
-> + ? ? ? strh ? ?ip, [r7, #2]
-> +4: ? ? cmp ? ? r4, r5
-> + ? ? ? ?ldrcc ? r7, [r4], #4 ? @ use branch for delay slot
-> + ? ? ? ?bcc ? ?2b
-> + ? ? ? ?bx ? ? lr
-> +#else
-> ?#ifdef CONFIG_ARM_PATCH_PHYS_VIRT_16BIT
-> ? ? ? ?and ? ? r0, r6, #255 ? ?@ offset bits 23-16
-> ? ? ? ?mov ? ? r6, r6, lsr #8 ?@ offset bits 31-24
-> @@ -513,6 +558,7 @@ __fixup_a_pv_table:
-> ? ? ? ?ldrcc ? r7, [r4], #4 ? ?@ use branch for delay slot
-> ? ? ? ?bcc ? ? 2b
-> ? ? ? ?mov ? ? pc, lr
-> +#endif
-> ?ENDPROC(__fixup_a_pv_table)
->
-> ?ENTRY(fixup_pv_table)
-> --
-> 1.7.4
->
+Maybe we could make the dma_addr_t size configurable (and disabled by
+default) since I expect there'll be platforms capable of >32-bit DMA.
 
-Not sure I entirely all the implications of this code, and I haven't
-tested it yet, but it looks sound if I've understood it correctly.
-
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
-
-Cheers
----Dave
+-- 
+Catalin
