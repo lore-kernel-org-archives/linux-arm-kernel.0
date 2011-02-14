@@ -1,50 +1,34 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 14 Feb 2011 11:06:40 +0200 (EET)
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <20110214.105553.296482686007701595.Hiroshi.DOYU@nokia.com>
-References: <20110214.093257.58795266617213863.Hiroshi.DOYU@nokia.com>
-	<AANLkTimnHHhYKnvUgsMo_jsKaYdY+XuABZ+FV0p25JLi@mail.gmail.com>
-	<20110214.105553.296482686007701595.Hiroshi.DOYU@nokia.com>
-Message-ID: <20110214.110640.467772673621785414.Hiroshi.DOYU@nokia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 14 Feb 2011 17:23:06 +0900
+Subject: [PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
+In-Reply-To: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1297671787-10571-11-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-Subject: Re: [RFC] Inter-processor Mailboxes Drivers
-Date: Mon, 14 Feb 2011 10:55:53 +0200 (EET)
+This patch changes dependency of ARCH_EXYNOS4 from ARCH_S5PV310
+according to the change of ARCH name, EXYNOS4.
 
-> From: ext Linus Walleij <linus.walleij@linaro.org>
-> Subject: Re: [RFC] Inter-processor Mailboxes Drivers
-> Date: Mon, 14 Feb 2011 09:39:32 +0100
-> 
->> On Mon, Feb 14, 2011 at 8:32 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
->> 
->>> OMAP mailbox is the interrupt driven 32bit unit H/W FIFO to other
->>> cores.
->> 
->> How is it used? Is it a low-traffic (like single 32bit words etc) signal
->> control-path link while the actual high-throughput data-path is done
->> with shared memory? (That is how the db5500 mbox works anyways.)
-> 
-> Yes, maybe quite similar.
-> 
-> maibox is not single 32 bit but is 32 bit x 4(or 8?) slots fifo, IIRC,
-> and mainly it is used as notification between cores. And big amount of
-> data is transftered with sahred memory, which has been mapped onto the
-> virtual address space of the other side of core, in advance.
-> 
-> For example, typical usage of DSP, mp3 decoding,
-> 
-> 1, ARM maps 2 shared memory area(input/output) onto DSP virtual
->    address space.
-> 2, ARM fills mp3 data in input buffer.
-> 3, ARM notifies DSP that data is ready in input buffer.
-> 4, DSP decodes input data and put output data on output buffer.
-> 5, DSP notifies that output buffer is ready.
-> 
-> Roughly something like the above. DSP S/W is multi-tasking, though.
+Cc: Jassi Brar <jassi.brar@samsung.com>
+Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ sound/soc/samsung/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Here, ARM side process talks to DSP site process in their own way, and
-also there are another cores, talking with their own protocols. So I
-think that at least, protocol part should be pluggable anyway although
-it doesn't have to be always in userland.
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index a6a6b5f..d6713d5 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+-	depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_S5PV310
++	depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_EXYNOS4
+ 	select S3C64XX_DMA if ARCH_S3C64XX
+ 	select S3C2410_DMA if ARCH_S3C2410
+ 	help
+-- 
+1.7.1
