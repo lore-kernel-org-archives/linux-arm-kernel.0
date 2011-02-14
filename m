@@ -1,38 +1,72 @@
 From: John.Linn@xilinx.com (John Linn)
-Date: Mon, 14 Feb 2011 07:42:24 -0700
-Subject: [PATCH V2 3/4] ARM: Xilinx: base header files and assemblymacros
-In-Reply-To: <20110212121609.GI15616@n2100.arm.linux.org.uk>
-References: <1297270845-18802-1-git-send-email-john.linn@xilinx.com>
-	<1297270845-18802-2-git-send-email-john.linn@xilinx.com>
-	<1297270845-18802-3-git-send-email-john.linn@xilinx.com>
-	<e19bc079-5f8a-4622-b7cd-668cede3cb97@VA3EHSMHS032.ehs.local>
-	<20110212121609.GI15616@n2100.arm.linux.org.uk>
-Message-ID: <1bbbc116-1107-46fe-8dbc-daa3c798d76e@VA3EHSMHS027.ehs.local>
+Date: Mon, 14 Feb 2011 07:46:02 -0700
+Subject: Machine ID question
+In-Reply-To: <20110210082915.GV27982@pengutronix.de>
+References: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
+	<20110210082915.GV27982@pengutronix.de>
+Message-ID: <697e0ab2-c24d-4ad8-b293-1e86af31c28a@CH1EHSMHS014.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
 > -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Saturday, February 12, 2011 5:16 AM
+> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+> Sent: Thursday, February 10, 2011 1:29 AM
 > To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org;
-linux-kernel at vger.kernel.org; catalin.marinas at arm.com;
-> glikely at secretlab.ca
-> Subject: Re: [PATCH V2 3/4] ARM: Xilinx: base header files and
-assemblymacros
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: Machine ID question
 > 
-> On Wed, Feb 09, 2011 at 10:00:44AM -0700, John Linn wrote:
-> > +#ifndef __MACH_VMALLOC_H__
-> > +#define __MACH_VMALLOC_H__
-> > +
-> > +#define VMALLOC_END       0xE0000000
+> On Wed, Feb 09, 2011 at 02:23:07PM -0700, John Linn wrote:
+> > I used the form to create a new machine ID for the new Xilinx platform
+> > in anticipation of
+> > the code making it into the mainline sometime in the future.
+> >
+> > The proposed patches are using ARCH_XILINX in the Kconfig.
+> You should use MACH_XILINX in the patches.  There are some ARCH_... in
+> the machine db, but I think nowadays you cannot (and should not) create
+> them there.
+
+Russell, should I change from ARCH_XILINX to MACH_XILINX in the V3 of my patchset?
+
 > 
-> Should have a UL suffix on this.
+> >
+> > Below is the line that it created when I clicked on this link:
+> > http://www.arm.linux.org.uk/developer/machines/download.php
+> >
+> > xilinx			MACH_XILINX		XILINX
+> > 3343
+> >
+> > Did I hose it up as the form wasn't completely clear to me (if I needed
+> > to enter ARCH_XILINX)?
+> >
+> > Thanks,
+> > John
+> >
+> >
+> >
+> > This email and any attachments are intended for the sole use of the
+> > named recipient(s) and contain(s) confidential information that may be
+> hmm, I'm at least not named explicitly, still I think the intention of
+> your mail was to get an answer.  IMHO it's not very sensible to add this
+> footer on postings to public mailing lists.
 
-OK, easy to fix.
+Agreed. Not my choice and will discuss more with others to see if I can 
+get around it and still use corporate email.
 
-Thanks for another review Russell, appreciate your time and help.
+> 
+> > proprietary, privileged or copyrighted under applicable law. If you
+> > are not the intended recipient, do not read, copy, or forward this
+> > email message or any attachments. Delete this email message and any
+> > attachments immediately.
+> 
+> Best regards
+> Uwe
+
+Thanks Uwe,
 
 -- John
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+> 
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
