@@ -1,68 +1,97 @@
 From: andreiw@motorola.com (Andrei Warkentin)
-Date: Mon, 14 Feb 2011 13:29:59 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102131839.08517.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102121937.24933.arnd@arndb.de>
-	<AANLkTikGvUZ2sWfox9Ws+gbuCw1JiykO=y-rk9QjL8xJ@mail.gmail.com>
-	<201102131839.08517.arnd@arndb.de>
-Message-ID: <AANLkTin=bkzvdQXoWUKRfX8Xs=4bXnxWf88TUG+VvjPD@mail.gmail.com>
+Date: Mon, 14 Feb 2011 13:33:22 -0600
+Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
+	cause data corruption
+In-Reply-To: <33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
+References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
+	<1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com>
+	<AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com>
+	<13596bec9184b117d6a1d02da8e017bf@mail.gmail.com>
+	<AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com>
+	<33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
+Message-ID: <AANLkTinfx3eEgvPpeUAAxcrDOtQ+G_PkkoQH4V9E+N=7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 13, 2011 at 11:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> I don't think it needs to be boot-time, it can easily be run-time
-> tuneable using sysfs, where you can configure it using an init script
-> or some other logic from user space.
-
-True, definitely expose the controls through sysfs.
-
->
-> Yes.
->
-> What is "PE" here?
->
-
-Ah sorry, I had to look that one up myself, I thought it was the local
-jargon associated with the problem space :-). Program/Erase cycle.
-
->> So T suggested for random data to better go into buffer A. How? Two suggestions.
->> 1) Split smaller accesses into 8KB and write with reliable write.
->> 2) Split smaller accesses into 8KB and write in reverse.
+On Sun, Feb 13, 2011 at 11:08 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+>> -----Original Message-----
+>> From: Andrei Warkentin [mailto:andreiw at motorola.com]
+>> Sent: Sunday, February 13, 2011 4:48 AM
+>> To: Santosh Shilimkar
+>> Cc: linux-omap at vger.kernel.org; Kevin Hilman; tony at atomide.com;
+>> linux-arm-kernel at lists.infradead.org; Catalin Marinas
+>> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
+>> operation can cause data corruption
 >>
->> The patch does both and I am verifying if that is really necessary. I
->> need to go see the mmc spec and what it says about reliable write.
+>> On Sat, Feb 12, 2011 at 11:59 AM, Santosh Shilimkar
+>> <santosh.shilimkar@ti.com> wrote:
+>> >> -----Original Message-----
+>> >> From: Andrei Warkentin [mailto:andreiw at motorola.com]
+>> >> Sent: Saturday, February 12, 2011 11:20 PM
+>> >> To: Santosh Shilimkar
+>> >> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
+>> >> linux-arm-kernel at lists.infradead.org; Catalin Marinas
+>> >> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
+>> >> operation can cause data corruption
+>> >>
+>> > [....]
+>> >
+>> >>
+>> >> Can these PL310 errata fixes be made more generic? PL310 is
+>> present
+>> >> in
+>> >> non-OMAP platforms too, which lack the TI hypervisor. And these
+>> >> platforms might have the same PL310 rev, and suffer the same
+>> >> glitches.
+>> >> While ideally there is some kind of hypervisor_ops to modify the
+>> >> protected register, at the very least there should be the generic
+>> >> debug_write handling the ?"I ?can write all PL310 regs" case. If
+>> >> you're interested I have a patch someplace that tried to do this,
+>> >> hopefully I can still find it.
+>> >
+>> > They are kind of generic. If you look at it, the only change
+>> > Which is arch specific is the implementation of "debug_writel"
+>> function.
+>> > Today this code is not in generic PL310 code, but
+>> > OMAP specific.
+>> >
+>> > May be we can make this as exported function pointer, which
+>> > arch's can populate.
+>> >
+>> > Will that work for you ?
+>> >
+>> > Regards,
+>> > Santosh
+>> >
+>>
+>> Ie something like the following.... what do you think???
+>>
+>> #define L2X0_DCR (0xF40)
+>>
+>> static void debug_writel(unsigned long val)
+>> {
+>> #ifdef CONFIG_ARCH_OMAP4
+>> ? ? ? ?omap_smc1(0x100, val);
+>> #else
+>> ? ? ? ?writel_relaxed(val, l2x0_base + L2X0_DCR);
+>> #endif
+>> }
+>> ...
+> I understood that from first comment. But I am not in favor
+> of polluting common ARM files with SOC specific #ifdeffery.
+> We have gone over this when first errata support
+> was added for PL310
 >
-> I should add this to my test tool once I can reproduce it. If it turns
-> out that other media do the same, we can also trigger the same behavior
-> for those.
+> I have a better way to handle this scenario.
+> Expect an updated patch for this.
+>
+> Regards,
+> Santosh
 >
 
-As I mentioned, I am checking with T right now on whether we can use
-suggestion (1) or
-suggestion (2) or if they need to be combined. The documentation we
-got was open to interpretation and the patch created from that did
-both.
-You mentioned that writing in reverse is not a good idea. Could you
-elaborate why? I would guess because you're always causing a write
-into a different AU (on these Toshiba cards), causing extra GC on
-every write?
-
->> Basically, whatever behavior you choose is going to be wrong some set
->> of cards. Which is why tuning it probably only makes sense for eMMC
->> parts, and should be a set of runtime/compile-time quirks. What do you
->> think?
->
-> Your explanation makes sense, but I'd definitely favor a run-time solution
-> over compile-time or boot-time, because it would be much more flexible.
-> We should also be able to find some optimizations that are universally
-> good so we can always use them.
->
-
-Then that's the angle I will pursue. It is the most flexible and then
-you don't have to pollute the block driver with little workarounds for
-soon-to-be-obsolete hardware. Hopefully I'll have something for
-re-review soon.
-
-Thanks Again!
+Fair enough, but you're doing it right now :-). I believe the smarter
+approach would be to start abstracting all accesses to secure-only
+resources (like the DCR reg). This would be your "hypervisor"
+interface. Then provide an implementation for your TI secure monitor.
+Obviously over time :).
