@@ -1,36 +1,31 @@
 From: prakity@marvell.com (Philip Rakity)
-Date: Sun, 13 Feb 2011 22:50:32 -0800
-Subject: [PATCH 2/5] arm: mach-mmp: mmp2.c use revised APMU registers
-	defines for APMU_CLK_OPS
-Message-ID: <3A0B1D79-FBC5-4952-94FE-AF91A87C8292@marvell.com>
+Date: Sun, 13 Feb 2011 22:52:03 -0800
+Subject: [PATCH 3/5] plat-pxa: sdhci.h define for PERMANENT SD/eMMC/SDIO cards
+Message-ID: <29AD1C6B-3E61-45A7-A1E6-D9B869738FB2@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: [PATCH 2/5] arm: mach-mmp: mmp2.c use revised APMU registers defines for APMU_CLK_OPS
+
+Permanent SD cards are part of the board design.  The mmc layer
+when told the card is physically on the board will not poll for
+card insert.  Add the define.
 
 Signed-off-by: Philip Rakity <prakity@marvell.com>
 ---
- arch/arm/mach-mmp/mmp2.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/plat-pxa/include/plat/sdhci.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index 8e6c3ac..564bfbc 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -151,10 +151,10 @@ static APBC_CLK(twsi5, MMP2_TWSI5, 0, 26000000);
- static APBC_CLK(twsi6, MMP2_TWSI6, 0, 26000000);
+diff --git a/arch/arm/plat-pxa/include/plat/sdhci.h b/arch/arm/plat-pxa/include/plat/sdhci.h
+index 1ab332e..a5bf405 100644
+--- a/arch/arm/plat-pxa/include/plat/sdhci.h
++++ b/arch/arm/plat-pxa/include/plat/sdhci.h
+@@ -17,6 +17,7 @@
+ /* Require clock free running */
+ #define PXA_FLAG_DISABLE_CLOCK_GATING (1<<0)
  
- static APMU_CLK(nand, NAND, 0xbf, 100000000);
--static APMU_CLK_OPS(sdh0, SDH0, 0x1b, 200000000, &sdhc_clk_ops);
--static APMU_CLK_OPS(sdh1, SDH1, 0x1b, 200000000, &sdhc_clk_ops);
--static APMU_CLK_OPS(sdh2, SDH2, 0x1b, 200000000, &sdhc_clk_ops);
--static APMU_CLK_OPS(sdh3, SDH3, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh0, MMP2_SDH0, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh1, MMP2_SDH1, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh2, MMP2_SDH2, 0x1b, 200000000, &sdhc_clk_ops);
-+static APMU_CLK_OPS(sdh3, MMP2_SDH3, 0x1b, 200000000, &sdhc_clk_ops);
++#define PXA_FLAG_CARD_PERMANENT		(1<<1)
+ /* Board design supports 8-bit data on SD/SDIO BUS */
+ #define PXA_FLAG_SD_8_BIT_CAPABLE_SLOT (1<<2)
  
- static struct clk_lookup mmp2_clkregs[] = {
- 	INIT_CLKREG(&clk_uart1, "pxa2xx-uart.0", NULL),
 -- 
 1.7.0.4
