@@ -1,44 +1,52 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 14 Feb 2011 17:47:15 +0530
-Subject: [PATCH] OMAP: clock: Fix compile break with a
-Message-ID: <mailman.142.1297686293.1530.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 14 Feb 2011 17:59:21 +0530
+Subject: [PATCH v2 4/7] omap: dpll: Add allow_idle/deny_idle support for
+	all DPLL's
+In-Reply-To: <alpine.DEB.2.00.1102121727140.21991@utopia.booyaka.com>
+References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
+	<1297329400-5936-2-git-send-email-rnayak@ti.com>
+	<1297329400-5936-3-git-send-email-rnayak@ti.com>
+	<1297329400-5936-4-git-send-email-rnayak@ti.com>
+	<1297329400-5936-5-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1102121727140.21991@utopia.booyaka.com>
+Message-ID: <813a909da6bafa7ce0c15fa77d9d25b9@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s/spin_lock_irq*/spin_unlock_irq*
+Hi Paul,
 
-Trivial fix to do a s/spin_lock_irqrestore/spin_unlock_irqrestore
-and fix the compile break.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Sunday, February 13, 2011 5:58 AM
+> To: Rajendra Nayak
+> Cc: linux-omap at vger.kernel.org; b-cousson at ti.com; khilman at ti.com;
+santosh.shilimkar at ti.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 4/7] omap: dpll: Add allow_idle/deny_idle support
+for all DPLL's
+>
+> On Thu, 10 Feb 2011, Rajendra Nayak wrote:
+>
+> > All OMAP3/4 dpll's support hardware level autogating.
+> > Populate allow_idle/deny_idle function pointers for all
+> > DPLL's in clkops.
+> >
+> > Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>
+> Thanks, queued for 2.6.39.  Two questions though.  Was the OMAP4
+> autogeneration script updated?  Also, any technical reason why you
+didn't
+> add the OMAP2 DPLL?
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/plat-omap/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Yes, the autogen scripts are updated, however they are
+currently in a separate branch (dpll-gatectrl).
+Will merge them into master soon.
 
-diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-index 585533a..a2b069f 100644
---- a/arch/arm/plat-omap/clock.c
-+++ b/arch/arm/plat-omap/clock.c
-@@ -346,7 +346,7 @@ void omap_clk_enable_autoidle_all(void)
- 		if (c->ops->allow_idle)
- 			c->ops->allow_idle(c);
-
--	spin_lock_irqrestore(&clockfw_lock, flags);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
- }
-
- void omap_clk_disable_autoidle_all(void)
-@@ -360,7 +360,7 @@ void omap_clk_disable_autoidle_all(void)
- 		if (c->ops->deny_idle)
- 			c->ops->deny_idle(c);
-
--	spin_lock_irqrestore(&clockfw_lock, flags);
-+	spin_unlock_irqrestore(&clockfw_lock, flags);
- }
-
- /*
--- 
-1.7.0.4
+No real reason for not adding OMAP2 dpll autoidle support.
+Its just that I started off trying to do this for OMAP4, and
+then found me touching some omap3 stuff and hence
+also did it for OMAP3.(For some reason I thought there
+were no DPLL's in OMAP2).
 
 Regards,
 Rajendra
@@ -46,112 +54,3 @@ Rajendra
 >
 >
 > - Paul
->
-> From: Rajendra Nayak <rnayak@ti.com>
-> Date: Thu, 10 Feb 2011 14:46:36 +0530
-> Subject: [PATCH] omap: clock: Add allow_idle/deny_idle support in clkops
->
-> On OMAP various clock nodes (dpll's, mx post dividers, interface clocks)
-> support hardware level autogating which can be controlled from
-> software.
-> Support such functionality by adding two new function pointer
-> allow_idle and deny_idle in the clkops structure.
->
-> These function pointers can be populated for any clock
-> node which supports hardware level autogating.
->
-> Also add 2 new functions (omap_clk_enable_auotidle and
-> omap_clk_disable_autoidle) which can be called from
-> architecture specific PM core code, if hardware level
-> autogating (for all supported clock nodes) is to be
-> enabled or disabled.
->
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> [paul at pwsan.com: use spinlock rather than mutex due to race]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/plat-omap/clock.c              |   28
-++++++++++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/clock.h |    6 ++++++
->  2 files changed, 34 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
-> index fc62fb5..0cdac8d 100644
-> --- a/arch/arm/plat-omap/clock.c
-> +++ b/arch/arm/plat-omap/clock.c
-> @@ -335,6 +335,34 @@ struct clk *omap_clk_get_by_name(const char *name)
->  	return ret;
->  }
->
-> +void omap_clk_enable_autoidle(void)
-> +{
-> +	struct clk *c;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&clockfw_lock, flags);
-> +
-> +	list_for_each_entry(c, &clocks, node)
-> +		if (c->ops->allow_idle)
-> +			c->ops->allow_idle(c);
-> +
-> +	spin_lock_irqrestore(&clockfw_lock, flags);
-> +}
-> +
-> +void omap_clk_disable_autoidle(void)
-> +{
-> +	struct clk *c;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&clockfw_lock, flags);
-> +
-> +	list_for_each_entry(c, &clocks, node)
-> +		if (c->ops->deny_idle)
-> +			c->ops->deny_idle(c);
-> +
-> +	spin_lock_irqrestore(&clockfw_lock, flags);
-> +}
-> +
->  /*
->   * Low level helpers
->   */
-> diff --git a/arch/arm/plat-omap/include/plat/clock.h
-b/arch/arm/plat-omap/include/plat/clock.h
-> index 8eb0ada..167f1e0f 100644
-> --- a/arch/arm/plat-omap/include/plat/clock.h
-> +++ b/arch/arm/plat-omap/include/plat/clock.h
-> @@ -25,6 +25,8 @@ struct clockdomain;
->   * @disable: fn ptr that enables the current clock in hardware
->   * @find_idlest: function returning the IDLEST register for the clock's
-IP blk
->   * @find_companion: function returning the "companion" clk reg for the
-clock
-> + * @allow_idle: fn ptr that enables autoidle for the current clock in
-hardware
-> + * @deny_idle: fn ptr that disables autoidle for the current clock in
-hardware
->   *
->   * A "companion" clk is an accompanying clock to the one being queried
->   * that must be enabled for the IP module connected to the clock to
-> @@ -42,6 +44,8 @@ struct clkops {
->  					       u8 *, u8 *);
->  	void			(*find_companion)(struct clk *, void
-__iomem **,
->  						  u8 *);
-> +	void			(*allow_idle)(struct clk *);
-> +	void			(*deny_idle)(struct clk *);
->  };
->
->  #ifdef CONFIG_ARCH_OMAP2PLUS
-> @@ -292,6 +296,8 @@ extern void clk_init_cpufreq_table(struct
-cpufreq_frequency_table **table);
->  extern void clk_exit_cpufreq_table(struct cpufreq_frequency_table
-**table);
->  #endif
->  extern struct clk *omap_clk_get_by_name(const char *name);
-> +extern void omap_clk_enable_autoidle(void);
-> +extern void omap_clk_disable_autoidle(void);
->
->  extern const struct clkops clkops_null;
->
-> --
-> 1.7.2.3
