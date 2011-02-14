@@ -1,97 +1,33 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Mon, 14 Feb 2011 13:33:22 -0600
-Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
-	cause data corruption
-In-Reply-To: <33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
-References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com>
-	<AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com>
-	<13596bec9184b117d6a1d02da8e017bf@mail.gmail.com>
-	<AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com>
-	<33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
-Message-ID: <AANLkTinfx3eEgvPpeUAAxcrDOtQ+G_PkkoQH4V9E+N=7@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Feb 2011 20:02:22 +0000
+Subject: [PATCH] Ensure predictable endian state on signal handler entry
+Message-ID: <20110214200222.GD31103@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 13, 2011 at 11:08 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->> -----Original Message-----
->> From: Andrei Warkentin [mailto:andreiw at motorola.com]
->> Sent: Sunday, February 13, 2011 4:48 AM
->> To: Santosh Shilimkar
->> Cc: linux-omap at vger.kernel.org; Kevin Hilman; tony at atomide.com;
->> linux-arm-kernel at lists.infradead.org; Catalin Marinas
->> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
->> operation can cause data corruption
->>
->> On Sat, Feb 12, 2011 at 11:59 AM, Santosh Shilimkar
->> <santosh.shilimkar@ti.com> wrote:
->> >> -----Original Message-----
->> >> From: Andrei Warkentin [mailto:andreiw at motorola.com]
->> >> Sent: Saturday, February 12, 2011 11:20 PM
->> >> To: Santosh Shilimkar
->> >> Cc: linux-omap at vger.kernel.org; khilman at ti.com; tony at atomide.com;
->> >> linux-arm-kernel at lists.infradead.org; Catalin Marinas
->> >> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
->> >> operation can cause data corruption
->> >>
->> > [....]
->> >
->> >>
->> >> Can these PL310 errata fixes be made more generic? PL310 is
->> present
->> >> in
->> >> non-OMAP platforms too, which lack the TI hypervisor. And these
->> >> platforms might have the same PL310 rev, and suffer the same
->> >> glitches.
->> >> While ideally there is some kind of hypervisor_ops to modify the
->> >> protected register, at the very least there should be the generic
->> >> debug_write handling the ?"I ?can write all PL310 regs" case. If
->> >> you're interested I have a patch someplace that tried to do this,
->> >> hopefully I can still find it.
->> >
->> > They are kind of generic. If you look at it, the only change
->> > Which is arch specific is the implementation of "debug_writel"
->> function.
->> > Today this code is not in generic PL310 code, but
->> > OMAP specific.
->> >
->> > May be we can make this as exported function pointer, which
->> > arch's can populate.
->> >
->> > Will that work for you ?
->> >
->> > Regards,
->> > Santosh
->> >
->>
->> Ie something like the following.... what do you think???
->>
->> #define L2X0_DCR (0xF40)
->>
->> static void debug_writel(unsigned long val)
->> {
->> #ifdef CONFIG_ARCH_OMAP4
->> ? ? ? ?omap_smc1(0x100, val);
->> #else
->> ? ? ? ?writel_relaxed(val, l2x0_base + L2X0_DCR);
->> #endif
->> }
->> ...
-> I understood that from first comment. But I am not in favor
-> of polluting common ARM files with SOC specific #ifdeffery.
-> We have gone over this when first errata support
-> was added for PL310
->
-> I have a better way to handle this scenario.
-> Expect an updated patch for this.
->
-> Regards,
-> Santosh
->
+Ensure a predictable endian state when entering signal handlers.  This
+avoids programs which use SETEND to momentarily switch their endian
+state from having their signal handlers entered with an unpredictable
+endian state.
 
-Fair enough, but you're doing it right now :-). I believe the smarter
-approach would be to start abstracting all accesses to secure-only
-resources (like the DCR reg). This would be your "hypervisor"
-interface. Then provide an implementation for your TI secure monitor.
-Obviously over time :).
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+--
+
+ arch/arm/kernel/signal.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 907d5a6..abaf844 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -474,7 +474,9 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 	unsigned long handler = (unsigned long)ka->sa.sa_handler;
+ 	unsigned long retcode;
+ 	int thumb = 0;
+-	unsigned long cpsr = regs->ARM_cpsr & ~PSR_f;
++	unsigned long cpsr = regs->ARM_cpsr & ~(PSR_f | PSR_E_BIT);
++
++	cpsr |= PSR_ENDSTATE;
+ 
+ 	/*
+ 	 * Maybe we need to deliver a 32-bit signal to a 26-bit task.
