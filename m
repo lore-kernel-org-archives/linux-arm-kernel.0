@@ -1,58 +1,33 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 14 Feb 2011 15:33:20 +0300
-Subject: [PATCH 5/5] pxa2xx: drop gpio_vbus field from info struct
-In-Reply-To: <1297686800-27599-1-git-send-email-dbaryshkov@gmail.com>
-References: <1297686800-27599-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1297686800-27599-6-git-send-email-dbaryshkov@gmail.com>
+Date: Mon, 14 Feb 2011 15:33:15 +0300
+Subject: [PATCH 0/5][RESENT] Get rid of gpio-vbus related code from pxa25x_udc
+Message-ID: <1297686800-27599-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neither pxa25x_udc, nor pxa27x_udc use gpio_vbus/gpio_vbus_inverted
-anymore. Drop those two fields from udc info completely.
+Currently pxa25x_udc contains some code duplicating gpio-vbus functionality.
+Please merge this serie of patches (based on v2.6.38-rc4), which makes all
+relevant platforms use gpio-vbus tranceiver instead of relying on pxa25x_udc
+and then drop support for gpio-vbus handling in pxa25x_udc.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/include/asm/mach/udc_pxa2xx.h |    2 --
+Please tell me if I should rebase these patches on top of some other commit.
+
+The following changes since commit 100b33c8bd8a3235fd0b7948338d6cbb3db3c63d:
+
+  Linux 2.6.38-rc4 (2011-02-07 16:03:55 -0800)
+
+Dmitry Eremin-Solenikov (5):
+      eseries: switch to using gpio-vbus transceiver
+      gumstix: switch to using gpio-vbus transceiver
+      tosa: switch to using gpio-vbus transceiver
+      pxa25x_udc: stop handling gpio-vbus internally
+      pxa2xx: drop gpio_vbus field from info struct
+
+ arch/arm/include/asm/mach/udc_pxa2xx.h |    2 -
  arch/arm/mach-pxa/corgi.c              |    1 -
  arch/arm/mach-pxa/devices.c            |    1 -
- 3 files changed, 0 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/udc_pxa2xx.h b/arch/arm/include/asm/mach/udc_pxa2xx.h
-index 833306e..ea297ac 100644
---- a/arch/arm/include/asm/mach/udc_pxa2xx.h
-+++ b/arch/arm/include/asm/mach/udc_pxa2xx.h
-@@ -20,8 +20,6 @@ struct pxa2xx_udc_mach_info {
- 	 * VBUS IRQ and omit the methods above.  Store the GPIO number
- 	 * here.  Note that sometimes the signals go through inverters...
- 	 */
--	bool	gpio_vbus_inverted;
--	int	gpio_vbus;			/* high == vbus present */
- 	bool	gpio_pullup_inverted;
- 	int	gpio_pullup;			/* high == pullup activated */
- };
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index a5452a3..002be00 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -462,7 +462,6 @@ static struct pxaficp_platform_data corgi_ficp_platform_data = {
-  * USB Device Controller
-  */
- static struct pxa2xx_udc_mach_info udc_info __initdata = {
--	.gpio_vbus		= -1,
- 	/* no connect GPIO; corgi can't tell connection status */
- 	.gpio_pullup		= CORGI_GPIO_USB_PULLUP,
- };
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index 4c766e3..9e10841 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -90,7 +90,6 @@ void __init pxa_set_mci_info(struct pxamci_platform_data *info)
- 
- static struct pxa2xx_udc_mach_info pxa_udc_info = {
- 	.gpio_pullup = -1,
--	.gpio_vbus   = -1,
- };
- 
- void __init pxa_set_udc_info(struct pxa2xx_udc_mach_info *info)
--- 
-1.7.2.3
+ arch/arm/mach-pxa/eseries.c            |   34 +++++++++++---
+ arch/arm/mach-pxa/gumstix.c            |   13 +++++-
+ arch/arm/mach-pxa/tosa.c               |   13 +++++-
+ drivers/usb/gadget/pxa25x_udc.c        |   76 +++-----------------------------
+ 7 files changed, 55 insertions(+), 85 deletions(-)
