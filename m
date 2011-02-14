@@ -1,50 +1,60 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Mon, 14 Feb 2011 13:26:08 +0200
-Subject: [PATCH] OMAP: IOMMU: add missing function declaration
-In-Reply-To: <AANLkTikUMURq-=okRju5YJroMEShHH6_eEMSvrg11UxC@mail.gmail.com>
-References: <1297508987-9193-1-git-send-email-dacohen@gmail.com>
-	<AANLkTikUMURq-=okRju5YJroMEShHH6_eEMSvrg11UxC@mail.gmail.com>
-Message-ID: <AANLkTinQOCG9dEwky53LRwEYO95ptchu6tsRF1iXmfLn@mail.gmail.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Mon, 14 Feb 2011 03:58:43 -0800
+Subject: [PATCH] dmaengine: add slave-dma maintainer
+Message-ID: <20110214115523.25875.45143.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 12:36 AM, Varadarajan, Charulatha <charu@ti.com> wrote:
-> On Sat, Feb 12, 2011 at 19:09, David Cohen <dacohen@gmail.com> wrote:
->> Function declaration 'iopgtable_lookup_entry' is missing from header
->> file.
->
-> Is this done because of any error?
-> You may add a comment on why this is required.
+Slave-dma has become the predominant usage model for dmaengine and needs
+special attention.  Memory-to-memory dma usage cases will continue to be
+maintained by Dan.
 
-The function is exported by iommu module, but no other driver is using
-it so far. So, it's wrong but currently we have only a sparse warning.
-I can add this information to the patch description.
+Cc: Alan Cox <alan@linux.intel.com>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+---
 
-Br,
+Several factors have contributed to the need to add a co-maintainer
+to dmaengine.  First my time is being consumed in other areas [1].
+Also, after Russell's review of amba-pl08x it became clear that the
+semantics of the slave interface need to specified [2].  My work on the
+iop-adma and ioatdma drivers has been limited to the memory-to-memory
+use cases (NET_DMA and ASYNC_TX_DMA).  Without direct slave-dma api
+experience (client driver or dma driver) it is difficult to parse its
+needs outside of its base similarities with the memory-to-memory case.
 
-David
+I have asked my colleague, Vinod Koul, to:
+1/ put more definition around the slave api and usages to try to ensure 
+consistent behavior across drivers (as much as possible)
+2/ help review and merge new drivers according to this definition
 
->
->>
->> Signed-off-by: David Cohen <dacohen@gmail.com>
->> ---
->> ?arch/arm/plat-omap/include/plat/iommu.h | ? ?2 ++
->> ?1 files changed, 2 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
->> index 9e8c104..5a2475f 100644
->> --- a/arch/arm/plat-omap/include/plat/iommu.h
->> +++ b/arch/arm/plat-omap/include/plat/iommu.h
->> @@ -163,6 +163,8 @@ extern void flush_iotlb_range(struct iommu *obj, u32 start, u32 end);
->> ?extern void flush_iotlb_all(struct iommu *obj);
->>
->> ?extern int iopgtable_store_entry(struct iommu *obj, struct iotlb_entry *e);
->> +extern void iopgtable_lookup_entry(struct iommu *obj, u32 da, u32 **ppgd,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 **ppte);
->> ?extern size_t iopgtable_clear_entry(struct iommu *obj, u32 iova);
->>
->> ?extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
->> --
->> 1.7.1
->>
->
+Vinod wrote the intel_mid_dma driver and expects to be involved with
+slave-dma for the foreseeable future.
+
+I will continue to maintain the memory-to-memory and related async_tx 
+usages of dmaengine (that need fixing [3]), but it is clear that this
+usage has become a secondary role for the dmaengine infrastructure.
+
+--
+Dan
+
+[1]: http://marc.info/?l=linux-scsi&m=129703780424729&w=2
+[2]: http://marc.info/?l=linux-arm-kernel&m=129383280413633&w=2
+[3]: http://marc.info/?l=linux-arm-kernel&m=129407269402930&w=2
+
+
+ MAINTAINERS |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 55592f8..e2f0992 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2124,6 +2124,7 @@ S:	Supported
+ F:	fs/dlm/
+ 
+ DMA GENERIC OFFLOAD ENGINE SUBSYSTEM
++M:	Vinod Koul <vinod.koul@intel.com>
+ M:	Dan Williams <dan.j.williams@intel.com>
+ S:	Supported
+ F:	drivers/dma/
