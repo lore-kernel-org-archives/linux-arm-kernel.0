@@ -1,34 +1,48 @@
 From: prakity@marvell.com (Philip Rakity)
-Date: Sun, 13 Feb 2011 22:55:45 -0800
-Subject: [PATCH 1/2] plat-pxa: Enable ability to adjust SD/MMC clocks
-Message-ID: <ADFFF718-5858-412E-94BB-6F696CB5FD31@marvell.com>
+Date: Sun, 13 Feb 2011 22:56:22 -0800
+Subject: [PATCH 2/2] mach-mmp: Support for SD/MMC clock adjustment in
+	brownstone
+Message-ID: <9C2307EC-8314-40D5-A33B-38834F0F4698@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The PXA168, PXA910, and MMP2 SoC have the ability to adjust the SD/MMC
-clock.  This feature is useful and required depending on the board
-design.  Add infrastructure to support SD clock tuning.
+Set timing for brownstone for SD/MMC cards to enable detection
+timing adjustments are needed when speed > 25MHz
+remove limitation on maximum speed of 25MHz
 
 Signed-off-by: Philip Rakity <prakity@marvell.com>
-Signed-off-by: Mark F. Brown <markb@marvell.com>
 ---
- arch/arm/plat-pxa/include/plat/sdhci.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/brownstone.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/include/plat/sdhci.h b/arch/arm/plat-pxa/include/plat/sdhci.h
-index a5bf405..bae194a 100644
---- a/arch/arm/plat-pxa/include/plat/sdhci.h
-+++ b/arch/arm/plat-pxa/include/plat/sdhci.h
-@@ -31,6 +31,9 @@ struct sdhci_pxa_platdata {
- 	unsigned int	max_speed;
- 	unsigned int	quirks;
- 	unsigned int	flags;
-+	unsigned short	adjust_clocks;
-+	unsigned short	clk_select;
-+	unsigned short	clk_delay;
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index 0e92fd7..35afe60 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -178,14 +178,22 @@ static struct i2c_board_info brownstone_twsi1_info[] = {
  };
  
- #endif /* __PLAT_PXA_SDHCI_H */
+ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc0 = {
+-	.max_speed	= 25000000,
++	.adjust_clocks	= 1,
++	.clk_select	= 1,
++	.clk_delay	= 31,
+ };
+ 
+ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc1 = {
++	.adjust_clocks	= 1,
++	.clk_select	= 1,
++	.clk_delay	= 15,
+ 	.flags		= PXA_FLAG_CARD_PERMANENT,
+ };
+ 
+ static struct sdhci_pxa_platdata mmp2_sdh_platdata_mmc2 = {
++	.adjust_clocks	= 1,
++	.clk_select	= 1,
++	.clk_delay	= 31,
+ 	.flags		= PXA_FLAG_CARD_PERMANENT |
+ 				PXA_FLAG_SD_8_BIT_CAPABLE_SLOT,
+ };
 -- 
 1.7.0.4
