@@ -1,53 +1,70 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Feb 2011 10:00:23 -0500 (EST)
-Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
-In-Reply-To: <20110214131750.GA2869@arm.com>
-References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
-	<87pqqy6tdj.fsf@ti.com> <20110214131750.GA2869@arm.com>
-Message-ID: <alpine.LFD.2.00.1102140950580.14920@xanadu.home>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 14 Feb 2011 16:00:57 +0100
+Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
+In-Reply-To: <1296674843-12718-4-git-send-email-omar.ramirez@ti.com>
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+	<1296674843-12718-4-git-send-email-omar.ramirez@ti.com>
+Message-ID: <4D5943A9.8010205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Feb 2011, Dave Martin wrote:
+Hi Omar,
 
-> @@ -289,8 +297,20 @@ clean_l2:
->  	 *  - should be faster and will change with kernel
->  	 *  - 'might' have to copy address, load and jump to it
->  	 */
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +	/* kernel is non-interworking : must do this from Thumb */
-> +	adr	r1, . + 1
-> +	bx	r1
-> +	.thumb
-> +#endif
->  	ldr	r1, kernel_flush
+I found one minor change wrt to the original that I'd like to understand 
+better.
 
-Didn't you mean this instead:
+On 2/2/2011 8:27 PM, Ramirez Luna, Omar wrote:
+> From: Benoit Cousson<b-cousson@ti.com>
+>
+> Mailbox hwmod data for omap4.
+>
+> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> Signed-off-by: Omar Ramirez Luna<omar.ramirez@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   67 ++++++++++++++++++++++++++++
+>   1 files changed, 67 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index c2806bd..c495669 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -2001,6 +2001,70 @@ static struct omap_hwmod omap44xx_wd_timer3_hwmod = {
+>   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+>   };
+>
+> +/*
+> + * 'mailbox' class
+> + * mailbox module allowing communication between the on-chip processors
+> + * using a queued mailbox-interrupt mechanism.
+> + */
+> +
+> +static struct omap_hwmod_class_sysconfig omap44xx_mailbox_sysc = {
+> +	.rev_offs	= 0x0000,
+> +	.sysc_offs	= 0x0010,
+> +	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
+> +			   SYSC_HAS_SOFTRESET),
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	=&omap_hwmod_sysc_type2,
+> +};
+> +
+> +static struct omap_hwmod_class omap44xx_mailbox_hwmod_class = {
+> +	.name = "mailbox",
+> +	.sysc =&omap44xx_mailbox_sysc,
+> +};
+> +
+> +/* mailbox */
+> +static struct omap_hwmod omap44xx_mailbox_hwmod;
+> +static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
+> +	{ .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
 
-	/* kernel is non-interworking : must do this from Thumb */
-	adr	r1, 1f + 1
-	bx	r1
-	.thumb
-1:	ldr	r1, kernel_flush
-	...
+The original entry was unnamed since it is an unique entry and thus does 
+not need to be differentiate on this platform.
 
-?
+	{ .irq = 26 + OMAP44XX_IRQ_GIC_START },
 
->  	blx	r1
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +	.align
-> +	bx	pc
-> +	nop
-> +	.arm
+Do you really need to have a name here? The strategy being to provide a 
+name only if more than one entry exist.
+It is perfectibility doable, I'm just trying to understand your rational.
 
-Also here, the .align has the potential to introduce a zero halfword in 
-the instruction stream before the bx.  What about:
-
-	adr	r3, 1f
-	bx	r3
-	.align
-	.arm
-1:	...
-
-
-Nicolas
+Thanks,
+Benoit
