@@ -1,93 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Feb 2011 15:52:39 -0800
-Subject: [PATCH] omap: Move omap2_check_revision and omap_sram_init out of
-	map_io
-In-Reply-To: <20110214234520.GT20795@atomide.com>
-References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-	<20110123174814.GI30094@n2100.arm.linux.org.uk>
-	<20110124201731.GC13589@atomide.com>
-	<20110214234520.GT20795@atomide.com>
-Message-ID: <20110214235238.GU20795@atomide.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Tue, 15 Feb 2011 08:53:12 +0900
+Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
+	ARCH_EXYNOS4 from ARCH_S5PV310
+In-Reply-To: <AANLkTim49dpC_r4BcK7tqo9wmu8W=qMDZE5szDUja6Wo@mail.gmail.com>
+References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTim49dpC_r4BcK7tqo9wmu8W=qMDZE5szDUja6Wo@mail.gmail.com>
+Message-ID: <002d01cbcca2$5900e430$0b02ac90$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the early init changes we just want to map IO in map_io.
-Both omap2_check_revision and omap_sram_init can be moved to
-happen later in omap2_init_common_infrastructure.
+Hi,
+I answer your questions in detail.
 
-Note that now we can now remove _omap2_map_common_io and remove
-the extra flushes too as devicemaps_init will take care of it.
+> On Monday, February 14, 2011 8:16 PM, Kyungmin Park wrote:
+> 
+> Hi,
+> 
+> Wow, fast move, but need to more explanation.
+> what's the exact meaning of exynos4210?
+> Exynos4 is prefix and remaining are variants?
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Exynos4210 means below.
 
----
+1st digit means ARM core version. In this case, 4 means Cortex A9.
+(If we release cortex A15, it will be Exynos5xxx)
+2nd digit means number of core.  2 mean dual core.
+3rd digit means application category(LSI internal category).
+4th digit means design rule (generation or shrink version)
 
-This is on top of the other early init related patches:
+> Now you changed all s5pv310 to exynos4. if new exynos4xxx chip are
+> comes then how to handle this one?
+> e.g., exynos4220 or later.
+> it's also conflict with mach-exynos4. do you handle all exynos4 series
+> at this mach directory?
+> historically there's no rules of the base RAM address at least samsung
+> chips.
 
-omap: hwmod: Populate _mpu_rt_va later on in omap_hwmod_late_init
-omap2+: Fix omap_serial_early_init to work with init_early hook
-omap2+: Make omap_hwmod_late_init into core_initcall
-ARM: OMAP2: use early init hook
+Yes, we will handle all exynos4 series at mach-exynos4 directory.
+In the past, there is no rule. 
+But now, we are making consistent rules with AP design team.
+So, new version of exynos4 series will have same base RAM address.
 
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -228,25 +228,11 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
- };
- #endif
- 
--static void __init _omap2_map_common_io(void)
--{
--	/* Normally devicemaps_init() would flush caches and tlb after
--	 * mdesc->map_io(), but we must also do it here because of the CPU
--	 * revision check below.
--	 */
--	local_flush_tlb_all();
--	flush_cache_all();
--
--	omap2_check_revision();
--	omap_sram_init();
--}
--
- #ifdef CONFIG_ARCH_OMAP2420
- void __init omap242x_map_common_io(void)
- {
- 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
- 	iotable_init(omap242x_io_desc, ARRAY_SIZE(omap242x_io_desc));
--	_omap2_map_common_io();
- }
- #endif
- 
-@@ -255,7 +241,6 @@ void __init omap243x_map_common_io(void)
- {
- 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
- 	iotable_init(omap243x_io_desc, ARRAY_SIZE(omap243x_io_desc));
--	_omap2_map_common_io();
- }
- #endif
- 
-@@ -263,7 +248,6 @@ void __init omap243x_map_common_io(void)
- void __init omap34xx_map_common_io(void)
- {
- 	iotable_init(omap34xx_io_desc, ARRAY_SIZE(omap34xx_io_desc));
--	_omap2_map_common_io();
- }
- #endif
- 
-@@ -271,7 +255,6 @@ void __init omap34xx_map_common_io(void)
- void __init omap44xx_map_common_io(void)
- {
- 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
--	_omap2_map_common_io();
- }
- #endif
- 
-@@ -335,6 +318,9 @@ void __init omap2_init_common_infrastructure(void)
- {
- 	u8 postsetup_state;
- 
-+	omap2_check_revision();
-+	omap_sram_init();
-+
- 	if (cpu_is_omap242x()) {
- 		omap2xxx_powerdomains_init();
- 		omap2_clockdomains_init();
+Thanks and regards,
+Sangbeom Kim
+
+> 
+> Thank you,
+> Kyungmin Park
+> 
+> On Mon, Feb 14, 2011 at 5:22 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting
+> Samsung's
+> > new brand name EXYNOS. Samsung officially announced about the brand name
+> of EXYNOS
+> > at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor
+> with several
+> > other peripherals to support features such as multimedai, storage,
+> graphics and gaming.
+> > Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be
+> used in
+> > products such as Mobile devices.
+> >
+> > This patch set consists of the following patches.
+> >
+> > [PATCH 01/11] ARM: EXYNOS4: Add EXYNOS4 CPU initialization support
+> > [PATCH 02/11] ARM: EXYNOS4: Update Clock part
+> > [PATCH 03/11] ARM: EXYNOS4: Update IRQ part
+> > [PATCH 04/11] ARM: EXYNOS4: Update Timer part
+> > [PATCH 05/11] ARM: EXYNOS4: Update device support
+> > [PATCH 06/11] ARM: EXYNOS4: Moved board support files
+> > [PATCH 07/11] ARM: EXYNOS4: Update Kconfig and Makefile for the new
+> ARCH_EXYNOS4
+> > [PATCH 08/11] ARM: exynos4_defconfig: Add defconfig for EXYNOS4
+> > [PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
+> > [PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
+> > [PATCH 11/11] tty: Change dependency of ARCH_EXYNOS4
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
