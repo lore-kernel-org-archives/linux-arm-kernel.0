@@ -1,33 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Feb 2011 20:02:22 +0000
-Subject: [PATCH] Ensure predictable endian state on signal handler entry
-Message-ID: <20110214200222.GD31103@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Feb 2011 21:22:54 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTin=bkzvdQXoWUKRfX8Xs=4bXnxWf88TUG+VvjPD@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102131839.08517.arnd@arndb.de>
+	<AANLkTin=bkzvdQXoWUKRfX8Xs=4bXnxWf88TUG+VvjPD@mail.gmail.com>
+Message-ID: <201102142122.54766.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure a predictable endian state when entering signal handlers.  This
-avoids programs which use SETEND to momentarily switch their endian
-state from having their signal handlers entered with an unpredictable
-endian state.
+On Monday 14 February 2011 20:29:59 Andrei Warkentin wrote:
+> On Sun, Feb 13, 2011 at 11:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> Ah sorry, I had to look that one up myself, I thought it was the local
+> jargon associated with the problem space :-). Program/Erase cycle.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
---
+Ok, makes sense.
 
- arch/arm/kernel/signal.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+> >> So T suggested for random data to better go into buffer A. How? Two suggestions.
+> >> 1) Split smaller accesses into 8KB and write with reliable write.
+> >> 2) Split smaller accesses into 8KB and write in reverse.
+> >>
+> >> The patch does both and I am verifying if that is really necessary. I
+> >> need to go see the mmc spec and what it says about reliable write.
+> >
+> > I should add this to my test tool once I can reproduce it. If it turns
+> > out that other media do the same, we can also trigger the same behavior
+> > for those.
+> >
+> 
+> As I mentioned, I am checking with T right now on whether we can use
+> suggestion (1) or
+> suggestion (2) or if they need to be combined. The documentation we
+> got was open to interpretation and the patch created from that did
+> both.
+> You mentioned that writing in reverse is not a good idea. Could you
+> elaborate why? I would guess because you're always causing a write
+> into a different AU (on these Toshiba cards), causing extra GC on
+> every write?
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 907d5a6..abaf844 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -474,7 +474,9 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 	unsigned long handler = (unsigned long)ka->sa.sa_handler;
- 	unsigned long retcode;
- 	int thumb = 0;
--	unsigned long cpsr = regs->ARM_cpsr & ~PSR_f;
-+	unsigned long cpsr = regs->ARM_cpsr & ~(PSR_f | PSR_E_BIT);
-+
-+	cpsr |= PSR_ENDSTATE;
- 
- 	/*
- 	 * Maybe we need to deliver a 32-bit signal to a 26-bit task.
+Probably both the reliable write and writing small blocks in reverse
+order will cause any card to do something that is different from
+what it does on normal 64kb (or larger) aligned accesses.
+
+There are multiple ways how this could be implemented:
+
+1. Have one exception cache for all "special" blocks. This would normally
+   be for FAT32 subdirectory updates, which always write to the same
+   few blocks. This means you can do small writes efficiently anywhere
+   on the card, but only up to a (small) fixed number of block addresses.
+   If you overflow the table, the card still needs to go through an
+   extra PE for each new entry you write, in order to free up an entry.
+
+2. Have a small number of AUs that can be in a special mode with efficient
+   small writes but inefficient large writes. This means that when you
+   alternate between small and large writes in the same AU, it has to go
+   through a PE on every switch. Similarly, if you do small writes to
+   more than the maximum number of AUs that can be held in this mode, you
+   get the same effect. This number can be as small as one, because that
+   is what FAT32 requires.
+
+In both cases, you don't actually have a solution for the problem, you just
+make it less likely for specific workloads.
+
+	Arnd
