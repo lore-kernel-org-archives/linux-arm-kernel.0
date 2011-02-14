@@ -1,8 +1,7 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Feb 2011 17:39:53 +0000
-Subject: [RFC PATCH 1/2] ARMv7: Use a reserved TTB rather than ASID 0 during
-	context switch
-Message-ID: <20110214173953.21717.36145.stgit@e102109-lin.cambridge.arm.com>
+Date: Mon, 14 Feb 2011 17:39:58 +0000
+Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page tables
+Message-ID: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,70 +9,147 @@ Newer processors like Cortex-A15 may cache entries in the higher page
 table levels. These cached entries are ASID-tagged and are invalidated
 during normal TLB operations.
 
-When using the reserved ASID 0 during a context switch, the processor
-may cache an entry from the first level of page tables and tag it with
-ASID 0. Later the corresponding first level entry may no longer be valid
-(e.g. second level table freed) but the TLB invalidation is done by the
-ASID of the corresponding mm structure and not ASID 0. During a
-subsequent context switch, the stale level 1 ASID 0 cached entry may be
-used to speculatively fetch a TLB entry. If the level 2 page table it
-points to contains random data (page freed as the previous process had
-been removed) it could create a global TLB entry which is no longer ASID
-tagged. This entry is then used in subsequent user space processes.
+When a level 2 (pte) page table is removed, the current code sequence
+first clears the level 1 (pmd) entry, flushes the cache, frees the level
+2 table and then invalidates the TLB. Because of the caching of the
+higher page table entries, the processor may speculatively create a TLB
+entry after the level 2 page table has been freed but before the TLB
+invalidation. If such speculative PTW accesses random data, it could
+create a global TLB entry that gets used for subsequent user space
+accesses.
 
-This patch uses one of the other methods specified in the ARM ARM for
-the context switch sequence. It uses the swapper_pg_dir as it only
-contains global (kernel) mappings.
+The patch ensures that the TLB is invalidated before the page table is
+freed (pte_free_tlb). Since pte_free_tlb() does not get a vma structure,
+the patch also introduces flush_tlb_user_page() which takes an mm_struct
+rather than vma_struct. The original flush_tlb_page() is implemented as
+a call to flush_tlb_user_page().
 
-Reported-by: Tony Thompson <anthony.thompson@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/kernel/head.S |    3 +++
- arch/arm/mm/proc-v7.S  |   11 +++++++----
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/tlb.h      |   17 +++++++++++++++--
+ arch/arm/include/asm/tlbflush.h |   16 +++++++++++-----
+ arch/arm/kernel/smp_tlb.c       |   11 ++++++-----
+ 3 files changed, 32 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index c0225da..cc08f1b 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -48,6 +48,9 @@
- 	.globl	swapper_pg_dir
- 	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - 0x4000
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index f41a6f5..565403a 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -102,8 +102,21 @@ tlb_end_vma(struct mmu_gather *tlb, struct vm_area_struct *vma)
+ }
  
-+	.globl	swapper_pg_dir_phys
-+	.equ	swapper_pg_dir_phys, KERNEL_RAM_PADDR - 0x4000
+ #define tlb_remove_page(tlb,page)	free_page_and_swap_cache(page)
+-#define pte_free_tlb(tlb, ptep, addr)	pte_free((tlb)->mm, ptep)
+-#define pmd_free_tlb(tlb, pmdp, addr)	pmd_free((tlb)->mm, pmdp)
 +
- 	.macro	pgtbl, rd
- 	ldr	\rd, =(KERNEL_RAM_PADDR - 0x4000)
- 	.endm
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 0c1172b..38d6436 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -101,19 +101,22 @@ ENDPROC(cpu_v7_dcache_clean_area)
++static inline void pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
++				unsigned long addr)
++{
++#if __LINUX_ARM_ARCH__ >= 7
++	flush_tlb_user_page(tlb->mm, addr);
++#endif
++	pte_free(tlb->mm, pte);
++}
++
++static inline void pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
++				unsigned long addr)
++{
++	pmd_free(tlb->mm, pmdp);
++}
+ 
+ #define tlb_migrate_finish(mm)		do { } while (0)
+ 
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index ce7378e..7bd9c52cd 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -408,17 +408,17 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+ }
+ 
+ static inline void
+-local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
++local_flush_tlb_user_page(struct mm_struct *mm, unsigned long uaddr)
+ {
+ 	const int zero = 0;
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+-	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
++	uaddr = (uaddr & PAGE_MASK) | ASID(mm);
+ 
+ 	if (tlb_flag(TLB_WB))
+ 		dsb();
+ 
+-	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
++	if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+ 		if (tlb_flag(TLB_V3_PAGE))
+ 			asm("mcr p15, 0, %0, c6, c0, 0" : : "r" (uaddr) : "cc");
+ 		if (tlb_flag(TLB_V4_U_PAGE))
+@@ -556,19 +556,25 @@ static inline void clean_pmd_entry(pmd_t *pmd)
+ #ifndef CONFIG_SMP
+ #define flush_tlb_all		local_flush_tlb_all
+ #define flush_tlb_mm		local_flush_tlb_mm
+-#define flush_tlb_page		local_flush_tlb_page
++#define flush_tlb_user_page	local_flush_tlb_user_page
+ #define flush_tlb_kernel_page	local_flush_tlb_kernel_page
+ #define flush_tlb_range		local_flush_tlb_range
+ #define flush_tlb_kernel_range	local_flush_tlb_kernel_range
+ #else
+ extern void flush_tlb_all(void);
+ extern void flush_tlb_mm(struct mm_struct *mm);
+-extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr);
++extern void flush_tlb_user_page(struct mm_struct *mm, unsigned long uaddr);
+ extern void flush_tlb_kernel_page(unsigned long kaddr);
+ extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
+ #endif
+ 
++static inline void
++flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
++{
++	flush_tlb_user_page(vma->vm_mm, uaddr);
++}
++
+ /*
+  * If PG_dcache_clean is not set for the page, we need to ensure that any
+  * cache entries for the kernels virtual memory range are written
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 7dcb352..8f57f32 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -32,6 +32,7 @@ static void on_each_cpu_mask(void (*func)(void *), void *info, int wait,
   */
- ENTRY(cpu_v7_switch_mm)
- #ifdef CONFIG_MMU
--	mov	r2, #0
- 	ldr	r1, [r1, #MM_CONTEXT_ID]	@ get mm->context.id
-+	ldr	r3, =swapper_pg_dir_phys	@ prepare global-only TTB 0
- 	ALT_SMP(orr	r0, r0, #TTB_FLAGS_SMP)
- 	ALT_UP(orr	r0, r0, #TTB_FLAGS_UP)
-+	ALT_SMP(orr	r3, r3, #TTB_FLAGS_SMP)
-+	ALT_UP(orr	r3, r3, #TTB_FLAGS_UP)
- #ifdef CONFIG_ARM_ERRATA_430973
-+	mov	r2, #0
- 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
- #endif
--	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
--	isb
--1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
-+	mcr	p15, 0, r3, c2, c0, 0		@ set global-only TTB 0
- 	isb
- 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
- 	isb
-+	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
-+	isb
- #endif
- 	mov	pc, lr
- ENDPROC(cpu_v7_switch_mm)
+ struct tlb_args {
+ 	struct vm_area_struct *ta_vma;
++	struct mm_struct *ta_mm;
+ 	unsigned long ta_start;
+ 	unsigned long ta_end;
+ };
+@@ -52,7 +53,7 @@ static inline void ipi_flush_tlb_page(void *arg)
+ {
+ 	struct tlb_args *ta = (struct tlb_args *)arg;
+ 
+-	local_flush_tlb_page(ta->ta_vma, ta->ta_start);
++	local_flush_tlb_user_page(ta->ta_mm, ta->ta_start);
+ }
+ 
+ static inline void ipi_flush_tlb_kernel_page(void *arg)
+@@ -92,15 +93,15 @@ void flush_tlb_mm(struct mm_struct *mm)
+ 		local_flush_tlb_mm(mm);
+ }
+ 
+-void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
++void flush_tlb_user_page(struct mm_struct *mm, unsigned long uaddr)
+ {
+ 	if (tlb_ops_need_broadcast()) {
+ 		struct tlb_args ta;
+-		ta.ta_vma = vma;
++		ta.ta_mm = mm;
+ 		ta.ta_start = uaddr;
+-		on_each_cpu_mask(ipi_flush_tlb_page, &ta, 1, mm_cpumask(vma->vm_mm));
++		on_each_cpu_mask(ipi_flush_tlb_page, &ta, 1, mm_cpumask(mm));
+ 	} else
+-		local_flush_tlb_page(vma, uaddr);
++		local_flush_tlb_user_page(mm, uaddr);
+ }
+ 
+ void flush_tlb_kernel_page(unsigned long kaddr)
