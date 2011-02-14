@@ -1,32 +1,100 @@
-From: shiraz.linux.kernel@gmail.com (shiraz hashim)
-Date: Mon, 14 Feb 2011 09:07:34 +0530
-Subject: reboot not working on linux-2.6.37 for ARMv7
-In-Reply-To: <AANLkTim1-0ipuM+8w5-AiTi74x5ghZ66o72WrOjhN94s@mail.gmail.com>
-References: <AANLkTi=FCJr-0aF0LG92PC4Q7J4R5PDU7xobnvCgDHy8@mail.gmail.com>
-	<20110211120305.GD23404@n2100.arm.linux.org.uk>
-	<AANLkTikvBRJyDJb4=puFzbTCXNYGSEXDRkAZ=1PZuneD@mail.gmail.com>
-	<AANLkTim1-0ipuM+8w5-AiTi74x5ghZ66o72WrOjhN94s@mail.gmail.com>
-Message-ID: <AANLkTinckD5ZToBo2QZj3rBv8PtUUj2vqLRe=KXVSUB4@mail.gmail.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Mon, 14 Feb 2011 10:24:48 +0530
+Subject: [PATCH v2 09/13] can: pruss CAN driver.
+In-Reply-To: <20110211150602.GB373@e-circ.dyndns.org>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>
+	<20110211150602.GB373@e-circ.dyndns.org>
+Message-ID: <C1C4300CE90A406FBDA2388D5491FAD5@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rabin,
+Hello,
 
-On Sun, Feb 13, 2011 at 9:26 AM, Rabin Vincent <rabin@rab.in> wrote:
-> On Sat, Feb 12, 2011 at 21:45, viresh kumar <viresh.linux@gmail.com> wrote:
->> We are not modifying flush_cache_all. L2 cache is not flushed from
->> there. ?Actually as soon as L1 Cache is flushed and disabled,
->> spin_lock is taken from some other thread. This creates problem for
->> our platform, as we do not have monitors support at L2 thus failing
->> strex instruction.
+I had a discussion regarding this with Wolfgang:
+
+http://www.mail-archive.com/socketcan-users at lists.berlios.de/msg00324.html
+
+The problem here is that we must configure the mailbox ID's and this support 
+is not available in the socketCan sub-system.
+
+--------------------------------------------------
+From: "Kurt Van Dijck" <kurt.van.dijck@eia.be>
+Sent: Friday, February 11, 2011 8:36 PM
+To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
+Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
+<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
+<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "Wolfgang Grandegger" 
+<wg@grandegger.com>; "open list:CAN NETWORK DRIVERS" 
+<socketcan-core@lists.berlios.de>; "open list:CAN NETWORK DRIVERS" 
+<netdev@vger.kernel.org>; "open list" <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH v2 09/13] can: pruss CAN driver.
+
+> On Fri, Feb 11, 2011 at 08:21:28PM +0530, Subhasish Ghosh wrote:
+>> +config DA8XX_PRU_CANID_MBX0
+>> + hex "CANID for mailbox 0"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 0
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX1
+>> + hex "CANID for mailbox 1"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 1
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX2
+>> + hex "CANID for mailbox 2"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 2
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX3
+>> + hex "CANID for mailbox 3"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 3
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX4
+>> + hex "CANID for mailbox 4"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 4
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX5
+>> + hex "CANID for mailbox 5"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 5
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX6
+>> + hex "CANID for mailbox 6"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 6
+>> + Default value is set to 0x123, change this as required.
+>> +
+>> +config DA8XX_PRU_CANID_MBX7
+>> + hex "CANID for mailbox 7"
+>> + depends on CAN_TI_DA8XX_PRU
+>> + default "0x123"
+>> + ---help---
+>> + Enter the CANID for mailbox 7
+>> + Default value is set to 0x123, change this as required.
+> Why is filling the mailboxes the job of kernel config?
 >
-> Do you use writel() in your arch_reset() routine (as plat-spear appears
-> to be doing)? ?There's a spinlock in there too (l2x0_cache_sync(), via
-> the barriers) which will also not work in your situation.
-
-You are right. Changed this to writel_relaxed and picked
-28e18293cf0f8d23a0950d7b1d2212d11af494dc. Now it is working fine.
-
--- 
-regards
-Shiraz Hashim
+> Regards,
+> Kurt 
