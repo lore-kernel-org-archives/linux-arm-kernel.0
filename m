@@ -1,17 +1,114 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 14 Feb 2011 14:39:49 +0000
-Subject: mc13xxx-core, support for i2c, V4
-In-Reply-To: <201102141121.34676.philippe.retornaz@epfl.ch>
-References: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
-	<20110212084035.GB17755@angua.secretlab.ca>
-	<201102141121.34676.philippe.retornaz@epfl.ch>
-Message-ID: <20110214143949.GB32596@sirena.org.uk>
+From: John.Linn@xilinx.com (John Linn)
+Date: Mon, 14 Feb 2011 07:41:47 -0700
+Subject: [PATCH V2 1/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <20110212121320.GH15616@n2100.arm.linux.org.uk>
+References: <1297270845-18802-1-git-send-email-john.linn@xilinx.com>
+	<0e8b21c6-60ff-4f82-a8e6-5c2a0fe80372@VA3EHSMHS005.ehs.local>
+	<20110212121320.GH15616@n2100.arm.linux.org.uk>
+Message-ID: <3c99c5b6-61cd-4049-9461-04c60fceaa7b@VA3EHSMHS028.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 11:21:34AM +0100, Philippe R?tornaz wrote:
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Saturday, February 12, 2011 5:13 AM
+> To: John Linn
+> Cc: linux-arm-kernel at lists.infradead.org;
+linux-kernel at vger.kernel.org; catalin.marinas at arm.com;
+> glikely at secretlab.ca
+> Subject: Re: [PATCH V2 1/4] ARM: Xilinx: Adding Xilinx board support
+> 
+> On Wed, Feb 09, 2011 at 10:00:42AM -0700, John Linn wrote:
+> > +/* arch/arm/mach-xilinx/board_ep107.c
+> > + *
+> > + * This file contains code specific to the Xilinx EP107 board.
+> > + *
+> > + *  Copyright (C) 2011 Xilinx
+> > + *
+> > + * based on /arch/arm/mach-realview/core.c
+> > + *
+> > + *  Copyright (C) 1999 - 2003 ARM Limited
+> > + *  Copyright (C) 2000 Deep Blue Solutions Ltd
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+modify
+> > + * it under the terms of the GNU General Public License as
+published by
+> > + * the Free Software Foundation; either version 2 of the License,
+or
+> > + * (at your option) any later version.
+> > + *
+> > + * You should have received a copy of the GNU General Public
+License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+02111-1307  USA
+> 
+> You probably don't want to include this paragraph - their address
+keeps
+> changing, so will require files to be constantly updated.
 
-> AFAIK the audio part of the mc13783 has still not been merged.
+Makes sense. Easy to fix.
 
-No, it hasn't.  Sacha posted something ages ago but it had a lot of
-problems and I've not seen any subsequent spins.
+> 
+> > + */
+> > +
+> > +#include <linux/platform_device.h>
+> > +#include <asm/mach-types.h>
+> > +#include <asm/mach/arch.h>
+> > +#include <mach/xilinx_soc.h>
+> > +#include <mach/irqs.h>
+> > +#include <linux/clkdev.h>
+> 
+> Please group linux/ includes together, then asm/ includes, lastly
+mach/
+> includes.
+> 
+> > @@ -0,0 +1,113 @@
+> > +/* arch/arm/mach-xilinx/common.c
+> ...
+> > +/**
+> > + * system_init - System specific initialization, intended to be
+called from
+> > + *			board specific initialization.
+> > + *
+> > + **/
+> > +void __init system_init(void)
+> 
+> Is there a better name for this - maybe prefixing it with xilinx_ ?
+
+Sure, that's easy.
+
+> 
+> > +{
+> > +#ifdef CONFIG_CACHE_L2X0
+> > +	/*
+> > +	 * 64KB way size, 8-way associativity, parity disabled
+> > +	 */
+> > +	l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
+> > +#endif
+> > +}
+> > +
+> > +/**
+> > + * irq_init - Interrupt controller initialization for the GIC.
+> > + *
+> > + **/
+> > +void __init irq_init(void)
+> 
+> Ditto.
+
+Same thing, easy.
+
+> 
+> > +/**
+> > + * map_io - Create memory mappings needed for early I/O.
+> > + *
+> > + **/
+> > +void __init map_io(void)
+> 
+> Ditto.
+
+Yep.
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
