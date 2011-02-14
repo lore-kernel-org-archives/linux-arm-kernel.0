@@ -1,17 +1,18 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 14 Feb 2011 14:36:06 -0800
-Subject: [PATCH] arm: mach-omap2: smartreflex: fix another memory leak
-In-Reply-To: <1297083471-6341-1-git-send-email-aaro.koskinen@nokia.com> (Aaro
-	Koskinen's message of "Mon, 7 Feb 2011 14:57:51 +0200")
-References: <1297083471-6341-1-git-send-email-aaro.koskinen@nokia.com>
-Message-ID: <87k4h2z1k9.fsf@ti.com>
+Date: Mon, 14 Feb 2011 14:38:42 -0800
+Subject: [PATCHv2] arm: mach-omap2: smartreflex: fix another memory leak
+In-Reply-To: <1297087684-19967-1-git-send-email-aaro.koskinen@nokia.com> (Aaro
+	Koskinen's message of "Mon, 7 Feb 2011 16:08:04 +0200")
+References: <1297087684-19967-1-git-send-email-aaro.koskinen@nokia.com>
+Message-ID: <87bp2ez1fx.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Aaro Koskinen <aaro.koskinen@nokia.com> writes:
 
 > Temporary strings with volt_* file names should be released after the
-> debugfs entries are created.
+> debugfs entries are created. While at it, also simplify the string
+> allocation, and use just snprintf() to create the name.
 >
 > The patch eliminates kmemleak reports with the following stack trace
 > (multiple objects depending on HW):
@@ -39,24 +40,43 @@ Aaro Koskinen <aaro.koskinen@nokia.com> writes:
 >     [<ffffffff>] 0xffffffff
 >
 > Signed-off-by: Aaro Koskinen <aaro.koskinen@nokia.com>
+> ---
+>
+> v2: Get rid of kmalloc().
 
-Thanks, queuing for 2.6.38-rc cycle.
+Replied to the wrong patch earlier.
+
+Just to be clear, I'm queuing v2 for the 2.6.38-rc cycle.
 
 Kevin
 
-> ---
->  arch/arm/mach-omap2/smartreflex.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+>  arch/arm/mach-omap2/smartreflex.c |   15 +++------------
+>  1 files changed, 3 insertions(+), 12 deletions(-)
 >
 > diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 77ecebf..61aebed 100644
+> index 77ecebf..e54db84 100644
 > --- a/arch/arm/mach-omap2/smartreflex.c
 > +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -942,6 +942,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
->  		strcat(name, volt_name);
->  		(void) debugfs_create_x32(name, S_IRUGO | S_IWUGO, nvalue_dir,
->  				&(sr_info->nvalue_table[i].nvalue));
-> +		kfree(name);
+> @@ -927,19 +927,10 @@ static int __init omap_sr_probe(struct platform_device *pdev)
 >  	}
 >  
->  	return ret;
+>  	for (i = 0; i < sr_info->nvalue_count; i++) {
+> -		char *name;
+> -		char volt_name[32];
+> -
+> -		name = kzalloc(NVALUE_NAME_LEN + 1, GFP_KERNEL);
+> -		if (!name) {
+> -			dev_err(&pdev->dev, "%s: Unable to allocate memory"
+> -				" for n-value directory name\n",  __func__);
+> -			return -ENOMEM;
+> -		}
+> +		char name[NVALUE_NAME_LEN + 1];
+>  
+> -		strcpy(name, "volt_");
+> -		sprintf(volt_name, "%d", volt_data[i].volt_nominal);
+> -		strcat(name, volt_name);
+> +		snprintf(name, sizeof(name), "volt_%d",
+> +			 volt_data[i].volt_nominal);
+>  		(void) debugfs_create_x32(name, S_IRUGO | S_IWUGO, nvalue_dir,
+>  				&(sr_info->nvalue_table[i].nvalue));
+>  	}
