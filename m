@@ -1,21 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Feb 2011 11:19:17 +0100
-Subject: [PATCH] pl011: add optional RX DMA to PL011
-In-Reply-To: <20110214101730.GB19375@n2100.arm.linux.org.uk>
-References: <1297677085-13097-1-git-send-email-linus.walleij@linaro.org>
-	<20110214101730.GB19375@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTimA487os_vbmbTZKZ=1E3Uqq4wMOsTKV_KwPuGR@mail.gmail.com>
+From: philippe.retornaz@epfl.ch (Philippe =?iso-8859-1?q?R=E9tornaz?=)
+Date: Mon, 14 Feb 2011 11:21:34 +0100
+Subject: mc13xxx-core, support for i2c, V4
+In-Reply-To: <20110212084035.GB17755@angua.secretlab.ca>
+References: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
+	<20110212084035.GB17755@angua.secretlab.ca>
+Message-ID: <201102141121.34676.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 11:17 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Le samedi, 12 f?vrier 2011 09.40:35, Grant Likely a ?crit :
+> On Tue, Jan 04, 2011 at 04:34:55PM +1100, Marc Reilly wrote:
+> > Hi,
+> >
+> > These patches add i2c support for the mc13xxx-core drive. For v4 I've
+> > tried to take in all previous comments, hopefully making it better to
+> > follow, and bisectable.
+> 
+> This series looks okay to me.  Since this is audio drivers, I expect
+> that it would best be taken via the ASoC tree?  Have you sent it to
+> Mark Brown and the ALSA list for review?
 
-> This is where I got to with this - it needs updating with the various
-> dma engine improvements.
+AFAIK the audio part of the mc13783 has still not been merged.
 
-Thanks Russell, I'll try this out and make any three-way adjustments to
-get it working on Ux500...
+Regards,
 
-Yours,
-Linus Walleij
+Philippe
