@@ -1,62 +1,34 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Tue, 15 Feb 2011 16:36:26 +0200
-Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
-	dev_dbg()
-In-Reply-To: <20110215142923.GC11199@n2100.arm.linux.org.uk>
-References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
-	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
-	<4D5A81D8.2080800@ru.mvista.com>
-	<20110215142923.GC11199@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTin++DGAGT9-nahy1Qm7ASbGm=JjNuPZWZ6XUbcX@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 16 Feb 2011 06:39:42 +0800
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110214165958.GH10709@pengutronix.de>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165958.GH10709@pengutronix.de>
+Message-ID: <20110215223941.GJ10990@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 4:29 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 15, 2011 at 04:38:32PM +0300, Sergei Shtylyov wrote:
->>> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
->>> index 14ee686..4244a07 100644
->>> --- a/arch/arm/mach-omap2/iommu2.c
->>> +++ b/arch/arm/mach-omap2/iommu2.c
->>> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->>> ? ? ?da = iommu_read_reg(obj, MMU_FAULT_AD);
->>> ? ? ?*ra = da;
->>>
->>> - ? ?dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
->>> + ? ?dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
->>
->> ? ?Note that dev_dbg() will only print something if either DEBUG or
->> CONFIG_DYNAMIC_DEBUG are defined...
->>
->>>
->>> ? ? ?for (i = 0; i< ?ARRAY_SIZE(err_msg); i++) {
->>> ? ? ? ? ? ? ?if (stat & (1<< ?i))
->>> - ? ? ? ? ? ? ? ? ? ?printk("%s ", err_msg[i]);
->>> + ? ? ? ? ? ? ? ? ? ?printk(KERN_DEBUG "%s ", err_msg[i]);
->>
->> ? ?... unlike printk(KERN_DEBUG...). You probably want to use pr_debug() instead.
->
-> No - this isn't starting a new line. ?pr_cont() here.
+Hi Wolfram,
 
-But pr_cont() would be wrong in case of DEBUG isn't set, isn't it?
+On Mon, Feb 14, 2011 at 05:59:58PM +0100, Wolfram Sang wrote:
+> On Mon, Feb 14, 2011 at 10:32:20AM +0800, Shawn Guo wrote:
+> > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
+> > The driver calls into mxs-dma via generic dmaengine api for both pio
+> > and data transfer.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> 
+> While trying, I got this lockdep-warning and BUG. It might be that my setup is
+> wrong, causing all these timeouts. But they probably are meant to be handled
+> more gracefully? I can continue testing tomorrow, maybe this report already
+> helps identifying a problem?
+> 
+Ah, yes.  I can also see the problem here after turning on
+DEBUG_SPINLOCK.  I really should always turn it on in daily
+development.
 
->
->>> ? ? ?}
->>> - ? ?printk("\n");
->>> + ? ?printk(KERN_DEBUG "\n");
->>
->> ? ?Here too... Although wait, it should be KERN_CONT instead! Debug
->> levels are only attributed to the whole lines.
->
-> And pr_cont() here too. ?If you care about using KERN_CONT which is
-> just a static marker to allow automated printk level checking easier.
+Thanks for catching.  I will fix it in v3.
 
-The same situation here.
-
-But this patch was dropped in the next version.
-
-Br,
-
-David
-
->
+Regards,
+Shawn
