@@ -1,32 +1,23 @@
-From: tero.kristo@nokia.com (Tero Kristo)
-Date: Tue, 15 Feb 2011 18:30:28 +0200
-Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
-Message-ID: <1297787428-5717-1-git-send-email-tero.kristo@nokia.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Tue, 15 Feb 2011 17:29:31 +0200
+Subject: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on TWL
+In-Reply-To: <20110215171652.601c9c68.jhnikula@gmail.com>
+References: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
+	<20110215171652.601c9c68.jhnikula@gmail.com>
+Message-ID: <20110215172931.3a6e45a8.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This saves some power. OMAP4 version should check for GPT module ID, as
-autoidle is only supported on a subset of these.
+On Tue, 15 Feb 2011 17:16:52 +0200
+Jarkko Nikula <jhnikula@gmail.com> wrote:
 
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
----
- arch/arm/plat-omap/dmtimer.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> Would it make more sense to set only the flag here and do the register
+> writes when omap3_twl_init is executing? Then it's not so strict when
+> the board code calls this function.
+> 
+Probably discussed earlier but would it make more sense to have flag in
+struct twl4030_platform_data and to do registers writes in twl-core?
+Looks suspicious to have i2c_writes under arch/arm/.
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 1d706cf..ee9f6eb 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -342,6 +342,10 @@ static void omap_dm_timer_reset(struct omap_dm_timer *timer)
- 	l |= 0x02 << 3;  /* Set to smart-idle mode */
- 	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on idle */
- 
-+	/* Enable autoidle on OMAP2 / OMAP3 */
-+	if (cpu_is_omap24xx() || cpu_is_omap34xx())
-+		l |= 0x1 << 0;
-+
- 	/*
- 	 * Enable wake-up on OMAP2 CPUs.
- 	 */
 -- 
-1.7.1
+Jarkko
