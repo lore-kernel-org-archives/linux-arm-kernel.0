@@ -1,36 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 10:31:27 +0000
-Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
-	tables
-In-Reply-To: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-Message-ID: <20110215103127.GC4152@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 15 Feb 2011 10:37:29 +0000
+Subject: [PATCH] Ensure predictable endian state on signal handler entry
+In-Reply-To: <20110214200222.GD31103@n2100.arm.linux.org.uk>
+References: <20110214200222.GD31103@n2100.arm.linux.org.uk>
+Message-ID: <20110215103728.GA2650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 05:39:58PM +0000, Catalin Marinas wrote:
-> Newer processors like Cortex-A15 may cache entries in the higher page
-> table levels. These cached entries are ASID-tagged and are invalidated
-> during normal TLB operations.
+On Mon, Feb 14, 2011 at 08:02:22PM +0000, Russell King - ARM Linux wrote:
+> Ensure a predictable endian state when entering signal handlers.  This
+> avoids programs which use SETEND to momentarily switch their endian
+> state from having their signal handlers entered with an unpredictable
+> endian state.
 > 
-> When a level 2 (pte) page table is removed, the current code sequence
-> first clears the level 1 (pmd) entry, flushes the cache, frees the level
-> 2 table and then invalidates the TLB. Because of the caching of the
-> higher page table entries, the processor may speculatively create a TLB
-> entry after the level 2 page table has been freed but before the TLB
-> invalidation. If such speculative PTW accesses random data, it could
-> create a global TLB entry that gets used for subsequent user space
-> accesses.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> --
 > 
-> The patch ensures that the TLB is invalidated before the page table is
-> freed (pte_free_tlb). Since pte_free_tlb() does not get a vma structure,
-> the patch also introduces flush_tlb_user_page() which takes an mm_struct
-> rather than vma_struct. The original flush_tlb_page() is implemented as
-> a call to flush_tlb_user_page().
+>  arch/arm/kernel/signal.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 907d5a6..abaf844 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -474,7 +474,9 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+>  	unsigned long handler = (unsigned long)ka->sa.sa_handler;
+>  	unsigned long retcode;
+>  	int thumb = 0;
+> -	unsigned long cpsr = regs->ARM_cpsr & ~PSR_f;
+> +	unsigned long cpsr = regs->ARM_cpsr & ~(PSR_f | PSR_E_BIT);
+> +
+> +	cpsr |= PSR_ENDSTATE;
+>  
+>  	/*
+>  	 * Maybe we need to deliver a 32-bit signal to a 26-bit task.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-We already have support for doing this, and Peter Zijlstra posted patches
-to convert ARM to use a generic implementation of the TLB shootdown code.
+Looks sensible to me.
 
-http://marc.info/?l=linux-kernel&m=129604765010347&w=2
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-Does this patch solve your problem?
+Only tested it with little-endian, but it's enough to make my silly
+test program not segfault.  (Without your patch, it definitely does...)
+
+#include <stdio.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+
+static void handler(int n)
+{
+	unsigned long cpsr;
+#define FORMAT "handler: CPSR = 0x%08lX\n"
+	char buf[sizeof FORMAT - 5 + 8];
+
+	asm ("mrs %0, CPSR" : "=r" (cpsr));
+
+	snprintf(buf, sizeof buf, FORMAT, cpsr);
+
+	write(STDOUT_FILENO, buf, strlen(buf));
+}
+
+int main(void)
+{
+	signal(SIGINT, handler);
+
+	asm volatile (
+	"0:	setend	be\n\t"
+	"	b 0b"
+	);
+}
+
+Cheers
+---Dave
