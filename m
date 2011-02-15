@@ -1,77 +1,32 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 15 Feb 2011 15:09:38 -0700
-Subject: [PATCH 4/4] spi/pl022: minor kerneldoc updates
-In-Reply-To: <1297166635-5205-1-git-send-email-linus.walleij@stericsson.com>
-References: <1297166635-5205-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110215220938.GI28005@angua.secretlab.ca>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 16 Feb 2011 01:20:28 +0300
+Subject: [PATCH 4/4] arm: V2 configs: update pxa910 defconfig for SoC
+	Selection
+In-Reply-To: <5DE28962-5F04-4D34-8D65-DF4020F135CD@marvell.com>
+References: <5DE28962-5F04-4D34-8D65-DF4020F135CD@marvell.com>
+Message-ID: <4D5AFC2C.6010408@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 08, 2011 at 01:03:55PM +0100, Linus Walleij wrote:
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On 16-02-2011 0:55, Philip Rakity wrote:
 
-Applied, thanks.
+> V2
+> ==
+> Use make savedefconfigconfig to produce reduced size defconfig
+> per suggestion of Nico Pitre.
 
-g.
+> V1
+> ==
 
+    The log of the patch changes should go under the --- tear line.
+
+> took old pxa910_defconfig --
+> did make menuconfig
+> changed to CPU_PXA910
+
+> Signed-off-by: Philip Rakity<prakity@marvell.com>
 > ---
->  drivers/spi/amba-pl022.c |   25 ++++++++++++++++---------
->  1 files changed, 16 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index 2b591f0..4cd05cc 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -329,15 +329,16 @@ struct vendor_data {
->  /**
->   * struct pl022 - This is the private SSP driver data structure
->   * @adev: AMBA device model hookup
-> - * @vendor: Vendor data for the IP block
-> - * @phybase: The physical memory where the SSP device resides
-> - * @virtbase: The virtual memory where the SSP is mapped
-> + * @vendor: vendor data for the IP block
-> + * @phybase: the physical memory where the SSP device resides
-> + * @virtbase: the virtual memory where the SSP is mapped
-> + * @clk: outgoing clock "SPICLK" for the SPI bus
->   * @master: SPI framework hookup
->   * @master_info: controller-specific data from machine setup
-> - * @regs: SSP controller register's virtual address
-> - * @pump_messages: Work struct for scheduling work to the workqueue
-> - * @lock: spinlock to syncronise access to driver data
->   * @workqueue: a workqueue on which any spi_message request is queued
-> + * @pump_messages: work struct for scheduling work to the workqueue
-> + * @queue_lock: spinlock to syncronise access to message queue
-> + * @queue: message queue
->   * @busy: workqueue is busy
->   * @running: workqueue is running
->   * @pump_transfers: Tasklet used in Interrupt Transfer mode
-> @@ -348,8 +349,14 @@ struct vendor_data {
->   * @tx_end: end position in TX buffer to be read
->   * @rx: current position in RX buffer to be written
->   * @rx_end: end position in RX buffer to be written
-> - * @readingtype: the type of read currently going on
-> - * @writingtype: the type or write currently going on
-> + * @read: the type of read currently going on
-> + * @write: the type of write currently going on
-> + * @exp_fifo_level: expected FIFO level
-> + * @dma_rx_channel: optional channel for RX DMA
-> + * @dma_tx_channel: optional channel for TX DMA
-> + * @sgt_rx: scattertable for the RX transfer
-> + * @sgt_tx: scattertable for the TX transfer
-> + * @dummypage: a dummy page used for driving data on the bus with DMA
->   */
->  struct pl022 {
->  	struct amba_device		*adev;
-> @@ -397,8 +404,8 @@ struct pl022 {
->   * @cpsr: Value of Clock prescale register
->   * @n_bytes: how many bytes(power of 2) reqd for a given data width of client
->   * @enable_dma: Whether to enable DMA or not
-> - * @write: function ptr to be used to write when doing xfer for this chip
->   * @read: function ptr to be used to read when doing xfer for this chip
-> + * @write: function ptr to be used to write when doing xfer for this chip
->   * @cs_control: chip select callback provided by chip
->   * @xfer_type: polling/interrupt/DMA
->   *
-> -- 
-> 1.7.3.2
-> 
+>   arch/arm/configs/pxa910_defconfig |    6 +-----
+>   1 files changed, 1 insertions(+), 5 deletions(-)
+
+WBR, Sergei
