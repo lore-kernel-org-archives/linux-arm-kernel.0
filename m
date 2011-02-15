@@ -1,158 +1,42 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Tue, 15 Feb 2011 17:10:32 +0200
-Subject: [PATCH v2 1/1] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <20110215.164822.811675675026794737.Hiroshi.DOYU@nokia.com>
-References: <1297780591-15613-1-git-send-email-dacohen@gmail.com>
-	<1297780591-15613-2-git-send-email-dacohen@gmail.com>
-	<20110215.164822.811675675026794737.Hiroshi.DOYU@nokia.com>
-Message-ID: <AANLkTikK0zAYtSaA1LCdkn2t4_XiTH_DmESEzw8MLvfU@mail.gmail.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 15 Feb 2011 16:11:09 +0100
+Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
+In-Reply-To: <20110215141253.GJ4152@n2100.arm.linux.org.uk>
+References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
+	<20110215133232.GI4152@n2100.arm.linux.org.uk>
+	<20110215134134.GA17208@n2100.arm.linux.org.uk>
+	<AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
+	<20110215141253.GJ4152@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinpcYoHKKDhqy9mKpqOEGtMpNc1BSukNWH-GVBX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 4:48 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
-> Hi David,
-
-Hi Hiroshi,
-
->
-> Sorry for a bit late reply....
-
-You're just in time. :)
-
->
-> From: David Cohen <dacohen@gmail.com>
-> Subject: [PATCH v2 1/1] OMAP: IOMMU: add support to callback during fault handling
-> Date: Tue, 15 Feb 2011 16:36:31 +0200
->
->> Add support to register a callback for IOMMU fault situations. Drivers using
->> IOMMU module might want to be informed when such errors happen in order to
->> debug it or react.
+On 15 February 2011 15:12, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 15, 2011 at 02:54:21PM +0100, Per Forlin wrote:
+>> I don't fully understand this yet. I think you are right but I need a
+>> little help to get there myself.
+>> I agree, the cache (L1 and L2) must be invalidated after the DMA has completed.
+>> Before starting the DMA the write buffers must be drained (cache_sync).
 >>
->> Signed-off-by: David Cohen <dacohen@gmail.com>
->> ---
->> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 21 +++++++++++++--
->> ?arch/arm/plat-omap/include/plat/iommu.h | ? 15 ++++++++++-
->> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 41 ++++++++++++++++++++++++++++---
->> ?3 files changed, 69 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
->> index 14ee686..504310d 100644
->> --- a/arch/arm/mach-omap2/iommu2.c
->> +++ b/arch/arm/mach-omap2/iommu2.c
->> @@ -143,10 +143,10 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
->> ? ? ? __iommu_set_twl(obj, false);
->> ?}
->>
->> -static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->> +static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra, u32 *iommu_errs)
->> ?{
->> ? ? ? int i;
->> - ? ? u32 stat, da;
->> + ? ? u32 stat, da, errs;
->> ? ? ? const char *err_msg[] = {
->> ? ? ? ? ? ? ? "tlb miss",
->> ? ? ? ? ? ? ? "translation fault",
->> @@ -157,8 +157,10 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->>
->> ? ? ? stat = iommu_read_reg(obj, MMU_IRQSTATUS);
->> ? ? ? stat &= MMU_IRQ_MASK;
->> - ? ? if (!stat)
->> + ? ? if (!stat) {
->> + ? ? ? ? ? ? *iommu_errs = 0;
->> ? ? ? ? ? ? ? return 0;
->> + ? ? }
->>
->> ? ? ? da = iommu_read_reg(obj, MMU_FAULT_AD);
->> ? ? ? *ra = da;
->> @@ -171,6 +173,19 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->> ? ? ? }
->> ? ? ? printk("\n");
->>
->> + ? ? errs = 0;
->> + ? ? if (stat & MMU_IRQ_TLBMISS)
->> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
->> + ? ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
->> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
->> + ? ? if (stat & MMU_IRQ_EMUMISS)
->> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
->> + ? ? if (stat & MMU_IRQ_TABLEWALKFAULT)
->> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
->> + ? ? if (stat & MMU_IRQ_MULTIHITFAULT)
->> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
->> + ? ? *iommu_errs = errs;
->> +
->> ? ? ? iommu_write_reg(obj, stat, MMU_IRQSTATUS);
->>
->> ? ? ? return stat;
->> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
->> index 19cbb5e..5a2475f 100644
->> --- a/arch/arm/plat-omap/include/plat/iommu.h
->> +++ b/arch/arm/plat-omap/include/plat/iommu.h
->> @@ -31,6 +31,7 @@ struct iommu {
->> ? ? ? struct clk ? ? ?*clk;
->> ? ? ? void __iomem ? ?*regbase;
->> ? ? ? struct device ? *dev;
->> + ? ? void ? ? ? ? ? ?*fault_cb_priv;
->>
->> ? ? ? unsigned int ? ?refcount;
->> ? ? ? struct mutex ? ?iommu_lock; ? ? /* global for this whole object */
->> @@ -48,6 +49,7 @@ struct iommu {
->> ? ? ? struct mutex ? ? ? ? ? ?mmap_lock; /* protect mmap */
->>
->> ? ? ? int (*isr)(struct iommu *obj);
->> + ? ? void (*fault_cb)(struct iommu *obj, u32 da, u32 iommu_errs, void *priv);
+>> Why invalidate the cache before starting the DMA?
 >
-> What about making use of (*isr)() for fault call back as well?
+> Think about what happens if you have dirty cache lines in the DMA region.
+> These can be evicted when other cache lines are loaded, which will result
+> in them overwriting contents of memory. ?If the DMA device has already
+> written to that memory, the result is data corruption.
 >
-> Basic concept is that, client can decide how to deal with iommu
-> fault. For example, for advanced case, client wants daynamic loading of
-> TLB(or PTE), or for ISP case, clients just want more appropriate fault
-> reporting. This (*isr)() could be used in such flexibility.
-
-In this case, it seems we can re-use it.
-
+> So, the invalidate prior to DMA is to get rid of any dirty cache lines
+> which could be written back to memory.
 >
-> ? 785 ? * ? ? ?Device IOMMU generic operations
-> ? 786 ? */
-> ? 787 ?static irqreturn_t iommu_fault_handler(int irq, void *data)
-> ? 788 ?{
-> ? 789 ? ? ? ? ?u32 stat, da;
-> ? 790 ? ? ? ? ?u32 *iopgd, *iopte;
-> ? 791 ? ? ? ? ?int err = -EIO;
-> ? 792 ? ? ? ? ?struct iommu *obj = data;
-> ? 793
-> ? 794 ? ? ? ? ?if (!obj->refcount)
-> ? 795 ? ? ? ? ? ? ? ? ?return IRQ_NONE;
-> ? 796
-> ? 797 ? ? ? ? ?/* Dynamic loading TLB or PTE */
-> ? 798 ? ? ? ? ?if (obj->isr)
-> ? 799 ? ? ? ? ? ? ? ? ?err = obj->isr(obj);
-> ? 800
-> ? 801 ? ? ? ? ?if (!err)
-> ? 802 ? ? ? ? ? ? ? ? ?return IRQ_HANDLED;
-> ? 803
-> ? 804 ? ? ? ? ?clk_enable(obj->clk);
-> ? 805 ? ? ? ? ?stat = iommu_report_fault(obj, &da);
-> ? 806 ? ? ? ? ?clk_disable(obj->clk);
-> ? 807 ? ? ? ? ?if (!stat)
-> ? 808 ? ? ? ? ? ? ? ? ?return IRQ_HANDLED;
-> ? 809
-> ? 810 ? ? ? ? ?iommu_disable(obj);
->
-> I guess that this modifying the above code could make (*isr)()
-> flexible to be used for any purpose for clients? For me, having both
-> following may be a bit residual.
+True. In my case write back is disable but read back is enable, that's
+why I didn't consider it.
+Do you think it is feasible to let dma-mapping detect the cache
+configurations in runtime in order to prevent "unnecessary" cache
+operations? I can see some FIXME comments in the code which indicates
+you may have plans to change it.
 
-I agree. We need to add 'void *isr_priv' to iommu struct and the
-function to register isr.
-I'll send a v3 soon.
+I can try to think of a proposal if you agree.
 
-Regards,
-
-David
-
->
->> ? ? ? int (*isr)(struct iommu *obj);
->> + ? ? void (*fault_cb)(struct iommu *obj, u32 da, u32 iommu_errs, void *priv);
->
+Thanks again,
+/Per
