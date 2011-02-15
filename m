@@ -1,47 +1,100 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 15 Feb 2011 23:05:46 +0100
-Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
-In-Reply-To: <AANLkTinA2a60TSM7qDC1LQiRaUTs0DR3bDMv+oVsVOE0@mail.gmail.com>
-References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>	<1296674843-12718-4-git-send-email-omar.ramirez@ti.com>	<4D5943A9.8010205@ti.com>
-	<AANLkTinA2a60TSM7qDC1LQiRaUTs0DR3bDMv+oVsVOE0@mail.gmail.com>
-Message-ID: <4D5AF8BA.8080403@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 15 Feb 2011 15:09:19 -0700
+Subject: [PATCH 1/4] spi/pl022: use dmaengine helper macros
+In-Reply-To: <1297166592-5098-1-git-send-email-linus.walleij@stericsson.com>
+References: <1297166592-5098-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110215220919.GF28005@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Omar,
+On Tue, Feb 08, 2011 at 01:03:12PM +0100, Linus Walleij wrote:
+> This simplifies the DMA code a bit by using the dmaengine helpers.
+> The cookie from descriptor submission can be ignored in this case
+> as has been established in review of the MMCI/PL180 driver.
+> 
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-On 2/15/2011 10:55 PM, Ramirez Luna, Omar wrote:
-> Hi Benoit,
->
-> On Mon, Feb 14, 2011 at 9:00 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->>> +static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
->>> +       { .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
->>
->> The original entry was unnamed since it is an unique entry and thus does not
->> need to be differentiate on this platform.
->>
->>         { .irq = 26 + OMAP44XX_IRQ_GIC_START },
->>
->> Do you really need to have a name here? The strategy being to provide a name
->> only if more than one entry exist.
->> It is perfectibility doable, I'm just trying to understand your rational.
->
-> It is this way instead of plain platform_get_irq because omap2420 has
-> two interrupt sources to MPU and mailbox driver uses
-> platform_get_irq_byname to get the irq number.
+Applied, thanks.
 
-This is what I was thinking, except that on OMAP2420 the names are:
-+	{ .name = "dsp", .irq = 26, },
-+	{ .name = "iva", .irq = 34, },
+g.
 
-and on OMAP2430 and OMAP3
-+	{ .name = "dsp", .irq = 26, },
-
-so why is it named "mbox" on OMAP4?
-
-If you have to do several platform_get_irq_byname to get this one, I'd 
-prefer to get rid of that name for OMAP4. It will make mailbox irq 
-consistent with the other hwmods.
-
-Thanks,
-Benoit
+> ---
+>  drivers/spi/amba-pl022.c |   27 ++++++++++-----------------
+>  1 files changed, 10 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+> index 71a1219..4220aad 100644
+> --- a/drivers/spi/amba-pl022.c
+> +++ b/drivers/spi/amba-pl022.c
+> @@ -917,7 +917,6 @@ static int configure_dma(struct pl022 *pl022)
+>  	struct dma_chan *txchan = pl022->dma_tx_channel;
+>  	struct dma_async_tx_descriptor *rxdesc;
+>  	struct dma_async_tx_descriptor *txdesc;
+> -	dma_cookie_t cookie;
+>  
+>  	/* Check that the channels are available */
+>  	if (!rxchan || !txchan)
+> @@ -962,10 +961,8 @@ static int configure_dma(struct pl022 *pl022)
+>  		tx_conf.dst_addr_width = rx_conf.src_addr_width;
+>  	BUG_ON(rx_conf.src_addr_width != tx_conf.dst_addr_width);
+>  
+> -	rxchan->device->device_control(rxchan, DMA_SLAVE_CONFIG,
+> -				       (unsigned long) &rx_conf);
+> -	txchan->device->device_control(txchan, DMA_SLAVE_CONFIG,
+> -				       (unsigned long) &tx_conf);
+> +	dmaengine_slave_config(rxchan, &rx_conf);
+> +	dmaengine_slave_config(txchan, &tx_conf);
+>  
+>  	/* Create sglists for the transfers */
+>  	pages = (pl022->cur_transfer->len >> PAGE_SHIFT) + 1;
+> @@ -1018,23 +1015,19 @@ static int configure_dma(struct pl022 *pl022)
+>  	rxdesc->callback_param = pl022;
+>  
+>  	/* Submit and fire RX and TX with TX last so we're ready to read! */
+> -	cookie = rxdesc->tx_submit(rxdesc);
+> -	if (dma_submit_error(cookie))
+> -		goto err_submit_rx;
+> -	cookie = txdesc->tx_submit(txdesc);
+> -	if (dma_submit_error(cookie))
+> -		goto err_submit_tx;
+> -	rxchan->device->device_issue_pending(rxchan);
+> -	txchan->device->device_issue_pending(txchan);
+> +	dmaengine_submit(rxdesc);
+> +	dmaengine_submit(txdesc);
+> +	dma_async_issue_pending(rxchan);
+> +	dma_async_issue_pending(txchan);
+>  
+>  	return 0;
+>  
+>  err_submit_tx:
+>  err_submit_rx:
+>  err_txdesc:
+> -	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
+> +	dmaengine_terminate_all(txchan);
+>  err_rxdesc:
+> -	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
+> +	dmaengine_terminate_all(rxchan);
+>  	dma_unmap_sg(txchan->device->dev, pl022->sgt_tx.sgl,
+>  		     pl022->sgt_tx.nents, DMA_TO_DEVICE);
+>  err_tx_sgmap:
+> @@ -1101,8 +1094,8 @@ static void terminate_dma(struct pl022 *pl022)
+>  	struct dma_chan *rxchan = pl022->dma_rx_channel;
+>  	struct dma_chan *txchan = pl022->dma_tx_channel;
+>  
+> -	rxchan->device->device_control(rxchan, DMA_TERMINATE_ALL, 0);
+> -	txchan->device->device_control(txchan, DMA_TERMINATE_ALL, 0);
+> +	dmaengine_terminate_all(rxchan);
+> +	dmaengine_terminate_all(txchan);
+>  	unmap_free_dma_scatter(pl022);
+>  }
+>  
+> -- 
+> 1.7.3.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
