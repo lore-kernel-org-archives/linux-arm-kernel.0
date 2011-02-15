@@ -1,33 +1,55 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Tue, 15 Feb 2011 15:55:41 -0600
-Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
-In-Reply-To: <4D5943A9.8010205@ti.com>
-References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
-	<1296674843-12718-4-git-send-email-omar.ramirez@ti.com>
-	<4D5943A9.8010205@ti.com>
-Message-ID: <AANLkTinA2a60TSM7qDC1LQiRaUTs0DR3bDMv+oVsVOE0@mail.gmail.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Tue, 15 Feb 2011 13:56:47 -0800
+Subject: [PATCH 2/4] arm: V2 configs: update pxa168 defconfig for SoC
+	Selection
+Message-ID: <15EF0652-2088-4876-AF9D-CDAC8E423CA8@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+V2
+==
+Use make savedefconfigconfig to produce reduced size defconfig
+per suggestion of Nico Pitre.
 
-On Mon, Feb 14, 2011 at 9:00 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> +static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
->> + ? ? ? { .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
->
-> The original entry was unnamed since it is an unique entry and thus does not
-> need to be differentiate on this platform.
->
-> ? ? ? ?{ .irq = 26 + OMAP44XX_IRQ_GIC_START },
->
-> Do you really need to have a name here? The strategy being to provide a name
-> only if more than one entry exist.
-> It is perfectibility doable, I'm just trying to understand your rational.
+V1
+took old pxa168_defconfig --
+did make menuconfig
 
-It is this way instead of plain platform_get_irq because omap2420 has
-two interrupt sources to MPU and mailbox driver uses
-platform_get_irq_byname to get the irq number.
+Signed-off-by: Philip Rakity <prakity@marvell.com>
+---
+ arch/arm/configs/pxa168_defconfig |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-Regards,
-
-Omar
+diff --git a/arch/arm/configs/pxa168_defconfig b/arch/arm/configs/pxa168_defconfig
+index 74d7e01..b07eb58 100644
+--- a/arch/arm/configs/pxa168_defconfig
++++ b/arch/arm/configs/pxa168_defconfig
+@@ -1,7 +1,6 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+@@ -30,7 +29,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ # CONFIG_STANDALONE is not set
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
+ # CONFIG_BLK_DEV is not set
+-# CONFIG_MISC_DEVICES is not set
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_SMC91X=y
+@@ -45,10 +43,8 @@ CONFIG_SERIAL_PXA_CONSOLE=y
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_HWMON is not set
+-# CONFIG_VGA_CONSOLE is not set
+ # CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+-CONFIG_INOTIFY=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_CRAMFS=y
+-- 
+1.7.0.4
