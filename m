@@ -1,101 +1,137 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 15 Feb 2011 14:43:05 +1300
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <201102150936.26110.jeremy.kerr@canonical.com>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<4D52F73A.4010707@bluewatersys.com>
-	<201102150936.26110.jeremy.kerr@canonical.com>
-Message-ID: <4D59DA29.6070501@bluewatersys.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Tue, 15 Feb 2011 10:52:09 +0900
+Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
+	ARCH_EXYNOS4 from ARCH_S5PV310
+In-Reply-To: <AANLkTimOqg4XGMv+Gsarpa9U56MB3hxewhZxznHpx4-u@mail.gmail.com>
+References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTim49dpC_r4BcK7tqo9wmu8W=qMDZE5szDUja6Wo@mail.gmail.com>
+	<002d01cbcca2$5900e430$0b02ac90$@com>
+	<AANLkTimOqg4XGMv+Gsarpa9U56MB3hxewhZxznHpx4-u@mail.gmail.com>
+Message-ID: <003301cbccb2$f8511720$e8f34560$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2011 02:36 PM, Jeremy Kerr wrote:
-> Hi Ryan,
-> 
->>> +int clk_enable(struct clk *clk)
->>> +{
->>> +	unsigned long flags;
->>> +	int ret = 0;
->>> +
->>> +	spin_lock_irqsave(&clk->enable_lock, flags);
->>
->> 	WARN_ON(clk->prepare_count == 0); ?
-> 
-> Added later, but yes.
+Hi,
 
-Okay, but still failing to understand why this isn't it the first patch.
-You are introducing a new file after all.
-
->>
->>> +	if (clk->enable_count == 0 && clk->ops->enable)
->>> +		ret = clk->ops->enable(clk);
->>
->> Does it make sense to have a clock with no enable function which still
->> returns success from clk_enable? Do we have any platforms which have
->> NULL clk_enable functions?
+On Monday, February 14, 2011 8:16 PM, Kyungmin Park wrote:
+> > Hi,
+> > I answer your questions in detail.
+> >
+> >> On Monday, February 14, 2011 8:16 PM, Kyungmin Park wrote:
+> >>
+> >> Hi,
+> >>
+> >> Wow, fast move, but need to more explanation.
+> >> what's the exact meaning of exynos4210?
+> >> Exynos4 is prefix and remaining are variants?
+> >
+> > Exynos4210 means below.
+> >
+> > 1st digit means ARM core version. In this case, 4 means Cortex A9.
+> > (If we release cortex A15, it will be Exynos5xxx)
+> > 2nd digit means number of core. ?2 mean dual core.
+> > 3rd digit means application category(LSI internal category).
+> > 4th digit means design rule (generation or shrink version)
 > 
-> It does, yes. Driver code should be always be calling clk_enable before using 
-> a clock, regardless of the implementation (which it shouldn't have to care 
-> abut), and should abort their initialisation if the clk_enable() fails.
+> Nice, I want these rules.
+> >
+> >> Now you changed all s5pv310 to exynos4. if new exynos4xxx chip are
+> >> comes then how to handle this one?
+> >> e.g., exynos4220 or later.
+> >> it's also conflict with mach-exynos4. do you handle all exynos4 series
+> >> at this mach directory?
+> >> historically there's no rules of the base RAM address at least samsung
+> >> chips.
+> >
+> > Yes, we will handle all exynos4 series at mach-exynos4 directory.
+> > In the past, there is no rule.
+> > But now, we are making consistent rules with AP design team.
+> > So, new version of exynos4 series will have same base RAM address.
 > 
-> Some clocks are always running, so the enable op will be empty. This is not an 
-> error, so the driver is free to continue.
+> Okay, no problem with base ram address,
 > 
->> I think that for enable/disable at least we should require platforms to
->> provide functions and oops if they have failed to do so. In the rare
->> case that a platform doesn't need to do anything for enable/disable they
->> can just supply empty functions.
+> Another one is how do you handle the GPIOs?
+> Now it's also changed as EXYNOS4_GPXX, I think it's difficult to use
+> the same banks as exynos4210 has if new chips are introduced.
+> maybe IRQ also has similar issue.
+
+We already had reviewed your concern before.
+S5P6450 and S5P6440 is basically same processor. 
+But GPIO, IRQ and some peripheral is little different.
+We can handle that by checking each processors chipid.
+
+Please check the below patch.
+http://www.spinics.net/lists/linux-samsung-soc/msg03530.html
+
+Thanks and regards,
+Sangbeom Kim
 > 
-> Sounds like useless boilerplate - it's not an error to not need 
-> enable/disable, so I don't see why we need to add extra effort to handle this 
-> case.
-
-I have been convinced that enable/prepare potentially being NULL
-callbacks is valid :-).
-
+> Now these patches assumes all exynos4 has same gpios, irqs and so on.
 > 
->>> +/**
->>> + * __clk_get - acquire a reference to a clock
->>> + *
->>> + * @clk: The clock to refcount
->>> + *
->>> + * Before a clock is returned from clk_get, this function should be
->>> called + * to update any clock-specific refcounting.
->>
->> This is a bit misleading. It's not "should be called", it "is called". I
->> think you should just remove the documentation for __clk_get/__clk_put
->> or move it into clk.c since the functions are only used internally by
->> the common clock code.
+> How do you think about it?
 > 
-> It'd be nice to remove this from the header, but this means we'll need extern 
-> prototypes in clkdev.c. Might be a reasonable compromise though.
-
-That's probably a better approach anyway, since that makes it blatantly
-obvious that the __clk_get and __clk_put functions should not be called
-from anywhere except clkdev.c.
-
-> 
->>> +/**
->>> + * clk_prepare - prepare clock for atomic enabling.
->>> + *
->>> + * @clk: The clock to prepare
->>> + *
->>> + * Do any blocking initialisation on @clk, allowing the clock to be
->>> later + * enabled atomically (via clk_enable). This function may sleep.
->>
->> "Possibly blocking" as below?
-> 
-> Yep, will unify these (and spell "possibly" correctly :) )
-
-:-)
-
-~Ryan
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+> Thank you,
+> Kyungmin Park
+> >
+> > Thanks and regards,
+> > Sangbeom Kim
+> >
+> >>
+> >> Thank you,
+> >> Kyungmin Park
+> >>
+> >> On Mon, Feb 14, 2011 at 5:22 PM, Kukjin Kim <kgene.kim@samsung.com>
+> wrote:
+> >> > This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for
+> supporting
+> >> Samsung's
+> >> > new brand name EXYNOS. Samsung officially announced about the brand
+> name
+> >> of EXYNOS
+> >> > at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor
+> >> with several
+> >> > other peripherals to support features such as multimedai, storage,
+> >> graphics and gaming.
+> >> > Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can
+> be
+> >> used in
+> >> > products such as Mobile devices.
+> >> >
+> >> > This patch set consists of the following patches.
+> >> >
+> >> > [PATCH 01/11] ARM: EXYNOS4: Add EXYNOS4 CPU initialization support
+> >> > [PATCH 02/11] ARM: EXYNOS4: Update Clock part
+> >> > [PATCH 03/11] ARM: EXYNOS4: Update IRQ part
+> >> > [PATCH 04/11] ARM: EXYNOS4: Update Timer part
+> >> > [PATCH 05/11] ARM: EXYNOS4: Update device support
+> >> > [PATCH 06/11] ARM: EXYNOS4: Moved board support files
+> >> > [PATCH 07/11] ARM: EXYNOS4: Update Kconfig and Makefile for the new
+> >> ARCH_EXYNOS4
+> >> > [PATCH 08/11] ARM: exynos4_defconfig: Add defconfig for EXYNOS4
+> >> > [PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
+> >> > [PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
+> >> > [PATCH 11/11] tty: Change dependency of ARCH_EXYNOS4
+> >> >
+> >> > _______________________________________________
+> >> > linux-arm-kernel mailing list
+> >> > linux-arm-kernel at lists.infradead.org
+> >> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >> >
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-
+> samsung-
+> >> soc" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+> soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
