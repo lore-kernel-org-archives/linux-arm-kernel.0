@@ -1,40 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Feb 2011 13:37:07 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <1297773569.14691.36.camel@e102109-lin.cambridge.arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
-	<20110212102803.GC15616@n2100.arm.linux.org.uk>
-	<1297770742.21448.2.camel@e102144-lin.cambridge.arm.com>
-	<20110215123522.GH4152@n2100.arm.linux.org.uk>
-	<1297773569.14691.36.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <1297777027.1293.2.camel@e102144-lin.cambridge.arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 15 Feb 2011 16:38:32 +0300
+Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
+	dev_dbg()
+In-Reply-To: <1297776033-8579-2-git-send-email-dacohen@gmail.com>
+References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
+	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
+Message-ID: <4D5A81D8.2080800@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-02-15 at 12:39 +0000, Catalin Marinas wrote:
-> On Tue, 2011-02-15 at 12:35 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 15, 2011 at 11:52:22AM +0000, Will Deacon wrote:
-> > > Excellent! I've split the patch up into four distinct parts, as per your
-> > > suggestions. I've submitted these to your patch system (6670/1-6673/1)
-> > > alongside a fixed version of the printf format patch (6669/1) because
-> > > without that, you get a bunch of compiler warnings.
-> >
-> > Except 6669/1 still suffers from "%#08llx".  For a value of one, that prints:
-> >
-> >         0x000001
-> >
-> > five zeros following the 0x rather than seven.  The width in the format
-> > string includes the 0x prefix.
-> 
-> Ah, sorry, I only fixed one case and forgot about the rest (and
-> misleading Will).
-> 
+Hello.
 
-I should've spotted this either way. I've superseded the old patch with
-6674/1.
+On 15-02-2011 16:20, David Cohen wrote:
 
-Apologies for the confusion,
+> IOMMU upper layer is already printing error message. OMAP2+ specific
+> layer may print error message only for debug purpose.
 
-Will
+> Signed-off-by: David Cohen<dacohen@gmail.com>
+> ---
+>   arch/arm/mach-omap2/iommu2.c |    6 +++---
+>   1 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
+> index 14ee686..4244a07 100644
+> --- a/arch/arm/mach-omap2/iommu2.c
+> +++ b/arch/arm/mach-omap2/iommu2.c
+> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
+>   	da = iommu_read_reg(obj, MMU_FAULT_AD);
+>   	*ra = da;
+>
+> -	dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
+> +	dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
+
+    Note that dev_dbg() will only print something if either DEBUG or 
+CONFIG_DYNAMIC_DEBUG are defined...
+
+>
+>   	for (i = 0; i<  ARRAY_SIZE(err_msg); i++) {
+>   		if (stat & (1<<  i))
+> -			printk("%s ", err_msg[i]);
+> +			printk(KERN_DEBUG "%s ", err_msg[i]);
+
+    ... unlike printk(KERN_DEBUG...). You probably want to use pr_debug() instead.
+
+>   	}
+> -	printk("\n");
+> +	printk(KERN_DEBUG "\n");
+
+    Here too... Although wait, it should be KERN_CONT instead! Debug levels 
+are only attributed to the whole lines.
+
+WBR, Sergei
