@@ -1,128 +1,80 @@
 From: shweta.gulati@ti.com (Shweta Gulati)
-Date: Tue, 15 Feb 2011 13:28:58 +0530
-Subject: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on TWL
-Message-ID: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
+Date: Tue, 15 Feb 2011 13:40:30 +0530
+Subject: [PATCH] OMAP: Fix Memory Leaks in Smartreflex driver
+Message-ID: <1297757430-3059-1-git-send-email-shweta.gulati@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thara Gopinath <thara@ti.com>
+This Patch frees all the dynamically allocated memory
+which couldn't have been released in some error hitting cases.
 
-Voltage control on TWL can be done using VMODE/I2C1/I2C_SR.
-Since almost all platforms use I2C_SR on omap3, omap3_twl_init by
-default expects that OMAP's I2C_SR is plugged in to TWL's I2C
-and calls omap3_twl_set_sr_bit. On platforms where I2C_SR is not connected,
-the board files are expected to call omap3_twl_set_sr_bit(false) to
-ensure that I2C_SR path is not set for voltage control and prevent
-the default behavior of omap3_twl_init.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Thara Gopinath <thara@ti.com>
 Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
-This patch is based on LO PM Branch and Smartreflex has been
-tested on OMAP3430 SDP, OMAP3630 SDP and boot tested on
-OMAP2430 SDP.
+ arch/arm/mach-omap2/smartreflex.c |   18 ++++++++++++------
+ 1 files changed, 12 insertions(+), 6 deletions(-)
 
- arch/arm/mach-omap2/omap_twl.c |   60 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/pm.h       |    1 +
- 2 files changed, 61 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 00e1d2b..b341c36 100644
---- a/arch/arm/mach-omap2/omap_twl.c
-+++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -59,8 +59,15 @@
- 
- static bool is_offset_valid;
- static u8 smps_offset;
-+/*
-+ * Flag to ensure Smartreflex bit in TWL
-+ * being cleared in board file is not overwritten.
-+ */
-+static bool __initdata twl_sr_enable_autoinit;
- 
-+#define TWL4030_DCDC_GLOBAL_CFG        0x06
- #define REG_SMPS_OFFSET         0xE0
-+#define SMARTREFLEX_ENABLE     BIT(3)
- 
- static unsigned long twl4030_vsel_to_uv(const u8 vsel)
- {
-@@ -269,6 +276,18 @@ int __init omap3_twl_init(void)
- 		omap3_core_volt_info.vp_vddmax = OMAP3630_VP2_VLIMITTO_VDDMAX;
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index a1f532e..5af8829 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -284,6 +284,7 @@ error:
+ 		dev_err(&sr_info->pdev->dev, "%s: ERROR in registering"
+ 			"interrupt handler. Smartreflex will"
+ 			"not function as desired\n", __func__);
++		kfree(name);
+ 		kfree(sr_info);
+ 		return ret;
+ }
+@@ -881,7 +882,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 		ret = sr_late_init(sr_info);
+ 		if (ret) {
+ 			pr_warning("%s: Error in SR late init\n", __func__);
+-			return ret;
++			goto err_release_region;
+ 		}
  	}
  
-+	/*
-+	 * The smartreflex bit on twl4030 specifies if the setting of voltage
-+	 * is done over the I2C_SR path. Since this setting is independent of
-+	 * the actual usage of smartreflex AVS module, we enable TWL SR bit
-+	 * by default irrespective of whether smartreflex AVS module is enabled
-+	 * on the OMAP side or not. This is because without this bit enabled,
-+	 * the voltage scaling through vp forceupdate/bypass mechanism of
-+	 * voltage scaling will not function on TWL over I2C_SR.
-+	 */
-+	if (!twl_sr_enable_autoinit)
-+		omap3_twl_set_sr_bit(true);
-+
- 	voltdm = omap_voltage_domain_lookup("mpu");
- 	omap_voltage_register_pmic(voltdm, &omap3_mpu_volt_info);
- 
-@@ -277,3 +296,44 @@ int __init omap3_twl_init(void)
- 
- 	return 0;
- }
-+
-+/**
-+ * omap3_twl_set_sr_bit() - Set/Clear SR bit on TWL
-+ * @enable: enable SR mode in twl or not
-+ *
-+ * If 'enable' is true, enables Smartreflex bit on TWL 4030 to make sure
-+ * voltage scaling through OMAP SR works. Else, the smartreflex bit
-+ * on twl4030 is cleared as there are platforms which use OMAP3 and T2 but
-+ * use Synchronized Scaling Hardware Strategy (ENABLE_VMODE=1) and Direct
-+ * Strategy Software Scaling Mode (ENABLE_VMODE=0), for setting the voltages,
-+ * in those scenarios this bit is to be cleared (enable = false).
-+ *
-+ * Returns 0 on sucess, error is returned if I2C read/write fails.
-+ */
-+int __init omap3_twl_set_sr_bit(bool enable)
-+{
-+	u8 temp;
-+	int ret;
-+	if (twl_sr_enable_autoinit)
-+		pr_warning("%s: unexpected multiple calls\n", __func__);
-+
-+	ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
-+					TWL4030_DCDC_GLOBAL_CFG);
-+	if (ret)
-+		goto err;
-+
-+	if (enable)
-+		temp |= SMARTREFLEX_ENABLE;
-+	else
-+		temp &= ~SMARTREFLEX_ENABLE;
-+
-+	ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
-+				TWL4030_DCDC_GLOBAL_CFG);
-+	if (!ret) {
-+		twl_sr_enable_autoinit = true;
-+		return 0;
+@@ -892,14 +893,17 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 	 * not try to create rest of the debugfs entries.
+ 	 */
+ 	vdd_dbg_dir = omap_voltage_get_dbgdir(sr_info->voltdm);
+-	if (!vdd_dbg_dir)
+-		return -EINVAL;
++	if (!vdd_dbg_dir) {
++		ret = -EINVAL;
++		goto err_release_region;
 +	}
-+err:
-+	pr_err("%s: Error access to TWL4030 (%d)\n", __func__, ret);
-+	return ret;
-+}
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 39580e6..797bfd1 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -127,6 +127,7 @@ static inline void omap_enable_smartreflex_on_init(void) {}
- #ifdef CONFIG_TWL4030_CORE
- extern int omap3_twl_init(void);
- extern int omap4_twl_init(void);
-+extern int omap3_twl_set_sr_bit(bool enable);
- #else
- static inline int omap3_twl_init(void)
- {
+ 
+ 	dbg_dir = debugfs_create_dir("smartreflex", vdd_dbg_dir);
+ 	if (IS_ERR(dbg_dir)) {
+ 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
+ 			__func__);
+-		return PTR_ERR(dbg_dir);
++		ret = PTR_ERR(dbg_dir);
++		goto err_release_region;
+ 	}
+ 
+ 	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR, dbg_dir,
+@@ -915,7 +919,8 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 	if (IS_ERR(nvalue_dir)) {
+ 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"
+ 			"for n-values\n", __func__);
+-		return PTR_ERR(nvalue_dir);
++		ret = PTR_ERR(nvalue_dir);
++		goto err_release_region;
+ 	}
+ 
+ 	omap_voltage_get_volttable(sr_info->voltdm, &volt_data);
+@@ -924,7 +929,8 @@ static int __init omap_sr_probe(struct platform_device *pdev)
+ 			" corresponding vdd vdd_%s. Cannot create debugfs"
+ 			"entries for n-values\n",
+ 			__func__, sr_info->voltdm->name);
+-		return -ENODATA;
++		ret = -ENODATA;
++		goto err_release_region;
+ 	}
+ 
+ 	for (i = 0; i < sr_info->nvalue_count; i++) {
 -- 
 1.7.0.4
