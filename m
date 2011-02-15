@@ -1,68 +1,30 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Tue, 15 Feb 2011 16:21:28 +0200
-Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
-	dev_dbg()
-In-Reply-To: <AANLkTim3+PFgJUU_-YqOt1M5NkSyHo6wUwF_XwC9MWSP@mail.gmail.com>
-References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
-	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
-	<4D5A81D8.2080800@ru.mvista.com>
-	<AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
-	<20110215155948.32b564d5.jhnikula@gmail.com>
-	<AANLkTim3+PFgJUU_-YqOt1M5NkSyHo6wUwF_XwC9MWSP@mail.gmail.com>
-Message-ID: <AANLkTimCnK3gia4=EQ4ZDhhwgned3J0OGM+1Sqo_+e=t@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Feb 2011 14:23:39 +0000
+Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
+	unsigned long for physical addresses
+In-Reply-To: <1297777027.1293.2.camel@e102144-lin.cambridge.arm.com>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+	<20110212102803.GC15616@n2100.arm.linux.org.uk>
+	<1297770742.21448.2.camel@e102144-lin.cambridge.arm.com>
+	<20110215123522.GH4152@n2100.arm.linux.org.uk>
+	<1297773569.14691.36.camel@e102109-lin.cambridge.arm.com>
+	<1297777027.1293.2.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <20110215142339.GL4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 4:08 PM, David Cohen <dacohen@gmail.com> wrote:
-> On Tue, Feb 15, 2011 at 3:59 PM, Jarkko Nikula <jhnikula@gmail.com> wrote:
->> On Tue, 15 Feb 2011 15:44:27 +0200
->> David Cohen <dacohen@gmail.com> wrote:
->>
->>> >> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj,
->>> >> u32 *ra)
->>> >> ? ? ? ?da = iommu_read_reg(obj, MMU_FAULT_AD);
->>> >> ? ? ? ?*ra = da;
->>> >>
->>> >> - ? ? ? dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
->>> >> + ? ? ? dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
->>> >
->>> > ? Note that dev_dbg() will only print something if either DEBUG or
->>> > CONFIG_DYNAMIC_DEBUG are defined...
->>>
->>> That's my plan.
->>>
->> So it's sure that a developer won't need these error dumps when
->> receiving an error report? I.e. IOMMU upper level errors give enough
->> information to start doing own debugging?
->
-> Yes, developers do need this information.
-> But it's a bit useless tell only we've got an iommu fault, due to many
-> places might be causing it. My purpose is to let the debug
-> responsibility to IOMMU users. They have access to the iovmm layer as
-> well and can provide a much more useful information.
-> e.g. OMAP3 ISP has many submodules using IOMMU. With a fault callback,
-> it can dump all the iovm areas and the faulty 'da' too. It might
-> indicate which submodule was responsible for the issue.
->
-> Of course we can just let this debug messages the way they are and
-> print this redundant information. But IMO it's not necessary.
+On Tue, Feb 15, 2011 at 01:37:07PM +0000, Will Deacon wrote:
+> I should've spotted this either way. I've superseded the old patch with
+> 6674/1.
 
-Indeed, we can leave this discussion for future. My main purpose now
-is the fault callback. I'll drop this patch 1/2 for now.
+One additional thing that I think has been lost.  I said in the original
+reply to Catalin:
+| asm/memory.h will conflict non-trivially with p2v patch set, but I think
+| we can merge the changes to everything but __virt_to_phys/__phys_to_virt.
 
-Regards,
+So 6670/1 which I'm intending to apply to the p2v branch can't be merged
+as-is.  The ideal solution would be a version of 6670/1 to apply on top
+of the existing p2v branch.
 
-David
-
->
-> Regards,
->
-> David
->
->>
->> Just my 2 cents.
->>
->> --
->> Jarkko
->>
->
+Thanks.
