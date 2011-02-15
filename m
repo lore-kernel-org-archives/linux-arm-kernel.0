@@ -1,44 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Feb 2011 18:16:56 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTinPtiwXmtRy9qS2zZXwuhQDOyO-H8-wmF=fSNnJ@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102142122.54766.arnd@arndb.de>
-	<AANLkTinPtiwXmtRy9qS2zZXwuhQDOyO-H8-wmF=fSNnJ@mail.gmail.com>
-Message-ID: <201102151816.57104.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Feb 2011 17:19:17 +0000
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110215171341.GD10770@pengutronix.de>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165958.GH10709@pengutronix.de>
+	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
+	<20110215171341.GD10770@pengutronix.de>
+Message-ID: <20110215171917.GQ4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 February 2011, Andrei Warkentin wrote:
-> > There are multiple ways how this could be implemented:
-> >
-> > 1. Have one exception cache for all "special" blocks. This would normally
-> >   be for FAT32 subdirectory updates, which always write to the same
-> >   few blocks. This means you can do small writes efficiently anywhere
-> >   on the card, but only up to a (small) fixed number of block addresses.
-> >   If you overflow the table, the card still needs to go through an
-> >   extra PE for each new entry you write, in order to free up an entry.
-> >
-> > 2. Have a small number of AUs that can be in a special mode with efficient
-> >   small writes but inefficient large writes. This means that when you
-> >   alternate between small and large writes in the same AU, it has to go
-> >   through a PE on every switch. Similarly, if you do small writes to
-> >   more than the maximum number of AUs that can be held in this mode, you
-> >   get the same effect. This number can be as small as one, because that
-> >   is what FAT32 requires.
-> >
-> > In both cases, you don't actually have a solution for the problem, you just
-> > make it less likely for specific workloads.
+On Tue, Feb 15, 2011 at 06:13:41PM +0100, Wolfram Sang wrote:
 > 
-> Aha, ok. By the way, I did find out that either suggestion works. So
-> I'll pull out the reversing portion of the patch. No need to
-> overcomplicate :).
+> > Ah, yes.  I can also see the problem here after turning on
+> > DEBUG_SPINLOCK.
+> 
+> Ah, okay. After turning it off, it works a lot better :)
 
-BTW, what file system are you using? I could imagine that each of ext4, btrfs
-and nilfs2 give you very different results here. It could be that if your
-patch is optimizing for one file system, it is actually pessimising for
-another one.
+That doesn't mean the problem is fixed.  The spinlock debugging is there
+to find broken code, and it's saying that the code is broken, and in
+this case its saying that there's potential for deadlock.
 
-What benchmark do you use to find out of your optimizations actually help you?
+> MMC fails for me (note: the card works fine with an mx35-based board)
+> 
+> 	mmc0: new high speed MMC card at address 0001
+> 	mmcblk0: mmc0:0001 AF HMP 247 MiB 
+> 	mmcblk0: retrying using single block read
+> 	mmcblk0: error -84 transferring data, sector 0, nr 8, card status 0x900
+> 	end_request: I/O error, dev mmcblk0, sector 0
 
-	Arnd
+EILSEQ means CRC failure.  Probably unrelated.
+
+> SDIO card locks the machine. Is it supposed to work already?
+
+Guess it's the spinlock causing that problem.
