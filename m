@@ -1,75 +1,76 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 15 Feb 2011 10:41:21 +0200
-Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
-In-Reply-To: <AANLkTi=AfxN73pSNZ5RiTiTWfxR7PhcyJUyXzzeaYNWw@mail.gmail.com>
-References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
-	<AANLkTi=AfxN73pSNZ5RiTiTWfxR7PhcyJUyXzzeaYNWw@mail.gmail.com>
-Message-ID: <201102151041.21560.anarsoul@gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 15 Feb 2011 09:54:09 +0100
+Subject: [PATCH v2] ARM: S5PV210: Add GONI board setup for CIF camera
+	support
+In-Reply-To: <008d01cbccd4$3897da00$a9c78e00$%kim@samsung.com>
+References: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
+	<008d01cbccd4$3897da00$a9c78e00$%kim@samsung.com>
+Message-ID: <4D5A3F31.1070106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 February 2011 09:35:44 Eric Miao wrote:
+Hi Kukjin,
 
-> Or maybe simply:
+On 02/15/2011 06:50 AM, Kukjin Kim wrote:
+> Sylwester Nawrocki wrote:
+>>
+>> Hello,
+>>
+> Hi,
 > 
-> 	if (lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN)
-> 		return;
+>> the following patch series introduces changes in GONI board setup file
+>> required for the CIF camera sensor driver.
+>> The first patch adds the I2C0 bus driver, the second one adds the
+> regulator
+>> supply definitions and the third one just increases virtual size
+>> of the framebuffer window 0 to enable double-buffering.
+>> The added regulator supplies are also a subset of the supplies of the high
+>> resolution camera which that reference board is equipped with.
+>>
+>> Changes since v1:
+>>  - removed unnecessary "select CONFIG_S3C_DEV_I2C0"
+>>
+>>
+>> The patch series contains:
+>>
+>> [PATCH 1/3] ARM: S5PV210: Enable I2C0 bus on GONI board
+>> [PATCH 2/3] ARM: S5PV210: Add supplies for CIF camera on GONI board
+>> [PATCH 3/3] ARM: S5PV210: Change framebuffer window 0 size on GONI
+>>
+>> Created against for-next branch at:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+>>
+> Hmm...looks you don't want to follow my suggestion on 2nd patch.
 
-You mean if (!lcd_readl.....) return? Then OK.
+I've attempted to make a change as you suggested but it turned out
+that all regulators I'm adding supplies for in the second patch are
+also used by the other, high resolution camera. It's not about I don't
+want to follow you suggestions. The argument is that I's like to add shortly
+support for the other camera and then the patch would be just one line
+per a power supply rather than 4. I really don't mind to adhere to your
+preferred style. But in this case it would be just more work to revert
+things back and forth.
 
-> this makes this block of change much cleaner.
+I've boot tested your patch:
+ARM: S5PV210: Use REGULATOR_SUPPLY macro for regulator consumers
+on Aquila and GONI board altogether with my changeset.
+
 > 
-> > -       lcd_writel(ofb->fbi, OVL1C1, ofb->control[0] & ~OVLxC1_OEN);
-> > +       if (lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN) {
-> > +               lcd_writel(ofb->fbi, OVL1C1, ofb->control[0] &
-
-<skip>
-
-> >  static struct pxafb_layer_ops ofb_ops[] = {
-> > @@ -720,12 +726,10 @@ static int overlayfb_open(struct fb_info *info, int
-> > user) if (user == 0)
-> >                return -ENODEV;
-> > 
-> > -       /* allow only one user at a time */
-> > -       if (atomic_inc_and_test(&ofb->usage))
-> > -               return -EBUSY;
-> > +       if (ofb->usage++ == 0)
-> > +               /* unblank the base framebuffer */
-> > +               fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+> I'm still wondering why array is needed for just one member in
+> regulator_consumer_supply structure now even though other something will be
+> added later.
 > 
-> The change above allows multiple user at a time? Then I guess
-> some other places need to be changed accordingly to avoid the
-> racing conditions.
+> Nevertheless will apply your 3 patches but if not required array will be
+> removed later.
 
-For multiple users driver needs some rework indeed.
+Thanks! I am going to post further patches for this board soon so there
+should be no need to change anything. Please use you time for more important
+things ;)
 
-> If this is a feature request, can we postpone it to subsequent
-> patches?
+I've noticed one issue with the first patch, i.e. Kyungmin's email address
+is broken. Should I resend the patch or could you please correct this on your side?
 
-I prefer to fix it later.
-
-> >        lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
-> > -       lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
-> > +       if (fbi->lccr0 & LCCR0_SDS)
-> > +               lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
-> 
-> My original intention was to simplify the code a bit by ignoring
-> LCCR0_SDS, as FDADR1 would not take effect if not enabled even
-> if it's being read/written.
-
-It leads to potential race condition when you try to reconfigure main plane 
-and overlay1 simultaneously.
-
-> > +#ifdef CONFIG_FB_PXA_OVERLAY
-> > +       if (cpu_is_pxa27x())
-> > +               fbi->lccr0 |= LCCR0_OUC;
-> > +#endif
-> > +
-> 
-> I seem to remember LCCR0_OUC is still valid on pxa3xx, did you
-> do some test on pxa3xx as well?
-
-Sorry, I have no any pxa3xx boards.
- 
-Regards
-Vasily
+Thanks,
+-- 
+Sylwester Nawrocki
+Samsung Poland R&D Center
