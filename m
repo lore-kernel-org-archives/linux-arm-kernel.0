@@ -1,41 +1,28 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 15 Feb 2011 17:18:00 +0200
-Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
-In-Reply-To: <AANLkTimapyDg0G0k2GfTdQ6RcUs9oUxXmHGMWoDhaZED@mail.gmail.com>
-References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
-	<201102151551.20080.anarsoul@gmail.com>
-	<AANLkTimapyDg0G0k2GfTdQ6RcUs9oUxXmHGMWoDhaZED@mail.gmail.com>
-Message-ID: <201102151718.00800.anarsoul@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Feb 2011 15:24:06 +0000
+Subject: [PATCH v4 16/19] ARM: LPAE: Use generic dma_addr_t type definition
+In-Reply-To: <20110215142730.GM4152@n2100.arm.linux.org.uk>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
+	<20110212103413.GD15616@n2100.arm.linux.org.uk>
+	<1297688490.31111.38.camel@e102109-lin.cambridge.arm.com>
+	<20110215142730.GM4152@n2100.arm.linux.org.uk>
+Message-ID: <1297783446.14691.167.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 February 2011 17:12:10 Eric Miao wrote:
-> On Tue, Feb 15, 2011 at 9:51 PM, Vasily Khoruzhick <anarsoul@gmail.com> 
-wrote:
-> > On Tuesday 15 February 2011 15:36:07 you wrote:
-> >> Then maybe in this way? (I'd rather keep this bit in overlay specific
-> >> code, and make it valid not only to pxa27x)
-> >> 
-> >> @@ -925,6 +925,8 @@ static int __devinit pxafb_overlay_init(struct
-> >> pxafb_info *fbi)
-> >> 
-> >>         /* place overlay(s) on top of base */
-> >>         fbi->lccr0 |= LCCR0_OUC;
-> >> +       lcd_writel(fbi, LCCR0, fbi->lccr0 & ~LCCR0_ENB);
-> >> +
-> >>         pr_info("PXA Overlay driver loaded successfully!\n");
-> >>         return 0;
-> > 
-> > I tried it, it doesn't work that way (I got garbage on screen). Maybe
-> > it's not right time to modify LCCR0 reg?
+On Tue, 2011-02-15 at 14:27 +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 14, 2011 at 01:01:30PM +0000, Catalin Marinas wrote:
+> > Maybe we could make the dma_addr_t size configurable (and disabled by
+> > default) since I expect there'll be platforms capable of >32-bit DMA.
 > 
-> I guess that's because OUC bit needs to be set when the panel is
-> not enabled. But re-enabling here is a bit hackish as well.
-> 
-> I don't mind move the code a bit, but can we separate this change
-> into another patch from the rest?
+> It would be far better to fix the dma_addr_t abuses.
 
-Ok, will send patches tonight
+That's not a simple task, I have no idea how many drivers get used on
+ARM systems. We can defer this until people start using Cortex-A15 in
+real hardware and only fix the drivers they need.
 
-> Thanks
-> - eric
+BTW, can sparse help here (I haven't used it much)?
+
+-- 
+Catalin
