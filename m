@@ -1,46 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 14:29:23 +0000
-Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
-	dev_dbg()
-In-Reply-To: <4D5A81D8.2080800@ru.mvista.com>
-References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
-	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
-	<4D5A81D8.2080800@ru.mvista.com>
-Message-ID: <20110215142923.GC11199@n2100.arm.linux.org.uk>
+From: dacohen@gmail.com (David Cohen)
+Date: Tue, 15 Feb 2011 16:36:30 +0200
+Subject: [PATCH v2 0/1] OMAP: IOMMU fault callback support
+Message-ID: <1297780591-15613-1-git-send-email-dacohen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 04:38:32PM +0300, Sergei Shtylyov wrote:
->> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
->> index 14ee686..4244a07 100644
->> --- a/arch/arm/mach-omap2/iommu2.c
->> +++ b/arch/arm/mach-omap2/iommu2.c
->> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->>   	da = iommu_read_reg(obj, MMU_FAULT_AD);
->>   	*ra = da;
->>
->> -	dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
->> +	dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
->
->    Note that dev_dbg() will only print something if either DEBUG or  
-> CONFIG_DYNAMIC_DEBUG are defined...
->
->>
->>   	for (i = 0; i<  ARRAY_SIZE(err_msg); i++) {
->>   		if (stat & (1<<  i))
->> -			printk("%s ", err_msg[i]);
->> +			printk(KERN_DEBUG "%s ", err_msg[i]);
->
->    ... unlike printk(KERN_DEBUG...). You probably want to use pr_debug() instead.
+Hi,
 
-No - this isn't starting a new line.  pr_cont() here.
+v2:
 
->>   	}
->> -	printk("\n");
->> +	printk(KERN_DEBUG "\n");
->
->    Here too... Although wait, it should be KERN_CONT instead! Debug 
-> levels are only attributed to the whole lines.
+Previous patch 1/2 on v1 was dropped.
 
-And pr_cont() here too.  If you care about using KERN_CONT which is
-just a static marker to allow automated printk level checking easier.
+---
+
+v1:
+
+This patch set adds fault callback support to allow IOMMU users to debug or
+react when a fault happens.
+IOMMU faults might be very difficult to reproduce and then to figure out
+the source of the problem. Currently IOMMU driver prints not so useful
+debug message and does not notice user about such issue.
+With a fault callback, IOMMU user may debug much more useful information
+and/or react to go back to a valid state.
+
+Br,
+
+David
+---
+
+David Cohen (1):
+  OMAP: IOMMU: add support to callback during fault handling
+
+ arch/arm/mach-omap2/iommu2.c            |   21 +++++++++++++--
+ arch/arm/plat-omap/include/plat/iommu.h |   15 ++++++++++-
+ arch/arm/plat-omap/iommu.c              |   41 ++++++++++++++++++++++++++++---
+ 3 files changed, 69 insertions(+), 8 deletions(-)
+
+-- 
+1.7.2.3
