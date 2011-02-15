@@ -1,45 +1,65 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 15 Feb 2011 13:58:46 +0200
-Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
-In-Reply-To: <AANLkTimR_6fYuJHuVC8TD5agjyCoUWiKQmEunhZHSQE5@mail.gmail.com>
-References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
-	<201102151041.21560.anarsoul@gmail.com>
-	<AANLkTimR_6fYuJHuVC8TD5agjyCoUWiKQmEunhZHSQE5@mail.gmail.com>
-Message-ID: <201102151358.47203.anarsoul@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Feb 2011 12:11:39 +0000
+Subject: [PATCH] ARM: pmu: avoid setting IRQ affinity on UP systems
+Message-ID: <1297771899-23209-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 February 2011 13:51:06 Eric Miao wrote:
-> >> >        lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
-> >> > -       lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
-> >> > +       if (fbi->lccr0 & LCCR0_SDS)
-> >> > +               lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
-> >> 
-> >> My original intention was to simplify the code a bit by ignoring
-> >> LCCR0_SDS, as FDADR1 would not take effect if not enabled even
-> >> if it's being read/written.
-> > 
-> > It leads to potential race condition when you try to reconfigure main
-> > plane and overlay1 simultaneously.
-> 
-> You are right on this.
-> 
-> >> > +#ifdef CONFIG_FB_PXA_OVERLAY
-> >> > +       if (cpu_is_pxa27x())
-> >> > +               fbi->lccr0 |= LCCR0_OUC;
-> >> > +#endif
-> >> > +
-> >> 
-> >> I seem to remember LCCR0_OUC is still valid on pxa3xx, did you
-> >> do some test on pxa3xx as well?
-> > 
-> > Sorry, I have no any pxa3xx boards.
-> 
-> That's all right, I can give it a test later. The point is, why
-> did you move the code here from pxafb_overlay_init()?
+Now that we can execute a CONFIG_SMP kernel on a uniprocessor system,
+extra care has to be taken in the PMU IRQ affinity setting code to
+ensure that we don't always fail to initialise.
 
-Because otherwise correct plane order (overlays on top) will be selected only 
-on next main plane reconfigure.
+This patch changes the CPU PMU initialisation code so that when we
+only have a single IRQ, whose affinity can not be changed at the
+controller, we report success (0) rather than -EINVAL.
 
-Regards
-Vasily
+Cc: Jamie Iles <jamie@jamieiles.com>
+Reported-by: Avik Sil <avik.sil@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/pmu.c |   21 ++++++++++++++-------
+ 1 files changed, 14 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+index b8af96e..2b65d10 100644
+--- a/arch/arm/kernel/pmu.c
++++ b/arch/arm/kernel/pmu.c
+@@ -97,22 +97,29 @@ set_irq_affinity(int irq,
+ 			   irq, cpu);
+ 	return err;
+ #else
+-	return 0;
++	return -EINVAL;
+ #endif
+ }
+ 
+ static int
+ init_cpu_pmu(void)
+ {
+-	int i, err = 0;
++	int i, irqs, err = 0;
+ 	struct platform_device *pdev = pmu_devices[ARM_PMU_DEVICE_CPU];
+ 
+-	if (!pdev) {
+-		err = -ENODEV;
+-		goto out;
+-	}
++	if (!pdev)
++		return -ENODEV;
++
++	irqs = pdev->num_resources;
++
++	/*
++	 * If we have a single PMU interrupt that we can't shift, assume that
++	 * we're running on a uniprocessor machine and continue.
++	 */
++	if (irqs == 1 && !irq_can_set_affinity(platform_get_irq(pdev, 0)))
++		return 0;
+ 
+-	for (i = 0; i < pdev->num_resources; ++i) {
++	for (i = 0; i < irqs; ++i) {
+ 		err = set_irq_affinity(platform_get_irq(pdev, i), i);
+ 		if (err)
+ 			break;
+-- 
+1.7.0.4
