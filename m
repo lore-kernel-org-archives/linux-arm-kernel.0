@@ -1,79 +1,96 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 15 Feb 2011 10:37:29 +0000
-Subject: [PATCH] Ensure predictable endian state on signal handler entry
-In-Reply-To: <20110214200222.GD31103@n2100.arm.linux.org.uk>
-References: <20110214200222.GD31103@n2100.arm.linux.org.uk>
-Message-ID: <20110215103728.GA2650@arm.com>
+Date: Tue, 15 Feb 2011 10:45:16 +0000
+Subject: [PATCH v4 0/5] ARM: omap[34]: Thumb-2 compatibility fixes
+In-Reply-To: <87zkpyxl64.fsf@ti.com>
+References: <1297263683-10621-1-git-send-email-dave.martin@linaro.org>
+	<87pqqy6tdj.fsf@ti.com> <20110214131750.GA2869@arm.com>
+	<alpine.LFD.2.00.1102140950580.14920@xanadu.home>
+	<20110214153726.GA20144@arm.com> <87zkpyxl64.fsf@ti.com>
+Message-ID: <AANLkTinz1055v7x0y2W_AYkbj+9h7z_cGtF4xn4=pkQ7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 08:02:22PM +0000, Russell King - ARM Linux wrote:
-> Ensure a predictable endian state when entering signal handlers.  This
-> avoids programs which use SETEND to momentarily switch their endian
-> state from having their signal handlers entered with an unpredictable
-> endian state.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> --
-> 
->  arch/arm/kernel/signal.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 907d5a6..abaf844 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -474,7 +474,9 @@ setup_return(struct pt_regs *regs, struct k_sigaction *ka,
->  	unsigned long handler = (unsigned long)ka->sa.sa_handler;
->  	unsigned long retcode;
->  	int thumb = 0;
-> -	unsigned long cpsr = regs->ARM_cpsr & ~PSR_f;
-> +	unsigned long cpsr = regs->ARM_cpsr & ~(PSR_f | PSR_E_BIT);
-> +
-> +	cpsr |= PSR_ENDSTATE;
->  
->  	/*
->  	 * Maybe we need to deliver a 32-bit signal to a 26-bit task.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Mon, Feb 14, 2011 at 11:15 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Dave,
+>
+> Dave Martin <dave.martin@linaro.org> writes:
+>
+>> On Mon, Feb 14, 2011 at 10:00:23AM -0500, Nicolas Pitre wrote:
+>>> On Mon, 14 Feb 2011, Dave Martin wrote:
+>>>
+>>> > @@ -289,8 +297,20 @@ clean_l2:
+>>> > ? ? * ?- should be faster and will change with kernel
+>>> > ? ? * ?- 'might' have to copy address, load and jump to it
+>>> > ? ? */
+>>> > +#ifdef CONFIG_THUMB2_KERNEL
+>>> > + ?/* kernel is non-interworking : must do this from Thumb */
+>>> > + ?adr ? ? r1, . + 1
+>>> > + ?bx ? ? ?r1
+>>> > + ?.thumb
+>>> > +#endif
+>>> > ? ?ldr ? ? r1, kernel_flush
+>>>
+>>> Didn't you mean this instead:
+>>>
+>>> ? ? ?/* kernel is non-interworking : must do this from Thumb */
+>>> ? ? ?adr ? ? r1, 1f + 1
+>>> ? ? ?bx ? ? ?r1
+>>> ? ? ?.thumb
+>>> 1: ? ldr ? ? r1, kernel_flush
+>>> ? ? ?...
+>>
+>> Note that this is intended as an experimental hack, not a real patch
+>> (apologies if I didn't make that clear...)
+>>
+>> Well, actually I meant "add r1, pc, #1" ... which means I was too
+>> busy trying to be clever... oops!
+>>
+>> That is of course exactly equivalent to your code...
+>>
+>>>
+>>> ?
+>>>
+>>> > ? ?blx ? ? r1
+>>> > +#ifdef CONFIG_THUMB2_KERNEL
+>>> > + ?.align
+>>> > + ?bx ? ? ?pc
+>>> > + ?nop
+>>> > + ?.arm
+>>>
+>>> Also here, the .align has the potential to introduce a zero halfword in
+>>> the instruction stream before the bx. ?What about:
+>>>
+>>> ? ? ?adr ? ? r3, 1f
+>>> ? ? ?bx ? ? ?r3
+>>> ? ? ?.align
+>>> ? ? ?.arm
+>>> 1: ? ...
+>>
+>> .align inserts a 16-bit nop when misaligned in Thumb in a text section,
+>> and a word-aligned bx pc is a specific architecturally allowed way
+>> to do an inline switch to ARM. ?The linker uses this trick for PLT
+>> veneers etc.
+>>
+>> A nicer fix for doing this sort of call from low-level code which
+>> might be ARM is to convert arch/arm/mm/*-v7.S to use "bx lr" to return.
+>>
+>> Generally, we can do this for all arches >= v5, without any
+>> incompatibility. ?However, since the need for it will be rare and it
+>> will generate patch noise for not much real benefit,
+>> I haven't proposed this.
+>>
+>> Updated patch below.
+>
+> I tested the updated patch on top of your "dirty" branch I tested with
+> last week, and now see off-mode working just fine.
 
-Looks sensible to me.
+Thanks for testing-- that's great news.
 
-Acked-by: Dave Martin <dave.martin@linaro.org>
-
-Only tested it with little-endian, but it's enough to make my silly
-test program not segfault.  (Without your patch, it definitely does...)
-
-#include <stdio.h>
-#include <signal.h>
-#include <string.h>
-#include <unistd.h>
-
-static void handler(int n)
-{
-	unsigned long cpsr;
-#define FORMAT "handler: CPSR = 0x%08lX\n"
-	char buf[sizeof FORMAT - 5 + 8];
-
-	asm ("mrs %0, CPSR" : "=r" (cpsr));
-
-	snprintf(buf, sizeof buf, FORMAT, cpsr);
-
-	write(STDOUT_FILENO, buf, strlen(buf));
-}
-
-int main(void)
-{
-	signal(SIGINT, handler);
-
-	asm volatile (
-	"0:	setend	be\n\t"
-	"	b 0b"
-	);
-}
+I will have a think about whether the patch can be tidied up to revert
+most of the code back to Thumb, though that isn't essential.  If I've
+understood what's going on correctly, I think only the restore entry
+points, SMC call sites and the entry to omap3_sram_configure_core_dpll
+could need to be ARM; the rest shouldn't really make any difference...
 
 Cheers
 ---Dave
