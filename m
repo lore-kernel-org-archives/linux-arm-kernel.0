@@ -1,25 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Feb 2011 17:53:20 -0800
-Subject: [PATCH] omap: Move omap2_check_revision and omap_sram_init out
-	of map_io
-In-Reply-To: <20110214235238.GU20795@atomide.com>
-References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-	<20110123174814.GI30094@n2100.arm.linux.org.uk>
-	<20110124201731.GC13589@atomide.com>
-	<20110214234520.GT20795@atomide.com>
-	<20110214235238.GU20795@atomide.com>
-Message-ID: <20110215015320.GX20795@atomide.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 15 Feb 2011 10:00:28 +0800
+Subject: [RFC,
+	PATCH 3/3] clk: add warnings for incorrect enable/prepare semantics
+In-Reply-To: <20110210093756.GA24710@b20223-02.ap.freescale.net>
+References: <1297233693.241680.897691111624.0.gpush@pororo>
+	<1297233693.243373.411051105619.3.gpush@pororo>
+	<20110210093756.GA24710@b20223-02.ap.freescale.net>
+Message-ID: <201102151000.29385.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110214 15:51]:
-> With the early init changes we just want to map IO in map_io.
-> Both omap2_check_revision and omap_sram_init can be moved to
-> happen later in omap2_init_common_infrastructure.
+Hi Richard,
+
+> >  void clk_unprepare(struct clk *clk)
+> >  {
+> > 
+> > +	WARN_ON(clk->enable_count != 0);
+> > +
 > 
-> Note that now we can now remove _omap2_map_common_io and remove
-> the extra flushes too as devicemaps_init will take care of it.
+> Other drivers may be using the clock and increased the enable_count.
+> This check may be moved to where we actually do unprepare.
 
-Hmm this one seems to need a bit more work, won't work on 2420.
+Of course, thanks. Will update the series.
 
-Tony
+
+Jeremy
