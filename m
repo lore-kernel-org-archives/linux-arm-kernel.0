@@ -1,441 +1,112 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 14 Feb 2011 16:15:25 -0800
-Subject: [PATCH v2 1/2] staging: msm: Use explicit GPLv2 licenses
-In-Reply-To: <1297208593-16368-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1297728926-15793-1-git-send-email-davidb@codeaurora.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 15 Feb 2011 09:18:22 +0900
+Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
+	ARCH_EXYNOS4 from ARCH_S5PV310
+In-Reply-To: <002d01cbcca2$5900e430$0b02ac90$@com>
+References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTim49dpC_r4BcK7tqo9wmu8W=qMDZE5szDUja6Wo@mail.gmail.com>
+	<002d01cbcca2$5900e430$0b02ac90$@com>
+Message-ID: <AANLkTimOqg4XGMv+Gsarpa9U56MB3hxewhZxznHpx4-u@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace a BSD-style license in Code Aurora Forum authored files with
-an explicit GPLv2.
+On Tue, Feb 15, 2011 at 8:53 AM, Sangbeom Kim <sbkim73@samsung.com> wrote:
+> Hi,
+> I answer your questions in detail.
+>
+>> On Monday, February 14, 2011 8:16 PM, Kyungmin Park wrote:
+>>
+>> Hi,
+>>
+>> Wow, fast move, but need to more explanation.
+>> what's the exact meaning of exynos4210?
+>> Exynos4 is prefix and remaining are variants?
+>
+> Exynos4210 means below.
+>
+> 1st digit means ARM core version. In this case, 4 means Cortex A9.
+> (If we release cortex A15, it will be Exynos5xxx)
+> 2nd digit means number of core. ?2 mean dual core.
+> 3rd digit means application category(LSI internal category).
+> 4th digit means design rule (generation or shrink version)
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
----
-v2: Remove FSF address block
+Nice, I want these rules.
+>
+>> Now you changed all s5pv310 to exynos4. if new exynos4xxx chip are
+>> comes then how to handle this one?
+>> e.g., exynos4220 or later.
+>> it's also conflict with mach-exynos4. do you handle all exynos4 series
+>> at this mach directory?
+>> historically there's no rules of the base RAM address at least samsung
+>> chips.
+>
+> Yes, we will handle all exynos4 series at mach-exynos4 directory.
+> In the past, there is no rule.
+> But now, we are making consistent rules with AP design team.
+> So, new version of exynos4 series will have same base RAM address.
 
- drivers/staging/msm/mddi_toshiba.h |   30 +++++++-----------------------
- drivers/staging/msm/mddihost.h     |   30 +++++++-----------------------
- drivers/staging/msm/mddihosti.h    |   30 +++++++-----------------------
- drivers/staging/msm/mdp.h          |   30 +++++++-----------------------
- drivers/staging/msm/mdp4.h         |   30 +++++++-----------------------
- drivers/staging/msm/mdp_ppp_dq.h   |   31 +++++++------------------------
- drivers/staging/msm/msm_fb.h       |   30 +++++++-----------------------
- drivers/staging/msm/msm_fb_def.h   |   30 +++++++-----------------------
- drivers/staging/msm/msm_fb_panel.h |   30 +++++++-----------------------
- drivers/staging/msm/tvenc.h        |   30 +++++++-----------------------
- 10 files changed, 70 insertions(+), 231 deletions(-)
+Okay, no problem with base ram address,
 
-diff --git a/drivers/staging/msm/mddi_toshiba.h b/drivers/staging/msm/mddi_toshiba.h
-index 2d22b9a..cbeea0a 100644
---- a/drivers/staging/msm/mddi_toshiba.h
-+++ b/drivers/staging/msm/mddi_toshiba.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MDDI_TOSHIBA_H
-diff --git a/drivers/staging/msm/mddihost.h b/drivers/staging/msm/mddihost.h
-index c46f24a..8f532d0 100644
---- a/drivers/staging/msm/mddihost.h
-+++ b/drivers/staging/msm/mddihost.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MDDIHOST_H
-diff --git a/drivers/staging/msm/mddihosti.h b/drivers/staging/msm/mddihosti.h
-index 7b26a42..79eb399 100644
---- a/drivers/staging/msm/mddihosti.h
-+++ b/drivers/staging/msm/mddihosti.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MDDIHOSTI_H
-diff --git a/drivers/staging/msm/mdp.h b/drivers/staging/msm/mdp.h
-index 0a5d6ac..44b1147 100644
---- a/drivers/staging/msm/mdp.h
-+++ b/drivers/staging/msm/mdp.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MDP_H
-diff --git a/drivers/staging/msm/mdp4.h b/drivers/staging/msm/mdp4.h
-index 26ec8f1..96997d9 100644
---- a/drivers/staging/msm/mdp4.h
-+++ b/drivers/staging/msm/mdp4.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MDP4_H
-diff --git a/drivers/staging/msm/mdp_ppp_dq.h b/drivers/staging/msm/mdp_ppp_dq.h
-index 03e4e9a..759abc2 100644
---- a/drivers/staging/msm/mdp_ppp_dq.h
-+++ b/drivers/staging/msm/mdp_ppp_dq.h
-@@ -1,30 +1,13 @@
- /* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are
-- * met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above
-- *       copyright notice, this list of conditions and the following
-- *       disclaimer in the documentation and/or other materials provided
-- *       with the distribution.
-- *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
-- *       contributors may be used to endorse or promote products derived
-- *       from this software without specific prior written permission.
-- *
-- * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
-- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
-- * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
-- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-- * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
-- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MDP_PPP_DQ_H
-diff --git a/drivers/staging/msm/msm_fb.h b/drivers/staging/msm/msm_fb.h
-index f939138..4bca6d2 100644
---- a/drivers/staging/msm/msm_fb.h
-+++ b/drivers/staging/msm/msm_fb.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MSM_FB_H
-diff --git a/drivers/staging/msm/msm_fb_def.h b/drivers/staging/msm/msm_fb_def.h
-index c5f9e9e..bc7f256 100644
---- a/drivers/staging/msm/msm_fb_def.h
-+++ b/drivers/staging/msm/msm_fb_def.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MSM_FB_DEF_H
-diff --git a/drivers/staging/msm/msm_fb_panel.h b/drivers/staging/msm/msm_fb_panel.h
-index ab45831..6375976 100644
---- a/drivers/staging/msm/msm_fb_panel.h
-+++ b/drivers/staging/msm/msm_fb_panel.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef MSM_FB_PANEL_H
-diff --git a/drivers/staging/msm/tvenc.h b/drivers/staging/msm/tvenc.h
-index a682dbe..6bb375d 100644
---- a/drivers/staging/msm/tvenc.h
-+++ b/drivers/staging/msm/tvenc.h
-@@ -1,29 +1,13 @@
- /* Copyright (c) 2008-2009, Code Aurora Forum. All rights reserved.
-  *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions are met:
-- *     * Redistributions of source code must retain the above copyright
-- *       notice, this list of conditions and the following disclaimer.
-- *     * Redistributions in binary form must reproduce the above copyright
-- *       notice, this list of conditions and the following disclaimer in the
-- *       documentation and/or other materials provided with the distribution.
-- *     * Neither the name of Code Aurora nor
-- *       the names of its contributors may be used to endorse or promote
-- *       products derived from this software without specific prior written
-- *       permission.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-- * IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- * NON-INFRINGEMENT ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
-- * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
-- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-  *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-  */
- 
- #ifndef TVENC_H
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Another one is how do you handle the GPIOs?
+Now it's also changed as EXYNOS4_GPXX, I think it's difficult to use
+the same banks as exynos4210 has if new chips are introduced.
+maybe IRQ also has similar issue.
+
+Now these patches assumes all exynos4 has same gpios, irqs and so on.
+
+How do you think about it?
+
+Thank you,
+Kyungmin Park
+>
+> Thanks and regards,
+> Sangbeom Kim
+>
+>>
+>> Thank you,
+>> Kyungmin Park
+>>
+>> On Mon, Feb 14, 2011 at 5:22 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting
+>> Samsung's
+>> > new brand name EXYNOS. Samsung officially announced about the brand name
+>> of EXYNOS
+>> > at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor
+>> with several
+>> > other peripherals to support features such as multimedai, storage,
+>> graphics and gaming.
+>> > Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be
+>> used in
+>> > products such as Mobile devices.
+>> >
+>> > This patch set consists of the following patches.
+>> >
+>> > [PATCH 01/11] ARM: EXYNOS4: Add EXYNOS4 CPU initialization support
+>> > [PATCH 02/11] ARM: EXYNOS4: Update Clock part
+>> > [PATCH 03/11] ARM: EXYNOS4: Update IRQ part
+>> > [PATCH 04/11] ARM: EXYNOS4: Update Timer part
+>> > [PATCH 05/11] ARM: EXYNOS4: Update device support
+>> > [PATCH 06/11] ARM: EXYNOS4: Moved board support files
+>> > [PATCH 07/11] ARM: EXYNOS4: Update Kconfig and Makefile for the new
+>> ARCH_EXYNOS4
+>> > [PATCH 08/11] ARM: exynos4_defconfig: Add defconfig for EXYNOS4
+>> > [PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
+>> > [PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
+>> > [PATCH 11/11] tty: Change dependency of ARCH_EXYNOS4
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> >
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
+>> soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
