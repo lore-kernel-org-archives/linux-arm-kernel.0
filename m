@@ -1,30 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 15:46:33 +0000
-Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
-In-Reply-To: <AANLkTinpcYoHKKDhqy9mKpqOEGtMpNc1BSukNWH-GVBX@mail.gmail.com>
-References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
-	<20110215133232.GI4152@n2100.arm.linux.org.uk>
-	<20110215134134.GA17208@n2100.arm.linux.org.uk>
-	<AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
-	<20110215141253.GJ4152@n2100.arm.linux.org.uk>
-	<AANLkTinpcYoHKKDhqy9mKpqOEGtMpNc1BSukNWH-GVBX@mail.gmail.com>
-Message-ID: <20110215154633.GN4152@n2100.arm.linux.org.uk>
+Date: Tue, 15 Feb 2011 15:48:19 +0000
+Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
+	unsigned long for physical addresses
+In-Reply-To: <1297783609.23889.6.camel@e102144-lin.cambridge.arm.com>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+	<20110212102803.GC15616@n2100.arm.linux.org.uk>
+	<1297770742.21448.2.camel@e102144-lin.cambridge.arm.com>
+	<20110215123522.GH4152@n2100.arm.linux.org.uk>
+	<1297773569.14691.36.camel@e102109-lin.cambridge.arm.com>
+	<1297777027.1293.2.camel@e102144-lin.cambridge.arm.com>
+	<20110215142339.GL4152@n2100.arm.linux.org.uk>
+	<1297783609.23889.6.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <20110215154819.GO4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 04:11:09PM +0100, Per Forlin wrote:
-> True. In my case write back is disable but read back is enable, that's
-> why I didn't consider it.
+On Tue, Feb 15, 2011 at 03:26:49PM +0000, Will Deacon wrote:
+> The conflict with the p2v branch is fairly hefty, but something like
+> this should do (if you're happy I'll submit it to replace 6670/1):
 
-What do you mean "write back is disable" ?  You can only prevent
-writebacks by using a write-through cache.
+I was thinking that was the case - which is why I wanted this split up
+so this can be tackled separately.
 
-Any writeback cache, whether in read-allocate or read-write-allocate
-mode will have writebacks.
+> Note that because the v2p macros only work for lowmem, I've not bothered
+> to add casts for the __v2p macros (rather, I've just changed the types
+> of the static inline functions). This simplifies the code and means we
+> can stay clear of the runtime fixup stuff.
 
-> Do you think it is feasible to let dma-mapping detect the cache
-> configurations in runtime in order to prevent "unnecessary" cache
-> operations?
-
-Let's first straighten out your cache understanding above, because I
-don't think you understand properly yet.
+This patch looks good enough, thanks.
