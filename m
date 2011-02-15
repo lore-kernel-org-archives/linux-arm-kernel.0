@@ -1,23 +1,80 @@
-From: ccross@google.com (Colin Cross)
-Date: Mon, 14 Feb 2011 17:21:07 -0800
-Subject: [PATCH 2/6] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <E1Pnvgw-0002yZ-M0@rmk-PC.arm.linux.org.uk>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-	<E1Pnvgw-0002yZ-M0@rmk-PC.arm.linux.org.uk>
-Message-ID: <AANLkTi=6zLxGxabBE4-+qGyRt7-219KE=4CB0jf9D=LG@mail.gmail.com>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 15 Feb 2011 09:36:25 +0800
+Subject: [RFC,PATCH 1/3] Add a common struct clk
+In-Reply-To: <4D52F73A.4010707@bluewatersys.com>
+References: <1297233693.242364.862698430999.1.gpush@pororo>
+	<4D52F73A.4010707@bluewatersys.com>
+Message-ID: <201102150936.26110.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 8:17 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> This adds core support for saving and restoring CPU coprocessor
-> registers for suspend/resume support. ?This contains support for suspend
-> with ARM920, ARM926, SA11x0, PXA25x, PXA27x, PXA3xx, V6 and V7 CPUs.
+Hi Ryan,
 
-I would like to use cpu_suspend in a case where the L2 is still
-enabled.  When cpu_resume is called, the MMU and cache bits in SCTLR
-are disabled, so the reads skip the L2 cache, and the data that was
-saved (sleep_save_sp and *sleep_save_sp) is not read back.
+> > +int clk_enable(struct clk *clk)
+> > +{
+> > +	unsigned long flags;
+> > +	int ret = 0;
+> > +
+> > +	spin_lock_irqsave(&clk->enable_lock, flags);
+> 
+> 	WARN_ON(clk->prepare_count == 0); ?
 
-Is it possible to call the outer_cache functions from cpu_suspend to
-flush sleep_save_sp and the saved data?
+Added later, but yes.
+
+> 
+> > +	if (clk->enable_count == 0 && clk->ops->enable)
+> > +		ret = clk->ops->enable(clk);
+> 
+> Does it make sense to have a clock with no enable function which still
+> returns success from clk_enable? Do we have any platforms which have
+> NULL clk_enable functions?
+
+It does, yes. Driver code should be always be calling clk_enable before using 
+a clock, regardless of the implementation (which it shouldn't have to care 
+abut), and should abort their initialisation if the clk_enable() fails.
+
+Some clocks are always running, so the enable op will be empty. This is not an 
+error, so the driver is free to continue.
+
+> I think that for enable/disable at least we should require platforms to
+> provide functions and oops if they have failed to do so. In the rare
+> case that a platform doesn't need to do anything for enable/disable they
+> can just supply empty functions.
+
+Sounds like useless boilerplate - it's not an error to not need 
+enable/disable, so I don't see why we need to add extra effort to handle this 
+case.
+
+> > +/**
+> > + * __clk_get - acquire a reference to a clock
+> > + *
+> > + * @clk: The clock to refcount
+> > + *
+> > + * Before a clock is returned from clk_get, this function should be
+> > called + * to update any clock-specific refcounting.
+> 
+> This is a bit misleading. It's not "should be called", it "is called". I
+> think you should just remove the documentation for __clk_get/__clk_put
+> or move it into clk.c since the functions are only used internally by
+> the common clock code.
+
+It'd be nice to remove this from the header, but this means we'll need extern 
+prototypes in clkdev.c. Might be a reasonable compromise though.
+
+
+> > +/**
+> > + * clk_prepare - prepare clock for atomic enabling.
+> > + *
+> > + * @clk: The clock to prepare
+> > + *
+> > + * Do any blocking initialisation on @clk, allowing the clock to be
+> > later + * enabled atomically (via clk_enable). This function may sleep.
+> 
+> "Possibly blocking" as below?
+
+Yep, will unify these (and spell "possibly" correctly :) )
+
+Cheers,
+
+
+Jeremy
