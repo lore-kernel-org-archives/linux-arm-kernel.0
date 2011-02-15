@@ -1,31 +1,20 @@
-From: mboettcher@boettcher-edv.de (=?iso-8859-1?Q?Marcel_B=F6ttcher?=)
-Date: Tue, 15 Feb 2011 19:51:02 +0100
-Subject: N50 Stuff
-Message-ID: <025c01cbcd41$4b4a25f0$e1de71d0$@boettcher-edv.de>
+From: vb@vsbe.com (vb at vsbe.com)
+Date: Tue, 15 Feb 2011 11:26:52 -0800
+Subject: compiling 2.6.37 kernel in THUMB2 mode
+Message-ID: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi there,
+hello all,
 
-I saw, that a mach_n50 is in the machines list.
+I am trying to compile the 2.6.37 kernel in THUMB2 mode and am
+experiencing some compilation problems. Some inline assembly in some
+files uses commands inappropriate for THUMB2 mode.
 
-Does possibly anyone have further details like default configs or drivers?
+I wonder if the kernel is expected to compile cleanly when
+CONFIG_THUMB2_KERNEL is enabled (and I am doing something wrong), or
+is it know not to compile/work in Thumb2 node for any reason?
 
- 
+Thank you in advance for your help,
 
-Regards
-
- 
-
-Marcel
-
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110215/bfedd963/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 6414 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110215/bfedd963/attachment.p7s>
+Vadim
