@@ -1,38 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 14:27:30 +0000
-Subject: [PATCH v4 16/19] ARM: LPAE: Use generic dma_addr_t type definition
-In-Reply-To: <1297688490.31111.38.camel@e102109-lin.cambridge.arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
-	<20110212103413.GD15616@n2100.arm.linux.org.uk>
-	<1297688490.31111.38.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110215142730.GM4152@n2100.arm.linux.org.uk>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Tue, 15 Feb 2011 16:30:27 +0200
+Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
+	dev_dbg()
+In-Reply-To: <AANLkTim3+PFgJUU_-YqOt1M5NkSyHo6wUwF_XwC9MWSP@mail.gmail.com>
+References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
+	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
+	<4D5A81D8.2080800@ru.mvista.com>
+	<AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
+	<20110215155948.32b564d5.jhnikula@gmail.com>
+	<AANLkTim3+PFgJUU_-YqOt1M5NkSyHo6wUwF_XwC9MWSP@mail.gmail.com>
+Message-ID: <20110215163027.c08d0cb1.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 01:01:30PM +0000, Catalin Marinas wrote:
-> Maybe we could make the dma_addr_t size configurable (and disabled by
-> default) since I expect there'll be platforms capable of >32-bit DMA.
+On Tue, 15 Feb 2011 16:08:32 +0200
+David Cohen <dacohen@gmail.com> wrote:
 
-It would be far better to fix the dma_addr_t abuses.  I've already fixed
-those in the pl08x driver:
+> > So it's sure that a developer won't need these error dumps when
+> > receiving an error report? I.e. IOMMU upper level errors give enough
+> > information to start doing own debugging?
+> 
+> Yes, developers do need this information.
+> But it's a bit useless tell only we've got an iommu fault, due to many
+> places might be causing it. My purpose is to let the debug
+> responsibility to IOMMU users. They have access to the iovmm layer as
+> well and can provide a much more useful information.
+> e.g. OMAP3 ISP has many submodules using IOMMU. With a fault callback,
+> it can dump all the iovm areas and the faulty 'da' too. It might
+> indicate which submodule was responsible for the issue.
+> 
+> Of course we can just let this debug messages the way they are and
+> print this redundant information. But IMO it's not necessary.
+> 
+Sounds fair enough and if I understood correctly this is not something
+what end user will hit but more like another developer. In that case
+the debug messages are the right thing.
 
-struct lli {
-        dma_addr_t src;
-        dma_addr_t dst;
-        dma_addr_t next;
-        u32 cctl;
-};
-
-became:
-
-struct pl08x_lli {
-        u32 src;
-        u32 dst;
-        u32 lli;
-        u32 cctl;
-};
-
-and similar needs to be done elsewhere in ARM specific drivers.
-dma_addr_t has no business being in structures that describe data which
-hardware accesses.
+-- 
+Jarkko
