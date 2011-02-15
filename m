@@ -1,10 +1,11 @@
 From: prakity@marvell.com (Philip Rakity)
-Date: Tue, 15 Feb 2011 13:56:47 -0800
-Subject: [PATCH 2/4] arm: V2 configs: update pxa168 defconfig for SoC
+Date: Tue, 15 Feb 2011 13:55:11 -0800
+Subject: [PATCH 4/4] arm: V2 configs: update pxa910 defconfig for SoC
 	Selection
-Message-ID: <15EF0652-2088-4876-AF9D-CDAC8E423CA8@marvell.com>
+Message-ID: <5DE28962-5F04-4D34-8D65-DF4020F135CD@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 V2
 ==
@@ -12,26 +13,38 @@ Use make savedefconfigconfig to produce reduced size defconfig
 per suggestion of Nico Pitre.
 
 V1
-took old pxa168_defconfig --
+==
+
+took old pxa910_defconfig --
 did make menuconfig
+changed to CPU_PXA910
 
 Signed-off-by: Philip Rakity <prakity@marvell.com>
 ---
- arch/arm/configs/pxa168_defconfig |    4 ----
- 1 files changed, 0 insertions(+), 4 deletions(-)
+ arch/arm/configs/pxa910_defconfig |    6 +-----
+ 1 files changed, 1 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/pxa168_defconfig b/arch/arm/configs/pxa168_defconfig
-index 74d7e01..b07eb58 100644
---- a/arch/arm/configs/pxa168_defconfig
-+++ b/arch/arm/configs/pxa168_defconfig
+diff --git a/arch/arm/configs/pxa910_defconfig b/arch/arm/configs/pxa910_defconfig
+index 1cd381e..8c405cd 100644
+--- a/arch/arm/configs/pxa910_defconfig
++++ b/arch/arm/configs/pxa910_defconfig
 @@ -1,7 +1,6 @@
  CONFIG_EXPERIMENTAL=y
  CONFIG_SYSVIPC=y
  CONFIG_LOG_BUF_SHIFT=14
 -CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_BLK_DEV_INITRD=y
  CONFIG_SLAB=y
  CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
+@@ -9,7 +8,7 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODULE_FORCE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_MMP=y
+-CONFIG_MACH_TAVOREVB=y
++CONFIG_CPU_PXA910=y
+ CONFIG_MACH_TTC_DKB=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
 @@ -30,7 +29,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
  # CONFIG_STANDALONE is not set
  # CONFIG_PREVENT_FIRMWARE_BUILD is not set
