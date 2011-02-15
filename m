@@ -1,30 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 14:23:39 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <1297777027.1293.2.camel@e102144-lin.cambridge.arm.com>
+Date: Tue, 15 Feb 2011 14:27:30 +0000
+Subject: [PATCH v4 16/19] ARM: LPAE: Use generic dma_addr_t type definition
+In-Reply-To: <1297688490.31111.38.camel@e102109-lin.cambridge.arm.com>
 References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
-	<20110212102803.GC15616@n2100.arm.linux.org.uk>
-	<1297770742.21448.2.camel@e102144-lin.cambridge.arm.com>
-	<20110215123522.GH4152@n2100.arm.linux.org.uk>
-	<1297773569.14691.36.camel@e102109-lin.cambridge.arm.com>
-	<1297777027.1293.2.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <20110215142339.GL4152@n2100.arm.linux.org.uk>
+	<1295891761-18366-17-git-send-email-catalin.marinas@arm.com>
+	<20110212103413.GD15616@n2100.arm.linux.org.uk>
+	<1297688490.31111.38.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110215142730.GM4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 01:37:07PM +0000, Will Deacon wrote:
-> I should've spotted this either way. I've superseded the old patch with
-> 6674/1.
+On Mon, Feb 14, 2011 at 01:01:30PM +0000, Catalin Marinas wrote:
+> Maybe we could make the dma_addr_t size configurable (and disabled by
+> default) since I expect there'll be platforms capable of >32-bit DMA.
 
-One additional thing that I think has been lost.  I said in the original
-reply to Catalin:
-| asm/memory.h will conflict non-trivially with p2v patch set, but I think
-| we can merge the changes to everything but __virt_to_phys/__phys_to_virt.
+It would be far better to fix the dma_addr_t abuses.  I've already fixed
+those in the pl08x driver:
 
-So 6670/1 which I'm intending to apply to the p2v branch can't be merged
-as-is.  The ideal solution would be a version of 6670/1 to apply on top
-of the existing p2v branch.
+struct lli {
+        dma_addr_t src;
+        dma_addr_t dst;
+        dma_addr_t next;
+        u32 cctl;
+};
 
-Thanks.
+became:
+
+struct pl08x_lli {
+        u32 src;
+        u32 dst;
+        u32 lli;
+        u32 cctl;
+};
+
+and similar needs to be done elsewhere in ARM specific drivers.
+dma_addr_t has no business being in structures that describe data which
+hardware accesses.
