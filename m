@@ -1,40 +1,30 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 16 Feb 2011 07:11:46 +0800
-Subject: [PATCH v2 7/7] ARM: mxs/mx28evk: add mmc device
-In-Reply-To: <20110214102646.GB30100@pengutronix.de>
-References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-	<1297650746-12841-8-git-send-email-shawn.guo@freescale.com>
-	<20110214102646.GB30100@pengutronix.de>
-Message-ID: <20110215231145.GK10990@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Feb 2011 15:46:33 +0000
+Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
+In-Reply-To: <AANLkTinpcYoHKKDhqy9mKpqOEGtMpNc1BSukNWH-GVBX@mail.gmail.com>
+References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
+	<20110215133232.GI4152@n2100.arm.linux.org.uk>
+	<20110215134134.GA17208@n2100.arm.linux.org.uk>
+	<AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
+	<20110215141253.GJ4152@n2100.arm.linux.org.uk>
+	<AANLkTinpcYoHKKDhqy9mKpqOEGtMpNc1BSukNWH-GVBX@mail.gmail.com>
+Message-ID: <20110215154633.GN4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 11:26:46AM +0100, Wolfram Sang wrote:
-> Shawn,
-> 
-> > +/* mmc */
-> > +static void __init mx28evk_mmc_slot_poweron(int gpio)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = gpio_request(gpio, "mmc-slot-power");
-> > +	if (ret) {
-> > +		pr_err("Failed to request gpio mmc-slot-power: %d\n", ret);
-> > +		return;
-> > +	}
-> > +
-> > +	ret = gpio_direction_output(gpio, 0);
-> > +	if (ret) {
-> > +		pr_err("Failed to drive gpio mmc-slot-power: %d\n", ret);
-> > +		return;
-> > +	}
-> > +}
-> 
-> Minor nit: You could use gpio_request_one(), and doing so maybe even get rid of
-> this function and simply do it the init-function. The advantage would be, that
-> you can name the two GPIOs independently.
-> 
-OK. Will take it.
+On Tue, Feb 15, 2011 at 04:11:09PM +0100, Per Forlin wrote:
+> True. In my case write back is disable but read back is enable, that's
+> why I didn't consider it.
 
-Thanks,
-Shawn
+What do you mean "write back is disable" ?  You can only prevent
+writebacks by using a write-through cache.
+
+Any writeback cache, whether in read-allocate or read-write-allocate
+mode will have writebacks.
+
+> Do you think it is feasible to let dma-mapping detect the cache
+> configurations in runtime in order to prevent "unnecessary" cache
+> operations?
+
+Let's first straighten out your cache understanding above, because I
+don't think you understand properly yet.
