@@ -1,79 +1,57 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 15 Feb 2011 13:44:17 -0700
-Subject: [PATCH] spi/imx: select master mode for all channels
-In-Reply-To: <1297195739-24951-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1297195739-24951-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110215204417.GA28005@angua.secretlab.ca>
+From: omar.ramirez@ti.com (Ramirez Luna, Omar)
+Date: Tue, 15 Feb 2011 14:56:46 -0600
+Subject: [PATCH v5 0/5] omap: mailbox: hwmod support
+In-Reply-To: <87ipwq89by.fsf@ti.com>
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
+	<87ipwq89by.fsf@ti.com>
+Message-ID: <AANLkTimE=BkNgxUeNXbcPR=yuEWgs1uvSgnnBn9Xectz@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 08, 2011 at 09:08:59PM +0100, Uwe Kleine-K?nig wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> The hardware seems to have a race condition when the inactive
-> channels are in slave mode. We support master mode only, so
-> we can just switch all channels to master mode.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> [ukleinek: add more verbose comment about the race]
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> maybe one of our friends at Freescale can comment?
+Hi Kevin, Benoit,
 
-Any feedback on this one?  Or should I just merge it?
+On Fri, Feb 11, 2011 at 5:01 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Omar Ramirez Luna <omar.ramirez@ti.com> writes:
+>
+>> Mailbox hwmod support for OMAP 2,3,4.
+>>
+>> This was tested on OMAP3 (3430, 3630), minor testing
+>> was made on OMAP4.
+>>
+>> No testing on OMAP2 since I don't have the hardware.
+>
+> To help in testing, I wrote a simple mailbox loopback test module for
+> OMAP2/3/4 that I used to do send and receive messages on the MPU. ?This
+> can be used to test the mailbox without any DSP software.
+>
+> I tested it against l-o master branch and found a couple bugs in the
+> mailbox driver (patches posted earlier today.)
+>
+> With those patches plus my test I can send & receieve a series of
+> messages on the MPU, which is enough to sanity test the basic sending
+> and receiving messages on the MPU.
+>
+> I've tested the master branch, now it's your turn to use this test
+> module to validate this hmod conversion series.
+>
+> The test module is available here:
+>
+> ? ?git://gitorious.org/omap-test/mailbox.git
 
-g.
+I rechecked on OMAP3 (zoom2, zoom3) and OMAP4 (blaze), and
+functionality hasn't changed with the hwmod support + Kevin's mbox
+test.
 
-> 
-> Best regards
-> Uwe
-> 
->  drivers/spi/spi_imx.c |   12 +++++++++---
->  1 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
-> index 1cf9d5f..69d6dba 100644
-> --- a/drivers/spi/spi_imx.c
-> +++ b/drivers/spi/spi_imx.c
-> @@ -174,7 +174,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
->  #define SPI_IMX2_3_CTRL		0x08
->  #define SPI_IMX2_3_CTRL_ENABLE		(1 <<  0)
->  #define SPI_IMX2_3_CTRL_XCH		(1 <<  2)
-> -#define SPI_IMX2_3_CTRL_MODE(cs)	(1 << ((cs) +  4))
-> +#define SPI_IMX2_3_CTRL_MODE_MASK	(0xf << 4)
->  #define SPI_IMX2_3_CTRL_POSTDIV_OFFSET	8
->  #define SPI_IMX2_3_CTRL_PREDIV_OFFSET	12
->  #define SPI_IMX2_3_CTRL_CS(cs)		((cs) << 18)
-> @@ -253,8 +253,14 @@ static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
->  {
->  	u32 ctrl = SPI_IMX2_3_CTRL_ENABLE, cfg = 0;
->  
-> -	/* set master mode */
-> -	ctrl |= SPI_IMX2_3_CTRL_MODE(config->cs);
-> +	/*
-> +	 * The hardware seems to have a race condition when changing modes. The
-> +	 * current assumption is that the selection of the channel arrives
-> +	 * earlier in the hardware than the mode bits when they are written at
-> +	 * the same time.
-> +	 * So set master mode for all channels as we do not support slave mode.
-> +	 */
-> +	ctrl |= SPI_IMX2_3_CTRL_MODE_MASK;
->  
->  	/* set clock speed */
->  	ctrl |= spi_imx2_3_clkdiv(spi_imx->spi_clk, config->speed_hz);
-> -- 
-> 1.7.2.3
-> 
-> 
-> ------------------------------------------------------------------------------
-> The ultimate all-in-one performance toolkit: Intel(R) Parallel Studio XE:
-> Pinpoint memory and threading errors before they happen.
-> Find and fix more than 250 security defects in the development cycle.
-> Locate bottlenecks in serial and parallel code that limit performance.
-> http://p.sf.net/sfu/intel-dev2devfeb
-> _______________________________________________
-> spi-devel-general mailing list
-> spi-devel-general at lists.sourceforge.net
-> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
+On OMAP3, although functionality is ok with this patch set, I noticed
+that the interface clock is not being disabled with its corresponding
+pm_runtime_disable call. Previously, the driver enabled/disabled the
+ick clock on demand, but now the clock stays enabled always (only
+affected by the smart-idle feature, I presume).
+
+Should this clock be placed in the main_clk field of omap_hwmod struct
+instead of omap_hwmod_ocp_if, I moved it to ocp_if because of the ick
+thing, any comment?
+
+Regards,
+
+Omar
