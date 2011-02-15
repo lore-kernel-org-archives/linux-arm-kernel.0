@@ -1,27 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 13:32:32 +0000
-Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
-In-Reply-To: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
-References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
-Message-ID: <20110215133232.GI4152@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 15 Feb 2011 21:36:07 +0800
+Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
+In-Reply-To: <201102151358.47203.anarsoul@gmail.com>
+References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+	<201102151041.21560.anarsoul@gmail.com>
+	<AANLkTimR_6fYuJHuVC8TD5agjyCoUWiKQmEunhZHSQE5@mail.gmail.com>
+	<201102151358.47203.anarsoul@gmail.com>
+Message-ID: <AANLkTinu2LT4t=f=Y0ZBmT6=nsoiQ9HVVTYmzgLMpDXR@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 02:14:55PM +0100, Per Forlin wrote:
-> outer_inv_range () is called twice for DMA_FROM_DEVICE.
-> The first time to "get rid of potential writebacks" and the second
-> time to "get rid of any stale speculative prefetches"
+On Tue, Feb 15, 2011 at 7:58 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> On Tuesday 15 February 2011 13:51:06 Eric Miao wrote:
+>> >> > ? ? ? ?lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
+>> >> > - ? ? ? lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+>> >> > + ? ? ? if (fbi->lccr0 & LCCR0_SDS)
+>> >> > + ? ? ? ? ? ? ? lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+>> >>
+>> >> My original intention was to simplify the code a bit by ignoring
+>> >> LCCR0_SDS, as FDADR1 would not take effect if not enabled even
+>> >> if it's being read/written.
+>> >
+>> > It leads to potential race condition when you try to reconfigure main
+>> > plane and overlay1 simultaneously.
+>>
+>> You are right on this.
+>>
+>> >> > +#ifdef CONFIG_FB_PXA_OVERLAY
+>> >> > + ? ? ? if (cpu_is_pxa27x())
+>> >> > + ? ? ? ? ? ? ? fbi->lccr0 |= LCCR0_OUC;
+>> >> > +#endif
+>> >> > +
+>> >>
+>> >> I seem to remember LCCR0_OUC is still valid on pxa3xx, did you
+>> >> do some test on pxa3xx as well?
+>> >
+>> > Sorry, I have no any pxa3xx boards.
+>>
+>> That's all right, I can give it a test later. The point is, why
+>> did you move the code here from pxafb_overlay_init()?
+>
+> Because otherwise correct plane order (overlays on top) will be selected only
+> on next main plane reconfigure.
+>
 
-Correct.
+Then maybe in this way? (I'd rather keep this bit in overlay specific
+code, and make it valid not only to pxa27x)
 
-> outer_inv_range() is a rather expensive operation. In the first case
-> isn't it enough to just call cache_sync()?
+@@ -925,6 +925,8 @@ static int __devinit pxafb_overlay_init(struct
+pxafb_info *fbi)
 
-No.  If the CPU speculatively fetches data from the DMA buffer after
-it's been mapped for DMA, it will bring data into the L2 cache.  This
-data may or may not be up to date with the DMA buffer contents once
-DMA has completed.
+        /* place overlay(s) on top of base */
+        fbi->lccr0 |= LCCR0_OUC;
++       lcd_writel(fbi, LCCR0, fbi->lccr0 & ~LCCR0_ENB);
++
+        pr_info("PXA Overlay driver loaded successfully!\n");
+        return 0;
 
-As there is no way to know, we have to invalidate the L2 cache (and the
-L1 cache) after the DMA has completed to avoid any possibility of data
-corruption.
+
+> Regards
+> Vasily
+>
