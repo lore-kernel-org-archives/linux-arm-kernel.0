@@ -1,59 +1,65 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 15 Feb 2011 14:54:21 +0100
-Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
-In-Reply-To: <20110215134134.GA17208@n2100.arm.linux.org.uk>
-References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
-	<20110215133232.GI4152@n2100.arm.linux.org.uk>
-	<20110215134134.GA17208@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 15 Feb 2011 16:56:04 +0300
+Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
+	dev_dbg()
+In-Reply-To: <AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
+References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>	<1297776033-8579-2-git-send-email-dacohen@gmail.com>	<4D5A81D8.2080800@ru.mvista.com>
+	<AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
+Message-ID: <4D5A85F4.5060103@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2011 14:41, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 15, 2011 at 01:32:32PM +0000, Russell King - ARM Linux wrote:
->> On Tue, Feb 15, 2011 at 02:14:55PM +0100, Per Forlin wrote:
->> > outer_inv_range () is called twice for DMA_FROM_DEVICE.
->> > The first time to "get rid of potential writebacks" and the second
->> > time to "get rid of any stale speculative prefetches"
->>
->> Correct.
->>
->> > outer_inv_range() is a rather expensive operation. In the first case
->> > isn't it enough to just call cache_sync()?
->>
->> No. ?If the CPU speculatively fetches data from the DMA buffer after
->> it's been mapped for DMA, it will bring data into the L2 cache. ?This
->> data may or may not be up to date with the DMA buffer contents once
->> DMA has completed.
->>
->> As there is no way to know, we have to invalidate the L2 cache (and the
->> L1 cache) after the DMA has completed to avoid any possibility of data
->> corruption.
->
-> I should add: the solution to all of this is to have cache coherent DMA.
->
-> As the CPUs become more complex and start playing tricks like speculative
-> prefetching, we have seen cache maintainence for DMA becomes more expensive.
-> The only way to reduce the cost of that is to have cache coherency for DMA.
->
-> There is no way to safely avoid the double-invalidate for DMA_FROM_DEVICE.
->
-I don't fully understand this yet. I think you are right but I need a
-little help
-to get there myself.
-I agree, the cache (L1 and L2) must be invalidated after the DMA has completed.
-Before starting the DMA the write buffers must be drained (cache_sync).
+On 15-02-2011 16:44, David Cohen wrote:
 
-Why invalidate the cache before starting the DMA?
+>>> IOMMU upper layer is already printing error message. OMAP2+ specific
+>>> layer may print error message only for debug purpose.
 
-The user shouldn't care about the cache until the DMA has finished and
-the cache is
-invalidated.
-I don't unsderstand how the DMA transfered data can be corrupt from a
-CPU perspective
-if the cache is invalidated after DMA transfer is done, but _not_
-before DMA is started?
+>>> Signed-off-by: David Cohen<dacohen@gmail.com>
+>>> ---
+>>>   arch/arm/mach-omap2/iommu2.c |    6 +++---
+>>>   1 files changed, 3 insertions(+), 3 deletions(-)
 
-Thanks for your fast response
-/Per
+>>> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
+>>> index 14ee686..4244a07 100644
+>>> --- a/arch/arm/mach-omap2/iommu2.c
+>>> +++ b/arch/arm/mach-omap2/iommu2.c
+>>> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj,
+>>> u32 *ra)
+>>>         da = iommu_read_reg(obj, MMU_FAULT_AD);
+>>>         *ra = da;
+>>>
+>>> -       dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
+>>> +       dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
+
+>>    Note that dev_dbg() will only print something if either DEBUG or
+>> CONFIG_DYNAMIC_DEBUG are defined...
+
+> That's my plan.
+
+>>>         for (i = 0; i < ARRAY_SIZE(err_msg); i++) {
+>>>                 if (stat&  (1<<    i))
+>>> -                       printk("%s ", err_msg[i]);
+>>> +                       printk(KERN_DEBUG "%s ", err_msg[i]);
+
+>>    ... unlike printk(KERN_DEBUG...). You probably want to use pr_debug()
+>> instead.
+
+>>>         }
+>>> -       printk("\n");
+>>> +       printk(KERN_DEBUG "\n");
+
+>>    Here too... Although wait, it should be KERN_CONT instead! Debug levels
+>> are only attributed to the whole lines.
+
+> But your observation is correct. I'll resend it with KERN_CONT instead.
+
+    This won't play out correctly anyway. If DEBUG is not #define'd, the 
+beginning of line won't be printed but the continuations will. You just can't 
+do it correctly with dev_dbg(), unless you break the single line into several 
+ones.
+
+> Regards,
+
+> David
+
+WBR, Sergei
