@@ -1,24 +1,69 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Tue, 15 Feb 2011 15:09:04 +0200 (EET)
-Subject: [PATCH v2] OMAP: IOMMU: add missing function declaration
-In-Reply-To: <1297769473-24052-1-git-send-email-dacohen@gmail.com>
-References: <1297769473-24052-1-git-send-email-dacohen@gmail.com>
-Message-ID: <20110215.150904.31489671848521371.Hiroshi.DOYU@nokia.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 15 Feb 2011 14:14:55 +0100
+Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
+Message-ID: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Cohen <dacohen@gmail.com>
-Subject: [PATCH v2] OMAP: IOMMU: add missing function declaration
-Date: Tue, 15 Feb 2011 13:31:13 +0200
+Hi,
 
-> Declaration of exported function 'iopgtable_lookup_entry' is missing from
-> header file. Currently we have a sparse warning as it's not being used
-> externally. Adding its declaration to avoid such warning and allow its usage
-> in future.
-> 
-> Signed-off-by: David Cohen <dacohen@gmail.com>
-> ---
->  arch/arm/plat-omap/include/plat/iommu.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+My question concerns this patch
+--------
+commit 2ffe2da3e71652d4f4cae19539b5c78c2a239136
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Sat Oct 31 16:52:16 2009 +0000
 
-Thanks. Tony, Please put this into your queue.
+    ARMv6 and ARMv7 CPUs can perform speculative prefetching, which makes
+    DMA cache coherency handling slightly more interesting.  Rather than
+    being able to rely upon the CPU not accessing the DMA buffer until DMA
+    has completed, we now must expect that the cache could be loaded with
+    possibly stale data from the DMA buffer.
+
+    Where DMA involves data being transferred to the device, we clean the
+    cache before handing it over for DMA, otherwise we invalidate the buffer
+    to get rid of potential writebacks.  On DMA Completion, if data was
+    transferred from the device, we invalidate the buffer to get rid of
+    any stale speculative prefetches.
+
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+    Tested-By: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---------
+
+file: arch/arm/mm/dma-mapping.c
+> void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
+> 	size_t size, enum dma_data_direction dir)
+> {
+> ...
+> 	if (dir == DMA_FROM_DEVICE) {
+> 		outer_inv_range(paddr, paddr + size);
+> ...
+> }
+> EXPORT_SYMBOL(___dma_page_cpu_to_dev);
+>
+> void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
+> 	size_t size, enum dma_data_direction dir)
+> {
+> ...
+> 	if (dir != DMA_TO_DEVICE)
+> 		outer_inv_range(paddr, paddr + size);
+> ...
+> }
+
+outer_inv_range () is called twice for DMA_FROM_DEVICE.
+The first time to "get rid of potential writebacks" and the second
+time to "get rid of any stale speculative prefetches"
+outer_inv_range() is a rather expensive operation. In the first case
+isn't it enough to just call cache_sync()?
+
+What about:
+void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
+	size_t size, enum dma_data_direction dir)
+{
+...
+	if (dir == DMA_FROM_DEVICE) {
+-		outer_inv_range(paddr, paddr + size);
++		outer_sync();
+...
+}
+
+/Per
