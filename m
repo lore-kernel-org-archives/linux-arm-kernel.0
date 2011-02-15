@@ -1,68 +1,37 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Tue, 15 Feb 2011 13:55:11 -0800
-Subject: [PATCH 4/4] arm: V2 configs: update pxa910 defconfig for SoC
-	Selection
-Message-ID: <5DE28962-5F04-4D34-8D65-DF4020F135CD@marvell.com>
+From: meador_inge@mentor.com (Meador Inge)
+Date: Tue, 15 Feb 2011 15:58:42 -0600
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <20110214100104.GC4371@pulham.picochip.com>
+References: <4D55A7F7.5090700@mentor.com>
+	<20110214100104.GC4371@pulham.picochip.com>
+Message-ID: <4D5AF712.3080509@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/14/2011 04:01 AM, Jamie Iles wrote:
+> On Fri, Feb 11, 2011 at 03:19:51PM -0600, Meador Inge wrote:
+>>      1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
+>>         for the MPIC message registers on Power and OMAP4 mailboxes, for
+>>         example.
+>>      2. A higher level driver under '.../drivers/mailbox/*'.  That the
+>>         pieces in (1) would register with.  This piece would expose the
+>>         main kernel API.
+>>      3. Userspace interfaces for accessing the mailboxes.  A
+>>         '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
+>
+> How about using virtio for all of this and having the mailbox as a
+> notification/message passing driver for the virtio backend?  There are
+> already virtio console and network drivers that could be useful for the
+> userspace part of it.  drivers/virtio/virtio_ring.c might be a good
+> starting point if you thought there was some mileage in this approach.
 
-V2
-==
-Use make savedefconfigconfig to produce reduced size defconfig
-per suggestion of Nico Pitre.
+To be honest, I am not that familiar with 'virtio', but I will take a 
+look.  Thanks for the pointer.  Maybe Hollis can speak to this idea more.
 
-V1
-==
+> Jamie
+>
 
-took old pxa910_defconfig --
-did make menuconfig
-changed to CPU_PXA910
 
-Signed-off-by: Philip Rakity <prakity@marvell.com>
----
- arch/arm/configs/pxa910_defconfig |    6 +-----
- 1 files changed, 1 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/configs/pxa910_defconfig b/arch/arm/configs/pxa910_defconfig
-index 1cd381e..8c405cd 100644
---- a/arch/arm/configs/pxa910_defconfig
-+++ b/arch/arm/configs/pxa910_defconfig
-@@ -1,7 +1,6 @@
- CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
-@@ -9,7 +8,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_MMP=y
--CONFIG_MACH_TAVOREVB=y
-+CONFIG_CPU_PXA910=y
- CONFIG_MACH_TTC_DKB=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-@@ -30,7 +29,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_BLK_DEV is not set
--# CONFIG_MISC_DEVICES is not set
- CONFIG_NETDEVICES=y
- CONFIG_NET_ETHERNET=y
- CONFIG_SMC91X=y
-@@ -45,10 +43,8 @@ CONFIG_SERIAL_PXA_CONSOLE=y
- # CONFIG_LEGACY_PTYS is not set
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
--# CONFIG_VGA_CONSOLE is not set
- # CONFIG_HID_SUPPORT is not set
- # CONFIG_USB_SUPPORT is not set
--CONFIG_INOTIFY=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- CONFIG_CRAMFS=y
 -- 
-1.7.0.4
+Meador Inge     | meador_inge AT mentor.com
+Mentor Embedded | http://www.mentor.com/embedded-software
