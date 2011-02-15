@@ -1,88 +1,53 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Tue, 15 Feb 2011 08:53:12 +0900
-Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
-	ARCH_EXYNOS4 from ARCH_S5PV310
-In-Reply-To: <AANLkTim49dpC_r4BcK7tqo9wmu8W=qMDZE5szDUja6Wo@mail.gmail.com>
-References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTim49dpC_r4BcK7tqo9wmu8W=qMDZE5szDUja6Wo@mail.gmail.com>
-Message-ID: <002d01cbcca2$5900e430$0b02ac90$@com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 14 Feb 2011 16:08:10 -0800
+Subject: [PATCH] omap3: pm: Use exported set_cr() instead of a custom one.
+In-Reply-To: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Fri, 11 Feb 2011 20:42:11 +0530")
+References: <1297437132-1005-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <871v3axiqd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-I answer your questions in detail.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-> On Monday, February 14, 2011 8:16 PM, Kyungmin Park wrote:
-> 
-> Hi,
-> 
-> Wow, fast move, but need to more explanation.
-> what's the exact meaning of exynos4210?
-> Exynos4 is prefix and remaining are variants?
+> Remove the custom restore_control_register() and use the exported
+> set_cr() instead to set the system control register(SCTRL) value.
+>
+> No functional change.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-Exynos4210 means below.
+Tested/validated on ?
 
-1st digit means ARM core version. In this case, 4 means Cortex A9.
-(If we release cortex A15, it will be Exynos5xxx)
-2nd digit means number of core.  2 mean dual core.
-3rd digit means application category(LSI internal category).
-4th digit means design rule (generation or shrink version)
+Kevin
 
-> Now you changed all s5pv310 to exynos4. if new exynos4xxx chip are
-> comes then how to handle this one?
-> e.g., exynos4220 or later.
-> it's also conflict with mach-exynos4. do you handle all exynos4 series
-> at this mach directory?
-> historically there's no rules of the base RAM address at least samsung
-> chips.
-
-Yes, we will handle all exynos4 series at mach-exynos4 directory.
-In the past, there is no rule. 
-But now, we are making consistent rules with AP design team.
-So, new version of exynos4 series will have same base RAM address.
-
-Thanks and regards,
-Sangbeom Kim
-
-> 
-> Thank you,
-> Kyungmin Park
-> 
-> On Mon, Feb 14, 2011 at 5:22 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting
-> Samsung's
-> > new brand name EXYNOS. Samsung officially announced about the brand name
-> of EXYNOS
-> > at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor
-> with several
-> > other peripherals to support features such as multimedai, storage,
-> graphics and gaming.
-> > Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be
-> used in
-> > products such as Mobile devices.
-> >
-> > This patch set consists of the following patches.
-> >
-> > [PATCH 01/11] ARM: EXYNOS4: Add EXYNOS4 CPU initialization support
-> > [PATCH 02/11] ARM: EXYNOS4: Update Clock part
-> > [PATCH 03/11] ARM: EXYNOS4: Update IRQ part
-> > [PATCH 04/11] ARM: EXYNOS4: Update Timer part
-> > [PATCH 05/11] ARM: EXYNOS4: Update device support
-> > [PATCH 06/11] ARM: EXYNOS4: Moved board support files
-> > [PATCH 07/11] ARM: EXYNOS4: Update Kconfig and Makefile for the new
-> ARCH_EXYNOS4
-> > [PATCH 08/11] ARM: exynos4_defconfig: Add defconfig for EXYNOS4
-> > [PATCH 09/11] mtd: OneNAND: Change dependency of ARCH_EXYNOS4
-> > [PATCH 10/11] ASoC: Change dependency of ARCH_EXYNOS4
-> > [PATCH 11/11] tty: Change dependency of ARCH_EXYNOS4
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
-> soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> ---
+>  arch/arm/mach-omap2/pm34xx.c |    7 +------
+>  1 files changed, 1 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 2f864e4..63a3e1d 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -311,11 +311,6 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static void restore_control_register(u32 val)
+> -{
+> -	__asm__ __volatile__ ("mcr p15, 0, %0, c1, c0, 0" : : "r" (val));
+> -}
+> -
+>  /* Function to restore the table entry that was modified for enabling MMU */
+>  static void restore_table_entry(void)
+>  {
+> @@ -337,7 +332,7 @@ static void restore_table_entry(void)
+>  	control_reg_value = __raw_readl(scratchpad_address
+>  					+ OMAP343X_CONTROL_REG_VALUE_OFFSET);
+>  	/* This will enable caches and prediction */
+> -	restore_control_register(control_reg_value);
+> +	set_cr(control_reg_value);
+>  }
+>  
+>  void omap_sram_idle(void)
