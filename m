@@ -1,57 +1,27 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Tue, 15 Feb 2011 16:08:32 +0200
-Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
-	dev_dbg()
-In-Reply-To: <20110215155948.32b564d5.jhnikula@gmail.com>
-References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
-	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
-	<4D5A81D8.2080800@ru.mvista.com>
-	<AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
-	<20110215155948.32b564d5.jhnikula@gmail.com>
-Message-ID: <AANLkTim3+PFgJUU_-YqOt1M5NkSyHo6wUwF_XwC9MWSP@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Feb 2011 14:12:53 +0000
+Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
+In-Reply-To: <AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
+References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
+	<20110215133232.GI4152@n2100.arm.linux.org.uk>
+	<20110215134134.GA17208@n2100.arm.linux.org.uk>
+	<AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
+Message-ID: <20110215141253.GJ4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 3:59 PM, Jarkko Nikula <jhnikula@gmail.com> wrote:
-> On Tue, 15 Feb 2011 15:44:27 +0200
-> David Cohen <dacohen@gmail.com> wrote:
->
->> >> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj,
->> >> u32 *ra)
->> >> ? ? ? ?da = iommu_read_reg(obj, MMU_FAULT_AD);
->> >> ? ? ? ?*ra = da;
->> >>
->> >> - ? ? ? dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
->> >> + ? ? ? dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
->> >
->> > ? Note that dev_dbg() will only print something if either DEBUG or
->> > CONFIG_DYNAMIC_DEBUG are defined...
->>
->> That's my plan.
->>
-> So it's sure that a developer won't need these error dumps when
-> receiving an error report? I.e. IOMMU upper level errors give enough
-> information to start doing own debugging?
+On Tue, Feb 15, 2011 at 02:54:21PM +0100, Per Forlin wrote:
+> I don't fully understand this yet. I think you are right but I need a
+> little help to get there myself.
+> I agree, the cache (L1 and L2) must be invalidated after the DMA has completed.
+> Before starting the DMA the write buffers must be drained (cache_sync).
+> 
+> Why invalidate the cache before starting the DMA?
 
-Yes, developers do need this information.
-But it's a bit useless tell only we've got an iommu fault, due to many
-places might be causing it. My purpose is to let the debug
-responsibility to IOMMU users. They have access to the iovmm layer as
-well and can provide a much more useful information.
-e.g. OMAP3 ISP has many submodules using IOMMU. With a fault callback,
-it can dump all the iovm areas and the faulty 'da' too. It might
-indicate which submodule was responsible for the issue.
+Think about what happens if you have dirty cache lines in the DMA region.
+These can be evicted when other cache lines are loaded, which will result
+in them overwriting contents of memory.  If the DMA device has already
+written to that memory, the result is data corruption.
 
-Of course we can just let this debug messages the way they are and
-print this redundant information. But IMO it's not necessary.
-
-Regards,
-
-David
-
->
-> Just my 2 cents.
->
-> --
-> Jarkko
->
+So, the invalidate prior to DMA is to get rid of any dirty cache lines
+which could be written back to memory.
