@@ -1,37 +1,47 @@
-From: meador_inge@mentor.com (Meador Inge)
-Date: Tue, 15 Feb 2011 15:58:42 -0600
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <20110214100104.GC4371@pulham.picochip.com>
-References: <4D55A7F7.5090700@mentor.com>
-	<20110214100104.GC4371@pulham.picochip.com>
-Message-ID: <4D5AF712.3080509@mentor.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 15 Feb 2011 23:05:46 +0100
+Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
+In-Reply-To: <AANLkTinA2a60TSM7qDC1LQiRaUTs0DR3bDMv+oVsVOE0@mail.gmail.com>
+References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>	<1296674843-12718-4-git-send-email-omar.ramirez@ti.com>	<4D5943A9.8010205@ti.com>
+	<AANLkTinA2a60TSM7qDC1LQiRaUTs0DR3bDMv+oVsVOE0@mail.gmail.com>
+Message-ID: <4D5AF8BA.8080403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2011 04:01 AM, Jamie Iles wrote:
-> On Fri, Feb 11, 2011 at 03:19:51PM -0600, Meador Inge wrote:
->>      1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
->>         for the MPIC message registers on Power and OMAP4 mailboxes, for
->>         example.
->>      2. A higher level driver under '.../drivers/mailbox/*'.  That the
->>         pieces in (1) would register with.  This piece would expose the
->>         main kernel API.
->>      3. Userspace interfaces for accessing the mailboxes.  A
->>         '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
+Hi Omar,
+
+On 2/15/2011 10:55 PM, Ramirez Luna, Omar wrote:
+> Hi Benoit,
 >
-> How about using virtio for all of this and having the mailbox as a
-> notification/message passing driver for the virtio backend?  There are
-> already virtio console and network drivers that could be useful for the
-> userspace part of it.  drivers/virtio/virtio_ring.c might be a good
-> starting point if you thought there was some mileage in this approach.
-
-To be honest, I am not that familiar with 'virtio', but I will take a 
-look.  Thanks for the pointer.  Maybe Hollis can speak to this idea more.
-
-> Jamie
+> On Mon, Feb 14, 2011 at 9:00 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>>> +static struct omap_hwmod_irq_info omap44xx_mailbox_irqs[] = {
+>>> +       { .name = "mbox", .irq = 26 + OMAP44XX_IRQ_GIC_START, },
+>>
+>> The original entry was unnamed since it is an unique entry and thus does not
+>> need to be differentiate on this platform.
+>>
+>>         { .irq = 26 + OMAP44XX_IRQ_GIC_START },
+>>
+>> Do you really need to have a name here? The strategy being to provide a name
+>> only if more than one entry exist.
+>> It is perfectibility doable, I'm just trying to understand your rational.
 >
+> It is this way instead of plain platform_get_irq because omap2420 has
+> two interrupt sources to MPU and mailbox driver uses
+> platform_get_irq_byname to get the irq number.
 
+This is what I was thinking, except that on OMAP2420 the names are:
++	{ .name = "dsp", .irq = 26, },
++	{ .name = "iva", .irq = 34, },
 
--- 
-Meador Inge     | meador_inge AT mentor.com
-Mentor Embedded | http://www.mentor.com/embedded-software
+and on OMAP2430 and OMAP3
++	{ .name = "dsp", .irq = 26, },
+
+so why is it named "mbox" on OMAP4?
+
+If you have to do several platform_get_irq_byname to get this one, I'd 
+prefer to get rid of that name for OMAP4. It will make mailbox irq 
+consistent with the other hwmods.
+
+Thanks,
+Benoit
