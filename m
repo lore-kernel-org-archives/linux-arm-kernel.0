@@ -1,60 +1,41 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Tue, 15 Feb 2011 17:16:52 +0200
-Subject: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on TWL
-In-Reply-To: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
-References: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
-Message-ID: <20110215171652.601c9c68.jhnikula@gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 15 Feb 2011 17:18:00 +0200
+Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
+In-Reply-To: <AANLkTimapyDg0G0k2GfTdQ6RcUs9oUxXmHGMWoDhaZED@mail.gmail.com>
+References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+	<201102151551.20080.anarsoul@gmail.com>
+	<AANLkTimapyDg0G0k2GfTdQ6RcUs9oUxXmHGMWoDhaZED@mail.gmail.com>
+Message-ID: <201102151718.00800.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Feb 2011 13:28:58 +0530
-Shweta Gulati <shweta.gulati@ti.com> wrote:
-
-> This patch is based on LO PM Branch and Smartreflex has been
-> tested on OMAP3430 SDP, OMAP3630 SDP and boot tested on
-> OMAP2430 SDP.
+On Tuesday 15 February 2011 17:12:10 Eric Miao wrote:
+> On Tue, Feb 15, 2011 at 9:51 PM, Vasily Khoruzhick <anarsoul@gmail.com> 
+wrote:
+> > On Tuesday 15 February 2011 15:36:07 you wrote:
+> >> Then maybe in this way? (I'd rather keep this bit in overlay specific
+> >> code, and make it valid not only to pxa27x)
+> >> 
+> >> @@ -925,6 +925,8 @@ static int __devinit pxafb_overlay_init(struct
+> >> pxafb_info *fbi)
+> >> 
+> >>         /* place overlay(s) on top of base */
+> >>         fbi->lccr0 |= LCCR0_OUC;
+> >> +       lcd_writel(fbi, LCCR0, fbi->lccr0 & ~LCCR0_ENB);
+> >> +
+> >>         pr_info("PXA Overlay driver loaded successfully!\n");
+> >>         return 0;
+> > 
+> > I tried it, it doesn't work that way (I got garbage on screen). Maybe
+> > it's not right time to modify LCCR0 reg?
 > 
-I saw this was working on N900 (kind of special instrumentation
-setup) after enabling /sys/kernel/debug/voltage/[vdd_core |
-vdd_mpu]/smartreflex/autocomp. Few comments below.
+> I guess that's because OUC bit needs to be set when the panel is
+> not enabled. But re-enabling here is a bit hackish as well.
+> 
+> I don't mind move the code a bit, but can we separate this change
+> into another patch from the rest?
 
-> @@ -269,6 +276,18 @@ int __init omap3_twl_init(void)
->  		omap3_core_volt_info.vp_vddmax = OMAP3630_VP2_VLIMITTO_VDDMAX;
->  	}
-...
-> +	if (!twl_sr_enable_autoinit)
-> +		omap3_twl_set_sr_bit(true);
-...
-> +int __init omap3_twl_set_sr_bit(bool enable)
-> +{
-> +	u8 temp;
-> +	int ret;
-> +	if (twl_sr_enable_autoinit)
-> +		pr_warning("%s: unexpected multiple calls\n", __func__);
-> +
-> +	ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
-> +					TWL4030_DCDC_GLOBAL_CFG);
-> +	if (ret)
-> +		goto err;
-> +
-> +	if (enable)
-> +		temp |= SMARTREFLEX_ENABLE;
-> +	else
-> +		temp &= ~SMARTREFLEX_ENABLE;
-> +
-> +	ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
-> +				TWL4030_DCDC_GLOBAL_CFG);
+Ok, will send patches tonight
 
-Would it make more sense to set only the flag here and do the register
-writes when omap3_twl_init is executing? Then it's not so strict when
-the board code calls this function.
-
-> +	if (!ret) {
-> +		twl_sr_enable_autoinit = true;
-> +		return 0;
-
-Should this be twl_sr_enable_autoinit = enable (if going to do
-register write here)?
-
--- 
-Jarkko
+> Thanks
+> - eric
