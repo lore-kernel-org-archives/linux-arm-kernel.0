@@ -1,143 +1,113 @@
 From: arve@android.com (=?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?=)
-Date: Mon, 14 Feb 2011 22:11:11 -0800
-Subject: [PATCH 3/8] ARM: etm: Don't try to clear the buffer full status after
-	reading the buffer
+Date: Mon, 14 Feb 2011 22:11:12 -0800
+Subject: [PATCH 4/8] ARM: etm: Allow range selection
 In-Reply-To: <1296701663-12168-1-git-send-email-arve@android.com>
 References: <1296701663-12168-1-git-send-email-arve@android.com>
-Message-ID: <1297750276-12475-3-git-send-email-arve@android.com>
+Message-ID: <1297750276-12475-4-git-send-email-arve@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the write address was at the end of the buffer, toggling the trace
-capture bit would set the RAM-full status instead of clearing it, and
-if any of the stop bits in the formatter is set toggling the trace
-capture bit may not do anything.
-
-Instead use the read position to find out if the data has already
-been returned.
-
-This also fixes the read function so it works when the trace buffer is
-larger than the buffer passed in from user space. The old version
-would reset the trace buffer pointers after every read, so the second
-call to read would always return 0.
+Trace kernel text segment by default as before, allow tracing of other
+ranges by writing a range to /sys/devices/etm/trace_range, or to trace
+everything by writing 0 0.
 
 Signed-off-by: Arve Hj?nnev?g <arve@android.com>
 ---
- arch/arm/kernel/etm.c |   58 ++++++++++++++++++++++---------------------------
- 1 files changed, 26 insertions(+), 32 deletions(-)
+ arch/arm/kernel/etm.c |   49 ++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 46 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 6e15c48..bc7d8f2 100644
+index bc7d8f2..8a1c422 100644
 --- a/arch/arm/kernel/etm.c
 +++ b/arch/arm/kernel/etm.c
-@@ -91,6 +91,7 @@ static int trace_start(struct tracectx *t)
+@@ -40,12 +40,17 @@ struct tracectx {
+ 	unsigned long	flags;
+ 	int		ncmppairs;
+ 	int		etm_portsz;
++	unsigned long	range_start;
++	unsigned long	range_end;
+ 	struct device	*dev;
+ 	struct clk	*emu_clk;
+ 	struct mutex	mutex;
+ };
  
- 	etb_unlock(t);
+-static struct tracectx tracer;
++static struct tracectx tracer = {
++	.range_start = (unsigned long)_stext,
++	.range_end = (unsigned long)_etext,
++};
  
-+	etb_writel(t, 0, ETBR_WRITEADDR);
- 	etb_writel(t, 0, ETBR_FORMATTERCTRL);
- 	etb_writel(t, 1, ETBR_CTRL);
- 
-@@ -184,24 +185,15 @@ static int trace_stop(struct tracectx *t)
- static int etb_getdatalen(struct tracectx *t)
+ static inline bool trace_isrunning(struct tracectx *t)
  {
- 	u32 v;
--	int rp, wp;
-+	int wp;
+@@ -115,8 +120,12 @@ static int trace_start(struct tracectx *t)
+ 		return -EFAULT;
+ 	}
  
- 	v = etb_readl(t, ETBR_STATUS);
- 
- 	if (v & 1)
- 		return t->etb_bufsz;
- 
--	rp = etb_readl(t, ETBR_READADDR);
- 	wp = etb_readl(t, ETBR_WRITEADDR);
--
--	if (rp > wp) {
--		etb_writel(t, 0, ETBR_READADDR);
--		etb_writel(t, 0, ETBR_WRITEADDR);
--
--		return 0;
--	}
--
--	return wp - rp;
-+	return wp;
- }
- 
- /* sysrq+v will always stop the running trace and leave it at that */
-@@ -234,14 +226,6 @@ static void etm_dump(void)
- 		printk("%08x", cpu_to_be32(etb_readl(t, ETBR_READMEM)));
- 	printk(KERN_INFO "\n--- ETB buffer end ---\n");
- 
--	/* deassert the overflow bit */
--	etb_writel(t, 1, ETBR_CTRL);
--	etb_writel(t, 0, ETBR_CTRL);
--
--	etb_writel(t, 0, ETBR_TRIGGERCOUNT);
--	etb_writel(t, 0, ETBR_READADDR);
--	etb_writel(t, 0, ETBR_WRITEADDR);
--
- 	etb_lock(t);
- }
- 
-@@ -275,6 +259,10 @@ static ssize_t etb_read(struct file *file, char __user *data,
- 	struct tracectx *t = file->private_data;
- 	u32 first = 0;
- 	u32 *buf;
-+	int wpos;
-+	int skip;
-+	long wlength;
-+	loff_t pos = *ppos;
- 
- 	mutex_lock(&t->mutex);
- 
-@@ -289,28 +277,34 @@ static ssize_t etb_read(struct file *file, char __user *data,
- 	if (total == t->etb_bufsz)
- 		first = etb_readl(t, ETBR_WRITEADDR);
- 
-+	if (pos > total * 4) {
-+		skip = 0;
-+		wpos = total;
-+	} else {
-+		skip = (int)pos % 4;
-+		wpos = (int)pos / 4;
-+	}
-+	total -= wpos;
-+	first = (first + wpos) % t->etb_bufsz;
+-	etm_setup_address_range(t, 1, (unsigned long)_stext,
+-			(unsigned long)_etext, 0, 0);
++	if (t->range_start || t->range_end)
++		etm_setup_address_range(t, 1,
++					t->range_start, t->range_end, 0, 0);
++	else
++		etm_writel(t, ETMTE_INCLEXCL, ETMR_TRACEENCTRL);
 +
- 	etb_writel(t, first, ETBR_READADDR);
+ 	etm_writel(t, 0, ETMR_TRACEENCTRL2);
+ 	etm_writel(t, 0, ETMR_TRACESSCTRL);
+ 	etm_writel(t, 0x6f, ETMR_TRACEENEVT);
+@@ -525,6 +534,35 @@ static ssize_t trace_mode_store(struct kobject *kobj,
+ static struct kobj_attribute trace_mode_attr =
+ 	__ATTR(trace_mode, 0644, trace_mode_show, trace_mode_store);
  
--	length = min(total * 4, (int)len);
--	buf = vmalloc(length);
-+	wlength = min(total, DIV_ROUND_UP(skip + (int)len, 4));
-+	length = min(total * 4 - skip, (int)len);
-+	buf = vmalloc(wlength * 4);
++static ssize_t trace_range_show(struct kobject *kobj,
++				  struct kobj_attribute *attr,
++				  char *buf)
++{
++	return sprintf(buf, "%08lx %08lx\n",
++			tracer.range_start, tracer.range_end);
++}
++
++static ssize_t trace_range_store(struct kobject *kobj,
++				   struct kobj_attribute *attr,
++				   const char *buf, size_t n)
++{
++	unsigned long range_start, range_end;
++
++	if (sscanf(buf, "%lx %lx", &range_start, &range_end) != 2)
++		return -EINVAL;
++
++	mutex_lock(&tracer.mutex);
++	tracer.range_start = range_start;
++	tracer.range_end = range_end;
++	mutex_unlock(&tracer.mutex);
++
++	return n;
++}
++
++
++static struct kobj_attribute trace_range_attr =
++	__ATTR(trace_range, 0644, trace_range_show, trace_range_store);
++
+ static int __init etm_probe(struct amba_device *dev, struct amba_id *id)
+ {
+ 	struct tracectx *t = &tracer;
+@@ -576,6 +614,10 @@ static int __init etm_probe(struct amba_device *dev, struct amba_id *id)
+ 	if (ret)
+ 		dev_dbg(&dev->dev, "Failed to create trace_mode in sysfs\n");
  
--	dev_dbg(t->dev, "ETB buffer length: %d\n", total);
-+	dev_dbg(t->dev, "ETB read %ld bytes to %lld from %ld words at %d\n",
-+		length, pos, wlength, first);
-+	dev_dbg(t->dev, "ETB buffer length: %d\n", total + wpos);
- 	dev_dbg(t->dev, "ETB status reg: %x\n", etb_readl(t, ETBR_STATUS));
--	for (i = 0; i < length / 4; i++)
-+	for (i = 0; i < wlength; i++)
- 		buf[i] = etb_readl(t, ETBR_READMEM);
- 
--	/* the only way to deassert overflow bit in ETB status is this */
--	etb_writel(t, 1, ETBR_CTRL);
--	etb_writel(t, 0, ETBR_CTRL);
--
--	etb_writel(t, 0, ETBR_WRITEADDR);
--	etb_writel(t, 0, ETBR_READADDR);
--	etb_writel(t, 0, ETBR_TRIGGERCOUNT);
--
- 	etb_lock(t);
- 
--	length -= copy_to_user(data, buf, length);
-+	length -= copy_to_user(data, (u8 *)buf + skip, length);
- 	vfree(buf);
-+	*ppos = pos + length;
++	ret = sysfs_create_file(&dev->dev.kobj, &trace_range_attr.attr);
++	if (ret)
++		dev_dbg(&dev->dev, "Failed to create trace_range in sysfs\n");
++
+ 	dev_dbg(t->dev, "ETM AMBA driver initialized.\n");
  
  out:
- 	mutex_unlock(&t->mutex);
+@@ -605,6 +647,7 @@ static int etm_remove(struct amba_device *dev)
+ 	sysfs_remove_file(&dev->dev.kobj, &trace_running_attr.attr);
+ 	sysfs_remove_file(&dev->dev.kobj, &trace_info_attr.attr);
+ 	sysfs_remove_file(&dev->dev.kobj, &trace_mode_attr.attr);
++	sysfs_remove_file(&dev->dev.kobj, &trace_range_attr.attr);
+ 
+ 	return 0;
+ }
 -- 
 1.7.3.1
