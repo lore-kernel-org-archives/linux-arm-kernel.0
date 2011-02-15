@@ -1,49 +1,56 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 15 Feb 2011 16:31:28 +0100
-Subject: [PATCH v2] ARM: S5PV210: Add GONI board setup for CIF camera
-	support
-In-Reply-To: <00a801cbccfa$df478e10$9dd6aa30$%kim@samsung.com>
-References: <1297445273-3829-1-git-send-email-s.nawrocki@samsung.com>
-	<008d01cbccd4$3897da00$a9c78e00$%kim@samsung.com>
-	<4D5A3F31.1070106@samsung.com>
-	<00a801cbccfa$df478e10$9dd6aa30$%kim@samsung.com>
-Message-ID: <4D5A9C50.4080408@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 15 Feb 2011 21:07:53 +0530
+Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
+In-Reply-To: <1297787428-5717-1-git-send-email-tero.kristo@nokia.com>
+References: <1297787428-5717-1-git-send-email-tero.kristo@nokia.com>
+Message-ID: <6038d98e9a2eb2129200f5e08560cf7e@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Tero Kristo
+> Sent: Tuesday, February 15, 2011 10:00 PM
+> To: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
+>
+> This saves some power. OMAP4 version should check for GPT module ID,
+> as
+> autoidle is only supported on a subset of these.
+>
+> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+> ---
+>  arch/arm/plat-omap/dmtimer.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-
+> omap/dmtimer.c
+> index 1d706cf..ee9f6eb 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -342,6 +342,10 @@ static void omap_dm_timer_reset(struct
+> omap_dm_timer *timer)
+>  	l |= 0x02 << 3;  /* Set to smart-idle mode */
+>  	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on
+> idle */
+>
+> +	/* Enable autoidle on OMAP2 / OMAP3 */
+> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> +		l |= 0x1 << 0;
+> +
+We should get rid of this CPU checks. How about adding a flag
+and populating it on init for the architectures it supports.
 
-On 02/15/2011 11:26 AM, Kukjin Kim wrote:
-> Sylwester Nawrocki wrote:
->>
-...
-> 
-> As a note, I received request about common phy control from Marek. So I will
-> re-think with your mipi phy patches, then let you know about that soon.
-> 
 
-OK, thanks. It looks like treating PHYs as clocks would cause least trouble.
-Some of PHYs are really not much different than clocks, they generate a carrier
-of some frequency, like for example HDMI PHY. Some even have their own divider.
-
-We thought about creating an API for PHYs, similar to clock API. There is
-quite many PHYs in S5P SoCs - SATA, USB, MIPI, HDMI devices have them.
-Such a PHY API would be mostly doubling the clock API functionality though.
-
-We also cannot easily create common helpers in plat-s5p for mipi because
-of the different headers issue. 
-
-So we have 3 options if it comes to mipi:
-1. create helper functions in relevant mach-s5p* directories 
-2. register special clocks with own enable/disable functions
-3. create separate API to manage all PHY's in the SoC series
-
-MIPI PHY issue is a blocking point for a mipi-csi driver inclusion.
-It has been ready for quite some time yet and I would appreciate
-if we could take time to finally work out compromise.
-
-
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+>  	/*
+>  	 * Enable wake-up on OMAP2 CPUs.
+>  	 */
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-
+> omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
