@@ -1,34 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Feb 2011 11:52:22 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <20110212102803.GC15616@n2100.arm.linux.org.uk>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
-	<20110212102803.GC15616@n2100.arm.linux.org.uk>
-Message-ID: <1297770742.21448.2.camel@e102144-lin.cambridge.arm.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 15 Feb 2011 13:58:46 +0200
+Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
+In-Reply-To: <AANLkTimR_6fYuJHuVC8TD5agjyCoUWiKQmEunhZHSQE5@mail.gmail.com>
+References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+	<201102151041.21560.anarsoul@gmail.com>
+	<AANLkTimR_6fYuJHuVC8TD5agjyCoUWiKQmEunhZHSQE5@mail.gmail.com>
+Message-ID: <201102151358.47203.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Sat, 2011-02-12 at 10:28 +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 24, 2011 at 05:55:57PM +0000, Catalin Marinas wrote:
-> >  arch/arm/include/asm/memory.h     |   17 +++++++++--------
-> >  arch/arm/include/asm/outercache.h |   14 ++++++++------
-> >  arch/arm/include/asm/pgtable.h    |    2 +-
-> >  arch/arm/include/asm/setup.h      |    2 +-
-> >  arch/arm/kernel/setup.c           |    5 +++--
-> >  arch/arm/mm/init.c                |    6 +++---
-> >  arch/arm/mm/mmu.c                 |    7 ++++---
-> >  7 files changed, 29 insertions(+), 24 deletions(-)
+On Tuesday 15 February 2011 13:51:06 Eric Miao wrote:
+> >> >        lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
+> >> > -       lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+> >> > +       if (fbi->lccr0 & LCCR0_SDS)
+> >> > +               lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+> >> 
+> >> My original intention was to simplify the code a bit by ignoring
+> >> LCCR0_SDS, as FDADR1 would not take effect if not enabled even
+> >> if it's being read/written.
+> > 
+> > It leads to potential race condition when you try to reconfigure main
+> > plane and overlay1 simultaneously.
 > 
-> If this is split up into four separate patches, we can probably sort out
-> merging this for the upcoming window.
+> You are right on this.
 > 
-Excellent! I've split the patch up into four distinct parts, as per your
-suggestions. I've submitted these to your patch system (6670/1-6673/1)
-alongside a fixed version of the printf format patch (6669/1) because
-without that, you get a bunch of compiler warnings.
+> >> > +#ifdef CONFIG_FB_PXA_OVERLAY
+> >> > +       if (cpu_is_pxa27x())
+> >> > +               fbi->lccr0 |= LCCR0_OUC;
+> >> > +#endif
+> >> > +
+> >> 
+> >> I seem to remember LCCR0_OUC is still valid on pxa3xx, did you
+> >> do some test on pxa3xx as well?
+> > 
+> > Sorry, I have no any pxa3xx boards.
+> 
+> That's all right, I can give it a test later. The point is, why
+> did you move the code here from pxafb_overlay_init()?
 
-Will
+Because otherwise correct plane order (overlays on top) will be selected only 
+on next main plane reconfigure.
+
+Regards
+Vasily
