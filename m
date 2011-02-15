@@ -1,42 +1,40 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 15 Feb 2011 16:11:09 +0100
-Subject: [RFC] ARM: dma-mapping: outer cache is invalidated twice
-In-Reply-To: <20110215141253.GJ4152@n2100.arm.linux.org.uk>
-References: <AANLkTi=rZJq0CPQD0Q1HMgih7UP0Tqoh9sPEYb2NEV_X@mail.gmail.com>
-	<20110215133232.GI4152@n2100.arm.linux.org.uk>
-	<20110215134134.GA17208@n2100.arm.linux.org.uk>
-	<AANLkTi=Fs5+3yG-_4u0oU8WK4K4FU_8zN38H=RNcgRNU@mail.gmail.com>
-	<20110215141253.GJ4152@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinpcYoHKKDhqy9mKpqOEGtMpNc1BSukNWH-GVBX@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 15 Feb 2011 23:12:10 +0800
+Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
+In-Reply-To: <201102151551.20080.anarsoul@gmail.com>
+References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+	<201102151358.47203.anarsoul@gmail.com>
+	<AANLkTinu2LT4t=f=Y0ZBmT6=nsoiQ9HVVTYmzgLMpDXR@mail.gmail.com>
+	<201102151551.20080.anarsoul@gmail.com>
+Message-ID: <AANLkTimapyDg0G0k2GfTdQ6RcUs9oUxXmHGMWoDhaZED@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2011 15:12, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Feb 15, 2011 at 02:54:21PM +0100, Per Forlin wrote:
->> I don't fully understand this yet. I think you are right but I need a
->> little help to get there myself.
->> I agree, the cache (L1 and L2) must be invalidated after the DMA has completed.
->> Before starting the DMA the write buffers must be drained (cache_sync).
+On Tue, Feb 15, 2011 at 9:51 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> On Tuesday 15 February 2011 15:36:07 you wrote:
+>
+>> Then maybe in this way? (I'd rather keep this bit in overlay specific
+>> code, and make it valid not only to pxa27x)
 >>
->> Why invalidate the cache before starting the DMA?
+>> @@ -925,6 +925,8 @@ static int __devinit pxafb_overlay_init(struct
+>> pxafb_info *fbi)
+>>
+>> ? ? ? ? /* place overlay(s) on top of base */
+>> ? ? ? ? fbi->lccr0 |= LCCR0_OUC;
+>> + ? ? ? lcd_writel(fbi, LCCR0, fbi->lccr0 & ~LCCR0_ENB);
+>> +
+>> ? ? ? ? pr_info("PXA Overlay driver loaded successfully!\n");
+>> ? ? ? ? return 0;
 >
-> Think about what happens if you have dirty cache lines in the DMA region.
-> These can be evicted when other cache lines are loaded, which will result
-> in them overwriting contents of memory. ?If the DMA device has already
-> written to that memory, the result is data corruption.
+> I tried it, it doesn't work that way (I got garbage on screen). Maybe it's not
+> right time to modify LCCR0 reg?
 >
-> So, the invalidate prior to DMA is to get rid of any dirty cache lines
-> which could be written back to memory.
->
-True. In my case write back is disable but read back is enable, that's
-why I didn't consider it.
-Do you think it is feasible to let dma-mapping detect the cache
-configurations in runtime in order to prevent "unnecessary" cache
-operations? I can see some FIXME comments in the code which indicates
-you may have plans to change it.
 
-I can try to think of a proposal if you agree.
+I guess that's because OUC bit needs to be set when the panel is
+not enabled. But re-enabling here is a bit hackish as well.
 
-Thanks again,
-/Per
+I don't mind move the code a bit, but can we separate this change
+into another patch from the rest?
+
+Thanks
+- eric
