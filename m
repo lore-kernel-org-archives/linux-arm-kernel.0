@@ -1,114 +1,34 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Tue, 15 Feb 2011 10:41:40 +0800
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <4D53749B.6010102@codeaurora.org>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<4D53749B.6010102@codeaurora.org>
-Message-ID: <201102151041.40655.jeremy.kerr@canonical.com>
+From: ccross@google.com (Colin Cross)
+Date: Mon, 14 Feb 2011 20:11:23 -0800
+Subject: [PATCH 2/6] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <AANLkTi=6zLxGxabBE4-+qGyRt7-219KE=4CB0jf9D=LG@mail.gmail.com>
+References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
+	<E1Pnvgw-0002yZ-M0@rmk-PC.arm.linux.org.uk>
+	<AANLkTi=6zLxGxabBE4-+qGyRt7-219KE=4CB0jf9D=LG@mail.gmail.com>
+Message-ID: <AANLkTi=JF1c-aFHpSZ-XECLEPSMsFihXT+w3=NXdYn8L@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravana,
+On Mon, Feb 14, 2011 at 5:21 PM, Colin Cross <ccross@google.com> wrote:
+> On Fri, Feb 11, 2011 at 8:17 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> This adds core support for saving and restoring CPU coprocessor
+>> registers for suspend/resume support. ?This contains support for suspend
+>> with ARM920, ARM926, SA11x0, PXA25x, PXA27x, PXA3xx, V6 and V7 CPUs.
+>
+> I would like to use cpu_suspend in a case where the L2 is still
+> enabled. ?When cpu_resume is called, the MMU and cache bits in SCTLR
+> are disabled, so the reads skip the L2 cache, and the data that was
+> saved (sleep_save_sp and *sleep_save_sp) is not read back.
+>
+> Is it possible to call the outer_cache functions from cpu_suspend to
+> flush sleep_save_sp and the saved data?
 
-> Shouldn't you be grabbing the prepare_lock here?
+Even with a cache flush, cpu_resume_turn_on_mmu fails because the page
+table modification, done with the cache off, ends up in memory, but
+the L2 contains the old value.  When the MMU and cache are enabled,
+the 1:1 mapping disappears.  The page table would need to be
+invalidated during suspend.
 
-This depends on semantics that (as far as I can tell) aren't defined yet. We 
-may even want to disallow set_rate (and set_parent) when prepare_count is non-
-zero.
-
-Ideally, we should work out what the semantics are with regards to changing a 
-clock's rate when it has multiple users and/or is enabled or prepared, but 
-that's a separate issue, and we should *definitely* implement that as a 
-separate change.
-
-I'd prefer to enforce the 'sleepability' with might_sleep instead.
-
-> You should probably rename the lock to something else since it's not
-> limited to prepare/unprepare. How about resource_lock?
-
-It's not, but that's the only thing it's protecting in the common code. I'm 
-open for better names, but resource_lock is too generic.
-
-> > +int clk_set_parent(struct clk *clk, struct clk *parent)
-> > +{
-> > +	if (clk->ops->set_parent)
-> > +		return clk->ops->set_parent(clk, parent);
-> 
-> I'm not sure on this one. If the prepare ops for a clock also calls the
-> prepare ops on the parent, shouldn't we prevent changing the parent
-> while the prepare/unprepare is going on?
-
-Again, this is related to set_rate during enable/disable or prepare/unprepare; 
-we don't have defined semantics for this at present.
-
-> > +
-> > +/* static initialiser for clocks */
-> > +#define INIT_CLK(name, o) {						\
-> > +	.ops		=&o,						\
-> > +	.enable_count	= 0,						\
-> > +	.prepare_count	= 0,						\
-> 
-> Do we need these inits? Doesn't check patch complain about initing
-> static/global to 0? If it's generally frowned upon, why the exception
-> here. I realize that checkpatch won't catch this, but still...
-
-This took some reading through c99, but yes, it looks like we can drop these 
-zero initialisations.
-
-However, the coding style convention for the implicit zeroing of static 
-variables is to allow these variables to be put into the .bss section, 
-reducing object size. In this case, the clock will never be able to go into 
-.bss (it has non-zero elements too), and so this will have no change on object 
-size. I prefer to be explicit here, and show that the counts are initialised 
-to zero.
-
-I'm happy to go either way. I have a preference for the explicit 
-initialisation, but that may not be general style.
-
-> 
-> > +	.enable_lock	= __SPIN_LOCK_UNLOCKED(name.enable_lock),	\
-> > +	.prepare_lock	= __MUTEX_INITIALIZER(name.prepare_lock),	\
-> 
-> After a long day, I'm not able to wrap my head around this. Probably a
-> stupid question, but will this name.xxx thing prevent using this
-> INIT_CLK macro to initialize an array of clocks? More specifically,
-> prevent the sub class macro (like INIT_CLK_FIXED) from being used to
-> initialize an array of clocks?
-
-That's correct. For an array of clocks, you'll have to use a different 
-initialiser. We can add helpers for that that when (and if) the need arises.
-
-> > + * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-> > + * implementations to split any work between atomic (enable) and
-> > sleepable + * (prepare) contexts.  If a clock requires blocking code to
-> > be turned on, this
-> 
-> Aren't all locks blocking? Shouldn't it be, "If turning on a clock
-> requires code that might sleep, it should be done in clk_prepare"?
-> Replace all "blocking" with "sleepable" or "sleeping" in the comments?
-
-I think "blocking" is generally accepted as is intended in this case, but it's 
-probably better to be explicit here.
-> 
-> > + * should be done in clk_prepare. Switching that will not block should
-> > be done + * in clk_enable.
-> > + *
-> > + * Typically, drivers will call clk_prepare when a clock may be needed
-> > later + * (eg. when a device is opened), and clk_enable when the clock
-> > is actually + * required (eg. from an interrupt). Note that clk_prepare
-> > *must* have been + * called before clk_enable.
-> > + *
-> > + * For other callbacks, see the corresponding clk_* functions.
-> > Parameters and + * return values are passed directly from/to these API
-> > functions, or + * -ENOSYS (or zero, in the case of clk_get_rate) is
-> > returned if the callback + * is NULL, see kernel/clk.c for
-> > implementation details. All are optional.
-> 
-> is NULL. See kernel... ?
-
-Ah, yes, I'll update this.
-
-Cheers,
-
-
-Jeremy
+I can avoid the problem entirely by leaving the MMU on and skipping
+cpu_resume when the CPU does not go through reset.
