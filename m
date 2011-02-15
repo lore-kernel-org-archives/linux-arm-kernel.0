@@ -1,54 +1,33 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Tue, 15 Feb 2011 22:13:04 +0800
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <201102151733.30332.jeremy.kerr@canonical.com>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<201102151526.54280.jeremy.kerr@canonical.com>
-	<20110215083759.GA4152@n2100.arm.linux.org.uk>
-	<201102151733.30332.jeremy.kerr@canonical.com>
-Message-ID: <20110215141304.GA1968@richard-laptop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Feb 2011 14:13:25 +0000
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110215220311.GH10990@S2100-06.ap.freescale.net>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165959.GC31103@n2100.arm.linux.org.uk>
+	<20110215220311.GH10990@S2100-06.ap.freescale.net>
+Message-ID: <20110215141325.GK4152@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 05:33:29PM +0800, Jeremy Kerr wrote:
-> Hi Russell,
-> 
-> > > Why is that? Consider two devices using one clock; one does some
-> > > initialisation based on the return value of clk_get_rate(), the other
-> > > calls clk_set_rate() some time later. Now the first device is
-> > > incorrectly initialised.
+On Wed, Feb 16, 2011 at 06:03:12AM +0800, Shawn Guo wrote:
+> On Mon, Feb 14, 2011 at 04:59:59PM +0000, Russell King - ARM Linux wrote:
+> > You really should be testing for MMC_RSP_PRESENT and MMC_RSP_136
+> > here.  The response types are made up of a bitfield which allows
+> > you to detect what's required rather than having to decode the
+> > response type itself.
 > > 
-> > What about a clock sourced from a PLL which provides the dotclock for a
-> > framebuffer device?  On every mode set, should the clk have to be disabled,
-> > unprepared, rate set, re-prepared and re-enabled?
+> Please review the update.
 > 
-> Sounds heavy-handed, but I honestly have no idea if that's reasonable or not.
-> 
-> Other options are:
-> 
->  * Require that the driver has called clk_prepare, and that prepare_count
->    is 1 during the set_rate call (indicating that this is the only user); or
-> 
->  * Leave the set_rate and set_parent semantics as-is and assume that anything
->    calling either knows what it's doing (and that it won't affect other
->    devices)
-I vote the second option. Two reasons:
-1. Has any mach specific clock restricted clk_set_rate use? I don't hear any.
-2. In my opinion, clk_set_rate is not called very often by drivers, especially
-for the clock which has child clocks. Leaf clock are seldom shared. Even if it's
-shared, we can let drivers handle it case by case .
+>         if (mmc_resp_type(cmd) & MMC_RSP_PRESENT) {
+>                 if (mmc_resp_type(cmd) & MMC_RSP_136) {
+>                         cmd->resp[3] = readl(host->base + HW_SSP_SDRESP0);
+>                         cmd->resp[2] = readl(host->base + HW_SSP_SDRESP1);
+>                         cmd->resp[1] = readl(host->base + HW_SSP_SDRESP2);
+>                         cmd->resp[0] = readl(host->base + HW_SSP_SDRESP3);
+>                 } else {
+>                         cmd->resp[0] = readl(host->base + HW_SSP_SDRESP0);
+>                 }
+>         }
 
-Thanks
-Richard
-> 
-> Are you OK if we address this separately to the API unification though?
-> 
-> Cheers,
-> 
-> 
-> Jeremy
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Looks right to me.
