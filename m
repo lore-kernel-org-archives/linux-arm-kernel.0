@@ -1,37 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 08:37:59 +0000
-Subject: [RFC,PATCH 1/3] Add a common struct clk
-In-Reply-To: <201102151526.54280.jeremy.kerr@canonical.com>
-References: <1297233693.242364.862698430999.1.gpush@pororo>
-	<201102151041.40655.jeremy.kerr@canonical.com>
-	<4D5A100F.9000809@codeaurora.org>
-	<201102151526.54280.jeremy.kerr@canonical.com>
-Message-ID: <20110215083759.GA4152@n2100.arm.linux.org.uk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Tue, 15 Feb 2011 10:41:21 +0200
+Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
+In-Reply-To: <AANLkTi=AfxN73pSNZ5RiTiTWfxR7PhcyJUyXzzeaYNWw@mail.gmail.com>
+References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+	<AANLkTi=AfxN73pSNZ5RiTiTWfxR7PhcyJUyXzzeaYNWw@mail.gmail.com>
+Message-ID: <201102151041.21560.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 03:26:53PM +0800, Jeremy Kerr wrote:
-> Hi Saravana,
-> 
-> > Sure, one could argue that in some archs for a certain set of clocks the
-> > slow stuff in prepare/unprepare won't need to be done during set rate --
-> > say, a simple clock that always runs off the same PLL but just has a
-> > integer divider to change the rate.
-> > 
-> > In those cases, not grabbing the prepare_lock would make the code less
-> > "locky".
-> > 
-> > > We
-> > > may even want to disallow set_rate (and set_parent) when prepare_count is
-> > > non- zero.
-> > 
-> > This is definitely not right.
-> 
-> Why is that? Consider two devices using one clock; one does some 
-> initialisation based on the return value of clk_get_rate(), the other calls 
-> clk_set_rate() some time later. Now the first device is incorrectly 
-> initialised.
+On Tuesday 15 February 2011 09:35:44 Eric Miao wrote:
 
-What about a clock sourced from a PLL which provides the dotclock for a
-framebuffer device?  On every mode set, should the clk have to be disabled,
-unprepared, rate set, re-prepared and re-enabled?
+> Or maybe simply:
+> 
+> 	if (lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN)
+> 		return;
+
+You mean if (!lcd_readl.....) return? Then OK.
+
+> this makes this block of change much cleaner.
+> 
+> > -       lcd_writel(ofb->fbi, OVL1C1, ofb->control[0] & ~OVLxC1_OEN);
+> > +       if (lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN) {
+> > +               lcd_writel(ofb->fbi, OVL1C1, ofb->control[0] &
+
+<skip>
+
+> >  static struct pxafb_layer_ops ofb_ops[] = {
+> > @@ -720,12 +726,10 @@ static int overlayfb_open(struct fb_info *info, int
+> > user) if (user == 0)
+> >                return -ENODEV;
+> > 
+> > -       /* allow only one user at a time */
+> > -       if (atomic_inc_and_test(&ofb->usage))
+> > -               return -EBUSY;
+> > +       if (ofb->usage++ == 0)
+> > +               /* unblank the base framebuffer */
+> > +               fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+> 
+> The change above allows multiple user at a time? Then I guess
+> some other places need to be changed accordingly to avoid the
+> racing conditions.
+
+For multiple users driver needs some rework indeed.
+
+> If this is a feature request, can we postpone it to subsequent
+> patches?
+
+I prefer to fix it later.
+
+> >        lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
+> > -       lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+> > +       if (fbi->lccr0 & LCCR0_SDS)
+> > +               lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+> 
+> My original intention was to simplify the code a bit by ignoring
+> LCCR0_SDS, as FDADR1 would not take effect if not enabled even
+> if it's being read/written.
+
+It leads to potential race condition when you try to reconfigure main plane 
+and overlay1 simultaneously.
+
+> > +#ifdef CONFIG_FB_PXA_OVERLAY
+> > +       if (cpu_is_pxa27x())
+> > +               fbi->lccr0 |= LCCR0_OUC;
+> > +#endif
+> > +
+> 
+> I seem to remember LCCR0_OUC is still valid on pxa3xx, did you
+> do some test on pxa3xx as well?
+
+Sorry, I have no any pxa3xx boards.
+ 
+Regards
+Vasily
