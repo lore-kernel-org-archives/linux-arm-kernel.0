@@ -1,44 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 17:03:36 +0000
-Subject: [PATCH v2] ARM: vfp: Always save VFP state in vfp_pm_suspend
-In-Reply-To: <1297724147-6320-1-git-send-email-ccross@android.com>
-References: <AANLkTik_Jey_PtRmr530FVckA6RXHESeX+CyoJC=ZTkR@mail.gmail.com>
-	<1297724147-6320-1-git-send-email-ccross@android.com>
-Message-ID: <20110215170336.GP4152@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 15 Feb 2011 18:13:41 +0100
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110215223941.GJ10990@S2100-06.ap.freescale.net>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165958.GH10709@pengutronix.de>
+	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
+Message-ID: <20110215171341.GD10770@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 02:55:47PM -0800, Colin Cross wrote:
-> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-> index 66bf8d1..7231d18 100644
-> --- a/arch/arm/vfp/vfpmodule.c
-> +++ b/arch/arm/vfp/vfpmodule.c
-> @@ -415,13 +415,13 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
->  	struct thread_info *ti = current_thread_info();
->  	u32 fpexc = fmrx(FPEXC);
->  
-> -	/* if vfp is on, then save state for resumption */
-> -	if (fpexc & FPEXC_EN) {
-> +	/* save state for resume */
-> +	if (last_VFP_context[ti->cpu]) {
 
-I'm not entirely happy with this.
+> Ah, yes.  I can also see the problem here after turning on
+> DEBUG_SPINLOCK.
 
-It is true that last_VFP_context[] when non-NULL indicates who owns the
-hardware VFP state, so saving it would seem logical.  However, this new
-code now saves the state with the saved fpexc indicating that it's disabled.
+Ah, okay. After turning it off, it works a lot better :)
 
-This will cause a VFP exception to misbehave by reloading the state, and
-then disabling the VFP unit.  That will cause another VFP exception which
-will find the VFP unit disabled, and re-enable it.  All in all, this is
-rather wasteful.
+SD seems to work:
 
-So...
-	/* If lazy disable, re-enable the VFP ready for it to be saved */
-	if (last_VFP_context[ti->cpu] != &ti->vfpstate) {
-		fpexc |= FPEXC_EN;
-		fmxr(FPEXC, fpexc);
-	}
-	/* If VFP is on, then save state for resumption */
-	if (fpexc & FPEXC_EN) {
-		...
+	mmc0: new high speed SD card at address b368
+	mmcblk0: mmc0:b368 NCard 1.86 GiB 
+	 mmcblk0: p1
+	mmc0: card b368 removed
+
+SDHC seems to work:
+
+	mmc0: new high speed SDHC card at address 0007
+	mmcblk0: mmc0:0007 SD04G 3.70 GiB 
+	 mmcblk0: p1
+	mmc0: card 0007 removed
+
+MMC fails for me (note: the card works fine with an mx35-based board)
+
+	mmc0: new high speed MMC card at address 0001
+	mmcblk0: mmc0:0001 AF HMP 247 MiB 
+	mmcblk0: retrying using single block read
+	mmcblk0: error -84 transferring data, sector 0, nr 8, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 0
+	mmcblk0: error -84 transferring data, sector 1, nr 7, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 1
+	mmcblk0: error -84 transferring data, sector 2, nr 6, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 2
+	mmcblk0: error -84 transferring data, sector 3, nr 5, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 3
+	mmcblk0: error -84 transferring data, sector 4, nr 4, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 4
+	mmcblk0: error -84 transferring data, sector 5, nr 3, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 5
+	mmcblk0: error -84 transferring data, sector 6, nr 2, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 6
+	mmcblk0: error -84 transferring data, sector 7, nr 1, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 7
+	Buffer I/O error on device mmcblk0, logical block 0
+	mmcblk0: retrying using single block read
+	mmcblk0: error -84 transferring data, sector 0, nr 8, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 0
+	mmcblk0: error -84 transferring data, sector 1, nr 7, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 1
+	mmcblk0: error -84 transferring data, sector 2, nr 6, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 2
+	mmcblk0: error -84 transferring data, sector 3, nr 5, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 3
+	mmcblk0: error -84 transferring data, sector 4, nr 4, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 4
+	mmcblk0: error -84 transferring data, sector 5, nr 3, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 5
+	mmcblk0: error -84 transferring data, sector 6, nr 2, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 6
+	mmcblk0: error -84 transferring data, sector 7, nr 1, card status 0x900
+	end_request: I/O error, dev mmcblk0, sector 7
+	Buffer I/O error on device mmcblk0, logical block 0
+	 mmcblk0: unable to read partition table
+	mmc0: card 0001 removed
+
+SDIO card locks the machine. Is it supposed to work already?
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
