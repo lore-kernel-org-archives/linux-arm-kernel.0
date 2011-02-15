@@ -1,37 +1,43 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Tue, 15 Feb 2011 15:59:48 +0200
-Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
-	dev_dbg()
-In-Reply-To: <AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
-References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
-	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
-	<4D5A81D8.2080800@ru.mvista.com>
-	<AANLkTinQX59iyX1La=99Urgh5_JF0iZacBDqQz1VQfhi@mail.gmail.com>
-Message-ID: <20110215155948.32b564d5.jhnikula@gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 15 Feb 2011 16:59:28 +0300
+Subject: [PATCH] i2c-pxa: fix unbinding/rebinding of the device
+In-Reply-To: <20110108161828.GC8237@pengutronix.de>
+References: <20110106124028.GX25121@pengutronix.de>
+	<1294502804-6580-1-git-send-email-dbaryshkov@gmail.com>
+	<20110108161828.GC8237@pengutronix.de>
+Message-ID: <AANLkTimO1KFNm5xZ+2qJoGQq-ndVg0ER3KKwf0RYYOLK@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Feb 2011 15:44:27 +0200
-David Cohen <dacohen@gmail.com> wrote:
+Hello, all
 
-> >> @@ -163,13 +163,13 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj,
-> >> u32 *ra)
-> >> ? ? ? ?da = iommu_read_reg(obj, MMU_FAULT_AD);
-> >> ? ? ? ?*ra = da;
-> >>
-> >> - ? ? ? dev_err(obj->dev, "%s:\tda:%08x ", __func__, da);
-> >> + ? ? ? dev_dbg(obj->dev, "%s:\tda:%08x ", __func__, da);
-> >
-> > ? Note that dev_dbg() will only print something if either DEBUG or
-> > CONFIG_DYNAMIC_DEBUG are defined...
-> 
-> That's my plan.
-> 
-So it's sure that a developer won't need these error dumps when
-receiving an error report? I.e. IOMMU upper level errors give enough
-information to start doing own debugging?
+2011/1/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Sat, Jan 08, 2011 at 07:06:44PM +0300, Dmitry Eremin-Solenikov wrote:
+>> When a "pxa2xx-i2c" device was unbound (e.g. via sysfs) the remove
+>> callback was not called because it was discarded when linking the
+>> kernel. ?Because of that the resources allocated in probe were not
+>> freed and so a clean unbind/rebind was impossible.
+>>
+>> Fix that by moving the remove callback to .devexit.text.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Just my 2 cents.
+I see this patch is still not pushed to neither linus nor linux-next.
+Should I put it into rmk's patch system? Or will it find it's way to main kernel
+via other paths?
+
+>
+> Thanks
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
+
+
 
 -- 
-Jarkko
+With best wishes
+Dmitry
