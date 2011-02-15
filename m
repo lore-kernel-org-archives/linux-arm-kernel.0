@@ -1,37 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 17:32:55 +0000
-Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110215172948.GE10770@pengutronix.de>
-References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
-	<20110214165958.GH10709@pengutronix.de>
-	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
-	<20110215171341.GD10770@pengutronix.de>
-	<20110215171917.GQ4152@n2100.arm.linux.org.uk>
-	<20110215172948.GE10770@pengutronix.de>
-Message-ID: <20110215173255.GR4152@n2100.arm.linux.org.uk>
+From: hemantp@ti.com (Hemant Pedanekar)
+Date: Tue, 15 Feb 2011 23:05:19 +0530
+Subject: [PATCH v7 0/4] Introduce support for TI816X processor series
+Message-ID: <1297791319-31891-1-git-send-email-hemantp@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 06:29:48PM +0100, Wolfram Sang wrote:
-> On Tue, Feb 15, 2011 at 05:19:17PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 15, 2011 at 06:13:41PM +0100, Wolfram Sang wrote:
-> > > MMC fails for me (note: the card works fine with an mx35-based board)
-> > > 
-> > > 	mmc0: new high speed MMC card at address 0001
-> > > 	mmcblk0: mmc0:0001 AF HMP 247 MiB 
-> > > 	mmcblk0: retrying using single block read
-> > > 	mmcblk0: error -84 transferring data, sector 0, nr 8, card status 0x900
-> > > 	end_request: I/O error, dev mmcblk0, sector 0
-> > 
-> > EILSEQ means CRC failure.  Probably unrelated.
-> 
-> Even if it works in another setup? As a result of the above, I can't read the
-> partition table of that MMC. The mx35 can do so.
+This patch set adds support for TI816X processor series. This series includes
+DM8168, C6A816x and AM389x devices.
 
-CRC is generated to protect the link between the card and the host.  It
-means that the CRC computed by the card for the transfer and the CRC
-computed by the host didn't match.
+The details can be found at following links:
 
-In other words, data was corrupted in some way between the card and the
-MMC host.
+http://focus.ti.com/general/docs/gencontent.tsp?contentId=77960
+http://www.ti.com/ww/en/dsp/davinci-netra/index.shtml
+
+This series is architecturally closer to the OMAP devices. Hence, these patches
+are being submitted on linux-omap.
+
+These patches are tested on OMAP3 EVM with multi-omap build.
+
+Note that, additional patches consisting of TI816X specific hwmods, clock data
+and DMTIMER changes, are required to enable successful booting on TI816X EVM.
+These patches will follow shortly.
+
+The TI816X support is added as part of OMAP3 variant. The approach taken is in
+accordance to the discussions in thread related to following post:
+http://www.spinics.net/lists/linux-omap/msg41505.html
+
+In addition, TI816X specific customizations/optimizations are handled as a part
+of build configuration CONFIG_SOC_OMAPTI816X. Discussed here:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg41927.html
+
+Hemant Pedanekar (4):
+  TI816X: Update common omap platform files
+  TI816X: Update common OMAP machine specific sources
+  TI816X: Create board support and enable build for TI816X EVM
+  TI816X: Add low level debug support
+
+ arch/arm/mach-omap2/Kconfig                    |   10 ++++
+ arch/arm/mach-omap2/Makefile                   |    1 +
+ arch/arm/mach-omap2/board-ti8168evm.c          |   57 ++++++++++++++++++++++++
+ arch/arm/mach-omap2/clock3xxx_data.c           |    5 ++-
+ arch/arm/mach-omap2/common.c                   |   21 +++++++++
+ arch/arm/mach-omap2/control.h                  |    6 +++
+ arch/arm/mach-omap2/id.c                       |   33 +++++++++++++-
+ arch/arm/mach-omap2/include/mach/debug-macro.S |   12 +++++
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   13 +++++
+ arch/arm/mach-omap2/io.c                       |   22 +++++++++-
+ arch/arm/mach-omap2/irq.c                      |    5 ++-
+ arch/arm/mach-omap2/serial.c                   |    8 ++--
+ arch/arm/plat-omap/include/plat/clkdev_omap.h  |    1 +
+ arch/arm/plat-omap/include/plat/clock.h        |    1 +
+ arch/arm/plat-omap/include/plat/common.h       |    1 +
+ arch/arm/plat-omap/include/plat/cpu.h          |   18 +++++++
+ arch/arm/plat-omap/include/plat/hardware.h     |    1 +
+ arch/arm/plat-omap/include/plat/io.h           |    8 +++
+ arch/arm/plat-omap/include/plat/serial.h       |    8 +++
+ arch/arm/plat-omap/include/plat/ti816x.h       |   27 +++++++++++
+ arch/arm/plat-omap/include/plat/uncompress.h   |    7 +++
+ arch/arm/plat-omap/io.c                        |    5 ++-
+ 22 files changed, 260 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-ti8168evm.c
+ create mode 100644 arch/arm/plat-omap/include/plat/ti816x.h
+
+-- 
+1.7.3.5
