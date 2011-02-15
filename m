@@ -1,58 +1,54 @@
-From: rob@ti.com (Clark, Rob)
-Date: Tue, 15 Feb 2011 08:13:27 -0600
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <201102091731.07794.arnd@arndb.de>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091547.12131.arnd@arndb.de>
-	<20110209153716.GN9041@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-Message-ID: <AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Tue, 15 Feb 2011 22:13:04 +0800
+Subject: [RFC,PATCH 1/3] Add a common struct clk
+In-Reply-To: <201102151733.30332.jeremy.kerr@canonical.com>
+References: <1297233693.242364.862698430999.1.gpush@pororo>
+	<201102151526.54280.jeremy.kerr@canonical.com>
+	<20110215083759.GA4152@n2100.arm.linux.org.uk>
+	<201102151733.30332.jeremy.kerr@canonical.com>
+Message-ID: <20110215141304.GA1968@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 9, 2011 at 10:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 09 February 2011, Sascha Hauer wrote:
->
->> The driver patch itself is Cced to linux-fbdev, only the introductory
->> mail is not.
->
-> Ok, I see.
->
->> > Did you consider making the driver a KMS driver instead of
->> > a frame buffer? I think the recommendation these days is
->> > to start out with KMS for new drivers, which will be somewhat
->> > simpler and give you a frame buffer device as well. I don't
->> > think that there is a need to change over any drivers from
->> > fb to kms though, since you've already done the work.
->>
->> I tried doing so for the i.MX51 which supports multiple displays on dvi
->> and vga outputs and thus could make good use of KMS and friends. Anyway,
->> I got stuck quite fast. The KMS stuff is tightly coupled with DRM/DRI
->> and needs many many callbacks to implement. Additionally the userspace
->> tools expect a nvidia/amd/intel driver and do not have a generic
->> fallback. I think this stuff is good for implementing a full blown
->> graphics driver, but is lacking support for simple framebuffer grapics.
->> I'd love to go this way but it still requires a lot of work.
->
-> Ok. This sounds like a lot of upfront work indeed, to make KMS more
-> generic, though I think a number of driver would benefit from it
-> eventually. It could be something for the Linaro graphics working
-> group to look at in the following 11.11 release, depending on how
-> many other people are interested in getting there.
->
+On Tue, Feb 15, 2011 at 05:33:29PM +0800, Jeremy Kerr wrote:
+> Hi Russell,
+> 
+> > > Why is that? Consider two devices using one clock; one does some
+> > > initialisation based on the return value of clk_get_rate(), the other
+> > > calls clk_set_rate() some time later. Now the first device is
+> > > incorrectly initialised.
+> > 
+> > What about a clock sourced from a PLL which provides the dotclock for a
+> > framebuffer device?  On every mode set, should the clk have to be disabled,
+> > unprepared, rate set, re-prepared and re-enabled?
+> 
+> Sounds heavy-handed, but I honestly have no idea if that's reasonable or not.
+> 
+> Other options are:
+> 
+>  * Require that the driver has called clk_prepare, and that prepare_count
+>    is 1 during the set_rate call (indicating that this is the only user); or
+> 
+>  * Leave the set_rate and set_parent semantics as-is and assume that anything
+>    calling either knows what it's doing (and that it won't affect other
+>    devices)
+I vote the second option. Two reasons:
+1. Has any mach specific clock restricted clk_set_rate use? I don't hear any.
+2. In my opinion, clk_set_rate is not called very often by drivers, especially
+for the clock which has child clocks. Leaf clock are seldom shared. Even if it's
+shared, we can let drivers handle it case by case .
 
-fwiw, it seems to me like xorg could have some more common code to
-deal with the KMS part of DRM.. the various userspace xorg drivers end
-up having a lot of very similar code to deal with enumerating
-CRTCs/outputs and modes, handle hotplug, etc.
-
-I'd been experimenting a bit on the side w/ the DRM driver framework (
-http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
-), but had to add a good chunk of mostly boilerplate code to our xorg
-driver in order just to test it.  Maybe some generic support for KMS
-in xf86-video-fbdev would have made this easier to develop the kernel
-part without in parallel having to implement the userspace part.  I'm
-not sure if this is the sort of thing the linaro-wg has in mind?
-
-BR,
--R
+Thanks
+Richard
+> 
+> Are you OK if we address this separately to the API unification though?
+> 
+> Cheers,
+> 
+> 
+> Jeremy
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
