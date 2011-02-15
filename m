@@ -1,54 +1,65 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 15 Feb 2011 08:19:35 -0800
-Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
-In-Reply-To: <6038d98e9a2eb2129200f5e08560cf7e@mail.gmail.com> (Santosh
-	Shilimkar's message of "Tue, 15 Feb 2011 21:07:53 +0530")
-References: <1297787428-5717-1-git-send-email-tero.kristo@nokia.com>
-	<6038d98e9a2eb2129200f5e08560cf7e@mail.gmail.com>
-Message-ID: <878vxhuv6w.fsf@ti.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 16 Feb 2011 00:20:49 +0800
+Subject: [PATCH] ARM: pxa: support 806MHz operating points for PXA31x
+	processors A2 stepping
+Message-ID: <1297786849.2596.13.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+PXA3xx Specification Update document states that the 806MHz
+operating points were added for PXA31x processors A2 stepping.
 
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of Tero Kristo
->> Sent: Tuesday, February 15, 2011 10:00 PM
->> To: linux-omap at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
->>
->> This saves some power. OMAP4 version should check for GPT module ID,
->> as
->> autoidle is only supported on a subset of these.
->>
->> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
->> ---
->>  arch/arm/plat-omap/dmtimer.c |    4 ++++
->>  1 files changed, 4 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-
->> omap/dmtimer.c
->> index 1d706cf..ee9f6eb 100644
->> --- a/arch/arm/plat-omap/dmtimer.c
->> +++ b/arch/arm/plat-omap/dmtimer.c
->> @@ -342,6 +342,10 @@ static void omap_dm_timer_reset(struct
->> omap_dm_timer *timer)
->>  	l |= 0x02 << 3;  /* Set to smart-idle mode */
->>  	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on
->> idle */
->>
->> +	/* Enable autoidle on OMAP2 / OMAP3 */
->> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
->> +		l |= 0x1 << 0;
->> +
-> We should get rid of this CPU checks. How about adding a flag
-> and populating it on init for the architectures it supports.
->
+This patch adds 806MHz operating points support for PXA31x A2 stepping.
 
-Instead, this should be implemented on top of Tarun's hwmod conversion
-which knows that different timers have different capabilities (e.g. 1ms)
-and autoidle can be set based on capabilities.
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
 
-Kevin
+I cannot find any details for PXA31x stepping B1 and B2,
+thus I made this patch for PXA31x stepping A2 only.
+
+Axel
+
+ arch/arm/mach-pxa/cpufreq-pxa3xx.c |   23 +++++++++++++++++++----
+ 1 files changed, 19 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/cpufreq-pxa3xx.c b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+index 88fbec0..f4f0c2e 100644
+--- a/arch/arm/mach-pxa/cpufreq-pxa3xx.c
++++ b/arch/arm/mach-pxa/cpufreq-pxa3xx.c
+@@ -210,15 +210,30 @@ static int pxa3xx_cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	/* set default policy and cpuinfo */
+ 	policy->cpuinfo.min_freq = 104000;
+-	policy->cpuinfo.max_freq = (cpu_is_pxa320()) ? 806000 : 624000;
++
++	if (cpu_is_pxa300())
++		policy->cpuinfo.max_freq = 624000;
++	else if (cpu_is_pxa310())
++		policy->cpuinfo.max_freq = ((read_cpuid_id() & 0xf) == 0x2) ?
++						806000 : 624000;
++	else if (cpu_is_pxa320())
++		policy->cpuinfo.max_freq = 806000;
++
+ 	policy->cpuinfo.transition_latency = 1000; /* FIXME: 1 ms, assumed */
+ 	policy->max = pxa3xx_get_clk_frequency_khz(0);
+ 	policy->cur = policy->min = policy->max;
+ 
+-	if (cpu_is_pxa300() || cpu_is_pxa310())
++	if (cpu_is_pxa300())
+ 		ret = setup_freqs_table(policy, ARRAY_AND_SIZE(pxa300_freqs));
+-
+-	if (cpu_is_pxa320())
++	else if (cpu_is_pxa310())
++		/* PXA310 A2 STEPPING supports 806Mhz operating points */
++		if ((read_cpuid_id() & 0xf) == 0x2)
++			ret = setup_freqs_table(policy,
++						ARRAY_AND_SIZE(pxa320_freqs));
++		else
++			ret = setup_freqs_table(policy,
++						ARRAY_AND_SIZE(pxa300_freqs));
++	else if (cpu_is_pxa320())
+ 		ret = setup_freqs_table(policy, ARRAY_AND_SIZE(pxa320_freqs));
+ 
+ 	if (ret) {
+-- 
+1.7.2
