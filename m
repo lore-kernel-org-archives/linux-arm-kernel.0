@@ -1,83 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Feb 2011 14:42:06 +0000
-Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
-	tables
-In-Reply-To: <20110215121437.GG4152@n2100.arm.linux.org.uk>
-References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-	<20110215103127.GC4152@n2100.arm.linux.org.uk>
-	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
-	<20110215113242.GD4152@n2100.arm.linux.org.uk>
-	<20110215121437.GG4152@n2100.arm.linux.org.uk>
-Message-ID: <1297780926.14691.164.camel@e102109-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 15 Feb 2011 14:44:57 +0000
+Subject: [PATCH 1/2] OMAP2+: IOMMU: change OMAP2+ error message to
+	dev_dbg()
+In-Reply-To: <AANLkTin++DGAGT9-nahy1Qm7ASbGm=JjNuPZWZ6XUbcX@mail.gmail.com>
+References: <1297776033-8579-1-git-send-email-dacohen@gmail.com>
+	<1297776033-8579-2-git-send-email-dacohen@gmail.com>
+	<4D5A81D8.2080800@ru.mvista.com>
+	<20110215142923.GC11199@n2100.arm.linux.org.uk>
+	<AANLkTin++DGAGT9-nahy1Qm7ASbGm=JjNuPZWZ6XUbcX@mail.gmail.com>
+Message-ID: <20110215144457.GD11199@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-02-15 at 12:14 +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 15, 2011 at 11:32:42AM +0000, Russell King - ARM Linux wrote:
-> > The point of TLB shootdown is that we unmap the entries from the page
-> > tables, then issue the TLB flushes, and then free the pages and page
-> > tables after that.  All that Peter's patch tries to do is to get ARM to
-> > use the generic stuff.
-> 
-> As Peter's patch preserves the current behaviour, that's not sufficient.
-> So, let's do this our own way and delay pages and page table frees on
-> ARMv6 and v7.  Untested.
+On Tue, Feb 15, 2011 at 04:36:26PM +0200, David Cohen wrote:
+> But pr_cont() would be wrong in case of DEBUG isn't set, isn't it?
 
-ARMv7 should be enough, I'm not aware of any pre-v7 with this behaviour.
+Yes.  One other solution you could do is:
 
-> Note that the generic code doesn't allow us to delay frees on UP as it
-> assumes that if there's no TLB entry, the CPU won't speculatively
-> prefetch.  This seems to be where ARM differs from the rest of the
-> planet.  Please confirm that this is indeed the case.
+	char buf[80], *p = buf;
 
-The CPU can speculatively prefetch instructions and access data as long
-as there is a valid mapping in the page tables. There is no need to have
-a TLB entry for the speculative access, this can be created
-speculatively from existing page table entries. That's not the issue
-(ARM has been doing this for ages, probably other architectures too).
+	buf[0] = '\0';
+	for (i = 0; i < ARRAY_SIZE(err_msg); i++)
+		if (stat & (1 << i))
+			p += scnprintf(p, sizeof(buf) - (p - buf),
+					" %s", err_msg[i]);
 
-With newer cores, apart from the TLB (which stores a virtual to physical
-translation), the CPU is allowed to cache entries in the higher page
-table levels. This is important especially for LPAE where the 1st level
-covers 1GB and can be easily cached to avoid 3 levels of page table walk
-(or 2 levels for the classic page tables).
+	dev_dbg(obj->dev, "%s: da:%08x%s\n", __func__, da, buf);
 
-So even when we clear a page table entry in RAM (pmd_clear), the
-processor still has it in its page table cache (pretty much part of the
-TLB, different from the D-cache) and that's why we need the TLB
-invalidation before freeing the lower page table.
-> 
-> diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-> index f41a6f5..1ca3e16 100644
-> --- a/arch/arm/include/asm/tlb.h
-> +++ b/arch/arm/include/asm/tlb.h
-> @@ -30,6 +30,16 @@
->  #include <asm/pgalloc.h>
-> 
->  /*
-> + * As v6 and v7 speculatively prefetch, which can drag new entries into the
-> + * TLB, we need to delay freeing pages and page tables.
-> + */
-> +#if defined(CONFIG_CPU_32v6) || defined(CONFIG_CPU_32v7)
-> +#define tlb_fast_mode(tlb)     0
-> +#else
-> +#define tlb_fast_mode(tlb)     1
-> +#endif
+which means that you're then printing the entire string in one go -
+and there's no chance for another message to come in the middle of it.
 
-We could make this v7 only. If you want it to be more dynamic, we can
-check the MMFR0[3:0] bits (Cortex-A15 sets them to 4). But
-architecturally we should assume that intermediate page table levels may
-be cached.
-
-> -#define tlb_remove_page(tlb,page)      free_page_and_swap_cache(page)
-> -#define pte_free_tlb(tlb, ptep, addr)  pte_free((tlb)->mm, ptep)
-> +#define pte_free_tlb(tlb, ptep, addr)  __pte_free_tlb(tlb, ptep, addr)
->  #define pmd_free_tlb(tlb, pmdp, addr)  pmd_free((tlb)->mm, pmdp)
-
-With LPAE, we'll need a __pmd_free_tlb() but I can add this as part of
-my patches.
-
-Apart from the need for ARMv6, the patch looks fine (I'll give it a try
-as well).
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Note that I've placed the ' ' at the beginning of the format string so
+that we don't end up with useless trailing space in messages.  Minor
+point but it's easy to do here.
