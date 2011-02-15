@@ -1,36 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 15 Feb 2011 13:58:00 +0100
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
-Message-ID: <AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>
+From: mkl0301@gmail.com (Lin Mac)
+Date: Tue, 15 Feb 2011 21:02:07 +0800
+Subject: [PATCH v5 0/3] add CNS3xxx AHCI support
+In-Reply-To: <1294557970-654-1-git-send-email-mkl0301@gmail.com>
+References: <1294557970-654-1-git-send-email-mkl0301@gmail.com>
+Message-ID: <AANLkTimuh_hqfHayieEosMG4v6afj+Hz9U-cUQSNkUUr@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2010/5/11 Eduardo Valentin <eduardo.valentin@nokia.com>:
-
-> Here is the version 5 of the change to export OMAP data to userspace
-> (name, revision, id code, production id and die id).
+2011/1/9  <mkl0301@gmail.com>:
+> From: Mac Lin <mkl0301@gmail.com>
 >
-> Basically, this version is still attempting to create a new file under /proc.
-> It is the /proc/socinfo, which should be used to export bits which are SoC specific
-> (not CPU related, nor machine related).
+> v5:
+> ?- Rename ahci_platforms.h to ahci_platform.h
+> ?- s/pltfm/platform/ in ahci_platform.c
 >
-> So, differences between previous version are:
-> - merged patch 02/04 with 03/04 to avoid compilation breakages.
-> - simplified the seq_file usage by using the single_open and single_release functions
-> - exported a function to register a seq_operation .show callback
-> - adapted the changes accordingly
+> v4: http://www.spinics.net/lists/linux-ide/msg39852.html
+> ?- v2 basically, which make SoC-specific changes into separate files
+> ?- Rename module ahci_platform to ahci_platforms, into which link the ahci_platform and the SoC-specific changes
+> ?- No rename of ahci_platform.c
+> ?- Some cosmetic code changes since v2
 >
-> As usual, comments are welcome.
+> v3: http://www.spinics.net/lists/arm-kernel/msg109924.html
+> ?- Make the SoC-specific changes into ahci_platform.c directly.
+> ?- Some cosmetic code changes
+> => ahci_platform.c is less readable due to SoC-specific changes and macro
+>
+> v2: http://www.spinics.net/lists/linux-ide/msg39766.html
+> ?- Renaming ahci_platform.c to ahci_pltfm.c for linking SoC specific changes into ahci_platform, while not changing the module name.
+> ?- Switch ahci_platform to module device table matching to add SoC specific support
+> ?- Add CNS3xxx SoC specific AHCI support to ahci_cns3xxx.c
+>
+> v1: http://www.spinics.net/lists/arm-kernel/msg106236.html
+> ?- Add CNS3xxx SoC specific AHCI support to arch/arm/mach-cns3xxx
+> => The changes depends on libahci and libata, i.e. both of them need to be built into kernel
+>
+> This patchset is based on linux-2.6.37
+>
 
-Eduardo, what has happened to this patchset?
+ping?
+Please kindly provide your opinion.
 
-Now we need something similar for arch/arm/mach-ux500 and I was sort of
-hoping that this infrastructure would be in place already... wrong I was.
-
-Do you want help in picking it up and try to polish it up?
-
-Yours,
-Linus Walleij
+Best Regards,
+Mac Lin
