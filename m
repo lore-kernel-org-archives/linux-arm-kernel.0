@@ -1,71 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 15 Feb 2011 11:04:53 +0000
-Subject: [PATCH 2/6] ARM: pm: add generic CPU suspend/resume support
-In-Reply-To: <AANLkTinL0HgSsFmoxyiBuRA6JiWKsHTLW4wFnVDJf_1w@mail.gmail.com>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-	<E1Pnvgw-0002yZ-M0@rmk-PC.arm.linux.org.uk>
-	<AANLkTinL0HgSsFmoxyiBuRA6JiWKsHTLW4wFnVDJf_1w@mail.gmail.com>
-Message-ID: <20110215110453.GB11199@n2100.arm.linux.org.uk>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 15 Feb 2011 16:48:03 +0530
+Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
+Message-ID: <1297768683-30273-1-git-send-email-srinidhi.kasagar@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 06:50:57PM -0800, Colin Cross wrote:
-> > +ENDPROC(cpu_resume_turn_mmu_on)
-> > +cpu_resume_after_mmu:
-> > + ? ? ? str ? ? r5, [r2, r4, lsl #2] ? ?@ restore old mapping
-> > +#ifdef MULTI_CACHE
-> > + ? ? ? ldr ? ? r10, =cpu_cache
-> > + ? ? ? ldr ? ? pc, [r10, #CACHE_FLUSH_KERN_ALL]
-> > +#else
-> > + ? ? ? b ? ? ? __cpuc_flush_kern_all
-> > +#endif
+The effect of cache sync operation is to drain the store
+buffer and wait for all internal buffers to be empty. In
+normal conditions, store buffer is able to merge the
+normal memory writes within its 32-byte data buffers.
+Due to this erratum present in r3p0, the effect of cache
+sync operation on the store buffer still remains when
+the operation completes. This means that the store buffer
+is always asked to drain and this prevents it from merging
+any further writes.
 
-I think we can eliminate this cache flush by delaying the cache enable
-as below.  Could you see whether Tegra 2 survives this please?
-Thanks.
+This can severely affect performance on the write traffic
+esp. on Normal memory NC one.
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index bed1876..193be5f 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -4,6 +4,7 @@
- #include <asm/assembler.h>
- #include <asm/glue-cache.h>
- #include <asm/glue-proc.h>
-+#include <asm/system.h>
- 	.text
+The proposed workaround is to replace the normal offset of
+cache sync operation(0x730) by another offset targeting an
+unmapped PL310 register 0x740.
+
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/Kconfig         |   15 +++++++++++++++
+ arch/arm/mm/cache-l2x0.c |    8 ++++++++
+ 2 files changed, 23 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d5eb308..f1946e4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1186,6 +1186,21 @@ config ARM_ERRATA_743622
+ 	  visible impact on the overall performance or power consumption of the
+ 	  processor.
  
- /*
-@@ -81,25 +82,22 @@ ENTRY(cpu_resume_mmu)
- 	str	r3, [r2, r4, lsl #2]	@ setup 1:1 mapping for mmu code
- 	sub	r2, r2, r1
- 	ldr	r3, =cpu_resume_after_mmu
-+	bic	r1, r0, #CR_C		@ ensure D-cache is disabled
- 	b	cpu_resume_turn_mmu_on
- ENDPROC(cpu_resume_mmu)
- 	.ltorg
- 	.align	5
- cpu_resume_turn_mmu_on:
--	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, caches, etc
--	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
--	mov	r0, r0
--	mov	r0, r0
-+	mcr	p15, 0, r1, c1, c0, 0	@ turn on MMU, I-cache, etc
-+	mrc	p15, 0, r1, c0, c0, 0	@ read id reg
-+	mov	r1, r1
-+	mov	r1, r1
- 	mov	pc, r3			@ jump to virtual address
- ENDPROC(cpu_resume_turn_mmu_on)
- cpu_resume_after_mmu:
- 	str	r5, [r2, r4, lsl #2]	@ restore old mapping
--#ifdef MULTI_CACHE
--	ldr	r10, =cpu_cache
--	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
--#else
--	b	__cpuc_flush_kern_all
--#endif
-+	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
-+	mov	pc, lr
++config ARM_ERRATA_753970
++	bool "ARM errata: cache sync operation may be faulty"
++	depends on CACHE_PL310
++	help
++	  This option enables the workaround for the 753970 PL310 erratum.
++
++	  Under some condition the effect of cache sync operation on
++	  the store buffer still remains when the operation completes.
++	  This means that the store buffer is always asked to drain and
++	  this prevents it from merging any further writes. The workaround
++	  is to replace the normal offset of cache sync operation (0x730)
++	  by another offset targeting an unmapped PL310 register 0x740.
++	  This has the same effect as the cache sync operation: store buffer
++	  drain and waiting for all buffers empty.
++
+ endmenu
  
- /*
-  * Note: Yes, part of the following code is located into the .data section.
+ source "arch/arm/common/Kconfig"
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 170c9bb..998d521 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -49,8 +49,16 @@ static inline void cache_wait(void __iomem *reg, unsigned long mask)
+ static inline void cache_sync(void)
+ {
+ 	void __iomem *base = l2x0_base;
++
++#ifdef ARM_ERRATA_753970
++#define L2X0_DUMMY_REG  0x740
++	/* write to an unmmapped register */
++	writel_relaxed(0, base + L2X0_DUMMY_REG);
++	cache_wait(base + L2X0_CACHE_SYNC, 1);
++#else
+ 	writel_relaxed(0, base + L2X0_CACHE_SYNC);
+ 	cache_wait(base + L2X0_CACHE_SYNC, 1);
++#endif
+ }
+ 
+ static inline void l2x0_clean_line(unsigned long addr)
+-- 
+1.7.0.4
