@@ -1,38 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 15 Feb 2011 17:23:23 +0100
-Subject: [PATCH] i2c-pxa: fix unbinding/rebinding of the device
-In-Reply-To: <AANLkTimO1KFNm5xZ+2qJoGQq-ndVg0ER3KKwf0RYYOLK@mail.gmail.com>
-References: <20110106124028.GX25121@pengutronix.de>
-	<1294502804-6580-1-git-send-email-dbaryshkov@gmail.com>
-	<20110108161828.GC8237@pengutronix.de>
-	<AANLkTimO1KFNm5xZ+2qJoGQq-ndVg0ER3KKwf0RYYOLK@mail.gmail.com>
-Message-ID: <20110215162323.GO13279@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 15 Feb 2011 21:55:25 +0530
+Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
+In-Reply-To: <878vxhuv6w.fsf@ti.com>
+References: <1297787428-5717-1-git-send-email-tero.kristo@nokia.com><6038d98e9a2eb2129200f5e08560cf7e@mail.gmail.com>
+	<878vxhuv6w.fsf@ti.com>
+Message-ID: <56b8f6de37c57ffb77efdb349985d8e0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 04:59:28PM +0300, Dmitry Eremin-Solenikov wrote:
-> Hello, all
-> 
-> 2011/1/8 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > On Sat, Jan 08, 2011 at 07:06:44PM +0300, Dmitry Eremin-Solenikov wrote:
-> >> When a "pxa2xx-i2c" device was unbound (e.g. via sysfs) the remove
-> >> callback was not called because it was discarded when linking the
-> >> kernel. ?Because of that the resources allocated in probe were not
-> >> freed and so a clean unbind/rebind was impossible.
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Tuesday, February 15, 2011 9:50 PM
+> To: Santosh Shilimkar
+> Cc: Tero Kristo; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCHv2] omap2/3: dmtimer: Enable autoidle
+>
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>
+> >> -----Original Message-----
+> >> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> >> owner at vger.kernel.org] On Behalf Of Tero Kristo
+> >> Sent: Tuesday, February 15, 2011 10:00 PM
+> >> To: linux-omap at vger.kernel.org
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Subject: [PATCHv2] omap2/3: dmtimer: Enable autoidle
 > >>
-> >> Fix that by moving the remove callback to .devexit.text.
+> >> This saves some power. OMAP4 version should check for GPT module
+> ID,
+> >> as
+> >> autoidle is only supported on a subset of these.
 > >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> I see this patch is still not pushed to neither linus nor linux-next.
-> Should I put it into rmk's patch system? Or will it find it's way to main kernel
-> via other paths?
-rmk's patch system isn't the right place.  Ben needs to take it.  Ben?
+> >> Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
+> >> ---
+> >>  arch/arm/plat-omap/dmtimer.c |    4 ++++
+> >>  1 files changed, 4 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-
+> >> omap/dmtimer.c
+> >> index 1d706cf..ee9f6eb 100644
+> >> --- a/arch/arm/plat-omap/dmtimer.c
+> >> +++ b/arch/arm/plat-omap/dmtimer.c
+> >> @@ -342,6 +342,10 @@ static void omap_dm_timer_reset(struct
+> >> omap_dm_timer *timer)
+> >>  	l |= 0x02 << 3;  /* Set to smart-idle mode */
+> >>  	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on
+> >> idle */
+> >>
+> >> +	/* Enable autoidle on OMAP2 / OMAP3 */
+> >> +	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> >> +		l |= 0x1 << 0;
+> >> +
+> > We should get rid of this CPU checks. How about adding a flag
+> > and populating it on init for the architectures it supports.
+> >
+>
+> Instead, this should be implemented on top of Tarun's hwmod
+> conversion
+> which knows that different timers have different capabilities (e.g.
+> 1ms)
+> and autoidle can be set based on capabilities.
+>
+You are right. Looking at patches it's seems to be already
+implemented.
 
-Best regards
-Uwe
+So this patch isn't needed really.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Santosh
