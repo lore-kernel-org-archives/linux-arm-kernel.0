@@ -1,24 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Feb 2011 13:22:07 +0100
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
-Message-ID: <201102161322.08126.arnd@arndb.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 16 Feb 2011 10:26:57 -0200
+Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
+	drivers
+In-Reply-To: <20110216094154.GV13279@pengutronix.de>
+References: <20110211181921.3d561568@queued.net>
+	<20110216094154.GV13279@pengutronix.de>
+Message-ID: <4D5BC291.1010906@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 15 February 2011, Clark, Rob wrote:
-> I'd been experimenting a bit on the side w/ the DRM driver framework (
-> http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
-> ), but had to add a good chunk of mostly boilerplate code to our xorg
-> driver in order just to test it.  Maybe some generic support for KMS
-> in xf86-video-fbdev would have made this easier to develop the kernel
-> part without in parallel having to implement the userspace part.  I'm
-> not sure if this is the sort of thing the linaro-wg has in mind?
+Hi Uwe,
 
-I'm not sure what the the linaro multimedia wg thinks of this, but the
-kernel code you linked looks like it's doing exactly the right thing.
+On 2/16/2011 7:41 AM, Uwe Kleine-K?nig wrote:
+...
+>>  
+>>  /* MC13783 */
+>> -static struct mc13783_platform_data mc13783_pdata __initdata = {
+> isn't using __initdata here broken already before your patch?  Was
+> introduced in c67a3e09.  Fabio?
 
-	Arnd
+I followed the same approach as in the mx31_3ds.c file.
+
+> But in general I'd prefer to keep as much __initdata as possible because
+> this occupies less memory when using a multi-machine kernel.
+
+So keeping __initdata is OK then? Let me know and I can fix it needed.
+
+Regards,
+
+Fabio Estevam
