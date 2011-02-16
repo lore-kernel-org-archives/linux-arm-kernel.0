@@ -1,58 +1,26 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 16 Feb 2011 09:19:46 +0000
-Subject: compiling 2.6.37 kernel in THUMB2 mode
-In-Reply-To: <AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
-References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
-	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
-	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
-Message-ID: <AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
+Date: Wed, 16 Feb 2011 09:26:12 +0000
+Subject: [PATCH] ARM: Thumb-2: Enable ARM/Thumb interworking for v7 cache
+	maintenance
+In-Reply-To: <20110215180058.GS4152@n2100.arm.linux.org.uk>
+References: <1297792565-30401-1-git-send-email-dave.martin@linaro.org>
+	<20110215180058.GS4152@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTims4DDAP8nLZELLMWKh72AZCU8M3kPNqDFEuppQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 9:17 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> Hi,
+On Tue, Feb 15, 2011 at 6:00 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 15, 2011 at 05:56:05PM +0000, Dave Martin wrote:
+>> Cache maintenence functions may need to be called from low-level
+>> platform code (such as for omap3).
 >
-> On Wed, Feb 16, 2011 at 4:03 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> On Tue, 15 Feb 2011, vb at vsbe.com wrote:
->>
->>> hello all,
->>>
->>> I am trying to compile the 2.6.37 kernel in THUMB2 mode and am
->>> experiencing some compilation problems. Some inline assembly in some
->>> files uses commands inappropriate for THUMB2 mode.
->>>
->>> I wonder if the kernel is expected to compile cleanly when
->>> CONFIG_THUMB2_KERNEL is enabled (and I am doing something wrong), or
->>> is it know not to compile/work in Thumb2 node for any reason?
->>
->> It is known not to compile in mainline right now depending on your
->> target, but fixes are slowly being merged upstream.
->>
->> Dave Martin is maintaining a Git tree with all the fixes required for
->> Thumb2 here (see the Thumb2 related branches):
->>
->> http://git.linaro.org/gitweb?p=people/dmart/linux-2.6-arm.git;a=summary
->>
->> Beware that some patches might not be final yet.
+> I'd rather wait until we have the suspend stuff sorted out. ?I'm
+> waiting for OMAP folk to sort out what's happening with the sleep*.S
+> code so that it can have the generic CPU suspend code integrated.
+> That could result in this change not being required.
 >
-> Note that while the bulk of the kernel is Thumb-2 safe, there are
-> occasional regressions, and individual platforms and drivers could
-> still have problems. ?For now, I've been focusing on omap--- see
->
-> git://git.linaro.org/people/dmart/linux-2.6-arm.git dirty/arm/omap-thumb2+merged
->
-> ARM: Add local symbols in relocate_kernel.S to work around gas bugs
 
-^ Oops, forgot to explain that line: this is the patch required to
-work around a specific bug in the assembler.  I'm not currently
-proposing to merge this upstream, since I prefer the assembler to get
-fixed...
-You can grab this patch from the branch.
+OK; I guess we can work around this in the omap BSP for the time being.
 
->
-> If you're trying to support a specific board I'm unlikely to be able
-> to debug it for you, but feel free to ping me with questions.
->
-> Cheers
-> ---Dave
->
+---Dave
