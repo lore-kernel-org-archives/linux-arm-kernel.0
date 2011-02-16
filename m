@@ -1,56 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Feb 2011 10:13:26 +0100
-Subject: [PATCH v2 1/2] ARM: IMX5: cpuidle driver
-In-Reply-To: <AANLkTinj_8wqZ36TKdcx3L6CLaYyLD36ymFRq+KnyZXF@mail.gmail.com>
-References: <1297416973-32740-1-git-send-email-yong.shen@linaro.org>
-	<1297416973-32740-2-git-send-email-yong.shen@linaro.org>
-	<20110216081103.GE2027@pengutronix.de>
-	<AANLkTinj_8wqZ36TKdcx3L6CLaYyLD36ymFRq+KnyZXF@mail.gmail.com>
-Message-ID: <20110216091326.GD26437@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Feb 2011 09:17:37 +0000
+Subject: compiling 2.6.37 kernel in THUMB2 mode
+In-Reply-To: <alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
+	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+Message-ID: <AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 09:37:47AM +0100, Yong Shen wrote:
-> Hi Sascha,
-> 
-> 
-> > > +     local_irq_disable();
-> > > +     do_gettimeofday(&before);
-> > > +
-> > > +     plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
-> > > +         ~(MXC_CORTEXA8_PLAT_LPC_DSM);
-> >
-> > One thing that strikes me here is the fact that this code can probably
-> > run on i.MX53 aswell, right? It's only that these registers have
-> > different addresses on i.MX53. The MXC_ prefix is therefore not a good
-> > idea. Switching this to MX51_ and having an additional MX53_ register
-> > leads to code duplication. This shows that it's a bad idea to code
-> > fixed addresses in the code. We should go for base + offset instead
-> > so that this code will have a better start on i.MX53. This of course
-> > needs changes in the current crm_regs.h and probably in the i.MX51/53
-> > clock code.
-> >
-> Yes, for mx53, it is similar.
-> But for the case you are talking about, is it easier that we keep MXC_
-> prefix in this file and define MXC_ to MX51 or MX53 in crm_regs.h according
-> to which board is running?
+Hi,
 
-I don't understand. How can we 'define' (which is compile time) to
-something depending on the board (which is runtime)?
+On Wed, Feb 16, 2011 at 4:03 AM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Tue, 15 Feb 2011, vb at vsbe.com wrote:
+>
+>> hello all,
+>>
+>> I am trying to compile the 2.6.37 kernel in THUMB2 mode and am
+>> experiencing some compilation problems. Some inline assembly in some
+>> files uses commands inappropriate for THUMB2 mode.
+>>
+>> I wonder if the kernel is expected to compile cleanly when
+>> CONFIG_THUMB2_KERNEL is enabled (and I am doing something wrong), or
+>> is it know not to compile/work in Thumb2 node for any reason?
+>
+> It is known not to compile in mainline right now depending on your
+> target, but fixes are slowly being merged upstream.
+>
+> Dave Martin is maintaining a Git tree with all the fixes required for
+> Thumb2 here (see the Thumb2 related branches):
+>
+> http://git.linaro.org/gitweb?p=people/dmart/linux-2.6-arm.git;a=summary
+>
+> Beware that some patches might not be final yet.
 
-> In addition, registers for this code are not in one section, which means
-> many BASEx + offset there, if I understand right. Do you have a sample for
-> 'base + offset' case? since mx53 just came in, I am not sure about such
-> case.
+Note that while the bulk of the kernel is Thumb-2 safe, there are
+occasional regressions, and individual platforms and drivers could
+still have problems.  For now, I've been focusing on omap--- see
 
-Forget it. I just realized that more or less by accident the virtual
-addresses for the i.MX51 and i.MX53 are the same.
+git://git.linaro.org/people/dmart/linux-2.6-arm.git dirty/arm/omap-thumb2+merged
 
-Sascha
+ARM: Add local symbols in relocate_kernel.S to work around gas bugs
 
+If you're trying to support a specific board I'm unlikely to be able
+to debug it for you, but feel free to ping me with questions.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers
+---Dave
