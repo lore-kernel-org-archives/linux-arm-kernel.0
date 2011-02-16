@@ -1,44 +1,36 @@
-From: c.aeschlimann@acn-group.ch (Christophe Aeschlimann)
-Date: Wed, 16 Feb 2011 15:07:57 +0100
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-Message-ID: <4D5BDA3D.5080905@acn-group.ch>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 16 Feb 2011 15:10:50 +0100
+Subject: [PATCH 5/7] ARM i.MX5: Allow to increase max zone order
+In-Reply-To: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1297865452-32181-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudhakar,
+default setting of 11 allows us to allocate at maximum
+2MB chunks of contiguous memory. For resolutions up to
+1920x1080 32bpp we need much more memory, so make zone
+order configurable
 
-On 18.01.2011 05:43, Rajashekhara, Sudhakar wrote:
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-[...]
-
- > With the above fixes, arecord and aplay does not work for the first time.
- > Couple of times I get the below error:
- >
- > root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
- > arecord: main:608: audio open error: Invalid argument
- > aplay: playback:2297: read error
- > root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
- > aplay: main:608: audio open error: Invalid argument
- > Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, 
-Stereo
- >
- > Third time arecord and aplay work normally.
- >
- > Has anyone seen such issues on DA850 or any other platform?
- >
- > I am currently debugging this issue. I'll submit the above patch to 
-community
- > once the issue of fixed.
-
-I'm facing the same issue here.
-
-Did you make any progress on that one ?
-
- > Regards,
- > Sudhakar
-
-Regards,
-
-Christophe
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 26d45e5..e25c04e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1451,8 +1451,8 @@ config HW_PERF_EVENTS
+ source "mm/Kconfig"
+ 
+ config FORCE_MAX_ZONEORDER
+-	int "Maximum zone order" if ARCH_SHMOBILE
+-	range 11 64 if ARCH_SHMOBILE
++	int "Maximum zone order" if ARCH_SHMOBILE || ARCH_MX5
++	range 11 64 if ARCH_SHMOBILE || ARCH_MX5
+ 	default "9" if SA1111
+ 	default "11"
+ 	help
+-- 
+1.7.2.3
