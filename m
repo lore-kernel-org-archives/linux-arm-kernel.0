@@ -1,22 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 16 Feb 2011 08:53:49 -0800
-Subject: platform data and mfd design question
-In-Reply-To: <4D5B8F61.3090105@stericsson.com>
-References: <4D5AF554.2030208@codeaurora.org> <4D5B8F61.3090105@stericsson.com>
-Message-ID: <20110216165348.GB4390@opensource.wolfsonmicro.com>
+From: dilinger@queued.net (Andres Salomon)
+Date: Wed, 16 Feb 2011 09:00:36 -0800
+Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
+	drivers
+In-Reply-To: <20110216094154.GV13279@pengutronix.de>
+References: <20110211181921.3d561568@queued.net>
+	<20110216094154.GV13279@pengutronix.de>
+Message-ID: <20110216090036.6fffed34@debxo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 09:48:33AM +0100, Linus Walleij wrote:
-> On 02/15/2011 10:51 PM, Abhijeet Dharmapurikar wrote:
-> >Msm on the other hand declares the struct mfd_cell subdevice[] array in
-> >the board file and passes this on to the core driver via platfom data.
+On Wed, 16 Feb 2011 10:41:54 +0100
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-> This way the platform data tells the core driver what kind of
-> silicon it has "hey, PM8058, guess what, you have an RTC!"
-> which looks backwards to me, especially given that it does
-> not need any fancy platform data at all, just two IRQ numbers
-> which the core driver can very well handle.
+> On Fri, Feb 11, 2011 at 06:19:21PM -0800, Andres Salomon wrote:
+> > 
+> > The cell's platform_data is now accessed with a helper function;
+> > change clients to use that, and remove the now-unused data_size.
+> > 
+> > Note that mfd-core no longer makes a copy of platform_data, but the
+> why was this changed and where?  I'm not able to find your complete
+> series via gmane.
 
-Indeed, and the RTC would still be useful even without IRQ support I
-imagine (it should still be able to tell you the time).
+http://permalink.gmane.org/gmane.linux.kernel/1099164
+I screwed up the threading, so the patches aren't underneath that
+one.  Patchwork provides them nicely, though.
+
+Here are the relevant patches:
+https://patchwork.kernel.org/patch/551241/
+https://patchwork.kernel.org/patch/551251/
+https://patchwork.kernel.org/patch/551261/
+..through
+https://patchwork.kernel.org/patch/551451/
+
+The next series is here:
+http://thread.gmane.org/gmane.linux.kernel/1100514/focus=6046
