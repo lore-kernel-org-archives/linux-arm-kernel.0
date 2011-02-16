@@ -1,40 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Feb 2011 12:36:11 +0000
-Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
-In-Reply-To: <20110216123410.GA6267@bnru02>
-References: <1297768683-30273-1-git-send-email-srinidhi.kasagar@stericsson.com>
-	<20110215113422.GE4152@n2100.arm.linux.org.uk>
-	<20110216060351.GB16604@bnru02>
-	<AANLkTi=svL42XJE-61H16B-jgwwu-+pXjS3QcMKNJN6Z@mail.gmail.com>
-	<20110216123410.GA6267@bnru02>
-Message-ID: <1297859771.28844.33.camel@e102109-lin.cambridge.arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 16 Feb 2011 15:35:28 +0300
+Subject: [PATCH 1/3] OMAP2+: hwmod: Avoid setup if clock lookup failed
+In-Reply-To: <1297858285-7056-2-git-send-email-rnayak@ti.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<1297858285-7056-2-git-send-email-rnayak@ti.com>
+Message-ID: <4D5BC490.4060809@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-02-16 at 12:34 +0000, Srinidhi KASAGAR wrote:
-> From 7a1fa2f8ec106bda4f940f5c9478ec16b2de6846 Mon Sep 17 00:00:00 2001
-> From: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Date: Mon, 14 Feb 2011 17:07:06 +0530
-> Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
-> 
-> The effect of cache sync operation is to drain the store
-> buffer and wait for all internal buffers to be empty. In
-> normal conditions, store buffer is able to merge the
-> normal memory writes within its 32-byte data buffers.
-> Due to this erratum present in r3p0, the effect of cache
-> sync operation on the store buffer still remains when
-> the operation completes. This means that the store buffer
-> is always asked to drain and this prevents it from merging
-> any further writes.
-> 
-> This can severely affect performance on the write traffic
-> esp. on Normal memory NC one.
-> 
-> The proposed workaround is to replace the normal offset of
-> cache sync operation(0x730) by another offset targeting an
-> unmapped PL310 register 0x740.
-> 
-> Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+Hello.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On 16.02.2011 15:11, Rajendra Nayak wrote:
+
+> Add a hwmod state check in the _setup function
+> to avoid setting up hwmods' for which clock
+> lookup has failed.
+
+> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+[...]
+
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index e282e35..cd9dcde 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1362,6 +1362,12 @@ static int _setup(struct omap_hwmod *oh, void *data)
+>   	int i, r;
+>   	u8 postsetup_state;
+>
+> +	if (oh->_state != _HWMOD_STATE_CLKS_INITED) {
+> +		WARN(1, "omap_hwmod: %s: _setup failed as one or more"
+
+    You forgot space bafore " -- "moreclock" will be printed.
+
+> +		     "clock lookups' have failed\n", oh->name);
+
+    Why there's apostrophe here?
+
+WBR, Sergei
