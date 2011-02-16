@@ -1,24 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 16 Feb 2011 17:11:24 -0500 (EST)
-Subject: [PATCH 2/2] ARM: remove the 4x expansion presumption while
-	decompressing the kernel
-In-Reply-To: <4D5C47C7.6010006@codeaurora.org>
-References: <1297892343-29064-1-git-send-email-nico@fluxnic.net>
-	<1297892343-29064-2-git-send-email-nico@fluxnic.net>
-	<4D5C47C7.6010006@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1102161707180.14920@xanadu.home>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 16 Feb 2011 15:14:15 -0700 (MST)
+Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
+	OMAP2xxx
+In-Reply-To: <b83b1717e83fc907a1caf589cc53badf@mail.gmail.com>
+References: <20110216065030.22089.61217.stgit@twilight.localdomain>
+	<b83b1717e83fc907a1caf589cc53badf@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102161510410.29817@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Feb 2011, Stephen Boyd wrote:
+Hi Rajendra
 
-> On 02/16/2011 01:39 PM, Nicolas Pitre wrote:
-> > -LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
-> > +LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
+On Wed, 16 Feb 2011, Rajendra Nayak wrote:
+
+> > -----Original Message-----
+> > From: linux-arm-kernel-bounces at lists.infradead.org
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf
+> > Of Paul Walmsley
+> > Sent: Wednesday, February 16, 2011 12:23 PM
+> >
+> > This series also ensures that all clock autoidle is disabled during
+> > boot and only re-enabled if CONFIG_PM is enabled.
 > 
-> What is this for?
+> This does not seem to be the case. Maybe something like the
+> below patch is what is missing..
 
-It replaces the assignment operator with an addition operator ?
+Thanks for the review, you are absolutely right.  Rather than the patch 
+you sent, and since mach-omap2/pm.c is compiled in even if !CONFIG_PM, 
+I'd propose a different approach.  Until we can sort out the 
+CONFIG_PM/pm.c issue, probably it would make more sense to move the 
+autoidle-enable as part of CONFIG_OMAP_RESET_CLOCKS.  Will send a patch in 
+reply to the original thread.
 
 
-Nicolas
+- Paul
