@@ -1,57 +1,156 @@
-From: B02280@freescale.com (Chen Jie-B02280)
-Date: Wed, 16 Feb 2011 01:40:42 +0000
-Subject: [PATCH 1/3] IPUv3: Add i.MX53 IPU support
-In-Reply-To: <AANLkTikD-=LJB2mmxG5jnBT_YXAcKfV6g5cXEvcWF4pV@mail.gmail.com>
-References: <1297760175-19211-1-git-send-email-jason.chen@freescale.com>
-	<AANLkTikD-=LJB2mmxG5jnBT_YXAcKfV6g5cXEvcWF4pV@mail.gmail.com>
-Message-ID: <33F32152BE7EC740BC2C838D2836AC870E64EE@039-SN1MPN1-003.039d.mgd.msft.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 15 Feb 2011 21:05:45 -0500
+Subject: Question about ARM function graph tracing
+In-Reply-To: <4D5B2AC9.3030502@am.sony.com>
+References: <4D4B3D63.4090207@am.sony.com>
+	<AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
+	<4D4C61A5.4050403@am.sony.com>  <4D5B2AC9.3030502@am.sony.com>
+Message-ID: <1297821945.23343.136.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio,
+On Tue, 2011-02-15 at 17:39 -0800, Tim Bird wrote:
+> On 02/04/2011 12:29 PM, Tim Bird wrote:
+> >> OMAP is missing a notrace annotation on omap_readl():
+> >>
+> >> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg38911.html
+> >>
+> >> Part of that patch was merged through rmk's work, but the
+> >> omap_readl() annotation seems to have been missed.
+> > Yep.  It's missing in 2.6.38-rc3.
+> > 
+> >> Also, if this is OMAP1 and not latest mainline, I think you
+> >> will need  a notrace on omap_rev() also (called from inside
+> >> omap_readl() until recently).
+> > 
+> > I couldn't find that in the sched_clock code paths, but
+> > I 'notrace'd it anyways.
+> > 
+> >>
+> >> I think this is most probably what is wrong, since IIRC I saw
+> >> crashes like this on BeagleBoard before I added the notrace on
+> >> omap_readl.  Could you please try with these changes?
+> > 
+> > I have sprinkled 'notrace's liberally throughout the sched_clock
+> > code (including omap_readl() and omap_rev()), and I'm still
+> > seeing problems.  I put a recursion guard in
+> > prepare_ftrace_return, and I'm seeing lots of recursion.  So
+> > there's still a notrace missing somewhere.
 
-You need do some cherry-pick from Sascha's ipuv3 branch to for-next.
+Note, if you find that you need to add "notrace" to most functions in a
+file, you can simply make the entire file "notrace" from the make file:
 
-Jason Chen / Chen Jie
-NMG / MAD
-Freescale Semiconductor (China) Ltd.
-2F, Building B, 177#, Bi Bo Rd
-Pu Dong New District Shanghai?201203
-Tel:???? 021-28937178?
-Fax:???? 021-28937444
-E-mail:??Jason.Chen at freescale.com
+CFLAGS_REMOVE_myfile.o = -pg
 
 
------Original Message-----
-From: Fabio Estevam [mailto:festevam at gmail.com] 
-Sent: Wednesday, February 16, 2011 12:12 AM
-To: Chen Jie-B02280
-Cc: s.hauer at pengutronix.de; linux-arm-kernel at lists.infradead.org; Chen Jie-B02280
-Subject: Re: [PATCH 1/3] IPUv3: Add i.MX53 IPU support
+> 
+> OK.  The notrace was indeed missing fro omap_readl(), but fixing
+> this did not completely fix the problem.  I put the following
+> (crude) recursion guard in arch/arm/kernel/ftrace.c:prepare_ftrace_return:
+> 
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index c0062ad..5872c25 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -209,6 +209,8 @@ int __init ftrace_dyn_arch_init(void *data)
+>  #endif /* CONFIG_DYNAMIC_FTRACE */
+> 
+>  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +static int already_here = 0;
+> +
+>  void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+>                            unsigned long frame_pointer)
+>  {
+> @@ -217,8 +219,16 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_a
+>         unsigned long old;
+>         int err;
+> 
+> -       if (unlikely(atomic_read(&current->tracing_graph_pause)))
+> +       if(unlikely(already_here)) {
+>                 return;
+> +       } else {
+> +               already_here=1;
+> +       }
 
-Hi Jason,
+Um, single cpu ?
 
-On Tue, Feb 15, 2011 at 6:56 AM,  <jason.chen@freescale.com> wrote:
-> From: Jason Chen <b02280@freescale.com>
->
-> Signed-off-by: Jason Chen <b02280@freescale.com>
-> ---
-> ?arch/arm/mach-mx5/board-mx51_babbage.c ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-mx5/devices-imx51.h ? ? ? ? ? ? ? | ? ?3 -
-> ?arch/arm/plat-mxc/devices/platform-imx_ipuv3.c ?| ? 97 
-> +++++++++++++++++++++--
-> ?arch/arm/plat-mxc/include/mach/devices-common.h | ? ?4 +-
-> ?arch/arm/plat-mxc/include/mach/ipu-v3.h ? ? ? ? | ? ?1 +
-> ?drivers/mfd/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?6 +-
-> ?drivers/mfd/imx-ipu-v3/ipu-common.c ? ? ? ? ? ? | ? 66 
-> +++------------
-> ?drivers/mfd/imx-ipu-v3/ipu-prv.h ? ? ? ? ? ? ? ?| ? 32 ++++----
-> ?8 files changed, 126 insertions(+), 85 deletions(-)
 
-Which git tree did you use for these patches?
+> +
+> +       if (unlikely(atomic_read(&current->tracing_graph_pause))) {
+> +               already_here=0;
+> +               return;
+> +       }
+> 
+>         old = *parent;
+>         *parent = return_hooker;
+> @@ -227,6 +237,7 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_ad
+>                                        frame_pointer);
+>         if (err == -EBUSY) {
+>                 *parent = old;
+> +               already_here=0;
+>                 return;
+>         }
+> 
+> @@ -237,6 +248,7 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_ad
+>                 current->curr_ret_stack--;
+>                 *parent = old;
+>         }
+> +       already_here=0;
+>  }
+> 
+>  #ifdef CONFIG_DYNAMIC_FTRACE
+> 
+> Without this, the system hangs for long periods of time after starting
+> the function graph tracer (echo function_graph >/debug/tracing/current_tracer)
+> Sometimes the system comes back and sometimes it doesn't.  With the above
+> code, the system works, and I can get traces (but obviously I'm dumping
+> a bunch of tracepoints whenever the tracer nests.)
+> 
+> I put some extra instrumentation in, and MOST of the time, the item
+> causing nesting is asm_do_IRQ(), which is to be expected.  However,
+> I have seen a recursion from preempt_schedule(), which I didn't really
+> expect.  Does the tracer invoke anything that would cause a schedule
+> from inside the trace-recording code?
+> 
+> Should I try this with CONFIG_PREEMPT off? (It's currently on.)
+> 
+> Any ideas for debugging this would be appreciated.
 
-I can not see a git tree that contains both the MX51 IPU and MX53LOCO board support.
+I've had to debug things that broke in the function graph tracer like
+this before. Is dynamic ftrace available in arm?
 
-Regards,
+Hmm, from arch/arm/Kconfig:
 
-Fabio Estevam
+	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+
+
+I guess so. If you are running something other than this XIP_KERNEL, I
+would suggest using the dynamic functions to binary search the issue.
+
+cat available_filter_functions > /tmp/funcs
+
+Then copy half the funcs to /tmp/funcs1 and the other half
+to /tmp/funcs2
+
+cat /tmp/funcs1 > set_ftrace_filter
+
+This may take a while, as setting the filter one by one is slow.
+
+then run the function graph tracer. If it locks up, try it again
+with /tmp/funcs2. If it locks up, you may have two issues or it could be
+something wrong with the function graph tracer itself. But I'm betting
+one will work and one wont.
+
+Then just keep chopping these funcs files until you get down to a set of
+functions that are causing issues. Then it should point out the problem.
+
+This is the procedure I used to find out why a kvm guest was locking up
+with function graph tracer.
+
+See commit:
+
+258af47479980d8238a04568b94a4e55aa1cb537
+
+Something tells me you may have a similar issue ;)
+
+-- Steve
