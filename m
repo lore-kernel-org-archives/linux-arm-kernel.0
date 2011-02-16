@@ -1,76 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Feb 2011 10:41:54 +0100
-Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110211181921.3d561568@queued.net>
-References: <20110211181921.3d561568@queued.net>
-Message-ID: <20110216094154.GV13279@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Feb 2011 09:56:15 +0000
+Subject: [PATCH V5 12/63] ST SPEAr: Adding support for CLCD on SPEAr3xx/6xx
+In-Reply-To: <9a376f8d8a927e333a36a04e9e40e801dbfe398f.1295499394.git.viresh.kumar@st.com>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+	<9a376f8d8a927e333a36a04e9e40e801dbfe398f.1295499394.git.viresh.kumar@st.com>
+Message-ID: <20110216095615.GA6504@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 06:19:21PM -0800, Andres Salomon wrote:
-> 
-> The cell's platform_data is now accessed with a helper function;
-> change clients to use that, and remove the now-unused data_size.
-> 
-> Note that mfd-core no longer makes a copy of platform_data, but the
-why was this changed and where?  I'm not able to find your complete
-series via gmane.
-
-> mc13xxx-core driver creates the pdata structures on the stack.  In
-> order to get around that, the various ARM mach types that set the
-> pdata have been changed to hold the variable in static (global) memory.
-> Also note that __initdata references in aforementioned pdata structs
-> have been dropped.
-> 
-> Signed-off-by: Andres Salomon <dilinger@queued.net>
-> ---
->  arch/arm/mach-imx/mach-mx27_3ds.c     |    6 +++++-
->  arch/arm/mach-imx/mach-pcm038.c       |    6 +++++-
->  arch/arm/mach-mx3/mach-mx31_3ds.c     |    6 +++++-
->  arch/arm/mach-mx3/mach-mx31moboard.c  |    6 +++++-
->  drivers/leds/leds-mc13783.c           |    6 +++---
->  drivers/mfd/mc13xxx-core.c            |   18 +++++-------------
->  drivers/regulator/mc13783-regulator.c |    6 ++----
->  drivers/regulator/mc13892-regulator.c |    6 ++----
->  include/linux/mfd/mc13xxx.h           |    3 +--
->  9 files changed, 33 insertions(+), 30 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-> index 1643315..f223371 100644
-> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -227,9 +227,13 @@ static struct mc13783_regulator_init_data mx27_3ds_regulators[] = {
->  };
+On Thu, Jan 20, 2011 at 12:55:51PM +0530, Viresh Kumar wrote:
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index d916ac0..bf6632d 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -324,10 +324,22 @@ config FB_ARMCLCD
 >  
->  /* MC13783 */
-> -static struct mc13783_platform_data mc13783_pdata __initdata = {
-isn't using __initdata here broken already before your patch?  Was
-introduced in c67a3e09.  Fabio?
-
-But in general I'd prefer to keep as much __initdata as possible because
-this occupies less memory when using a multi-machine kernel.
-
-> diff --git a/include/linux/mfd/mc13xxx.h b/include/linux/mfd/mc13xxx.h
-> index a1d391b..052b133 100644
-> --- a/include/linux/mfd/mc13xxx.h
-> +++ b/include/linux/mfd/mc13xxx.h
-> @@ -146,8 +146,7 @@ struct mc13xxx_platform_data {
->  #define MC13XXX_USE_LED		(1 << 5)
->  	unsigned int flags;
+>  choice
 >  
-> -	int num_regulators;
-> -	struct mc13xxx_regulator_init_data *regulators;
-> +	struct mc13xxx_regulator_platform_data *regulators;
->  	struct mc13xxx_leds_platform_data *leds;
->  };
-... so I'd prefer to embed a struct mc13xxx_regulator_platform_data into
-mc13xxx_platform_data, not a pointer to it.  This makes initialisation a
-bit easier, too.
+> -	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X)
+> +	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X || ARCH_SPEAR6XX || MACH_SPEAR300 || MACH_SPEAR320)
+>  	prompt "LCD Panel"
+>  	default FB_ARMCLCD_SHARP_LQ035Q7DB02
+>  
+> +config FB_ARMCLCD_SHARP_LQ043T1DG01
+> +	bool "SHARP LQ043T1DG01 CLCD 4.2\" TFT(480x272)"
+> +	help
+> +	  This is an implementation of the Sharp LQ043T1DG01, a 4.2"
+> +	  color TFT panel. The native resolution is 480x272.
+> +
+> +config FB_ARMCLCD_SAMSUNG_LMS700
+> +	bool "SAMSUNG CLCD 7\" TFT(800x480)"
+> +	help
+> +	  This is an implementation of the Samsung LMS700, a 7"
+> +	  color TFT panel. The native resolution is 800x480.
+> +
+>  config FB_ARMCLCD_SHARP_LQ035Q7DB02_HRTFT
+>  	bool "LogicPD LCD 3.5\" QVGA w/HRTFT IC"
+>  	help
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+This choice stuff has gone with the removal of the lpd code from the
+kernel, and thus is unmergable.  This kind of platform specific
+configuration has no business being in this file anyway.
