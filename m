@@ -1,37 +1,96 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 15 Feb 2011 18:19:26 -0800
-Subject: platform data and mfd design question
-In-Reply-To: <4D5AF554.2030208@codeaurora.org>
-References: <4D5AF554.2030208@codeaurora.org>
-Message-ID: <20110216021925.GC3021@opensource.wolfsonmicro.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 15 Feb 2011 19:44:30 -0700
+Subject: [PATCH] spi/imx: select master mode for all channels
+In-Reply-To: <20110215204417.GA28005@angua.secretlab.ca>
+References: <1297195739-24951-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110215204417.GA28005@angua.secretlab.ca>
+Message-ID: <AANLkTimYDNN3KQ1V9riDYPdmJe_J64euJzcPFLZpe4jd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 01:51:16PM -0800, Abhijeet Dharmapurikar wrote:
+2011/2/15 Grant Likely <grant.likely@secretlab.ca>:
+> On Tue, Feb 08, 2011 at 09:08:59PM +0100, Uwe Kleine-K?nig wrote:
+>> From: Sascha Hauer <s.hauer@pengutronix.de>
+>>
+>> The hardware seems to have a race condition when the inactive
+>> channels are in slave mode. We support master mode only, so
+>> we can just switch all channels to master mode.
+>>
+>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>> [ukleinek: add more verbose comment about the race]
+>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> ---
+>> Hello,
+>>
+>> maybe one of our friends at Freescale can comment?
+>
+> Any feedback on this one? ?Or should I just merge it?
 
-> This code can be found here (sorry for the long url - it is convinient to
-> click on it),
+I've gone ahead and merged it.  I can pull it back out if anyone
+complains though.
 
-I can't actually render this URL on a single line without fiddling with
-the font size for my terminal...  When pasting gitweb URLs you almost
-always want to edit out the head ID and just rely on the branch.
+Thanks,
 
-> This gives one the convenience of changing the mfd_cells and their
-> platform data in the board file itself. There are boards where the
-> platform data of some cells changes and in some cases we dont even
-> add a particular cell.
+g.
 
-My main question is why you're trying to do this.  Even if some features
-aren't used on a given board one would strongly expect that the silicon
-will be the same anyway - what's the goal in changing the devices?
+>
+> g.
+>
+>>
+>> Best regards
+>> Uwe
+>>
+>> ?drivers/spi/spi_imx.c | ? 12 +++++++++---
+>> ?1 files changed, 9 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi_imx.c b/drivers/spi/spi_imx.c
+>> index 1cf9d5f..69d6dba 100644
+>> --- a/drivers/spi/spi_imx.c
+>> +++ b/drivers/spi/spi_imx.c
+>> @@ -174,7 +174,7 @@ static unsigned int spi_imx_clkdiv_2(unsigned int fin,
+>> ?#define SPI_IMX2_3_CTRL ? ? ? ? ? ? ?0x08
+>> ?#define SPI_IMX2_3_CTRL_ENABLE ? ? ? ? ? ? ? (1 << ?0)
+>> ?#define SPI_IMX2_3_CTRL_XCH ? ? ? ? ?(1 << ?2)
+>> -#define SPI_IMX2_3_CTRL_MODE(cs) ? ? (1 << ((cs) + ?4))
+>> +#define SPI_IMX2_3_CTRL_MODE_MASK ? ?(0xf << 4)
+>> ?#define SPI_IMX2_3_CTRL_POSTDIV_OFFSET ? ? ? 8
+>> ?#define SPI_IMX2_3_CTRL_PREDIV_OFFSET ? ? ? ?12
+>> ?#define SPI_IMX2_3_CTRL_CS(cs) ? ? ? ? ? ? ? ((cs) << 18)
+>> @@ -253,8 +253,14 @@ static int __maybe_unused spi_imx2_3_config(struct spi_imx_data *spi_imx,
+>> ?{
+>> ? ? ? u32 ctrl = SPI_IMX2_3_CTRL_ENABLE, cfg = 0;
+>>
+>> - ? ? /* set master mode */
+>> - ? ? ctrl |= SPI_IMX2_3_CTRL_MODE(config->cs);
+>> + ? ? /*
+>> + ? ? ?* The hardware seems to have a race condition when changing modes. The
+>> + ? ? ?* current assumption is that the selection of the channel arrives
+>> + ? ? ?* earlier in the hardware than the mode bits when they are written at
+>> + ? ? ?* the same time.
+>> + ? ? ?* So set master mode for all channels as we do not support slave mode.
+>> + ? ? ?*/
+>> + ? ? ctrl |= SPI_IMX2_3_CTRL_MODE_MASK;
+>>
+>> ? ? ? /* set clock speed */
+>> ? ? ? ctrl |= spi_imx2_3_clkdiv(spi_imx->spi_clk, config->speed_hz);
+>> --
+>> 1.7.2.3
+>>
+>>
+>> ------------------------------------------------------------------------------
+>> The ultimate all-in-one performance toolkit: Intel(R) Parallel Studio XE:
+>> Pinpoint memory and threading errors before they happen.
+>> Find and fix more than 250 security defects in the development cycle.
+>> Locate bottlenecks in serial and parallel code that limit performance.
+>> http://p.sf.net/sfu/intel-dev2devfeb
+>> _______________________________________________
+>> spi-devel-general mailing list
+>> spi-devel-general at lists.sourceforge.net
+>> https://lists.sourceforge.net/lists/listinfo/spi-devel-general
+>
 
-> This design makes the core driver very light weight. All it does is
-> calls mfd_add_devices on the cell array passed from its platform
-> data.
 
-The downside is that it then becomes impossible for the MFD to pass in
-resources to the devices (IRQs being the most obvious example) and every
-single board needs to replicate the definitions of all the subdevices
-which gets tedious, especially if you want to change them for some
-reason (eg, an IP becomes used in a wider range of chips so a rename is
-appropriate).
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
