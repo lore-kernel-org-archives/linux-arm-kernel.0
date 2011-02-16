@@ -1,28 +1,32 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 16 Feb 2011 09:48:33 +0100
-Subject: platform data and mfd design question
-In-Reply-To: <4D5AF554.2030208@codeaurora.org>
-References: <4D5AF554.2030208@codeaurora.org>
-Message-ID: <4D5B8F61.3090105@stericsson.com>
+From: J.Lambrecht@televic.com (=?ISO-8859-1?Q?J=FCrgen_Lambrecht?=)
+Date: Wed, 16 Feb 2011 09:58:34 +0100
+Subject: newbie question: location of frame buffer driver for imx27
+Message-ID: <4D5B91BA.9090306@televic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2011 10:51 PM, Abhijeet Dharmapurikar wrote:
-> Msm on the other hand declares the struct mfd_cell subdevice[] array in
-> the board file and passes this on to the core driver via platfom data.
->    
+Hello,
 
-This way the platform data tells the core driver what kind of
-silicon it has "hey, PM8058, guess what, you have an RTC!"
-which looks backwards to me, especially given that it does
-not need any fancy platform data at all, just two IRQ numbers
-which the core driver can very well handle.
+we have the Freescale IMX27-PDK demo kit. Along with it, we got the 
+source code for the linux kernel version 2.6.22, and a lot of patches.
+Also for the video part, there are a lot of patches, creating a 
+/drivers/video/mxc subdirectory.
+In the linux sources 2.6.37, I only find 2 files: mx3fb.c (imx3x i 
+guess) and imxfb.c.
+When we try to compile linux for the imx27 (with the latest ltib) there 
+are no framebuffers under devices.
 
-For example: if the platform data (which is about how the
-components are connected on the board etc) does not
-provide the RTC resource, all of a sudden it appears to the
-system as if the PM8058 does not have an RTC, but it does...
+Do I still need to patch linux/drivers/video for the imx27, or should it 
+work fine like it is?
+(and if so, what do I do wrong ;-)
 
+Kind regards,
+Juergen
 
-Yours,
-Linus Walleij
+-- 
+J?rgen Lambrecht
+R&D Associate
+Tel: +32 (0)51 303045    Fax: +32 (0)51 310670
+http://www.televic-rail.com
+Televic Rail NV - Leo Bekaertlaan 1 - 8870 Izegem - Belgium
+Company number 0825.539.581 - RPR Kortrijk
