@@ -1,121 +1,46 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 16 Feb 2011 16:45:17 +0530
-Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
-	OMAP2xxx
-In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
-References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-Message-ID: <43af56d25809fa616f0e17d7e641ebc0@mail.gmail.com>
+From: gadiyar@ti.com (Anand Gadiyar)
+Date: Wed, 16 Feb 2011 16:47:20 +0530
+Subject: [PATCH 2/2] omap4: 4430sdp: mux GPIO_157 to safe mode
+In-Reply-To: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
+References: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
+Message-ID: <1297855040-1337-2-git-send-email-gadiyar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org
-[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf
-> Of Paul Walmsley
-> Sent: Wednesday, February 16, 2011 12:23 PM
-> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
-OMAP2xxx
->
-> Hello,
->
-> This patch series adds clock framework-controlled autoidle support for
-> the OMAP2xxx DPLL, APLLs, and OMAP2/3 interface clocks.  The old
-> direct register writes in the PM code to enable clock autoidle have been
-> removed.
->
-> This series also ensures that all clock autoidle is disabled during
-> boot and only re-enabled if CONFIG_PM is enabled.
->
-> The series applies on the 'clk_autoidle_a_2.6.39' branch of
-> git://git.pwsan.com/linux-2.6.
->
-> Boot-tested on N800, and dynamic idle-tested on OMAP3430 Beagleboard.
-> Compile-tested with omap1_defconfig, omap2plus_defconfig, a 5912
-> OSK-only config, an N8x0-only config, an OMAP3-only config, and an
-OMAP4-only
-> config.
+Commit 7d4ca85a5 (omap4: Fix ULPI PHY init for ES1.0 SDP)
+changed the mux mode of the pad for GPIO_157 to HSI_MODE
+by accident - the original intent was to mux it properly
+to solve a board reboot problem.
 
-Boot-tested on 3430sdp/4430sdp, with CONFIG_PM and with !CONFIG_PM.
-suspend-offmode tested on 3430sdp and suspend-retmode on 4430sdp (with
-some out-of-tree patches)
-Dynamic idle testing on 3430sdp showed me some very jerky debug console
-the
-moment a 'echo 1 > /debug/pm_debug/sleep_while_idle' is done.
-This however seems to be the case even on 2.6.38-rc4 and not related to
-the
-current patch series. Will debug further, but seems to some 3430sdp
-specific
-issue, since you did not see it on Beagleboard and seems it is not seen on
-OMAP3
-zoom's either.
-Just out of curiosity, what dynamic-idle state where you able to achieve
-on
-Beagle? And what was the debug console timeout that you configured?
+The board reboot is caused by a bug on many revs of the
+board that causes an accidental short circuilt when this
+pad is driven high. To ensure this never happens (even
+with misbehaving bootloaders), mux the pad to safe mode instead.
 
-Regards,
-Rajendra
+Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/board-4430sdp.c |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
->
->
-> - Paul
->
-> ---
->
-> clk_autoidle_b_2.6.39
->    text	   data	    bss	    dec	    hex	filename
-> 5530703	 330544	5594520	11455767	 aecd17
-vmlinux.omap2plus_defconfig.orig
-> 5531167	 330544	5594520	11456231	 aecee7
-vmlinux.omap2plus_defconfig.patched
->
-> Paul Walmsley (11):
->       OMAP2+: clock: disable autoidle on all clocks during clock init
->       OMAP2: clock: add DPLL autoidle support
->       OMAP2xxx: clock: add clockfw autoidle support for APLLs
->       OMAP2+: clock: comment that osc_ck/osc_sys_ck should use clockfw
-autoidle control
->       OMAP2+: clock: add interface clock type code with autoidle support
->       OMAP2420: clock: add sdrc_ick
->       OMAP2420: clock: use autoidle clkops for all autoidle-controllable
-interface clocks
->       OMAP2430/3xxx: clock: add modem clock autoidle support
->       OMAP2430: clock: use autoidle clkops for all autoidle-controllable
-interface clocks
->       OMAP3: clock: use autoidle clkops for all autoidle-controllable
-interface clocks
->       OMAP2/3: PM: remove manual CM_AUTOIDLE bit setting in
-mach-omap2/pm*xx.c
->
->
->  arch/arm/mach-omap2/Makefile          |    7 +
->  arch/arm/mach-omap2/clkt2xxx_apll.c   |   24 +++++
->  arch/arm/mach-omap2/clkt2xxx_dpll.c   |   63 +++++++++++++
->  arch/arm/mach-omap2/clkt2xxx_osc.c    |   14 +++
->  arch/arm/mach-omap2/clkt_iclk.c       |   82 +++++++++++++++++
->  arch/arm/mach-omap2/clock.h           |   11 ++
->  arch/arm/mach-omap2/clock2420_data.c  |  130
-+++++++++++++++++-----------
->  arch/arm/mach-omap2/clock2430_data.c  |  130
-++++++++++++++++------------
->  arch/arm/mach-omap2/clock34xx.c       |   29 ++++++
->  arch/arm/mach-omap2/clock34xx.h       |    5 +
->  arch/arm/mach-omap2/clock3517.c       |    4 +
->  arch/arm/mach-omap2/clock3xxx.c       |    3 -
->  arch/arm/mach-omap2/clock3xxx_data.c  |  155
-+++++++++++++++++----------------
->  arch/arm/mach-omap2/clock44xx_data.c  |    3 +
->  arch/arm/mach-omap2/cm-regbits-24xx.h |    3 +
->  arch/arm/mach-omap2/cm2xxx_3xxx.c     |   69 +++++++++++++++
->  arch/arm/mach-omap2/cm2xxx_3xxx.h     |    8 ++
->  arch/arm/mach-omap2/pm24xx.c          |   69 +--------------
->  arch/arm/mach-omap2/pm34xx.c          |  105 ----------------------
->  19 files changed, 557 insertions(+), 357 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/clkt2xxx_dpll.c
->  create mode 100644 arch/arm/mach-omap2/clkt_iclk.c
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Index: linux-omap-usb/arch/arm/mach-omap2/board-4430sdp.c
+===================================================================
+--- linux-omap-usb.orig/arch/arm/mach-omap2/board-4430sdp.c
++++ linux-omap-usb/arch/arm/mach-omap2/board-4430sdp.c
+@@ -543,7 +543,15 @@ static void __init omap_sfh7741prox_init
+ 
+ #ifdef CONFIG_OMAP_MUX
+ static struct omap_board_mux board_mux[] __initdata = {
+-	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
++	/*
++	 * USBB2_ULPITLL_CLK/GPIO_157 controls the circuitry
++	 * that turns on the PHY connected to the EHCI port.
++	 * several revisions of the Blaze are affected by
++	 * an accidental short-circuit that causes a reboot
++	 * if this pad is driven high. So, explicitly configure
++	 * the pad in safe mode to ensure this never happens
++	 */
++	OMAP4_MUX(USBB2_ULPITLL_CLK, OMAP_MUX_MODE7),
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+ #else
