@@ -1,43 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 16 Feb 2011 13:26:31 +0200
-Subject: [PATCH 1/2] omap4: 4430sdp: drop ehci support
-In-Reply-To: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
-References: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
-Message-ID: <20110216112631.GA2497@legolas.emea.dhcp.ti.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 16 Feb 2011 16:59:34 +0530
+Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <1297697188-5206-1-git-send-email-will.deacon@arm.com>
+References: <1297697188-5206-1-git-send-email-will.deacon@arm.com>
+Message-ID: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 04:47:19PM +0530, Anand Gadiyar wrote:
-> Most revisions of the OMAP4 Blaze/SDP platform do not have
-> the EHCI signals routed by default. The pads are routed
-> for the alternate HSI functionality instead, and explicit
-> board modifications are needed to route the signals to
-> the USB PHY on the board.
-> 
-> Also, turning on the PHY connected to the EHCI port causes
-> a board reboot during bootup due to an unintended short
-> on the rails - this affects many initial revisions of the
-> board, and needs a minor board mod to fix (or as a
-> workaround, one should not attempt to power on the
-> USB PHY).
-> 
-> Given that these boards need explicit board mods to even
-> get EHCI working (separate from the accidental short above),
-> we should not attempt to enable EHCI by default.
-> 
-> So drop the EHCI support from the board files for the
-> Blaze/SDP platforms.
-> 
-> Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-> Cc: Keshava Munegowda <keshava_mgowda@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
+On Mon, Feb 14, 2011 at 20:56, Will Deacon <will.deacon@arm.com> wrote:
+> Currently, the gic uses handle_level_irq for handling SPIs (Shared
+> Peripheral Interrupts), requiring active interrupts to be masked at
+> the distributor level during IRQ handling.
+>
+> On a virtualised system, only the CPU interfaces are virtualised in
+> hardware. Accesses to the distributor must be trapped by the hypervisor,
+> adding latency to the critical interrupt path in Linux.
+>
+> This patch modifies the GIC code to use handle_fasteoi_irq for handling
+> interrupts, which only requires us to signal EOI to the CPU interface
+> when handling is complete. Cascaded IRQ handling is also updated so that
+> EOI is signalled after handling.
 
-Tony, if you want to queue this one directly, here's my:
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
-if you wish, I can send you a pull request as well. I already have
-another patch for you anyway.
-
--- 
-balbi
+Several of the platforms using the GIC also have GPIO code which uses
+set_irq_chained_handler().  I think you will have to modify all of
+these to call irq_eoi() appropriately and not the other functions.
+Some of these will also likely be used with other interrupt handlers
+than the GIC, though.
