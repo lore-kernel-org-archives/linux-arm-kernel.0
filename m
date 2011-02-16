@@ -1,35 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 16 Feb 2011 13:27:36 -0200
-Subject: newbie question: location of frame buffer driver for imx27
-In-Reply-To: <4D5B91BA.9090306@televic.com>
-References: <4D5B91BA.9090306@televic.com>
-Message-ID: <AANLkTi=9ReeZMxEWn=-aor55tPdTsV=Oi=6EsbmbHGv2@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 16 Feb 2011 16:33:32 +0100
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110216202818.GA11467@S2100-06.ap.freescale.net>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165958.GH10709@pengutronix.de>
+	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
+	<20110215171341.GD10770@pengutronix.de>
+	<20110215171917.GQ4152@n2100.arm.linux.org.uk>
+	<20110215172948.GE10770@pengutronix.de>
+	<20110216202818.GA11467@S2100-06.ap.freescale.net>
+Message-ID: <20110216153332.GC6365@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J?rgen,
+Hi Shawn,
 
-2011/2/16 J?rgen Lambrecht <J.Lambrecht@televic.com>:
-> Hello,
->
-> we have the Freescale IMX27-PDK demo kit. Along with it, we got the source
-> code for the linux kernel version 2.6.22, and a lot of patches.
-> Also for the video part, there are a lot of patches, creating a
-> /drivers/video/mxc subdirectory.
-> In the linux sources 2.6.37, I only find 2 files: mx3fb.c (imx3x i guess)
-> and imxfb.c.
-> When we try to compile linux for the imx27 (with the latest ltib) there are
-> no framebuffers under devices.
->
-> Do I still need to patch linux/drivers/video for the imx27, or should it
-> work fine like it is?
-> (and if so, what do I do wrong ;-)
+[CRC failures on MMC]
+> I guess you will also get the unknown partition table message if you
+> test this card on mx35 right now.
 
-Framebuffer support for MX27 is available at: drivers/video/imxfb.c
+No, I didn't see that message on MX35. (Doesn't matter much now).
 
-You can also take a look at arch/arm/mach-imx/mach-mx27ads.c to see an
-example of a MX27 based board with framebuffer support.
+> I just tested 7 mmc cards in total.  6 cards work fine, and 1 card
+> (Transcend MMC plus 1GB) has the exactly same problem as yours. And
+> if I remove the 8 bit cap, this card also works fine.  So I would
+> agree with Russell that it's unrelated to the driver.
 
-Regards,
+Ah, the 8_BIT_CAP was the right pointer. It works now and I can see the
+partitions \o/ But IMHO it is related to the driver because it cannot set that
+8_BIT_DATA_CAP unconditionally? Probably something like 'flags' should be added
+to platform_data? One flag could then be 8_BIT_CAPABLE_SLOT or something.
 
-Fabio Estevam
+> I tested the SDIO, but probably in different way from yours.  I had
+> two card slots on my board, rootfs on mmc0 and SDIO card on mmc1.
+> It seems working fine in this way.  However, when I use nfs and test
+> SDIO on mmc0, my systems hangs too.  I will look into it.
+
+The latter scenario is the only one I can test, because I don't have an
+(active) second slot.
+
+Thanks for keeping up with the driver!
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
