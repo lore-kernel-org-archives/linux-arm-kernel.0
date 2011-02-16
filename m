@@ -1,36 +1,68 @@
-From: dilinger@queued.net (Andres Salomon)
-Date: Wed, 16 Feb 2011 09:00:36 -0800
-Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110216094154.GV13279@pengutronix.de>
-References: <20110211181921.3d561568@queued.net>
-	<20110216094154.GV13279@pengutronix.de>
-Message-ID: <20110216090036.6fffed34@debxo>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 16 Feb 2011 09:12:41 -0800
+Subject: [PATCH] TI816X: Update to use init_early
+In-Reply-To: <20110215180533.GA20795@atomide.com>
+References: <1297791368-32042-1-git-send-email-hemantp@ti.com>
+	<20110215180139.GF11199@n2100.arm.linux.org.uk>
+	<20110215180533.GA20795@atomide.com>
+Message-ID: <20110216171241.GE20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Feb 2011 10:41:54 +0100
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-
-> On Fri, Feb 11, 2011 at 06:19:21PM -0800, Andres Salomon wrote:
+* Tony Lindgren <tony@atomide.com> [110215 10:04]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110215 10:00]:
+> > On Tue, Feb 15, 2011 at 11:06:08PM +0530, Hemant Pedanekar wrote:
+> > > +static void __init ti8168_evm_init_irq(void)
+> > > +{
+> > > +	omap_board_config = ti8168_evm_config;
+> > > +	omap_board_config_size = ARRAY_SIZE(ti8168_evm_config);
+> > > +	omap2_init_common_infrastructure();
+> > > +	omap2_init_common_devices(NULL, NULL);
+> > > +	omap_init_irq();
+> > > +}
 > > 
-> > The cell's platform_data is now accessed with a helper function;
-> > change clients to use that, and remove the now-unused data_size.
-> > 
-> > Note that mfd-core no longer makes a copy of platform_data, but the
-> why was this changed and where?  I'm not able to find your complete
-> series via gmane.
+> > What here can use the new init_early hook in the machine record?
+> 
+> I can fix this up for the init_early changes when I merge the branches
+> together.
 
-http://permalink.gmane.org/gmane.linux.kernel/1099164
-I screwed up the threading, so the patches aren't underneath that
-one.  Patchwork provides them nicely, though.
+Here's the patch to do that.
 
-Here are the relevant patches:
-https://patchwork.kernel.org/patch/551241/
-https://patchwork.kernel.org/patch/551251/
-https://patchwork.kernel.org/patch/551261/
-..through
-https://patchwork.kernel.org/patch/551451/
+Tony
 
-The next series is here:
-http://thread.gmane.org/gmane.linux.kernel/1100514/focus=6046
+From: Tony Lindgren <tony@atomide.com>
+Date: Wed, 16 Feb 2011 08:45:46 -0800
+Subject: [PATCH] TI816X: Update to use init_early
+
+Update to use init_early
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/board-ti8168evm.c
++++ b/arch/arm/mach-omap2/board-ti8168evm.c
+@@ -27,12 +27,16 @@
+ static struct omap_board_config_kernel ti8168_evm_config[] __initdata = {
+ };
+ 
+-static void __init ti8168_evm_init_irq(void)
++static void __init ti8168_init_early(void)
+ {
+ 	omap_board_config = ti8168_evm_config;
+ 	omap_board_config_size = ARRAY_SIZE(ti8168_evm_config);
+ 	omap2_init_common_infrastructure();
+ 	omap2_init_common_devices(NULL, NULL);
++}
++
++static void __init ti8168_evm_init_irq(void)
++{
+ 	omap_init_irq();
+ }
+ 
+@@ -51,6 +55,7 @@ MACHINE_START(TI8168EVM, "ti8168evm")
+ 	/* Maintainer: Texas Instruments */
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= ti8168_evm_map_io,
++	.init_early	= ti8168_init_early,
+ 	.init_irq	= ti8168_evm_init_irq,
+ 	.timer		= &omap_timer,
+ 	.init_machine	= ti8168_evm_init,
