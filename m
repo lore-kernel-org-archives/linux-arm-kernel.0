@@ -1,24 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Feb 2011 10:04:24 +0000
-Subject: [PATCH V5 00/63] Updating SPEAr Support
-In-Reply-To: <4D58E86E.3040100@st.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<4D463B01.4050004@st.com>
-	<20110131092251.GA8729@n2100.arm.linux.org.uk>
-	<4D58E86E.3040100@st.com>
-Message-ID: <20110216100424.GB6504@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Feb 2011 10:11:05 +0000
+Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
+In-Reply-To: <20110216050842.GB17274@bnru02>
+References: <1297768683-30273-1-git-send-email-srinidhi.kasagar@stericsson.com>
+	<AANLkTikPGwcm-_j-NzW2UixaEx_ekJMjJcrTO1SUy7Ao@mail.gmail.com>
+	<20110216050842.GB17274@bnru02>
+Message-ID: <1297851065.28844.29.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 02:01:42PM +0530, viresh kumar wrote:
-> On 01/31/2011 02:52 PM, Russell King - ARM Linux wrote:
-> >> > Should I push these patches to tracker now ?
-> > I've not yet been through them.  I only got part way through v4 before you
-> > posted v5.
+On Wed, 2011-02-16 at 05:08 +0000, Srinidhi KASAGAR wrote:
+> On Tue, Feb 15, 2011 at 17:38:52 +0100, Catalin Marinas wrote:
+> > On 15 February 2011 11:18, srinidhi kasagar
+> > <srinidhi.kasagar@stericsson.com> wrote:
+> > > +config ARM_ERRATA_753970
+> > > +       bool "ARM errata: cache sync operation may be faulty"
+> > > +       depends on CACHE_PL310
+> > > +       help
+> > > +         This option enables the workaround for the 753970 PL310 erratum.
+> >
+> > Is this number correct? I couldn't find it in ARM's internal database.
 > 
-> Russell,
-> 
-> Is there any further feedback on this patchset?
+> yes, we got this errata notice from ARM recently (10-feb-11), document
+> revision 12.1
 
-No idea, I've still not looked at them.  I don't know when I'll be able to
-look at them.
+Ah, I found it (I was looking in the wrong place).
+
+Catalin
