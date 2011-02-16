@@ -1,94 +1,29 @@
 From: shweta.gulati@ti.com (Gulati, Shweta)
-Date: Wed, 16 Feb 2011 11:14:36 +0530
+Date: Wed, 16 Feb 2011 11:22:09 +0530
 Subject: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on TWL
-In-Reply-To: <bf1e2a72d8f16365df684cd5add00eee@mail.gmail.com>
+In-Reply-To: <20110215172931.3a6e45a8.jhnikula@gmail.com>
 References: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
 	<20110215171652.601c9c68.jhnikula@gmail.com>
-	<bf1e2a72d8f16365df684cd5add00eee@mail.gmail.com>
-Message-ID: <AANLkTinAORWkciE04L3QSfXJ0Peb3xKLK=8Sq=tY4L-h@mail.gmail.com>
+	<20110215172931.3a6e45a8.jhnikula@gmail.com>
+Message-ID: <AANLkTi=3PCBOvFtd1T-=tDjXcs+_0opKqxVps+StCZqf@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 15, 2011 at 10:00 PM, Vishwanath Sripathy
-<vishwanath.bs@ti.com> wrote:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
->> kernel-bounces at lists.infradead.org] On Behalf Of Jarkko Nikula
->> Sent: Tuesday, February 15, 2011 8:47 PM
->> To: Shweta Gulati
->> Cc: Nishanth Menon; Thara Gopinath; linux-omap at vger.kernel.org;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on
->> TWL
->>
->> On Tue, 15 Feb 2011 13:28:58 +0530
->> Shweta Gulati <shweta.gulati@ti.com> wrote:
->>
->> > This patch is based on LO PM Branch and Smartreflex has been
->> > tested on OMAP3430 SDP, OMAP3630 SDP and boot tested on
->> > OMAP2430 SDP.
->> >
->> I saw this was working on N900 (kind of special instrumentation
->> setup) after enabling /sys/kernel/debug/voltage/[vdd_core |
->> vdd_mpu]/smartreflex/autocomp. Few comments below.
->>
->> > @@ -269,6 +276,18 @@ int __init omap3_twl_init(void)
->> > ? ? ? ? ? ? omap3_core_volt_info.vp_vddmax =
->> OMAP3630_VP2_VLIMITTO_VDDMAX;
->> > ? ? }
->> ...
->> > + ? if (!twl_sr_enable_autoinit)
->> > + ? ? ? ? ? omap3_twl_set_sr_bit(true);
->> ...
->> > +int __init omap3_twl_set_sr_bit(bool enable)
->> > +{
->> > + ? u8 temp;
->> > + ? int ret;
->> > + ? if (twl_sr_enable_autoinit)
->> > + ? ? ? ? ? pr_warning("%s: unexpected multiple calls\n", __func__);
->> > +
->> > + ? ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL4030_DCDC_GLOBAL_CFG);
->> > + ? if (ret)
->> > + ? ? ? ? ? goto err;
->> > +
->> > + ? if (enable)
->> > + ? ? ? ? ? temp |= SMARTREFLEX_ENABLE;
->> > + ? else
->> > + ? ? ? ? ? temp &= ~SMARTREFLEX_ENABLE;
->> > +
->> > + ? ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
->> > + ? ? ? ? ? ? ? ? ? ? ? ? ? TWL4030_DCDC_GLOBAL_CFG);
->>
+On Tue, Feb 15, 2011 at 8:59 PM, Jarkko Nikula <jhnikula@gmail.com> wrote:
+> On Tue, 15 Feb 2011 17:16:52 +0200
+> Jarkko Nikula <jhnikula@gmail.com> wrote:
+>
 >> Would it make more sense to set only the flag here and do the register
 >> writes when omap3_twl_init is executing? Then it's not so strict when
 >> the board code calls this function.
-> What if board code calls this function after twl_init is executed? Then
-> you will not clear the bit right?
-> Intention of this function is to make sure the bit is set/cleared when it
-> is called.
-ompa3_twl_init is called from 'omap2_common_pm_late_init' which is
-late_initcall.
-So it would be called after board specific initializations are
-completed in 'init' process.
-> vishwa
 >>
->> > + ? if (!ret) {
->> > + ? ? ? ? ? twl_sr_enable_autoinit = true;
->> > + ? ? ? ? ? return 0;
->>
->> Should this be twl_sr_enable_autoinit = enable (if going to do
->> register write here)?
->>
->> --
->> Jarkko
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Probably discussed earlier but would it make more sense to have flag in
+> struct twl4030_platform_data and to do registers writes in twl-core?
+> Looks suspicious to have i2c_writes under arch/arm/.
+twl_i2c_read/write APIs are used from arch/arm in many board files,
+so I think it should not cause any issue.
+> --
+> Jarkko
 >
 
 
