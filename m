@@ -1,10 +1,10 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 15 Feb 2011 23:52:51 -0700
-Subject: [PATCH 07/11] OMAP2420: clock: use autoidle clkops for all
+Date: Tue, 15 Feb 2011 23:52:54 -0700
+Subject: [PATCH 09/11] OMAP2430: clock: use autoidle clkops for all
 	autoidle-controllable interface clocks
 In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
 References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-Message-ID: <20110216065250.22089.89851.stgit@twilight.localdomain>
+Message-ID: <20110216065253.22089.94431.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,16 +15,15 @@ these clocks.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock2420_data.c  |  109 ++++++++++++++++++---------------
- arch/arm/mach-omap2/cm-regbits-24xx.h |    2 +
- 2 files changed, 63 insertions(+), 48 deletions(-)
+ arch/arm/mach-omap2/clock2430_data.c |  125 +++++++++++++++++++---------------
+ 1 files changed, 69 insertions(+), 56 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 63ed481..68c0369 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
+diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
+index 1ff150a..34daed9 100644
+--- a/arch/arm/mach-omap2/clock2430_data.c
++++ b/arch/arm/mach-omap2/clock2430_data.c
 @@ -2,7 +2,7 @@
-  *  linux/arch/arm/mach-omap2/clock2420_data.c
+  *  linux/arch/arm/mach-omap2/clock2430_data.c
   *
   *  Copyright (C) 2005-2009 Texas Instruments, Inc.
 - *  Copyright (C) 2004-2010 Nokia Corporation
@@ -32,16 +31,7 @@ index 63ed481..68c0369 100644
   *
   *  Contacts:
   *  Richard Woodruff <r-woodruff2@ti.com>
-@@ -481,7 +481,7 @@ static struct clk dsp_irate_ick = {
- /* 2420 only */
- static struct clk dsp_ick = {
- 	.name		= "dsp_ick",	 /* apparently ipi and isp */
--	.ops		= &clkops_omap2_dflt_wait,
-+	.ops		= &clkops_omap2_iclk_dflt_wait,
- 	.parent		= &dsp_irate_ick,
- 	.enable_reg	= OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP2420_EN_DSP_IPI_SHIFT,	      /* for ipi */
-@@ -579,7 +579,7 @@ static const struct clksel usb_l4_ick_clksel[] = {
+@@ -525,7 +525,7 @@ static const struct clksel usb_l4_ick_clksel[] = {
  /* It is unclear from TRM whether usb_l4_ick is really in L3 or L4 clkdm */
  static struct clk usb_l4_ick = {	/* FS-USB interface clock */
  	.name		= "usb_l4_ick",
@@ -50,7 +40,7 @@ index 63ed481..68c0369 100644
  	.parent		= &core_l3_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
-@@ -661,7 +661,7 @@ static struct clk ssi_ssr_sst_fck = {
+@@ -606,7 +606,7 @@ static struct clk ssi_ssr_sst_fck = {
   */
  static struct clk ssi_l4_ick = {
  	.name		= "ssi_l4_ick",
@@ -59,7 +49,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
-@@ -716,6 +716,7 @@ static struct clk gfx_2d_fck = {
+@@ -661,6 +661,7 @@ static struct clk gfx_2d_fck = {
  	.recalc		= &omap2_clksel_recalc,
  };
  
@@ -67,7 +57,25 @@ index 63ed481..68c0369 100644
  static struct clk gfx_ick = {
  	.name		= "gfx_ick",		/* From l3 */
  	.ops		= &clkops_omap2_dflt_wait,
-@@ -763,7 +764,7 @@ static const struct clksel dss1_fck_clksel[] = {
+@@ -693,7 +694,7 @@ static const struct clksel mdm_ick_clksel[] = {
+ 
+ static struct clk mdm_ick = {		/* used both as a ick and fck */
+ 	.name		= "mdm_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &core_ck,
+ 	.clkdm_name	= "mdm_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_ICLKEN),
+@@ -706,7 +707,7 @@ static struct clk mdm_ick = {		/* used both as a ick and fck */
+ 
+ static struct clk mdm_osc_ck = {
+ 	.name		= "mdm_osc_ck",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_mdmclk_dflt_wait,
+ 	.parent		= &osc_ck,
+ 	.clkdm_name	= "mdm_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_FCLKEN),
+@@ -751,7 +752,7 @@ static const struct clksel dss1_fck_clksel[] = {
  
  static struct clk dss_ick = {		/* Enables both L3,L4 ICLK's */
  	.name		= "dss_ick",
@@ -76,7 +84,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,	/* really both l3 and l4 */
  	.clkdm_name	= "dss_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -845,7 +846,7 @@ static const struct clksel omap24xx_gpt_clksel[] = {
+@@ -833,7 +834,7 @@ static const struct clksel omap24xx_gpt_clksel[] = {
  
  static struct clk gpt1_ick = {
  	.name		= "gpt1_ick",
@@ -85,7 +93,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
-@@ -871,7 +872,7 @@ static struct clk gpt1_fck = {
+@@ -859,7 +860,7 @@ static struct clk gpt1_fck = {
  
  static struct clk gpt2_ick = {
  	.name		= "gpt2_ick",
@@ -94,7 +102,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -895,7 +896,7 @@ static struct clk gpt2_fck = {
+@@ -883,7 +884,7 @@ static struct clk gpt2_fck = {
  
  static struct clk gpt3_ick = {
  	.name		= "gpt3_ick",
@@ -103,7 +111,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -919,7 +920,7 @@ static struct clk gpt3_fck = {
+@@ -907,7 +908,7 @@ static struct clk gpt3_fck = {
  
  static struct clk gpt4_ick = {
  	.name		= "gpt4_ick",
@@ -112,7 +120,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -943,7 +944,7 @@ static struct clk gpt4_fck = {
+@@ -931,7 +932,7 @@ static struct clk gpt4_fck = {
  
  static struct clk gpt5_ick = {
  	.name		= "gpt5_ick",
@@ -121,7 +129,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -967,7 +968,7 @@ static struct clk gpt5_fck = {
+@@ -955,7 +956,7 @@ static struct clk gpt5_fck = {
  
  static struct clk gpt6_ick = {
  	.name		= "gpt6_ick",
@@ -130,7 +138,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -991,7 +992,7 @@ static struct clk gpt6_fck = {
+@@ -979,7 +980,7 @@ static struct clk gpt6_fck = {
  
  static struct clk gpt7_ick = {
  	.name		= "gpt7_ick",
@@ -139,7 +147,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
  	.enable_bit	= OMAP24XX_EN_GPT7_SHIFT,
-@@ -1014,7 +1015,7 @@ static struct clk gpt7_fck = {
+@@ -1002,7 +1003,7 @@ static struct clk gpt7_fck = {
  
  static struct clk gpt8_ick = {
  	.name		= "gpt8_ick",
@@ -148,7 +156,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1038,7 +1039,7 @@ static struct clk gpt8_fck = {
+@@ -1026,7 +1027,7 @@ static struct clk gpt8_fck = {
  
  static struct clk gpt9_ick = {
  	.name		= "gpt9_ick",
@@ -157,7 +165,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1062,7 +1063,7 @@ static struct clk gpt9_fck = {
+@@ -1050,7 +1051,7 @@ static struct clk gpt9_fck = {
  
  static struct clk gpt10_ick = {
  	.name		= "gpt10_ick",
@@ -166,7 +174,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1086,7 +1087,7 @@ static struct clk gpt10_fck = {
+@@ -1074,7 +1075,7 @@ static struct clk gpt10_fck = {
  
  static struct clk gpt11_ick = {
  	.name		= "gpt11_ick",
@@ -175,7 +183,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1110,7 +1111,7 @@ static struct clk gpt11_fck = {
+@@ -1098,7 +1099,7 @@ static struct clk gpt11_fck = {
  
  static struct clk gpt12_ick = {
  	.name		= "gpt12_ick",
@@ -184,7 +192,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1134,7 +1135,7 @@ static struct clk gpt12_fck = {
+@@ -1122,7 +1123,7 @@ static struct clk gpt12_fck = {
  
  static struct clk mcbsp1_ick = {
  	.name		= "mcbsp1_ick",
@@ -193,7 +201,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1174,7 +1175,7 @@ static struct clk mcbsp1_fck = {
+@@ -1162,7 +1163,7 @@ static struct clk mcbsp1_fck = {
  
  static struct clk mcbsp2_ick = {
  	.name		= "mcbsp2_ick",
@@ -202,7 +210,34 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1198,7 +1199,7 @@ static struct clk mcbsp2_fck = {
+@@ -1186,7 +1187,7 @@ static struct clk mcbsp2_fck = {
+ 
+ static struct clk mcbsp3_ick = {
+ 	.name		= "mcbsp3_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1210,7 +1211,7 @@ static struct clk mcbsp3_fck = {
+ 
+ static struct clk mcbsp4_ick = {
+ 	.name		= "mcbsp4_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1234,7 +1235,7 @@ static struct clk mcbsp4_fck = {
+ 
+ static struct clk mcbsp5_ick = {
+ 	.name		= "mcbsp5_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1258,7 +1259,7 @@ static struct clk mcbsp5_fck = {
  
  static struct clk mcspi1_ick = {
  	.name		= "mcspi1_ick",
@@ -211,7 +246,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1218,7 +1219,7 @@ static struct clk mcspi1_fck = {
+@@ -1278,7 +1279,7 @@ static struct clk mcspi1_fck = {
  
  static struct clk mcspi2_ick = {
  	.name		= "mcspi2_ick",
@@ -220,7 +255,16 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1238,7 +1239,7 @@ static struct clk mcspi2_fck = {
+@@ -1298,7 +1299,7 @@ static struct clk mcspi2_fck = {
+ 
+ static struct clk mcspi3_ick = {
+ 	.name		= "mcspi3_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1318,7 +1319,7 @@ static struct clk mcspi3_fck = {
  
  static struct clk uart1_ick = {
  	.name		= "uart1_ick",
@@ -229,7 +273,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1258,7 +1259,7 @@ static struct clk uart1_fck = {
+@@ -1338,7 +1339,7 @@ static struct clk uart1_fck = {
  
  static struct clk uart2_ick = {
  	.name		= "uart2_ick",
@@ -238,7 +282,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1278,7 +1279,7 @@ static struct clk uart2_fck = {
+@@ -1358,7 +1359,7 @@ static struct clk uart2_fck = {
  
  static struct clk uart3_ick = {
  	.name		= "uart3_ick",
@@ -247,7 +291,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
-@@ -1298,7 +1299,7 @@ static struct clk uart3_fck = {
+@@ -1378,7 +1379,7 @@ static struct clk uart3_fck = {
  
  static struct clk gpios_ick = {
  	.name		= "gpios_ick",
@@ -256,7 +300,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
-@@ -1318,7 +1319,7 @@ static struct clk gpios_fck = {
+@@ -1398,7 +1399,7 @@ static struct clk gpios_fck = {
  
  static struct clk mpu_wdt_ick = {
  	.name		= "mpu_wdt_ick",
@@ -265,7 +309,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
-@@ -1338,7 +1339,7 @@ static struct clk mpu_wdt_fck = {
+@@ -1418,7 +1419,7 @@ static struct clk mpu_wdt_fck = {
  
  static struct clk sync_32k_ick = {
  	.name		= "sync_32k_ick",
@@ -274,7 +318,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.flags		= ENABLE_ON_INIT,
  	.clkdm_name	= "core_l4_clkdm",
-@@ -1349,7 +1350,7 @@ static struct clk sync_32k_ick = {
+@@ -1429,7 +1430,7 @@ static struct clk sync_32k_ick = {
  
  static struct clk wdt1_ick = {
  	.name		= "wdt1_ick",
@@ -283,7 +327,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
-@@ -1359,7 +1360,7 @@ static struct clk wdt1_ick = {
+@@ -1439,7 +1440,7 @@ static struct clk wdt1_ick = {
  
  static struct clk omapctrl_ick = {
  	.name		= "omapctrl_ick",
@@ -292,7 +336,16 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.flags		= ENABLE_ON_INIT,
  	.clkdm_name	= "core_l4_clkdm",
-@@ -1370,7 +1371,7 @@ static struct clk omapctrl_ick = {
+@@ -1450,7 +1451,7 @@ static struct clk omapctrl_ick = {
+ 
+ static struct clk icr_ick = {
+ 	.name		= "icr_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+@@ -1460,7 +1461,7 @@ static struct clk icr_ick = {
  
  static struct clk cam_ick = {
  	.name		= "cam_ick",
@@ -301,7 +354,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1395,7 +1396,7 @@ static struct clk cam_fck = {
+@@ -1485,7 +1486,7 @@ static struct clk cam_fck = {
  
  static struct clk mailboxes_ick = {
  	.name		= "mailboxes_ick",
@@ -310,7 +363,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1405,7 +1406,7 @@ static struct clk mailboxes_ick = {
+@@ -1495,7 +1496,7 @@ static struct clk mailboxes_ick = {
  
  static struct clk wdt4_ick = {
  	.name		= "wdt4_ick",
@@ -319,16 +372,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1425,7 +1426,7 @@ static struct clk wdt4_fck = {
- 
- static struct clk wdt3_ick = {
- 	.name		= "wdt3_ick",
--	.ops		= &clkops_omap2_dflt_wait,
-+	.ops		= &clkops_omap2_iclk_dflt_wait,
- 	.parent		= &l4_ck,
- 	.clkdm_name	= "core_l4_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1445,7 +1446,7 @@ static struct clk wdt3_fck = {
+@@ -1515,7 +1516,7 @@ static struct clk wdt4_fck = {
  
  static struct clk mspro_ick = {
  	.name		= "mspro_ick",
@@ -337,16 +381,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1465,7 +1466,7 @@ static struct clk mspro_fck = {
- 
- static struct clk mmc_ick = {
- 	.name		= "mmc_ick",
--	.ops		= &clkops_omap2_dflt_wait,
-+	.ops		= &clkops_omap2_iclk_dflt_wait,
- 	.parent		= &l4_ck,
- 	.clkdm_name	= "core_l4_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1485,7 +1486,7 @@ static struct clk mmc_fck = {
+@@ -1535,7 +1536,7 @@ static struct clk mspro_fck = {
  
  static struct clk fac_ick = {
  	.name		= "fac_ick",
@@ -355,16 +390,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1505,7 +1506,7 @@ static struct clk fac_fck = {
- 
- static struct clk eac_ick = {
- 	.name		= "eac_ick",
--	.ops		= &clkops_omap2_dflt_wait,
-+	.ops		= &clkops_omap2_iclk_dflt_wait,
- 	.parent		= &l4_ck,
- 	.clkdm_name	= "core_l4_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1525,7 +1526,7 @@ static struct clk eac_fck = {
+@@ -1555,7 +1556,7 @@ static struct clk fac_fck = {
  
  static struct clk hdq_ick = {
  	.name		= "hdq_ick",
@@ -373,8 +399,8 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1545,7 +1546,7 @@ static struct clk hdq_fck = {
- 
+@@ -1579,7 +1580,7 @@ static struct clk hdq_fck = {
+  */
  static struct clk i2c2_ick = {
  	.name		= "i2c2_ick",
 -	.ops		= &clkops_omap2_dflt_wait,
@@ -382,8 +408,8 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1565,7 +1566,7 @@ static struct clk i2c2_fck = {
- 
+@@ -1603,7 +1604,7 @@ static struct clk i2chs2_fck = {
+  */
  static struct clk i2c1_ick = {
  	.name		= "i2c1_ick",
 -	.ops		= &clkops_omap2_dflt_wait,
@@ -391,7 +417,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1583,12 +1584,18 @@ static struct clk i2c1_fck = {
+@@ -1621,12 +1622,18 @@ static struct clk i2chs1_fck = {
  	.recalc		= &followparent_recalc,
  };
  
@@ -411,7 +437,7 @@ index 63ed481..68c0369 100644
  	.recalc		= &followparent_recalc,
  };
  
-@@ -1600,11 +1607,17 @@ static struct clk sdma_fck = {
+@@ -1638,17 +1645,23 @@ static struct clk sdma_fck = {
  	.recalc		= &followparent_recalc,
  };
  
@@ -430,16 +456,14 @@ index 63ed481..68c0369 100644
  	.recalc		= &followparent_recalc,
  };
  
-@@ -1625,7 +1638,7 @@ static struct clk sdrc_ick = {
- 
- static struct clk vlynq_ick = {
- 	.name		= "vlynq_ick",
+ static struct clk sdrc_ick = {
+ 	.name		= "sdrc_ick",
 -	.ops		= &clkops_omap2_dflt_wait,
-+	.ops		= &clkops_omap2_iclk_dflt_wait,
- 	.parent		= &core_l3_ck,
- 	.clkdm_name	= "core_l3_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
-@@ -1674,7 +1687,7 @@ static struct clk vlynq_fck = {
++	.ops		= &clkops_omap2_iclk_idle_only,
+ 	.parent		= &l4_ck,
+ 	.flags		= ENABLE_ON_INIT,
+ 	.clkdm_name	= "core_l4_clkdm",
+@@ -1659,7 +1672,7 @@ static struct clk sdrc_ick = {
  
  static struct clk des_ick = {
  	.name		= "des_ick",
@@ -448,7 +472,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
-@@ -1684,7 +1697,7 @@ static struct clk des_ick = {
+@@ -1669,7 +1682,7 @@ static struct clk des_ick = {
  
  static struct clk sha_ick = {
  	.name		= "sha_ick",
@@ -457,7 +481,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
-@@ -1694,7 +1707,7 @@ static struct clk sha_ick = {
+@@ -1679,7 +1692,7 @@ static struct clk sha_ick = {
  
  static struct clk rng_ick = {
  	.name		= "rng_ick",
@@ -466,7 +490,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
-@@ -1704,7 +1717,7 @@ static struct clk rng_ick = {
+@@ -1689,7 +1702,7 @@ static struct clk rng_ick = {
  
  static struct clk aes_ick = {
  	.name		= "aes_ick",
@@ -475,7 +499,7 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
-@@ -1714,7 +1727,7 @@ static struct clk aes_ick = {
+@@ -1699,7 +1712,7 @@ static struct clk aes_ick = {
  
  static struct clk pka_ick = {
  	.name		= "pka_ick",
@@ -484,17 +508,48 @@ index 63ed481..68c0369 100644
  	.parent		= &l4_ck,
  	.clkdm_name	= "core_l4_clkdm",
  	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
-diff --git a/arch/arm/mach-omap2/cm-regbits-24xx.h b/arch/arm/mach-omap2/cm-regbits-24xx.h
-index 409c813..6862904 100644
---- a/arch/arm/mach-omap2/cm-regbits-24xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-24xx.h
-@@ -212,7 +212,9 @@
- /* CM_AUTOIDLE3_CORE */
- #define OMAP24XX_AUTO_SDRC_SHIFT			2
- #define OMAP24XX_AUTO_SDRC_MASK				(1 << 2)
-+#define OMAP24XX_AUTO_GPMC_SHIFT			1
- #define OMAP24XX_AUTO_GPMC_MASK				(1 << 1)
-+#define OMAP24XX_AUTO_SDMA_SHIFT			0
- #define OMAP24XX_AUTO_SDMA_MASK				(1 << 0)
+@@ -1719,7 +1732,7 @@ static struct clk usb_fck = {
  
- /* CM_AUTOIDLE4_CORE */
+ static struct clk usbhs_ick = {
+ 	.name		= "usbhs_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &core_l3_ck,
+ 	.clkdm_name	= "core_l3_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1729,7 +1742,7 @@ static struct clk usbhs_ick = {
+ 
+ static struct clk mmchs1_ick = {
+ 	.name		= "mmchs1_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1749,7 +1762,7 @@ static struct clk mmchs1_fck = {
+ 
+ static struct clk mmchs2_ick = {
+ 	.name		= "mmchs2_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1768,7 +1781,7 @@ static struct clk mmchs2_fck = {
+ 
+ static struct clk gpio5_ick = {
+ 	.name		= "gpio5_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+@@ -1788,7 +1801,7 @@ static struct clk gpio5_fck = {
+ 
+ static struct clk mdm_intc_ick = {
+ 	.name		= "mdm_intc_ick",
+-	.ops		= &clkops_omap2_dflt_wait,
++	.ops		= &clkops_omap2_iclk_dflt_wait,
+ 	.parent		= &l4_ck,
+ 	.clkdm_name	= "core_l4_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
