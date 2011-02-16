@@ -1,48 +1,236 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 15 Feb 2011 23:52:53 -0700
-Subject: [PATCH 08/11] OMAP2430/3xxx: clock: add modem clock autoidle support
+Date: Tue, 15 Feb 2011 23:52:57 -0700
+Subject: [PATCH 11/11] OMAP2/3: PM: remove manual CM_AUTOIDLE bit setting in
+	mach-omap2/pm*xx.c
 In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
 References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-Message-ID: <20110216065251.22089.75492.stgit@twilight.localdomain>
+Message-ID: <20110216065255.22089.9139.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP2430 and OMAP3xxx have modem autoidle bits that are actually
-attached to clocks with CM_FCLKEN bits; add the code and data to
-handle these.
+These CM_AUTOIDLE bits are now set by the clock code via the common PM
+code in mach-omap2/pm.c.
+
+N.B.: The pm24xx.c code that this patch removes didn't ensure that the
+CM_AUTOIDLE bits were set for several 2430-only modules, such as
+GPIO5, MDM_INTC, MMCHS1/2, the modem oscillator clock, and USBHS.
+Similarly, the pm34xx.c code that this patch removes didn't ensure
+that the CM_AUTOIDLE bits were set for USIM and the AM3517 UART4.
+Those cases should now be handled.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/clkt_iclk.c |    9 +++++++++
- arch/arm/mach-omap2/clock.h     |    1 +
- 2 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm24xx.c |   63 ++-----------------------
+ arch/arm/mach-omap2/pm34xx.c |  105 ------------------------------------------
+ 2 files changed, 5 insertions(+), 163 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt_iclk.c b/arch/arm/mach-omap2/clkt_iclk.c
-index dd8a6d3..3d43fba 100644
---- a/arch/arm/mach-omap2/clkt_iclk.c
-+++ b/arch/arm/mach-omap2/clkt_iclk.c
-@@ -71,3 +71,12 @@ const struct clkops clkops_omap2_iclk_idle_only = {
- 	.deny_idle	= omap2_clkt_iclk_deny_idle,
- };
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index 15b0f53..a168730 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -379,7 +379,10 @@ static void __init prcm_setup_regs(void)
+ 	int i, num_mem_banks;
+ 	struct powerdomain *pwrdm;
  
-+const struct clkops clkops_omap2_mdmclk_dflt_wait = {
-+	.enable		= omap2_dflt_clk_enable,
-+	.disable	= omap2_dflt_clk_disable,
-+	.find_companion	= omap2_clk_dflt_find_companion,
-+	.find_idlest	= omap2_clk_dflt_find_idlest,
-+	.allow_idle	= omap2_clkt_iclk_allow_idle,
-+	.deny_idle	= omap2_clkt_iclk_deny_idle,
-+};
-+
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 5008f14..70f8b07 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -155,6 +155,7 @@ extern void omap2_clk_exit_cpufreq_table(struct cpufreq_frequency_table **table)
- extern const struct clkops clkops_omap2_iclk_dflt_wait;
- extern const struct clkops clkops_omap2_iclk_dflt;
- extern const struct clkops clkops_omap2_iclk_idle_only;
-+extern const struct clkops clkops_omap2_mdmclk_dflt_wait;
- extern const struct clkops clkops_omap2xxx_dpll_ops;
- extern const struct clkops clkops_omap3_noncore_dpll_ops;
- extern const struct clkops clkops_omap3_core_dpll_ops;
+-	/* Enable autoidle */
++	/*
++	 * Enable autoidle
++	 * XXX This should be handled by hwmod code or PRCM init code
++	 */
+ 	omap2_prm_write_mod_reg(OMAP24XX_AUTOIDLE_MASK, OCP_MOD,
+ 			  OMAP2_PRCM_SYSCONFIG_OFFSET);
+ 
+@@ -418,64 +421,6 @@ static void __init prcm_setup_regs(void)
+ 	clkdm_for_each(clkdms_setup, NULL);
+ 	clkdm_add_wkdep(mpu_clkdm, wkup_clkdm);
+ 
+-	/* Enable clock autoidle for all domains */
+-	omap2_cm_write_mod_reg(OMAP24XX_AUTO_CAM_MASK |
+-			       OMAP24XX_AUTO_MAILBOXES_MASK |
+-			       OMAP24XX_AUTO_WDT4_MASK |
+-			       OMAP2420_AUTO_WDT3_MASK |
+-			       OMAP24XX_AUTO_MSPRO_MASK |
+-			       OMAP2420_AUTO_MMC_MASK |
+-			       OMAP24XX_AUTO_FAC_MASK |
+-			       OMAP2420_AUTO_EAC_MASK |
+-			       OMAP24XX_AUTO_HDQ_MASK |
+-			       OMAP24XX_AUTO_UART2_MASK |
+-			       OMAP24XX_AUTO_UART1_MASK |
+-			       OMAP24XX_AUTO_I2C2_MASK |
+-			       OMAP24XX_AUTO_I2C1_MASK |
+-			       OMAP24XX_AUTO_MCSPI2_MASK |
+-			       OMAP24XX_AUTO_MCSPI1_MASK |
+-			       OMAP24XX_AUTO_MCBSP2_MASK |
+-			       OMAP24XX_AUTO_MCBSP1_MASK |
+-			       OMAP24XX_AUTO_GPT12_MASK |
+-			       OMAP24XX_AUTO_GPT11_MASK |
+-			       OMAP24XX_AUTO_GPT10_MASK |
+-			       OMAP24XX_AUTO_GPT9_MASK |
+-			       OMAP24XX_AUTO_GPT8_MASK |
+-			       OMAP24XX_AUTO_GPT7_MASK |
+-			       OMAP24XX_AUTO_GPT6_MASK |
+-			       OMAP24XX_AUTO_GPT5_MASK |
+-			       OMAP24XX_AUTO_GPT4_MASK |
+-			       OMAP24XX_AUTO_GPT3_MASK |
+-			       OMAP24XX_AUTO_GPT2_MASK |
+-			       OMAP2420_AUTO_VLYNQ_MASK |
+-			       OMAP24XX_AUTO_DSS_MASK,
+-			       CORE_MOD, CM_AUTOIDLE1);
+-	omap2_cm_write_mod_reg(OMAP24XX_AUTO_UART3_MASK |
+-			       OMAP24XX_AUTO_SSI_MASK |
+-			       OMAP24XX_AUTO_USB_MASK,
+-			       CORE_MOD, CM_AUTOIDLE2);
+-	omap2_cm_write_mod_reg(OMAP24XX_AUTO_SDRC_MASK |
+-			       OMAP24XX_AUTO_GPMC_MASK |
+-			       OMAP24XX_AUTO_SDMA_MASK,
+-			       CORE_MOD, CM_AUTOIDLE3);
+-	omap2_cm_write_mod_reg(OMAP24XX_AUTO_PKA_MASK |
+-			       OMAP24XX_AUTO_AES_MASK |
+-			       OMAP24XX_AUTO_RNG_MASK |
+-			       OMAP24XX_AUTO_SHA_MASK |
+-			       OMAP24XX_AUTO_DES_MASK,
+-			       CORE_MOD, OMAP24XX_CM_AUTOIDLE4);
+-
+-	omap2_cm_write_mod_reg(OMAP2420_AUTO_DSP_IPI_MASK, OMAP24XX_DSP_MOD,
+-			       CM_AUTOIDLE);
+-
+-	omap2_cm_write_mod_reg(OMAP24XX_AUTO_OMAPCTRL_MASK |
+-			       OMAP24XX_AUTO_WDT1_MASK |
+-			       OMAP24XX_AUTO_MPU_WDT_MASK |
+-			       OMAP24XX_AUTO_GPIOS_MASK |
+-			       OMAP24XX_AUTO_32KSYNC_MASK |
+-			       OMAP24XX_AUTO_GPT1_MASK,
+-			       WKUP_MOD, CM_AUTOIDLE);
+-
+ 	/* REVISIT: Configure number of 32 kHz clock cycles for sys_clk
+ 	 * stabilisation */
+ 	omap2_prm_write_mod_reg(15 << OMAP_SETUP_TIME_SHIFT, OMAP24XX_GR_MOD,
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 1fe2e73..76e9f9a 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -688,14 +688,11 @@ static void __init omap3_d2d_idle(void)
+ 
+ static void __init prcm_setup_regs(void)
+ {
+-	u32 omap3630_auto_uart4_mask = cpu_is_omap3630() ?
+-					OMAP3630_AUTO_UART4_MASK : 0;
+ 	u32 omap3630_en_uart4_mask = cpu_is_omap3630() ?
+ 					OMAP3630_EN_UART4_MASK : 0;
+ 	u32 omap3630_grpsel_uart4_mask = cpu_is_omap3630() ?
+ 					OMAP3630_GRPSEL_UART4_MASK : 0;
+ 
+-
+ 	/* XXX Reset all wkdeps. This should be done when initializing
+ 	 * powerdomains */
+ 	omap2_prm_write_mod_reg(0, OMAP3430_IVA2_MOD, PM_WKDEP);
+@@ -710,107 +707,7 @@ static void __init prcm_setup_regs(void)
+ 	} else
+ 		omap2_prm_write_mod_reg(0, GFX_MOD, PM_WKDEP);
+ 
+-	/*
+-	 * Enable interface clock autoidle for all modules.
+-	 * Note that in the long run this should be done by clockfw
+-	 */
+-	omap2_cm_write_mod_reg(
+-		OMAP3430_AUTO_MODEM_MASK |
+-		OMAP3430ES2_AUTO_MMC3_MASK |
+-		OMAP3430ES2_AUTO_ICR_MASK |
+-		OMAP3430_AUTO_AES2_MASK |
+-		OMAP3430_AUTO_SHA12_MASK |
+-		OMAP3430_AUTO_DES2_MASK |
+-		OMAP3430_AUTO_MMC2_MASK |
+-		OMAP3430_AUTO_MMC1_MASK |
+-		OMAP3430_AUTO_MSPRO_MASK |
+-		OMAP3430_AUTO_HDQ_MASK |
+-		OMAP3430_AUTO_MCSPI4_MASK |
+-		OMAP3430_AUTO_MCSPI3_MASK |
+-		OMAP3430_AUTO_MCSPI2_MASK |
+-		OMAP3430_AUTO_MCSPI1_MASK |
+-		OMAP3430_AUTO_I2C3_MASK |
+-		OMAP3430_AUTO_I2C2_MASK |
+-		OMAP3430_AUTO_I2C1_MASK |
+-		OMAP3430_AUTO_UART2_MASK |
+-		OMAP3430_AUTO_UART1_MASK |
+-		OMAP3430_AUTO_GPT11_MASK |
+-		OMAP3430_AUTO_GPT10_MASK |
+-		OMAP3430_AUTO_MCBSP5_MASK |
+-		OMAP3430_AUTO_MCBSP1_MASK |
+-		OMAP3430ES1_AUTO_FAC_MASK | /* This is es1 only */
+-		OMAP3430_AUTO_MAILBOXES_MASK |
+-		OMAP3430_AUTO_OMAPCTRL_MASK |
+-		OMAP3430ES1_AUTO_FSHOSTUSB_MASK |
+-		OMAP3430_AUTO_HSOTGUSB_MASK |
+-		OMAP3430_AUTO_SAD2D_MASK |
+-		OMAP3430_AUTO_SSI_MASK,
+-		CORE_MOD, CM_AUTOIDLE1);
+-
+-	omap2_cm_write_mod_reg(
+-		OMAP3430_AUTO_PKA_MASK |
+-		OMAP3430_AUTO_AES1_MASK |
+-		OMAP3430_AUTO_RNG_MASK |
+-		OMAP3430_AUTO_SHA11_MASK |
+-		OMAP3430_AUTO_DES1_MASK,
+-		CORE_MOD, CM_AUTOIDLE2);
+-
+-	if (omap_rev() > OMAP3430_REV_ES1_0) {
+-		omap2_cm_write_mod_reg(
+-			OMAP3430_AUTO_MAD2D_MASK |
+-			OMAP3430ES2_AUTO_USBTLL_MASK,
+-			CORE_MOD, CM_AUTOIDLE3);
+-	}
+-
+-	omap2_cm_write_mod_reg(
+-		OMAP3430_AUTO_WDT2_MASK |
+-		OMAP3430_AUTO_WDT1_MASK |
+-		OMAP3430_AUTO_GPIO1_MASK |
+-		OMAP3430_AUTO_32KSYNC_MASK |
+-		OMAP3430_AUTO_GPT12_MASK |
+-		OMAP3430_AUTO_GPT1_MASK,
+-		WKUP_MOD, CM_AUTOIDLE);
+-
+-	omap2_cm_write_mod_reg(
+-		OMAP3430_AUTO_DSS_MASK,
+-		OMAP3430_DSS_MOD,
+-		CM_AUTOIDLE);
+-
+-	omap2_cm_write_mod_reg(
+-		OMAP3430_AUTO_CAM_MASK,
+-		OMAP3430_CAM_MOD,
+-		CM_AUTOIDLE);
+-
+-	omap2_cm_write_mod_reg(
+-		omap3630_auto_uart4_mask |
+-		OMAP3430_AUTO_GPIO6_MASK |
+-		OMAP3430_AUTO_GPIO5_MASK |
+-		OMAP3430_AUTO_GPIO4_MASK |
+-		OMAP3430_AUTO_GPIO3_MASK |
+-		OMAP3430_AUTO_GPIO2_MASK |
+-		OMAP3430_AUTO_WDT3_MASK |
+-		OMAP3430_AUTO_UART3_MASK |
+-		OMAP3430_AUTO_GPT9_MASK |
+-		OMAP3430_AUTO_GPT8_MASK |
+-		OMAP3430_AUTO_GPT7_MASK |
+-		OMAP3430_AUTO_GPT6_MASK |
+-		OMAP3430_AUTO_GPT5_MASK |
+-		OMAP3430_AUTO_GPT4_MASK |
+-		OMAP3430_AUTO_GPT3_MASK |
+-		OMAP3430_AUTO_GPT2_MASK |
+-		OMAP3430_AUTO_MCBSP4_MASK |
+-		OMAP3430_AUTO_MCBSP3_MASK |
+-		OMAP3430_AUTO_MCBSP2_MASK,
+-		OMAP3430_PER_MOD,
+-		CM_AUTOIDLE);
+-
+-	if (omap_rev() > OMAP3430_REV_ES1_0) {
+-		omap2_cm_write_mod_reg(
+-			OMAP3430ES2_AUTO_USBHOST_MASK,
+-			OMAP3430ES2_USBHOST_MOD,
+-			CM_AUTOIDLE);
+-	}
+-
++	/* XXX This should be handled by hwmod code or SCM init code */
+ 	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
+ 
+ 	/*
