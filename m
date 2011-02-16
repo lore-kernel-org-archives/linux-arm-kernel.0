@@ -1,33 +1,32 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 15 Feb 2011 23:03:30 -0500 (EST)
-Subject: compiling 2.6.37 kernel in THUMB2 mode
-In-Reply-To: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
-References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+Date: Tue, 15 Feb 2011 23:22:37 -0500 (EST)
+Subject: The p2v branch
+In-Reply-To: <20110213114050.GB4799@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
+	<20110212184138.GD22402@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102121556330.14920@xanadu.home>
+	<20110213114050.GB4799@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102152319000.14920@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Feb 2011, vb at vsbe.com wrote:
+On Sun, 13 Feb 2011, Russell King - ARM Linux wrote:
 
-> hello all,
+> On Sat, Feb 12, 2011 at 04:01:14PM -0500, Nicolas Pitre wrote:
+> > I've rebased my 2 patches on top of your latest p2v branch.  You may 
+> > pull them from:
+> > 
+> > 	git://git.linaro.org/people/nico/linux p2v
+> > 
+> > Or if you prefer I can put them in the patch system.
 > 
-> I am trying to compile the 2.6.37 kernel in THUMB2 mode and am
-> experiencing some compilation problems. Some inline assembly in some
-> files uses commands inappropriate for THUMB2 mode.
-> 
-> I wonder if the kernel is expected to compile cleanly when
-> CONFIG_THUMB2_KERNEL is enabled (and I am doing something wrong), or
-> is it know not to compile/work in Thumb2 node for any reason?
+> I'd like to wait for Catalin to respond on the phys_addr_t patch - which
+> allows 64-bit phys addresses.  Obviously that's going to have an impact
+> on the p2v code and I'd rather someone else had the job of working out
+> what to do about the T2 code.
 
-It is known not to compile in mainline right now depending on your 
-target, but fixes are slowly being merged upstream.
-
-Dave Martin is maintaining a Git tree with all the fixes required for 
-Thumb2 here (see the Thumb2 related branches):
-
-http://git.linaro.org/gitweb?p=people/dmart/linux-2.6-arm.git;a=summary
-
-Beware that some patches might not be final yet.
+I rebased my revised patches on top of Will's in your p2v branch and 
+pushed the result to the above repository.
 
 
 Nicolas
