@@ -1,64 +1,71 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 15 Feb 2011 23:52:50 -0700
-Subject: [PATCH 06/11] OMAP2420: clock: add sdrc_ick
-In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
-References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-Message-ID: <20110216065248.22089.45836.stgit@twilight.localdomain>
+Date: Tue, 15 Feb 2011 23:52:39 -0700
+Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks, OMAP2xxx
+Message-ID: <20110216065030.22089.61217.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sdrc_ick to the OMAP2420 clock data so the clock code can control
-the CM_AUTOIDLE bit associated with this clock.
+Hello,
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+This patch series adds clock framework-controlled autoidle support for
+the OMAP2xxx DPLL, APLLs, and OMAP2/3 interface clocks.  The old
+direct register writes in the PM code to enable clock autoidle have been
+removed.  
+
+This series also ensures that all clock autoidle is disabled during
+boot and only re-enabled if CONFIG_PM is enabled.
+
+The series applies on the 'clk_autoidle_a_2.6.39' branch of
+git://git.pwsan.com/linux-2.6.
+
+Boot-tested on N800, and dynamic idle-tested on OMAP3430 Beagleboard.
+Compile-tested with omap1_defconfig, omap2plus_defconfig, a 5912
+OSK-only config, an N8x0-only config, an OMAP3-only config, and an OMAP4-only
+config.
+
+
+- Paul
+
 ---
- arch/arm/mach-omap2/clock2420_data.c  |   16 ++++++++++++++++
- arch/arm/mach-omap2/cm-regbits-24xx.h |    1 +
- 2 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 30fbcbd..63ed481 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -1608,6 +1608,21 @@ static struct clk sdma_ick = {
- 	.recalc		= &followparent_recalc,
- };
- 
-+/*
-+ * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
-+ * accesses derived from this data.
-+ */
-+static struct clk sdrc_ick = {
-+	.name		= "sdrc_ick",
-+	.ops		= &clkops_omap2_iclk_idle_only,
-+	.parent		= &core_l3_ck,
-+	.flags		= ENABLE_ON_INIT,
-+	.clkdm_name	= "core_l3_clkdm",
-+	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
-+	.enable_bit	= OMAP24XX_AUTO_SDRC_SHIFT,
-+	.recalc		= &followparent_recalc,
-+};
-+
- static struct clk vlynq_ick = {
- 	.name		= "vlynq_ick",
- 	.ops		= &clkops_omap2_dflt_wait,
-@@ -1869,6 +1884,7 @@ static struct omap_clk omap2420_clks[] = {
- 	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_242X),
- 	CLK(NULL,	"sdma_fck",	&sdma_fck,	CK_242X),
- 	CLK(NULL,	"sdma_ick",	&sdma_ick,	CK_242X),
-+	CLK(NULL,	"sdrc_ick",	&sdrc_ick,	CK_242X),
- 	CLK(NULL,	"vlynq_ick",	&vlynq_ick,	CK_242X),
- 	CLK(NULL,	"vlynq_fck",	&vlynq_fck,	CK_242X),
- 	CLK(NULL,	"des_ick",	&des_ick,	CK_242X),
-diff --git a/arch/arm/mach-omap2/cm-regbits-24xx.h b/arch/arm/mach-omap2/cm-regbits-24xx.h
-index d70660e..409c813 100644
---- a/arch/arm/mach-omap2/cm-regbits-24xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-24xx.h
-@@ -210,6 +210,7 @@
- #define OMAP24XX_AUTO_USB_MASK				(1 << 0)
- 
- /* CM_AUTOIDLE3_CORE */
-+#define OMAP24XX_AUTO_SDRC_SHIFT			2
- #define OMAP24XX_AUTO_SDRC_MASK				(1 << 2)
- #define OMAP24XX_AUTO_GPMC_MASK				(1 << 1)
- #define OMAP24XX_AUTO_SDMA_MASK				(1 << 0)
+clk_autoidle_b_2.6.39
+   text	   data	    bss	    dec	    hex	filename
+5530703	 330544	5594520	11455767	 aecd17	vmlinux.omap2plus_defconfig.orig
+5531167	 330544	5594520	11456231	 aecee7	vmlinux.omap2plus_defconfig.patched
+
+Paul Walmsley (11):
+      OMAP2+: clock: disable autoidle on all clocks during clock init
+      OMAP2: clock: add DPLL autoidle support
+      OMAP2xxx: clock: add clockfw autoidle support for APLLs
+      OMAP2+: clock: comment that osc_ck/osc_sys_ck should use clockfw autoidle control
+      OMAP2+: clock: add interface clock type code with autoidle support
+      OMAP2420: clock: add sdrc_ick
+      OMAP2420: clock: use autoidle clkops for all autoidle-controllable interface clocks
+      OMAP2430/3xxx: clock: add modem clock autoidle support
+      OMAP2430: clock: use autoidle clkops for all autoidle-controllable interface clocks
+      OMAP3: clock: use autoidle clkops for all autoidle-controllable interface clocks
+      OMAP2/3: PM: remove manual CM_AUTOIDLE bit setting in mach-omap2/pm*xx.c
+
+
+ arch/arm/mach-omap2/Makefile          |    7 +
+ arch/arm/mach-omap2/clkt2xxx_apll.c   |   24 +++++
+ arch/arm/mach-omap2/clkt2xxx_dpll.c   |   63 +++++++++++++
+ arch/arm/mach-omap2/clkt2xxx_osc.c    |   14 +++
+ arch/arm/mach-omap2/clkt_iclk.c       |   82 +++++++++++++++++
+ arch/arm/mach-omap2/clock.h           |   11 ++
+ arch/arm/mach-omap2/clock2420_data.c  |  130 +++++++++++++++++-----------
+ arch/arm/mach-omap2/clock2430_data.c  |  130 ++++++++++++++++------------
+ arch/arm/mach-omap2/clock34xx.c       |   29 ++++++
+ arch/arm/mach-omap2/clock34xx.h       |    5 +
+ arch/arm/mach-omap2/clock3517.c       |    4 +
+ arch/arm/mach-omap2/clock3xxx.c       |    3 -
+ arch/arm/mach-omap2/clock3xxx_data.c  |  155 +++++++++++++++++----------------
+ arch/arm/mach-omap2/clock44xx_data.c  |    3 +
+ arch/arm/mach-omap2/cm-regbits-24xx.h |    3 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.c     |   69 +++++++++++++++
+ arch/arm/mach-omap2/cm2xxx_3xxx.h     |    8 ++
+ arch/arm/mach-omap2/pm24xx.c          |   69 +--------------
+ arch/arm/mach-omap2/pm34xx.c          |  105 ----------------------
+ 19 files changed, 557 insertions(+), 357 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clkt2xxx_dpll.c
+ create mode 100644 arch/arm/mach-omap2/clkt_iclk.c
