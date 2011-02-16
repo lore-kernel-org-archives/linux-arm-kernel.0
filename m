@@ -1,101 +1,77 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 16 Feb 2011 13:01:09 -0800
-Subject: [PATCH 12/21] ARM: tegra: clock: Add shared bus clock type
-In-Reply-To: <4D5C34E0.5000209@codeaurora.org>
-References: <1297590033-15035-1-git-send-email-ccross@android.com>
-	<1297590033-15035-13-git-send-email-ccross@android.com>
-	<4D5C34E0.5000209@codeaurora.org>
-Message-ID: <AANLkTi=knKY65xaOT85jFidy6Be8K8RT0L1XtGqq_v2V@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 Feb 2011 22:01:52 +0100
+Subject: [RFC] MMC: error handling improvements
+In-Reply-To: <8ya8vxf4w4w.fsf@huya.qualcomm.com>
+References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
+	<8yaoc6c7tan.fsf@huya.qualcomm.com>
+	<AANLkTikpdwfM19oirENbOhnz8Rh40ZnMXByGX_QKdu-V@mail.gmail.com>
+	<8ya8vxf4w4w.fsf@huya.qualcomm.com>
+Message-ID: <AANLkTimQqGVTwUv4ywQnmd4Z1Ur4vWk2sK5+ZLa4mmTs@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 12:34 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 02/13/2011 01:40 AM, Colin Cross wrote:
->> +/* shared bus ops */
->> +/*
->> + * Some clocks may have multiple downstream users that need to request a
->> + * higher clock rate. ?Shared bus clocks provide a unique shared_bus_user
->> + * clock to each user. ?The frequency of the bus is set to the highest
->> + * enabled shared_bus_user clock, with a minimum value set by the
->> + * shared bus.
->> + */
->> +static void tegra_clk_shared_bus_update(struct clk *bus)
->> +{
->> + ? ? struct clk *c;
->> + ? ? unsigned long rate = bus->min_rate;
->> +
->> + ? ? list_for_each_entry(c, &bus->shared_bus_list, u.shared_bus_user.node)
->> + ? ? ? ? ? ? if (c->u.shared_bus_user.enabled)
->> + ? ? ? ? ? ? ? ? ? ? rate = max(c->u.shared_bus_user.rate, rate);
->> +
->> + ? ? if (rate != clk_get_rate(bus))
->> + ? ? ? ? ? ? clk_set_rate(bus, rate);
+2011/2/16 David Brown <davidb@codeaurora.org>:
+> On Wed, Feb 16 2011, Linus Walleij wrote:
+>> 2011/2/16 David Brown <davidb@codeaurora.org>:
 >
-> What do you do if clk_set_rate() fails? Should you unwind all the state
-> such as the rate and if it's enabled/disabled? Or is it safe to say
-> clk_set_rate() can't fail unless the kernel is buggy in which case why
-> aren't all those return -E* in the set rate functions just BUG_ONs?
-
-In general, clk_set_rate can fail and return an error, but in this
-case the failure may not be directly related to the driver that called
-into tegra_clk_shared_bus_update.  For example, if clk_disable is
-called on a shared clock handle, the rate may drop to the rate
-requested by another shared clock handle.  clk_disable cannot fail, so
-there's nothing that could be done with the return code, and the
-problem was not caused by the driver that called clk_disable, so an
-error would be meaningless.
-
-I will modify tegra_clk_shared_bus_update to BUG on a failed
-clk_set_rate, and modify tegra_clk_shared_bus_set_rate to
-call clk_round_rate on the parent to ensure that the requested rate is valid.
-
->> +};
->> +
->> +static void tegra_clk_shared_bus_init(struct clk *c)
->> +{
->> + ? ? c->max_rate = c->parent->max_rate;
->> + ? ? c->u.shared_bus_user.rate = c->parent->max_rate;
->> + ? ? c->state = OFF;
->> +#ifdef CONFIG_DEBUG_FS
->> + ? ? c->set = 1;
->> +#endif
->> +
->> + ? ? list_add_tail(&c->u.shared_bus_user.node,
->> + ? ? ? ? ? ? &c->parent->shared_bus_list);
->> +}
->> +
->> +static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
->> +{
->> + ? ? c->u.shared_bus_user.rate = rate;
->> + ? ? tegra_clk_shared_bus_update(c->parent);
->> + ? ? return 0;
->> +}
->> +
->> +static long tegra_clk_shared_bus_round_rate(struct clk *c, unsigned long rate)
->> +{
->> + ? ? return clk_round_rate(c->parent, rate);
->> +}
->> +
->> +static int tegra_clk_shared_bus_enable(struct clk *c)
->> +{
->> + ? ? c->u.shared_bus_user.enabled = true;
->> + ? ? tegra_clk_shared_bus_update(c->parent);
->> + ? ? return 0;
->> +}
+>>> It's also possible this is finding problems in our SDCC driver.
+>>
+>> The SDCC is obviously an MMCI derivate, VHDL hacking
+>> on top of ARMs source code for PL180/PL181.
+>>
+>> Why do you insist on maintaining a forked driver?
 >
-> Shouldn't you call clk_enable(c->parent)? And do you need to check for
-> errors from clk_enable()?
+> Well, it's not me insisting on it. ?I'll let the maintainers of the
+> driver chime in.
 
-clk_enable on the parent is handled by the clock op implementation in
-mach-tegra/clock.c
+Yeah OK. I tried writing them last week on linux-arm-kernel
+with more or less the same question.
 
->> +
->> +static void tegra_clk_shared_bus_disable(struct clk *c)
->> +{
->> + ? ? c->u.shared_bus_user.enabled = false;
->> + ? ? tegra_clk_shared_bus_update(c->parent);
->> +}
->
-> And a similar clk_disable(c->parent) here.
+>?The driver doesn't directly
+> access the registers of the controller, but all accesses go through a
+> custom DMA engine.
+> (...)
+> The SDCC block is shared between
+> the modem processor and the processor running Linux.  If the driver
+> doesn't go through the DMA engine, which coordinates this, the registers
+> will be stomped on by the other CPU whenever it decides to access it's
+> parts of the flash device.
 
-Same for disable
+That's significant, I agree. That the DMA engine is custom
+instead of using the <linux/dmaengine.h> interface is not
+making things easier, but it's another issue. If it did, I think it
+could quite easily use mmci.c.
+
+At the same time what you're saying sounds very weird:
+the ios handler in mmc_sdcc does not request any DMA
+channel before messing with the hardware, it simply just write
+into registers very much in the style of mmci.c. Wouldn't that
+disturb any simultaneous access to the MMC from another
+CPU?
+
+The DMA code path doesn't look one bit different from
+what we currently do for the generic DMA engine in
+mmci.c, it sets up a DMA job from the sglist in the datapath,
+but maybe I'm not looking close enough?
+
+> I suspect the changes to mmci would be fairly drastic.
+
+I don't think so, but the changes to the DMA engine
+(I guess mach-msm/dma.c) would potentially be pretty drastic,
+apart from just moving the thing to drivers/dma.
+
+Actually when I look at the code in msm_sdcc.c it looks
+like some of the code we usually centralize into the
+DMA engine (like the thing iterating over a sglist and
+packing it into some custom struct called "box") is instead
+spread out in the client drivers.
+
+I just wanted to raise the issue because I see that the
+msm_sdcc driver is trying to e.g. synchronize against
+dataend signals and such stuff that we've worked with
+recently in mmci.c, and I really think it would be in the
+MSM platforms best interest to use this driver rather than
+its own.
+
+Yours,
+Linus Walleij
