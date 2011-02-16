@@ -1,60 +1,55 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Wed, 16 Feb 2011 05:39:43 +0100
-Subject: Question about ARM function graph tracing
-In-Reply-To: <1297821945.23343.136.camel@gandalf.stny.rr.com>
-References: <4D4B3D63.4090207@am.sony.com>
-	<AANLkTinoFRE2ho9u9yF5nhfgr1gGouHV3anf2OX0mN2T@mail.gmail.com>
-	<4D4C61A5.4050403@am.sony.com> <4D5B2AC9.3030502@am.sony.com>
-	<1297821945.23343.136.camel@gandalf.stny.rr.com>
-Message-ID: <20110216043941.GA21346@nowhere>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 15 Feb 2011 20:53:09 -0800
+Subject: [RFC,PATCH 1/3] Add a common struct clk
+In-Reply-To: <4D5A100F.9000809@codeaurora.org>
+References: <1297233693.242364.862698430999.1.gpush@pororo>	<4D53749B.6010102@codeaurora.org>	<201102151041.40655.jeremy.kerr@canonical.com>
+	<4D5A100F.9000809@codeaurora.org>
+Message-ID: <4D5B5835.4070407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 09:05:45PM -0500, Steven Rostedt wrote:
-> On Tue, 2011-02-15 at 17:39 -0800, Tim Bird wrote:
-> I've had to debug things that broke in the function graph tracer like
-> this before. Is dynamic ftrace available in arm?
-> 
-> Hmm, from arch/arm/Kconfig:
-> 
-> 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
-> 
-> 
-> I guess so. If you are running something other than this XIP_KERNEL, I
-> would suggest using the dynamic functions to binary search the issue.
-> 
-> cat available_filter_functions > /tmp/funcs
-> 
-> Then copy half the funcs to /tmp/funcs1 and the other half
-> to /tmp/funcs2
-> 
-> cat /tmp/funcs1 > set_ftrace_filter
-> 
-> This may take a while, as setting the filter one by one is slow.
-> 
-> then run the function graph tracer. If it locks up, try it again
-> with /tmp/funcs2. If it locks up, you may have two issues or it could be
-> something wrong with the function graph tracer itself. But I'm betting
-> one will work and one wont.
-> 
-> Then just keep chopping these funcs files until you get down to a set of
-> functions that are causing issues. Then it should point out the problem.
-> 
-> This is the procedure I used to find out why a kvm guest was locking up
-> with function graph tracer.
-> 
-> See commit:
-> 
-> 258af47479980d8238a04568b94a4e55aa1cb537
-> 
-> Something tells me you may have a similar issue ;)
+On 02/14/2011 09:33 PM, Saravana Kannan wrote:
+> Russell, A question for you further down this email. Please take a look.
 
+Russell, Ping... I will snip the rest of the discussion so that it's 
+easy to spot the question.
 
-That's a very nice idea to debug ftrace recursions!
+>>>> +int clk_set_parent(struct clk *clk, struct clk *parent)
+>>>> +{
+>>>> + if (clk->ops->set_parent)
+>>>> + return clk->ops->set_parent(clk, parent);
+>>>
+>>> I'm not sure on this one. If the prepare ops for a clock also calls the
+>>> prepare ops on the parent, shouldn't we prevent changing the parent
+>>> while the prepare/unprepare is going on?
+>>
+>> Again, this is related to set_rate during enable/disable or
+>> prepare/unprepare;
+>> we don't have defined semantics for this at present.
+>
+> After thinking about this the past couple of days, this looks like a
+> location where the locking is more necessary than inside set rate. I
+> always saw the parent clock as the clock that generates the clock signal
+> from which this clock derives (divide, etc) it's clock signal from.
+>
+> Assuming Russell and/or the community agrees on the semantics of
+> "parent", without the generic implementation grabbing the prepare_lock
+> while setting the parent, there is no way for the specific clock driver
+> implementations to cleanly ensure correctness. The only option for them
+> would be to peek into the generic clock struct and grab the prepare lock
+> -- to me that would be an ugly hack and/or layering violation that would
+> cause problems later on.
+>
+> Russell/All,
+>
+> What's the meaning of a parent clock? Do you agree with my definition --
+> "the parent clock is the clock that generates the clock signal from
+> which the child clock derives (divide, etc) it's clock signal from."? Or
+> is it open to interpretation by each implementation?
 
-As a last resort, in case the binary search doesn't work, you can try:
+Thanks,
+Saravana
 
-1) do a local_irq_save() in asm (to avoid possible recursions with common funcs)
-2) test recursion, if so, printk_once() the traced func
-3) exit recursion
-3) local_irq_restore() in asm
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
