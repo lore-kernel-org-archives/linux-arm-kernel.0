@@ -1,50 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 16 Feb 2011 10:32:12 +0000
-Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
-In-Reply-To: <20110216060351.GB16604@bnru02>
-References: <1297768683-30273-1-git-send-email-srinidhi.kasagar@stericsson.com>
-	<20110215113422.GE4152@n2100.arm.linux.org.uk>
-	<20110216060351.GB16604@bnru02>
-Message-ID: <AANLkTi=svL42XJE-61H16B-jgwwu-+pXjS3QcMKNJN6Z@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 16 Feb 2011 16:04:27 +0530
+Subject: [PATCHv2 1/2] ARM: perf_event: allow platform-specific interrupt
+	handler
+In-Reply-To: <-6723806473392693428@unknownmsgid>
+References: <1297137277-26889-1-git-send-email-rabin.vincent@stericsson.com>
+	<-6723806473392693428@unknownmsgid>
+Message-ID: <AANLkTi=wQ9ku+zbu6sx5Mm+ux4Ot6K2h9a_WK=XEB_iG@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2011 06:03, Srinidhi KASAGAR
-<srinidhi.kasagar@stericsson.com> wrote:
-> On Tue, Feb 15, 2011 at 12:34:22 +0100, Russell King - ARM Linux wrote:
->> On Tue, Feb 15, 2011 at 04:48:03PM +0530, srinidhi kasagar wrote:
->> > +#ifdef ARM_ERRATA_753970
->> > +#define L2X0_DUMMY_REG ?0x740
->> > + ? /* write to an unmmapped register */
->> > + ? writel_relaxed(0, base + L2X0_DUMMY_REG);
->> > + ? cache_wait(base + L2X0_CACHE_SYNC, 1);
->> > +#else
->> > ? ? writel_relaxed(0, base + L2X0_CACHE_SYNC);
->> > ? ? cache_wait(base + L2X0_CACHE_SYNC, 1);
->> > +#endif
+On Fri, Feb 11, 2011 at 22:03, Will Deacon <will.deacon@arm.com> wrote:
+>> Allow a platform-specific IRQ handler to be specified via platform data. ?This
+>> will be used to implement the single-irq workaround for the DB8500.
 >>
->> So why wrap cache_wait() up in that horrible ifdef as well - and why not
->> put the dummy register definition along side the other register definitions?
-[...]
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -49,8 +49,14 @@ static inline void cache_wait(void __iomem *reg, unsigned long mask)
-> ?static inline void cache_sync(void)
+>> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+>> ---
+>> ?arch/arm/include/asm/pmu.h ? | ? 14 ++++++++++++++
+>> ?arch/arm/kernel/perf_event.c | ? 17 ++++++++++++++++-
+>> ?2 files changed, 30 insertions(+), 1 deletions(-)
+>
+> If you're happy with this as a workaround for your platform, then
+> it looks alright to me.
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks.
+
+>
+> One thing you could try is using the GIC patch I posted the other day:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041496.html
+>
+> If you then do:
+>
+> ? ?ARM: gic: allow per-cpu SPIs to be affine to multiple CPUs
+>
+> ? ?The concept of a per-cpu SPI is somewhat a contradiction, but can occur in
+> ? ?systems where SPIs from different CPUs are ORd together into a single line.
+>
+> ? ?An example of this is the PMU interrupt on the u8500 platform.
+>
+> ? ?This patch allows SPIs with the IRQF_PERCPU flag to be affine to multiple
+> ? ?CPUs in a CPU mask. This, of course, assumes that the driver knows what it
+> ? ?is doing and can handle such a configuration.
+>
+> ? ?Signed-off-by: Will Deacon <will.deacon@arm.com>
+>
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 9def30b..512f55f 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -145,7 +145,7 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
 > ?{
-> ? ? ? ?void __iomem *base = l2x0_base;
+> ? ? ? ?void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+> ? ? ? ?unsigned int shift = (d->irq % 4) * 8;
+> - ? ? ? unsigned int cpu = cpumask_first(mask_val);
+> + ? ? ? unsigned int cpu_map, cpu = cpumask_first(mask_val);
+> ? ? ? ?u32 val;
+> ? ? ? ?struct irq_desc *desc;
+>
+> @@ -155,9 +155,19 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
+> ? ? ? ? ? ? ? ?spin_unlock(&irq_controller_lock);
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?}
 > +
-> +#ifdef CONFIG_ARM_ERRATA_753970
-> + ? ? ? /* write to an unmmapped register */
-> + ? ? ? writel_relaxed(0, base + L2X0_DUMMY_REG);
-> +#else
-> ? ? ? ?writel_relaxed(0, base + L2X0_CACHE_SYNC);
-> ? ? ? ?cache_wait(base + L2X0_CACHE_SYNC, 1);
-> +#endif
-> ?}
+> ? ? ? ?d->node = cpu;
+> +
+> + ? ? ? if (CHECK_IRQ_PER_CPU(desc->status)) {
+> + ? ? ? ? ? ? ? cpu_map = 0;
+> + ? ? ? ? ? ? ? for_each_cpu(cpu, mask_val)
+> + ? ? ? ? ? ? ? ? ? ? ? cpu_map |= 1 << (cpu + shift);
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? cpu_map = 1 << (cpu + shift);
+> + ? ? ? }
+> +
+> ? ? ? ?val = readl(reg) & ~(0xff << shift);
+> - ? ? ? val |= 1 << (cpu + shift);
+> + ? ? ? val |= cpu_map;
+> ? ? ? ?writel(val, reg);
+> ? ? ? ?spin_unlock(&irq_controller_lock);
+>
+>
+> You'll be able to target the PMU IRQ to both CPUs and avoid the need for
+> ping-ponging the affinity. This is a bit weird though as usually you'd have
+> a PPI for a percpu interrupt so this might be better off staying inside
+> platform code and leaving the GIC code alone. I also think this approach
+> is more invasive from the perf point of view.
+>
+> Unless this approach gives markedly better profiling results than your
+> proposal, I think we should go with what you've got.
 
-You could still leave cache_wait() after #endif, even though it is a
-no-op. I think it is clearer that the erratum workaround only targets
-the sync.
-
--- 
-Catalin
+I gave this a try, along with the modifications to enable IRQ_PER_CPU
+and have the pmu code use the appropriate flags and set the affinity.
+Didn't work though; it always ends up triggering the spurious IRQ check.
