@@ -1,24 +1,35 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 16 Feb 2011 17:41:22 +0530
-Subject: [PATCH 0/3] OMAP2+ hwmod fixes
-Message-ID: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+Date: Wed, 16 Feb 2011 17:41:24 +0530
+Subject: [PATCH 2/3] OMAP2+: hwmod: Fix what _init_clock returns
+In-Reply-To: <1297858285-7056-2-git-send-email-rnayak@ti.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<1297858285-7056-2-git-send-email-rnayak@ti.com>
+Message-ID: <1297858285-7056-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes some hwmod api return values
-and also adds some state checks.
-The hwmod iterator functions are made to
-continue and not break if one of the
-callback functions ends up with an error.
+_init_clock always returns 0 and does
+not propogate the error (in case of failure)
+back to the caller, causing _init_clocks to
+fail silently.
 
-Series applies on 2.6.38-rc4 and is boot
-tested on OMAP3430SDP and OMAP4430SDP
-platforms.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Rajendra Nayak (3):
-  OMAP2+: hwmod: Avoid setup if clock lookup failed
-  OMAP2+: hwmod: Fix what _init_clock returns
-  OMAP2+: hwmod: Do not break iterator fn's if one fails
-
- arch/arm/mach-omap2/omap_hwmod.c |   31 +++++++++++++++----------------
- 1 files changed, 15 insertions(+), 16 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index cd9dcde..960461f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -926,7 +926,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
+ 	if (!ret)
+ 		oh->_state = _HWMOD_STATE_CLKS_INITED;
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ /**
+-- 
+1.7.0.4
