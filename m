@@ -1,39 +1,30 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Wed, 16 Feb 2011 14:31:12 +0200
-Subject: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on TWL
-In-Reply-To: <AANLkTiniGdh2_=eFjSaLsQ4VVG1Eh0F=0Tex-KNKspBf@mail.gmail.com>
-References: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
-	<20110215171652.601c9c68.jhnikula@gmail.com>
-	<20110215172931.3a6e45a8.jhnikula@gmail.com>
-	<AANLkTi=3PCBOvFtd1T-=tDjXcs+_0opKqxVps+StCZqf@mail.gmail.com>
-	<20110216134523.ba5d3917.jhnikula@gmail.com>
-	<AANLkTiniGdh2_=eFjSaLsQ4VVG1Eh0F=0Tex-KNKspBf@mail.gmail.com>
-Message-ID: <20110216143112.6f756a94.jhnikula@gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 16 Feb 2011 10:31:10 -0200
+Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
+	drivers
+In-Reply-To: <20110216094154.GV13279@pengutronix.de>
+References: <20110211181921.3d561568@queued.net>
+	<20110216094154.GV13279@pengutronix.de>
+Message-ID: <4D5BC38E.1060009@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 16 Feb 2011 17:24:30 +0530
-"Gulati, Shweta" <shweta.gulati@ti.com> wrote:
+Hi Uwe,
 
-> > Note proof of concept patch only. I omitted the comments and don't do
-> > explicit SR disable and I'd clean up the error paths in twl4030_power_init
-> > a bit before this (e.g. printing error codes). Not sure either is the
-> > twl4030-power.c right place for this or core.
-> You missed commit log which says that "T2 bit is required to enable I2C_SR
-> path of voltage control" it is not at all enabling SR, voltage scale
-> APIs VPforceupdate/ VCbypass
-> needs this path to be enabled.
-> And calling APIs twl_i2c_read/write in driver codebase does n't ensure correct
-> ordering of flag changes and twl_read/write.
+On 2/16/2011 7:41 AM, Uwe Kleine-K?nig wrote:
+... 
+>>  /* MC13783 */
+>> -static struct mc13783_platform_data mc13783_pdata __initdata = {
+> isn't using __initdata here broken already before your patch?  Was
+> introduced in c67a3e09.  Fabio?
 
-Ah, yeah. I forgot to comment that I tried shortly also to run this
-enable code from workqueue ~60 s after bootup and indeed SR didn't work
-if those autocomp sysfs nodes were set before setting the TWL SR bit and
-I believe same holds for voltage scaling too as you say.
+I followed the same approach as in mx31_3ds.c file.
+ 
+> But in general I'd prefer to keep as much __initdata as possible because
+> this occupies less memory when using a multi-machine kernel.
 
-What I'm thinking is there actually need for some higher level
-control for these that quarantees the right order independently from
-when each module are initialized.
+Ok, is the __initdata usage correct then? If not, I can change it. Just let me know.
 
--- 
-Jarkko
+Regards,
+
+Fabio Estevam
