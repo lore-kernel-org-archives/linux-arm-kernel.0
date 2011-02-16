@@ -1,95 +1,121 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 16 Feb 2011 16:04:27 +0530
-Subject: [PATCHv2 1/2] ARM: perf_event: allow platform-specific interrupt
-	handler
-In-Reply-To: <-6723806473392693428@unknownmsgid>
-References: <1297137277-26889-1-git-send-email-rabin.vincent@stericsson.com>
-	<-6723806473392693428@unknownmsgid>
-Message-ID: <AANLkTi=wQ9ku+zbu6sx5Mm+ux4Ot6K2h9a_WK=XEB_iG@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 16 Feb 2011 16:45:17 +0530
+Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
+	OMAP2xxx
+In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
+References: <20110216065030.22089.61217.stgit@twilight.localdomain>
+Message-ID: <43af56d25809fa616f0e17d7e641ebc0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 22:03, Will Deacon <will.deacon@arm.com> wrote:
->> Allow a platform-specific IRQ handler to be specified via platform data. ?This
->> will be used to implement the single-irq workaround for the DB8500.
->>
->> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
->> ---
->> ?arch/arm/include/asm/pmu.h ? | ? 14 ++++++++++++++
->> ?arch/arm/kernel/perf_event.c | ? 17 ++++++++++++++++-
->> ?2 files changed, 30 insertions(+), 1 deletions(-)
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org
+[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf
+> Of Paul Walmsley
+> Sent: Wednesday, February 16, 2011 12:23 PM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
+OMAP2xxx
 >
-> If you're happy with this as a workaround for your platform, then
-> it looks alright to me.
+> Hello,
 >
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> This patch series adds clock framework-controlled autoidle support for
+> the OMAP2xxx DPLL, APLLs, and OMAP2/3 interface clocks.  The old
+> direct register writes in the PM code to enable clock autoidle have been
+> removed.
+>
+> This series also ensures that all clock autoidle is disabled during
+> boot and only re-enabled if CONFIG_PM is enabled.
+>
+> The series applies on the 'clk_autoidle_a_2.6.39' branch of
+> git://git.pwsan.com/linux-2.6.
+>
+> Boot-tested on N800, and dynamic idle-tested on OMAP3430 Beagleboard.
+> Compile-tested with omap1_defconfig, omap2plus_defconfig, a 5912
+> OSK-only config, an N8x0-only config, an OMAP3-only config, and an
+OMAP4-only
+> config.
 
-Thanks.
+Boot-tested on 3430sdp/4430sdp, with CONFIG_PM and with !CONFIG_PM.
+suspend-offmode tested on 3430sdp and suspend-retmode on 4430sdp (with
+some out-of-tree patches)
+Dynamic idle testing on 3430sdp showed me some very jerky debug console
+the
+moment a 'echo 1 > /debug/pm_debug/sleep_while_idle' is done.
+This however seems to be the case even on 2.6.38-rc4 and not related to
+the
+current patch series. Will debug further, but seems to some 3430sdp
+specific
+issue, since you did not see it on Beagleboard and seems it is not seen on
+OMAP3
+zoom's either.
+Just out of curiosity, what dynamic-idle state where you able to achieve
+on
+Beagle? And what was the debug console timeout that you configured?
+
+Regards,
+Rajendra
 
 >
-> One thing you could try is using the GIC patch I posted the other day:
 >
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041496.html
+> - Paul
 >
-> If you then do:
+> ---
 >
-> ? ?ARM: gic: allow per-cpu SPIs to be affine to multiple CPUs
+> clk_autoidle_b_2.6.39
+>    text	   data	    bss	    dec	    hex	filename
+> 5530703	 330544	5594520	11455767	 aecd17
+vmlinux.omap2plus_defconfig.orig
+> 5531167	 330544	5594520	11456231	 aecee7
+vmlinux.omap2plus_defconfig.patched
 >
-> ? ?The concept of a per-cpu SPI is somewhat a contradiction, but can occur in
-> ? ?systems where SPIs from different CPUs are ORd together into a single line.
->
-> ? ?An example of this is the PMU interrupt on the u8500 platform.
->
-> ? ?This patch allows SPIs with the IRQF_PERCPU flag to be affine to multiple
-> ? ?CPUs in a CPU mask. This, of course, assumes that the driver knows what it
-> ? ?is doing and can handle such a configuration.
->
-> ? ?Signed-off-by: Will Deacon <will.deacon@arm.com>
->
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 9def30b..512f55f 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -145,7 +145,7 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
-> ?{
-> ? ? ? ?void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
-> ? ? ? ?unsigned int shift = (d->irq % 4) * 8;
-> - ? ? ? unsigned int cpu = cpumask_first(mask_val);
-> + ? ? ? unsigned int cpu_map, cpu = cpumask_first(mask_val);
-> ? ? ? ?u32 val;
-> ? ? ? ?struct irq_desc *desc;
->
-> @@ -155,9 +155,19 @@ gic_set_cpu(struct irq_data *d, const struct cpumask *mask_val, bool force)
-> ? ? ? ? ? ? ? ?spin_unlock(&irq_controller_lock);
-> ? ? ? ? ? ? ? ?return -EINVAL;
-> ? ? ? ?}
-> +
-> ? ? ? ?d->node = cpu;
-> +
-> + ? ? ? if (CHECK_IRQ_PER_CPU(desc->status)) {
-> + ? ? ? ? ? ? ? cpu_map = 0;
-> + ? ? ? ? ? ? ? for_each_cpu(cpu, mask_val)
-> + ? ? ? ? ? ? ? ? ? ? ? cpu_map |= 1 << (cpu + shift);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? cpu_map = 1 << (cpu + shift);
-> + ? ? ? }
-> +
-> ? ? ? ?val = readl(reg) & ~(0xff << shift);
-> - ? ? ? val |= 1 << (cpu + shift);
-> + ? ? ? val |= cpu_map;
-> ? ? ? ?writel(val, reg);
-> ? ? ? ?spin_unlock(&irq_controller_lock);
+> Paul Walmsley (11):
+>       OMAP2+: clock: disable autoidle on all clocks during clock init
+>       OMAP2: clock: add DPLL autoidle support
+>       OMAP2xxx: clock: add clockfw autoidle support for APLLs
+>       OMAP2+: clock: comment that osc_ck/osc_sys_ck should use clockfw
+autoidle control
+>       OMAP2+: clock: add interface clock type code with autoidle support
+>       OMAP2420: clock: add sdrc_ick
+>       OMAP2420: clock: use autoidle clkops for all autoidle-controllable
+interface clocks
+>       OMAP2430/3xxx: clock: add modem clock autoidle support
+>       OMAP2430: clock: use autoidle clkops for all autoidle-controllable
+interface clocks
+>       OMAP3: clock: use autoidle clkops for all autoidle-controllable
+interface clocks
+>       OMAP2/3: PM: remove manual CM_AUTOIDLE bit setting in
+mach-omap2/pm*xx.c
 >
 >
-> You'll be able to target the PMU IRQ to both CPUs and avoid the need for
-> ping-ponging the affinity. This is a bit weird though as usually you'd have
-> a PPI for a percpu interrupt so this might be better off staying inside
-> platform code and leaving the GIC code alone. I also think this approach
-> is more invasive from the perf point of view.
+>  arch/arm/mach-omap2/Makefile          |    7 +
+>  arch/arm/mach-omap2/clkt2xxx_apll.c   |   24 +++++
+>  arch/arm/mach-omap2/clkt2xxx_dpll.c   |   63 +++++++++++++
+>  arch/arm/mach-omap2/clkt2xxx_osc.c    |   14 +++
+>  arch/arm/mach-omap2/clkt_iclk.c       |   82 +++++++++++++++++
+>  arch/arm/mach-omap2/clock.h           |   11 ++
+>  arch/arm/mach-omap2/clock2420_data.c  |  130
++++++++++++++++++-----------
+>  arch/arm/mach-omap2/clock2430_data.c  |  130
+++++++++++++++++------------
+>  arch/arm/mach-omap2/clock34xx.c       |   29 ++++++
+>  arch/arm/mach-omap2/clock34xx.h       |    5 +
+>  arch/arm/mach-omap2/clock3517.c       |    4 +
+>  arch/arm/mach-omap2/clock3xxx.c       |    3 -
+>  arch/arm/mach-omap2/clock3xxx_data.c  |  155
++++++++++++++++++----------------
+>  arch/arm/mach-omap2/clock44xx_data.c  |    3 +
+>  arch/arm/mach-omap2/cm-regbits-24xx.h |    3 +
+>  arch/arm/mach-omap2/cm2xxx_3xxx.c     |   69 +++++++++++++++
+>  arch/arm/mach-omap2/cm2xxx_3xxx.h     |    8 ++
+>  arch/arm/mach-omap2/pm24xx.c          |   69 +--------------
+>  arch/arm/mach-omap2/pm34xx.c          |  105 ----------------------
+>  19 files changed, 557 insertions(+), 357 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/clkt2xxx_dpll.c
+>  create mode 100644 arch/arm/mach-omap2/clkt_iclk.c
 >
-> Unless this approach gives markedly better profiling results than your
-> proposal, I think we should go with what you've got.
-
-I gave this a try, along with the modifications to enable IRQ_PER_CPU
-and have the pmu code use the appropriate flags and set the affinity.
-Didn't work though; it always ends up triggering the spurious IRQ check.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
