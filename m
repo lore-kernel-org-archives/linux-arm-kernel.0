@@ -1,32 +1,28 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 16 Feb 2011 09:40:26 +0100
-Subject: [PATCH] spi/pl022: rid dangling labels
-Message-ID: <1297845626-13332-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 16 Feb 2011 09:48:33 +0100
+Subject: platform data and mfd design question
+In-Reply-To: <4D5AF554.2030208@codeaurora.org>
+References: <4D5AF554.2030208@codeaurora.org>
+Message-ID: <4D5B8F61.3090105@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 02/15/2011 10:51 PM, Abhijeet Dharmapurikar wrote:
+> Msm on the other hand declares the struct mfd_cell subdevice[] array in
+> the board file and passes this on to the core driver via platfom data.
+>    
 
-Remove a compilation error regarding unused labels that came about
-when simplifying the DMA code.
+This way the platform data tells the core driver what kind of
+silicon it has "hey, PM8058, guess what, you have an RTC!"
+which looks backwards to me, especially given that it does
+not need any fancy platform data at all, just two IRQ numbers
+which the core driver can very well handle.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/amba-pl022.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+For example: if the platform data (which is about how the
+components are connected on the board etc) does not
+provide the RTC resource, all of a sudden it appears to the
+system as if the PM8058 does not have an RTC, but it does...
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 4cd05cc..14a451b 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -1030,8 +1030,6 @@ static int configure_dma(struct pl022 *pl022)
- 
- 	return 0;
- 
--err_submit_tx:
--err_submit_rx:
- err_txdesc:
- 	dmaengine_terminate_all(txchan);
- err_rxdesc:
--- 
-1.7.3.2
+
+Yours,
+Linus Walleij
