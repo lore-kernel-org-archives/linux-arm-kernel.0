@@ -1,25 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 16 Feb 2011 20:33:17 +0100
-Subject: [PATCH] ARM: reenable DEBUG_SECTION_MISMATCH
-In-Reply-To: <1297876993-4146-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1297876993-4146-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110216193317.GF22310@pengutronix.de>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 16 Feb 2011 11:36:45 -0800
+Subject: [PATCH v2] ARM: vfp: Always save VFP state in vfp_pm_suspend
+In-Reply-To: <20110215170336.GP4152@n2100.arm.linux.org.uk>
+References: <AANLkTik_Jey_PtRmr530FVckA6RXHESeX+CyoJC=ZTkR@mail.gmail.com>
+	<1297724147-6320-1-git-send-email-ccross@android.com>
+	<20110215170336.GP4152@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim4ANuErvT4c5mBnu+Yg5m9sz6N8xugryXRJeN7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 06:23:13PM +0100, Uwe Kleine-K?nig wrote:
-> For 2.6.38-rc4-git9 only 29 out of 133 defconfigs still produce section
-> mismatches.  These defconfigs produce 55 mismatches (weighted sum, so
-> maybe less uniq mismatches).
-> 
-> This is in my opinion enough to start scaring people about the remaining
-> problems.
-@Vincent: Additionally it would be great if kautobuild would recognise
-these as warnings.
+On Tue, Feb 15, 2011 at 9:03 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 14, 2011 at 02:55:47PM -0800, Colin Cross wrote:
+>> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+>> index 66bf8d1..7231d18 100644
+>> --- a/arch/arm/vfp/vfpmodule.c
+>> +++ b/arch/arm/vfp/vfpmodule.c
+>> @@ -415,13 +415,13 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
+>> ? ? ? struct thread_info *ti = current_thread_info();
+>> ? ? ? u32 fpexc = fmrx(FPEXC);
+>>
+>> - ? ? /* if vfp is on, then save state for resumption */
+>> - ? ? if (fpexc & FPEXC_EN) {
+>> + ? ? /* save state for resume */
+>> + ? ? if (last_VFP_context[ti->cpu]) {
+>
+> I'm not entirely happy with this.
+>
+> It is true that last_VFP_context[] when non-NULL indicates who owns the
+> hardware VFP state, so saving it would seem logical. ?However, this new
+> code now saves the state with the saved fpexc indicating that it's disabled.
+>
+> This will cause a VFP exception to misbehave by reloading the state, and
+> then disabling the VFP unit. ?That will cause another VFP exception which
+> will find the VFP unit disabled, and re-enable it. ?All in all, this is
+> rather wasteful.
+>
+> So...
+> ? ? ? ?/* If lazy disable, re-enable the VFP ready for it to be saved */
+> ? ? ? ?if (last_VFP_context[ti->cpu] != &ti->vfpstate) {
+> ? ? ? ? ? ? ? ?fpexc |= FPEXC_EN;
+> ? ? ? ? ? ? ? ?fmxr(FPEXC, fpexc);
+> ? ? ? ?}
+> ? ? ? ?/* If VFP is on, then save state for resumption */
+> ? ? ? ?if (fpexc & FPEXC_EN) {
+> ? ? ? ? ? ? ? ?...
 
-Best regards
-Uwe
+I think v2 of the patch handles this case correctly:
+	/* save state for resume */
+	if (last_VFP_context[ti->cpu]) {
+		printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+		fmxr(FPEXC, fpexc | FPEXC_EN);
+		vfp_save_state(last_VFP_context[ti->cpu], fpexc);
+		last_VFP_context[ti->cpu] = NULL;
+		fmxr(FPEXC, fpexc & ~FPEXC_EN);
+	}
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+This version enables the VFP if it was not enabled, but saves the
+original fpexc value.
