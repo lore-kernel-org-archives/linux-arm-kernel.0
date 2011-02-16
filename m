@@ -1,53 +1,32 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 16 Feb 2011 11:28:15 -0800
-Subject: [RFC] MMC: error handling improvements
-In-Reply-To: <AANLkTikpdwfM19oirENbOhnz8Rh40ZnMXByGX_QKdu-V@mail.gmail.com>
-	(Linus Walleij's message of "Wed, 16 Feb 2011 19:41:42 +0100")
-References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
-	<8yaoc6c7tan.fsf@huya.qualcomm.com>
-	<AANLkTikpdwfM19oirENbOhnz8Rh40ZnMXByGX_QKdu-V@mail.gmail.com>
-Message-ID: <8ya8vxf4w4w.fsf@huya.qualcomm.com>
+From: dacohen@gmail.com (David Cohen)
+Date: Wed, 16 Feb 2011 21:35:49 +0200
+Subject: [PATCH v3 0/2] OMAP: IOMMU fault callback support
+Message-ID: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16 2011, Linus Walleij wrote:
+Hi,
 
-> 2011/2/16 David Brown <davidb@codeaurora.org>:
+This patch set adapts current (*isr)() to be used as fault callback.
+IOMMU faults might be very difficult to reproduce and then to figure out
+the source of the problem. Currently IOMMU driver prints not so useful
+debug message and does not notice user about such issue.
+With a fault callback, IOMMU user may debug much more useful information
+and/or react to go back to a valid state.
 
->> It's also possible this is finding problems in our SDCC driver.
->
-> The SDCC is obviously an MMCI derivate, VHDL hacking
-> on top of ARMs source code for PL180/PL181.
->
-> Why do you insist on maintaining a forked driver?
-
-Well, it's not me insisting on it.  I'll let the maintainers of the
-driver chime in.
-
-The changes we made to the block are significant, but even beyond that
-we changed how the block is even accessed.  The driver doesn't directly
-access the registers of the controller, but all accesses go through a
-custom DMA engine.
-
-> Please consider switching to using mmci.c like everyone else.
-> The quirks we have in place for U300, Nomadik and Ux500
-> should show you the way for how to do this (yes we did the
-> same thing, hacking the ARM VHDL).
-
-I suspect the changes to mmci would be fairly drastic.
-
-> If I remember correctly I could even see that some early
-> Android sources were using Russells mmci.c driver before this
-> fork was created.
-
-These old drivers are also not usable.  The SDCC block is shared between
-the modem processor and the processor running Linux.  If the driver
-doesn't go through the DMA engine, which coordinates this, the registers
-will be stomped on by the other CPU whenever it decides to access it's
-parts of the flash device.
+Br,
 
 David
+---
+
+David Cohen (2):
+  OMAP2+: IOMMU: don't print fault warning on specific layer
+  OMAP: IOMMU: add support to callback during fault handling
+
+ arch/arm/mach-omap2/iommu2.c            |   33 +++++++++-----------
+ arch/arm/plat-omap/include/plat/iommu.h |   14 ++++++++-
+ arch/arm/plat-omap/iommu.c              |   52 ++++++++++++++++++++++---------
+ 3 files changed, 65 insertions(+), 34 deletions(-)
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.2.3
