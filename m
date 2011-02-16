@@ -1,44 +1,24 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 16 Feb 2011 17:49:03 +0530
-Subject: [PATCH v2 0/2] Fix/Clean regulator consumer mapping for 3430sdp
-In-Reply-To: <1296737122-20765-1-git-send-email-rnayak@ti.com>
-References: <1296737122-20765-1-git-send-email-rnayak@ti.com>
-Message-ID: <147642dc9bed7d0af86fc618cca09edd@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Feb 2011 13:22:07 +0100
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102091731.07794.arnd@arndb.de>
+	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
+Message-ID: <201102161322.08126.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tuesday 15 February 2011, Clark, Rob wrote:
+> I'd been experimenting a bit on the side w/ the DRM driver framework (
+> http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
+> ), but had to add a good chunk of mostly boilerplate code to our xorg
+> driver in order just to test it.  Maybe some generic support for KMS
+> in xf86-video-fbdev would have made this easier to develop the kernel
+> part without in parallel having to implement the userspace part.  I'm
+> not sure if this is the sort of thing the linaro-wg has in mind?
 
-> -----Original Message-----
-> From: Rajendra Nayak [mailto:rnayak at ti.com]
-> Sent: Thursday, February 03, 2011 6:15 PM
-> To: linux-omap at vger.kernel.org
-> Cc: tony at atomide.com; linux-arm-kernel at lists.infradead.org;
-balbi at ti.com; Rajendra Nayak
-> Subject: [PATCH v2 0/2] Fix/Clean regulator consumer mapping for 3430sdp
->
-> This is a short series to fix some, and clean the
-> existing regulator consumer supply mappings for
-> the OMAP3430sdp board.
->
-> The series is boot tested on the 3430sdp board
-> and applies on 2.6.38-rc3.
+I'm not sure what the the linaro multimedia wg thinks of this, but the
+kernel code you linked looks like it's doing exactly the right thing.
 
-Any plans to pull these 3430sdp board file cleanup/fixes?
-
-Regards,
-Rajendra
-
->
-> Changes in v2:
-> Define regulator_consumer_supply as array's
-> and use ARRAY_SIZE macro to define
-> num_consumer_supplies
->
-> Rajendra Nayak (2):
->   omap3sdp: Fix regulator mapping for ads7846 TS controller
->   omap3sdp: clean regulator supply mapping in board file
->
->  arch/arm/mach-omap2/board-3430sdp.c |   78
-+++++++++++++++++------------------
->  1 files changed, 38 insertions(+), 40 deletions(-)
+	Arnd
