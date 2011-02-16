@@ -1,45 +1,100 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 16 Feb 2011 19:35:29 +0530
-Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <-4413647205110644369@unknownmsgid>
-References: <1297697188-5206-1-git-send-email-will.deacon@arm.com>
-	<AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
-	<-4413647205110644369@unknownmsgid>
-Message-ID: <AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 16 Feb 2011 19:35:35 +0530
+Subject: [PATCH v2] OMAP: PM: DMA: Enable runtime pm
+In-Reply-To: <87ipwm1daa.fsf@ti.com>
+References: <1297082286-8449-1-git-send-email-manjugk@ti.com>
+	<87ipwm1daa.fsf@ti.com>
+Message-ID: <20110216140535.GA15484@m-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 18:39, Will Deacon <will.deacon@arm.com> wrote:
->> On Mon, Feb 14, 2011 at 20:56, Will Deacon <will.deacon@arm.com> wrote:
->> > This patch modifies the GIC code to use handle_fasteoi_irq for handling
->> > interrupts, which only requires us to signal EOI to the CPU interface
->> > when handling is complete. Cascaded IRQ handling is also updated so that
->> > EOI is signalled after handling.
->>
->> Several of the platforms using the GIC also have GPIO code which uses
->> set_irq_chained_handler(). ?I think you will have to modify all of
->> these to call irq_eoi() appropriately and not the other functions.
->> Some of these will also likely be used with other interrupt handlers
->> than the GIC, though.
->
-> Hmm, I had a quick look at some platforms that do this (mach-dove and
-> plat-spear) and I don't see what the problem is. They use their own irq_chip
-> structures, with their own function pointers, so this doesn't seem to relate
-> to the GIC at all. What am I missing?!
+Hi Kevin,
 
-The chained handlers are usually installed on GIC interrupts.  So, when
-a chained handler does something like this
+On Mon, Feb 14, 2011 at 02:06:53PM -0800, Kevin Hilman wrote:
+> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> 
+> > From: Manjunath G Kondaiah <manjugk@ti.com>
+> >
+> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put_autosuspend
+> > for OMAP DMA driver.
+> >
+> > The DMA driver uses auto suspend feature of runtime pm framework through
+> > which the clock gets disabled automatically if there is no activity for
+> > more than one second.
+> >
+> > Testing:
+> > Compile: omap1_defconfig and omap2plus_defconfig
+> > Boot: OMAP1710(H3), OMAP2420(H4), OMAP3630(Zoom3), OMAP4(Blaze)
+> 
+> The normal DMA tests should also be run on these platforms.  Based on
+> the above, I can't tell any DMA tests were run.   Based on my tests,
+> this isn't working for chained xfers.
+> 
+> Using the runtime PM sysfs interface, you can check the runtime status
+> of the device:
+> 
+> # cat /sys/devices/platform/omap/omap_dma_system.0/power/runtime_status          
+> 
+> It should show 'active' during transfer, and after timeout expires it
+> will show 'suspended'.
+> 
+> Doing some tests using my dmatest module:
+> 
+>   git://gitorious.org/omap-test/dmatest.git
+> 
+> I noticed that it gets stuck in 'active' and never gets suspended when I
+> used DMA channel linking (load module using 'linking=1' as load-time option)
+> 
+> I'm not sure exactly why, but I will guess that the reason is that there
+> is an imbalance in get/put calls when using chaining, since 'get' is
+> only called once upon omap_start_dma() but 'put' is called for every
+> channel in the callback.
 
-	desc->irq_data.chip->irq_unmask(&desc->irq_data);
+Even I noticed this after running chaining test case and checking
+runtime status. But, I am wondering even with 'active' runtime status, 
+the core hits off and retention.
 
-the desc->irq_data.chip refers to the gic_chip.  These handlers are
-written with the knowledge of what flow handler the GIC uses and what
-functions it implements, so when you change that, the chained handler
-code will not work correctly, and they'll need to be updated just like
-you've updated the cascade IRQ handler.
+The complete log which has all the sequences of running chaining tests,
+enabling off mode and checking runtime status is available at:
+http://pastebin.com/YEHMEXUP
 
-In fact, I think that 846afbd1 ("GIC: Dont disable INT in ack callback")
-has broken not just GIC cascading interrupts but assumptions in several
-of these chained handlers, since several of them seem to have been
-written assuming (invalidly) that irq_ack() masks the interrupt, but
-this is no longer the case with the GIC after that commit.
+Though I agree on the point that, it is mismatch with get/put calls with
+DMA chaining, I still need to analyze this in detail.
+
+The other thing which is not considered here is, the get_sync is called
+inside start_dma only(request_dma will call get_sync and put after the
+getting requested channel). After request_dma and start_dma, there are
+API's called by user(dma_set_params, priority etc) which also require
+get_sync since those API's will access configuration registers. I am
+wondering if have get_sync and put in all the API's, this might result
+in over loading. 
+
+> 
+> > On zoom3 core retention is tested with following steps:
+> > echo 1 > /debug/pm_debug/sleep_while_idle
+> > echo 1 > /debug/pm_debug/enable_off_mode
+> > echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
+> > echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
+> > echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
+> > echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
+> >
+> > It is observed that(on pm branch), core retention count gets increasing if the
+> > board is left idle for more than 5 seconds. However, it doesnot enter off mode
+> > (even without DMA runtime changes).
+> 
+> What silicon rev is on your Zoom3?  
+It's 3630 ES1.0. 
+> Mainline kernels now disable core off-mode for 3630 revs < ES2.1 due to erratum 
+>i583.
+> 
+> If this happens, you should see something like this on the console:
+> 
+>            Core OFF disabled due to errata i583
+> 
+We can observe above message in mainline after enabling cpu idle in
+omap2plus_defconfig.
+
+I switched to zoom2 and able to hit core retention and
+off mode with mainline.
+
+-Manjunath
