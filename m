@@ -1,41 +1,86 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 16 Feb 2011 05:09:08 -0700
-Subject: [PATCH] spi/pl022: rid dangling labels
-In-Reply-To: <1297845626-13332-1-git-send-email-linus.walleij@stericsson.com>
-References: <1297845626-13332-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110216120908.GB24203@angua.secretlab.ca>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 16 Feb 2011 17:41:25 +0530
+Subject: [PATCH 3/3] OMAP2+: hwmod: Do not break iterator fn's if one fails
+In-Reply-To: <1297858285-7056-3-git-send-email-rnayak@ti.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<1297858285-7056-2-git-send-email-rnayak@ti.com>
+	<1297858285-7056-3-git-send-email-rnayak@ti.com>
+Message-ID: <1297858285-7056-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 09:40:26AM +0100, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Remove a compilation error regarding unused labels that came about
-> when simplifying the DMA code.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+The iterator functions used to iterate over all
+registered hwmods and all hwmods of a given class
+break if one of the iterator functions fail.
+Instead iterate over all the functions and return
+an ORed return value back to the user.
 
-Applied, thanks.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   23 ++++++++---------------
+ 1 files changed, 8 insertions(+), 15 deletions(-)
 
-g.
-
-> ---
->  drivers/spi/amba-pl022.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index 4cd05cc..14a451b 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -1030,8 +1030,6 @@ static int configure_dma(struct pl022 *pl022)
->  
->  	return 0;
->  
-> -err_submit_tx:
-> -err_submit_rx:
->  err_txdesc:
->  	dmaengine_terminate_all(txchan);
->  err_rxdesc:
-> -- 
-> 1.7.3.2
-> 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 960461f..3cab82e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1568,25 +1568,21 @@ struct omap_hwmod *omap_hwmod_lookup(const char *name)
+  *
+  * Call @fn for each registered omap_hwmod, passing @data to each
+  * function.  @fn must return 0 for success or any other value for
+- * failure.  If @fn returns non-zero, the iteration across omap_hwmods
+- * will stop and the non-zero return value will be passed to the
+- * caller of omap_hwmod_for_each().  @fn is called with
++ * failure. Return value of all callback functions is OR'd and the
++ * value is passed back to the caller. @fn is called with
+  * omap_hwmod_for_each() held.
+  */
+ int omap_hwmod_for_each(int (*fn)(struct omap_hwmod *oh, void *data),
+ 			void *data)
+ {
+ 	struct omap_hwmod *temp_oh;
+-	int ret;
++	int ret = 0;
+ 
+ 	if (!fn)
+ 		return -EINVAL;
+ 
+-	list_for_each_entry(temp_oh, &omap_hwmod_list, node) {
+-		ret = (*fn)(temp_oh, data);
+-		if (ret)
+-			break;
+-	}
++	list_for_each_entry(temp_oh, &omap_hwmod_list, node)
++		ret |= (*fn)(temp_oh, data);
+ 
+ 	return ret;
+ }
+@@ -2127,8 +2123,7 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name)
+  * @user: arbitrary context data to pass to the callback function
+  *
+  * For each omap_hwmod of class @classname, call @fn.
+- * If the callback function returns something other than
+- * zero, the iterator is terminated, and the callback function's return
++ * Return value of all callback functions is OR'd and the
+  * value is passed back to the caller.  Returns 0 upon success, -EINVAL
+  * if @classname or @fn are NULL, or passes back the error code from @fn.
+  */
+@@ -2150,14 +2145,12 @@ int omap_hwmod_for_each_by_class(const char *classname,
+ 		if (!strcmp(temp_oh->class->name, classname)) {
+ 			pr_debug("omap_hwmod: %s: %s: calling callback fn\n",
+ 				 __func__, temp_oh->name);
+-			ret = (*fn)(temp_oh, user);
+-			if (ret)
+-				break;
++			ret |= (*fn)(temp_oh, user);
+ 		}
+ 	}
+ 
+ 	if (ret)
+-		pr_debug("omap_hwmod: %s: iterator terminated early: %d\n",
++		pr_debug("omap_hwmod: %s: one or more callback fn failed: %d\n",
+ 			 __func__, ret);
+ 
+ 	return ret;
+-- 
+1.7.0.4
