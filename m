@@ -1,65 +1,125 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Feb 2011 15:10:45 +0100
-Subject: [PATCH v3] Add i.MX51/53 IPU framebuffer support
-Message-ID: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+Date: Wed, 16 Feb 2011 15:10:49 +0100
+Subject: [PATCH 4/7] ARM i.MX51: Add IPU device support
+In-Reply-To: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1297865452-32181-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following is the third version of the series adding ipu support
-for the i.MX51/53.
-
-Changes since last version:
-
-- The IPU core driver now sits in drivers/video instead of drivers/mfd.
-  It still needs mfd support, so it has a select on MFD_SUPPORT and
-  MFD_CORE.
-- The fb driver does not reallocate memory anymore. This is broken since
-  there is a risk that some userspace process still has the memory mapped
-  while we reallocate it which leads to bad results.
-
-Sascha Hauer (7):
-      Add a mfd IPUv3 driver
-      fb: export fb mode db table
-      Add i.MX5 framebuffer driver
-      ARM i.MX51: Add IPU device support
-      ARM i.MX5: Allow to increase max zone order
-      ARM i.MX5: increase dma consistent size for IPU support
-      ARM i.MX51 babbage: Add framebuffer support
-
- arch/arm/Kconfig                                |    4 +-
- arch/arm/mach-mx5/Kconfig                       |    1 +
- arch/arm/mach-mx5/board-mx51_babbage.c          |   74 ++
- arch/arm/mach-mx5/devices-imx51.h               |    4 +
- arch/arm/plat-mxc/devices/Kconfig               |    4 +
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mx5/devices-imx51.h               |    4 ++
+ arch/arm/plat-mxc/devices/Kconfig               |    4 ++
  arch/arm/plat-mxc/devices/Makefile              |    1 +
- arch/arm/plat-mxc/devices/platform-imx_ipuv3.c  |   47 ++
- arch/arm/plat-mxc/include/mach/devices-common.h |   10 +
- arch/arm/plat-mxc/include/mach/ipu-v3.h         |   49 ++
- arch/arm/plat-mxc/include/mach/memory.h         |    3 +-
- drivers/video/Kconfig                           |   13 +
- drivers/video/Makefile                          |    2 +
- drivers/video/imx-ipu-v3/Makefile               |    3 +
- drivers/video/imx-ipu-v3/ipu-common.c           |  708 +++++++++++++++++
- drivers/video/imx-ipu-v3/ipu-cpmem.c            |  612 +++++++++++++++
- drivers/video/imx-ipu-v3/ipu-dc.c               |  364 +++++++++
- drivers/video/imx-ipu-v3/ipu-di.c               |  550 ++++++++++++++
- drivers/video/imx-ipu-v3/ipu-dmfc.c             |  355 +++++++++
- drivers/video/imx-ipu-v3/ipu-dp.c               |  476 ++++++++++++
- drivers/video/imx-ipu-v3/ipu-prv.h              |  216 ++++++
- drivers/video/modedb.c                          |    8 +-
- drivers/video/mx5fb.c                           |  925 +++++++++++++++++++++++
- include/linux/fb.h                              |    3 +
- include/linux/mfd/imx-ipu-v3.h                  |  219 ++++++
- 24 files changed, 4646 insertions(+), 5 deletions(-)
+ arch/arm/plat-mxc/devices/platform-imx_ipuv3.c  |   47 +++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 +++++
+ 5 files changed, 66 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
- create mode 100644 arch/arm/plat-mxc/include/mach/ipu-v3.h
- create mode 100644 drivers/video/imx-ipu-v3/Makefile
- create mode 100644 drivers/video/imx-ipu-v3/ipu-common.c
- create mode 100644 drivers/video/imx-ipu-v3/ipu-cpmem.c
- create mode 100644 drivers/video/imx-ipu-v3/ipu-dc.c
- create mode 100644 drivers/video/imx-ipu-v3/ipu-di.c
- create mode 100644 drivers/video/imx-ipu-v3/ipu-dmfc.c
- create mode 100644 drivers/video/imx-ipu-v3/ipu-dp.c
- create mode 100644 drivers/video/imx-ipu-v3/ipu-prv.h
- create mode 100644 drivers/video/mx5fb.c
- create mode 100644 include/linux/mfd/imx-ipu-v3.h
+
+diff --git a/arch/arm/mach-mx5/devices-imx51.h b/arch/arm/mach-mx5/devices-imx51.h
+index 7fff485..1bd73b3 100644
+--- a/arch/arm/mach-mx5/devices-imx51.h
++++ b/arch/arm/mach-mx5/devices-imx51.h
+@@ -55,3 +55,7 @@ extern const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst;
+ extern const struct imx_imx_keypad_data imx51_imx_keypad_data __initconst;
+ #define imx51_add_imx_keypad(pdata)	\
+ 	imx_add_imx_keypad(&imx51_imx_keypad_data, pdata)
++
++extern const struct imx_ipuv3_data imx51_ipuv3_data __initconst;
++#define imx51_add_ipuv3(pdata)	\
++	imx_add_ipuv3(&imx51_ipuv3_data, pdata)
+diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
+index b9ab1d5..f99317e 100644
+--- a/arch/arm/plat-mxc/devices/Kconfig
++++ b/arch/arm/plat-mxc/devices/Kconfig
+@@ -71,3 +71,7 @@ config IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 
+ config IMX_HAVE_PLATFORM_SPI_IMX
+ 	bool
++
++config IMX_HAVE_PLATFORM_IMX_IPUV3
++	bool
++
+diff --git a/arch/arm/plat-mxc/devices/Makefile b/arch/arm/plat-mxc/devices/Makefile
+index 75cd2ec..0a6be0a 100644
+--- a/arch/arm/plat-mxc/devices/Makefile
++++ b/arch/arm/plat-mxc/devices/Makefile
+@@ -22,3 +22,4 @@ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_RNGA) += platform-mxc_rnga.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_MXC_W1) += platform-mxc_w1.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX) += platform-sdhci-esdhc-imx.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_SPI_IMX) +=  platform-spi_imx.o
++obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_IPUV3) +=  platform-imx_ipuv3.o
+diff --git a/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+new file mode 100644
+index 0000000..2c6b913
+--- /dev/null
++++ b/arch/arm/plat-mxc/devices/platform-imx_ipuv3.c
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2010 Pengutronix
++ * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
++ *
++ * This program is free software; you can redistribute it and/or modify it under
++ * the terms of the GNU General Public License version 2 as published by the
++ * Free Software Foundation.
++ */
++#include <mach/hardware.h>
++#include <mach/devices-common.h>
++
++#define imx51_ipuv3_data_entry_single(soc)				\
++	{								\
++		.iobase = soc ## _IPU_CTRL_BASE_ADDR,			\
++		.irq_err = soc ## _INT_IPU_ERR,				\
++		.irq = soc ## _INT_IPU_SYN,				\
++	}
++
++#ifdef CONFIG_SOC_IMX51
++const struct imx_ipuv3_data imx51_ipuv3_data __initconst =
++	imx51_ipuv3_data_entry_single(MX51);
++#endif /* ifdef CONFIG_SOC_IMX35 */
++
++struct platform_device *__init imx_add_ipuv3(
++		const struct imx_ipuv3_data *data,
++		const struct imx_ipuv3_platform_data *pdata)
++{
++	struct resource res[] = {
++		{
++			.start = data->iobase,
++			.end = data->iobase + SZ_512M - 1,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = data->irq_err,
++			.end = data->irq_err,
++			.flags = IORESOURCE_IRQ,
++		}, {
++			.start = data->irq,
++			.end = data->irq,
++			.flags = IORESOURCE_IRQ,
++		},
++	};
++
++	return imx_add_platform_device("imx-ipuv3", -1,
++			res, ARRAY_SIZE(res), pdata, sizeof(*pdata));
++}
++
+diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
+index 8658c9c..8f5197f 100644
+--- a/arch/arm/plat-mxc/include/mach/devices-common.h
++++ b/arch/arm/plat-mxc/include/mach/devices-common.h
+@@ -264,3 +264,13 @@ struct imx_spi_imx_data {
+ struct platform_device *__init imx_add_spi_imx(
+ 		const struct imx_spi_imx_data *data,
+ 		const struct spi_imx_master *pdata);
++
++#include <mach/ipu-v3.h>
++struct imx_ipuv3_data {
++	resource_size_t iobase;
++	resource_size_t irq_err;
++	resource_size_t irq;
++};
++struct platform_device *__init imx_add_ipuv3(
++		const struct imx_ipuv3_data *data,
++		const struct imx_ipuv3_platform_data *pdata);
+-- 
+1.7.2.3
