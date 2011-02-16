@@ -1,92 +1,49 @@
-From: gadiyar@ti.com (Anand Gadiyar)
-Date: Wed, 16 Feb 2011 15:42:15 +0530
-Subject: [PATCH] omap4: usb: explicitly configure MUSB pads
-Message-ID: <1297851135-25952-1-git-send-email-gadiyar@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 16 Feb 2011 10:14:26 +0000
+Subject: [PATCH V5 12/63] ST SPEAr: Adding support for CLCD on SPEAr3xx/6xx
+In-Reply-To: <20110216095615.GA6504@n2100.arm.linux.org.uk>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+	<9a376f8d8a927e333a36a04e9e40e801dbfe398f.1295499394.git.viresh.kumar@st.com>
+	<20110216095615.GA6504@n2100.arm.linux.org.uk>
+Message-ID: <20110216101426.GC6504@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the mux framework APIs to explicitly configure
-the MUSB pads. The MUSB controller in OMAP4 can use
-either the old ULPI interface, or the new internal PHY.
-Configure the pads accordingly.
+On Wed, Feb 16, 2011 at 09:56:15AM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 20, 2011 at 12:55:51PM +0530, Viresh Kumar wrote:
+> > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> > index d916ac0..bf6632d 100644
+> > --- a/drivers/video/Kconfig
+> > +++ b/drivers/video/Kconfig
+> > @@ -324,10 +324,22 @@ config FB_ARMCLCD
+> >  
+> >  choice
+> >  
+> > -	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X)
+> > +	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X || ARCH_SPEAR6XX || MACH_SPEAR300 || MACH_SPEAR320)
+> >  	prompt "LCD Panel"
+> >  	default FB_ARMCLCD_SHARP_LQ035Q7DB02
+> >  
+> > +config FB_ARMCLCD_SHARP_LQ043T1DG01
+> > +	bool "SHARP LQ043T1DG01 CLCD 4.2\" TFT(480x272)"
+> > +	help
+> > +	  This is an implementation of the Sharp LQ043T1DG01, a 4.2"
+> > +	  color TFT panel. The native resolution is 480x272.
+> > +
+> > +config FB_ARMCLCD_SAMSUNG_LMS700
+> > +	bool "SAMSUNG CLCD 7\" TFT(800x480)"
+> > +	help
+> > +	  This is an implementation of the Samsung LMS700, a 7"
+> > +	  color TFT panel. The native resolution is 800x480.
+> > +
+> >  config FB_ARMCLCD_SHARP_LQ035Q7DB02_HRTFT
+> >  	bool "LogicPD LCD 3.5\" QVGA w/HRTFT IC"
+> >  	help
+> 
+> This choice stuff has gone with the removal of the lpd code from the
+> kernel, and thus is unmergable.  This kind of platform specific
+> configuration has no business being in this file anyway.
 
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
-Each of these signals are brought out on exactly one pad,
-so there is no conflict.
-
-This patch was developed as part of bringing up the USBTLL
-interface on OMAP4. However it's purely OMAP4 specific,
-so it should go through Tony.
-
-Applies against linux-next as of today.
-
- arch/arm/mach-omap2/usb-musb.c |   40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
-
-Index: linux-omap-usb/arch/arm/mach-omap2/usb-musb.c
-===================================================================
---- linux-omap-usb.orig/arch/arm/mach-omap2/usb-musb.c
-+++ linux-omap-usb/arch/arm/mach-omap2/usb-musb.c
-@@ -31,6 +31,7 @@
- #include <mach/am35xx.h>
- #include <plat/usb.h>
- #include "control.h"
-+#include "mux.h"
- 
- #if defined(CONFIG_USB_MUSB_OMAP2PLUS) || defined (CONFIG_USB_MUSB_AM35X)
- 
-@@ -181,6 +182,43 @@ static struct platform_device musb_devic
- 	.resource	= musb_resources,
- };
- 
-+static void usb_musb_mux_init(struct omap_musb_board_data *board_data)
-+{
-+	switch (board_data->interface_type) {
-+	case MUSB_INTERFACE_UTMI:
-+		omap_mux_init_signal("usba0_otg_dp", OMAP_PIN_INPUT);
-+		omap_mux_init_signal("usba0_otg_dm", OMAP_PIN_INPUT);
-+		break;
-+	case MUSB_INTERFACE_ULPI:
-+		omap_mux_init_signal("usba0_ulpiphy_clk",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_stp",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dir",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_nxt",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat0",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat1",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat2",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat3",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat4",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat5",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat6",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat7",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		break;
-+	default:
-+		break;
-+	}
-+}
- void __init usb_musb_init(struct omap_musb_board_data *board_data)
- {
- 	if (cpu_is_omap243x()) {
-@@ -199,6 +237,8 @@ void __init usb_musb_init(struct omap_mu
- 		musb_resources[0].start = OMAP44XX_HSUSB_OTG_BASE;
- 		musb_resources[1].start = OMAP44XX_IRQ_HS_USB_MC_N;
- 		musb_resources[2].start = OMAP44XX_IRQ_HS_USB_DMA_N;
-+
-+		usb_musb_mux_init(board_data);
- 	}
- 	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
- 
+The other thing is that the handling of BGR/RGB has changed in the
+'versatile' branch too, so you may want to delay this patch until
+later.
