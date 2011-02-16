@@ -1,37 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Feb 2011 09:20:02 -0800
-Subject: [PATCH] omap: Move omap2_check_revision and omap_sram_init out
-	of map_io
-In-Reply-To: <20110215015320.GX20795@atomide.com>
-References: <20110123171344.GH30094@n2100.arm.linux.org.uk>
-	<20110123174814.GI30094@n2100.arm.linux.org.uk>
-	<20110124201731.GC13589@atomide.com>
-	<20110214234520.GT20795@atomide.com>
-	<20110214235238.GU20795@atomide.com>
-	<20110215015320.GX20795@atomide.com>
-Message-ID: <20110216172002.GF20795@atomide.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 16 Feb 2011 18:23:13 +0100
+Subject: [PATCH] ARM: reenable DEBUG_SECTION_MISMATCH
+Message-ID: <1297876993-4146-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110214 17:52]:
-> * Tony Lindgren <tony@atomide.com> [110214 15:51]:
-> > With the early init changes we just want to map IO in map_io.
-> > Both omap2_check_revision and omap_sram_init can be moved to
-> > happen later in omap2_init_common_infrastructure.
-> > 
-> > Note that now we can now remove _omap2_map_common_io and remove
-> > the extra flushes too as devicemaps_init will take care of it.
-> 
-> Hmm this one seems to need a bit more work, won't work on 2420.
+For 2.6.38-rc4-git9 only 29 out of 133 defconfigs still produce section
+mismatches.  These defconfigs produce 55 mismatches (weighted sum, so
+maybe less uniq mismatches).
 
-That's because calling iotable_init after bootmem_init will skip
-calling arm_bootmem_init and the new memblock_region we never
-call reserve_bootmem on the new entry. So let's skip this for now.
+This is in my opinion enough to start scaring people about the remaining
+problems.
 
-If we want to do SoC detection and SRAM init later during the
-boot, we'd have to allocate SRAM the same way as dma-mapping
-and ioremap code does.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ lib/Kconfig.debug |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 3967c23..1130dd4 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -102,7 +102,7 @@ config HEADERS_CHECK
+ 
+ config DEBUG_SECTION_MISMATCH
+ 	bool "Enable full Section mismatch analysis"
+-	depends on UNDEFINED || (BLACKFIN)
++	depends on ARM || BLACKFIN
+ 	default y
+ 	# This option is on purpose disabled for now.
+ 	# It will be enabled when we are down to a reasonable number
+-- 
+1.7.2.3
