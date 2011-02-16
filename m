@@ -1,49 +1,68 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 16 Feb 2011 16:33:32 +0100
-Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110216202818.GA11467@S2100-06.ap.freescale.net>
-References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
-	<20110214165958.GH10709@pengutronix.de>
-	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
-	<20110215171341.GD10770@pengutronix.de>
-	<20110215171917.GQ4152@n2100.arm.linux.org.uk>
-	<20110215172948.GE10770@pengutronix.de>
-	<20110216202818.GA11467@S2100-06.ap.freescale.net>
-Message-ID: <20110216153332.GC6365@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 16 Feb 2011 15:53:48 +0000
+Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
+	cause data corruption
+In-Reply-To: <4dfaffa99292bf8e36791ea9a68de75e@mail.gmail.com>
+References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
+	<1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com>
+	<AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com>
+	<13596bec9184b117d6a1d02da8e017bf@mail.gmail.com>
+	<AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com>
+	<33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com>
+	<4dfaffa99292bf8e36791ea9a68de75e@mail.gmail.com>
+Message-ID: <AANLkTikEjTgisftQV46djrOP8iWMFV267v-efHsVf_Nd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 15 February 2011 07:14, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1140,7 +1140,7 @@ config ARM_ERRATA_742231
+>
+> ?config PL310_ERRATA_588369
+> ? ? ? ?bool "Clean & Invalidate maintenance operations do not invalidate
+> clean lines"
+> - ? ? ? depends on CACHE_L2X0 && ARCH_OMAP4
+> + ? ? ? depends on CACHE_L2X0 && CACHE_PL310
 
-[CRC failures on MMC]
-> I guess you will also get the unknown partition table message if you
-> test this card on mx35 right now.
+It can just depend on CACHE_PL310 as this depends on CACHE_L2X0.
 
-No, I didn't see that message on MX35. (Doesn't matter much now).
+> +config PL310_ERRATA_727915
+> + ? ? ? bool "Background Clean & Invalidate by Way operation can cause
+> data corruption"
+> + ? ? ? depends on CACHE_L2X0 && CACHE_PL310
 
-> I just tested 7 mmc cards in total.  6 cards work fine, and 1 card
-> (Transcend MMC plus 1GB) has the exactly same problem as yours. And
-> if I remove the 8 bit cap, this card also works fine.  So I would
-> agree with Russell that it's unrelated to the driver.
+Same here.
 
-Ah, the 8_BIT_CAP was the right pointer. It works now and I can see the
-partitions \o/ But IMHO it is related to the driver because it cannot set that
-8_BIT_DATA_CAP unconditionally? Probably something like 'flags' should be added
-to platform_data? One flag could then be 8_BIT_CAPABLE_SLOT or something.
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -45,7 +45,10 @@ config ARCH_OMAP4
+> ? ? ? ?select CPU_V7
+> ? ? ? ?select ARM_GIC
+> ? ? ? ?select LOCAL_TIMERS
+> + ? ? ? select CACHE_L2X0
 
-> I tested the SDIO, but probably in different way from yours.  I had
-> two card slots on my board, rootfs on mmc0 and SDIO card on mmc1.
-> It seems working fine in this way.  However, when I use nfs and test
-> SDIO on mmc0, my systems hangs too.  I will look into it.
+CACHE_L2X0 has a long dependency list. You could add ARCH_OMAP4 in
+there or just change the other platforms to select a HAVE_CACHE_L2X0.
+Ideally we would like this option to be selectable in config just in
+case you want to debug some issues.
 
-The latter scenario is the only one I can test, because I don't have an
-(active) second slot.
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -52,6 +52,12 @@ static void omap4_l2x0_disable(void)
+> ? ? ? ?omap_smc1(0x102, 0x0);
+> ?}
+>
+> +static void omap4_l2x0_set_debug(unsigned long val)
+> +{
+> + ? ? ? /* Program PL310 L2 Cache controller debug register */
+> + ? ? ? omap_smc1(0x100, val);
+> +}
 
-Thanks for keeping up with the driver!
+This part together with the Kconfig changes for OMAP4 could be a
+separate patch, OMAP-specific.
 
-   Wolfram
+The rest seems fine.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Catalin
