@@ -1,91 +1,50 @@
-From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
-Date: Mon, 14 Feb 2011 17:07:06 +0530
-Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
-Message-ID: <mailman.144.1297836274.1530.linux-arm-kernel@lists.infradead.org>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Wed, 16 Feb 2011 08:22:28 +0200 (EET)
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <DD7A9A95166BF4418C4C1EB2033B6EE2038FAAF0@na3-mail.mgc.mentorg.com>
+References: <20110214100104.GC4371@pulham.picochip.com>
+	<4D5AF712.3080509@mentor.com>
+	<DD7A9A95166BF4418C4C1EB2033B6EE2038FAAF0@na3-mail.mgc.mentorg.com>
+Message-ID: <20110216.082228.814509512977216497.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The effect of cache sync operation is to drain the store
-buffer and wait for all internal buffers to be empty. In
-normal conditions, store buffer is able to merge the
-normal memory writes within its 32-byte data buffers.
-Due to this erratum present in r3p0, the effect of cache
-sync operation on the store buffer still remains when
-the operation completes. This means that the store buffer
-is always asked to drain and this prevents it from merging
-any further writes.
+From: "ext Blanchard, Hollis" <Hollis_Blanchard@mentor.com>
+Subject: Re: [RFC] Inter-processor Mailboxes Drivers
+Date: Tue, 15 Feb 2011 15:38:25 -0800
 
-This can severely affect performance on the write traffic
-esp. on Normal memory NC one.
+> On 02/15/2011 01:58 PM, Meador Inge wrote:
+>> On 02/14/2011 04:01 AM, Jamie Iles wrote:
+>>> On Fri, Feb 11, 2011 at 03:19:51PM -0600, Meador Inge wrote:
+>>>>      1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
+>>>>         for the MPIC message registers on Power and OMAP4 mailboxes, 
+>>>> for
+>>>>         example.
+>>>>      2. A higher level driver under '.../drivers/mailbox/*'.  That the
+>>>>         pieces in (1) would register with.  This piece would expose the
+>>>>         main kernel API.
+>>>>      3. Userspace interfaces for accessing the mailboxes.  A
+>>>>         '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
+>>>
+>>> How about using virtio for all of this and having the mailbox as a
+>>> notification/message passing driver for the virtio backend?  There are
+>>> already virtio console and network drivers that could be useful for the
+>>> userspace part of it.  drivers/virtio/virtio_ring.c might be a good
+>>> starting point if you thought there was some mileage in this approach.
+>>
+>> To be honest, I am not that familiar with 'virtio', but I will take a 
+>> look.  Thanks for the pointer.  Maybe Hollis can speak to this idea more.
+> My opinion is that virtio is (over?) complicated.
 
-The proposed workaround is to replace the normal offset of
-cache sync operation(0x730) by another offset targeting an
-unmapped PL310 register 0x740.
+Considering the case of omap mailbox H/W, it is just a simple one way
+4 slot x 32bit H/W FIFO, I also may think that this may be a bit too
+much...
 
-Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@stericsson.com>
----
- arch/arm/Kconfig                           |   15 +++++++++++++++
- arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
- arch/arm/mm/cache-l2x0.c                   |    6 ++++++
- 3 files changed, 22 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d5eb308..0b67a9f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1186,6 +1186,21 @@ config ARM_ERRATA_743622
- 	  visible impact on the overall performance or power consumption of the
- 	  processor.
- 
-+config ARM_ERRATA_753970
-+	bool "ARM errata: cache sync operation may be faulty"
-+	depends on CACHE_PL310
-+	help
-+	  This option enables the workaround for the 753970 PL310 (r3p0) erratum.
-+
-+	  Under some condition the effect of cache sync operation on
-+	  the store buffer still remains when the operation completes.
-+	  This means that the store buffer is always asked to drain and
-+	  this prevents it from merging any further writes. The workaround
-+	  is to replace the normal offset of cache sync operation (0x730)
-+	  by another offset targeting an unmapped PL310 register 0x740.
-+	  This has the same effect as the cache sync operation: store buffer
-+	  drain and waiting for all buffers empty.
-+
- endmenu
- 
- source "arch/arm/common/Kconfig"
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 5aeec1e..16bd480 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -36,6 +36,7 @@
- #define L2X0_RAW_INTR_STAT		0x21C
- #define L2X0_INTR_CLEAR			0x220
- #define L2X0_CACHE_SYNC			0x730
-+#define L2X0_DUMMY_REG			0x740
- #define L2X0_INV_LINE_PA		0x770
- #define L2X0_INV_WAY			0x77C
- #define L2X0_CLEAN_LINE_PA		0x7B0
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 170c9bb..8cabe09 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -49,8 +49,14 @@ static inline void cache_wait(void __iomem *reg, unsigned long mask)
- static inline void cache_sync(void)
- {
- 	void __iomem *base = l2x0_base;
-+
-+#ifdef CONFIG_ARM_ERRATA_753970
-+	/* write to an unmmapped register */
-+	writel_relaxed(0, base + L2X0_DUMMY_REG);
-+#else
- 	writel_relaxed(0, base + L2X0_CACHE_SYNC);
- 	cache_wait(base + L2X0_CACHE_SYNC, 1);
-+#endif
- }
- 
- static inline void l2x0_clean_line(unsigned long addr)
--- 
-1.7.0.4
+> I've looked into it in the past, and I'm definitely open to using it if 
+> somebody can demonstrate how easy it is, but adopting it wouldn't have 
+> helped OpenMCAPI with our use cases, and would have incurred extra pain, 
+> so we didn't.
+> 
+> Hollis Blanchard
+> Mentor Graphics, Embedded Systems Division
+> 
