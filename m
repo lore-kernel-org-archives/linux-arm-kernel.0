@@ -1,43 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 16 Feb 2011 09:56:15 +0000
-Subject: [PATCH V5 12/63] ST SPEAr: Adding support for CLCD on SPEAr3xx/6xx
-In-Reply-To: <9a376f8d8a927e333a36a04e9e40e801dbfe398f.1295499394.git.viresh.kumar@st.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<9a376f8d8a927e333a36a04e9e40e801dbfe398f.1295499394.git.viresh.kumar@st.com>
-Message-ID: <20110216095615.GA6504@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 16 Feb 2011 10:56:37 +0100
+Subject: [PATCH v2] i.MX23/28 Framebuffer driver
+Message-ID: <1297850199-1688-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 12:55:51PM +0530, Viresh Kumar wrote:
-> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> index d916ac0..bf6632d 100644
-> --- a/drivers/video/Kconfig
-> +++ b/drivers/video/Kconfig
-> @@ -324,10 +324,22 @@ config FB_ARMCLCD
->  
->  choice
->  
-> -	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X)
-> +	depends on FB_ARMCLCD && (ARCH_LH7A40X || ARCH_LH7952X || ARCH_SPEAR6XX || MACH_SPEAR300 || MACH_SPEAR320)
->  	prompt "LCD Panel"
->  	default FB_ARMCLCD_SHARP_LQ035Q7DB02
->  
-> +config FB_ARMCLCD_SHARP_LQ043T1DG01
-> +	bool "SHARP LQ043T1DG01 CLCD 4.2\" TFT(480x272)"
-> +	help
-> +	  This is an implementation of the Sharp LQ043T1DG01, a 4.2"
-> +	  color TFT panel. The native resolution is 480x272.
-> +
-> +config FB_ARMCLCD_SAMSUNG_LMS700
-> +	bool "SAMSUNG CLCD 7\" TFT(800x480)"
-> +	help
-> +	  This is an implementation of the Samsung LMS700, a 7"
-> +	  color TFT panel. The native resolution is 800x480.
-> +
->  config FB_ARMCLCD_SHARP_LQ035Q7DB02_HRTFT
->  	bool "LogicPD LCD 3.5\" QVGA w/HRTFT IC"
->  	help
+This is the second version of the i.MX23/28 fb driver with
+the changes integrated from the last review.
 
-This choice stuff has gone with the removal of the lpd code from the
-kernel, and thus is unmergable.  This kind of platform specific
-configuration has no business being in this file anyway.
+Sascha Hauer (2):
+      video: Add i.MX23/28 framebuffer driver
+      ARM i.MX23/28: Add framebuffer device support
+
+ arch/arm/mach-mxs/clock-mx23.c             |    2 +-
+ arch/arm/mach-mxs/clock-mx28.c             |    1 +
+ arch/arm/mach-mxs/devices-mx23.h           |    4 +
+ arch/arm/mach-mxs/devices-mx28.h           |    4 +
+ arch/arm/mach-mxs/devices/Kconfig          |    4 +
+ arch/arm/mach-mxs/devices/Makefile         |    1 +
+ arch/arm/mach-mxs/devices/platform-mxsfb.c |   46 ++
+ arch/arm/mach-mxs/include/mach/fb.h        |   48 ++
+ drivers/video/Kconfig                      |    9 +
+ drivers/video/Makefile                     |    1 +
+ drivers/video/mxsfb.c                      |  910 ++++++++++++++++++++++++++++
+ 11 files changed, 1029 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-mxsfb.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/fb.h
+ create mode 100644 drivers/video/mxsfb.c
