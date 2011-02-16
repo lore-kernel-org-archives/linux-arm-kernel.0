@@ -1,97 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 16 Feb 2011 13:51:19 -0800
-Subject: [PATCH 12/21] ARM: tegra: clock: Add shared bus clock type
-In-Reply-To: <AANLkTi=knKY65xaOT85jFidy6Be8K8RT0L1XtGqq_v2V@mail.gmail.com>
-References: <1297590033-15035-1-git-send-email-ccross@android.com>	<1297590033-15035-13-git-send-email-ccross@android.com>	<4D5C34E0.5000209@codeaurora.org>
-	<AANLkTi=knKY65xaOT85jFidy6Be8K8RT0L1XtGqq_v2V@mail.gmail.com>
-Message-ID: <4D5C46D7.1040903@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 Feb 2011 22:54:12 +0100
+Subject: [RFC] Inter-processor Mailboxes Drivers
+In-Reply-To: <DD7A9A95166BF4418C4C1EB2033B6EE2038FAADB@na3-mail.mgc.mentorg.com>
+References: <4D55A7F7.5090700@mentor.com>
+	<AANLkTin+ZSNHX2iv=XwWCgxy330UJwhkf1T=4BMXZ22s@mail.gmail.com>
+	<DD7A9A95166BF4418C4C1EB2033B6EE2038FAADB@na3-mail.mgc.mentorg.com>
+Message-ID: <AANLkTimieGeZjL6=tXqkaKbsEvfu3E0YkSO+XGoBKRC_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2011 01:01 PM, Colin Cross wrote:
-> On Wed, Feb 16, 2011 at 12:34 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>
->> What do you do if clk_set_rate() fails? Should you unwind all the state
->> such as the rate and if it's enabled/disabled? Or is it safe to say
->> clk_set_rate() can't fail unless the kernel is buggy in which case why
->> aren't all those return -E* in the set rate functions just BUG_ONs?
->
-> In general, clk_set_rate can fail and return an error, but in this
-> case the failure may not be directly related to the driver that called
-> into tegra_clk_shared_bus_update.  For example, if clk_disable is
-> called on a shared clock handle, the rate may drop to the rate
-> requested by another shared clock handle.  clk_disable cannot fail, so
-> there's nothing that could be done with the return code, and the
-> problem was not caused by the driver that called clk_disable, so an
-> error would be meaningless.
->
->
-> I will modify tegra_clk_shared_bus_update to BUG on a failed
-> clk_set_rate,
+2011/2/15 Blanchard, Hollis <Hollis_Blanchard@mentor.com>:
 
-Yes, currently if there are any errors we can't determine which clock's
-vote is causing the error since the rate only takes effect when the
-clock is enabled and another clock could have updated their rate while
-the list is being iterated over.
+> OpenMCAPI (http://openmcapi.org) implements the MCAPI specification,
+> which is a simple application-level communication API that uses shared
+> memory. The API could be layered over any protocol, but was more or less
+> designed for simple shared-memory systems, e.g. fixed topology, no
+> retransmission, etc.
 
-The code could be written so that we only call clk_set_rate() on the
-parent when the calling clock affects the aggregate rate. That would
-allow us to catch errors for the clk_enable() path and the
-clk_set_rate() path when the clock is already on. In the clk_disable()
-path we could just ignore the errors since we can't do anything anyways
-like you say. The only path that doesn't seem possible is clk_set_rate()
-when the clock is off which presumably doesn't actually matter since
-when you turn the clock on it will fail the same way (delayed
-clk_set_rate?).
+Cool...
 
-BTW, is there a race there in the rate updating code? Say clock 1 is
-enabled with rate 2 on cpu1 and clock 2 is enabled at the same time with
-rate 3 (currently the greatest rate) on cpu2. clock 1 is iterating over
-the list and sees that clock 2 is enabled so it calculates 3 as the max.
-clock 2 then returns from the enable call and then a call to disable
-clock 2 comes in. clock 1 is still iterating over the list and clock 2's
-call to disable runs to completion. clock 1 finally stops iterating over
-the list and has an aggregated rate of 3 (since it saw that clock 2 was
-on which is no longer true). It then calls set_rate() with 3 even though
-the only clock that is on is clock 1 with a rate of 2.
+> Currently, we implement almost all of this as a shared library, plus a
+> very small kernel driver. The only requirements on the kernel are to
+> allow userspace to map the shared memory area, and provide an IPI
+> mechanism (and allow the process to sleep while waiting). Applications
+> sync with each other using normal atomic memory operations.
 
-c1 and c2 are off initially
+Can't this real small kernel driver take care of the mailbox
+business as well?
 
-CPU1                    CPU2
-----                    -----
-clk_set_rate(c1, 2)     clk_set_rate(c2, 3)
-clk_enable(c1)          clk_enable(c2)
-max == 3                max == 3; clk_set_rate(parent, 3)
-...                     clk_disable(c2)
-                        max == 2; clk_set_rate(parent, 2)
-clk_set_rate(parent, 3)
+It seems a bit backward if you have say /dev/mcapi0, /dev/mcapi1
+etc (or however you expose this to userspace) and /dev/mailbox0
+/dev/mailbox1 etc on top of that. One device node per communication
+channel instead of this would certainly be nicer? Then you would
+have some ioctl() on the /dev/mcapi0 etc node to trigger the
+transport and need not worry that it's a mailbox doing the sync.
 
-I think you need some kind of lock while iterating to stop the shared
-clocks from changing underneath you.
+What I'm after is that whatever datapath you have should include
+the control mechanism, now it's like you're opening two interfaces
+into the kernel, one for mapping in data pages, one for synchronizing
+the transfers, or am I getting things wrong?
 
-> and modify tegra_clk_shared_bus_set_rate to
-> call clk_round_rate on the parent to ensure that the requested rate is valid.
->
+I think nominally all mailbox users would be in-kernel like the
+MCAPI driver, so they don't need a userspace interface, to me
+it feels like say /dev/mutex0, /dev/mutex1 for some other
+shared memory opening into the kernel (such as the framebuffer),
+and that would look a bit funny.
 
-I would hope clk_round_rate() isn't necessary to get a valid rate.
-clk_set_rate() shouldn't require exact/valid rates. clk_round_rate() is
-there to help drivers determine if calling clk_set_rate() with a certain
-rate is going to give them something they want. It's like saying "If I
-call clk_set_rate() with 500Hz what would the clock's rate actually be
-after the call returns?" If the set_rate implementation needs to round
-internally to find a divider or something, it should be done in the
-set_rate code and not in each driver.
+> I'll add that we haven't done serious optimization yet, but the numbers
+> we do have seem reasonable. What are the "efficiency" issues you're
+> worried about?
 
->>
->> Shouldn't you call clk_enable(c->parent)? And do you need to check for
->> errors from clk_enable()?
->
-> clk_enable on the parent is handled by the clock op implementation in
-> mach-tegra/clock.c
->
+For huge data flows I think you may get into trouble, needing things
+like queueing, descriptor pools etc. But if you're convinced this will
+work, do go ahead.
 
-Oops, thanks. Time to visit the optometrist.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Linus Walleij
