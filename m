@@ -1,181 +1,84 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Wed, 16 Feb 2011 18:28:49 +0200
-Subject: [PATCH v2 1/1] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <AANLkTikK0zAYtSaA1LCdkn2t4_XiTH_DmESEzw8MLvfU@mail.gmail.com>
-References: <1297780591-15613-1-git-send-email-dacohen@gmail.com>
-	<1297780591-15613-2-git-send-email-dacohen@gmail.com>
-	<20110215.164822.811675675026794737.Hiroshi.DOYU@nokia.com>
-	<AANLkTikK0zAYtSaA1LCdkn2t4_XiTH_DmESEzw8MLvfU@mail.gmail.com>
-Message-ID: <AANLkTikcd9EkgUpm9JMPoiG+O3_CVBGO9T_45Me-qWn3@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 16 Feb 2011 16:35:43 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have
+	SMP_ON_UP fixups
+In-Reply-To: <20110211163247.GB31529@n2100.arm.linux.org.uk>
+References: <AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
+	<20110210191125.GA12582@n2100.arm.linux.org.uk>
+	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
+	<20110211101345.GA23785@n2100.arm.linux.org.uk>
+	<AANLkTikFkZH6KK_KUgXaaKyQM6eZOh-ki3xdtS2fk8zN@mail.gmail.com>
+	<20110211160500.GA31529@n2100.arm.linux.org.uk>
+	<AANLkTik1T_RDb_MVw9WWY_BX75isoGq2k1L+uVCN-bbq@mail.gmail.com>
+	<20110211163247.GB31529@n2100.arm.linux.org.uk>
+Message-ID: <20110216163543.GA27480@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 5:10 PM, David Cohen <dacohen@gmail.com> wrote:
-> On Tue, Feb 15, 2011 at 4:48 PM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
->> Hi David,
->
-> Hi Hiroshi,
->
->>
->> Sorry for a bit late reply....
->
-> You're just in time. :)
->
->>
->> From: David Cohen <dacohen@gmail.com>
->> Subject: [PATCH v2 1/1] OMAP: IOMMU: add support to callback during fault handling
->> Date: Tue, 15 Feb 2011 16:36:31 +0200
->>
->>> Add support to register a callback for IOMMU fault situations. Drivers using
->>> IOMMU module might want to be informed when such errors happen in order to
->>> debug it or react.
->>>
->>> Signed-off-by: David Cohen <dacohen@gmail.com>
->>> ---
->>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 21 +++++++++++++--
->>> ?arch/arm/plat-omap/include/plat/iommu.h | ? 15 ++++++++++-
->>> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 41 ++++++++++++++++++++++++++++---
->>> ?3 files changed, 69 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
->>> index 14ee686..504310d 100644
->>> --- a/arch/arm/mach-omap2/iommu2.c
->>> +++ b/arch/arm/mach-omap2/iommu2.c
->>> @@ -143,10 +143,10 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
->>> ? ? ? __iommu_set_twl(obj, false);
->>> ?}
->>>
->>> -static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->>> +static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra, u32 *iommu_errs)
->>> ?{
->>> ? ? ? int i;
->>> - ? ? u32 stat, da;
->>> + ? ? u32 stat, da, errs;
->>> ? ? ? const char *err_msg[] = {
->>> ? ? ? ? ? ? ? "tlb miss",
->>> ? ? ? ? ? ? ? "translation fault",
->>> @@ -157,8 +157,10 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->>>
->>> ? ? ? stat = iommu_read_reg(obj, MMU_IRQSTATUS);
->>> ? ? ? stat &= MMU_IRQ_MASK;
->>> - ? ? if (!stat)
->>> + ? ? if (!stat) {
->>> + ? ? ? ? ? ? *iommu_errs = 0;
->>> ? ? ? ? ? ? ? return 0;
->>> + ? ? }
->>>
->>> ? ? ? da = iommu_read_reg(obj, MMU_FAULT_AD);
->>> ? ? ? *ra = da;
->>> @@ -171,6 +173,19 @@ static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->>> ? ? ? }
->>> ? ? ? printk("\n");
->>>
->>> + ? ? errs = 0;
->>> + ? ? if (stat & MMU_IRQ_TLBMISS)
->>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
->>> + ? ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
->>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
->>> + ? ? if (stat & MMU_IRQ_EMUMISS)
->>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
->>> + ? ? if (stat & MMU_IRQ_TABLEWALKFAULT)
->>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
->>> + ? ? if (stat & MMU_IRQ_MULTIHITFAULT)
->>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
->>> + ? ? *iommu_errs = errs;
->>> +
->>> ? ? ? iommu_write_reg(obj, stat, MMU_IRQSTATUS);
->>>
->>> ? ? ? return stat;
->>> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
->>> index 19cbb5e..5a2475f 100644
->>> --- a/arch/arm/plat-omap/include/plat/iommu.h
->>> +++ b/arch/arm/plat-omap/include/plat/iommu.h
->>> @@ -31,6 +31,7 @@ struct iommu {
->>> ? ? ? struct clk ? ? ?*clk;
->>> ? ? ? void __iomem ? ?*regbase;
->>> ? ? ? struct device ? *dev;
->>> + ? ? void ? ? ? ? ? ?*fault_cb_priv;
->>>
->>> ? ? ? unsigned int ? ?refcount;
->>> ? ? ? struct mutex ? ?iommu_lock; ? ? /* global for this whole object */
->>> @@ -48,6 +49,7 @@ struct iommu {
->>> ? ? ? struct mutex ? ? ? ? ? ?mmap_lock; /* protect mmap */
->>>
->>> ? ? ? int (*isr)(struct iommu *obj);
->>> + ? ? void (*fault_cb)(struct iommu *obj, u32 da, u32 iommu_errs, void *priv);
->>
->> What about making use of (*isr)() for fault call back as well?
->>
->> Basic concept is that, client can decide how to deal with iommu
->> fault. For example, for advanced case, client wants daynamic loading of
->> TLB(or PTE), or for ISP case, clients just want more appropriate fault
->> reporting. This (*isr)() could be used in such flexibility.
->
-> In this case, it seems we can re-use it.
->
->>
->> ? 785 ? * ? ? ?Device IOMMU generic operations
->> ? 786 ? */
->> ? 787 ?static irqreturn_t iommu_fault_handler(int irq, void *data)
->> ? 788 ?{
->> ? 789 ? ? ? ? ?u32 stat, da;
->> ? 790 ? ? ? ? ?u32 *iopgd, *iopte;
->> ? 791 ? ? ? ? ?int err = -EIO;
->> ? 792 ? ? ? ? ?struct iommu *obj = data;
->> ? 793
->> ? 794 ? ? ? ? ?if (!obj->refcount)
->> ? 795 ? ? ? ? ? ? ? ? ?return IRQ_NONE;
->> ? 796
->> ? 797 ? ? ? ? ?/* Dynamic loading TLB or PTE */
->> ? 798 ? ? ? ? ?if (obj->isr)
->> ? 799 ? ? ? ? ? ? ? ? ?err = obj->isr(obj);
->> ? 800
->> ? 801 ? ? ? ? ?if (!err)
->> ? 802 ? ? ? ? ? ? ? ? ?return IRQ_HANDLED;
->> ? 803
->> ? 804 ? ? ? ? ?clk_enable(obj->clk);
->> ? 805 ? ? ? ? ?stat = iommu_report_fault(obj, &da);
->> ? 806 ? ? ? ? ?clk_disable(obj->clk);
->> ? 807 ? ? ? ? ?if (!stat)
->> ? 808 ? ? ? ? ? ? ? ? ?return IRQ_HANDLED;
->> ? 809
->> ? 810 ? ? ? ? ?iommu_disable(obj);
->>
->> I guess that this modifying the above code could make (*isr)()
->> flexible to be used for any purpose for clients? For me, having both
->> following may be a bit residual.
->
+Hi,
 
-There are few possible issues in this case. (*isr)() is meant to
-replace the generic fault handler on iommu, but the fault callback
-isn't. Basically fault callback needs to call specific iommu fault
-report to know faulty 'da' and iommu errors, so part of the generic
-fault handler must be called.
+On Fri, Feb 11, 2011 at 04:32:47PM +0000, Russell King - ARM Linux wrote:
 
-One possible solution is always call specific fault report before
-(*isr)(). IMO it makes sense as (*isr)() might want to know at least
-the current faults.
-But in this case, specific fault report should not print anything else
-as only the upper layer and user will know when a fault is actually an
-error or not. So, they're responsible for error messages.
+[...]
 
-I'm sending a v3 with these changes. Comments will be welcome.
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 45b5651..343d29f 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -21,6 +21,12 @@
+>  #define ARM_CPU_KEEP(x)
+>  #endif
+>  
+> +#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
+> +#define ARM_EXIT_KEEP(x)	x
+> +#else
+> +#define ARM_EXIT_KEEP(x)
+> +#endif
+> +
+>  OUTPUT_ARCH(arm)
+>  ENTRY(stext)
+>  
+> @@ -43,6 +49,7 @@ SECTIONS
+>  		_sinittext = .;
+>  			HEAD_TEXT
+>  			INIT_TEXT
+> +			ARM_EXIT_KEEP(EXIT_TEXT)
+>  		_einittext = .;
+>  		ARM_CPU_DISCARD(PROC_INFO)
+>  		__arch_info_begin = .;
+> @@ -71,6 +78,7 @@ SECTIONS
+>  #ifndef CONFIG_XIP_KERNEL
+>  		__init_begin = _stext;
+>  		INIT_DATA
+> +		ARM_EXIT_KEEP(EXIT_DATA)
+>  #endif
+>  	}
+>  
+> @@ -166,6 +174,7 @@ SECTIONS
+>  		. = ALIGN(PAGE_SIZE);
+>  		__init_begin = .;
+>  		INIT_DATA
+> +		ARM_EXIT_KEEP(EXIT_DATA)
+>  		. = ALIGN(PAGE_SIZE);
+>  		__init_end = .;
+>  #endif
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Br,
+This works for me in a case known to fail without the patch.
 
-David
+Tested-by: Dave Martin <dave.martin@linaro.org>
 
-> I agree. We need to add 'void *isr_priv' to iommu struct and the
-> function to register isr.
-> I'll send a v3 soon.
->
-> Regards,
->
-> David
->
->>
->>> ? ? ? int (*isr)(struct iommu *obj);
->>> + ? ? void (*fault_cb)(struct iommu *obj, u32 da, u32 iommu_errs, void *priv);
->>
->
+I still don't quite understand the intricacies of how vmlinux
+is laid out, but the patch looks sensible.
+
+Do you need anything more from me on this?  If not, I will
+throw away my patch and replace it with yours.
+
+Cheers
+---Dave
