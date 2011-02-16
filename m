@@ -1,30 +1,99 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi KASAGAR)
-Date: Wed, 16 Feb 2011 11:06:58 +0530
-Subject: [PATCH] ARM: errata: pl310 cache sync operation may be faulty
-In-Reply-To: <20110215113422.GE4152@n2100.arm.linux.org.uk>
-References: <1297768683-30273-1-git-send-email-srinidhi.kasagar@stericsson.com>
-	<20110215113422.GE4152@n2100.arm.linux.org.uk>
-Message-ID: <20110216053657.GA17002@bnru02>
+From: shweta.gulati@ti.com (Gulati, Shweta)
+Date: Wed, 16 Feb 2011 11:14:36 +0530
+Subject: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on TWL
+In-Reply-To: <bf1e2a72d8f16365df684cd5add00eee@mail.gmail.com>
+References: <1297756738-2696-1-git-send-email-shweta.gulati@ti.com>
+	<20110215171652.601c9c68.jhnikula@gmail.com>
+	<bf1e2a72d8f16365df684cd5add00eee@mail.gmail.com>
+Message-ID: <AANLkTinAORWkciE04L3QSfXJ0Peb3xKLK=8Sq=tY4L-h@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 12:34:22 +0100, Russell King - ARM Linux wrote:
-> On Tue, Feb 15, 2011 at 04:48:03PM +0530, srinidhi kasagar wrote:
-> > +#ifdef ARM_ERRATA_753970
-> > +#define L2X0_DUMMY_REG  0x740
-> > +	/* write to an unmmapped register */
-> > +	writel_relaxed(0, base + L2X0_DUMMY_REG);
-> > +	cache_wait(base + L2X0_CACHE_SYNC, 1);
-> > +#else
-> >  	writel_relaxed(0, base + L2X0_CACHE_SYNC);
-> >  	cache_wait(base + L2X0_CACHE_SYNC, 1);
-> > +#endif
-> 
-> So why wrap cache_wait() up in that horrible ifdef as well - and why not
-> put the dummy register definition along side the other register definitions?
+Hi,
 
-OK. In fact cache_wait need not have to be under ifdef
-as this bug found only on PL310 where the sync operations
-are atomic. I will send out a new patch.
+On Tue, Feb 15, 2011 at 10:00 PM, Vishwanath Sripathy
+<vishwanath.bs@ti.com> wrote:
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+>> kernel-bounces at lists.infradead.org] On Behalf Of Jarkko Nikula
+>> Sent: Tuesday, February 15, 2011 8:47 PM
+>> To: Shweta Gulati
+>> Cc: Nishanth Menon; Thara Gopinath; linux-omap at vger.kernel.org;
+>> linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH V4] OMAP3: PM: Set/clear T2 bit for Smartreflex on
+>> TWL
+>>
+>> On Tue, 15 Feb 2011 13:28:58 +0530
+>> Shweta Gulati <shweta.gulati@ti.com> wrote:
+>>
+>> > This patch is based on LO PM Branch and Smartreflex has been
+>> > tested on OMAP3430 SDP, OMAP3630 SDP and boot tested on
+>> > OMAP2430 SDP.
+>> >
+>> I saw this was working on N900 (kind of special instrumentation
+>> setup) after enabling /sys/kernel/debug/voltage/[vdd_core |
+>> vdd_mpu]/smartreflex/autocomp. Few comments below.
+>>
+>> > @@ -269,6 +276,18 @@ int __init omap3_twl_init(void)
+>> > ? ? ? ? ? ? omap3_core_volt_info.vp_vddmax =
+>> OMAP3630_VP2_VLIMITTO_VDDMAX;
+>> > ? ? }
+>> ...
+>> > + ? if (!twl_sr_enable_autoinit)
+>> > + ? ? ? ? ? omap3_twl_set_sr_bit(true);
+>> ...
+>> > +int __init omap3_twl_set_sr_bit(bool enable)
+>> > +{
+>> > + ? u8 temp;
+>> > + ? int ret;
+>> > + ? if (twl_sr_enable_autoinit)
+>> > + ? ? ? ? ? pr_warning("%s: unexpected multiple calls\n", __func__);
+>> > +
+>> > + ? ret = twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER, &temp,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? TWL4030_DCDC_GLOBAL_CFG);
+>> > + ? if (ret)
+>> > + ? ? ? ? ? goto err;
+>> > +
+>> > + ? if (enable)
+>> > + ? ? ? ? ? temp |= SMARTREFLEX_ENABLE;
+>> > + ? else
+>> > + ? ? ? ? ? temp &= ~SMARTREFLEX_ENABLE;
+>> > +
+>> > + ? ret = twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, temp,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? TWL4030_DCDC_GLOBAL_CFG);
+>>
+>> Would it make more sense to set only the flag here and do the register
+>> writes when omap3_twl_init is executing? Then it's not so strict when
+>> the board code calls this function.
+> What if board code calls this function after twl_init is executed? Then
+> you will not clear the bit right?
+> Intention of this function is to make sure the bit is set/cleared when it
+> is called.
+ompa3_twl_init is called from 'omap2_common_pm_late_init' which is
+late_initcall.
+So it would be called after board specific initializations are
+completed in 'init' process.
+> vishwa
+>>
+>> > + ? if (!ret) {
+>> > + ? ? ? ? ? twl_sr_enable_autoinit = true;
+>> > + ? ? ? ? ? return 0;
+>>
+>> Should this be twl_sr_enable_autoinit = enable (if going to do
+>> register write here)?
+>>
+>> --
+>> Jarkko
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-srinidhi
+
+
+-- 
+Thanks,
+Regards,
+Shweta
