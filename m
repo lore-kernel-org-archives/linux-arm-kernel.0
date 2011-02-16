@@ -1,21 +1,101 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 16 Feb 2011 14:14:30 -0800
-Subject: [PATCH 2/2] ARM: remove the 4x expansion presumption
-	while	decompressing the kernel
-In-Reply-To: <alpine.LFD.2.00.1102161707180.14920@xanadu.home>
-References: <1297892343-29064-1-git-send-email-nico@fluxnic.net>	<1297892343-29064-2-git-send-email-nico@fluxnic.net>	<4D5C47C7.6010006@codeaurora.org>
-	<alpine.LFD.2.00.1102161707180.14920@xanadu.home>
-Message-ID: <4D5C4C46.1060505@codeaurora.org>
+From: alex@digriz.org.uk (Alexander Clouter)
+Date: Wed, 16 Feb 2011 22:26:03 +0000
+Subject: [PATCHv3] [ARM] orion5x: accelerate NAND on the TS-78xx
+Message-ID: <20110216222602.GI20988@chipmunk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/16/2011 2:11 PM, Nicolas Pitre wrote:
-> On Wed, 16 Feb 2011, Stephen Boyd wrote:
->
->> On 02/16/2011 01:39 PM, Nicolas Pitre wrote:
->>> -LDFLAGS_vmlinux := --defsym zreladdr=$(ZRELADDR)
->>> +LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
->> What is this for?
-> It replaces the assignment operator with an addition operator ?
+The NAND supports 32bit reads and writes so lets stop shunting 8bit
+chunks across the bus.
 
-Ah sorry, ignore me.
+Doing a dumb 'dd' benchmark, this increases performance roughly like so:
+ * read: 1.3MB/s to 3.4MB/s
+ * write: 614kB/s to 882kB/s
+
+Changelog:
+ v3: added cast to first parameter of min() to remove gcc warnings
+ v2: used approach suggested by Russell King instead
+	<20110105003316.GJ24935@n2100.arm.linux.org.uk>
+ v1: initial release <20110104235158.GQ12386@chipmunk>
+
+Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+---
+ arch/arm/mach-orion5x/ts78xx-setup.c |   56 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 56 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
+index c1c1cd0..4431309 100644
+--- a/arch/arm/mach-orion5x/ts78xx-setup.c
++++ b/arch/arm/mach-orion5x/ts78xx-setup.c
+@@ -191,6 +191,60 @@ static int ts78xx_ts_nand_dev_ready(struct mtd_info *mtd)
+ 	return readb(TS_NAND_CTRL) & 0x20;
+ }
+ 
++static void ts78xx_ts_nand_write_buf(struct mtd_info *mtd,
++			const uint8_t *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	void __iomem *io_base = chip->IO_ADDR_W;
++	unsigned long off = ((unsigned long)buf & 3);
++	int sz;
++
++	if (off) {
++		sz = min((int) (4 - off), len);
++		writesb(io_base, buf, sz);
++		buf += sz;
++		len -= sz;
++	}
++
++	sz = len >> 2;
++	if (sz) {
++		u32 *buf32 = (u32 *)buf;
++		writesl(io_base, buf32, sz);
++		buf += sz << 2;
++		len -= sz << 2;
++	}
++
++	if (len)
++		writesb(io_base, buf, len);
++}
++
++static void ts78xx_ts_nand_read_buf(struct mtd_info *mtd,
++			uint8_t *buf, int len)
++{
++	struct nand_chip *chip = mtd->priv;
++	void __iomem *io_base = chip->IO_ADDR_R;
++	unsigned long off = ((unsigned long)buf & 3);
++	int sz;
++
++	if (off) {
++		sz = min((int) (4 - off), len);
++		readsb(io_base, buf, sz);
++		buf += sz;
++		len -= sz;
++	}
++
++	sz = len >> 2;
++	if (sz) {
++		u32 *buf32 = (u32 *)buf;
++		readsl(io_base, buf32, sz);
++		buf += sz << 2;
++		len -= sz << 2;
++	}
++
++	if (len)
++		readsb(io_base, buf, len);
++}
++
+ const char *ts_nand_part_probes[] = { "cmdlinepart", NULL };
+ 
+ static struct mtd_partition ts78xx_ts_nand_parts[] = {
+@@ -233,6 +287,8 @@ static struct platform_nand_data ts78xx_ts_nand_data = {
+ 		 */
+ 		.cmd_ctrl		= ts78xx_ts_nand_cmd_ctrl,
+ 		.dev_ready		= ts78xx_ts_nand_dev_ready,
++		.write_buf		= ts78xx_ts_nand_write_buf,
++		.read_buf		= ts78xx_ts_nand_read_buf,
+ 	},
+ };
+ 
+-- 
+1.7.2.3
