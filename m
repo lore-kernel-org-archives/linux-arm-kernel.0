@@ -1,63 +1,30 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 16 Feb 2011 15:10:47 +0100
-Subject: [PATCH 2/7] fb: export fb mode db table
+Date: Wed, 16 Feb 2011 15:10:51 +0100
+Subject: [PATCH 6/7] ARM i.MX5: increase dma consistent size for IPU support
 In-Reply-To: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
 References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1297865452-32181-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1297865452-32181-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The different modes can be useful for drivers. Currently there is
-no way to expose the modes to sysfs, so export them.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-fbdev at vger.kernel.org
-Cc: Paul Mundt <lethal@linux-sh.org>
 ---
- drivers/video/modedb.c |    8 ++++++--
- include/linux/fb.h     |    3 +++
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/plat-mxc/include/mach/memory.h |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/video/modedb.c b/drivers/video/modedb.c
-index 48c3ea8..942b44d 100644
---- a/drivers/video/modedb.c
-+++ b/drivers/video/modedb.c
-@@ -36,8 +36,7 @@ EXPORT_SYMBOL_GPL(fb_mode_option);
-  *  Standard video mode definitions (taken from XFree86)
-  */
+diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+index 8386140..81b4158 100644
+--- a/arch/arm/plat-mxc/include/mach/memory.h
++++ b/arch/arm/plat-mxc/include/mach/memory.h
+@@ -43,7 +43,8 @@
+ # endif
+ #endif
  
--static const struct fb_videomode modedb[] = {
--
-+const struct fb_videomode modedb[] = {
- 	/* 640x400 @ 70 Hz, 31.5 kHz hsync */
- 	{ NULL, 70, 640, 400, 39721, 40, 24, 39, 9, 96, 2, 0,
- 		FB_VMODE_NONINTERLACED },
-@@ -291,6 +290,11 @@ static const struct fb_videomode modedb[] = {
- 		0, FB_VMODE_NONINTERLACED },
- };
- 
-+const struct fb_videomode *fb_modes = modedb;
-+EXPORT_SYMBOL(fb_modes);
-+const int num_fb_modes = ARRAY_SIZE(modedb);
-+EXPORT_SYMBOL(num_fb_modes);
-+
- #ifdef CONFIG_FB_MODE_HELPERS
- const struct fb_videomode cea_modes[64] = {
- 	/* #1: 640x480p at 59.94/60Hz */
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index 68ba85a..41b0ce1 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -1154,6 +1154,9 @@ extern const char *fb_mode_option;
- extern const struct fb_videomode vesa_modes[];
- extern const struct fb_videomode cea_modes[64];
- 
-+extern const struct fb_videomode *fb_modes;
-+extern const int num_fb_modes;
-+
- struct fb_modelist {
- 	struct list_head list;
- 	struct fb_videomode mode;
+-#if defined(CONFIG_MX3_VIDEO)
++#if defined(CONFIG_MX3_VIDEO) || defined(CONFIG_MFD_IMX_IPU_V3) || \
++	defined(CONFIG_MFD_IMX_IPU_V3_MODULE)
+ /*
+  * Increase size of DMA-consistent memory region.
+  * This is required for mx3 camera driver to capture at least two QXGA frames.
 -- 
 1.7.2.3
