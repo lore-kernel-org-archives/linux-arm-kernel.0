@@ -1,71 +1,108 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 15 Feb 2011 23:52:39 -0700
-Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks, OMAP2xxx
-Message-ID: <20110216065030.22089.61217.stgit@twilight.localdomain>
+Date: Tue, 15 Feb 2011 23:52:43 -0700
+Subject: [PATCH 01/11] OMAP2+: clock: disable autoidle on all clocks during
+	clock init
+In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
+References: <20110216065030.22089.61217.stgit@twilight.localdomain>
+Message-ID: <20110216065239.22089.24784.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Disable autoidle on all clocks during clock framework initialization.
+(If CONFIG_PM is set, autoidle is re-enabled for all clocks later in
+the boot process.)
 
-This patch series adds clock framework-controlled autoidle support for
-the OMAP2xxx DPLL, APLLs, and OMAP2/3 interface clocks.  The old
-direct register writes in the PM code to enable clock autoidle have been
-removed.  
+The principle behind this patch, and some similar patches, is that the
+kernel should start with all power management features disabled.
+Later in the boot process, the PM code, if compiled in with CONFIG_PM,
+enables or re-enables power management features.
 
-This series also ensures that all clock autoidle is disabled during
-boot and only re-enabled if CONFIG_PM is enabled.
-
-The series applies on the 'clk_autoidle_a_2.6.39' branch of
-git://git.pwsan.com/linux-2.6.
-
-Boot-tested on N800, and dynamic idle-tested on OMAP3430 Beagleboard.
-Compile-tested with omap1_defconfig, omap2plus_defconfig, a 5912
-OSK-only config, an N8x0-only config, an OMAP3-only config, and an OMAP4-only
-config.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/clock2420_data.c |    3 +++
+ arch/arm/mach-omap2/clock2430_data.c |    3 +++
+ arch/arm/mach-omap2/clock3xxx.c      |    3 ---
+ arch/arm/mach-omap2/clock3xxx_data.c |    6 +++++-
+ arch/arm/mach-omap2/clock44xx_data.c |    3 +++
+ 5 files changed, 14 insertions(+), 4 deletions(-)
 
-clk_autoidle_b_2.6.39
-   text	   data	    bss	    dec	    hex	filename
-5530703	 330544	5594520	11455767	 aecd17	vmlinux.omap2plus_defconfig.orig
-5531167	 330544	5594520	11456231	 aecee7	vmlinux.omap2plus_defconfig.patched
-
-Paul Walmsley (11):
-      OMAP2+: clock: disable autoidle on all clocks during clock init
-      OMAP2: clock: add DPLL autoidle support
-      OMAP2xxx: clock: add clockfw autoidle support for APLLs
-      OMAP2+: clock: comment that osc_ck/osc_sys_ck should use clockfw autoidle control
-      OMAP2+: clock: add interface clock type code with autoidle support
-      OMAP2420: clock: add sdrc_ick
-      OMAP2420: clock: use autoidle clkops for all autoidle-controllable interface clocks
-      OMAP2430/3xxx: clock: add modem clock autoidle support
-      OMAP2430: clock: use autoidle clkops for all autoidle-controllable interface clocks
-      OMAP3: clock: use autoidle clkops for all autoidle-controllable interface clocks
-      OMAP2/3: PM: remove manual CM_AUTOIDLE bit setting in mach-omap2/pm*xx.c
-
-
- arch/arm/mach-omap2/Makefile          |    7 +
- arch/arm/mach-omap2/clkt2xxx_apll.c   |   24 +++++
- arch/arm/mach-omap2/clkt2xxx_dpll.c   |   63 +++++++++++++
- arch/arm/mach-omap2/clkt2xxx_osc.c    |   14 +++
- arch/arm/mach-omap2/clkt_iclk.c       |   82 +++++++++++++++++
- arch/arm/mach-omap2/clock.h           |   11 ++
- arch/arm/mach-omap2/clock2420_data.c  |  130 +++++++++++++++++-----------
- arch/arm/mach-omap2/clock2430_data.c  |  130 ++++++++++++++++------------
- arch/arm/mach-omap2/clock34xx.c       |   29 ++++++
- arch/arm/mach-omap2/clock34xx.h       |    5 +
- arch/arm/mach-omap2/clock3517.c       |    4 +
- arch/arm/mach-omap2/clock3xxx.c       |    3 -
- arch/arm/mach-omap2/clock3xxx_data.c  |  155 +++++++++++++++++----------------
- arch/arm/mach-omap2/clock44xx_data.c  |    3 +
- arch/arm/mach-omap2/cm-regbits-24xx.h |    3 +
- arch/arm/mach-omap2/cm2xxx_3xxx.c     |   69 +++++++++++++++
- arch/arm/mach-omap2/cm2xxx_3xxx.h     |    8 ++
- arch/arm/mach-omap2/pm24xx.c          |   69 +--------------
- arch/arm/mach-omap2/pm34xx.c          |  105 ----------------------
- 19 files changed, 557 insertions(+), 357 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clkt2xxx_dpll.c
- create mode 100644 arch/arm/mach-omap2/clkt_iclk.c
+diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
+index 0a992bc..ee73e14 100644
+--- a/arch/arm/mach-omap2/clock2420_data.c
++++ b/arch/arm/mach-omap2/clock2420_data.c
+@@ -1913,6 +1913,9 @@ int __init omap2420_clk_init(void)
+ 		omap2_init_clk_clkdm(c->lk.clk);
+ 	}
+ 
++	/* Disable autoidle on all clocks; let the PM code enable it later */
++	omap_clk_disable_autoidle_all();
++
+ 	/* Check the MPU rate set by bootloader */
+ 	clkrate = omap2xxx_clk_get_core_rate(&dpll_ck);
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
+index c047dcd..a1298e5 100644
+--- a/arch/arm/mach-omap2/clock2430_data.c
++++ b/arch/arm/mach-omap2/clock2430_data.c
+@@ -2028,6 +2028,9 @@ int __init omap2430_clk_init(void)
+ 		omap2_init_clk_clkdm(c->lk.clk);
+ 	}
+ 
++	/* Disable autoidle on all clocks; let the PM code enable it later */
++	omap_clk_disable_autoidle_all();
++
+ 	/* Check the MPU rate set by bootloader */
+ 	clkrate = omap2xxx_clk_get_core_rate(&dpll_ck);
+ 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+diff --git a/arch/arm/mach-omap2/clock3xxx.c b/arch/arm/mach-omap2/clock3xxx.c
+index e9f66b6..952c3e0 100644
+--- a/arch/arm/mach-omap2/clock3xxx.c
++++ b/arch/arm/mach-omap2/clock3xxx.c
+@@ -65,9 +65,6 @@ void __init omap3_clk_lock_dpll5(void)
+ 	clk_set_rate(dpll5_clk, DPLL5_FREQ_FOR_USBHOST);
+ 	clk_enable(dpll5_clk);
+ 
+-	/* Enable autoidle to allow it to enter low power bypass */
+-	omap3_dpll_allow_idle(dpll5_clk);
+-
+ 	/* Program dpll5_m2_clk divider for no division */
+ 	dpll5_m2_clk = clk_get(NULL, "dpll5_m2_ck");
+ 	clk_enable(dpll5_m2_clk);
+diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+index 7cf89f8..0021559 100644
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -3535,6 +3535,9 @@ int __init omap3xxx_clk_init(void)
+ 			omap2_init_clk_clkdm(c->lk.clk);
+ 		}
+ 
++	/* Disable autoidle on all clocks; let the PM code enable it later */
++	omap_clk_disable_autoidle_all();
++
+ 	recalculate_root_clocks();
+ 
+ 	pr_info("Clocking rate (Crystal/Core/MPU): %ld.%01ld/%ld/%ld MHz\n",
+@@ -3548,7 +3551,8 @@ int __init omap3xxx_clk_init(void)
+ 	clk_enable_init_clocks();
+ 
+ 	/*
+-	 * Lock DPLL5 and put it in autoidle.
++	 * Lock DPLL5 -- here only until other device init code can
++	 * handle this
+ 	 */
+ 	if (omap_rev() >= OMAP3430_REV_ES2_0)
+ 		omap3_clk_lock_dpll5();
+diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+index dcbe105..2795342 100644
+--- a/arch/arm/mach-omap2/clock44xx_data.c
++++ b/arch/arm/mach-omap2/clock44xx_data.c
+@@ -3309,6 +3309,9 @@ int __init omap4xxx_clk_init(void)
+ 			omap2_init_clk_clkdm(c->lk.clk);
+ 		}
+ 
++	/* Disable autoidle on all clocks; let the PM code enable it later */
++	omap_clk_disable_autoidle_all();
++
+ 	recalculate_root_clocks();
+ 
+ 	/*
