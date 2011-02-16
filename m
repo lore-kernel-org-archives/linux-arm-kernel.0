@@ -1,48 +1,104 @@
-From: alex@digriz.org.uk (Alexander Clouter)
-Date: Wed, 16 Feb 2011 22:29:39 +0000
-Subject: [PATCH] [ARM] update FPGA revisions for TS-7800
-Message-ID: <20110216222939.GJ20988@chipmunk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 16 Feb 2011 15:37:26 -0700 (MST)
+Subject: [PATCH v2 5/7] omap: dpll: Enable all OMAP3/4 dpll autoidle late
+	at boot
+In-Reply-To: <ee3e93f406daf1a283b8d551f57933e3@mail.gmail.com>
+References: <1297329400-5936-1-git-send-email-rnayak@ti.com>
+	<1297329400-5936-2-git-send-email-rnayak@ti.com>
+	<1297329400-5936-3-git-send-email-rnayak@ti.com>
+	<1297329400-5936-4-git-send-email-rnayak@ti.com>
+	<1297329400-5936-5-git-send-email-rnayak@ti.com>
+	<1297329400-5936-6-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1102121741340.21991@utopia.booyaka.com>
+	<ee3e93f406daf1a283b8d551f57933e3@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102161531460.29817@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New FPGA revisions have been released and seen in the wild on the 
-platform, so it's time to update the list.
 
-Signed-off-by: Alexander Clouter <alex@digriz.org.uk>
+Hi
+
+After Rajendra's E-mail here:
+
+   http://marc.info/?l=linux-arm-kernel&m=129785498406128&w=2
+
+upon looking further, mach-omap2/pm.c is compiled in for !CONFIG_PM.  
+This will be dealt with in a separate patch, but in the meantime, I 
+propose we enable clock autoidle if CONFIG_OMAP_RESET_CLOCKS is set.  
+(Really this config option should be called CONFIG_OMAP_DONT_BREAK_CLOCKFW 
+or CONFIG_OMAP_MAKE_POWER_MANAGEMENT_WORK, but all that, too, is a matter 
+for another patch.)
+
+Here's what I'm proposing to use as a replacement; comments welcome.  The 
+clk_autoidle_a_2.6.39 branch has been updated accordingly.
+
+
+- Paul
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 14 Feb 2011 09:39:11 -0700
+Subject: [PATCH] OMAP2+: clock: autoidle as many clocks as possible if CONFIG_OMAP_RESET_CLOCKS
+
+Attempt to enable autoidle for as many clocks as possible in the
+OMAP2+-common CONFIG_OMAP_RESET_CLOCKS code.  Currently, this only
+enables DPLL autoidle for OMAP3/4 DPLLs; but future patches will
+enable autoidle for other clocks and the OMAP2 DPLL/APLLs.
+
+In the long run, we should probably get rid of
+CONFIG_OMAP_RESET_CLOCKS, and unconditionally run the code that it
+selects.  Otherwise, the state of the clock tree won't match the
+hardware state - this could result in clocks being enabled or disabled
+unpredictably.
+
+Based on a patch by Rajendra Nayak <rnayak@ti.com> that did this in
+the pm34xx.c/pm44xx.c code.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-orion5x/ts78xx-fpga.h  |    4 ++++
- arch/arm/mach-orion5x/ts78xx-setup.c |    4 ++++
- 2 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c |   17 -----------------
+ arch/arm/plat-omap/clock.c   |    1 +
+ 2 files changed, 1 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/ts78xx-fpga.h b/arch/arm/mach-orion5x/ts78xx-fpga.h
-index 37b3d48..791f754 100644
---- a/arch/arm/mach-orion5x/ts78xx-fpga.h
-+++ b/arch/arm/mach-orion5x/ts78xx-fpga.h
-@@ -11,6 +11,10 @@ enum fpga_ids {
- 	TS7800_REV_3	= FPGAID(0x00b480, 0x03),
- 	TS7800_REV_4	= FPGAID(0x00b480, 0x04),
- 	TS7800_REV_5	= FPGAID(0x00b480, 0x05),
-+	TS7800_REV_6	= FPGAID(0x00b480, 0x06),
-+	TS7800_REV_7	= FPGAID(0x00b480, 0x07),
-+	TS7800_REV_8	= FPGAID(0x00b480, 0x08),
-+	TS7800_REV_9	= FPGAID(0x00b480, 0x09),
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 2f864e4..1fe2e73 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -814,23 +814,6 @@ static void __init prcm_setup_regs(void)
+ 	omap_ctrl_writel(OMAP3430_AUTOIDLE_MASK, OMAP2_CONTROL_SYSCONFIG);
  
- 	/* Unaffordable & Expensive */
- 	UAE_DUMMY	= FPGAID(0xffffff, 0x01),
-diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-index c1c1cd0..7bed418 100644
---- a/arch/arm/mach-orion5x/ts78xx-setup.c
-+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-@@ -334,6 +334,10 @@ static void ts78xx_fpga_supports(void)
- 	case TS7800_REV_3:
- 	case TS7800_REV_4:
- 	case TS7800_REV_5:
-+	case TS7800_REV_6:
-+	case TS7800_REV_7:
-+	case TS7800_REV_8:
-+	case TS7800_REV_9:
- 		ts78xx_fpga.supports.ts_rtc.present = 1;
- 		ts78xx_fpga.supports.ts_nand.present = 1;
- 		ts78xx_fpga.supports.ts_rng.present = 1;
+ 	/*
+-	 * Set all plls to autoidle. This is needed until autoidle is
+-	 * enabled by clockfw
+-	 */
+-	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_IVA2_DPLL_SHIFT,
+-			 OMAP3430_IVA2_MOD, CM_AUTOIDLE2);
+-	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_MPU_DPLL_SHIFT,
+-			 MPU_MOD,
+-			 CM_AUTOIDLE2);
+-	omap2_cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
+-			 (1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+-			 PLL_MOD,
+-			 CM_AUTOIDLE);
+-	omap2_cm_write_mod_reg(1 << OMAP3430ES2_AUTO_PERIPH2_DPLL_SHIFT,
+-			 PLL_MOD,
+-			 CM_AUTOIDLE2);
+-
+-	/*
+ 	 * Enable control of expternal oscillator through
+ 	 * sys_clkreq. In the long run clock framework should
+ 	 * take care of this.
+diff --git a/arch/arm/plat-omap/clock.c b/arch/arm/plat-omap/clock.c
+index 0ae0eae..2770ddd 100644
+--- a/arch/arm/plat-omap/clock.c
++++ b/arch/arm/plat-omap/clock.c
+@@ -446,6 +446,7 @@ static int __init clk_disable_unused(void)
+ 	return 0;
+ }
+ late_initcall(clk_disable_unused);
++late_initcall(omap_clk_enable_autoidle_all);
+ #endif
+ 
+ int __init clk_init(struct clk_functions * custom_clocks)
 -- 
 1.7.2.3
