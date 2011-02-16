@@ -1,58 +1,49 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 16 Feb 2011 19:01:06 +0000
-Subject: [RFC] MMC: error handling improvements
-In-Reply-To: <20110215230311.GT4152@n2100.arm.linux.org.uk>
-References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
-Message-ID: <1297882866.20252.20.camel@hornet.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 16 Feb 2011 20:20:17 +0100 (CET)
+Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
+References: <1297697188-5206-1-git-send-email-will.deacon@arm.com>
+	<AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
+	<-4413647205110644369@unknownmsgid>
+	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
+	<146267380211262372@unknownmsgid>
+	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 16 Feb 2011, Rabin Vincent wrote:
+> On Wed, Feb 16, 2011 at 21:47, Will Deacon <will.deacon@arm.com> wrote:
+> > Ah yes, thanks for the explanation. After looking at the plat-omap code
+> > I finally understand what's going on and I can't help but feel that the
+> > chained GPIO handlers are terminally broken! The generic irq chip high-level
+> > handlers (handle_{edge,level}_irq for example) at least check to see if
+> > the irq_chip functions are non-NULL before calling them.
+> >
+> > Ideally, the chained handler would be able to query the irq_chip to find
+> > out what types of IRQ flow-control it supports and then assume that behaviour.
+> 
+> Thomas, suggestions on how best to handle this?  (Some of these chained
+> handlers are the ones in plat-omap/gpio.c, plat-nomadik/gpio.c, and
+> mach-s5pv310/irq-combiner.c.)
 
-> The adaptive clock
-> rate algorithm can probably do with a lot more work to avoid it up-
-> clocking to a rate which has proven to never work.  I'd actually go as
-> far as to say that the algorithm probably has a lot to be desired - but
-> it seems to work for my test scenarios.
+I'm not much of a fan of those chained handlers. They work fine, when
+they are tied into the irq_chip implementation of a SoC where the
+chained handler code is 1:1 related to that irq_chip.
 
-I've just gave it a try (on top of a clean 2.6.38-rc5):
+Once you start assigning those handlers somewhere else or even using
+the same handler for different underlying primary irq chips, then it's
+a lost case and wreckage like this is just lurking around the corner.
 
+The only sane way to deal with this is to install a regular interrupt
+handler with request/setup_irq() and do the demultiplexing from
+there. That way the demux handler does not have to worry about the
+underlying primary chip at all. It does not have to worry whether this
+chip uses level, fasteoi, edge or whatever. It just works.
 
-/ # dd if=/dev/mmcblk0 of=/dev/null bs=128k count=10
-10+0 records in
-10+0 records out
-1310720 bytes (1.3MB) copied, 2.922722 seconds, 437.9KB/s
-/ # cat /dev/sda > /dev/null &
-/ # dd if=/dev/mmcblk0 of=/dev/null bs=128k count=10
-mmcblk0: error -5 transferring data, sector 0, nr 120, cmd response 0x900, card status 0xb00
-mmcblk0: error -5 transferring data, sector 0, nr 120, cmd response 0x900, card status 0xb00
-mmcblk0: retrying with slower /2 clock rate
-mmcblk0: error -5 transferring data, sector 0, nr 120, cmd response 0x900, card status 0xb00
-mmcblk0: retrying with slower /4 clock rate
-mmcblk0: error -5 transferring data, sector 0, nr 120, cmd response 0x900, card status 0xb00
-mmcblk0: retrying with slower /8 clock rate
-mmcblk0: error -5 transferring data, sector 0, nr 120, cmd response 0x900, card status 0xb00
-mmcblk0: retrying with slower /16 clock rate
-10+0 records in
-10+0 records out
-1310720 bytes (1.3MB) copied, 46.763456 seconds, 27.4KB/s
-/ # kill %1
-/ # 
-[1]+  Terminated                 cat /dev/sda 1>/dev/null
-/ # dd if=/dev/mmcblk0 of=/dev/null bs=128k count=10
-10+0 records in
-10+0 records out
-1310720 bytes (1.3MB) copied, 46.539866 seconds, 27.5KB/s
-/ # sleep 30
-/ # dd if=/dev/mmcblk0 of=/dev/null bs=128k count=10
-10+0 records in
-10+0 records out
-1310720 bytes (1.3MB) copied, 46.540215 seconds, 27.5KB/s
+The runtime overhead of going through that path is minimal and really
+not worth the pain.
 
+Thanks,
 
-So it does the right thing with decreasing the clock rate in face of
-problems, I just can't see it clocking it back up...
-
-Cheers!
-
-Pawe?
+	tglx
