@@ -1,51 +1,64 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 15 Feb 2011 23:52:47 -0700
-Subject: [PATCH 04/11] OMAP2+: clock: comment that osc_ck/osc_sys_ck should
-	use clockfw autoidle control
+Date: Tue, 15 Feb 2011 23:52:50 -0700
+Subject: [PATCH 06/11] OMAP2420: clock: add sdrc_ick
 In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
 References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-Message-ID: <20110216065246.22089.21163.stgit@twilight.localdomain>
+Message-ID: <20110216065248.22089.45836.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Place some comments in the OMAP oscillator clock control code to note that
-its autoidle mode should eventually be controlled via the new OMAP clockfw
-autoidle control interface.
+Add sdrc_ick to the OMAP2420 clock data so the clock code can control
+the CM_AUTOIDLE bit associated with this clock.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clkt2xxx_osc.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/clock2420_data.c  |   16 ++++++++++++++++
+ arch/arm/mach-omap2/cm-regbits-24xx.h |    1 +
+ 2 files changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_osc.c b/arch/arm/mach-omap2/clkt2xxx_osc.c
-index df7b805..c346092 100644
---- a/arch/arm/mach-omap2/clkt2xxx_osc.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_osc.c
-@@ -30,6 +30,13 @@
- #include "prm2xxx_3xxx.h"
- #include "prm-regbits-24xx.h"
+diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
+index 30fbcbd..63ed481 100644
+--- a/arch/arm/mach-omap2/clock2420_data.c
++++ b/arch/arm/mach-omap2/clock2420_data.c
+@@ -1608,6 +1608,21 @@ static struct clk sdma_ick = {
+ 	.recalc		= &followparent_recalc,
+ };
  
 +/*
-+ * XXX This does not actually enable the osc_ck, since the osc_ck must
-+ * be running for this function to be called.  Instead, this function
-+ * is used to disable an autoidle mode on the osc_ck.  The existing
-+ * clk_enable/clk_disable()-based usecounting for osc_ck should be
-+ * replaced with autoidle-based usecounting.
++ * The enable_reg/enable_bit in this clock is only used for CM_AUTOIDLE
++ * accesses derived from this data.
 + */
- static int omap2_enable_osc_ck(struct clk *clk)
- {
- 	u32 pcc;
-@@ -41,6 +48,13 @@ static int omap2_enable_osc_ck(struct clk *clk)
- 	return 0;
- }
++static struct clk sdrc_ick = {
++	.name		= "sdrc_ick",
++	.ops		= &clkops_omap2_iclk_idle_only,
++	.parent		= &core_l3_ck,
++	.flags		= ENABLE_ON_INIT,
++	.clkdm_name	= "core_l3_clkdm",
++	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
++	.enable_bit	= OMAP24XX_AUTO_SDRC_SHIFT,
++	.recalc		= &followparent_recalc,
++};
++
+ static struct clk vlynq_ick = {
+ 	.name		= "vlynq_ick",
+ 	.ops		= &clkops_omap2_dflt_wait,
+@@ -1869,6 +1884,7 @@ static struct omap_clk omap2420_clks[] = {
+ 	CLK(NULL,	"gpmc_fck",	&gpmc_fck,	CK_242X),
+ 	CLK(NULL,	"sdma_fck",	&sdma_fck,	CK_242X),
+ 	CLK(NULL,	"sdma_ick",	&sdma_ick,	CK_242X),
++	CLK(NULL,	"sdrc_ick",	&sdrc_ick,	CK_242X),
+ 	CLK(NULL,	"vlynq_ick",	&vlynq_ick,	CK_242X),
+ 	CLK(NULL,	"vlynq_fck",	&vlynq_fck,	CK_242X),
+ 	CLK(NULL,	"des_ick",	&des_ick,	CK_242X),
+diff --git a/arch/arm/mach-omap2/cm-regbits-24xx.h b/arch/arm/mach-omap2/cm-regbits-24xx.h
+index d70660e..409c813 100644
+--- a/arch/arm/mach-omap2/cm-regbits-24xx.h
++++ b/arch/arm/mach-omap2/cm-regbits-24xx.h
+@@ -210,6 +210,7 @@
+ #define OMAP24XX_AUTO_USB_MASK				(1 << 0)
  
-+/*
-+ * XXX This does not actually disable the osc_ck, since doing so would
-+ * immediately halt the system.  Instead, this function is used to
-+ * enable an autoidle mode on the osc_ck.  The existing
-+ * clk_enable/clk_disable()-based usecounting for osc_ck should be
-+ * replaced with autoidle-based usecounting.
-+ */
- static void omap2_disable_osc_ck(struct clk *clk)
- {
- 	u32 pcc;
+ /* CM_AUTOIDLE3_CORE */
++#define OMAP24XX_AUTO_SDRC_SHIFT			2
+ #define OMAP24XX_AUTO_SDRC_MASK				(1 << 2)
+ #define OMAP24XX_AUTO_GPMC_MASK				(1 << 1)
+ #define OMAP24XX_AUTO_SDMA_MASK				(1 << 0)
