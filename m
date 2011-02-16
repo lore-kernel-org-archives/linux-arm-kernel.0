@@ -1,84 +1,22 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 16 Feb 2011 16:35:43 +0000
-Subject: [PATCH] ARM: Avoid discarding sections that might have
-	SMP_ON_UP fixups
-In-Reply-To: <20110211163247.GB31529@n2100.arm.linux.org.uk>
-References: <AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
-	<20110210144617.GD3652@n2100.arm.linux.org.uk>
-	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
-	<20110210191125.GA12582@n2100.arm.linux.org.uk>
-	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
-	<20110211101345.GA23785@n2100.arm.linux.org.uk>
-	<AANLkTikFkZH6KK_KUgXaaKyQM6eZOh-ki3xdtS2fk8zN@mail.gmail.com>
-	<20110211160500.GA31529@n2100.arm.linux.org.uk>
-	<AANLkTik1T_RDb_MVw9WWY_BX75isoGq2k1L+uVCN-bbq@mail.gmail.com>
-	<20110211163247.GB31529@n2100.arm.linux.org.uk>
-Message-ID: <20110216163543.GA27480@arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 16 Feb 2011 08:53:49 -0800
+Subject: platform data and mfd design question
+In-Reply-To: <4D5B8F61.3090105@stericsson.com>
+References: <4D5AF554.2030208@codeaurora.org> <4D5B8F61.3090105@stericsson.com>
+Message-ID: <20110216165348.GB4390@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Feb 16, 2011 at 09:48:33AM +0100, Linus Walleij wrote:
+> On 02/15/2011 10:51 PM, Abhijeet Dharmapurikar wrote:
+> >Msm on the other hand declares the struct mfd_cell subdevice[] array in
+> >the board file and passes this on to the core driver via platfom data.
 
-On Fri, Feb 11, 2011 at 04:32:47PM +0000, Russell King - ARM Linux wrote:
+> This way the platform data tells the core driver what kind of
+> silicon it has "hey, PM8058, guess what, you have an RTC!"
+> which looks backwards to me, especially given that it does
+> not need any fancy platform data at all, just two IRQ numbers
+> which the core driver can very well handle.
 
-[...]
-
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 45b5651..343d29f 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -21,6 +21,12 @@
->  #define ARM_CPU_KEEP(x)
->  #endif
->  
-> +#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
-> +#define ARM_EXIT_KEEP(x)	x
-> +#else
-> +#define ARM_EXIT_KEEP(x)
-> +#endif
-> +
->  OUTPUT_ARCH(arm)
->  ENTRY(stext)
->  
-> @@ -43,6 +49,7 @@ SECTIONS
->  		_sinittext = .;
->  			HEAD_TEXT
->  			INIT_TEXT
-> +			ARM_EXIT_KEEP(EXIT_TEXT)
->  		_einittext = .;
->  		ARM_CPU_DISCARD(PROC_INFO)
->  		__arch_info_begin = .;
-> @@ -71,6 +78,7 @@ SECTIONS
->  #ifndef CONFIG_XIP_KERNEL
->  		__init_begin = _stext;
->  		INIT_DATA
-> +		ARM_EXIT_KEEP(EXIT_DATA)
->  #endif
->  	}
->  
-> @@ -166,6 +174,7 @@ SECTIONS
->  		. = ALIGN(PAGE_SIZE);
->  		__init_begin = .;
->  		INIT_DATA
-> +		ARM_EXIT_KEEP(EXIT_DATA)
->  		. = ALIGN(PAGE_SIZE);
->  		__init_end = .;
->  #endif
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-This works for me in a case known to fail without the patch.
-
-Tested-by: Dave Martin <dave.martin@linaro.org>
-
-I still don't quite understand the intricacies of how vmlinux
-is laid out, but the patch looks sensible.
-
-Do you need anything more from me on this?  If not, I will
-throw away my patch and replace it with yours.
-
-Cheers
----Dave
+Indeed, and the RTC would still be useful even without IRQ support I
+imagine (it should still be able to tell you the time).
