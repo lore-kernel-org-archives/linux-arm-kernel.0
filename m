@@ -1,50 +1,51 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Wed, 16 Feb 2011 08:22:28 +0200 (EET)
-Subject: [RFC] Inter-processor Mailboxes Drivers
-In-Reply-To: <DD7A9A95166BF4418C4C1EB2033B6EE2038FAAF0@na3-mail.mgc.mentorg.com>
-References: <20110214100104.GC4371@pulham.picochip.com>
-	<4D5AF712.3080509@mentor.com>
-	<DD7A9A95166BF4418C4C1EB2033B6EE2038FAAF0@na3-mail.mgc.mentorg.com>
-Message-ID: <20110216.082228.814509512977216497.Hiroshi.DOYU@nokia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 15 Feb 2011 23:52:47 -0700
+Subject: [PATCH 04/11] OMAP2+: clock: comment that osc_ck/osc_sys_ck should
+	use clockfw autoidle control
+In-Reply-To: <20110216065030.22089.61217.stgit@twilight.localdomain>
+References: <20110216065030.22089.61217.stgit@twilight.localdomain>
+Message-ID: <20110216065246.22089.21163.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "ext Blanchard, Hollis" <Hollis_Blanchard@mentor.com>
-Subject: Re: [RFC] Inter-processor Mailboxes Drivers
-Date: Tue, 15 Feb 2011 15:38:25 -0800
+Place some comments in the OMAP oscillator clock control code to note that
+its autoidle mode should eventually be controlled via the new OMAP clockfw
+autoidle control interface.
 
-> On 02/15/2011 01:58 PM, Meador Inge wrote:
->> On 02/14/2011 04:01 AM, Jamie Iles wrote:
->>> On Fri, Feb 11, 2011 at 03:19:51PM -0600, Meador Inge wrote:
->>>>      1. Hardware specific bits somewhere under '.../arch/*'.  Drivers
->>>>         for the MPIC message registers on Power and OMAP4 mailboxes, 
->>>> for
->>>>         example.
->>>>      2. A higher level driver under '.../drivers/mailbox/*'.  That the
->>>>         pieces in (1) would register with.  This piece would expose the
->>>>         main kernel API.
->>>>      3. Userspace interfaces for accessing the mailboxes.  A
->>>>         '/dev/mailbox1', '/dev/mailbox2', etc... mapping, for example.
->>>
->>> How about using virtio for all of this and having the mailbox as a
->>> notification/message passing driver for the virtio backend?  There are
->>> already virtio console and network drivers that could be useful for the
->>> userspace part of it.  drivers/virtio/virtio_ring.c might be a good
->>> starting point if you thought there was some mileage in this approach.
->>
->> To be honest, I am not that familiar with 'virtio', but I will take a 
->> look.  Thanks for the pointer.  Maybe Hollis can speak to this idea more.
-> My opinion is that virtio is (over?) complicated.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/clkt2xxx_osc.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-Considering the case of omap mailbox H/W, it is just a simple one way
-4 slot x 32bit H/W FIFO, I also may think that this may be a bit too
-much...
-
-> I've looked into it in the past, and I'm definitely open to using it if 
-> somebody can demonstrate how easy it is, but adopting it wouldn't have 
-> helped OpenMCAPI with our use cases, and would have incurred extra pain, 
-> so we didn't.
-> 
-> Hollis Blanchard
-> Mentor Graphics, Embedded Systems Division
-> 
+diff --git a/arch/arm/mach-omap2/clkt2xxx_osc.c b/arch/arm/mach-omap2/clkt2xxx_osc.c
+index df7b805..c346092 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_osc.c
++++ b/arch/arm/mach-omap2/clkt2xxx_osc.c
+@@ -30,6 +30,13 @@
+ #include "prm2xxx_3xxx.h"
+ #include "prm-regbits-24xx.h"
+ 
++/*
++ * XXX This does not actually enable the osc_ck, since the osc_ck must
++ * be running for this function to be called.  Instead, this function
++ * is used to disable an autoidle mode on the osc_ck.  The existing
++ * clk_enable/clk_disable()-based usecounting for osc_ck should be
++ * replaced with autoidle-based usecounting.
++ */
+ static int omap2_enable_osc_ck(struct clk *clk)
+ {
+ 	u32 pcc;
+@@ -41,6 +48,13 @@ static int omap2_enable_osc_ck(struct clk *clk)
+ 	return 0;
+ }
+ 
++/*
++ * XXX This does not actually disable the osc_ck, since doing so would
++ * immediately halt the system.  Instead, this function is used to
++ * enable an autoidle mode on the osc_ck.  The existing
++ * clk_enable/clk_disable()-based usecounting for osc_ck should be
++ * replaced with autoidle-based usecounting.
++ */
+ static void omap2_disable_osc_ck(struct clk *clk)
+ {
+ 	u32 pcc;
