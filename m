@@ -1,90 +1,85 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 14:41:00 +0200
-Subject: [patch-v2.6.39 1/7] arm: omap4: usb: explicitly configure MUSB pads
+Date: Thu, 17 Feb 2011 14:41:01 +0200
+Subject: [patch-v2.6.39 2/7] arm: omap4: 4430sdp: drop ehci support
 In-Reply-To: <1297946466-9565-1-git-send-email-balbi@ti.com>
 References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-Message-ID: <1297946466-9565-2-git-send-email-balbi@ti.com>
+Message-ID: <1297946466-9565-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anand Gadiyar <gadiyar@ti.com>
 
-Use the mux framework APIs to explicitly configure
-the MUSB pads. The MUSB controller in OMAP4 can use
-either the old ULPI interface, or the new internal PHY.
-Configure the pads accordingly.
+Most revisions of the OMAP4 Blaze/SDP platform do not have
+the EHCI signals routed by default. The pads are routed
+for the alternate HSI functionality instead, and explicit
+board modifications are needed to route the signals to
+the USB PHY on the board.
+
+Also, turning on the PHY connected to the EHCI port causes
+a board reboot during bootup due to an unintended short
+on the rails - this affects many initial revisions of the
+board, and needs a minor board mod to fix (or as a
+workaround, one should not attempt to power on the
+USB PHY).
+
+Given that these boards need explicit board mods to even
+get EHCI working (separate from the accidental short above),
+we should not attempt to enable EHCI by default.
+
+So drop the EHCI support from the board files for the
+Blaze/SDP platforms.
 
 Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+Cc: Keshava Munegowda <keshava_mgowda@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/usb-musb.c |   40 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 40 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |   19 -------------------
+ 1 files changed, 0 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 5298949..5a82b43 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -31,6 +31,7 @@
- #include <mach/am35xx.h>
- #include <plat/usb.h>
- #include "control.h"
-+#include "mux.h"
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 07d1b20..674c183 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -44,7 +44,6 @@
+ #define ETH_KS8851_IRQ			34
+ #define ETH_KS8851_POWER_ON		48
+ #define ETH_KS8851_QUART		138
+-#define OMAP4SDP_MDM_PWR_EN_GPIO	157
+ #define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
+ #define OMAP4_SFH7741_ENABLE_GPIO		188
  
- #if defined(CONFIG_USB_MUSB_OMAP2PLUS) || defined (CONFIG_USB_MUSB_AM35X)
+@@ -251,16 +250,6 @@ static void __init omap_4430sdp_init_irq(void)
+ 	gic_init_irq();
+ }
  
-@@ -181,6 +182,43 @@ static struct platform_device musb_device = {
- 	.resource	= musb_resources,
- };
+-static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
+-	.port_mode[0]	= EHCI_HCD_OMAP_MODE_PHY,
+-	.port_mode[1]	= EHCI_HCD_OMAP_MODE_UNKNOWN,
+-	.port_mode[2]	= EHCI_HCD_OMAP_MODE_UNKNOWN,
+-	.phy_reset	= false,
+-	.reset_gpio_port[0]  = -EINVAL,
+-	.reset_gpio_port[1]  = -EINVAL,
+-	.reset_gpio_port[2]  = -EINVAL,
+-};
+-
+ static struct omap_musb_board_data musb_board_data = {
+ 	.interface_type		= MUSB_INTERFACE_UTMI,
+ 	.mode			= MUSB_OTG,
+@@ -576,14 +565,6 @@ static void __init omap_4430sdp_init(void)
+ 	omap_serial_init();
+ 	omap4_twl6030_hsmmc_init(mmc);
  
-+static void usb_musb_mux_init(struct omap_musb_board_data *board_data)
-+{
-+	switch (board_data->interface_type) {
-+	case MUSB_INTERFACE_UTMI:
-+		omap_mux_init_signal("usba0_otg_dp", OMAP_PIN_INPUT);
-+		omap_mux_init_signal("usba0_otg_dm", OMAP_PIN_INPUT);
-+		break;
-+	case MUSB_INTERFACE_ULPI:
-+		omap_mux_init_signal("usba0_ulpiphy_clk",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_stp",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dir",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_nxt",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat0",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat1",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat2",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat3",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat4",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat5",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat6",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		omap_mux_init_signal("usba0_ulpiphy_dat7",
-+						OMAP_PIN_INPUT_PULLDOWN);
-+		break;
-+	default:
-+		break;
-+	}
-+}
- void __init usb_musb_init(struct omap_musb_board_data *board_data)
- {
- 	if (cpu_is_omap243x()) {
-@@ -199,6 +237,8 @@ void __init usb_musb_init(struct omap_musb_board_data *board_data)
- 		musb_resources[0].start = OMAP44XX_HSUSB_OTG_BASE;
- 		musb_resources[1].start = OMAP44XX_IRQ_HS_USB_MC_N;
- 		musb_resources[2].start = OMAP44XX_IRQ_HS_USB_DMA_N;
-+
-+		usb_musb_mux_init(board_data);
- 	}
- 	musb_resources[0].end = musb_resources[0].start + SZ_4K - 1;
+-	/* Power on the ULPI PHY */
+-	status = gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
+-	if (status)
+-		pr_err("%s: Could not get USBB1 PHY GPIO\n", __func__);
+-	else
+-		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
+-
+-	usb_ehci_init(&ehci_pdata);
+ 	usb_musb_init(&musb_board_data);
  
+ 	status = omap_ethernet_init();
 -- 
 1.7.4.rc2
