@@ -1,35 +1,106 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Feb 2011 09:05:14 -0800
-Subject: [PATCH 2/8] OMAP4: hwmod data: Add McSPI
-In-Reply-To: <1297938289-8678-3-git-send-email-b-cousson@ti.com>
-References: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
-	<1297938289-8678-3-git-send-email-b-cousson@ti.com>
-Message-ID: <20110217170514.GS20795@atomide.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 17 Feb 2011 18:11:18 +0100
+Subject: [PATCH v5 3/5] ARM: omap3: Remove hand-encoded SMC instructions
+In-Reply-To: <1297946558-13436-4-git-send-email-dave.martin@linaro.org>
+References: <1297946558-13436-1-git-send-email-dave.martin@linaro.org>
+	<1297946558-13436-4-git-send-email-dave.martin@linaro.org>
+Message-ID: <AANLkTi=izx5txQR1A-RUAESrUN0NLsXg9xK2L5ybqo+W@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 17, 2011 at 1:42 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> For various reasons, Linux now only officially supports being built
+> with tools which are new enough to understand the SMC instruction.
+>
+> Replacing the hand-encoded instructions when the mnemonic also
+> allows for correct assembly in Thumb-2 (otherwise, the result is
+> random data in the middle of the code).
+>
+> The Makefile already ensures that this file is built with a high
+> enough gcc -march= flag (armv7-a).
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Noticed one cosmetic thing below.
+Reviewed OK
+Reviewed-by: Jean Pihet <j-pihet@ti.com>
 
-* Benoit Cousson <b-cousson@ti.com> [110217 02:23]:
-> Update omap4 hwmod file with McSPI info.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested OK on OMAP3 with and without CONFIG_THUMB2_KERNEL set. PM
+RETention and OFF modes in cpuidle OK.
+Tested-by: Jean Pihet <j-pihet@ti.com>
+
 > ---
-  ^^^ That should not be here, it shows up in your commit.
-
-> [b-cousson at ti.com: Remove dev_attr to prevent dependency
-> with device code. It will have to be re-added along with
-> the original series]
-
-As the above should be part of the commit too. Care to
-refresh your branch for that?
-
-Regards,
-
-Tony
+> ?arch/arm/mach-omap2/sleep34xx.S | ? 14 +++++++-------
+> ?1 files changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index 98d8232..a05c348 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -133,7 +133,7 @@ ENTRY(save_secure_ram_context)
+> ? ? ? ?mov ? ? r6, #0xff
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 4 ?@ data write barrier
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 5 ?@ data memory barrier
+> - ? ? ? .word ? 0xE1600071 ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> + ? ? ? smc ? ? #1 ? ? ? ? ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> ? ? ? ?nop
+> ? ? ? ?nop
+> ? ? ? ?nop
+> @@ -408,7 +408,7 @@ skipl2dis:
+> ? ? ? ?adr ? ? r3, l2_inv_api_params ? @ r3 points to dummy parameters
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 4 ?@ data write barrier
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 5 ?@ data memory barrier
+> - ? ? ? .word ? 0xE1600071 ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> + ? ? ? smc ? ? #1 ? ? ? ? ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> ? ? ? ?/* Write to Aux control register to set some bits */
+> ? ? ? ?mov ? ? r0, #42 ? ? ? ? ? ? ? ? @ set service ID for PPA
+> ? ? ? ?mov ? ? r12, r0 ? ? ? ? ? ? ? ? @ copy secure Service ID in r12
+> @@ -419,7 +419,7 @@ skipl2dis:
+> ? ? ? ?ldr ? ? r3, [r4, #0xBC] ? ? ? ? @ r3 points to parameters
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 4 ?@ data write barrier
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 5 ?@ data memory barrier
+> - ? ? ? .word ? 0xE1600071 ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> + ? ? ? smc ? ? #1 ? ? ? ? ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+>
+> ?#ifdef CONFIG_OMAP3_L2_AUX_SECURE_SAVE_RESTORE
+> ? ? ? ?/* Restore L2 aux control register */
+> @@ -434,7 +434,7 @@ skipl2dis:
+> ? ? ? ?adds ? ?r3, r3, #8 ? ? ? ? ? ? ?@ r3 points to parameters
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 4 ?@ data write barrier
+> ? ? ? ?mcr ? ? p15, 0, r0, c7, c10, 5 ?@ data memory barrier
+> - ? ? ? .word ? 0xE1600071 ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> + ? ? ? smc ? ? #1 ? ? ? ? ? ? ? ? ? ? ?@ call SMI monitor (smi #1)
+> ?#endif
+> ? ? ? ?b ? ? ? logic_l1_restore
+>
+> @@ -443,18 +443,18 @@ l2_inv_api_params:
+> ?l2_inv_gp:
+> ? ? ? ?/* Execute smi to invalidate L2 cache */
+> ? ? ? ?mov r12, #0x1 ? ? ? ? ? ? ? ? ? @ set up to invalidate L2
+> - ? ? ? .word 0xE1600070 ? ? ? ? ? ? ? ?@ Call SMI monitor (smieq)
+> + ? ? ? smc ? ? #0 ? ? ? ? ? ? ? ? ? ? ?@ Call SMI monitor (smieq)
+> ? ? ? ?/* Write to Aux control register to set some bits */
+> ? ? ? ?ldr ? ? r4, scratchpad_base
+> ? ? ? ?ldr ? ? r3, [r4,#0xBC]
+> ? ? ? ?ldr ? ? r0, [r3,#4]
+> ? ? ? ?mov ? ? r12, #0x3
+> - ? ? ? .word ? 0xE1600070 ? ? ? ? ? ? ?@ Call SMI monitor (smieq)
+> + ? ? ? smc ? ? #0 ? ? ? ? ? ? ? ? ? ? ?@ Call SMI monitor (smieq)
+> ? ? ? ?ldr ? ? r4, scratchpad_base
+> ? ? ? ?ldr ? ? r3, [r4,#0xBC]
+> ? ? ? ?ldr ? ? r0, [r3,#12]
+> ? ? ? ?mov ? ? r12, #0x2
+> - ? ? ? .word ? 0xE1600070 ? ? ? ? ? ? ?@ Call SMI monitor (smieq)
+> + ? ? ? smc ? ? #0 ? ? ? ? ? ? ? ? ? ? ?@ Call SMI monitor (smieq)
+> ?logic_l1_restore:
+> ? ? ? ?ldr ? ? r1, l2dis_3630
+> ? ? ? ?cmp ? ? r1, #0x1 ? ? ? ? ? ? ? ?@ Test if L2 re-enable needed on 3630
+> --
+> 1.7.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
