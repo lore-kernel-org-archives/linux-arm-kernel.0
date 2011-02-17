@@ -1,57 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Feb 2011 15:46:03 -0800
-Subject: [PATCH 4/4] mtd: OneNAND: OMAP2: increase multiblock erase
-	verify timeout
-In-Reply-To: <1297068421-14430-5-git-send-email-adrian.hunter@nokia.com>
-References: <1297068421-14430-1-git-send-email-adrian.hunter@nokia.com>
-	<1297068421-14430-5-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <20110217234603.GI20795@atomide.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 18 Feb 2011 08:46:36 +0900
+Subject: [PATCH 5/6] ARM: pm: convert samsung platforms to generic
+	suspend/resume support
+In-Reply-To: <20110217232947.GA4110@n2100.arm.linux.org.uk>
+References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
+	<E1Pnvhv-0002yp-A0@rmk-PC.arm.linux.org.uk>
+	<017901cbce9b$7b405ee0$71c11ca0$%kim@samsung.com>
+	<20110217140621.GC24989@n2100.arm.linux.org.uk>
+	<01b001cbcef7$3e7f5f90$bb7e1eb0$%kim@samsung.com>
+	<20110217232947.GA4110@n2100.arm.linux.org.uk>
+Message-ID: <01b401cbcefc$ed4f51b0$c7edf510$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adrian Hunter <adrian.hunter@nokia.com> [110207 00:45]:
-> From: Roman Tereshonkov <roman.tereshonkov@nokia.com>
+Russell King - ARM Linux wrote:
 > 
-> The current multiblock erase verify read timeout 100us is the maximum
-> for none-error case. If errors happen during multibock erase then
-> the specification recommends to run multiblock erase verify command
-> with maximum timeout 10ms (see specs. for KFM4G16Q2A and KFN8G16Q2A).
+> On Fri, Feb 18, 2011 at 08:05:57AM +0900, Kukjin Kim wrote:
+> > Russell King - ARM Linux wrote:
+> > >
+> > > On Thu, Feb 17, 2011 at 09:09:02PM +0900, Kukjin Kim wrote:
+> > > > Hi Russell,
+> > > >
+> > > > I tested on SMDKV210(S5PV210) and SMDKC110(S5PC110).
+> > >
+> > > Thanks for testing.  It looks like I'm missing a load for r3 in the
+> > > s5pv210 code.  The replacement patch below should resolve this.
+> > >
+> >
+> > Hooray, it works fine ;)
+> >
+> > Tested-by: Kukjin Kim <kgene.kim@samsung.com>
 > 
-> For the most common non-error case we wait 100us in udelay polling
-> loop. In case of timeout the interrupt mode is used to wait for the
-> command end.
+> Thanks.  I'm assuming that applies to:
 > 
-> Signed-off-by: Roman Tereshonkov <roman.tereshonkov@nokia.com>
+> "ARM: pm: add generic CPU suspend/resume support"
+> 
+> too as you can't test this without that patch.
 
-I'll queue this series. Anybody from MTD list care to ack this patch?
+Yeah, it's ok to me :)
 
-Regards,
+Thanks.
 
-Tony
-
-> ---
->  drivers/mtd/onenand/omap2.c |    8 +++-----
->  1 files changed, 3 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
-> index 3e1bb95..ec26399 100644
-> --- a/drivers/mtd/onenand/omap2.c
-> +++ b/drivers/mtd/onenand/omap2.c
-> @@ -148,11 +148,9 @@ static int omap2_onenand_wait(struct mtd_info *mtd, int state)
->  			wait_err("controller error", state, ctrl, intr);
->  			return -EIO;
->  		}
-> -		if ((intr & intr_flags) != intr_flags) {
-> -			wait_err("timeout", state, ctrl, intr);
-> -			return -EIO;
-> -		}
-> -		return 0;
-> +		if ((intr & intr_flags) == intr_flags)
-> +			return 0;
-> +		/* Continue in wait for interrupt branch */
->  	}
->  
->  	if (state != FL_READING) {
-> -- 
-> 1.7.0.4
-> 
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
