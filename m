@@ -1,80 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Feb 2011 10:19:57 +0000
-Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
-References: <1297697188-5206-1-git-send-email-will.deacon@arm.com>
-	<AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
-	<-4413647205110644369@unknownmsgid>
-	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
-	<146267380211262372@unknownmsgid>
-	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
-	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
-	<20110217091741.GA24627@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
-Message-ID: <20110217101957.GC24627@n2100.arm.linux.org.uk>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Thu, 17 Feb 2011 15:50:09 +0530
+Subject: [PATCH v2] OMAP: PM: DMA: Enable runtime pm
+In-Reply-To: <87zkpvn4mi.fsf@ti.com>
+References: <1297082286-8449-1-git-send-email-manjugk@ti.com>
+	<87ipwm1daa.fsf@ti.com> <20110216140535.GA15484@m-desktop>
+	<87zkpvn4mi.fsf@ti.com>
+Message-ID: <20110217102009.GA17370@m-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 10:38:08AM +0100, Thomas Gleixner wrote:
-> On Thu, 17 Feb 2011, Russell King - ARM Linux wrote:
-> > That's a result of genirq.  With the ARM non-genirq implementation
-> > where we had just ack, mask and unmask, it all turned out much easier.
-> > In fact, we hardly ever called any of these functions in chained
-> > handlers (except ack) - the only time when mask and unmask were called
-> > was when we had an IRQ multiplexer which didn't allow us to mask the
-> > individual interrupts.
-> > 
-> > With the advent of genirq and its expansion of the irq chip methods it's
-> > become much more complicated.  That's one of the faults of trying to
-> > generalize this across different architectures.
-> > 
-> > You can't do without chained handlers on ARM - we used to do it without
-> > them and it was proven to be a complete disaster.  Dropped interrupts
-> > and various drivers just didn't work with chained interrupt controllers.
+On Wed, Feb 16, 2011 at 11:47:33AM -0800, Kevin Hilman wrote:
+> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
 > 
-> I really have a hard time to see the difference between doing:
+> > Hi Kevin,
+> >
+> > On Mon, Feb 14, 2011 at 02:06:53PM -0800, Kevin Hilman wrote:
+> >> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
+> >> 
+> >> > From: Manjunath G Kondaiah <manjugk@ti.com>
+> >> >
+> >> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put_autosuspend
+> >> > for OMAP DMA driver.
+> >> >
+> >> > The DMA driver uses auto suspend feature of runtime pm framework through
+> >> > which the clock gets disabled automatically if there is no activity for
+> >> > more than one second.
+> >> >
+> >> > Testing:
+> >> > Compile: omap1_defconfig and omap2plus_defconfig
+> >> > Boot: OMAP1710(H3), OMAP2420(H4), OMAP3630(Zoom3), OMAP4(Blaze)
+> >> 
+> >> The normal DMA tests should also be run on these platforms.  Based on
+> >> the above, I can't tell any DMA tests were run.   Based on my tests,
+> >> this isn't working for chained xfers.
+> >> 
+> >> Using the runtime PM sysfs interface, you can check the runtime status
+> >> of the device:
+> >> 
+> >> # cat /sys/devices/platform/omap/omap_dma_system.0/power/runtime_status          
+> >> 
+> >> It should show 'active' during transfer, and after timeout expires it
+> >> will show 'suspended'.
+> >> 
+> >> Doing some tests using my dmatest module:
+> >> 
+> >>   git://gitorious.org/omap-test/dmatest.git
+> >> 
+> >> I noticed that it gets stuck in 'active' and never gets suspended when I
+> >> used DMA channel linking (load module using 'linking=1' as load-time option)
+> >> 
+> >> I'm not sure exactly why, but I will guess that the reason is that there
+> >> is an imbalance in get/put calls when using chaining, since 'get' is
+> >> only called once upon omap_start_dma() but 'put' is called for every
+> >> channel in the callback.
+> >
+> > Even I noticed this after running chaining test case and checking
+> > runtime status. But, I am wondering even with 'active' runtime status, 
+> > the core hits off and retention.
 > 
->   chained_handler()
-> 	fiddle_with_primary_chip()
-> 	demux()
-> 	fiddle_with_primary_chip()
-> 	
-> and
+> Probably because system DMA is auto-idle and clocked by the core_l3_iclk
 > 
->   handle_xxxx_irq()
-> 	fiddle_with_primary_chip()
+> > The complete log which has all the sequences of running chaining tests,
+> > enabling off mode and checking runtime status is available at:
+> > http://pastebin.com/YEHMEXUP
+> >
+> > Though I agree on the point that, it is mismatch with get/put calls with
+> > DMA chaining, I still need to analyze this in detail.
 > 
-> 	chained_handler()
-> 		demux()
+> Yes.  The mismatch highlights an underlying problem.
 > 
-> 	fiddle_with_primary_chip()
+> > The other thing which is not considered here is, the get_sync is called
+> > inside start_dma only(request_dma will call get_sync and put after the
+> > getting requested channel). After request_dma and start_dma, there are
+> > API's called by user(dma_set_params, priority etc) which also require
+> > get_sync since those API's will access configuration registers. I am
+> > wondering if have get_sync and put in all the API's, this might result
+> > in over loading. 
 > 
-> Why should that drop more interrupt? The only difference is that you
-> make the demux handler oblivious of the underlying primary chip and
-> let the chip chose the appropriate flow handler which issues the right
-> chip methods.
+> I'm not sure what you mean by over loading.
+> 
+> You need to have all register accesses inside get/put calls.  As long as
+> they are balanced, this should not leed to problems.
 
-The difference is that properly implemented chained handlers do *not*
-mask the interrupt on the parent IRQ controller, thereby allowing
-other interrupts to be serviced as appropriate.
+I mean, almost all the api's will have get_sync and put_autosuspend
+calls. If it is acceptable, let me check the same with implementation.
 
-The issue that this whole implementation was designed in the first place
-to fix was lost IDE interrupts for CF cards connected to the PCMCIA/CF
-interfaces of SA1111 devices.  These were lost because the CF interrupt
-output is a level-based output, but the SA11xx interrupt inputs are all
-edge based.
+I feel this is equivalent to placing get_sync and put_autosuspend with 
+low level read/write api's.
 
-When the CF interrupt is connected to a SA1111 GPIO, and using the old
-interrupt system, edge transitions were _often_ missed resulting in
-frequent 'lost interrupt' complaints from the IDE layer.  Exactly why
-this was could never be ascertained (probably because the hardware
-combination I had at the time did not allow me to setup this scenario.)
-
-With the chained interrupt handler implementation, things were setup to
-ensure that as much of the interrupt levels were left enabled so that
-there was symetrical handling across the entire interrupt tree, and the
-result of that was no more lost interrupts.
-
-There is a lot of difference between using a conventional 'flow' handler
-which does masking/unmasking of the parent interrupt and a properly
-written chained handler which avoids that masking.
+-Manjunath
