@@ -1,50 +1,128 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 17 Feb 2011 08:25:22 +0100
-Subject: [PATCH 0/5] S5PC210/S5PV310/EXYNOS4 interrupts update
-Message-ID: <1297927527-1338-1-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 17 Feb 2011 08:25:23 +0100
+Subject: [PATCH 1/5] ARM: S5PV310: Add missing GPYx banks.
+In-Reply-To: <1297927527-1338-1-git-send-email-m.szyprowski@samsung.com>
+References: <1297927527-1338-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1297927527-1338-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds missing GPYx gpio banks on Samsung S5PC210 platform.
 
-This patch series perform an update on interrupts support for
-S5PC210/S5PV310/EXYNOS4 platform. Two optional features have been added.
-The first one is GPIO interrupts handler, a second is support for board
-specific interrupts. The patches have been prepared to maximise the code
-reuse, so common code for gpio interrupts for s5pc100, s5pc110 & s5pc210
-have been prepared.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv310/gpiolib.c           |   49 +++++++++++++++++++++++++++++
+ arch/arm/mach-s5pv310/include/mach/gpio.h |   23 +++++++++++++-
+ 2 files changed, 71 insertions(+), 1 deletions(-)
 
-The patches have been prepared against
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-for-next branch (commit 857ddb87db).
-
-Patches that make use of these 2 optional features for universal c210
-board will follow soon.
-
-Best regards
---
-Marek Szyprowski
-Samsung Poland R&D Center
-
-
-
-Patch summary:
-
-Marek Szyprowski (5):
-  ARM: S5PV310: Add missing GPYx banks.
-  ARM: Samsung: cleanup S5P gpio interrupt code
-  ARM: Samsung: add function to register gpio interrupt bank data
-  ARM: S5PC210: add support for gpio interrupts
-  ARM: S5PC210: add a placeholder for board specific interrupts
-
- arch/arm/mach-s5pc100/gpiolib.c               |    1 +
- arch/arm/mach-s5pv210/gpiolib.c               |    1 +
- arch/arm/mach-s5pv310/gpiolib.c               |   67 ++++++++++-
- arch/arm/mach-s5pv310/include/mach/gpio.h     |   23 ++++-
- arch/arm/mach-s5pv310/include/mach/irqs.h     |   16 ++-
- arch/arm/plat-s5p/irq-gpioint.c               |  169 +++++++++++++++----------
- arch/arm/plat-samsung/include/plat/gpio-cfg.h |   16 +++
- 7 files changed, 220 insertions(+), 73 deletions(-)
-
+diff --git a/arch/arm/mach-s5pv310/gpiolib.c b/arch/arm/mach-s5pv310/gpiolib.c
+index 55217b8..f417ecd 100644
+--- a/arch/arm/mach-s5pv310/gpiolib.c
++++ b/arch/arm/mach-s5pv310/gpiolib.c
+@@ -199,6 +199,55 @@ static struct s3c_gpio_chip s5pv310_gpio_part2_4bit[] = {
+ 			.label	= "GPL2",
+ 		},
+ 	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY0(0),
++			.ngpio	= S5PV310_GPIO_Y0_NR,
++			.label	= "GPY0",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY1(0),
++			.ngpio	= S5PV310_GPIO_Y1_NR,
++			.label	= "GPY1",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY2(0),
++			.ngpio	= S5PV310_GPIO_Y2_NR,
++			.label	= "GPY2",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY3(0),
++			.ngpio	= S5PV310_GPIO_Y3_NR,
++			.label	= "GPY3",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY4(0),
++			.ngpio	= S5PV310_GPIO_Y4_NR,
++			.label	= "GPY4",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY5(0),
++			.ngpio	= S5PV310_GPIO_Y5_NR,
++			.label	= "GPY5",
++		},
++	}, {
++		.config	= &gpio_cfg_noint,
++		.chip	= {
++			.base	= S5PV310_GPY6(0),
++			.ngpio	= S5PV310_GPIO_Y6_NR,
++			.label	= "GPY6",
++		},
++	}, {
+ 		.base	= (S5P_VA_GPIO2 + 0xC00),
+ 		.config	= &gpio_cfg_noint,
+ 		.irq_base = IRQ_EINT(0),
+diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-s5pv310/include/mach/gpio.h
+index 20cb80c..4b44463 100644
+--- a/arch/arm/mach-s5pv310/include/mach/gpio.h
++++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
+@@ -50,6 +50,13 @@
+ #define S5PV310_GPIO_X1_NR	(8)
+ #define S5PV310_GPIO_X2_NR	(8)
+ #define S5PV310_GPIO_X3_NR	(8)
++#define S5PV310_GPIO_Y0_NR	(6)
++#define S5PV310_GPIO_Y1_NR	(4)
++#define S5PV310_GPIO_Y2_NR	(6)
++#define S5PV310_GPIO_Y3_NR	(8)
++#define S5PV310_GPIO_Y4_NR	(8)
++#define S5PV310_GPIO_Y5_NR	(8)
++#define S5PV310_GPIO_Y6_NR	(8)
+ #define S5PV310_GPIO_Z_NR	(7)
+ 
+ /* GPIO bank numbers */
+@@ -87,7 +94,14 @@ enum s5p_gpio_number {
+ 	S5PV310_GPIO_X1_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X0),
+ 	S5PV310_GPIO_X2_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
+ 	S5PV310_GPIO_X3_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
+-	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
++	S5PV310_GPIO_Y0_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
++	S5PV310_GPIO_Y1_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y0),
++	S5PV310_GPIO_Y2_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y1),
++	S5PV310_GPIO_Y3_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y2),
++	S5PV310_GPIO_Y4_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y3),
++	S5PV310_GPIO_Y5_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y4),
++	S5PV310_GPIO_Y6_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y5),
++	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y6),
+ };
+ 
+ /* S5PV310 GPIO number definitions */
+@@ -120,6 +134,13 @@ enum s5p_gpio_number {
+ #define S5PV310_GPX1(_nr)	(S5PV310_GPIO_X1_START + (_nr))
+ #define S5PV310_GPX2(_nr)	(S5PV310_GPIO_X2_START + (_nr))
+ #define S5PV310_GPX3(_nr)	(S5PV310_GPIO_X3_START + (_nr))
++#define S5PV310_GPY0(_nr)	(S5PV310_GPIO_Y0_START + (_nr))
++#define S5PV310_GPY1(_nr)	(S5PV310_GPIO_Y1_START + (_nr))
++#define S5PV310_GPY2(_nr)	(S5PV310_GPIO_Y2_START + (_nr))
++#define S5PV310_GPY3(_nr)	(S5PV310_GPIO_Y3_START + (_nr))
++#define S5PV310_GPY4(_nr)	(S5PV310_GPIO_Y4_START + (_nr))
++#define S5PV310_GPY5(_nr)	(S5PV310_GPIO_Y5_START + (_nr))
++#define S5PV310_GPY6(_nr)	(S5PV310_GPIO_Y6_START + (_nr))
+ #define S5PV310_GPZ(_nr)	(S5PV310_GPIO_Z_START + (_nr))
+ 
+ /* the end of the S5PV310 specific gpios */
 -- 
 1.7.1.569.g6f426
