@@ -1,45 +1,144 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 Feb 2011 10:44:09 +0800
-Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <201102161659.18475.arnd@arndb.de>
-References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
-	<20110215172948.GE10770@pengutronix.de>
-	<20110216202818.GA11467@S2100-06.ap.freescale.net>
-	<201102161659.18475.arnd@arndb.de>
-Message-ID: <20110217024408.GA1273@S2100-06.ap.freescale.net>
+From: raj.khem@gmail.com (Khem Raj)
+Date: Wed, 16 Feb 2011 19:17:47 -0800
+Subject: [klibc] fwd: fix up ARM assembly to use 'bx lr' in place of 'mov
+	pc, lr'.
+In-Reply-To: <AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
+References: <20110216230648.GA7649@stro.at>
+	<20110216235019.GA17674@shutemov.name>
+	<AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
+Message-ID: <AANLkTikOEdrkU_14QK+Fs=9zQ7kvJeJNZRkD0_1stW3R@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Feb 16, 2011 at 4:03 PM, Khem Raj <raj.khem@gmail.com> wrote:
+> On Wed, Feb 16, 2011 at 3:50 PM, Kirill A. Shutemov
+> <kirill@shutemov.name> wrote:
+>> On Thu, Feb 17, 2011 at 12:06:48AM +0100, maximilian attems wrote:
+>>> hello vorlon,
+>>>
+>>> got notified of your patch,
+>>> will apply next days upstream unless some critiques are voiced on ml.
+>>> thanks.
+>>>
+>>> --
+>>> maks
+>>>
+>>>
+>>> ----- Forwarded message from Steve Langasek <steve.langasek@canonical.com> -----
+>>>
+>>> Date: Wed, 16 Feb 2011 22:05:42 -0000
+>>> From: Steve Langasek <steve.langasek@canonical.com>
+>>> Subject: [Bug 527720] Re: thumb2 porting issues identified: klibc uses mov.*pc
+>>>
+>>>
+>>> I've also touched it up to be mergeable with Debian (support v4t builds
+>>> with #ifdef).
+>>>
+>>> Confirmed that installing the resulting klibc packages on my beagleboard
+>>> gives me a successfully-booting initramfs with klibc; and the
+>>> vfork/setjmptest test cases all pass in the klibc package tree.
+>>>
+>>> Fixes: https://bugs.launchpad.net/ubuntu/+source/klibc/+bug/527720
+>>>
+>>> --- klibc-1.5.20.orig/usr/klibc/arch/arm/vfork.S
+>>> +++ klibc-1.5.20/usr/klibc/arch/arm/vfork.S
+>>> @@ -25,7 +25,11 @@ vfork:
+>>> ? ? ? ? ?ldrcs ? ? ? ?r3, 1f
+>>> ? ? ? ? ?mvncs ? ? ? ?r0, #0
+>>> ? ? ? ? ?strcs ? ? ? ?r2, [r3]
+>>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
+>>
+>> NAK. ARMv4T supports bx intruction. ARMv4 doesn't.
+>
+> Does ARMv4t support BX lr ?
 
-On Wed, Feb 16, 2011 at 04:59:18PM +0100, Arnd Bergmann wrote:
-> On Wednesday 16 February 2011, Shawn Guo wrote:
-> > It's caused by spinlock recursion introduced by mxs-dma functions
-> > mxs_dma_tx_submit and mxs_dma_tasklet.  We have mmc_request_done
-> > invoked in the dma callback tasklet.  At the meantime,
-> > mmc_request_done will issue retries in some case, which will call in
-> > mxs_dma_tx_submit.
-> > 
-> > I added the lock by referring to other dma driver implementation, but
-> > now I'm considering to remove the lock completely, as I do not see
-> > any global data needs to be protected there.  Comments?
-> 
-> You need to be sure that the data accessed in the tasklet does not
-> need to be locked against mxs_dma_tx_submit.
-> 
-The only thing we actually put in tasklet is just the callback
-registered by client device driver, which should not have anything
-that mxs_dma_tx_submit would concern.
+hmm yes it does. I confused it with blx <Rm> which is unpredictable in
+thumb mode on architectures < armv5t
 
-> I haven't looked at the dmaengine code for this, but it's quite likely
-> that you actually need it, because you need to serialize adding an
-> element to the DMA device with removing it again.
-> 
-I'm not sure that I understand your comment. If the adding/removing
-an element means what mxs_dma_alloc_chan_resources and 
-mxs_dma_free_chan_resources do, I do not think it's a problem, as
-client driver is calling them in probe/remove for once.
-
--- 
-Regards,
-Shawn
+>
+>
+>>
+>>> ? ? ? mov ? ? pc, lr
+>>> +#else
+>>> + ? ? bx ? ? ?lr
+>>> +#endif
+>>>
+>>> ? ? ? .balign 4
+>>> ?1:
+>>> @@ -49,7 +53,11 @@ vfork:
+>>> ? ? ? str ? ? r2, [r1]
+>>> ? ? ? neg ? ? r0, r0
+>>> ?1:
+>>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
+>>> ? ? ? mov ? ? pc, lr
+>>> +#else
+>>> + ? ? bx ? ? ?lr
+>>> +#endif
+>>>
+>>> ? ? ? .balign 4
+>>> ?2:
+>>> --- klibc-1.5.20.orig/usr/klibc/arch/arm/setjmp.S
+>>> +++ klibc-1.5.20/usr/klibc/arch/arm/setjmp.S
+>>> @@ -29,7 +29,11 @@
+>>> ?setjmp:
+>>> ? ? ? stmia ? r0, {r4, r5, r6, r7, r8, r9, r10, fp, sp, lr}
+>>> ? ? ? mov ? ? r0, #0
+>>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
+>>> ? ? ? mov ? ? pc, lr
+>>> +#else
+>>> + ? ? bx ? ? ?lr
+>>> +#endif
+>>> ? ? ? .size setjmp,.-setjmp
+>>>
+>>> ? ? ? .text
+>>> @@ -39,7 +43,11 @@ setjmp:
+>>> ?longjmp:
+>>> ? ? ? ldmia ? r0, {r4, r5, r6, r7, r8, r9, r10, fp, sp, lr}
+>>> ? ? ? mov ? ? r0, r1
+>>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
+>>> ? ? ? mov ? ? pc, lr
+>>> +#else
+>>> + ? ? bx ? ? ?lr
+>>> +#endif
+>>> ? ? ? .size longjmp,.-longjmp
+>>>
+>>> ?#else /* __thumb__ */
+>>> @@ -75,7 +83,11 @@ setjmp:
+>>> ? ? ? mov ? ? r7, sp
+>>> ? ? ? stmia ? r0!, {r3, r4, r5, r6, r7}
+>>> ? ? ? mov ? ? r0, #0
+>>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
+>>> ? ? ? mov ? ? pc, lr
+>>> +#else
+>>> + ? ? bx ? ? ?lr
+>>> +#endif
+>>> ? ? ? .size setjmp,.-setjmp
+>>>
+>>> ? ? ? .text
+>>> @@ -96,7 +108,11 @@ longjmp:
+>>> ? ? ? mov ? ? r0, r1
+>>> ? ? ? bne ? ? 1f
+>>> ? ? ? mov ? ? r0, #1
+>>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
+>>> ?1: ? mov ? ? pc, r3
+>>> +#else
+>>> +1: ? bx ? ? ?r3
+>>> +#endif
+>>> ? ? ? .size longjmp,.-longjmp
+>>>
+>>> ?#endif /* __thumb__ */
+>>>
+>>> _______________________________________________
+>>> klibc mailing list
+>>> klibc at zytor.com
+>>> http://www.zytor.com/mailman/listinfo/klibc
+>>
+>> --
+>> ?Kirill A. Shutemov
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
