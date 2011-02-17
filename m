@@ -1,130 +1,189 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 17 Feb 2011 19:11:54 +0100
-Subject: [PATCH 7/7] ARM i.MX51 babbage: Add framebuffer support
-In-Reply-To: <1297865452-32181-8-git-send-email-s.hauer@pengutronix.de>
-	(Sascha Hauer's message of "Wed, 16 Feb 2011 15:10:52 +0100")
-References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
-	<1297865452-32181-8-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <87wrkyo7it.fsf@lechat.rtp-net.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 17 Feb 2011 19:17:41 +0100
+Subject: [PATCH 1/2] ARM: PXA: PXAFB: Fix double-free issue.
+In-Reply-To: <1297928588-10545-1-git-send-email-anarsoul@gmail.com>
+References: <201102151718.00800.anarsoul@gmail.com>
+	<1297928588-10545-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201102171917.41442.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
-
-Hi,
-
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Thursday 17 February 2011 08:43:07 Vasily Khoruzhick wrote:
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> 
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> 
+> Release callback tries to free memory even if it was not allocated in
+> map_video_memory, fix it.
+> 
+> Added by Vasily Khoruzhick:
+> 
+> - Clear x_res/y_res fields of fb.var on release, to make sure
+> our callback will be called on next FBIOPUT_VSCREENINFO ioctl.
+> - Disable overlay only if it was enabled.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 > ---
->  arch/arm/mach-mx5/Kconfig              |    1 +
->  arch/arm/mach-mx5/board-mx51_babbage.c |   74 ++++++++++++++++++++++++++++++++
->  2 files changed, 75 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index de4fa992f..89e71da 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -42,6 +42,7 @@ config MACH_MX51_BABBAGE
->  	select IMX_HAVE_PLATFORM_IMX_UART
->  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
->  	select IMX_HAVE_PLATFORM_SPI_IMX
-> +	select IMX_HAVE_PLATFORM_IMX_IPUV3
->  	help
->  	  Include support for MX51 Babbage platform, also known as MX51EVK in
->  	  u-boot. This includes specific configurations for the board and its
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 1d231e8..c5170e8 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -22,11 +22,13 @@
->  #include <linux/input.h>
->  #include <linux/spi/flash.h>
->  #include <linux/spi/spi.h>
-> +#include <linux/mfd/imx-ipu-v3.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
->  #include <mach/iomux-mx51.h>
->  #include <mach/mxc_ehci.h>
-> +#include <mach/ipu-v3.h>
->  
->  #include <asm/irq.h>
->  #include <asm/setup.h>
-> @@ -158,6 +160,41 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
->  	MX51_PAD_CSPI1_SCLK__ECSPI1_SCLK,
->  	MX51_PAD_CSPI1_SS0__GPIO4_24,
->  	MX51_PAD_CSPI1_SS1__GPIO4_25,
+>  drivers/video/pxafb.c |   55
+> +++++++++++++++++++++++++++++++++--------------- drivers/video/pxafb.h |  
+>  2 +-
+>  2 files changed, 39 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+> index 825b665..c6aad56 100644
+> --- a/drivers/video/pxafb.c
+> +++ b/drivers/video/pxafb.c
+> @@ -629,6 +629,9 @@ static void overlay1fb_disable(struct pxafb_layer *ofb)
+>  {
+>  	uint32_t lccr5 = lcd_readl(ofb->fbi, LCCR5);
+> 
+> +	if (!(lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN))
+> +		return;
 > +
-> +	/* Display */
-> +	MX51_PAD_DISPB2_SER_DIN__GPIO3_5,
-> +	MX51_PAD_DISPB2_SER_DIO__GPIO3_6,
-> +	MX51_PAD_NANDF_D12__GPIO3_28,
+>  	lcd_writel(ofb->fbi, OVL1C1, ofb->control[0] & ~OVLxC1_OEN);
+> 
+>  	lcd_writel(ofb->fbi, LCSR1, LCSR1_BS(1));
+> @@ -636,7 +639,8 @@ static void overlay1fb_disable(struct pxafb_layer *ofb)
+>  	lcd_writel(ofb->fbi, FBR1, ofb->fbi->fdadr[DMA_OV1] | 0x3);
+> 
+>  	if (wait_for_completion_timeout(&ofb->branch_done, 1 * HZ) == 0)
+> -		pr_warning("%s: timeout disabling overlay1\n", __func__);
+> +		pr_warning("%s: timeout disabling overlay1\n",
+> +			__func__);
+> 
+>  	lcd_writel(ofb->fbi, LCCR5, lccr5);
+>  }
+> @@ -687,6 +691,9 @@ static void overlay2fb_disable(struct pxafb_layer *ofb)
+>  {
+>  	uint32_t lccr5 = lcd_readl(ofb->fbi, LCCR5);
+> 
+> +	if (!(lcd_readl(ofb->fbi, OVL2C1) & OVLxC1_OEN))
+> +		return;
 > +
-> +	MX51_PAD_DISP1_DAT0__DISP1_DAT0,
-> +	MX51_PAD_DISP1_DAT1__DISP1_DAT1,
-> +	MX51_PAD_DISP1_DAT2__DISP1_DAT2,
-> +	MX51_PAD_DISP1_DAT3__DISP1_DAT3,
-> +	MX51_PAD_DISP1_DAT4__DISP1_DAT4,
-> +	MX51_PAD_DISP1_DAT5__DISP1_DAT5,
-> +	MX51_PAD_DISP1_DAT6__DISP1_DAT6,
-> +	MX51_PAD_DISP1_DAT7__DISP1_DAT7,
-> +	MX51_PAD_DISP1_DAT8__DISP1_DAT8,
-> +	MX51_PAD_DISP1_DAT9__DISP1_DAT9,
-> +	MX51_PAD_DISP1_DAT10__DISP1_DAT10,
-> +	MX51_PAD_DISP1_DAT11__DISP1_DAT11,
-> +	MX51_PAD_DISP1_DAT12__DISP1_DAT12,
-> +	MX51_PAD_DISP1_DAT13__DISP1_DAT13,
-> +	MX51_PAD_DISP1_DAT14__DISP1_DAT14,
-> +	MX51_PAD_DISP1_DAT15__DISP1_DAT15,
-> +	MX51_PAD_DISP1_DAT16__DISP1_DAT16,
-> +	MX51_PAD_DISP1_DAT17__DISP1_DAT17,
-> +	MX51_PAD_DISP1_DAT18__DISP1_DAT18,
-> +	MX51_PAD_DISP1_DAT19__DISP1_DAT19,
-> +	MX51_PAD_DISP1_DAT20__DISP1_DAT20,
-> +	MX51_PAD_DISP1_DAT21__DISP1_DAT21,
-> +	MX51_PAD_DISP1_DAT22__DISP1_DAT22,
-> +	MX51_PAD_DISP1_DAT23__DISP1_DAT23,
-> +#define MX51_PAD_DI_GP4__IPU_DI2_PIN15                 IOMUX_PAD(0x758, 0x350, 4, 0x0,   0, NO_PAD_CTRL)
-> +	MX51_PAD_DI_GP4__IPU_DI2_PIN15,
-> +
-> +	/* I2C DVI enable */
-> +	MX51_PAD_CSI2_HSYNC__GPIO4_14,
->  };
->  
->  /* Serial ports */
-> @@ -346,6 +383,23 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
->  	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
->  };
->  
-> +static struct ipuv3_fb_platform_data babbage_fb0_data = {
-> +	.interface_pix_fmt = IPU_PIX_FMT_RGB24,
-> +	.flags = IMX_IPU_FB_USE_MODEDB | IMX_IPU_FB_USE_OVERLAY,
-> +	.display = 0,
-> +};
-> +
-> +static struct ipuv3_fb_platform_data babbage_fb1_data = {
-> +	.interface_pix_fmt = IPU_PIX_FMT_RGB565,
-> +	.flags = IMX_IPU_FB_USE_MODEDB,
-> +	.display = 1,
-> +};
-> +
-> +static struct imx_ipuv3_platform_data ipu_data = {
-> +	.fb_head0_platform_data = &babbage_fb0_data,
-> +	.fb_head1_platform_data = &babbage_fb1_data,
-> +};
-> +
->  /*
->   * Board specific initialization.
->   */
-> @@ -392,6 +446,26 @@ static void __init mxc_board_init(void)
->  		ARRAY_SIZE(mx51_babbage_spi_board_info));
->  	imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
->  	imx51_add_imx2_wdt(0, NULL);
-> +
-> +#define GPIO_DVI_DETECT	(2 * 32 + 28)
-> +#define GPIO_DVI_RESET	(2 * 32 + 5)
-> +#define GPIO_DVI_PWRDN	(2 * 32 + 6)
-> +#define GPIO_DVI_I2C	(3 * 32 + 14)
+>  	lcd_writel(ofb->fbi, OVL2C1, ofb->control[0] & ~OVLxC1_OEN);
+> 
+>  	lcd_writel(ofb->fbi, LCSR1, LCSR1_BS(2));
+> @@ -696,7 +703,8 @@ static void overlay2fb_disable(struct pxafb_layer *ofb)
+>  	lcd_writel(ofb->fbi, FBR4, ofb->fbi->fdadr[DMA_OV2_Cr] | 0x3);
+> 
+>  	if (wait_for_completion_timeout(&ofb->branch_done, 1 * HZ) == 0)
+> -		pr_warning("%s: timeout disabling overlay2\n", __func__);
+> +		pr_warning("%s: timeout disabling overlay2\n",
+> +			__func__);
+>  }
+> 
+>  static struct pxafb_layer_ops ofb_ops[] = {
+> @@ -720,12 +728,10 @@ static int overlayfb_open(struct fb_info *info, int
+> user) if (user == 0)
+>  		return -ENODEV;
+> 
 
-What about using IMX_GPIO_NR() ?
+Why are you getting rid of the atomic operations ?
+Besides, "if (ofb->usage++ == 0)" looks suspicious, especially if you later 
+declare it as uint32_t.
 
-Arnaud
+> -	/* allow only one user at a time */
+> -	if (atomic_inc_and_test(&ofb->usage))
+> -		return -EBUSY;
+> +	if (ofb->usage++ == 0)
+> +		/* unblank the base framebuffer */
+> +		fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+> 
+> -	/* unblank the base framebuffer */
+> -	fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+>  	return 0;
+>  }
+> 
+> @@ -733,12 +739,24 @@ static int overlayfb_release(struct fb_info *info,
+> int user) {
+>  	struct pxafb_layer *ofb = (struct pxafb_layer*) info;
+> 
+
+DTTO, why no atomic?
+
+> -	atomic_dec(&ofb->usage);
+> -	ofb->ops->disable(ofb);
+> -
+> -	free_pages_exact(ofb->video_mem, ofb->video_mem_size);
+> -	ofb->video_mem = NULL;
+> -	ofb->video_mem_size = 0;
+> +	if (--ofb->usage == 0) {
+> +		ofb->ops->disable(ofb);
+> +		ofb->fb.var.height	= -1;
+> +		ofb->fb.var.width	= -1;
+> +		ofb->fb.var.xres = ofb->fb.var.xres_virtual = 0;
+> +		ofb->fb.var.yres = ofb->fb.var.yres_virtual = 0;
+> +
+> +		mutex_lock(&ofb->fb.mm_lock);
+> +		ofb->fb.fix.smem_start	= 0;
+> +		ofb->fb.fix.smem_len	= 0;
+> +		mutex_unlock(&ofb->fb.mm_lock);
+> +
+> +		if (ofb->video_mem) {
+> +			free_pages_exact(ofb->video_mem, ofb->video_mem_size);
+> +			ofb->video_mem = NULL;
+> +			ofb->video_mem_size = 0;
+> +		}
+> +	}
+>  	return 0;
+>  }
+> 
+> @@ -817,7 +835,8 @@ static int overlayfb_map_video_memory(struct
+> pxafb_layer *ofb) if (ofb->video_mem_size >= size)
+>  			return 0;
+> 
+> -		free_pages_exact(ofb->video_mem, ofb->video_mem_size);
+> +		/* don't re-allocate: userspace may have the buffer mapped */
+> +		return -EINVAL;
+>  	}
+> 
+>  	ofb->video_mem = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+> @@ -891,7 +910,7 @@ static void __devinit init_pxafb_overlay(struct
+> pxafb_info *fbi,
+> 
+>  	ofb->id = id;
+>  	ofb->ops = &ofb_ops[id];
+
+DTTO
+
+> -	atomic_set(&ofb->usage, 0);
+> +	ofb->usage = 0;
+>  	ofb->fbi = fbi;
+>  	init_completion(&ofb->branch_done);
+>  }
+> @@ -1368,7 +1387,8 @@ static int pxafb_activate_var(struct
+> fb_var_screeninfo *var, (lcd_readl(fbi, LCCR3) != fbi->reg_lccr3) ||
+>  	    (lcd_readl(fbi, LCCR4) != fbi->reg_lccr4) ||
+>  	    (lcd_readl(fbi, FDADR0) != fbi->fdadr[0]) ||
+> -	    (lcd_readl(fbi, FDADR1) != fbi->fdadr[1]))
+> +	    ((fbi->lccr0 & LCCR0_SDS) &&
+> +	    (lcd_readl(fbi, FDADR1) != fbi->fdadr[1])))
+>  		pxafb_schedule_work(fbi, C_REENABLE);
+> 
+>  	return 0;
+> @@ -1420,7 +1440,8 @@ static void pxafb_enable_controller(struct pxafb_info
+> *fbi) lcd_writel(fbi, LCCR0, fbi->reg_lccr0 & ~LCCR0_ENB);
+> 
+>  	lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
+> -	lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+> +	if (fbi->lccr0 & LCCR0_SDS)
+> +		lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+>  	lcd_writel(fbi, LCCR0, fbi->reg_lccr0 | LCCR0_ENB);
+>  }
+> 
+> diff --git a/drivers/video/pxafb.h b/drivers/video/pxafb.h
+> index 2353521..84e3ae1 100644
+> --- a/drivers/video/pxafb.h
+> +++ b/drivers/video/pxafb.h
+> @@ -92,7 +92,7 @@ struct pxafb_layer_ops {
+>  struct pxafb_layer {
+>  	struct fb_info		fb;
+>  	int			id;
+
+DTTO, here.
+
+> -	atomic_t		usage;
+> +	uint32_t		usage;
+>  	uint32_t		control[2];
+> 
+>  	struct pxafb_layer_ops	*ops;
