@@ -1,68 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Feb 2011 23:37:36 +0000
-Subject: [PATCH 00/10] Fix CLCD framebuffer formats and consolidate ARM
-	platform CLCD support
-In-Reply-To: <20110127125714.GD25968@n2100.arm.linux.org.uk>
-References: <20110127125714.GD25968@n2100.arm.linux.org.uk>
-Message-ID: <20110217233736.GA4077@n2100.arm.linux.org.uk>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Thu, 17 Feb 2011 15:38:59 -0800
+Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <alpine.LFD.2.00.1102171831520.2701@localhost6.localdomain6>
+References: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
+	<-4413647205110644369@unknownmsgid>
+	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
+	<146267380211262372@unknownmsgid>
+	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
+	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
+	<20110217091741.GA24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
+	<20110217101957.GC24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171136550.2701@localhost6.localdomain6>
+	<20110217105611.GE24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171203280.2701@localhost6.localdomain6>
+	<001301cbcebf$76925cd0$63b71670$@deacon@arm.com>
+	<alpine.LFD.2.00.1102171831520.2701@localhost6.localdomain6>
+Message-ID: <4D5DB193.5010007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments on this patch set?
 
-On Thu, Jan 27, 2011 at 12:57:14PM +0000, Russell King - ARM Linux wrote:
-> This patch series fixes the framebuffer formatting for the various
-> CLCD colour modes - including those which the CLCD doesn't actually
-> support.
+>> Right, so to get back to the original discussion about how to handle
+>> chained handlers if the high-level flow type of the IRQ chip is altered
+>> it seems that there are two options:
+>>
+>> 1.) Update all of the chained handlers to use the new flow-control
+>> 2.) Retain backwards compatibility if a chained handler decides to
+>>     use the old method of flow control (specifically, leave an ack
+>>     implementation in the GIC code after moving to fasteoi).
+>>
+>> Obviously, I'd rather go with option (2) and let platforms migrate
+>> over time if they choose to. Now, given that the ack function is really
+>> not something you want to do in a virtualised environment (because it
+>> pokes the distributor), is it worth sticking a
+>> WARN_ON_ONCE(cpu_has_virtualisation()); in the ack code?
 > 
-> PL110 in TFT mode only supports 888 and 5551 connectivity.  Some ARM
-> platforms have additional muxing on their outputs which rewire this
-> to allow the 5551 output to be used in 565 mode:
-> 
-> FBMEM bit (RGB)	5551	565
-> 0		R0	R0
-> 1		R1	R1
-> 2		R2	R2
-> 3		R3	R3
-> 4		R4	R4
-> 5		G0	G0
-> 6		G1	G1
-> 7		G2	G2
-> 8		G3	G3
-> 9		G4	G4
-> 10		B0	G5
-> 11		B1	B0
-> 12		B2	B1
-> 13		B3	B2
-> 14		B4	B3
-> 15		I	B4
-> 
-> This means that when BGR mode is selected, it in green mapping to bits
-> 0, 9, 8, 7, 6, 5 in the framebuffer, which is not sane.  There appears
-> to be no external MUX selection for this format.
-> 
-> PL111 on the other hand supports 888, 5551, 565 and 444 natively, so it
-> can support RGB and BGR pixel formats directly.
-> 
-> Introduce a set of capabilities one bit for each format (RGB888, BGR888,
-> RGB5551, BGR5551 etc) describing what formats the panel itself can support,
-> and also what the board can support.  These are combined, and from that
-> we select the appropriate 16bpp pixel format which the panel and board can
-> support.  Where a panel and board combination supports multiple 16bpp
-> formats, pick the closest format to the requested format.
-> 
-> Implementations which do not supply the capabilities fall back to the old
-> way of doing things, which is based on the cntl register to indicate
-> whether we should be using RGB or BGR mode.
-> 
-> This then allows us to unify the CLCD support across Integrator, Versatile,
-> Realview and Versatile Express.  This has been successfully tested on:
-> 
-> Integrator/CP - RGB565, RGB5551, BGR5551.
-> Versatile PB926 - RGB565, BGR565, RGB5551, BGR5551.
-> Realview EB ARM11MPcore - RGB565, BGR565, RGB5551, BGR5551, RGB444, BGR444.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> #2 is less painful and just works. The fasteoi stuff does not use ack
+> IIRC so it wont hurt.
+
+On an MSM we use handle_percpu_irq for PPIs, if we have ack and eoi we 
+will end up EOI ing the interrupt twice so #2 wont work. Also all the 
+cascaded handlers would have assumed that the ack function masks the 
+interrupt, it is best we fix all of them to use eoi at the end (just 
+like handle_fasteoi_irq). Please tell me how you guys locate such 
+cascaded handlers?
+
+Sorry for my earlier patch - didnt realize that the chaging the ack will 
+break the chained handler. My board doesnt have cascaded gics. The only 
+chained handler I knew was gpio-v2.c and it does the correct thing of 
+calling an desc->chip->ack at the end.
+
+BTW, I am all in favor of using handle_fasteoi_irq for shared PPIs , It 
+will fix a problem I pointed out here.
+http://kerneltrap.org/mailarchive/linux-kernel/2010/12/30/4664338
+
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
