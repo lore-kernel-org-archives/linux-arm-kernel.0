@@ -1,51 +1,96 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 Feb 2011 14:28:49 +0800
-Subject: [PATCH 1/4] ARM: mx23: rename mx23 auart irq definition to align with
-	mx28
+Date: Thu, 17 Feb 2011 14:28:50 +0800
+Subject: [PATCH 2/4] ARM: mx23: dynamically allocate mx23 auart device
 In-Reply-To: <1297924132-17402-1-git-send-email-shawn.guo@freescale.com>
 References: <1297924132-17402-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1297924132-17402-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1297924132-17402-3-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX23 Reference Manual names auart irq differently from i.MX28.
-This patch is to align the naming with mx28, so that some device
-registration codes can be shared.
+i.MX23 Reference Manaul starts auart index from 1 than 0.  Changing
+the index to start from 0 requires corresponding changes on base
+address, irq, and iomux definitions, and will probably confuse people
+who reads codes and hardware documents together.
+
+This patch introduced the field 'hwid' to distinguish the driver id
+and controller id.  These two ids are different on mx23 while
+identical on mx28.
 
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/include/mach/mx23.h |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-mxs/clock-mx23.c             |    1 +
+ arch/arm/mach-mxs/devices-mx23.h           |    5 +++++
+ arch/arm/mach-mxs/devices/platform-auart.c |   22 ++++++++++++++++------
+ 3 files changed, 22 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/include/mach/mx23.h b/arch/arm/mach-mxs/include/mach/mx23.h
-index 9edd02e..4768402 100644
---- a/arch/arm/mach-mxs/include/mach/mx23.h
-+++ b/arch/arm/mach-mxs/include/mach/mx23.h
-@@ -101,9 +101,9 @@
- #define MX23_INT_SSP2_DMA		20
- #define MX23_INT_ECC8_IRQ		21
- #define MX23_INT_RTC_ALARM		22
--#define MX23_INT_UARTAPP_TX_DMA		23
--#define MX23_INT_UARTAPP_INTERNAL	24
--#define MX23_INT_UARTAPP_RX_DMA		25
-+#define MX23_INT_AUART1_TX_DMA		23
-+#define MX23_INT_AUART1			24
-+#define MX23_INT_AUART1_RX_DMA		25
- #define MX23_INT_I2C_DMA		26
- #define MX23_INT_I2C_ERROR		27
- #define MX23_INT_TIMER0			28
-@@ -135,9 +135,9 @@
- #define MX23_INT_DCP			54
- #define MX23_INT_BCH			56
- #define MX23_INT_PXP			57
--#define MX23_INT_UARTAPP2_TX_DMA	58
--#define MX23_INT_UARTAPP2_INTERNAL	59
--#define MX23_INT_UARTAPP2_RX_DMA	60
-+#define MX23_INT_AUART2_TX_DMA		58
-+#define MX23_INT_AUART2			59
-+#define MX23_INT_AUART2_RX_DMA		60
- #define MX23_INT_VDAC_DETECT		61
- #define MX23_INT_VDD5V_DROOP		64
- #define MX23_INT_DCDC4P2_BO		65
+diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+index ca72a05..7c5dace 100644
+--- a/arch/arm/mach-mxs/clock-mx23.c
++++ b/arch/arm/mach-mxs/clock-mx23.c
+@@ -442,6 +442,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("duart", "apb_pclk", xbus_clk)
+ 	/* for amba-pl011 driver */
+ 	_REGISTER_CLOCK("duart", NULL, uart_clk)
++	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+ 	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+ 	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+ 	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+index 1256788..c4d4773 100644
+--- a/arch/arm/mach-mxs/devices-mx23.h
++++ b/arch/arm/mach-mxs/devices-mx23.h
+@@ -14,3 +14,8 @@
+ extern const struct amba_device mx23_duart_device __initconst;
+ #define mx23_add_duart() \
+ 	mxs_add_duart(&mx23_duart_device)
++
++extern const struct mxs_auart_data mx23_auart_data[] __initconst;
++#define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
++#define mx23_add_auart0()		mx23_add_auart(0)
++#define mx23_add_auart1()		mx23_add_auart(1)
+diff --git a/arch/arm/mach-mxs/devices/platform-auart.c b/arch/arm/mach-mxs/devices/platform-auart.c
+index f0dbf8a..796606c 100644
+--- a/arch/arm/mach-mxs/devices/platform-auart.c
++++ b/arch/arm/mach-mxs/devices/platform-auart.c
+@@ -7,23 +7,33 @@
+  * Free Software Foundation.
+  */
+ #include <asm/sizes.h>
++#include <mach/mx23.h>
+ #include <mach/mx28.h>
+ #include <mach/devices-common.h>
+ 
+-#define mxs_auart_data_entry_single(soc, _id)				\
++#define mxs_auart_data_entry_single(soc, _id, hwid)			\
+ 	{								\
+ 		.id = _id,						\
+-		.iobase = soc ## _AUART ## _id ## _BASE_ADDR,		\
+-		.irq = soc ## _INT_AUART ## _id,			\
++		.iobase = soc ## _AUART ## hwid ## _BASE_ADDR,		\
++		.irq = soc ## _INT_AUART ## hwid,			\
+ 	}
+ 
+-#define mxs_auart_data_entry(soc, _id)					\
+-	[_id] = mxs_auart_data_entry_single(soc, _id)
++#define mxs_auart_data_entry(soc, _id, hwid)				\
++	[_id] = mxs_auart_data_entry_single(soc, _id, hwid)
++
++#ifdef CONFIG_SOC_IMX23
++const struct mxs_auart_data mx23_auart_data[] __initconst = {
++#define mx23_auart_data_entry(_id, hwid)				\
++	mxs_auart_data_entry(MX23, _id, hwid)
++	mx23_auart_data_entry(0, 1),
++	mx23_auart_data_entry(1, 2),
++};
++#endif
+ 
+ #ifdef CONFIG_SOC_IMX28
+ const struct mxs_auart_data mx28_auart_data[] __initconst = {
+ #define mx28_auart_data_entry(_id)					\
+-	mxs_auart_data_entry(MX28, _id)
++	mxs_auart_data_entry(MX28, _id, _id)
+ 	mx28_auart_data_entry(0),
+ 	mx28_auart_data_entry(1),
+ 	mx28_auart_data_entry(2),
 -- 
 1.7.1
