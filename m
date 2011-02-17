@@ -1,96 +1,58 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 17 Feb 2011 14:28:50 +0800
-Subject: [PATCH 2/4] ARM: mx23: dynamically allocate mx23 auart device
+Date: Thu, 17 Feb 2011 14:28:51 +0800
+Subject: [PATCH 3/4] ARM: mxs/mx23evk: add auart device
 In-Reply-To: <1297924132-17402-1-git-send-email-shawn.guo@freescale.com>
 References: <1297924132-17402-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1297924132-17402-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1297924132-17402-4-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX23 Reference Manaul starts auart index from 1 than 0.  Changing
-the index to start from 0 requires corresponding changes on base
-address, irq, and iomux definitions, and will probably confuse people
-who reads codes and hardware documents together.
-
-This patch introduced the field 'hwid' to distinguish the driver id
-and controller id.  These two ids are different on mx23 while
-identical on mx28.
-
 Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-mxs/clock-mx23.c             |    1 +
- arch/arm/mach-mxs/devices-mx23.h           |    5 +++++
- arch/arm/mach-mxs/devices/platform-auart.c |   22 ++++++++++++++++------
- 3 files changed, 22 insertions(+), 6 deletions(-)
+ arch/arm/mach-mxs/Kconfig        |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c |   11 +++++++++++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-index ca72a05..7c5dace 100644
---- a/arch/arm/mach-mxs/clock-mx23.c
-+++ b/arch/arm/mach-mxs/clock-mx23.c
-@@ -442,6 +442,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("duart", "apb_pclk", xbus_clk)
- 	/* for amba-pl011 driver */
- 	_REGISTER_CLOCK("duart", NULL, uart_clk)
-+	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
- 	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
- 	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
- 	_REGISTER_CLOCK(NULL, "usb", usb_clk)
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-index 1256788..c4d4773 100644
---- a/arch/arm/mach-mxs/devices-mx23.h
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -14,3 +14,8 @@
- extern const struct amba_device mx23_duart_device __initconst;
- #define mx23_add_duart() \
- 	mxs_add_duart(&mx23_duart_device)
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index cd2fbdf..3c5ce09 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -19,6 +19,7 @@ config MACH_MX23EVK
+ 	bool "Support MX23EVK Platform"
+ 	select SOC_IMX23
+ 	select MXS_HAVE_AMBA_DUART
++	select MXS_HAVE_PLATFORM_AUART
+ 	default y
+ 	help
+ 	  Include support for MX23EVK platform. This includes specific
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index aa06400..0737ce2 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -30,6 +30,16 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+ 	/* duart */
+ 	MX23_PAD_PWM0__DUART_RX | MXS_PAD_4MA,
+ 	MX23_PAD_PWM1__DUART_TX | MXS_PAD_4MA,
 +
-+extern const struct mxs_auart_data mx23_auart_data[] __initconst;
-+#define mx23_add_auart(id)	mxs_add_auart(&mx23_auart_data[id])
-+#define mx23_add_auart0()		mx23_add_auart(0)
-+#define mx23_add_auart1()		mx23_add_auart(1)
-diff --git a/arch/arm/mach-mxs/devices/platform-auart.c b/arch/arm/mach-mxs/devices/platform-auart.c
-index f0dbf8a..796606c 100644
---- a/arch/arm/mach-mxs/devices/platform-auart.c
-+++ b/arch/arm/mach-mxs/devices/platform-auart.c
-@@ -7,23 +7,33 @@
-  * Free Software Foundation.
-  */
- #include <asm/sizes.h>
-+#include <mach/mx23.h>
- #include <mach/mx28.h>
- #include <mach/devices-common.h>
++	/* auart */
++	MX23_PAD_AUART1_RX__AUART1_RX |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_AUART1_TX__AUART1_TX |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_AUART1_CTS__AUART1_CTS |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_AUART1_RTS__AUART1_RTS |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+ };
  
--#define mxs_auart_data_entry_single(soc, _id)				\
-+#define mxs_auart_data_entry_single(soc, _id, hwid)			\
- 	{								\
- 		.id = _id,						\
--		.iobase = soc ## _AUART ## _id ## _BASE_ADDR,		\
--		.irq = soc ## _INT_AUART ## _id,			\
-+		.iobase = soc ## _AUART ## hwid ## _BASE_ADDR,		\
-+		.irq = soc ## _INT_AUART ## hwid,			\
- 	}
+ static void __init mx23evk_init(void)
+@@ -37,6 +47,7 @@ static void __init mx23evk_init(void)
+ 	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
  
--#define mxs_auart_data_entry(soc, _id)					\
--	[_id] = mxs_auart_data_entry_single(soc, _id)
-+#define mxs_auart_data_entry(soc, _id, hwid)				\
-+	[_id] = mxs_auart_data_entry_single(soc, _id, hwid)
-+
-+#ifdef CONFIG_SOC_IMX23
-+const struct mxs_auart_data mx23_auart_data[] __initconst = {
-+#define mx23_auart_data_entry(_id, hwid)				\
-+	mxs_auart_data_entry(MX23, _id, hwid)
-+	mx23_auart_data_entry(0, 1),
-+	mx23_auart_data_entry(1, 2),
-+};
-+#endif
+ 	mx23_add_duart();
++	mx23_add_auart0();
+ }
  
- #ifdef CONFIG_SOC_IMX28
- const struct mxs_auart_data mx28_auart_data[] __initconst = {
- #define mx28_auart_data_entry(_id)					\
--	mxs_auart_data_entry(MX28, _id)
-+	mxs_auart_data_entry(MX28, _id, _id)
- 	mx28_auart_data_entry(0),
- 	mx28_auart_data_entry(1),
- 	mx28_auart_data_entry(2),
+ static void __init mx23evk_timer_init(void)
 -- 
 1.7.1
