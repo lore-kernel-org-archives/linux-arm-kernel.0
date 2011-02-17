@@ -1,251 +1,253 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Feb 2011 15:38:30 +0100
-Subject: [PATCH v2 1/3] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1297650228-12762-2-git-send-email-shawn.guo@freescale.com>
-References: <1297650228-12762-1-git-send-email-shawn.guo@freescale.com>
-	<1297650228-12762-2-git-send-email-shawn.guo@freescale.com>
-Message-ID: <201102171538.31061.arnd@arndb.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 17 Feb 2011 15:40:48 +0100
+Subject: [PATCH] mach-ux500: basic HREFv60 support v2
+Message-ID: <1297953648-23170-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 14 February 2011, Shawn Guo wrote:
-> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> including apbh-dma and apbx-dma.
-> 
-> * apbh-dma and apbx-dma are supported in the driver as two instances,
->   and have to be filtered by dma clients via device id.  It becomes
->   the convention that apbh-dma always gets registered prior to
->   apbx-dma.
-> 
-> * apbh-dma is different between mx23 and mx28, hardware version
->   register is used to handle the differences.
-> 
-> * mxs-dma supports pio function besides data transfer.  The driver
->   uses dma_data_direction DMA_NONE to identify the pio mode, and
->   steals sgl and sg_len to get pio words and numbers from clients.
-> 
-> * mxs dmaengine has some very specific features, like sense function
->   and the special NAND support (nand_lock, nand_wait4ready).  These
->   are too specific to implemented in generic dmaengine driver.
-> 
-> * The driver refers to imx-sdma and only a single descriptor is
->   statically assigned to each channel.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hi Shawn,
+The HREFv60 variant of the MOP500 family of boards remove the
+external GPIO expander and route these pins back to some of the
+readily available internal GPIO pins instead.
 
-I took a look at this after our discussion about the MMC driver locking
-problem. My feeling is that you still need to get a better understanding
-of the locking interfaces in Linux.
+Based on a patch by Bibek Basu <bibek.basu@stericsson.com> for
+an internal kernel version.
 
-> +struct mxs_dma_ccw {
-> +	u32		next;
-> +	u16		bits;
-> +	u16		xfer_bytes;
-> +#define MAX_XFER_BYTES	0xff00
-> +	dma_addr_t	bufaddr;
-> +#define MXS_PIO_WORDS	16
-> +	u32		pio_words[MXS_PIO_WORDS];
-> +};
+Cc: Bibek Basu <bibek.basu@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Re-spin when I realized that I was adding the GPIO pins for
+HREFv60 in an init function connected to the Toshiba GPIO
+expander just removed from the board. Fix it up the right way
+instead, hopefully.
+---
+ arch/arm/mach-ux500/board-mop500-sdi.c        |   42 +++++++++++++++++++-----
+ arch/arm/mach-ux500/board-mop500-stuib.c      |   12 ++++++-
+ arch/arm/mach-ux500/board-mop500.c            |   23 ++++++++++++--
+ arch/arm/mach-ux500/board-mop500.h            |   14 ++++++++-
+ arch/arm/mach-ux500/include/mach/uncompress.h |    6 +++-
+ 5 files changed, 81 insertions(+), 16 deletions(-)
 
-Unrelated, but should bufaddr really be dma_addr_t? If this is a hardware
-structure, you should make it u32, because dma_addr_t may be either 32 or
-64 bit in the future, as we get to multiplatform kernels.
-
-> +struct mxs_dma_chan {
-> +	struct mxs_dma_engine		*mxs_dma;
-> +	struct dma_chan			chan;
-> +	struct dma_async_tx_descriptor	desc;
-> +	struct tasklet_struct		tasklet;
-> +	spinlock_t			lock;
-> +	int				chan_irq;
-> +	struct mxs_dma_ccw		*ccw;
-> +	dma_addr_t			ccw_phys;
-> +	dma_cookie_t			last_completed;
-> +	enum dma_status			status;
-> +	unsigned int			flags;
-> +#define MXS_DMA_SG_LOOP			(1 << 0)
-> +};
-> +
-> +struct mxs_dma_engine {
-> +	int				dev_id;
-> +	unsigned int			version;
-> +	void __iomem			*base;
-> +	struct clk			*clk;
-> +	struct dma_device		dma_device;
-> +	struct device_dma_parameters	dma_parms;
-> +#define MXS_DMA_CHANNELS		16
-> +	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
-> +};
-
-So you have locking per channel, but there is no lock in the dma engine
-structure locking the global fields. This is probably fine.
-
-> +static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	int chan_id = mxs_chan->chan.chan_id;
-> +
-> +	if (dma_is_apbh() && apbh_is_old())
-> +		__mxs_setl(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
-> +				mxs_dma->base + HW_APBHX_CTRL0);
-> +	else
-> +		__mxs_setl(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
-> +				mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
-> +}
-> +
-> +static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	int chan_id = mxs_chan->chan.chan_id;
-> +
-> +	/* set cmd_addr up */
-> +	__raw_writel(mxs_chan->ccw_phys,
-> +			mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id));
-> +
-> +	/* enable apbh channel clock */
-> +	if (dma_is_apbh()) {
-> +		if (apbh_is_old())
-> +			__mxs_clrl(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> +						mxs_dma->base + HW_APBHX_CTRL0);
-> +		else
-> +			__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> +	}
-> +
-> +	/* write 1 to SEMA to kick off the channel */
-> +	__raw_writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(chan_id));
-> +}
-
-Just like the MMC driver, you also use __raw_writel(). If you have to do
-that, please encapsulate the access into a wrapper function that adds
-all the necessary serialization and add a comment explaining why you
-cannot use writel()/writel_relaxed().
-
-Or just use writel().
-
-> +static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	int chan_id = mxs_chan->chan.chan_id;
-> +
-> +	/* disable apbh channel clock */
-> +	if (dma_is_apbh()) {
-> +		if (apbh_is_old())
-> +			__mxs_setl(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> +						mxs_dma->base + HW_APBHX_CTRL0);
-> +		else
-> +			__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> +	}
-> +
-> +	mxs_chan->status = DMA_SUCCESS;
-> +}
-> +
-> +static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	int chan_id = mxs_chan->chan.chan_id;
-> +
-> +	/* freeze the channel */
-> +	if (dma_is_apbh() && apbh_is_old())
-> +		__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> +	else
-> +		__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
-> +
-> +	mxs_chan->status = DMA_PAUSED;
-> +}
-> +
-> +static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> +	int chan_id = mxs_chan->chan.chan_id;
-> +
-> +	/* unfreeze the channel */
-> +	if (dma_is_apbh() && apbh_is_old())
-> +		__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> +	else
-> +		__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
-> +
-> +	mxs_chan->status = DMA_IN_PROGRESS;
-> +}
-
-Should these take the spinlock? What if they are called simultaneously on
-multiple CPUs, or while the interrupt handler is running on another CPU?
-
-Without a lock, another thread might see an incorrect value of mxs_chan->status.
-
-> +static dma_cookie_t mxs_dma_assign_cookie(struct mxs_dma_chan *mxs_chan)
-> +{
-> +	dma_cookie_t cookie = mxs_chan->chan.cookie;
-> +
-> +	if (++cookie < 0)
-> +		cookie = 1;
-> +
-> +	mxs_chan->chan.cookie = cookie;
-> +	mxs_chan->desc.cookie = cookie;
-> +
-> +	return cookie;
-> +}
-> +
-> +static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
-> +{
-> +	return container_of(chan, struct mxs_dma_chan, chan);
-> +}
-> +
-> +static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> +{
-> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> +	dma_cookie_t cookie;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&mxs_chan->lock, flags);
-> +
-> +	cookie = mxs_dma_assign_cookie(mxs_chan);
-> +
-> +	mxs_dma_enable_chan(mxs_chan);
-> +
-> +	spin_unlock_irqrestore(&mxs_chan->lock, flags);
-> +
-> +	return cookie;
-> +}
-
-Just like the MMC driver, you use spin_lock_irqsave() in the functions that
-are called by other drivers, but then don't actually lock in the interrupt
-handler. This is clearly wrong, as I explained before:
-
-The interrupt handler may already be running on another CPU, so it
-is not at all serialized with this code.
-
-> +static void mxs_dma_tasklet(unsigned long data)
-> +{
-> +	struct mxs_dma_chan *mxs_chan = (struct mxs_dma_chan *) data;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&mxs_chan->lock, flags);
-> +
-> +	if (mxs_chan->desc.callback)
-> +		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-> +
-> +	if (mxs_chan->status == DMA_SUCCESS)
-> +		mxs_chan->last_completed = mxs_chan->desc.cookie;
-> +
-> +	spin_unlock_irqrestore(&mxs_chan->lock, flags);
-> +}
-
-Here is a different problem. The entire tasklet has interrupts
-disabled and holds the spinlock that the interrupt handler does
-not hold.
-
-This actually makes the tasklet a stricter context than the
-actual interrupt handler, defeating the purpose of tasklets
-(i.e. that you can run code without disabling interrupts).
-
-I don't know what the rules for dmaengine callbacks are regarding
-the context in which they are called, but it seems you should
-either get rid of the spin_lock_irqsave here or do everything
-from the interrupt handler.
-
-That leaves the last_completed variable. This apparently
-needs to be protected using a spinlock, because
-it can be read from other tasks calling mxs_dma_tx_status,
-which in turn does not take the lock, so that is broken, too.
-
-	Arnd
+diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+index 68c8375..bf0b024 100644
+--- a/arch/arm/mach-ux500/board-mop500-sdi.c
++++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+@@ -12,6 +12,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/platform_device.h>
+ 
++#include <asm/mach-types.h>
+ #include <plat/ste_dma40.h>
+ #include <mach/devices.h>
+ #include <mach/hardware.h>
+@@ -68,7 +69,6 @@ static struct mmci_platform_data mop500_sdi0_data = {
+ 	.ocr_mask	= MMC_VDD_29_30,
+ 	.f_max		= 100000000,
+ 	.capabilities	= MMC_CAP_4_BIT_DATA,
+-	.gpio_cd	= GPIO_SDMMC_CD,
+ 	.gpio_wp	= -1,
+ #ifdef CONFIG_STE_DMA40
+ 	.dma_filter	= stedma40_filter,
+@@ -77,23 +77,40 @@ static struct mmci_platform_data mop500_sdi0_data = {
+ #endif
+ };
+ 
+-void mop500_sdi_tc35892_init(void)
++/* GPIO pins used by the sdi0 level shifter */
++static int sdi0_en = -1;
++static int sdi0_vsel = -1;
++
++static void sdi0_configure(void)
+ {
+ 	int ret;
+ 
+-	ret = gpio_request(GPIO_SDMMC_EN, "SDMMC_EN");
++	ret = gpio_request(sdi0_en, "level shifter enable");
+ 	if (!ret)
+-		ret = gpio_request(GPIO_SDMMC_1V8_3V_SEL,
+-				   "GPIO_SDMMC_1V8_3V_SEL");
+-	if (ret)
++		ret = gpio_request(sdi0_vsel,
++				   "level shifter 1v8-3v select");
++
++	if (ret) {
++		pr_warning("unable to config sdi0 gpios for level shifter.\n");
+ 		return;
++	}
+ 
+-	gpio_direction_output(GPIO_SDMMC_1V8_3V_SEL, 0);
+-	gpio_direction_output(GPIO_SDMMC_EN, 1);
++	/* Select the default 2.9V and enable level shifter */
++	gpio_direction_output(sdi0_vsel, 0);
++	gpio_direction_output(sdi0_en, 1);
+ 
++	/* Add the device */
+ 	db8500_add_sdi0(&mop500_sdi0_data);
+ }
+ 
++void mop500_sdi_tc35892_init(void)
++{
++	mop500_sdi0_data.gpio_cd = GPIO_SDMMC_CD;
++	sdi0_en = GPIO_SDMMC_EN;
++	sdi0_vsel = GPIO_SDMMC_1V8_3V_SEL;
++	sdi0_configure();
++}
++
+ /*
+  * SDI 2 (POP eMMC, not on DB8500ed)
+  */
+@@ -179,8 +196,15 @@ void __init mop500_sdi_init(void)
+ 	/* On-board eMMC */
+ 	db8500_add_sdi4(&mop500_sdi4_data);
+ 
++	if (machine_is_hrefv60()) {
++		mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;
++		sdi0_en = HREFV60_SDMMC_EN_GPIO;
++		sdi0_vsel = HREFV60_SDMMC_1V8_3V_GPIO;
++		sdi0_configure();
++	}
+ 	/*
+-	 * sdi0 will finally be added when the TC35892 initializes and calls
++	 * On boards with the TC35892 GPIO expander, sdi0 will finally
++	 * be added when the TC35892 initializes and calls
+ 	 * mop500_sdi_tc35892_init() above.
+ 	 */
+ }
+diff --git a/arch/arm/mach-ux500/board-mop500-stuib.c b/arch/arm/mach-ux500/board-mop500-stuib.c
+index 8b6323e..8c97977 100644
+--- a/arch/arm/mach-ux500/board-mop500-stuib.c
++++ b/arch/arm/mach-ux500/board-mop500-stuib.c
+@@ -12,6 +12,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/i2c.h>
+ #include <linux/input/matrix_keypad.h>
++#include <asm/mach-types.h>
+ 
+ #include "board-mop500.h"
+ 
+@@ -154,7 +155,6 @@ static struct bu21013_platform_device tsc_plat_device = {
+ 	.cs_dis = bu21013_gpio_board_exit,
+ 	.irq_read_val = bu21013_read_pin_val,
+ 	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
+-	.cs_pin = GPIO_BU21013_CS,
+ 	.touch_x_max = TOUCH_XMAX,
+ 	.touch_y_max = TOUCH_YMAX,
+ 	.ext_clk = false,
+@@ -167,7 +167,6 @@ static struct bu21013_platform_device tsc_plat2_device = {
+ 	.cs_dis = bu21013_gpio_board_exit,
+ 	.irq_read_val = bu21013_read_pin_val,
+ 	.irq = NOMADIK_GPIO_TO_IRQ(TOUCH_GPIO_PIN),
+-	.cs_pin = GPIO_BU21013_CS,
+ 	.touch_x_max = TOUCH_XMAX,
+ 	.touch_y_max = TOUCH_YMAX,
+ 	.ext_clk = false,
+@@ -189,6 +188,15 @@ static struct i2c_board_info __initdata u8500_i2c3_devices_stuib[] = {
+ 
+ void __init mop500_stuib_init(void)
+ {
++	if (machine_is_hrefv60()) {
++		tsc_plat_device.cs_pin = HREFV60_TOUCH_RST_GPIO;
++		tsc_plat2_device.cs_pin = HREFV60_TOUCH_RST_GPIO;
++	} else {
++		tsc_plat_device.cs_pin = GPIO_BU21013_CS;
++		tsc_plat2_device.cs_pin = GPIO_BU21013_CS;
++
++	}
++
+ 	mop500_uib_i2c_add(0, mop500_i2c0_devices_stuib,
+ 			ARRAY_SIZE(mop500_i2c0_devices_stuib));
+ 
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 72448e1..8790d98 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -202,7 +202,6 @@ static struct gpio_keys_button mop500_gpio_keys[] = {
+ 		.desc			= "SFH7741 Proximity Sensor",
+ 		.type			= EV_SW,
+ 		.code			= SW_FRONT_PROXIMITY,
+-		.gpio			= GPIO_PROX_SENSOR,
+ 		.active_low		= 0,
+ 		.can_disable		= 1,
+ 	}
+@@ -379,8 +378,18 @@ static void __init mop500_uart_init(void)
+ 	db8500_add_uart2(&uart2_plat);
+ }
+ 
+-static void __init u8500_init_machine(void)
++static void __init mop500_init_machine(void)
+ {
++	/*
++	 * The HREFv60 board removed a GPIO expander and routed
++	 * all these GPIO pins to the internal GPIO controller
++	 * instead.
++	 */
++	if (machine_is_hrefv60())
++		mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
++	else
++		mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
++
+ 	u8500_init_devices();
+ 
+ 	mop500_pins_init();
+@@ -407,5 +416,13 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
+ 	.init_irq	= ux500_init_irq,
+ 	/* we re-use nomadik timer here */
+ 	.timer		= &ux500_timer,
+-	.init_machine	= u8500_init_machine,
++	.init_machine	= mop500_init_machine,
++MACHINE_END
++
++MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
++	.boot_params	= 0x100,
++	.map_io		= u8500_map_io,
++	.init_irq	= ux500_init_irq,
++	.timer		= &ux500_timer,
++	.init_machine	= mop500_init_machine,
+ MACHINE_END
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index 48abca7..56722f4 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -7,9 +7,21 @@
+ #ifndef __BOARD_MOP500_H
+ #define __BOARD_MOP500_H
+ 
+-#define MOP500_EGPIO(x)			(NOMADIK_NR_GPIO + (x))
++/* HREFv60-specific GPIO assignments, this board has no GPIO expander */
++#define HREFV60_TOUCH_RST_GPIO		143
++#define HREFV60_PROX_SENSE_GPIO		217
++#define HREFV60_HAL_SW_GPIO		145
++#define HREFV60_SDMMC_EN_GPIO		169
++#define HREFV60_SDMMC_1V8_3V_GPIO	5
++#define HREFV60_SDMMC_CD_GPIO		95
++#define HREFV60_ACCEL_INT1_GPIO		82
++#define HREFV60_ACCEL_INT2_GPIO		83
++#define HREFV60_MAGNET_DRDY_GPIO	32
++#define HREFV60_DISP1_RST_GPIO		65
++#define HREFV60_DISP2_RST_GPIO		66
+ 
+ /* GPIOs on the TC35892 expander */
++#define MOP500_EGPIO(x)			(NOMADIK_NR_GPIO + (x))
+ #define GPIO_SDMMC_CD			MOP500_EGPIO(3)
+ #define GPIO_PROX_SENSOR		MOP500_EGPIO(7)
+ #define GPIO_BU21013_CS			MOP500_EGPIO(13)
+diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
+index 9a6614c..ab0fe14 100644
+--- a/arch/arm/mach-ux500/include/mach/uncompress.h
++++ b/arch/arm/mach-ux500/include/mach/uncompress.h
+@@ -50,7 +50,11 @@ static void flush(void)
+ 
+ static inline void arch_decomp_setup(void)
+ {
+-	if (machine_is_u8500())
++	/* Check in run time if we run on an U8500 or U5500 */
++	if (machine_is_u8500() ||
++	    machine_is_svp8500v1() ||
++	    machine_is_svp8500v2() ||
++	    machine_is_hrefv60())
+ 		ux500_uart_base = U8500_UART2_BASE;
+ 	else if (machine_is_u5500())
+ 		ux500_uart_base = U5500_UART0_BASE;
+-- 
+1.7.3.2
