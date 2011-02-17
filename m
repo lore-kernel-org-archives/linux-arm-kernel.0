@@ -1,80 +1,55 @@
-From: rob@ti.com (Clark, Rob)
-Date: Thu, 17 Feb 2011 09:25:48 -0600
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <AANLkTim3iUNHsaCf7387H-X+XW0YDQsQVa1FwDvo0KvH@mail.gmail.com>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
-	<201102161322.08126.arnd@arndb.de>
-	<AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
-	<AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
-	<AANLkTim3iUNHsaCf7387H-X+XW0YDQsQVa1FwDvo0KvH@mail.gmail.com>
-Message-ID: <AANLkTim4rsuDLnyLtetMpn_i+x0e8FmyzLvy1Bm0JEAG@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Feb 2011 17:26:48 +0200
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <4D5D3D0B.8090106@ti.com>
+References: <1297946466-9565-1-git-send-email-balbi@ti.com>
+	<1297946466-9565-7-git-send-email-balbi@ti.com>
+	<4D5D25F9.8030907@ti.com>
+	<20110217151527.GL22356@legolas.emea.dhcp.ti.com>
+	<20110217151804.GM22356@legolas.emea.dhcp.ti.com>
+	<4D5D3D0B.8090106@ti.com>
+Message-ID: <20110217152648.GO22356@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hmm, I was thinking more on the xf86 side of things.. ie. to provide
-default implementations of xf86CrtcFuncsRec and xf86OutputFuncsRec
-functions..
+On Thu, Feb 17, 2011 at 04:21:47PM +0100, Cousson, Benoit wrote:
+> On 2/17/2011 4:18 PM, Balbi, Felipe wrote:
+> >On Thu, Feb 17, 2011 at 05:15:27PM +0200, Felipe Balbi wrote:
+> >>On Thu, Feb 17, 2011 at 02:43:21PM +0100, Cousson, Benoit wrote:
+> >>>Hi Felipe and Hema,
+> >>>
+> >>>Sorry for this late review, but I have a couple of comments on this one.
+> >>>
+> >>>Since I was planning to send usb hwmod data file to Tony directly
+> >>>like I did for the other drivers, I can handle the update myself if
+> >>>you want.
+> >>
+> >>I'll change this particular patch to yours.
+> >
+> >doesn't apply:
+> >
+> >$ patch -p1<  ~/benoit.diff
+> >patching file arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> >Hunk #1 succeeded at 55 with fuzz 1 (offset -7 lines).
+> >patch: **** malformed patch at line 42: omap44xx_l4_cfg__l3_main_2 = {
+> >
+> >could you base this off of v2.6.38-rc5 ?
+> 
+> This is what I was about to say.
+> You have a dependency with the for_2.6.39/omap4_hwmod_data branch
+> in git://gitorious.org/omap-pm/linux.git.
 
-BR,
--R
+I cannot have such a dependency and if you create that I can't send a
+pull request to Tony otherwise we will have conflicts later. Either you
+clear up that dependency or Tony will have to manually apply the patches
+I have queued. It's only 7 of them anyway, so maybe not a big deal.
 
-On Wed, Feb 16, 2011 at 7:24 PM, Jammy Zhou <jammy.zhou@linaro.org> wrote:
->
-> There is already one KMS abstraction layer (libkms.so) in libdrm, maybe it can serve as what we needed.
->
-> Regards,
-> Jammy
->
-> On Thu, Feb 17, 2011 at 9:08 AM, Clark, Rob <rob@ti.com> wrote:
->>
->> I'm still in the learning-as-I-go phase here, so definitely not ready
->> to propose a solution, but it does seem to me like there is room for
->> some sort of kms-helper library here to handle more of the boilerplate
->> xf86-video-* stuff.. ?I guess I'll have a better picture once I have a
->> chance to add support for the various multi-monitor configurations.
->> But certainly would be interested if anyone already has some ideas.
->>
->> BR,
->> -R
->>
->> On Wed, Feb 16, 2011 at 8:42 AM, Jesse Barker <jesse.barker@linaro.org> wrote:
->> > Speaking for the Linaro graphics working group, I think it's great.? And, I
->> > think you're right, that if enough of the KMS support in xf86-video-* is
->> > similar enough (I was only aware of intel and nouveau supporting it properly
->> > at current), pulling it out into a common layer would make it easier to
->> > support in new drivers (including fbdev).
->> >
->> > cheers,
->> > Jesse
->> >
->> > On Wed, Feb 16, 2011 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >>
->> >> On Tuesday 15 February 2011, Clark, Rob wrote:
->> >> > I'd been experimenting a bit on the side w/ the DRM driver framework (
->> >> >
->> >> > http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
->> >> > ), but had to add a good chunk of mostly boilerplate code to our xorg
->> >> > driver in order just to test it. ?Maybe some generic support for KMS
->> >> > in xf86-video-fbdev would have made this easier to develop the kernel
->> >> > part without in parallel having to implement the userspace part. ?I'm
->> >> > not sure if this is the sort of thing the linaro-wg has in mind?
->> >>
->> >> I'm not sure what the the linaro multimedia wg thinks of this, but the
->> >> kernel code you linked looks like it's doing exactly the right thing.
->> >>
->> >> ? ? ? ?Arnd
->> >>
->> >> _______________________________________________
->> >> linaro-dev mailing list
->> >> linaro-dev at lists.linaro.org
->> >> http://lists.linaro.org/mailman/listinfo/linaro-dev
->> >
->> >
->>
->> _______________________________________________
->> linaro-dev mailing list
->> linaro-dev at lists.linaro.org
->> http://lists.linaro.org/mailman/listinfo/linaro-dev
->
+Tony, what do you prefer ? Do we clear out the dependency, or you queue
+all the patches I have manually ??
+
+A simple way to clear this out would be with a git rebase -i v2.6.38-rc5
+and moving the MUSB HWMOD to be the first one in the series, then it
+should apply cleanly on my tree.
+
+-- 
+balbi
