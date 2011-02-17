@@ -1,701 +1,696 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 17 Feb 2011 11:24:45 +0100
-Subject: [PATCH 4/8] OMAP4: hwmod data: Add DSS, DISPC, DSI1&2, RFBI,
-	HDMI and VENC
+Date: Thu, 17 Feb 2011 11:24:44 +0100
+Subject: [PATCH 3/8] OMAP4: hwmod data: Add timer
 In-Reply-To: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
 References: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1297938289-8678-5-git-send-email-b-cousson@ti.com>
+Message-ID: <1297938289-8678-4-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dss, dispc, dsi1, dsi2, hdmi, rfbi and venc hwmods.
-In OMAP4 there are severals IPs that can be reached by differents
-interconnect paths depending of the access initiator (MPU vs. SDMA).
-In the case of the DSS, both L3 direct path and L4 CFG path can be
-used to access all the DSS IPs. The two ocp_ip already exists to support
-the two address spaces.
+Add the data for the 11 timers IPs.
+OMAP4 contains two differents IP variants for the timers:
+- 8 x regular timer (3, 4, 5, 6, 7, 8, 9 & 11)
+- 3 x 1ms timer (1, 2 & 10)
 
-      +------------+-- L3_MAIN --+ MPU
-  IP  |            |
-      +-- L4_CFG --+
+The regular timers registers programming model was changed due to the
+adaptation to the new IP interface. Unfortunately the 1ms version
+still use the previous programming model. The driver will have
+to take care of theses differences.
 
-L3 main address range is specified first, since it is used by default.
-dss is also considered as an IP as dispc, rfbi, and named as dss_core.
+Please note that the capability and the partitioning is also
+different depending of the instance.
+- timer 1 is inside the wakeup domain
+- timers 5, 6, 7 & 8 are inside in the ABE (audio backend)
+- timers 2, 3, 4, 9, 10 & 11 are inside the PER power domain
+
+The timer was previously named gptimerX or dmtimerX, it is
+now simply named timerX.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: Mayuresh Janorkar <mayur@ti.com>
-Signed-off-by: Senthilvadivu Guruswamy <svadivu@ti.com>
-Signed-off-by: Sumit Semwal <sumit.semwal@ti.com>
-[b-cousson at ti.com: Re-organize structures to match file
-convention and remove irq entry from dss_hwmod]
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+[b-cousson at ti.com: Fix alignement in class attribute,
+re-order flags and update the changelog]
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  612 +++++++++++++++++++++++++++-
- 1 files changed, 604 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  633 +++++++++++++++++++++++++++-
+ 1 files changed, 622 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 37b3024..aafe60d 100644
+index 8199eb2..37b3024 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1,7 +1,7 @@
- /*
-  * Hardware modules present on the OMAP44xx chips
-  *
-- * Copyright (C) 2009-2010 Texas Instruments, Inc.
-+ * Copyright (C) 2009-2011 Texas Instruments, Inc.
-  * Copyright (C) 2009-2010 Nokia Corporation
-  *
-  * Paul Walmsley
-@@ -43,6 +43,7 @@
- static struct omap_hwmod omap44xx_dma_system_hwmod;
- static struct omap_hwmod omap44xx_dmm_hwmod;
- static struct omap_hwmod omap44xx_dsp_hwmod;
-+static struct omap_hwmod omap44xx_dss_hwmod;
- static struct omap_hwmod omap44xx_emif_fw_hwmod;
- static struct omap_hwmod omap44xx_iva_hwmod;
- static struct omap_hwmod omap44xx_l3_instr_hwmod;
-@@ -213,6 +214,14 @@ static struct omap_hwmod_ocp_if omap44xx_dsp__l3_main_1 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* dss -> l3_main_1 */
-+static struct omap_hwmod_ocp_if omap44xx_dss__l3_main_1 = {
-+	.master		= &omap44xx_dss_hwmod,
-+	.slave		= &omap44xx_l3_main_1_hwmod,
-+	.clk		= "l3_div_ck",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l3_main_2 -> l3_main_1 */
- static struct omap_hwmod_ocp_if omap44xx_l3_main_2__l3_main_1 = {
- 	.master		= &omap44xx_l3_main_2_hwmod,
-@@ -240,6 +249,7 @@ static struct omap_hwmod_ocp_if omap44xx_mpu__l3_main_1 = {
- /* l3_main_1 slave ports */
- static struct omap_hwmod_ocp_if *omap44xx_l3_main_1_slaves[] = {
- 	&omap44xx_dsp__l3_main_1,
-+	&omap44xx_dss__l3_main_1,
- 	&omap44xx_l3_main_2__l3_main_1,
- 	&omap44xx_l4_cfg__l3_main_1,
- 	&omap44xx_mpu__l3_main_1,
-@@ -507,13 +517,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
-  *  ctrl_module_wkup
-  *  debugss
-  *  dmic
-- *  dss
-- *  dss_dispc
-- *  dss_dsi1
-- *  dss_dsi2
-- *  dss_hdmi
-- *  dss_rfbi
-- *  dss_venc
-  *  efuse_ctrl_cust
-  *  efuse_ctrl_std
-  *  elm
-@@ -731,6 +734,590 @@ static struct omap_hwmod omap44xx_dsp_hwmod = {
+@@ -551,17 +551,6 @@ static struct omap_hwmod omap44xx_mpu_private_hwmod = {
+  *  sl2if
+  *  slimbus1
+  *  slimbus2
+- *  timer1
+- *  timer10
+- *  timer11
+- *  timer2
+- *  timer3
+- *  timer4
+- *  timer5
+- *  timer6
+- *  timer7
+- *  timer8
+- *  timer9
+  *  usb_host_fs
+  *  usb_host_hs
+  *  usb_otg_hs
+@@ -1934,6 +1923,615 @@ static struct omap_hwmod omap44xx_spinlock_hwmod = {
  };
  
  /*
-+ * 'dss' class
-+ * display sub-system
++ * 'timer' class
++ * general purpose timer module with accurate 1ms tick
++ * This class contains several variants: ['timer_1ms', 'timer']
 + */
 +
-+static struct omap_hwmod_class_sysconfig omap44xx_dss_sysc = {
-+	.rev_offs	= 0x0000,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= SYSS_HAS_RESET_STATUS,
-+};
-+
-+static struct omap_hwmod_class omap44xx_dss_hwmod_class = {
-+	.name	= "dss",
-+	.sysc	= &omap44xx_dss_sysc,
-+};
-+
-+/* dss */
-+/* dss master ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_masters[] = {
-+	&omap44xx_dss__l3_main_1,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x58000000,
-+		.pa_end		= 0x5800007f,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l3_main_2 -> dss */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dma_addrs),
-+	.user		= OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_addrs[] = {
-+	{
-+		.pa_start	= 0x48040000,
-+		.pa_end		= 0x4804007f,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> dss */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_addrs),
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* dss slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_slaves[] = {
-+	&omap44xx_l3_main_2__dss,
-+	&omap44xx_l4_per__dss,
-+};
-+
-+static struct omap_hwmod_opt_clk dss_opt_clks[] = {
-+	{ .role = "sys_clk", .clk = "dss_sys_clk" },
-+	{ .role = "tv_clk", .clk = "dss_tv_clk" },
-+	{ .role = "dss_clk", .clk = "dss_dss_clk" },
-+	{ .role = "video_clk", .clk = "dss_48mhz_clk" },
-+};
-+
-+static struct omap_hwmod omap44xx_dss_hwmod = {
-+	.name		= "dss_core",
-+	.class		= &omap44xx_dss_hwmod_class,
-+	.main_clk	= "dss_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
-+		},
-+	},
-+	.opt_clks	= dss_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(dss_opt_clks),
-+	.slaves		= omap44xx_dss_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_slaves),
-+	.masters	= omap44xx_dss_masters,
-+	.masters_cnt	= ARRAY_SIZE(omap44xx_dss_masters),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/*
-+ * 'dispc' class
-+ * display controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_dispc_sysc = {
++static struct omap_hwmod_class_sysconfig omap44xx_timer_1ms_sysc = {
 +	.rev_offs	= 0x0000,
 +	.sysc_offs	= 0x0010,
 +	.syss_offs	= 0x0014,
 +	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_MIDLEMODE |
++			   SYSC_HAS_EMUFREE | SYSC_HAS_ENAWAKEUP |
 +			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
 +			   SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
-+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap44xx_dispc_hwmod_class = {
-+	.name	= "dispc",
-+	.sysc	= &omap44xx_dispc_sysc,
-+};
-+
-+/* dss_dispc */
-+static struct omap_hwmod omap44xx_dss_dispc_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_dss_dispc_irqs[] = {
-+	{ .irq = 25 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_dss_dispc_sdma_reqs[] = {
-+	{ .dma_req = 5 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dispc_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x58001000,
-+		.pa_end		= 0x58001fff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l3_main_2 -> dss_dispc */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dispc = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_dispc_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_dispc_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dispc_dma_addrs),
-+	.user		= OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dispc_addrs[] = {
-+	{
-+		.pa_start	= 0x48041000,
-+		.pa_end		= 0x48041fff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> dss_dispc */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_dispc = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_dispc_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_dispc_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dispc_addrs),
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* dss_dispc slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_dispc_slaves[] = {
-+	&omap44xx_l3_main_2__dss_dispc,
-+	&omap44xx_l4_per__dss_dispc,
-+};
-+
-+static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
-+	.name		= "dss_dispc",
-+	.class		= &omap44xx_dispc_hwmod_class,
-+	.mpu_irqs	= omap44xx_dss_dispc_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_dss_dispc_irqs),
-+	.sdma_reqs	= omap44xx_dss_dispc_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_dss_dispc_sdma_reqs),
-+	.main_clk	= "dss_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_dss_dispc_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_dispc_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/*
-+ * 'dsi' class
-+ * display serial interface controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_dsi_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
 +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
 +	.sysc_fields	= &omap_hwmod_sysc_type1,
 +};
 +
-+static struct omap_hwmod_class omap44xx_dsi_hwmod_class = {
-+	.name	= "dsi",
-+	.sysc	= &omap44xx_dsi_sysc,
++static struct omap_hwmod_class omap44xx_timer_1ms_hwmod_class = {
++	.name	= "timer",
++	.sysc	= &omap44xx_timer_1ms_sysc,
 +};
 +
-+/* dss_dsi1 */
-+static struct omap_hwmod omap44xx_dss_dsi1_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_dss_dsi1_irqs[] = {
-+	{ .irq = 53 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_dss_dsi1_sdma_reqs[] = {
-+	{ .dma_req = 74 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dsi1_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x58004000,
-+		.pa_end		= 0x580041ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l3_main_2 -> dss_dsi1 */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dsi1 = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_dsi1_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_dsi1_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dsi1_dma_addrs),
-+	.user		= OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dsi1_addrs[] = {
-+	{
-+		.pa_start	= 0x48044000,
-+		.pa_end		= 0x480441ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> dss_dsi1 */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_dsi1 = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_dsi1_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_dsi1_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dsi1_addrs),
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* dss_dsi1 slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_dsi1_slaves[] = {
-+	&omap44xx_l3_main_2__dss_dsi1,
-+	&omap44xx_l4_per__dss_dsi1,
-+};
-+
-+static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
-+	.name		= "dss_dsi1",
-+	.class		= &omap44xx_dsi_hwmod_class,
-+	.mpu_irqs	= omap44xx_dss_dsi1_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_dss_dsi1_irqs),
-+	.sdma_reqs	= omap44xx_dss_dsi1_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_dss_dsi1_sdma_reqs),
-+	.main_clk	= "dss_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_dss_dsi1_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_dsi1_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/* dss_dsi2 */
-+static struct omap_hwmod omap44xx_dss_dsi2_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_dss_dsi2_irqs[] = {
-+	{ .irq = 84 + OMAP44XX_IRQ_GIC_START },
-+};
-+
-+static struct omap_hwmod_dma_info omap44xx_dss_dsi2_sdma_reqs[] = {
-+	{ .dma_req = 83 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dsi2_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x58005000,
-+		.pa_end		= 0x580051ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l3_main_2 -> dss_dsi2 */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_dsi2 = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_dsi2_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_dsi2_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_dma_addrs),
-+	.user		= OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_dsi2_addrs[] = {
-+	{
-+		.pa_start	= 0x48045000,
-+		.pa_end		= 0x480451ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> dss_dsi2 */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_dsi2 = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_dsi2_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_dsi2_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_addrs),
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* dss_dsi2 slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_dsi2_slaves[] = {
-+	&omap44xx_l3_main_2__dss_dsi2,
-+	&omap44xx_l4_per__dss_dsi2,
-+};
-+
-+static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
-+	.name		= "dss_dsi2",
-+	.class		= &omap44xx_dsi_hwmod_class,
-+	.mpu_irqs	= omap44xx_dss_dsi2_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_irqs),
-+	.sdma_reqs	= omap44xx_dss_dsi2_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_sdma_reqs),
-+	.main_clk	= "dss_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_dss_dsi2_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_dsi2_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/*
-+ * 'hdmi' class
-+ * hdmi controller
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_hdmi_sysc = {
++static struct omap_hwmod_class_sysconfig omap44xx_timer_sysc = {
 +	.rev_offs	= 0x0000,
 +	.sysc_offs	= 0x0010,
-+	.sysc_flags	= (SYSC_HAS_RESET_STATUS | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET),
++	.sysc_flags	= (SYSC_HAS_EMUFREE | SYSC_HAS_RESET_STATUS |
++			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
 +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
 +			   SIDLE_SMART_WKUP),
 +	.sysc_fields	= &omap_hwmod_sysc_type2,
 +};
 +
-+static struct omap_hwmod_class omap44xx_hdmi_hwmod_class = {
-+	.name	= "hdmi",
-+	.sysc	= &omap44xx_hdmi_sysc,
++static struct omap_hwmod_class omap44xx_timer_hwmod_class = {
++	.name	= "timer",
++	.sysc	= &omap44xx_timer_sysc,
 +};
 +
-+/* dss_hdmi */
-+static struct omap_hwmod omap44xx_dss_hdmi_hwmod;
-+static struct omap_hwmod_irq_info omap44xx_dss_hdmi_irqs[] = {
-+	{ .irq = 101 + OMAP44XX_IRQ_GIC_START },
++/* timer1 */
++static struct omap_hwmod omap44xx_timer1_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer1_irqs[] = {
++	{ .irq = 37 + OMAP44XX_IRQ_GIC_START },
 +};
 +
-+static struct omap_hwmod_dma_info omap44xx_dss_hdmi_sdma_reqs[] = {
-+	{ .dma_req = 75 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_hdmi_dma_addrs[] = {
++static struct omap_hwmod_addr_space omap44xx_timer1_addrs[] = {
 +	{
-+		.pa_start	= 0x58006000,
-+		.pa_end		= 0x58006fff,
++		.pa_start	= 0x4a318000,
++		.pa_end		= 0x4a31807f,
 +		.flags		= ADDR_TYPE_RT
 +	},
 +};
 +
-+/* l3_main_2 -> dss_hdmi */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_hdmi = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_hdmi_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_hdmi_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_hdmi_dma_addrs),
-+	.user		= OCP_USER_SDMA,
++/* l4_wkup -> timer1 */
++static struct omap_hwmod_ocp_if omap44xx_l4_wkup__timer1 = {
++	.master		= &omap44xx_l4_wkup_hwmod,
++	.slave		= &omap44xx_timer1_hwmod,
++	.clk		= "l4_wkup_clk_mux_ck",
++	.addr		= omap44xx_timer1_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer1_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
-+static struct omap_hwmod_addr_space omap44xx_dss_hdmi_addrs[] = {
++/* timer1 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer1_slaves[] = {
++	&omap44xx_l4_wkup__timer1,
++};
++
++static struct omap_hwmod omap44xx_timer1_hwmod = {
++	.name		= "timer1",
++	.class		= &omap44xx_timer_1ms_hwmod_class,
++	.mpu_irqs	= omap44xx_timer1_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer1_irqs),
++	.main_clk	= "timer1_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_WKUP_TIMER1_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer1_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer1_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer2 */
++static struct omap_hwmod omap44xx_timer2_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer2_irqs[] = {
++	{ .irq = 38 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer2_addrs[] = {
 +	{
-+		.pa_start	= 0x48046000,
-+		.pa_end		= 0x48046fff,
++		.pa_start	= 0x48032000,
++		.pa_end		= 0x4803207f,
 +		.flags		= ADDR_TYPE_RT
 +	},
 +};
 +
-+/* l4_per -> dss_hdmi */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_hdmi = {
++/* l4_per -> timer2 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__timer2 = {
 +	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_hdmi_hwmod,
++	.slave		= &omap44xx_timer2_hwmod,
 +	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_hdmi_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_hdmi_addrs),
++	.addr		= omap44xx_timer2_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer2_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* timer2 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer2_slaves[] = {
++	&omap44xx_l4_per__timer2,
++};
++
++static struct omap_hwmod omap44xx_timer2_hwmod = {
++	.name		= "timer2",
++	.class		= &omap44xx_timer_1ms_hwmod_class,
++	.mpu_irqs	= omap44xx_timer2_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer2_irqs),
++	.main_clk	= "timer2_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4PER_DMTIMER2_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer2_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer2_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer3 */
++static struct omap_hwmod omap44xx_timer3_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer3_irqs[] = {
++	{ .irq = 39 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer3_addrs[] = {
++	{
++		.pa_start	= 0x48034000,
++		.pa_end		= 0x4803407f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_per -> timer3 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__timer3 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_timer3_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_timer3_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer3_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* timer3 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer3_slaves[] = {
++	&omap44xx_l4_per__timer3,
++};
++
++static struct omap_hwmod omap44xx_timer3_hwmod = {
++	.name		= "timer3",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer3_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer3_irqs),
++	.main_clk	= "timer3_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4PER_DMTIMER3_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer3_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer3_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer4 */
++static struct omap_hwmod omap44xx_timer4_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer4_irqs[] = {
++	{ .irq = 40 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer4_addrs[] = {
++	{
++		.pa_start	= 0x48036000,
++		.pa_end		= 0x4803607f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_per -> timer4 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__timer4 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_timer4_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_timer4_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer4_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* timer4 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer4_slaves[] = {
++	&omap44xx_l4_per__timer4,
++};
++
++static struct omap_hwmod omap44xx_timer4_hwmod = {
++	.name		= "timer4",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer4_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer4_irqs),
++	.main_clk	= "timer4_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4PER_DMTIMER4_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer4_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer4_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer5 */
++static struct omap_hwmod omap44xx_timer5_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer5_irqs[] = {
++	{ .irq = 41 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer5_addrs[] = {
++	{
++		.pa_start	= 0x40138000,
++		.pa_end		= 0x4013807f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer5 */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer5 = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer5_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer5_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer5_addrs),
 +	.user		= OCP_USER_MPU,
 +};
 +
-+/* dss_hdmi slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_hdmi_slaves[] = {
-+	&omap44xx_l3_main_2__dss_hdmi,
-+	&omap44xx_l4_per__dss_hdmi,
++static struct omap_hwmod_addr_space omap44xx_timer5_dma_addrs[] = {
++	{
++		.pa_start	= 0x49038000,
++		.pa_end		= 0x4903807f,
++		.flags		= ADDR_TYPE_RT
++	},
 +};
 +
-+static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
-+	.name		= "dss_hdmi",
-+	.class		= &omap44xx_hdmi_hwmod_class,
-+	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
-+	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_dss_hdmi_irqs),
-+	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_dss_hdmi_sdma_reqs),
-+	.main_clk	= "dss_fck",
++/* l4_abe -> timer5 (dma) */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer5_dma = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer5_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer5_dma_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer5_dma_addrs),
++	.user		= OCP_USER_SDMA,
++};
++
++/* timer5 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer5_slaves[] = {
++	&omap44xx_l4_abe__timer5,
++	&omap44xx_l4_abe__timer5_dma,
++};
++
++static struct omap_hwmod omap44xx_timer5_hwmod = {
++	.name		= "timer5",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer5_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer5_irqs),
++	.main_clk	= "timer5_fck",
 +	.prcm = {
 +		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
++			.clkctrl_reg = OMAP4430_CM1_ABE_TIMER5_CLKCTRL,
 +		},
 +	},
-+	.slaves		= omap44xx_dss_hdmi_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_hdmi_slaves),
++	.slaves		= omap44xx_timer5_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer5_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer6 */
++static struct omap_hwmod omap44xx_timer6_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer6_irqs[] = {
++	{ .irq = 42 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer6_addrs[] = {
++	{
++		.pa_start	= 0x4013a000,
++		.pa_end		= 0x4013a07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer6 */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer6 = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer6_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer6_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer6_addrs),
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer6_dma_addrs[] = {
++	{
++		.pa_start	= 0x4903a000,
++		.pa_end		= 0x4903a07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer6 (dma) */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer6_dma = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer6_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer6_dma_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer6_dma_addrs),
++	.user		= OCP_USER_SDMA,
++};
++
++/* timer6 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer6_slaves[] = {
++	&omap44xx_l4_abe__timer6,
++	&omap44xx_l4_abe__timer6_dma,
++};
++
++static struct omap_hwmod omap44xx_timer6_hwmod = {
++	.name		= "timer6",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer6_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer6_irqs),
++	.main_clk	= "timer6_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM1_ABE_TIMER6_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer6_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer6_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer7 */
++static struct omap_hwmod omap44xx_timer7_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer7_irqs[] = {
++	{ .irq = 43 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer7_addrs[] = {
++	{
++		.pa_start	= 0x4013c000,
++		.pa_end		= 0x4013c07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer7 */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer7 = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer7_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer7_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer7_addrs),
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer7_dma_addrs[] = {
++	{
++		.pa_start	= 0x4903c000,
++		.pa_end		= 0x4903c07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer7 (dma) */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer7_dma = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer7_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer7_dma_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer7_dma_addrs),
++	.user		= OCP_USER_SDMA,
++};
++
++/* timer7 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer7_slaves[] = {
++	&omap44xx_l4_abe__timer7,
++	&omap44xx_l4_abe__timer7_dma,
++};
++
++static struct omap_hwmod omap44xx_timer7_hwmod = {
++	.name		= "timer7",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer7_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer7_irqs),
++	.main_clk	= "timer7_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM1_ABE_TIMER7_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer7_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer7_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer8 */
++static struct omap_hwmod omap44xx_timer8_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer8_irqs[] = {
++	{ .irq = 44 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer8_addrs[] = {
++	{
++		.pa_start	= 0x4013e000,
++		.pa_end		= 0x4013e07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer8 */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer8 = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer8_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer8_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer8_addrs),
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer8_dma_addrs[] = {
++	{
++		.pa_start	= 0x4903e000,
++		.pa_end		= 0x4903e07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_abe -> timer8 (dma) */
++static struct omap_hwmod_ocp_if omap44xx_l4_abe__timer8_dma = {
++	.master		= &omap44xx_l4_abe_hwmod,
++	.slave		= &omap44xx_timer8_hwmod,
++	.clk		= "ocp_abe_iclk",
++	.addr		= omap44xx_timer8_dma_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer8_dma_addrs),
++	.user		= OCP_USER_SDMA,
++};
++
++/* timer8 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer8_slaves[] = {
++	&omap44xx_l4_abe__timer8,
++	&omap44xx_l4_abe__timer8_dma,
++};
++
++static struct omap_hwmod omap44xx_timer8_hwmod = {
++	.name		= "timer8",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer8_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer8_irqs),
++	.main_clk	= "timer8_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM1_ABE_TIMER8_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer8_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer8_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer9 */
++static struct omap_hwmod omap44xx_timer9_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer9_irqs[] = {
++	{ .irq = 45 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer9_addrs[] = {
++	{
++		.pa_start	= 0x4803e000,
++		.pa_end		= 0x4803e07f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_per -> timer9 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__timer9 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_timer9_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_timer9_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer9_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* timer9 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer9_slaves[] = {
++	&omap44xx_l4_per__timer9,
++};
++
++static struct omap_hwmod omap44xx_timer9_hwmod = {
++	.name		= "timer9",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer9_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer9_irqs),
++	.main_clk	= "timer9_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4PER_DMTIMER9_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer9_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer9_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer10 */
++static struct omap_hwmod omap44xx_timer10_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer10_irqs[] = {
++	{ .irq = 46 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer10_addrs[] = {
++	{
++		.pa_start	= 0x48086000,
++		.pa_end		= 0x4808607f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_per -> timer10 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__timer10 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_timer10_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_timer10_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer10_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* timer10 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer10_slaves[] = {
++	&omap44xx_l4_per__timer10,
++};
++
++static struct omap_hwmod omap44xx_timer10_hwmod = {
++	.name		= "timer10",
++	.class		= &omap44xx_timer_1ms_hwmod_class,
++	.mpu_irqs	= omap44xx_timer10_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer10_irqs),
++	.main_clk	= "timer10_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4PER_DMTIMER10_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer10_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer10_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
++/* timer11 */
++static struct omap_hwmod omap44xx_timer11_hwmod;
++static struct omap_hwmod_irq_info omap44xx_timer11_irqs[] = {
++	{ .irq = 47 + OMAP44XX_IRQ_GIC_START },
++};
++
++static struct omap_hwmod_addr_space omap44xx_timer11_addrs[] = {
++	{
++		.pa_start	= 0x48088000,
++		.pa_end		= 0x4808807f,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/* l4_per -> timer11 */
++static struct omap_hwmod_ocp_if omap44xx_l4_per__timer11 = {
++	.master		= &omap44xx_l4_per_hwmod,
++	.slave		= &omap44xx_timer11_hwmod,
++	.clk		= "l4_div_ck",
++	.addr		= omap44xx_timer11_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap44xx_timer11_addrs),
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* timer11 slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_timer11_slaves[] = {
++	&omap44xx_l4_per__timer11,
++};
++
++static struct omap_hwmod omap44xx_timer11_hwmod = {
++	.name		= "timer11",
++	.class		= &omap44xx_timer_hwmod_class,
++	.mpu_irqs	= omap44xx_timer11_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer11_irqs),
++	.main_clk	= "timer11_fck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_reg = OMAP4430_CM_L4PER_DMTIMER11_CLKCTRL,
++		},
++	},
++	.slaves		= omap44xx_timer11_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_timer11_slaves),
 +	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
 +};
 +
 +/*
-+ * 'rfbi' class
-+ * remote frame buffer interface
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap44xx_rfbi_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_SIDLEMODE |
-+			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap44xx_rfbi_hwmod_class = {
-+	.name	= "rfbi",
-+	.sysc	= &omap44xx_rfbi_sysc,
-+};
-+
-+/* dss_rfbi */
-+static struct omap_hwmod omap44xx_dss_rfbi_hwmod;
-+static struct omap_hwmod_dma_info omap44xx_dss_rfbi_sdma_reqs[] = {
-+	{ .dma_req = 13 + OMAP44XX_DMA_REQ_START },
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_rfbi_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x58002000,
-+		.pa_end		= 0x580020ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l3_main_2 -> dss_rfbi */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_rfbi = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_rfbi_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_rfbi_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_rfbi_dma_addrs),
-+	.user		= OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_rfbi_addrs[] = {
-+	{
-+		.pa_start	= 0x48042000,
-+		.pa_end		= 0x480420ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> dss_rfbi */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_rfbi = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_rfbi_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_rfbi_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_rfbi_addrs),
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* dss_rfbi slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_rfbi_slaves[] = {
-+	&omap44xx_l3_main_2__dss_rfbi,
-+	&omap44xx_l4_per__dss_rfbi,
-+};
-+
-+static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
-+	.name		= "dss_rfbi",
-+	.class		= &omap44xx_rfbi_hwmod_class,
-+	.sdma_reqs	= omap44xx_dss_rfbi_sdma_reqs,
-+	.sdma_reqs_cnt	= ARRAY_SIZE(omap44xx_dss_rfbi_sdma_reqs),
-+	.main_clk	= "dss_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_dss_rfbi_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_rfbi_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/*
-+ * 'venc' class
-+ * video encoder
-+ */
-+
-+static struct omap_hwmod_class omap44xx_venc_hwmod_class = {
-+	.name	= "venc",
-+};
-+
-+/* dss_venc */
-+static struct omap_hwmod omap44xx_dss_venc_hwmod;
-+static struct omap_hwmod_addr_space omap44xx_dss_venc_dma_addrs[] = {
-+	{
-+		.pa_start	= 0x58003000,
-+		.pa_end		= 0x580030ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l3_main_2 -> dss_venc */
-+static struct omap_hwmod_ocp_if omap44xx_l3_main_2__dss_venc = {
-+	.master		= &omap44xx_l3_main_2_hwmod,
-+	.slave		= &omap44xx_dss_venc_hwmod,
-+	.clk		= "l3_div_ck",
-+	.addr		= omap44xx_dss_venc_dma_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_venc_dma_addrs),
-+	.user		= OCP_USER_SDMA,
-+};
-+
-+static struct omap_hwmod_addr_space omap44xx_dss_venc_addrs[] = {
-+	{
-+		.pa_start	= 0x48043000,
-+		.pa_end		= 0x480430ff,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+};
-+
-+/* l4_per -> dss_venc */
-+static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_venc = {
-+	.master		= &omap44xx_l4_per_hwmod,
-+	.slave		= &omap44xx_dss_venc_hwmod,
-+	.clk		= "l4_div_ck",
-+	.addr		= omap44xx_dss_venc_addrs,
-+	.addr_cnt	= ARRAY_SIZE(omap44xx_dss_venc_addrs),
-+	.user		= OCP_USER_MPU,
-+};
-+
-+/* dss_venc slave ports */
-+static struct omap_hwmod_ocp_if *omap44xx_dss_venc_slaves[] = {
-+	&omap44xx_l3_main_2__dss_venc,
-+	&omap44xx_l4_per__dss_venc,
-+};
-+
-+static struct omap_hwmod omap44xx_dss_venc_hwmod = {
-+	.name		= "dss_venc",
-+	.class		= &omap44xx_venc_hwmod_class,
-+	.main_clk	= "dss_fck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_reg = OMAP4430_CM_DSS_DSS_CLKCTRL,
-+		},
-+	},
-+	.slaves		= omap44xx_dss_venc_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap44xx_dss_venc_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-+};
-+
-+/*
-  * 'gpio' class
-  * general purpose io module
+  * 'uart' class
+  * universal asynchronous receiver/transmitter (uart)
   */
-@@ -2924,6 +3511,15 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
- 	&omap44xx_dsp_hwmod,
- 	&omap44xx_dsp_c0_hwmod,
+@@ -2362,6 +2960,19 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 	/* spinlock class */
+ 	&omap44xx_spinlock_hwmod,
  
-+	/* dss class */
-+	&omap44xx_dss_hwmod,
-+	&omap44xx_dss_dispc_hwmod,
-+	&omap44xx_dss_dsi1_hwmod,
-+	&omap44xx_dss_dsi2_hwmod,
-+	&omap44xx_dss_hdmi_hwmod,
-+	&omap44xx_dss_rfbi_hwmod,
-+	&omap44xx_dss_venc_hwmod,
++	/* timer class */
++	&omap44xx_timer1_hwmod,
++	&omap44xx_timer2_hwmod,
++	&omap44xx_timer3_hwmod,
++	&omap44xx_timer4_hwmod,
++	&omap44xx_timer5_hwmod,
++	&omap44xx_timer6_hwmod,
++	&omap44xx_timer7_hwmod,
++	&omap44xx_timer8_hwmod,
++	&omap44xx_timer9_hwmod,
++	&omap44xx_timer10_hwmod,
++	&omap44xx_timer11_hwmod,
 +
- 	/* gpio class */
- 	&omap44xx_gpio1_hwmod,
- 	&omap44xx_gpio2_hwmod,
+ 	/* uart class */
+ 	&omap44xx_uart1_hwmod,
+ 	&omap44xx_uart2_hwmod,
 -- 
 1.7.0.4
