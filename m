@@ -1,56 +1,53 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 16 Feb 2011 21:17:51 -0700
-Subject: [PATCH 1/5] OMAP2xxx: clock: fix parents for L3-derived clocks
+Date: Wed, 16 Feb 2011 21:17:52 -0700
+Subject: [PATCH 2/5] OMAP2xxx: clock: fix low-frequency oscillator clock rate
 In-Reply-To: <20110217041437.16009.52336.stgit@twilight.localdomain>
 References: <20110217041437.16009.52336.stgit@twilight.localdomain>
-Message-ID: <20110217041749.16009.43307.stgit@twilight.localdomain>
+Message-ID: <20110217041751.16009.33809.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several clocks are listed as having the core L4 clock as their parent,
-when they are actually derived from the L3 clock.  Fix these.
+The OMAP2420/2430 external 32-kHz low-frequency oscillator is a 32768
+Hz oscillator, not a 32,000 Hz oscillator[1][2].  Fix this in the clock
+tree.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+
+1. OMAP2420/22 Multimedia Processor Data Manual, Version P [SWPS019P],
+   section 5.1.4 "External 32-kHz CMOS Clock" (note that it refers to
+   a "32.768-kHz" clock; this presumably should be "32.768-KHz")
+
+2. OMAP2430 Multimedia Processor ES2.1 Data Manual, Version V [SWPS023V],
+   section 5.1.4 "External 32-kHz CMOS Clock" (note that it refers to
+   a "32.768-kHz" clock; this presumably should be "32.768-KHz")
 ---
  arch/arm/mach-omap2/clock2420_data.c |    2 +-
- arch/arm/mach-omap2/clock2430_data.c |    6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/clock2430_data.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 68c0369..693a0a8 100644
+index 693a0a8..fd5ba90 100644
 --- a/arch/arm/mach-omap2/clock2420_data.c
 +++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -1614,7 +1614,7 @@ static struct clk sdma_fck = {
- static struct clk sdma_ick = {
- 	.name		= "sdma_ick",
- 	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &l4_ck,
-+	.parent		= &core_l3_ck,
- 	.clkdm_name	= "core_l3_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
- 	.enable_bit	= OMAP24XX_AUTO_SDMA_SHIFT,
+@@ -55,7 +55,7 @@
+ static struct clk func_32k_ck = {
+ 	.name		= "func_32k_ck",
+ 	.ops		= &clkops_null,
+-	.rate		= 32000,
++	.rate		= 32768,
+ 	.clkdm_name	= "wkup_clkdm",
+ };
+ 
 diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index 34daed9..f00f52e 100644
+index f00f52e..0d069ef 100644
 --- a/arch/arm/mach-omap2/clock2430_data.c
 +++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -1652,7 +1652,7 @@ static struct clk sdma_fck = {
- static struct clk sdma_ick = {
- 	.name		= "sdma_ick",
- 	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &l4_ck,
-+	.parent		= &core_l3_ck,
- 	.clkdm_name	= "core_l3_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
- 	.enable_bit	= OMAP24XX_AUTO_SDMA_SHIFT,
-@@ -1662,9 +1662,9 @@ static struct clk sdma_ick = {
- static struct clk sdrc_ick = {
- 	.name		= "sdrc_ick",
- 	.ops		= &clkops_omap2_iclk_idle_only,
--	.parent		= &l4_ck,
-+	.parent		= &core_l3_ck,
- 	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l4_clkdm",
-+	.clkdm_name	= "core_l3_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
- 	.enable_bit	= OMAP2430_EN_SDRC_SHIFT,
- 	.recalc		= &followparent_recalc,
+@@ -55,7 +55,7 @@
+ static struct clk func_32k_ck = {
+ 	.name		= "func_32k_ck",
+ 	.ops		= &clkops_null,
+-	.rate		= 32000,
++	.rate		= 32768,
+ 	.clkdm_name	= "wkup_clkdm",
+ };
+ 
