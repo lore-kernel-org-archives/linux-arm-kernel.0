@@ -1,44 +1,56 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 16 Feb 2011 21:17:49 -0700
-Subject: [PATCH 0/5] OMAP: clock: miscellaneous fixes and dead code removal
-	for 2.6.39
-Message-ID: <20110217041437.16009.52336.stgit@twilight.localdomain>
+Date: Wed, 16 Feb 2011 21:17:51 -0700
+Subject: [PATCH 1/5] OMAP2xxx: clock: fix parents for L3-derived clocks
+In-Reply-To: <20110217041437.16009.52336.stgit@twilight.localdomain>
+References: <20110217041437.16009.52336.stgit@twilight.localdomain>
+Message-ID: <20110217041749.16009.43307.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Several clocks are listed as having the core L4 clock as their parent,
+when they are actually derived from the L3 clock.  Fix these.
 
-This series contains some OMAP clock patches for 2.6.39.  The patches
-in this series fix some long-standing inaccuracies in the OMAP2xxx clock trees,
-prepare for some clock framework locking changes, and remove some
-DPLL rate rounding code that I don't think anyone is using.
-
-Dynamic idle entry and exit has been tested on an OMAP3530 Beagleboard, and
-the "before" and "after" clock trees have been verified on an N800.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/clock2420_data.c |    2 +-
+ arch/arm/mach-omap2/clock2430_data.c |    6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-clk_b_2.6.39
-   text	   data	    bss	    dec	    hex	filename
-3697449	 229488	5390028	9316965	 8e2a65	vmlinux.n800.orig
-3697325	 229584	5390028	9316937	 8e2a49	vmlinux.n800.patched
-
-Paul Walmsley (5):
-      OMAP2xxx: clock: fix parents for L3-derived clocks
-      OMAP2xxx: clock: fix low-frequency oscillator clock rate
-      OMAP2xxx: clock: fix interface clocks and clockdomains for modules in the WKUP domain
-      OMAP: clock: bail out early if arch_clock functions not implemented
-      OMAP2+: clock: remove the DPLL rate tolerance code
-
-
- arch/arm/mach-omap2/clkt_dpll.c         |   91 ++++++++-----------------------
- arch/arm/mach-omap2/clock.h             |    4 -
- arch/arm/mach-omap2/clock2420_data.c    |   38 ++++++++-----
- arch/arm/mach-omap2/clock2430_data.c    |   46 +++++++++-------
- arch/arm/mach-omap2/clock3xxx_data.c    |    6 --
- arch/arm/plat-omap/clock.c              |   66 +++++++++++++---------
- arch/arm/plat-omap/include/plat/clock.h |    7 --
- 7 files changed, 112 insertions(+), 146 deletions(-)
+diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
+index 68c0369..693a0a8 100644
+--- a/arch/arm/mach-omap2/clock2420_data.c
++++ b/arch/arm/mach-omap2/clock2420_data.c
+@@ -1614,7 +1614,7 @@ static struct clk sdma_fck = {
+ static struct clk sdma_ick = {
+ 	.name		= "sdma_ick",
+ 	.ops		= &clkops_omap2_iclk_idle_only,
+-	.parent		= &l4_ck,
++	.parent		= &core_l3_ck,
+ 	.clkdm_name	= "core_l3_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+ 	.enable_bit	= OMAP24XX_AUTO_SDMA_SHIFT,
+diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
+index 34daed9..f00f52e 100644
+--- a/arch/arm/mach-omap2/clock2430_data.c
++++ b/arch/arm/mach-omap2/clock2430_data.c
+@@ -1652,7 +1652,7 @@ static struct clk sdma_fck = {
+ static struct clk sdma_ick = {
+ 	.name		= "sdma_ick",
+ 	.ops		= &clkops_omap2_iclk_idle_only,
+-	.parent		= &l4_ck,
++	.parent		= &core_l3_ck,
+ 	.clkdm_name	= "core_l3_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+ 	.enable_bit	= OMAP24XX_AUTO_SDMA_SHIFT,
+@@ -1662,9 +1662,9 @@ static struct clk sdma_ick = {
+ static struct clk sdrc_ick = {
+ 	.name		= "sdrc_ick",
+ 	.ops		= &clkops_omap2_iclk_idle_only,
+-	.parent		= &l4_ck,
++	.parent		= &core_l3_ck,
+ 	.flags		= ENABLE_ON_INIT,
+-	.clkdm_name	= "core_l4_clkdm",
++	.clkdm_name	= "core_l3_clkdm",
+ 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+ 	.enable_bit	= OMAP2430_EN_SDRC_SHIFT,
+ 	.recalc		= &followparent_recalc,
