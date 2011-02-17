@@ -1,24 +1,18 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 17:15:27 +0200
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <4D5D25F9.8030907@ti.com>
-References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-	<1297946466-9565-7-git-send-email-balbi@ti.com>
-	<4D5D25F9.8030907@ti.com>
-Message-ID: <20110217151527.GL22356@legolas.emea.dhcp.ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 17 Feb 2011 23:16:00 +0800
+Subject: [RFC 1/5] ARM: P2V: separate PHYS_OFFSET from platform definitions
+In-Reply-To: <E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
+	<E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+Message-ID: <AANLkTinwQwPK7Lg4dxkLGBxvp1hz489iAB6YrSG45e75@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 02:43:21PM +0100, Cousson, Benoit wrote:
-> Hi Felipe and Hema,
-> 
-> Sorry for this late review, but I have a couple of comments on this one.
-> 
-> Since I was planning to send usb hwmod data file to Tony directly
-> like I did for the other drivers, I can handle the update myself if
-> you want.
+On Wed, Jan 5, 2011 at 4:22 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> This uncouple PHYS_OFFSET from the platform definitions, thereby
+> facilitating run-time computation of the physical memory offset.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-I'll change this particular patch to yours.
-
--- 
-balbi
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
