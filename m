@@ -1,78 +1,32 @@
-From: jammy.zhou@linaro.org (Jammy Zhou)
-Date: Thu, 17 Feb 2011 09:24:37 +0800
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
-	<201102161322.08126.arnd@arndb.de>
-	<AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
-	<AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
-Message-ID: <AANLkTim3iUNHsaCf7387H-X+XW0YDQsQVa1FwDvo0KvH@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Thu, 17 Feb 2011 09:18:11 +0100
+Subject: [PATCH v2 1/2] ARM: IMX5: cpuidle driver
+In-Reply-To: <20110215182752.GD2027@pengutronix.de>
+References: <1297416973-32740-1-git-send-email-yong.shen@linaro.org>
+	<1297416973-32740-2-git-send-email-yong.shen@linaro.org>
+	<20110215182752.GD2027@pengutronix.de>
+Message-ID: <AANLkTim_7HiWutTyTuWvAR5sx1Nd7HdSyhfwRjS2CfYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is already one KMS abstraction layer (libkms.so) in libdrm, maybe it
-can serve as what we needed.
+>
+>
+> > +     return 0;
+> > +}
+> > +
+> > +late_initcall(imx_cpuidle_init);
+>
+> We have a late_initcall here which needs to be protected from other
+> cpus. On the other hand we depend on board code calling
+> imx_cpuidle_board_params() before this initcall. I think the board code
+> should call a imx_cpuidle_init(struct imx_cpuidle_params
+> *cpuidle_params) instead which makes the flow of execution more clear.
+>
+> imx_cpuidle_init can not be called directly in board code, since it is too
+early to register cpuidle driver and device which depend on some other
+system resource.
 
-Regards,
-Jammy
-
-On Thu, Feb 17, 2011 at 9:08 AM, Clark, Rob <rob@ti.com> wrote:
-
-> I'm still in the learning-as-I-go phase here, so definitely not ready
-> to propose a solution, but it does seem to me like there is room for
-> some sort of kms-helper library here to handle more of the boilerplate
-> xf86-video-* stuff..  I guess I'll have a better picture once I have a
-> chance to add support for the various multi-monitor configurations.
-> But certainly would be interested if anyone already has some ideas.
->
-> BR,
-> -R
->
-> On Wed, Feb 16, 2011 at 8:42 AM, Jesse Barker <jesse.barker@linaro.org>
-> wrote:
-> > Speaking for the Linaro graphics working group, I think it's great.  And,
-> I
-> > think you're right, that if enough of the KMS support in xf86-video-* is
-> > similar enough (I was only aware of intel and nouveau supporting it
-> properly
-> > at current), pulling it out into a common layer would make it easier to
-> > support in new drivers (including fbdev).
-> >
-> > cheers,
-> > Jesse
-> >
-> > On Wed, Feb 16, 2011 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >>
-> >> On Tuesday 15 February 2011, Clark, Rob wrote:
-> >> > I'd been experimenting a bit on the side w/ the DRM driver framework (
-> >> >
-> >> >
-> http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
-> >> > ), but had to add a good chunk of mostly boilerplate code to our xorg
-> >> > driver in order just to test it.  Maybe some generic support for KMS
-> >> > in xf86-video-fbdev would have made this easier to develop the kernel
-> >> > part without in parallel having to implement the userspace part.  I'm
-> >> > not sure if this is the sort of thing the linaro-wg has in mind?
-> >>
-> >> I'm not sure what the the linaro multimedia wg thinks of this, but the
-> >> kernel code you linked looks like it's doing exactly the right thing.
-> >>
-> >>        Arnd
-> >>
-> >> _______________________________________________
-> >> linaro-dev mailing list
-> >> linaro-dev at lists.linaro.org
-> >> http://lists.linaro.org/mailman/listinfo/linaro-dev
-> >
-> >
->
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
->
+Yong
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110217/47c57980/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110217/407ee15f/attachment-0001.html>
