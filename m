@@ -1,229 +1,297 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 16 Feb 2011 21:17:53 -0700
-Subject: [PATCH 3/5] OMAP2xxx: clock: fix interface clocks and clockdomains
-	for modules in the WKUP domain
+Date: Wed, 16 Feb 2011 21:17:56 -0700
+Subject: [PATCH 5/5] OMAP2+: clock: remove the DPLL rate tolerance code
 In-Reply-To: <20110217041437.16009.52336.stgit@twilight.localdomain>
 References: <20110217041437.16009.52336.stgit@twilight.localdomain>
-Message-ID: <20110217041752.16009.3279.stgit@twilight.localdomain>
+Message-ID: <20110217041755.16009.10145.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parent of the interface clocks for GPTIMER1, MPU_WDT,
-SYNCTIMER_32K, SCM, WDT1, and the ICR (2430 only) were all listed as
-being l4_ck.  This isn't accurate; these modules exist inside the WKUP
-domain, and the interface clock to these modules runs at the SYS_CLK
-rate rather than the CORE L4 rate.
-
-So, create a new clock "wu_l4_ick", similar to the OMAP3
-"wkup_l4_ick", that serves as the parent for these clocks.
-
-Also, these clocks were listed as existing inside core_l4_clkdm;
-wkup_clkdm is probably more accurate.
+Remove the DPLL rate tolerance code that is called during rate
+rounding.  As far as I know, this code is never used, since it's been
+more important for callers of the DPLL round_rate()/set_rate()
+functions to obtain an exact rate than it is to save a relatively
+small amount of power.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clock2420_data.c |   33 +++++++++++++++++++-----------
- arch/arm/mach-omap2/clock2430_data.c |   37 +++++++++++++++++++++-------------
- 2 files changed, 44 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap2/clkt_dpll.c         |   91 ++++++++-----------------------
+ arch/arm/mach-omap2/clock.h             |    4 -
+ arch/arm/mach-omap2/clock2420_data.c    |    1 
+ arch/arm/mach-omap2/clock2430_data.c    |    1 
+ arch/arm/mach-omap2/clock3xxx_data.c    |    6 --
+ arch/arm/plat-omap/include/plat/clock.h |    7 --
+ 6 files changed, 24 insertions(+), 86 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/clkt_dpll.c b/arch/arm/mach-omap2/clkt_dpll.c
+index 337392c..17735e7 100644
+--- a/arch/arm/mach-omap2/clkt_dpll.c
++++ b/arch/arm/mach-omap2/clkt_dpll.c
+@@ -178,12 +178,11 @@ void omap2_init_dpll_parent(struct clk *clk)
+ 	if (!dd)
+ 		return;
+ 
+-	/* Return bypass rate if DPLL is bypassed */
+ 	v = __raw_readl(dd->control_reg);
+ 	v &= dd->enable_mask;
+ 	v >>= __ffs(dd->enable_mask);
+ 
+-	/* Reparent in case the dpll is in bypass */
++	/* Reparent the struct clk in case the dpll is in bypass */
+ 	if (cpu_is_omap24xx()) {
+ 		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
+ 		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
+@@ -260,50 +259,22 @@ u32 omap2_get_dpll_rate(struct clk *clk)
+ /* DPLL rate rounding code */
+ 
+ /**
+- * omap2_dpll_set_rate_tolerance: set the error tolerance during rate rounding
+- * @clk: struct clk * of the DPLL
+- * @tolerance: maximum rate error tolerance
+- *
+- * Set the maximum DPLL rate error tolerance for the rate rounding
+- * algorithm.  The rate tolerance is an attempt to balance DPLL power
+- * saving (the least divider value "n") vs. rate fidelity (the least
+- * difference between the desired DPLL target rate and the rounded
+- * rate out of the algorithm).  So, increasing the tolerance is likely
+- * to decrease DPLL power consumption and increase DPLL rate error.
+- * Returns -EINVAL if provided a null clock ptr or a clk that is not a
+- * DPLL; or 0 upon success.
+- */
+-int omap2_dpll_set_rate_tolerance(struct clk *clk, unsigned int tolerance)
+-{
+-	if (!clk || !clk->dpll_data)
+-		return -EINVAL;
+-
+-	clk->dpll_data->rate_tolerance = tolerance;
+-
+-	return 0;
+-}
+-
+-/**
+  * omap2_dpll_round_rate - round a target rate for an OMAP DPLL
+  * @clk: struct clk * for a DPLL
+  * @target_rate: desired DPLL clock rate
+  *
+- * Given a DPLL, a desired target rate, and a rate tolerance, round
+- * the target rate to a possible, programmable rate for this DPLL.
+- * Rate tolerance is assumed to be set by the caller before this
+- * function is called.  Attempts to select the minimum possible n
+- * within the tolerance to reduce power consumption.  Stores the
+- * computed (m, n) in the DPLL's dpll_data structure so set_rate()
+- * will not need to call this (expensive) function again.  Returns ~0
+- * if the target rate cannot be rounded, either because the rate is
+- * too low or because the rate tolerance is set too tightly; or the
+- * rounded rate upon success.
++ * Given a DPLL and a desired target rate, round the target rate to a
++ * possible, programmable rate for this DPLL.  Attempts to select the
++ * minimum possible n.  Stores the computed (m, n) in the DPLL's
++ * dpll_data structure so set_rate() will not need to call this
++ * (expensive) function again.  Returns ~0 if the target rate cannot
++ * be rounded, or the rounded rate upon success.
+  */
+ long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
+ {
+-	int m, n, r, e, scaled_max_m;
+-	unsigned long scaled_rt_rp, new_rate;
+-	int min_e = -1, min_e_m = -1, min_e_n = -1;
++	int m, n, r, scaled_max_m;
++	unsigned long scaled_rt_rp;
++	unsigned long new_rate = 0;
+ 	struct dpll_data *dd;
+ 
+ 	if (!clk || !clk->dpll_data)
+@@ -311,8 +282,8 @@ long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
+ 
+ 	dd = clk->dpll_data;
+ 
+-	pr_debug("clock: starting DPLL round_rate for clock %s, target rate "
+-		 "%ld\n", clk->name, target_rate);
++	pr_debug("clock: %s: starting DPLL round_rate, target rate %ld\n",
++		 clk->name, target_rate);
+ 
+ 	scaled_rt_rp = target_rate / (dd->clk_ref->rate / DPLL_SCALE_FACTOR);
+ 	scaled_max_m = dd->max_multiplier * DPLL_SCALE_FACTOR;
+@@ -347,39 +318,23 @@ long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
+ 		if (r == DPLL_MULT_UNDERFLOW)
+ 			continue;
+ 
+-		e = target_rate - new_rate;
+-		pr_debug("clock: n = %d: m = %d: rate error is %d "
+-			 "(new_rate = %ld)\n", n, m, e, new_rate);
+-
+-		if (min_e == -1 ||
+-		    min_e >= (int)(abs(e) - dd->rate_tolerance)) {
+-			min_e = e;
+-			min_e_m = m;
+-			min_e_n = n;
+-
+-			pr_debug("clock: found new least error %d\n", min_e);
++		pr_debug("clock: %s: m = %d: n = %d: new_rate = %ld\n",
++			 clk->name, m, n, new_rate);
+ 
+-			/* We found good settings -- bail out now */
+-			if (min_e <= dd->rate_tolerance)
+-				break;
++		if (target_rate == new_rate) {
++			dd->last_rounded_m = m;
++			dd->last_rounded_n = n;
++			dd->last_rounded_rate = target_rate;
++			break;
+ 		}
+ 	}
+ 
+-	if (min_e < 0) {
+-		pr_debug("clock: error: target rate or tolerance too low\n");
++	if (target_rate != new_rate) {
++		pr_debug("clock: %s: cannot round to rate %ld\n", clk->name,
++			 target_rate);
+ 		return ~0;
+ 	}
+ 
+-	dd->last_rounded_m = min_e_m;
+-	dd->last_rounded_n = min_e_n;
+-	dd->last_rounded_rate = _dpll_compute_new_rate(dd->clk_ref->rate,
+-						       min_e_m,  min_e_n);
+-
+-	pr_debug("clock: final least error: e = %d, m = %d, n = %d\n",
+-		 min_e, min_e_m, min_e_n);
+-	pr_debug("clock: final rate: %ld  (target rate: %ld)\n",
+-		 dd->last_rounded_rate, target_rate);
+-
+-	return dd->last_rounded_rate;
++	return target_rate;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 70f8b07..62cfd6c 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -18,9 +18,6 @@
+ 
+ #include <plat/clock.h>
+ 
+-/* The maximum error between a target DPLL rate and the rounded rate in Hz */
+-#define DEFAULT_DPLL_RATE_TOLERANCE	50000
+-
+ /* CM_CLKSEL2_PLL.CORE_CLK_SRC bits (2XXX) */
+ #define CORE_CLK_SRC_32K		0x0
+ #define CORE_CLK_SRC_DPLL		0x1
+@@ -55,7 +52,6 @@ void omap2_clk_disable(struct clk *clk);
+ long omap2_clk_round_rate(struct clk *clk, unsigned long rate);
+ int omap2_clk_set_rate(struct clk *clk, unsigned long rate);
+ int omap2_clk_set_parent(struct clk *clk, struct clk *new_parent);
+-int omap2_dpll_set_rate_tolerance(struct clk *clk, unsigned int tolerance);
+ long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate);
+ unsigned long omap3_dpll_recalc(struct clk *clk);
+ unsigned long omap3_clkoutx2_recalc(struct clk *clk);
 diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index fd5ba90..6e9d20d 100644
+index 6e9d20d..22eeafc 100644
 --- a/arch/arm/mach-omap2/clock2420_data.c
 +++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -826,6 +826,14 @@ static struct clk dss_54m_fck = {	/* Alt clk used in power management */
- 	.recalc		= &followparent_recalc,
+@@ -116,7 +116,6 @@ static struct dpll_data dpll_dd = {
+ 	.max_multiplier		= 1023,
+ 	.min_divider		= 1,
+ 	.max_divider		= 16,
+-	.rate_tolerance		= DEFAULT_DPLL_RATE_TOLERANCE
  };
  
-+static struct clk wu_l4_ick = {
-+	.name		= "wu_l4_ick",
-+	.ops		= &clkops_null,
-+	.parent		= &sys_ck,
-+	.clkdm_name	= "wkup_clkdm",
-+	.recalc		= &followparent_recalc,
-+};
-+
  /*
-  * CORE power domain ICLK & FCLK defines.
-  * Many of the these can have more than one possible parent. Entries
-@@ -847,8 +855,8 @@ static const struct clksel omap24xx_gpt_clksel[] = {
- static struct clk gpt1_ick = {
- 	.name		= "gpt1_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_GPT1_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1300,8 +1308,8 @@ static struct clk uart3_fck = {
- static struct clk gpios_ick = {
- 	.name		= "gpios_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_GPIOS_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1320,8 +1328,8 @@ static struct clk gpios_fck = {
- static struct clk mpu_wdt_ick = {
- 	.name		= "mpu_wdt_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_MPU_WDT_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1340,9 +1348,9 @@ static struct clk mpu_wdt_fck = {
- static struct clk sync_32k_ick = {
- 	.name		= "sync_32k_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l4_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_32KSYNC_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1351,8 +1359,8 @@ static struct clk sync_32k_ick = {
- static struct clk wdt1_ick = {
- 	.name		= "wdt1_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_WDT1_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1361,9 +1369,9 @@ static struct clk wdt1_ick = {
- static struct clk omapctrl_ick = {
- 	.name		= "omapctrl_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l4_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_OMAPCTRL_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1825,6 +1833,7 @@ static struct omap_clk omap2420_clks[] = {
- 	/* L4 domain clocks */
- 	CLK(NULL,	"l4_ck",	&l4_ck,		CK_242X),
- 	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_242X),
-+	CLK(NULL,	"wu_l4_ick",	&wu_l4_ick,	CK_242X),
- 	/* virtual meta-group clock */
- 	CLK(NULL,	"virt_prcm_set", &virt_prcm_set, CK_242X),
- 	/* general l4 interface ck, multi-parent functional clk */
 diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index 0d069ef..3378dbf 100644
+index 3378dbf..df4cac5 100644
 --- a/arch/arm/mach-omap2/clock2430_data.c
 +++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -814,6 +814,14 @@ static struct clk dss_54m_fck = {	/* Alt clk used in power management */
- 	.recalc		= &followparent_recalc,
+@@ -116,7 +116,6 @@ static struct dpll_data dpll_dd = {
+ 	.max_multiplier		= 1023,
+ 	.min_divider		= 1,
+ 	.max_divider		= 16,
+-	.rate_tolerance		= DEFAULT_DPLL_RATE_TOLERANCE
  };
  
-+static struct clk wu_l4_ick = {
-+	.name		= "wu_l4_ick",
-+	.ops		= &clkops_null,
-+	.parent		= &sys_ck,
-+	.clkdm_name	= "wkup_clkdm",
-+	.recalc		= &followparent_recalc,
-+};
-+
  /*
-  * CORE power domain ICLK & FCLK defines.
-  * Many of the these can have more than one possible parent. Entries
-@@ -835,8 +843,8 @@ static const struct clksel omap24xx_gpt_clksel[] = {
- static struct clk gpt1_ick = {
- 	.name		= "gpt1_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_GPT1_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1380,8 +1388,8 @@ static struct clk uart3_fck = {
- static struct clk gpios_ick = {
- 	.name		= "gpios_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_GPIOS_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1400,8 +1408,8 @@ static struct clk gpios_fck = {
- static struct clk mpu_wdt_ick = {
- 	.name		= "mpu_wdt_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_MPU_WDT_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1420,9 +1428,9 @@ static struct clk mpu_wdt_fck = {
- static struct clk sync_32k_ick = {
- 	.name		= "sync_32k_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
- 	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_32KSYNC_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1431,8 +1439,8 @@ static struct clk sync_32k_ick = {
- static struct clk wdt1_ick = {
- 	.name		= "wdt1_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_WDT1_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1441,9 +1449,9 @@ static struct clk wdt1_ick = {
- static struct clk omapctrl_ick = {
- 	.name		= "omapctrl_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
- 	.flags		= ENABLE_ON_INIT,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP24XX_EN_OMAPCTRL_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1452,8 +1460,8 @@ static struct clk omapctrl_ick = {
- static struct clk icr_ick = {
- 	.name		= "icr_ick",
- 	.ops		= &clkops_omap2_iclk_dflt_wait,
--	.parent		= &l4_ck,
--	.clkdm_name	= "core_l4_clkdm",
-+	.parent		= &wu_l4_ick,
-+	.clkdm_name	= "wkup_clkdm",
- 	.enable_reg	= OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
- 	.enable_bit	= OMAP2430_EN_ICR_SHIFT,
- 	.recalc		= &followparent_recalc,
-@@ -1914,6 +1922,7 @@ static struct omap_clk omap2430_clks[] = {
- 	/* L4 domain clocks */
- 	CLK(NULL,	"l4_ck",	&l4_ck,		CK_243X),
- 	CLK(NULL,	"ssi_l4_ick",	&ssi_l4_ick,	CK_243X),
-+	CLK(NULL,	"wu_l4_ick",	&wu_l4_ick,	CK_243X),
- 	/* virtual meta-group clock */
- 	CLK(NULL,	"virt_prcm_set", &virt_prcm_set, CK_243X),
- 	/* general l4 interface ck, multi-parent functional clk */
+diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+index 58db368..b82afec 100644
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -291,7 +291,6 @@ static struct dpll_data dpll1_dd = {
+ 	.max_multiplier = OMAP3_MAX_DPLL_MULT,
+ 	.min_divider	= 1,
+ 	.max_divider	= OMAP3_MAX_DPLL_DIV,
+-	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE
+ };
+ 
+ static struct clk dpll1_ck = {
+@@ -364,7 +363,6 @@ static struct dpll_data dpll2_dd = {
+ 	.max_multiplier = OMAP3_MAX_DPLL_MULT,
+ 	.min_divider	= 1,
+ 	.max_divider	= OMAP3_MAX_DPLL_DIV,
+-	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE
+ };
+ 
+ static struct clk dpll2_ck = {
+@@ -424,7 +422,6 @@ static struct dpll_data dpll3_dd = {
+ 	.max_multiplier = OMAP3_MAX_DPLL_MULT,
+ 	.min_divider	= 1,
+ 	.max_divider	= OMAP3_MAX_DPLL_DIV,
+-	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE
+ };
+ 
+ static struct clk dpll3_ck = {
+@@ -583,7 +580,6 @@ static struct dpll_data dpll4_dd_34xx __initdata = {
+ 	.max_multiplier = OMAP3_MAX_DPLL_MULT,
+ 	.min_divider	= 1,
+ 	.max_divider	= OMAP3_MAX_DPLL_DIV,
+-	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE
+ };
+ 
+ static struct dpll_data dpll4_dd_3630 __initdata = {
+@@ -607,7 +603,6 @@ static struct dpll_data dpll4_dd_3630 __initdata = {
+ 	.max_multiplier = OMAP3630_MAX_JTYPE_DPLL_MULT,
+ 	.min_divider	= 1,
+ 	.max_divider	= OMAP3_MAX_DPLL_DIV,
+-	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE,
+ 	.flags		= DPLL_J_TYPE
+ };
+ 
+@@ -939,7 +934,6 @@ static struct dpll_data dpll5_dd = {
+ 	.max_multiplier = OMAP3_MAX_DPLL_MULT,
+ 	.min_divider	= 1,
+ 	.max_divider	= OMAP3_MAX_DPLL_DIV,
+-	.rate_tolerance = DEFAULT_DPLL_RATE_TOLERANCE
+ };
+ 
+ static struct clk dpll5_ck = {
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 48b52fb..072eef1 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -108,7 +108,6 @@ struct clksel {
+  * @clk_ref: struct clk pointer to the clock's reference clock input
+  * @control_reg: register containing the DPLL mode bitfield
+  * @enable_mask: mask of the DPLL mode bitfield in @control_reg
+- * @rate_tolerance: maximum variance allowed from target rate (in Hz)
+  * @last_rounded_rate: cache of the last rate result of omap2_dpll_round_rate()
+  * @last_rounded_m: cache of the last M result of omap2_dpll_round_rate()
+  * @max_multiplier: maximum valid non-bypass multiplier value (actual)
+@@ -134,12 +133,9 @@ struct clksel {
+  * XXX Some DPLLs have multiple bypass inputs, so it's not technically
+  * correct to only have one @clk_bypass pointer.
+  *
+- * XXX @rate_tolerance should probably be deprecated - currently there
+- * don't seem to be any usecases for DPLL rounding that is not exact.
+- *
+  * XXX The runtime-variable fields (@last_rounded_rate, @last_rounded_m,
+  * @last_rounded_n) should be separated from the runtime-fixed fields
+- * and placed into a differenct structure, so that the runtime-fixed data
++ * and placed into a different structure, so that the runtime-fixed data
+  * can be placed into read-only space.
+  */
+ struct dpll_data {
+@@ -150,7 +146,6 @@ struct dpll_data {
+ 	struct clk		*clk_ref;
+ 	void __iomem		*control_reg;
+ 	u32			enable_mask;
+-	unsigned int		rate_tolerance;
+ 	unsigned long		last_rounded_rate;
+ 	u16			last_rounded_m;
+ 	u16			max_multiplier;
