@@ -1,24 +1,54 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Thu, 17 Feb 2011 16:51:02 +0100 (CET)
-Subject: [PATCH]drivers:dma:coh901318.c Change initate to initiate.
-In-Reply-To: <AANLkTi=F29x=iFUGd3PkHhLtA5E_oA5R7fOyUvQJXW0J@mail.gmail.com>
-References: <1296244098-3732-1-git-send-email-justinmattock@gmail.com>
-	<AANLkTi=F29x=iFUGd3PkHhLtA5E_oA5R7fOyUvQJXW0J@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1102171650560.2160@pobox.suse.cz>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 17 Feb 2011 16:54:23 +0100
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <20110217152648.GO22356@legolas.emea.dhcp.ti.com>
+References: <1297946466-9565-1-git-send-email-balbi@ti.com>
+	<1297946466-9565-7-git-send-email-balbi@ti.com>
+	<4D5D25F9.8030907@ti.com>
+	<20110217151527.GL22356@legolas.emea.dhcp.ti.com>
+	<20110217151804.GM22356@legolas.emea.dhcp.ti.com>
+	<4D5D3D0B.8090106@ti.com>
+	<20110217152648.GO22356@legolas.emea.dhcp.ti.com>
+Message-ID: <4D5D44AF.5050805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Jan 2011, Linus Walleij wrote:
+On 2/17/2011 4:26 PM, Balbi, Felipe wrote:
+> On Thu, Feb 17, 2011 at 04:21:47PM +0100, Cousson, Benoit wrote:
+>> On 2/17/2011 4:18 PM, Balbi, Felipe wrote:
+>>> On Thu, Feb 17, 2011 at 05:15:27PM +0200, Felipe Balbi wrote:
+>>>> On Thu, Feb 17, 2011 at 02:43:21PM +0100, Cousson, Benoit wrote:
+>>>>> Hi Felipe and Hema,
+>>>>>
+>>>>> Sorry for this late review, but I have a couple of comments on this one.
+>>>>>
+>>>>> Since I was planning to send usb hwmod data file to Tony directly
+>>>>> like I did for the other drivers, I can handle the update myself if
+>>>>> you want.
+>>>>
+>>>> I'll change this particular patch to yours.
+>>>
+>>> doesn't apply:
+>>>
+>>> $ patch -p1<   ~/benoit.diff
+>>> patching file arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> Hunk #1 succeeded at 55 with fuzz 1 (offset -7 lines).
+>>> patch: **** malformed patch at line 42: omap44xx_l4_cfg__l3_main_2 = {
+>>>
+>>> could you base this off of v2.6.38-rc5 ?
+>>
+>> This is what I was about to say.
+>> You have a dependency with the for_2.6.39/omap4_hwmod_data branch
+>> in git://gitorious.org/omap-pm/linux.git.
+>
+> I cannot have such a dependency and if you create that I can't send a
+> pull request to Tony otherwise we will have conflicts later. Either you
+> clear up that dependency or Tony will have to manually apply the patches
+> I have queued. It's only 7 of them anyway, so maybe not a big deal.
 
-> > Not sure if this is a typo or not. if it is then feel free to take this.
-> >
-> > Signed-off-by: Justin P. Mattock <justinmattock@gmail.com>
-> 
-> Why not,
-> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
+I will try to rebase that one on v2.6.38-rc5 and see if it will generate 
+any issue during the merge with the omap4_hwmod_data series. Generally 
+issues appears if the data are located at the same place in the file. 
+Since the usb is between uart and wd_timer, that might work.
 
-Applied.
-
--- 
-Jiri Kosina
-SUSE Labs, Novell Inc.
+Benoit
