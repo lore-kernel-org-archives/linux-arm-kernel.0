@@ -1,46 +1,51 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 17 Feb 2011 09:43:08 +0200
-Subject: [PATCH 2/2] ARM: PXA: PXAFB: fix plane Z-ordering problem
-In-Reply-To: <1297928588-10545-1-git-send-email-anarsoul@gmail.com>
-References: <201102151718.00800.anarsoul@gmail.com>
-	<1297928588-10545-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <1297928588-10545-2-git-send-email-anarsoul@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 17 Feb 2011 09:47:06 +0200
+Subject: [PATCH 1/2] omap4: 4430sdp: drop ehci support
+In-Reply-To: <20110217014210.GL20795@atomide.com>
+References: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
+	<20110216112631.GA2497@legolas.emea.dhcp.ti.com>
+	<20110217014210.GL20795@atomide.com>
+Message-ID: <20110217074706.GD2439@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pxafb_overlay_init is not right place to change Z-ordering,
-move it to main plane initialization.
+On Wed, Feb 16, 2011 at 05:42:10PM -0800, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [110216 03:25]:
+> > On Wed, Feb 16, 2011 at 04:47:19PM +0530, Anand Gadiyar wrote:
+> > > Most revisions of the OMAP4 Blaze/SDP platform do not have
+> > > the EHCI signals routed by default. The pads are routed
+> > > for the alternate HSI functionality instead, and explicit
+> > > board modifications are needed to route the signals to
+> > > the USB PHY on the board.
+> > > 
+> > > Also, turning on the PHY connected to the EHCI port causes
+> > > a board reboot during bootup due to an unintended short
+> > > on the rails - this affects many initial revisions of the
+> > > board, and needs a minor board mod to fix (or as a
+> > > workaround, one should not attempt to power on the
+> > > USB PHY).
+> > > 
+> > > Given that these boards need explicit board mods to even
+> > > get EHCI working (separate from the accidental short above),
+> > > we should not attempt to enable EHCI by default.
+> > > 
+> > > So drop the EHCI support from the board files for the
+> > > Blaze/SDP platforms.
+> > > 
+> > > Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> > > Cc: Keshava Munegowda <keshava_mgowda@ti.com>
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > 
+> > Tony, if you want to queue this one directly, here's my:
+> > 
+> > Acked-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > if you wish, I can send you a pull request as well. I already have
+> > another patch for you anyway.
+> 
+> OK if you have more I'd rather pull.
 
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/video/pxafb.c |    8 ++++++--
- 1 files changed, 6 insertions(+), 2 deletions(-)
+ok. Taken.
 
-diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index c6aad56..590a99a 100644
---- a/drivers/video/pxafb.c
-+++ b/drivers/video/pxafb.c
-@@ -942,8 +942,6 @@ static int __devinit pxafb_overlay_init(struct pxafb_info *fbi)
- 	/* mask all IU/BS/EOF/SOF interrupts */
- 	lcd_writel(fbi, LCCR5, ~0);
- 
--	/* place overlay(s) on top of base */
--	fbi->lccr0 |= LCCR0_OUC;
- 	pr_info("PXA Overlay driver loaded successfully!\n");
- 	return 0;
- }
-@@ -1827,6 +1825,12 @@ static struct pxafb_info * __devinit pxafb_init_fbinfo(struct device *dev)
- 
- 	pxafb_decode_mach_info(fbi, inf);
- 
-+#ifdef CONFIG_FB_PXA_OVERLAY
-+	/* place overlay(s) on top of base */
-+	if (pxafb_overlay_supported())
-+		fbi->lccr0 |= LCCR0_OUC;
-+#endif
-+
- 	init_waitqueue_head(&fbi->ctrlr_wait);
- 	INIT_WORK(&fbi->task, pxafb_task);
- 	mutex_init(&fbi->ctrlr_lock);
 -- 
-1.7.4
+balbi
