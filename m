@@ -1,699 +1,251 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Thu, 17 Feb 2011 07:31:57 -0700
-Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <20110217100126.GD22961@pulham.picochip.com>
-References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>
-	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>
-	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>
-	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
-	<20110217100126.GD22961@pulham.picochip.com>
-Message-ID: <71326bcb-7836-4820-84c1-f3d8257e9f92@VA3EHSMHS020.ehs.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Feb 2011 15:38:30 +0100
+Subject: [PATCH v2 1/3] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <1297650228-12762-2-git-send-email-shawn.guo@freescale.com>
+References: <1297650228-12762-1-git-send-email-shawn.guo@freescale.com>
+	<1297650228-12762-2-git-send-email-shawn.guo@freescale.com>
+Message-ID: <201102171538.31061.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jamie Iles [mailto:jamie at jamieiles.com]
-> Sent: Thursday, February 17, 2011 3:01 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org;
-linux-kernel at vger.kernel.org; linux at arm.linux.org.uk;
-> catalin.marinas at arm.com; glikely at secretlab.ca; arnd at arndb.de
-> Subject: Re: [PATCH V3 3/4] ARM: Xilinx: base header files and
-assembly macros
+On Monday 14 February 2011, Shawn Guo wrote:
+> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
+> including apbh-dma and apbx-dma.
 > 
-> Hi John,
+> * apbh-dma and apbx-dma are supported in the driver as two instances,
+>   and have to be filtered by dma clients via device id.  It becomes
+>   the convention that apbh-dma always gets registered prior to
+>   apbx-dma.
 > 
-> A few more nitpicks, but looking good now!
+> * apbh-dma is different between mx23 and mx28, hardware version
+>   register is used to handle the differences.
 > 
-> Jamie
+> * mxs-dma supports pio function besides data transfer.  The driver
+>   uses dma_data_direction DMA_NONE to identify the pio mode, and
+>   steals sgl and sg_len to get pio words and numbers from clients.
 > 
-> On Wed, Feb 16, 2011 at 09:11:55AM -0700, John Linn wrote:
-> > These are the minimum needed to build the kernel for the new
-platform.
-> >
-> > Signed-off-by: John Linn <john.linn@xilinx.com>
-> > ---
-> >
-> > V3 Changes
-> >
-> > Updates based on Russell Kings' comments
-> > 	Changed headers to update the license info and remove
-> > 	the address
-> >
-> > 	Updated the constant to use UL in vmalloc.h
-> >
-> > V2 Changes
-> >
-> > Updates based on Russell King's comments
-> > 	moved to using entry-macro-gic.S
-> > 	moved stuff from hardware.h to xilinx_soc.h
-> > 	added IOMEM() in io.h to help with typing
-> > 	Minor updates to IO_SPACE_LIMIT and __io()
-> > 	Updated addresses to be clear with seperate virtual
-> > 		and physical addresses
-> >
-> >  arch/arm/mach-xilinx/include/mach/clkdev.h      |   33
-++++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/debug-macro.S |   36
-+++++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/entry-macro.S |   30
-++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/hardware.h    |   18 +++++++++
-> >  arch/arm/mach-xilinx/include/mach/io.h          |   33
-++++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/irqs.h        |   29
-++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/memory.h      |   23 +++++++++++
-> >  arch/arm/mach-xilinx/include/mach/system.h      |   28
-+++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/timex.h       |   24 ++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/uart.h        |   31
-+++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/uncompress.h  |   47
-+++++++++++++++++++++++
-> >  arch/arm/mach-xilinx/include/mach/vmalloc.h     |   20 ++++++++++
-> >  arch/arm/mach-xilinx/include/mach/xilinx_soc.h  |   46
-++++++++++++++++++++++
-> >  13 files changed, 398 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/clkdev.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/debug-macro.S
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/entry-macro.S
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/hardware.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/io.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/irqs.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/memory.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/system.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/timex.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/uart.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/uncompress.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/vmalloc.h
-> >  create mode 100644 arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-> >
-> > diff --git a/arch/arm/mach-xilinx/include/mach/clkdev.h
-b/arch/arm/mach-xilinx/include/mach/clkdev.h
-> > new file mode 100644
-> > index 0000000..5dd1453
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/clkdev.h
-> > @@ -0,0 +1,33 @@
-> > +/*
-> > + * arch/arm/mach-xilinx/include/mach/clkdev.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx, Inc.
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + */
-> > +
-> > +#ifndef __MACH_CLKDEV_H__
-> > +#define __MACH_CLKDEV_H__
-> > +
-> > +struct clk {
-> > +	unsigned long rate;
-> > +};
-> > +
-> > +static inline int __clk_get(struct clk *clk)
-> > +{
-> > +	return 1;
-> > +}
-> > +
-> > +static inline void __clk_put(struct clk *clk)
-> > +{
-> > +}
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/debug-macro.S
-b/arch/arm/mach-
-> xilinx/include/mach/debug-macro.S
-> > new file mode 100644
-> > index 0000000..30d3d3d
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/debug-macro.S
-> > @@ -0,0 +1,36 @@
-> > +/* arch/arm/mach-xilinx/include/mach/debug-macro.S
-> > + *
-> > + * Debugging macro include header
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <mach/xilinx_soc.h>
-> > +#include <mach/uart.h>
-> > +
-> > +		.macro	addruart, rp, rv
-> > +		ldr	\rp, =LL_UART_PADDR	@ physical
-> > +		ldr	\rv, =LL_UART_VADDR	@ virtual
-> > +		.endm
-> > +
-> > +		.macro	senduart,rd,rx
-> > +		str	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
-> > +		.endm
-> > +
-> > +		.macro	waituart,rd,rx
-> > +		.endm
-> > +
-> > +		.macro	busyuart,rd,rx
-> > +1002:		ldr	\rd, [\rx, #UART_SR_OFFSET]	@ get
-status register
-> > +		tst	\rd, #UART_SR_TXFULL		@
-> > +		bne	1002b			@ wait if FIFO is full
-> > +		.endm
-> > diff --git a/arch/arm/mach-xilinx/include/mach/entry-macro.S
-b/arch/arm/mach-
-> xilinx/include/mach/entry-macro.S
-> > new file mode 100644
-> > index 0000000..11a2866
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/entry-macro.S
-> > @@ -0,0 +1,30 @@
-> > +/*
-> > + * arch/arm/mach-xilinx/include/mach/entry-macro.S
-> > + *
-> > + * Low-level IRQ helper macros
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * based on arch/plat-mxc/include/mach/entry-macro.S
-> > + *
-> > + *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
-> > + *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights
-Reserved.
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <mach/hardware.h>
-> > +#include <asm/hardware/entry-macro-gic.S>
-> > +
-> > +                .macro  disable_fiq
-> > +                .endm
-> > +
-> > +                .macro  arch_ret_to_user, tmp1, tmp2
-> > +                .endm
-> > diff --git a/arch/arm/mach-xilinx/include/mach/hardware.h
-b/arch/arm/mach-
-> xilinx/include/mach/hardware.h
-> > new file mode 100644
-> > index 0000000..f9685c4
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/hardware.h
-> > @@ -0,0 +1,18 @@
-> > +/* arch/arm/mach-xilinx/include/mach/hardware.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_HARDWARE_H__
-> > +#define __MACH_HARDWARE_H__
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/io.h
-b/arch/arm/mach-xilinx/include/mach/io.h
-> > new file mode 100644
-> > index 0000000..ef69e65
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/io.h
-> > @@ -0,0 +1,33 @@
-> > +/* arch/arm/mach-xilinx/include/mach/io.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_IO_H__
-> > +#define __MACH_IO_H__
-> > +
-> > +/* Allow IO space to be anywhere in the memory */
-> > +
-> > +#define IO_SPACE_LIMIT 0xffff
-> > +
-> > +/* IO address mapping macros, nothing special at this time but
-required */
-> > +
-> > +#ifdef __ASSEMBLER__
-> > +#define IOMEM(x)		(x)
-> > +#else
-> > +#define IOMEM(x)		((void __force __iomem *)(x))
-> > +#endif
-> > +
-> > +#define __io(a)			__typesafe_io(a)
-> > +#define __mem_pci(a)		(a)
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/irqs.h
-b/arch/arm/mach-xilinx/include/mach/irqs.h
-> > new file mode 100644
-> > index 0000000..47a8162
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/irqs.h
-> > @@ -0,0 +1,29 @@
-> > +/* arch/arm/mach-xilinx/include/mach/irqs.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_IRQS_H
-> > +#define __MACH_IRQS_H
-> > +
-> > +#define ARCH_NR_GPIOS	118
-> > +#define NR_IRQS		(128 + ARCH_NR_GPIOS)
-> > +
-> > +/*
-> > + * GIC Interrupts
-> > + */
-> > +
-> > +#define IRQ_GIC_SPI_START	32
-> > +#define IRQ_TIMERCOUNTER0	42
-> > +#define IRQ_UART0		59
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/memory.h
-b/arch/arm/mach-xilinx/include/mach/memory.h
-> > new file mode 100644
-> > index 0000000..c200486
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/memory.h
-> > @@ -0,0 +1,23 @@
-> > +/* arch/arm/mach-xilinx/include/mach/memory.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_MEMORY_H__
-> > +#define __MACH_MEMORY_H__
-> > +
-> > +#include <mach/hardware.h>
-> > +
-> > +#define PHYS_OFFSET             0x0
+> * mxs dmaengine has some very specific features, like sense function
+>   and the special NAND support (nand_lock, nand_wait4ready).  These
+>   are too specific to implemented in generic dmaengine driver.
 > 
-> This should be PLAT_PHYS_OFFSET and could do with being surrounded
-with
-> UL() e.g.
-> 
-> #define PLAT_PHYS_OFFSET	UL(0x00000000)
+> * The driver refers to imx-sdma and only a single descriptor is
+>   statically assigned to each channel.
 
-I think Russell mentioned it was changing in the future but I didn't
-know when to do it.
+Hi Shawn,
 
-Easy enough.
+I took a look at this after our discussion about the MMC driver locking
+problem. My feeling is that you still need to get a better understanding
+of the locking interfaces in Linux.
 
-> 
-> > +#define MEM_SIZE		SZ_256M
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/system.h
-b/arch/arm/mach-xilinx/include/mach/system.h
-> > new file mode 100644
-> > index 0000000..e8514a0
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/system.h
-> > @@ -0,0 +1,28 @@
-> > +/* arch/arm/mach-xilinx/include/mach/system.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_SYSTEM_H__
-> > +#define __MACH_SYSTEM_H__
-> > +
-> > +static inline void arch_idle(void)
-> > +{
-> > +	cpu_do_idle();
-> > +}
-> > +
-> > +static inline void arch_reset(char mode, const char *cmd)
-> > +{
-> > +	/* Add architecture specific reset processing here */
-> 
-> I think you can add cpu_reset(0) in here to try a soft reset by
-jumping
-> to the reset vector.  This should give you some reset functionality.
-> 
+> +struct mxs_dma_ccw {
+> +	u32		next;
+> +	u16		bits;
+> +	u16		xfer_bytes;
+> +#define MAX_XFER_BYTES	0xff00
+> +	dma_addr_t	bufaddr;
+> +#define MXS_PIO_WORDS	16
+> +	u32		pio_words[MXS_PIO_WORDS];
+> +};
 
-Will look at that.  I think it requires a lot more than that for our
-platform to clean up.
+Unrelated, but should bufaddr really be dma_addr_t? If this is a hardware
+structure, you should make it u32, because dma_addr_t may be either 32 or
+64 bit in the future, as we get to multiplatform kernels.
 
-> > +}
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/timex.h
-b/arch/arm/mach-xilinx/include/mach/timex.h
-> > new file mode 100644
-> > index 0000000..6765e15
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/timex.h
-> > @@ -0,0 +1,24 @@
-> > +/* arch/arm/mach-xilinx/include/mach/timex.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_TIMEX_H__
-> > +#define __MACH_TIMEX_H__
-> > +
-> > +#include <mach/hardware.h>
-> 
-> I don't think you need mach/hardware.h included in here.
-> 
+> +struct mxs_dma_chan {
+> +	struct mxs_dma_engine		*mxs_dma;
+> +	struct dma_chan			chan;
+> +	struct dma_async_tx_descriptor	desc;
+> +	struct tasklet_struct		tasklet;
+> +	spinlock_t			lock;
+> +	int				chan_irq;
+> +	struct mxs_dma_ccw		*ccw;
+> +	dma_addr_t			ccw_phys;
+> +	dma_cookie_t			last_completed;
+> +	enum dma_status			status;
+> +	unsigned int			flags;
+> +#define MXS_DMA_SG_LOOP			(1 << 0)
+> +};
+> +
+> +struct mxs_dma_engine {
+> +	int				dev_id;
+> +	unsigned int			version;
+> +	void __iomem			*base;
+> +	struct clk			*clk;
+> +	struct dma_device		dma_device;
+> +	struct device_dma_parameters	dma_parms;
+> +#define MXS_DMA_CHANNELS		16
+> +	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
+> +};
 
-Looks like that's true.  I should have caught that.
+So you have locking per channel, but there is no lock in the dma engine
+structure locking the global fields. This is probably fine.
 
-> > +
-> > +#define PERIPHERAL_CLOCK_RATE	2500000
-> > +
-> > +#define CLOCK_TICK_RATE	(PERIPHERAL_CLOCK_RATE / 32)
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/uart.h
-b/arch/arm/mach-xilinx/include/mach/uart.h
-> > new file mode 100644
-> > index 0000000..20a10d7
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/uart.h
-> > @@ -0,0 +1,31 @@
-> > +/* arch/arm/mach-xilinx/include/mach/uart.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_UART_H__
-> > +#define __MACH_UART_H__
-> > +
-> > +#define UART_CR_OFFSET          0x00  /* Control Register [8:0] */
-> > +#define UART_SR_OFFSET          0x2C  /* Channel Status [11:0] */
-> > +#define UART_FIFO_OFFSET        0x30  /* FIFO [15:0] or [7:0] */
-> > +
-> > +#define UART_SR_TXFULL		0x00000010	/* TX FIFO full
-*/
-> > +#define UART_SR_TXEMPTY		0x00000008	/* TX FIFO empty
-*/
-> > +
-> > +#define UART_FIFO_WRITE(base, value) \
-> > +	(*(volatile unsigned int *)((base) + UART_FIFO_OFFSET) =
-(value))
-> > +
-> > +#define UART_STATUS(base) \
-> > +	(*(volatile unsigned int *)((base) + UART_SR_OFFSET))
-> 
-> You could probably make these static inline functions in the header
-and
-> use __raw_{readl,writel}() to make this a little cleaner.
-> 
+> +static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +	int chan_id = mxs_chan->chan.chan_id;
+> +
+> +	if (dma_is_apbh() && apbh_is_old())
+> +		__mxs_setl(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
+> +				mxs_dma->base + HW_APBHX_CTRL0);
+> +	else
+> +		__mxs_setl(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
+> +				mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
+> +}
+> +
+> +static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +	int chan_id = mxs_chan->chan.chan_id;
+> +
+> +	/* set cmd_addr up */
+> +	__raw_writel(mxs_chan->ccw_phys,
+> +			mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id));
+> +
+> +	/* enable apbh channel clock */
+> +	if (dma_is_apbh()) {
+> +		if (apbh_is_old())
+> +			__mxs_clrl(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
+> +						mxs_dma->base + HW_APBHX_CTRL0);
+> +		else
+> +			__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
+> +	}
+> +
+> +	/* write 1 to SEMA to kick off the channel */
+> +	__raw_writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(chan_id));
+> +}
 
-I had considered that, but it wasn't clear to me at the time what the
-compressor could use or not.
+Just like the MMC driver, you also use __raw_writel(). If you have to do
+that, please encapsulate the access into a wrapper function that adds
+all the necessary serialization and add a comment explaining why you
+cannot use writel()/writel_relaxed().
 
-I'll give it a try as I agree that's cleaner.
+Or just use writel().
 
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/uncompress.h
-b/arch/arm/mach-
-> xilinx/include/mach/uncompress.h
-> > new file mode 100644
-> > index 0000000..b7a5110
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/uncompress.h
-> > @@ -0,0 +1,47 @@
-> > +/* arch/arm/mach-xilinx/include/mach/uncompress.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_UNCOMPRESS_H__
-> > +#define __MACH_UNCOMPRESS_H__
-> > +
-> > +#include <mach/xilinx_soc.h>
-> > +#include <mach/uart.h>
-> > +
-> > +void arch_decomp_setup(void)
-> > +{
-> > +}
-> > +
-> > +static inline void flush(void)
-> > +{
-> > +	/*
-> > +	 * Wait while the FIFO is not empty
-> > +	 */
-> > +	while (!(UART_STATUS(LL_UART_PADDR) & UART_SR_TXEMPTY))
-> > +		;
-> > +}
-> > +
-> > +#define arch_decomp_wdog()
-> > +
-> > +static void putc(char ch)
-> > +{
-> > +	/*
-> > +	 * Wait for room in the FIFO, then write the char into the FIFO
-> > +	 */
-> > +	while (UART_STATUS(LL_UART_PADDR) & UART_SR_TXFULL)
-> > +		;
-> 
-> It might be worth adding a barrier() call to these loops to be
-explicit
-> about the volatility.
+> +static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +	int chan_id = mxs_chan->chan.chan_id;
+> +
+> +	/* disable apbh channel clock */
+> +	if (dma_is_apbh()) {
+> +		if (apbh_is_old())
+> +			__mxs_setl(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
+> +						mxs_dma->base + HW_APBHX_CTRL0);
+> +		else
+> +			__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
+> +	}
+> +
+> +	mxs_chan->status = DMA_SUCCESS;
+> +}
+> +
+> +static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +	int chan_id = mxs_chan->chan.chan_id;
+> +
+> +	/* freeze the channel */
+> +	if (dma_is_apbh() && apbh_is_old())
+> +		__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
+> +	else
+> +		__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
+> +
+> +	mxs_chan->status = DMA_PAUSED;
+> +}
+> +
+> +static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
+> +	int chan_id = mxs_chan->chan.chan_id;
+> +
+> +	/* unfreeze the channel */
+> +	if (dma_is_apbh() && apbh_is_old())
+> +		__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
+> +	else
+> +		__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
+> +
+> +	mxs_chan->status = DMA_IN_PROGRESS;
+> +}
 
-OK
+Should these take the spinlock? What if they are called simultaneously on
+multiple CPUs, or while the interrupt handler is running on another CPU?
 
-I appreciate all your help and time to review, both you and Russell. I'm
-learning a lot and it's much
-cleaner too.
+Without a lock, another thread might see an incorrect value of mxs_chan->status.
 
-I hope there's an ack in the near future :)
+> +static dma_cookie_t mxs_dma_assign_cookie(struct mxs_dma_chan *mxs_chan)
+> +{
+> +	dma_cookie_t cookie = mxs_chan->chan.cookie;
+> +
+> +	if (++cookie < 0)
+> +		cookie = 1;
+> +
+> +	mxs_chan->chan.cookie = cookie;
+> +	mxs_chan->desc.cookie = cookie;
+> +
+> +	return cookie;
+> +}
+> +
+> +static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
+> +{
+> +	return container_of(chan, struct mxs_dma_chan, chan);
+> +}
+> +
+> +static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+> +{
+> +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
+> +	dma_cookie_t cookie;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&mxs_chan->lock, flags);
+> +
+> +	cookie = mxs_dma_assign_cookie(mxs_chan);
+> +
+> +	mxs_dma_enable_chan(mxs_chan);
+> +
+> +	spin_unlock_irqrestore(&mxs_chan->lock, flags);
+> +
+> +	return cookie;
+> +}
 
-Thanks
-John
+Just like the MMC driver, you use spin_lock_irqsave() in the functions that
+are called by other drivers, but then don't actually lock in the interrupt
+handler. This is clearly wrong, as I explained before:
 
-> 
-> > +
-> > +	UART_FIFO_WRITE(LL_UART_PADDR, ch);
-> > +}
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/vmalloc.h
-b/arch/arm/mach-
-> xilinx/include/mach/vmalloc.h
-> > new file mode 100644
-> > index 0000000..aba20a3
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/vmalloc.h
-> > @@ -0,0 +1,20 @@
-> > +/* arch/arm/mach-xilinx/include/mach/vmalloc.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_VMALLOC_H__
-> > +#define __MACH_VMALLOC_H__
-> > +
-> > +#define VMALLOC_END       0xE0000000UL
-> > +
-> > +#endif
-> > diff --git a/arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-b/arch/arm/mach-
-> xilinx/include/mach/xilinx_soc.h
-> > new file mode 100644
-> > index 0000000..d01cde1
-> > --- /dev/null
-> > +++ b/arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-> > @@ -0,0 +1,46 @@
-> > +/* arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-> > + *
-> > + *  Copyright (C) 2011 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General
-Public
-> > + * License version 2, as published by the Free Software Foundation,
-and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#ifndef __MACH_XILINX_SOC_H__
-> > +#define __MACH_XILINX_SOC_H__
-> > +
-> > +/* For now, all mappings are flat (physical = virtual)
-> > + */
-> > +#define UART0_PHYS			0xE0000000
-> > +#define UART0_VIRT			UART0_PHYS
-> > +
-> > +#define TTC0_PHYS			0xF8001000
-> > +#define TTC0_VIRT			TTC0_PHYS
-> > +
-> > +#define PL310_L2CC_PHYS			0xF8F02000
-> > +#define PL310_L2CC_VIRT			PL310_L2CC_PHYS
-> > +
-> > +#define SCU_PERIPH_PHYS			0xF8F00000
-> > +#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
-> > +
-> > +/* The following are intended for the devices that are mapped early
-*/
-> > +
-> > +#define TTC0_BASE			IOMEM(TTC0_VIRT)
-> > +#define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
-> > +#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
-> > +#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
-> > +#define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
-> > +
-> > +/*
-> > + * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
-> > + */
-> > +#define LL_UART_PADDR	UART0_PHYS
-> > +#define LL_UART_VADDR	UART0_VIRT
-> > +
-> > +#endif
-> > --
-> > 1.6.2.1
-> >
-> >
-> >
-> > This email and any attachments are intended for the sole use of the
-named recipient(s) and
-> contain(s) confidential information that may be proprietary,
-privileged or copyrighted under
-> applicable law. If you are not the intended recipient, do not read,
-copy, or forward this email
-> message or any attachments. Delete this email message and any
-attachments immediately.
-> >
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe
-linux-kernel" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > Please read the FAQ at  http://www.tux.org/lkml/
+The interrupt handler may already be running on another CPU, so it
+is not at all serialized with this code.
 
+> +static void mxs_dma_tasklet(unsigned long data)
+> +{
+> +	struct mxs_dma_chan *mxs_chan = (struct mxs_dma_chan *) data;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&mxs_chan->lock, flags);
+> +
+> +	if (mxs_chan->desc.callback)
+> +		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
+> +
+> +	if (mxs_chan->status == DMA_SUCCESS)
+> +		mxs_chan->last_completed = mxs_chan->desc.cookie;
+> +
+> +	spin_unlock_irqrestore(&mxs_chan->lock, flags);
+> +}
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Here is a different problem. The entire tasklet has interrupts
+disabled and holds the spinlock that the interrupt handler does
+not hold.
+
+This actually makes the tasklet a stricter context than the
+actual interrupt handler, defeating the purpose of tasklets
+(i.e. that you can run code without disabling interrupts).
+
+I don't know what the rules for dmaengine callbacks are regarding
+the context in which they are called, but it seems you should
+either get rid of the spin_lock_irqsave here or do everything
+from the interrupt handler.
+
+That leaves the last_completed variable. This apparently
+needs to be protected using a spinlock, because
+it can be read from other tasks calling mxs_dma_tx_status,
+which in turn does not take the lock, so that is broken, too.
+
+	Arnd
