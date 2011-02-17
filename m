@@ -1,33 +1,57 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Feb 2011 15:39:09 -0800
-Subject: [PATCH v5 3/5] OMAP4: hwmod data: add mailbox data
-In-Reply-To: <AANLkTi=yj2_bS1h87u0hhUUpA=RPZe-A=PiNSf_q_66r@mail.gmail.com>
-References: <1296674843-12718-1-git-send-email-omar.ramirez@ti.com>
-	<1296674843-12718-4-git-send-email-omar.ramirez@ti.com>
-	<4D5943A9.8010205@ti.com>
-	<AANLkTinA2a60TSM7qDC1LQiRaUTs0DR3bDMv+oVsVOE0@mail.gmail.com>
-	<4D5AF8BA.8080403@ti.com>
-	<AANLkTi=yj2_bS1h87u0hhUUpA=RPZe-A=PiNSf_q_66r@mail.gmail.com>
-Message-ID: <20110217233908.GG20795@atomide.com>
+Date: Thu, 17 Feb 2011 15:46:03 -0800
+Subject: [PATCH 4/4] mtd: OneNAND: OMAP2: increase multiblock erase
+	verify timeout
+In-Reply-To: <1297068421-14430-5-git-send-email-adrian.hunter@nokia.com>
+References: <1297068421-14430-1-git-send-email-adrian.hunter@nokia.com>
+	<1297068421-14430-5-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <20110217234603.GI20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ramirez Luna, Omar <omar.ramirez@ti.com> [110215 16:11]:
+* Adrian Hunter <adrian.hunter@nokia.com> [110207 00:45]:
+> From: Roman Tereshonkov <roman.tereshonkov@nokia.com>
 > 
-> > If you have to do several platform_get_irq_byname to get this one, I'd
-> > prefer to get rid of that name for OMAP4. It will make mailbox irq
-> > consistent with the other hwmods.
+> The current multiblock erase verify read timeout 100us is the maximum
+> for none-error case. If errors happen during multibock erase then
+> the specification recommends to run multiblock erase verify command
+> with maximum timeout 10ms (see specs. for KFM4G16Q2A and KFN8G16Q2A).
 > 
-> I was thinking to standardize the names to be mbox0..mboxN across all
-> the platforms, reason being that the mailbox also has capabilities to
-> be used not only by dsp or iva, by using a polling method.
+> For the most common non-error case we wait 100us in udelay polling
+> loop. In case of timeout the interrupt mode is used to wait for the
+> command end.
 > 
-> So even if the mailbox in OMAP3 is called "dsp", it has 4 more queues
-> apart from the 2 used for messaging between arm and dsp, that could be
-> used even if tidspbridge wasn't there.
+> Signed-off-by: Roman Tereshonkov <roman.tereshonkov@nokia.com>
 
-So what's the status of this series? Can the rest of the patches
-now be applied on top of the current omap-for-linus or do the names
-still need fixing?
+I'll queue this series. Anybody from MTD list care to ack this patch?
+
+Regards,
 
 Tony
+
+> ---
+>  drivers/mtd/onenand/omap2.c |    8 +++-----
+>  1 files changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
+> index 3e1bb95..ec26399 100644
+> --- a/drivers/mtd/onenand/omap2.c
+> +++ b/drivers/mtd/onenand/omap2.c
+> @@ -148,11 +148,9 @@ static int omap2_onenand_wait(struct mtd_info *mtd, int state)
+>  			wait_err("controller error", state, ctrl, intr);
+>  			return -EIO;
+>  		}
+> -		if ((intr & intr_flags) != intr_flags) {
+> -			wait_err("timeout", state, ctrl, intr);
+> -			return -EIO;
+> -		}
+> -		return 0;
+> +		if ((intr & intr_flags) == intr_flags)
+> +			return 0;
+> +		/* Continue in wait for interrupt branch */
+>  	}
+>  
+>  	if (state != FL_READING) {
+> -- 
+> 1.7.0.4
+> 
