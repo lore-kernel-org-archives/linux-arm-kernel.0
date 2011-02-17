@@ -1,85 +1,163 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 14:41:01 +0200
-Subject: [patch-v2.6.39 2/7] arm: omap4: 4430sdp: drop ehci support
+Date: Thu, 17 Feb 2011 14:41:02 +0200
+Subject: [patch-v2.6.39 3/7] OMAP2430: hwmod data: Add USBOTG
 In-Reply-To: <1297946466-9565-1-git-send-email-balbi@ti.com>
 References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-Message-ID: <1297946466-9565-3-git-send-email-balbi@ti.com>
+Message-ID: <1297946466-9565-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anand Gadiyar <gadiyar@ti.com>
+From: Hema HK <hemahk@ti.com>
 
-Most revisions of the OMAP4 Blaze/SDP platform do not have
-the EHCI signals routed by default. The pads are routed
-for the alternate HSI functionality instead, and explicit
-board modifications are needed to route the signals to
-the USB PHY on the board.
+OMAP2430 hwmod data structures are populated with base address, L3 and L4
+interface clocks, IRQs and sysconfig register details.
 
-Also, turning on the PHY connected to the EHCI port causes
-a board reboot during bootup due to an unintended short
-on the rails - this affects many initial revisions of the
-board, and needs a minor board mod to fix (or as a
-workaround, one should not attempt to power on the
-USB PHY).
+As per OMAP USBOTG specification, need to configure the USBOTG
+to smart idle/standby or no idle/standby during data transfer and
+force idle/standby when not in use to support retention and off-mode.
+By setting HWMOD_SWSUP_SIDLE and HWMOD_SWSUP_MSTANDBY flags, framework
+will take care of configuring to no idle/standby when module is enabled
+and force idle/standby when suspended.
 
-Given that these boards need explicit board mods to even
-get EHCI working (separate from the accidental short above),
-we should not attempt to enable EHCI by default.
-
-So drop the EHCI support from the board files for the
-Blaze/SDP platforms.
-
-Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
-Cc: Keshava Munegowda <keshava_mgowda@ti.com>
+Signed-off-by: Hema HK <hemahk@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Cc: Cousson, Benoit <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c |   19 -------------------
- 1 files changed, 0 insertions(+), 19 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   98 ++++++++++++++++++++++++++++
+ 1 files changed, 98 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 07d1b20..674c183 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -44,7 +44,6 @@
- #define ETH_KS8851_IRQ			34
- #define ETH_KS8851_POWER_ON		48
- #define ETH_KS8851_QUART		138
--#define OMAP4SDP_MDM_PWR_EN_GPIO	157
- #define OMAP4_SFH7741_SENSOR_OUTPUT_GPIO	184
- #define OMAP4_SFH7741_ENABLE_GPIO		188
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 8ecfbcd..76bbf8a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -89,6 +89,16 @@ static struct omap_hwmod omap2430_uart3_hwmod;
+ static struct omap_hwmod omap2430_i2c1_hwmod;
+ static struct omap_hwmod omap2430_i2c2_hwmod;
  
-@@ -251,16 +250,6 @@ static void __init omap_4430sdp_init_irq(void)
- 	gic_init_irq();
- }
++static struct omap_hwmod omap2430_usbhsotg_hwmod;
++
++/* l3_core -> usbhsotg  interface */
++static struct omap_hwmod_ocp_if omap2430_usbhsotg__l3 = {
++	.master		= &omap2430_usbhsotg_hwmod,
++	.slave		= &omap2430_l3_main_hwmod,
++	.clk		= "core_l3_ck",
++	.user		= OCP_USER_MPU,
++};
++
+ /* I2C IP block address space length (in bytes) */
+ #define OMAP2_I2C_AS_LEN		128
  
--static const struct ehci_hcd_omap_platform_data ehci_pdata __initconst = {
--	.port_mode[0]	= EHCI_HCD_OMAP_MODE_PHY,
--	.port_mode[1]	= EHCI_HCD_OMAP_MODE_UNKNOWN,
--	.port_mode[2]	= EHCI_HCD_OMAP_MODE_UNKNOWN,
--	.phy_reset	= false,
--	.reset_gpio_port[0]  = -EINVAL,
--	.reset_gpio_port[1]  = -EINVAL,
--	.reset_gpio_port[2]  = -EINVAL,
--};
--
- static struct omap_musb_board_data musb_board_data = {
- 	.interface_type		= MUSB_INTERFACE_UTMI,
- 	.mode			= MUSB_OTG,
-@@ -576,14 +565,6 @@ static void __init omap_4430sdp_init(void)
- 	omap_serial_init();
- 	omap4_twl6030_hsmmc_init(mmc);
+@@ -189,6 +199,35 @@ static struct omap_hwmod_ocp_if omap2_l4_core__uart3 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
  
--	/* Power on the ULPI PHY */
--	status = gpio_request(OMAP4SDP_MDM_PWR_EN_GPIO, "USBB1 PHY VMDM_3V3");
--	if (status)
--		pr_err("%s: Could not get USBB1 PHY GPIO\n", __func__);
--	else
--		gpio_direction_output(OMAP4SDP_MDM_PWR_EN_GPIO, 1);
--
--	usb_ehci_init(&ehci_pdata);
- 	usb_musb_init(&musb_board_data);
++/*
++* usbhsotg interface data
++*/
++static struct omap_hwmod_addr_space omap2430_usbhsotg_addrs[] = {
++	{
++		.pa_start	= OMAP243X_HS_BASE,
++		.pa_end		= OMAP243X_HS_BASE + SZ_4K - 1,
++		.flags		= ADDR_TYPE_RT
++	},
++};
++
++/*  l4_core ->usbhsotg  interface */
++static struct omap_hwmod_ocp_if omap2430_l4_core__usbhsotg = {
++	.master		= &omap2430_l4_core_hwmod,
++	.slave		= &omap2430_usbhsotg_hwmod,
++	.clk		= "usb_l4_ick",
++	.addr		= omap2430_usbhsotg_addrs,
++	.addr_cnt	= ARRAY_SIZE(omap2430_usbhsotg_addrs),
++	.user		= OCP_USER_MPU,
++};
++
++static struct omap_hwmod_ocp_if *omap2430_usbhsotg_masters[] = {
++	&omap2430_usbhsotg__l3,
++};
++
++static struct omap_hwmod_ocp_if *omap2430_usbhsotg_slaves[] = {
++	&omap2430_l4_core__usbhsotg,
++};
++
+ /* Slave interfaces on the L4_CORE interconnect */
+ static struct omap_hwmod_ocp_if *omap2430_l4_core_slaves[] = {
+ 	&omap2430_l3_main__l4_core,
+@@ -919,6 +958,62 @@ static struct omap_hwmod omap2430_dma_system_hwmod = {
+ 	.flags		= HWMOD_NO_IDLEST,
+ };
  
- 	status = omap_ethernet_init();
++/*
++ * usbhsotg
++ */
++static struct omap_hwmod_class_sysconfig omap2430_usbhsotg_sysc = {
++	.rev_offs	= 0x0400,
++	.sysc_offs	= 0x0404,
++	.syss_offs	= 0x0408,
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE|
++			  SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
++			  SYSC_HAS_AUTOIDLE),
++	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++			  MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
++
++static struct omap_hwmod_class usbotg_class = {
++	.name = "usbotg",
++	.sysc = &omap2430_usbhsotg_sysc,
++};
++
++/* usb_otg_hs */
++static struct omap_hwmod_irq_info omap2430_usbhsotg_mpu_irqs[] = {
++
++	{ .name = "mc", .irq = 92 },
++	{ .name = "dma", .irq = 93 },
++};
++
++static struct omap_hwmod omap2430_usbhsotg_hwmod = {
++	.name		= "usb_otg_hs",
++	.mpu_irqs	= omap2430_usbhsotg_mpu_irqs,
++	.mpu_irqs_cnt	= ARRAY_SIZE(omap2430_usbhsotg_mpu_irqs),
++	.main_clk	= "usbhs_ick",
++	.prcm		= {
++		.omap2 = {
++			.prcm_reg_id = 1,
++			.module_bit = OMAP2430_EN_USBHS_MASK,
++			.module_offs = CORE_MOD,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP2430_ST_USBHS_SHIFT,
++		},
++	},
++	.masters	= omap2430_usbhsotg_masters,
++	.masters_cnt	= ARRAY_SIZE(omap2430_usbhsotg_masters),
++	.slaves		= omap2430_usbhsotg_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap2430_usbhsotg_slaves),
++	.class		= &usbotg_class,
++	/*
++	 * Erratum ID: i479  idle_req / idle_ack mechanism potentially
++	 * broken when autoidle is enabled
++	 * workaround is to disable the autoidle bit at module level.
++	 */
++	.flags		= HWMOD_NO_OCP_AUTOIDLE | HWMOD_SWSUP_SIDLE
++				| HWMOD_SWSUP_MSTANDBY,
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2430)
++};
++
+ static __initdata struct omap_hwmod *omap2430_hwmods[] = {
+ 	&omap2430_l3_main_hwmod,
+ 	&omap2430_l4_core_hwmod,
+@@ -941,6 +1036,9 @@ static __initdata struct omap_hwmod *omap2430_hwmods[] = {
+ 
+ 	/* dma_system class*/
+ 	&omap2430_dma_system_hwmod,
++
++	/* usbotg class*/
++	&omap2430_usbhsotg_hwmod,
+ 	NULL,
+ };
+ 
 -- 
 1.7.4.rc2
