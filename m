@@ -1,29 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Feb 2011 08:59:53 -0800
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110217162209.GA13425@legolas.emea.dhcp.ti.com>
-References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-	<1297946466-9565-7-git-send-email-balbi@ti.com>
-	<4D5D25F9.8030907@ti.com>
-	<20110217151527.GL22356@legolas.emea.dhcp.ti.com>
-	<20110217151804.GM22356@legolas.emea.dhcp.ti.com>
-	<4D5D3D0B.8090106@ti.com>
-	<20110217152648.GO22356@legolas.emea.dhcp.ti.com>
-	<4D5D44AF.5050805@ti.com> <20110217162000.GP20795@atomide.com>
-	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
-Message-ID: <20110217165953.GR20795@atomide.com>
+Date: Thu, 17 Feb 2011 09:05:14 -0800
+Subject: [PATCH 2/8] OMAP4: hwmod data: Add McSPI
+In-Reply-To: <1297938289-8678-3-git-send-email-b-cousson@ti.com>
+References: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
+	<1297938289-8678-3-git-send-email-b-cousson@ti.com>
+Message-ID: <20110217170514.GS20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [110217 08:20]:
-> On Thu, Feb 17, 2011 at 08:20:01AM -0800, Tony Lindgren wrote:
-> > 
-> > Maybe no need to rebase, I'll apply Benoit's series first into
-> > omap-for-linus, then let's applying the other hwmod related patches
-> > should be trivial.
-> 
-> So I can drop the omap4 HWMOD part from my branch ?
+Hi,
 
-Yeh assuming Benoit's data is correct.
+Noticed one cosmetic thing below.
+
+* Benoit Cousson <b-cousson@ti.com> [110217 02:23]:
+> Update omap4 hwmod file with McSPI info.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Signed-off-by: Charulatha V <charu@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> ---
+  ^^^ That should not be here, it shows up in your commit.
+
+> [b-cousson at ti.com: Remove dev_attr to prevent dependency
+> with device code. It will have to be re-added along with
+> the original series]
+
+As the above should be part of the commit too. Care to
+refresh your branch for that?
+
+Regards,
 
 Tony
