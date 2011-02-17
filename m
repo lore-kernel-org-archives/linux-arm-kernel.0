@@ -1,33 +1,44 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 21:08:09 +0200
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110217181849.GV20795@atomide.com>
-References: <4D5D44AF.5050805@ti.com> <20110217162000.GP20795@atomide.com>
-	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
-	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
-	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
-	<4D5D59E5.6020307@ti.com>
-	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
-	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
-Message-ID: <20110217190809.GM14574@legolas.emea.dhcp.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 17 Feb 2011 20:48:52 +0100
+Subject: [PATCH 2/2] ARM: mach-mx5: Add watchdog support for MX53 based
+	boards
+In-Reply-To: <1297969066-14810-2-git-send-email-fabio.estevam@freescale.com>
+References: <1297969066-14810-1-git-send-email-fabio.estevam@freescale.com>
+	<1297969066-14810-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110217194851.GQ22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 10:18:49AM -0800, Tony Lindgren wrote:
-> * Cousson, Benoit <b-cousson@ti.com> [110217 09:45]:
-> > 
-> > Done, boot tested, and that does remove the warning about the
-> > missing opt clock you had with the previous data.
-> > 
-> > git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
-> > 
-> > Just let me know if it does break anything else.
-> 
-> Pulled into omap-for-linus. Also now merged are the devel-hwspinlock
-> and devel-mcspi branches.
+Hi Fabio,
 
-Ok good. Tomorrow I'll send you a proper pull request for my part, will
-leave testusb running over night.
+just a small nitpick below, 
+
+On Thu, Feb 17, 2011 at 04:57:46PM -0200, Fabio Estevam wrote:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Kconfig           |    3 +++
+>  arch/arm/mach-mx5/board-mx53_evk.c  |    1 +
+>  arch/arm/mach-mx5/board-mx53_loco.c |    1 +
+>  arch/arm/mach-mx5/board-mx53_smd.c  |    1 +
+>  4 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index 10b6008..8441462 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -128,6 +128,7 @@ config MACH_MX53_EVK
+>  	select SOC_IMX53
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+IMX2 sorts before IMX_
+
+Other than that ack for both patches.
+
+Best regards
+Uwe
+
 
 -- 
-balbi
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
