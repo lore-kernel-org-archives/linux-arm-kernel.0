@@ -1,70 +1,45 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Wed, 16 Feb 2011 20:08:56 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102151816.57104.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102142122.54766.arnd@arndb.de>
-	<AANLkTinPtiwXmtRy9qS2zZXwuhQDOyO-H8-wmF=fSNnJ@mail.gmail.com>
-	<201102151816.57104.arnd@arndb.de>
-Message-ID: <AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Feb 2011 10:44:09 +0800
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <201102161659.18475.arnd@arndb.de>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<20110215172948.GE10770@pengutronix.de>
+	<20110216202818.GA11467@S2100-06.ap.freescale.net>
+	<201102161659.18475.arnd@arndb.de>
+Message-ID: <20110217024408.GA1273@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 11:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 14 February 2011, Andrei Warkentin wrote:
->> > There are multiple ways how this could be implemented:
->> >
->> > 1. Have one exception cache for all "special" blocks. This would normally
->> > ? be for FAT32 subdirectory updates, which always write to the same
->> > ? few blocks. This means you can do small writes efficiently anywhere
->> > ? on the card, but only up to a (small) fixed number of block addresses.
->> > ? If you overflow the table, the card still needs to go through an
->> > ? extra PE for each new entry you write, in order to free up an entry.
->> >
->> > 2. Have a small number of AUs that can be in a special mode with efficient
->> > ? small writes but inefficient large writes. This means that when you
->> > ? alternate between small and large writes in the same AU, it has to go
->> > ? through a PE on every switch. Similarly, if you do small writes to
->> > ? more than the maximum number of AUs that can be held in this mode, you
->> > ? get the same effect. This number can be as small as one, because that
->> > ? is what FAT32 requires.
->> >
->> > In both cases, you don't actually have a solution for the problem, you just
->> > make it less likely for specific workloads.
->>
->> Aha, ok. By the way, I did find out that either suggestion works. So
->> I'll pull out the reversing portion of the patch. No need to
->> overcomplicate :).
->
-> BTW, what file system are you using? I could imagine that each of ext4, btrfs
-> and nilfs2 give you very different results here. It could be that if your
-> patch is optimizing for one file system, it is actually pessimising for
-> another one.
->
+Hi Arnd,
 
-Ext4. I've actually been rewriting the patch a lot and it's taking
-time because there are a lot of things that are wrong in it (so I feel
-kinda bad for forwarding it to this list in the first place...). I've
-already mentioned that there is no need to reorder, so that's going
-away and it simplifies everything greatly.
+On Wed, Feb 16, 2011 at 04:59:18PM +0100, Arnd Bergmann wrote:
+> On Wednesday 16 February 2011, Shawn Guo wrote:
+> > It's caused by spinlock recursion introduced by mxs-dma functions
+> > mxs_dma_tx_submit and mxs_dma_tasklet.  We have mmc_request_done
+> > invoked in the dma callback tasklet.  At the meantime,
+> > mmc_request_done will issue retries in some case, which will call in
+> > mxs_dma_tx_submit.
+> > 
+> > I added the lock by referring to other dma driver implementation, but
+> > now I'm considering to remove the lock completely, as I do not see
+> > any global data needs to be protected there.  Comments?
+> 
+> You need to be sure that the data accessed in the tasklet does not
+> need to be locked against mxs_dma_tx_submit.
+> 
+The only thing we actually put in tasklet is just the callback
+registered by client device driver, which should not have anything
+that mxs_dma_tx_submit would concern.
 
-I agree, which is why all of this is controlled now through sysfs, and
-there are no more hard-coded checks for manfid, mmc versus sd or any
-other magic. There is a page_size_secs attribute, through which you
-can notify of the page size for the device. The workaround for small
-writes crossing the page boundary (and winding up in Buffer B, instead
-of A) is turned on by setting split_tlow and split_thigh, which
-provided a threshold range in sectors over which the the writes will
-be split/aligned. The second workaround for splitting larger requests
-and writing them with reliable write (to avoid getting coalesced and
-winding up in Buffer B again) is controlled through split_relw_tlow
-and split_relw_thigh. Do you think there is a better way? Or is this
-good enough?
+> I haven't looked at the dmaengine code for this, but it's quite likely
+> that you actually need it, because you need to serialize adding an
+> element to the DMA device with removing it again.
+> 
+I'm not sure that I understand your comment. If the adding/removing
+an element means what mxs_dma_alloc_chan_resources and 
+mxs_dma_free_chan_resources do, I do not think it's a problem, as
+client driver is calling them in probe/remove for once.
 
-So, as I mentioned before, T had done some tests given data provided
-by M, and then T verified that this fix was good. I need to do my own
-tests on the patch after I rewrite it. Is iozone the best tool I can
-use? So far I have a MMC logging facility through connector that I use
-to collect stats (useful for seeing how fs traffic translates to
-actual mmc commands...once I clean it up I'll push here for RFC). What
-about the tool you're writing? Any way I can use it?
+-- 
+Regards,
+Shawn
