@@ -1,144 +1,69 @@
-From: raj.khem@gmail.com (Khem Raj)
-Date: Wed, 16 Feb 2011 19:17:47 -0800
-Subject: [klibc] fwd: fix up ARM assembly to use 'bx lr' in place of 'mov
-	pc, lr'.
-In-Reply-To: <AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
-References: <20110216230648.GA7649@stro.at>
-	<20110216235019.GA17674@shutemov.name>
-	<AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
-Message-ID: <AANLkTikOEdrkU_14QK+Fs=9zQ7kvJeJNZRkD0_1stW3R@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 17 Feb 2011 12:17:14 +0800
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110216153332.GC6365@pengutronix.de>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165958.GH10709@pengutronix.de>
+	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
+	<20110215171341.GD10770@pengutronix.de>
+	<20110215171917.GQ4152@n2100.arm.linux.org.uk>
+	<20110215172948.GE10770@pengutronix.de>
+	<20110216202818.GA11467@S2100-06.ap.freescale.net>
+	<20110216153332.GC6365@pengutronix.de>
+Message-ID: <20110217041713.GB1273@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 4:03 PM, Khem Raj <raj.khem@gmail.com> wrote:
-> On Wed, Feb 16, 2011 at 3:50 PM, Kirill A. Shutemov
-> <kirill@shutemov.name> wrote:
->> On Thu, Feb 17, 2011 at 12:06:48AM +0100, maximilian attems wrote:
->>> hello vorlon,
->>>
->>> got notified of your patch,
->>> will apply next days upstream unless some critiques are voiced on ml.
->>> thanks.
->>>
->>> --
->>> maks
->>>
->>>
->>> ----- Forwarded message from Steve Langasek <steve.langasek@canonical.com> -----
->>>
->>> Date: Wed, 16 Feb 2011 22:05:42 -0000
->>> From: Steve Langasek <steve.langasek@canonical.com>
->>> Subject: [Bug 527720] Re: thumb2 porting issues identified: klibc uses mov.*pc
->>>
->>>
->>> I've also touched it up to be mergeable with Debian (support v4t builds
->>> with #ifdef).
->>>
->>> Confirmed that installing the resulting klibc packages on my beagleboard
->>> gives me a successfully-booting initramfs with klibc; and the
->>> vfork/setjmptest test cases all pass in the klibc package tree.
->>>
->>> Fixes: https://bugs.launchpad.net/ubuntu/+source/klibc/+bug/527720
->>>
->>> --- klibc-1.5.20.orig/usr/klibc/arch/arm/vfork.S
->>> +++ klibc-1.5.20/usr/klibc/arch/arm/vfork.S
->>> @@ -25,7 +25,11 @@ vfork:
->>> ? ? ? ? ?ldrcs ? ? ? ?r3, 1f
->>> ? ? ? ? ?mvncs ? ? ? ?r0, #0
->>> ? ? ? ? ?strcs ? ? ? ?r2, [r3]
->>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->>
->> NAK. ARMv4T supports bx intruction. ARMv4 doesn't.
->
-> Does ARMv4t support BX lr ?
+Hi Wolfram,
 
-hmm yes it does. I confused it with blx <Rm> which is unpredictable in
-thumb mode on architectures < armv5t
+On Wed, Feb 16, 2011 at 04:33:32PM +0100, Wolfram Sang wrote:
+> Hi Shawn,
+> 
+> [CRC failures on MMC]
+> > I guess you will also get the unknown partition table message if you
+> > test this card on mx35 right now.
+> 
+> No, I didn't see that message on MX35. (Doesn't matter much now).
+> 
+> > I just tested 7 mmc cards in total.  6 cards work fine, and 1 card
+> > (Transcend MMC plus 1GB) has the exactly same problem as yours. And
+> > if I remove the 8 bit cap, this card also works fine.  So I would
+> > agree with Russell that it's unrelated to the driver.
+> 
+> Ah, the 8_BIT_CAP was the right pointer. It works now and I can see the
+> partitions \o/ But IMHO it is related to the driver because it cannot set that
+> 8_BIT_DATA_CAP unconditionally? Probably something like 'flags' should be added
+> to platform_data? One flag could then be 8_BIT_CAPABLE_SLOT or something.
+> 
+If a platform is designed to support 8-bit mode (e.g. all 8 data
+lines are routed), I do not think the 8-bit cap will be removed from
+this platform just because one particular card has problem to work
+in 8-bit mode.
 
->
->
->>
->>> ? ? ? mov ? ? pc, lr
->>> +#else
->>> + ? ? bx ? ? ?lr
->>> +#endif
->>>
->>> ? ? ? .balign 4
->>> ?1:
->>> @@ -49,7 +53,11 @@ vfork:
->>> ? ? ? str ? ? r2, [r1]
->>> ? ? ? neg ? ? r0, r0
->>> ?1:
->>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->>> ? ? ? mov ? ? pc, lr
->>> +#else
->>> + ? ? bx ? ? ?lr
->>> +#endif
->>>
->>> ? ? ? .balign 4
->>> ?2:
->>> --- klibc-1.5.20.orig/usr/klibc/arch/arm/setjmp.S
->>> +++ klibc-1.5.20/usr/klibc/arch/arm/setjmp.S
->>> @@ -29,7 +29,11 @@
->>> ?setjmp:
->>> ? ? ? stmia ? r0, {r4, r5, r6, r7, r8, r9, r10, fp, sp, lr}
->>> ? ? ? mov ? ? r0, #0
->>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->>> ? ? ? mov ? ? pc, lr
->>> +#else
->>> + ? ? bx ? ? ?lr
->>> +#endif
->>> ? ? ? .size setjmp,.-setjmp
->>>
->>> ? ? ? .text
->>> @@ -39,7 +43,11 @@ setjmp:
->>> ?longjmp:
->>> ? ? ? ldmia ? r0, {r4, r5, r6, r7, r8, r9, r10, fp, sp, lr}
->>> ? ? ? mov ? ? r0, r1
->>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->>> ? ? ? mov ? ? pc, lr
->>> +#else
->>> + ? ? bx ? ? ?lr
->>> +#endif
->>> ? ? ? .size longjmp,.-longjmp
->>>
->>> ?#else /* __thumb__ */
->>> @@ -75,7 +83,11 @@ setjmp:
->>> ? ? ? mov ? ? r7, sp
->>> ? ? ? stmia ? r0!, {r3, r4, r5, r6, r7}
->>> ? ? ? mov ? ? r0, #0
->>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->>> ? ? ? mov ? ? pc, lr
->>> +#else
->>> + ? ? bx ? ? ?lr
->>> +#endif
->>> ? ? ? .size setjmp,.-setjmp
->>>
->>> ? ? ? .text
->>> @@ -96,7 +108,11 @@ longjmp:
->>> ? ? ? mov ? ? r0, r1
->>> ? ? ? bne ? ? 1f
->>> ? ? ? mov ? ? r0, #1
->>> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->>> ?1: ? mov ? ? pc, r3
->>> +#else
->>> +1: ? bx ? ? ?r3
->>> +#endif
->>> ? ? ? .size longjmp,.-longjmp
->>>
->>> ?#endif /* __thumb__ */
->>>
->>> _______________________________________________
->>> klibc mailing list
->>> klibc at zytor.com
->>> http://www.zytor.com/mailman/listinfo/klibc
->>
->> --
->> ?Kirill A. Shutemov
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+But I would anyway let platform_data tell the 4 BIT_CAP and 8_BIT_CAP
+just like what Freescale BSP is doing, as some platforms may design
+this cap differently.
+
+> > I tested the SDIO, but probably in different way from yours.  I had
+> > two card slots on my board, rootfs on mmc0 and SDIO card on mmc1.
+> > It seems working fine in this way.  However, when I use nfs and test
+> > SDIO on mmc0, my systems hangs too.  I will look into it.
+> 
+> The latter scenario is the only one I can test, because I don't have an
+> (active) second slot.
+> 
+It's a board thing.  I just rechecked the schematics of mx28evk
+board, and found that the power supply of the two slots are
+different.  The mmc1 uses the external regulator REG_3V3 which can
+supply up to 1.5 A current, while mmc0 uses mx28 internal regulator
+VDDIO_3V3 which has very limited current capability.  That's why my
+SDIO WiFi card works on mmc1 slot while hangs system on mmc0.  When
+I reworked the board to supply mmc0 with REG_3V3, the card works on
+mmc0 too.
+
+So your board supplies mmc0 slot with VDDIO_3V3 as well?
+
+-- 
+Regards,
+Shawn
