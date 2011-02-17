@@ -1,141 +1,74 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 17 Feb 2011 12:07:14 +0100
-Subject: [PATCH 0/8] OMAP4: hwmod data: Add a bunch of IPs
-In-Reply-To: <20110217104207.GB17370@m-desktop>
-References: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
-	<20110217104207.GB17370@m-desktop>
-Message-ID: <4D5D0162.6010505@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 17 Feb 2011 12:21:32 +0100 (CET)
+Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <20110217105611.GE24627@n2100.arm.linux.org.uk>
+References: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
+	<-4413647205110644369@unknownmsgid>
+	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
+	<146267380211262372@unknownmsgid>
+	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
+	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
+	<20110217091741.GA24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
+	<20110217101957.GC24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171136550.2701@localhost6.localdomain6>
+	<20110217105611.GE24627@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1102171203280.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
+On Thu, 17 Feb 2011, Russell King - ARM Linux wrote:
+> On Thu, Feb 17, 2011 at 11:43:38AM +0100, Thomas Gleixner wrote:
+> > > There is a lot of difference between using a conventional 'flow' handler
+> > > which does masking/unmasking of the parent interrupt and a properly
+> > > written chained handler which avoids that masking.
+> > 
+> > Depends on the underlying flow handler. fasteoi does not mask, but I
+> > can see your point. If you have that oddball SA11xx thing, you are
+> > forced to do that, but that is tied into SA11xx and confined.
+> 
+> It isn't - what I highlight above is the correct way to deal with
+> chained interrupts - which is to leave the parent interrupt enabled
+> _unless_ there is a good reason not to.
+> 
+> It also needs to be symetrical otherwise you unbalance the interrupt
+> handling such that those interrupts which are downstream of the primary
+> controller become less likely to be handled, and you end up with some
+> interrupts being soo pessimistic its untrue.  This commonly happens
+> when people don't think and just throw loop after loop into their
+> flow handlers.
+> 
+> The last reason for this is to ensure that IRQ handling is *fast* and
+> *efficient*.  Using the standard handlers adds a hell of a lot of
+> unnecessary overhead which just isn't required.
+> 
+> Look, I put a lot of time and effort into giving ARM an interrupt handling
+> subsystem which actually _works_ for the hardware that we commonly have,
+> and I'm not having all that thrown out in the name of 'generalization'.
+> If genirq can't cope with it, then ARM needs to avoid genirq.
+> 
+> Chained flow handlers are here to stay on ARM.
 
-On 2/17/2011 11:42 AM, G, Manjunath Kondaiah wrote:
-> On Thu, Feb 17, 2011 at 11:24:41AM +0100, Benoit Cousson wrote:
->> All,
->>
->> Due to the important number of modifications recently done on the
->> OMAP4 data compared to the original and the total absence of explanation
->> in the changelog, I re-submit the data before the driver series in order
->> to maintain the integrity of the original file and to avoid a huge pain
->> during the merge.
->>
->> Govind, Tarun and Kishon,
->> Please note that I cannot include here the dev_attr or rev field for
->> McSPI, McBSP and timer since it requires some modification in the device
->> header.
->
-> McSPI is already merged to l-o master. Will not this series breaks spi
-> hwmod?
+I have no intention to remove them. If they are done correct they are
+not a problem at all. And correct means: tied to the underlying
+primary chip.
 
-It will not break, it will just make the merge a little bit painful for 
-Tony if we do not re-submit the updated McSPI hwmod data for OMAP4.
+The shit hits the fan when a chained handler implementation is trying
+to be agnostic about the actual underlying primary chip. That won't
+ever work and is broken. The only way to make a demux handler agnostic
+is to use a regular requested interrupt handler. That's all what I'm
+saying.
 
-Please find below a sample of what the patch should now look like.
+You have to actually use your brain when implementing a chained
+handler. Looking through a bunch of implementations I found stuff,
+which is basically a poorly implemented flow handler. Worst example:
+fsl_msi_cascade().
 
-BTW, in this case, it will be much better to rename omap2_mcspi_dev_attr 
-using the same convention as others: <class_name>_dev_attr -> 
-mcspi_dev_attr.
+ARM ones are mostly sane, but e.g. nmk_gpio_irq_handler() is not
+really one which fits your description. It's trying to deal with
+different underlying primary chips obviously, which is wrong in the
+first place.
 
-Regards,
-Benoit
+Thanks,
 
----
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c 
-b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index f108614..fc7fabf 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -24,6 +24,9 @@
-  #include <plat/cpu.h>
-  #include <plat/gpio.h>
-  #include <plat/dma.h>
-+#include <plat/mcspi.h>
-
-  #include "omap_hwmod_common_data.h"
-
-@@ -2497,6 +2508,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi1_slaves[] = {
-  	&omap44xx_l4_per__mcspi1,
-  };
-
-+/* mcspi1 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
-+	.num_chipselect	= 4,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi1_hwmod = {
-  	.name		= "mcspi1",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -2510,6 +2526,7 @@ static struct omap_hwmod omap44xx_mcspi1_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi1_dev_attr,
-  	.slaves		= omap44xx_mcspi1_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi1_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -2551,6 +2568,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi2_slaves[] = {
-  	&omap44xx_l4_per__mcspi2,
-  };
-
-+/* mcspi2 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
-+	.num_chipselect	= 2,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi2_hwmod = {
-  	.name		= "mcspi2",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -2564,6 +2586,7 @@ static struct omap_hwmod omap44xx_mcspi2_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi2_dev_attr,
-  	.slaves		= omap44xx_mcspi2_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi2_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -2605,6 +2628,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi3_slaves[] = {
-  	&omap44xx_l4_per__mcspi3,
-  };
-
-+/* mcspi3 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
-+	.num_chipselect	= 2,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi3_hwmod = {
-  	.name		= "mcspi3",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -2618,6 +2646,7 @@ static struct omap_hwmod omap44xx_mcspi3_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi3_dev_attr,
-  	.slaves		= omap44xx_mcspi3_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi3_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -2657,6 +2686,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi4_slaves[] = {
-  	&omap44xx_l4_per__mcspi4,
-  };
-
-+/* mcspi4 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
-+	.num_chipselect	= 1,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi4_hwmod = {
-  	.name		= "mcspi4",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -2670,6 +2704,7 @@ static struct omap_hwmod omap44xx_mcspi4_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi4_dev_attr,
-  	.slaves		= omap44xx_mcspi4_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi4_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
----
+	tglx
