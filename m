@@ -1,28 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 17 Feb 2011 13:58:24 -0800
-Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <20110217100126.GD22961@pulham.picochip.com>
-References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
-	<20110217100126.GD22961@pulham.picochip.com>
-Message-ID: <4D5D9A00.7060609@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Feb 2011 14:19:33 -0800
+Subject: [PATCH 5/5] OMAP3EVM: Set TSC wakeup option in pad config
+In-Reply-To: <87k4hqnq6l.fsf@ti.com>
+References: <1295977061-11086-1-git-send-email-hvaibhav@ti.com>
+	<1295977061-11086-6-git-send-email-hvaibhav@ti.com>
+	<87k4hqnq6l.fsf@ti.com>
+Message-ID: <20110217221933.GC20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2011 02:01 AM, Jamie Iles wrote:
->> +
->> +static void putc(char ch)
->> +{
->> +	/*
->> +	 * Wait for room in the FIFO, then write the char into the FIFO
->> +	 */
->> +	while (UART_STATUS(LL_UART_PADDR) & UART_SR_TXFULL)
->> +		;
->
-> It might be worth adding a barrier() call to these loops to be explicit 
-> about the volatility.
+* Kevin Hilman <khilman@ti.com> [110127 10:41]:
+> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+> 
+> > Set OMAP_PIN_OFF_WAKEUPENABLE to enable the wake-up
+> > functionality from touchscreen controller.
+> >
+> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/board-omap3evm.c |    6 ++++--
+> >  1 files changed, 4 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+> > index 2a2efa9..5eddf93 100644
+> > --- a/arch/arm/mach-omap2/board-omap3evm.c
+> > +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> > @@ -716,7 +716,8 @@ static struct omap_board_mux omap35x_board_mux[] __initdata = {
+> >  				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW |
+> >  				OMAP_PIN_OFF_WAKEUPENABLE),
+> >  	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+> > -				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW),
+> > +				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW |
+> > +				OMAP_PIN_OFF_WAKEUPENABLE),
+> 
+> This hunk doesn't apply because the code below (SYS_BOOT5, etc.) doesn't
+> exist in upstream code.
 
-I think you want cpu_relax() then.
+Looks like this applies on top of current omap-for-linus with the mcspi changes
+in. So I've applied all the omap3evm related patches.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I had to resolve few changes manually with wl12xx changes, can you guys please
+check that everything is working? Pushing them into the devel-board branch.
+
+Regards,
+
+Tony
