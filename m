@@ -1,137 +1,62 @@
-From: raj.khem@gmail.com (Khem Raj)
-Date: Wed, 16 Feb 2011 16:03:07 -0800
-Subject: [klibc] fwd: fix up ARM assembly to use 'bx lr' in place of 'mov
-	pc, lr'.
-In-Reply-To: <20110216235019.GA17674@shutemov.name>
-References: <20110216230648.GA7649@stro.at>
-	<20110216235019.GA17674@shutemov.name>
-Message-ID: <AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 16 Feb 2011 17:09:23 -0700
+Subject: [PATCH 2/2] ARM: remove the 4x expansion presumption while
+	decompressing the kernel
+In-Reply-To: <1297892343-29064-2-git-send-email-nico@fluxnic.net>
+References: <1297892343-29064-1-git-send-email-nico@fluxnic.net>
+	<1297892343-29064-2-git-send-email-nico@fluxnic.net>
+Message-ID: <20110217000923.GF2364@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 3:50 PM, Kirill A. Shutemov
-<kirill@shutemov.name> wrote:
-> On Thu, Feb 17, 2011 at 12:06:48AM +0100, maximilian attems wrote:
->> hello vorlon,
->>
->> got notified of your patch,
->> will apply next days upstream unless some critiques are voiced on ml.
->> thanks.
->>
->> --
->> maks
->>
->>
->> ----- Forwarded message from Steve Langasek <steve.langasek@canonical.com> -----
->>
->> Date: Wed, 16 Feb 2011 22:05:42 -0000
->> From: Steve Langasek <steve.langasek@canonical.com>
->> Subject: [Bug 527720] Re: thumb2 porting issues identified: klibc uses mov.*pc
->>
->>
->> I've also touched it up to be mergeable with Debian (support v4t builds
->> with #ifdef).
->>
->> Confirmed that installing the resulting klibc packages on my beagleboard
->> gives me a successfully-booting initramfs with klibc; and the
->> vfork/setjmptest test cases all pass in the klibc package tree.
->>
->> Fixes: https://bugs.launchpad.net/ubuntu/+source/klibc/+bug/527720
->>
->> --- klibc-1.5.20.orig/usr/klibc/arch/arm/vfork.S
->> +++ klibc-1.5.20/usr/klibc/arch/arm/vfork.S
->> @@ -25,7 +25,11 @@ vfork:
->> ? ? ? ? ?ldrcs ? ? ? ?r3, 1f
->> ? ? ? ? ?mvncs ? ? ? ?r0, #0
->> ? ? ? ? ?strcs ? ? ? ?r2, [r3]
->> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->
-> NAK. ARMv4T supports bx intruction. ARMv4 doesn't.
+On Wed, Feb 16, 2011 at 04:39:03PM -0500, Nicolas Pitre wrote:
+> We currently presume a 4x expansion to guess the decompressed kernel size
+> in order to determine if the decompressed kernel is in conflict with
+> the location where zImage is loaded.  This guess may cause many issues
+> by overestimating the final kernel image size:
+> 
+> - This may force a needless relocation if the location of zImage was
+>   fine, wasting some precious microseconds of boot time.
+> 
+> - The relocation may be located way too far, possibly overwriting the
+>   initrd image in RAM.
+> 
+> - If the kernel image includes a large already-compressed initramfs image
+>   then the problem is even more exacerbated.
+> 
+> And if by some strange means the 4x guess is too low then we may overwrite
+> ourselves with the decompressed image.
+> 
+> So let's use the exact decompressed kernel image size instead.  For that
+> we need to rely on the stat command, but this is hardly a new build
+> dependency as the kernel already depends on many commands provided by
+> the same coreutils package where stat is found to be built.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/boot/compressed/Makefile       |    4 +++-
+>  arch/arm/boot/compressed/vmlinux.lds.in |    3 ---
+>  2 files changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 0a8f748..9d328be 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -83,9 +83,11 @@ endif
+>  EXTRA_CFLAGS  := -fpic -fno-builtin
+>  EXTRA_AFLAGS  := -Wa,-march=all
+>  
+> +# Provide size of uncompressed kernel to the decompressor via a linker symbol.
+> +LDFLAGS_vmlinux := --defsym _image_size=$(shell stat -c "%s" $(obj)/../Image)
 
-Does ARMv4t support BX lr ?
+Patch looks good to me, but on a related note, I'm looking for a way
+to also find the end of .bss.
 
+When John looks at adding support for appending an initrd and/or dtb
+to the zimage, it will be important to make sure the start of the
+initrd/dtb does not overlap the ram the kernel is expecting to be
+empty and available.  I was thinking about simply grepping System.map
+for __end and doing some sed magic to extract the offset from the
+beginning of the kernel.
 
->
->> ? ? ? mov ? ? pc, lr
->> +#else
->> + ? ? bx ? ? ?lr
->> +#endif
->>
->> ? ? ? .balign 4
->> ?1:
->> @@ -49,7 +53,11 @@ vfork:
->> ? ? ? str ? ? r2, [r1]
->> ? ? ? neg ? ? r0, r0
->> ?1:
->> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->> ? ? ? mov ? ? pc, lr
->> +#else
->> + ? ? bx ? ? ?lr
->> +#endif
->>
->> ? ? ? .balign 4
->> ?2:
->> --- klibc-1.5.20.orig/usr/klibc/arch/arm/setjmp.S
->> +++ klibc-1.5.20/usr/klibc/arch/arm/setjmp.S
->> @@ -29,7 +29,11 @@
->> ?setjmp:
->> ? ? ? stmia ? r0, {r4, r5, r6, r7, r8, r9, r10, fp, sp, lr}
->> ? ? ? mov ? ? r0, #0
->> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->> ? ? ? mov ? ? pc, lr
->> +#else
->> + ? ? bx ? ? ?lr
->> +#endif
->> ? ? ? .size setjmp,.-setjmp
->>
->> ? ? ? .text
->> @@ -39,7 +43,11 @@ setjmp:
->> ?longjmp:
->> ? ? ? ldmia ? r0, {r4, r5, r6, r7, r8, r9, r10, fp, sp, lr}
->> ? ? ? mov ? ? r0, r1
->> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->> ? ? ? mov ? ? pc, lr
->> +#else
->> + ? ? bx ? ? ?lr
->> +#endif
->> ? ? ? .size longjmp,.-longjmp
->>
->> ?#else /* __thumb__ */
->> @@ -75,7 +83,11 @@ setjmp:
->> ? ? ? mov ? ? r7, sp
->> ? ? ? stmia ? r0!, {r3, r4, r5, r6, r7}
->> ? ? ? mov ? ? r0, #0
->> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->> ? ? ? mov ? ? pc, lr
->> +#else
->> + ? ? bx ? ? ?lr
->> +#endif
->> ? ? ? .size setjmp,.-setjmp
->>
->> ? ? ? .text
->> @@ -96,7 +108,11 @@ longjmp:
->> ? ? ? mov ? ? r0, r1
->> ? ? ? bne ? ? 1f
->> ? ? ? mov ? ? r0, #1
->> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
->> ?1: ? mov ? ? pc, r3
->> +#else
->> +1: ? bx ? ? ?r3
->> +#endif
->> ? ? ? .size longjmp,.-longjmp
->>
->> ?#endif /* __thumb__ */
->>
->> _______________________________________________
->> klibc mailing list
->> klibc at zytor.com
->> http://www.zytor.com/mailman/listinfo/klibc
->
-> --
-> ?Kirill A. Shutemov
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Do you think that is sufficient to protect appended data images?
