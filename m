@@ -1,28 +1,58 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Feb 2011 18:52:23 +0000
-Subject: [PATCH 2/2] ARM: remove the 4x expansion presumption while
-	decompressing the kernel
-In-Reply-To: <20110217175156.GB31812@angua.secretlab.ca>
-References: <1297892343-29064-1-git-send-email-nico@fluxnic.net>
-	<1297892343-29064-2-git-send-email-nico@fluxnic.net>
-	<20110217000923.GF2364@angua.secretlab.ca>
-	<20110217092617.GB24627@n2100.arm.linux.org.uk>
-	<20110217175156.GB31812@angua.secretlab.ca>
-Message-ID: <20110217185223.GA30606@n2100.arm.linux.org.uk>
+Date: Thu, 17 Feb 2011 18:56:09 +0000
+Subject: [PATCH 1/2] ARM: PXA: PXAFB: Fix double-free issue.
+In-Reply-To: <201102171917.41442.marek.vasut@gmail.com>
+References: <201102151718.00800.anarsoul@gmail.com>
+	<1297928588-10545-1-git-send-email-anarsoul@gmail.com>
+	<201102171917.41442.marek.vasut@gmail.com>
+Message-ID: <20110217185609.GB30606@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 10:51:56AM -0700, Grant Likely wrote:
-> As for knowing where it can relocate to, we already know (actually
-> current code just makes an assumption) about how long the kernel
-> proper image is and where it wants to live in the zImage's head.S.
-> Assuming enough ram, if r6 reflects the size of the zImage + the size
-> of the appended data then it should be good.
+On Thu, Feb 17, 2011 at 07:17:41PM +0100, Marek Vasut wrote:
+> Why are you getting rid of the atomic operations ?
 
-That isn't a valid argument.  Just because "the decompressor already
-does it" does not mean that it'll work with ramdisks.  We've been
-lucky so far that it has worked with the kernel - and that's exactly
-what it is - luck.
+Because they're idiotic.  Just because something is called "atomic"
+doesn't make it so, and this is one instance where it's absolutely
+useless.
 
-It works for a 1-2MB kernel.  A 16MB ramdisk is a completely different
-kettle of bytes.
+The open and release functions are called with a mutex held.  Only
+_one_ thread can be inside these at any one time.  So what use does
+additionally doing an atomic operation within an already thread-safe
+environment gain you?
+
+> Besides, "if (ofb->usage++ == 0)" looks suspicious, especially if you later 
+> declare it as uint32_t.
+
+No.  You're not understanding the code.  This is equivalent to:
+
+	usage = ofb->usage;
+	ofb->usage = usage + 1;
+	if (usage == 0)
+
+And if you write it like that, then it is obvious.  It's your understanding
+of what a post-increment looks like which is suspicious here.
+
+> > @@ -733,12 +739,24 @@ static int overlayfb_release(struct fb_info *info,
+> > int user) {
+> >  	struct pxafb_layer *ofb = (struct pxafb_layer*) info;
+> > 
+> 
+> DTTO, why no atomic?
+
+Because this is already a thread-safe code region.
+
+> >  	ofb->video_mem = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+> > @@ -891,7 +910,7 @@ static void __devinit init_pxafb_overlay(struct
+> > pxafb_info *fbi,
+> > 
+> >  	ofb->id = id;
+> >  	ofb->ops = &ofb_ops[id];
+> 
+> DTTO
+
+An initializing store by which a machine can write the entire contents in
+one instruction _is_ by its very nature atomic.
+
+atomic_t is one of the most over(ab)used types because people just don't
+think about the code they're writing. ;(
