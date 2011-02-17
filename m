@@ -1,76 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Feb 2011 16:47:46 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102151816.57104.arnd@arndb.de>
-	<AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
-Message-ID: <201102171647.46190.arnd@arndb.de>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Thu, 17 Feb 2011 16:51:02 +0100 (CET)
+Subject: [PATCH]drivers:dma:coh901318.c Change initate to initiate.
+In-Reply-To: <AANLkTi=F29x=iFUGd3PkHhLtA5E_oA5R7fOyUvQJXW0J@mail.gmail.com>
+References: <1296244098-3732-1-git-send-email-justinmattock@gmail.com>
+	<AANLkTi=F29x=iFUGd3PkHhLtA5E_oA5R7fOyUvQJXW0J@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1102171650560.2160@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 February 2011, Andrei Warkentin wrote:
-> Ext4.
+On Mon, 31 Jan 2011, Linus Walleij wrote:
 
-Ok, I see. I haven't really done this kind of tests before, but my
-feeling is that ext3/ext4 may be much worse than the alternatives
-at the moment. It would certainly be worthwhile to do tests using
-nilfs2 and btrfs, whose default behaviour matches the requirements
-of your eMMC flash much better, and see how they perform with and
-without your patch.
+> > Not sure if this is a typo or not. if it is then feel free to take this.
+> >
+> > Signed-off-by: Justin P. Mattock <justinmattock@gmail.com>
+> 
+> Why not,
+> Acked-by: Linus Walleij <linus.walleij@stericsson.com>
 
-> I agree, which is why all of this is controlled now through sysfs, and
-> there are no more hard-coded checks for manfid, mmc versus sd or any
-> other magic. There is a page_size_secs attribute, through which you
-> can notify of the page size for the device.
+Applied.
 
-How about making that just page_size in bytes? sectors don't always
-mean 512 bytes, so this would be both shorter and less anbiguous.
-
-> The workaround for small
-> writes crossing the page boundary (and winding up in Buffer B, instead
-> of A) is turned on by setting split_tlow and split_thigh, which
-> provided a threshold range in sectors over which the the writes will
-> be split/aligned. The second workaround for splitting larger requests
-> and writing them with reliable write (to avoid getting coalesced and
-> winding up in Buffer B again) is controlled through split_relw_tlow
-> and split_relw_thigh. Do you think there is a better way? Or is this
-> good enough?
-
-I think I'd try to reduce the number of sysfs files needed for this.
-What are the values you would typically set here?
-
-My feeling is that separating unaligned page writes from full pages
-or multiples of pages could always be benefitial for all cards, or at
-least harmless, but that will require more measurements.
-Whether to do the reliable write or not could be a simple flag
-if the numbers are the same.
-
-> So, as I mentioned before, T had done some tests given data provided
-> by M, and then T verified that this fix was good. I need to do my own
-> tests on the patch after I rewrite it. Is iozone the best tool I can
-> use? So far I have a MMC logging facility through connector that I use
-> to collect stats (useful for seeing how fs traffic translates to
-> actual mmc commands...once I clean it up I'll push here for RFC). What
-> about the tool you're writing? Any way I can use it?
-
-It's now available in a an early almost-usable version at
-git://git.linaro.org/people/arnd/flashbench.git
-
-I don't have a test for the second buffer yet, but it would be
-good to know some of the other characteristics of your eMMC drive.
-
-Please try some of these commands:
-
-flashbench -a /dev/mmcblk0  --blocksize=1024
-flashbench --open-au --open-au-nr=1 /dev/mmcblk0 --blocksize=512
-flashbench --open-au --open-au-nr=1 /dev/mmcblk0 --blocksize=512 --random
-flashbench --open-au --open-au-nr=2 /dev/mmcblk0 --blocksize=512
-flashbench --open-au --open-au-nr=2 /dev/mmcblk0 --blocksize=512 --random
-flashbench --open-au --open-au-nr=3 /dev/mmcblk0 --blocksize=512
-flashbench --open-au --open-au-nr=3 /dev/mmcblk0 --blocksize=512 --random
-
-Note that the --open-au test will overwrite your data. You can do it on a
-partition you don't use, but it needs to be aligned to 4 MB.
-
-	Arnd
+-- 
+Jiri Kosina
+SUSE Labs, Novell Inc.
