@@ -1,30 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 18:31:06 +0200
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110217162157.GQ20795@atomide.com>
-References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-	<1297946466-9565-7-git-send-email-balbi@ti.com>
-	<4D5D25F9.8030907@ti.com>
-	<20110217151527.GL22356@legolas.emea.dhcp.ti.com>
-	<20110217151804.GM22356@legolas.emea.dhcp.ti.com>
-	<4D5D3D0B.8090106@ti.com>
-	<20110217152648.GO22356@legolas.emea.dhcp.ti.com>
-	<20110217162157.GQ20795@atomide.com>
-Message-ID: <20110217163106.GB13425@legolas.emea.dhcp.ti.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 17 Feb 2011 16:24:21 +0000
+Subject: [PATCH] ARM: pmu: avoid setting IRQ affinity on UP systems
+In-Reply-To: <1297771899-23209-1-git-send-email-will.deacon@arm.com>
+References: <1297771899-23209-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20110217162421.GC941@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 08:21:57AM -0800, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [110217 07:25]:
-> > 
-> > Tony, what do you prefer ? Do we clear out the dependency, or you queue
-> > all the patches I have manually ??
+On Tue, Feb 15, 2011 at 12:11:39PM +0000, Will Deacon wrote:
+> Now that we can execute a CONFIG_SMP kernel on a uniprocessor system,
+> extra care has to be taken in the PMU IRQ affinity setting code to
+> ensure that we don't always fail to initialise.
 > 
-> Let's apply Benoit's hwmod data patches first into omap-for-linus,
-> then rebasing other patches to that should be trivial and I can
-> pull in your patches.
+> This patch changes the CPU PMU initialisation code so that when we
+> only have a single IRQ, whose affinity can not be changed at the
+> controller, we report success (0) rather than -EINVAL.
+> 
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Reported-by: Avik Sil <avik.sil@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-ok, let me know and I'll rebase on top of omap-for-linus.
+Look good!
 
--- 
-balbi
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+
+Jamie
