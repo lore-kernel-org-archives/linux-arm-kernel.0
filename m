@@ -1,49 +1,56 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Thu, 17 Feb 2011 09:53:40 +0530
-Subject: ALSA issue on DA850/OMAP-L138/AM18x
-In-Reply-To: <4D5BDA3D.5080905@acn-group.ch>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
-	<4D5BDA3D.5080905@acn-group.ch>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 16 Feb 2011 21:33:20 -0700
+Subject: [PATCH 2/2] ARM: remove the 4x expansion presumption while
+	decompressing the kernel
+In-Reply-To: <alpine.LFD.2.00.1102161944090.14920@xanadu.home>
+References: <1297892343-29064-1-git-send-email-nico@fluxnic.net>
+	<1297892343-29064-2-git-send-email-nico@fluxnic.net>
+	<20110217000923.GF2364@angua.secretlab.ca>
+	<alpine.LFD.2.00.1102161944090.14920@xanadu.home>
+Message-ID: <AANLkTindF2z=XmhBCiQL95yPv_s+=_GK4=niTvjP2i=J@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christophe,
+On Wed, Feb 16, 2011 at 6:48 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 16 Feb 2011, Grant Likely wrote:
+>
+>> Patch looks good to me, but on a related note, I'm looking for a way
+>> to also find the end of .bss.
+>>
+>> When John looks at adding support for appending an initrd and/or dtb
+>> to the zimage, it will be important to make sure the start of the
+>> initrd/dtb does not overlap the ram the kernel is expecting to be
+>> empty and available. ?I was thinking about simply grepping System.map
+>> for __end and doing some sed magic to extract the offset from the
+>> beginning of the kernel.
+>
+> I'd use the 'size' command instead:
+>
+> $ arm-linux-size vmlinux
+> ? text ? ?data ? ? bss ? ? dec ? ? hex filename
+> 3707759 ?135316 ?137808 3980883 ?3cbe53 vmlinux
+>
+>> Do you think that is sufficient to protect appended data images?
+>
+> Starting with my compressed/head.S rework, you'd have to:
+>
+> 1) Detect if there is some valuable data past _edata, and if so then
+> ? increase the cached _edata value in r6 accordingly. ?This way, if
+> ? zImage needs to relocate itself then that will include that data.
+>
+> 2) Modify the conditions and parameters for a zImage relocation to
+> ? ensure the end of the kernel .bss is below the start of your data.
+>
+> 3) Modify the relocation of .bss entries in the GOT table so .bss is
+> ? effectively moved after that appended data.
+>
+> 4) Tell the kernel about the data via extra ATAG/DTB entries.
+>
+> Except for (4), this can be done with only a few assembly instructions.
+> And even in the ATAG case there is a good example in
+> arch/arm/boot/bootp/init.S for (4), but that could as well be done in C
+> instead, like the initial patch that John Bonesio did.
 
-On Wed, Feb 16, 2011 at 19:37:57, Christophe Aeschlimann wrote:
-> Hi Sudhakar,
-> 
-> On 18.01.2011 05:43, Rajashekhara, Sudhakar wrote:
-> 
-> [...]
-> 
->  > With the above fixes, arecord and aplay does not work for the first time.
->  > Couple of times I get the below error:
->  >
->  > root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
->  > arecord: main:608: audio open error: Invalid argument
->  > aplay: playback:2297: read error
->  > root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
->  > aplay: main:608: audio open error: Invalid argument
->  > Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, 
-> Stereo
->  >
->  > Third time arecord and aplay work normally.
->  >
->  > Has anyone seen such issues on DA850 or any other platform?
->  >
->  > I am currently debugging this issue. I'll submit the above patch to 
-> community
->  > once the issue of fixed.
-> 
-> I'm facing the same issue here.
-> 
-> Did you make any progress on that one ?
-> 
+Cool, that matches my thinking.  We'll start working on this.
 
-Reverting the commit 140176159597ea1f23dcccb47b5c38fdf7c7faa8 
-(ASoC: Configure symmetric rates for tlv320aic3x) resolves the issue. We are
-still working on the proper fix.
-
-Thanks,
-Sudhakar 
+g.
