@@ -1,31 +1,63 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 17 Feb 2011 08:19:32 -0800
-Subject: [RFC 2/5] ARM: P2V: avoid initializers and assembly using
-	PHYS_OFFSET
-In-Reply-To: <20110217141129.GG24627@n2100.arm.linux.org.uk> (Russell King's
-	message of "Thu, 17 Feb 2011 14:11:29 +0000")
-References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
-	<E1PaDOv-00023d-Gi@rmk-PC.arm.linux.org.uk>
-	<20110217141129.GG24627@n2100.arm.linux.org.uk>
-Message-ID: <8yak4gyvdkb.fsf@huya.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Feb 2011 08:20:01 -0800
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <4D5D44AF.5050805@ti.com>
+References: <1297946466-9565-1-git-send-email-balbi@ti.com>
+	<1297946466-9565-7-git-send-email-balbi@ti.com>
+	<4D5D25F9.8030907@ti.com>
+	<20110217151527.GL22356@legolas.emea.dhcp.ti.com>
+	<20110217151804.GM22356@legolas.emea.dhcp.ti.com>
+	<4D5D3D0B.8090106@ti.com>
+	<20110217152648.GO22356@legolas.emea.dhcp.ti.com>
+	<4D5D44AF.5050805@ti.com>
+Message-ID: <20110217162000.GP20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17 2011, Russell King - ARM Linux wrote:
+* Cousson, Benoit <b-cousson@ti.com> [110217 07:52]:
+> On 2/17/2011 4:26 PM, Balbi, Felipe wrote:
+> >On Thu, Feb 17, 2011 at 04:21:47PM +0100, Cousson, Benoit wrote:
+> >>On 2/17/2011 4:18 PM, Balbi, Felipe wrote:
+> >>>On Thu, Feb 17, 2011 at 05:15:27PM +0200, Felipe Balbi wrote:
+> >>>>On Thu, Feb 17, 2011 at 02:43:21PM +0100, Cousson, Benoit wrote:
+> >>>>>Hi Felipe and Hema,
+> >>>>>
+> >>>>>Sorry for this late review, but I have a couple of comments on this one.
+> >>>>>
+> >>>>>Since I was planning to send usb hwmod data file to Tony directly
+> >>>>>like I did for the other drivers, I can handle the update myself if
+> >>>>>you want.
+> >>>>
+> >>>>I'll change this particular patch to yours.
+> >>>
+> >>>doesn't apply:
+> >>>
+> >>>$ patch -p1<   ~/benoit.diff
+> >>>patching file arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> >>>Hunk #1 succeeded at 55 with fuzz 1 (offset -7 lines).
+> >>>patch: **** malformed patch at line 42: omap44xx_l4_cfg__l3_main_2 = {
+> >>>
+> >>>could you base this off of v2.6.38-rc5 ?
+> >>
+> >>This is what I was about to say.
+> >>You have a dependency with the for_2.6.39/omap4_hwmod_data branch
+> >>in git://gitorious.org/omap-pm/linux.git.
+> >
+> >I cannot have such a dependency and if you create that I can't send a
+> >pull request to Tony otherwise we will have conflicts later. Either you
+> >clear up that dependency or Tony will have to manually apply the patches
+> >I have queued. It's only 7 of them anyway, so maybe not a big deal.
+> 
+> I will try to rebase that one on v2.6.38-rc5 and see if it will
+> generate any issue during the merge with the omap4_hwmod_data
+> series. Generally issues appears if the data are located at the same
+> place in the file. Since the usb is between uart and wd_timer, that
+> might work.
 
-> On Tue, Jan 04, 2011 at 08:22:37PM +0000, Russell King - ARM Linux wrote:
->> As PHYS_OFFSET will be becoming a variable, we can't have it used in
->> initializers nor assembly code.  Replace those in generic code with
->> a run-time initialization.  Replace those in platform code using the
->> individual platform specific PLAT_PHYS_OFFSET.
->
-> I'm still missing acks for MSM, PXA and TCC8k stuff for this change.
+Maybe no need to rebase, I'll apply Benoit's series first into
+omap-for-linus, then let's applying the other hwmod related patches
+should be trivial.
 
-Sorry, I did test it, but forgot an explicit Ack:
+Regards,
 
-  Acked-by: David Brown <davidb@codeaurora.org>
-
-David
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Tony
