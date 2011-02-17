@@ -1,53 +1,30 @@
-From: yong.shen@linaro.org (yong.shen at linaro.org)
-Date: Thu, 17 Feb 2011 10:01:39 +0100
-Subject: [PATCH v3 3/3] ARM: IMX5 bbg: add cpuidle parameters
-In-Reply-To: <1297933299-30367-1-git-send-email-yong.shen@linaro.org>
-References: <1297933299-30367-1-git-send-email-yong.shen@linaro.org>
-Message-ID: <1297933299-30367-4-git-send-email-yong.shen@linaro.org>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Thu, 17 Feb 2011 14:33:35 +0530
+Subject: [PATCH V4 resend] rtc: Adding support for spear rtc
+In-Reply-To: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
+References: <6bd0f375a2f9475172a3ea968b0662b7c73da421.1297247552.git.viresh.kumar@st.com>
+Message-ID: <4D5CE467.4000307@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Shen <yong.shen@freescale.com>
+On 02/09/2011 04:06 PM, Viresh KUMAR wrote:
+> From: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> 
+> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> ---
+>  drivers/rtc/Kconfig     |    8 +
+>  drivers/rtc/Makefile    |    1 +
+>  drivers/rtc/rtc-spear.c |  534 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 543 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/rtc/rtc-spear.c
 
-This parameters are workable, but need further tuning.
+Guys,
 
-Signed-off-by: Yong Shen <yong.shen@freescale.com>
----
- arch/arm/mach-mx5/board-mx51_babbage.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Am i posting this patch to incorrect lists?
+We have been awaiting review/inclusion for this patch since 2-3 months now.
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index d9d402e..bb6fda0 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -37,6 +37,7 @@
- #include "devices-imx51.h"
- #include "devices.h"
- #include "cpu_op-mx51.h"
-+#include "cpuidle.h"
- 
- #define BABBAGE_USB_HUB_RESET	IMX_GPIO_NR(1, 7)
- #define BABBAGE_USBH1_STP	IMX_GPIO_NR(1, 27)
-@@ -333,6 +334,11 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
- 	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
- };
- 
-+static struct mx5_cpuidle_params babbage_cpuidle_params[] = {
-+	{100,},
-+	{150,},
-+	{1000,},
-+};
- /*
-  * Board specific initialization.
-  */
-@@ -383,6 +389,8 @@ static void __init mxc_board_init(void)
- 		ARRAY_SIZE(mx51_babbage_spi_board_info));
- 	imx51_add_ecspi(0, &mx51_babbage_spi_pdata);
- 	imx51_add_imx2_wdt(0, NULL);
-+
-+	mx5_cpuidle_board_params(babbage_cpuidle_params);
- }
- 
- static void __init mx51_babbage_timer_init(void)
+Can somebody please help?
+
 -- 
-1.7.1
+viresh
