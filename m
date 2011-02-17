@@ -1,55 +1,63 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 17 Feb 2011 18:46:59 +0100
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110217173711.GF14574@legolas.emea.dhcp.ti.com>
-References: <20110217151804.GM22356@legolas.emea.dhcp.ti.com>
-	<4D5D3D0B.8090106@ti.com>
-	<20110217152648.GO22356@legolas.emea.dhcp.ti.com>
-	<4D5D44AF.5050805@ti.com> <20110217162000.GP20795@atomide.com>
-	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
-	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
-	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
-	<4D5D59E5.6020307@ti.com>
-	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
-Message-ID: <4D5D5F13.2010602@ti.com>
+Date: Thu, 17 Feb 2011 18:47:25 +0100
+Subject: [PATCH 2/8] OMAP4: hwmod data: Add McSPI
+In-Reply-To: <20110217170514.GS20795@atomide.com>
+References: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
+	<1297938289-8678-3-git-send-email-b-cousson@ti.com>
+	<20110217170514.GS20795@atomide.com>
+Message-ID: <4D5D5F2D.9020100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/17/2011 6:37 PM, Balbi, Felipe wrote:
-> On Thu, Feb 17, 2011 at 06:24:53PM +0100, Cousson, Benoit wrote:
->> On 2/17/2011 6:17 PM, Balbi, Felipe wrote:
->>> On Thu, Feb 17, 2011 at 06:14:24PM +0100, Cousson, Benoit wrote:
->>>> On 2/17/2011 5:59 PM, Tony Lindgren wrote:
->>>>> * Felipe Balbi<balbi@ti.com>    [110217 08:20]:
->>>>>> On Thu, Feb 17, 2011 at 08:20:01AM -0800, Tony Lindgren wrote:
->>>>>>>
->>>>>>> Maybe no need to rebase, I'll apply Benoit's series first into
->>>>>>> omap-for-linus, then let's applying the other hwmod related patches
->>>>>>> should be trivial.
->>>>>>
->>>>>> So I can drop the omap4 HWMOD part from my branch ?
->>>>>
->>>>> Yeh assuming Benoit's data is correct.
->>>>
->>>> Of course, it is :-)
->>>>
->>>> Then I will add USB in my series.
->>>
->>> BTW, which branch should I use from your tree to test ?
+On 2/17/2011 6:05 PM, Tony Lindgren wrote:
+> Hi,
+> 
+> Noticed one cosmetic thing below.
+> 
+> * Benoit Cousson<b-cousson@ti.com>  [110217 02:23]:
+>> Update omap4 hwmod file with McSPI info.
 >>
->> I'll put that in the refresh version of the branch I have done for
->> Tony. I messed up the McSPI changelog... and Tony caught me :-)
->>
->> I'll push that in 5 minutes.
->
-> cool, let me know
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Signed-off-by: Charulatha V<charu@ti.com>
+>> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
+>> Acked-by: Grant Likely<grant.likely@secretlab.ca>
+>> Reviewed-by: Kevin Hilman<khilman@ti.com>
+>> ---
+>    ^^^ That should not be here, it shows up in your commit.
+> 
+>> [b-cousson at ti.com: Remove dev_attr to prevent dependency
+>> with device code. It will have to be re-added along with
+>> the original series]
+> 
+> As the above should be part of the commit too. Care to
+> refresh your branch for that?
 
-Done, boot tested, and that does remove the warning about the missing 
-opt clock you had with the previous data.
-
-git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
-
-Just let me know if it does break anything else.
+Done. I added the USBOTG for Felipe as well.
 
 Thanks,
 Benoit
+
+---
+
+The following changes since commit 85e2efbb1db9a18d218006706d6e4fbeb0216213:
+  Linus Torvalds (1):
+        Linux 2.6.38-rc5
+
+are available in the git repository at:
+
+  git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
+
+Benoit Cousson (9):
+      OMAP4: hwmod data: Add hwspinlock
+      OMAP4: hwmod data: Add McSPI
+      OMAP4: hwmod data: Add timer
+      OMAP4: hwmod data: Add DSS, DISPC, DSI1&2, RFBI, HDMI and VENC
+      OMAP4: hwmod data: Add mailbox
+      OMAP4: hwmod data: Add DMIC
+      OMAP4: hwmod data: Add McBSP
+      OMAP4: hwmod data: Add AESS, McPDM, bandgap, counter_32k, MMC, KBD, ISS & IPU
+      OMAP4: hwmod data: Add USBOTG
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 3119 +++++++++++++++++++++++++++-
+ 1 files changed, 3072 insertions(+), 47 deletions(-)
+ 
