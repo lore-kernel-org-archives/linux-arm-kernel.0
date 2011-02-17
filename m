@@ -1,89 +1,37 @@
-From: sawant@ti.com (sawant at ti.com)
-Date: Thu, 17 Feb 2011 21:27:30 +0530
-Subject: [PATCH] omap2plus: smartreflex: remove sr debug directory in
-	omap_sr_remove()
-Message-ID: <1297958250-13612-1-git-send-email-sawant@ti.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Thu, 17 Feb 2011 08:13:57 -0800
+Subject: [PATCH] Fix hang on reboot with Tegra2
+Message-ID: <1297959237-8277-1-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anand S Sawant <sawant@ti.com>
+This seems to be a regression in 2.6.37.
 
-omap_sr_probe() creates the smartreflex debug directory and its
-underlying nvalue debug directory. These directories are removed in
-omap_sr_remove().
+We cannot use writel() here since the resulting wmb() calls l2x0_cache_sync()
+which uses a spinlock and L1 cache may be off at this point.
 
-Basic smartreflex functionality tested on OMAP3630 Zoom3 & OMAP4430 SDP
+Change-Id: Ia23b317dee919055ff4abba1484735ea3165fd99
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041909.html
 
-Signed-off-by: Anand S Sawant <sawant@ti.com>
+Signed-off-by: Simon Glass <sjg@chromium.org>
 ---
-Rebased on the latest Kevin's pm branch 
-(commit id: b6fb54bc4bfc396a9b982d76c1c954c974290a1a)
+ arch/arm/mach-tegra/include/mach/system.h |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
- arch/arm/mach-omap2/smartreflex.c |   23 +++++++++++++----------
- 1 files changed, 13 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index a1f532e..dc19f17 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -54,6 +54,7 @@ struct omap_sr {
- 	struct list_head		node;
- 	struct omap_sr_nvalue_table	*nvalue_table;
- 	struct voltagedomain		*voltdm;
-+	struct dentry			*dbg_dir;
- };
+diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
+index 84d5d46..f1c0a79 100644
+--- a/arch/arm/mach-tegra/include/mach/system.h
++++ b/arch/arm/mach-tegra/include/mach/system.h
+@@ -33,7 +33,9 @@ static inline void arch_reset(char mode, const char *cmd)
+ 	void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
+ 	u32 reg = readl(reset);
+ 	reg |= 0x04;
+-	writel(reg, reset);
++
++	/* use writel_related to avoid spinlock since L1 cache may be off */
++	writel_relaxed(reg, reset);
+ }
  
- /* sr_list contains all the instances of smartreflex module */
-@@ -822,7 +823,7 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	struct omap_sr *sr_info = kzalloc(sizeof(struct omap_sr), GFP_KERNEL);
- 	struct omap_sr_data *pdata = pdev->dev.platform_data;
- 	struct resource *mem, *irq;
--	struct dentry *vdd_dbg_dir, *dbg_dir, *nvalue_dir;
-+	struct dentry *vdd_dbg_dir, *nvalue_dir;
- 	struct omap_volt_data *volt_data;
- 	int i, ret = 0;
- 
-@@ -895,23 +896,23 @@ static int __init omap_sr_probe(struct platform_device *pdev)
- 	if (!vdd_dbg_dir)
- 		return -EINVAL;
- 
--	dbg_dir = debugfs_create_dir("smartreflex", vdd_dbg_dir);
--	if (IS_ERR(dbg_dir)) {
-+	sr_info->dbg_dir = debugfs_create_dir("smartreflex", vdd_dbg_dir);
-+	if (IS_ERR(sr_info->dbg_dir)) {
- 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory\n",
- 			__func__);
--		return PTR_ERR(dbg_dir);
-+		return PTR_ERR(sr_info->dbg_dir);
- 	}
- 
--	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR, dbg_dir,
--				(void *)sr_info, &pm_sr_fops);
--	(void) debugfs_create_x32("errweight", S_IRUGO, dbg_dir,
-+	(void) debugfs_create_file("autocomp", S_IRUGO | S_IWUSR,
-+			sr_info->dbg_dir, (void *)sr_info, &pm_sr_fops);
-+	(void) debugfs_create_x32("errweight", S_IRUGO, sr_info->dbg_dir,
- 			&sr_info->err_weight);
--	(void) debugfs_create_x32("errmaxlimit", S_IRUGO, dbg_dir,
-+	(void) debugfs_create_x32("errmaxlimit", S_IRUGO, sr_info->dbg_dir,
- 			&sr_info->err_maxlimit);
--	(void) debugfs_create_x32("errminlimit", S_IRUGO, dbg_dir,
-+	(void) debugfs_create_x32("errminlimit", S_IRUGO, sr_info->dbg_dir,
- 			&sr_info->err_minlimit);
- 
--	nvalue_dir = debugfs_create_dir("nvalue", dbg_dir);
-+	nvalue_dir = debugfs_create_dir("nvalue", sr_info->dbg_dir);
- 	if (IS_ERR(nvalue_dir)) {
- 		dev_err(&pdev->dev, "%s: Unable to create debugfs directory"
- 			"for n-values\n", __func__);
-@@ -975,6 +976,8 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
- 
- 	if (sr_info->autocomp_active)
- 		sr_stop_vddautocomp(sr_info);
-+	if (sr_info->dbg_dir)
-+		debugfs_remove_recursive(sr_info->dbg_dir);
- 
- 	list_del(&sr_info->node);
- 	iounmap(sr_info->base);
+ #endif
 -- 
-1.7.0.4
+1.7.3.1
