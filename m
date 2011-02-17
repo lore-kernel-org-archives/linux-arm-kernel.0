@@ -1,23 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Feb 2011 15:57:13 -0800
-Subject: [PATCH] omap iommu: print module name on error messages
-In-Reply-To: <20110214.154130.1019130951550611673.Hiroshi.DOYU@nokia.com>
-References: <1297504949-26233-1-git-send-email-dacohen@gmail.com>
-	<20110214.154130.1019130951550611673.Hiroshi.DOYU@nokia.com>
-Message-ID: <20110217235713.GM20795@atomide.com>
+Date: Thu, 17 Feb 2011 15:59:04 -0800
+Subject: [PATCH 0/2] omap3: minor clean-up in flash related code
+In-Reply-To: <1297767452-22554-1-git-send-email-premi@ti.com>
+References: <1297767452-22554-1-git-send-email-premi@ti.com>
+Message-ID: <20110217235904.GN20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hiroshi DOYU <Hiroshi.DOYU@nokia.com> [110214 05:39]:
-> From: ext David Cohen <dacohen@gmail.com>
-> Subject: [PATCH] omap iommu: print module name on error messages
-> Date: Sat, 12 Feb 2011 12:02:29 +0200
-> 
-> > OMAP IOMMU generic layer doesn't need ot print function name during
-> > error messages. Print module name instead which is more useful.
-> 
-> Agree. This makes more sense.
+* Sanjeev Premi <premi@ti.com> [110215 02:56]:
+> Changes include:
+>  - fixing typos
+>  - using pr_err() instead of printk
 
-Applying to devel-iommu-mailbox for the upcoming merge window.
+Thanks, applying to devel-cleanup for the upcoming merge window.
 
 Tony
