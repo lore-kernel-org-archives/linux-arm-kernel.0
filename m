@@ -1,61 +1,25 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 20:01:32 +0200
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110217175217.GI14574@legolas.emea.dhcp.ti.com>
-References: <4D5D44AF.5050805@ti.com> <20110217162000.GP20795@atomide.com>
-	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
-	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
-	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
-	<4D5D59E5.6020307@ti.com>
-	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
-	<4D5D5F13.2010602@ti.com>
-	<20110217175217.GI14574@legolas.emea.dhcp.ti.com>
-Message-ID: <20110217180131.GJ14574@legolas.emea.dhcp.ti.com>
+From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
+Date: Thu, 17 Feb 2011 10:07:45 -0800
+Subject: [RFC 1/5] ARM: P2V: separate PHYS_OFFSET from platform definitions
+In-Reply-To: <AANLkTinwQwPK7Lg4dxkLGBxvp1hz489iAB6YrSG45e75@mail.gmail.com>
+References: <20110104202052.GE24935@n2100.arm.linux.org.uk>
+	<E1PaDOb-00023Z-CR@rmk-PC.arm.linux.org.uk>
+	<AANLkTinwQwPK7Lg4dxkLGBxvp1hz489iAB6YrSG45e75@mail.gmail.com>
+Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AADDDF03CE1D9@SJEXCHCCR02.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 07:52:17PM +0200, Felipe Balbi wrote:
-> On Thu, Feb 17, 2011 at 06:46:59PM +0100, Cousson, Benoit wrote:
-> > On 2/17/2011 6:37 PM, Balbi, Felipe wrote:
-> > >On Thu, Feb 17, 2011 at 06:24:53PM +0100, Cousson, Benoit wrote:
-> > >>On 2/17/2011 6:17 PM, Balbi, Felipe wrote:
-> > >>>On Thu, Feb 17, 2011 at 06:14:24PM +0100, Cousson, Benoit wrote:
-> > >>>>On 2/17/2011 5:59 PM, Tony Lindgren wrote:
-> > >>>>>* Felipe Balbi<balbi@ti.com>    [110217 08:20]:
-> > >>>>>>On Thu, Feb 17, 2011 at 08:20:01AM -0800, Tony Lindgren wrote:
-> > >>>>>>>
-> > >>>>>>>Maybe no need to rebase, I'll apply Benoit's series first into
-> > >>>>>>>omap-for-linus, then let's applying the other hwmod related patches
-> > >>>>>>>should be trivial.
-> > >>>>>>
-> > >>>>>>So I can drop the omap4 HWMOD part from my branch ?
-> > >>>>>
-> > >>>>>Yeh assuming Benoit's data is correct.
-> > >>>>
-> > >>>>Of course, it is :-)
-> > >>>>
-> > >>>>Then I will add USB in my series.
-> > >>>
-> > >>>BTW, which branch should I use from your tree to test ?
-> > >>
-> > >>I'll put that in the refresh version of the branch I have done for
-> > >>Tony. I messed up the McSPI changelog... and Tony caught me :-)
-> > >>
-> > >>I'll push that in 5 minutes.
-> > >
-> > >cool, let me know
-> > 
-> > Done, boot tested, and that does remove the warning about the missing
-> > opt clock you had with the previous data.
-> > 
-> > git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
-> > 
-> > Just let me know if it does break anything else.
-> 
-> Ok, pulling ;-)
+On Wed, Jan 5, 2011 at 4:22 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> This uncouple PHYS_OFFSET from the platform definitions, thereby
+> facilitating run-time computation of the physical memory offset.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> arch/arm/include/asm/memory.h                  |    2 ++
+> arch/arm/kernel/tcm.c                          |    2 +-
 
-Just tested, all good ;-) Tomorrow I'll test more and send my pull
-request.
+> arch/arm/mach-bcmring/include/mach/hardware.h  |    2 +-
+> arch/arm/mach-bcmring/include/mach/memory.h    |    2 +-
 
--- 
-balbi
+Acked-by: Jiandong Zheng <jdzheng@broadcom.com>
