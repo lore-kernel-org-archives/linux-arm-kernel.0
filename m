@@ -1,20 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Feb 2011 15:49:15 -0800
-Subject: [PATCH v2 0/2] Fix/Clean regulator consumer mapping for 3430sdp
-In-Reply-To: <1296737122-20765-1-git-send-email-rnayak@ti.com>
-References: <1296737122-20765-1-git-send-email-rnayak@ti.com>
-Message-ID: <20110217234915.GK20795@atomide.com>
+Date: Thu, 17 Feb 2011 15:54:46 -0800
+Subject: [PATCH] OMAP2: add regulator for MMC1
+In-Reply-To: <AANLkTinGOQ6-FmVG=LbQHjYPZ_tm3yDtVdDLx7EqhHpw@mail.gmail.com>
+References: <1297094927-727-1-git-send-email-balajitk@ti.com>
+	<AANLkTinGOQ6-FmVG=LbQHjYPZ_tm3yDtVdDLx7EqhHpw@mail.gmail.com>
+Message-ID: <20110217235446.GL20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rajendra Nayak <rnayak@ti.com> [110203 04:44]:
-> This is a short series to fix some, and clean the
-> existing regulator consumer supply mappings for
-> the OMAP3430sdp board.
+* Kishore Kadiyala <kishorek.kadiyala@gmail.com> [110208 12:55]:
+> On Mon, Feb 7, 2011 at 9:38 PM, Balaji T K <balajitk@ti.com> wrote:
+> > Add regulator VMMC1 used by SD/MMC card slot1 in 2430sdp.
+> >
+> > Signed-off-by: Balaji T K <balajitk@ti.com>
 > 
-> The series is boot tested on the 3430sdp board
-> and applies on 2.6.38-rc3.
+> Tested-by: Kishore Kadiyala <kishore.kadiyala@ti.com>
 
-Adding these to devel-board for the upcoming merge window.
+Thanks adding.
 
 Tony
