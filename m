@@ -1,84 +1,89 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 17 Feb 2011 18:09:53 -0200
-Subject: [PATCH v2 2/2] ARM: mach-mx5: Add watchdog support for MX53 based
-	boards
-In-Reply-To: <1297973393-31388-1-git-send-email-fabio.estevam@freescale.com>
-References: <1297973393-31388-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1297973393-31388-2-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 17 Feb 2011 18:09:52 -0200
+Subject: [PATCH v2 1/2] ARM: mx5: Add watchdog support for MX53
+Message-ID: <1297973393-31388-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mx5/Kconfig           |    3 +++
- arch/arm/mach-mx5/board-mx53_evk.c  |    1 +
- arch/arm/mach-mx5/board-mx53_loco.c |    1 +
- arch/arm/mach-mx5/board-mx53_smd.c  |    1 +
- 4 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c           |    2 ++
+ arch/arm/mach-mx5/devices-imx53.h             |    4 ++++
+ arch/arm/mach-mx5/mm.c                        |    2 +-
+ arch/arm/plat-mxc/devices/platform-imx2-wdt.c |    9 +++++++++
+ arch/arm/plat-mxc/include/mach/mx53.h         |    2 +-
+ 5 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 10b6008..9a291f6 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -126,6 +126,7 @@ config MACH_MX51_EFIKAMX
- config MACH_MX53_EVK
- 	bool "Support MX53 EVK platforms"
- 	select SOC_IMX53
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
-@@ -137,6 +138,7 @@ config MACH_MX53_EVK
- config MACH_MX53_SMD
- 	bool "Support MX53 SMD platforms"
- 	select SOC_IMX53
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	help
- 	  Include support for MX53 SMD platform. This includes specific
-@@ -145,6 +147,7 @@ config MACH_MX53_SMD
- config MACH_MX53_LOCO
- 	bool "Support MX53 LOCO platforms"
- 	select SOC_IMX53
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	help
- 	  Include support for MX53 LOCO platform. This includes specific
-diff --git a/arch/arm/mach-mx5/board-mx53_evk.c b/arch/arm/mach-mx5/board-mx53_evk.c
-index 8ed316b..652e1e0 100644
---- a/arch/arm/mach-mx5/board-mx53_evk.c
-+++ b/arch/arm/mach-mx5/board-mx53_evk.c
-@@ -137,6 +137,7 @@ static void __init mx53_evk_board_init(void)
- 	spi_register_board_info(mx53_evk_spi_board_info,
- 		ARRAY_SIZE(mx53_evk_spi_board_info));
- 	imx53_add_ecspi(0, &mx53_evk_spi_data);
-+	imx53_add_imx2_wdt(0, NULL);
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index c66be0e..8164b1d 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1336,6 +1336,8 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx53-ecspi.0", NULL, ecspi1_clk)
+ 	_REGISTER_CLOCK("imx53-ecspi.1", NULL, ecspi2_clk)
+ 	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
++	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
++	_REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+index 8639735..9251008 100644
+--- a/arch/arm/mach-mx5/devices-imx53.h
++++ b/arch/arm/mach-mx5/devices-imx53.h
+@@ -29,3 +29,7 @@ imx53_sdhci_esdhc_imx_data[] __initconst;
+ extern const struct imx_spi_imx_data imx53_ecspi_data[] __initconst;
+ #define imx53_add_ecspi(id, pdata)	\
+ 	imx_add_spi_imx(&imx53_ecspi_data[id], pdata)
++
++extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
++#define imx53_add_imx2_wdt(id, pdata)	\
++	imx_add_imx2_wdt(&imx53_imx2_wdt_data[id])
+diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+index 8730cd1..ff55730 100644
+--- a/arch/arm/mach-mx5/mm.c
++++ b/arch/arm/mach-mx5/mm.c
+@@ -66,7 +66,7 @@ void __init imx53_init_early(void)
+ {
+ 	mxc_set_cpu_type(MXC_CPU_MX53);
+ 	mxc_iomux_v3_init(MX53_IO_ADDRESS(MX53_IOMUXC_BASE_ADDR));
+-	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG_BASE_ADDR));
++	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG1_BASE_ADDR));
  }
  
- static void __init mx53_evk_timer_init(void)
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 0fea252..6005f49 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -69,6 +69,7 @@ static void __init mx53_loco_board_init(void)
- 	imx53_add_imx_uart(0, NULL);
- 	mx53_loco_fec_reset();
- 	imx53_add_fec(&mx53_loco_fec_data);
-+	imx53_add_imx2_wdt(0, NULL);
- }
+ int imx51_register_gpios(void);
+diff --git a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c b/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
+index e0aec61..5e07ef2 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
++++ b/arch/arm/plat-mxc/devices/platform-imx2-wdt.c
+@@ -53,6 +53,15 @@ const struct imx_imx2_wdt_data imx51_imx2_wdt_data[] __initconst = {
+ };
+ #endif /* ifdef CONFIG_SOC_IMX51 */
  
- static void __init mx53_loco_timer_init(void)
-diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
-index fa0fad8..8a8694c 100644
---- a/arch/arm/mach-mx5/board-mx53_smd.c
-+++ b/arch/arm/mach-mx5/board-mx53_smd.c
-@@ -90,6 +90,7 @@ static void __init mx53_smd_board_init(void)
- 	mx53_smd_init_uart();
- 	mx53_smd_fec_reset();
- 	imx53_add_fec(&mx53_smd_fec_data);
-+	imx53_add_imx2_wdt(0, NULL);
- }
- 
- static void __init mx53_smd_timer_init(void)
++#ifdef CONFIG_SOC_IMX53
++const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst = {
++#define imx53_imx2_wdt_data_entry(_id, _hwid)				\
++	imx_imx2_wdt_data_entry(MX53, _id, _hwid, SZ_16K)
++	imx53_imx2_wdt_data_entry(0, 1),
++	imx53_imx2_wdt_data_entry(1, 2),
++};
++#endif /* ifdef CONFIG_SOC_IMX53 */
++
+ struct platform_device *__init imx_add_imx2_wdt(
+ 		const struct imx_imx2_wdt_data *data)
+ {
+diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
+index d7a8e52..ace1786 100644
+--- a/arch/arm/plat-mxc/include/mach/mx53.h
++++ b/arch/arm/plat-mxc/include/mach/mx53.h
+@@ -79,7 +79,7 @@
+ #define MX53_GPIO3_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x0008C000)
+ #define MX53_GPIO4_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x00090000)
+ #define MX53_KPP_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x00094000)
+-#define MX53_WDOG_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x00098000)
++#define MX53_WDOG1_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x00098000)
+ #define MX53_WDOG2_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x0009C000)
+ #define MX53_GPT1_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x000A0000)
+ #define MX53_SRTC_BASE_ADDR	(MX53_AIPS1_BASE_ADDR + 0x000A4000)
 -- 
 1.6.0.4
