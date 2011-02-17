@@ -1,41 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 17 Feb 2011 09:53:56 -0200
-Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110216125820.GA22310@pengutronix.de>
-References: <20110211181921.3d561568@queued.net>
-	<20110216094154.GV13279@pengutronix.de>
-	<4D5BC38E.1060009@freescale.com>
-	<20110216125820.GA22310@pengutronix.de>
-Message-ID: <AANLkTimhXR=AWT6wV-MXhtW7dvs6OYW7OqaV5RPhFP5V@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 17 Feb 2011 13:06:32 +0100
+Subject: [PATCH v2 1/7] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110217041713.GB1273@S2100-06.ap.freescale.net>
+References: <1297650746-12841-1-git-send-email-shawn.guo@freescale.com>
+	<1297650746-12841-2-git-send-email-shawn.guo@freescale.com>
+	<20110214165958.GH10709@pengutronix.de>
+	<20110215223941.GJ10990@S2100-06.ap.freescale.net>
+	<20110215171341.GD10770@pengutronix.de>
+	<20110215171917.GQ4152@n2100.arm.linux.org.uk>
+	<20110215172948.GE10770@pengutronix.de>
+	<20110216202818.GA11467@S2100-06.ap.freescale.net>
+	<20110216153332.GC6365@pengutronix.de>
+	<20110217041713.GB1273@S2100-06.ap.freescale.net>
+Message-ID: <20110217120632.GB30692@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Shawn,
 
-2011/2/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Wed, Feb 16, 2011 at 10:31:10AM -0200, Fabio Estevam wrote:
->> Hi Uwe,
->>
->> On 2/16/2011 7:41 AM, Uwe Kleine-K?nig wrote:
->> ...
->> >> ?/* MC13783 */
->> >> -static struct mc13783_platform_data mc13783_pdata __initdata = {
->> > isn't using __initdata here broken already before your patch? ?Was
->> > introduced in c67a3e09. ?Fabio?
->>
->> I followed the same approach as in mx31_3ds.c file.
->>
->> > But in general I'd prefer to keep as much __initdata as possible because
->> > this occupies less memory when using a multi-machine kernel.
->>
->> Ok, is the __initdata usage correct then? If not, I can change it. Just let me know.
-> I guess that if you compile mc13xxx support as module it won't work.
->
-> Try that, and if it breaks, send a patch fixing mx31_3ds.c, too.
+> > Ah, the 8_BIT_CAP was the right pointer. It works now and I can see the
+> > partitions \o/ But IMHO it is related to the driver because it cannot set that
+> > 8_BIT_DATA_CAP unconditionally? Probably something like 'flags' should be added
+> > to platform_data? One flag could then be 8_BIT_CAPABLE_SLOT or something.
+> > 
+> If a platform is designed to support 8-bit mode (e.g. all 8 data
+> lines are routed), I do not think the 8-bit cap will be removed from
+> this platform just because one particular card has problem to work
+> in 8-bit mode.
 
-I built it as module and the build went fine.
+Right, surely not beacuse of a card, this was a misunderstanding. The issue is
+not related to cards but slots. By naming the flag 8_BIT_CAPABLE_SLOT I wanted
+to indicate this.
 
-Regards,
+> But I would anyway let platform_data tell the 4 BIT_CAP and 8_BIT_CAP
+> just like what Freescale BSP is doing, as some platforms may design
+> this cap differently.
 
-Fabio Estevam
+Yep, that's what I meant, too :) Adding the slot capabilities in platform_data.
+
+> So your board supplies mmc0 slot with VDDIO_3V3 as well?
+
+Hmm, the schematics say no, but I will assume it is a board issue and check
+with the manufacturer.
+
+Thanks again!
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
