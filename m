@@ -1,48 +1,70 @@
-From: vb@vsbe.com (vb at vsbe.com)
-Date: Wed, 16 Feb 2011 18:02:29 -0800
-Subject: compiling 2.6.37 kernel in THUMB2 mode
-In-Reply-To: <AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
-References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
-	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
-	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
-	<AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
-Message-ID: <AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Wed, 16 Feb 2011 20:08:56 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102151816.57104.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102142122.54766.arnd@arndb.de>
+	<AANLkTinPtiwXmtRy9qS2zZXwuhQDOyO-H8-wmF=fSNnJ@mail.gmail.com>
+	<201102151816.57104.arnd@arndb.de>
+Message-ID: <AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 1:19 AM, Dave Martin <dave.martin@linaro.org> wrote:
+On Tue, Feb 15, 2011 at 11:16 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 14 February 2011, Andrei Warkentin wrote:
+>> > There are multiple ways how this could be implemented:
+>> >
+>> > 1. Have one exception cache for all "special" blocks. This would normally
+>> > ? be for FAT32 subdirectory updates, which always write to the same
+>> > ? few blocks. This means you can do small writes efficiently anywhere
+>> > ? on the card, but only up to a (small) fixed number of block addresses.
+>> > ? If you overflow the table, the card still needs to go through an
+>> > ? extra PE for each new entry you write, in order to free up an entry.
+>> >
+>> > 2. Have a small number of AUs that can be in a special mode with efficient
+>> > ? small writes but inefficient large writes. This means that when you
+>> > ? alternate between small and large writes in the same AU, it has to go
+>> > ? through a PE on every switch. Similarly, if you do small writes to
+>> > ? more than the maximum number of AUs that can be held in this mode, you
+>> > ? get the same effect. This number can be as small as one, because that
+>> > ? is what FAT32 requires.
+>> >
+>> > In both cases, you don't actually have a solution for the problem, you just
+>> > make it less likely for specific workloads.
 >>
->> Note that while the bulk of the kernel is Thumb-2 safe, there are
->> occasional regressions, and individual platforms and drivers could
->> still have problems. ?For now, I've been focusing on omap--- see
->>
->> git://git.linaro.org/people/dmart/linux-2.6-arm.git dirty/arm/omap-thumb2+merged
->>
->> ARM: Add local symbols in relocate_kernel.S to work around gas bugs
+>> Aha, ok. By the way, I did find out that either suggestion works. So
+>> I'll pull out the reversing portion of the patch. No need to
+>> overcomplicate :).
 >
-> ^ Oops, forgot to explain that line: this is the patch required to
-> work around a specific bug in the assembler. ?I'm not currently
-> proposing to merge this upstream, since I prefer the assembler to get
-> fixed...
-> You can grab this patch from the branch.
+> BTW, what file system are you using? I could imagine that each of ext4, btrfs
+> and nilfs2 give you very different results here. It could be that if your
+> patch is optimizing for one file system, it is actually pessimising for
+> another one.
 >
 
-Dave, thank you for this information. I checked out this branch and
-would like to build a kernel. I don't know what omap is though, can
-you please share a config file one could use to build the thumb
-enabled kernel for it?
+Ext4. I've actually been rewriting the patch a lot and it's taking
+time because there are a lot of things that are wrong in it (so I feel
+kinda bad for forwarding it to this list in the first place...). I've
+already mentioned that there is no need to reorder, so that's going
+away and it simplifies everything greatly.
 
-TIA,
-cheers,
-Vadim
+I agree, which is why all of this is controlled now through sysfs, and
+there are no more hard-coded checks for manfid, mmc versus sd or any
+other magic. There is a page_size_secs attribute, through which you
+can notify of the page size for the device. The workaround for small
+writes crossing the page boundary (and winding up in Buffer B, instead
+of A) is turned on by setting split_tlow and split_thigh, which
+provided a threshold range in sectors over which the the writes will
+be split/aligned. The second workaround for splitting larger requests
+and writing them with reliable write (to avoid getting coalesced and
+winding up in Buffer B again) is controlled through split_relw_tlow
+and split_relw_thigh. Do you think there is a better way? Or is this
+good enough?
 
-
-
->>
->> If you're trying to support a specific board I'm unlikely to be able
->> to debug it for you, but feel free to ping me with questions.
->>
->> Cheers
->> ---Dave
->>
->
+So, as I mentioned before, T had done some tests given data provided
+by M, and then T verified that this fix was good. I need to do my own
+tests on the patch after I rewrite it. Is iozone the best tool I can
+use? So far I have a MMC logging facility through connector that I use
+to collect stats (useful for seeing how fs traffic translates to
+actual mmc commands...once I clean it up I'll push here for RFC). What
+about the tool you're writing? Any way I can use it?
