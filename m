@@ -1,35 +1,23 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 17 Feb 2011 17:18:04 +0200
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110217151527.GL22356@legolas.emea.dhcp.ti.com>
-References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-	<1297946466-9565-7-git-send-email-balbi@ti.com>
-	<4D5D25F9.8030907@ti.com>
-	<20110217151527.GL22356@legolas.emea.dhcp.ti.com>
-Message-ID: <20110217151804.GM22356@legolas.emea.dhcp.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Feb 2011 16:18:44 +0100
+Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <20110217151223.GJ24627@n2100.arm.linux.org.uk>
+References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>
+	<201102171541.12261.arnd@arndb.de>
+	<20110217151223.GJ24627@n2100.arm.linux.org.uk>
+Message-ID: <201102171618.44269.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 05:15:27PM +0200, Felipe Balbi wrote:
-> On Thu, Feb 17, 2011 at 02:43:21PM +0100, Cousson, Benoit wrote:
-> > Hi Felipe and Hema,
-> > 
-> > Sorry for this late review, but I have a couple of comments on this one.
-> > 
-> > Since I was planning to send usb hwmod data file to Tony directly
-> > like I did for the other drivers, I can handle the update myself if
-> > you want.
+On Thursday 17 February 2011, Russell King - ARM Linux wrote:
+> > Actually, for correctness you should use the regular readl/writel, not
+> > the __raw_ versions, which can result in reordered or partial accesses
+> > on the bus.
 > 
-> I'll change this particular patch to yours.
+> Not in the decompressor.  readl/writel are unsupported there - the
+> decompressor doesn't have the L2 cache support code and so the barriers
+> necessary for readl/writel cause link errors.
 
-doesn't apply:
+Ah right, of course. Sorry for the confusion.
 
-$ patch -p1 < ~/benoit.diff 
-patching file arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-Hunk #1 succeeded at 55 with fuzz 1 (offset -7 lines).
-patch: **** malformed patch@line 42: omap44xx_l4_cfg__l3_main_2 = {
-
-could you base this off of v2.6.38-rc5 ?
-
--- 
-balbi
+	Arnd
