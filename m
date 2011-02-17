@@ -1,56 +1,46 @@
-From: rob@ti.com (Clark, Rob)
-Date: Wed, 16 Feb 2011 19:08:48 -0600
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
-	<201102161322.08126.arnd@arndb.de>
-	<AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
-Message-ID: <AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 16 Feb 2011 17:42:10 -0800
+Subject: [PATCH 1/2] omap4: 4430sdp: drop ehci support
+In-Reply-To: <20110216112631.GA2497@legolas.emea.dhcp.ti.com>
+References: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
+	<20110216112631.GA2497@legolas.emea.dhcp.ti.com>
+Message-ID: <20110217014210.GL20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm still in the learning-as-I-go phase here, so definitely not ready
-to propose a solution, but it does seem to me like there is room for
-some sort of kms-helper library here to handle more of the boilerplate
-xf86-video-* stuff..  I guess I'll have a better picture once I have a
-chance to add support for the various multi-monitor configurations.
-But certainly would be interested if anyone already has some ideas.
+* Felipe Balbi <balbi@ti.com> [110216 03:25]:
+> On Wed, Feb 16, 2011 at 04:47:19PM +0530, Anand Gadiyar wrote:
+> > Most revisions of the OMAP4 Blaze/SDP platform do not have
+> > the EHCI signals routed by default. The pads are routed
+> > for the alternate HSI functionality instead, and explicit
+> > board modifications are needed to route the signals to
+> > the USB PHY on the board.
+> > 
+> > Also, turning on the PHY connected to the EHCI port causes
+> > a board reboot during bootup due to an unintended short
+> > on the rails - this affects many initial revisions of the
+> > board, and needs a minor board mod to fix (or as a
+> > workaround, one should not attempt to power on the
+> > USB PHY).
+> > 
+> > Given that these boards need explicit board mods to even
+> > get EHCI working (separate from the accidental short above),
+> > we should not attempt to enable EHCI by default.
+> > 
+> > So drop the EHCI support from the board files for the
+> > Blaze/SDP platforms.
+> > 
+> > Signed-off-by: Anand Gadiyar <gadiyar@ti.com>
+> > Cc: Keshava Munegowda <keshava_mgowda@ti.com>
+> > Cc: Tony Lindgren <tony@atomide.com>
+> 
+> Tony, if you want to queue this one directly, here's my:
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
+> 
+> if you wish, I can send you a pull request as well. I already have
+> another patch for you anyway.
 
-BR,
--R
+OK if you have more I'd rather pull.
 
-On Wed, Feb 16, 2011 at 8:42 AM, Jesse Barker <jesse.barker@linaro.org> wrote:
-> Speaking for the Linaro graphics working group, I think it's great.? And, I
-> think you're right, that if enough of the KMS support in xf86-video-* is
-> similar enough (I was only aware of intel and nouveau supporting it properly
-> at current), pulling it out into a common layer would make it easier to
-> support in new drivers (including fbdev).
->
-> cheers,
-> Jesse
->
-> On Wed, Feb 16, 2011 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> On Tuesday 15 February 2011, Clark, Rob wrote:
->> > I'd been experimenting a bit on the side w/ the DRM driver framework (
->> >
->> > http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
->> > ), but had to add a good chunk of mostly boilerplate code to our xorg
->> > driver in order just to test it. ?Maybe some generic support for KMS
->> > in xf86-video-fbdev would have made this easier to develop the kernel
->> > part without in parallel having to implement the userspace part. ?I'm
->> > not sure if this is the sort of thing the linaro-wg has in mind?
->>
->> I'm not sure what the the linaro multimedia wg thinks of this, but the
->> kernel code you linked looks like it's doing exactly the right thing.
->>
->> ? ? ? ?Arnd
->>
->> _______________________________________________
->> linaro-dev mailing list
->> linaro-dev at lists.linaro.org
->> http://lists.linaro.org/mailman/listinfo/linaro-dev
->
->
+Tony
