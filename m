@@ -1,24 +1,49 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Thu, 17 Feb 2011 09:49:47 +0530
-Subject: [PATCH V5 12/63] ST SPEAr: Adding support for CLCD on	SPEAr3xx/6xx
-In-Reply-To: <20110216101426.GC6504@n2100.arm.linux.org.uk>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<9a376f8d8a927e333a36a04e9e40e801dbfe398f.1295499394.git.viresh.kumar@st.com>
-	<20110216095615.GA6504@n2100.arm.linux.org.uk>
-	<20110216101426.GC6504@n2100.arm.linux.org.uk>
-Message-ID: <4D5CA1E3.6080604@st.com>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Thu, 17 Feb 2011 09:53:40 +0530
+Subject: ALSA issue on DA850/OMAP-L138/AM18x
+In-Reply-To: <4D5BDA3D.5080905@acn-group.ch>
+References: <B85A65D85D7EB246BE421B3FB0FBB59302484734E0@dbde02.ent.ti.com>
+	<4D5BDA3D.5080905@acn-group.ch>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024B83B5E4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2011 03:44 PM, Russell King - ARM Linux wrote:
->> > This choice stuff has gone with the removal of the lpd code from the
->> > kernel, and thus is unmergable.  This kind of platform specific
->> > configuration has no business being in this file anyway.
-> The other thing is that the handling of BGR/RGB has changed in the
-> 'versatile' branch too, so you may want to delay this patch until
-> later.
+Hi Christophe,
 
-Ok.
+On Wed, Feb 16, 2011 at 19:37:57, Christophe Aeschlimann wrote:
+> Hi Sudhakar,
+> 
+> On 18.01.2011 05:43, Rajashekhara, Sudhakar wrote:
+> 
+> [...]
+> 
+>  > With the above fixes, arecord and aplay does not work for the first time.
+>  > Couple of times I get the below error:
+>  >
+>  > root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
+>  > arecord: main:608: audio open error: Invalid argument
+>  > aplay: playback:2297: read error
+>  > root at da850-omapl138-evm:~# arecord -f dat | aplay -f dat
+>  > aplay: main:608: audio open error: Invalid argument
+>  > Recording WAVE 'stdin' : Signed 16 bit Little Endian, Rate 48000 Hz, 
+> Stereo
+>  >
+>  > Third time arecord and aplay work normally.
+>  >
+>  > Has anyone seen such issues on DA850 or any other platform?
+>  >
+>  > I am currently debugging this issue. I'll submit the above patch to 
+> community
+>  > once the issue of fixed.
+> 
+> I'm facing the same issue here.
+> 
+> Did you make any progress on that one ?
+> 
 
---
-viresh
+Reverting the commit 140176159597ea1f23dcccb47b5c38fdf7c7faa8 
+(ASoC: Configure symmetric rates for tlv320aic3x) resolves the issue. We are
+still working on the proper fix.
+
+Thanks,
+Sudhakar 
