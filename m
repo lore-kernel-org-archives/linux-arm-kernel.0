@@ -1,38 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Feb 2011 09:26:17 +0000
-Subject: [PATCH 2/2] ARM: remove the 4x expansion presumption while
-	decompressing the kernel
-In-Reply-To: <20110217000923.GF2364@angua.secretlab.ca>
-References: <1297892343-29064-1-git-send-email-nico@fluxnic.net>
-	<1297892343-29064-2-git-send-email-nico@fluxnic.net>
-	<20110217000923.GF2364@angua.secretlab.ca>
-Message-ID: <20110217092617.GB24627@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 17 Feb 2011 09:27:47 +0000
+Subject: compiling 2.6.37 kernel in THUMB2 mode
+In-Reply-To: <AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
+References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
+	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
+	<AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
+	<AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
+Message-ID: <AANLkTinKhCG4HauFHrPd=qr9vmVheH59vu2Be=tWoJft@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 05:09:23PM -0700, Grant Likely wrote:
-> Patch looks good to me, but on a related note, I'm looking for a way
-> to also find the end of .bss.
-> 
-> When John looks at adding support for appending an initrd and/or dtb
-> to the zimage, it will be important to make sure the start of the
-> initrd/dtb does not overlap the ram the kernel is expecting to be
-> empty and available.
+Hi,
 
-Appending data to the zImage has already been solved with the 'bootp'
-stuff - and I'm afraid to say that merely catting a zImage with something
-else just isn't going to work.  There's no way for the zImage decompressor
-to know that there's anything on the end of the image, and there's no way
-for it to know where it can relocate itself to or where in memory it can
-safely decompress to in such scenarios.
+On Thu, Feb 17, 2011 at 2:02 AM,  <vb@vsbe.com> wrote:
+> On Wed, Feb 16, 2011 at 1:19 AM, Dave Martin <dave.martin@linaro.org> wrote:
+>>>
+>>> Note that while the bulk of the kernel is Thumb-2 safe, there are
+>>> occasional regressions, and individual platforms and drivers could
+>>> still have problems. ?For now, I've been focusing on omap--- see
+>>>
+>>> git://git.linaro.org/people/dmart/linux-2.6-arm.git dirty/arm/omap-thumb2+merged
+>>>
+>>> ARM: Add local symbols in relocate_kernel.S to work around gas bugs
+>>
+>> ^ Oops, forgot to explain that line: this is the patch required to
+>> work around a specific bug in the assembler. ?I'm not currently
+>> proposing to merge this upstream, since I prefer the assembler to get
+>> fixed...
+>> You can grab this patch from the branch.
+>>
+>
+> Dave, thank you for this information. I checked out this branch and
+> would like to build a kernel. I don't know what omap is though, can
+> you please share a config file one could use to build the thumb
+> enabled kernel for it?
 
-While such stuff may be possible with architectures where you know memory
-always starts at zero and extends contiguously for N MB where N is some
-number larger than 16, we don't have that luxury on ARM.  Sometimes it
-might be in 4MB chunks scattered throughout the physical address space
-at maybe 256MB offset from zero.  Or maybe 32MB chunks starting at 3GB.
-etc.
-
-And that's why the 'bootp' stuff takes a fixed address for where to
-locate the initrd - the only person who knows where its safe to do so is
-the person building the image for the platform.
+OMAP is one of TI's applications processor families.
