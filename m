@@ -1,64 +1,141 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 17 Feb 2011 13:06:59 +0200
-Subject: [PATCH 1/2] ARM: PXA: PXAFB: Fix double-free issue.
-In-Reply-To: <20110217110321.GF24627@n2100.arm.linux.org.uk>
-References: <201102151718.00800.anarsoul@gmail.com>
-	<1297928588-10545-1-git-send-email-anarsoul@gmail.com>
-	<20110217110321.GF24627@n2100.arm.linux.org.uk>
-Message-ID: <201102171306.59493.anarsoul@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 17 Feb 2011 12:07:14 +0100
+Subject: [PATCH 0/8] OMAP4: hwmod data: Add a bunch of IPs
+In-Reply-To: <20110217104207.GB17370@m-desktop>
+References: <1297938289-8678-1-git-send-email-b-cousson@ti.com>
+	<20110217104207.GB17370@m-desktop>
+Message-ID: <4D5D0162.6010505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 February 2011 13:03:21 Russell King - ARM Linux wrote:
-> On Thu, Feb 17, 2011 at 09:43:07AM +0200, Vasily Khoruzhick wrote:
-> > From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > 
-> > From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> 
-> No need for two From: lines.
+Hi Manjunath,
 
-It was added accidently, sorry
+On 2/17/2011 11:42 AM, G, Manjunath Kondaiah wrote:
+> On Thu, Feb 17, 2011 at 11:24:41AM +0100, Benoit Cousson wrote:
+>> All,
+>>
+>> Due to the important number of modifications recently done on the
+>> OMAP4 data compared to the original and the total absence of explanation
+>> in the changelog, I re-submit the data before the driver series in order
+>> to maintain the integrity of the original file and to avoid a huge pain
+>> during the merge.
+>>
+>> Govind, Tarun and Kishon,
+>> Please note that I cannot include here the dev_attr or rev field for
+>> McSPI, McBSP and timer since it requires some modification in the device
+>> header.
+>
+> McSPI is already merged to l-o master. Will not this series breaks spi
+> hwmod?
 
-> > @@ -636,7 +639,8 @@ static void overlay1fb_disable(struct pxafb_layer
-> > *ofb)
-> > 
-> >  	lcd_writel(ofb->fbi, FBR1, ofb->fbi->fdadr[DMA_OV1] | 0x3);
-> >  	
-> >  	if (wait_for_completion_timeout(&ofb->branch_done, 1 * HZ) == 0)
-> > 
-> > -		pr_warning("%s: timeout disabling overlay1\n", __func__);
-> > +		pr_warning("%s: timeout disabling overlay1\n",
-> > +			__func__);
-> 
-> No need for this change.
-> 
-> > @@ -687,6 +691,9 @@ static void overlay2fb_disable(struct pxafb_layer
-> > *ofb)
-> > 
-> >  {
-> >  
-> >  	uint32_t lccr5 = lcd_readl(ofb->fbi, LCCR5);
-> > 
-> > +	if (!(lcd_readl(ofb->fbi, OVL2C1) & OVLxC1_OEN))
-> > +		return;
-> > +
-> 
-> You don't describe this change in the change log, and this wasn't in my
-> patch.
+It will not break, it will just make the merge a little bit painful for 
+Tony if we do not re-submit the updated McSPI hwmod data for OMAP4.
 
-I did, "- Disable overlay only if it was enabled."
+Please find below a sample of what the patch should now look like.
 
-> > @@ -696,7 +703,8 @@ static void overlay2fb_disable(struct pxafb_layer
-> > *ofb)
-> > 
-> >  	lcd_writel(ofb->fbi, FBR4, ofb->fbi->fdadr[DMA_OV2_Cr] | 0x3);
-> >  	
-> >  	if (wait_for_completion_timeout(&ofb->branch_done, 1 * HZ) == 0)
-> > 
-> > -		pr_warning("%s: timeout disabling overlay2\n", __func__);
-> > +		pr_warning("%s: timeout disabling overlay2\n",
-> > +			__func__);
-> 
-> No need for this change.
+BTW, in this case, it will be much better to rename omap2_mcspi_dev_attr 
+using the same convention as others: <class_name>_dev_attr -> 
+mcspi_dev_attr.
 
-Ok
+Regards,
+Benoit
+
+---
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c 
+b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index f108614..fc7fabf 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -24,6 +24,9 @@
+  #include <plat/cpu.h>
+  #include <plat/gpio.h>
+  #include <plat/dma.h>
++#include <plat/mcspi.h>
+
+  #include "omap_hwmod_common_data.h"
+
+@@ -2497,6 +2508,11 @@ static struct omap_hwmod_ocp_if 
+*omap44xx_mcspi1_slaves[] = {
+  	&omap44xx_l4_per__mcspi1,
+  };
+
++/* mcspi1 dev_attr */
++static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
++	.num_chipselect	= 4,
++};
++
+  static struct omap_hwmod omap44xx_mcspi1_hwmod = {
+  	.name		= "mcspi1",
+  	.class		= &omap44xx_mcspi_hwmod_class,
+@@ -2510,6 +2526,7 @@ static struct omap_hwmod omap44xx_mcspi1_hwmod = {
+  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
+  		},
+  	},
++	.dev_attr	= &mcspi1_dev_attr,
+  	.slaves		= omap44xx_mcspi1_slaves,
+  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi1_slaves),
+  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -2551,6 +2568,11 @@ static struct omap_hwmod_ocp_if 
+*omap44xx_mcspi2_slaves[] = {
+  	&omap44xx_l4_per__mcspi2,
+  };
+
++/* mcspi2 dev_attr */
++static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
++	.num_chipselect	= 2,
++};
++
+  static struct omap_hwmod omap44xx_mcspi2_hwmod = {
+  	.name		= "mcspi2",
+  	.class		= &omap44xx_mcspi_hwmod_class,
+@@ -2564,6 +2586,7 @@ static struct omap_hwmod omap44xx_mcspi2_hwmod = {
+  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
+  		},
+  	},
++	.dev_attr	= &mcspi2_dev_attr,
+  	.slaves		= omap44xx_mcspi2_slaves,
+  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi2_slaves),
+  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -2605,6 +2628,11 @@ static struct omap_hwmod_ocp_if 
+*omap44xx_mcspi3_slaves[] = {
+  	&omap44xx_l4_per__mcspi3,
+  };
+
++/* mcspi3 dev_attr */
++static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
++	.num_chipselect	= 2,
++};
++
+  static struct omap_hwmod omap44xx_mcspi3_hwmod = {
+  	.name		= "mcspi3",
+  	.class		= &omap44xx_mcspi_hwmod_class,
+@@ -2618,6 +2646,7 @@ static struct omap_hwmod omap44xx_mcspi3_hwmod = {
+  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
+  		},
+  	},
++	.dev_attr	= &mcspi3_dev_attr,
+  	.slaves		= omap44xx_mcspi3_slaves,
+  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi3_slaves),
+  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+@@ -2657,6 +2686,11 @@ static struct omap_hwmod_ocp_if 
+*omap44xx_mcspi4_slaves[] = {
+  	&omap44xx_l4_per__mcspi4,
+  };
+
++/* mcspi4 dev_attr */
++static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
++	.num_chipselect	= 1,
++};
++
+  static struct omap_hwmod omap44xx_mcspi4_hwmod = {
+  	.name		= "mcspi4",
+  	.class		= &omap44xx_mcspi_hwmod_class,
+@@ -2670,6 +2704,7 @@ static struct omap_hwmod omap44xx_mcspi4_hwmod = {
+  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
+  		},
+  	},
++	.dev_attr	= &mcspi4_dev_attr,
+  	.slaves		= omap44xx_mcspi4_slaves,
+  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi4_slaves),
+  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+---
