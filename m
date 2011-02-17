@@ -1,51 +1,76 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 17 Feb 2011 20:55:06 +0530
-Subject: platform/i2c busses: pm runtime and system sleep
-In-Reply-To: <201012170109.43137.rjw@sisk.pl>
-References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
-	<201012170109.43137.rjw@sisk.pl>
-Message-ID: <AANLkTikRUZRh0YnP8nYTKFnFeUiJbK5xKvHHjn_S+gZE@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Feb 2011 16:47:46 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102151816.57104.arnd@arndb.de>
+	<AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
+Message-ID: <201102171647.46190.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 17, 2010 at 05:39, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Thursday, December 16, 2010, Rabin Vincent wrote:
->> There seem to be some differences between the generic ops and the i2c
->> and platform busses' implementations of the interaction between runtime
->> PM and system sleep:
->>
->> ? (1) The platform bus does not implement the
->> ? ? ? don't-call-pm->suspend()-if pm_runtime_suspended()-returns-true
->> ? ? ? functionality implemented by the generic ops and i2c.
->>
->> ? (2) Both I2C and platform do not set the device as active when a
->> ? ? ? pm->resume callback exists and it succeeds.
-...
->> Are these divergences from the generic ops to be considered as bugs?
->
-> I think so. ?I'm not sure about (1), because someone may already depend on
-> that behavior, but (2) looks like a bug to me.
+On Thursday 17 February 2011, Andrei Warkentin wrote:
+> Ext4.
 
-Revisiting these points again.  (2) has since been corrected for i2c,
-but platform does not do (1) and (2).
+Ok, I see. I haven't really done this kind of tests before, but my
+feeling is that ext3/ext4 may be much worse than the alternatives
+at the moment. It would certainly be worthwhile to do tests using
+nilfs2 and btrfs, whose default behaviour matches the requirements
+of your eMMC flash much better, and see how they perform with and
+without your patch.
 
-I've submitted a patch today to convert the AMBA bus to support pm-ops,
-and it was convenient to just use the GENERIC_SUBSYS_PM_OPS.  But some
-ARM SoCs have a combination of AMBA and platform devices for the on-chip
-devices so having different behaviour between the interaction of
-runtime-pm and system suspend callbacks does not seem like an ideal
-situation, and would only serve to confuse driver writers.  So, should I
-just not use GENERIC_SUBSYS_PM_OPS in the AMBA bus but instead open-code
-the rountines to make it work like platform?
+> I agree, which is why all of this is controlled now through sysfs, and
+> there are no more hard-coded checks for manfid, mmc versus sd or any
+> other magic. There is a page_size_secs attribute, through which you
+> can notify of the page size for the device.
 
-This will solve the platform vs AMBA bus, but shouldn't we really be
-aiming for consistent behaviour between these and the other busses such
-as I2C and SPI, which are also usually commonly used on the same
-platforms and are using GENERIC_PM_OPS?
+How about making that just page_size in bytes? sectors don't always
+mean 512 bytes, so this would be both shorter and less anbiguous.
 
-Should we be auditing all platform drivers and then switch platform to
-the GENERIC_PM_OPS?
+> The workaround for small
+> writes crossing the page boundary (and winding up in Buffer B, instead
+> of A) is turned on by setting split_tlow and split_thigh, which
+> provided a threshold range in sectors over which the the writes will
+> be split/aligned. The second workaround for splitting larger requests
+> and writing them with reliable write (to avoid getting coalesced and
+> winding up in Buffer B again) is controlled through split_relw_tlow
+> and split_relw_thigh. Do you think there is a better way? Or is this
+> good enough?
 
-Or should the two points (1) and (2) be not handled in the bus at all
-and be left to individual drivers (in which case we should audit i2c and
-spi and change GENERIC_PM_OPS)?
+I think I'd try to reduce the number of sysfs files needed for this.
+What are the values you would typically set here?
+
+My feeling is that separating unaligned page writes from full pages
+or multiples of pages could always be benefitial for all cards, or at
+least harmless, but that will require more measurements.
+Whether to do the reliable write or not could be a simple flag
+if the numbers are the same.
+
+> So, as I mentioned before, T had done some tests given data provided
+> by M, and then T verified that this fix was good. I need to do my own
+> tests on the patch after I rewrite it. Is iozone the best tool I can
+> use? So far I have a MMC logging facility through connector that I use
+> to collect stats (useful for seeing how fs traffic translates to
+> actual mmc commands...once I clean it up I'll push here for RFC). What
+> about the tool you're writing? Any way I can use it?
+
+It's now available in a an early almost-usable version at
+git://git.linaro.org/people/arnd/flashbench.git
+
+I don't have a test for the second buffer yet, but it would be
+good to know some of the other characteristics of your eMMC drive.
+
+Please try some of these commands:
+
+flashbench -a /dev/mmcblk0  --blocksize=1024
+flashbench --open-au --open-au-nr=1 /dev/mmcblk0 --blocksize=512
+flashbench --open-au --open-au-nr=1 /dev/mmcblk0 --blocksize=512 --random
+flashbench --open-au --open-au-nr=2 /dev/mmcblk0 --blocksize=512
+flashbench --open-au --open-au-nr=2 /dev/mmcblk0 --blocksize=512 --random
+flashbench --open-au --open-au-nr=3 /dev/mmcblk0 --blocksize=512
+flashbench --open-au --open-au-nr=3 /dev/mmcblk0 --blocksize=512 --random
+
+Note that the --open-au test will overwrite your data. You can do it on a
+partition you don't use, but it needs to be aligned to 4 MB.
+
+	Arnd
