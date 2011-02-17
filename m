@@ -1,60 +1,56 @@
-From: kirill@shutemov.name (Kirill A. Shutemov)
-Date: Thu, 17 Feb 2011 02:42:13 +0200
-Subject: [klibc] fwd: fix up ARM assembly to use 'bx lr' in place of 'mov
-	pc, lr'.
-In-Reply-To: <AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
-References: <20110216230648.GA7649@stro.at>
-	<20110216235019.GA17674@shutemov.name>
-	<AANLkTimF6ppk1RHXJnZ+pT1Xwb02idKr5dsFFXsW0Nqr@mail.gmail.com>
-Message-ID: <20110217004213.GA19028@shutemov.name>
+From: rob@ti.com (Clark, Rob)
+Date: Wed, 16 Feb 2011 19:08:48 -0600
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102091731.07794.arnd@arndb.de>
+	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
+	<201102161322.08126.arnd@arndb.de>
+	<AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
+Message-ID: <AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 04:03:07PM -0800, Khem Raj wrote:
-> On Wed, Feb 16, 2011 at 3:50 PM, Kirill A. Shutemov
-> <kirill@shutemov.name> wrote:
-> > On Thu, Feb 17, 2011 at 12:06:48AM +0100, maximilian attems wrote:
-> >> hello vorlon,
-> >>
-> >> got notified of your patch,
-> >> will apply next days upstream unless some critiques are voiced on ml.
-> >> thanks.
-> >>
-> >> --
-> >> maks
-> >>
-> >>
-> >> ----- Forwarded message from Steve Langasek <steve.langasek@canonical.com> -----
-> >>
-> >> Date: Wed, 16 Feb 2011 22:05:42 -0000
-> >> From: Steve Langasek <steve.langasek@canonical.com>
-> >> Subject: [Bug 527720] Re: thumb2 porting issues identified: klibc uses mov.*pc
-> >>
-> >>
-> >> I've also touched it up to be mergeable with Debian (support v4t builds
-> >> with #ifdef).
-> >>
-> >> Confirmed that installing the resulting klibc packages on my beagleboard
-> >> gives me a successfully-booting initramfs with klibc; and the
-> >> vfork/setjmptest test cases all pass in the klibc package tree.
-> >>
-> >> Fixes: https://bugs.launchpad.net/ubuntu/+source/klibc/+bug/527720
-> >>
-> >> --- klibc-1.5.20.orig/usr/klibc/arch/arm/vfork.S
-> >> +++ klibc-1.5.20/usr/klibc/arch/arm/vfork.S
-> >> @@ -25,7 +25,11 @@ vfork:
-> >> ? ? ? ? ?ldrcs ? ? ? ?r3, 1f
-> >> ? ? ? ? ?mvncs ? ? ? ?r0, #0
-> >> ? ? ? ? ?strcs ? ? ? ?r2, [r3]
-> >> +#if defined (___ARM_ARCH_4T__) || defined (__ARM_ARCH_4__)
-> >
-> > NAK. ARMv4T supports bx intruction. ARMv4 doesn't.
-> 
-> Does ARMv4t support BX lr ?
+I'm still in the learning-as-I-go phase here, so definitely not ready
+to propose a solution, but it does seem to me like there is room for
+some sort of kms-helper library here to handle more of the boilerplate
+xf86-video-* stuff..  I guess I'll have a better picture once I have a
+chance to add support for the various multi-monitor configurations.
+But certainly would be interested if anyone already has some ideas.
 
-Sure.
+BR,
+-R
 
-See http://wiki.debian.org/ArmEabiPort
-
--- 
- Kirill A. Shutemov
+On Wed, Feb 16, 2011 at 8:42 AM, Jesse Barker <jesse.barker@linaro.org> wrote:
+> Speaking for the Linaro graphics working group, I think it's great.? And, I
+> think you're right, that if enough of the KMS support in xf86-video-* is
+> similar enough (I was only aware of intel and nouveau supporting it properly
+> at current), pulling it out into a common layer would make it easier to
+> support in new drivers (including fbdev).
+>
+> cheers,
+> Jesse
+>
+> On Wed, Feb 16, 2011 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> On Tuesday 15 February 2011, Clark, Rob wrote:
+>> > I'd been experimenting a bit on the side w/ the DRM driver framework (
+>> >
+>> > http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
+>> > ), but had to add a good chunk of mostly boilerplate code to our xorg
+>> > driver in order just to test it. ?Maybe some generic support for KMS
+>> > in xf86-video-fbdev would have made this easier to develop the kernel
+>> > part without in parallel having to implement the userspace part. ?I'm
+>> > not sure if this is the sort of thing the linaro-wg has in mind?
+>>
+>> I'm not sure what the the linaro multimedia wg thinks of this, but the
+>> kernel code you linked looks like it's doing exactly the right thing.
+>>
+>> ? ? ? ?Arnd
+>>
+>> _______________________________________________
+>> linaro-dev mailing list
+>> linaro-dev at lists.linaro.org
+>> http://lists.linaro.org/mailman/listinfo/linaro-dev
+>
+>
