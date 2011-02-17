@@ -1,28 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Feb 2011 11:49:16 +0000
-Subject: [PATCH 1/2] omap4: 4430sdp: drop ehci support
-In-Reply-To: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
-References: <1297855040-1337-1-git-send-email-gadiyar@ti.com>
-Message-ID: <20110217114916.GA24989@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 17 Feb 2011 09:53:56 -0200
+Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
+	drivers
+In-Reply-To: <20110216125820.GA22310@pengutronix.de>
+References: <20110211181921.3d561568@queued.net>
+	<20110216094154.GV13279@pengutronix.de>
+	<4D5BC38E.1060009@freescale.com>
+	<20110216125820.GA22310@pengutronix.de>
+Message-ID: <AANLkTimhXR=AWT6wV-MXhtW7dvs6OYW7OqaV5RPhFP5V@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 16, 2011 at 04:47:19PM +0530, Anand Gadiyar wrote:
-> Most revisions of the OMAP4 Blaze/SDP platform do not have
-> the EHCI signals routed by default. The pads are routed
-> for the alternate HSI functionality instead, and explicit
-> board modifications are needed to route the signals to
-> the USB PHY on the board.
-> 
-> Also, turning on the PHY connected to the EHCI port causes
-> a board reboot during bootup due to an unintended short
-> on the rails - this affects many initial revisions of the
-> board, and needs a minor board mod to fix (or as a
-> workaround, one should not attempt to power on the
-> USB PHY).
+Hi Uwe,
 
-It's probably a good idea to put some comment in the code to that
-effect - people don't generally look at the history when adding new
-features.  It's probably also a good idea to claim the GPIO for the
-PHY power control and ensure that it's set to 'off' mode - that code
-can then be a placeholder for the comment.
+2011/2/16 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> On Wed, Feb 16, 2011 at 10:31:10AM -0200, Fabio Estevam wrote:
+>> Hi Uwe,
+>>
+>> On 2/16/2011 7:41 AM, Uwe Kleine-K?nig wrote:
+>> ...
+>> >> ?/* MC13783 */
+>> >> -static struct mc13783_platform_data mc13783_pdata __initdata = {
+>> > isn't using __initdata here broken already before your patch? ?Was
+>> > introduced in c67a3e09. ?Fabio?
+>>
+>> I followed the same approach as in mx31_3ds.c file.
+>>
+>> > But in general I'd prefer to keep as much __initdata as possible because
+>> > this occupies less memory when using a multi-machine kernel.
+>>
+>> Ok, is the __initdata usage correct then? If not, I can change it. Just let me know.
+> I guess that if you compile mc13xxx support as module it won't work.
+>
+> Try that, and if it breaks, send a patch fixing mx31_3ds.c, too.
+
+I built it as module and the build went fine.
+
+Regards,
+
+Fabio Estevam
