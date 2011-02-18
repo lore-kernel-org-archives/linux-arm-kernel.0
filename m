@@ -1,558 +1,216 @@
-From: john.linn@xilinx.com (John Linn)
-Date: Fri, 18 Feb 2011 11:14:40 -0700
-Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <1298052881-14591-3-git-send-email-john.linn@xilinx.com>
-References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-2-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-3-git-send-email-john.linn@xilinx.com>
-Message-ID: <42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 18 Feb 2011 23:51:38 +0530
+Subject: [PATCH] perf: add OMAP support for the new power events
+In-Reply-To: <1298052645-4164-1-git-send-email-j-pihet@ti.com>
+References: <1298052645-4164-1-git-send-email-j-pihet@ti.com>
+Message-ID: <ef11c43d66fe4e7c7177b1120fab5f1a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are the minimum needed to build the kernel for the new platform.
+Jean,
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of jean.pihet at newoldbits.com
+> Sent: Friday, February 18, 2011 11:41 PM
+> To: Kevin Hilman; Thomas Renninger; linux-omap at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Cc: Jean Pihet
+> Subject: [PATCH] perf: add OMAP support for the new power events
+>
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> The patch adds the new power management trace points for
+> the OMAP architecture.
+>
+> The trace points are for:
+> - default idle handler. Since the cpuidle framework is
+>   instrumented in the generic way there is no need to
+>   add trace points in the OMAP specific cpuidle handler;
+> - cpufreq (DVFS),
+> - SoC clocks changes (enable, disable, set_rate),
+> - power domain states: the desired target state and -if different-
+>   the actually hit state.
+>
+> Because of the generic nature of the changes, OMAP3 and OMAP4 are
+> supported.
+>
+> Tested on OMAP3 with suspend/resume, cpuidle, basic DVFS.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-Signed-off-by: John Linn <john.linn@xilinx.com>
----
+Thanks for additional power domain trace point as per
+discussion.
 
-V4 Changes
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Cleanup based on input from Jamie Iles.
-	Moved to PLAT_PHYS_OFFSET.
-	Remove headers file inclusions that weren't needed.
-	Added use of raw_readl/raw_writel in uncompressor uart code.
-	Added cpu_relax() in the uncompressor uart code.
-
-V3 Changes
-
-Updates based on Russell Kings' comments
-	Changed headers to update the license info and remove
-	the address
-
-	Updated the constant to use UL in vmalloc.h
-
-V2 Changes
-
-Updates based on Russell King's comments	
-	moved to using entry-macro-gic.S
-	moved stuff from hardware.h to xilinx_soc.h 
-	added IOMEM() in io.h to help with typing
-	Minor updates to IO_SPACE_LIMIT and __io()
-	Updated addresses to be clear with seperate virtual
-		and physical addresses
-
- arch/arm/mach-xilinx/include/mach/clkdev.h      |   33 ++++++++++++
- arch/arm/mach-xilinx/include/mach/debug-macro.S |   36 +++++++++++++
- arch/arm/mach-xilinx/include/mach/entry-macro.S |   30 +++++++++++
- arch/arm/mach-xilinx/include/mach/hardware.h    |   18 +++++++
- arch/arm/mach-xilinx/include/mach/io.h          |   33 ++++++++++++
- arch/arm/mach-xilinx/include/mach/irqs.h        |   29 +++++++++++
- arch/arm/mach-xilinx/include/mach/memory.h      |   23 +++++++++
- arch/arm/mach-xilinx/include/mach/system.h      |   28 ++++++++++
- arch/arm/mach-xilinx/include/mach/timex.h       |   22 ++++++++
- arch/arm/mach-xilinx/include/mach/uart.h        |   25 +++++++++
- arch/arm/mach-xilinx/include/mach/uncompress.h  |   61 +++++++++++++++++++++++
- arch/arm/mach-xilinx/include/mach/vmalloc.h     |   20 +++++++
- arch/arm/mach-xilinx/include/mach/xilinx_soc.h  |   46 +++++++++++++++++
- 13 files changed, 404 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-xilinx/include/mach/clkdev.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-xilinx/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-xilinx/include/mach/hardware.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/io.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/irqs.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/memory.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/system.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/timex.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/uart.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-
-diff --git a/arch/arm/mach-xilinx/include/mach/clkdev.h b/arch/arm/mach-xilinx/include/mach/clkdev.h
-new file mode 100644
-index 0000000..5dd1453
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/clkdev.h
-@@ -0,0 +1,33 @@
-+/*
-+ * arch/arm/mach-xilinx/include/mach/clkdev.h
-+ *
-+ *  Copyright (C) 2011 Xilinx, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __MACH_CLKDEV_H__
-+#define __MACH_CLKDEV_H__
-+
-+struct clk {
-+	unsigned long rate;
-+};
-+
-+static inline int __clk_get(struct clk *clk)
-+{
-+	return 1;
-+}
-+
-+static inline void __clk_put(struct clk *clk)
-+{
-+}
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/debug-macro.S b/arch/arm/mach-xilinx/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..30d3d3d
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/debug-macro.S
-@@ -0,0 +1,36 @@
-+/* arch/arm/mach-xilinx/include/mach/debug-macro.S
-+ *
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <mach/xilinx_soc.h>
-+#include <mach/uart.h>
-+
-+		.macro	addruart, rp, rv
-+		ldr	\rp, =LL_UART_PADDR	@ physical
-+		ldr	\rv, =LL_UART_VADDR	@ virtual
-+		.endm
-+
-+		.macro	senduart,rd,rx
-+		str	\rd, [\rx, #UART_FIFO_OFFSET]	@ TXDATA
-+		.endm
-+
-+		.macro	waituart,rd,rx
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1002:		ldr	\rd, [\rx, #UART_SR_OFFSET]	@ get status register
-+		tst	\rd, #UART_SR_TXFULL		@
-+		bne	1002b			@ wait if FIFO is full
-+		.endm
-diff --git a/arch/arm/mach-xilinx/include/mach/entry-macro.S b/arch/arm/mach-xilinx/include/mach/entry-macro.S
-new file mode 100644
-index 0000000..11a2866
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/entry-macro.S
-@@ -0,0 +1,30 @@
-+/*
-+ * arch/arm/mach-xilinx/include/mach/entry-macro.S
-+ *
-+ * Low-level IRQ helper macros
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * based on arch/plat-mxc/include/mach/entry-macro.S
-+ *
-+ *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
-+ *  Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <mach/hardware.h>
-+#include <asm/hardware/entry-macro-gic.S>
-+
-+                .macro  disable_fiq
-+                .endm
-+
-+                .macro  arch_ret_to_user, tmp1, tmp2
-+                .endm
-diff --git a/arch/arm/mach-xilinx/include/mach/hardware.h b/arch/arm/mach-xilinx/include/mach/hardware.h
-new file mode 100644
-index 0000000..f9685c4
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/hardware.h
-@@ -0,0 +1,18 @@
-+/* arch/arm/mach-xilinx/include/mach/hardware.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_HARDWARE_H__
-+#define __MACH_HARDWARE_H__
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/io.h b/arch/arm/mach-xilinx/include/mach/io.h
-new file mode 100644
-index 0000000..ef69e65
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/io.h
-@@ -0,0 +1,33 @@
-+/* arch/arm/mach-xilinx/include/mach/io.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_IO_H__
-+#define __MACH_IO_H__
-+
-+/* Allow IO space to be anywhere in the memory */
-+
-+#define IO_SPACE_LIMIT 0xffff
-+
-+/* IO address mapping macros, nothing special at this time but required */
-+
-+#ifdef __ASSEMBLER__
-+#define IOMEM(x)		(x)
-+#else
-+#define IOMEM(x)		((void __force __iomem *)(x))
-+#endif
-+
-+#define __io(a)			__typesafe_io(a)
-+#define __mem_pci(a)		(a)
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/irqs.h b/arch/arm/mach-xilinx/include/mach/irqs.h
-new file mode 100644
-index 0000000..47a8162
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/irqs.h
-@@ -0,0 +1,29 @@
-+/* arch/arm/mach-xilinx/include/mach/irqs.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_IRQS_H
-+#define __MACH_IRQS_H
-+
-+#define ARCH_NR_GPIOS	118
-+#define NR_IRQS		(128 + ARCH_NR_GPIOS)
-+
-+/*
-+ * GIC Interrupts
-+ */
-+
-+#define IRQ_GIC_SPI_START	32
-+#define IRQ_TIMERCOUNTER0	42
-+#define IRQ_UART0		59
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/memory.h b/arch/arm/mach-xilinx/include/mach/memory.h
-new file mode 100644
-index 0000000..3efde15
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/memory.h
-@@ -0,0 +1,23 @@
-+/* arch/arm/mach-xilinx/include/mach/memory.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_MEMORY_H__
-+#define __MACH_MEMORY_H__
-+
-+#include <asm/sizes.h>
-+
-+#define PHYS_OFFSET             UL(0x0)
-+#define MEM_SIZE		SZ_256M
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/system.h b/arch/arm/mach-xilinx/include/mach/system.h
-new file mode 100644
-index 0000000..e8514a0
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/system.h
-@@ -0,0 +1,28 @@
-+/* arch/arm/mach-xilinx/include/mach/system.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_SYSTEM_H__
-+#define __MACH_SYSTEM_H__
-+
-+static inline void arch_idle(void)
-+{
-+	cpu_do_idle();
-+}
-+
-+static inline void arch_reset(char mode, const char *cmd)
-+{
-+	/* Add architecture specific reset processing here */
-+}
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/timex.h b/arch/arm/mach-xilinx/include/mach/timex.h
-new file mode 100644
-index 0000000..4ebc0a6
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/timex.h
-@@ -0,0 +1,22 @@
-+/* arch/arm/mach-xilinx/include/mach/timex.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_TIMEX_H__
-+#define __MACH_TIMEX_H__
-+
-+#define PERIPHERAL_CLOCK_RATE	2500000
-+
-+#define CLOCK_TICK_RATE	(PERIPHERAL_CLOCK_RATE / 32)
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/uart.h b/arch/arm/mach-xilinx/include/mach/uart.h
-new file mode 100644
-index 0000000..7fca361
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/uart.h
-@@ -0,0 +1,25 @@
-+/* arch/arm/mach-xilinx/include/mach/uart.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_UART_H__
-+#define __MACH_UART_H__
-+
-+#define UART_CR_OFFSET          0x00  /* Control Register [8:0] */
-+#define UART_SR_OFFSET          0x2C  /* Channel Status [11:0] */
-+#define UART_FIFO_OFFSET        0x30  /* FIFO [15:0] or [7:0] */
-+
-+#define UART_SR_TXFULL		0x00000010	/* TX FIFO full */
-+#define UART_SR_TXEMPTY		0x00000008	/* TX FIFO empty */
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/uncompress.h b/arch/arm/mach-xilinx/include/mach/uncompress.h
-new file mode 100644
-index 0000000..ff3754c
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/uncompress.h
-@@ -0,0 +1,61 @@
-+/* arch/arm/mach-xilinx/include/mach/uncompress.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_UNCOMPRESS_H__
-+#define __MACH_UNCOMPRESS_H__
-+
-+#include <mach/xilinx_soc.h>
-+#include <mach/uart.h>
-+#include <asm/processor.h>
-+#include <asm/io.h>
-+#include <mach/io.h>
-+
-+void arch_decomp_setup(void)
-+{
-+}
-+
-+static inline void flush(void)
-+{
-+	u32 status;
-+	/*
-+	 * Wait while the FIFO is not empty
-+	 */
-+	while (1) {
-+		status = __raw_readl(IOMEM(LL_UART_PADDR + UART_SR_OFFSET));
-+		if (status & UART_SR_TXEMPTY)
-+			break;
-+		cpu_relax();
-+	}
-+}
-+
-+#define arch_decomp_wdog()
-+
-+static void putc(char ch)
-+{
-+	u32 status;
-+
-+	/*
-+	 * Wait for room in the FIFO, then write the char into the FIFO
-+	 */
-+	while (1) {
-+		status = __raw_readl(IOMEM(LL_UART_PADDR + UART_SR_OFFSET));
-+		if (!(status & UART_SR_TXFULL))
-+			break;
-+		cpu_relax();
-+	}
-+
-+	__raw_writel(ch, IOMEM(LL_UART_PADDR + UART_FIFO_OFFSET));
-+}
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/vmalloc.h b/arch/arm/mach-xilinx/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..aba20a3
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/vmalloc.h
-@@ -0,0 +1,20 @@
-+/* arch/arm/mach-xilinx/include/mach/vmalloc.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_VMALLOC_H__
-+#define __MACH_VMALLOC_H__
-+
-+#define VMALLOC_END       0xE0000000UL
-+
-+#endif
-diff --git a/arch/arm/mach-xilinx/include/mach/xilinx_soc.h b/arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-new file mode 100644
-index 0000000..d01cde1
---- /dev/null
-+++ b/arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-@@ -0,0 +1,46 @@
-+/* arch/arm/mach-xilinx/include/mach/xilinx_soc.h
-+ *
-+ *  Copyright (C) 2011 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __MACH_XILINX_SOC_H__
-+#define __MACH_XILINX_SOC_H__
-+
-+/* For now, all mappings are flat (physical = virtual)
-+ */
-+#define UART0_PHYS			0xE0000000
-+#define UART0_VIRT			UART0_PHYS
-+
-+#define TTC0_PHYS			0xF8001000
-+#define TTC0_VIRT			TTC0_PHYS
-+
-+#define PL310_L2CC_PHYS			0xF8F02000
-+#define PL310_L2CC_VIRT			PL310_L2CC_PHYS
-+
-+#define SCU_PERIPH_PHYS			0xF8F00000
-+#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
-+
-+/* The following are intended for the devices that are mapped early */
-+
-+#define TTC0_BASE			IOMEM(TTC0_VIRT)
-+#define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
-+#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
-+#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
-+#define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
-+
-+/*
-+ * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
-+ */
-+#define LL_UART_PADDR	UART0_PHYS
-+#define LL_UART_VADDR	UART0_VIRT
-+
-+#endif
--- 
-1.6.2.1
-
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+> ---
+>  arch/arm/mach-omap2/clock.c       |    8 +++++++-
+>  arch/arm/mach-omap2/pm34xx.c      |    7 +++++++
+>  arch/arm/mach-omap2/powerdomain.c |   26 +++++++++++++++++++++++---
+>  3 files changed, 37 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-
+> omap2/clock.c
+> index 2a2f152..72af75d 100644
+> --- a/arch/arm/mach-omap2/clock.c
+> +++ b/arch/arm/mach-omap2/clock.c
+> @@ -22,7 +22,9 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/bitops.h>
+> +#include <trace/events/power.h>
+>
+> +#include <asm/cpu.h>
+>  #include <plat/clock.h>
+>  #include "clockdomain.h"
+>  #include <plat/cpu.h>
+> @@ -261,6 +263,7 @@ void omap2_clk_disable(struct clk *clk)
+>
+>  	pr_debug("clock: %s: disabling in hardware\n", clk->name);
+>
+> +	trace_clock_disable(clk->name, 0, smp_processor_id());
+>  	clk->ops->disable(clk);
+>
+>  	if (clk->clkdm)
+> @@ -312,6 +315,7 @@ int omap2_clk_enable(struct clk *clk)
+>  		}
+>  	}
+>
+> +	trace_clock_enable(clk->name, 1, smp_processor_id());
+>  	ret = clk->ops->enable(clk);
+>  	if (ret) {
+>  		WARN(1, "clock: %s: could not enable: %d\n", clk->name,
+> ret);
+> @@ -349,8 +353,10 @@ int omap2_clk_set_rate(struct clk *clk,
+> unsigned long rate)
+>  	pr_debug("clock: set_rate for clock %s to rate %ld\n", clk-
+> >name, rate);
+>
+>  	/* dpll_ck, core_ck, virt_prcm_set; plus all clksel clocks */
+> -	if (clk->set_rate)
+> +	if (clk->set_rate) {
+> +		trace_clock_set_rate(clk->name, rate,
+> smp_processor_id());
+>  		ret = clk->set_rate(clk, rate);
+> +	}
+>
+>  	return ret;
+>  }
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-
+> omap2/pm34xx.c
+> index 2f864e4..d1cc3f4 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/delay.h>
+>  #include <linux/slab.h>
+>  #include <linux/console.h>
+> +#include <trace/events/power.h>
+>
+>  #include <plat/sram.h>
+>  #include "clockdomain.h"
+> @@ -519,8 +520,14 @@ static void omap3_pm_idle(void)
+>  	if (omap_irq_pending() || need_resched())
+>  		goto out;
+>
+> +	trace_power_start(POWER_CSTATE, 1, smp_processor_id());
+> +	trace_cpu_idle(1, smp_processor_id());
+> +
+>  	omap_sram_idle();
+>
+> +	trace_power_end(smp_processor_id());
+> +	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
+> +
+>  out:
+>  	local_fiq_enable();
+>  	local_irq_enable();
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-
+> omap2/powerdomain.c
+> index eaed0df..1495eed 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -19,12 +19,15 @@
+>  #include <linux/list.h>
+>  #include <linux/errno.h>
+>  #include <linux/string.h>
+> +#include <trace/events/power.h>
+> +
+>  #include "cm2xxx_3xxx.h"
+>  #include "prcm44xx.h"
+>  #include "cm44xx.h"
+>  #include "prm2xxx_3xxx.h"
+>  #include "prm44xx.h"
+>
+> +#include <asm/cpu.h>
+>  #include <plat/cpu.h>
+>  #include "powerdomain.h"
+>  #include "clockdomain.h"
+> @@ -32,6 +35,8 @@
+>
+>  #include "pm.h"
+>
+> +#define PWRDM_TRACE_STATES_FLAG	(1<<31)
+> +
+>  enum {
+>  	PWRDM_STATE_NOW = 0,
+>  	PWRDM_STATE_PREV,
+> @@ -130,8 +135,7 @@ static void
+> _update_logic_membank_counters(struct powerdomain *pwrdm)
+>  static int _pwrdm_state_switch(struct powerdomain *pwrdm, int flag)
+>  {
+>
+> -	int prev;
+> -	int state;
+> +	int prev, state, trace_state = 0;
+>
+>  	if (pwrdm == NULL)
+>  		return -EINVAL;
+> @@ -148,6 +152,17 @@ static int _pwrdm_state_switch(struct
+> powerdomain *pwrdm, int flag)
+>  			pwrdm->state_counter[prev]++;
+>  		if (prev == PWRDM_POWER_RET)
+>  			_update_logic_membank_counters(pwrdm);
+> +		/*
+> +		 * If the power domain did not hit the desired state,
+> +		 * generate a trace event with both the desired and hit
+> states
+> +		 */
+> +		if (state != prev) {
+> +			trace_state = (PWRDM_TRACE_STATES_FLAG |
+> +				       ((state & OMAP_POWERSTATE_MASK) <<
+8)
+> |
+> +				       ((prev & OMAP_POWERSTATE_MASK) <<
+> 0));
+> +			trace_power_domain_target(pwrdm->name,
+> trace_state,
+> +						  smp_processor_id());
+> +		}
+>  		break;
+>  	default:
+>  		return -EINVAL;
+> @@ -406,8 +421,13 @@ int pwrdm_set_next_pwrst(struct powerdomain
+> *pwrdm, u8 pwrst)
+>  	pr_debug("powerdomain: setting next powerstate for %s to
+> %0x\n",
+>  		 pwrdm->name, pwrst);
+>
+> -	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst)
+> +	if (arch_pwrdm && arch_pwrdm->pwrdm_set_next_pwrst) {
+> +		/* Trace the pwrdm desired target state */
+> +		trace_power_domain_target(pwrdm->name, pwrst,
+> +					  smp_processor_id());
+> +		/* Program the pwrdm desired target state */
+>  		ret = arch_pwrdm->pwrdm_set_next_pwrst(pwrdm, pwrst);
+> +	}
+>
+>  	return ret;
+>  }
+> --
+> 1.7.2.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-
+> omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
