@@ -1,53 +1,50 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 18 Feb 2011 10:49:49 +0100
-Subject: [PATCH 1/7] Add a mfd IPUv3 driver
-In-Reply-To: <871v36pm5r.fsf@lechat.rtp-net.org>
+Date: Fri, 18 Feb 2011 10:52:21 +0100
+Subject: [PATCH 3/7] Add i.MX5 framebuffer driver
+In-Reply-To: <AANLkTina46_CMvB_9cqc4=PvcPxaV_BQ_H_ghJZFFxg8@mail.gmail.com>
 References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
-	<1297865452-32181-2-git-send-email-s.hauer@pengutronix.de>
-	<871v36pm5r.fsf@lechat.rtp-net.org>
-Message-ID: <20110218094949.GJ24426@pengutronix.de>
+	<1297865452-32181-4-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTina46_CMvB_9cqc4=PvcPxaV_BQ_H_ghJZFFxg8@mail.gmail.com>
+Message-ID: <20110218095221.GK24426@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 07:10:24PM +0100, Arnaud Patard wrote:
-> > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> > index 6bafb51b..ffdb37a 100644
-> > --- a/drivers/video/Kconfig
-> > +++ b/drivers/video/Kconfig
-> > @@ -26,6 +26,8 @@ source "drivers/gpu/drm/Kconfig"
-> >  
-> >  source "drivers/gpu/stub/Kconfig"
-> >  
-> > +source "drivers/video/imx-ipu-v3/Kconfig"
-> > +
-> 
-> I don't see such a Kconfig file in this patch. Got lost while moving
-> from mfd to video ?
+Hi Jason,
 
-Oops, yes still untracked in my repository. Will add in the next series.
+On Fri, Feb 18, 2011 at 05:22:09PM +0800, Jason Chen wrote:
+> hi, Sasha,
+> 
+> > +       if (var->vmode & FB_VMODE_ODD_FLD_FIRST) /* PAL */
+> > +               sig_cfg.odd_field_first = 1;
+> > +       if (var->sync & FB_SYNC_EXT)
+> > +               sig_cfg.ext_clk = 1;
+> > +       if (var->sync & FB_SYNC_HOR_HIGH_ACT)
+> > +               sig_cfg.Hsync_pol = 1;
+> Please remove FB_SYNC_EXT support.
+
+No problem, can do. But why? Is it nonfunctional in the hardware
+or is it that the current code just misses more pieces to support
+this?
 
 > 
->  
-> >  config VGASTATE
-> >         tristate
-> >         default n
-> > diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-> > index 8c8fabd..f4921ab 100644
-> > --- a/drivers/video/Makefile
-> > +++ b/drivers/video/Makefile
-> > @@ -153,6 +153,7 @@ obj-$(CONFIG_FB_BFIN_T350MCQB)	  += bfin-t350mcqb-fb.o
-> >  obj-$(CONFIG_FB_BFIN_7393)        += bfin_adv7393fb.o
-> >  obj-$(CONFIG_FB_MX3)		  += mx3fb.o
-> >  obj-$(CONFIG_FB_DA8XX)		  += da8xx-fb.o
-> > +obj-$(CONFIG_MFD_IMX_IPU_V3)	  += imx-ipu-v3/
-> 
-> Now that files are in drivers/video, do we want to keep MFD in the name ?
+> +static void imx_ipu_fb_disable_overlay(struct fb_info *ovl)
+> +{
+> +       struct imx_ipu_fb_info *mxc_ovl = ovl->par;
+> +
+> +       if (!mxc_ovl->enabled)
+> +               return;
+> +
+> +       ipu_dp_disable_fg(mxc_ovl->dp);
+> +       ipu_wait_for_interrupt(451, 100);
+> +       ipu_idmac_disable_channel(mxc_ovl->ipu_ch);
+> +       ipu_dmfc_disable_channel(mxc_ovl->dmfc);
+> +       mxc_ovl->enabled = 0;
+> +}
+> Had better has a definition of ipu irq 451.
 
-I asked myself the same question and had no clear answer. Probably
-better to remove the MFD.
+Ok.
 
 Sascha
-
 
 -- 
 Pengutronix e.K.                           |                             |
