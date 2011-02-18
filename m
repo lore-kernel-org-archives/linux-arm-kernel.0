@@ -1,57 +1,92 @@
-From: dilinger@queued.net (Andres Salomon)
-Date: Fri, 18 Feb 2011 09:50:29 -0800
-Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110218083928.GU22310@pengutronix.de>
-References: <20110211181921.3d561568@queued.net>
-	<20110216094154.GV13279@pengutronix.de>
-	<20110216090036.6fffed34@debxo>
-	<20110218083928.GU22310@pengutronix.de>
-Message-ID: <20110218095029.462e6ef3@queued.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 18 Feb 2011 17:52:54 +0000
+Subject: [PATCH] ARM: Avoid discarding sections that might have SMP_ON_UP
+	fixups
+In-Reply-To: <20110216163543.GA27480@arm.com>
+References: <AANLkTinjAHLCMJja8q=bPhRBuoR2DCO_NjDw1qNi5MrU@mail.gmail.com>
+	<20110210144617.GD3652@n2100.arm.linux.org.uk>
+	<AANLkTiks_8hXd=7cKN0jNw=1QGcb=5ZyFu1sEFc0G=Px@mail.gmail.com>
+	<20110210191125.GA12582@n2100.arm.linux.org.uk>
+	<AANLkTim0RRw-xHQYTdHLCXCS_GXkaCiW8y9Fz=jMmwPa@mail.gmail.com>
+	<20110211101345.GA23785@n2100.arm.linux.org.uk>
+	<AANLkTikFkZH6KK_KUgXaaKyQM6eZOh-ki3xdtS2fk8zN@mail.gmail.com>
+	<20110211160500.GA31529@n2100.arm.linux.org.uk>
+	<AANLkTik1T_RDb_MVw9WWY_BX75isoGq2k1L+uVCN-bbq@mail.gmail.com>
+	<20110211163247.GB31529@n2100.arm.linux.org.uk>
+	<20110216163543.GA27480@arm.com>
+Message-ID: <AANLkTina+bHd=dJRjfASci=GU3fAWbk2OGb6pU8rx67D@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Feb 2011 09:39:28 +0100
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
+Hi Russell,
 
-> On Wed, Feb 16, 2011 at 09:00:36AM -0800, Andres Salomon wrote:
-> > On Wed, 16 Feb 2011 10:41:54 +0100
-> > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > 
-> > > On Fri, Feb 11, 2011 at 06:19:21PM -0800, Andres Salomon wrote:
-> > > > 
-> > > > The cell's platform_data is now accessed with a helper function;
-> > > > change clients to use that, and remove the now-unused data_size.
-> > > > 
-> > > > Note that mfd-core no longer makes a copy of platform_data, but
-> > > > the
-> > > why was this changed and where?  I'm not able to find your
-> > > complete series via gmane.
-> > 
-> > http://permalink.gmane.org/gmane.linux.kernel/1099164
-> I still don't get the motivation of your patch set.  For drivers that
-> don't need the mfd_cells you introduce another level of indirection.
-> And drivers that want to use mfd_cells as platform_data, they can
-> already now.
-> 
-> Best regards
-> Uwe
-> 
+On Wed, Feb 16, 2011 at 4:35 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> Hi,
+>
+> On Fri, Feb 11, 2011 at 04:32:47PM +0000, Russell King - ARM Linux wrote:
+>
+> [...]
+>
+>> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+>> index 45b5651..343d29f 100644
+>> --- a/arch/arm/kernel/vmlinux.lds.S
+>> +++ b/arch/arm/kernel/vmlinux.lds.S
+>> @@ -21,6 +21,12 @@
+>> ?#define ARM_CPU_KEEP(x)
+>> ?#endif
+>>
+>> +#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
+>> +#define ARM_EXIT_KEEP(x) ? ? x
+>> +#else
+>> +#define ARM_EXIT_KEEP(x)
+>> +#endif
+>> +
+>> ?OUTPUT_ARCH(arm)
+>> ?ENTRY(stext)
+>>
+>> @@ -43,6 +49,7 @@ SECTIONS
+>> ? ? ? ? ? ? ? _sinittext = .;
+>> ? ? ? ? ? ? ? ? ? ? ? HEAD_TEXT
+>> ? ? ? ? ? ? ? ? ? ? ? INIT_TEXT
+>> + ? ? ? ? ? ? ? ? ? ? ARM_EXIT_KEEP(EXIT_TEXT)
+>> ? ? ? ? ? ? ? _einittext = .;
+>> ? ? ? ? ? ? ? ARM_CPU_DISCARD(PROC_INFO)
+>> ? ? ? ? ? ? ? __arch_info_begin = .;
+>> @@ -71,6 +78,7 @@ SECTIONS
+>> ?#ifndef CONFIG_XIP_KERNEL
+>> ? ? ? ? ? ? ? __init_begin = _stext;
+>> ? ? ? ? ? ? ? INIT_DATA
+>> + ? ? ? ? ? ? ARM_EXIT_KEEP(EXIT_DATA)
+>> ?#endif
+>> ? ? ? }
+>>
+>> @@ -166,6 +174,7 @@ SECTIONS
+>> ? ? ? ? ? ? ? . = ALIGN(PAGE_SIZE);
+>> ? ? ? ? ? ? ? __init_begin = .;
+>> ? ? ? ? ? ? ? INIT_DATA
+>> + ? ? ? ? ? ? ARM_EXIT_KEEP(EXIT_DATA)
+>> ? ? ? ? ? ? ? . = ALIGN(PAGE_SIZE);
+>> ? ? ? ? ? ? ? __init_end = .;
+>> ?#endif
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> This works for me in a case known to fail without the patch.
+>
+> Tested-by: Dave Martin <dave.martin@linaro.org>
+>
+> I still don't quite understand the intricacies of how vmlinux
+> is laid out, but the patch looks sensible.
+>
+> Do you need anything more from me on this? ?If not, I will
+> throw away my patch and replace it with yours.
 
-The main motivation for making mfd_cell available to all was to be able
-to provide functions within mfd-core (introduced in later
-patches/patchsets) that accept platform devices and operate on their
-mfd_cells.  The mfd_cell used to be automatically carried by the pdevs,
-and I'm not entirely sure the reason for getting rid of that.  It also
-(imo) cleans up a lot of things.  For example, the mfd_cell API
-platform_data/driver_data stuff was unclear when I first
-encountered it, as various drivers were doing things completely
-differently (some incorrectly, as witnessed by some of the drivers
-that I modified that were using driver_data and had clients later
-calling set_drvdata on the same pdev).   This is clearer, and provides
-a uniform way to do things that, afaict, sacrifices absolutely no
-flexibility or functionality.  Yes, it adds some overhead by having a
-copy of the mfd_cell around in memory, but if that's really an issue it
-could be optimized further by not making a full copy of the mfd_cell.
-With the new wrappers (mfd_get_data/mfd_get_cell), this could be done
-without having to mess with drivers.
+Are you still intending to merge your patch here?  I don't see it
+anywhere yet, but I would like to get rid of my hack (which is rather
+messy).
+
+Cheers
+---Dave
