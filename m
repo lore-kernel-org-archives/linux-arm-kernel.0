@@ -1,39 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 18 Feb 2011 10:27:22 +0900
-Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
-	ARCH_EXYNOS4 from ARCH_S5PV310
-In-Reply-To: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
-References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <01b901cbcf0b$01406b60$03c14220$%kim@samsung.com>
+From: John.Linn@xilinx.com (John Linn)
+Date: Thu, 17 Feb 2011 18:29:42 -0700
+Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <4D5D9A00.7060609@codeaurora.org>
+References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
+	<20110217100126.GD22961@pulham.picochip.com>
+	<4D5D9A00.7060609@codeaurora.org>
+Message-ID: <8d5eb291-6a7c-4500-92e1-cdd84f4657b9@VA3EHSMHS009.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
+> Sent: Thursday, February 17, 2011 2:58 PM
+> To: Jamie Iles
+> Cc: John Linn; linux at arm.linux.org.uk; arnd at arndb.de;
+catalin.marinas at arm.com; linux-
+> kernel at vger.kernel.org; glikely at secretlab.ca;
+linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V3 3/4] ARM: Xilinx: base header files and
+assembly macros
 > 
-> This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting
-> Samsung's
-> new brand name EXYNOS. Samsung officially announced about the brand name
-of
-> EXYNOS
-> at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor with
-> several
-> other peripherals to support features such as multimedai, storage,
-graphics
-> and gaming.
-> Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be
-used
-> in
-> products such as Mobile devices.
+> On 02/17/2011 02:01 AM, Jamie Iles wrote:
+> >> +
+> >> +static void putc(char ch)
+> >> +{
+> >> +	/*
+> >> +	 * Wait for room in the FIFO, then write the char into the FIFO
+> >> +	 */
+> >> +	while (UART_STATUS(LL_UART_PADDR) & UART_SR_TXFULL)
+> >> +		;
+> >
+> > It might be worth adding a barrier() call to these loops to be
+explicit
+> > about the volatility.
 > 
-Hi all,
+> I think you want cpu_relax() then.
 
-If there are no more comments for this, will merge this into for-next this
-weekend.
+Thanks Stephen.
 
-Thanks.
+> 
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
+> 
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
