@@ -1,55 +1,28 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 18 Feb 2011 21:20:29 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Feb 2011 20:27:44 +0000
 Subject: platform/i2c busses: pm runtime and system sleep
-In-Reply-To: <AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
+In-Reply-To: <201102182120.29977.rjw@sisk.pl>
 References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
 	<201102181928.05911.rjw@sisk.pl>
 	<AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
-Message-ID: <201102182120.29977.rjw@sisk.pl>
+	<201102182120.29977.rjw@sisk.pl>
+Message-ID: <20110218202744.GA19427@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 18, 2011, Rabin Vincent wrote:
-> On Fri, Feb 18, 2011 at 23:58, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> > On Friday, February 18, 2011, Rabin Vincent wrote:
-> >> On Thu, Feb 17, 2011 at 20:55, Rabin Vincent <rabin@rab.in> wrote:
-> >> > This will solve the platform vs AMBA bus, but shouldn't we really be
-> >> > aiming for consistent behaviour between these and the other busses such
-> >> > as I2C and SPI, which are also usually commonly used on the same
-> >> > platforms and are using GENERIC_PM_OPS?
-> >> >
-> >> > Should we be auditing all platform drivers and then switch platform to
-> >> > the GENERIC_PM_OPS?
-> >> >
-> >> > Or should the two points (1) and (2) be not handled in the bus at all
-> >> > and be left to individual drivers (in which case we should audit i2c and
-> >> > spi and change GENERIC_PM_OPS)?
-> >>
-> >> How about something like the below?  If we have something like this, we
-> >> can just switch platform to GENERIC_PM_OPS and add the
-> >> pm_runtime_want_interaction() (or something better named) call to the
-> >> i2c and spi drivers using runtime PM.
-> >
-> > Why don't we make platform_bus_type behave along the lines of generic ops
-> > instead?
+On Fri, Feb 18, 2011 at 09:20:29PM +0100, Rafael J. Wysocki wrote:
+> On Friday, February 18, 2011, Rabin Vincent wrote:
+> > Looking at the i2c drivers using runtime pm in comparison, they all seem
+> > to be using straightforward UNIVERSAL_PM_OPS-style code with the runtime
+> > and the system sleep doing the same things.  So maybe we do need to
+> > treat platform/AMBA different from the I2C/SPI group?
 > 
-> At least drivers/spi/omap2_mcspi.c, drivers/video/sh_mobile_lcdcfb.c and
-> drivers/watchdog/omap_wdt.c are some pm_runtime-using drivers which seem
-> to do different things in their runtime vs normal suspend/resume
-> routines, so forcing platform into the active-on-resume behaviour of the
-> generic ops may make some use cases impossible.  Conversion of more OMAP
-> drivers to runtime pm appears to be ongoing so I'd imagine we'd be
-> seeing more of this.  Perhaps Kevin or Magnus will have a comment here.
-> The same thing applies to AMBA drivers.
+> We probably do.
 
-I see.
+Do we have any pressing need to convert AMBA stuff?  I haven't heard any
+reason yet to convert them to runtime PM - they don't even make any
+runtime PM calls.
 
-> Looking at the i2c drivers using runtime pm in comparison, they all seem
-> to be using straightforward UNIVERSAL_PM_OPS-style code with the runtime
-> and the system sleep doing the same things.  So maybe we do need to
-> treat platform/AMBA different from the I2C/SPI group?
-
-We probably do.
-
-Thanks,
-Rafael
+Maybe Linus can comment on the PM stuff as he has SoCs with these in.
+As my boards don't have any sensible PM support, I don't have any
+visibility of what PM facilities would be required.
