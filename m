@@ -1,72 +1,126 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 18 Feb 2011 09:07:52 +0200
-Subject: [PATCH 1/1] ARM: imx53: correct Silicon Revision definition
-	following fuse map
-In-Reply-To: <1298008049-20352-1-git-send-email-richard.zhao@freescale.com>
-References: <1298008049-20352-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20110218070752.GC2343@tarshish>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Fri, 18 Feb 2011 12:43:32 +0530
+Subject: [PATCH v2 11/13] da850: pruss SUART board specific additions.
+In-Reply-To: <4D555523.7040507@criticallink.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-12-git-send-email-subhasish@mistralsolutions.com>
+	<4D555523.7040507@criticallink.com>
+Message-ID: <B7287DA9F96B436894703FF6663F1E13@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+--------------------------------------------------
+From: "Michael Williamson" <michael.williamson@criticallink.com>
+Sent: Friday, February 11, 2011 8:56 PM
+To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
+Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
+<sachi@mistralsolutions.com>; "Russell King" <linux@arm.linux.org.uk>; 
+"Kevin Hilman" <khilman@deeprootsystems.com>; "open list" 
+<linux-kernel@vger.kernel.org>; <m-watkins@ti.com>; 
+<linux-arm-kernel@lists.infradead.org>
+Subject: Re: [PATCH v2 11/13] da850: pruss SUART board specific additions.
 
-On Fri, Feb 18, 2011 at 01:47:29PM +0800, Richard Zhao wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Hi Subhasish,
+>
+> On 2/11/2011 9:51 AM, Subhasish Ghosh wrote:
+>
+>> This patch adds the pruss SUART pin mux and registers the device
+>> with the pruss mfd driver.
+>>
+>> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+>> ---
+>>  arch/arm/mach-davinci/board-da850-evm.c |   36 
+>> +++++++++++++++++++++++++++++++
+>>  1 files changed, 36 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/board-da850-evm.c 
+>> b/arch/arm/mach-davinci/board-da850-evm.c
+>> index f9c38f8..3858516 100644
+>> --- a/arch/arm/mach-davinci/board-da850-evm.c
+>> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+>> @@ -1060,6 +1060,25 @@ const short da850_evm_pruss_can_pins[] = {
+>>  -1
+>>  };
+>>
+>> +const short da850_evm_pruss_suart_pins[] = {
+>> + DA850_AHCLKX, DA850_ACLKX, DA850_AFSX,
+>> + DA850_AHCLKR, DA850_ACLKR, DA850_AFSR,
+>> + DA850_AXR_13, DA850_AXR_9, DA850_AXR_7,
+>> + DA850_AXR_14, DA850_AXR_10, DA850_AXR_8,
+>> + -1
+>> +};
+>> +
+>
+>
+> Shouldn't this pins select PRU[0,1]_XXX type functions and not McASP 
+> functions?
+> E.G.: PRU0_R31[17] instead of AHCLKX, PRU0_R31[18] instead of AHCLKR, etc.
+>
+
+SG - The Soft-UART implementation uses the McASP as shift registers to push 
+out the data sequentially.
+            Hence, we configure the McASP PINS and not the PRU PINS.
+
+>> +static int __init da850_evm_setup_pruss_suart(void)
+>> +{
+>> + int ret;
+>> +
+>> + ret = davinci_cfg_reg_list(da850_evm_pruss_suart_pins);
+>> + if (ret)
+>> + pr_warning("%s: da850_evm_pruss_suart_pins "
+>> + "mux setup failed: %d\n", __func__, ret);
+>> + return ret;
+>> +}
+>> +
+>>  static int __init da850_evm_setup_pruss_can(void)
+>>  {
+>>  int ret, val = 0;
+>> @@ -1085,6 +1104,17 @@ static int __init da850_evm_setup_pruss_can(void)
+>>  return ret;
+>>  }
+>>
+>> +static struct da850_evm_pruss_suart_data suart_data = {
+>> + .version = 1,
+>> + .resource = {
+>> + .name = "da8xx_mcasp0_iomem",
+>> + .start = DAVINCI_DA8XX_MCASP0_REG_BASE,
+>> + .end = DAVINCI_DA8XX_MCASP0_REG_BASE +
+>> + (SZ_1K * 12) - 1,
+>> + .flags = IORESOURCE_MEM,
+>> + },
+>> +};
+>> +
+>>  static struct da8xx_pruss_can_data can_data = {
+>>  .version = 1,
+>>  };
+>> @@ -1094,6 +1124,12 @@ static struct da8xx_pruss_devices pruss_devices[] 
+>> = {
+>>  .dev_name = "da8xx_pruss_can",
+>>  .pdata = &can_data,
+>>  .pdata_size = sizeof(can_data),
+>> + .setup = da850_evm_setup_pruss_suart,
+>
+>
+> Should this be da850_evm_setup_pruss_can instead?
+
+SG - This just the way the patch is displayed. In the code the order is 
+correct.
+
+>
+>> + },
+>> + {
+>> + .dev_name = "da8xx_pruss_uart",
+>> + .pdata = &suart_data,
+>> + .pdata_size = sizeof(suart_data),
+>>  .setup = da850_evm_setup_pruss_can,
+>
+>
+> Should this be da850_evm_setup_pruss_suart instead?
+SG - Ditto
+>
+>>  },
+>>  {
+>
+>
+> -Mike
 > 
-> diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-> index d40671d..95fd5f8 100644
-> --- a/arch/arm/mach-mx5/cpu.c
-> +++ b/arch/arm/mach-mx5/cpu.c
-> @@ -76,13 +76,25 @@ late_initcall(mx51_neon_fixup);
->  static int get_mx53_srev(void)
->  {
->  	void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
-> -	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
-> +	u32 reg = readl(iim_base + IIM_SREV) & 0xff;
-> +	int rev;
-> +
-> +	switch (reg) {
-> +	case 0x0:
-> +		rev = IMX_CHIP_REVISION_1_0;
-> +		break;
-> +	case 0x2:
-> +		rev = IMX_CHIP_REVISION_2_0;
-> +		break;
-> +	case 0x3:
-> +		rev = IMX_CHIP_REVISION_2_1;
-> +		break;
-> +	default:
-> +		rev = IMX_CHIP_REVISION_UNKNOWN;
-> +		break;
-> +	}
->  
-> -	if (rev == 0x0)
-> -		return IMX_CHIP_REVISION_1_0;
-> -	else if (rev == 0x10)
-> -		return IMX_CHIP_REVISION_2_0;
-> -	return 0;
-> +	return rev;
->  }
->  
->  /*
-
-I think the following code is shorter and more readable:
-
-switch (reg) {
-case 0x0:
-    return IMX_CHIP_REVISION_1_0;
-case 0x2:
-    return IMX_CHIP_REVISION_2_0;
-case 0x3:
-    return IMX_CHIP_REVISION_2_1;
-default:
-    return IMX_CHIP_REVISION_UNKNOWN;
-}
-
-baruch
-
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
