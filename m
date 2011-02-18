@@ -1,39 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Feb 2011 11:34:18 -0000
-Subject: [PATCHv2 1/2] ARM: perf_event: allow platform-specific interrupt
-	handler
-In-Reply-To: <AANLkTi=ph8U3qGFgfhc15SNuYcj6oSUq8VPyJ+h_8b5O@mail.gmail.com>
-References: <1297137277-26889-1-git-send-email-rabin.vincent@stericsson.com>
-	<-6723806473392693428@unknownmsgid>
-	<AANLkTi=wQ9ku+zbu6sx5Mm+ux4Ot6K2h9a_WK=XEB_iG@mail.gmail.com>
-	<-3663809140750500272@unknownmsgid>
-	<AANLkTi=ph8U3qGFgfhc15SNuYcj6oSUq8VPyJ+h_8b5O@mail.gmail.com>
-Message-ID: <001e01cbcf5f$c7ab5bd0$57021370$@deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Feb 2011 11:34:53 +0000
+Subject: [PATCH 00/11] Rationalize and consolidate ARMs evaluation boards
+In-Reply-To: <20110127134532.GE25968@n2100.arm.linux.org.uk>
+References: <20110127134532.GE25968@n2100.arm.linux.org.uk>
+Message-ID: <1298028893.11711.38.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Feb 17, 2011 at 22:03, Will Deacon <will.deacon@arm.com> wrote:
-> >> I gave this a try, along with the modifications to enable IRQ_PER_CPU
-> >> and have the pmu code use the appropriate flags and set the affinity.
-> >> Didn't work though; it always ends up triggering the spurious IRQ check.
-> >
-> > Hmm, that doesn't sound right. Did you have any synchronisation to ensure
-> > that the CPU without the overflow didn't return IRQ_NONE until the handling
-> > CPU had returned IRQ_HANDLED?
+On Thu, 2011-01-27 at 13:45 +0000, Russell King - ARM Linux wrote:
+> This series, which applies on top of the CLCD series consolidates some
+> of the code used on ARM platforms, in particular the FPGA interrupt,
+> local timer, and SMP bring up code.
 > 
-> No.  What kind of synchronization do you mean?
+> We also add sched_clock() support for Integrator/CP, but only when we're
+> building only for Integrator/CP as Integrator/AP platforms don't have
+> the 24MHz counter.  We also move the sched_clock() initialization to
+> the early init callback, along with registering the clock lookups.
+> 
+> As we know how DMA is to be supported with primecells, we no longer need
+> the DMA definitions which aren't used, so these are removed.
 
-Well my guess is that the CPU returning IRQ_NONE is perpetually taking the
-same interrupt until the other CPU has poked the PMU to stop it asserting
-the line (otherwise I can't see how the spurious check would trip). You could
-have a lock in the driver to synchronise between the two CPUs so that if you
-don't have an overflow, you wait for the other CPU to clear the interrupt before
-returning.
+The whole series looks fine (acked. if you need one).
 
-This has quickly started to become horrible but I was just curious as to whether
-it provides better results than the affinity-setting approach (which is certainly
-less invasive).
-
-Cheers,
-
-Will
+-- 
+Catalin
