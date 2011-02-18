@@ -1,23 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Feb 2011 11:15:47 +0000
-Subject: [PATCH 00/10] Fix CLCD framebuffer formats and consolidate ARM
-	platform CLCD support
-In-Reply-To: <20110127125714.GD25968@n2100.arm.linux.org.uk>
-References: <20110127125714.GD25968@n2100.arm.linux.org.uk>
-Message-ID: <1298027747.11711.37.camel@e102109-lin.cambridge.arm.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Fri, 18 Feb 2011 16:59:15 +0530
+Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+In-Reply-To: <1297946466-9565-6-git-send-email-balbi@ti.com>
+References: <1297946466-9565-1-git-send-email-balbi@ti.com>
+	<1297946466-9565-6-git-send-email-balbi@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024B83BED5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-27 at 12:57 +0000, Russell King - ARM Linux wrote:
-> This patch series fixes the framebuffer formatting for the various
-> CLCD colour modes - including those which the CLCD doesn't actually
-> support.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Balbi, Felipe
+> Sent: Thursday, February 17, 2011 6:11 PM
+> To: Tony Lindgren
+> Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List; Kalliguddi,
+> Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley; Balbi, Felipe
+> Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+> 
+> From: Hema HK <hemahk@ti.com>
+> 
+> AM35xx hwmod data structures are populated for USBOTG with base address,
+> L3 and L4 interface clocks and IRQ.
+> 
+> Signed-off-by: Hema HK <hemahk@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Cousson, Benoit <b-cousson@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   65
+> ++++++++++++++++++++++++++++
+>  1 files changed, 65 insertions(+), 0 deletions(-)
+> 
+[snip]
+> 
+> +	/* usbotg for am35x */
+> +	&am35xx_usbhsotg_hwmod,
+> +
+>  	NULL,
 
-I reviewed the patches and they look fine (ack if you want).
+Felipe, Hema,
 
-What I can't tell for sure is whether the capabilities supported by the
-displays are correct (platforms people here in ARM should know better
-but I don't think we have all those available to try).
+This patch will break all existing OMAP35x (and I believe
+OMAP3430 - since there is no difference - unless there is
+some trick in the USB driver code).
 
--- 
-Catalin
+I have seen similar problems with smart reflex included in
+the AM35x hwmod data.
+
+In this case accessing "unknown" registers corresponding to
+SmartReflex in _setup() causes crash.
+(http://marc.info/?l=linux-omap&m=129777408503329&w=2)
+
+I expect similar to be happening on OMAP35x with inclusion
+of am35xx_usbhsotg_hwmod. If you don't see any crash, there
+would be side-effects - and _setup() would be initializing
+non-existent OTG registers on OMAP35x.
+
+Did you see any problems while testing?
+
+~sanjeev
+
+PS: Sending mail via webmailer. Formatting may break
+
+>  };
+> 
+> --
+> 1.7.4.rc2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
