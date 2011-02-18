@@ -1,52 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 18 Feb 2011 18:05:54 +0900
-Subject: [PATCH] ARM: SAMSUNG: Drop exporting s3c24xx_ts_set_platdata
-In-Reply-To: <1297651767.13143.3.camel@mola>
-References: <1297651767.13143.3.camel@mola>
-Message-ID: <01ff01cbcf4b$0e162420$2a426c60$%kim@samsung.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Fri, 18 Feb 2011 14:39:15 +0530
+Subject: [PATCH v2 09/13] can: pruss CAN driver.
+In-Reply-To: <4D5E2F86.1020400@pengutronix.de>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>	<1297435892-28278-10-git-send-email-subhasish@mistralsolutions.com>	<20110211152026.GC373@e-circ.dyndns.org>	<32A5399EB727427C98185089E5DBFA65@subhasishg>	<4D5E2570.10108@grandegger.com>
+	<184FA07B783D4F5FAAC09D5C11737A3F@subhasishg>
+	<4D5E2F86.1020400@pengutronix.de>
+Message-ID: <CAA7B3D71228413B9F7F3C0F5A011119@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Axel Lin wrote:
-> 
-> s3c24xx_ts_set_platdata is annotated __init and not used by any module,
-> thus don't export it.
-> This patch fixes below warning:
-> 
-> WARNING: arch/arm/plat-samsung/built-in.o(__ksymtab+0x90): Section
-mismatch
-> in reference from the variable __ksymtab_s3c24xx_ts_set_platdata to the
-> function .init.text:s3c24xx_ts_set_platdata()
-> The symbol s3c24xx_ts_set_platdata is exported and annotated __init
-> Fix this by removing the __init annotation of s3c24xx_ts_set_platdata or
-drop
-> the export.
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
->  arch/arm/plat-samsung/dev-ts.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/dev-ts.c
-b/arch/arm/plat-samsung/dev-ts.c
-> index 236ef84..3e4bd81 100644
-> --- a/arch/arm/plat-samsung/dev-ts.c
-> +++ b/arch/arm/plat-samsung/dev-ts.c
-> @@ -58,4 +58,3 @@ void __init s3c24xx_ts_set_platdata(struct
-> s3c2410_ts_mach_info *pd)
-> 
->  	s3c_device_ts.dev.platform_data = npd;
->  }
-> -EXPORT_SYMBOL(s3c24xx_ts_set_platdata);
-> --
-> 1.7.2
-> 
-Ok, applied.
+Ok, will do NAPI
 
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+On 02/18/2011 09:15 AM, Subhasish Ghosh wrote:
+>> On 02/18/2011 08:07 AM, Subhasish Ghosh wrote:
+>>> --------------------------------------------------
+>>> From: "Kurt Van Dijck" <kurt.van.dijck@eia.be>
+>>
+>> ...
+>>>>> + /* register interrupt handler */
+>>>>> + err = request_irq(priv->trx_irq, &omapl_rx_can_intr, IRQF_SHARED,
+>>>>> +   "pru_can_irq", ndev);
+>>>> you're doing a lot of work _in_ the irq handler. Maybe threaded irq?
+>>>>
+>>> SG -Ok, will do
+>>
+>> No, please use NAPI instead.
+> 
+> We are using h/w filters, so the number of interrupts coming into the
+> processor are not hogging it.
+> I feel that we may not require an interrupt mitigation.
+
+As davem stated the other day, all new drivers should use NAPI.
+
+regards, Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 | 
