@@ -1,97 +1,338 @@
 From: john.linn@xilinx.com (John Linn)
-Date: Fri, 18 Feb 2011 11:14:41 -0700
-Subject: [PATCH V4 4/4] ARM: Xilinx: Adding Xilinx platform infrastructure
-	support
-In-Reply-To: <1298052881-14591-4-git-send-email-john.linn@xilinx.com>
+Date: Fri, 18 Feb 2011 11:14:38 -0700
+Subject: [PATCH V4 1/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
 References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-2-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-3-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-4-git-send-email-john.linn@xilinx.com>
-Message-ID: <d83e2113-bfe6-48b9-a278-8fe4e9870e23@VA3EHSMHS029.ehs.local>
+Message-ID: <b8e72ca5-de48-41ec-89b9-95bb90e18826@VA3EHSMHS013.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minimum infrastructure to add the Xilinx machine and allow it to
-be selected in the build.
+The 1st board support is minimal to get a system up and running
+on the Xilinx platform.
 
 Signed-off-by: John Linn <john.linn@xilinx.com>
 ---
 
-V4
+V4 Changes
+	Minor cleanup based on input from Jamie Iles.
 
-Updated to apply against linux-next branch.
+V3 Changes
 
-No updates for V3
+Updates based on Russell Kings' comments
+	Changed headers to update the license info and remove
+	the address
+
+	Changed the name of functions to include "xilinx" in 
+	common.c and common.h
+
+Changed the Kconfig and Makefile to use MACH_XILINX which
+matches the machine registered.
 
 V2 Changes
 
 Updates based on Russell King's comments	
-	Cleanup of the Kconfig
-	Moved this patch to be last in the patch series
+	minor cleanups
+	cleaned up physical/virtual addresses in early i/o table		
 
+ arch/arm/mach-xilinx/Kconfig       |   14 +++++
+ arch/arm/mach-xilinx/Makefile      |    7 ++
+ arch/arm/mach-xilinx/Makefile.boot |    3 +
+ arch/arm/mach-xilinx/board_ep107.c |   82 ++++++++++++++++++++++++++
+ arch/arm/mach-xilinx/common.c      |  113 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-xilinx/common.h      |   30 ++++++++++
+ 6 files changed, 249 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-xilinx/Kconfig
+ create mode 100644 arch/arm/mach-xilinx/Makefile
+ create mode 100644 arch/arm/mach-xilinx/Makefile.boot
+ create mode 100644 arch/arm/mach-xilinx/board_ep107.c
+ create mode 100644 arch/arm/mach-xilinx/common.c
+ create mode 100644 arch/arm/mach-xilinx/common.h
 
- arch/arm/Kconfig    |   14 ++++++++++++++
- arch/arm/Makefile   |    1 +
- arch/arm/mm/Kconfig |    2 +-
- 3 files changed, 16 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 08799af..326f1b5 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -880,6 +880,18 @@ config ARCH_VT8500
- 	select HAVE_PWM
- 	help
- 	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
+diff --git a/arch/arm/mach-xilinx/Kconfig b/arch/arm/mach-xilinx/Kconfig
+new file mode 100644
+index 0000000..61532af
+--- /dev/null
++++ b/arch/arm/mach-xilinx/Kconfig
+@@ -0,0 +1,14 @@
++if ARCH_XILINX
 +
-+config ARCH_XILINX
-+	bool "Xilinx ARM Cortex A9 Platform"
-+	select CPU_V7
-+	select GENERIC_TIME
-+	select GENERIC_CLOCKEVENTS
-+	select CLKDEV_LOOKUP
-+	select ARM_GIC
-+	select ARM_AMBA
++choice
++        prompt "Board Selection"
++	default MACH_XILINX
++
++config MACH_XILINX
++	bool "Xilinx EP107 Board"
 +	help
-+	  Support for Xilinx ARM Cortex A9 Platform
++	  Select if you are using a Xilinx EP107 board.
 +
- endchoice
- 
- #
-@@ -1013,6 +1025,8 @@ source "arch/arm/mach-vt8500/Kconfig"
- 
- source "arch/arm/mach-w90x900/Kconfig"
- 
-+source "arch/arm/mach-xilinx/Kconfig"
++endchoice
 +
- # Definitions to make life easier
- config ARCH_ACORN
- 	bool
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 9a0f6a3..bb5fa87 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -197,6 +197,7 @@ machine-$(CONFIG_MACH_SPEAR300)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
- machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
-+machine-$(CONFIG_ARCH_XILINX)		:= xilinx
- 
- # Platform directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 8926638..34fa4af 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -821,7 +821,7 @@ config CACHE_L2X0
- 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
- 		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || \
- 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_S5PV310 || ARCH_TEGRA || \
--		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE
-+		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || ARCH_XILINX
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
++endif
+diff --git a/arch/arm/mach-xilinx/Makefile b/arch/arm/mach-xilinx/Makefile
+new file mode 100644
+index 0000000..76e9e55
+--- /dev/null
++++ b/arch/arm/mach-xilinx/Makefile
+@@ -0,0 +1,7 @@
++#
++# Makefile for the linux kernel.
++#
++
++# Common support
++obj-y 				:= common.o
++obj-$(CONFIG_MACH_XILINX)	+= board_ep107.o
+diff --git a/arch/arm/mach-xilinx/Makefile.boot b/arch/arm/mach-xilinx/Makefile.boot
+new file mode 100644
+index 0000000..67039c3
+--- /dev/null
++++ b/arch/arm/mach-xilinx/Makefile.boot
+@@ -0,0 +1,3 @@
++   zreladdr-y	:= 0x00008000
++params_phys-y	:= 0x00000100
++initrd_phys-y	:= 0x00800000
+diff --git a/arch/arm/mach-xilinx/board_ep107.c b/arch/arm/mach-xilinx/board_ep107.c
+new file mode 100644
+index 0000000..a1635b5
+--- /dev/null
++++ b/arch/arm/mach-xilinx/board_ep107.c
+@@ -0,0 +1,82 @@
++/* arch/arm/mach-xilinx/board_ep107.c
++ *
++ * This file contains code specific to the Xilinx EP107 board.
++ *
++ *  Copyright (C) 2011 Xilinx
++ *
++ * based on /arch/arm/mach-realview/core.c
++ *
++ *  Copyright (C) 1999 - 2003 ARM Limited
++ *  Copyright (C) 2000 Deep Blue Solutions Ltd
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/platform_device.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <mach/xilinx_soc.h>
++#include <mach/irqs.h>
++#include <linux/clkdev.h>
++#include "common.h"
++
++/*
++ * Fixed clocks for now
++ */
++
++static struct clk ref50_clk = {
++	.rate	= 50000000,
++};
++
++/* Create all the platform devices for the board */
++
++static struct resource uart0[] = {
++	{
++		.start = UART0_PHYS,
++		.end = UART0_PHYS + 0xFFF,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = IRQ_UART0,
++		.end = IRQ_UART0,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device uart_device0 = {
++	.name = "xuartpss",
++	.id = 0,
++	.dev = {
++		.platform_data = &ref50_clk.rate,
++	},
++	.resource = uart0,
++	.num_resources = ARRAY_SIZE(uart0),
++};
++
++static struct platform_device *xilinx_pdevices[] __initdata = {
++	&uart_device0,
++};
++
++/**
++ * board_ep107_init - Board specific initialization for the Xilinx EP107 board.
++ *
++ **/
++static void __init board_ep107_init(void)
++{
++	xilinx_system_init();
++	platform_add_devices(&xilinx_pdevices[0], ARRAY_SIZE(xilinx_pdevices));
++}
++
++MACHINE_START(XILINX_EP107, "Xilinx EP107")
++	.boot_params    = PHYS_OFFSET + 0x00000100,
++	.map_io         = xilinx_map_io,
++	.init_irq       = xilinx_irq_init,
++	.init_machine   = board_ep107_init,
++	.timer          = &xttcpss_sys_timer,
++MACHINE_END
+diff --git a/arch/arm/mach-xilinx/common.c b/arch/arm/mach-xilinx/common.c
+new file mode 100644
+index 0000000..564b707
+--- /dev/null
++++ b/arch/arm/mach-xilinx/common.c
+@@ -0,0 +1,113 @@
++/* arch/arm/mach-xilinx/common.c
++ *
++ * This file contains common code that is intended to be used across
++ * boards so that it's not replicated.
++ *
++ *  Copyright (C) 2011 Xilinx
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/cpumask.h>
++#include <linux/platform_device.h>
++#include <linux/clk.h>
++
++#include <asm/mach/map.h>
++#include <asm/page.h>
++#include <asm/hardware/gic.h>
++#include <asm/hardware/cache-l2x0.h>
++
++#include <mach/xilinx_soc.h>
++#include <mach/clkdev.h>
++
++/*
++ * Clock function infrastructure.
++ */
++int clk_enable(struct clk *clk)
++{
++	return 0;
++}
++
++void clk_disable(struct clk *clk)
++{
++}
++
++unsigned long clk_get_rate(struct clk *clk)
++{
++	return clk->rate;
++}
++
++/**
++ * system_init - System specific initialization, intended to be called from
++ *			board specific initialization.
++ *
++ **/
++void __init xilinx_system_init(void)
++{
++#ifdef CONFIG_CACHE_L2X0
++	/*
++	 * 64KB way size, 8-way associativity, parity disabled
++	 */
++	l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
++#endif
++}
++
++/**
++ * irq_init - Interrupt controller initialization for the GIC.
++ *
++ **/
++void __init xilinx_irq_init(void)
++{
++	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
++}
++
++/* The minimum devices needed to be mapped before the VM system is up and
++ * running include the GIC, UART and Timer Counter.
++ */
++
++static struct map_desc io_desc[] __initdata = {
++	{
++		.virtual	= TTC0_VIRT,
++		.pfn		= __phys_to_pfn(TTC0_PHYS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= SCU_PERIPH_VIRT,
++		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
++		.length		= SZ_8K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= PL310_L2CC_VIRT,
++		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++
++#ifdef CONFIG_DEBUG_LL
++	{
++		.virtual	= UART0_VIRT,
++		.pfn		= __phys_to_pfn(UART0_PHYS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++#endif
++
++};
++
++/**
++ * map_io - Create memory mappings needed for early I/O.
++ *
++ **/
++void __init xilinx_map_io(void)
++{
++	iotable_init(io_desc, ARRAY_SIZE(io_desc));
++}
+diff --git a/arch/arm/mach-xilinx/common.h b/arch/arm/mach-xilinx/common.h
+new file mode 100644
+index 0000000..71f4ebc
+--- /dev/null
++++ b/arch/arm/mach-xilinx/common.h
+@@ -0,0 +1,30 @@
++/* arch/arm/mach-xilinx/common.h
++ *
++ * This file contains common function prototypes to avoid externs
++ * in the c files.
++ *
++ *  Copyright (C) 2011 Xilinx
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MACH_XILINX_COMMON_H__
++#define __MACH_XILINX_COMMON_H__
++
++#include <linux/init.h>
++#include <asm/mach/time.h>
++
++void __init xilinx_system_init(void);
++void __init xilinx_irq_init(void);
++void __init xilinx_map_io(void);
++
++extern struct sys_timer xttcpss_sys_timer;
++
++#endif
 -- 
 1.6.2.1
 
