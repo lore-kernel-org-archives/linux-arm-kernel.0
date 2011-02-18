@@ -1,49 +1,135 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Thu, 17 Feb 2011 18:29:42 -0700
-Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <4D5D9A00.7060609@codeaurora.org>
-References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
-	<20110217100126.GD22961@pulham.picochip.com>
-	<4D5D9A00.7060609@codeaurora.org>
-Message-ID: <8d5eb291-6a7c-4500-92e1-cdd84f4657b9@VA3EHSMHS009.ehs.local>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Thu, 17 Feb 2011 19:42:27 -0600
+Subject: [PATCH v6 4/4] OMAP: mailbox: use runtime pm for clk and sysc handling
+In-Reply-To: <1297993347-5654-1-git-send-email-omar.ramirez@ti.com>
+References: <1297993347-5654-1-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1297993347-5654-5-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at codeaurora.org]
-> Sent: Thursday, February 17, 2011 2:58 PM
-> To: Jamie Iles
-> Cc: John Linn; linux at arm.linux.org.uk; arnd at arndb.de;
-catalin.marinas at arm.com; linux-
-> kernel at vger.kernel.org; glikely at secretlab.ca;
-linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V3 3/4] ARM: Xilinx: base header files and
-assembly macros
-> 
-> On 02/17/2011 02:01 AM, Jamie Iles wrote:
-> >> +
-> >> +static void putc(char ch)
-> >> +{
-> >> +	/*
-> >> +	 * Wait for room in the FIFO, then write the char into the FIFO
-> >> +	 */
-> >> +	while (UART_STATUS(LL_UART_PADDR) & UART_SR_TXFULL)
-> >> +		;
-> >
-> > It might be worth adding a barrier() call to these loops to be
-explicit
-> > about the volatility.
-> 
-> I think you want cpu_relax() then.
+Use runtime pm APIs to enable/disable mailbox clocks and
+to configure SYSC register.
 
-Thanks Stephen.
+Based on the patch sent by Felipe Contreras:
+https://patchwork.kernel.org/patch/101662/
 
-> 
-> --
-> Sent by an employee of the Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum.
-> 
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+ arch/arm/mach-omap2/mailbox.c |   67 ++++-------------------------------------
+ 1 files changed, 6 insertions(+), 61 deletions(-)
 
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index de352bd..9a61e1f 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -14,12 +14,11 @@
+ #include <linux/err.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/pm_runtime.h>
+ #include <plat/mailbox.h>
+ #include <mach/irqs.h>
+ 
+ #define MAILBOX_REVISION		0x000
+-#define MAILBOX_SYSCONFIG		0x010
+-#define MAILBOX_SYSSTATUS		0x014
+ #define MAILBOX_MESSAGE(m)		(0x040 + 4 * (m))
+ #define MAILBOX_FIFOSTATUS(m)		(0x080 + 4 * (m))
+ #define MAILBOX_MSGSTATUS(m)		(0x0c0 + 4 * (m))
+@@ -33,17 +32,6 @@
+ #define MAILBOX_IRQ_NEWMSG(m)		(1 << (2 * (m)))
+ #define MAILBOX_IRQ_NOTFULL(m)		(1 << (2 * (m) + 1))
+ 
+-/* SYSCONFIG: register bit definition */
+-#define AUTOIDLE	(1 << 0)
+-#define SOFTRESET	(1 << 1)
+-#define SMARTIDLE	(2 << 3)
+-#define OMAP4_SOFTRESET	(1 << 0)
+-#define OMAP4_NOIDLE	(1 << 2)
+-#define OMAP4_SMARTIDLE	(2 << 2)
+-
+-/* SYSSTATUS: register bit definition */
+-#define RESETDONE	(1 << 0)
+-
+ #define MBOX_REG_SIZE			0x120
+ 
+ #define OMAP4_MBOX_REG_SIZE		0x130
+@@ -70,8 +58,6 @@ struct omap_mbox2_priv {
+ 	unsigned long irqdisable;
+ };
+ 
+-static struct clk *mbox_ick_handle;
+-
+ static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
+ 				  omap_mbox_type_t irq);
+ 
+@@ -89,53 +75,13 @@ static inline void mbox_write_reg(u32 val, size_t ofs)
+ static int omap2_mbox_startup(struct omap_mbox *mbox)
+ {
+ 	u32 l;
+-	unsigned long timeout;
+ 
+-	mbox_ick_handle = clk_get(NULL, "mailboxes_ick");
+-	if (IS_ERR(mbox_ick_handle)) {
+-		printk(KERN_ERR "Could not get mailboxes_ick: %ld\n",
+-			PTR_ERR(mbox_ick_handle));
+-		return PTR_ERR(mbox_ick_handle);
+-	}
+-	clk_enable(mbox_ick_handle);
+-
+-	if (cpu_is_omap44xx()) {
+-		mbox_write_reg(OMAP4_SOFTRESET, MAILBOX_SYSCONFIG);
+-		timeout = jiffies + msecs_to_jiffies(20);
+-		do {
+-			l = mbox_read_reg(MAILBOX_SYSCONFIG);
+-			if (!(l & OMAP4_SOFTRESET))
+-				break;
+-		} while (!time_after(jiffies, timeout));
+-
+-		if (l & OMAP4_SOFTRESET) {
+-			pr_err("Can't take mailbox out of reset\n");
+-			return -ENODEV;
+-		}
+-	} else {
+-		mbox_write_reg(SOFTRESET, MAILBOX_SYSCONFIG);
+-		timeout = jiffies + msecs_to_jiffies(20);
+-		do {
+-			l = mbox_read_reg(MAILBOX_SYSSTATUS);
+-			if (l & RESETDONE)
+-				break;
+-		} while (!time_after(jiffies, timeout));
+-
+-		if (!(l & RESETDONE)) {
+-			pr_err("Can't take mailbox out of reset\n");
+-			return -ENODEV;
+-		}
+-	}
++	pm_runtime_enable(mbox->dev->parent);
++	pm_runtime_get_sync(mbox->dev->parent);
+ 
+ 	l = mbox_read_reg(MAILBOX_REVISION);
+ 	pr_debug("omap mailbox rev %d.%d\n", (l & 0xf0) >> 4, (l & 0x0f));
+ 
+-	if (cpu_is_omap44xx())
+-		l = OMAP4_SMARTIDLE;
+-	else
+-		l = SMARTIDLE | AUTOIDLE;
+-	mbox_write_reg(l, MAILBOX_SYSCONFIG);
+-
+ 	omap2_mbox_enable_irq(mbox, IRQ_RX);
+ 
+ 	return 0;
+@@ -143,9 +89,8 @@ static int omap2_mbox_startup(struct omap_mbox *mbox)
+ 
+ static void omap2_mbox_shutdown(struct omap_mbox *mbox)
+ {
+-	clk_disable(mbox_ick_handle);
+-	clk_put(mbox_ick_handle);
+-	mbox_ick_handle = NULL;
++	pm_runtime_put_sync(mbox->dev->parent);
++	pm_runtime_disable(mbox->dev->parent);
+ }
+ 
+ /* Mailbox FIFO handle functions */
+-- 
+1.7.1
