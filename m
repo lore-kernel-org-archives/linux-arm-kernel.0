@@ -1,113 +1,135 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Feb 2011 14:22:39 +0100
-Subject: [PATCH v2 1/3] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <20110218084513.GB18085@S2100-06.ap.freescale.net>
-References: <1297650228-12762-1-git-send-email-shawn.guo@freescale.com>
-	<201102171538.31061.arnd@arndb.de>
-	<20110218084513.GB18085@S2100-06.ap.freescale.net>
-Message-ID: <201102181422.39266.arnd@arndb.de>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Fri, 18 Feb 2011 19:01:15 +0530
+Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+In-Reply-To: <0387bf9911e20f7d6fa56aeb8ded4071@mail.gmail.com>
+References: <1297946466-9565-1-git-send-email-balbi@ti.com>
+	<1297946466-9565-6-git-send-email-balbi@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83BED5@dbde02.ent.ti.com>
+	<0387bf9911e20f7d6fa56aeb8ded4071@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024B83BF61@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 February 2011, Shawn Guo wrote:
-> > > +static dma_cookie_t mxs_dma_assign_cookie(struct mxs_dma_chan *mxs_chan)
-> > > +{
-> > > +   dma_cookie_t cookie = mxs_chan->chan.cookie;
-> > > +
-> > > +   if (++cookie < 0)
-> > > +           cookie = 1;
-> > > +
-> > > +   mxs_chan->chan.cookie = cookie;
-> > > +   mxs_chan->desc.cookie = cookie;
-> > > +
-> > > +   return cookie;
-> > > +}
-> > > +
-> > > +static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
-> > > +{
-> > > +   return container_of(chan, struct mxs_dma_chan, chan);
-> > > +}
-> > > +
-> > > +static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> > > +{
-> > > +   struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> > > +   dma_cookie_t cookie;
-> > > +   unsigned long flags;
-> > > +
-> > > +   spin_lock_irqsave(&mxs_chan->lock, flags);
-> > > +
-> > > +   cookie = mxs_dma_assign_cookie(mxs_chan);
-> > > +
-> > > +   mxs_dma_enable_chan(mxs_chan);
-> > > +
-> > > +   spin_unlock_irqrestore(&mxs_chan->lock, flags);
-> > > +
-> > > +   return cookie;
-> > > +}
-> > 
-> > Just like the MMC driver, you use spin_lock_irqsave() in the functions that
-> > are called by other drivers, but then don't actually lock in the interrupt
-> > handler. This is clearly wrong, as I explained before:
-> > 
-> > The interrupt handler may already be running on another CPU, so it
-> > is not at all serialized with this code.
-> > 
-> I may be wrong on this point, but spin_lock_irqsave/irqrestore pair
-> is only for the protection you described?  I learnt that the pair
-> should be used to protect the critical region, where I'm not sure
-> if it's called from interrupt context.  Here I'm intending to protect
-> the dma registers accessed in mxs_dma_enable_chan.
+> -----Original Message-----
+> From: Kalliguddi, Hema
+> Sent: Friday, February 18, 2011 6:37 PM
+> To: Premi, Sanjeev; Balbi, Felipe; Tony Lindgren
+> Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List; Kevin Hilman;
+> Cousson, Benoit; Paul Walmsley
+> Subject: RE: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+> 
+> Hi Premi,
+> 
+> >-----Original Message-----
+> >From: Premi, Sanjeev [mailto:premi at ti.com]
+> >Sent: Friday, February 18, 2011 4:59 PM
+> >To: Balbi, Felipe; Tony Lindgren
+> >Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List;
+> >Kalliguddi, Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley
+> >Subject: RE: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+> >
+> >> -----Original Message-----
+> >> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> >> owner at vger.kernel.org] On Behalf Of Balbi, Felipe
+> >> Sent: Thursday, February 17, 2011 6:11 PM
+> >> To: Tony Lindgren
+> >> Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List;
+> >Kalliguddi,
+> >> Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley; Balbi, Felipe
+> >> Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+> >>
+> >> From: Hema HK <hemahk@ti.com>
+> >>
+> >> AM35xx hwmod data structures are populated for USBOTG with
+> >base address,
+> >> L3 and L4 interface clocks and IRQ.
+> >>
+> >> Signed-off-by: Hema HK <hemahk@ti.com>
+> >> Cc: Tony Lindgren <tony@atomide.com>
+> >> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> >> Cc: Cousson, Benoit <b-cousson@ti.com>
+> >> Cc: Paul Walmsley <paul@pwsan.com>
+> >> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >> ---
+> >>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   65
+> >> ++++++++++++++++++++++++++++
+> >>  1 files changed, 65 insertions(+), 0 deletions(-)
+> >>
+> >[snip]
+> >>
+> >> +	/* usbotg for am35x */
+> >> +	&am35xx_usbhsotg_hwmod,
+> >> +
+> >>  	NULL,
+> >
+> >Felipe, Hema,
+> >
+> >This patch will break all existing OMAP35x (and I believe
+> >OMAP3430 - since there is no difference - unless there is
+> >some trick in the USB driver code).
+> >
+> 
+> I agree that this will break the AM35x because there is no
+> separate CHIP_IS* defined for AM35x.
+> AM35x is treated as one of the version of OMAP3430.
+> 
+> >I have seen similar problems with smart reflex included in
+> >the AM35x hwmod data.
+> 
+> Unless the new CHIP_IS_* introduced for AM35x this problem will
+> still exists.
+> 
+> I thought you are already working on this because you were
+> asking the questions in the list.
 
-To generalize this further, a lock should protect specific data,
-not portions of the code, and ideally you should document
-exactly what you protect near the definition of the lock.
+[sp] Yes. I am working on it. Just responded to same query.
 
-If you use the lock to protect all the DMA registers, you should use
-it consistently, including inside of the interrupt handler, where
-you access some other registers.
+> 
+> >
+> >In this case accessing "unknown" registers corresponding to
+> >SmartReflex in _setup() causes crash.
+> >(http://marc.info/?l=linux-omap&m=129777408503329&w=2)
+> >
+> >I expect similar to be happening on OMAP35x with inclusion
+> >of am35xx_usbhsotg_hwmod. If you don't see any crash, there
+> >would be side-effects - and _setup() would be initializing
+> >non-existent OTG registers on OMAP35x.
+> >
+> This will not impact for OMAP3 as the IDCODE is different AM35x and
+> OMAP3, so passing the right chip version in the HWMOD database for AM35x
+> will avoid the hwod init incase of OMAP3.
 
-If you can prove that the registers used in the IRQ handler are
-totally independent of the other ones, you don't need to use the
-lock there, but then I'd advise documenting your assumptions.
+[sp] Are you saying that IDCODE is being used in HWMOD to prevent
+     possible 'pollution' in the current implementation of
+     am35xx_usbhsotg_hwmod?
 
-> Thanks for teaching.  I intend to take the fix that Russell offered.
-> (Thanks, Russell).  Does that look good to you, or spin_lock_bh
-> version should be used than spin_lock_irqsave?
+> 
+> >Did you see any problems while testing?
+> >
+> I tested with OMAP3430SDP and OMAP3630Zoom3 and did not see
+> the problem.
 
-Russell's change looks correct to me.
+[sp] Could this be due to difference in kind of processing done
+     in _setup() for this hwmod. OR that addresses are (possibly)
+     overlapping/ or not used?
 
-Regarding the choice between spin_lock_bh and spin_lock_irqsave,
-I always prefer to use the one that expresses best to the reader
-what the intention is. spin_lock_irqsave() is stronger than
-spin_lock_bh(), and can always be used in its place.
-
-A short form of the strict rules (there are better documentations
-out there) is:
-
-* If all users are outside of interrupt or tasklet context,
-  use a bare spin_lock().
-
-* If one user is in a tasklet context, use spin_lock() inside
-  the tasklet, but spin_lock_bh() outside, to prevent the
-  tasklet from interrupting the critical section. Code that
-  can be called in either tasklet or regular context needs
-  to use spin_lock_bh() as well.
-
-* If one user is in interrupt context, use spin_lock() inside
-  of the interrupt handler, but spin_lock_irq() in tasklet
-  and normal context (not spin_lock_irqsave()), to prevent
-  the interrupt from happening during the critical section.
-
-* Use spin_lock_irqsave() only for functions that can be called
-  in either interrupt or non-interrupt context. Most drivers
-  don't need this at all.
-
-The simplified rule would be to always use spin_lock_irqsave(),
-because that does not require you to understand what you are doing.
-
-My position is that it is better to use the stricter rules, because
-that documents that you actually do understand what you are doing ;-)
-It's also slightly more efficient, because it avoids having to
-save the interrupt status in a variable.
-
-	Arnd
+     I suggest verifying this at the earliest.
+> 
+> Regards,
+> Hema
+> 
+> >~sanjeev
+> >
+> >PS: Sending mail via webmailer. Formatting may break
+> >
+> >>  };
+> >>
+> >> --
+> >> 1.7.4.rc2
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe
+> >linux-omap" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
