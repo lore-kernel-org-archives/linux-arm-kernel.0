@@ -1,7 +1,7 @@
 From: b-cousson@ti.com (Benoit Cousson)
 Date: Fri, 18 Feb 2011 14:01:06 +0100
 Subject: [PATCH] OMAP4: hwmod data: Add rev and dev_attr fields in McSPI
-Message-ID: <mailman.152.1298324220.1530.linux-arm-kernel@lists.infradead.org>
+Message-ID: <mailman.153.1298324220.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -120,11 +120,4 @@ index 84e795c..182aa79 100644
 1.7.0.4
 
 
-
---------------020600090501030202090907
-Content-Type: text/plain;
-	name="0001-OMAP4-hwmod-data-Add-rev-and-dev_attr-fields-in-McSP.patch"
-Content-Transfer-Encoding: 7bit
-Content-Disposition: attachment;
-	filename*0="0001-OMAP4-hwmod-data-Add-rev-and-dev_attr-fields-in-McSP.pa";
-	filename*1="tch"
+--------------020600090501030202090907--
