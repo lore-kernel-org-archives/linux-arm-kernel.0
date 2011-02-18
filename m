@@ -1,93 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 17 Feb 2011 20:26:55 -0500 (EST)
-Subject: [PATCH] ARM: fold lookup_machine_type() into setup_machine()
-Message-ID: <alpine.LFD.2.00.1102172023350.14920@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 18 Feb 2011 10:27:22 +0900
+Subject: [PATCH 0/11] ARM: EXYNOS4: Change ARCH name,
+	ARCH_EXYNOS4 from ARCH_S5PV310
+In-Reply-To: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+References: <1297671787-10571-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <01b901cbcf0b$01406b60$03c14220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Kukjin Kim wrote:
+> 
+> This patch set changes to ARCH_EXYNOS4 from ARCH_S5PV310 for supporting
+> Samsung's
+> new brand name EXYNOS. Samsung officially announced about the brand name
+of
+> EXYNOS
+> at MWC 2011 and The EXYNOS4 integrates a ARM Cortex A9 microporcessor with
+> several
+> other peripherals to support features such as multimedai, storage,
+graphics
+> and gaming.
+> Especially, the EXYNOS4210 CPU which is one of EXYNOS4 SoC series can be
+used
+> in
+> products such as Mobile devices.
+> 
+Hi all,
 
-Since commit 6fc31d54 there is no callers for lookup_machine_type()
-other than setup_machine(). And if the former fails it won't return,
-therefore the error path in the later is dead code.  Let's clean
-things up by merging them together.
+If there are no more comments for this, will merge this into for-next this
+weekend.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
+Thanks.
 
-This is meant for the p2v-stable branch.
-
- arch/arm/kernel/setup.c |   48 ++++++++++++++++------------------------------
- 1 files changed, 17 insertions(+), 31 deletions(-)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 773b5cd..f43f041 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -325,28 +325,6 @@ static void __init early_print(const char *str, ...)
- 	printk("%s", buf);
- }
- 
--static struct machine_desc * __init lookup_machine_type(unsigned int type)
--{
--	extern struct machine_desc __arch_info_begin[], __arch_info_end[];
--	struct machine_desc *p;
--
--	for (p = __arch_info_begin; p < __arch_info_end; p++)
--		if (type == p->nr)
--			return p;
--
--	early_print("\n"
--		"Error: unrecognized/unsupported machine ID (r1 = 0x%08x).\n\n"
--		"Available machine support:\n\nID (hex)\tNAME\n", type);
--
--	for (p = __arch_info_begin; p < __arch_info_end; p++)
--		early_print("%08x\t%s\n", p->nr, p->name);
--
--	early_print("\nPlease check your kernel config and/or bootloader.\n");
--
--	while (true)
--		/* can't use cpu_relax() here as it may require MMU setup */;
--}
--
- static void __init feat_v6_fixup(void)
- {
- 	int id = read_cpuid_id();
-@@ -463,21 +441,29 @@ void cpu_init(void)
- 
- static struct machine_desc * __init setup_machine(unsigned int nr)
- {
--	struct machine_desc *list;
-+	extern struct machine_desc __arch_info_begin[], __arch_info_end[];
-+	struct machine_desc *p;
- 
- 	/*
- 	 * locate machine in the list of supported machines.
- 	 */
--	list = lookup_machine_type(nr);
--	if (!list) {
--		printk("Machine configuration botched (nr %d), unable "
--		       "to continue.\n", nr);
--		while (1);
--	}
-+	for (p = __arch_info_begin; p < __arch_info_end; p++)
-+		if (nr == p->nr) {
-+			printk("Machine: %s\n", p->name);
-+			return p;
-+		}
- 
--	printk("Machine: %s\n", list->name);
-+	early_print("\n"
-+		"Error: unrecognized/unsupported machine ID (r1 = 0x%08x).\n\n"
-+		"Available machine support:\n\nID (hex)\tNAME\n", nr);
-+
-+	for (p = __arch_info_begin; p < __arch_info_end; p++)
-+		early_print("%08x\t%s\n", p->nr, p->name);
- 
--	return list;
-+	early_print("\nPlease check your kernel config and/or bootloader.\n");
-+
-+	while (true)
-+		/* can't use cpu_relax() here as it may require MMU setup */;
- }
- 
- static int __init arm_add_memory(unsigned long start, unsigned long size)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
