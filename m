@@ -1,46 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 18 Feb 2011 16:57:04 +0800
-Subject: [PATCH 1/2] video: Add i.MX23/28 framebuffer driver
-In-Reply-To: <20110218083055.GE24426@pengutronix.de>
-References: <1297850199-1688-1-git-send-email-s.hauer@pengutronix.de>
-	<1297850199-1688-2-git-send-email-s.hauer@pengutronix.de>
-	<20110218052418.GA18053@S2100-06.ap.freescale.net>
-	<20110218083055.GE24426@pengutronix.de>
-Message-ID: <20110218085703.GC18085@S2100-06.ap.freescale.net>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 18 Feb 2011 16:59:41 +0800
+Subject: [PATCH RESEND 3/4] ARM: imx53_loco: add i2c device support
+In-Reply-To: <20110218084533.GV22310@pengutronix.de>
+References: <1298003777-7687-1-git-send-email-richard.zhao@freescale.com>
+	<1298003777-7687-3-git-send-email-richard.zhao@freescale.com>
+	<20110218084533.GV22310@pengutronix.de>
+Message-ID: <20110218085940.GA2086@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 09:30:55AM +0100, Sascha Hauer wrote:
-> On Fri, Feb 18, 2011 at 01:24:20PM +0800, Shawn Guo wrote:
-> > Sorry, I did not catch up with v1 of the patch set.
-> > 
-> > I have a overall comment on the driver.  There is many occurrences
-> > of mx23, mx28 etc. throughout the file.  IMHO, this is not a good
-> > idea.  It may be better to use the IP version to handle the
-> > differences.  In this way, if we have another SoC coming later
-> > using the same LCDIF revision as i.MX28.  The driver could
-> > immediately fit in without code change, ideally.
-> > 
-> > The only problem with version register is that the offset of LCDIF
-> > version register is different on i.MX28 from i.MX23.
-> 
-> Can opener inside can. I love it ;)
-> 
-Well, that's the situation we have to deal with.
+Hi Uwe,
 
-> > You still need
-> > cpu_is_mx23 to read the correct version.
+On Fri, Feb 18, 2011 at 09:45:33AM +0100, Uwe Kleine-K?nig wrote:
+> On Fri, Feb 18, 2011 at 12:36:16PM +0800, Richard Zhao wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 > > 
-> > BTW, I would try to use cpu_is_mx23 than cpu_is_mx28, as the 'else'
-> > of cpu_is_mx23 could _possibly_ cover later SoC as well as i.MX28.
-> 
-> There is only one cpu_is_mx28 in the driver without else. I can switch
-> MXSFB_MX23 and MXSFB_MX28 to MXSFB_V3 and MXSFB_V4 if you like it
-> better.
-> 
-Yes, I like it better.  With it, if we have a new SoC using LCDIF v4,
-the driver needs no change. 
+> > diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> > index 10b6008..abea297 100644
+> > --- a/arch/arm/mach-mx5/Kconfig
+> > +++ b/arch/arm/mach-mx5/Kconfig
+> > @@ -146,6 +146,7 @@ config MACH_MX53_LOCO
+> >  	bool "Support MX53 LOCO platforms"
+> >  	select SOC_IMX53
+> >  	select IMX_HAVE_PLATFORM_IMX_UART
+> > +	select IMX_HAVE_PLATFORM_IMX_I2C
+> please keep these sorted alphabetically
+ok. I will move it up by one line.
 
--- 
-Regards,
-Shawn
+Thanks
+Richard
+> 
+> Best regards
+> Uwe
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
