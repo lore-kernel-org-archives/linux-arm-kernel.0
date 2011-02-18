@@ -1,25 +1,61 @@
-From: bryanh@codeaurora.org (Bryan Huntsman)
-Date: Thu, 17 Feb 2011 16:51:21 -0800
-Subject: [PATCH] msm: add single-wire serial bus interface (SSBI) driver
-In-Reply-To: <1297989432.9680.50.camel@c-dwalke-linux.qualcomm.com>
-References: <1297989299-27320-1-git-send-email-kheitke@codeaurora.org>
-	<1297989432.9680.50.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <4D5DC289.1090004@codeaurora.org>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 17 Feb 2011 16:58:09 -0800
+Subject: [RFC PATCH 2/3] ARM: gic: Use cpu pm notifiers to save gic state
+In-Reply-To: <1297373487-23902-3-git-send-email-ccross@android.com>
+References: <1297373487-23902-1-git-send-email-ccross@android.com>
+	<1297373487-23902-3-git-send-email-ccross@android.com>
+Message-ID: <AANLkTik3O_keaFh25kd_Pr7dkiSAG5rg3-ZGZ7wAVN6S@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2011 04:37 PM, Daniel Walker wrote:
-> Can you put this in drivers/ this doesn't looks like it need to be here.
+On Thu, Feb 10, 2011 at 1:31 PM, Colin Cross <ccross@android.com> wrote:
 
-Where would you suggest?  The initial attempt to model SSBI as an I2C
-bus didn't go anywhere.  See http://lkml.org/lkml/2010/7/21/400.  This
-functionality is specific to MSM.  Plus, we're trying to maintain
-similarity to the Android MSM tree.  That may not matter to people who
-don't use MSM, but is matters to us.  Given these considerations, the
-current location seems as good a place as any.
+<snip>
 
-- Bryan
+> +#ifdef CONFIG_PM
+> + ? ? ? u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
+> + ? ? ? u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
+> + ? ? ? u32 saved_spi_pri[DIV_ROUND_UP(1020, 4)];
+> + ? ? ? u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
+> + ? ? ? u32 __percpu *saved_ppi_enable;
+> + ? ? ? u32 __percpu *saved_ppi_conf;
+> + ? ? ? u32 __percpu *saved_ppi_pri;
+> +#endif
+The #ifdef CONFIG_PM breaks building !CONFIG_PM, and this should
+depend on CONFIG_CPU_IDLE, not CONFIG_PM.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> +static void gic_cpu_save(unsigned int gic_nr)
+> +{
+> + ? ? ? int i;
+> + ? ? ? u32 *ptr;
+> + ? ? ? void __iomem *dist_base;
+> + ? ? ? void __iomem *cpu_base;
+> +
+> + ? ? ? if (gic_nr >= MAX_GIC_NR)
+> + ? ? ? ? ? ? ? BUG();
+> +
+> + ? ? ? dist_base = gic_data[gic_nr].dist_base;
+> + ? ? ? cpu_base = gic_data[gic_nr].cpu_base;
+> +
+> + ? ? ? if (!dist_base || !cpu_base)
+> + ? ? ? ? ? ? ? return;
+> +
+> + ? ? ? ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_enable);
+> + ? ? ? for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
+> + ? ? ? ? ? ? ? ptr[i] = readl(dist_base + GIC_DIST_ENABLE_SET + i * 4);
+> +
+> + ? ? ? ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
+> + ? ? ? for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
+> + ? ? ? ? ? ? ? ptr[i] = readl(dist_base + GIC_DIST_CONFIG + i * 4);
+> +
+> + ? ? ? ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_pri);
+> + ? ? ? for (i = 0; i < DIV_ROUND_UP(32, 4); i++)
+> + ? ? ? ? ? ? ? ptr[i] = readl(dist_base + GIC_DIST_PRI + i * 4);
+> +
+> + ? ? ? writel(0, cpu_base + GIC_CPU_CTRL);
+> +}
+Disabling the GIC cpu interface here prevents SGIs from waking the CPU
+from WFI.  On Tegra2, it is useful to be able to go to WFI, and then
+either back to normal or into reset depending on the state of the
+other CPU.  Is it safe to leave the GIC CPU control on when going to
+reset?
