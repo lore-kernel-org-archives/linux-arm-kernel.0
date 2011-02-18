@@ -1,26 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Feb 2011 22:11:49 +0000
-Subject: [PATCH] arm/mach-stmp3xxx: remove headers for DUART
-In-Reply-To: <1298062481-29547-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1298062481-29547-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110218221149.GC19427@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 18 Feb 2011 22:16:06 +0000
+Subject: platform/i2c busses: pm runtime and system sleep
+In-Reply-To: <20110218202744.GA19427@n2100.arm.linux.org.uk>
+References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
+	<201102181928.05911.rjw@sisk.pl>
+	<AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
+	<201102182120.29977.rjw@sisk.pl>
+	<20110218202744.GA19427@n2100.arm.linux.org.uk>
+Message-ID: <20110218221606.GB25168@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 09:54:41PM +0100, Uwe Kleine-K?nig wrote:
-> From: Wolfram Sang <w.sang@pengutronix.de>
-> 
-> The DUART is an AMBA PL011 and its registers are already available in
-> linux/amba/serial.h
-> 
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> there is no maintainer listed in MAINTAINERS.  Should I put is in the
-> patch system?  Or should it go via Sascha, as stmp3xxx is the
-> predecessor of i.MX23?
+On Fri, Feb 18, 2011 at 08:27:44PM +0000, Russell King - ARM Linux wrote:
 
-stmp came from embedded alley.  See git logs.  That probably gives
-you an idea where to send the patch.
+> Do we have any pressing need to convert AMBA stuff?  I haven't heard any
+> reason yet to convert them to runtime PM - they don't even make any
+> runtime PM calls.
+
+There's a bit of a chicken and egg problem in that it's not possible for
+devices to make use of runtime PM unless the bus has runtime PM support
+implemented - the bus implementation is mandatory, there's no default.
