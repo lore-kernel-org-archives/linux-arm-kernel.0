@@ -1,20 +1,26 @@
-From: vapier.adi@gmail.com (Mike Frysinger)
-Date: Fri, 18 Feb 2011 16:42:34 -0500
-Subject: [PATCH] kbuild: reenable section mismatch analysis
-In-Reply-To: <1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110216200734.GA25184@merkur.ravnborg.org>
-	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <AANLkTinNT05b4YNdTvUF3jRqA=zob7KPT1_Vcic5vxQh@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 18 Feb 2011 21:55:09 +0000
+Subject: Question About Linux Memory Mapping
+In-Reply-To: <AANLkTinUoFzzx4hM8SpUt-mpjn1Z5xmrDqmXwuELuu3e@mail.gmail.com>
+References: <AANLkTinUoFzzx4hM8SpUt-mpjn1Z5xmrDqmXwuELuu3e@mail.gmail.com>
+Message-ID: <20110218215509.GB19427@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> This was disabled in commit
->
-> ? ? ? ?e5f95c8 (kbuild: print only total number of section mismatces found)
->
-> because there were too many warnings. ?Now we're down to a reasonable
-> number again, so we start scaring people with the details.
+On Fri, Feb 18, 2011 at 09:56:28PM +0100, Drasko DRASKOVIC wrote:
+> Hi all,
+> in the article Booting ARM Linux :
+> http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html
+> I can see that mem map is passed via ATAG_MEM. However, in the same
+> article it is mentioned that this information can also be passed via
+> kernel command line paramters,  mem=<size>[KM][,@<phys_offset>].
 
-Acked-by: Mike Frysinger <vapier@gentoo.org>
--mike
+Why do you discard this information soo lightly?  Did you try it?
+
+> However, this does not seem to be true, as "mem" command line
+> parameter seems to be formated like this : mem= n[KMG] (i.e. no
+> offset), regarding to this reference :
+> http://oreilly.com/linux/excerpts/9780596100797/kernel-boot-command-line-parameter-reference.html.
+> Seems like memmap should be used instead.
+
+Maybe O'Reilly is outdated?
