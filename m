@@ -1,72 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 18 Feb 2011 11:05:47 +0530
-Subject: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for iclks,
-	OMAP2xxx
-In-Reply-To: <alpine.DEB.2.00.1102161551400.29817@utopia.booyaka.com>
-References: <20110216065030.22089.61217.stgit@twilight.localdomain>
-	<43af56d25809fa616f0e17d7e641ebc0@mail.gmail.com>
-	<alpine.DEB.2.00.1102161551400.29817@utopia.booyaka.com>
-Message-ID: <cf17c43dfb21a50236058918ae984a65@mail.gmail.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Fri, 18 Feb 2011 13:47:29 +0800
+Subject: [PATCH 1/1] ARM: imx53: correct Silicon Revision definition following
+	fuse map
+Message-ID: <1298008049-20352-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Thursday, February 17, 2011 4:35 AM
-> To: Rajendra Nayak
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 00/11] OMAP2+: clock: add clockfw autoidle for
-iclks, OMAP2xxx
->
-> On Wed, 16 Feb 2011, Rajendra Nayak wrote:
->
-> > Boot-tested on 3430sdp/4430sdp, with CONFIG_PM and with !CONFIG_PM.
-> > suspend-offmode tested on 3430sdp and suspend-retmode on 4430sdp (with
-> > some out-of-tree patches)
->
-> Thanks, will add Tested-by:s.
->
-> > Dynamic idle testing on 3430sdp showed me some very jerky debug
-console
-> > the moment a 'echo 1 > /debug/pm_debug/sleep_while_idle' is done. This
-> > however seems to be the case even on 2.6.38-rc4 and not related to the
-> > current patch series.
->
-> Does enabling CONFIG_OMAP2_DSS resolve the problem you're seeing?
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-Maybe, will try it out. Thanks for the tip.
-
->
-> > Will debug further, but seems to some 3430sdp specific issue, since
-you
-> > did not see it on Beagleboard and seems it is not seen on OMAP3 zoom's
-> > either. Just out of curiosity, what dynamic-idle state where you able
-to
-> > achieve on Beagle?
->
-> Full chip off.  I use omap2plus_defconfig, sometimes with
-CONFIG_OMAP2_DSS
-> depending on personal mood and what's being tested.  I boot to a shell
-and
-> run the commands at the end of this message (some of which are probably
-> superfluous).
-
-Ok, thanks.
-
->
->
-> - Paul
->
->
-> echo 1 > /debug/pm_debug/sleep_while_idle
-> echo 1 > /debug/pm_debug/enable_off_mode
-> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
-> echo enabled >
-/sys/devices/platform/omap/omap_uart.0/tty/ttyO0/power/wakeup
-> echo enabled >
-/sys/devices/platform/omap/omap_uart.1/tty/ttyO1/power/wakeup
-> echo enabled >
-/sys/devices/platform/omap/omap_uart.2/tty/ttyO2/power/wakeup
->
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index d40671d..95fd5f8 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -76,13 +76,25 @@ late_initcall(mx51_neon_fixup);
+ static int get_mx53_srev(void)
+ {
+ 	void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
+-	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
++	u32 reg = readl(iim_base + IIM_SREV) & 0xff;
++	int rev;
++
++	switch (reg) {
++	case 0x0:
++		rev = IMX_CHIP_REVISION_1_0;
++		break;
++	case 0x2:
++		rev = IMX_CHIP_REVISION_2_0;
++		break;
++	case 0x3:
++		rev = IMX_CHIP_REVISION_2_1;
++		break;
++	default:
++		rev = IMX_CHIP_REVISION_UNKNOWN;
++		break;
++	}
+ 
+-	if (rev == 0x0)
+-		return IMX_CHIP_REVISION_1_0;
+-	else if (rev == 0x10)
+-		return IMX_CHIP_REVISION_2_0;
+-	return 0;
++	return rev;
+ }
+ 
+ /*
+-- 
+1.7.1
