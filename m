@@ -1,107 +1,46 @@
-From: jammy.zhou@linaro.org (Jammy Zhou)
-Date: Fri, 18 Feb 2011 10:25:29 +0800
-Subject: [PATCH] i.MX23/28 framebuffer driver
-In-Reply-To: <AANLkTim4rsuDLnyLtetMpn_i+x0e8FmyzLvy1Bm0JEAG@mail.gmail.com>
-References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
-	<201102091731.07794.arnd@arndb.de>
-	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
-	<201102161322.08126.arnd@arndb.de>
-	<AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
-	<AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
-	<AANLkTim3iUNHsaCf7387H-X+XW0YDQsQVa1FwDvo0KvH@mail.gmail.com>
-	<AANLkTim4rsuDLnyLtetMpn_i+x0e8FmyzLvy1Bm0JEAG@mail.gmail.com>
-Message-ID: <AANLkTimOUnaHNMg03cHAiNJLuGhGuMWSHt+kibxWfYMH@mail.gmail.com>
+From: kgilmer@buglabs.net (Ken Gilmer)
+Date: Thu, 17 Feb 2011 21:47:00 -0800
+Subject: [bug-dev] [PATCHv3] mx31: add support for the bugbase 1.3 from
+	buglabs
+In-Reply-To: <1297956221.2675.1.camel@gnutoo-laptop>
+References: <20110211213348.GJ27982@pengutronix.de>
+	<1297545419-31181-1-git-send-email-GNUtoo@no-log.org>
+	<20110213211855.GC13279@pengutronix.de>
+	<1297956221.2675.1.camel@gnutoo-laptop>
+Message-ID: <AANLkTik2o0xfOgOxEuBKNA4MHhK9f0VGVQ0G6apqthWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I also noticed that default XRandR1.2+ implementation is missing in X side.
-If we can implement one, it would be beneficial for all ARM platforms. By
-the way, does X driver of TI support XRandR1.2+?
+No problems for that on our end Denis.
 
-Regards,
-Jammy
+thx
+ken
 
-On Thu, Feb 17, 2011 at 11:25 PM, Clark, Rob <rob@ti.com> wrote:
+2011/2/17 Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
 
-> Hmm, I was thinking more on the xf86 side of things.. ie. to provide
-> default implementations of xf86CrtcFuncsRec and xf86OutputFuncsRec
-> functions..
+> > And I wonder there is no copyright statement by you in
+> > arch/arm/mach-mx3/mach-bug.c, maybe because you consider your changes
+> > too minor to be relevant?  (INAL and I don't know who to value your
+> > contribution.)
+> Here is the thread:
+> http://thread.gmane.org/gmane.linux.ports.arm.msm/122
 >
-> BR,
-> -R
+> What should I do? can I add my own name too?
 >
-> On Wed, Feb 16, 2011 at 7:24 PM, Jammy Zhou <jammy.zhou@linaro.org> wrote:
-> >
-> > There is already one KMS abstraction layer (libkms.so) in libdrm, maybe
-> it can serve as what we needed.
-> >
-> > Regards,
-> > Jammy
-> >
-> > On Thu, Feb 17, 2011 at 9:08 AM, Clark, Rob <rob@ti.com> wrote:
-> >>
-> >> I'm still in the learning-as-I-go phase here, so definitely not ready
-> >> to propose a solution, but it does seem to me like there is room for
-> >> some sort of kms-helper library here to handle more of the boilerplate
-> >> xf86-video-* stuff..  I guess I'll have a better picture once I have a
-> >> chance to add support for the various multi-monitor configurations.
-> >> But certainly would be interested if anyone already has some ideas.
-> >>
-> >> BR,
-> >> -R
-> >>
-> >> On Wed, Feb 16, 2011 at 8:42 AM, Jesse Barker <jesse.barker@linaro.org>
-> wrote:
-> >> > Speaking for the Linaro graphics working group, I think it's great.
-> And, I
-> >> > think you're right, that if enough of the KMS support in xf86-video-*
-> is
-> >> > similar enough (I was only aware of intel and nouveau supporting it
-> properly
-> >> > at current), pulling it out into a common layer would make it easier
-> to
-> >> > support in new drivers (including fbdev).
-> >> >
-> >> > cheers,
-> >> > Jesse
-> >> >
-> >> > On Wed, Feb 16, 2011 at 4:22 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> >>
-> >> >> On Tuesday 15 February 2011, Clark, Rob wrote:
-> >> >> > I'd been experimenting a bit on the side w/ the DRM driver
-> framework (
-> >> >> >
-> >> >> >
-> http://gitorious.com/~robclark/pandaboard/robclarks-kernel-omap4/commits/omap_gpu
-> >> >> > ), but had to add a good chunk of mostly boilerplate code to our
-> xorg
-> >> >> > driver in order just to test it.  Maybe some generic support for
-> KMS
-> >> >> > in xf86-video-fbdev would have made this easier to develop the
-> kernel
-> >> >> > part without in parallel having to implement the userspace part.
->  I'm
-> >> >> > not sure if this is the sort of thing the linaro-wg has in mind?
-> >> >>
-> >> >> I'm not sure what the the linaro multimedia wg thinks of this, but
-> the
-> >> >> kernel code you linked looks like it's doing exactly the right thing.
-> >> >>
-> >> >>        Arnd
-> >> >>
-> >> >> _______________________________________________
-> >> >> linaro-dev mailing list
-> >> >> linaro-dev at lists.linaro.org
-> >> >> http://lists.linaro.org/mailman/listinfo/linaro-dev
-> >> >
-> >> >
-> >>
-> >> _______________________________________________
-> >> linaro-dev mailing list
-> >> linaro-dev at lists.linaro.org
-> >> http://lists.linaro.org/mailman/listinfo/linaro-dev
-> >
+> Denis.
 >
+>
+> _______________________________________________
+> bug-dev mailing list
+> bug-dev at lists.buglabs.net
+> http://lists.buglabs.net/cgi-bin/mailman/listinfo/bug-dev
+>
+
+
+
+-- 
+thx
+ken
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110218/dae57eaa/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110217/91e473a2/attachment-0001.html>
