@@ -1,66 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Feb 2011 16:44:17 +0100
-Subject: [PATCH 1/2] PRUSS UIO driver support
-In-Reply-To: <1298041530-26855-2-git-send-email-pratheesh@ti.com>
-References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
-	<1298041530-26855-2-git-send-email-pratheesh@ti.com>
-Message-ID: <201102181644.17634.arnd@arndb.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 18 Feb 2011 16:55:09 +0100
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <20110218154135.GF11151@legolas.emea.dhcp.ti.com>
+References: <20110217162000.GP20795@atomide.com>
+	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
+	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
+	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
+	<4D5D59E5.6020307@ti.com>
+	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
+	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
+	<4D5E7DFF.7020609@ti.com>
+	<20110218154135.GF11151@legolas.emea.dhcp.ti.com>
+Message-ID: <4D5E965D.7040500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 February 2011, Pratheesh Gangadhar wrote:
-> Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
+Hi Felipe,
+
+On 2/18/2011 4:41 PM, Balbi, Felipe wrote:
+> Hi all,
 > 
-> This patch implements PRUSS (Programmable Real-time Unit Sub System)
-> UIO driver which exports SOC resources associated with PRUSS like
-> I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
-> processors which is efficient in performing embedded tasks that
-> require manipulation of packed memory mapped data structures and
-> efficient in handling system events that have tight real time
-> constraints. This driver is currently supported on Texas Instruments
-> DA850, AM18xx and OMAPL1-38 devices.
-> For example, PRUSS runs firmware for real-time critical industrial
-> communication data link layer and communicates with application stack
-> running in user space via shared memory and IRQs.
+> On Fri, Feb 18, 2011 at 03:11:11PM +0100, Cousson, Benoit wrote:
+>> On 2/17/2011 7:18 PM, Tony Lindgren wrote:
+>>> * Cousson, Benoit<b-cousson@ti.com>   [110217 09:45]:
+>>>>
+>>>> Done, boot tested, and that does remove the warning about the
+>>>> missing opt clock you had with the previous data.
+>>>>
+>>>> git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
+>>>>
+>>>> Just let me know if it does break anything else.
+>>>
+>>> Pulled into omap-for-linus. Also now merged are the devel-hwspinlock
+>>> and devel-mcspi branches.
+>>
+>> McSPI OMAP4 hwmod data are missing a couple of flags that break the boot for the moment.
+>>
+>> Govindraj should rebase on the omap4_hwmod_data branch and add the missing rev and dev_attr for the McSPI.
+>>
+>> Unfortunately, even with that patch omap-for-linus boot hangs after the following trace:
+>>
+>> [    0.875091] omap_device: omap2_mcspi.1: new worst case activate latency 0: 30517
+>> [    0.886657] usbcore: registered new interface driver usbfs
+>> [    0.892822] usbcore: registered new interface driver hub
+>> [    0.898681] usbcore: registered new device driver usb
+>> [    0.904815] omap_i2c omap_i2c.1: bus 1 rev4.0 at 400 kHz
+> 
+> I tested your branch merged with mine and it was working fine. What else
+> is on omap-for-linus ? There are only 28 patches on that branch, a
+> bisect would be quick ?
 
-Looks basically ok, but there are two limitations that I see that you
-might consider fixing.
+This is what I observed too. There are some early stuff in it + some TI816X... I do not know what is going wrong. 
+Please note that there are a little bit more (47) stuff added but they are below the -rc5 tag... The bisect will be longer :-)
 
-Oh, and you should put the Signed-off-by statement below the changelog,
-not above it, but that has nothing to do with the code.
+ + [HEAD^2] OMAP: runtime: McSPI driver runtime conversion
+ + [HEAD^2^] OMAP: devices: Modify McSPI device to adapt to hwmod framework
+ + [HEAD^2~2] OMAP3: hwmod data: Add McSPI
+ + [HEAD^2~3] OMAP2430: hwmod data: Add McSPI
+ + [HEAD^2~4] OMAP2420: hwmod data: Add McSPI
+ + [HEAD^] omap: add hwspinlock device
+ + [HEAD~2] drivers: hwspinlock: add OMAP implementation
+ + [HEAD~3] drivers: hwspinlock: add framework
+ + [HEAD~4^2] OMAP4: hwmod data: Add USBOTG
+ + [HEAD~4^2^] OMAP4: hwmod data: Add AESS, McPDM, bandgap, counter_32k, MMC, KBD, ISS & IPU
+ + [HEAD~4^2~2] OMAP4: hwmod data: Add McBSP
+ + [HEAD~4^2~3] OMAP4: hwmod data: Add DMIC
+ + [HEAD~4^2~4] OMAP4: hwmod data: Add mailbox
+ + [HEAD~4^2~5] OMAP4: hwmod data: Add DSS, DISPC, DSI1&2, RFBI, HDMI and VENC
+ + [HEAD~4^2~6] OMAP4: hwmod data: Add timer
+ + [HEAD~4^2~7] OMAP4: hwmod data: Add McSPI
+ + [HEAD~4^2~8] OMAP4: hwmod data: Add hwspinlock
+ + [HEAD~5^3] TI816X: Update to use init_early
+ + [HEAD~5^3^] TI816X: Add low level debug support
+ + [HEAD~5^3~2] TI816X: Create board support and enable build for TI816X EVM
+ + [HEAD~5^3~3] TI816X: Update common OMAP machine specific sources
+ + [HEAD~5^3~4] TI816X: Update common omap platform files
+ + [HEAD~5^3~5] omap: hwmod: Populate _mpu_rt_va later on in omap_hwmod_late_init
+ + [HEAD~5^3~6] omap2+: Fix omap_serial_early_init to work with init_early hook
+ + [HEAD~5^3~7] omap2+: Make omap_hwmod_late_init into core_initcall
+ + [HEAD~5^3~8] ARM: OMAP2: use early init hook
+ + [HEAD~5^2] omap: McBSP: Remove unused audio macros in mcbsp.h
+ + [HEAD~5^2^] wip: fix section mismatches in omap1_defconfig
+ + [HEAD~5^2~2] ARM: omap: move omap_board_config_kernel to .init.data
+ + [HEAD~5^2~3] ARM: omap: move omap_get_config et al. to .init.text
+ + [HEAD~5^2~4] ARM: omap1/nokia770: mark some functions __init
+ + [HEAD~5^2~5] arm: mach-omap1: board-voiceblue: add missing include
+ + [HEAD~5^2~6] ARM: OMAP: Allow platforms to hook reset cleanly
+ + [HEAD~5^2~7] arm: mach-omap1: board-h3: make nand_platdata static
+ + [HEAD~5^2~8] arm: mach-omap1: board-htcherald: make htcpld_chips and htcpld_pfdata static
+ + [HEAD~5^2~9] arm: mach-omap1: board-innovator: make innovator_mmc_init() static
+ + [HEAD~5^2~10] arm: mach-omap1: board-h2: make h2_nand_platdata static
+ + [HEAD~5^2~11] arm: plat-omap: dma: make omap_dma_in_1510_mode() static
+ + [HEAD~5^2~12] arm: omap2: irq: fix compile warning:
+ + [HEAD~5^2~13] arm: omap1: fix a bunch of section mismatches
+ + [HEAD~5^2~14] arm: omap1: fix compile warnings
+ + [HEAD~5^2~15] arm: omap1: fix compile warning
+ + [HEAD~5^2~16] arm: omap: i2c: fix compile warning
+ + [HEAD~5^2~17] omap: Start using CONFIG_SOC_OMAP
+++ [85e2efb] Linux 2.6.38-rc5
 
-> +/*
-> + * Host event IRQ numbers from PRUSS 	
-> + * 3 PRU_EVTOUT0 PRUSS Interrupt
-> + * 4 PRU_EVTOUT1 PRUSS Interrupt
-> + * 5 PRU_EVTOUT2 PRUSS Interrupt
-> + * 6 PRU_EVTOUT3 PRUSS Interrupt
-> + * 7 PRU_EVTOUT4 PRUSS Interrupt
-> + * 8 PRU_EVTOUT5 PRUSS Interrupt
-> + * 9 PRU_EVTOUT6 PRUSS Interrupt
-> + * 10 PRU_EVTOUT7 PRUSS Interrupt
-> +*/
-> +
-> +#define MAX_PRUSS_EVTOUT_INSTANCE	(8)
-> +
-> +static struct clk *pruss_clk;
-> +static struct uio_info *info[MAX_PRUSS_EVTOUT_INSTANCE];
-> +static void *ddr_virt_addr;
-> +static dma_addr_t ddr_phy_addr;
 
-By making all of these static variables, you limit youself to
-a single PRUSS instance in the system. It's generally better
-to write device drivers in a way that makes it possible to
-have multiple instances, e.g. by moving these four variables
-into the 'priv' part of struct uio_info.
-
-> +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
-> +{
-> +	return IRQ_HANDLED;
-> +}
-
-An empty interrupt handler is rather pointless. I guess you really
-notify user space when the interrupt handler gets called, as this
-is the main point of a UIO driver as far as I understand it.
-
-	Arnd
+Regards,
+Benoit
