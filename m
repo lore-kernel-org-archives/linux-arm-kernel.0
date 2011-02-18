@@ -1,48 +1,31 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 19 Feb 2011 00:55:28 +0530
-Subject: platform/i2c busses: pm runtime and system sleep
-In-Reply-To: <201102181928.05911.rjw@sisk.pl>
-References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
-	<AANLkTikRUZRh0YnP8nYTKFnFeUiJbK5xKvHHjn_S+gZE@mail.gmail.com>
-	<AANLkTinsPqFcodH0w7LQeFEY+amodNH4CneRCRhhbKaz@mail.gmail.com>
-	<201102181928.05911.rjw@sisk.pl>
-Message-ID: <AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Fri, 18 Feb 2011 13:47:26 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102181444.24476.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<AANLkTinaY2RM86tX4ex+zsMwFKUdBNVpdZ8fFrt-e12_@mail.gmail.com>
+	<AANLkTikjUEjr=Sd1Ewyj8-yAKPV3Wa2Ch1aE=0DtrXP6@mail.gmail.com>
+	<201102181444.24476.arnd@arndb.de>
+Message-ID: <AANLkTi=W16NxpzhrBhxJPmk-CSe+yyxAXMh6YYq6oaEt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 23:58, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Friday, February 18, 2011, Rabin Vincent wrote:
->> On Thu, Feb 17, 2011 at 20:55, Rabin Vincent <rabin@rab.in> wrote:
->> > This will solve the platform vs AMBA bus, but shouldn't we really be
->> > aiming for consistent behaviour between these and the other busses such
->> > as I2C and SPI, which are also usually commonly used on the same
->> > platforms and are using GENERIC_PM_OPS?
->> >
->> > Should we be auditing all platform drivers and then switch platform to
->> > the GENERIC_PM_OPS?
->> >
->> > Or should the two points (1) and (2) be not handled in the bus at all
->> > and be left to individual drivers (in which case we should audit i2c and
->> > spi and change GENERIC_PM_OPS)?
->>
->> How about something like the below? ?If we have something like this, we
->> can just switch platform to GENERIC_PM_OPS and add the
->> pm_runtime_want_interaction() (or something better named) call to the
->> i2c and spi drivers using runtime PM.
+On Fri, Feb 18, 2011 at 7:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> I'm curious. Neither the manfid nor the oemid fields of either card
+> match what I have seen on SD cards, I would expect them to be
 >
-> Why don't we make platform_bus_type behave along the lines of generic ops
-> instead?
+> Sandisk: manfid 0x000003, oemid 0x5344
+> Toshiba: manfid 0x000002, oemid 0x544d
+>
+> I have not actually seen any Toshiba SD cards, but I assume that they
+> use the same controllers as Kingston.
+>
+> Does anyone know if the IDs have any correlation between MMC and SD
+> controllers?
+>
+> ? ? ? ?Arnd
+>
 
-At least drivers/spi/omap2_mcspi.c, drivers/video/sh_mobile_lcdcfb.c and
-drivers/watchdog/omap_wdt.c are some pm_runtime-using drivers which seem
-to do different things in their runtime vs normal suspend/resume
-routines, so forcing platform into the active-on-resume behaviour of the
-generic ops may make some use cases impossible.  Conversion of more OMAP
-drivers to runtime pm appears to be ongoing so I'd imagine we'd be
-seeing more of this.  Perhaps Kevin or Magnus will have a comment here.
-The same thing applies to AMBA drivers.
-
-Looking at the i2c drivers using runtime pm in comparison, they all seem
-to be using straightforward UNIVERSAL_PM_OPS-style code with the runtime
-and the system sleep doing the same things.  So maybe we do need to
-treat platform/AMBA different from the I2C/SPI group?
+I'm unsure about the older scheme (assigned by MMCA), but ever since
+MMC is now JEDEC-controlled, the IDs have changed. Sandisk's new id
+will be 0x45, and Toshiba I guess will be 0x11.
