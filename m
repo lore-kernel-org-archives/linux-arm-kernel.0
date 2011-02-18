@@ -1,59 +1,57 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 18 Feb 2011 13:07:17 +0100
-Subject: [PATCH 1/7] Add a mfd IPUv3 driver
-In-Reply-To: <20110218094949.GJ24426@pengutronix.de>
-References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
-	<1297865452-32181-2-git-send-email-s.hauer@pengutronix.de>
-	<871v36pm5r.fsf@lechat.rtp-net.org>
-	<20110218094949.GJ24426@pengutronix.de>
-Message-ID: <20110218120716.GC15832@sortiz-mobl>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Feb 2011 12:09:49 -0000
+Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <alpine.LFD.2.00.1102181240370.2701@localhost6.localdomain6>
+References: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
+	<-4413647205110644369@unknownmsgid>
+	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
+	<146267380211262372@unknownmsgid>
+	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
+	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
+	<20110217091741.GA24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
+	<20110217101957.GC24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171136550.2701@localhost6.localdomain6>
+	<20110217105611.GE24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171203280.2701@localhost6.localdomain6>
+	<001301cbcebf$76925cd0$63b71670$@deacon@arm.com>
+	<alpine.LFD.2.00.1102171831520.2701@localhost6.localdomain6>
+	<4D5DB193.5010007@codeaurora.org>
+	<001d01cbcf5f$1cfc9870$56f5c950$@deacon@arm.com>
+	<alpine.LFD.2.00.1102181240370.2701@localhost6.localdomain6>
+Message-ID: <002001cbcf64$bdc562a0$395027e0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+> > I don't think the cascaded handlers would have assumed that because ack
+> > just sends EOI - it doesn't do any masking. We do have a problem with
+> > the percpu_irq flow though (the GIC reference manual says that EOIing a
+> > non-active interrupt is UNPREDICTABLE).
+> >
+> > Another easy hack is to set IRQ_PER_CPU in the irq_desc->status for PPI
+> > interrupts and then check this in the ack routine. It's pretty ugly, but
+> > it doesn't affect the common case and it at least postpones the platform
+> > changes.
+> 
+> Conditionals in irq_chip callbacks are almost always a sign of
+> doom. Don't do that.
 
-On Fri, Feb 18, 2011 at 10:49:49AM +0100, Sascha Hauer wrote:
-> On Thu, Feb 17, 2011 at 07:10:24PM +0100, Arnaud Patard wrote:
-> > > diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-> > > index 6bafb51b..ffdb37a 100644
-> > > --- a/drivers/video/Kconfig
-> > > +++ b/drivers/video/Kconfig
-> > > @@ -26,6 +26,8 @@ source "drivers/gpu/drm/Kconfig"
-> > >  
-> > >  source "drivers/gpu/stub/Kconfig"
-> > >  
-> > > +source "drivers/video/imx-ipu-v3/Kconfig"
-> > > +
-> > 
-> > I don't see such a Kconfig file in this patch. Got lost while moving
-> > from mfd to video ?
-> 
-> Oops, yes still untracked in my repository. Will add in the next series.
-> 
-> > 
-> >  
-> > >  config VGASTATE
-> > >         tristate
-> > >         default n
-> > > diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-> > > index 8c8fabd..f4921ab 100644
-> > > --- a/drivers/video/Makefile
-> > > +++ b/drivers/video/Makefile
-> > > @@ -153,6 +153,7 @@ obj-$(CONFIG_FB_BFIN_T350MCQB)	  += bfin-t350mcqb-fb.o
-> > >  obj-$(CONFIG_FB_BFIN_7393)        += bfin_adv7393fb.o
-> > >  obj-$(CONFIG_FB_MX3)		  += mx3fb.o
-> > >  obj-$(CONFIG_FB_DA8XX)		  += da8xx-fb.o
-> > > +obj-$(CONFIG_MFD_IMX_IPU_V3)	  += imx-ipu-v3/
-> > 
-> > Now that files are in drivers/video, do we want to keep MFD in the name ?
-> 
-> I asked myself the same question and had no clear answer. Probably
-> better to remove the MFD.
-Definitely, yes.
+Ok, that was a hack too far! Let's fix this properly.
+ 
+> How many chained handlers need to be fixed, when the whole gic stuff
+> switches to eoi ?
+
+Well, grepping for set_chained_irq_handler yields a whole bunch of platforms
+but the set of these which appear to use the gic is only:
+
+mach-msm
+mach-s5pv310
+mach-shmobile
+mach-tegra
+
+I'll have a look through the code there and post some patches next week.
+Hopefully if I've missed anybody, they'll shout then.
 
 Cheers,
-Samuel.
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Will
