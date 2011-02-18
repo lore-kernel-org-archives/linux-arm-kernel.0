@@ -1,40 +1,35 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 18 Feb 2011 16:18:11 -0700
-Subject: [PATCH 1/3] ARM: Tegra: Add pll_d table entries for 252MHz
+Date: Fri, 18 Feb 2011 16:18:12 -0700
+Subject: [PATCH 2/3] video: tegra: Fix CTS/N table for 25.2MHz pclk,
+	44.1Hz audio
 In-Reply-To: <1298071093-23865-1-git-send-email-swarren@nvidia.com>
 References: <1298071093-23865-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1298071093-23865-2-git-send-email-swarren@nvidia.com>
+Message-ID: <1298071093-23865-3-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This rate is required for correct generation of 640x480 HDMI video;
-see subsequent patches.
+The existing values are for a 25.25MHz clock, not a 25.20MHz clock:
 
-Note: I tested the entry with 12MHz input. The other entries are untested,
-but appear logically correct. However, I'm not familiar enough with PLLs
-to know if they perhaps exceed the PLL VCO frequency, nor whether the
-cpcon values are strictly correct.
+25250000 * 14112 / (128 * 63125) == 44100.000
+25200000 * 5656  / (128 * 25250) == 44100.000
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/tegra2_clocks.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ drivers/video/tegra/dc/hdmi.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 41f5953..f3ead19 100644
---- a/arch/arm/mach-tegra/tegra2_clocks.c
-+++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -1531,6 +1531,11 @@ static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
- 	{ 19200000, 216000000, 135, 12, 1, 3},
- 	{ 26000000, 216000000, 216, 26, 1, 4},
+diff --git a/drivers/video/tegra/dc/hdmi.c b/drivers/video/tegra/dc/hdmi.c
+index 878cca5..9210737 100644
+--- a/drivers/video/tegra/dc/hdmi.c
++++ b/drivers/video/tegra/dc/hdmi.c
+@@ -152,7 +152,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_32k[] = {
+ };
  
-+	{ 12000000, 252000000, 252, 12, 1, 4},
-+	{ 13000000, 252000000, 252, 13, 1, 4},
-+	{ 19200000, 252000000, 210, 16, 1, 3},
-+	{ 26000000, 252000000, 252, 26, 1, 4},
-+
- 	{ 12000000, 594000000, 594, 12, 1, 8},
- 	{ 13000000, 594000000, 594, 13, 1, 8},
- 	{ 19200000, 594000000, 495, 16, 1, 8},
+ const struct tegra_hdmi_audio_config tegra_hdmi_audio_44_1k[] = {
+-	{25200000,	14112,	63125},
++	{25200000,	5656,	25250},
+ 	{27000000,	6272,	30000},
+ 	{54000000,	6272,	60000},
+ 	{74250000,	6272,	82500},
 -- 
 1.7.1
