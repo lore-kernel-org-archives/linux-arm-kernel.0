@@ -1,37 +1,67 @@
-From: weitway@gmail.com (Jason Chen)
-Date: Fri, 18 Feb 2011 17:22:09 +0800
-Subject: [PATCH 3/7] Add i.MX5 framebuffer driver
-In-Reply-To: <1297865452-32181-4-git-send-email-s.hauer@pengutronix.de>
-References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
-	<1297865452-32181-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <AANLkTina46_CMvB_9cqc4=PvcPxaV_BQ_H_ghJZFFxg8@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 18 Feb 2011 09:26:42 +0000
+Subject: compiling 2.6.37 kernel in THUMB2 mode
+In-Reply-To: <AANLkTik1FY=K1Wuo=vnh5xuq6aS1x2d2Km=ByrCSufJC@mail.gmail.com>
+References: <AANLkTi=bJwvTMk0B9N5AAbkNXEh_Wmvu75qrdHeL2Rrh@mail.gmail.com>
+	<alpine.LFD.2.00.1102152257500.14920@xanadu.home>
+	<AANLkTinQzK=s_r+_uaNRkq4MTPcF4zVE2aHPx5cqwYAN@mail.gmail.com>
+	<AANLkTi=PLJBZ=Q-4k8ZUbX4S3w7f3WfUd9acb7iVYGBP@mail.gmail.com>
+	<AANLkTi=_=jzs+MrvGbwF3L0c_eSq4nnbqE-xZ_+Z5fgH@mail.gmail.com>
+	<AANLkTinKhCG4HauFHrPd=qr9vmVheH59vu2Be=tWoJft@mail.gmail.com>
+	<AANLkTik1FY=K1Wuo=vnh5xuq6aS1x2d2Km=ByrCSufJC@mail.gmail.com>
+Message-ID: <AANLkTi=3s6ZRkaBG4uaS=7kaLWD-q2MgN0cN1otBrcmy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Sasha,
+On Thu, Feb 17, 2011 at 5:30 PM,  <vb@vsbe.com> wrote:
 
-> +       if (var->vmode & FB_VMODE_ODD_FLD_FIRST) /* PAL */
-> +               sig_cfg.odd_field_first = 1;
-> +       if (var->sync & FB_SYNC_EXT)
-> +               sig_cfg.ext_clk = 1;
-> +       if (var->sync & FB_SYNC_HOR_HIGH_ACT)
-> +               sig_cfg.Hsync_pol = 1;
-Please remove FB_SYNC_EXT support.
+[...]
 
-+static void imx_ipu_fb_disable_overlay(struct fb_info *ovl)
-+{
-+       struct imx_ipu_fb_info *mxc_ovl = ovl->par;
-+
-+       if (!mxc_ovl->enabled)
-+               return;
-+
-+       ipu_dp_disable_fg(mxc_ovl->dp);
-+       ipu_wait_for_interrupt(451, 100);
-+       ipu_idmac_disable_channel(mxc_ovl->ipu_ch);
-+       ipu_dmfc_disable_channel(mxc_ovl->dmfc);
-+       mxc_ovl->enabled = 0;
-+}
-Had better has a definition of ipu irq 451.
+>
+> Hi Dave,
+>
+> thank you again for the hints.
+>
+> I am trying to build an image for a Tegra2 based platform, it s a
+> 2.6.37 based tree with a fair amount of private additions (to be
+> upstreamed at some point), which does now come up and run in ARM mode.
+> I am trying to see if it can run in Thumb mode.
+>
+> It looks like certain files need to be compiled in ARM mode even when
+> THUMB2_KERNEL is enabled, but I don't see this happening in 2.6.37, I
+> was wondering how this is done in your tree.
 
-Jason Chen
-BRs
+Generally, this can be kept to a minimum.
+
+On OMAP, the low-level PM code calls into firmware which cannot cope
+with interworking between ARM and Thumb.  The PM code on the ARM side
+could be made to work with this even if it is mostly built in Thumb,
+but that would be complex and not really worth the pain.
+
+You may have this problem if you're trying to communicate with
+firmware, but it's best if you port everything else to be buildable in
+Thumb-2: the primary reason is that for backwards compatibility
+reasons, much of the assembler code in the kernel doesn't support
+ARM/Thumb interworking either.  This means that mixing ARM and Thumb
+code in the kernel will lead to problems unless you're careful.
+
+>
+> I tried building an OMAP image, but it does not build in Thumb mode,
+> and Thumb can't even be enabled for it because CPU_V6 configured in.
+> So I was wondering if this tree has some other working config which
+> does use Thumb mode. I'll look at the config files you mentioned, but
+> any suggestions/warnings about converting a kernel to work in Thumb
+> mode are welcome,
+
+Assuming you started with omap2plus_defconfig, you need to remove
+CONFIG_ARCH_OMAP2 from the config.  It's not possible to incorporate
+support for omap2 with CONFIG_THUMB2_KERNEL enabled because ARMv6
+doesn't support Thumb-2.
+
+Here's the config I was using:
+http://people.linaro.org/~dmart/arm_omap-thumb2+v2_config (based on
+the linaro config-- note: you don't need to build all the modules!
+Just make zImage or uImage)
+
+Hope that helps!
+---Dave
