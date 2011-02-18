@@ -1,47 +1,19 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 17 Feb 2011 21:28:42 -0500 (EST)
-Subject: The p2v branch
-In-Reply-To: <alpine.LFD.2.00.1102130915120.14920@xanadu.home>
-References: <alpine.LFD.2.00.1102121304500.14920@xanadu.home>
-	<20110212184138.GD22402@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102121556330.14920@xanadu.home>
-	<20110213114050.GB4799@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102130915120.14920@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1102172117230.14920@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 18 Feb 2011 11:05:51 +0900
+Subject: [PATCH 0/2] ARM: Update number of VIC for S5P SoCs
+Message-ID: <1297994753-22246-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 13 Feb 2011, Nicolas Pitre wrote:
+The S5PV210 has 4 VICs and S5P6442 and S5PC100 have 3 VICs.
+However, default VIC number is defined 2 in arch/arm/common.
+So can be happened some problem on above SoCs.
 
-> On Sun, 13 Feb 2011, Russell King - ARM Linux wrote:
-> 
-> > On Sat, Feb 12, 2011 at 04:01:14PM -0500, Nicolas Pitre wrote:
-> > > I've rebased my 2 patches on top of your latest p2v branch.  You may 
-> > > pull them from:
-> > > 
-> > > 	git://git.linaro.org/people/nico/linux p2v
-> > > 
-> > > Or if you prefer I can put them in the patch system.
-> > 
-> > I'd like to wait for Catalin to respond on the phys_addr_t patch - which
-> > allows 64-bit phys addresses.  Obviously that's going to have an impact
-> > on the p2v code and I'd rather someone else had the job of working out
-> > what to do about the T2 code.
-> 
-> OK.
+I know, another better patch which has been submitted for it,
+but I couldn't find any its progress, right now, need this
+for esp., PM and so on.
 
-Now rebased on top of p2v-stable, and includes the lookup_machine_type() 
-cleanup patch.
+And if required, can be improved for it later.
 
-Nicolas Pitre (3):
-      ARM: P2V: Thumb2 support
-      ARM: ignore mdesc->boot_params if out of range
-      ARM: fold lookup_machine_type() into setup_machine()
-
- arch/arm/Kconfig        |    4 +-
- arch/arm/kernel/head.S  |   49 ++++++++++++++++++++++++++++-
- arch/arm/kernel/setup.c |   69 +++++++++++++++++++++-------------------
- 3 files changed, 86 insertions(+), 36 deletions(-)
-
-
-Nicolas
+[PATCH RE-SEND 1/2] ARM: Update number of VIC for S5PV210
+[PATCH RE-SEND 2/2] ARM: Update number of VIC for S5P6442 and S5PC100
