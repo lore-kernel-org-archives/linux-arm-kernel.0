@@ -1,33 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Feb 2011 15:22:53 -0000
-Subject: [PATCH] ARM: pmu: avoid setting IRQ affinity on UP systems
-In-Reply-To: <20110217162421.GC941@pulham.picochip.com>
-References: <1297771899-23209-1-git-send-email-will.deacon@arm.com>
-	<20110217162421.GC941@pulham.picochip.com>
-Message-ID: <002401cbcf7f$b62c1690$228443b0$@deacon@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 18 Feb 2011 17:41:35 +0200
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <4D5E7DFF.7020609@ti.com>
+References: <20110217162000.GP20795@atomide.com>
+	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
+	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
+	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
+	<4D5D59E5.6020307@ti.com>
+	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
+	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
+	<4D5E7DFF.7020609@ti.com>
+Message-ID: <20110218154135.GF11151@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Hi all,
 
-> On Tue, Feb 15, 2011 at 12:11:39PM +0000, Will Deacon wrote:
-> > Now that we can execute a CONFIG_SMP kernel on a uniprocessor system,
-> > extra care has to be taken in the PMU IRQ affinity setting code to
-> > ensure that we don't always fail to initialise.
-> >
-> > This patch changes the CPU PMU initialisation code so that when we
-> > only have a single IRQ, whose affinity can not be changed at the
-> > controller, we report success (0) rather than -EINVAL.
-> >
-> > Cc: Jamie Iles <jamie@jamieiles.com>
-> > Reported-by: Avik Sil <avik.sil@linaro.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Fri, Feb 18, 2011 at 03:11:11PM +0100, Cousson, Benoit wrote:
+> On 2/17/2011 7:18 PM, Tony Lindgren wrote:
+> > * Cousson, Benoit<b-cousson@ti.com>  [110217 09:45]:
+> >>
+> >> Done, boot tested, and that does remove the warning about the
+> >> missing opt clock you had with the previous data.
+> >>
+> >> git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
+> >>
+> >> Just let me know if it does break anything else.
+> > 
+> > Pulled into omap-for-linus. Also now merged are the devel-hwspinlock
+> > and devel-mcspi branches.
 > 
-> Look good!
+> McSPI OMAP4 hwmod data are missing a couple of flags that break the boot for the moment.
 > 
-> Acked-by: Jamie Iles <jamie@jamieiles.com>
+> Govindraj should rebase on the omap4_hwmod_data branch and add the missing rev and dev_attr for the McSPI.
+> 
+> Unfortunately, even with that patch omap-for-linus boot hangs after the following trace:
+> 
+> [    0.875091] omap_device: omap2_mcspi.1: new worst case activate latency 0: 30517
+> [    0.886657] usbcore: registered new interface driver usbfs
+> [    0.892822] usbcore: registered new interface driver hub
+> [    0.898681] usbcore: registered new device driver usb
+> [    0.904815] omap_i2c omap_i2c.1: bus 1 rev4.0 at 400 kHz
 
-Cheers. I've submitted this as 6742/1 with a minor change (deleted the out:
-label as it's no longer used).
+I tested your branch merged with mine and it was working fine. What else
+is on omap-for-linus ? There are only 28 patches on that branch, a
+bisect would be quick ?
 
-Will
+-- 
+balbi
