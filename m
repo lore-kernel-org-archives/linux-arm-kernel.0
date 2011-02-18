@@ -1,44 +1,81 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 18 Feb 2011 16:59:41 +0800
-Subject: [PATCH RESEND 3/4] ARM: imx53_loco: add i2c device support
-In-Reply-To: <20110218084533.GV22310@pengutronix.de>
-References: <1298003777-7687-1-git-send-email-richard.zhao@freescale.com>
-	<1298003777-7687-3-git-send-email-richard.zhao@freescale.com>
-	<20110218084533.GV22310@pengutronix.de>
-Message-ID: <20110218085940.GA2086@b20223-02.ap.freescale.net>
+Date: Fri, 18 Feb 2011 17:01:57 +0800
+Subject: [PATCH 1/1] ARM: imx53: correct Silicon Revision definition
+	following fuse map
+In-Reply-To: <20110218070752.GC2343@tarshish>
+References: <1298008049-20352-1-git-send-email-richard.zhao@freescale.com>
+	<20110218070752.GC2343@tarshish>
+Message-ID: <20110218090156.GB2086@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi Baruch,
 
-On Fri, Feb 18, 2011 at 09:45:33AM +0100, Uwe Kleine-K?nig wrote:
-> On Fri, Feb 18, 2011 at 12:36:16PM +0800, Richard Zhao wrote:
+On Fri, Feb 18, 2011 at 09:07:52AM +0200, Baruch Siach wrote:
+> Hi Richard,
+> 
+> On Fri, Feb 18, 2011 at 01:47:29PM +0800, Richard Zhao wrote:
 > > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 > > 
-> > diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> > index 10b6008..abea297 100644
-> > --- a/arch/arm/mach-mx5/Kconfig
-> > +++ b/arch/arm/mach-mx5/Kconfig
-> > @@ -146,6 +146,7 @@ config MACH_MX53_LOCO
-> >  	bool "Support MX53 LOCO platforms"
-> >  	select SOC_IMX53
-> >  	select IMX_HAVE_PLATFORM_IMX_UART
-> > +	select IMX_HAVE_PLATFORM_IMX_I2C
-> please keep these sorted alphabetically
-ok. I will move it up by one line.
+> > diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+> > index d40671d..95fd5f8 100644
+> > --- a/arch/arm/mach-mx5/cpu.c
+> > +++ b/arch/arm/mach-mx5/cpu.c
+> > @@ -76,13 +76,25 @@ late_initcall(mx51_neon_fixup);
+> >  static int get_mx53_srev(void)
+> >  {
+> >  	void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
+> > -	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
+> > +	u32 reg = readl(iim_base + IIM_SREV) & 0xff;
+> > +	int rev;
+> > +
+> > +	switch (reg) {
+> > +	case 0x0:
+> > +		rev = IMX_CHIP_REVISION_1_0;
+> > +		break;
+> > +	case 0x2:
+> > +		rev = IMX_CHIP_REVISION_2_0;
+> > +		break;
+> > +	case 0x3:
+> > +		rev = IMX_CHIP_REVISION_2_1;
+> > +		break;
+> > +	default:
+> > +		rev = IMX_CHIP_REVISION_UNKNOWN;
+> > +		break;
+> > +	}
+> >  
+> > -	if (rev == 0x0)
+> > -		return IMX_CHIP_REVISION_1_0;
+> > -	else if (rev == 0x10)
+> > -		return IMX_CHIP_REVISION_2_0;
+> > -	return 0;
+> > +	return rev;
+> >  }
+> >  
+> >  /*
+> 
+> I think the following code is shorter and more readable:
+> 
+> switch (reg) {
+> case 0x0:
+>     return IMX_CHIP_REVISION_1_0;
+> case 0x2:
+>     return IMX_CHIP_REVISION_2_0;
+> case 0x3:
+>     return IMX_CHIP_REVISION_2_1;
+> default:
+>     return IMX_CHIP_REVISION_UNKNOWN;
+> }
+Yes. I thought there would be compile warning, but not.
 
 Thanks
 Richard
 > 
-> Best regards
-> Uwe
+> baruch
+> 
 > 
 > -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>                                                      ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
 > 
