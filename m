@@ -1,32 +1,43 @@
-From: dwalker@codeaurora.org (Daniel Walker)
-Date: Fri, 18 Feb 2011 10:46:11 -0800
-Subject: [PATCH] msm: add single-wire serial bus interface (SSBI) driver
-In-Reply-To: <4D5DC289.1090004@codeaurora.org>
-References: <1297989299-27320-1-git-send-email-kheitke@codeaurora.org>
-	<1297989432.9680.50.camel@c-dwalke-linux.qualcomm.com>
-	<4D5DC289.1090004@codeaurora.org>
-Message-ID: <1298054771.17758.1.camel@c-dwalke-linux.qualcomm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Feb 2011 19:51:32 +0100
+Subject: [PATCH v2 13/13] tty: pruss SUART driver
+In-Reply-To: <alpine.LFD.2.00.1102181917520.2701@localhost6.localdomain6>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<20110218143500.23b3044b@lxorguk.ukuu.org.uk>
+	<alpine.LFD.2.00.1102181917520.2701@localhost6.localdomain6>
+Message-ID: <201102181951.32631.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-02-17 at 16:51 -0800, Bryan Huntsman wrote:
-> On 02/17/2011 04:37 PM, Daniel Walker wrote:
-> > Can you put this in drivers/ this doesn't looks like it need to be here.
+On Friday 18 February 2011 19:23:49 Thomas Gleixner wrote:
+> On Fri, 18 Feb 2011, Alan Cox wrote:
 > 
-> Where would you suggest?  The initial attempt to model SSBI as an I2C
-> bus didn't go anywhere.  See http://lkml.org/lkml/2010/7/21/400.  This
-> functionality is specific to MSM.  Plus, we're trying to maintain
-> similarity to the Android MSM tree.  That may not matter to people who
-> don't use MSM, but is matters to us.  Given these considerations, the
-> current location seems as good a place as any.
+> > On Fri, 18 Feb 2011 19:17:38 +0530
+> > "Subhasish Ghosh" <subhasish@mistralsolutions.com> wrote:
+> > 
+> > > Hello,
+> > > 
+> > > Regarding the semaphore to mutex migration.
+> > > We are using down_trylock in interrupt context,
+> > > mutex_trylock cannot be used in interrupt context, so we cannot use mutex in 
+> > > our driver.
+> > 
+> > Then you probably need to rework your locking. Best bet might be to fix
+> > all the other stuff and report the driver, and people can think about the
+> > locking problem.
+> 
+> That semaphore is utterly useless to begin with. There are more
+> serious locking problems than this one. Non serialized calls to
+> suart_intr_clrmask/suart_intr_setmask are the most obvious ones.
+> 
+> Aside of that the code is complete unreadable.
 
-I don't know the driver well enough to be more detailed than suggesting
-drivers/ . In the thread you quoted Pavel (who I added to the CC line)
-suggested drivers/ssbi/ .
+I think it mostly suffers from the same problem as the CAN driver
+I commented on earlier: One of the files (pruss_suart_api.c) was
+clearly not written with Linux as the target, and the other files
+try to work around this by wrapping a Linux driver around it.
 
-Daniel
+The suart_api HAL stuff clearly needs to go away, so that the rest
+can be rewritten into a proper device driver.
 
--- 
-
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	Arnd
