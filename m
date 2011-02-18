@@ -1,49 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 18 Feb 2011 18:34:34 +0100
-Subject: [PATCH 1/3] OMAP2+: hwmod: Avoid setup if clock lookup failed
-In-Reply-To: <1297858285-7056-2-git-send-email-rnayak@ti.com>
-References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
-	<1297858285-7056-2-git-send-email-rnayak@ti.com>
-Message-ID: <4D5EADAA.7010007@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 18 Feb 2011 09:34:47 -0800
+Subject: [PATCH 4/4] mtd: OneNAND: OMAP2: increase multiblock erase
+	verify timeout
+In-Reply-To: <1298003498.2735.4.camel@localhost>
+References: <1297068421-14430-1-git-send-email-adrian.hunter@nokia.com>
+	<1297068421-14430-5-git-send-email-adrian.hunter@nokia.com>
+	<20110217234603.GI20795@atomide.com>
+	<1298003498.2735.4.camel@localhost>
+Message-ID: <20110218173447.GT20795@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/16/2011 1:11 PM, Nayak, Rajendra wrote:
-> Add a hwmod state check in the _setup function
-> to avoid setting up hwmods' for which clock
-> lookup has failed.
->
-> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c |    6 ++++++
->   1 files changed, 6 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index e282e35..cd9dcde 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -1362,6 +1362,12 @@ static int _setup(struct omap_hwmod *oh, void *data)
->   	int i, r;
->   	u8 postsetup_state;
->
-> +	if (oh->_state != _HWMOD_STATE_CLKS_INITED) {
-> +		WARN(1, "omap_hwmod: %s: _setup failed as one or more"
-> +		     "clock lookups' have failed\n", oh->name);
+* Artem Bityutskiy <dedekind1@gmail.com> [110217 20:31]:
+> Hi,
+> 
+> On Thu, 2011-02-17 at 15:46 -0800, Tony Lindgren wrote:
+> > * Adrian Hunter <adrian.hunter@nokia.com> [110207 00:45]:
+> > > From: Roman Tereshonkov <roman.tereshonkov@nokia.com>
+> > > 
+> > > The current multiblock erase verify read timeout 100us is the maximum
+> > > for none-error case. If errors happen during multibock erase then
+> > > the specification recommends to run multiblock erase verify command
+> > > with maximum timeout 10ms (see specs. for KFM4G16Q2A and KFN8G16Q2A).
+> > > 
+> > > For the most common non-error case we wait 100us in udelay polling
+> > > loop. In case of timeout the interrupt mode is used to wait for the
+> > > command end.
+> > > 
+> > > Signed-off-by: Roman Tereshonkov <roman.tereshonkov@nokia.com>
+> > 
+> > I'll queue this series. Anybody from MTD list care to ack this patch?
+> 
+> Acked-by: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
 
-Maybe a pr_warning will be enough for that?
+Thanks!
 
-> +		return -EINVAL;
-
-As discussed previously I'd prefer to return 0 here since we do not want 
-to break the iteration.
-
-> +	}
-> +
->   	/* Set iclk autoidle mode */
->   	if (oh->slaves_cnt>  0) {
->   		for (i = 0; i<  oh->slaves_cnt; i++) {
-
-Otherwise it is fine for me.
-
-Thanks,
-Benoit
+Tony
