@@ -1,170 +1,100 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 18 Feb 2011 12:36:17 +0800
-Subject: [PATCH RESEND 4/4] ARM: imx50: correct iomux-mx50.h wrong daisy chain
-	settings
-In-Reply-To: <1298003777-7687-1-git-send-email-richard.zhao@freescale.com>
-References: <1298003777-7687-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1298003777-7687-4-git-send-email-richard.zhao@freescale.com>
+From: balajitk@ti.com (Krishnamoorthy, Balaji T)
+Date: Fri, 18 Feb 2011 10:48:17 +0530
+Subject: [PATCH] OMAP4:Fix -EINVAL for vana, vcxio, vdac
+In-Reply-To: <1297092599-428-1-git-send-email-balajitk@ti.com>
+References: <1297092599-428-1-git-send-email-balajitk@ti.com>
+Message-ID: <AANLkTinaueC5dizcKXJ-eEjwA1HpLCaYX8Mv6NA9PMC1@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most fix is for uart txd/cts. They don't need to select input.
-And fix some other pads with wrong select input.
+On Mon, Feb 7, 2011 at 8:59 PM, Balaji T K <balajitk@ti.com> wrote:
+> Fixed regulators in twl6030 do not have set_voltage hook.
+> Regulator core returns -22 if set_voltage is NULL and apply_uV is set
+> while applying the constraint to set voltage resulting in failure during probe
+> of these regulators.
+> Do not set apply_uV for fixed regulators which don't have set_voltage.
 
-Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Hi Tony,
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx50.h b/arch/arm/plat-mxc/include/mach/iomux-mx50.h
-index 058a922..98e7fd0 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx50.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx50.h
-@@ -86,7 +86,7 @@
- #define MX50_PAD_I2C1_SCL__I2C1_SCL	IOMUX_PAD(0x2EC, 0x40, IOMUX_CONFIG_SION, 0x0, 0, \
- 							MX50_I2C_PAD_CTRL)
- #define MX50_PAD_I2C1_SCL__GPIO_6_18	IOMUX_PAD(0x2EC, 0x40, 1, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_I2C1_SCL__UART2_TXD	IOMUX_PAD(0x2EC, 0x40, 2, 0x7cc, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_I2C1_SCL__UART2_TXD	IOMUX_PAD(0x2EC, 0x40, 2, 0x0, 0, MX50_UART_PAD_CTRL)
- 
- #define MX50_PAD_I2C1_SDA__I2C1_SDA	IOMUX_PAD(0x2F0, 0x44, IOMUX_CONFIG_SION, 0x0, 0, \
- 							MX50_I2C_PAD_CTRL)
-@@ -96,7 +96,7 @@
- #define MX50_PAD_I2C2_SCL__I2C2_SCL	IOMUX_PAD(0x2F4, 0x48, IOMUX_CONFIG_SION, 0x0, 0, \
- 							MX50_I2C_PAD_CTRL)
- #define MX50_PAD_I2C2_SCL__GPIO_6_20	IOMUX_PAD(0x2F4, 0x48, 1, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_I2C2_SCL__UART2_CTS	IOMUX_PAD(0x2F4, 0x48, 2, 0x7c8, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_I2C2_SCL__UART2_CTS	IOMUX_PAD(0x2F4, 0x48, 2, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_I2C2_SCL__DCDC_OK	IOMUX_PAD(0x2F4, 0x48, 7, 0x0, 0, NO_PAD_CTRL)
- 
- #define MX50_PAD_I2C2_SDA__I2C2_SDA	IOMUX_PAD(0x2F8, 0x4C, IOMUX_CONFIG_SION, 0x0, 0, \
-@@ -172,7 +172,7 @@
- 
- #define MX50_PAD_SSI_RXFS__AUD3_RXFS	IOMUX_PAD(0x328, 0x7C, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_SSI_RXFS__GPIO_6_4	IOMUX_PAD(0x328, 0x7C, 1, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_SSI_RXFS__UART5_TXD	IOMUX_PAD(0x328, 0x7C, 2, 0x7e4, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_SSI_RXFS__UART5_TXD	IOMUX_PAD(0x328, 0x7C, 2, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_SSI_RXFS__WEIM_D6	IOMUX_PAD(0x328, 0x7C, 3, 0x804, 0, NO_PAD_CTRL)
- #define MX50_PAD_SSI_RXFS__CSPI_SS2	IOMUX_PAD(0x328, 0x7C, 4, 0x6f0, 0, MX50_CSPI_SS_PAD)
- #define MX50_PAD_SSI_RXFS__FEC_COL	IOMUX_PAD(0x328, 0x7C, 5, 0x770, 0, PAD_CTL_DSE_HIGH)
-@@ -186,25 +186,25 @@
- #define MX50_PAD_SSI_RXC__FEC_RX_CLK	IOMUX_PAD(0x32C, 0x80, 5, 0x780, 0, NO_PAD_CTRL)
- #define MX50_PAD_SSI_RXC__FEC_MDIO	IOMUX_PAD(0x32C, 0x80, 6, 0x774, 1, MX50_FEC_PAD_CTRL)
- 
--#define MX50_PAD_UART1_TXD__UART1_TXD	IOMUX_PAD(0x330, 0x84, 0, 0x7c4, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART1_TXD__UART1_TXD	IOMUX_PAD(0x330, 0x84, 0, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART1_TXD__GPIO_6_6	IOMUX_PAD(0x330, 0x84, 1, 0x0, 0, NO_PAD_CTRL)
- 
- #define MX50_PAD_UART1_RXD__UART1_RXD	IOMUX_PAD(0x334, 0x88, 0, 0x7c4, 1, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART1_RXD__GPIO_6_7	IOMUX_PAD(0x334, 0x88, 1, 0x0, 0, NO_PAD_CTRL)
- 
--#define MX50_PAD_UART1_CTS__UART1_CTS	IOMUX_PAD(0x338, 0x8C, 0, 0x7c0, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART1_CTS__UART1_CTS	IOMUX_PAD(0x338, 0x8C, 0, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART1_CTS__GPIO_6_8	IOMUX_PAD(0x338, 0x8C, 1, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_UART1_CTS__UART5_TXD	IOMUX_PAD(0x338, 0x8C, 2, 0x7e4, 2, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART1_CTS__UART5_TXD	IOMUX_PAD(0x338, 0x8C, 2, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART1_CTS__SD4_D4	IOMUX_PAD(0x338, 0x8C, 4, 0x760, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART1_CTS__SD4_CMD	IOMUX_PAD(0x338, 0x8C, 5, 0x74c, 0, MX50_SD_PAD_CTRL)
- 
- #define MX50_PAD_UART1_RTS__UART1_RTS	IOMUX_PAD(0x33C, 0x90, 0, 0x7c0, 1, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART1_RTS__GPIO_6_9	IOMUX_PAD(0x33C, 0x90, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_UART1_RTS__UART5_RXD	IOMUX_PAD(0x33C, 0x90, 2, 0x7e4, 3, MX50_UART_PAD_CTRL)
--#define MX50_PAD_UART1_RTS__SD4_D5	IOMUX_PAD(0x33C, 0x90, 4, 0x0, 1, MX50_SD_PAD_CTRL)
--#define MX50_PAD_UART1_RTS__SD4_CLK	IOMUX_PAD(0x33C, 0x90, 5, 0x0, 1, MX50_SD_PAD_CTRL)
-+#define MX50_PAD_UART1_RTS__SD4_D5	IOMUX_PAD(0x33C, 0x90, 4, 0x764, 0, MX50_SD_PAD_CTRL)
-+#define MX50_PAD_UART1_RTS__SD4_CLK	IOMUX_PAD(0x33C, 0x90, 5, 0x748, 0, MX50_SD_PAD_CTRL)
- 
--#define MX50_PAD_UART2_TXD__UART2_TXD	IOMUX_PAD(0x340, 0x94, 0, 0x7cc, 2, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART2_TXD__UART2_TXD	IOMUX_PAD(0x340, 0x94, 0, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART2_TXD__GPIO_6_10	IOMUX_PAD(0x340, 0x94, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_UART2_TXD__SD4_D6	IOMUX_PAD(0x340, 0x94, 4, 0x768, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART2_TXD__SD4_D4	IOMUX_PAD(0x340, 0x94, 5, 0x760, 1, MX50_SD_PAD_CTRL)
-@@ -214,7 +214,7 @@
- #define MX50_PAD_UART2_RXD__SD4_D7	IOMUX_PAD(0x344, 0x98, 4, 0x76c, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART2_RXD__SD4_D5	IOMUX_PAD(0x344, 0x98, 5, 0x764, 1, MX50_SD_PAD_CTRL)
- 
--#define MX50_PAD_UART2_CTS__UART2_CTS	IOMUX_PAD(0x348, 0x9C, 0, 0x7c8, 2, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART2_CTS__UART2_CTS	IOMUX_PAD(0x348, 0x9C, 0, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART2_CTS__GPIO_6_12	IOMUX_PAD(0x348, 0x9C, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_UART2_CTS__SD4_CMD	IOMUX_PAD(0x348, 0x9C, 4, 0x74c, 1, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART2_CTS__SD4_D6	IOMUX_PAD(0x348, 0x9C, 5, 0x768, 1, MX50_SD_PAD_CTRL)
-@@ -224,7 +224,7 @@
- #define MX50_PAD_UART2_RTS__SD4_CLK	IOMUX_PAD(0x34C, 0xA0, 4, 0x748, 1, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART2_RTS__SD4_D7	IOMUX_PAD(0x34C, 0xA0, 5, 0x76c, 1, MX50_SD_PAD_CTRL)
- 
--#define MX50_PAD_UART3_TXD__UART3_TXD	IOMUX_PAD(0x350, 0xA4, 0, 0x7d4, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART3_TXD__UART3_TXD	IOMUX_PAD(0x350, 0xA4, 0, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART3_TXD__GPIO_6_14	IOMUX_PAD(0x350, 0xA4, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_UART3_TXD__SD1_D4	IOMUX_PAD(0x350, 0xA4, 3, 0x0, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART3_TXD__SD4_D0	IOMUX_PAD(0x350, 0xA4, 4, 0x750, 0, MX50_SD_PAD_CTRL)
-@@ -238,9 +238,9 @@
- #define MX50_PAD_UART3_RXD__SD2_CD	IOMUX_PAD(0x354, 0xA8, 5, 0x740, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART3_RXD__WEIM_D13	IOMUX_PAD(0x354, 0xA8, 6, 0x820, 0, NO_PAD_CTRL)
- 
--#define MX50_PAD_UART4_TXD__UART4_TXD	IOMUX_PAD(0x358, 0xAC, 0, 0x7dc, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART4_TXD__UART4_TXD	IOMUX_PAD(0x358, 0xAC, 0, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART4_TXD__GPIO_6_16	IOMUX_PAD(0x358, 0xAC, 1, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_UART4_TXD__UART3_CTS	IOMUX_PAD(0x358, 0xAC, 2, 0x7d0, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_UART4_TXD__UART3_CTS	IOMUX_PAD(0x358, 0xAC, 2, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_UART4_TXD__SD1_D6	IOMUX_PAD(0x358, 0xAC, 3, 0x0, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART4_TXD__SD4_D2	IOMUX_PAD(0x358, 0xAC, 4, 0x758, 0, MX50_SD_PAD_CTRL)
- #define MX50_PAD_UART4_TXD__SD2_LCTL	IOMUX_PAD(0x358, 0xAC, 5, 0x0, 0, MX50_SD_PAD_CTRL)
-@@ -278,7 +278,7 @@
- #define MX50_PAD_ECSPI1_MOSI__GPIO_4_13		IOMUX_PAD(0x374, 0xC8, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI1_MOSI__CSPI_SS1		IOMUX_PAD(0x374, 0xC8, 2, 0x6ec, 1, MX50_CSPI_SS_PAD)
- #define MX50_PAD_ECSPI1_MOSI__ECSPI2_SS1	IOMUX_PAD(0x374, 0xC8, 3, 0x0, 0, MX50_CSPI_SS_PAD)
--#define MX50_PAD_ECSPI1_MOSI__UART3_CTS		IOMUX_PAD(0x374, 0xC8, 4, 0x7d0, 3, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_ECSPI1_MOSI__UART3_CTS		IOMUX_PAD(0x374, 0xC8, 4, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_ECSPI1_MOSI__EPDC_SDCE7	IOMUX_PAD(0x374, 0xC8, 5, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI1_MOSI__WEIM_D9		IOMUX_PAD(0x374, 0xC8, 7, 0x810, 0, NO_PAD_CTRL)
- 
-@@ -294,7 +294,7 @@
- #define MX50_PAD_ECSPI1_SS0__GPIO_4_15		IOMUX_PAD(0x37C, 0xD0, 1, 0x0, 0, PAD_CTL_PUS_100K_UP)
- #define MX50_PAD_ECSPI1_SS0__CSPI_SS3		IOMUX_PAD(0x37C, 0xD0, 2, 0x6f4, 1, MX50_CSPI_SS_PAD)
- #define MX50_PAD_ECSPI1_SS0__ECSPI2_SS3		IOMUX_PAD(0x37C, 0xD0, 3, 0x0, 0, MX50_CSPI_SS_PAD)
--#define MX50_PAD_ECSPI1_SS0__UART4_CTS		IOMUX_PAD(0x37C, 0xD0, 4, 0x7d8, 1, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_ECSPI1_SS0__UART4_CTS		IOMUX_PAD(0x37C, 0xD0, 4, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_ECSPI1_SS0__EPDC_SDCE9		IOMUX_PAD(0x37C, 0xD0, 5, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI1_SS0__WEIM_D11		IOMUX_PAD(0x37C, 0xD0, 7, 0x818, 0, NO_PAD_CTRL)
- 
-@@ -311,17 +311,17 @@
- #define MX50_PAD_ECSPI2_MOSI__GPIO_4_17		IOMUX_PAD(0x384, 0xD8, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MOSI__ELCDIF_RD		IOMUX_PAD(0x384, 0xD8, 2, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MOSI__ECSPI1_SS1	IOMUX_PAD(0x384, 0xD8, 3, 0x0, 0, MX50_CSPI_SS_PAD)
--#define MX50_PAD_ECSPI2_MOSI__UART5_CTS		IOMUX_PAD(0x384, 0xD8, 4, 0x7e0, 1, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_ECSPI2_MOSI__UART5_CTS		IOMUX_PAD(0x384, 0xD8, 4, 0x0, 0, MX50_UART_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MOSI__ELCDIF_EN		IOMUX_PAD(0x384, 0xD8, 5, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MOSI__NANDF_CEN5	IOMUX_PAD(0x384, 0xD8, 6, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MOSI__WEIM_D9		IOMUX_PAD(0x384, 0xD8, 7, 0x810, 1, NO_PAD_CTRL)
- 
--#define MX50_PAD_ECSPI2_MISO__ECSPI2_MISO	IOMUX_PAD(0x388, 0xDC, 0, 0x73c, 0, NO_PAD_CTRL)
-+#define MX50_PAD_ECSPI2_MISO__ECSPI2_MISO	IOMUX_PAD(0x388, 0xDC, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MISO__GPIO_4_18		IOMUX_PAD(0x388, 0xDC, 1, 0x0, 0, PAD_CTL_PUS_100K_UP)
- #define MX50_PAD_ECSPI2_MISO__ELCDIF_RS		IOMUX_PAD(0x388, 0xDC, 2, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MISO__ECSPI1_SS2	IOMUX_PAD(0x388, 0xDC, 3, 0x0, 0, MX50_CSPI_SS_PAD)
--#define MX50_PAD_ECSPI2_MISO__UART5_TXD		IOMUX_PAD(0x388, 0xDC, 4, 0x7e4, 4, MX50_UART_PAD_CTRL)
--#define MX50_PAD_ECSPI2_MISO__ELCDIF_VSYNC	IOMUX_PAD(0x388, 0xDC, 5, 0x0, 0, NO_PAD_CTRL)
-+#define MX50_PAD_ECSPI2_MISO__UART5_TXD		IOMUX_PAD(0x388, 0xDC, 4, 0x0, 0, MX50_UART_PAD_CTRL)
-+#define MX50_PAD_ECSPI2_MISO__ELCDIF_VSYNC	IOMUX_PAD(0x388, 0xDC, 5, 0x73c, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MISO__NANDF_CEN6	IOMUX_PAD(0x388, 0xDC, 6, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_ECSPI2_MISO__WEIM_D10		IOMUX_PAD(0x388, 0xDC, 7, 0x814, 1, NO_PAD_CTRL)
- 
-@@ -503,7 +503,7 @@
- #define MX50_PAD_DISP_RD__ELCDIF_EN	IOMUX_PAD(0x430, 0x150, 2, 0x0, 0, MX50_ELCDIF_PAD_CTRL)
- #define MX50_PAD_DISP_RD__WEIM_A25	IOMUX_PAD(0x430, 0x150, 3, 0x0, 0, NO_PAD_CTRL)
- 
--#define MX50_PAD_DISP_RS__ELCDIF_RS	IOMUX_PAD(0x434, 0x154, 0, 0x73c, 1, MX50_ELCDIF_PAD_CTRL)
-+#define MX50_PAD_DISP_RS__ELCDIF_RS	IOMUX_PAD(0x434, 0x154, 0, 0x0, 0, MX50_ELCDIF_PAD_CTRL)
- #define MX50_PAD_DISP_RS__GPIO_2_17	IOMUX_PAD(0x434, 0x154, 1, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_DISP_RS__ELCDIF_VSYNC	IOMUX_PAD(0x434, 0x154, 2, 0x73c, 1, MX50_ELCDIF_PAD_CTRL)
- #define MX50_PAD_DISP_RS__WEIM_A26	IOMUX_PAD(0x434, 0x154, 3, 0x0, 0, NO_PAD_CTRL)
-@@ -691,8 +691,8 @@
- 
- #define MX50_PAD_EPDC_D9__EPDC_D9	IOMUX_PAD(0x570, 0x1D4, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_EPDC_D9__GPIO_3_9	IOMUX_PAD(0x570, 0x1D4, 1, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_EPDC_D9__WEIM_D9	IOMUX_PAD(0x570, 0x1D4, 2, 0x0, 0, NO_PAD_CTRL)
--#define MX50_PAD_EPDC_D9__ELCDIF_D25	IOMUX_PAD(0x570, 0x1D4, 3, 0x810, 2, MX50_ELCDIF_PAD_CTRL)
-+#define MX50_PAD_EPDC_D9__WEIM_D9	IOMUX_PAD(0x570, 0x1D4, 2, 0x810, 2, NO_PAD_CTRL)
-+#define MX50_PAD_EPDC_D9__ELCDIF_D25	IOMUX_PAD(0x570, 0x1D4, 3, 0x0, 0, MX50_ELCDIF_PAD_CTRL)
- 
- #define MX50_PAD_EPDC_D10__EPDC_D10	IOMUX_PAD(0x574, 0x1D8, 0, 0x0, 0, NO_PAD_CTRL)
- #define MX50_PAD_EPDC_D10__GPIO_3_10	IOMUX_PAD(0x574, 0x1D8, 1, 0x0, 0, NO_PAD_CTRL)
--- 
-1.7.1
+Any comments on this patch.
+If not can you queue this.
+
+>
+> machine_constraints_voltage: VANA: failed to apply 2100000uV constraint
+> twl_reg twl_reg.43: can't register VANA, -22
+> twl_reg: probe of twl_reg.43 failed with error -22
+> machine_constraints_voltage: VCXIO: failed to apply 1800000uV constraint
+> twl_reg twl_reg.44: can't register VCXIO, -22
+> twl_reg: probe of twl_reg.44 failed with error -22
+> machine_constraints_voltage: VDAC: failed to apply 1800000uV constraint
+> twl_reg twl_reg.45: can't register VDAC, -22
+> twl_reg: probe of twl_reg.45 failed with error -22
+>
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+> ---
+> Boot tested on OMAP4SDP with omap2plus_defconfig
+>
+> ?arch/arm/mach-omap2/board-4430sdp.c ? ?| ? ?3 ---
+> ?arch/arm/mach-omap2/board-omap4panda.c | ? ?3 ---
+> ?2 files changed, 0 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index 07d1b20..1b16525 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -434,7 +434,6 @@ static struct regulator_init_data sdp4430_vana = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 2100000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 2100000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= REGULATOR_CHANGE_MODE
+> @@ -446,7 +445,6 @@ static struct regulator_init_data sdp4430_vcxio = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 1800000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 1800000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= REGULATOR_CHANGE_MODE
+> @@ -458,7 +456,6 @@ static struct regulator_init_data sdp4430_vdac = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 1800000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 1800000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= REGULATOR_CHANGE_MODE
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index e001a04..3686533 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -305,7 +305,6 @@ static struct regulator_init_data omap4_panda_vana = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 2100000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 2100000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= REGULATOR_CHANGE_MODE
+> @@ -317,7 +316,6 @@ static struct regulator_init_data omap4_panda_vcxio = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 1800000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 1800000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= REGULATOR_CHANGE_MODE
+> @@ -329,7 +327,6 @@ static struct regulator_init_data omap4_panda_vdac = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 1800000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 1800000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= REGULATOR_CHANGE_MODE
+> --
+> 1.7.0.4
+>
+>
