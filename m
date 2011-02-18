@@ -1,200 +1,68 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Fri, 18 Feb 2011 19:17:38 +0530
-Subject: [PATCH v2 13/13] tty: pruss SUART driver
-In-Reply-To: <20110211162814.6ff274f1@lxorguk.ukuu.org.uk>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com><1297435892-28278-14-git-send-email-subhasish@mistralsolutions.com>
-	<20110211162814.6ff274f1@lxorguk.ukuu.org.uk>
-Message-ID: <90BDE50764124CA8AAD560BB1E92C062@subhasishg>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 18 Feb 2011 14:59:41 +0100
+Subject: [RFC/PATCH] OMAP: Fix section mismatch
+In-Reply-To: <1298034953-21016-1-git-send-email-weber@corscience.de>
+References: <1298034953-21016-1-git-send-email-weber@corscience.de>
+Message-ID: <20110218135941.GB22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-Regarding the semaphore to mutex migration.
-We are using down_trylock in interrupt context,
-mutex_trylock cannot be used in interrupt context, so we cannot use mutex in 
-our driver.
+[added cpufreq at vger.kernel.org and Dave to Cc:]
 
---------------------------------------------------
-From: "Alan Cox" <alan@lxorguk.ukuu.org.uk>
-Sent: Friday, February 11, 2011 9:58 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
-<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
-<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "Greg Kroah-Hartman" 
-<gregkh@suse.de>; "open list" <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2 13/13] tty: pruss SUART driver
-
-> Don't see why it needs its own sub-directory
->
->
->
->> +#ifdef __SUART_DEBUG
->> +#define __suart_debug(fmt, args...) \
->> + printk(KERN_DEBUG "suart_debug: " fmt, ## args)
->> +#else
->> +#define __suart_debug(fmt, args...)
->> +#endif
->> +
->> +#define  __suart_err(fmt, args...) printk(KERN_ERR "suart_err: " fmt, ## 
->> args)
->
-> Use dev_dbg/dev_err/pr_debug/pr_err
->
->
->> +static void omapl_pru_tx_chars(struct omapl_pru_suart *soft_uart, u32 
->> uart_no)
->> +{
->> + struct circ_buf *xmit = &soft_uart->port[uart_no].state->xmit;
->> + struct device *dev = soft_uart->dev;
->> + s32 count = 0;
->> +
->> + if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_TX))
->> + return;
->> +
->> + if (down_trylock(&soft_uart->port_sem[uart_no]))
->> + return;
->
-> Please use a mutex not a semaphore. We are trying to get almost all the
-> kernel using mutexes as it is needed for hard real time.
->
->
->> + pru_softuart_read_data(dev, &soft_uart->suart_hdl[uart_no],
->> +        suart_data, data_len + 1,
->> +        &data_len_read);
->> +
->> + for (i = 0; i <= data_len_read; i++) {
->> + soft_uart->port[uart_no].icount.rx++;
->> + /* check for sys rq */
->> + if (uart_handle_sysrq_char
->> +     (&soft_uart->port[uart_no], suart_data))
->> + continue;
->> + }
->> + /* update the tty data structure */
->> + tty_insert_flip_string(tty, suart_data, data_len_read);
->
-> You can avoid a copy here by using tty_prepare_flip_string()
->
-> Also please use the tty_port_tty_get/tty_kref_put interfaces so the tty
-> refcounting is right
->
->
->> +static void pruss_suart_set_termios(struct uart_port *port,
->> +   struct ktermios *termios,
->> +   struct ktermios *old)
->> +{
->> + struct omapl_pru_suart *soft_uart =
->> +     container_of(port, struct omapl_pru_suart, port[port->line]);
->> + struct device *dev = soft_uart->dev;
->> + u8 cval = 0;
->> + unsigned long flags = 0;
->> + u32 baud = 0;
->> + u32 old_csize = old ? old->c_cflag & CSIZE : CS8;
->> +
->> +/*
->> + * Do not allow unsupported configurations to be set
->> + */
->> + if (1) {
->> + termios->c_cflag &= ~(HUPCL | CRTSCTS | CMSPAR | CSTOPB
->> +       | PARENB | PARODD | CMSPAR);
->> + termios->c_cflag |= CLOCAL;
->
-> No. CLOCAL and HUPCL are user side flags. Apps expect to able to set them
-> even if in fact they have no effect, so leave those two alone. The rest
-> is fine.
->
->
->> +/*
->> + * Characteres to ignore
->
-> Typo
->
->
->
->> diff --git a/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c 
->> b/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
->> new file mode 100644
->> index 0000000..d809dd3
->> --- /dev/null
->> +++ b/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
->> @@ -0,0 +1,2350 @@
->> +/*
->> + * Copyright (C) 2010 Texas Instruments Incorporated
->> + * Author: Jitendra Kumar <jitendra@mistralsolutions.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify 
->> it
->> + * under the terms of the GNU General Public License as  published by 
->> the
->> + * Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
->> + * whether express or implied; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License for more details.
->> + */
->> +
->> +#include <linux/types.h>
->> +#include <linux/mfd/pruss/da8xx_pru.h>
->> +#include <linux/io.h>
->> +#include <mach/hardware.h>
->> +#include "pruss_suart_api.h"
->> +#include "pruss_suart_regs.h"
->> +#include "pruss_suart_board.h"
->> +#include "pruss_suart_utils.h"
->> +#include "pruss_suart_err.h"
->> +
->> +static u8 g_uart_statu_table[8];
-> Can you lose the g_, its  a windows naming convention we dont use
->
->
->> +s16 pru_softuart_open(suart_handle h_suart)
->> +{
->
-> If you just used normal integers you could surely make this routine
-> trivial and remove all the duplication in the switches
->
->> + s16 status = PRU_SUART_SUCCESS;
->
-> And please stick to Linux error codes
->
->
->> +/* suart instance close routine */
->> +s16 pru_softuart_close(suart_handle h_uart)
->> +{
->> + s16 status = SUART_SUCCESS;
->> +
->> + if (h_uart == NULL) {
->> + return PRU_SUART_ERR_HANDLE_INVALID;
->
-> Which is never checked. Far better to use WARN_ON and the like for such
-> cases - or if like this one they don't appear to be possible to simply
-> delete them
->
->> + if ((tx_clk_divisor > 385) || (tx_clk_divisor == 0))
->> + return SUART_INVALID_CLKDIVISOR;
->> + if ((rx_clk_divisor > 385) || (rx_clk_divisor == 0))
->> + return SUART_INVALID_CLKDIVISOR;
->
-> [minor] Lots of excess brackets
->
->
->> + u32offset = (u32) (PRUSS_INTC_CHANMAP9 & 0xFFFF);
->> + u32value = PRU_INTC_CHAN_34_SYSEVT_36_39;
->> + s16retval = pruss_writel(dev, u32offset, (u32 *)&u32value, 1);
->> + if (-1 == s16retval)
->> + return -1;
->
-> If you fixed the API here you'd be able to just write
->
-> if (pruss_writel(dev, PRUSS_INTC_CHANMAP9 & 0xFFFF,
-> PRU_INTC_BLAH)
->
-> or similar which would clean up a lot of messy code and shrink it
-> dramatically. Given you have lots of series of writes some kind of
->
-> pruss_writel_multi(dev, array, len)
->
-> that took an array of addr/value pairs might also clean up a ton of code
-> and turn it into trivial tables
+On Fri, Feb 18, 2011 at 02:15:53PM +0100, Thomas Weber wrote:
+> When compiling linux-omap with 'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+> the following output occurs:
 > 
+> WARNING: arch/arm/plat-omap/built-in.o(.data+0x6e8): Section mismatch in
+> reference from the variable omap_driver to the function
+> .init.text:omap_cpu_init()
+> The variable omap_driver references
+> the function __init omap_cpu_init()
+> If the reference is valid then annotate the
+> variable with __init* or __refdata (see linux/init.h) or name the
+> variable:
+> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+> 
+> This patch fixes this by adding __refdata to the omap_driver variable.
+> 
+> Signed-off-by: Thomas Weber <weber@corscience.de>
+> ---
+>  arch/arm/plat-omap/cpu-omap.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
+> index 11c54ec..17fdd5f 100644
+> --- a/arch/arm/plat-omap/cpu-omap.c
+> +++ b/arch/arm/plat-omap/cpu-omap.c
+> @@ -144,7 +144,7 @@ static struct freq_attr *omap_cpufreq_attr[] = {
+>  	NULL,
+>  };
+>  
+> -static struct cpufreq_driver omap_driver = {
+> +static struct cpufreq_driver omap_driver __refdata = {
+>  	.flags		= CPUFREQ_STICKY,
+>  	.verify		= omap_verify_speed,
+>  	.target		= omap_target,
+This is correct for a single case.  But actually the better fix would be
+to remove the .init member of struct cpufreq_driver and change the
+prototype of cpufreq_register_driver from
+
+	int (*)(struct cpufreq_driver *)
+
+to
+
+	int (*)(struct cpufreq_driver *, int (*)(struct cpufreq_policy *)) 
+
+and pass the init function directly to it.
+This way you don't need __refdata (which should be an exception) and you
+don't waste memory for a pointer that is never used after
+cpufreq_register_driver returns.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
