@@ -1,69 +1,50 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 18 Feb 2011 12:42:37 +0100 (CET)
-Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <001d01cbcf5f$1cfc9870$56f5c950$@deacon@arm.com>
-References: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
-	<-4413647205110644369@unknownmsgid>
-	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
-	<146267380211262372@unknownmsgid>
-	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
-	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
-	<20110217091741.GA24627@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
-	<20110217101957.GC24627@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102171136550.2701@localhost6.localdomain6>
-	<20110217105611.GE24627@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1102171203280.2701@localhost6.localdomain6>
-	<001301cbcebf$76925cd0$63b71670$@deacon@arm.com>
-	<alpine.LFD.2.00.1102171831520.2701@localhost6.localdomain6>
-	<4D5DB193.5010007@codeaurora.org>
-	<001d01cbcf5f$1cfc9870$56f5c950$@deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1102181240370.2701@localhost6.localdomain6>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 18 Feb 2011 17:32:32 +0530
+Subject: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way operation can
+	cause data corruption
+In-Reply-To: <AANLkTikEjTgisftQV46djrOP8iWMFV267v-efHsVf_Nd@mail.gmail.com>
+References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com><1297510187-31547-4-git-send-email-santosh.shilimkar@ti.com><AANLkTimkqZ5datA+7shggbWz3+j=TDg5beUkQK=b1AmK@mail.gmail.com><13596bec9184b117d6a1d02da8e017bf@mail.gmail.com><AANLkTimjXG5-kEW=1vodnGo3Ct_xOS_HihdqN0TeL9ba@mail.gmail.com><33573d5cfc91cf45dc58ee861cccc2ae@mail.gmail.com><4dfaffa99292bf8e36791ea9a68de75e@mail.gmail.com>
+	<AANLkTikEjTgisftQV46djrOP8iWMFV267v-efHsVf_Nd@mail.gmail.com>
+Message-ID: <a52fd2d3aaca5ad999974fe3f886d90d@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Feb 2011, Will Deacon wrote:
-> > >> Right, so to get back to the original discussion about how to handle
-> > >> chained handlers if the high-level flow type of the IRQ chip is altered
-> > >> it seems that there are two options:
-> > >>
-> > >> 1.) Update all of the chained handlers to use the new flow-control
-> > >> 2.) Retain backwards compatibility if a chained handler decides to
-> > >>     use the old method of flow control (specifically, leave an ack
-> > >>     implementation in the GIC code after moving to fasteoi).
-> > >>
-> > >> Obviously, I'd rather go with option (2) and let platforms migrate
-> > >> over time if they choose to. Now, given that the ack function is really
-> > >> not something you want to do in a virtualised environment (because it
-> > >> pokes the distributor), is it worth sticking a
-> > >> WARN_ON_ONCE(cpu_has_virtualisation()); in the ack code?
-> > >
-> > > #2 is less painful and just works. The fasteoi stuff does not use ack
-> > > IIRC so it wont hurt.
-> > 
-> > On an MSM we use handle_percpu_irq for PPIs, if we have ack and eoi we
-> > will end up EOI ing the interrupt twice so #2 wont work. Also all the
-> > cascaded handlers would have assumed that the ack function masks the
-> > interrupt, it is best we fix all of them to use eoi at the end (just
-> > like handle_fasteoi_irq). Please tell me how you guys locate such
-> > cascaded handlers?
-> 
-> I don't think the cascaded handlers would have assumed that because ack
-> just sends EOI - it doesn't do any masking. We do have a problem with
-> the percpu_irq flow though (the GIC reference manual says that EOIing a
-> non-active interrupt is UNPREDICTABLE).
-> 
-> Another easy hack is to set IRQ_PER_CPU in the irq_desc->status for PPI
-> interrupts and then check this in the ack routine. It's pretty ugly, but
-> it doesn't affect the common case and it at least postpones the platform
-> changes.
+> -----Original Message-----
+> From: catalin.marinas at gmail.com [mailto:catalin.marinas at gmail.com]
+> On Behalf Of Catalin Marinas
+> Sent: Wednesday, February 16, 2011 9:24 PM
+> To: Santosh Shilimkar
+> Cc: linux-arm-kernel at lists.infradead.org; Andrei Warkentin; Kevin
+> Hilman; tony at atomide.com; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 3/5] ARM: l2x0: Errata fix for flush by Way
+> operation can cause data corruption
+>
+> On 15 February 2011 07:14, Santosh Shilimkar
+> <santosh.shilimkar@ti.com> wrote:
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1140,7 +1140,7 @@ config ARM_ERRATA_742231
+> >
+> > ?config PL310_ERRATA_588369
+> > ? ? ? ?bool "Clean & Invalidate maintenance operations do not
+> invalidate
+> > clean lines"
+> > - ? ? ? depends on CACHE_L2X0 && ARCH_OMAP4
+> > + ? ? ? depends on CACHE_L2X0 && CACHE_PL310
+>
+> It can just depend on CACHE_PL310 as this depends on CACHE_L2X0.
+>
+With CACHE_PL310 alone, I get below warning.
 
-Conditionals in irq_chip callbacks are almost always a sign of
-doom. Don't do that.
+warning: (ARCH_OMAP4) selects PL310_ERRATA_588369 which has unmet direct
+dependencies (CACHE_PL310)
 
-How many chained handlers need to be fixed, when the whole gic stuff
-switches to eoi ?
+This is coming because Pl310 can't be selected on V6 and OMAP
+common build has V6 and V7 both enabled.
 
-Thanks,
+So to avoid the warning and also able to select the errata in
+OMAP build, I am making the errata's depends on CACHE_L2X0
+with comment.
 
-	tglx
+Regards,
+Santosh
