@@ -1,283 +1,220 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 18 Feb 2011 16:45:14 +0800
-Subject: [PATCH v2 1/3] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <201102171538.31061.arnd@arndb.de>
-References: <1297650228-12762-1-git-send-email-shawn.guo@freescale.com>
-	<1297650228-12762-2-git-send-email-shawn.guo@freescale.com>
-	<201102171538.31061.arnd@arndb.de>
-Message-ID: <20110218084513.GB18085@S2100-06.ap.freescale.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 18 Feb 2011 09:46:25 +0100
+Subject: [PATCH 2/2] ARM i.MX23/28: Add framebuffer device support
+In-Reply-To: <20110218061440.GA18085@S2100-06.ap.freescale.net>
+References: <1297850199-1688-1-git-send-email-s.hauer@pengutronix.de>
+	<1297850199-1688-3-git-send-email-s.hauer@pengutronix.de>
+	<20110218061440.GA18085@S2100-06.ap.freescale.net>
+Message-ID: <20110218084625.GF24426@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 03:38:30PM +0100, Arnd Bergmann wrote:
-> On Monday 14 February 2011, Shawn Guo wrote:
-> > This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> > including apbh-dma and apbx-dma.
+On Fri, Feb 18, 2011 at 02:14:41PM +0800, Shawn Guo wrote:
+> On Wed, Feb 16, 2011 at 10:56:39AM +0100, Sascha Hauer wrote:
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/clock-mx23.c             |    2 +-
+> >  arch/arm/mach-mxs/clock-mx28.c             |    1 +
+> >  arch/arm/mach-mxs/devices-mx23.h           |    4 ++
+> >  arch/arm/mach-mxs/devices-mx28.h           |    4 ++
+> >  arch/arm/mach-mxs/devices/Kconfig          |    4 ++
+> >  arch/arm/mach-mxs/devices/Makefile         |    1 +
+> >  arch/arm/mach-mxs/devices/platform-mxsfb.c |   46 ++++++++++++++++++++++++++++
+> >  7 files changed, 61 insertions(+), 1 deletions(-)
+> >  create mode 100644 arch/arm/mach-mxs/devices/platform-mxsfb.c
 > > 
-> > * apbh-dma and apbx-dma are supported in the driver as two instances,
-> >   and have to be filtered by dma clients via device id.  It becomes
-> >   the convention that apbh-dma always gets registered prior to
-> >   apbx-dma.
-> > 
-> > * apbh-dma is different between mx23 and mx28, hardware version
-> >   register is used to handle the differences.
-> > 
-> > * mxs-dma supports pio function besides data transfer.  The driver
-> >   uses dma_data_direction DMA_NONE to identify the pio mode, and
-> >   steals sgl and sg_len to get pio words and numbers from clients.
-> > 
-> > * mxs dmaengine has some very specific features, like sense function
-> >   and the special NAND support (nand_lock, nand_wait4ready).  These
-> >   are too specific to implemented in generic dmaengine driver.
-> > 
-> > * The driver refers to imx-sdma and only a single descriptor is
-> >   statically assigned to each channel.
+> > diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> > index ca72a05..bfc7f27 100644
+> > --- a/arch/arm/mach-mxs/clock-mx23.c
+> > +++ b/arch/arm/mach-mxs/clock-mx23.c
+> > @@ -446,7 +446,7 @@ static struct clk_lookup lookups[] = {
+> >  	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+> >  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+> >  	_REGISTER_CLOCK(NULL, "audio", audio_clk)
+> > -	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> Introducing the warning below ...
 > 
-> Hi Shawn,
-> 
-Hi Arnd,
+> arch/arm/mach-mxs/clock-mx23.c:430: warning: ?pwm_clk? defined but not used
 
-> I took a look at this after our discussion about the MMC driver locking
+Right, it was not intended to remove the pwm here. Will fix.
 
-Thanks for reviewing the dma code too.
+> 
+> > +	_REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
+> >  };
+> >  
+> >  static int clk_misc_init(void)
+> > diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> > index fd1c4c5..6a7ebcb 100644
+> > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > @@ -620,6 +620,7 @@ static struct clk_lookup lookups[] = {
+> >  	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> >  	_REGISTER_CLOCK(NULL, "lradc", lradc_clk)
+> >  	_REGISTER_CLOCK(NULL, "spdif", spdif_clk)
+> > +	_REGISTER_CLOCK("imx28-fb", NULL, lcdif_clk)
+> >  };
+> >  
+> >  static int clk_misc_init(void)
+> > diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+> > index 1256788..b9745a2 100644
+> > --- a/arch/arm/mach-mxs/devices-mx23.h
+> > +++ b/arch/arm/mach-mxs/devices-mx23.h
+> > @@ -10,7 +10,11 @@
+> >   */
+> >  #include <mach/mx23.h>
+> >  #include <mach/devices-common.h>
+> > +#include <mach/fb.h>
+> >  
+> Why do we have mxsfb platform device code breaking the consistency
+> that we are maintaining well so far?
 
-> problem. My feeling is that you still need to get a better understanding
-> of the locking interfaces in Linux.
-> 
-Yes, I'm still learning Linux ;)
+The rule is that we include header files where we need them.
+devices-common.h is not touched in this patch and it does not need
+mach/fb.h, hence it is not include there.
 
-> > +struct mxs_dma_ccw {
-> > +	u32		next;
-> > +	u16		bits;
-> > +	u16		xfer_bytes;
-> > +#define MAX_XFER_BYTES	0xff00
-> > +	dma_addr_t	bufaddr;
-> > +#define MXS_PIO_WORDS	16
-> > +	u32		pio_words[MXS_PIO_WORDS];
-> > +};
 > 
-> Unrelated, but should bufaddr really be dma_addr_t? If this is a hardware
-> structure, you should make it u32, because dma_addr_t may be either 32 or
-> 64 bit in the future, as we get to multiplatform kernels.
+> Generally, we have this header included in devices-common.h
 > 
-OK.
+> >  extern const struct amba_device mx23_duart_device __initconst;
+> >  #define mx23_add_duart() \
+> >  	mxs_add_duart(&mx23_duart_device)
+> > +
+> > +struct platform_device *__init mx23_add_mxsfb(
+> > +		const struct mxsfb_platform_data *pdata);
+> 
+> Generally, this goes to devices-common.h
 
-> > +struct mxs_dma_chan {
-> > +	struct mxs_dma_engine		*mxs_dma;
-> > +	struct dma_chan			chan;
-> > +	struct dma_async_tx_descriptor	desc;
-> > +	struct tasklet_struct		tasklet;
-> > +	spinlock_t			lock;
-> > +	int				chan_irq;
-> > +	struct mxs_dma_ccw		*ccw;
-> > +	dma_addr_t			ccw_phys;
-> > +	dma_cookie_t			last_completed;
-> > +	enum dma_status			status;
-> > +	unsigned int			flags;
-> > +#define MXS_DMA_SG_LOOP			(1 << 0)
-> > +};
-> > +
-> > +struct mxs_dma_engine {
-> > +	int				dev_id;
-> > +	unsigned int			version;
-> > +	void __iomem			*base;
-> > +	struct clk			*clk;
-> > +	struct dma_device		dma_device;
-> > +	struct device_dma_parameters	dma_parms;
-> > +#define MXS_DMA_CHANNELS		16
-> > +	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
-> > +};
-> 
-> So you have locking per channel, but there is no lock in the dma engine
-> structure locking the global fields. This is probably fine.
-> 
-> > +static void mxs_dma_reset_chan(struct mxs_dma_chan *mxs_chan)
-> > +{
-> > +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> > +	int chan_id = mxs_chan->chan.chan_id;
-> > +
-> > +	if (dma_is_apbh() && apbh_is_old())
-> > +		__mxs_setl(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
-> > +				mxs_dma->base + HW_APBHX_CTRL0);
-> > +	else
-> > +		__mxs_setl(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
-> > +				mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
-> > +}
-> > +
-> > +static void mxs_dma_enable_chan(struct mxs_dma_chan *mxs_chan)
-> > +{
-> > +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> > +	int chan_id = mxs_chan->chan.chan_id;
-> > +
-> > +	/* set cmd_addr up */
-> > +	__raw_writel(mxs_chan->ccw_phys,
-> > +			mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id));
-> > +
-> > +	/* enable apbh channel clock */
-> > +	if (dma_is_apbh()) {
-> > +		if (apbh_is_old())
-> > +			__mxs_clrl(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> > +						mxs_dma->base + HW_APBHX_CTRL0);
-> > +		else
-> > +			__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> > +	}
-> > +
-> > +	/* write 1 to SEMA to kick off the channel */
-> > +	__raw_writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(chan_id));
-> > +}
-> 
-> Just like the MMC driver, you also use __raw_writel(). If you have to do
-> that, please encapsulate the access into a wrapper function that adds
-> all the necessary serialization and add a comment explaining why you
-> cannot use writel()/writel_relaxed().
-> 
-> Or just use writel().
-> 
-OK.  Will change to readl/writel pair.
+No, devices-common.h only declares the mxs_* functions. There is no
+mxs_add_mxsfb in this patch which indeed would go to devices-common.h
 
-> > +static void mxs_dma_disable_chan(struct mxs_dma_chan *mxs_chan)
-> > +{
-> > +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> > +	int chan_id = mxs_chan->chan.chan_id;
-> > +
-> > +	/* disable apbh channel clock */
-> > +	if (dma_is_apbh()) {
-> > +		if (apbh_is_old())
-> > +			__mxs_setl(1 << (chan_id + BP_APBH_CTRL0_CLKGATE_CHANNEL),
-> > +						mxs_dma->base + HW_APBHX_CTRL0);
-> > +		else
-> > +			__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> > +	}
-> > +
-> > +	mxs_chan->status = DMA_SUCCESS;
-> > +}
-> > +
-> > +static void mxs_dma_pause_chan(struct mxs_dma_chan *mxs_chan)
-> > +{
-> > +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> > +	int chan_id = mxs_chan->chan.chan_id;
-> > +
-> > +	/* freeze the channel */
-> > +	if (dma_is_apbh() && apbh_is_old())
-> > +		__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> > +	else
-> > +		__mxs_setl(1 << chan_id, mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
-> > +
-> > +	mxs_chan->status = DMA_PAUSED;
-> > +}
-> > +
-> > +static void mxs_dma_resume_chan(struct mxs_dma_chan *mxs_chan)
-> > +{
-> > +	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
-> > +	int chan_id = mxs_chan->chan.chan_id;
-> > +
-> > +	/* unfreeze the channel */
-> > +	if (dma_is_apbh() && apbh_is_old())
-> > +		__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CTRL0);
-> > +	else
-> > +		__mxs_clrl(1 << chan_id, mxs_dma->base + HW_APBHX_CHANNEL_CTRL);
-> > +
-> > +	mxs_chan->status = DMA_IN_PROGRESS;
-> > +}
 > 
-> Should these take the spinlock? What if they are called simultaneously on
-> multiple CPUs, or while the interrupt handler is running on another CPU?
+> > diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+> > index 33773a6..c902dc7 100644
+> > --- a/arch/arm/mach-mxs/devices-mx28.h
+> > +++ b/arch/arm/mach-mxs/devices-mx28.h
+> > @@ -10,6 +10,7 @@
+> >   */
+> >  #include <mach/mx28.h>
+> >  #include <mach/devices-common.h>
+> > +#include <mach/fb.h>
+> >  
+> >  extern const struct amba_device mx28_duart_device __initconst;
+> >  #define mx28_add_duart() \
+> > @@ -18,3 +19,6 @@ extern const struct amba_device mx28_duart_device __initconst;
+> >  extern const struct mxs_fec_data mx28_fec_data[] __initconst;
+> >  #define mx28_add_fec(id, pdata) \
+> >  	mxs_add_fec(&mx28_fec_data[id], pdata)
+> > +
+> > +struct platform_device *__init mx28_add_mxsfb(
+> > +		const struct mxsfb_platform_data *pdata);
 > 
-> Without a lock, another thread might see an incorrect value of mxs_chan->status.
+> ditto
 > 
-The mxs dma hardware somehow simplified the design to dedicate each
-channel to a specific client device, e.g. mmc 0 has to use channel 0.
-And I simplified the driver design accordingly with less locking
-since only that specific client device will access the channel, in
-which case the situation you are concerning very likely will not
-happen.
+> > diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+> > index cf7dc1a..1538cb9 100644
+> > --- a/arch/arm/mach-mxs/devices/Kconfig
+> > +++ b/arch/arm/mach-mxs/devices/Kconfig
+> > @@ -4,3 +4,7 @@ config MXS_HAVE_AMBA_DUART
+> >  
+> >  config MXS_HAVE_PLATFORM_FEC
+> >  	bool
+> > +
+> > +config MXS_HAVE_PLATFORM_MXSFB
+> > +	bool
+> > +
+> 
+> I understand that "mxsfb" was picked up for the device name to
+> reflect the driver name.  But since this is the device under mach- mxs
+> folder, can we simply call it "fb" just like the way you name fb.h?
+> 
+> In this way, we have all mxs platform device naming schema aligned,
+> auart, duart, dma, fb, fec, flexcan, mmc ...
 
-> > +static dma_cookie_t mxs_dma_assign_cookie(struct mxs_dma_chan *mxs_chan)
-> > +{
-> > +	dma_cookie_t cookie = mxs_chan->chan.cookie;
-> > +
-> > +	if (++cookie < 0)
-> > +		cookie = 1;
-> > +
-> > +	mxs_chan->chan.cookie = cookie;
-> > +	mxs_chan->desc.cookie = cookie;
-> > +
-> > +	return cookie;
-> > +}
-> > +
-> > +static struct mxs_dma_chan *to_mxs_dma_chan(struct dma_chan *chan)
-> > +{
-> > +	return container_of(chan, struct mxs_dma_chan, chan);
-> > +}
-> > +
-> > +static dma_cookie_t mxs_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> > +{
-> > +	struct mxs_dma_chan *mxs_chan = to_mxs_dma_chan(tx->chan);
-> > +	dma_cookie_t cookie;
-> > +	unsigned long flags;
-> > +
-> > +	spin_lock_irqsave(&mxs_chan->lock, flags);
-> > +
-> > +	cookie = mxs_dma_assign_cookie(mxs_chan);
-> > +
-> > +	mxs_dma_enable_chan(mxs_chan);
-> > +
-> > +	spin_unlock_irqrestore(&mxs_chan->lock, flags);
-> > +
-> > +	return cookie;
-> > +}
-> 
-> Just like the MMC driver, you use spin_lock_irqsave() in the functions that
-> are called by other drivers, but then don't actually lock in the interrupt
-> handler. This is clearly wrong, as I explained before:
-> 
-> The interrupt handler may already be running on another CPU, so it
-> is not at all serialized with this code.
-> 
-I may be wrong on this point, but spin_lock_irqsave/irqrestore pair
-is only for the protection you described?  I learnt that the pair
-should be used to protect the critical region, where I'm not sure
-if it's called from interrupt context.  Here I'm intending to protect
-the dma registers accessed in mxs_dma_enable_chan.
+I see it the other way round. mach/fb.h is too generic, I would prefer
+mach/mxsfb.h to be able to add support for a different framebuffer
+later. So I better change fb.h to mxsfb.h.
 
-> > +static void mxs_dma_tasklet(unsigned long data)
+> 
+> > diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> > index d0a09f6..0cf8b48 100644
+> > --- a/arch/arm/mach-mxs/devices/Makefile
+> > +++ b/arch/arm/mach-mxs/devices/Makefile
+> > @@ -1,2 +1,3 @@
+> >  obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
+> >  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
+> > +obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
+> > diff --git a/arch/arm/mach-mxs/devices/platform-mxsfb.c b/arch/arm/mach-mxs/devices/platform-mxsfb.c
+> > new file mode 100644
+> > index 0000000..632bbdc
+> > --- /dev/null
+> > +++ b/arch/arm/mach-mxs/devices/platform-mxsfb.c
+> > @@ -0,0 +1,46 @@
+> > +/*
+> > + * Copyright (C) 2011 Pengutronix, Sascha Hauer <s.hauer@pengutronix.de>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it under
+> > + * the terms of the GNU General Public License version 2 as published by the
+> > + * Free Software Foundation.
+> > + */
+> > +#include <asm/sizes.h>
+> > +#include <mach/mx23.h>
+> > +#include <mach/mx28.h>
+> > +#include <mach/devices-common.h>
+> > +#include <mach/fb.h>
+> 
+> Generally, this goes to devices-common.h
+> 
+> > +
+> > +#ifdef CONFIG_SOC_IMX23
+> > +struct platform_device *__init mx23_add_mxsfb(
+> > +		const struct mxsfb_platform_data *pdata)
 > > +{
-> > +	struct mxs_dma_chan *mxs_chan = (struct mxs_dma_chan *) data;
-> > +	unsigned long flags;
+> > +	struct resource res[] = {
+> > +		{
+> > +			.start = MX23_LCDIF_BASE_ADDR,
+> > +			.end = MX23_LCDIF_BASE_ADDR + SZ_8K - 1,
+> > +			.flags = IORESOURCE_MEM,
+> > +		},
+> > +	};
 > > +
-> > +	spin_lock_irqsave(&mxs_chan->lock, flags);
-> > +
-> > +	if (mxs_chan->desc.callback)
-> > +		mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-> > +
-> > +	if (mxs_chan->status == DMA_SUCCESS)
-> > +		mxs_chan->last_completed = mxs_chan->desc.cookie;
-> > +
-> > +	spin_unlock_irqrestore(&mxs_chan->lock, flags);
+> > +	return mxs_add_platform_device_dmamask("imx23-fb", -1,
+> > +			res, ARRAY_SIZE(res), pdata, sizeof(*pdata), DMA_BIT_MASK(32));
 > > +}
+> > +#endif /* ifdef CONFIG_SOC_IMX23 */
+> > +
+> > +#ifdef CONFIG_SOC_IMX28
+> > +struct platform_device *__init mx28_add_mxsfb(
+> > +		const struct mxsfb_platform_data *pdata)
+> > +{
+> > +	struct resource res[] = {
+> > +		{
+> > +			.start = MX28_LCDIF_BASE_ADDR,
+> > +			.end = MX28_LCDIF_BASE_ADDR + SZ_8K - 1,
+> > +			.flags = IORESOURCE_MEM,
+> > +		},
+> > +	};
+> > +
+> > +	return mxs_add_platform_device_dmamask("imx28-fb", -1,
+> > +			res, ARRAY_SIZE(res), pdata, sizeof(*pdata), DMA_BIT_MASK(32));
+> > +}
+> > +#endif /* ifdef CONFIG_SOC_IMX28 */
 > 
-> Here is a different problem. The entire tasklet has interrupts
-> disabled and holds the spinlock that the interrupt handler does
-> not hold.
-> 
-> This actually makes the tasklet a stricter context than the
-> actual interrupt handler, defeating the purpose of tasklets
-> (i.e. that you can run code without disabling interrupts).
-> 
-> I don't know what the rules for dmaengine callbacks are regarding
-> the context in which they are called, but it seems you should
-> either get rid of the spin_lock_irqsave here or do everything
-> from the interrupt handler.
-> 
-> That leaves the last_completed variable. This apparently
-> needs to be protected using a spinlock, because
-> it can be read from other tasks calling mxs_dma_tx_status,
-> which in turn does not take the lock, so that is broken, too.
-> 
-Thanks for teaching.  I intend to take the fix that Russell offered.
-(Thanks, Russell).  Does that look good to you, or spin_lock_bh
-version should be used than spin_lock_irqsave?
+> Generally, we have macro mxs_fb_data_entry and function mxs_add_fb
+> in this file.  It's nothing but all about consistency.  We do not
+> want some later coming platform device looking at this as example,
+> and bring more inconsistency into mach-mxs platform device codes.
+
+My opinion on this is that we should not use complex ## macro constructs
+where not necessary. With a device which is only present once on the SoC
+it is not necessary, so I skippped it. And yes, if someone is in the
+same situation with a single device on a system, he actually should take
+this as an example. So no, I don't agree with you.
+
+Sascha
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
