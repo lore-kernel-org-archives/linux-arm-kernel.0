@@ -1,26 +1,69 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Feb 2011 11:34:53 +0000
-Subject: [PATCH 00/11] Rationalize and consolidate ARMs evaluation boards
-In-Reply-To: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-References: <20110127134532.GE25968@n2100.arm.linux.org.uk>
-Message-ID: <1298028893.11711.38.camel@e102109-lin.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 18 Feb 2011 12:42:37 +0100 (CET)
+Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <001d01cbcf5f$1cfc9870$56f5c950$@deacon@arm.com>
+References: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>
+	<-4413647205110644369@unknownmsgid>
+	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>
+	<146267380211262372@unknownmsgid>
+	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>
+	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>
+	<20110217091741.GA24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>
+	<20110217101957.GC24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171136550.2701@localhost6.localdomain6>
+	<20110217105611.GE24627@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1102171203280.2701@localhost6.localdomain6>
+	<001301cbcebf$76925cd0$63b71670$@deacon@arm.com>
+	<alpine.LFD.2.00.1102171831520.2701@localhost6.localdomain6>
+	<4D5DB193.5010007@codeaurora.org>
+	<001d01cbcf5f$1cfc9870$56f5c950$@deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1102181240370.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-01-27 at 13:45 +0000, Russell King - ARM Linux wrote:
-> This series, which applies on top of the CLCD series consolidates some
-> of the code used on ARM platforms, in particular the FPGA interrupt,
-> local timer, and SMP bring up code.
+On Fri, 18 Feb 2011, Will Deacon wrote:
+> > >> Right, so to get back to the original discussion about how to handle
+> > >> chained handlers if the high-level flow type of the IRQ chip is altered
+> > >> it seems that there are two options:
+> > >>
+> > >> 1.) Update all of the chained handlers to use the new flow-control
+> > >> 2.) Retain backwards compatibility if a chained handler decides to
+> > >>     use the old method of flow control (specifically, leave an ack
+> > >>     implementation in the GIC code after moving to fasteoi).
+> > >>
+> > >> Obviously, I'd rather go with option (2) and let platforms migrate
+> > >> over time if they choose to. Now, given that the ack function is really
+> > >> not something you want to do in a virtualised environment (because it
+> > >> pokes the distributor), is it worth sticking a
+> > >> WARN_ON_ONCE(cpu_has_virtualisation()); in the ack code?
+> > >
+> > > #2 is less painful and just works. The fasteoi stuff does not use ack
+> > > IIRC so it wont hurt.
+> > 
+> > On an MSM we use handle_percpu_irq for PPIs, if we have ack and eoi we
+> > will end up EOI ing the interrupt twice so #2 wont work. Also all the
+> > cascaded handlers would have assumed that the ack function masks the
+> > interrupt, it is best we fix all of them to use eoi at the end (just
+> > like handle_fasteoi_irq). Please tell me how you guys locate such
+> > cascaded handlers?
 > 
-> We also add sched_clock() support for Integrator/CP, but only when we're
-> building only for Integrator/CP as Integrator/AP platforms don't have
-> the 24MHz counter.  We also move the sched_clock() initialization to
-> the early init callback, along with registering the clock lookups.
+> I don't think the cascaded handlers would have assumed that because ack
+> just sends EOI - it doesn't do any masking. We do have a problem with
+> the percpu_irq flow though (the GIC reference manual says that EOIing a
+> non-active interrupt is UNPREDICTABLE).
 > 
-> As we know how DMA is to be supported with primecells, we no longer need
-> the DMA definitions which aren't used, so these are removed.
+> Another easy hack is to set IRQ_PER_CPU in the irq_desc->status for PPI
+> interrupts and then check this in the ack routine. It's pretty ugly, but
+> it doesn't affect the common case and it at least postpones the platform
+> changes.
 
-The whole series looks fine (acked. if you need one).
+Conditionals in irq_chip callbacks are almost always a sign of
+doom. Don't do that.
 
--- 
-Catalin
+How many chained handlers need to be fixed, when the whole gic stuff
+switches to eoi ?
+
+Thanks,
+
+	tglx
