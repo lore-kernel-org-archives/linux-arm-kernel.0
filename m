@@ -1,53 +1,39 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 18 Feb 2011 23:38:18 +0300
-Subject: [PATCH] DaVinci: fix compilation warnings in <mach/clkdev.h>
-In-Reply-To: <201102092133.23765.sshtylyov@ru.mvista.com>
-References: <201102092133.23765.sshtylyov@ru.mvista.com>
-Message-ID: <4D5ED8BA.5000703@mvista.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 18 Feb 2011 21:47:20 +0100
+Subject: [PATCH] kbuild: reenable section mismatch analysis
+In-Reply-To: <20110216200734.GA25184@merkur.ravnborg.org>
+References: <20110216200734.GA25184@merkur.ravnborg.org>
+Message-ID: <1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This was disabled in commit
 
-I wrote:
+	e5f95c8 (kbuild: print only total number of section mismatces found)
 
-> Commit 6d803ba736abb5e122dede70a4720e4843dd6df4 (ARM: 6483/1: arm & sh:
-> factorised duplicated clkdev.c) caused the following warnings:
+because there were too many warnings.  Now we're down to a reasonable
+number again, so we start scaring people with the details.
 
-> In file included from /home/headless/src/kernel.org/linux-davinci/arch/arm/
-> include/asm/clkdev.h:17,
->                  from include/linux/clkdev.h:15,
->                  from arch/arm/mach-davinci/clock.h:71,
->                  from arch/arm/mach-davinci/common.c:22:
-> arch/arm/mach-davinci/include/mach/clkdev.h:4: warning: `struct clk' declared
-> inside parameter list
-> arch/arm/mach-davinci/include/mach/clkdev.h:4: warning: its scope is only this
-> definition or declaration, which is probably not what you want
-> arch/arm/mach-davinci/include/mach/clkdev.h:9: warning: `struct clk' declared
-> inside parameter list
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ lib/Kconfig.debug |    4 ----
+ 1 files changed, 0 insertions(+), 4 deletions(-)
 
-> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-
-> ---
-> The patch is against the recent DaVinci tree.
-
->  arch/arm/mach-davinci/include/mach/clkdev.h |    2 ++
->  1 file changed, 2 insertions(+)
-
-> Index: linux-davinci/arch/arm/mach-davinci/include/mach/clkdev.h
-> ===================================================================
-> --- linux-davinci.orig/arch/arm/mach-davinci/include/mach/clkdev.h
-> +++ linux-davinci/arch/arm/mach-davinci/include/mach/clkdev.h
-> @@ -1,6 +1,8 @@
->  #ifndef __MACH_CLKDEV_H
->  #define __MACH_CLKDEV_H
->  
-> +struct clk;
-> +
->  static inline int __clk_get(struct clk *clk)
->  {
->  	return 1;
-
-    Kevin, Sekhar, will you apply this?
-
-WBR, Sergei
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 2b97418..0f77ed1 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -102,11 +102,7 @@ config HEADERS_CHECK
+ 
+ config DEBUG_SECTION_MISMATCH
+ 	bool "Enable full Section mismatch analysis"
+-	depends on UNDEFINED || (BLACKFIN)
+ 	default y
+-	# This option is on purpose disabled for now.
+-	# It will be enabled when we are down to a reasonable number
+-	# of section mismatch warnings (< 10 for an allyesconfig build)
+ 	help
+ 	  The section mismatch analysis checks if there are illegal
+ 	  references from one section to another section.
+-- 
+1.7.2.3
