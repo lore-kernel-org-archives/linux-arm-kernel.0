@@ -1,45 +1,40 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 18 Feb 2011 16:18:13 -0700
-Subject: [PATCH 3/3] video: tegra: Run pll_d at 252mhz for HDMI 640x480
+Date: Fri, 18 Feb 2011 16:18:11 -0700
+Subject: [PATCH 1/3] ARM: Tegra: Add pll_d table entries for 252MHz
 In-Reply-To: <1298071093-23865-1-git-send-email-swarren@nvidia.com>
 References: <1298071093-23865-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1298071093-23865-4-git-send-email-swarren@nvidia.com>
+Message-ID: <1298071093-23865-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using a pll_d clock rate of 216MHz yields a 24MHz pixel clock instead of
-25.2MHz. This is just under a 5% error. Instead, use a 252MHz pll_d rate,
-which generates 25.2MHz exactly.
+This rate is required for correct generation of 640x480 HDMI video;
+see subsequent patches.
 
-This makes it more likely that monitors will sync to the emitted signal.
-
-This also fixes HDMI audio issues, since the CTS/N tables are now based
-on the actual pixel clock rate, not merely the intended pixel clock rate.
-
-Tested with a 12MHz pll_m rate on Seaboard, all of 32/44.1/48KHz audio,
-all video modes supported by the Tegra dc HDMI driver, and a Dell U2410
-dislay.
+Note: I tested the entry with 12MHz input. The other entries are untested,
+but appear logically correct. However, I'm not familiar enough with PLLs
+to know if they perhaps exceed the PLL VCO frequency, nor whether the
+cpcon values are strictly correct.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/video/tegra/dc/dc.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-tegra/tegra2_clocks.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/video/tegra/dc/dc.c b/drivers/video/tegra/dc/dc.c
-index 16789c2..c1eea05 100644
---- a/drivers/video/tegra/dc/dc.c
-+++ b/drivers/video/tegra/dc/dc.c
-@@ -699,8 +699,10 @@ void tegra_dc_setup_clk(struct tegra_dc *dc, struct clk *clk)
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 41f5953..f3ead19 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1531,6 +1531,11 @@ static struct clk_pll_freq_table tegra_pll_d_freq_table[] = {
+ 	{ 19200000, 216000000, 135, 12, 1, 3},
+ 	{ 26000000, 216000000, 216, 26, 1, 4},
  
- 		if (dc->mode.pclk > 70000000)
- 			rate = 594000000;
--		else
-+		else if (dc->mode.pclk >= 27000000)
- 			rate = 216000000;
-+		else
-+			rate = 252000000;
- 
- 		if (rate != clk_get_rate(pll_d_clk))
- 			clk_set_rate(pll_d_clk, rate);
++	{ 12000000, 252000000, 252, 12, 1, 4},
++	{ 13000000, 252000000, 252, 13, 1, 4},
++	{ 19200000, 252000000, 210, 16, 1, 3},
++	{ 26000000, 252000000, 252, 26, 1, 4},
++
+ 	{ 12000000, 594000000, 594, 12, 1, 8},
+ 	{ 13000000, 594000000, 594, 13, 1, 8},
+ 	{ 19200000, 594000000, 495, 16, 1, 8},
 -- 
 1.7.1
