@@ -1,43 +1,16 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 18 Feb 2011 15:51:42 +0100
-Subject: [PATCH 2/3] OMAP2+: hwmod: Fix what _init_clock returns
-In-Reply-To: <1297858285-7056-3-git-send-email-rnayak@ti.com>
-References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
-	<1297858285-7056-2-git-send-email-rnayak@ti.com>
-	<1297858285-7056-3-git-send-email-rnayak@ti.com>
-Message-ID: <4D5E877E.5090600@ti.com>
+From: barrchongkimwong@att.net (Barrister Chong Kim Wong)
+Date: Fri, 18 Feb 2011 19:16:58 +0800
+Subject: Good Day
+Message-ID: <USERPCb85c2c46a1c547bfb1d9327afd4c59d9@userPC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/16/2011 1:11 PM, Nayak, Rajendra wrote:
-> _init_clock always returns 0 and does
-> not propogate the error (in case of failure)
-> back to the caller, causing _init_clocks to
-> fail silently.
->
-> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index cd9dcde..960461f 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -926,7 +926,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
->   	if (!ret)
->   		oh->_state = _HWMOD_STATE_CLKS_INITED;
->
-> -	return 0;
-> +	return ret;
->   }
->
->   /**
+I am Chong Kim Wong, Attorney at law.I have contacted you to assist in 
+distributing the money left behind by my Late client , that shares the same 
+name as yours,who lost his life alongside his wife and only child in 
+(Beirut-bound charter jet) plane crash on the Monday, 9 January 2006,Prior to 
+the Death of my Late Client.Get back to me via email for more detils:barrchongkim1 at hotmail.com
 
-This is correct and that makes kerneldoc accurate : "Returns ... a 
-non-zero error on failure."
+Regards And hope to hear from you soon.
 
-I'll queue it for 2.6.39.
-
-Thanks,
-Benoit
+Barr Chong Kim Wong 
