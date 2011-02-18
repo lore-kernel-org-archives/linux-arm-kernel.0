@@ -1,35 +1,20 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 18 Feb 2011 22:38:46 +0100
-Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
-In-Reply-To: <1298064143-27158-1-git-send-email-GNUtoo@no-log.org>
-References: <20110213211855.GC13279@pengutronix.de>
-	<1298064143-27158-1-git-send-email-GNUtoo@no-log.org>
-Message-ID: <20110218213846.GK22310@pengutronix.de>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Fri, 18 Feb 2011 16:42:34 -0500
+Subject: [PATCH] kbuild: reenable section mismatch analysis
+In-Reply-To: <1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110216200734.GA25184@merkur.ravnborg.org>
+	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <AANLkTinNT05b4YNdTvUF3jRqA=zob7KPT1_Vcic5vxQh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 10:22:23PM +0100, Denis 'GNUtoo' Carikli wrote:
-> Note that the hardware schematics and documentations can be obtained
->   here: http://www.bugcommunity.com/wiki/index.php/BUGbase
-> 
-> Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
-> ---
-As you didn't provide these and before someone else does the same, here
-come the changes compared to v3:
+2011/2/18 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> This was disabled in commit
+>
+> ? ? ? ?e5f95c8 (kbuild: print only total number of section mismatces found)
+>
+> because there were too many warnings. ?Now we're down to a reasonable
+> number again, so we start scaring people with the details.
 
- - moved "config MACH_BUG" further to the top of
-   arch/arm/mach-mx3/Kconfig
- - add a copyright statement in arch/arm/mach-mx3/mach-bug.c
- - removed an empty line
- - s/\t=/ =/ in the initializer of bug_timer
-
-I don't know why you moved config MACH_BUG, but I don't care much.
-
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Acked-by: Mike Frysinger <vapier@gentoo.org>
+-mike
