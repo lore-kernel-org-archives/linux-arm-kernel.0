@@ -1,28 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 18 Feb 2011 20:27:44 +0000
-Subject: platform/i2c busses: pm runtime and system sleep
-In-Reply-To: <201102182120.29977.rjw@sisk.pl>
-References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
-	<201102181928.05911.rjw@sisk.pl>
-	<AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
-	<201102182120.29977.rjw@sisk.pl>
-Message-ID: <20110218202744.GA19427@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 18 Feb 2011 23:38:18 +0300
+Subject: [PATCH] DaVinci: fix compilation warnings in <mach/clkdev.h>
+In-Reply-To: <201102092133.23765.sshtylyov@ru.mvista.com>
+References: <201102092133.23765.sshtylyov@ru.mvista.com>
+Message-ID: <4D5ED8BA.5000703@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 09:20:29PM +0100, Rafael J. Wysocki wrote:
-> On Friday, February 18, 2011, Rabin Vincent wrote:
-> > Looking at the i2c drivers using runtime pm in comparison, they all seem
-> > to be using straightforward UNIVERSAL_PM_OPS-style code with the runtime
-> > and the system sleep doing the same things.  So maybe we do need to
-> > treat platform/AMBA different from the I2C/SPI group?
-> 
-> We probably do.
+Hello.
 
-Do we have any pressing need to convert AMBA stuff?  I haven't heard any
-reason yet to convert them to runtime PM - they don't even make any
-runtime PM calls.
+I wrote:
 
-Maybe Linus can comment on the PM stuff as he has SoCs with these in.
-As my boards don't have any sensible PM support, I don't have any
-visibility of what PM facilities would be required.
+> Commit 6d803ba736abb5e122dede70a4720e4843dd6df4 (ARM: 6483/1: arm & sh:
+> factorised duplicated clkdev.c) caused the following warnings:
+
+> In file included from /home/headless/src/kernel.org/linux-davinci/arch/arm/
+> include/asm/clkdev.h:17,
+>                  from include/linux/clkdev.h:15,
+>                  from arch/arm/mach-davinci/clock.h:71,
+>                  from arch/arm/mach-davinci/common.c:22:
+> arch/arm/mach-davinci/include/mach/clkdev.h:4: warning: `struct clk' declared
+> inside parameter list
+> arch/arm/mach-davinci/include/mach/clkdev.h:4: warning: its scope is only this
+> definition or declaration, which is probably not what you want
+> arch/arm/mach-davinci/include/mach/clkdev.h:9: warning: `struct clk' declared
+> inside parameter list
+
+> Signed-off-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+
+> ---
+> The patch is against the recent DaVinci tree.
+
+>  arch/arm/mach-davinci/include/mach/clkdev.h |    2 ++
+>  1 file changed, 2 insertions(+)
+
+> Index: linux-davinci/arch/arm/mach-davinci/include/mach/clkdev.h
+> ===================================================================
+> --- linux-davinci.orig/arch/arm/mach-davinci/include/mach/clkdev.h
+> +++ linux-davinci/arch/arm/mach-davinci/include/mach/clkdev.h
+> @@ -1,6 +1,8 @@
+>  #ifndef __MACH_CLKDEV_H
+>  #define __MACH_CLKDEV_H
+>  
+> +struct clk;
+> +
+>  static inline int __clk_get(struct clk *clk)
+>  {
+>  	return 1;
+
+    Kevin, Sekhar, will you apply this?
+
+WBR, Sergei
