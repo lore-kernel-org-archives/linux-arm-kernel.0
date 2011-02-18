@@ -1,68 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 18 Feb 2011 14:59:41 +0100
-Subject: [RFC/PATCH] OMAP: Fix section mismatch
-In-Reply-To: <1298034953-21016-1-git-send-email-weber@corscience.de>
-References: <1298034953-21016-1-git-send-email-weber@corscience.de>
-Message-ID: <20110218135941.GB22310@pengutronix.de>
+From: John.Linn@xilinx.com (John Linn)
+Date: Fri, 18 Feb 2011 06:59:47 -0700
+Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <20110218090625.GA3203@pulham.picochip.com>
+References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>
+	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>
+	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>
+	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
+	<20110217100126.GD22961@pulham.picochip.com>
+	<2fdc2d92-486e-4319-866f-3882938363c3@VA3EHSMHS026.ehs.local>
+	<20110218090625.GA3203@pulham.picochip.com>
+Message-ID: <625bb321-106e-432a-b8d1-bdc9012fd18d@VA3EHSMHS016.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-[added cpufreq at vger.kernel.org and Dave to Cc:]
-
-On Fri, Feb 18, 2011 at 02:15:53PM +0100, Thomas Weber wrote:
-> When compiling linux-omap with 'make CONFIG_DEBUG_SECTION_MISMATCH=y'
-> the following output occurs:
+> -----Original Message-----
+> From: Jamie Iles [mailto:jamie at jamieiles.com]
+> Sent: Friday, February 18, 2011 2:06 AM
+> To: John Linn
+> Cc: Jamie Iles; linux-arm-kernel at lists.infradead.org;
+linux-kernel at vger.kernel.org;
+> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
+arnd at arndb.de
+> Subject: Re: [PATCH V3 3/4] ARM: Xilinx: base header files and
+assembly macros
 > 
-> WARNING: arch/arm/plat-omap/built-in.o(.data+0x6e8): Section mismatch in
-> reference from the variable omap_driver to the function
-> .init.text:omap_cpu_init()
-> The variable omap_driver references
-> the function __init omap_cpu_init()
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the
-> variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
+> On Thu, Feb 17, 2011 at 06:19:09PM -0700, John Linn wrote:
+> > > > +#define PHYS_OFFSET             0x0
+> > >
+> > > This should be PLAT_PHYS_OFFSET and could do with being surrounded
+> > with
+> > > UL() e.g.
+> > >
+> > > #define PLAT_PHYS_OFFSET	UL(0x00000000)
+> >
+> > This doesn't build with 2.6.38-rc5, am I missing something?
+> >
+> > PHYS_OFFSET is still needed from what I can tell, but maybe I
+overlooked
+> > something.
 > 
-> This patch fixes this by adding __refdata to the omap_driver variable.
+> The change is queued up in Russell's devel branch for the dynamic p2v
+> and will be in 2.6.39.  For a patch series like this it's probably
+worth
+> developing off of linux-next[1].  This contains all of the trees that
+> will be mereged into the next kernel so carries the bigger changes
+like
+> dynamic p2v.
+
+My hope was to get into 2.6.38 and maybe that was not realistic.  If
+it's too late
+for 2.6.38 then I'll revise the patch for this branch.
+
+Any thoughts Russell based on where we are?
+
+Thanks for the insight.
+John
+
 > 
-> Signed-off-by: Thomas Weber <weber@corscience.de>
-> ---
->  arch/arm/plat-omap/cpu-omap.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Jamie
 > 
-> diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
-> index 11c54ec..17fdd5f 100644
-> --- a/arch/arm/plat-omap/cpu-omap.c
-> +++ b/arch/arm/plat-omap/cpu-omap.c
-> @@ -144,7 +144,7 @@ static struct freq_attr *omap_cpufreq_attr[] = {
->  	NULL,
->  };
->  
-> -static struct cpufreq_driver omap_driver = {
-> +static struct cpufreq_driver omap_driver __refdata = {
->  	.flags		= CPUFREQ_STICKY,
->  	.verify		= omap_verify_speed,
->  	.target		= omap_target,
-This is correct for a single case.  But actually the better fix would be
-to remove the .init member of struct cpufreq_driver and change the
-prototype of cpufreq_register_driver from
+> 1. git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
 
-	int (*)(struct cpufreq_driver *)
 
-to
-
-	int (*)(struct cpufreq_driver *, int (*)(struct cpufreq_policy *)) 
-
-and pass the init function directly to it.
-This way you don't need __refdata (which should be an exception) and you
-don't waste memory for a pointer that is never used after
-cpufreq_register_driver returns.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
