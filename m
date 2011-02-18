@@ -1,181 +1,291 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 18 Feb 2011 17:50:50 +0100
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <20110218154135.GF11151@legolas.emea.dhcp.ti.com>
-References: <20110217162000.GP20795@atomide.com>
-	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
-	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
-	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
-	<4D5D59E5.6020307@ti.com>
-	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
-	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
-	<4D5E7DFF.7020609@ti.com>
-	<20110218154135.GF11151@legolas.emea.dhcp.ti.com>
-Message-ID: <4D5EA36A.4000903@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 18 Feb 2011 17:51:57 +0100 (CET)
+Subject: [PATCH 1/2] PRUSS UIO driver support
+In-Reply-To: <1298041530-26855-2-git-send-email-pratheesh@ti.com>
+References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
+	<1298041530-26855-2-git-send-email-pratheesh@ti.com>
+Message-ID: <alpine.LFD.2.00.1102181715260.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/18/2011 4:41 PM, Balbi, Felipe wrote:
-> Hi all,
->
-> On Fri, Feb 18, 2011 at 03:11:11PM +0100, Cousson, Benoit wrote:
->> On 2/17/2011 7:18 PM, Tony Lindgren wrote:
->>> * Cousson, Benoit<b-cousson@ti.com>   [110217 09:45]:
->>>>
->>>> Done, boot tested, and that does remove the warning about the
->>>> missing opt clock you had with the previous data.
->>>>
->>>> git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
->>>>
->>>> Just let me know if it does break anything else.
->>>
->>> Pulled into omap-for-linus. Also now merged are the devel-hwspinlock
->>> and devel-mcspi branches.
->>
->> McSPI OMAP4 hwmod data are missing a couple of flags that break the boot for the moment.
->>
->> Govindraj should rebase on the omap4_hwmod_data branch and add the missing rev and dev_attr for the McSPI.
->>
->> Unfortunately, even with that patch omap-for-linus boot hangs after the following trace:
->>
->> [    0.875091] omap_device: omap2_mcspi.1: new worst case activate latency 0: 30517
->> [    0.886657] usbcore: registered new interface driver usbfs
->> [    0.892822] usbcore: registered new interface driver hub
->> [    0.898681] usbcore: registered new device driver usb
->> [    0.904815] omap_i2c omap_i2c.1: bus 1 rev4.0 at 400 kHz
->
-> I tested your branch merged with mine and it was working fine. What else
-> is on omap-for-linus ? There are only 28 patches on that branch, a
-> bisect would be quick ?
+On Fri, 18 Feb 2011, Pratheesh Gangadhar wrote:
+> +/*
+> + * Host event IRQ numbers from PRUSS 	
+> + * 3 PRU_EVTOUT0 PRUSS Interrupt
+> + * 4 PRU_EVTOUT1 PRUSS Interrupt
+> + * 5 PRU_EVTOUT2 PRUSS Interrupt
+> + * 6 PRU_EVTOUT3 PRUSS Interrupt
+> + * 7 PRU_EVTOUT4 PRUSS Interrupt
+> + * 8 PRU_EVTOUT5 PRUSS Interrupt
+> + * 9 PRU_EVTOUT6 PRUSS Interrupt
+> + * 10 PRU_EVTOUT7 PRUSS Interrupt
+> +*/
+> +
+> +#define MAX_PRUSS_EVTOUT_INSTANCE	(8)
+> +
+> +static struct clk *pruss_clk;
+> +static struct uio_info *info[MAX_PRUSS_EVTOUT_INSTANCE];
+> +static void *ddr_virt_addr;
+> +static dma_addr_t ddr_phy_addr;
+> +
+> +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
+> +{
+> +	return IRQ_HANDLED;
 
-This patch is at least fixing the McSPI crash. I still don't have a clue 
-about the final hang :-(
+  See other mail.
 
-Benoit
+> +}
+> +
+> +static int __devinit pruss_probe(struct platform_device *dev)
+> +{
+> +	int ret = -ENODEV;
+> +	int count = 0;
 
----
- From b2190f0d339c9d843eb5e370d0db8b7090fbcfab Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Fri, 18 Feb 2011 14:01:06 +0100
-Subject: [PATCH] OMAP4: hwmod data: Add rev and dev_attr fields in McSPI
+  Please make this one line.
 
-- Add a rev attribute to identify various McSPI IP version.
-- Add a dev_attr structure to provide the number of chipselect
-   supported by the instance.
+> +	struct resource *regs_pruram, *regs_l3ram, *regs_ddr;
+> +	char *string;
+> +
+> +	/* Power on PRU in case its not done as part of boot-loader */
+> +	pruss_clk = clk_get(&dev->dev, "pruss");
+> +	if (IS_ERR(pruss_clk)) {
+> +		dev_err(&dev->dev, "Failed to get clock\n");
+> +		ret = PTR_ERR(pruss_clk);
+> +		pruss_clk = NULL;
+> +		return ret;
+> +	} else {
+> +		clk_enable(pruss_clk);
+> +	}
+> +
+> +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
+> +		info[count] = kzalloc(sizeof(struct uio_info), GFP_KERNEL);
+> +		if (!info[count])
+> +			return -ENOMEM;
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Govindraj.R <govindraj.raja@ti.com>
----
-  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   26 
-++++++++++++++++++++++++++
-  1 files changed, 26 insertions(+), 0 deletions(-)
+  That leaks memory in case of count > 0
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c 
-b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 84e795c..182aa79 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -24,6 +24,7 @@
-  #include <plat/cpu.h>
-  #include <plat/gpio.h>
-  #include <plat/dma.h>
-+#include <plat/mcspi.h>
+  And this whole loop is crap:
 
-  #include "omap_hwmod_common_data.h"
+  struct uio_info *info = kzalloc(sizeof(struct uio_info) * MAX_PRUSS_EVTOUT_INSTANCE,
+  	 	  	  	  GFP_KERNEL);
 
-@@ -3114,6 +3115,7 @@ static struct omap_hwmod_class_sysconfig 
-omap44xx_mcspi_sysc = {
-  static struct omap_hwmod_class omap44xx_mcspi_hwmod_class = {
-  	.name	= "mcspi",
-  	.sysc	= &omap44xx_mcspi_sysc,
-+	.rev	= OMAP4_MCSPI_REV,
-  };
+  perhaps ?		
 
-  /* mcspi1 */
-@@ -3156,6 +3158,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi1_slaves[] = {
-  	&omap44xx_l4_per__mcspi1,
-  };
+> +	}
+> +
+> +	regs_pruram = platform_get_resource(dev, IORESOURCE_MEM, 0);
+> +	if (!regs_pruram) {
+> +		dev_err(&dev->dev, "No memory resource specified\n");
+> +		goto out_free;
+> +	}
+> +
+> +	regs_l3ram = platform_get_resource(dev, IORESOURCE_MEM, 1);
+> +	if (!regs_l3ram) {
+> +		dev_err(&dev->dev, "No memory resource specified\n");
+> +		goto out_free;
+> +	}
+> +
+> +	regs_ddr = platform_get_resource(dev, IORESOURCE_MEM, 2);
+> +	if (!regs_ddr) {
+> +		dev_err(&dev->dev, "No memory resource specified\n");
+> +		goto out_free;
+> +	}
+> +	ddr_virt_addr =
+> +	    dma_alloc_coherent(&dev->dev, regs_ddr->end - regs_ddr->start + 1,
+> +			       &ddr_phy_addr, GFP_KERNEL | GFP_DMA);
+> +	if (!ddr_virt_addr) {
+> +		dev_err(&dev->dev, "Could not allocate external memory\n");
+> +		goto out_free;
+> +	}
+> +
+> +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
+> +		info[count]->mem[0].addr = regs_pruram->start;
+> +		info[count]->mem[0].size =
+> +		    regs_pruram->end - regs_pruram->start + 1;
+> +		if (!info[count]->mem[0].addr
+> +		    || !(info[count]->mem[0].size - 1)) {
+> +			dev_err(&dev->dev, "Invalid memory resource\n");
+> +			break;
 
-+/* mcspi1 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
-+	.num_chipselect	= 4,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi1_hwmod = {
-  	.name		= "mcspi1",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3169,6 +3176,7 @@ static struct omap_hwmod omap44xx_mcspi1_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi1_dev_attr,
-  	.slaves		= omap44xx_mcspi1_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi1_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -3210,6 +3218,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi2_slaves[] = {
-  	&omap44xx_l4_per__mcspi2,
-  };
+  Is this break intentional ? Assume you have registered one uio
+  instance already then ret = 0 and you fall into the good path below.
 
-+/* mcspi2 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
-+	.num_chipselect	= 2,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi2_hwmod = {
-  	.name		= "mcspi2",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3223,6 +3236,7 @@ static struct omap_hwmod omap44xx_mcspi2_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi2_dev_attr,
-  	.slaves		= omap44xx_mcspi2_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi2_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -3264,6 +3278,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi3_slaves[] = {
-  	&omap44xx_l4_per__mcspi3,
-  };
+> +		}
+> +		info[count]->mem[0].internal_addr =
+> +		    ioremap(regs_pruram->start, info[count]->mem[0].size);
+> +		if (!info[count]->mem[0].internal_addr) {
+> +			dev_err(&dev->dev,
+> +				"Can't remap memory address range\n");
+> +			break;
 
-+/* mcspi3 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
-+	.num_chipselect	= 2,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi3_hwmod = {
-  	.name		= "mcspi3",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3277,6 +3296,7 @@ static struct omap_hwmod omap44xx_mcspi3_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi3_dev_attr,
-  	.slaves		= omap44xx_mcspi3_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi3_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -3316,6 +3336,11 @@ static struct omap_hwmod_ocp_if 
-*omap44xx_mcspi4_slaves[] = {
-  	&omap44xx_l4_per__mcspi4,
-  };
+  Ditto
 
-+/* mcspi4 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
-+	.num_chipselect	= 1,
-+};
-+
-  static struct omap_hwmod omap44xx_mcspi4_hwmod = {
-  	.name		= "mcspi4",
-  	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3329,6 +3354,7 @@ static struct omap_hwmod omap44xx_mcspi4_hwmod = {
-  			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
-  		},
-  	},
-+	.dev_attr	= &mcspi4_dev_attr,
-  	.slaves		= omap44xx_mcspi4_slaves,
-  	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi4_slaves),
-  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
--- 
-1.7.0.4
+> +		}
+> +		info[count]->mem[0].memtype = UIO_MEM_PHYS;
+> +
+> +		info[count]->mem[1].addr = regs_l3ram->start;
+> +		info[count]->mem[1].size =
+> +		    regs_l3ram->end - regs_l3ram->start + 1;
+> +		if (!info[count]->mem[1].addr
+> +		    || !(info[count]->mem[1].size - 1)) {
+> +			dev_err(&dev->dev, "Invalid memory resource\n");
+> +			break;
+> +		}
+> +		info[count]->mem[1].internal_addr =
+> +		    ioremap(regs_l3ram->start, info[count]->mem[1].size);
+> +		if (!info[count]->mem[1].internal_addr) {
+> +			dev_err(&dev->dev,
+> +				"Can't remap memory address range\n");
+> +			break;
+> +		}
+> +		info[count]->mem[1].memtype = UIO_MEM_PHYS;
+> +
+> +		info[count]->mem[2].addr = ddr_phy_addr;
+> +		info[count]->mem[2].size = regs_ddr->end - regs_ddr->start + 1;
+> +		if (!info[count]->mem[2].addr
+> +		    || !(info[count]->mem[2].size - 1)) {
+> +			dev_err(&dev->dev, "Invalid memory resource\n");
+> +			break;
+
+  This is silly. If ddr_virt_addr == NULL you never reach that code.
+
+
+> +		}
+> +		info[count]->mem[2].internal_addr = ddr_virt_addr;
+> +		if (!info[count]->mem[2].internal_addr) {
+> +			dev_err(&dev->dev,
+> +				"Can't remap memory address range\n");
+
+  This is silly. If ddr_virt_addr == NULL you never reach that code.
+
+> +			break;
+> +		}
+> +		info[count]->mem[2].memtype = UIO_MEM_PHYS;
+> +
+> +		string = kzalloc(20, GFP_KERNEL);
+> +		sprintf(string, "pruss_evt%d", count);
+> +		info[count]->name = string;
+> +		info[count]->version = "0.50";
+> +
+> +		/* Register PRUSS IRQ lines */
+> +		info[count]->irq = IRQ_DA8XX_EVTOUT0 + count;
+> +
+> +		info[count]->irq_flags = IRQF_SHARED;
+
+  Huch. That can be shared ? Then you must in the interrupt handler
+
+  1) check whether the interrupt is originated from your device
+  2) mask at the device level.
+
+> +		info[count]->handler = pruss_handler;
+> +
+> +		ret = uio_register_device(&dev->dev, info[count]);
+> +
+> +		if (ret < 0)
+> +			break;
+> +	}
+> +
+> +	if (ret < 0) {
+> +		if (ddr_virt_addr)
+> +			dma_free_coherent(&dev->dev,
+> +					  regs_ddr->end - regs_ddr->start + 1,
+> +					  ddr_virt_addr, ddr_phy_addr);
+> +		while (count--) {
+> +			uio_unregister_device(info[count]);
+> +			kfree(info[count]->name);
+> +			iounmap(info[count]->mem[0].internal_addr);
+
+  Please move that section below the return 0 and use goto out_uio;
+  instead of break;
+
+  This is real horrible.
+
+> +		}
+> +	} else {
+> +		platform_set_drvdata(dev, info);
+> +		return 0;
+> +	}
+> +
+> +out_free:
+> +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++)
+> +		kfree(info[count]);
+> +
+> +	if (pruss_clk != NULL)
+> +		clk_put(pruss_clk);
+> +
+> +	return ret;
+> +}
+> +
+> +static int __devexit pruss_remove(struct platform_device *dev)
+> +{
+> +	int count = 0;
+> +	struct uio_info **info;
+> +
+> +	info = (struct uio_info **)platform_get_drvdata(dev);
+> +
+> +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
+> +		uio_unregister_device(info[count]);
+> +		kfree(info[count]->name);
+
+  In the above error exit path you do:
+
+		iounmap(info[count]->mem[0].internal_addr);
+
+  And in both cases you dont unmap info[count]->mem[1].internal_addr
+
+  Why do you have those kernel mappings at all if you do not access
+  the device from this code ?
+
+> +
+> +	}
+> +	iounmap(info[0]->mem[0].internal_addr);
+> +	iounmap(info[0]->mem[1].internal_addr);
+
+  Sigh
+
+> +	if (ddr_virt_addr)
+> +		dma_free_coherent(&dev->dev, info[0]->mem[2].size,
+> +				  info[0]->mem[2].internal_addr,
+> +				  info[0]->mem[2].addr);
+> +
+> +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++)
+> +		kfree(info[count]);
+> +
+> +	platform_set_drvdata(dev, NULL);
+> +
+> +	if (pruss_clk != NULL)
+> +		clk_put(pruss_clk);
+> +	return 0;
+
+So you have basically the same cleanup code twice with different bugs.
+Please avoid this kind of mistake which will happen with duplicated
+code. The right way to do that is creating a cleanup function and call
+them from both places.
+
+You can call uio_unregister_device on a non registered info struct as
+well. So all it takes is:
+
+	if (ddr_virt_addr)
+		dma_free_coherent(&dev->dev, info[0]->mem[2].size,
+				  info[0]->mem[2].internal_addr,
+				  info[0]->mem[2].addr);
+
+	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
+      	  	if (!info[count])
+			break;
+
+		uio_unregister_device(info[count]);
+		kfree(info[count]->name);
+		...
+		kfree(info[count]);
+		info[count] = NULL; 
+        }
+
+	platform_set_drvdata(dev, NULL);
+
+	if (pruss_clk)
+		clk_put(pruss_clk);
+
+Thanks,
+
+	tglx
