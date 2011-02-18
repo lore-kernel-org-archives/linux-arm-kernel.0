@@ -1,65 +1,46 @@
-From: John.Linn@xilinx.com (John Linn)
-Date: Fri, 18 Feb 2011 06:59:47 -0700
-Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <20110218090625.GA3203@pulham.picochip.com>
-References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>
-	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>
-	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>
-	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
-	<20110217100126.GD22961@pulham.picochip.com>
-	<2fdc2d92-486e-4319-866f-3882938363c3@VA3EHSMHS026.ehs.local>
-	<20110218090625.GA3203@pulham.picochip.com>
-Message-ID: <625bb321-106e-432a-b8d1-bdc9012fd18d@VA3EHSMHS016.ehs.local>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 18 Feb 2011 15:11:11 +0100
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <20110217181849.GV20795@atomide.com>
+References: <20110217152648.GO22356@legolas.emea.dhcp.ti.com>
+	<4D5D44AF.5050805@ti.com> <20110217162000.GP20795@atomide.com>
+	<20110217162209.GA13425@legolas.emea.dhcp.ti.com>
+	<20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
+	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
+	<4D5D59E5.6020307@ti.com>
+	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
+	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
+Message-ID: <4D5E7DFF.7020609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jamie Iles [mailto:jamie at jamieiles.com]
-> Sent: Friday, February 18, 2011 2:06 AM
-> To: John Linn
-> Cc: Jamie Iles; linux-arm-kernel at lists.infradead.org;
-linux-kernel at vger.kernel.org;
-> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
-arnd at arndb.de
-> Subject: Re: [PATCH V3 3/4] ARM: Xilinx: base header files and
-assembly macros
+Hi Tony
+
+On 2/17/2011 7:18 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [110217 09:45]:
+>>
+>> Done, boot tested, and that does remove the warning about the
+>> missing opt clock you had with the previous data.
+>>
+>> git://gitorious.org/omap-pm/linux.git for_2.6.39/omap4_hwmod_data
+>>
+>> Just let me know if it does break anything else.
 > 
-> On Thu, Feb 17, 2011 at 06:19:09PM -0700, John Linn wrote:
-> > > > +#define PHYS_OFFSET             0x0
-> > >
-> > > This should be PLAT_PHYS_OFFSET and could do with being surrounded
-> > with
-> > > UL() e.g.
-> > >
-> > > #define PLAT_PHYS_OFFSET	UL(0x00000000)
-> >
-> > This doesn't build with 2.6.38-rc5, am I missing something?
-> >
-> > PHYS_OFFSET is still needed from what I can tell, but maybe I
-overlooked
-> > something.
-> 
-> The change is queued up in Russell's devel branch for the dynamic p2v
-> and will be in 2.6.39.  For a patch series like this it's probably
-worth
-> developing off of linux-next[1].  This contains all of the trees that
-> will be mereged into the next kernel so carries the bigger changes
-like
-> dynamic p2v.
+> Pulled into omap-for-linus. Also now merged are the devel-hwspinlock
+> and devel-mcspi branches.
 
-My hope was to get into 2.6.38 and maybe that was not realistic.  If
-it's too late
-for 2.6.38 then I'll revise the patch for this branch.
+McSPI OMAP4 hwmod data are missing a couple of flags that break the boot for the moment.
 
-Any thoughts Russell based on where we are?
+Govindraj should rebase on the omap4_hwmod_data branch and add the missing rev and dev_attr for the McSPI.
 
-Thanks for the insight.
-John
+Unfortunately, even with that patch omap-for-linus boot hangs after the following trace:
 
-> 
-> Jamie
-> 
-> 1. git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
+[    0.875091] omap_device: omap2_mcspi.1: new worst case activate latency 0: 30517
+[    0.886657] usbcore: registered new interface driver usbfs
+[    0.892822] usbcore: registered new interface driver hub
+[    0.898681] usbcore: registered new device driver usb
+[    0.904815] omap_i2c omap_i2c.1: bus 1 rev4.0 at 400 kHz
 
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Regards,
+Benoit
