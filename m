@@ -1,112 +1,42 @@
-From: hemahk@ti.com (Hema Kalliguddi)
-Date: Fri, 18 Feb 2011 18:37:03 +0530
-Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024B83BED5@dbde02.ent.ti.com>
-References: <1297946466-9565-1-git-send-email-balbi@ti.com>
-	<1297946466-9565-6-git-send-email-balbi@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024B83BED5@dbde02.ent.ti.com>
-Message-ID: <0387bf9911e20f7d6fa56aeb8ded4071@mail.gmail.com>
+From: weber@corscience.de (Thomas Weber)
+Date: Fri, 18 Feb 2011 14:15:53 +0100
+Subject: [RFC/PATCH] OMAP: Fix section mismatch
+Message-ID: <1298034953-21016-1-git-send-email-weber@corscience.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Premi,
+When compiling linux-omap with 'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+the following output occurs:
 
->-----Original Message-----
->From: Premi, Sanjeev [mailto:premi at ti.com]
->Sent: Friday, February 18, 2011 4:59 PM
->To: Balbi, Felipe; Tony Lindgren
->Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List;
->Kalliguddi, Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley
->Subject: RE: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
->
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
->> owner at vger.kernel.org] On Behalf Of Balbi, Felipe
->> Sent: Thursday, February 17, 2011 6:11 PM
->> To: Tony Lindgren
->> Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List;
->Kalliguddi,
->> Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley; Balbi, Felipe
->> Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
->>
->> From: Hema HK <hemahk@ti.com>
->>
->> AM35xx hwmod data structures are populated for USBOTG with
->base address,
->> L3 and L4 interface clocks and IRQ.
->>
->> Signed-off-by: Hema HK <hemahk@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Kevin Hilman <khilman@deeprootsystems.com>
->> Cc: Cousson, Benoit <b-cousson@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Signed-off-by: Felipe Balbi <balbi@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   65
->> ++++++++++++++++++++++++++++
->>  1 files changed, 65 insertions(+), 0 deletions(-)
->>
->[snip]
->>
->> +	/* usbotg for am35x */
->> +	&am35xx_usbhsotg_hwmod,
->> +
->>  	NULL,
->
->Felipe, Hema,
->
->This patch will break all existing OMAP35x (and I believe
->OMAP3430 - since there is no difference - unless there is
->some trick in the USB driver code).
->
+WARNING: arch/arm/plat-omap/built-in.o(.data+0x6e8): Section mismatch in
+reference from the variable omap_driver to the function
+.init.text:omap_cpu_init()
+The variable omap_driver references
+the function __init omap_cpu_init()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the
+variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
 
-I agree that this will break the AM35x because there is no
-separate CHIP_IS* defined for AM35x.
-AM35x is treated as one of the version of OMAP3430.
+This patch fixes this by adding __refdata to the omap_driver variable.
 
->I have seen similar problems with smart reflex included in
->the AM35x hwmod data.
+Signed-off-by: Thomas Weber <weber@corscience.de>
+---
+ arch/arm/plat-omap/cpu-omap.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Unless the new CHIP_IS_* introduced for AM35x this problem will
-still exists.
-
-I thought you are already working on this because you were
-asking the questions in the list.
-
->
->In this case accessing "unknown" registers corresponding to
->SmartReflex in _setup() causes crash.
->(http://marc.info/?l=linux-omap&m=129777408503329&w=2)
->
->I expect similar to be happening on OMAP35x with inclusion
->of am35xx_usbhsotg_hwmod. If you don't see any crash, there
->would be side-effects - and _setup() would be initializing
->non-existent OTG registers on OMAP35x.
->
-This will not impact for OMAP3 as the IDCODE is different AM35x and
-OMAP3, so passing the right chip version in the HWMOD database for AM35x
-will avoid the hwod init incase of OMAP3.
-
->Did you see any problems while testing?
->
-I tested with OMAP3430SDP and OMAP3630Zoom3 and did not see
-the problem.
-
-Regards,
-Hema
-
->~sanjeev
->
->PS: Sending mail via webmailer. Formatting may break
->
->>  };
->>
->> --
->> 1.7.4.rc2
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe
->linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
+index 11c54ec..17fdd5f 100644
+--- a/arch/arm/plat-omap/cpu-omap.c
++++ b/arch/arm/plat-omap/cpu-omap.c
+@@ -144,7 +144,7 @@ static struct freq_attr *omap_cpufreq_attr[] = {
+ 	NULL,
+ };
+ 
+-static struct cpufreq_driver omap_driver = {
++static struct cpufreq_driver omap_driver __refdata = {
+ 	.flags		= CPUFREQ_STICKY,
+ 	.verify		= omap_verify_speed,
+ 	.target		= omap_target,
+-- 
+1.7.4.1
