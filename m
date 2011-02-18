@@ -1,81 +1,37 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 18 Feb 2011 17:01:57 +0800
-Subject: [PATCH 1/1] ARM: imx53: correct Silicon Revision definition
-	following fuse map
-In-Reply-To: <20110218070752.GC2343@tarshish>
-References: <1298008049-20352-1-git-send-email-richard.zhao@freescale.com>
-	<20110218070752.GC2343@tarshish>
-Message-ID: <20110218090156.GB2086@b20223-02.ap.freescale.net>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 18 Feb 2011 09:06:25 +0000
+Subject: [PATCH V3 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <2fdc2d92-486e-4319-866f-3882938363c3@VA3EHSMHS026.ehs.local>
+References: <1297872716-13353-1-git-send-email-john.linn@xilinx.com>
+	<1297872716-13353-2-git-send-email-john.linn@xilinx.com>
+	<1297872716-13353-3-git-send-email-john.linn@xilinx.com>
+	<e58673f5-2881-4820-b5cd-99e8ef294ed5@VA3EHSMHS024.ehs.local>
+	<20110217100126.GD22961@pulham.picochip.com>
+	<2fdc2d92-486e-4319-866f-3882938363c3@VA3EHSMHS026.ehs.local>
+Message-ID: <20110218090625.GA3203@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
-
-On Fri, Feb 18, 2011 at 09:07:52AM +0200, Baruch Siach wrote:
-> Hi Richard,
-> 
-> On Fri, Feb 18, 2011 at 01:47:29PM +0800, Richard Zhao wrote:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+On Thu, Feb 17, 2011 at 06:19:09PM -0700, John Linn wrote:
+> > > +#define PHYS_OFFSET             0x0
 > > 
-> > diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-> > index d40671d..95fd5f8 100644
-> > --- a/arch/arm/mach-mx5/cpu.c
-> > +++ b/arch/arm/mach-mx5/cpu.c
-> > @@ -76,13 +76,25 @@ late_initcall(mx51_neon_fixup);
-> >  static int get_mx53_srev(void)
-> >  {
-> >  	void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
-> > -	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
-> > +	u32 reg = readl(iim_base + IIM_SREV) & 0xff;
-> > +	int rev;
-> > +
-> > +	switch (reg) {
-> > +	case 0x0:
-> > +		rev = IMX_CHIP_REVISION_1_0;
-> > +		break;
-> > +	case 0x2:
-> > +		rev = IMX_CHIP_REVISION_2_0;
-> > +		break;
-> > +	case 0x3:
-> > +		rev = IMX_CHIP_REVISION_2_1;
-> > +		break;
-> > +	default:
-> > +		rev = IMX_CHIP_REVISION_UNKNOWN;
-> > +		break;
-> > +	}
-> >  
-> > -	if (rev == 0x0)
-> > -		return IMX_CHIP_REVISION_1_0;
-> > -	else if (rev == 0x10)
-> > -		return IMX_CHIP_REVISION_2_0;
-> > -	return 0;
-> > +	return rev;
-> >  }
-> >  
-> >  /*
+> > This should be PLAT_PHYS_OFFSET and could do with being surrounded
+> with
+> > UL() e.g.
+> > 
+> > #define PLAT_PHYS_OFFSET	UL(0x00000000)
 > 
-> I think the following code is shorter and more readable:
+> This doesn't build with 2.6.38-rc5, am I missing something?
 > 
-> switch (reg) {
-> case 0x0:
->     return IMX_CHIP_REVISION_1_0;
-> case 0x2:
->     return IMX_CHIP_REVISION_2_0;
-> case 0x3:
->     return IMX_CHIP_REVISION_2_1;
-> default:
->     return IMX_CHIP_REVISION_UNKNOWN;
-> }
-Yes. I thought there would be compile warning, but not.
+> PHYS_OFFSET is still needed from what I can tell, but maybe I overlooked
+> something.
 
-Thanks
-Richard
-> 
-> baruch
-> 
-> 
-> -- 
->                                                      ~. .~   Tk Open Systems
-> =}------------------------------------------------ooO--U--Ooo------------{=
->    - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
-> 
+The change is queued up in Russell's devel branch for the dynamic p2v 
+and will be in 2.6.39.  For a patch series like this it's probably worth 
+developing off of linux-next[1].  This contains all of the trees that 
+will be mereged into the next kernel so carries the bigger changes like 
+dynamic p2v.
+
+Jamie
+
+1. git://git.kernel.org/pub/scm/linux/kernel/git/sfr/linux-next.git
