@@ -1,29 +1,55 @@
-From: nickpelling@nanodome.com (Nick Pelling)
-Date: Thu, 17 Feb 2011 23:58:19 +0000
-Subject: SAMSUNG: any example code for soc_camera, tv output, etc...?
-In-Reply-To: <01b001cbcef7$3e7f5f90$bb7e1eb0$%kim@samsung.com>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-	<E1Pnvhv-0002yp-A0@rmk-PC.arm.linux.org.uk>
-	<017901cbce9b$7b405ee0$71c11ca0$%kim@samsung.com>
-	<20110217140621.GC24989@n2100.arm.linux.org.uk>
-	<01b001cbcef7$3e7f5f90$bb7e1eb0$%kim@samsung.com>
-Message-ID: <9f2nkr$9lh756@out1.ip04ir2.opaltelecom.net>
+From: jammy.zhou@linaro.org (Jammy Zhou)
+Date: Fri, 18 Feb 2011 10:19:58 +0800
+Subject: [PATCH] i.MX23/28 framebuffer driver
+In-Reply-To: <alpine.LFD.2.00.1102171545470.21278@casper.infradead.org>
+References: <1297257651-8002-1-git-send-email-s.hauer@pengutronix.de>
+	<201102091731.07794.arnd@arndb.de>
+	<AANLkTikhcphz_8TS4L+z2heayqnJbK1NEW8DzqTm=YKp@mail.gmail.com>
+	<201102161322.08126.arnd@arndb.de>
+	<AANLkTik+ounqcTJ6rhiUqKPGkwcCOKGXdsVADs6zHfPU@mail.gmail.com>
+	<AANLkTimMBLhopNq0L-NuJLdX08SrA078VF3tWf9TcEom@mail.gmail.com>
+	<alpine.LFD.2.00.1102171545470.21278@casper.infradead.org>
+Message-ID: <AANLkTimcwr4vpycSQCH9vMaB+umh+yHD_+WD2MJNqMOB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+To accommodate the fact of independent display controller and GPU components
+in ARM SOC, it will be better if we can separate KMS from DRM both in kernel
+space and user space (i.e, create a new drivers/video/kms directory for
+kernel side, move KMS related code in libdrm to libkms in user space). Then
+we can build xrandr1.2+ support based on KMS for ARM platforms, even if DRM
+is still not supported. Besides, for buffer management part (GEM) in DRM, if
+possible, we can also make it an independent module leaving DRM just a
+wrapper, so that the GEM stuff can be used more flexibly.
 
-I've just gone through a lot of Samsung platform setup files in 
-arch/arm/ , but haven't yet found any Samsung-SoC-based boards 
-pre-plumbed into V4L2, nor any that connect up to a TV out (rather 
-than to an LCD screen). Is there a repository out there containing 
-Samsung Linux source code for these kinds of useful things, or even 
-brief documentation on how to do this kind of basic video plumbing?
+Regards,
+Jammy
 
-Even though I'm working on the S5PC100, information about hooking 
-sensors into other Samsung SoC platforms would probably be 
-sufficient. Alternatively, please say if you know which specific 
-file(s) I should be asking Samsung tech support for under NDA (via my 
-distributor's tech support).
+On Fri, Feb 18, 2011 at 12:14 AM, James Simmons <jsimmons@infradead.org>wrote:
 
-Thanks, ....Nick Pelling.... // Nanodome Ltd
+>
+> > I'm still in the learning-as-I-go phase here, so definitely not ready
+> > to propose a solution, but it does seem to me like there is room for
+> > some sort of kms-helper library here to handle more of the boilerplate
+> > xf86-video-* stuff..  I guess I'll have a better picture once I have a
+> > chance to add support for the various multi-monitor configurations.
+> > But certainly would be interested if anyone already has some ideas.
+>
+> I have been thinking about this as well. One of the short coming for DRM
+> on embedded platforms is the lack of a small well defined library that one
+> could use. Right now libkms only handles buffer allocation. The mode
+> setting is currently tied to the libdrm library. It would be nice to
+> seperate the two out more. Move the mode setting code to libkms and then
+> have libdrm be a wrapper around this. This way libdrm can both support
+> the legacy drm drivers and the new kms drivers at the same time. It also
+> makes a clear seperation. Jakob if you are willing to take this work I
+> will gladly seen you patches.
+>
+> _______________________________________________
+> linaro-dev mailing list
+> linaro-dev at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-dev
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110218/312cbc88/attachment-0001.html>
