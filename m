@@ -1,25 +1,49 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Fri, 18 Feb 2011 12:36:15 +0800
-Subject: [PATCH RESEND 2/4] ARM: imx53_loco add uncompress print
+Date: Fri, 18 Feb 2011 12:36:16 +0800
+Subject: [PATCH RESEND 3/4] ARM: imx53_loco: add i2c device support
 In-Reply-To: <1298003777-7687-1-git-send-email-richard.zhao@freescale.com>
 References: <1298003777-7687-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1298003777-7687-2-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1298003777-7687-3-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
-index e634d6c..b702884 100644
---- a/arch/arm/plat-mxc/include/mach/uncompress.h
-+++ b/arch/arm/plat-mxc/include/mach/uncompress.h
-@@ -111,6 +111,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
- 		uart_base = MX50_UART1_BASE_ADDR;
- 		break;
- 	case MACH_TYPE_MX53_EVK:
-+	case MACH_TYPE_MX53_LOCO:
- 		uart_base = MX53_UART1_BASE_ADDR;
- 		break;
- 	default:
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 10b6008..abea297 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -146,6 +146,7 @@ config MACH_MX53_LOCO
+ 	bool "Support MX53 LOCO platforms"
+ 	select SOC_IMX53
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	help
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index b8241bd..ec9ea9c 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -199,6 +199,10 @@ static struct fec_platform_data mx53_loco_fec_data = {
+ 	.phy = PHY_INTERFACE_MODE_RMII,
+ };
+ 
++static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
++	.bitrate = 100000,
++};
++
+ static void __init mx53_loco_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+@@ -206,6 +210,8 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_imx_uart(0, NULL);
+ 	mx53_loco_fec_reset();
+ 	imx53_add_fec(&mx53_loco_fec_data);
++	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
++	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
 -- 
 1.7.1
