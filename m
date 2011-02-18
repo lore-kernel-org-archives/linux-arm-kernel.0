@@ -1,63 +1,112 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 18 Feb 2011 14:03:29 +0100
-Subject: [RFC] MMC: error handling improvements
-In-Reply-To: <AANLkTikDxOeW9Nfaew_mZLnVJ6e7pyzQTNs139g_AehW@mail.gmail.com>
-References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
-	<8yaoc6c7tan.fsf@huya.qualcomm.com>
-	<AANLkTikpdwfM19oirENbOhnz8Rh40ZnMXByGX_QKdu-V@mail.gmail.com>
-	<8ya8vxf4w4w.fsf@huya.qualcomm.com>
-	<AANLkTimQqGVTwUv4ywQnmd4Z1Ur4vWk2sK5+ZLa4mmTs@mail.gmail.com>
-	<AANLkTikDxOeW9Nfaew_mZLnVJ6e7pyzQTNs139g_AehW@mail.gmail.com>
-Message-ID: <AANLkTin64W=VQP+EomU3PK-Ye=Nz_SP+DOLxgT__4fkQ@mail.gmail.com>
+From: hemahk@ti.com (Hema Kalliguddi)
+Date: Fri, 18 Feb 2011 18:37:03 +0530
+Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024B83BED5@dbde02.ent.ti.com>
+References: <1297946466-9565-1-git-send-email-balbi@ti.com>
+	<1297946466-9565-6-git-send-email-balbi@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83BED5@dbde02.ent.ti.com>
+Message-ID: <0387bf9911e20f7d6fa56aeb8ded4071@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/17 Brian Swetland <swetland@google.com>:
-> On Wed, Feb 16, 2011 at 1:01 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> 2011/2/16 David Brown <davidb@codeaurora.org>:
+Hi Premi,
 
->>> The SDCC block is shared between
->>> the modem processor and the processor running Linux. ?If the driver
->>> doesn't go through the DMA engine, which coordinates this, the registers
->>> will be stomped on by the other CPU whenever it decides to access it's
->>> parts of the flash device.
->> (...)
->>
->> At the same time what you're saying sounds very weird:
->> the ios handler in mmc_sdcc does not request any DMA
->> channel before messing with the hardware, it simply just write
->> into registers very much in the style of mmci.c. Wouldn't that
->> disturb any simultaneous access to the MMC from another
->> CPU?
+>-----Original Message-----
+>From: Premi, Sanjeev [mailto:premi at ti.com]
+>Sent: Friday, February 18, 2011 4:59 PM
+>To: Balbi, Felipe; Tony Lindgren
+>Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List;
+>Kalliguddi, Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley
+>Subject: RE: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
 >
-> (...)
-> The way register access for the SDCC is synchronized between these two
-> cores is by using a locking primitive built into the MSM DMA
-> controller. ?If you don't use this indirect access model (via DMA
-> transactions to the registers), you end up tripping over the baseband
-> or the other way 'round. ?It's not fun.
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+>> owner at vger.kernel.org] On Behalf Of Balbi, Felipe
+>> Sent: Thursday, February 17, 2011 6:11 PM
+>> To: Tony Lindgren
+>> Cc: Linux OMAP Mailing List; Linux ARM Kernel Mailing List;
+>Kalliguddi,
+>> Hema; Kevin Hilman; Cousson, Benoit; Paul Walmsley; Balbi, Felipe
+>> Subject: [patch-v2.6.39 5/7] AM35xx: hwmod data: Add USBOTG
+>>
+>> From: Hema HK <hemahk@ti.com>
+>>
+>> AM35xx hwmod data structures are populated for USBOTG with
+>base address,
+>> L3 and L4 interface clocks and IRQ.
+>>
+>> Signed-off-by: Hema HK <hemahk@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>> Cc: Cousson, Benoit <b-cousson@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   65
+>> ++++++++++++++++++++++++++++
+>>  1 files changed, 65 insertions(+), 0 deletions(-)
+>>
+>[snip]
+>>
+>> +	/* usbotg for am35x */
+>> +	&am35xx_usbhsotg_hwmod,
+>> +
+>>  	NULL,
+>
+>Felipe, Hema,
+>
+>This patch will break all existing OMAP35x (and I believe
+>OMAP3430 - since there is no difference - unless there is
+>some trick in the USB driver code).
+>
 
-Wherever is that synchronized in the DMA controller?
-I don't get it because the code is so very similar.
+I agree that this will break the AM35x because there is no
+separate CHIP_IS* defined for AM35x.
+AM35x is treated as one of the version of OMAP3430.
 
-When the ios does this:
-msmsdcc_writel(host, clk, MMCICLOCK);
+>I have seen similar problems with smart reflex included in
+>the AM35x hwmod data.
 
-This magic macro does the trick?
+Unless the new CHIP_IS_* introduced for AM35x this problem will
+still exists.
 
-static inline void
-msmsdcc_writel(struct msmsdcc_host *host, u32 data, unsigned int reg)
-{
-        writel(data, host->base + reg);
-        /* 3 clk delay required! */
-        udelay(1 + ((3 * USEC_PER_SEC) /
-               (host->clk_rate ? host->clk_rate : msmsdcc_fmin)));
-}
+I thought you are already working on this because you were
+asking the questions in the list.
 
-What is so hard about renaming this mmci_writel() and putting
-the udelay() weirdness inside #ifdef ARCH_MSM? Wrapping
-all the writes in the mmci driver inside an inline function is hardly
-a big problem.
+>
+>In this case accessing "unknown" registers corresponding to
+>SmartReflex in _setup() causes crash.
+>(http://marc.info/?l=linux-omap&m=129777408503329&w=2)
+>
+>I expect similar to be happening on OMAP35x with inclusion
+>of am35xx_usbhsotg_hwmod. If you don't see any crash, there
+>would be side-effects - and _setup() would be initializing
+>non-existent OTG registers on OMAP35x.
+>
+This will not impact for OMAP3 as the IDCODE is different AM35x and
+OMAP3, so passing the right chip version in the HWMOD database for AM35x
+will avoid the hwod init incase of OMAP3.
 
-Yours,
-Linus Walleij
+>Did you see any problems while testing?
+>
+I tested with OMAP3430SDP and OMAP3630Zoom3 and did not see
+the problem.
+
+Regards,
+Hema
+
+>~sanjeev
+>
+>PS: Sending mail via webmailer. Formatting may break
+>
+>>  };
+>>
+>> --
+>> 1.7.4.rc2
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
