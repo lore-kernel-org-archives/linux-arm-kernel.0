@@ -1,33 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Feb 2011 18:57:32 -0000
-Subject: [PATCH] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <AANLkTikRXgT76Pzv8yiVLN8gRAxvrYu1CWqDjt7V-GH=@mail.gmail.com>
-References: <AANLkTik-0SaVbtiXZ-iefvvgLq=7KqRTGi7XPLPEKx85@mail.gmail.com>	<-4413647205110644369@unknownmsgid>	<AANLkTikaZkRMHH1bUmO0pWYT1FgTC+83F5KxPySasG-S@mail.gmail.com>	<146267380211262372@unknownmsgid>	<AANLkTimPDNv+2n2-QHtBq0X+Vkj21yQCPh8iKZkYjfqG@mail.gmail.com>	<alpine.LFD.2.00.1102162008490.2701@localhost6.localdomain6>	<20110217091741.GA24627@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1102171032580.2701@localhost6.localdomain6>	<20110217101957.GC24627@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1102171136550.2701@localhost6.localdomain6>	<20110217105611.GE24627@n2100.arm.linux.org.uk>	<alpine.LFD.2.00.1102171203280.2701@localhost6.localdomain6>	<alpine.LFD.2.00.1102171831520.2701@localhost6.localdomain6>	<4D5DB193.5010007@codeaurora.org>	<alpine.LFD.2.00.1102181240370.2701@localhost6.localdomain6>	<-8083923411736601789@unknownmsgid>
-	<AANLkTikRXgT76Pzv8yiVLN8gRAxvrYu1CWqDjt7V-GH=@mail.gmail.com>
-Message-ID: <000001cbcf9d$b2e75030$18b5f090$@deacon@arm.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 19 Feb 2011 00:55:28 +0530
+Subject: platform/i2c busses: pm runtime and system sleep
+In-Reply-To: <201102181928.05911.rjw@sisk.pl>
+References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
+	<AANLkTikRUZRh0YnP8nYTKFnFeUiJbK5xKvHHjn_S+gZE@mail.gmail.com>
+	<AANLkTinsPqFcodH0w7LQeFEY+amodNH4CneRCRhhbKaz@mail.gmail.com>
+	<201102181928.05911.rjw@sisk.pl>
+Message-ID: <AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Well, grepping for set_chained_irq_handler yields a whole bunch of platforms
-> > but the set of these which appear to use the gic is only:
-> >
-> > mach-msm
-> > mach-s5pv310
-> > mach-shmobile
-> > mach-tegra
-> >
-> > I'll have a look through the code there and post some patches next week.
-> > Hopefully if I've missed anybody, they'll shout then.
-> 
-> omap4 uses the gic, and uses chained handlers in plat-omap/gpio.c.
-> plat-omap/gpio.c seems to handle similar gpio hardware connected to
-> different IRQ controllers on different SoCs - non-gic on omap2-3, and
-> gic on omap4.
+On Fri, Feb 18, 2011 at 23:58, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Friday, February 18, 2011, Rabin Vincent wrote:
+>> On Thu, Feb 17, 2011 at 20:55, Rabin Vincent <rabin@rab.in> wrote:
+>> > This will solve the platform vs AMBA bus, but shouldn't we really be
+>> > aiming for consistent behaviour between these and the other busses such
+>> > as I2C and SPI, which are also usually commonly used on the same
+>> > platforms and are using GENERIC_PM_OPS?
+>> >
+>> > Should we be auditing all platform drivers and then switch platform to
+>> > the GENERIC_PM_OPS?
+>> >
+>> > Or should the two points (1) and (2) be not handled in the bus at all
+>> > and be left to individual drivers (in which case we should audit i2c and
+>> > spi and change GENERIC_PM_OPS)?
+>>
+>> How about something like the below? ?If we have something like this, we
+>> can just switch platform to GENERIC_PM_OPS and add the
+>> pm_runtime_want_interaction() (or something better named) call to the
+>> i2c and spi drivers using runtime PM.
+>
+> Why don't we make platform_bus_type behave along the lines of generic ops
+> instead?
 
-Thanks for spotting this Colin. My grep-fu failed me because the gic
-initialisation for omap is under a different directory to the GPIO cascaded
-IRQ stuff (plat- vs mach-).
+At least drivers/spi/omap2_mcspi.c, drivers/video/sh_mobile_lcdcfb.c and
+drivers/watchdog/omap_wdt.c are some pm_runtime-using drivers which seem
+to do different things in their runtime vs normal suspend/resume
+routines, so forcing platform into the active-on-resume behaviour of the
+generic ops may make some use cases impossible.  Conversion of more OMAP
+drivers to runtime pm appears to be ongoing so I'd imagine we'd be
+seeing more of this.  Perhaps Kevin or Magnus will have a comment here.
+The same thing applies to AMBA drivers.
 
-I'll add OMAP to the list.
-
-Will
+Looking at the i2c drivers using runtime pm in comparison, they all seem
+to be using straightforward UNIVERSAL_PM_OPS-style code with the runtime
+and the system sleep doing the same things.  So maybe we do need to
+treat platform/AMBA different from the I2C/SPI group?
