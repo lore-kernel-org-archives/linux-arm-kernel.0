@@ -1,148 +1,148 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 18 Feb 2011 22:16:18 +0100
-Subject: [PATCH 2/2] arm: mxs: add i2c-devices
-In-Reply-To: <1298049507-6987-3-git-send-email-w.sang@pengutronix.de>
-References: <1298049507-6987-1-git-send-email-w.sang@pengutronix.de>
-	<1298049507-6987-3-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20110218211618.GI22310@pengutronix.de>
+From: GNUtoo@no-log.org (Denis 'GNUtoo' Carikli)
+Date: Fri, 18 Feb 2011 22:22:23 +0100
+Subject: [PATCH] mx31: add support for the bugbase 1.3 from buglabs
+In-Reply-To: <20110213211855.GC13279@pengutronix.de>
+References: <20110213211855.GC13279@pengutronix.de>
+Message-ID: <1298064143-27158-1-git-send-email-GNUtoo@no-log.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+Note that the hardware schematics and documentations can be obtained
+  here: http://www.bugcommunity.com/wiki/index.php/BUGbase
 
-On Fri, Feb 18, 2011 at 06:18:27PM +0100, Wolfram Sang wrote:
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-mxs/devices-mx28.h                |    3 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-i2c.c        |   56 +++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/devices-common.h |    9 ++++
->  5 files changed, 72 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-i2c.c
-> 
-> diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
-> index 3b18304..c581b26 100644
-> --- a/arch/arm/mach-mxs/devices-mx28.h
-> +++ b/arch/arm/mach-mxs/devices-mx28.h
-> @@ -32,3 +32,6 @@ extern const struct mxs_flexcan_data mx28_flexcan_data[] __initconst;
->  	mxs_add_flexcan(&mx28_flexcan_data[id], pdata)
->  #define mx28_add_flexcan0(pdata)	mx28_add_flexcan(0, pdata)
->  #define mx28_add_flexcan1(pdata)	mx28_add_flexcan(1, pdata)
-> +
-> +extern const struct mxs_i2c_data mx28_i2c_data[] __initconst;
-> +#define mx28_add_i2c(id)	mxs_add_i2c(&mx28_i2c_data[id])
-I'd like to have these named "mx28_mxs_i2c_data" to have the driver name
-in the struct.  (And by the way I already fixed that for you even before
-you sent out that patch :-)
+Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
+---
+ arch/arm/mach-mx3/Kconfig                   |    9 ++++
+ arch/arm/mach-mx3/Makefile                  |    1 +
+ arch/arm/mach-mx3/mach-bug.c                |   66 +++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/uncompress.h |    4 ++
+ 4 files changed, 80 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx3/mach-bug.c
 
-> diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-> index 6c65b67..c9f80e1 100644
-> --- a/arch/arm/mach-mxs/devices/Kconfig
-> +++ b/arch/arm/mach-mxs/devices/Kconfig
-> @@ -11,3 +11,6 @@ config MXS_HAVE_PLATFORM_FEC
->  config MXS_HAVE_PLATFORM_FLEXCAN
->  	select HAVE_CAN_FLEXCAN if CAN
->  	bool
-> +
-> +config MXS_HAVE_PLATFORM_I2C
-> +	bool
-> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-> index a8dc8d5..4fb4d9a 100644
-> --- a/arch/arm/mach-mxs/devices/Makefile
-> +++ b/arch/arm/mach-mxs/devices/Makefile
-> @@ -2,3 +2,4 @@ obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
->  obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
->  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
->  obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
-> +obj-$(CONFIG_MXS_HAVE_PLATFORM_I2C) += platform-i2c.o
-ditto
-
-> diff --git a/arch/arm/mach-mxs/devices/platform-i2c.c b/arch/arm/mach-mxs/devices/platform-i2c.c
-> new file mode 100644
-> index 0000000..22236b2
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/devices/platform-i2c.c
-> @@ -0,0 +1,56 @@
-> +/*
-> + * Copyright (C) 2011 Pengutronix
-> + * Wolfram Sang <w.sang@pengutronix.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +#include <asm/sizes.h>
-> +#include <mach/mx28.h>
-> +#include <mach/devices-common.h>
-> +
-> +/* helper defines to fix MX23 naming anomaly */
-> +#define MX23_I2C0_BASE_ADDR	MX23_I2C_BASE_ADDR
-> +#define MX23_INT_I2C0_ERROR	MX23_INT_I2C_ERROR
-> +#define MX23_INT_I2C0_DMA	MX23_INT_I2C_DMA
-not needed yet, but OK
-
-> +
-> +#define mxs_i2c_data_entry_single(soc, _id)				\
-> +	{								\
-> +		.id = _id,						\
-> +		.iobase = soc ## _I2C ## _id ## _BASE_ADDR,		\
-> +		.errirq = soc ## _INT_I2C ## _id ## _ERROR,		\
-> +		.dmairq = soc ## _INT_I2C ## _id ## _DMA,		\
-> +	}
-> +
-> +#define mxs_i2c_data_entry(soc, _id)					\
-> +	[_id] = mxs_i2c_data_entry_single(soc, _id)
-add here an addional mxs, too.  (Thought I don't care that much here)
-
-> +
-> +#ifdef CONFIG_SOC_IMX28
-> +const struct mxs_i2c_data mx28_i2c_data[] __initconst = {
-> +	mxs_i2c_data_entry(MX28, 0),
-> +	mxs_i2c_data_entry(MX28, 1),
-> +};
-> +#endif
-> +
-> +struct platform_device *__init mxs_add_i2c(const struct mxs_i2c_data *data)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobase,
-> +			.end = data->iobase + SZ_8K - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->errirq,
-> +			.end = data->errirq,
-> +			.flags = IORESOURCE_IRQ,
-> +		}, {
-> +			.start = data->dmairq,
-> +			.end = data->dmairq,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +
-> +	return mxs_add_platform_device("mxs-i2c", data->id, res,
-> +					ARRAY_SIZE(res), NULL, 0);
-> +}
-> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-> index e7aefb4..e385ece 100644
-> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
-> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-> @@ -63,3 +63,12 @@ struct mxs_flexcan_data {
->  struct platform_device *__init mxs_add_flexcan(
->  		const struct mxs_flexcan_data *data,
->  		const struct flexcan_platform_data *pdata);
-> +
-> +/* i2c */
-> +struct mxs_i2c_data {
-> +	int id;
-> +	resource_size_t iobase;
-> +	resource_size_t errirq;
-> +	resource_size_t dmairq;
-> +};
-> +struct platform_device * __init mxs_add_i2c(const struct mxs_i2c_data *data);
-
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 5000ac1..3daf1fe 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -160,6 +160,15 @@ config MACH_KZM_ARM11_01
+ 	  Include support for KZM-ARM11-01. This includes specific
+ 	  configurations for the board and its peripherals.
+ 
++config MACH_BUG
++	bool "Support Buglabs BUGBase platform"
++	select SOC_IMX31
++	select IMX_HAVE_PLATFORM_IMX_UART
++	default y
++	help
++	  Include support for BUGBase 1.3 platform. This includes specific
++	  configurations for the board and its peripherals.
++
+ config MACH_EUKREA_CPUIMX35
+ 	bool "Support Eukrea CPUIMX35 Platform"
+ 	select ARCH_MX35
+diff --git a/arch/arm/mach-mx3/Makefile b/arch/arm/mach-mx3/Makefile
+index 8a182d0..95a45e8 100644
+--- a/arch/arm/mach-mx3/Makefile
++++ b/arch/arm/mach-mx3/Makefile
+@@ -23,5 +23,6 @@ obj-$(CONFIG_MACH_PCM043)	+= mach-pcm043.o
+ obj-$(CONFIG_MACH_ARMADILLO5X0) += mach-armadillo5x0.o
+ obj-$(CONFIG_MACH_MX35_3DS)	+= mach-mx35_3ds.o
+ obj-$(CONFIG_MACH_KZM_ARM11_01)	+= mach-kzm_arm11_01.o
++obj-$(CONFIG_MACH_BUG)		+= mach-bug.o
+ obj-$(CONFIG_MACH_EUKREA_CPUIMX35)	+= mach-cpuimx35.o
+ obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD)	+= eukrea_mbimxsd-baseboard.o
+diff --git a/arch/arm/mach-mx3/mach-bug.c b/arch/arm/mach-mx3/mach-bug.c
+new file mode 100644
+index 0000000..d137d70
+--- /dev/null
++++ b/arch/arm/mach-mx3/mach-bug.c
+@@ -0,0 +1,66 @@
++/*
++ * Copyright (C) 2000 Deep Blue Solutions Ltd
++ * Copyright (C) 2002 Shane Nay (shane at minirl.com)
++ * Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2011 Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/platform_device.h>
++
++#include <mach/iomux-mx3.h>
++#include <mach/imx-uart.h>
++#include <mach/hardware.h>
++#include <mach/common.h>
++
++#include <asm/mach/time.h>
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++
++#include "devices-imx31.h"
++
++static const struct imxuart_platform_data uart_pdata __initconst = {
++	.flags = IMXUART_HAVE_RTSCTS,
++};
++
++static const unsigned int bug_pins[] __initconst = {
++	MX31_PIN_PC_RST__CTS5,
++	MX31_PIN_PC_VS2__RTS5,
++	MX31_PIN_PC_BVD2__TXD5,
++	MX31_PIN_PC_BVD1__RXD5,
++};
++
++static void __init bug_board_init(void)
++{
++	mxc_iomux_setup_multiple_pins(bug_pins,
++				      ARRAY_SIZE(bug_pins), "uart-4");
++	imx31_add_imx_uart4(&uart_pdata);
++}
++
++static void __init bug_timer_init(void)
++{
++	mx31_clocks_init(26000000);
++}
++
++static struct sys_timer bug_timer = {
++	.init = bug_timer_init,
++};
++
++MACHINE_START(BUG, "BugLabs BUGBase")
++	.map_io = mx31_map_io,
++	.init_early = imx31_init_early,
++	.init_irq = mx31_init_irq,
++	.timer = &bug_timer,
++	.init_machine = bug_board_init,
++MACHINE_END
+diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+index 9dd9c20..c3b155c 100644
+--- a/arch/arm/plat-mxc/include/mach/uncompress.h
++++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+@@ -62,6 +62,7 @@ static inline void flush(void)
+ #define MX2X_UART1_BASE_ADDR	0x1000a000
+ #define MX3X_UART1_BASE_ADDR	0x43F90000
+ #define MX3X_UART2_BASE_ADDR	0x43F94000
++#define MX3X_UART5_BASE_ADDR	0x43FB4000
+ #define MX51_UART1_BASE_ADDR	0x73fbc000
+ 
+ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+@@ -98,6 +99,9 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+ 	case MACH_TYPE_MAGX_ZN5:
+ 		uart_base = MX3X_UART2_BASE_ADDR;
+ 		break;
++	case MACH_TYPE_BUG:
++		uart_base = MX3X_UART5_BASE_ADDR;
++		break;
+ 	case MACH_TYPE_MX51_BABBAGE:
+ 	case MACH_TYPE_EUKREA_CPUIMX51SD:
+ 		uart_base = MX51_UART1_BASE_ADDR;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.0.4
