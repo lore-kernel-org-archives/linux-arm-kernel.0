@@ -1,16 +1,29 @@
-From: barrchongkimwong@att.net (Barrister Chong Kim Wong)
-Date: Fri, 18 Feb 2011 19:16:58 +0800
-Subject: Good Day
-Message-ID: <USERPCb85c2c46a1c547bfb1d9327afd4c59d9@userPC>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Fri, 18 Feb 2011 20:35:28 +0530
+Subject: [PATCH 0/2] Add PRUSS UIO driver support
+Message-ID: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am Chong Kim Wong, Attorney at law.I have contacted you to assist in 
-distributing the money left behind by my Late client , that shares the same 
-name as yours,who lost his life alongside his wife and only child in 
-(Beirut-bound charter jet) plane crash on the Monday, 9 January 2006,Prior to 
-the Death of my Late Client.Get back to me via email for more detils:barrchongkim1 at hotmail.com
+This patch series add support for PRUSS (Programmable Real-time Unit Sub System) UIO driver in Texas Instruments DA850, AM18xx and OMAPL1-38 processors. PRUSS is programmable RISC core which can be used to implement Soft IPs (eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers (eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts to user space application.PRUSS UIO application API can be used to control PRUs in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host processor and PRUs. More information on PRUSS and UIO linux user space API available in the links below
 
-Regards And hope to hear from you soon.
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide 
 
-Barr Chong Kim Wong 
+PRUSS UIO driver support patch applies on top of Linus's tree latest.
+Both patches applies on top of linux-davinci tree latest. 
+
+Pratheesh Gangadhar (2):
+  PRUSS UIO driver support
+  Defines DA850/AM18xx/OMAPL1-38 SOC resources used by PRUSS UIO driver
+
+ arch/arm/mach-davinci/board-da850-evm.c    |    4 +
+ arch/arm/mach-davinci/da850.c              |   35 ++++
+ arch/arm/mach-davinci/devices-da8xx.c      |   73 ++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    3 +
+ drivers/uio/Kconfig                        |   10 +
+ drivers/uio/Makefile                       |    1 +
+ drivers/uio/uio_pruss.c                    |  250 ++++++++++++++++++++++++++++
+ 7 files changed, 376 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
