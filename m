@@ -1,58 +1,32 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Fri, 18 Feb 2011 11:02:46 +0100
-Subject: [PATCH RESEND 2.6.39 1/3] ARM: simpad: Add ucb1x00 GPIO definitions
-	and register GPIO
-In-Reply-To: <1298023368-27090-1-git-send-email-jochen@scram.de>
-References: <1298023368-27090-1-git-send-email-jochen@scram.de>
-Message-ID: <1298023368-27090-2-git-send-email-jochen@scram.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 18 Feb 2011 11:07:01 +0100
+Subject: [PATCH] ARM: PXA: Make PXA27x/PXA3xx overlay actually work
+In-Reply-To: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+References: <1296679619-32666-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <20110218100701.GA24655@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ucb1x00 GPIO definitions to simpad.h and add gpio_base
-to ucb1x00 platform device so the pins are available using
-the GPIO API.
+Hi Vasily,
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-sa1100/include/mach/simpad.h |   13 +++++++++++++
- arch/arm/mach-sa1100/simpad.c              |    1 +
- 2 files changed, 14 insertions(+), 0 deletions(-)
+On Wed, Feb 02, 2011 at 10:46:59PM +0200, Vasily Khoruzhick wrote:
+> From: "Russell King - ARM Linux" <linux@arm.linux.org.uk>
+> 
+> Release callback tries to free memory even if it was not allocated in
+> map_video_memory. Fix PXA27x/3xx overlay memory management and make overlay
+> actually work.
 
-diff --git a/arch/arm/mach-sa1100/include/mach/simpad.h b/arch/arm/mach-sa1100/include/mach/simpad.h
-index 9296c45..231550d 100644
---- a/arch/arm/mach-sa1100/include/mach/simpad.h
-+++ b/arch/arm/mach-sa1100/include/mach/simpad.h
-@@ -48,6 +48,19 @@
- #define GPIO_SMART_CARD		GPIO_GPIO10
- #define IRQ_GPIO_SMARD_CARD	IRQ_GPIO10
- 
-+/*--- ucb1x00 GPIO ---*/
-+#define SIMPAD_UCB1X00_GPIO_BASE	(GPIO_MAX + 1)
-+#define SIMPAD_UCB1X00_GPIO_PROG1	(SIMPAD_UCB1X00_GPIO_BASE)
-+#define SIMPAD_UCB1X00_GPIO_PROG2	(SIMPAD_UCB1X00_GPIO_BASE + 1)
-+#define SIMPAD_UCB1X00_GPIO_UP		(SIMPAD_UCB1X00_GPIO_BASE + 2)
-+#define SIMPAD_UCB1X00_GPIO_DOWN	(SIMPAD_UCB1X00_GPIO_BASE + 3)
-+#define SIMPAD_UCB1X00_GPIO_LEFT	(SIMPAD_UCB1X00_GPIO_BASE + 4)
-+#define SIMPAD_UCB1X00_GPIO_RIGHT	(SIMPAD_UCB1X00_GPIO_BASE + 5)
-+#define SIMPAD_UCB1X00_GPIO_6		(SIMPAD_UCB1X00_GPIO_BASE + 6)
-+#define SIMPAD_UCB1X00_GPIO_7		(SIMPAD_UCB1X00_GPIO_BASE + 7)
-+#define SIMPAD_UCB1X00_GPIO_HEADSET	(SIMPAD_UCB1X00_GPIO_BASE + 8)
-+#define SIMPAD_UCB1X00_GPIO_SPEAKER	(SIMPAD_UCB1X00_GPIO_BASE + 9)
-+
- // CS3 Latch is write only, a shadow is necessary
- 
- #define CS3BUSTYPE unsigned volatile long
-diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-index cfb7607..718b802 100644
---- a/arch/arm/mach-sa1100/simpad.c
-+++ b/arch/arm/mach-sa1100/simpad.c
-@@ -132,6 +132,7 @@ static struct resource simpad_flash_resources [] = {
- static struct mcp_plat_data simpad_mcp_data = {
- 	.mccr0		= MCCR0_ADM,
- 	.sclk_rate	= 11981000,
-+	.gpio_base	= SIMPAD_UCB1X00_GPIO_BASE,
- };
- 
- 
+While at pxa overlay support you also might to fix that the xpos field
+in var->nonstd is also used for ypos in two places:
+
+ypos = NONSTD_TO_XPOS(var->nonstd);
+                ^^^
+
+I stumbled upon this but was not interested enough that moment to create
+a patch.
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
