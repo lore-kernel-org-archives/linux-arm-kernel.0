@@ -1,39 +1,51 @@
-From: drasko.draskovic@gmail.com (Drasko DRASKOVIC)
-Date: Fri, 18 Feb 2011 21:56:28 +0100
-Subject: Question About Linux Memory Mapping
-Message-ID: <AANLkTinUoFzzx4hM8SpUt-mpjn1Z5xmrDqmXwuELuu3e@mail.gmail.com>
+From: rdunlap@xenotime.net (Randy Dunlap)
+Date: Fri, 18 Feb 2011 12:50:43 -0800
+Subject: [PATCH] kbuild: reenable section mismatch analysis
+In-Reply-To: <1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110216200734.GA25184@merkur.ravnborg.org>
+	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110218125043.d65a4064.rdunlap@xenotime.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-in the article Booting ARM Linux :
-http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html
-I can see that mem map is passed via ATAG_MEM. However, in the same
-article it is mentioned that this information can also be passed via
-kernel command line paramters,  mem=<size>[KM][,@<phys_offset>].
+On Fri, 18 Feb 2011 21:47:20 +0100 Uwe Kleine-K?nig wrote:
 
-However, this does not seem to be true, as "mem" command line
-parameter seems to be formated like this : mem= n[KMG] (i.e. no
-offset), regarding to this reference :
-http://oreilly.com/linux/excerpts/9780596100797/kernel-boot-command-line-parameter-reference.html.
-Seems like memmap should be used instead.
+> This was disabled in commit
+> 
+> 	e5f95c8 (kbuild: print only total number of section mismatces found)
+> 
+> because there were too many warnings.  Now we're down to a reasonable
+> number again, so we start scaring people with the details.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-I tried passing the parameters like memmap= n[KMG]@start[KMG] but that
-had no effect at all - still the same amount of System Ram was read
-from ATAGS and presented in the system via /proc/iomem.
+Acked-by: Randy Dunlap <rdunlap@xenotime.net>
 
-What I needed it to reserve 1MB region for one FIFO at the end of RAM
-(or somewhere else)
-and protect it from the kernel. I tried passing memmap=
-n[KMG]$start[KMG], but that did not worn neither.
+Thanks.
 
-So my questions are following :
-1) Why commandlines are ignored and ATAGS are given priority ?
-2) What is the most elegant way to protect one region in RAM :
- a) By giving less memory with ATAGS_MEM and thus making protected
-region invisible to Linux, lying to it that RAM is smaller
- b) By changing somehow linker script
- c) By changing some configuration variables (which ?)
+> ---
+>  lib/Kconfig.debug |    4 ----
+>  1 files changed, 0 insertions(+), 4 deletions(-)
+> 
+> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+> index 2b97418..0f77ed1 100644
+> --- a/lib/Kconfig.debug
+> +++ b/lib/Kconfig.debug
+> @@ -102,11 +102,7 @@ config HEADERS_CHECK
+>  
+>  config DEBUG_SECTION_MISMATCH
+>  	bool "Enable full Section mismatch analysis"
+> -	depends on UNDEFINED || (BLACKFIN)
+>  	default y
+> -	# This option is on purpose disabled for now.
+> -	# It will be enabled when we are down to a reasonable number
+> -	# of section mismatch warnings (< 10 for an allyesconfig build)
+>  	help
+>  	  The section mismatch analysis checks if there are illegal
+>  	  references from one section to another section.
+> -- 
 
-Thanks for the answers and best regards,
-Drasko
+
+---
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
