@@ -1,108 +1,103 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:26:08 -0800
-Subject: [PATCH v2 19/21] ARM: tegra: clock: Add function to set SDMMC tap
-	delay
+Date: Sat, 19 Feb 2011 14:26:04 -0800
+Subject: [PATCH v2 15/21] ARM: tegra: clock: Round rate before setting rate
 In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <1298154371-5641-21-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-17-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDMMC controllers have extra bits in the clock source
-register that adjust the delay between the clock and data
-to compenstate for delays on the PCB.  The values need to
-be set from the clock code so the clock can be locked
-during the read-modify-write on the clock source register.
+Call the clock's round_rate op, if it exists, before calling
+the set_rate op.  This will help later when dvfs is added,
+dvfs needs to know what the final rate will be before the
+frequency changes.
+
+Also requires fixes to the round rate functions to ensure
+calling round rate and then set rate will not cause the
+frequency to be rounded down twice.  When picking clock
+divider values, the clock framework picks the closest
+frequency that is lower than the requested frequency.  If
+the new frequency calculated from the divider value is
+rounded down, and then passed to set_rate, it will get
+rounded down again, possibly resulting in a frequency two
+steps lower than the original requested frequency.
+
+Fix the problem by rounding up when calculating the frequency
+coming out of a clock divider, so if that frequency is
+requested again, the same divider value will be picked.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/clock.c            |   12 ++++++++++++
- arch/arm/mach-tegra/clock.h            |    1 +
- arch/arm/mach-tegra/include/mach/clk.h |    2 ++
- arch/arm/mach-tegra/tegra2_clocks.c    |   19 +++++++++++++++++++
- 4 files changed, 34 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/clock.c         |   12 ++++++++++++
+ arch/arm/mach-tegra/tegra2_clocks.c |    8 ++++----
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index 9798585..0df6206 100644
+index 8d01a49..9798585 100644
 --- a/arch/arm/mach-tegra/clock.c
 +++ b/arch/arm/mach-tegra/clock.c
-@@ -433,6 +433,18 @@ int __init tegra_disable_boot_clocks(void)
- late_initcall(tegra_disable_boot_clocks);
- #endif
+@@ -86,6 +86,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
  
-+/* The SDMMC controllers have extra bits in the clock source register that
-+ * adjust the delay between the clock and data to compenstate for delays
-+ * on the PCB. */
-+void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-+{
-+	unsigned long flags;
+ 	if (c->mul != 0 && c->div != 0) {
+ 		rate *= c->mul;
++		rate += c->div / 2; /* round up */
+ 		do_div(rate, c->div);
+ 	}
+ 
+@@ -240,12 +241,23 @@ EXPORT_SYMBOL(clk_get_parent);
+ 
+ int clk_set_rate_locked(struct clk *c, unsigned long rate)
+ {
++	long new_rate;
 +
-+	spin_lock_irqsave(&c->spinlock, flags);
-+	tegra2_sdmmc_tap_delay(c, delay);
-+	spin_unlock_irqrestore(&c->spinlock, flags);
-+}
+ 	if (!c->ops || !c->ops->set_rate)
+ 		return -ENOSYS;
+ 
+ 	if (rate > c->max_rate)
+ 		rate = c->max_rate;
+ 
++	if (c->ops && c->ops->round_rate) {
++		new_rate = c->ops->round_rate(c, rate);
 +
- #ifdef CONFIG_DEBUG_FS
- 
- static int __clk_lock_all_spinlocks(void)
-diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
-index ebe6ea8..688316a 100644
---- a/arch/arm/mach-tegra/clock.h
-+++ b/arch/arm/mach-tegra/clock.h
-@@ -155,5 +155,6 @@ int clk_reparent(struct clk *c, struct clk *parent);
- void tegra_clk_init_from_table(struct tegra_clk_init_table *table);
- unsigned long clk_get_rate_locked(struct clk *c);
- int clk_set_rate_locked(struct clk *c, unsigned long rate);
-+void tegra2_sdmmc_tap_delay(struct clk *c, int delay);
- 
- #endif
-diff --git a/arch/arm/mach-tegra/include/mach/clk.h b/arch/arm/mach-tegra/include/mach/clk.h
-index fa7f9ca..c8baf8f 100644
---- a/arch/arm/mach-tegra/include/mach/clk.h
-+++ b/arch/arm/mach-tegra/include/mach/clk.h
-@@ -26,4 +26,6 @@ void tegra_periph_reset_deassert(struct clk *c);
- void tegra_periph_reset_assert(struct clk *c);
- 
- unsigned long clk_get_rate_all_locked(struct clk *c);
-+void tegra_sdmmc_tap_delay(struct clk *c, int delay);
++		if (new_rate < 0)
++			return new_rate;
 +
- #endif
++		rate = new_rate;
++	}
++
+ 	return c->ops->set_rate(c, rate);
+ }
+ 
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 395d006..cc2616c 100644
+index 2734889..480c0f6 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -74,6 +74,10 @@
- #define PERIPH_CLK_SOURCE_DIVU16_MASK	0xFFFF
- #define PERIPH_CLK_SOURCE_DIV_SHIFT	0
+@@ -866,9 +866,9 @@ static long tegra2_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
+ 		divider = clk_div71_get_divider(parent_rate, rate);
+ 		if (divider < 0)
+ 			return divider;
+-		return parent_rate * 2 / (divider + 2);
++		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
+ 	} else if (c->flags & DIV_2) {
+-		return parent_rate / 2;
++		return DIV_ROUND_UP(parent_rate, 2);
+ 	}
+ 	return -EINVAL;
+ }
+@@ -1058,12 +1058,12 @@ static long tegra2_periph_clk_round_rate(struct clk *c,
+ 		if (divider < 0)
+ 			return divider;
  
-+#define SDMMC_CLK_INT_FB_SEL		(1 << 23)
-+#define SDMMC_CLK_INT_FB_DLY_SHIFT	16
-+#define SDMMC_CLK_INT_FB_DLY_MASK	(0xF << SDMMC_CLK_INT_FB_DLY_SHIFT)
-+
- #define PLL_BASE			0x0
- #define PLL_BASE_BYPASS			(1<<31)
- #define PLL_BASE_ENABLE			(1<<30)
-@@ -1079,6 +1083,21 @@ static struct clk_ops tegra_periph_clk_ops = {
- 	.reset			= &tegra2_periph_clk_reset,
- };
- 
-+/* The SDMMC controllers have extra bits in the clock source register that
-+ * adjust the delay between the clock and data to compenstate for delays
-+ * on the PCB. */
-+void tegra2_sdmmc_tap_delay(struct clk *c, int delay)
-+{
-+	u32 reg;
-+
-+	delay = clamp(delay, 0, 15);
-+	reg = clk_readl(c->reg);
-+	reg &= ~SDMMC_CLK_INT_FB_DLY_MASK;
-+	reg |= SDMMC_CLK_INT_FB_SEL;
-+	reg |= delay << SDMMC_CLK_INT_FB_DLY_SHIFT;
-+	clk_writel(reg, c->reg);
-+}
-+
- /* External memory controller clock ops */
- static void tegra2_emc_clk_init(struct clk *c)
- {
+-		return parent_rate * 2 / (divider + 2);
++		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
+ 	} else if (c->flags & DIV_U16) {
+ 		divider = clk_div16_get_divider(parent_rate, rate);
+ 		if (divider < 0)
+ 			return divider;
+-		return parent_rate / (divider + 1);
++		return DIV_ROUND_UP(parent_rate, divider + 1);
+ 	}
+ 	return -EINVAL;
+ }
 -- 
 1.7.3.1
