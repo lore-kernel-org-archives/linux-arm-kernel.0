@@ -1,55 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Feb 2011 10:00:17 +0000
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 19 Feb 2011 11:16:17 +0100
 Subject: platform/i2c busses: pm runtime and system sleep
-In-Reply-To: <AANLkTim2TfG-18XN3r9m3Rq68ZD6QHUY7X82E4-XWH83@mail.gmail.com>
+In-Reply-To: <20110219100017.GA29493@n2100.arm.linux.org.uk>
 References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
 	<201102181928.05911.rjw@sisk.pl>
 	<AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
 	<201102182120.29977.rjw@sisk.pl>
 	<20110218202744.GA19427@n2100.arm.linux.org.uk>
 	<AANLkTim2TfG-18XN3r9m3Rq68ZD6QHUY7X82E4-XWH83@mail.gmail.com>
-Message-ID: <20110219100017.GA29493@n2100.arm.linux.org.uk>
+	<20110219100017.GA29493@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinz55AAYA7Ltgcs_z+ysedxtavW2xsdw4=4qP0_@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 19, 2011 at 10:54:57AM +0100, Linus Walleij wrote:
-> 2011/2/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> 
-> > Do we have any pressing need to convert AMBA stuff? ?I haven't heard any
-> > reason yet to convert them to runtime PM - they don't even make any
-> > runtime PM calls.
-> >
-> > Maybe Linus can comment on the PM stuff as he has SoCs with these in.
-> > As my boards don't have any sensible PM support, I don't have any
-> > visibility of what PM facilities would be required.
-> 
-> Sure, basically I ACK Rabins patch and his reasoning for it. (BTW
-> Rabin spends most of his days working on the Ux500 SoCs too.)
-> 
-> The runtime PM we need for Ux500 is to switch off silicon core
-> voltage first and foremost. The call I've added to switch of a core
-> voltage regulator will need to be called when the silicon is idle.
-> 
-> In spi/amba-pl022.c I take the most brutal approach with a recent
-> patch: hammer off this core switch (and clock) whenever the hardware
-> is not used. This is simple in this driver since it has no state to preserve
-> across transfers, it is written such that the core is loaded with the
-> appropriate state for each message.
-> 
-> Continuing this approach we run into two problems with this
-> and other drivers:
-> 
-> -  Hammering off/on the clock+voltage is causing delays in HW
->    so what you want is some hysteresis (usually, wait a few us/ms
->    then switch off) - sort of a takeoff/landing effect.
-> 
-> -  Modelling voltage domains as regulators is nice, but require
->    us to switch on/off from process context, so we cannot do this
->    from interrupt handlers.
-> 
-> Both of these problems are solved by elegance if we use runtime
-> PM, since it will provide a hysteresis timeout that can be triggered
-> from interrupt context and call the idling hooks in process context.
+2011/2/19 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> [Me]
+>> Both of these problems are solved by elegance if we use runtime
+>> PM, since it will provide a hysteresis timeout that can be triggered
+>> from interrupt context and call the idling hooks in process context.
+>
+> So what's the interdependence with the platform bus that was being talked
+> about earlier in this thread?
 
-So what's the interdependence with the platform bus that was being talked
-about earlier in this thread?
+That's about consistency of runtime PM semantics across
+different buses as I understand it.
+
+We have both platform bus and AMBA bus devices in the system,
+so it is desireable if the semantics of their runtime PM are identical.
+
+If I understand it, the difference is that the platform bus will call
+runtime_suspend() on the device even if it was already in suspended
+state, so the question is about whether the AMBA runtime PM
+should do this too since it is similar to the platform bus, or if it should
+go for the more intutive approach of not suspending suspended
+hardware.
+
+I think the current patch from Rabin as it stands does the latter, and
+is good as it stands. It's the other buses and their drivers that
+need patching.
+
+Yours,
+Linus Walleij
