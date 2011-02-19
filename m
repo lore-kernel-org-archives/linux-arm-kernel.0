@@ -1,256 +1,110 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:26:05 -0800
-Subject: [PATCH v2 16/21] ARM: tegra: Add external memory controller driver
+Date: Sat, 19 Feb 2011 14:26:03 -0800
+Subject: [PATCH v2 14/21] ARM: tegra: clock: Refcount periph clock enables
 In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <1298154371-5641-18-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-16-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some peripheral clocks share enable bits.  Refcount the enables so
+that calling clk_disable on one clock will not turn off another
+clock.
+
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/Kconfig      |    4 +
- arch/arm/mach-tegra/Makefile     |    1 +
- arch/arm/mach-tegra/tegra2_emc.c |  172 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/tegra2_emc.h |   27 ++++++
- 4 files changed, 204 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-tegra/tegra2_emc.c
- create mode 100644 arch/arm/mach-tegra/tegra2_emc.h
+ arch/arm/mach-tegra/tegra2_clocks.c |   35 +++++++++++++++++++++++++++++------
+ 1 files changed, 29 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 9f4fc6b..42d44c7 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -71,3 +71,7 @@ config TEGRA_SYSTEM_DMA
- 	  several Tegra device drivers
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index 196c249..2734889 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -154,6 +154,12 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+  */
+ static DEFINE_SPINLOCK(clock_register_lock);
  
- endif
-+
-+config TEGRA_EMC_SCALING_ENABLE
-+	bool "Enable scaling the memory frequency"
-+	default n
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 23de060..3fe357b 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -9,6 +9,7 @@ obj-y                                   += powergate.o
- obj-y					+= fuse.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
-+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
- obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-new file mode 100644
-index 0000000..bd4fa27
---- /dev/null
-+++ b/arch/arm/mach-tegra/tegra2_emc.c
-@@ -0,0 +1,172 @@
 +/*
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
++ * Some peripheral clocks share an enable bit, so refcount the enable bits
++ * in registers CLK_ENABLE_L, CLK_ENABLE_H, and CLK_ENABLE_U
 + */
++static int tegra_periph_clk_enable_refcount[3 * 32];
 +
-+#include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
+ #define clk_writel(value, reg) \
+ 	__raw_writel(value, (u32)reg_clk_base + (reg))
+ #define clk_readl(reg) \
+@@ -920,8 +926,19 @@ static void tegra2_periph_clk_init(struct clk *c)
+ static int tegra2_periph_clk_enable(struct clk *c)
+ {
+ 	u32 val;
++	unsigned long flags;
++	int refcount;
+ 	pr_debug("%s on clock %s\n", __func__, c->name);
+ 
++	spin_lock_irqsave(&clock_register_lock, flags);
 +
-+#include <mach/iomap.h>
++	refcount = tegra_periph_clk_enable_refcount[c->u.periph.clk_num]++;
 +
-+#include "tegra2_emc.h"
++	spin_unlock_irqrestore(&clock_register_lock, flags);
 +
-+#ifdef CONFIG_TEGRA_EMC_SCALING_ENABLE
-+static bool emc_enable = true;
-+#else
-+static bool emc_enable;
-+#endif
-+module_param(emc_enable, bool, 0644);
++	if (refcount > 1)
++		return 0;
 +
-+static void __iomem *emc = IO_ADDRESS(TEGRA_EMC_BASE);
-+static const struct tegra_emc_table *tegra_emc_table;
-+static int tegra_emc_table_size;
+ 	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+ 		CLK_OUT_ENB_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
+ 	if (!(c->flags & PERIPH_NO_RESET) && !(c->flags & PERIPH_MANUAL_RESET))
+@@ -939,10 +956,20 @@ static int tegra2_periph_clk_enable(struct clk *c)
+ 
+ static void tegra2_periph_clk_disable(struct clk *c)
+ {
++	unsigned long flags;
 +
-+static inline void emc_writel(u32 val, unsigned long addr)
-+{
-+	writel(val, emc + addr);
-+}
+ 	pr_debug("%s on clock %s\n", __func__, c->name);
+ 
+-	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+-		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
++	spin_lock_irqsave(&clock_register_lock, flags);
 +
-+static inline u32 emc_readl(unsigned long addr)
-+{
-+	return readl(emc + addr);
-+}
++	if (c->refcnt)
++		tegra_periph_clk_enable_refcount[c->u.periph.clk_num]--;
 +
-+static const unsigned long emc_reg_addr[TEGRA_EMC_NUM_REGS] = {
-+	0x2c,	/* RC */
-+	0x30,	/* RFC */
-+	0x34,	/* RAS */
-+	0x38,	/* RP */
-+	0x3c,	/* R2W */
-+	0x40,	/* W2R */
-+	0x44,	/* R2P */
-+	0x48,	/* W2P */
-+	0x4c,	/* RD_RCD */
-+	0x50,	/* WR_RCD */
-+	0x54,	/* RRD */
-+	0x58,	/* REXT */
-+	0x5c,	/* WDV */
-+	0x60,	/* QUSE */
-+	0x64,	/* QRST */
-+	0x68,	/* QSAFE */
-+	0x6c,	/* RDV */
-+	0x70,	/* REFRESH */
-+	0x74,	/* BURST_REFRESH_NUM */
-+	0x78,	/* PDEX2WR */
-+	0x7c,	/* PDEX2RD */
-+	0x80,	/* PCHG2PDEN */
-+	0x84,	/* ACT2PDEN */
-+	0x88,	/* AR2PDEN */
-+	0x8c,	/* RW2PDEN */
-+	0x90,	/* TXSR */
-+	0x94,	/* TCKE */
-+	0x98,	/* TFAW */
-+	0x9c,	/* TRPAB */
-+	0xa0,	/* TCLKSTABLE */
-+	0xa4,	/* TCLKSTOP */
-+	0xa8,	/* TREFBW */
-+	0xac,	/* QUSE_EXTRA */
-+	0x114,	/* FBIO_CFG6 */
-+	0xb0,	/* ODT_WRITE */
-+	0xb4,	/* ODT_READ */
-+	0x104,	/* FBIO_CFG5 */
-+	0x2bc,	/* CFG_DIG_DLL */
-+	0x2c0,	/* DLL_XFORM_DQS */
-+	0x2c4,	/* DLL_XFORM_QUSE */
-+	0x2e0,	/* ZCAL_REF_CNT */
-+	0x2e4,	/* ZCAL_WAIT_CNT */
-+	0x2a8,	/* AUTO_CAL_INTERVAL */
-+	0x2d0,	/* CFG_CLKTRIM_0 */
-+	0x2d4,	/* CFG_CLKTRIM_1 */
-+	0x2d8,	/* CFG_CLKTRIM_2 */
-+};
++	if (tegra_periph_clk_enable_refcount[c->u.periph.clk_num] == 0)
++		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
++			CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
 +
-+/* Select the closest EMC rate that is higher than the requested rate */
-+long tegra_emc_round_rate(unsigned long rate)
-+{
-+	int i;
-+	int best = -1;
-+	unsigned long distance = ULONG_MAX;
-+
-+	if (!tegra_emc_table)
-+		return -EINVAL;
-+
-+	if (!emc_enable)
-+		return -EINVAL;
-+
-+	pr_debug("%s: %lu\n", __func__, rate);
-+
-+	/* The EMC clock rate is twice the bus rate, and the bus rate is
-+	 * measured in kHz */
-+	rate = rate / 2 / 1000;
-+
-+	for (i = 0; i < tegra_emc_table_size; i++) {
-+		if (tegra_emc_table[i].rate >= rate &&
-+		    (tegra_emc_table[i].rate - rate) < distance) {
-+			distance = tegra_emc_table[i].rate - rate;
-+			best = i;
-+		}
-+	}
-+
-+	if (best < 0)
-+		return -EINVAL;
-+
-+	pr_debug("%s: using %lu\n", __func__, tegra_emc_table[best].rate);
-+
-+	return tegra_emc_table[best].rate * 2 * 1000;
-+}
-+
-+/* The EMC registers have shadow registers.  When the EMC clock is updated
-+ * in the clock controller, the shadow registers are copied to the active
-+ * registers, allowing glitchless memory bus frequency changes.
-+ * This function updates the shadow registers for a new clock frequency,
-+ * and relies on the clock lock on the emc clock to avoid races between
-+ * multiple frequency changes */
-+int tegra_emc_set_rate(unsigned long rate)
-+{
-+	int i;
-+	int j;
-+
-+	if (!tegra_emc_table)
-+		return -EINVAL;
-+
-+	/* The EMC clock rate is twice the bus rate, and the bus rate is
-+	 * measured in kHz */
-+	rate = rate / 2 / 1000;
-+
-+	for (i = 0; i < tegra_emc_table_size; i++)
-+		if (tegra_emc_table[i].rate == rate)
-+			break;
-+
-+	if (i >= tegra_emc_table_size)
-+		return -EINVAL;
-+
-+	pr_debug("%s: setting to %lu\n", __func__, rate);
-+
-+	for (j = 0; j < TEGRA_EMC_NUM_REGS; j++)
-+		emc_writel(tegra_emc_table[i].regs[j], emc_reg_addr[j]);
-+
-+	emc_readl(tegra_emc_table[i].regs[TEGRA_EMC_NUM_REGS - 1]);
-+
-+	return 0;
-+}
-+
-+void tegra_init_emc(const struct tegra_emc_table *table, int table_size)
-+{
-+	tegra_emc_table = table;
-+	tegra_emc_table_size = table_size;
-+}
-diff --git a/arch/arm/mach-tegra/tegra2_emc.h b/arch/arm/mach-tegra/tegra2_emc.h
-new file mode 100644
-index 0000000..3515e57
---- /dev/null
-+++ b/arch/arm/mach-tegra/tegra2_emc.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) 2010 Google, Inc.
-+ *
-+ * Author:
-+ *	Colin Cross <ccross@google.com>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#define TEGRA_EMC_NUM_REGS 46
-+
-+struct tegra_emc_table {
-+	unsigned long rate;
-+	u32 regs[TEGRA_EMC_NUM_REGS];
-+};
-+
-+int tegra_emc_set_rate(unsigned long rate);
-+long tegra_emc_round_rate(unsigned long rate);
-+void tegra_init_emc(const struct tegra_emc_table *table, int table_size);
++	spin_unlock_irqrestore(&clock_register_lock, flags);
+ }
+ 
+ static void tegra2_periph_clk_reset(struct clk *c, bool assert)
+@@ -1976,7 +2003,6 @@ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
+ 	PERIPH_CLK("i2s1",	"i2s.0",		NULL,	11,	0x100,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("i2s2",	"i2s.1",		NULL,	18,	0x104,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+-	/* FIXME: spdif has 2 clocks but 1 enable */
+ 	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	100000000, mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71),
+ 	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71),
+@@ -1989,7 +2015,6 @@ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("sbc4",	"spi_tegra.3",		NULL,	68,	0x1b4,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("ide",	"ide",			NULL,	25,	0x144,	100000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* requires min voltage */
+ 	PERIPH_CLK("ndflash",	"tegra_nand",		NULL,	13,	0x160,	164000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
+-	/* FIXME: vfir shares an enable with uartb */
+ 	PERIPH_CLK("vfir",	"vfir",			NULL,	7,	0x168,	72000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
+ 	PERIPH_CLK("sdmmc1",	"sdhci-tegra.0",	NULL,	14,	0x150,	52000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
+ 	PERIPH_CLK("sdmmc2",	"sdhci-tegra.1",	NULL,	9,	0x154,	52000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
+@@ -2017,13 +2042,11 @@ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("uarte",	"uart.4",		NULL,	66,	0x1c4,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
+ 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
+ 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+-	/* FIXME: vi and vi_sensor share an enable */
+ 	PERIPH_CLK("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+ 	PERIPH_CLK("vi_sensor",	"tegra_camera",		"vi_sensor",	20,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET), /* scales with voltage and process_id */
+ 	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+ 	PERIPH_CLK("mpe",	"mpe",			NULL,	60,	0x170,	250000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+ 	PERIPH_CLK("host1x",	"host1x",		NULL,	28,	0x180,	166000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
+-	/* FIXME: cve and tvo share an enable	*/
+ 	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
+ 	PERIPH_CLK("tvo",	"tvo",			NULL,	49,	0x188,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
+ 	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 -- 
 1.7.3.1
