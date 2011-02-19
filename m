@@ -1,96 +1,196 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:25:50 -0800
-Subject: [PATCH v2 01/21] ARM: tegra: clock: enable clk reset for
-	non-peripheral clocks
-In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
-References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <1298154371-5641-3-git-send-email-ccross@android.com>
+Date: Sat, 19 Feb 2011 14:25:48 -0800
+Subject: [PATCH v2 12/21] ARM: tegra: clock: Add shared bus clock type
+Message-ID: <1298154371-5641-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dima Zavin <dima@android.com>
+Some clocks may have multiple downstream users that need to request a
+higher clock rate.  Shared bus clocks provide a unique shared_bus_user
+clock to each user.  The frequency of the bus is set to the highest
+enabled shared_bus_user clock, with a minimum value set by the
+shared bus.  Drivers can use clk_enable and clk_disable to enable
+or disable their requirement, and clk_set_rate to set the minimum rate.
 
-Add a new 'reset' clk op. This can be provided for any clock,
-not just peripherals.
-
-Signed-off-by: Dima Zavin <dima@android.com>
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/clock.h         |    1 +
- arch/arm/mach-tegra/tegra2_clocks.c |   29 ++++++++++++++++++-----------
- 2 files changed, 19 insertions(+), 11 deletions(-)
+ arch/arm/mach-tegra/clock.h         |    8 +++
+ arch/arm/mach-tegra/tegra2_clocks.c |  116 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 124 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
-index 083a4cf..42f00c0 100644
+index a63dbf9..bb755c2 100644
 --- a/arch/arm/mach-tegra/clock.h
 +++ b/arch/arm/mach-tegra/clock.h
-@@ -86,6 +86,7 @@ struct clk_ops {
- 	int		(*set_parent)(struct clk *, struct clk *);
- 	int		(*set_rate)(struct clk *, unsigned long);
- 	long		(*round_rate)(struct clk *, unsigned long);
-+	void		(*reset)(struct clk *, bool);
- };
+@@ -85,6 +85,7 @@ struct clk {
+ 	struct clk_ops		*ops;
+ 	unsigned long		rate;
+ 	unsigned long		max_rate;
++	unsigned long		min_rate;
+ 	u32			flags;
+ 	const char		*name;
  
- enum clk_state {
+@@ -98,6 +99,8 @@ struct clk {
+ 	u32				reg;
+ 	u32				reg_shift;
+ 
++	struct list_head		shared_bus_list;
++
+ 	union {
+ 		struct {
+ 			unsigned int			clk_num;
+@@ -120,6 +123,11 @@ struct clk {
+ 			struct clk			*main;
+ 			struct clk			*backup;
+ 		} cpu;
++		struct {
++			struct list_head		node;
++			bool				enabled;
++			unsigned long			rate;
++		} shared_bus_user;
+ 	} u;
+ 
+ 	spinlock_t spinlock;
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 7a2926a..240f921 100644
+index a1c86d8..dd53af3 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -263,6 +263,18 @@ static struct clk_ops tegra_clk_m_ops = {
- 	.disable	= tegra2_clk_m_disable,
+@@ -1188,6 +1188,110 @@ static struct clk_ops tegra_cdev_clk_ops = {
+ 	.disable		= &tegra2_cdev_clk_disable,
  };
  
-+void tegra2_periph_reset_assert(struct clk *c)
++/* shared bus ops */
++/*
++ * Some clocks may have multiple downstream users that need to request a
++ * higher clock rate.  Shared bus clocks provide a unique shared_bus_user
++ * clock to each user.  The frequency of the bus is set to the highest
++ * enabled shared_bus_user clock, with a minimum value set by the
++ * shared bus.
++ */
++static int tegra_clk_shared_bus_update(struct clk *bus)
 +{
-+	BUG_ON(!c->ops->reset);
-+	c->ops->reset(c, true);
++	struct clk *c;
++	unsigned long rate = bus->min_rate;
++
++	list_for_each_entry(c, &bus->shared_bus_list, u.shared_bus_user.node)
++		if (c->u.shared_bus_user.enabled)
++			rate = max(c->u.shared_bus_user.rate, rate);
++
++	if (rate == clk_get_rate_locked(bus))
++		return 0;
++
++	return clk_set_rate_locked(bus, rate);
++};
++
++static void tegra_clk_shared_bus_init(struct clk *c)
++{
++	unsigned long flags;
++
++	c->max_rate = c->parent->max_rate;
++	c->u.shared_bus_user.rate = c->parent->max_rate;
++	c->state = OFF;
++#ifdef CONFIG_DEBUG_FS
++	c->set = 1;
++#endif
++
++	spin_lock_irqsave(&c->parent->spinlock, flags);
++
++	list_add_tail(&c->u.shared_bus_user.node,
++		&c->parent->shared_bus_list);
++
++	spin_unlock_irqrestore(&c->parent->spinlock, flags);
 +}
 +
-+void tegra2_periph_reset_deassert(struct clk *c)
++static int tegra_clk_shared_bus_set_rate(struct clk *c, unsigned long rate)
 +{
-+	BUG_ON(!c->ops->reset);
-+	c->ops->reset(c, false);
++	unsigned long flags;
++	int ret;
++
++	rate = clk_round_rate(c->parent, rate);
++	if (rate < 0)
++		return rate;
++
++	spin_lock_irqsave(&c->parent->spinlock, flags);
++
++	c->u.shared_bus_user.rate = rate;
++	ret = tegra_clk_shared_bus_update(c->parent);
++
++	spin_unlock_irqrestore(&c->parent->spinlock, flags);
++
++	return ret;
 +}
 +
- /* super clock functions */
- /* "super clocks" on tegra have two-stage muxes and a clock skipping
-  * super divider.  We will ignore the clock skipping divider, since we
-@@ -895,23 +907,17 @@ static void tegra2_periph_clk_disable(struct clk *c)
- 		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
- }
++static long tegra_clk_shared_bus_round_rate(struct clk *c, unsigned long rate)
++{
++	return clk_round_rate(c->parent, rate);
++}
++
++static int tegra_clk_shared_bus_enable(struct clk *c)
++{
++	unsigned long flags;
++	int ret;
++
++	spin_lock_irqsave(&c->parent->spinlock, flags);
++
++	c->u.shared_bus_user.enabled = true;
++	ret = tegra_clk_shared_bus_update(c->parent);
++
++	spin_unlock_irqrestore(&c->parent->spinlock, flags);
++
++	return ret;
++}
++
++static void tegra_clk_shared_bus_disable(struct clk *c)
++{
++	unsigned long flags;
++	int ret;
++
++	spin_lock_irqsave(&c->parent->spinlock, flags);
++
++	c->u.shared_bus_user.enabled = false;
++	ret = tegra_clk_shared_bus_update(c->parent);
++	WARN_ON_ONCE(ret);
++
++	spin_unlock_irqrestore(&c->parent->spinlock, flags);
++}
++
++static struct clk_ops tegra_clk_shared_bus_ops = {
++	.init = tegra_clk_shared_bus_init,
++	.enable = tegra_clk_shared_bus_enable,
++	.disable = tegra_clk_shared_bus_disable,
++	.set_rate = tegra_clk_shared_bus_set_rate,
++	.round_rate = tegra_clk_shared_bus_round_rate,
++};
++
++
+ /* Clock definitions */
+ static struct clk tegra_clk_32k = {
+ 	.name = "clk_32k",
+@@ -1858,6 +1962,17 @@ static struct clk_mux_sel mux_clk_32k[] = {
+ 		},					\
+ 	}
  
--void tegra2_periph_reset_deassert(struct clk *c)
-+static void tegra2_periph_clk_reset(struct clk *c, bool assert)
++#define SHARED_CLK(_name, _dev, _con, _parent)		\
++	{						\
++		.name      = _name,			\
++		.lookup    = {				\
++			.dev_id    = _dev,		\
++			.con_id    = _con,		\
++		},					\
++		.ops       = &tegra_clk_shared_bus_ops,	\
++		.parent = _parent,			\
++	}
++
+ struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("rtc",	"rtc-tegra",		NULL,	4,	0,	32768,     mux_clk_32k,			PERIPH_NO_RESET),
+ 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
+@@ -2001,6 +2116,7 @@ struct clk *tegra_ptr_clks[] = {
+ static void tegra2_init_one_clock(struct clk *c)
  {
--	pr_debug("%s on clock %s\n", __func__, c->name);
--	if (!(c->flags & PERIPH_NO_RESET))
--		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
--			RST_DEVICES_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
--}
-+	unsigned long base = assert ? RST_DEVICES_SET : RST_DEVICES_CLR;
- 
--void tegra2_periph_reset_assert(struct clk *c)
--{
--	pr_debug("%s on clock %s\n", __func__, c->name);
-+	pr_debug("%s %s on clock %s\n", __func__,
-+		 assert ? "assert" : "deassert", c->name);
- 	if (!(c->flags & PERIPH_NO_RESET))
- 		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
--			RST_DEVICES_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
-+			   base + PERIPH_CLK_TO_ENB_SET_REG(c));
- }
- 
--
- static int tegra2_periph_clk_set_parent(struct clk *c, struct clk *p)
- {
- 	u32 val;
-@@ -1002,6 +1008,7 @@ static struct clk_ops tegra_periph_clk_ops = {
- 	.set_parent		= &tegra2_periph_clk_set_parent,
- 	.set_rate		= &tegra2_periph_clk_set_rate,
- 	.round_rate		= &tegra2_periph_clk_round_rate,
-+	.reset			= &tegra2_periph_clk_reset,
- };
- 
- /* Clock doubler ops */
+ 	clk_init(c);
++	INIT_LIST_HEAD(&c->shared_bus_list);
+ 	if (!c->lookup.dev_id && !c->lookup.con_id)
+ 		c->lookup.con_id = c->name;
+ 	c->lookup.clk = c;
 -- 
 1.7.3.1
