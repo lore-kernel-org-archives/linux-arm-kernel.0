@@ -1,46 +1,65 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 18 Feb 2011 15:48:43 -0800
-Subject: [PATCH 1/3] ARM: Tegra: Add pll_d table entries for 252MHz
-In-Reply-To: <AANLkTimp==gtU2jvCYExqoV6tv-_dgvsF0yAf_k-F7CX@mail.gmail.com>
-References: <1298071093-23865-1-git-send-email-swarren@nvidia.com>
-	<1298071093-23865-2-git-send-email-swarren@nvidia.com>
-	<AANLkTimp==gtU2jvCYExqoV6tv-_dgvsF0yAf_k-F7CX@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03112A58DE@HQMAIL01.nvidia.com>
+From: weitway@gmail.com (Jason Chen)
+Date: Sat, 19 Feb 2011 10:22:08 +0800
+Subject: [PATCH 3/7] Add i.MX5 framebuffer driver
+In-Reply-To: <20110218095221.GK24426@pengutronix.de>
+References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+	<1297865452-32181-4-git-send-email-s.hauer@pengutronix.de>
+	<AANLkTina46_CMvB_9cqc4=PvcPxaV_BQ_H_ghJZFFxg8@mail.gmail.com>
+	<20110218095221.GK24426@pengutronix.de>
+Message-ID: <AANLkTi=hm41HUtwXJSdfGtjj2pRo1xAv1AmZ5zaTp5Sj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Erik Gilling wrote at Friday, February 18, 2011 4:46 PM:
+hi, Sascha,
+
+2011/2/18 Sascha Hauer <s.hauer@pengutronix.de>:
+> Hi Jason,
 >
-> These look good.  Have you run these through a CTS tester at 720x480
-> and 1280x720?  We pass those now and I want to make sure there's not
-> regressions.  We're supposed to be getting one in a week or two.  If
-> you haven't run it by then, I'll run a pass with these then merge.
-
-Unfortunately, I don't have one available, so no.
-
-(although I don't believe I made any changes to clocking, CTS, or N
-for those two modes, just 640x480).
-
-Thanks for the review and offer to test!
-
-> 
-> Cheers,
->    Erik
-> 
-> On Fri, Feb 18, 2011 at 3:18 PM, Stephen Warren <swarren@nvidia.com>
-> wrote:
-> > This rate is required for correct generation of 640x480 HDMI video;
-> > see subsequent patches.
-> >
-> > Note: I tested the entry with 12MHz input. The other entries are untested,
-> > but appear logically correct. However, I'm not familiar enough with PLLs
-> > to know if they perhaps exceed the PLL VCO frequency, nor whether the
-> > cpcon values are strictly correct.
-> >
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > ---
-> > ?arch/arm/mach-tegra/tegra2_clocks.c | ? ?5 +++++
-> > ?1 files changed, 5 insertions(+), 0 deletions(-)
-
--- 
-Nvpublic
+> On Fri, Feb 18, 2011 at 05:22:09PM +0800, Jason Chen wrote:
+>> hi, Sasha,
+>>
+>> > + ? ? ? if (var->vmode & FB_VMODE_ODD_FLD_FIRST) /* PAL */
+>> > + ? ? ? ? ? ? ? sig_cfg.odd_field_first = 1;
+>> > + ? ? ? if (var->sync & FB_SYNC_EXT)
+>> > + ? ? ? ? ? ? ? sig_cfg.ext_clk = 1;
+>> > + ? ? ? if (var->sync & FB_SYNC_HOR_HIGH_ACT)
+>> > + ? ? ? ? ? ? ? sig_cfg.Hsync_pol = 1;
+>> Please remove FB_SYNC_EXT support.
+>
+> No problem, can do. But why? Is it nonfunctional in the hardware
+> or is it that the current code just misses more pieces to support
+> this?
+>
+This flag represents external sync, some application will not check
+this flag when they reset fb var, for example, X server fb driver will
+ignore it, if so, the ipu external clock can not be set correctly.
+I think ipu should decide external clock usage by other method. The
+latest method in freesacle mainline is decide it automatically -- if
+internal clock can not fit target clock rate well, switch it to
+external.
+>>
+>> +static void imx_ipu_fb_disable_overlay(struct fb_info *ovl)
+>> +{
+>> + ? ? ? struct imx_ipu_fb_info *mxc_ovl = ovl->par;
+>> +
+>> + ? ? ? if (!mxc_ovl->enabled)
+>> + ? ? ? ? ? ? ? return;
+>> +
+>> + ? ? ? ipu_dp_disable_fg(mxc_ovl->dp);
+>> + ? ? ? ipu_wait_for_interrupt(451, 100);
+>> + ? ? ? ipu_idmac_disable_channel(mxc_ovl->ipu_ch);
+>> + ? ? ? ipu_dmfc_disable_channel(mxc_ovl->dmfc);
+>> + ? ? ? mxc_ovl->enabled = 0;
+>> +}
+>> Had better has a definition of ipu irq 451.
+>
+> Ok.
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
