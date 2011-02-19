@@ -1,81 +1,72 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:25:54 -0800
-Subject: [PATCH v2 05/21] ARM: tegra: clock: Disable clocks left on by
-	bootloader
+Date: Sat, 19 Feb 2011 14:26:02 -0800
+Subject: [PATCH v2 13/21] ARM: tegra: clock: Remove unnecessary uses of #ifdef
+	CONFIG_DEBUG_FS
 In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <1298154371-5641-7-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-15-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS that iterates
-through all clocks, disabling any for which the refcount
-is 0 but the clock init detected the bootloader left the
-clock on.
-
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/Kconfig |    6 ++++++
- arch/arm/mach-tegra/clock.c |   30 ++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/clock.c         |    6 ++----
+ arch/arm/mach-tegra/clock.h         |    2 +-
+ arch/arm/mach-tegra/tegra2_clocks.c |    4 +---
+ 3 files changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index f0fda77..9f4fc6b 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -57,6 +57,12 @@ config TEGRA_DEBUG_UARTE
- 
- endchoice
- 
-+config TEGRA_DISABLE_BOOTLOADER_CLOCKS
-+	bool "Disable clocks left on by bootloader"
-+	help
-+	  Disables clocks that are detected to be on but haven't
-+	  been requested by a kernel driver.
-+
- config TEGRA_SYSTEM_DMA
- 	bool "Enable system DMA driver for NVIDIA Tegra SoCs"
- 	default y
 diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index f55bb83..0ea5d92 100644
+index f6c934a..8d01a49 100644
 --- a/arch/arm/mach-tegra/clock.c
 +++ b/arch/arm/mach-tegra/clock.c
-@@ -511,6 +511,36 @@ int __init tegra_init_dvfs(void)
+@@ -135,7 +135,7 @@ void clk_init(struct clk *c)
  
- late_initcall(tegra_init_dvfs);
+ 	if (!c->ops || !c->ops->enable) {
+ 		c->refcnt++;
+-		c->set = 1;
++		c->set = true;
+ 		if (c->parent)
+ 			c->state = c->parent->state;
+ 		else
+@@ -169,9 +169,7 @@ int clk_enable(struct clk *c)
+ 				goto out;
+ 			}
+ 			c->state = ON;
+-#ifdef CONFIG_DEBUG_FS
+-			c->set = 1;
+-#endif
++			c->set = true;
+ 		}
+ 	}
+ 	c->refcnt++;
+diff --git a/arch/arm/mach-tegra/clock.h b/arch/arm/mach-tegra/clock.h
+index bb755c2..ebe6ea8 100644
+--- a/arch/arm/mach-tegra/clock.h
++++ b/arch/arm/mach-tegra/clock.h
+@@ -80,8 +80,8 @@ struct clk {
  
-+/*
-+ * Iterate through all clocks, disabling any for which the refcount is 0
-+ * but the clock init detected the bootloader left the clock on.
-+ */
-+#ifdef CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS
-+int __init tegra_disable_boot_clocks(void)
-+{
-+	unsigned long flags;
-+
-+	struct clk *c;
-+
-+	spin_lock_irqsave(&clock_lock, flags);
-+
-+	list_for_each_entry(c, &clocks, node) {
-+		if (c->refcnt == 0 && c->state == ON &&
-+				c->ops && c->ops->disable) {
-+			pr_warning("Disabling clock %s left on by bootloader\n",
-+				c->name);
-+			c->ops->disable(c);
-+			c->state = OFF;
-+		}
-+	}
-+
-+	spin_unlock_irqrestore(&clock_lock, flags);
-+
-+	return 0;
-+}
-+late_initcall(tegra_disable_boot_clocks);
-+#endif
-+
  #ifdef CONFIG_DEBUG_FS
- static struct dentry *clk_debugfs_root;
+ 	struct dentry		*dent;
+-	bool			set;
+ #endif
++	bool			set;
+ 	struct clk_ops		*ops;
+ 	unsigned long		rate;
+ 	unsigned long		max_rate;
+diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
+index dd53af3..196c249 100644
+--- a/arch/arm/mach-tegra/tegra2_clocks.c
++++ b/arch/arm/mach-tegra/tegra2_clocks.c
+@@ -1218,9 +1218,7 @@ static void tegra_clk_shared_bus_init(struct clk *c)
+ 	c->max_rate = c->parent->max_rate;
+ 	c->u.shared_bus_user.rate = c->parent->max_rate;
+ 	c->state = OFF;
+-#ifdef CONFIG_DEBUG_FS
+-	c->set = 1;
+-#endif
++	c->set = true;
+ 
+ 	spin_lock_irqsave(&c->parent->spinlock, flags);
  
 -- 
 1.7.3.1
