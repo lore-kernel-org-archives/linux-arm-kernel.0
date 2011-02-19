@@ -1,55 +1,56 @@
-From: ccross@google.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:59:04 -0800
-Subject: [PATCH] Fix hang on reboot with Tegra2
-In-Reply-To: <1297959237-8277-1-git-send-email-sjg@chromium.org>
-References: <1297959237-8277-1-git-send-email-sjg@chromium.org>
-Message-ID: <AANLkTi=4SAu7+McLpvRVtQP+QmuUGiXX4=teP8XvL=i-@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 19 Feb 2011 23:16:56 +0000
+Subject: [PATCH v4 12/19] ARM: LPAE: Add context switching support
+In-Reply-To: <20110219183027.GT29493@n2100.arm.linux.org.uk>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-13-git-send-email-catalin.marinas@arm.com>
+	<20110212104400.GF15616@n2100.arm.linux.org.uk>
+	<1297689846.31111.43.camel@e102109-lin.cambridge.arm.com>
+	<20110219183027.GT29493@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimrwJA_KkfueXohLbTe5-Ji57P127WCw-h_0umF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 8:13 AM, Simon Glass <sjg@chromium.org> wrote:
-> This seems to be a regression in 2.6.37.
-
-Thanks, I'll put this in linux-tegra-2.6.37 and a modified version in
-for-next, where arch_reset is in common.c.
-
-> We cannot use writel() here since the resulting wmb() calls l2x0_cache_sync()
-> which uses a spinlock and L1 cache may be off at this point.
-
-I'm going to change the readl to readl_relaxed as well.
-
-> Change-Id: Ia23b317dee919055ff4abba1484735ea3165fd99
-
-Upstream complains when they see these.
-
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041909.html
+On Saturday, 19 February 2011, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 14, 2011 at 01:24:06PM +0000, Catalin Marinas wrote:
+>> On Sat, 2011-02-12 at 10:44 +0000, Russell King - ARM Linux wrote:
+>> > On Mon, Jan 24, 2011 at 05:55:54PM +0000, Catalin Marinas wrote:
+>> > > +#ifdef CONFIG_ARM_LPAE
+>> > > +#define cpu_set_asid(asid) { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> > > + ? ? unsigned long ttbl, ttbh; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> > > + ? ? asm(" ? mrrc ? ?p15, 0, %0, %1, c2 ? ? ? ? ? ? ?@ read TTBR0\n" \
+>> > > + ? ? ? ? " ? mov ? ? %1, %1, lsl #(48 - 32) ? ? ? ? ?@ set ASID\n" ? \
+>> > > + ? ? ? ? " ? mcrr ? ?p15, 0, %0, %1, c2 ? ? ? ? ? ? ?@ set TTBR0\n" ?\
+>> > > + ? ? ? ? : "=r" (ttbl), "=r" (ttbh) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> > > + ? ? ? ? : "r" (asid & ~ASID_MASK)); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> >
+>> > This is wrong:
+>> > 1. It does nothing with %2 (the new asid)
+>> > 2. it shifts the high address bits of TTBR0 left 16 places each time its
+>> > ? ?called.
+>>
+>> It was worse actually, not even compiled in because it had output
+>> arguments but it wasn't volatile. Some early clobber is also needed.
+>> What about this:
+>>
+>> #define cpu_set_asid(asid) { ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ? ? ? unsigned long ttbl, ttbh; ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> ? ? ? asm volatile( ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> ? ? ? " ? ? ? mrrc ? ?p15, 0, %0, %1, c2 ? ? ? ? ? ? ?@ read TTBR0\n" \
+>> ? ? ? " ? ? ? mov ? ? %1, %2, lsl #(48 - 32) ? ? ? ? ?@ set ASID\n" ? \
+>> ? ? ? " ? ? ? mcrr ? ?p15, 0, %0, %1, c2 ? ? ? ? ? ? ?@ set TTBR0\n" ?\
+>> ? ? ? : "=&r" (ttbl), "=&r" (ttbh) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ? ? ? : "r" (asid & ~ASID_MASK)); ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? \
+>> }
 >
-> Signed-off-by: Simon Glass <sjg@chromium.org>
-> ---
-> ?arch/arm/mach-tegra/include/mach/system.h | ? ?4 +++-
-> ?1 files changed, 3 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
-> index 84d5d46..f1c0a79 100644
-> --- a/arch/arm/mach-tegra/include/mach/system.h
-> +++ b/arch/arm/mach-tegra/include/mach/system.h
-> @@ -33,7 +33,9 @@ static inline void arch_reset(char mode, const char *cmd)
-> ? ? ? ?void __iomem *reset = IO_ADDRESS(TEGRA_CLK_RESET_BASE + 0x04);
-> ? ? ? ?u32 reg = readl(reset);
-> ? ? ? ?reg |= 0x04;
-> - ? ? ? writel(reg, reset);
-> +
-> + ? ? ? /* use writel_related to avoid spinlock since L1 cache may be off */
-> + ? ? ? writel_relaxed(reg, reset);
-> ?}
->
-> ?#endif
-> --
-> 1.7.3.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> So we don't care about the low 16 bits of ttbh which can be simply zeroed?
+
+Since the pgd is always allocated from lowmem, it is within 32-bit of
+physical address and we can safely ignore ttbh. I could write a
+comment here to this.
+
+Catalin
+
+-- 
+Catalin
