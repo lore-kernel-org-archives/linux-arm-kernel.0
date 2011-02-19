@@ -1,176 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Feb 2011 18:01:19 +0000
-Subject: [PATCH V5 30/63] ST SPEAr: Replacing SIZE macro's with actual
-	required size
-In-Reply-To: <38be663ab3e653d889d64005a86ed4dcf8661ae1.1295499395.git.viresh.kumar@st.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<38be663ab3e653d889d64005a86ed4dcf8661ae1.1295499395.git.viresh.kumar@st.com>
-Message-ID: <20110219180119.GR29493@n2100.arm.linux.org.uk>
+Date: Sat, 19 Feb 2011 18:26:31 +0000
+Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
+	unsigned long for physical addresses
+In-Reply-To: <1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110219182631.GS29493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Same comments as the other patch changing to SZ_* macros.  Where possible
-fold these changes into the patch(es) which add the original definitions
-rather than having patches which add stuff and then separate patches
-which rework those patches.
+On Mon, Jan 24, 2011 at 05:55:57PM +0000, Catalin Marinas wrote:
+> From: Will Deacon <will.deacon@arm.com>
+> 
+> The unsigned long datatype is not sufficient for mapping physical addresses
+> >= 4GB.
+> 
+> This patch ensures that the phys_addr_t datatype is used to represent
+> physical addresses which may be beyond the range of an unsigned long.
+> The virt <-> phys macros are updated accordingly to ensure that virtual
+> addresses can remain as they are.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Could you do that and provide reworked patches please?  I'll publish the
-branch I've merged stuff onto thus far (but note that it's 'unstable'),
-but note that it won't contain the bits I've merged into the 'fixes'
-branch.
+This patch needs some more things fixed to prevent warnings:
 
-On Thu, Jan 20, 2011 at 12:56:08PM +0530, Viresh Kumar wrote:
-> From: Shiraz Hashim <shiraz.hashim@st.com>
-> 
-> In arch specific files SIZE macro's were defined which were used for
-> creating memory/io mappings for sepecific devices. These macro's are
-> coming straight from h/w user manual and are much greated than required
-> sizes. Replacing these macros by actual required size.
-> 
-> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
-> Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  arch/arm/mach-spear3xx/spear300.c |    9 +++------
->  arch/arm/mach-spear3xx/spear310.c |    2 +-
->  arch/arm/mach-spear3xx/spear320.c |    2 +-
->  arch/arm/mach-spear3xx/spear3xx.c |    8 ++++----
->  arch/arm/mach-spear6xx/spear6xx.c |   10 +++++-----
->  5 files changed, 14 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-> index 6989407..30e893f 100644
-> --- a/arch/arm/mach-spear3xx/spear300.c
-> +++ b/arch/arm/mach-spear3xx/spear300.c
-> @@ -604,8 +604,7 @@ struct spear_shirq shirq_ras1 = {
->  void sdhci_i2s_mem_enable(u8 mask)
->  {
->  	u32 val;
-> -	void __iomem *base = ioremap(SPEAR300_SOC_CONFIG_BASE,
-> -			SPEAR300_SOC_CONFIG_SIZE);
-> +	void __iomem *base = ioremap(SPEAR300_SOC_CONFIG_BASE, SZ_4K);
->  	if (!base) {
->  		pr_debug("sdhci_i2s_enb: ioremap fail\n");
->  		return;
-> @@ -628,8 +627,7 @@ void __init spear300_init(void)
->  	spear3xx_init();
->  
->  	/* shared irq registration */
-> -	shirq_ras1.regs.base =
-> -		ioremap(SPEAR300_TELECOM_BASE, SPEAR300_TELECOM_REG_SIZE);
-> +	shirq_ras1.regs.base = ioremap(SPEAR300_TELECOM_BASE, SZ_4K);
->  	if (shirq_ras1.regs.base) {
->  		ret = spear_shirq_register(&shirq_ras1);
->  		if (ret)
-> @@ -637,8 +635,7 @@ void __init spear300_init(void)
->  	}
->  
->  	/* pmx initialization */
-> -	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE,
-> -			SPEAR300_SOC_CONFIG_SIZE);
-> +	pmx_driver.base = ioremap(SPEAR300_SOC_CONFIG_BASE, SZ_4K);
->  	if (pmx_driver.base) {
->  		ret = pmx_register(&pmx_driver);
->  		if (ret)
-> diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-> index bb9ff7c..ffc1f63 100644
-> --- a/arch/arm/mach-spear3xx/spear310.c
-> +++ b/arch/arm/mach-spear3xx/spear310.c
-> @@ -362,7 +362,7 @@ void __init spear310_init(void)
->  	spear3xx_init();
->  
->  	/* shared irq registration */
-> -	base = ioremap(SPEAR310_SOC_CONFIG_BASE, SPEAR310_SOC_CONFIG_SIZE);
-> +	base = ioremap(SPEAR310_SOC_CONFIG_BASE, SZ_4K);
->  	if (base) {
->  		/* shirq 1 */
->  		shirq_ras1.regs.base = base;
-> diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-> index ab4ad8e..ac4f80b 100644
-> --- a/arch/arm/mach-spear3xx/spear320.c
-> +++ b/arch/arm/mach-spear3xx/spear320.c
-> @@ -694,7 +694,7 @@ void __init spear320_init(void)
->  	spear3xx_init();
->  
->  	/* shared irq registration */
-> -	base = ioremap(SPEAR320_SOC_CONFIG_BASE, SPEAR320_SOC_CONFIG_SIZE);
-> +	base = ioremap(SPEAR320_SOC_CONFIG_BASE, SZ_4K);
->  	if (base) {
->  		/* shirq 1 */
->  		shirq_ras1.regs.base = base;
-> diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-> index 6be49b3..0088b7c 100644
-> --- a/arch/arm/mach-spear3xx/spear3xx.c
-> +++ b/arch/arm/mach-spear3xx/spear3xx.c
-> @@ -235,22 +235,22 @@ struct map_desc spear3xx_io_desc[] __initdata = {
->  	{
->  		.virtual	= VA_SPEAR3XX_ICM1_UART_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR3XX_ICM1_UART_BASE),
-> -		.length		= SPEAR3XX_ICM1_UART_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR3XX_ML1_VIC_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR3XX_ML1_VIC_BASE),
-> -		.length		= SPEAR3XX_ML1_VIC_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR3XX_ICM3_SYS_CTRL_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_SYS_CTRL_BASE),
-> -		.length		= SPEAR3XX_ICM3_SYS_CTRL_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR3XX_ICM3_MISC_REG_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR3XX_ICM3_MISC_REG_BASE),
-> -		.length		= SPEAR3XX_ICM3_MISC_REG_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	},
->  };
-> diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-> index a948dd4..f8be93a 100644
-> --- a/arch/arm/mach-spear6xx/spear6xx.c
-> +++ b/arch/arm/mach-spear6xx/spear6xx.c
-> @@ -389,27 +389,27 @@ static struct map_desc spear6xx_io_desc[] __initdata = {
->  	{
->  		.virtual	= VA_SPEAR6XX_ICM1_UART0_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR6XX_ICM1_UART0_BASE),
-> -		.length		= SPEAR6XX_ICM1_UART0_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR6XX_CPU_VIC_PRI_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_PRI_BASE),
-> -		.length		= SPEAR6XX_CPU_VIC_PRI_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR6XX_CPU_VIC_SEC_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR6XX_CPU_VIC_SEC_BASE),
-> -		.length		= SPEAR6XX_CPU_VIC_SEC_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR6XX_ICM3_SYS_CTRL_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_SYS_CTRL_BASE),
-> -		.length		= SPEAR6XX_ICM3_MISC_REG_BASE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	}, {
->  		.virtual	= VA_SPEAR6XX_ICM3_MISC_REG_BASE,
->  		.pfn		= __phys_to_pfn(SPEAR6XX_ICM3_MISC_REG_BASE),
-> -		.length		= SPEAR6XX_ICM3_MISC_REG_SIZE,
-> +		.length		= SZ_4K,
->  		.type		= MT_DEVICE
->  	},
->  };
-> -- 
-> 1.7.3.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index a81355d..6cf76b3 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -809,9 +809,10 @@ static void __init sanity_check_meminfo(void)
+ 		 */
+ 		if (__va(bank->start) >= vmalloc_min ||
+ 		    __va(bank->start) < (void *)PAGE_OFFSET) {
+-			printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
++			printk(KERN_NOTICE "Ignoring RAM@%.8llx-%.8llx "
+ 			       "(vmalloc region overlap).\n",
+-			       bank->start, bank->start + bank->size - 1);
++			       (unsigned long long)bank->start,
++			       (unsigned long long)bank->start + bank->size - 1);
+ 			continue;
+ 		}
+ 
+@@ -822,10 +823,11 @@ static void __init sanity_check_meminfo(void)
+ 		if (__va(bank->start + bank->size) > vmalloc_min ||
+ 		    __va(bank->start + bank->size) < __va(bank->start)) {
+ 			unsigned long newsize = vmalloc_min - __va(bank->start);
+-			printk(KERN_NOTICE "Truncating RAM at %.8lx-%.8lx "
+-			       "to -%.8lx (vmalloc region overlap).\n",
+-			       bank->start, bank->start + bank->size - 1,
+-			       bank->start + newsize - 1);
++			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
++			       "to -%.8llx (vmalloc region overlap).\n",
++			       (unsigned long long)bank->start,
++			       (unsigned long long)bank->start + bank->size - 1,
++			       (unsigned long long)bank->start + newsize - 1);
+ 			bank->size = newsize;
+ 		}
+ #endif
