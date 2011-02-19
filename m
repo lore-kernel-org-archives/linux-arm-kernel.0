@@ -1,53 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 19 Feb 2011 10:54:57 +0100
-Subject: platform/i2c busses: pm runtime and system sleep
-In-Reply-To: <20110218202744.GA19427@n2100.arm.linux.org.uk>
-References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
-	<201102181928.05911.rjw@sisk.pl>
-	<AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
-	<201102182120.29977.rjw@sisk.pl>
-	<20110218202744.GA19427@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTim2TfG-18XN3r9m3Rq68ZD6QHUY7X82E4-XWH83@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 19 Feb 2011 10:54:48 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTi=rg2Du2RbakqpRNZZ7HHkhrsobz713YL29Wqoi@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<AANLkTi=W16NxpzhrBhxJPmk-CSe+yyxAXMh6YYq6oaEt@mail.gmail.com>
+	<AANLkTi=rg2Du2RbakqpRNZZ7HHkhrsobz713YL29Wqoi@mail.gmail.com>
+Message-ID: <201102191054.48706.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/18 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-
-> Do we have any pressing need to convert AMBA stuff? ?I haven't heard any
-> reason yet to convert them to runtime PM - they don't even make any
-> runtime PM calls.
+On Friday 18 February 2011 23:40:16 Andrei Warkentin wrote:
+> On Fri, Feb 18, 2011 at 1:47 PM, Andrei Warkentin <andreiw@motorola.com> wrote:
 >
-> Maybe Linus can comment on the PM stuff as he has SoCs with these in.
-> As my boards don't have any sensible PM support, I don't have any
-> visibility of what PM facilities would be required.
+> Flashbench timings for both Sandisk and Toshiba cards. Attaching due to size.
 
-Sure, basically I ACK Rabins patch and his reasoning for it. (BTW
-Rabin spends most of his days working on the Ux500 SoCs too.)
+Very nice, thanks for the measurement!
 
-The runtime PM we need for Ux500 is to switch off silicon core
-voltage first and foremost. The call I've added to switch of a core
-voltage regulator will need to be called when the silicon is idle.
+I don't think having the results inline in the mail is a problem,
+it would even make it easier to quote.
+ 
+> Some interesting things that I don't understand. For the align test, I
+> extended it to do a write align test (-A). I tried two partitions that
+> I could write over, and both read and writes behaved differently for
+> the two partitions on same device. Odd. They are both 4MB aligned.
 
-In spi/amba-pl022.c I take the most brutal approach with a recent
-patch: hammer off this core switch (and clock) whenever the hardware
-is not used. This is simple in this driver since it has no state to preserve
-across transfers, it is written such that the core is loaded with the
-appropriate state for each message.
+I never did a write align test because the results will be highly
+unreliable as soon as you get into thrashing. Your results seem
+to be meaningful still, so maybe we should have it after all, but
+I'll put a big warning on it.
 
-Continuing this approach we run into two problems with this
-and other drivers:
+> On the sandisk it was the write align that made the page size stand
+> out.  The read align had pretty constant results.
 
--  Hammering off/on the clock+voltage is causing delays in HW
-   so what you want is some hysteresis (usually, wait a few us/ms
-   then switch off) - sort of a takeoff/landing effect.
+I've noticed on other Sandisk media that the read align test is
+sometimes useless. It may help to do a full erase of the partition,
+or to fill it with data before running the test.
 
--  Modelling voltage domains as regulators is nice, but require
-   us to switch on/off from process context, so we cannot do this
-   from interrupt handlers.
+> On the toshiba the results varied wildly for the two partitions. For
+> partition 6, there was a clear pattern in the diff values for read
+> align. For 9, it was all over the place. For 9 with the write align,
+> 8K and 16K the crossing writes took ~115ms!! Look in attached files
+> for all the data.
 
-Both of these problems are solved by elegance if we use runtime
-PM, since it will provide a hysteresis timeout that can be triggered
-from interrupt context and call the idling hooks in process context.
+Partition 6 is a lot smaller, so you have the accesses less than a
+segment apart, so it shows other effects.
 
-Yours,
-Linus Walleij
+> The AU tests were interesting too, especially how with several open
+> AUs the throughput is higher for certain smaller sizes on sandisk, but
+> if I interpret it correctly both cards have at least 4 AUs, as I
+> didn't see yet a significant drop for small sizes. The larger ones I
+> am running now on mmcblk0p9 which is sufficiently larger for these
+> tests... (mmcblk0p6 is only 40mb, p9 is 314 mb)
+
+Right, you should try larger values for --open-au-nr here. It's at
+least a good sign that the drive can do random access inside a segment
+and that it can have at least 4 segments open. This is much better
+than I expected from your descriptions at first.
+
+However, the drop from 32 KB to 16 KB in performance is horrifying
+for the Toshiba drive, it's clear that this one does not like
+to be accessed smaller than 32 KB at a time, an obvious optimization
+for FAT32 with 32 KB clusters. How does this change with your
+kernel patches?
+
+For the sandisk drive, it's funny how it is consistently faster
+doing random access than linear access. I don't think I've seem that
+before. It does seem to have some cache for linear access using
+smaller than 16 KB, and can probably combine them when it's only
+writing to a single segment.
+
+	Arnd
