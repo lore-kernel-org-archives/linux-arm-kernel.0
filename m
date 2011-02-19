@@ -1,57 +1,81 @@
-From: sylvain.calador@gmail.com (Sylvain Calador)
-Date: Sat, 19 Feb 2011 22:45:40 +0100
-Subject: [PATCH] arm: mach-at91: remove double-semicolons
-Message-ID: <1298151940-14411-1-git-send-email-sylvain.calador@gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Sat, 19 Feb 2011 14:25:54 -0800
+Subject: [PATCH v2 05/21] ARM: tegra: clock: Disable clocks left on by
+	bootloader
+In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
+References: <1298154371-5641-1-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-7-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove double-semicolons.
+Adds CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS that iterates
+through all clocks, disabling any for which the refcount
+is 0 but the clock init detected the bootloader left the
+clock on.
 
-Signed-off-by: Sylvain Calador <sylvain.calador@gmail.com>
+Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-at91/at91cap9_devices.c    |    2 +-
- arch/arm/mach-at91/at91sam9g45_devices.c |    2 +-
- arch/arm/mach-at91/at91sam9rl_devices.c  |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-tegra/Kconfig |    6 ++++++
+ arch/arm/mach-tegra/clock.c |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index d1f775e..308ce7a 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -171,7 +171,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
- 	 */
- 	usba_udc_data.pdata.vbus_pin = -EINVAL;
- 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
--	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
-+	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index f0fda77..9f4fc6b 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -57,6 +57,12 @@ config TEGRA_DEBUG_UARTE
  
- 	if (data && data->vbus_pin > 0) {
- 		at91_set_gpio_input(data->vbus_pin, 0);
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 1e8f275..5e9f8a4 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -256,7 +256,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
- {
- 	usba_udc_data.pdata.vbus_pin = -EINVAL;
- 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
--	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
-+	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ endchoice
  
- 	if (data && data->vbus_pin > 0) {
- 		at91_set_gpio_input(data->vbus_pin, 0);
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 53aaa94..c49262b 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -145,7 +145,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
- 	 */
- 	usba_udc_data.pdata.vbus_pin = -EINVAL;
- 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
--	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));;
-+	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
++config TEGRA_DISABLE_BOOTLOADER_CLOCKS
++	bool "Disable clocks left on by bootloader"
++	help
++	  Disables clocks that are detected to be on but haven't
++	  been requested by a kernel driver.
++
+ config TEGRA_SYSTEM_DMA
+ 	bool "Enable system DMA driver for NVIDIA Tegra SoCs"
+ 	default y
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index f55bb83..0ea5d92 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -511,6 +511,36 @@ int __init tegra_init_dvfs(void)
  
- 	if (data && data->vbus_pin > 0) {
- 		at91_set_gpio_input(data->vbus_pin, 0);
+ late_initcall(tegra_init_dvfs);
+ 
++/*
++ * Iterate through all clocks, disabling any for which the refcount is 0
++ * but the clock init detected the bootloader left the clock on.
++ */
++#ifdef CONFIG_TEGRA_DISABLE_BOOTLOADER_CLOCKS
++int __init tegra_disable_boot_clocks(void)
++{
++	unsigned long flags;
++
++	struct clk *c;
++
++	spin_lock_irqsave(&clock_lock, flags);
++
++	list_for_each_entry(c, &clocks, node) {
++		if (c->refcnt == 0 && c->state == ON &&
++				c->ops && c->ops->disable) {
++			pr_warning("Disabling clock %s left on by bootloader\n",
++				c->name);
++			c->ops->disable(c);
++			c->state = OFF;
++		}
++	}
++
++	spin_unlock_irqrestore(&clock_lock, flags);
++
++	return 0;
++}
++late_initcall(tegra_disable_boot_clocks);
++#endif
++
+ #ifdef CONFIG_DEBUG_FS
+ static struct dentry *clk_debugfs_root;
+ 
 -- 
-1.7.0.4
+1.7.3.1
