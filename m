@@ -1,206 +1,62 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Sat, 19 Feb 2011 19:09:52 +0530
-Subject: [PATCH v2] OMAP: PM: DMA: Enable runtime pm
-In-Reply-To: <87ipwm1daa.fsf@ti.com>
-References: <1297082286-8449-1-git-send-email-manjugk@ti.com>
-	<87ipwm1daa.fsf@ti.com>
-Message-ID: <20110219133952.GB2167@manju-desktop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 19 Feb 2011 13:47:43 +0000
+Subject: [PATCH V5 00/63] Updating SPEAr Support
+In-Reply-To: <cover.1295499392.git.viresh.kumar@st.com>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+Message-ID: <20110219134743.GE29493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 02:06:53PM -0800, Kevin Hilman wrote:
-> "G, Manjunath Kondaiah" <manjugk@ti.com> writes:
-> 
-> > From: Manjunath G Kondaiah <manjugk@ti.com>
-> >
-> > Enable runtime pm and use pm_runtime_get_sync and pm_runtime_put_autosuspend
-> > for OMAP DMA driver.
-> >
-> > The DMA driver uses auto suspend feature of runtime pm framework through
-> > which the clock gets disabled automatically if there is no activity for
-> > more than one second.
-> >
-> > Testing:
-> > Compile: omap1_defconfig and omap2plus_defconfig
-> > Boot: OMAP1710(H3), OMAP2420(H4), OMAP3630(Zoom3), OMAP4(Blaze)
-> 
-> The normal DMA tests should also be run on these platforms.  Based on
-> the above, I can't tell any DMA tests were run.   Based on my tests,
-> this isn't working for chained xfers.
-> 
-> Using the runtime PM sysfs interface, you can check the runtime status
-> of the device:
-> 
-> # cat /sys/devices/platform/omap/omap_dma_system.0/power/runtime_status
-> 
-> It should show 'active' during transfer, and after timeout expires it
-> will show 'suspended'.
-> 
-> Doing some tests using my dmatest module:
-> 
->   git://gitorious.org/omap-test/dmatest.git
-> 
-> I noticed that it gets stuck in 'active' and never gets suspended when I
-> used DMA channel linking (load module using 'linking=1' as load-time option)
-> 
-> I'm not sure exactly why, but I will guess that the reason is that there
-> is an imbalance in get/put calls when using chaining, since 'get' is
-> only called once upon omap_start_dma() but 'put' is called for every
-> channel in the callback.
+I don't understand why people think that it's a good idea to post a
+patch series which adds new support and then has a whole series of
+patches which modify then modifies both new and old stuff.
 
-found this issue and fixed. It was due to chain handling in interrupt
-handler. Since get_sync used only in omap_start_dma for 1st transfer and there
-will be no omap_start_dma for second transfer onwards since it will be linked
-through chaining in interrupt handler. Here is the fix.
+It makes it a lot harder to apply, a lot harder to review, and all
+round is a bad idea.
 
-@@ -1895,8 +2002,11 @@ static int omap2_dma_handle_ch(int ch)
-                                                OMAP_DMA_DYNAMIC_CHAIN)
-                        disable_lnk(ch);
- 
--               if (!OMAP_DMA_CHAIN_QEMPTY(chain_id))
-+               if (!OMAP_DMA_CHAIN_QEMPTY(chain_id)) {
-                        OMAP_DMA_CHAIN_INCQHEAD(chain_id);
-+                       pm_runtime_get_sync(dev);
-+               }
-+
- 
-                status = p->dma_read(CSR, ch);
-                p->dma_write(status, CSR, ch);
+The problem is that mixing it up in the way you've done means that
+it's impossible to apply the cleanup patches before the new support.
 
--Manjunath
+Another issue worth pointing out is that submission of patch series
+by email has to be done _carefully_ - which basically means slowly.
+The email system on this planet will randomly re-order messages -
+there is no guarantee that the order in which you send them is the
+order in which they're received at the remote end.  If you want them
+to arrive in a certain order, you're out of luck.
 
-> 
-> > On zoom3 core retention is tested with following steps:
-> > echo 1 > /debug/pm_debug/sleep_while_idle
-> > echo 1 > /debug/pm_debug/enable_off_mode
-> > echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-> > echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-> > echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
-> > echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout
-> >
-> > It is observed that(on pm branch), core retention count gets increasing if the
-> > board is left idle for more than 5 seconds. However, it doesnot enter off mode
-> > (even without DMA runtime changes).
-> 
-> What silicon rev is on your Zoom3?  Mainline kernels now disable core
-> off-mode for 3630 revs < ES2.1 due to erratum i583.
-> 
-> If this happens, you should see something like this on the console:
-> 
->            Core OFF disabled due to errata i583
-> 
-> Kevin
-> 
-> > Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> > ---
-> >  arch/arm/plat-omap/dma.c |   27 +++++++++++++++++++++++++++
-> >  1 files changed, 27 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> > index 2ec3b5d..6bfe25c 100644
-> > --- a/arch/arm/plat-omap/dma.c
-> > +++ b/arch/arm/plat-omap/dma.c
-> > @@ -35,6 +35,7 @@
-> >  #include <linux/io.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/delay.h>
-> > +#include <linux/pm_runtime.h>
-> >  
-> >  #include <asm/system.h>
-> >  #include <mach/hardware.h>
-> > @@ -59,6 +60,7 @@ enum { DMA_CHAIN_STARTED, DMA_CHAIN_NOTSTARTED };
-> >  
-> >  static struct omap_system_dma_plat_info *p;
-> >  static struct omap_dma_dev_attr *d;
-> > +static struct device *dev;
-> >  
-> >  static int enable_1510_mode;
-> >  static u32 errata;
-> > @@ -676,6 +678,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
-> >  	unsigned long flags;
-> >  	struct omap_dma_lch *chan;
-> >  
-> > +	pm_runtime_get_sync(dev);
-> >  	spin_lock_irqsave(&dma_chan_lock, flags);
-> >  	for (ch = 0; ch < dma_chan_count; ch++) {
-> >  		if (free_ch == -1 && dma_chan[ch].dev_id == -1) {
-> > @@ -686,6 +689,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
-> >  	}
-> >  	if (free_ch == -1) {
-> >  		spin_unlock_irqrestore(&dma_chan_lock, flags);
-> > +		pm_runtime_put_autosuspend(dev);
-> >  		return -EBUSY;
-> >  	}
-> >  	chan = dma_chan + free_ch;
-> > @@ -743,6 +747,7 @@ int omap_request_dma(int dev_id, const char *dev_name,
-> >  	}
-> >  
-> >  	*dma_ch_out = free_ch;
-> > +	pm_runtime_put_autosuspend(dev);
-> >  
-> >  	return 0;
-> >  }
-> > @@ -871,6 +876,8 @@ void omap_start_dma(int lch)
-> >  {
-> >  	u32 l;
-> >  
-> > +	pm_runtime_get_sync(dev);
-> > +
-> >  	/*
-> >  	 * The CPC/CDAC register needs to be initialized to zero
-> >  	 * before starting dma transfer.
-> > @@ -1805,6 +1812,8 @@ static int omap1_dma_handle_ch(int ch)
-> >  	if (likely(dma_chan[ch].callback != NULL))
-> >  		dma_chan[ch].callback(ch, csr, dma_chan[ch].data);
-> >  
-> > +	pm_runtime_mark_last_busy(dev);
-> > +	pm_runtime_put_autosuspend(dev);
-> >  	return 1;
-> >  }
-> >  
-> > @@ -1899,6 +1908,8 @@ static int omap2_dma_handle_ch(int ch)
-> >  	if (likely(dma_chan[ch].callback != NULL))
-> >  		dma_chan[ch].callback(ch, status, dma_chan[ch].data);
-> >  
-> > +	pm_runtime_mark_last_busy(dev);
-> > +	pm_runtime_put_autosuspend(dev);
-> >  	return 0;
-> >  }
-> >  
-> > @@ -1978,6 +1989,7 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
-> >  		return -EINVAL;
-> >  	}
-> >  
-> > +	dev			= &pdev->dev;
-> >  	d			= p->dma_attr;
-> >  	errata			= p->errata;
-> >  
-> > @@ -1999,6 +2011,11 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
-> >  		}
-> >  	}
-> >  
-> > +	pm_runtime_use_autosuspend(dev);
-> > +	pm_runtime_set_autosuspend_delay(dev, 1000);
-> > +	pm_runtime_enable(dev);
-> > +	pm_runtime_get_sync(dev);
-> > +
-> >  	spin_lock_init(&dma_chan_lock);
-> >  	for (ch = 0; ch < dma_chan_count; ch++) {
-> >  		omap_clear_dma(ch);
-> > @@ -2064,6 +2081,16 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
-> >  		dma_chan[1].dev_id = 1;
-> >  	}
-> >  	p->show_dma_caps();
-> > +
-> > +	/*
-> > +	 * Note: If dma channels are reserved through boot paramters,
-> > +	 * then dma device is always enabled.
-> > +	 */
-> > +	if (omap_dma_reserve_channels)
-> > +		pm_runtime_get(dev);
-> > +
-> > +	pm_runtime_put_autosuspend(dev);
-> > +
-> >  	return 0;
-> >  
-> >  exit_dma_irq_fail:
+You can help by not dumping 63 patches into the mail system within a
+few seconds or so, but leaving a greater period of time between each.
+The longer that period, the more likely they are to arrive in order -
+but it's something that will never be guaranteed.
+
+As it is, I'm going to have to spend something like a few _hours_
+over sorting out how to merge these Spear patches because they're all
+out of order and they're all interdependent.
+
+That's another argument for not waiting until you have a huge patch
+set before sending stuff out - keep patch sets small and targetted to
+specific areas.  For instance, with the Versatile updates which form a
+total of 21 individual patches, I split them up into one set of 10
+patches which changed the way CLCD stuff was handled, and another
+separate set of 11 patches of platform specific stuff.
+
+So, why aren't all the padmux changes together?  Why aren't the clk
+API patches together?
+
+And another thing: separate out the 'fixes' from the new developments.
+Things like the addition of UL to VMALLOC_END counts as a warning fix.
+Using readl_relaxed/writel_relaxed also counts as a fix as things in
+the decompressor break.  As these are technically bug fixes, they go
+upstream faster than new work.
+
+Bug fixes should _always_ be at the very start of any patch series,
+then cleanups, then new stuff.
+
+In summary, I hate large patch sets.  I tend to ignore large patch
+sets.  I have very little motivation to review large patch sets.  I
+have very little motivation to apply large patch sets.  Don't create
+them in the first place.  Spend time sorting the patches into smaller
+sets and things all round go much easier.
+
+I'll work through what you've already submitted, but it will be a
+slow and erratic job.
