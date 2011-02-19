@@ -1,28 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Feb 2011 14:44:39 +0000
-Subject: [PATCH V5 41/63] ST SPEAr: replace readl, writel with
-	readl_relaxed, writel_relaxed in uncompress.h
-In-Reply-To: <c792c9602552d0650cd55c4f724257ad46b79cc8.1295499395.git.viresh.kumar@st.com>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<c792c9602552d0650cd55c4f724257ad46b79cc8.1295499395.git.viresh.kumar@st.com>
-Message-ID: <20110219144439.GG29493@n2100.arm.linux.org.uk>
+Date: Sat, 19 Feb 2011 15:00:06 +0000
+Subject: [RFC] MMC: error handling improvements
+In-Reply-To: <8yaoc6c7tan.fsf@huya.qualcomm.com>
+References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
+	<8yaoc6c7tan.fsf@huya.qualcomm.com>
+Message-ID: <20110219150006.GH29493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 12:56:19PM +0530, Viresh Kumar wrote:
-> readl also calls outer cache maintainance operations which are not available
-> during Linux uncompression. This patch replaces readl, writel with readl_relaxed
-> and writel_relaxed.
+On Tue, Feb 15, 2011 at 03:49:04PM -0800, David Brown wrote:
+> On Tue, Feb 15 2011, Russell King - ARM Linux wrote:
+> 
+> > This patch is for RFC only; it needs splitting up somewhat.  However, I
+> > wanted to get it out there for some comment.
+> 
+> Just for kicks, I applied this and ran it on an MSM target (8x50).  It
+> seems to cause lots of:
+> 
+>   mmc0: Data timeout
+>   mmc0: Controller has been re-initialized
+>   ...
+>   mmc0: Data CRC error
+> 
+> and I can post more if you would find them interesting.  Eventually the
+> MSM mmc driver derefernces a null pointer in the interrupt code.
 
-Shouldn't this be near the start of the series?
+That doesn't look right.  If resetting the MMC controller results in all
+state being lost, it presumably means the card gets powered down too.
+If that happens, the card needs to be reinitialized from scratch again,
+and I don't see how that happens in this driver.
 
-Also, would:
-
-"SPEAr: replace readl, writel with relaxed versions in uncompress.h
-
-readl() and writel() calls the outer cache maintainance operations
-which are not available during Linux uncompression. This patch replaces
-readl() and writel() with readl_relaxed() and writel_relaxed() to avoid
-the link time errors."
-
-be a better patch description?
+Nothing in this patch should cause data timeouts to appear where they
+weren't already appearing before the patch - the patch only changes
+what happens after an error occurs, so you must already be encountering
+errors on the interface before you applied this patch.
