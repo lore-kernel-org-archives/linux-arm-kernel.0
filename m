@@ -1,79 +1,154 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:26:00 -0800
-Subject: [PATCH v2 11/21] ARM: tegra: cpufreq: Take an extra reference to pllx
+Date: Sat, 19 Feb 2011 14:25:57 -0800
+Subject: [PATCH v2 08/21] ARM: tegra: clock: Rearrange static clock tables
 In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <1298154371-5641-13-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-10-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During cpu frequency changes, take an extra reference to pllx so
-that it doesn't turn off and on while the cpu is temporarily on
-pllp.  If the cpu is moved to pllp permanently, pllx will be
-turned off.
+Make the static clocks look more like the array of clocks
+so they can all be initalized with the same helper function.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/cpu-tegra.c     |    2 ++
- arch/arm/mach-tegra/tegra2_clocks.c |   15 +++++++++++----
- 2 files changed, 13 insertions(+), 4 deletions(-)
+ arch/arm/mach-tegra/tegra2_clocks.c |  106 +++++++++++++++++------------------
+ 1 files changed, 51 insertions(+), 55 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index cda03f1..f02ba60 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -173,6 +173,8 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
- 	if (IS_ERR(cpu_clk))
- 		return PTR_ERR(cpu_clk);
- 
-+	clk_enable(cpu_clk);
-+
- 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
- 	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
- 	policy->cur = tegra_getspeed(policy->cpu);
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index ab013b1..a1c86d8 100644
+index e1e0d81f..62ec3fb 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -385,10 +385,16 @@ static void tegra2_cpu_clk_disable(struct clk *c)
- static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
- {
- 	int ret;
-+	/*
-+	 * Take an extra reference to the main pll so it doesn't turn
-+	 * off when we move the cpu off of it
-+	 */
-+	clk_enable(c->u.cpu.main);
+@@ -1770,7 +1770,7 @@ static struct clk_mux_sel mux_clk_32k[] = {
+ 		.max_rate  = _max,			\
+ 	}
+ 
+-struct clk tegra_periph_clks[] = {
++struct clk tegra_list_clks[] = {
+ 	PERIPH_CLK("rtc",	"rtc-tegra",		NULL,	4,	0,	32768,     mux_clk_32k,			PERIPH_NO_RESET),
+ 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
+ 	PERIPH_CLK("i2s1",	"i2s.0",		NULL,	11,	0x100,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
+@@ -1879,71 +1879,67 @@ struct clk_duplicate tegra_clk_duplicates[] = {
+ 		.clk = ck,	\
+ 	}
+ 
+-struct clk_lookup tegra_clk_lookups[] = {
+-	/* external root sources */
+-	CLK(NULL,	"32k_clk",	&tegra_clk_32k),
+-	CLK(NULL,	"pll_s",	&tegra_pll_s),
+-	CLK(NULL,	"clk_m",	&tegra_clk_m),
+-	CLK(NULL,	"pll_m",	&tegra_pll_m),
+-	CLK(NULL,	"pll_m_out1",	&tegra_pll_m_out1),
+-	CLK(NULL,	"pll_c",	&tegra_pll_c),
+-	CLK(NULL,	"pll_c_out1",	&tegra_pll_c_out1),
+-	CLK(NULL,	"pll_p",	&tegra_pll_p),
+-	CLK(NULL,	"pll_p_out1",	&tegra_pll_p_out1),
+-	CLK(NULL,	"pll_p_out2",	&tegra_pll_p_out2),
+-	CLK(NULL,	"pll_p_out3",	&tegra_pll_p_out3),
+-	CLK(NULL,	"pll_p_out4",	&tegra_pll_p_out4),
+-	CLK(NULL,	"pll_a",	&tegra_pll_a),
+-	CLK(NULL,	"pll_a_out0",	&tegra_pll_a_out0),
+-	CLK(NULL,	"pll_d",	&tegra_pll_d),
+-	CLK(NULL,	"pll_d_out0",	&tegra_pll_d_out0),
+-	CLK(NULL,	"pll_u",	&tegra_pll_u),
+-	CLK(NULL,	"pll_x",	&tegra_pll_x),
+-	CLK(NULL,	"pll_e",	&tegra_pll_e),
+-	CLK(NULL,	"cclk",		&tegra_clk_cclk),
+-	CLK(NULL,	"sclk",		&tegra_clk_sclk),
+-	CLK(NULL,	"hclk",		&tegra_clk_hclk),
+-	CLK(NULL,	"pclk",		&tegra_clk_pclk),
+-	CLK(NULL,	"clk_d",	&tegra_clk_d),
+-	CLK(NULL,	"clk_dev1",	&tegra_dev1_clk),
+-	CLK(NULL,	"clk_dev2",	&tegra_dev2_clk),
+-	CLK(NULL,	"cpu",		&tegra_clk_virtual_cpu),
+-	CLK(NULL,	"blink",	&tegra_clk_blink),
+-};
++struct clk *tegra_ptr_clks[] = {
++	&tegra_clk_32k,
++	&tegra_pll_s,
++	&tegra_clk_m,
++	&tegra_pll_m,
++	&tegra_pll_m_out1,
++	&tegra_pll_c,
++	&tegra_pll_c_out1,
++	&tegra_pll_p,
++	&tegra_pll_p_out1,
++	&tegra_pll_p_out2,
++	&tegra_pll_p_out3,
++	&tegra_pll_p_out4,
++	&tegra_pll_a,
++	&tegra_pll_a_out0,
++	&tegra_pll_d,
++	&tegra_pll_d_out0,
++	&tegra_pll_u,
++	&tegra_pll_x,
++	&tegra_pll_e,
++	&tegra_clk_cclk,
++	&tegra_clk_sclk,
++	&tegra_clk_hclk,
++	&tegra_clk_pclk,
++	&tegra_clk_d,
++	&tegra_dev1_clk,
++	&tegra_dev2_clk,
++	&tegra_clk_virtual_cpu,
++	&tegra_clk_blink,
++};
 +
- 	ret = clk_set_parent(c->parent, c->u.cpu.backup);
- 	if (ret) {
- 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.backup->name);
--		return ret;
-+		goto out;
++static void tegra2_init_one_clock(struct clk *c)
++{
++	clk_init(c);
++	if (!c->lookup.dev_id && !c->lookup.con_id)
++		c->lookup.con_id = c->name;
++	c->lookup.clk = c;
++	clkdev_add(&c->lookup);
++}
+ 
+ void __init tegra2_init_clocks(void)
+ {
+ 	int i;
+-	struct clk_lookup *cl;
+ 	struct clk *c;
+-	struct clk_duplicate *cd;
+-
+-	for (i = 0; i < ARRAY_SIZE(tegra_clk_lookups); i++) {
+-		cl = &tegra_clk_lookups[i];
+-		clk_init(cl->clk);
+-		clkdev_add(cl);
+-	}
+ 
+-	for (i = 0; i < ARRAY_SIZE(tegra_periph_clks); i++) {
+-		c = &tegra_periph_clks[i];
+-		cl = &c->lookup;
+-		cl->clk = c;
++	for (i = 0; i < ARRAY_SIZE(tegra_ptr_clks); i++)
++		tegra2_init_one_clock(tegra_ptr_clks[i]);
+ 
+-		clk_init(cl->clk);
+-		clkdev_add(cl);
+-	}
++	for (i = 0; i < ARRAY_SIZE(tegra_list_clks); i++)
++		tegra2_init_one_clock(&tegra_list_clks[i]);
+ 
+ 	for (i = 0; i < ARRAY_SIZE(tegra_clk_duplicates); i++) {
+-		cd = &tegra_clk_duplicates[i];
+-		c = tegra_get_clock_by_name(cd->name);
+-		if (c) {
+-			cl = &cd->lookup;
+-			cl->clk = c;
+-			clkdev_add(cl);
+-		} else {
++		c = tegra_get_clock_by_name(tegra_clk_duplicates[i].name);
++		if (!c) {
+ 			pr_err("%s: Unknown duplicate clock %s\n", __func__,
+-				cd->name);
++				tegra_clk_duplicates[i].name);
++			continue;
+ 		}
++
++		tegra_clk_duplicates[i].lookup.clk = c;
++		clkdev_add(&tegra_clk_duplicates[i].lookup);
  	}
  
- 	if (rate == clk_get_rate(c->u.cpu.backup))
-@@ -397,17 +403,18 @@ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
- 	ret = clk_set_rate(c->u.cpu.main, rate);
- 	if (ret) {
- 		pr_err("Failed to change cpu pll to %lu\n", rate);
--		return ret;
-+		goto out;
- 	}
- 
- 	ret = clk_set_parent(c->parent, c->u.cpu.main);
- 	if (ret) {
- 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.main->name);
--		return ret;
-+		goto out;
- 	}
- 
- out:
--	return 0;
-+	clk_disable(c->u.cpu.main);
-+	return ret;
- }
- 
- static struct clk_ops tegra_cpu_ops = {
+ 	init_audio_sync_clock_mux();
 -- 
 1.7.3.1
