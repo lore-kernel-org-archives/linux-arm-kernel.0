@@ -1,31 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 19 Feb 2011 01:31:30 -0200
-Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
-	drivers
-In-Reply-To: <20110217131025.GO22310@pengutronix.de>
-References: <20110211181921.3d561568@queued.net>
-	<20110216094154.GV13279@pengutronix.de>
-	<4D5BC38E.1060009@freescale.com>
-	<20110216125820.GA22310@pengutronix.de>
-	<AANLkTimhXR=AWT6wV-MXhtW7dvs6OYW7OqaV5RPhFP5V@mail.gmail.com>
-	<20110217131025.GO22310@pengutronix.de>
-Message-ID: <AANLkTi=t0=Um26mEXZ1NLQWBYbukQnqm3d4B7B4G6MMF@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 19 Feb 2011 12:54:52 +0530
+Subject: platform/i2c busses: pm runtime and system sleep
+In-Reply-To: <20110218202744.GA19427@n2100.arm.linux.org.uk>
+References: <AANLkTinyDE3OxKup_aqsN8HJH_r5LcwkP17OtuMRpACx@mail.gmail.com>
+	<201102181928.05911.rjw@sisk.pl>
+	<AANLkTi=j9KeX2TSzMaKMWR6GpXjFcsjp0z8Rt+ArLXiV@mail.gmail.com>
+	<201102182120.29977.rjw@sisk.pl>
+	<20110218202744.GA19427@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinb0zVSUyNBAySH7K7=3bX-ecoQa--CzPJ+OM_b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-2011/2/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-...
->> I built it as module and the build went fine.
-> And you did a runtime test, too?
+On Sat, Feb 19, 2011 at 01:57, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Do we have any pressing need to convert AMBA stuff? ?I haven't heard any
+> reason yet to convert them to runtime PM - they don't even make any
+> runtime PM calls.
 >
-> If you did and that went smooth, I'll take a look again, because I
-> expected it to barf.
+> Maybe Linus can comment on the PM stuff as he has SoCs with these in.
+> As my boards don't have any sensible PM support, I don't have any
+> visibility of what PM facilities would be required.
 
-I haven?t performed a runtime test yet. I am travelling today and will
-be one week out of the office, but I can test it when I return.
+The rationale for runtime power control is the same as that for
+65500fa94aaeb3 "ARM: 6467/1: amba: optional PrimeCell core voltage
+switch".
 
-Regards,
+As compared to the regulator API which that patch is using, the runtime
+pm usage is more flexible (for example allowing certain power control
+APIs to be called from atomic context), provides callbacks for
+asynchronous turnoff with callbacks back to the driver to save/restore
+state (runtime_suspend()/runtime_resume()), and provides core support
+for things like "autosuspend" which allows delaying suspend until some
+time after last inactivity.  Using runtime PM also allows use of the new
+device-level power domain support ("PM: Add support for device power
+domains", in -next) to easily implement SoC-specific handling.
 
-Fabio Estevam
+We need to first add bus support for this to allow drivers to use this
+API.  It is possible to make the AMBA patch smaller and touch only the
+AMBA bus code by implementing support for the legacy bus-specific
+suspend/resume calls, and drivers can be later converted to pm-ops as
+needed.
