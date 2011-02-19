@@ -1,44 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Feb 2011 18:30:27 +0000
-Subject: [PATCH v4 12/19] ARM: LPAE: Add context switching support
-In-Reply-To: <1297689846.31111.43.camel@e102109-lin.cambridge.arm.com>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-13-git-send-email-catalin.marinas@arm.com>
-	<20110212104400.GF15616@n2100.arm.linux.org.uk>
-	<1297689846.31111.43.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110219183027.GT29493@n2100.arm.linux.org.uk>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Sat, 19 Feb 2011 19:34:27 +0100
+Subject: [PATCH 1/2] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024B83C108@dbde02.ent.ti.com>
+References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
+	<201102181644.17634.arnd@arndb.de>
+	<alpine.LFD.2.00.1102181713480.2701@localhost6.localdomain6>
+	<201102181731.05644.arnd@arndb.de>
+	<alpine.LFD.2.00.1102181802580.2701@localhost6.localdomain6>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83C108@dbde02.ent.ti.com>
+Message-ID: <20110219183427.GG4684@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 14, 2011 at 01:24:06PM +0000, Catalin Marinas wrote:
-> On Sat, 2011-02-12 at 10:44 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Jan 24, 2011 at 05:55:54PM +0000, Catalin Marinas wrote:
-> > > +#ifdef CONFIG_ARM_LPAE
-> > > +#define cpu_set_asid(asid) {                                         \
-> > > +     unsigned long ttbl, ttbh;                                       \
-> > > +     asm("   mrrc    p15, 0, %0, %1, c2              @ read TTBR0\n" \
-> > > +         "   mov     %1, %1, lsl #(48 - 32)          @ set ASID\n"   \
-> > > +         "   mcrr    p15, 0, %0, %1, c2              @ set TTBR0\n"  \
-> > > +         : "=r" (ttbl), "=r" (ttbh)                                  \
-> > > +         : "r" (asid & ~ASID_MASK));                                 \
-> > 
-> > This is wrong:
-> > 1. It does nothing with %2 (the new asid)
-> > 2. it shifts the high address bits of TTBR0 left 16 places each time its
-> >    called.
+On Sat, Feb 19, 2011 at 09:10:23PM +0530, TK, Pratheesh Gangadhar wrote:
 > 
-> It was worse actually, not even compiled in because it had output
-> arguments but it wasn't volatile. Some early clobber is also needed.
-> What about this:
-> 
-> #define cpu_set_asid(asid) {						\
-> 	unsigned long ttbl, ttbh;					\
-> 	asm volatile(							\
-> 	"	mrrc	p15, 0, %0, %1, c2		@ read TTBR0\n"	\
-> 	"	mov	%1, %2, lsl #(48 - 32)		@ set ASID\n"	\
-> 	"	mcrr	p15, 0, %0, %1, c2		@ set TTBR0\n"	\
-> 	: "=&r" (ttbl), "=&r" (ttbh)					\
-> 	: "r" (asid & ~ASID_MASK));					\
-> }
+> For my understanding - if the interrupt is not shared and not level triggered -
+> is this okay to have empty handler?
 
-So we don't care about the low 16 bits of ttbh which can be simply zeroed?
+Greg already said he won't accept that. And I'm quite sure these interrupts
+are level triggered, since that is the default on arch/omap.
+
+E.g. in arch/arm/mach-omap1/irq.c, a loop sets all irqs to level triggered
+handling: set_irq_handler(j, handle_level_irq); (line 234)
+
+> In this specific case, these interrupt lines are internal to SOC and hooked to ARM INTC from PRUSS. PRUSS has another INTC to handle system events to PRUSS as well as to generate system events to host ARM. These generated events are used for IPC between user application and PRU firmware and for async notifications from PRU firmware to user space. I don't see a reason to make it shared as we have 8 lines available for use. As mentioned before ARM INTC interrupt processing logic converts interrupts to active high pulses.
+
+What's a "pulse triggered interrupt"? I know level and edge triggered ones.
+
+> 
+> I also looked at the interrupt handling in existing UIO drivers
+> 
+> 
+> static irqreturn_t my_uio_handler(int irq, struct uio_info *dev_info)
+> {
+>         if (no interrupt is enabled and no interrupt is active) /For shared interrupt handling
+>                 return IRQ_NONE;
+> 
+>         disable interrupt; // For level triggered interrupts 
+>         return IRQ_HANDLED;
+> }
+> 
+> It's not clear how and where interrupts are re-enabled. Is this expected to be done from user space?
+
+That's the normal case, yes. You re-enable the interrupts by accessing the irq
+mask register of your chip.
+
+> 
+> Uio_secos3.c has an irqcontrol function to enable/disable interrupts. Is this the recommended approach?
+
+No. That is a workaround for broken hardware. You need it if and only if your
+chip 1) has several internal irq sources and 2) there's no possibility for
+the kernel to mask the interrupt in the chip without loosing the information
+which irq source actually triggered the interrupt.
+
+If that is the case, the kernel will disable the irq line in some other way
+without touching the chip. Userspace then needs a way to re-enable irqs,
+and that's where the irqcontrol function is used.
+
+Normally, you shouldn't need it.
+
+Thanks,
+Hans
