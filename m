@@ -1,36 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 18 Feb 2011 19:14:09 -0800
-Subject: [PATCH] msm: headsmp.S: Fix section mismatch
-Message-ID: <1298085249-10518-1-git-send-email-sboyd@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 19 Feb 2011 01:31:30 -0200
+Subject: [PATCH 16/17] mc13xxx: mfd_cell is now implicitly available to
+	drivers
+In-Reply-To: <20110217131025.GO22310@pengutronix.de>
+References: <20110211181921.3d561568@queued.net>
+	<20110216094154.GV13279@pengutronix.de>
+	<4D5BC38E.1060009@freescale.com>
+	<20110216125820.GA22310@pengutronix.de>
+	<AANLkTimhXR=AWT6wV-MXhtW7dvs6OYW7OqaV5RPhFP5V@mail.gmail.com>
+	<20110217131025.GO22310@pengutronix.de>
+Message-ID: <AANLkTi=t0=Um26mEXZ1NLQWBYbukQnqm3d4B7B4G6MMF@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: vmlinux.o(.cpuinit.text+0xc80): Section mismatch in
-reference from the function boot_secondary() to the variable
-.init.text:msm_secondary_startup
-The function __cpuinit boot_secondary() references a variable
-__init msm_secondary_startup.  If msm_secondary_startup is only
-used by boot_secondary then annotate msm_secondary_startup with
-a matching annotation.
+Hi Uwe,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/headsmp.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+2011/2/17 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+...
+>> I built it as module and the build went fine.
+> And you did a runtime test, too?
+>
+> If you did and that went smooth, I'll take a look again, because I
+> expected it to barf.
 
-diff --git a/arch/arm/mach-msm/headsmp.S b/arch/arm/mach-msm/headsmp.S
-index d0c2143..0c631a9 100644
---- a/arch/arm/mach-msm/headsmp.S
-+++ b/arch/arm/mach-msm/headsmp.S
-@@ -11,7 +11,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
--	__INIT
-+	__CPUINIT
- 
- /*
-  * MSM specific entry point for secondary CPUs.  This provides
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+I haven?t performed a runtime test yet. I am travelling today and will
+be one week out of the office, but I can test it when I return.
+
+Regards,
+
+Fabio Estevam
