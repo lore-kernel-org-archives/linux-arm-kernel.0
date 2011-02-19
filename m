@@ -1,41 +1,35 @@
 From: viresh.linux@gmail.com (viresh kumar)
-Date: Sat, 19 Feb 2011 22:46:53 +0530
-Subject: [PATCH V5 41/63] ST SPEAr: replace readl, writel with
-	readl_relaxed, writel_relaxed in uncompress.h
-In-Reply-To: <20110219144439.GG29493@n2100.arm.linux.org.uk>
+Date: Sat, 19 Feb 2011 22:50:13 +0530
+Subject: [PATCH V5 15/63] ST SPEAr: Correcting SOC Config base address for
+	spear320
+In-Reply-To: <20110219164020.GM29493@n2100.arm.linux.org.uk>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-	<c792c9602552d0650cd55c4f724257ad46b79cc8.1295499395.git.viresh.kumar@st.com>
-	<20110219144439.GG29493@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTiku32iA2qXWBWY1T8+p3DTnie-CnJ-pcW0-U73P@mail.gmail.com>
+	<cac5d194ea4be06a5a10dcf8059e87426ae1ee9d.1295499394.git.viresh.kumar@st.com>
+	<20110219164020.GM29493@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTi=bWPYaEyRMujLChAdGPNqCYXRoAKMgVqptLffD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2/19/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Thu, Jan 20, 2011 at 12:56:19PM +0530, Viresh Kumar wrote:
->> readl also calls outer cache maintainance operations which are not
->> available
->> during Linux uncompression. This patch replaces readl, writel with
->> readl_relaxed
->> and writel_relaxed.
+> On Thu, Jan 20, 2011 at 12:55:54PM +0530, Viresh Kumar wrote:
+>> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 >
-> Shouldn't this be near the start of the series?
+> This looks to me like another bug fix, and I'm treating it as such.  It
+> should be submitted separately from this patch set along with other bug
+> fixes, and clearly labelled as such.
 >
 
-Yes.
+Yes it is a bug fix and should have been submitted separately.
 
-> Also, would:
+> I've also changed the comments on this patch to:
 >
-> "SPEAr: replace readl, writel with relaxed versions in uncompress.h
+> "SPEAr: Correct SOC config base address for spear320
 >
-> readl() and writel() calls the outer cache maintainance operations
-> which are not available during Linux uncompression. This patch replaces
-> readl() and writel() with readl_relaxed() and writel_relaxed() to avoid
-> the link time errors."
->
-> be a better patch description?
+> SPEAR320_SOC_CONFIG_BASE was wrong, causing the wrong registers to be
+> accessed."
 >
 
-Obviously. Will take care of such things next time we send a patch.
+Thanks for your help. Will take care of commit message next time.
 
 --
 viresh
