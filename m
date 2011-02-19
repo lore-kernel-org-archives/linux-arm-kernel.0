@@ -1,60 +1,155 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 Feb 2011 12:20:54 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTimWAnPg2sYiLbfZXAAUiu7P5T3LmNoVbPi9RTEG@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<AANLkTi=rg2Du2RbakqpRNZZ7HHkhrsobz713YL29Wqoi@mail.gmail.com>
-	<AANLkTimWAnPg2sYiLbfZXAAUiu7P5T3LmNoVbPi9RTEG@mail.gmail.com>
-Message-ID: <201102191220.54815.arnd@arndb.de>
+From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
+Date: Sat, 19 Feb 2011 17:00:12 +0530
+Subject: [PATCH 1/2] PRUSS UIO driver support
+In-Reply-To: <20110218163147.GD4684@local>
+References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
+	<1298041530-26855-2-git-send-email-pratheesh@ti.com>
+	<20110218163147.GD4684@local>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024B83C0E8@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 19 February 2011 00:17:51 Andrei Warkentin wrote:
-> # echo 0 > /sys/block/mmcblk0/device/page_size
-> # ./flashbench -A -b 1024 /dev/block/mmcblk0p9
-> write align 8388608     pre 3.59ms      on 6.54ms       post 3.65ms     diff 2.92ms
-> write align 4194304     pre 4.13ms      on 7.37ms       post 4.27ms     diff 3.17ms
-> write align 2097152     pre 3.62ms      on 6.81ms       post 3.94ms     diff 3.03ms
-> write align 1048576     pre 3.62ms      on 6.53ms       post 3.55ms     diff 2.95ms
-> write align 524288      pre 3.62ms      on 6.51ms       post 3.63ms     diff 2.88ms
-> write align 262144      pre 3.62ms      on 6.51ms       post 3.63ms     diff 2.89ms
-> write align 131072      pre 3.62ms      on 6.5ms        post 3.63ms     diff 2.88ms
-> write align 65536       pre 3.61ms      on 6.49ms       post 3.62ms     diff 2.88ms
-> write align 32768       pre 3.61ms      on 6.49ms       post 3.61ms     diff 2.88ms
-> write align 16384       pre 3.68ms      on 107ms        post 3.51ms     diff 103ms
-> write align 8192        pre 3.74ms      on 121ms        post 3.91ms     diff 117ms
-> write align 4096        pre 3.88ms      on 3.87ms       post 3.87ms     diff -2937ns
-> write align 2048        pre 3.89ms      on 3.88ms       post 3.88ms     diff -8734ns
-> # fjnh84 at fjnh84-desktop:~/src/n/src/flash$ adb -s 17006185428011d7 shell
-> # echo 8192 > /sys/block/mmcblk0/device/page_size
-> # cd data
-> # ./flashbench -A -b 1024 /dev/block/mmcblk0p9
-> write align 8388608     pre 3.33ms      on 6.8ms        post 3.65ms     diff 3.31ms
-> write align 4194304     pre 4.34ms      on 8.14ms       post 4.53ms     diff 3.71ms
-> write align 2097152     pre 3.64ms      on 7.31ms       post 4.09ms     diff 3.44ms
-> write align 1048576     pre 3.65ms      on 7.52ms       post 3.65ms     diff 3.87ms
-> write align 524288      pre 3.62ms      on 6.8ms        post 3.63ms     diff 3.17ms
-> write align 262144      pre 3.62ms      on 6.84ms       post 3.63ms     diff 3.22ms
-> write align 131072      pre 3.62ms      on 6.85ms       post 3.44ms     diff 3.32ms
-> write align 65536       pre 3.39ms      on 6.8ms        post 3.66ms     diff 3.28ms
-> write align 32768       pre 3.64ms      on 6.86ms       post 3.66ms     diff 3.21ms
-> write align 16384       pre 3.67ms      on 6.86ms       post 3.65ms     diff 3.2ms
-> write align 8192        pre 3.66ms      on 6.84ms       post 3.64ms     diff 3.19ms
-> write align 4096        pre 3.71ms      on 3.71ms       post 3.64ms     diff 38.6?s
-> write align 2048        pre 3.71ms      on 3.71ms       post 3.72ms     diff -656ns
+> -----Original Message-----
+> From: Hans J. Koch [mailto:hjk at hansjkoch.de]
+> Sent: Friday, February 18, 2011 10:02 PM
+> To: TK, Pratheesh Gangadhar
+> Cc: davinci-linux-open-source at linux.davincidsp.com; hjk at hansjkoch.de;
+> gregkh at suse.de; Chatterjee, Amit; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] PRUSS UIO driver support
 > 
-> This was with the split unaligned accesses patch... Which I am
-> attaching for comments.
+> On Fri, Feb 18, 2011 at 08:35:29PM +0530, Pratheesh Gangadhar wrote:
+> > Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
+> >
+> > This patch implements PRUSS (Programmable Real-time Unit Sub System)
+> > UIO driver which exports SOC resources associated with PRUSS like
+> > I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
+> > processors which is efficient in performing embedded tasks that
+> > require manipulation of packed memory mapped data structures and
+> > efficient in handling system events that have tight real time
+> > constraints. This driver is currently supported on Texas Instruments
+> > DA850, AM18xx and OMAPL1-38 devices.
+> > For example, PRUSS runs firmware for real-time critical industrial
+> > communication data link layer and communicates with application stack
+> > running in user space via shared memory and IRQs.
+> 
+> I see a few issues, comments below.
+> 
+> Thanks,
+> Hans
+> 
+> > ---
+> >  drivers/uio/Kconfig     |   10 ++
+> >  drivers/uio/Makefile    |    1 +
+> >  drivers/uio/uio_pruss.c |  250
+> +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 261 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/uio/uio_pruss.c
+> >
+> > diff --git a/drivers/uio/Kconfig b/drivers/uio/Kconfig
+> > index bb44079..631ffe3 100644
+> > --- a/drivers/uio/Kconfig
+> > +++ b/drivers/uio/Kconfig
+> > @@ -94,4 +94,14 @@ config UIO_NETX
+> >  	  To compile this driver as a module, choose M here; the module
+> >  	  will be called uio_netx.
+> >
+> > +config UIO_PRUSS
+> > +	tristate "Texas Instruments PRUSS driver"
+> > +	depends on ARCH_DAVINCI_DA850
+> > +	default n
+> 
+> That line is unneccessary, "n" is already the default.
+> 
+Ok, will fix in the next version.
+> > +	help
+> > +	  PRUSS driver for OMAPL138/DA850/AM18XX devices
+> > +	  PRUSS driver requires user space components
+> > +	  To compile this driver as a module, choose M here: the module
+> > +	  will be called uio_pruss.
+> > +
+> >  endif
+> > +#define MAX_PRUSS_EVTOUT_INSTANCE	(8)
+> 
+> The brackets are not needed.
+> 
+Will fix in the next version.
+> > +
+> > +static struct clk *pruss_clk;
+> > +static struct uio_info *info[MAX_PRUSS_EVTOUT_INSTANCE];
+> 
+> is it really neccessary to allocate that statically?
+> 
+> > +static void *ddr_virt_addr;
+> > +static dma_addr_t ddr_phy_addr;
+> > +
+Agree - not necessary - will fix.
 
-I agree, this is very fascinating behavior. 100ms second latency for a
-single 2KB access is definitely something we should try to avoid, and I
-wonder why the drive decides to do that. It must get into a state where
-it requires an extra garbage collection (you mentioned that earlier).
+> > +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
+> > +{
+> > +	return IRQ_HANDLED;
+> > +}
+> 
+> ROTFL. That reminds me of an old story. The last time I wrote this, and
+> Greg dared to post it, we received this reply:
+> 
+> http://marc.info/?l=linux-kernel&m=116604101232144&w=2
+> 
+> So, if you really have a _very_ good reason why this _always_ works on
+> _any_ DA850 board, add a comment that explains why. Otherwise the whole
+> patch set will be doomed.
+> 
+It always worked for me during the tests on the h/w. So did not bother to dig into the details then. From AM1808/AM1810 ARM Microprocessor System Reference Guide (http://focus.ti.com/general/docs/lit/getliterature.tsp?literatureNumber=sprugm9a&fileType=pdf), section 11.3.1 Interrupt processing
+The interrupt processing block does the following tasks:
+	-Synchronization of slower and asynchronous interrupts
+	- Conversion of polarity to active high
+	- Conversion of interrupt type to pulse interrupts
+After the processing block, all interrupts will be active-high pulses
 
-The numbers you see here are taken over multiple runs. Do you see a lot
-of fluctuation when doing this with --count=1?
+Interrupt processing is the first step in INTC h/w which maps system interrupts to ARM (host) interrupts (FIQ, IRQ). 
 
-Also, does the same happen with other blocksizes, e.g. 4096 or 8192, passed
-to flashbench?
+However I am willing to clean this up to meet the kernel guidelines and good practices... 
+> > +
+> > +static int __devinit pruss_probe(struct platform_device *dev)
+> > +{
+> > +	int ret = -ENODEV;
+> > +	int count = 0;
+> > +	struct resource *regs_pruram, *regs_l3ram, *regs_ddr;
+> > +	char *string;
+> > +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
+> > +		info[count]->mem[0].addr = regs_pruram->start;
+> > +		info[count]->mem[0].size =
+> > +		    regs_pruram->end - regs_pruram->start + 1;
+> > +		if (!info[count]->mem[0].addr
+> > +		    || !(info[count]->mem[0].size - 1)) {
+> 
+> That size check looks fishy. If somebody forgot to set the size it's OK ?
+> 
+size is set just previous line, right? If regs_prum_ram->end== regs_prum_ram->start - then there is something wrong... 
 
-	Arnd
+> > +			dev_err(&dev->dev, "Invalid memory resource\n");
+> > +			break;
+> > +		}
+> > +		info[count]->mem[0].internal_addr =
+> > +		    ioremap(regs_pruram->start, info[count]->mem[0].size);
+> > +		if (!info[count]->mem[0].internal_addr) {
+> > +			dev_err(&dev->dev,
+> > +				"Can't remap memory address range\n");
+> > +			break;
+> > +		}
+> > +		/* Register PRUSS IRQ lines */
+> > +		info[count]->irq = IRQ_DA8XX_EVTOUT0 + count;
+> > +
+> > +		info[count]->irq_flags = IRQF_SHARED;
+> 
+> How do you handle shared interrupts with the handler above?
+> 
+> > +		info[count]->handler = pruss_handler;
+> 
+> And how do you make sure your interrupts are not level triggered? The
+> handler above will hang for level triggered interrupts.
+
+As mentioned above interrupt controller (ARM INTC) converts interrupt type to pulse. After required processing is complete - user space handler clears the interrupt from PRUSS.
+
+Thanks,
+Pratheesh
