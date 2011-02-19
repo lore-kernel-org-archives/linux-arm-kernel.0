@@ -1,18 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 19 Feb 2011 17:16:01 +0000
-Subject: [PATCH V5 13/63] ST SPEAr: Updating Clock Support
-In-Reply-To: <b136f1242af026a0453de2c56b88bce55b41e222.1295499394.git.viresh.kumar@st.com>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Sat, 19 Feb 2011 22:46:53 +0530
+Subject: [PATCH V5 41/63] ST SPEAr: replace readl, writel with
+	readl_relaxed, writel_relaxed in uncompress.h
+In-Reply-To: <20110219144439.GG29493@n2100.arm.linux.org.uk>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-	<b136f1242af026a0453de2c56b88bce55b41e222.1295499394.git.viresh.kumar@st.com>
-Message-ID: <20110219171601.GP29493@n2100.arm.linux.org.uk>
+	<c792c9602552d0650cd55c4f724257ad46b79cc8.1295499395.git.viresh.kumar@st.com>
+	<20110219144439.GG29493@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTiku32iA2qXWBWY1T8+p3DTnie-CnJ-pcW0-U73P@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 20, 2011 at 12:55:52PM +0530, Viresh Kumar wrote:
->  arch/arm/mach-spear13xx/clock.c                  |  621 +++++++++++++++++++-
->  arch/arm/mach-spear13xx/include/mach/misc_regs.h |  101 ++--
+On 2/19/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Thu, Jan 20, 2011 at 12:56:19PM +0530, Viresh Kumar wrote:
+>> readl also calls outer cache maintainance operations which are not
+>> available
+>> during Linux uncompression. This patch replaces readl, writel with
+>> readl_relaxed
+>> and writel_relaxed.
+>
+> Shouldn't this be near the start of the series?
+>
 
-As I said in the patch system, I think this should be a preparatory
-patch before adding spear13xx support.  So I've committed this patch
-without the spear13xx changes.  When I commit the spear13xx changes
-I'll fold them into that patch.
+Yes.
+
+> Also, would:
+>
+> "SPEAr: replace readl, writel with relaxed versions in uncompress.h
+>
+> readl() and writel() calls the outer cache maintainance operations
+> which are not available during Linux uncompression. This patch replaces
+> readl() and writel() with readl_relaxed() and writel_relaxed() to avoid
+> the link time errors."
+>
+> be a better patch description?
+>
+
+Obviously. Will take care of such things next time we send a patch.
+
+--
+viresh
