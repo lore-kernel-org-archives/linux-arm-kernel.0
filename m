@@ -1,103 +1,79 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:26:04 -0800
-Subject: [PATCH v2 15/21] ARM: tegra: clock: Round rate before setting rate
+Date: Sat, 19 Feb 2011 14:26:00 -0800
+Subject: [PATCH v2 11/21] ARM: tegra: cpufreq: Take an extra reference to pllx
 In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <1298154371-5641-17-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-13-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call the clock's round_rate op, if it exists, before calling
-the set_rate op.  This will help later when dvfs is added,
-dvfs needs to know what the final rate will be before the
-frequency changes.
-
-Also requires fixes to the round rate functions to ensure
-calling round rate and then set rate will not cause the
-frequency to be rounded down twice.  When picking clock
-divider values, the clock framework picks the closest
-frequency that is lower than the requested frequency.  If
-the new frequency calculated from the divider value is
-rounded down, and then passed to set_rate, it will get
-rounded down again, possibly resulting in a frequency two
-steps lower than the original requested frequency.
-
-Fix the problem by rounding up when calculating the frequency
-coming out of a clock divider, so if that frequency is
-requested again, the same divider value will be picked.
+During cpu frequency changes, take an extra reference to pllx so
+that it doesn't turn off and on while the cpu is temporarily on
+pllp.  If the cpu is moved to pllp permanently, pllx will be
+turned off.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/clock.c         |   12 ++++++++++++
- arch/arm/mach-tegra/tegra2_clocks.c |    8 ++++----
- 2 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/mach-tegra/cpu-tegra.c     |    2 ++
+ arch/arm/mach-tegra/tegra2_clocks.c |   15 +++++++++++----
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index 8d01a49..9798585 100644
---- a/arch/arm/mach-tegra/clock.c
-+++ b/arch/arm/mach-tegra/clock.c
-@@ -86,6 +86,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index cda03f1..f02ba60 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -173,6 +173,8 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
+ 	if (IS_ERR(cpu_clk))
+ 		return PTR_ERR(cpu_clk);
  
- 	if (c->mul != 0 && c->div != 0) {
- 		rate *= c->mul;
-+		rate += c->div / 2; /* round up */
- 		do_div(rate, c->div);
- 	}
- 
-@@ -240,12 +241,23 @@ EXPORT_SYMBOL(clk_get_parent);
- 
- int clk_set_rate_locked(struct clk *c, unsigned long rate)
- {
-+	long new_rate;
++	clk_enable(cpu_clk);
 +
- 	if (!c->ops || !c->ops->set_rate)
- 		return -ENOSYS;
- 
- 	if (rate > c->max_rate)
- 		rate = c->max_rate;
- 
-+	if (c->ops && c->ops->round_rate) {
-+		new_rate = c->ops->round_rate(c, rate);
-+
-+		if (new_rate < 0)
-+			return new_rate;
-+
-+		rate = new_rate;
-+	}
-+
- 	return c->ops->set_rate(c, rate);
- }
- 
+ 	cpufreq_frequency_table_cpuinfo(policy, freq_table);
+ 	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+ 	policy->cur = tegra_getspeed(policy->cpu);
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 2734889..480c0f6 100644
+index ab013b1..a1c86d8 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -866,9 +866,9 @@ static long tegra2_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
- 		divider = clk_div71_get_divider(parent_rate, rate);
- 		if (divider < 0)
- 			return divider;
--		return parent_rate * 2 / (divider + 2);
-+		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
- 	} else if (c->flags & DIV_2) {
--		return parent_rate / 2;
-+		return DIV_ROUND_UP(parent_rate, 2);
+@@ -385,10 +385,16 @@ static void tegra2_cpu_clk_disable(struct clk *c)
+ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
+ {
+ 	int ret;
++	/*
++	 * Take an extra reference to the main pll so it doesn't turn
++	 * off when we move the cpu off of it
++	 */
++	clk_enable(c->u.cpu.main);
++
+ 	ret = clk_set_parent(c->parent, c->u.cpu.backup);
+ 	if (ret) {
+ 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.backup->name);
+-		return ret;
++		goto out;
  	}
- 	return -EINVAL;
- }
-@@ -1058,12 +1058,12 @@ static long tegra2_periph_clk_round_rate(struct clk *c,
- 		if (divider < 0)
- 			return divider;
  
--		return parent_rate * 2 / (divider + 2);
-+		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
- 	} else if (c->flags & DIV_U16) {
- 		divider = clk_div16_get_divider(parent_rate, rate);
- 		if (divider < 0)
- 			return divider;
--		return parent_rate / (divider + 1);
-+		return DIV_ROUND_UP(parent_rate, divider + 1);
+ 	if (rate == clk_get_rate(c->u.cpu.backup))
+@@ -397,17 +403,18 @@ static int tegra2_cpu_clk_set_rate(struct clk *c, unsigned long rate)
+ 	ret = clk_set_rate(c->u.cpu.main, rate);
+ 	if (ret) {
+ 		pr_err("Failed to change cpu pll to %lu\n", rate);
+-		return ret;
++		goto out;
  	}
- 	return -EINVAL;
+ 
+ 	ret = clk_set_parent(c->parent, c->u.cpu.main);
+ 	if (ret) {
+ 		pr_err("Failed to switch cpu to clock %s\n", c->u.cpu.main->name);
+-		return ret;
++		goto out;
+ 	}
+ 
+ out:
+-	return 0;
++	clk_disable(c->u.cpu.main);
++	return ret;
  }
+ 
+ static struct clk_ops tegra_cpu_ops = {
 -- 
 1.7.3.1
