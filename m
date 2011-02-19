@@ -1,7 +1,9 @@
 From: ccross@android.com (Colin Cross)
-Date: Sat, 19 Feb 2011 14:25:48 -0800
+Date: Sat, 19 Feb 2011 14:26:01 -0800
 Subject: [PATCH v2 12/21] ARM: tegra: clock: Add shared bus clock type
-Message-ID: <1298154371-5641-1-git-send-email-ccross@android.com>
+In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
+References: <1298154371-5641-1-git-send-email-ccross@android.com>
+Message-ID: <1298154371-5641-14-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
