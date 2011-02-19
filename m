@@ -1,49 +1,70 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 19 Feb 2011 16:12:24 +0530
-Subject: [PATCH 03/17] omap4: Export scu base address
+Date: Sat, 19 Feb 2011 16:12:27 +0530
+Subject: [PATCH 06/17] omap4: pm: Program CPU1 to hit OFF when off-lined
 In-Reply-To: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1298112158-28469-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1298112158-28469-7-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The scu base address needs to be accessed in cpu hotplug
-for power management. Hence export the same
+Program non-boot CPUs to hit lowest supported power state
+when it is off-lined using cpu hotplug framework.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/include/mach/omap4-common.h |    4 ++++
- arch/arm/mach-omap2/omap-smp.c                  |    2 +-
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap-hotplug.c |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
-index 5b0270b..0e5edd8 100644
---- a/arch/arm/mach-omap2/include/mach/omap4-common.h
-+++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
-@@ -26,6 +26,10 @@ extern void __iomem *l2cache_base;
+diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
+index 4976b93..9f8f097 100644
+--- a/arch/arm/mach-omap2/omap-hotplug.c
++++ b/arch/arm/mach-omap2/omap-hotplug.c
+@@ -20,6 +20,9 @@
  
- extern void __iomem *gic_dist_base_addr;
- 
-+#ifdef CONFIG_SMP
-+extern void __iomem *scu_base;
-+#endif
-+
- extern void __init gic_init_irq(void);
- extern void omap_smc1(u32 fn, u32 arg);
- 
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index b66cfe8..b105a29 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -26,7 +26,7 @@
+ #include <asm/cacheflush.h>
  #include <mach/omap4-common.h>
++#include <mach/omap-wakeupgen.h>
++
++#include "powerdomain.h"
  
- /* SCU base address */
--static void __iomem *scu_base;
-+void __iomem *scu_base;
+ int platform_cpu_kill(unsigned int cpu)
+ {
+@@ -32,6 +35,8 @@ int platform_cpu_kill(unsigned int cpu)
+  */
+ void platform_cpu_die(unsigned int cpu)
+ {
++	unsigned int this_cpu;
++
+ 	flush_cache_all();
+ 	dsb();
  
- static DEFINE_SPINLOCK(boot_lock);
+@@ -39,18 +44,21 @@ void platform_cpu_die(unsigned int cpu)
+ 	 * we're ready for shutdown now, so do it
+ 	 */
+ 	if (omap_modify_auxcoreboot0(0x0, 0x200) != 0x0)
+-		printk(KERN_CRIT "Secure clear status failed\n");
++		pr_err("Secure clear status failed\n");
  
+ 	for (;;) {
+ 		/*
+-		 * Execute WFI
++		 * Enter into low power state
++		 * clear all interrupt wakeup sources
+ 		 */
+-		do_wfi();
+-
+-		if (omap_read_auxcoreboot0() == cpu) {
++		omap_wakeupgen_irqmask_all(cpu, 1);
++		omap4_enter_lowpower(cpu, PWRDM_POWER_OFF);
++		this_cpu = hard_smp_processor_id();
++		if (omap_read_auxcoreboot0() == this_cpu) {
+ 			/*
+ 			 * OK, proper wakeup, we're done
+ 			 */
++			omap_wakeupgen_irqmask_all(this_cpu, 0);
+ 			break;
+ 		}
+ 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
 -- 
 1.6.0.4
