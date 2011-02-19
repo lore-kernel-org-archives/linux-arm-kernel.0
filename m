@@ -1,110 +1,238 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 19 Feb 2011 16:12:23 +0530
-Subject: [PATCH 02/17] omap4: pm: Add SAR RAM support
+Date: Sat, 19 Feb 2011 16:12:34 +0530
+Subject: [PATCH 13/17] omap4: cpuidle: Basic CPUidle support
 In-Reply-To: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1298112158-28469-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1298112158-28469-14-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SAR RAM support on OMAP4430. SAR RAM used to save
-and restore the HW context in low power modes.
+From: Rajendra Nayak <rnayak@ti.com>
 
+The patch adds a basic CPUidle driver for OMAP4. Just
+one C state is registered for both CPU cores which
+does a wfi.
+
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap4-common.c         |   25 ++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap4-sar-layout.h     |   24 ++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
- 3 files changed, 49 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
+ arch/arm/mach-omap2/Makefile      |    3 +-
+ arch/arm/mach-omap2/cpuidle44xx.c |  165 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.h          |    1 +
+ arch/arm/mach-omap2/pm44xx.c      |    2 +
+ 4 files changed, 170 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
 
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 559d227..48484a5 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -23,12 +23,14 @@
- #include <mach/omap4-common.h>
- #include <mach/omap-wakeupgen.h>
- 
-+#include "omap4-sar-layout.h"
-+
- #ifdef CONFIG_CACHE_L2X0
- void __iomem *l2cache_base;
- #endif
- 
- void __iomem *gic_dist_base_addr;
--
-+void __iomem *sar_ram_base;
- 
- void __init gic_init_irq(void)
- {
-@@ -107,3 +109,24 @@ static int __init omap_l2_cache_init(void)
- }
- early_initcall(omap_l2_cache_init);
- #endif
-+
-+/*
-+ * SAR RAM used to save and restore the HW
-+ * context in low power modes
-+ */
-+static int __init omap4_sar_ram_init(void)
-+{
-+	/*
-+	 * To avoid code running on other OMAPs in
-+	 * multi-omap builds
-+	 */
-+	if (!cpu_is_omap44xx())
-+		return -ENODEV;
-+
-+	/* Static mapping, never released */
-+	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
-+	BUG_ON(!sar_ram_base);
-+
-+	return 0;
-+}
-+early_initcall(omap4_sar_ram_init);
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 5d94f7e..2b4fe44 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -64,7 +64,8 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o pm_bus.o voltage.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o voltage.o \
+ 					   cpuidle34xx.o pm_bus.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o voltage.o pm_bus.o \
+-					   omap4-mpuss-lowpower.o sleep44xx.o
++					   omap4-mpuss-lowpower.o sleep44xx.o \
++					   cpuidle44xx.o
+ obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+ obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
+ obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
 new file mode 100644
-index 0000000..bb66816
+index 0000000..6c3c69d
 --- /dev/null
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -0,0 +1,24 @@
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -0,0 +1,165 @@
 +/*
-+ * omap4-sar-layout.h: OMAP4 SAR RAM layout header file
++ * OMAP4 CPU IDLE Routines
 + *
 + * Copyright (C) 2011 Texas Instruments, Inc.
-+ * Santosh Shilimkar <santosh.shilimkar@ti.com>
++ * Rajendra Nayak <rnayak@ti.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+#ifndef OMAP_ARCH_OMAP4_SAR_LAYOUT_H
-+#define OMAP_ARCH_OMAP4_SAR_LAYOUT_H
 +
-+/*
-+ * SAR BANK offsets from base address OMAP44XX_SAR_RAM_BASE
++#include <linux/sched.h>
++#include <linux/cpuidle.h>
++
++#include <asm/proc-fns.h>
++
++#include <mach/omap4-common.h>
++
++#include "pm.h"
++
++#ifdef CONFIG_CPU_IDLE
++
++#define OMAP4_MAX_STATES	1
++/* C1 - CPUx wfi + MPU inactive + CORE inactive */
++#define OMAP4_STATE_C1		0
++
++struct omap4_processor_cx {
++	u8 valid;
++	u8 type;
++	u32 sleep_latency;
++	u32 wakeup_latency;
++	u32 cpu0_state;
++	u32 cpu1_state;
++	u32 mpu_state;
++	u32 core_state;
++	u32 threshold;
++	u32 flags;
++};
++
++struct omap4_processor_cx omap4_power_states[OMAP4_MAX_STATES];
++struct omap4_processor_cx current_cx_state;
++
++static struct cpuidle_params cpuidle_params_table[] = {
++	/* C1 */
++	{1, 2, 2, 5},
++};
++
++/**
++ * omap4_enter_idle - Programs OMAP4 to enter the specified state
++ * @dev: cpuidle device
++ * @state: The target state to be programmed
++ *
++ * Called from the CPUidle framework to program the device to the
++ * specified low power state selected by the governor.
++ * Returns the amount of time spent in the low power state.
 + */
-+#define SAR_BANK1_OFFSET		0x0000
-+#define SAR_BANK2_OFFSET		0x1000
-+#define SAR_BANK3_OFFSET		0x2000
-+#define SAR_BANK4_OFFSET		0x3000
++static int omap4_enter_idle(struct cpuidle_device *dev,
++			struct cpuidle_state *state)
++{
++	struct timespec ts_preidle, ts_postidle, ts_idle;
 +
-+extern void __iomem *sar_ram_base;
++	/* Used to keep track of the total time in idle */
++	getnstimeofday(&ts_preidle);
 +
-+#endif
-diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
-index ea2b8a6..c0d478e 100644
---- a/arch/arm/plat-omap/include/plat/omap44xx.h
-+++ b/arch/arm/plat-omap/include/plat/omap44xx.h
-@@ -45,6 +45,7 @@
- #define OMAP44XX_WKUPGEN_BASE		0x48281000
- #define OMAP44XX_MCPDM_BASE		0x40132000
- #define OMAP44XX_MCPDM_L3_BASE		0x49032000
-+#define OMAP44XX_SAR_RAM_BASE		0x4a326000
++	local_irq_disable();
++	local_fiq_disable();
++
++	cpu_do_idle();
++
++	getnstimeofday(&ts_postidle);
++	ts_idle = timespec_sub(ts_postidle, ts_preidle);
++
++	local_irq_enable();
++	local_fiq_enable();
++
++	return ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * USEC_PER_SEC;
++}
++
++DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
++
++/**
++ * omap4_init_power_states - Initialises the OMAP4 specific C states.
++ *
++ * Below is the desciption of each C state.
++ * C1 : CPUx wfi + MPU inative + Core inactive
++ */
++void omap_init_power_states(void)
++{
++	/* C1 . CPUx wfi + MPU inactive + Core inactive */
++	omap4_power_states[OMAP4_STATE_C1].valid =
++			cpuidle_params_table[OMAP4_STATE_C1].valid;
++	omap4_power_states[OMAP4_STATE_C1].type = OMAP4_STATE_C1;
++	omap4_power_states[OMAP4_STATE_C1].sleep_latency =
++			cpuidle_params_table[OMAP4_STATE_C1].sleep_latency;
++	omap4_power_states[OMAP4_STATE_C1].wakeup_latency =
++			cpuidle_params_table[OMAP4_STATE_C1].wake_latency;
++	omap4_power_states[OMAP4_STATE_C1].threshold =
++			cpuidle_params_table[OMAP4_STATE_C1].threshold;
++	omap4_power_states[OMAP4_STATE_C1].mpu_state = PWRDM_POWER_ON;
++	omap4_power_states[OMAP4_STATE_C1].core_state = PWRDM_POWER_ON;
++	omap4_power_states[OMAP4_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
++
++}
++
++struct cpuidle_driver omap4_idle_driver = {
++	.name =		"omap4_idle",
++	.owner =	THIS_MODULE,
++};
++
++/**
++ * omap4_idle_init - Init routine for OMAP4 idle
++ *
++ * Registers the OMAP4 specific cpuidle driver with the cpuidle
++ * framework with the valid set of states.
++ */
++int __init omap4_idle_init(void)
++{
++	int cpu_id, i, count = 0;
++	struct omap4_processor_cx *cx;
++	struct cpuidle_state *state;
++	struct cpuidle_device *dev;
++
++	omap_init_power_states();
++	cpuidle_register_driver(&omap4_idle_driver);
++
++	for_each_cpu(cpu_id, cpu_online_mask) {
++		pr_err("CPUidle for CPU%d registered\n", cpu_id);
++		dev = &per_cpu(omap4_idle_dev, cpu_id);
++		dev->cpu = cpu_id;
++		count = 0;
++		for (i = OMAP4_STATE_C1; i < OMAP4_MAX_STATES; i++) {
++			cx = &omap4_power_states[i];
++			state = &dev->states[count];
++
++			if (!cx->valid)
++				continue;
++			cpuidle_set_statedata(state, cx);
++			state->exit_latency = cx->sleep_latency +
++							cx->wakeup_latency;
++			state->target_residency = cx->threshold;
++			state->flags = cx->flags;
++			state->enter = omap4_enter_idle;
++			sprintf(state->name, "C%d", count+1);
++			count++;
++		}
++
++		if (!count)
++			return -EINVAL;
++		dev->state_count = count;
++
++		if (cpuidle_register_device(dev)) {
++			pr_err("%s: CPUidle register device failed\n",
++				__func__);
++			return -EIO;
++		}
++	}
++
++	return 0;
++}
++#else
++int __init omap4_idle_init(void)
++{
++	return 0;
++}
++#endif /* CONFIG_CPU_IDLE */
+diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+index f557407..ce848b0 100644
+--- a/arch/arm/mach-omap2/pm.h
++++ b/arch/arm/mach-omap2/pm.h
+@@ -22,6 +22,7 @@ extern void omap_sram_idle(void);
+ extern int omap3_can_sleep(void);
+ extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
+ extern int omap3_idle_init(void);
++extern int omap4_idle_init(void);
  
- #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
- #define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
+ #if defined(CONFIG_PM_OPP)
+ extern int omap3_opp_init(void);
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 8e57b42..628242d 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -230,6 +230,8 @@ static int __init omap4_pm_init(void)
+ 	suspend_set_ops(&omap_pm_ops);
+ #endif /* CONFIG_SUSPEND */
+ 
++	omap4_idle_init();
++
+ err2:
+ 	return ret;
+ }
 -- 
 1.6.0.4
