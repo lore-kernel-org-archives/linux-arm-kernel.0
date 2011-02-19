@@ -1,50 +1,40 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sat, 19 Feb 2011 21:22:53 +0100
-Subject: Question About Linux Memory Mapping
-In-Reply-To: <AANLkTinUoFzzx4hM8SpUt-mpjn1Z5xmrDqmXwuELuu3e@mail.gmail.com>
-References: <AANLkTinUoFzzx4hM8SpUt-mpjn1Z5xmrDqmXwuELuu3e@mail.gmail.com>
-Message-ID: <201102192122.53746.marek.vasut@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 19 Feb 2011 22:14:31 +0100
+Subject: [GIT PULL] ARM: PMU for U8500
+In-Reply-To: <AANLkTikie8ZsTAv3fkS0AcVXpKhS3r8U8idajP3U=Mz8@mail.gmail.com>
+References: <AANLkTikie8ZsTAv3fkS0AcVXpKhS3r8U8idajP3U=Mz8@mail.gmail.com>
+Message-ID: <AANLkTi=XV+xWHOEAnnmRM41aS5z+YN8gH5OXePvo9Teh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 18 February 2011 21:56:28 Drasko DRASKOVIC wrote:
-> Hi all,
-> in the article Booting ARM Linux :
-> http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html
-> I can see that mem map is passed via ATAG_MEM. However, in the same
-> article it is mentioned that this information can also be passed via
-> kernel command line paramters,  mem=<size>[KM][,@<phys_offset>].
-> 
-> However, this does not seem to be true, as "mem" command line
-> parameter seems to be formated like this : mem= n[KMG] (i.e. no
-> offset), regarding to this reference :
-> http://oreilly.com/linux/excerpts/9780596100797/kernel-boot-command-line-pa
-> rameter-reference.html. Seems like memmap should be used instead.
-> 
-> I tried passing the parameters like memmap= n[KMG]@start[KMG] but that
-> had no effect at all - still the same amount of System Ram was read
-> from ATAGS and presented in the system via /proc/iomem.
-> 
-> What I needed it to reserve 1MB region for one FIFO at the end of RAM
-> (or somewhere else)
-> and protect it from the kernel. I tried passing memmap=
-> n[KMG]$start[KMG], but that did not worn neither.
+2011/2/17 Linus Walleij <linus.walleij@linaro.org>:
 
-What are you exactly trying to achieve ? btw. if you really need to make a hole 
-in RAM, you should reserve a bootmem node maybe?
-> 
-> So my questions are following :
-> 1) Why commandlines are ignored and ATAGS are given priority ?
-> 2) What is the most elegant way to protect one region in RAM :
->  a) By giving less memory with ATAGS_MEM and thus making protected
-> region invisible to Linux, lying to it that RAM is smaller
->  b) By changing somehow linker script
->  c) By changing some configuration variables (which ?)
-> 
-> Thanks for the answers and best regards,
-> Drasko
-> 
-> _______________________________________________
-> linux-arm mailing list
-> linux-arm at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm
+> Russell, could you please pull:
+>
+> ? ? git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> pmu-for-rmk
+>
+> This is two patches giving us PMU support on the weird
+> single-PMU-irq U8500.
+>
+> This is based on 2.6.38-rc4 and is identical to the v2
+> patchset which was Acked by Will Deacon.
+>
+> Rabin Vincent (2):
+> ?ARM: perf_event: allow platform-specific interrupt handler
+> ?mach-ux500: DB8500 PMU support
+
+I don't know why I missed to include the mailing list on this
+one. :-(
+
+I've included both patches in ux500-core so we get some -next
+testing, at the begining of the patch series so they can be pulled
+into your tree without any conflicts in -next if you decide to do
+so.
+
+Should be OK, but if the first patch disturbs anything in the
+ARM tree merge with -next due to something else messing
+around with the PMU files I will happily take it out again.
+
+Yours,
+Linus Walleij
