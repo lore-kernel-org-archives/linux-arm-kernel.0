@@ -1,114 +1,110 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 19 Feb 2011 16:12:28 +0530
-Subject: [PATCH 07/17] omap4: pm: CPU1 wakeup workaround form Low power modes
+Date: Sat, 19 Feb 2011 16:12:23 +0530
+Subject: [PATCH 02/17] omap4: pm: Add SAR RAM support
 In-Reply-To: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1298112158-28469-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1298112158-28469-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SGI(Software Generated Interrupts) are not wakeup capable from
-low power states. This is known limitation on OMAP4 and needs to be
-worked around by using software forced clockdomain wake-up. CPU0 forces
-the CPU1 clockdomain to software force wakeup. After the wakeup, CPU1
-restores its clockdomain hardware supervised mode.
-
-More details can be found in OMAP4430 TRM - Version J
-Section :
-	4.3.4.2 Power States of CPU0 and CPU1
+This patch adds SAR RAM support on OMAP4430. SAR RAM used to save
+and restore the HW context in low power modes.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/omap-hotplug.c |    9 +++++++++
- arch/arm/mach-omap2/omap-smp.c     |   27 ++++++++++++++++++++++++++-
- 2 files changed, 35 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c         |   25 ++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap4-sar-layout.h     |   24 ++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap44xx.h |    1 +
+ 3 files changed, 49 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
 
-diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-index 9f8f097..cf4ab15 100644
---- a/arch/arm/mach-omap2/omap-hotplug.c
-+++ b/arch/arm/mach-omap2/omap-hotplug.c
-@@ -23,6 +23,7 @@
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 559d227..48484a5 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -23,12 +23,14 @@
+ #include <mach/omap4-common.h>
  #include <mach/omap-wakeupgen.h>
  
- #include "powerdomain.h"
-+#include "clockdomain.h"
++#include "omap4-sar-layout.h"
++
+ #ifdef CONFIG_CACHE_L2X0
+ void __iomem *l2cache_base;
+ #endif
  
- int platform_cpu_kill(unsigned int cpu)
+ void __iomem *gic_dist_base_addr;
+-
++void __iomem *sar_ram_base;
+ 
+ void __init gic_init_irq(void)
  {
-@@ -36,6 +37,11 @@ int platform_cpu_kill(unsigned int cpu)
- void platform_cpu_die(unsigned int cpu)
- {
- 	unsigned int this_cpu;
-+	static struct clockdomain *cpu1_clkdm;
+@@ -107,3 +109,24 @@ static int __init omap_l2_cache_init(void)
+ }
+ early_initcall(omap_l2_cache_init);
+ #endif
 +
-+	/* To avoid cpu1 clockdomain lookup every time */
-+	if (!cpu1_clkdm)
-+		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
- 
- 	flush_cache_all();
- 	dsb();
-@@ -59,6 +65,9 @@ void platform_cpu_die(unsigned int cpu)
- 			 * OK, proper wakeup, we're done
- 			 */
- 			omap_wakeupgen_irqmask_all(this_cpu, 0);
-+
-+			/* Restore clockdomain to hardware supervised */
-+			clkdm_allow_idle(cpu1_clkdm);
- 			break;
- 		}
- 		pr_debug("CPU%u: spurious wakeup call\n", cpu);
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index b105a29..31c9b79 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -25,6 +25,8 @@
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
- 
-+#include "clockdomain.h"
-+
- /* SCU base address */
- void __iomem *scu_base;
- 
-@@ -48,6 +50,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	static struct clockdomain *cpu1_clkdm;
-+	static bool booted;
- 	/*
- 	 * Set synchronisation state between this boot processor
- 	 * and the secondary one
-@@ -63,7 +67,28 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
- 	flush_cache_all();
- 	smp_wmb();
--	smp_cross_call(cpumask_of(cpu), 1);
-+
-+	/* To avoid cpu1 clockdomain lookup every time */
-+	if (!cpu1_clkdm)
-+		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
-+
++/*
++ * SAR RAM used to save and restore the HW
++ * context in low power modes
++ */
++static int __init omap4_sar_ram_init(void)
++{
 +	/*
-+	 * The SGI(Software Generated Interrupts) are not wakeup capable
-+	 * from low power states. This is known limitation on OMAP4 and
-+	 * needs to be worked around by using software forced clockdomain
-+	 * wake-up. To wakeup CPU1, CPU0 forces the CPU1 clockdomain to
-+	 * software force wakeup. After the wakeup, CPU1 restores its
-+	 * clockdomain hardware supervised mode.
-+	 * More details can be found in OMAP4430 TRM - Version J
-+	 * Section :
-+	 *	4.3.4.2 Power States of CPU0 and CPU1
++	 * To avoid code running on other OMAPs in
++	 * multi-omap builds
 +	 */
-+	if (booted) {
-+		clkdm_wakeup(cpu1_clkdm);
-+	} else {
-+		dsb_sev();
-+		booted = true;
-+	}
++	if (!cpu_is_omap44xx())
++		return -ENODEV;
++
++	/* Static mapping, never released */
++	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
++	BUG_ON(!sar_ram_base);
++
++	return 0;
++}
++early_initcall(omap4_sar_ram_init);
+diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+new file mode 100644
+index 0000000..bb66816
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap4-sar-layout.h
+@@ -0,0 +1,24 @@
++/*
++ * omap4-sar-layout.h: OMAP4 SAR RAM layout header file
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ * Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef OMAP_ARCH_OMAP4_SAR_LAYOUT_H
++#define OMAP_ARCH_OMAP4_SAR_LAYOUT_H
++
++/*
++ * SAR BANK offsets from base address OMAP44XX_SAR_RAM_BASE
++ */
++#define SAR_BANK1_OFFSET		0x0000
++#define SAR_BANK2_OFFSET		0x1000
++#define SAR_BANK3_OFFSET		0x2000
++#define SAR_BANK4_OFFSET		0x3000
++
++extern void __iomem *sar_ram_base;
++
++#endif
+diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
+index ea2b8a6..c0d478e 100644
+--- a/arch/arm/plat-omap/include/plat/omap44xx.h
++++ b/arch/arm/plat-omap/include/plat/omap44xx.h
+@@ -45,6 +45,7 @@
+ #define OMAP44XX_WKUPGEN_BASE		0x48281000
+ #define OMAP44XX_MCPDM_BASE		0x40132000
+ #define OMAP44XX_MCPDM_L3_BASE		0x49032000
++#define OMAP44XX_SAR_RAM_BASE		0x4a326000
  
- 	/*
- 	 * Now the secondary core is starting up let it run its
+ #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
+ #define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
 -- 
 1.6.0.4
