@@ -1,74 +1,83 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Sun, 20 Feb 2011 05:27:39 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102171647.46190.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102151816.57104.arnd@arndb.de>
-	<AANLkTimoqCtWMmBJ40v+1UjR0U2Sdh9pp+2fwYpi3fUx@mail.gmail.com>
-	<201102171647.46190.arnd@arndb.de>
-Message-ID: <AANLkTimGrT_p_5xdXJv5UURPMC0cwJCPkZ=xcX5Nk=o=@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 20 Feb 2011 12:00:39 +0000
+Subject: [PATCH 2/6] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110215110453.GB11199@n2100.arm.linux.org.uk>
+References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
+	<E1Pnvgw-0002yZ-M0@rmk-PC.arm.linux.org.uk>
+	<AANLkTinL0HgSsFmoxyiBuRA6JiWKsHTLW4wFnVDJf_1w@mail.gmail.com>
+	<20110215110453.GB11199@n2100.arm.linux.org.uk>
+Message-ID: <20110220120039.GA14495@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 9:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> I think I'd try to reduce the number of sysfs files needed for this.
-> What are the values you would typically set here?
->
-> My feeling is that separating unaligned page writes from full pages
-> or multiples of pages could always be benefitial for all cards, or at
-> least harmless, but that will require more measurements.
-> Whether to do the reliable write or not could be a simple flag
-> if the numbers are the same.
+Kukjin, could you test this update as well please?
 
-I thought about this some more, and I realized it would be ugly if
-everybody added enable_workaround_sec_start/enable_workaround_sec_end
-for every novel idea of working around some issue with
-performance/reliability on mmc/sd cards.
+Thanks.
 
-What about letting the user/embedder create policies for how certain
-accesses are done? That way you give runtime-accessible
-blocks for tuning mmc block layer while having one interface to
-manipulate (and combine) multiple workarounds, all the while catching
-conflicts and
-without forcing specific policy in code.
-
-Essentially under /sys/block/mmcblk0/device you have an attribute
-called "policies". Example:
-
-# echo mypol0 > /sys/block/mmcblk0/device/policies
-# ls /sys/block/mmcblk0/device/mypol0
-debug
-delete
-start_block
-end_block
-access_size_low
-access_size_high
-write_policy
-erase_policy
-read_policy
-# cat /sys/block/mmcblk0/device/mypol0/write_policy
-Current: none
-0x00000001: Split unaligned writes across page_size
-0x00000002: Split writes into page_size chunks and write using reliable writes
-0x00000004: Use reliable writes for WRITE_META blocks.
-# cat /sys/block/mmcblk0/device/mypol0/erase_policy
-Current: none
-0x00000001: Use secure erase.
-# echo 1 > delete
-# Policy is deleted.
-
-The policies are all stored in a rb-tree. First order of business
-inside mmc_blk_issue_rw_rq/mmc_blk_issue_* is to fetch an existing
-policy given the access type and block start/end (which both tells
-where the access is going and the size of the access). Later, it's
-that policy information which controls how the request is translated
-into MMC commands. I'm almost done with a prototype.
-
-I noticed that all sysfs attributes are managed by code under
-core/mmc.c and core/sd.c, duplicating where necessary. I think some of
-the new block-related settings like page_size (or policies) are
-generic enough that they should live in the card/block code. How about
-putting all future sysfs block related things into block-sysfs.c?
-
-Thanks,
-A
+On Tue, Feb 15, 2011 at 11:04:53AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 11, 2011 at 06:50:57PM -0800, Colin Cross wrote:
+> > > +ENDPROC(cpu_resume_turn_mmu_on)
+> > > +cpu_resume_after_mmu:
+> > > + ? ? ? str ? ? r5, [r2, r4, lsl #2] ? ?@ restore old mapping
+> > > +#ifdef MULTI_CACHE
+> > > + ? ? ? ldr ? ? r10, =cpu_cache
+> > > + ? ? ? ldr ? ? pc, [r10, #CACHE_FLUSH_KERN_ALL]
+> > > +#else
+> > > + ? ? ? b ? ? ? __cpuc_flush_kern_all
+> > > +#endif
+> 
+> I think we can eliminate this cache flush by delaying the cache enable
+> as below.  Could you see whether Tegra 2 survives this please?
+> Thanks.
+> 
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index bed1876..193be5f 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -4,6 +4,7 @@
+>  #include <asm/assembler.h>
+>  #include <asm/glue-cache.h>
+>  #include <asm/glue-proc.h>
+> +#include <asm/system.h>
+>  	.text
+>  
+>  /*
+> @@ -81,25 +82,22 @@ ENTRY(cpu_resume_mmu)
+>  	str	r3, [r2, r4, lsl #2]	@ setup 1:1 mapping for mmu code
+>  	sub	r2, r2, r1
+>  	ldr	r3, =cpu_resume_after_mmu
+> +	bic	r1, r0, #CR_C		@ ensure D-cache is disabled
+>  	b	cpu_resume_turn_mmu_on
+>  ENDPROC(cpu_resume_mmu)
+>  	.ltorg
+>  	.align	5
+>  cpu_resume_turn_mmu_on:
+> -	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, caches, etc
+> -	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
+> -	mov	r0, r0
+> -	mov	r0, r0
+> +	mcr	p15, 0, r1, c1, c0, 0	@ turn on MMU, I-cache, etc
+> +	mrc	p15, 0, r1, c0, c0, 0	@ read id reg
+> +	mov	r1, r1
+> +	mov	r1, r1
+>  	mov	pc, r3			@ jump to virtual address
+>  ENDPROC(cpu_resume_turn_mmu_on)
+>  cpu_resume_after_mmu:
+>  	str	r5, [r2, r4, lsl #2]	@ restore old mapping
+> -#ifdef MULTI_CACHE
+> -	ldr	r10, =cpu_cache
+> -	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
+> -#else
+> -	b	__cpuc_flush_kern_all
+> -#endif
+> +	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
+> +	mov	pc, lr
+>  
+>  /*
+>   * Note: Yes, part of the following code is located into the .data section.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
