@@ -1,46 +1,36 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 20 Feb 2011 19:47:24 +0100
-Subject: [PATCH v2 3/3] ARM: PXA: PXAFB: Fix typo in ypos assignment
-In-Reply-To: <1298214147-11578-3-git-send-email-anarsoul@gmail.com>
-References: <20110217110321.GF24627@n2100.arm.linux.org.uk>
-	<1298214147-11578-1-git-send-email-anarsoul@gmail.com>
-	<1298214147-11578-3-git-send-email-anarsoul@gmail.com>
-Message-ID: <201102201947.24481.marek.vasut@gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 20 Feb 2011 19:31:36 +0000
+Subject: [PATCH v2] mxcmmc: use dmaengine API
+In-Reply-To: <201102181437.02943.arnd@arndb.de>
+References: <20110218092109.GG24426@pengutronix.de>
+	<201102181437.02943.arnd@arndb.de>
+Message-ID: <20110220193136.GA13266@void.printf.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 20 February 2011 16:02:27 Vasily Khoruzhick wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> pointed that
-> ypos takes value of xpos due to typo.
+Hi Sascha,
 
-Looks good,
+On Fri, Feb 18, 2011 at 02:37:02PM +0100, Arnd Bergmann wrote:
+> On Friday 18 February 2011, Sascha Hauer wrote:
+> > This switches the mxcmmc driver to use the dmaengine API. Unlike
+> > the old one this one is always present in the tree, even if no DMA
+> > is implemented, hence we can remove all the #ifdefs in from the driver.
+> > The driver automatically switches to PIO mode if no DMA support or no
+> > suitable channel is available.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> The patch looks good to me, but shouldn't you also add a Kconfig
+> dependency or select on CONFIG_DMA_ENGINE? I don't see where that
+> gets set.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  drivers/video/pxafb.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-> index 54a9ab8..80ea7e6 100644
-> --- a/drivers/video/pxafb.c
-> +++ b/drivers/video/pxafb.c
-> @@ -766,7 +766,7 @@ static int overlayfb_check_var(struct fb_var_screeninfo
-> *var, int xpos, ypos, pfor, bpp;
-> 
->  	xpos = NONSTD_TO_XPOS(var->nonstd);
-> -	ypos = NONSTD_TO_XPOS(var->nonstd);
-> +	ypos = NONSTD_TO_YPOS(var->nonstd);
->  	pfor = NONSTD_TO_PFOR(var->nonstd);
-> 
->  	bpp = pxafb_var_to_bpp(var);
-> @@ -864,7 +864,7 @@ static int overlayfb_set_par(struct fb_info *info)
-> 
->  	bpp  = pxafb_var_to_bpp(var);
->  	xpos = NONSTD_TO_XPOS(var->nonstd);
-> -	ypos = NONSTD_TO_XPOS(var->nonstd);
-> +	ypos = NONSTD_TO_YPOS(var->nonstd);
->  	pfor = NONSTD_TO_PFOR(var->nonstd);
-> 
->  	ofb->control[0] = OVLxC1_PPL(var->xres) | OVLxC1_LPO(var->yres) |
+I've pushed this to mmc-next now, but please do reply to Arnd's Kconfig
+question.
+
+Thanks,
+
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
