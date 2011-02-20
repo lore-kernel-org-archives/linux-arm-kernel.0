@@ -1,46 +1,59 @@
-From: kgilmer@buglabs.net (Ken Gilmer)
-Date: Thu, 17 Feb 2011 21:47:00 -0800
-Subject: [bug-dev] [PATCHv3] mx31: add support for the bugbase 1.3 from
-	buglabs
-In-Reply-To: <1297956221.2675.1.camel@gnutoo-laptop>
-References: <20110211213348.GJ27982@pengutronix.de>
-	<1297545419-31181-1-git-send-email-GNUtoo@no-log.org>
-	<20110213211855.GC13279@pengutronix.de>
-	<1297956221.2675.1.camel@gnutoo-laptop>
-Message-ID: <AANLkTik2o0xfOgOxEuBKNA4MHhK9f0VGVQ0G6apqthWw@mail.gmail.com>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Sun, 20 Feb 2011 15:58:02 +0100
+Subject: [PATCH v2 1/2] ARM: IMX5: cpuidle driver
+In-Reply-To: <20110217105415.GB24426@pengutronix.de>
+References: <1297416973-32740-1-git-send-email-yong.shen@linaro.org>
+	<1297416973-32740-2-git-send-email-yong.shen@linaro.org>
+	<20110215182752.GD2027@pengutronix.de>
+	<AANLkTim_7HiWutTyTuWvAR5sx1Nd7HdSyhfwRjS2CfYg@mail.gmail.com>
+	<20110217105415.GB24426@pengutronix.de>
+Message-ID: <AANLkTi=VkaCY5u-ibEKWU6=AiRkB5aZwPevY6A3bmk0T@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No problems for that on our end Denis.
+Hi Sascha,
 
-thx
-ken
+I had sent out v3 patch before the your last comments.
+I noticed how davinci is doing, but some SOCs like omap, they also do it in
+another way like my code.
+However, if you prefer the way davinci is doing, I will redo it. Please
+confirm.
 
-2011/2/17 Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
+thanks
+Yong
 
-> > And I wonder there is no copyright statement by you in
-> > arch/arm/mach-mx3/mach-bug.c, maybe because you consider your changes
-> > too minor to be relevant?  (INAL and I don't know who to value your
-> > contribution.)
-> Here is the thread:
-> http://thread.gmane.org/gmane.linux.ports.arm.msm/122
+On Thu, Feb 17, 2011 at 11:54 AM, Sascha Hauer <s.hauer@pengutronix.de>wrote:
+
+> On Thu, Feb 17, 2011 at 09:18:11AM +0100, Yong Shen wrote:
+> > >
+> > >
+> > > > +     return 0;
+> > > > +}
+> > > > +
+> > > > +late_initcall(imx_cpuidle_init);
+> > >
+> > > We have a late_initcall here which needs to be protected from other
+> > > cpus. On the other hand we depend on board code calling
+> > > imx_cpuidle_board_params() before this initcall. I think the board code
+> > > should call a imx_cpuidle_init(struct imx_cpuidle_params
+> > > *cpuidle_params) instead which makes the flow of execution more clear.
+> > >
+> > > imx_cpuidle_init can not be called directly in board code, since it is
+> too
+> > early to register cpuidle driver and device which depend on some other
+> > system resource.
 >
-> What should I do? can I add my own name too?
+> I see. Maybe we should make this a platform driver then like for example
+> davinci does.
 >
-> Denis.
+> Sascha
 >
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 >
-> _______________________________________________
-> bug-dev mailing list
-> bug-dev at lists.buglabs.net
-> http://lists.buglabs.net/cgi-bin/mailman/listinfo/bug-dev
->
-
-
-
--- 
-thx
-ken
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110217/91e473a2/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110220/59d8ac2c/attachment-0001.html>
