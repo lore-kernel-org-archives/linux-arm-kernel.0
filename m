@@ -1,46 +1,47 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Sun, 20 Feb 2011 22:04:08 +0200
-Subject: [PATCH resend] omap: Fix linker error in
-	drivers/video/omap/lcd_2430sdp.c
-In-Reply-To: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
-References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <1298232248-347-1-git-send-email-jhnikula@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 20 Feb 2011 22:37:47 +0100
+Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
+	<1298052881-14591-3-git-send-email-john.linn@xilinx.com>
+	<42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
+Message-ID: <201102202237.47327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a linker error from lcd_2430sdp.c if CONFIG_TWL4030_CORE is not
-set. This can be triggered on OMAP2 builds where OMAP3 or OMAP4 are not set.
+On Friday 18 February 2011, John Linn wrote:
+> +
+> +/* IO address mapping macros, nothing special at this time but required */
+> +
+> +#ifdef __ASSEMBLER__
+> +#define IOMEM(x)               (x)
+> +#else
+> +#define IOMEM(x)               ((void __force __iomem *)(x))
+> +#endif
+> +
+> +#define __io(a)                        __typesafe_io(a)
+> +#define __mem_pci(a)           (a)
 
-drivers/built-in.o: In function `sdp2430_panel_disable':
-drivers/video/omap/lcd_2430sdp.c:123: undefined reference to `twl_i2c_write_u8'
-drivers/video/omap/lcd_2430sdp.c:124: undefined reference to `twl_i2c_write_u8'
-drivers/built-in.o: In function `sdp2430_panel_enable':
-drivers/video/omap/lcd_2430sdp.c:110: undefined reference to `twl_i2c_write_u8'
-drivers/video/omap/lcd_2430sdp.c:112: undefined reference to `twl_i2c_write_u8'
+Are you planning to support PCI or PCMCIA? If so, the __io definition will have to
+change so it points to the PIO register window.
 
-Fix this by adding TWL4030_CORE dependency to CONFIG_MACH_OMAP_2430SDP as
-there is no own entry in drivers/video/omap/Kconfig.
+> diff --git a/arch/arm/mach-xilinx/include/mach/timex.h b/arch/arm/mach-xilinx/include/mach/timex.h
+> new file mode 100644
+> index 0000000..4ebc0a6
+> --- /dev/null
+> +++ b/arch/arm/mach-xilinx/include/mach/timex.h
+> +#ifndef __MACH_TIMEX_H__
+> +#define __MACH_TIMEX_H__
+> +
+> +#define PERIPHERAL_CLOCK_RATE  2500000
+> +
+> +#define CLOCK_TICK_RATE        (PERIPHERAL_CLOCK_RATE / 32)
+> +
+> +#endif
 
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
-Resend = forgot to cc LAKML.
-Quite old issue most probably. Can be triggered in mainline anyway.
----
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I thought we were at the point where CLOCK_TICK_RATE is no longer used.
+Did the patches not make it in yet?
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index b9d8a7b..bfdf240 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -132,6 +132,7 @@ config MACH_OMAP_2430SDP
- 	depends on SOC_OMAP2430
- 	default y
- 	select OMAP_PACKAGE_ZAC
-+	select TWL4030_CORE
- 
- config MACH_OMAP3_BEAGLE
- 	bool "OMAP3 BEAGLE board"
--- 
-1.7.0.4
+The rest looks fine to me.
+
+	Arnd
