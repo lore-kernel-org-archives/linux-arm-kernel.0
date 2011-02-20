@@ -1,73 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 20 Feb 2011 12:12:27 +0000
-Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
-	tables
-In-Reply-To: <1297780926.14691.164.camel@e102109-lin.cambridge.arm.com>
-References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
-	<20110215103127.GC4152@n2100.arm.linux.org.uk>
-	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
-	<20110215113242.GD4152@n2100.arm.linux.org.uk>
-	<20110215121437.GG4152@n2100.arm.linux.org.uk>
-	<1297780926.14691.164.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110220121227.GB14495@n2100.arm.linux.org.uk>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Sun, 20 Feb 2011 14:43:52 +0200
+Subject: [PATCH 2/2] ARM: tegra: add TrimSlice board
+In-Reply-To: <4D58C91F.9030303@compulab.co.il>
+References: <cover.1297063443.git.mike@compulab.co.il>	<c61e1816027e51acfb5bda1e498225a4da37d92d.1297063443.git.mike@compulab.co.il>	<AANLkTim5-dmpF8r9uZp8iDsT6p61D0iaJZuHvRLfUL6Y@mail.gmail.com>	<4D57BBC7.4070306@compulab.co.il>	<AANLkTimU9tpeY3-5yisqOAKBeAtz684gtM2ieYb62zO-@mail.gmail.com>
+	<4D58C91F.9030303@compulab.co.il>
+Message-ID: <4D610C88.7070305@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 02:42:06PM +0000, Catalin Marinas wrote:
-> On Tue, 2011-02-15 at 12:14 +0000, Russell King - ARM Linux wrote:
-> > On Tue, Feb 15, 2011 at 11:32:42AM +0000, Russell King - ARM Linux wrote:
-> > > The point of TLB shootdown is that we unmap the entries from the page
-> > > tables, then issue the TLB flushes, and then free the pages and page
-> > > tables after that.  All that Peter's patch tries to do is to get ARM to
-> > > use the generic stuff.
-> > 
-> > As Peter's patch preserves the current behaviour, that's not sufficient.
-> > So, let's do this our own way and delay pages and page table frees on
-> > ARMv6 and v7.  Untested.
+On 02/14/11 08:18, Mike Rapoport wrote:
+> On 02/13/11 21:06, Colin Cross wrote:
+>>>>
+>>>> Ack, the machine type is merged so I'll put this in for-next.  Do you
+>>>> want it enabled in tegra_defconfig?
+>>>
+>>> If 'select TEGRA_PCI' does not trouble you, I'd be glad to have the TrimSlice in
+>>> tegra_defconfig :)
+>>
+>> My board without PCI doesn't boot if CONFIG_TEGRA_PCI is selected, so
+>> I guess it should stay off for now.  Any idea why it wouldn't boot?
 > 
-> ARMv7 should be enough, I'm not aware of any pre-v7 with this behaviour.
+> The PCI subsystem should be re-gated, otherwise any access to PCI hangs the
+> system. Besides, on Harmony you need to enable two additional voltage supplies
+> to provide PEX_CLK voltage.
+> I'll send the patches that handle it, hopefully in the next few days.
 
-ARM11MPCore.  Any SMP system can access a page which was free'd by the
-tlb code but hasn't been flushed from the hardware TLBs.  So maybe we
-want it to be "defined(CONFIG_SMP) || defined(CONFIG_CPU_32v7)" ?
+I was little bit too enthusiastic about it :( To enable PCI on Harmony and
+probably on Ventana one need to have I2C and TPS up and running before setting
+up the PCI clocks...
+I have working implementation on top of your  linux-tegra-2.6.37 branch (1), but
+it's not quite ready to go upstream.
 
-> > diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-> > index f41a6f5..1ca3e16 100644
-> > --- a/arch/arm/include/asm/tlb.h
-> > +++ b/arch/arm/include/asm/tlb.h
-> > @@ -30,6 +30,16 @@
-> >  #include <asm/pgalloc.h>
-> > 
-> >  /*
-> > + * As v6 and v7 speculatively prefetch, which can drag new entries into the
-> > + * TLB, we need to delay freeing pages and page tables.
-> > + */
-> > +#if defined(CONFIG_CPU_32v6) || defined(CONFIG_CPU_32v7)
-> > +#define tlb_fast_mode(tlb)     0
-> > +#else
-> > +#define tlb_fast_mode(tlb)     1
-> > +#endif
-> 
-> We could make this v7 only. If you want it to be more dynamic, we can
-> check the MMFR0[3:0] bits (Cortex-A15 sets them to 4). But
-> architecturally we should assume that intermediate page table levels may
-> be cached.
+So, let's keep the TrimSlice out of common defconfig for now
 
-I don't think that a runtime check justifies the optimization.  We're
-talking about the difference between storing a set of pages in an array
-and freeing them later vs freeing them one at a time.  Doing a test per
-page is probably more expensive than just storing them in an array.
+[1]
+http://git.kernel.org/?p=linux/kernel/git/rppt/linux-tegra.git;a=shortlog;h=refs/heads/tegra/devel
 
-> > -#define tlb_remove_page(tlb,page)      free_page_and_swap_cache(page)
-> > -#define pte_free_tlb(tlb, ptep, addr)  pte_free((tlb)->mm, ptep)
-> > +#define pte_free_tlb(tlb, ptep, addr)  __pte_free_tlb(tlb, ptep, addr)
-> >  #define pmd_free_tlb(tlb, pmdp, addr)  pmd_free((tlb)->mm, pmdp)
-> 
-> With LPAE, we'll need a __pmd_free_tlb() but I can add this as part of
-> my patches.
-
-Yes.
-
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks.
+-- 
+Sincerely yours,
+Mike.
