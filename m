@@ -1,41 +1,67 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Sun, 20 Feb 2011 14:43:52 +0200
-Subject: [PATCH 2/2] ARM: tegra: add TrimSlice board
-In-Reply-To: <4D58C91F.9030303@compulab.co.il>
-References: <cover.1297063443.git.mike@compulab.co.il>	<c61e1816027e51acfb5bda1e498225a4da37d92d.1297063443.git.mike@compulab.co.il>	<AANLkTim5-dmpF8r9uZp8iDsT6p61D0iaJZuHvRLfUL6Y@mail.gmail.com>	<4D57BBC7.4070306@compulab.co.il>	<AANLkTimU9tpeY3-5yisqOAKBeAtz684gtM2ieYb62zO-@mail.gmail.com>
-	<4D58C91F.9030303@compulab.co.il>
-Message-ID: <4D610C88.7070305@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 20 Feb 2011 12:57:45 +0000
+Subject: [PATCH v2] ARM: vfp: Always save VFP state in vfp_pm_suspend
+In-Reply-To: <AANLkTim4ANuErvT4c5mBnu+Yg5m9sz6N8xugryXRJeN7@mail.gmail.com>
+References: <AANLkTik_Jey_PtRmr530FVckA6RXHESeX+CyoJC=ZTkR@mail.gmail.com>
+	<1297724147-6320-1-git-send-email-ccross@android.com>
+	<20110215170336.GP4152@n2100.arm.linux.org.uk>
+	<AANLkTim4ANuErvT4c5mBnu+Yg5m9sz6N8xugryXRJeN7@mail.gmail.com>
+Message-ID: <20110220125745.GC14495@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/11 08:18, Mike Rapoport wrote:
-> On 02/13/11 21:06, Colin Cross wrote:
->>>>
->>>> Ack, the machine type is merged so I'll put this in for-next.  Do you
->>>> want it enabled in tegra_defconfig?
->>>
->>> If 'select TEGRA_PCI' does not trouble you, I'd be glad to have the TrimSlice in
->>> tegra_defconfig :)
->>
->> My board without PCI doesn't boot if CONFIG_TEGRA_PCI is selected, so
->> I guess it should stay off for now.  Any idea why it wouldn't boot?
+On Wed, Feb 16, 2011 at 11:36:45AM -0800, Colin Cross wrote:
+> On Tue, Feb 15, 2011 at 9:03 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Feb 14, 2011 at 02:55:47PM -0800, Colin Cross wrote:
+> >> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> >> index 66bf8d1..7231d18 100644
+> >> --- a/arch/arm/vfp/vfpmodule.c
+> >> +++ b/arch/arm/vfp/vfpmodule.c
+> >> @@ -415,13 +415,13 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
+> >> ? ? ? struct thread_info *ti = current_thread_info();
+> >> ? ? ? u32 fpexc = fmrx(FPEXC);
+> >>
+> >> - ? ? /* if vfp is on, then save state for resumption */
+> >> - ? ? if (fpexc & FPEXC_EN) {
+> >> + ? ? /* save state for resume */
+> >> + ? ? if (last_VFP_context[ti->cpu]) {
+> >
+> > I'm not entirely happy with this.
+> >
+> > It is true that last_VFP_context[] when non-NULL indicates who owns the
+> > hardware VFP state, so saving it would seem logical. ?However, this new
+> > code now saves the state with the saved fpexc indicating that it's disabled.
+> >
+> > This will cause a VFP exception to misbehave by reloading the state, and
+> > then disabling the VFP unit. ?That will cause another VFP exception which
+> > will find the VFP unit disabled, and re-enable it. ?All in all, this is
+> > rather wasteful.
+> >
+> > So...
+> > ? ? ? ?/* If lazy disable, re-enable the VFP ready for it to be saved */
+> > ? ? ? ?if (last_VFP_context[ti->cpu] != &ti->vfpstate) {
+> > ? ? ? ? ? ? ? ?fpexc |= FPEXC_EN;
+> > ? ? ? ? ? ? ? ?fmxr(FPEXC, fpexc);
+> > ? ? ? ?}
+> > ? ? ? ?/* If VFP is on, then save state for resumption */
+> > ? ? ? ?if (fpexc & FPEXC_EN) {
+> > ? ? ? ? ? ? ? ?...
 > 
-> The PCI subsystem should be re-gated, otherwise any access to PCI hangs the
-> system. Besides, on Harmony you need to enable two additional voltage supplies
-> to provide PEX_CLK voltage.
-> I'll send the patches that handle it, hopefully in the next few days.
+> I think v2 of the patch handles this case correctly:
+> 	/* save state for resume */
+> 	if (last_VFP_context[ti->cpu]) {
+> 		printk(KERN_DEBUG "%s: saving vfp state\n", __func__);
+> 		fmxr(FPEXC, fpexc | FPEXC_EN);
+> 		vfp_save_state(last_VFP_context[ti->cpu], fpexc);
 
-I was little bit too enthusiastic about it :( To enable PCI on Harmony and
-probably on Ventana one need to have I2C and TPS up and running before setting
-up the PCI clocks...
-I have working implementation on top of your  linux-tegra-2.6.37 branch (1), but
-it's not quite ready to go upstream.
+This saves fpexc with the enable flag possibly clear.
 
-So, let's keep the TrimSlice out of common defconfig for now
+> 		last_VFP_context[ti->cpu] = NULL;
+> 		fmxr(FPEXC, fpexc & ~FPEXC_EN);
+> 	}
+> 
+> This version enables the VFP if it was not enabled, but saves the
+> original fpexc value.
 
-[1]
-http://git.kernel.org/?p=linux/kernel/git/rppt/linux-tegra.git;a=shortlog;h=refs/heads/tegra/devel
-
--- 
-Sincerely yours,
-Mike.
+Which is wrong as I said above.
