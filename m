@@ -1,101 +1,154 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 20 Feb 2011 15:39:08 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTimGrT_p_5xdXJv5UURPMC0cwJCPkZ=xcX5Nk=o=@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102171647.46190.arnd@arndb.de>
-	<AANLkTimGrT_p_5xdXJv5UURPMC0cwJCPkZ=xcX5Nk=o=@mail.gmail.com>
-Message-ID: <201102201539.08496.arnd@arndb.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sun, 20 Feb 2011 17:02:25 +0200
+Subject: [PATCH v2 1/3] ARM: PXA: PXAFB: Fix double-free issue
+In-Reply-To: <20110217110321.GF24627@n2100.arm.linux.org.uk>
+References: <20110217110321.GF24627@n2100.arm.linux.org.uk>
+Message-ID: <1298214147-11578-1-git-send-email-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding linux-fsdevel to Cc, see http://lwn.net/Articles/428941/ and
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/105607 for more
-on this discussion.]
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
 
-On Sunday 20 February 2011 12:27:39 Andrei Warkentin wrote:
-> On Thu, Feb 17, 2011 at 9:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I think I'd try to reduce the number of sysfs files needed for this.
-> > What are the values you would typically set here?
-> >
-> > My feeling is that separating unaligned page writes from full pages
-> > or multiples of pages could always be benefitial for all cards, or at
-> > least harmless, but that will require more measurements.
-> > Whether to do the reliable write or not could be a simple flag
-> > if the numbers are the same.
-> 
-> I thought about this some more, and I realized it would be ugly if
-> everybody added enable_workaround_sec_start/enable_workaround_sec_end
-> for every novel idea of working around some issue with
-> performance/reliability on mmc/sd cards.
-> 
-> What about letting the user/embedder create policies for how certain
-> accesses are done? That way you give runtime-accessible
-> blocks for tuning mmc block layer while having one interface to
-> manipulate (and combine) multiple workarounds, all the while catching
-> conflicts and
-> without forcing specific policy in code.
-> 
-> Essentially under /sys/block/mmcblk0/device you have an attribute
-> called "policies". Example:
-> 
-> # echo mypol0 > /sys/block/mmcblk0/device/policies
-> # ls /sys/block/mmcblk0/device/mypol0
-> debug
-> delete
-> start_block
-> end_block
-> access_size_low
-> access_size_high
-> write_policy
-> erase_policy
-> read_policy
-> # cat /sys/block/mmcblk0/device/mypol0/write_policy
-> Current: none
-> 0x00000001: Split unaligned writes across page_size
-> 0x00000002: Split writes into page_size chunks and write using reliable writes
-> 0x00000004: Use reliable writes for WRITE_META blocks.
-> # cat /sys/block/mmcblk0/device/mypol0/erase_policy
-> Current: none
-> 0x00000001: Use secure erase.
-> # echo 1 > delete
-> # Policy is deleted.
-> 
-> The policies are all stored in a rb-tree. First order of business
-> inside mmc_blk_issue_rw_rq/mmc_blk_issue_* is to fetch an existing
-> policy given the access type and block start/end (which both tells
-> where the access is going and the size of the access). Later, it's
-> that policy information which controls how the request is translated
-> into MMC commands. I'm almost done with a prototype.
+Release callback tries to free memory even if it was not allocated in
+map_video_memory, fix it.
 
-I think it's good to discuss all the options, but my feeling is that
-we should not add so much complexity at the interface level, because
-we will never be able to change all that again. In general, sysfs
-files should contain simple values that are self-descriptive (a simple
-number or one word), and should have no side-effects (unlike the delete
-or the policies attributes you describe).
+Added by Vasily Khoruzhick:
 
-The behavior of the Toshiba chip is peculiar enough to justify having
-some workarounds for it, including run-time selected ones, but I'm
-looking for something much simpler. I'd certainly be interested in
-the patch you come up with and any performance results, but I don't
-think it can be merged like that.
+- Clear x_res/y_res fields of fb.var on release, to make sure
+our callback will be called on next FBIOPUT_VSCREENINFO ioctl.
+- Disable overlay only if it was enabled.
+- Don't touch FDADR1 if it's not necessary
 
-In the end, Chris will have to make the decision on mmc patches of
-course -- I'm just trying to contribute experience from other subsystems.
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+---
+v2: remove unnecessary newlines, add comment about FDADR1
 
-What I see as a more promising approach is to add the tunables
-to attributes of the CFQ I/O scheduler once we know what we want.
-This will allow doing the same optimizations to non-MMC devices such
-as USB sticks or CF/IDE cards without reimplementing it in other
-subsystems, and give more control over the individual requests than
-the MMC layer has.
+ drivers/video/pxafb.c |   49 ++++++++++++++++++++++++++++++++++---------------
+ drivers/video/pxafb.h |    2 +-
+ 2 files changed, 35 insertions(+), 16 deletions(-)
 
-E.g. the I/O scheduler can also make sure that we always submit all
-blocks from the start of one erase unit (e.g. 4 MB) to the end, but
-not try to merge requests across erase unit boundaries. It can
-also try to group the requests in aligned power-of-two sized chunks
-rather than merging as many sectors as possible up to the maximum
-request size, ignoring the alignment.
-
-	Arnd
+diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
+index 825b665..41a499f 100644
+--- a/drivers/video/pxafb.c
++++ b/drivers/video/pxafb.c
+@@ -629,6 +629,9 @@ static void overlay1fb_disable(struct pxafb_layer *ofb)
+ {
+ 	uint32_t lccr5 = lcd_readl(ofb->fbi, LCCR5);
+ 
++	if (!(lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN))
++		return;
++
+ 	lcd_writel(ofb->fbi, OVL1C1, ofb->control[0] & ~OVLxC1_OEN);
+ 
+ 	lcd_writel(ofb->fbi, LCSR1, LCSR1_BS(1));
+@@ -687,6 +690,9 @@ static void overlay2fb_disable(struct pxafb_layer *ofb)
+ {
+ 	uint32_t lccr5 = lcd_readl(ofb->fbi, LCCR5);
+ 
++	if (!(lcd_readl(ofb->fbi, OVL2C1) & OVLxC1_OEN))
++		return;
++
+ 	lcd_writel(ofb->fbi, OVL2C1, ofb->control[0] & ~OVLxC1_OEN);
+ 
+ 	lcd_writel(ofb->fbi, LCSR1, LCSR1_BS(2));
+@@ -720,12 +726,10 @@ static int overlayfb_open(struct fb_info *info, int user)
+ 	if (user == 0)
+ 		return -ENODEV;
+ 
+-	/* allow only one user at a time */
+-	if (atomic_inc_and_test(&ofb->usage))
+-		return -EBUSY;
++	if (ofb->usage++ == 0)
++		/* unblank the base framebuffer */
++		fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+ 
+-	/* unblank the base framebuffer */
+-	fb_blank(&ofb->fbi->fb, FB_BLANK_UNBLANK);
+ 	return 0;
+ }
+ 
+@@ -733,12 +737,24 @@ static int overlayfb_release(struct fb_info *info, int user)
+ {
+ 	struct pxafb_layer *ofb = (struct pxafb_layer*) info;
+ 
+-	atomic_dec(&ofb->usage);
+-	ofb->ops->disable(ofb);
+-
+-	free_pages_exact(ofb->video_mem, ofb->video_mem_size);
+-	ofb->video_mem = NULL;
+-	ofb->video_mem_size = 0;
++	if (--ofb->usage == 0) {
++		ofb->ops->disable(ofb);
++		ofb->fb.var.height	= -1;
++		ofb->fb.var.width	= -1;
++		ofb->fb.var.xres = ofb->fb.var.xres_virtual = 0;
++		ofb->fb.var.yres = ofb->fb.var.yres_virtual = 0;
++
++		mutex_lock(&ofb->fb.mm_lock);
++		ofb->fb.fix.smem_start	= 0;
++		ofb->fb.fix.smem_len	= 0;
++		mutex_unlock(&ofb->fb.mm_lock);
++
++		if (ofb->video_mem) {
++			free_pages_exact(ofb->video_mem, ofb->video_mem_size);
++			ofb->video_mem = NULL;
++			ofb->video_mem_size = 0;
++		}
++	}
+ 	return 0;
+ }
+ 
+@@ -817,7 +833,8 @@ static int overlayfb_map_video_memory(struct pxafb_layer *ofb)
+ 		if (ofb->video_mem_size >= size)
+ 			return 0;
+ 
+-		free_pages_exact(ofb->video_mem, ofb->video_mem_size);
++		/* don't re-allocate: userspace may have the buffer mapped */
++		return -EINVAL;
+ 	}
+ 
+ 	ofb->video_mem = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+@@ -891,7 +908,7 @@ static void __devinit init_pxafb_overlay(struct pxafb_info *fbi,
+ 
+ 	ofb->id = id;
+ 	ofb->ops = &ofb_ops[id];
+-	atomic_set(&ofb->usage, 0);
++	ofb->usage = 0;
+ 	ofb->fbi = fbi;
+ 	init_completion(&ofb->branch_done);
+ }
+@@ -1368,7 +1385,8 @@ static int pxafb_activate_var(struct fb_var_screeninfo *var,
+ 	    (lcd_readl(fbi, LCCR3) != fbi->reg_lccr3) ||
+ 	    (lcd_readl(fbi, LCCR4) != fbi->reg_lccr4) ||
+ 	    (lcd_readl(fbi, FDADR0) != fbi->fdadr[0]) ||
+-	    (lcd_readl(fbi, FDADR1) != fbi->fdadr[1]))
++	    ((fbi->lccr0 & LCCR0_SDS) &&
++	    (lcd_readl(fbi, FDADR1) != fbi->fdadr[1])))
+ 		pxafb_schedule_work(fbi, C_REENABLE);
+ 
+ 	return 0;
+@@ -1420,7 +1438,8 @@ static void pxafb_enable_controller(struct pxafb_info *fbi)
+ 	lcd_writel(fbi, LCCR0, fbi->reg_lccr0 & ~LCCR0_ENB);
+ 
+ 	lcd_writel(fbi, FDADR0, fbi->fdadr[0]);
+-	lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
++	if (fbi->lccr0 & LCCR0_SDS)
++		lcd_writel(fbi, FDADR1, fbi->fdadr[1]);
+ 	lcd_writel(fbi, LCCR0, fbi->reg_lccr0 | LCCR0_ENB);
+ }
+ 
+diff --git a/drivers/video/pxafb.h b/drivers/video/pxafb.h
+index 2353521..84e3ae1 100644
+--- a/drivers/video/pxafb.h
++++ b/drivers/video/pxafb.h
+@@ -92,7 +92,7 @@ struct pxafb_layer_ops {
+ struct pxafb_layer {
+ 	struct fb_info		fb;
+ 	int			id;
+-	atomic_t		usage;
++	uint32_t		usage;
+ 	uint32_t		control[2];
+ 
+ 	struct pxafb_layer_ops	*ops;
+-- 
+1.7.4
