@@ -1,52 +1,60 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Sat, 19 Feb 2011 20:38:55 -0700
-Subject: [PATCH 2/4] ARM: tegra: Prevent requeuing in-progress DMA requests
+Date: Sat, 19 Feb 2011 20:38:57 -0700
+Subject: [PATCH 4/4] ARM: tegra: Move pinmux init call
 In-Reply-To: <1298173137-9242-1-git-send-email-swarren@nvidia.com>
 References: <1298173137-9242-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1298173137-9242-3-git-send-email-swarren@nvidia.com>
+Message-ID: <1298173137-9242-5-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a request already in the queue is passed to tegra_dma_enqueue_req,
-tegra_dma_req.node->{next,prev} will end up pointing to itself instead
-of at tegra_dma_channel.list, which is the way a the end-of-list
-should be set up. When the DMA request completes and is list_del'd,
-the list head will still point at it, yet the node's next/prev will
-contain the list poison values. When the next DMA request completes,
-a kernel panic will occur when those poison values are dereferenced.
-
-This makes the DMA driver more robust in the face of buggy clients.
+In order for the clock initialization to pick up the results of the
+pinmux initialization (which will initialize various parameters of
+clocks cdev1, cdev2), the pinmux initialization must happen first.
+Move the pinmux init to achieve this.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-tegra/dma.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/board-harmony.c   |    4 ++--
+ arch/arm/mach-tegra/board-trimslice.c |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-index 250bc7b..f3b869b 100644
---- a/arch/arm/mach-tegra/dma.c
-+++ b/arch/arm/mach-tegra/dma.c
-@@ -311,6 +311,7 @@ int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
- 	struct tegra_dma_req *req)
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index b9dbdb1..eea5ad6 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -104,12 +104,12 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
+ 
+ static void __init tegra_harmony_init(void)
  {
- 	unsigned long irq_flags;
-+	struct tegra_dma_req *_req;
- 	int start_dma = 0;
- 
- 	if (req->size > NV_DMA_MAX_TRASFER_SIZE ||
-@@ -321,6 +322,13 @@ int tegra_dma_enqueue_req(struct tegra_dma_channel *ch,
- 
- 	spin_lock_irqsave(&ch->lock, irq_flags);
- 
-+	list_for_each_entry(_req, &ch->list, node) {
-+		if (req == _req) {
-+			spin_unlock_irqrestore(&ch->lock, irq_flags);
-+			return -EEXIST;
-+		}
-+	}
++	harmony_pinmux_init();
 +
- 	req->bytes_transferred = 0;
- 	req->status = 0;
- 	req->buffer_status = 0;
+ 	tegra_common_init();
+ 
+ 	tegra_clk_init_from_table(harmony_clk_init_table);
+ 
+-	harmony_pinmux_init();
+-
+ 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
+ }
+ 
+diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
+index ef233b2..aef6abb 100644
+--- a/arch/arm/mach-tegra/board-trimslice.c
++++ b/arch/arm/mach-tegra/board-trimslice.c
+@@ -85,12 +85,12 @@ subsys_initcall(tegra_trimslice_pci_init);
+ 
+ static void __init tegra_trimslice_init(void)
+ {
++	trimslice_pinmux_init();
++
+ 	tegra_common_init();
+ 
+ 	tegra_clk_init_from_table(trimslice_clk_init_table);
+ 
+-	trimslice_pinmux_init();
+-
+ 	platform_add_devices(trimslice_devices, ARRAY_SIZE(trimslice_devices));
+ }
+ 
 -- 
 1.7.1
