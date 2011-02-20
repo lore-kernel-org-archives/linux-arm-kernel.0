@@ -1,36 +1,46 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 20 Feb 2011 19:31:36 +0000
-Subject: [PATCH v2] mxcmmc: use dmaengine API
-In-Reply-To: <201102181437.02943.arnd@arndb.de>
-References: <20110218092109.GG24426@pengutronix.de>
-	<201102181437.02943.arnd@arndb.de>
-Message-ID: <20110220193136.GA13266@void.printf.net>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Sun, 20 Feb 2011 22:04:08 +0200
+Subject: [PATCH resend] omap: Fix linker error in
+	drivers/video/omap/lcd_2430sdp.c
+In-Reply-To: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
+References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <1298232248-347-1-git-send-email-jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+There is a linker error from lcd_2430sdp.c if CONFIG_TWL4030_CORE is not
+set. This can be triggered on OMAP2 builds where OMAP3 or OMAP4 are not set.
 
-On Fri, Feb 18, 2011 at 02:37:02PM +0100, Arnd Bergmann wrote:
-> On Friday 18 February 2011, Sascha Hauer wrote:
-> > This switches the mxcmmc driver to use the dmaengine API. Unlike
-> > the old one this one is always present in the tree, even if no DMA
-> > is implemented, hence we can remove all the #ifdefs in from the driver.
-> > The driver automatically switches to PIO mode if no DMA support or no
-> > suitable channel is available.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> The patch looks good to me, but shouldn't you also add a Kconfig
-> dependency or select on CONFIG_DMA_ENGINE? I don't see where that
-> gets set.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+drivers/built-in.o: In function `sdp2430_panel_disable':
+drivers/video/omap/lcd_2430sdp.c:123: undefined reference to `twl_i2c_write_u8'
+drivers/video/omap/lcd_2430sdp.c:124: undefined reference to `twl_i2c_write_u8'
+drivers/built-in.o: In function `sdp2430_panel_enable':
+drivers/video/omap/lcd_2430sdp.c:110: undefined reference to `twl_i2c_write_u8'
+drivers/video/omap/lcd_2430sdp.c:112: undefined reference to `twl_i2c_write_u8'
 
-I've pushed this to mmc-next now, but please do reply to Arnd's Kconfig
-question.
+Fix this by adding TWL4030_CORE dependency to CONFIG_MACH_OMAP_2430SDP as
+there is no own entry in drivers/video/omap/Kconfig.
 
-Thanks,
+Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+Resend = forgot to cc LAKML.
+Quite old issue most probably. Can be triggered in mainline anyway.
+---
+ arch/arm/mach-omap2/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index b9d8a7b..bfdf240 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -132,6 +132,7 @@ config MACH_OMAP_2430SDP
+ 	depends on SOC_OMAP2430
+ 	default y
+ 	select OMAP_PACKAGE_ZAC
++	select TWL4030_CORE
+ 
+ config MACH_OMAP3_BEAGLE
+ 	bool "OMAP3 BEAGLE board"
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.0.4
