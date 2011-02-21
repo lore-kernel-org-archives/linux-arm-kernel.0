@@ -1,43 +1,42 @@
-From: ccross@android.com (Colin Cross)
-Date: Sun, 20 Feb 2011 23:06:01 -0800
-Subject: [PATCH v2 14/21] ARM: tegra: clock: Refcount periph clock enables
-In-Reply-To: <AANLkTin8AmjM2CWoNh54NmyV6=298bGzDUPO+j4LTrBj@mail.gmail.com>
-References: <1298154371-5641-1-git-send-email-ccross@android.com>
-	<1298154371-5641-16-git-send-email-ccross@android.com>
-	<AANLkTin8AmjM2CWoNh54NmyV6=298bGzDUPO+j4LTrBj@mail.gmail.com>
-Message-ID: <AANLkTin5O-dbKhwkBmsZVYCJM=qg=QY=N1w4Zc++6qY4@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 21 Feb 2011 13:06:59 +0530
+Subject: [linux-pm] [PATCH] amba: move to pm ops
+In-Reply-To: <s5hr5b6wo7z.wl%tiwai@suse.de>
+References: <1297928986-31171-1-git-send-email-rabin.vincent@stericsson.com>
+	<s5hr5b6wo7z.wl%tiwai@suse.de>
+Message-ID: <AANLkTinFpX_uRzrVN+ZpuOLyM-QJovyK14Lb5bQSdTwh@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 20, 2011 at 8:18 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
+On Thu, Feb 17, 2011 at 23:14, Takashi Iwai <tiwai@suse.de> wrote:
+> At Thu, 17 Feb 2011 13:19:46 +0530,
+> Rabin Vincent wrote:
+>>
+>> Support pm_ops in the AMBA bus instead of the legacy ops. ? pm_ops is needed
+>> for runtime pm, and there is also a general move to convert drivers to
+>> dev_pm_ops rather than bus specific PM ops in order to facilitate core
+>> development.
+>>
+>> Since there are only 6 AMBA drivers using suspend/resume, convert them all in
+>> one go and directly use the GENERIC_SUBSYS_PM_OPS in the bus.
+>>
+>> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> Cc: Chris Ball <cjb@laptop.org>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>> Cc: Takashi Iwai <tiwai@suse.de>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Greg Kroah-Hartman <gregkh@suse.de>
+>> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 >
-> On Sat, Feb 19, 2011 at 2:26 PM, Colin Cross <ccross@android.com> wrote:
->> Some peripheral clocks share enable bits. ?Refcount the enables so
->> that calling clk_disable on one clock will not turn off another
->> clock.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> ---
->> ?arch/arm/mach-tegra/tegra2_clocks.c | ? 35 +++++++++++++++++++++++++++++------
->> ?1 files changed, 29 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
->> index 196c249..2734889 100644
->> --- a/arch/arm/mach-tegra/tegra2_clocks.c
->> +++ b/arch/arm/mach-tegra/tegra2_clocks.c
->> @@ -154,6 +154,12 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
->> ?*/
->> ?static DEFINE_SPINLOCK(clock_register_lock);
->>
->> +/*
->> + * Some peripheral clocks share an enable bit, so refcount the enable bits
->> + * in registers CLK_ENABLE_L, CLK_ENABLE_H, and CLK_ENABLE_U
->> + */
->> +static int tegra_periph_clk_enable_refcount[3 * 32];
+> For sound/arm/aaci.c,
 >
-> Given that this is always locked when incrementing/decrementing,
-> should it just be switched to an array of atomics instead?
-No, the spinlock needs to be held between the increment/decrement and
-test and the actual register write.  The spinlock release in the
-enable function needs to be moved after the register write.
+> ?Acked-by: Takashi Iwai <tiwai@suse.de>
+>
+> Though, this would result in a zero-filled *_pm struct when
+> CONFIG_PM_* isn't set? ?It's a few bytes wastes ;)
+
+Thank you for the ack.  However, in v2 of the patch I've done a
+different implementation in the bus code that doesn't necessitate
+the conversion of all the drivers together, so this part is
+dropped.  I will take this comment into consideration if I do
+end up converting all the drivers.  Thanks.
