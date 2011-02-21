@@ -1,168 +1,40 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Mon, 21 Feb 2011 23:12:20 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <AANLkTikbjZ7GH7+bx94r6saYuGzCt9aito-Y8NS94SoQ@mail.gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikbjZ7GH7+bx94r6saYuGzCt9aito-Y8NS94SoQ@mail.gmail.com>
-Message-ID: <AANLkTi=rJZo2KwryYznFp6Qq25Oh0+F44OKV-khuQyte@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 21 Feb 2011 22:36:48 +0100
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <20110221182213.GD15225@atomide.com>
+References: <20110217165953.GR20795@atomide.com> <4D5D5770.9020501@ti.com>
+	<20110217171747.GC14574@legolas.emea.dhcp.ti.com>
+	<4D5D59E5.6020307@ti.com>
+	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
+	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
+	<4D5E7DFF.7020609@ti.com>
+	<20110218154135.GF11151@legolas.emea.dhcp.ti.com>
+	<4D5EA36A.4000903@ti.com> <20110221182213.GD15225@atomide.com>
+Message-ID: <4D62DAF0.9050301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 8:43 PM, Ramirez Luna, Omar <omar.ramirez@ti.com> wrote:
-> Hi,
-
-Hi,
-
-Thanks for the comments.
-
->
-> On Wed, Feb 16, 2011 at 1:35 PM, David Cohen <dacohen@gmail.com> wrote:
->> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
->> index 49a1e5e..adb083e 100644
->> --- a/arch/arm/mach-omap2/iommu2.c
->> +++ b/arch/arm/mach-omap2/iommu2.c
-> ...
+On 2/21/2011 7:22 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [110218 08:49]:
+>> ---
+>>  From b2190f0d339c9d843eb5e370d0db8b7090fbcfab Mon Sep 17 00:00:00 2001
+>> From: Benoit Cousson<b-cousson@ti.com>
+>> Date: Fri, 18 Feb 2011 14:01:06 +0100
+>> Subject: [PATCH] OMAP4: hwmod data: Add rev and dev_attr fields in McSPI
 >>
->> ? ? ? ?da = iommu_read_reg(obj, MMU_FAULT_AD);
->> ? ? ? ?*ra = da;
->>
->> + ? ? ? if (stat & MMU_IRQ_TLBMISS)
->> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
->> + ? ? ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
->> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
->> + ? ? ? if (stat & MMU_IRQ_EMUMISS)
->> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
->> + ? ? ? if (stat & MMU_IRQ_TABLEWALKFAULT)
->> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
->> + ? ? ? if (stat & MMU_IRQ_MULTIHITFAULT)
->> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
->
-> I still don't think this adds any value, "generic layer" and omap
-> errors are the same thing in this case... OTOH OMAP 1710 (not
-> supported by iommu yet) has the following bits:
->
-> 3 Prefetch_err
-> 2 Perm_fault
-> 1 Tlb_miss
-> 0 Trans_fault
->
-> They don't match any of your "generic layer errors" masks for reading,
+>> - Add a rev attribute to identify various McSPI IP version.
+>> - Add a dev_attr structure to provide the number of chipselect
+>>    supported by the instance.
+> 
+> Looks like one seems to be wrapped and does not apply even after unwapping..
 
-Have you noticed:
- 0 = OMAP_IOMMU_ERR_TRANS_FAULT
- 1 = OMAP_IOMMU_ERR_TLB_MISS
+#$*%&!@ Thunderbird...
 
-2 and 3 could be added.
+Here is the same one without the "enable word wrap" and attached as well just in case.
 
-> hence more generic errors will need to be defined, and then more OMAP#
-> masks... I think we just need to stick with the mach specific errors,
-> and let mach code handle its specifics when reporting.
+It should apply on your omap-for-linus branch at commit df7ffd3.
 
-How many are we talking about? I don't think every new OMAP version it
-would completely re-invent IOMMU faults.
-Generic errors codes make easier to threat possible IOMMU users which
-have (partially or totally) common drivers for different OMAP
-versions.
-Unless it's really an out-of-control number of generic faults, I don't
-see it as a real problem.
+Regards,
+Benoit
 
->
-> But anyway it is just me...
->
->> diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
->> index f55f458..b0e0efc 100644
->> --- a/arch/arm/plat-omap/iommu.c
->> +++ b/arch/arm/plat-omap/iommu.c
->> @@ -780,25 +780,19 @@ static void iopgtable_clear_entry_all(struct iommu *obj)
->> ?*/
->> ?static irqreturn_t iommu_fault_handler(int irq, void *data)
->> ?{
->> - ? ? ? u32 stat, da;
->> + ? ? ? u32 da, errs;
->> ? ? ? ?u32 *iopgd, *iopte;
->> - ? ? ? int err = -EIO;
->> ? ? ? ?struct iommu *obj = data;
->>
->> ? ? ? ?if (!obj->refcount)
->> ? ? ? ? ? ? ? ?return IRQ_NONE;
->>
->> - ? ? ? /* Dynamic loading TLB or PTE */
->> - ? ? ? if (obj->isr)
->> - ? ? ? ? ? ? ? err = obj->isr(obj);
->> -
->> - ? ? ? if (!err)
->> - ? ? ? ? ? ? ? return IRQ_HANDLED;
->> -
->> ? ? ? ?clk_enable(obj->clk);
->> - ? ? ? stat = iommu_report_fault(obj, &da);
->> + ? ? ? errs = iommu_report_fault(obj, &da);
->> ? ? ? ?clk_disable(obj->clk);
->> - ? ? ? if (!stat)
->> +
->> + ? ? ? /* Fault callback or TLB/PTE Dynamic loading */
->> + ? ? ? if (obj->isr && !obj->isr(obj, da, errs, obj->isr_priv))
->> ? ? ? ? ? ? ? ?return IRQ_HANDLED;
->
-> BTW, why not changing the name isr for cb, it is confusing since there
-> is another fault_isr called by mmu, AFAIK nobody uses obj->isr
-
-The main purpose of this function is to be an ISR, not only callback.
-But as you noticed, nobody is using it yet, but OMAP3 ISP should start
-to use it soon.
-
->
->> ? ? ? ?iommu_disable(obj);
->> @@ -806,15 +800,16 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
->> ? ? ? ?iopgd = iopgd_offset(obj, da);
->>
->> ? ? ? ?if (!iopgd_is_table(*iopgd)) {
->> - ? ? ? ? ? ? ? dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", obj->name,
->> - ? ? ? ? ? ? ? ? ? ? ? da, iopgd, *iopgd);
->> + ? ? ? ? ? ? ? dev_err(obj->dev, "%s: errs:0x%08x da:0x%08x pgd:0x%p "
->> + ? ? ? ? ? ? ? ? ? ? ? "*pgd:px%08x\n", obj->name, errs, da, iopgd, *iopgd);
->> ? ? ? ? ? ? ? ?return IRQ_NONE;
->> ? ? ? ?}
->>
->> ? ? ? ?iopte = iopte_offset(iopgd, da);
->>
->> - ? ? ? dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x pte:%p *pte:%08x\n",
->> - ? ? ? ? ? ? ? obj->name, da, iopgd, *iopgd, iopte, *iopte);
->> + ? ? ? dev_err(obj->dev, "%s: errs:0x%08x da:0x%08x pgd:0x%p *pgd:0x%08x "
->> + ? ? ? ? ? ? ? "pte:0x%p *pte:0x%08x\n", obj->name, errs, da, iopgd, *iopgd,
->> + ? ? ? ? ? ? ? iopte, *iopte);
->>
->> ? ? ? ?return IRQ_NONE;
->> ?}
->> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
->> ?}
->> ?EXPORT_SYMBOL_GPL(iommu_put);
->>
->> +int iommu_set_isr(const char *name,
->> + ? ? ? ? ? ? ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *priv),
->> + ? ? ? ? ? ? ? ? void *isr_priv)
->
-> So I think the following will be bad practice:
->
-> ? ? ? ?mmu = iommu_get("iva2");
-> ? ? ? ?if (!IS_ERR(mmu))
-> ? ? ? ? ? ? ? ?mmu->isr = mmu_fault_callback;
->
-> Shall we think anything to prevent such mis-usage?
-
-Well, the IOMMU user has access to IOMMU obj, so it can not only
-change the (*isr)() but to mess with a lot of other stuff. The only
-way to prevent it is to avoid user to have obj. But then, this fix (or
-issue) does not belong to this patch.
-
-Br,
-
-David
-
->
-> Regards,
->
-> Omar
->
+---
