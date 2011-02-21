@@ -1,42 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 20 Feb 2011 20:15:25 -0800
-Subject: [PATCH v2 12/21] ARM: tegra: clock: Add shared bus clock type
-In-Reply-To: <1298154371-5641-1-git-send-email-ccross@android.com>
+Date: Sun, 20 Feb 2011 20:17:28 -0800
+Subject: [PATCH v2 13/21] ARM: tegra: clock: Remove unnecessary uses of
+	#ifdef CONFIG_DEBUG_FS
+In-Reply-To: <1298154371-5641-15-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-Message-ID: <AANLkTinWQRmKhorYHQ2rHCArHN89go-2mYVAe5UUZVOV@mail.gmail.com>
+	<1298154371-5641-15-git-send-email-ccross@android.com>
+Message-ID: <AANLkTimHrMZAfxx-N+Ub7_cjtwJC2s0KsnUPHw4Z7B7o@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sat, Feb 19, 2011 at 2:25 PM, Colin Cross <ccross@android.com> wrote:
-> Some clocks may have multiple downstream users that need to request a
-> higher clock rate. ?Shared bus clocks provide a unique shared_bus_user
-> clock to each user. ?The frequency of the bus is set to the highest
-> enabled shared_bus_user clock, with a minimum value set by the
-> shared bus. ?Drivers can use clk_enable and clk_disable to enable
-> or disable their requirement, and clk_set_rate to set the minimum rate.
->
+On Sat, Feb 19, 2011 at 2:26 PM, Colin Cross <ccross@android.com> wrote:
 > Signed-off-by: Colin Cross <ccross@android.com>
 
-[...]
-> diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-> index a1c86d8..dd53af3 100644
-> --- a/arch/arm/mach-tegra/tegra2_clocks.c
-> +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-[...]
+Technically, this patch does not _just_ "remove unneccessary uses of #ifdef".
 
-> + ? ? ? c->u.shared_bus_user.rate = c->parent->max_rate;
-> + ? ? ? c->state = OFF;
-> +#ifdef CONFIG_DEBUG_FS
-> + ? ? ? c->set = 1;
-> +#endif
-> +
-> + ? ? ? spin_lock_irqsave(&c->parent->spinlock, flags);
+I'd say "tegra: clock: minor cleanups" as patch subject, and:
+* Remove unneccessary uses of #ifdef CONFIG_DEBUG_FS
+* "1" -> "true" for some bool assigments
 
-
-A later patch in the series removes the ifdef. Might as well remove it
-here. Also, should be c->set = true, which that patch also does. :)
+as patch description.
 
 With that fixed:
 
