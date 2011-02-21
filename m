@@ -1,49 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Feb 2011 15:28:15 +0000
-Subject: [PATCH 4/5] ARM: s5pv310: update IRQ combiner to use EOI in parent
-	chip
+Date: Mon, 21 Feb 2011 15:28:16 +0000
+Subject: [PATCH 5/5] ARM: msm: update GPIO chained IRQ handler to use EOI in
+	parent chip
 In-Reply-To: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
 References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1298302096-21275-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1298302096-21275-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQ combiner code invokes the ->irq_{un}mask routines of the parent
-chip.
+The chained GPIO IRQ handler on MSM8x60 calls ->ack on the parent chip
+after handling the interrupt.
 
-This patch updates the cascaded handler to use EOI now that the GIC has
-moved to using the fasteoi flow model.
+This patch updates the code to use ->irq_eoi now that the GIC has moved
+to using the fasteoi flow model.
 
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-s5pv310/irq-combiner.c |    7 ++-----
- 1 files changed, 2 insertions(+), 5 deletions(-)
+ arch/arm/mach-msm/gpio-v2.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
-index 1ea4a9e..24d5604 100644
---- a/arch/arm/mach-s5pv310/irq-combiner.c
-+++ b/arch/arm/mach-s5pv310/irq-combiner.c
-@@ -59,9 +59,6 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- 	unsigned int cascade_irq, combiner_irq;
- 	unsigned long status;
- 
--	/* primary controller ack'ing */
--	chip->irq_ack(&desc->irq_data);
--
- 	spin_lock(&irq_controller_lock);
- 	status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
- 	spin_unlock(&irq_controller_lock);
-@@ -79,8 +76,8 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- 		generic_handle_irq(cascade_irq);
- 
-  out:
--	/* primary controller unmasking */
--	chip->irq_unmask(&desc->irq_data);
-+	/* primary controller EOI */
-+	chip->irq_eoi(&desc->irq_data);
+diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+index 0de19ec..04fb411 100644
+--- a/arch/arm/mach-msm/gpio-v2.c
++++ b/arch/arm/mach-msm/gpio-v2.c
+@@ -318,7 +318,7 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
+ 							   i));
+ 	}
+-	desc->chip->ack(irq);
++	desc->chip->irq_eoi(irq);
  }
  
- static struct irq_chip combiner_chip = {
+ static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 -- 
 1.7.0.4
