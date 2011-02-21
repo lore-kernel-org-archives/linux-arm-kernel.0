@@ -1,30 +1,56 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 21 Feb 2011 16:37:00 +0100 (CET)
-Subject: dma_declare_coherent_memory() again.
-Message-ID: <Pine.LNX.4.64.1102211602140.26977@axis700.grange>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Feb 2011 17:00:28 +0100
+Subject: [PATCH] arm: imx: Zero entire imxdma structure
+In-Reply-To: <20110220230458.GA21198@n2100.arm.linux.org.uk>
+References: <1298239851-958-1-git-send-email-imirkin@alum.mit.edu>
+	<AANLkTin4gJpzV6-bo15rn_AHVGvTD8+9vq3Q+ciLF8vB@mail.gmail.com>
+	<20110220230458.GA21198@n2100.arm.linux.org.uk>
+Message-ID: <20110221160028.GQ24426@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All
+On Sun, Feb 20, 2011 at 11:04:58PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Feb 20, 2011 at 10:59:24PM +0000, Ilia Mirkin wrote:
+> > On Sun, Feb 20, 2011 at 10:10 PM, Ilia Mirkin <imirkin@alum.mit.edu> wrote:
+> > > The semantic match that finds the problem:
+> > > // <smpl>
+> > > @@
+> > > type T;
+> > > identifier x;
+> > > @@
+> > >
+> > > T *x;
+> > > ...
+> > > * memset(x, ..., ... * sizeof(x) * ...);
+> > > // </smpl>
+> > >
+> > > Signed-off-by: Ilia Mirkin <imirkin@alum.mit.edu>
+> > >
+> > > ---
+> > > ?arch/arm/mach-imx/dma-v1.c | ? ?2 +-
+> > > ?1 files changed, 1 insertions(+), 1 deletions(-)
+> > >
+> > > Untested, lack of tool chain and hardware. But there's definitely something
+> > > odd going on here, and this seemed like the most logical fix.
+> > 
+> > Doing some quick digging (as I've been discovering that a few of the
+> > other patches I was planning on sending have already been sent out in
+> > the past), I noticed that this same patch was already sent on Dec 9,
+> > 2009 by Julia Lawall[1] (back when it was plat-mxc/dma-mx1-mx2.c), and
+> > then again by Vasiliy Kulikov[2] on Oct 10, 2010.
+> > 
+> > On each occasion, the response was positive, but patch has yet to make
+> > it upstream. Weird.
+> 
+> Sascha, are you going to take this patch?
 
-AFAIU, dma_declare_coherent_memory() is still present on the following 
-platforms:
+Yes.
 
-arch/arm/mach-mx3/mach-pcm037.c
-arch/arm/mach-mx3/mach-mx31moboard.c
-arch/arm/mach-shmobile/board-ap4evb.c
-arch/arm/mach-shmobile/board-mackerel.c (latter 2 via 
-	drivers/media/video/sh_mobile_ceu_camera.c)
+Sascha
 
-and there are no pending patches to fix them for 2.6.38, is this right? If 
-there are no realistic plans for proper memory reservation on ARM in 
-2.6.38, shall I just submit patches to disable those calls on the above 
-platforms and hope, that the user manages to get RAM without boot-time 
-reservation? Or is a definite failure preferred?
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
