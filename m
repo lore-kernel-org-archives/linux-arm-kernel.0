@@ -1,78 +1,101 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Feb 2011 14:23:07 +0530
-Subject: [PATCH] perf: add OMAP support for the new power events
-In-Reply-To: <AANLkTiktdLja39dC38E_LciYZK7+pTp3_Sgm9jf5FA4R@mail.gmail.com>
-References: <1298052645-4164-1-git-send-email-j-pihet@ti.com><ec45f3f591691ce6a5253dfb70cc8e90@mail.gmail.com>
-	<AANLkTiktdLja39dC38E_LciYZK7+pTp3_Sgm9jf5FA4R@mail.gmail.com>
-Message-ID: <5dad46ab75a15145f907aeca53f769c1@mail.gmail.com>
+From: dacohen@gmail.com (David Cohen)
+Date: Mon, 21 Feb 2011 10:57:45 +0200
+Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
+	handling
+In-Reply-To: <20110221082240.GL3094@legolas.emea.dhcp.ti.com>
+References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
+	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
+	<20110221.101856.76372714451194378.Hiroshi.DOYU@nokia.com>
+	<20110221082240.GL3094@legolas.emea.dhcp.ti.com>
+Message-ID: <AANLkTinTCGhH9HgGEr1ciHL5Vf+gQxecr17O6Z9OTOWv@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jean Pihet [mailto:jean.pihet at newoldbits.com]
-> Sent: Monday, February 21, 2011 2:14 PM
-> To: Santosh Shilimkar
-> Cc: Kevin Hilman; Thomas Renninger; linux-omap at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; Jean Pihet-XID
-> Subject: Re: [PATCH] perf: add OMAP support for the new power events
+On Mon, Feb 21, 2011 at 10:22 AM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
 >
-> Hi Santosh,
+> On Mon, Feb 21, 2011 at 10:18:56AM +0200, Hiroshi DOYU wrote:
+>> From: David Cohen <dacohen@gmail.com>
+>> Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault handling
+>> Date: Wed, 16 Feb 2011 21:35:51 +0200
+>>
+>> > Add support to register an isr for IOMMU fault situations and adapt it
+>> > to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
+>> > module might want to be informed when errors happen in order to debug it
+>> > or react.
+>> >
+>> > Signed-off-by: David Cohen <dacohen@gmail.com>
+>> > ---
+>> > ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 17 +++++++++-
+>> > ?arch/arm/plat-omap/include/plat/iommu.h | ? 14 ++++++++-
+>> > ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 52 ++++++++++++++++++++++---------
+>> > ?3 files changed, 65 insertions(+), 18 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
+>> > index 49a1e5e..adb083e 100644
+>> > --- a/arch/arm/mach-omap2/iommu2.c
+>> > +++ b/arch/arm/mach-omap2/iommu2.c
+>> > @@ -146,18 +146,31 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
+>> > ?static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
+>> > ?{
+>> > ? ? u32 stat, da;
+>> > + ? u32 errs = 0;
+>> >
+>> > ? ? stat = iommu_read_reg(obj, MMU_IRQSTATUS);
+>> > ? ? stat &= MMU_IRQ_MASK;
+>> > - ? if (!stat)
+>> > + ? if (!stat) {
+>> > + ? ? ? ? ? *ra = 0;
+>> > ? ? ? ? ? ? return 0;
+>> > + ? }
+>> >
+>> > ? ? da = iommu_read_reg(obj, MMU_FAULT_AD);
+>> > ? ? *ra = da;
+>> >
+>> > + ? if (stat & MMU_IRQ_TLBMISS)
+>> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
+>> > + ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
+>> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
+>> > + ? if (stat & MMU_IRQ_EMUMISS)
+>> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
+>> > + ? if (stat & MMU_IRQ_TABLEWALKFAULT)
+>> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
+>> > + ? if (stat & MMU_IRQ_MULTIHITFAULT)
+>> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
+>> > ? ? iommu_write_reg(obj, stat, MMU_IRQSTATUS);
+>> >
+>> > - ? return stat;
+>> > + ? return errs;
+>> > ?}
+>> >
+>> > ?static void omap2_tlb_read_cr(struct iommu *obj, struct cr_regs *cr)
+>> > diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
+>> > index 19cbb5e..174f1b9 100644
+>> > --- a/arch/arm/plat-omap/include/plat/iommu.h
+>> > +++ b/arch/arm/plat-omap/include/plat/iommu.h
+>> > @@ -31,6 +31,7 @@ struct iommu {
+>> > ? ? struct clk ? ? ?*clk;
+>> > ? ? void __iomem ? ?*regbase;
+>> > ? ? struct device ? *dev;
+>> > + ? void ? ? ? ? ? ?*isr_priv;
+>>
+>> Ideally I'd like to avoid having "isr_priv" in iommu since it's not
+>> used for iommu but client needs the place to pass its info to its
+>> custom handler. Any better idea?
 >
+> I'm not sure if it makes sense as I don't know the mailbox block, but
+> maybe moving to GENIRQ ? Then IRQ subsystem would take care of the
+> "dev_id"
 
-[...]
+Not sure if it fits in this case. It's a different module (IOMMU user)
+which needs to get a callback from IOMMU when a fault happens.
+Is there any GENIRQ usage currently in this scenario?
 
-> >> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-
-> >> omap2/pm34xx.c
-> >> index 2f864e4..d1cc3f4 100644
-> >> --- a/arch/arm/mach-omap2/pm34xx.c
-> >> +++ b/arch/arm/mach-omap2/pm34xx.c
-> >> @@ -29,6 +29,7 @@
-> >> ?#include <linux/delay.h>
-> >> ?#include <linux/slab.h>
-> >> ?#include <linux/console.h>
-> >> +#include <trace/events/power.h>
-> >>
-> >> ?#include <plat/sram.h>
-> >> ?#include "clockdomain.h"
-> >> @@ -519,8 +520,14 @@ static void omap3_pm_idle(void)
-> >> ? ? ? if (omap_irq_pending() || need_resched())
-> >> ? ? ? ? ? ? ? goto out;
-> >>
-> >> + ? ? trace_power_start(POWER_CSTATE, 1, smp_processor_id());
-> >> + ? ? trace_cpu_idle(1, smp_processor_id());
-> >> +
-> >
-> > This default idle code won't be used when you enable the
-> > CONFIG_CPUIDLE. That case the cpuidle34xx.c idle code gets
-> > registered.
-> That is correct. OMAP has a default idle handler (omap3_pm_idle) and
-> a
-> cpuidle handler (omap3_enter_idle in
-> arch/arm/mach-omap2/cpuidle34xx.c).
+Br,
+
+David
+
 >
-> > Shouldn't you patch that code instead? This is more or less
-> > dead code and it is just like default idle code when idle
-> > drivers isn't registered.
-> The cpuidle framework already is instrumented in a generic way. This
-> code adds the instrumentation to the default idle handler so that
-> all
-> cases are covered. BTW the patch description gives that information.
+> --
+> balbi
 >
-> If there is dead code then it is not only the code from this patch
-> but
-> all the code for the default idle handler.
->
-I read your change log. It says.
-
->> The trace points are for:
->> - default idle handler. Since the cpuidle framework is
->> ? instrumented in the generic way there is no need to
->> ? add trace points in the OMAP specific cpuidle handler;
-Now code in cpuilde34xx.c is also OMAP specific and hence the
-confusion at least for me.
-Regarding dead code, I meant existing code of default handler.
-
-Thanks for clarification.
-
-Regards,
-Santosh
