@@ -1,40 +1,41 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 21 Feb 2011 11:46:08 +0100
-Subject: [PATCH 5/5] mmc: sdhci: add quirk
-	SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO
-In-Reply-To: <010C9052C42A00499CE76D637FA5EE900C579F@039-SN1MPN1-001.039d.mgd.msft.net>
-References: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
-	<1298282095-2279-5-git-send-email-richard.zhao@freescale.com>
-	<20110221100439.GE2616@pengutronix.de>
-	<010C9052C42A00499CE76D637FA5EE900C579F@039-SN1MPN1-001.039d.mgd.msft.net>
-Message-ID: <20110221104608.GF2616@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Feb 2011 11:02:33 +0000
+Subject: [PATCH V5 36/63] ST SPEAr : EMI (Extrenal Memory Interface)
+	controller driver
+In-Reply-To: <4D620582.40802@st.com>
+References: <cover.1295499392.git.viresh.kumar@st.com>
+	<942264b07d606a02eb68561c7be559b6a4904961.1295499395.git.viresh.kumar@st.com>
+	<20110219171320.GO29493@n2100.arm.linux.org.uk>
+	<4D620582.40802@st.com>
+Message-ID: <20110221110233.GI14495@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > -   if (cpu_is_mx35() || cpu_is_mx51())
-> > > +   if (cpu_is_mx53())
-> > > +           host->quirks |= SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO;
-> >
-> > Have you tried it doing it via IO-accessors?
-> Richard Zhu: This quirk is used to fix a mechanism problem in the MMC CMDs execution procedure.
-> It would be very abrupt and ugly, if the IO-accessors are added into these original procedures.
+On Mon, Feb 21, 2011 at 11:56:10AM +0530, Vipin Kumar wrote:
+> >> +void __init
+> >> +emi_init_board_info(struct platform_device *pdev, struct resource *resources,
+> >> +		int res_num, struct mtd_partition *partitions,
+> >> +		unsigned int nr_partitions, unsigned int width)
+> >> +{
+> >> +	struct physmap_flash_data *emi_plat_data = dev_get_platdata(&pdev->dev);
+> >> +
+> >> +	pdev->resource = resources;
+> >> +	pdev->num_resources = res_num;
+> >> +
+> >> +	if (partitions) {
+> >> +		emi_plat_data->parts = partitions;
+> >> +		emi_plat_data->nr_parts = nr_partitions;
+> >> +	}
+> >> +
+> >> +	emi_plat_data->width = width;
+> >> +}
+> > 
+> > I don't see why this has to be code rather than in the platform specific
+> > files as static initializers.  
+> 
+> The device is instantiated in the machine file and above information comes
+> from the board file. So we kept them this way.
 
-Please don't get it personal, but IMHO it is pretty ugly the way it is
-now. This quirk is very imx-specific and calling something like
-SDHCI_VENDOR_SPEC in sdhci.c looks clearly wrong to me. By the way, what
-does this bit do, the description doesn't say so?
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110221/2393fe81/attachment.sig>
+Ok, but I don't see why this should be in the EMI code.  Surely this
+should be along side the nor device, and called 'nor_init_board_info'
+or something similar?
