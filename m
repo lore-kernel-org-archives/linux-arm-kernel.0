@@ -1,48 +1,65 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 21 Feb 2011 11:04:39 +0100
-Subject: [PATCH 5/5] mmc: sdhci: add quirk
-	SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO
-In-Reply-To: <1298282095-2279-5-git-send-email-richard.zhao@freescale.com>
-References: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
-	<1298282095-2279-5-git-send-email-richard.zhao@freescale.com>
-Message-ID: <20110221100439.GE2616@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 21 Feb 2011 18:58:25 +0900
+Subject: [GIT PULL] Samsung fixes for 2.6.38-rc6
+Message-ID: <000001cbd1ad$e634f9d0$b29eed70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 05:54:55PM +0800, Richard Zhao wrote:
-> Fix no INT in MULTI-BLK IO.
-> 
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 9b82910..2eeb03e 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -113,7 +113,10 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
->  	clk_enable(clk);
->  	pltfm_host->clk = clk;
->  
-> -	if (cpu_is_mx35() || cpu_is_mx51())
-> +	if (cpu_is_mx53())
-> +		host->quirks |= SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO;
+Hi Linus,
 
-Have you tried it doing it via IO-accessors?
+Please pull Samsung fixes from:
 
-> +	if (cpu_is_mx35() || cpu_is_mx51() || cpu_is_mx53())
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
 
-Maybe we should use !cpu_is_mx25 for simplicity?
+These things are for small fix and cleanup on 2.6.38-rc6.
+As a note, cleanup patch includes fixing coding style such as removing
+useless braces, and re-ordering.
 
-Regards,
+If any problems, please let me know.
 
-   Wolfram
+Thanks.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110221/41168972/attachment.sig>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit 85e2efbb1db9a18d218006706d6e4fbeb0216213:
+
+  Linux 2.6.38-rc5 (2011-02-15 19:23:45 -0800)
+
+are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+s5p-fixes-for-linus
+
+Axel Lin (1):
+      ARM: SAMSUNG: Drop exporting s3c24xx_ts_set_platdata
+
+Kukjin Kim (5):
+      ARM: S5PV310: Cleanup map.h file
+      ARM: S5PV210: Cleanup map.h file
+      ARM: S5PC100: Clenaup map.h file
+      ARM: S5P6442: Cleanup map.h file
+      ARM: S5P64X0: Cleanup map.h file
+
+Marek Szyprowski (2):
+      ARM: S5PV210: Update max8998_platform_data
+      ARM: S5PV210: Fix regulator names
+
+Thomas Abraham (1):
+      ARM: S5P: Fix end address in memory resource information for UART
+devices
+
+ arch/arm/mach-s5p6442/include/mach/map.h |   69 ++++++-----
+ arch/arm/mach-s5p64x0/include/mach/map.h |   83 +++++++-------
+ arch/arm/mach-s5pc100/include/mach/map.h |  193
++++++++++++++-----------------
+ arch/arm/mach-s5pv210/include/mach/map.h |  168 +++++++++++++-------------
+ arch/arm/mach-s5pv210/mach-aquila.c      |   15 ++-
+ arch/arm/mach-s5pv210/mach-goni.c        |   15 ++-
+ arch/arm/mach-s5pv310/include/mach/map.h |  149 +++++++++++------------
+ arch/arm/plat-s5p/dev-uart.c             |   12 +-
+ arch/arm/plat-samsung/dev-ts.c           |    1 -
+ 9 files changed, 342 insertions(+), 363 deletions(-)
