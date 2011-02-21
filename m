@@ -1,34 +1,19 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 21 Feb 2011 18:19:46 +0100
-Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
-References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110221171946.GL2616@pengutronix.de>
+Date: Mon, 21 Feb 2011 18:20:26 +0100
+Subject: [PATCH v3 0/2] Add dma device for i.MX23/28
+In-Reply-To: <1298284306-14710-1-git-send-email-shawn.guo@freescale.com>
+References: <1298284306-14710-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110221172026.GM2616@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 06:21:39PM +0800, Shawn Guo wrote:
-> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> including apbh-dma and apbx-dma.
+On Mon, Feb 21, 2011 at 06:31:44PM +0800, Shawn Guo wrote:
+> Hi Sascha,
 > 
-> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
->   instances.
-> 
-> * apbh-dma is different between mx23 and mx28, hardware version
->   register is used to differentiate.
-> 
-> * mxs-dma supports pio function besides data transfer.  The driver
->   uses dma_data_direction DMA_NONE to identify the pio mode, and
->   steals sgl and sg_len to get pio words and numbers from clients.
-> 
-> * mxs dmaengine has some very specific features, like sense function
->   and the special NAND support (nand_lock, nand_wait4ready).  These
->   are too specific to implemented in generic dmaengine driver.
-> 
-> * The driver refers to imx-sdma and only a single descriptor is
->   statically assigned to each channel.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> These two patches have no change since v2, and I re-post them to let
+> you pick them up easily.
+
+Both
 
 Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 
@@ -41,4 +26,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110221/1990aa59/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110221/86334d96/attachment.sig>
