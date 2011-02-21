@@ -1,46 +1,52 @@
-From: henry.nestler@gmail.com (Henry Nestler)
-Date: Mon, 21 Feb 2011 22:03:31 +0100
-Subject: [PATCH 2/2] DM9000B: Fix PHY power for network down/up
-In-Reply-To: <4D62491F.4050602@ru.mvista.com>
-References: <4D618B5D.5040001@henry.nestler.mail.gmail.com>
-	<4D62491F.4050602@ru.mvista.com>
-Message-ID: <4D62D323.7010403@henry.nestler.mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Feb 2011 22:08:10 +0100
+Subject: CLOCK_TICK_RATE,
+	was: Re: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly
+	macros
+In-Reply-To: <20110221151752.GR14495@n2100.arm.linux.org.uk>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
+	<201102211548.36296.arnd@arndb.de>
+	<20110221151752.GR14495@n2100.arm.linux.org.uk>
+Message-ID: <201102212208.10231.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.02.2011 12:14, Sergei Shtylyov wrote:
-> On 21-02-2011 0:45, Henry Nestler wrote:
+On Monday 21 February 2011, Russell King - ARM Linux wrote:
+> Eg, LOW_RES_NSEC is exported to userspace via the posix clocks interface.
 > 
->> DM9000 revision B needs 1 ms delay after PHY power on (see spec), and PHY
->> power must on in register
+> NSEC_PER_SEC and TICK_NSEC are used for cmos clock updates, so probably
+> don't matter too much there.  TICK_NSEC is also used by the scheduler,
+> time conversions (timespec/timeval to/from jiffies) and profiling code.
 > 
->     Couldn't parse that.
-
-This can read in manual DM900B-12-DS-F02 from September 2 2010, Page 14:
-"If this Register 1FH bit 0 is updated from '1' to '0', the all
-Registers can not be accessed within 1ms."
-
-The example driver code waits 2 ms.
-
->> diff --git a/drivers/net/dm9000.c b/drivers/net/dm9000.c
->> index 2d4c4fc..5925569 100644
->> --- a/drivers/net/dm9000.c
->> +++ b/drivers/net/dm9000.c
-> [...]
->> @@ -1194,6 +1191,10 @@ dm9000_open(struct net_device *dev)
->>   	if (request_irq(dev->irq, dm9000_interrupt, irqflags, dev->name, dev))
->>   		return -EAGAIN;
->>
->> +	/* GPIO0 on pre-activate PHY, Reg 1F is not set by reset */
->> +	iow(db, DM9000_GPR, 0);	/* REG_1F bit0 activate phyxcer */
->> +	udelay(1000); /* delay needs by DM9000B */
+> NSEC_PER_JIFFY is used by the jiffy clocksource code, which only matters
+> if you don't have your own clocksource.
 > 
->     Why not mdelay(1)?
+> So, I feel very uneasy about saying that CLOCK_TICK_RATE doesn't matter
+> anymore given all the places which reference something that's derived
+> from it.
 
-Because udelay is the base of mdelay.
-See include/linux/delay.h:31
+All the calculations based off of CLOCK_TICK_RATE are derived from ACTHZ,
+which is either the correct value based on the underlying HW timer tick,
+or slightly off, when either the HW tick or the value of CLOCK_TICK_RATE
+is not a true multiple of HZ.
 
-#define mdelay(n) ... udelay((n)*1000)
+In fact, I'm pretty sure that it's off on a lot of machines:
 
--- 
-Henry N.
+arch/frv/include/asm/timex.h:#define CLOCK_TICK_RATE            1193180 /* Underlying HZ */
+arch/m68k/include/asm/timex.h:#define CLOCK_TICK_RATE   1193180 /* Underlying HZ */
+arch/mips/include/asm/timex.h:#define CLOCK_TICK_RATE 1193182
+arch/parisc/include/asm/timex.h:#define CLOCK_TICK_RATE 1193180 /* Underlying HZ */
+arch/s390/include/asm/timex.h:#define CLOCK_TICK_RATE   1193180 /* Underlying HZ */
+arch/sh/include/asm/timex.h:#define CLOCK_TICK_RATE             1193180
+arch/x86/include/asm/timex.h:#define CLOCK_TICK_RATE            PIT_TICK_RATE
+arch/xtensa/include/asm/timex.h:#define CLOCK_TICK_RATE         1193180 /* (everyone is using this value) */
+
+None of these is actually using a PC-style PIT these days, the just copied the
+definition blindly from old i386. I think a simple
+
+#define ACTHZ (HZ << 8)
+
+would fix more than it can break, and most likely nobody would ever notice
+the difference. If we do that, CLOCK_TICK_RATE becomes unused.
+
+	Arnd
