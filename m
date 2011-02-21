@@ -1,101 +1,221 @@
 From: dacohen@gmail.com (David Cohen)
-Date: Mon, 21 Feb 2011 10:57:45 +0200
+Date: Mon, 21 Feb 2011 11:07:01 +0200
 Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
 	handling
-In-Reply-To: <20110221082240.GL3094@legolas.emea.dhcp.ti.com>
+In-Reply-To: <20110221.101856.76372714451194378.Hiroshi.DOYU@nokia.com>
 References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
 	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
 	<20110221.101856.76372714451194378.Hiroshi.DOYU@nokia.com>
-	<20110221082240.GL3094@legolas.emea.dhcp.ti.com>
-Message-ID: <AANLkTinTCGhH9HgGEr1ciHL5Vf+gQxecr17O6Z9OTOWv@mail.gmail.com>
+Message-ID: <AANLkTimdWknRuk+QSV3bFU=qQGMsmmH-dj6a_QaTp49r@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 10:22 AM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
+On Mon, Feb 21, 2011 at 10:18 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: David Cohen <dacohen@gmail.com>
+> Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault handling
+> Date: Wed, 16 Feb 2011 21:35:51 +0200
 >
-> On Mon, Feb 21, 2011 at 10:18:56AM +0200, Hiroshi DOYU wrote:
->> From: David Cohen <dacohen@gmail.com>
->> Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault handling
->> Date: Wed, 16 Feb 2011 21:35:51 +0200
+>> Add support to register an isr for IOMMU fault situations and adapt it
+>> to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
+>> module might want to be informed when errors happen in order to debug it
+>> or react.
 >>
->> > Add support to register an isr for IOMMU fault situations and adapt it
->> > to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
->> > module might want to be informed when errors happen in order to debug it
->> > or react.
->> >
->> > Signed-off-by: David Cohen <dacohen@gmail.com>
->> > ---
->> > ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 17 +++++++++-
->> > ?arch/arm/plat-omap/include/plat/iommu.h | ? 14 ++++++++-
->> > ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 52 ++++++++++++++++++++++---------
->> > ?3 files changed, 65 insertions(+), 18 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
->> > index 49a1e5e..adb083e 100644
->> > --- a/arch/arm/mach-omap2/iommu2.c
->> > +++ b/arch/arm/mach-omap2/iommu2.c
->> > @@ -146,18 +146,31 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
->> > ?static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
->> > ?{
->> > ? ? u32 stat, da;
->> > + ? u32 errs = 0;
->> >
->> > ? ? stat = iommu_read_reg(obj, MMU_IRQSTATUS);
->> > ? ? stat &= MMU_IRQ_MASK;
->> > - ? if (!stat)
->> > + ? if (!stat) {
->> > + ? ? ? ? ? *ra = 0;
->> > ? ? ? ? ? ? return 0;
->> > + ? }
->> >
->> > ? ? da = iommu_read_reg(obj, MMU_FAULT_AD);
->> > ? ? *ra = da;
->> >
->> > + ? if (stat & MMU_IRQ_TLBMISS)
->> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
->> > + ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
->> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
->> > + ? if (stat & MMU_IRQ_EMUMISS)
->> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
->> > + ? if (stat & MMU_IRQ_TABLEWALKFAULT)
->> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
->> > + ? if (stat & MMU_IRQ_MULTIHITFAULT)
->> > + ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
->> > ? ? iommu_write_reg(obj, stat, MMU_IRQSTATUS);
->> >
->> > - ? return stat;
->> > + ? return errs;
->> > ?}
->> >
->> > ?static void omap2_tlb_read_cr(struct iommu *obj, struct cr_regs *cr)
->> > diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
->> > index 19cbb5e..174f1b9 100644
->> > --- a/arch/arm/plat-omap/include/plat/iommu.h
->> > +++ b/arch/arm/plat-omap/include/plat/iommu.h
->> > @@ -31,6 +31,7 @@ struct iommu {
->> > ? ? struct clk ? ? ?*clk;
->> > ? ? void __iomem ? ?*regbase;
->> > ? ? struct device ? *dev;
->> > + ? void ? ? ? ? ? ?*isr_priv;
+>> Signed-off-by: David Cohen <dacohen@gmail.com>
+>> ---
+>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 17 +++++++++-
+>> ?arch/arm/plat-omap/include/plat/iommu.h | ? 14 ++++++++-
+>> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 52 ++++++++++++++++++++++---------
+>> ?3 files changed, 65 insertions(+), 18 deletions(-)
 >>
->> Ideally I'd like to avoid having "isr_priv" in iommu since it's not
->> used for iommu but client needs the place to pass its info to its
->> custom handler. Any better idea?
+>> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
+>> index 49a1e5e..adb083e 100644
+>> --- a/arch/arm/mach-omap2/iommu2.c
+>> +++ b/arch/arm/mach-omap2/iommu2.c
+>> @@ -146,18 +146,31 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
+>> ?static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
+>> ?{
+>> ? ? ? u32 stat, da;
+>> + ? ? u32 errs = 0;
+>>
+>> ? ? ? stat = iommu_read_reg(obj, MMU_IRQSTATUS);
+>> ? ? ? stat &= MMU_IRQ_MASK;
+>> - ? ? if (!stat)
+>> + ? ? if (!stat) {
+>> + ? ? ? ? ? ? *ra = 0;
+>> ? ? ? ? ? ? ? return 0;
+>> + ? ? }
+>>
+>> ? ? ? da = iommu_read_reg(obj, MMU_FAULT_AD);
+>> ? ? ? *ra = da;
+>>
+>> + ? ? if (stat & MMU_IRQ_TLBMISS)
+>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
+>> + ? ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
+>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
+>> + ? ? if (stat & MMU_IRQ_EMUMISS)
+>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
+>> + ? ? if (stat & MMU_IRQ_TABLEWALKFAULT)
+>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
+>> + ? ? if (stat & MMU_IRQ_MULTIHITFAULT)
+>> + ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
+>> ? ? ? iommu_write_reg(obj, stat, MMU_IRQSTATUS);
+>>
+>> - ? ? return stat;
+>> + ? ? return errs;
+>> ?}
+>>
+>> ?static void omap2_tlb_read_cr(struct iommu *obj, struct cr_regs *cr)
+>> diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
+>> index 19cbb5e..174f1b9 100644
+>> --- a/arch/arm/plat-omap/include/plat/iommu.h
+>> +++ b/arch/arm/plat-omap/include/plat/iommu.h
+>> @@ -31,6 +31,7 @@ struct iommu {
+>> ? ? ? struct clk ? ? ?*clk;
+>> ? ? ? void __iomem ? ?*regbase;
+>> ? ? ? struct device ? *dev;
+>> + ? ? void ? ? ? ? ? ?*isr_priv;
 >
-> I'm not sure if it makes sense as I don't know the mailbox block, but
-> maybe moving to GENIRQ ? Then IRQ subsystem would take care of the
-> "dev_id"
+> Ideally I'd like to avoid having "isr_priv" in iommu since it's not
+> used for iommu but client needs the place to pass its info to its
+> custom handler. Any better idea?
 
-Not sure if it fits in this case. It's a different module (IOMMU user)
-which needs to get a callback from IOMMU when a fault happens.
-Is there any GENIRQ usage currently in this scenario?
+(*isr)() relies in the same situation, as it belongs to the client.
+Without this priv_data, it's necessary to create a global variable to
+store client's private data on client side. IMO, it is worse.
 
 Br,
 
 David
 
 >
-> --
-> balbi
+>
+>> ? ? ? unsigned int ? ?refcount;
+>> ? ? ? struct mutex ? ?iommu_lock; ? ? /* global for this whole object */
+>> @@ -47,7 +48,7 @@ struct iommu {
+>> ? ? ? struct list_head ? ? ? ?mmap;
+>> ? ? ? struct mutex ? ? ? ? ? ?mmap_lock; /* protect mmap */
+>>
+>> - ? ? int (*isr)(struct iommu *obj);
+>> + ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs, void *priv);
+>>
+>> ? ? ? void *ctx; /* iommu context: registres saved area */
+>> ? ? ? u32 da_start;
+>> @@ -109,6 +110,13 @@ struct iommu_platform_data {
+>> ? ? ? u32 da_end;
+>> ?};
+>>
+>> +/* IOMMU errors */
+>> +#define OMAP_IOMMU_ERR_TLB_MISS ? ? ? ? ? ? ?(1 << 0)
+>> +#define OMAP_IOMMU_ERR_TRANS_FAULT ? (1 << 1)
+>> +#define OMAP_IOMMU_ERR_EMU_MISS ? ? ? ? ? ? ?(1 << 2)
+>> +#define OMAP_IOMMU_ERR_TBLWALK_FAULT (1 << 3)
+>> +#define OMAP_IOMMU_ERR_MULTIHIT_FAULT ? ? ? ?(1 << 4)
+>> +
+>> ?#if defined(CONFIG_ARCH_OMAP1)
+>> ?#error "iommu for this processor not implemented yet"
+>> ?#else
+>> @@ -161,6 +169,10 @@ extern size_t iopgtable_clear_entry(struct iommu *obj, u32 iova);
+>> ?extern int iommu_set_da_range(struct iommu *obj, u32 start, u32 end);
+>> ?extern struct iommu *iommu_get(const char *name);
+>> ?extern void iommu_put(struct iommu *obj);
+>> +extern int iommu_set_isr(const char *name,
+>> + ? ? ? ? ? ? ? ? ? ? ?int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *priv),
+>> + ? ? ? ? ? ? ? ? ? ? ?void *isr_priv);
+>>
+>> ?extern void iommu_save_ctx(struct iommu *obj);
+>> ?extern void iommu_restore_ctx(struct iommu *obj);
+>> diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
+>> index f55f458..b0e0efc 100644
+>> --- a/arch/arm/plat-omap/iommu.c
+>> +++ b/arch/arm/plat-omap/iommu.c
+>> @@ -780,25 +780,19 @@ static void iopgtable_clear_entry_all(struct iommu *obj)
+>> ? */
+>> ?static irqreturn_t iommu_fault_handler(int irq, void *data)
+>> ?{
+>> - ? ? u32 stat, da;
+>> + ? ? u32 da, errs;
+>> ? ? ? u32 *iopgd, *iopte;
+>> - ? ? int err = -EIO;
+>> ? ? ? struct iommu *obj = data;
+>>
+>> ? ? ? if (!obj->refcount)
+>> ? ? ? ? ? ? ? return IRQ_NONE;
+>>
+>> - ? ? /* Dynamic loading TLB or PTE */
+>> - ? ? if (obj->isr)
+>> - ? ? ? ? ? ? err = obj->isr(obj);
+>> -
+>> - ? ? if (!err)
+>> - ? ? ? ? ? ? return IRQ_HANDLED;
+>> -
+>> ? ? ? clk_enable(obj->clk);
+>> - ? ? stat = iommu_report_fault(obj, &da);
+>> + ? ? errs = iommu_report_fault(obj, &da);
+>> ? ? ? clk_disable(obj->clk);
+>> - ? ? if (!stat)
+>> +
+>> + ? ? /* Fault callback or TLB/PTE Dynamic loading */
+>> + ? ? if (obj->isr && !obj->isr(obj, da, errs, obj->isr_priv))
+>> ? ? ? ? ? ? ? return IRQ_HANDLED;
+>>
+>> ? ? ? iommu_disable(obj);
+>> @@ -806,15 +800,16 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
+>> ? ? ? iopgd = iopgd_offset(obj, da);
+>>
+>> ? ? ? if (!iopgd_is_table(*iopgd)) {
+>> - ? ? ? ? ? ? dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", obj->name,
+>> - ? ? ? ? ? ? ? ? ? ? da, iopgd, *iopgd);
+>> + ? ? ? ? ? ? dev_err(obj->dev, "%s: errs:0x%08x da:0x%08x pgd:0x%p "
+>> + ? ? ? ? ? ? ? ? ? ? "*pgd:px%08x\n", obj->name, errs, da, iopgd, *iopgd);
+>> ? ? ? ? ? ? ? return IRQ_NONE;
+>> ? ? ? }
+>>
+>> ? ? ? iopte = iopte_offset(iopgd, da);
+>>
+>> - ? ? dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x pte:%p *pte:%08x\n",
+>> - ? ? ? ? ? ? obj->name, da, iopgd, *iopgd, iopte, *iopte);
+>> + ? ? dev_err(obj->dev, "%s: errs:0x%08x da:0x%08x pgd:0x%p *pgd:0x%08x "
+>> + ? ? ? ? ? ? "pte:0x%p *pte:0x%08x\n", obj->name, errs, da, iopgd, *iopgd,
+>> + ? ? ? ? ? ? iopte, *iopte);
+>>
+>> ? ? ? return IRQ_NONE;
+>> ?}
+>> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(iommu_put);
+>>
+>> +int iommu_set_isr(const char *name,
+>> + ? ? ? ? ? ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ?void *priv),
+>> + ? ? ? ? ? ? ? void *isr_priv)
+>> +{
+>> + ? ? struct device *dev;
+>> + ? ? struct iommu *obj;
+>> +
+>> + ? ? dev = driver_find_device(&omap_iommu_driver.driver, NULL, (void *)name,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?device_match_by_alias);
+>> + ? ? if (!dev)
+>> + ? ? ? ? ? ? return -ENODEV;
+>> +
+>> + ? ? obj = to_iommu(dev);
+>> + ? ? mutex_lock(&obj->iommu_lock);
+>> + ? ? if (obj->refcount != 0) {
+>> + ? ? ? ? ? ? mutex_unlock(&obj->iommu_lock);
+>> + ? ? ? ? ? ? return -EBUSY;
+>> + ? ? }
+>> + ? ? obj->isr = isr;
+>> + ? ? obj->isr_priv = isr_priv;
+>> + ? ? mutex_unlock(&obj->iommu_lock);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(iommu_set_isr);
+>> +
+>> ?/*
+>> ? * ? OMAP Device MMU(IOMMU) detection
+>> ? */
+>> --
+>> 1.7.2.3
+>>
 >
