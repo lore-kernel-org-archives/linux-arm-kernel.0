@@ -1,76 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Feb 2011 14:36:47 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <20110219182631.GS29493@n2100.arm.linux.org.uk>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
-	<20110219182631.GS29493@n2100.arm.linux.org.uk>
-Message-ID: <1298299008.19814.20.camel@e102144-lin.cambridge.arm.com>
+From: John.Linn@xilinx.com (John Linn)
+Date: Mon, 21 Feb 2011 07:36:56 -0700
+Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <201102210936.42098.arnd@arndb.de>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
+	<201102202237.47327.arnd@arndb.de>
+	<c170bbf2-ac0a-4c55-b2a7-0215c7a79635@VA3EHSMHS032.ehs.local>
+	<201102210936.42098.arnd@arndb.de>
+Message-ID: <c3cdf33d-2163-4417-bc64-7637f5c211e0@VA3EHSMHS021.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Sat, 2011-02-19 at 18:26 +0000, Russell King - ARM Linux wrote:
-> On Mon, Jan 24, 2011 at 05:55:57PM +0000, Catalin Marinas wrote:
-> > From: Will Deacon <will.deacon@arm.com>
-> >
-> > The unsigned long datatype is not sufficient for mapping physical addresses
-> > >= 4GB.
-> >
-> > This patch ensures that the phys_addr_t datatype is used to represent
-> > physical addresses which may be beyond the range of an unsigned long.
-> > The virt <-> phys macros are updated accordingly to ensure that virtual
-> > addresses can remain as they are.
-> >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Monday, February 21, 2011 1:37 AM
+> To: John Linn
+> Cc: linux-arm-kernel at lists.infradead.org;
+linux-kernel at vger.kernel.org;
+> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
+> jamie at jamieiles.com
+> Subject: Re: [PATCH V4 3/4] ARM: Xilinx: base header files and
+assembly
+> macros
 > 
-> This patch needs some more things fixed to prevent warnings:
-
-Ah yes, this is for the non-HIGHMEM case which I hadn't considered for
-LPAE. It's a perfectly reasonable configuration I suppose so this needs
-fixing.
-
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index a81355d..6cf76b3 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -809,9 +809,10 @@ static void __init sanity_check_meminfo(void)
->                  */
->                 if (__va(bank->start) >= vmalloc_min ||
->                     __va(bank->start) < (void *)PAGE_OFFSET) {
-> -                       printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
-> +                       printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
->                                "(vmalloc region overlap).\n",
-> -                              bank->start, bank->start + bank->size - 1);
-> +                              (unsigned long long)bank->start,
-> +                              (unsigned long long)bank->start + bank->size - 1);
->                         continue;
->                 }
+> On Monday 21 February 2011, John Linn wrote:
+> > > > diff --git a/arch/arm/mach-xilinx/include/mach/timex.h
+> > > b/arch/arm/mach-xilinx/include/mach/timex.h
+> > > > new file mode 100644
+> > > > index 0000000..4ebc0a6
+> > > > --- /dev/null
+> > > > +++ b/arch/arm/mach-xilinx/include/mach/timex.h
+> > > > +#ifndef __MACH_TIMEX_H__
+> > > > +#define __MACH_TIMEX_H__
+> > > > +
+> > > > +#define PERIPHERAL_CLOCK_RATE  2500000
+> > > > +
+> > > > +#define CLOCK_TICK_RATE        (PERIPHERAL_CLOCK_RATE / 32)
+> > > > +
+> > > > +#endif
+> > >
+> > > I thought we were at the point where CLOCK_TICK_RATE is no longer
+> > used.
+> >
+> > The timer code in these patches is using it, no other comments on it
+> so
+> > far.
+> >
+> > > Did the patches not make it in yet?
+> > >
+> >
+> > I haven't heard they made them in yet, just waiting and hoping for
+an
+> > ack.
 > 
-> @@ -822,10 +823,11 @@ static void __init sanity_check_meminfo(void)
->                 if (__va(bank->start + bank->size) > vmalloc_min ||
->                     __va(bank->start + bank->size) < __va(bank->start)) {
->                         unsigned long newsize = vmalloc_min - __va(bank->start);
-> -                       printk(KERN_NOTICE "Truncating RAM at %.8lx-%.8lx "
-> -                              "to -%.8lx (vmalloc region overlap).\n",
-> -                              bank->start, bank->start + bank->size - 1,
-> -                              bank->start + newsize - 1);
-> +                       printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
-> +                              "to -%.8llx (vmalloc region overlap).\n",
-> +                              (unsigned long long)bank->start,
-> +                              (unsigned long long)bank->start + bank->size - 1,
-> +                              (unsigned long long)bank->start + newsize - 1);
->                         bank->size = newsize;
->                 }
->  #endif
+> I meant the patches removing CLOCK_TICK_RATE from common code, not
+your
+> patches, sorry for being vague.
+
+Ahh... understand.  No problem, wishful thinking on my part :)
+
+> 
+> It would be better if you could avoid introducing new uses of
+> CLOCK_TICK_RATE, because that will have to be removed before we can
+> move to a real multi-platform kernel. For instance, you can put
+> PERIPHERAL_CLOCK_RATE in a hardware specific header and put a bogus
+> definition for CLOCK_TICK_RATE into timex.h
+
+Hi Arnd,
+
+I can remove the use of it from my timer code, but I still see
+CLOCK_TICK_RATE 
+being used in linux/jiffies.h.
+
+I tried removing it and got build errors.  Am I missing something there?
+
+Thanks,
+John
+
+> 
+> 	Arnd
 
 
-Would you like me to submit an additional patch or are you happy merging
-this diff in with my ack?
-
-Cheers,
-
-Will
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
