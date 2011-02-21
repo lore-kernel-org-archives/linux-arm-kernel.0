@@ -1,135 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Feb 2011 15:56:57 +0530
-Subject: [PATCH 14/17] omap4: cpuidle: Add MPUSS RET OFF states
-In-Reply-To: <AANLkTik-hj+-ZPnfVKLCH0h-QeyziH4H-j6EE+_QHHCU@mail.gmail.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-15-git-send-email-santosh.shilimkar@ti.com>
-	<AANLkTik-hj+-ZPnfVKLCH0h-QeyziH4H-j6EE+_QHHCU@mail.gmail.com>
-Message-ID: <6176616fe77333f80f0cfaae4fc8aff3@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Feb 2011 10:30:18 +0000
+Subject: [RFC PATCH 2/2] ARMv7: Invalidate the TLB before freeing page
+	tables
+In-Reply-To: <AANLkTimpcQCjnfzT0R+Af+f38RwBg6DUBg_b85opJJnh@mail.gmail.com>
+References: <20110214173958.21717.30746.stgit@e102109-lin.cambridge.arm.com>
+	<20110215103127.GC4152@n2100.arm.linux.org.uk>
+	<1297767748.14691.15.camel@e102109-lin.cambridge.arm.com>
+	<20110215113242.GD4152@n2100.arm.linux.org.uk>
+	<20110215121437.GG4152@n2100.arm.linux.org.uk>
+	<1297780926.14691.164.camel@e102109-lin.cambridge.arm.com>
+	<20110220121227.GB14495@n2100.arm.linux.org.uk>
+	<AANLkTimpcQCjnfzT0R+Af+f38RwBg6DUBg_b85opJJnh@mail.gmail.com>
+Message-ID: <20110221103018.GH14495@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jean Pihet [mailto:jean.pihet at newoldbits.com]
-> Sent: Monday, February 21, 2011 3:49 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; khilman at ti.com; linux-arm-
-> kernel at lists.infradead.org; Rajendra Nayak
-> Subject: Re: [PATCH 14/17] omap4: cpuidle: Add MPUSS RET OFF states
->
-> Hi Santosh,
->
-[...]
-
->
-> > + * cpuidle CORE retention support.
-> > + * Currently only MPUSS latency numbers are added based on
-> > + * measurements done internally. The numbers for MPUSS are
-> > + * not board dependent and hence set directly here instead of
-> > + * passing it from board files.
-> > + */
-> > ?static struct cpuidle_params cpuidle_params_table[] = {
-> > - ? ? ? /* C1 */
-> > - ? ? ? {1, 2, 2, 5},
-> > + ? ? ? /* C1 - CPU0 WFI + CPU1 ON/OFF + MPU ON ? + CORE ON */
-> > + ? ? ? {1, ? ? 2, ? ? ?2, ? ? ?5},
-> > + ? ? ? /* C2 - CPU0 ON + CPU1 OFF + MPU ON ?+ CORE ON */
-> > + ? ? ? {1, ? ? 140, ? ?160, ? ?300},
-> > + ? ? ? /* C3 - CPU0 OFF + CPU1 OFF + MPU CSWR + CORE ON */
-> > + ? ? ? {1, ? ? 200, ? ?300, ? ?700},
-> > + ? ? ? /* C4 - CPU0 OFF + CPU1 OFF + MPU OFF + CORE ON */
-> > + ? ? ? {1, ? ? 1400, ? 600, ? ?5000},
-> > ?};
+On Mon, Feb 21, 2011 at 09:39:32AM +0000, Catalin Marinas wrote:
+> On 20 February 2011 12:12, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Feb 15, 2011 at 02:42:06PM +0000, Catalin Marinas wrote:
+> >> On Tue, 2011-02-15 at 12:14 +0000, Russell King - ARM Linux wrote:
+> >> > On Tue, Feb 15, 2011 at 11:32:42AM +0000, Russell King - ARM Linux wrote:
+> >> > > The point of TLB shootdown is that we unmap the entries from the page
+> >> > > tables, then issue the TLB flushes, and then free the pages and page
+> >> > > tables after that. ?All that Peter's patch tries to do is to get ARM to
+> >> > > use the generic stuff.
+> >> >
+> >> > As Peter's patch preserves the current behaviour, that's not sufficient.
+> >> > So, let's do this our own way and delay pages and page table frees on
+> >> > ARMv6 and v7. ?Untested.
+> >>
+> >> ARMv7 should be enough, I'm not aware of any pre-v7 with this behaviour.
 > >
-> > +DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
-> > +
-> > +static int omap4_idle_bm_check(void)
-> > +{
-> > + ? ? ? /* FIXME: Populate this with CORE retention support */
-> > + ? ? ? return 0;
-> > +}
-> > +
-> > ?/**
-> > ?* omap4_enter_idle - Programs OMAP4 to enter the specified state
-> > ?* @dev: cpuidle device
-> > @@ -57,7 +92,9 @@ static struct cpuidle_params
-> cpuidle_params_table[] = {
-> > ?static int omap4_enter_idle(struct cpuidle_device *dev,
-> > ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_state *state)
-> > ?{
-> > + ? ? ? struct omap4_processor_cx *cx =
-> cpuidle_get_statedata(state);
-> > ? ? ? ?struct timespec ts_preidle, ts_postidle, ts_idle;
-> > + ? ? ? u32 cpu1_state;
-> >
-> > ? ? ? ?/* Used to keep track of the total time in idle */
-> > ? ? ? ?getnstimeofday(&ts_preidle);
-> > @@ -65,28 +102,74 @@ static int omap4_enter_idle(struct
-> cpuidle_device *dev,
-> > ? ? ? ?local_irq_disable();
-> > ? ? ? ?local_fiq_disable();
-> >
-> > - ? ? ? cpu_do_idle();
->
-> I think the piece of code below is rather difficult to read and
-> understand. Based on the patch description and the comment here
-> below
-> I do not see the relation with the code.
->
-There is relation. The comments are as per the conditions. And
-The hardware constraint is back-ground behind the conditions.
+> > ARM11MPCore. ?Any SMP system can access a page which was free'd by the
+> > tlb code but hasn't been flushed from the hardware TLBs. ?So maybe we
+> > want it to be "defined(CONFIG_SMP) || defined(CONFIG_CPU_32v7)" ?
+> 
+> In practice, since the hardware TLB does not store higher level
+> entries on existing v6 cores, there is no cached value pointing to the
+> freed pte page.
 
-> " On OMAP4 because of hardware constraints, no low power states are
->  targeted when both CPUs are online and in SMP mode. The low power
->  states are attempted only when secondary CPU gets offline to OFF
->  through hotplug infrastructure. "
-> The test below does not seem to match this comment.
->
-> > + ? ? ? /*
-> > + ? ? ? ?* Special hardware/software considerations:
-> > + ? ? ? ?* 1. Do only WFI for secondary CPU(non-boot - CPU1).
-> > + ? ? ? ?* ? ?Secondary cores are taken down only via hotplug
-> path.
-> The comment looks contradictory. Which one is taken OFF using this
-> code, which one from hotplug?
-> Does this correspond to the condition '(dev->cpu)' in the test
-> below?
+It's not about cached values of PTE pointers.
 
-Yes.
->
-> > + ? ? ? ?* 2. Do only a WFI as long as in SMP mode.
-> Does this correspond to the condition '(num_online_cpus() > 1)' in
-> the
-> test below? If so it this one triggering the low power mode for
-> cpu0?
-yes
->
-> > + ? ? ? ?* 3. Continue to do only WFI till CPU1 hits OFF state.
-> > + ? ? ? ?* ? ?This is necessary to honour hardware recommondation
-> > + ? ? ? ?* ? ?of triggeing all the possible low power modes once
-> CPU1 is
-> > + ? ? ? ?* ? ?out of coherency and in OFF mode.
-> Does this correspond to the condition '(cpu1_state !=
-> PWRDM_POWER_OFF)' in the test below?
->
-Yes
+> In theory, we first clear the pmd entry but another
+> CPU could be doing a PTW at the same time and had already read the pmd
+> before being cleared. But the timing constraints are difficult to
+> reproduce in practice.
 
-> > + ? ? ? ?* Update dev->last_state so that governor stats reflects
-> right
-> > + ? ? ? ?* data.
-> > + ? ? ? ?*/
-> > + ? ? ? cpu1_state = pwrdm_read_pwrst(cpu1_pd);
-> > + ? ? ? if ((dev->cpu) || (num_online_cpus() > 1) ||
-> > + ? ? ? ? ? ? ? ? ? ? ? (cpu1_state != PWRDM_POWER_OFF)) {
-> Are '||' correct here?
-Yes.
+I don't think you properly understand the problem.
 
-> Sorry if the code behaves correctly, the remarks are about
-> readability especially in the comments.
->
-You got all three correct. Instead of having three If's doing
-same thing I have merged them and added comments above.
+CPU#0 is unmapping page tables, eg due to munmap(), mremap(), etc.
+CPU#1 is running a thread, and has TLB entries for the region being unmapped.
 
-And you got all of them correctly.
+	CPU#0				CPU#1
+	clear page table entry
+	frees page
+	loop continues
+					accesses page
+	...
+	sometime in the future
+	invalidates TLB
 
-Regards,
-Santosh
+The point here is that user threads on CPU#1 should not have access to
+a page which has been freed back into the pool, no matter how slim the
+possibility of hitting such a condition.  What if a thread on CPU#2 is
+given that free page which CPU#1 still has access to, and CPU#2 stores
+your SSH private key there?
