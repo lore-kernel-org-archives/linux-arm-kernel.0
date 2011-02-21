@@ -1,115 +1,49 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 21 Feb 2011 09:35:41 +0100
-Subject: [PATCH v5 4/5] ARM: omap3: Thumb-2 compatibility for sram34xx.S
-In-Reply-To: <1297946558-13436-5-git-send-email-dave.martin@linaro.org>
-References: <1297946558-13436-1-git-send-email-dave.martin@linaro.org>
-	<1297946558-13436-5-git-send-email-dave.martin@linaro.org>
-Message-ID: <AANLkTinW8NL6FxDJtm7Bd5zurFCurQp9XWuKQvNGRjne@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Feb 2011 09:36:41 +0100
+Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <c170bbf2-ac0a-4c55-b2a7-0215c7a79635@VA3EHSMHS032.ehs.local>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
+	<201102202237.47327.arnd@arndb.de>
+	<c170bbf2-ac0a-4c55-b2a7-0215c7a79635@VA3EHSMHS032.ehs.local>
+Message-ID: <201102210936.42098.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 17, 2011 at 1:42 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> ?* Build unconditionally as ARM for correct interoperation with
-> ? OMAP firmware.
->
-> ?* Remove deprecated PC-relative stores
->
-> ?* Add the required ENDPROC() directive for each ENTRY().
->
-> ?* .align before data words
->
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
-> ?arch/arm/mach-omap2/sram34xx.S | ? 36 ++++++++++++++++++++++++++++--------
-> ?1 files changed, 28 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
-> index 7f893a2..fd1531c 100644
-> --- a/arch/arm/mach-omap2/sram34xx.S
-> +++ b/arch/arm/mach-omap2/sram34xx.S
-> @@ -34,6 +34,12 @@
-> ?#include "sdrc.h"
-> ?#include "cm2xxx_3xxx.h"
->
-> +/*
-> + * This file needs be built unconditionally as ARM to interoperate correctly
-> + * with non-Thumb-2-capable firmware.
-> + */
-> + ? ? ? .arm
-> +
-> ? ? ? ?.text
->
-> ?/* r1 parameters */
-> @@ -116,24 +122,36 @@ ENTRY(omap3_sram_configure_core_dpll)
->
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ pull the extra args off the stack
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ ?and store them in SRAM
-> +
-> +/*
-> + * PC-relative stores are deprecated in ARMv7 and lead to undefined behaviour
-> + * in Thumb-2: use a r7 as a base instead.
-> + * Be careful not to clobber r7 when maintaing this file.
-Sorry I forgot about this minor typo: 'maintaining'
+On Monday 21 February 2011, John Linn wrote:
+> > > diff --git a/arch/arm/mach-xilinx/include/mach/timex.h
+> > b/arch/arm/mach-xilinx/include/mach/timex.h
+> > > new file mode 100644
+> > > index 0000000..4ebc0a6
+> > > --- /dev/null
+> > > +++ b/arch/arm/mach-xilinx/include/mach/timex.h
+> > > +#ifndef __MACH_TIMEX_H__
+> > > +#define __MACH_TIMEX_H__
+> > > +
+> > > +#define PERIPHERAL_CLOCK_RATE  2500000
+> > > +
+> > > +#define CLOCK_TICK_RATE        (PERIPHERAL_CLOCK_RATE / 32)
+> > > +
+> > > +#endif
+> > 
+> > I thought we were at the point where CLOCK_TICK_RATE is no longer
+> used.
+> 
+> The timer code in these patches is using it, no other comments on it so
+> far.
+> 
+> > Did the patches not make it in yet?
+> > 
+> 
+> I haven't heard they made them in yet, just waiting and hoping for an
+> ack.
 
-Jean
+I meant the patches removing CLOCK_TICK_RATE from common code, not your
+patches, sorry for being vague.
 
-> + */
-> + THUMB( ? ? ? ?adr ? ? r7, omap3_sram_configure_core_dpll ? ? ? ? ? ? ? ? ? ? ?)
-> + ? ? ? .macro strtext Rt:req, label:req
-> + ARM( ?str ? ? \Rt, \label ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? )
-> + THUMB( ? ? ? ?str ? ? \Rt, [r7, \label - omap3_sram_configure_core_dpll] ? ? ?)
-> + ? ? ? .endm
-> +
-> ? ? ? ?ldr ? ? r4, [sp, #52]
-> - ? ? ? str ? ? r4, omap_sdrc_rfr_ctrl_0_val
-> + ? ? ? strtext r4, omap_sdrc_rfr_ctrl_0_val
-> ? ? ? ?ldr ? ? r4, [sp, #56]
-> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_a_0_val
-> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_a_0_val
-> ? ? ? ?ldr ? ? r4, [sp, #60]
-> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_b_0_val
-> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_b_0_val
-> ? ? ? ?ldr ? ? r4, [sp, #64]
-> - ? ? ? str ? ? r4, omap_sdrc_mr_0_val
-> + ? ? ? strtext r4, omap_sdrc_mr_0_val
-> ? ? ? ?ldr ? ? r4, [sp, #68]
-> - ? ? ? str ? ? r4, omap_sdrc_rfr_ctrl_1_val
-> + ? ? ? strtext r4, omap_sdrc_rfr_ctrl_1_val
-> ? ? ? ?cmp ? ? r4, #0 ? ? ? ? ? ? ? ? ?@ if SDRC_RFR_CTRL_1 is 0,
-> ? ? ? ?beq ? ? skip_cs1_params ? ? ? ? @ ?do not use cs1 params
-> ? ? ? ?ldr ? ? r4, [sp, #72]
-> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_a_1_val
-> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_a_1_val
-> ? ? ? ?ldr ? ? r4, [sp, #76]
-> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_b_1_val
-> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_b_1_val
-> ? ? ? ?ldr ? ? r4, [sp, #80]
-> - ? ? ? str ? ? r4, omap_sdrc_mr_1_val
-> + ? ? ? strtext r4, omap_sdrc_mr_1_val
-> ?skip_cs1_params:
-> ? ? ? ?mrc ? ? p15, 0, r8, c1, c0, 0 ? @ read ctrl register
-> ? ? ? ?bic ? ? r10, r8, #0x800 ? ? ? ? @ clear Z-bit, disable branch prediction
-> @@ -271,6 +289,7 @@ skip_cs1_prog:
-> ? ? ? ?ldr ? ? r12, [r11] ? ? ? ? ? ? ?@ posted-write barrier for SDRC
-> ? ? ? ?bx ? ? ?lr
->
-> + ? ? ? .align
-> ?omap3_sdrc_power:
-> ? ? ? ?.word OMAP34XX_SDRC_REGADDR(SDRC_POWER)
-> ?omap3_cm_clksel1_pll:
-> @@ -319,6 +338,7 @@ omap3_sdrc_dlla_ctrl:
-> ? ? ? ?.word OMAP34XX_SDRC_REGADDR(SDRC_DLLA_CTRL)
-> ?core_m2_mask_val:
-> ? ? ? ?.word 0x07FFFFFF
-> +ENDPROC(omap3_sram_configure_core_dpll)
->
-> ?ENTRY(omap3_sram_configure_core_dpll_sz)
-> ? ? ? ?.word ? . - omap3_sram_configure_core_dpll
-> --
-> 1.7.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+It would be better if you could avoid introducing new uses of
+CLOCK_TICK_RATE, because that will have to be removed before we can 
+move to a real multi-platform kernel. For instance, you can put
+PERIPHERAL_CLOCK_RATE in a hardware specific header and put a bogus
+definition for CLOCK_TICK_RATE into timex.h
+
+	Arnd
