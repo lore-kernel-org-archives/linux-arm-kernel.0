@@ -1,32 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Feb 2011 13:13:25 +0000
-Subject: Question About Linux Memory Mapping
-In-Reply-To: <AANLkTikdPrjHRFc6bD1VsN3MCZkKD0dVSNq1ijgp7qz9@mail.gmail.com>
-References: <201102192122.53746.marek.vasut@gmail.com>
-	<919555.44803.qm@web161702.mail.bf1.yahoo.com>
-	<AANLkTikdPrjHRFc6bD1VsN3MCZkKD0dVSNq1ijgp7qz9@mail.gmail.com>
-Message-ID: <20110221131325.GP14495@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 21 Feb 2011 18:49:21 +0530
+Subject: [PATCH 2/6] omap3: pm: Fix the mmu on sequence in the asm code
+In-Reply-To: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1298294365-30770-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 01:13:16PM +0100, Drasko DRASKOVIC wrote:
-> Thanks for your answers.
-> 
-> I can see now that "mem" parameter is parsed in
-> arch/arm/kernel/setup.c, as Nicolas underlined. However, in my case
-> early_mem() is never called during the Linux boot.
-> 
-> Does anybody have an idea why ?
+Add necessary barriers after enabling MMU. Also use the sane way to
+load pc and jump to it instead of executing ldma first up.
 
-Maybe the command line setting is being ignored by your boot loader
-and the one built-in to the kernel is being used?
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/sleep34xx.S |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-Maybe your kernel is configured to ignore the command line supplied
-by your boot loader?
-
-Maybe you're setting it in the kernel build but not realising that
-the boot loader passed one is being used instead?
-
-If you provide the kernel configuration and the kernel boot messages
-for the last kernel you tried, it may be possible to work out what's
-going on.
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index db4cc57..4478379 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -591,12 +591,17 @@ usettbr0:
+ 	ldr	r2, cache_pred_disable_mask
+ 	and	r4, r2
+ 	mcr	p15, 0, r4, c1, c0, 0
++	dsb
++	isb
++	ldr     r0, =restoremmu_on
++	bx      r0
+ 
+ /*
+  * ==============================
+  * == Exit point from OFF mode ==
+  * ==============================
+  */
++restoremmu_on:
+ 	ldmfd	sp!, {r0-r12, pc}	@ restore regs and return
+ 
+ 
+-- 
+1.6.0.4
