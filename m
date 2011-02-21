@@ -1,123 +1,56 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 18 Feb 2011 14:01:06 +0100
-Subject: [PATCH] OMAP4: hwmod data: Add rev and dev_attr fields in McSPI
-Message-ID: <mailman.153.1298324220.1530.linux-arm-kernel@lists.infradead.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 21 Feb 2011 22:51:00 +0100 (CET)
+Subject: CLOCK_TICK_RATE, was: Re: [PATCH V4 3/4] ARM: Xilinx: base header
+	files and assembly macros
+In-Reply-To: <201102212208.10231.arnd@arndb.de>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
+	<201102211548.36296.arnd@arndb.de>
+	<20110221151752.GR14495@n2100.arm.linux.org.uk>
+	<201102212208.10231.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1102212250290.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Add a rev attribute to identify various McSPI IP version.
-- Add a dev_attr structure to provide the number of chipselect
-  supported by the instance.
+On Mon, 21 Feb 2011, Arnd Bergmann wrote:
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+> On Monday 21 February 2011, Russell King - ARM Linux wrote:
+> > Eg, LOW_RES_NSEC is exported to userspace via the posix clocks interface.
+> > 
+> > NSEC_PER_SEC and TICK_NSEC are used for cmos clock updates, so probably
+> > don't matter too much there.  TICK_NSEC is also used by the scheduler,
+> > time conversions (timespec/timeval to/from jiffies) and profiling code.
+> > 
+> > NSEC_PER_JIFFY is used by the jiffy clocksource code, which only matters
+> > if you don't have your own clocksource.
+> > 
+> > So, I feel very uneasy about saying that CLOCK_TICK_RATE doesn't matter
+> > anymore given all the places which reference something that's derived
+> > from it.
+> 
+> All the calculations based off of CLOCK_TICK_RATE are derived from ACTHZ,
+> which is either the correct value based on the underlying HW timer tick,
+> or slightly off, when either the HW tick or the value of CLOCK_TICK_RATE
+> is not a true multiple of HZ.
+> 
+> In fact, I'm pretty sure that it's off on a lot of machines:
+> 
+> arch/frv/include/asm/timex.h:#define CLOCK_TICK_RATE            1193180 /* Underlying HZ */
+> arch/m68k/include/asm/timex.h:#define CLOCK_TICK_RATE   1193180 /* Underlying HZ */
+> arch/mips/include/asm/timex.h:#define CLOCK_TICK_RATE 1193182
+> arch/parisc/include/asm/timex.h:#define CLOCK_TICK_RATE 1193180 /* Underlying HZ */
+> arch/s390/include/asm/timex.h:#define CLOCK_TICK_RATE   1193180 /* Underlying HZ */
+> arch/sh/include/asm/timex.h:#define CLOCK_TICK_RATE             1193180
+> arch/x86/include/asm/timex.h:#define CLOCK_TICK_RATE            PIT_TICK_RATE
+> arch/xtensa/include/asm/timex.h:#define CLOCK_TICK_RATE         1193180 /* (everyone is using this value) */
+> 
+> None of these is actually using a PC-style PIT these days, the just copied the
+> definition blindly from old i386. I think a simple
+> 
+> #define ACTHZ (HZ << 8)
+> 
+> would fix more than it can break, and most likely nobody would ever notice
+> the difference. If we do that, CLOCK_TICK_RATE becomes unused.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 84e795c..182aa79 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -24,6 +24,7 @@
- #include <plat/cpu.h>
- #include <plat/gpio.h>
- #include <plat/dma.h>
-+#include <plat/mcspi.h>
- 
- #include "omap_hwmod_common_data.h"
- 
-@@ -3114,6 +3115,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_mcspi_sysc = {
- static struct omap_hwmod_class omap44xx_mcspi_hwmod_class = {
- 	.name	= "mcspi",
- 	.sysc	= &omap44xx_mcspi_sysc,
-+	.rev	= OMAP4_MCSPI_REV,
- };
- 
- /* mcspi1 */
-@@ -3156,6 +3158,11 @@ static struct omap_hwmod_ocp_if *omap44xx_mcspi1_slaves[] = {
- 	&omap44xx_l4_per__mcspi1,
- };
- 
-+/* mcspi1 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi1_dev_attr = {
-+	.num_chipselect	= 4,
-+};
-+
- static struct omap_hwmod omap44xx_mcspi1_hwmod = {
- 	.name		= "mcspi1",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3169,6 +3176,7 @@ static struct omap_hwmod omap44xx_mcspi1_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI1_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &mcspi1_dev_attr,
- 	.slaves		= omap44xx_mcspi1_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi1_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -3210,6 +3218,11 @@ static struct omap_hwmod_ocp_if *omap44xx_mcspi2_slaves[] = {
- 	&omap44xx_l4_per__mcspi2,
- };
- 
-+/* mcspi2 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi2_dev_attr = {
-+	.num_chipselect	= 2,
-+};
-+
- static struct omap_hwmod omap44xx_mcspi2_hwmod = {
- 	.name		= "mcspi2",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3223,6 +3236,7 @@ static struct omap_hwmod omap44xx_mcspi2_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI2_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &mcspi2_dev_attr,
- 	.slaves		= omap44xx_mcspi2_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi2_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -3264,6 +3278,11 @@ static struct omap_hwmod_ocp_if *omap44xx_mcspi3_slaves[] = {
- 	&omap44xx_l4_per__mcspi3,
- };
- 
-+/* mcspi3 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi3_dev_attr = {
-+	.num_chipselect	= 2,
-+};
-+
- static struct omap_hwmod omap44xx_mcspi3_hwmod = {
- 	.name		= "mcspi3",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3277,6 +3296,7 @@ static struct omap_hwmod omap44xx_mcspi3_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI3_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &mcspi3_dev_attr,
- 	.slaves		= omap44xx_mcspi3_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi3_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
-@@ -3316,6 +3336,11 @@ static struct omap_hwmod_ocp_if *omap44xx_mcspi4_slaves[] = {
- 	&omap44xx_l4_per__mcspi4,
- };
- 
-+/* mcspi4 dev_attr */
-+static struct omap2_mcspi_dev_attr mcspi4_dev_attr = {
-+	.num_chipselect	= 1,
-+};
-+
- static struct omap_hwmod omap44xx_mcspi4_hwmod = {
- 	.name		= "mcspi4",
- 	.class		= &omap44xx_mcspi_hwmod_class,
-@@ -3329,6 +3354,7 @@ static struct omap_hwmod omap44xx_mcspi4_hwmod = {
- 			.clkctrl_reg = OMAP4430_CM_L4PER_MCSPI4_CLKCTRL,
- 		},
- 	},
-+	.dev_attr	= &mcspi4_dev_attr,
- 	.slaves		= omap44xx_mcspi4_slaves,
- 	.slaves_cnt	= ARRAY_SIZE(omap44xx_mcspi4_slaves),
- 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
--- 
-1.7.0.4
+Indeed.
 
-
---------------020600090501030202090907--
+	tglx
