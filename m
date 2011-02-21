@@ -1,57 +1,20 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 21 Feb 2011 17:25:56 -0600
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <AANLkTi=rJZo2KwryYznFp6Qq25Oh0+F44OKV-khuQyte@mail.gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikbjZ7GH7+bx94r6saYuGzCt9aito-Y8NS94SoQ@mail.gmail.com>
-	<AANLkTi=rJZo2KwryYznFp6Qq25Oh0+F44OKV-khuQyte@mail.gmail.com>
-Message-ID: <AANLkTi=ETUza9vYLxucB4hs-7x9+tDTY8mxUPziWvnig@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 21 Feb 2011 23:28:12 +0000
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <4D62ECCC.3040208@ti.com>
+References: <20110217173711.GF14574@legolas.emea.dhcp.ti.com>
+	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
+	<4D5E7DFF.7020609@ti.com>
+	<20110218154135.GF11151@legolas.emea.dhcp.ti.com>
+	<4D5EA36A.4000903@ti.com> <20110221182213.GD15225@atomide.com>
+	<4D62DAF0.9050301@ti.com> <20110221220815.GG15225@atomide.com>
+	<4D62ECCC.3040208@ti.com>
+Message-ID: <20110221232812.GB15494@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 21, 2011 at 11:53:00PM +0100, Cousson, Benoit wrote:
+> I still didn't fully understand the rational behind that early_init for  
+> timer BTW.
 
-On Mon, Feb 21, 2011 at 3:12 PM, David Cohen <dacohen@gmail.com> wrote:
-> Generic errors codes make easier to threat possible IOMMU users which
-> have (partially or totally) common drivers for different OMAP
-> versions.
-
-Agree then.
-
->>> + ? ? ? /* Fault callback or TLB/PTE Dynamic loading */
->>> + ? ? ? if (obj->isr && !obj->isr(obj, da, errs, obj->isr_priv))
->>> ? ? ? ? ? ? ? ?return IRQ_HANDLED;
->>
->> BTW, why not changing the name isr for cb, it is confusing since there
->> is another fault_isr called by mmu, AFAIK nobody uses obj->isr
->
-> The main purpose of this function is to be an ISR, not only callback.
-
-Yep, I just thought it was a bit too much of:
-(1) The real isr: iommu_fault_handler, set on request_irq
-(2) A plugged fault_isr for mach specific code: omap2_iommu_fault_isr,
-for error reporting.
-(3) And then a plugged custom isr, to be set by the user.
-
-Feel free to ignore.
-
->> So I think the following will be bad practice:
->>
->> ? ? ? ?mmu = iommu_get("iva2");
->> ? ? ? ?if (!IS_ERR(mmu))
->> ? ? ? ? ? ? ? ?mmu->isr = mmu_fault_callback;
->>
->> Shall we think anything to prevent such mis-usage?
->
-> Well, the IOMMU user has access to IOMMU obj, so it can not only
-> change the (*isr)() but to mess with a lot of other stuff. The only
-> way to prevent it is to avoid user to have obj. But then, this fix (or
-> issue) does not belong to this patch.
-
-Agree, just pointing out.
-
-Regards,
-
-Omar
+To ensure that sched_clock() is setup and running before its first use.
