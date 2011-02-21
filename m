@@ -1,61 +1,23 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
 Date: Mon, 21 Feb 2011 18:58:25 +0900
-Subject: [PATCH 01/09] ARM: s3c2442: gta02: Fix usage gpio bank j pin
-	definitions
-In-Reply-To: <4D5E4CC1.1010705@metafoo.de>
-References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-	<4D5E4CC1.1010705@metafoo.de>
-Message-ID: <000101cbd1ad$e658d580$b30a8080$%kim@samsung.com>
+Subject: [PATCH 2/6] ARM: pm: add generic CPU suspend/resume support
+In-Reply-To: <20110220120039.GA14495@n2100.arm.linux.org.uk>
+References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
+	<E1Pnvgw-0002yZ-M0@rmk-PC.arm.linux.org.uk>
+	<AANLkTinL0HgSsFmoxyiBuRA6JiWKsHTLW4wFnVDJf_1w@mail.gmail.com>
+	<20110215110453.GB11199@n2100.arm.linux.org.uk>
+	<20110220120039.GA14495@n2100.arm.linux.org.uk>
+Message-ID: <000301cbd1ad$e67cb130$b3761390$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lasrs-Peter Clausen wrote:
+Russell King - ARM Linux wrote:
 > 
-> On 02/07/2011 02:51 AM, Lars-Peter Clausen wrote:
-> > The gta02 header file still uses the old S3C2410_GPJx defines instead of
-> the
-> > S3C2410_GPJ(x) macro. Since the S3C2410_GPJx defines have already been
-> removed
-> > this causes the following build failure:
-> >
-> > 	sound/soc/samsung/neo1973_wm8753.c: In function 'lm4853_set_spk':
-> > 	sound/soc/samsung/neo1973_wm8753.c:259: error: 'S3C2440_GPJ2'
-> undeclared (first use in this function)
-> > 	sound/soc/samsung/neo1973_wm8753.c:259: error: (Each undeclared
-> identifier is reported only once
-> > 	sound/soc/samsung/neo1973_wm8753.c:259: error: for each function it
-> appears in.)
-> > 	sound/soc/samsung/neo1973_wm8753.c: In function 'lm4853_get_spk':
-> > 	sound/soc/samsung/neo1973_wm8753.c:267: error: 'S3C2440_GPJ2'
-> undeclared (first use in this function)
-> > 	sound/soc/samsung/neo1973_wm8753.c: In function 'lm4853_event':
-> > 	sound/soc/samsung/neo1973_wm8753.c:276: error: 'S3C2440_GPJ1'
-> undeclared (first use in this function)
-> > 	sound/soc/samsung/neo1973_wm8753.c: At top level:
-> > 	sound/soc/samsung/neo1973_wm8753.c:439: error: 'S3C2440_GPJ2'
-> undeclared here (not in a function)
-> > 	sound/soc/samsung/neo1973_wm8753.c:440: error: 'S3C2440_GPJ1'
-> undeclared here (not in a function)
-> >
-> > This patches fixes the issue by doing a
-> s,S3C2410_GPJ([\d]+),S3C2410_GPJ(\1),g
-> > on the file.
-> >
-> > Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+> Kukjin, could you test this update as well please?
 > 
-> 
-> Hi
-> 
-> Ben or Kukjin could you take a look at this series and merge it, if it is
-ok?
-> 
-Hi Lars-Peter,
+No problem :)
 
-Basically, the maintainer of mach-s3c* is Ben Dooks.
-I think, he will review this series but if he can't soon, I will/can do it.
-
-Ben, could you please review this patches?
-If you're busy, please let me know :)
+It works fine with following.
 
 Thanks.
 
@@ -64,3 +26,68 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Thanks.
+> 
+> On Tue, Feb 15, 2011 at 11:04:53AM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Feb 11, 2011 at 06:50:57PM -0800, Colin Cross wrote:
+> > > > +ENDPROC(cpu_resume_turn_mmu_on)
+> > > > +cpu_resume_after_mmu:
+> > > > + ? ? ? str ? ? r5, [r2, r4, lsl #2] ? ?@ restore old mapping
+> > > > +#ifdef MULTI_CACHE
+> > > > + ? ? ? ldr ? ? r10, =cpu_cache
+> > > > + ? ? ? ldr ? ? pc, [r10, #CACHE_FLUSH_KERN_ALL]
+> > > > +#else
+> > > > + ? ? ? b ? ? ? __cpuc_flush_kern_all
+> > > > +#endif
+> >
+> > I think we can eliminate this cache flush by delaying the cache enable
+> > as below.  Could you see whether Tegra 2 survives this please?
+> > Thanks.
+> >
+> > diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> > index bed1876..193be5f 100644
+> > --- a/arch/arm/kernel/sleep.S
+> > +++ b/arch/arm/kernel/sleep.S
+> > @@ -4,6 +4,7 @@
+> >  #include <asm/assembler.h>
+> >  #include <asm/glue-cache.h>
+> >  #include <asm/glue-proc.h>
+> > +#include <asm/system.h>
+> >  	.text
+> >
+> >  /*
+> > @@ -81,25 +82,22 @@ ENTRY(cpu_resume_mmu)
+> >  	str	r3, [r2, r4, lsl #2]	@ setup 1:1 mapping for mmu code
+> >  	sub	r2, r2, r1
+> >  	ldr	r3, =cpu_resume_after_mmu
+> > +	bic	r1, r0, #CR_C		@ ensure D-cache is disabled
+> >  	b	cpu_resume_turn_mmu_on
+> >  ENDPROC(cpu_resume_mmu)
+> >  	.ltorg
+> >  	.align	5
+> >  cpu_resume_turn_mmu_on:
+> > -	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, caches, etc
+> > -	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
+> > -	mov	r0, r0
+> > -	mov	r0, r0
+> > +	mcr	p15, 0, r1, c1, c0, 0	@ turn on MMU, I-cache, etc
+> > +	mrc	p15, 0, r1, c0, c0, 0	@ read id reg
+> > +	mov	r1, r1
+> > +	mov	r1, r1
+> >  	mov	pc, r3			@ jump to virtual address
+> >  ENDPROC(cpu_resume_turn_mmu_on)
+> >  cpu_resume_after_mmu:
+> >  	str	r5, [r2, r4, lsl #2]	@ restore old mapping
+> > -#ifdef MULTI_CACHE
+> > -	ldr	r10, =cpu_cache
+> > -	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
+> > -#else
+> > -	b	__cpuc_flush_kern_all
+> > -#endif
+> > +	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
+> > +	mov	pc, lr
+> >
+> >  /*
+> >   * Note: Yes, part of the following code is located into the .data
+section.
