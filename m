@@ -1,37 +1,54 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Feb 2011 18:49:19 +0530
-Subject: [PATCH 0/6] omap3: pm: Fixes for low power code
-Message-ID: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Mon, 21 Feb 2011 18:49:24 +0530
+Subject: [PATCH 5/6] omap3: pm: Clear the SCTLR C bit in asm code to prevent
+	data cache allocation
+In-Reply-To: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1298294365-30770-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series does below fixes to the omap3 low power code.
-	1. Use supported ARMv7 instructions instead of the legacy ones
-	2. Fix the MMU on sequence
-	3. Fix the cache flush scenario when only L1 lost.
-	4. Remove all un-necessary context save registers
-	5. Disable C-bit before cache clean
-	6. Use set_cr() exported API instead of custom one. 
+On the newer ARM processors like CortexA8, CortexA9, the caches can be
+speculatively loaded while they are getting flushed.
 
-It's generated against mainline and tested with OMAP3630 ZOOM3.
-	1. Renetion and off-mode mode in suspend - ok.
-	2. Retention in idle - ok
+Clear the SCTLR C bit to prevent further data cache allocation as
+part of cache clean routine
 
-The following changes since commit 85e2efbb1db9a18d218006706d6e4fbeb0216213:
-  Linus Torvalds (1):
-        Linux 2.6.38-rc5
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/sleep34xx.S |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-Santosh Shilimkar (6):
-  omap3: pm: Use amrv7 supported instructions instead of legacy cp15
-    ones
-  omap3: pm: Fix the mmu on sequence in the asm code
-  omap3: pm: Allow the cache clean when L1 is lost.
-  omap3: pm: Remove un-necessary cp15 registers form low power cpu
-    context
-  omap3: pm: Clear the SCTLR C bit in asm code to prevent data cache
-    allocation
-  omap3: pm: Use exported set_cr() instead of a custom one.
-
- arch/arm/mach-omap2/pm34xx.c    |    7 +-
- arch/arm/mach-omap2/sleep34xx.S |  223 ++++++++++++++-------------------------
- 2 files changed, 78 insertions(+), 152 deletions(-)
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 28baeb2..1e723bb 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -224,6 +224,12 @@ l1_logic_lost:
+ 	mrc	p15, 0, r4, c1, c0, 0	@ save control register
+ 	stmia	r8!, {r4}
+ 
++	/* Clear the SCTLR C bit to prevent further data cache allocation */
++	mrc	p15, 0, r0, c1, c0, 0
++	bic	r0, r0, #(1 << 2)	@ Disable the C bit
++	mcr	p15, 0, r0, c1, c0, 0
++	isb
++
+ clean_caches:
+ 	/*
+ 	 * jump out to kernel flush routine
+@@ -270,6 +276,12 @@ omap3_do_wfi:
+ 	nop
+ 	bl wait_sdrc_ok
+ 
++	mrc	p15, 0, r0, c1, c0, 0
++	tst	r0, #(1 << 2)		@ Check C bit enabled?
++	orreq	r0, r0, #(1 << 2)	@ Enable the C bit if cleared
++	mcreq	p15, 0, r0, c1, c0, 0
++	isb
++
+ /*
+  * ===================================
+  * == Exit point from non-OFF modes ==
+-- 
+1.6.0.4
