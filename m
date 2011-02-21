@@ -1,24 +1,51 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 21 Feb 2011 17:14:19 +0530
-Subject: [PATCH V5 30/63] ST SPEAr: Replacing SIZE macro's with actual
-	required size
-In-Reply-To: <20110221110331.GJ14495@n2100.arm.linux.org.uk>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Mon, 21 Feb 2011 17:14:10 +0530
+Subject: [PATCH V5 36/63] ST SPEAr : EMI (Extrenal Memory
+	Interface)	controller driver
+In-Reply-To: <20110221110233.GI14495@n2100.arm.linux.org.uk>
 References: <cover.1295499392.git.viresh.kumar@st.com>
-	<38be663ab3e653d889d64005a86ed4dcf8661ae1.1295499395.git.viresh.kumar@st.com>
-	<20110219180119.GR29493@n2100.arm.linux.org.uk>
-	<4D62088D.7050205@st.com>
-	<20110221110331.GJ14495@n2100.arm.linux.org.uk>
-Message-ID: <4D625013.3000204@st.com>
+	<942264b07d606a02eb68561c7be559b6a4904961.1295499395.git.viresh.kumar@st.com>
+	<20110219171320.GO29493@n2100.arm.linux.org.uk>
+	<4D620582.40802@st.com>
+	<20110221110233.GI14495@n2100.arm.linux.org.uk>
+Message-ID: <4D62500A.8070309@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2011 04:33 PM, Russell King - ARM Linux wrote:
-> If you can update the ones I've mentioned in the patch tracker that'd
-> be great.
+On 2/21/2011 4:32 PM, Russell King - ARM Linux wrote:
+> On Mon, Feb 21, 2011 at 11:56:10AM +0530, Vipin Kumar wrote:
+>>>> +void __init
+>>>> +emi_init_board_info(struct platform_device *pdev, struct resource *resources,
+>>>> +		int res_num, struct mtd_partition *partitions,
+>>>> +		unsigned int nr_partitions, unsigned int width)
+>>>> +{
+>>>> +	struct physmap_flash_data *emi_plat_data = dev_get_platdata(&pdev->dev);
+>>>> +
+>>>> +	pdev->resource = resources;
+>>>> +	pdev->num_resources = res_num;
+>>>> +
+>>>> +	if (partitions) {
+>>>> +		emi_plat_data->parts = partitions;
+>>>> +		emi_plat_data->nr_parts = nr_partitions;
+>>>> +	}
+>>>> +
+>>>> +	emi_plat_data->width = width;
+>>>> +}
+>>>
+>>> I don't see why this has to be code rather than in the platform specific
+>>> files as static initializers.  
+>>
+>> The device is instantiated in the machine file and above information comes
+>> from the board file. So we kept them this way.
+> 
+> Ok, but I don't see why this should be in the EMI code.  Surely this
+> should be along side the nor device, and called 'nor_init_board_info'
+> or something similar?
+> .
+> 
 
-Ok. I will do that.
-You can decline all pending patches from your tracker, and i will resend
-them after rearranging.
+Yes, you are right. I would change this and resend
+Thanks
 
--- 
-viresh
+Regards
+Vipin
