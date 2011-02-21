@@ -1,44 +1,44 @@
-From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
-Date: Mon, 21 Feb 2011 11:52:21 +0200 (EET)
-Subject: [PATCH v3 0/2] OMAP: IOMMU fault callback support
-In-Reply-To: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-Message-ID: <20110221.115221.795673505667830874.Hiroshi.DOYU@nokia.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Mon, 21 Feb 2011 17:54:54 +0800
+Subject: [PATCH 4/5] mm: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET from
+	ESDHC_DEFAULT_QUIRKS
+In-Reply-To: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
+References: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1298282095-2279-4-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Cohen <dacohen@gmail.com>
-Subject: [PATCH v3 0/2] OMAP: IOMMU fault callback support
-Date: Wed, 16 Feb 2011 21:35:49 +0200
+sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET.
+Make it OF-specific.
 
-> Hi,
-> 
-> This patch set adapts current (*isr)() to be used as fault callback.
-> IOMMU faults might be very difficult to reproduce and then to figure out
-> the source of the problem. Currently IOMMU driver prints not so useful
-> debug message and does not notice user about such issue.
-> With a fault callback, IOMMU user may debug much more useful information
-> and/or react to go back to a valid state.
+Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
 
-Tony, please put them in your queue too. Thanks.
-
-> Br,
-> 
-> David
-> ---
-> 
-> David Cohen (2):
->   OMAP2+: IOMMU: don't print fault warning on specific layer
->   OMAP: IOMMU: add support to callback during fault handling
-
-Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-
-> 
->  arch/arm/mach-omap2/iommu2.c            |   33 +++++++++-----------
->  arch/arm/plat-omap/include/plat/iommu.h |   14 ++++++++-
->  arch/arm/plat-omap/iommu.c              |   52 ++++++++++++++++++++++---------
->  3 files changed, 65 insertions(+), 34 deletions(-)
-> 
-> -- 
-> 1.7.2.3
-> 
+diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
+index afaf1bc..303cde0 100644
+--- a/drivers/mmc/host/sdhci-esdhc.h
++++ b/drivers/mmc/host/sdhci-esdhc.h
+@@ -24,8 +24,7 @@
+ 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
+ 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
+ 				SDHCI_QUIRK_PIO_NEEDS_DELAY | \
+-				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET | \
+-				SDHCI_QUIRK_NO_CARD_NO_RESET)
++				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
+ 
+ #define ESDHC_SYSTEM_CONTROL	0x2c
+ #define ESDHC_CLOCK_MASK	0x0000fff0
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index fcd0e1f..6337607 100644
+--- a/drivers/mmc/host/sdhci-of-esdhc.c
++++ b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -73,7 +73,7 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
+ }
+ 
+ struct sdhci_of_data sdhci_esdhc = {
+-	.quirks = ESDHC_DEFAULT_QUIRKS,
++	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_CARD_NO_RESET,
+ 	.ops = {
+ 		.read_l = sdhci_be32bs_readl,
+ 		.read_w = esdhc_readw,
+-- 
+1.7.1
