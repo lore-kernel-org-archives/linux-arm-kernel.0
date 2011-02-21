@@ -1,92 +1,70 @@
-From: henryzhang62@yahoo.com (hong zhang)
-Date: Sun, 20 Feb 2011 21:27:57 -0800 (PST)
-Subject: Question About Linux Memory Mapping
-In-Reply-To: <201102192122.53746.marek.vasut@gmail.com>
-Message-ID: <919555.44803.qm@web161702.mail.bf1.yahoo.com>
+From: weitway@gmail.com (Jason Chen)
+Date: Mon, 21 Feb 2011 13:38:32 +0800
+Subject: [PATCH 1/7] Add a mfd IPUv3 driver
+In-Reply-To: <1297865452-32181-2-git-send-email-s.hauer@pengutronix.de>
+References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+	<1297865452-32181-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <AANLkTinQrXUwyRjehLr4YFiR66CRxT8ocEQMLXOEzHJx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drasko,
+hi, Sascha,
 
-Command line can assign all physical memory or partial memory to kernel using one or few mem=. For example, if you have 1 GBytes memory with starting port at 0x80000000, and want to reserve 512M anywhere between 0x80000000 and 0xc0000000 saying at 0x90000000. Then command line should be
-mem=256M at 0x80000000 mem=256M at 0xb0000000. At this format, kernel should not touch memory between 0x9000000 and 0xb0000000 and the memory can be used by other OS or firmware.
+I have few comments for this patch.
 
-This is my understanding.
+> +#define MX51_IPU_CHANNEL_CSI0 ? ? ? ? ? ? ? ? ? 0
+> +#define MX51_IPU_CHANNEL_CSI1 ? ? ? ? ? ? ? ? ? 1
+> +#define MX51_IPU_CHANNEL_CSI2 ? ? ? ? ? ? ? ? ? 2
+> +#define MX51_IPU_CHANNEL_CSI3 ? ? ? ? ? ? ? ? ? 3
+> +#define MX51_IPU_CHANNEL_MEM_BG_SYNC ? ? ? ? ? 23
+> +#define MX51_IPU_CHANNEL_MEM_FG_SYNC ? ? ? ? ? 27
+> +#define MX51_IPU_CHANNEL_MEM_DC_SYNC ? ? ? ? ? 28
+> +#define MX51_IPU_CHANNEL_MEM_FG_SYNC_ALPHA ? ? 31
+> +#define MX51_IPU_CHANNEL_MEM_DC_ASYNC ? ? ? ? ?41
+> +#define MX51_IPU_CHANNEL_ROT_ENC_MEM ? ? ? ? ? 45
+> +#define MX51_IPU_CHANNEL_ROT_VF_MEM ? ? ? ? ? ?46
+> +#define MX51_IPU_CHANNEL_ROT_PP_MEM ? ? ? ? ? ?47
+> +#define MX51_IPU_CHANNEL_ROT_ENC_MEM_OUT ? ? ? 48
+> +#define MX51_IPU_CHANNEL_ROT_VF_MEM_OUT ? ? ? ? ? ? ? ?49
+> +#define MX51_IPU_CHANNEL_ROT_PP_MEM_OUT ? ? ? ? ? ? ? ?50
+> +#define MX51_IPU_CHANNEL_MEM_BG_SYNC_ALPHA ? ? 51
+Had better use MX5_IPU as prefix because it's same value in MX5X.
 
----henry
-
---- On Sat, 2/19/11, Marek Vasut <marek.vasut@gmail.com> wrote:
-
-> From: Marek Vasut <marek.vasut@gmail.com>
-> Subject: Re: Question About Linux Memory Mapping
-> To: linux-arm at lists.infradead.org
-> Cc: "Drasko DRASKOVIC" <drasko.draskovic@gmail.com>, linux-arm-kernel at lists.infradead.org
-> Date: Saturday, February 19, 2011, 2:22 PM
-> On Friday 18 February 2011 21:56:28
-> Drasko DRASKOVIC wrote:
-> > Hi all,
-> > in the article Booting ARM Linux :
-> > http://www.simtec.co.uk/products/SWLINUX/files/booting_article.html
-> > I can see that mem map is passed via ATAG_MEM.
-> However, in the same
-> > article it is mentioned that this information can also
-> be passed via
-> > kernel command line paramters,?
-> mem=<size>[KM][,@<phys_offset>].
-> > 
-> > However, this does not seem to be true, as "mem"
-> command line
-> > parameter seems to be formated like this : mem= n[KMG]
-> (i.e. no
-> > offset), regarding to this reference :
-> > http://oreilly.com/linux/excerpts/9780596100797/kernel-boot-command-line-pa
-> > rameter-reference.html. Seems like memmap should be
-> used instead.
-> > 
-> > I tried passing the parameters like memmap=
-> n[KMG]@start[KMG] but that
-> > had no effect at all - still the same amount of System
-> Ram was read
-> > from ATAGS and presented in the system via
-> /proc/iomem.
-> > 
-> > What I needed it to reserve 1MB region for one FIFO at
-> the end of RAM
-> > (or somewhere else)
-> > and protect it from the kernel. I tried passing
-> memmap=
-> > n[KMG]$start[KMG], but that did not worn neither.
-> 
-> What are you exactly trying to achieve ? btw. if you really
-> need to make a hole 
-> in RAM, you should reserve a bootmem node maybe?
-> > 
-> > So my questions are following :
-> > 1) Why commandlines are ignored and ATAGS are given
-> priority ?
-> > 2) What is the most elegant way to protect one region
-> in RAM :
-> >? a) By giving less memory with ATAGS_MEM and thus
-> making protected
-> > region invisible to Linux, lying to it that RAM is
-> smaller
-> >? b) By changing somehow linker script
-> >? c) By changing some configuration variables
-> (which ?)
-> > 
-> > Thanks for the answers and best regards,
-> > Drasko
-> > 
-> > _______________________________________________
-> > linux-arm mailing list
-> > linux-arm at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm
-> 
-> _______________________________________________
-> linux-arm mailing list
-> linux-arm at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm
-> 
-
-
-      
+> +
+> + ? ? ? ipu_idmac_reg = ioremap(ipu_base + IPU_IDMAC_REG_BASE, PAGE_SIZE);
+> + ? ? ? if (!ipu_idmac_reg) {
+> + ? ? ? ? ? ? ? ret = -ENOMEM;
+> + ? ? ? ? ? ? ? goto failed_ioremap2;
+> + ? ? ? }
+> +
+> + ? ? ? ret = ipu_mipi_setup();
+> + ? ? ? if (ret)
+> + ? ? ? ? ? ? ? goto failed_mipi_setup;
+I dont know what's the best way to do it, but I think you had better
+consider mx53 platform, so maybe this mipi_setup function and also
+below ipu hw reset could be set in platform data.
+> +
+> + ? ? ? ipu_clk = clk_get(&pdev->dev, "ipu");
+> + ? ? ? if (IS_ERR(ipu_clk)) {
+> + ? ? ? ? ? ? ? ret = PTR_ERR(ipu_clk);
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "clk_get failed with %d", ret);
+> + ? ? ? ? ? ? ? goto failed_clk_get;
+> + ? ? ? }
+> +
+> + ? ? ? ipu_get();
+> +
+> + ? ? ? ret = request_irq(irq1, ipu_irq_handler, IRQF_DISABLED, pdev->name,
+> + ? ? ? ? ? ? ? ? ? ? ? &pdev->dev);
+> + ? ? ? if (ret) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "request irq %d failed with: %d\n", irq1, ret);
+> + ? ? ? ? ? ? ? goto failed_request_irq1;
+> + ? ? ? }
+> +
+> + ? ? ? ret = request_irq(irq2, ipu_irq_handler, IRQF_DISABLED, pdev->name,
+> + ? ? ? ? ? ? ? ? ? ? ? &pdev->dev);
+> + ? ? ? if (ret) {
+> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "request irq %d failed with: %d\n", irq2, ret);
+> + ? ? ? ? ? ? ? goto failed_request_irq2;
+> + ? ? ? }
+> +
+> + ? ? ? ipu_reset();
