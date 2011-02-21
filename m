@@ -1,83 +1,54 @@
 From: John.Linn@xilinx.com (John Linn)
-Date: Mon, 21 Feb 2011 07:36:56 -0700
-Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <201102210936.42098.arnd@arndb.de>
-References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
-	<201102202237.47327.arnd@arndb.de>
-	<c170bbf2-ac0a-4c55-b2a7-0215c7a79635@VA3EHSMHS032.ehs.local>
-	<201102210936.42098.arnd@arndb.de>
-Message-ID: <c3cdf33d-2163-4417-bc64-7637f5c211e0@VA3EHSMHS021.ehs.local>
+Date: Mon, 21 Feb 2011 07:41:18 -0700
+Subject: Machine ID question
+In-Reply-To: <20110220130420.GD14495@n2100.arm.linux.org.uk>
+References: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
+	<20110210082915.GV27982@pengutronix.de>
+	<201102141612.17340.alexander.stein@systec-electronic.com>
+	<20110220130420.GD14495@n2100.arm.linux.org.uk>
+Message-ID: <15649513-b696-4075-9b29-006a7ea8de00@VA3EHSMHS012.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Monday, February 21, 2011 1:37 AM
-> To: John Linn
-> Cc: linux-arm-kernel at lists.infradead.org;
-linux-kernel at vger.kernel.org;
-> linux at arm.linux.org.uk; catalin.marinas at arm.com; glikely at secretlab.ca;
-> jamie at jamieiles.com
-> Subject: Re: [PATCH V4 3/4] ARM: Xilinx: base header files and
-assembly
-> macros
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Sunday, February 20, 2011 6:04 AM
+> To: Alexander Stein
+> Cc: linux-arm-kernel at lists.infradead.org; John Linn; Uwe Kleine-K?nig
+> Subject: Re: Machine ID question
 > 
-> On Monday 21 February 2011, John Linn wrote:
-> > > > diff --git a/arch/arm/mach-xilinx/include/mach/timex.h
-> > > b/arch/arm/mach-xilinx/include/mach/timex.h
-> > > > new file mode 100644
-> > > > index 0000000..4ebc0a6
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/mach-xilinx/include/mach/timex.h
-> > > > +#ifndef __MACH_TIMEX_H__
-> > > > +#define __MACH_TIMEX_H__
-> > > > +
-> > > > +#define PERIPHERAL_CLOCK_RATE  2500000
-> > > > +
-> > > > +#define CLOCK_TICK_RATE        (PERIPHERAL_CLOCK_RATE / 32)
-> > > > +
-> > > > +#endif
+> On Mon, Feb 14, 2011 at 04:12:16PM +0100, Alexander Stein wrote:
+> > On Thursday 10 February 2011, 09:29:15 Uwe Kleine-K?nig wrote:
+> > > On Wed, Feb 09, 2011 at 02:23:07PM -0700, John Linn wrote:
+> > > > I used the form to create a new machine ID for the new Xilinx
+> platform
+> > > > in anticipation of
+> > > > the code making it into the mainline sometime in the future.
+> > > >
+> > > > The proposed patches are using ARCH_XILINX in the Kconfig.
 > > >
-> > > I thought we were at the point where CLOCK_TICK_RATE is no longer
-> > used.
+> > > You should use MACH_XILINX in the patches.  There are some ARCH_...
+> in
+> > > the machine db, but I think nowadays you cannot (and should not)
+> create
+> > > them there.
 > >
-> > The timer code in these patches is using it, no other comments on it
-> so
-> > far.
-> >
-> > > Did the patches not make it in yet?
-> > >
-> >
-> > I haven't heard they made them in yet, just waiting and hoping for
-an
-> > ack.
+> > Uhm, the last entry in the db was created today (14th Feb). Is there
+> a reason
+> > why there no new entries should be created?
 > 
-> I meant the patches removing CLOCK_TICK_RATE from common code, not
-your
-> patches, sorry for being vague.
-
-Ahh... understand.  No problem, wishful thinking on my part :)
-
+> huh?
 > 
-> It would be better if you could avoid introducing new uses of
-> CLOCK_TICK_RATE, because that will have to be removed before we can
-> move to a real multi-platform kernel. For instance, you can put
-> PERIPHERAL_CLOCK_RATE in a hardware specific header and put a bogus
-> definition for CLOCK_TICK_RATE into timex.h
+> The machine registry hands out MACH_foo identifiers.  It used to hand
+> them out as ARCH_foo identifiers, but we decided that was misleading -
+> it's dealing with machines, not architectures.  So a MACH_ prefix is
+> more correct than an ARCH_ prefix.
 
-Hi Arnd,
+Thanks Russell, yea I figured that out after I had sent this out.
 
-I can remove the use of it from my timer code, but I still see
-CLOCK_TICK_RATE 
-being used in linux/jiffies.h.
+Appreciate the help,
 
-I tried removing it and got build errors.  Am I missing something there?
-
-Thanks,
 John
-
-> 
-> 	Arnd
 
 
 This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
