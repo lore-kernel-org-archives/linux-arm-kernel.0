@@ -1,19 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 21 Feb 2011 09:06:53 +0100
-Subject: [PATCH v2 2/2] msm: Use explicit GPLv2 licenses
-In-Reply-To: <1297728926-15793-2-git-send-email-davidb@codeaurora.org>
-References: <1297208593-16368-2-git-send-email-davidb@codeaurora.org>
-	<1297728926-15793-2-git-send-email-davidb@codeaurora.org>
-Message-ID: <20110221080652.GA1437@ucw.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 21 Feb 2011 15:07:50 +0100
+Subject: [PATCH v2] mxcmmc: use dmaengine API
+In-Reply-To: <201102181437.02943.arnd@arndb.de>
+References: <20110218092109.GG24426@pengutronix.de>
+	<201102181437.02943.arnd@arndb.de>
+Message-ID: <20110221140750.GN24426@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2011-02-14 16:15:26, David Brown wrote:
-> Replace a BSD-style license in Code Aurora Forum authored files with
-> an explicit GPLv2.
+On Fri, Feb 18, 2011 at 02:37:02PM +0100, Arnd Bergmann wrote:
+> On Friday 18 February 2011, Sascha Hauer wrote:
+> > This switches the mxcmmc driver to use the dmaengine API. Unlike
+> > the old one this one is always present in the tree, even if no DMA
+> > is implemented, hence we can remove all the #ifdefs in from the driver.
+> > The driver automatically switches to PIO mode if no DMA support or no
+> > suitable channel is available.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> The patch looks good to me, but shouldn't you also add a Kconfig
+> dependency or select on CONFIG_DMA_ENGINE? I don't see where that
+> gets set.
 
-Thanks!
+I was about to answer with a patch adding a select on CONFIG_DMA_ENGINE
+but just realized this isn't necessary. Without dmaengine support
+dma_request_channel becomes a static inline returning NULL. The mxcmmc
+driver falls back to PIO then and still works.
+
+Sascha
+
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
