@@ -1,27 +1,26 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 21 Feb 2011 16:48:34 +1100
-Subject: [PATCH] picoxcell_crypto: add support for the picoxcell crypto
-	engines
-In-Reply-To: <1297776733-17816-1-git-send-email-jamie@jamieiles.com>
-References: <1297776733-17816-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110221054834.GB26462@gondor.apana.org.au>
+From: Frank.Li@freescale.com (Frank Li)
+Date: Mon, 21 Feb 2011 14:28:10 +0800
+Subject: [PATCH] ARM: imx53_smd add uncompress print
+Message-ID: <1298269690-23705-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15, 2011 at 01:32:13PM +0000, Jamie Iles wrote:
-> Picochip picoXcell devices have two crypto engines, one targeted
-> at IPSEC offload and the other at WCDMA layer 2 ciphering.
-> 
-> v2:	- use symbolic constants for key sizes etc
-> 	- cleanup DDT generation
-> 	- use strict_strtoul() for stat irq threshold
-> 	- minor code cleanups
-> 
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/plat-mxc/include/mach/uncompress.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Patch applied.  Thanks Jamie!
+diff --git a/arch/arm/plat-mxc/include/mach/uncompress.h b/arch/arm/plat-mxc/include/mach/uncompress.h
+index b702884..7412558 100644
+--- a/arch/arm/plat-mxc/include/mach/uncompress.h
++++ b/arch/arm/plat-mxc/include/mach/uncompress.h
+@@ -112,6 +112,7 @@ static __inline__ void __arch_decomp_setup(unsigned long arch_id)
+ 		break;
+ 	case MACH_TYPE_MX53_EVK:
+ 	case MACH_TYPE_MX53_LOCO:
++	case MACH_TYPE_MX53_SMD:
+ 		uart_base = MX53_UART1_BASE_ADDR;
+ 		break;
+ 	default:
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.6.3.3
