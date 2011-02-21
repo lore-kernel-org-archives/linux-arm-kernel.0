@@ -1,44 +1,141 @@
 From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 21 Feb 2011 17:54:54 +0800
-Subject: [PATCH 4/5] mm: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET from
-	ESDHC_DEFAULT_QUIRKS
+Date: Mon, 21 Feb 2011 17:54:52 +0800
+Subject: [PATCH 2/5] ARM: imx51/53: add sdhc3/4 clock
 In-Reply-To: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
 References: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
-Message-ID: <1298282095-2279-4-git-send-email-richard.zhao@freescale.com>
+Message-ID: <1298282095-2279-2-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET.
-Make it OF-specific.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index afaf1bc..303cde0 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -24,8 +24,7 @@
- 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
- 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
- 				SDHCI_QUIRK_PIO_NEEDS_DELAY | \
--				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET | \
--				SDHCI_QUIRK_NO_CARD_NO_RESET)
-+				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index 8164b1d..8ac61d5 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -42,6 +42,7 @@ static struct clk usboh3_clk;
+ static struct clk emi_fast_clk;
+ static struct clk ipu_clk;
+ static struct clk mipi_hsc1_clk;
++static struct clk esdhc1_clk;
  
- #define ESDHC_SYSTEM_CONTROL	0x2c
- #define ESDHC_CLOCK_MASK	0x0000fff0
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fcd0e1f..6337607 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -73,7 +73,7 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
- }
+ #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
  
- struct sdhci_of_data sdhci_esdhc = {
--	.quirks = ESDHC_DEFAULT_QUIRKS,
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_CARD_NO_RESET,
- 	.ops = {
- 		.read_l = sdhci_be32bs_readl,
- 		.read_w = esdhc_readw,
+@@ -1147,6 +1148,34 @@ CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+ CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
+ CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+ 
++static int clk_esdhc3_set_parent(struct clk *clk, struct clk *parent)
++{
++	u32 reg;
++
++	reg = __raw_readl(MXC_CCM_CSCMR1);
++	if (parent == &esdhc1_clk)
++		reg &= ~MXC_CCM_CSCMR1_ESDHC3_CLK_SEL;
++	else
++		reg |= MXC_CCM_CSCMR1_ESDHC3_CLK_SEL;
++	__raw_writel(reg, MXC_CCM_CSCMR1);
++
++	return 0;
++}
++
++static int clk_esdhc4_set_parent(struct clk *clk, struct clk *parent)
++{
++	u32 reg;
++
++	reg = __raw_readl(MXC_CCM_CSCMR1);
++	if (parent == &esdhc1_clk)
++		reg &= ~MXC_CCM_CSCMR1_ESDHC4_CLK_SEL;
++	else
++		reg |= MXC_CCM_CSCMR1_ESDHC4_CLK_SEL;
++	__raw_writel(reg, MXC_CCM_CSCMR1);
++
++	return 0;
++}
++
+ #define DEFINE_CLOCK_FULL(name, i, er, es, gr, sr, e, d, p, s)		\
+ 	static struct clk name = {					\
+ 		.id		= i,					\
+@@ -1253,6 +1282,32 @@ DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
+ 	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+ DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
+ 	clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
++DEFINE_CLOCK_FULL(esdhc3_ipg_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG4_OFFSET,
++	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
++DEFINE_CLOCK_FULL(esdhc4_ipg_clk, 3, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG6_OFFSET,
++	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
++
++static struct clk esdhc3_clk = {
++	.id = 2,
++	.parent = &esdhc1_clk,
++	.set_parent = clk_esdhc3_set_parent,
++	.enable_reg = MXC_CCM_CCGR3,
++	.enable_shift = MXC_CCM_CCGRx_CG5_OFFSET,
++	.enable  = _clk_max_enable,
++	.disable = _clk_max_disable,
++	.secondary = &esdhc3_ipg_clk,
++};
++
++static struct clk esdhc4_clk = {
++	.id = 3,
++	.parent = &esdhc1_clk,
++	.set_parent = clk_esdhc4_set_parent,
++	.enable_reg = MXC_CCM_CCGR3,
++	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
++	.enable  = _clk_max_enable,
++	.disable = _clk_max_disable,
++	.secondary = &esdhc4_ipg_clk,
++};
+ 
+ DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
+ DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
+@@ -1312,6 +1367,8 @@ static struct clk_lookup mx51_lookups[] = {
+ 	_REGISTER_CLOCK("imx51-cspi.0", NULL, cspi_clk)
+ 	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
+ 	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
++	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_clk)
++	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, esdhc4_clk)
+ 	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
+ 	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+@@ -1333,6 +1390,8 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+ 	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
+ 	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
++	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_clk)
++	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, esdhc4_clk)
+ 	_REGISTER_CLOCK("imx53-ecspi.0", NULL, ecspi1_clk)
+ 	_REGISTER_CLOCK("imx53-ecspi.1", NULL, ecspi2_clk)
+ 	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
+@@ -1412,6 +1471,14 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 	ckih2_reference = ckih2;
+ 	oscillator_reference = osc;
+ 
++	esdhc2_clk.get_rate = NULL;
++	esdhc2_clk.set_rate = NULL;
++	esdhc2_clk.set_parent = clk_esdhc3_set_parent;
++	esdhc2_clk.parent = &esdhc1_clk;
++	esdhc3_clk.get_rate = clk_esdhc2_get_rate;
++	esdhc3_clk.set_rate = clk_esdhc2_set_rate;
++	esdhc3_clk.set_parent = clk_esdhc2_set_parent;
++
+ 	for (i = 0; i < ARRAY_SIZE(mx53_lookups); i++)
+ 		clkdev_add(&mx53_lookups[i]);
+ 
+@@ -1425,6 +1492,14 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 	mx53_revision();
+ 	clk_disable(&iim_clk);
+ 
++	/* Set SDHC parents to be PLL2 */
++	clk_set_parent(&esdhc1_clk, &pll2_sw_clk);
++	clk_set_parent(&esdhc3_clk, &pll2_sw_clk);
++
++	/* set SDHC root clock as 200MHZ*/
++	clk_set_rate(&esdhc1_clk, 200000000);
++	clk_set_rate(&esdhc3_clk, 200000000);
++
+ 	/* System timer */
+ 	mxc_timer_init(&gpt_clk, MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR),
+ 		MX53_INT_GPT);
 -- 
 1.7.1
