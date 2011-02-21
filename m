@@ -1,45 +1,113 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 21 Feb 2011 23:23:43 +0530
-Subject: OMAP4: IRQ line of CortexA9 performance monitor
-In-Reply-To: <yw1x62sd1f26.fsf@unicorn.mansr.com>
-References: <AANLkTin3q+rv+fcgCE6nwTN+=v_uQzT-Sn++gr6ekXcp@mail.gmail.com>
-	<yw1x62sd1f26.fsf@unicorn.mansr.com>
-Message-ID: <e96b735de3303ad461e00ccc0ef61b8f@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 21 Feb 2011 11:08:23 -0700 (MST)
+Subject: [PATCH 1/3] OMAP: smartreflex: move plat/smartreflex.h to
+	mach-omap2/smartreflex.h
+In-Reply-To: <4D6236AE.7000407@ti.com>
+References: <20110221020231.7598.14024.stgit@twilight.localdomain>
+	<20110221020851.7598.57763.stgit@twilight.localdomain>
+	<4D6236AE.7000407@ti.com>
+Message-ID: <alpine.DEB.2.00.1102211107530.22636@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of M?ns Rullg?rd
-> Sent: Monday, February 21, 2011 10:49 PM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: OMAP4: IRQ line of CortexA9 performance monitor
->
-> Ming Lei <tom.leiming@gmail.com> writes:
->
-> > Hi,
-> >
-> > From chapter 17 of "Interrupt controller", OMAP4 TRM, I can't
-> > find what is the interrupt line of CortexA9 performance monitor
-> > in omap4. Seems without this information, we can't use perf on
-> > omap4.
-> >
-> > Any suggestions or ideas about it?
->
-> The PMU interrupt is routed through the CTI, which needs to be
-> properly
-> configured.  Unfortunately, the CTI is not documented in the public
-> TRM,
-> and nobody has seen fit to submit a patch suitable for upstream.
-> Some dirty hacks have been posted, though.
->
-Mans is right. Last time I looked at this, the OMAP4 PMU support
-needed some hacky code and was not fitting to the generic PMU
-framework.
+Hi Beno?t,
 
-I will take a second look at it and see if a patch can be generated
-for upstream.
+On Mon, 21 Feb 2011, Cousson, Benoit wrote:
 
-Regards,
-Santosh
+> In fact that include is not used for OMAP4 data and does not seems to be used
+> either in this file.
+> I guess you can simply remove it.
+
+Thanks, done.  Updated patch below.
+
+
+- Paul
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Wed, 16 Feb 2011 21:49:21 -0700
+Subject: [PATCH] OMAP: smartreflex: move plat/smartreflex.h to mach-omap2/smartreflex.h
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+There's no reason for this header file to be in
+plat-omap/include/plat/smartreflex.h.  The hardware devices are in
+OMAP2+ SoCs only.  Leaving this header file in plat-omap causes
+problems due to cross-dependencies with other header files that should
+live in mach-omap2/.
+
+Thanks to Beno?t Cousson <b-cousson@ti.com> for suggesting the removal
+of the smartreflex.h include from the OMAP3xxx hwmod data.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    1 -
+ arch/arm/mach-omap2/smartreflex-class3.c           |    2 +-
+ arch/arm/mach-omap2/smartreflex.c                  |    2 +-
+ .../include/plat => mach-omap2}/smartreflex.h      |    0
+ arch/arm/mach-omap2/sr_device.c                    |    2 +-
+ 5 files changed, 3 insertions(+), 4 deletions(-)
+ rename arch/arm/{plat-omap/include/plat => mach-omap2}/smartreflex.h (100%)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 8d81813..5445588 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -21,7 +21,6 @@
+ #include <plat/l4_3xxx.h>
+ #include <plat/i2c.h>
+ #include <plat/gpio.h>
+-#include <plat/smartreflex.h>
+ 
+ #include "omap_hwmod_common_data.h"
+ 
+diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
+index 60e7055..f438cf4 100644
+--- a/arch/arm/mach-omap2/smartreflex-class3.c
++++ b/arch/arm/mach-omap2/smartreflex-class3.c
+@@ -11,7 +11,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#include <plat/smartreflex.h>
++#include "smartreflex.h"
+ 
+ static int sr_class3_enable(struct voltagedomain *voltdm)
+ {
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index c37e823..077dfb6 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -26,9 +26,9 @@
+ #include <linux/pm_runtime.h>
+ 
+ #include <plat/common.h>
+-#include <plat/smartreflex.h>
+ 
+ #include "pm.h"
++#include "smartreflex.h"
+ 
+ #define SMARTREFLEX_NAME_LEN	16
+ #define NVALUE_NAME_LEN		40
+diff --git a/arch/arm/plat-omap/include/plat/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
+similarity index 100%
+rename from arch/arm/plat-omap/include/plat/smartreflex.h
+rename to arch/arm/mach-omap2/smartreflex.h
+diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+index b1e0af1..a636604 100644
+--- a/arch/arm/mach-omap2/sr_device.c
++++ b/arch/arm/mach-omap2/sr_device.c
+@@ -23,9 +23,9 @@
+ #include <linux/io.h>
+ 
+ #include <plat/omap_device.h>
+-#include <plat/smartreflex.h>
+ #include <plat/voltage.h>
+ 
++#include "smartreflex.h"
+ #include "control.h"
+ #include "pm.h"
+ 
+-- 
+1.7.2.3
