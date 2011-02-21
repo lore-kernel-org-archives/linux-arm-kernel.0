@@ -1,33 +1,115 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 21 Feb 2011 12:09:09 +0530
-Subject: [PATCH V5 30/63] ST SPEAr: Replacing SIZE macro's with actual
-	required size
-In-Reply-To: <20110219180119.GR29493@n2100.arm.linux.org.uk>
-References: <cover.1295499392.git.viresh.kumar@st.com>
-	<38be663ab3e653d889d64005a86ed4dcf8661ae1.1295499395.git.viresh.kumar@st.com>
-	<20110219180119.GR29493@n2100.arm.linux.org.uk>
-Message-ID: <4D62088D.7050205@st.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Mon, 21 Feb 2011 08:42:36 +0200
+Subject: [PATCH resend] omap: rx51: Add SI4713 FM transmitter
+In-Reply-To: <1298040354-1726-1-git-send-email-jhnikula@gmail.com>
+References: <1298040354-1726-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <1298270556-11571-1-git-send-email-jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2011 11:31 PM, Russell King - ARM Linux wrote:
-> Same comments as the other patch changing to SZ_* macros.  Where possible
-> fold these changes into the patch(es) which add the original definitions
-> rather than having patches which add stuff and then separate patches
-> which rework those patches.
-> 
+Add SI4713 FM transmitter supplies, platform data and setup to RX-51/N900.
+It is connected to line output signals of TLV320AIC34 codec A part.
+Driver can be either built-in or a module. It can be tuned with v4l2-ctl
+from ivtv-utils. Following examples illustrate the use of it:
 
-Ok.
+	v4l2-ctl -d /dev/radio0 --set-ctrl=mute=0 (power up)
+	v4l2-ctl -d /dev/radio0 -f 107900 (tune 107.9 MHz)
 
-> Could you do that and provide reworked patches please?  I'll publish the
-> branch I've merged stuff onto thus far (but note that it's 'unstable'),
-> but note that it won't contain the bits I've merged into the 'fixes'
-> branch.
+	v4l2-ctl -d /dev/radio0 --set-ctrl=mute=1 (power down)
 
-Ok. I will surely do that.
+Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+---
+Resend = forgot to cc LAKML.
+---
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   44 ++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
 
-Just one question, should i send these patches to mailing list again or
-directly to tracker?
-
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index e75e240..d0998f8 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -36,6 +36,8 @@
+ 
+ #include <sound/tlv320aic3x.h>
+ #include <sound/tpa6130a2-plat.h>
++#include <media/radio-si4713.h>
++#include <media/si4713.h>
+ 
+ #include <../drivers/staging/iio/light/tsl2563.h>
+ 
+@@ -47,6 +49,8 @@
+ 
+ #define RX51_WL1251_POWER_GPIO		87
+ #define RX51_WL1251_IRQ_GPIO		42
++#define RX51_FMTX_RESET_GPIO		163
++#define RX51_FMTX_IRQ			53
+ 
+ /* list all spi devices here */
+ enum {
+@@ -357,10 +361,14 @@ static struct regulator_consumer_supply rx51_vio_supplies[] = {
+ 	REGULATOR_SUPPLY("DVDD", "2-0018"),
+ 	REGULATOR_SUPPLY("IOVDD", "2-0019"),
+ 	REGULATOR_SUPPLY("DVDD", "2-0019"),
++	/* Si4713 IO supply */
++	REGULATOR_SUPPLY("vio", "2-0063"),
+ };
+ 
+ static struct regulator_consumer_supply rx51_vaux1_consumers[] = {
+ 	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
++	/* Si4713 supply */
++	REGULATOR_SUPPLY("vdd", "2-0063"),
+ };
+ 
+ static struct regulator_consumer_supply rx51_vdac_supply[] = {
+@@ -511,6 +519,41 @@ static struct regulator_init_data rx51_vio = {
+ 	.consumer_supplies	= rx51_vio_supplies,
+ };
+ 
++static struct si4713_platform_data rx51_si4713_i2c_data __initdata_or_module = {
++	.gpio_reset	= RX51_FMTX_RESET_GPIO,
++};
++
++static struct i2c_board_info rx51_si4713_board_info __initdata_or_module = {
++	I2C_BOARD_INFO("si4713", SI4713_I2C_ADDR_BUSEN_HIGH),
++	.platform_data	= &rx51_si4713_i2c_data,
++};
++
++static struct radio_si4713_platform_data rx51_si4713_data __initdata_or_module = {
++	.i2c_bus	= 2,
++	.subdev_board_info = &rx51_si4713_board_info,
++};
++
++static struct platform_device rx51_si4713_dev __initdata_or_module = {
++	.name	= "radio-si4713",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &rx51_si4713_data,
++	},
++};
++
++static __init void rx51_init_si4713(void)
++{
++	int err;
++
++	err = gpio_request_one(RX51_FMTX_IRQ, GPIOF_DIR_IN, "si4713 irq");
++	if (err) {
++		printk(KERN_ERR "Cannot request si4713 irq gpio. %d\n", err);
++		return;
++	}
++	rx51_si4713_board_info.irq = gpio_to_irq(RX51_FMTX_IRQ);
++	platform_device_register(&rx51_si4713_dev);
++}
++
+ static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
+ {
+ 	/* FIXME this gpio setup is just a placeholder for now */
+@@ -921,6 +964,7 @@ void __init rx51_peripherals_init(void)
+ 	board_smc91x_init();
+ 	rx51_add_gpio_keys();
+ 	rx51_init_wl1251();
++	rx51_init_si4713();
+ 	spi_register_board_info(rx51_peripherals_spi_board_info,
+ 				ARRAY_SIZE(rx51_peripherals_spi_board_info));
+ 
 -- 
-viresh
+1.7.2.3
