@@ -1,89 +1,115 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 21 Feb 2011 10:22:40 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during
-	fault handling
-In-Reply-To: <20110221.101856.76372714451194378.Hiroshi.DOYU@nokia.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<20110221.101856.76372714451194378.Hiroshi.DOYU@nokia.com>
-Message-ID: <20110221082240.GL3094@legolas.emea.dhcp.ti.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 21 Feb 2011 09:35:41 +0100
+Subject: [PATCH v5 4/5] ARM: omap3: Thumb-2 compatibility for sram34xx.S
+In-Reply-To: <1297946558-13436-5-git-send-email-dave.martin@linaro.org>
+References: <1297946558-13436-1-git-send-email-dave.martin@linaro.org>
+	<1297946558-13436-5-git-send-email-dave.martin@linaro.org>
+Message-ID: <AANLkTinW8NL6FxDJtm7Bd5zurFCurQp9XWuKQvNGRjne@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 17, 2011 at 1:42 PM, Dave Martin <dave.martin@linaro.org> wrote:
+> ?* Build unconditionally as ARM for correct interoperation with
+> ? OMAP firmware.
+>
+> ?* Remove deprecated PC-relative stores
+>
+> ?* Add the required ENDPROC() directive for each ENTRY().
+>
+> ?* .align before data words
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> ?arch/arm/mach-omap2/sram34xx.S | ? 36 ++++++++++++++++++++++++++++--------
+> ?1 files changed, 28 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/sram34xx.S b/arch/arm/mach-omap2/sram34xx.S
+> index 7f893a2..fd1531c 100644
+> --- a/arch/arm/mach-omap2/sram34xx.S
+> +++ b/arch/arm/mach-omap2/sram34xx.S
+> @@ -34,6 +34,12 @@
+> ?#include "sdrc.h"
+> ?#include "cm2xxx_3xxx.h"
+>
+> +/*
+> + * This file needs be built unconditionally as ARM to interoperate correctly
+> + * with non-Thumb-2-capable firmware.
+> + */
+> + ? ? ? .arm
+> +
+> ? ? ? ?.text
+>
+> ?/* r1 parameters */
+> @@ -116,24 +122,36 @@ ENTRY(omap3_sram_configure_core_dpll)
+>
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ pull the extra args off the stack
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ ?and store them in SRAM
+> +
+> +/*
+> + * PC-relative stores are deprecated in ARMv7 and lead to undefined behaviour
+> + * in Thumb-2: use a r7 as a base instead.
+> + * Be careful not to clobber r7 when maintaing this file.
+Sorry I forgot about this minor typo: 'maintaining'
 
-On Mon, Feb 21, 2011 at 10:18:56AM +0200, Hiroshi DOYU wrote:
-> From: David Cohen <dacohen@gmail.com>
-> Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault handling
-> Date: Wed, 16 Feb 2011 21:35:51 +0200
-> 
-> > Add support to register an isr for IOMMU fault situations and adapt it
-> > to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
-> > module might want to be informed when errors happen in order to debug it
-> > or react.
-> > 
-> > Signed-off-by: David Cohen <dacohen@gmail.com>
-> > ---
-> >  arch/arm/mach-omap2/iommu2.c            |   17 +++++++++-
-> >  arch/arm/plat-omap/include/plat/iommu.h |   14 ++++++++-
-> >  arch/arm/plat-omap/iommu.c              |   52 ++++++++++++++++++++++---------
-> >  3 files changed, 65 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
-> > index 49a1e5e..adb083e 100644
-> > --- a/arch/arm/mach-omap2/iommu2.c
-> > +++ b/arch/arm/mach-omap2/iommu2.c
-> > @@ -146,18 +146,31 @@ static void omap2_iommu_set_twl(struct iommu *obj, bool on)
-> >  static u32 omap2_iommu_fault_isr(struct iommu *obj, u32 *ra)
-> >  {
-> >  	u32 stat, da;
-> > +	u32 errs = 0;
-> >  
-> >  	stat = iommu_read_reg(obj, MMU_IRQSTATUS);
-> >  	stat &= MMU_IRQ_MASK;
-> > -	if (!stat)
-> > +	if (!stat) {
-> > +		*ra = 0;
-> >  		return 0;
-> > +	}
-> >  
-> >  	da = iommu_read_reg(obj, MMU_FAULT_AD);
-> >  	*ra = da;
-> >  
-> > +	if (stat & MMU_IRQ_TLBMISS)
-> > +		errs |= OMAP_IOMMU_ERR_TLB_MISS;
-> > +	if (stat & MMU_IRQ_TRANSLATIONFAULT)
-> > +		errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
-> > +	if (stat & MMU_IRQ_EMUMISS)
-> > +		errs |= OMAP_IOMMU_ERR_EMU_MISS;
-> > +	if (stat & MMU_IRQ_TABLEWALKFAULT)
-> > +		errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
-> > +	if (stat & MMU_IRQ_MULTIHITFAULT)
-> > +		errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
-> >  	iommu_write_reg(obj, stat, MMU_IRQSTATUS);
-> >  
-> > -	return stat;
-> > +	return errs;
-> >  }
-> >  
-> >  static void omap2_tlb_read_cr(struct iommu *obj, struct cr_regs *cr)
-> > diff --git a/arch/arm/plat-omap/include/plat/iommu.h b/arch/arm/plat-omap/include/plat/iommu.h
-> > index 19cbb5e..174f1b9 100644
-> > --- a/arch/arm/plat-omap/include/plat/iommu.h
-> > +++ b/arch/arm/plat-omap/include/plat/iommu.h
-> > @@ -31,6 +31,7 @@ struct iommu {
-> >  	struct clk	*clk;
-> >  	void __iomem	*regbase;
-> >  	struct device	*dev;
-> > +	void		*isr_priv;
-> 
-> Ideally I'd like to avoid having "isr_priv" in iommu since it's not
-> used for iommu but client needs the place to pass its info to its
-> custom handler. Any better idea?
+Jean
 
-I'm not sure if it makes sense as I don't know the mailbox block, but
-maybe moving to GENIRQ ? Then IRQ subsystem would take care of the
-"dev_id"
-
--- 
-balbi
+> + */
+> + THUMB( ? ? ? ?adr ? ? r7, omap3_sram_configure_core_dpll ? ? ? ? ? ? ? ? ? ? ?)
+> + ? ? ? .macro strtext Rt:req, label:req
+> + ARM( ?str ? ? \Rt, \label ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? )
+> + THUMB( ? ? ? ?str ? ? \Rt, [r7, \label - omap3_sram_configure_core_dpll] ? ? ?)
+> + ? ? ? .endm
+> +
+> ? ? ? ?ldr ? ? r4, [sp, #52]
+> - ? ? ? str ? ? r4, omap_sdrc_rfr_ctrl_0_val
+> + ? ? ? strtext r4, omap_sdrc_rfr_ctrl_0_val
+> ? ? ? ?ldr ? ? r4, [sp, #56]
+> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_a_0_val
+> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_a_0_val
+> ? ? ? ?ldr ? ? r4, [sp, #60]
+> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_b_0_val
+> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_b_0_val
+> ? ? ? ?ldr ? ? r4, [sp, #64]
+> - ? ? ? str ? ? r4, omap_sdrc_mr_0_val
+> + ? ? ? strtext r4, omap_sdrc_mr_0_val
+> ? ? ? ?ldr ? ? r4, [sp, #68]
+> - ? ? ? str ? ? r4, omap_sdrc_rfr_ctrl_1_val
+> + ? ? ? strtext r4, omap_sdrc_rfr_ctrl_1_val
+> ? ? ? ?cmp ? ? r4, #0 ? ? ? ? ? ? ? ? ?@ if SDRC_RFR_CTRL_1 is 0,
+> ? ? ? ?beq ? ? skip_cs1_params ? ? ? ? @ ?do not use cs1 params
+> ? ? ? ?ldr ? ? r4, [sp, #72]
+> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_a_1_val
+> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_a_1_val
+> ? ? ? ?ldr ? ? r4, [sp, #76]
+> - ? ? ? str ? ? r4, omap_sdrc_actim_ctrl_b_1_val
+> + ? ? ? strtext r4, omap_sdrc_actim_ctrl_b_1_val
+> ? ? ? ?ldr ? ? r4, [sp, #80]
+> - ? ? ? str ? ? r4, omap_sdrc_mr_1_val
+> + ? ? ? strtext r4, omap_sdrc_mr_1_val
+> ?skip_cs1_params:
+> ? ? ? ?mrc ? ? p15, 0, r8, c1, c0, 0 ? @ read ctrl register
+> ? ? ? ?bic ? ? r10, r8, #0x800 ? ? ? ? @ clear Z-bit, disable branch prediction
+> @@ -271,6 +289,7 @@ skip_cs1_prog:
+> ? ? ? ?ldr ? ? r12, [r11] ? ? ? ? ? ? ?@ posted-write barrier for SDRC
+> ? ? ? ?bx ? ? ?lr
+>
+> + ? ? ? .align
+> ?omap3_sdrc_power:
+> ? ? ? ?.word OMAP34XX_SDRC_REGADDR(SDRC_POWER)
+> ?omap3_cm_clksel1_pll:
+> @@ -319,6 +338,7 @@ omap3_sdrc_dlla_ctrl:
+> ? ? ? ?.word OMAP34XX_SDRC_REGADDR(SDRC_DLLA_CTRL)
+> ?core_m2_mask_val:
+> ? ? ? ?.word 0x07FFFFFF
+> +ENDPROC(omap3_sram_configure_core_dpll)
+>
+> ?ENTRY(omap3_sram_configure_core_dpll_sz)
+> ? ? ? ?.word ? . - omap3_sram_configure_core_dpll
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
