@@ -1,20 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 21 Feb 2011 23:28:12 +0000
-Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
-In-Reply-To: <4D62ECCC.3040208@ti.com>
-References: <20110217173711.GF14574@legolas.emea.dhcp.ti.com>
-	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
-	<4D5E7DFF.7020609@ti.com>
-	<20110218154135.GF11151@legolas.emea.dhcp.ti.com>
-	<4D5EA36A.4000903@ti.com> <20110221182213.GD15225@atomide.com>
-	<4D62DAF0.9050301@ti.com> <20110221220815.GG15225@atomide.com>
-	<4D62ECCC.3040208@ti.com>
-Message-ID: <20110221232812.GB15494@n2100.arm.linux.org.uk>
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Tue, 22 Feb 2011 07:29:11 +0800
+Subject: [PATCH 2/2] clk: Generic support for fixed-rate clocks
+In-Reply-To: <4D62C237.1020803@bluewatersys.com>
+References: <1298256658.862488.956979497586.2.gpush@pororo>
+	<4D62C237.1020803@bluewatersys.com>
+Message-ID: <201102220729.13708.jeremy.kerr@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 11:53:00PM +0100, Cousson, Benoit wrote:
-> I still didn't fully understand the rational behind that early_init for  
-> timer BTW.
+Hi Ryan,
 
-To ensure that sched_clock() is setup and running before its first use.
+> If we never need to dynamically create fixed clocks (which seems
+> unlikely) then rate can be const.
+
+There's been a few cases where I've needed to set the rate of a fixed clock 
+during boot - for example when a clock rate varies between boards, it may be 
+defined in a platform-wide file, but have the rate modified early (ie, 
+clk_foo.rate = 32678) in a board file.
+
+Also, if we're parsing clocks from the device tree (or any other discovery 
+mechanism), we'll need to modify rate.
+
+Cheers,
+
+
+Jeremy
