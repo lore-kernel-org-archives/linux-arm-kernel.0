@@ -1,40 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 20 Feb 2011 20:23:20 -0800
-Subject: [PATCH v2 18/21] ARM: tegra: cpufreq: Adjust memory frequency
-	with cpu frequency
-In-Reply-To: <1298154371-5641-20-git-send-email-ccross@android.com>
+Date: Sun, 20 Feb 2011 20:26:49 -0800
+Subject: [PATCH v2 19/21] ARM: tegra: clock: Add function to set SDMMC tap
+	delay
+In-Reply-To: <1298154371-5641-21-git-send-email-ccross@android.com>
 References: <1298154371-5641-1-git-send-email-ccross@android.com>
-	<1298154371-5641-20-git-send-email-ccross@android.com>
-Message-ID: <AANLkTikbOQZ2jW+mfN41dXwuKVVJ3vCVKRZLezxbj61o@mail.gmail.com>
+	<1298154371-5641-21-git-send-email-ccross@android.com>
+Message-ID: <AANLkTin_eZemFBP5NirvHV8fDUemRHX3tSkb21=gZVme@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
 On Sat, Feb 19, 2011 at 2:26 PM, Colin Cross <ccross@android.com> wrote:
+> The SDMMC controllers have extra bits in the clock source
+> register that adjust the delay between the clock and data
+> to compenstate for delays on the PCB. ?The values need to
+> be set from the clock code so the clock can be locked
+> during the read-modify-write on the clock source register.
+>
 > Signed-off-by: Colin Cross <ccross@android.com>
 
-Patch description please. Besides that:
+This is going in without any in-tree consumers of the functions.
+Still, it'll likely be added shortly, so:
 
 Acked-by: Olof Johansson <olof@lixom.net>
 
-But note for future work:
+(If they don't show up, it'll be easy to drop it again if need be).
 
-
-> + ? ? ? /*
-> + ? ? ? ?* Vote on memory bus frequency based on cpu frequency
-> + ? ? ? ?* This sets the minimum frequency, display or avp may request higher
-> + ? ? ? ?*/
-> + ? ? ? if (rate >= 816000)
-> + ? ? ? ? ? ? ? clk_set_rate(emc_clk, 600000000); /* cpu 816 MHz, emc max */
-> + ? ? ? else if (rate >= 456000)
-> + ? ? ? ? ? ? ? clk_set_rate(emc_clk, 300000000); /* cpu 456 MHz, emc 150Mhz */
-> + ? ? ? else
-> + ? ? ? ? ? ? ? clk_set_rate(emc_clk, 100000000); ?/* emc 50Mhz */
-> +
-
-
-This hardcodes frequencies that might or might not be used on some
-systems and some parts. So it'll need to be revisited when enabling
-other configurations.
 
 
 -Olof
