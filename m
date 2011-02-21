@@ -1,87 +1,137 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 20 Feb 2011 20:37:29 -0800
-Subject: [PATCH v2] i2c: tegra: Add i2c support
-In-Reply-To: <1298250861-27094-1-git-send-email-ccross@android.com>
-References: <AANLkTim0X=gUwYJmR+EAYjGamiJb7tgiVEjwqCEF0-L0@mail.gmail.com>
-	<1298250861-27094-1-git-send-email-ccross@android.com>
-Message-ID: <AANLkTi=ia1FGur6mrVuE2rOBGjjRYZ3A41mTq3qOowmS@mail.gmail.com>
+From: shweta.gulati@ti.com (Gulati, Shweta)
+Date: Mon, 21 Feb 2011 10:21:26 +0530
+Subject: [PATCH 2/3] OMAP: voltage: move plat/voltage.h to
+	mach-omap2/voltage.h
+In-Reply-To: <20110221020855.7598.95586.stgit@twilight.localdomain>
+References: <20110221020231.7598.14024.stgit@twilight.localdomain>
+	<20110221020855.7598.95586.stgit@twilight.localdomain>
+Message-ID: <AANLkTimkoaKxWVJTd7TLj5W4Ly-bSEagokPekwwp4L8K@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Just a couple of minor nits. I wouldn't worry about respinning just
-for these comments, but if you end up doing it for other feedback, see
-below.
-
-
--Olof
-
-On Sun, Feb 20, 2011 at 5:14 PM, Colin Cross <ccross@android.com> wrote:
-
-> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-> new file mode 100644
-> index 0000000..3921f66
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-tegra.c
-> @@ -0,0 +1,700 @@
-> +/*
-> + * drivers/i2c/busses/i2c-tegra.c
-> + *
-> + * Copyright (C) 2010 Google, Inc.
-
-2011?
-
-[..]
-
-> +/*
-> + * i2c_writel and i2c_readl will offset the register if necessary to talk
-> + * to the I2C block inside the DVC block
-> + */
-> +static unsigned long tegra_i2c_reg_addr(struct tegra_i2c_dev *i2c_dev,
-> + ? ? ? unsigned long reg)
-> +{
-> + ? ? ? if (i2c_dev->is_dvc)
-> + ? ? ? ? ? ? ? reg += (reg >= I2C_TX_FIFO) ? 0x10 : 0x40;
-> + ? ? ? return reg;
-> +}
+On Mon, Feb 21, 2011 at 7:38 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> At this point in time, there's no reason for this header file to be in
+> plat-omap/include/plat/voltage.h. ?It should not be included by device
+> drivers, and the code that uses it is currently all under mach-omap2/.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+> ?arch/arm/mach-omap2/omap_twl.c ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-omap2/pm.c ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/mach-omap2/smartreflex.h ? ? ? ? ? ?| ? ?3 ++-
+> ?arch/arm/mach-omap2/sr_device.c ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/mach-omap2/voltage.c ? ? ? ? ? ? ? ?| ? ?3 ++-
+> ?arch/arm/mach-omap2/voltage.h ? ? ? ? ? ? ? ?| ? ?0
+> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 -
+> ?7 files changed, 7 insertions(+), 6 deletions(-)
+> ?rename arch/arm/{plat-omap/include/plat/voltage.h => mach-omap2/voltage.h} (100%)
+>
+> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+> index 00e1d2b..ad8c18a 100644
+> --- a/arch/arm/mach-omap2/omap_twl.c
+> +++ b/arch/arm/mach-omap2/omap_twl.c
+> @@ -18,7 +18,7 @@
+> ?#include <linux/kernel.h>
+> ?#include <linux/i2c/twl.h>
+>
+> -#include <plat/voltage.h>
+> +#include "voltage.h"
+Extra Blank Line
+> ?#include "pm.h"
+>
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index d5a102c..4baa674 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -18,8 +18,8 @@
+> ?#include <plat/omap-pm.h>
+> ?#include <plat/omap_device.h>
+> ?#include <plat/common.h>
+> -#include <plat/voltage.h>
+>
+> +#include "voltage.h"
+> ?#include "powerdomain.h"
+> ?#include "clockdomain.h"
+> ?#include "pm.h"
+> diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
+> index 6568c88..5f35b9e 100644
+> --- a/arch/arm/mach-omap2/smartreflex.h
+> +++ b/arch/arm/mach-omap2/smartreflex.h
+> @@ -21,7 +21,8 @@
+> ?#define __ASM_ARM_OMAP_SMARTREFLEX_H
+>
+> ?#include <linux/platform_device.h>
+> -#include <plat/voltage.h>
 > +
-> +static void i2c_writel(struct tegra_i2c_dev *i2c_dev, u32 val,
-> + ? ? ? unsigned long reg)
-> +{
-> + ? ? ? writel(val, i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg));
-> +}
+> +#include "voltage.h"
+>
+> ?/*
+> ?* Different Smartreflex IPs version. The v1 is the 65nm version used in
+> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
+> index a636604..10d3c5e 100644
+> --- a/arch/arm/mach-omap2/sr_device.c
+> +++ b/arch/arm/mach-omap2/sr_device.c
+> @@ -23,9 +23,9 @@
+> ?#include <linux/io.h>
+>
+> ?#include <plat/omap_device.h>
+> -#include <plat/voltage.h>
+>
+> ?#include "smartreflex.h"
+> +#include "voltage.h"
+> ?#include "control.h"
+> ?#include "pm.h"
+>
+> diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+> index 12be525..3c9bcdc 100644
+> --- a/arch/arm/mach-omap2/voltage.c
+> +++ b/arch/arm/mach-omap2/voltage.c
+> @@ -26,7 +26,6 @@
+> ?#include <linux/slab.h>
+>
+> ?#include <plat/common.h>
+> -#include <plat/voltage.h>
+>
+> ?#include "prm-regbits-34xx.h"
+> ?#include "prm-regbits-44xx.h"
+> @@ -35,6 +34,8 @@
+> ?#include "prminst44xx.h"
+> ?#include "control.h"
+Extra Blank line
+> +#include "voltage.h"
 > +
-> +static u32 i2c_readl(struct tegra_i2c_dev *i2c_dev, unsigned long reg)
-> +{
-> + ? ? ? return readl(i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg));
-> +}
-> +
-> +static void i2c_writesl(struct tegra_i2c_dev *i2c_dev, void *data,
-> + ? ? ? unsigned long reg, int len)
-> +{
-> + ? ? ? writesl(i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg), data, len);
-> +}
-> +
-> +static void i2c_readsl(struct tegra_i2c_dev *i2c_dev, void *data,
-> + ? ? ? unsigned long reg, int len)
-> +{
-> + ? ? ? readsl(i2c_dev->base + tegra_i2c_reg_addr(i2c_dev, reg), data, len);
-> +}
+> ?#define VP_IDLE_TIMEOUT ? ? ? ? ? ? ? ?200
+> ?#define VP_TRANXDONE_TIMEOUT ? 300
+> ?#define VOLTAGE_DIR_SIZE ? ? ? 16
+> diff --git a/arch/arm/plat-omap/include/plat/voltage.h b/arch/arm/mach-omap2/voltage.h
+> similarity index 100%
+> rename from arch/arm/plat-omap/include/plat/voltage.h
+> rename to arch/arm/mach-omap2/voltage.h
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 1eee85a..93beae2 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -34,7 +34,6 @@
+> ?#include <linux/ioport.h>
+> ?#include <linux/spinlock.h>
+> ?#include <plat/cpu.h>
+> -#include <plat/voltage.h>
+"voltage.h" is not added.
+> ?struct omap_device;
+>
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
 
-All of the above pass in i2c_dev to tegra_i2c_reg_addr, might as well
-do the base addition in there.
 
-> diff --git a/include/linux/i2c-tegra.h b/include/linux/i2c-tegra.h
-> new file mode 100644
-> index 0000000..9c85da4
-> --- /dev/null
-> +++ b/include/linux/i2c-tegra.h
-> @@ -0,0 +1,25 @@
-> +/*
-> + * drivers/i2c/busses/i2c-tegra.c
-> + *
-> + * Copyright (C) 2010 Google, Inc.
-
-2011?
+-- 
+Thanks,
+Regards,
+Shweta
