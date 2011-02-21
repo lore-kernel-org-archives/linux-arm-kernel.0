@@ -1,44 +1,61 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 21 Feb 2011 14:14:39 +0300
-Subject: [PATCH 2/2] DM9000B: Fix PHY power for network down/up
-In-Reply-To: <4D618B5D.5040001@henry.nestler.mail.gmail.com>
-References: <4D618B5D.5040001@henry.nestler.mail.gmail.com>
-Message-ID: <4D62491F.4050602@ru.mvista.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 21 Feb 2011 12:15:57 +0100
+Subject: [PATCH 5/5] mmc: sdhci: add quirk
+	SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO
+In-Reply-To: <20110221110905.GL14495@n2100.arm.linux.org.uk>
+References: <1298282095-2279-1-git-send-email-richard.zhao@freescale.com>
+	<1298282095-2279-5-git-send-email-richard.zhao@freescale.com>
+	<20110221100439.GE2616@pengutronix.de>
+	<010C9052C42A00499CE76D637FA5EE900C579F@039-SN1MPN1-001.039d.mgd.msft.net>
+	<20110221104608.GF2616@pengutronix.de>
+	<20110221110905.GL14495@n2100.arm.linux.org.uk>
+Message-ID: <20110221111557.GG2616@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Feb 21, 2011 at 11:09:05AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 21, 2011 at 11:46:08AM +0100, Wolfram Sang wrote:
+> > > > > -   if (cpu_is_mx35() || cpu_is_mx51())
+> > > > > +   if (cpu_is_mx53())
+> > > > > +           host->quirks |= SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO;
+> > > >
+> > > > Have you tried it doing it via IO-accessors?
+> > > Richard Zhu: This quirk is used to fix a mechanism problem in the MMC CMDs execution procedure.
+> > > It would be very abrupt and ugly, if the IO-accessors are added into these original procedures.
+> > 
+> > Please don't get it personal, but IMHO it is pretty ugly the way it is
+> > now. This quirk is very imx-specific and calling something like
+> > SDHCI_VENDOR_SPEC in sdhci.c looks clearly wrong to me. By the way, what
+> > does this bit do, the description doesn't say so?
+> 
+> SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO is rather too verbose.  Isn't
+> there a shorter version which could be used?  SDHCI_QUIRK_SDIO_MULTIBLK_INT
+> maybe?
 
-On 21-02-2011 0:45, Henry Nestler wrote:
+As I understand, the non-SDIO part is handled here:
 
-> DM9000 revision B needs 1 ms delay after PHY power on (see spec), and PHY
-> power must on in register
++       /*Set the CMD_TYPE of the CMD12, fix no INT in MULTI_BLK IO */
++       if (host->quirks & SDHCI_QUIRK_FIX_NO_INT_IN_MULTI_BLK_IO) {
++               if (cmd->opcode == 12)
++                       flags |= SDHCI_CMD_ABORTCMD;
++       }
 
-    Couldn't parse that.
+But I'd really like to avoid the quirk bit. Maybe we'll get a better
+idea once we understand what that magic bit actually does. For a start,
+we might simply set SDHCI_QUIRK_NO_MULTIBLOCK for mx53 like we do for
+other imx.
 
-> DM9000_GPR before all other settings will change.
-> Remember, that register DM9000_GPR was not changed by reset sequence.
+Regards,
 
-> Without these fix the FIFO goes out of sync and sends wrong data after
+   Wolfram
 
-    s/these/this/
-
-> sequence of "ifconfig ethX down ; sleep 3 ; ifconfig ethX up".
-[...]
-
-> diff --git a/drivers/net/dm9000.c b/drivers/net/dm9000.c
-> index 2d4c4fc..5925569 100644
-> --- a/drivers/net/dm9000.c
-> +++ b/drivers/net/dm9000.c
-[...]
-> @@ -1194,6 +1191,10 @@ dm9000_open(struct net_device *dev)
->   	if (request_irq(dev->irq, dm9000_interrupt, irqflags, dev->name, dev))
->   		return -EAGAIN;
->
-> +	/* GPIO0 on pre-activate PHY, Reg 1F is not set by reset */
-> +	iow(db, DM9000_GPR, 0);	/* REG_1F bit0 activate phyxcer */
-> +	udelay(1000); /* delay needs by DM9000B */
-
-    Why not mdelay(1)?
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110221/d80aa342/attachment.sig>
