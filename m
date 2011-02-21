@@ -1,47 +1,28 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Mon, 21 Feb 2011 13:10:59 +0530
-Subject: [PATCH resend] omap: rx51: Add SI4713 FM transmitter
-In-Reply-To: <1298270556-11571-1-git-send-email-jhnikula@gmail.com>
-References: <1298040354-1726-1-git-send-email-jhnikula@gmail.com>
-	<1298270556-11571-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <AANLkTikR5v9_G3oyRjVP1oCcBo=hU+ikywximd=VDbDd@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 20 Feb 2011 23:52:28 -0800
+Subject: [PATCH v2 15/21] ARM: tegra: clock: Round rate before setting rate
+In-Reply-To: <AANLkTi=jJRhyMZXbs3Unr-U+J59rt4SxMQtT4KtCqWbe@mail.gmail.com>
+References: <1298154371-5641-1-git-send-email-ccross@android.com>
+	<1298154371-5641-17-git-send-email-ccross@android.com>
+	<AANLkTi=jJRhyMZXbs3Unr-U+J59rt4SxMQtT4KtCqWbe@mail.gmail.com>
+Message-ID: <AANLkTin3wPBZtgFp-AvEFhKG3X9Q7B=xFN9jR6fGjr+i@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 12:12, Jarkko Nikula <jhnikula@gmail.com> wrote:
-> Add SI4713 FM transmitter supplies, platform data and setup to RX-51/N900.
-> It is connected to line output signals of TLV320AIC34 codec A part.
-> Driver can be either built-in or a module. It can be tuned with v4l2-ctl
-> from ivtv-utils. Following examples illustrate the use of it:
+On Sun, Feb 20, 2011 at 8:19 PM, Olof Johansson <olof@lixom.net> wrote:
+> Hi,
 >
-> ? ? ? ?v4l2-ctl -d /dev/radio0 --set-ctrl=mute=0 (power up)
-> ? ? ? ?v4l2-ctl -d /dev/radio0 -f 107900 (tune 107.9 MHz)
+> On Sat, Feb 19, 2011 at 2:26 PM, Colin Cross <ccross@android.com> wrote:
 >
-> ? ? ? ?v4l2-ctl -d /dev/radio0 --set-ctrl=mute=1 (power down)
+>> diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+>> index 8d01a49..9798585 100644
+>> --- a/arch/arm/mach-tegra/clock.c
+>> +++ b/arch/arm/mach-tegra/clock.c
+>> @@ -86,6 +86,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
+>>
+>> ? ? ? ?if (c->mul != 0 && c->div != 0) {
+>> ? ? ? ? ? ? ? ?rate *= c->mul;
+>> + ? ? ? ? ? ? ? rate += c->div / 2; /* round up */
 >
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-> ---
-> Resend = forgot to cc LAKML.
-> ---
-
-<<snip>>
-
-> +
-> +static __init void rx51_init_si4713(void)
-> +{
-> + ? ? ? int err;
-> +
-> + ? ? ? err = gpio_request_one(RX51_FMTX_IRQ, GPIOF_DIR_IN, "si4713 irq");
-> + ? ? ? if (err) {
-> + ? ? ? ? ? ? ? printk(KERN_ERR "Cannot request si4713 irq gpio. %d\n", err);
-
-use pr_err instead of printk.
-
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? }
-> + ? ? ? rx51_si4713_board_info.irq = gpio_to_irq(RX51_FMTX_IRQ);
-> + ? ? ? platform_device_register(&rx51_si4713_dev);
-> +}
-> +
-
-<<snip>>
+> Shouldn't this be "rate += c->div - 1;"?
+Yes, will fix
