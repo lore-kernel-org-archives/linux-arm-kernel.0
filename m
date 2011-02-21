@@ -1,116 +1,283 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Mon, 21 Feb 2011 10:09:21 +0200
-Subject: [PATCHv2] omap: rx51: Add SI4713 FM transmitter
-In-Reply-To: <20110221095421.6576a98d.jhnikula@gmail.com>
-References: <20110221095421.6576a98d.jhnikula@gmail.com>
-Message-ID: <1298275761-21486-1-git-send-email-jhnikula@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 21 Feb 2011 09:05:32 +0100
+Subject: [PATCH 2/4] V4L: mx3_camera: convert to videobuf2
+In-Reply-To: <Pine.LNX.4.64.1102180906500.1851@axis700.grange>
+References: <Pine.LNX.4.64.1102180857360.1851@axis700.grange>
+	<Pine.LNX.4.64.1102180906500.1851@axis700.grange>
+Message-ID: <000001cbd19e$1f528210$5df78630$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SI4713 FM transmitter supplies, platform data and setup to RX-51/N900.
-It is connected to line output signals of TLV320AIC34 codec A part.
-Driver can be either built-in or a module. It can be tuned with v4l2-ctl
-from ivtv-utils. Following examples illustrate the use of it:
+Hello,
 
-	v4l2-ctl -d /dev/radio0 --set-ctrl=mute=0 (power up)
-	v4l2-ctl -d /dev/radio0 -f 107900 (tune 107.9 MHz)
+On Friday, February 18, 2011 9:14 AM Guennadi Liakhovetski wrote:
 
-	v4l2-ctl -d /dev/radio0 --set-ctrl=mute=1 (power down)
+> Now that soc-camera supports videobuf API v1 and v2, camera-host drivers
+> can be converted to videobuf2 individually. This patch converts the
+> mx3_camera driver.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+> 
+> This one is also on git.linuxtv.org already.
+> 
+>  drivers/media/video/mx3_camera.c |  342 ++++++++++++++++----------------------
+>  1 files changed, 143 insertions(+), 199 deletions(-)
+> 
+> diff --git a/drivers/media/video/mx3_camera.c b/drivers/media/video/mx3_camera.c
+> index b9cb4a4..d61ff0d 100644
+> --- a/drivers/media/video/mx3_camera.c
+> +++ b/drivers/media/video/mx3_camera.c
+> @@ -21,7 +21,7 @@
+> 
+>  #include <media/v4l2-common.h>
+>  #include <media/v4l2-dev.h>
+> -#include <media/videobuf-dma-contig.h>
+> +#include <media/videobuf2-dma-contig.h>
+>  #include <media/soc_camera.h>
+>  #include <media/soc_mediabus.h>
+> 
+> @@ -62,10 +62,16 @@
+> 
+>  #define MAX_VIDEO_MEM 16
+> 
+> +enum csi_buffer_state {
+> +	CSI_BUF_NEEDS_INIT,
+> +	CSI_BUF_PREPARED,
+> +};
+> +
+>  struct mx3_camera_buffer {
+>  	/* common v4l buffer stuff -- must be first */
+> -	struct videobuf_buffer			vb;
+> -	enum v4l2_mbus_pixelcode		code;
+> +	struct vb2_buffer			vb;
+> +	enum csi_buffer_state			state;
+> +	struct list_head			queue;
+> 
+>  	/* One descriptot per scatterlist (per frame) */
+>  	struct dma_async_tx_descriptor		*txd;
+> @@ -108,6 +114,9 @@ struct mx3_camera_dev {
+>  	struct list_head	capture;
+>  	spinlock_t		lock;		/* Protects video buffer lists */
+>  	struct mx3_camera_buffer *active;
+> +	struct vb2_alloc_ctx	*alloc_ctx;
+> +	enum v4l2_field		field;
+> +	int			sequence;
+> 
+>  	/* IDMAC / dmaengine interface */
+>  	struct idmac_channel	*idmac_channel[1];	/* We need one channel */
+> @@ -130,6 +139,11 @@ static void csi_reg_write(struct mx3_camera_dev *mx3, u32 value, off_t reg)
+>  	__raw_writel(value, mx3->base + reg);
+>  }
+> 
+> +static struct mx3_camera_buffer *to_mx3_vb(struct vb2_buffer *vb)
+> +{
+> +	return container_of(vb, struct mx3_camera_buffer, vb);
+> +}
+> +
+>  /* Called from the IPU IDMAC ISR */
+>  static void mx3_cam_dma_done(void *arg)
+>  {
+> @@ -137,20 +151,20 @@ static void mx3_cam_dma_done(void *arg)
+>  	struct dma_chan *chan = desc->txd.chan;
+>  	struct idmac_channel *ichannel = to_idmac_chan(chan);
+>  	struct mx3_camera_dev *mx3_cam = ichannel->client;
+> -	struct videobuf_buffer *vb;
+> 
+>  	dev_dbg(chan->device->dev, "callback cookie %d, active DMA 0x%08x\n",
+>  		desc->txd.cookie, mx3_cam->active ? sg_dma_address(&mx3_cam->active->sg) : 0);
+> 
+>  	spin_lock(&mx3_cam->lock);
+>  	if (mx3_cam->active) {
+> -		vb = &mx3_cam->active->vb;
+> -
+> -		list_del_init(&vb->queue);
+> -		vb->state = VIDEOBUF_DONE;
+> -		do_gettimeofday(&vb->ts);
+> -		vb->field_count++;
+> -		wake_up(&vb->done);
+> +		struct vb2_buffer *vb = &mx3_cam->active->vb;
+> +		struct mx3_camera_buffer *buf = to_mx3_vb(vb);
+> +
+> +		list_del_init(&buf->queue);
+> +		do_gettimeofday(&vb->v4l2_buf.timestamp);
+> +		vb->v4l2_buf.field = mx3_cam->field;
+> +		vb->v4l2_buf.sequence = mx3_cam->sequence++;
+> +		vb2_buffer_done(vb, VB2_BUF_STATE_DONE);
+>  	}
+> 
+>  	if (list_empty(&mx3_cam->capture)) {
+> @@ -165,38 +179,10 @@ static void mx3_cam_dma_done(void *arg)
+>  	}
+> 
+>  	mx3_cam->active = list_entry(mx3_cam->capture.next,
+> -				     struct mx3_camera_buffer, vb.queue);
+> -	mx3_cam->active->vb.state = VIDEOBUF_ACTIVE;
+> +				     struct mx3_camera_buffer, queue);
+>  	spin_unlock(&mx3_cam->lock);
+>  }
+> 
+> -static void free_buffer(struct videobuf_queue *vq, struct mx3_camera_buffer *buf)
+> -{
+> -	struct soc_camera_device *icd = vq->priv_data;
+> -	struct videobuf_buffer *vb = &buf->vb;
+> -	struct dma_async_tx_descriptor *txd = buf->txd;
+> -	struct idmac_channel *ichan;
+> -
+> -	BUG_ON(in_interrupt());
+> -
+> -	dev_dbg(icd->dev.parent, "%s (vb=0x%p) 0x%08lx %d\n", __func__,
+> -		vb, vb->baddr, vb->bsize);
+> -
+> -	/*
+> -	 * This waits until this buffer is out of danger, i.e., until it is no
+> -	 * longer in STATE_QUEUED or STATE_ACTIVE
+> -	 */
+> -	videobuf_waiton(vq, vb, 0, 0);
+> -	if (txd) {
+> -		ichan = to_idmac_chan(txd->chan);
+> -		async_tx_ack(txd);
+> -	}
+> -	videobuf_dma_contig_free(vq, vb);
+> -	buf->txd = NULL;
+> -
+> -	vb->state = VIDEOBUF_NEEDS_INIT;
+> -}
+> -
+>  /*
+>   * Videobuf operations
+>   */
+> @@ -205,10 +191,11 @@ static void free_buffer(struct videobuf_queue *vq, struct mx3_camera_buffer *buf
+>   * Calculate the __buffer__ (not data) size and number of buffers.
+>   * Called with .vb_lock held
+>   */
+> -static int mx3_videobuf_setup(struct videobuf_queue *vq, unsigned int *count,
+> -			      unsigned int *size)
+> +static int mx3_videobuf_setup(struct vb2_queue *vq,
+> +			unsigned int *count, unsigned int *num_planes,
+> +			unsigned long sizes[], void *alloc_ctxs[])
+>  {
+> -	struct soc_camera_device *icd = vq->priv_data;
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
+>  	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+>  	struct mx3_camera_dev *mx3_cam = ici->priv;
+>  	int bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
+> @@ -220,104 +207,68 @@ static int mx3_videobuf_setup(struct videobuf_queue *vq, unsigned int *count,
+>  	if (!mx3_cam->idmac_channel[0])
+>  		return -EINVAL;
+> 
+> -	*size = bytes_per_line * icd->user_height;
+> +	*num_planes = 1;
+> +
+> +	mx3_cam->sequence = 0;
+> +	sizes[0] = bytes_per_line * icd->user_height;
+> +	alloc_ctxs[0] = mx3_cam->alloc_ctx;
+> 
+>  	if (!*count)
+>  		*count = 32;
+> 
+> -	if (*size * *count > MAX_VIDEO_MEM * 1024 * 1024)
+> -		*count = MAX_VIDEO_MEM * 1024 * 1024 / *size;
+> +	if (sizes[0] * *count > MAX_VIDEO_MEM * 1024 * 1024)
+> +		*count = MAX_VIDEO_MEM * 1024 * 1024 / sizes[0];
+> 
+>  	return 0;
+>  }
+> 
+>  /* Called with .vb_lock held */
 
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
----
-v2: Using pr_err instead of printk. Thanks to
-"Varadarajan, Charulatha" <charu@ti.com> for noticing.
----
- arch/arm/mach-omap2/board-rx51-peripherals.c |   44 ++++++++++++++++++++++++++
- 1 files changed, 44 insertions(+), 0 deletions(-)
+vb_lock has no meaning in vb2, so the above line should be removed imho.
 
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index e75e240..17ef1af 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -36,6 +36,8 @@
- 
- #include <sound/tlv320aic3x.h>
- #include <sound/tpa6130a2-plat.h>
-+#include <media/radio-si4713.h>
-+#include <media/si4713.h>
- 
- #include <../drivers/staging/iio/light/tsl2563.h>
- 
-@@ -47,6 +49,8 @@
- 
- #define RX51_WL1251_POWER_GPIO		87
- #define RX51_WL1251_IRQ_GPIO		42
-+#define RX51_FMTX_RESET_GPIO		163
-+#define RX51_FMTX_IRQ			53
- 
- /* list all spi devices here */
- enum {
-@@ -357,10 +361,14 @@ static struct regulator_consumer_supply rx51_vio_supplies[] = {
- 	REGULATOR_SUPPLY("DVDD", "2-0018"),
- 	REGULATOR_SUPPLY("IOVDD", "2-0019"),
- 	REGULATOR_SUPPLY("DVDD", "2-0019"),
-+	/* Si4713 IO supply */
-+	REGULATOR_SUPPLY("vio", "2-0063"),
- };
- 
- static struct regulator_consumer_supply rx51_vaux1_consumers[] = {
- 	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
-+	/* Si4713 supply */
-+	REGULATOR_SUPPLY("vdd", "2-0063"),
- };
- 
- static struct regulator_consumer_supply rx51_vdac_supply[] = {
-@@ -511,6 +519,41 @@ static struct regulator_init_data rx51_vio = {
- 	.consumer_supplies	= rx51_vio_supplies,
- };
- 
-+static struct si4713_platform_data rx51_si4713_i2c_data __initdata_or_module = {
-+	.gpio_reset	= RX51_FMTX_RESET_GPIO,
-+};
-+
-+static struct i2c_board_info rx51_si4713_board_info __initdata_or_module = {
-+	I2C_BOARD_INFO("si4713", SI4713_I2C_ADDR_BUSEN_HIGH),
-+	.platform_data	= &rx51_si4713_i2c_data,
-+};
-+
-+static struct radio_si4713_platform_data rx51_si4713_data __initdata_or_module = {
-+	.i2c_bus	= 2,
-+	.subdev_board_info = &rx51_si4713_board_info,
-+};
-+
-+static struct platform_device rx51_si4713_dev __initdata_or_module = {
-+	.name	= "radio-si4713",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &rx51_si4713_data,
-+	},
-+};
-+
-+static __init void rx51_init_si4713(void)
-+{
-+	int err;
-+
-+	err = gpio_request_one(RX51_FMTX_IRQ, GPIOF_DIR_IN, "si4713 irq");
-+	if (err) {
-+		pr_err("Cannot request si4713 irq gpio. %d\n", err);
-+		return;
-+	}
-+	rx51_si4713_board_info.irq = gpio_to_irq(RX51_FMTX_IRQ);
-+	platform_device_register(&rx51_si4713_dev);
-+}
-+
- static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
- {
- 	/* FIXME this gpio setup is just a placeholder for now */
-@@ -921,6 +964,7 @@ void __init rx51_peripherals_init(void)
- 	board_smc91x_init();
- 	rx51_add_gpio_keys();
- 	rx51_init_wl1251();
-+	rx51_init_si4713();
- 	spi_register_board_info(rx51_peripherals_spi_board_info,
- 				ARRAY_SIZE(rx51_peripherals_spi_board_info));
- 
--- 
-1.7.2.3
+> -static int mx3_videobuf_prepare(struct videobuf_queue *vq,
+> -		struct videobuf_buffer *vb, enum v4l2_field field)
+> +static int mx3_videobuf_prepare(struct vb2_buffer *vb)
+>  {
+> -	struct soc_camera_device *icd = vq->priv_data;
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vb->vb2_queue);
+>  	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+>  	struct mx3_camera_dev *mx3_cam = ici->priv;
+> -	struct mx3_camera_buffer *buf =
+> -		container_of(vb, struct mx3_camera_buffer, vb);
+> +	struct idmac_channel *ichan = mx3_cam->idmac_channel[0];
+> +	struct scatterlist *sg;
+> +	struct mx3_camera_buffer *buf;
+>  	size_t new_size;
+> -	int ret;
+>  	int bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
+>  						icd->current_fmt->host_fmt);
+> 
+>  	if (bytes_per_line < 0)
+>  		return bytes_per_line;
+> 
+> -	new_size = bytes_per_line * icd->user_height;
+> +	buf = to_mx3_vb(vb);
+> +	sg = &buf->sg;
+> 
+> -	/*
+> -	 * I think, in buf_prepare you only have to protect global data,
+> -	 * the actual buffer is yours
+> -	 */
+> -
+> -	if (buf->code	!= icd->current_fmt->code ||
+> -	    vb->width	!= icd->user_width ||
+> -	    vb->height	!= icd->user_height ||
+> -	    vb->field	!= field) {
+> -		buf->code	= icd->current_fmt->code;
+> -		vb->width	= icd->user_width;
+> -		vb->height	= icd->user_height;
+> -		vb->field	= field;
+> -		if (vb->state != VIDEOBUF_NEEDS_INIT)
+> -			free_buffer(vq, buf);
+> -	}
+> +	new_size = bytes_per_line * icd->user_height;
+> 
+> -	if (vb->baddr && vb->bsize < new_size) {
+> -		/* User provided buffer, but it is too small */
+> -		ret = -ENOMEM;
+> -		goto out;
+> +	if (vb2_plane_size(vb, 0) < new_size) {
+> +		dev_err(icd->dev.parent, "Buffer too small (%lu < %zu)\n",
+> +			vb2_plane_size(vb, 0), new_size);
+> +		return -ENOBUFS;
+>  	}
+> 
+> -	if (vb->state == VIDEOBUF_NEEDS_INIT) {
+> -		struct idmac_channel *ichan = mx3_cam->idmac_channel[0];
+> -		struct scatterlist *sg = &buf->sg;
+> -
+> -		/*
+> -		 * The total size of video-buffers that will be allocated / mapped.
+> -		 * *size that we calculated in videobuf_setup gets assigned to
+> -		 * vb->bsize, and now we use the same calculation to get vb->size.
+> -		 */
+> -		vb->size = new_size;
+> -
+> -		/* This actually (allocates and) maps buffers */
+> -		ret = videobuf_iolock(vq, vb, NULL);
+> -		if (ret)
+> -			goto fail;
+> -
+> -		/*
+> -		 * We will have to configure the IDMAC channel. It has two slots
+> -		 * for DMA buffers, we shall enter the first two buffers there,
+> -		 * and then submit new buffers in DMA-ready interrupts
+> -		 */
+> -		sg_init_table(sg, 1);
+> -		sg_dma_address(sg)	= videobuf_to_dma_contig(vb);
+> -		sg_dma_len(sg)		= vb->size;
+> +	if (buf->state == CSI_BUF_NEEDS_INIT) {
+> +		sg_dma_address(sg)	= (dma_addr_t)icd->vb2_vidq.mem_ops->cookie(
+> +			vb->planes[0].mem_priv);
+
+You should use vb2_dma_contig_plane_paddr() function from include/media/videobuf2-dma-contig.h
+instead of hacking with cookie directly:
+	sg_dma_address(sg) = vb2_dma_contig_plane_paddr(vb, 0);
+
+Everything else look fine!
+
+> [snip]
+
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
