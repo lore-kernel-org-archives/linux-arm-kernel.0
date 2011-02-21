@@ -1,39 +1,75 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Mon, 21 Feb 2011 16:03:05 +0100
-Subject: Machine ID question
-In-Reply-To: <20110220130420.GD14495@n2100.arm.linux.org.uk>
-References: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
-	<201102141612.17340.alexander.stein@systec-electronic.com>
-	<20110220130420.GD14495@n2100.arm.linux.org.uk>
-Message-ID: <201102211603.06074.alexander.stein@systec-electronic.com>
+From: John.Linn@xilinx.com (John Linn)
+Date: Mon, 21 Feb 2011 08:04:38 -0700
+Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <201102211548.36296.arnd@arndb.de>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com><201102210936.42098.arnd@arndb.de><c3cdf33d-2163-4417-bc64-7637f5c211e0@VA3EHSMHS021.ehs.local>
+	<201102211548.36296.arnd@arndb.de>
+Message-ID: <6c1f68a4-997a-4a8d-882e-5840e8bdf7af@VA3EHSMHS004.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 20 February 2011, 14:04:20 Russell King - ARM Linux wrote:
-> On Mon, Feb 14, 2011 at 04:12:16PM +0100, Alexander Stein wrote:
-> > On Thursday 10 February 2011, 09:29:15 Uwe Kleine-K?nig wrote:
-> > > On Wed, Feb 09, 2011 at 02:23:07PM -0700, John Linn wrote:
-> > > > I used the form to create a new machine ID for the new Xilinx
-> > > > platform in anticipation of
-> > > > the code making it into the mainline sometime in the future.
-> > > > 
-> > > > The proposed patches are using ARCH_XILINX in the Kconfig.
-> > > 
-> > > You should use MACH_XILINX in the patches.  There are some ARCH_... in
-> > > the machine db, but I think nowadays you cannot (and should not) create
-> > > them there.
-> > 
-> > Uhm, the last entry in the db was created today (14th Feb). Is there a
-> > reason why there no new entries should be created?
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-arm-
+> kernel-bounces at lists.infradead.org] On Behalf Of Arnd Bergmann
+> Sent: Monday, February 21, 2011 7:49 AM
+> To: John Linn
+> Cc: linux at arm.linux.org.uk; catalin.marinas at arm.com;
+> glikely at secretlab.ca; linux-kernel at vger.kernel.org;
+> jamie at jamieiles.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V4 3/4] ARM: Xilinx: base header files and
+assembly
+> macros
 > 
-> huh?
+> On Monday 21 February 2011, John Linn wrote:
+> > > It would be better if you could avoid introducing new uses of
+> > > CLOCK_TICK_RATE, because that will have to be removed before we
+can
+> > > move to a real multi-platform kernel. For instance, you can put
+> > > PERIPHERAL_CLOCK_RATE in a hardware specific header and put a
+bogus
+> > > definition for CLOCK_TICK_RATE into timex.h
+> >
+> > Hi Arnd,
+> >
+> > I can remove the use of it from my timer code, but I still see
+> > CLOCK_TICK_RATE
+> > being used in linux/jiffies.h.
+> >
+> > I tried removing it and got build errors.  Am I missing something
+> there?
+> >
 > 
-> The machine registry hands out MACH_foo identifiers.  It used to hand
-> them out as ARCH_foo identifiers, but we decided that was misleading -
-> it's dealing with machines, not architectures.  So a MACH_ prefix is
-> more correct than an ARCH_ prefix.
+> You still need to have some definition for CLOCK_TICK_RATE to make
+> the jiffies code compile, but the actual value no longer matters.
 
-Ah, without that knowledge Uwe's mail was a bit misleading.
-Thanks for clarification.
+I see. Now that I re-read your last response I get that from it.
 
-Alexander
+> 
+> Traditionally, this was the i386-style PIT timer frequency of 11.93
+MHz
+> for some things and the actual timer frequency for other things.
+> The timer code tries to correct the jiffies value based on difference
+> between the intended HZ frequency (100, 250 or 1000) and the actual
+> on (something very close to that, but not exact).
+> 
+> You can e.g. set it to (100 * HZ) to make something up that won't
+> hurt in that calculation.
+> 
+
+Gotcha. I now understand to stay away from using CLOCK_TICK_RATE.
+
+Sounds like it's worth a comment in mach/timex.h that says it's not 
+really used as it seems a bit misleading for others.
+
+Thanks,
+John
+
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
