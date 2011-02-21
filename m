@@ -1,77 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 22 Feb 2011 00:45:10 +0530
-Subject: [PATCH 2/5] ARM: omap: update GPIO chained IRQ handler to use EOI
-	in parent chip
-In-Reply-To: <1298302096-21275-3-git-send-email-will.deacon@arm.com>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-3-git-send-email-will.deacon@arm.com>
-Message-ID: <e25ffece0a5b549a68c28ca29abb847a@mail.gmail.com>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Mon, 21 Feb 2011 20:33:16 +0100
+Subject: [PATCH 1/2] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024B83C20F@dbde02.ent.ti.com>
+References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
+	<201102181644.17634.arnd@arndb.de>
+	<alpine.LFD.2.00.1102181713480.2701@localhost6.localdomain6>
+	<201102181731.05644.arnd@arndb.de>
+	<alpine.LFD.2.00.1102181802580.2701@localhost6.localdomain6>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83C108@dbde02.ent.ti.com>
+	<20110219183427.GG4684@local>
+	<B85A65D85D7EB246BE421B3FB0FBB593024B83C20F@dbde02.ent.ti.com>
+Message-ID: <20110221193316.GC2773@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Monday, February 21, 2011 8:58 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux at arm.linux.org.uk; adharmap at codeaurora.org; rabin at rab.in;
-> tglx at linutronix.de; catalin.marinas at arm.com;
-> santosh.shilimkar at ti.com; ccross at google.com;
-> kyungmin.park at samsung.com; Will Deacon
-> Subject: [PATCH 2/5] ARM: omap: update GPIO chained IRQ handler to
-> use EOI in parent chip
->
-> On OMAP4, gpio_irq_handler can be chained to a physical interrupt
-> using
-> the GIC as the primary IRQ chip. Now that the GIC uses the fasteoi
-> flow
-> model, the chained handler must invoke ->irq_eoi once handling is
-> complete.
->
-> This patch adds a conditional call to ->irq_eoi in the GPIO IRQ
-> handler
-> for OMAP platforms. For OMAP implementations using other primary
-> interrupt controllers, the ->irq_ack call remains and is also made
-> conditional on the support offered by the controller.
->
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Colin Cross <ccross@google.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-Thanks Will for changes. They look fine.
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Mon, Feb 21, 2011 at 09:27:47AM +0530, TK, Pratheesh Gangadhar wrote:
+> Hi Hans,
+> 
+> > -----Original Message-----
+> > From: Hans J. Koch [mailto:hjk at hansjkoch.de]
+> > Sent: Sunday, February 20, 2011 12:04 AM
+> > To: TK, Pratheesh Gangadhar
+> > Cc: Thomas Gleixner; Arnd Bergmann; linux-arm-kernel at lists.infradead.org;
+> > davinci-linux-open-source at linux.davincidsp.com; gregkh at suse.de;
+> > Chatterjee, Amit; Hans J. Koch; LKML
+> > Subject: Re: [PATCH 1/2] PRUSS UIO driver support
+> > 
+> > On Sat, Feb 19, 2011 at 09:10:23PM +0530, TK, Pratheesh Gangadhar wrote:
+> > >
+> > > For my understanding - if the interrupt is not shared and not level
+> > triggered -
+> > > is this okay to have empty handler?
+> > 
+> > Greg already said he won't accept that. And I'm quite sure these
+> > interrupts
+> > are level triggered, since that is the default on arch/omap.
+> > 
+> > E.g. in arch/arm/mach-omap1/irq.c, a loop sets all irqs to level triggered
+> > handling: set_irq_handler(j, handle_level_irq); (line 234)
+> 
+> You should be looking at arch/arm/mach-davinci/irq.c
 
-I will test your series tomorrow on OMAP with some
-GPIO interrupts.
+Hmpf. I alway get lost in the directory structure of TI SoCs...
+At least I learned that OMAP3 is in the omap2 directory :)
 
+> and all interrupts except IRQ_TINT1_TINT34 is set to edge trigger mode (line 160).
 
->  arch/arm/plat-omap/gpio.c |    5 ++++-
->  1 files changed, 4 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-> index 971d186..1d2d1c7 100644
-> --- a/arch/arm/plat-omap/gpio.c
-> +++ b/arch/arm/plat-omap/gpio.c
-> @@ -1144,7 +1144,8 @@ static void gpio_irq_handler(unsigned int irq,
-> struct irq_desc *desc)
->  	u32 retrigger = 0;
->  	int unmasked = 0;
->
-> -	desc->irq_data.chip->irq_ack(&desc->irq_data);
-> +	if (desc->irq_data.chip->irq_ack)
-> +		desc->irq_data.chip->irq_ack(&desc->irq_data);
->
->  	bank = get_irq_data(irq);
->  #ifdef CONFIG_ARCH_OMAP1
-> @@ -1238,6 +1239,8 @@ static void gpio_irq_handler(unsigned int irq,
-> struct irq_desc *desc)
->  exit:
->  	if (!unmasked)
->  		desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> +	if (desc->irq_data.chip->irq_eoi)
-> +		desc->irq_data.chip->irq_eoi(&desc->irq_data);
->  }
->
->  static void gpio_irq_shutdown(struct irq_data *d)
-> --
-> 1.7.0.4
->
+Is that really needed? Level triggered interrupts should certainly be
+preferred if possible.
+
+Thanks,
+Hans
