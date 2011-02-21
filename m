@@ -1,129 +1,57 @@
-From: omar.ramirez@ti.com (Ramirez Luna, Omar)
-Date: Mon, 21 Feb 2011 12:43:07 -0600
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <1297884951-3019-3-git-send-email-dacohen@gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-Message-ID: <AANLkTikbjZ7GH7+bx94r6saYuGzCt9aito-Y8NS94SoQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 21 Feb 2011 11:53:27 -0700 (MST)
+Subject: [PATCH 3/3] OMAP2+: voltage: reorganize, split code from data
+In-Reply-To: <AANLkTikdx41hE5d5xG8rpB95DUvVu0=VHi6Zj=ePtREb@mail.gmail.com>
+References: <20110221020231.7598.14024.stgit@twilight.localdomain>
+	<20110221020856.7598.34506.stgit@twilight.localdomain>
+	<AANLkTikdx41hE5d5xG8rpB95DUvVu0=VHi6Zj=ePtREb@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102211034450.22636@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello
 
-On Wed, Feb 16, 2011 at 1:35 PM, David Cohen <dacohen@gmail.com> wrote:
-> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
-> index 49a1e5e..adb083e 100644
-> --- a/arch/arm/mach-omap2/iommu2.c
-> +++ b/arch/arm/mach-omap2/iommu2.c
+On Mon, 21 Feb 2011, Gulati, Shweta wrote:
+
+> On Mon, Feb 21, 2011 at 7:38 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
+> > index 0486fce..3c7f0c0 100644
+> > --- a/arch/arm/mach-omap2/opp3xxx_data.c
+> > +++ b/arch/arm/mach-omap2/opp3xxx_data.c
+
 ...
->
-> ? ? ? ?da = iommu_read_reg(obj, MMU_FAULT_AD);
-> ? ? ? ?*ra = da;
->
-> + ? ? ? if (stat & MMU_IRQ_TLBMISS)
-> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TLB_MISS;
-> + ? ? ? if (stat & MMU_IRQ_TRANSLATIONFAULT)
-> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TRANS_FAULT;
-> + ? ? ? if (stat & MMU_IRQ_EMUMISS)
-> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_EMU_MISS;
-> + ? ? ? if (stat & MMU_IRQ_TABLEWALKFAULT)
-> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_TBLWALK_FAULT;
-> + ? ? ? if (stat & MMU_IRQ_MULTIHITFAULT)
-> + ? ? ? ? ? ? ? errs |= OMAP_IOMMU_ERR_MULTIHIT_FAULT;
 
-I still don't think this adds any value, "generic layer" and omap
-errors are the same thing in this case... OTOH OMAP 1710 (not
-supported by iommu yet) has the following bits:
+> > +/* VDD2 */
+> > +struct omap_volt_data omap36xx_vddcore_volt_data[] = {
+> > + ? ? ? VOLT_DATA_DEFINE(OMAP3630_VDD_CORE_OPP50_UV, OMAP3630_CONTROL_FUSE_OPP50_VDD2, 0xf4, 0x0c),
+> > + ? ? ? VOLT_DATA_DEFINE(OMAP3630_VDD_CORE_OPP100_UV, OMAP3630_CONTROL_FUSE_OPP100_VDD2, 0xf9, 0x16),
+> > + ? ? ? VOLT_DATA_DEFINE(0, 0, 0, 0),
+> > +};
+> > +
+> The definition of "VOLT_DATA_DEFINE" is there in voltage.h
+> I think its better to move these Volt_data to voltagedomains files
+> rather than in
+> OPP layer files
 
-3 Prefetch_err
-2 Perm_fault
-1 Tlb_miss
-0 Trans_fault
+opp*_data.c is currently where process/wafer/die-variable parameters go.  
+The struct omap_volt_data also consists mostly[1] of 
+process/wafer/die-variable parameters.  So it made sense to group it 
+there.
 
-They don't match any of your "generic layer errors" masks for reading,
-hence more generic errors will need to be defined, and then more OMAP#
-masks... I think we just need to stick with the mach specific errors,
-and let mach code handle its specifics when reporting.
+In comparison, voltagedomains*_data.c files consist of 
+process/wafer/die-invariant data, such as register layouts, voltage domain 
+partitioning, etc.  This is data that we don't expect to ever change over 
+the lifetime of a production design.
 
-But anyway it is just me...
+You are correct in that there seems to be little point leaving the 
+VOLT_DATA_DEFINE macro in voltage.h, so I have moved this to 
+omap_opp_data.h.
 
-> diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-> index f55f458..b0e0efc 100644
-> --- a/arch/arm/plat-omap/iommu.c
-> +++ b/arch/arm/plat-omap/iommu.c
-> @@ -780,25 +780,19 @@ static void iopgtable_clear_entry_all(struct iommu *obj)
-> ?*/
-> ?static irqreturn_t iommu_fault_handler(int irq, void *data)
-> ?{
-> - ? ? ? u32 stat, da;
-> + ? ? ? u32 da, errs;
-> ? ? ? ?u32 *iopgd, *iopte;
-> - ? ? ? int err = -EIO;
-> ? ? ? ?struct iommu *obj = data;
->
-> ? ? ? ?if (!obj->refcount)
-> ? ? ? ? ? ? ? ?return IRQ_NONE;
->
-> - ? ? ? /* Dynamic loading TLB or PTE */
-> - ? ? ? if (obj->isr)
-> - ? ? ? ? ? ? ? err = obj->isr(obj);
-> -
-> - ? ? ? if (!err)
-> - ? ? ? ? ? ? ? return IRQ_HANDLED;
-> -
-> ? ? ? ?clk_enable(obj->clk);
-> - ? ? ? stat = iommu_report_fault(obj, &da);
-> + ? ? ? errs = iommu_report_fault(obj, &da);
-> ? ? ? ?clk_disable(obj->clk);
-> - ? ? ? if (!stat)
-> +
-> + ? ? ? /* Fault callback or TLB/PTE Dynamic loading */
-> + ? ? ? if (obj->isr && !obj->isr(obj, da, errs, obj->isr_priv))
-> ? ? ? ? ? ? ? ?return IRQ_HANDLED;
 
-BTW, why not changing the name isr for cb, it is confusing since there
-is another fault_isr called by mmu, AFAIK nobody uses obj->isr
+- Paul
 
-> ? ? ? ?iommu_disable(obj);
-> @@ -806,15 +800,16 @@ static irqreturn_t iommu_fault_handler(int irq, void *data)
-> ? ? ? ?iopgd = iopgd_offset(obj, da);
->
-> ? ? ? ?if (!iopgd_is_table(*iopgd)) {
-> - ? ? ? ? ? ? ? dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x\n", obj->name,
-> - ? ? ? ? ? ? ? ? ? ? ? da, iopgd, *iopgd);
-> + ? ? ? ? ? ? ? dev_err(obj->dev, "%s: errs:0x%08x da:0x%08x pgd:0x%p "
-> + ? ? ? ? ? ? ? ? ? ? ? "*pgd:px%08x\n", obj->name, errs, da, iopgd, *iopgd);
-> ? ? ? ? ? ? ? ?return IRQ_NONE;
-> ? ? ? ?}
->
-> ? ? ? ?iopte = iopte_offset(iopgd, da);
->
-> - ? ? ? dev_err(obj->dev, "%s: da:%08x pgd:%p *pgd:%08x pte:%p *pte:%08x\n",
-> - ? ? ? ? ? ? ? obj->name, da, iopgd, *iopgd, iopte, *iopte);
-> + ? ? ? dev_err(obj->dev, "%s: errs:0x%08x da:0x%08x pgd:0x%p *pgd:0x%08x "
-> + ? ? ? ? ? ? ? "pte:0x%p *pte:0x%08x\n", obj->name, errs, da, iopgd, *iopgd,
-> + ? ? ? ? ? ? ? iopte, *iopte);
->
-> ? ? ? ?return IRQ_NONE;
-> ?}
-> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
-> ?}
-> ?EXPORT_SYMBOL_GPL(iommu_put);
->
-> +int iommu_set_isr(const char *name,
-> + ? ? ? ? ? ? ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *priv),
-> + ? ? ? ? ? ? ? ? void *isr_priv)
-
-So I think the following will be bad practice:
-
-        mmu = iommu_get("iva2");
-        if (!IS_ERR(mmu))
-                mmu->isr = mmu_fault_callback;
-
-Shall we think anything to prevent such mis-usage?
-
-Regards,
-
-Omar
+1. The SCM register offsets in the struct omap_volt_data don't technically 
+belong in the process/wafer/die-variable parameters.  It probably would 
+make sense to replace these with SCM OPP IDs, and then to create an 
+interface in the SCM code to fetch the SR data from the SCM, given an OPP 
+ID.
