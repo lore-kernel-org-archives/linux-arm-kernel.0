@@ -1,121 +1,158 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 21 Feb 2011 09:55:29 -0700 (MST)
-Subject: [PATCH 0/3] OMAP2+ hwmod fixes
-In-Reply-To: <4D5E85EA.70605@ti.com>
-References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
-	<4D5BCC10.2060301@ti.com>
-	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
-	<4D5E85EA.70605@ti.com>
-Message-ID: <alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 21 Feb 2011 20:10:26 +0300
+Subject: [PATCH 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources used
+	by PRUSS UIO driver
+In-Reply-To: <1298041530-26855-3-git-send-email-pratheesh@ti.com>
+References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>	<1298041530-26855-2-git-send-email-pratheesh@ti.com>
+	<1298041530-26855-3-git-send-email-pratheesh@ti.com>
+Message-ID: <4D629C82.3080906@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Beno?t, Rajendra,
+Hello.
 
-On Fri, 18 Feb 2011, Cousson, Benoit wrote:
+Pratheesh Gangadhar wrote:
 
-> On 2/16/2011 2:43 PM, Nayak, Rajendra wrote:
-> > > -----Original Message-----
-> > > From: Cousson, Benoit [mailto:b-cousson at ti.com]
-> > > Sent: Wednesday, February 16, 2011 6:37 PM
-> > > To: Nayak, Rajendra
-> > > Cc: linux-omap at vger.kernel.org; paul at pwsan.com;
-> > linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH 0/3] OMAP2+ hwmod fixes
-> > > 
-> > > Hi Rajendra,
-> > > 
-> > > On 2/16/2011 1:11 PM, Nayak, Rajendra wrote:
-> > > > This series fixes some hwmod api return values
-> > > > and also adds some state checks.
-> > > > The hwmod iterator functions are made to
-> > > > continue and not break if one of the
-> > > > callback functions ends up with an error.
-> > > 
-> > > By doing that, you change the behavior of this function.
-> > > I'm not sure I fully understand why.
-> > > Could you elaborate on the use case?
-> > 
-> > Since these functions iterate over all hwmods
-> > calling a common callback function, there might
-> > be cases wherein the callback function for *some*
-> > hwmods might fail. For instance, if you run through
-> > all hwmods and try to clear the context registers
-> > for all of them, for some hwmods which might
-> > not have context registers the callback function
-> > might return a -EINVAL, however that should not
-> > stop you from attempting to clear the context
-> > registers for the rest of the hwmods which have
-> > them and abort the function midway, no?
-> > This is more hypothetical, however the real usecase
-> > that prompted me with this patch was when I
-> > had some wrong state check in _setup function,
-> > and the iterator would stop with the first failure
-> > and not even attempt to setup the rest of the
-> > hwmods.
-> 
-> Yeah, but by using that function you implicitly accept that an error will
-> break the loop, so the function you pass to the iterator should be written for
-> that. Meaning if you do not want to exit on error you should not report an
-> error.
-> 
-> > > To avoid that behavior in the past, I was just returning
-> > > 0 in case of failure to avoid stopping the iteration.
-> > > It looks like you do not want to stop the iteration but still
-> > > retrieve the error.
-> > > I do not see in this series what you plan to do with the
-> > > error at the end of the iteration.
-> > 
-> > Most users of these iterators would just use the non-zero
-> > return value to throw an error/warning out stating there
-> > were failures running through all the callback functions.
-> > That does not change with this patch, and they can still
-> > do it.
-> 
-> Except that now, the iterator is not able anymore to stop on error if needed
-> potentially.
-> My point is that you are changing the behavior of this function without
-> maintaining the legacy.
-> 
-> So maybe creating a new iterator is a better approach.
-> Even is this feature is not used today I have some secret plan for this
-> behavior in the near future :-)
-> 
-> But my initial comment is still valid, if you do not care about the final
-> error status after the iteration, you'd better not return any error at the
-> beginning.
-> This was the behavior or the _setup until now.
+> Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
 
-The original behavior of the iterator was intentional: loops over 
-functions like _init_clocks() and _setup() should terminate upon 
-encountering an error.  This is because the rest of that code currently 
-relies on the hwmod/clock data to be accurate in order to work.  There is 
-no provision in the code for a hwmod to fail initialization due to data 
-errors.  The idea was that if the data is inaccurate, the data should be 
-fixed first before doing anything else.
+    Signoff should follow the change log, not precede it. "From:" line may 
+precede the change log.
 
-That said, I suppose that it's possible to enhance the code such that 
-hwmods could be allowed to fail initialization, and simply brick 
-themselves, rather than prevent the rest of the hwmods from initializing.  
-Probably that would need a new _HWMOD_STATE_INIT_FAILED, or something 
-similar.  If a hwmod would end up in that state, it must not be used by 
-any other code, and the code should complain loudly.
+> This patch defines PRUSS, ECAP clocks, memory and IRQ resources
+> used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
+> driver exports 64K I/O region of PRUSS, 128KB L3 RAM and 256KB
+> DDR buffer to user space. PRUSS has 8 host event interrupt lines
+> mapped to IRQ_DA8XX_EVTOUT0..7 of ARM9 INTC.These in conjunction
+> with shared memory can be used to implement IPC between ARM9 and
+> PRUSS.
 
-The broader issue of whether the iterators should return immediately upon 
-failure (as the current code does), or continue through the rest of the 
-list, is a separate one.  I'd suggest one of two approaches:
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 11f986b..ddcbac8 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -1077,6 +1077,10 @@ static __init void da850_evm_init(void)
+>  		pr_warning("da850_evm_init: i2c0 registration failed: %d\n",
+>  				ret);
+>  
+> +	ret = da8xx_register_pruss();
+> +       if (ret)
+> +                pr_warning("da850_evm_init: pruss registration failed: %d\n",
+> +                                 ret);
+>  
+>  	ret = da8xx_register_watchdog();
+>  	if (ret)
 
-1. If the rest of the code can be changed to gracefully handle cases where 
-hwmod initialization fails, and if Beno?t agrees, I don't have a problem 
-with changing the iterator behavior to ignore failures as you describe.  
-Of course, all of the current users of omap_hwmod_for_each*() would need 
-to be checked to ensure that this behavior makes sense for them.
+    I'd put this into a pacth of its own, to have the SoC level changes 
+separated from board-level changes...
 
-... or ...
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 3443d97..0096d4f 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -238,6 +238,13 @@ static struct clk tptc2_clk = {
+>  	.flags		= ALWAYS_ENABLED,
+>  };
+>  
+> +static struct clk pruss_clk = {
+> +	.name		= "pruss",
+> +	.parent		= &pll0_sysclk2,
+> +	.lpsc		= DA8XX_LPSC0_DMAX,
 
-2. The iterators could take an extra parameter that would control the 
-behavior upon encountering an error: terminate, or continue.  But I am not 
-sure that both cases are needed.  Ideas, feedback here are welcome.
+    We have patch submitted by TI that renames this #define to DA8XX_LPSC0_PRUSS...
 
+> +	.flags		= ALWAYS_ENABLED,
+> +};
+> +
 
-- Paul
+    We already have patch submitted by TI that defines this clock. It would be 
+nice if you coordinated your efforts to avoid such conflicts.
+    Again, I'd put the part adding the clocks into a patch of its own.
+
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index beda8a4..4ea3d1f 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -725,3 +725,76 @@ int __init da8xx_register_cpuidle(void)
+>  
+>  	return platform_device_register(&da8xx_cpuidle_device);
+>  }
+> +static struct resource pruss_resources[] = {
+> +	[0] = {
+> +		.start  = DA8XX_PRUSS_BASE,
+> +		.end    = DA8XX_PRUSS_BASE + SZ_64K - 1,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start  = DA8XX_L3RAM_BASE,
+> +		.end    = DA8XX_L3RAM_BASE + SZ_128K - 1,
+> +		.flags  = IORESOURCE_MEM,
+
+    Are you going to use all SRAM?
+
+> +	},
+> +	[2] = {
+> +		.start  = 0,
+> +		.end    = SZ_256K - 1,
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +
+> +	[3] = {
+> +		.start  = IRQ_DA8XX_EVTOUT0,
+> +		.end    = IRQ_DA8XX_EVTOUT0,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[4] = {
+> +		.start  = IRQ_DA8XX_EVTOUT1,
+> +		.end    = IRQ_DA8XX_EVTOUT1,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[5] = {
+> +		.start  = IRQ_DA8XX_EVTOUT2,
+> +		.end    = IRQ_DA8XX_EVTOUT2,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[6] = {
+> +		.start  = IRQ_DA8XX_EVTOUT3,
+> +		.end    = IRQ_DA8XX_EVTOUT3,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[7] = {
+> +		.start  = IRQ_DA8XX_EVTOUT4,
+> +		.end    = IRQ_DA8XX_EVTOUT4,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[8] = {
+> +		.start  = IRQ_DA8XX_EVTOUT5,
+> +		.end    = IRQ_DA8XX_EVTOUT5,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[9] = {
+> +		.start  = IRQ_DA8XX_EVTOUT6,
+> +		.end    = IRQ_DA8XX_EVTOUT6,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +	[10] = {
+> +		.start  = IRQ_DA8XX_EVTOUT7,
+> +		.end    = IRQ_DA8XX_EVTOUT7,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device pruss_device = {
+> +	.name			= "pruss",
+> +	.id			= 0,
+> +	.num_resources		= ARRAY_SIZE(pruss_resources),
+> +	.resource		= pruss_resources,
+> +	.dev	 =	{
+> +		.coherent_dma_mask = 0xffffffff,
+> +	}
+> +};
+> +
+> +int __init da8xx_register_pruss()
+> +{
+> +	return platform_device_register(&pruss_device);
+> +}
+
+    Again, there's TI patch that adds this device already...
+
+WBR, Sergei
