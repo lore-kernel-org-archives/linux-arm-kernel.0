@@ -1,158 +1,44 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 21 Feb 2011 20:10:26 +0300
-Subject: [PATCH 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources used
-	by PRUSS UIO driver
-In-Reply-To: <1298041530-26855-3-git-send-email-pratheesh@ti.com>
-References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>	<1298041530-26855-2-git-send-email-pratheesh@ti.com>
-	<1298041530-26855-3-git-send-email-pratheesh@ti.com>
-Message-ID: <4D629C82.3080906@mvista.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 21 Feb 2011 18:19:46 +0100
+Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
+References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110221171946.GL2616@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Feb 21, 2011 at 06:21:39PM +0800, Shawn Guo wrote:
+> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
+> including apbh-dma and apbx-dma.
+> 
+> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
+>   instances.
+> 
+> * apbh-dma is different between mx23 and mx28, hardware version
+>   register is used to differentiate.
+> 
+> * mxs-dma supports pio function besides data transfer.  The driver
+>   uses dma_data_direction DMA_NONE to identify the pio mode, and
+>   steals sgl and sg_len to get pio words and numbers from clients.
+> 
+> * mxs dmaengine has some very specific features, like sense function
+>   and the special NAND support (nand_lock, nand_wait4ready).  These
+>   are too specific to implemented in generic dmaengine driver.
+> 
+> * The driver refers to imx-sdma and only a single descriptor is
+>   statically assigned to each channel.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-Pratheesh Gangadhar wrote:
+Tested-by: Wolfram Sang <w.sang@pengutronix.de>
 
-> Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
-
-    Signoff should follow the change log, not precede it. "From:" line may 
-precede the change log.
-
-> This patch defines PRUSS, ECAP clocks, memory and IRQ resources
-> used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
-> driver exports 64K I/O region of PRUSS, 128KB L3 RAM and 256KB
-> DDR buffer to user space. PRUSS has 8 host event interrupt lines
-> mapped to IRQ_DA8XX_EVTOUT0..7 of ARM9 INTC.These in conjunction
-> with shared memory can be used to implement IPC between ARM9 and
-> PRUSS.
-
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 11f986b..ddcbac8 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -1077,6 +1077,10 @@ static __init void da850_evm_init(void)
->  		pr_warning("da850_evm_init: i2c0 registration failed: %d\n",
->  				ret);
->  
-> +	ret = da8xx_register_pruss();
-> +       if (ret)
-> +                pr_warning("da850_evm_init: pruss registration failed: %d\n",
-> +                                 ret);
->  
->  	ret = da8xx_register_watchdog();
->  	if (ret)
-
-    I'd put this into a pacth of its own, to have the SoC level changes 
-separated from board-level changes...
-
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 3443d97..0096d4f 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -238,6 +238,13 @@ static struct clk tptc2_clk = {
->  	.flags		= ALWAYS_ENABLED,
->  };
->  
-> +static struct clk pruss_clk = {
-> +	.name		= "pruss",
-> +	.parent		= &pll0_sysclk2,
-> +	.lpsc		= DA8XX_LPSC0_DMAX,
-
-    We have patch submitted by TI that renames this #define to DA8XX_LPSC0_PRUSS...
-
-> +	.flags		= ALWAYS_ENABLED,
-> +};
-> +
-
-    We already have patch submitted by TI that defines this clock. It would be 
-nice if you coordinated your efforts to avoid such conflicts.
-    Again, I'd put the part adding the clocks into a patch of its own.
-
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index beda8a4..4ea3d1f 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -725,3 +725,76 @@ int __init da8xx_register_cpuidle(void)
->  
->  	return platform_device_register(&da8xx_cpuidle_device);
->  }
-> +static struct resource pruss_resources[] = {
-> +	[0] = {
-> +		.start  = DA8XX_PRUSS_BASE,
-> +		.end    = DA8XX_PRUSS_BASE + SZ_64K - 1,
-> +		.flags  = IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start  = DA8XX_L3RAM_BASE,
-> +		.end    = DA8XX_L3RAM_BASE + SZ_128K - 1,
-> +		.flags  = IORESOURCE_MEM,
-
-    Are you going to use all SRAM?
-
-> +	},
-> +	[2] = {
-> +		.start  = 0,
-> +		.end    = SZ_256K - 1,
-> +		.flags  = IORESOURCE_MEM,
-> +	},
-> +
-> +	[3] = {
-> +		.start  = IRQ_DA8XX_EVTOUT0,
-> +		.end    = IRQ_DA8XX_EVTOUT0,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[4] = {
-> +		.start  = IRQ_DA8XX_EVTOUT1,
-> +		.end    = IRQ_DA8XX_EVTOUT1,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[5] = {
-> +		.start  = IRQ_DA8XX_EVTOUT2,
-> +		.end    = IRQ_DA8XX_EVTOUT2,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[6] = {
-> +		.start  = IRQ_DA8XX_EVTOUT3,
-> +		.end    = IRQ_DA8XX_EVTOUT3,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[7] = {
-> +		.start  = IRQ_DA8XX_EVTOUT4,
-> +		.end    = IRQ_DA8XX_EVTOUT4,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[8] = {
-> +		.start  = IRQ_DA8XX_EVTOUT5,
-> +		.end    = IRQ_DA8XX_EVTOUT5,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[9] = {
-> +		.start  = IRQ_DA8XX_EVTOUT6,
-> +		.end    = IRQ_DA8XX_EVTOUT6,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +	[10] = {
-> +		.start  = IRQ_DA8XX_EVTOUT7,
-> +		.end    = IRQ_DA8XX_EVTOUT7,
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +static struct platform_device pruss_device = {
-> +	.name			= "pruss",
-> +	.id			= 0,
-> +	.num_resources		= ARRAY_SIZE(pruss_resources),
-> +	.resource		= pruss_resources,
-> +	.dev	 =	{
-> +		.coherent_dma_mask = 0xffffffff,
-> +	}
-> +};
-> +
-> +int __init da8xx_register_pruss()
-> +{
-> +	return platform_device_register(&pruss_device);
-> +}
-
-    Again, there's TI patch that adds this device already...
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110221/1990aa59/attachment.sig>
