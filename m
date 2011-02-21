@@ -1,39 +1,76 @@
-From: drasko.draskovic@gmail.com (Drasko DRASKOVIC)
-Date: Mon, 21 Feb 2011 15:25:27 +0100
-Subject: Question About Linux Memory Mapping
-In-Reply-To: <20110221131325.GP14495@n2100.arm.linux.org.uk>
-References: <201102192122.53746.marek.vasut@gmail.com>
-	<919555.44803.qm@web161702.mail.bf1.yahoo.com>
-	<AANLkTikdPrjHRFc6bD1VsN3MCZkKD0dVSNq1ijgp7qz9@mail.gmail.com>
-	<20110221131325.GP14495@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTim=YHZ96TrQZKK7=Nsg4Pc6VCKwkTQ-OsU-hZrd@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 21 Feb 2011 14:36:47 +0000
+Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
+	unsigned long for physical addresses
+In-Reply-To: <20110219182631.GS29493@n2100.arm.linux.org.uk>
+References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
+	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
+	<20110219182631.GS29493@n2100.arm.linux.org.uk>
+Message-ID: <1298299008.19814.20.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 2:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Feb 21, 2011 at 01:13:16PM +0100, Drasko DRASKOVIC wrote:
->> Thanks for your answers.
->>
->> I can see now that "mem" parameter is parsed in
->> arch/arm/kernel/setup.c, as Nicolas underlined. However, in my case
->> early_mem() is never called during the Linux boot.
->>
->> Does anybody have an idea why ?
->
-> Maybe the command line setting is being ignored by your boot loader
-> and the one built-in to the kernel is being used?
->
-> Maybe your kernel is configured to ignore the command line supplied
-> by your boot loader?
->
-> Maybe you're setting it in the kernel build but not realising that
-> the boot loader passed one is being used instead?
+Hi Russell,
 
-Turns out that I had badly formatted command line parameters. After
-correcting this everything works fine.
+On Sat, 2011-02-19 at 18:26 +0000, Russell King - ARM Linux wrote:
+> On Mon, Jan 24, 2011 at 05:55:57PM +0000, Catalin Marinas wrote:
+> > From: Will Deacon <will.deacon@arm.com>
+> >
+> > The unsigned long datatype is not sufficient for mapping physical addresses
+> > >= 4GB.
+> >
+> > This patch ensures that the phys_addr_t datatype is used to represent
+> > physical addresses which may be beyond the range of an unsigned long.
+> > The virt <-> phys macros are updated accordingly to ensure that virtual
+> > addresses can remain as they are.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> This patch needs some more things fixed to prevent warnings:
 
-Thanks again for the help.
+Ah yes, this is for the non-HIGHMEM case which I hadn't considered for
+LPAE. It's a perfectly reasonable configuration I suppose so this needs
+fixing.
 
-BR,
-Drasko
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index a81355d..6cf76b3 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -809,9 +809,10 @@ static void __init sanity_check_meminfo(void)
+>                  */
+>                 if (__va(bank->start) >= vmalloc_min ||
+>                     __va(bank->start) < (void *)PAGE_OFFSET) {
+> -                       printk(KERN_NOTICE "Ignoring RAM at %.8lx-%.8lx "
+> +                       printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+>                                "(vmalloc region overlap).\n",
+> -                              bank->start, bank->start + bank->size - 1);
+> +                              (unsigned long long)bank->start,
+> +                              (unsigned long long)bank->start + bank->size - 1);
+>                         continue;
+>                 }
+> 
+> @@ -822,10 +823,11 @@ static void __init sanity_check_meminfo(void)
+>                 if (__va(bank->start + bank->size) > vmalloc_min ||
+>                     __va(bank->start + bank->size) < __va(bank->start)) {
+>                         unsigned long newsize = vmalloc_min - __va(bank->start);
+> -                       printk(KERN_NOTICE "Truncating RAM at %.8lx-%.8lx "
+> -                              "to -%.8lx (vmalloc region overlap).\n",
+> -                              bank->start, bank->start + bank->size - 1,
+> -                              bank->start + newsize - 1);
+> +                       printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+> +                              "to -%.8llx (vmalloc region overlap).\n",
+> +                              (unsigned long long)bank->start,
+> +                              (unsigned long long)bank->start + bank->size - 1,
+> +                              (unsigned long long)bank->start + newsize - 1);
+>                         bank->size = newsize;
+>                 }
+>  #endif
+
+
+Would you like me to submit an additional patch or are you happy merging
+this diff in with my ack?
+
+Cheers,
+
+Will
