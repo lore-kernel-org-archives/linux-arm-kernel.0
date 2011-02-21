@@ -1,47 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 21 Feb 2011 15:18:42 +0100
-Subject: [PATCH 2/2] ARM i.MX23/28: Add framebuffer device support
-In-Reply-To: <20110218093622.GE18085@S2100-06.ap.freescale.net>
-References: <1297850199-1688-1-git-send-email-s.hauer@pengutronix.de>
-	<1297850199-1688-3-git-send-email-s.hauer@pengutronix.de>
-	<20110218061440.GA18085@S2100-06.ap.freescale.net>
-	<20110218084625.GF24426@pengutronix.de>
-	<20110218091717.GD18085@S2100-06.ap.freescale.net>
-	<20110218092650.GH24426@pengutronix.de>
-	<20110218093622.GE18085@S2100-06.ap.freescale.net>
-Message-ID: <20110221141842.GP24426@pengutronix.de>
+From: drasko.draskovic@gmail.com (Drasko DRASKOVIC)
+Date: Mon, 21 Feb 2011 15:25:27 +0100
+Subject: Question About Linux Memory Mapping
+In-Reply-To: <20110221131325.GP14495@n2100.arm.linux.org.uk>
+References: <201102192122.53746.marek.vasut@gmail.com>
+	<919555.44803.qm@web161702.mail.bf1.yahoo.com>
+	<AANLkTikdPrjHRFc6bD1VsN3MCZkKD0dVSNq1ijgp7qz9@mail.gmail.com>
+	<20110221131325.GP14495@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTim=YHZ96TrQZKK7=Nsg4Pc6VCKwkTQ-OsU-hZrd@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 05:36:23PM +0800, Shawn Guo wrote:
-> On Fri, Feb 18, 2011 at 10:26:50AM +0100, Sascha Hauer wrote:
-> > On Fri, Feb 18, 2011 at 05:17:18PM +0800, Shawn Guo wrote:
-> > > > > I understand that "mxsfb" was picked up for the device name to
-> > > > > reflect the driver name.  But since this is the device under mach- mxs
-> > > > > folder, can we simply call it "fb" just like the way you name fb.h?
-> > > > > 
-> > > > > In this way, we have all mxs platform device naming schema aligned,
-> > > > > auart, duart, dma, fb, fec, flexcan, mmc ...
-> > > > 
-> > > > I see it the other way round. mach/fb.h is too generic, I would prefer
-> > > > mach/mxsfb.h to be able to add support for a different framebuffer
-> > > > later. So I better change fb.h to mxsfb.h.
-> > > > 
-> > > I'm fine with either way, but just wondering what kind of fb later
-> > > it is and its naming, relatively to mxsfs.
-> > 
-> > IPU...?
-> > 
-> AFAICT, this is something that never going to happen.
+On Mon, Feb 21, 2011 at 2:13 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 21, 2011 at 01:13:16PM +0100, Drasko DRASKOVIC wrote:
+>> Thanks for your answers.
+>>
+>> I can see now that "mem" parameter is parsed in
+>> arch/arm/kernel/setup.c, as Nicolas underlined. However, in my case
+>> early_mem() is never called during the Linux boot.
+>>
+>> Does anybody have an idea why ?
+>
+> Maybe the command line setting is being ignored by your boot loader
+> and the one built-in to the kernel is being used?
+>
+> Maybe your kernel is configured to ignore the command line supplied
+> by your boot loader?
+>
+> Maybe you're setting it in the kernel build but not realising that
+> the boot loader passed one is being used instead?
 
-Just the first thing that came to my mind. It could also be the lcd
-controller known from i.MX1/2
+Turns out that I had badly formatted command line parameters. After
+correcting this everything works fine.
 
-Sascha
+Thanks again for the help.
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+BR,
+Drasko
