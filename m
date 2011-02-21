@@ -1,26 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Feb 2011 15:01:04 +0000
-Subject: [PATCH v4 15/19] ARM: LPAE: use phys_addr_t instead of
-	unsigned long for physical addresses
-In-Reply-To: <20110221145818.GQ14495@n2100.arm.linux.org.uk>
-References: <1295891761-18366-1-git-send-email-catalin.marinas@arm.com>
-	<1295891761-18366-16-git-send-email-catalin.marinas@arm.com>
-	<20110219182631.GS29493@n2100.arm.linux.org.uk>
-	<1298299008.19814.20.camel@e102144-lin.cambridge.arm.com>
-	<20110221145818.GQ14495@n2100.arm.linux.org.uk>
-Message-ID: <1298300464.20460.1.camel@e102144-lin.cambridge.arm.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Mon, 21 Feb 2011 16:03:05 +0100
+Subject: Machine ID question
+In-Reply-To: <20110220130420.GD14495@n2100.arm.linux.org.uk>
+References: <d6ddc34c-a962-4f4d-80b7-fc789606d899@VA3EHSMHS031.ehs.local>
+	<201102141612.17340.alexander.stein@systec-electronic.com>
+	<20110220130420.GD14495@n2100.arm.linux.org.uk>
+Message-ID: <201102211603.06074.alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-02-21 at 14:58 +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 21, 2011 at 02:36:47PM +0000, Will Deacon wrote:
-> > Would you like me to submit an additional patch or are you happy merging
-> > this diff in with my ack?
+On Sunday 20 February 2011, 14:04:20 Russell King - ARM Linux wrote:
+> On Mon, Feb 14, 2011 at 04:12:16PM +0100, Alexander Stein wrote:
+> > On Thursday 10 February 2011, 09:29:15 Uwe Kleine-K?nig wrote:
+> > > On Wed, Feb 09, 2011 at 02:23:07PM -0700, John Linn wrote:
+> > > > I used the form to create a new machine ID for the new Xilinx
+> > > > platform in anticipation of
+> > > > the code making it into the mainline sometime in the future.
+> > > > 
+> > > > The proposed patches are using ARCH_XILINX in the Kconfig.
+> > > 
+> > > You should use MACH_XILINX in the patches.  There are some ARCH_... in
+> > > the machine db, but I think nowadays you cannot (and should not) create
+> > > them there.
+> > 
+> > Uhm, the last entry in the db was created today (14th Feb). Is there a
+> > reason why there no new entries should be created?
 > 
-> The latter - I've already merged it and if you give an ack I'll add that.
+> huh?
 > 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> The machine registry hands out MACH_foo identifiers.  It used to hand
+> them out as ARCH_foo identifiers, but we decided that was misleading -
+> it's dealing with machines, not architectures.  So a MACH_ prefix is
+> more correct than an ARCH_ prefix.
 
-Thanks,
+Ah, without that knowledge Uwe's mail was a bit misleading.
+Thanks for clarification.
 
-Will
+Alexander
