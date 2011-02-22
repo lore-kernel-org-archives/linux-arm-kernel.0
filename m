@@ -1,52 +1,54 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 22 Feb 2011 18:54:18 +0530
-Subject: [PATCH v2 12/13] da850: pruss SUART platform specific additions.
-In-Reply-To: <4D639C18.9010309@mvista.com>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-13-git-send-email-subhasish@mistralsolutions.com>
-	<4D55860E.3090908@mvista.com>
-	<B2D7D72494BB443F80DA08E22323999B@subhasishg>
-	<4D639C18.9010309@mvista.com>
-Message-ID: <01ADA340BA2E4A62BBFC1E4FB630B380@subhasishg>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Tue, 22 Feb 2011 14:30:02 +0100
+Subject: [PATCH 5/5] arm: mach-mx3: use IMX_GPIO_NR instead of hard-coded
+	values
+In-Reply-To: <1298379500-27590-6-git-send-email-w.sang@pengutronix.de>
+References: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
+	<1298379500-27590-6-git-send-email-w.sang@pengutronix.de>
+Message-ID: <19811.47706.277301.848103@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, will do.
+Hi,
 
---------------------------------------------------
-From: "Sergei Shtylyov" <sshtylyov@mvista.com>
-Sent: Tuesday, February 22, 2011 4:50 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
-<sachi@mistralsolutions.com>; "Russell King" <linux@arm.linux.org.uk>; 
-"Kevin Hilman" <khilman@deeprootsystems.com>; <nsekhar@ti.com>; "open list" 
-<linux-kernel@vger.kernel.org>; <m-watkins@ti.com>; 
-<linux-arm-kernel@lists.infradead.org>
-Subject: Re: [PATCH v2 12/13] da850: pruss SUART platform specific 
-additions.
+> The latter are error-prone because the bank number is one less than one
+> would read in the documentation.
+> 
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Eric B?nard <eric@eukrea.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c |    4 ++--
+>  arch/arm/mach-mx3/mach-cpuimx35.c            |    2 +-
+>  arch/arm/mach-mx3/mach-pcm043.c              |   10 +++++-----
+>  3 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c
+> index 14a5ffc..8076147 100644
+> --- a/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c
+> +++ b/arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c
+> @@ -165,8 +165,8 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+>  	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
+>  };
+>  
+> -#define GPIO_LED1	(2 * 32 + 29)
+> -#define GPIO_SWITCH1	(2 * 32 + 25)
+> +#define GPIO_LED1	IMX_GPIO_NR(3, 29)
+> +#define GPIO_SWITCH1	IMX_GPIO_NR(3, 25)
+>  #define GPIO_LCDPWR	(4)
+>  
+While you are at it you could also remove the nonsensical () around
+the bare number.
 
-> Hello.
->
-> On 22-02-2011 12:18, Subhasish Ghosh wrote:
->
->> I could not follow your recommendations clearly, are you suggesting this:
->
->> int __init da8xx_register_pruss(struct da8xx_pruss_devices *pruss_device)
->> {
->> #ifdef CONFIG_SERIAL_PRUSS_SUART_MODULE
->> int ret;
->>
->> ret = clk_add_alias(NULL, "da8xx_pruss_uart.1",
->> NULL, &da850_mcasp_device.dev);
->> if (ret < 0)
->> return ret;
->> #endif
->> da8xx_pruss_dev.dev.platform_data = pruss_device;
->> return platform_device_register(&da8xx_pruss_dev);
->> }
->
->    Yes. But still better would be to wrap clk_add_alias() into a function 
-> of its own (defining it empty if CONFIG_SERIAL_PRUSS_SUART_MODULE is not 
-> defined).
->
-> WBR, Sergei 
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
