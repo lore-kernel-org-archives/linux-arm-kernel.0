@@ -1,56 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Feb 2011 21:43:19 -0800
-Subject: [PATCH 7/7] ARM: tegra: clock: Disable clocks left on by
-	bootloader
-In-Reply-To: <1298342392-21236-8-git-send-email-ccross@android.com>
-References: <1298342392-21236-1-git-send-email-ccross@android.com>
-	<1298342392-21236-8-git-send-email-ccross@android.com>
-Message-ID: <AANLkTikNSEyjdL0Lchmm-bFxD00omkGLq6Q6Yyjy51Ov@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 22 Feb 2011 11:14:33 +0530
+Subject: [linux-pm] [PATCHv2] amba: support pm ops
+In-Reply-To: <201102212126.10742.rjw@sisk.pl>
+References: <1297928986-31171-1-git-send-email-rabin.vincent@stericsson.com>
+	<1298271737-1606-1-git-send-email-rabin.vincent@stericsson.com>
+	<201102212126.10742.rjw@sisk.pl>
+Message-ID: <AANLkTin75bnW69CDrKPkw+4K9sfAMLGPqYsV-UfHTASD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Feb 21, 2011 at 6:39 PM, Colin Cross <ccross@android.com> wrote:
-> Iterates through all clocks, disabling any for which the
-> refcount is 0 but the clock init detected the bootloader
-> left the clock on. ?Can be disabled with command line
-> tegra_clock.disable_boot_clocks=N
+On Tue, Feb 22, 2011 at 01:56, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Monday, February 21, 2011, Rabin Vincent wrote:
+>> Support pm_ops in the AMBA bus, required to allow drivers to use runtime pm.
+>> The implementation of AMBA bus pm ops is based on the platform bus
+>> implementation.
+>>
+>> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 >
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
-> ?arch/arm/mach-tegra/clock.c | ? 44 +++++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 44 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-> index e028320..6d686ff 100644
-> --- a/arch/arm/mach-tegra/clock.c
-> +++ b/arch/arm/mach-tegra/clock.c
-> @@ -33,6 +33,9 @@
-> ?#include "board.h"
-> ?#include "clock.h"
->
-> +#undef MODULE_PARAM_PREFIX
-> +#define MODULE_PARAM_PREFIX "tegra_clock."
-> +
-> ?/*
-> ?* Locking:
-> ?*
-> @@ -416,6 +419,47 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
-> ? ? ? ?spin_unlock_irqrestore(&c->spinlock, flags);
-> ?}
->
-> +static bool tegra_disable_boot_clocks = true;
-> +module_param_named(disable_boot_clocks, tegra_disable_boot_clocks, bool,
-> + ? ? ? S_IRUGO | S_IWUSR | S_IWGRP);
+> Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
 
-I suggest doing this as an early_param instead. I know it's not truly
-an early param, but it's the easier way to do non-module bootargs,
-i.e. by not requiring a (fake) module prefix. It'd be a little
-cleaner, in my opinion. The variable name itself is unique enough to
-not need a module prefix for namespace reasons.
+Thanks.
 
-Also, Documentation/kernel-parameters.txt should be updated with it.
+> (although I'd probably avoid creating an empty struct dev_pm_ops object
+> if both CONFIG_HIBERNATION and CONFIG_SUSPEND are unset).
 
-
--Olof
+Done in v3.
