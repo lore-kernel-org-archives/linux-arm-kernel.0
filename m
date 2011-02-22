@@ -1,36 +1,44 @@
-From: henry.nestler@gmail.com (Henry Nestler)
-Date: Tue, 22 Feb 2011 20:58:20 +0100
-Subject: [PATCH 2/2] DM9000B: Fix PHY power for network down/up
-In-Reply-To: <20110222.102410.260079835.davem@davemloft.net>
-References: <4D618B5D.5040001@henry.nestler.mail.gmail.com>
-	<4D62491F.4050602@ru.mvista.com>
-	<4D62D323.7010403@henry.nestler.mail.gmail.com>
-	<20110222.102410.260079835.davem@davemloft.net>
-Message-ID: <4D64155C.9050407@henry.nestler.mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Feb 2011 19:59:29 +0000
+Subject: [PATCH] ARM: Fix compile after delay page freeing patch
+In-Reply-To: <20110222194332.GQ15225@atomide.com>
+References: <20110222194332.GQ15225@atomide.com>
+Message-ID: <20110222195929.GA31275@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello David,
-
-On 22.02.2011 19:24, David Miller wrote:
-> From: Henry Nestler <henry.nestler@gmail.com>
-> Date: Mon, 21 Feb 2011 22:03:31 +0100
+On Tue, Feb 22, 2011 at 11:43:32AM -0800, Tony Lindgren wrote:
+> Commit 06824ba824b3e9f2fedb38bee79af0643198ed7f
+> (ARM: tlb: delay page freeing for SMP and ARMv7 CPUs) causes
+> the following compile error for at least omap1_defconfig:
 > 
->> On 21.02.2011 12:14, Sergei Shtylyov wrote:
->>> On 21-02-2011 0:45, Henry Nestler wrote:
->>>> +	udelay(1000); /* delay needs by DM9000B */
->>>
->>>     Why not mdelay(1)?
->>
->> Because udelay is the base of mdelay.
->> See include/linux/delay.h:31
->>
->> #define mdelay(n) ... udelay((n)*1000)
-> 
-> He is telling you to use mdelay(1) because it's clearer.  Please do
-> so.
+> In file included from arch/arm/mm/init.c:27:
+> arch/arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
+> arch/arm/include/asm/tlb.h:101: error: implicit declaration of function 'release_pages'
+> arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
+> arch/arm/include/asm/tlb.h:165: error: implicit declaration of function 'page_cache_release'
 
-Thanks, that text explains it better. No problem. I will resend this patch.
+Grant already mentioned this to me this evening.
 
--- 
-Henry N.
+This happens if you build with CONFIG_SWAP=n, and is something that the
+asm-generic/tlb.h also appears to suffer from.  Why no one else has
+noticed this I've no idea.
+
+Note that linux/swap.h has this comment:
+
+/* only sparc can not include linux/pagemap.h in this file
+ * so leave page_cache_release and release_pages undeclared... */
+#define free_page_and_swap_cache(page) \
+        page_cache_release(page)
+#define free_pages_and_swap_cache(pages, nr) \
+        release_pages((pages), (nr), 0);
+
+which is rather annoying, because it makes the build error dependent on
+the configuration.
+
+So, we should add linux/pagemap.h to both asm-generic/tlb.h and the ARM
+tlb.h as they both should suffer the same problem.
+
+Note that arch/x86/mm/init.c and arch/x86/mm/pgtable.c both include
+asm/tlb.h without linux/pagemap.h, and use the generic version.  I bet
+no one's tried building x86 with CONFIG_SWAP=n yet...
