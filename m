@@ -1,20 +1,169 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 22 Feb 2011 08:52:41 +0100
-Subject: [PATCH v3 2/2] ARM: mxs: add dma device
-In-Reply-To: <1298284306-14710-3-git-send-email-shawn.guo@freescale.com>
-References: <1298284306-14710-1-git-send-email-shawn.guo@freescale.com>
-	<1298284306-14710-3-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110222075241.GU24426@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Feb 2011 09:31:13 +0100
+Subject: [PATCH v3 3/6] ARM: mxs: dynamically allocate mmc device
+In-Reply-To: <1298284979-14853-4-git-send-email-shawn.guo@freescale.com>
+References: <1298284979-14853-1-git-send-email-shawn.guo@freescale.com>
+	<1298284979-14853-4-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110222083113.GU22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 06:31:46PM +0800, Shawn Guo wrote:
-> diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
+On Mon, Feb 21, 2011 at 06:42:56PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx23.c                  |   16 +++++
+>  arch/arm/mach-mxs/clock-mx28.c                  |   18 +++++
+>  arch/arm/mach-mxs/devices-mx23.h                |    4 +
+>  arch/arm/mach-mxs/devices-mx28.h                |    4 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-mmc.c        |   77 +++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |   13 ++++
+>  8 files changed, 136 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-mmc.c
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> index c19b69a..a1ed5f4 100644
+> --- a/arch/arm/mach-mxs/clock-mx23.c
+> +++ b/arch/arm/mach-mxs/clock-mx23.c
+> @@ -445,6 +445,7 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+>  	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+>  	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
+> +	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp_clk)
+>  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+>  	_REGISTER_CLOCK(NULL, "audio", audio_clk)
+>  	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> @@ -515,6 +516,15 @@ static int clk_misc_init(void)
+>  	__raw_writel(BM_CLKCTRL_CPU_INTERRUPT_WAIT,
+>  			CLKCTRL_BASE_ADDR + HW_CLKCTRL_CPU_SET);
+>  
+> +	/*
+> +	 * 480 MHz seems too high to be ssp clock source directly,
+> +	 * so set frac to get a 288 MHz ref_io.
+> +	 */
+> +	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC);
+> +	reg &= ~BM_CLKCTRL_FRAC_IOFRAC;
+> +	reg |= 30 << BP_CLKCTRL_FRAC_IOFRAC;
+> +	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -522,6 +532,12 @@ int __init mx23_clocks_init(void)
+>  {
+>  	clk_misc_init();
+>  
+> +	/*
+> +	 * source ssp clock from ref_io than ref_xtal,
+> +	 * as ref_xtal only provides 24 MHz as maximum.
+> +	 */
+> +	clk_set_parent(&ssp_clk, &ref_io_clk);
+> +
+>  	clk_enable(&cpu_clk);
+>  	clk_enable(&hbus_clk);
+>  	clk_enable(&xbus_clk);
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 9f4ee36..aeb7b2c 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -619,6 +619,8 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
+>  	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+>  	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
+> +	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp0_clk)
+> +	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp1_clk)
+>  	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
+>  	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+>  	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+> @@ -730,6 +732,15 @@ static int clk_misc_init(void)
+>  	reg |= BM_CLKCTRL_ENET_CLK_OUT_EN;
+>  	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_ENET);
+>  
+> +	/*
+> +	 * 480 MHz seems too high to be ssp clock source directly,
+> +	 * so set frac0 to get a 288 MHz ref_io0.
+> +	 */
+> +	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC0);
+> +	reg &= ~BM_CLKCTRL_FRAC0_IO0FRAC;
+> +	reg |= 30 << BP_CLKCTRL_FRAC0_IO0FRAC;
+> +	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_FRAC0);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -737,6 +748,13 @@ int __init mx28_clocks_init(void)
+>  {
+>  	clk_misc_init();
+>  
+> +	/*
+> +	 * source ssp clock from ref_io0 than ref_xtal,
+> +	 * as ref_xtal only provides 24 MHz as maximum.
+> +	 */
+> +	clk_set_parent(&ssp0_clk, &ref_io0_clk);
+> +	clk_set_parent(&ssp1_clk, &ref_io0_clk);
+> +
+>  	clk_enable(&cpu_clk);
+>  	clk_enable(&hbus_clk);
+>  	clk_enable(&xbus_clk);
+> diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
+> index 1256788..4419390 100644
+> --- a/arch/arm/mach-mxs/devices-mx23.h
+> +++ b/arch/arm/mach-mxs/devices-mx23.h
+> @@ -14,3 +14,7 @@
+>  extern const struct amba_device mx23_duart_device __initconst;
+>  #define mx23_add_duart() \
+>  	mxs_add_duart(&mx23_duart_device)
+> +
+> +extern const struct mxs_mmc_data mx23_mmc_data[] __initconst;
+> +#define mx23_add_mmc(id, pdata) \
+> +	mxs_add_mmc(&mx23_mmc_data[id], pdata)
+mxs_mmc please (not sure about mxs_mxs_mmc_data, but it would be
+consistent).  At least mx23_add_mxs_mmc and mxs_add_mxs_mmc.
+
+> diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+> index 3b18304..540639d 100644
+> --- a/arch/arm/mach-mxs/devices-mx28.h
+> +++ b/arch/arm/mach-mxs/devices-mx28.h
+> @@ -32,3 +32,7 @@ extern const struct mxs_flexcan_data mx28_flexcan_data[] __initconst;
+>  	mxs_add_flexcan(&mx28_flexcan_data[id], pdata)
+>  #define mx28_add_flexcan0(pdata)	mx28_add_flexcan(0, pdata)
+>  #define mx28_add_flexcan1(pdata)	mx28_add_flexcan(1, pdata)
+> +
+> +extern const struct mxs_mmc_data mx28_mmc_data[] __initconst;
+> +#define mx28_add_mmc(id, pdata) \
+> +	mxs_add_mmc(&mx28_mmc_data[id], pdata)
+This conflicts with my series, but it's trivial enough to let Sascha
+handle that.
+
+> diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
+> index 6c65b67..49307f8 100644
+> --- a/arch/arm/mach-mxs/devices/Kconfig
+> +++ b/arch/arm/mach-mxs/devices/Kconfig
+> @@ -11,3 +11,6 @@ config MXS_HAVE_PLATFORM_FEC
+>  config MXS_HAVE_PLATFORM_FLEXCAN
+>  	select HAVE_CAN_FLEXCAN if CAN
+>  	bool
+> +
+> +config MXS_HAVE_PLATFORM_MMC
+> +	bool
+ditto MXS_HAVE_PLATFORM_MXS_MMC
+
+> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> index ca7acc4..c0dacfd 100644
+> --- a/arch/arm/mach-mxs/devices/Makefile
+> +++ b/arch/arm/mach-mxs/devices/Makefile
+> @@ -3,3 +3,4 @@ obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+>  obj-y += platform-dma.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+> +obj-$(CONFIG_MXS_HAVE_PLATFORM_MMC) += platform-mmc.o
+> diff --git a/arch/arm/mach-mxs/devices/platform-mmc.c b/arch/arm/mach-mxs/devices/platform-mmc.c
 > new file mode 100644
-> index 0000000..ee3220e
+> index 0000000..868def1
 > --- /dev/null
-> +++ b/arch/arm/mach-mxs/devices/platform-dma.c
-> @@ -0,0 +1,101 @@
+> +++ b/arch/arm/mach-mxs/devices/platform-mmc.c
+> @@ -0,0 +1,77 @@
 > +/*
 > + * Copyright (C) 2010 Pengutronix
 > + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
@@ -25,6 +174,7 @@ On Mon, Feb 21, 2011 at 06:31:46PM +0800, Shawn Guo wrote:
 > + * the terms of the GNU General Public License version 2 as published by the
 > + * Free Software Foundation.
 > + */
+> +
 > +#include <linux/compiler.h>
 > +#include <linux/err.h>
 > +#include <linux/init.h>
@@ -33,134 +183,56 @@ On Mon, Feb 21, 2011 at 06:31:46PM +0800, Shawn Guo wrote:
 > +#include <mach/mx28.h>
 > +#include <mach/devices-common.h>
 > +
-> +struct mxs_mxs_dma_data {
-> +	const char *devid;
-> +	resource_size_t iobase;
-> +};
-> +
-> +#define mxs_dma_data_entry_single(soc, type, _devid)			\
+> +#define mxs_mmc_data_entry_single(soc, _id, hwid)			\
 > +	{								\
-> +		.devid = _devid,					\
-> +		.iobase = soc ## _ ## type ## _DMA ## _BASE_ADDR,	\
+> +		.id = _id,						\
+> +		.iobase = soc ## _SSP ## hwid ## _BASE_ADDR,		\
+> +		.dma = soc ## _DMA_SSP ## hwid,				\
+> +		.irq_err = soc ## _INT_SSP ## hwid ## _ERROR,		\
+> +		.irq_dma = soc ## _INT_SSP ## hwid ## _DMA,		\
 > +	}
 > +
+> +#define mxs_mmc_data_entry(soc, _id, hwid)				\
+> +	[_id] = mxs_mmc_data_entry_single(soc, _id, hwid)
+> +
+> +
 > +#ifdef CONFIG_SOC_IMX23
-> +struct mxs_mxs_dma_data mx23_dma_data[] __initconst = {
-> +	mxs_dma_data_entry_single(MX23, APBH, "mxs-dma-apbh"),
-> +	mxs_dma_data_entry_single(MX23, APBX, "mxs-dma-apbx"),
+> +const struct mxs_mmc_data mx23_mmc_data[] __initconst = {
+> +#define mx23_mmc_data_entry(_id, hwid)					\
+> +	mxs_mmc_data_entry(MX23, _id, hwid)
+> +	mx23_mmc_data_entry(0, 1),
+> +	mx23_mmc_data_entry(1, 2),
 > +};
+hmm, maybe let mxs-mmc.1 use MX23_SSP1_BASE_ADDR?
+BTW, Sascha pointed out that
+
+	mxs_mmc_data_entry(MX23, 0, 1),
+	mxs_mmc_data_entry(MX23, 1, 2),
+
+is easier than
+
+	#define mx23_mmc_data_entry(_id, hwid)					\
+		mxs_mmc_data_entry(MX23, _id, hwid)
+		mx23_mmc_data_entry(0, 1),
+		mx23_mmc_data_entry(1, 2),
+
+though it has to repeat MX23.
+
 > +#endif
 > +
 > +#ifdef CONFIG_SOC_IMX28
-> +struct mxs_mxs_dma_data mx28_dma_data[] __initconst = {
-> +	mxs_dma_data_entry_single(MX28, APBH, "mxs-dma-apbh"),
-> +	mxs_dma_data_entry_single(MX28, APBX, "mxs-dma-apbx"),
+> +const struct mxs_mmc_data mx28_mmc_data[] __initconst = {
+> +#define mx28_mmc_data_entry(_id)					\
+> +	mxs_mmc_data_entry(MX28, _id, _id)
+> +	mx28_mmc_data_entry(0),
+> +	mx28_mmc_data_entry(1),
 > +};
 > +#endif
-> +
-> +struct platform_device *__init mxs_add_dma(
-> +			const struct mxs_mxs_dma_data *data)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobase,
-> +			.end = data->iobase + SZ_8K - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}
-> +	};
-> +
-> +	return mxs_add_platform_device_dmamask(data->devid, -1,
-> +				res, ARRAY_SIZE(res), NULL, 0,
-> +				DMA_BIT_MASK(32));
-> +}
-> +
-> +#define mx23_add_apbh_dma() \
-> +	mxs_add_dma(&mx23_dma_data[0])
-> +#define mx23_add_apbx_dma() \
-> +	mxs_add_dma(&mx23_dma_data[1])
-> +
-> +#define mx28_add_apbh_dma() \
-> +	mxs_add_dma(&mx28_dma_data[0])
-> +#define mx28_add_apbx_dma() \
-> +	mxs_add_dma(&mx28_dma_data[1])
-> +
-> +static int __init mxs_add_mxs_dma(void)
-> +{
-> +	struct platform_device *ret;
-> +
-> +#ifdef CONFIG_SOC_IMX23
-> +	if (cpu_is_mx23()) {
-> +		ret = mx23_add_apbh_dma();
-> +		if (IS_ERR(ret))
-> +			goto out;
-> +
-> +		ret = mx23_add_apbx_dma();
-> +	} else
-> +#endif
-> +
-> +#ifdef CONFIG_SOC_IMX28
-> +	if (cpu_is_mx28()) {
-> +		ret = mx28_add_apbh_dma();
-> +		if (IS_ERR(ret))
-> +			goto out;
-> +
-> +		ret = mx28_add_apbx_dma();
-> +	} else
-> +#endif
-> +		ret = ERR_PTR(-ENODEV);
-> +
-> +out:
-> +	if (IS_ERR(ret))
-> +		return PTR_ERR(ret);
-> +	else
-> +		return 0;
-> +}
-> +arch_initcall(mxs_add_mxs_dma);
+hmm, so i.MX28 starts at 0, i.MX23 at 1.  Well, that's how it is.
 
-Being consistent is one thing, but this should not lead to ifdeffery
-where not necessary. Wouldn't it be much simpler to do the following:
-
-static struct platform_device * __init mxs_add_dma(const char *devid,
-		resource_size_t base)
-{
-	struct resource res_apbh[] = {
-		{
-			.start = base,
-			.end = base + SZ_8K - 1,
-			.flags = IORESOURCE_MEM,
-		},
-	};
-
-	return mxs_add_platform_device_dmamask(devid, -1,
-				res, ARRAY_SIZE(res), NULL, 0,
-				DMA_BIT_MASK(32));
-}
-
-static int __init mxs_add_mxs_dma(void)
-{
-	char *apbh = "mxs-dma-apbh";
-	char *apbx = "mxs-dma-apbx";
-
-	if (cpu_is_mx23()) {
-		mxs_add_dma(apbh, MX23_APBH_DMA_BASE_ADDR);
-		mxs_add_dma(apbx, MX23_APBX_DMA_BASE_ADDR);
-	}
-
-	if (cpu_is_mx28()) {
-		mxs_add_dma(apbh, MX28_APBH_DMA_BASE_ADDR);
-		mxs_add_dma(apbx, MX28_APBX_DMA_BASE_ADDR);
-	}
-
-	return 0;
-}
-arch_initcall(mxs_add_mxs_dma);
-
-No ifdef, clear to read and only half the size.
-
-Sascha
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
