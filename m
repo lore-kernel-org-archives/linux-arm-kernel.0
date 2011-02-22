@@ -1,63 +1,73 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Tue, 22 Feb 2011 18:38:40 +0800
-Subject: [PATCH] ARM: pxa: support 806MHz operating points for PXA31x
-	processors A2 stepping
-In-Reply-To: <4D637557.2070707@compulab.co.il>
-References: <1297786849.2596.13.camel@phoenix>
-	<4D5AB09C.9000106@compulab.co.il>
-	<AANLkTino2vLisNgKeyXppuHwDyhLMMAcOOZjA0hgmkj6@mail.gmail.com>
-	<4D637557.2070707@compulab.co.il>
-Message-ID: <AANLkTikTHnz+7C-QmXaHwFE0a+pw7U-t2JP11a0qdoyU@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 22 Feb 2011 09:09:29 +0100
+Subject: [PATCH v3 2/2] ARM: mxs: add dma device
+In-Reply-To: <1298284306-14710-3-git-send-email-shawn.guo@freescale.com>
+References: <1298284306-14710-1-git-send-email-shawn.guo@freescale.com>
+	<1298284306-14710-3-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110222080928.GS22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/22 Igor Grinberg <grinberg@compulab.co.il>:
-> Hi,
->
-> On 02/22/11 03:12, Axel Lin wrote:
->
->> Hi Igor,
->>
->>> Also, there is one thing that is not related to this patch, but
->>> if you have the hardware, you need to be concerned with,
->>> is that the vcc_core voltage has to be 1.4V, otherwise your
->>> hardware will be unstable.
->> I don't see any unstable issue on my device.
->> But it seems the vcc_core and vcc_sram fields of pxa3xx_freq_info
->> are not used now.
->
-> Indeed, they are not used, because we don't have any DVFS driver for PXA3xx.
-> But, the hardware is running regardless of you have the driver or not ;)
-> There are other means to make sure the vcc_core voltage is set appropriately:
-> 1) could be already set (PMIC default)
-> 2) could be set by "Hardware-Controlled Voltage-Change Sequencer" automatically
-> ? (PXA3xx_DM_Vol_I chapter 6.8.3) if your PMIC is 100% compatible with PXA3xx
-> ? and PVCR[FVE/PVE] bits set accordingly.
-> 3) If your PMIC is for some reason not 100% compatible, then the voltage can be
-> ? set by regulator API or even by the bootloader.
->
-> Anyway, to make sure it is set to the appropriate level, you need to measure it.
-> Usually, this line has some capacitors on it, so it shouldn't be a hard task
->
-Thanks for the information. I'll check my settings.
+On Mon, Feb 21, 2011 at 06:31:46PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+>  arch/arm/mach-mxs/clock-mx23.c           |    3 +-
+>  arch/arm/mach-mxs/clock-mx28.c           |    4 +-
+>  arch/arm/mach-mxs/devices/Makefile       |    1 +
+>  arch/arm/mach-mxs/devices/platform-dma.c |  101 ++++++++++++++++++++++++++++++
+>  4 files changed, 106 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-dma.c
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
+> index b1a362e..350b28c 100644
+> --- a/arch/arm/mach-mxs/clock-mx23.c
+> +++ b/arch/arm/mach-mxs/clock-mx23.c
+> @@ -443,7 +443,8 @@ static struct clk_lookup lookups[] = {
+>  	/* for amba-pl011 driver */
+>  	_REGISTER_CLOCK("duart", NULL, uart_clk)
+>  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+> -	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+> +	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+> +	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
+>  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
+>  	_REGISTER_CLOCK(NULL, "audio", audio_clk)
+>  	_REGISTER_CLOCK(NULL, "pwm", pwm_clk)
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index c9d7951..a3b4787 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -617,8 +617,8 @@ static struct clk_lookup lookups[] = {
+>  	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
+>  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
+>  	_REGISTER_CLOCK("pll2", NULL, pll2_clk)
+> -	_REGISTER_CLOCK(NULL, "hclk", hbus_clk)
+> -	_REGISTER_CLOCK(NULL, "xclk", xbus_clk)
+> +	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
+> +	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
+>  	_REGISTER_CLOCK("flexcan.0", NULL, can0_clk)
+>  	_REGISTER_CLOCK("flexcan.1", NULL, can1_clk)
+>  	_REGISTER_CLOCK(NULL, "usb0", usb0_clk)
+> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> index a8dc8d5..ca7acc4 100644
+> --- a/arch/arm/mach-mxs/devices/Makefile
+> +++ b/arch/arm/mach-mxs/devices/Makefile
+> @@ -1,4 +1,5 @@
+>  obj-$(CONFIG_MXS_HAVE_AMBA_DUART) += amba-duart.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
+> +obj-y += platform-dma.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+> diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
+> new file mode 100644
+> index 0000000..ee3220e
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/devices/platform-dma.c
+I'd prefer to have that called platform-mxs-dma.c to match the driver
+name.  (At least that's what you use for the data structs.)
 
-> Now, regarding hardware instability:
-> I've seen instabilities related to the vcc_core set improperly, but it has never
-> showed up that quickly, sometimes it took a week of testing for it to show up.
-> But when it shows up, you can see strange things happening, like your DRAM
-> is messed or buses fail or the cpu just freezes.
->
->
-> Another thing (which could be related to the patch) is the package marking.
-> We have PXA3xx SoCs marked A2 stepping, but C624, which means that the
-> highest running frequency should not exceed 624MHz.
+Best regards
+Uwe
 
-This means not all PXA310 A2 stepping supports 806Mhz.
-Can we differentiate the Cxxx option in software?
-
-> What is your PXA3xx A2 marking in respect to Cxxx option?
-
-Mine is 88AP310-A2-BGK2C806.
-
-Regards,
-Axel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
