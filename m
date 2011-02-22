@@ -1,187 +1,184 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Tue, 22 Feb 2011 17:08:26 +0530
-Subject: [PATCH 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources used
-	by PRUSS UIO driver
-In-Reply-To: <4D629C82.3080906@mvista.com>
-References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
-	<1298041530-26855-2-git-send-email-pratheesh@ti.com>
-	<1298041530-26855-3-git-send-email-pratheesh@ti.com>
-	<4D629C82.3080906@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BD49121@dbde02.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Feb 2011 19:50:46 +0800
+Subject: [PATCH v3] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110222103349.GA2755@pengutronix.de>
+References: <1298284528-14761-1-git-send-email-shawn.guo@freescale.com>
+	<20110221174016.GN2616@pengutronix.de>
+	<20110222085256.GA19871@S2100-06.ap.freescale.net>
+	<20110222103349.GA2755@pengutronix.de>
+Message-ID: <20110222115045.GB19871@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Feb 22, 2011 at 11:33:49AM +0100, Wolfram Sang wrote:
+> 
+> > > What throughput rates do you get on a mx28-regulated slot serving a card
+> > > at 50Mhz? This is poor here (55kb/s) while it is OK at 25Mhz. Could be a
+> > 
+> > To make sure we are on the same test, can you share the test case
+> > you ran to get the result?  So that I can run it here for the result
+> > on my board.
+> 
+> # mount -t vfat /dev/mmcblk0p1 /mnt
+> # dd if=/mnt/test.dat of=/tmp/a bs=1024
+> # umount /mnt
+> # ./dd --version
+> dd (coreutils) 8.5
+> ...
+> 
+> 'test.dat' was a 8MB file of random data on a 4GB SDHC card
+> (extrememory) on a slot powered by the mx28. Operating the card at
+> 50Mhz, dd will report ~55 kb/s. If I add 'rate /= 2;' to the beginning
+> of set_clk_rate, so it will operate at 25Mhz, I have 8mb/s.
+> 
+My busybox version of dd does not report the speed.  But I tried to
+dd 8MB data and saw it's done in 1~2 seconds.
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
-> Sent: Monday, February 21, 2011 10:40 PM
-> To: TK, Pratheesh Gangadhar
-> Cc: davinci-linux-open-source at linux.davincidsp.com; gregkh at suse.de;
-> Chatterjee, Amit; hjk at linutronix.de; linux-kernel at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources used
-> by PRUSS UIO driver
-> 
-> Hello.
-> 
-> Pratheesh Gangadhar wrote:
-> 
-> > Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
-> 
->     Signoff should follow the change log, not precede it. "From:" line may
-> precede the change log.
-Fixed this in the new version.
-> 
-> > This patch defines PRUSS, ECAP clocks, memory and IRQ resources
-> > used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
-> > driver exports 64K I/O region of PRUSS, 128KB L3 RAM and 256KB
-> > DDR buffer to user space. PRUSS has 8 host event interrupt lines
-> > mapped to IRQ_DA8XX_EVTOUT0..7 of ARM9 INTC.These in conjunction
-> > with shared memory can be used to implement IPC between ARM9 and
-> > PRUSS.
-> 
-> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-
-> davinci/board-da850-evm.c
-> > index 11f986b..ddcbac8 100644
-> > --- a/arch/arm/mach-davinci/board-da850-evm.c
-> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> > @@ -1077,6 +1077,10 @@ static __init void da850_evm_init(void)
-> >  		pr_warning("da850_evm_init: i2c0 registration failed: %d\n",
-> >  				ret);
-> >
-> > +	ret = da8xx_register_pruss();
-> > +       if (ret)
-> > +                pr_warning("da850_evm_init: pruss registration failed:
-> %d\n",
-> > +                                 ret);
-> >
-> >  	ret = da8xx_register_watchdog();
-> >  	if (ret)
-> 
->     I'd put this into a pacth of its own, to have the SoC level changes
-> separated from board-level changes...
+Also here is mmc host driver test performance related result on my
+board if you are interested.
 
-Ok. I will do this; I need to make this change for hawkboard as well.
-> 
-> > diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-
-> davinci/da850.c
-> > index 3443d97..0096d4f 100644
-> > --- a/arch/arm/mach-davinci/da850.c
-> > +++ b/arch/arm/mach-davinci/da850.c
-> > @@ -238,6 +238,13 @@ static struct clk tptc2_clk = {
-> >  	.flags		= ALWAYS_ENABLED,
-> >  };
-> >
-> > +static struct clk pruss_clk = {
-> > +	.name		= "pruss",
-> > +	.parent		= &pll0_sysclk2,
-> > +	.lpsc		= DA8XX_LPSC0_DMAX,
-> 
->     We have patch submitted by TI that renames this #define to
-> DA8XX_LPSC0_PRUSS...
-> 
-> > +	.flags		= ALWAYS_ENABLED,
-> > +};
-> > +
-> 
->     We already have patch submitted by TI that defines this clock. It
-> would be
-> nice if you coordinated your efforts to avoid such conflicts.
->     Again, I'd put the part adding the clocks into a patch of its own.
+mmc0: Test case 23. Best-case read performance...
+mmc0: Transfer of 6630 sectors (3315 KiB) took 0.101999209 seconds (33280 kB/s,
+32500 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 24. Best-case write performance...
+mmc0: Transfer of 6630 sectors (3315 KiB) took 0.388688317 seconds (8733 kB/s, 8
+528 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 25. Best-case read performance into scattered pages...
+mmc0: Transfer of 416 sectors (208 KiB) took 0.006997933 seconds (30436 kB/s, 29
+723 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 26. Best-case write performance from scattered pages...
+mmc0: Transfer of 416 sectors (208 KiB) took 0.020431605 seconds (10424 kB/s, 10
+180 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 27. Single read performance by transfer size...
+mmc0: Transfer of 1 sectors (0.5 KiB) took 0.000906524 seconds (564 kB/s, 551 Ki
+B/s)
+mmc0: Transfer of 2 sectors (1 KiB) took 0.000625190 seconds (1637 kB/s, 1599 Ki
+B/s)
+mmc0: Transfer of 4 sectors (2 KiB) took 0.000687706 seconds (2978 kB/s, 2908 Ki
+B/s)
+mmc0: Transfer of 8 sectors (4 KiB) took 0.000718959 seconds (5697 kB/s, 5563 Ki
+B/s)
+mmc0: Transfer of 16 sectors (8 KiB) took 0.000812729 seconds (10079 kB/s, 9843
+KiB/s)
+mmc0: Transfer of 32 sectors (16 KiB) took 0.001094051 seconds (14975 kB/s, 1462
+4 KiB/s)
+mmc0: Transfer of 64 sectors (32 KiB) took 0.001625434 seconds (20159 kB/s, 1968
+7 KiB/s)
+mmc0: Transfer of 128 sectors (64 KiB) took 0.002594421 seconds (25260 kB/s, 246
+68 KiB/s)
+mmc0: Transfer of 256 sectors (128 KiB) took 0.004563644 seconds (28720 kB/s, 28
+047 KiB/s)
+mmc0: Transfer of 512 sectors (256 KiB) took 0.008439521 seconds (31061 kB/s, 30
+333 KiB/s)
+mmc0: Transfer of 1024 sectors (512 KiB) took 0.016253622 seconds (32256 kB/s, 3
+1500 KiB/s)
+mmc0: Transfer of 2048 sectors (1024 KiB) took 0.031886943 seconds (32884 kB/s,
+32113 KiB/s)
+mmc0: Transfer of 4096 sectors (2048 KiB) took 0.063176177 seconds (33195 kB/s,
+32417 KiB/s)
+mmc0: Transfer of 6630 sectors (3315 KiB) took 0.101735514 seconds (33366 kB/s,
+32584 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 28. Single write performance by transfer size...
+mmc0: Transfer of 1 sectors (0.5 KiB) took 0.001781476 seconds (287 kB/s, 280 Ki
+B/s)
+mmc0: Transfer of 2 sectors (1 KiB) took 0.002250249 seconds (455 kB/s, 444 KiB/
+s)
+mmc0: Transfer of 4 sectors (2 KiB) took 0.002312719 seconds (885 kB/s, 864 KiB/
+s)
+mmc0: Transfer of 8 sectors (4 KiB) took 0.003437771 seconds (1191 kB/s, 1163 Ki
+B/s)
+mmc0: Transfer of 16 sectors (8 KiB) took 0.002718920 seconds (3012 kB/s, 2942 K
+iB/s)
+mmc0: Transfer of 32 sectors (16 KiB) took 0.001500142 seconds (10921 kB/s, 1066
+5 KiB/s)
+mmc0: Transfer of 64 sectors (32 KiB) took 0.003875336 seconds (8455 kB/s, 8257
+KiB/s)
+mmc0: Transfer of 128 sectors (64 KiB) took 0.006250472 seconds (10484 kB/s, 102
+39 KiB/s)
+mmc0: Transfer of 256 sectors (128 KiB) took 0.011563288 seconds (11335 kB/s, 11
+069 KiB/s)
+mmc0: Transfer of 512 sectors (256 KiB) took 0.022187432 seconds (11814 kB/s, 11
+538 KiB/s)
+mmc0: Transfer of 1024 sectors (512 KiB) took 0.049155884 seconds (10665 kB/s, 1
+0415 KiB/s)
+mmc0: Transfer of 2048 sectors (1024 KiB) took 0.085375335 seconds (12281 kB/s,
+11994 KiB/s)
+mmc0: Transfer of 4096 sectors (2048 KiB) took 0.262563987 seconds (7987 kB/s, 7
+800 KiB/s)
+mmc0: Transfer of 6630 sectors (3315 KiB) took 0.284787038 seconds (11919 kB/s,
+11640 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 29. Single trim performance by transfer size...
+mmc0: Result: UNSUPPORTED (by card)
+mmc0: Test case 30. Consecutive read performance by transfer size...
+mmc0: Transfer of 8192 x 1 sectors (8192 x 0.5 KiB) took 4.091141441 seconds (10
+25 kB/s, 1001 KiB/s)
+mmc0: Transfer of 4096 x 2 sectors (4096 x 1 KiB) took 2.490875000 seconds (1683
+ kB/s, 1644 KiB/s)
+mmc0: Transfer of 2048 x 4 sectors (2048 x 2 KiB) took 1.316531250 seconds (3185
+ kB/s, 3111 KiB/s)
+mmc0: Transfer of 1024 x 8 sectors (1024 x 4 KiB) took 0.727437500 seconds (5765
+ kB/s, 5630 KiB/s)
+mmc0: Transfer of 512 x 16 sectors (512 x 8 KiB) took 0.437000000 seconds (9597
+kB/s, 9372 KiB/s)
+mmc0: Transfer of 256 x 32 sectors (256 x 16 KiB) took 0.283156250 seconds (1481
+2 kB/s, 14465 KiB/s)
+mmc0: Transfer of 128 x 64 sectors (128 x 32 KiB) took 0.205812500 seconds (2037
+9 kB/s, 19901 KiB/s)
+mmc0: Transfer of 64 x 128 sectors (64 x 64 KiB) took 0.165750000 seconds (25305
+ kB/s, 24711 KiB/s)
+mmc0: Transfer of 32 x 256 sectors (32 x 128 KiB) took 0.145343750 seconds (2885
+7 kB/s, 28181 KiB/s)
+mmc0: Transfer of 16 x 512 sectors (16 x 256 KiB) took 0.134968750 seconds (3107
+6 kB/s, 30347 KiB/s)
+mmc0: Transfer of 8 x 1024 sectors (8 x 512 KiB) took 0.130125000 seconds (32232
+ kB/s, 31477 KiB/s)
+mmc0: Transfer of 4 x 2048 sectors (4 x 1024 KiB) took 0.127531249 seconds (3288
+8 kB/s, 32117 KiB/s)
+mmc0: Transfer of 2 x 4096 sectors (2 x 2048 KiB) took 0.126343751 seconds (3319
+7 kB/s, 32419 KiB/s)
+mmc0: Transfer of 1 x 6630 sectors (1 x 3315 KiB) took 0.101687494 seconds (3338
+2 kB/s, 32599 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 31. Consecutive write performance by transfer size...
+mmc0: Transfer of 8192 x 1 sectors (8192 x 0.5 KiB) took 14.309562500 seconds (2
+93 kB/s, 286 KiB/s)
+mmc0: Transfer of 4096 x 2 sectors (4096 x 1 KiB) took 9.871062499 seconds (424
+kB/s, 414 KiB/s)
+mmc0: Transfer of 2048 x 4 sectors (2048 x 2 KiB) took 4.814593750 seconds (871
+kB/s, 850 KiB/s)
+mmc0: Transfer of 1024 x 8 sectors (1024 x 4 KiB) took 2.296875000 seconds (1826
+ kB/s, 1783 KiB/s)
+mmc0: Transfer of 512 x 16 sectors (512 x 8 KiB) took 1.072843750 seconds (3909
+kB/s, 3817 KiB/s)
+mmc0: Transfer of 256 x 32 sectors (256 x 16 KiB) took 0.596312500 seconds (7033
+ kB/s, 6868 KiB/s)
+mmc0: Transfer of 128 x 64 sectors (128 x 32 KiB) took 0.455375000 seconds (9210
+ kB/s, 8994 KiB/s)
+mmc0: Transfer of 64 x 128 sectors (64 x 64 KiB) took 0.402875000 seconds (10410
+ kB/s, 10166 KiB/s)
+mmc0: Transfer of 32 x 256 sectors (32 x 128 KiB) took 0.375531250 seconds (1116
+8 kB/s, 10907 KiB/s)
+mmc0: Transfer of 16 x 512 sectors (16 x 256 KiB) took 0.362562500 seconds (1156
+8 kB/s, 11297 KiB/s)
+mmc0: Transfer of 8 x 1024 sectors (8 x 512 KiB) took 0.350500000 seconds (11966
+ kB/s, 11686 KiB/s)
+mmc0: Transfer of 4 x 2048 sectors (4 x 1024 KiB) took 0.351593796 seconds (1192
+9 kB/s, 11649 KiB/s)
+mmc0: Transfer of 2 x 4096 sectors (2 x 2048 KiB) took 0.346812955 seconds (1209
+3 kB/s, 11810 KiB/s)
+mmc0: Transfer of 1 x 6630 sectors (1 x 3315 KiB) took 0.280838757 seconds (1208
+7 kB/s, 11803 KiB/s)
+mmc0: Result: OK
+mmc0: Test case 32. Consecutive trim performance by transfer size...
+mmc0: Result: UNSUPPORTED (by card)
+mmc0: Tests completed.
 
-I will try to sync with that patch. 
-> 
-> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-
-> davinci/devices-da8xx.c
-> > index beda8a4..4ea3d1f 100644
-> > --- a/arch/arm/mach-davinci/devices-da8xx.c
-> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> > @@ -725,3 +725,76 @@ int __init da8xx_register_cpuidle(void)
-> >
-> >  	return platform_device_register(&da8xx_cpuidle_device);
-> >  }
-> > +static struct resource pruss_resources[] = {
-> > +	[0] = {
-> > +		.start  = DA8XX_PRUSS_BASE,
-> > +		.end    = DA8XX_PRUSS_BASE + SZ_64K - 1,
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +	[1] = {
-> > +		.start  = DA8XX_L3RAM_BASE,
-> > +		.end    = DA8XX_L3RAM_BASE + SZ_128K - 1,
-> > +		.flags  = IORESOURCE_MEM,
-> 
->     Are you going to use all SRAM?
-Its application dependent - we don't use more than 10KB at this point.
-> 
-> > +	},
-> > +	[2] = {
-> > +		.start  = 0,
-> > +		.end    = SZ_256K - 1,
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +
-> > +	[3] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT0,
-> > +		.end    = IRQ_DA8XX_EVTOUT0,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[4] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT1,
-> > +		.end    = IRQ_DA8XX_EVTOUT1,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[5] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT2,
-> > +		.end    = IRQ_DA8XX_EVTOUT2,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[6] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT3,
-> > +		.end    = IRQ_DA8XX_EVTOUT3,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[7] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT4,
-> > +		.end    = IRQ_DA8XX_EVTOUT4,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[8] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT5,
-> > +		.end    = IRQ_DA8XX_EVTOUT5,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[9] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT6,
-> > +		.end    = IRQ_DA8XX_EVTOUT6,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +	[10] = {
-> > +		.start  = IRQ_DA8XX_EVTOUT7,
-> > +		.end    = IRQ_DA8XX_EVTOUT7,
-> > +		.flags  = IORESOURCE_IRQ,
-> > +	},
-> > +};
-> > +
-> > +static struct platform_device pruss_device = {
-> > +	.name			= "pruss",
-> > +	.id			= 0,
-> > +	.num_resources		= ARRAY_SIZE(pruss_resources),
-> > +	.resource		= pruss_resources,
-> > +	.dev	 =	{
-> > +		.coherent_dma_mask = 0xffffffff,
-> > +	}
-> > +};
-> > +
-> > +int __init da8xx_register_pruss()
-> > +{
-> > +	return platform_device_register(&pruss_device);
-> > +}
-> 
->     Again, there's TI patch that adds this device already...
-I will check this.
-
-
-Thanks,
-Pratheesh
+-- 
+Regards,
+Shawn
