@@ -1,45 +1,27 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 22 Feb 2011 13:48:58 +0000
-Subject: [PATCH] ARM: Thumb-2: Reflect ARM/Thumb-2 configuration in module
-	vermagic
-Message-ID: <1298382538-15682-1-git-send-email-dave.martin@linaro.org>
+From: yujinzhi123@gmail.com (=?GB2312?B?0+C999bH?=)
+Date: Tue, 22 Feb 2011 22:00:16 +0800
+Subject: SAMSUNG: any example code for soc_camera, tv output, etc...?
+In-Reply-To: <9f2nkr$9lh756@out1.ip04ir2.opaltelecom.net>
+References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
+	<E1Pnvhv-0002yp-A0@rmk-PC.arm.linux.org.uk>
+	<017901cbce9b$7b405ee0$71c11ca0$%kim@samsung.com>
+	<20110217140621.GC24989@n2100.arm.linux.org.uk>
+	<01b001cbcef7$3e7f5f90$bb7e1eb0$%kim@samsung.com>
+	<9f2nkr$9lh756@out1.ip04ir2.opaltelecom.net>
+Message-ID: <AANLkTin0PR3VQLruade+w6GbCMoW9pXy4Kvn-sBZ+LBM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Loading Thumb-2 modules into an ARM kernel or vice-versa isn't
-guaranteed to work safely, since the kernel is not interworking-
-aware everywhere.
+> I've just gone through a lot of Samsung platform setup files in arch/arm/ , but >haven't yet found any Samsung-SoC-based boards pre-plumbed into V4L2, nor >any that connect up to a TV out (rather than to an LCD screen).
 
-This patch adds "thumb2" to the module vermagic when
-CONFIG_THUMB2_KERNEL is enabled, to help avoid accidental loading
-of modules into the wrong kernel.
+I have port a embeded linux system on my board based on EP9315, with
+support for usb video capture device, V4L2. Do you need V4L2 based on
+usb video capture device or other video/FM/AM controller on your
+board? If conveniently, can you provide more details about your
+project?
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/include/asm/module.h |   11 +++++++++--
- 1 files changed, 9 insertions(+), 2 deletions(-)
+>Alternatively, please say if you know which specific file(s) I should be asking >Samsung tech support for under NDA (via my distributor's tech support).
 
-diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-index 12c8e68..09fcaa0 100644
---- a/arch/arm/include/asm/module.h
-+++ b/arch/arm/include/asm/module.h
-@@ -25,8 +25,15 @@ struct mod_arch_specific {
- };
- 
- /*
-- * Include the ARM architecture version.
-+ * Include the ARM architecture version and instruction set architecture.
-  */
--#define MODULE_ARCH_VERMAGIC	"ARMv" __stringify(__LINUX_ARM_ARCH__) " "
-+#ifdef CONFIG_THUMB2_KERNEL
-+#define ARM_ARCH_VERMAGIC_ISAFAMILY " thumb2"
-+#else
-+#define ARM_ARCH_VERMAGIC_ISAFAMILY ""
-+#endif
-+
-+#define MODULE_ARCH_VERMAGIC	"ARMv" __stringify(__LINUX_ARM_ARCH__) \
-+	ARM_ARCH_VERMAGIC_ISAFAMILY " "
- 
- #endif /* _ASM_ARM_MODULE_H */
--- 
-1.7.1
+You MUST need the datasheet of S5PC100 on your board, and other
+peripheral device's datasheet, like dm9000 ethernet controller if not
+integrated in SoC, and schematic diagrams of your board.
