@@ -1,54 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Feb 2011 12:20:23 -0800
-Subject: [PATCH] ARM: Fix compile after delay page freeing patch
-In-Reply-To: <20110222195929.GA31275@n2100.arm.linux.org.uk>
-References: <20110222194332.GQ15225@atomide.com>
-	<20110222195929.GA31275@n2100.arm.linux.org.uk>
-Message-ID: <20110222202023.GS15225@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 22 Feb 2011 20:25:14 +0000
+Subject: [PATCH] ARM: Thumb-2: Reflect ARM/Thumb-2 configuration in
+	module vermagic
+In-Reply-To: <alpine.LFD.2.00.1102221502160.14920@xanadu.home>
+References: <1298382538-15682-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1102221502160.14920@xanadu.home>
+Message-ID: <20110222202514.GC29559@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110222 11:57]:
-> On Tue, Feb 22, 2011 at 11:43:32AM -0800, Tony Lindgren wrote:
-> > Commit 06824ba824b3e9f2fedb38bee79af0643198ed7f
-> > (ARM: tlb: delay page freeing for SMP and ARMv7 CPUs) causes
-> > the following compile error for at least omap1_defconfig:
+On Tue, Feb 22, 2011 at 03:03:46PM -0500, Nicolas Pitre wrote:
+> On Tue, 22 Feb 2011, Dave Martin wrote:
+> 
+> > Loading Thumb-2 modules into an ARM kernel or vice-versa isn't
+> > guaranteed to work safely, since the kernel is not interworking-
+> > aware everywhere.
+> 
+> Too bad.
+> 
+> > This patch adds "thumb2" to the module vermagic when
+> > CONFIG_THUMB2_KERNEL is enabled, to help avoid accidental loading
+> > of modules into the wrong kernel.
 > > 
-> > In file included from arch/arm/mm/init.c:27:
-> > arch/arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
-> > arch/arm/include/asm/tlb.h:101: error: implicit declaration of function 'release_pages'
-> > arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
-> > arch/arm/include/asm/tlb.h:165: error: implicit declaration of function 'page_cache_release'
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
 > 
-> Grant already mentioned this to me this evening.
-> 
-> This happens if you build with CONFIG_SWAP=n, and is something that the
-> asm-generic/tlb.h also appears to suffer from.  Why no one else has
-> noticed this I've no idea.
-> 
-> Note that linux/swap.h has this comment:
-> 
-> /* only sparc can not include linux/pagemap.h in this file
->  * so leave page_cache_release and release_pages undeclared... */
-> #define free_page_and_swap_cache(page) \
->         page_cache_release(page)
-> #define free_pages_and_swap_cache(pages, nr) \
->         release_pages((pages), (nr), 0);
-> 
-> which is rather annoying, because it makes the build error dependent on
-> the configuration.
-> 
-> So, we should add linux/pagemap.h to both asm-generic/tlb.h and the ARM
-> tlb.h as they both should suffer the same problem.
-> 
-> Note that arch/x86/mm/init.c and arch/x86/mm/pgtable.c both include
-> asm/tlb.h without linux/pagemap.h, and use the generic version.  I bet
-> no one's tried building x86 with CONFIG_SWAP=n yet...
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Looks like it's in arch/x86/mm/init_[32|64].c and pgtable[32|64].c
-though. So maybe we just need to patch either ARM tlb.h. Or patch
-the necessary .c files to include pagemap.h.
-
-Regards,
-
-Tony
+Lets wait until after the next merge window has gone, or let's have a
+patch which takes account of stuff already merged.  Either way, there
+little point acking it as it needs an effective rewrite to fit around
+the P2V changes to this file.
