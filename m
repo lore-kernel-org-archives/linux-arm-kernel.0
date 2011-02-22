@@ -1,415 +1,56 @@
-From: rabin.vincent@stericsson.com (Rabin Vincent)
-Date: Tue, 22 Feb 2011 11:11:01 +0530
-Subject: [PATCHv3] amba: support pm ops
-In-Reply-To: <201102212126.10742.rjw@sisk.pl>
-References: <201102212126.10742.rjw@sisk.pl>
-Message-ID: <1298353261-22193-1-git-send-email-rabin.vincent@stericsson.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Feb 2011 21:43:19 -0800
+Subject: [PATCH 7/7] ARM: tegra: clock: Disable clocks left on by
+	bootloader
+In-Reply-To: <1298342392-21236-8-git-send-email-ccross@android.com>
+References: <1298342392-21236-1-git-send-email-ccross@android.com>
+	<1298342392-21236-8-git-send-email-ccross@android.com>
+Message-ID: <AANLkTikNSEyjdL0Lchmm-bFxD00omkGLq6Q6Yyjy51Ov@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support pm_ops in the AMBA bus, required to allow drivers to use runtime pm.
-The implementation of AMBA bus pm ops is based on the platform bus
-implementation.
+Hi,
 
-Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
----
-v3: add a missing header. don't keep an empty dev_pm_ops struct when it's
-    not used.
+On Mon, Feb 21, 2011 at 6:39 PM, Colin Cross <ccross@android.com> wrote:
+> Iterates through all clocks, disabling any for which the
+> refcount is 0 but the clock init detected the bootloader
+> left the clock on. ?Can be disabled with command line
+> tegra_clock.disable_boot_clocks=N
+>
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+> ?arch/arm/mach-tegra/clock.c | ? 44 +++++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 44 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+> index e028320..6d686ff 100644
+> --- a/arch/arm/mach-tegra/clock.c
+> +++ b/arch/arm/mach-tegra/clock.c
+> @@ -33,6 +33,9 @@
+> ?#include "board.h"
+> ?#include "clock.h"
+>
+> +#undef MODULE_PARAM_PREFIX
+> +#define MODULE_PARAM_PREFIX "tegra_clock."
+> +
+> ?/*
+> ?* Locking:
+> ?*
+> @@ -416,6 +419,47 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
+> ? ? ? ?spin_unlock_irqrestore(&c->spinlock, flags);
+> ?}
+>
+> +static bool tegra_disable_boot_clocks = true;
+> +module_param_named(disable_boot_clocks, tegra_disable_boot_clocks, bool,
+> + ? ? ? S_IRUGO | S_IWUSR | S_IWGRP);
 
- drivers/amba/bus.c       |  340 ++++++++++++++++++++++++++++++++++++++++++---
- include/linux/amba/bus.h |    2 +
- 2 files changed, 319 insertions(+), 23 deletions(-)
+I suggest doing this as an early_param instead. I know it's not truly
+an early param, but it's the easier way to do non-module bootargs,
+i.e. by not requiring a (fake) module prefix. It'd be a little
+cleaner, in my opinion. The variable name itself is unique enough to
+not need a module prefix for namespace reasons.
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index ca96b0a..7d38981 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -13,12 +13,13 @@
- #include <linux/string.h>
- #include <linux/slab.h>
- #include <linux/io.h>
-+#include <linux/pm.h>
-+#include <linux/pm_runtime.h>
- #include <linux/amba/bus.h>
- 
- #include <asm/irq.h>
- #include <asm/sizes.h>
- 
--#define to_amba_device(d)	container_of(d, struct amba_device, dev)
- #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
- 
- static struct amba_id *
-@@ -57,26 +58,6 @@ static int amba_uevent(struct device *dev, struct kobj_uevent_env *env)
- #define amba_uevent NULL
- #endif
- 
--static int amba_suspend(struct device *dev, pm_message_t state)
--{
--	struct amba_driver *drv = to_amba_driver(dev->driver);
--	int ret = 0;
--
--	if (dev->driver && drv->suspend)
--		ret = drv->suspend(to_amba_device(dev), state);
--	return ret;
--}
--
--static int amba_resume(struct device *dev)
--{
--	struct amba_driver *drv = to_amba_driver(dev->driver);
--	int ret = 0;
--
--	if (dev->driver && drv->resume)
--		ret = drv->resume(to_amba_device(dev));
--	return ret;
--}
--
- #define amba_attr_func(name,fmt,arg...)					\
- static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
-@@ -102,6 +83,320 @@ static struct device_attribute amba_dev_attrs[] = {
- 	__ATTR_NULL,
- };
- 
-+#ifdef CONFIG_PM_SLEEP
-+
-+static int amba_legacy_suspend(struct device *dev, pm_message_t mesg)
-+{
-+	struct amba_driver *adrv = to_amba_driver(dev->driver);
-+	struct amba_device *adev = to_amba_device(dev);
-+	int ret = 0;
-+
-+	if (dev->driver && adrv->suspend)
-+		ret = adrv->suspend(adev, mesg);
-+
-+	return ret;
-+}
-+
-+static int amba_legacy_resume(struct device *dev)
-+{
-+	struct amba_driver *adrv = to_amba_driver(dev->driver);
-+	struct amba_device *adev = to_amba_device(dev);
-+	int ret = 0;
-+
-+	if (dev->driver && adrv->resume)
-+		ret = adrv->resume(adev);
-+
-+	return ret;
-+}
-+
-+static int amba_pm_prepare(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (drv && drv->pm && drv->pm->prepare)
-+		ret = drv->pm->prepare(dev);
-+
-+	return ret;
-+}
-+
-+static void amba_pm_complete(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+
-+	if (drv && drv->pm && drv->pm->complete)
-+		drv->pm->complete(dev);
-+}
-+
-+#else /* !CONFIG_PM_SLEEP */
-+
-+#define amba_pm_prepare		NULL
-+#define amba_pm_complete		NULL
-+
-+#endif /* !CONFIG_PM_SLEEP */
-+
-+#ifdef CONFIG_SUSPEND
-+
-+static int amba_pm_suspend(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->suspend)
-+			ret = drv->pm->suspend(dev);
-+	} else {
-+		ret = amba_legacy_suspend(dev, PMSG_SUSPEND);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_suspend_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->suspend_noirq)
-+			ret = drv->pm->suspend_noirq(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_resume(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->resume)
-+			ret = drv->pm->resume(dev);
-+	} else {
-+		ret = amba_legacy_resume(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_resume_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->resume_noirq)
-+			ret = drv->pm->resume_noirq(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+#else /* !CONFIG_SUSPEND */
-+
-+#define amba_pm_suspend		NULL
-+#define amba_pm_resume		NULL
-+#define amba_pm_suspend_noirq	NULL
-+#define amba_pm_resume_noirq	NULL
-+
-+#endif /* !CONFIG_SUSPEND */
-+
-+#ifdef CONFIG_HIBERNATION
-+
-+static int amba_pm_freeze(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->freeze)
-+			ret = drv->pm->freeze(dev);
-+	} else {
-+		ret = amba_legacy_suspend(dev, PMSG_FREEZE);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_freeze_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->freeze_noirq)
-+			ret = drv->pm->freeze_noirq(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_thaw(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->thaw)
-+			ret = drv->pm->thaw(dev);
-+	} else {
-+		ret = amba_legacy_resume(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_thaw_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->thaw_noirq)
-+			ret = drv->pm->thaw_noirq(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_poweroff(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->poweroff)
-+			ret = drv->pm->poweroff(dev);
-+	} else {
-+		ret = amba_legacy_suspend(dev, PMSG_HIBERNATE);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_poweroff_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->poweroff_noirq)
-+			ret = drv->pm->poweroff_noirq(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_restore(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->restore)
-+			ret = drv->pm->restore(dev);
-+	} else {
-+		ret = amba_legacy_resume(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+static int amba_pm_restore_noirq(struct device *dev)
-+{
-+	struct device_driver *drv = dev->driver;
-+	int ret = 0;
-+
-+	if (!drv)
-+		return 0;
-+
-+	if (drv->pm) {
-+		if (drv->pm->restore_noirq)
-+			ret = drv->pm->restore_noirq(dev);
-+	}
-+
-+	return ret;
-+}
-+
-+#else /* !CONFIG_HIBERNATION */
-+
-+#define amba_pm_freeze		NULL
-+#define amba_pm_thaw		NULL
-+#define amba_pm_poweroff		NULL
-+#define amba_pm_restore		NULL
-+#define amba_pm_freeze_noirq	NULL
-+#define amba_pm_thaw_noirq		NULL
-+#define amba_pm_poweroff_noirq	NULL
-+#define amba_pm_restore_noirq	NULL
-+
-+#endif /* !CONFIG_HIBERNATION */
-+
-+#ifdef CONFIG_PM
-+
-+static const struct dev_pm_ops amba_pm = {
-+	.prepare	= amba_pm_prepare,
-+	.complete	= amba_pm_complete,
-+	.suspend	= amba_pm_suspend,
-+	.resume		= amba_pm_resume,
-+	.freeze		= amba_pm_freeze,
-+	.thaw		= amba_pm_thaw,
-+	.poweroff	= amba_pm_poweroff,
-+	.restore	= amba_pm_restore,
-+	.suspend_noirq	= amba_pm_suspend_noirq,
-+	.resume_noirq	= amba_pm_resume_noirq,
-+	.freeze_noirq	= amba_pm_freeze_noirq,
-+	.thaw_noirq	= amba_pm_thaw_noirq,
-+	.poweroff_noirq	= amba_pm_poweroff_noirq,
-+	.restore_noirq	= amba_pm_restore_noirq,
-+	SET_RUNTIME_PM_OPS(
-+		pm_generic_runtime_suspend,
-+		pm_generic_runtime_resume,
-+		pm_generic_runtime_idle
-+	)
-+};
-+
-+#define AMBA_PM (&amba_pm)
-+
-+#else /* !CONFIG_PM */
-+
-+#define AMBA_PM	NULL
-+
-+#endif /* !CONFIG_PM */
-+
- /*
-  * Primecells are part of the Advanced Microcontroller Bus Architecture,
-  * so we call the bus "amba".
-@@ -111,8 +406,7 @@ struct bus_type amba_bustype = {
- 	.dev_attrs	= amba_dev_attrs,
- 	.match		= amba_match,
- 	.uevent		= amba_uevent,
--	.suspend	= amba_suspend,
--	.resume		= amba_resume,
-+	.pm		= AMBA_PM,
- };
- 
- static int __init amba_init(void)
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index a0ccf28..1849975 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -58,6 +58,8 @@ enum amba_vendor {
- 
- extern struct bus_type amba_bustype;
- 
-+#define to_amba_device(d)	container_of(d, struct amba_device, dev)
-+
- #define amba_get_drvdata(d)	dev_get_drvdata(&d->dev)
- #define amba_set_drvdata(d,p)	dev_set_drvdata(&d->dev, p)
- 
--- 
-1.7.2.dirty
+Also, Documentation/kernel-parameters.txt should be updated with it.
+
+
+-Olof
