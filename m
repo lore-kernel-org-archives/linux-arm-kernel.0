@@ -1,150 +1,128 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 12:32:23 +0100
-Subject: [PATCH v2 5/5] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <1298369606-29972-5-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1298369606-29972-5-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110222113222.GE2755@pengutronix.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 22 Feb 2011 12:33:11 +0100
+Subject: [PATCH v2 01/13] mfd: pruss mfd driver.
+In-Reply-To: <4D639493.1060601@grandegger.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-2-git-send-email-subhasish@mistralsolutions.com>
+	<20110221163027.GF10686@sortiz-mobl>
+	<37B3755C4AE64BAA805DFBAEBDC3D9E4@subhasishg>
+	<20110222103127.GC30279@sortiz-mobl>
+	<4D639493.1060601@grandegger.com>
+Message-ID: <20110222113310.GD30279@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 06:13:26PM +0800, Richard Zhu wrote:
-> Fix the NO INT in the Multi-BLK IO in SD/MMC, and
-> Multi-BLK read in SDIO
+On Tue, Feb 22, 2011 at 11:48:51AM +0100, Wolfgang Grandegger wrote:
+> On 02/22/2011 11:31 AM, Samuel Ortiz wrote:
+> > Hi Subhasish,
+> > 
+> > On Tue, Feb 22, 2011 at 11:13:38AM +0530, Subhasish Ghosh wrote:
+> >> Thank you for your comments.
+> > No problem.
+> > 
+> >>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> >>>> index fd01836..6c437df 100644
+> >>>> --- a/drivers/mfd/Kconfig
+> >>>> +++ b/drivers/mfd/Kconfig
+> >>>> @@ -81,6 +81,16 @@ config MFD_DM355EVM_MSP
+> >>>>   boards.  MSP430 firmware manages resets and power sequencing,
+> >>>>   inputs from buttons and the IR remote, LEDs, an RTC, and more.
+> >>>>
+> >>>> +config MFD_DA8XX_PRUSS
+> >>>> + tristate "Texas Instruments DA8XX PRUSS support"
+> >>>> + depends on ARCH_DAVINCI && ARCH_DAVINCI_DA850
+> >>> Why are we depending on those ?
+> >>
+> >> SG -- The PRUSS core in only available within DA850 and DA830,
+> >>            DA830 support is not yet implemented.
+> > Sure, but if there are no actual code dependencies, I'd like to get rid of
+> > those depends.
+> > 
+> >>>> +u32 pruss_disable(struct device *dev, u8 pruss_num)
+> >>>> +{
+> >>>> + struct da8xx_pruss *pruss = dev_get_drvdata(dev->parent);
+> >>>> + da8xx_prusscore_regs h_pruss;
+> >>>> + u32 temp_reg;
+> >>>> +
+> >>>> + if (pruss_num == DA8XX_PRUCORE_0) {
+> >>>> + /* Disable PRU0  */
+> >>>> + h_pruss = (da8xx_prusscore_regs)
+> >>>> + ((u32) pruss->ioaddr + 0x7000);
+> >>> So it seems you're doing this in several places, and I have a few
+> >>> comments:
+> >>>
+> >>> - You don't need the da8xx_prusscore_regs at all.
+> >>> - Define the register map through a set of #define in your header file.
+> >>> - Use a static routine that takes the core number and returns the
+> >>> register map
+> >>> offset.
+> >>>
+> >>> Then routines like this one will look a lot more readable.
+> >>
+> >> SG -- There are a huge number of PRUSS registers. A lot of them are
+> >> reserved and are expected to change as development on the
+> >>            controller is still ongoing. 
+> > First of all, from what I read in your patch you're only using the CONTROL
+> > offset.
+> > 
+> >> If we use #defines to plot
+> >> all the registers, then first, there are too many array type
+> >> registers which will need to be duplicated.
+> > What I'm expecting is a small set of defines for the register offsets. You
+> > have 13 fields in your da8xx_prusscore_regs, you only need to define 13
+> > register offsets.
+> > 
+> > So, if you have a:
+> > 
+> > static u32 reg_offset(struct device *dev, u8 pru_num)
+> > {
+> > 	struct da8xx_pruss *pru = dev_get_drvdata(dev->parent);
+> > 
+> > 	switch (pru_num) {
+> > 	case DA8XX_PRUCORE_0:
+> > 		return (u32) pru->ioaddr + 0x7000;
+> > 	case DA8XX_PRUCORE_1:
+> > 		return (u32) pru->ioaddr + 0x7800;
+> > 	default:
+> > 		return 0;
+> > }
+> > 
+> > 
+> > then routines like pruss_enable (which should return an int, btw) would look
+> > like:
+> > 
+> > int pruss_enable(struct device *dev, u8 pruss_num)
+> > {
+> > 	u32 offset = reg_offset(dev, pruss_num);
+> > 
+> > 	if (offset == 0)
+> > 		return -EINVAL;
+> > 
+> > 	__raw_writel(DA8XX_PRUCORE_CONTROL_RESETVAL,
+> > 			offset + PRU_CORE_CONTROL);
+> > 
+> > 	return 0;
+> > }
 > 
-> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
-
-Thanks for respinning \o/ This approach looks better to me, but CCing
-Olof to comment on abstraction issues if he has them. Will do a deeper
-review later this week.
-
-Regards,
-
-   Wolfram
-
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   41 +++++++++++++++++++++++++++++++++++-
->  drivers/mmc/host/sdhci-esdhc.h     |    5 ++++
->  2 files changed, 45 insertions(+), 1 deletions(-)
+> All registers are memory mapped and could nicely be described by
+> structures (and sub-structures). Therefore we asked to considerer
+> structs, at least for the Pruss SocketCAN drivers. 
+>
+> That would result in
+> much much clearer and better readable code. The code above would shrink to:
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 9b82910..a09f786 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -17,6 +17,8 @@
->  #include <linux/clk.h>
->  #include <linux/mmc/host.h>
->  #include <linux/mmc/sdhci-pltfm.h>
-> +#include <linux/mmc/mmc.h>
-> +#include <linux/mmc/sdio.h>
->  #include <mach/hardware.h>
->  #include "sdhci.h"
->  #include "sdhci-pltfm.h"
-> @@ -38,6 +40,27 @@ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
->  	return readw(host->ioaddr + reg);
->  }
->  
-> +static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
-> +{
-> +	switch (reg) {
-> +	case SDHCI_INT_STATUS:
-> +		/*
-> +		 * Fix no INT bug in SDIO MULTI-BLK read
-> +		 * clear bit1 of Vendor Spec registor after TC
-> +		 */
-> +		if (val & SDHCI_INT_DATA_END) {
-> +			u32 v;
-> +			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-> +			if (v & 0x2) {
-> +				v &= (~0x2);
-> +				writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-> +			}
-> +		}
-> +		break;
-> +	}
-> +	writel(val, host->ioaddr + reg);
-> +}
-> +
->  static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> @@ -45,12 +68,27 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  	switch (reg) {
->  	case SDHCI_TRANSFER_MODE:
->  		/*
-> +		 * Fix no INT bug in SDIO MULTI-BLK read
-> +		 * set bit1 of Vendor Spec registor
-> +		 */
-> +		if ((host->cmd->opcode == SD_IO_RW_EXTENDED)
-> +				&& (host->cmd->data->blocks > 1)
-> +				&& (host->cmd->data->flags & MMC_DATA_READ)) {
-> +			u32 v;
-> +			v = readl(host->ioaddr + SDHCI_VENDOR_SPEC);
-> +			v |= 0x2;
-> +			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
-> +		}
-> +		/*
->  		 * Postpone this write, we must do it together with a
->  		 * command write that is down below.
->  		 */
->  		pltfm_host->scratchpad = val;
->  		return;
->  	case SDHCI_COMMAND:
-> +		/*Set the CMD_TYPE of the CMD12, fix no INT in MULTI_BLK IO */
-> +		if (host->cmd->opcode == MMC_STOP_TRANSMISSION)
-> +			val |= SDHCI_CMD_ABORTCMD;
->  		writel(val << 16 | pltfm_host->scratchpad,
->  			host->ioaddr + SDHCI_TRANSFER_MODE);
->  		return;
-> @@ -113,7 +151,7 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
->  	clk_enable(clk);
->  	pltfm_host->clk = clk;
->  
-> -	if (cpu_is_mx35() || cpu_is_mx51())
-> +	if (!cpu_is_mx25())
->  		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
->  
->  	/* Fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
-> @@ -133,6 +171,7 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
->  
->  static struct sdhci_ops sdhci_esdhc_ops = {
->  	.read_w = esdhc_readw_le,
-> +	.write_l = esdhc_writel_le,
->  	.write_w = esdhc_writew_le,
->  	.write_b = esdhc_writeb_le,
->  	.set_clock = esdhc_set_clock,
-> diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-> index 303cde0..c93168c 100644
-> --- a/drivers/mmc/host/sdhci-esdhc.h
-> +++ b/drivers/mmc/host/sdhci-esdhc.h
-> @@ -43,6 +43,11 @@
->  
->  #define ESDHC_HOST_CONTROL_RES	0x05
->  
-> +/* Abort type definition in the command register  */
-> +#define  SDHCI_CMD_ABORTCMD	0xC0
-> +/* VENDOR SPEC register */
-> +#define SDHCI_VENDOR_SPEC	0xC0
-> +
->  static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
->  {
->  	int pre_div = 2;
-> -- 
-> 1.7.1
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 	__raw_writel(DA8XX_PRUCORE_CONTROL_RESETVAL,
+> 		     &prucore[pruss_num].control);
+This driver seems to exclusively use the control offset, which is why I don't
+see an absolute need for doing this mapping.
+But if both maps are contiguous then doing the mapping would prevent us from
+calling reg_offset() and would bring some advantage. I'd then be fine with it.
+For now, da8xx_prusscore_regs seems to be larger than the 0x800 interval
+between the 2 maps, so I have no idea if both maps are indeed contiguous.
+
+Cheers,
+Samuel.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/08a756f9/attachment.sig>
+Intel Open Source Technology Centre
+http://oss.intel.com/
