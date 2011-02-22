@@ -1,54 +1,90 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Tue, 22 Feb 2011 07:13:59 -0500
-Subject: [PATCH v2 5/6] davinci: add spi devices support for
-	da850/omap-l138/am18x evm
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BD48EB5@dbde02.ent.ti.com>
-References: <1297257114-764-1-git-send-email-michael.williamson@criticallink.com>
-	<1297257114-764-6-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BD48EB5@dbde02.ent.ti.com>
-Message-ID: <4D63A887.6050301@criticallink.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Feb 2011 20:22:05 +0800
+Subject: [PATCH v3 5/6] ARM: mxs/mx23evk: add mmc device
+In-Reply-To: <20110222083344.GV22310@pengutronix.de>
+References: <1298284979-14853-1-git-send-email-shawn.guo@freescale.com>
+	<1298284979-14853-6-git-send-email-shawn.guo@freescale.com>
+	<20110222083344.GV22310@pengutronix.de>
+Message-ID: <20110222122204.GC19871@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/22/2011 1:37 AM, Nori, Sekhar wrote:
+Hi Uwe,
 
-> On Wed, Feb 09, 2011 at 18:41:53, Michael Williamson wrote:
->> From: Sekhar Nori <nsekhar@ti.com>
->>
->> This patch adds the on-board SPI flash device to the
->> DA850/OMAP-L138/AM18x EVM. It also registers the SPI flash
->> device to the MTD subsystem.
->>
->> Based on SPI flash device support for MityDSP-L138F platform.
->>
->> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->> [michael.williamson at criticallink.com: moved da850_evm_spi1_pdata to devices-da8xx.c]
->> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
->> +static void __init da850evm_init_spi1(struct spi_board_info *info, unsigned len)
->> +{
->> +	int ret;
->> +
->> +	ret = spi_register_board_info(info, len);
->> +	if (ret)
->> +		pr_warning("failed to register board info : %d\n", ret);
->> +
->> +	da8xx_spi_pdata[1].num_chipselect = len;
->> +
->> +	ret = da8xx_register_spi(1);
->> +	if (ret)
->> +		pr_warning("failed to register spi 1 device : %d\n", ret);
->> +}
+On Tue, Feb 22, 2011 at 09:33:44AM +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Feb 21, 2011 at 06:42:58PM +0800, Shawn Guo wrote:
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/Kconfig        |    1 +
+> >  arch/arm/mach-mxs/mach-mx23evk.c |   47 ++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 48 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> > index cd2fbdf..f47fae3 100644
+> > --- a/arch/arm/mach-mxs/Kconfig
+> > +++ b/arch/arm/mach-mxs/Kconfig
+> > @@ -19,6 +19,7 @@ config MACH_MX23EVK
+> >  	bool "Support MX23EVK Platform"
+> >  	select SOC_IMX23
+> >  	select MXS_HAVE_AMBA_DUART
+> > +	select MXS_HAVE_PLATFORM_MMC
+> >  	default y
+> >  	help
+> >  	  Include support for MX23EVK platform. This includes specific
+> > diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+> > index aa06400..21519e3 100644
+> > --- a/arch/arm/mach-mxs/mach-mx23evk.c
+> > +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> > @@ -26,17 +26,64 @@
+> >  
+> >  #include "devices-mx23.h"
+> >  
+> > +#define MX23EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
+> > +#define MX23EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
+> > +
+> >  static const iomux_cfg_t mx23evk_pads[] __initconst = {
+> >  	/* duart */
+> >  	MX23_PAD_PWM0__DUART_RX | MXS_PAD_4MA,
+> >  	MX23_PAD_PWM1__DUART_TX | MXS_PAD_4MA,
+> > +
+> > +	/* mmc */
+> > +	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_GPMI_D08__SSP1_DATA4 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_GPMI_D09__SSP1_DATA5 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_GPMI_D10__SSP1_DATA6 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_GPMI_D11__SSP1_DATA7 |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_SSP1_CMD__SSP1_CMD |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> > +	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > +	MX23_PAD_SSP1_SCK__SSP1_SCK |
+> > +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > +	/* write protect */
+> > +	MX23_PAD_PWM4__GPIO_1_30 |
+> > +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > +	/* slot power enable */
+> > +	MX23_PAD_PWM3__GPIO_1_29 |
+> > +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > +};
+> > +
+> > +static struct mxs_mmc_platform_data mx23_mmc_pdata __initdata = {
+> > +	.wp_gpio = MX23EVK_MMC0_WRITE_PROTECT,
+> > +	.flags = SLOTF_8_BIT_CAPABLE,
+> can this be const?
 > 
-> When reposting can you also modify this to print function name
-> with the error message (so it is easy to find what exactly failed).
-> 
-> The same thing needs to be done with DA830 EVM.
-> 
-> Rest of the stuff looks good to me.
-> 
+Do you care this much to see a new version of the patch?
 
-
-Sure.
-
-> Thanks,
-> Sekhar
+-- 
+Regards,
+Shawn
