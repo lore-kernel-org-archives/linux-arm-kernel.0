@@ -1,39 +1,30 @@
-From: konkers@android.com (Erik Gilling)
-Date: Tue, 22 Feb 2011 15:14:08 -0800
-Subject: [PATCH 1/6] ARM: tegra: add tegra_gpio_table and tegra_gpio_config
-In-Reply-To: <AANLkTimBh2qDx71+P3QCeWJ0sKS1AzYOUohAdSW=AoeS@mail.gmail.com>
-References: <1298354117-19097-1-git-send-email-olof@lixom.net>
-	<1298354117-19097-2-git-send-email-olof@lixom.net>
-	<AANLkTik9_t0mq07mysO2CcK4ppKAmuPAujownfeWEGL5@mail.gmail.com>
-	<AANLkTimBh2qDx71+P3QCeWJ0sKS1AzYOUohAdSW=AoeS@mail.gmail.com>
-Message-ID: <AANLkTikLhbvD5gRogt+-8cXydGJW8w+DvGRii3W86omf@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 22 Feb 2011 20:24:13 -0300
+Subject: [PATCH] ARM: imx/mach-mx25_3ds: Use IMX_GPIO_NR instead of hard-coded
+	values
+Message-ID: <1298417053-14418-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cool
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-mx25_3ds.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Acked-by: Erik Gilling <konkers@android.com>
-
-On Tue, Feb 22, 2011 at 11:35 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi
->
-> On Tue, Feb 22, 2011 at 11:18 AM, Erik Gilling <konkers@android.com> wrote:
->> Can you split the boardfile changes into their own patch? ?Also see
->> the below whitespace only change. ?Other than that, looks good.
->
-> Ok, done (will push separately, no need to repost just with the split though).
->
-> Thanks.
->
->
->>> ?}
->>> -
->>> ?postcore_initcall(tegra_gpio_init);
->>
->> whitespace only change
->
-> D'oh, sloppy of me. Fixed.
->
->
-> -Olof
->
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+index aafc6f7..66b6cdd 100644
+--- a/arch/arm/mach-imx/mach-mx25_3ds.c
++++ b/arch/arm/mach-imx/mach-mx25_3ds.c
+@@ -109,8 +109,8 @@ static const struct fec_platform_data mx25_fec_pdata __initconst = {
+ 	.phy    = PHY_INTERFACE_MODE_RMII,
+ };
+ 
+-#define FEC_ENABLE_GPIO		35
+-#define FEC_RESET_B_GPIO	104
++#define FEC_ENABLE_GPIO		IMX_GPIO_NR(2, 3)
++#define FEC_RESET_B_GPIO	IMX_GPIO_NR(4, 8)
+ 
+ static void __init mx25pdk_fec_reset(void)
+ {
+-- 
+1.6.0.4
