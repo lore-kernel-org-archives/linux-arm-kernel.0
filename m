@@ -1,73 +1,73 @@
-From: ccross@google.com (Colin Cross)
-Date: Mon, 21 Feb 2011 19:21:42 -0800
-Subject: [PATCH 4/4] ARM: tegra: Move pinmux init call
-In-Reply-To: <1298173137-9242-5-git-send-email-swarren@nvidia.com>
-References: <1298173137-9242-1-git-send-email-swarren@nvidia.com>
-	<1298173137-9242-5-git-send-email-swarren@nvidia.com>
-Message-ID: <AANLkTimcadeAHWuFApw_H+AEs+hgURxCRO2X92M9cehG@mail.gmail.com>
+From: marc@cpdesign.com.au (Marc Reilly)
+Date: Tue, 22 Feb 2011 14:23:45 +1100
+Subject: mc13xxx-core, support for i2c, V4
+In-Reply-To: <20110221163347.GG10686@sortiz-mobl>
+References: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
+	<201102122111.30525.marc@cpdesign.com.au>
+	<20110221163347.GG10686@sortiz-mobl>
+Message-ID: <201102221423.45932.marc@cpdesign.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 19, 2011 at 7:38 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> In order for the clock initialization to pick up the results of the
-> pinmux initialization (which will initialize various parameters of
-> clocks cdev1, cdev2), the pinmux initialization must happen first.
-> Move the pinmux init to achieve this.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> ?arch/arm/mach-tegra/board-harmony.c ? | ? ?4 ++--
-> ?arch/arm/mach-tegra/board-trimslice.c | ? ?4 ++--
-> ?2 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-> index b9dbdb1..eea5ad6 100644
-> --- a/arch/arm/mach-tegra/board-harmony.c
-> +++ b/arch/arm/mach-tegra/board-harmony.c
-> @@ -104,12 +104,12 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
->
-> ?static void __init tegra_harmony_init(void)
-> ?{
-> + ? ? ? harmony_pinmux_init();
-> +
-> ? ? ? ?tegra_common_init();
->
-> ? ? ? ?tegra_clk_init_from_table(harmony_clk_init_table);
->
-> - ? ? ? harmony_pinmux_init();
-> -
-> ? ? ? ?platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
-> ?}
->
-> diff --git a/arch/arm/mach-tegra/board-trimslice.c b/arch/arm/mach-tegra/board-trimslice.c
-> index ef233b2..aef6abb 100644
-> --- a/arch/arm/mach-tegra/board-trimslice.c
-> +++ b/arch/arm/mach-tegra/board-trimslice.c
-> @@ -85,12 +85,12 @@ subsys_initcall(tegra_trimslice_pci_init);
->
-> ?static void __init tegra_trimslice_init(void)
-> ?{
-> + ? ? ? trimslice_pinmux_init();
-> +
-> ? ? ? ?tegra_common_init();
->
-> ? ? ? ?tegra_clk_init_from_table(trimslice_clk_init_table);
->
-> - ? ? ? trimslice_pinmux_init();
-> -
-> ? ? ? ?platform_add_devices(trimslice_devices, ARRAY_SIZE(trimslice_devices));
-> ?}
+Hi Samuel,
 
-This isn't going to work any more.  In order for the timer to get a
-reference to its clock, clocks have to be up before the system timer
-is initialized, so Russell added an init_early hook for clock
-initialization.  init_machine happens much later, so the per-board
-pinmux init will always happen after clock init.
 
-The calls from clk_dev1/2 init into tegra_pinmux_get_func should be
-fine, but they will pick up the bootloader's settings instead of the
-board pinmux table settings.  You would need to use the pinmux tables
-to untristate the pins (or maybe add untristating, but not
-re-tristating, to the clk_enable op?), and add clk_dev1/2 entries to
-the clock init table to set the parent to get the correct pinmux
-settings.
+> > > {Grant wrote}
+> > > This series looks okay to me.  Since this is audio drivers, I expect
+> > > that it would best be taken via the ASoC tree?  Have you sent it to
+> > > Mark Brown and the ALSA list for review?
+> > > 
+> > > g.
+> > 
+> > Actually only the mc13873 has audio support. I think these IC's really
+> > fit better under the MFD tree, but silly me didn't add Samuel Ortiz (MFD
+> > maintainer) to this series... so included him now.
+> > 
+> > Samuel, are you the most appropriate to take this series in and would you
+> > like me to resend these patches to you? The thread archive is at [1].
+> 
+> Yes, I would be the one taking those patches. Please resend the patch set
+> to me, and I'll have a look. 
+
+I don't have the original patch files available to resend the normal way, but 
+attached are the 4 patch files off of patchwork [1]. Apologies if they are not 
+what is required/inconvenient for you.
+
+> Has Uwe commented on them yet ?
+Uwe was very helpful in the first three versions of this series, but didn't 
+have anything to say about V4.
+
+
+Cheers
+Marc
+
+[1] https://patchwork.kernel.org/patch/449541/
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: v4-1-4-mc13xxx-core-Prepare-for-separate-spi-and-i2c-backends..patch
+Type: text/x-patch
+Size: 11185 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/eec38aa9/attachment-0004.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: v4-2-4-mc13xxx-core-Kconfig-Config-menu-driven-by-specific-IC-type.patch
+Type: text/x-patch
+Size: 2740 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/eec38aa9/attachment-0005.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: v4-3-4-mc13xxx-core-Move-spi-specific-code-into-separate-module..patch
+Type: text/x-patch
+Size: 10876 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/eec38aa9/attachment-0006.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: v4-4-4-mc13xxx-core-Add-i2c-driver.patch
+Type: text/x-patch
+Size: 5118 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/eec38aa9/attachment-0007.bin>
