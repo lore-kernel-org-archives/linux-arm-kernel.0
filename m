@@ -1,73 +1,35 @@
-From: ccross@google.com (Colin Cross)
-Date: Tue, 22 Feb 2011 11:09:43 -0800
-Subject: [PATCH 3/5] ARM: tegra: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <1298302096-21275-4-git-send-email-will.deacon@arm.com>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-4-git-send-email-will.deacon@arm.com>
-Message-ID: <AANLkTimYvHOzv2w_oxOB5HJfMhp8Kg_A0-Y7Mj41M-HX@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 22 Feb 2011 12:09:56 -0700 (MST)
+Subject: [PATCH 0/3] OMAP2+ hwmod fixes
+In-Reply-To: <e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<4D5BCC10.2060301@ti.com>
+	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
+	<4D5E85EA.70605@ti.com>
+	<alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
+	<e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102221200260.22636@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 7:28 AM, Will Deacon <will.deacon@arm.com> wrote:
-> The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
-> chip prior to handling the interrupt.
->
-> This patch updates the code to use ->irq_eoi now that the GIC has moved
-> to using the fasteoi flow model.
->
-> Cc: Colin Cross <ccross@google.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> ?arch/arm/mach-tegra/gpio.c | ? 17 +----------------
-> ?1 files changed, 1 insertions(+), 16 deletions(-)
->
-> diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-> index ad80488..5019b01 100644
-> --- a/arch/arm/mach-tegra/gpio.c
-> +++ b/arch/arm/mach-tegra/gpio.c
-> @@ -219,9 +219,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ?struct tegra_gpio_bank *bank;
-> ? ? ? ?int port;
-> ? ? ? ?int pin;
-> - ? ? ? int unmasked = 0;
-> -
-> - ? ? ? desc->irq_data.chip->irq_ack(&desc->irq_data);
->
-> ? ? ? ?bank = get_irq_data(irq);
->
-> @@ -233,23 +230,11 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
->
-> ? ? ? ? ? ? ? ?for_each_set_bit(pin, &sta, 8) {
-> ? ? ? ? ? ? ? ? ? ? ? ?__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
-> -
-> - ? ? ? ? ? ? ? ? ? ? ? /* if gpio is edge triggered, clear condition
-> - ? ? ? ? ? ? ? ? ? ? ? ?* before executing the hander so that we don't
-> - ? ? ? ? ? ? ? ? ? ? ? ?* miss edges
-> - ? ? ? ? ? ? ? ? ? ? ? ?*/
-> - ? ? ? ? ? ? ? ? ? ? ? if (lvl & (0x100 << pin)) {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unmasked = 1;
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> - ? ? ? ? ? ? ? ? ? ? ? }
-> -
-> ? ? ? ? ? ? ? ? ? ? ? ?generic_handle_irq(gpio_to_irq(gpio + pin));
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
->
-> - ? ? ? if (!unmasked)
-> - ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
-> -
-> + ? ? ? desc->irq_data.chip->irq_eoi(&desc->irq_data);
-> ?}
->
-> ?#ifdef CONFIG_PM
-> --
-> 1.7.0.4
->
->
->
+Hi Rajendra
 
-Acked-by: Colin Cross <ccross@android.com>
+On Tue, 22 Feb 2011, Rajendra Nayak wrote:
 
-Works with chained gpio handlers on Tegra, although the patch is
-filled with = escaping.
+> The original behavior of the iterators, to terminate upon
+> encountering an error, seems fine to me. The only problem
+> I faced was that they fail silently and go undetected, unless
+> their user catches the return value and WARN's, which I found
+> was not the case with most users, mainly those of
+> omap_hwmod_for_each_by_class.
+> I was thinking of keeping the behaviour of these iterators
+> same for now and add WARN's in these iterators itself upon
+> an error, so its seen even if the user fails to catch it.
+
+What's your opinion on adding the pr_err() or WARN() into the code that 
+the iterator calls for each hwmod?  That code should know why something 
+fails, so it should be able to provide a more detailed error message.  Of 
+course, it is not as general a solution...
+
+
+- Paul
