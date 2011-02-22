@@ -1,26 +1,154 @@
 From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Tue, 22 Feb 2011 17:28:43 +0530
+Date: Tue, 22 Feb 2011 17:31:30 +0530
 Subject: [PATCH v2 1/2] PRUSS UIO driver support
-In-Reply-To: <alpine.LFD.2.00.1102211939110.2701@localhost6.localdomain6>
+In-Reply-To: <20110221184432.GA2773@local>
 References: <1298309715-21362-1-git-send-email-pratheesh@ti.com>
 	<1298309715-21362-2-git-send-email-pratheesh@ti.com>
-	<alpine.LFD.2.00.1102211939110.2701@localhost6.localdomain6>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BD49152@dbde02.ent.ti.com>
+	<20110221184432.GA2773@local>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BD49158@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 > -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Tuesday, February 22, 2011 12:24 AM
+> From: Hans J. Koch [mailto:hjk at hansjkoch.de]
+> Sent: Tuesday, February 22, 2011 12:15 AM
 > To: TK, Pratheesh Gangadhar
 > Cc: davinci-linux-open-source at linux.davincidsp.com; hjk at hansjkoch.de;
 > gregkh at suse.de; Chatterjee, Amit; linux-kernel at vger.kernel.org; linux-arm-
 > kernel at lists.infradead.org
 > Subject: Re: [PATCH v2 1/2] PRUSS UIO driver support
 > 
-> On Mon, 21 Feb 2011, Pratheesh Gangadhar wrote:
+> On Mon, Feb 21, 2011 at 11:05:14PM +0530, Pratheesh Gangadhar wrote:
+> > This patch implements PRUSS (Programmable Real-time Unit Sub System)
+> > UIO driver which exports SOC resources associated with PRUSS like
+> > I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
+> > processors which is efficient in performing embedded tasks that
+> > require manipulation of packed memory mapped data structures and
+> > efficient in handling system events that have tight real time
+> > constraints. This driver is currently supported on Texas Instruments
+> > DA850, AM18xx and OMAPL1-38 devices.
+> > For example, PRUSS runs firmware for real-time critical industrial
+> > communication data link layer and communicates with application stack
+> > running in user space via shared memory and IRQs.
+> >
+> > Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
+> 
+> Looks much better now. Just some minor issues, see below.
+> 
+> Thanks,
+> Hans
+> 
+> > ---
+> >  drivers/uio/Kconfig     |    9 ++
+> >  drivers/uio/Makefile    |    1 +
+> >  drivers/uio/uio_pruss.c |  231
+> +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 241 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/uio/uio_pruss.c
+> >
+> > diff --git a/drivers/uio/Kconfig b/drivers/uio/Kconfig
+> > index bb44079..f92f20d 100644
+> > --- a/drivers/uio/Kconfig
+> > +++ b/drivers/uio/Kconfig
+> > @@ -94,4 +94,13 @@ config UIO_NETX
+> >  	  To compile this driver as a module, choose M here; the module
+> >  	  will be called uio_netx.
+> >
+> > +config UIO_PRUSS
+> > +	tristate "Texas Instruments PRUSS driver"
+> > +	depends on ARCH_DAVINCI_DA850
+> > +	help
+> > +	  PRUSS driver for OMAPL138/DA850/AM18XX devices
+> > +	  PRUSS driver requires user space components
+> 
+> It would be nice to mention a link here where these user space components
+> are
+> available.
+Ok, will do.
+> 
+> > +	  To compile this driver as a module, choose M here: the module
+> > +	  will be called uio_pruss.
+> > +
+> >  endif
+> > diff --git a/drivers/uio/Makefile b/drivers/uio/Makefile
+> > index 18fd818..d4dd9a5 100644
+> > --- a/drivers/uio/Makefile
+> > +++ b/drivers/uio/Makefile
+> > @@ -6,3 +6,4 @@ obj-$(CONFIG_UIO_AEC)	+= uio_aec.o
+> >  obj-$(CONFIG_UIO_SERCOS3)	+= uio_sercos3.o
+> >  obj-$(CONFIG_UIO_PCI_GENERIC)	+= uio_pci_generic.o
+> >  obj-$(CONFIG_UIO_NETX)	+= uio_netx.o
+> > +obj-$(CONFIG_UIO_PRUSS)         += uio_pruss.o
+> > diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
+> > new file mode 100644
+> > index 0000000..b402197
+> > --- /dev/null
+> > +++ b/drivers/uio/uio_pruss.c
+> > @@ -0,0 +1,231 @@
+> > +/*
+> > + * Programmable Real-Time Unit Sub System (PRUSS) UIO driver
+> (uio_pruss)
+> > + *
+> > + * This driver exports PRUSS host event out interrupts and PRUSS, L3
+> RAM,
+> > + * and DDR RAM to user space for applications interacting with PRUSS
+> firmware
+> > + *
+> > + * Copyright (C) 2010-11 Texas Instruments Incorporated -
+> http://www.ti.com/
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation version 2.
+> > + *
+> > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> > + * kind, whether express or implied; without even the implied warranty
+> > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +#include <linux/device.h>
+> > +#include <linux/module.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/uio_driver.h>
+> > +#include <linux/io.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#define DRV_NAME "pruss"
+> > +#define DRV_VERSION "0.50"
+> > +
+> > +/*
+> > + * Host event IRQ numbers from PRUSS - PRUSS can generate upto 8
+> interrupt
+> > + * events to AINTC of ARM host processor - which can be used for IPC
+> b/w PRUSS
+> > + * firmware and user space application, async notification from PRU
+> firmware
+> > + * to user space application
+> > + * 3	PRU_EVTOUT0
+> > + * 4	PRU_EVTOUT1
+> > + * 5	PRU_EVTOUT2
+> > + * 6	PRU_EVTOUT3
+> > + * 7	PRU_EVTOUT4
+> > + * 8	PRU_EVTOUT5
+> > + * 9	PRU_EVTOUT6
+> > + * 10	PRU_EVTOUT7
+> > +*/
+> > +
+> > +#define MAX_PRUSS_EVTOUT_INSTANCE	8
+> > +
+> > +#define	PRUSS_INTC_HIPIR		0x4900
+> > +#define	PRUSS_INTC_HIPIR_INTPEND_MASK	0x80000000
+> > +#define	PRUSS_INTC_HIER			0x5500
+> > +
+> > +struct clk *pruss_clk;
+> > +struct uio_info *info;
+> > +void *ddr_virt_addr;
+> > +dma_addr_t ddr_phy_addr;
+> > +
 > > +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
 > > +{
 > > +	void __iomem *int_enable_reg = dev_info->mem[0].internal_addr
@@ -28,31 +156,30 @@ Hi,
 > > +	void __iomem *int_status_reg = dev_info->mem[0].internal_addr
 > > +					+ PRUSS_INTC_HIPIR+((irq-1) << 2);
 > 
->   	void __iomem *base = dev_info->mem[0].internal_addr;
-> 	void __iomem *int_enable_reg = base + PRUSS_INTC_HIER;
-> 	....
+> Blank line between variable definitions and code, please.
 > 
-> Makes that readable.
 Ok.
-> 
 > > +	/* Is interrupt enabled and active ? */
 > > +	if (!(ioread32(int_enable_reg) & (1<<(irq-1))) &&
+> 
+> Hmm. I'd prefer blanks around operands, like (1 << (irq - 1))).
+> I won't be too picky about that, noticing that checkpatch.pl doesn't
+> complain.
+> If you want to do me a favor, you can fix it ;-)
+> 
+Ok.
 > > +		 (ioread32(int_status_reg) & PRUSS_INTC_HIPIR_INTPEND_MASK))
 > > +		return IRQ_NONE;
-> 
->   That returns when the interrupt is disabled _AND_ pending. It should
->   return when the interrupt is disabled _OR_ not pending.
-I should have named it _NOPEND_MASK, basically mask is set when there is no pending interrupt.
-
 > > +
 > > +	/* Disable interrupt */
 > > +	iowrite32(ioread32(int_enable_reg) & ~(1<<(irq-1)),
+> 
+> If you save the return value of the first ioread32(int_enable_reg) in a
+> variable,
+> you don't need the second hardware access.
+> 
+Will do.
 > > +		int_enable_reg);
-> 
-> Chosing shorter variable names avoid those line breaks all over the
-> place.
-> 
-Ok.
 > > +	return IRQ_HANDLED;
 > > +}
 > > +
@@ -61,23 +188,15 @@ Ok.
 > > +{
 > > +	int count;
 > 
-> New line between variables and code please
+> Blank line between variable definitions and code, please.
 > 
 Ok.
 > > +	if (info) {
-> 
-> This check is silly. pruss_probe() returns right away when it cannot
-> allocate info. pruss_remove() is never called when info == NULL
-> 
-Ok.
 > > +		for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
 > > +			uio_unregister_device(&info[count]);
 > > +			kfree(info[count].name);
 > > +			iounmap(info[count].mem[0].internal_addr);
-> 
-> Why do you map/unmap the same physical address 8 times ????
-Will fix this.
-> 
+> > +
 > > +		}
 > > +		if (ddr_virt_addr)
 > > +			dma_free_coherent(&dev->dev, info[0].mem[2].size,
@@ -86,10 +205,6 @@ Will fix this.
 > > +		kfree(info);
 > > +	}
 > > +	if (pruss_clk != NULL)
-> 
-> Silly check as well.
-> 
-Ok.
 > > +		clk_put(pruss_clk);
 > > +}
 > > +
@@ -113,13 +228,10 @@ Ok.
 > > +		       GFP_KERNEL);
 > > +	if (info == NULL)
 > 
->   if (!info)
+> if (!info) looks better.
 > 
 > > +		return -ENOMEM;
-> 
->   Leaves the clock enabled
-> 
-Will fix this.
+> > +
 > > +	regs_pruram = platform_get_resource(dev, IORESOURCE_MEM, 0);
 > > +	if (!regs_pruram) {
 > > +		dev_err(&dev->dev, "No memory resource specified\n");
@@ -147,34 +259,16 @@ Will fix this.
 > > +	}
 > > +
 > > +	for (count = 0; count < MAX_PRUSS_EVTOUT_INSTANCE; count++) {
-> 
-> Sigh. Can't you have a pointer struct uio_info *p and do the following.
-> 
-Ok.
->       for (cnt = 0; p = info; cnt < MAX_PRUSS_EVTOUT_INSTANCE; cnt++, p++)
-> {
-> 
->       	       p->mem[0] ...
-> 
 > > +		info[count].mem[0].addr = regs_pruram->start;
 > > +		info[count].mem[0].size =
 > > +		    regs_pruram->end - regs_pruram->start + 1;
 > > +		if (!info[count].mem[0].addr ||
 > > +			!(info[count].mem[0].size - 1)) {
-> 
-> All you catch is size == 0. So with size == 1 it works ???
-I can drop this check as well as normally one won't specify improbable size for mapping memory during configuration.
-> 
 > > +			dev_err(&dev->dev, "Invalid memory resource\n");
 > > +			goto out_free;
 > > +		}
 > > +		info[count].mem[0].internal_addr =
 > > +		    ioremap(regs_pruram->start, info[count].mem[0].size);
-> 
-> That's redundant to remap the same address 8 times. That and the check
-> above should be done before the loop and the result used in the loop.
-> 
-Ok, will do.
 > > +		if (!info[count].mem[0].internal_addr) {
 > > +			dev_err(&dev->dev,
 > > +				"Can't remap memory address range\n");
@@ -190,9 +284,6 @@ Ok, will do.
 > > +			dev_err(&dev->dev, "Invalid memory resource\n");
 > > +			goto out_free;
 > > +		}
-> 
-> No need to check the same thing over and over.
-> 
 > > +		info[count].mem[1].memtype = UIO_MEM_PHYS;
 > > +
 > > +		info[count].mem[2].internal_addr = ddr_virt_addr;
@@ -203,20 +294,12 @@ Ok, will do.
 > > +		string = kzalloc(20, GFP_KERNEL);
 > > +		sprintf(string, "pruss_evt%d", count);
 > > +		info[count].name = string;
-> 
->   kasprintf() please
-Ok.
-> 
 > > +		info[count].version = "0.50";
 > > +
 > > +		/* Register PRUSS IRQ lines */
 > > +		info[count].irq = IRQ_DA8XX_EVTOUT0 + count;
 > > +
 > > +		info[count].irq_flags = 0;
-> 
->   Is already zero
-> 
-Ok.
 > > +		info[count].handler = pruss_handler;
 > > +
 > > +		ret = uio_register_device(&dev->dev, &info[count]);
@@ -237,12 +320,9 @@ Ok.
 > > +{
 > > +	struct uio_info *info = platform_get_drvdata(dev);
 > 
-> Empty line between variables and code.
+> Blank line, please.
 > 
 Ok.
-> > +	pruss_cleanup(dev, info);
-> > +	platform_set_drvdata(dev, NULL);
-> > +	return 0;
-> 
+
 Thanks,
 Pratheesh
