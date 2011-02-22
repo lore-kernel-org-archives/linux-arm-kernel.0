@@ -1,123 +1,98 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 22 Feb 2011 14:13:21 +0530
-Subject: [PATCH v2 13/13] tty: pruss SUART driver
-In-Reply-To: <201102181951.32631.arnd@arndb.de>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<20110218143500.23b3044b@lxorguk.ukuu.org.uk>
-	<alpine.LFD.2.00.1102181917520.2701@localhost6.localdomain6>
-	<201102181951.32631.arnd@arndb.de>
-Message-ID: <DADE3366197E4479A57F3B967A881C33@subhasishg>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Feb 2011 16:49:19 +0800
+Subject: [PATCH v4] ARM: mxs/mx23evk: add mmc device
+In-Reply-To: <1298284979-14853-6-git-send-email-shawn.guo@freescale.com>
+References: <1298284979-14853-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1298364559-19876-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I agree with the Codingstyle which needs to be fixed and would appreciate 
-more feedback on it.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-mxs/Kconfig        |    1 +
+ arch/arm/mach-mxs/mach-mx23evk.c |   47 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+), 0 deletions(-)
 
-I have also gotten rid of the semaphore completely, please let me know what 
-you feel of this implementation:
-I have tested this without any problem.
-What I am basically doing below is that, I am getting the data from the circ 
-buff and then using the interrupt handler to
-pump out the data. As the circ buff empties, I am accepting another request 
-from the TTY.
-Are you noticing any problems with this:
-
-diff --git a/drivers/tty/serial/da8xx_pruss/pruss_suart.c 
-b/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-index d222e2e..edc3863 100644
---- a/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-+++ b/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-@@ -72,7 +72,7 @@ struct suart_fifo {
- struct omapl_pru_suart {
-        struct uart_port port[NR_SUART];
-        struct device *dev; /* pdev->dev */
--       struct semaphore port_sem[NR_SUART];
-+       bool tx_empty[NR_SUART];
-        struct clk *clk_mcasp;
-        struct suart_fifo suart_fifo_addr[NR_SUART];
-        const struct firmware *fw;
-@@ -122,13 +122,10 @@ static void omapl_pru_tx_chars(struct omapl_pru_suart 
-*soft_uart, u32 uart_no)
-        if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_TX))
-                return;
-
--       if (down_trylock(&soft_uart->port_sem[uart_no]))
--               return;
--
-        if (uart_circ_empty(xmit) ||
-                        uart_tx_stopped(&soft_uart->port[uart_no])) {
-                pruss_suart_stop_tx(&soft_uart->port[uart_no]);
--               up(&soft_uart->port_sem[uart_no]);
-+               soft_uart->tx_empty[uart_no] = true;
-                return;
-        }
-
-@@ -259,7 +256,6 @@ static irqreturn_t pruss_suart_interrupt(s32 irq, void 
-*dev_id)
-                        pru_intr_clr_isrstatus(dev, uart_num, PRU_TX_INTR);
-                        pru_softuart_clr_tx_status(dev, 
-&soft_uart->suart_hdl
-                                                 [port->line]);
--                       up(&soft_uart->port_sem[port->line]);
-                        omapl_pru_tx_chars(soft_uart, port->line);
-                }
-        } while (txrx_flag & (PRU_RX_INTR | PRU_TX_INTR));
-@@ -294,7 +290,10 @@ static void pruss_suart_start_tx(struct uart_port 
-*port)
-
-        suart_intr_setmask(dev, soft_uart->suart_hdl[port->line].uart_num,
-                           PRU_TX_INTR, CHN_TXRX_IE_MASK_CMPLT);
--       omapl_pru_tx_chars(soft_uart, port->line);
-+       if (soft_uart->tx_empty[port->line] == true) {
-+               soft_uart->tx_empty[port->line] = false;
-+               omapl_pru_tx_chars(soft_uart, port->line);
-+       }
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index cd2fbdf..f47fae3 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -19,6 +19,7 @@ config MACH_MX23EVK
+ 	bool "Support MX23EVK Platform"
+ 	select SOC_IMX23
+ 	select MXS_HAVE_AMBA_DUART
++	select MXS_HAVE_PLATFORM_MMC
+ 	default y
+ 	help
+ 	  Include support for MX23EVK platform. This includes specific
+diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+index aa06400..d690fa0 100644
+--- a/arch/arm/mach-mxs/mach-mx23evk.c
++++ b/arch/arm/mach-mxs/mach-mx23evk.c
+@@ -26,17 +26,64 @@
+ 
+ #include "devices-mx23.h"
+ 
++#define MX23EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
++#define MX23EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
++
+ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+ 	/* duart */
+ 	MX23_PAD_PWM0__DUART_RX | MXS_PAD_4MA,
+ 	MX23_PAD_PWM1__DUART_TX | MXS_PAD_4MA,
++
++	/* mmc */
++	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_GPMI_D08__SSP1_DATA4 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_GPMI_D09__SSP1_DATA5 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_GPMI_D10__SSP1_DATA6 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_GPMI_D11__SSP1_DATA7 |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_SSP1_CMD__SSP1_CMD |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
++	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	MX23_PAD_SSP1_SCK__SSP1_SCK |
++		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	/* write protect */
++	MX23_PAD_PWM4__GPIO_1_30 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++	/* slot power enable */
++	MX23_PAD_PWM3__GPIO_1_29 |
++		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++};
++
++static struct mxs_mmc_platform_data mx23evk_mmc_pdata __initdata = {
++	.wp_gpio = MX23EVK_MMC0_WRITE_PROTECT,
++	.flags = SLOTF_8_BIT_CAPABLE,
+ };
+ 
+ static void __init mx23evk_init(void)
+ {
++	int ret;
++
+ 	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+ 
+ 	mx23_add_duart();
++
++	/* power on mmc slot by writing 0 to the gpio */
++	ret = gpio_request_one(MX23EVK_MMC0_SLOT_POWER, GPIOF_DIR_OUT,
++			       "mmc0-slot-power");
++	if (ret)
++		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
++	mx23_add_mmc(0, &mx23evk_mmc_pdata);
  }
-
-
---------------------------------------------------
-From: "Arnd Bergmann" <arnd@arndb.de>
-Sent: Saturday, February 19, 2011 12:21 AM
-To: <linux-arm-kernel@lists.infradead.org>
-Cc: "Thomas Gleixner" <tglx@linutronix.de>; "Alan Cox" 
-<alan@lxorguk.ukuu.org.uk>; <sachi@mistralsolutions.com>; 
-<davinci-linux-open-source@linux.davincidsp.com>; "Subhasish Ghosh" 
-<subhasish@mistralsolutions.com>; "Greg Kroah-Hartman" <gregkh@suse.de>; 
-<nsekhar@ti.com>; "open list" <linux-kernel@vger.kernel.org>; 
-<m-watkins@ti.com>
-Subject: Re: [PATCH v2 13/13] tty: pruss SUART driver
-
-> On Friday 18 February 2011 19:23:49 Thomas Gleixner wrote:
->> On Fri, 18 Feb 2011, Alan Cox wrote:
->>
->> > On Fri, 18 Feb 2011 19:17:38 +0530
->> > "Subhasish Ghosh" <subhasish@mistralsolutions.com> wrote:
->> >
->> > > Hello,
->> > >
->> > > Regarding the semaphore to mutex migration.
->> > > We are using down_trylock in interrupt context,
->> > > mutex_trylock cannot be used in interrupt context, so we cannot use 
->> > > mutex in
->> > > our driver.
->> >
->> > Then you probably need to rework your locking. Best bet might be to fix
->> > all the other stuff and report the driver, and people can think about 
->> > the
->> > locking problem.
->>
->> That semaphore is utterly useless to begin with. There are more
->> serious locking problems than this one. Non serialized calls to
->> suart_intr_clrmask/suart_intr_setmask are the most obvious ones.
->>
->> Aside of that the code is complete unreadable.
->
-> I think it mostly suffers from the same problem as the CAN driver
-> I commented on earlier: One of the files (pruss_suart_api.c) was
-> clearly not written with Linux as the target, and the other files
-> try to work around this by wrapping a Linux driver around it.
->
-> The suart_api HAL stuff clearly needs to go away, so that the rest
-> can be rewritten into a proper device driver.
->
-> Arnd 
+ 
+ static void __init mx23evk_timer_init(void)
+-- 
+1.7.1
