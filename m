@@ -1,63 +1,49 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 13:58:17 +0100
-Subject: [PATCH 2/5] mmc: sdhci-esdhc: broken card detection is not a default
-	quirk
-In-Reply-To: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
-References: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1298379500-27590-3-git-send-email-w.sang@pengutronix.de>
+Date: Tue, 22 Feb 2011 13:58:15 +0100
+Subject: [PATCH V2 0/5] sdhci-esdhc-imx: use gpio for write protection and
+	card detection
+Message-ID: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It can be worked around using a GPIO which will be done for i.MX later.
+Hi,
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
-Tested-by: Marc Reilly <marc@cpdesign.com.au>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    3 ++-
- drivers/mmc/host/sdhci-esdhc.h     |    1 -
- drivers/mmc/host/sdhci-of-esdhc.c  |    3 ++-
- 3 files changed, 4 insertions(+), 3 deletions(-)
+Second version of my series, no major changes:
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 65df00b..49c9801 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -171,7 +171,8 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- }
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-+			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
- 	/* ADMA has issues. Might be fixable */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index afaf1bc..c55aae8 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -19,7 +19,6 @@
-  */
- 
- #define ESDHC_DEFAULT_QUIRKS	(SDHCI_QUIRK_FORCE_BLK_SZ_2048 | \
--				SDHCI_QUIRK_BROKEN_CARD_DETECTION | \
- 				SDHCI_QUIRK_NO_BUSY_IRQ | \
- 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
- 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fcd0e1f..08161f6 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -73,7 +73,8 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
- }
- 
- struct sdhci_of_data sdhci_esdhc = {
--	.quirks = ESDHC_DEFAULT_QUIRKS,
-+	/* card detection could be handled via GPIO */
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION,
- 	.ops = {
- 		.read_l = sdhci_be32bs_readl,
- 		.read_w = esdhc_readw,
+* rephrased warnings
+* collected some tags
+* rebased to mmc/mmc-next as of today
+
+Eric wanted to tested these patches soonish. Thanks to Marc for testing the
+first three already.
+
+I think the first three patches should go via Chris and the latter two via
+Sascha. The last one is more a cleanup-patch, but it depends on the former, so
+I included it here.
+
+The branch can be found at:
+
+	git://git.pengutronix.de/git/wsa/linux-2.6.git pcm043-mmc
+
+Thanks,
+
+   Wolfram
+
+Wolfram Sang (5):
+  mmc: sdhci-esdhc-imx: add support for write protect on custom GPIO
+  mmc: sdhci-esdhc: broken card detection is not a default quirk
+  mmc: sdhci-esdhc-imx: add card detect on custom GPIO
+  arm: mach-mx3: pcm043: add write-protect and card-detect for SD1
+  arm: mach-mx3: use IMX_GPIO_NR instead of hard-coded values
+
+ arch/arm/mach-mx3/eukrea_mbimxsd-baseboard.c |    4 +-
+ arch/arm/mach-mx3/mach-cpuimx35.c            |    2 +-
+ arch/arm/mach-mx3/mach-pcm043.c              |   19 +++-
+ arch/arm/plat-mxc/include/mach/esdhc.h       |   12 ++-
+ drivers/mmc/host/sdhci-esdhc-imx.c           |  131 +++++++++++++++++++++++---
+ drivers/mmc/host/sdhci-esdhc.h               |    1 -
+ drivers/mmc/host/sdhci-of-esdhc.c            |    3 +-
+ 7 files changed, 148 insertions(+), 22 deletions(-)
+
 -- 
 1.7.2.3
