@@ -1,17 +1,83 @@
 From: ccross@android.com (Colin Cross)
-Date: Mon, 21 Feb 2011 18:39:45 -0800
-Subject: [PATCH 0/7] Second batch of Tegra clock updates for 2.6.39
-Message-ID: <1298342392-21236-1-git-send-email-ccross@android.com>
+Date: Mon, 21 Feb 2011 18:39:52 -0800
+Subject: [PATCH 7/7] ARM: tegra: clock: Disable clocks left on by bootloader
+In-Reply-To: <1298342392-21236-1-git-send-email-ccross@android.com>
+References: <1298342392-21236-1-git-send-email-ccross@android.com>
+Message-ID: <1298342392-21236-8-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains two small patches out of the previous
-series that needed fixes, as well as some new ones to disable
-unused clocks during boot and related bug fixes.
+Iterates through all clocks, disabling any for which the
+refcount is 0 but the clock init detected the bootloader
+left the clock on.  Can be disabled with command line
+tegra_clock.disable_boot_clocks=N
 
-Patch 4 converts the Harmony and Trimslice boards to use the new
-init_early machine handler.  Any boards that go in after this
-patch will need to be updated to match, and this patch will need
-to be updated if any boards go in before this patch.
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/mach-tegra/clock.c |   44 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
 
-Tested-bys on Harmony and Trimslice would be appreciated.
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index e028320..6d686ff 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -33,6 +33,9 @@
+ #include "board.h"
+ #include "clock.h"
+ 
++#undef MODULE_PARAM_PREFIX
++#define MODULE_PARAM_PREFIX "tegra_clock."
++
+ /*
+  * Locking:
+  *
+@@ -416,6 +419,47 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
+ 	spin_unlock_irqrestore(&c->spinlock, flags);
+ }
+ 
++static bool tegra_disable_boot_clocks = true;
++module_param_named(disable_boot_clocks, tegra_disable_boot_clocks, bool,
++	S_IRUGO | S_IWUSR | S_IWGRP);
++
++/*
++ * Iterate through all clocks, disabling any for which the refcount is 0
++ * but the clock init detected the bootloader left the clock on.
++ */
++static int __init tegra_init_disable_boot_clocks(void)
++{
++	struct clk *c;
++
++	mutex_lock(&clock_list_lock);
++
++	list_for_each_entry(c, &clocks, node) {
++		spin_lock_irq(&c->spinlock);
++
++		if (c->refcnt == 0 && c->state == ON &&
++				c->ops && c->ops->disable) {
++			pr_warn_once("%s clocks left on by bootloader:\n",
++				tegra_disable_boot_clocks ?
++					"Disabling" :
++					"Prevented disabling");
++
++			pr_warn("   %s\n", c->name);
++
++			if (tegra_disable_boot_clocks) {
++				c->ops->disable(c);
++				c->state = OFF;
++			}
++		}
++
++		spin_unlock_irq(&c->spinlock);
++	}
++
++	mutex_unlock(&clock_list_lock);
++
++	return 0;
++}
++late_initcall(tegra_init_disable_boot_clocks);
++
+ #ifdef CONFIG_DEBUG_FS
+ 
+ static int __clk_lock_all_spinlocks(void)
+-- 
+1.7.3.1
