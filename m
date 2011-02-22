@@ -1,68 +1,142 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 13:58:19 +0100
-Subject: [PATCH 4/5] arm: mach-mx3: pcm043: add write-protect and card-detect
-	for SD1
+Date: Tue, 22 Feb 2011 13:58:16 +0100
+Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add support for write protect on
+	custom GPIO
 In-Reply-To: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
 References: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1298379500-27590-5-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1298379500-27590-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Tested-by: Marc Reilly <marc@cpdesign.com.au>
 ---
- arch/arm/mach-mx3/mach-pcm043.c |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx3/mach-pcm043.c b/arch/arm/mach-mx3/mach-pcm043.c
-index bcf83fc..26b686c 100644
---- a/arch/arm/mach-mx3/mach-pcm043.c
-+++ b/arch/arm/mach-mx3/mach-pcm043.c
-@@ -40,6 +40,7 @@
- #include <mach/mx3fb.h>
- #include <mach/ulpi.h>
- #include <mach/audmux.h>
+Change since last version:
+
+* rewrote the warning message to apply to non-existant wp_gpio
+
+ arch/arm/plat-mxc/include/mach/esdhc.h |   10 +++++-
+ drivers/mmc/host/sdhci-esdhc-imx.c     |   52 +++++++++++++++++++++++++-------
+ 2 files changed, 50 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/esdhc.h b/arch/arm/plat-mxc/include/mach/esdhc.h
+index a48a9aa..dbf6d56 100644
+--- a/arch/arm/plat-mxc/include/mach/esdhc.h
++++ b/arch/arm/plat-mxc/include/mach/esdhc.h
+@@ -10,7 +10,15 @@
+ #ifndef __ASM_ARCH_IMX_ESDHC_H
+ #define __ASM_ARCH_IMX_ESDHC_H
+ 
++/**
++ * struct esdhc_platform_data - optional platform data for esdhc on i.MX
++ *
++ * strongly recommended for i.MX25/35, not needed for other variants
++ *
++ * @wp_gpio:	gpio for write_protect
++ */
++
+ struct esdhc_platform_data {
+-	unsigned int wp_gpio;	/* write protect pin */
++	unsigned int wp_gpio;
+ };
+ #endif /* __ASM_ARCH_IMX_ESDHC_H */
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 9b82910..65df00b 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -15,9 +15,11 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
++#include <linux/gpio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sdhci-pltfm.h>
+ #include <mach/hardware.h>
 +#include <mach/esdhc.h>
- 
- #include "devices-imx35.h"
- #include "devices.h"
-@@ -219,12 +220,17 @@ static iomux_v3_cfg_t pcm043_pads[] = {
- 	MX35_PAD_SD1_DATA1__ESDHC1_DAT1,
- 	MX35_PAD_SD1_DATA2__ESDHC1_DAT2,
- 	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
-+	MX35_PAD_ATA_DATA10__GPIO2_23, /* WriteProtect */
-+	MX35_PAD_ATA_DATA11__GPIO2_24, /* CardDetect */
- };
- 
- #define AC97_GPIO_TXFS	(1 * 32 + 31)
- #define AC97_GPIO_TXD	(1 * 32 + 28)
- #define AC97_GPIO_RESET	(1 * 32 + 0)
- 
-+#define SD1_GPIO_WP	(1 * 32 + 23)
-+#define SD1_GPIO_CD	(1 * 32 + 24)
-+
- static void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
- {
- 	iomux_v3_cfg_t txfs_gpio = MX35_PAD_STXFS4__GPIO2_31;
-@@ -307,6 +313,11 @@ pcm037_nand_board_info __initconst = {
- 	.hw_ecc = 1,
- };
- 
-+static struct esdhc_platform_data sd1_pdata = {
-+	.wp_gpio = SD1_GPIO_WP,
-+	.cd_gpio = SD1_GPIO_CD,
-+};
-+
- #if defined(CONFIG_USB_ULPI)
- static struct mxc_usbh_platform_data otg_pdata __initdata = {
- 	.portsc	= MXC_EHCI_MODE_UTMI,
-@@ -393,7 +404,7 @@ static void __init mxc_board_init(void)
- 		imx35_add_fsl_usb2_udc(&otg_device_pdata);
- 
- 	imx35_add_flexcan1(NULL);
--	imx35_add_sdhci_esdhc_imx(0, NULL);
-+	imx35_add_sdhci_esdhc_imx(0, &sd1_pdata);
+ #include "sdhci.h"
+ #include "sdhci-pltfm.h"
+ #include "sdhci-esdhc.h"
+@@ -100,10 +102,31 @@ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
+ 	return clk_get_rate(pltfm_host->clk) / 256 / 16;
  }
  
- static void __init pcm043_timer_init(void)
++static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
++{
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
++
++	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
++		return gpio_get_value(boarddata->wp_gpio);
++	else
++		return -ENOSYS;
++}
++
++static struct sdhci_ops sdhci_esdhc_ops = {
++	.read_w = esdhc_readw_le,
++	.write_w = esdhc_writew_le,
++	.write_b = esdhc_writeb_le,
++	.set_clock = esdhc_set_clock,
++	.get_max_clock = esdhc_pltfm_get_max_clock,
++	.get_min_clock = esdhc_pltfm_get_min_clock,
++};
++
+ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
+ 	struct clk *clk;
++	int err;
+ 
+ 	clk = clk_get(mmc_dev(host->mmc), NULL);
+ 	if (IS_ERR(clk)) {
+@@ -116,9 +139,21 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ 	if (cpu_is_mx35() || cpu_is_mx51())
+ 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
+ 
+-	/* Fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
+-	if (cpu_is_mx25() || cpu_is_mx35())
++	if (cpu_is_mx25() || cpu_is_mx35()) {
++		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
+ 		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
++		/* write_protect can't be routed to controller, use gpio */
++		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
++	}
++
++	if (boarddata) {
++		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
++		if (err) {
++			dev_warn(mmc_dev(host->mmc),
++				"no write-protect pin available!\n");
++			boarddata->wp_gpio = err;
++		}
++	}
+ 
+ 	return 0;
+ }
+@@ -126,20 +161,15 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ static void esdhc_pltfm_exit(struct sdhci_host *host)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
++
++	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
++		gpio_free(boarddata->wp_gpio);
+ 
+ 	clk_disable(pltfm_host->clk);
+ 	clk_put(pltfm_host->clk);
+ }
+ 
+-static struct sdhci_ops sdhci_esdhc_ops = {
+-	.read_w = esdhc_readw_le,
+-	.write_w = esdhc_writew_le,
+-	.write_b = esdhc_writeb_le,
+-	.set_clock = esdhc_set_clock,
+-	.get_max_clock = esdhc_pltfm_get_max_clock,
+-	.get_min_clock = esdhc_pltfm_get_min_clock,
+-};
+-
+ struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+ 	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
+ 	/* ADMA has issues. Might be fixable */
 -- 
 1.7.2.3
