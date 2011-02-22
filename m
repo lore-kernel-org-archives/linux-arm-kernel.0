@@ -1,157 +1,158 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 13:58:18 +0100
-Subject: [PATCH 3/5] mmc: sdhci-esdhc-imx: add card detect on custom GPIO
-In-Reply-To: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
-References: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1298379500-27590-4-git-send-email-w.sang@pengutronix.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 22 Feb 2011 18:41:36 +0530
+Subject: [PATCH 0/3] OMAP2+ hwmod fixes
+In-Reply-To: <alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<4D5BCC10.2060301@ti.com>
+	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
+	<4D5E85EA.70605@ti.com>
+	<alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
+Message-ID: <e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Tested-by: Marc Reilly <marc@cpdesign.com.au>
----
+Hi Paul,
 
-Change since last version:
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Monday, February 21, 2011 10:25 PM
+> To: Cousson, Benoit; Nayak, Rajendra
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 0/3] OMAP2+ hwmod fixes
+>
+> Hello Beno?t, Rajendra,
+>
+> On Fri, 18 Feb 2011, Cousson, Benoit wrote:
+>
+> > On 2/16/2011 2:43 PM, Nayak, Rajendra wrote:
+> > > > -----Original Message-----
+> > > > From: Cousson, Benoit [mailto:b-cousson at ti.com]
+> > > > Sent: Wednesday, February 16, 2011 6:37 PM
+> > > > To: Nayak, Rajendra
+> > > > Cc: linux-omap at vger.kernel.org; paul at pwsan.com;
+> > > linux-arm-kernel at lists.infradead.org
+> > > > Subject: Re: [PATCH 0/3] OMAP2+ hwmod fixes
+> > > >
+> > > > Hi Rajendra,
+> > > >
+> > > > On 2/16/2011 1:11 PM, Nayak, Rajendra wrote:
+> > > > > This series fixes some hwmod api return values
+> > > > > and also adds some state checks.
+> > > > > The hwmod iterator functions are made to
+> > > > > continue and not break if one of the
+> > > > > callback functions ends up with an error.
+> > > >
+> > > > By doing that, you change the behavior of this function.
+> > > > I'm not sure I fully understand why.
+> > > > Could you elaborate on the use case?
+> > >
+> > > Since these functions iterate over all hwmods
+> > > calling a common callback function, there might
+> > > be cases wherein the callback function for *some*
+> > > hwmods might fail. For instance, if you run through
+> > > all hwmods and try to clear the context registers
+> > > for all of them, for some hwmods which might
+> > > not have context registers the callback function
+> > > might return a -EINVAL, however that should not
+> > > stop you from attempting to clear the context
+> > > registers for the rest of the hwmods which have
+> > > them and abort the function midway, no?
+> > > This is more hypothetical, however the real usecase
+> > > that prompted me with this patch was when I
+> > > had some wrong state check in _setup function,
+> > > and the iterator would stop with the first failure
+> > > and not even attempt to setup the rest of the
+> > > hwmods.
+> >
+> > Yeah, but by using that function you implicitly accept that an error
+will
+> > break the loop, so the function you pass to the iterator should be
+written for
+> > that. Meaning if you do not want to exit on error you should not
+report an
+> > error.
+> >
+> > > > To avoid that behavior in the past, I was just returning
+> > > > 0 in case of failure to avoid stopping the iteration.
+> > > > It looks like you do not want to stop the iteration but still
+> > > > retrieve the error.
+> > > > I do not see in this series what you plan to do with the
+> > > > error at the end of the iteration.
+> > >
+> > > Most users of these iterators would just use the non-zero
+> > > return value to throw an error/warning out stating there
+> > > were failures running through all the callback functions.
+> > > That does not change with this patch, and they can still
+> > > do it.
+> >
+> > Except that now, the iterator is not able anymore to stop on error if
+needed
+> > potentially.
+> > My point is that you are changing the behavior of this function
+without
+> > maintaining the legacy.
+> >
+> > So maybe creating a new iterator is a better approach.
+> > Even is this feature is not used today I have some secret plan for
+this
+> > behavior in the near future :-)
+> >
+> > But my initial comment is still valid, if you do not care about the
+final
+> > error status after the iteration, you'd better not return any error at
+the
+> > beginning.
+> > This was the behavior or the _setup until now.
+>
+> The original behavior of the iterator was intentional: loops over
+> functions like _init_clocks() and _setup() should terminate upon
+> encountering an error.  This is because the rest of that code currently
+> relies on the hwmod/clock data to be accurate in order to work.  There
+is
+> no provision in the code for a hwmod to fail initialization due to data
+> errors.  The idea was that if the data is inaccurate, the data should be
+> fixed first before doing anything else.
 
-* rewrote the warning message to apply to non-existant cd_gpio
+The original behavior of the iterators, to terminate upon
+encountering an error, seems fine to me. The only problem
+I faced was that they fail silently and go undetected, unless
+their user catches the return value and WARN's, which I found
+was not the case with most users, mainly those of
+omap_hwmod_for_each_by_class.
+I was thinking of keeping the behaviour of these iterators
+same for now and add WARN's in these iterators itself upon
+an error, so its seen even if the user fails to catch it.
 
- arch/arm/plat-mxc/include/mach/esdhc.h |    2 +
- drivers/mmc/host/sdhci-esdhc-imx.c     |   76 ++++++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+), 0 deletions(-)
+Regards,
+Rajendra
 
-diff --git a/arch/arm/plat-mxc/include/mach/esdhc.h b/arch/arm/plat-mxc/include/mach/esdhc.h
-index dbf6d56..7501d4e 100644
---- a/arch/arm/plat-mxc/include/mach/esdhc.h
-+++ b/arch/arm/plat-mxc/include/mach/esdhc.h
-@@ -16,9 +16,11 @@
-  * strongly recommended for i.MX25/35, not needed for other variants
-  *
-  * @wp_gpio:	gpio for write_protect
-+ * @cd_gpio:	gpio for card_detect interrupt
-  */
- 
- struct esdhc_platform_data {
- 	unsigned int wp_gpio;
-+	unsigned int cd_gpio;
- };
- #endif /* __ASM_ARCH_IMX_ESDHC_H */
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 49c9801..241eb78 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -32,6 +32,39 @@ static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, i
- 	writel(((readl(base) & ~(mask << shift)) | (val << shift)), base);
- }
- 
-+static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
-+{
-+	/* fake CARD_PRESENT flag on mx25/35 */
-+	u32 val = readl(host->ioaddr + reg);
-+
-+	if (unlikely(reg == SDHCI_PRESENT_STATE)) {
-+		struct esdhc_platform_data *boarddata =
-+				host->mmc->parent->platform_data;
-+
-+		if (boarddata && gpio_is_valid(boarddata->cd_gpio)
-+				&& gpio_get_value(boarddata->cd_gpio))
-+			/* no card, if a valid gpio says so... */
-+			val &= SDHCI_CARD_PRESENT;
-+		else
-+			/* ... in all other cases assume card is present */
-+			val |= SDHCI_CARD_PRESENT;
-+	}
-+
-+	return val;
-+}
-+
-+static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
-+{
-+	if (unlikely(reg == SDHCI_INT_ENABLE))
-+		/*
-+		 * these interrupts won't work with a custom card_detect gpio
-+		 * (only applied to mx25/35)
-+		 */
-+		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
-+
-+	writel(val, host->ioaddr + reg);
-+}
-+
- static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
- {
- 	if (unlikely(reg == SDHCI_HOST_VERSION))
-@@ -121,6 +154,14 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- 	.get_min_clock = esdhc_pltfm_get_min_clock,
- };
- 
-+static irqreturn_t cd_irq(int irq, void *data)
-+{
-+	struct sdhci_host *sdhost = (struct sdhci_host *)data;
-+
-+	tasklet_schedule(&sdhost->card_tasklet);
-+	return IRQ_HANDLED;
-+};
-+
- static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-@@ -142,6 +183,8 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 	if (cpu_is_mx25() || cpu_is_mx35()) {
- 		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
- 		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
-+		/* card_detect can't be routed to controller, mark broken */
-+		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
- 		/* write_protect can't be routed to controller, use gpio */
- 		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
- 	}
-@@ -153,9 +196,35 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 				"no write-protect pin available!\n");
- 			boarddata->wp_gpio = err;
- 		}
-+
-+		err = gpio_request_one(boarddata->cd_gpio, GPIOF_IN, "ESDHC_CD");
-+		if (err) {
-+			dev_warn(mmc_dev(host->mmc),
-+				"no card-detect pin available!\n");
-+			goto no_card_detect_pin;
-+		}
-+
-+		err = request_irq(gpio_to_irq(boarddata->cd_gpio), cd_irq,
-+				 IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-+				 mmc_hostname(host->mmc), host);
-+		if (err) {
-+			dev_warn(mmc_dev(host->mmc), "request irq error\n");
-+			goto no_card_detect_irq;
-+		}
-+
-+		sdhci_esdhc_ops.write_l = esdhc_writel_le;
-+		sdhci_esdhc_ops.read_l = esdhc_readl_le;
-+		/* Now we have a working card_detect again */
-+		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
- 	}
- 
- 	return 0;
-+
-+ no_card_detect_irq:
-+	gpio_free(boarddata->cd_gpio);
-+ no_card_detect_pin:
-+	boarddata->cd_gpio = err;
-+	return 0;
- }
- 
- static void esdhc_pltfm_exit(struct sdhci_host *host)
-@@ -166,6 +235,13 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- 	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
- 		gpio_free(boarddata->wp_gpio);
- 
-+	if (boarddata && gpio_is_valid(boarddata->cd_gpio)) {
-+		gpio_free(boarddata->cd_gpio);
-+
-+		if (!(host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION))
-+			free_irq(gpio_to_irq(boarddata->cd_gpio), host);
-+	}
-+
- 	clk_disable(pltfm_host->clk);
- 	clk_put(pltfm_host->clk);
- }
--- 
-1.7.2.3
+>
+> That said, I suppose that it's possible to enhance the code such that
+> hwmods could be allowed to fail initialization, and simply brick
+> themselves, rather than prevent the rest of the hwmods from
+initializing.
+> Probably that would need a new _HWMOD_STATE_INIT_FAILED, or something
+> similar.  If a hwmod would end up in that state, it must not be used by
+> any other code, and the code should complain loudly.
+>
+> The broader issue of whether the iterators should return immediately
+upon
+> failure (as the current code does), or continue through the rest of the
+> list, is a separate one.  I'd suggest one of two approaches:
+>
+> 1. If the rest of the code can be changed to gracefully handle cases
+where
+> hwmod initialization fails, and if Beno?t agrees, I don't have a problem
+> with changing the iterator behavior to ignore failures as you describe.
+> Of course, all of the current users of omap_hwmod_for_each*() would need
+> to be checked to ensure that this behavior makes sense for them.
+>
+> ... or ...
+>
+> 2. The iterators could take an extra parameter that would control the
+> behavior upon encountering an error: terminate, or continue.  But I am
+not
+> sure that both cases are needed.  Ideas, feedback here are welcome.
+>
+>
+> - Paul
