@@ -1,39 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Feb 2011 18:40:18 +0000
-Subject: [PATCH] ARM: ptrace: fix register indexing in GETHBPREGS request
-Message-ID: <1298400018-10612-1-git-send-email-will.deacon@arm.com>
+From: ccross@google.com (Colin Cross)
+Date: Tue, 22 Feb 2011 11:09:43 -0800
+Subject: [PATCH 3/5] ARM: tegra: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <1298302096-21275-4-git-send-email-will.deacon@arm.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
+	<1298302096-21275-4-git-send-email-will.deacon@arm.com>
+Message-ID: <AANLkTimYvHOzv2w_oxOB5HJfMhp8Kg_A0-Y7Mj41M-HX@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GETHBPREGS ptrace request incorrectly maps its index argument onto
-the thread's saved debug state when the index != 0. This has not yet
-been seen from userspace because GDB (the only user of this request)
-only reads from register 0.
+On Mon, Feb 21, 2011 at 7:28 AM, Will Deacon <will.deacon@arm.com> wrote:
+> The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
+> chip prior to handling the interrupt.
+>
+> This patch updates the code to use ->irq_eoi now that the GIC has moved
+> to using the fasteoi flow model.
+>
+> Cc: Colin Cross <ccross@google.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> ?arch/arm/mach-tegra/gpio.c | ? 17 +----------------
+> ?1 files changed, 1 insertions(+), 16 deletions(-)
+>
+> diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+> index ad80488..5019b01 100644
+> --- a/arch/arm/mach-tegra/gpio.c
+> +++ b/arch/arm/mach-tegra/gpio.c
+> @@ -219,9 +219,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?struct tegra_gpio_bank *bank;
+> ? ? ? ?int port;
+> ? ? ? ?int pin;
+> - ? ? ? int unmasked = 0;
+> -
+> - ? ? ? desc->irq_data.chip->irq_ack(&desc->irq_data);
+>
+> ? ? ? ?bank = get_irq_data(irq);
+>
+> @@ -233,23 +230,11 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+>
+> ? ? ? ? ? ? ? ?for_each_set_bit(pin, &sta, 8) {
+> ? ? ? ? ? ? ? ? ? ? ? ?__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
+> -
+> - ? ? ? ? ? ? ? ? ? ? ? /* if gpio is edge triggered, clear condition
+> - ? ? ? ? ? ? ? ? ? ? ? ?* before executing the hander so that we don't
+> - ? ? ? ? ? ? ? ? ? ? ? ?* miss edges
+> - ? ? ? ? ? ? ? ? ? ? ? ?*/
+> - ? ? ? ? ? ? ? ? ? ? ? if (lvl & (0x100 << pin)) {
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unmasked = 1;
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> - ? ? ? ? ? ? ? ? ? ? ? }
+> -
+> ? ? ? ? ? ? ? ? ? ? ? ?generic_handle_irq(gpio_to_irq(gpio + pin));
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+> - ? ? ? if (!unmasked)
+> - ? ? ? ? ? ? ? desc->irq_data.chip->irq_unmask(&desc->irq_data);
+> -
+> + ? ? ? desc->irq_data.chip->irq_eoi(&desc->irq_data);
+> ?}
+>
+> ?#ifdef CONFIG_PM
+> --
+> 1.7.0.4
+>
+>
+>
 
-This patch fixes the indexing.
+Acked-by: Colin Cross <ccross@android.com>
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/ptrace.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index eace844..2bf27f3 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -615,10 +615,10 @@ static int ptrace_gethbpregs(struct task_struct *tsk, long num,
- 		while (!(arch_ctrl.len & 0x1))
- 			arch_ctrl.len >>= 1;
- 
--		if (idx & 0x1)
--			reg = encode_ctrl_reg(arch_ctrl);
--		else
-+		if (num & 0x1)
- 			reg = bp->attr.bp_addr;
-+		else
-+			reg = encode_ctrl_reg(arch_ctrl);
- 	}
- 
- put:
--- 
-1.7.0.4
+Works with chained gpio handlers on Tegra, although the patch is
+filled with = escaping.
