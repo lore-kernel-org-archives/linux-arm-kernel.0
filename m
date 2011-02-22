@@ -1,41 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 22 Feb 2011 22:51:53 +0300
-Subject: [PATCH] ARM: Fix compile after delay page freeing patch
-In-Reply-To: <20110222194332.GQ15225@atomide.com>
-References: <20110222194332.GQ15225@atomide.com>
-Message-ID: <4D6413D9.7080906@ru.mvista.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 22 Feb 2011 20:55:04 +0100
+Subject: [PATCH 4/5] arm: mach-mx3: pcm043: add write-protect and
+	card-detect for SD1
+In-Reply-To: <AANLkTi=cDkuo9Q1Eqzno=_FKLN+0pNBCdvD=SqFsysVf@mail.gmail.com>
+References: <1298379500-27590-1-git-send-email-w.sang@pengutronix.de>
+	<1298379500-27590-5-git-send-email-w.sang@pengutronix.de>
+	<AANLkTi=cDkuo9Q1Eqzno=_FKLN+0pNBCdvD=SqFsysVf@mail.gmail.com>
+Message-ID: <20110222195504.GA9046@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+> +#define SD1_GPIO_WP    IMX_GPIO_NR(2, 23)
+> +#define SD1_GPIO_CD     IMX_GPIO_NR(2, 24)
 
-Tony Lindgren wrote:
+Probably you noticed by now, but the next patch does that for the whole
+directory :)
 
-> Commit 06824ba824b3e9f2fedb38bee79af0643198ed7f
-> (ARM: tlb: delay page freeing for SMP and ARMv7 CPUs) causes
-> the following compile error for at least omap1_defconfig:
-
-> In file included from arch/arm/mm/init.c:27:
-> arch/arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
-> arch/arm/include/asm/tlb.h:101: error: implicit declaration of function 'release_pages'
-> arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
-> arch/arm/include/asm/tlb.h:165: error: implicit declaration of function 'page_cache_release'
-> 
-> Fix this by including pagemap.h.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -19,6 +19,7 @@
->  #include <linux/gfp.h>
->  #include <linux/memblock.h>
->  #include <linux/sort.h>
-> +#include <linux/pagemap.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/sections.h>
-
-    Shouldn't you be #including it into tlb.h instead?
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 197 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/9f7b6640/attachment.sig>
