@@ -1,37 +1,35 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 16:51:30 +0100
-Subject: [PATCH v2 5/5] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <AANLkTimbx6=YvRHFuVkmPVYvYtwME31PxXWNHNfFsVRQ@mail.gmail.com>
-References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1298369606-29972-5-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<20110222113222.GE2755@pengutronix.de>
-	<AANLkTimbx6=YvRHFuVkmPVYvYtwME31PxXWNHNfFsVRQ@mail.gmail.com>
-Message-ID: <20110222155130.GJ2755@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Feb 2011 17:15:07 +0100
+Subject: [PATCH v3] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110222103349.GA2755@pengutronix.de>
+References: <1298284528-14761-1-git-send-email-shawn.guo@freescale.com>
+	<20110222085256.GA19871@S2100-06.ap.freescale.net>
+	<20110222103349.GA2755@pengutronix.de>
+Message-ID: <201102221715.07480.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 22 February 2011, Wolfram Sang wrote:
+> # mount -t vfat /dev/mmcblk0p1 /mnt
+> # dd if=/mnt/test.dat of=/tmp/a bs=1024
+> # umount /mnt
+> # ./dd --version
+> dd (coreutils) 8.5
 
-> > Thanks for respinning \o/ This approach looks better to me, but CCing
-> > Olof to comment on abstraction issues if he has them. Will do a deeper
-> > review later this week.
-> 
-> 
-> I like it! Definitely the right approach. Pushing quirks down into the
-> I/O accessors is definitely the only scalable way to handle all the
-> various buggy controllers out there.
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
+In general, you should try to rule out file system, garbage collection,
+partitioning and cache effects.
 
-Glad to hear that. I do have a few issues though, will report them later
-as mentioned before, it needs a bit of time.
+With coreutils dd, a good command is
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/3b2754ad/attachment.sig>
+dd if=/dev/zero of=/dev/mmcblk0 bs=64K count=64 seek=256 oflag=direct
+
+* Always write multiples of 4 MB to avoid garbage collection
+* smaller block sizes may be faster, so writing 64 times 64K may
+  be better than writing 4 MB once, depending on the card
+* don't write to the FAT area, so start writing at 16 MB into the
+  device.
+* use direct I/O to bypass the page cache.
+* read from /dev/zero instead of a disk file to avoid measuring the
+  wrong thing
+
+	Arnd
