@@ -1,117 +1,103 @@
 From: ccross@android.com (Colin Cross)
-Date: Mon, 21 Feb 2011 18:39:46 -0800
-Subject: [PATCH 1/7] ARM: tegra: clock: Refcount periph clock enables
+Date: Mon, 21 Feb 2011 18:39:47 -0800
+Subject: [PATCH 2/7] ARM: tegra: clock: Round rate before setting rate
 In-Reply-To: <1298342392-21236-1-git-send-email-ccross@android.com>
 References: <1298342392-21236-1-git-send-email-ccross@android.com>
-Message-ID: <1298342392-21236-2-git-send-email-ccross@android.com>
+Message-ID: <1298342392-21236-3-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some peripheral clocks share enable bits.  Refcount the enables so
-that calling clk_disable on one clock will not turn off another
-clock.
+Call the clock's round_rate op, if it exists, before calling
+the set_rate op.  This will help later when dvfs is added,
+dvfs needs to know what the final rate will be before the
+frequency changes.
+
+Also requires fixes to the round rate functions to ensure
+calling round rate and then set rate will not cause the
+frequency to be rounded down twice.  When picking clock
+divider values, the clock framework picks the closest
+frequency that is lower than the requested frequency.  If
+the new frequency calculated from the divider value is
+rounded down, and then passed to set_rate, it will get
+rounded down again, possibly resulting in a frequency two
+steps lower than the original requested frequency.
+
+Fix the problem by rounding up when calculating the frequency
+coming out of a clock divider, so if that frequency is
+requested again, the same divider value will be picked.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/tegra2_clocks.c |   37 +++++++++++++++++++++++++++++-----
- 1 files changed, 31 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/clock.c         |   12 ++++++++++++
+ arch/arm/mach-tegra/tegra2_clocks.c |    8 ++++----
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index 165aa9c..e028320 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -86,6 +86,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
+ 
+ 	if (c->mul != 0 && c->div != 0) {
+ 		rate *= c->mul;
++		rate += c->div - 1; /* round up */
+ 		do_div(rate, c->div);
+ 	}
+ 
+@@ -240,12 +241,23 @@ EXPORT_SYMBOL(clk_get_parent);
+ 
+ int clk_set_rate_locked(struct clk *c, unsigned long rate)
+ {
++	long new_rate;
++
+ 	if (!c->ops || !c->ops->set_rate)
+ 		return -ENOSYS;
+ 
+ 	if (rate > c->max_rate)
+ 		rate = c->max_rate;
+ 
++	if (c->ops && c->ops->round_rate) {
++		new_rate = c->ops->round_rate(c, rate);
++
++		if (new_rate < 0)
++			return new_rate;
++
++		rate = new_rate;
++	}
++
+ 	return c->ops->set_rate(c, rate);
+ }
+ 
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 59e77ba..2ca8b74 100644
+index 2ca8b74..73e112f 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -159,6 +159,12 @@ static void __iomem *reg_pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
-  */
- static DEFINE_SPINLOCK(clock_register_lock);
- 
-+/*
-+ * Some peripheral clocks share an enable bit, so refcount the enable bits
-+ * in registers CLK_ENABLE_L, CLK_ENABLE_H, and CLK_ENABLE_U
-+ */
-+static int tegra_periph_clk_enable_refcount[3 * 32];
-+
- #define clk_writel(value, reg) \
- 	__raw_writel(value, (u32)reg_clk_base + (reg))
- #define clk_readl(reg) \
-@@ -952,8 +958,17 @@ static void tegra2_periph_clk_init(struct clk *c)
- static int tegra2_periph_clk_enable(struct clk *c)
- {
- 	u32 val;
-+	unsigned long flags;
-+	int refcount;
- 	pr_debug("%s on clock %s\n", __func__, c->name);
- 
-+	spin_lock_irqsave(&clock_register_lock, flags);
-+
-+	refcount = tegra_periph_clk_enable_refcount[c->u.periph.clk_num]++;
-+
-+	if (refcount > 1)
-+		goto out;
-+
- 	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
- 		CLK_OUT_ENB_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
- 	if (!(c->flags & PERIPH_NO_RESET) && !(c->flags & PERIPH_MANUAL_RESET))
-@@ -966,15 +981,29 @@ static int tegra2_periph_clk_enable(struct clk *c)
- 		val |= 0x3 << 24;
- 		clk_writel(val, c->reg);
+@@ -898,9 +898,9 @@ static long tegra2_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
+ 		divider = clk_div71_get_divider(parent_rate, rate);
+ 		if (divider < 0)
+ 			return divider;
+-		return parent_rate * 2 / (divider + 2);
++		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
+ 	} else if (c->flags & DIV_2) {
+-		return parent_rate / 2;
++		return DIV_ROUND_UP(parent_rate, 2);
  	}
-+
-+out:
-+	spin_unlock_irqrestore(&clock_register_lock, flags);
-+
- 	return 0;
+ 	return -EINVAL;
  }
+@@ -1092,12 +1092,12 @@ static long tegra2_periph_clk_round_rate(struct clk *c,
+ 		if (divider < 0)
+ 			return divider;
  
- static void tegra2_periph_clk_disable(struct clk *c)
- {
-+	unsigned long flags;
-+
- 	pr_debug("%s on clock %s\n", __func__, c->name);
- 
--	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
--		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
-+	spin_lock_irqsave(&clock_register_lock, flags);
-+
-+	if (c->refcnt)
-+		tegra_periph_clk_enable_refcount[c->u.periph.clk_num]--;
-+
-+	if (tegra_periph_clk_enable_refcount[c->u.periph.clk_num] == 0)
-+		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
-+			CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
-+
-+	spin_unlock_irqrestore(&clock_register_lock, flags);
+-		return parent_rate * 2 / (divider + 2);
++		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
+ 	} else if (c->flags & DIV_U16) {
+ 		divider = clk_div16_get_divider(parent_rate, rate);
+ 		if (divider < 0)
+ 			return divider;
+-		return parent_rate / (divider + 1);
++		return DIV_ROUND_UP(parent_rate, divider + 1);
+ 	}
+ 	return -EINVAL;
  }
- 
- static void tegra2_periph_clk_reset(struct clk *c, bool assert)
-@@ -2076,7 +2105,6 @@ struct clk tegra_list_clks[] = {
- 	PERIPH_CLK("timer",	"timer",		NULL,	5,	0,	26000000,  mux_clk_m,			0),
- 	PERIPH_CLK("i2s1",	"i2s.0",		NULL,	11,	0x100,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("i2s2",	"i2s.1",		NULL,	18,	0x104,	26000000,  mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
--	/* FIXME: spdif has 2 clocks but 1 enable */
- 	PERIPH_CLK("spdif_out",	"spdif_out",		NULL,	10,	0x108,	100000000, mux_pllaout0_audio2x_pllp_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("spdif_in",	"spdif_in",		NULL,	10,	0x10c,	100000000, mux_pllp_pllc_pllm,		MUX | DIV_U71),
- 	PERIPH_CLK("pwm",	"pwm",			NULL,	17,	0x110,	432000000, mux_pllp_pllc_audio_clkm_clk32,	MUX | DIV_U71),
-@@ -2089,7 +2117,6 @@ struct clk tegra_list_clks[] = {
- 	PERIPH_CLK("sbc4",	"spi_tegra.3",		NULL,	68,	0x1b4,	160000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("ide",	"ide",			NULL,	25,	0x144,	100000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* requires min voltage */
- 	PERIPH_CLK("ndflash",	"tegra_nand",		NULL,	13,	0x160,	164000000, mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
--	/* FIXME: vfir shares an enable with uartb */
- 	PERIPH_CLK("vfir",	"vfir",			NULL,	7,	0x168,	72000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71),
- 	PERIPH_CLK("sdmmc1",	"sdhci-tegra.0",	NULL,	14,	0x150,	52000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
- 	PERIPH_CLK("sdmmc2",	"sdhci-tegra.1",	NULL,	9,	0x154,	52000000,  mux_pllp_pllc_pllm_clkm,	MUX | DIV_U71), /* scales with voltage */
-@@ -2120,13 +2147,11 @@ struct clk tegra_list_clks[] = {
- 	PERIPH_CLK("uarte",	"uart.4",		NULL,	66,	0x1c4,	600000000, mux_pllp_pllc_pllm_clkm,	MUX),
- 	PERIPH_CLK("3d",	"3d",			NULL,	24,	0x158,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_MANUAL_RESET), /* scales with voltage and process_id */
- 	PERIPH_CLK("2d",	"2d",			NULL,	21,	0x15c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
--	/* FIXME: vi and vi_sensor share an enable */
- 	PERIPH_CLK("vi",	"tegra_camera",		"vi",	20,	0x148,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
- 	PERIPH_CLK("vi_sensor",	"tegra_camera",		"vi_sensor",	20,	0x1a8,	150000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71 | PERIPH_NO_RESET), /* scales with voltage and process_id */
- 	PERIPH_CLK("epp",	"epp",			NULL,	19,	0x16c,	300000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
- 	PERIPH_CLK("mpe",	"mpe",			NULL,	60,	0x170,	250000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
- 	PERIPH_CLK("host1x",	"host1x",		NULL,	28,	0x180,	166000000, mux_pllm_pllc_pllp_plla,	MUX | DIV_U71), /* scales with voltage and process_id */
--	/* FIXME: cve and tvo share an enable	*/
- 	PERIPH_CLK("cve",	"cve",			NULL,	49,	0x140,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
- 	PERIPH_CLK("tvo",	"tvo",			NULL,	49,	0x188,	250000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
- 	PERIPH_CLK("hdmi",	"hdmi",			NULL,	51,	0x18c,	600000000, mux_pllp_plld_pllc_clkm,	MUX | DIV_U71), /* requires min voltage */
 -- 
 1.7.3.1
