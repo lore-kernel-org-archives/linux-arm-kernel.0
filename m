@@ -1,27 +1,64 @@
-From: yujinzhi123@gmail.com (=?GB2312?B?0+C999bH?=)
-Date: Tue, 22 Feb 2011 22:00:16 +0800
-Subject: SAMSUNG: any example code for soc_camera, tv output, etc...?
-In-Reply-To: <9f2nkr$9lh756@out1.ip04ir2.opaltelecom.net>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-	<E1Pnvhv-0002yp-A0@rmk-PC.arm.linux.org.uk>
-	<017901cbce9b$7b405ee0$71c11ca0$%kim@samsung.com>
-	<20110217140621.GC24989@n2100.arm.linux.org.uk>
-	<01b001cbcef7$3e7f5f90$bb7e1eb0$%kim@samsung.com>
-	<9f2nkr$9lh756@out1.ip04ir2.opaltelecom.net>
-Message-ID: <AANLkTin0PR3VQLruade+w6GbCMoW9pXy4Kvn-sBZ+LBM@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 22 Feb 2011 19:44:32 +0530
+Subject: [PATCH 2/5] ARM: omap: update GPIO chained IRQ handler to use EOI
+	in parent chip
+In-Reply-To: <e25ffece0a5b549a68c28ca29abb847a@mail.gmail.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
+	<1298302096-21275-3-git-send-email-will.deacon@arm.com>
+	<e25ffece0a5b549a68c28ca29abb847a@mail.gmail.com>
+Message-ID: <bb6bff8b082a50e6b739b22bad6ab6ec@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I've just gone through a lot of Samsung platform setup files in arch/arm/ , but >haven't yet found any Samsung-SoC-based boards pre-plumbed into V4L2, nor >any that connect up to a TV out (rather than to an LCD screen).
+Will,
+> -----Original Message-----
+> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> Sent: Tuesday, February 22, 2011 12:45 AM
+> To: Will Deacon; linux-arm-kernel at lists.infradead.org
+> Cc: linux at arm.linux.org.uk; adharmap at codeaurora.org; rabin at rab.in;
+> tglx at linutronix.de; catalin.marinas at arm.com; ccross at google.com;
+> kyungmin.park at samsung.com
+> Subject: RE: [PATCH 2/5] ARM: omap: update GPIO chained IRQ handler
+> to use EOI in parent chip
+>
+> > -----Original Message-----
+> > From: Will Deacon [mailto:will.deacon at arm.com]
+> > Sent: Monday, February 21, 2011 8:58 PM
+> > To: linux-arm-kernel at lists.infradead.org
+> > Cc: linux at arm.linux.org.uk; adharmap at codeaurora.org; rabin at rab.in;
+> > tglx at linutronix.de; catalin.marinas at arm.com;
+> > santosh.shilimkar at ti.com; ccross at google.com;
+> > kyungmin.park at samsung.com; Will Deacon
+> > Subject: [PATCH 2/5] ARM: omap: update GPIO chained IRQ handler to
+> > use EOI in parent chip
+> >
+> > On OMAP4, gpio_irq_handler can be chained to a physical interrupt
+> > using
+> > the GIC as the primary IRQ chip. Now that the GIC uses the fasteoi
+> > flow
+> > model, the chained handler must invoke ->irq_eoi once handling is
+> > complete.
+> >
+> > This patch adds a conditional call to ->irq_eoi in the GPIO IRQ
+> > handler
+> > for OMAP platforms. For OMAP implementations using other primary
+> > interrupt controllers, the ->irq_ack call remains and is also made
+> > conditional on the support offered by the controller.
+> >
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Colin Cross <ccross@google.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> Thanks Will for changes. They look fine.
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> I will test your series tomorrow on OMAP with some
+> GPIO interrupts.
+>
+Tested your series on OMAP4 SDP, where GPIO is used for
+ethernet interrupts. They seems to work as expected.
+For omap changes,
+	Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-I have port a embeded linux system on my board based on EP9315, with
-support for usb video capture device, V4L2. Do you need V4L2 based on
-usb video capture device or other video/FM/AM controller on your
-board? If conveniently, can you provide more details about your
-project?
-
->Alternatively, please say if you know which specific file(s) I should be asking >Samsung tech support for under NDA (via my distributor's tech support).
-
-You MUST need the datasheet of S5PC100 on your board, and other
-peripheral device's datasheet, like dm9000 ethernet controller if not
-integrated in SoC, and schematic diagrams of your board.
+Regards,
+Santosh
