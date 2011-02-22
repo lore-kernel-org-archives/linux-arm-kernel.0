@@ -1,103 +1,110 @@
 From: ccross@android.com (Colin Cross)
-Date: Mon, 21 Feb 2011 18:39:47 -0800
-Subject: [PATCH 2/7] ARM: tegra: clock: Round rate before setting rate
+Date: Mon, 21 Feb 2011 18:39:48 -0800
+Subject: [PATCH 3/7] ARM: tegra: clock: Check for clk_num == 0
 In-Reply-To: <1298342392-21236-1-git-send-email-ccross@android.com>
 References: <1298342392-21236-1-git-send-email-ccross@android.com>
-Message-ID: <1298342392-21236-3-git-send-email-ccross@android.com>
+Message-ID: <1298342392-21236-4-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call the clock's round_rate op, if it exists, before calling
-the set_rate op.  This will help later when dvfs is added,
-dvfs needs to know what the final rate will be before the
-frequency changes.
-
-Also requires fixes to the round rate functions to ensure
-calling round rate and then set rate will not cause the
-frequency to be rounded down twice.  When picking clock
-divider values, the clock framework picks the closest
-frequency that is lower than the requested frequency.  If
-the new frequency calculated from the divider value is
-rounded down, and then passed to set_rate, it will get
-rounded down again, possibly resulting in a frequency two
-steps lower than the original requested frequency.
-
-Fix the problem by rounding up when calculating the frequency
-coming out of a clock divider, so if that frequency is
-requested again, the same divider value will be picked.
+Peripheral clocks that have no clock enable bit in the
+enable registers have their clk_num set to 0.  Bit 0
+in the clock enable registers is the CPU clock.
+Prevent disables on these peripheral clocks from
+accidentally disabling the CPU clock.
 
 Signed-off-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/clock.c         |   12 ++++++++++++
- arch/arm/mach-tegra/tegra2_clocks.c |    8 ++++----
- 2 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/mach-tegra/tegra2_clocks.c |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
-index 165aa9c..e028320 100644
---- a/arch/arm/mach-tegra/clock.c
-+++ b/arch/arm/mach-tegra/clock.c
-@@ -86,6 +86,7 @@ static unsigned long clk_predict_rate_from_parent(struct clk *c, struct clk *p)
- 
- 	if (c->mul != 0 && c->div != 0) {
- 		rate *= c->mul;
-+		rate += c->div - 1; /* round up */
- 		do_div(rate, c->div);
- 	}
- 
-@@ -240,12 +241,23 @@ EXPORT_SYMBOL(clk_get_parent);
- 
- int clk_set_rate_locked(struct clk *c, unsigned long rate)
- {
-+	long new_rate;
-+
- 	if (!c->ops || !c->ops->set_rate)
- 		return -ENOSYS;
- 
- 	if (rate > c->max_rate)
- 		rate = c->max_rate;
- 
-+	if (c->ops && c->ops->round_rate) {
-+		new_rate = c->ops->round_rate(c, rate);
-+
-+		if (new_rate < 0)
-+			return new_rate;
-+
-+		rate = new_rate;
-+	}
-+
- 	return c->ops->set_rate(c, rate);
- }
- 
 diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-index 2ca8b74..73e112f 100644
+index 73e112f..3015a2c 100644
 --- a/arch/arm/mach-tegra/tegra2_clocks.c
 +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-@@ -898,9 +898,9 @@ static long tegra2_pll_div_clk_round_rate(struct clk *c, unsigned long rate)
- 		divider = clk_div71_get_divider(parent_rate, rate);
- 		if (divider < 0)
- 			return divider;
--		return parent_rate * 2 / (divider + 2);
-+		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
- 	} else if (c->flags & DIV_2) {
--		return parent_rate / 2;
-+		return DIV_ROUND_UP(parent_rate, 2);
+@@ -946,9 +946,14 @@ static void tegra2_periph_clk_init(struct clk *c)
  	}
- 	return -EINVAL;
- }
-@@ -1092,12 +1092,12 @@ static long tegra2_periph_clk_round_rate(struct clk *c,
- 		if (divider < 0)
- 			return divider;
  
--		return parent_rate * 2 / (divider + 2);
-+		return DIV_ROUND_UP(parent_rate * 2, divider + 2);
- 	} else if (c->flags & DIV_U16) {
- 		divider = clk_div16_get_divider(parent_rate, rate);
- 		if (divider < 0)
- 			return divider;
--		return parent_rate / (divider + 1);
-+		return DIV_ROUND_UP(parent_rate, divider + 1);
- 	}
- 	return -EINVAL;
+ 	c->state = ON;
++
++	if (!c->u.periph.clk_num)
++		return;
++
+ 	if (!(clk_readl(CLK_OUT_ENB + PERIPH_CLK_TO_ENB_REG(c)) &
+ 			PERIPH_CLK_TO_ENB_BIT(c)))
+ 		c->state = OFF;
++
+ 	if (!(c->flags & PERIPH_NO_RESET))
+ 		if (clk_readl(RST_DEVICES + PERIPH_CLK_TO_ENB_REG(c)) &
+ 				PERIPH_CLK_TO_ENB_BIT(c))
+@@ -962,6 +967,9 @@ static int tegra2_periph_clk_enable(struct clk *c)
+ 	int refcount;
+ 	pr_debug("%s on clock %s\n", __func__, c->name);
+ 
++	if (!c->u.periph.clk_num)
++		return 0;
++
+ 	spin_lock_irqsave(&clock_register_lock, flags);
+ 
+ 	refcount = tegra_periph_clk_enable_refcount[c->u.periph.clk_num]++;
+@@ -994,6 +1002,9 @@ static void tegra2_periph_clk_disable(struct clk *c)
+ 
+ 	pr_debug("%s on clock %s\n", __func__, c->name);
+ 
++	if (!c->u.periph.clk_num)
++		return;
++
+ 	spin_lock_irqsave(&clock_register_lock, flags);
+ 
+ 	if (c->refcnt)
+@@ -1012,6 +1023,9 @@ static void tegra2_periph_clk_reset(struct clk *c, bool assert)
+ 
+ 	pr_debug("%s %s on clock %s\n", __func__,
+ 		 assert ? "assert" : "deassert", c->name);
++
++	BUG_ON(!c->u.periph.clk_num);
++
+ 	if (!(c->flags & PERIPH_NO_RESET))
+ 		clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+ 			   base + PERIPH_CLK_TO_ENB_SET_REG(c));
+@@ -1182,6 +1196,10 @@ static void tegra2_clk_double_init(struct clk *c)
+ 	c->mul = 2;
+ 	c->div = 1;
+ 	c->state = ON;
++
++	if (!c->u.periph.clk_num)
++		return;
++
+ 	if (!(clk_readl(CLK_OUT_ENB + PERIPH_CLK_TO_ENB_REG(c)) &
+ 			PERIPH_CLK_TO_ENB_BIT(c)))
+ 		c->state = OFF;
+@@ -1269,6 +1287,9 @@ static void tegra2_cdev_clk_init(struct clk *c)
+ 	/* We could un-tristate the cdev1 or cdev2 pingroup here; this is
+ 	 * currently done in the pinmux code. */
+ 	c->state = ON;
++
++	BUG_ON(!c->u.periph.clk_num);
++
+ 	if (!(clk_readl(CLK_OUT_ENB + PERIPH_CLK_TO_ENB_REG(c)) &
+ 			PERIPH_CLK_TO_ENB_BIT(c)))
+ 		c->state = OFF;
+@@ -1276,6 +1297,8 @@ static void tegra2_cdev_clk_init(struct clk *c)
+ 
+ static int tegra2_cdev_clk_enable(struct clk *c)
+ {
++	BUG_ON(!c->u.periph.clk_num);
++
+ 	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+ 		CLK_OUT_ENB_SET + PERIPH_CLK_TO_ENB_SET_REG(c));
+ 	return 0;
+@@ -1283,6 +1306,8 @@ static int tegra2_cdev_clk_enable(struct clk *c)
+ 
+ static void tegra2_cdev_clk_disable(struct clk *c)
+ {
++	BUG_ON(!c->u.periph.clk_num);
++
+ 	clk_writel(PERIPH_CLK_TO_ENB_BIT(c),
+ 		CLK_OUT_ENB_CLR + PERIPH_CLK_TO_ENB_SET_REG(c));
  }
 -- 
 1.7.3.1
