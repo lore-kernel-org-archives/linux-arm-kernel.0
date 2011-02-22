@@ -1,61 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 22 Feb 2011 20:34:13 +0800
-Subject: [PATCH v3 2/2] ARM: mxs: add dma device
-In-Reply-To: <20110222075241.GU24426@pengutronix.de>
-References: <1298284306-14710-1-git-send-email-shawn.guo@freescale.com>
-	<1298284306-14710-3-git-send-email-shawn.guo@freescale.com>
-	<20110222075241.GU24426@pengutronix.de>
-Message-ID: <20110222123412.GE19871@S2100-06.ap.freescale.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 22 Feb 2011 15:36:02 +0300
+Subject: [PATCH 2/2] DM9000B: Fix PHY power for network down/up
+In-Reply-To: <4D62D323.7010403@henry.nestler.mail.gmail.com>
+References: <4D618B5D.5040001@henry.nestler.mail.gmail.com>	<4D62491F.4050602@ru.mvista.com>
+	<4D62D323.7010403@henry.nestler.mail.gmail.com>
+Message-ID: <4D63ADB2.7090105@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hello.
 
-On Tue, Feb 22, 2011 at 08:52:41AM +0100, Sascha Hauer wrote:
-> On Mon, Feb 21, 2011 at 06:31:46PM +0800, Shawn Guo wrote:
-> 
-> Being consistent is one thing, but this should not lead to ifdeffery
-> where not necessary. Wouldn't it be much simpler to do the following:
-> 
-> static struct platform_device * __init mxs_add_dma(const char *devid,
-> 		resource_size_t base)
-> {
-> 	struct resource res_apbh[] = {
-> 		{
-> 			.start = base,
-> 			.end = base + SZ_8K - 1,
-> 			.flags = IORESOURCE_MEM,
-> 		},
-> 	};
-> 
-> 	return mxs_add_platform_device_dmamask(devid, -1,
-> 				res, ARRAY_SIZE(res), NULL, 0,
-> 				DMA_BIT_MASK(32));
-> }
-> 
-> static int __init mxs_add_mxs_dma(void)
-> {
-> 	char *apbh = "mxs-dma-apbh";
-> 	char *apbx = "mxs-dma-apbx";
-> 
-> 	if (cpu_is_mx23()) {
-> 		mxs_add_dma(apbh, MX23_APBH_DMA_BASE_ADDR);
-> 		mxs_add_dma(apbx, MX23_APBX_DMA_BASE_ADDR);
-> 	}
-> 
-> 	if (cpu_is_mx28()) {
-> 		mxs_add_dma(apbh, MX28_APBH_DMA_BASE_ADDR);
-> 		mxs_add_dma(apbx, MX28_APBX_DMA_BASE_ADDR);
-> 	}
-> 
-> 	return 0;
-> }
-> arch_initcall(mxs_add_mxs_dma);
-> 
-> No ifdef, clear to read and only half the size.
-> 
-Looks sane.  Thanks.
+On 22-02-2011 0:03, Henry Nestler wrote:
 
--- 
-Regards,
-Shawn
+>>> DM9000 revision B needs 1 ms delay after PHY power on (see spec), and PHY
+>>> power must on in register
+
+>>      Couldn't parse that.
+
+    You seem to have missed a word in your patch description.
+
+> This can read in manual DM900B-12-DS-F02 from September 2 2010, Page 14:
+> "If this Register 1FH bit 0 is updated from '1' to '0', the all
+> Registers can not be accessed within 1ms."
+
+    That I've understood.
+
+> The example driver code waits 2 ms.
+
+>>> diff --git a/drivers/net/dm9000.c b/drivers/net/dm9000.c
+>>> index 2d4c4fc..5925569 100644
+>>> --- a/drivers/net/dm9000.c
+>>> +++ b/drivers/net/dm9000.c
+>> [...]
+>>> @@ -1194,6 +1191,10 @@ dm9000_open(struct net_device *dev)
+>>>    	if (request_irq(dev->irq, dm9000_interrupt, irqflags, dev->name, dev))
+>>>    		return -EAGAIN;
+>>>
+>>> +	/* GPIO0 on pre-activate PHY, Reg 1F is not set by reset */
+>>> +	iow(db, DM9000_GPR, 0);	/* REG_1F bit0 activate phyxcer */
+>>> +	udelay(1000); /* delay needs by DM9000B */
+
+>>      Why not mdelay(1)?
+
+> Because udelay is the base of mdelay.
+> See include/linux/delay.h:31
+
+> #define mdelay(n) ... udelay((n)*1000)
+
+    And?
+
+WBR, Sergei
