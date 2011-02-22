@@ -1,81 +1,57 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Tue, 22 Feb 2011 17:36:23 +0530
-Subject: [PATCH 1/2] PRUSS UIO driver support
-In-Reply-To: <4D62C2A0.6060405@mvista.com>
-References: <1298041530-26855-1-git-send-email-pratheesh@ti.com>
-	<201102181644.17634.arnd@arndb.de>
-	<alpine.LFD.2.00.1102181713480.2701@localhost6.localdomain6>
-	<201102181731.05644.arnd@arndb.de>
-	<alpine.LFD.2.00.1102181802580.2701@localhost6.localdomain6>
-	<B85A65D85D7EB246BE421B3FB0FBB593024B83C108@dbde02.ent.ti.com>
-	<20110219183427.GG4684@local>
-	<B85A65D85D7EB246BE421B3FB0FBB593024B83C20F@dbde02.ent.ti.com>
-	<20110221193316.GC2773@local> <4D62C2A0.6060405@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BD4916A@dbde02.ent.ti.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Tue, 22 Feb 2011 07:13:29 -0500
+Subject: [PATCH v2 3/6] davinci: da8xx: add spi resources and registration
+	routine
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BD48E7B@dbde02.ent.ti.com>
+References: <1297257114-764-1-git-send-email-michael.williamson@criticallink.com>
+	<1297257114-764-4-git-send-email-michael.williamson@criticallink.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BD48E7B@dbde02.ent.ti.com>
+Message-ID: <4D63A869.1070401@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2/22/2011 1:14 AM, Nori, Sekhar wrote:
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
-> Sent: Tuesday, February 22, 2011 1:23 AM
-> To: Hans J. Koch
-> Cc: TK, Pratheesh Gangadhar; davinci-linux-open-
-> source at linux.davincidsp.com; Arnd Bergmann; Chatterjee, Amit;
-> gregkh at suse.de; LKML; Thomas Gleixner; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] PRUSS UIO driver support
+> Hi Mike,
 > 
-> Hello.
+> On Wed, Feb 09, 2011 at 18:41:51, Michael Williamson wrote:
+>> Add IO resource structures, platform data, and a registration
+>> routine in order to support spi device on DA850/OMAP-L138/AM18x
+>> and DA830/OMAP-L137/AM17x platforms.
+>>
+>> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 > 
-> Hans J. Koch wrote:
+> [...]
 > 
-> >>> -----Original Message-----
-> >>> From: Hans J. Koch [mailto:hjk at hansjkoch.de]
-> >>> Sent: Sunday, February 20, 2011 12:04 AM
-> >>> To: TK, Pratheesh Gangadhar
-> >>> Cc: Thomas Gleixner; Arnd Bergmann; linux-arm-
-> kernel at lists.infradead.org;
-> >>> davinci-linux-open-source at linux.davincidsp.com; gregkh at suse.de;
-> >>> Chatterjee, Amit; Hans J. Koch; LKML
-> >>> Subject: Re: [PATCH 1/2] PRUSS UIO driver support
+>> +static struct resource da8xx_spi1_resources[] = {
+>> +	[0] = {
+>> +		.start	= DA8XX_SPI1_BASE,
+>> +		.end	= DA8XX_SPI1_BASE + SZ_4K -1,
 > 
-> >>> On Sat, Feb 19, 2011 at 09:10:23PM +0530, TK, Pratheesh Gangadhar
-> wrote:
-> >>>> For my understanding - if the interrupt is not shared and not level
-> triggered -
-> >>>> is this okay to have empty handler?
-> 
-> >>> Greg already said he won't accept that. And I'm quite sure these
-> >>> interrupts
-> >>> are level triggered, since that is the default on arch/omap.
-> 
-> >>> E.g. in arch/arm/mach-omap1/irq.c, a loop sets all irqs to level
-> triggered
-> >>> handling: set_irq_handler(j, handle_level_irq); (line 234)
-> 
-> >> You should be looking at arch/arm/mach-davinci/irq.c
-> 
->     Into arch/arm/mach-davinci/cp_intc.c actually as we're not talking
-> about a
-> "real" DaVincis here, but about OMAP-L138.
-> 
-> > Hmpf. I alway get lost in the directory structure of TI SoCs...
-> > At least I learned that OMAP3 is in the omap2 directory :)
-> 
->     It's probably even more convoluted with DaVinci and friends. :-)
-> 
-> >> and all interrupts except IRQ_TINT1_TINT34 is set to edge trigger mode
-> (line 160).
-> 
-> > Is that really needed? Level triggered interrupts should certainly be
-> > preferred if possible.
-> 
->     Don't look there, this code is for "real" DaVincis only.
+> checkpatch reports a warning here. Need to have spaces
+> on either side of binary '-'
 > 
 
-Thanks for correcting. Interrupts are configured as edge triggered here as well.
 
-Thanks and Regards,
-Pratheesh
+Sorry about that... not sure how I missed that one.
+
+> I tested this series and the two patches it depends on
+> using SPI flash present on DA850 and DA830 EVMs (tested
+> in DMA mode) and found no issues.
+> 
+
+
+Thanks for testing, Sekhar.
+
+> So, with this minor issue fixed, can you please repost
+> with my Ack? You can include the two dependent patches
+> in the same series so it is easy to pick-up the whole
+> bunch.
+> 
+
+
+OK.
+
+> Thanks,
+> Sekhar
+> 
