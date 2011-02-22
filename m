@@ -1,25 +1,63 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 11:35:46 +0100
-Subject: [PATCH v4] ARM: mxs/mx28evk: add mmc device
-In-Reply-To: <1298364624-19907-1-git-send-email-shawn.guo@freescale.com>
-References: <1298284979-14853-7-git-send-email-shawn.guo@freescale.com>
-	<1298364624-19907-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110222103546.GC2755@pengutronix.de>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Tue, 22 Feb 2011 18:38:40 +0800
+Subject: [PATCH] ARM: pxa: support 806MHz operating points for PXA31x
+	processors A2 stepping
+In-Reply-To: <4D637557.2070707@compulab.co.il>
+References: <1297786849.2596.13.camel@phoenix>
+	<4D5AB09C.9000106@compulab.co.il>
+	<AANLkTino2vLisNgKeyXppuHwDyhLMMAcOOZjA0hgmkj6@mail.gmail.com>
+	<4D637557.2070707@compulab.co.il>
+Message-ID: <AANLkTikTHnz+7C-QmXaHwFE0a+pw7U-t2JP11a0qdoyU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 04:50:24PM +0800, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+2011/2/22 Igor Grinberg <grinberg@compulab.co.il>:
+> Hi,
+>
+> On 02/22/11 03:12, Axel Lin wrote:
+>
+>> Hi Igor,
+>>
+>>> Also, there is one thing that is not related to this patch, but
+>>> if you have the hardware, you need to be concerned with,
+>>> is that the vcc_core voltage has to be 1.4V, otherwise your
+>>> hardware will be unstable.
+>> I don't see any unstable issue on my device.
+>> But it seems the vcc_core and vcc_sram fields of pxa3xx_freq_info
+>> are not used now.
+>
+> Indeed, they are not used, because we don't have any DVFS driver for PXA3xx.
+> But, the hardware is running regardless of you have the driver or not ;)
+> There are other means to make sure the vcc_core voltage is set appropriately:
+> 1) could be already set (PMIC default)
+> 2) could be set by "Hardware-Controlled Voltage-Change Sequencer" automatically
+> ? (PXA3xx_DM_Vol_I chapter 6.8.3) if your PMIC is 100% compatible with PXA3xx
+> ? and PVCR[FVE/PVE] bits set accordingly.
+> 3) If your PMIC is for some reason not 100% compatible, then the voltage can be
+> ? set by regulator API or even by the bootloader.
+>
+> Anyway, to make sure it is set to the appropriate level, you need to measure it.
+> Usually, this line has some capacitors on it, so it shouldn't be a hard task
+>
+Thanks for the information. I'll check my settings.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> Now, regarding hardware instability:
+> I've seen instabilities related to the vcc_core set improperly, but it has never
+> showed up that quickly, sometimes it took a week of testing for it to show up.
+> But when it shows up, you can see strange things happening, like your DRAM
+> is messed or buses fail or the cpu just freezes.
+>
+>
+> Another thing (which could be related to the patch) is the package marking.
+> We have PXA3xx SoCs marked A2 stepping, but C624, which means that the
+> highest running frequency should not exceed 624MHz.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/f5d6699c/attachment.sig>
+This means not all PXA310 A2 stepping supports 806Mhz.
+Can we differentiate the Cxxx option in software?
+
+> What is your PXA3xx A2 marking in respect to Cxxx option?
+
+Mine is 88AP310-A2-BGK2C806.
+
+Regards,
+Axel
