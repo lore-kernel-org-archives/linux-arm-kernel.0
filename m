@@ -1,59 +1,54 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 22 Feb 2011 00:05:03 -0800
-Subject: [PATCH 7/7] ARM: tegra: clock: Disable clocks left on by
-	bootloader
-In-Reply-To: <AANLkTikNSEyjdL0Lchmm-bFxD00omkGLq6Q6Yyjy51Ov@mail.gmail.com>
-References: <1298342392-21236-1-git-send-email-ccross@android.com>
-	<1298342392-21236-8-git-send-email-ccross@android.com>
-	<AANLkTikNSEyjdL0Lchmm-bFxD00omkGLq6Q6Yyjy51Ov@mail.gmail.com>
-Message-ID: <AANLkTi==wykFCCjamRNh2ngEaubgeLqmZ7Mv9OsH=0cL@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 22 Feb 2011 10:35:35 +0200
+Subject: [PATCH] ARM: pxa: support 806MHz operating points for PXA31x
+	processors A2 stepping
+In-Reply-To: <AANLkTino2vLisNgKeyXppuHwDyhLMMAcOOZjA0hgmkj6@mail.gmail.com>
+References: <1297786849.2596.13.camel@phoenix>
+	<4D5AB09C.9000106@compulab.co.il>
+	<AANLkTino2vLisNgKeyXppuHwDyhLMMAcOOZjA0hgmkj6@mail.gmail.com>
+Message-ID: <4D637557.2070707@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 21, 2011 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
-> Hi,
->
-> On Mon, Feb 21, 2011 at 6:39 PM, Colin Cross <ccross@android.com> wrote:
->> Iterates through all clocks, disabling any for which the
->> refcount is 0 but the clock init detected the bootloader
->> left the clock on. ?Can be disabled with command line
->> tegra_clock.disable_boot_clocks=N
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> ---
->> ?arch/arm/mach-tegra/clock.c | ? 44 +++++++++++++++++++++++++++++++++++++++++++
->> ?1 files changed, 44 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
->> index e028320..6d686ff 100644
->> --- a/arch/arm/mach-tegra/clock.c
->> +++ b/arch/arm/mach-tegra/clock.c
->> @@ -33,6 +33,9 @@
->> ?#include "board.h"
->> ?#include "clock.h"
->>
->> +#undef MODULE_PARAM_PREFIX
->> +#define MODULE_PARAM_PREFIX "tegra_clock."
->> +
->> ?/*
->> ?* Locking:
->> ?*
->> @@ -416,6 +419,47 @@ void tegra_sdmmc_tap_delay(struct clk *c, int delay)
->> ? ? ? ?spin_unlock_irqrestore(&c->spinlock, flags);
->> ?}
->>
->> +static bool tegra_disable_boot_clocks = true;
->> +module_param_named(disable_boot_clocks, tegra_disable_boot_clocks, bool,
->> + ? ? ? S_IRUGO | S_IWUSR | S_IWGRP);
->
-> I suggest doing this as an early_param instead. I know it's not truly
-> an early param, but it's the easier way to do non-module bootargs,
-> i.e. by not requiring a (fake) module prefix. It'd be a little
-> cleaner, in my opinion. The variable name itself is unique enough to
-> not need a module prefix for namespace reasons.
-It doesn't need to be an early_param, I can make it a __setup.
+Hi,
 
-> Also, Documentation/kernel-parameters.txt should be updated with it.
-Is it really worth adding every debug flag on every platform to
-kernel-parametes.txt?  I could add the flag to the warning message
-instead.
+On 02/22/11 03:12, Axel Lin wrote:
+
+> Hi Igor,
+>
+>> Also, there is one thing that is not related to this patch, but
+>> if you have the hardware, you need to be concerned with,
+>> is that the vcc_core voltage has to be 1.4V, otherwise your
+>> hardware will be unstable.
+> I don't see any unstable issue on my device.
+> But it seems the vcc_core and vcc_sram fields of pxa3xx_freq_info
+> are not used now.
+
+Indeed, they are not used, because we don't have any DVFS driver for PXA3xx.
+But, the hardware is running regardless of you have the driver or not ;)
+There are other means to make sure the vcc_core voltage is set appropriately:
+1) could be already set (PMIC default)
+2) could be set by "Hardware-Controlled Voltage-Change Sequencer" automatically
+   (PXA3xx_DM_Vol_I chapter 6.8.3) if your PMIC is 100% compatible with PXA3xx
+   and PVCR[FVE/PVE] bits set accordingly.
+3) If your PMIC is for some reason not 100% compatible, then the voltage can be
+   set by regulator API or even by the bootloader.
+
+Anyway, to make sure it is set to the appropriate level, you need to measure it.
+Usually, this line has some capacitors on it, so it shouldn't be a hard task
+
+Now, regarding hardware instability:
+I've seen instabilities related to the vcc_core set improperly, but it has never
+showed up that quickly, sometimes it took a week of testing for it to show up.
+But when it shows up, you can see strange things happening, like your DRAM
+is messed or buses fail or the cpu just freezes.
+
+
+Another thing (which could be related to the patch) is the package marking.
+We have PXA3xx SoCs marked A2 stepping, but C624, which means that the
+highest running frequency should not exceed 624MHz.
+What is your PXA3xx A2 marking in respect to Cxxx option?
+
+-- 
+Regards,
+Igor.
