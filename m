@@ -1,64 +1,105 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 22 Feb 2011 11:37:07 +0100
-Subject: [PATCH v4 2/4] mc13xxx-core: Kconfig: Config menu driven by
-	specific IC type
-In-Reply-To: <1294119299-18352-3-git-send-email-marc@cpdesign.com.au>
-References: <1294119299-18352-1-git-send-email-marc@cpdesign.com.au>
-	<1294119299-18352-3-git-send-email-marc@cpdesign.com.au>
-Message-ID: <20110222103707.GZ22310@pengutronix.de>
+Date: Tue, 22 Feb 2011 09:33:44 +0100
+Subject: [PATCH v3 5/6] ARM: mxs/mx23evk: add mmc device
+In-Reply-To: <1298284979-14853-6-git-send-email-shawn.guo@freescale.com>
+References: <1298284979-14853-1-git-send-email-shawn.guo@freescale.com>
+	<1298284979-14853-6-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110222083344.GV22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 04, 2011 at 04:34:57PM +1100, Marc Reilly wrote:
-> This patch makes config items for the mc13892 and mc13783 distinct and
-> splits introduces a separate config item for spi interface support in
-> preparation for a separate i2c and spi backend.
-> 
-> The mc13xxx generic core is therefore selected by the spi (or i2c) item:
-> having it the other way around doesn't work for other drivers that will
-> need to distinguish between mc13783 and mc13892 (at build time).
-> 
-> Signed-off-by: Marc Reilly <marc@cpdesign.com.au>
+On Mon, Feb 21, 2011 at 06:42:58PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
->  drivers/mfd/Kconfig |   34 +++++++++++++++++++++++++---------
->  1 files changed, 25 insertions(+), 9 deletions(-)
+>  arch/arm/mach-mxs/Kconfig        |    1 +
+>  arch/arm/mach-mxs/mach-mx23evk.c |   47 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 48 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 3a1493b..9ce1d42 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -425,20 +425,36 @@ config MFD_PCF50633
->  	  so that function-specific drivers can bind to them.
->  
->  config MFD_MC13783
-> -	tristate
-> -
-> -config MFD_MC13XXX
-> -	tristate "Support Freescale MC13783 and MC13892"
->  	depends on SPI_MASTER
-> -	select MFD_CORE
-> -	select MFD_MC13783
-> +	select MFD_MC13XXX_SPI
-> +	tristate "Support for Freescale MC13783 PMIC"
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index cd2fbdf..f47fae3 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -19,6 +19,7 @@ config MACH_MX23EVK
+>  	bool "Support MX23EVK Platform"
+>  	select SOC_IMX23
+>  	select MXS_HAVE_AMBA_DUART
+> +	select MXS_HAVE_PLATFORM_MMC
+>  	default y
 >  	help
-> -	  Support for the Freescale (Atlas) PMIC and audio CODECs
-> -	  MC13783 and MC13892.
-> -	  This driver provides common support for accessing  the device,
-> +	  Support for the Freescale MC13783 PMIC and audio CODEC.
-> +	  This driver provides common support for accessing the device,
->  	  additional drivers must be enabled in order to use the
->  	  functionality of the device.
+>  	  Include support for MX23EVK platform. This includes specific
+> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+> index aa06400..21519e3 100644
+> --- a/arch/arm/mach-mxs/mach-mx23evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> @@ -26,17 +26,64 @@
 >  
-> +config MFD_MC13892
-> +	depends on SPI_MASTER || I2C
-Actually you don't have that || I2C yet, do you?
+>  #include "devices-mx23.h"
+>  
+> +#define MX23EVK_MMC0_WRITE_PROTECT	MXS_GPIO_NR(1, 30)
+> +#define MX23EVK_MMC0_SLOT_POWER		MXS_GPIO_NR(1, 29)
+> +
+>  static const iomux_cfg_t mx23evk_pads[] __initconst = {
+>  	/* duart */
+>  	MX23_PAD_PWM0__DUART_RX | MXS_PAD_4MA,
+>  	MX23_PAD_PWM1__DUART_TX | MXS_PAD_4MA,
+> +
+> +	/* mmc */
+> +	MX23_PAD_SSP1_DATA0__SSP1_DATA0 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_SSP1_DATA1__SSP1_DATA1 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_SSP1_DATA2__SSP1_DATA2 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_SSP1_DATA3__SSP1_DATA3 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_GPMI_D08__SSP1_DATA4 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_GPMI_D09__SSP1_DATA5 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_GPMI_D10__SSP1_DATA6 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_GPMI_D11__SSP1_DATA7 |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_SSP1_CMD__SSP1_CMD |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_PULLUP),
+> +	MX23_PAD_SSP1_DETECT__SSP1_DETECT |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	MX23_PAD_SSP1_SCK__SSP1_SCK |
+> +		(MXS_PAD_8MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	/* write protect */
+> +	MX23_PAD_PWM4__GPIO_1_30 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +	/* slot power enable */
+> +	MX23_PAD_PWM3__GPIO_1_29 |
+> +		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> +};
+> +
+> +static struct mxs_mmc_platform_data mx23_mmc_pdata __initdata = {
+> +	.wp_gpio = MX23EVK_MMC0_WRITE_PROTECT,
+> +	.flags = SLOTF_8_BIT_CAPABLE,
+can this be const?
 
-Other than that I only wonder if it's worth to split the support for
-13892 and 13783 explicitly and move the spi and i2c backends to
-dedicated files.
-
-Best regards
-Uwe
+>  };
+>  
+>  static void __init mx23evk_init(void)
+>  {
+> +	int ret;
+> +
+>  	mxs_iomux_setup_multiple_pads(mx23evk_pads, ARRAY_SIZE(mx23evk_pads));
+>  
+>  	mx23_add_duart();
+> +
+> +	/* power on mmc slot by writing 0 to the gpio */
+> +	ret = gpio_request_one(MX23EVK_MMC0_SLOT_POWER, GPIOF_DIR_OUT,
+> +			       "mmc0-slot-power");
+> +	if (ret)
+> +		pr_warn("failed to request gpio mmc0-slot-power: %d\n", ret);
+> +	mx23_add_mmc(0, &mx23_mmc_pdata);
+>  }
+>  
+>  static void __init mx23evk_timer_init(void)
+> -- 
+> 1.7.1
 
 -- 
 Pengutronix e.K.                           | Uwe Kleine-K?nig            |
