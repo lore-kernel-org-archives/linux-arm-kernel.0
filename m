@@ -1,23 +1,27 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 22 Feb 2011 12:57:28 -0800
-Subject: [PATCH] ARM: tegra: Hide EMC scaling config behind ARCH_TEGRA
-In-Reply-To: <AANLkTim7ZOeEC1muV8trT1bSc6DHMerxUjRmthnpt0Ui@mail.gmail.com>
-References: <1298406924-2074-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<AANLkTim7ZOeEC1muV8trT1bSc6DHMerxUjRmthnpt0Ui@mail.gmail.com>
-Message-ID: <AANLkTimiTPd-Sq530MAw80w3GSUyGzCLGgnZ3K0S45dH@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 22 Feb 2011 13:05:36 -0800
+Subject: [PATCH 6/6] ARM: tegra: add seaboard, wario and kaen boards
+In-Reply-To: <20110222204821.GE29559@n2100.arm.linux.org.uk>
+References: <1298354117-19097-1-git-send-email-olof@lixom.net>
+	<1298354117-19097-7-git-send-email-olof@lixom.net>
+	<20110222204821.GE29559@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTimymMLPswnALDuePEdabXGaH7MgOQafx-juLEto@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 12:40 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Feb 22, 2011 at 12:35 PM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> The option isn't terribly useful on other ARM platforms.
->>
->> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->
-> Acked-by: Olof Johansson <olof@lixom.net>
->
->
-> -Olof
+On Tue, Feb 22, 2011 at 12:48 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-Oops, thanks.  Pushed to for-next.
+
+>> +#include <mach/gpio.h>
+>
+> Another linux/gpio.h please.
+
+Another d'oh. Thanks.
+
+mach/io.h and mach/gpio.h seem to be common mistakes in general. I'll
+look at adding it to checkpatch while I'm still annoyed at having made
+the mistakes. :)
+
+
+-olof
