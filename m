@@ -1,75 +1,45 @@
-From: konkers@android.com (Erik Gilling)
-Date: Tue, 22 Feb 2011 11:18:08 -0800
-Subject: [PATCH 1/6] ARM: tegra: add tegra_gpio_table and tegra_gpio_config
-In-Reply-To: <1298354117-19097-2-git-send-email-olof@lixom.net>
-References: <1298354117-19097-1-git-send-email-olof@lixom.net>
-	<1298354117-19097-2-git-send-email-olof@lixom.net>
-Message-ID: <AANLkTik9_t0mq07mysO2CcK4ppKAmuPAujownfeWEGL5@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Feb 2011 19:21:09 -0000
+Subject: [PATCH 3/5] ARM: tegra: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <AANLkTimYvHOzv2w_oxOB5HJfMhp8Kg_A0-Y7Mj41M-HX@mail.gmail.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>	<1298302096-21275-4-git-send-email-will.deacon@arm.com>
+	<AANLkTimYvHOzv2w_oxOB5HJfMhp8Kg_A0-Y7Mj41M-HX@mail.gmail.com>
+Message-ID: <001d01cbd2c5$a97f17a0$fc7d46e0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Can you split the boardfile changes into their own patch?  Also see
-the below whitespace only change.  Other than that, looks good.
+Hi Colin,
 
-On Mon, Feb 21, 2011 at 9:55 PM, Olof Johansson <olof@lixom.net> wrote:
-snip
-> diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-> index 132dcd6..ffc146d 100644
-> --- a/arch/arm/mach-tegra/gpio.c
-> +++ b/arch/arm/mach-tegra/gpio.c
-> @@ -378,9 +378,22 @@ static int __init tegra_gpio_init(void)
->
-> ? ? ? ?return 0;
-> ?}
-> -
-> ?postcore_initcall(tegra_gpio_init);
+> On Mon, Feb 21, 2011 at 7:28 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
+> > chip prior to handling the interrupt.
+> >
+> > This patch updates the code to use ->irq_eoi now that the GIC has moved
+> > to using the fasteoi flow model.
+> >
+> > Cc: Colin Cross <ccross@google.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/mach-tegra/gpio.c |   17 +----------------
+> >  1 files changed, 1 insertions(+), 16 deletions(-)
 
-whitespace only change
+[...]
 
->
-> +void __init tegra_gpio_config(struct tegra_gpio_table *table, int num)
-> +{
-> + ? ? ? int i;
-> +
-> + ? ? ? for (i = 0; i < num; i++) {
-> + ? ? ? ? ? ? ? int gpio = table[i].gpio;
-> +
-> + ? ? ? ? ? ? ? if (table[i].enable)
-> + ? ? ? ? ? ? ? ? ? ? ? tegra_gpio_enable(gpio);
-> + ? ? ? ? ? ? ? else
-> + ? ? ? ? ? ? ? ? ? ? ? tegra_gpio_disable(gpio);
-> + ? ? ? }
-> +}
-> +
-> ?#ifdef CONFIG_DEBUG_FS
->
-> ?#include <linux/debugfs.h>
-> diff --git a/arch/arm/mach-tegra/include/mach/gpio.h b/arch/arm/mach-tegra/include/mach/gpio.h
-> index e31f486..2369fba 100644
-> --- a/arch/arm/mach-tegra/include/mach/gpio.h
-> +++ b/arch/arm/mach-tegra/include/mach/gpio.h
-> @@ -20,6 +20,7 @@
-> ?#ifndef __MACH_TEGRA_GPIO_H
-> ?#define __MACH_TEGRA_GPIO_H
->
-> +#include <linux/init.h>
-> ?#include <mach/irqs.h>
->
-> ?#define TEGRA_NR_GPIOS ? ? ? ? INT_GPIO_NR
-> @@ -47,6 +48,12 @@ static inline int irq_to_gpio(unsigned int irq)
-> ? ? ? ?return -EINVAL;
-> ?}
->
-> +struct tegra_gpio_table {
-> + ? ? ? int ? ? gpio; ? /* GPIO number */
-> + ? ? ? bool ? ?enable; /* Enable for GPIO at init? */
-> +};
-> +
-> +void __init tegra_gpio_config(struct tegra_gpio_table *table, int num);
-> ?void tegra_gpio_enable(int gpio);
-> ?void tegra_gpio_disable(int gpio);
->
-> --
-> 1.7.0.4
->
->
+> Acked-by: Colin Cross <ccross@android.com>
+
+Thanks Colin.
+
+> Works with chained gpio handlers on Tegra, although the patch is
+> filled with = escaping.
+
+Hmm, I've seen this problem before. See Russell's explanation here:
+
+http://lists.arm.linux.org.uk/lurker/message/20101201.172105.938cf2c5.en.html
+
+I don't believe it's a problem my end, but if it starts happening
+regularly I'll investigate further.
+
+Cheers,
+
+Will
