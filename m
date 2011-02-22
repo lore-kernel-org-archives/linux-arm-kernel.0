@@ -1,37 +1,17 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 22 Feb 2011 11:33:49 +0100
-Subject: [PATCH v3] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110222085256.GA19871@S2100-06.ap.freescale.net>
-References: <1298284528-14761-1-git-send-email-shawn.guo@freescale.com>
-	<20110221174016.GN2616@pengutronix.de>
-	<20110222085256.GA19871@S2100-06.ap.freescale.net>
-Message-ID: <20110222103349.GA2755@pengutronix.de>
+Date: Tue, 22 Feb 2011 11:35:36 +0100
+Subject: [PATCH v4] ARM: mxs/mx23evk: add mmc device
+In-Reply-To: <1298364559-19876-1-git-send-email-shawn.guo@freescale.com>
+References: <1298284979-14853-6-git-send-email-shawn.guo@freescale.com>
+	<1298364559-19876-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110222103536.GB2755@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 22, 2011 at 04:49:19PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 
-> > What throughput rates do you get on a mx28-regulated slot serving a card
-> > at 50Mhz? This is poor here (55kb/s) while it is OK at 25Mhz. Could be a
-> 
-> To make sure we are on the same test, can you share the test case
-> you ran to get the result?  So that I can run it here for the result
-> on my board.
-
-# mount -t vfat /dev/mmcblk0p1 /mnt
-# dd if=/mnt/test.dat of=/tmp/a bs=1024
-# umount /mnt
-# ./dd --version
-dd (coreutils) 8.5
-...
-
-'test.dat' was a 8MB file of random data on a 4GB SDHC card
-(extrememory) on a slot powered by the mx28. Operating the card at
-50Mhz, dd will report ~55 kb/s. If I add 'rate /= 2;' to the beginning
-of set_clk_rate, so it will operate at 25Mhz, I have 8mb/s.
-
-Regards,
-
-   Wolfram
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
 -- 
 Pengutronix e.K.                           | Wolfram Sang                |
@@ -42,4 +22,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/067cb096/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/a246e02b/attachment.sig>
