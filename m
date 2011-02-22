@@ -1,23 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 22 Feb 2011 07:31:20 -0800
-Subject: [PATCH 1/6] ARM: tegra: add tegra_gpio_table and tegra_gpio_config
-In-Reply-To: <4D63B661.6000407@ru.mvista.com>
-References: <1298354117-19097-1-git-send-email-olof@lixom.net>
-	<1298354117-19097-2-git-send-email-olof@lixom.net>
-	<4D63B661.6000407@ru.mvista.com>
-Message-ID: <AANLkTi=y88Ju+0=2WJJO_5fpq-RP+kPRHeWiYBrjCDQ0@mail.gmail.com>
+Date: Tue, 22 Feb 2011 07:35:11 -0800
+Subject: [PATCH v2 5/5] mmc: sdhci-esdhc: enable esdhc on imx53
+In-Reply-To: <20110222113222.GE2755@pengutronix.de>
+References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1298369606-29972-5-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110222113222.GE2755@pengutronix.de>
+Message-ID: <AANLkTimbx6=YvRHFuVkmPVYvYtwME31PxXWNHNfFsVRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Feb 22, 2011 at 5:13 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-
->> +void __init tegra_gpio_config(struct tegra_gpio_table *table, int num);
+On Tue, Feb 22, 2011 at 3:32 AM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> On Tue, Feb 22, 2011 at 06:13:26PM +0800, Richard Zhu wrote:
+>> Fix the NO INT in the Multi-BLK IO in SD/MMC, and
+>> Multi-BLK read in SDIO
+>>
+>> Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
 >
-> ? You don't need to annotate the declaration as __init.
+> Thanks for respinning \o/ This approach looks better to me, but CCing
+> Olof to comment on abstraction issues if he has them. Will do a deeper
+> review later this week.
 
-D'oh. Fixed. Thanks.
 
+I like it! Definitely the right approach. Pushing quirks down into the
+I/O accessors is definitely the only scalable way to handle all the
+various buggy controllers out there.
 
--Olof
+Acked-by: Olof Johansson <olof@lixom.net>
