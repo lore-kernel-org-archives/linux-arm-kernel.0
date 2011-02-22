@@ -1,50 +1,46 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 22 Feb 2011 10:24:10 -0800 (PST)
-Subject: [PATCH 2/2] DM9000B: Fix PHY power for network down/up
-In-Reply-To: <4D62D323.7010403@henry.nestler.mail.gmail.com>
-References: <4D618B5D.5040001@henry.nestler.mail.gmail.com>
-	<4D62491F.4050602@ru.mvista.com>
-	<4D62D323.7010403@henry.nestler.mail.gmail.com>
-Message-ID: <20110222.102410.260079835.davem@davemloft.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 22 Feb 2011 11:27:59 -0700 (MST)
+Subject: [patch-v2.6.39 6/7] OMAP4430: hwmod data: Adding USBOTG
+In-Reply-To: <4D62ECCC.3040208@ti.com>
+References: <20110217171747.GC14574@legolas.emea.dhcp.ti.com>
+	<4D5D59E5.6020307@ti.com>
+	<20110217173711.GF14574@legolas.emea.dhcp.ti.com>
+	<4D5D5F13.2010602@ti.com> <20110217181849.GV20795@atomide.com>
+	<4D5E7DFF.7020609@ti.com>
+	<20110218154135.GF11151@legolas.emea.dhcp.ti.com>
+	<4D5EA36A.4000903@ti.com> <20110221182213.GD15225@atomide.com>
+	<4D62DAF0.9050301@ti.com> <20110221220815.GG15225@atomide.com>
+	<4D62ECCC.3040208@ti.com>
+Message-ID: <alpine.DEB.2.00.1102221127180.22636@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Henry Nestler <henry.nestler@gmail.com>
-Date: Mon, 21 Feb 2011 22:03:31 +0100
+On Mon, 21 Feb 2011, Cousson, Benoit wrote:
 
-> On 21.02.2011 12:14, Sergei Shtylyov wrote:
->> On 21-02-2011 0:45, Henry Nestler wrote:
->> 
->>> DM9000 revision B needs 1 ms delay after PHY power on (see spec), and PHY
->>> power must on in register
->> 
->>     Couldn't parse that.
+> Meanwhile, the following will just prevent the fmwk to reset and idle the
+> timer during hwmod_init.
 > 
-> This can read in manual DM900B-12-DS-F02 from September 2 2010, Page 14:
-> "If this Register 1FH bit 0 is updated from '1' to '0', the all
-> Registers can not be accessed within 1ms."
-> 
-> The example driver code waits 2 ms.
-> 
->>> diff --git a/drivers/net/dm9000.c b/drivers/net/dm9000.c
->>> index 2d4c4fc..5925569 100644
->>> --- a/drivers/net/dm9000.c
->>> +++ b/drivers/net/dm9000.c
->> [...]
->>> @@ -1194,6 +1191,10 @@ dm9000_open(struct net_device *dev)
->>>   	if (request_irq(dev->irq, dm9000_interrupt, irqflags, dev->name, dev))
->>>   		return -EAGAIN;
->>>
->>> +	/* GPIO0 on pre-activate PHY, Reg 1F is not set by reset */
->>> +	iow(db, DM9000_GPR, 0);	/* REG_1F bit0 activate phyxcer */
->>> +	udelay(1000); /* delay needs by DM9000B */
->> 
->>     Why not mdelay(1)?
-> 
-> Because udelay is the base of mdelay.
-> See include/linux/delay.h:31
-> 
-> #define mdelay(n) ... udelay((n)*1000)
+> Regards,
+> Benoit
 
-He is telling you to use mdelay(1) because it's clearer.  Please do
-so.
+Looks okay to me for the time being.
+
+Acked-by: Paul Walmsley <paul@pwsan.com>
+
+> 
+> 
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -3989,6 +3989,7 @@ static struct omap_hwmod_ocp_if
+> *omap44xx_timer1_slaves[] = {
+>  static struct omap_hwmod omap44xx_timer1_hwmod = {
+>  	.name		= "timer1",
+>  	.class		= &omap44xx_timer_1ms_hwmod_class,
+> +	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
+>  	.mpu_irqs	= omap44xx_timer1_irqs,
+>  	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_timer1_irqs),
+>  	.main_clk	= "timer1_fck",
+> 
+
+
+- Paul
