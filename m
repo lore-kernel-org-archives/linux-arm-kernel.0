@@ -1,54 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Feb 2011 23:55:14 -0600
-Subject: [PATCH 3/6] ARM: tegra: remove stale nvidia atag handler
-In-Reply-To: <1298354117-19097-1-git-send-email-olof@lixom.net>
-References: <1298354117-19097-1-git-send-email-olof@lixom.net>
-Message-ID: <1298354117-19097-4-git-send-email-olof@lixom.net>
+Date: Mon, 21 Feb 2011 23:55:11 -0600
+Subject: [PATCH v3 0/6] Tegra board patches
+Message-ID: <1298354117-19097-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove dead atag handling code for nvidia-specific tags.
+Third spin of board patches for .39. They have been tested on harmony
+and seaboard.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-tegra/board-harmony.c |   25 -------------------------
- 1 files changed, 0 insertions(+), 25 deletions(-)
+Chances since v2:
 
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index b9dbdb1..f6ad58b 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -35,31 +35,6 @@
- #include "board-harmony.h"
- #include "clock.h"
- 
--/* NVidia bootloader tags */
--#define ATAG_NVIDIA		0x41000801
--
--#define ATAG_NVIDIA_RM			0x1
--#define ATAG_NVIDIA_DISPLAY		0x2
--#define ATAG_NVIDIA_FRAMEBUFFER		0x3
--#define ATAG_NVIDIA_CHIPSHMOO		0x4
--#define ATAG_NVIDIA_CHIPSHMOOPHYS	0x5
--#define ATAG_NVIDIA_PRESERVED_MEM_0	0x10000
--#define ATAG_NVIDIA_PRESERVED_MEM_N	2
--#define ATAG_NVIDIA_FORCE_32		0x7fffffff
--
--struct tag_tegra {
--	__u32 bootarg_key;
--	__u32 bootarg_len;
--	char bootarg[1];
--};
--
--static int __init parse_tag_nvidia(const struct tag *tag)
--{
--
--	return 0;
--}
--__tagtable(ATAG_NVIDIA, parse_tag_nvidia);
--
- static struct plat_serial8250_port debug_uart_platform_data[] = {
- 	{
- 		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
--- 
-1.7.0.4
+* Fixed up a mismerge resulting in a bad sdhci patch for harmony
+* Revised seaboard patch based on comments
+* Synced up harmony pinmux and seaboard pinmux with runtime debugfs info
+
+Changes since v1:
+
+* I dropped the PCI-e patch since Mike is actively working on fixing
+up that subsystem, and the reboot patch from Simon went in to Colin's
+branch already.
