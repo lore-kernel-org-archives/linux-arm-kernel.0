@@ -1,41 +1,134 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 22 Feb 2011 11:44:48 +0530
-Subject: [PATCH v2 3/6] davinci: da8xx: add spi resources and
-	registration routine
-In-Reply-To: <1297257114-764-4-git-send-email-michael.williamson@criticallink.com>
-References: <1297257114-764-1-git-send-email-michael.williamson@criticallink.com>
-	<1297257114-764-4-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BD48E7B@dbde02.ent.ti.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Tue, 22 Feb 2011 11:52:08 +0530
+Subject: [PATCH v2 11/13] da850: pruss SUART board specific additions.
+In-Reply-To: <4D5584EC.4070506@mvista.com>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-12-git-send-email-subhasish@mistralsolutions.com>
+	<4D5584EC.4070506@mvista.com>
+Message-ID: <66FC4FA6F0A146B68ED19D473735C15D@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hello,
 
-On Wed, Feb 09, 2011 at 18:41:51, Michael Williamson wrote:
-> Add IO resource structures, platform data, and a registration
-> routine in order to support spi device on DA850/OMAP-L138/AM18x
-> and DA830/OMAP-L137/AM17x platforms.
-> 
-> Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
+Have modified this as shown below:
+Please let me know if this looks ok.
 
-[...]
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c 
+b/arch/arm/mach-davinci/board-da850-evm.c
++static struct da850_evm_pruss_can_data can_data = {
+        .version        = 1,
+ };
 
-> +static struct resource da8xx_spi1_resources[] = {
-> +	[0] = {
-> +		.start	= DA8XX_SPI1_BASE,
-> +		.end	= DA8XX_SPI1_BASE + SZ_4K -1,
++static struct resource da850_evm_suart_resource[] = 
+  ------------------------->>> Added a separate resource structure for 
+suart.
++       {
++               .name   = "da8xx_mcasp0_iomem",
++               .start  = DAVINCI_DA8XX_MCASP0_REG_BASE,
++               .end    = DAVINCI_DA8XX_MCASP0_REG_BASE +
++                               (SZ_1K * 12) - 1,
++               .flags  = IORESOURCE_MEM,
++       },
++};
++
+ static struct da8xx_pruss_devices pruss_devices[] = {
+        {
+                .dev_name       = "da8xx_pruss_can",
+                .pdata          = &can_data,
+                .pdata_size     = sizeof(can_data),
+                .setup          = da850_evm_setup_pruss_can,
++               .num_resources  = 0,
++               .resources      = NULL,
+        },
+        {
+                .dev_name       = "da8xx_pruss_uart",
+                .pdata          = &suart_data,
+                .pdata_size     = sizeof(suart_data),
+                .setup          = da850_evm_setup_pruss_suart,
++               .num_resources  = ARRAY_SIZE(da850_evm_suart_resource),
++               .resources      = 
+a850_evm_suart_resource,  ---------------------------- >>>>> Initialized it 
+here
+        },
+        {
+                .dev_name       = NULL,
 
-checkpatch reports a warning here. Need to have spaces
-on either side of binary '-'
 
-I tested this series and the two patches it depends on
-using SPI flash present on DA850 and DA830 EVMs (tested
-in DMA mode) and found no issues.
+diff --git a/drivers/mfd/da8xx_pru.c b/drivers/mfd/da8xx_pru.c
+index f7868a4..140bf14 100644
+--- a/drivers/mfd/da8xx_pru.c
++++ b/drivers/mfd/da8xx_pru.c
+@@ -332,6 +332,8 @@ static int pruss_mfd_add_devices(struct platform_device 
+*pdev)
+                cell.name               = (dev_data + count)->dev_name;
+                cell.platform_data      = (dev_data + count)->pdata;
+                cell.data_size          = (dev_data + count)->pdata_size;
++               cell.resources          = (dev_data + 
+ount)->resources;  ---------------------->>>Modified the MFD driver to add 
+the resources.
++               cell.num_resources      = (dev_data + count)->num_resources;
 
-So, with this minor issue fixed, can you please repost
-with my Ack? You can include the two dependent patches
-in the same series so it is easy to pick-up the whole
-bunch.
 
-Thanks,
-Sekhar
+diff --git a/drivers/tty/serial/da8xx_pruss/pruss_suart.c 
+b/drivers/tty/serial/da8xx_pruss/pruss_suart.c
+
++       res = platform_get_resource(pdev, IORESOURCE_MEM, 
+0); ------------------>> Used platform infrastructure to get the data.
++       if (!res) {
++               dev_err(&pdev->dev, "Failed to get resource");
++               return -ENOMEM;
++       }
++
++       if (!request_mem_region(res->start,
++                       resource_size(res),
+
+
+
+--------------------------------------------------
+From: "Sergei Shtylyov" <sshtylyov@mvista.com>
+Sent: Saturday, February 12, 2011 12:20 AM
+To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
+Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
+<sachi@mistralsolutions.com>; "Russell King" <linux@arm.linux.org.uk>; 
+"Kevin Hilman" <khilman@deeprootsystems.com>; <nsekhar@ti.com>; "open list" 
+<linux-kernel@vger.kernel.org>; <m-watkins@ti.com>; 
+<linux-arm-kernel@lists.infradead.org>
+Subject: Re: [PATCH v2 11/13] da850: pruss SUART board specific additions.
+
+> Subhasish Ghosh wrote:
+>
+>> This patch adds the pruss SUART pin mux and registers the device
+>> with the pruss mfd driver.
+>
+>> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+>> ---
+>>  arch/arm/mach-davinci/board-da850-evm.c |   36 
+>> +++++++++++++++++++++++++++++++
+>>  1 files changed, 36 insertions(+), 0 deletions(-)
+>
+>> diff --git a/arch/arm/mach-davinci/board-da850-evm.c 
+>> b/arch/arm/mach-davinci/board-da850-evm.c
+>> index f9c38f8..3858516 100644
+>> --- a/arch/arm/mach-davinci/board-da850-evm.c
+>> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> [...]
+>> @@ -1085,6 +1104,17 @@ static int __init da850_evm_setup_pruss_can(void)
+>>  return ret;
+>>  }
+>>  +static struct da850_evm_pruss_suart_data suart_data = {
+>> + .version = 1,
+>> + .resource = {
+>> + .name = "da8xx_mcasp0_iomem",
+>> + .start = DAVINCI_DA8XX_MCASP0_REG_BASE,
+>> + .end = DAVINCI_DA8XX_MCASP0_REG_BASE +
+>> + (SZ_1K * 12) - 1,
+>> + .flags = IORESOURCE_MEM,
+>> + },
+>> +};
+>> +
+>
+>    I don't think passing a resource thru platform data is good idea... 
+> Resources should be bound to the platform device.
+>
+> WBR, Sergei 
