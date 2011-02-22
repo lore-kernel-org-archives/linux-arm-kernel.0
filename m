@@ -1,86 +1,601 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 21 Feb 2011 23:55:15 -0600
-Subject: [PATCH 4/6] ARM: tegra: harmony: register sdhci devices
+Date: Mon, 21 Feb 2011 23:55:13 -0600
+Subject: [PATCH 2/6] ARM: tegra: common device resources
 In-Reply-To: <1298354117-19097-1-git-send-email-olof@lixom.net>
 References: <1298354117-19097-1-git-send-email-olof@lixom.net>
-Message-ID: <1298354117-19097-5-git-send-email-olof@lixom.net>
+Message-ID: <1298354117-19097-3-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 3 sdhci devices that are available on Harmony as
-platform devices. Two go to slots (one 4-lane, one 8-lane),
-and one goes to onboard wifi.
+Add a common location to register resources for used on-chip devices
+that are commonly configured on boards. Devices will be added to this file
+as more drivers are added that can make use of them.
+
+This is based on work contributed by several people, most of it from
+Colin Cross and Erik Gilling.
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
+Acked-by: Colin Cross <ccross@android.com>
 ---
- arch/arm/mach-tegra/board-harmony.c |   30 ++++++++++++++++++++++++++++++
- 1 files changed, 30 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/Makefile  |    1 +
+ arch/arm/mach-tegra/devices.c |  505 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/devices.h |   46 ++++
+ 3 files changed, 552 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/devices.c
+ create mode 100644 arch/arm/mach-tegra/devices.h
 
-diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
-index f6ad58b..7010774 100644
---- a/arch/arm/mach-tegra/board-harmony.c
-+++ b/arch/arm/mach-tegra/board-harmony.c
-@@ -30,10 +30,13 @@
- 
- #include <mach/iomap.h>
- #include <mach/irqs.h>
-+#include <mach/sdhci.h>
- 
- #include "board.h"
- #include "board-harmony.h"
- #include "clock.h"
-+#include "devices.h"
-+#include "gpio-names.h"
- 
- static struct plat_serial8250_port debug_uart_platform_data[] = {
- 	{
-@@ -59,6 +62,9 @@ static struct platform_device debug_uart = {
- 
- static struct platform_device *harmony_devices[] __initdata = {
- 	&debug_uart,
-+	&tegra_sdhci_device1,
-+	&tegra_sdhci_device2,
-+	&tegra_sdhci_device4,
- };
- 
- static void __init tegra_harmony_fixup(struct machine_desc *desc,
-@@ -77,6 +83,26 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
- 	{ NULL,		NULL,		0,		0},
- };
- 
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 3fe357b..c530dba 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -1,4 +1,5 @@
+ obj-y                                   += common.o
++obj-y                                   += devices.o
+ obj-y                                   += io.o
+ obj-y                                   += irq.o legacy_irq.o
+ obj-y                                   += clock.o
+diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+new file mode 100644
+index 0000000..682e6d3
+--- /dev/null
++++ b/arch/arm/mach-tegra/devices.c
+@@ -0,0 +1,505 @@
++/*
++ * Copyright (C) 2010,2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *	Erik Gilling <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
 +
-+static struct tegra_sdhci_platform_data sdhci_pdata1 = {
-+	.cd_gpio	= -1,
-+	.wp_gpio	= -1,
-+	.power_gpio	= -1,
++
++#include <linux/resource.h>
++#include <linux/platform_device.h>
++#include <linux/dma-mapping.h>
++#include <linux/fsl_devices.h>
++#include <linux/serial_8250.h>
++#include <asm/pmu.h>
++#include <mach/irqs.h>
++#include <mach/iomap.h>
++#include <mach/dma.h>
++
++static struct resource i2c_resource1[] = {
++	[0] = {
++		.start	= INT_I2C,
++		.end	= INT_I2C,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_I2C_BASE,
++		.end	= TEGRA_I2C_BASE + TEGRA_I2C_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
 +};
 +
-+static struct tegra_sdhci_platform_data sdhci_pdata2 = {
-+	.cd_gpio	= TEGRA_GPIO_PI5,
-+	.wp_gpio	= TEGRA_GPIO_PH1,
-+	.power_gpio	= TEGRA_GPIO_PT3,
++static struct resource i2c_resource2[] = {
++	[0] = {
++		.start	= INT_I2C2,
++		.end	= INT_I2C2,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_I2C2_BASE,
++		.end	= TEGRA_I2C2_BASE + TEGRA_I2C2_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
 +};
 +
-+static struct tegra_sdhci_platform_data sdhci_pdata4 = {
-+	.cd_gpio	= TEGRA_GPIO_PH2,
-+	.wp_gpio	= TEGRA_GPIO_PH3,
-+	.power_gpio	= TEGRA_GPIO_PI6,
-+	.is_8bit	= 1,
++static struct resource i2c_resource3[] = {
++	[0] = {
++		.start	= INT_I2C3,
++		.end	= INT_I2C3,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_I2C3_BASE,
++		.end	= TEGRA_I2C3_BASE + TEGRA_I2C3_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
 +};
 +
- static void __init tegra_harmony_init(void)
- {
- 	tegra_common_init();
-@@ -85,6 +111,10 @@ static void __init tegra_harmony_init(void)
- 
- 	harmony_pinmux_init();
- 
-+	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
-+	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
-+	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
++static struct resource i2c_resource4[] = {
++	[0] = {
++		.start	= INT_DVC,
++		.end	= INT_DVC,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_DVC_BASE,
++		.end	= TEGRA_DVC_BASE + TEGRA_DVC_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
 +
- 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
- }
- 
++struct platform_device tegra_i2c_device1 = {
++	.name		= "tegra-i2c",
++	.id		= 0,
++	.resource	= i2c_resource1,
++	.num_resources	= ARRAY_SIZE(i2c_resource1),
++	.dev = {
++		.platform_data = 0,
++	},
++};
++
++struct platform_device tegra_i2c_device2 = {
++	.name		= "tegra-i2c",
++	.id		= 1,
++	.resource	= i2c_resource2,
++	.num_resources	= ARRAY_SIZE(i2c_resource2),
++	.dev = {
++		.platform_data = 0,
++	},
++};
++
++struct platform_device tegra_i2c_device3 = {
++	.name		= "tegra-i2c",
++	.id		= 2,
++	.resource	= i2c_resource3,
++	.num_resources	= ARRAY_SIZE(i2c_resource3),
++	.dev = {
++		.platform_data = 0,
++	},
++};
++
++struct platform_device tegra_i2c_device4 = {
++	.name		= "tegra-i2c",
++	.id		= 3,
++	.resource	= i2c_resource4,
++	.num_resources	= ARRAY_SIZE(i2c_resource4),
++	.dev = {
++		.platform_data = 0,
++	},
++};
++
++static struct resource spi_resource1[] = {
++	[0] = {
++		.start	= INT_S_LINK1,
++		.end	= INT_S_LINK1,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SPI1_BASE,
++		.end	= TEGRA_SPI1_BASE + TEGRA_SPI1_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource spi_resource2[] = {
++	[0] = {
++		.start	= INT_SPI_2,
++		.end	= INT_SPI_2,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SPI2_BASE,
++		.end	= TEGRA_SPI2_BASE + TEGRA_SPI2_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource spi_resource3[] = {
++	[0] = {
++		.start	= INT_SPI_3,
++		.end	= INT_SPI_3,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SPI3_BASE,
++		.end	= TEGRA_SPI3_BASE + TEGRA_SPI3_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource spi_resource4[] = {
++	[0] = {
++		.start	= INT_SPI_4,
++		.end	= INT_SPI_4,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SPI4_BASE,
++		.end	= TEGRA_SPI4_BASE + TEGRA_SPI4_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++struct platform_device tegra_spi_device1 = {
++	.name		= "spi_tegra",
++	.id		= 0,
++	.resource	= spi_resource1,
++	.num_resources	= ARRAY_SIZE(spi_resource1),
++	.dev		= {
++		.coherent_dma_mask	= 0xffffffff,
++	},
++};
++
++struct platform_device tegra_spi_device2 = {
++	.name		= "spi_tegra",
++	.id		= 1,
++	.resource	= spi_resource2,
++	.num_resources	= ARRAY_SIZE(spi_resource2),
++	.dev		= {
++		.coherent_dma_mask	= 0xffffffff,
++	},
++};
++
++struct platform_device tegra_spi_device3 = {
++	.name		= "spi_tegra",
++	.id		= 2,
++	.resource	= spi_resource3,
++	.num_resources	= ARRAY_SIZE(spi_resource3),
++	.dev		= {
++		.coherent_dma_mask	= 0xffffffff,
++	},
++};
++
++struct platform_device tegra_spi_device4 = {
++	.name		= "spi_tegra",
++	.id		= 3,
++	.resource	= spi_resource4,
++	.num_resources	= ARRAY_SIZE(spi_resource4),
++	.dev		= {
++		.coherent_dma_mask	= 0xffffffff,
++	},
++};
++
++
++static struct resource sdhci_resource1[] = {
++	[0] = {
++		.start	= INT_SDMMC1,
++		.end	= INT_SDMMC1,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SDMMC1_BASE,
++		.end	= TEGRA_SDMMC1_BASE + TEGRA_SDMMC1_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource sdhci_resource2[] = {
++	[0] = {
++		.start	= INT_SDMMC2,
++		.end	= INT_SDMMC2,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SDMMC2_BASE,
++		.end	= TEGRA_SDMMC2_BASE + TEGRA_SDMMC2_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource sdhci_resource3[] = {
++	[0] = {
++		.start	= INT_SDMMC3,
++		.end	= INT_SDMMC3,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SDMMC3_BASE,
++		.end	= TEGRA_SDMMC3_BASE + TEGRA_SDMMC3_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++static struct resource sdhci_resource4[] = {
++	[0] = {
++		.start	= INT_SDMMC4,
++		.end	= INT_SDMMC4,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= TEGRA_SDMMC4_BASE,
++		.end	= TEGRA_SDMMC4_BASE + TEGRA_SDMMC4_SIZE-1,
++		.flags	= IORESOURCE_MEM,
++	},
++};
++
++/* board files should fill in platform_data register the devices themselvs.
++ * See board-harmony.c for an example
++ */
++struct platform_device tegra_sdhci_device1 = {
++	.name		= "sdhci-tegra",
++	.id		= 0,
++	.resource	= sdhci_resource1,
++	.num_resources	= ARRAY_SIZE(sdhci_resource1),
++};
++
++struct platform_device tegra_sdhci_device2 = {
++	.name		= "sdhci-tegra",
++	.id		= 1,
++	.resource	= sdhci_resource2,
++	.num_resources	= ARRAY_SIZE(sdhci_resource2),
++};
++
++struct platform_device tegra_sdhci_device3 = {
++	.name		= "sdhci-tegra",
++	.id		= 2,
++	.resource	= sdhci_resource3,
++	.num_resources	= ARRAY_SIZE(sdhci_resource3),
++};
++
++struct platform_device tegra_sdhci_device4 = {
++	.name		= "sdhci-tegra",
++	.id		= 3,
++	.resource	= sdhci_resource4,
++	.num_resources	= ARRAY_SIZE(sdhci_resource4),
++};
++
++static struct resource tegra_usb1_resources[] = {
++	[0] = {
++		.start	= TEGRA_USB_BASE,
++		.end	= TEGRA_USB_BASE + TEGRA_USB_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_USB,
++		.end	= INT_USB,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tegra_usb2_resources[] = {
++	[0] = {
++		.start	= TEGRA_USB2_BASE,
++		.end	= TEGRA_USB2_BASE + TEGRA_USB2_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_USB2,
++		.end	= INT_USB2,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tegra_usb3_resources[] = {
++	[0] = {
++		.start	= TEGRA_USB3_BASE,
++		.end	= TEGRA_USB3_BASE + TEGRA_USB3_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_USB3,
++		.end	= INT_USB3,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static u64 tegra_ehci_dmamask = DMA_BIT_MASK(32);
++
++struct platform_device tegra_ehci1_device = {
++	.name	= "tegra-ehci",
++	.id	= 0,
++	.dev	= {
++		.dma_mask	= &tegra_ehci_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++	.resource = tegra_usb1_resources,
++	.num_resources = ARRAY_SIZE(tegra_usb1_resources),
++};
++
++struct platform_device tegra_ehci2_device = {
++	.name	= "tegra-ehci",
++	.id	= 1,
++	.dev	= {
++		.dma_mask	= &tegra_ehci_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++	.resource = tegra_usb2_resources,
++	.num_resources = ARRAY_SIZE(tegra_usb2_resources),
++};
++
++struct platform_device tegra_ehci3_device = {
++	.name	= "tegra-ehci",
++	.id	= 2,
++	.dev	= {
++		.dma_mask	= &tegra_ehci_dmamask,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
++	},
++	.resource = tegra_usb3_resources,
++	.num_resources = ARRAY_SIZE(tegra_usb3_resources),
++};
++
++static struct resource tegra_pmu_resources[] = {
++	[0] = {
++		.start	= INT_CPU0_PMU_INTR,
++		.end	= INT_CPU0_PMU_INTR,
++		.flags	= IORESOURCE_IRQ,
++	},
++	[1] = {
++		.start	= INT_CPU1_PMU_INTR,
++		.end	= INT_CPU1_PMU_INTR,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device tegra_pmu_device = {
++	.name		= "arm-pmu",
++	.id		= ARM_PMU_DEVICE_CPU,
++	.num_resources	= ARRAY_SIZE(tegra_pmu_resources),
++	.resource	= tegra_pmu_resources,
++};
++
++static struct resource tegra_uarta_resources[] = {
++	[0] = {
++		.start	= TEGRA_UARTA_BASE,
++		.end	= TEGRA_UARTA_BASE + TEGRA_UARTA_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_UARTA,
++		.end	= INT_UARTA,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tegra_uartb_resources[] = {
++	[0] = {
++		.start	= TEGRA_UARTB_BASE,
++		.end	= TEGRA_UARTB_BASE + TEGRA_UARTB_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_UARTB,
++		.end	= INT_UARTB,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tegra_uartc_resources[] = {
++	[0] = {
++		.start	= TEGRA_UARTC_BASE,
++		.end	= TEGRA_UARTC_BASE + TEGRA_UARTC_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_UARTC,
++		.end	= INT_UARTC,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tegra_uartd_resources[] = {
++	[0] = {
++		.start	= TEGRA_UARTD_BASE,
++		.end	= TEGRA_UARTD_BASE + TEGRA_UARTD_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_UARTD,
++		.end	= INT_UARTD,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct resource tegra_uarte_resources[] = {
++	[0] = {
++		.start	= TEGRA_UARTE_BASE,
++		.end	= TEGRA_UARTE_BASE + TEGRA_UARTE_SIZE - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= INT_UARTE,
++		.end	= INT_UARTE,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device tegra_uarta_device = {
++	.name	= "tegra_uart",
++	.id	= 0,
++	.num_resources	= ARRAY_SIZE(tegra_uarta_resources),
++	.resource	= tegra_uarta_resources,
++	.dev	= {
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct platform_device tegra_uartb_device = {
++	.name	= "tegra_uart",
++	.id	= 1,
++	.num_resources	= ARRAY_SIZE(tegra_uartb_resources),
++	.resource	= tegra_uartb_resources,
++	.dev	= {
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct platform_device tegra_uartc_device = {
++	.name	= "tegra_uart",
++	.id	= 2,
++	.num_resources	= ARRAY_SIZE(tegra_uartc_resources),
++	.resource	= tegra_uartc_resources,
++	.dev	= {
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct platform_device tegra_uartd_device = {
++	.name	= "tegra_uart",
++	.id	= 3,
++	.num_resources	= ARRAY_SIZE(tegra_uartd_resources),
++	.resource	= tegra_uartd_resources,
++	.dev	= {
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
++
++struct platform_device tegra_uarte_device = {
++	.name	= "tegra_uart",
++	.id	= 4,
++	.num_resources	= ARRAY_SIZE(tegra_uarte_resources),
++	.resource	= tegra_uarte_resources,
++	.dev	= {
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
++};
+diff --git a/arch/arm/mach-tegra/devices.h b/arch/arm/mach-tegra/devices.h
+new file mode 100644
+index 0000000..888810c
+--- /dev/null
++++ b/arch/arm/mach-tegra/devices.h
+@@ -0,0 +1,46 @@
++/*
++ * Copyright (C) 2010,2011 Google, Inc.
++ *
++ * Author:
++ *	Colin Cross <ccross@android.com>
++ *	Erik Gilling <ccross@android.com>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef __MACH_TEGRA_DEVICES_H
++#define __MACH_TEGRA_DEVICES_H
++
++#include <linux/platform_device.h>
++
++extern struct platform_device tegra_sdhci_device1;
++extern struct platform_device tegra_sdhci_device2;
++extern struct platform_device tegra_sdhci_device3;
++extern struct platform_device tegra_sdhci_device4;
++extern struct platform_device tegra_i2c_device1;
++extern struct platform_device tegra_i2c_device2;
++extern struct platform_device tegra_i2c_device3;
++extern struct platform_device tegra_i2c_device4;
++extern struct platform_device tegra_spi_device1;
++extern struct platform_device tegra_spi_device2;
++extern struct platform_device tegra_spi_device3;
++extern struct platform_device tegra_spi_device4;
++extern struct platform_device tegra_ehci1_device;
++extern struct platform_device tegra_ehci2_device;
++extern struct platform_device tegra_ehci3_device;
++extern struct platform_device tegra_uarta_device;
++extern struct platform_device tegra_uartb_device;
++extern struct platform_device tegra_uartc_device;
++extern struct platform_device tegra_uartd_device;
++extern struct platform_device tegra_uarte_device;
++extern struct platform_device tegra_pmu_device;
++
++#endif
 -- 
 1.7.0.4
