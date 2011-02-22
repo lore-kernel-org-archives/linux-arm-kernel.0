@@ -1,291 +1,172 @@
-From: subhasish@mistralsolutions.com (Subhasish)
-Date: Tue, 22 Feb 2011 15:56:41 +0530
-Subject: [PATCH v2 13/13] tty: pruss SUART driver
-In-Reply-To: <20110211162814.6ff274f1@lxorguk.ukuu.org.uk>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com><1297435892-28278-14-git-send-email-subhasish@mistralsolutions.com>
-	<20110211162814.6ff274f1@lxorguk.ukuu.org.uk>
-Message-ID: <A6D1CF0E941748448610BE8874FC586F@subhasishg>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 22 Feb 2011 11:31:27 +0100
+Subject: [PATCH v2 01/13] mfd: pruss mfd driver.
+In-Reply-To: <37B3755C4AE64BAA805DFBAEBDC3D9E4@subhasishg>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<1297435892-28278-2-git-send-email-subhasish@mistralsolutions.com>
+	<20110221163027.GF10686@sortiz-mobl>
+	<37B3755C4AE64BAA805DFBAEBDC3D9E4@subhasishg>
+Message-ID: <20110222103127.GC30279@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
---------------------------------------------------
-From: "Alan Cox" <alan@lxorguk.ukuu.org.uk>
-Sent: Friday, February 11, 2011 9:58 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Cc: <davinci-linux-open-source@linux.davincidsp.com>;
-<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>;
-<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "Greg Kroah-Hartman"
-<gregkh@suse.de>; "open list" <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2 13/13] tty: pruss SUART driver
+Hi Subhasish,
 
-> Don't see why it needs its own sub-directory
+On Tue, Feb 22, 2011 at 11:13:38AM +0530, Subhasish Ghosh wrote:
+> Thank you for your comments.
+No problem.
 
-SG - We have two different layers of implementation. One is the driver
-layer, which interacts with the TTY sub-system and the other is the API 
-layer,
-which interacts with the PRUSS. To maintain this (also explained in the 
-other mail),
-we used separate files and hence we decided to keep the code in a separate
-directory so that the related files can be identified easily.
-
->
->
->
->> +#ifdef __SUART_DEBUG
->> +#define __suart_debug(fmt, args...) \
->> + printk(KERN_DEBUG "suart_debug: " fmt, ## args)
->> +#else
->> +#define __suart_debug(fmt, args...)
->> +#endif
->> +
->> +#define  __suart_err(fmt, args...) printk(KERN_ERR "suart_err: " fmt, ##
->> args)
->
-> Use dev_dbg/dev_err/pr_debug/pr_err
-
-SG - did you mean replace the printks above with dev_dgb/err or the 
-suart_dbg/err.
-
->
->
->> +static void omapl_pru_tx_chars(struct omapl_pru_suart *soft_uart, u32
->> uart_no)
->> +{
->> + struct circ_buf *xmit = &soft_uart->port[uart_no].state->xmit;
->> + struct device *dev = soft_uart->dev;
->> + s32 count = 0;
->> +
->> + if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_TX))
->> + return;
->> +
->> + if (down_trylock(&soft_uart->port_sem[uart_no]))
->> + return;
->
-> Please use a mutex not a semaphore. We are trying to get almost all the
-> kernel using mutexes as it is needed for hard real time.
-
-SG - Have removed, need your feedback.
-
->
->
->> + pru_softuart_read_data(dev, &soft_uart->suart_hdl[uart_no],
->> +        suart_data, data_len + 1,
->> +        &data_len_read);
->> +
->> + for (i = 0; i <= data_len_read; i++) {
->> + soft_uart->port[uart_no].icount.rx++;
->> + /* check for sys rq */
->> + if (uart_handle_sysrq_char
->> +     (&soft_uart->port[uart_no], suart_data))
->> + continue;
->> + }
->> + /* update the tty data structure */
->> + tty_insert_flip_string(tty, suart_data, data_len_read);
->
-> You can avoid a copy here by using tty_prepare_flip_string()
-
-SG - Ok, Thus this look ok ?
-==================================================================================
---- a/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-+++ b/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-@@ -170,8 +170,9 @@ static void omapl_pru_rx_chars(struct omapl_pru_suart 
-*soft_uart, u32 uart_no)
-        s8 flags = TTY_NORMAL;
-        u16 rx_status, data_len = SUART_FIFO_LEN;
-        u32 data_len_read;
--       u8 suart_data[SUART_FIFO_LEN + 1];
-+       u8 *suart_data = NULL;
-        s32 i = 0;
-+       s32 alloc_len = 0;
-
-        if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_RX))
-                return;
-@@ -199,9 +200,10 @@ static void omapl_pru_rx_chars(struct omapl_pru_suart 
-*soft_uart, u32 uart_no)
-                soft_uart->port[uart_no].sysrq = 0;
- #endif
-        } else {
-+               alloc_len = tty_prepare_flip_string(tty, &suart_data, 
-data_len + 1);
-                pru_softuart_read_data(dev, &soft_uart->suart_hdl[uart_no],
--                                      suart_data, data_len + 1,
--                                      &data_len_read);
-+                                               suart_data, alloc_len,
-+                                               &data_len_read);
-
-                for (i = 0; i <= data_len_read; i++) {
-                        soft_uart->port[uart_no].icount.rx++;
-@@ -210,8 +212,6 @@ static void omapl_pru_rx_chars(struct omapl_pru_suart 
-*soft_uart, u32 uart_no)
-                            (&soft_uart->port[uart_no], suart_data))
-                                continue;
-                }
--               /* update the tty data structure */
--               tty_insert_flip_string(tty, suart_data, data_len_read);
-        }
-============================================================================================
-
-> Also please use the tty_port_tty_get/tty_kref_put interfaces so the tty
-> refcounting is right
-
-SG - Ok, Will do.
-
->
->
->> +static void pruss_suart_set_termios(struct uart_port *port,
->> +   struct ktermios *termios,
->> +   struct ktermios *old)
->> +{
->> + struct omapl_pru_suart *soft_uart =
->> +     container_of(port, struct omapl_pru_suart, port[port->line]);
->> + struct device *dev = soft_uart->dev;
->> + u8 cval = 0;
->> + unsigned long flags = 0;
->> + u32 baud = 0;
->> + u32 old_csize = old ? old->c_cflag & CSIZE : CS8;
->> +
->> +/*
->> + * Do not allow unsupported configurations to be set
->> + */
->> + if (1) {
->> + termios->c_cflag &= ~(HUPCL | CRTSCTS | CMSPAR | CSTOPB
->> +       | PARENB | PARODD | CMSPAR);
->> + termios->c_cflag |= CLOCAL;
->
-> No. CLOCAL and HUPCL are user side flags. Apps expect to able to set them
-> even if in fact they have no effect, so leave those two alone. The rest
-> is fine.
-
-SG -Ok, will do.
-
->
->
->> +/*
->> + * Characteres to ignore
->
-> Typo
->
-
-SG - ok.
-
->
->
->> diff --git a/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
->> b/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
->> new file mode 100644
->> index 0000000..d809dd3
->> --- /dev/null
->> +++ b/drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
->> @@ -0,0 +1,2350 @@
->> +/*
->> + * Copyright (C) 2010 Texas Instruments Incorporated
->> + * Author: Jitendra Kumar <jitendra@mistralsolutions.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> it
->> + * under the terms of the GNU General Public License as  published by
->> the
->> + * Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
->> + * whether express or implied; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License for more details.
->> + */
->> +
->> +#include <linux/types.h>
->> +#include <linux/mfd/pruss/da8xx_pru.h>
->> +#include <linux/io.h>
->> +#include <mach/hardware.h>
->> +#include "pruss_suart_api.h"
->> +#include "pruss_suart_regs.h"
->> +#include "pruss_suart_board.h"
->> +#include "pruss_suart_utils.h"
->> +#include "pruss_suart_err.h"
->> +
->> +static u8 g_uart_statu_table[8];
-> Can you lose the g_, its  a windows naming convention we dont use
-
-SG -- Ok, I can also see the Hungarian style like u32Offset, will get rid of 
-these as well.
-            Would really appreciate if you may please point me out more such 
-problems.
-
->
->
->> +s16 pru_softuart_open(suart_handle h_suart)
->> +{
->
-> If you just used normal integers you could surely make this routine
-> trivial and remove all the duplication in the switches
-
-SG -- Ok, will do.
-
->
->> + s16 status = PRU_SUART_SUCCESS;
->
-> And please stick to Linux error codes
-
-SG - Ok, Will do
->
->
->> +/* suart instance close routine */
->> +s16 pru_softuart_close(suart_handle h_uart)
->> +{
->> + s16 status = SUART_SUCCESS;
->> +
->> + if (h_uart == NULL) {
->> + return PRU_SUART_ERR_HANDLE_INVALID;
->
-> Which is never checked. Far better to use WARN_ON and the like for such
-> cases - or if like this one they don't appear to be possible to simply
-> delete them
-
-SG -- OK, does this look ok ?
-=================================
-if (h_uart == NULL) {
-+WARN_ON(1);
-- return PRU_SUART_ERR_HANDLE_INVALID;
-+return -EINVAL;
-}
-=================================
-
->
->> + if ((tx_clk_divisor > 385) || (tx_clk_divisor == 0))
->> + return SUART_INVALID_CLKDIVISOR;
->> + if ((rx_clk_divisor > 385) || (rx_clk_divisor == 0))
->> + return SUART_INVALID_CLKDIVISOR;
->
-> [minor] Lots of excess brackets
-
-Ok - Will do.
->
->
->> + u32offset = (u32) (PRUSS_INTC_CHANMAP9 & 0xFFFF);
->> + u32value = PRU_INTC_CHAN_34_SYSEVT_36_39;
->> + s16retval = pruss_writel(dev, u32offset, (u32 *)&u32value, 1);
->> + if (-1 == s16retval)
->> + return -1;
->
-> If you fixed the API here you'd be able to just write
->
-> if (pruss_writel(dev, PRUSS_INTC_CHANMAP9 & 0xFFFF,
-> PRU_INTC_BLAH)
->
-> or similar which would clean up a lot of messy code and shrink it
-> dramatically. Given you have lots of series of writes some kind of
->
-> pruss_writel_multi(dev, array, len)
->
-> that took an array of addr/value pairs might also clean up a ton of code
-> and turn it into trivial tables
-
-SG -- Will shrink this function.
-
+> >>diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> >>index fd01836..6c437df 100644
+> >>--- a/drivers/mfd/Kconfig
+> >>+++ b/drivers/mfd/Kconfig
+> >>@@ -81,6 +81,16 @@ config MFD_DM355EVM_MSP
+> >>   boards.  MSP430 firmware manages resets and power sequencing,
+> >>   inputs from buttons and the IR remote, LEDs, an RTC, and more.
+> >>
+> >>+config MFD_DA8XX_PRUSS
+> >>+ tristate "Texas Instruments DA8XX PRUSS support"
+> >>+ depends on ARCH_DAVINCI && ARCH_DAVINCI_DA850
+> >Why are we depending on those ?
 > 
+> SG -- The PRUSS core in only available within DA850 and DA830,
+>            DA830 support is not yet implemented.
+Sure, but if there are no actual code dependencies, I'd like to get rid of
+those depends.
 
-Please do not print this email unless it is absolutely necessary. Spread environmental awareness.
+> >>+u32 pruss_disable(struct device *dev, u8 pruss_num)
+> >>+{
+> >>+ struct da8xx_pruss *pruss = dev_get_drvdata(dev->parent);
+> >>+ da8xx_prusscore_regs h_pruss;
+> >>+ u32 temp_reg;
+> >>+
+> >>+ if (pruss_num == DA8XX_PRUCORE_0) {
+> >>+ /* Disable PRU0  */
+> >>+ h_pruss = (da8xx_prusscore_regs)
+> >>+ ((u32) pruss->ioaddr + 0x7000);
+> >So it seems you're doing this in several places, and I have a few
+> >comments:
+> >
+> >- You don't need the da8xx_prusscore_regs at all.
+> >- Define the register map through a set of #define in your header file.
+> >- Use a static routine that takes the core number and returns the
+> >register map
+> >offset.
+> >
+> >Then routines like this one will look a lot more readable.
+> 
+> SG -- There are a huge number of PRUSS registers. A lot of them are
+> reserved and are expected to change as development on the
+>            controller is still ongoing. 
+First of all, from what I read in your patch you're only using the CONTROL
+offset.
 
--------------------------------------------------------DISCLAIMER------------------------------------------------------
-The information transmitted herewith is confidential and proprietary information intended only for use by the individual or entity to which it is addressed. If the reader of this message is not the intended recipient, you are hereby notified that any review, retransmission, dissemination, distribution, copying or other use of, or taking of any action in reliance upon this information is strictly prohibited. If you have received this communication in error, please contact the sender and delete the material from your computer.
----------------------------------------------------------------------------------------------------------------------------
+> If we use #defines to plot
+> all the registers, then first, there are too many array type
+> registers which will need to be duplicated.
+What I'm expecting is a small set of defines for the register offsets. You
+have 13 fields in your da8xx_prusscore_regs, you only need to define 13
+register offsets.
+
+So, if you have a:
+
+static u32 reg_offset(struct device *dev, u8 pru_num)
+{
+	struct da8xx_pruss *pru = dev_get_drvdata(dev->parent);
+
+	switch (pru_num) {
+	case DA8XX_PRUCORE_0:
+		return (u32) pru->ioaddr + 0x7000;
+	case DA8XX_PRUCORE_1:
+		return (u32) pru->ioaddr + 0x7800;
+	default:
+		return 0;
+}
+
+
+then routines like pruss_enable (which should return an int, btw) would look
+like:
+
+int pruss_enable(struct device *dev, u8 pruss_num)
+{
+	u32 offset = reg_offset(dev, pruss_num);
+
+	if (offset == 0)
+		return -EINVAL;
+
+	__raw_writel(DA8XX_PRUCORE_CONTROL_RESETVAL,
+			offset + PRU_CORE_CONTROL);
+
+	return 0;
+}
+
+> >Also, all your exported routines severely lack any sort of locking. An IO
+> >mutex or spinlock is mandatory here.
+> 
+> SG - As per our current implementation, we do not have two devices
+> running simultaneously on the PRU,
+>        so we do not have any way to test it. We have kept this as an
+> enhancement if request comes in for
+>        multiple devices.
+It's not about having multiple devices at the same time, it's about having
+multiple callers writing and reading to the same registers. Since you're
+exporting all your I/O routines you have no way to prevent 2 drivers from
+writing to the same register at the "same" time. You need locking here,
+regardless of the number of devices that you can have on a system.
+
+ 
+> >>+static int pruss_mfd_add_devices(struct platform_device *pdev)
+> >>+{
+> >>+ struct da8xx_pruss_devices *dev_data = pdev->dev.platform_data;
+> >>+ struct device *dev = &pdev->dev;
+> >>+ struct mfd_cell cell;
+> >>+ u32 err, count;
+> >>+
+> >>+ for (count = 0; (dev_data + count)->dev_name != NULL; count++) {
+> >>+ memset(&cell, 0, sizeof(struct mfd_cell));
+> >>+ cell.id = count;
+> >>+ cell.name = (dev_data + count)->dev_name;
+> >>+ cell.platform_data = (dev_data + count)->pdata;
+> >>+ cell.data_size = (dev_data + count)->pdata_size;
+> >>+
+> >>+ err = mfd_add_devices(dev, 0, &cell, 1, NULL, 0);
+> >>+ if (err) {
+> >>+ dev_err(dev, "cannot add mfd cells\n");
+> >>+ return err;
+> >>+ }
+> >>+ }
+> >>+ return err;
+> >>+}
+> >So, what are the potential subdevices for this driver ? If it's a really
+> >dynamic setup, I'm fine with passing those as platform data but
+> >then do it so
+> >that you pass a NULL terminated da8xx_pruss_devices array. That will avoid
+> >most of the ugly casts you're doing here.
+> 
+> SG -- I did not follow your recommendations here, could you please
+> elaborate.
+>            I am already checking the dev_name for a NULL.
+>            This device is basically a microcontroller within DA850,
+> so basically any device or protocol can be
+>            emulated on it. Currently, we have emulated 8 UARTS using
+> the two PRUs and also a CAN device.
+Ok, I wasnt sure you can emulate anything on that thing. So I'm fine with you
+passing all your devices through platform_data. But I'd prefer this routine to
+look like:
+
+[...]
+	for (count = 0; dev_data[count] != NULL; count++) {
+		memset(&cell, 0, sizeof(struct mfd_cell));
+		cell.id			= count;
+		cell.name		= dev_data[count]->dev_name;
+		cell.platform_data	= dev_data[count]->pdata;
+		cell.data_size		= dev_data[count]->pdata_size;
+
+Looks nicer to me.
+
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
