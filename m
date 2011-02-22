@@ -1,27 +1,54 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 22 Feb 2011 11:14:33 +0530
-Subject: [linux-pm] [PATCHv2] amba: support pm ops
-In-Reply-To: <201102212126.10742.rjw@sisk.pl>
-References: <1297928986-31171-1-git-send-email-rabin.vincent@stericsson.com>
-	<1298271737-1606-1-git-send-email-rabin.vincent@stericsson.com>
-	<201102212126.10742.rjw@sisk.pl>
-Message-ID: <AANLkTin75bnW69CDrKPkw+4K9sfAMLGPqYsV-UfHTASD@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 21 Feb 2011 23:55:14 -0600
+Subject: [PATCH 3/6] ARM: tegra: remove stale nvidia atag handler
+In-Reply-To: <1298354117-19097-1-git-send-email-olof@lixom.net>
+References: <1298354117-19097-1-git-send-email-olof@lixom.net>
+Message-ID: <1298354117-19097-4-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 01:56, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Monday, February 21, 2011, Rabin Vincent wrote:
->> Support pm_ops in the AMBA bus, required to allow drivers to use runtime pm.
->> The implementation of AMBA bus pm ops is based on the platform bus
->> implementation.
->>
->> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
->
-> Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
+Remove dead atag handling code for nvidia-specific tags.
 
-Thanks.
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm/mach-tegra/board-harmony.c |   25 -------------------------
+ 1 files changed, 0 insertions(+), 25 deletions(-)
 
-> (although I'd probably avoid creating an empty struct dev_pm_ops object
-> if both CONFIG_HIBERNATION and CONFIG_SUSPEND are unset).
-
-Done in v3.
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index b9dbdb1..f6ad58b 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -35,31 +35,6 @@
+ #include "board-harmony.h"
+ #include "clock.h"
+ 
+-/* NVidia bootloader tags */
+-#define ATAG_NVIDIA		0x41000801
+-
+-#define ATAG_NVIDIA_RM			0x1
+-#define ATAG_NVIDIA_DISPLAY		0x2
+-#define ATAG_NVIDIA_FRAMEBUFFER		0x3
+-#define ATAG_NVIDIA_CHIPSHMOO		0x4
+-#define ATAG_NVIDIA_CHIPSHMOOPHYS	0x5
+-#define ATAG_NVIDIA_PRESERVED_MEM_0	0x10000
+-#define ATAG_NVIDIA_PRESERVED_MEM_N	2
+-#define ATAG_NVIDIA_FORCE_32		0x7fffffff
+-
+-struct tag_tegra {
+-	__u32 bootarg_key;
+-	__u32 bootarg_len;
+-	char bootarg[1];
+-};
+-
+-static int __init parse_tag_nvidia(const struct tag *tag)
+-{
+-
+-	return 0;
+-}
+-__tagtable(ATAG_NVIDIA, parse_tag_nvidia);
+-
+ static struct plat_serial8250_port debug_uart_platform_data[] = {
+ 	{
+ 		.membase	= IO_ADDRESS(TEGRA_UARTD_BASE),
+-- 
+1.7.0.4
