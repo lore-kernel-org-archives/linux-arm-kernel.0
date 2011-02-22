@@ -1,44 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 22 Feb 2011 19:59:29 +0000
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Feb 2011 11:59:39 -0800
 Subject: [PATCH] ARM: Fix compile after delay page freeing patch
-In-Reply-To: <20110222194332.GQ15225@atomide.com>
+In-Reply-To: <4D6413D9.7080906@ru.mvista.com>
 References: <20110222194332.GQ15225@atomide.com>
-Message-ID: <20110222195929.GA31275@n2100.arm.linux.org.uk>
+	<4D6413D9.7080906@ru.mvista.com>
+Message-ID: <20110222195938.GR15225@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 11:43:32AM -0800, Tony Lindgren wrote:
-> Commit 06824ba824b3e9f2fedb38bee79af0643198ed7f
-> (ARM: tlb: delay page freeing for SMP and ARMv7 CPUs) causes
-> the following compile error for at least omap1_defconfig:
+* Sergei Shtylyov <sshtylyov@mvista.com> [110222 11:51]:
+> Hello.
 > 
-> In file included from arch/arm/mm/init.c:27:
-> arch/arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
-> arch/arm/include/asm/tlb.h:101: error: implicit declaration of function 'release_pages'
-> arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
-> arch/arm/include/asm/tlb.h:165: error: implicit declaration of function 'page_cache_release'
+> Tony Lindgren wrote:
+> 
+> >Commit 06824ba824b3e9f2fedb38bee79af0643198ed7f
+> >(ARM: tlb: delay page freeing for SMP and ARMv7 CPUs) causes
+> >the following compile error for at least omap1_defconfig:
+> 
+> >In file included from arch/arm/mm/init.c:27:
+> >arch/arm/include/asm/tlb.h: In function 'tlb_flush_mmu':
+> >arch/arm/include/asm/tlb.h:101: error: implicit declaration of function 'release_pages'
+> >arch/arm/include/asm/tlb.h: In function 'tlb_remove_page':
+> >arch/arm/include/asm/tlb.h:165: error: implicit declaration of function 'page_cache_release'
+> >
+> >Fix this by including pagemap.h.
+> >
+> >Signed-off-by: Tony Lindgren <tony@atomide.com>
+> >
+> >--- a/arch/arm/mm/init.c
+> >+++ b/arch/arm/mm/init.c
+> >@@ -19,6 +19,7 @@
+> > #include <linux/gfp.h>
+> > #include <linux/memblock.h>
+> > #include <linux/sort.h>
+> >+#include <linux/pagemap.h>
+> > #include <asm/mach-types.h>
+> > #include <asm/sections.h>
+> 
+>    Shouldn't you be #including it into tlb.h instead?
 
-Grant already mentioned this to me this evening.
+Hmm, pagemap.h actually seems to be there in tlb.h,
+but in #ifndef CONFIG_MMU.
 
-This happens if you build with CONFIG_SWAP=n, and is something that the
-asm-generic/tlb.h also appears to suffer from.  Why no one else has
-noticed this I've no idea.
-
-Note that linux/swap.h has this comment:
-
-/* only sparc can not include linux/pagemap.h in this file
- * so leave page_cache_release and release_pages undeclared... */
-#define free_page_and_swap_cache(page) \
-        page_cache_release(page)
-#define free_pages_and_swap_cache(pages, nr) \
-        release_pages((pages), (nr), 0);
-
-which is rather annoying, because it makes the build error dependent on
-the configuration.
-
-So, we should add linux/pagemap.h to both asm-generic/tlb.h and the ARM
-tlb.h as they both should suffer the same problem.
-
-Note that arch/x86/mm/init.c and arch/x86/mm/pgtable.c both include
-asm/tlb.h without linux/pagemap.h, and use the generic version.  I bet
-no one's tried building x86 with CONFIG_SWAP=n yet...
+Tony
