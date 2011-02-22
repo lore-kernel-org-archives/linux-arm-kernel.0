@@ -1,51 +1,58 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Tue, 22 Feb 2011 17:27:51 +0100
-Subject: [PATCH v2 01/13] mfd: pruss mfd driver.
-In-Reply-To: <C73EA0C998A34C709A8130A50A1C443F@subhasishg>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Feb 2011 17:34:15 +0100
+Subject: [PATCH v2 13/13] tty: pruss SUART driver
+In-Reply-To: <DADE3366197E4479A57F3B967A881C33@subhasishg>
 References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-2-git-send-email-subhasish@mistralsolutions.com>
-	<20110221163027.GF10686@sortiz-mobl>
-	<37B3755C4AE64BAA805DFBAEBDC3D9E4@subhasishg>
-	<20110222103127.GC30279@sortiz-mobl>
-	<4D639493.1060601@grandegger.com>
-	<20110222113310.GD30279@sortiz-mobl>
-	<C73EA0C998A34C709A8130A50A1C443F@subhasishg>
-Message-ID: <4D63E407.3010801@grandegger.com>
+	<201102181951.32631.arnd@arndb.de>
+	<DADE3366197E4479A57F3B967A881C33@subhasishg>
+Message-ID: <201102221734.15582.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2011 01:49 PM, Subhasish Ghosh wrote:
-> I am not sure if I understood you correctly, but the current sizeof the
-> structure da8xx_prusscore_regs  is 0x500.
+On Tuesday 22 February 2011, Subhasish Ghosh wrote:
+
+> @@ -122,13 +122,10 @@ static void omapl_pru_tx_chars(struct omapl_pru_suart 
+> *soft_uart, u32 uart_no)
+>         if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_TX))
+>                 return;
 > 
-> Here is a link to the PRUSS memory map:
-> http://processors.wiki.ti.com/index.php/PRUSS_Memory_Map
+> -       if (down_trylock(&soft_uart->port_sem[uart_no]))
+> -               return;
+> -
+>         if (uart_circ_empty(xmit) ||
+>                         uart_tx_stopped(&soft_uart->port[uart_no])) {
+>                 pruss_suart_stop_tx(&soft_uart->port[uart_no]);
+> -               up(&soft_uart->port_sem[uart_no]);
+> +               soft_uart->tx_empty[uart_no] = true;
+>                 return;
+>         }
 > 
-> The offset 0x00007000 is the PRU0 reg offset and 0x00007800 is the PRU1
-> reg offset.
-> We cannot have a register file larger than this, but lot of space is
-> left out, possibly for future development.
+> @@ -259,7 +256,6 @@ static irqreturn_t pruss_suart_interrupt(s32 irq, void 
+> *dev_id)
+>                         pru_intr_clr_isrstatus(dev, uart_num, PRU_TX_INTR);
+>                         pru_softuart_clr_tx_status(dev, &soft_uart->suart_hdl
+>                                                  [port->line]);
+> -                       up(&soft_uart->port_sem[port->line]);
+>                         omapl_pru_tx_chars(soft_uart, port->line);
+>                 }
+>         } while (txrx_flag & (PRU_RX_INTR | PRU_TX_INTR));
+> @@ -294,7 +290,10 @@ static void pruss_suart_start_tx(struct uart_port 
+> *port)
+> 
+>         suart_intr_setmask(dev, soft_uart->suart_hdl[port->line].uart_num,
+>                            PRU_TX_INTR, CHN_TXRX_IE_MASK_CMPLT);
+> -       omapl_pru_tx_chars(soft_uart, port->line);
+> +       if (soft_uart->tx_empty[port->line] == true) {
+> +               soft_uart->tx_empty[port->line] = false;
+> +               omapl_pru_tx_chars(soft_uart, port->line);
+> +       }
+>  }
 
-What do you mean with "larger than this"? You ioremap the whole space
-and unsued space could be filled with padding bytes:
+This looks racy, and I think you at least need to take the spinlock in
+pruss_suart_start_tx(), but I don't fully understand the intention of the
+code.
 
-struct pruss_regs {
-	u8 ram0[0x0200];
-	u8 res0[0x1e00];
-	u8 ram1[0x0200];
-	u8 res1[0x1e00];
-	struct pruss_intc_regs intc;
-	struct pruss_core_regs core[2];
-};
+I guess you could also use a bitmask for tx_empty and use test_and_clear_bit()
+on that to guarantee atomicity.
 
-Then:
-
-  pruss_dev->regs = ioremap(pruss_dev->res->start,
-	   	    resource_size(pruss_dev->res));
-
-  __raw_writel(DA8XX_PRUCORE_CONTROL_RESETVAL,
-               &pruss_dev->regs.core[pruss_num].control);
-
-That's simple, transparent and save without magic offset handling.
-
-Wolfgang.
+	Arnd
