@@ -1,89 +1,128 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 22 Feb 2011 00:42:59 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102201603.41856.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102191054.48706.arnd@arndb.de>
-	<AANLkTi=GO8N15pCnZWuuJ6FfyQMytFt23LPS5oYMNuMu@mail.gmail.com>
-	<201102201603.41856.arnd@arndb.de>
-Message-ID: <AANLkTin0BVMgpjmeg682F7zcJJajRumLYcsgNriBwX2v@mail.gmail.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Tue, 22 Feb 2011 08:59:16 +0200
+Subject: [PATCH 4/6] ARM: tegra: harmony: register sdhci devices
+In-Reply-To: <1298354117-19097-5-git-send-email-olof@lixom.net>
+References: <1298354117-19097-1-git-send-email-olof@lixom.net>
+	<1298354117-19097-5-git-send-email-olof@lixom.net>
+Message-ID: <4D635EC4.2030102@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 20, 2011 at 9:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> From your flashbench -a run, I would guess that it uses
-> 8 MB allocation units, although the data is not 100% conclusive
-> there.
->
+Hi Olof,
+Sorry for jumping late, haven't thought about the proposal below yesterday.
+I'm not objecting to applying the patch as is, we can refactor the code
+afterwards as well.
 
-Because the 8MB aligned write time is significantly faster, right?
+On 02/22/11 07:55, Olof Johansson wrote:
+> Add the 3 sdhci devices that are available on Harmony as
+> platform devices. Two go to slots (one 4-lane, one 8-lane),
+> and one goes to onboard wifi.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>  arch/arm/mach-tegra/board-harmony.c |   30 ++++++++++++++++++++++++++++++
+>  1 files changed, 30 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+> index f6ad58b..7010774 100644
+> --- a/arch/arm/mach-tegra/board-harmony.c
+> +++ b/arch/arm/mach-tegra/board-harmony.c
+> @@ -30,10 +30,13 @@
+>  
+>  #include <mach/iomap.h>
+>  #include <mach/irqs.h>
+> +#include <mach/sdhci.h>
+>  
+>  #include "board.h"
+>  #include "board-harmony.h"
+>  #include "clock.h"
+> +#include "devices.h"
+> +#include "gpio-names.h"
+>  
+>  static struct plat_serial8250_port debug_uart_platform_data[] = {
+>  	{
+> @@ -59,6 +62,9 @@ static struct platform_device debug_uart = {
+>  
+>  static struct platform_device *harmony_devices[] __initdata = {
+>  	&debug_uart,
+> +	&tegra_sdhci_device1,
+> +	&tegra_sdhci_device2,
+> +	&tegra_sdhci_device4,
+>  };
+>  
+>  static void __init tegra_harmony_fixup(struct machine_desc *desc,
+> @@ -77,6 +83,26 @@ static __initdata struct tegra_clk_init_table harmony_clk_init_table[] = {
+>  	{ NULL,		NULL,		0,		0},
+>  };
+>  
+> +
+> +static struct tegra_sdhci_platform_data sdhci_pdata1 = {
+> +	.cd_gpio	= -1,
+> +	.wp_gpio	= -1,
+> +	.power_gpio	= -1,
+> +};
+> +
+> +static struct tegra_sdhci_platform_data sdhci_pdata2 = {
+> +	.cd_gpio	= TEGRA_GPIO_PI5,
+> +	.wp_gpio	= TEGRA_GPIO_PH1,
+> +	.power_gpio	= TEGRA_GPIO_PT3,
+> +};
+> +
+> +static struct tegra_sdhci_platform_data sdhci_pdata4 = {
+> +	.cd_gpio	= TEGRA_GPIO_PH2,
+> +	.wp_gpio	= TEGRA_GPIO_PH3,
+> +	.power_gpio	= TEGRA_GPIO_PI6,
+> +	.is_8bit	= 1,
+> +};
+> +
+>  static void __init tegra_harmony_init(void)
+>  {
+>  	tegra_common_init();
+> @@ -85,6 +111,10 @@ static void __init tegra_harmony_init(void)
+>  
+>  	harmony_pinmux_init();
+>  
+> +	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
+> +	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
+> +	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
+> +
 
->
-> My interpretation is that it uses 16 KB pages, but can do two page-sized
-> writes in a single access (multi-plane write). Anything smaller than
-> a page goes to a temporary buffer first (like the Toshiba chip), but
-> gets flushed when the next one is not contiguous. If you manage to fill
-> the entire 16 KB page using small contiguous writes, it can do a single
-> efficient write access instead.
->
-> To confirm that 16 KB is the page size, you can try
->
-> flashbench -s --scatter-span=1 --scatter-order=10 -o plot.data \
-> ? ? ? ?/dev/mmcblk1 -c 32 --blocksize=16384
-> gnuplot -p -e 'plot "plot.data" '
->
-> On most MLC flashes, this will show a pattern alternating between slow
-> and fast pages like the one from https://lwn.net/Articles/428836/
+I think that instead of copying explicit initialization of the platform_data
+member from board to board we can do something similar to what PXA does. The
+board file would have to call something like
+tegra_set_device_X_info(struct tegra_device_X_platform_data *data);
+and then static registration of platform devices in the board files can be dropped.
 
-Cool.
+For instance, the devices.c would have
 
-I am attaching some graphs. The 16k sandisk shows the slow and fast
-page parallel lines, as does the 8k toshiba (but we knew it for the
-toshiba case), but the boundaries are strange for the sandisk case,
-and there an interesting 2mb variation in the toshiba 8k graph. What
-is the correct way to interpret graphs with other block sizes?
+void __init tegra_register_device(struct platform_device *dev, void *data)
+{
+	int ret;
 
-A
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scatter_8k_read_ts.png
-Type: image/png
-Size: 11238 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/220679a1/attachment-0006.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scatter_8k_sandisk.png
-Type: image/png
-Size: 8964 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/220679a1/attachment-0007.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scatter_16k_sandisk.png
-Type: image/png
-Size: 6853 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/220679a1/attachment-0008.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scatter_32k_read_ts.png
-Type: image/png
-Size: 9471 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/220679a1/attachment-0009.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scatter_32k_sandisk.png
-Type: image/png
-Size: 6790 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/220679a1/attachment-0010.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: scatter_16k_read_ts.png
-Type: image/png
-Size: 9040 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110222/220679a1/attachment-0011.png>
+	dev->dev.platform_data = data;
+
+	ret = platform_device_register(dev);
+	if (ret)
+		dev_err(&dev->dev, "unable to register device: %d\n", ret);
+}
+
+void __init tegra_set_sdhci1_info(struct tegra_sdhci_platform_data *info)
+{
+	tegra_register_device(&tegra_sdhci_device1, info);
+}
+
+and the board files would just call tegra_set_sdhci1_info to pass the platform
+data for the tegra_sdhci_device1 and register the device.
+
+This way we could reduce amount of copy/paste between the board files. Besides,
+if/when tegra will be using device trees, handling of the device registration in
+common place would make the transition easier.
+
+>  	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
+>  }
+>  
+
+
+-- 
+Sincerely yours,
+Mike.
