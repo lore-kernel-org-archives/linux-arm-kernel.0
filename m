@@ -1,28 +1,39 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 24 Feb 2011 14:12:45 +0100
-Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
-	and card detection
-In-Reply-To: <87k4gp3bl1.fsf@lebrac.rtp-net.org>
-References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-	<87k4gp3bl1.fsf@lebrac.rtp-net.org>
-Message-ID: <20110224131245.GA2420@pengutronix.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 22 Feb 2011 16:09:06 +0800
+Subject: [PATCH v3] mmc: mxs-mmc: add mmc host driver for i.MX23/28
+In-Reply-To: <20110221174016.GN2616@pengutronix.de>
+References: <1298284528-14761-1-git-send-email-shawn.guo@freescale.com>
+	<20110221174016.GN2616@pengutronix.de>
+Message-ID: <20110222080905.GB16141@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm getting a hard freeze on my efika sb and mx once I remove the
-> unconditional BROKEN_CARD_DETECTION flag. I'm still investigating the
-> issue. I'll keep you informed if I find something.
+Hi Wolfram,
 
-Hmm, this is probably an unhandled interrupt. Will see if I can get the
-efika here...
+On Mon, Feb 21, 2011 at 06:40:16PM +0100, Wolfram Sang wrote:
+> Shawn,
+> 
+> On Mon, Feb 21, 2011 at 06:35:28PM +0800, Shawn Guo wrote:
+> > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
+> > The driver calls into mxs-dma via generic dmaengine api for both pio
+> > and data transfer.
+> > 
+> > Thanks Chris Ball for the indentation patch.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> What throughput rates do you get on a mx28-regulated slot serving a card
+> at 50Mhz? This is poor here (55kb/s) while it is OK at 25Mhz. Could be a
+
+To make sure we are on the same page, can you share me the test you
+ran?  And I can give it a try on my board.
+
+> board issue though (or we can fix it later), rest works fine, thus:
+> 
+> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+> 
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110224/8852c4d8/attachment.sig>
+Regards,
+Shawn
