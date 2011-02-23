@@ -1,229 +1,76 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 23 Feb 2011 08:50:36 +0100
-Subject: [PATCH v2 2/5] ARM: imx51/53: add sdhc3/4 clock
-In-Reply-To: <1298369606-29972-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1298369606-29972-2-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <20110223075036.GE7381@pengutronix.de>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 23 Feb 2011 08:58:11 +0100
+Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <20110223055709.GC20346@S2100-06.ap.freescale.net>
+References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
+	<1298433701.23371.236.camel@vkoul-udesk3>
+	<20110223055709.GC20346@S2100-06.ap.freescale.net>
+Message-ID: <19812.48659.899411.205912@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 06:13:23PM +0800, Richard Zhu wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51-mx53.c |  100 ++++++++++++++++++++++++++++++++++-
->  arch/arm/mach-mx5/crm_regs.h        |    7 +++
->  2 files changed, 106 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> index 8164b1d..2ca97de 100644
-> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> @@ -42,6 +42,9 @@ static struct clk usboh3_clk;
->  static struct clk emi_fast_clk;
->  static struct clk ipu_clk;
->  static struct clk mipi_hsc1_clk;
-> +static struct clk esdhc1_clk;
-> +static struct clk esdhc2_clk;
-> +static struct clk esdhc3_mx53_clk;
->  
->  #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
->  
-> @@ -1138,15 +1141,45 @@ static struct clk ecspi_main_clk = {
->  	.set_parent = clk_ecspi_set_parent,
->  };
->  
-> +#define SDHC_SET_PARENT_SHORT(name, parent2, bitsname)			\
-> +static int clk_##name##_set_parent(struct clk *clk, struct clk *parent)	\
-> +{									\
-> +	u32 reg;							\
-> +									\
-> +	reg = __raw_readl(MXC_CCM_CSCMR1);				\
-> +	if (parent == &esdhc1_clk)					\
-> +		reg &= ~MXC_CCM_CSCMR1_##bitsname##_CLK_SEL;		\
-> +	else if (parent == &parent2)					\
-> +		reg |= MXC_CCM_CSCMR1_##bitsname##_CLK_SEL;		\
-> +	else								\
-> +		return -EINVAL;						\
-> +	__raw_writel(reg, MXC_CCM_CSCMR1);				\
-> +									\
-> +	return 0;							\
-> +}
+Hi,
 
-Please don't do this. I should have rejected this kind of stuff for the
-i.MX23/28. This ## stuff looks short in the source code but expands to
-duplicated binary code. Also it's hard to make changes in such code.
+Shawn Guo writes:
+> On Wed, Feb 23, 2011 at 09:31:41AM +0530, Koul, Vinod wrote:
+> > On Mon, 2011-02-21 at 15:51 +0530, Shawn Guo wrote:
+> > > This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
+> > > including apbh-dma and apbx-dma.
+> > > 
+> > > * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
+> > >   instances.
+> > > 
+> > > * apbh-dma is different between mx23 and mx28, hardware version
+> > >   register is used to differentiate.
+> > > 
+> > > * mxs-dma supports pio function besides data transfer.  The driver
+> > >   uses dma_data_direction DMA_NONE to identify the pio mode, and
+> > >   steals sgl and sg_len to get pio words and numbers from clients.
+> > > 
+> > > * mxs dmaengine has some very specific features, like sense function
+> > >   and the special NAND support (nand_lock, nand_wait4ready).  These
+> > >   are too specific to implemented in generic dmaengine driver.
+> > > 
+> > > * The driver refers to imx-sdma and only a single descriptor is
+> > >   statically assigned to each channel.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/mach-mxs/include/mach/dma.h |   26 ++
+> > >  drivers/dma/Kconfig                  |    8 +
+> > >  drivers/dma/Makefile                 |    1 +
+> > >  drivers/dma/mxs-dma.c                |  719 ++++++++++++++++++++++++++++++++++
+> > >  4 files changed, 754 insertions(+), 0 deletions(-)
+> > >  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
+> > >  create mode 100644 drivers/dma/mxs-dma.c
+> > [snip]
+> > 
+> > > +#define MXS_DMA_APBH           0
+> > > +#define MXS_DMA_APBX           1
+> > > +#define dma_is_apbh()          (mxs_dma->dev_id == MXS_DMA_APBH)
+> > > +
+> > > +#define APBH_VERSION_LATEST    3
+> > > +#define apbh_is_old()          (mxs_dma->version < APBH_VERSION_LATEST)
+> > > +
+> > > +#define HW_APBHX_CTRL0                         0x000
+> > > +#define  BM_APBH_CTRL0_APB_BURST8_EN           (1 << 29)
+> > > +#define  BM_APBH_CTRL0_APB_BURST_EN            (1 << 28)
+> > > +#define  BP_APBH_CTRL0_CLKGATE_CHANNEL         (8)
+> > > +#define  BP_APBH_CTRL0_RESET_CHANNEL           (16)
+>
+There is no need to enclose bare number in macro definitions in
+parenthesis.
+...
 
-To answer your question about cleaning up the i.MX clock code you asked
-few days ago: Yes, I definitely want to proceed on this once Jeremys
-patches are ready. Then this can become a clock multiplexer consuming
-not much space in both binary and source code.
 
-For now I suggest that you just duplicate the code in real functions
-without macro voodoo.
-
-Sascha
-
-> +
->  /* eSDHC */
->  CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC1)
->  CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC1)
->  CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC1)
->  
-> +/* mx51 specific */
->  CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
->  CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
->  CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
->  
-> +SDHC_SET_PARENT_SHORT(esdhc3, esdhc2_clk, ESDHC3)
-> +SDHC_SET_PARENT_SHORT(esdhc4, esdhc2_clk, ESDHC4)
-> +
-> +/* mx53 specific */
-> +SDHC_SET_PARENT_SHORT(esdhc2_mx53, esdhc3_mx53_clk, ESDHC2_MSHC2_MX53)
-> +
-> +CLK_GET_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
-> +CLK_SET_PARENT(esdhc3_mx53, 1, ESDHC3_MX53)
-> +CLK_SET_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
-> +
-> +SDHC_SET_PARENT_SHORT(esdhc4_mx53, esdhc3_mx53_clk, ESDHC4)
-> +
->  #define DEFINE_CLOCK_FULL(name, i, er, es, gr, sr, e, d, p, s)		\
->  	static struct clk name = {					\
->  		.id		= i,					\
-> @@ -1251,9 +1284,62 @@ DEFINE_CLOCK_MAX(esdhc1_clk, 0, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG1_OFFSET,
->  	clk_esdhc1, &pll2_sw_clk, &esdhc1_ipg_clk);
->  DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
->  	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
-> +DEFINE_CLOCK_FULL(esdhc3_ipg_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG4_OFFSET,
-> +	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
-> +DEFINE_CLOCK_FULL(esdhc4_ipg_clk, 3, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG6_OFFSET,
-> +	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
-> +
-> +/* mx51 specific */
->  DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
->  	clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
->  
-> +static struct clk esdhc3_clk = {
-> +	.id = 2,
-> +	.parent = &esdhc1_clk,
-> +	.set_parent = clk_esdhc3_set_parent,
-> +	.enable_reg = MXC_CCM_CCGR3,
-> +	.enable_shift = MXC_CCM_CCGRx_CG5_OFFSET,
-> +	.enable  = _clk_max_enable,
-> +	.disable = _clk_max_disable,
-> +	.secondary = &esdhc3_ipg_clk,
-> +};
-> +static struct clk esdhc4_clk = {
-> +	.id = 3,
-> +	.parent = &esdhc1_clk,
-> +	.set_parent = clk_esdhc4_set_parent,
-> +	.enable_reg = MXC_CCM_CCGR3,
-> +	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
-> +	.enable  = _clk_max_enable,
-> +	.disable = _clk_max_disable,
-> +	.secondary = &esdhc4_ipg_clk,
-> +};
-> +
-> +/* mx53 specific */
-> +static struct clk esdhc2_mx53_clk = {
-> +	.id = 2,
-> +	.parent = &esdhc1_clk,
-> +	.set_parent = clk_esdhc2_mx53_set_parent,
-> +	.enable_reg = MXC_CCM_CCGR3,
-> +	.enable_shift = MXC_CCM_CCGRx_CG3_OFFSET,
-> +	.enable  = _clk_max_enable,
-> +	.disable = _clk_max_disable,
-> +	.secondary = &esdhc3_ipg_clk,
-> +};
-> +
-> +DEFINE_CLOCK_MAX(esdhc3_mx53_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG5_OFFSET,
-> +	clk_esdhc3_mx53, &pll2_sw_clk, &esdhc2_ipg_clk);
-> +
-> +static struct clk esdhc4_mx53_clk = {
-> +	.id = 3,
-> +	.parent = &esdhc1_clk,
-> +	.set_parent = clk_esdhc4_mx53_set_parent,
-> +	.enable_reg = MXC_CCM_CCGR3,
-> +	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
-> +	.enable  = _clk_max_enable,
-> +	.disable = _clk_max_disable,
-> +	.secondary = &esdhc4_ipg_clk,
-> +};
-> +
->  DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
->  DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
->  DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
-> @@ -1312,6 +1398,8 @@ static struct clk_lookup mx51_lookups[] = {
->  	_REGISTER_CLOCK("imx51-cspi.0", NULL, cspi_clk)
->  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
->  	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
-> +	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_clk)
-> +	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, esdhc4_clk)
->  	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
->  	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
->  	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
-> @@ -1332,7 +1420,9 @@ static struct clk_lookup mx53_lookups[] = {
->  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
->  	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
->  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
-> -	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
-> +	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_mx53_clk)
-> +	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_mx53_clk)
-> +	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, esdhc4_mx53_clk)
->  	_REGISTER_CLOCK("imx53-ecspi.0", NULL, ecspi1_clk)
->  	_REGISTER_CLOCK("imx53-ecspi.1", NULL, ecspi2_clk)
->  	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
-> @@ -1425,6 +1515,14 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
->  	mx53_revision();
->  	clk_disable(&iim_clk);
->  
-> +	/* Set SDHC parents to be PLL2 */
-> +	clk_set_parent(&esdhc1_clk, &pll2_sw_clk);
-> +	clk_set_parent(&esdhc3_mx53_clk, &pll2_sw_clk);
-> +
-> +	/* set SDHC root clock as 200MHZ*/
-> +	clk_set_rate(&esdhc1_clk, 200000000);
-> +	clk_set_rate(&esdhc3_mx53_clk, 200000000);
-> +
->  	/* System timer */
->  	mxc_timer_init(&gpt_clk, MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR),
->  		MX53_INT_GPT);
-> diff --git a/arch/arm/mach-mx5/crm_regs.h b/arch/arm/mach-mx5/crm_regs.h
-> index b462c22..87c0c58 100644
-> --- a/arch/arm/mach-mx5/crm_regs.h
-> +++ b/arch/arm/mach-mx5/crm_regs.h
-> @@ -217,9 +217,12 @@
->  #define MXC_CCM_CSCMR1_ESDHC1_MSHC1_CLK_SEL_OFFSET	(20)
->  #define MXC_CCM_CSCMR1_ESDHC1_MSHC1_CLK_SEL_MASK	(0x3 << 20)
->  #define MXC_CCM_CSCMR1_ESDHC3_CLK_SEL			(0x1 << 19)
-> +#define MXC_CCM_CSCMR1_ESDHC2_MSHC2_MX53_CLK_SEL	(0x1 << 19)
->  #define MXC_CCM_CSCMR1_ESDHC4_CLK_SEL			(0x1 << 18)
->  #define MXC_CCM_CSCMR1_ESDHC2_MSHC2_CLK_SEL_OFFSET	(16)
->  #define MXC_CCM_CSCMR1_ESDHC2_MSHC2_CLK_SEL_MASK	(0x3 << 16)
-> +#define MXC_CCM_CSCMR1_ESDHC3_MX53_CLK_SEL_OFFSET	(16)
-> +#define MXC_CCM_CSCMR1_ESDHC3_MX53_CLK_SEL_MASK		(0x3 << 16)
->  #define MXC_CCM_CSCMR1_SSI1_CLK_SEL_OFFSET		(14)
->  #define MXC_CCM_CSCMR1_SSI1_CLK_SEL_MASK		(0x3 << 14)
->  #define MXC_CCM_CSCMR1_SSI2_CLK_SEL_OFFSET		(12)
-> @@ -271,6 +274,10 @@
->  #define MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PRED_MASK	(0x7 << 22)
->  #define MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_OFFSET	(19)
->  #define MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_MASK	(0x7 << 19)
-> +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PRED_OFFSET	(22)
-> +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PRED_MASK	(0x7 << 22)
-> +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PODF_OFFSET	(19)
-> +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PODF_MASK	(0x7 << 19)
->  #define MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_OFFSET	(16)
->  #define MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_MASK	(0x7 << 16)
->  #define MXC_CCM_CSCDR1_PGC_CLK_PODF_OFFSET		(14)
-> -- 
-> 1.7.1
-> 
-> 
-> 
-
+Lothar Wa?mann
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
