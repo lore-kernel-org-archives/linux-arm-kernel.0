@@ -1,82 +1,78 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Feb 2011 19:27:05 +0900
-Subject: [PATCH 2/2] ARM: S5PC110: add power consumers for hsotg for Goni
-	board
-In-Reply-To: <1297760784-8486-3-git-send-email-m.szyprowski@samsung.com>
-References: <1297760784-8486-1-git-send-email-m.szyprowski@samsung.com>
-	<1297760784-8486-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <01f401cbd344$55621800$00264800$%kim@samsung.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 23 Feb 2011 11:37:32 +0100
+Subject: [PATCH V11 0/4] ptp: IEEE 1588 hardware clock support
+Message-ID: <cover.1298447722.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyprowski wrote:
-> 
-> This patch adds definitions for power consumers for s3c-hsotg driver
-> on Goni board. The consumers are defined as arrays, because later more
-> entries for MIPI and ADC will be defined.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-s5pv210/mach-goni.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
-b/arch/arm/mach-s5pv210/mach-
-> goni.c
-> index 10f754b..796625c 100644
-> --- a/arch/arm/mach-s5pv210/mach-goni.c
-> +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -269,10 +269,18 @@ static void __init goni_tsp_init(void)
->  /* MAX8998 regulators */
->  #if defined(CONFIG_REGULATOR_MAX8998) ||
-> defined(CONFIG_REGULATOR_MAX8998_MODULE)
-> 
-> +static struct regulator_consumer_supply goni_ldo3_consumers[] = {
-> +	REGULATOR_SUPPLY("vusb_a", "s3c-hsotg"),
-> +};
-> +
->  static struct regulator_consumer_supply goni_ldo5_consumers[] = {
->  	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
->  };
-> 
-> +static struct regulator_consumer_supply goni_ldo8_consumers[] = {
-> +	REGULATOR_SUPPLY("vusb_d", "s3c-hsotg"),
-> +};
-> +
->  static struct regulator_init_data goni_ldo2_data = {
->  	.constraints	= {
->  		.name		= "VALIVE_1.1V",
-> @@ -292,7 +300,10 @@ static struct regulator_init_data goni_ldo3_data = {
->  		.min_uV		= 1100000,
->  		.max_uV		= 1100000,
->  		.apply_uV	= 1,
-> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
->  	},
-> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo3_consumers),
-> +	.consumer_supplies = goni_ldo3_consumers,
->  };
-> 
->  static struct regulator_init_data goni_ldo4_data = {
-> @@ -341,7 +352,10 @@ static struct regulator_init_data goni_ldo8_data = {
->  		.min_uV		= 3300000,
->  		.max_uV		= 3300000,
->  		.apply_uV	= 1,
-> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
->  	},
-> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo8_consumers),
-> +	.consumer_supplies = goni_ldo8_consumers,
->  };
-> 
->  static struct regulator_init_data goni_ldo9_data = {
-> --
+This just might be the last round of review of the PTP hardware clock
+patch series. These patches apply on top of the timers/core branch in
+the tip tree. Patches 1 and 4 have changed since the last version.
 
-Ok...will apply :)
+* Why all the CCs?
+  - One driver is for PowerPC, and adds device tree stuff.
+  - One driver is for the ARM Xscale IXP465.
 
-Thanks.
+* Patch ChangeLog
+** v11
+   - added more padding to the structures in the user space ABI
+   - tweaked Kconfig to make dependencies more clear
+   - fixed locking on time stamp event queue
+   - added John Stultz's acks on patches 2 and 3.
+   - now the phyter driver handles multiple PHYs
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+Richard Cochran (4):
+  ptp: Added a brand new class driver for ptp clocks.
+  ptp: Added a clock that uses the eTSEC found on the MPC85xx.
+  ptp: Added a clock driver for the IXP46x.
+  ptp: Added a clock driver for the National Semiconductor PHYTER.
+
+ Documentation/ABI/testing/sysfs-ptp                |   98 ++
+ .../devicetree/bindings/net/fsl-tsec-phy.txt       |   57 ++
+ Documentation/ptp/ptp.txt                          |   89 ++
+ Documentation/ptp/testptp.c                        |  352 +++++++
+ Documentation/ptp/testptp.mk                       |   33 +
+ arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h      |   78 ++
+ arch/powerpc/boot/dts/mpc8313erdb.dts              |   14 +
+ arch/powerpc/boot/dts/mpc8572ds.dts                |   14 +
+ arch/powerpc/boot/dts/p2020ds.dts                  |   14 +
+ arch/powerpc/boot/dts/p2020rdb.dts                 |   14 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/net/Makefile                               |    1 +
+ drivers/net/arm/ixp4xx_eth.c                       |  192 ++++-
+ drivers/net/gianfar_ptp.c                          |  448 +++++++++
+ drivers/net/gianfar_ptp_reg.h                      |  113 +++
+ drivers/net/phy/Makefile                           |    1 +
+ drivers/net/phy/dp83640.c                          | 1012 ++++++++++++++++++++
+ drivers/net/phy/dp83640_reg.h                      |  267 +++++
+ drivers/ptp/Kconfig                                |   75 ++
+ drivers/ptp/Makefile                               |    7 +
+ drivers/ptp/ptp_chardev.c                          |  156 +++
+ drivers/ptp/ptp_clock.c                            |  320 ++++++
+ drivers/ptp/ptp_ixp46x.c                           |  332 +++++++
+ drivers/ptp/ptp_private.h                          |   86 ++
+ drivers/ptp/ptp_sysfs.c                            |  230 +++++
+ include/linux/Kbuild                               |    1 +
+ include/linux/ptp_clock.h                          |   84 ++
+ include/linux/ptp_clock_kernel.h                   |  139 +++
+ 29 files changed, 4227 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-ptp
+ create mode 100644 Documentation/ptp/ptp.txt
+ create mode 100644 Documentation/ptp/testptp.c
+ create mode 100644 Documentation/ptp/testptp.mk
+ create mode 100644 arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h
+ create mode 100644 drivers/net/gianfar_ptp.c
+ create mode 100644 drivers/net/gianfar_ptp_reg.h
+ create mode 100644 drivers/net/phy/dp83640.c
+ create mode 100644 drivers/net/phy/dp83640_reg.h
+ create mode 100644 drivers/ptp/Kconfig
+ create mode 100644 drivers/ptp/Makefile
+ create mode 100644 drivers/ptp/ptp_chardev.c
+ create mode 100644 drivers/ptp/ptp_clock.c
+ create mode 100644 drivers/ptp/ptp_ixp46x.c
+ create mode 100644 drivers/ptp/ptp_private.h
+ create mode 100644 drivers/ptp/ptp_sysfs.c
+ create mode 100644 include/linux/ptp_clock.h
+ create mode 100644 include/linux/ptp_clock_kernel.h
