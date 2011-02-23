@@ -1,36 +1,65 @@
-From: bryanh@codeaurora.org (Bryan Huntsman)
-Date: Wed, 23 Feb 2011 13:26:01 -0800
-Subject: [PATCH] MAINTAINERS: Update MSM maintainers
-In-Reply-To: <AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
-References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>
-	<1298420395.17118.6.camel@m0nster>
-	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
-Message-ID: <4D657B69.4000107@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 23 Feb 2011 13:25:53 -0800
+Subject: [PATCH 5/5] ARM: Tegra: Enable Harmony audio support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF03112A5D88@HQMAIL01.nvidia.com>
+References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
+	<1298487532-5000-6-git-send-email-swarren@nvidia.com>
+	<AANLkTimffVNK2EmTqypQcrWHLisf3c8_dMsHwSbv-nWi@mail.gmail.com>
+	<AANLkTikk6f0Nv8XZEmY4-85FtBE1re9hKqgFRNZkyPfz@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF03112A5D88@HQMAIL01.nvidia.com>
+Message-ID: <AANLkTi=YyBAxhhK7_DJrj+iKZt19jZuwwBjexFUvmHCB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2011 05:12 PM, Linus Torvalds wrote:
-> On Tue, Feb 22, 2011 at 4:19 PM, Daniel Walker <dwalker@fifo99.com> wrote:
->> On Tue, 2011-02-22 at 16:03 -0800, David Brown wrote:
->>> Remove Bryan Huntsman and Daniel Walker from the MSM maintainer list.
->>>
+On Wed, Feb 23, 2011 at 1:22 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Colin Cross wrote at Wednesday, February 23, 2011 2:16 PM:
 >>
->> No.. I don't sign off on this.. Please ignore this Linus.
-> 
-> Guys, you need to sort out your differences here..
-> 
->                         Linus
+>> On Wed, Feb 23, 2011 at 1:08 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > ...
+>> > On Wed, Feb 23, 2011 at 10:58 AM, Stephen Warren <swarren@nvidia.com> wrote:
+>> > [...]
+>> >> diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
+>> >> index 4fe33b8..fbf2304 100644
+>> >> --- a/arch/arm/mach-tegra/board-harmony.h
+>> >> +++ b/arch/arm/mach-tegra/board-harmony.h
+>> >> @@ -17,12 +17,19 @@
+>> >> ?#ifndef _MACH_TEGRA_BOARD_HARMONY_H
+>> >> ?#define _MACH_TEGRA_BOARD_HARMONY_H
+>> >>
+>> >> +#define GPIO_WM8903(_x_) ? ? ? ? ? ? ? (TEGRA_NR_GPIOS + (_x_))
+>> >
+>> >
+>> > The above assumes that wm8903 is the GPIO controller that gets
+>> > allocated the numbers right after native tegra gpio. That might not be
+>> > the case on all boards, since the TPS PMIC has some as well, I
+>> > believe.
+>> The GPIO numbers above TEGRA_NR_GPIOS are allocated by the board, and
+>> this is in board-harmony.h, so I think its OK.
+>
+> The Seaboard equivalent of this that I wrote for ChromeOS is:
+>
+> #define TPS_GPIO_BASE ? ? ? ? ? ? ? ? ? TEGRA_NR_GPIOS
+>
+> #define TPS_GPIO_WWAN_PWR ? ? ? ? ? ? ? (TPS_GPIO_BASE + 2)
+>
+> #define GPIO_WM8903(_x_) ? ? ? ? ? ? ? ?(TPS_GPIO_BASE + 4 + (_x_))
+>
+> Which takes into account other devices.
+>
+>> > Does it need a hardcoded GPIO base, or can it use the dynamic one
+>> > (i.e. use -1 here)? I don't even see any reference to gpio_base in the
+>> > driver...
+>> I assume that is in the ASoC tree. ?The platform data in tegra
+>> for-next does not include a gpio_base entry.
+>
+> Yes, gpio_base is added to that tree.
+>
+> -1 would probably work. But then, I have no idea how to find out what base
+> was assigned to the WM8903, in order to initialize the ASoC machine driver's
+> platform_data...
 
-Daniel, let's do what Linus is asking and figure this out.  What is your
-intention here?  Going forward, David Brown is in the best position to
-handle MSM maintenance since he has direct access to all past, current,
-and future MSM devices as well as all the HW and SW experts at Qualcomm.
-In that spirit, I think it's entirely appropriate for both you and I to
-step back and let David handle this role so that there is one consistent
-and clear voice for MSM.
+Yeah, like I said in a separate reply, keeping it the way it is will
+work out for the best.
 
-- Bryan
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+-Olof
