@@ -1,32 +1,24 @@
-From: jeremy.kerr@canonical.com (Jeremy Kerr)
-Date: Wed, 23 Feb 2011 10:49:17 +0800
-Subject: [PATCH 1/2] Add a common struct clk
-In-Reply-To: <20110222201725.GF22310@pengutronix.de>
-References: <1298256658.861611.43913489619.0.gpush@pororo>
-	<1298256658.862188.178150188637.1.gpush@pororo>
-	<20110222201725.GF22310@pengutronix.de>
-Message-ID: <201102231049.17466.jeremy.kerr@canonical.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 22 Feb 2011 21:55:25 -0500 (EST)
+Subject: [PATCH v4 7/7] dt: add documentation of ARM dt boot interface
+In-Reply-To: <20110223022239.18318.87333.stgit@localhost6.localdomain6>
+References: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
+	<20110223022239.18318.87333.stgit@localhost6.localdomain6>
+Message-ID: <alpine.LFD.2.00.1102222149370.22028@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Tue, 22 Feb 2011, Grant Likely wrote:
 
-> > +static inline void clk_common_init(struct clk *clk) { }
-> > +
-> > +/*
-> > + * For !CONFIG_USE_COMMON_STRUCT_CLK, we don't enforce any atomicity
-> > + * requirements for clk_enable/clk_disable, so the prepare and unprepare
-> > + * functions are no-ops
-> > + */
-> > +int clk_prepare(struct clk *clk) { return 0; }
-> > +void clk_unprepare(struct clk *clk) { }
-> 
-> these should be static inline.  Otherwise these functions end up in many
-> files and so provoke a build failure.
+> +The boot loader must load a device tree image (dtb) into system ram
+> +at a 64bit aligned address and initialize it with the boot data.
+[...]
+> +                r2 : physical pointer to the device-tree block
+> +                (defined in chapter II) in RAM.  Device tree can be located
+> +                anywhere in system RAM, but it should be aligned on a 32 bit
+> +                boundary.
 
-Ugh, brown paper bag time. Thanks for that, I'll update this patch.
-
-Cheers,
+So... which one is true?
 
 
-Jeremy
+Nicolas
