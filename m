@@ -1,60 +1,27 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 23 Feb 2011 09:57:40 -0500
-Subject: [PATCH v3 7/9] davinci: add spi devices support for
-	MityDSP-L138/MityARM-1808 platform
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BE4914B@dbde02.ent.ti.com>
-References: <1298381824-7723-1-git-send-email-michael.williamson@criticallink.com>
-	<1298381824-7723-8-git-send-email-michael.williamson@criticallink.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BE4914B@dbde02.ent.ti.com>
-Message-ID: <4D652064.3020809@criticallink.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Feb 2011 15:02:44 +0000
+Subject: CPU_V6K build failure in next-20110223
+In-Reply-To: <20110223144020.GE2796@pulham.picochip.com>
+References: <20110223144020.GE2796@pulham.picochip.com>
+Message-ID: <20110223150244.GA14911@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/23/2011 9:50 AM, Nori, Sekhar wrote:
+On Wed, Feb 23, 2011 at 02:40:20PM +0000, Jamie Iles wrote:
+> Hi Russell,
+> 
+> Building todays next tree for my board (CPU_V6K) results in the 
+> following build error:
+> 
+>   CC      arch/arm/kernel/asm-offsets.s
+> In file included from /home/jamiei/src/linux-2.6/arch/arm/include/asm/cacheflush.h:15,
+>                  from arch/arm/kernel/asm-offsets.c:16:
+> /home/jamiei/src/linux-2.6/arch/arm/include/asm/glue-cache.h:129:2: error: #error Unknown cache maintainence model
+> make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+> make: *** [prepare0] Error 2
+> 
+> Building dove_defconfig also results in the same error.  The patch below 
+> appears to fix the issue.
 
-> Hi Mike,
-> 
-> On Tue, Feb 22, 2011 at 19:07:02, Michael Williamson wrote:
-> 
->> +static void __init mityomapl138_init_spi1(struct spi_board_info *info,
->> +					  unsigned len)
->> +{
->> +	int ret;
->> +
->> +	ret = spi_register_board_info(info, len);
->> +	if (ret)
->> +		pr_warning("%s: failed to register board info : %d\n",
->> +				__func__, ret);
->> +
->> +	da8xx_spi_pdata[1].num_chipselect = len;
->> +
->> +	ret = da8xx_register_spi(1);
->> +	if (ret)
->> +		pr_warning("%s: failed to register spi 1 device : %d\n",
->> +				__func__, ret);
->> +}
-> 
-> I missed this previously. We seem to be adding this boilerplate
-> evm init function for every board. It will be worthwhile to
-> modify the da8xx_register_spi() function to take in the info and
-> num_chipselect too. The same function can then be called by each
-> evm.
-> 
-> Sorry about trickling in the comments - this should be the last
-> one ;) I have added the first five patches of the series to the
-> branch here:
-> 
-
-> http://arago-project.org/git/projects/?p=linux-davinci.git;a=shortlog;h=refs/heads/next-for-kevin
-> 
-> You can rebase to this branch so you will have to spin only the
-> modified patches again.
-> 
-
-
-My arm's getting a bit tired from the polishing...  I'll resend against
-your branch the merged routine.
-
-> Thanks,
-> Sekhar
-> 
+Welcome to the wonderful world of git conflicts with fixes needed in
+non-conflicting files...
