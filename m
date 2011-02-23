@@ -1,88 +1,26 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 23 Feb 2011 14:23:03 +0530
-Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
-	hwmodright before timer init
-In-Reply-To: <20110223071153.5874.58923.stgit@twilight.localdomain>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<20110223071153.5874.58923.stgit@twilight.localdomain>
-Message-ID: <581270b49665fcf8227a96065dbbc584@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 23 Feb 2011 09:55:30 +0100
+Subject: [PATCH] ARM: mx51_defconfig: change CONFIG_LEDS_CLASS 'm' to 'y'
+In-Reply-To: <1298448415-21986-1-git-send-email-shawn.guo@freescale.com>
+References: <1298448415-21986-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110223085530.GO22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Wednesday, February 23, 2011 12:42 PM
-> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Cc: Tony Lindgren; Kevin Hilman; Santosh Shilimkar; Beno?t Cousson
-> Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER
-> clockevent hwmodright before timer init
->
-> Late-initialize the GPTIMER hwmod used for the clockevent source
-> immediately
-> before it is used.  This avoids the need to late-initialize all of
-> the hwmods
-> until the boot process is further along.  (In general, we want to
-> defer
-> as much as possible until late in the boot process.)
->
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-omap2/timer-gp.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
-> omap2/timer-gp.c
-> index 0fc550e..a4e51a2 100644
-> --- a/arch/arm/mach-omap2/timer-gp.c
-> +++ b/arch/arm/mach-omap2/timer-gp.c
-> @@ -40,10 +40,11 @@
->  #include <plat/dmtimer.h>
->  #include <asm/localtimer.h>
->  #include <asm/sched_clock.h>
-> +#include <plat/common.h>
->
->  #include "timer-gp.h"
-> +#include <plat/omap_hwmod.h>
->
-> -#include <plat/common.h>
->
->  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
->  #define MAX_GPTIMER_ID		12
-> @@ -133,9 +134,13 @@ static void __init
-> omap2_gp_clockevent_init(void)
->  {
->  	u32 tick_rate;
->  	int src;
-> +	const char *clockevent_hwmod_name;
->
->  	inited = 1;
->
-> +	clockevent_hwmod_name = (gptimer_id == 12) ? "timer12" :
-> "timer1";
-> +	omap_hwmod_late_init_one(clockevent_hwmod_name);
-> +
+Hello Shawn,
 
-Do we need above hard-coding ? This takes away flexibility of
-choosing system timer from board files, right ?
+On Wed, Feb 23, 2011 at 04:06:55PM +0800, Shawn Guo wrote:
+> This patch is to fix the warning below.
+> 
+> arch/arm/configs/mx51_defconfig:113:warning: symbol value 'm' invalid for LEDS_CLASS
+I fixed that in my local tree, too, together with some more things.
+Actually I thought I already sent it out, but my mailboxes seem to
+not agree.  I wanted to update my pull request for Sascha today anyhow
+and can put that one in, too.
 
-Am I missing something here?
+Best regards
+Uwe
 
-
-
->  	gptimer = omap_dm_timer_request_specific(gptimer_id);
->  	BUG_ON(gptimer == NULL);
->  	gptimer_wakeup = gptimer;
-> @@ -250,6 +255,7 @@ static void __init omap2_gp_timer_init(void)
->  		BUG_ON(!twd_base);
->  	}
->  #endif
-> +
->  	omap_dm_timer_init();
->
->  	omap2_gp_clockevent_init();
->
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
