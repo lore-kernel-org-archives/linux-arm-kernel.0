@@ -1,53 +1,39 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 23 Feb 2011 10:39:31 -0800
-Subject: [PATCH] ARM: Tegra: DMA: Fail safe if initialization fails
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF03112A5CF5@HQMAIL01.nvidia.com>
-References: <1298482170-3678-1-git-send-email-swarren@nvidia.com>
-	<AANLkTi=iWsX_UN6pE7nE=7NBXRPv7=6Ja68B=u8U4Ww=@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF03112A5CF5@HQMAIL01.nvidia.com>
-Message-ID: <AANLkTinhrb+GFGs=93=eu=0XfPHtm_-hc6OATns6eKNY@mail.gmail.com>
+From: michael.williamson@criticallink.com (Michael Williamson)
+Date: Wed, 23 Feb 2011 13:44:07 -0500
+Subject: [PATCH v4 0/4] davinci: add spi devices support for da8xx based
+	platforms
+Message-ID: <1298486651-18882-1-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 9:54 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Colin Cross wrote at Wednesday, February 23, 2011 10:38 AM:
->>
->> On Wed, Feb 23, 2011 at 9:29 AM, Stephen Warren <swarren@nvidia.com> wrote:
->> > tegra_dma_init currently simply bails out early if any initialization fails.
->> > This skips various data-structure initialization. In turn, this means that
->> > tegra_dma_allocate_channel can still hand out channels. In this case, when
->> > tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
->> > on ch->list will OOPS since the list's next/prev pointers may still be
->> > NULL.
->> >
->> > To solve this:
->> > * Mark all possible channels as in-use before doing anything else in init.
->> > * Only mark a channel as free once all channel-related initialization has
->> > ?completed.
->> >
->> > This prevents allocate_channel from handing out uninitialized channels.
->> >
->> > There is still one small hole; allocate_channel can't check the usage array
->> > for the shared channel, since this channel is permanently marked in-use.
->> > This could be solved using an explicit "init OK" flag that allocate_channel
->> > could check.
->>
->> If we still need an init complete flag, why not skip this patch and
->> just add that?
->
-> I tend to like the cleanup in this patch; it simplifies the channel_usage
-> initialization. I'll let you make the call on whether to take this or not.
-Ok, it seems like a reasonable cleanup.  Can I request a few changes?
-Get rid of the redundant memsets
-Replace the initial for loop to set all the bits with bitmap_set
-Might as well add the init complete flag to this patch as well.  You
-could also do it by checking the channel_usage bit for the shared
-channel, and never setting it in tegra_dma_allocate_channel.
+This patch series adds SPI bus support and devices for the MityDSP-L138,
+MityARM-1808, da850 evm, and da830 evm platforms.  This patch series is 
+against the staging tree at [1] as per Sekhar's instructions.
 
-> I can certainly throw together a second patch, or modify this patch, to also
-> use an init_ok flag to completely solve the shared channel case too though.
->
-> --
-> nvpublic
->
->
+This series has been tested on the MityDSP-L138 platform.
+
+[1] http://arago-project.org/git/projects/?p=linux-davinci.git;a=shortlog;h=refs/heads/next-for-kevin
+
+---
+changes since v3:
+   -- first 5 patches of series are incorporated in [1] and not included 
+      in this submission
+   -- refactored common spi registration code into da8xx_register_spi
+      routine, reducing effective lines of code for multiple platform
+      support.
+
+Michael Williamson (2):
+  davinci: da8xx: add spi resources and registration routine
+  davinci: add spi devices support for MityDSP-L138/MityARM-1808
+    platform
+
+Sekhar Nori (2):
+  davinci: add spi devices support for da850/omap-l138/am18x evm
+  davinci: add spi devices support for da830/omap-l137/am17x evm
+
+ arch/arm/mach-davinci/board-da830-evm.c    |   67 ++++++++++++++++++
+ arch/arm/mach-davinci/board-da850-evm.c    |   73 +++++++++++++++++++
+ arch/arm/mach-davinci/board-mityomapl138.c |   84 ++++++++++++++++++++++
+ arch/arm/mach-davinci/devices-da8xx.c      |  104 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    4 +
+ 5 files changed, 332 insertions(+), 0 deletions(-)
