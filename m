@@ -1,828 +1,328 @@
 From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Wed, 23 Feb 2011 12:38:16 +0100
-Subject: [PATCH 2/6] ARM: pxa2xx: reorganize I2C files
+Date: Wed, 23 Feb 2011 12:38:17 +0100
+Subject: [PATCH 3/6] i2c-pxa2xx: Add PCI support for PXA I2C controller
 In-Reply-To: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
 References: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <1298461100-14869-3-git-send-email-bigeasy@linutronix.de>
+Message-ID: <1298461100-14869-4-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the platform data definition from
-arch/arm/plat-pxa/include/plat/i2c.h to include/linux/i2c/pxa-i2c.h so
-it can be accessed from x86 the same way as on ARM.
+The Sodaville I2C controller is almost the same as found on PXA2xx. The
+difference:
+- the register are at a different offset
+- no slave support
 
-This change should make no functional change to the PXA code. The move
-is verified by building the following defconfigs:
-  cm_x2xx_defconfig corgi_defconfig em_x270_defconfig ezx_defconfig
-  imote2_defconfig pxa3xx_defconfig spitz_defconfig zeus_defconfig
-  raumfeld_defconfig magician_defconfig mmp2_defconfig pxa168_defconfig
-  pxa910_defconfig
+The PCI probe code adds three platform devices which are probed then by
+the platform code.
+The X86 part also adds dummy clock defines because we don't have HW
+clock support.
 
 Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 Signed-off-by: Dirk Brandewie <dirk.brandewie@gmail.com>
 ---
- arch/arm/mach-mmp/include/mach/mmp2.h              |    2 +-
- arch/arm/mach-mmp/include/mach/pxa168.h            |    2 +-
- arch/arm/mach-mmp/include/mach/pxa910.h            |    2 +-
- arch/arm/mach-pxa/balloon3.c                       |    3 +--
- arch/arm/mach-pxa/cm-x300.c                        |    2 +-
- arch/arm/mach-pxa/colibri-evalboard.c              |    3 +--
- arch/arm/mach-pxa/colibri-pxa270-income.c          |    3 +--
- arch/arm/mach-pxa/corgi.c                          |    2 +-
- arch/arm/mach-pxa/csb726.c                         |    2 +-
- arch/arm/mach-pxa/devices.c                        |    2 +-
- arch/arm/mach-pxa/em-x270.c                        |    2 +-
- arch/arm/mach-pxa/ezx.c                            |    2 +-
- arch/arm/mach-pxa/hx4700.c                         |    2 +-
- arch/arm/mach-pxa/littleton.c                      |    2 +-
- arch/arm/mach-pxa/magician.c                       |    2 +-
- arch/arm/mach-pxa/mainstone.c                      |    2 +-
- arch/arm/mach-pxa/mioa701.c                        |    2 +-
- arch/arm/mach-pxa/mxm8x10.c                        |    2 +-
- arch/arm/mach-pxa/palm27x.c                        |    3 +--
- arch/arm/mach-pxa/pcm990-baseboard.c               |    2 +-
- arch/arm/mach-pxa/poodle.c                         |    2 +-
- arch/arm/mach-pxa/pxa27x.c                         |    3 +--
- arch/arm/mach-pxa/pxa3xx.c                         |    2 +-
- arch/arm/mach-pxa/pxa95x.c                         |    2 +-
- arch/arm/mach-pxa/raumfeld.c                       |    2 +-
- arch/arm/mach-pxa/saar.c                           |    2 +-
- arch/arm/mach-pxa/saarb.c                          |    3 +--
- arch/arm/mach-pxa/spitz.c                          |    3 +--
- arch/arm/mach-pxa/stargate2.c                      |    2 +-
- arch/arm/mach-pxa/tavorevb3.c                      |    3 +--
- arch/arm/mach-pxa/tosa.c                           |    2 +-
- arch/arm/mach-pxa/trizeps4.c                       |    2 +-
- arch/arm/mach-pxa/viper.c                          |    2 +-
- arch/arm/mach-pxa/vpac270.c                        |    3 +--
- arch/arm/mach-pxa/xcep.c                           |    3 +--
- arch/arm/mach-pxa/z2.c                             |    3 +--
- arch/arm/mach-pxa/zeus.c                           |    3 +--
- arch/arm/mach-pxa/zylonite_pxa300.c                |    2 +-
- drivers/i2c/busses/i2c-pxa.c                       |    2 +-
- .../plat/i2c.h => include/linux/i2c/pxa-i2c.h      |    0
- 40 files changed, 39 insertions(+), 51 deletions(-)
- rename arch/arm/plat-pxa/include/plat/i2c.h => include/linux/i2c/pxa-i2c.h (100%)
+ drivers/i2c/busses/Kconfig       |    7 +-
+ drivers/i2c/busses/Makefile      |    1 +
+ drivers/i2c/busses/i2c-pxa-pci.c |  176 ++++++++++++++++++++++++++++++++++++++
+ drivers/i2c/busses/i2c-pxa.c     |   27 +++++-
+ 4 files changed, 206 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-pxa-pci.c
 
-diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
-index 4aec493..2cbf6df 100644
---- a/arch/arm/mach-mmp/include/mach/mmp2.h
-+++ b/arch/arm/mach-mmp/include/mach/mmp2.h
-@@ -11,8 +11,8 @@ extern void __init mmp2_init_irq(void);
- extern void mmp2_clear_pmic_int(void);
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 113505a..deefa13 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -525,15 +525,18 @@ config I2C_PNX
  
- #include <linux/i2c.h>
+ config I2C_PXA
+ 	tristate "Intel PXA2XX I2C adapter"
+-	depends on ARCH_PXA || ARCH_MMP
++	depends on ARCH_PXA || ARCH_MMP || (X86_32 && PCI && OF)
+ 	help
+ 	  If you have devices in the PXA I2C bus, say yes to this option.
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-pxa.
+ 
++config I2C_PXA_PCI
++	def_bool I2C_PXA && X86_32 && PCI && OF
++
+ config I2C_PXA_SLAVE
+ 	bool "Intel PXA2XX I2C Slave comms support"
+-	depends on I2C_PXA
++	depends on I2C_PXA && !X86_32
+ 	help
+ 	  Support I2C slave mode communications on the PXA I2C bus.  This
+ 	  is necessary for systems where the PXA may be a target on the
+diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
+index 9d2d0ec..e95d0bf 100644
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -52,6 +52,7 @@ obj-$(CONFIG_I2C_PCA_PLATFORM)	+= i2c-pca-platform.o
+ obj-$(CONFIG_I2C_PMCMSP)	+= i2c-pmcmsp.o
+ obj-$(CONFIG_I2C_PNX)		+= i2c-pnx.o
+ obj-$(CONFIG_I2C_PXA)		+= i2c-pxa.o
++obj-$(CONFIG_I2C_PXA_PCI)	+= i2c-pxa-pci.o
+ obj-$(CONFIG_I2C_S3C2410)	+= i2c-s3c2410.o
+ obj-$(CONFIG_I2C_S6000)		+= i2c-s6000.o
+ obj-$(CONFIG_I2C_SH7760)	+= i2c-sh7760.o
+diff --git a/drivers/i2c/busses/i2c-pxa-pci.c b/drivers/i2c/busses/i2c-pxa-pci.c
+new file mode 100644
+index 0000000..6659d26
+--- /dev/null
++++ b/drivers/i2c/busses/i2c-pxa-pci.c
+@@ -0,0 +1,176 @@
++/*
++ * The CE4100's I2C device is more or less the same one as found on PXA.
++ * It does not support slave mode, the register slightly moved. This PCI
++ * device provides three bars, every contains a single I2C controller.
++ */
++#include <linux/pci.h>
++#include <linux/platform_device.h>
 +#include <linux/i2c/pxa-i2c.h>
- #include <mach/devices.h>
--#include <plat/i2c.h>
- 
- extern struct pxa_device_desc mmp2_device_uart1;
- extern struct pxa_device_desc mmp2_device_uart2;
-diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
-index 1801e42..a52b3d2 100644
---- a/arch/arm/mach-mmp/include/mach/pxa168.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa168.h
-@@ -8,8 +8,8 @@ extern void __init pxa168_init_irq(void);
- extern void pxa168_clear_keypad_wakeup(void);
- 
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <mach/devices.h>
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- #include <video/pxa168fb.h>
- #include <plat/pxa27x_keypad.h>
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index f13c49d..91be755 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -7,8 +7,8 @@ extern struct sys_timer pxa910_timer;
- extern void __init pxa910_init_irq(void);
- 
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <mach/devices.h>
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- 
- extern struct pxa_device_desc pxa910_device_uart1;
-diff --git a/arch/arm/mach-pxa/balloon3.c b/arch/arm/mach-pxa/balloon3.c
-index a134a14..f1d4824 100644
---- a/arch/arm/mach-pxa/balloon3.c
-+++ b/arch/arm/mach-pxa/balloon3.c
-@@ -27,6 +27,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/types.h>
- #include <linux/i2c/pcf857x.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/mtd/nand.h>
- #include <linux/mtd/physmap.h>
- #include <linux/regulator/max1586.h>
-@@ -51,8 +52,6 @@
- #include <mach/irda.h>
- #include <mach/ohci.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- 
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index 7984268..bfca7ed 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -29,6 +29,7 @@
- 
- #include <linux/i2c.h>
- #include <linux/i2c/pca953x.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <linux/mfd/da903x.h>
- #include <linux/regulator/machine.h>
-@@ -48,7 +49,6 @@
- #include <mach/pxafb.h>
- #include <mach/mmc.h>
- #include <mach/ohci.h>
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- #include <mach/audio.h>
- #include <mach/pxa3xx-u2d.h>
-diff --git a/arch/arm/mach-pxa/colibri-evalboard.c b/arch/arm/mach-pxa/colibri-evalboard.c
-index 6b2c800..2adabbf 100644
---- a/arch/arm/mach-pxa/colibri-evalboard.c
-+++ b/arch/arm/mach-pxa/colibri-evalboard.c
-@@ -20,6 +20,7 @@
- #include <mach/hardware.h>
- #include <asm/mach/arch.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <mach/pxa27x.h>
- #include <mach/colibri.h>
-@@ -27,8 +28,6 @@
- #include <mach/ohci.h>
- #include <mach/pxa27x-udc.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- 
-diff --git a/arch/arm/mach-pxa/colibri-pxa270-income.c b/arch/arm/mach-pxa/colibri-pxa270-income.c
-index 07b62a0..ee79739 100644
---- a/arch/arm/mach-pxa/colibri-pxa270-income.c
-+++ b/arch/arm/mach-pxa/colibri-pxa270-income.c
-@@ -21,6 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/platform_device.h>
- #include <linux/pwm_backlight.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/sysdev.h>
- 
- #include <asm/irq.h>
-@@ -33,8 +34,6 @@
- #include <mach/pxa27x-udc.h>
- #include <mach/pxafb.h>
- 
--#include <plat/i2c.h>
--
- #include "devices.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index a5452a3..d4e705c 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -24,6 +24,7 @@
- #include <linux/gpio.h>
- #include <linux/backlight.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/io.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
-@@ -45,7 +46,6 @@
- #include <asm/mach/irq.h>
- 
- #include <mach/pxa25x.h>
--#include <plat/i2c.h>
- #include <mach/irda.h>
- #include <mach/mmc.h>
- #include <mach/udc.h>
-diff --git a/arch/arm/mach-pxa/csb726.c b/arch/arm/mach-pxa/csb726.c
-index a305424..0481c29 100644
---- a/arch/arm/mach-pxa/csb726.c
-+++ b/arch/arm/mach-pxa/csb726.c
-@@ -17,12 +17,12 @@
- #include <linux/mtd/partitions.h>
- #include <linux/sm501.h>
- #include <linux/smsc911x.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <mach/csb726.h>
- #include <mach/mfp-pxa27x.h>
--#include <plat/i2c.h>
- #include <mach/mmc.h>
- #include <mach/ohci.h>
- #include <mach/pxa2xx-regs.h>
-diff --git a/arch/arm/mach-pxa/devices.c b/arch/arm/mach-pxa/devices.c
-index 4c766e3..c4bf08b 100644
---- a/arch/arm/mach-pxa/devices.c
-+++ b/arch/arm/mach-pxa/devices.c
-@@ -4,6 +4,7 @@
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/spi/pxa2xx_spi.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/pmu.h>
- #include <mach/udc.h>
-@@ -16,7 +17,6 @@
- #include <mach/camera.h>
- #include <mach/audio.h>
- #include <mach/hardware.h>
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- 
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index a78bb30..b411d7c 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -31,6 +31,7 @@
- #include <linux/apm-emulation.h>
- #include <linux/i2c.h>
- #include <linux/i2c/pca953x.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/regulator/userspace-consumer.h>
- 
- #include <media/soc_camera.h>
-@@ -45,7 +46,6 @@
- #include <mach/ohci.h>
- #include <mach/mmc.h>
- #include <plat/pxa27x_keypad.h>
--#include <plat/i2c.h>
- #include <mach/camera.h>
- 
- #include "generic.h"
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index 87cec0a..93f05e0 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -20,6 +20,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/leds-lp3944.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <media/soc_camera.h>
- 
-@@ -30,7 +31,6 @@
- #include <mach/pxa27x.h>
- #include <mach/pxafb.h>
- #include <mach/ohci.h>
--#include <plat/i2c.h>
- #include <mach/hardware.h>
- #include <plat/pxa27x_keypad.h>
- #include <mach/camera.h>
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index a908e0a..6de0ad0 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -35,6 +35,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/pxa2xx_spi.h>
- #include <linux/usb/gpio_vbus.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -42,7 +43,6 @@
- 
- #include <mach/pxa27x.h>
- #include <mach/hx4700.h>
--#include <plat/i2c.h>
- #include <mach/irda.h>
- 
- #include <video/platform_lcd.h>
-diff --git a/arch/arm/mach-pxa/littleton.c b/arch/arm/mach-pxa/littleton.c
-index ccb7bfa..87c1ed9 100644
---- a/arch/arm/mach-pxa/littleton.c
-+++ b/arch/arm/mach-pxa/littleton.c
-@@ -28,6 +28,7 @@
- #include <linux/leds.h>
- #include <linux/mfd/da903x.h>
- #include <linux/i2c/max732x.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/types.h>
- #include <asm/setup.h>
-@@ -45,7 +46,6 @@
- #include <mach/mmc.h>
- #include <plat/pxa27x_keypad.h>
- #include <mach/littleton.h>
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- 
- #include "generic.h"
-diff --git a/arch/arm/mach-pxa/magician.c b/arch/arm/mach-pxa/magician.c
-index 41198f0..5535991 100644
---- a/arch/arm/mach-pxa/magician.c
-+++ b/arch/arm/mach-pxa/magician.c
-@@ -28,6 +28,7 @@
- #include <linux/regulator/bq24022.h>
- #include <linux/regulator/machine.h>
- #include <linux/usb/gpio_vbus.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -36,7 +37,6 @@
- #include <mach/pxa27x.h>
- #include <mach/magician.h>
- #include <mach/pxafb.h>
--#include <plat/i2c.h>
- #include <mach/mmc.h>
- #include <mach/irda.h>
- #include <mach/ohci.h>
-diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
-index d4b6f23..f954222 100644
---- a/arch/arm/mach-pxa/mainstone.c
-+++ b/arch/arm/mach-pxa/mainstone.c
-@@ -27,6 +27,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/pwm_backlight.h>
- #include <linux/smc91x.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/types.h>
- #include <asm/setup.h>
-@@ -46,7 +47,6 @@
- #include <mach/mainstone.h>
- #include <mach/audio.h>
- #include <mach/pxafb.h>
--#include <plat/i2c.h>
- #include <mach/mmc.h>
- #include <mach/irda.h>
- #include <mach/ohci.h>
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index faafea3..78d98a8 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -39,6 +39,7 @@
- #include <linux/usb/gpio_vbus.h>
- #include <linux/regulator/max1586.h>
- #include <linux/slab.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -50,7 +51,6 @@
- #include <mach/mmc.h>
- #include <mach/udc.h>
- #include <mach/pxa27x-udc.h>
--#include <plat/i2c.h>
- #include <mach/camera.h>
- #include <mach/audio.h>
- #include <media/soc_camera.h>
-diff --git a/arch/arm/mach-pxa/mxm8x10.c b/arch/arm/mach-pxa/mxm8x10.c
-index cdf7f41..b5a8fd3 100644
---- a/arch/arm/mach-pxa/mxm8x10.c
-+++ b/arch/arm/mach-pxa/mxm8x10.c
-@@ -22,8 +22,8 @@
- #include <linux/serial_8250.h>
- #include <linux/dm9000.h>
- #include <linux/gpio.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- 
- #include <mach/pxafb.h>
-diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
-index 405b92a..ad077e8 100644
---- a/arch/arm/mach-pxa/palm27x.c
-+++ b/arch/arm/mach-pxa/palm27x.c
-@@ -22,6 +22,7 @@
- #include <linux/power_supply.h>
- #include <linux/usb/gpio_vbus.h>
- #include <linux/regulator/max1586.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -36,8 +37,6 @@
- #include <mach/palmasoc.h>
- #include <mach/palm27x.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- 
-diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
-index 90820fa..9dbf3cc 100644
---- a/arch/arm/mach-pxa/pcm990-baseboard.c
-+++ b/arch/arm/mach-pxa/pcm990-baseboard.c
-@@ -23,12 +23,12 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/pwm_backlight.h>
- 
- #include <media/soc_camera.h>
- 
- #include <asm/gpio.h>
--#include <plat/i2c.h>
- #include <mach/camera.h>
- #include <asm/mach/map.h>
- #include <mach/pxa27x.h>
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 4f0ff1a..35353af 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -23,6 +23,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/gpio.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
- #include <linux/spi/pxa2xx_spi.h>
-@@ -44,7 +45,6 @@
- #include <mach/irda.h>
- #include <mach/poodle.h>
- #include <mach/pxafb.h>
--#include <plat/i2c.h>
- 
- #include <asm/hardware/scoop.h>
- #include <asm/hardware/locomo.h>
-diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
-index 987301f..9845bd9 100644
---- a/arch/arm/mach-pxa/pxa27x.c
-+++ b/arch/arm/mach-pxa/pxa27x.c
-@@ -19,6 +19,7 @@
- #include <linux/sysdev.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach/map.h>
- #include <mach/hardware.h>
-@@ -32,8 +33,6 @@
- #include <mach/dma.h>
- #include <mach/smemc.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
-index a7a19e1..e748d9c 100644
---- a/arch/arm/mach-pxa/pxa3xx.c
-+++ b/arch/arm/mach-pxa/pxa3xx.c
-@@ -21,6 +21,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/sysdev.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach/map.h>
- #include <mach/hardware.h>
-@@ -32,7 +33,6 @@
- #include <mach/dma.h>
- #include <mach/regs-intc.h>
- #include <mach/smemc.h>
--#include <plat/i2c.h>
- 
- #include "generic.h"
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
-index 437980f..23b229b 100644
---- a/arch/arm/mach-pxa/pxa95x.c
-+++ b/arch/arm/mach-pxa/pxa95x.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
- #include <linux/pm.h>
- #include <linux/platform_device.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/sysdev.h>
-@@ -27,7 +28,6 @@
- #include <mach/pm.h>
- #include <mach/dma.h>
- #include <mach/regs-intc.h>
--#include <plat/i2c.h>
- 
- #include "generic.h"
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
-index 8361151..4709418 100644
---- a/arch/arm/mach-pxa/raumfeld.c
-+++ b/arch/arm/mach-pxa/raumfeld.c
-@@ -32,6 +32,7 @@
- #include <linux/sched.h>
- #include <linux/pwm_backlight.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/spi_gpio.h>
- #include <linux/lis3lv02d.h>
-@@ -53,7 +54,6 @@
- #include <mach/ohci.h>
- #include <mach/pxafb.h>
- #include <mach/mmc.h>
--#include <plat/i2c.h>
- #include <plat/pxa3xx_nand.h>
- 
- #include "generic.h"
-diff --git a/arch/arm/mach-pxa/saar.c b/arch/arm/mach-pxa/saar.c
-index c1ca8cb..eb83c89 100644
---- a/arch/arm/mach-pxa/saar.c
-+++ b/arch/arm/mach-pxa/saar.c
-@@ -20,6 +20,7 @@
- #include <linux/delay.h>
- #include <linux/fb.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/smc91x.h>
- #include <linux/mfd/da903x.h>
- #include <linux/mtd/mtd.h>
-@@ -31,7 +32,6 @@
- #include <asm/mach/flash.h>
- 
- #include <mach/pxa930.h>
--#include <plat/i2c.h>
- #include <mach/pxafb.h>
- 
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
-index e497922..9322fe5 100644
---- a/arch/arm/mach-pxa/saarb.c
-+++ b/arch/arm/mach-pxa/saarb.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/mfd/88pm860x.h>
- 
- #include <asm/mach-types.h>
-@@ -24,8 +25,6 @@
- #include <mach/mfp-pxa930.h>
- #include <mach/gpio.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- 
- #define SAARB_NR_IRQS	(IRQ_BOARD_START + 40)
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index b49a2c2..38e2c09 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -19,6 +19,7 @@
- #include <linux/gpio.h>
- #include <linux/leds.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/i2c/pca953x.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/ads7846.h>
-@@ -47,8 +48,6 @@
- #include <mach/sharpsl_pm.h>
- #include <mach/smemc.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- 
-diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-index 9a14fdb..cb5611d 100644
---- a/arch/arm/mach-pxa/stargate2.c
-+++ b/arch/arm/mach-pxa/stargate2.c
-@@ -25,6 +25,7 @@
- #include <linux/mtd/plat-ram.h>
- #include <linux/mtd/partitions.h>
- 
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/i2c/pcf857x.h>
- #include <linux/i2c/at24.h>
- #include <linux/smc91x.h>
-@@ -43,7 +44,6 @@
- #include <asm/mach/flash.h>
- 
- #include <mach/pxa27x.h>
--#include <plat/i2c.h>
- #include <mach/mmc.h>
- #include <mach/udc.h>
- #include <mach/pxa27x-udc.h>
-diff --git a/arch/arm/mach-pxa/tavorevb3.c b/arch/arm/mach-pxa/tavorevb3.c
-index 70191a9..79f4422 100644
---- a/arch/arm/mach-pxa/tavorevb3.c
-+++ b/arch/arm/mach-pxa/tavorevb3.c
-@@ -15,6 +15,7 @@
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/gpio.h>
- #include <linux/mfd/88pm860x.h>
- 
-@@ -23,8 +24,6 @@
- 
- #include <mach/pxa930.h>
- 
--#include <plat/i2c.h>
--
- #include "devices.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index af152e7..2de1492 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -34,6 +34,7 @@
- #include <linux/spi/spi.h>
- #include <linux/spi/pxa2xx_spi.h>
- #include <linux/input/matrix_keypad.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -41,7 +42,6 @@
- #include <mach/pxa25x.h>
- #include <mach/reset.h>
- #include <mach/irda.h>
--#include <plat/i2c.h>
- #include <mach/mmc.h>
- #include <mach/udc.h>
- #include <mach/tosa_bt.h>
-diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-index 423261d..857bb2e 100644
---- a/arch/arm/mach-pxa/trizeps4.c
-+++ b/arch/arm/mach-pxa/trizeps4.c
-@@ -26,6 +26,7 @@
- #include <linux/dm9000.h>
- #include <linux/mtd/physmap.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/types.h>
- #include <asm/setup.h>
-@@ -47,7 +48,6 @@
- #include <mach/irda.h>
- #include <mach/ohci.h>
- #include <mach/smemc.h>
--#include <plat/i2c.h>
- 
- #include "generic.h"
- #include "devices.h"
-diff --git a/arch/arm/mach-pxa/viper.c b/arch/arm/mach-pxa/viper.c
-index 49eeeab..1227921 100644
---- a/arch/arm/mach-pxa/viper.c
-+++ b/arch/arm/mach-pxa/viper.c
-@@ -36,6 +36,7 @@
- #include <linux/gpio.h>
- #include <linux/jiffies.h>
- #include <linux/i2c-gpio.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/serial_8250.h>
- #include <linux/smc91x.h>
- #include <linux/pwm_backlight.h>
-@@ -47,7 +48,6 @@
- #include <mach/pxa25x.h>
- #include <mach/audio.h>
- #include <mach/pxafb.h>
--#include <plat/i2c.h>
- #include <mach/regs-uart.h>
- #include <mach/arcom-pcmcia.h>
- #include <mach/viper.h>
-diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-index b9b5797..e709fd4 100644
---- a/arch/arm/mach-pxa/vpac270.c
-+++ b/arch/arm/mach-pxa/vpac270.c
-@@ -26,6 +26,7 @@
- #include <linux/ucb1400.h>
- #include <linux/ata_platform.h>
- #include <linux/regulator/max1586.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -40,8 +41,6 @@
- #include <mach/udc.h>
- #include <mach/pata_pxa.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- 
-diff --git a/arch/arm/mach-pxa/xcep.c b/arch/arm/mach-pxa/xcep.c
-index 51c0281..f55f8f2 100644
---- a/arch/arm/mach-pxa/xcep.c
-+++ b/arch/arm/mach-pxa/xcep.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/platform_device.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/smc91x.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-@@ -26,8 +27,6 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/map.h>
- 
--#include <plat/i2c.h>
--
- #include <mach/hardware.h>
- #include <mach/pxa2xx-regs.h>
- #include <mach/mfp-pxa25x.h>
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index a323e07..aaf8837 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -29,6 +29,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/delay.h>
- #include <linux/regulator/machine.h>
-+#include <linux/i2c/pxa-i2c.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -40,8 +41,6 @@
- #include <mach/mmc.h>
- #include <plat/pxa27x_keypad.h>
- 
--#include <plat/i2c.h>
--
- #include "generic.h"
- #include "devices.h"
- 
-diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-index f4b053b..0bc99ac 100644
---- a/arch/arm/mach-pxa/zeus.c
-+++ b/arch/arm/mach-pxa/zeus.c
-@@ -25,6 +25,7 @@
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/physmap.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/i2c/pca953x.h>
- #include <linux/apm-emulation.h>
- #include <linux/can/platform/mcp251x.h>
-@@ -33,8 +34,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#include <plat/i2c.h>
--
- #include <mach/pxa2xx-regs.h>
- #include <mach/regs-uart.h>
- #include <mach/ohci.h>
-diff --git a/arch/arm/mach-pxa/zylonite_pxa300.c b/arch/arm/mach-pxa/zylonite_pxa300.c
-index 3aa73b3..93c64d8 100644
---- a/arch/arm/mach-pxa/zylonite_pxa300.c
-+++ b/arch/arm/mach-pxa/zylonite_pxa300.c
-@@ -17,11 +17,11 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/i2c.h>
-+#include <linux/i2c/pxa-i2c.h>
- #include <linux/i2c/pca953x.h>
- #include <linux/gpio.h>
- 
- #include <mach/pxa300.h>
--#include <plat/i2c.h>
- #include <mach/zylonite.h>
- 
- #include "generic.h"
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++
++#define CE4100_PCI_I2C_DEVS	3
++
++struct ce4100_devices {
++	struct platform_device *pdev[CE4100_PCI_I2C_DEVS];
++};
++
++static struct platform_device *add_i2c_device(struct pci_dev *dev, int bar)
++{
++	struct platform_device *pdev;
++	struct i2c_pxa_platform_data pdata;
++	struct resource res[2];
++	struct device_node *child;
++	static int devnum;
++	int ret;
++
++	memset(&pdata, 0, sizeof(struct i2c_pxa_platform_data));
++	memset(&res, 0, sizeof(res));
++
++	res[0].flags = IORESOURCE_MEM;
++	res[0].start = pci_resource_start(dev, bar);
++	res[0].end = pci_resource_end(dev, bar);
++
++	res[1].flags = IORESOURCE_IRQ;
++	res[1].start = dev->irq;
++	res[1].end = dev->irq;
++
++	for_each_child_of_node(dev->dev.of_node, child) {
++		const void *prop;
++		struct resource r;
++		int ret;
++
++		ret = of_address_to_resource(child, 0, &r);
++		if (ret < 0)
++			continue;
++		if (r.start != res[0].start)
++			continue;
++		if (r.end != res[0].end)
++			continue;
++		if (r.flags != res[0].flags)
++			continue;
++
++		prop = of_get_property(child, "fast-mode", NULL);
++		if (prop)
++			pdata.fast_mode = 1;
++
++		break;
++	}
++
++	if (!child) {
++		dev_err(&dev->dev, "failed to match a DT node for bar %d.\n",
++				bar);
++		ret = -EINVAL;
++		goto out;
++	}
++
++	pdev = platform_device_alloc("ce4100-i2c", devnum);
++	if (!pdev) {
++		of_node_put(child);
++		ret = -ENOMEM;
++		goto out;
++	}
++	pdev->dev.parent = &dev->dev;
++	pdev->dev.of_node = child;
++
++	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
++	if (ret)
++		goto err;
++
++	ret = platform_device_add_data(pdev, &pdata, sizeof(pdata));
++	if (ret)
++		goto err;
++
++	ret = platform_device_add(pdev);
++	if (ret)
++		goto err;
++	devnum++;
++	return pdev;
++err:
++	platform_device_put(pdev);
++out:
++	return ERR_PTR(ret);
++}
++
++static int __devinit ce4100_i2c_probe(struct pci_dev *dev,
++		const struct pci_device_id *ent)
++{
++	int ret;
++	int i;
++	struct ce4100_devices *sds;
++
++	ret = pci_enable_device_mem(dev);
++	if (ret)
++		return ret;
++
++	if (!dev->dev.of_node) {
++		dev_err(&dev->dev, "Missing device tree node.\n");
++		return -EINVAL;
++	}
++	sds = kzalloc(sizeof(*sds), GFP_KERNEL);
++	if (!sds)
++		goto err_mem;
++
++	for (i = 0; i < ARRAY_SIZE(sds->pdev); i++) {
++		sds->pdev[i] = add_i2c_device(dev, i);
++		if (IS_ERR(sds->pdev[i])) {
++			while (--i >= 0)
++				platform_device_unregister(sds->pdev[i]);
++			goto err_dev_add;
++		}
++	}
++	pci_set_drvdata(dev, sds);
++	return 0;
++
++err_dev_add:
++	pci_set_drvdata(dev, NULL);
++	kfree(sds);
++err_mem:
++	pci_disable_device(dev);
++	return ret;
++}
++
++static void __devexit ce4100_i2c_remove(struct pci_dev *dev)
++{
++	struct ce4100_devices *sds;
++	unsigned int i;
++
++	sds = pci_get_drvdata(dev);
++	pci_set_drvdata(dev, NULL);
++
++	for (i = 0; i < ARRAY_SIZE(sds->pdev); i++)
++		platform_device_unregister(sds->pdev[i]);
++
++	pci_disable_device(dev);
++	kfree(sds);
++}
++
++static struct pci_device_id ce4100_i2c_devices[] __devinitdata = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x2e68)},
++	{ },
++};
++MODULE_DEVICE_TABLE(pci, ce4100_i2c_devices);
++
++static struct pci_driver ce4100_i2c_driver = {
++	.name           = "ce4100_i2c",
++	.id_table       = ce4100_i2c_devices,
++	.probe          = ce4100_i2c_probe,
++	.remove         = __devexit_p(ce4100_i2c_remove),
++};
++
++static int __init ce4100_i2c_init(void)
++{
++	return pci_register_driver(&ce4100_i2c_driver);
++}
++module_init(ce4100_i2c_init);
++
++static void __exit ce4100_i2c_exit(void)
++{
++	pci_unregister_driver(&ce4100_i2c_driver);
++}
++module_exit(ce4100_i2c_exit);
++
++MODULE_DESCRIPTION("CE4100 PCI-I2C glue code for PXA's driver");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Sebastian Andrzej Siewior <bigeasy@linutronix.de>");
 diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index a011455..fc2a90e 100644
+index fc2a90e..225e9a5 100644
 --- a/drivers/i2c/busses/i2c-pxa.c
 +++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -34,9 +34,9 @@
- #include <linux/clk.h>
- #include <linux/slab.h>
- #include <linux/io.h>
-+#include <linux/i2c/pxa-i2c.h>
+@@ -38,6 +38,13 @@
  
  #include <asm/irq.h>
--#include <plat/i2c.h>
  
++#ifdef CONFIG_X86
++#define clk_get(dev, id)	NULL
++#define clk_put(clk)		do { } while (0)
++#define clk_disable(clk)	do { } while (0)
++#define clk_enable(clk)		do { } while (0)
++#endif
++
  struct pxa_reg_layout {
  	u32 ibmr;
-diff --git a/arch/arm/plat-pxa/include/plat/i2c.h b/include/linux/i2c/pxa-i2c.h
-similarity index 100%
-rename from arch/arm/plat-pxa/include/plat/i2c.h
-rename to include/linux/i2c/pxa-i2c.h
+ 	u32 idbr;
+@@ -49,6 +56,7 @@ struct pxa_reg_layout {
+ enum pxa_i2c_types {
+ 	REGS_PXA2XX,
+ 	REGS_PXA3XX,
++	REGS_CE4100,
+ };
+ 
+ /*
+@@ -69,11 +77,19 @@ static struct pxa_reg_layout pxa_reg_layout[] = {
+ 		.isr =	0x18,
+ 		.isar =	0x20,
+ 	},
++	[REGS_CE4100] = {
++		.ibmr =	0x14,
++		.idbr =	0x0c,
++		.icr =	0x00,
++		.isr =	0x04,
++		/* no isar register */
++	},
+ };
+ 
+ static const struct platform_device_id i2c_pxa_id_table[] = {
+ 	{ "pxa2xx-i2c",		REGS_PXA2XX },
+ 	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
++	{ "ce4100-i2c",		REGS_CE4100 },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
+@@ -442,7 +458,8 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
+ 	writel(I2C_ISR_INIT, _ISR(i2c));
+ 	writel(readl(_ICR(i2c)) & ~ICR_UR, _ICR(i2c));
+ 
+-	writel(i2c->slave_addr, _ISAR(i2c));
++	if (i2c->reg_isar)
++		writel(i2c->slave_addr, _ISAR(i2c));
+ 
+ 	/* set control register values */
+ 	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
+@@ -1074,7 +1091,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
+ 	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
+ 	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
+-	i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
++	if (i2c_type != REGS_CE4100)
++		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
+ 
+ 	i2c->iobase = res->start;
+ 	i2c->iosize = resource_size(res);
+@@ -1113,7 +1131,10 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 	i2c->adap.algo_data = i2c;
+ 	i2c->adap.dev.parent = &dev->dev;
+ 
+-	ret = i2c_add_numbered_adapter(&i2c->adap);
++	if (i2c_type == REGS_CE4100)
++		ret = i2c_add_adapter(&i2c->adap);
++	else
++		ret = i2c_add_numbered_adapter(&i2c->adap);
+ 	if (ret < 0) {
+ 		printk(KERN_INFO "I2C: Failed to add bus\n");
+ 		goto eadapt;
 -- 
 1.7.4
