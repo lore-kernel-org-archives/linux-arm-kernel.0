@@ -1,88 +1,61 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 23 Feb 2011 12:03:57 +0100
-Subject: SAMSUNG: any example code for soc_camera, tv output,  etc...?
-In-Reply-To: <9fibsi$eahr36@out1.ip07ir2.opaltelecom.net>
-References: <20110211161626.GA31356@n2100.arm.linux.org.uk>
-	<E1Pnvhv-0002yp-A0@rmk-PC.arm.linux.org.uk>
-	<017901cbce9b$7b405ee0$71c11ca0$%kim@samsung.com>
-	<20110217140621.GC24989@n2100.arm.linux.org.uk>
-	<01b001cbcef7$3e7f5f90$bb7e1eb0$%kim@samsung.com>
-	<9f2nkr$9lh756@out1.ip04ir2.opaltelecom.net>
-	<AANLkTin0PR3VQLruade+w6GbCMoW9pXy4Kvn-sBZ+LBM@mail.gmail.com>
-	<9fibsi$eahr36@out1.ip07ir2.opaltelecom.net>
-Message-ID: <4D64E99D.10208@samsung.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Wed, 23 Feb 2011 04:19:50 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102221800.17196.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102201539.08496.arnd@arndb.de>
+	<AANLkTi=ZOUrNoT1W1n3d+9KTMewKZ3kxo71AQsas9OpD@mail.gmail.com>
+	<201102221800.17196.arnd@arndb.de>
+Message-ID: <AANLkTinfWiRaGruP8cM44c62T8svVOKsFhi4Dmg8yzEa@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nick,
+On Tue, Feb 22, 2011 at 11:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> Do you think there is any need for runtime tuning of the MMC
+>> workarounds (disregarding ones that really belong in the I/O
+>> scheduler)? Should the workarounds be simply platform callbacks, or
+>> should they be something heftier ("policies")?
+>
+> The platform hook seems the wrong place, because you might use
+> the same chip in multiple platforms, and a single platform might
+> have a large number of different boards, all of which require
+> separate workarounds.
+>
 
-On 02/22/2011 11:54 PM, Nick Pelling wrote:
-> Hi yujinzhi,
-> 
-> At 22:00 22/02/2011 +0800, =?GB2312?B?0+C999bH?= wrote:
->> I have port a embeded linux system on my board based on EP9315, with
->> support for usb video capture device, V4L2. Do you need V4L2 based on
->> usb video capture device or other video/FM/AM controller on your
->> board? If conveniently, can you provide more details about your
->> project?
-> 
-> It's a tiny S5PC100 board with an Aptina MT9M131 (1.3MP) sensor and video out
-> for some security camera projects I'm working on. I've just brought up another
-> embedded V4L2-based Linux camera, so V4L2 would be nice - in fact, there's
-> already some Samsung s5p fimc code checked into the main tree, but it's far
-> from clear (to me, at least) how to go about integrating image sensors with
-> that to get V4L2 working.
+That's a good point. At best it would result in massive copy-paste/
 
-Currently there is no a board in mainstream kernel that would have essential
-S5P SoC multimedia device drivers hooked into it. I expect first reference
-board with complete camera support to appear in kernel 2.6.39-rc1.
+> A per-card quirk table does not seem so bad, we have that in
+> other subsystems as well. I wouldn't necessarily make it
+> a list of possible quirks, but rather a __devinit function that
+> is called for a new card on insertion, in order to tweak various
+> parameters.
+>
 
-The bad news is that your sensor driver is compatible with the soc_camera
-framework whereas s5p fimc driver exports a regular V4L2 video capture node.
-And they won't work together out of the box. You might want to look at
-noon010pc30 and sr010pc30 sensor drivers, those were tested with s5p fimc.
-All you have to do is to define an instance of struct s5p_fimc_isp_info
-and set it with s3c_set_platdata helper function in your board file.
-For more details please check file include/media/s5p_fimc.h
+That sounds good! In fact, for any quirks enabled for a particular
+card, I'll expose the tuneables through sysfs attributes, something
+like /sys/block/mmcblk0/device/quirks/quirk-name/attr-names.
 
-There are ongoing efforts to make soc_camera sensors work with not soc_camera
-host driver. But I'm really not sure about the schedule.
+Quirks will have block intervals and access size intervals over which
+they are valid, along with any other quirk-specific parameter.
+Interval overlap will not be allowed for quirks in the same operation
+type (r/w/e). The goal here is to make the changes to issue_*_rq as
+small as possible, and not to pollute block.c at all with the quirks
+stuff. Quirks are looked up inside issue_*_rq based on req type and
+[start,end) interval. The resulting found quirks structure will
+contain a callback used inside issue_*_rq to modify mmc block request
+structures prior to generating actual MMC commands.
 
-S5PC100 has no IOMMU and its multimedia devices require physically contiguous
-memory. We have been developing the Contiguous Memory Allocator (CMA)
-to efficiently manage system memory among graphics devices.
-Unfortunately due to some memory remapping constraints in newer
-ARM architectures, emerging during development, the CMA is still not
-in mainline kernel.
-You can still use the videobuf2 dma-contig allocator with s5p fimc as it done
-in mainline kernel but it is not realiable on long running system.
+Quirks consist of a callback called inside of mmc issue_*_rq,
+configurable attributes, and the sysfs interface. Quirk groups are
+defined per-card. At card insertion time, a matching quirk group is
+found, and is enabled. The quirk group enable function then enables
+the relevant quirks with the right parameters (adds them to per
+mmc_blk_data quirk interval tree). Some sane defaults for the tunables
+are used. If the tunables are modified through sysfs, care is taken
+that an interval overlap never happens, otherwise the tunable is not
+modified and a kernel error message is logged.
 
-Another solution would be to use physically contiguous memory reserved
-by other device, e.g. framebuffer and pass it as USERPTR memory to the
-camera driver.
+I hope I explained the tentative idea clearly... Thoughts?
 
-You can find latest Samsung System LSI linux kernel development tree at
-http://git.kernel.org/?p=linux/kernel/git/kki_ap/linux-2.6-samsung.git
-
-For most recent status of the S5P SoC graphics drivers you might want
-to follow posting on linux-media ML (http://linuxtv.org/lists.php).
-
->> You MUST need the datasheet of S5PC100 on your board, and other
->> peripheral device's datasheet, like dm9000 ethernet controller if not
->> integrated in SoC, and schematic diagrams of your board.
-> 
-> Hardware datasheets I have plenty of, it's the supporting documentation on the
-> s3c fb / s5p fimc devices / v4l2 host stuff that I'm missing. Not a lot in the
-> Documentation/arm/Samsung* directories, for example. :-(
-
-s3c-fb IMO is not different from other frambuffers. For basic setup you might
-want to look at arch/arm/mach-s5pv210/mach-goni.c
-
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
-
-> 
-> Cheers, ....Nick Pelling....
-> 
+A
