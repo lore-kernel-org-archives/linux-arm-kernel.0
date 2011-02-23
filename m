@@ -1,143 +1,34 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 23 Feb 2011 14:51:54 +0100
-Subject: [PATCH 1/5] mmc: sdhci-esdhc-imx: add support for write protect on
-	custom GPIO
-In-Reply-To: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1298469118-25282-2-git-send-email-w.sang@pengutronix.de>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Wed, 23 Feb 2011 19:22:39 +0530
+Subject: [PATCH v3 0/2] Add PRUSS UIO driver support
+Message-ID: <1298469161-7644-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Tested-by: Marc Reilly <marc@cpdesign.com.au>
-Tested-by: Eric Benard <eric@eukrea.com>
----
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAPL1-38 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts 
+to user space application.PRUSS UIO application API can be used to control PRUs
+ in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+ processor and PRUs. More information on PRUSS and UIO linux user space API 
+available in the links below
 
-change since last version:
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-* improve kerneldoc
+Pratheesh Gangadhar (2):
+  PRUSS UIO driver support
+  Defines DA850/AM18xx/OMAPL1-38 SOC resources used by PRUSS UIO driver
 
- arch/arm/plat-mxc/include/mach/esdhc.h |   10 +++++-
- drivers/mmc/host/sdhci-esdhc-imx.c     |   52 +++++++++++++++++++++++++-------
- 2 files changed, 50 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/include/mach/esdhc.h b/arch/arm/plat-mxc/include/mach/esdhc.h
-index a48a9aa..47da109 100644
---- a/arch/arm/plat-mxc/include/mach/esdhc.h
-+++ b/arch/arm/plat-mxc/include/mach/esdhc.h
-@@ -10,7 +10,15 @@
- #ifndef __ASM_ARCH_IMX_ESDHC_H
- #define __ASM_ARCH_IMX_ESDHC_H
- 
-+/**
-+ * struct esdhc_platform_data - optional platform data for esdhc on i.MX
-+ *
-+ * strongly recommended for i.MX25/35, not needed for other variants
-+ *
-+ * @wp_gpio:	gpio for write_protect (-EINVAL if unused)
-+ */
-+
- struct esdhc_platform_data {
--	unsigned int wp_gpio;	/* write protect pin */
-+	unsigned int wp_gpio;
- };
- #endif /* __ASM_ARCH_IMX_ESDHC_H */
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 9b82910..65df00b 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -15,9 +15,11 @@
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-+#include <linux/gpio.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sdhci-pltfm.h>
- #include <mach/hardware.h>
-+#include <mach/esdhc.h>
- #include "sdhci.h"
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -100,10 +102,31 @@ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
- 	return clk_get_rate(pltfm_host->clk) / 256 / 16;
- }
- 
-+static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
-+{
-+	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
-+
-+	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
-+		return gpio_get_value(boarddata->wp_gpio);
-+	else
-+		return -ENOSYS;
-+}
-+
-+static struct sdhci_ops sdhci_esdhc_ops = {
-+	.read_w = esdhc_readw_le,
-+	.write_w = esdhc_writew_le,
-+	.write_b = esdhc_writeb_le,
-+	.set_clock = esdhc_set_clock,
-+	.get_max_clock = esdhc_pltfm_get_max_clock,
-+	.get_min_clock = esdhc_pltfm_get_min_clock,
-+};
-+
- static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
- 	struct clk *clk;
-+	int err;
- 
- 	clk = clk_get(mmc_dev(host->mmc), NULL);
- 	if (IS_ERR(clk)) {
-@@ -116,9 +139,21 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 	if (cpu_is_mx35() || cpu_is_mx51())
- 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
- 
--	/* Fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
--	if (cpu_is_mx25() || cpu_is_mx35())
-+	if (cpu_is_mx25() || cpu_is_mx35()) {
-+		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
- 		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
-+		/* write_protect can't be routed to controller, use gpio */
-+		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
-+	}
-+
-+	if (boarddata) {
-+		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
-+		if (err) {
-+			dev_warn(mmc_dev(host->mmc),
-+				"no write-protect pin available!\n");
-+			boarddata->wp_gpio = err;
-+		}
-+	}
- 
- 	return 0;
- }
-@@ -126,20 +161,15 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- static void esdhc_pltfm_exit(struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
-+
-+	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
-+		gpio_free(boarddata->wp_gpio);
- 
- 	clk_disable(pltfm_host->clk);
- 	clk_put(pltfm_host->clk);
- }
- 
--static struct sdhci_ops sdhci_esdhc_ops = {
--	.read_w = esdhc_readw_le,
--	.write_w = esdhc_writew_le,
--	.write_b = esdhc_writeb_le,
--	.set_clock = esdhc_set_clock,
--	.get_max_clock = esdhc_pltfm_get_max_clock,
--	.get_min_clock = esdhc_pltfm_get_min_clock,
--};
--
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
- 	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
- 	/* ADMA has issues. Might be fixable */
--- 
-1.7.2.3
+ arch/arm/mach-davinci/board-da850-evm.c    |    4 +
+ arch/arm/mach-davinci/da850.c              |   35 +++++
+ arch/arm/mach-davinci/devices-da8xx.c      |   73 +++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    3 +
+ drivers/uio/Kconfig                        |   17 ++
+ drivers/uio/Makefile                       |    1 +
+ drivers/uio/uio_pruss.c                    |  223 ++++++++++++++++++++++++++++
+ 7 files changed, 356 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
