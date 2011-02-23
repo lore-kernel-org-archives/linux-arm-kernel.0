@@ -1,52 +1,85 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 23 Feb 2011 11:26:12 -0600
-Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found on
-	the MPC85xx.
-In-Reply-To: <20110223165058.GE14597@angua.secretlab.ca>
-References: <cover.1298447722.git.richard.cochran@omicron.at>
-	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
-	<20110223165058.GE14597@angua.secretlab.ca>
-Message-ID: <20110223112612.30071995@schlenkerla>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 23 Feb 2011 10:29:30 -0700
+Subject: [PATCH] ARM: Tegra: DMA: Fail safe if initialization fails
+Message-ID: <1298482170-3678-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Feb 2011 09:50:58 -0700
-Grant Likely <grant.likely@secretlab.ca> wrote:
+tegra_dma_init currently simply bails out early if any initialization fails.
+This skips various data-structure initialization. In turn, this means that
+tegra_dma_allocate_channel can still hand out channels. In this case, when
+tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
+on ch->list will OOPS since the list's next/prev pointers may still be
+NULL.
 
-> On Wed, Feb 23, 2011 at 11:38:17AM +0100, Richard Cochran wrote:
-> > +
-> > +* Gianfar PTP clock nodes
-> > +
-> > +General Properties:
-> > +
-> > +  - compatible   Should be "fsl,etsec-ptp"
-> 
-> Should specify an *exact* part; ie: "fsl,mpc8313-etsec-ptp" instead of
-> trying to define a generic catchall.  The reason is that the same
-> marketing name can end up getting applied to a wide range of parts.
-> 
-> Instead, choose one specific device to stand in as the 'common'
-> implementation and get all parts with the same core to claim
-> compatibility with it.  ie: a p2020 might have:
-> 
-> 	compatible = "fsl,mpc2020-etsec-ptp", "fsl,mpc8313-etsec-ptp";
+To solve this:
+* Mark all possible channels as in-use before doing anything else in init.
+* Only mark a channel as free once all channel-related initialization has
+  completed.
 
-eTSEC is versioned, that's more reliable than the chip name since chips
-have revisions (rev 2.1 of mpc8313 has eTSEC 1.6, not sure about previous
-revs of mpc8313).  Logic blocks can be and have been uprevved between one
-revision of a chip to the next.  I think "fsl,mpc8313rev2.1-etsec-ptp"
-would be taking things a bit too far (and there could be board-level bugs
-too...).
+This prevents allocate_channel from handing out uninitialized channels.
 
-If you really need to know the exact SoC you're on, look in SVR (which
-will provide revision info as well).  Isn't the device tree for things that
-can't be probed?
+There is still one small hole; allocate_channel can't check the usage array
+for the shared channel, since this channel is permanently marked in-use.
+This could be solved using an explicit "init OK" flag that allocate_channel
+could check.
 
-The eTSEC revision is probeable as well, but due the way PTP is described as
-a separate node, the driver doesn't have straightforward access to those
-registers.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/dma.c |   20 ++++++++------------
+ 1 files changed, 8 insertions(+), 12 deletions(-)
 
-Insisting on an explicit chip also encourages people to claim compatibility
-with that chip without ensuring that it really is fully compatible.
-
--Scott
+diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+index 2d720f2..79765ca 100644
+--- a/arch/arm/mach-tegra/dma.c
++++ b/arch/arm/mach-tegra/dma.c
+@@ -678,6 +678,12 @@ int __init tegra_dma_init(void)
+ 	void __iomem *addr;
+ 	struct clk *c;
+ 
++	memset(channel_usage, 0, sizeof(channel_usage));
++	memset(dma_channels, 0, sizeof(dma_channels));
++
++	for (i = 0; i < NV_DMA_MAX_CHANNELS; i++)
++		__set_bit(i, channel_usage);
++
+ 	c = clk_get_sys("tegra-dma", NULL);
+ 	if (IS_ERR(c)) {
+ 		pr_err("Unable to get clock for APB DMA\n");
+@@ -696,18 +702,9 @@ int __init tegra_dma_init(void)
+ 	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
+ 	       addr + APB_DMA_IRQ_MASK_SET);
+ 
+-	memset(channel_usage, 0, sizeof(channel_usage));
+-	memset(dma_channels, 0, sizeof(dma_channels));
+-
+-	/* Reserve all the channels we are not supposed to touch */
+-	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_MIN; i++)
+-		__set_bit(i, channel_usage);
+-
+ 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
+ 		struct tegra_dma_channel *ch = &dma_channels[i];
+ 
+-		__clear_bit(i, channel_usage);
+-
+ 		ch->id = i;
+ 		snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
+ 
+@@ -726,13 +723,12 @@ int __init tegra_dma_init(void)
+ 			goto fail;
+ 		}
+ 		ch->irq = irq;
++
++		__clear_bit(i, channel_usage);
+ 	}
+ 	/* mark the shared channel allocated */
+ 	__set_bit(TEGRA_SYSTEM_DMA_CH_MIN, channel_usage);
+ 
+-	for (i = TEGRA_SYSTEM_DMA_CH_MAX+1; i < NV_DMA_MAX_CHANNELS; i++)
+-		__set_bit(i, channel_usage);
+-
+ 	return ret;
+ fail:
+ 	writel(0, addr + APB_DMA_GEN);
+-- 
+1.7.1
