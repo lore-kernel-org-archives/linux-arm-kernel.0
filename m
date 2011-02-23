@@ -1,86 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Feb 2011 17:17:06 +0900
-Subject: [PATCH] ARM: EXYNOS4: Fix wrong constants in the hotplug assembly
-	code.
-In-Reply-To: <AANLkTinpjGwd+pFr1oKQb1jiaih2h81Wp9G7Df8J1LLk@mail.gmail.com>
-References: <1298444621-3739-1-git-send-email-kgene.kim@samsung.com>
-	<AANLkTinpjGwd+pFr1oKQb1jiaih2h81Wp9G7Df8J1LLk@mail.gmail.com>
-Message-ID: <01e901cbd332$12a09350$37e1b9f0$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 23 Feb 2011 14:23:03 +0530
+Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+	hwmodright before timer init
+In-Reply-To: <20110223071153.5874.58923.stgit@twilight.localdomain>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<20110223071153.5874.58923.stgit@twilight.localdomain>
+Message-ID: <581270b49665fcf8227a96065dbbc584@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Hi,
-> 
-Hi :)
+Paul,
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Wednesday, February 23, 2011 12:42 PM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Tony Lindgren; Kevin Hilman; Santosh Shilimkar; Beno?t Cousson
+> Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER
+> clockevent hwmodright before timer init
+>
+> Late-initialize the GPTIMER hwmod used for the clockevent source
+> immediately
+> before it is used.  This avoids the need to late-initialize all of
+> the hwmods
+> until the boot process is further along.  (In general, we want to
+> defer
+> as much as possible until late in the boot process.)
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer-gp.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
+> omap2/timer-gp.c
+> index 0fc550e..a4e51a2 100644
+> --- a/arch/arm/mach-omap2/timer-gp.c
+> +++ b/arch/arm/mach-omap2/timer-gp.c
+> @@ -40,10 +40,11 @@
+>  #include <plat/dmtimer.h>
+>  #include <asm/localtimer.h>
+>  #include <asm/sched_clock.h>
+> +#include <plat/common.h>
+>
+>  #include "timer-gp.h"
+> +#include <plat/omap_hwmod.h>
+>
+> -#include <plat/common.h>
+>
+>  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+>  #define MAX_GPTIMER_ID		12
+> @@ -133,9 +134,13 @@ static void __init
+> omap2_gp_clockevent_init(void)
+>  {
+>  	u32 tick_rate;
+>  	int src;
+> +	const char *clockevent_hwmod_name;
+>
+>  	inited = 1;
+>
+> +	clockevent_hwmod_name = (gptimer_id == 12) ? "timer12" :
+> "timer1";
+> +	omap_hwmod_late_init_one(clockevent_hwmod_name);
+> +
 
-> At that time Russell modified the s5cv310, tegra, and realview also. I
-> think you also modify it.
-> 
-Maybe you mean commit 30b99d07 (ARM: fix wrongly patched constants).
-It was due to his patch commit e3d9c625 (ARM: CPU hotplug: fix hard-coded
-control register constants) but this is different with that.
-Firstly this patch fixes wrong constants in the hotplug assembly code.
-Then secondly, fixes hard-coded control register constants.
+Do we need above hard-coding ? This takes away flexibility of
+choosing system timer from board files, right ?
 
-Of course, first reason is more important on this.
-And I'm not sure whether need to fix on tegra also.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Am I missing something here?
 
 
-> On Wed, Feb 23, 2011 at 4:03 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > This patch fixes wrong constants in the hotplug assembly code for
-> > Exynos4 such as Russell's changing in vexpress hotplug and fixes
-> > hard-coded control register constatns also.
-> >
-> > Reported-by: Changhwan Youn <chaos.youn@samsung.com>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?arch/arm/mach-exynos4/hotplug.c | ? ?8 ++++----
-> > ?1 files changed, 4 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-
-> exynos4/hotplug.c
-> > index 4c42f9c..2b5909e 100644
-> > --- a/arch/arm/mach-exynos4/hotplug.c
-> > +++ b/arch/arm/mach-exynos4/hotplug.c
-> > @@ -30,13 +30,13 @@ static inline void cpu_enter_lowpower(void)
-> > ? ? ? ? * Turn off coherency
-> > ? ? ? ? */
-> > ? ? ? ?" ? ? ? mrc ? ? p15, 0, %0, c1, c0, 1\n"
-> > - ? ? ? " ? ? ? bic ? ? %0, %0, #0x20\n"
-> > + ? ? ? " ? ? ? bic ? ? %0, %0, %3\n"
-> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 1\n"
-> > ? ? ? ?" ? ? ? mrc ? ? p15, 0, %0, c1, c0, 0\n"
-> > ? ? ? ?" ? ? ? bic ? ? %0, %0, %2\n"
-> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 0\n"
-> > ? ? ? ? ?: "=&r" (v)
-> > - ? ? ? ? : "r" (0), "Ir" (CR_C)
-> > + ? ? ? ? : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-> > ? ? ? ? ?: "cc");
-> > ?}
-> >
-> > @@ -49,10 +49,10 @@ static inline void cpu_leave_lowpower(void)
-> > ? ? ? ?" ? ? ? orr ? ? %0, %0, %1\n"
-> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 0\n"
-> > ? ? ? ?" ? ? ? mrc ? ? p15, 0, %0, c1, c0, 1\n"
-> > - ? ? ? " ? ? ? orr ? ? %0, %0, #0x20\n"
-> > + ? ? ? " ? ? ? orr ? ? %0, %0, %2\n"
-> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 1\n"
-> > ? ? ? ? ?: "=&r" (v)
-> > - ? ? ? ? : "Ir" (CR_C)
-> > + ? ? ? ? : "Ir" (CR_C), "Ir" (0x40)
-> > ? ? ? ? ?: "cc");
-> > ?}
-> >
-> > --
-> > 1.7.1
+
+>  	gptimer = omap_dm_timer_request_specific(gptimer_id);
+>  	BUG_ON(gptimer == NULL);
+>  	gptimer_wakeup = gptimer;
+> @@ -250,6 +255,7 @@ static void __init omap2_gp_timer_init(void)
+>  		BUG_ON(!twd_base);
+>  	}
+>  #endif
+> +
+>  	omap_dm_timer_init();
+>
+>  	omap2_gp_clockevent_init();
+>
