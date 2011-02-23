@@ -1,82 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 22 Feb 2011 19:59:49 -0700 (MST)
-Subject: [PATCH] OMAP2+: clocksource: fix crash on boot when
-	!CONFIG_OMAP_32K_TIMER
-Message-ID: <alpine.DEB.2.00.1102221958190.22636@utopia.booyaka.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 22 Feb 2011 19:05:58 -0800
+Subject: [PATCH] msm: add single-wire serial bus interface (SSBI) driver
+In-Reply-To: <alpine.LFD.2.00.1102222049410.22028@xanadu.home> (Nicolas
+	Pitre's message of "Tue, 22 Feb 2011 21:37:28 -0500 (EST)")
+References: <1297989299-27320-1-git-send-email-kheitke@codeaurora.org>
+	<1297989432.9680.50.camel@c-dwalke-linux.qualcomm.com>
+	<4D5DC289.1090004@codeaurora.org>
+	<1298054771.17758.1.camel@c-dwalke-linux.qualcomm.com>
+	<AANLkTi=0Pxg09x8DdVDVy9Ur7r1dgB+4LM3q0hM4_8Rg@mail.gmail.com>
+	<1298419839.17118.5.camel@m0nster> <8ya62sbli3z.fsf@huya.qualcomm.com>
+	<alpine.LFD.2.00.1102222049410.22028@xanadu.home>
+Message-ID: <8ya8vx7jvqh.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 22 2011, Nicolas Pitre wrote:
 
-OMAP2+ kernels built without CONFIG_OMAP_32K_TIMER crash on boot after the
-2.6.38 sched_clock changes:
+> And if someone else comes up with a SSBI interface, then it will be much 
+> easier to notice the already existing driver if it is in the driver 
+> directory rather than somewhere else in some unrelated (from that 
+> person's pov) obscure directory.
 
-[    0.000000] OMAP clockevent source: GPTIMER1 at 13000000 Hz
-[    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-[    0.000000] pgd = c0004000
-[    0.000000] [00000000] *pgd=00000000
-[    0.000000] Internal error: Oops: 80000005 [#1] SMP
-[    0.000000] last sysfs file:
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0    Not tainted  (2.6.38-rc5-00057-g04aa67d #152)
-[    0.000000] PC is at 0x0
-[    0.000000] LR is at sched_clock_poll+0x2c/0x3c
+Well, I'm fairly sure that nobody would be making an SSBI interface, but
+point taken.
 
-Without CONFIG_OMAP_32K_TIMER, the kernel has an clockevent and
-clocksource resolution about three orders of magnitude higher than
-with CONFIG_OMAP_32K_TIMER set.  The tradeoff is that the lowest
-power consumption states are not available.
+>> It seems kind of unusual to create an entirely new directory under
+>> drivers to hold what will only ever be a single driver.
+>
+> Well, a couple examples exist already: drivers/dca, drivers/nfc, 
+> drivers/sn, drivers/tc, drivers/vlynq, etc.  And if you expect to have 
+> more oddball msm drivers then you can create a drivers/msm directory, 
+> similar to the existing drivers/macintosh, drivers/parisc, drivers/s390, 
+> drivers/sh, drivers/video/omap, drivers/video/omap2, etc.
 
-Fix by calling init_sched_clock() from the GPTIMER clocksource init code.
+drivers/msm seems like a reasonable place.  We already have other
+drivers that are in appropriate places.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/timer-gp.c |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+So what kinds of things constitute drivers versus arch-specific code?
+Currently, iommu drivers seem to be sprinkled throughout arch.
 
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index 7b7c268..0fc550e 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -39,6 +39,7 @@
- #include <asm/mach/time.h>
- #include <plat/dmtimer.h>
- #include <asm/localtimer.h>
-+#include <asm/sched_clock.h>
- 
- #include "timer-gp.h"
- 
-@@ -190,6 +191,7 @@ static void __init omap2_gp_clocksource_init(void)
- /*
-  * clocksource
-  */
-+static DEFINE_CLOCK_DATA(cd);
- static struct omap_dm_timer *gpt_clocksource;
- static cycle_t clocksource_read_cycles(struct clocksource *cs)
- {
-@@ -204,6 +206,15 @@ static struct clocksource clocksource_gpt = {
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-+static void notrace dmtimer_update_sched_clock(void)
-+{
-+	u32 cyc;
-+
-+	cyc = omap_dm_timer_read_counter(gpt_clocksource);
-+
-+	update_sched_clock(&cd, cyc, (u32)~0);
-+}
-+
- /* Setup free-running counter for clocksource */
- static void __init omap2_gp_clocksource_init(void)
- {
-@@ -224,6 +235,8 @@ static void __init omap2_gp_clocksource_init(void)
- 
- 	omap_dm_timer_set_load_start(gpt, 1, 0);
- 
-+	init_sched_clock(&cd, dmtimer_update_sched_clock, 32, tick_rate);
-+
- 	if (clocksource_register_hz(&clocksource_gpt, tick_rate))
- 		printk(err2, clocksource_gpt.name);
- }
+We also have a shared-memory driver-type thing that is only used by
+other drivers.  Does that make sense to be in drivers/msm?
+
+Ken, do you mind moving this driver into 'drivers/msm' as the first one
+there?
+
+Thanks,
+David
+
 -- 
-1.7.2.3
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
