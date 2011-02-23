@@ -1,25 +1,30 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 23 Feb 2011 13:21:04 -0800
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 23 Feb 2011 13:21:31 -0800
 Subject: [PATCH 5/5] ARM: Tegra: Enable Harmony audio support
-In-Reply-To: <AANLkTimffVNK2EmTqypQcrWHLisf3c8_dMsHwSbv-nWi@mail.gmail.com>
+In-Reply-To: <AANLkTikk6f0Nv8XZEmY4-85FtBE1re9hKqgFRNZkyPfz@mail.gmail.com>
 References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
 	<1298487532-5000-6-git-send-email-swarren@nvidia.com>
 	<AANLkTimffVNK2EmTqypQcrWHLisf3c8_dMsHwSbv-nWi@mail.gmail.com>
-Message-ID: <AANLkTi=tDJvfEFFvXGEkZswRWekRLuz4rBoT-0hgobgn@mail.gmail.com>
+	<AANLkTikk6f0Nv8XZEmY4-85FtBE1re9hKqgFRNZkyPfz@mail.gmail.com>
+Message-ID: <AANLkTikYhiaAgZLJ5APpbTVn-2_zdrU5S_7b_SFnu1d-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 1:08 PM, Olof Johansson <olof@lixom.net> wrote:
-> Stephen,
->
-> Since this depends on i2c, and registers one of the adapters to do it,
-> we should just get the adapters registered separately (all of them)
-> before this. I was holding off that part of board code since the i2c
-> driver went up that maintainer path instead, but if Colin pulls it
-> into tegra for-next, then I'll go ahead with those peices as well.
+Hi,
 
-I'll merge the i2c-tegra branch into for-next (assuming Ben doesn't
-object to it), and you can put all the i2c devices in your pull
-request.  That way we can get everything except this patch into the
-first pull request to Linus, and just put this patch into a second
-pull request once the ASoC branch is merged.
+> The GPIO numbers above TEGRA_NR_GPIOS are allocated by the board, and
+> this is in board-harmony.h, so I think its OK.
+
+On second thought, it's probably even preferred, since otherwise the
+dynamic allocation can mess up the static ones.
+
+>> Does it need a hardcoded GPIO base, or can it use the dynamic one
+>> (i.e. use -1 here)? I don't even see any reference to gpio_base in the
+>> driver...
+> I assume that is in the ASoC tree. ?The platform data in tegra
+> for-next does not include a gpio_base entry.
+
+Yeah, I only looked at the current driver in .37, my bad.
+
+
+-Olof
