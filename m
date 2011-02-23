@@ -1,35 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 23 Feb 2011 16:06:55 +0800
-Subject: [PATCH] ARM: mx51_defconfig: change CONFIG_LEDS_CLASS 'm' to 'y'
-Message-ID: <1298448415-21986-1-git-send-email-shawn.guo@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 23 Feb 2011 09:15:39 +0100
+Subject: [PATCH] wip: convert imx27 to common struct clk
+In-Reply-To: <4D648A3D.7020402@codeaurora.org>
+References: <1298256658.861611.43913489619.0.gpush@pororo>
+	<1298417599-23522-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4D648A3D.7020402@codeaurora.org>
+Message-ID: <20110223081539.GM22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to fix the warning below.
+Hi Saravana,
 
-arch/arm/configs/mx51_defconfig:113:warning: symbol value 'm' invalid for LEDS_CLASS
+On Tue, Feb 22, 2011 at 08:17:01PM -0800, Saravana Kannan wrote:
+> On 02/22/2011 03:33 PM, Uwe Kleine-K?nig wrote:
+> >I had to degrade one WARN_ON to WARN_ON_ONCE in drivers/clk/clk.c to
+> >actually make it work.  Otherwise console output results in a warning
+> >that results in console output ...
+> 
+> You won't be able to do mainline the WARN_ON_ONCE because that will
+> only warn for the first clock that violates whatever condition it's
+> warning about.
+I wonder if it is more sensible while the warning is new.  But I don't
+care much because I'm going to fix the serial driver before switching.
+ 
+Best regards
+Uwe
 
-Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
----
-This warning bothers me for quite some time.  I'm unsure if this is
-the right fix, and I just want to draw people's attention with this
-patch.
-
- arch/arm/configs/mx51_defconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-index 9cba68c..e3c9032 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -110,7 +110,7 @@ CONFIG_MMC=y
- CONFIG_MMC_BLOCK=m
- CONFIG_MMC_SDHCI=m
- CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=m
-+CONFIG_LEDS_CLASS=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
- CONFIG_EXT2_FS=y
 -- 
-1.7.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
