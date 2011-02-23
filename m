@@ -1,24 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Feb 2011 13:18:05 +0000
-Subject: [PATCH] nmk-gpio: use request_irq instead of chained handler
-In-Reply-To: <1298465690-27077-1-git-send-email-rabin.vincent@stericsson.com>
-References: <1298465690-27077-1-git-send-email-rabin.vincent@stericsson.com>
-Message-ID: <20110223131805.GK29559@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 23 Feb 2011 15:33:26 +0200
+Subject: [PATCH] OMAP2/3/4: DSS2: Enable Display SubSystem as modules
+In-Reply-To: <1298463753-24880-1-git-send-email-samreen@ti.com>
+References: <1298463753-24880-1-git-send-email-samreen@ti.com>
+Message-ID: <1298468006.18466.37.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 06:24:50PM +0530, Rabin Vincent wrote:
-> __nmk_gpio_irq_handler doesn't do anything more that what a normal handler
-> does, so it can become one.  This is also needed for changing the GIC
-> implementation to a different flow handler.
+Hi,
 
-So you want to allow other people to request the GPIO interrupt?
+On Wed, 2011-02-23 at 06:22 -0600, Nilofer, Samreen wrote:
+> Enabling Display options to be built as modules
+> Also, the generic dpi, sharp & nec panels are also
+> enabled as modules.
 
-You also want to have the IRQ tracing code called once for entry into
-this handler and once for each GPIO interrupt which is pending?
+I've just posted a patch which fixes the problem with the regulators in
+DSS. With that patch we can safely enable all DSS interfaces (and thus
+panels) and the resulting binary will work on all boards.
 
-You want to have the overhead of dealing with the inprogress stuff, etc?
+So can you make one more version which enables all the interfaces and
+panels as modules, based on
+git://gitorious.org/linux-omap-dss2/linux.git master
 
-I really don't like the idea of getting rid of the interrupt chaining
-and reverting back to the proven-to-be-broken 2.2 kernel way of handing
-this kind of thing - which is exactly what you're doing here.
+ Tomi
