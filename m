@@ -1,66 +1,118 @@
-From: samreen@ti.com (Samreen)
-Date: Wed, 23 Feb 2011 17:52:33 +0530
-Subject: [PATCH] OMAP2/3/4: DSS2: Enable Display SubSystem as modules
-Message-ID: <1298463753-24880-1-git-send-email-samreen@ti.com>
+From: rabin.vincent@stericsson.com (Rabin Vincent)
+Date: Wed, 23 Feb 2011 18:24:50 +0530
+Subject: [PATCH] nmk-gpio: use request_irq instead of chained handler
+Message-ID: <1298465690-27077-1-git-send-email-rabin.vincent@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling Display options to be built as modules
-Also, the generic dpi, sharp & nec panels are also
-enabled as modules.
+__nmk_gpio_irq_handler doesn't do anything more that what a normal handler
+does, so it can become one.  This is also needed for changing the GIC
+implementation to a different flow handler.
 
-Signed-off-by: Samreen <samreen@ti.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
 ---
- Version5:
-        Incorporating the comments from Tony Lindgren, Kevin Hilman,
- Paul Mundt & Tomi Valkeinen to build DSS & panels as modules.
- See: https://patchwork.kernel.org/patch/281492/
+ arch/arm/plat-nomadik/gpio.c |   54 ++++++++++++++++++++---------------------
+ 1 files changed, 26 insertions(+), 28 deletions(-)
 
- Version4:
-       Remove the enabling of the display panels by default.
-
- Version3:
-       Eliminate the separate default number of FBs for
- different architecture. Keeping default FBs as 3 as before.
-
- Version2:
-        Enables by default NEC panel used in zoom2/3/3630sdp, instead of
- Sharp LQ043T1DG01 panel enabled in previous version of this patch.
-
-Testing:
----------
-The base used for OMAP3 testing is:
-branch: master
-commit: 7c23277
-URL: git://gitorious.org/linux-omap-dss2/linux.git
-
-And OMAP4 testing is on the following branch + few patches to enable DSI taal panel:
-branch: lo-dss2-Feb18
-commit: 67bcb5600
-URL: git://dev.omapzoom.org/pub/scm/axelcx/kernel-display.git
-
-The patch is tested on 3630zoom, 3430sdp & 4430sdp, it was not tested
-on OMAP2 platform due crash seen while boot.
-(See: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg43921.html)
-
- arch/arm/configs/omap2plus_defconfig |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index ae890ca..ddcae13 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -192,6 +192,11 @@ CONFIG_FIRMWARE_EDID=y
- CONFIG_FB_MODE_HELPERS=y
- CONFIG_FB_TILEBLITTING=y
- CONFIG_FB_OMAP_LCD_VGA=y
-+CONFIG_OMAP2_DSS=m
-+CONFIG_FB_OMAP2=m
-+CONFIG_PANEL_GENERIC_DPI=m
-+CONFIG_PANEL_SHARP_LS037V7DW01=m
-+CONFIG_PANEL_NEC_NL8048HL11_01B=m
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_PLATFORM=y
+diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
+index 45b1cf9..efa6737 100644
+--- a/arch/arm/plat-nomadik/gpio.c
++++ b/arch/arm/plat-nomadik/gpio.c
+@@ -651,22 +651,14 @@ static struct irq_chip nmk_gpio_irq_chip = {
+ 	.irq_set_wake	= nmk_gpio_irq_set_wake,
+ };
+ 
+-static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+-				   u32 status)
++static irqreturn_t
++__nmk_gpio_irq_handler(struct nmk_gpio_chip *nmk_chip, u32 status)
+ {
+-	struct nmk_gpio_chip *nmk_chip;
+-	struct irq_chip *host_chip = get_irq_chip(irq);
+ 	unsigned int first_irq;
+ 
+-	if (host_chip->irq_mask_ack)
+-		host_chip->irq_mask_ack(&desc->irq_data);
+-	else {
+-		host_chip->irq_mask(&desc->irq_data);
+-		if (host_chip->irq_ack)
+-			host_chip->irq_ack(&desc->irq_data);
+-	}
++	if (!status)
++		return IRQ_NONE;
+ 
+-	nmk_chip = get_irq_data(irq);
+ 	first_irq = NOMADIK_GPIO_TO_IRQ(nmk_chip->chip.base);
+ 	while (status) {
+ 		int bit = __ffs(status);
+@@ -675,29 +667,30 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+ 		status &= ~BIT(bit);
+ 	}
+ 
+-	host_chip->irq_unmask(&desc->irq_data);
++	return IRQ_HANDLED;
+ }
+ 
+-static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
++static irqreturn_t nmk_gpio_irq_handler(int irq, void *dev_id)
+ {
+-	struct nmk_gpio_chip *nmk_chip = get_irq_data(irq);
++	struct nmk_gpio_chip *nmk_chip = dev_id;
+ 	u32 status = readl(nmk_chip->addr + NMK_GPIO_IS);
+ 
+-	__nmk_gpio_irq_handler(irq, desc, status);
++	return __nmk_gpio_irq_handler(nmk_chip, status);
+ }
+ 
+-static void nmk_gpio_secondary_irq_handler(unsigned int irq,
+-					   struct irq_desc *desc)
++static irqreturn_t nmk_gpio_secondary_irq_handler(int irq, void *dev_id)
+ {
+-	struct nmk_gpio_chip *nmk_chip = get_irq_data(irq);
++	struct nmk_gpio_chip *nmk_chip = dev_id;
+ 	u32 status = nmk_chip->get_secondary_status(nmk_chip->bank);
+ 
+-	__nmk_gpio_irq_handler(irq, desc, status);
++	return __nmk_gpio_irq_handler(nmk_chip, status);
+ }
+ 
+-static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
++static void nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
+ {
++	struct gpio_chip *gpio_chip = &nmk_chip->chip;
+ 	unsigned int first_irq;
++	int ret;
+ 	int i;
+ 
+ 	first_irq = NOMADIK_GPIO_TO_IRQ(nmk_chip->chip.base);
+@@ -709,16 +702,21 @@ static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
+ 		set_irq_type(i, IRQ_TYPE_EDGE_FALLING);
+ 	}
+ 
+-	set_irq_chained_handler(nmk_chip->parent_irq, nmk_gpio_irq_handler);
+-	set_irq_data(nmk_chip->parent_irq, nmk_chip);
++	ret = request_irq(nmk_chip->parent_irq, nmk_gpio_irq_handler,
++			  IRQF_NO_SUSPEND, gpio_chip->label, nmk_chip);
++	if (ret)
++		dev_err(gpio_chip->dev, "Unable to request IRQ%d: %d\n",
++			nmk_chip->parent_irq, ret);
+ 
+ 	if (nmk_chip->secondary_parent_irq >= 0) {
+-		set_irq_chained_handler(nmk_chip->secondary_parent_irq,
+-					nmk_gpio_secondary_irq_handler);
+-		set_irq_data(nmk_chip->secondary_parent_irq, nmk_chip);
+-	}
++		ret = request_irq(nmk_chip->secondary_parent_irq,
++				  nmk_gpio_secondary_irq_handler,
++				  IRQF_NO_SUSPEND, gpio_chip->label, nmk_chip);
+ 
+-	return 0;
++		if (ret)
++			dev_err(gpio_chip->dev, "Unable to request secondary IRQ%d: %d\n",
++				nmk_chip->secondary_parent_irq, ret);
++	}
+ }
+ 
+ /* I/O Functions */
 -- 
-1.5.6.3
+1.7.2.dirty
