@@ -1,73 +1,174 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Wed, 23 Feb 2011 22:21:06 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <4D656961.7080105@maxwell.research.nokia.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
-	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
-	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-	<4D656961.7080105@maxwell.research.nokia.com>
-Message-ID: <AANLkTikJykSYxv2zKS=vYsdKh0WQaKFOv0a7fSEQ_7JR@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 23 Feb 2011 21:25:48 +0100 (CET)
+Subject: [PATCH v3 1/2] PRUSS UIO driver support
+In-Reply-To: <1298469161-7644-2-git-send-email-pratheesh@ti.com>
+References: <1298469161-7644-1-git-send-email-pratheesh@ti.com>
+	<1298469161-7644-2-git-send-email-pratheesh@ti.com>
+Message-ID: <alpine.LFD.2.00.1102232057260.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 10:09 PM, Sakari Ailus
-<sakari.ailus@maxwell.research.nokia.com> wrote:
-> Guzman Lugo, Fernando wrote:
->> Hi,
->
-> Hi Fernando,
->
->> In OMAP4 the cortex M3 is a double core processor and as each core is
->> running they own version of the RTOS we threat them independently. So
->> our driver which controls the remote processor sees two processor but
->> both use the same iommu hw. When a iommu fault happens, at this
->> moment, it is consider as a faltal error and it is no managed to
->> recover and continue, instead a restart of the processor is needed, if
->> the fault happens in core0 we need to reset core1 too and vice versa.
->> if the iommu would support several user callbacks, we can register the
->> callback which resets core0 and also the callback which resets core1
->> and treat them as totally independent processors. Also we have an
->> error event notifier driver, which is only in charge of notifying
->> error events to userspace, so we would have multiple callbacks we
->> could do this
->
-> The original purpose of the patch, as far as I understand, is to allow
-> getting useful information for debugging purposes should an iommu fault
-> happen.
->
-> Also, I'm not sure it's necessarily a good idea to just go and reset
-> the M3 cores in case an iommu fault happens --- this is very probably a
-> grave bug in the software running on those M3s. It should be fixed
-> instead of just hiding it. There will be consequences to host side as
-> well, won't there?
+On Wed, 23 Feb 2011, Pratheesh Gangadhar wrote:
 
-That's really a good point. callbacks in this situation are mostly to
-debug purpose. Drivers shouldn't rely on that to work properly.
+Is it actually too much of an hassle to cc the people who spent their
+time to review previous versions of your patch ?
 
-David
+> +struct clk *pruss_clk;
+> +struct uio_info *info;
+> +void *ddr_virt_addr = NULL, *prussio_virt_addr = NULL;
 
->
->> iommu <---- register fault callback for error notify driver
->>
->> instead of
->>
->> iommu <--- register fault callback for remote processor driver
->> <----register fault event for error notify driver.
->>
->> with that, we remove one dependency of the errornotify driver.
->
-> I suppose this is not in mainline?
->
-> Regards,
->
-> --
-> Sakari Ailus
-> sakari.ailus at maxwell.research.nokia.com
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Grrr. We do not initialize with NULL.
+
+> +dma_addr_t ddr_phy_addr;
+
+Also all of these want to be static.
+
+> +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
+> +{
+> +	void __iomem *base = dev_info->mem[0].internal_addr;
+> +	void __iomem *intren_reg = base + PINTC_HIER;
+> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + ((irq - 1) << 2);
+> +	int intren_regval = ioread32(intren_reg), intr_mask = (1 << (irq - 1));
+> +
+> +	/* Is interrupt enabled and active ? */
+> +	if (!(intren_regval & intr_mask)
+> +	    && (ioread32(intrstat_reg) & PINTC_HIPIR_NO_PEND_MASK))
+> +		return IRQ_NONE;
+
+You could avoid all these ugly line breaks by chosing sensible short
+names for variables and defines.
+
+> +	/* Disable interrupt */
+> +	iowrite32((intren_regval & ~intr_mask), intren_reg);
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static void pruss_cleanup(struct platform_device *dev, struct uio_info *info)
+> +{
+> +	int count;
+> +	struct uio_info *p;
+
+Nit: I prefer the longer declarations above the shorter ones. It's
+easier to parse, but that's really my personal preference. 
+
+	struct uio_info *p;
+	int count;
+
+Compare and contrast it and decide yourself.
+
+> +
+> +	for (count = 0, p = info; count < MAX_PRUSS_EVTOUT_INSTANCE;
+> +	     count++, p++) {
+
+Aside of making that constant shorter, you could assign info to p in
+the variable declaration already. So avoid that line break.
+
+> +		uio_unregister_device(p);
+> +		kfree(p->name);
+> +	}
+> +	iounmap(prussio_virt_addr);
+> +	dma_free_coherent(&dev->dev, info[0].mem[2].size,
+> +			  info[0].mem[2].internal_addr, info[0].mem[2].addr);
+
+You sure, that iounmap and dma_free_coherent are too happy about being
+called with NULL pointers?
+
+> +
+> +	kfree(info);
+> +	clk_put(pruss_clk);
+> +}
+> +
+> +static int __devinit pruss_probe(struct platform_device *dev)
+> +{
+> +	int ret = -ENODEV, count = 0;
+> +	struct resource *regs_prussio, *regs_l3ram, *regs_ddr;
+> +	struct uio_info *p;
+> +
+> +	info = kzalloc(sizeof(struct uio_info) * MAX_PRUSS_EVTOUT_INSTANCE,
+> +		       GFP_KERNEL);
+> +	if (!info)
+> +		return -ENOMEM;
+> +
+> +	/* Power on PRU in case its not done as part of boot-loader */
+> +	pruss_clk = clk_get(&dev->dev, "pruss");
+> +	if (IS_ERR(pruss_clk)) {
+> +		dev_err(&dev->dev, "Failed to get clock\n");
+> +		ret = PTR_ERR(pruss_clk);
+> +		return ret;
+
+Memory leak.
+
+> +	} else {
+> +		clk_enable(pruss_clk);
+> +	}
+> +
+> +	regs_prussio = platform_get_resource(dev, IORESOURCE_MEM, 0);
+> +	if (!regs_prussio) {
+> +		dev_err(&dev->dev, "No PRUSS I/O resource specified\n");
+> +		goto out_free;
+> +	}
+> +
+> +	regs_l3ram = platform_get_resource(dev, IORESOURCE_MEM, 1);
+> +	if (!regs_l3ram) {
+> +		dev_err(&dev->dev, "No L3 RAM resource specified\n");
+> +		goto out_free;
+> +	}
+> +
+> +	regs_ddr = platform_get_resource(dev, IORESOURCE_MEM, 2);
+> +	if (!regs_ddr) {
+> +		dev_err(&dev->dev, "No External RAM resource specified\n");
+> +		goto out_free;
+> +	}
+> +
+> +	if (!regs_prussio->start || !regs_l3ram->start) {
+> +		dev_err(&dev->dev, "Invalid memory resource\n");
+> +		goto out_free;
+> +	}
+> +
+> +	ddr_virt_addr =
+> +	    dma_alloc_coherent(&dev->dev, regs_ddr->end - regs_ddr->start + 1,
+> +			       &ddr_phy_addr, GFP_KERNEL | GFP_DMA);
+> +	if (!ddr_virt_addr) {
+> +		dev_err(&dev->dev, "Could not allocate external memory\n");
+> +		goto out_free;
+> +	}
+> +
+> +	prussio_virt_addr =
+> +	    ioremap(regs_prussio->start,
+> +		    regs_prussio->end - regs_prussio->start + 1);
+
+Either make those variable names shorter or do:
+
+       len = regs_prussio->end - regs_prussio->start + 1;
+       prussio_virt_addr = ioremap(regs_prussio->start, len);
+
+Those multi line breaks are irritating and not necessary at all.
+
+They result from mindlessly converting code following an unfortunately
+popular codingstyle which is only readable on extra wide screen
+monitors. I really wonder when people start to understand that the
+human eye can only parse up to a certain line width easily. There is a
+reason why newspapers are printed in columns.
+
+Please be a bit more careful about this. Just mechanically converting
+existing horrible code to 80 chars does not make it more readable and
+less horrible than not converting it at all.
+
+> +	if (prussio_virt_addr) {
+> +		dev_err(&dev->dev, "Can't remap PRUSS I/O  address range\n");
+> +		goto out_free;
+> +	}
+> +
+> +	for (count = 0, p = info; count < MAX_PRUSS_EVTOUT_INSTANCE;
+> +	     count++, p++) {
+
+See above.
+
+	for (cnt = 0, p = info; cnt < MAX_PRUSS_EVT; cnt++, p++) {
+
+is better readable and contains exactly the same amount of
+information.
+
+Thanks,
+
+	tglx
