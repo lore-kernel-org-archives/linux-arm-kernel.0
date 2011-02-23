@@ -1,127 +1,41 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Wed, 23 Feb 2011 21:54:26 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
-	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
-	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-Message-ID: <AANLkTi=+rzHDB_hGzGtZKNZB02z4v65GAD-87zVpOdni@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Feb 2011 19:55:33 +0000
+Subject: [PATCH 1/5] ARM: smp: Select local timers vs
+	dummytimersupportruntime
+In-Reply-To: <b9ea630b656efc370b6c5da78dedd41d@mail.gmail.com>
+References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
+	<1297510187-31547-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110220110341.GA15494@n2100.arm.linux.org.uk>
+	<e3674a4c299e3cc0fad3e15a3cc03db4@mail.gmail.com>
+	<20110223163635.GA16041@n2100.arm.linux.org.uk>
+	<780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
+	<2d63c430d007703753afa4ae98902341@mail.gmail.com>
+	<20110223190305.GB16041@n2100.arm.linux.org.uk>
+	<b9ea630b656efc370b6c5da78dedd41d@mail.gmail.com>
+Message-ID: <20110223195533.GC16041@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 3:39 PM, Guzman Lugo, Fernando
-<fernando.lugo@ti.com> wrote:
-> On Wed, Feb 23, 2011 at 3:45 AM, David Cohen <dacohen@gmail.com> wrote:
->> On Wed, Feb 23, 2011 at 3:17 AM, Guzman Lugo, Fernando
->> <fernando.lugo@ti.com> wrote:
->>> On Wed, Feb 16, 2011 at 1:35 PM, David Cohen <dacohen@gmail.com> wrote:
->>>> Add support to register an isr for IOMMU fault situations and adapt it
->>>> to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
->>>> module might want to be informed when errors happen in order to debug it
->>>> or react.
->>>>
->>>> Signed-off-by: David Cohen <dacohen@gmail.com>
->>>> ---
->>>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 17 +++++++++-
->>>> ?arch/arm/plat-omap/include/plat/iommu.h | ? 14 ++++++++-
->>>> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 52 ++++++++++++++++++++++---------
->>>> ?3 files changed, 65 insertions(+), 18 deletions(-)
->>>>
->>> ....
->>>
->>>> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
->>>> ?}
->>>> ?EXPORT_SYMBOL_GPL(iommu_put);
->>>>
->>>> +int iommu_set_isr(const char *name,
->>>> + ? ? ? ? ? ? ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
->>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *priv),
->>>> + ? ? ? ? ? ? ? ? void *isr_priv)
->>>> +{
->>>> + ? ? ? struct device *dev;
->>>> + ? ? ? struct iommu *obj;
->>>> +
->>>
->>> if the driver support multiple user for the same iommu why can only
->>> one callback be registered? should it support register multiple
->>> callback function (one per user)?
->>
->> Can you define a scenario for that?
->> On OMAP3 ISP the multiple users are the multiple ISP submodule, but I
->> don't think it's necessary all submodule to have a specific callback.
->> ISP core layer should handle.
->
-> Hi,
->
-> In OMAP4 the cortex M3 is a double core processor and as each core is
-> running they own version of the RTOS we threat them independently. So
-> our driver which controls the remote processor sees two processor but
-> both use the same iommu hw. When a iommu fault happens, at this
-> moment, it is consider as a faltal error and it is no managed to
-> recover and continue, instead a restart of the processor is needed, if
-> the fault happens in core0 we need to reset core1 too and vice versa.
-> if the iommu would support several user callbacks, we can register the
-> callback which resets core0 and also the callback which resets core1
-> and treat them as totally independent processors. Also we have an
-> error event notifier driver, which is only in charge of notifying
-> error events to userspace, so we would have multiple callbacks we
-> could do this
+On Thu, Feb 24, 2011 at 12:41:38AM +0530, Santosh Shilimkar wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Thursday, February 24, 2011 12:33 AM
+> > To: Santosh Shilimkar
+> > Cc: linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
+> > kernel at lists.infradead.org; tony at atomide.com; David Brown; Daniel
+> > Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm; Colin
+> > Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
+> > Subject: Re: [PATCH 1/5] ARM: smp: Select local timers vs
+> > dummytimersupportruntime
+> >
+> > On Wed, Feb 23, 2011 at 11:28:11PM +0530, Santosh Shilimkar wrote:
+> > > Patch 6759/1 and patch 6760/1 in patch system
+> >
+> > Was there any difference between 6760 and 6753 ?
+> Nope.
+> I just rebased them together and pushed
 
-I understood your point. In this case, I may not disagree about having
-more than one callback per obj, although it doesn't seem a nice
-scenario.
-We can have a list of callbacks and call the entire list when a fault
-happens. But it's necessary to pay attention it will happen in atomic
-context and users should not abuse and register many callbacks. The
-callback should *NOT* print useless messages and must verify the error
-code to not execute useless steps.
-In this context, callback and ISR cannot share a same pointer anymore.
+Well, both patches are identical, so I'll stick with 6753/1 which I've
+already merged.
 
->
-> iommu <---- register fault callback for error notify driver
->
-> instead of
->
-> iommu <--- register fault callback for remote processor driver
-> <----register fault event for error notify driver.
->
-> with that, we remove one dependency of the errornotify driver.
-
-I don't know very well the errornotify driver, but to bypass it seems
-be a good approach for me.
-
->
-> Moreover, the iommu code support serveral users of the same hw iommu,
-> and it does not make sense for me, that you can register only one
-> callback, or if other user register its callback the previous one will
-> be overwritten.
-
-It's quite complex and dangerous this situation, as one driver can
-crash another one. But I don't think drivers have much choice.
-
-Hiroshi, do you have any different opinion for this subject? I can
-send a v4 version for this patch giving support for multiple callbacks
-per obj.
-
-Br,
-
-David
-
->
-> Regards,
-> Fernando.
->
->>
->> Br,
->>
->> David
->>
->>>
->>> Regards,
->>> Fernando.
->>>
->>
->
+Thanks
