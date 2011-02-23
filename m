@@ -1,46 +1,120 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Feb 2011 10:21:40 +0000
-Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <20110223100547.GG29559@n2100.arm.linux.org.uk>
-References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
-	<1298433701.23371.236.camel@vkoul-udesk3>
-	<20110223055709.GC20346@S2100-06.ap.freescale.net>
-	<1298440516.23371.258.camel@vkoul-udesk3>
-	<20110223100547.GG29559@n2100.arm.linux.org.uk>
-Message-ID: <20110223102140.GH29559@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Feb 2011 19:23:33 +0900
+Subject: [PATCH 1/2] ARM: S5PC110: disable unused power regulators on Goni
+	board
+In-Reply-To: <1297760784-8486-2-git-send-email-m.szyprowski@samsung.com>
+References: <1297760784-8486-1-git-send-email-m.szyprowski@samsung.com>
+	<1297760784-8486-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <01f301cbd343$d0af4c90$720de5b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 10:05:47AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 23, 2011 at 11:25:16AM +0530, Koul, Vinod wrote:
-> > Well in that case you are calling the callback from irq handler which is
-> > not so good. The tasklet is other extreme (slow).
+Marek Szyprowski wrote:
 > 
-> tasklets are run on the exit path of interrupts.
+> A lot of power regulator has been enabled by default causing the board
+> to consume a lot of power. This patch fixes this issue.
 > 
-> > Given that this is
-> > also intended for audio I am not sure if calling period elapsed from
-> > tasklet callback will not cause any audio over/underruns, last I tried
-> > it used to break quite often in stressed situations.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-s5pv210/mach-goni.c |   10 +---------
+>  1 files changed, 1 insertions(+), 9 deletions(-)
 > 
-> Nevertheless, the DMA engine API specifies that callbacks shall be called
-> from tasklet context.
+> diff --git a/arch/arm/mach-s5pv210/mach-goni.c
+b/arch/arm/mach-s5pv210/mach-
+> goni.c
+> index 43c1c1b..10f754b 100644
+> --- a/arch/arm/mach-s5pv210/mach-goni.c
+> +++ b/arch/arm/mach-s5pv210/mach-goni.c
+> @@ -292,7 +292,6 @@ static struct regulator_init_data goni_ldo3_data = {
+>  		.min_uV		= 1100000,
+>  		.max_uV		= 1100000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -311,6 +310,7 @@ static struct regulator_init_data goni_ldo5_data = {
+>  		.min_uV		= 2800000,
+>  		.max_uV		= 2800000,
+>  		.apply_uV	= 1,
+> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+>  	},
+>  	.num_consumer_supplies = ARRAY_SIZE(goni_ldo5_consumers),
+>  	.consumer_supplies = goni_ldo5_consumers,
+> @@ -341,7 +341,6 @@ static struct regulator_init_data goni_ldo8_data = {
+>  		.min_uV		= 3300000,
+>  		.max_uV		= 3300000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -351,7 +350,6 @@ static struct regulator_init_data goni_ldo9_data = {
+>  		.min_uV		= 2800000,
+>  		.max_uV		= 2800000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -371,7 +369,6 @@ static struct regulator_init_data goni_ldo11_data = {
+>  		.min_uV		= 2800000,
+>  		.max_uV		= 2800000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -381,7 +378,6 @@ static struct regulator_init_data goni_ldo12_data = {
+>  		.min_uV		= 1200000,
+>  		.max_uV		= 1200000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -391,7 +387,6 @@ static struct regulator_init_data goni_ldo13_data = {
+>  		.min_uV		= 2800000,
+>  		.max_uV		= 2800000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -401,7 +396,6 @@ static struct regulator_init_data goni_ldo14_data = {
+>  		.min_uV		= 1800000,
+>  		.max_uV		= 1800000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -411,7 +405,6 @@ static struct regulator_init_data goni_ldo15_data = {
+>  		.min_uV		= 3300000,
+>  		.max_uV		= 3300000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> @@ -421,7 +414,6 @@ static struct regulator_init_data goni_ldo16_data = {
+>  		.min_uV		= 1800000,
+>  		.max_uV		= 1800000,
+>  		.apply_uV	= 1,
+> -		.always_on	= 1,
+>  	},
+>  };
+> 
+> --
 
-Note also that the DMA engine API is supposed to work as follows:
+Ok...will apply this.
+And how about "mach-aquila.c"?
 
-1. You submit DMA jobs to it.
-2. The DMA engine starts the first job
-3. When the first job is complete, it retires it to a retired list and
-   marks the tasklet to run
-4. If there is another job waiting, the DMA engine starts the next job
-5. Repeat 3 until no further jobs are queued
+Thanks.
 
-The tasklet then processes the list of retired jobs, cleaning them
-up and calling their callbacks. 
-
-So the way to efficiently handle audio is to initially submit several
-'period' sized buffers for the DMA engine.  As each buffer completes,
-you call snd_pcm_elapsed() to tell ALSA that a period has finished
-and submit the next buffer.  As there's always several buffers submitted,
-the DMA engine never waits for the callback to complete.  And ALSA is
-capable of handling latency in snd_pcm_elapsed().
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
