@@ -1,127 +1,35 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 23 Feb 2011 13:44:11 -0500
-Subject: [PATCH v4 4/4] davinci: add spi devices support for
-	da830/omap-l137/am17x evm
-In-Reply-To: <1298486651-18882-1-git-send-email-michael.williamson@criticallink.com>
-References: <1298486651-18882-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <1298486651-18882-5-git-send-email-michael.williamson@criticallink.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 23 Feb 2011 11:58:47 -0700
+Subject: [PATCH 0/5] ARM: Tegra: Harmony: Enable audio driver
+Message-ID: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sekhar Nori <nsekhar@ti.com>
+This patchset enables the audio driver for Tegra Harmony.
 
-This patch adds the on-board SPI flash device to the
-DA830/OMAP-L137/AM17x EVM. It also registers the SPI flash
-device to the MTD subsystem.
+Important notes:
+* This series is based on Olof's recently posted boards-for-next branch.
+  Some patches won't apply without that being in first.
+* The final patch in the series depends on header adds/edits that are not
+  in Tegra's for-next branch
 
-Based on SPI flash device support for MityDSP-L138F platform.
+See notes in the individual patches for further details.
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-[michael.williamson at criticallink.com: moved da830evm_spi0_pdata to devices-da8xx.c]
-[michael.williamson at criticallink.com: moved da830evm_init_spi0 to devices-da8xx.c]
-Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
----
- arch/arm/mach-davinci/board-da830-evm.c |   67 +++++++++++++++++++++++++++++++
- 1 files changed, 67 insertions(+), 0 deletions(-)
+Stephen Warren (5):
+  ARM: Tegra: Add devices.c entries for audio
+  ARM: Tegra: Rename I2S clocks to match driver name
+  ARM: Tegra: Rename clk_dev1/2 to cdev1/2
+  ARM: Tegra: Create defines for GPIO names
+  ARM: Tegra: Enable Harmony audio support
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index b52a3a1..8bc3701 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -20,6 +20,8 @@
- #include <linux/i2c/at24.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/spi/spi.h>
-+#include <linux/spi/flash.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -30,6 +32,7 @@
- #include <mach/da8xx.h>
- #include <mach/usb.h>
- #include <mach/aemif.h>
-+#include <mach/spi.h>
- 
- #define DA830_EVM_PHY_ID		""
- /*
-@@ -534,6 +537,64 @@ static struct edma_rsv_info da830_edma_rsv[] = {
- 	},
- };
- 
-+static struct mtd_partition da830evm_spiflash_part[] = {
-+	[0] = {
-+		.name = "DSP-UBL",
-+		.offset = 0,
-+		.size = SZ_8K,
-+		.mask_flags = MTD_WRITEABLE,
-+	},
-+	[1] = {
-+		.name = "ARM-UBL",
-+		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_16K + SZ_8K,
-+		.mask_flags = MTD_WRITEABLE,
-+	},
-+	[2] = {
-+		.name = "U-Boot",
-+		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_256K - SZ_32K,
-+		.mask_flags = MTD_WRITEABLE,
-+	},
-+	[3] = {
-+		.name = "U-Boot-Environment",
-+		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_16K,
-+		.mask_flags = 0,
-+	},
-+	[4] = {
-+		.name = "Kernel",
-+		.offset = MTDPART_OFS_APPEND,
-+		.size = MTDPART_SIZ_FULL,
-+		.mask_flags = 0,
-+	},
-+};
-+
-+static struct flash_platform_data da830evm_spiflash_data = {
-+	.name		= "m25p80",
-+	.parts		= da830evm_spiflash_part,
-+	.nr_parts	= ARRAY_SIZE(da830evm_spiflash_part),
-+	.type		= "w25x32",
-+};
-+
-+static struct davinci_spi_config da830evm_spiflash_cfg = {
-+	.io_type	= SPI_IO_TYPE_DMA,
-+	.c2tdelay	= 8,
-+	.t2cdelay	= 8,
-+};
-+
-+static struct spi_board_info da830evm_spi_info[] = {
-+	{
-+		.modalias		= "m25p80",
-+		.platform_data		= &da830evm_spiflash_data,
-+		.controller_data	= &da830evm_spiflash_cfg,
-+		.mode			= SPI_MODE_0,
-+		.max_speed_hz		= 30000000,
-+		.bus_num		= 0,
-+		.chip_select		= 0,
-+	},
-+};
-+
- static __init void da830_evm_init(void)
- {
- 	struct davinci_soc_info *soc_info = &davinci_soc_info;
-@@ -590,6 +651,12 @@ static __init void da830_evm_init(void)
- 	ret = da8xx_register_rtc();
- 	if (ret)
- 		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
-+
-+	ret = da8xx_register_spi(0, da830evm_spi_info,
-+				 ARRAY_SIZE(da830evm_spi_info));
-+	if (ret)
-+		pr_warning("da830_evm_init: spi 0 registration failed: %d\n",
-+			   ret);
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
--- 
-1.7.0.4
+ arch/arm/mach-tegra/board-harmony-pinmux.c  |   28 ++++++-----
+ arch/arm/mach-tegra/board-harmony.c         |   70 ++++++++++++++++++++++++--
+ arch/arm/mach-tegra/board-harmony.h         |   14 +++++
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   10 ++--
+ arch/arm/mach-tegra/board-seaboard.c        |    6 +-
+ arch/arm/mach-tegra/board-seaboard.h        |    3 +
+ arch/arm/mach-tegra/devices.c               |   70 +++++++++++++++++++++++++++
+ arch/arm/mach-tegra/devices.h               |    4 ++
+ arch/arm/mach-tegra/include/mach/iomap.h    |    3 +
+ arch/arm/mach-tegra/tegra2_clocks.c         |   16 +++---
+ 10 files changed, 190 insertions(+), 34 deletions(-)
