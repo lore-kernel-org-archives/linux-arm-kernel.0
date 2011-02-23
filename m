@@ -1,114 +1,56 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Feb 2011 13:06:42 -0700
-Subject: [PATCH v2] ARM: Tegra: DMA: Fail safe if initialization fails
-Message-ID: <1298491602-20072-1-git-send-email-swarren@nvidia.com>
+From: sakari.ailus@maxwell.research.nokia.com (Sakari Ailus)
+Date: Wed, 23 Feb 2011 22:09:05 +0200
+Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
+	handling
+In-Reply-To: <AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
+References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>	<1297884951-3019-3-git-send-email-dacohen@gmail.com>	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
+	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
+Message-ID: <4D656961.7080105@maxwell.research.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra_dma_init currently simply bails out early if any initialization fails.
-This skips various data-structure initialization. In turn, this means that
-tegra_dma_allocate_channel can still hand out channels. In this case, when
-tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
-on ch->list will OOPS since the list's next/prev pointers may still be
-NULL.
+Guzman Lugo, Fernando wrote:
+> Hi,
 
-To solve this, add an explicit "initialized" flag, only set this once _init
-has fully completed successfully, and have _allocate_channel refuse to hand
-out channels if this is not set.
+Hi Fernando,
 
-While at it, simplify _init:
-* Remove redundant memsets
-* Use bitmap_fill to mark all channels as in-use up-front, and remove
-  some now-redundant bitmap initialization loops.
-* Only mark a channel as free once all channel-related initialization has
-  completed.
+> In OMAP4 the cortex M3 is a double core processor and as each core is
+> running they own version of the RTOS we threat them independently. So
+> our driver which controls the remote processor sees two processor but
+> both use the same iommu hw. When a iommu fault happens, at this
+> moment, it is consider as a faltal error and it is no managed to
+> recover and continue, instead a restart of the processor is needed, if
+> the fault happens in core0 we need to reset core1 too and vice versa.
+> if the iommu would support several user callbacks, we can register the
+> callback which resets core0 and also the callback which resets core1
+> and treat them as totally independent processors. Also we have an
+> error event notifier driver, which is only in charge of notifying
+> error events to userspace, so we would have multiple callbacks we
+> could do this
 
-Finally, the successful exit path from _init always has ret==0, so just
-hard-code that return. The error path still returns ret.
+The original purpose of the patch, as far as I understand, is to allow
+getting useful information for debugging purposes should an iommu fault
+happen.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v2:
-* Added explicit initialized flag. I chose not to re-use the shared-channel
-  bitmap entry for this purpose, since that bit needs to be marked in-use
-  so that the non-shared-channel path doesn't hand out that channel.
-* Removed redundant memsets
-* Use bitmap_fill instead of a loop
-* Hard-code success return value
+Also, I'm not sure it's necessarily a good idea to just go and reset
+the M3 cores in case an iommu fault happens --- this is very probably a
+grave bug in the software running on those M3s. It should be fixed
+instead of just hiding it. There will be consequences to host side as
+well, won't there?
 
- arch/arm/mach-tegra/dma.c |   23 ++++++++++-------------
- 1 files changed, 10 insertions(+), 13 deletions(-)
+> iommu <---- register fault callback for error notify driver
+> 
+> instead of
+> 
+> iommu <--- register fault callback for remote processor driver
+> <----register fault event for error notify driver.
+> 
+> with that, we remove one dependency of the errornotify driver.
 
-diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-index bd4f62a..01db832 100644
---- a/arch/arm/mach-tegra/dma.c
-+++ b/arch/arm/mach-tegra/dma.c
-@@ -127,8 +127,8 @@ struct tegra_dma_channel {
- 
- #define  NV_DMA_MAX_CHANNELS  32
- 
-+static int initialized;
- static DEFINE_MUTEX(tegra_dma_lock);
--
- static DECLARE_BITMAP(channel_usage, NV_DMA_MAX_CHANNELS);
- static struct tegra_dma_channel dma_channels[NV_DMA_MAX_CHANNELS];
- 
-@@ -352,6 +352,9 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
- 	int channel;
- 	struct tegra_dma_channel *ch = NULL;
- 
-+	if (!initialized)
-+		return NULL;
-+
- 	mutex_lock(&tegra_dma_lock);
- 
- 	/* first channel is the shared channel */
-@@ -678,6 +681,8 @@ int __init tegra_dma_init(void)
- 	void __iomem *addr;
- 	struct clk *c;
- 
-+	bitmap_fill(channel_usage, NV_DMA_MAX_CHANNELS);
-+
- 	c = clk_get_sys("tegra-dma", NULL);
- 	if (IS_ERR(c)) {
- 		pr_err("Unable to get clock for APB DMA\n");
-@@ -696,18 +701,9 @@ int __init tegra_dma_init(void)
- 	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
- 	       addr + APB_DMA_IRQ_MASK_SET);
- 
--	memset(channel_usage, 0, sizeof(channel_usage));
--	memset(dma_channels, 0, sizeof(dma_channels));
--
--	/* Reserve all the channels we are not supposed to touch */
--	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_MIN; i++)
--		__set_bit(i, channel_usage);
--
- 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
- 		struct tegra_dma_channel *ch = &dma_channels[i];
- 
--		__clear_bit(i, channel_usage);
--
- 		ch->id = i;
- 		snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
- 
-@@ -726,14 +722,15 @@ int __init tegra_dma_init(void)
- 			goto fail;
- 		}
- 		ch->irq = irq;
-+
-+		__clear_bit(i, channel_usage);
- 	}
- 	/* mark the shared channel allocated */
- 	__set_bit(TEGRA_SYSTEM_DMA_CH_MIN, channel_usage);
- 
--	for (i = TEGRA_SYSTEM_DMA_CH_MAX+1; i < NV_DMA_MAX_CHANNELS; i++)
--		__set_bit(i, channel_usage);
-+	initialized = 1;
- 
--	return ret;
-+	return 0;
- fail:
- 	writel(0, addr + APB_DMA_GEN);
- 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
+I suppose this is not in mainline?
+
+Regards,
+
 -- 
-1.7.1
+Sakari Ailus
+sakari.ailus at maxwell.research.nokia.com
