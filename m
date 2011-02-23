@@ -1,99 +1,44 @@
-From: sakari.ailus@maxwell.research.nokia.com (Sakari Ailus)
-Date: Wed, 23 Feb 2011 22:56:48 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <AANLkTi=+rzHDB_hGzGtZKNZB02z4v65GAD-87zVpOdni@mail.gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>	<1297884951-3019-3-git-send-email-dacohen@gmail.com>	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-	<AANLkTi=+rzHDB_hGzGtZKNZB02z4v65GAD-87zVpOdni@mail.gmail.com>
-Message-ID: <4D657490.20504@maxwell.research.nokia.com>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 23 Feb 2011 12:58:18 -0800
+Subject: [PATCH 4/5] ARM: Tegra: Create defines for GPIO names
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF03112A5D63@HQMAIL01.nvidia.com>
+References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
+	<1298487532-5000-5-git-send-email-swarren@nvidia.com>
+	<AANLkTinPssv8Wpy0Qe5GAHqN=9dicSLZ8sUmq+JeW2_q@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF03112A5D59@HQMAIL01.nvidia.com>
+	<AANLkTimgB3CZmiVXR9MYTEOXk9uSok12vcVaTTx1tn2M@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF03112A5D63@HQMAIL01.nvidia.com>
+Message-ID: <AANLkTinApR8pYRoz526y7XV0bKWq22LOyQpt3gz61ZHt@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Cohen wrote:
-> On Wed, Feb 23, 2011 at 3:39 PM, Guzman Lugo, Fernando
-> <fernando.lugo@ti.com> wrote:
->> On Wed, Feb 23, 2011 at 3:45 AM, David Cohen <dacohen@gmail.com> wrote:
->>> On Wed, Feb 23, 2011 at 3:17 AM, Guzman Lugo, Fernando
->>> <fernando.lugo@ti.com> wrote:
->>>> On Wed, Feb 16, 2011 at 1:35 PM, David Cohen <dacohen@gmail.com> wrote:
->>>>> Add support to register an isr for IOMMU fault situations and adapt it
->>>>> to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
->>>>> module might want to be informed when errors happen in order to debug it
->>>>> or react.
->>>>>
->>>>> Signed-off-by: David Cohen <dacohen@gmail.com>
->>>>> ---
->>>>>  arch/arm/mach-omap2/iommu2.c            |   17 +++++++++-
->>>>>  arch/arm/plat-omap/include/plat/iommu.h |   14 ++++++++-
->>>>>  arch/arm/plat-omap/iommu.c              |   52 ++++++++++++++++++++++---------
->>>>>  3 files changed, 65 insertions(+), 18 deletions(-)
->>>>>
->>>> ....
->>>>
->>>>> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
->>>>>  }
->>>>>  EXPORT_SYMBOL_GPL(iommu_put);
->>>>>
->>>>> +int iommu_set_isr(const char *name,
->>>>> +                 int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
->>>>> +                            void *priv),
->>>>> +                 void *isr_priv)
->>>>> +{
->>>>> +       struct device *dev;
->>>>> +       struct iommu *obj;
->>>>> +
->>>>
->>>> if the driver support multiple user for the same iommu why can only
->>>> one callback be registered? should it support register multiple
->>>> callback function (one per user)?
->>>
->>> Can you define a scenario for that?
->>> On OMAP3 ISP the multiple users are the multiple ISP submodule, but I
->>> don't think it's necessary all submodule to have a specific callback.
->>> ISP core layer should handle.
+On Wed, Feb 23, 2011 at 12:49 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Colin Cross wrote at Wednesday, February 23, 2011 1:39 PM:
 >>
->> Hi,
+>> On Wed, Feb 23, 2011 at 12:35 PM, Stephen Warren <swarren@nvidia.com> wrote:
+>> > Colin Cross wrote at Wednesday, February 23, 2011 12:09 PM:
+>> >> On Wed, Feb 23, 2011 at 10:58 AM, Stephen Warren <swarren@nvidia.com> wrote:
+>> >> > This ensures they're kept in sync between platform_data definitions and
+>> >> > the GPIO table initialization.
+>> >>
+>> >> Can you name these for what they are used for (if they have a single use)?
+>> >> i.e. TEGRA_GPIO_EMMC_CD instead of TEGRA_GPIO_SD2_CD
+>> >
+>> > Are you looking for correlation with the schematics, or something else;
+>>...
 >>
->> In OMAP4 the cortex M3 is a double core processor and as each core is
->> running they own version of the RTOS we threat them independently. So
->> our driver which controls the remote processor sees two processor but
->> both use the same iommu hw. When a iommu fault happens, at this
->> moment, it is consider as a faltal error and it is no managed to
->> recover and continue, instead a restart of the processor is needed, if
->> the fault happens in core0 we need to reset core1 too and vice versa.
->> if the iommu would support several user callbacks, we can register the
->> callback which resets core0 and also the callback which resets core1
->> and treat them as totally independent processors. Also we have an
->> error event notifier driver, which is only in charge of notifying
->> error events to userspace, so we would have multiple callbacks we
->> could do this
-> 
-> I understood your point. In this case, I may not disagree about having
-> more than one callback per obj, although it doesn't seem a nice
-> scenario.
-> We can have a list of callbacks and call the entire list when a fault
-> happens. But it's necessary to pay attention it will happen in atomic
-> context and users should not abuse and register many callbacks. The
-> callback should *NOT* print useless messages and must verify the error
-> code to not execute useless steps.
-> In this context, callback and ISR cannot share a same pointer anymore.
+>> I meant use the name of the device they are connected to (if there is
+>> one). ?By EMMC I meant the embedded MMC storage device. ?The gpio is
+>> not notable because it is used by the SDIO driver for port 2, it is
+>> notable because it is connected to the EMMC chip or the wifi chip or a
+>> card slot.
+>
+> The GPIOs currently in the code are for SD slots/connectors; we don't have
+> any GPIO definitions for any internal MMC memory, or WiFi chips.
+>
+> I guess the numbering could be changed; 2 vs. 4 don't very obviously map to
+> the slots on the board for the user, yet the only thing better I can think
+> of would be the connector numbers on the silkscreen?
 
-I think this is outside of the scope of the patch but...
-
-To efficiently debug iommu faults (with a driver using iommu page
-walking), besides the actual fault address the list of existing mappings
-and the information which driver created them and for which purpose is
-useful.
-
-The list of mappings is already available in the iommu structure. It'd
-be nice if there was a function a driver could call to print them.
-
-I can only think of ugly ways to implement the other.
-
-Just my 5 cents (as we have no 2 cent coins here).
-
-Regards,
-
--- 
-Sakari Ailus
-sakari.ailus at maxwell.research.nokia.com
+If they are just general-purpose slots, the existing naming is fine.
+Acked-by: Colin Cross <ccross@android.com>
