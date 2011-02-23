@@ -1,44 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 22 Feb 2011 22:21:21 -0500 (EST)
-Subject: [PATCH] msm: add single-wire serial bus interface (SSBI) driver
-In-Reply-To: <8ya8vx7jvqh.fsf@huya.qualcomm.com>
-References: <1297989299-27320-1-git-send-email-kheitke@codeaurora.org>
-	<1297989432.9680.50.camel@c-dwalke-linux.qualcomm.com>
-	<4D5DC289.1090004@codeaurora.org>
-	<1298054771.17758.1.camel@c-dwalke-linux.qualcomm.com>
-	<AANLkTi=0Pxg09x8DdVDVy9Ur7r1dgB+4LM3q0hM4_8Rg@mail.gmail.com>
-	<1298419839.17118.5.camel@m0nster> <8ya62sbli3z.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1102222049410.22028@xanadu.home>
-	<8ya8vx7jvqh.fsf@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1102222209350.22028@xanadu.home>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 23 Feb 2011 11:28:57 +0800
+Subject: [PATCH 2/2] ARM i.MX23/28: Add framebuffer device support
+In-Reply-To: <20110221141842.GP24426@pengutronix.de>
+References: <1297850199-1688-1-git-send-email-s.hauer@pengutronix.de>
+	<1297850199-1688-3-git-send-email-s.hauer@pengutronix.de>
+	<20110218061440.GA18085@S2100-06.ap.freescale.net>
+	<20110218084625.GF24426@pengutronix.de>
+	<20110218091717.GD18085@S2100-06.ap.freescale.net>
+	<20110218092650.GH24426@pengutronix.de>
+	<20110218093622.GE18085@S2100-06.ap.freescale.net>
+	<20110221141842.GP24426@pengutronix.de>
+Message-ID: <20110223032856.GB20346@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Feb 2011, David Brown wrote:
+Hi Sascha,
 
-> On Tue, Feb 22 2011, Nicolas Pitre wrote:
+On Mon, Feb 21, 2011 at 03:18:42PM +0100, Sascha Hauer wrote:
+> On Fri, Feb 18, 2011 at 05:36:23PM +0800, Shawn Guo wrote:
+> > On Fri, Feb 18, 2011 at 10:26:50AM +0100, Sascha Hauer wrote:
+> > > On Fri, Feb 18, 2011 at 05:17:18PM +0800, Shawn Guo wrote:
+> > > > > > I understand that "mxsfb" was picked up for the device name to
+> > > > > > reflect the driver name.  But since this is the device under mach- mxs
+> > > > > > folder, can we simply call it "fb" just like the way you name fb.h?
+> > > > > > 
+> > > > > > In this way, we have all mxs platform device naming schema aligned,
+> > > > > > auart, duart, dma, fb, fec, flexcan, mmc ...
+> > > > > 
+> > > > > I see it the other way round. mach/fb.h is too generic, I would prefer
+> > > > > mach/mxsfb.h to be able to add support for a different framebuffer
+> > > > > later. So I better change fb.h to mxsfb.h.
+> > > > > 
+> > > > I'm fine with either way, but just wondering what kind of fb later
+> > > > it is and its naming, relatively to mxsfs.
+> > > 
+> > > IPU...?
+> > > 
+> > AFAICT, this is something that never going to happen.
 > 
-> > And if someone else comes up with a SSBI interface, then it will be much 
-> > easier to notice the already existing driver if it is in the driver 
-> > directory rather than somewhere else in some unrelated (from that 
-> > person's pov) obscure directory.
+> Just the first thing that came to my mind. It could also be the lcd
+> controller known from i.MX1/2
 > 
-> Well, I'm fairly sure that nobody would be making an SSBI interface, but
-> point taken.
+What about only having one pair fb.h/platform-fb.c to accommodate all
+possible framebuffer driver stuff there with appropriate name-space 
+added for definitions inside the files?  Less files, and some common
+definitions and functions can be consolidated inside the file.
 
-It's not necessarily the SSBI interface per se that is interesting to 
-other people, but rather the fact that the code driving it might be 
-relying upon generic kernel infrastructure, such as driver or bus 
-registration, interrupt requests, resource allocation, etc.
-
-> So what kinds of things constitute drivers versus arch-specific code?
-> Currently, iommu drivers seem to be sprinkled throughout arch.
-
-Yes, and so are clock source and clock event "drivers".  Some things 
-fall into a gray area and this is not always clear what the proper 
-location is for them.  But as a rule of thumb you should follow what 
-most other people did, and if there is no example to follow then just go 
-with drivers/msm/ by default which should be a pretty safe bet.
-
-
-Nicolas
+-- 
+Regards,
+Shawn
