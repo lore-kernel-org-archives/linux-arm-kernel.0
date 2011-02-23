@@ -1,91 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 23 Feb 2011 10:12:07 +0100
-Subject: [PATCH 0/5] my imx patches for 2.6.39
-In-Reply-To: <20110218213022.GJ22310@pengutronix.de>
-References: <20110218213022.GJ22310@pengutronix.de>
-Message-ID: <20110223091207.GP22310@pengutronix.de>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 23 Feb 2011 14:43:30 +0530
+Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+	hwmod	right before timer init
+In-Reply-To: <20110223071153.5874.58923.stgit@twilight.localdomain>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<20110223071153.5874.58923.stgit@twilight.localdomain>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037A095471@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello 
-On Fri, Feb 18, 2011 at 10:30:22PM +0100, Uwe Kleine-K?nig wrote:
-> apart from the patches below there is another patch not yet applied.
-> That's "mxs: irq_data conversion" that was already sent on this list.
-> Because I assumed that it belongs to Russells domain I sent it to the
-> patch system as
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6744/1
-> .  If you prefer, I can add it to this series; just tell me.
-Russell asked Sascha to ack this patch, so I assume it will not go via
-Sascha.
- 
-I found another patch that should be added to .39:
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Wednesday, February 23, 2011 12:42 PM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Tony Lindgren; Hilman, Kevin; Shilimkar, Santosh; Cousson, Benoit
+> Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+> hwmod right before timer init
+I am not able to apply this patch.
+Patch 1-7 applied successfully on top of:
+04aa67d  Merge branch 'for-tony' of git://gitorious.org/usb/usb into omap-for-linus
 
-Uwe Kleine-K?nig (1):
-      ARM: mx51_defconfig: enable various options
-
-Will send this in reply to this mail.
-
-> The following changes since commit b807afe41ceefef11a0d965cd9970142afc53d25:
+--
+Tarun
 > 
->   ARM: imx50: correct iomux-mx50.h wrong daisy chain settings (2011-02-18 11:01:34 +0100)
+> Late-initialize the GPTIMER hwmod used for the clockevent source
+> immediately
+> before it is used.  This avoids the need to late-initialize all of the
+> hwmods
+> until the boot process is further along.  (In general, we want to defer
+> as much as possible until late in the boot process.)
 > 
-> are available in the git repository at:
->   git://git.pengutronix.de/git/ukl/linux-2.6.git imx-for-2.6.39
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer-gp.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
 > 
-> Lothar Wa?mann (2):
->       ARM: mxs: free dma_mask in error path
->       ARM: mxs: add a dma mask to fec devices
+> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-
+> gp.c
+> index 0fc550e..a4e51a2 100644
+> --- a/arch/arm/mach-omap2/timer-gp.c
+> +++ b/arch/arm/mach-omap2/timer-gp.c
+> @@ -40,10 +40,11 @@
+>  #include <plat/dmtimer.h>
+>  #include <asm/localtimer.h>
+>  #include <asm/sched_clock.h>
+> +#include <plat/common.h>
 > 
-> Sascha Hauer (1):
->       ARM: mxs: Add pwm clocks and device registration
+>  #include "timer-gp.h"
+> +#include <plat/omap_hwmod.h>
 > 
-> Uwe Kleine-K?nig (2):
->       ARM: mxc: free dma_mask in error path
->       ARM: mxc: add a dma mask to fec devices
+> -#include <plat/common.h>
 > 
->  arch/arm/mach-mxs/Kconfig                       |    2 ++
->  arch/arm/mach-mxs/clock-mx23.c                  |    6 +++++-
->  arch/arm/mach-mxs/clock-mx28.c                  |    9 ++++++++-
->  arch/arm/mach-mxs/devices-mx23.h                |    2 ++
->  arch/arm/mach-mxs/devices-mx28.h                |    2 ++
->  arch/arm/mach-mxs/devices.c                     |    2 ++
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +++
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-fec.c        |    5 +++--
->  arch/arm/mach-mxs/devices/platform-mxs-pwm.c    |   22 ++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/devices-common.h |    4 ++++
->  arch/arm/plat-mxc/devices.c                     |    2 ++
->  arch/arm/plat-mxc/devices/platform-fec.c        |    4 ++--
->  13 files changed, 58 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-pwm.c
-
-The new diffstat is:
-
- arch/arm/configs/mx51_defconfig                 |   53 +++++++++++++++++++----
- arch/arm/mach-mxs/Kconfig                       |    2 +
- arch/arm/mach-mxs/clock-mx23.c                  |    6 ++-
- arch/arm/mach-mxs/clock-mx28.c                  |    9 +++-
- arch/arm/mach-mxs/devices-mx23.h                |    2 +
- arch/arm/mach-mxs/devices-mx28.h                |    2 +
- arch/arm/mach-mxs/devices.c                     |    2 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-fec.c        |    5 +-
- arch/arm/mach-mxs/devices/platform-mxs-pwm.c    |   22 +++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h |    4 ++
- arch/arm/plat-mxc/devices.c                     |    2 +
- arch/arm/plat-mxc/devices/platform-fec.c        |    4 +-
- 14 files changed, 102 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-pwm.c
-
-(only arch/arm/configs/mx51_defconfig added and a different scale for the other
-lines)
-
-Sascha, I hope that's OK for you.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+>  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+>  #define MAX_GPTIMER_ID		12
+> @@ -133,9 +134,13 @@ static void __init omap2_gp_clockevent_init(void)
+>  {
+>  	u32 tick_rate;
+>  	int src;
+> +	const char *clockevent_hwmod_name;
+> 
+>  	inited = 1;
+> 
+> +	clockevent_hwmod_name = (gptimer_id == 12) ? "timer12" : "timer1";
+> +	omap_hwmod_late_init_one(clockevent_hwmod_name);
+> +
+>  	gptimer = omap_dm_timer_request_specific(gptimer_id);
+>  	BUG_ON(gptimer == NULL);
+>  	gptimer_wakeup = gptimer;
+> @@ -250,6 +255,7 @@ static void __init omap2_gp_timer_init(void)
+>  		BUG_ON(!twd_base);
+>  	}
+>  #endif
+> +
+>  	omap_dm_timer_init();
+> 
+>  	omap2_gp_clockevent_init();
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
