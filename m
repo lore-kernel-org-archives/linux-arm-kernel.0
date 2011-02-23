@@ -1,137 +1,69 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 22 Feb 2011 19:22:39 -0700
-Subject: [PATCH v4 7/7] dt: add documentation of ARM dt boot interface
-In-Reply-To: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
-References: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
-Message-ID: <20110223022239.18318.87333.stgit@localhost6.localdomain6>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 22 Feb 2011 21:37:28 -0500 (EST)
+Subject: [PATCH] msm: add single-wire serial bus interface (SSBI) driver
+In-Reply-To: <8ya62sbli3z.fsf@huya.qualcomm.com>
+References: <1297989299-27320-1-git-send-email-kheitke@codeaurora.org>
+	<1297989432.9680.50.camel@c-dwalke-linux.qualcomm.com>
+	<4D5DC289.1090004@codeaurora.org>
+	<1298054771.17758.1.camel@c-dwalke-linux.qualcomm.com>
+	<AANLkTi=0Pxg09x8DdVDVy9Ur7r1dgB+4LM3q0hM4_8Rg@mail.gmail.com>
+	<1298419839.17118.5.camel@m0nster> <8ya62sbli3z.fsf@huya.qualcomm.com>
+Message-ID: <alpine.LFD.2.00.1102222049410.22028@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v3: added details to Documentation/arm/Booting
+On Tue, 22 Feb 2011, David Brown wrote:
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- Documentation/arm/Booting                       |   33 +++++++++++++++++--
- Documentation/devicetree/booting-without-of.txt |   40 +++++++++++++++++++++++
- 2 files changed, 69 insertions(+), 4 deletions(-)
+> On Tue, Feb 22 2011, Daniel Walker wrote:
+> 
+> > On Tue, 2011-02-22 at 12:47 -0800, Dima Zavin wrote:
+> >
+> >> What is the problem leaving it under arch/arm/mach-msm?
+> >
+> > Because it's a driver.
+> 
+> There are a lot of other drivers currently under various arch
+> subsystems.  
 
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index 7685029..4e686a2 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -65,13 +65,19 @@ looks at the connected hardware is beyond the scope of this document.
- The boot loader must ultimately be able to provide a MACH_TYPE_xxx
- value to the kernel. (see linux/arch/arm/tools/mach-types).
- 
--
--4. Setup the kernel tagged list
---------------------------------
-+4. Setup boot data
-+------------------
- 
- Existing boot loaders:		OPTIONAL, HIGHLY RECOMMENDED
- New boot loaders:		MANDATORY
- 
-+The boot loader must provide either a tagged list or a dtb image for
-+passing configuration data to the kernel.  The physical address of the
-+boot data is passed to the kernel in register r2.
-+
-+4a. Setup the kernel tagged list
-+--------------------------------
-+
- The boot loader must create and initialise the kernel tagged list.
- A valid tagged list starts with ATAG_CORE and ends with ATAG_NONE.
- The ATAG_CORE tag may or may not be empty.  An empty ATAG_CORE tag
-@@ -101,6 +107,24 @@ The tagged list must be placed in a region of memory where neither
- the kernel decompressor nor initrd 'bootp' program will overwrite
- it.  The recommended placement is in the first 16KiB of RAM.
- 
-+4b. Setup the device tree
-+-------------------------
-+
-+The boot loader must load a device tree image (dtb) into system ram
-+at a 64bit aligned address and initialize it with the boot data.  The
-+dtb format is documented in Documentation/devicetree/booting-without-of.txt.
-+The kernel will look for the dtb magic value of 0xd00dfeed at the dtb
-+physical address to determine if a dtb has been passed instead of a
-+tagged list.
-+
-+The boot loader must pass at a minimum the size and location of the
-+system memory, and the root filesystem location.  The dtb must be
-+placed in a region of memory where the kernel decompressor will not
-+overwrite it.  The recommended placement is in the first 16KiB of RAM
-+with the caveat that it may not be located at physical address 0 since
-+the kernel interprets a value of 0 in r2 to mean neither a tagged list
-+nor a dtb were passed.
-+
- 5. Calling the kernel image
- ---------------------------
- 
-@@ -125,7 +149,8 @@ In either case, the following conditions must be met:
- - CPU register settings
-   r0 = 0,
-   r1 = machine type number discovered in (3) above.
--  r2 = physical address of tagged list in system RAM.
-+  r2 = physical address of tagged list in system RAM, or
-+       physical address of device tree block (dtb) in system RAM
- 
- - CPU mode
-   All forms of interrupts must be disabled (IRQs and FIQs)
-diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-index 28b1c9d..9381a14 100644
---- a/Documentation/devicetree/booting-without-of.txt
-+++ b/Documentation/devicetree/booting-without-of.txt
-@@ -13,6 +13,7 @@ Table of Contents
- 
-   I - Introduction
-     1) Entry point for arch/powerpc
-+    2) Entry point for arch/arm
- 
-   II - The DT block format
-     1) Header
-@@ -225,6 +226,45 @@ it with special cases.
-   cannot support both configurations with Book E and configurations
-   with classic Powerpc architectures.
- 
-+2) Entry point for arch/arm
-+---------------------------
-+
-+   There is one single entry point to the kernel, at the start
-+   of the kernel image. That entry point supports two calling
-+   conventions.  A summary of the interface is described here.  A full
-+   description of the boot requirements is documented in
-+   Documentation/arm/Booting
-+
-+        a) ATAGS interface.  Minimal information is passed from firmware
-+        to the kernel with a tagged list of predefined parameters.
-+
-+                r0 : 0
-+
-+                r1 : Machine type number
-+
-+                r2 : Physical address of tagged list in system RAM
-+
-+        b) Entry with a flattened device-tree block.  Firmware loads the
-+        physical address of the flattened device tree block (dtb) into r2,
-+        r1 is not used, but it is considered good practise to use a valid
-+        machine number as described in Documentation/arm/Booting.
-+
-+                r0 : 0
-+
-+                r1 : Valid machine type number.  When using a device tree,
-+                a single machine type number will often be assigned to
-+                represent a class or family of SoCs.
-+
-+                r2 : physical pointer to the device-tree block
-+                (defined in chapter II) in RAM.  Device tree can be located
-+                anywhere in system RAM, but it should be aligned on a 32 bit
-+                boundary.
-+
-+   The kernel will differentiate between ATAGS and device tree booting by
-+   reading the memory pointed to by r1 and looking for either the flattened
-+   device tree block magic value (0xd00dfeed) or the ATAG_CORE value at
-+   offset 0x4 from r2 (0x54410001).
-+
- 
- II - The DT block format
- ========================
+And they are wrong.  Probably because of some historical reasons.
+
+> I'm not sure if a driver that is specific to only one arch
+> has a strong reason to be elsewhere in the kernel.
+
+You'll find plenty of examples for that, far more than drivers in arch 
+specific directories.
+
+> If there was a possibility of there being other devices that used 
+> SSBI, it might make sense to put it elsewhere.  But, as far as I know, 
+> this device is only found on MSM chips.
+
+That doesn't matter.
+
+The main reasoning is that Linux has no stable internal API by design. 
+When large scale driver API changes happen, it is the responsibility of 
+the person doing that change to also fix up all the in-tree users of 
+that API.  And it is far more trouble for that person who probably has 
+no knowledge about msm to go and hunt for all scattered drivers 
+throughout the tree than it is for you to remember that all your drivers 
+are under linux/drivers/.
+
+And if someone else comes up with a SSBI interface, then it will be much 
+easier to notice the already existing driver if it is in the driver 
+directory rather than somewhere else in some unrelated (from that 
+person's pov) obscure directory.
+
+This was discussed in the past already.  I would have liked to provide a 
+link to some archived discussions (they do exist) but I can't find them 
+at the moment.
+
+> It seems kind of unusual to create an entirely new directory under
+> drivers to hold what will only ever be a single driver.
+
+Well, a couple examples exist already: drivers/dca, drivers/nfc, 
+drivers/sn, drivers/tc, drivers/vlynq, etc.  And if you expect to have 
+more oddball msm drivers then you can create a drivers/msm directory, 
+similar to the existing drivers/macintosh, drivers/parisc, drivers/s390, 
+drivers/sh, drivers/video/omap, drivers/video/omap2, etc.
+
+
+Nicolas
