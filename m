@@ -1,46 +1,34 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Feb 2011 13:35:10 -0800
-Subject: [PATCH 5/5] ARM: Tegra: Enable Harmony audio support
-In-Reply-To: <AANLkTinzVinbW_rDt5Rqe7i68P2u_XvDvRWA8R2mq0_9@mail.gmail.com>
-References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
-	<1298487532-5000-6-git-send-email-swarren@nvidia.com>
-	<AANLkTimffVNK2EmTqypQcrWHLisf3c8_dMsHwSbv-nWi@mail.gmail.com>
-	<AANLkTi=tDJvfEFFvXGEkZswRWekRLuz4rBoT-0hgobgn@mail.gmail.com>
-	<AANLkTinzVinbW_rDt5Rqe7i68P2u_XvDvRWA8R2mq0_9@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03112A5D95@HQMAIL01.nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 23 Feb 2011 14:36:01 -0700
+Subject: [PATCH v4 6/7] arm/dt: Basic tegra devicetree support
+In-Reply-To: <4D657880.50405@ru.mvista.com>
+References: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
+	<20110223022234.18318.90592.stgit@localhost6.localdomain6>
+	<4D657880.50405@ru.mvista.com>
+Message-ID: <20110223213601.GA5404@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Wednesday, February 23, 2011 2:25 PM:
-> On Wed, Feb 23, 2011 at 1:21 PM, Colin Cross <ccross@android.com> wrote:
-> > On Wed, Feb 23, 2011 at 1:08 PM, Olof Johansson <olof@lixom.net> wrote:
-> >> Stephen,
-> >>
-> >> Since this depends on i2c, and registers one of the adapters to do it,
-> >> we should just get the adapters registered separately (all of them)
-> >> before this. I was holding off that part of board code since the i2c
-> >> driver went up that maintainer path instead, but if Colin pulls it
-> >> into tegra for-next, then I'll go ahead with those peices as well.
-> >
-> > I'll merge the i2c-tegra branch into for-next (assuming Ben doesn't
-> > object to it), and you can put all the i2c devices in your pull
-> > request. ?That way we can get everything except this patch into the
-> > first pull request to Linus, and just put this patch into a second
-> > pull request once the ASoC branch is merged.
+On Thu, Feb 24, 2011 at 12:13:36AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Sure, that works. I'll stage the i2c changes tonight.
+> On 23-02-2011 5:22, Grant Likely wrote:
+> 
+> >This patch adds adds very basic support for booting tegra with a
+> >device tree.  It simply allows the existing machine_descs to match
+> >against the tegra compatible values so that the kernel can boot.
+> >Kernel parameters and the initrd pointer is read out of the tree
+> >instead of atags.
+> 
+> >This is not complete device tree support.  This change will be
+> >reverted when a new machine_desc is added that can populate the
+> >device registrations directly from data in the tree instead of using
+> >hard coded data.  That change will be made in a future patch.
+> 
+> >v2: Fixed cut-and-paste error in commit text
+> 
+>    Shouldn't this sentence follow the --- tearline?
 
-OK, so just so I'm clear:
-
-Patches 1..4 are all going in as-is.
-
-I should re-post patch 5 once the merge window is open, having rebased
-it on Olof's i2c registration changes, and
-s/GPIO_WM8903/HARMONY_GPIO_WM8903/. Or, should I repost as soon as Olof
-has updated his branch with the I2C changes, and you'll just hold off
-applying it until the merge window?
-
-Thanks.
-
--- 
-nvpublic
+Nope!  It is actually quite useful for the version information to show
+up in the commit text.  That way you know *exactly* which version got
+merged.  dwmw2 pointed that out to me a few months back.
