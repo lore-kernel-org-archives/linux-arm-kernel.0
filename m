@@ -1,61 +1,62 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Wed, 23 Feb 2011 04:19:50 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201102221800.17196.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102201539.08496.arnd@arndb.de>
-	<AANLkTi=ZOUrNoT1W1n3d+9KTMewKZ3kxo71AQsas9OpD@mail.gmail.com>
-	<201102221800.17196.arnd@arndb.de>
-Message-ID: <AANLkTinfWiRaGruP8cM44c62T8svVOKsFhi4Dmg8yzEa@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 23 Feb 2011 16:36:46 +0530
+Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <20110223102140.GH29559@n2100.arm.linux.org.uk>
+References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
+	<1298433701.23371.236.camel@vkoul-udesk3>
+	<20110223055709.GC20346@S2100-06.ap.freescale.net>
+	<1298440516.23371.258.camel@vkoul-udesk3>
+	<20110223100547.GG29559@n2100.arm.linux.org.uk>
+	<20110223102140.GH29559@n2100.arm.linux.org.uk>
+Message-ID: <1298459206.23371.267.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 22, 2011 at 11:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->> Do you think there is any need for runtime tuning of the MMC
->> workarounds (disregarding ones that really belong in the I/O
->> scheduler)? Should the workarounds be simply platform callbacks, or
->> should they be something heftier ("policies")?
->
-> The platform hook seems the wrong place, because you might use
-> the same chip in multiple platforms, and a single platform might
-> have a large number of different boards, all of which require
-> separate workarounds.
->
+On Wed, 2011-02-23 at 15:51 +0530, Russell King - ARM Linux wrote:
+> On Wed, Feb 23, 2011 at 10:05:47AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 23, 2011 at 11:25:16AM +0530, Koul, Vinod wrote:
+> > > Well in that case you are calling the callback from irq handler which is
+> > > not so good. The tasklet is other extreme (slow).
+> > 
+> > tasklets are run on the exit path of interrupts.
+> > 
+> > > Given that this is
+> > > also intended for audio I am not sure if calling period elapsed from
+> > > tasklet callback will not cause any audio over/underruns, last I tried
+> > > it used to break quite often in stressed situations.
+> > 
+> > Nevertheless, the DMA engine API specifies that callbacks shall be called
+> > from tasklet context.
+> 
+> Note also that the DMA engine API is supposed to work as follows:
+> 
+> 1. You submit DMA jobs to it.
+> 2. The DMA engine starts the first job
+> 3. When the first job is complete, it retires it to a retired list and
+>    marks the tasklet to run
+> 4. If there is another job waiting, the DMA engine starts the next job
+> 5. Repeat 3 until no further jobs are queued
+> 
+> The tasklet then processes the list of retired jobs, cleaning them
+> up and calling their callbacks. 
+> 
+> So the way to efficiently handle audio is to initially submit several
+> 'period' sized buffers for the DMA engine.  As each buffer completes,
+> you call snd_pcm_elapsed() to tell ALSA that a period has finished
+> and submit the next buffer.  As there's always several buffers submitted,
+> the DMA engine never waits for the callback to complete.  And ALSA is
+> capable of handling latency in snd_pcm_elapsed().
+Russel,
+agree with you on this. But in case you have few periods say 2 and small
+period sizes (10ms), or similar scenarios where client is waiting to do
+something (process data) on callback notification, faster the callback
+better it is.
 
-That's a good point. At best it would result in massive copy-paste/
+I know DMA engine species callback to be called from tasklet context,
+but do we need this for slave-dma or not? If this is posing some
+limitation then I am okay to discuss on ways to improve :) 
 
-> A per-card quirk table does not seem so bad, we have that in
-> other subsystems as well. I wouldn't necessarily make it
-> a list of possible quirks, but rather a __devinit function that
-> is called for a new card on insertion, in order to tweak various
-> parameters.
->
+Thoughts??
 
-That sounds good! In fact, for any quirks enabled for a particular
-card, I'll expose the tuneables through sysfs attributes, something
-like /sys/block/mmcblk0/device/quirks/quirk-name/attr-names.
-
-Quirks will have block intervals and access size intervals over which
-they are valid, along with any other quirk-specific parameter.
-Interval overlap will not be allowed for quirks in the same operation
-type (r/w/e). The goal here is to make the changes to issue_*_rq as
-small as possible, and not to pollute block.c at all with the quirks
-stuff. Quirks are looked up inside issue_*_rq based on req type and
-[start,end) interval. The resulting found quirks structure will
-contain a callback used inside issue_*_rq to modify mmc block request
-structures prior to generating actual MMC commands.
-
-Quirks consist of a callback called inside of mmc issue_*_rq,
-configurable attributes, and the sysfs interface. Quirk groups are
-defined per-card. At card insertion time, a matching quirk group is
-found, and is enabled. The quirk group enable function then enables
-the relevant quirks with the right parameters (adds them to per
-mmc_blk_data quirk interval tree). Some sane defaults for the tunables
-are used. If the tunables are modified through sysfs, care is taken
-that an interval overlap never happens, otherwise the tunable is not
-modified and a kernel error message is logged.
-
-I hope I explained the tentative idea clearly... Thoughts?
-
-A
+-- 
+~Vinod
