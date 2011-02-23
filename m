@@ -1,146 +1,74 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Feb 2011 15:57:29 +0900
-Subject: [PATCH 1/5] ARM: S5PV310: Add missing GPYx banks.
-In-Reply-To: <1297927527-1338-2-git-send-email-m.szyprowski@samsung.com>
-References: <1297927527-1338-1-git-send-email-m.szyprowski@samsung.com>
-	<1297927527-1338-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <01e301cbd326$f2bc5d40$d83517c0$%kim@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 23 Feb 2011 15:59:42 +0900
+Subject: [PATCH 4/5] ARM: s5pv310: update IRQ combiner to use EOI in
+	parent chip
+In-Reply-To: <1298302096-21275-5-git-send-email-will.deacon@arm.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
+	<1298302096-21275-5-git-send-email-will.deacon@arm.com>
+Message-ID: <AANLkTimiPEsb_S3tv+yPOr=p8UageK_-er9HkjM10ro5@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek Szyrowski wrote:
-> 
-> This patch adds missing GPYx gpio banks on Samsung S5PC210 platform.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+It's boot and working at mainline.
+
+It's just for record.
+Current mainline codes doesn't have full features of s5pv310 (aka
+s5pc210 or exynos4210).
+So I back-ported the same codes to 2.6.36. it's booted and working at
+boot time, but some times later it's hang.
+no serial. I think as irq cores at arm changed, it requires the more
+patched than just this patch.
+
+Thank you,
+Kyungmin Park
+
+On Tue, Feb 22, 2011 at 12:28 AM, Will Deacon <will.deacon@arm.com> wrote:
+> The IRQ combiner code invokes the ->irq_{un}mask routines of the parent
+> chip.
+>
+> This patch updates the cascaded handler to use EOI now that the GIC has
+> moved to using the fasteoi flow model.
+>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/mach-s5pv310/gpiolib.c           |   49
-> +++++++++++++++++++++++++++++
->  arch/arm/mach-s5pv310/include/mach/gpio.h |   23 +++++++++++++-
->  2 files changed, 71 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s5pv310/gpiolib.c b/arch/arm/mach-
-> s5pv310/gpiolib.c
-> index 55217b8..f417ecd 100644
-> --- a/arch/arm/mach-s5pv310/gpiolib.c
-> +++ b/arch/arm/mach-s5pv310/gpiolib.c
-> @@ -199,6 +199,55 @@ static struct s3c_gpio_chip s5pv310_gpio_part2_4bit[]
-=
-> {
->  			.label	= "GPL2",
->  		},
->  	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY0(0),
-> +			.ngpio	= S5PV310_GPIO_Y0_NR,
-> +			.label	= "GPY0",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY1(0),
-> +			.ngpio	= S5PV310_GPIO_Y1_NR,
-> +			.label	= "GPY1",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY2(0),
-> +			.ngpio	= S5PV310_GPIO_Y2_NR,
-> +			.label	= "GPY2",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY3(0),
-> +			.ngpio	= S5PV310_GPIO_Y3_NR,
-> +			.label	= "GPY3",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY4(0),
-> +			.ngpio	= S5PV310_GPIO_Y4_NR,
-> +			.label	= "GPY4",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY5(0),
-> +			.ngpio	= S5PV310_GPIO_Y5_NR,
-> +			.label	= "GPY5",
-> +		},
-> +	}, {
-> +		.config	= &gpio_cfg_noint,
-> +		.chip	= {
-> +			.base	= S5PV310_GPY6(0),
-> +			.ngpio	= S5PV310_GPIO_Y6_NR,
-> +			.label	= "GPY6",
-> +		},
-> +	}, {
->  		.base	= (S5P_VA_GPIO2 + 0xC00),
->  		.config	= &gpio_cfg_noint,
->  		.irq_base = IRQ_EINT(0),
-> diff --git a/arch/arm/mach-s5pv310/include/mach/gpio.h b/arch/arm/mach-
-> s5pv310/include/mach/gpio.h
-> index 20cb80c..4b44463 100644
-> --- a/arch/arm/mach-s5pv310/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5pv310/include/mach/gpio.h
-> @@ -50,6 +50,13 @@
->  #define S5PV310_GPIO_X1_NR	(8)
->  #define S5PV310_GPIO_X2_NR	(8)
->  #define S5PV310_GPIO_X3_NR	(8)
-> +#define S5PV310_GPIO_Y0_NR	(6)
-> +#define S5PV310_GPIO_Y1_NR	(4)
-> +#define S5PV310_GPIO_Y2_NR	(6)
-> +#define S5PV310_GPIO_Y3_NR	(8)
-> +#define S5PV310_GPIO_Y4_NR	(8)
-> +#define S5PV310_GPIO_Y5_NR	(8)
-> +#define S5PV310_GPIO_Y6_NR	(8)
->  #define S5PV310_GPIO_Z_NR	(7)
-> 
->  /* GPIO bank numbers */
-> @@ -87,7 +94,14 @@ enum s5p_gpio_number {
->  	S5PV310_GPIO_X1_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X0),
->  	S5PV310_GPIO_X2_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X1),
->  	S5PV310_GPIO_X3_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X2),
-> -	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
-> +	S5PV310_GPIO_Y0_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_X3),
-> +	S5PV310_GPIO_Y1_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y0),
-> +	S5PV310_GPIO_Y2_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y1),
-> +	S5PV310_GPIO_Y3_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y2),
-> +	S5PV310_GPIO_Y4_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y3),
-> +	S5PV310_GPIO_Y5_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y4),
-> +	S5PV310_GPIO_Y6_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y5),
-> +	S5PV310_GPIO_Z_START	= S5PV310_GPIO_NEXT(S5PV310_GPIO_Y6),
->  };
-> 
->  /* S5PV310 GPIO number definitions */
-> @@ -120,6 +134,13 @@ enum s5p_gpio_number {
->  #define S5PV310_GPX1(_nr)	(S5PV310_GPIO_X1_START + (_nr))
->  #define S5PV310_GPX2(_nr)	(S5PV310_GPIO_X2_START + (_nr))
->  #define S5PV310_GPX3(_nr)	(S5PV310_GPIO_X3_START + (_nr))
-> +#define S5PV310_GPY0(_nr)	(S5PV310_GPIO_Y0_START + (_nr))
-> +#define S5PV310_GPY1(_nr)	(S5PV310_GPIO_Y1_START + (_nr))
-> +#define S5PV310_GPY2(_nr)	(S5PV310_GPIO_Y2_START + (_nr))
-> +#define S5PV310_GPY3(_nr)	(S5PV310_GPIO_Y3_START + (_nr))
-> +#define S5PV310_GPY4(_nr)	(S5PV310_GPIO_Y4_START + (_nr))
-> +#define S5PV310_GPY5(_nr)	(S5PV310_GPIO_Y5_START + (_nr))
-> +#define S5PV310_GPY6(_nr)	(S5PV310_GPIO_Y6_START + (_nr))
->  #define S5PV310_GPZ(_nr)	(S5PV310_GPIO_Z_START + (_nr))
-> 
->  /* the end of the S5PV310 specific gpios */
+> ?arch/arm/mach-s5pv310/irq-combiner.c | ? ?7 ++-----
+> ?1 files changed, 2 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
+> index 1ea4a9e..24d5604 100644
+> --- a/arch/arm/mach-s5pv310/irq-combiner.c
+> +++ b/arch/arm/mach-s5pv310/irq-combiner.c
+> @@ -59,9 +59,6 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?unsigned int cascade_irq, combiner_irq;
+> ? ? ? ?unsigned long status;
+>
+> - ? ? ? /* primary controller ack'ing */
+> - ? ? ? chip->irq_ack(&desc->irq_data);
+> -
+> ? ? ? ?spin_lock(&irq_controller_lock);
+> ? ? ? ?status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
+> ? ? ? ?spin_unlock(&irq_controller_lock);
+> @@ -79,8 +76,8 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ? ? ? ? ?generic_handle_irq(cascade_irq);
+>
+> ?out:
+> - ? ? ? /* primary controller unmasking */
+> - ? ? ? chip->irq_unmask(&desc->irq_data);
+> + ? ? ? /* primary controller EOI */
+> + ? ? ? chip->irq_eoi(&desc->irq_data);
+> ?}
+>
+> ?static struct irq_chip combiner_chip = {
 > --
-
-Ok...but as you know, need to re-work based on latest.
-Could you re-submit this based on my for-next which includes Exynos4?
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 1.7.0.4
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
