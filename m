@@ -1,42 +1,29 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Feb 2011 12:49:46 -0800
-Subject: [PATCH 4/5] ARM: Tegra: Create defines for GPIO names
-In-Reply-To: <AANLkTimgB3CZmiVXR9MYTEOXk9uSok12vcVaTTx1tn2M@mail.gmail.com>
-References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
-	<1298487532-5000-5-git-send-email-swarren@nvidia.com>
-	<AANLkTinPssv8Wpy0Qe5GAHqN=9dicSLZ8sUmq+JeW2_q@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF03112A5D59@HQMAIL01.nvidia.com>
-	<AANLkTimgB3CZmiVXR9MYTEOXk9uSok12vcVaTTx1tn2M@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03112A5D63@HQMAIL01.nvidia.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 23 Feb 2011 23:49:49 +0300
+Subject: [PATCH v3 1/2] PRUSS UIO driver support
+In-Reply-To: <alpine.LFD.2.00.1102232057260.2701@localhost6.localdomain6>
+References: <1298469161-7644-1-git-send-email-pratheesh@ti.com>	<1298469161-7644-2-git-send-email-pratheesh@ti.com>
+	<alpine.LFD.2.00.1102232057260.2701@localhost6.localdomain6>
+Message-ID: <4D6572ED.9020805@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross wrote at Wednesday, February 23, 2011 1:39 PM:
-> 
-> On Wed, Feb 23, 2011 at 12:35 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Colin Cross wrote at Wednesday, February 23, 2011 12:09 PM:
-> >> On Wed, Feb 23, 2011 at 10:58 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> >> > This ensures they're kept in sync between platform_data definitions and
-> >> > the GPIO table initialization.
-> >>
-> >> Can you name these for what they are used for (if they have a single use)?
-> >> i.e. TEGRA_GPIO_EMMC_CD instead of TEGRA_GPIO_SD2_CD
-> >
-> > Are you looking for correlation with the schematics, or something else;
->...
-> 
-> I meant use the name of the device they are connected to (if there is
-> one).  By EMMC I meant the embedded MMC storage device.  The gpio is
-> not notable because it is used by the SDIO driver for port 2, it is
-> notable because it is connected to the EMMC chip or the wifi chip or a
-> card slot.
+Hello.
 
-The GPIOs currently in the code are for SD slots/connectors; we don't have
-any GPIO definitions for any internal MMC memory, or WiFi chips.
+On 23-02-2011 23:25, Thomas Gleixner wrote:
 
-I guess the numbering could be changed; 2 vs. 4 don't very obviously map to
-the slots on the board for the user, yet the only thing better I can think
-of would be the connector numbers on the silkscreen?
+>> +	prussio_virt_addr =
+>> +	    ioremap(regs_prussio->start,
+>> +		    regs_prussio->end - regs_prussio->start + 1);
 
--- 
-nvpublic
+> Either make those variable names shorter or do:
+
+>         len = regs_prussio->end - regs_prussio->start + 1;
+
+    Or even:
+
+	len = resource_size(regs_prussio);
+
+>         prussio_virt_addr = ioremap(regs_prussio->start, len);
+
+WBR, Sergei
