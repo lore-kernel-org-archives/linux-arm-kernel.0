@@ -1,45 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 23 Feb 2011 11:09:32 +0800
-Subject: [PATCH v3 2/2] ARM: mxs: add dma device
-In-Reply-To: <20110222183036.GB22310@pengutronix.de>
-References: <1298284306-14710-1-git-send-email-shawn.guo@freescale.com>
-	<1298284306-14710-3-git-send-email-shawn.guo@freescale.com>
-	<20110222080928.GS22310@pengutronix.de>
-	<20110222122733.GD19871@S2100-06.ap.freescale.net>
-	<20110222183036.GB22310@pengutronix.de>
-Message-ID: <20110223030931.GA20346@S2100-06.ap.freescale.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 22 Feb 2011 19:12:07 -0800
+Subject: Problem with "ARM: tegra: Move tegra_common_init to tegra_init_early"
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03112A5C22@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+The following commit makes the Tegra APB DMA engine fail to initialize correctly:
 
-On Tue, Feb 22, 2011 at 07:30:36PM +0100, Uwe Kleine-K?nig wrote:
-> Hi Shawn,
-> 
-> On Tue, Feb 22, 2011 at 08:27:34PM +0800, Shawn Guo wrote:
-> > > > diff --git a/arch/arm/mach-mxs/devices/platform-dma.c b/arch/arm/mach-mxs/devices/platform-dma.c
-> > > > new file mode 100644
-> > > > index 0000000..ee3220e
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/mach-mxs/devices/platform-dma.c
-> > > I'd prefer to have that called platform-mxs-dma.c to match the driver
-> > > name.  (At least that's what you use for the data structs.)
-> > > 
-> > If you put this comment a little bit earlier on platform-auart.c which
-> > is the first example that saves the "mxs" from driver name, I would
-> > have platform-mxs-dma.c and platform-mxs-mmc.c from the start.
-> I already noticed I missed auart and planned to follow up with a patch.
-> Sorry if this resulted in an extra iteration for you.
-> 
-Can we keep it as it is for now, and get your patch fix this
-"mxs global" thing?
+commit 0cf6230af909a86f81907455eca2a5c9b8f68fe6
 
-Sascha plans to rename fb.h to mxsfb.h, and I'm not sure if you will
-do the same to rename dma.h and mmc.h under mach-mxs/include/mach to
-align everything with driver name.  Just a reminder, this will
-require changes in dma and mmc drivers accordingly, also will bring
-plat-mxc a mxs-dma.h later support gpmi with mxs dma.
+    ARM: tegra: Move tegra_common_init to tegra_init_early
+    
+    Move tegra_common_init to tegra_init_early, and set it
+    as the init_early entry in the machine struct.
+    Initializes the clocks earlier so that timers can enable
+    their clocks.
+    
+    Also reorders the members in the Harmony and Trimslice
+    boards' machine structs to match the order they are
+    called in.
+
+The reason is that tegra_init_early_ calls tegra_dma_init which calls
+request_threaded_irq, which fails since the IRQ hasn't yet been marked valid;
+that only happens in tegra_init_irq, which gets called after tegra_init_early.
+
+This used to work OK, since tegra_init_early was tegra_common_init, which got
+called after tegra_init_irq, basically from the beginning of tegra_harmony_init.
+
+I tried moving the call to tegra_dma_init back to each of the very end of
+tegra_init_irq and the very beginning of tegra_harmony_init. Both of these
+resulted in a kernel that wouldn't boot.
+
+Simply removing the call to tegra_dma_init completely does allow the kernel
+to boot, but obviously, DMA isn't available.
+
+I'm a little stumped why moving tegra_dma_init causes a boot failure. Does
+anyone have any helpful ideas, or any alternative ways to fix the underlying
+problem?
+
+Thanks.
 
 -- 
-Regards,
-Shawn
+nvpublic
