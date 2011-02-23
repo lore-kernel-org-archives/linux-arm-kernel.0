@@ -1,43 +1,69 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Feb 2011 09:54:35 -0800
-Subject: [PATCH] ARM: Tegra: DMA: Fail safe if initialization fails
-In-Reply-To: <AANLkTi=iWsX_UN6pE7nE=7NBXRPv7=6Ja68B=u8U4Ww=@mail.gmail.com>
-References: <1298482170-3678-1-git-send-email-swarren@nvidia.com>
-	<AANLkTi=iWsX_UN6pE7nE=7NBXRPv7=6Ja68B=u8U4Ww=@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03112A5CF5@HQMAIL01.nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 23 Feb 2011 10:54:59 -0700
+Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found
+	on the MPC85xx.
+In-Reply-To: <20110223112612.30071995@schlenkerla>
+References: <cover.1298447722.git.richard.cochran@omicron.at>
+	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
+	<20110223165058.GE14597@angua.secretlab.ca>
+	<20110223112612.30071995@schlenkerla>
+Message-ID: <20110223175459.GH14597@angua.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross wrote at Wednesday, February 23, 2011 10:38 AM:
+On Wed, Feb 23, 2011 at 11:26:12AM -0600, Scott Wood wrote:
+> On Wed, 23 Feb 2011 09:50:58 -0700
+> Grant Likely <grant.likely@secretlab.ca> wrote:
 > 
-> On Wed, Feb 23, 2011 at 9:29 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > tegra_dma_init currently simply bails out early if any initialization fails.
-> > This skips various data-structure initialization. In turn, this means that
-> > tegra_dma_allocate_channel can still hand out channels. In this case, when
-> > tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
-> > on ch->list will OOPS since the list's next/prev pointers may still be
-> > NULL.
-> >
-> > To solve this:
-> > * Mark all possible channels as in-use before doing anything else in init.
-> > * Only mark a channel as free once all channel-related initialization has
-> > ?completed.
-> >
-> > This prevents allocate_channel from handing out uninitialized channels.
-> >
-> > There is still one small hole; allocate_channel can't check the usage array
-> > for the shared channel, since this channel is permanently marked in-use.
-> > This could be solved using an explicit "init OK" flag that allocate_channel
-> > could check.
->
-> If we still need an init complete flag, why not skip this patch and
-> just add that?
+> > On Wed, Feb 23, 2011 at 11:38:17AM +0100, Richard Cochran wrote:
+> > > +
+> > > +* Gianfar PTP clock nodes
+> > > +
+> > > +General Properties:
+> > > +
+> > > +  - compatible   Should be "fsl,etsec-ptp"
+> > 
+> > Should specify an *exact* part; ie: "fsl,mpc8313-etsec-ptp" instead of
+> > trying to define a generic catchall.  The reason is that the same
+> > marketing name can end up getting applied to a wide range of parts.
+> > 
+> > Instead, choose one specific device to stand in as the 'common'
+> > implementation and get all parts with the same core to claim
+> > compatibility with it.  ie: a p2020 might have:
+> > 
+> > 	compatible = "fsl,mpc2020-etsec-ptp", "fsl,mpc8313-etsec-ptp";
+> 
+> eTSEC is versioned, that's more reliable than the chip name since chips
+> have revisions (rev 2.1 of mpc8313 has eTSEC 1.6, not sure about previous
+> revs of mpc8313).  Logic blocks can be and have been uprevved between one
+> revision of a chip to the next.  I think "fsl,mpc8313rev2.1-etsec-ptp"
+> would be taking things a bit too far (and there could be board-level bugs
+> too...).
+> 
+> If you really need to know the exact SoC you're on, look in SVR (which
+> will provide revision info as well).  Isn't the device tree for things that
+> can't be probed?
 
-I tend to like the cleanup in this patch; it simplifies the channel_usage
-initialization. I'll let you make the call on whether to take this or not.
+This is far more about the binding than it is about the chip revision.
+When documenting a binding it makes far more sense to anchor it to a
+specific implementation than to try and come up with a 'generic'
+catchall.  A new binding means new compatible value and dropping any
+claims of being compatible with the old.
 
-I can certainly throw together a second patch, or modify this patch, to also
-use an init_ok flag to completely solve the shared channel case too though.
+It is not about the logic block version, particularly when it is
+detectable by the driver as you say.
 
--- 
-nvpublic
+> 
+> The eTSEC revision is probeable as well, but due the way PTP is described as
+> a separate node, the driver doesn't have straightforward access to those
+> registers.
+
+Ignorant question: Should the ptp be described as a separate node?
+
+> 
+> Insisting on an explicit chip also encourages people to claim compatibility
+> with that chip without ensuring that it really is fully compatible.
+
+In practise, I've not seen this to be an issue.
+
+g.
