@@ -1,64 +1,46 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 23 Feb 2011 13:31:30 -0800
-Subject: [GIT PULL] Please pull tegra board updates for .39
-In-Reply-To: <AANLkTim99BSkaX-hm8kb43tm6YJY5VUk6OYL6SwyPmD5@mail.gmail.com>
-References: <AANLkTimA1=CCXM8wmkoatL59mzitC=5-GK3HUs-_daE9@mail.gmail.com>
-	<AANLkTim99BSkaX-hm8kb43tm6YJY5VUk6OYL6SwyPmD5@mail.gmail.com>
-Message-ID: <AANLkTi=5MN6mjQKZz-HEb91c+7yEv5QSviSg-cpPUNQA@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 23 Feb 2011 13:35:10 -0800
+Subject: [PATCH 5/5] ARM: Tegra: Enable Harmony audio support
+In-Reply-To: <AANLkTinzVinbW_rDt5Rqe7i68P2u_XvDvRWA8R2mq0_9@mail.gmail.com>
+References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
+	<1298487532-5000-6-git-send-email-swarren@nvidia.com>
+	<AANLkTimffVNK2EmTqypQcrWHLisf3c8_dMsHwSbv-nWi@mail.gmail.com>
+	<AANLkTi=tDJvfEFFvXGEkZswRWekRLuz4rBoT-0hgobgn@mail.gmail.com>
+	<AANLkTinzVinbW_rDt5Rqe7i68P2u_XvDvRWA8R2mq0_9@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF03112A5D95@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 1:17 PM, Olof Johansson <olof@lixom.net> wrote:
-> Colin,
->
-> Since things got held up due to rebases and a few patch respins,
-> here's a fresh pull request and diff stats. Please pull
-> boards-for-next.
->
-> Given current activity, I expect to stage one more pull before the
-> merge window once the i2c driver is in the main tegra for-next branch.
->
->
->
-> The following changes since commit 38376866a1fe5b1e6d9510ec4913c2b461f456f3:
-> ?Mark Brown (1):
-> ? ? ? ?ARM: tegra: Hide EMC scaling config behind ARCH_TEGRA
->
-> are available in the git repository at:
->
-> ?git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra-2.6.git
-> boards-for-next
->
-> Olof Johansson (7):
-> ? ? ?ARM: tegra: add tegra_gpio_table and tegra_gpio_config
-> ? ? ?ARM: tegra: harmony: move over to tegra_gpio_config
-> ? ? ?ARM: tegra: common device resources
-> ? ? ?ARM: tegra: remove stale nvidia atag handler
-> ? ? ?ARM: tegra: harmony: register sdhci devices
-> ? ? ?ARM: tegra: harmony: fix pinmux for MMC slot
-> ? ? ?ARM: tegra: add seaboard, wario and kaen boards
->
-> ?arch/arm/mach-tegra/Kconfig ? ? ? ? ? ? ? ? | ? 19 +
-> ?arch/arm/mach-tegra/Makefile ? ? ? ? ? ? ? ?| ? ?4 +
-> ?arch/arm/mach-tegra/board-harmony-pinmux.c ?| ? 19 +-
-> ?arch/arm/mach-tegra/board-harmony.c ? ? ? ? | ? 55 ++--
-> ?arch/arm/mach-tegra/board-seaboard-pinmux.c | ?179 ++++++++++
-> ?arch/arm/mach-tegra/board-seaboard.c ? ? ? ?| ?196 +++++++++++
-> ?arch/arm/mach-tegra/board-seaboard.h ? ? ? ?| ? 38 ++
-> ?arch/arm/mach-tegra/devices.c ? ? ? ? ? ? ? | ?505 +++++++++++++++++++++++++++
-> ?arch/arm/mach-tegra/devices.h ? ? ? ? ? ? ? | ? 46 +++
-> ?arch/arm/mach-tegra/gpio.c ? ? ? ? ? ? ? ? ?| ? 14 +
-> ?arch/arm/mach-tegra/include/mach/gpio.h ? ? | ? ?7 +
-> ?11 files changed, 1054 insertions(+), 28 deletions(-)
-> ?create mode 100644 arch/arm/mach-tegra/board-seaboard-pinmux.c
-> ?create mode 100644 arch/arm/mach-tegra/board-seaboard.c
-> ?create mode 100644 arch/arm/mach-tegra/board-seaboard.h
-> ?create mode 100644 arch/arm/mach-tegra/devices.c
-> ?create mode 100644 arch/arm/mach-tegra/devices.h
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Olof Johansson wrote at Wednesday, February 23, 2011 2:25 PM:
+> On Wed, Feb 23, 2011 at 1:21 PM, Colin Cross <ccross@android.com> wrote:
+> > On Wed, Feb 23, 2011 at 1:08 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> Stephen,
+> >>
+> >> Since this depends on i2c, and registers one of the adapters to do it,
+> >> we should just get the adapters registered separately (all of them)
+> >> before this. I was holding off that part of board code since the i2c
+> >> driver went up that maintainer path instead, but if Colin pulls it
+> >> into tegra for-next, then I'll go ahead with those peices as well.
+> >
+> > I'll merge the i2c-tegra branch into for-next (assuming Ben doesn't
+> > object to it), and you can put all the i2c devices in your pull
+> > request. ?That way we can get everything except this patch into the
+> > first pull request to Linus, and just put this patch into a second
+> > pull request once the ASoC branch is merged.
+> 
+> Sure, that works. I'll stage the i2c changes tonight.
 
-Thanks, merged to tegra/for-next
+OK, so just so I'm clear:
+
+Patches 1..4 are all going in as-is.
+
+I should re-post patch 5 once the merge window is open, having rebased
+it on Olof's i2c registration changes, and
+s/GPIO_WM8903/HARMONY_GPIO_WM8903/. Or, should I repost as soon as Olof
+has updated his branch with the I2C changes, and you'll just hold off
+applying it until the merge window?
+
+Thanks.
+
+-- 
+nvpublic
