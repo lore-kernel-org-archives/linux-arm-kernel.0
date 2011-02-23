@@ -1,31 +1,86 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 23 Feb 2011 09:15:39 +0100
-Subject: [PATCH] wip: convert imx27 to common struct clk
-In-Reply-To: <4D648A3D.7020402@codeaurora.org>
-References: <1298256658.861611.43913489619.0.gpush@pororo>
-	<1298417599-23522-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4D648A3D.7020402@codeaurora.org>
-Message-ID: <20110223081539.GM22310@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 23 Feb 2011 17:17:06 +0900
+Subject: [PATCH] ARM: EXYNOS4: Fix wrong constants in the hotplug assembly
+	code.
+In-Reply-To: <AANLkTinpjGwd+pFr1oKQb1jiaih2h81Wp9G7Df8J1LLk@mail.gmail.com>
+References: <1298444621-3739-1-git-send-email-kgene.kim@samsung.com>
+	<AANLkTinpjGwd+pFr1oKQb1jiaih2h81Wp9G7Df8J1LLk@mail.gmail.com>
+Message-ID: <01e901cbd332$12a09350$37e1b9f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravana,
-
-On Tue, Feb 22, 2011 at 08:17:01PM -0800, Saravana Kannan wrote:
-> On 02/22/2011 03:33 PM, Uwe Kleine-K?nig wrote:
-> >I had to degrade one WARN_ON to WARN_ON_ONCE in drivers/clk/clk.c to
-> >actually make it work.  Otherwise console output results in a warning
-> >that results in console output ...
+Kyungmin Park wrote:
 > 
-> You won't be able to do mainline the WARN_ON_ONCE because that will
-> only warn for the first clock that violates whatever condition it's
-> warning about.
-I wonder if it is more sensible while the warning is new.  But I don't
-care much because I'm going to fix the serial driver before switching.
- 
-Best regards
-Uwe
+> Hi,
+> 
+Hi :)
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> At that time Russell modified the s5cv310, tegra, and realview also. I
+> think you also modify it.
+> 
+Maybe you mean commit 30b99d07 (ARM: fix wrongly patched constants).
+It was due to his patch commit e3d9c625 (ARM: CPU hotplug: fix hard-coded
+control register constants) but this is different with that.
+Firstly this patch fixes wrong constants in the hotplug assembly code.
+Then secondly, fixes hard-coded control register constants.
+
+Of course, first reason is more important on this.
+And I'm not sure whether need to fix on tegra also.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> On Wed, Feb 23, 2011 at 4:03 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > This patch fixes wrong constants in the hotplug assembly code for
+> > Exynos4 such as Russell's changing in vexpress hotplug and fixes
+> > hard-coded control register constatns also.
+> >
+> > Reported-by: Changhwan Youn <chaos.youn@samsung.com>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > ---
+> > ?arch/arm/mach-exynos4/hotplug.c | ? ?8 ++++----
+> > ?1 files changed, 4 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-
+> exynos4/hotplug.c
+> > index 4c42f9c..2b5909e 100644
+> > --- a/arch/arm/mach-exynos4/hotplug.c
+> > +++ b/arch/arm/mach-exynos4/hotplug.c
+> > @@ -30,13 +30,13 @@ static inline void cpu_enter_lowpower(void)
+> > ? ? ? ? * Turn off coherency
+> > ? ? ? ? */
+> > ? ? ? ?" ? ? ? mrc ? ? p15, 0, %0, c1, c0, 1\n"
+> > - ? ? ? " ? ? ? bic ? ? %0, %0, #0x20\n"
+> > + ? ? ? " ? ? ? bic ? ? %0, %0, %3\n"
+> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 1\n"
+> > ? ? ? ?" ? ? ? mrc ? ? p15, 0, %0, c1, c0, 0\n"
+> > ? ? ? ?" ? ? ? bic ? ? %0, %0, %2\n"
+> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 0\n"
+> > ? ? ? ? ?: "=&r" (v)
+> > - ? ? ? ? : "r" (0), "Ir" (CR_C)
+> > + ? ? ? ? : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+> > ? ? ? ? ?: "cc");
+> > ?}
+> >
+> > @@ -49,10 +49,10 @@ static inline void cpu_leave_lowpower(void)
+> > ? ? ? ?" ? ? ? orr ? ? %0, %0, %1\n"
+> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 0\n"
+> > ? ? ? ?" ? ? ? mrc ? ? p15, 0, %0, c1, c0, 1\n"
+> > - ? ? ? " ? ? ? orr ? ? %0, %0, #0x20\n"
+> > + ? ? ? " ? ? ? orr ? ? %0, %0, %2\n"
+> > ? ? ? ?" ? ? ? mcr ? ? p15, 0, %0, c1, c0, 1\n"
+> > ? ? ? ? ?: "=&r" (v)
+> > - ? ? ? ? : "Ir" (CR_C)
+> > + ? ? ? ? : "Ir" (CR_C), "Ir" (0x40)
+> > ? ? ? ? ?: "cc");
+> > ?}
+> >
+> > --
+> > 1.7.1
