@@ -1,131 +1,125 @@
 From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Wed, 23 Feb 2011 13:44:10 -0500
-Subject: [PATCH v4 3/4] davinci: add spi devices support for
-	da850/omap-l138/am18x evm
+Date: Wed, 23 Feb 2011 13:44:11 -0500
+Subject: [PATCH v4 4/4] davinci: add spi devices support for
+	da830/omap-l137/am17x evm
 In-Reply-To: <1298486651-18882-1-git-send-email-michael.williamson@criticallink.com>
 References: <1298486651-18882-1-git-send-email-michael.williamson@criticallink.com>
-Message-ID: <1298486651-18882-4-git-send-email-michael.williamson@criticallink.com>
+Message-ID: <1298486651-18882-5-git-send-email-michael.williamson@criticallink.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sekhar Nori <nsekhar@ti.com>
 
 This patch adds the on-board SPI flash device to the
-DA850/OMAP-L138/AM18x EVM. It also registers the SPI flash
+DA830/OMAP-L137/AM17x EVM. It also registers the SPI flash
 device to the MTD subsystem.
 
 Based on SPI flash device support for MityDSP-L138F platform.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-[michael.williamson at criticallink.com: moved da850_evm_spi1_pdata to devices-da8xx.c]
-[michael.williamson at criticallink.com: moved da850evm_init_spi1 to devices-da8xx.c]
+[michael.williamson at criticallink.com: moved da830evm_spi0_pdata to devices-da8xx.c]
+[michael.williamson at criticallink.com: moved da830evm_init_spi0 to devices-da8xx.c]
 Signed-off-by: Michael Williamson <michael.williamson@criticallink.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c |   73 +++++++++++++++++++++++++++++++
- 1 files changed, 73 insertions(+), 0 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c |   67 +++++++++++++++++++++++++++++++
+ 1 files changed, 67 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 11f986b..0aef6b2 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -29,6 +29,8 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/tps6507x.h>
- #include <linux/input/tps6507x-ts.h>
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index b52a3a1..8bc3701 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -20,6 +20,8 @@
+ #include <linux/i2c/at24.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
 +#include <linux/spi/spi.h>
 +#include <linux/spi/flash.h>
  
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
-@@ -38,6 +40,7 @@
- #include <mach/nand.h>
- #include <mach/mux.h>
+@@ -30,6 +32,7 @@
+ #include <mach/da8xx.h>
+ #include <mach/usb.h>
  #include <mach/aemif.h>
 +#include <mach/spi.h>
  
- #define DA850_EVM_PHY_ID		"0:00"
- #define DA850_LCD_PWR_PIN		GPIO_TO_PIN(2, 8)
-@@ -48,6 +51,70 @@
+ #define DA830_EVM_PHY_ID		""
+ /*
+@@ -534,6 +537,64 @@ static struct edma_rsv_info da830_edma_rsv[] = {
+ 	},
+ };
  
- #define DA850_MII_MDIO_CLKEN_PIN	GPIO_TO_PIN(2, 6)
- 
-+static struct mtd_partition da850evm_spiflash_part[] = {
++static struct mtd_partition da830evm_spiflash_part[] = {
 +	[0] = {
-+		.name = "UBL",
++		.name = "DSP-UBL",
 +		.offset = 0,
-+		.size = SZ_64K,
++		.size = SZ_8K,
 +		.mask_flags = MTD_WRITEABLE,
 +	},
 +	[1] = {
-+		.name = "U-Boot",
++		.name = "ARM-UBL",
 +		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_512K,
++		.size = SZ_16K + SZ_8K,
 +		.mask_flags = MTD_WRITEABLE,
 +	},
 +	[2] = {
-+		.name = "U-Boot-Env",
++		.name = "U-Boot",
 +		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_64K,
++		.size = SZ_256K - SZ_32K,
 +		.mask_flags = MTD_WRITEABLE,
 +	},
 +	[3] = {
-+		.name = "Kernel",
++		.name = "U-Boot-Environment",
 +		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_2M + SZ_512K,
++		.size = SZ_16K,
 +		.mask_flags = 0,
 +	},
 +	[4] = {
-+		.name = "Filesystem",
++		.name = "Kernel",
 +		.offset = MTDPART_OFS_APPEND,
-+		.size = SZ_4M,
++		.size = MTDPART_SIZ_FULL,
 +		.mask_flags = 0,
 +	},
-+	[5] = {
-+		.name = "MAC-Address",
-+		.offset = SZ_8M - SZ_64K,
-+		.size = SZ_64K,
-+		.mask_flags = MTD_WRITEABLE,
-+	},
 +};
 +
-+static struct flash_platform_data da850evm_spiflash_data = {
++static struct flash_platform_data da830evm_spiflash_data = {
 +	.name		= "m25p80",
-+	.parts		= da850evm_spiflash_part,
-+	.nr_parts	= ARRAY_SIZE(da850evm_spiflash_part),
-+	.type		= "m25p64",
++	.parts		= da830evm_spiflash_part,
++	.nr_parts	= ARRAY_SIZE(da830evm_spiflash_part),
++	.type		= "w25x32",
 +};
 +
-+static struct davinci_spi_config da850evm_spiflash_cfg = {
++static struct davinci_spi_config da830evm_spiflash_cfg = {
 +	.io_type	= SPI_IO_TYPE_DMA,
 +	.c2tdelay	= 8,
 +	.t2cdelay	= 8,
 +};
 +
-+static struct spi_board_info da850evm_spi_info[] = {
++static struct spi_board_info da830evm_spi_info[] = {
 +	{
 +		.modalias		= "m25p80",
-+		.platform_data		= &da850evm_spiflash_data,
-+		.controller_data	= &da850evm_spiflash_cfg,
++		.platform_data		= &da830evm_spiflash_data,
++		.controller_data	= &da830evm_spiflash_cfg,
 +		.mode			= SPI_MODE_0,
 +		.max_speed_hz		= 30000000,
-+		.bus_num		= 1,
++		.bus_num		= 0,
 +		.chip_select		= 0,
 +	},
 +};
 +
- static struct mtd_partition da850_evm_norflash_partition[] = {
- 	{
- 		.name           = "bootloaders + env",
-@@ -1167,6 +1234,12 @@ static __init void da850_evm_init(void)
+ static __init void da830_evm_init(void)
+ {
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
+@@ -590,6 +651,12 @@ static __init void da830_evm_init(void)
+ 	ret = da8xx_register_rtc();
  	if (ret)
- 		pr_warning("da850_evm_init: suspend registration failed: %d\n",
- 				ret);
+ 		pr_warning("da830_evm_init: rtc setup failed: %d\n", ret);
 +
-+	ret = da8xx_register_spi(1, da850evm_spi_info,
-+				 ARRAY_SIZE(da850evm_spi_info));
++	ret = da8xx_register_spi(0, da830evm_spi_info,
++				 ARRAY_SIZE(da830evm_spi_info));
 +	if (ret)
-+		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
-+				ret);
++		pr_warning("da830_evm_init: spi 0 registration failed: %d\n",
++			   ret);
  }
  
  #ifdef CONFIG_SERIAL_8250_CONSOLE
