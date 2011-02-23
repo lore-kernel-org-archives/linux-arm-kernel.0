@@ -1,68 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Feb 2011 10:39:35 -0000
-Subject: [PATCH 3/5] ARM: tegra: update GPIO chained IRQ handler to
-	use	EOI in parent chip
-In-Reply-To: <20110222195241.GA29559@n2100.arm.linux.org.uk>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-4-git-send-email-will.deacon@arm.com>
-	<AANLkTimYvHOzv2w_oxOB5HJfMhp8Kg_A0-Y7Mj41M-HX@mail.gmail.com>
-	<001d01cbd2c5$a97f17a0$fc7d46e0$@deacon@arm.com>
-	<20110222195241.GA29559@n2100.arm.linux.org.uk>
-Message-ID: <001e01cbd345$f72fcbe0$e58f63a0$@deacon@arm.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 23 Feb 2011 11:50:07 +0100
+Subject: [PATCH V11 0/4] ptp: IEEE 1588 hardware clock support
+In-Reply-To: <cover.1298447722.git.richard.cochran@omicron.at>
+References: <cover.1298447722.git.richard.cochran@omicron.at>
+Message-ID: <20110223105007.GA31292@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+* Previous Discussions
 
-> On Tue, Feb 22, 2011 at 07:21:09PM -0000, Will Deacon wrote:
-> > Hmm, I've seen this problem before. See Russell's explanation here:
-> >
-> > http://lists.arm.linux.org.uk/lurker/message/20101201.172105.938cf2c5.en.html
-> >
-> > I don't believe it's a problem my end, but if it starts happening
-> > regularly I'll investigate further.
-> 
-> I wonder what's happening here is that the mailing list is converting
-> your messages from quoted-printable to plain text.
-> 
-> Looking at two of your recent messages, one of them came via the mailing
-> list.  That one was not quoted-printable.  These ones which you Cc'd me
-> on, and arrived before the copy from the mailing list came through as
-> quoted-printable though.
+  This patch set previously appeared on the netdev list. Since V5 of
+  the character device patch set, the discussion has moved to the
+  lkml.
 
-You've hit the nail on the head. On leaving ARM the headers get munged to:
+  - IEEE 1588 hardware clock support [V5]
+    http://lkml.org/lkml/2010/8/16/90
 
-Content-Type: text/plain; charset=WINDOWS-1252
-Content-Transfer-Encoding: quoted-printable
- 
-The mailing list fixes that up. See the headers on one of the LPAE patches
-sent by Catalin:
+  - POSIX clock tuning syscall with static clock ids
+    http://lkml.org/lkml/2010/8/23/49
 
-https://patchwork.kernel.org/patch/502491/
+  - POSIX clock tuning syscall with dynamic clock ids
+    http://lkml.org/lkml/2010/9/3/119
 
-> AFAIK, git-send-email doesn't generate quoted-printable mails.  From what
-> I remember, it doesn't generate any MIME headers at all either, expecting
-> the first MTA to be able to figure out what to do with the following
-> string of bytes.  It's not surprising that some MTAs may do weird things
-> with that.
->
-> I don't use git send-email, but instead have my own scripts based around
-> git format-patch, and adds the following headers:
-> 
->   MIME-Version: 1.0
->   Content-Disposition: inline
->   Content-Type: text/plain; charset="us-ascii"
+  - IEEE 1588 hardware clock support [V6]
+    http://lkml.org/lkml/2010/9/23/310
 
-Even if I make sure my headers match this, they still get reverted to the
-stuff I mentioned earlier. If I specify Content-Transfer-Encoding: binary
-then it gets left alone but I'm not sure if that's better or worse than
-quoted-printable.
- 
-> to each file it produces, as well as other header modifications.  I've
-> then got a separate script which sends the contents of the directory
-> slowly (20sec between each message) via '/usr/sbin/sendmail' (iow,
-> the local MTA - exim for me) to make it a little kinder on MTAs.
+  - Dynamic clock devices [RFC]
+    http://lkml.org/lkml/2010/11/4/290
 
-Oh for a local MTA... (ports are all blocked here).
+  - IEEE 1588 hardware clock support [V7]
+    http://lkml.org/lkml/2010/12/16/195
 
-Will
+  - IEEE 1588 hardware clock support [V8]
+    http://lkml.org/lkml/2010/12/31/128
+
+  - IEEE 1588 hardware clock support [V9]
+    http://lkml.org/lkml/2011/1/13/65
+
+  - IEEE 1588 hardware clock support [V10]
+    http://lkml.org/lkml/2011/1/27/71
+
+  - Thomas Gleixner: Rework of the PTP support series core code
+    http://lkml.org/lkml/2011/2/1/137
