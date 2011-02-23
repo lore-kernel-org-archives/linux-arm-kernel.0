@@ -1,110 +1,54 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 23 Feb 2011 14:49:30 -0700
-Subject: [PATCH v3] ARM: Tegra: DMA: Fail safe if initialization fails
-Message-ID: <1298497770-8859-1-git-send-email-swarren@nvidia.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 23 Feb 2011 13:51:43 -0800
+Subject: [PATCH 5/5] ARM: Tegra: Enable Harmony audio support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF03112A5D95@HQMAIL01.nvidia.com>
+References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
+	<1298487532-5000-6-git-send-email-swarren@nvidia.com>
+	<AANLkTimffVNK2EmTqypQcrWHLisf3c8_dMsHwSbv-nWi@mail.gmail.com>
+	<AANLkTi=tDJvfEFFvXGEkZswRWekRLuz4rBoT-0hgobgn@mail.gmail.com>
+	<AANLkTinzVinbW_rDt5Rqe7i68P2u_XvDvRWA8R2mq0_9@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF03112A5D95@HQMAIL01.nvidia.com>
+Message-ID: <AANLkTikmP5H6TQN1v1BNbGTfGokHgyXQ5LbFpEWgWjPB@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tegra_dma_init currently simply bails out early if any initialization fails.
-This skips various data-structure initialization. In turn, this means that
-tegra_dma_allocate_channel can still hand out channels. In this case, when
-tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
-on ch->list will OOPS since the list's next/prev pointers may still be
-NULL.
+On Wed, Feb 23, 2011 at 1:35 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, February 23, 2011 2:25 PM:
+>> On Wed, Feb 23, 2011 at 1:21 PM, Colin Cross <ccross@android.com> wrote:
+>> > On Wed, Feb 23, 2011 at 1:08 PM, Olof Johansson <olof@lixom.net> wrote:
+>> >> Stephen,
+>> >>
+>> >> Since this depends on i2c, and registers one of the adapters to do it,
+>> >> we should just get the adapters registered separately (all of them)
+>> >> before this. I was holding off that part of board code since the i2c
+>> >> driver went up that maintainer path instead, but if Colin pulls it
+>> >> into tegra for-next, then I'll go ahead with those peices as well.
+>> >
+>> > I'll merge the i2c-tegra branch into for-next (assuming Ben doesn't
+>> > object to it), and you can put all the i2c devices in your pull
+>> > request. ?That way we can get everything except this patch into the
+>> > first pull request to Linus, and just put this patch into a second
+>> > pull request once the ASoC branch is merged.
+>>
+>> Sure, that works. I'll stage the i2c changes tonight.
+>
+> OK, so just so I'm clear:
+>
+> Patches 1..4 are all going in as-is.
+>
+> I should re-post patch 5 once the merge window is open, having rebased
+> it on Olof's i2c registration changes, and
+> s/GPIO_WM8903/HARMONY_GPIO_WM8903/. Or, should I repost as soon as Olof
+> has updated his branch with the I2C changes, and you'll just hold off
+> applying it until the merge window?
 
-To solve this, add an explicit "initialized" flag, only set this once _init
-has fully completed successfully, and have _allocate_channel refuse to hand
-out channels if this is not set.
+How big would the delta be between a patch that would apply (and work)
+with current .38-rc wm8903 platform data? If it's just the GPIO base,
+we can merge everything but that and just do the small change late in
+the merge window.
 
-While at it, simplify _init:
-* Remove redundant memsets
-* Use bitmap_fill to mark all channels as in-use up-front, and remove
-  some now-redundant bitmap initialization loops.
-* Only mark a channel as free once all channel-related initialization has
-  completed.
+And yeah, please repost after the i2c stuff is in my branch, I'll
+stage it accordingly.
 
-Finally, the successful exit path from _init always has ret==0, so just
-hard-code that return. The error path still returns ret.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-v3:
-s/initialized/tegra_dma_initialized/
-Change type to bool, assign true not 1
-Add WARN_ON
-Revert whitespace cleanup
-
- arch/arm/mach-tegra/dma.c |   22 ++++++++++------------
- 1 files changed, 10 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-index bd4f62a..e945ae2 100644
---- a/arch/arm/mach-tegra/dma.c
-+++ b/arch/arm/mach-tegra/dma.c
-@@ -127,6 +127,7 @@ struct tegra_dma_channel {
- 
- #define  NV_DMA_MAX_CHANNELS  32
- 
-+static bool tegra_dma_initialized;
- static DEFINE_MUTEX(tegra_dma_lock);
- 
- static DECLARE_BITMAP(channel_usage, NV_DMA_MAX_CHANNELS);
-@@ -352,6 +353,9 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
- 	int channel;
- 	struct tegra_dma_channel *ch = NULL;
- 
-+	if (WARN_ON(!tegra_dma_initialized))
-+		return NULL;
-+
- 	mutex_lock(&tegra_dma_lock);
- 
- 	/* first channel is the shared channel */
-@@ -678,6 +682,8 @@ int __init tegra_dma_init(void)
- 	void __iomem *addr;
- 	struct clk *c;
- 
-+	bitmap_fill(channel_usage, NV_DMA_MAX_CHANNELS);
-+
- 	c = clk_get_sys("tegra-dma", NULL);
- 	if (IS_ERR(c)) {
- 		pr_err("Unable to get clock for APB DMA\n");
-@@ -696,18 +702,9 @@ int __init tegra_dma_init(void)
- 	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
- 	       addr + APB_DMA_IRQ_MASK_SET);
- 
--	memset(channel_usage, 0, sizeof(channel_usage));
--	memset(dma_channels, 0, sizeof(dma_channels));
--
--	/* Reserve all the channels we are not supposed to touch */
--	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_MIN; i++)
--		__set_bit(i, channel_usage);
--
- 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
- 		struct tegra_dma_channel *ch = &dma_channels[i];
- 
--		__clear_bit(i, channel_usage);
--
- 		ch->id = i;
- 		snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
- 
-@@ -726,14 +723,15 @@ int __init tegra_dma_init(void)
- 			goto fail;
- 		}
- 		ch->irq = irq;
-+
-+		__clear_bit(i, channel_usage);
- 	}
- 	/* mark the shared channel allocated */
- 	__set_bit(TEGRA_SYSTEM_DMA_CH_MIN, channel_usage);
- 
--	for (i = TEGRA_SYSTEM_DMA_CH_MAX+1; i < NV_DMA_MAX_CHANNELS; i++)
--		__set_bit(i, channel_usage);
-+	tegra_dma_initialized = true;
- 
--	return ret;
-+	return 0;
- fail:
- 	writel(0, addr + APB_DMA_GEN);
- 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
--- 
-1.7.1
+-Olof
