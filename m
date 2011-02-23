@@ -1,83 +1,47 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 23 Feb 2011 13:24:44 -0600
-Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found on
-	the MPC85xx.
-In-Reply-To: <20110223175459.GH14597@angua.secretlab.ca>
-References: <cover.1298447722.git.richard.cochran@omicron.at>
-	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
-	<20110223165058.GE14597@angua.secretlab.ca>
-	<20110223112612.30071995@schlenkerla>
-	<20110223175459.GH14597@angua.secretlab.ca>
-Message-ID: <20110223132444.65dfdda4@schlenkerla>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 23 Feb 2011 11:26:42 -0800
+Subject: [PATCH v2] i2c: tegra: Add i2c support
+In-Reply-To: <20110223002059.GV15795@trinity.fluff.org>
+References: <AANLkTim0X=gUwYJmR+EAYjGamiJb7tgiVEjwqCEF0-L0@mail.gmail.com>
+	<1298250861-27094-1-git-send-email-ccross@android.com>
+	<20110223002059.GV15795@trinity.fluff.org>
+Message-ID: <AANLkTi=wtxzKGHXgtoUsV8J4O3NUYdz9PGHi-sdd-Osy@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Feb 2011 10:54:59 -0700
-Grant Likely <grant.likely@secretlab.ca> wrote:
-
-> On Wed, Feb 23, 2011 at 11:26:12AM -0600, Scott Wood wrote:
-> > eTSEC is versioned, that's more reliable than the chip name since chips
-> > have revisions (rev 2.1 of mpc8313 has eTSEC 1.6, not sure about previous
-> > revs of mpc8313).  Logic blocks can be and have been uprevved between one
-> > revision of a chip to the next.  I think "fsl,mpc8313rev2.1-etsec-ptp"
-> > would be taking things a bit too far (and there could be board-level bugs
-> > too...).
-> > 
-> > If you really need to know the exact SoC you're on, look in SVR (which
-> > will provide revision info as well).  Isn't the device tree for things that
-> > can't be probed?
-> 
-> This is far more about the binding than it is about the chip revision.
-> When documenting a binding it makes far more sense to anchor it to a
-> specific implementation than to try and come up with a 'generic'
-> catchall.
-
-Whatever string is used should be written into a binding document.
-
-fsl,etsec-v1.6-ptp seems like it would be just as good for that purpose.
-
-Even just fsl,etsec-ptp will identify the binding, though it's lacking in
-identifying the hardware (in the absence of access to the eTSEC ID
-registers).
-
-If somehow Freescale makes something completely different in the future
-called "etsec-ptp", then we'll just have to pick a different name for
-*that* compatible (after we smack whoever was responsible for reusing the
-name).  The point of the vendor namespacing is to constrain this problem to
-a manageable scope.
-
-> > The eTSEC revision is probeable as well, but due the way PTP is described as
-> > a separate node, the driver doesn't have straightforward access to those
-> > registers.
-> 
-> Ignorant question: Should the ptp be described as a separate node?
-
-Probably not.
-
-> > Insisting on an explicit chip also encourages people to claim compatibility
-> > with that chip without ensuring that it really is fully compatible.
-> 
-> In practise, I've not seen this to be an issue.
-
-I see it often enough in our BSPs (though the BSP device trees tend to be
-problematic in a variety of ways), especially on things like guts and
-pmc.
-
-It's a question of how strong a statement people are asked to make -- in a
-place where fixing errors is somewhat painful, and we don't really need that
-strong statement of compatibility to be made, as long as there's another
-way to fully identify the hardware (e.g. SVR, top-level board compatible) if
-some strange workaround needs to be made[1].
-
-To turn things around, in practice, I've not seen compatibles that don't
-encode a specific chip name to be a problem, as long as it's well
-documented what it means.
-
--Scott
-
-[1] IIRC, this was the original reason for citing a specific chip, but it
-doesn't hold up if that chip gets cited by other chips as compatible.  If
-compatibliity includes having all the same bugs, then very little will be
-able to claim compatibility, and we'll be back to long lists of device
-IDs in the driver.  Not to mention errata that are discovered after a
-device tree claiming compatibility is released...
+On Tue, Feb 22, 2011 at 4:20 PM, Ben Dooks <ben-i2c@fluff.org> wrote:
+> On Sun, Feb 20, 2011 at 05:14:21PM -0800, Colin Cross wrote:
+>> Adds I2C bus driver for nVidia Tegra SoCs. ?Tegra includes 4 I2C
+>> controllers, one of which is inside the Dynamic Voltage Controller
+>> and has a slightly different register map.
+>>
+>> Signed-off-by: Colin Cross <ccross@android.com>
+>
+> Would have been helpful to start a new thread, missed this the first time
+> around.
+>
+>> + ? ? i2c_dev = kzalloc(sizeof(struct tegra_i2c_dev), GFP_KERNEL);
+>> + ? ? if (!i2c_dev) {
+>
+> no error print here.
+>
+>> + ? ? ? ? ? ? ret = -ENOMEM;
+>> + ? ? ? ? ? ? goto err_i2c_clk_put;
+>> + ? ? }
+>
+>> + ? ? if (pdev->id == 3)
+>> + ? ? ? ? ? ? i2c_dev->is_dvc = 1;
+>> + ? ? init_completion(&i2c_dev->msg_complete);
+>
+> you might want to think about having a seperate platform bus name for
+> this case, and switching the is_dvc field on that. It'll make life much
+> easier if someone decides that what the next tegra i2c needs is 5 i2c
+> controllers.
+>
+> I'll consider putting this (as is) into the -next tree, but would like
+> to see the issues with readsl/writesl sorted out and any other review
+> comments sorted.
+>
+Thanks for merging it.  Can I merge your i2c-tegra tree into the tegra
+for-next tree to allow some board changes that depend on the header to
+go on top?
