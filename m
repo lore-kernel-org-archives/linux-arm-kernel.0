@@ -1,129 +1,130 @@
 From: ccross@android.com (Colin Cross)
-Date: Wed, 23 Feb 2011 13:03:07 -0800
-Subject: [PATCH v2] ARM: Tegra: DMA: Fail safe if initialization fails
-In-Reply-To: <1298491602-20072-1-git-send-email-swarren@nvidia.com>
-References: <1298491602-20072-1-git-send-email-swarren@nvidia.com>
-Message-ID: <AANLkTimrhHO=kWp9c__qfub3jBYrpsjy5J2zKb+LCnsh@mail.gmail.com>
+Date: Wed, 23 Feb 2011 13:04:16 -0800
+Subject: [PATCH 1/5] ARM: Tegra: Add devices.c entries for audio
+In-Reply-To: <1298487532-5000-2-git-send-email-swarren@nvidia.com>
+References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
+	<1298487532-5000-2-git-send-email-swarren@nvidia.com>
+Message-ID: <AANLkTi=awEAk3MA5LjrnxBE8epqv7c4xLXN8RnErkLSS@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 12:06 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> tegra_dma_init currently simply bails out early if any initialization fails.
-> This skips various data-structure initialization. In turn, this means that
-> tegra_dma_allocate_channel can still hand out channels. In this case, when
-> tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
-> on ch->list will OOPS since the list's next/prev pointers may still be
-> NULL.
->
-> To solve this, add an explicit "initialized" flag, only set this once _init
-> has fully completed successfully, and have _allocate_channel refuse to hand
-> out channels if this is not set.
->
-> While at it, simplify _init:
-> * Remove redundant memsets
-> * Use bitmap_fill to mark all channels as in-use up-front, and remove
-> ?some now-redundant bitmap initialization loops.
-> * Only mark a channel as free once all channel-related initialization has
-> ?completed.
->
-> Finally, the successful exit path from _init always has ret==0, so just
-> hard-code that return. The error path still returns ret.
+On Wed, Feb 23, 2011 at 10:58 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> For I2S, DAS, PCM devices
 >
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
-> v2:
-> * Added explicit initialized flag. I chose not to re-use the shared-channel
-> ?bitmap entry for this purpose, since that bit needs to be marked in-use
-> ?so that the non-shared-channel path doesn't hand out that channel.
-> * Removed redundant memsets
-> * Use bitmap_fill instead of a loop
-> * Hard-code success return value
+> NOTE: This patch will not apply until Olof's recently posted
+> boards-for-next branch is merged.
 >
-> ?arch/arm/mach-tegra/dma.c | ? 23 ++++++++++-------------
-> ?1 files changed, 10 insertions(+), 13 deletions(-)
+> ?arch/arm/mach-tegra/devices.c ? ? ? ? ? ?| ? 70 ++++++++++++++++++++++++++++++
+> ?arch/arm/mach-tegra/devices.h ? ? ? ? ? ?| ? ?4 ++
+> ?arch/arm/mach-tegra/include/mach/iomap.h | ? ?3 +
+> ?3 files changed, 77 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
-> index bd4f62a..01db832 100644
-> --- a/arch/arm/mach-tegra/dma.c
-> +++ b/arch/arm/mach-tegra/dma.c
-> @@ -127,8 +127,8 @@ struct tegra_dma_channel {
->
-> ?#define ?NV_DMA_MAX_CHANNELS ?32
->
-> +static int initialized;
-Use a bool, and call it something like tegra_dma_initialized to
-prevent warnings if someone else forgets a static on a variable called
-initialized.
-
-> ?static DEFINE_MUTEX(tegra_dma_lock);
-> -
-Unnecessary whitespace change
-
-> ?static DECLARE_BITMAP(channel_usage, NV_DMA_MAX_CHANNELS);
-> ?static struct tegra_dma_channel dma_channels[NV_DMA_MAX_CHANNELS];
->
-> @@ -352,6 +352,9 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
-> ? ? ? ?int channel;
-> ? ? ? ?struct tegra_dma_channel *ch = NULL;
->
-> + ? ? ? if (!initialized)
-Maybe if (WARN_ON(!initialized))?
-
-> + ? ? ? ? ? ? ? return NULL;
+> diff --git a/arch/arm/mach-tegra/devices.c b/arch/arm/mach-tegra/devices.c
+> index 682e6d3..1528f9d 100644
+> --- a/arch/arm/mach-tegra/devices.c
+> +++ b/arch/arm/mach-tegra/devices.c
+> @@ -503,3 +503,73 @@ struct platform_device tegra_uarte_device = {
+> ? ? ? ? ? ? ? ?.coherent_dma_mask ? ? ?= DMA_BIT_MASK(32),
+> ? ? ? ?},
+> ?};
 > +
-> ? ? ? ?mutex_lock(&tegra_dma_lock);
->
-> ? ? ? ?/* first channel is the shared channel */
-> @@ -678,6 +681,8 @@ int __init tegra_dma_init(void)
-> ? ? ? ?void __iomem *addr;
-> ? ? ? ?struct clk *c;
->
-> + ? ? ? bitmap_fill(channel_usage, NV_DMA_MAX_CHANNELS);
+> +static struct resource i2s_resource1[] = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .start ?= INT_I2S1,
+> + ? ? ? ? ? ? ? .end ? ?= INT_I2S1,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ
+> + ? ? ? },
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .start ?= TEGRA_DMA_REQ_SEL_I2S_1,
+> + ? ? ? ? ? ? ? .end ? ?= TEGRA_DMA_REQ_SEL_I2S_1,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_DMA
+> + ? ? ? },
+> + ? ? ? [2] = {
+> + ? ? ? ? ? ? ? .start ?= TEGRA_I2S1_BASE,
+> + ? ? ? ? ? ? ? .end ? ?= TEGRA_I2S1_BASE + TEGRA_I2S1_SIZE - 1,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM
+> + ? ? ? }
+> +};
 > +
-> ? ? ? ?c = clk_get_sys("tegra-dma", NULL);
-> ? ? ? ?if (IS_ERR(c)) {
-> ? ? ? ? ? ? ? ?pr_err("Unable to get clock for APB DMA\n");
-> @@ -696,18 +701,9 @@ int __init tegra_dma_init(void)
-> ? ? ? ?writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
-> ? ? ? ? ? ? ? addr + APB_DMA_IRQ_MASK_SET);
->
-> - ? ? ? memset(channel_usage, 0, sizeof(channel_usage));
-> - ? ? ? memset(dma_channels, 0, sizeof(dma_channels));
-> -
-> - ? ? ? /* Reserve all the channels we are not supposed to touch */
-> - ? ? ? for (i = 0; i < TEGRA_SYSTEM_DMA_CH_MIN; i++)
-> - ? ? ? ? ? ? ? __set_bit(i, channel_usage);
-> -
-> ? ? ? ?for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
-> ? ? ? ? ? ? ? ?struct tegra_dma_channel *ch = &dma_channels[i];
->
-> - ? ? ? ? ? ? ? __clear_bit(i, channel_usage);
-> -
-> ? ? ? ? ? ? ? ?ch->id = i;
-> ? ? ? ? ? ? ? ?snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
->
-> @@ -726,14 +722,15 @@ int __init tegra_dma_init(void)
-> ? ? ? ? ? ? ? ? ? ? ? ?goto fail;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?ch->irq = irq;
+> +static struct resource i2s_resource2[] = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .start ?= INT_I2S2,
+> + ? ? ? ? ? ? ? .end ? ?= INT_I2S2,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ
+> + ? ? ? },
+> + ? ? ? [1] = {
+> + ? ? ? ? ? ? ? .start ?= TEGRA_DMA_REQ_SEL_I2S2_1,
+> + ? ? ? ? ? ? ? .end ? ?= TEGRA_DMA_REQ_SEL_I2S2_1,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_DMA
+> + ? ? ? },
+> + ? ? ? [2] = {
+> + ? ? ? ? ? ? ? .start ?= TEGRA_I2S2_BASE,
+> + ? ? ? ? ? ? ? .end ? ?= TEGRA_I2S2_BASE + TEGRA_I2S2_SIZE - 1,
+> + ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM
+> + ? ? ? }
+> +};
 > +
-> + ? ? ? ? ? ? ? __clear_bit(i, channel_usage);
-> ? ? ? ?}
-> ? ? ? ?/* mark the shared channel allocated */
-> ? ? ? ?__set_bit(TEGRA_SYSTEM_DMA_CH_MIN, channel_usage);
+> +struct platform_device tegra_i2s_device1 = {
+> + ? ? ? .name ? ? ? ? ? = "tegra-i2s",
+> + ? ? ? .id ? ? ? ? ? ? = 0,
+> + ? ? ? .resource ? ? ? = i2s_resource1,
+> + ? ? ? .num_resources ?= ARRAY_SIZE(i2s_resource1),
+> +};
+> +
+> +struct platform_device tegra_i2s_device2 = {
+> + ? ? ? .name ? ? ? ? ? = "tegra-i2s",
+> + ? ? ? .id ? ? ? ? ? ? = 1,
+> + ? ? ? .resource ? ? ? = i2s_resource2,
+> + ? ? ? .num_resources ?= ARRAY_SIZE(i2s_resource2),
+> +};
+> +
+> +static struct resource tegra_das_resources[] = {
+> + ? ? ? [0] = {
+> + ? ? ? ? ? ? ? .start = TEGRA_APB_MISC_DAS_BASE,
+> + ? ? ? ? ? ? ? .end = TEGRA_APB_MISC_DAS_BASE + TEGRA_APB_MISC_DAS_SIZE - 1,
+> + ? ? ? ? ? ? ? .flags = IORESOURCE_MEM,
+> + ? ? ? },
+> +};
+> +
+> +struct platform_device tegra_das_device = {
+> + ? ? ? .name ? ? ? ? ? = "tegra-das",
+> + ? ? ? .id ? ? ? ? ? ? = -1,
+> + ? ? ? .num_resources ?= ARRAY_SIZE(tegra_das_resources),
+> + ? ? ? .resource ? ? ? = tegra_das_resources,
+> +};
+> +
+> +struct platform_device tegra_pcm_device = {
+> + ? ? ? .name = "tegra-pcm-audio",
+> + ? ? ? .id = -1,
+> +};
+> diff --git a/arch/arm/mach-tegra/devices.h b/arch/arm/mach-tegra/devices.h
+> index 888810c..4a7dc0a 100644
+> --- a/arch/arm/mach-tegra/devices.h
+> +++ b/arch/arm/mach-tegra/devices.h
+> @@ -42,5 +42,9 @@ extern struct platform_device tegra_uartc_device;
+> ?extern struct platform_device tegra_uartd_device;
+> ?extern struct platform_device tegra_uarte_device;
+> ?extern struct platform_device tegra_pmu_device;
+> +extern struct platform_device tegra_i2s_device1;
+> +extern struct platform_device tegra_i2s_device2;
+> +extern struct platform_device tegra_das_device;
+> +extern struct platform_device tegra_pcm_device;
 >
-> - ? ? ? for (i = TEGRA_SYSTEM_DMA_CH_MAX+1; i < NV_DMA_MAX_CHANNELS; i++)
-> - ? ? ? ? ? ? ? __set_bit(i, channel_usage);
-> + ? ? ? initialized = 1;
-intialized = true
+> ?#endif
+> diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+> index 691cdab..19dec3a 100644
+> --- a/arch/arm/mach-tegra/include/mach/iomap.h
+> +++ b/arch/arm/mach-tegra/include/mach/iomap.h
+> @@ -122,6 +122,9 @@
+> ?#define TEGRA_APB_MISC_BASE ? ? ? ? ? ?0x70000000
+> ?#define TEGRA_APB_MISC_SIZE ? ? ? ? ? ?SZ_4K
+>
+> +#define TEGRA_APB_MISC_DAS_BASE ? ? ? ? ? ? ? ?0x70000c00
+> +#define TEGRA_APB_MISC_DAS_SIZE ? ? ? ? ? ? ? ?SZ_128
+> +
+> ?#define TEGRA_AC97_BASE ? ? ? ? ? ? ? ? ? ? ? ?0x70002000
+> ?#define TEGRA_AC97_SIZE ? ? ? ? ? ? ? ? ? ? ? ?SZ_512
 
->
-> - ? ? ? return ret;
-> + ? ? ? return 0;
-> ?fail:
-> ? ? ? ?writel(0, addr + APB_DMA_GEN);
-> ? ? ? ?for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
-> --
-> 1.7.1
->
->
+Acked-by: Colin Cross <ccross@android.com>
