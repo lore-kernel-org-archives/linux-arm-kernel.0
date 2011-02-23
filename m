@@ -1,171 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 23 Feb 2011 10:13:56 +0100
-Subject: [PATCH] ARM: mx51_defconfig: enable various options
-In-Reply-To: <20110223091207.GP22310@pengutronix.de>
-References: <20110223091207.GP22310@pengutronix.de>
-Message-ID: <1298452436-32085-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: dacohen@gmail.com (David Cohen)
+Date: Wed, 23 Feb 2011 11:45:17 +0200
+Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
+	handling
+In-Reply-To: <AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
+References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
+	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
+	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
+Message-ID: <AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- - all currently available machines
- - MXC_PWM
- - CAN_MCP251X (not yet available but pending)
- - MTD_NAND_MXC and UBI
- - I2C_IMX and SPI_IMX
- - mc13xxx including regulator, rtc and touch support
- - SND_IMX_SOC
- - IMX_SDMA
+On Wed, Feb 23, 2011 at 3:17 AM, Guzman Lugo, Fernando
+<fernando.lugo@ti.com> wrote:
+> On Wed, Feb 16, 2011 at 1:35 PM, David Cohen <dacohen@gmail.com> wrote:
+>> Add support to register an isr for IOMMU fault situations and adapt it
+>> to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
+>> module might want to be informed when errors happen in order to debug it
+>> or react.
+>>
+>> Signed-off-by: David Cohen <dacohen@gmail.com>
+>> ---
+>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 17 +++++++++-
+>> ?arch/arm/plat-omap/include/plat/iommu.h | ? 14 ++++++++-
+>> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 52 ++++++++++++++++++++++---------
+>> ?3 files changed, 65 insertions(+), 18 deletions(-)
+>>
+> ....
+>
+>> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
+>> ?}
+>> ?EXPORT_SYMBOL_GPL(iommu_put);
+>>
+>> +int iommu_set_isr(const char *name,
+>> + ? ? ? ? ? ? ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *priv),
+>> + ? ? ? ? ? ? ? ? void *isr_priv)
+>> +{
+>> + ? ? ? struct device *dev;
+>> + ? ? ? struct iommu *obj;
+>> +
+>
+> if the driver support multiple user for the same iommu why can only
+> one callback be registered? should it support register multiple
+> callback function (one per user)?
 
-The change CONFIG_LEDS_CLASS=m -> y was needed to fix a kconfig warning
+Can you define a scenario for that?
+On OMAP3 ISP the multiple users are the multiple ISP submodule, but I
+don't think it's necessary all submodule to have a specific callback.
+ISP core layer should handle.
 
-	arch/arm/configs/mx51_defconfig:113:warning: symbol value 'm' invalid for LEDS_CLASS
+Br,
 
-and was suggested independently by Shawn Guo, too.
+David
 
-The other changes are either needed to get the options above or just update
-noise.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/configs/mx51_defconfig |   53 ++++++++++++++++++++++++++++++++------
- 1 files changed, 44 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-index 9cba68c..11a9904 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -17,6 +17,12 @@ CONFIG_ARCH_MX5=y
- CONFIG_MACH_MX51_BABBAGE=y
- CONFIG_MACH_MX51_3DS=y
- CONFIG_MACH_EUKREA_CPUIMX51=y
-+CONFIG_MACH_EUKREA_CPUIMX51SD=y
-+CONFIG_MACH_MX51_EFIKAMX=y
-+CONFIG_MACH_MX53_EVK=y
-+CONFIG_MACH_MX53_SMD=y
-+CONFIG_MACH_MX53_LOCO=y
-+CONFIG_MXC_PWM=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT_VOLUNTARY=y
-@@ -41,13 +47,26 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_INET_XFRM_MODE_BEET is not set
- # CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
-+CONFIG_CAN=y
-+CONFIG_CAN_RAW=y
-+CONFIG_CAN_DEV=y
-+CONFIG_CAN_CALC_BITTIMING=y
-+CONFIG_CAN_MCP251X=y
- # CONFIG_WIRELESS is not set
- # CONFIG_STANDALONE is not set
- CONFIG_CONNECTOR=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CONCAT=y
-+CONFIG_MTD_PARTITIONS=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_MXC=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
--# CONFIG_MISC_DEVICES is not set
- CONFIG_SCSI=y
- # CONFIG_SCSI_PROC_FS is not set
- CONFIG_BLK_DEV_SD=y
-@@ -58,6 +77,7 @@ CONFIG_SCSI_SCAN_ASYNC=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_ATA=m
- CONFIG_NETDEVICES=y
-+CONFIG_MII=m
- CONFIG_MARVELL_PHY=y
- CONFIG_DAVICOM_PHY=y
- CONFIG_QSEMI_PHY=y
-@@ -74,7 +94,6 @@ CONFIG_LSI_ET1011C_PHY=y
- CONFIG_MDIO_BITBANG=y
- CONFIG_MDIO_GPIO=y
- CONFIG_NET_ETHERNET=y
--CONFIG_MII=m
- CONFIG_FEC=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
-@@ -82,10 +101,12 @@ CONFIG_FEC=y
- CONFIG_INPUT_FF_MEMLESS=m
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
- CONFIG_INPUT_EVDEV=y
--CONFIG_KEYBOARD_GPIO=y
- CONFIG_INPUT_EVBUG=m
-+CONFIG_KEYBOARD_GPIO=y
- CONFIG_MOUSE_PS2=m
- CONFIG_MOUSE_PS2_ELANTECH=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_MC13783=y
- CONFIG_SERIO_SERPORT=m
- CONFIG_VT_HW_CONSOLE_BINDING=y
- # CONFIG_DEVKMEM is not set
-@@ -100,8 +121,21 @@ CONFIG_I2C_CHARDEV=m
- CONFIG_I2C_ALGOBIT=m
- CONFIG_I2C_ALGOPCF=m
- CONFIG_I2C_ALGOPCA=m
-+CONFIG_I2C_IMX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_IMX=y
-+CONFIG_SPI_SPIDEV=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_MFD_MC13XXX=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_MC13783=y
-+CONFIG_REGULATOR_MC13892=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+# CONFIG_SND_SUPPORT_OLD_API is not set
-+CONFIG_SND_SOC=y
-+CONFIG_SND_IMX_SOC=y
- # CONFIG_HID_SUPPORT is not set
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
-@@ -110,9 +144,12 @@ CONFIG_MMC=y
- CONFIG_MMC_BLOCK=m
- CONFIG_MMC_SDHCI=m
- CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=m
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_PWM=y
- CONFIG_RTC_CLASS=y
--CONFIG_RTC_INTF_DEV_UIE_EMUL=y
-+CONFIG_RTC_DRV_MC13XXX=y
-+CONFIG_DMADEVICES=y
-+CONFIG_IMX_SDMA=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
-@@ -126,7 +163,6 @@ CONFIG_EXT4_FS_SECURITY=y
- CONFIG_QUOTA=y
- CONFIG_QUOTA_NETLINK_INTERFACE=y
- # CONFIG_PRINT_QUOTA_WARNING is not set
--CONFIG_AUTOFS_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_FUSE_FS=y
- CONFIG_ISO9660_FS=m
-@@ -153,14 +189,13 @@ CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
- # CONFIG_SCHED_DEBUG is not set
- # CONFIG_DEBUG_BUGVERBOSE is not set
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- # CONFIG_FTRACE is not set
- # CONFIG_ARM_UNWIND is not set
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_SECURITYFS=y
--CONFIG_CRYPTO_DEFLATE=y
--CONFIG_CRYPTO_LZO=y
-+CONFIG_CRYPTO_DEFLATE=m
-+CONFIG_CRYPTO_LZO=m
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- # CONFIG_CRYPTO_HW is not set
- CONFIG_CRC_CCITT=m
--- 
-1.7.2.3
+>
+> Regards,
+> Fernando.
+>
