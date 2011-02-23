@@ -1,39 +1,65 @@
 From: ccross@android.com (Colin Cross)
-Date: Wed, 23 Feb 2011 13:06:27 -0800
-Subject: [PATCH 2/5] ARM: Tegra: Rename I2S clocks to match driver name
-In-Reply-To: <1298487532-5000-3-git-send-email-swarren@nvidia.com>
+Date: Wed, 23 Feb 2011 13:06:40 -0800
+Subject: [PATCH 3/5] ARM: Tegra: Rename clk_dev1/2 to cdev1/2
+In-Reply-To: <1298487532-5000-4-git-send-email-swarren@nvidia.com>
 References: <1298487532-5000-1-git-send-email-swarren@nvidia.com>
-	<1298487532-5000-3-git-send-email-swarren@nvidia.com>
-Message-ID: <AANLkTintojPzByxWM9L3JUzbvmTozf0pLA_Joy+01DUk@mail.gmail.com>
+	<1298487532-5000-4-git-send-email-swarren@nvidia.com>
+Message-ID: <AANLkTi=Wbe_og3fJ__cC+Rdgagb_RQNgWPmoZUjvRYAD@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Feb 23, 2011 at 10:58 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> The driver is tegra-i2s not just i2s. Rename the clocks to match, so that
-> clk_get_sys can look up by driver name.
+> The ASoC machine driver was written assuming my previous patch to add
+> complete support for these clocks, which named them cdev1/2. Rename
+> the clocks to match that, to avoid churn in the ASoC driver.
+>
+> This rename also makes the clocks more consistent with other Tegra
+> clocks irrespective of any of that.
 >
 > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
 > NOTE: This patch should apply right now.
 >
-> ?arch/arm/mach-tegra/tegra2_clocks.c | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
+> ?arch/arm/mach-tegra/tegra2_clocks.c | ? 12 ++++++------
+> ?1 files changed, 6 insertions(+), 6 deletions(-)
 >
 > diff --git a/arch/arm/mach-tegra/tegra2_clocks.c b/arch/arm/mach-tegra/tegra2_clocks.c
-> index 3015a2c..ee3f9d7 100644
+> index ee3f9d7..6d7c4ee 100644
 > --- a/arch/arm/mach-tegra/tegra2_clocks.c
 > +++ b/arch/arm/mach-tegra/tegra2_clocks.c
-> @@ -2128,8 +2128,8 @@ struct clk tegra_list_clks[] = {
-> ? ? ? ?PERIPH_CLK("apbdma", ? ?"tegra-dma", ? ? ? ? ? ?NULL, ? 34, ? ? 0, ? ? ?108000000, mux_pclk, ? ? ? ? ? ? ? ? ? ?0),
-> ? ? ? ?PERIPH_CLK("rtc", ? ? ? "rtc-tegra", ? ? ? ? ? ?NULL, ? 4, ? ? ?0, ? ? ?32768, ? ? mux_clk_32k, ? ? ? ? ? ? ? ? PERIPH_NO_RESET),
-> ? ? ? ?PERIPH_CLK("timer", ? ? "timer", ? ? ? ? ? ? ? ?NULL, ? 5, ? ? ?0, ? ? ?26000000, ?mux_clk_m, ? ? ? ? ? ? ? ? ? 0),
-> - ? ? ? PERIPH_CLK("i2s1", ? ? ?"i2s.0", ? ? ? ? ? ? ? ?NULL, ? 11, ? ? 0x100, ?26000000, ?mux_pllaout0_audio2x_pllp_clkm, ? ? ?MUX | DIV_U71),
-> - ? ? ? PERIPH_CLK("i2s2", ? ? ?"i2s.1", ? ? ? ? ? ? ? ?NULL, ? 18, ? ? 0x104, ?26000000, ?mux_pllaout0_audio2x_pllp_clkm, ? ? ?MUX | DIV_U71),
-> + ? ? ? PERIPH_CLK("i2s1", ? ? ?"tegra-i2s.0", ? ? ? ? ?NULL, ? 11, ? ? 0x100, ?26000000, ?mux_pllaout0_audio2x_pllp_clkm, ? ? ?MUX | DIV_U71),
-> + ? ? ? PERIPH_CLK("i2s2", ? ? ?"tegra-i2s.1", ? ? ? ? ?NULL, ? 18, ? ? 0x104, ?26000000, ?mux_pllaout0_audio2x_pllp_clkm, ? ? ?MUX | DIV_U71),
-> ? ? ? ?PERIPH_CLK("spdif_out", "spdif_out", ? ? ? ? ? ?NULL, ? 10, ? ? 0x108, ?100000000, mux_pllaout0_audio2x_pllp_clkm, ? ? ?MUX | DIV_U71),
-> ? ? ? ?PERIPH_CLK("spdif_in", ?"spdif_in", ? ? ? ? ? ? NULL, ? 10, ? ? 0x10c, ?100000000, mux_pllp_pllc_pllm, ? ? ? ? ?MUX | DIV_U71),
-> ? ? ? ?PERIPH_CLK("pwm", ? ? ? "pwm", ? ? ? ? ? ? ? ? ?NULL, ? 17, ? ? 0x110, ?432000000, mux_pllp_pllc_audio_clkm_clk32, ? ? ?MUX | DIV_U71),
+> @@ -1823,8 +1823,8 @@ static struct clk tegra_clk_d = {
+> ?};
+>
+> ?/* dap_mclk1, belongs to the cdev1 pingroup. */
+> -static struct clk tegra_dev1_clk = {
+> - ? ? ? .name ? ? ?= "clk_dev1",
+> +static struct clk tegra_clk_cdev1 = {
+> + ? ? ? .name ? ? ?= "cdev1",
+> ? ? ? ?.ops ? ? ? = &tegra_cdev_clk_ops,
+> ? ? ? ?.rate ? ? ?= 26000000,
+> ? ? ? ?.max_rate ?= 26000000,
+> @@ -1834,8 +1834,8 @@ static struct clk tegra_dev1_clk = {
+> ?};
+>
+> ?/* dap_mclk2, belongs to the cdev2 pingroup. */
+> -static struct clk tegra_dev2_clk = {
+> - ? ? ? .name ? ? ?= "clk_dev2",
+> +static struct clk tegra_clk_cdev2 = {
+> + ? ? ? .name ? ? ?= "cdev2",
+> ? ? ? ?.ops ? ? ? = &tegra_cdev_clk_ops,
+> ? ? ? ?.rate ? ? ?= 26000000,
+> ? ? ? ?.max_rate ?= 26000000,
+> @@ -2276,8 +2276,8 @@ struct clk *tegra_ptr_clks[] = {
+> ? ? ? ?&tegra_clk_hclk,
+> ? ? ? ?&tegra_clk_pclk,
+> ? ? ? ?&tegra_clk_d,
+> - ? ? ? &tegra_dev1_clk,
+> - ? ? ? &tegra_dev2_clk,
+> + ? ? ? &tegra_clk_cdev1,
+> + ? ? ? &tegra_clk_cdev2,
+> ? ? ? ?&tegra_clk_virtual_cpu,
+> ? ? ? ?&tegra_clk_blink,
+> ? ? ? ?&tegra_clk_cop,
 > --
 > 1.7.1
 >
