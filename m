@@ -1,40 +1,54 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 23 Feb 2011 23:28:11 +0530
-Subject: [PATCH 1/5] ARM: smp: Select local timers vs dummytimersupport
-	runtime
-In-Reply-To: <780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
-References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297510187-31547-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110220110341.GA15494@n2100.arm.linux.org.uk>
-	<e3674a4c299e3cc0fad3e15a3cc03db4@mail.gmail.com>
-	<20110223163635.GA16041@n2100.arm.linux.org.uk>
-	<780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
-Message-ID: <2d63c430d007703753afa4ae98902341@mail.gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Wed, 23 Feb 2011 10:20:53 -0800
+Subject: [PATCH v2 13/13] tty: pruss SUART driver
+In-Reply-To: <86364E209B534BF1ADB2764227483070@subhasishg>
+References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
+	<20110218143500.23b3044b@lxorguk.ukuu.org.uk>
+	<alpine.LFD.2.00.1102181917520.2701@localhost6.localdomain6>
+	<201102181951.32631.arnd@arndb.de>
+	<9826735BD9DD48A599C595D28C4A05F0@subhasishg>
+	<20110222143704.GA978@suse.de>
+	<86364E209B534BF1ADB2764227483070@subhasishg>
+Message-ID: <20110223182053.GB30517@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> Sent: Wednesday, February 23, 2011 10:09 PM
-> To: Russell King - ARM Linux
-> Cc: linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
-> kernel at lists.infradead.org; tony at atomide.com; David Brown; Daniel
-> Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm; Colin
-> Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
-> Subject: RE: [PATCH 1/5] ARM: smp: Select local timers vs
-> dummytimersupport runtime
+On Wed, Feb 23, 2011 at 11:00:25AM +0530, Subhasish Ghosh wrote:
+> I could not follow the recommendations clearly.
+> This is just to clarify.
+> 
+> Currently, I have the following files for the suart implementation:
+> 
+> drivers/tty/serial/da8xx_pruss/pruss_suart_api.h
+> drivers/tty/serial/da8xx_pruss/pruss_suart_err.h
+> drivers/tty/serial/da8xx_pruss/pruss_suart_regs.h
+> drivers/tty/serial/da8xx_pruss/pruss_suart_board.h
+> drivers/tty/serial/da8xx_pruss/pruss_suart_mcasp.h
+> drivers/tty/serial/da8xx_pruss/pruss_suart_utils.h
+> 
+> drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
+> drivers/tty/serial/da8xx_pruss/pruss_suart.c
+> drivers/tty/serial/da8xx_pruss/pruss_suart_utils.c
+> 
+> Of these, I will be removing pruss_suart_err.h as part of the Linux
+> error code cleanup.
+> But, I need to keep at least  pruss_suart_board.h as a separate
+> file, as this defines
+> configurations which will be often modified by users, I don't want
+> to mix it with other files.
 
-[....]
+Why would a .h file ever need to be "modified by users"?  That sounds
+wrong to me.
 
-> >
-> > Grr.  This conflicts horribly with the Versatile stuff.  Can you
-> > recreate
-> > against what currently appears in devel rather than mainline
-> please?
-> Ok. I will pull your devel branch and rebase it
+> Should I combine rest of the headers into a single file ?
 
-Done.
-Patch 6759/1 and patch 6760/1 in patch system
+Yes, why would they need to be separate?
 
-Regards,
-Santosh
+> and keep the other three .c files under "drivers/tty/serial/" and
+> remove the da8xx_pruss directory altogether.
+
+Yes.
+
+thanks,
+
+greg k-h
