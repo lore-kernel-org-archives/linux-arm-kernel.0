@@ -1,68 +1,32 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 23 Feb 2011 21:00:29 +0530
-Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
-In-Reply-To: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
-References: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BE49175@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Feb 2011 15:58:52 -0000
+Subject: [PATCH 4/5] ARM: s5pv310: update IRQ combiner to use EOI in
+	parent chip
+In-Reply-To: <AANLkTimiPEsb_S3tv+yPOr=p8UageK_-er9HkjM10ro5@mail.gmail.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>	<1298302096-21275-5-git-send-email-will.deacon@arm.com>
+	<AANLkTimiPEsb_S3tv+yPOr=p8UageK_-er9HkjM10ro5@mail.gmail.com>
+Message-ID: <001f01cbd372$91f49990$b5ddccb0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subhasish,
+Hi Kyungmin,
 
-On Fri, Feb 11, 2011 at 19:51:28, Subhasish Ghosh wrote:
-> This patch modifies the sram allocator to allocate memory
-> from the DA8XX shared RAM.
+> Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> It's boot and working at mainline.
 
-It will be nice to know if you tried suspend-to-RAM
-after this change and found it to be working.
+Thanks for testing this.
+ 
+> It's just for record.
+> Current mainline codes doesn't have full features of s5pv310 (aka
+> s5pc210 or exynos4210).
+> So I back-ported the same codes to 2.6.36. it's booted and working at
+> boot time, but some times later it's hang.
+> no serial. I think as irq cores at arm changed, it requires the more
+> patched than just this patch.
 
-Thanks,
-Sekhar
+Interesting. I backported to v2.6.36 and stress-tested it for a few
+hours on my versatile express without any problems. If you diagnose
+this further, please let me know.
 
-> 
-> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
-> ---
->  arch/arm/mach-davinci/da850.c              |    6 +++---
->  arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
->  2 files changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 3443d97..8a4de97 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -711,7 +711,7 @@ static struct map_desc da850_io_desc[] = {
->  	},
->  	{
->  		.virtual	= SRAM_VIRT,
-> -		.pfn		= __phys_to_pfn(DA8XX_ARM_RAM_BASE),
-> +		.pfn		= __phys_to_pfn(DA8XX_SHARED_RAM_BASE),
->  		.length		= SZ_8K,
->  		.type		= MT_DEVICE
->  	},
-> @@ -1083,8 +1083,8 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
->  	.gpio_irq		= IRQ_DA8XX_GPIO0,
->  	.serial_dev		= &da8xx_serial_device,
->  	.emac_pdata		= &da8xx_emac_pdata,
-> -	.sram_dma		= DA8XX_ARM_RAM_BASE,
-> -	.sram_len		= SZ_8K,
-> +	.sram_dma		= DA8XX_SHARED_RAM_BASE,
-> +	.sram_len		= SZ_128K,
->  	.reset_device		= &da8xx_wdt_device,
->  };
->  
-> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-> index cfcb223..c3c3339 100644
-> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
-> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-> @@ -70,6 +70,7 @@ extern unsigned int da850_max_speed;
->  #define DA8XX_AEMIF_CTL_BASE	0x68000000
->  #define DA8XX_DDR2_CTL_BASE	0xb0000000
->  #define DA8XX_ARM_RAM_BASE	0xffff0000
-> +#define DA8XX_SHARED_RAM_BASE	0x80000000
->  
->  void __init da830_init(void);
->  void __init da850_init(void);
-> -- 
-> 1.7.2.3
-> 
-> 
+Will
