@@ -1,74 +1,58 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 23 Feb 2011 15:59:42 +0900
-Subject: [PATCH 4/5] ARM: s5pv310: update IRQ combiner to use EOI in
-	parent chip
-In-Reply-To: <1298302096-21275-5-git-send-email-will.deacon@arm.com>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-5-git-send-email-will.deacon@arm.com>
-Message-ID: <AANLkTimiPEsb_S3tv+yPOr=p8UageK_-er9HkjM10ro5@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 23 Feb 2011 00:11:43 -0700
+Subject: [PATCH 0/8] OMAP2+: hwmod/clockevent: allow late-init of individual
+	hwmods
+Message-ID: <20110223070455.5874.51326.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hello,
 
-It's boot and working at mainline.
+This series adds the ability to late-initialize individual
+hwmods.  The goal here is for clockevent (and eventually
+clocksource) hwmods to be late-initialized individually, and
+right before they are needed, in the timer init code.  Then
+omap_hwmod_late_init(), which late-inits the rest of the hwmods,
+is intended to run as an initcall -- much later in the boot
+process.
 
-It's just for record.
-Current mainline codes doesn't have full features of s5pv310 (aka
-s5pc210 or exynos4210).
-So I back-ported the same codes to 2.6.36. it's booted and working at
-boot time, but some times later it's hang.
-no serial. I think as irq cores at arm changed, it requires the more
-patched than just this patch.
+This series includes the OMAP2/3 hwmod data for the GPTIMERs that
+Tarun posted earlier.  This data is necessary for this new code
+to avoid warnings during boot.
 
-Thank you,
-Kyungmin Park
+Boot-tested on N800, OMAP34xx Beagleboard and OMAP4430ES2 Panda.
+Applies on Tony's 04aa67dec63b61c1a8b9b6d001262250f1a92130
+("Merge branch 'for-tony' of git://gitorious.org/usb/usb into omap-for-linus")
 
-On Tue, Feb 22, 2011 at 12:28 AM, Will Deacon <will.deacon@arm.com> wrote:
-> The IRQ combiner code invokes the ->irq_{un}mask routines of the parent
-> chip.
->
-> This patch updates the cascaded handler to use EOI now that the GIC has
-> moved to using the fasteoi flow model.
->
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> ?arch/arm/mach-s5pv310/irq-combiner.c | ? ?7 ++-----
-> ?1 files changed, 2 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv310/irq-combiner.c b/arch/arm/mach-s5pv310/irq-combiner.c
-> index 1ea4a9e..24d5604 100644
-> --- a/arch/arm/mach-s5pv310/irq-combiner.c
-> +++ b/arch/arm/mach-s5pv310/irq-combiner.c
-> @@ -59,9 +59,6 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ?unsigned int cascade_irq, combiner_irq;
-> ? ? ? ?unsigned long status;
->
-> - ? ? ? /* primary controller ack'ing */
-> - ? ? ? chip->irq_ack(&desc->irq_data);
-> -
-> ? ? ? ?spin_lock(&irq_controller_lock);
-> ? ? ? ?status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
-> ? ? ? ?spin_unlock(&irq_controller_lock);
-> @@ -79,8 +76,8 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
-> ? ? ? ? ? ? ? ?generic_handle_irq(cascade_irq);
->
-> ?out:
-> - ? ? ? /* primary controller unmasking */
-> - ? ? ? chip->irq_unmask(&desc->irq_data);
-> + ? ? ? /* primary controller EOI */
-> + ? ? ? chip->irq_eoi(&desc->irq_data);
-> ?}
->
-> ?static struct irq_chip combiner_chip = {
-> --
-> 1.7.0.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+
+- Paul
+
+---
+
+hwmod_clockevent_2.6.39
+   text	   data	    bss	    dec	    hex	filename
+5774609	 497512	5596888	11869009	 b51b51	vmlinux.omap2plus_defconfig.orig
+5778597	 504584	5596856	11880037	 b54665	vmlinux.omap2plus_defconfig
+
+
+Paul Walmsley (5):
+      OMAP2+: hwmod: find MPU initiator hwmod during in _register()
+      OMAP2+: hwmod: allow multiple calls to omap_hwmod_init()
+      OMAP2+: hwmod: ignore attempts to re-late-init a hwmod
+      OMAP2+: hwmod: add ability to late-init individual hwmods
+      OMAP2+: clockevent: late-init GPTIMER clockevent hwmod right before timer init
+
+Thara Gopinath (3):
+      OMAP2420: hwmod data: add dmtimer
+      OMAP2430: hwmod data: add dmtimer
+      OMAP3: hwmod data: add dmtimer
+
+
+ arch/arm/mach-omap2/omap_hwmod.c             |  124 +++--
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c   |  634 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c   |  633 +++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |  649 ++++++++++++++++++++++++++
+ arch/arm/mach-omap2/timer-gp.c               |    8 
+ arch/arm/plat-omap/include/plat/dmtimer.h    |   11 
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 
+ 7 files changed, 2024 insertions(+), 38 deletions(-)
