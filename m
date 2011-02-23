@@ -1,62 +1,32 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 23 Feb 2011 16:36:46 +0530
-Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <20110223102140.GH29559@n2100.arm.linux.org.uk>
-References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
-	<1298433701.23371.236.camel@vkoul-udesk3>
-	<20110223055709.GC20346@S2100-06.ap.freescale.net>
-	<1298440516.23371.258.camel@vkoul-udesk3>
-	<20110223100547.GG29559@n2100.arm.linux.org.uk>
-	<20110223102140.GH29559@n2100.arm.linux.org.uk>
-Message-ID: <1298459206.23371.267.camel@vkoul-udesk3>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed, 23 Feb 2011 12:38:14 +0100
+Subject: I2C support for CE4100, v3
+Message-ID: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-02-23 at 15:51 +0530, Russell King - ARM Linux wrote:
-> On Wed, Feb 23, 2011 at 10:05:47AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 23, 2011 at 11:25:16AM +0530, Koul, Vinod wrote:
-> > > Well in that case you are calling the callback from irq handler which is
-> > > not so good. The tasklet is other extreme (slow).
-> > 
-> > tasklets are run on the exit path of interrupts.
-> > 
-> > > Given that this is
-> > > also intended for audio I am not sure if calling period elapsed from
-> > > tasklet callback will not cause any audio over/underruns, last I tried
-> > > it used to break quite often in stressed situations.
-> > 
-> > Nevertheless, the DMA engine API specifies that callbacks shall be called
-> > from tasklet context.
-> 
-> Note also that the DMA engine API is supposed to work as follows:
-> 
-> 1. You submit DMA jobs to it.
-> 2. The DMA engine starts the first job
-> 3. When the first job is complete, it retires it to a retired list and
->    marks the tasklet to run
-> 4. If there is another job waiting, the DMA engine starts the next job
-> 5. Repeat 3 until no further jobs are queued
-> 
-> The tasklet then processes the list of retired jobs, cleaning them
-> up and calling their callbacks. 
-> 
-> So the way to efficiently handle audio is to initially submit several
-> 'period' sized buffers for the DMA engine.  As each buffer completes,
-> you call snd_pcm_elapsed() to tell ALSA that a period has finished
-> and submit the next buffer.  As there's always several buffers submitted,
-> the DMA engine never waits for the callback to complete.  And ALSA is
-> capable of handling latency in snd_pcm_elapsed().
-Russel,
-agree with you on this. But in case you have few periods say 2 and small
-period sizes (10ms), or similar scenarios where client is waiting to do
-something (process data) on callback notification, faster the callback
-better it is.
+The I2C core inside CE4100 is very much the same as in PXA25x.
+I Cc the ARM folks because patch 2 reorganizes some files so that they
+can be accessed from x86.
+The I2C device is behind a PCI bus. The PCI probe code simply creates
+three platform devices so we don't have much changes to the platform
+driver. There is no clock framework on x86 and the peripherals don't
+support changing their clocks or to enable/disable them. So I provided
+dummy function which keep the driver happy.
 
-I know DMA engine species callback to be called from tasklet context,
-but do we need this for slave-dma or not? If this is posing some
-limitation then I am okay to discuss on ways to improve :) 
+History:
+v1: Initial post
+v2: - ISAR is still touched if not in SLAVE mode except on X86 where it
+      is not touched at all.
+    - There are no files created in include/asm
+    - register defines are in common code
+    - the PCI controller now requires a device tree. It is used to obtain
+      an id (which is used as device & i2c bus id).
+    - the PCI part now uses ARRAY_SIZE(). As it turns out pci_select_bars()
+      is not useable.
+    - the patch which resetted the chip if the i2c bus was not available
+      has been dropped.
+v3: - rebased against v2.6.38-rc3, fixed conflicts in ARM tree
+    - the dependency on SPI is gone.
 
-Thoughts??
-
--- 
-~Vinod
+Sebastian
