@@ -1,69 +1,40 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 23 Feb 2011 10:54:59 -0700
-Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found
-	on the MPC85xx.
-In-Reply-To: <20110223112612.30071995@schlenkerla>
-References: <cover.1298447722.git.richard.cochran@omicron.at>
-	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
-	<20110223165058.GE14597@angua.secretlab.ca>
-	<20110223112612.30071995@schlenkerla>
-Message-ID: <20110223175459.GH14597@angua.secretlab.ca>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 23 Feb 2011 23:28:11 +0530
+Subject: [PATCH 1/5] ARM: smp: Select local timers vs dummytimersupport
+	runtime
+In-Reply-To: <780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
+References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
+	<1297510187-31547-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110220110341.GA15494@n2100.arm.linux.org.uk>
+	<e3674a4c299e3cc0fad3e15a3cc03db4@mail.gmail.com>
+	<20110223163635.GA16041@n2100.arm.linux.org.uk>
+	<780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
+Message-ID: <2d63c430d007703753afa4ae98902341@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 11:26:12AM -0600, Scott Wood wrote:
-> On Wed, 23 Feb 2011 09:50:58 -0700
-> Grant Likely <grant.likely@secretlab.ca> wrote:
-> 
-> > On Wed, Feb 23, 2011 at 11:38:17AM +0100, Richard Cochran wrote:
-> > > +
-> > > +* Gianfar PTP clock nodes
-> > > +
-> > > +General Properties:
-> > > +
-> > > +  - compatible   Should be "fsl,etsec-ptp"
-> > 
-> > Should specify an *exact* part; ie: "fsl,mpc8313-etsec-ptp" instead of
-> > trying to define a generic catchall.  The reason is that the same
-> > marketing name can end up getting applied to a wide range of parts.
-> > 
-> > Instead, choose one specific device to stand in as the 'common'
-> > implementation and get all parts with the same core to claim
-> > compatibility with it.  ie: a p2020 might have:
-> > 
-> > 	compatible = "fsl,mpc2020-etsec-ptp", "fsl,mpc8313-etsec-ptp";
-> 
-> eTSEC is versioned, that's more reliable than the chip name since chips
-> have revisions (rev 2.1 of mpc8313 has eTSEC 1.6, not sure about previous
-> revs of mpc8313).  Logic blocks can be and have been uprevved between one
-> revision of a chip to the next.  I think "fsl,mpc8313rev2.1-etsec-ptp"
-> would be taking things a bit too far (and there could be board-level bugs
-> too...).
-> 
-> If you really need to know the exact SoC you're on, look in SVR (which
-> will provide revision info as well).  Isn't the device tree for things that
-> can't be probed?
+> -----Original Message-----
+> From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> Sent: Wednesday, February 23, 2011 10:09 PM
+> To: Russell King - ARM Linux
+> Cc: linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
+> kernel at lists.infradead.org; tony at atomide.com; David Brown; Daniel
+> Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm; Colin
+> Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
+> Subject: RE: [PATCH 1/5] ARM: smp: Select local timers vs
+> dummytimersupport runtime
 
-This is far more about the binding than it is about the chip revision.
-When documenting a binding it makes far more sense to anchor it to a
-specific implementation than to try and come up with a 'generic'
-catchall.  A new binding means new compatible value and dropping any
-claims of being compatible with the old.
+[....]
 
-It is not about the logic block version, particularly when it is
-detectable by the driver as you say.
+> >
+> > Grr.  This conflicts horribly with the Versatile stuff.  Can you
+> > recreate
+> > against what currently appears in devel rather than mainline
+> please?
+> Ok. I will pull your devel branch and rebase it
 
-> 
-> The eTSEC revision is probeable as well, but due the way PTP is described as
-> a separate node, the driver doesn't have straightforward access to those
-> registers.
+Done.
+Patch 6759/1 and patch 6760/1 in patch system
 
-Ignorant question: Should the ptp be described as a separate node?
-
-> 
-> Insisting on an explicit chip also encourages people to claim compatibility
-> with that chip without ensuring that it really is fully compatible.
-
-In practise, I've not seen this to be an issue.
-
-g.
+Regards,
+Santosh
