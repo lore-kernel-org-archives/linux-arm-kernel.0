@@ -1,47 +1,67 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 23 Feb 2011 15:28:40 +0100
-Subject: [PATCH 0/8] OMAP2+: hwmod/clockevent: allow late-init of
-	individual hwmods
-In-Reply-To: <20110223070455.5874.51326.stgit@twilight.localdomain>
+Date: Wed, 23 Feb 2011 15:38:20 +0100
+Subject: [PATCH 4/8] OMAP2+: hwmod: find MPU initiator hwmod during in
+	_register()
+In-Reply-To: <20110223071146.5874.15334.stgit@twilight.localdomain>
 References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-Message-ID: <4D651998.3040002@ti.com>
+	<20110223071146.5874.15334.stgit@twilight.localdomain>
+Message-ID: <4D651BDC.8040700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
 On 2/23/2011 8:11 AM, Paul Walmsley wrote:
-> Hello,
-> 
-> This series adds the ability to late-initialize individual
-> hwmods.  The goal here is for clockevent (and eventually
-> clocksource) hwmods to be late-initialized individually, and
-> right before they are needed, in the timer init code.  Then
-> omap_hwmod_late_init(), which late-inits the rest of the hwmods,
-> is intended to run as an initcall -- much later in the boot
-> process.
-> 
-> This series includes the OMAP2/3 hwmod data for the GPTIMERs that
-> Tarun posted earlier.  This data is necessary for this new code
-> to avoid warnings during boot.
-> 
-> Boot-tested on N800, OMAP34xx Beagleboard and OMAP4430ES2 Panda.
+> Move the code that looks for the MPU initiator hwmod to run during
+> the individual hwmod _register() function.  (Previously, it ran after
+> all hwmods were registered in the omap_hwmod_late_init() function.)
+>
+> This is done so code can late-initialize a few individual hwmods --
+> for example, for the system timer -- before the entire set of hwmods is
+> initialized later in boot via omap_hwmod_late_init().
+>
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> Cc: Beno?t Cousson<b-cousson@ti.com>
+> Cc: Kevin Hilman<khilman@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod.c |   23 +++++++++++++++--------
+>   1 files changed, 15 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 9e89a58..41f548e 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -1455,7 +1455,7 @@ static int _setup(struct omap_hwmod *oh, void *data)
+>    */
+>   static int __init _register(struct omap_hwmod *oh)
+>   {
+> -	int ret, ms_id;
+> +	int ms_id;
+>
+>   	if (!oh || !oh->name || !oh->class || !oh->class->name ||
+>   	    (oh->_state != _HWMOD_STATE_UNKNOWN))
+> @@ -1478,9 +1478,14 @@ static int __init _register(struct omap_hwmod *oh)
+>
+>   	oh->_state = _HWMOD_STATE_REGISTERED;
+>
+> -	ret = 0;
+> +	/*
+> +	 * XXX Rather than doing a strcmp(), this should test a flag
+> +	 * set in the hwmod data, inserted by the autogenerator code.
 
-I'm testing it on 4430sdp, and I have the following warning:
+What do you mean exactly? Something like a "is_mpu" field set to true 
+for the mpu?
+Since we are enforcing a consistent naming for every hwmods, that looks 
+like a duplication of the name.
+We will always named this hwmod "mpu", so the strcmp() should be enough.
 
-[    0.000000] omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: at arch/arm/mach-omap2/timer-gp.c:157 omap2_gp_timer_init+0x80/0x190()
-[    0.000000] timer-gp: omap_dm_timer_set_source() failed
-[    0.000000] Modules linked in:
-[    0.000000] [<c0062a6c>] (unwind_backtrace+0x0/0xec) from [<c009422c>] (warn_slowpath_common+0x4c/0x64)
-[    0.000000] [<c009422c>] (warn_slowpath_common+0x4c/0x64) from [<c00942c4>] (warn_slowpath_fmt+0x2c/0x3c)
-[    0.000000] [<c00942c4>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0010e30>] (omap2_gp_timer_init+0x80/0x190)
-[    0.000000] [<c0010e30>] (omap2_gp_timer_init+0x80/0x190) from [<c000c0dc>] (time_init+0x20/0x30)
-[    0.000000] [<c000c0dc>] (time_init+0x20/0x30) from [<c0008cbc>] (start_kernel+0x1a4/0x30c)
-[    0.000000] [<c0008cbc>] (start_kernel+0x1a4/0x30c) from [<80008038>] (0x80008038)
-[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-[    0.000000] OMAP clockevent source: GPTIMER1 at 32768 Hz
+But, maybe I'm missing your point.
 
-Regards,
 Benoit
+
+> +	 */
+> +	if (!strcmp(oh->name, MPU_INITIATOR_NAME))
+> +		mpu_oh = oh;
+>
+> -	return ret;
+> +	return 0;
+>   }
+>
