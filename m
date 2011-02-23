@@ -1,115 +1,77 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 23 Feb 2011 19:23:33 +0900
-Subject: [PATCH 1/2] ARM: S5PC110: disable unused power regulators on Goni
+Date: Wed, 23 Feb 2011 19:27:05 +0900
+Subject: [PATCH 2/2] ARM: S5PC110: add power consumers for hsotg for Goni
 	board
-In-Reply-To: <1297760784-8486-2-git-send-email-m.szyprowski@samsung.com>
+In-Reply-To: <1297760784-8486-3-git-send-email-m.szyprowski@samsung.com>
 References: <1297760784-8486-1-git-send-email-m.szyprowski@samsung.com>
-	<1297760784-8486-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <01f301cbd343$d0af4c90$720de5b0$%kim@samsung.com>
+	<1297760784-8486-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <01f401cbd344$55621800$00264800$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marek Szyprowski wrote:
 > 
-> A lot of power regulator has been enabled by default causing the board
-> to consume a lot of power. This patch fixes this issue.
+> This patch adds definitions for power consumers for s3c-hsotg driver
+> on Goni board. The consumers are defined as arrays, because later more
+> entries for MIPI and ADC will be defined.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
->  arch/arm/mach-s5pv210/mach-goni.c |   10 +---------
->  1 files changed, 1 insertions(+), 9 deletions(-)
+>  arch/arm/mach-s5pv210/mach-goni.c |   14 ++++++++++++++
+>  1 files changed, 14 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/mach-s5pv210/mach-goni.c
 b/arch/arm/mach-s5pv210/mach-
 > goni.c
-> index 43c1c1b..10f754b 100644
+> index 10f754b..796625c 100644
 > --- a/arch/arm/mach-s5pv210/mach-goni.c
 > +++ b/arch/arm/mach-s5pv210/mach-goni.c
-> @@ -292,7 +292,6 @@ static struct regulator_init_data goni_ldo3_data = {
+> @@ -269,10 +269,18 @@ static void __init goni_tsp_init(void)
+>  /* MAX8998 regulators */
+>  #if defined(CONFIG_REGULATOR_MAX8998) ||
+> defined(CONFIG_REGULATOR_MAX8998_MODULE)
+> 
+> +static struct regulator_consumer_supply goni_ldo3_consumers[] = {
+> +	REGULATOR_SUPPLY("vusb_a", "s3c-hsotg"),
+> +};
+> +
+>  static struct regulator_consumer_supply goni_ldo5_consumers[] = {
+>  	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+>  };
+> 
+> +static struct regulator_consumer_supply goni_ldo8_consumers[] = {
+> +	REGULATOR_SUPPLY("vusb_d", "s3c-hsotg"),
+> +};
+> +
+>  static struct regulator_init_data goni_ldo2_data = {
+>  	.constraints	= {
+>  		.name		= "VALIVE_1.1V",
+> @@ -292,7 +300,10 @@ static struct regulator_init_data goni_ldo3_data = {
 >  		.min_uV		= 1100000,
 >  		.max_uV		= 1100000,
 >  		.apply_uV	= 1,
-> -		.always_on	= 1,
+> +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
 >  	},
+> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo3_consumers),
+> +	.consumer_supplies = goni_ldo3_consumers,
 >  };
 > 
-> @@ -311,6 +310,7 @@ static struct regulator_init_data goni_ldo5_data = {
->  		.min_uV		= 2800000,
->  		.max_uV		= 2800000,
+>  static struct regulator_init_data goni_ldo4_data = {
+> @@ -341,7 +352,10 @@ static struct regulator_init_data goni_ldo8_data = {
+>  		.min_uV		= 3300000,
+>  		.max_uV		= 3300000,
 >  		.apply_uV	= 1,
 > +		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
 >  	},
->  	.num_consumer_supplies = ARRAY_SIZE(goni_ldo5_consumers),
->  	.consumer_supplies = goni_ldo5_consumers,
-> @@ -341,7 +341,6 @@ static struct regulator_init_data goni_ldo8_data = {
->  		.min_uV		= 3300000,
->  		.max_uV		= 3300000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
+> +	.num_consumer_supplies = ARRAY_SIZE(goni_ldo8_consumers),
+> +	.consumer_supplies = goni_ldo8_consumers,
 >  };
 > 
-> @@ -351,7 +350,6 @@ static struct regulator_init_data goni_ldo9_data = {
->  		.min_uV		= 2800000,
->  		.max_uV		= 2800000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
-> @@ -371,7 +369,6 @@ static struct regulator_init_data goni_ldo11_data = {
->  		.min_uV		= 2800000,
->  		.max_uV		= 2800000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
-> @@ -381,7 +378,6 @@ static struct regulator_init_data goni_ldo12_data = {
->  		.min_uV		= 1200000,
->  		.max_uV		= 1200000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
-> @@ -391,7 +387,6 @@ static struct regulator_init_data goni_ldo13_data = {
->  		.min_uV		= 2800000,
->  		.max_uV		= 2800000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
-> @@ -401,7 +396,6 @@ static struct regulator_init_data goni_ldo14_data = {
->  		.min_uV		= 1800000,
->  		.max_uV		= 1800000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
-> @@ -411,7 +405,6 @@ static struct regulator_init_data goni_ldo15_data = {
->  		.min_uV		= 3300000,
->  		.max_uV		= 3300000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
-> @@ -421,7 +414,6 @@ static struct regulator_init_data goni_ldo16_data = {
->  		.min_uV		= 1800000,
->  		.max_uV		= 1800000,
->  		.apply_uV	= 1,
-> -		.always_on	= 1,
->  	},
->  };
-> 
+>  static struct regulator_init_data goni_ldo9_data = {
 > --
 
-Ok...will apply this.
-And how about "mach-aquila.c"?
+Ok...will apply :)
 
 Thanks.
 
