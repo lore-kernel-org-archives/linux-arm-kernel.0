@@ -1,112 +1,35 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 23 Feb 2011 13:34:45 -0000
-Subject: [PATCH v2 13/13] tty: pruss SUART driver
-Message-ID: <6E7634AAF813458489E0444DF71260CF@subhasishg>
+From: yong.shen@linaro.org (Yong Shen)
+Date: Wed, 23 Feb 2011 15:41:58 -0000
+Subject: [PATCH v3 1/2] ARM: IMX5: cpuidle driver
+In-Reply-To: <AANLkTi=VkaCY5u-ibEKWU6=AiRkB5aZwPevY6A3bmk0T@mail.gmail.com>
+References: <1297416973-32740-1-git-send-email-yong.shen@linaro.org>
+	<1297416973-32740-2-git-send-email-yong.shen@linaro.org>
+	<20110215182752.GD2027@pengutronix.de>
+	<AANLkTim_7HiWutTyTuWvAR5sx1Nd7HdSyhfwRjS2CfYg@mail.gmail.com>
+	<20110217105415.GB24426@pengutronix.de>
+	<AANLkTi=VkaCY5u-ibEKWU6=AiRkB5aZwPevY6A3bmk0T@mail.gmail.com>
+Message-ID: <AANLkTi=DSKxwGoMM8Og7X6LFZewhDNrAT-LBo1TOy0wp@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Sascha,
 
-Anything regarding this.
+I noticed there were no comments for v3, but you had comments for v2 which
+was posted after v3. See below:
 
---------------------------------------------------
-From: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-Sent: Wednesday, February 23, 2011 11:00 AM
-To: "Greg KH" <gregkh@suse.de>; "Alan Cox" <alan@lxorguk.ukuu.org.uk>
-Cc: "Arnd Bergmann" <arnd@arndb.de>; <linux-arm-kernel@lists.infradead.org>; 
-"Thomas Gleixner" <tglx@linutronix.de>; <sachi@mistralsolutions.com>; 
-<davinci-linux-open-source@linux.davincidsp.com>; <nsekhar@ti.com>; "open 
-list" <linux-kernel@vger.kernel.org>; <m-watkins@ti.com>; "Stalin 
-Srinivasan" <stalin.s@mistralsolutions.com>
-Subject: Re: [PATCH v2 13/13] tty: pruss SUART driver
+>>I see. Maybe we should make this a platform driver then like for example
+>>davinci does.
 
-> I could not follow the recommendations clearly.
-> This is just to clarify.
->
-> Currently, I have the following files for the suart implementation:
->
-> drivers/tty/serial/da8xx_pruss/pruss_suart_api.h
-> drivers/tty/serial/da8xx_pruss/pruss_suart_err.h
-> drivers/tty/serial/da8xx_pruss/pruss_suart_regs.h
-> drivers/tty/serial/da8xx_pruss/pruss_suart_board.h
-> drivers/tty/serial/da8xx_pruss/pruss_suart_mcasp.h
-> drivers/tty/serial/da8xx_pruss/pruss_suart_utils.h
->
-> drivers/tty/serial/da8xx_pruss/pruss_suart_api.c
-> drivers/tty/serial/da8xx_pruss/pruss_suart.c
-> drivers/tty/serial/da8xx_pruss/pruss_suart_utils.c
->
-> Of these, I will be removing pruss_suart_err.h as part of the Linux error 
-> code cleanup.
-> But, I need to keep at least  pruss_suart_board.h as a separate file, as 
-> this defines
-> configurations which will be often modified by users, I don't want to mix 
-> it with other files.
->
-> Should I combine rest of the headers into a single file ? and keep the 
-> other three .c files under "drivers/tty/serial/"
-> and remove the da8xx_pruss directory altogether.
->
->
-> --------------------------------------------------
-> From: "Greg KH" <gregkh@suse.de>
-> Sent: Tuesday, February 22, 2011 8:07 PM
-> To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>
-> Cc: "Arnd Bergmann" <arnd@arndb.de>; 
-> <linux-arm-kernel@lists.infradead.org>; "Thomas Gleixner" 
-> <tglx@linutronix.de>; "Alan Cox" <alan@lxorguk.ukuu.org.uk>; 
-> <sachi@mistralsolutions.com>; 
-> <davinci-linux-open-source@linux.davincidsp.com>; <nsekhar@ti.com>; "open 
-> list" <linux-kernel@vger.kernel.org>; <m-watkins@ti.com>
-> Subject: Re: [PATCH v2 13/13] tty: pruss SUART driver
->
->> On Tue, Feb 22, 2011 at 02:12:32PM +0530, Subhasish Ghosh wrote:
->>> Hello,
->>>
->>> I had kept separate files to affirm the modularity and ease of
->>> portability of the system.
->>>
->>> There are three different interfaces,
->>> 1. The Linux driver interface
->>> 2. The PRU control interface
->>> 3. The McASP serializer interface.
->>>
->>> To maintain modularity, I  had classified the files respectively as :
->>> 1.  pruss_suart.c
->>> 2.  pruss_suart_api.c
->>> 3.  pruss_suart_utils.c
->>>
->>> This is not a single device which can be expressed as a single file,
->>> but functionally different devices logically cascaded together to
->>> work in unison.
->>>
->>> We use the PRU for packet processing, but the actual data is
->>> transmitted/received through the
->>> McASP, which we use as a serializer.
->>>
->>> I feel to combine these disparate functionalities into a single file
->>> will not
->>>
->>> 1. Help better understanding the device. I mean, why should a TTY
->>> UART driver be aware of the McASP or the PRU.
->>> 2. In case of a bug in the API layer or McASP, the driver need not
->>> be touched, thus improve maintainability.
->>> 3. If we need to port it to another Linux version, just editing the
->>> driver file should suffice, this will reduce bugs while porting.
->>
->> If your code is in the kernel tree, you do not need to ever port it to a
->> new version, as it will happen automatically as new kernels are
->> released, so this really isn't anything to worry about.
->>
->>> To me, combining all of these into a single file only creates a
->>> mess. This is the reason I had separated them into different files!!
->>> I don't understand why should it be better to have all of these into
->>> a single file.
->>
->> As Alan stated, just use 3 files in the directory with the other
->> drivers, you don't need a subdir for something small like this.
->>
->> thanks,
->>
->> greg k-h
-> 
+>I had sent out v3 patch before the your last comments.
+>I noticed how davinci is doing, but some SOCs like omap, they also do it in
+another way like my code.
+>However, if you prefer the way davinci is doing, I will redo it. Please
+confirm
+
+Shall we still follow davinci's code?
+
+Thanks
+Yong
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110223/510859b3/attachment-0001.html>
