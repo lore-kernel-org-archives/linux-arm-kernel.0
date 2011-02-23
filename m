@@ -1,41 +1,241 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 23 Feb 2011 14:40:20 +0000
-Subject: CPU_V6K build failure in next-20110223
-Message-ID: <20110223144020.GE2796@pulham.picochip.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Wed, 23 Feb 2011 22:43:28 +0800
+Subject: [PATCH v2 2/5] ARM: imx51/53: add sdhc3/4 clock
+In-Reply-To: <20110223075036.GE7381@pengutronix.de>
+References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1298369606-29972-2-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110223075036.GE7381@pengutronix.de>
+Message-ID: <20110223144328.GA2820@richard-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Sascha,
 
-Building todays next tree for my board (CPU_V6K) results in the 
-following build error:
+On Wed, Feb 23, 2011 at 08:50:36AM +0100, Sascha Hauer wrote:
+> On Tue, Feb 22, 2011 at 06:13:23PM +0800, Richard Zhu wrote:
+> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> > ---
+> >  arch/arm/mach-mx5/clock-mx51-mx53.c |  100 ++++++++++++++++++++++++++++++++++-
+> >  arch/arm/mach-mx5/crm_regs.h        |    7 +++
+> >  2 files changed, 106 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> > index 8164b1d..2ca97de 100644
+> > --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
+> > +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+> > @@ -42,6 +42,9 @@ static struct clk usboh3_clk;
+> >  static struct clk emi_fast_clk;
+> >  static struct clk ipu_clk;
+> >  static struct clk mipi_hsc1_clk;
+> > +static struct clk esdhc1_clk;
+> > +static struct clk esdhc2_clk;
+> > +static struct clk esdhc3_mx53_clk;
+> >  
+> >  #define MAX_DPLL_WAIT_TRIES	1000 /* 1000 * udelay(1) = 1ms */
+> >  
+> > @@ -1138,15 +1141,45 @@ static struct clk ecspi_main_clk = {
+> >  	.set_parent = clk_ecspi_set_parent,
+> >  };
+> >  
+> > +#define SDHC_SET_PARENT_SHORT(name, parent2, bitsname)			\
+> > +static int clk_##name##_set_parent(struct clk *clk, struct clk *parent)	\
+> > +{									\
+> > +	u32 reg;							\
+> > +									\
+> > +	reg = __raw_readl(MXC_CCM_CSCMR1);				\
+> > +	if (parent == &esdhc1_clk)					\
+> > +		reg &= ~MXC_CCM_CSCMR1_##bitsname##_CLK_SEL;		\
+> > +	else if (parent == &parent2)					\
+> > +		reg |= MXC_CCM_CSCMR1_##bitsname##_CLK_SEL;		\
+> > +	else								\
+> > +		return -EINVAL;						\
+> > +	__raw_writel(reg, MXC_CCM_CSCMR1);				\
+> > +									\
+> > +	return 0;							\
+> > +}
+> 
+> Please don't do this. I should have rejected this kind of stuff for the
+> i.MX23/28. This ## stuff looks short in the source code but expands to
+> duplicated binary code.
+The macro way is widely used in this file. Happy that it'll get re-structure.
+> Also it's hard to make changes in such code.
+Yes, and not that readable.
+> 
+> To answer your question about cleaning up the i.MX clock code you asked
+> few days ago: Yes, I definitely want to proceed on this once Jeremys
+> patches are ready. Then this can become a clock multiplexer consuming
+> not much space in both binary and source code.
+Looking for that.
+> 
+> For now I suggest that you just duplicate the code in real functions
+> without macro voodoo.
+ok. I'll re-send the patch.
 
-  CC      arch/arm/kernel/asm-offsets.s
-In file included from /home/jamiei/src/linux-2.6/arch/arm/include/asm/cacheflush.h:15,
-                 from arch/arm/kernel/asm-offsets.c:16:
-/home/jamiei/src/linux-2.6/arch/arm/include/asm/glue-cache.h:129:2: error: #error Unknown cache maintainence model
-make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
-make: *** [prepare0] Error 2
-
-Building dove_defconfig also results in the same error.  The patch below 
-appears to fix the issue.
-
-Jamie
-
-8<----
-
-diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
-index 0591d35..c7afbc5 100644
---- a/arch/arm/include/asm/glue-cache.h
-+++ b/arch/arm/include/asm/glue-cache.h
-@@ -109,7 +109,7 @@
- # define MULTI_CACHE 1
- #endif
- 
--#if defined(CONFIG_CPU_V6)
-+#if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
- //# ifdef _CACHE
- #  define MULTI_CACHE 1
- //# else
- //
----->8
+Thanks
+Richard
+> 
+> Sascha
+> 
+> > +
+> >  /* eSDHC */
+> >  CLK_GET_RATE(esdhc1, 1, ESDHC1_MSHC1)
+> >  CLK_SET_PARENT(esdhc1, 1, ESDHC1_MSHC1)
+> >  CLK_SET_RATE(esdhc1, 1, ESDHC1_MSHC1)
+> >  
+> > +/* mx51 specific */
+> >  CLK_GET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+> >  CLK_SET_PARENT(esdhc2, 1, ESDHC2_MSHC2)
+> >  CLK_SET_RATE(esdhc2, 1, ESDHC2_MSHC2)
+> >  
+> > +SDHC_SET_PARENT_SHORT(esdhc3, esdhc2_clk, ESDHC3)
+> > +SDHC_SET_PARENT_SHORT(esdhc4, esdhc2_clk, ESDHC4)
+> > +
+> > +/* mx53 specific */
+> > +SDHC_SET_PARENT_SHORT(esdhc2_mx53, esdhc3_mx53_clk, ESDHC2_MSHC2_MX53)
+> > +
+> > +CLK_GET_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
+> > +CLK_SET_PARENT(esdhc3_mx53, 1, ESDHC3_MX53)
+> > +CLK_SET_RATE(esdhc3_mx53, 1, ESDHC3_MX53)
+> > +
+> > +SDHC_SET_PARENT_SHORT(esdhc4_mx53, esdhc3_mx53_clk, ESDHC4)
+> > +
+> >  #define DEFINE_CLOCK_FULL(name, i, er, es, gr, sr, e, d, p, s)		\
+> >  	static struct clk name = {					\
+> >  		.id		= i,					\
+> > @@ -1251,9 +1284,62 @@ DEFINE_CLOCK_MAX(esdhc1_clk, 0, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG1_OFFSET,
+> >  	clk_esdhc1, &pll2_sw_clk, &esdhc1_ipg_clk);
+> >  DEFINE_CLOCK_FULL(esdhc2_ipg_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG2_OFFSET,
+> >  	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> > +DEFINE_CLOCK_FULL(esdhc3_ipg_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG4_OFFSET,
+> > +	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> > +DEFINE_CLOCK_FULL(esdhc4_ipg_clk, 3, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG6_OFFSET,
+> > +	NULL,  NULL, _clk_max_enable, _clk_max_disable, &ipg_clk, NULL);
+> > +
+> > +/* mx51 specific */
+> >  DEFINE_CLOCK_MAX(esdhc2_clk, 1, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG3_OFFSET,
+> >  	clk_esdhc2, &pll2_sw_clk, &esdhc2_ipg_clk);
+> >  
+> > +static struct clk esdhc3_clk = {
+> > +	.id = 2,
+> > +	.parent = &esdhc1_clk,
+> > +	.set_parent = clk_esdhc3_set_parent,
+> > +	.enable_reg = MXC_CCM_CCGR3,
+> > +	.enable_shift = MXC_CCM_CCGRx_CG5_OFFSET,
+> > +	.enable  = _clk_max_enable,
+> > +	.disable = _clk_max_disable,
+> > +	.secondary = &esdhc3_ipg_clk,
+> > +};
+> > +static struct clk esdhc4_clk = {
+> > +	.id = 3,
+> > +	.parent = &esdhc1_clk,
+> > +	.set_parent = clk_esdhc4_set_parent,
+> > +	.enable_reg = MXC_CCM_CCGR3,
+> > +	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
+> > +	.enable  = _clk_max_enable,
+> > +	.disable = _clk_max_disable,
+> > +	.secondary = &esdhc4_ipg_clk,
+> > +};
+> > +
+> > +/* mx53 specific */
+> > +static struct clk esdhc2_mx53_clk = {
+> > +	.id = 2,
+> > +	.parent = &esdhc1_clk,
+> > +	.set_parent = clk_esdhc2_mx53_set_parent,
+> > +	.enable_reg = MXC_CCM_CCGR3,
+> > +	.enable_shift = MXC_CCM_CCGRx_CG3_OFFSET,
+> > +	.enable  = _clk_max_enable,
+> > +	.disable = _clk_max_disable,
+> > +	.secondary = &esdhc3_ipg_clk,
+> > +};
+> > +
+> > +DEFINE_CLOCK_MAX(esdhc3_mx53_clk, 2, MXC_CCM_CCGR3, MXC_CCM_CCGRx_CG5_OFFSET,
+> > +	clk_esdhc3_mx53, &pll2_sw_clk, &esdhc2_ipg_clk);
+> > +
+> > +static struct clk esdhc4_mx53_clk = {
+> > +	.id = 3,
+> > +	.parent = &esdhc1_clk,
+> > +	.set_parent = clk_esdhc4_mx53_set_parent,
+> > +	.enable_reg = MXC_CCM_CCGR3,
+> > +	.enable_shift = MXC_CCM_CCGRx_CG7_OFFSET,
+> > +	.enable  = _clk_max_enable,
+> > +	.disable = _clk_max_disable,
+> > +	.secondary = &esdhc4_ipg_clk,
+> > +};
+> > +
+> >  DEFINE_CLOCK(mipi_esc_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG5_OFFSET, NULL, NULL, NULL, &pll2_sw_clk);
+> >  DEFINE_CLOCK(mipi_hsc2_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG4_OFFSET, NULL, NULL, &mipi_esc_clk, &pll2_sw_clk);
+> >  DEFINE_CLOCK(mipi_hsc1_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET, NULL, NULL, &mipi_hsc2_clk, &pll2_sw_clk);
+> > @@ -1312,6 +1398,8 @@ static struct clk_lookup mx51_lookups[] = {
+> >  	_REGISTER_CLOCK("imx51-cspi.0", NULL, cspi_clk)
+> >  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
+> >  	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
+> > +	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_clk)
+> > +	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, esdhc4_clk)
+> >  	_REGISTER_CLOCK(NULL, "cpu_clk", cpu_clk)
+> >  	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
+> >  	_REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
+> > @@ -1332,7 +1420,9 @@ static struct clk_lookup mx53_lookups[] = {
+> >  	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
+> >  	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
+> >  	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
+> > -	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_clk)
+> > +	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_mx53_clk)
+> > +	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_mx53_clk)
+> > +	_REGISTER_CLOCK("sdhci-esdhc-imx.3", NULL, esdhc4_mx53_clk)
+> >  	_REGISTER_CLOCK("imx53-ecspi.0", NULL, ecspi1_clk)
+> >  	_REGISTER_CLOCK("imx53-ecspi.1", NULL, ecspi2_clk)
+> >  	_REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
+> > @@ -1425,6 +1515,14 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+> >  	mx53_revision();
+> >  	clk_disable(&iim_clk);
+> >  
+> > +	/* Set SDHC parents to be PLL2 */
+> > +	clk_set_parent(&esdhc1_clk, &pll2_sw_clk);
+> > +	clk_set_parent(&esdhc3_mx53_clk, &pll2_sw_clk);
+> > +
+> > +	/* set SDHC root clock as 200MHZ*/
+> > +	clk_set_rate(&esdhc1_clk, 200000000);
+> > +	clk_set_rate(&esdhc3_mx53_clk, 200000000);
+> > +
+> >  	/* System timer */
+> >  	mxc_timer_init(&gpt_clk, MX53_IO_ADDRESS(MX53_GPT1_BASE_ADDR),
+> >  		MX53_INT_GPT);
+> > diff --git a/arch/arm/mach-mx5/crm_regs.h b/arch/arm/mach-mx5/crm_regs.h
+> > index b462c22..87c0c58 100644
+> > --- a/arch/arm/mach-mx5/crm_regs.h
+> > +++ b/arch/arm/mach-mx5/crm_regs.h
+> > @@ -217,9 +217,12 @@
+> >  #define MXC_CCM_CSCMR1_ESDHC1_MSHC1_CLK_SEL_OFFSET	(20)
+> >  #define MXC_CCM_CSCMR1_ESDHC1_MSHC1_CLK_SEL_MASK	(0x3 << 20)
+> >  #define MXC_CCM_CSCMR1_ESDHC3_CLK_SEL			(0x1 << 19)
+> > +#define MXC_CCM_CSCMR1_ESDHC2_MSHC2_MX53_CLK_SEL	(0x1 << 19)
+> >  #define MXC_CCM_CSCMR1_ESDHC4_CLK_SEL			(0x1 << 18)
+> >  #define MXC_CCM_CSCMR1_ESDHC2_MSHC2_CLK_SEL_OFFSET	(16)
+> >  #define MXC_CCM_CSCMR1_ESDHC2_MSHC2_CLK_SEL_MASK	(0x3 << 16)
+> > +#define MXC_CCM_CSCMR1_ESDHC3_MX53_CLK_SEL_OFFSET	(16)
+> > +#define MXC_CCM_CSCMR1_ESDHC3_MX53_CLK_SEL_MASK		(0x3 << 16)
+> >  #define MXC_CCM_CSCMR1_SSI1_CLK_SEL_OFFSET		(14)
+> >  #define MXC_CCM_CSCMR1_SSI1_CLK_SEL_MASK		(0x3 << 14)
+> >  #define MXC_CCM_CSCMR1_SSI2_CLK_SEL_OFFSET		(12)
+> > @@ -271,6 +274,10 @@
+> >  #define MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PRED_MASK	(0x7 << 22)
+> >  #define MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_OFFSET	(19)
+> >  #define MXC_CCM_CSCDR1_ESDHC2_MSHC2_CLK_PODF_MASK	(0x7 << 19)
+> > +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PRED_OFFSET	(22)
+> > +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PRED_MASK	(0x7 << 22)
+> > +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PODF_OFFSET	(19)
+> > +#define MXC_CCM_CSCDR1_ESDHC3_MX53_CLK_PODF_MASK	(0x7 << 19)
+> >  #define MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_OFFSET	(16)
+> >  #define MXC_CCM_CSCDR1_ESDHC1_MSHC1_CLK_PRED_MASK	(0x7 << 16)
+> >  #define MXC_CCM_CSCDR1_PGC_CLK_PODF_OFFSET		(14)
+> > -- 
+> > 1.7.1
+> > 
+> > 
+> > 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
