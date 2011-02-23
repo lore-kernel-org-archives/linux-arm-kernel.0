@@ -1,58 +1,114 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 24 Feb 2011 01:34:44 +0530
-Subject: [PATCH 1/5] ARM: smp: Select local timers
-	vsdummytimersupportruntime
-In-Reply-To: <20110223195533.GC16041@n2100.arm.linux.org.uk>
-References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297510187-31547-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110220110341.GA15494@n2100.arm.linux.org.uk>
-	<e3674a4c299e3cc0fad3e15a3cc03db4@mail.gmail.com>
-	<20110223163635.GA16041@n2100.arm.linux.org.uk>
-	<780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
-	<2d63c430d007703753afa4ae98902341@mail.gmail.com>
-	<20110223190305.GB16041@n2100.arm.linux.org.uk>
-	<b9ea630b656efc370b6c5da78dedd41d@mail.gmail.com>
-	<20110223195533.GC16041@n2100.arm.linux.org.uk>
-Message-ID: <67a61c19606a2125fce3355d444a338f@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 23 Feb 2011 13:06:42 -0700
+Subject: [PATCH v2] ARM: Tegra: DMA: Fail safe if initialization fails
+Message-ID: <1298491602-20072-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Thursday, February 24, 2011 1:26 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
-> kernel at lists.infradead.org; tony at atomide.com; David Brown; Daniel
-> Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm; Colin
-> Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
-> Subject: Re: [PATCH 1/5] ARM: smp: Select local timers
-> vsdummytimersupportruntime
->
-> On Thu, Feb 24, 2011 at 12:41:38AM +0530, Santosh Shilimkar wrote:
-> > > -----Original Message-----
-> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > > Sent: Thursday, February 24, 2011 12:33 AM
-> > > To: Santosh Shilimkar
-> > > Cc: linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
-> > > kernel at lists.infradead.org; tony at atomide.com; David Brown;
-> Daniel
-> > > Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm;
-> Colin
-> > > Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
-> > > Subject: Re: [PATCH 1/5] ARM: smp: Select local timers vs
-> > > dummytimersupportruntime
-> > >
-> > > On Wed, Feb 23, 2011 at 11:28:11PM +0530, Santosh Shilimkar
-> wrote:
-> > > > Patch 6759/1 and patch 6760/1 in patch system
-> > >
-> > > Was there any difference between 6760 and 6753 ?
-> > Nope.
-> > I just rebased them together and pushed
->
-> Well, both patches are identical, so I'll stick with 6753/1 which
-> I've already merged.
->
-Thanks.
-I got discarded messege for 6753, so I submitted it.
-As you noticed, they are same.
+tegra_dma_init currently simply bails out early if any initialization fails.
+This skips various data-structure initialization. In turn, this means that
+tegra_dma_allocate_channel can still hand out channels. In this case, when
+tegra_dma_free_channel is called, which calls tegra_dma_cancel, the walking
+on ch->list will OOPS since the list's next/prev pointers may still be
+NULL.
+
+To solve this, add an explicit "initialized" flag, only set this once _init
+has fully completed successfully, and have _allocate_channel refuse to hand
+out channels if this is not set.
+
+While at it, simplify _init:
+* Remove redundant memsets
+* Use bitmap_fill to mark all channels as in-use up-front, and remove
+  some now-redundant bitmap initialization loops.
+* Only mark a channel as free once all channel-related initialization has
+  completed.
+
+Finally, the successful exit path from _init always has ret==0, so just
+hard-code that return. The error path still returns ret.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2:
+* Added explicit initialized flag. I chose not to re-use the shared-channel
+  bitmap entry for this purpose, since that bit needs to be marked in-use
+  so that the non-shared-channel path doesn't hand out that channel.
+* Removed redundant memsets
+* Use bitmap_fill instead of a loop
+* Hard-code success return value
+
+ arch/arm/mach-tegra/dma.c |   23 ++++++++++-------------
+ 1 files changed, 10 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/dma.c b/arch/arm/mach-tegra/dma.c
+index bd4f62a..01db832 100644
+--- a/arch/arm/mach-tegra/dma.c
++++ b/arch/arm/mach-tegra/dma.c
+@@ -127,8 +127,8 @@ struct tegra_dma_channel {
+ 
+ #define  NV_DMA_MAX_CHANNELS  32
+ 
++static int initialized;
+ static DEFINE_MUTEX(tegra_dma_lock);
+-
+ static DECLARE_BITMAP(channel_usage, NV_DMA_MAX_CHANNELS);
+ static struct tegra_dma_channel dma_channels[NV_DMA_MAX_CHANNELS];
+ 
+@@ -352,6 +352,9 @@ struct tegra_dma_channel *tegra_dma_allocate_channel(int mode)
+ 	int channel;
+ 	struct tegra_dma_channel *ch = NULL;
+ 
++	if (!initialized)
++		return NULL;
++
+ 	mutex_lock(&tegra_dma_lock);
+ 
+ 	/* first channel is the shared channel */
+@@ -678,6 +681,8 @@ int __init tegra_dma_init(void)
+ 	void __iomem *addr;
+ 	struct clk *c;
+ 
++	bitmap_fill(channel_usage, NV_DMA_MAX_CHANNELS);
++
+ 	c = clk_get_sys("tegra-dma", NULL);
+ 	if (IS_ERR(c)) {
+ 		pr_err("Unable to get clock for APB DMA\n");
+@@ -696,18 +701,9 @@ int __init tegra_dma_init(void)
+ 	writel(0xFFFFFFFFul >> (31 - TEGRA_SYSTEM_DMA_CH_MAX),
+ 	       addr + APB_DMA_IRQ_MASK_SET);
+ 
+-	memset(channel_usage, 0, sizeof(channel_usage));
+-	memset(dma_channels, 0, sizeof(dma_channels));
+-
+-	/* Reserve all the channels we are not supposed to touch */
+-	for (i = 0; i < TEGRA_SYSTEM_DMA_CH_MIN; i++)
+-		__set_bit(i, channel_usage);
+-
+ 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
+ 		struct tegra_dma_channel *ch = &dma_channels[i];
+ 
+-		__clear_bit(i, channel_usage);
+-
+ 		ch->id = i;
+ 		snprintf(ch->name, TEGRA_DMA_NAME_SIZE, "dma_channel_%d", i);
+ 
+@@ -726,14 +722,15 @@ int __init tegra_dma_init(void)
+ 			goto fail;
+ 		}
+ 		ch->irq = irq;
++
++		__clear_bit(i, channel_usage);
+ 	}
+ 	/* mark the shared channel allocated */
+ 	__set_bit(TEGRA_SYSTEM_DMA_CH_MIN, channel_usage);
+ 
+-	for (i = TEGRA_SYSTEM_DMA_CH_MAX+1; i < NV_DMA_MAX_CHANNELS; i++)
+-		__set_bit(i, channel_usage);
++	initialized = 1;
+ 
+-	return ret;
++	return 0;
+ fail:
+ 	writel(0, addr + APB_DMA_GEN);
+ 	for (i = TEGRA_SYSTEM_DMA_CH_MIN; i <= TEGRA_SYSTEM_DMA_CH_MAX; i++) {
+-- 
+1.7.1
