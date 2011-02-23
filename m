@@ -1,54 +1,25 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 23 Feb 2011 15:35:07 +0530
-Subject: [PATCH 0/3] OMAP2+ hwmod fixes
-In-Reply-To: <alpine.DEB.2.00.1102221200260.22636@utopia.booyaka.com>
-References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
-	<4D5BCC10.2060301@ti.com>
-	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
-	<4D5E85EA.70605@ti.com>
-	<alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
-	<e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
-	<alpine.DEB.2.00.1102221200260.22636@utopia.booyaka.com>
-Message-ID: <19850e063c924a8a30c69ac02621a659@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 23 Feb 2011 10:05:47 +0000
+Subject: [PATCH v3] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <1298440516.23371.258.camel@vkoul-udesk3>
+References: <1298283699-14635-1-git-send-email-shawn.guo@freescale.com>
+	<1298433701.23371.236.camel@vkoul-udesk3>
+	<20110223055709.GC20346@S2100-06.ap.freescale.net>
+	<1298440516.23371.258.camel@vkoul-udesk3>
+Message-ID: <20110223100547.GG29559@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Wed, Feb 23, 2011 at 11:25:16AM +0530, Koul, Vinod wrote:
+> Well in that case you are calling the callback from irq handler which is
+> not so good. The tasklet is other extreme (slow).
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com]
-> Sent: Wednesday, February 23, 2011 12:40 AM
-> To: Rajendra Nayak; Cousson, Benoit
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 0/3] OMAP2+ hwmod fixes
->
-> Hi Rajendra
->
-> On Tue, 22 Feb 2011, Rajendra Nayak wrote:
->
-> > The original behavior of the iterators, to terminate upon
-> > encountering an error, seems fine to me. The only problem
-> > I faced was that they fail silently and go undetected, unless
-> > their user catches the return value and WARN's, which I found
-> > was not the case with most users, mainly those of
-> > omap_hwmod_for_each_by_class.
-> > I was thinking of keeping the behaviour of these iterators
-> > same for now and add WARN's in these iterators itself upon
-> > an error, so its seen even if the user fails to catch it.
->
-> What's your opinion on adding the pr_err() or WARN() into the code that
-> the iterator calls for each hwmod?  That code should know why something
-> fails, so it should be able to provide a more detailed error message.
-Of
-> course, it is not as general a solution...
+tasklets are run on the exit path of interrupts.
 
-I agree, if the callback functions are written with proper errors
-or WARN's, they are the right place where most of the details'
-exist. So maybe we don't need these in the iterator's after all.
+> Given that this is
+> also intended for audio I am not sure if calling period elapsed from
+> tasklet callback will not cause any audio over/underruns, last I tried
+> it used to break quite often in stressed situations.
 
-Regards,
-Rajendra
-
->
->
-> - Paul
+Nevertheless, the DMA engine API specifies that callbacks shall be called
+from tasklet context.
