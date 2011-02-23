@@ -1,21 +1,52 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 23 Feb 2011 22:55:03 +0530
-Subject: [PATCH] nmk-gpio: use request_irq instead of chained handler
-In-Reply-To: <-6148324460357957969@unknownmsgid>
-References: <1298465690-27077-1-git-send-email-rabin.vincent@stericsson.com>
-	<-6148324460357957969@unknownmsgid>
-Message-ID: <AANLkTin94vzJ_RvxvydnF1ymT2hbKGHruqUMrFTZKPJ+@mail.gmail.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 23 Feb 2011 11:26:12 -0600
+Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found on
+	the MPC85xx.
+In-Reply-To: <20110223165058.GE14597@angua.secretlab.ca>
+References: <cover.1298447722.git.richard.cochran@omicron.at>
+	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
+	<20110223165058.GE14597@angua.secretlab.ca>
+Message-ID: <20110223112612.30071995@schlenkerla>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 22:47, Will Deacon <will.deacon@arm.com> wrote:
->> __nmk_gpio_irq_handler doesn't do anything more that what a normal handler
->> does, so it can become one. ?This is also needed for changing the GIC
->> implementation to a different flow handler.
->>
->> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
->
-> mach-nomadik only seems to use the vic. Why does this GPIO handler
-> need updating?
+On Wed, 23 Feb 2011 09:50:58 -0700
+Grant Likely <grant.likely@secretlab.ca> wrote:
 
-plat-nomadik/gpio.c is also used by mach-ux500, which uses the GIC.
+> On Wed, Feb 23, 2011 at 11:38:17AM +0100, Richard Cochran wrote:
+> > +
+> > +* Gianfar PTP clock nodes
+> > +
+> > +General Properties:
+> > +
+> > +  - compatible   Should be "fsl,etsec-ptp"
+> 
+> Should specify an *exact* part; ie: "fsl,mpc8313-etsec-ptp" instead of
+> trying to define a generic catchall.  The reason is that the same
+> marketing name can end up getting applied to a wide range of parts.
+> 
+> Instead, choose one specific device to stand in as the 'common'
+> implementation and get all parts with the same core to claim
+> compatibility with it.  ie: a p2020 might have:
+> 
+> 	compatible = "fsl,mpc2020-etsec-ptp", "fsl,mpc8313-etsec-ptp";
+
+eTSEC is versioned, that's more reliable than the chip name since chips
+have revisions (rev 2.1 of mpc8313 has eTSEC 1.6, not sure about previous
+revs of mpc8313).  Logic blocks can be and have been uprevved between one
+revision of a chip to the next.  I think "fsl,mpc8313rev2.1-etsec-ptp"
+would be taking things a bit too far (and there could be board-level bugs
+too...).
+
+If you really need to know the exact SoC you're on, look in SVR (which
+will provide revision info as well).  Isn't the device tree for things that
+can't be probed?
+
+The eTSEC revision is probeable as well, but due the way PTP is described as
+a separate node, the driver doesn't have straightforward access to those
+registers.
+
+Insisting on an explicit chip also encourages people to claim compatibility
+with that chip without ensuring that it really is fully compatible.
+
+-Scott
