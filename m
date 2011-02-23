@@ -1,20 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 23 Feb 2011 19:03:05 +0000
-Subject: [PATCH 1/5] ARM: smp: Select local timers vs dummytimersupport
-	runtime
-In-Reply-To: <2d63c430d007703753afa4ae98902341@mail.gmail.com>
-References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297510187-31547-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110220110341.GA15494@n2100.arm.linux.org.uk>
-	<e3674a4c299e3cc0fad3e15a3cc03db4@mail.gmail.com>
-	<20110223163635.GA16041@n2100.arm.linux.org.uk>
-	<780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
-	<2d63c430d007703753afa4ae98902341@mail.gmail.com>
-Message-ID: <20110223190305.GB16041@n2100.arm.linux.org.uk>
+From: John.Linn@xilinx.com (John Linn)
+Date: Wed, 23 Feb 2011 12:06:21 -0700
+Subject: When does mach-types get updated in a tree?
+Message-ID: <fbe0504b-0d9b-4a72-8e49-a4517170f889@VA3EHSMHS032.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 11:28:11PM +0530, Santosh Shilimkar wrote:
-> Patch 6759/1 and patch 6760/1 in patch system
+I am trying to get a branch ready that could be pulled from with my new
+patches.
 
-Was there any difference between 6760 and 6753 ?
+There is a new Xilinx entry when I look at the
+http://www.arm.linux.org.uk/developer/machines/download.php.
+
+But I don't see a Xilinx entry anywhere in any git trees.
+
+Maybe I overlooked it, or don't really understand the process (more than
+likely).
+
+Thanks,
+John
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
