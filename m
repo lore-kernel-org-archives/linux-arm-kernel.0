@@ -1,59 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 23 Feb 2011 22:08:52 +0530
-Subject: [PATCH 1/5] ARM: smp: Select local timers vs dummytimersupport
-	runtime
-In-Reply-To: <20110223163635.GA16041@n2100.arm.linux.org.uk>
-References: <1297510187-31547-1-git-send-email-santosh.shilimkar@ti.com>
-	<1297510187-31547-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110220110341.GA15494@n2100.arm.linux.org.uk>
-	<e3674a4c299e3cc0fad3e15a3cc03db4@mail.gmail.com>
-	<20110223163635.GA16041@n2100.arm.linux.org.uk>
-Message-ID: <780a7a77ef7a93b801ca178e1518e05b@mail.gmail.com>
+From: eric@eukrea.com (Eric Benard)
+Date: Wed, 23 Feb 2011 17:48:11 +0100
+Subject: [PATCH v3] Add i.MX51/53 IPU framebuffer support
+In-Reply-To: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+References: <1297865452-32181-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <4D653A4B.4050405@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: Wednesday, February 23, 2011 10:07 PM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; Kevin Hilman; linux-arm-
-> kernel at lists.infradead.org; tony at atomide.com; David Brown; Daniel
-> Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm; Colin
-> Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
-> Subject: Re: [PATCH 1/5] ARM: smp: Select local timers vs
-> dummytimersupport runtime
+Hi Sascha,
+
+On 16/02/2011 15:10, Sascha Hauer wrote:
+> The following is the third version of the series adding ipu support
+> for the i.MX51/53.
 >
-> On Sun, Feb 20, 2011 at 04:37:36PM +0530, Santosh Shilimkar wrote:
-> > > -----Original Message-----
-> > > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > > Sent: Sunday, February 20, 2011 4:34 PM
-> > > To: Santosh Shilimkar
-> > > Cc: linux-omap at vger.kernel.org; khilman at ti.com; linux-arm-
-> > > kernel at lists.infradead.org; tony at atomide.com; David Brown;
-> Daniel
-> > > Walker; Bryan Huntsman; Kukjin Kim; Paul Mundt; Magnus Damm;
-> Colin
-> > > Cross; Erik Gilling; Srinidhi Kasagar; Linus Walleij
-> > > Subject: Re: [PATCH 1/5] ARM: smp: Select local timers vs dummy
-> > > timersupport runtime
-> > >
-> > > On Sat, Feb 12, 2011 at 04:59:43PM +0530, Santosh Shilimkar
-> wrote:
-> > > > -#ifndef CONFIG_LOCAL_TIMERS
-> > > >  static void broadcast_timer_set_mode(enum clock_event_mode
-> mode,
-> > > >  	struct clock_event_device *evt)
-> > > >  {
-> > > >  }
-> > > >
-> > > > -static void local_timer_setup(struct clock_event_device *evt)
-> > > > +static void dummy_timer_setup(struct clock_event_device *evt)
-> > >
-> > > Please call this broadcast_timer_setup().
-> >
-> > Right. Will fix this.
+> Changes since last version:
 >
-> Grr.  This conflicts horribly with the Versatile stuff.  Can you
-> recreate
-> against what currently appears in devel rather than mainline please?
-Ok. I will pull your devel branch and rebase it
+> - The IPU core driver now sits in drivers/video instead of drivers/mfd.
+>    It still needs mfd support, so it has a select on MFD_SUPPORT and
+>    MFD_CORE.
+> - The fb driver does not reallocate memory anymore. This is broken since
+>    there is a risk that some userspace process still has the memory mapped
+>    while we reallocate it which leads to bad results.
+>
+> Sascha Hauer (7):
+>        Add a mfd IPUv3 driver
+>        fb: export fb mode db table
+>        Add i.MX5 framebuffer driver
+>        ARM i.MX51: Add IPU device support
+>        ARM i.MX5: Allow to increase max zone order
+>        ARM i.MX5: increase dma consistent size for IPU support
+>        ARM i.MX51 babbage: Add framebuffer support
+>
+for the whole serie except the last one concerning babbage :
+Tested-by: Eric B?nard <eric@eukrea.com>
+
+Eric
