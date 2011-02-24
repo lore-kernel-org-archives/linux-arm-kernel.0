@@ -1,16 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Feb 2011 13:28:52 -0800
-Subject: [PATCH resend] omap: rx51: Add SI4713 FM transmitter
-In-Reply-To: <1298270556-11571-1-git-send-email-jhnikula@gmail.com>
-References: <1298040354-1726-1-git-send-email-jhnikula@gmail.com>
-	<1298270556-11571-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <20110224212852.GO20560@atomide.com>
+From: bryanh@codeaurora.org (Bryan Huntsman)
+Date: Thu, 24 Feb 2011 13:29:56 -0800
+Subject: [PATCH] MAINTAINERS: Update MSM maintainers
+In-Reply-To: <1298512932.17118.16.camel@m0nster>
+References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>	
+	<1298420395.17118.6.camel@m0nster>	
+	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>	
+	<4D657B69.4000107@codeaurora.org>
+	<1298512932.17118.16.camel@m0nster>
+Message-ID: <4D66CDD4.7080103@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [110220 22:40]:
-> Add SI4713 FM transmitter supplies, platform data and setup to RX-51/N900.
+On 02/23/2011 06:02 PM, Daniel Walker wrote:
 
-Thanks adding to devel-board for the upcoming merge window.
+> There's nothing really to figure out. I don't feel like you and David
+> can do the job alone. My intentions are just to make sure that you don't
+> mess with my targets, and that you do the right thing by the community.
+> 
+> Daniel
 
-Tony
+I'd like to address the points you mention.  I disagree with your
+personal feelings about David's suitability for the task.  David has
+been involved with Linux MSM development for it's entire history.  This
+is important because he knows the HW behavior and SW designs for all the
+MSM chips and drivers.  This gives him the context to recognize
+potentially subtle interactions and behavioral issues.  I hope you would
+agree that this type of expertise and insight is valuable for any
+maintainer to have.  Regarding his ability to do this on his own, public
+maintainership of the MSM architecture is David's primary
+responsibility.  I agree that this is a somewhat new role for him, but
+maintainers have to start somewhere.  From what I've seen so far, David
+is showing the proper maturity and judgement expected from a
+maintainer.  As an example, I would point to David's handling of Arnd's
+comments in this thread; https://lkml.org/lkml/2010/12/16/434.  This
+caused a considerable amount re-work and testing for us but David made
+sure that it was addressed and resolved correctly and in a timely manner.
+
+For your second point, would you please explain how we're "messing with
+your targets"?  I understand that you have a personal interest in
+getting G1 and NexusOne support into the kernel.  This is a great goal
+and I would encourage you to continue with this effort.  We're happy to
+accept any patches you submit in this regard.  Additionally, I think you
+would provide value to the MSM maintainer and the community by testing
+patches on these targets once there is support for them in the kernel.
+However, I would like to point out that the MSM architecture includes
+much more that just G1 or NexusOne.  By my last last count, there were
+about 47 MSM machines registered.
+
+For your last point, would you please explain why it falls to you to
+"make sure ... that we do the right thing by the community"?  We are
+trying very hard to become good citizens in the Linux kernel development
+community.  This is not always an easy thing to do.  The issues with SOC
+vendors are well known.  I think the fact that one of our key MSM
+developers, David Brown, has stepped up to handle public maintainership
+of the MSM architecture, as well as the fact that many of our developers
+are now submitting patches upstream, demonstrates that we are trying to
+do the right thing.  I'm sure there are lots of areas where we could
+improve and many things we could do better.  This is a learning process
+for many of us.  If you have specific examples of things that should be
+fixed or could be done better, please let us know.  That kind of
+feedback is why we're participating and sending patches out for public
+review in the first place.  If you have specific examples of us doing
+wrong by the community please share those as well.  To my knowledge, no
+such issues have been raised by anyone in the community so far.
+
+Finally, it's my hope that you and Linux community will help and support
+David as the MSM maintainer by reviewing MSM-related patches and
+pointing out areas where the MSM architecture could be improved.  In
+this spirit, I'm asking you to please acknowledge the patch that started
+this email chain.  Please let the MSM developers take full
+responsibility for the MSM architecture.  That is, after all, what the
+community typically asks from SOC vendors.  Thanks.
+
+- Bryan
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
