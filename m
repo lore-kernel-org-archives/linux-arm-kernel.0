@@ -1,54 +1,79 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Feb 2011 21:48:19 +0800
-Subject: [PATCH v3] mmc: mxs-mmc: add mmc host driver for i.MX23/28
-In-Reply-To: <20110222080905.GB16141@S2101-09.ap.freescale.net>
-References: <1298284528-14761-1-git-send-email-shawn.guo@freescale.com>
-	<20110221174016.GN2616@pengutronix.de>
-	<20110222080905.GB16141@S2101-09.ap.freescale.net>
-Message-ID: <20110224134818.GA1404@S2100-06.ap.freescale.net>
+From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
+Date: Thu, 24 Feb 2011 19:24:55 +0530
+Subject: [PATCH v3 1/2] PRUSS UIO driver support
+In-Reply-To: <alpine.LFD.2.00.1102232057260.2701@localhost6.localdomain6>
+References: <1298469161-7644-1-git-send-email-pratheesh@ti.com>
+	<1298469161-7644-2-git-send-email-pratheesh@ti.com>
+	<alpine.LFD.2.00.1102232057260.2701@localhost6.localdomain6>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BE49813@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore the message which is the one I sent a few days ago
-and I thought it did not get through.
 
-On Tue, Feb 22, 2011 at 04:09:06PM +0800, Shawn Guo wrote:
-> Hi Wolfram,
+> -----Original Message-----
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: Thursday, February 24, 2011 1:56 AM
+> To: TK, Pratheesh Gangadhar
+> Cc: davinci-linux-open-source at linux.davincidsp.com; hjk at hansjkoch.de;
+> gregkh at suse.de; Chatterjee, Amit; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3 1/2] PRUSS UIO driver support
 > 
-> On Mon, Feb 21, 2011 at 06:40:16PM +0100, Wolfram Sang wrote:
-> > Shawn,
-> > 
-> > On Mon, Feb 21, 2011 at 06:35:28PM +0800, Shawn Guo wrote:
-> > > This adds the mmc host driver for Freescale MXS-based SoC i.MX23/28.
-> > > The driver calls into mxs-dma via generic dmaengine api for both pio
-> > > and data transfer.
-> > > 
-> > > Thanks Chris Ball for the indentation patch.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > What throughput rates do you get on a mx28-regulated slot serving a card
-> > at 50Mhz? This is poor here (55kb/s) while it is OK at 25Mhz. Could be a
+> On Wed, 23 Feb 2011, Pratheesh Gangadhar wrote:
 > 
-> To make sure we are on the same page, can you share me the test you
-> ran?  And I can give it a try on my board.
+> Is it actually too much of an hassle to cc the people who spent their
+> time to review previous versions of your patch ?
 > 
-> > board issue though (or we can fix it later), rest works fine, thus:
-> > 
-> > Tested-by: Wolfram Sang <w.sang@pengutronix.de>
-> > 
+Sorry. Will do...
+> > +struct clk *pruss_clk;
+> > +struct uio_info *info;
+> > +void *ddr_virt_addr = NULL, *prussio_virt_addr = NULL;
 > 
-> -- 
-> Regards,
-> Shawn
+> Grrr. We do not initialize with NULL.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > +dma_addr_t ddr_phy_addr;
 > 
+> Also all of these want to be static.
+> 
+Ok.
+> 
+> > +		uio_unregister_device(p);
+> > +		kfree(p->name);
+> > +	}
+> > +	iounmap(prussio_virt_addr);
+> > +	dma_free_coherent(&dev->dev, info[0].mem[2].size,
+> > +			  info[0].mem[2].internal_addr, info[0].mem[2].addr);
+> 
+> You sure, that iounmap and dma_free_coherent are too happy about being
+> called with NULL pointers?
+> 
+For iounmap its ok, not ok for dma_free_coherent. Will fix.
+> > +
+> > +	kfree(info);
+> > +	clk_put(pruss_clk);
+> > +}
+> > +
+> > +static int __devinit pruss_probe(struct platform_device *dev)
+> > +{
+> > +	int ret = -ENODEV, count = 0;
+> > +	struct resource *regs_prussio, *regs_l3ram, *regs_ddr;
+> > +	struct uio_info *p;
+> > +
+> > +	info = kzalloc(sizeof(struct uio_info) * MAX_PRUSS_EVTOUT_INSTANCE,
+> > +		       GFP_KERNEL);
+> > +	if (!info)
+> > +		return -ENOMEM;
+> > +
+> > +	/* Power on PRU in case its not done as part of boot-loader */
+> > +	pruss_clk = clk_get(&dev->dev, "pruss");
+> > +	if (IS_ERR(pruss_clk)) {
+> > +		dev_err(&dev->dev, "Failed to get clock\n");
+> > +		ret = PTR_ERR(pruss_clk);
+> > +		return ret;
+> 
+> Memory leak.
+Will fix.
+ 
 
--- 
-Regards,
-Shawn
+Thanks,
+Pratheesh
