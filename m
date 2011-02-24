@@ -1,31 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 24 Feb 2011 20:11:02 +0000
-Subject: [PATCH] S3C64XX: Tone down SDHCI debugging
-Message-ID: <1298578262-25391-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Feb 2011 12:21:57 -0800
+Subject: [PATCH] OMAP2+: clocksource: fix crash on boot when
+	!CONFIG_OMAP_32K_TIMER
+In-Reply-To: <alpine.DEB.2.00.1102221958190.22636@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1102221958190.22636@utopia.booyaka.com>
+Message-ID: <20110224202157.GG20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC core calls s3c6400_setup_sdhcp_cfg_card() very frequently, causing
-the log message in there at KERN_INFO to be displayed a lot which is slow
-and overly chatty. Convert the message into a pr_debug() to tone this down.
+* Paul Walmsley <paul@pwsan.com> [110222 18:58]:
+> 
+> OMAP2+ kernels built without CONFIG_OMAP_32K_TIMER crash on boot after the
+> 2.6.38 sched_clock changes:
+> 
+> [    0.000000] OMAP clockevent source: GPTIMER1 at 13000000 Hz
+> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> [    0.000000] pgd = c0004000
+> [    0.000000] [00000000] *pgd=00000000
+> [    0.000000] Internal error: Oops: 80000005 [#1] SMP
+> [    0.000000] last sysfs file:
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0    Not tainted  (2.6.38-rc5-00057-g04aa67d #152)
+> [    0.000000] PC is at 0x0
+> [    0.000000] LR is at sched_clock_poll+0x2c/0x3c
+> 
+> Without CONFIG_OMAP_32K_TIMER, the kernel has an clockevent and
+> clocksource resolution about three orders of magnitude higher than
+> with CONFIG_OMAP_32K_TIMER set.  The tradeoff is that the lowest
+> power consumption states are not available.
+> 
+> Fix by calling init_sched_clock() from the GPTIMER clocksource init code.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/setup-sdhci.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I'll queue this as a fix as it's a regression.
 
-diff --git a/arch/arm/mach-s3c64xx/setup-sdhci.c b/arch/arm/mach-s3c64xx/setup-sdhci.c
-index 1a94203..f344a22 100644
---- a/arch/arm/mach-s3c64xx/setup-sdhci.c
-+++ b/arch/arm/mach-s3c64xx/setup-sdhci.c
-@@ -56,7 +56,7 @@ void s3c6400_setup_sdhci_cfg_card(struct platform_device *dev,
- 	else
- 		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
- 
--	printk(KERN_INFO "%s: CTRL 2=%08x, 3=%08x\n", __func__, ctrl2, ctrl3);
-+	pr_debug("%s: CTRL 2=%08x, 3=%08x\n", __func__, ctrl2, ctrl3);
- 	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
- 	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
- }
--- 
-1.7.2.3
+Tony
