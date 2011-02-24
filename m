@@ -1,71 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 24 Feb 2011 10:55:39 -0800
-Subject: [TRIVIAL/PATCH] ARM: hw_breakpoint: Fix newlines in WARN messages
-Message-ID: <1298573739-25144-1-git-send-email-sboyd@codeaurora.org>
+From: eric@eukrea.com (Eric Benard)
+Date: Thu, 24 Feb 2011 20:00:52 +0100
+Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
+	and	card detection
+In-Reply-To: <87k4gp3bl1.fsf@lebrac.rtp-net.org>
+References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
+	<87k4gp3bl1.fsf@lebrac.rtp-net.org>
+Message-ID: <4D66AAE4.4000308@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These warnings are missing newlines and spaces causing confusing
-looking output when they trigger.
+Hi Arnaud,
 
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/hw_breakpoint.c |   13 +++++++------
- 1 files changed, 7 insertions(+), 6 deletions(-)
+On 24/02/2011 12:40, Arnaud Patard (Rtp) wrote:
+> Wolfram Sang<w.sang@pengutronix.de>  writes:
+>
+> Hi,
+>
+>> Take #3, changes:
+>>
+>> * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
+>> * remove unconditional BROKEN_CARD_DETECTION (leftover)
+>> * improved kernel-doc about unused GPIO
+>> * added tags from Eric
+>>
+>> Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
+>> chance to retest on mx51? What about the FSL guys? :)
+>
+> I'm getting a hard freeze on my efika sb and mx once I remove the
+> unconditional BROKEN_CARD_DETECTION flag. I'm still investigating the
+> issue. I'll keep you informed if I find something.
+>
+may you please test the attached patch. It may give someone with a better 
+knowledge of sdhci than me an idea of what is wrong.
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index d600bd3..5aab00e 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -238,8 +238,8 @@ static int enable_monitor_mode(void)
- 	ARM_DBG_READ(c1, 0, dscr);
- 
- 	/* Ensure that halting mode is disabled. */
--	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN, "halting debug mode enabled."
--				"Unable to access hardware resources.")) {
-+	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN, "halting debug mode enabled. "
-+				"Unable to access hardware resources.\n")) {
- 		ret = -EPERM;
- 		goto out;
- 	}
-@@ -377,7 +377,7 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
- 		}
- 	}
- 
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot")) {
-+	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n")) {
- 		ret = -EBUSY;
- 		goto out;
- 	}
-@@ -423,7 +423,7 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
- 		}
- 	}
- 
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot"))
-+	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
- 		return;
- 
- 	/* Reset the control register. */
-@@ -635,7 +635,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	if (WARN_ONCE(!bp->overflow_handler &&
- 		(arch_check_bp_in_kernelspace(bp) || !core_has_mismatch_brps()
- 		 || !bp->hw.bp_target),
--			"overflow handler required but none found")) {
-+			"overflow handler required but none found\n")) {
- 		ret = -EINVAL;
- 	}
- out:
-@@ -917,7 +917,8 @@ static int __init arch_hw_breakpoint_init(void)
- 	if (dscr & ARM_DSCR_HDBGEN) {
- 		max_watchpoint_len = 4;
- 		pr_warning("halting debug mode enabled. Assuming maximum "
--			   "watchpoint size of %u bytes.", max_watchpoint_len);
-+			   "watchpoint size of %u bytes.\n",
-+			   max_watchpoint_len);
- 	} else {
- 		/* Work out the maximum supported watchpoint length. */
- 		max_watchpoint_len = get_max_wp_len();
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Here are the workaround this patch add :
+- we can't let enable or disable irq enabled when the card is present/not 
+present, else the irq triger again which explains why you get the freeze -> so 
+we must rely on the card presence bit to enable the right interrupt,
+- we can't turn the clock off if we want the card detect to work when the card 
+is removed -> as a quick workaround this patch prevents sdhci_set_clock from 
+turning off the clocks when the SDHCI_INT_CARD_INSERT interrupt is enabled.
+
+Also, I had to change the MX51_PAD_GPIO1_0__SD1_CD pad setting as follows to 
+enable the internal pull up :
+	_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
+			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
+			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
+
+Eric
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: mx51_sdhci_cd_fix.patch
+Type: text/x-patch
+Size: 2488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110224/e118ff7a/attachment-0001.bin>
