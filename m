@@ -1,69 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Feb 2011 09:38:40 -0800
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
-	boot failure)
-In-Reply-To: <84fafb82318b1287513d198c6535eb59@mail.gmail.com>
-References: <20110106204053.GA7771@atomide.com>
-	<20110107161230.GR1198@n2100.arm.linux.org.uk>
-	<20110110185209.GC4957@atomide.com>
-	<20110111231611.GX4957@atomide.com>
-	<3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
-	<20110202011006.GP3358@atomide.com>
-	<81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
-	<20110202194855.GA3322@atomide.com>
-	<cace62268ad657586f07ecbb0e6a99ab@mail.gmail.com>
-	<84fafb82318b1287513d198c6535eb59@mail.gmail.com>
-Message-ID: <20110224173840.GC20560@atomide.com>
+From: fernando.lugo@ti.com (Guzman Lugo, Fernando)
+Date: Thu, 24 Feb 2011 11:58:13 -0600
+Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
+	handling
+In-Reply-To: <20110224112912.GQ3528@legolas.emea.dhcp.ti.com>
+References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
+	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
+	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
+	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
+	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
+	<4D656961.7080105@maxwell.research.nokia.com>
+	<20110224083518.GC3528@legolas.emea.dhcp.ti.com>
+	<AANLkTinh_a81sELdF19ob0A0KbLR+9MUnb0+283NxO2b@mail.gmail.com>
+	<20110224112912.GQ3528@legolas.emea.dhcp.ti.com>
+Message-ID: <AANLkTikXBKcbOQXdse31=qjoLoAhkvKz15PeFuw3AmCj@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110212 00:45]:
-> Tony,
-> > -----Original Message-----
-> > From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> > Sent: Thursday, February 03, 2011 2:13 PM
-> > To: Tony Lindgren
-> > Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
-> > kernel at lists.infradead.org; linux-omap at vger.kernel.org; Keshava
-> > Munegowda; Felipe Balbi
-> > Subject: RE: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
-> > 4430SDP boot failure)
-> >
-> > > -----Original Message-----
-> > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > Sent: Thursday, February 03, 2011 1:19 AM
-> > > To: Santosh Shilimkar
-> > > Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
-> > > kernel at lists.infradead.org; linux-omap at vger.kernel.org; Keshava
-> > > Munegowda; Felipe Balbi
-> > > Subject: Re: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
-> > > 4430SDP boot failure)
-> > >
-> > > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110201 22:04]:
-> > > > >
-> > > > > It's a ES1.0 blaze, with the patch below it reboots early
-> > > > > during the boot. I also have to disable omap_l2_cache_init
-> > > > > on this board to get it to boot.
-> > > > >
-> > > > Do you still get this problem with 'omap_l2_cache_init' ?
-> > > > As reported earlier, we don't see this issue on ES1.0
-> > > > SDP.
-> > >
-> > > Yeah I do, it rarely makes it to the userspace. Works reliably
-> > > if I disable omap_l2_cache_init.
-> > >
-> > Ok. I shall try few experiments and try to reproduce it
-> 
-> Not sure if it's the same issue but I managed to reproduce the
-> issue on ES2.0 itself. And after some experiments, it boiled
-> down to the V6 and V7 issue. By disabling OMAP2 from the build,
-> everything was fine again.
+On Thu, Feb 24, 2011 at 5:29 AM, Felipe Balbi <balbi@ti.com> wrote:
+> On Thu, Feb 24, 2011 at 01:26:05PM +0200, David Cohen wrote:
+>> On Thu, Feb 24, 2011 at 10:35 AM, Felipe Balbi <balbi@ti.com> wrote:
+>> > Hi,
+>> >
+>> > On Wed, Feb 23, 2011 at 10:09:05PM +0200, Sakari Ailus wrote:
+>> >> > In OMAP4 the cortex M3 is a double core processor and as each core is
+>> >> > running they own version of the RTOS we threat them independently. So
+>> >> > our driver which controls the remote processor sees two processor but
+>> >> > both use the same iommu hw. When a iommu fault happens, at this
+>> >> > moment, it is consider as a faltal error and it is no managed to
+>> >> > recover and continue, instead a restart of the processor is needed, if
+>> >> > the fault happens in core0 we need to reset core1 too and vice versa.
+>> >> > if the iommu would support several user callbacks, we can register the
+>> >> > callback which resets core0 and also the callback which resets core1
+>> >> > and treat them as totally independent processors. Also we have an
+>> >> > error event notifier driver, which is only in charge of notifying
+>> >> > error events to userspace, so we would have multiple callbacks we
+>> >> > could do this
+>> >>
+>> >> The original purpose of the patch, as far as I understand, is to allow
+>> >> getting useful information for debugging purposes should an iommu fault
+>> >> happen.
+>> >>
+>> >> Also, I'm not sure it's necessarily a good idea to just go and reset
+>> >> the M3 cores in case an iommu fault happens --- this is very probably a
+>> >> grave bug in the software running on those M3s. It should be fixed
+>> >> instead of just hiding it. There will be consequences to host side as
+>> >
+>> > I have to agree here. Besides the fact that multiple callbacks is
+>> > outside the scope of this patch.
+>>
+>> This patch is already acked. What about leave it as it is and discuss
+>> multiple callbacks before release a new patch to support it?
+>
+> fine by me ;-)
 
-Was this with linux-omap master branch or mainline?
-
-The V6 vs V7 issues should be sorted out with Russell's patches that
-we also have now in linux-omap master branch.
+Ok, maybe it was too late to change it, due to it is already acked, I
+just wanted to avoid change isr here and then change it on other
+patch. it is ok then.
 
 Regards,
+Fernando.
 
-Tony
+>
+> --
+> balbi
+>
