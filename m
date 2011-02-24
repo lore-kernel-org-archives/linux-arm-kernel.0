@@ -1,57 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Feb 2011 10:24:01 +0100
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <AANLkTimZDDo0xa2CzgHhH1LSWJ-KT0QgOmEAKs2nJK8x@mail.gmail.com>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201102231709.05036.arnd@arndb.de>
-	<AANLkTimZDDo0xa2CzgHhH1LSWJ-KT0QgOmEAKs2nJK8x@mail.gmail.com>
-Message-ID: <201102241024.01437.arnd@arndb.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 24 Feb 2011 11:27:23 +0200
+Subject: [PATCH v10 05/18] OMAP2,3 DSS2 Change driver name to omap_display
+In-Reply-To: <1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+Message-ID: <1298539643.16119.54.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 February 2011, Andrei Warkentin wrote:
+Hi,
 
-> I am more concerned with workarounds that depend on access size (like
-> the toshiba one) and that modify the MMC commands sent (using reliable
-> writes, like the Toshiba one, or putting parameters differently like
-> the Sandisk erase workaround). It's these kinds of workarounds that
-> the quirks framework is meant to address. I don't think it's a good
-> idea to pollute mmc_blk_issue_rw_rq and mmc_blk_issue_discard_rq with
-> if()-elsed workarounds, because it's going to quickly complicate the
-> logic, and get out of hand and unmanageable the more cards are added.
-> I'm trying to avoid having to make any changes to card/block.c as part
-> of making quirk workarounds. The only cost when compared to an if-else
-> will be one O(log n) quirk lookup, where n is either one or something
-> close that (since the search is only done for quirks per
-> mmc_blk_data), and one callback invoked after "brq.data.sg_len =
-> mmc_queue_map_sg(mq);" so it can patch up mrq as necessary.
+On Mon, 2011-01-24 at 11:51 +0530, ext Sumit Semwal wrote:
+> From: Senthilvadivu Guruswamy <svadivu@ti.com>
+> 
+> Change the driver name from omapdss to omap_display as the driver takes care of
+> the display devices ie number of panels, type of panels available in the
+> platform.  Change the device name in the board files and 2420,2430,3xxx clock
+> files from omapdss to omap_display to match the driver name.
 
-Unlike the sysfs interface, the code does not need to be future-proof,
-it can always be changed if we feel the code becomes more maintainable
-by doing it another way.
+I just realized that changing the driver name will break all scripts and
+applications using omapdss sysfs files.
 
-The approach that I'd like to see here is:
+How does this sound:
 
-* Start out with an ad-hoc patch for a quirk (like the one you already
-  have).
-* Add a boolean variable to enable it per card.
-* Get performance data for this quirk to show that it's useful in
-  real-world workloads for some cards but counterproductive for others
-* Get the patch into the mmc tree.
-* Repeat for the next quirk
-* When the code becomes overly complicated after adding all the quirks,
-  decide on a good strategy to move the code around, and do a new patch.
+Let's leave the omapdss device name as it is. It represents a "super"
+device, containing the dss sysfs files and upper level dss management.
 
-I understand that you are convinced that you will need the indirect function
-calls in the end. That is fine, just don't add them before they are
-actually needed -- that would only make it harder for you to get the first
-patch included.
+Name the HW module platform drivers as: omapdss_dss, omapdss_venc,
+omapdss_dispc, etc. This would indicate them to be clearly parts of DSS,
+and would also prevent any possible name conflict if there would happen
+to be a, say, "dsi" block in some other HW component.
 
-Note that the situation is very different for user interfaces such as sysfs:
-You need to plan ahead because once the interface is merged upstream, it
-can never be changed. When you submit a patch that introduces a new sysfs
-interface, it has to be documented, and you have to convince the reviewers
-that it is sufficient to cover all the cases it is designed for, while
-at the same time it is the most simple way to achieve this.
-
-	Arnd
+ Tomi
