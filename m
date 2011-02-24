@@ -1,71 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Feb 2011 14:12:46 -0000
-Subject: [PATCH 5/5] ARM: msm: update GPIO chained IRQ handler to use EOI
-	in parent chip
-In-Reply-To: <alpine.LFD.2.00.1102241338410.2701@localhost6.localdomain6>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-6-git-send-email-will.deacon@arm.com>
-	<4D65A4BA.8030206@codeaurora.org>
-	<alpine.LFD.2.00.1102241338410.2701@localhost6.localdomain6>
-Message-ID: <000401cbd42c$e9a957b0$bcfc0710$@deacon@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 24 Feb 2011 15:28:02 +0100 (CET)
+Subject: [PATCH v4 1/2] PRUSS UIO driver support
+In-Reply-To: <1298556402-26456-2-git-send-email-pratheesh@ti.com>
+References: <1298556402-26456-1-git-send-email-pratheesh@ti.com>
+	<1298556402-26456-2-git-send-email-pratheesh@ti.com>
+Message-ID: <alpine.LFD.2.00.1102241510450.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, 23 Feb 2011, Abhijeet Dharmapurikar wrote:
-> 
-> > Will Deacon wrote:
-> > > The chained GPIO IRQ handler on MSM8x60 calls ->ack on the parent chip
-> > > after handling the interrupt.
-> > >
-> > > This patch updates the code to use ->irq_eoi now that the GIC has moved
-> > > to using the fasteoi flow model.
-> > >
-> > > Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  arch/arm/mach-msm/gpio-v2.c |    2 +-
-> > >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-> > > index 0de19ec..04fb411 100644
-> > > --- a/arch/arm/mach-msm/gpio-v2.c
-> > > +++ b/arch/arm/mach-msm/gpio-v2.c
-> > > @@ -318,7 +318,7 @@ static void msm_summary_irq_handler(unsigned int irq,
-> > > struct irq_desc *desc)
-> > >  			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
-> > >  							   i));
-> > >  	}
-> > > -	desc->chip->ack(irq);
-> > > +	desc->chip->irq_eoi(irq);
-> >
-> > should be dec->chip->irq_eoi(&desc->irq_data);
-> 
-> Nope, it should do:
-> 
->       struct irq_chip *chip = get_irq_desc_chip(desc);
-> 
->       chip->irq_eoi();
+On Thu, 24 Feb 2011, Pratheesh Gangadhar wrote:
 
-Something like this?
+A few nits.
 
-diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-index 0de19ec..90a968f 100644
---- a/arch/arm/mach-msm/gpio-v2.c
-+++ b/arch/arm/mach-msm/gpio-v2.c
-@@ -310,6 +310,7 @@ static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
- static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
-        unsigned long i;
-+       struct irq_chip *chip = get_irq_desc_chip(desc);
- 
-        for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
-             i < NR_GPIO_IRQS;
-@@ -318,7 +319,7 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
-                        generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
-                                                           i));
-        }
--       desc->chip->ack(irq);
-+       chip->irq_eoi(&desc->irq_data);
- }
+> +static void pruss_cleanup(struct platform_device *dev, struct uio_info *info)
+> +{
+> +	struct uio_info *p = info;
+> +	int cnt;
+> +
+> +	for (cnt = 0; cnt < MAX_PRUSS_EVT; cnt++, p++) {
+> +		uio_unregister_device(p);
+> +		kfree(p->name);
+> +	}
+> +	iounmap(prussio_vaddr);
+> +	if (ddr_vaddr) 
+> +		dma_free_coherent(&dev->dev, info->mem[2].size,
+> +			info->mem[2].internal_addr, info->mem[2].addr);
 
-Will
+That is easier to read with curly braces even if they are strictly not
+necessary
+
+	if (ddr_vaddr) {
+		dma_free_coherent(&dev->dev, info->mem[2].size,
+			info->mem[2].internal_addr, info->mem[2].addr);
+	}
+
+
+> +	kfree(info);
+> +	clk_put(pruss_clk);
+> +}
+> +	len = resource_size(regs_ddr);
+> +	ddr_vaddr =
+> +	dma_alloc_coherent(&dev->dev, len, &ddr_paddr, GFP_KERNEL | GFP_DMA);
+
+That wants to be:
+     
+	ddr_vaddr = dma_alloc_coherent(&dev->dev, len, &ddr_paddr,
+					GFP_KERNEL | GFP_DMA);
+
+Otherwise this looks very clean and readable now and I can't spot any
+technical problems with it anymore.
+
+Please fixup the nits and feel free to add
+
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+
+Thanks for following up on all this!
+
+       tglx
