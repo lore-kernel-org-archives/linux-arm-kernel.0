@@ -1,447 +1,326 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Feb 2011 15:11:14 -0800
-Subject: [PATCH] omap2+: Minimize board specific init_early calls
-In-Reply-To: <20110224223137.GV20560@atomide.com>
-References: <6dac4c4aac867da9cf2971ce555f54ac@localhost>
-	<20110224223137.GV20560@atomide.com>
-Message-ID: <20110224231114.GW20560@atomide.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 24 Feb 2011 15:42:50 -0800
+Subject: [PATCH] drivers: ld9040 amoled driver support
+In-Reply-To: <1294893628-16998-1-git-send-email-dh09.lee@samsung.com>
+References: <1294893628-16998-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <20110224154250.266b2688.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should only call init_common_infrastructure and
-init_common_devices from init_early.
+On Thu, 13 Jan 2011 13:40:28 +0900
+Donghwa Lee <dh09.lee@samsung.com> wrote:
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+> This patch is ld9040 amoled panel driver.
+> I resend because there was no comment.
+> 
+> It is similar to s6e63m0 panel driver and use spi gpio to send panel
+> information.
+> 
+>
+> ...
+>
+> +#define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
 
----
-This is done against the linux-omap devel-board branch 
----
-diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index cc42d47..59de1dc 100644
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -142,8 +142,6 @@ static struct omap_board_config_kernel sdp2430_config[] __initdata = {
- 
- static void __init omap_2430sdp_init_early(void)
- {
--	omap_board_config = sdp2430_config;
--	omap_board_config_size = ARRAY_SIZE(sdp2430_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -246,6 +244,9 @@ static void __init omap_2430sdp_init(void)
- 
- 	omap2430_mux_init(board_mux, OMAP_PACKAGE_ZAC);
- 
-+	omap_board_config = sdp2430_config;
-+	omap_board_config_size = ARRAY_SIZE(sdp2430_config);
-+
- 	omap2430_i2c_init();
- 
- 	platform_add_devices(sdp2430_devices, ARRAY_SIZE(sdp2430_devices));
-diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-index 8950ecc..b12b620 100644
---- a/arch/arm/mach-omap2/board-3430sdp.c
-+++ b/arch/arm/mach-omap2/board-3430sdp.c
-@@ -315,9 +315,6 @@ static struct omap_board_config_kernel sdp3430_config[] __initdata = {
- 
- static void __init omap_3430sdp_init_early(void)
- {
--	omap_board_config = sdp3430_config;
--	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
--	omap3_pm_init_cpuidle(omap3_cpuidle_params_table);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(hyb18m512160af6_sdrc_params, NULL);
- }
-@@ -788,6 +785,9 @@ static struct omap_musb_board_data musb_board_data = {
- static void __init omap_3430sdp_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_board_config = sdp3430_config;
-+	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
-+	omap3_pm_init_cpuidle(omap3_cpuidle_params_table);
- 	omap3430_i2c_init();
- 	omap_display_init(&sdp3430_dss_data);
- 	if (omap_rev() > OMAP3430_REV_ES1_0)
-diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
-index 8d1c435..c4e22b3 100644
---- a/arch/arm/mach-omap2/board-3630sdp.c
-+++ b/arch/arm/mach-omap2/board-3630sdp.c
-@@ -72,8 +72,6 @@ static struct omap_board_config_kernel sdp_config[] __initdata = {
- 
- static void __init omap_sdp_init_early(void)
- {
--	omap_board_config = sdp_config;
--	omap_board_config_size = ARRAY_SIZE(sdp_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(h8mbx00u0mer0em_sdrc_params,
- 				  h8mbx00u0mer0em_sdrc_params);
-@@ -206,6 +204,8 @@ static struct flash_partitions sdp_flash_partitions[] = {
- static void __init omap_sdp_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
-+	omap_board_config = sdp_config;
-+	omap_board_config_size = ARRAY_SIZE(sdp_config);
- 	zoom_peripherals_init();
- 	zoom_display_init();
- 	board_smc91x_init();
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 1a943be..81ef979 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -325,8 +325,6 @@ static struct omap_board_config_kernel sdp4430_config[] __initdata = {
- 
- static void __init omap_4430sdp_init_early(void)
- {
--	omap_board_config = sdp4430_config;
--	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- #ifdef CONFIG_OMAP_32K_TIMER
-@@ -640,6 +638,9 @@ static void __init omap_4430sdp_init(void)
- 		package = OMAP_PACKAGE_CBL;
- 	omap4_mux_init(board_mux, package);
- 
-+	omap_board_config = sdp4430_config;
-+	omap_board_config_size = ARRAY_SIZE(sdp4430_config);
-+
- 	omap4_i2c_init();
- 	omap_sfh7741prox_init();
- 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index ae3a83d..f53bbb2 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -51,9 +51,6 @@ static struct omap_board_mux board_mux[] __initdata = {
- 
- static void __init am3517_crane_init_early(void)
- {
--	omap_board_config = am3517_crane_config;
--	omap_board_config_size = ARRAY_SIZE(am3517_crane_config);
--
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -76,6 +73,9 @@ static void __init am3517_crane_init(void)
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_serial_init();
- 
-+	omap_board_config = am3517_crane_config;
-+	omap_board_config_size = ARRAY_SIZE(am3517_crane_config);
-+
- 	/* Configure GPIO for EHCI port */
- 	if (omap_mux_init_gpio(GPIO_USB_NRESET, OMAP_PIN_OUTPUT)) {
- 		pr_err("Can not configure mux for GPIO_USB_NRESET %d\n",
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index 634fe65..30ec451 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -381,13 +381,8 @@ static struct omap_dss_board_info am3517_evm_dss_data = {
- /*
-  * Board initialization
-  */
--static struct omap_board_config_kernel am3517_evm_config[] __initdata = {
--};
--
- static void __init am3517_evm_init_early(void)
- {
--	omap_board_config = am3517_evm_config;
--	omap_board_config_size = ARRAY_SIZE(am3517_evm_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -481,8 +476,13 @@ static void am3517_evm_hecc_init(struct ti_hecc_platform_data *pdata)
- 	platform_device_register(&am3517_hecc_device);
- }
- 
-+static struct omap_board_config_kernel am3517_evm_config[] __initdata = {
-+};
-+
- static void __init am3517_evm_init(void)
- {
-+	omap_board_config = am3517_evm_config;
-+	omap_board_config_size = ARRAY_SIZE(am3517_evm_config);
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 
- 	am3517_evm_i2c_init();
-diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
-index 4ef4aad..f4f8374 100644
---- a/arch/arm/mach-omap2/board-apollon.c
-+++ b/arch/arm/mach-omap2/board-apollon.c
-@@ -276,8 +276,6 @@ static struct omap_board_config_kernel apollon_config[] __initdata = {
- 
- static void __init omap_apollon_init_early(void)
- {
--	omap_board_config = apollon_config;
--	omap_board_config_size = ARRAY_SIZE(apollon_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -319,6 +317,8 @@ static void __init omap_apollon_init(void)
- 	u32 v;
- 
- 	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAC);
-+	omap_board_config = apollon_config;
-+	omap_board_config_size = ARRAY_SIZE(apollon_config);
- 
- 	apollon_init_smc91x();
- 	apollon_led_init();
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 7311824..27bea54 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -668,14 +668,8 @@ static void __init cm_t35_init_i2c(void)
- 			      ARRAY_SIZE(cm_t35_i2c_boardinfo));
- }
- 
--static struct omap_board_config_kernel cm_t35_config[] __initdata = {
--};
--
- static void __init cm_t35_init_early(void)
- {
--	omap_board_config = cm_t35_config;
--	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
--
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
- 			     mt46h32m32lf6_sdrc_params);
-@@ -785,8 +779,13 @@ static struct omap_musb_board_data musb_board_data = {
- 	.power			= 100,
- };
- 
-+static struct omap_board_config_kernel cm_t35_config[] __initdata = {
-+};
-+
- static void __init cm_t35_init(void)
- {
-+	omap_board_config = cm_t35_config;
-+	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
- 	omap_serial_init();
- 	cm_t35_init_i2c();
-diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-index 38bef6d..9da6e82 100644
---- a/arch/arm/mach-omap2/board-cm-t3517.c
-+++ b/arch/arm/mach-omap2/board-cm-t3517.c
-@@ -256,9 +256,6 @@ static struct omap_board_config_kernel cm_t3517_config[] __initdata = {
- 
- static void __init cm_t3517_init_early(void)
- {
--	omap_board_config = cm_t3517_config;
--	omap_board_config_size = ARRAY_SIZE(cm_t3517_config);
--
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -293,6 +290,8 @@ static void __init cm_t3517_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap_serial_init();
-+	omap_board_config = cm_t3517_config;
-+	omap_board_config_size = ARRAY_SIZE(cm_t3517_config);
- 	cm_t3517_init_leds();
- 	cm_t3517_init_nand();
- 	cm_t3517_init_rtc();
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 682da92..73e3c31 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -35,8 +35,6 @@ static struct omap_board_config_kernel generic_config[] = {
- 
- static void __init omap_generic_init_early(void)
- {
--	omap_board_config = generic_config;
--	omap_board_config_size = ARRAY_SIZE(generic_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -44,6 +42,8 @@ static void __init omap_generic_init_early(void)
- static void __init omap_generic_init(void)
- {
- 	omap_serial_init();
-+	omap_board_config = generic_config;
-+	omap_board_config_size = ARRAY_SIZE(generic_config);
- }
- 
- static void __init omap_generic_map_io(void)
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index f6a3872..7e6bf4f 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -292,8 +292,6 @@ static struct omap_board_config_kernel h4_config[] __initdata = {
- 
- static void __init omap_h4_init_early(void)
- {
--	omap_board_config = h4_config;
--	omap_board_config_size = ARRAY_SIZE(h4_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -334,6 +332,9 @@ static void __init omap_h4_init(void)
- {
- 	omap2420_mux_init(board_mux, OMAP_PACKAGE_ZAF);
- 
-+	omap_board_config = h4_config;
-+	omap_board_config_size = ARRAY_SIZE(h4_config);
-+
- 	/*
- 	 * Make sure the serial ports are muxed on at this point.
- 	 * You have to mux them off in device drivers later on
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index a3fae56..a69e594 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -290,8 +290,6 @@ static struct omap_board_config_kernel ldp_config[] __initdata = {
- 
- static void __init omap_ldp_init_early(void)
- {
--	omap_board_config = ldp_config;
--	omap_board_config_size = ARRAY_SIZE(ldp_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -422,6 +420,8 @@ static struct mtd_partition ldp_nand_partitions[] = {
- static void __init omap_ldp_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_board_config = ldp_config;
-+	omap_board_config_size = ARRAY_SIZE(ldp_config);
- 	ldp_init_smsc911x();
- 	omap_i2c_init();
- 	platform_add_devices(ldp_devices, ARRAY_SIZE(ldp_devices));
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index 5364147..3d9b58a 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -732,8 +732,6 @@ static struct omap_board_config_kernel omap3_evm_config[] __initdata = {
- 
- static void __init omap3_evm_init_early(void)
- {
--	omap_board_config = omap3_evm_config;
--	omap_board_config_size = ARRAY_SIZE(omap3_evm_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(mt46h32m32lf6_sdrc_params, NULL);
- }
-@@ -824,6 +822,9 @@ static void __init omap3_evm_init(void)
- 	else
- 		omap3_mux_init(omap35x_board_mux, OMAP_PACKAGE_CBB);
- 
-+	omap_board_config = omap3_evm_config;
-+	omap_board_config_size = ARRAY_SIZE(omap3_evm_config);
-+
- 	omap3_evm_i2c_init();
- 
- 	omap_display_init(&omap3_evm_dss_data);
-diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
-index 07006c3..fd8b764 100644
---- a/arch/arm/mach-omap2/board-omap3stalker.c
-+++ b/arch/arm/mach-omap2/board-omap3stalker.c
-@@ -581,8 +581,6 @@ static struct omap_board_config_kernel omap3_stalker_config[] __initdata = {
- 
- static void __init omap3_stalker_init_early(void)
- {
--	omap_board_config = omap3_stalker_config;
--	omap_board_config_size = ARRAY_SIZE(omap3_stalker_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(mt46h32m32lf6_sdrc_params, NULL);
- }
-@@ -629,6 +627,8 @@ static struct omap_musb_board_data musb_board_data = {
- static void __init omap3_stalker_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
-+	omap_board_config = omap3_stalker_config;
-+	omap_board_config_size = ARRAY_SIZE(omap3_stalker_config);
- 
- 	omap3_stalker_i2c_init();
- 
-diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
-index a35afe2..8e2a7ba 100644
---- a/arch/arm/mach-omap2/board-omap3touchbook.c
-+++ b/arch/arm/mach-omap2/board-omap3touchbook.c
-@@ -417,8 +417,6 @@ static struct omap_board_mux board_mux[] __initdata = {
- 
- static void __init omap3_touchbook_init_early(void)
- {
--	omap_board_config = omap3_touchbook_config;
--	omap_board_config_size = ARRAY_SIZE(omap3_touchbook_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
- 				  mt46h32m32lf6_sdrc_params);
-@@ -514,6 +512,9 @@ static struct omap_musb_board_data musb_board_data = {
- static void __init omap3_touchbook_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_board_config = omap3_touchbook_config;
-+	omap_board_config_size = ARRAY_SIZE(omap3_touchbook_config);
-+
- 	pm_power_off = omap3_touchbook_poweroff;
- 
- 	omap3_touchbook_i2c_init();
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index a33ec0e..d480ddb 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -411,8 +411,6 @@ static struct omap_board_config_kernel overo_config[] __initdata = {
- 
- static void __init overo_init_early(void)
- {
--	omap_board_config = overo_config;
--	omap_board_config_size = ARRAY_SIZE(overo_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
- 				  mt46h32m32lf6_sdrc_params);
-@@ -448,6 +446,8 @@ static struct omap_musb_board_data musb_board_data = {
- static void __init overo_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_board_config = overo_config;
-+	omap_board_config_size = ARRAY_SIZE(overo_config);
- 	overo_i2c_init();
- 	platform_add_devices(overo_devices, ARRAY_SIZE(overo_devices));
- 	omap_serial_init();
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 3cf72fe..e964895 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -102,9 +102,6 @@ static void __init rx51_init_early(void)
- {
- 	struct omap_sdrc_params *sdrc_params;
- 
--	omap_board_config = rx51_config;
--	omap_board_config_size = ARRAY_SIZE(rx51_config);
--	omap3_pm_init_cpuidle(rx51_cpuidle_params);
- 	omap2_init_common_infrastructure();
- 	sdrc_params = nokia_get_sdram_timings();
- 	omap2_init_common_devices(sdrc_params, sdrc_params);
-@@ -127,6 +124,9 @@ static struct omap_musb_board_data musb_board_data = {
- static void __init rx51_init(void)
- {
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_board_config = rx51_config;
-+	omap_board_config_size = ARRAY_SIZE(rx51_config);
-+	omap3_pm_init_cpuidle(rx51_cpuidle_params);
- 	omap_serial_init();
- 	usb_musb_init(&musb_board_data);
- 	rx51_peripherals_init();
-diff --git a/arch/arm/mach-omap2/board-ti8168evm.c b/arch/arm/mach-omap2/board-ti8168evm.c
-index f2b0971..09fa7bf 100644
---- a/arch/arm/mach-omap2/board-ti8168evm.c
-+++ b/arch/arm/mach-omap2/board-ti8168evm.c
-@@ -29,8 +29,6 @@ static struct omap_board_config_kernel ti8168_evm_config[] __initdata = {
- 
- static void __init ti8168_init_early(void)
- {
--	omap_board_config = ti8168_evm_config;
--	omap_board_config_size = ARRAY_SIZE(ti8168_evm_config);
- 	omap2_init_common_infrastructure();
- 	omap2_init_common_devices(NULL, NULL);
- }
-@@ -43,6 +41,8 @@ static void __init ti8168_evm_init_irq(void)
- static void __init ti8168_evm_init(void)
- {
- 	omap_serial_init();
-+	omap_board_config = ti8168_evm_config;
-+	omap_board_config_size = ARRAY_SIZE(ti8168_evm_config);
- }
- 
- static void __init ti8168_evm_map_io(void)
+This could and should be implemented as a regular lower-case C function.
+
+> +struct ld9040 {
+> +	struct device			*dev;
+> +	struct spi_device		*spi;
+> +	unsigned int			power;
+> +	unsigned int			gamma_mode;
+> +	unsigned int			current_brightness;
+> +	unsigned int			gamma_table_count;
+> +
+> +	struct lcd_device		*ld;
+> +	struct backlight_device		*bd;
+> +	struct lcd_platform_data	*lcd_pd;
+> +};
+> +
+> +static const unsigned short SEQ_SWRESET[] = {
+> +	0x01, COMMAND_ONLY,
+> +	ENDDEF, 0x00
+> +};
+
+It's strange that all these tables have upper-case names.  Unless
+there's some special reason for doing it this way, please make them
+regular lower-case identifiers.
+
+>
+> ...
+>
+> +static int ld9040_ldi_init(struct ld9040 *lcd)
+> +{
+> +	int ret, i;
+> +	const unsigned short *init_seq[] = {
+> +		SEQ_USER_SETTING,
+> +		SEQ_PANEL_CONDITION,
+> +		SEQ_DISPCTL,
+> +		SEQ_MANPWR,
+> +		SEQ_PWR_CTRL,
+> +		SEQ_ELVSS_ON,
+> +		SEQ_GTCON,
+> +		SEQ_GAMMA_SET1,
+> +		SEQ_GAMMA_CTRL,
+> +		SEQ_SLPOUT,
+> +	};
+
+Make this table static so the compiler doesn't rebuild it on the stack
+each time the function is called.  The compiler probably already
+performs that optimisation, but it doesn't hurt to be explicit.
+
+
+> +	for (i = 0; i < ARRAY_SIZE(init_seq); i++) {
+> +		ret = ld9040_panel_send_sequence(lcd, init_seq[i]);
+> +		/* workaround: minimum delay time for transferring CMD */
+> +		udelay(300);
+> +		if (ret)
+> +			break;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>
+> ...
+>
+> +static ssize_t ld9040_sysfs_show_gamma_mode(struct device *dev,
+> +				      struct device_attribute *attr, char *buf)
+> +{
+> +	struct ld9040 *lcd = dev_get_drvdata(dev);
+> +	char temp[10];
+> +
+> +	switch (lcd->gamma_mode) {
+> +	case 0:
+> +		sprintf(temp, "2.2 mode\n");
+> +		strcat(buf, temp);
+
+Could do sprintf(buf + strlen(buf)) and eliminate temp[].
+
+> +		break;
+> +	default:
+> +		dev_info(dev, "gamma mode could be 0:2.2\n");
+> +		break;
+> +	}
+> +
+> +	return strlen(buf);
+> +}
+> +
+> +static ssize_t ld9040_sysfs_store_gamma_mode(struct device *dev,
+> +				       struct device_attribute *attr,
+> +				       const char *buf, size_t len)
+> +{
+> +	struct ld9040 *lcd = dev_get_drvdata(dev);
+> +	struct backlight_device *bd = NULL;
+> +	int brightness, rc;
+> +
+> +	rc = strict_strtoul(buf, 0, (unsigned long *)&lcd->gamma_mode);
+
+That's a bug.  gamma_mode has type int, which is 4 bytes, but you're
+telling strict_strtoul() to write eight bytes - it will corrupt *lcd on
+a 64-bit machine.  Use a temporary.
+
+
+> +	if (rc < 0)
+> +		return rc;
+> +
+> +	bd = lcd->bd;
+> +
+> +	brightness = bd->props.brightness;
+> +
+> +	switch (lcd->gamma_mode) {
+> +	case 0:
+> +		_ld9040_gamma_ctl(lcd, gamma_table.gamma_22_table[brightness]);
+> +		break;
+> +	default:
+> +		dev_info(dev, "gamma mode could be 0:2.2\n");
+> +		_ld9040_gamma_ctl(lcd, gamma_table.gamma_22_table[brightness]);
+> +		break;
+> +	}
+> +	return len;
+> +}
+> +
+> +static DEVICE_ATTR(gamma_mode, 0644,
+> +		ld9040_sysfs_show_gamma_mode, ld9040_sysfs_store_gamma_mode);
+> +
+> +static ssize_t ld9040_sysfs_show_gamma_table(struct device *dev,
+> +				      struct device_attribute *attr, char *buf)
+> +{
+> +	struct ld9040 *lcd = dev_get_drvdata(dev);
+> +	char temp[3];
+> +
+> +	sprintf(temp, "%d\n", lcd->gamma_table_count);
+> +	strcpy(buf, temp);
+
+sprintf(buf + strlen(buf), remove temp[].
+
+> +	return strlen(buf);
+> +}
+> +
+> +static DEVICE_ATTR(gamma_table, 0644,
+> +		ld9040_sysfs_show_gamma_table, NULL);
+> +
+> +static int ld9040_probe(struct spi_device *spi)
+> +{
+> +	int ret = 0;
+> +	struct ld9040 *lcd = NULL;
+> +	struct lcd_device *ld = NULL;
+> +	struct backlight_device *bd = NULL;
+> +
+> +	lcd = kzalloc(sizeof(struct ld9040), GFP_KERNEL);
+> +	if (!lcd)
+> +		return -ENOMEM;
+> +
+> +	/* ld9040 lcd panel uses 3-wire 9bits SPI Mode. */
+> +	spi->bits_per_word = 9;
+> +
+> +	ret = spi_setup(spi);
+> +	if (ret < 0) {
+> +		dev_err(&spi->dev, "spi setup failed.\n");
+> +		goto out_free_lcd;
+> +	}
+> +
+> +	lcd->spi = spi;
+> +	lcd->dev = &spi->dev;
+> +
+> +	lcd->lcd_pd = (struct lcd_platform_data *)spi->dev.platform_data;
+
+Unneeded and undesirable typecast.
+
+> +	if (!lcd->lcd_pd) {
+> +		dev_err(&spi->dev, "platform data is NULL.\n");
+> +		goto out_free_lcd;
+> +	}
+> +
+> +	ld = lcd_device_register("ld9040", &spi->dev, lcd, &ld9040_lcd_ops);
+> +	if (IS_ERR(ld)) {
+> +		ret = PTR_ERR(ld);
+> +		goto out_free_lcd;
+> +	}
+> +
+> +	lcd->ld = ld;
+> +
+> +	bd = backlight_device_register("ld9040-bl", &spi->dev,
+> +		lcd, &ld9040_backlight_ops, NULL);
+> +	if (IS_ERR(ld)) {
+> +		ret = PTR_ERR(ld);
+> +		goto out_free_lcd;
+> +	}
+> +
+> +	bd->props.max_brightness = MAX_BRIGHTNESS;
+> +	bd->props.brightness = MAX_BRIGHTNESS;
+> +	lcd->bd = bd;
+> +
+> +	/*
+> +	 * it gets gamma table count available so it gets user
+> +	 * know that.
+> +	 */
+> +	lcd->gamma_table_count =
+> +	    sizeof(gamma_table) / (MAX_GAMMA_LEVEL * sizeof(int));
+> +
+> +	ret = device_create_file(&(spi->dev), &dev_attr_gamma_mode);
+> +	if (ret < 0)
+> +		dev_err(&(spi->dev), "failed to add sysfs entries\n");
+> +
+> +	ret = device_create_file(&(spi->dev), &dev_attr_gamma_table);
+> +	if (ret < 0)
+> +		dev_err(&(spi->dev), "failed to add sysfs entries\n");
+
+These errors are just ignored.  It would be better to perform cleanup
+and to then return the correct errno.
+
+> +	/*
+> +	 * if lcd panel was on from bootloader like u-boot then
+> +	 * do not lcd on.
+> +	 */
+> +	if (!lcd->lcd_pd->lcd_enabled) {
+> +		/*
+> +		 * if lcd panel was off from bootloader then
+> +		 * current lcd status is powerdown and then
+> +		 * it enables lcd panel.
+> +		 */
+> +		lcd->power = FB_BLANK_POWERDOWN;
+> +
+> +		ld9040_power(lcd, FB_BLANK_UNBLANK);
+> +	} else
+> +		lcd->power = FB_BLANK_UNBLANK;
+> +
+> +	dev_set_drvdata(&spi->dev, lcd);
+> +
+> +	dev_info(&spi->dev, "ld9040 panel driver has been probed.\n");
+> +	return 0;
+> +
+> +out_free_lcd:
+> +	kfree(lcd);
+> +	return ret;
+> +}
+> +
+> +static int __devexit ld9040_remove(struct spi_device *spi)
+> +{
+> +	struct ld9040 *lcd = dev_get_drvdata(&spi->dev);
+> +
+> +	ld9040_power(lcd, FB_BLANK_POWERDOWN);
+> +	lcd_device_unregister(lcd->ld);
+> +	kfree(lcd);
+> +
+> +	return 0;
+> +}
+> +
+> +#if defined(CONFIG_PM)
+> +unsigned int beforepower;
+
+This should be static.
+
+Also, it shouldn't exist.  Its presence assumes that there will only be
+one device controlled by this driver.  It should be moved into the
+per-device data area.
+
+>
+> ...
+>
+> +struct ld9040_gamma {
+> +	unsigned int *gamma_22_table[MAX_GAMMA_LEVEL];
+> +};
+> +
+> +static struct ld9040_gamma gamma_table = {
+
+Could do
+
+static struct ld9040_gamma {
+	unsigned int *gamma_22_table[MAX_GAMMA_LEVEL];
+} gamma_table = {
+
+here.
+
+> +	.gamma_22_table[0] = (unsigned int *)&ld9040_22_50,
+> +	.gamma_22_table[1] = (unsigned int *)&ld9040_22_70,
+> +	.gamma_22_table[2] = (unsigned int *)&ld9040_22_80,
+> +	.gamma_22_table[3] = (unsigned int *)&ld9040_22_90,
+> +	.gamma_22_table[4] = (unsigned int *)&ld9040_22_100,
+> +	.gamma_22_table[5] = (unsigned int *)&ld9040_22_110,
+> +	.gamma_22_table[6] = (unsigned int *)&ld9040_22_120,
+> +	.gamma_22_table[7] = (unsigned int *)&ld9040_22_130,
+> +	.gamma_22_table[8] = (unsigned int *)&ld9040_22_140,
+> +	.gamma_22_table[9] = (unsigned int *)&ld9040_22_150,
+> +	.gamma_22_table[10] = (unsigned int *)&ld9040_22_160,
+> +	.gamma_22_table[11] = (unsigned int *)&ld9040_22_170,
+> +	.gamma_22_table[12] = (unsigned int *)&ld9040_22_180,
+> +	.gamma_22_table[13] = (unsigned int *)&ld9040_22_190,
+> +	.gamma_22_table[14] = (unsigned int *)&ld9040_22_200,
+> +	.gamma_22_table[15] = (unsigned int *)&ld9040_22_210,
+> +	.gamma_22_table[16] = (unsigned int *)&ld9040_22_220,
+> +	.gamma_22_table[17] = (unsigned int *)&ld9040_22_230,
+> +	.gamma_22_table[18] = (unsigned int *)&ld9040_22_240,
+> +	.gamma_22_table[19] = (unsigned int *)&ld9040_22_250,
+> +	.gamma_22_table[20] = (unsigned int *)&ld9040_22_260,
+> +	.gamma_22_table[21] = (unsigned int *)&ld9040_22_270,
+> +	.gamma_22_table[22] = (unsigned int *)&ld9040_22_280,
+> +	.gamma_22_table[23] = (unsigned int *)&ld9040_22_290,
+> +	.gamma_22_table[24] = (unsigned int *)&ld9040_22_300,
+> +};
+> +
+> +#endif
+
+Defining static tables in a header file is strange.  It would be very
+wrong if that header was ever included by more than a single .c file,
+so why not just eliminate this file and move its contents into that .c
+file?
