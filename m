@@ -1,41 +1,79 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Wed, 23 Feb 2011 16:22:18 -0800
-Subject: [PATCH 5/5] ARM: msm: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <1298302096-21275-6-git-send-email-will.deacon@arm.com>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-6-git-send-email-will.deacon@arm.com>
-Message-ID: <4D65A4BA.8030206@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 24 Feb 2011 10:33:43 +0900
+Subject: [PATCH 1/2] ARM: S5PC110: disable unused power regulators on Goni
+	board
+In-Reply-To: <01f301cbd343$d0af4c90$720de5b0$%kim@samsung.com>
+References: <1297760784-8486-1-git-send-email-m.szyprowski@samsung.com>
+	<1297760784-8486-2-git-send-email-m.szyprowski@samsung.com>
+	<01f301cbd343$d0af4c90$720de5b0$%kim@samsung.com>
+Message-ID: <022a01cbd3c2$e335ef70$a9a1ce50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> The chained GPIO IRQ handler on MSM8x60 calls ->ack on the parent chip
-> after handling the interrupt.
+Kukjin Kim wrote:
 > 
-> This patch updates the code to use ->irq_eoi now that the GIC has moved
-> to using the fasteoi flow model.
+> Marek Szyprowski wrote:
+> >
+> > A lot of power regulator has been enabled by default causing the board
+> > to consume a lot of power. This patch fixes this issue.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-s5pv210/mach-goni.c |   10 +---------
+> >  1 files changed, 1 insertions(+), 9 deletions(-)
+
+(snip)
+
+> > @@ -371,7 +369,6 @@ static struct regulator_init_data goni_ldo11_data =
+{
+> >  		.min_uV		= 2800000,
+> >  		.max_uV		= 2800000,
+> >  		.apply_uV	= 1,
+> > -		.always_on	= 1,
+> >  	},
+> >  };
+
+Oops, already merged above changes by Sylwester's "Add supplies for CIF
+camera on GONI board" into my for-next.
+So will apply this with removing above changes.
+
+(snip)
+
+> > @@ -391,7 +387,6 @@ static struct regulator_init_data goni_ldo13_data =
+{
+> >  		.min_uV		= 2800000,
+> >  		.max_uV		= 2800000,
+> >  		.apply_uV	= 1,
+> > -		.always_on	= 1,
+> >  	},
+> >  };
+
+Same as above.
+
+> > @@ -401,7 +396,6 @@ static struct regulator_init_data goni_ldo14_data =
+{
+> >  		.min_uV		= 1800000,
+> >  		.max_uV		= 1800000,
+> >  		.apply_uV	= 1,
+> > -		.always_on	= 1,
+> >  	},
+> >  };
+
+Same as above.
+
+(snip)
+
+> > --
 > 
-> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/mach-msm/gpio-v2.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Ok...will apply this.
+> And how about "mach-aquila.c"?
 > 
-> diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-> index 0de19ec..04fb411 100644
-> --- a/arch/arm/mach-msm/gpio-v2.c
-> +++ b/arch/arm/mach-msm/gpio-v2.c
-> @@ -318,7 +318,7 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
->  			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
->  							   i));
->  	}
-> -	desc->chip->ack(irq);
-> +	desc->chip->irq_eoi(irq);
 
-should be dec->chip->irq_eoi(&desc->irq_data);
+Thanks.
 
-
+Best regards,
+Kgene.
 --
-Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
-Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
