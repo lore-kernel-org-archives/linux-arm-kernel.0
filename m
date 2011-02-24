@@ -1,79 +1,69 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Thu, 24 Feb 2011 11:27:31 -0600
-Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found on
-	the MPC85xx.
-In-Reply-To: <20110224165004.GB15234@riccoc20.at.omicron.at>
-References: <cover.1298447722.git.richard.cochran@omicron.at>
-	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
-	<20110223165058.GE14597@angua.secretlab.ca>
-	<20110223112612.30071995@schlenkerla>
-	<20110223175459.GH14597@angua.secretlab.ca>
-	<20110223132444.65dfdda4@schlenkerla>
-	<20110224165004.GB15234@riccoc20.at.omicron.at>
-Message-ID: <20110224112731.2d9bf080@schlenkerla>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Feb 2011 09:38:40 -0800
+Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
+	boot failure)
+In-Reply-To: <84fafb82318b1287513d198c6535eb59@mail.gmail.com>
+References: <20110106204053.GA7771@atomide.com>
+	<20110107161230.GR1198@n2100.arm.linux.org.uk>
+	<20110110185209.GC4957@atomide.com>
+	<20110111231611.GX4957@atomide.com>
+	<3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
+	<20110202011006.GP3358@atomide.com>
+	<81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
+	<20110202194855.GA3322@atomide.com>
+	<cace62268ad657586f07ecbb0e6a99ab@mail.gmail.com>
+	<84fafb82318b1287513d198c6535eb59@mail.gmail.com>
+Message-ID: <20110224173840.GC20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Feb 2011 17:50:04 +0100
-Richard Cochran <richardcochran@gmail.com> wrote:
-
-> On Wed, Feb 23, 2011 at 01:24:44PM -0600, Scott Wood wrote:
-> > Whatever string is used should be written into a binding document.
-> > 
-> > fsl,etsec-v1.6-ptp seems like it would be just as good for that purpose.
-> > 
-> > Even just fsl,etsec-ptp will identify the binding, though it's lacking in
-> > identifying the hardware (in the absence of access to the eTSEC ID
-> > registers).
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [110212 00:45]:
+> Tony,
+> > -----Original Message-----
+> > From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
+> > Sent: Thursday, February 03, 2011 2:13 PM
+> > To: Tony Lindgren
+> > Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
+> > kernel at lists.infradead.org; linux-omap at vger.kernel.org; Keshava
+> > Munegowda; Felipe Balbi
+> > Subject: RE: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
+> > 4430SDP boot failure)
+> >
+> > > -----Original Message-----
+> > > From: Tony Lindgren [mailto:tony at atomide.com]
+> > > Sent: Thursday, February 03, 2011 1:19 AM
+> > > To: Santosh Shilimkar
+> > > Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
+> > > kernel at lists.infradead.org; linux-omap at vger.kernel.org; Keshava
+> > > Munegowda; Felipe Balbi
+> > > Subject: Re: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
+> > > 4430SDP boot failure)
+> > >
+> > > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110201 22:04]:
+> > > > >
+> > > > > It's a ES1.0 blaze, with the patch below it reboots early
+> > > > > during the boot. I also have to disable omap_l2_cache_init
+> > > > > on this board to get it to boot.
+> > > > >
+> > > > Do you still get this problem with 'omap_l2_cache_init' ?
+> > > > As reported earlier, we don't see this issue on ES1.0
+> > > > SDP.
+> > >
+> > > Yeah I do, it rarely makes it to the userspace. Works reliably
+> > > if I disable omap_l2_cache_init.
+> > >
+> > Ok. I shall try few experiments and try to reproduce it
 > 
-> I read the conversation, and I don't mind admitting that I do not
-> understand what you both are arguing/discussing about.
-> 
-> How should I set the strings?  Like this?
-> 
-> arch/powerpc/boot/dts/mpc8313erdb.dts:
-> 	ptp_clock at 24E00 {
-> 		compatible = "fsl,mpc8313-etsec-ptp";
-> 	}
-> arch/powerpc/boot/dts/mpc8572ds.dts:
-> 	ptp_clock at 24E00 {
-> 		compatible = "fsl,mpc8572-etsec-ptp";
-> 	} 
-> arch/powerpc/boot/dts/p2020ds.dts:
-> 	ptp_clock at 24E00 {
-> 		compatible = "fsl,p2020ds-etsec-ptp";
-> 	} 
-> arch/powerpc/boot/dts/p2020rdb.dts:
-> 	ptp_clock at 24E00 {
-> 		compatible = "fsl,p2020rdb-etsec-ptp";
-> 	} 
-> 
-> drivers/net/gianfar_ptp.c:
-> 
-> static struct of_device_id match_table[] = {
-> 	{ .compatible = "fsl,mpc8313-etsec-ptp" },
-> 	{ .compatible = "fsl,mpc8572-etsec-ptp" },
-> 	{ .compatible = "fsl,p2020ds-etsec-ptp" },
-> 	{ .compatible = "fsl,p2020rdb-etsec-ptp" },
-> 	{},
-> };
+> Not sure if it's the same issue but I managed to reproduce the
+> issue on ES2.0 itself. And after some experiments, it boiled
+> down to the V6 and V7 issue. By disabling OMAP2 from the build,
+> everything was fine again.
 
-Those last two are boards, not chips.  I don't think even Grant is asking
-to take things that far.
+Was this with linux-omap master branch or mainline?
 
-My vote, if it goes in a separate node at all, is "fsl,etsec-ptp", and let
-the driver use SVR.  Even encoding an etsec version in the compatible
-string would be difficult, unless fixed up by u-boot, as it appears to
-differ based on chip revision (and the chip manuals seem to often not match
-the hardware regarding the advertised eTSEC revision) and we don't normally
-have separate dts files for different revisions of the same chip.  Plus,
-our docs (at least the public ones) don't seem to be very helpful in
-determining what version of eTSEC implies what.
+The V6 vs V7 issues should be sorted out with Russell's patches that
+we also have now in linux-omap master branch.
 
-If you want to use chip-based compatibles instead, then use the actual name
-of the chip.  You'll need to verify 100% compatibility if you want to claim
-compatibility with another chip; it's probably easier/safer to just list
-every single Freescale chip that has this type of PTP in a huge compatible
-table, like PCI drivers do.
+Regards,
 
--Scott
+Tony
