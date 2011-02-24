@@ -1,46 +1,108 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 24 Feb 2011 10:35:19 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during
-	fault handling
-In-Reply-To: <4D656961.7080105@maxwell.research.nokia.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
-	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
-	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-	<4D656961.7080105@maxwell.research.nokia.com>
-Message-ID: <20110224083518.GC3528@legolas.emea.dhcp.ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 24 Feb 2011 14:27:13 +0530
+Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+	hwmodright before timer init
+In-Reply-To: <alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<20110223071153.5874.58923.stgit@twilight.localdomain>
+	<581270b49665fcf8227a96065dbbc584@mail.gmail.com>
+	<alpine.DEB.2.00.1102240109500.6198@utopia.booyaka.com>
+	<alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
+Message-ID: <1f61c4651cf90f6a906f042ee4ec8c27@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Thursday, February 24, 2011 1:45 PM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Tony Lindgren; Kevin Hilman; Benoit
+> Cousson
+> Subject: RE: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER
+> clockevent hwmodright before timer init
+>
+> Hello Santosh,
+>
+> On Thu, 24 Feb 2011, Paul Walmsley wrote:
+>
+> > I propose the following change instead - please let me know what
+> you
+> > think.
+>
+> Oops - the patch I sent you was not completely refreshed in the
+> local
+> tree.  Here is the correct one.
+>
+>
+> - Paul
+>
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Wed, 23 Feb 2011 00:14:08 -0700
+> Subject: [PATCH] OMAP2+: clockevent: late-init GPTIMER clockevent
+> hwmod right before timer init
+>
+> Late-initialize the GPTIMER hwmod used for the clockevent source
+> immediately
+> before it is used.  This avoids the need to late-initialize all of
+> the hwmods
+> until the boot process is further along.  (In general, we want to
+> defer
+> as much as possible until late in the boot process.)
+>
+> This second version fixes a bug pointed out by Santosh Shilimkar
+> <santosh.shilimkar@ti.com>, that would cause the kernel to use an
+> incorrect timer hwmod name if the selected GPTIMER was not 1 or 12 -
+> thanks Santosh.  Also, Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> pointed out that the original patch did not apply cleanly; this has
+> now been fixed.
+>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> ---
+Looks good and thanks for fixing this one.
 
-On Wed, Feb 23, 2011 at 10:09:05PM +0200, Sakari Ailus wrote:
-> > In OMAP4 the cortex M3 is a double core processor and as each core is
-> > running they own version of the RTOS we threat them independently. So
-> > our driver which controls the remote processor sees two processor but
-> > both use the same iommu hw. When a iommu fault happens, at this
-> > moment, it is consider as a faltal error and it is no managed to
-> > recover and continue, instead a restart of the processor is needed, if
-> > the fault happens in core0 we need to reset core1 too and vice versa.
-> > if the iommu would support several user callbacks, we can register the
-> > callback which resets core0 and also the callback which resets core1
-> > and treat them as totally independent processors. Also we have an
-> > error event notifier driver, which is only in charge of notifying
-> > error events to userspace, so we would have multiple callbacks we
-> > could do this
-> 
-> The original purpose of the patch, as far as I understand, is to allow
-> getting useful information for debugging purposes should an iommu fault
-> happen.
-> 
-> Also, I'm not sure it's necessarily a good idea to just go and reset
-> the M3 cores in case an iommu fault happens --- this is very probably a
-> grave bug in the software running on those M3s. It should be fixed
-> instead of just hiding it. There will be consequences to host side as
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-I have to agree here. Besides the fact that multiple callbacks is
-outside the scope of this patch.
-
--- 
-balbi
+>  arch/arm/mach-omap2/timer-gp.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
+> omap2/timer-gp.c
+> index 7b7c268..b289d53 100644
+> --- a/arch/arm/mach-omap2/timer-gp.c
+> +++ b/arch/arm/mach-omap2/timer-gp.c
+> @@ -39,10 +39,11 @@
+>  #include <asm/mach/time.h>
+>  #include <plat/dmtimer.h>
+>  #include <asm/localtimer.h>
+> +#include <plat/common.h>
+> +#include <plat/omap_hwmod.h>
+>
+>  #include "timer-gp.h"
+>
+> -#include <plat/common.h>
+>
+>  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+>  #define MAX_GPTIMER_ID		12
+> @@ -132,9 +133,13 @@ static void __init
+> omap2_gp_clockevent_init(void)
+>  {
+>  	u32 tick_rate;
+>  	int src;
+> +	char clockevent_hwmod_name[8]; /* 8 = sizeof("timerXX0") */
+>
+>  	inited = 1;
+>
+> +	sprintf(clockevent_hwmod_name, "timer%d", gptimer_id);
+> +	omap_hwmod_late_init_one(clockevent_hwmod_name);
+> +
+>  	gptimer = omap_dm_timer_request_specific(gptimer_id);
+>  	BUG_ON(gptimer == NULL);
+>  	gptimer_wakeup = gptimer;
+> --
+> 1.7.2.3
