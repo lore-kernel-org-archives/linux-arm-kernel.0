@@ -1,48 +1,72 @@
 From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Thu, 24 Feb 2011 19:25:51 +0530
+Date: Thu, 24 Feb 2011 19:26:28 +0530
 Subject: [PATCH v3 1/2] PRUSS UIO driver support
-In-Reply-To: <alpine.LFD.2.00.1102232153500.2701@localhost6.localdomain6>
+In-Reply-To: <20110223173724.GA2801@local>
 References: <1298469161-7644-1-git-send-email-pratheesh@ti.com>
 	<1298469161-7644-2-git-send-email-pratheesh@ti.com>
-	<alpine.LFD.2.00.1102232057260.2701@localhost6.localdomain6>
-	<4D6572ED.9020805@mvista.com>
-	<alpine.LFD.2.00.1102232153500.2701@localhost6.localdomain6>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BE49815@dbde02.ent.ti.com>
+	<20110223173724.GA2801@local>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BE49816@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+
 > -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Thursday, February 24, 2011 2:24 AM
-> To: Sergei Shtylyov
-> Cc: TK, Pratheesh Gangadhar; davinci-linux-open-
-> source at linux.davincidsp.com; Chatterjee, Amit; gregkh at suse.de; linux-
-> kernel at vger.kernel.org; hjk at hansjkoch.de; linux-arm-
+> From: Hans J. Koch [mailto:hjk at hansjkoch.de]
+> Sent: Wednesday, February 23, 2011 11:07 PM
+> To: TK, Pratheesh Gangadhar
+> Cc: davinci-linux-open-source at linux.davincidsp.com; hjk at hansjkoch.de;
+> gregkh at suse.de; Chatterjee, Amit; linux-kernel at vger.kernel.org; linux-arm-
 > kernel at lists.infradead.org
 > Subject: Re: [PATCH v3 1/2] PRUSS UIO driver support
 > 
-> On Wed, 23 Feb 2011, Sergei Shtylyov wrote:
-> > Hello.
+> On Wed, Feb 23, 2011 at 07:22:40PM +0530, Pratheesh Gangadhar wrote:
+> > This patch implements PRUSS (Programmable Real-time Unit Sub System)
+> > UIO driver which exports SOC resources associated with PRUSS like
+> > I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
+> > processors which is efficient in performing embedded tasks that
+> > require manipulation of packed memory mapped data structures and
+> > efficient in handling system events that have tight real time
+> > constraints. This driver is currently supported on Texas Instruments
+> > DA850, AM18xx and OMAPL1-38 devices.
+> > For example, PRUSS runs firmware for real-time critical industrial
+> > communication data link layer and communicates with application stack
+> > running in user space via shared memory and IRQs.
 > >
-> > On 23-02-2011 23:25, Thomas Gleixner wrote:
+> > Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
+> > ---
+> >  drivers/uio/Kconfig     |   17 ++++
+> >  drivers/uio/Makefile    |    1 +
+> >  drivers/uio/uio_pruss.c |  223
+> +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 241 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/uio/uio_pruss.c
 > >
-> > > > +	prussio_virt_addr =
-> > > > +	    ioremap(regs_prussio->start,
-> > > > +		    regs_prussio->end - regs_prussio->start + 1);
-> >
-> > > Either make those variable names shorter or do:
-> >
-> > >         len = regs_prussio->end - regs_prussio->start + 1;
-> >
-> >    Or even:
-> >
-> > 	len = resource_size(regs_prussio);
-> >
-> > >         prussio_virt_addr = ioremap(regs_prussio->start, len);
 > 
-> Good point. Forgot about that one :)
+> [...]
 > 
-Thanks will do this.
+> > +
+> > +static int __devinit pruss_probe(struct platform_device *dev)
+> > +{
+> > +	int ret = -ENODEV, count = 0;
+> > +	struct resource *regs_prussio, *regs_l3ram, *regs_ddr;
+> > +	struct uio_info *p;
+> > +
+> > +	info = kzalloc(sizeof(struct uio_info) * MAX_PRUSS_EVTOUT_INSTANCE,
+> > +		       GFP_KERNEL);
+> > +	if (!info)
+> > +		return -ENOMEM;
+> > +
+> > +	/* Power on PRU in case its not done as part of boot-loader */
+> > +	pruss_clk = clk_get(&dev->dev, "pruss");
+> > +	if (IS_ERR(pruss_clk)) {
+> > +		dev_err(&dev->dev, "Failed to get clock\n");
+> > +		ret = PTR_ERR(pruss_clk);
+> > +		return ret;
+> 
+> You leak memory here. What about freeing "info"?
 
+Ok. Will fix.
+
+Thanks,
 Pratheesh
