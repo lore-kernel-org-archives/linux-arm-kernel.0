@@ -1,49 +1,46 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 24 Feb 2011 10:31:52 +0200
-Subject: [PATCH v6] OMAP2/3/4: DSS2: Enable Display SubSystem as modules
-In-Reply-To: <1298528800-7399-1-git-send-email-samreen@ti.com>
-References: <1298528800-7399-1-git-send-email-samreen@ti.com>
-Message-ID: <1298536312.16119.23.camel@deskari>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 24 Feb 2011 10:35:19 +0200
+Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during
+	fault handling
+In-Reply-To: <4D656961.7080105@maxwell.research.nokia.com>
+References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
+	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
+	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
+	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
+	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
+	<4D656961.7080105@maxwell.research.nokia.com>
+Message-ID: <20110224083518.GC3528@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-02-24 at 00:26 -0600, Nilofer, Samreen wrote:
-> Enabling all the display interface options to be built as module
-> And enabling all the display panels to be built as modules.
+Hi,
+
+On Wed, Feb 23, 2011 at 10:09:05PM +0200, Sakari Ailus wrote:
+> > In OMAP4 the cortex M3 is a double core processor and as each core is
+> > running they own version of the RTOS we threat them independently. So
+> > our driver which controls the remote processor sees two processor but
+> > both use the same iommu hw. When a iommu fault happens, at this
+> > moment, it is consider as a faltal error and it is no managed to
+> > recover and continue, instead a restart of the processor is needed, if
+> > the fault happens in core0 we need to reset core1 too and vice versa.
+> > if the iommu would support several user callbacks, we can register the
+> > callback which resets core0 and also the callback which resets core1
+> > and treat them as totally independent processors. Also we have an
+> > error event notifier driver, which is only in charge of notifying
+> > error events to userspace, so we would have multiple callbacks we
+> > could do this
 > 
-> Signed-off-by: Samreen <samreen@ti.com>
-
-This looks good to me.
-
-Tony, want to ack this? This enables all DSS features as modules. This
-should go through dss tree, as this doesn't work without a fix that is
-there.
-
- Tomi
-
-
->  arch/arm/configs/omap2plus_defconfig |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+> The original purpose of the patch, as far as I understand, is to allow
+> getting useful information for debugging purposes should an iommu fault
+> happen.
 > 
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index ae890ca..407ccf8 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -192,6 +192,17 @@ CONFIG_FIRMWARE_EDID=y
->  CONFIG_FB_MODE_HELPERS=y
->  CONFIG_FB_TILEBLITTING=y
->  CONFIG_FB_OMAP_LCD_VGA=y
-> +CONFIG_OMAP2_DSS=m
-> +CONFIG_OMAP2_DSS_RFBI=y
-> +CONFIG_OMAP2_DSS_SDI=y
-> +CONFIG_OMAP2_DSS_DSI=y
-> +CONFIG_FB_OMAP2=m
-> +CONFIG_PANEL_GENERIC_DPI=m
-> +CONFIG_PANEL_SHARP_LS037V7DW01=m
-> +CONFIG_PANEL_NEC_NL8048HL11_01B=m
-> +CONFIG_PANEL_TAAL=m
-> +CONFIG_PANEL_TPO_TD043MTEA1=m
-> +CONFIG_PANEL_ACX565AKM=m
->  CONFIG_BACKLIGHT_LCD_SUPPORT=y
->  CONFIG_LCD_CLASS_DEVICE=y
->  CONFIG_LCD_PLATFORM=y
+> Also, I'm not sure it's necessarily a good idea to just go and reset
+> the M3 cores in case an iommu fault happens --- this is very probably a
+> grave bug in the software running on those M3s. It should be fixed
+> instead of just hiding it. There will be consequences to host side as
+
+I have to agree here. Besides the fact that multiple callbacks is
+outside the scope of this patch.
+
+-- 
+balbi
