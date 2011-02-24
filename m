@@ -1,60 +1,28 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 24 Feb 2011 18:26:42 +0530
-Subject: [PATCH] ldp: Fix regulator mapping for ads7846 TS controller
-Message-ID: <1298552202-28307-1-git-send-email-rnayak@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 24 Feb 2011 14:12:45 +0100
+Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
+	and card detection
+In-Reply-To: <87k4gp3bl1.fsf@lebrac.rtp-net.org>
+References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
+	<87k4gp3bl1.fsf@lebrac.rtp-net.org>
+Message-ID: <20110224131245.GA2420@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the OMAP3430LDP board, the ads7846 touchscreen controller
-is powered by VAUX1 regulator (supplying 3.0v).
-Fix this mapping in the board file, and hence prevent
-the ads7846 driver init to fail with the below error..
+> I'm getting a hard freeze on my efika sb and mx once I remove the
+> unconditional BROKEN_CARD_DETECTION flag. I'm still investigating the
+> issue. I'll keep you informed if I find something.
 
-ads7846 spi1.0: unable to get regulator: -19
+Hmm, this is probably an unhandled interrupt. Will see if I can get the
+efika here...
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/board-ldp.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index a3fae56..9a99cad 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -329,6 +329,26 @@ static struct regulator_init_data ldp_vmmc1 = {
- 	.consumer_supplies	= &ldp_vmmc1_supply,
- };
- 
-+/* ads7846 on SPI */
-+static struct regulator_consumer_supply ldp_vaux1_supplies[] = {
-+	REGULATOR_SUPPLY("vcc", "spi1.0"),
-+};
-+
-+/* VAUX1 */
-+static struct regulator_init_data ldp_vaux1 = {
-+	.constraints = {
-+		.min_uV			= 3000000,
-+		.max_uV			= 3000000,
-+		.apply_uV		= true,
-+		.valid_modes_mask	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask		= REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies		= ARRAY_SIZE(ldp_vaux1_supplies),
-+	.consumer_supplies		= ldp_vaux1_supplies,
-+};
-+
- static struct twl4030_platform_data ldp_twldata = {
- 	.irq_base	= TWL4030_IRQ_BASE,
- 	.irq_end	= TWL4030_IRQ_END,
-@@ -337,6 +357,7 @@ static struct twl4030_platform_data ldp_twldata = {
- 	.madc		= &ldp_madc_data,
- 	.usb		= &ldp_usb_data,
- 	.vmmc1		= &ldp_vmmc1,
-+	.vaux1		= &ldp_vaux1,
- 	.gpio		= &ldp_gpio_data,
- 	.keypad		= &ldp_kp_twl4030_data,
- };
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110224/8852c4d8/attachment.sig>
