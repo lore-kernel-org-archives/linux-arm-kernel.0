@@ -1,18 +1,20 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 24 Feb 2011 20:01:26 +0100 (CET)
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 24 Feb 2011 22:32:06 +0300
 Subject: [PATCH 4/4] msm: scm: Get cacheline size from CTR
 In-Reply-To: <1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
 References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
 	<1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1102241959290.2701@localhost6.localdomain6>
+Message-ID: <4D66B236.4030003@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Feb 2011, Stephen Boyd wrote:
+Hello.
+
+Stephen Boyd wrote:
 
 > Instead of hardcoding the cacheline size as 32, get the cacheline
 > size from the CTR register.
-> 
+
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
 >  arch/arm/mach-msm/scm.c |   17 ++++++++++++-----
@@ -22,16 +24,7 @@ On Thu, 24 Feb 2011, Stephen Boyd wrote:
 > index cfa808d..0528c71 100644
 > --- a/arch/arm/mach-msm/scm.c
 > +++ b/arch/arm/mach-msm/scm.c
-> @@ -26,9 +26,6 @@
->  
->  #include "scm.h"
->  
-> -/* Cache line size for msm8x60 */
-> -#define CACHELINESIZE 32
-> -
->  #define SCM_ENOMEM		-5
->  #define SCM_EOPNOTSUPP		-4
->  #define SCM_EINVAL_ADDR		-3
+[...]
 > @@ -207,6 +204,14 @@ static int __scm_call(const struct scm_command *cmd)
 >  	return ret;
 >  }
@@ -43,21 +36,8 @@ On Thu, 24 Feb 2011, Stephen Boyd wrote:
 > +	asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
 > +	return 4 << ((ctr >> 16) & 0xf);
 > +}
-> +
->  /**
->   * scm_call() - Send an SCM command
->   * @svc_id: service identifier
-> @@ -243,11 +248,13 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
->  	do {
->  		u32 start = (u32)rsp;
->  		u32 end = (u32)scm_get_response_buffer(rsp) + resp_len;
-> -		start &= ~(CACHELINESIZE - 1);
-> +		u32 cacheline_size = dcache_line_size();
 
-And why do you want to do that on every scm_call() invocation and on
-every loop of that code? If your dcache_line_size() changes at
-runtime, then you might have other problems.
+    Won't generic cache_line_size() macro do instead? It's defined as 
+L1_CACHE_BYTES.
 
-Thanks,
-
-	tglx
+WBR, Sergei
