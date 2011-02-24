@@ -1,50 +1,60 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 24 Feb 2011 13:40:18 +0100 (CET)
-Subject: [PATCH 5/5] ARM: msm: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <4D65A4BA.8030206@codeaurora.org>
-References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
-	<1298302096-21275-6-git-send-email-will.deacon@arm.com>
-	<4D65A4BA.8030206@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1102241338410.2701@localhost6.localdomain6>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 24 Feb 2011 18:26:42 +0530
+Subject: [PATCH] ldp: Fix regulator mapping for ads7846 TS controller
+Message-ID: <1298552202-28307-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Feb 2011, Abhijeet Dharmapurikar wrote:
+On the OMAP3430LDP board, the ads7846 touchscreen controller
+is powered by VAUX1 regulator (supplying 3.0v).
+Fix this mapping in the board file, and hence prevent
+the ads7846 driver init to fail with the below error..
 
-> Will Deacon wrote:
-> > The chained GPIO IRQ handler on MSM8x60 calls ->ack on the parent chip
-> > after handling the interrupt.
-> > 
-> > This patch updates the code to use ->irq_eoi now that the GIC has moved
-> > to using the fasteoi flow model.
-> > 
-> > Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mach-msm/gpio-v2.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
-> > index 0de19ec..04fb411 100644
-> > --- a/arch/arm/mach-msm/gpio-v2.c
-> > +++ b/arch/arm/mach-msm/gpio-v2.c
-> > @@ -318,7 +318,7 @@ static void msm_summary_irq_handler(unsigned int irq,
-> > struct irq_desc *desc)
-> >  			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
-> >  							   i));
-> >  	}
-> > -	desc->chip->ack(irq);
-> > +	desc->chip->irq_eoi(irq);
-> 
-> should be dec->chip->irq_eoi(&desc->irq_data);
+ads7846 spi1.0: unable to get regulator: -19
 
-Nope, it should do:
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/board-ldp.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
 
-      struct irq_chip *chip = get_irq_desc_chip(desc);
-
-      chip->irq_eoi();
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index a3fae56..9a99cad 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -329,6 +329,26 @@ static struct regulator_init_data ldp_vmmc1 = {
+ 	.consumer_supplies	= &ldp_vmmc1_supply,
+ };
+ 
++/* ads7846 on SPI */
++static struct regulator_consumer_supply ldp_vaux1_supplies[] = {
++	REGULATOR_SUPPLY("vcc", "spi1.0"),
++};
++
++/* VAUX1 */
++static struct regulator_init_data ldp_vaux1 = {
++	.constraints = {
++		.min_uV			= 3000000,
++		.max_uV			= 3000000,
++		.apply_uV		= true,
++		.valid_modes_mask	= REGULATOR_MODE_NORMAL
++					| REGULATOR_MODE_STANDBY,
++		.valid_ops_mask		= REGULATOR_CHANGE_MODE
++					| REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies		= ARRAY_SIZE(ldp_vaux1_supplies),
++	.consumer_supplies		= ldp_vaux1_supplies,
++};
++
+ static struct twl4030_platform_data ldp_twldata = {
+ 	.irq_base	= TWL4030_IRQ_BASE,
+ 	.irq_end	= TWL4030_IRQ_END,
+@@ -337,6 +357,7 @@ static struct twl4030_platform_data ldp_twldata = {
+ 	.madc		= &ldp_madc_data,
+ 	.usb		= &ldp_usb_data,
+ 	.vmmc1		= &ldp_vmmc1,
++	.vaux1		= &ldp_vaux1,
+ 	.gpio		= &ldp_gpio_data,
+ 	.keypad		= &ldp_kp_twl4030_data,
+ };
+-- 
+1.7.0.4
