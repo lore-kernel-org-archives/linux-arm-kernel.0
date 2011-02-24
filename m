@@ -1,125 +1,123 @@
-From: dacohen@gmail.com (David Cohen)
-Date: Thu, 24 Feb 2011 08:39:43 +0200
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during fault
-	handling
-In-Reply-To: <AANLkTim+kcVxH=5pW51F0LFX=3igfWTgmthHN2F7tBB4@mail.gmail.com>
-References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
-	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
-	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
-	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-	<AANLkTi=+rzHDB_hGzGtZKNZB02z4v65GAD-87zVpOdni@mail.gmail.com>
-	<4D657490.20504@maxwell.research.nokia.com>
-	<AANLkTim+kcVxH=5pW51F0LFX=3igfWTgmthHN2F7tBB4@mail.gmail.com>
-Message-ID: <AANLkTi=RGTDGrQtvH7CDi=C2eu4T3nGZK-ixd8=NnYPp@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 24 Feb 2011 01:13:38 -0700 (MST)
+Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+	hwmodright before timer init
+In-Reply-To: <581270b49665fcf8227a96065dbbc584@mail.gmail.com>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<20110223071153.5874.58923.stgit@twilight.localdomain>
+	<581270b49665fcf8227a96065dbbc584@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1102240109500.6198@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 11:48 PM, Guzman Lugo, Fernando
-<fernando.lugo@ti.com> wrote:
-> On Wed, Feb 23, 2011 at 2:56 PM, Sakari Ailus
-> <sakari.ailus@maxwell.research.nokia.com> wrote:
->> David Cohen wrote:
->>> On Wed, Feb 23, 2011 at 3:39 PM, Guzman Lugo, Fernando
->>> <fernando.lugo@ti.com> wrote:
->>>> On Wed, Feb 23, 2011 at 3:45 AM, David Cohen <dacohen@gmail.com> wrote:
->>>>> On Wed, Feb 23, 2011 at 3:17 AM, Guzman Lugo, Fernando
->>>>> <fernando.lugo@ti.com> wrote:
->>>>>> On Wed, Feb 16, 2011 at 1:35 PM, David Cohen <dacohen@gmail.com> wrote:
->>>>>>> Add support to register an isr for IOMMU fault situations and adapt it
->>>>>>> to allow such (*isr)() to be used as fault callback. Drivers using IOMMU
->>>>>>> module might want to be informed when errors happen in order to debug it
->>>>>>> or react.
->>>>>>>
->>>>>>> Signed-off-by: David Cohen <dacohen@gmail.com>
->>>>>>> ---
->>>>>>> ?arch/arm/mach-omap2/iommu2.c ? ? ? ? ? ?| ? 17 +++++++++-
->>>>>>> ?arch/arm/plat-omap/include/plat/iommu.h | ? 14 ++++++++-
->>>>>>> ?arch/arm/plat-omap/iommu.c ? ? ? ? ? ? ?| ? 52 ++++++++++++++++++++++---------
->>>>>>> ?3 files changed, 65 insertions(+), 18 deletions(-)
->>>>>>>
->>>>>> ....
->>>>>>
->>>>>>> @@ -917,6 +912,33 @@ void iommu_put(struct iommu *obj)
->>>>>>> ?}
->>>>>>> ?EXPORT_SYMBOL_GPL(iommu_put);
->>>>>>>
->>>>>>> +int iommu_set_isr(const char *name,
->>>>>>> + ? ? ? ? ? ? ? ? int (*isr)(struct iommu *obj, u32 da, u32 iommu_errs,
->>>>>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?void *priv),
->>>>>>> + ? ? ? ? ? ? ? ? void *isr_priv)
->>>>>>> +{
->>>>>>> + ? ? ? struct device *dev;
->>>>>>> + ? ? ? struct iommu *obj;
->>>>>>> +
->>>>>>
->>>>>> if the driver support multiple user for the same iommu why can only
->>>>>> one callback be registered? should it support register multiple
->>>>>> callback function (one per user)?
->>>>>
->>>>> Can you define a scenario for that?
->>>>> On OMAP3 ISP the multiple users are the multiple ISP submodule, but I
->>>>> don't think it's necessary all submodule to have a specific callback.
->>>>> ISP core layer should handle.
->>>>
->>>> Hi,
->>>>
->>>> In OMAP4 the cortex M3 is a double core processor and as each core is
->>>> running they own version of the RTOS we threat them independently. So
->>>> our driver which controls the remote processor sees two processor but
->>>> both use the same iommu hw. When a iommu fault happens, at this
->>>> moment, it is consider as a faltal error and it is no managed to
->>>> recover and continue, instead a restart of the processor is needed, if
->>>> the fault happens in core0 we need to reset core1 too and vice versa.
->>>> if the iommu would support several user callbacks, we can register the
->>>> callback which resets core0 and also the callback which resets core1
->>>> and treat them as totally independent processors. Also we have an
->>>> error event notifier driver, which is only in charge of notifying
->>>> error events to userspace, so we would have multiple callbacks we
->>>> could do this
->>>
->>> I understood your point. In this case, I may not disagree about having
->>> more than one callback per obj, although it doesn't seem a nice
->>> scenario.
->>> We can have a list of callbacks and call the entire list when a fault
->>> happens. But it's necessary to pay attention it will happen in atomic
->>> context and users should not abuse and register many callbacks. The
->>> callback should *NOT* print useless messages and must verify the error
->>> code to not execute useless steps.
->>> In this context, callback and ISR cannot share a same pointer anymore.
->>
->> I think this is outside of the scope of the patch but...
->
-> yes, the same behaviour was before the patches, but as the patches are
-> changing the isr, I think it is a good time to modify, not in patch 2,
-> but in a new patch to be added to the serie between patch 1 and 2, so
-> that we dont need to change ISR part again after this set of patches.
+Hello Santosh,
 
-Let's wait for Hiroshi's opinion and decide if I change or not the patches.
+On Wed, 23 Feb 2011, Santosh Shilimkar wrote:
 
-Br,
+> > -----Original Message-----
+> > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > Sent: Wednesday, February 23, 2011 12:42 PM
+> >
+> > diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-
+> > omap2/timer-gp.c
+> > index 0fc550e..a4e51a2 100644
+> > --- a/arch/arm/mach-omap2/timer-gp.c
+> > +++ b/arch/arm/mach-omap2/timer-gp.c
+> > @@ -40,10 +40,11 @@
+> >  #include <plat/dmtimer.h>
+> >  #include <asm/localtimer.h>
+> >  #include <asm/sched_clock.h>
+> > +#include <plat/common.h>
+> >
+> >  #include "timer-gp.h"
+> > +#include <plat/omap_hwmod.h>
+> >
+> > -#include <plat/common.h>
+> >
+> >  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+> >  #define MAX_GPTIMER_ID		12
+> > @@ -133,9 +134,13 @@ static void __init
+> > omap2_gp_clockevent_init(void)
+> >  {
+> >  	u32 tick_rate;
+> >  	int src;
+> > +	const char *clockevent_hwmod_name;
+> >
+> >  	inited = 1;
+> >
+> > +	clockevent_hwmod_name = (gptimer_id == 12) ? "timer12" :
+> > "timer1";
+> > +	omap_hwmod_late_init_one(clockevent_hwmod_name);
+> > +
+> 
+> Do we need above hard-coding ? This takes away flexibility of
+> choosing system timer from board files, right ?
+> 
+> Am I missing something here?
 
-David
+You are absolutely right.  That was an error on my part.  I propose the 
+following change instead - please let me know what you think.
 
->
->>
->> To efficiently debug iommu faults (with a driver using iommu page
->> walking), besides the actual fault address the list of existing mappings
->> and the information which driver created them and for which purpose is
->> useful.
->>
->> The list of mappings is already available in the iommu structure. It'd
->> be nice if there was a function a driver could call to print them.
->
->>
->> I can only think of ugly ways to implement the other.
->>
->> Just my 5 cents (as we have no 2 cent coins here).
->>
->> Regards,
->>
->> --
->> Sakari Ailus
->> sakari.ailus at maxwell.research.nokia.com
->>
->
+
+- Paul
+
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Wed, 23 Feb 2011 00:14:08 -0700
+Subject: [PATCH] OMAP2+: clockevent: late-init GPTIMER clockevent hwmod right before timer init
+
+Late-initialize the GPTIMER hwmod used for the clockevent source immediately
+before it is used.  This avoids the need to late-initialize all of the hwmods
+until the boot process is further along.  (In general, we want to defer
+as much as possible until late in the boot process.)
+
+This second version fixes a bug pointed out by Santosh Shilimkar
+<santosh.shilimkar@ti.com>, that would cause the kernel to use an
+incorrect timer hwmod name if the selected GPTIMER was not 1 or 12 -
+thanks Santosh.  Also, Tarun Kanti DebBarma <tarun.kanti@ti.com>
+pointed out that the original patch did not apply cleanly; this has
+now been fixed.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+---
+ arch/arm/mach-omap2/timer-gp.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
+index 7b7c268..d23767f 100644
+--- a/arch/arm/mach-omap2/timer-gp.c
++++ b/arch/arm/mach-omap2/timer-gp.c
+@@ -39,10 +39,11 @@
+ #include <asm/mach/time.h>
+ #include <plat/dmtimer.h>
+ #include <asm/localtimer.h>
++#include <plat/common.h>
++#include <plat/omap_hwmod.h>
+ 
+ #include "timer-gp.h"
+ 
+-#include <plat/common.h>
+ 
+ /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+ #define MAX_GPTIMER_ID		12
+@@ -132,9 +133,13 @@ static void __init omap2_gp_clockevent_init(void)
+ {
+ 	u32 tick_rate;
+ 	int src;
++	char *clockevent_hwmod_name;
+ 
+ 	inited = 1;
+ 
++	sprintf(clockevent_hwmod_name, "timer%d", gptimer_id);
++	omap_hwmod_late_init_one(clockevent_hwmod_name);
++
+ 	gptimer = omap_dm_timer_request_specific(gptimer_id);
+ 	BUG_ON(gptimer == NULL);
+ 	gptimer_wakeup = gptimer;
+-- 
+1.7.2.3
