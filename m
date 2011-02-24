@@ -1,43 +1,38 @@
-From: arve@android.com (=?UTF-8?q?Arve=20Hj=C3=B8nnev=C3=A5g?=)
-Date: Wed, 23 Feb 2011 17:36:09 -0800
-Subject: [PATCH 9/9 (originally 8)] ARM: etm: Power down etm(s) when tracing
-	is not enabled
-In-Reply-To: <1296701663-12168-1-git-send-email-arve@android.com>
-References: <1296701663-12168-1-git-send-email-arve@android.com>
-Message-ID: <1298511369-20257-1-git-send-email-arve@android.com>
+From: dwalker@fifo99.com (Daniel Walker)
+Date: Wed, 23 Feb 2011 18:02:12 -0800
+Subject: [PATCH] MAINTAINERS: Update MSM maintainers
+In-Reply-To: <4D657B69.4000107@codeaurora.org>
+References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>
+	<1298420395.17118.6.camel@m0nster>
+	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
+	<4D657B69.4000107@codeaurora.org>
+Message-ID: <1298512932.17118.16.camel@m0nster>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this change a saw an 18% increase in idle power consumption
-on one deivce when trace support is compiled into the kernel. Now
-I see the same increase only when tracing.
+On Wed, 2011-02-23 at 13:26 -0800, Bryan Huntsman wrote:
+> On 02/22/2011 05:12 PM, Linus Torvalds wrote:
+> > On Tue, Feb 22, 2011 at 4:19 PM, Daniel Walker <dwalker@fifo99.com> wrote:
+> >> On Tue, 2011-02-22 at 16:03 -0800, David Brown wrote:
+> >>> Remove Bryan Huntsman and Daniel Walker from the MSM maintainer list.
+> >>>
+> >>
+> >> No.. I don't sign off on this.. Please ignore this Linus.
+> > 
+> > Guys, you need to sort out your differences here..
+> > 
+> >                         Linus
+> 
+> Daniel, let's do what Linus is asking and figure this out.  What is your
+> intention here?  Going forward, David Brown is in the best position to
+> handle MSM maintenance since he has direct access to all past, current,
+> and future MSM devices as well as all the HW and SW experts at Qualcomm.
+> In that spirit, I think it's entirely appropriate for both you and I to
+> step back and let David handle this role so that there is one consistent
+> and clear voice for MSM.
 
-Signed-off-by: Arve Hj?nnev?g <arve@android.com>
----
- arch/arm/kernel/etm.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+There's nothing really to figure out. I don't feel like you and David
+can do the job alone. My intentions are just to make sure that you don't
+mess with my targets, and that you do the right thing by the community.
 
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 48de5a4..f2bc95e 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -199,7 +199,7 @@ static int trace_stop_etm(struct tracectx *t, int id)
- 
- 	etm_unlock(t, id);
- 
--	etm_writel(t, id, 0x440, ETMR_CTRL);
-+	etm_writel(t, id, 0x441, ETMR_CTRL);
- 	while (!(etm_readl(t, id, ETMR_CTRL) & ETMCTRL_PROGRAM) && --timeout)
- 		;
- 	if (!timeout) {
-@@ -738,7 +738,7 @@ static int __init etm_probe(struct amba_device *dev, struct amba_id *id)
- 	(void)etm_readl(&tracer, t->etm_regs_count, ETMMR_OSSRR);
- 
- 	t->ncmppairs = etm_readl(t, t->etm_regs_count, ETMR_CONFCODE) & 0xf;
--	etm_writel(t, t->etm_regs_count, 0x440, ETMR_CTRL);
-+	etm_writel(t, t->etm_regs_count, 0x441, ETMR_CTRL);
- 	etm_writel(t, t->etm_regs_count, new_count, ETMR_TRACEIDR);
- 	etm_lock(t, t->etm_regs_count);
- 
--- 
-1.7.3.1
+Daniel
