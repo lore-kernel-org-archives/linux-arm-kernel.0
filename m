@@ -1,62 +1,39 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 24 Feb 2011 20:45:57 +0100
-Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
-	and card detection
-In-Reply-To: <20110224160300.GA1483@S2100-06.ap.freescale.net>
-References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-	<20110224081803.GA29530@S2100-06.ap.freescale.net>
-	<20110224155126.GA1466@S2100-06.ap.freescale.net>
-	<20110224160300.GA1483@S2100-06.ap.freescale.net>
-Message-ID: <20110224194557.GA20877@pengutronix.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 24 Feb 2011 11:50:39 -0800
+Subject: [PATCH 4/4] msm: scm: Get cacheline size from CTR
+In-Reply-To: <4D66B236.4030003@ru.mvista.com>
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
+	<4D66B236.4030003@ru.mvista.com>
+Message-ID: <4D66B68F.6010706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 25, 2011 at 12:03:01AM +0800, Shawn Guo wrote:
-> On Thu, Feb 24, 2011 at 11:51:28PM +0800, Shawn Guo wrote:
-> > On Thu, Feb 24, 2011 at 04:18:05PM +0800, Shawn Guo wrote:
-> > > Hi Wolfram,
-> > > 
-> > > On Wed, Feb 23, 2011 at 02:51:53PM +0100, Wolfram Sang wrote:
-> > > > Take #3, changes:
-> > > > 
-> > > > * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
-> > > > * remove unconditional BROKEN_CARD_DETECTION (leftover)
-> > > > * improved kernel-doc about unused GPIO
-> > > > * added tags from Eric
-> > > > 
-> > > > Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
-> > > > chance to retest on mx51? What about the FSL guys? :)
-> > > > 
-> > > I'm testing it on mx25 3ds and mx51 babbage. Both card-detect and
-> > > write-protect are working on mx25 3ds, but write-protect has some
-> > > problem on babbage, and I need some time to figure it out.
-> > > 
-> > I just figured out why wp_gpio does not work on mx51.
-> > 
-> > +       if (cpu_is_mx25() || cpu_is_mx35()) {
-> > +               /* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
-> >                 host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
-> > +               /* write_protect can't be routed to controller, use gpio */
-> > +               sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
-> > +       }
-> > 
-> > Would it make sense to do the same for mx51?  On babbage board,
-> > SD1_WP is routed to controller, but SD2_WP is not, so we have to use
-> > gpio for SD2 write_protect.
-> > 
-> We should probably have esdhc_pltfm_get_ro whenever platform provides
-> a wp_gpio, and fall on controller SD_WP only when platform does not
-> provide the wp_gpio.
+On 02/24/2011 11:32 AM, Sergei Shtylyov wrote:
+> Stephen Boyd wrote:
+>
+>> @@ -207,6 +204,14 @@ static int __scm_call(const struct scm_command
+>> *cmd)
+>>      return ret;
+>>  }
+>>  
+>> +static inline u32 dcache_line_size(void)
+>> +{
+>> +    u32 ctr;
+>> +
+>> +    asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
+>> +    return 4 << ((ctr >> 16) & 0xf);
+>> +}
+>
+>    Won't generic cache_line_size() macro do instead? It's defined as
+> L1_CACHE_BYTES.
+>
 
-OK, will think about it. Thanks for testing!
+Interesting. It would be the same value (32) but I'm not sure how
+multi-platform friendly that will be since L1_CACHE_BYTES is (1 <<
+CONFIG_ARM_L1_CACHE_SHIFT). I suppose we can punt supporting platforms
+with different cache line sizes in one kernel for another day.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 197 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110224/1e00e5e7/attachment.sig>
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
