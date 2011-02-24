@@ -1,38 +1,76 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 24 Feb 2011 14:16:55 +0800
-Subject: [PATCH v2 5/5] mmc: sdhci-esdhc: enable esdhc on imx53
-In-Reply-To: <20110222155130.GJ2755@pengutronix.de>
-References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<1298369606-29972-5-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<20110222113222.GE2755@pengutronix.de>
-	<AANLkTimbx6=YvRHFuVkmPVYvYtwME31PxXWNHNfFsVRQ@mail.gmail.com>
-	<20110222155130.GJ2755@pengutronix.de>
-Message-ID: <20110224061653.GA3657@b20223-02.ap.freescale.net>
+From: samreen@ti.com (Samreen)
+Date: Thu, 24 Feb 2011 11:56:40 +0530
+Subject: [PATCH v6] OMAP2/3/4: DSS2: Enable Display SubSystem as modules
+Message-ID: <1298528800-7399-1-git-send-email-samreen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Enabling all the display interface options to be built as module
+And enabling all the display panels to be built as modules.
 
-On Tue, Feb 22, 2011 at 04:51:30PM +0100, Wolfram Sang wrote:
-> 
-> > > Thanks for respinning \o/ This approach looks better to me, but CCing
-> > > Olof to comment on abstraction issues if he has them. Will do a deeper
-> > > review later this week.
-> > 
-> > 
-> > I like it! Definitely the right approach. Pushing quirks down into the
-> > I/O accessors is definitely the only scalable way to handle all the
-> > various buggy controllers out there.
-> > 
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> Glad to hear that. I do have a few issues though, will report them later
-> as mentioned before, it needs a bit of time.
-What issues on what SoC/board did you find? Maybe we can help debug?
+Signed-off-by: Samreen <samreen@ti.com>
+---
+ Version6:
+        Enabling all the display interface options and all the display
+ panels.
 
-Thanks
-Richard
-> 
-> -- 
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ Version5:
+        Incorporating the comments from Tony Lindgren, Kevin Hilman,
+ Paul Mundt & Tomi Valkeinen to build DSS & panels as modules.
+ See: https://patchwork.kernel.org/patch/281492/
+
+ Version4:
+       Remove the enabling of the display panels by default.
+
+ Version3:
+       Eliminate the separate default number of FBs for
+ different architecture. Keeping default FBs as 3 as before.
+
+ Version2:
+        Enables by default NEC panel used in zoom2/3/3630sdp, instead of
+ Sharp LQ043T1DG01 panel enabled in previous version of this patch.
+
+Testing:
+---------
+The base used for OMAP3 testing is:
+branch: master
+commit: bb95b65a
+URL: git://gitorious.org/linux-omap-dss2/linux.git
+
+And OMAP4 testing is on the following branch + few patches to enable DSI taal panel:
+branch: lo-dss2-Feb18
+commit: 67bcb5600
+URL: git://dev.omapzoom.org/pub/scm/axelcx/kernel-display.git
+
+The patch is tested on 3630zoom, 3430sdp & 4430sdp, it was not tested
+on OMAP2 platform due crash seen while boot.
+(See: http://www.mail-archive.com/linux-omap at vger.kernel.org/msg43921.html)
+
+
+ arch/arm/configs/omap2plus_defconfig |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index ae890ca..407ccf8 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -192,6 +192,17 @@ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_FB_TILEBLITTING=y
+ CONFIG_FB_OMAP_LCD_VGA=y
++CONFIG_OMAP2_DSS=m
++CONFIG_OMAP2_DSS_RFBI=y
++CONFIG_OMAP2_DSS_SDI=y
++CONFIG_OMAP2_DSS_DSI=y
++CONFIG_FB_OMAP2=m
++CONFIG_PANEL_GENERIC_DPI=m
++CONFIG_PANEL_SHARP_LS037V7DW01=m
++CONFIG_PANEL_NEC_NL8048HL11_01B=m
++CONFIG_PANEL_TAAL=m
++CONFIG_PANEL_TPO_TD043MTEA1=m
++CONFIG_PANEL_ACX565AKM=m
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_PLATFORM=y
+-- 
+1.5.6.3
