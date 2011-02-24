@@ -1,44 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 24 Feb 2011 20:56:45 +0100 (CET)
-Subject: [PATCH 4/4] msm: scm: Get cacheline size from CTR
-In-Reply-To: <4D66B505.6010702@codeaurora.org>
-References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
-	<alpine.LFD.2.00.1102241959290.2701@localhost6.localdomain6>
-	<4D66B505.6010702@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1102242056010.2701@localhost6.localdomain6>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 24 Feb 2011 20:11:02 +0000
+Subject: [PATCH] S3C64XX: Tone down SDHCI debugging
+Message-ID: <1298578262-25391-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Feb 2011, Stephen Boyd wrote:
+The MMC core calls s3c6400_setup_sdhcp_cfg_card() very frequently, causing
+the log message in there at KERN_INFO to be displayed a lot which is slow
+and overly chatty. Convert the message into a pr_debug() to tone this down.
 
-> On 02/24/2011 11:01 AM, Thomas Gleixner wrote:
-> > On Thu, 24 Feb 2011, Stephen Boyd wrote:
-> >
-> >>
-> >>  /**
-> >>   * scm_call() - Send an SCM command
-> >>   * @svc_id: service identifier
-> >> @@ -243,11 +248,13 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
-> >>  	do {
-> >>  		u32 start = (u32)rsp;
-> >>  		u32 end = (u32)scm_get_response_buffer(rsp) + resp_len;
-> >> -		start &= ~(CACHELINESIZE - 1);
-> >> +		u32 cacheline_size = dcache_line_size();
-> >
-> > And why do you want to do that on every scm_call() invocation and on
-> > every loop of that code? If your dcache_line_size() changes at
-> > runtime, then you might have other problems.
-> 
-> I definitely don't want to do it for every loop. I'm fine with getting
-> it every scm_call() invocation though.
-> 
-> For now, I'll pull the end and cacheline_size variables out of the
-> do-while loop.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/setup-sdhci.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Why not do it correct right away and retrieve it in an __init
-function?
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-s3c64xx/setup-sdhci.c b/arch/arm/mach-s3c64xx/setup-sdhci.c
+index 1a94203..f344a22 100644
+--- a/arch/arm/mach-s3c64xx/setup-sdhci.c
++++ b/arch/arm/mach-s3c64xx/setup-sdhci.c
+@@ -56,7 +56,7 @@ void s3c6400_setup_sdhci_cfg_card(struct platform_device *dev,
+ 	else
+ 		ctrl3 = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
+ 
+-	printk(KERN_INFO "%s: CTRL 2=%08x, 3=%08x\n", __func__, ctrl2, ctrl3);
++	pr_debug("%s: CTRL 2=%08x, 3=%08x\n", __func__, ctrl2, ctrl3);
+ 	writel(ctrl2, r + S3C_SDHCI_CONTROL2);
+ 	writel(ctrl3, r + S3C_SDHCI_CONTROL3);
+ }
+-- 
+1.7.2.3
