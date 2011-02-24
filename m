@@ -1,42 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Feb 2011 14:21:10 -0800
-Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during
-	fault handling
-In-Reply-To: <20110224203137.GH20560@atomide.com>
-References: <1297884951-3019-3-git-send-email-dacohen@gmail.com>
-	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
-	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
-	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
-	<4D656961.7080105@maxwell.research.nokia.com>
-	<20110224083518.GC3528@legolas.emea.dhcp.ti.com>
-	<AANLkTinh_a81sELdF19ob0A0KbLR+9MUnb0+283NxO2b@mail.gmail.com>
-	<20110224112912.GQ3528@legolas.emea.dhcp.ti.com>
-	<AANLkTikXBKcbOQXdse31=qjoLoAhkvKz15PeFuw3AmCj@mail.gmail.com>
-	<20110224203137.GH20560@atomide.com>
-Message-ID: <20110224222110.GU20560@atomide.com>
+From: mnazarewicz@google.com (Michal Nazarewicz)
+Date: Thu, 24 Feb 2011 23:24:19 +0100
+Subject: [PATCH 1/2] lib: vsprintf: optimised put_dec() function
+In-Reply-To: <20110224141818.7fd0207f.akpm@linux-foundation.org>
+References: <a02a83033d5d61c5d78f110b44f24ae5cd94ab06.1298384703.git.mina86@mina86.com>
+	<20110224135101.9205d91e.akpm@linux-foundation.org>
+	<op.vrfg66mgvgw7ix@mnazarewicz-glaptop>
+	<20110224141818.7fd0207f.akpm@linux-foundation.org>
+Message-ID: <op.vrfhus0ivgw7ix@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110224 12:29]:
-> * Guzman Lugo, Fernando <fernando.lugo@ti.com> [110224 09:56]:
-> > On Thu, Feb 24, 2011 at 5:29 AM, Felipe Balbi <balbi@ti.com> wrote:
-> > > On Thu, Feb 24, 2011 at 01:26:05PM +0200, David Cohen wrote:
-> > >> On Thu, Feb 24, 2011 at 10:35 AM, Felipe Balbi <balbi@ti.com> wrote:
-> > >>
-> > >> This patch is already acked. What about leave it as it is and discuss
-> > >> multiple callbacks before release a new patch to support it?
-> > >
-> > > fine by me ;-)
-> > 
-> > Ok, maybe it was too late to change it, due to it is already acked, I
-> > just wanted to avoid change isr here and then change it on other
-> > patch. it is ok then.
-> 
-> Hiroshi any comments?
-> 
-> Would like to see a proper Acked-by before I apply, now there's
-> just the earlier comment "Ok, I see. Let's go with this. Thanks." :)
+>> On Thu, 24 Feb 2011 22:52:42 +0100, Andrew Morton wrote:
+>> > Also, the funky indenting to align on the "=" is atypical for kernel
+>> > code and is inconsistent with the rest of vsprintf.c.  Just a single
+>> > space, please.
 
-Ah I see an ack in another mail. So applying these.
+> On Thu, 24 Feb 2011 23:10:09 +0100 "Michal Nazarewicz" wrote:
+>> Want me to resubmit with spaces fixed?
 
-Tony
+On Thu, 24 Feb 2011 23:18:18 +0100, Andrew Morton wrote:
+> nah, we'll live.
+>
+> I'd prefer that you find a workload where it actually matters :)
+
+I'll try. :) Still have Contiguous Memory Allocator to work on. ;)
+Thanks!
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
