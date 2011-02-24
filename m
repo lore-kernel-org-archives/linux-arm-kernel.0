@@ -1,34 +1,101 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 24 Feb 2011 16:18:05 +0800
-Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
-	and card detection
-In-Reply-To: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20110224081803.GA29530@S2100-06.ap.freescale.net>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Thu, 24 Feb 2011 13:59:01 +0530
+Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+	hwmodright before timer init
+In-Reply-To: <alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<20110223071153.5874.58923.stgit@twilight.localdomain>
+	<581270b49665fcf8227a96065dbbc584@mail.gmail.com>
+	<alpine.DEB.2.00.1102240109500.6198@utopia.booyaka.com>
+	<alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037A0958B7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-On Wed, Feb 23, 2011 at 02:51:53PM +0100, Wolfram Sang wrote:
-> Take #3, changes:
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Paul Walmsley
+> Sent: Thursday, February 24, 2011 1:45 PM
+> To: Shilimkar, Santosh
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Tony
+> Lindgren; Hilman, Kevin; Cousson, Benoit
+> Subject: RE: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+> hwmodright before timer init
 > 
-> * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
-> * remove unconditional BROKEN_CARD_DETECTION (leftover)
-> * improved kernel-doc about unused GPIO
-> * added tags from Eric
+> Hello Santosh,
 > 
-> Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
-> chance to retest on mx51? What about the FSL guys? :)
+> On Thu, 24 Feb 2011, Paul Walmsley wrote:
 > 
-I'm testing it on mx25 3ds and mx51 babbage. Both card-detect and
-write-protect are working on mx25 3ds, but write-protect has some
-problem on babbage, and I need some time to figure it out.
-
-Also it's not testable on mx35 3ds board, as these two "gpio" pins
-are routed to a MCU which needs the I2C access.  Do we have this
-support on mainline?
-
--- 
-Regards,
-Shawn
+> > I propose the following change instead - please let me know what you
+> > think.
+> 
+> Oops - the patch I sent you was not completely refreshed in the local
+> tree.  Here is the correct one.
+I have tested on OMAP3 and works fine.
+On OMAP2, I guess there is different issue for which it does not work.
+--
+Tarun
+> 
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Wed, 23 Feb 2011 00:14:08 -0700
+> Subject: [PATCH] OMAP2+: clockevent: late-init GPTIMER clockevent hwmod
+> right before timer init
+> 
+> Late-initialize the GPTIMER hwmod used for the clockevent source
+> immediately
+> before it is used.  This avoids the need to late-initialize all of the
+> hwmods
+> until the boot process is further along.  (In general, we want to defer
+> as much as possible until late in the boot process.)
+> 
+> This second version fixes a bug pointed out by Santosh Shilimkar
+> <santosh.shilimkar@ti.com>, that would cause the kernel to use an
+> incorrect timer hwmod name if the selected GPTIMER was not 1 or 12 -
+> thanks Santosh.  Also, Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> pointed out that the original patch did not apply cleanly; this has
+> now been fixed.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Beno?t Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer-gp.c |    7 ++++++-
+>  1 files changed, 6 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-
+> gp.c
+> index 7b7c268..b289d53 100644
+> --- a/arch/arm/mach-omap2/timer-gp.c
+> +++ b/arch/arm/mach-omap2/timer-gp.c
+> @@ -39,10 +39,11 @@
+>  #include <asm/mach/time.h>
+>  #include <plat/dmtimer.h>
+>  #include <asm/localtimer.h>
+> +#include <plat/common.h>
+> +#include <plat/omap_hwmod.h>
+> 
+>  #include "timer-gp.h"
+> 
+> -#include <plat/common.h>
+> 
+>  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+>  #define MAX_GPTIMER_ID		12
+> @@ -132,9 +133,13 @@ static void __init omap2_gp_clockevent_init(void)
+>  {
+>  	u32 tick_rate;
+>  	int src;
+> +	char clockevent_hwmod_name[8]; /* 8 = sizeof("timerXX0") */
+> 
+>  	inited = 1;
+> 
+> +	sprintf(clockevent_hwmod_name, "timer%d", gptimer_id);
+> +	omap_hwmod_late_init_one(clockevent_hwmod_name);
+> +
+>  	gptimer = omap_dm_timer_request_specific(gptimer_id);
+>  	BUG_ON(gptimer == NULL);
+>  	gptimer_wakeup = gptimer;
+> --
+> 1.7.2.3
