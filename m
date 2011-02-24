@@ -1,55 +1,51 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 24 Feb 2011 16:12:06 -0800
-Subject: [PATCH 1/3] msm: iommu: Create a Kconfig item for the IOMMU driver
-In-Reply-To: <1297799373.7088.5.camel@c-dwalke-linux.qualcomm.com> (Daniel
-	Walker's message of "Tue, 15 Feb 2011 11:49:33 -0800")
-References: <1297456098-3241-1-git-send-email-stepanm@codeaurora.org>
-	<1297456729.4852.9.camel@m0nster> <8yar5b9850l.fsf@huya.qualcomm.com>
-	<1297799373.7088.5.camel@c-dwalke-linux.qualcomm.com>
-Message-ID: <8yay655c6qx.fsf@huya.qualcomm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 25 Feb 2011 00:03:01 +0800
+Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
+	and card detection
+In-Reply-To: <20110224155126.GA1466@S2100-06.ap.freescale.net>
+References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
+	<20110224081803.GA29530@S2100-06.ap.freescale.net>
+	<20110224155126.GA1466@S2100-06.ap.freescale.net>
+Message-ID: <20110224160300.GA1483@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 15 2011, Daniel Walker wrote:
-
-> Typically we include everything the SoC has regardless of if drivers use
-> the hardware or not . For instance there could be modules that use the
-> hardware ..
->
-> Regardless of this point, I've nacked the whole series. It looks like
-> there was very little thought put into this.
-
-I want to try to resolve this particular series.  I had originally
-pulled the series in because I thought everything had been addressed,
-you followed this with a generic NAK.
-
-You raised a couple of issues:
-
-  - Should this be configurable?  I responded that our iommu is
-    optional.  Drivers will work whether the iommu is enabled or not.
-    Other architectures have configurable iommu drivers (and some are
-    selected).  For example: arm/plat-s5p, powerpc/pasemi, as well x86.
-
-    One reason to disable may be for building a slimmed kernel for
-    kexec.
-
-  - Should the iommu driver be under arch/arm/mach-msm.  As discussed in
-    <https://lkml.org/lkml/2011/2/22/722>, iommu drivers fall into kind
-    of a grey area.  Currently, most platform iommu drivers are in arch
-    specific directories.
-
-  - The renaming of the device file.  At this point, the two MSM chips
-    that have an IOMMU have an identical IOMMU configuration.  The
-    patches reflect this by removing the soc name from the file.  Future
-    chips will probably have iommu hardware that differs, but it isn't
-    possible to predict what the differences will be, so that will have
-    to be addressed then.
-
-I can certainly back out the changes if necessary.  Please let me know
-if you have any specific concerns.
-
-David
+On Thu, Feb 24, 2011 at 11:51:28PM +0800, Shawn Guo wrote:
+> On Thu, Feb 24, 2011 at 04:18:05PM +0800, Shawn Guo wrote:
+> > Hi Wolfram,
+> > 
+> > On Wed, Feb 23, 2011 at 02:51:53PM +0100, Wolfram Sang wrote:
+> > > Take #3, changes:
+> > > 
+> > > * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
+> > > * remove unconditional BROKEN_CARD_DETECTION (leftover)
+> > > * improved kernel-doc about unused GPIO
+> > > * added tags from Eric
+> > > 
+> > > Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
+> > > chance to retest on mx51? What about the FSL guys? :)
+> > > 
+> > I'm testing it on mx25 3ds and mx51 babbage. Both card-detect and
+> > write-protect are working on mx25 3ds, but write-protect has some
+> > problem on babbage, and I need some time to figure it out.
+> > 
+> I just figured out why wp_gpio does not work on mx51.
+> 
+> +       if (cpu_is_mx25() || cpu_is_mx35()) {
+> +               /* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
+>                 host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
+> +               /* write_protect can't be routed to controller, use gpio */
+> +               sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
+> +       }
+> 
+> Would it make sense to do the same for mx51?  On babbage board,
+> SD1_WP is routed to controller, but SD2_WP is not, so we have to use
+> gpio for SD2 write_protect.
+> 
+We should probably have esdhc_pltfm_get_ro whenever platform provides
+a wp_gpio, and fall on controller SD_WP only when platform does not
+provide the wp_gpio.
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Shawn
