@@ -1,31 +1,50 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 Feb 2011 02:06:05 -0700 (MST)
-Subject: [PATCH 7/8] OMAP2+: hwmod: add ability to late-init individual
-	hwmods
-In-Reply-To: <20110223191212.GA15225@atomide.com>
+Date: Thu, 24 Feb 2011 02:16:57 -0700 (MST)
+Subject: [PATCH 4/8] OMAP2+: hwmod: find MPU initiator hwmod during in
+	_register()
+In-Reply-To: <4D651BDC.8040700@ti.com>
 References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<20110223071152.5874.54222.stgit@twilight.localdomain>
-	<20110223191212.GA15225@atomide.com>
-Message-ID: <alpine.DEB.2.00.1102240204190.6198@utopia.booyaka.com>
+	<20110223071146.5874.15334.stgit@twilight.localdomain>
+	<4D651BDC.8040700@ti.com>
+Message-ID: <alpine.DEB.2.00.1102240208160.6198@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Feb 2011, Tony Lindgren wrote:
+Hello Beno?t,
 
-> * Paul Walmsley <paul@pwsan.com> [110222 23:11]:
-> > --- a/arch/arm/mach-omap2/omap_hwmod.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> > +int __init omap_hwmod_late_init_one(const char *oh_name)
+On Wed, 23 Feb 2011, Cousson, Benoit wrote:
+> On 2/23/2011 8:11 AM, Paul Walmsley wrote:
+> > +	/*
+> > +	 * XXX Rather than doing a strcmp(), this should test a flag
+> > +	 * set in the hwmod data, inserted by the autogenerator code.
 > 
-> How about the following naming changes to avoid confusion:
+> What do you mean exactly? Something like a "is_mpu" field set to true 
+> for the mpu? Since we are enforcing a consistent naming for every 
+> hwmods, that looks like a duplication of the name. We will always named 
+> this hwmod "mpu", so the strcmp() should be enough.
 > 
-> omap_hwmod_init			-> omap_hwmod_register
-> omap_hwmod_late_init		-> omap_hwmod_init
-> omap_hwmod_late_init_one	-> omap_hwmod_init_one
-> 
-> This is because "late_init" gets actually called very early
-> during the boot.
+> But, maybe I'm missing your point.
 
-Sounds good to me.  Will write a patch to make this change,
+I had in mind adding a new flag bit for struct omap_hwmod.flags for this 
+purpose, mostly for these reasons:
+
+1. Russell indicated a preference to avoid strcmp() for this type of
+   situation during the clock code merge a few years ago
+
+2. Testing a single bit is much more efficient than calling strcmp(), 
+   which will hopefully make life a little easier when running on an 
+   FPGA emulator
+
+A separate field would of course work as well, but seems more heavyweight 
+if there's only one special case.
+
+> > +	 */
+> > +	if (!strcmp(oh->name, MPU_INITIATOR_NAME))
+> > +		mpu_oh = oh;
+> > 
+> > -	return ret;
+> > +	return 0;
+> >   }
+
 
 - Paul
