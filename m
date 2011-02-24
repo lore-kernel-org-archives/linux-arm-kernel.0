@@ -1,29 +1,38 @@
-From: samreen@ti.com (Nilofer, Samreen)
-Date: Thu, 24 Feb 2011 09:52:28 +0530
-Subject: [PATCH] OMAP2/3/4: DSS2: Enable Display SubSystem as modules
-In-Reply-To: <1298468006.18466.37.camel@deskari>
-References: <1298463753-24880-1-git-send-email-samreen@ti.com>
-	<1298468006.18466.37.camel@deskari>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370563B3A@dbde02.ent.ti.com>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Thu, 24 Feb 2011 14:16:55 +0800
+Subject: [PATCH v2 5/5] mmc: sdhci-esdhc: enable esdhc on imx53
+In-Reply-To: <20110222155130.GJ2755@pengutronix.de>
+References: <1298369606-29972-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1298369606-29972-5-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110222113222.GE2755@pengutronix.de>
+	<AANLkTimbx6=YvRHFuVkmPVYvYtwME31PxXWNHNfFsVRQ@mail.gmail.com>
+	<20110222155130.GJ2755@pengutronix.de>
+Message-ID: <20110224061653.GA3657@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-Valkeinen, Tomi wrote:
-> Hi,
+Hi Wolfram,
+
+On Tue, Feb 22, 2011 at 04:51:30PM +0100, Wolfram Sang wrote:
 > 
-> On Wed, 2011-02-23 at 06:22 -0600, Nilofer, Samreen wrote:
->> Enabling Display options to be built as modules Also, the generic dpi,
->> sharp & nec panels are also enabled as modules.
+> > > Thanks for respinning \o/ This approach looks better to me, but CCing
+> > > Olof to comment on abstraction issues if he has them. Will do a deeper
+> > > review later this week.
+> > 
+> > 
+> > I like it! Definitely the right approach. Pushing quirks down into the
+> > I/O accessors is definitely the only scalable way to handle all the
+> > various buggy controllers out there.
+> > 
+> > Acked-by: Olof Johansson <olof@lixom.net>
 > 
-> I've just posted a patch which fixes the problem with the
-> regulators in DSS. With that patch we can safely enable all DSS interfaces
-> (and thus panels) and the resulting binary will work on all boards.
+> Glad to hear that. I do have a few issues though, will report them later
+> as mentioned before, it needs a bit of time.
+What issues on what SoC/board did you find? Maybe we can help debug?
+
+Thanks
+Richard
 > 
-> So can you make one more version which enables all the
-> interfaces and panels as modules, based on
-> git://gitorious.org/linux-omap-dss2/linux.git master
-> 
-[samreen]
-Sure. Will post out the next version soon.
->  Tomi
+> -- 
+> Pengutronix e.K.                           | Wolfram Sang                |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
