@@ -1,101 +1,49 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 24 Feb 2011 13:59:01 +0530
-Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
-	hwmodright before timer init
-In-Reply-To: <alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<20110223071153.5874.58923.stgit@twilight.localdomain>
-	<581270b49665fcf8227a96065dbbc584@mail.gmail.com>
-	<alpine.DEB.2.00.1102240109500.6198@utopia.booyaka.com>
-	<alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037A0958B7@dbde02.ent.ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 24 Feb 2011 10:31:52 +0200
+Subject: [PATCH v6] OMAP2/3/4: DSS2: Enable Display SubSystem as modules
+In-Reply-To: <1298528800-7399-1-git-send-email-samreen@ti.com>
+References: <1298528800-7399-1-git-send-email-samreen@ti.com>
+Message-ID: <1298536312.16119.23.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> Sent: Thursday, February 24, 2011 1:45 PM
-> To: Shilimkar, Santosh
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Tony
-> Lindgren; Hilman, Kevin; Cousson, Benoit
-> Subject: RE: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
-> hwmodright before timer init
+On Thu, 2011-02-24 at 00:26 -0600, Nilofer, Samreen wrote:
+> Enabling all the display interface options to be built as module
+> And enabling all the display panels to be built as modules.
 > 
-> Hello Santosh,
+> Signed-off-by: Samreen <samreen@ti.com>
+
+This looks good to me.
+
+Tony, want to ack this? This enables all DSS features as modules. This
+should go through dss tree, as this doesn't work without a fix that is
+there.
+
+ Tomi
+
+
+>  arch/arm/configs/omap2plus_defconfig |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
 > 
-> On Thu, 24 Feb 2011, Paul Walmsley wrote:
-> 
-> > I propose the following change instead - please let me know what you
-> > think.
-> 
-> Oops - the patch I sent you was not completely refreshed in the local
-> tree.  Here is the correct one.
-I have tested on OMAP3 and works fine.
-On OMAP2, I guess there is different issue for which it does not work.
---
-Tarun
-> 
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Wed, 23 Feb 2011 00:14:08 -0700
-> Subject: [PATCH] OMAP2+: clockevent: late-init GPTIMER clockevent hwmod
-> right before timer init
-> 
-> Late-initialize the GPTIMER hwmod used for the clockevent source
-> immediately
-> before it is used.  This avoids the need to late-initialize all of the
-> hwmods
-> until the boot process is further along.  (In general, we want to defer
-> as much as possible until late in the boot process.)
-> 
-> This second version fixes a bug pointed out by Santosh Shilimkar
-> <santosh.shilimkar@ti.com>, that would cause the kernel to use an
-> incorrect timer hwmod name if the selected GPTIMER was not 1 or 12 -
-> thanks Santosh.  Also, Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> pointed out that the original patch did not apply cleanly; this has
-> now been fixed.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Beno?t Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> ---
->  arch/arm/mach-omap2/timer-gp.c |    7 ++++++-
->  1 files changed, 6 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-
-> gp.c
-> index 7b7c268..b289d53 100644
-> --- a/arch/arm/mach-omap2/timer-gp.c
-> +++ b/arch/arm/mach-omap2/timer-gp.c
-> @@ -39,10 +39,11 @@
->  #include <asm/mach/time.h>
->  #include <plat/dmtimer.h>
->  #include <asm/localtimer.h>
-> +#include <plat/common.h>
-> +#include <plat/omap_hwmod.h>
-> 
->  #include "timer-gp.h"
-> 
-> -#include <plat/common.h>
-> 
->  /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
->  #define MAX_GPTIMER_ID		12
-> @@ -132,9 +133,13 @@ static void __init omap2_gp_clockevent_init(void)
->  {
->  	u32 tick_rate;
->  	int src;
-> +	char clockevent_hwmod_name[8]; /* 8 = sizeof("timerXX0") */
-> 
->  	inited = 1;
-> 
-> +	sprintf(clockevent_hwmod_name, "timer%d", gptimer_id);
-> +	omap_hwmod_late_init_one(clockevent_hwmod_name);
-> +
->  	gptimer = omap_dm_timer_request_specific(gptimer_id);
->  	BUG_ON(gptimer == NULL);
->  	gptimer_wakeup = gptimer;
-> --
-> 1.7.2.3
+> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+> index ae890ca..407ccf8 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -192,6 +192,17 @@ CONFIG_FIRMWARE_EDID=y
+>  CONFIG_FB_MODE_HELPERS=y
+>  CONFIG_FB_TILEBLITTING=y
+>  CONFIG_FB_OMAP_LCD_VGA=y
+> +CONFIG_OMAP2_DSS=m
+> +CONFIG_OMAP2_DSS_RFBI=y
+> +CONFIG_OMAP2_DSS_SDI=y
+> +CONFIG_OMAP2_DSS_DSI=y
+> +CONFIG_FB_OMAP2=m
+> +CONFIG_PANEL_GENERIC_DPI=m
+> +CONFIG_PANEL_SHARP_LS037V7DW01=m
+> +CONFIG_PANEL_NEC_NL8048HL11_01B=m
+> +CONFIG_PANEL_TAAL=m
+> +CONFIG_PANEL_TPO_TD043MTEA1=m
+> +CONFIG_PANEL_ACX565AKM=m
+>  CONFIG_BACKLIGHT_LCD_SUPPORT=y
+>  CONFIG_LCD_CLASS_DEVICE=y
+>  CONFIG_LCD_PLATFORM=y
