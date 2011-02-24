@@ -1,33 +1,29 @@
 From: kheitke@codeaurora.org (Kenneth Heitke)
-Date: Thu, 24 Feb 2011 15:19:12 -0700
-Subject: [PATCH v2 0/2] msm: add single-wire serial bus interface (SSBI) driver
-Message-ID: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
+Date: Thu, 24 Feb 2011 15:19:13 -0700
+Subject: [PATCH v2 1/2] MAINTAINERS: Add drivers/msm to MSM subsystem
+In-Reply-To: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
+References: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
+Message-ID: <1298585954-22422-2-git-send-email-kheitke@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches replace the previous patch by moving the SSBI driver from
-the arch/arm/mach-msm directory to drivers/msm.
+Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
+---
+ MAINTAINERS |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-The MAINTAINERS file is being updated to add the appropriate maintainer
-for drivers/msm.
-
-Kenneth Heitke (2):
-  MAINTAINERS: Add drivers/msm to MSM subsystem
-  msm: add single-wire serial bus interface (SSBI) driver
-
- MAINTAINERS              |    1 +
- drivers/Kconfig          |    2 +
- drivers/Makefile         |    1 +
- drivers/msm/Kconfig      |   13 ++
- drivers/msm/Makefile     |    4 +
- drivers/msm/ssbi.c       |  376 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/msm_ssbi.h |   49 ++++++
- 7 files changed, 446 insertions(+), 0 deletions(-)
- create mode 100644 drivers/msm/Kconfig
- create mode 100644 drivers/msm/Makefile
- create mode 100644 drivers/msm/ssbi.c
- create mode 100644 include/linux/msm_ssbi.h
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6f99e12..e2ca70b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -889,6 +889,7 @@ M:	Daniel Walker <dwalker@fifo99.com>
+ M:	Bryan Huntsman <bryanh@codeaurora.org>
+ L:	linux-arm-msm at vger.kernel.org
+ F:	arch/arm/mach-msm/
++F:	drivers/msm/
+ F:	drivers/video/msm/
+ F:	drivers/mmc/host/msm_sdcc.c
+ F:	drivers/mmc/host/msm_sdcc.h
 -- 
 1.7.3.3
 
