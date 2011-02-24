@@ -1,115 +1,55 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 24 Feb 2011 16:57:54 +0530
-Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
-In-Reply-To: <886E26C48DE446C3937D89ECF86030B2@subhasishg>
-References: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BE49175@dbde02.ent.ti.com>
-	<886E26C48DE446C3937D89ECF86030B2@subhasishg>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 24 Feb 2011 13:29:13 +0200
+Subject: [PATCH v3 2/2] OMAP: IOMMU: add support to callback during
+	fault handling
+In-Reply-To: <AANLkTinh_a81sELdF19ob0A0KbLR+9MUnb0+283NxO2b@mail.gmail.com>
+References: <1297884951-3019-1-git-send-email-dacohen@gmail.com>
+	<1297884951-3019-3-git-send-email-dacohen@gmail.com>
+	<AANLkTikZu+pqwpPXExFirPouN+1i3Yp0QHfomHN4decx@mail.gmail.com>
+	<AANLkTi=C01Yf9rQN1uxMptFyOrwqxJWt+quJ8ipiM+k6@mail.gmail.com>
+	<AANLkTi=s-p3OQfzor27sf-qqqNxipSrOAEQtPQEGaO=L@mail.gmail.com>
+	<4D656961.7080105@maxwell.research.nokia.com>
+	<20110224083518.GC3528@legolas.emea.dhcp.ti.com>
+	<AANLkTinh_a81sELdF19ob0A0KbLR+9MUnb0+283NxO2b@mail.gmail.com>
+Message-ID: <20110224112912.GQ3528@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subhasish,
-
-On Thu, Feb 24, 2011 at 15:54:56, Subhasish Ghosh wrote:
-> --------------------------------------------------
-> From: "Nori, Sekhar" <nsekhar@ti.com>
-> Sent: Wednesday, February 23, 2011 9:00 PM
-> To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>; 
-> <davinci-linux-open-source@linux.davincidsp.com>
-> Cc: <linux-arm-kernel@lists.infradead.org>; "Watkins, Melissa" 
-> <m-watkins@ti.com>; <sachi@mistralsolutions.com>; "Kevin Hilman" 
-> <khilman@deeprootsystems.com>; "Russell King" <linux@arm.linux.org.uk>; 
-> "Michael Williamson" <michael.williamson@criticallink.com>; "Chemparathy, 
-> Cyril" <cyril@ti.com>; "Sergei Shtylyov" <sshtylyov@ru.mvista.com>; "open 
-> list" <linux-kernel@vger.kernel.org>
-> Subject: RE: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
+On Thu, Feb 24, 2011 at 01:26:05PM +0200, David Cohen wrote:
+> On Thu, Feb 24, 2011 at 10:35 AM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Wed, Feb 23, 2011 at 10:09:05PM +0200, Sakari Ailus wrote:
+> >> > In OMAP4 the cortex M3 is a double core processor and as each core is
+> >> > running they own version of the RTOS we threat them independently. So
+> >> > our driver which controls the remote processor sees two processor but
+> >> > both use the same iommu hw. When a iommu fault happens, at this
+> >> > moment, it is consider as a faltal error and it is no managed to
+> >> > recover and continue, instead a restart of the processor is needed, if
+> >> > the fault happens in core0 we need to reset core1 too and vice versa.
+> >> > if the iommu would support several user callbacks, we can register the
+> >> > callback which resets core0 and also the callback which resets core1
+> >> > and treat them as totally independent processors. Also we have an
+> >> > error event notifier driver, which is only in charge of notifying
+> >> > error events to userspace, so we would have multiple callbacks we
+> >> > could do this
+> >>
+> >> The original purpose of the patch, as far as I understand, is to allow
+> >> getting useful information for debugging purposes should an iommu fault
+> >> happen.
+> >>
+> >> Also, I'm not sure it's necessarily a good idea to just go and reset
+> >> the M3 cores in case an iommu fault happens --- this is very probably a
+> >> grave bug in the software running on those M3s. It should be fixed
+> >> instead of just hiding it. There will be consequences to host side as
+> >
+> > I have to agree here. Besides the fact that multiple callbacks is
+> > outside the scope of this patch.
 > 
-> > Hi Subhasish,
-> >
-> > On Fri, Feb 11, 2011 at 19:51:28, Subhasish Ghosh wrote:
-> >> This patch modifies the sram allocator to allocate memory
-> >> from the DA8XX shared RAM.
-> >
-> > It will be nice to know if you tried suspend-to-RAM
-> > after this change and found it to be working.
-> >
-> 
-> SG -- My file system is currently mounted from MMC.
->           Suspend to RAM seems to have bug with MMC.
->            (http://processors.wiki.ti.com/index.php/OMAP-L1_Linux_Drivers_Usage#Suspend-to-RAM)
+> This patch is already acked. What about leave it as it is and discuss
+> multiple callbacks before release a new patch to support it?
 
-You can try Kevin's suggestion here:
+fine by me ;-)
 
-http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2011-January/021807.html
-
->           I had tried NFS earlier, but I think there is some problem with 
-> NFS boot and udev with this kernel.
-
-Anyway there are some problems reported with Ethernet
-driver and suspend on the latest kernel. Folks inside
-TI are working on it.
-
->            So, currently I will not be able to do it, but will try if I get 
-> a chance.
-
-How about using ramdisk?
-
-Thanks,
-Sekhar
-
-> > Thanks,
-> > Sekhar
-> >
-> >>
-> >> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
-> >> ---
-> >>  arch/arm/mach-davinci/da850.c              |    6 +++---
-> >>  arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
-> >>  2 files changed, 4 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-davinci/da850.c 
-> >> b/arch/arm/mach-davinci/da850.c
-> >> index 3443d97..8a4de97 100644
-> >> --- a/arch/arm/mach-davinci/da850.c
-> >> +++ b/arch/arm/mach-davinci/da850.c
-> >> @@ -711,7 +711,7 @@ static struct map_desc da850_io_desc[] = {
-> >>  },
-> >>  {
-> >>  .virtual = SRAM_VIRT,
-> >> - .pfn = __phys_to_pfn(DA8XX_ARM_RAM_BASE),
-> >> + .pfn = __phys_to_pfn(DA8XX_SHARED_RAM_BASE),
-> >>  .length = SZ_8K,
-> >>  .type = MT_DEVICE
-> >>  },
-> >> @@ -1083,8 +1083,8 @@ static struct davinci_soc_info 
-> >> davinci_soc_info_da850 = {
-> >>  .gpio_irq = IRQ_DA8XX_GPIO0,
-> >>  .serial_dev = &da8xx_serial_device,
-> >>  .emac_pdata = &da8xx_emac_pdata,
-> >> - .sram_dma = DA8XX_ARM_RAM_BASE,
-> >> - .sram_len = SZ_8K,
-> >> + .sram_dma = DA8XX_SHARED_RAM_BASE,
-> >> + .sram_len = SZ_128K,
-> >>  .reset_device = &da8xx_wdt_device,
-> >>  };
-> >>
-> >> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h 
-> >> b/arch/arm/mach-davinci/include/mach/da8xx.h
-> >> index cfcb223..c3c3339 100644
-> >> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
-> >> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-> >> @@ -70,6 +70,7 @@ extern unsigned int da850_max_speed;
-> >>  #define DA8XX_AEMIF_CTL_BASE 0x68000000
-> >>  #define DA8XX_DDR2_CTL_BASE 0xb0000000
-> >>  #define DA8XX_ARM_RAM_BASE 0xffff0000
-> >> +#define DA8XX_SHARED_RAM_BASE 0x80000000
-> >>
-> >>  void __init da830_init(void);
-> >>  void __init da850_init(void);
-> >> -- 
-> >> 1.7.2.3
-> >>
-> >>
-> > 
-> 
+-- 
+balbi
