@@ -1,30 +1,50 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 24 Feb 2011 12:40:10 +0100
-Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection and
-	card detection
-In-Reply-To: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-	(Wolfram Sang's message of "Wed, 23 Feb 2011 14:51:53 +0100")
-References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <87k4gp3bl1.fsf@lebrac.rtp-net.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 24 Feb 2011 17:27:52 +0530
+Subject: [PATCH 0/3] OMAP2+: voltage: first pass at cleanup/reorganization
+In-Reply-To: <20110221020231.7598.14024.stgit@twilight.localdomain>
+References: <20110221020231.7598.14024.stgit@twilight.localdomain>
+Message-ID: <553cd99ec29ee91e4a4b324d0f4a0be7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <w.sang@pengutronix.de> writes:
+Hi Paul,
 
-Hi,
-
-> Take #3, changes:
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org
+[mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf
+> Of Paul Walmsley
+> Sent: Monday, February 21, 2011 7:39 AM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: khilman at ti.com; nm at ti.com; b-cousson at ti.com; mturquette at ti.com
+> Subject: [PATCH 0/3] OMAP2+: voltage: first pass at
+cleanup/reorganization
 >
-> * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
-> * remove unconditional BROKEN_CARD_DETECTION (leftover)
-> * improved kernel-doc about unused GPIO
-> * added tags from Eric
+> Hello,
 >
-> Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
-> chance to retest on mx51? What about the FSL guys? :)
+> this patch set does an initial round of cleanup on the OMAP "voltage"
+code
+> in arch/arm/mach-omap2/voltage.c.  As part of this process, the header
+files
+> for the voltage code and SmartReflex are moved into arch/arm/mach-omap2,
+since
+> they are currently OMAP2+-specific.
+>
+> There is still quite a bit of cleanup left to do; hopefully someone else
+will
+> get to it before I do.  More details are in the last patch.
+>
+> This series was built-tested for an OSK5912-specific config,
+omap1_defconfig,
+> a N800-specific config, omap2plus_defconfig, an OMAP3-specific config,
+and
+> an OMAP4-specific config.  It was boot-tested on an OMAP35xx
+Beagleboard.
+> Further testing assistance is, of course, appreciated.
 
-I'm getting a hard freeze on my efika sb and mx once I remove the
-unconditional BROKEN_CARD_DETECTION flag. I'm still investigating the
-issue. I'll keep you informed if I find something.
+I found these abort on my 4430SDP. The below changes I found
+are needed for it to bootup..
+I tested the 'integration-2.6.39' branch of
+git://git.pwsan.com/linux-integration and the patch is
+based on this branch.
 
-Arnaud
+---
