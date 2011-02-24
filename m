@@ -1,50 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 Feb 2011 02:16:57 -0700 (MST)
-Subject: [PATCH 4/8] OMAP2+: hwmod: find MPU initiator hwmod during in
-	_register()
-In-Reply-To: <4D651BDC.8040700@ti.com>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<20110223071146.5874.15334.stgit@twilight.localdomain>
-	<4D651BDC.8040700@ti.com>
-Message-ID: <alpine.DEB.2.00.1102240208160.6198@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Feb 2011 10:24:01 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTimZDDo0xa2CzgHhH1LSWJ-KT0QgOmEAKs2nJK8x@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102231709.05036.arnd@arndb.de>
+	<AANLkTimZDDo0xa2CzgHhH1LSWJ-KT0QgOmEAKs2nJK8x@mail.gmail.com>
+Message-ID: <201102241024.01437.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Beno?t,
+On Wednesday 23 February 2011, Andrei Warkentin wrote:
 
-On Wed, 23 Feb 2011, Cousson, Benoit wrote:
-> On 2/23/2011 8:11 AM, Paul Walmsley wrote:
-> > +	/*
-> > +	 * XXX Rather than doing a strcmp(), this should test a flag
-> > +	 * set in the hwmod data, inserted by the autogenerator code.
-> 
-> What do you mean exactly? Something like a "is_mpu" field set to true 
-> for the mpu? Since we are enforcing a consistent naming for every 
-> hwmods, that looks like a duplication of the name. We will always named 
-> this hwmod "mpu", so the strcmp() should be enough.
-> 
-> But, maybe I'm missing your point.
+> I am more concerned with workarounds that depend on access size (like
+> the toshiba one) and that modify the MMC commands sent (using reliable
+> writes, like the Toshiba one, or putting parameters differently like
+> the Sandisk erase workaround). It's these kinds of workarounds that
+> the quirks framework is meant to address. I don't think it's a good
+> idea to pollute mmc_blk_issue_rw_rq and mmc_blk_issue_discard_rq with
+> if()-elsed workarounds, because it's going to quickly complicate the
+> logic, and get out of hand and unmanageable the more cards are added.
+> I'm trying to avoid having to make any changes to card/block.c as part
+> of making quirk workarounds. The only cost when compared to an if-else
+> will be one O(log n) quirk lookup, where n is either one or something
+> close that (since the search is only done for quirks per
+> mmc_blk_data), and one callback invoked after "brq.data.sg_len =
+> mmc_queue_map_sg(mq);" so it can patch up mrq as necessary.
 
-I had in mind adding a new flag bit for struct omap_hwmod.flags for this 
-purpose, mostly for these reasons:
+Unlike the sysfs interface, the code does not need to be future-proof,
+it can always be changed if we feel the code becomes more maintainable
+by doing it another way.
 
-1. Russell indicated a preference to avoid strcmp() for this type of
-   situation during the clock code merge a few years ago
+The approach that I'd like to see here is:
 
-2. Testing a single bit is much more efficient than calling strcmp(), 
-   which will hopefully make life a little easier when running on an 
-   FPGA emulator
+* Start out with an ad-hoc patch for a quirk (like the one you already
+  have).
+* Add a boolean variable to enable it per card.
+* Get performance data for this quirk to show that it's useful in
+  real-world workloads for some cards but counterproductive for others
+* Get the patch into the mmc tree.
+* Repeat for the next quirk
+* When the code becomes overly complicated after adding all the quirks,
+  decide on a good strategy to move the code around, and do a new patch.
 
-A separate field would of course work as well, but seems more heavyweight 
-if there's only one special case.
+I understand that you are convinced that you will need the indirect function
+calls in the end. That is fine, just don't add them before they are
+actually needed -- that would only make it harder for you to get the first
+patch included.
 
-> > +	 */
-> > +	if (!strcmp(oh->name, MPU_INITIATOR_NAME))
-> > +		mpu_oh = oh;
-> > 
-> > -	return ret;
-> > +	return 0;
-> >   }
+Note that the situation is very different for user interfaces such as sysfs:
+You need to plan ahead because once the interface is merged upstream, it
+can never be changed. When you submit a patch that introduces a new sysfs
+interface, it has to be documented, and you have to convince the reviewers
+that it is sufficient to cover all the cases it is designed for, while
+at the same time it is the most simple way to achieve this.
 
-
-- Paul
+	Arnd
