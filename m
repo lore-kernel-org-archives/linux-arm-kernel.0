@@ -1,35 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 Feb 2011 01:18:27 -0700 (MST)
-Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
-	hwmod right before timer init
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB037A095471@dbde02.ent.ti.com>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<20110223071153.5874.58923.stgit@twilight.localdomain>
-	<5A47E75E594F054BAF48C5E4FC4B92AB037A095471@dbde02.ent.ti.com>
-Message-ID: <alpine.DEB.2.00.1102240115300.6198@utopia.booyaka.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 24 Feb 2011 16:18:05 +0800
+Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
+	and card detection
+In-Reply-To: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
+References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20110224081803.GA29530@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tarun
+Hi Wolfram,
 
-On Wed, 23 Feb 2011, DebBarma, Tarun Kanti wrote:
+On Wed, Feb 23, 2011 at 02:51:53PM +0100, Wolfram Sang wrote:
+> Take #3, changes:
+> 
+> * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
+> * remove unconditional BROKEN_CARD_DETECTION (leftover)
+> * improved kernel-doc about unused GPIO
+> * added tags from Eric
+> 
+> Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
+> chance to retest on mx51? What about the FSL guys? :)
+> 
+I'm testing it on mx25 3ds and mx51 babbage. Both card-detect and
+write-protect are working on mx25 3ds, but write-protect has some
+problem on babbage, and I need some time to figure it out.
 
-> > -----Original Message-----
-> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > owner at vger.kernel.org] On Behalf Of Paul Walmsley
-> > Sent: Wednesday, February 23, 2011 12:42 PM
-> > To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Cc: Tony Lindgren; Hilman, Kevin; Shilimkar, Santosh; Cousson, Benoit
-> > Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
-> > hwmod right before timer init
-> I am not able to apply this patch.
-> Patch 1-7 applied successfully on top of:
-> 04aa67d  Merge branch 'for-tony' of git://gitorious.org/usb/usb into omap-for-linus
+Also it's not testable on mx35 3ds board, as these two "gpio" pins
+are routed to a MCU which needs the I2C access.  Do we have this
+support on mainline?
 
-Thanks, it seems that there was a stray header change left in my original 
-tree.  The updated version is here:
-
-   http://marc.info/?l=linux-omap&m=129853532211359&w=2
-
-
-- Paul
+-- 
+Regards,
+Shawn
