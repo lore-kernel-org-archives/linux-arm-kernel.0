@@ -1,31 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Feb 2011 07:41:09 -0800
-Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
-	hwmodright before timer init
-In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB037A0958B7@dbde02.ent.ti.com>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<20110223071153.5874.58923.stgit@twilight.localdomain>
-	<581270b49665fcf8227a96065dbbc584@mail.gmail.com>
-	<alpine.DEB.2.00.1102240109500.6198@utopia.booyaka.com>
-	<alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
-	<5A47E75E594F054BAF48C5E4FC4B92AB037A0958B7@dbde02.ent.ti.com>
-Message-ID: <20110224154108.GB20560@atomide.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 24 Feb 2011 16:42:08 +0100 (CET)
+Subject: [PATCH 5/5] ARM: msm: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <000401cbd42c$e9a957b0$bcfc0710$@deacon@arm.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
+	<1298302096-21275-6-git-send-email-will.deacon@arm.com>
+	<4D65A4BA.8030206@codeaurora.org>
+	<alpine.LFD.2.00.1102241338410.2701@localhost6.localdomain6>
+	<000401cbd42c$e9a957b0$bcfc0710$@deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1102241641400.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [110224 00:27]:
-> I have tested on OMAP3 and works fine.
-> On OMAP2, I guess there is different issue for which it does not work.
+On Thu, 24 Feb 2011, Will Deacon wrote:
+> > On Wed, 23 Feb 2011, Abhijeet Dharmapurikar wrote:
+> 
+> Something like this?
+> 
+> diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+> index 0de19ec..90a968f 100644
+> --- a/arch/arm/mach-msm/gpio-v2.c
+> +++ b/arch/arm/mach-msm/gpio-v2.c
+> @@ -310,6 +310,7 @@ static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
+>  static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  {
+>         unsigned long i;
+> +       struct irq_chip *chip = get_irq_desc_chip(desc);
+>  
+>         for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
+>              i < NR_GPIO_IRQS;
+> @@ -318,7 +319,7 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+>                         generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
+>                                                            i));
+>         }
+> -       desc->chip->ack(irq);
+> +       chip->irq_eoi(&desc->irq_data);
 
-That's because commit 15490ef8ff8fd22d677cb5d4f6a98e5a79118dba changed
-things to include CONFIG_CPU_32v6K. And this means that omap-for-linus
-won't boot on omap2 currently using omap2plus_defconfig. The master
-branch boots because of the patches in omap-testing.
+Yep. Thanks,
 
-To boot test omap-for-linus, you can temporarily merge in the
-omap-testing branch that has the pending patches from Russell to
-make non-6K ARMv6 processors work with CONFIG_CPU_32v6K.
-
-Regards,
-
-Tony
+     tglx
+> 
