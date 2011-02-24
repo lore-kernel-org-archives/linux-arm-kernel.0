@@ -1,24 +1,31 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Thu, 24 Feb 2011 16:26:34 +0100
-Subject: [PATCH] kbuild: reenable section mismatch analysis
-In-Reply-To: <1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110216200734.GA25184@merkur.ravnborg.org>
-	<1298062040-2774-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <4D6678AA.9000503@suse.cz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 24 Feb 2011 07:41:09 -0800
+Subject: [PATCH 8/8] OMAP2+: clockevent: late-init GPTIMER clockevent
+	hwmodright before timer init
+In-Reply-To: <5A47E75E594F054BAF48C5E4FC4B92AB037A0958B7@dbde02.ent.ti.com>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<20110223071153.5874.58923.stgit@twilight.localdomain>
+	<581270b49665fcf8227a96065dbbc584@mail.gmail.com>
+	<alpine.DEB.2.00.1102240109500.6198@utopia.booyaka.com>
+	<alpine.DEB.2.00.1102240114160.6198@utopia.booyaka.com>
+	<5A47E75E594F054BAF48C5E4FC4B92AB037A0958B7@dbde02.ent.ti.com>
+Message-ID: <20110224154108.GB20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.2.2011 21:47, Uwe Kleine-K?nig wrote:
-> This was disabled in commit
-> 
-> 	e5f95c8 (kbuild: print only total number of section mismatces found)
-> 
-> because there were too many warnings.  Now we're down to a reasonable
-> number again, so we start scaring people with the details.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [110224 00:27]:
+> I have tested on OMAP3 and works fine.
+> On OMAP2, I guess there is different issue for which it does not work.
 
-OK, applied to kbuild-2.6.git#kbuild.
+That's because commit 15490ef8ff8fd22d677cb5d4f6a98e5a79118dba changed
+things to include CONFIG_CPU_32v6K. And this means that omap-for-linus
+won't boot on omap2 currently using omap2plus_defconfig. The master
+branch boots because of the patches in omap-testing.
 
-Thanks,
-Michal
+To boot test omap-for-linus, you can temporarily merge in the
+omap-testing branch that has the pending patches from Russell to
+make non-6K ARMv6 processors work with CONFIG_CPU_32v6K.
+
+Regards,
+
+Tony
