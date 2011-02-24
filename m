@@ -1,46 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 24 Feb 2011 13:13:29 -0800
-Subject: [PATCH] OMAP2+: clocksource: fix crash on boot when
-	!CONFIG_OMAP_32K_TIMER
-In-Reply-To: <alpine.DEB.2.00.1102241330500.6198@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1102221958190.22636@utopia.booyaka.com>
-	<20110224202157.GG20560@atomide.com>
-	<alpine.DEB.2.00.1102241330500.6198@utopia.booyaka.com>
-Message-ID: <20110224211328.GK20560@atomide.com>
+Date: Thu, 24 Feb 2011 13:26:44 -0800
+Subject: [PATCH resend] omap: Fix linker error in
+	drivers/video/omap/lcd_2430sdp.c
+In-Reply-To: <1298232248-347-1-git-send-email-jhnikula@gmail.com>
+References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
+	<1298232248-347-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <20110224212644.GN20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110224 12:29]:
-> On Thu, 24 Feb 2011, Tony Lindgren wrote:
-> 
-> > * Paul Walmsley <paul@pwsan.com> [110222 18:58]:
-> > > 
-> > > OMAP2+ kernels built without CONFIG_OMAP_32K_TIMER crash on boot after the
-> > > 2.6.38 sched_clock changes:
-> > > 
-> > > [    0.000000] OMAP clockevent source: GPTIMER1 at 13000000 Hz
-> > > [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-> > > [    0.000000] pgd = c0004000
-> > > [    0.000000] [00000000] *pgd=00000000
-> > > [    0.000000] Internal error: Oops: 80000005 [#1] SMP
-> > > [    0.000000] last sysfs file:
-> > > [    0.000000] Modules linked in:
-> > > [    0.000000] CPU: 0    Not tainted  (2.6.38-rc5-00057-g04aa67d #152)
-> > > [    0.000000] PC is at 0x0
-> > > [    0.000000] LR is at sched_clock_poll+0x2c/0x3c
-> > > 
-> > > Without CONFIG_OMAP_32K_TIMER, the kernel has an clockevent and
-> > > clocksource resolution about three orders of magnitude higher than
-> > > with CONFIG_OMAP_32K_TIMER set.  The tradeoff is that the lowest
-> > > power consumption states are not available.
-> > > 
-> > > Fix by calling init_sched_clock() from the GPTIMER clocksource init code.
-> > 
-> > I'll queue this as a fix as it's a regression.
-> 
-> Sounds good, I've got one or two other -rc candidates.  Want me to build a 
-> branch with this and the other two?
+Hi,
 
-Well I already applied this one. But for the two others yes please.
+* Jarkko Nikula <jhnikula@gmail.com> [110220 12:13]:
+> There is a linker error from lcd_2430sdp.c if CONFIG_TWL4030_CORE is not
+> set. This can be triggered on OMAP2 builds where OMAP3 or OMAP4 are not set.
+> 
+> drivers/built-in.o: In function `sdp2430_panel_disable':
+> drivers/video/omap/lcd_2430sdp.c:123: undefined reference to `twl_i2c_write_u8'
+> drivers/video/omap/lcd_2430sdp.c:124: undefined reference to `twl_i2c_write_u8'
+> drivers/built-in.o: In function `sdp2430_panel_enable':
+> drivers/video/omap/lcd_2430sdp.c:110: undefined reference to `twl_i2c_write_u8'
+> drivers/video/omap/lcd_2430sdp.c:112: undefined reference to `twl_i2c_write_u8'
+> 
+> Fix this by adding TWL4030_CORE dependency to CONFIG_MACH_OMAP_2430SDP as
+> there is no own entry in drivers/video/omap/Kconfig.
+> 
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+> Resend = forgot to cc LAKML.
+> Quite old issue most probably. Can be triggered in mainline anyway.
+> ---
+>  arch/arm/mach-omap2/Kconfig |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index b9d8a7b..bfdf240 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -132,6 +132,7 @@ config MACH_OMAP_2430SDP
+>  	depends on SOC_OMAP2430
+>  	default y
+>  	select OMAP_PACKAGE_ZAC
+> +	select TWL4030_CORE
+>  
+>  config MACH_OMAP3_BEAGLE
+>  	bool "OMAP3 BEAGLE board"
+
+We should avoid selecting driver related things, otherwise we can never
+build a tiny kernel with initramfs with everything as modules.
+
+Can you see if adding depends to the LCD panel option does the trick
+instead?
+
+Thanks,
 
 Tony
