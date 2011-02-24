@@ -1,78 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Feb 2011 17:57:00 +0100
-Subject: mxs: name##_set_rate broken
-Message-ID: <20110224165700.GY22310@pengutronix.de>
+From: scottwood@freescale.com (Scott Wood)
+Date: Thu, 24 Feb 2011 11:08:04 -0600
+Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found on
+	the MPC85xx.
+In-Reply-To: <20110224163944.GA15234@riccoc20.at.omicron.at>
+References: <cover.1298447722.git.richard.cochran@omicron.at>
+	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
+	<20110223165058.GE14597@angua.secretlab.ca>
+	<20110223112612.30071995@schlenkerla>
+	<20110223175459.GH14597@angua.secretlab.ca>
+	<20110224163944.GA15234@riccoc20.at.omicron.at>
+Message-ID: <20110224110804.74b546c0@schlenkerla>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+On Thu, 24 Feb 2011 17:39:44 +0100
+Richard Cochran <richardcochran@gmail.com> wrote:
 
-for the lcdif clock get_rate looks as follows:
+> On Wed, Feb 23, 2011 at 10:54:59AM -0700, Grant Likely wrote:
+> > On Wed, Feb 23, 2011 at 11:26:12AM -0600, Scott Wood wrote:
+> 
+> > > The eTSEC revision is probeable as well, but due the way PTP is described as
+> > > a separate node, the driver doesn't have straightforward access to those
+> > > registers.
+> > 
+> > Ignorant question: Should the ptp be described as a separate node?
+> 
+> Well, the PTP Hardware Clock function is logically separate from the
+> MAC function.
 
-	read div from HW_CLKCTRL_DIS_LCDIF.DIV
-	return clk_get_rate(clk->parent) / div
+The eTSEC node doesn't describe the MAC function, it describes the whole
+device (or at least it should... we make an exception for MDIO, which
+should probably have been a subnode instead).
 
-with clk->parent being ref_pix_clk on our system.
+> PHCs can be implemented in the MAC, in the PHY, or in
+> between in an FPGA on MII bus.
+> 
+> If the PHC is in the MAC, then it might be wise to implement one
+> driver that offers both the MAC and the PHC.
+> 
+> In the case of gianfar, it is not really necessary to combine the PHC
+> into the gianfar driver, since the registers are pretty well
+> separated.
 
-ref_pix_clk's rate depends on HW_CLKCTRL_FRAC1.PIXFRAC.
+How the drivers are structured in Linux is a separate concern from how the
+devices are described in the device tree.  The tree is supposed to be an
+OS-independent representation of hardware.
 
-The set_rate function for lcdif does:
+If Linux has multiple drivers that correspond to portions of one node, a
+toplevel driver can register platform devices for the components, adding
+in any additional information like versioning that it gets from the
+toplevel registers.
 
-	parent_rate = clk_get_rate(clk->parent);
-	based on that calculate frac and div such that 
-	  parent_rate * 18 / frac / div is near the requested rate.
-        HW_CLKCTRL_FRAC1.PIXFRAC is updated with frac
-	HW_CLKCTRL_DIS_LCDIF.DIV is updated with div
-
-For this calculation to be correct the parent_rate needs to be
-initialized not with the clock rate of lcdif's parent (i.e. ref_pix) but
-that of its grandparent (i.e. ref_pix' parent == pll0_clk)
-
-I think the else branch to if (clk->parent == &ref_xtal_clk) of
-name##_set_rate is broken for all clocks, but Sascha and I didn't
-verified that.  Our local fix is:
-
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index febd787..7a26edd 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -295,11 +295,11 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 	unsigned long diff, parent_rate, calc_rate;			\
- 	int i;								\
- 									\
--	parent_rate = clk_get_rate(clk->parent);			\
- 	div_max = BM_CLKCTRL_##dr##_DIV >> BP_CLKCTRL_##dr##_DIV;	\
- 	bm_busy = BM_CLKCTRL_##dr##_BUSY;				\
- 									\
- 	if (clk->parent == &ref_xtal_clk) {				\
-+		parent_rate = clk_get_rate(clk->parent);		\
- 		div = DIV_ROUND_UP(parent_rate, rate);			\
- 		if (clk == &cpu_clk) {					\
- 			div_max = BM_CLKCTRL_CPU_DIV_XTAL >>		\
-@@ -309,6 +309,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
- 		if (div == 0 || div > div_max)				\
- 			return -EINVAL;					\
- 	} else {							\
-+		parent_rate = clk_get_rate(&pll0_clk);			\
- 		rate >>= PARENT_RATE_SHIFT;				\
- 		parent_rate >>= PARENT_RATE_SHIFT;			\
- 		diff = parent_rate;					\
-
-that seems to work.  (Actually using the grandparent instead of a hard
-coded &pll0_clk would be better.)
-
-Can you please have a look, too and maybe even come up with a better
-fix?
-
-IMHO it's time that Jeremy's clk patches get merged to resolve the
-uglinesses here.  (One thing that comes to mind is that the result of
-if (clk->parent == &ref_xtal_clk) doesn't change during runtime, so
-it would be better to use two different implementations.  (That
-statement still needs a careful verification though.))
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Scott
