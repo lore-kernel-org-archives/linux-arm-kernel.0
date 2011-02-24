@@ -1,33 +1,44 @@
-From: mnazarewicz@google.com (Michal Nazarewicz)
-Date: Thu, 24 Feb 2011 23:24:19 +0100
-Subject: [PATCH 1/2] lib: vsprintf: optimised put_dec() function
-In-Reply-To: <20110224141818.7fd0207f.akpm@linux-foundation.org>
-References: <a02a83033d5d61c5d78f110b44f24ae5cd94ab06.1298384703.git.mina86@mina86.com>
-	<20110224135101.9205d91e.akpm@linux-foundation.org>
-	<op.vrfg66mgvgw7ix@mnazarewicz-glaptop>
-	<20110224141818.7fd0207f.akpm@linux-foundation.org>
-Message-ID: <op.vrfhus0ivgw7ix@mnazarewicz-glaptop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 24 Feb 2011 18:08:31 -0500 (EST)
+Subject: [PATCH v2 1/2] MAINTAINERS: Add drivers/msm to MSM subsystem
+In-Reply-To: <1298585954-22422-2-git-send-email-kheitke@codeaurora.org>
+References: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
+	<1298585954-22422-2-git-send-email-kheitke@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1102241807540.31831@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> On Thu, 24 Feb 2011 22:52:42 +0100, Andrew Morton wrote:
->> > Also, the funky indenting to align on the "=" is atypical for kernel
->> > code and is inconsistent with the rest of vsprintf.c.  Just a single
->> > space, please.
+On Thu, 24 Feb 2011, Kenneth Heitke wrote:
 
-> On Thu, 24 Feb 2011 23:10:09 +0100 "Michal Nazarewicz" wrote:
->> Want me to resubmit with spaces fixed?
+> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
 
-On Thu, 24 Feb 2011 23:18:18 +0100, Andrew Morton wrote:
-> nah, we'll live.
->
-> I'd prefer that you find a workload where it actually matters :)
+Acked-by: Nicolas Pitre <nico@fluxnic.net>
 
-I'll try. :) Still have Contiguous Memory Allocator to work on. ;)
-Thanks!
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
-ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
+> ---
+>  MAINTAINERS |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 6f99e12..e2ca70b 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -889,6 +889,7 @@ M:	Daniel Walker <dwalker@fifo99.com>
+>  M:	Bryan Huntsman <bryanh@codeaurora.org>
+>  L:	linux-arm-msm at vger.kernel.org
+>  F:	arch/arm/mach-msm/
+> +F:	drivers/msm/
+>  F:	drivers/video/msm/
+>  F:	drivers/mmc/host/msm_sdcc.c
+>  F:	drivers/mmc/host/msm_sdcc.h
+> -- 
+> 1.7.3.3
+> 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
