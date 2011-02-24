@@ -1,73 +1,32 @@
-From: mnazarewicz@google.com (Michal Nazarewicz)
-Date: Thu, 24 Feb 2011 23:10:09 +0100
-Subject: [PATCH 1/2] lib: vsprintf: optimised put_dec() function
-In-Reply-To: <20110224135101.9205d91e.akpm@linux-foundation.org>
-References: <a02a83033d5d61c5d78f110b44f24ae5cd94ab06.1298384703.git.mina86@mina86.com>
-	<20110224135101.9205d91e.akpm@linux-foundation.org>
-Message-ID: <op.vrfg66mgvgw7ix@mnazarewicz-glaptop>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 24 Feb 2011 14:10:46 -0800
+Subject: [PATCH] MAINTAINERS: Update MSM maintainers
+In-Reply-To: <4D66CDD4.7080103@codeaurora.org>
+References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>
+	<1298420395.17118.6.camel@m0nster>
+	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
+	<4D657B69.4000107@codeaurora.org> <1298512932.17118.16.camel@m0nster>
+	<4D66CDD4.7080103@codeaurora.org>
+Message-ID: <AANLkTin8kQbCODofWv15P=UiFkh2RGAAAqMiF0MuHc9c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Feb 2011 22:51:01 +0100, Andrew Morton wrote:
-
->> Cc: linux-arm at lists.arm.linux.org.uk, Michal Nazarewicz  
->> <mina86@mina86.com>, "Douglas W. Jones" <jones@cs.uiowa.edu>, Denis  
->> Vlasenko <vda.linux@googlemail.com
+On Thu, Feb 24, 2011 at 1:29 PM, Bryan Huntsman <bryanh@codeaurora.org> wrote:
 >
-> linux-arm-kernel is for arm patches.  linux-kernel at vger.kernel.org
-> would be an appropriate cc for patches against lib/vsprintf.c.
+>        ?Please let the MSM developers take full
+> responsibility for the MSM architecture. ?That is, after all, what the
+> community typically asks from SOC vendors.
 
-Yes, I realised I forgot about LKML just after I submitted the patch.
-I included ARM because of the benchmark I did on ARM I mentioned.
+Actually, "the community" (not that there really is any such cohesive
+thing) generally asks that vendors be "involved". Not that vendors be
+"exclusively in control". There's a big difference.
 
-> On Tue, 22 Feb 2011 15:26:26 +0100 Michal Nazarewicz wrote:
->> The put_dec() and family of functions were based on a code
->> optimised for processors with 8-bit ALU but since we don't
->> need to limit ourselves to such small ALUs, the code was
->> optimised and used capacities of an 16-bit ALU anyway.
-[...]
+So what I personally find distasteful is how there's apparently some
+entity that argues that _others_ should be removed from the
+maintainership. Why would that be the case? This kind of exclusivity
+argument is bad. Maintainers can step down, but having others remove
+maintainership seems dubious at best.
 
-> I don't think this was worth optimising!  If any kernel workload is
-> calling sprintf("%d") with any frequency then something surely is
-> busted.
+So get your politics sorted out, guys.
 
->>  lib/vsprintf.c |  269  
->> ++++++++++++++++++++++++++++++++++++++------------------
->>  1 files changed, 185 insertions(+), 84 deletions(-)
-
-> Despite the code bloat, the patch somehow reduces the vsprintf.o
-> footprint by 150 bytes (1%).
->
-> I'm not really sure that we should apply this.  But given that the
-> existing code is an incomprehensible over-optimised mess I guess this
-> patch doesn't make things much worse.
->
-> However I think that a better approach would be to rip out the existing
-> stuff and go for some small, simple and slow thing.  Reduce the kernel
-> footprint and increase understandability and hence maintainability.
->
-> Unless I'm all wrong and you're aware of a workload which calls these
-> things with any frequency?
-
-Oh, no, I just felt like hacking this piece of code one evening. ;)
-I don't have any strong feelings about this patch so feel free to
-ignore it.  I just wanted decision to include it or not to include
-it be made by someone with experience rather than be a consequence
-of me forgetting about this patch.
-
-
->> +	r      = (q * (uint64_t)0xcccd) >> 19;
->> +	*buf++ = (q - 10 * r) + '0';
-
-On Thu, 24 Feb 2011 22:52:42 +0100, Andrew Morton wrote:
-> Also, the funky indenting to align on the "=" is atypical for kernel
-> code and is inconsistent with the rest of vsprintf.c.  Just a single
-> space, please.
-
-Want me to resubmit with spaces fixed?
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
-ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
+                               Linus
