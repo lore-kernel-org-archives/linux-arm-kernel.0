@@ -1,38 +1,45 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Wed, 23 Feb 2011 18:02:12 -0800
-Subject: [PATCH] MAINTAINERS: Update MSM maintainers
-In-Reply-To: <4D657B69.4000107@codeaurora.org>
-References: <1298419415-3973-1-git-send-email-davidb@codeaurora.org>
-	<1298420395.17118.6.camel@m0nster>
-	<AANLkTikuaOL7mdARoNtx2ZJGJm6FBrqizrit6_uSaUte@mail.gmail.com>
-	<4D657B69.4000107@codeaurora.org>
-Message-ID: <1298512932.17118.16.camel@m0nster>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Wed, 23 Feb 2011 19:58:39 -0800
+Subject: Compilation error in ARM NOMMU kernel due to fixup_smp change
+Message-ID: <4D65D76F.4000006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-02-23 at 13:26 -0800, Bryan Huntsman wrote:
-> On 02/22/2011 05:12 PM, Linus Torvalds wrote:
-> > On Tue, Feb 22, 2011 at 4:19 PM, Daniel Walker <dwalker@fifo99.com> wrote:
-> >> On Tue, 2011-02-22 at 16:03 -0800, David Brown wrote:
-> >>> Remove Bryan Huntsman and Daniel Walker from the MSM maintainer list.
-> >>>
-> >>
-> >> No.. I don't sign off on this.. Please ignore this Linus.
-> > 
-> > Guys, you need to sort out your differences here..
-> > 
-> >                         Linus
-> 
-> Daniel, let's do what Linus is asking and figure this out.  What is your
-> intention here?  Going forward, David Brown is in the best position to
-> handle MSM maintenance since he has direct access to all past, current,
-> and future MSM devices as well as all the HW and SW experts at Qualcomm.
-> In that spirit, I think it's entirely appropriate for both you and I to
-> step back and let David handle this role so that there is one consistent
-> and clear voice for MSM.
+Hi Russell,
 
-There's nothing really to figure out. I don't feel like you and David
-can do the job alone. My intentions are just to make sure that you don't
-mess with my targets, and that you do the right thing by the community.
+I am seeing the following compilation error in arch/arm/kernek/module.c 
+when trying to compile an ARM NOMMU kernel (using Linus's tree as of an 
+hour ago):
 
-Daniel
+arch/arm/kernel/built-in.o: In function `module_finalize':
+~/linux-2.6/arch/arm/kernel/module.c:337: undefined reference to `fixup_smp'
+make: *** [.tmp_vmlinux1] Error 1
+
+It looks like you have added fixup_smp to head.S but not to 
+head-nommu.S, which is what gets used when building a NOMMU kernel. I 
+have tried to find the original thread for that patch, but I was not 
+able to find it, so I am just sending it here. I believe this was 
+introduced by the commit below:
+
+commit 4a9cb360197684a861bc06f06d33d5fcc8ffcbf5
+Author: Russell King <rmk+kernel@arm.linux.org.uk>
+Date:   Thu Feb 10 15:25:18 2011 +0000
+
+     ARM: fixup SMP alternatives in modules
+
+     With certain configurations, we inline the unlock functions in modules,
+     which results in SMP alternatives being created in modules.  We need to
+     fix those up when loading a module to prevent undefined instruction
+     faults.
+
+     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+I am not sure how you would want to go about fixing this (put the proper 
+things into head-nommu.S, or just wrap the offending code in #ifdef 
+CONFIG_MMU), but I thought I would bring this to your attention.
+
+Thanks
+Steve
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
