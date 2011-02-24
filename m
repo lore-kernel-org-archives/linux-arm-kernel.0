@@ -1,43 +1,38 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 24 Feb 2011 22:32:06 +0300
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 24 Feb 2011 11:44:05 -0800
 Subject: [PATCH 4/4] msm: scm: Get cacheline size from CTR
-In-Reply-To: <1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
+In-Reply-To: <alpine.LFD.2.00.1102241959290.2701@localhost6.localdomain6>
 References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
 	<1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4D66B236.4030003@ru.mvista.com>
+	<alpine.LFD.2.00.1102241959290.2701@localhost6.localdomain6>
+Message-ID: <4D66B505.6010702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 02/24/2011 11:01 AM, Thomas Gleixner wrote:
+> On Thu, 24 Feb 2011, Stephen Boyd wrote:
+>
+>>
+>>  /**
+>>   * scm_call() - Send an SCM command
+>>   * @svc_id: service identifier
+>> @@ -243,11 +248,13 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
+>>  	do {
+>>  		u32 start = (u32)rsp;
+>>  		u32 end = (u32)scm_get_response_buffer(rsp) + resp_len;
+>> -		start &= ~(CACHELINESIZE - 1);
+>> +		u32 cacheline_size = dcache_line_size();
+>
+> And why do you want to do that on every scm_call() invocation and on
+> every loop of that code? If your dcache_line_size() changes at
+> runtime, then you might have other problems.
 
-Stephen Boyd wrote:
+I definitely don't want to do it for every loop. I'm fine with getting
+it every scm_call() invocation though.
 
-> Instead of hardcoding the cacheline size as 32, get the cacheline
-> size from the CTR register.
+For now, I'll pull the end and cacheline_size variables out of the
+do-while loop.
 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-msm/scm.c |   17 ++++++++++++-----
->  1 files changed, 12 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-> index cfa808d..0528c71 100644
-> --- a/arch/arm/mach-msm/scm.c
-> +++ b/arch/arm/mach-msm/scm.c
-[...]
-> @@ -207,6 +204,14 @@ static int __scm_call(const struct scm_command *cmd)
->  	return ret;
->  }
->  
-> +static inline u32 dcache_line_size(void)
-> +{
-> +	u32 ctr;
-> +
-> +	asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
-> +	return 4 << ((ctr >> 16) & 0xf);
-> +}
-
-    Won't generic cache_line_size() macro do instead? It's defined as 
-L1_CACHE_BYTES.
-
-WBR, Sergei
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
