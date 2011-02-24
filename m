@@ -1,63 +1,41 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 23 Feb 2011 16:06:32 -0800
-Subject: [PATCH V5 Resend] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <1298276455-23989-1-git-send-email-pratyush.anand@st.com>
-References: <1298276455-23989-1-git-send-email-pratyush.anand@st.com>
-Message-ID: <20110223160632.0b21c550.akpm@linux-foundation.org>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Wed, 23 Feb 2011 16:22:18 -0800
+Subject: [PATCH 5/5] ARM: msm: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <1298302096-21275-6-git-send-email-will.deacon@arm.com>
+References: <1298302096-21275-1-git-send-email-will.deacon@arm.com>
+	<1298302096-21275-6-git-send-email-will.deacon@arm.com>
+Message-ID: <4D65A4BA.8030206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Feb 2011 13:50:55 +0530
-Pratyush Anand <pratyush.anand@st.com> wrote:
-
-> This is a configurable gadget. can be configured by configfs interface. Any
-> IP available at PCIE bus can be programmed to be used by host
-> controller.It supoorts both INTX and MSI.
-> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
-> with size 0x1000
+Will Deacon wrote:
+> The chained GPIO IRQ handler on MSM8x60 calls ->ack on the parent chip
+> after handling the interrupt.
 > 
-> Changes since V4:
-> - All documentation related comments incorporated
+> This patch updates the code to use ->irq_eoi now that the GIC has moved
+> to using the fasteoi flow model.
 > 
-> Changes since V3:
-> - support for multiple instances of such device
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mach-msm/gpio-v2.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/gpio-v2.c b/arch/arm/mach-msm/gpio-v2.c
+> index 0de19ec..04fb411 100644
+> --- a/arch/arm/mach-msm/gpio-v2.c
+> +++ b/arch/arm/mach-msm/gpio-v2.c
+> @@ -318,7 +318,7 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
+>  			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
+>  							   i));
+>  	}
+> -	desc->chip->ack(irq);
+> +	desc->chip->irq_eoi(irq);
 
-^^ This doesn't seem to agree with the documentation.
+should be dec->chip->irq_eoi(&desc->irq_data);
 
-> ...
->
-> --- /dev/null
-> +++ b/Documentation/ABI/testing/configfs-spear-pcie-gadget
-> @@ -0,0 +1,30 @@
-> +What:		/config/pcie-gadget
-> +Date:		Feb 2011
-> +KernelVersion:	2.6.37
-> +Contact:	Pratyush Anand <pratyush.anand@st.com>
-> +Description:
-> +
-> +	Interface is used to configure selected dual mode PCIe controller
-> +	as device and then program its various registers to configure it
-> +	as a particular device type.
-> +	This interfaces can be used to show spear's PCIe device capability.
-> +
-> +	Nodes are only visible when configfs is mounted. To mount configfs
-> +	in /config directory use:
-> +	# mount -t configfs none /config/
-> +
-> +	/config/pcie-gadget/
-> +		link ... used to enable ltssm and read its status.
-> +		int_type ...used to configure and read type of supported
-> +			interrupt
-> +		no_of_msi ... used to configure number of MSI vector needed and
-> +			to read no of MSI granted.
-> +		inta ... write 1 to assert INTA and 0 to de-assert.
-> +		send_msi ... write MSI vector to be sent.
-> +		vendor_id ... used to write and read vendor id (hex)
-> +		device_id ... used to write and read device id (hex)
-> +		bar0_size ... used to write and read bar0_size
-> +		bar0_address ... used to write and read bar0 mapped area in hex.
-> +		bar0_rw_offset ... used to write and read offset of bar0 where
-> +			bar0_data will be written or read.
-> +		bar0_data ... used to write and read data at bar0_rw_offset.
 
-What's the configfs naming scheme for the second and later devices?
+--
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
