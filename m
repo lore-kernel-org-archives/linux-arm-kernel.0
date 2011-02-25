@@ -1,38 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Feb 2011 15:11:00 +0000
-Subject: When does mach-types get updated in a tree?
-In-Reply-To: <0812376c-ea4b-4185-aa6e-6fb582dce21f@VA3EHSMHS032.ehs.local>
-References: <a9937fcf-a4cb-41c5-a767-ecfebae5c748@VA3EHSMHS024.ehs.local>
-	<20110228101030.GB29843@n2100.arm.linux.org.uk>
-	<0812376c-ea4b-4185-aa6e-6fb582dce21f@VA3EHSMHS032.ehs.local>
-Message-ID: <20110228151100.GB1937@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 25 Feb 2011 16:49:52 +0800
+Subject: mxs: name##_set_rate broken
+In-Reply-To: <20110224165700.GY22310@pengutronix.de>
+References: <20110224165700.GY22310@pengutronix.de>
+Message-ID: <20110225084950.GA13684@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 07:35:57AM -0700, John Linn wrote:
-> What is your suggestion to people with regards to patches that need the
-> update?
+Hi Uwe,
 
-The only suggestion I can make is: don't wait until the last minute before
-putting something into the machine registry, because you will get into
-these kinds of problems.
+On Thu, Feb 24, 2011 at 05:57:00PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
+> 
+> for the lcdif clock get_rate looks as follows:
+> 
+> 	read div from HW_CLKCTRL_DIS_LCDIF.DIV
+> 	return clk_get_rate(clk->parent) / div
+> 
+> with clk->parent being ref_pix_clk on our system.
+> 
+> ref_pix_clk's rate depends on HW_CLKCTRL_FRAC1.PIXFRAC.
+> 
+> The set_rate function for lcdif does:
+> 
+> 	parent_rate = clk_get_rate(clk->parent);
+> 	based on that calculate frac and div such that 
+> 	  parent_rate * 18 / frac / div is near the requested rate.
+>         HW_CLKCTRL_FRAC1.PIXFRAC is updated with frac
+> 	HW_CLKCTRL_DIS_LCDIF.DIV is updated with div
+> 
+> For this calculation to be correct the parent_rate needs to be
+> initialized not with the clock rate of lcdif's parent (i.e. ref_pix) but
+> that of its grandparent (i.e. ref_pix' parent == pll0_clk)
+> 
+Yes, this is bug.  I hesitated to go this way when implementing the
+function, because it's not generic that the set_rate function needs
+to play parent's rate.  It becomes even worse if the parent has other
+children clocks.  But we have to go this way to get the rate close to
+the desired one.  For particular example, we have specific cpu rate
+for different set points per data sheet, which is not reachable
+without playing ref_cpu_clk.
 
-If I do an update now, it'll be the second time it's happened in February.
-It's likely it will need another update just before the merge window too
-in 3-4 weeks time.
+> I think the else branch to if (clk->parent == &ref_xtal_clk) of
+> name##_set_rate is broken for all clocks, but Sascha and I didn't
+> verified that.  Our local fix is:
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index febd787..7a26edd 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -295,11 +295,11 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  	unsigned long diff, parent_rate, calc_rate;			\
+>  	int i;								\
+>  									\
+> -	parent_rate = clk_get_rate(clk->parent);			\
+>  	div_max = BM_CLKCTRL_##dr##_DIV >> BP_CLKCTRL_##dr##_DIV;	\
+>  	bm_busy = BM_CLKCTRL_##dr##_BUSY;				\
+>  									\
+>  	if (clk->parent == &ref_xtal_clk) {				\
+> +		parent_rate = clk_get_rate(clk->parent);		\
+>  		div = DIV_ROUND_UP(parent_rate, rate);			\
+>  		if (clk == &cpu_clk) {					\
+>  			div_max = BM_CLKCTRL_CPU_DIV_XTAL >>		\
+> @@ -309,6 +309,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  		if (div == 0 || div > div_max)				\
+>  			return -EINVAL;					\
+>  	} else {							\
+> +		parent_rate = clk_get_rate(&pll0_clk);			\
+>  		rate >>= PARENT_RATE_SHIFT;				\
+>  		parent_rate >>= PARENT_RATE_SHIFT;			\
+>  		diff = parent_rate;					\
+> 
+> that seems to work.  (Actually using the grandparent instead of a hard
+> coded &pll0_clk would be better.)
+> 
+> Can you please have a look, too and maybe even come up with a better
+> fix?
+> 
+The fix looks good to me.
 
-So really all that I can say is that people need to ensure that they get
-stuff from the machine registry earlier rather than later.
+> IMHO it's time that Jeremy's clk patches get merged to resolve the
+> uglinesses here.  (One thing that comes to mind is that the result of
 
-I do think we're heading for a major problem with the mach-types file
-becoming too big inspite of its brevity.  I think I may start marking
-entries as 'inactive' and therefore omitted from the kernel's tree if
-they don't appear in mainline within one year of being allocated (or
-some similar rule.)
+Yes, agree.  But I'm not able to start working on this immediately,
+because I have other priority to take care for my next time slot.
+Do you want to take this on?  Feel free to ...
 
-> I'm open to suggestions, just trying to work with everyone the best way
-> to get Xilinx patches into the system.
+> if (clk->parent == &ref_xtal_clk) doesn't change during runtime, so
+> it would be better to use two different implementations.  (That
+> statement still needs a careful verification though.))
+> 
 
-The only thing I can think is to wait a couple more weeks and I'll see
-about doing an update mid-March.  Maybe by then we can have a smaller
-file...
+-- 
+Regards,
+Shawn
