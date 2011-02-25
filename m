@@ -1,40 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 25 Feb 2011 10:54:28 +0100 (CET)
-Subject: [PATCH v5 1/2] PRUSS UIO driver support
-In-Reply-To: <1298623530-10294-2-git-send-email-pratheesh@ti.com>
-References: <1298623530-10294-1-git-send-email-pratheesh@ti.com>
-	<1298623530-10294-2-git-send-email-pratheesh@ti.com>
-Message-ID: <alpine.LFD.2.00.1102251049090.2701@localhost6.localdomain6>
+From: vinay.hegde@ti.com (Hegde, Vinay)
+Date: Fri, 25 Feb 2011 15:26:28 +0530
+Subject: [PATCH] davinci: da850/omap-l138: Add Carrier Link OK check in
+	Davinci RX Handler
+Message-ID: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 25 Feb 2011, Pratheesh Gangadhar wrote:
-> +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
-> +{
-> +	void __iomem *base = dev_info->mem[0].internal_addr;
-> +	void __iomem *intren_reg = base + PINTC_HIER;
-> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + ((irq - 1) << 2);
-> +	int val = ioread32(intren_reg), intr_mask = (1 << (irq - 1));
-> +
-> +	/* Is interrupt enabled and active ? */
-> +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND))
-> +		return IRQ_NONE;
-> +
-> +	/* Disable interrupt */
-> +	iowrite32((val & ~intr_mask), intren_reg);
-> +	return IRQ_HANDLED;
-> +}
+This patch adds an additional check in the Davinci EMAC RX Handler,
+which tests the __LINK_STATE_NOCARRIER flag along with the
+__LINK_STATE_START flag as part EMAC shutting down procedure.
 
-Hmm, just noticed, that you fiddle with the interrupt enable register
-here totally unprotected. So on a SMP system you might haandle two
-different interrupts at the same time. That wants locking.
+This avoids
+WARNING: at drivers/net/davinci_emac.c:1040 emac_rx_handler+0xf8/0x120()
+during rtcwake used to suspend the target for a specified duration.
 
-And even on UP, you have a problem as you reenable that thing from
-user space which requires a read modify write. Racy as hell.
+Signed-off-by: Hegde, Vinay <vinay.hegde@ti.com>
+---
+ drivers/net/davinci_emac.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Please look at the other UIO drivers which have the same problem.
-Sorry for not noticing earlier!
-
-Thanks,
-
-	tglx
+diff --git a/drivers/net/davinci_emac.c b/drivers/net/davinci_emac.c
+index 2a628d1..7018bfe 100644
+--- a/drivers/net/davinci_emac.c
++++ b/drivers/net/davinci_emac.c
+@@ -1008,7 +1008,7 @@ static void emac_rx_handler(void *token, int len, int status)
+ 	int			ret;
+ 
+ 	/* free and bail if we are shutting down */
+-	if (unlikely(!netif_running(ndev))) {
++	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
+ 		dev_kfree_skb_any(skb);
+ 		return;
+ 	}
+-- 
+1.7.1
