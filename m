@@ -1,68 +1,75 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Fri, 25 Feb 2011 20:31:17 +0100
-Subject: [PATCH V3 0/5] sdhci-esdhc-imx: use gpio for write protection
-	and	card detection
-In-Reply-To: <4D66AAE4.4000308@eukrea.com> (Eric Benard's message of "Thu, 24
-	Feb 2011 20:00:52 +0100")
-References: <1298469118-25282-1-git-send-email-w.sang@pengutronix.de>
-	<87k4gp3bl1.fsf@lebrac.rtp-net.org> <4D66AAE4.4000308@eukrea.com>
-Message-ID: <874o7r29oa.fsf@lebrac.rtp-net.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 25 Feb 2011 13:07:46 -0700 (MST)
+Subject: [PATCH v2 2/9] omap4: prcm: Fix the CPUx clockdomain offsets
+In-Reply-To: <1296813544-25170-3-git-send-email-santosh.shilimkar@ti.com>
+References: <1296813544-25170-1-git-send-email-santosh.shilimkar@ti.com>
+	<1296813544-25170-3-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.00.1102251304240.6198@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Benard <eric@eukrea.com> writes:
+On Fri, 4 Feb 2011, Santosh Shilimkar wrote:
 
-> Hi Arnaud,
+> CPU0 and CPU1 clockdomain is at the offset of 0x18 from the LPRM base.
+> The header file has set it wrongly to 0x0. Offset 0x0 is for CPUx power
+> domain control register
+> 
+> Fix the same.
+> 
+> The autogen scripts is fixed thanks to Benoit Cousson
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
 
-Salut !
->
-> On 24/02/2011 12:40, Arnaud Patard (Rtp) wrote:
->> Wolfram Sang<w.sang@pengutronix.de>  writes:
->>
->> Hi,
->>
->>> Take #3, changes:
->>>
->>> * also intercept calls to SDHCI_SIGNAL_ENABLE (needed on mx25)
->>> * remove unconditional BROKEN_CARD_DETECTION (leftover)
->>> * improved kernel-doc about unused GPIO
->>> * added tags from Eric
->>>
->>> Tested now by me and Marc on mx35, Eric on mx25/35/51. Arnaud, did you have a
->>> chance to retest on mx51? What about the FSL guys? :)
->>
->> I'm getting a hard freeze on my efika sb and mx once I remove the
->> unconditional BROKEN_CARD_DETECTION flag. I'm still investigating the
->> issue. I'll keep you informed if I find something.
->>
-> may you please test the attached patch. It may give someone with a
-> better knowledge of sdhci than me an idea of what is wrong.
+Will submit this one for -rc series, since this could result in writes to 
+an incorrect register.  Updated patch below.
 
-I've tested this patch on my efikamx and this patch does solve the
-issue. I didn't test on the efika smartbook but I guess it'll be fine
-here too. Thanks.
 
->
-> Here are the workaround this patch add :
-> - we can't let enable or disable irq enabled when the card is
-> present/not present, else the irq triger again which explains why you
-> get the freeze -> so we must rely on the card presence bit to enable
-> the right interrupt,
+- Paul
 
-so, we're getting an interrupt storm, right ? can't it be fixed by
-setting a different irq type ?
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Fri, 4 Feb 2011 15:28:57 +0530
+Subject: [PATCH] omap4: prcm: Fix the CPUx clockdomain offsets
 
-> - we can't turn the clock off if we want the card detect to work when
-> the card is removed -> as a quick workaround this patch prevents
-> sdhci_set_clock from turning off the clocks when the
-> SDHCI_INT_CARD_INSERT interrupt is enabled.
->
-> Also, I had to change the MX51_PAD_GPIO1_0__SD1_CD pad setting as
-> follows to enable the internal pull up :
-> 	_MX51_PAD_GPIO1_0__SD1_CD | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
-> 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
-> 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
+CPU0 and CPU1 clockdomain is at the offset of 0x18 from the LPRM base.
+The header file has set it wrongly to 0x0. Offset 0x0 is for CPUx power
+domain control register
 
-It worked without changing this.
+Fix the same.
 
-Arnaud
+The autogen scripts is fixed thanks to Benoit Cousson
+
+With the old value, the clockdomain code would access the
+*_PWRSTCTRL.POWERSTATE field when it thought it was accessing the
+*_CLKSTCTRL.CLKTRCTRL field.  In the worst case, this could cause
+system power management to behave incorrectly.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+[paul at pwsan.com: added second paragraph to commit message]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/prcm_mpu44xx.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
+index 729a644..3300ff6 100644
+--- a/arch/arm/mach-omap2/prcm_mpu44xx.h
++++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
+@@ -38,8 +38,8 @@
+ #define OMAP4430_PRCM_MPU_CPU1_INST		0x0800
+ 
+ /* PRCM_MPU clockdomain register offsets (from instance start) */
+-#define OMAP4430_PRCM_MPU_CPU0_MPU_CDOFFS	0x0000
+-#define OMAP4430_PRCM_MPU_CPU1_MPU_CDOFFS	0x0000
++#define OMAP4430_PRCM_MPU_CPU0_MPU_CDOFFS	0x0018
++#define OMAP4430_PRCM_MPU_CPU1_MPU_CDOFFS	0x0018
+ 
+ 
+ /*
+-- 
+1.7.2.3
