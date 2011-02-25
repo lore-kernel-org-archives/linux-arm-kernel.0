@@ -1,43 +1,23 @@
-From: gregkh@suse.de (Greg KH)
-Date: Thu, 24 Feb 2011 19:28:56 -0800
-Subject: [PATCH v2 2/2] msm: add single-wire serial bus interface (SSBI)
-	driver
-In-Reply-To: <8ya8vx4dcky.fsf@huya.qualcomm.com>
-References: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
-	<1298585954-22422-3-git-send-email-kheitke@codeaurora.org>
-	<1298600621.17118.27.camel@m0nster>
-	<8yad3mgdeut.fsf@huya.qualcomm.com>
-	<1298601346.17118.29.camel@m0nster>
-	<AANLkTikD1Ued=rit1QbMWwe3NGFz2iQ-KO7B=-N6Ok-2@mail.gmail.com>
-	<8ya8vx4dcky.fsf@huya.qualcomm.com>
-Message-ID: <20110225032856.GA8475@suse.de>
+From: bill_carson@126.com (rocky)
+Date: Fri, 25 Feb 2011 11:35:52 +0800 (CST)
+Subject: Question about free_pgd_slow ?
+Message-ID: <79b2dce2.4b84.12e5ae30c01.Coremail.bill_carson@126.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 24, 2011 at 07:20:45PM -0800, David Brown wrote:
-> On Thu, Feb 24 2011, Dima Zavin wrote:
-> 
-> > On that note, should we have a "drivers/arm/msm" instead of just
-> > "drivers/msm"? Other non-msm arm sub-arches probably have the same
-> > problem and polluting drivers/ top-level for every arm-subarch maybe
-> > undesirable.
-> 
-> I'm moving linux-kernel to the 'to' field, and adding Greg KH to CC.
-> 
-> This is about a new driver (ssbi) for the MSM chips, and where the
-> driver for this should go.  The driver is specific to MSM chips (as far
-> as I know, the bus is only supported there).  There are likely to be
-> future msm-specific drivers, so the suggestion was to put this under
-> drivers/msm, or possibly drivers/arm/msm.
-> 
-> Anyone other suggestions, or preferences for the location?
+Hi,all
 
-drivers/ssbi?  What's keeping this from later moving off of the msm
-chips to run on others?  USB started out only on one processor, as did a
-lot of other bus-specific drivers, before the hardware became present on
-other architectures.  So no need to bury it under a msm specific
-location.
+free_pgd_slow in arch/arm/mm/pgd.c  free the 4 pages at pgd level,
+while could I ask a question about why free the page by pointed by pgd index 0 ?
 
-Hope this helps,
+cannot figure it out, any tips ?
 
-greg k-h
+thanks
+
+
+rocky
+
+
+
+
+       
