@@ -1,312 +1,220 @@
-From: mk7.kang@samsung.com (Minkyu Kang)
-Date: Fri, 25 Feb 2011 17:43:36 +0900
-Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
-Message-ID: <4D676BB8.9040803@samsung.com>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Fri, 25 Feb 2011 14:15:30 +0530
+Subject: [PATCH v5 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources used by
+	PRUSS UIO driver
+In-Reply-To: <1298623530-10294-2-git-send-email-pratheesh@ti.com>
+References: <1298623530-10294-1-git-send-email-pratheesh@ti.com>
+	<1298623530-10294-2-git-send-email-pratheesh@ti.com>
+Message-ID: <1298623530-10294-3-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Samsung NURI board support.
+This patch defines PRUSS, ECAP clocks, memory and IRQ resources
+used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
+driver exports 64K I/O region of PRUSS, 128KB L3 RAM and 256KB
+DDR buffer to user space. PRUSS has 8 host event interrupt lines
+mapped to IRQ_DA8XX_EVTOUT0..7 of ARM9 INTC.These in conjunction
+with shared memory can be used to implement IPC between ARM9 and
+PRUSS.
 
-Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
 ---
-This patch is base on next-exynos4 branch at kgene tree.
+ arch/arm/mach-davinci/board-da850-evm.c    |    4 ++
+ arch/arm/mach-davinci/da850.c              |   35 +++++++++++++
+ arch/arm/mach-davinci/devices-da8xx.c      |   73 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |    3 +
+ 4 files changed, 115 insertions(+), 0 deletions(-)
 
- arch/arm/configs/exynos4_defconfig |    1 +
- arch/arm/mach-exynos4/Kconfig      |   15 +++
- arch/arm/mach-exynos4/Makefile     |    1 +
- arch/arm/mach-exynos4/mach-nuri.c  |  233 ++++++++++++++++++++++++++++++++++++
- 4 files changed, 250 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
-
-diff --git a/arch/arm/configs/exynos4_defconfig b/arch/arm/configs/exynos4_defconfig
-index 2ffba24..fd92324 100644
---- a/arch/arm/configs/exynos4_defconfig
-+++ b/arch/arm/configs/exynos4_defconfig
-@@ -9,6 +9,7 @@ CONFIG_S3C_LOWLEVEL_UART_PORT=1
- CONFIG_MACH_SMDKC210=y
- CONFIG_MACH_SMDKV310=y
- CONFIG_MACH_UNIVERSAL_C210=y
-+CONFIG_MACH_NURI=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index ad03840..5bf00b9 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -123,6 +123,21 @@ config MACH_UNIVERSAL_C210
- 	  Machine support for Samsung Mobile Universal S5PC210 Reference
- 	  Board.
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 11f986b..bd85aa3 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1077,6 +1077,10 @@ static __init void da850_evm_init(void)
+ 		pr_warning("da850_evm_init: i2c0 registration failed: %d\n",
+ 				ret);
  
-+config MACH_NURI
-+	bool "Mobile NURI Board"
-+	select CPU_EXYNOS4210
-+	select S3C_DEV_WDT
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC2
-+	select S3C_DEV_HSMMC3
-+	select S3C_DEV_I2C1
-+	select S3C_DEV_I2C5
-+	select EXYNOS4_SETUP_I2C1
-+	select EXYNOS4_SETUP_I2C5
-+	select EXYNOS4_SETUP_SDHCI
-+	help
-+	  Machine support for Samsung Mobile NURI Board.
-+
- endmenu
++	ret = da8xx_register_pruss();
++	if (ret)
++		pr_warning("da850_evm_init: pruss registration failed: %d\n",
++				ret);
  
- comment "Configuration for HSMMC bus width"
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 0558235..fa9e814 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -25,6 +25,7 @@ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkc210.o
- obj-$(CONFIG_MACH_SMDKV310)		+= mach-smdkv310.o
- obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
-+obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
+ 	ret = da8xx_register_watchdog();
+ 	if (ret)
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 3443d97..0096d4f 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -238,6 +238,13 @@ static struct clk tptc2_clk = {
+ 	.flags		= ALWAYS_ENABLED,
+ };
  
- # device support
++static struct clk pruss_clk = {
++	.name		= "pruss",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC0_DMAX,
++	.flags		= ALWAYS_ENABLED,
++};
++
+ static struct clk uart0_clk = {
+ 	.name		= "uart0",
+ 	.parent		= &pll0_sysclk2,
+@@ -359,6 +366,30 @@ static struct clk usb20_clk = {
+ 	.gpsc		= 1,
+ };
  
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-new file mode 100644
-index 0000000..28010bd
---- /dev/null
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -0,0 +1,233 @@
-+/*
-+ * linux/arch/arm/mach-exynos4/mach-nuri.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/serial_core.h>
-+#include <linux/input.h>
-+#include <linux/i2c.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/gpio.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
-+#include <linux/mmc/host.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach-types.h>
-+
-+#include <plat/regs-serial.h>
-+#include <plat/exynos4.h>
-+#include <plat/cpu.h>
-+#include <plat/devs.h>
-+#include <plat/sdhci.h>
-+
-+#include <mach/map.h>
-+
-+/* Following are default values for UCON, ULCON and UFCON UART registers */
-+#define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-+				 S3C2410_UCON_RXILEVEL |	\
-+				 S3C2410_UCON_TXIRQMODE |	\
-+				 S3C2410_UCON_RXIRQMODE |	\
-+				 S3C2410_UCON_RXFIFO_TOI |	\
-+				 S3C2443_UCON_RXERR_IRQEN)
-+
-+#define NURI_ULCON_DEFAULT	S3C2410_LCON_CS8
-+
-+#define NURI_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
-+				 S5PV210_UFCON_TXTRIG256 |	\
-+				 S5PV210_UFCON_RXTRIG256)
-+
-+enum fixed_regulator_id {
-+	FIXED_REG_ID_MMC = 0,
++static struct clk ecap0_clk = {
++	.name		= "ecap0",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC1_ECAP,
++	.flags		= DA850_CLK_ASYNC3,
++	.gpsc		= 1,
 +};
 +
-+static struct s3c2410_uartcfg nuri_uartcfgs[] __initdata = {
-+	{
-+		.hwport		= 0,
-+		.ucon		= NURI_UCON_DEFAULT,
-+		.ulcon		= NURI_ULCON_DEFAULT,
-+		.ufcon		= NURI_UFCON_DEFAULT,
++static struct clk ecap1_clk = {
++	.name		= "ecap1",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC1_ECAP,
++	.flags		= DA850_CLK_ASYNC3,
++	.gpsc		= 1,
++};
++
++static struct clk ecap2_clk = {
++	.name		= "ecap2",
++	.parent		= &pll0_sysclk2,
++	.lpsc		= DA8XX_LPSC1_ECAP,
++	.flags		= DA850_CLK_ASYNC3,
++	.gpsc		= 1,
++};
++
+ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"ref",		&ref_clk),
+ 	CLK(NULL,		"pll0",		&pll0_clk),
+@@ -386,6 +417,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"tptc1",	&tptc1_clk),
+ 	CLK(NULL,		"tpcc1",	&tpcc1_clk),
+ 	CLK(NULL,		"tptc2",	&tptc2_clk),
++	CLK(NULL,		"pruss",	&pruss_clk),
+ 	CLK(NULL,		"uart0",	&uart0_clk),
+ 	CLK(NULL,		"uart1",	&uart1_clk),
+ 	CLK(NULL,		"uart2",	&uart2_clk),
+@@ -403,6 +435,9 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK(NULL,		"aemif",	&aemif_clk),
+ 	CLK(NULL,		"usb11",	&usb11_clk),
+ 	CLK(NULL,		"usb20",	&usb20_clk),
++	CLK(NULL,		"ecap0",	&ecap0_clk),
++	CLK(NULL,		"ecap1",	&ecap1_clk),
++	CLK(NULL,		"ecap2",	&ecap2_clk),
+ 	CLK(NULL,		NULL,		NULL),
+ };
+ 
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index beda8a4..4ea3d1f 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -725,3 +725,76 @@ int __init da8xx_register_cpuidle(void)
+ 
+ 	return platform_device_register(&da8xx_cpuidle_device);
+ }
++static struct resource pruss_resources[] = {
++	[0] = {
++		.start  = DA8XX_PRUSS_BASE,
++		.end    = DA8XX_PRUSS_BASE + SZ_64K - 1,
++		.flags  = IORESOURCE_MEM,
 +	},
-+	{
-+		.hwport		= 1,
-+		.ucon		= NURI_UCON_DEFAULT,
-+		.ulcon		= NURI_ULCON_DEFAULT,
-+		.ufcon		= NURI_UFCON_DEFAULT,
++	[1] = {
++		.start  = DA8XX_L3RAM_BASE,
++		.end    = DA8XX_L3RAM_BASE + SZ_128K - 1,
++		.flags  = IORESOURCE_MEM,
 +	},
-+	{
-+		.hwport		= 2,
-+		.ucon		= NURI_UCON_DEFAULT,
-+		.ulcon		= NURI_ULCON_DEFAULT,
-+		.ufcon		= NURI_UFCON_DEFAULT,
++	[2] = {
++		.start  = 0,
++		.end    = SZ_256K - 1,
++		.flags  = IORESOURCE_MEM,
 +	},
-+	{
-+		.hwport		= 3,
-+		.ucon		= NURI_UCON_DEFAULT,
-+		.ulcon		= NURI_ULCON_DEFAULT,
-+		.ufcon		= NURI_UFCON_DEFAULT,
++
++	[3] = {
++		.start  = IRQ_DA8XX_EVTOUT0,
++		.end    = IRQ_DA8XX_EVTOUT0,
++		.flags  = IORESOURCE_IRQ,
 +	},
-+};
-+
-+/* eMMC */
-+static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
-+	.max_width		= 8,
-+	.host_caps		= (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
-+			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
-+			   MMC_CAP_DISABLE | MMC_CAP_ERASE),
-+	.cd_type		= S3C_SDHCI_CD_PERMANENT,
-+	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
-+};
-+
-+static struct regulator_consumer_supply emmc_supplies[] = {
-+	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
-+	REGULATOR_SUPPLY("vmmc", "dw_mmc"),
-+};
-+
-+static struct regulator_init_data emmc_fixed_voltage_init_data = {
-+	.constraints		= {
-+		.name		= "VMEM_VDD_2.8V",
-+		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	[4] = {
++		.start  = IRQ_DA8XX_EVTOUT1,
++		.end    = IRQ_DA8XX_EVTOUT1,
++		.flags  = IORESOURCE_IRQ,
 +	},
-+	.num_consumer_supplies	= ARRAY_SIZE(emmc_supplies),
-+	.consumer_supplies	= emmc_supplies,
-+};
-+
-+static struct fixed_voltage_config emmc_fixed_voltage_config = {
-+	.supply_name		= "MASSMEMORY_EN (inverted)",
-+	.microvolts		= 2800000,
-+	.gpio			= EXYNOS4_GPL1(1),
-+	.enable_high		= false,
-+	.init_data		= &emmc_fixed_voltage_init_data,
-+};
-+
-+static struct platform_device emmc_fixed_voltage = {
-+	.name			= "reg-fixed-voltage",
-+	.id			= FIXED_REG_ID_MMC,
-+	.dev			= {
-+		.platform_data	= &emmc_fixed_voltage_config,
++	[5] = {
++		.start  = IRQ_DA8XX_EVTOUT2,
++		.end    = IRQ_DA8XX_EVTOUT2,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[6] = {
++		.start  = IRQ_DA8XX_EVTOUT3,
++		.end    = IRQ_DA8XX_EVTOUT3,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[7] = {
++		.start  = IRQ_DA8XX_EVTOUT4,
++		.end    = IRQ_DA8XX_EVTOUT4,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[8] = {
++		.start  = IRQ_DA8XX_EVTOUT5,
++		.end    = IRQ_DA8XX_EVTOUT5,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[9] = {
++		.start  = IRQ_DA8XX_EVTOUT6,
++		.end    = IRQ_DA8XX_EVTOUT6,
++		.flags  = IORESOURCE_IRQ,
++	},
++	[10] = {
++		.start  = IRQ_DA8XX_EVTOUT7,
++		.end    = IRQ_DA8XX_EVTOUT7,
++		.flags  = IORESOURCE_IRQ,
 +	},
 +};
 +
-+/* SD */
-+static struct s3c_sdhci_platdata nuri_hsmmc2_data __initdata = {
-+	.max_width		= 4,
-+	.host_caps		= MMC_CAP_4_BIT_DATA |
-+				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
-+				MMC_CAP_DISABLE,
-+	.ext_cd_gpio		= EXYNOS4_GPX3(3),	/* XEINT_27 */
-+	.ext_cd_gpio_invert	= 1,
-+	.cd_type		= S3C_SDHCI_CD_GPIO,
-+	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
++static struct platform_device pruss_device = {
++	.name			= "pruss",
++	.id			= 0,
++	.num_resources		= ARRAY_SIZE(pruss_resources),
++	.resource		= pruss_resources,
++	.dev	 =	{
++		.coherent_dma_mask = 0xffffffff,
++	}
 +};
 +
-+/* WLAN */
-+static struct s3c_sdhci_platdata nuri_hsmmc3_data __initdata = {
-+	.max_width		= 4,
-+	.host_caps		= MMC_CAP_4_BIT_DATA |
-+				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
-+	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
-+	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
-+};
-+
-+static void __init nuri_sdhci_init(void)
++int __init da8xx_register_pruss()
 +{
-+	s3c_sdhci0_set_platdata(&nuri_hsmmc0_data);
-+	s3c_sdhci2_set_platdata(&nuri_hsmmc2_data);
-+	s3c_sdhci3_set_platdata(&nuri_hsmmc3_data);
++	return platform_device_register(&pruss_device);
 +}
-+
-+/* GPIO KEYS */
-+static struct gpio_keys_button nuri_gpio_keys_tables[] = {
-+	{
-+		.code			= KEY_VOLUMEUP,
-+		.gpio			= EXYNOS4_GPX2(0),	/* XEINT16 */
-+		.desc			= "gpio-keys: KEY_VOLUMEUP",
-+		.type			= EV_KEY,
-+		.active_low		= 1,
-+		.debounce_interval	= 1,
-+	}, {
-+		.code			= KEY_VOLUMEDOWN,
-+		.gpio			= EXYNOS4_GPX2(1),	/* XEINT17 */
-+		.desc			= "gpio-keys: KEY_VOLUMEDOWN",
-+		.type			= EV_KEY,
-+		.active_low		= 1,
-+		.debounce_interval	= 1,
-+	}, {
-+		.code			= KEY_POWER,
-+		.gpio			= EXYNOS4_GPX2(7),	/* XEINT23 */
-+		.desc			= "gpio-keys: KEY_POWER",
-+		.type			= EV_KEY,
-+		.active_low		= 1,
-+		.wakeup			= 1,
-+		.debounce_interval	= 1,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data nuri_gpio_keys_data = {
-+	.buttons		= nuri_gpio_keys_tables,
-+	.nbuttons		= ARRAY_SIZE(nuri_gpio_keys_tables),
-+};
-+
-+static struct platform_device nuri_gpio_keys = {
-+	.name			= "gpio-keys",
-+	.dev			= {
-+		.platform_data	= &nuri_gpio_keys_data,
-+	},
-+};
-+
-+/* I2C1 */
-+static struct i2c_board_info i2c1_devs[] __initdata = {
-+	/* Gyro, To be updated */
-+};
-+
-+/* GPIO I2C 5 (PMIC) */
-+static struct i2c_board_info i2c5_devs[] __initdata = {
-+	/* max8997, To be updated */
-+};
-+
-+static struct platform_device *nuri_devices[] __initdata = {
-+	/* Samsung Platform Devices */
-+	&emmc_fixed_voltage,
-+	&s3c_device_hsmmc0,
-+	&s3c_device_hsmmc2,
-+	&s3c_device_hsmmc3,
-+#ifdef CONFIG_S3C2410_WATCHDOG
-+	&s3c_device_wdt,
-+#endif
-+
-+	/* NURI Devices */
-+	&nuri_gpio_keys,
-+};
-+
-+static void __init nuri_map_io(void)
-+{
-+	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-+	s3c24xx_init_clocks(24000000);
-+	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
-+}
-+
-+static void __init nuri_machine_init(void)
-+{
-+	nuri_sdhci_init();
-+
-+	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
-+	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
-+
-+	/* Last */
-+	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
-+}
-+
-+MACHINE_START(NURI, "NURI")
-+	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
-+	.boot_params	= S5P_PA_SDRAM + 0x100,
-+	.init_irq	= exynos4_init_irq,
-+	.map_io		= nuri_map_io,
-+	.init_machine	= nuri_machine_init,
-+	.timer		= &exynos4_timer,
-+MACHINE_END
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index cfcb223..3ed6ee0 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -60,6 +60,7 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_PLL0_BASE		0x01c11000
+ #define DA8XX_TIMER64P0_BASE	0x01c20000
+ #define DA8XX_TIMER64P1_BASE	0x01c21000
++#define DA8XX_PRUSS_BASE	0x01c30000
+ #define DA8XX_GPIO_BASE		0x01e26000
+ #define DA8XX_PSC1_BASE		0x01e27000
+ #define DA8XX_LCD_CNTRL_BASE	0x01e13000
+@@ -68,6 +69,7 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_AEMIF_CS2_BASE	0x60000000
+ #define DA8XX_AEMIF_CS3_BASE	0x62000000
+ #define DA8XX_AEMIF_CTL_BASE	0x68000000
++#define DA8XX_L3RAM_BASE	0x80000000
+ #define DA8XX_DDR2_CTL_BASE	0xb0000000
+ #define DA8XX_ARM_RAM_BASE	0xffff0000
+ 
+@@ -90,6 +92,7 @@ int da850_register_cpufreq(char *async_clk);
+ int da8xx_register_cpuidle(void);
+ void __iomem * __init da8xx_get_mem_ctlr(void);
+ int da850_register_pm(struct platform_device *pdev);
++int da8xx_register_pruss(void);
+ 
+ extern struct platform_device da8xx_serial_device;
+ extern struct emac_platform_data da8xx_emac_pdata;
 -- 
-1.7.1
+1.6.0.6
