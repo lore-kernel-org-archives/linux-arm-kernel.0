@@ -1,51 +1,54 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 25 Feb 2011 11:55:30 +0100
-Subject: [PATCH v4] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
-References: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110225105530.GA2178@pengutronix.de>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Fri, 25 Feb 2011 05:02:18 -0600
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <201102241024.01437.arnd@arndb.de>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102231709.05036.arnd@arndb.de>
+	<AANLkTimZDDo0xa2CzgHhH1LSWJ-KT0QgOmEAKs2nJK8x@mail.gmail.com>
+	<201102241024.01437.arnd@arndb.de>
+Message-ID: <AANLkTikWKk0kE=Hh4gfA6Mwt+-65TVFnBcOYy_eRuQfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, Feb 24, 2011 at 3:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On Fri, Feb 25, 2011 at 03:34:19PM +0800, Shawn Guo wrote:
-> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> including apbh-dma and apbx-dma.
-> 
-> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
->   instances.
-> 
-> * apbh-dma is different between mx23 and mx28, hardware version
->   register is used to differentiate.
-> 
-> * mxs-dma supports pio function besides data transfer.  The driver
->   uses dma_data_direction DMA_NONE to identify the pio mode, and
->   steals sgl and sg_len to get pio words and numbers from clients.
-> 
-> * mxs dmaengine has some very specific features, like sense function
->   and the special NAND support (nand_lock, nand_wait4ready).  These
->   are too specific to implemented in generic dmaengine driver.
-> 
-> * The driver refers to imx-sdma and only a single descriptor is
->   statically assigned to each channel.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
+> Unlike the sysfs interface, the code does not need to be future-proof,
+> it can always be changed if we feel the code becomes more maintainable
+> by doing it another way.
+>
+> The approach that I'd like to see here is:
+>
+> * Start out with an ad-hoc patch for a quirk (like the one you already
+> ?have).
+> * Add a boolean variable to enable it per card.
+> * Get performance data for this quirk to show that it's useful in
+> ?real-world workloads for some cards but counterproductive for others
+> * Get the patch into the mmc tree.
+> * Repeat for the next quirk
+> * When the code becomes overly complicated after adding all the quirks,
+> ?decide on a good strategy to move the code around, and do a new patch.
+>
 
-What are (roughly) the changes since last version?
+Yup. I understand :-).  That's the strategy I'm going to follow. For
+page_size-alignment/splitting I'm looking at the block layer now. Is
+that the right approach or should I still submit a (cleaned up) patch
+to mmc/card/block.c for that performance improvement? The other
+(Toshiba quirk) is obviously a quirk belonging to mmc/card/block.c.
 
-Regards,
+> I understand that you are convinced that you will need the indirect function
+> calls in the end. That is fine, just don't add them before they are
+> actually needed -- that would only make it harder for you to get the first
+> patch included.
+>
+> Note that the situation is very different for user interfaces such as sysfs:
+> You need to plan ahead because once the interface is merged upstream, it
+> can never be changed. When you submit a patch that introduces a new sysfs
+> interface, it has to be documented, and you have to convince the reviewers
+> that it is sufficient to cover all the cases it is designed for, while
+> at the same time it is the most simple way to achieve this.
 
-   Wolfram
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110225/7415eff3/attachment.sig>
+Ok, thanks a lot for the explanation, I hadn't thought of it that way
+(and should have).
+
+A
