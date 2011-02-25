@@ -1,84 +1,48 @@
 From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
-Date: Fri, 25 Feb 2011 14:38:26 +0100
-Subject: [PATCH 1/6] eukrea_mbimxsd: add audio support
-Message-ID: <1298641111-12957-1-git-send-email-eric@eukrea.com>
+Date: Fri, 25 Feb 2011 14:38:28 +0100
+Subject: [PATCH 3/6] cpuimx51sd: fix tsc2007
+In-Reply-To: <1298641111-12957-1-git-send-email-eric@eukrea.com>
+References: <1298641111-12957-1-git-send-email-eric@eukrea.com>
+Message-ID: <1298641111-12957-3-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+- wrong MUX was set before for IRQ
+- get_pendown_state is no more needed
+
 Signed-off-by: Eric B?nard <eric@eukrea.com>
 ---
- arch/arm/mach-mx5/Kconfig                    |    1 +
- arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |   28 ++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/board-cpuimx51sd.c |    8 +-------
+ 1 files changed, 1 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 4e4d7af..ded1d2d 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -108,6 +108,7 @@ config MACH_EUKREA_MBIMXSD51_BASEBOARD
- 	prompt "Eukrea MBIMXSD development board"
- 	bool
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
-+	select IMX_HAVE_PLATFORM_IMX_SSI
- 	help
- 	  This adds board specific devices that can be found on Eukrea's
- 	  MBIMXSD evaluation board.
-diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-index c372a43..712061c 100644
---- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-+++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
-@@ -67,6 +67,11 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
- 	MX51_PAD_SD1_DATA1__SD1_DATA1,
- 	MX51_PAD_SD1_DATA2__SD1_DATA2,
- 	MX51_PAD_SD1_DATA3__SD1_DATA3,
-+	/* SSI */
-+	MX51_PAD_AUD3_BB_TXD__AUD3_TXD,
-+	MX51_PAD_AUD3_BB_RXD__AUD3_RXD,
-+	MX51_PAD_AUD3_BB_CK__AUD3_TXC,
-+	MX51_PAD_AUD3_BB_FS__AUD3_TXFS,
+diff --git a/arch/arm/mach-mx5/board-cpuimx51sd.c b/arch/arm/mach-mx5/board-cpuimx51sd.c
+index 68ecfc0..5b19419 100644
+--- a/arch/arm/mach-mx5/board-cpuimx51sd.c
++++ b/arch/arm/mach-mx5/board-cpuimx51sd.c
+@@ -110,7 +110,7 @@ static iomux_v3_cfg_t eukrea_cpuimx51sd_pads[] = {
+ 
+ 	/* Touchscreen */
+ 	/* IRQ */
+-	_MX51_PAD_CSI1_D8__GPIO3_12 | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
++	MX51_PAD_GPIO_NAND__GPIO_NAND | MUX_PAD_CTRL(PAD_CTL_PUS_22K_UP |
+ 			PAD_CTL_PKE | PAD_CTL_SRE_FAST |
+ 			PAD_CTL_DSE_HIGH | PAD_CTL_PUE | PAD_CTL_HYS),
+ };
+@@ -119,15 +119,9 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
  };
  
- #define GPIO_LED1	IMX_GPIO_NR(3, 30)
-@@ -133,6 +138,11 @@ static struct i2c_board_info eukrea_mbimxsd_i2c_devices[] = {
- 	},
+-static int ts_get_pendown_state(void)
+-{
+-	return gpio_get_value(TSC2007_IRQGPIO) ? 0 : 1;
+-}
+-
+ static struct tsc2007_platform_data tsc2007_info = {
+ 	.model			= 2007,
+ 	.x_plate_ohms		= 180,
+-	.get_pendown_state	= ts_get_pendown_state,
  };
  
-+static const
-+struct imx_ssi_platform_data eukrea_mbimxsd_ssi_pdata __initconst = {
-+	.flags = IMX_SSI_SYN | IMX_SSI_NET | IMX_SSI_USE_I2S_SLAVE,
-+};
-+
- /*
-  * system init for baseboard usage. Will be called by cpuimx51sd init.
-  *
-@@ -145,10 +155,28 @@ void __init eukrea_mbimxsd51_baseboard_init(void)
- 			ARRAY_SIZE(eukrea_mbimxsd_pads)))
- 		printk(KERN_ERR "error setting mbimxsd pads !\n");
- 
-+#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
-+	/* SSI unit master I2S codec connected to SSI_AUD3 */
-+	mxc_audmux_v2_configure_port(0,
-+			MXC_AUDMUX_V2_PTCR_SYN |
-+			MXC_AUDMUX_V2_PTCR_TFSDIR |
-+			MXC_AUDMUX_V2_PTCR_TFSEL(2) |
-+			MXC_AUDMUX_V2_PTCR_TCLKDIR |
-+			MXC_AUDMUX_V2_PTCR_TCSEL(2),
-+			MXC_AUDMUX_V2_PDCR_RXDSEL(2)
-+	);
-+	mxc_audmux_v2_configure_port(2,
-+			MXC_AUDMUX_V2_PTCR_SYN |
-+			MXC_AUDMUX_V2_PTCR_TCSEL(0),
-+			MXC_AUDMUX_V2_PDCR_RXDSEL(0)
-+	);
-+#endif
-+
- 	imx51_add_imx_uart(1, NULL);
- 	imx51_add_imx_uart(2, &uart_pdata);
- 
- 	imx51_add_sdhci_esdhc_imx(0, NULL);
-+	imx51_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
- 
- 	gpio_request(GPIO_LED1, "LED1");
- 	gpio_direction_output(GPIO_LED1, 1);
+ static struct i2c_board_info eukrea_cpuimx51sd_i2c_devices[] = {
 -- 
 1.7.4
