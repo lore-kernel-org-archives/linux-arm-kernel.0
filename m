@@ -1,31 +1,37 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 25 Feb 2011 08:54:17 -0700
-Subject: [PATCH v4 6/7] arm/dt: Basic tegra devicetree support
-In-Reply-To: <4D67AEEE.30000@ru.mvista.com>
-References: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
-	<20110223022234.18318.90592.stgit@localhost6.localdomain6>
-	<4D657880.50405@ru.mvista.com>
-	<20110223213601.GA5404@angua.secretlab.ca>
-	<4D67AEEE.30000@ru.mvista.com>
-Message-ID: <AANLkTimcKkkRUSHOKo89ufZ4JfexsgKhUTHNroZqWH7_@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 25 Feb 2011 17:59:53 +0100
+Subject: [PATCH] nmk-gpio: use request_irq instead of chained handler
+In-Reply-To: <5890487119819559395@unknownmsgid>
+References: <1298465690-27077-1-git-send-email-rabin.vincent@stericsson.com>
+	<-6148324460357957969@unknownmsgid>
+	<AANLkTin94vzJ_RvxvydnF1ymT2hbKGHruqUMrFTZKPJ+@mail.gmail.com>
+	<5890487119819559395@unknownmsgid>
+Message-ID: <AANLkTin_xxPJnOKxiu-z=Yo2FVkD=_Ow7CoGb2gApUaq@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 25, 2011 at 6:30 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> On 24-02-2011 0:36, Grant Likely wrote:
->>>> v2: Fixed cut-and-paste error in commit text
+2011/2/23 Will Deacon <will.deacon@arm.com>:
+>> On Wed, Feb 23, 2011 at 22:47, Will Deacon <will.deacon@arm.com> wrote:
+>> >> __nmk_gpio_irq_handler doesn't do anything more that what a normal handler
+>> >> does, so it can become one. ?This is also needed for changing the GIC
+>> >> implementation to a different flow handler.
+>> >>
+>> >> Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+>> >
+>> > mach-nomadik only seems to use the vic. Why does this GPIO handler
+>> > need updating?
+>>
+>> plat-nomadik/gpio.c is also used by mach-ux500, which uses the GIC.
 >
->>> ? ?Shouldn't this sentence follow the --- tearline?
->
->> Nope! ?It is actually quite useful for the version information to show
->> up in the commit text. ?That way you know *exactly* which version got
->> merged. ?dwmw2 pointed that out to me a few months back.
->
-> ? Well, I think that depends on the patch. If you have say 9 revisions with
-> significant changes (that's what I actually had) and the revision history
-> far exceeds the original patch description, then this will just become too
-> ugly I think...
+> Ah yes, sorry I missed that one. I'm happy to include any patches from you
+> in the GIC fasteoi series if it makes merging easier.
 
-Meh.  commit text is cheap and useful.
+OK if this one is OK I sure prefer that you take it in your series Will,
+since you have the whole picture of what you want to do with the
+GIC.
 
-g.
+It'll likely collide with the stuff I have stacked up for the 2.6.39 merge
+window though, which will be pull-requested any day now.
+
+Yours,
+Linus Walleij
