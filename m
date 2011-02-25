@@ -1,44 +1,46 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 25 Feb 2011 12:39:31 +0200
-Subject: [PATCH V4 0/6] pxa3xx_nand update series set version 4
-In-Reply-To: <1298019428-7809-1-git-send-email-leiwen@marvell.com>
-References: <1298019428-7809-1-git-send-email-leiwen@marvell.com>
-Message-ID: <1298630371.2798.43.camel@localhost>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 25 Feb 2011 13:47:32 +0300
+Subject: [PATCH 1/3] pxa: Enable pxa-pcm-audio on pxa210/pxa25x platform
+In-Reply-To: <1298417351-24727-1-git-send-email-dbaryshkov@gmail.com>
+References: <1298417351-24727-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <AANLkTimD28SYLA=NZyEO8SS==wrZ2mL+LG92e6FGHtom@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-02-18 at 16:57 +0800, Lei Wen wrote:
-> Change from previous version:
-> rework the patch set accroding to Eric's suggestion.
-> Move the recode judgement to the after command execution.
-> 
-> Lei Wen (6):
->   pxa3xx_nand: make scan procedure more clear
->   pxa3xx_nand: rework irq logic
->   pxa3xx_nand: discard wait_for_event,write_cmd,__readid function
->   pxa3xx_nand: unify prepare command
->   pxa3xx_nand: mtd scan id process could be defined by driver itself
->   pxa3xx_nand: clean the keep configure code
+Eric, will it be possible to get at least this patch in the kernel?
 
-Hi, could you please make checkpatch.pl happy and re-send the patches?
+Otherwise all ASoC-based audio on pxa25x isn't working.
 
-There are many issues. OK, some are fine, do not try to fix them, e.g.:
+On 2/23/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+> pxa25x platforms were left out of major ASoC Update patch.
+> Since f0fba2ad1b a registration of pxa-pcm-audio device is required for
+> ASoC to function on pxa platforms. Register one also for pxa210/pxa25x.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> ---
+>  arch/arm/mach-pxa/pxa25x.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+> index fbc5b77..b166b1d 100644
+> --- a/arch/arm/mach-pxa/pxa25x.c
+> +++ b/arch/arm/mach-pxa/pxa25x.c
+> @@ -347,6 +347,7 @@ static struct platform_device *pxa25x_devices[]
+> __initdata = {
+>  	&pxa25x_device_assp,
+>  	&pxa25x_device_pwm0,
+>  	&pxa25x_device_pwm1,
+> +	&pxa_device_asoc_platform,
+>  };
+>
+>  static struct sys_device pxa25x_sysdev[] = {
+> --
+> 1.7.2.3
+>
+>
 
-WARNING: line over 80 characters
-#127: FILE: drivers/mtd/nand/pxa3xx_nand.c:221:
-+{ "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &default_cmdset, &timing[2] },
-
-but some are clearly stylistic errors:
-
-ERROR: else should follow close brace '}'
-#249: FILE: drivers/mtd/nand/pxa3xx_nand.c:539:
-+                }
-+                else {
-
-etc.
-
-Thanks!
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+With best wishes
+Dmitry
