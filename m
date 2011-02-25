@@ -1,424 +1,210 @@
-From: dwalker@fifo99.com (Daniel Walker)
-Date: Thu, 24 Feb 2011 18:23:41 -0800
-Subject: [PATCH v2 2/2] msm: add single-wire serial bus interface
-	(SSBI) driver
-In-Reply-To: <1298585954-22422-3-git-send-email-kheitke@codeaurora.org>
-References: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
-	<1298585954-22422-3-git-send-email-kheitke@codeaurora.org>
-Message-ID: <1298600621.17118.27.camel@m0nster>
+From: dh09.lee@samsung.com (Donghwa Lee)
+Date: Fri, 25 Feb 2011 11:31:16 +0900
+Subject: [PATCH] drivers: ld9040 amoled driver support
+In-Reply-To: <20110224154250.266b2688.akpm@linux-foundation.org>
+References: <1294893628-16998-1-git-send-email-dh09.lee@samsung.com>
+	<20110224154250.266b2688.akpm@linux-foundation.org>
+Message-ID: <4D671474.6090907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-You have some submission problems. one is that the subject should be
-"drivers: msm: ..." , this patch also shouldn't go to David.
-
-On Thu, 2011-02-24 at 15:19 -0700, Kenneth Heitke wrote:
-> SSBI is the Qualcomm single-wire serial bus interface used to connect
-> the MSM devices to the PMIC and other devices.
-> 
-> Since SSBI only supports a single slave, the driver gets the name of the
-> slave device passed in from the board file through the master device's
-> platform data.
-> 
-> SSBI registers pretty early (postcore), so that the PMIC can come up
-> before the board init. This is useful if the board init requires the
-> use of gpios that are connected through the PMIC.
-> 
-> Based on a patch by Dima Zavin <dima@android.com> that can be found at:
-> http://android.git.kernel.org/?p=kernel/msm.git;a=commitdiff;h=eb060bac4
-
-I don't really like links in the commit text, cause as soon as Google
-deletes this tree the link is worthless.
-
-> This patch adds PMIC Arbiter support for the MSM8660. The PMIC Arbiter
-> is a hardware wrapper around the SSBI 2.0 controller that is designed to
-> overcome concurrency issues and security limitations.  A controller_type
-> field is added to the platform data to specify the type of the SSBI
-> controller (1.0, 2.0, or PMIC Arbiter).
-> 
-> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
-> ---
->  drivers/Kconfig          |    2 +
->  drivers/Makefile         |    1 +
->  drivers/msm/Kconfig      |   13 ++
->  drivers/msm/Makefile     |    4 +
->  drivers/msm/ssbi.c       |  376 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/msm_ssbi.h |   49 ++++++
->  6 files changed, 445 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/msm/Kconfig
->  create mode 100644 drivers/msm/Makefile
->  create mode 100644 drivers/msm/ssbi.c
->  create mode 100644 include/linux/msm_ssbi.h
-> 
-> diff --git a/drivers/Kconfig b/drivers/Kconfig
-> index 9bfb71f..fceeb20 100644
-> --- a/drivers/Kconfig
-> +++ b/drivers/Kconfig
-> @@ -117,4 +117,6 @@ source "drivers/staging/Kconfig"
->  source "drivers/platform/Kconfig"
->  
->  source "drivers/clk/Kconfig"
-> +
-> +source "drivers/msm/Kconfig"
->  endmenu
-> diff --git a/drivers/Makefile b/drivers/Makefile
-> index b423bb1..14cb94b 100644
-> --- a/drivers/Makefile
-> +++ b/drivers/Makefile
-> @@ -117,3 +117,4 @@ obj-y				+= platform/
->  obj-y				+= ieee802154/
->  #common clk code
->  obj-y				+= clk/
-> +obj-y				+= msm/
-> diff --git a/drivers/msm/Kconfig b/drivers/msm/Kconfig
-> new file mode 100644
-> index 0000000..413bb65
-> --- /dev/null
-> +++ b/drivers/msm/Kconfig
-> @@ -0,0 +1,13 @@
-> +menu "Qualcomm MSM specific device drivers"
-> +	depends on ARCH_MSM
-> +
-> +config MSM_SSBI
-> +	bool "Qualcomm Single-wire Serial Bus Interface (SSBI)"
-> +	help
-> +	  If you say yes to this option, support will be included for the
-> +	  built-in SSBI interface on Qualcomm MSM family processors.
-> +
-> +	  This is required for communicating with Qualcomm PMICs and
-> +	  other devices that have the SSBI interface.
-> +
-> +endmenu
-> diff --git a/drivers/msm/Makefile b/drivers/msm/Makefile
-> new file mode 100644
-> index 0000000..ea8c1e4
-> --- /dev/null
-> +++ b/drivers/msm/Makefile
-> @@ -0,0 +1,4 @@
-> +#
-> +# Makefile for the MSM specific device drivers.
-> +#
-> +obj-$(CONFIG_MSM_SSBI) += ssbi.o
-> diff --git a/drivers/msm/ssbi.c b/drivers/msm/ssbi.c
-> new file mode 100644
-> index 0000000..1fae443
-> --- /dev/null
-> +++ b/drivers/msm/ssbi.c
-> @@ -0,0 +1,376 @@
-> +/* Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
-> + * Copyright (c) 2010, Google Inc.
-> + *
-> + * Original authors: Code Aurura Forum
-
-Spelling problem.
-
-> + * Author: Dima Zavin <dima@android.com>
-> + *  - Largely rewritten from original to not be an i2c driver.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/msm_ssbi.h>
-> +
-> +/* SSBI 2.0 controller registers */
-> +#define SSBI2_CMD			0x0008
-> +#define SSBI2_RD			0x0010
-> +#define SSBI2_STATUS			0x0014
-> +#define SSBI2_MODE2			0x001C
-> +
-> +/* SSBI_CMD fields */
-> +#define SSBI_CMD_RDWRN			(1 << 24)
-> +
-> +/* SSBI_STATUS fields */
-> +#define SSBI_STATUS_RD_READY		(1 << 2)
-> +#define SSBI_STATUS_READY		(1 << 1)
-> +#define SSBI_STATUS_MCHN_BUSY		(1 << 0)
-> +
-> +/* SSBI_MODE2 fields */
-> +#define SSBI_MODE2_REG_ADDR_15_8_SHFT	0x04
-> +#define SSBI_MODE2_REG_ADDR_15_8_MASK	(0x7f << SSBI_MODE2_REG_ADDR_15_8_SHFT)
-> +
-> +#define SET_SSBI_MODE2_REG_ADDR_15_8(MD, AD) \
-> +	(((MD) & 0x0F) | ((((AD) >> 8) << SSBI_MODE2_REG_ADDR_15_8_SHFT) & \
-> +	SSBI_MODE2_REG_ADDR_15_8_MASK))
-> +
-> +/* SSBI PMIC Arbiter command registers */
-> +#define SSBI_PA_CMD			0x0000
-> +#define SSBI_PA_RD_STATUS		0x0004
-> +
-> +/* SSBI_PA_CMD fields */
-> +#define SSBI_PA_CMD_RDWRN		(1 << 24)
-> +
-> +/* SSBI_PA_RD_STATUS fields */
-> +#define SSBI_PA_RD_STATUS_TRANS_DONE	(1 << 27)
-> +#define SSBI_PA_RD_STATUS_TRANS_DENIED	(1 << 26)
-> +
-> +#define SSBI_TIMEOUT_US			100
-> +
-> +struct msm_ssbi {
-> +	struct device		*dev;
-> +	struct device		*slave;
-> +	void __iomem		*base;
-> +	spinlock_t		lock;
-> +	enum msm_ssbi_controller_type controller_type;
-> +	int (*read)(struct msm_ssbi *, u16 addr, u8 *buf, int len);
-> +	int (*write)(struct msm_ssbi *, u16 addr, u8 *buf, int len);
-> +};
-> +
-> +#define to_msm_ssbi(dev)	platform_get_drvdata(to_platform_device(dev))
-> +
-> +static inline u32 ssbi_readl(struct msm_ssbi *ssbi, u32 reg)
+ On Fri, 25 Feb 2011 8:42 @t, Andrew Morton wrote:
+> On Thu, 13 Jan 2011 13:40:28 +0900
+> Donghwa Lee <dh09.lee@samsung.com> wrote:
+>
+>>  +#define POWER_IS_ON(pwr)	((pwr) <= FB_BLANK_NORMAL)
+> This could and should be implemented as a regular lower-case C function.
+>
+Ok, I will change to lower-case.
+>> +
+>> +static const unsigned short SEQ_SWRESET[] = {
+>> +	0x01, COMMAND_ONLY,
+>> +	ENDDEF, 0x00
+>> +};
+> It's strange that all these tables have upper-case names.  Unless
+> there's some special reason for doing it this way, please make them
+> regular lower-case identifiers.
+>
+It means specific register setting tables, but, on second thoughts, it is meaningless. I will change it.
+>> ...
+>>
+>> +static int ld9040_ldi_init(struct ld9040 *lcd)
+>> +{
+>> +	int ret, i;
+>> +	const unsigned short *init_seq[] = {
+>> +		SEQ_USER_SETTING,
+>> +		SEQ_PANEL_CONDITION,
+>> +		SEQ_DISPCTL,
+>> +		SEQ_MANPWR,
+>> +		SEQ_PWR_CTRL,
+>> +		SEQ_ELVSS_ON,
+>> +		SEQ_GTCON,
+>> +		SEQ_GAMMA_SET1,
+>> +		SEQ_GAMMA_CTRL,
+>> +		SEQ_SLPOUT,
+>> +	};
+> Make this table static so the compiler doesn't rebuild it on the stack
+> each time the function is called.  The compiler probably already
+> performs that optimisation, but it doesn't hurt to be explicit.
+>
+Ok, I will modify it.
+>  +static ssize_t ld9040_sysfs_show_gamma_mode(struct device *dev,
+> +				      struct device_attribute *attr, char *buf)
 > +{
-> +	return readl(ssbi->base + reg);
-> +}
+> +	struct ld9040 *lcd = dev_get_drvdata(dev);
+> +	char temp[10];
 > +
-> +static inline void ssbi_writel(struct msm_ssbi *ssbi, u32 val, u32 reg)
-> +{
-> +	writel(val, ssbi->base + reg);
-> +}
-> +
-> +static int ssbi_wait_mask(struct msm_ssbi *ssbi, u32 set_mask, u32 clr_mask)
-> +{
-> +	u32 timeout = SSBI_TIMEOUT_US;
-> +	u32 val;
-> +
-> +	while (timeout--) {
-> +		val = ssbi_readl(ssbi, SSBI2_STATUS);
-> +		if (((val & set_mask) == set_mask) && ((val & clr_mask) == 0))
-> +			return 0;
-> +		udelay(1);
-> +	}
-> +
-> +	dev_err(ssbi->dev, "%s: timeout (status %x set_mask %x clr_mask %x)\n",
-> +		__func__, ssbi_readl(ssbi, SSBI2_STATUS), set_mask, clr_mask);
-> +	return -ETIMEDOUT;
-> +}
-> +
-> +static int
-> +msm_ssbi_read_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-> +{
-> +	u32 cmd = SSBI_CMD_RDWRN | ((addr & 0xff) << 16);
-> +	int ret = 0;
-> +
-> +	if (ssbi->controller_type == MSM_SBI_CTRL_SSBI2) {
-> +		u32 mode2 = ssbi_readl(ssbi, SSBI2_MODE2);
-> +		mode2 = SET_SSBI_MODE2_REG_ADDR_15_8(mode2, addr);
-> +		ssbi_writel(ssbi, mode2, SSBI2_MODE2);
-> +	}
-> +
-> +	while (len) {
-> +		ret = ssbi_wait_mask(ssbi, SSBI_STATUS_READY, 0);
-> +		if (ret)
-> +			goto err;
-> +
-> +		ssbi_writel(ssbi, cmd, SSBI2_CMD);
-> +		ret = ssbi_wait_mask(ssbi, SSBI_STATUS_RD_READY, 0);
-> +		if (ret)
-> +			goto err;
-> +		*buf++ = ssbi_readl(ssbi, SSBI2_RD) & 0xff;
-> +		len--;
-> +	}
-> +
-> +err:
-> +	return ret;
-> +}
-> +
-> +static int
-> +msm_ssbi_write_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-> +{
-> +	int ret = 0;
-> +
-> +	if (ssbi->controller_type == MSM_SBI_CTRL_SSBI2) {
-> +		u32 mode2 = ssbi_readl(ssbi, SSBI2_MODE2);
-> +		mode2 = SET_SSBI_MODE2_REG_ADDR_15_8(mode2, addr);
-> +		ssbi_writel(ssbi, mode2, SSBI2_MODE2);
-> +	}
-> +
-> +	while (len) {
-> +		ret = ssbi_wait_mask(ssbi, SSBI_STATUS_READY, 0);
-> +		if (ret)
-> +			goto err;
-> +
-> +		ssbi_writel(ssbi, ((addr & 0xff) << 16) | *buf, SSBI2_CMD);
-> +		ret = ssbi_wait_mask(ssbi, 0, SSBI_STATUS_MCHN_BUSY);
-> +		if (ret)
-> +			goto err;
-> +		buf++;
-> +		len--;
-> +	}
-> +
-> +err:
-> +	return ret;
-> +}
-> +
-> +static inline int
-> +msm_ssbi_pa_transfer(struct msm_ssbi *ssbi, u32 cmd, u8 *data)
-> +{
-> +	u32 timeout = SSBI_TIMEOUT_US;
-> +	u32 rd_status = 0;
-> +
-> +	ssbi_writel(ssbi, cmd, SSBI_PA_CMD);
-> +
-> +	while (timeout--) {
-> +		rd_status = ssbi_readl(ssbi, SSBI_PA_RD_STATUS);
-> +
-> +		if (rd_status & SSBI_PA_RD_STATUS_TRANS_DENIED) {
-> +			dev_err(ssbi->dev, "%s: transaction denied (0x%x)\n",
-> +					__func__, rd_status);
-> +			return -EPERM;
-> +		}
-> +
-> +		if (rd_status & SSBI_PA_RD_STATUS_TRANS_DONE) {
-> +			if (data)
-> +				*data = rd_status & 0xff;
-> +			return 0;
-> +		}
-> +		udelay(1);
-> +	}
-> +
-> +	dev_err(ssbi->dev, "%s: timeout, status 0x%x\n", __func__, rd_status);
-> +	return -ETIMEDOUT;
-> +}
-> +
-> +static int
-> +msm_ssbi_pa_read_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-> +{
-> +	u32 cmd;
-> +	int ret = 0;
-> +
-> +	cmd = SSBI_PA_CMD_RDWRN | (addr & 0x3fff) << 8;
-> +
-> +	while (len) {
-> +		ret = msm_ssbi_pa_transfer(ssbi, cmd, buf);
-> +		if (ret)
-> +			goto err;
-> +		buf++;
-> +		len--;
-> +	}
-> +
-> +err:
-> +	return ret;
-> +}
-> +
-> +static int
-> +msm_ssbi_pa_write_bytes(struct msm_ssbi *ssbi, u16 addr, u8 *buf, int len)
-> +{
-> +	u32 cmd;
-> +	int ret = 0;
-> +
-> +	while (len) {
-> +		cmd = (addr & 0x3fff) << 8 | *buf;
-> +		ret = msm_ssbi_pa_transfer(ssbi, cmd, NULL);
-> +		if (ret)
-> +			goto err;
-> +		buf++;
-> +		len--;
-> +	}
-> +
-> +err:
-> +	return ret;
-> +}
-> +
-> +int msm_ssbi_read(struct device *dev, u16 addr, u8 *buf, int len)
-> +{
-> +	struct msm_ssbi *ssbi = to_msm_ssbi(dev);
-> +	unsigned long flags;
-> +	int ret;
-> +
-> +	BUG_ON(ssbi->dev != dev);
+> +	switch (lcd->gamma_mode) {
+> +	case 0:
+> +		sprintf(temp, "2.2 mode\n");
+> +		strcat(buf, temp);
+> Could do sprintf(buf + strlen(buf)) and eliminate temp[].
+Current gamma table is only one, so I remove all about gamma mode.
+>> +static ssize_t ld9040_sysfs_store_gamma_mode(struct device *dev,
+>> +				       struct device_attribute *attr,
+>> +				       const char *buf, size_t len)
+>> +{
+>> +	struct ld9040 *lcd = dev_get_drvdata(dev);
+>> +	struct backlight_device *bd = NULL;
+>> +	int brightness, rc;
+>> +
+>> +	rc = strict_strtoul(buf, 0, (unsigned long *)&lcd->gamma_mode);
+> That's a bug.  gamma_mode has type int, which is 4 bytes, but you're
+> telling strict_strtoul() to write eight bytes - it will corrupt *lcd on
+> a 64-bit machine.  Use a temporary.
+>
+Current gamma table is only one, so I remove all about gamma mode.
+>> +
+>> +static DEVICE_ATTR(gamma_mode, 0644,
+>> +		ld9040_sysfs_show_gamma_mode, ld9040_sysfs_store_gamma_mode);
+>> +
+>> +static ssize_t ld9040_sysfs_show_gamma_table(struct device *dev,
+>> +				      struct device_attribute *attr, char *buf)
+>> +{
+>> +	struct ld9040 *lcd = dev_get_drvdata(dev);
+>> +	char temp[3];
+>> +
+>> +	sprintf(temp, "%d\n", lcd->gamma_table_count);
+>> +	strcpy(buf, temp);
+> sprintf(buf + strlen(buf), remove temp[].
+>
+Current gamma table is only one, so I remove all about gamma mode.
+>> +	return strlen(buf);
+>> +}
+>> +
+>> +static DEVICE_ATTR(gamma_table, 0644,
+>> +		ld9040_sysfs_show_gamma_table, NULL);
+>> +
+>> +static int ld9040_probe(struct spi_device *spi)
+>> +{
+>> +	int ret = 0;
+>> +	struct ld9040 *lcd = NULL;
+>> +	struct lcd_device *ld = NULL;
+>> +	struct backlight_device *bd = NULL;
+>> +
+>> +	lcd = kzalloc(sizeof(struct ld9040), GFP_KERNEL);
+>> +	if (!lcd)
+>> +		return -ENOMEM;
+>> +
+>> +	/* ld9040 lcd panel uses 3-wire 9bits SPI Mode. */
+>> +	spi->bits_per_word = 9;
+>> +
+>> +	ret = spi_setup(spi);
+>> +	if (ret < 0) {
+>> +		dev_err(&spi->dev, "spi setup failed.\n");
+>> +		goto out_free_lcd;
+>> +	}
+>> +
+>> +	lcd->spi = spi;
+>> +	lcd->dev = &spi->dev;
+>> +
+>> +	lcd->lcd_pd = (struct lcd_platform_data *)spi->dev.platform_data;
+> Unneeded and undesirable typecast.
+>
+Ok, I will modify it.
+>> +	/*
+>> +	 * it gets gamma table count available so it gets user
+>> +	 * know that.
+>> +	 */
+>> +	lcd->gamma_table_count =
+>> +	    sizeof(gamma_table) / (MAX_GAMMA_LEVEL * sizeof(int));
+>> +
+>> +	ret = device_create_file(&(spi->dev), &dev_attr_gamma_mode);
+>> +	if (ret < 0)
+>> +		dev_err(&(spi->dev), "failed to add sysfs entries\n");
+>> +
+>> +	ret = device_create_file(&(spi->dev), &dev_attr_gamma_table);
+>> +	if (ret < 0)
+>> +		dev_err(&(spi->dev), "failed to add sysfs entries\n");
+> These errors are just ignored.  It would be better to perform cleanup
+> and to then return the correct errno.
+>
+Above, creating sysfs node is unneeded. I will remove it.
+>> +
+>> +#if defined(CONFIG_PM)
+>> +unsigned int beforepower;
+> This should be static.
+>
+> Also, it shouldn't exist.  Its presence assumes that there will only be
+> one device controlled by this driver.  It should be moved into the
+> per-device data area.
+>
+Yes, you're right. beforepower variable is unneeded, I will remove it.
+>> ...
+>>
+>> +struct ld9040_gamma {
+>> +	unsigned int *gamma_22_table[MAX_GAMMA_LEVEL];
+>> +};
+>> +
+>> +static struct ld9040_gamma gamma_table = {
+> Could do
+>
+> static struct ld9040_gamma {
+> 	unsigned int *gamma_22_table[MAX_GAMMA_LEVEL];
+> } gamma_table = {
+>
+> here.
+>
+Ok, I will move it.
+>> +	.gamma_22_table[0] = (unsigned int *)&ld9040_22_50,
+>> +	.gamma_22_table[1] = (unsigned int *)&ld9040_22_70,
+>> +	.gamma_22_table[2] = (unsigned int *)&ld9040_22_80,
+>> +	.gamma_22_table[3] = (unsigned int *)&ld9040_22_90,
+>> +	.gamma_22_table[4] = (unsigned int *)&ld9040_22_100,
+>> +	.gamma_22_table[5] = (unsigned int *)&ld9040_22_110,
+>> +	.gamma_22_table[6] = (unsigned int *)&ld9040_22_120,
+>> +	.gamma_22_table[7] = (unsigned int *)&ld9040_22_130,
+>> +	.gamma_22_table[8] = (unsigned int *)&ld9040_22_140,
+>> +	.gamma_22_table[9] = (unsigned int *)&ld9040_22_150,
+>> +	.gamma_22_table[10] = (unsigned int *)&ld9040_22_160,
+>> +	.gamma_22_table[11] = (unsigned int *)&ld9040_22_170,
+>> +	.gamma_22_table[12] = (unsigned int *)&ld9040_22_180,
+>> +	.gamma_22_table[13] = (unsigned int *)&ld9040_22_190,
+>> +	.gamma_22_table[14] = (unsigned int *)&ld9040_22_200,
+>> +	.gamma_22_table[15] = (unsigned int *)&ld9040_22_210,
+>> +	.gamma_22_table[16] = (unsigned int *)&ld9040_22_220,
+>> +	.gamma_22_table[17] = (unsigned int *)&ld9040_22_230,
+>> +	.gamma_22_table[18] = (unsigned int *)&ld9040_22_240,
+>> +	.gamma_22_table[19] = (unsigned int *)&ld9040_22_250,
+>> +	.gamma_22_table[20] = (unsigned int *)&ld9040_22_260,
+>> +	.gamma_22_table[21] = (unsigned int *)&ld9040_22_270,
+>> +	.gamma_22_table[22] = (unsigned int *)&ld9040_22_280,
+>> +	.gamma_22_table[23] = (unsigned int *)&ld9040_22_290,
+>> +	.gamma_22_table[24] = (unsigned int *)&ld9040_22_300,
+>> +};
+>> +
+>> +#endif
+> Defining static tables in a header file is strange.  It would be very
+> wrong if that header was ever included by more than a single .c file,
+> so why not just eliminate this file and move its contents into that .c
+> file?
+>
+But, if its contents moved into that .c file, ld9040.c  becomes very long file.
+Ld9040.c file already had many register set data variable, I think readability is less than
+before.
 
-Are you sure you don't just want to bail out here, cause this hangs the
-system when it triggers?
 
-> +	spin_lock_irqsave(&ssbi->lock, flags);
-> +	ret = ssbi->read(ssbi, addr, buf, len);
-> +	spin_unlock_irqrestore(&ssbi->lock, flags);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(msm_ssbi_read);
-> +
-> +int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len)
-> +{
-> +	struct msm_ssbi *ssbi = to_msm_ssbi(dev);
-> +	unsigned long flags;
-> +	int ret;
-> +
-> +	BUG_ON(ssbi->dev != dev);
-> +
-> +	spin_lock_irqsave(&ssbi->lock, flags);
-> +	ret = ssbi->write(ssbi, addr, buf, len);
-> +	spin_unlock_irqrestore(&ssbi->lock, flags);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL(msm_ssbi_write);
-> +
-> +static int __devinit msm_ssbi_add_slave(struct msm_ssbi *ssbi,
-> +				     const struct msm_ssbi_slave_info *slave)
-> +{
-> +	struct platform_device *slave_pdev;
-> +	int ret;
-> +
-> +	if (ssbi->slave) {
-> +		pr_err("%s: slave already attached??\n", __func__);
-> +		return -EBUSY;
+I'm very grateful to you for your review.
+Thank you.
 
-You can use a pr_fmt line to add the __func__ part, look in mach-msm for
-examples.
-
-> +	}
-> +
-> +	slave_pdev = platform_device_alloc(slave->name, -1);
-> +	if (!slave_pdev) {
-> +		pr_err("%s: cannot allocate pdev for slave '%s'", __func__,
-> +		       slave->name);
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
-> +
-> +	slave_pdev->dev.parent = ssbi->dev;
-> +	slave_pdev->dev.platform_data = slave->platform_data;
-> +
-> +	ret = platform_device_add(slave_pdev);
-> +	if (ret) {
-> +		pr_err("%s: cannot add slave platform device for '%s'\n",
-> +		       __func__, slave->name);
-> +		goto err;
-> +	}
-> +
-> +	ssbi->slave = &slave_pdev->dev;
-> +	return 0;
-> +
-> +err:
-> +	if (slave_pdev)
-> +		platform_device_put(slave_pdev);
-> +	return ret;
-> +}
-> +
-> +static int __devinit msm_ssbi_probe(struct platform_device *pdev)
-> +{
-> +	const struct msm_ssbi_platform_data *pdata = pdev->dev.platform_data;
-> +	struct resource *mem_res;
-> +	struct msm_ssbi *ssbi;
-> +	int ret = 0;
-> +
-> +	printk(KERN_INFO "%s: %s\n", __func__, pdata->slave.name);
-
-pr_info() ?
-
-Daniel
+Donghwa Lee
