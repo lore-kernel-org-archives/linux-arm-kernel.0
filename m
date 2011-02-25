@@ -1,20 +1,28 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Fri, 25 Feb 2011 14:02:41 +0100
-Subject: [PATCH v4 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources
-	used by PRUSS UIO driver
-In-Reply-To: <4D6796D6.5050008@mvista.com>
-References: <1298556402-26456-1-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-2-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-3-git-send-email-pratheesh@ti.com>
-	<4D6796D6.5050008@mvista.com>
-Message-ID: <20110225130241.GA2791@local>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 25 Feb 2011 14:14:08 +0100
+Subject: [PATCH] ARM: S5P: Add platform helpers for camera GPIO
+	configuration
+In-Reply-To: <1297447665-19492-2-git-send-email-s.nawrocki@samsung.com>
+References: <1297447665-19492-1-git-send-email-s.nawrocki@samsung.com>
+	<1297447665-19492-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <4D67AB20.8000000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 25, 2011 at 02:47:34PM +0300, Sergei Shtylyov wrote:
-> On 24-02-2011 17:06, Pratheesh Gangadhar wrote:
+
+On 02/11/2011 07:07 PM, Sylwester Nawrocki wrote:
+> Add functions for the parallel camera GPIO interface
+> configuration on S5PV210 and S5PV310 SoCs.
 > 
-> >This patch defines PRUSS, ECAP clocks, memory and IRQ resources
-> >used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
-> 
->    It's OMAP-L138.
+
+Kukjin, are you OK with general concept of those?
+I would probably need to rework the patches after recent
+S5PV310 -> EXYNOS4 renaming. And move camera.h 
+to arch/arm/plat-samsung/include/plat/?
+
+What's your opinion?
+
+Thanks,
+-- 
+Sylwester Nawrocki
+Samsung Poland R&D Center
