@@ -1,16 +1,20 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 25 Feb 2011 12:58:23 +0000
-Subject: [PATCH] eukrea-tlv320: fix platform_name
-In-Reply-To: <1298638066-4049-1-git-send-email-eric@eukrea.com>
-References: <1298638066-4049-1-git-send-email-eric@eukrea.com>
-Message-ID: <20110225125822.GA12705@opensource.wolfsonmicro.com>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Fri, 25 Feb 2011 14:02:41 +0100
+Subject: [PATCH v4 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources
+	used by PRUSS UIO driver
+In-Reply-To: <4D6796D6.5050008@mvista.com>
+References: <1298556402-26456-1-git-send-email-pratheesh@ti.com>
+	<1298556402-26456-2-git-send-email-pratheesh@ti.com>
+	<1298556402-26456-3-git-send-email-pratheesh@ti.com>
+	<4D6796D6.5050008@mvista.com>
+Message-ID: <20110225130241.GA2791@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 25, 2011 at 01:47:46PM +0100, Eric B?nard wrote:
-> commit f0fba2ad1b6b53d5360125c41953b7afcd6deff0 included a mistake
-> on the name of the platform in the snd_soc_dai_link structure.
+On Fri, Feb 25, 2011 at 02:47:34PM +0300, Sergei Shtylyov wrote:
+> On 24-02-2011 17:06, Pratheesh Gangadhar wrote:
 > 
-> Signed-off-by: Eric B?nard <eric@eukrea.com>
-
-Applied now, thanks.
+> >This patch defines PRUSS, ECAP clocks, memory and IRQ resources
+> >used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
+> 
+>    It's OMAP-L138.
