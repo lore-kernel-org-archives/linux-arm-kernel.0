@@ -1,51 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 Feb 2011 13:23:39 +0000
-Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
-In-Reply-To: <1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
-References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 25 Feb 2011 16:30:22 +0300
+Subject: [PATCH v4 6/7] arm/dt: Basic tegra devicetree support
+In-Reply-To: <20110223213601.GA5404@angua.secretlab.ca>
+References: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
+	<20110223022234.18318.90592.stgit@localhost6.localdomain6>
+	<4D657880.50405@ru.mvista.com>
+	<20110223213601.GA5404@angua.secretlab.ca>
+Message-ID: <4D67AEEE.30000@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-02-24 at 18:44 +0000, Stephen Boyd wrote:
-> Assign the registers used in the inline assembly immediately
-> before the inline assembly block. This ensures the compiler
-> doesn't optimize away dead register assignments when it
-> shouldn't.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-msm/scm.c |    7 +++++--
->  1 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-> index ba57b5a..5eddf54 100644
-> --- a/arch/arm/mach-msm/scm.c
-> +++ b/arch/arm/mach-msm/scm.c
-> @@ -264,13 +264,16 @@ u32 scm_get_version(void)
->  {
->         int context_id;
->         static u32 version = -1;
-> -       register u32 r0 asm("r0") = 0x1 << 8;
-> -       register u32 r1 asm("r1") = (u32)&context_id;
-> +       register u32 r0 asm("r0");
-> +       register u32 r1 asm("r1");
-> 
->         if (version != -1)
->                 return version;
-> 
->         mutex_lock(&scm_lock);
-> +
-> +       r0 = 0x1 << 8;
-> +       r1 = (u32)&context_id;
->         asm volatile(
->                 __asmeq("%0", "r1")
->                 __asmeq("%1", "r0")
+Hello.
 
+On 24-02-2011 0:36, Grant Likely wrote:
 
-Whoa, have you seen the compiler `optimise' the original assignments
-away? Since there is a use in the asm block, the definition shouldn't
-be omitted. What toolchain are you using?
+>>> This patch adds adds very basic support for booting tegra with a
+>>> device tree.  It simply allows the existing machine_descs to match
+>>> against the tegra compatible values so that the kernel can boot.
+>>> Kernel parameters and the initrd pointer is read out of the tree
+>>> instead of atags.
 
-Will
+>>> This is not complete device tree support.  This change will be
+>>> reverted when a new machine_desc is added that can populate the
+>>> device registrations directly from data in the tree instead of using
+>>> hard coded data.  That change will be made in a future patch.
+
+>>> v2: Fixed cut-and-paste error in commit text
+
+>>     Shouldn't this sentence follow the --- tearline?
+
+> Nope!  It is actually quite useful for the version information to show
+> up in the commit text.  That way you know *exactly* which version got
+> merged.  dwmw2 pointed that out to me a few months back.
+
+    Well, I think that depends on the patch. If you have say 9 revisions with 
+significant changes (that's what I actually had) and the revision history far 
+exceeds the original patch description, then this will just become too ugly I 
+think...
+
+WBR, Sergei
