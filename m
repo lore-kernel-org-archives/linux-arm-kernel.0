@@ -1,49 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 25 Feb 2011 11:56:57 +0000
-Subject: [PATCH 1/4] msm: scm: Mark inline asm as volatile
-In-Reply-To: <1298573085-23217-2-git-send-email-sboyd@codeaurora.org>
-References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1298635017.958.0.camel@e102144-lin.cambridge.arm.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 25 Feb 2011 14:55:45 +0300
+Subject: [PATCH] davinci: da850/omap-l138: Add Carrier Link OK check in
+	Davinci RX Handler
+In-Reply-To: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
+References: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
+Message-ID: <4D6798C1.7090404@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hello.
 
-On Thu, 2011-02-24 at 18:44 +0000, Stephen Boyd wrote:
-> We don't want the compiler to remove these asm statements or
-> reorder them in any way. Mark them as volatile to be sure.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  arch/arm/mach-msm/scm.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-> index f4b9bc9..ba57b5a 100644
-> --- a/arch/arm/mach-msm/scm.c
-> +++ b/arch/arm/mach-msm/scm.c
-> @@ -174,7 +174,7 @@ static u32 smc(u32 cmd_addr)
->         register u32 r0 asm("r0") = 1;
->         register u32 r1 asm("r1") = (u32)&context_id;
->         register u32 r2 asm("r2") = cmd_addr;
-> -       asm(
-> +       asm volatile(
->                 __asmeq("%0", "r0")
->                 __asmeq("%1", "r0")
->                 __asmeq("%2", "r1")
-> @@ -271,7 +271,7 @@ u32 scm_get_version(void)
->                 return version;
-> 
->         mutex_lock(&scm_lock);
-> -       asm(
-> +       asm volatile(
->                 __asmeq("%0", "r1")
->                 __asmeq("%1", "r0")
->                 __asmeq("%2", "r1")
+On 25-02-2011 12:56, Hegde, Vinay wrote:
 
+    This is not a patch to arch/arm/mach-davinci/, so the summary prefix 
+should not be "davinci: da850/omap-l138:" but rather "davinci_emac:" as you're 
+patching this driver.
 
-These asm blocks all have sensible looking output constraints. Why
-do they need to be marked volatile?
+> This patch adds an additional check in the Davinci EMAC RX Handler,
+> which tests the __LINK_STATE_NOCARRIER flag along with the
+> __LINK_STATE_START flag as part EMAC shutting down procedure.
 
-Will
+> This avoids
+> WARNING: at drivers/net/davinci_emac.c:1040 emac_rx_handler+0xf8/0x120()
+> during rtcwake used to suspend the target for a specified duration.
+
+> Signed-off-by: Hegde, Vinay <vinay.hegde@ti.com>
+
+> diff --git a/drivers/net/davinci_emac.c b/drivers/net/davinci_emac.c
+> index 2a628d1..7018bfe 100644
+> --- a/drivers/net/davinci_emac.c
+> +++ b/drivers/net/davinci_emac.c
+> @@ -1008,7 +1008,7 @@ static void emac_rx_handler(void *token, int len, int status)
+>   	int			ret;
+>
+>   	/* free and bail if we are shutting down */
+> -	if (unlikely(!netif_running(ndev))) {
+> +	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
+>   		dev_kfree_skb_any(skb);
+>   		return;
+>   	}
+
+WBR, Sergei
