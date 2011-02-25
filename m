@@ -1,43 +1,36 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 25 Feb 2011 14:55:45 +0300
-Subject: [PATCH] davinci: da850/omap-l138: Add Carrier Link OK check in
-	Davinci RX Handler
-In-Reply-To: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
-References: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
-Message-ID: <4D6798C1.7090404@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 25 Feb 2011 13:21:09 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <AANLkTikWKk0kE=Hh4gfA6Mwt+-65TVFnBcOYy_eRuQfw@mail.gmail.com>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102241024.01437.arnd@arndb.de>
+	<AANLkTikWKk0kE=Hh4gfA6Mwt+-65TVFnBcOYy_eRuQfw@mail.gmail.com>
+Message-ID: <201102251321.09232.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 25 February 2011, Andrei Warkentin wrote:
+> Yup. I understand :-).  That's the strategy I'm going to follow. For
+> page_size-alignment/splitting I'm looking at the block layer now. Is
+> that the right approach or should I still submit a (cleaned up) patch
+> to mmc/card/block.c for that performance improvement.
 
-On 25-02-2011 12:56, Hegde, Vinay wrote:
+I guess it should live in block/cfq-iosched in the long run, but I don't
+know how easy it is to implement it there for test purposes.
 
-    This is not a patch to arch/arm/mach-davinci/, so the summary prefix 
-should not be "davinci: da850/omap-l138:" but rather "davinci_emac:" as you're 
-patching this driver.
+It may be easier to prototype it in the mmc code, since you are more
+familiar with that already, post that patch together with benchmark
+results and then do a new patch for the final solution. We'll need
+more benchmarking to figure out if that should be applied for
+all nonrotational storage, or if there are cases where it actually
+hurts performance to split requests on page boundaries.
 
-> This patch adds an additional check in the Davinci EMAC RX Handler,
-> which tests the __LINK_STATE_NOCARRIER flag along with the
-> __LINK_STATE_START flag as part EMAC shutting down procedure.
+If it turns out to be a good idea in general, we won't even need a
+sysfs interface for enabling it, just one for reading/writing the
+underlying page size.
 
-> This avoids
-> WARNING: at drivers/net/davinci_emac.c:1040 emac_rx_handler+0xf8/0x120()
-> during rtcwake used to suspend the target for a specified duration.
+> The other (Toshiba quirk) is obviously a quirk belonging to mmc/card/block.c.
 
-> Signed-off-by: Hegde, Vinay <vinay.hegde@ti.com>
+Makes sense.
 
-> diff --git a/drivers/net/davinci_emac.c b/drivers/net/davinci_emac.c
-> index 2a628d1..7018bfe 100644
-> --- a/drivers/net/davinci_emac.c
-> +++ b/drivers/net/davinci_emac.c
-> @@ -1008,7 +1008,7 @@ static void emac_rx_handler(void *token, int len, int status)
->   	int			ret;
->
->   	/* free and bail if we are shutting down */
-> -	if (unlikely(!netif_running(ndev))) {
-> +	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
->   		dev_kfree_skb_any(skb);
->   		return;
->   	}
-
-WBR, Sergei
+	Arnd
