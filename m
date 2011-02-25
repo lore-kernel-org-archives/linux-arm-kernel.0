@@ -1,29 +1,312 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 25 Feb 2011 08:53:20 +0100
-Subject: [PATCH V11 2/4] ptp: Added a clock that uses the eTSEC found
-	on the MPC85xx.
-In-Reply-To: <20110224112731.2d9bf080@schlenkerla>
-References: <cover.1298447722.git.richard.cochran@omicron.at>
-	<be1f5e801e8cd0145dd23aadae7c2055bb3c1d47.1298447722.git.richard.cochran@omicron.at>
-	<20110223165058.GE14597@angua.secretlab.ca>
-	<20110223112612.30071995@schlenkerla>
-	<20110223175459.GH14597@angua.secretlab.ca>
-	<20110223132444.65dfdda4@schlenkerla>
-	<20110224165004.GB15234@riccoc20.at.omicron.at>
-	<20110224112731.2d9bf080@schlenkerla>
-Message-ID: <20110225075320.GA4032@riccoc20.at.omicron.at>
+From: mk7.kang@samsung.com (Minkyu Kang)
+Date: Fri, 25 Feb 2011 17:43:36 +0900
+Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
+Message-ID: <4D676BB8.9040803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 24, 2011 at 11:27:31AM -0600, Scott Wood wrote:
+This patch adds Samsung NURI board support.
 
-> My vote, if it goes in a separate node at all, is "fsl,etsec-ptp",
+Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+This patch is base on next-exynos4 branch at kgene tree.
 
-So, that is what the patch does.
+ arch/arm/configs/exynos4_defconfig |    1 +
+ arch/arm/mach-exynos4/Kconfig      |   15 +++
+ arch/arm/mach-exynos4/Makefile     |    1 +
+ arch/arm/mach-exynos4/mach-nuri.c  |  233 ++++++++++++++++++++++++++++++++++++
+ 4 files changed, 250 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
 
-> and let the driver use SVR.
-
-What is SVR?
-
-Thanks,
-Richard
+diff --git a/arch/arm/configs/exynos4_defconfig b/arch/arm/configs/exynos4_defconfig
+index 2ffba24..fd92324 100644
+--- a/arch/arm/configs/exynos4_defconfig
++++ b/arch/arm/configs/exynos4_defconfig
+@@ -9,6 +9,7 @@ CONFIG_S3C_LOWLEVEL_UART_PORT=1
+ CONFIG_MACH_SMDKC210=y
+ CONFIG_MACH_SMDKV310=y
+ CONFIG_MACH_UNIVERSAL_C210=y
++CONFIG_MACH_NURI=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index ad03840..5bf00b9 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -123,6 +123,21 @@ config MACH_UNIVERSAL_C210
+ 	  Machine support for Samsung Mobile Universal S5PC210 Reference
+ 	  Board.
+ 
++config MACH_NURI
++	bool "Mobile NURI Board"
++	select CPU_EXYNOS4210
++	select S3C_DEV_WDT
++	select S3C_DEV_HSMMC
++	select S3C_DEV_HSMMC2
++	select S3C_DEV_HSMMC3
++	select S3C_DEV_I2C1
++	select S3C_DEV_I2C5
++	select EXYNOS4_SETUP_I2C1
++	select EXYNOS4_SETUP_I2C5
++	select EXYNOS4_SETUP_SDHCI
++	help
++	  Machine support for Samsung Mobile NURI Board.
++
+ endmenu
+ 
+ comment "Configuration for HSMMC bus width"
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index 0558235..fa9e814 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
+ obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkc210.o
+ obj-$(CONFIG_MACH_SMDKV310)		+= mach-smdkv310.o
+ obj-$(CONFIG_MACH_UNIVERSAL_C210)	+= mach-universal_c210.o
++obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
+ 
+ # device support
+ 
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+new file mode 100644
+index 0000000..28010bd
+--- /dev/null
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -0,0 +1,233 @@
++/*
++ * linux/arch/arm/mach-exynos4/mach-nuri.c
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/platform_device.h>
++#include <linux/serial_core.h>
++#include <linux/input.h>
++#include <linux/i2c.h>
++#include <linux/gpio_keys.h>
++#include <linux/gpio.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
++#include <linux/mmc/host.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach-types.h>
++
++#include <plat/regs-serial.h>
++#include <plat/exynos4.h>
++#include <plat/cpu.h>
++#include <plat/devs.h>
++#include <plat/sdhci.h>
++
++#include <mach/map.h>
++
++/* Following are default values for UCON, ULCON and UFCON UART registers */
++#define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
++				 S3C2410_UCON_RXILEVEL |	\
++				 S3C2410_UCON_TXIRQMODE |	\
++				 S3C2410_UCON_RXIRQMODE |	\
++				 S3C2410_UCON_RXFIFO_TOI |	\
++				 S3C2443_UCON_RXERR_IRQEN)
++
++#define NURI_ULCON_DEFAULT	S3C2410_LCON_CS8
++
++#define NURI_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
++				 S5PV210_UFCON_TXTRIG256 |	\
++				 S5PV210_UFCON_RXTRIG256)
++
++enum fixed_regulator_id {
++	FIXED_REG_ID_MMC = 0,
++};
++
++static struct s3c2410_uartcfg nuri_uartcfgs[] __initdata = {
++	{
++		.hwport		= 0,
++		.ucon		= NURI_UCON_DEFAULT,
++		.ulcon		= NURI_ULCON_DEFAULT,
++		.ufcon		= NURI_UFCON_DEFAULT,
++	},
++	{
++		.hwport		= 1,
++		.ucon		= NURI_UCON_DEFAULT,
++		.ulcon		= NURI_ULCON_DEFAULT,
++		.ufcon		= NURI_UFCON_DEFAULT,
++	},
++	{
++		.hwport		= 2,
++		.ucon		= NURI_UCON_DEFAULT,
++		.ulcon		= NURI_ULCON_DEFAULT,
++		.ufcon		= NURI_UFCON_DEFAULT,
++	},
++	{
++		.hwport		= 3,
++		.ucon		= NURI_UCON_DEFAULT,
++		.ulcon		= NURI_ULCON_DEFAULT,
++		.ufcon		= NURI_UFCON_DEFAULT,
++	},
++};
++
++/* eMMC */
++static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
++	.max_width		= 8,
++	.host_caps		= (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
++			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
++			   MMC_CAP_DISABLE | MMC_CAP_ERASE),
++	.cd_type		= S3C_SDHCI_CD_PERMANENT,
++	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
++
++static struct regulator_consumer_supply emmc_supplies[] = {
++	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
++	REGULATOR_SUPPLY("vmmc", "dw_mmc"),
++};
++
++static struct regulator_init_data emmc_fixed_voltage_init_data = {
++	.constraints		= {
++		.name		= "VMEM_VDD_2.8V",
++		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(emmc_supplies),
++	.consumer_supplies	= emmc_supplies,
++};
++
++static struct fixed_voltage_config emmc_fixed_voltage_config = {
++	.supply_name		= "MASSMEMORY_EN (inverted)",
++	.microvolts		= 2800000,
++	.gpio			= EXYNOS4_GPL1(1),
++	.enable_high		= false,
++	.init_data		= &emmc_fixed_voltage_init_data,
++};
++
++static struct platform_device emmc_fixed_voltage = {
++	.name			= "reg-fixed-voltage",
++	.id			= FIXED_REG_ID_MMC,
++	.dev			= {
++		.platform_data	= &emmc_fixed_voltage_config,
++	},
++};
++
++/* SD */
++static struct s3c_sdhci_platdata nuri_hsmmc2_data __initdata = {
++	.max_width		= 4,
++	.host_caps		= MMC_CAP_4_BIT_DATA |
++				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
++				MMC_CAP_DISABLE,
++	.ext_cd_gpio		= EXYNOS4_GPX3(3),	/* XEINT_27 */
++	.ext_cd_gpio_invert	= 1,
++	.cd_type		= S3C_SDHCI_CD_GPIO,
++	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
++
++/* WLAN */
++static struct s3c_sdhci_platdata nuri_hsmmc3_data __initdata = {
++	.max_width		= 4,
++	.host_caps		= MMC_CAP_4_BIT_DATA |
++				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
++	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
++	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
++
++static void __init nuri_sdhci_init(void)
++{
++	s3c_sdhci0_set_platdata(&nuri_hsmmc0_data);
++	s3c_sdhci2_set_platdata(&nuri_hsmmc2_data);
++	s3c_sdhci3_set_platdata(&nuri_hsmmc3_data);
++}
++
++/* GPIO KEYS */
++static struct gpio_keys_button nuri_gpio_keys_tables[] = {
++	{
++		.code			= KEY_VOLUMEUP,
++		.gpio			= EXYNOS4_GPX2(0),	/* XEINT16 */
++		.desc			= "gpio-keys: KEY_VOLUMEUP",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	}, {
++		.code			= KEY_VOLUMEDOWN,
++		.gpio			= EXYNOS4_GPX2(1),	/* XEINT17 */
++		.desc			= "gpio-keys: KEY_VOLUMEDOWN",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.debounce_interval	= 1,
++	}, {
++		.code			= KEY_POWER,
++		.gpio			= EXYNOS4_GPX2(7),	/* XEINT23 */
++		.desc			= "gpio-keys: KEY_POWER",
++		.type			= EV_KEY,
++		.active_low		= 1,
++		.wakeup			= 1,
++		.debounce_interval	= 1,
++	},
++};
++
++static struct gpio_keys_platform_data nuri_gpio_keys_data = {
++	.buttons		= nuri_gpio_keys_tables,
++	.nbuttons		= ARRAY_SIZE(nuri_gpio_keys_tables),
++};
++
++static struct platform_device nuri_gpio_keys = {
++	.name			= "gpio-keys",
++	.dev			= {
++		.platform_data	= &nuri_gpio_keys_data,
++	},
++};
++
++/* I2C1 */
++static struct i2c_board_info i2c1_devs[] __initdata = {
++	/* Gyro, To be updated */
++};
++
++/* GPIO I2C 5 (PMIC) */
++static struct i2c_board_info i2c5_devs[] __initdata = {
++	/* max8997, To be updated */
++};
++
++static struct platform_device *nuri_devices[] __initdata = {
++	/* Samsung Platform Devices */
++	&emmc_fixed_voltage,
++	&s3c_device_hsmmc0,
++	&s3c_device_hsmmc2,
++	&s3c_device_hsmmc3,
++#ifdef CONFIG_S3C2410_WATCHDOG
++	&s3c_device_wdt,
++#endif
++
++	/* NURI Devices */
++	&nuri_gpio_keys,
++};
++
++static void __init nuri_map_io(void)
++{
++	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
++	s3c24xx_init_clocks(24000000);
++	s3c24xx_init_uarts(nuri_uartcfgs, ARRAY_SIZE(nuri_uartcfgs));
++}
++
++static void __init nuri_machine_init(void)
++{
++	nuri_sdhci_init();
++
++	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
++	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
++
++	/* Last */
++	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
++}
++
++MACHINE_START(NURI, "NURI")
++	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
++	.boot_params	= S5P_PA_SDRAM + 0x100,
++	.init_irq	= exynos4_init_irq,
++	.map_io		= nuri_map_io,
++	.init_machine	= nuri_machine_init,
++	.timer		= &exynos4_timer,
++MACHINE_END
+-- 
+1.7.1
