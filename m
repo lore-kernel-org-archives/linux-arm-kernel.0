@@ -1,95 +1,95 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 25 Feb 2011 16:49:52 +0800
-Subject: mxs: name##_set_rate broken
-In-Reply-To: <20110224165700.GY22310@pengutronix.de>
-References: <20110224165700.GY22310@pengutronix.de>
-Message-ID: <20110225084950.GA13684@S2101-09.ap.freescale.net>
+Date: Fri, 25 Feb 2011 19:11:50 +0800
+Subject: [PATCH v4] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <20110225105530.GA2178@pengutronix.de>
+References: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
+	<20110225105530.GA2178@pengutronix.de>
+Message-ID: <20110225111149.GB13684@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Fri, Feb 25, 2011 at 11:55:30AM +0100, Wolfram Sang wrote:
+> Hi Shawn,
+> 
+Hi Wolfram,
 
-On Thu, Feb 24, 2011 at 05:57:00PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
+> On Fri, Feb 25, 2011 at 03:34:19PM +0800, Shawn Guo wrote:
+> > This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
+> > including apbh-dma and apbx-dma.
+> > 
+> > * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
+> >   instances.
+> > 
+> > * apbh-dma is different between mx23 and mx28, hardware version
+> >   register is used to differentiate.
+> > 
+> > * mxs-dma supports pio function besides data transfer.  The driver
+> >   uses dma_data_direction DMA_NONE to identify the pio mode, and
+> >   steals sgl and sg_len to get pio words and numbers from clients.
+> > 
+> > * mxs dmaengine has some very specific features, like sense function
+> >   and the special NAND support (nand_lock, nand_wait4ready).  These
+> >   are too specific to implemented in generic dmaengine driver.
+> > 
+> > * The driver refers to imx-sdma and only a single descriptor is
+> >   statically assigned to each channel.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
 > 
-> for the lcdif clock get_rate looks as follows:
+> What are (roughly) the changes since last version?
 > 
-> 	read div from HW_CLKCTRL_DIS_LCDIF.DIV
-> 	return clk_get_rate(clk->parent) / div
-> 
-> with clk->parent being ref_pix_clk on our system.
-> 
-> ref_pix_clk's rate depends on HW_CLKCTRL_FRAC1.PIXFRAC.
-> 
-> The set_rate function for lcdif does:
-> 
-> 	parent_rate = clk_get_rate(clk->parent);
-> 	based on that calculate frac and div such that 
-> 	  parent_rate * 18 / frac / div is near the requested rate.
->         HW_CLKCTRL_FRAC1.PIXFRAC is updated with frac
-> 	HW_CLKCTRL_DIS_LCDIF.DIV is updated with div
-> 
-> For this calculation to be correct the parent_rate needs to be
-> initialized not with the clock rate of lcdif's parent (i.e. ref_pix) but
-> that of its grandparent (i.e. ref_pix' parent == pll0_clk)
-> 
-Yes, this is bug.  I hesitated to go this way when implementing the
-function, because it's not generic that the set_rate function needs
-to play parent's rate.  It becomes even worse if the parent has other
-children clocks.  But we have to go this way to get the rate close to
-the desired one.  For particular example, we have specific cpu rate
-for different set points per data sheet, which is not reachable
-without playing ref_cpu_clk.
+Sorry, I did not give the change log.  Basically, it addressed the
+comments below from Vinod and Lothar on v3.
 
-> I think the else branch to if (clk->parent == &ref_xtal_clk) of
-> name##_set_rate is broken for all clocks, but Sascha and I didn't
-> verified that.  Our local fix is:
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index febd787..7a26edd 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -295,11 +295,11 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  	unsigned long diff, parent_rate, calc_rate;			\
->  	int i;								\
->  									\
-> -	parent_rate = clk_get_rate(clk->parent);			\
->  	div_max = BM_CLKCTRL_##dr##_DIV >> BP_CLKCTRL_##dr##_DIV;	\
->  	bm_busy = BM_CLKCTRL_##dr##_BUSY;				\
->  									\
->  	if (clk->parent == &ref_xtal_clk) {				\
-> +		parent_rate = clk_get_rate(clk->parent);		\
->  		div = DIV_ROUND_UP(parent_rate, rate);			\
->  		if (clk == &cpu_clk) {					\
->  			div_max = BM_CLKCTRL_CPU_DIV_XTAL >>		\
-> @@ -309,6 +309,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
->  		if (div == 0 || div > div_max)				\
->  			return -EINVAL;					\
->  	} else {							\
-> +		parent_rate = clk_get_rate(&pll0_clk);			\
->  		rate >>= PARENT_RATE_SHIFT;				\
->  		parent_rate >>= PARENT_RATE_SHIFT;			\
->  		diff = parent_rate;					\
-> 
-> that seems to work.  (Actually using the grandparent instead of a hard
-> coded &pll0_clk would be better.)
-> 
-> Can you please have a look, too and maybe even come up with a better
-> fix?
-> 
-The fix looks good to me.
+======
+> +#define HW_APBHX_CTRL0                         0x000
+> +#define  BM_APBH_CTRL0_APB_BURST8_EN           (1 << 29)
+> +#define  BM_APBH_CTRL0_APB_BURST_EN            (1 << 28)
+> +#define  BP_APBH_CTRL0_CLKGATE_CHANNEL         (8)
+> +#define  BP_APBH_CTRL0_RESET_CHANNEL           (16)
+can you please use consistent spacing here...
 
-> IMHO it's time that Jeremy's clk patches get merged to resolve the
-> uglinesses here.  (One thing that comes to mind is that the result of
+> +static irqreturn_t mxs_dma_int_handler(int irq, void *dev_id)
+> +{
+> +       struct mxs_dma_engine *mxs_dma = dev_id;
+> +       u32 stat1, stat2;
+> +
+> +       /* completion status */
+> +       stat1 = readl(mxs_dma->base + HW_APBHX_CTRL1);
+> +       stat1 &= 0xffff;
+Magic number?
 
-Yes, agree.  But I'm not able to start working on this immediately,
-because I have other priority to take care for my next time slot.
-Do you want to take this on?  Feel free to ...
+> +       writel(stat1, mxs_dma->base + HW_APBHX_CTRL1 + MXS_CLR_ADDR);
+> +
+> +       /* error status */
+> +       stat2 = readl(mxs_dma->base + HW_APBHX_CTRL2);
+> +       writel(stat2, mxs_dma->base + HW_APBHX_CTRL2 + MXS_CLR_ADDR);
+> +
+> +       /*
+> +        * When both completion and error of termination bits set at the
+> +        * same time, we do not take it as an error.  IOW, it only becomes
+> +        * an error we need to handler here in case of ether it's an bus
+> +        * error or a termination error with no completion.
+> +        */
+> +       stat2 = ((stat2 >> 16) & stat2) |          /* bus error */
+> +               (~(stat2 >> 16) & stat2 & ~stat1); /* termination with no completion */
+> +
+> +       /* combine error and completion status for checking */
+> +       stat1 = (stat2 << 16) | stat1;
+would it be possible for you to avoid these magic number, will help you
+when you add more controllers...
 
-> if (clk->parent == &ref_xtal_clk) doesn't change during runtime, so
-> it would be better to use two different implementations.  (That
-> statement still needs a careful verification though.))
-> 
+> > > +#define HW_APBHX_CTRL0                         0x000
+> > > +#define  BM_APBH_CTRL0_APB_BURST8_EN           (1 << 29)
+> > > +#define  BM_APBH_CTRL0_APB_BURST_EN            (1 << 28)
+> > > +#define  BP_APBH_CTRL0_CLKGATE_CHANNEL         (8)
+> > > +#define  BP_APBH_CTRL0_RESET_CHANNEL           (16)
+>
+There is no need to enclose bare number in macro definitions in
+parenthesis.
+...
+=======
 
 -- 
 Regards,
