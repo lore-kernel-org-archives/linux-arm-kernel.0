@@ -1,46 +1,51 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 25 Feb 2011 13:47:32 +0300
-Subject: [PATCH 1/3] pxa: Enable pxa-pcm-audio on pxa210/pxa25x platform
-In-Reply-To: <1298417351-24727-1-git-send-email-dbaryshkov@gmail.com>
-References: <1298417351-24727-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <AANLkTimD28SYLA=NZyEO8SS==wrZ2mL+LG92e6FGHtom@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 25 Feb 2011 11:55:30 +0100
+Subject: [PATCH v4] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
+References: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <20110225105530.GA2178@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric, will it be possible to get at least this patch in the kernel?
+Hi Shawn,
 
-Otherwise all ASoC-based audio on pxa25x isn't working.
-
-On 2/23/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
-> pxa25x platforms were left out of major ASoC Update patch.
-> Since f0fba2ad1b a registration of pxa-pcm-audio device is required for
-> ASoC to function on pxa platforms. Register one also for pxa210/pxa25x.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
+On Fri, Feb 25, 2011 at 03:34:19PM +0800, Shawn Guo wrote:
+> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
+> including apbh-dma and apbx-dma.
+> 
+> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
+>   instances.
+> 
+> * apbh-dma is different between mx23 and mx28, hardware version
+>   register is used to differentiate.
+> 
+> * mxs-dma supports pio function besides data transfer.  The driver
+>   uses dma_data_direction DMA_NONE to identify the pio mode, and
+>   steals sgl and sg_len to get pio words and numbers from clients.
+> 
+> * mxs dmaengine has some very specific features, like sense function
+>   and the special NAND support (nand_lock, nand_wait4ready).  These
+>   are too specific to implemented in generic dmaengine driver.
+> 
+> * The driver refers to imx-sdma and only a single descriptor is
+>   statically assigned to each channel.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 > ---
->  arch/arm/mach-pxa/pxa25x.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
-> index fbc5b77..b166b1d 100644
-> --- a/arch/arm/mach-pxa/pxa25x.c
-> +++ b/arch/arm/mach-pxa/pxa25x.c
-> @@ -347,6 +347,7 @@ static struct platform_device *pxa25x_devices[]
-> __initdata = {
->  	&pxa25x_device_assp,
->  	&pxa25x_device_pwm0,
->  	&pxa25x_device_pwm1,
-> +	&pxa_device_asoc_platform,
->  };
->
->  static struct sys_device pxa25x_sysdev[] = {
-> --
-> 1.7.2.3
->
->
 
+What are (roughly) the changes since last version?
+
+Regards,
+
+   Wolfram
 
 -- 
-With best wishes
-Dmitry
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110225/7415eff3/attachment.sig>
