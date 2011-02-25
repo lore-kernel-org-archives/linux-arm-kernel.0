@@ -1,81 +1,50 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 25 Feb 2011 11:03:48 +0530
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP boot
-	failure)
-In-Reply-To: <20110224173840.GC20560@atomide.com>
-References: <20110106204053.GA7771@atomide.com>
-	<20110107161230.GR1198@n2100.arm.linux.org.uk>
-	<20110110185209.GC4957@atomide.com> <20110111231611.GX4957@atomide.com>
-	<3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
-	<20110202011006.GP3358@atomide.com>
-	<81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
-	<20110202194855.GA3322@atomide.com>
-	<cace62268ad657586f07ecbb0e6a99ab@mail.gmail.com>
-	<84fafb82318b1287513d198c6535eb59@mail.gmail.com>
-	<20110224173840.GC20560@atomide.com>
-Message-ID: <08df39a319ecf8f67fb87b4ba3af85dd@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 25 Feb 2011 07:38:23 +0100
+Subject: [TRIVIAL/PATCH] ARM: hw_breakpoint: Fix newlines in WARN messages
+In-Reply-To: <1298573739-25144-1-git-send-email-sboyd@codeaurora.org>
+References: <1298573739-25144-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <19815.20063.647326.437650@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Tony Lindgren
-> Sent: Thursday, February 24, 2011 11:09 PM
-> To: Santosh Shilimkar
-> Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
-> kernel at lists.infradead.org; linux-omap at vger.kernel.org; Keshava
-> Munegowda; Felipe Balbi
-> Subject: Re: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
-> 4430SDP boot failure)
+Hi,
+
+Stephen Boyd writes:
+> These warnings are missing newlines and spaces causing confusing
+> looking output when they trigger.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/kernel/hw_breakpoint.c |   13 +++++++------
+>  1 files changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> index d600bd3..5aab00e 100644
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -238,8 +238,8 @@ static int enable_monitor_mode(void)
+>  	ARM_DBG_READ(c1, 0, dscr);
+>  
+>  	/* Ensure that halting mode is disabled. */
+> -	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN, "halting debug mode enabled."
+> -				"Unable to access hardware resources.")) {
+> +	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN, "halting debug mode enabled. "
+> +				"Unable to access hardware resources.\n")) {
 >
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110212 00:45]:
-> > Tony,
-> > > -----Original Message-----
-> > > From: Santosh Shilimkar [mailto:santosh.shilimkar at ti.com]
-> > > Sent: Thursday, February 03, 2011 2:13 PM
-> > > To: Tony Lindgren
-> > > Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
-> > > kernel at lists.infradead.org; linux-omap at vger.kernel.org; Keshava
-> > > Munegowda; Felipe Balbi
-> > > Subject: RE: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re:
-> > > 4430SDP boot failure)
-> > >
-> > > > -----Original Message-----
-> > > > From: Tony Lindgren [mailto:tony at atomide.com]
-> > > > Sent: Thursday, February 03, 2011 1:19 AM
-> > > > To: Santosh Shilimkar
-> > > > Cc: Anand Gadiyar; Russell King - ARM Linux; linux-arm-
-> > > > kernel at lists.infradead.org; linux-omap at vger.kernel.org;
-> Keshava
-> > > > Munegowda; Felipe Balbi
-> > > > Subject: Re: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP
-> (Re:
-> > > > 4430SDP boot failure)
-> > > >
-> > > > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110201 22:04]:
-> > > > > >
-> > > > > > It's a ES1.0 blaze, with the patch below it reboots early
-> > > > > > during the boot. I also have to disable omap_l2_cache_init
-> > > > > > on this board to get it to boot.
-> > > > > >
-> > > > > Do you still get this problem with 'omap_l2_cache_init' ?
-> > > > > As reported earlier, we don't see this issue on ES1.0
-> > > > > SDP.
-> > > >
-> > > > Yeah I do, it rarely makes it to the userspace. Works reliably
-> > > > if I disable omap_l2_cache_init.
-> > > >
-> > > Ok. I shall try few experiments and try to reproduce it
-> >
-> > Not sure if it's the same issue but I managed to reproduce the
-> > issue on ES2.0 itself. And after some experiments, it boiled
-> > down to the V6 and V7 issue. By disabling OMAP2 from the build,
-> > everything was fine again.
->
-> Was this with linux-omap master branch or mainline?
->
-> The V6 vs V7 issues should be sorted out with Russell's patches that
-> we also have now in linux-omap master branch.
->
-This was with mainline.
-Then I applied RMK's series and things were OK.
+I'd prefer the message text not to be line wrapped, even if it
+violates the general line length rule, because that makes it easier to
+grep for the message in the source code.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
