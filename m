@@ -1,43 +1,40 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 25 Feb 2011 10:00:30 +0100
-Subject: [PATCH] ARM: mxs: Initial support for Ka-Ro TX28
-In-Reply-To: <1298581480-15585-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110224210353.GA22310@pengutronix.de>
-	<1298581480-15585-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110225090030.GB22310@pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 25 Feb 2011 10:54:28 +0100 (CET)
+Subject: [PATCH v5 1/2] PRUSS UIO driver support
+In-Reply-To: <1298623530-10294-2-git-send-email-pratheesh@ti.com>
+References: <1298623530-10294-1-git-send-email-pratheesh@ti.com>
+	<1298623530-10294-2-git-send-email-pratheesh@ti.com>
+Message-ID: <alpine.LFD.2.00.1102251049090.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, 25 Feb 2011, Pratheesh Gangadhar wrote:
+> +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
+> +{
+> +	void __iomem *base = dev_info->mem[0].internal_addr;
+> +	void __iomem *intren_reg = base + PINTC_HIER;
+> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + ((irq - 1) << 2);
+> +	int val = ioread32(intren_reg), intr_mask = (1 << (irq - 1));
+> +
+> +	/* Is interrupt enabled and active ? */
+> +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND))
+> +		return IRQ_NONE;
+> +
+> +	/* Disable interrupt */
+> +	iowrite32((val & ~intr_mask), intren_reg);
+> +	return IRQ_HANDLED;
+> +}
 
-as requested by Sascha I squashed the following patch in:
+Hmm, just noticed, that you fiddle with the interrupt enable register
+here totally unprotected. So on a SMP system you might haandle two
+different interrupts at the same time. That wants locking.
 
-diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
-index 540d6ea..b609b84 100644
---- a/arch/arm/mach-mxs/mach-tx28.c
-+++ b/arch/arm/mach-mxs/mach-tx28.c
-@@ -130,7 +130,6 @@ static const struct gpio_led_platform_data tx28_stk5v3_led_data __initconst = {
- };
- 
- static struct spi_board_info tx28_spi_board_info[] = {
--#if defined(CONFIG_SPI_SPIDEV) || defined(CONFIG_SPI_SPIDEV_MODULE)
- 	{
- 		.modalias = "spidev",
- 		.max_speed_hz = 20000000,
-@@ -139,7 +138,6 @@ static struct spi_board_info tx28_spi_board_info[] = {
- 		.controller_data = (void *)SPI_GPIO_NO_CHIPSELECT,
- 		.mode = SPI_MODE_0,
- 	},
--#endif
- };
- 
- static void __init tx28_stk5v3_init(void)
+And even on UP, you have a problem as you reenable that thing from
+user space which requires a read modify write. Racy as hell.
 
-The branch in my public repository is updated.
+Please look at the other UIO drivers which have the same problem.
+Sorry for not noticing earlier!
 
-Thanks
-Uwe
+Thanks,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	tglx
