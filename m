@@ -1,32 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 25 Feb 2011 09:49:34 -0800
-Subject: [PATCH] omap4: Fix ULPI PHY init for ES1.0 SDP (Re: 4430SDP
-	boot failure)
-In-Reply-To: <08df39a319ecf8f67fb87b4ba3af85dd@mail.gmail.com>
-References: <20110110185209.GC4957@atomide.com>
-	<20110111231611.GX4957@atomide.com>
-	<3c13ae6d9e13b94548bfcaaced7681e8@mail.gmail.com>
-	<20110202011006.GP3358@atomide.com>
-	<81ed58d7158cfa16007e141d0ac1f74c@mail.gmail.com>
-	<20110202194855.GA3322@atomide.com>
-	<cace62268ad657586f07ecbb0e6a99ab@mail.gmail.com>
-	<84fafb82318b1287513d198c6535eb59@mail.gmail.com>
-	<20110224173840.GC20560@atomide.com>
-	<08df39a319ecf8f67fb87b4ba3af85dd@mail.gmail.com>
-Message-ID: <20110225174934.GZ20560@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 25 Feb 2011 20:53:35 +0300
+Subject: [PATCH v2] ARM: Thumb-2: Reflect ARM/Thumb-2 configuration in
+	module vermagic
+In-Reply-To: <AANLkTimm+xqrQSWzPxxV7Kv+0NH2fpkg2HHUz=JNj3pN@mail.gmail.com>
+References: <1298462021-22177-1-git-send-email-dave.martin@linaro.org>	<4D657B12.8070702@ru.mvista.com>
+	<AANLkTimm+xqrQSWzPxxV7Kv+0NH2fpkg2HHUz=JNj3pN@mail.gmail.com>
+Message-ID: <4D67EC9F.8010305@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110224 21:31]:
-> >
-> > Was this with linux-omap master branch or mainline?
-> >
-> > The V6 vs V7 issues should be sorted out with Russell's patches that
-> > we also have now in linux-omap master branch.
-> >
-> This was with mainline.
-> Then I applied RMK's series and things were OK.
+Hello.
 
-OK good to hear & thanks for checking that.
+Dave Martin wrote:
 
-Tony
+>>> Loading Thumb-2 modules into an ARM kernel or vice-versa isn't
+>>> guaranteed to work safely, since the kernel is not interworking-
+>>> aware everywhere.
+>>> This patch adds "thumb2" to the module vermagic when
+>>> CONFIG_THUMB2_KERNEL is enabled, to help avoid accidental loading
+>>> of modules into the wrong kernel.
+>>> v2: modified to apply consistently on top of rmk's p2v branch.
+
+>>   Patch changelog should follow the -- tearline.
+
+>>> Signed-off-by: Dave Martin<dave.martin@linaro.org>
+>>> Acked-by: Nicolas Pitre<nicolas.pitre@linaro.org>
+
+  > Opinions seem to differ... I have no strong opinion on this myself.
+
+    At least that's what Documentation/SubmittingPatches suggests:
+
+<<
+One good use for the additional comments after the "---" marker is for
+a diffstat, to show what files have changed, and the number of
+inserted and deleted lines per file.  A diffstat is especially useful
+on bigger patches.  Other comments relevant only to the moment or the
+maintainer, not suitable for the permanent changelog, should also go
+here.  A good example of such comments might be "patch changelogs"
+which describe what has changed between the v1 and v2 version of the
+patch.
+ >>
+
+> Cheers
+> ---Dave
+
+WBR, Sergei
