@@ -1,27 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 24 Feb 2011 22:03:28 -0700 (MST)
-Subject: [PATCH 0/3] OMAP2+: voltage: first pass at cleanup/reorganization
-In-Reply-To: <553cd99ec29ee91e4a4b324d0f4a0be7@mail.gmail.com>
-References: <20110221020231.7598.14024.stgit@twilight.localdomain>
-	<553cd99ec29ee91e4a4b324d0f4a0be7@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1102242201410.6198@utopia.booyaka.com>
+From: r64343@freescale.com (Jason Liu)
+Date: Fri, 25 Feb 2011 13:06:18 +0800
+Subject: [PATCH] mtd: nand: fix one typo in the comments
+Message-ID: <1298610378-3105-1-git-send-email-r64343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+In the function nand_do_write_oob, the comments
+has one typo, this patch fix it.
 
-On Thu, 24 Feb 2011, Rajendra Nayak wrote:
+- /* Do not allow reads past end of device */
++ /* Do not allow write past end of device */
+if (unlikely(to >= mtd->size ||
+	     ops->ooboffs + ops->ooblen >
+		((mtd->size >> chip->page_shift) -
+		 (to >> chip->page_shift)) * len)) {
+	DEBUG(MTD_DEBUG_LEVEL0, "%s: Attempt write beyond "
+			"end of device\n", __func__);
+	return -EINVAL;
+}
 
-> I found these abort on my 4430SDP. The below changes I found
-> are needed for it to bootup..
-> I tested the 'integration-2.6.39' branch of
-> git://git.pwsan.com/linux-integration and the patch is
-> based on this branch.
+Signed-off-by: Jason Liu <r64343@freescale.com>
+---
+ drivers/mtd/nand/nand_base.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Thanks very much for the patch, this looks right.  Do you mind if I fold 
-it into the "OMAP2+: voltage: reorganize, split code from data" patch and 
-credit you appropriately in the patch description?  (That way, there won't 
-be any gaps between patches where OMAP4 won't work.)
-
-
-- Paul
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index a9c6ce7..da76040 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -2377,7 +2377,7 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
+ 		return -EINVAL;
+ 	}
+ 
+-	/* Do not allow reads past end of device */
++	/* Do not allow write past end of device */
+ 	if (unlikely(to >= mtd->size ||
+ 		     ops->ooboffs + ops->ooblen >
+ 			((mtd->size >> chip->page_shift) -
+-- 
+1.7.0.4
