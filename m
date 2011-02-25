@@ -1,41 +1,84 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 25 Feb 2011 16:30:22 +0300
-Subject: [PATCH v4 6/7] arm/dt: Basic tegra devicetree support
-In-Reply-To: <20110223213601.GA5404@angua.secretlab.ca>
-References: <20110223021524.18318.71902.stgit@localhost6.localdomain6>
-	<20110223022234.18318.90592.stgit@localhost6.localdomain6>
-	<4D657880.50405@ru.mvista.com>
-	<20110223213601.GA5404@angua.secretlab.ca>
-Message-ID: <4D67AEEE.30000@ru.mvista.com>
+From: eric@eukrea.com (=?UTF-8?q?Eric=20B=C3=A9nard?=)
+Date: Fri, 25 Feb 2011 14:38:26 +0100
+Subject: [PATCH 1/6] eukrea_mbimxsd: add audio support
+Message-ID: <1298641111-12957-1-git-send-email-eric@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Signed-off-by: Eric B?nard <eric@eukrea.com>
+---
+ arch/arm/mach-mx5/Kconfig                    |    1 +
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |   28 ++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 0 deletions(-)
 
-On 24-02-2011 0:36, Grant Likely wrote:
-
->>> This patch adds adds very basic support for booting tegra with a
->>> device tree.  It simply allows the existing machine_descs to match
->>> against the tegra compatible values so that the kernel can boot.
->>> Kernel parameters and the initrd pointer is read out of the tree
->>> instead of atags.
-
->>> This is not complete device tree support.  This change will be
->>> reverted when a new machine_desc is added that can populate the
->>> device registrations directly from data in the tree instead of using
->>> hard coded data.  That change will be made in a future patch.
-
->>> v2: Fixed cut-and-paste error in commit text
-
->>     Shouldn't this sentence follow the --- tearline?
-
-> Nope!  It is actually quite useful for the version information to show
-> up in the commit text.  That way you know *exactly* which version got
-> merged.  dwmw2 pointed that out to me a few months back.
-
-    Well, I think that depends on the patch. If you have say 9 revisions with 
-significant changes (that's what I actually had) and the revision history far 
-exceeds the original patch description, then this will just become too ugly I 
-think...
-
-WBR, Sergei
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 4e4d7af..ded1d2d 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -108,6 +108,7 @@ config MACH_EUKREA_MBIMXSD51_BASEBOARD
+ 	prompt "Eukrea MBIMXSD development board"
+ 	bool
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
++	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	help
+ 	  This adds board specific devices that can be found on Eukrea's
+ 	  MBIMXSD evaluation board.
+diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+index c372a43..712061c 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+@@ -67,6 +67,11 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+ 	MX51_PAD_SD1_DATA1__SD1_DATA1,
+ 	MX51_PAD_SD1_DATA2__SD1_DATA2,
+ 	MX51_PAD_SD1_DATA3__SD1_DATA3,
++	/* SSI */
++	MX51_PAD_AUD3_BB_TXD__AUD3_TXD,
++	MX51_PAD_AUD3_BB_RXD__AUD3_RXD,
++	MX51_PAD_AUD3_BB_CK__AUD3_TXC,
++	MX51_PAD_AUD3_BB_FS__AUD3_TXFS,
+ };
+ 
+ #define GPIO_LED1	IMX_GPIO_NR(3, 30)
+@@ -133,6 +138,11 @@ static struct i2c_board_info eukrea_mbimxsd_i2c_devices[] = {
+ 	},
+ };
+ 
++static const
++struct imx_ssi_platform_data eukrea_mbimxsd_ssi_pdata __initconst = {
++	.flags = IMX_SSI_SYN | IMX_SSI_NET | IMX_SSI_USE_I2S_SLAVE,
++};
++
+ /*
+  * system init for baseboard usage. Will be called by cpuimx51sd init.
+  *
+@@ -145,10 +155,28 @@ void __init eukrea_mbimxsd51_baseboard_init(void)
+ 			ARRAY_SIZE(eukrea_mbimxsd_pads)))
+ 		printk(KERN_ERR "error setting mbimxsd pads !\n");
+ 
++#if defined(CONFIG_SND_SOC_EUKREA_TLV320)
++	/* SSI unit master I2S codec connected to SSI_AUD3 */
++	mxc_audmux_v2_configure_port(0,
++			MXC_AUDMUX_V2_PTCR_SYN |
++			MXC_AUDMUX_V2_PTCR_TFSDIR |
++			MXC_AUDMUX_V2_PTCR_TFSEL(2) |
++			MXC_AUDMUX_V2_PTCR_TCLKDIR |
++			MXC_AUDMUX_V2_PTCR_TCSEL(2),
++			MXC_AUDMUX_V2_PDCR_RXDSEL(2)
++	);
++	mxc_audmux_v2_configure_port(2,
++			MXC_AUDMUX_V2_PTCR_SYN |
++			MXC_AUDMUX_V2_PTCR_TCSEL(0),
++			MXC_AUDMUX_V2_PDCR_RXDSEL(0)
++	);
++#endif
++
+ 	imx51_add_imx_uart(1, NULL);
+ 	imx51_add_imx_uart(2, &uart_pdata);
+ 
+ 	imx51_add_sdhci_esdhc_imx(0, NULL);
++	imx51_add_imx_ssi(0, &eukrea_mbimxsd_ssi_pdata);
+ 
+ 	gpio_request(GPIO_LED1, "LED1");
+ 	gpio_direction_output(GPIO_LED1, 1);
+-- 
+1.7.4
