@@ -1,33 +1,51 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 25 Feb 2011 16:22:02 +0300
-Subject: [PATCH v4 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources used
-	by PRUSS UIO driver
-In-Reply-To: <20110225130241.GA2791@local>
-References: <1298556402-26456-1-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-2-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-3-git-send-email-pratheesh@ti.com>
-	<4D6796D6.5050008@mvista.com> <20110225130241.GA2791@local>
-Message-ID: <4D67ACFA.4090600@mvista.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 25 Feb 2011 13:23:39 +0000
+Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
+In-Reply-To: <1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, 2011-02-24 at 18:44 +0000, Stephen Boyd wrote:
+> Assign the registers used in the inline assembly immediately
+> before the inline assembly block. This ensures the compiler
+> doesn't optimize away dead register assignments when it
+> shouldn't.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/scm.c |    7 +++++--
+>  1 files changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
+> index ba57b5a..5eddf54 100644
+> --- a/arch/arm/mach-msm/scm.c
+> +++ b/arch/arm/mach-msm/scm.c
+> @@ -264,13 +264,16 @@ u32 scm_get_version(void)
+>  {
+>         int context_id;
+>         static u32 version = -1;
+> -       register u32 r0 asm("r0") = 0x1 << 8;
+> -       register u32 r1 asm("r1") = (u32)&context_id;
+> +       register u32 r0 asm("r0");
+> +       register u32 r1 asm("r1");
+> 
+>         if (version != -1)
+>                 return version;
+> 
+>         mutex_lock(&scm_lock);
+> +
+> +       r0 = 0x1 << 8;
+> +       r1 = (u32)&context_id;
+>         asm volatile(
+>                 __asmeq("%0", "r1")
+>                 __asmeq("%1", "r0")
 
-On 25-02-2011 16:02, Hans J. Koch wrote:
 
->>> This patch defines PRUSS, ECAP clocks, memory and IRQ resources
->>> used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
+Whoa, have you seen the compiler `optimise' the original assignments
+away? Since there is a use in the asm block, the definition shouldn't
+be omitted. What toolchain are you using?
 
->>     It's OMAP-L138.
-
-> From the TI wiki: "The PRU subsystem is supported on
-> OMAP-L1x8/C674m/AM18xx devices (where m is an even number)."
-
-> http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
-
-    I meant there's a typo in "OMAPL1-38".
-
-> Thanks,
-> Hans
-
-WBR, Sergei
+Will
