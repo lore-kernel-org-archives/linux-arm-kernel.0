@@ -1,28 +1,41 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 25 Feb 2011 14:14:08 +0100
-Subject: [PATCH] ARM: S5P: Add platform helpers for camera GPIO
-	configuration
-In-Reply-To: <1297447665-19492-2-git-send-email-s.nawrocki@samsung.com>
-References: <1297447665-19492-1-git-send-email-s.nawrocki@samsung.com>
-	<1297447665-19492-2-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <4D67AB20.8000000@samsung.com>
+From: cyril@ti.com (Cyril Chemparathy)
+Date: Fri, 25 Feb 2011 08:16:18 -0500
+Subject: [PATCH] davinci: da850/omap-l138: Add Carrier Link OK check in
+	Davinci RX Handler
+In-Reply-To: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
+References: <1298627788-32339-1-git-send-email-vinay.hegde@ti.com>
+Message-ID: <4D67ABA2.6060808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/11/2011 07:07 PM, Sylwester Nawrocki wrote:
-> Add functions for the parallel camera GPIO interface
-> configuration on S5PV210 and S5PV310 SoCs.
+On 02/25/2011 04:56 AM, Hegde, Vinay wrote:
+> This patch adds an additional check in the Davinci EMAC RX Handler,
+> which tests the __LINK_STATE_NOCARRIER flag along with the
+> __LINK_STATE_START flag as part EMAC shutting down procedure.
 > 
+> This avoids
+> WARNING: at drivers/net/davinci_emac.c:1040 emac_rx_handler+0xf8/0x120()
+> during rtcwake used to suspend the target for a specified duration.
+> 
+> Signed-off-by: Hegde, Vinay <vinay.hegde@ti.com>
+> ---
+>  drivers/net/davinci_emac.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/net/davinci_emac.c b/drivers/net/davinci_emac.c
+> index 2a628d1..7018bfe 100644
+> --- a/drivers/net/davinci_emac.c
+> +++ b/drivers/net/davinci_emac.c
+> @@ -1008,7 +1008,7 @@ static void emac_rx_handler(void *token, int len, int status)
+>  	int			ret;
+>  
+>  	/* free and bail if we are shutting down */
+> -	if (unlikely(!netif_running(ndev))) {
+> +	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
+>  		dev_kfree_skb_any(skb);
+>  		return;
+>  	}
 
-Kukjin, are you OK with general concept of those?
-I would probably need to rework the patches after recent
-S5PV310 -> EXYNOS4 renaming. And move camera.h 
-to arch/arm/plat-samsung/include/plat/?
+Looks ok.
 
-What's your opinion?
-
-Thanks,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+Acked-by: Cyril Chemparathy <cyril@ti.com>
