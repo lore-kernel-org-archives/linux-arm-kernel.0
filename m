@@ -1,28 +1,34 @@
-From: s-jan@ti.com (Jan, Sebastien)
-Date: Fri, 25 Feb 2011 19:57:23 +0100
-Subject: [PATCH] OMAP4: PandaBoard: Adding DVI support
-In-Reply-To: <F55C15BA-2C89-4DB7-9930-5176AA72C2A7@dominion.thruhere.net>
-References: <1297259727-19690-1-git-send-email-raghuveer.murthy@ti.com>
-	<AANLkTimwCDYGfeXc=mW-1wyvSj+OGHd_fJMB7Grh60ih@mail.gmail.com>
-	<AANLkTimQxC3HgaRs-bBOGChLhvAK69XHCPEGyOcKeOz6@mail.gmail.com>
-	<F55C15BA-2C89-4DB7-9930-5176AA72C2A7@dominion.thruhere.net>
-Message-ID: <AANLkTikQ25tLoRSynp6xjaJPO0sPpY3RFFS52UsgBuvU@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 25 Feb 2011 11:00:27 -0800
+Subject: [PATCH v2 2/2] msm: add single-wire serial bus interface (SSBI)
+	driver
+In-Reply-To: <1298600621.17118.27.camel@m0nster> (Daniel Walker's message of
+	"Thu, 24 Feb 2011 18:23:41 -0800")
+References: <1298585954-22422-1-git-send-email-kheitke@codeaurora.org>
+	<1298585954-22422-3-git-send-email-kheitke@codeaurora.org>
+	<1298600621.17118.27.camel@m0nster>
+Message-ID: <8yak4go9bxw.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 11, 2011 at 4:38 PM, Koen Kooi <koen@dominion.thruhere.net> wrote:
->> I fetched this branch which contains 35 patches on top of 2.6.38-rc4.
->> After fixing some conflict, I applied these 35 patches on our Ubuntu
->> ti-omap-dev kernel. With built-in the DSS2 driver and GENERIC_DPI
->> driver, kernel boots fine on my Panda with Ubuntu GUI. But I have to
->> set the kernel boot command args with omapfb.mode=dvi:1024x768MR-24 at 60
->> omapdss.def_disp=dvi, pointed out by Sebastien. Without this bootargs,
->> no graphic at all. so as Robert concerned, EDID detection doesn't
->> work. Does that related to I2C driver? I2C driver always tell me
->> timeout in dmesg.
->
-> AIUI the i2c bus is only hooked up to the HDMI port, so unless you plug in something there, no dice.
+On Thu, Feb 24 2011, Daniel Walker wrote:
 
-Are you sure? According to the pandaboard user manual, there seem to
-be an i2c connection (i2c3): page 31, fig 9:
-http://pandaboard.org/sites/default/files/board_reference/A1/Panda_Board_Spec_DOC-21010_REV0_6.pdf
+>> Based on a patch by Dima Zavin <dima@android.com> that can be found at:
+>> http://android.git.kernel.org/?p=kernel/msm.git;a=commitdiff;h=eb060bac4
+>
+> I don't really like links in the commit text, cause as soon as Google
+> deletes this tree the link is worthless.
+
+I'm not sure how to better convey the information.  The tree is at least
+on kernel.org, and there's good useful information there that works
+now.  Links in commit text seem fairly common.
+
+I think it is helpful to demonstrate that Ken is trying to be diligent
+about indicating where the code comes from.
+
+Thanks,
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
