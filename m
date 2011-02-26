@@ -1,108 +1,126 @@
 From: banajit.g@samsung.com (Banajit Goswami)
-Date: Sat, 26 Feb 2011 13:29:04 +0900
-Subject: [PATCH 4/6] ARM: S5P64X0: Add PWM backlight support on SMDK6450
+Date: Sat, 26 Feb 2011 13:29:05 +0900
+Subject: [PATCH 5/6] ARM: S5PC100: Add PWM backlight support on SMDKC100
 In-Reply-To: <1298694546-16816-1-git-send-email-banajit.g@samsung.com>
 References: <1298694546-16816-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <1298694546-16816-5-git-send-email-banajit.g@samsung.com>
+Message-ID: <1298694546-16816-6-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for LCD backlight control using PWM timer
-for Samsung SMDK6450 board.
+This patch adds support for LCD backlight using PWM timer for
+Samsung SMDKC100 board.
 
 Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 ---
- arch/arm/mach-s5p64x0/Kconfig         |    1 +
- arch/arm/mach-s5p64x0/mach-smdk6450.c |   44 +++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5pc100/Kconfig         |    1 +
+ arch/arm/mach-s5pc100/mach-smdkc100.c |   48 ++++++++++++++++++++++++++++++---
+ 2 files changed, 45 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-index be5888a..08b0a5b 100644
---- a/arch/arm/mach-s5p64x0/Kconfig
-+++ b/arch/arm/mach-s5p64x0/Kconfig
-@@ -48,6 +48,7 @@ config MACH_SMDK6450
- 	select S3C_DEV_WDT
- 	select S3C64XX_DEV_SPI
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index b8fbf2f..608722f 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -58,6 +58,7 @@ config MACH_SMDKC100
  	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_IDE
+ 	select SAMSUNG_DEV_KEYPAD
 +	select SAMSUNG_DEV_PWM
  	select SAMSUNG_DEV_TS
- 	select S5P64X0_SETUP_I2C1
- 	help
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-index 3a20de0..296cc0f 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
-@@ -22,6 +22,7 @@
- #include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/gpio.h>
+ 	select S5PC100_SETUP_FB_24BPP
+ 	select S5PC100_SETUP_I2C1
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index dd192a2..22d5348 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -23,12 +23,15 @@
+ #include <linux/fb.h>
+ #include <linux/delay.h>
+ #include <linux/input.h>
 +#include <linux/pwm_backlight.h>
  
  #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
-@@ -32,6 +33,7 @@
+ 
  #include <mach/map.h>
- #include <mach/regs-clock.h>
- #include <mach/i2c.h>
+ #include <mach/regs-fb.h>
 +#include <mach/regs-gpio.h>
++
+ #include <video/platform_lcd.h>
  
- #include <plat/regs-serial.h>
- #include <plat/gpio-cfg.h>
-@@ -106,6 +108,45 @@ static struct s3c2410_uartcfg smdk6450_uartcfgs[] __initdata = {
- #endif
+ #include <asm/irq.h>
+@@ -107,9 +110,6 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+ static void smdkc100_lcd_power_set(struct plat_lcd_data *pd,
+ 				   unsigned int power)
+ {
+-	/* backlight */
+-	gpio_direction_output(S5PC100_GPD(0), power);
+-
+ 	if (power) {
+ 		/* module reset */
+ 		gpio_direction_output(S5PC100_GPH0(6), 1);
+@@ -178,6 +178,44 @@ static struct samsung_keypad_platdata smdkc100_keypad_data __initdata = {
+ 	.rows		= 2,
+ 	.cols		= 8,
  };
- 
-+static int smdk6450_backlight_init(struct device *dev)
++
++static int smdkc100_backlight_init(struct device *dev)
 +{
 +	int ret;
 +
-+	ret = gpio_request(S5P6450_GPF(15), "Backlight");
++	ret = gpio_request(S5PC100_GPD(0), "Backlight");
 +	if (ret) {
-+		printk(KERN_ERR "failed to request GPF for PWM-OUT1\n");
++		printk(KERN_ERR "failed to request GPF for PWM-OUT0\n");
 +		return ret;
 +	}
 +
-+	/* Configure GPIO pin with S5P6450_GPF15_PWM_TOUT1 */
-+	s3c_gpio_cfgpin(S5P6450_GPF(15), (0x02 << 30));
++	/* Configure GPIO pin with S5PC100_GPD_TOUT_0 */
++	s3c_gpio_cfgpin(S5PC100_GPD(0), (0x2 << 0));
 +
 +	return 0;
 +}
 +
-+static void smdk6450_backlight_exit(struct device *dev)
++static void smdkc100_backlight_exit(struct device *dev)
 +{
-+	s3c_gpio_cfgpin(S5P6450_GPF(15), S3C_GPIO_OUTPUT);
-+	gpio_free(S5P6450_GPF(15));
++	s3c_gpio_cfgpin(S5PC100_GPD(0), S3C_GPIO_OUTPUT);
++	gpio_free(S5PC100_GPD(0));
 +}
 +
-+static struct platform_pwm_backlight_data smdk6450_backlight_data = {
-+	.pwm_id		= 1,
++static struct platform_pwm_backlight_data smdkc100_backlight_data = {
++	.pwm_id		= 0,
 +	.max_brightness	= 255,
 +	.dft_brightness	= 255,
 +	.pwm_period_ns	= 78770,
-+	.init		= smdk6450_backlight_init,
-+	.exit		= smdk6450_backlight_exit,
++	.init		= smdkc100_backlight_init,
++	.exit		= smdkc100_backlight_exit,
 +};
 +
-+static struct platform_device smdk6450_backlight_device = {
++static struct platform_device smdkc100_backlight_device = {
 +	.name		= "pwm-backlight",
 +	.dev		= {
-+		.parent		= &s3c_device_timer[1].dev,
-+		.platform_data	= &smdk6450_backlight_data,
++		.parent		= &s3c_device_timer[0].dev,
++		.platform_data	= &smdkc100_backlight_data,
 +	},
 +};
-+
- static struct platform_device *smdk6450_devices[] __initdata = {
+ 
+ static struct platform_device *smdkc100_devices[] __initdata = {
  	&s3c_device_adc,
- 	&s3c_device_rtc,
-@@ -115,6 +156,9 @@ static struct platform_device *smdk6450_devices[] __initdata = {
- 	&s3c_device_wdt,
- 	&samsung_asoc_dma,
- 	&s5p6450_device_iis0,
+@@ -200,6 +238,9 @@ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&s5p_device_fimc1,
+ 	&s5p_device_fimc2,
+ 	&s5pc100_device_spdif,
 +	&s3c_device_timer[0],
 +	&s3c_device_timer[1],
-+	&smdk6450_backlight_device,
- 	/* s5p6450_device_spi0 will be added */
++	&smdkc100_backlight_device,
  };
  
+ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+@@ -233,7 +274,6 @@ static void __init smdkc100_machine_init(void)
+ 	s5pc100_spdif_setup_gpio(S5PC100_SPDIF_GPD);
+ 
+ 	/* LCD init */
+-	gpio_request(S5PC100_GPD(0), "GPD");
+ 	gpio_request(S5PC100_GPH0(6), "GPH0");
+ 	smdkc100_lcd_power_set(&smdkc100_lcd_power_data, 0);
+ 	platform_add_devices(smdkc100_devices, ARRAY_SIZE(smdkc100_devices));
 -- 
 1.6.5.2
