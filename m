@@ -1,83 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 Feb 2011 14:24:13 +0000
-Subject: [PATCH 1/3] ARM: S5P: Add s5p_timer support for HRT
-In-Reply-To: <1298688357-20775-2-git-send-email-sbkim73@samsung.com>
-References: <1298688357-20775-1-git-send-email-sbkim73@samsung.com>
-	<1298688357-20775-2-git-send-email-sbkim73@samsung.com>
-Message-ID: <20110226142413.GC3640@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sat, 26 Feb 2011 18:05:52 +0300
+Subject: [PATCH] OMAP2+: sdrc: fix compile break on OMAP4-only config
+	on current omap-for-linus
+In-Reply-To: <alpine.DEB.2.00.1102251839360.6198@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1102251839360.6198@utopia.booyaka.com>
+Message-ID: <4D6916D0.1080501@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 26, 2011 at 11:45:55AM +0900, Sangbeom Kim wrote:
-> +static irqreturn_t s5p_clock_event_isr(int irq, void *dev_id)
-> +{
-> +	struct clock_event_device *evt = &time_event_device;
+Hello.
 
-	struct clock_event_device *evt = dev_id;
+On 26-02-2011 4:40, Paul Walmsley wrote:
 
+> On non-OMAP2 and non-OMAP3 kernel configs, turn omap2_sdrc_init() into
+> a no-op.  Otherwise, compilation breaks on an OMAP4-only config with
+> the current omap-for-linus branch:
+
+> arch/arm/mach-omap2/built-in.o: In function `omap2_init_common_devices':
+> ../mach-omap2/io.c:421: undefined reference to `omap2_sdrc_init'
+
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> Cc: Tony Lindgren<tony@atomide.com>
+> ---
+>   arch/arm/plat-omap/include/plat/sdrc.h |    5 +++++
+>   1 files changed, 5 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/plat-omap/include/plat/sdrc.h b/arch/arm/plat-omap/include/plat/sdrc.h
+> index efd87c8..5a44b14 100644
+> --- a/arch/arm/plat-omap/include/plat/sdrc.h
+> +++ b/arch/arm/plat-omap/include/plat/sdrc.h
+> @@ -124,8 +124,13 @@ struct omap_sdrc_params {
+>   	u32 mr;
+>   };
+>
+> +#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+>   void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+>   			    struct omap_sdrc_params *sdrc_cs1);
+> +#else
+> +#define omap2_sdrc_init(x, y)		0
+
+    How about empty inline instead?
+
+> +#endif
 > +
-> +	evt->event_handler(evt);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static struct irqaction s5p_clock_event_irq = {
-> +	.name		= "s5p_time_irq",
-> +	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-> +	.handler	= s5p_clock_event_isr,
 
-	.dev_id	 	= &time_event_device,
-
-> +};
-...
-> +static void __init s5p_timer_resources(void)
-> +{
-> +	struct platform_device tmpdev;
-> +
-> +	tmpdev.dev.bus = &platform_bus_type;
-> +
-> +	timerclk = clk_get(NULL, "timers");
-> +	if (IS_ERR(timerclk))
-> +		panic("failed to get timers clock for system timer");
-> +
-> +	clk_enable(timerclk);
-> +
-> +	tmpdev.id = timer_source.event_id;
-
-So Samsung clock stuff is still being idiotic.  Will this ever be fixed?
-
-> +	tin_event = clk_get(&tmpdev.dev, "pwm-tin");
-> +	if (IS_ERR(tin_event)) {
-> +		clk_put(tin_event);
-
-Don't clk_put errors.
-
-> +		panic("failed to get pwm-tin2 clock for system timer");
-> +	}
-> +
-> +	tdiv_event = clk_get(&tmpdev.dev, "pwm-tdiv");
-> +	if (IS_ERR(tdiv_event)) {
-> +		clk_put(tdiv_event);
-
-Ditto.
-
-> +		panic("failed to get pwm-tdiv2 clock for system timer");
-> +	}
-> +
-> +	clk_enable(tin_event);
-> +
-> +	tmpdev.id = timer_source.source_id;
-> +	tin_source = clk_get(&tmpdev.dev, "pwm-tin");
-> +	if (IS_ERR(tin_source)) {
-> +		clk_put(tin_source);
-
-Ditto.
-
-> +		panic("failed to get pwm-tin4 clock for system timer");
-> +	}
-> +
-> +	tdiv_source = clk_get(&tmpdev.dev, "pwm-tdiv");
-> +	if (IS_ERR(tdiv_source)) {
-> +		clk_put(tdiv_source);
-
-Ditto.
+WBR, Sergei
