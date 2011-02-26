@@ -1,131 +1,121 @@
-From: subaparts@yandex.ru (Alexander Sverdlin)
-Date: Sat, 26 Feb 2011 10:43:01 +0300
-Subject: [PATCH] EDB93xx: Add support for CS4271 SPI-connected CODEC
-Message-ID: <1298706181.22098.8.camel@r60e>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 26 Feb 2011 15:50:28 +0800
+Subject: [PATCH] ARM: mxs: Initial support for Ka-Ro TX28
+In-Reply-To: <1298581480-15585-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110224210353.GA22310@pengutronix.de>
+	<1298581480-15585-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110226075027.GA2506@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Sverdlin <subaparts@yandex.ru>
+On Thu, Feb 24, 2011 at 10:04:40PM +0100, Uwe Kleine-K?nig wrote:
+> From: Lothar Wa?mann <LW@KARO-electronics.de>
+> 
+> Based on code created by Lothar Wa?mann, Sascha Hauer, Wolfram Sang and
+> me.
+> 
+> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mxs/Kconfig                   |   12 ++
+>  arch/arm/mach-mxs/Makefile                  |    2 +
+>  arch/arm/mach-mxs/include/mach/mxs.h        |    9 +-
+>  arch/arm/mach-mxs/include/mach/uncompress.h |    1 +
+>  arch/arm/mach-mxs/mach-tx28.c               |  175 +++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/module-tx28.c             |  131 ++++++++++++++++++++
+>  arch/arm/mach-mxs/module-tx28.h             |    9 ++
+>  7 files changed, 337 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/mach-tx28.c
+>  create mode 100644 arch/arm/mach-mxs/module-tx28.c
+>  create mode 100644 arch/arm/mach-mxs/module-tx28.h
+> 
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 836cc81..895d066 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -39,4 +39,16 @@ config MACH_MX28EVK
+>  	  Include support for MX28EVK platform. This includes specific
+>  	  configurations for the board and its peripherals.
+>  
+> +config MODULE_TX28
+> +	bool
+> +	select SOC_IMX28
+> +	select MXS_HAVE_AMBA_DUART
+> +	select MXS_HAVE_PLATFORM_AUART
+> +	select MXS_HAVE_PLATFORM_FEC
+> +	select MXS_HAVE_PLATFORM_MXS_PWM
+> +
+> +config MACH_TX28
+> +	bool "Ka-Ro TX28 module"
+> +	select MODULE_TX28
+> +
+>  endif
+> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
+> index 6b26f02..2f1f614 100644
+> --- a/arch/arm/mach-mxs/Makefile
+> +++ b/arch/arm/mach-mxs/Makefile
+> @@ -9,5 +9,7 @@ obj-$(CONFIG_SOC_IMX28) += clock-mx28.o mm-mx28.o
+>  
+>  obj-$(CONFIG_MACH_MX23EVK) += mach-mx23evk.o
+>  obj-$(CONFIG_MACH_MX28EVK) += mach-mx28evk.o
+> +obj-$(CONFIG_MODULE_TX28) += module-tx28.o
+> +obj-$(CONFIG_MACH_TX28)    += mach-tx28.o
+>  
+>  obj-y += devices/
+> diff --git a/arch/arm/mach-mxs/include/mach/mxs.h b/arch/arm/mach-mxs/include/mach/mxs.h
+> index f186c08..35a89dd 100644
+> --- a/arch/arm/mach-mxs/include/mach/mxs.h
+> +++ b/arch/arm/mach-mxs/include/mach/mxs.h
+> @@ -28,8 +28,13 @@
+>  /*
+>   * MXS CPU types
+>   */
+> -#define cpu_is_mx23()		(machine_is_mx23evk())
+> -#define cpu_is_mx28()		(machine_is_mx28evk())
+> +#define cpu_is_mx23()		(					\
+> +		machine_is_mx23evk() ||					\
+> +		0)
+> +#define cpu_is_mx28()		(					\
+> +		machine_is_mx28evk() ||					\
+> +		machine_is_tx28() ||					\
+> +		0)
+>  
+>  /*
+>   * IO addresses common to MXS-based
+> diff --git a/arch/arm/mach-mxs/include/mach/uncompress.h b/arch/arm/mach-mxs/include/mach/uncompress.h
+> index a005e76..f12a173 100644
+> --- a/arch/arm/mach-mxs/include/mach/uncompress.h
+> +++ b/arch/arm/mach-mxs/include/mach/uncompress.h
+> @@ -63,6 +63,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+>  		mxs_duart_base = MX23_DUART_BASE_ADDR;
+>  		break;
+>  	case MACH_TYPE_MX28EVK:
+> +	case MACH_TYPE_TX28:
+>  		mxs_duart_base = MX28_DUART_BASE_ADDR;
+>  		break;
+>  	default:
+> diff --git a/arch/arm/mach-mxs/mach-tx28.c b/arch/arm/mach-mxs/mach-tx28.c
+> new file mode 100644
+> index 0000000..540d6ea
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/mach-tx28.c
+> @@ -0,0 +1,175 @@
+> +/*
+> + * Copyright (C) 2010 <LW@KARO-electronics.de>
+> + *
+> + * based on: mach-mx28_evk.c
 
-Add support for CS4271 SPI-connected CODEC to EDB93xx.
-        
-Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
+mach-mx28evk.c?
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Acked-by: liam Girdwood <lrg@slimlogic.co.uk>
+> + * Copyright 2010 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation
+> + */
 
----
- arch/arm/mach-ep93xx/edb93xx.c |   83 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 83 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 3f37567..2c2f84d 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -30,9 +30,13 @@
- #include <linux/gpio.h>
- #include <linux/i2c.h>
- #include <linux/i2c-gpio.h>
-+#include <linux/spi/spi.h>
-+
-+#include <sound/cs4271.h>
- 
- #include <mach/hardware.h>
- #include <mach/fb.h>
-+#include <mach/ep93xx_spi.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -94,6 +98,83 @@ static void __init edb93xx_register_i2c(void)
- 
-
- /*************************************************************************
-+ * EDB93xx SPI peripheral handling
-+ *************************************************************************/
-+static struct cs4271_platform_data edb93xx_cs4271_data = {
-+	.gpio_nreset	= -EINVAL,	/* filled in later */
-+};
-+
-+static int edb93xx_cs4271_hw_setup(struct spi_device *spi)
-+{
-+	return gpio_request_one(EP93XX_GPIO_LINE_EGPIO6,
-+				GPIOF_OUT_INIT_HIGH, spi->modalias);
-+}
-+
-+static void edb93xx_cs4271_hw_cleanup(struct spi_device *spi)
-+{
-+	gpio_free(EP93XX_GPIO_LINE_EGPIO6);
-+}
-+
-+static void edb93xx_cs4271_hw_cs_control(struct spi_device *spi, int value)
-+{
-+	gpio_set_value(EP93XX_GPIO_LINE_EGPIO6, value);
-+}
-+
-+static struct ep93xx_spi_chip_ops edb93xx_cs4271_hw = {
-+	.setup		= edb93xx_cs4271_hw_setup,
-+	.cleanup	= edb93xx_cs4271_hw_cleanup,
-+	.cs_control	= edb93xx_cs4271_hw_cs_control,
-+};
-+
-+static struct spi_board_info edb93xx_spi_board_info[] __initdata = {
-+	{
-+		.modalias		= "cs4271",
-+		.platform_data		= &edb93xx_cs4271_data,
-+		.controller_data	= &edb93xx_cs4271_hw,
-+		.max_speed_hz		= 6000000,
-+		.bus_num		= 0,
-+		.chip_select		= 0,
-+		.mode			= SPI_MODE_3,
-+	},
-+};
-+
-+static struct ep93xx_spi_info edb93xx_spi_info __initdata = {
-+	.num_chipselect	= ARRAY_SIZE(edb93xx_spi_board_info),
-+};
-+
-+static void __init edb93xx_register_spi(void)
-+{
-+	if (machine_is_edb9301() || machine_is_edb9302())
-+		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO1;
-+	else if (machine_is_edb9302a() || machine_is_edb9307a())
-+		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_H(2);
-+	else if (machine_is_edb9315a())
-+		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
-+
-+	ep93xx_register_spi(&edb93xx_spi_info, edb93xx_spi_board_info,
-+			    ARRAY_SIZE(edb93xx_spi_board_info));
-+}
-+
-+
-+/*************************************************************************
-+ * EDB93xx I2S
-+ *************************************************************************/
-+static int __init edb93xx_has_audio(void)
-+{
-+	return (machine_is_edb9301() || machine_is_edb9302() ||
-+		machine_is_edb9302a() || machine_is_edb9307a() ||
-+		machine_is_edb9315a());
-+}
-+
-+static void __init edb93xx_register_i2s(void)
-+{
-+	if (edb93xx_has_audio()) {
-+		ep93xx_register_i2s();
-+	}
-+}
-+
-+
-+/*************************************************************************
-  * EDB93xx pwm
-  *************************************************************************/
- static void __init edb93xx_register_pwm(void)
-@@ -149,6 +230,8 @@ static void __init edb93xx_init_machine(void)
- 	edb93xx_register_flash();
- 	ep93xx_register_eth(&edb93xx_eth_data, 1);
- 	edb93xx_register_i2c();
-+	edb93xx_register_spi();
-+	edb93xx_register_i2s();
- 	edb93xx_register_pwm();
- 	edb93xx_register_fb();
- }
+-- 
+Regards,
+Shawn
