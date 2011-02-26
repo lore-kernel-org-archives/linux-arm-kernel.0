@@ -1,110 +1,108 @@
 From: banajit.g@samsung.com (Banajit Goswami)
-Date: Sat, 26 Feb 2011 13:29:06 +0900
-Subject: [PATCH 6/6] ARM: S5PV210: Add PWM backlight support on SMDKV210
+Date: Sat, 26 Feb 2011 13:29:03 +0900
+Subject: [PATCH 3/6] ARM: S5P64X0: Add PWM backlight support on SMDK6440
 In-Reply-To: <1298694546-16816-1-git-send-email-banajit.g@samsung.com>
 References: <1298694546-16816-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <1298694546-16816-7-git-send-email-banajit.g@samsung.com>
+Message-ID: <1298694546-16816-4-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds support for LCD backlight control using PWM timer
-for Samsung's SMDKV210 board.
+for Samsung SMDK6440 board.
 
 Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 ---
- arch/arm/mach-s5pv210/Kconfig         |    1 +
- arch/arm/mach-s5pv210/mach-smdkv210.c |   46 +++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p64x0/Kconfig         |    1 +
+ arch/arm/mach-s5p64x0/mach-smdk6440.c |   44 +++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
-index 53aabef..d7fd031 100644
---- a/arch/arm/mach-s5pv210/Kconfig
-+++ b/arch/arm/mach-s5pv210/Kconfig
-@@ -130,6 +130,7 @@ config MACH_SMDKV210
+diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+index 164d278..be5888a 100644
+--- a/arch/arm/mach-s5p64x0/Kconfig
++++ b/arch/arm/mach-s5p64x0/Kconfig
+@@ -34,6 +34,7 @@ config MACH_SMDK6440
+ 	select S3C_DEV_WDT
+ 	select S3C64XX_DEV_SPI
  	select SAMSUNG_DEV_ADC
- 	select SAMSUNG_DEV_IDE
- 	select SAMSUNG_DEV_KEYPAD
 +	select SAMSUNG_DEV_PWM
  	select SAMSUNG_DEV_TS
- 	select S5PV210_SETUP_FB_24BPP
- 	select S5PV210_SETUP_I2C1
-diff --git a/arch/arm/mach-s5pv210/mach-smdkv210.c b/arch/arm/mach-s5pv210/mach-smdkv210.c
-index bc9fdb5..8833e7b 100644
---- a/arch/arm/mach-s5pv210/mach-smdkv210.c
-+++ b/arch/arm/mach-s5pv210/mach-smdkv210.c
-@@ -18,6 +18,7 @@
- #include <linux/fb.h>
+ 	select S5P64X0_SETUP_I2C1
+ 	help
+diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+index e5beb84..58941d7 100644
+--- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
++++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+@@ -22,6 +22,7 @@
+ #include <linux/module.h>
+ #include <linux/clk.h>
  #include <linux/gpio.h>
- #include <linux/delay.h>
 +#include <linux/pwm_backlight.h>
  
  #include <asm/mach/arch.h>
  #include <asm/mach/map.h>
-@@ -43,6 +44,7 @@
- #include <plat/keypad.h>
- #include <plat/pm.h>
- #include <plat/fb.h>
-+#include <plat/gpio-cfg.h>
+@@ -32,6 +33,7 @@
+ #include <mach/map.h>
+ #include <mach/regs-clock.h>
+ #include <mach/i2c.h>
++#include <mach/regs-gpio.h>
  
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define SMDKV210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -208,6 +210,45 @@ static struct s3c_fb_platdata smdkv210_lcd0_pdata __initdata = {
- 	.setup_gpio	= s5pv210_fb_gpio_setup_24bpp,
+ #include <plat/regs-serial.h>
+ #include <plat/gpio-cfg.h>
+@@ -88,6 +90,45 @@ static struct s3c2410_uartcfg smdk6440_uartcfgs[] __initdata = {
+ 	},
  };
  
-+static int smdkv210_backlight_init(struct device *dev)
++static int smdk6440_backlight_init(struct device *dev)
 +{
 +	int ret;
 +
-+	ret = gpio_request(S5PV210_GPD0(3), "Backlight");
++	ret = gpio_request(S5P6440_GPF(15), "Backlight");
 +	if (ret) {
-+		printk(KERN_ERR "failed to request GPD for PWM-OUT 3\n");
++		printk(KERN_ERR "failed to request GPF for PWM-OUT1\n");
 +		return ret;
 +	}
 +
-+	/* Configure GPIO pin with S5PV210_GPD_0_3_TOUT_3 */
-+	s3c_gpio_cfgpin(S5PV210_GPD0(3), (0x2 << 12));
++	/* Configure GPIO pin with S5P6440_GPF15_PWM_TOUT1 */
++	s3c_gpio_cfgpin(S5P6440_GPF(15), (0x02 << 30));
 +
 +	return 0;
 +}
 +
-+static void smdkv210_backlight_exit(struct device *dev)
++static void smdk6440_backlight_exit(struct device *dev)
 +{
-+	s3c_gpio_cfgpin(S5PV210_GPD0(3), S3C_GPIO_OUTPUT);
-+	gpio_free(S5PV210_GPD0(3));
++	s3c_gpio_cfgpin(S5P6440_GPF(15), S3C_GPIO_OUTPUT);
++	gpio_free(S5P6440_GPF(15));
 +}
 +
-+static struct platform_pwm_backlight_data smdkv210_backlight_data = {
-+	.pwm_id		= 3,
++static struct platform_pwm_backlight_data smdk6440_backlight_data = {
++	.pwm_id		= 1,
 +	.max_brightness	= 255,
 +	.dft_brightness	= 255,
 +	.pwm_period_ns	= 78770,
-+	.init		= smdkv210_backlight_init,
-+	.exit		= smdkv210_backlight_exit,
++	.init		= smdk6440_backlight_init,
++	.exit		= smdk6440_backlight_exit,
 +};
 +
-+static struct platform_device smdkv210_backlight_device = {
++static struct platform_device smdk6440_backlight_device = {
 +	.name		= "pwm-backlight",
 +	.dev		= {
-+		.parent		= &s3c_device_timer[3].dev,
-+		.platform_data	= &smdkv210_backlight_data,
++		.parent		= &s3c_device_timer[1].dev,
++		.platform_data	= &smdk6440_backlight_data,
 +	},
 +};
 +
- static struct platform_device *smdkv210_devices[] __initdata = {
+ static struct platform_device *smdk6440_devices[] __initdata = {
  	&s3c_device_adc,
- 	&s3c_device_cfcon,
-@@ -229,6 +270,11 @@ static struct platform_device *smdkv210_devices[] __initdata = {
- 	&samsung_device_keypad,
- 	&smdkv210_dm9000,
- 	&smdkv210_lcd_lte480wv,
+ 	&s3c_device_rtc,
+@@ -97,6 +138,9 @@ static struct platform_device *smdk6440_devices[] __initdata = {
+ 	&s3c_device_wdt,
+ 	&samsung_asoc_dma,
+ 	&s5p6440_device_iis,
 +	&s3c_device_timer[0],
 +	&s3c_device_timer[1],
-+	&s3c_device_timer[2],
-+	&s3c_device_timer[3],
-+	&smdkv210_backlight_device,
++	&smdk6440_backlight_device,
  };
  
- static void __init smdkv210_dm9000_init(void)
+ static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
 -- 
 1.6.5.2
