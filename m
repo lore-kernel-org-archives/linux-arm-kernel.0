@@ -1,79 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 26 Feb 2011 10:33:54 +0100
-Subject: [PATCH 1/3] ARM: S5P: Add s5p_timer support for HRT
-In-Reply-To: <1298688357-20775-2-git-send-email-sbkim73@samsung.com>
-References: <1298688357-20775-1-git-send-email-sbkim73@samsung.com>
-	<1298688357-20775-2-git-send-email-sbkim73@samsung.com>
-Message-ID: <AANLkTinCyXm_z8tcjRHCYEvi79ifj+joKK7E8Kzboi2G@mail.gmail.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Sat, 26 Feb 2011 17:42:39 +0530
+Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
+References: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BE49175@dbde02.ent.ti.com>
+	<886E26C48DE446C3937D89ECF86030B2@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
+Message-ID: <25DBF349769A4CF7B883D6D7FF01AD70@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/2/26 Sangbeom Kim <sbkim73@samsung.com>:
-> (...)
-> +static void s5p_clockevent_init(void)
-> +{
-> + ? ? ? unsigned long pclk;
-> + ? ? ? unsigned long clock_rate;
-> + ? ? ? unsigned int irq_number;
-> + ? ? ? struct clk *tscaler;
-> +
-> + ? ? ? pclk = clk_get_rate(timerclk);
-> +
-> + ? ? ? tscaler = clk_get_parent(tdiv_event);
-> +
-> + ? ? ? clk_set_rate(tscaler, pclk / 2);
-> + ? ? ? clk_set_rate(tdiv_event, pclk / 2);
-> + ? ? ? clk_set_parent(tin_event, tdiv_event);
-> +
-> + ? ? ? clock_rate = clk_get_rate(tin_event);
-> + ? ? ? clock_count_per_tick = clock_rate / HZ;
-> +
-> + ? ? ? time_event_device.mult =
-> + ? ? ? ? ? ? ? div_sc(clock_rate, NSEC_PER_SEC, time_event_device.shift);
-> + ? ? ? time_event_device.max_delta_ns =
-> + ? ? ? ? ? ? ? clockevent_delta2ns(-1, &time_event_device);
-> + ? ? ? time_event_device.min_delta_ns =
-> + ? ? ? ? ? ? ? clockevent_delta2ns(1, &time_event_device);
+Hi Sekhar,
 
-This is a very complicated and inprecise way of doing this nowadays.
-Skip hardcoding the shift value and calculating mult like that and use
+I tried this using MMC and Kelvin's suggestions, but it never came back. 
+Here is a log:
 
-/* Be able to sleep for atleast 4 seconds (usually more) */
-#define EVT_MIN_RANGE 4
-
-clockevents_calc_mult_shift(&time_event_device,
-                                    clock_rate, EVT_MIN_RANGE);
-
-> (...)
-> +static void s5p_clocksource_init(void)
-> +{
-> + ? ? ? unsigned long pclk;
-> + ? ? ? unsigned long clock_rate;
-> +
-> + ? ? ? pclk = clk_get_rate(timerclk);
-> +
-> + ? ? ? clk_set_rate(tdiv_source, pclk / 2);
-> + ? ? ? clk_set_parent(tin_source, tdiv_source);
-> +
-> + ? ? ? clock_rate = clk_get_rate(tin_source);
-> +
-> + ? ? ? s5p_time_setup(timer_source.source_id, TCNT_MAX);
-> + ? ? ? s5p_time_start(timer_source.source_id, PERIODIC);
-> +
-> + ? ? ? if (clocksource_register_hz(&time_clocksource, clock_rate))
-> + ? ? ? ? ? ? ? panic("%s: can't register clocksource\n", time_clocksource.name);
-> +}
-
-This is more like it :-)
-
-But you probably also want to add a sched_clock hook for this
-platform too, so you get some nice scheduling resolution.
-
-I suggest you look at the simple straight-forward driver
-for U300 in arch/arm/mach-u300/timer.c for inspiration.
-It's using the same timer that is used for clocksource for
-sched_clock().
-
-
-Yours,
-Linus Walleij
+root at arago:~# rtcwake -d /dev/rtc0 -s 20 -m mem
+wakeup from "mem" at Tue Apr 21 14:31:13 2009
+PM: Syncing filesystems ... done.
+Freezing user space processes ... (elapsed 0.01 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+Suspending console(s) (use no_console_suspend to debug)
