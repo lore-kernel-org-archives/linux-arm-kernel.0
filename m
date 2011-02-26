@@ -1,71 +1,78 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 26 Feb 2011 14:43:16 -0500 (EST)
-Subject: [PATCH 1/4] msm: scm: Mark inline asm as volatile
-In-Reply-To: <8yapqqe3bs3.fsf@huya.qualcomm.com>
+Date: Sat, 26 Feb 2011 15:04:45 -0500 (EST)
+Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
+In-Reply-To: <8yazkpi3cfa.fsf@huya.qualcomm.com>
 References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-2-git-send-email-sboyd@codeaurora.org>
-	<1298635017.958.0.camel@e102144-lin.cambridge.arm.com>
-	<8yapqqe3bs3.fsf@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1102261439590.22034@xanadu.home>
+	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
+	<1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
+	<4D688AF1.1090607@codeaurora.org>
+	<20110226084736.GB3640@n2100.arm.linux.org.uk>
+	<8yazkpi3cfa.fsf@huya.qualcomm.com>
+Message-ID: <alpine.LFD.2.00.1102261452340.22034@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, 26 Feb 2011, David Brown wrote:
 
-> On Fri, Feb 25 2011, Will Deacon wrote:
+> On Sat, Feb 26 2011, Russell King - ARM Linux wrote:
 > 
-> > On Thu, 2011-02-24 at 18:44 +0000, Stephen Boyd wrote:
-> >> We don't want the compiler to remove these asm statements or
-> >> reorder them in any way. Mark them as volatile to be sure.
-> >> 
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> >> ---
-> >>  arch/arm/mach-msm/scm.c |    4 ++--
-> >>  1 files changed, 2 insertions(+), 2 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-msm/scm.c b/arch/arm/mach-msm/scm.c
-> >> index f4b9bc9..ba57b5a 100644
-> >> --- a/arch/arm/mach-msm/scm.c
-> >> +++ b/arch/arm/mach-msm/scm.c
-> >> @@ -174,7 +174,7 @@ static u32 smc(u32 cmd_addr)
-> >>         register u32 r0 asm("r0") = 1;
-> >>         register u32 r1 asm("r1") = (u32)&context_id;
-> >>         register u32 r2 asm("r2") = cmd_addr;
-> >> -       asm(
-> >> +       asm volatile(
-> >>                 __asmeq("%0", "r0")
-> >>                 __asmeq("%1", "r0")
-> >>                 __asmeq("%2", "r1")
-> >> @@ -271,7 +271,7 @@ u32 scm_get_version(void)
-> >>                 return version;
-> >> 
-> >>         mutex_lock(&scm_lock);
-> >> -       asm(
-> >> +       asm volatile(
-> >>                 __asmeq("%0", "r1")
-> >>                 __asmeq("%1", "r0")
-> >>                 __asmeq("%2", "r1")
-> >
-> > These asm blocks all have sensible looking output constraints. Why
-> > do they need to be marked volatile?
+> > On Fri, Feb 25, 2011 at 09:09:05PM -0800, Saravana Kannan wrote:
+> > One way to look at it is that if you specify a value for r0, assign it,
+> > and then call a function, how do you expect the r0 value to be preserved?
+> > r0 will be corrupted by the called function as its used to pass arg0 and
+> > the return value.
 > 
-> Without the volatile, the compiler is free to assume the only side
-> effects of the asm are to modify the output registers.  The volatile is
-> needed to indicate to the compiler that the asm has other side effects.
-> There isn't enough optimization, yet, in gcc to change the generated
-> code in this case, so it happens to generate the correct code without
-> it.
-> 
-> The second probably doesn't need it, unless we are expecting the version
-> to change dynamically.  The volatile makes the scm_get_version()
-> function clearly a call to scm, though, so is probably useful to
-> document the intent.
+> > I'm surprised the compiler didn't spit out an error.
 
-If the inline asm does have side effects which are not obvious other 
-than producing a result for the output operand then it is a good idea to 
-add a comment to that effect.  Otherwise it is always best to omit the 
-volatile and let gcc move the inline asm around or even delete it 
-entirely when possible.
+Me too.  The compiler should have moved the content of r0 somewhere else 
+before the function call, and restore it back into r0 if necessary 
+before the point where the corresponding variable is used again.  Or at 
+least issue a warning if it can't do that.
+
+> The gcc docs say:
+> 
+>    * Local register variables in specific registers do not reserve the
+>      registers, except at the point where they are used as input or
+>      output operands in an `asm' statement and the `asm' statement
+>      itself is not deleted.  The compiler's data flow analysis is
+>      capable of determining where the specified registers contain live
+>      values, and where they are available for other uses.  Stores into
+>      local register variables may be deleted when they appear to be
+>      dead according to dataflow analysis.  References to local register
+>      variables may be deleted or moved or simplified.
+> 
+> which would suggest that it should at least detect that it can't keep
+> the value in r0.  What it seems to do is detect that the value can't be
+> in the register, so it never bothers putting it there in the first
+> place.
+
+Right.  A minimal test case may look like this if someone feels like 
+filling a gcc bug report:
+
+extern int foo(int x);
+
+int bar(int x)
+{
+	register int a asm("r0") = 1;
+	x = foo(x);
+	asm ("add %0, %1, %2" : "=r" (x) : "r" (a), "r" (x));
+	return x;
+}
+
+And the produced code is:
+
+bar:
+        stmfd   sp!, {r3, lr}
+        bl      foo
+#APP
+        add r0, r0, r0
+        ldmfd   sp!, {r3, pc}
+
+So this is clearly bogus.
+
+> In any case, fortunately it works with the fix.
+
+Please add a comment in your patch to explain the issue.
 
 
 Nicolas
