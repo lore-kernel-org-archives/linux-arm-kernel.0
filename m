@@ -1,69 +1,83 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 26 Feb 2011 14:44:40 +0100
-Subject: [PATCH 2/3] mmc: sdhci-esdhc: broken card detection is not a default
-	quirk
-In-Reply-To: <1298727881-12141-1-git-send-email-w.sang@pengutronix.de>
-References: <1298727881-12141-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1298727881-12141-3-git-send-email-w.sang@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 26 Feb 2011 14:24:13 +0000
+Subject: [PATCH 1/3] ARM: S5P: Add s5p_timer support for HRT
+In-Reply-To: <1298688357-20775-2-git-send-email-sbkim73@samsung.com>
+References: <1298688357-20775-1-git-send-email-sbkim73@samsung.com>
+	<1298688357-20775-2-git-send-email-sbkim73@samsung.com>
+Message-ID: <20110226142413.GC3640@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It can be worked around using a GPIO which will be done for i.MX later.
+On Sat, Feb 26, 2011 at 11:45:55AM +0900, Sangbeom Kim wrote:
+> +static irqreturn_t s5p_clock_event_isr(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = &time_event_device;
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Acked-by: Anton Vorontsov <cbouatmailru@gmail.com>
-Tested-by: Marc Reilly <marc@cpdesign.com.au>
-Tested-by: Eric Benard <eric@eukrea.com>
----
+	struct clock_event_device *evt = dev_id;
 
-change since last version:
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct irqaction s5p_clock_event_irq = {
+> +	.name		= "s5p_time_irq",
+> +	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+> +	.handler	= s5p_clock_event_isr,
 
-* none
+	.dev_id	 	= &time_event_device,
 
- drivers/mmc/host/sdhci-esdhc-imx.c |    3 ++-
- drivers/mmc/host/sdhci-esdhc.h     |    1 -
- drivers/mmc/host/sdhci-of-esdhc.c  |    3 ++-
- 3 files changed, 4 insertions(+), 3 deletions(-)
+> +};
+...
+> +static void __init s5p_timer_resources(void)
+> +{
+> +	struct platform_device tmpdev;
+> +
+> +	tmpdev.dev.bus = &platform_bus_type;
+> +
+> +	timerclk = clk_get(NULL, "timers");
+> +	if (IS_ERR(timerclk))
+> +		panic("failed to get timers clock for system timer");
+> +
+> +	clk_enable(timerclk);
+> +
+> +	tmpdev.id = timer_source.event_id;
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 65df00b..49c9801 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -171,7 +171,8 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- }
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-+			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
- 	/* ADMA has issues. Might be fixable */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index afaf1bc..c55aae8 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -19,7 +19,6 @@
-  */
- 
- #define ESDHC_DEFAULT_QUIRKS	(SDHCI_QUIRK_FORCE_BLK_SZ_2048 | \
--				SDHCI_QUIRK_BROKEN_CARD_DETECTION | \
- 				SDHCI_QUIRK_NO_BUSY_IRQ | \
- 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
- 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fcd0e1f..08161f6 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -73,7 +73,8 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
- }
- 
- struct sdhci_of_data sdhci_esdhc = {
--	.quirks = ESDHC_DEFAULT_QUIRKS,
-+	/* card detection could be handled via GPIO */
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_CARD_DETECTION,
- 	.ops = {
- 		.read_l = sdhci_be32bs_readl,
- 		.read_w = esdhc_readw,
--- 
-1.7.2.3
+So Samsung clock stuff is still being idiotic.  Will this ever be fixed?
+
+> +	tin_event = clk_get(&tmpdev.dev, "pwm-tin");
+> +	if (IS_ERR(tin_event)) {
+> +		clk_put(tin_event);
+
+Don't clk_put errors.
+
+> +		panic("failed to get pwm-tin2 clock for system timer");
+> +	}
+> +
+> +	tdiv_event = clk_get(&tmpdev.dev, "pwm-tdiv");
+> +	if (IS_ERR(tdiv_event)) {
+> +		clk_put(tdiv_event);
+
+Ditto.
+
+> +		panic("failed to get pwm-tdiv2 clock for system timer");
+> +	}
+> +
+> +	clk_enable(tin_event);
+> +
+> +	tmpdev.id = timer_source.source_id;
+> +	tin_source = clk_get(&tmpdev.dev, "pwm-tin");
+> +	if (IS_ERR(tin_source)) {
+> +		clk_put(tin_source);
+
+Ditto.
+
+> +		panic("failed to get pwm-tin4 clock for system timer");
+> +	}
+> +
+> +	tdiv_source = clk_get(&tmpdev.dev, "pwm-tdiv");
+> +	if (IS_ERR(tdiv_source)) {
+> +		clk_put(tdiv_source);
+
+Ditto.
