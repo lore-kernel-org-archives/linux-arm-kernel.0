@@ -1,43 +1,109 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 25 Feb 2011 17:20:07 -0700
-Subject: [PATCH 2/4] OMAP2/3: clockdomains: remove warnings on an OMAP3-only
-	compile
+Date: Fri, 25 Feb 2011 17:20:10 -0700
+Subject: [PATCH 4/4] OMAP2xxx: clock data: clean up some comments
 In-Reply-To: <20110226001601.28142.46636.stgit@twilight.localdomain>
 References: <20110226001601.28142.46636.stgit@twilight.localdomain>
-Message-ID: <20110226002006.28142.52520.stgit@twilight.localdomain>
+Message-ID: <20110226002009.28142.93377.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resolve these compile-time gcc warnings on OMAP3-only kernel compiles:
-
-.../mach-omap2/clockdomains2xxx_3xxx_data.c:95: warning: 'dsp_24xx_wkdeps' defined but not used
-.../mach-omap2/clockdomains2xxx_3xxx_data.c:119: warning: 'mpu_24xx_wkdeps' defined but not used
-.../mach-omap2/clockdomains2xxx_3xxx_data.c:147: warning: 'core_24xx_wkdeps' defined but not used
+Minor cleanup of some clock data comments.  No functional changes.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/clock2420_data.c |   23 ++++++++++-------------
+ arch/arm/mach-omap2/clock2430_data.c |   23 ++++++++++-------------
+ 2 files changed, 20 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-index ffdfe54..f9df791 100644
---- a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
-@@ -89,6 +89,8 @@ static struct clkdm_dep gfx_sgx_wkdeps[] = {
- 
- /* 24XX-specific possible dependencies */
- 
-+#ifdef CONFIG_ARCH_OMAP2
-+
- /* Wakeup dependency source arrays */
- 
- /* 2420/2430 PM_WKDEP_DSP: CORE, MPU, WKUP */
-@@ -168,6 +170,8 @@ static struct clkdm_dep core_24xx_wkdeps[] = {
- 	{ NULL },
- };
- 
-+#endif
-+
- 
- /* 2430-specific possible wakeup dependencies */
- 
+diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
+index 5e80d3d..b6f65d4 100644
+--- a/arch/arm/mach-omap2/clock2420_data.c
++++ b/arch/arm/mach-omap2/clock2420_data.c
+@@ -1,12 +1,12 @@
+ /*
+- *  linux/arch/arm/mach-omap2/clock2420_data.c
++ * OMAP2420 clock data
+  *
+- *  Copyright (C) 2005-2009 Texas Instruments, Inc.
+- *  Copyright (C) 2004-2011 Nokia Corporation
++ * Copyright (C) 2005-2009 Texas Instruments, Inc.
++ * Copyright (C) 2004-2011 Nokia Corporation
+  *
+- *  Contacts:
+- *  Richard Woodruff <r-woodruff2@ti.com>
+- *  Paul Walmsley
++ * Contacts:
++ * Richard Woodruff <r-woodruff2@ti.com>
++ * Paul Walmsley
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -34,18 +34,15 @@
+ /*
+  * 2420 clock tree.
+  *
+- * NOTE:In many cases here we are assigning a 'default' parent.	In many
+- *	cases the parent is selectable.	The get/set parent calls will also
+- *	switch sources.
+- *
+- *	Many some clocks say always_enabled, but they can be auto idled for
+- *	power savings. They will always be available upon clock request.
++ * NOTE:In many cases here we are assigning a 'default' parent. In
++ *	many cases the parent is selectable. The set parent calls will
++ *	also switch sources.
+  *
+  *	Several sources are given initial rates which may be wrong, this will
+  *	be fixed up in the init func.
+  *
+  *	Things are broadly separated below by clock domains. It is
+- *	noteworthy that most periferals have dependencies on multiple clock
++ *	noteworthy that most peripherals have dependencies on multiple clock
+  *	domains. Many get their interface clocks from the L4 domain, but get
+  *	functional clocks from fixed sources or other core domain derived
+  *	clocks.
+diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
+index 8957fc6..5c2a075 100644
+--- a/arch/arm/mach-omap2/clock2430_data.c
++++ b/arch/arm/mach-omap2/clock2430_data.c
+@@ -1,12 +1,12 @@
+ /*
+- *  linux/arch/arm/mach-omap2/clock2430_data.c
++ * OMAP2430 clock data
+  *
+- *  Copyright (C) 2005-2009 Texas Instruments, Inc.
+- *  Copyright (C) 2004-2011 Nokia Corporation
++ * Copyright (C) 2005-2009 Texas Instruments, Inc.
++ * Copyright (C) 2004-2011 Nokia Corporation
+  *
+- *  Contacts:
+- *  Richard Woodruff <r-woodruff2@ti.com>
+- *  Paul Walmsley
++ * Contacts:
++ * Richard Woodruff <r-woodruff2@ti.com>
++ * Paul Walmsley
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -34,18 +34,15 @@
+ /*
+  * 2430 clock tree.
+  *
+- * NOTE:In many cases here we are assigning a 'default' parent.	In many
+- *	cases the parent is selectable.	The get/set parent calls will also
+- *	switch sources.
+- *
+- *	Many some clocks say always_enabled, but they can be auto idled for
+- *	power savings. They will always be available upon clock request.
++ * NOTE:In many cases here we are assigning a 'default' parent. In
++ *	many cases the parent is selectable. The set parent calls will
++ *	also switch sources.
+  *
+  *	Several sources are given initial rates which may be wrong, this will
+  *	be fixed up in the init func.
+  *
+  *	Things are broadly separated below by clock domains. It is
+- *	noteworthy that most periferals have dependencies on multiple clock
++ *	noteworthy that most peripherals have dependencies on multiple clock
+  *	domains. Many get their interface clocks from the L4 domain, but get
+  *	functional clocks from fixed sources or other core domain derived
+  *	clocks.
