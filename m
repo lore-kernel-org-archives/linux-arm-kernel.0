@@ -1,89 +1,29 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Sat, 26 Feb 2011 17:34:38 +0100
-Subject: [PATCH 1/2] drivers/watchdog/s3c2410_wdt.c: Convert release_resource
-	to release_region/release_mem_region
-Message-ID: <1298738079-28893-1-git-send-email-julia@diku.dk>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Sat, 26 Feb 2011 18:39:46 +0200
+Subject: [PATCH v2 1/3] ARM: PXA: PXAFB: Fix double-free issue
+In-Reply-To: <201102201946.20681.marek.vasut@gmail.com>
+References: <20110217110321.GF24627@n2100.arm.linux.org.uk>
+	<1298214147-11578-1-git-send-email-anarsoul@gmail.com>
+	<201102201946.20681.marek.vasut@gmail.com>
+Message-ID: <201102261839.46806.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Request_mem_region should be used with release_mem_region, not
-release_resource.
+On Sunday 20 February 2011 20:46:20 Marek Vasut wrote:
 
-The semantic match that finds this problem is as follows:
-(http://coccinelle.lip6.fr/)
+> > @@ -629,6 +629,9 @@ static void overlay1fb_disable(struct pxafb_layer
+> > *ofb)
+> > 
+> >  {
+> >  
+> >  	uint32_t lccr5 = lcd_readl(ofb->fbi, LCCR5);
+> > 
+> > +	if (!(lcd_readl(ofb->fbi, OVL1C1) & OVLxC1_OEN))
+> > +		return;
+> > +
+> 
+> Maybe you can even avoid reading LCCR5 above ;-)
 
-// <smpl>
-@@
-expression x,E;
-@@
-*x = request_mem_region(...)
-... when != release_mem_region(x)
-    when != x = E
-* release_resource(x);
-// </smpl>
+Agreed.
 
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- drivers/watchdog/s3c2410_wdt.c |   19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 25b39bf..95ae53d 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -402,7 +402,6 @@ static inline void s3c2410wdt_cpufreq_deregister(void)
- 
- static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- {
--	struct resource *res;
- 	struct device *dev;
- 	unsigned int wtcon;
- 	int started = 0;
-@@ -416,20 +415,19 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 
- 	/* get the memory region for the watchdog timer */
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (res == NULL) {
-+	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (wdt_mem == NULL) {
- 		dev_err(dev, "no memory resource specified\n");
- 		return -ENOENT;
- 	}
- 
--	size = resource_size(res);
--	wdt_mem = request_mem_region(res->start, size, pdev->name);
--	if (wdt_mem == NULL) {
-+	size = resource_size(wdt_mem);
-+	if (!request_mem_region(wdt_mem->start, size, pdev->name)) {
- 		dev_err(dev, "failed to get memory region\n");
- 		return -EBUSY;
- 	}
- 
--	wdt_base = ioremap(res->start, size);
-+	wdt_base = ioremap(wdt_mem->start, size);
- 	if (wdt_base == NULL) {
- 		dev_err(dev, "failed to ioremap() region\n");
- 		ret = -EINVAL;
-@@ -524,8 +522,8 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
- 	iounmap(wdt_base);
- 
-  err_req:
--	release_resource(wdt_mem);
--	kfree(wdt_mem);
-+	release_mem_region(wdt_mem->start, size);
-+	wdt_mem = NULL;
- 
- 	return ret;
- }
-@@ -545,8 +543,7 @@ static int __devexit s3c2410wdt_remove(struct platform_device *dev)
- 
- 	iounmap(wdt_base);
- 
--	release_resource(wdt_mem);
--	kfree(wdt_mem);
-+	release_mem_region(wdt_mem->start, resource_size(wdt_mem));
- 	wdt_mem = NULL;
- 	return 0;
- }
+Will resend soon.
