@@ -1,10 +1,10 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 26 Feb 2011 14:44:41 +0100
-Subject: [PATCH 3/3] mmc: sdhci-esdhc-imx: add card detect on custom GPIO for
-	mx25/35
+Date: Sat, 26 Feb 2011 14:44:39 +0100
+Subject: [PATCH 1/3] mmc: sdhci-esdhc-imx: add support for write protect on
+	custom GPIO on mx25/35
 In-Reply-To: <1298727881-12141-1-git-send-email-w.sang@pengutronix.de>
 References: <1298727881-12141-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1298727881-12141-4-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1298727881-12141-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,143 +15,129 @@ Tested-by: Eric Benard <eric@eukrea.com>
 
 change since last version:
 
-* BROKEN_CARD is default again for now
-* i.MX5x won't apply the custom IRQ
--> same behaviour for i.MX5x as before
+* none
 
- arch/arm/plat-mxc/include/mach/esdhc.h |    2 +
- drivers/mmc/host/sdhci-esdhc-imx.c     |   79 ++++++++++++++++++++++++++++++++
- 2 files changed, 81 insertions(+), 0 deletions(-)
+ arch/arm/plat-mxc/include/mach/esdhc.h |   10 +++++-
+ drivers/mmc/host/sdhci-esdhc-imx.c     |   52 +++++++++++++++++++++++++-------
+ 2 files changed, 50 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/plat-mxc/include/mach/esdhc.h b/arch/arm/plat-mxc/include/mach/esdhc.h
-index 47da109..86003f4 100644
+index a48a9aa..47da109 100644
 --- a/arch/arm/plat-mxc/include/mach/esdhc.h
 +++ b/arch/arm/plat-mxc/include/mach/esdhc.h
-@@ -16,9 +16,11 @@
-  * strongly recommended for i.MX25/35, not needed for other variants
-  *
-  * @wp_gpio:	gpio for write_protect (-EINVAL if unused)
-+ * @cd_gpio:	gpio for card_detect interrupt (-EINVAL if unused)
-  */
+@@ -10,7 +10,15 @@
+ #ifndef __ASM_ARCH_IMX_ESDHC_H
+ #define __ASM_ARCH_IMX_ESDHC_H
  
++/**
++ * struct esdhc_platform_data - optional platform data for esdhc on i.MX
++ *
++ * strongly recommended for i.MX25/35, not needed for other variants
++ *
++ * @wp_gpio:	gpio for write_protect (-EINVAL if unused)
++ */
++
  struct esdhc_platform_data {
- 	unsigned int wp_gpio;
-+	unsigned int cd_gpio;
+-	unsigned int wp_gpio;	/* write protect pin */
++	unsigned int wp_gpio;
  };
  #endif /* __ASM_ARCH_IMX_ESDHC_H */
 diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 49c9801..9be2c3e 100644
+index 9b82910..65df00b 100644
 --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -32,6 +32,39 @@ static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, i
- 	writel(((readl(base) & ~(mask << shift)) | (val << shift)), base);
+@@ -15,9 +15,11 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/clk.h>
++#include <linux/gpio.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sdhci-pltfm.h>
+ #include <mach/hardware.h>
++#include <mach/esdhc.h>
+ #include "sdhci.h"
+ #include "sdhci-pltfm.h"
+ #include "sdhci-esdhc.h"
+@@ -100,10 +102,31 @@ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
+ 	return clk_get_rate(pltfm_host->clk) / 256 / 16;
  }
  
-+static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
++static unsigned int esdhc_pltfm_get_ro(struct sdhci_host *host)
 +{
-+	/* fake CARD_PRESENT flag on mx25/35 */
-+	u32 val = readl(host->ioaddr + reg);
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
 +
-+	if (unlikely(reg == SDHCI_PRESENT_STATE)) {
-+		struct esdhc_platform_data *boarddata =
-+				host->mmc->parent->platform_data;
-+
-+		if (boarddata && gpio_is_valid(boarddata->cd_gpio)
-+				&& gpio_get_value(boarddata->cd_gpio))
-+			/* no card, if a valid gpio says so... */
-+			val &= SDHCI_CARD_PRESENT;
-+		else
-+			/* ... in all other cases assume card is present */
-+			val |= SDHCI_CARD_PRESENT;
-+	}
-+
-+	return val;
++	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
++		return gpio_get_value(boarddata->wp_gpio);
++	else
++		return -ENOSYS;
 +}
 +
-+static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
-+{
-+	if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE))
-+		/*
-+		 * these interrupts won't work with a custom card_detect gpio
-+		 * (only applied to mx25/35)
-+		 */
-+		val &= ~(SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT);
-+
-+	writel(val, host->ioaddr + reg);
-+}
-+
- static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
- {
- 	if (unlikely(reg == SDHCI_HOST_VERSION))
-@@ -121,6 +154,14 @@ static struct sdhci_ops sdhci_esdhc_ops = {
- 	.get_min_clock = esdhc_pltfm_get_min_clock,
- };
- 
-+static irqreturn_t cd_irq(int irq, void *data)
-+{
-+	struct sdhci_host *sdhost = (struct sdhci_host *)data;
-+
-+	tasklet_schedule(&sdhost->card_tasklet);
-+	return IRQ_HANDLED;
++static struct sdhci_ops sdhci_esdhc_ops = {
++	.read_w = esdhc_readw_le,
++	.write_w = esdhc_writew_le,
++	.write_b = esdhc_writeb_le,
++	.set_clock = esdhc_set_clock,
++	.get_max_clock = esdhc_pltfm_get_max_clock,
++	.get_min_clock = esdhc_pltfm_get_min_clock,
 +};
 +
  static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pdata)
  {
  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-@@ -153,9 +194,40 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
- 				"no write-protect pin available!\n");
- 			boarddata->wp_gpio = err;
- 		}
-+
-+		err = gpio_request_one(boarddata->cd_gpio, GPIOF_IN, "ESDHC_CD");
-+		if (err) {
-+			dev_warn(mmc_dev(host->mmc),
-+				"no card-detect pin available!\n");
-+			goto no_card_detect_pin;
-+		}
-+
-+		/* i.MX5x has issues to be researched */
-+		if (!cpu_is_mx25() && !cpu_is_mx35())
-+			goto not_supported;
-+
-+		err = request_irq(gpio_to_irq(boarddata->cd_gpio), cd_irq,
-+				 IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
-+				 mmc_hostname(host->mmc), host);
-+		if (err) {
-+			dev_warn(mmc_dev(host->mmc), "request irq error\n");
-+			goto no_card_detect_irq;
-+		}
-+
-+		sdhci_esdhc_ops.write_l = esdhc_writel_le;
-+		sdhci_esdhc_ops.read_l = esdhc_readl_le;
-+		/* Now we have a working card_detect again */
-+		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
- 	}
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
+ 	struct clk *clk;
++	int err;
  
- 	return 0;
-+
-+ no_card_detect_irq:
-+	gpio_free(boarddata->cd_gpio);
-+ no_card_detect_pin:
-+	boarddata->cd_gpio = err;
-+ not_supported:
-+	return 0;
- }
+ 	clk = clk_get(mmc_dev(host->mmc), NULL);
+ 	if (IS_ERR(clk)) {
+@@ -116,9 +139,21 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ 	if (cpu_is_mx35() || cpu_is_mx51())
+ 		host->quirks |= SDHCI_QUIRK_BROKEN_TIMEOUT_VAL;
  
- static void esdhc_pltfm_exit(struct sdhci_host *host)
-@@ -166,6 +238,13 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- 	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
- 		gpio_free(boarddata->wp_gpio);
- 
-+	if (boarddata && gpio_is_valid(boarddata->cd_gpio)) {
-+		gpio_free(boarddata->cd_gpio);
-+
-+		if (!(host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION))
-+			free_irq(gpio_to_irq(boarddata->cd_gpio), host);
+-	/* Fix errata ENGcm07207 which is present on i.MX25 and i.MX35 */
+-	if (cpu_is_mx25() || cpu_is_mx35())
++	if (cpu_is_mx25() || cpu_is_mx35()) {
++		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
+ 		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK;
++		/* write_protect can't be routed to controller, use gpio */
++		sdhci_esdhc_ops.get_ro = esdhc_pltfm_get_ro;
 +	}
 +
++	if (boarddata) {
++		err = gpio_request_one(boarddata->wp_gpio, GPIOF_IN, "ESDHC_WP");
++		if (err) {
++			dev_warn(mmc_dev(host->mmc),
++				"no write-protect pin available!\n");
++			boarddata->wp_gpio = err;
++		}
++	}
+ 
+ 	return 0;
+ }
+@@ -126,20 +161,15 @@ static int esdhc_pltfm_init(struct sdhci_host *host, struct sdhci_pltfm_data *pd
+ static void esdhc_pltfm_exit(struct sdhci_host *host)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct esdhc_platform_data *boarddata = host->mmc->parent->platform_data;
++
++	if (boarddata && gpio_is_valid(boarddata->wp_gpio))
++		gpio_free(boarddata->wp_gpio);
+ 
  	clk_disable(pltfm_host->clk);
  	clk_put(pltfm_host->clk);
  }
+ 
+-static struct sdhci_ops sdhci_esdhc_ops = {
+-	.read_w = esdhc_readw_le,
+-	.write_w = esdhc_writew_le,
+-	.write_b = esdhc_writeb_le,
+-	.set_clock = esdhc_set_clock,
+-	.get_max_clock = esdhc_pltfm_get_max_clock,
+-	.get_min_clock = esdhc_pltfm_get_min_clock,
+-};
+-
+ struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+ 	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA,
+ 	/* ADMA has issues. Might be fixable */
 -- 
 1.7.2.3
