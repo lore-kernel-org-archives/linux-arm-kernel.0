@@ -1,23 +1,39 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Sat, 26 Feb 2011 17:42:39 +0530
-Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
-References: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BE49175@dbde02.ent.ti.com>
-	<886E26C48DE446C3937D89ECF86030B2@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
-Message-ID: <25DBF349769A4CF7B883D6D7FF01AD70@subhasishg>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 26 Feb 2011 14:44:38 +0100
+Subject: [PATCH V4 0/3] adding write_protect and card_detect for mx25/35
+Message-ID: <1298727881-12141-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+Last tests showed some problems with MX51, especially with card_detect. While
+the approach in general will suffice for i.MX5x, it seems there are a few
+details missing right now. Because I do not have the resources (both time and
+hardware) to deal with these issues, I propose a step by step approach. Let's
+add the functionality for mx25/35 first and make sure there is no difference in
+behaviour for mx5x. (Note that the i.MX5x can route the pins directly to the
+controller, so a properly designed board should not need these gpio-additions.)
+That is what this patch series does: The main change is that mx5x won't notice
+any difference. For mx25/35, it is the same as it has been tested by Eric and
+Marc.
 
-I tried this using MMC and Kelvin's suggestions, but it never came back. 
-Here is a log:
+Thanks to all involved in providing feedback, I hope it can go in now. If you
+want to add support for it to your board, please CC me.
 
-root at arago:~# rtcwake -d /dev/rtc0 -s 20 -m mem
-wakeup from "mem" at Tue Apr 21 14:31:13 2009
-PM: Syncing filesystems ... done.
-Freezing user space processes ... (elapsed 0.01 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
-Suspending console(s) (use no_console_suspend to debug)
+Have a nice weekend,
+
+   Wolfram
+
+Wolfram Sang (3):
+  mmc: sdhci-esdhc-imx: add support for write protect on custom GPIO on
+    mx25/35
+  mmc: sdhci-esdhc: broken card detection is not a default quirk
+  mmc: sdhci-esdhc-imx: add card detect on custom GPIO for mx25/35
+
+ arch/arm/plat-mxc/include/mach/esdhc.h |   12 +++-
+ drivers/mmc/host/sdhci-esdhc-imx.c     |  134 +++++++++++++++++++++++++++++---
+ drivers/mmc/host/sdhci-esdhc.h         |    1 -
+ drivers/mmc/host/sdhci-of-esdhc.c      |    3 +-
+ 4 files changed, 135 insertions(+), 15 deletions(-)
+
+-- 
+1.7.2.3
