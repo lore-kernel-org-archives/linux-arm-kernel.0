@@ -1,47 +1,60 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 26 Feb 2011 18:05:52 +0300
-Subject: [PATCH] OMAP2+: sdrc: fix compile break on OMAP4-only config
-	on current omap-for-linus
-In-Reply-To: <alpine.DEB.2.00.1102251839360.6198@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1102251839360.6198@utopia.booyaka.com>
-Message-ID: <4D6916D0.1080501@ru.mvista.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 26 Feb 2011 23:19:04 +0800
+Subject: [PATCH] ARM: mach-imx: mx25_3ds: add write-protect and card-detect
+	for SD
+Message-ID: <1298733544-24659-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-imx/mach-mx25_3ds.c |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
-On 26-02-2011 4:40, Paul Walmsley wrote:
-
-> On non-OMAP2 and non-OMAP3 kernel configs, turn omap2_sdrc_init() into
-> a no-op.  Otherwise, compilation breaks on an OMAP4-only config with
-> the current omap-for-linus branch:
-
-> arch/arm/mach-omap2/built-in.o: In function `omap2_init_common_devices':
-> ../mach-omap2/io.c:421: undefined reference to `omap2_sdrc_init'
-
-> Signed-off-by: Paul Walmsley<paul@pwsan.com>
-> Cc: Tony Lindgren<tony@atomide.com>
-> ---
->   arch/arm/plat-omap/include/plat/sdrc.h |    5 +++++
->   1 files changed, 5 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/plat-omap/include/plat/sdrc.h b/arch/arm/plat-omap/include/plat/sdrc.h
-> index efd87c8..5a44b14 100644
-> --- a/arch/arm/plat-omap/include/plat/sdrc.h
-> +++ b/arch/arm/plat-omap/include/plat/sdrc.h
-> @@ -124,8 +124,13 @@ struct omap_sdrc_params {
->   	u32 mr;
->   };
->
-> +#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
->   void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
->   			    struct omap_sdrc_params *sdrc_cs1);
-> +#else
-> +#define omap2_sdrc_init(x, y)		0
-
-    How about empty inline instead?
-
-> +#endif
-> +
-
-WBR, Sergei
+diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+index 66b6cdd..561f07f 100644
+--- a/arch/arm/mach-imx/mach-mx25_3ds.c
++++ b/arch/arm/mach-imx/mach-mx25_3ds.c
+@@ -41,6 +41,7 @@
+ #include <mach/common.h>
+ #include <mach/mx25.h>
+ #include <mach/iomux-mx25.h>
++#include <mach/esdhc.h>
+ 
+ #include "devices-imx25.h"
+ 
+@@ -103,6 +104,8 @@ static iomux_v3_cfg_t mx25pdk_pads[] = {
+ 	MX25_PAD_SD1_DATA1__SD1_DATA1,
+ 	MX25_PAD_SD1_DATA2__SD1_DATA2,
+ 	MX25_PAD_SD1_DATA3__SD1_DATA3,
++	MX25_PAD_A14__GPIO_2_0, /* WriteProtect */
++	MX25_PAD_A15__GPIO_2_1, /* CardDetect */
+ };
+ 
+ static const struct fec_platform_data mx25_fec_pdata __initconst = {
+@@ -200,6 +203,14 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+ 	.phy_mode       = FSL_USB2_PHY_UTMI,
+ };
+ 
++#define SD1_GPIO_WP	IMX_GPIO_NR(2, 0)
++#define SD1_GPIO_CD	IMX_GPIO_NR(2, 1)
++
++static const struct esdhc_platform_data mx25pdk_esdhc_pdata __initconst = {
++	.wp_gpio = SD1_GPIO_WP,
++	.cd_gpio = SD1_GPIO_CD,
++};
++
+ static void __init mx25pdk_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx25pdk_pads,
+@@ -217,7 +228,7 @@ static void __init mx25pdk_init(void)
+ 	imx25_add_fec(&mx25_fec_pdata);
+ 	imx25_add_imx_keypad(&mx25pdk_keymap_data);
+ 
+-	imx25_add_sdhci_esdhc_imx(0, NULL);
++	imx25_add_sdhci_esdhc_imx(0, &mx25pdk_esdhc_pdata);
+ }
+ 
+ static void __init mx25pdk_timer_init(void)
+-- 
+1.7.1
