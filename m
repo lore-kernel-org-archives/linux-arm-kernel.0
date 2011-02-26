@@ -1,56 +1,89 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Sat, 26 Feb 2011 21:27:35 +0530
-Subject: [PATCH v4] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
-References: <1298619259-14344-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1298735855.6974.21.camel@vkoul-udesk3>
+From: julia@diku.dk (Julia Lawall)
+Date: Sat, 26 Feb 2011 17:34:38 +0100
+Subject: [PATCH 1/2] drivers/watchdog/s3c2410_wdt.c: Convert release_resource
+	to release_region/release_mem_region
+Message-ID: <1298738079-28893-1-git-send-email-julia@diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-02-25 at 15:34 +0800, Shawn Guo wrote:
-> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> including apbh-dma and apbx-dma.
-> 
-> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
->   instances.
-> 
-> * apbh-dma is different between mx23 and mx28, hardware version
->   register is used to differentiate.
-> 
-> * mxs-dma supports pio function besides data transfer.  The driver
->   uses dma_data_direction DMA_NONE to identify the pio mode, and
->   steals sgl and sg_len to get pio words and numbers from clients.
-> 
-> * mxs dmaengine has some very specific features, like sense function
->   and the special NAND support (nand_lock, nand_wait4ready).  These
->   are too specific to implemented in generic dmaengine driver.
-> 
-> * The driver refers to imx-sdma and only a single descriptor is
->   statically assigned to each channel.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-Please fix the checkpatch errors and warnings, at least it should have
-zero errors.
+Request_mem_region should be used with release_mem_region, not
+release_resource.
 
-ERROR: code indent should use tabs where possible
-#430: FILE: drivers/dma/mxs-dma.c:250:
-+        if (mxs_chan->desc.callback)$
+The semantic match that finds this problem is as follows:
+(http://coccinelle.lip6.fr/)
 
+// <smpl>
+@@
+expression x,E;
+@@
+*x = request_mem_region(...)
+... when != release_mem_region(x)
+    when != x = E
+* release_resource(x);
+// </smpl>
 
-WARNING: please, no spaces at the start of a line
-#430: FILE: drivers/dma/mxs-dma.c:250:
-+        if (mxs_chan->desc.callback)$
+Signed-off-by: Julia Lawall <julia@diku.dk>
 
-ERROR: code indent should use tabs where possible
-#431: FILE: drivers/dma/mxs-dma.c:251:
-+                mxs_chan->desc.callback(mxs_chan->desc.callback_param);
+---
+ drivers/watchdog/s3c2410_wdt.c |   19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-WARNING: please, no spaces at the start of a line
-#431: FILE: drivers/dma/mxs-dma.c:251:
-+                mxs_chan->desc.callback(mxs_chan->desc.callback_param);
-
-ERROR: do not initialise statics to 0 or NULL
-#564: FILE: drivers/dma/mxs-dma.c:384:
-+       static int idx = 0;
-
-~Vinod
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index 25b39bf..95ae53d 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -402,7 +402,6 @@ static inline void s3c2410wdt_cpufreq_deregister(void)
+ 
+ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+ {
+-	struct resource *res;
+ 	struct device *dev;
+ 	unsigned int wtcon;
+ 	int started = 0;
+@@ -416,20 +415,19 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+ 
+ 	/* get the memory region for the watchdog timer */
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (res == NULL) {
++	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (wdt_mem == NULL) {
+ 		dev_err(dev, "no memory resource specified\n");
+ 		return -ENOENT;
+ 	}
+ 
+-	size = resource_size(res);
+-	wdt_mem = request_mem_region(res->start, size, pdev->name);
+-	if (wdt_mem == NULL) {
++	size = resource_size(wdt_mem);
++	if (!request_mem_region(wdt_mem->start, size, pdev->name)) {
+ 		dev_err(dev, "failed to get memory region\n");
+ 		return -EBUSY;
+ 	}
+ 
+-	wdt_base = ioremap(res->start, size);
++	wdt_base = ioremap(wdt_mem->start, size);
+ 	if (wdt_base == NULL) {
+ 		dev_err(dev, "failed to ioremap() region\n");
+ 		ret = -EINVAL;
+@@ -524,8 +522,8 @@ static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+ 	iounmap(wdt_base);
+ 
+  err_req:
+-	release_resource(wdt_mem);
+-	kfree(wdt_mem);
++	release_mem_region(wdt_mem->start, size);
++	wdt_mem = NULL;
+ 
+ 	return ret;
+ }
+@@ -545,8 +543,7 @@ static int __devexit s3c2410wdt_remove(struct platform_device *dev)
+ 
+ 	iounmap(wdt_base);
+ 
+-	release_resource(wdt_mem);
+-	kfree(wdt_mem);
++	release_mem_region(wdt_mem->start, resource_size(wdt_mem));
+ 	wdt_mem = NULL;
+ 	return 0;
+ }
