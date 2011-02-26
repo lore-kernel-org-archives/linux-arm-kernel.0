@@ -1,132 +1,220 @@
 From: banajit.g@samsung.com (Banajit Goswami)
-Date: Sat, 26 Feb 2011 13:29:02 +0900
-Subject: [PATCH 2/6] ARM: S3C64XX: Add PWM backlight support on SMDK6410
+Date: Sat, 26 Feb 2011 13:29:01 +0900
+Subject: [PATCH 1/6] ARM: SAMSUNG: Move PWM device definition from
+	plat-s3c24xx to plat-samsung
 In-Reply-To: <1298694546-16816-1-git-send-email-banajit.g@samsung.com>
 References: <1298694546-16816-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <1298694546-16816-3-git-send-email-banajit.g@samsung.com>
+Message-ID: <1298694546-16816-2-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for LCD backlight using PWM timer for
-Samsung SMDK6410 board.
+This patch does the following:
+1. It moves file pwm.c from plat-s3c24xx to plat-samsung. This will
+   enable all machines with Samsung SoCs to make use of the same code.
+2. The device definitions have been separated to a new file dev-pwm.c
+   for better clarity and structure.
+3. It will enable all Samsung S3C and S5P series SoC's to use common
+   PWM Kconfig definition.
 
 Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 ---
- arch/arm/mach-s3c64xx/Kconfig         |    1 +
- arch/arm/mach-s3c64xx/mach-smdk6410.c |   46 ++++++++++++++++++++++++++++++--
- 2 files changed, 44 insertions(+), 3 deletions(-)
+ arch/arm/mach-s3c64xx/Kconfig   |    4 +-
+ arch/arm/plat-s3c24xx/Kconfig   |    7 -----
+ arch/arm/plat-samsung/Kconfig   |   13 +++++++++
+ arch/arm/plat-samsung/Makefile  |    1 +
+ arch/arm/plat-samsung/dev-pwm.c |   52 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/pwm.c     |   33 ------------------------
+ 6 files changed, 68 insertions(+), 42 deletions(-)
+ create mode 100644 arch/arm/plat-samsung/dev-pwm.c
 
 diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index f3a953f..e4177e2 100644
+index 579d2f0..f3a953f 100644
 --- a/arch/arm/mach-s3c64xx/Kconfig
 +++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -143,6 +143,7 @@ config MACH_SMDK6410
- 	select S3C_DEV_USB_HSOTG
- 	select S3C_DEV_WDT
- 	select SAMSUNG_DEV_KEYPAD
+@@ -231,7 +231,7 @@ config MACH_HMT
+ 	select S3C_DEV_NAND
+ 	select S3C_DEV_USB_HOST
+ 	select S3C64XX_SETUP_FB_24BPP
+-	select HAVE_PWM
 +	select SAMSUNG_DEV_PWM
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	help
+ 	  Machine support for the Airgoo HMT
+ 
+@@ -249,8 +249,8 @@ config MACH_SMARTQ
  	select S3C64XX_SETUP_SDHCI
- 	select S3C64XX_SETUP_I2C1
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index e85192a..4a3fe0c 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -28,6 +28,7 @@
- #include <linux/delay.h>
- #include <linux/smsc911x.h>
- #include <linux/regulator/fixed.h>
-+#include <linux/pwm_backlight.h>
+ 	select S3C64XX_SETUP_FB_24BPP
+ 	select SAMSUNG_DEV_ADC
++	select SAMSUNG_DEV_PWM
+ 	select SAMSUNG_DEV_TS
+-	select HAVE_PWM
+ 	help
+ 	    Shared machine support for SmartQ 5/7
  
- #ifdef CONFIG_SMDK6410_WM1190_EV1
- #include <linux/mfd/wm8350/core.h>
-@@ -48,6 +49,7 @@
- #include <mach/hardware.h>
- #include <mach/regs-fb.h>
- #include <mach/map.h>
-+#include <mach/gpio-bank-f.h>
+diff --git a/arch/arm/plat-s3c24xx/Kconfig b/arch/arm/plat-s3c24xx/Kconfig
+index eb105e6..d9c4096 100644
+--- a/arch/arm/plat-s3c24xx/Kconfig
++++ b/arch/arm/plat-s3c24xx/Kconfig
+@@ -56,13 +56,6 @@ config S3C24XX_DCLK
+ 	help
+ 	  Clock code for supporting DCLK/CLKOUT on S3C24XX architectures
  
- #include <asm/irq.h>
- #include <asm/mach-types.h>
-@@ -118,7 +120,6 @@ static void smdk6410_lcd_power_set(struct plat_lcd_data *pd,
- {
- 	if (power) {
- 		gpio_direction_output(S3C64XX_GPF(13), 1);
--		gpio_direction_output(S3C64XX_GPF(15), 1);
+-config S3C24XX_PWM
+-	bool "PWM device support"
+-	select HAVE_PWM
+-	help
+-	  Support for exporting the PWM timer blocks via the pwm device
+-	  system.
+-
+ # gpio configurations
  
- 		/* fire nRESET on power up */
- 		gpio_direction_output(S3C64XX_GPN(5), 0);
-@@ -126,7 +127,6 @@ static void smdk6410_lcd_power_set(struct plat_lcd_data *pd,
- 		gpio_direction_output(S3C64XX_GPN(5), 1);
- 		msleep(1);
- 	} else {
--		gpio_direction_output(S3C64XX_GPF(15), 0);
- 		gpio_direction_output(S3C64XX_GPF(13), 0);
- 	}
- }
-@@ -269,6 +269,45 @@ static struct samsung_keypad_platdata smdk6410_keypad_data __initdata = {
- 	.cols		= 8,
- };
+ config S3C24XX_GPIO_EXTRA
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index 32be05c..184a85a 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -273,6 +273,19 @@ config SAMSUNG_DEV_KEYPAD
+ 	help
+ 	  Compile in platform device definitions for keypad
  
-+static int smdk6410_backlight_init(struct device *dev)
-+{
-+	int ret;
++config SAMSUNG_DEV_PWM
++	bool
++	default y if ARCH_S3C2410
++	help
++	  Compile in platform device definition for PWM Timer
 +
-+	ret = gpio_request(S3C64XX_GPF(15), "Backlight");
-+	if (ret) {
-+		printk(KERN_ERR "failed to request GPF for PWM-OUT1\n");
-+		return ret;
++config S3C24XX_PWM
++	bool "PWM device support"
++	select HAVE_PWM
++	help
++	  Support for exporting the PWM timer blocks via the pwm device
++	  system.
++
+ # DMA
+ 
+ config S3C_DMA
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index 29932f8..e9de58a 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -59,6 +59,7 @@ obj-$(CONFIG_SAMSUNG_DEV_ADC)	+= dev-adc.o
+ obj-$(CONFIG_SAMSUNG_DEV_IDE)	+= dev-ide.o
+ obj-$(CONFIG_SAMSUNG_DEV_TS)	+= dev-ts.o
+ obj-$(CONFIG_SAMSUNG_DEV_KEYPAD)	+= dev-keypad.o
++obj-$(CONFIG_SAMSUNG_DEV_PWM)	+= dev-pwm.o
+ 
+ # DMA support
+ 
+diff --git a/arch/arm/plat-samsung/dev-pwm.c b/arch/arm/plat-samsung/dev-pwm.c
+new file mode 100644
+index 0000000..68c5986
+--- /dev/null
++++ b/arch/arm/plat-samsung/dev-pwm.c
+@@ -0,0 +1,53 @@
++/* linux/arch/arm/plat-samsung/dev-pwm.c
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Copyright (c) 2007 Ben Dooks
++ * Copyright (c) 2008 Simtec Electronics
++ *	Ben Dooks <ben@simtec.co.uk>, <ben-linux@fluff.org>
++ *
++ * S3C series device definition for the PWM timer
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++#include <mach/irqs.h>
++
++#include <plat/devs.h>
++
++#define TIMER_RESOURCE_SIZE (1)
++
++#define TIMER_RESOURCE(_tmr, _irq)			\
++	(struct resource [TIMER_RESOURCE_SIZE]) {	\
++		[0] = {					\
++			.start	= _irq,			\
++			.end	= _irq,			\
++			.flags	= IORESOURCE_IRQ	\
++		}					\
 +	}
 +
-+	/* Configure GPIO pin with S3C64XX_GPF15_PWM_TOUT1 */
-+	s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C64XX_GPF15_PWM_TOUT1);
++#define DEFINE_S3C_TIMER(_tmr_no, _irq)			\
++	.name		= "s3c24xx-pwm",		\
++	.id		= _tmr_no,			\
++	.num_resources	= TIMER_RESOURCE_SIZE,		\
++	.resource	= TIMER_RESOURCE(_tmr_no, _irq),	\
 +
-+	return 0;
-+}
++/*
++ * since we already have an static mapping for the timer,
++ * we do not bother setting any IO resource for the base.
++ */
 +
-+static void smdk6410_backlight_exit(struct device *dev)
-+{
-+	s3c_gpio_cfgpin(S3C64XX_GPF(15), S3C_GPIO_OUTPUT);
-+	gpio_free(S3C64XX_GPF(15));
-+}
-+
-+static struct platform_pwm_backlight_data smdk6410_backlight_data = {
-+	.pwm_id		= 1,
-+	.max_brightness	= 255,
-+	.dft_brightness	= 255,
-+	.pwm_period_ns	= 78770,
-+	.init		= smdk6410_backlight_init,
-+	.exit		= smdk6410_backlight_exit,
++struct platform_device s3c_device_timer[] = {
++	[0] = { DEFINE_S3C_TIMER(0, IRQ_TIMER0) },
++	[1] = { DEFINE_S3C_TIMER(1, IRQ_TIMER1) },
++	[2] = { DEFINE_S3C_TIMER(2, IRQ_TIMER2) },
++	[3] = { DEFINE_S3C_TIMER(3, IRQ_TIMER3) },
++	[4] = { DEFINE_S3C_TIMER(4, IRQ_TIMER4) },
 +};
-+
-+static struct platform_device smdk6410_backlight_device = {
-+	.name		= "pwm-backlight",
-+	.dev		= {
-+		.parent		= &s3c_device_timer[1].dev,
-+		.platform_data	= &smdk6410_backlight_data,
-+	},
-+};
-+
- static struct map_desc smdk6410_iodesc[] = {};
++EXPORT_SYMBOL(s3c_device_timer);
+diff --git a/arch/arm/plat-samsung/pwm.c b/arch/arm/plat-samsung/pwm.c
+index 2eeb49f..f37457c 100644
+--- a/arch/arm/plat-samsung/pwm.c
++++ b/arch/arm/plat-samsung/pwm.c
+@@ -20,10 +20,8 @@
+ #include <linux/io.h>
+ #include <linux/pwm.h>
  
- static struct platform_device *smdk6410_devices[] __initdata = {
-@@ -298,6 +337,9 @@ static struct platform_device *smdk6410_devices[] __initdata = {
- 	&s3c_device_rtc,
- 	&s3c_device_ts,
- 	&s3c_device_wdt,
-+	&s3c_device_timer[0],
-+	&s3c_device_timer[1],
-+	&smdk6410_backlight_device,
- };
+-#include <mach/irqs.h>
+ #include <mach/map.h>
  
- #ifdef CONFIG_REGULATOR
-@@ -693,7 +735,6 @@ static void __init smdk6410_machine_init(void)
+-#include <plat/devs.h>
+ #include <plat/regs-timer.h>
  
- 	gpio_request(S3C64XX_GPN(5), "LCD power");
- 	gpio_request(S3C64XX_GPF(13), "LCD power");
--	gpio_request(S3C64XX_GPF(15), "LCD power");
+ struct pwm_device {
+@@ -47,37 +45,6 @@ struct pwm_device {
  
- 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+ static struct clk *clk_scaler[2];
+ 
+-/* Standard setup for a timer block. */
+-
+-#define TIMER_RESOURCE_SIZE (1)
+-
+-#define TIMER_RESOURCE(_tmr, _irq)			\
+-	(struct resource [TIMER_RESOURCE_SIZE]) {	\
+-		[0] = {					\
+-			.start	= _irq,			\
+-			.end	= _irq,			\
+-			.flags	= IORESOURCE_IRQ	\
+-		}					\
+-	}
+-
+-#define DEFINE_S3C_TIMER(_tmr_no, _irq)			\
+-	.name		= "s3c24xx-pwm",		\
+-	.id		= _tmr_no,			\
+-	.num_resources	= TIMER_RESOURCE_SIZE,		\
+-	.resource	= TIMER_RESOURCE(_tmr_no, _irq),	\
+-
+-/* since we already have an static mapping for the timer, we do not
+- * bother setting any IO resource for the base.
+- */
+-
+-struct platform_device s3c_device_timer[] = {
+-	[0] = { DEFINE_S3C_TIMER(0, IRQ_TIMER0) },
+-	[1] = { DEFINE_S3C_TIMER(1, IRQ_TIMER1) },
+-	[2] = { DEFINE_S3C_TIMER(2, IRQ_TIMER2) },
+-	[3] = { DEFINE_S3C_TIMER(3, IRQ_TIMER3) },
+-	[4] = { DEFINE_S3C_TIMER(4, IRQ_TIMER4) },
+-};
+-
+ static inline int pwm_is_tdiv(struct pwm_device *pwm)
+ {
+ 	return clk_get_parent(pwm->clk) == pwm->clk_div;
 -- 
 1.6.5.2
