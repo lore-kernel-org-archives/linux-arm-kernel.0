@@ -1,41 +1,43 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 25 Feb 2011 17:20:01 -0700
-Subject: [PATCH 0/4] OMAP2/3: clock/clockdomains: miscellaneous fixes
-Message-ID: <20110226001601.28142.46636.stgit@twilight.localdomain>
+Date: Fri, 25 Feb 2011 17:20:07 -0700
+Subject: [PATCH 2/4] OMAP2/3: clockdomains: remove warnings on an OMAP3-only
+	compile
+In-Reply-To: <20110226001601.28142.46636.stgit@twilight.localdomain>
+References: <20110226001601.28142.46636.stgit@twilight.localdomain>
+Message-ID: <20110226002006.28142.52520.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Resolve these compile-time gcc warnings on OMAP3-only kernel compiles:
 
-here are a few miscellaneous OMAP2 clock and clockdomain
-data for 2.6.39.
+.../mach-omap2/clockdomains2xxx_3xxx_data.c:95: warning: 'dsp_24xx_wkdeps' defined but not used
+.../mach-omap2/clockdomains2xxx_3xxx_data.c:119: warning: 'mpu_24xx_wkdeps' defined but not used
+.../mach-omap2/clockdomains2xxx_3xxx_data.c:147: warning: 'core_24xx_wkdeps' defined but not used
 
-Boot-tested on N800.  Compile-tested for omap2plus_defconfig and
-omap3_defconfig.
-
-This series is available via git in the branch 'clk_clkdm_a_2.6.39' of
-git://git.pwsan.com/linux-2.6.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
+ arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-clk_clkdm_a_2.6.39
-   text	   data	    bss	    dec	    hex	filename
-3701835	 230192	5390012	9322039	 8e3e37	vmlinux.n800_config.orig
-3701803	 230064	5390012	9321879	 8e3d97	vmlinux.n800_config
-
-Paul Walmsley (4):
-      OMAP2xxx: clock: remove dsp_irate_ick
-      OMAP2/3: clockdomains: remove warnings on an OMAP3-only compile
-      OMAP2xxx: clock: fix clockdomains on gpt7_ick, 2430 mmchs2_fck clocks
-      OMAP2xxx: clock data: clean up some comments
-
-
- arch/arm/mach-omap2/clock.h                      |    1 
- arch/arm/mach-omap2/clock2420_data.c             |   55 +++++++--------------
- arch/arm/mach-omap2/clock2430_data.c             |   58 ++++++++--------------
- arch/arm/mach-omap2/clock_common_data.c          |    6 ++
- arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    4 ++
- 5 files changed, 51 insertions(+), 73 deletions(-)
+diff --git a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+index ffdfe54..f9df791 100644
+--- a/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
++++ b/arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c
+@@ -89,6 +89,8 @@ static struct clkdm_dep gfx_sgx_wkdeps[] = {
+ 
+ /* 24XX-specific possible dependencies */
+ 
++#ifdef CONFIG_ARCH_OMAP2
++
+ /* Wakeup dependency source arrays */
+ 
+ /* 2420/2430 PM_WKDEP_DSP: CORE, MPU, WKUP */
+@@ -168,6 +170,8 @@ static struct clkdm_dep core_24xx_wkdeps[] = {
+ 	{ NULL },
+ };
+ 
++#endif
++
+ 
+ /* 2430-specific possible wakeup dependencies */
+ 
