@@ -1,24 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 26 Feb 2011 08:47:36 +0000
-Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
-In-Reply-To: <4D688AF1.1090607@codeaurora.org>
-References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
-	<1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
-	<4D688AF1.1090607@codeaurora.org>
-Message-ID: <20110226084736.GB3640@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 26 Feb 2011 10:33:54 +0100
+Subject: [PATCH 1/3] ARM: S5P: Add s5p_timer support for HRT
+In-Reply-To: <1298688357-20775-2-git-send-email-sbkim73@samsung.com>
+References: <1298688357-20775-1-git-send-email-sbkim73@samsung.com>
+	<1298688357-20775-2-git-send-email-sbkim73@samsung.com>
+Message-ID: <AANLkTinCyXm_z8tcjRHCYEvi79ifj+joKK7E8Kzboi2G@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 25, 2011 at 09:09:05PM -0800, Saravana Kannan wrote:
-> Yeah, Stephen and I spent quite a bit of time discussing this and  
-> experimenting to figure out what the heck GCC was doing. But it kept  
-> optimizing the fake code we put in trying to force GCC to use a specific  
-> register.
+2011/2/26 Sangbeom Kim <sbkim73@samsung.com>:
+> (...)
+> +static void s5p_clockevent_init(void)
+> +{
+> + ? ? ? unsigned long pclk;
+> + ? ? ? unsigned long clock_rate;
+> + ? ? ? unsigned int irq_number;
+> + ? ? ? struct clk *tscaler;
+> +
+> + ? ? ? pclk = clk_get_rate(timerclk);
+> +
+> + ? ? ? tscaler = clk_get_parent(tdiv_event);
+> +
+> + ? ? ? clk_set_rate(tscaler, pclk / 2);
+> + ? ? ? clk_set_rate(tdiv_event, pclk / 2);
+> + ? ? ? clk_set_parent(tin_event, tdiv_event);
+> +
+> + ? ? ? clock_rate = clk_get_rate(tin_event);
+> + ? ? ? clock_count_per_tick = clock_rate / HZ;
+> +
+> + ? ? ? time_event_device.mult =
+> + ? ? ? ? ? ? ? div_sc(clock_rate, NSEC_PER_SEC, time_event_device.shift);
+> + ? ? ? time_event_device.max_delta_ns =
+> + ? ? ? ? ? ? ? clockevent_delta2ns(-1, &time_event_device);
+> + ? ? ? time_event_device.min_delta_ns =
+> + ? ? ? ? ? ? ? clockevent_delta2ns(1, &time_event_device);
 
-One way to look at it is that if you specify a value for r0, assign it,
-and then call a function, how do you expect the r0 value to be preserved?
-r0 will be corrupted by the called function as its used to pass arg0 and
-the return value.
+This is a very complicated and inprecise way of doing this nowadays.
+Skip hardcoding the shift value and calculating mult like that and use
 
-I'm surprised the compiler didn't spit out an error.
+/* Be able to sleep for atleast 4 seconds (usually more) */
+#define EVT_MIN_RANGE 4
+
+clockevents_calc_mult_shift(&time_event_device,
+                                    clock_rate, EVT_MIN_RANGE);
+
+> (...)
+> +static void s5p_clocksource_init(void)
+> +{
+> + ? ? ? unsigned long pclk;
+> + ? ? ? unsigned long clock_rate;
+> +
+> + ? ? ? pclk = clk_get_rate(timerclk);
+> +
+> + ? ? ? clk_set_rate(tdiv_source, pclk / 2);
+> + ? ? ? clk_set_parent(tin_source, tdiv_source);
+> +
+> + ? ? ? clock_rate = clk_get_rate(tin_source);
+> +
+> + ? ? ? s5p_time_setup(timer_source.source_id, TCNT_MAX);
+> + ? ? ? s5p_time_start(timer_source.source_id, PERIODIC);
+> +
+> + ? ? ? if (clocksource_register_hz(&time_clocksource, clock_rate))
+> + ? ? ? ? ? ? ? panic("%s: can't register clocksource\n", time_clocksource.name);
+> +}
+
+This is more like it :-)
+
+But you probably also want to add a sched_clock hook for this
+platform too, so you get some nice scheduling resolution.
+
+I suggest you look at the simple straight-forward driver
+for U300 in arch/arm/mach-u300/timer.c for inspiration.
+It's using the same timer that is used for clocksource for
+sched_clock().
+
+
+Yours,
+Linus Walleij
