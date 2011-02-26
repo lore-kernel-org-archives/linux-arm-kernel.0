@@ -1,137 +1,131 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Fri, 25 Feb 2011 21:40:00 -0800
-Subject: [PATCH] msm: gpiomux: Remove GPIOMUX_VALID and merge config enums
-In-Reply-To: <AANLkTinZCtbQnAk_OX92jqbW_GjH5wpxvbeoMkHV1inn@mail.gmail.com>
-References: <4D680EEE.1070706@codeaurora.org>
-	<AANLkTinZCtbQnAk_OX92jqbW_GjH5wpxvbeoMkHV1inn@mail.gmail.com>
-Message-ID: <4D689230.7020704@codeaurora.org>
+From: subaparts@yandex.ru (Alexander Sverdlin)
+Date: Sat, 26 Feb 2011 10:43:01 +0300
+Subject: [PATCH] EDB93xx: Add support for CS4271 SPI-connected CODEC
+Message-ID: <1298706181.22098.8.camel@r60e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2011 05:20 PM, Dima Zavin wrote:
-> On Fri, Feb 25, 2011 at 12:19 PM, Rohit Vaswani<rvaswani@codeaurora.org>  wrote:
->> diff --git a/arch/arm/mach-msm/board-qsd8x50.c
->> b/arch/arm/mach-msm/board-qsd8x50.c
->> index 33ab1fe..d665b0e 100644
->> --- a/arch/arm/mach-msm/board-qsd8x50.c
->> +++ b/arch/arm/mach-msm/board-qsd8x50.c
->> @@ -38,19 +38,26 @@
->>   #include "devices.h"
->>   #include "gpiomux.h"
->>
->> -#define UART3_SUSPENDED (GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |\
->> -            GPIOMUX_FUNC_1 | GPIOMUX_VALID)
->> +static struct gpiomux_setting uart3_suspended = {
->> +    .drv = GPIOMUX_DRV_2MA,
->> +    .pull = GPIOMUX_PULL_DOWN,
->> +    .func = GPIOMUX_FUNC_1,
->> +};
->>
->>   extern struct sys_timer msm_timer;
->>
->> -struct msm_gpiomux_config qsd8x50_uart3_configs[] __initdata = {
->> +struct msm_gpiomux_config qsd8x50_uart3_configs[] = {
->>      {
->>          .gpio = 86, /* UART3 RX */
->> -        .suspended = UART3_SUSPENDED,
->> +        .settings = {
->> +            [GPIOMUX_SUSPENDED] =&uart3_suspended,
->> +        },
->>      },
->>      {
->>          .gpio = 87, /* UART3 TX */
->> -        .suspended = UART3_SUSPENDED,
->> +        .settings = {
->> +            [GPIOMUX_SUSPENDED] =&uart3_suspended,
->> +        },
->>      },
->>   };
->
-> I think this new interface is way too verbose and will quickly get
-> unwieldy for configurations that have more than a few pins. For
-> instance, imagine what the above would look like when muxing a 24bit
-> LCD pin list...
->
-> How about adding a "bool valid" to gpiomux_setting, and convert the
-> "sets" array to an array of settings and not pointers to settings.
-> This will allow us to do (in gpiomux.h):
->
-> struct msm_gpiomux_rec {
->      struct gpiomux_setting sets[GPIOMUX_NSETTINGS];
->      int ref;
-> };
->
-> struct gpiomux_setting {
->      enum gpiomux_func func;
->      enum gpiomux_drv  drv;
->      enum gpiomux_pull pull;
->      bool valid;
-> };
->
-> This way, I can do something like (very rough):
->
-> #define GPIOMUX_SET(func,drv,pull) { \
->      .func = GPIOMUX_##func, \
->      .drv = GPIOMUX_##drv, \
->      .pull = GPIOMUX_##pull, \
->      .valid = true, \
->    }
->
-> #define GPIOMUX_SET_NONE { .valid = false, }
->
-> #define GPIOMUX_CFG(g, active, suspended) { \
->       .gpio = g, \
->       .sets = { \
->           [GPIOMUX_ACTIVE] = active, \
->           [GPIOMUX_SUSPENDED] = suspended, \
->        }, \
->   }
->
-> This will then allow me to define the uart3 pinmuxing in my board file
-> as follows:
->
-> struct msm_gpiomux_rec uart3_mux_cfg[] = {
->      GPIOMUX_CFG(86, GPIOMUX_SET_NONE,
->                             GPIOMUX_SET(FUNC_1, DRV_2MA, PULL_DOWN)),
->      GPIOMUX_CFG(87, GPIOMUX_SET_NONE,
->                             GPIOMUX_SET(FUNC_1, DRV_2MA, PULL_DOWN)),
-> };
->
-> Thoughts?
->
+From: Alexander Sverdlin <subaparts@yandex.ru>
 
-I haven't read this GPIO code thoroughly, but by looking just at the 
-diff, I think you can still have these type of macros with the structure 
-definition Rohit chose. I have no opinion one which struct definition is 
-better (not enough context). Just trying to help with writing helper macros.
+Add support for CS4271 SPI-connected CODEC to EDB93xx.
+        
+Signed-off-by: Alexander Sverdlin <subaparts@yandex.ru>
 
-The trick is to use pointers to anonymous struct. A very rough macro:
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: liam Girdwood <lrg@slimlogic.co.uk>
 
-#define GPIOMUX_SET(f, d, p) \
-&(struct gpiomux_setting) {
-	.func = f,
-	.drv = d,
-	.pull = p,
-}
+---
+ arch/arm/mach-ep93xx/edb93xx.c |   83 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 83 insertions(+), 0 deletions(-)
 
-#define GPIOMUX_CFG(g, active, suspended) { \
-	.gpio = g,
-	.settings = {
-		[ACTIVE] = active,
-		[SUSPENDED] = suspended,
-	}
-}
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index 3f37567..2c2f84d 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -30,9 +30,13 @@
+ #include <linux/gpio.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
++#include <linux/spi/spi.h>
++
++#include <sound/cs4271.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
++#include <mach/ep93xx_spi.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -94,6 +98,83 @@ static void __init edb93xx_register_i2c(void)
+ 
 
-struct msm_gpiomux_config foo_bar[] = {
-	GPIOMUX_CFG(10, GPIOMUX_SET(FUNC, 2MA, PULL_UP), NULL),
-	GPIOMUX_CFG(11, GPIOMUX_SET(FUNC, 2MA, PULL_UP), NULL),
-};
-
-I'm certain the pointer to anonymous struct stuff works. You might have 
-to tweak the macros a bit though. Hope this help.
-
--Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ /*************************************************************************
++ * EDB93xx SPI peripheral handling
++ *************************************************************************/
++static struct cs4271_platform_data edb93xx_cs4271_data = {
++	.gpio_nreset	= -EINVAL,	/* filled in later */
++};
++
++static int edb93xx_cs4271_hw_setup(struct spi_device *spi)
++{
++	return gpio_request_one(EP93XX_GPIO_LINE_EGPIO6,
++				GPIOF_OUT_INIT_HIGH, spi->modalias);
++}
++
++static void edb93xx_cs4271_hw_cleanup(struct spi_device *spi)
++{
++	gpio_free(EP93XX_GPIO_LINE_EGPIO6);
++}
++
++static void edb93xx_cs4271_hw_cs_control(struct spi_device *spi, int value)
++{
++	gpio_set_value(EP93XX_GPIO_LINE_EGPIO6, value);
++}
++
++static struct ep93xx_spi_chip_ops edb93xx_cs4271_hw = {
++	.setup		= edb93xx_cs4271_hw_setup,
++	.cleanup	= edb93xx_cs4271_hw_cleanup,
++	.cs_control	= edb93xx_cs4271_hw_cs_control,
++};
++
++static struct spi_board_info edb93xx_spi_board_info[] __initdata = {
++	{
++		.modalias		= "cs4271",
++		.platform_data		= &edb93xx_cs4271_data,
++		.controller_data	= &edb93xx_cs4271_hw,
++		.max_speed_hz		= 6000000,
++		.bus_num		= 0,
++		.chip_select		= 0,
++		.mode			= SPI_MODE_3,
++	},
++};
++
++static struct ep93xx_spi_info edb93xx_spi_info __initdata = {
++	.num_chipselect	= ARRAY_SIZE(edb93xx_spi_board_info),
++};
++
++static void __init edb93xx_register_spi(void)
++{
++	if (machine_is_edb9301() || machine_is_edb9302())
++		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO1;
++	else if (machine_is_edb9302a() || machine_is_edb9307a())
++		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_H(2);
++	else if (machine_is_edb9315a())
++		edb93xx_cs4271_data.gpio_nreset = EP93XX_GPIO_LINE_EGPIO14;
++
++	ep93xx_register_spi(&edb93xx_spi_info, edb93xx_spi_board_info,
++			    ARRAY_SIZE(edb93xx_spi_board_info));
++}
++
++
++/*************************************************************************
++ * EDB93xx I2S
++ *************************************************************************/
++static int __init edb93xx_has_audio(void)
++{
++	return (machine_is_edb9301() || machine_is_edb9302() ||
++		machine_is_edb9302a() || machine_is_edb9307a() ||
++		machine_is_edb9315a());
++}
++
++static void __init edb93xx_register_i2s(void)
++{
++	if (edb93xx_has_audio()) {
++		ep93xx_register_i2s();
++	}
++}
++
++
++/*************************************************************************
+  * EDB93xx pwm
+  *************************************************************************/
+ static void __init edb93xx_register_pwm(void)
+@@ -149,6 +230,8 @@ static void __init edb93xx_init_machine(void)
+ 	edb93xx_register_flash();
+ 	ep93xx_register_eth(&edb93xx_eth_data, 1);
+ 	edb93xx_register_i2c();
++	edb93xx_register_spi();
++	edb93xx_register_i2s();
+ 	edb93xx_register_pwm();
+ 	edb93xx_register_fb();
+ }
