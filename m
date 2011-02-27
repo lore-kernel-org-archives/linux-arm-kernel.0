@@ -1,78 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 26 Feb 2011 15:04:45 -0500 (EST)
-Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
-In-Reply-To: <8yazkpi3cfa.fsf@huya.qualcomm.com>
-References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
-	<1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
-	<4D688AF1.1090607@codeaurora.org>
-	<20110226084736.GB3640@n2100.arm.linux.org.uk>
-	<8yazkpi3cfa.fsf@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1102261452340.22034@xanadu.home>
+From: desrt@desrt.ca (Ryan Lortie)
+Date: Sat, 26 Feb 2011 19:41:53 -0500
+Subject: [PATCH 2/2] ARM: imx35: fix trivial copy/paste error
+In-Reply-To: <1298767313-16351-1-git-send-email-desrt@desrt.ca>
+References: <1298767313-16351-1-git-send-email-desrt@desrt.ca>
+Message-ID: <1298767313-16351-3-git-send-email-desrt@desrt.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 26 Feb 2011, David Brown wrote:
+Change imx31_add_imx_keypad() to imx35_add_imx_keypad() in
+mach-mx3/devices-imx35.h.
 
-> On Sat, Feb 26 2011, Russell King - ARM Linux wrote:
-> 
-> > On Fri, Feb 25, 2011 at 09:09:05PM -0800, Saravana Kannan wrote:
-> > One way to look at it is that if you specify a value for r0, assign it,
-> > and then call a function, how do you expect the r0 value to be preserved?
-> > r0 will be corrupted by the called function as its used to pass arg0 and
-> > the return value.
-> 
-> > I'm surprised the compiler didn't spit out an error.
+Signed-off-by: Ryan Lortie <desrt@desrt.ca>
+---
+ arch/arm/mach-mx3/devices-imx35.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Me too.  The compiler should have moved the content of r0 somewhere else 
-before the function call, and restore it back into r0 if necessary 
-before the point where the corresponding variable is used again.  Or at 
-least issue a warning if it can't do that.
-
-> The gcc docs say:
-> 
->    * Local register variables in specific registers do not reserve the
->      registers, except at the point where they are used as input or
->      output operands in an `asm' statement and the `asm' statement
->      itself is not deleted.  The compiler's data flow analysis is
->      capable of determining where the specified registers contain live
->      values, and where they are available for other uses.  Stores into
->      local register variables may be deleted when they appear to be
->      dead according to dataflow analysis.  References to local register
->      variables may be deleted or moved or simplified.
-> 
-> which would suggest that it should at least detect that it can't keep
-> the value in r0.  What it seems to do is detect that the value can't be
-> in the register, so it never bothers putting it there in the first
-> place.
-
-Right.  A minimal test case may look like this if someone feels like 
-filling a gcc bug report:
-
-extern int foo(int x);
-
-int bar(int x)
-{
-	register int a asm("r0") = 1;
-	x = foo(x);
-	asm ("add %0, %1, %2" : "=r" (x) : "r" (a), "r" (x));
-	return x;
-}
-
-And the produced code is:
-
-bar:
-        stmfd   sp!, {r3, lr}
-        bl      foo
-#APP
-        add r0, r0, r0
-        ldmfd   sp!, {r3, pc}
-
-So this is clearly bogus.
-
-> In any case, fortunately it works with the fix.
-
-Please add a comment in your patch to explain the issue.
-
-
-Nicolas
+diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
+index 677b18a..d545d86 100644
+--- a/arch/arm/mach-mx3/devices-imx35.h
++++ b/arch/arm/mach-mx3/devices-imx35.h
+@@ -35,7 +35,7 @@ extern const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst;
+ #define imx35_add_imx_i2c2(pdata)	imx35_add_imx_i2c(2, pdata)
+ 
+ extern const struct imx_imx_keypad_data imx35_imx_keypad_data __initconst;
+-#define imx31_add_imx_keypad(pdata)	\
++#define imx35_add_imx_keypad(pdata)	\
+ 	imx_add_imx_keypad(&imx35_imx_keypad_data, pdata)
+ 
+ extern const struct imx_imx_ssi_data imx35_imx_ssi_data[] __initconst;
+-- 
+1.7.4.1
