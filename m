@@ -1,13 +1,21 @@
-From: linux@prisktech.co.nz (Linux Mailing List Email Account)
-Date: Sun, 27 Feb 2011 06:28:30 -0000
-Subject: PATCH [1/1] V2 - Clock Support for VT8500/WM8505
-Message-ID: <76F764B079F92A4E843589C893D0A0228D57@SERVER.prisktech.co.nz>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 27 Feb 2011 20:43:46 +0000
+Subject: PATCH [1/1] V3 - Clock Support for VT8500/WM8505
+Message-ID: <76F764B079F92A4E843589C893D0A0228DAB@SERVER.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Patch to provide clock support on VT8500-/WM8505- based SoC.
-V2:  Included missing mach/clkdev.h
-     Fix errors in clocks-vt8500.c
+
+V2:         Included missing mach/clkdev.h
+
+Fix errors in clocks-vt8500.c
+
+V3:         Correct code to allow VT8500 + WM8505 selected concurrently (for runtime detection)
+
+                Added patch to initialize the clocks from existing board code (bv07.c, wm8505_7in.c)
+
+Signed-off-by: Tony Prisk (linux at prisktech.co.nz)
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
 index 5e34579..0593323 100644
 --- a/arch/arm/Kconfig
@@ -34,6 +42,22 @@ index 81aedb7..c0ae083 100644
 +obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o clocks-wm8505.o
  obj-$(CONFIG_MACH_BV07) += bv07.o
 obj-$(CONFIG_MACH_WM8505_7IN_NETBOOK) += wm8505_7in.o
+diff --git a/arch/arm/mach-vt8500/bv07.c b/arch/arm/mach-vt8500/bv07.c
+index 94a261d..b637167 100644
+--- a/arch/arm/mach-vt8500/bv07.c
++++ b/arch/arm/mach-vt8500/bv07.c
+@@ -25,6 +25,7 @@
+#include <asm/mach/arch.h>
+ #include "devices.h"
++#include "clock.h"
+ static void __iomem *pmc_hiber;
+@@ -65,6 +66,7 @@ void __init bv07_init(void)
+    vt8500_set_resources();
+    platform_add_devices(devices, ARRAY_SIZE(devices));
+    vt8500_gpio_init();
++    vt8500_clock_init();
+}
+ MACHINE_START(BV07, "Benign BV07 Mini Netbook")
 diff --git a/arch/arm/mach-vt8500/clock.c b/arch/arm/mach-vt8500/clock.c
 new file mode 100644
 index 0000000..9ce3a74
@@ -206,10 +230,10 @@ index 0000000..9ce3a74
 +}
 diff --git a/arch/arm/mach-vt8500/clock.h b/arch/arm/mach-vt8500/clock.h
 new file mode 100644
-index 0000000..b5a07de
+index 0000000..a4bd94f
 --- /dev/null
 +++ b/arch/arm/mach-vt8500/clock.h
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,130 @@
 +/*
 + *  arch/arm/mach-vt8500/clock.h
 + *
@@ -241,69 +265,58 @@ index 0000000..b5a07de
 +#define CLK_ENABLE        0x02
 +#define CLK_NO_PROPAGATE  0x04
 +
-+#define DEFINE_CKREF(_name, _rate)        \
-+struct clk clk_##_name = {                \
-+    .name = #_name,            \
-+    .parent = NULL,                 \
-+    .ops = NULL,                    \
-+    .rate = _rate,             \
-+    .type = CLK_PRIMARY,             \
-+    .delay  = 0,                    \
-+    .en_reg = 0,                    \
-+    .en_bit = 0                     \
-+}
++#define CLK_PM_STATUS_LOW 0x000
++#define CLK_PML_ANY_CLK_UPDATING    0x00000008
++#define CLK_PML_PLL_UPDATING        0x00000010
++#define CLK_PML_ARM_UPDATING        0x00000080
++#define CLK_PML_AHB_UPDATING        0x00000100
++#define CLK_PML_UPDATE_MASK         0x1FFF9B37
++#define CLK_PML_BUSY           0xFFFFFFFE
++#define CLK_PM_STATUS_HIGH     0x004
 +
-+#define DEFINE_CKEN(_name, _ops, _enreg, _enbit)    \
-+struct clk clk_##_name = {                     \
-+    .name = #_name,                  \
-+    .parent = NULL,                      \
-+    .ops = _ops,                         \
-+    .rate = 0,                       \
-+    .type = CLK_ENABLE,                   \
-+    .delay  = 0,                         \
-+    .en_reg = _enreg,                    \
-+    .en_bit = _enbit,                    \
-+    .div_reg = 0                         \
-+}
 +
-+#define DEFINE_CKPG(_name, _parent, _delay, _ops, _reg)   \
-+struct clk clk_##_name = {                     \
-+    .name = #_name,                  \
-+    .parent = _parent,                   \
-+    .ops = _ops,                         \
-+    .rate = 0,                       \
-+    .type = CLK_PROGRAMABLE,              \
-+    .delay  = _delay,                    \
-+    .en_reg = 0,                         \
-+    .en_bit = 0,                         \
-+    .div_reg = _reg                      \
-+}
++#define CLK_PLLA_MULTIPLIER    0x200
++#define CLK_PLLB_MULTIPLIER    0x204
++#define CLK_PLLC_MULTIPLIER    0x208
++#define CLK_PLLD_MULTIPLIER    0x20C
 +
-+#define DEFINE_CKPGNP(_name, _parent, _delay, _ops, _reg) \
-+struct clk clk_##_name = {                     \
-+    .name = #_name,                  \
-+    .parent = _parent,                   \
-+    .ops = _ops,                         \
-+    .rate = 0,                       \
-+    .type = CLK_PROGRAMABLE | CLK_NO_PROPAGATE, \
-+    .delay  = _delay,                    \
-+    .en_reg = 0,                         \
-+    .en_bit = 0,                         \
-+    .div_reg = _reg                      \
-+}
++#define CLK_EN_LOW        0x250
++#define CLK_EN_HIGH       0x254
 +
-+#define DEFINE_CKPGEN(_name, _parent, _delay, _ops, _reg, _enreg, _enbit) \
-+struct clk clk_##_name = {                     \
-+    .name = #_name,                  \
-+    .parent = _parent,                   \
-+    .ops = _ops,                         \
-+    .rate = 0,                       \
-+    .type = CLK_PROGRAMABLE | CLK_ENABLE,      \
-+    .delay  = _delay,                    \
-+    .en_reg = _enreg,                    \
-+    .en_bit = _enbit,                    \
-+    .div_reg = _reg                      \
-+}
++/* common clocks */
++#define CLK_ARM_DIVISOR        0x300
++#define CLK_AHB_DIVISOR        0x304
++#define CLK_DDR_DIVISOR        0x310 /* mask = 0x1F special */
++#define CLK_SFM_DIVISOR        0x314
++#define CLK_SDMMC_DIVISOR 0x328 /* mask = 0x1F special */
++#define CLK_GENET_DIVISOR 0x32C
++#define CLK_NAND_DIVISOR  0x330
++#define CLK_NOR_DIVISOR        0x334
++#define CLK_SPI0_DIVISOR  0x33C
++#define CLK_SPI1_DIVISOR  0x340
++#define CLK_SPI2_DIVISOR  0x344
++#define CLK_PWM_DIVISOR        0x348
++
++/* VT8500 clocks */
++#define CLK_DSP_DIVISOR        0x308
++#define CLK_LCD_DIVISOR        0x30C
++#define CLK_PCM_DIVISOR        0x320
++#define CLK_PWM2_DIVISOR  0x324
++#define CLK_MSPRO_DIVISOR 0x32C
++#define CLK_NAND_DIVISOR  0x330
++#define CLK_LCD_DIVISOR_HIGH   0x334
++
++/* WM8505 clocks */
++#define CLK_KBD_DIVISOR_PRE    0x318
++#define CLK_KBD_DIVISOR        0x31C
++#define CLK_APB_DIVISOR        0x350
++#define CLK_NA0_DIVISOR        0x358
++#define CLK_NA12_DIVISOR  0x35C
++#define CLK_I2C0_DIVISOR  0x36C
++#define CLK_I2C1_DIVISOR  0x370
++#define CLK_DVO_DIVISOR        0x374
++#define CLK_RO1_DIVISOR        0x378
++#define CLK_RO2_DIVISOR        0x37C
 +
 +
 +#define INIT_CLKREG(_clk, _devid, _conid)      \
@@ -340,18 +353,23 @@ index 0000000..b5a07de
 +    struct list_head     childnode;
 +};
 +
-+/* wm8505-clocks.c */
-+extern int wmt_clock_init(void);
++#ifdef CONFIG_VTWM_VERSION_WM8505
++extern int wm8505_clock_init(void);
++#endif
++
++#ifdef CONFIG_VTWM_VERSION_VT8500
++extern int vt8500_clock_init(void);
++#endif
 +
 +int clk_register(struct clk *clk);
 +
 +#endif
 diff --git a/arch/arm/mach-vt8500/clocks-vt8500.c b/arch/arm/mach-vt8500/clocks-vt8500.c
 new file mode 100644
-index 0000000..06740f5
+index 0000000..0e3ceab
 --- /dev/null
 +++ b/arch/arm/mach-vt8500/clocks-vt8500.c
-@@ -0,0 +1,602 @@
+@@ -0,0 +1,618 @@
 +/*
 + *  arch/arm/mach-vt8500/clocks-vt8500.c
 + *
@@ -378,79 +396,97 @@ index 0000000..06740f5
 +#include <mach/vt8500_regs.h>
 +#include "clock.h"
 +
-+#define CLK_PM_STATUS_LOW 0x000
-+#define CLK_PML_ANY_CLK_UPDATING    0x00000008
-+#define CLK_PML_PLL_UPDATING        0x00000010
-+#define CLK_PML_ARM_UPDATING        0x00000080
-+#define CLK_PML_AHB_UPDATING        0x00000100
-+#define CLK_PML_UPDATE_MASK         0x1FFF9B37
-+#define CLK_PML_BUSY           0xFFFFFFFE
-+#define CLK_PM_STATUS_HIGH     0x004
++#define DEFINE_CKREF(_name, _rate)        \
++struct clk clk_vt8500_##_name = {         \
++    .name = #_name,            \
++    .parent = NULL,                 \
++    .ops = NULL,                    \
++    .rate = _rate,             \
++    .type = CLK_PRIMARY,             \
++    .delay  = 0,                    \
++    .en_reg = 0,                    \
++    .en_bit = 0                     \
++}
 +
-+#define CLK_PLLA_MULTIPLIER    0x200
-+#define CLK_PLLB_MULTIPLIER    0x204
-+#define CLK_PLLC_MULTIPLIER    0x208
++#define DEFINE_CKEN(_name, _ops, _enreg, _enbit)    \
++struct clk clk_vt8500_##_name = {              \
++    .name = #_name,                  \
++    .parent = NULL,                      \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_ENABLE,                   \
++    .delay  = 0,                         \
++    .en_reg = _enreg,                    \
++    .en_bit = _enbit,                    \
++    .div_reg = 0                         \
++}
 +
-+#define CLK_EN_LOW        0x250
-+#define CLK_EN_HIGH       0x254
++#define DEFINE_CKPG(_name, _parent, _delay, _ops, _reg)   \
++struct clk clk_vt8500_##_name = {              \
++    .name = #_name,                  \
++    .parent = _parent,                   \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_PROGRAMABLE,              \
++    .delay  = _delay,                    \
++    .en_reg = 0,                         \
++    .en_bit = 0,                         \
++    .div_reg = _reg                      \
++}
 +
-+#define CLK_ARM_DIVISOR        0x300
-+#define CLK_AHB_DIVISOR        0x304
-+#define CLK_DSP_DIVISOR        0x308 /* new */
-+#define CLK_LCD_DIVISOR        0x30C /* new */
-+#define CLK_DDR_DIVISOR        0x310 /* mask = 0x1F special */
-+#define CLK_SFM_DIVISOR        0x314
-+#define CLK_PCM_DIVISOR        0x320 /* new */
-+#define CLK_PWM1_DIVISOR  0x324 /* new */
-+#define CLK_SDMMC_DIVISOR 0x328 /* mask = 0x1F special */
-+#define CLK_MSPRO_DIVISOR 0x32C /* new name */
-+#define CLK_NAND_DIVISOR  0x330
-+#define CLK_LCD_DIVISOR_HIGH   0x334
-+#define CLK_SPI0_DIVISOR  0x33C
-+#define CLK_SPI1_DIVISOR  0x340
-+#define CLK_SPI2_DIVISOR  0x344
-+#define CLK_PWM2_DIVISOR  0x348
++#define DEFINE_CKPGNP(_name, _parent, _delay, _ops, _reg) \
++struct clk clk_vt8500_##_name = {              \
++    .name = #_name,                  \
++    .parent = _parent,                   \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_PROGRAMABLE | CLK_NO_PROPAGATE, \
++    .delay  = _delay,                    \
++    .en_reg = 0,                         \
++    .en_bit = 0,                         \
++    .div_reg = _reg                      \
++}
 +
-+void __iomem *clk_pmc_base;
++#define DEFINE_CKPGEN(_name, _parent, _delay, _ops, _reg, _enreg, _enbit) \
++struct clk clk_vt8500_##_name = {              \
++    .name = #_name,                  \
++    .parent = _parent,                   \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_PROGRAMABLE | CLK_ENABLE,      \
++    .delay  = _delay,                    \
++    .en_reg = _enreg,                    \
++    .en_bit = _enbit,                    \
++    .div_reg = _reg                      \
++}
 +
-+/*
-+ * define our supported clocks
-+ *
-+ * Clock structure tree
-+ *
-+ * REF_CLK (25Mhz)
-+ * |\     PLL_A
-+ * | |-        cpu
-+ * |  \-       ahb
-+ * |   -       apb
-+ * |\     PLL_B
-+ * | |\-  nand flash
-+ * | | -  nor flash
-+ * | |-        sdmmc
-+ * | |-        lcd controller
-+ * | |-        pcm
-+ * | |-        pwm
-+ * | |-        spi
-+ * | \-        kbdc
-+ * |
-+ *  \     PLL_C
-+ *   \-        ddr
-+ *
-+ */
++void __iomem *vt8500_pmc_base;
 +
 +static void wmt_pm_wait_update(void)
 +{
-+    while (readl(clk_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_UPDATE_MASK)
-+          ;
++    int cnt = 1000000;
++    while (readl(vt8500_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_UPDATE_MASK) {
++          if (--cnt == 0) break;
++          cpu_relax();
++    }
++
++    if (cnt == 0)
++          printk(KERN_ERR "clock: pm_wait_update timeout\n");
 +}
 +
 +static void wmt_pm_wait_busy(void)
 +{
-+    while (readl(clk_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_BUSY)
-+          ;
++    int cnt = 1000000;
++    while (readl(vt8500_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_BUSY) {
++          if (--cnt == 0) break;
++          cpu_relax();
++    }
++
++    if (cnt == 0)
++          printk(KERN_ERR "clock: pm_wait_busy timeout\n");
 +}
 +
-+void clk_cpu_speedstep(u32 plla_mul, u32 arm_div, u32 ahb_div)
++static void clk_cpu_speedstep(u32 plla_mul, u32 arm_div, u32 ahb_div)
 +{
 +    if (ahb_div > 1) {
 +          /*
@@ -458,35 +494,35 @@ index 0000000..06740f5
 +          */
 +          wmt_pm_wait_busy();
 +          wmt_pm_wait_update();
-+          writel(ahb_div, clk_pmc_base + CLK_AHB_DIVISOR);
++          writel(ahb_div, vt8500_pmc_base + CLK_AHB_DIVISOR);
 +
 +          wmt_pm_wait_update();
-+          writel(plla_mul, clk_pmc_base + CLK_PLLA_MULTIPLIER);
++          writel(plla_mul, vt8500_pmc_base + CLK_PLLA_MULTIPLIER);
 +
-+          wmt_pm_wait_update();
-+          writel(arm_div, clk_pmc_base + CLK_ARM_DIVISOR);
++         wmt_pm_wait_update();
++          writel(arm_div, vt8500_pmc_base + CLK_ARM_DIVISOR);
 +    } else {
 +          /*
 +             PLL, ARM, AHB
 +          */
 +          wmt_pm_wait_update();
-+          writel(plla_mul, clk_pmc_base + CLK_PLLA_MULTIPLIER);
++          writel(plla_mul, vt8500_pmc_base + CLK_PLLA_MULTIPLIER);
 +
 +          wmt_pm_wait_update();
-+          writel(arm_div, clk_pmc_base + CLK_ARM_DIVISOR);
++          writel(arm_div, vt8500_pmc_base + CLK_ARM_DIVISOR);
 +
 +          wmt_pm_wait_busy();
 +          wmt_pm_wait_update();
-+          writel(ahb_div, clk_pmc_base + CLK_AHB_DIVISOR);
++          writel(ahb_div, vt8500_pmc_base + CLK_AHB_DIVISOR);
 +    }
 +    wmt_pm_wait_update();
 +}
 +
-+unsigned long getrate_pll(struct clk *clk)
++static unsigned long getrate_pll(struct clk *clk)
 +{
 +    unsigned long prate = clk->parent->rate;
-+    u32 pll_mul = (readl(clk_pmc_base + clk->div_reg) & 0x1F);
-+    u32 pll_prediv = (readl(clk_pmc_base + clk->div_reg) & 0x100) ? 1 : 2;
++    u32 pll_mul = (readl(vt8500_pmc_base + clk->div_reg) & 0x1F);
++    u32 pll_prediv = (readl(vt8500_pmc_base + clk->div_reg) & 0x100) ? 1 : 2;
 +    if (pll_mul < 4)
 +          pll_mul = 1;
 +    else
@@ -496,7 +532,7 @@ index 0000000..06740f5
 +    return clk->rate;
 +}
 +
-+int setrate_pll(struct clk *clk, unsigned long rate)
++static int setrate_pll(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk->parent->rate;
 +    unsigned long actual_plla_rate;
@@ -537,10 +573,10 @@ index 0000000..06740f5
 +    return 0;
 +}
 +
-+unsigned long getrate_ahb(struct clk *clk)
++static unsigned long getrate_ahb(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x07);
++    u32 clk_div = (readl(vt8500_pmc_base + clk->div_reg) & 0x07);
 +    if (clk_div == 0)
 +          clk_div = 8;
 +
@@ -548,7 +584,7 @@ index 0000000..06740f5
 +    return clk->rate;
 +}
 +
-+int setrate_ahb(struct clk *clk, unsigned long rate)
++static int setrate_ahb(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -571,17 +607,17 @@ index 0000000..06740f5
 +
 +    wmt_pm_wait_busy();
 +    wmt_pm_wait_update();
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, vt8500_pmc_base + clk->div_reg);
 +
 +    wmt_pm_wait_update();
 +
 +    return 0;
 +}
 +
-+unsigned long getrate_arm(struct clk *clk)
++static unsigned long getrate_arm(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x1F);
++    u32 clk_div = (readl(vt8500_pmc_base + clk->div_reg) & 0x1F);
 +    if (clk_div == 0)
 +          clk_div = 32;
 +
@@ -589,7 +625,7 @@ index 0000000..06740f5
 +    return clk->rate;
 +}
 +
-+int setrate_arm(struct clk *clk, unsigned long rate)
++static int setrate_arm(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long actual_plla_rate;
 +    unsigned long actual_arm_rate;
@@ -634,7 +670,7 @@ index 0000000..06740f5
 +    return 0;
 +}
 +
-+int setrate_ddr(struct clk *clk, unsigned long rate)
++static int setrate_ddr(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -661,15 +697,15 @@ index 0000000..06740f5
 +          clk_div = 0;
 +
 +    wmt_pm_wait_update();
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, vt8500_pmc_base + clk->div_reg);
 +
 +    return 0;
 +}
 +
-+unsigned long getrate_sdmmc(struct clk *clk)
++static unsigned long getrate_sdmmc(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x3F);
++    u32 clk_div = (readl(vt8500_pmc_base + clk->div_reg) & 0x3F);
 +
 +    if (clk_div == 0)
 +          clk_div = 32;
@@ -682,7 +718,7 @@ index 0000000..06740f5
 +    return clk->rate;
 +}
 +
-+int setrate_sdmmc(struct clk *clk, unsigned long rate)
++static int setrate_sdmmc(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -708,15 +744,15 @@ index 0000000..06740f5
 +    if (clk_div == 32)
 +          clk_div = 0;
 +
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, vt8500_pmc_base + clk->div_reg);
 +
 +    return 0;
 +}
 +
-+unsigned long getrate_stdmask(struct clk *clk)
++static unsigned long getrate_stdmask(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x1F);
++    u32 clk_div = (readl(vt8500_pmc_base + clk->div_reg) & 0x1F);
 +    if (clk_div == 0)
 +          clk_div = 32;
 +
@@ -724,7 +760,7 @@ index 0000000..06740f5
 +    return clk->rate;
 +}
 +
-+int setrate_stdmask(struct clk *clk, unsigned long rate)
++static int setrate_stdmask(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -747,21 +783,21 @@ index 0000000..06740f5
 +          clk_div = 0;
 +
 +    wmt_pm_wait_update();
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, vt8500_pmc_base + clk->div_reg);
 +
 +    return 0;
 +}
 +
-+void enable_std(struct clk *clk)
++static void enable_std(struct clk *clk)
 +{
-+    u32 regtmp = readl(clk_pmc_base + clk->en_reg);
-+    writel(regtmp | (1 << clk->en_bit), clk_pmc_base + clk->en_reg);
++    u32 regtmp = readl(vt8500_pmc_base + clk->en_reg);
++    writel(regtmp | (1 << clk->en_bit), vt8500_pmc_base + clk->en_reg);
 +}
 +
-+void disable_std(struct clk *clk)
++static void disable_std(struct clk *clk)
 +{
-+    u32 regtmp = readl(clk_pmc_base + clk->en_reg);
-+    writel(regtmp & ~(1 << clk->en_bit), clk_pmc_base + clk->en_reg);
++    u32 regtmp = readl(vt8500_pmc_base + clk->en_reg);
++    writel(regtmp & ~(1 << clk->en_bit), vt8500_pmc_base + clk->en_reg);
 +}
 +
 +
@@ -801,38 +837,38 @@ index 0000000..06740f5
 +
 +DEFINE_CKREF(ref, 25000000);
 +
-+DEFINE_CKPGNP(pll_a, &clk_ref, 0, &clkops_pll, CLK_PLLA_MULTIPLIER);
-+DEFINE_CKPGNP(arm, &clk_pll_a, 0, &clkops_arm, CLK_ARM_DIVISOR);
-+DEFINE_CKPG(ahb, &clk_arm, 0, &clkops_ahb, CLK_AHB_DIVISOR);
++DEFINE_CKPGNP(pll_a, &clk_vt8500_ref, 0, &clkops_pll, CLK_PLLA_MULTIPLIER);
++DEFINE_CKPGNP(arm, &clk_vt8500_pll_a, 0, &clkops_arm, CLK_ARM_DIVISOR);
++DEFINE_CKPG(ahb, &clk_vt8500_arm, 0, &clkops_ahb, CLK_AHB_DIVISOR);
 +
-+DEFINE_CKPG(pll_b, &clk_ref, 0, &clkops_pll, CLK_PLLB_MULTIPLIER);
-+DEFINE_CKPGEN(sdmmc, &clk_pll_b, 0, &clkops_sdmmc, CLK_SDMMC_DIVISOR ,      \
++DEFINE_CKPG(pll_b, &clk_vt8500_ref, 0, &clkops_pll, CLK_PLLB_MULTIPLIER);
++DEFINE_CKPGEN(sdmmc, &clk_vt8500_pll_b, 0, &clkops_sdmmc, CLK_SDMMC_DIVISOR, \
 +               CLK_EN_HIGH, 18);
-+DEFINE_CKPGEN(nand, &clk_pll_b, 0, &clkops_stdmask, CLK_NAND_DIVISOR,         \
++DEFINE_CKPGEN(nand, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_NAND_DIVISOR, \
 +               CLK_EN_HIGH, 16);
-+DEFINE_CKPGEN(sfm, &clk_pll_b, 0, &clkops_stdmask, CLK_SFM_DIVISOR,     \
++DEFINE_CKPGEN(sfm, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_SFM_DIVISOR, \
 +               CLK_EN_HIGH, 23);
-+DEFINE_CKPGEN(mspro, &clk_pll_b, 0, &clkops_stdmask, CLK_MSPRO_DIVISOR,       \
++DEFINE_CKPGEN(mspro, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_MSPRO_DIVISOR,\
 +               CLK_EN_HIGH, 17);
-+DEFINE_CKPGEN(spi0, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI0_DIVISOR,         \
++DEFINE_CKPGEN(spi0, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_SPI0_DIVISOR, \
 +               CLK_EN_LOW, 12);
-+DEFINE_CKPGEN(spi1, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI1_DIVISOR,         \
++DEFINE_CKPGEN(spi1, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_SPI1_DIVISOR, \
 +               CLK_EN_LOW, 13);
-+DEFINE_CKPG(spi2, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI2_DIVISOR);
-+DEFINE_CKPG(dsp, &clk_pll_b, 0, &clkops_stdmask, CLK_DSP_DIVISOR);
-+DEFINE_CKPGEN(lcd, &clk_pll_b, 0, &clkops_stdmask, CLK_LCD_DIVISOR,     \
++DEFINE_CKPG(spi2, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_SPI2_DIVISOR);
++DEFINE_CKPG(dsp, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_DSP_DIVISOR);
++DEFINE_CKPGEN(lcd, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_LCD_DIVISOR, \
 +               CLK_EN_HIGH, 10);
-+DEFINE_CKPGEN(lcd_high, &clk_pll_b, 0, &clkops_stdmask, CLK_LCD_DIVISOR_HIGH,\
-+               CLK_EN_HIGH, 10);
-+DEFINE_CKPGEN(pcm, &clk_pll_b, 0, &clkops_stdmask, CLK_PCM_DIVISOR,     \
++DEFINE_CKPGEN(lcd_high, &clk_vt8500_pll_b, 0, &clkops_stdmask, \
++               CLK_LCD_DIVISOR_HIGH, CLK_EN_HIGH, 10);
++DEFINE_CKPGEN(pcm, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_PCM_DIVISOR, \
 +               CLK_EN_LOW, 16);
-+DEFINE_CKPGEN(pwm1, &clk_pll_b, 0, &clkops_stdmask, CLK_PWM1_DIVISOR,         \
++DEFINE_CKPGEN(pwm, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_PWM_DIVISOR, \
 +               CLK_EN_LOW, 14);
-+DEFINE_CKPGEN(pwm2, &clk_pll_b, 0, &clkops_stdmask, CLK_PWM2_DIVISOR,         \
++DEFINE_CKPGEN(pwm2, &clk_vt8500_pll_b, 0, &clkops_stdmask, CLK_PWM2_DIVISOR, \
 +               CLK_EN_LOW, 14);
 +
-+DEFINE_CKPG(pll_c, &clk_ref, 0, &clkops_pll, CLK_PLLC_MULTIPLIER);
-+DEFINE_CKPGEN(ddr, &clk_pll_c, 0, &clkops_ddr, CLK_DDR_DIVISOR,               \
++DEFINE_CKPG(pll_c, &clk_vt8500_ref, 0, &clkops_pll, CLK_PLLC_MULTIPLIER);
++DEFINE_CKPGEN(ddr, &clk_vt8500_pll_c, 0, &clkops_ddr, CLK_DDR_DIVISOR, \
 +          CLK_EN_HIGH, 0);
 +
 +/* Enable/Disable clocks - Non-programmable */
@@ -873,93 +909,91 @@ index 0000000..06740f5
 +DEFINE_CKEN(dma1,   &clkops_stdmask,     CLK_EN_HIGH, 9);
 +DEFINE_CKEN(dma0,   &clkops_stdmask,     CLK_EN_HIGH, 8);
 +
-+static struct clk_lookup wmt_clkregs[] = {
-+    INIT_CLKREG(&clk_ref,      NULL, "ref"),
-+    INIT_CLKREG(&clk_pll_a,         NULL, "pll_a"),
-+    INIT_CLKREG(&clk_pll_b,         NULL, "pll_b"),
-+    INIT_CLKREG(&clk_pll_c,         NULL, "pll_c"),
-+    INIT_CLKREG(&clk_arm,      NULL, "arm"),
-+    INIT_CLKREG(&clk_ahb,      NULL, "ahb"),
-+    INIT_CLKREG(&clk_ahb_bridge,    NULL, "ahb_bridge"),
-+    INIT_CLKREG(&clk_ddr,      NULL, "ddr"),
++static struct clk_lookup vt8500_clkregs[] = {
++    INIT_CLKREG(&clk_vt8500_ref,         NULL, "ref"),
++    INIT_CLKREG(&clk_vt8500_pll_a,       NULL, "pll_a"),
++    INIT_CLKREG(&clk_vt8500_pll_b,       NULL, "pll_b"),
++    INIT_CLKREG(&clk_vt8500_pll_c,       NULL, "pll_c"),
++    INIT_CLKREG(&clk_vt8500_arm,         NULL, "arm"),
++    INIT_CLKREG(&clk_vt8500_ahb,         NULL, "ahb"),
++    INIT_CLKREG(&clk_vt8500_ahb_bridge,  NULL, "ahb_bridge"),
++    INIT_CLKREG(&clk_vt8500_ddr,         NULL, "ddr"),
 +
-+    INIT_CLKREG(&clk_sdmmc,         NULL, "sdmmc"),
++    INIT_CLKREG(&clk_vt8500_sdmmc,       NULL, "sdmmc"),
 +
-+    INIT_CLKREG(&clk_ahb1,          NULL, "ahb1"),
-+    INIT_CLKREG(&clk_ahb2_1,   NULL, "ahb2-1"),
-+    INIT_CLKREG(&clk_ahb2_2,   NULL, "ahb2-2"),
-+    INIT_CLKREG(&clk_ahb2_3,   NULL, "ahb2-3"),
-+    INIT_CLKREG(&clk_ahb2_4,   NULL, "ahb2-4"),
-+    INIT_CLKREG(&clk_ahb2_5,   NULL, "ahb2-5"),
-+    INIT_CLKREG(&clk_ahb3,          NULL, "ahb3"),
++    INIT_CLKREG(&clk_vt8500_ahb1,        NULL, "ahb1"),
++    INIT_CLKREG(&clk_vt8500_ahb2_1,      NULL, "ahb2-1"),
++    INIT_CLKREG(&clk_vt8500_ahb2_2,      NULL, "ahb2-2"),
++    INIT_CLKREG(&clk_vt8500_ahb2_3,      NULL, "ahb2-3"),
++    INIT_CLKREG(&clk_vt8500_ahb2_4,      NULL, "ahb2-4"),
++    INIT_CLKREG(&clk_vt8500_ahb2_5,      NULL, "ahb2-5"),
++    INIT_CLKREG(&clk_vt8500_ahb3,        NULL, "ahb3"),
 +
-+    INIT_CLKREG(&clk_h264,          NULL, "h264"),
-+    INIT_CLKREG(&clk_vdu,      NULL, "vdu"),
-+    INIT_CLKREG(&clk_stri,          NULL, "stri"),
-+    INIT_CLKREG(&clk_tsbk,          NULL, "tsbk"),
++    INIT_CLKREG(&clk_vt8500_h264,        NULL, "h264"),
++    INIT_CLKREG(&clk_vt8500_vdu,         NULL, "vdu"),
++    INIT_CLKREG(&clk_vt8500_stri,        NULL, "stri"),
++    INIT_CLKREG(&clk_vt8500_tsbk,        NULL, "tsbk"),
 +
-+    INIT_CLKREG(&clk_scc,      NULL, "scc"),
-+    INIT_CLKREG(&clk_keypad,   NULL, "keypad"),
-+    INIT_CLKREG(&clk_ir,       NULL, "ir"),
-+    INIT_CLKREG(&clk_ac97,          NULL, "ac97"),
-+    INIT_CLKREG(&clk_gpio,          NULL, "gpio"),
-+    INIT_CLKREG(&clk_aam3,          NULL, "aam3"),
-+    INIT_CLKREG(&clk_aam2,          NULL, "aam2"),
-+    INIT_CLKREG(&clk_aam1,          NULL, "aam1"),
-+    INIT_CLKREG(&clk_aam0,          NULL, "aam0"),
-+    INIT_CLKREG(&clk_i2c,      NULL, "i2c"),
-+    INIT_CLKREG(&clk_uart3,         NULL, "uart3"),
-+    INIT_CLKREG(&clk_uart2,         NULL, "uart2"),
-+    INIT_CLKREG(&clk_uart1,         NULL, "uart1"),
-+    INIT_CLKREG(&clk_uart0,         NULL, "uart0"),
++    INIT_CLKREG(&clk_vt8500_scc,         NULL, "scc"),
++    INIT_CLKREG(&clk_vt8500_keypad,      NULL, "keypad"),
++    INIT_CLKREG(&clk_vt8500_ir,          NULL, "ir"),
++    INIT_CLKREG(&clk_vt8500_ac97,        NULL, "ac97"),
++    INIT_CLKREG(&clk_vt8500_gpio,        NULL, "gpio"),
++    INIT_CLKREG(&clk_vt8500_aam3,        NULL, "aam3"),
++    INIT_CLKREG(&clk_vt8500_aam2,        NULL, "aam2"),
++    INIT_CLKREG(&clk_vt8500_aam1,        NULL, "aam1"),
++    INIT_CLKREG(&clk_vt8500_aam0,        NULL, "aam0"),
++    INIT_CLKREG(&clk_vt8500_i2c,         NULL, "i2c"),
++    INIT_CLKREG(&clk_vt8500_uart3,       NULL, "uart3"),
++    INIT_CLKREG(&clk_vt8500_uart2,       NULL, "uart2"),
++    INIT_CLKREG(&clk_vt8500_uart1,       NULL, "uart1"),
++    INIT_CLKREG(&clk_vt8500_uart0,       NULL, "uart0"),
 +
-+    INIT_CLKREG(&clk_lpc,      NULL, "lpc"),
-+    INIT_CLKREG(&clk_eth_phy,  NULL, "eth-phy"),
-+    INIT_CLKREG(&clk_sae,      NULL, "sae"),
-+    INIT_CLKREG(&clk_usb_otg,  NULL, "usb-otg"),
-+    INIT_CLKREG(&clk_eth_mac,  NULL, "eth-mac"),
-+    INIT_CLKREG(&clk_pci_bridge,    NULL, "pci-bridge"),
-+    INIT_CLKREG(&clk_cf,       NULL, "cf"),
-+    INIT_CLKREG(&clk_ata,      NULL, "ata"),
-+    INIT_CLKREG(&clk_dma1,          NULL, "dma1"),
-+    INIT_CLKREG(&clk_dma0,          NULL, "dma0"),
++    INIT_CLKREG(&clk_vt8500_lpc,         NULL, "lpc"),
++    INIT_CLKREG(&clk_vt8500_eth_phy,     NULL, "eth-phy"),
++    INIT_CLKREG(&clk_vt8500_sae,         NULL, "sae"),
++    INIT_CLKREG(&clk_vt8500_usb_otg,     NULL, "usb-otg"),
++    INIT_CLKREG(&clk_vt8500_eth_mac,     NULL, "eth-mac"),
++    INIT_CLKREG(&clk_vt8500_pci_bridge,  NULL, "pci-bridge"),
++    INIT_CLKREG(&clk_vt8500_cf,          NULL, "cf"),
++    INIT_CLKREG(&clk_vt8500_ata,         NULL, "ata"),
++    INIT_CLKREG(&clk_vt8500_dma1,        NULL, "dma1"),
++    INIT_CLKREG(&clk_vt8500_dma0,        NULL, "dma0"),
 +
-+    INIT_CLKREG(&clk_nand,          NULL, "nand"),
-+    INIT_CLKREG(&clk_sfm,      NULL, "sfm"),
-+    INIT_CLKREG(&clk_mspro,         NULL, "mspro"),
-+    INIT_CLKREG(&clk_spi0,          NULL, "spi0"),
-+    INIT_CLKREG(&clk_spi1,          NULL, "spi1"),
-+    INIT_CLKREG(&clk_spi2,          NULL, "spi2"),
-+    INIT_CLKREG(&clk_pwm1,          NULL, "pwm1"),
-+    INIT_CLKREG(&clk_pwm2,          NULL, "pwm2"),
-+    INIT_CLKREG(&clk_dsp,      NULL, "dsp"),
-+    INIT_CLKREG(&clk_lcd,      NULL, "lcd"),
-+    INIT_CLKREG(&clk_lcd_high, NULL, "lcd-high"),
-+    INIT_CLKREG(&clk_pcm,      NULL, "pcm"),
-+    INIT_CLKREG(&clk_pwm1,          NULL, "pwm1"),
-+    INIT_CLKREG(&clk_pwm2,          NULL, "pwm2"),
++    INIT_CLKREG(&clk_vt8500_nand,        NULL, "nand"),
++    INIT_CLKREG(&clk_vt8500_sfm,         NULL, "sfm"),
++    INIT_CLKREG(&clk_vt8500_mspro,       NULL, "mspro"),
++    INIT_CLKREG(&clk_vt8500_spi0,        NULL, "spi0"),
++    INIT_CLKREG(&clk_vt8500_spi1,        NULL, "spi1"),
++    INIT_CLKREG(&clk_vt8500_spi2,        NULL, "spi2"),
++    INIT_CLKREG(&clk_vt8500_pwm,         NULL, "pwm"),
++    INIT_CLKREG(&clk_vt8500_pwm2,        NULL, "pwm2"),
++    INIT_CLKREG(&clk_vt8500_dsp,         NULL, "dsp"),
++    INIT_CLKREG(&clk_vt8500_lcd,         NULL, "lcd"),
++    INIT_CLKREG(&clk_vt8500_lcd_high,    NULL, "lcd-high"),
++    INIT_CLKREG(&clk_vt8500_pcm,         NULL, "pcm"),
 +};
 +
-+int wmt_clock_init(void)
++int vt8500_clock_init(void)
 +{
 +    struct clk_lookup *c;
 +
 +    /* map to PMC io memory */
-+    clk_pmc_base = ioremap(VT8500_PMC_BASE, 0x380);
++    vt8500_pmc_base = ioremap(VT8500_PMC_BASE, 0x380);
 +
-+    for (c = wmt_clkregs; c->clk; c++)
++    for (c = vt8500_clkregs; c->clk; c++)
 +          clk_register(c->clk);
 +
-+    clkdev_add_table(wmt_clkregs, ARRAY_SIZE(wmt_clkregs));
++    clkdev_add_table(vt8500_clkregs, ARRAY_SIZE(vt8500_clkregs));
 +
 +    return 0;
 +}
 diff --git a/arch/arm/mach-vt8500/clocks-wm8505.c b/arch/arm/mach-vt8500/clocks-wm8505.c
 new file mode 100644
-index 0000000..4ab0cb3
+index 0000000..8be3fa9
 --- /dev/null
 +++ b/arch/arm/mach-vt8500/clocks-wm8505.c
-@@ -0,0 +1,624 @@
+@@ -0,0 +1,635 @@
 +/*
 + *  arch/arm/mach-vt8500/clocks-wm8505.c
 + *
@@ -986,86 +1020,97 @@ index 0000000..4ab0cb3
 +#include <mach/wm8505_regs.h>
 +#include "clock.h"
 +
-+#define CLK_PM_STATUS_LOW 0x000
-+#define CLK_PML_ANY_CLK_UPDATING    0x00000008
-+#define CLK_PML_PLL_UPDATING        0x00000010
-+#define CLK_PML_ARM_UPDATING        0x00000080
-+#define CLK_PML_AHB_UPDATING        0x00000100
-+#define CLK_PML_UPDATE_MASK         0x1FFF9B37
-+#define CLK_PML_BUSY           0xFFFFFFFE
-+#define CLK_PM_STATUS_HIGH     0x004
++#define DEFINE_CKREF(_name, _rate)        \
++struct clk clk_wm8505_##_name = {         \
++    .name = #_name,            \
++    .parent = NULL,                 \
++    .ops = NULL,                    \
++    .rate = _rate,             \
++    .type = CLK_PRIMARY,             \
++    .delay  = 0,                    \
++    .en_reg = 0,                    \
++    .en_bit = 0                     \
++}
 +
-+#define CLK_PLLA_MULTIPLIER    0x200
-+#define CLK_PLLB_MULTIPLIER    0x204
-+#define CLK_PLLC_MULTIPLIER    0x208
-+#define CLK_PLLD_MULTIPLIER    0x20C
++#define DEFINE_CKEN(_name, _ops, _enreg, _enbit)    \
++struct clk clk_wm8505_##_name = {              \
++    .name = #_name,                  \
++    .parent = NULL,                      \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_ENABLE,                   \
++    .delay  = 0,                         \
++    .en_reg = _enreg,                    \
++    .en_bit = _enbit,                    \
++    .div_reg = 0                         \
++}
 +
-+#define CLK_EN_LOW        0x250
-+#define CLK_EN_HIGH       0x254
++#define DEFINE_CKPG(_name, _parent, _delay, _ops, _reg)   \
++struct clk clk_wm8505_##_name = {              \
++    .name = #_name,                  \
++    .parent = _parent,                   \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_PROGRAMABLE,              \
++    .delay  = _delay,                    \
++    .en_reg = 0,                         \
++    .en_bit = 0,                         \
++    .div_reg = _reg                      \
++}
 +
-+#define CLK_ARM_DIVISOR        0x300
-+#define CLK_AHB_DIVISOR        0x304
-+#define CLK_DDR_DIVISOR        0x310 /* mask = 0x1F special */
-+#define CLK_SFM_DIVISOR        0x314
-+#define CLK_KBD_DIVISOR_PRE    0x318
-+#define CLK_KBD_DIVISOR        0x31C
-+#define CLK_SDMMC_DIVISOR 0x328 /* mask = 0x1F special */
-+#define CLK_GENET_DIVISOR 0x32C
-+#define CLK_NAND_DIVISOR  0x330
-+#define CLK_NOR_DIVISOR        0x334
-+#define CLK_SPI0_DIVISOR  0x33C
-+#define CLK_SPI1_DIVISOR  0x340
-+#define CLK_SPI2_DIVISOR  0x344
-+#define CLK_PWM_DIVISOR        0x348
-+#define CLK_APB_DIVISOR        0x350
-+#define CLK_NA0_DIVISOR        0x358
-+#define CLK_NA12_DIVISOR  0x35C
-+#define CLK_I2C0_DIVISOR  0x36C
-+#define CLK_I2C1_DIVISOR  0x370
-+#define CLK_DVO_DIVISOR        0x374
-+#define CLK_RO1_DIVISOR        0x378
-+#define CLK_RO2_DIVISOR        0x37C
++#define DEFINE_CKPGNP(_name, _parent, _delay, _ops, _reg) \
++struct clk clk_wm8505_##_name = {              \
++    .name = #_name,                  \
++    .parent = _parent,                   \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_PROGRAMABLE | CLK_NO_PROPAGATE, \
++    .delay  = _delay,                    \
++    .en_reg = 0,                         \
++    .en_bit = 0,                         \
++    .div_reg = _reg                      \
++}
 +
-+void __iomem *clk_pmc_base;
++#define DEFINE_CKPGEN(_name, _parent, _delay, _ops, _reg, _enreg, _enbit) \
++struct clk clk_wm8505_##_name = {              \
++    .name = #_name,                  \
++    .parent = _parent,                   \
++    .ops = _ops,                         \
++    .rate = 0,                       \
++    .type = CLK_PROGRAMABLE | CLK_ENABLE,      \
++    .delay  = _delay,                    \
++    .en_reg = _enreg,                    \
++    .en_bit = _enbit,                    \
++    .div_reg = _reg                      \
++}
 +
-+/*
-+ * define our supported clocks
-+ *
-+ * Clock structure tree
-+ *
-+ * REF_CLK (25Mhz)
-+ * |\     PLL_A
-+ * | |-        cpu
-+ * |  \-       ahb
-+ * |   -       apb
-+ * |\     PLL_B
-+ * | |\-  nand flash
-+ * | | -  nor flash
-+ * | |-        sdmmc
-+ * | |-        lcd controller
-+ * | |-        pcm
-+ * | |-        pwm
-+ * | |-        spi
-+ * | \-        kbdc
-+ * |
-+ *  \     PLL_C
-+ *   \-        ddr
-+ *
-+ */
++void __iomem *wm8505_pmc_base;
 +
 +static void wmt_pm_wait_update(void)
 +{
-+    while (readl(clk_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_UPDATE_MASK)
-+          ;
++    int cnt = 1000000;
++    while (readl(wm8505_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_UPDATE_MASK) {
++          if (--cnt == 0) break;
++          cpu_relax();
++    }
++
++    if (cnt == 0)
++          printk(KERN_ERR "clock: pm_wait_update timeout\n");
 +}
 +
 +static void wmt_pm_wait_busy(void)
 +{
-+    while (readl(clk_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_BUSY)
-+          ;
++    int cnt = 1000000;
++    while (readl(wm8505_pmc_base + CLK_PM_STATUS_LOW) & CLK_PML_BUSY) {
++          if (--cnt == 0) break;
++          cpu_relax();
++    }
++
++    if (cnt == 0)
++          printk(KERN_ERR "clock: pm_wait_busy timeout\n");
 +}
 +
-+void clk_cpu_speedstep(u32 plla_mul, u32 arm_div, u32 ahb_div)
++static void clk_cpu_speedstep(u32 plla_mul, u32 arm_div, u32 ahb_div)
 +{
 +    if (ahb_div > 1) {
 +          /*
@@ -1073,35 +1118,35 @@ index 0000000..4ab0cb3
 +          */
 +          wmt_pm_wait_busy();
 +          wmt_pm_wait_update();
-+          writel(ahb_div, clk_pmc_base + CLK_AHB_DIVISOR);
++          writel(ahb_div, wm8505_pmc_base + CLK_AHB_DIVISOR);
 +
 +          wmt_pm_wait_update();
-+          writel(plla_mul, clk_pmc_base + CLK_PLLA_MULTIPLIER);
++          writel(plla_mul, wm8505_pmc_base + CLK_PLLA_MULTIPLIER);
 +
 +          wmt_pm_wait_update();
-+          writel(arm_div, clk_pmc_base + CLK_ARM_DIVISOR);
++          writel(arm_div, wm8505_pmc_base + CLK_ARM_DIVISOR);
 +    } else {
 +          /*
-+            PLL, ARM, AHB
++             PLL, ARM, AHB
 +          */
 +          wmt_pm_wait_update();
-+          writel(plla_mul, clk_pmc_base + CLK_PLLA_MULTIPLIER);
++          writel(plla_mul, wm8505_pmc_base + CLK_PLLA_MULTIPLIER);
 +
 +          wmt_pm_wait_update();
-+          writel(arm_div, clk_pmc_base + CLK_ARM_DIVISOR);
++          writel(arm_div, wm8505_pmc_base + CLK_ARM_DIVISOR);
 +
 +          wmt_pm_wait_busy();
 +          wmt_pm_wait_update();
-+          writel(ahb_div, clk_pmc_base + CLK_AHB_DIVISOR);
++          writel(ahb_div, wm8505_pmc_base + CLK_AHB_DIVISOR);
 +    }
 +    wmt_pm_wait_update();
 +}
 +
-+unsigned long getrate_pll(struct clk *clk)
++static unsigned long getrate_pll(struct clk *clk)
 +{
 +    unsigned long prate = clk->parent->rate;
-+    u32 pll_mul = (readl(clk_pmc_base + clk->div_reg) & 0x1F);
-+    u32 pll_prediv = (readl(clk_pmc_base + clk->div_reg) & 0x100) ? 1 : 2;
++    u32 pll_mul = (readl(wm8505_pmc_base + clk->div_reg) & 0x1F);
++    u32 pll_prediv = (readl(wm8505_pmc_base + clk->div_reg) & 0x100) ? 1 : 2;
 +    if (pll_mul < 4)
 +          pll_mul = 1;
 +    else
@@ -1111,7 +1156,7 @@ index 0000000..4ab0cb3
 +    return clk->rate;
 +}
 +
-+int setrate_pll(struct clk *clk, unsigned long rate)
++static int setrate_pll(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk->parent->rate;
 +    unsigned long actual_plla_rate;
@@ -1152,10 +1197,10 @@ index 0000000..4ab0cb3
 +    return 0;
 +}
 +
-+unsigned long getrate_ahb(struct clk *clk)
++static unsigned long getrate_ahb(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x07);
++    u32 clk_div = (readl(wm8505_pmc_base + clk->div_reg) & 0x07);
 +    if (clk_div == 0)
 +          clk_div = 8;
 +
@@ -1163,7 +1208,7 @@ index 0000000..4ab0cb3
 +    return clk->rate;
 +}
 +
-+int setrate_ahb(struct clk *clk, unsigned long rate)
++static int setrate_ahb(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -1186,17 +1231,17 @@ index 0000000..4ab0cb3
 +
 +    wmt_pm_wait_busy();
 +    wmt_pm_wait_update();
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, wm8505_pmc_base + clk->div_reg);
 +
 +    wmt_pm_wait_update();
 +
 +    return 0;
 +}
 +
-+unsigned long getrate_arm(struct clk *clk)
++static unsigned long getrate_arm(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x1F);
++    u32 clk_div = (readl(wm8505_pmc_base + clk->div_reg) & 0x1F);
 +    if (clk_div == 0)
 +          clk_div = 32;
 +
@@ -1204,7 +1249,7 @@ index 0000000..4ab0cb3
 +    return clk->rate;
 +}
 +
-+int setrate_arm(struct clk *clk, unsigned long rate)
++static int setrate_arm(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long actual_plla_rate;
 +    unsigned long actual_arm_rate;
@@ -1249,7 +1294,7 @@ index 0000000..4ab0cb3
 +    return 0;
 +}
 +
-+int setrate_ddr(struct clk *clk, unsigned long rate)
++static int setrate_ddr(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -1276,15 +1321,15 @@ index 0000000..4ab0cb3
 +          clk_div = 0;
 +
 +    wmt_pm_wait_update();
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, wm8505_pmc_base + clk->div_reg);
 +
 +    return 0;
 +}
 +
-+unsigned long getrate_sdmmc(struct clk *clk)
++static unsigned long getrate_sdmmc(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x3F);
++    u32 clk_div = (readl(wm8505_pmc_base + clk->div_reg) & 0x3F);
 +
 +    if (clk_div == 0)
 +          clk_div = 32;
@@ -1297,7 +1342,7 @@ index 0000000..4ab0cb3
 +    return clk->rate;
 +}
 +
-+int setrate_sdmmc(struct clk *clk, unsigned long rate)
++static int setrate_sdmmc(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -1316,22 +1361,22 @@ index 0000000..4ab0cb3
 +
 +    /* if clk_div > 32, enable the fixed divisor */
 +    if (clk_div > 32)
-+          clk_div = 0x20;
++         clk_div = 0x20;
 +
 +    clk->rate = prate / clk_div;
 +
 +    if (clk_div == 32)
 +          clk_div = 0;
 +
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, wm8505_pmc_base + clk->div_reg);
 +
 +    return 0;
 +}
 +
-+unsigned long getrate_stdmask(struct clk *clk)
++static unsigned long getrate_stdmask(struct clk *clk)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
-+    u32 clk_div = (readl(clk_pmc_base + clk->div_reg) & 0x1F);
++    u32 clk_div = (readl(wm8505_pmc_base + clk->div_reg) & 0x1F);
 +    if (clk_div == 0)
 +          clk_div = 32;
 +
@@ -1339,7 +1384,7 @@ index 0000000..4ab0cb3
 +    return clk->rate;
 +}
 +
-+int setrate_stdmask(struct clk *clk, unsigned long rate)
++static int setrate_stdmask(struct clk *clk, unsigned long rate)
 +{
 +    unsigned long prate = clk_get_rate(clk->parent);
 +    u32 clk_div;
@@ -1362,21 +1407,21 @@ index 0000000..4ab0cb3
 +          clk_div = 0;
 +
 +    wmt_pm_wait_update();
-+    writel(clk_div, clk_pmc_base + clk->div_reg);
++    writel(clk_div, wm8505_pmc_base + clk->div_reg);
 +
 +    return 0;
 +}
 +
-+void enable_std(struct clk *clk)
++static void enable_std(struct clk *clk)
 +{
-+    u32 regtmp = readl(clk_pmc_base + clk->en_reg);
-+    writel(regtmp | (1 << clk->en_bit), clk_pmc_base + clk->en_reg);
++    u32 regtmp = readl(wm8505_pmc_base + clk->en_reg);
++    writel(regtmp | (1 << clk->en_bit), wm8505_pmc_base + clk->en_reg);
 +}
 +
-+void disable_std(struct clk *clk)
++static void disable_std(struct clk *clk)
 +{
-+    u32 regtmp = readl(clk_pmc_base + clk->en_reg);
-+    writel(regtmp & ~(1 << clk->en_bit), clk_pmc_base + clk->en_reg);
++    u32 regtmp = readl(wm8505_pmc_base + clk->en_reg);
++    writel(regtmp & ~(1 << clk->en_bit), wm8505_pmc_base + clk->en_reg);
 +}
 +
 +
@@ -1417,51 +1462,51 @@ index 0000000..4ab0cb3
 +
 +DEFINE_CKREF(ref, 25000000);
 +
-+DEFINE_CKPGNP(pll_a, &clk_ref, 0, &clkops_pll, CLK_PLLA_MULTIPLIER);
-+DEFINE_CKPGNP(arm, &clk_pll_a, 0, &clkops_arm, CLK_ARM_DIVISOR);
-+DEFINE_CKPG(ahb, &clk_arm, 0, &clkops_ahb, CLK_AHB_DIVISOR);
-+DEFINE_CKPG(apb, &clk_arm, 0, &clkops_stdmask, CLK_APB_DIVISOR);
++DEFINE_CKPGNP(pll_a, &clk_wm8505_ref, 0, &clkops_pll, CLK_PLLA_MULTIPLIER);
++DEFINE_CKPGNP(arm, &clk_wm8505_pll_a, 0, &clkops_arm, CLK_ARM_DIVISOR);
++DEFINE_CKPG(ahb, &clk_wm8505_arm, 0, &clkops_ahb, CLK_AHB_DIVISOR);
++DEFINE_CKPG(apb, &clk_wm8505_arm, 0, &clkops_stdmask, CLK_APB_DIVISOR);
 +
-+DEFINE_CKPG(pll_b, &clk_ref, 0, &clkops_pll, CLK_PLLB_MULTIPLIER);
-+DEFINE_CKPGEN(sdmmc, &clk_pll_b, 0, &clkops_sdmmc, CLK_SDMMC_DIVISOR ,      \
++DEFINE_CKPG(pll_b, &clk_wm8505_ref, 0, &clkops_pll, CLK_PLLB_MULTIPLIER);
++DEFINE_CKPGEN(sdmmc, &clk_wm8505_pll_b, 0, &clkops_sdmmc, CLK_SDMMC_DIVISOR, \
 +               CLK_EN_HIGH, 18);
-+DEFINE_CKPGEN(nand, &clk_pll_b, 0, &clkops_stdmask, CLK_NAND_DIVISOR,         \
++DEFINE_CKPGEN(nand, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_NAND_DIVISOR, \
 +               CLK_EN_HIGH, 16);
-+DEFINE_CKPGEN(kbd_pre, &clk_pll_b, 0, &clkops_stdmask, CLK_KBD_DIVISOR_PRE, \
++DEFINE_CKPGEN(kbd_pre, &clk_wm8505_pll_b, 0, &clkops_stdmask, \
++               CLK_KBD_DIVISOR_PRE, CLK_EN_HIGH, 4);
++DEFINE_CKPGEN(kbd, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_KBD_DIVISOR, \
 +               CLK_EN_HIGH, 4);
-+DEFINE_CKPGEN(kbd, &clk_pll_b, 0, &clkops_stdmask, CLK_KBD_DIVISOR,     \
-+               CLK_EN_HIGH, 4);
-+DEFINE_CKPGEN(sfm, &clk_pll_b, 0, &clkops_stdmask, CLK_SFM_DIVISOR,     \
++DEFINE_CKPGEN(sfm, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_SFM_DIVISOR, \
 +               CLK_EN_HIGH, 23);
-+DEFINE_CKPG(genet, &clk_pll_b, 0, &clkops_stdmask, CLK_GENET_DIVISOR);
-+DEFINE_CKPGEN(nor, &clk_pll_b, 0, &clkops_stdmask, CLK_NOR_DIVISOR,     \
++DEFINE_CKPG(genet, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_GENET_DIVISOR);
++DEFINE_CKPGEN(nor, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_NOR_DIVISOR, \
 +               CLK_EN_HIGH, 3);
-+DEFINE_CKPGEN(spi0, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI0_DIVISOR,         \
++DEFINE_CKPGEN(spi0, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_SPI0_DIVISOR, \
 +               CLK_EN_LOW, 12);
-+DEFINE_CKPGEN(spi1, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI1_DIVISOR,         \
++DEFINE_CKPGEN(spi1, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_SPI1_DIVISOR, \
 +               CLK_EN_LOW, 13);
-+DEFINE_CKPGEN(spi2, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI2_DIVISOR,         \
++DEFINE_CKPGEN(spi2, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_SPI2_DIVISOR, \
 +               CLK_EN_LOW, 14);
-+DEFINE_CKPGEN(pwm, &clk_pll_b, 0, &clkops_stdmask, CLK_PWM_DIVISOR,     \
++DEFINE_CKPGEN(pwm, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_PWM_DIVISOR, \
 +               CLK_EN_LOW, 10);
-+DEFINE_CKPGEN(na0, &clk_pll_b, 0, &clkops_stdmask, CLK_NA0_DIVISOR,     \
++DEFINE_CKPGEN(na0, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_NA0_DIVISOR, \
 +               CLK_EN_HIGH, 1);
-+DEFINE_CKPGEN(na12, &clk_pll_b, 0, &clkops_stdmask, CLK_NA12_DIVISOR,         \
++DEFINE_CKPGEN(na12, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_NA12_DIVISOR, \
 +               CLK_EN_HIGH, 2);
-+DEFINE_CKPGEN(i2c0, &clk_pll_b, 0, &clkops_stdmask, CLK_I2C0_DIVISOR,         \
++DEFINE_CKPGEN(i2c0, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_I2C0_DIVISOR, \
 +               CLK_EN_LOW, 5);
-+DEFINE_CKPGEN(i2c1, &clk_pll_b, 0, &clkops_stdmask, CLK_I2C1_DIVISOR,         \
++DEFINE_CKPGEN(i2c1, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_I2C1_DIVISOR, \
 +               CLK_EN_LOW, 0);
-+DEFINE_CKPGEN(dvo, &clk_pll_b, 0, &clkops_stdmask, CLK_DVO_DIVISOR,     \
++DEFINE_CKPGEN(dvo, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_DVO_DIVISOR, \
 +               CLK_EN_LOW, 18);
-+DEFINE_CKPG(ro1, &clk_pll_b, 0, &clkops_stdmask, CLK_RO1_DIVISOR);
-+DEFINE_CKPG(ro2, &clk_pll_b, 0, &clkops_stdmask, CLK_RO2_DIVISOR);
++DEFINE_CKPG(ro1, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_RO1_DIVISOR);
++DEFINE_CKPG(ro2, &clk_wm8505_pll_b, 0, &clkops_stdmask, CLK_RO2_DIVISOR);
 +
-+DEFINE_CKPG(pll_c, &clk_ref, 0, &clkops_pll, CLK_PLLC_MULTIPLIER);
-+DEFINE_CKPGEN(ddr, &clk_pll_c, 0, &clkops_ddr, CLK_DDR_DIVISOR,               \
++DEFINE_CKPG(pll_c, &clk_wm8505_ref, 0, &clkops_pll, CLK_PLLC_MULTIPLIER);
++DEFINE_CKPGEN(ddr, &clk_wm8505_pll_c, 0, &clkops_ddr, CLK_DDR_DIVISOR, \
 +          CLK_EN_HIGH, 0);
 +
-+DEFINE_CKPG(pll_d, &clk_ref, 0, &clkops_pll, CLK_PLLD_MULTIPLIER);
++DEFINE_CKPG(pll_d, &clk_wm8505_ref, 0, &clkops_pll, CLK_PLLD_MULTIPLIER);
 +
 +
 +/* Enable/Disable clocks - Non-programmable */
@@ -1498,94 +1543,122 @@ index 0000000..4ab0cb3
 +DEFINE_CKEN(uhc,    &clkops_stdmask,     CLK_EN_HIGH, 7);
 +DEFINE_CKEN(dma,    &clkops_stdmask,     CLK_EN_HIGH, 5);
 +
-+static struct clk_lookup wmt_clkregs[] = {
-+    INIT_CLKREG(&clk_ref,      NULL, "ref"),
-+    INIT_CLKREG(&clk_pll_a,         NULL, "pll_a"),
-+    INIT_CLKREG(&clk_pll_b,         NULL, "pll_b"),
-+    INIT_CLKREG(&clk_pll_c,         NULL, "pll_c"),
-+    INIT_CLKREG(&clk_pll_d,         NULL, "pll_d"),
-+    INIT_CLKREG(&clk_arm,      NULL, "arm"),
-+    INIT_CLKREG(&clk_ahb,      NULL, "ahb"),
-+    INIT_CLKREG(&clk_ahb_bridge,    NULL, "ahb_bridge"),
-+    INIT_CLKREG(&clk_apb,      NULL, "apb"),
-+    INIT_CLKREG(&clk_ddr,      NULL, "ddr"),
++static struct clk_lookup wm8505_clkregs[] = {
++    INIT_CLKREG(&clk_wm8505_ref,         NULL, "ref"),
++    INIT_CLKREG(&clk_wm8505_pll_a,       NULL, "pll_a"),
++    INIT_CLKREG(&clk_wm8505_pll_b,       NULL, "pll_b"),
++    INIT_CLKREG(&clk_wm8505_pll_c,       NULL, "pll_c"),
++    INIT_CLKREG(&clk_wm8505_pll_d,       NULL, "pll_d"),
++    INIT_CLKREG(&clk_wm8505_arm,         NULL, "arm"),
++    INIT_CLKREG(&clk_wm8505_ahb,         NULL, "ahb"),
++    INIT_CLKREG(&clk_wm8505_ahb_bridge,  NULL, "ahb_bridge"),
++    INIT_CLKREG(&clk_wm8505_apb,         NULL, "apb"),
++    INIT_CLKREG(&clk_wm8505_ddr,         NULL, "ddr"),
 +
-+    INIT_CLKREG(&clk_nor,      NULL, "nor"),
-+    INIT_CLKREG(&clk_nand,          NULL, "nand"),
-+    INIT_CLKREG(&clk_sdmmc,         NULL, "sdmmc"),
++    INIT_CLKREG(&clk_wm8505_nor,         NULL, "nor"),
++    INIT_CLKREG(&clk_wm8505_nand,        NULL, "nand"),
++    INIT_CLKREG(&clk_wm8505_sdmmc,       NULL, "sdmmc"),
 +
-+    INIT_CLKREG(&clk_keypad,   NULL, "keypad"),
-+    INIT_CLKREG(&clk_kbd_pre,  NULL, "kbd_pre"),
-+    INIT_CLKREG(&clk_kbd,      NULL, "kbd"),
-+    INIT_CLKREG(&clk_sfm,      NULL, "sfm"),
-+    INIT_CLKREG(&clk_genet,         NULL, "genet"),
++    INIT_CLKREG(&clk_wm8505_keypad, NULL, "keypad"),
++    INIT_CLKREG(&clk_wm8505_kbd_pre,     NULL, "kbd_pre"),
++    INIT_CLKREG(&clk_wm8505_kbd,         NULL, "kbd"),
++    INIT_CLKREG(&clk_wm8505_sfm,         NULL, "sfm"),
++    INIT_CLKREG(&clk_wm8505_genet,       NULL, "genet"),
 +
-+    INIT_CLKREG(&clk_spi0,          NULL, "spi0"),
-+    INIT_CLKREG(&clk_spi1,          NULL, "spi1"),
-+    INIT_CLKREG(&clk_spi2,          NULL, "spi2"),
++    INIT_CLKREG(&clk_wm8505_spi0,        NULL, "spi0"),
++    INIT_CLKREG(&clk_wm8505_spi1,        NULL, "spi1"),
++    INIT_CLKREG(&clk_wm8505_spi2,        NULL, "spi2"),
 +
-+    INIT_CLKREG(&clk_govrhd,   NULL, "govrhd"),
-+    INIT_CLKREG(&clk_govw,          NULL, "govw"),
-+    INIT_CLKREG(&clk_ge,       NULL, "ge"),
-+    INIT_CLKREG(&clk_pwm,      NULL, "pwm"),
-+    INIT_CLKREG(&clk_dvo,      NULL, "dvo"),
-+    INIT_CLKREG(&clk_jenc,          NULL, "jenc"),
-+    INIT_CLKREG(&clk_sdtv,          NULL, "sdtv"),
++    INIT_CLKREG(&clk_wm8505_govrhd,      NULL, "govrhd"),
++    INIT_CLKREG(&clk_wm8505_govw,        NULL, "govw"),
++    INIT_CLKREG(&clk_wm8505_ge,          NULL, "ge"),
++    INIT_CLKREG(&clk_wm8505_pwm,         NULL, "pwm"),
++    INIT_CLKREG(&clk_wm8505_dvo,         NULL, "dvo"),
++    INIT_CLKREG(&clk_wm8505_jenc,        NULL, "jenc"),
++    INIT_CLKREG(&clk_wm8505_sdtv,        NULL, "sdtv"),
 +
-+    INIT_CLKREG(&clk_cir,      NULL, "cir"),
-+    INIT_CLKREG(&clk_gpio,          NULL, "gpio"),
-+    INIT_CLKREG(&clk_rtc,      NULL, "rtc"),
++    INIT_CLKREG(&clk_wm8505_cir,         NULL, "cir"),
++    INIT_CLKREG(&clk_wm8505_gpio,        NULL, "gpio"),
++    INIT_CLKREG(&clk_wm8505_rtc,         NULL, "rtc"),
 +
-+    INIT_CLKREG(&clk_i2c0,          NULL, "i2c0"),
-+    INIT_CLKREG(&clk_i2c1,          NULL, "i2c1"),
-+    INIT_CLKREG(&clk_i2c_slave,     NULL, "i2c_slave"),
++    INIT_CLKREG(&clk_wm8505_i2c0,        NULL, "i2c0"),
++    INIT_CLKREG(&clk_wm8505_i2c1,        NULL, "i2c1"),
++    INIT_CLKREG(&clk_wm8505_i2c_slave,   NULL, "i2c_slave"),
 +
-+    INIT_CLKREG(&clk_ac97,          NULL, "ac97"),
-+    INIT_CLKREG(&clk_i2s,      NULL, "i2s"),
++    INIT_CLKREG(&clk_wm8505_ac97,        NULL, "ac97"),
++    INIT_CLKREG(&clk_wm8505_i2s,         NULL, "i2s"),
 +
-+    INIT_CLKREG(&clk_eth_phy,  NULL, "eth_phy"),
-+    INIT_CLKREG(&clk_eth_mac0, NULL, "eth_mac0"),
++    INIT_CLKREG(&clk_wm8505_eth_phy,     NULL, "eth_phy"),
++    INIT_CLKREG(&clk_wm8505_eth_mac0,    NULL, "eth_mac0"),
 +
-+    INIT_CLKREG(&clk_uart5,         NULL, "uart5"),
-+    INIT_CLKREG(&clk_uart4,         NULL, "uart4"),
-+    INIT_CLKREG(&clk_uart3,         NULL, "uart3"),
-+    INIT_CLKREG(&clk_uart2,         NULL, "uart2"),
-+    INIT_CLKREG(&clk_uart1,         NULL, "uart1"),
-+    INIT_CLKREG(&clk_uart0,         NULL, "uart0"),
++    INIT_CLKREG(&clk_wm8505_uart5,       NULL, "uart5"),
++    INIT_CLKREG(&clk_wm8505_uart4,       NULL, "uart4"),
++    INIT_CLKREG(&clk_wm8505_uart3,       NULL, "uart3"),
++    INIT_CLKREG(&clk_wm8505_uart2,       NULL, "uart2"),
++    INIT_CLKREG(&clk_wm8505_uart1,       NULL, "uart1"),
++    INIT_CLKREG(&clk_wm8505_uart0,       NULL, "uart0"),
 +
-+    INIT_CLKREG(&clk_na0,      NULL, "na0"),
-+    INIT_CLKREG(&clk_na12,          NULL, "na12"),
-+    INIT_CLKREG(&clk_ro1,      NULL, "ro1"),
-+    INIT_CLKREG(&clk_ro2,      NULL, "ro2"),
-+    INIT_CLKREG(&clk_amp,      NULL, "amp"),
-+    INIT_CLKREG(&clk_scc,      NULL, "scc"),
-+    INIT_CLKREG(&clk_vpp,      NULL, "vpp"),
-+    INIT_CLKREG(&clk_vid,      NULL, "vid"),
-+    INIT_CLKREG(&clk_scl444u,  NULL, "scl444u"),
-+    INIT_CLKREG(&clk_sae,      NULL, "sae"),
-+    INIT_CLKREG(&clk_sys,      NULL, "sys"),
-+    INIT_CLKREG(&clk_udc,      NULL, "udc"),
-+    INIT_CLKREG(&clk_uhc,      NULL, "uhc"),
-+    INIT_CLKREG(&clk_dma,      NULL, "dma"),
-+    INIT_CLKREG(&clk_pdma,          NULL, "pdma"),
++    INIT_CLKREG(&clk_wm8505_na0,         NULL, "na0"),
++    INIT_CLKREG(&clk_wm8505_na12,        NULL, "na12"),
++    INIT_CLKREG(&clk_wm8505_ro1,         NULL, "ro1"),
++    INIT_CLKREG(&clk_wm8505_ro2,         NULL, "ro2"),
++    INIT_CLKREG(&clk_wm8505_amp,         NULL, "amp"),
++    INIT_CLKREG(&clk_wm8505_scc,         NULL, "scc"),
++    INIT_CLKREG(&clk_wm8505_vpp,         NULL, "vpp"),
++    INIT_CLKREG(&clk_wm8505_vid,         NULL, "vid"),
++    INIT_CLKREG(&clk_wm8505_scl444u,     NULL, "scl444u"),
++    INIT_CLKREG(&clk_wm8505_sae,         NULL, "sae"),
++    INIT_CLKREG(&clk_wm8505_sys,         NULL, "sys"),
++    INIT_CLKREG(&clk_wm8505_udc,         NULL, "udc"),
++    INIT_CLKREG(&clk_wm8505_uhc,         NULL, "uhc"),
++    INIT_CLKREG(&clk_wm8505_dma,         NULL, "dma"),
++    INIT_CLKREG(&clk_wm8505_pdma,        NULL, "pdma"),
 +};
 +
-+int wmt_clock_init(void)
++int wm8505_clock_init(void)
 +{
 +    struct clk_lookup *c;
 +
 +    /* map to PMC io memory */
-+    clk_pmc_base = ioremap(WM8505_PMC_BASE, 0x380);
++    wm8505_pmc_base = ioremap(WM8505_PMC_BASE, 0x380);
 +
-+    for (c = wmt_clkregs; c->clk; c++)
++    for (c = wm8505_clkregs; c->clk; c++)
 +          clk_register(c->clk);
 +
-+    clkdev_add_table(wmt_clkregs, ARRAY_SIZE(wmt_clkregs));
++    clkdev_add_table(wm8505_clkregs, ARRAY_SIZE(wm8505_clkregs));
 +
 +    return 0;
 +}
-
+diff --git a/arch/arm/mach-vt8500/include/mach/clkdev.h b/arch/arm/mach-vt8500/include/mach/clkdev.h
+new file mode 100644
+index 0000000..62b0a6a
+--- /dev/null
++++ b/arch/arm/mach-vt8500/include/mach/clkdev.h
+@@ -0,0 +1,7 @@
++#ifndef __WMT_CLKDEV_H
++#define __WMT_CLKDEV_H
++
++#define __clk_get(clk) ({ 1; })
++#define __clk_put(clk) do { } while (0)
++
++#endif
+diff --git a/arch/arm/mach-vt8500/wm8505_7in.c b/arch/arm/mach-vt8500/wm8505_7in.c
+index e73aadb..ce75c77 100644
+--- a/arch/arm/mach-vt8500/wm8505_7in.c
++++ b/arch/arm/mach-vt8500/wm8505_7in.c
+@@ -25,6 +25,7 @@
+#include <asm/mach/arch.h>
+ #include "devices.h"
++#include "clock.h"
+ static void __iomem *pmc_hiber;
+@@ -65,6 +66,7 @@ void __init wm8505_7in_init(void)
+    wm8505_set_resources();
+    platform_add_devices(devices, ARRAY_SIZE(devices));
+    vt8500_gpio_init();
++    wm8505_clock_init();
+}
+ MACHINE_START(WM8505_7IN_NETBOOK, "WM8505 7-inch generic netbook")
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110227/6ff72f6c/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110227/0fbb8711/attachment-0001.html>
