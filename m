@@ -1,43 +1,53 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 27 Feb 2011 21:33:46 +0800
-Subject: [PATCH] colibri : don't register pxa2xx-pcmcia nodes on
-	non-colibri platforms
-In-Reply-To: <1298417428-25064-1-git-send-email-dbaryshkov@gmail.com>
-References: <1298417428-25064-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <AANLkTikefHTH0nDtj_=bDnt_HgJEep3w374zUyDevx6A@mail.gmail.com>
+Date: Sun, 27 Feb 2011 21:36:09 +0800
+Subject: [PATCH 1/3] pxa: Enable pxa-pcm-audio on pxa210/pxa25x platform
+In-Reply-To: <AANLkTimD28SYLA=NZyEO8SS==wrZ2mL+LG92e6FGHtom@mail.gmail.com>
+References: <1298417351-24727-1-git-send-email-dbaryshkov@gmail.com>
+	<AANLkTimD28SYLA=NZyEO8SS==wrZ2mL+LG92e6FGHtom@mail.gmail.com>
+Message-ID: <AANLkTinbNVW9D4RkgEaEHkRorLAk8KzJWs3Ghkxze_-7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 23, 2011 at 7:30 AM, Dmitry Eremin-Solenikov
+On Fri, Feb 25, 2011 at 6:47 PM, Dmitry Eremin-Solenikov
 <dbaryshkov@gmail.com> wrote:
-> PXA supports multi-machine kernels since long ago. However a kernel
-> compiled with support for colibri and any other PXA machine and with
-> PCMCIA enabled will barf at runtime about duplicate registration of
-> pxa2xx-pcmcia device. Fix that.
+> Eric, will it be possible to get at least this patch in the kernel?
 >
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Otherwise all ASoC-based audio on pxa25x isn't working.
 
-Applied to 'fix'.
+Hrm, this deserves as a fix. Applied.
 
-> ---
-> ?drivers/pcmcia/pxa2xx_colibri.c | ? ?3 +++
-> ?1 files changed, 3 insertions(+), 0 deletions(-)
 >
-> diff --git a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
-> index c3f7219..a520395 100644
-> --- a/drivers/pcmcia/pxa2xx_colibri.c
-> +++ b/drivers/pcmcia/pxa2xx_colibri.c
-> @@ -181,6 +181,9 @@ static int __init colibri_pcmcia_init(void)
-> ?{
-> ? ? ? ?int ret;
+> On 2/23/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+>> pxa25x platforms were left out of major ASoC Update patch.
+>> Since f0fba2ad1b a registration of pxa-pcm-audio device is required for
+>> ASoC to function on pxa platforms. Register one also for pxa210/pxa25x.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>> ---
+>> ?arch/arm/mach-pxa/pxa25x.c | ? ?1 +
+>> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+>> index fbc5b77..b166b1d 100644
+>> --- a/arch/arm/mach-pxa/pxa25x.c
+>> +++ b/arch/arm/mach-pxa/pxa25x.c
+>> @@ -347,6 +347,7 @@ static struct platform_device *pxa25x_devices[]
+>> __initdata = {
+>> ? ? ? &pxa25x_device_assp,
+>> ? ? ? &pxa25x_device_pwm0,
+>> ? ? ? &pxa25x_device_pwm1,
+>> + ? ? &pxa_device_asoc_platform,
+>> ?};
+>>
+>> ?static struct sys_device pxa25x_sysdev[] = {
+>> --
+>> 1.7.2.3
+>>
+>>
 >
-> + ? ? ? if (!machine_is_colibri() && !machine_is_colibri320())
-> + ? ? ? ? ? ? ? return -ENODEV;
-> +
-> ? ? ? ?colibri_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
-> ? ? ? ?if (!colibri_pcmcia_device)
-> ? ? ? ? ? ? ? ?return -ENOMEM;
+>
 > --
-> 1.7.2.3
->
+> With best wishes
+> Dmitry
 >
