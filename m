@@ -1,26 +1,30 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 27 Feb 2011 22:30:19 +0800
-Subject: [GIT PULL] pxa: fixes for v2.6.38-rc6
-Message-ID: <AANLkTinO7_ojbwV0t5Mc_osKuiZq6+BNk--t669c8S6Y@mail.gmail.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Sun, 27 Feb 2011 19:42:44 +0300
+Subject: PATCH [1/1] V2 - Clock Support for VT8500/WM8505
+In-Reply-To: <76F764B079F92A4E843589C893D0A0228D57@SERVER.prisktech.co.nz>
+References: <76F764B079F92A4E843589C893D0A0228D57@SERVER.prisktech.co.nz>
+Message-ID: <AANLkTik+rVWZ5fMshO+NFU6UbJ+7xEimvKFZJ-kxsWc8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f5412be599602124d2bdd49947b231dd77c0bf99:
+2011/2/27 Linux Mailing List Email Account <linux@prisktech.co.nz>:
+> Patch to provide clock support on VT8500-/WM8505- based SoC.
+>
+> V2:? Included missing mach/clkdev.h
+>
+> ???? Fix errors in clocks-vt8500.c
+>
 
-  Linux 2.6.38-rc6 (2011-02-21 17:25:52 -0800)
+Tony, you should probably consider using your real name instead of
+"Linux Mailing List Email Account" here. Also, your sign-off is
+missing in this submission.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+As for the patch itself, it looks quite awesome to me. Just add error
+handling to ioremap calls and count the time you are busy-waiting for
+the status registers (and put cpu_relax inside the loop).
 
-Dmitry Eremin-Solenikov (4):
-      ARM: pxa/tosa: drop setting LED trigger name, as it's unsupported now
-      ARM: pxa/colibri: don't register pxa2xx-pcmcia nodes on
-non-colibri platforms
-      ARM: pxa: enable pxa-pcm-audio on pxa210/pxa25x platform
-      ARM: pxa/tosa: register wm9712 codec device
+Have you tested this code with both VT8500 and WM8505 enabled in the
+same kernel image?
 
- arch/arm/mach-pxa/pxa25x.c      |    1 +
- arch/arm/mach-pxa/tosa-bt.c     |    2 --
- arch/arm/mach-pxa/tosa.c        |    6 ++++++
- drivers/pcmcia/pxa2xx_colibri.c |    3 +++
- 4 files changed, 10 insertions(+), 2 deletions(-)
+Best regards,
+Alexey
