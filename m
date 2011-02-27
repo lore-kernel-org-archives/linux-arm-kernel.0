@@ -1,11 +1,39 @@
 From: linux@prisktech.co.nz (Linux Mailing List Email Account)
-Date: Sun, 27 Feb 2011 05:59:57 -0000
-Subject: PATCH [1/1] Clock support for VT8500/WM8505
-Message-ID: <76F764B079F92A4E843589C893D0A0228D36@SERVER.prisktech.co.nz>
+Date: Sun, 27 Feb 2011 06:28:30 -0000
+Subject: PATCH [1/1] V2 - Clock Support for VT8500/WM8505
+Message-ID: <76F764B079F92A4E843589C893D0A0228D57@SERVER.prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tony Prisk (linux at prisktech.co.nz)
+Patch to provide clock support on VT8500-/WM8505- based SoC.
+V2:  Included missing mach/clkdev.h
+     Fix errors in clocks-vt8500.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5e34579..0593323 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -878,6 +878,8 @@ config ARCH_VT8500
+    select GENERIC_CLOCKEVENTS
+    select ARCH_REQUIRE_GPIOLIB
+    select HAVE_PWM
++    select CLKDEV_LOOKUP
++    select HAVE_CLK
+    help
+      Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
+endchoice
+diff --git a/arch/arm/mach-vt8500/Makefile b/arch/arm/mach-vt8500/Makefile
+index 81aedb7..c0ae083 100644
+--- a/arch/arm/mach-vt8500/Makefile
++++ b/arch/arm/mach-vt8500/Makefile
+@@ -1,7 +1,7 @@
+-obj-y += devices.o gpio.o irq.o timer.o
++obj-y += clock.o devices.o gpio.o irq.o timer.o
+-obj-$(CONFIG_VTWM_VERSION_VT8500) += devices-vt8500.o
+-obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o
++obj-$(CONFIG_VTWM_VERSION_VT8500) += devices-vt8500.o clocks-vt8500.o
++obj-$(CONFIG_VTWM_VERSION_WM8505) += devices-wm8505.o clocks-wm8505.o
+ obj-$(CONFIG_MACH_BV07) += bv07.o
+obj-$(CONFIG_MACH_WM8505_7IN_NETBOOK) += wm8505_7in.o
 diff --git a/arch/arm/mach-vt8500/clock.c b/arch/arm/mach-vt8500/clock.c
 new file mode 100644
 index 0000000..9ce3a74
@@ -240,7 +268,7 @@ index 0000000..b5a07de
 +
 +#define DEFINE_CKPG(_name, _parent, _delay, _ops, _reg)   \
 +struct clk clk_##_name = {                     \
-+    .name = #_name,                 \
++    .name = #_name,                  \
 +    .parent = _parent,                   \
 +    .ops = _ops,                         \
 +    .rate = 0,                       \
@@ -320,10 +348,10 @@ index 0000000..b5a07de
 +#endif
 diff --git a/arch/arm/mach-vt8500/clocks-vt8500.c b/arch/arm/mach-vt8500/clocks-vt8500.c
 new file mode 100644
-index 0000000..5081cbf
+index 0000000..06740f5
 --- /dev/null
 +++ b/arch/arm/mach-vt8500/clocks-vt8500.c
-@@ -0,0 +1,605 @@
+@@ -0,0 +1,602 @@
 +/*
 + *  arch/arm/mach-vt8500/clocks-vt8500.c
 + *
@@ -790,12 +818,8 @@ index 0000000..5081cbf
 +               CLK_EN_LOW, 12);
 +DEFINE_CKPGEN(spi1, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI1_DIVISOR,         \
 +               CLK_EN_LOW, 13);
-+DEFINE_CKPGEN(spi2, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI2_DIVISOR,         \
-+               CLK_EN_LOW, x);
-+DEFINE_CKPGEN(pwm, &clk_pll_b, 0, &clkops_stdmask, CLK_PWM_DIVISOR,     \
-+               CLK_EN_LOW, 14);
-+DEFINE_CKPGEN(dsp, &clk_pll_b, 0, &clkops_stdmask, CLK_DSP_DIVISOR,     \
-+               CLK_EN_HIGH, x);
++DEFINE_CKPG(spi2, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI2_DIVISOR);
++DEFINE_CKPG(dsp, &clk_pll_b, 0, &clkops_stdmask, CLK_DSP_DIVISOR);
 +DEFINE_CKPGEN(lcd, &clk_pll_b, 0, &clkops_stdmask, CLK_LCD_DIVISOR,     \
 +               CLK_EN_HIGH, 10);
 +DEFINE_CKPGEN(lcd_high, &clk_pll_b, 0, &clkops_stdmask, CLK_LCD_DIVISOR_HIGH,\
@@ -803,9 +827,9 @@ index 0000000..5081cbf
 +DEFINE_CKPGEN(pcm, &clk_pll_b, 0, &clkops_stdmask, CLK_PCM_DIVISOR,     \
 +               CLK_EN_LOW, 16);
 +DEFINE_CKPGEN(pwm1, &clk_pll_b, 0, &clkops_stdmask, CLK_PWM1_DIVISOR,         \
-+               CLK_EN_HIGH, x);
++               CLK_EN_LOW, 14);
 +DEFINE_CKPGEN(pwm2, &clk_pll_b, 0, &clkops_stdmask, CLK_PWM2_DIVISOR,         \
-+               CLK_EN_HIGH, x);
++               CLK_EN_LOW, 14);
 +
 +DEFINE_CKPG(pll_c, &clk_ref, 0, &clkops_pll, CLK_PLLC_MULTIPLIER);
 +DEFINE_CKPGEN(ddr, &clk_pll_c, 0, &clkops_ddr, CLK_DDR_DIVISOR,               \
@@ -906,7 +930,8 @@ index 0000000..5081cbf
 +    INIT_CLKREG(&clk_spi0,          NULL, "spi0"),
 +    INIT_CLKREG(&clk_spi1,          NULL, "spi1"),
 +    INIT_CLKREG(&clk_spi2,          NULL, "spi2"),
-+    INIT_CLKREG(&clk_pwm,      NULL, "pwm"),
++    INIT_CLKREG(&clk_pwm1,          NULL, "pwm1"),
++    INIT_CLKREG(&clk_pwm2,          NULL, "pwm2"),
 +    INIT_CLKREG(&clk_dsp,      NULL, "dsp"),
 +    INIT_CLKREG(&clk_lcd,      NULL, "lcd"),
 +    INIT_CLKREG(&clk_lcd_high, NULL, "lcd-high"),
@@ -1057,7 +1082,7 @@ index 0000000..4ab0cb3
 +          writel(arm_div, clk_pmc_base + CLK_ARM_DIVISOR);
 +    } else {
 +          /*
-+             PLL, ARM, AHB
++            PLL, ARM, AHB
 +          */
 +          wmt_pm_wait_update();
 +          writel(plla_mul, clk_pmc_base + CLK_PLLA_MULTIPLIER);
@@ -1409,7 +1434,7 @@ index 0000000..4ab0cb3
 +DEFINE_CKPGEN(sfm, &clk_pll_b, 0, &clkops_stdmask, CLK_SFM_DIVISOR,     \
 +               CLK_EN_HIGH, 23);
 +DEFINE_CKPG(genet, &clk_pll_b, 0, &clkops_stdmask, CLK_GENET_DIVISOR);
-+DEFINE_CKPGEN(nor, &clk_pll_b, 0, &clkops_stdmask, CLK_NOR_DIVISOR,    \
++DEFINE_CKPGEN(nor, &clk_pll_b, 0, &clkops_stdmask, CLK_NOR_DIVISOR,     \
 +               CLK_EN_HIGH, 3);
 +DEFINE_CKPGEN(spi0, &clk_pll_b, 0, &clkops_stdmask, CLK_SPI0_DIVISOR,         \
 +               CLK_EN_LOW, 12);
@@ -1563,4 +1588,4 @@ index 0000000..4ab0cb3
 
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110227/e95301ee/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110227/6ff72f6c/attachment-0001.html>
