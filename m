@@ -1,84 +1,34 @@
-From: marc@cpdesign.com.au (Marc Reilly)
-Date: Sun, 27 Feb 2011 16:18:17 +1100
-Subject: [PATCH 1/2] ARM: imx35: fix ATA_DATA3 pad control address
-In-Reply-To: <1298767313-16351-2-git-send-email-desrt@desrt.ca>
-References: <1298767313-16351-1-git-send-email-desrt@desrt.ca>
-	<1298767313-16351-2-git-send-email-desrt@desrt.ca>
-Message-ID: <201102271618.17300.marc@cpdesign.com.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 27 Feb 2011 11:10:33 +0000
+Subject: [PATCH 1/4] msm: scm: Mark inline asm as volatile
+In-Reply-To: <8yapqqe3bs3.fsf@huya.qualcomm.com>
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<1298573085-23217-2-git-send-email-sboyd@codeaurora.org>
+	<1298635017.958.0.camel@e102144-lin.cambridge.arm.com>
+	<8yapqqe3bs3.fsf@huya.qualcomm.com>
+Message-ID: <1298805034.4626.4.camel@jazzbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+On Sat, 2011-02-26 at 18:12 +0000, David Brown wrote:
+> On Fri, Feb 25 2011, Will Deacon wrote:
 
-Good find!
-
-> According to the "i.MX35 (MCIMX35) Multimedia Applications Processor
-> Reference Manual" the correct address for the pad control register
-> IOMUXC_SW_PAD_CTL_PAD_ATA_DATA3 is 0x06ec, not 0x6e8.
+> > These asm blocks all have sensible looking output constraints. Why
+> > do they need to be marked volatile?
 > 
-> Signed-off-by: Ryan Lortie <desrt@desrt.ca>
+> Without the volatile, the compiler is free to assume the only side
+> effects of the asm are to modify the output registers.  The volatile is
+> needed to indicate to the compiler that the asm has other side effects.
 
-Acked-by: Marc Reilly <marc@cpdesign.com.au>
+As far as I know, volatile asm does two things:
 
-Cheers
-Marc
+(1) It stops the compiler from reordering the asm block with respect to
+other volatile statements.
 
-> ---
->  arch/arm/plat-mxc/include/mach/iomux-mx35.h |   14 +++++++-------
->  1 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx35.h
-> b/arch/arm/plat-mxc/include/mach/iomux-mx35.h index 2a24bae..3117c18
-> 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx35.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx35.h
-> @@ -989,13 +989,13 @@
->  #define MX35_PAD_ATA_DATA2__IPU_DIAGB_9				IOMUX_PAD(0x6e8, 
-0x284, 6, 0x0,
->   0, NO_PAD_CTRL) #define
-> MX35_PAD_ATA_DATA2__ARM11P_TOP_TRACE_28			IOMUX_PAD(0x6e8, 0x284, 7, 
-0x0, 
->  0, NO_PAD_CTRL)
-> 
-> -#define MX35_PAD_ATA_DATA3__ATA_DATA_3				IOMUX_PAD(0x6e8, 0x288, 
-0, 0x0, 
->  0, NO_PAD_CTRL) -#define
-> MX35_PAD_ATA_DATA3__ESDHC3_CLK				IOMUX_PAD(0x6e8, 0x288, 1, 
-0x814, 1,
-> NO_PAD_CTRL) -#define
-> MX35_PAD_ATA_DATA3__USB_TOP_USBOTG_DATA_5		IOMUX_PAD(0x6e8, 0x288, 2,
-> 0x9b8, 1, NO_PAD_CTRL) -#define
-> MX35_PAD_ATA_DATA3__CSPI2_SCLK				IOMUX_PAD(0x6e8, 0x288, 4, 
-0x7e0, 2,
-> NO_PAD_CTRL) -#define MX35_PAD_ATA_DATA3__GPIO2_16				
-IOMUX_PAD(0x6e8,
-> 0x288, 5, 0x884, 1, NO_PAD_CTRL) -#define
-> MX35_PAD_ATA_DATA3__IPU_DIAGB_10			IOMUX_PAD(0x6e8, 0x288, 6, 0x0,   0,
-> NO_PAD_CTRL) -#define
-> MX35_PAD_ATA_DATA3__ARM11P_TOP_TRACE_29			IOMUX_PAD(0x6e8, 0x288, 7, 
-0x0, 
->  0, NO_PAD_CTRL) +#define
-> MX35_PAD_ATA_DATA3__ATA_DATA_3				IOMUX_PAD(0x6ec, 0x288, 0, 0x0,   
-0,
-> NO_PAD_CTRL) +#define MX35_PAD_ATA_DATA3__ESDHC3_CLK				
-IOMUX_PAD(0x6ec,
-> 0x288, 1, 0x814, 1, NO_PAD_CTRL) +#define
-> MX35_PAD_ATA_DATA3__USB_TOP_USBOTG_DATA_5		IOMUX_PAD(0x6ec, 0x288, 2,
-> 0x9b8, 1, NO_PAD_CTRL) +#define
-> MX35_PAD_ATA_DATA3__CSPI2_SCLK				IOMUX_PAD(0x6ec, 0x288, 4, 
-0x7e0, 2,
-> NO_PAD_CTRL) +#define MX35_PAD_ATA_DATA3__GPIO2_16				
-IOMUX_PAD(0x6ec,
-> 0x288, 5, 0x884, 1, NO_PAD_CTRL) +#define
-> MX35_PAD_ATA_DATA3__IPU_DIAGB_10			IOMUX_PAD(0x6ec, 0x288, 6, 0x0,   0,
-> NO_PAD_CTRL) +#define
-> MX35_PAD_ATA_DATA3__ARM11P_TOP_TRACE_29			IOMUX_PAD(0x6ec, 0x288, 7, 
-0x0, 
->  0, NO_PAD_CTRL)
-> 
->  #define MX35_PAD_ATA_DATA4__ATA_DATA_4				IOMUX_PAD(0x6f0, 0x28c, 
-0, 0x0, 
->  0, NO_PAD_CTRL) #define
-> MX35_PAD_ATA_DATA4__ESDHC3_CMD				IOMUX_PAD(0x6f0, 0x28c, 1, 
-0x818, 1,
-> NO_PAD_CTRL)
+(2) It prevents the compiler from optimising the block away when
+dataflow analysis indicates it's not required.
+
+If side-effects need to be indicated, won't a memory clobber do the
+trick?
+
+Will
