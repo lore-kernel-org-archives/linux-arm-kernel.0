@@ -1,67 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 27 Feb 2011 12:00:21 +0000
-Subject: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Way operation
-	can cause data corruption
-In-Reply-To: <1298032525-21115-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1298032525-21115-1-git-send-email-santosh.shilimkar@ti.com>
-	<1298032525-21115-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110227120021.GA15314@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 27 Feb 2011 21:33:46 +0800
+Subject: [PATCH] colibri : don't register pxa2xx-pcmcia nodes on
+	non-colibri platforms
+In-Reply-To: <1298417428-25064-1-git-send-email-dbaryshkov@gmail.com>
+References: <1298417428-25064-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <AANLkTikefHTH0nDtj_=bDnt_HgJEep3w374zUyDevx6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 06:05:24PM +0530, Santosh Shilimkar wrote:
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 170c9bb..a8caee4 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -67,18 +67,22 @@ static inline void l2x0_inv_line(unsigned long addr)
->  	writel_relaxed(addr, base + L2X0_INV_LINE_PA);
->  }
->  
-> -#ifdef CONFIG_PL310_ERRATA_588369
-> +#if defined(CONFIG_PL310_ERRATA_588369) || defined(CONFIG_PL310_ERRATA_727915)
->  static void debug_writel(unsigned long val)
->  {
-> -	extern void omap_smc1(u32 fn, u32 arg);
-> -
-> -	/*
-> -	 * Texas Instrument secure monitor api to modify the
-> -	 * PL310 Debug Control Register.
-> -	 */
-> -	omap_smc1(0x100, val);
-> +	if (outer_cache.set_debug)
-> +		outer_cache.set_debug(val);
-> +	else
-> +		writel(val, l2x0_base + L2X0_DEBUG_CTRL);
-> +}
+On Wed, Feb 23, 2011 at 7:30 AM, Dmitry Eremin-Solenikov
+<dbaryshkov@gmail.com> wrote:
+> PXA supports multi-machine kernels since long ago. However a kernel
+> compiled with support for colibri and any other PXA machine and with
+> PCMCIA enabled will barf at runtime about duplicate registration of
+> pxa2xx-pcmcia device. Fix that.
+>
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-I think changing this to:
+Applied to 'fix'.
 
-#define debug_writel(val)	outer_cache.set_debug(val)
-
-static void l2x0_set_debug(unsigned long val)
-{
-	writel(val, l2x0_base + L2X0_DEBUG_CTRL);
-}
-
-> +#else
-> +/* Optimised out for non-errata case */
-> +static inline void debug_writel(unsigned long val)
-> +{
->  }
-
-#define l2x0_set_debug	NULL
-
-> +#endif
-
-> @@ -329,6 +330,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
->  	outer_cache.flush_all = l2x0_flush_all;
->  	outer_cache.inv_all = l2x0_inv_all;
->  	outer_cache.disable = l2x0_disable;
-> +	outer_cache.set_debug = NULL;
-
-	outer_cache.set_debug = l2x0_set_debug;
-
-may result in more efficient code as we're avoiding having to test the
-value of outer_cache.set_debug each time we want to call it and branch
-appropriately.
+> ---
+> ?drivers/pcmcia/pxa2xx_colibri.c | ? ?3 +++
+> ?1 files changed, 3 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/pcmcia/pxa2xx_colibri.c b/drivers/pcmcia/pxa2xx_colibri.c
+> index c3f7219..a520395 100644
+> --- a/drivers/pcmcia/pxa2xx_colibri.c
+> +++ b/drivers/pcmcia/pxa2xx_colibri.c
+> @@ -181,6 +181,9 @@ static int __init colibri_pcmcia_init(void)
+> ?{
+> ? ? ? ?int ret;
+>
+> + ? ? ? if (!machine_is_colibri() && !machine_is_colibri320())
+> + ? ? ? ? ? ? ? return -ENODEV;
+> +
+> ? ? ? ?colibri_pcmcia_device = platform_device_alloc("pxa2xx-pcmcia", -1);
+> ? ? ? ?if (!colibri_pcmcia_device)
+> ? ? ? ? ? ? ? ?return -ENOMEM;
+> --
+> 1.7.2.3
+>
+>
