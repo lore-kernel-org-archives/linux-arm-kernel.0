@@ -1,53 +1,26 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 27 Feb 2011 21:36:09 +0800
-Subject: [PATCH 1/3] pxa: Enable pxa-pcm-audio on pxa210/pxa25x platform
-In-Reply-To: <AANLkTimD28SYLA=NZyEO8SS==wrZ2mL+LG92e6FGHtom@mail.gmail.com>
-References: <1298417351-24727-1-git-send-email-dbaryshkov@gmail.com>
-	<AANLkTimD28SYLA=NZyEO8SS==wrZ2mL+LG92e6FGHtom@mail.gmail.com>
-Message-ID: <AANLkTinbNVW9D4RkgEaEHkRorLAk8KzJWs3Ghkxze_-7@mail.gmail.com>
+Date: Sun, 27 Feb 2011 22:30:19 +0800
+Subject: [GIT PULL] pxa: fixes for v2.6.38-rc6
+Message-ID: <AANLkTinO7_ojbwV0t5Mc_osKuiZq6+BNk--t669c8S6Y@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 25, 2011 at 6:47 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> Eric, will it be possible to get at least this patch in the kernel?
->
-> Otherwise all ASoC-based audio on pxa25x isn't working.
+The following changes since commit f5412be599602124d2bdd49947b231dd77c0bf99:
 
-Hrm, this deserves as a fix. Applied.
+  Linux 2.6.38-rc6 (2011-02-21 17:25:52 -0800)
 
->
-> On 2/23/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
->> pxa25x platforms were left out of major ASoC Update patch.
->> Since f0fba2ad1b a registration of pxa-pcm-audio device is required for
->> ASoC to function on pxa platforms. Register one also for pxa210/pxa25x.
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> Cc: Eric Miao <eric.y.miao@gmail.com>
->> ---
->> ?arch/arm/mach-pxa/pxa25x.c | ? ?1 +
->> ?1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
->> index fbc5b77..b166b1d 100644
->> --- a/arch/arm/mach-pxa/pxa25x.c
->> +++ b/arch/arm/mach-pxa/pxa25x.c
->> @@ -347,6 +347,7 @@ static struct platform_device *pxa25x_devices[]
->> __initdata = {
->> ? ? ? &pxa25x_device_assp,
->> ? ? ? &pxa25x_device_pwm0,
->> ? ? ? &pxa25x_device_pwm1,
->> + ? ? &pxa_device_asoc_platform,
->> ?};
->>
->> ?static struct sys_device pxa25x_sysdev[] = {
->> --
->> 1.7.2.3
->>
->>
->
->
-> --
-> With best wishes
-> Dmitry
->
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/ycmiao/pxa-linux-2.6.git fix
+
+Dmitry Eremin-Solenikov (4):
+      ARM: pxa/tosa: drop setting LED trigger name, as it's unsupported now
+      ARM: pxa/colibri: don't register pxa2xx-pcmcia nodes on
+non-colibri platforms
+      ARM: pxa: enable pxa-pcm-audio on pxa210/pxa25x platform
+      ARM: pxa/tosa: register wm9712 codec device
+
+ arch/arm/mach-pxa/pxa25x.c      |    1 +
+ arch/arm/mach-pxa/tosa-bt.c     |    2 --
+ arch/arm/mach-pxa/tosa.c        |    6 ++++++
+ drivers/pcmcia/pxa2xx_colibri.c |    3 +++
+ 4 files changed, 10 insertions(+), 2 deletions(-)
