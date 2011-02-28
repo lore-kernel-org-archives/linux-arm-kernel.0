@@ -1,24 +1,44 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 28 Feb 2011 09:43:22 -0300
-Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
-In-Reply-To: <1298892315-23386-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1298892315-23386-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <AANLkTin1U=B3xnp0UGK_2iHK2k=o4Tda=6NzyoLFgUAv@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 28 Feb 2011 18:17:07 +0530
+Subject: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Way operationcan
+	cause data corruption
+In-Reply-To: <20110228101351.GA30781@n2100.arm.linux.org.uk>
+References: <1298032525-21115-1-git-send-email-santosh.shilimkar@ti.com>
+	<1298032525-21115-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110227120021.GA15314@n2100.arm.linux.org.uk>
+	<20110228101351.GA30781@n2100.arm.linux.org.uk>
+Message-ID: <69dd173e3c7b4d02ef50ceaa19b2343a@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Monday, February 28, 2011 3:44 PM
+> To: Santosh Shilimkar
+> Cc: tony at atomide.com; catalin.marinas at arm.com; linux-
+> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Way
+> operationcan cause data corruption
+>
+> On Sun, Feb 27, 2011 at 12:00:21PM +0000, Russell King - ARM Linux
+> wrote:
+> > > +#else
+> > > +/* Optimised out for non-errata case */
+> > > +static inline void debug_writel(unsigned long val)
+> > > +{
+> > >  }
+> >
+> > #define l2x0_set_debug	NULL
+> >
+> > > +#endif
+>
+> I notice you got rid of the inline function.  Have you tried
+> building this without the errata enabled?
 
-On Mon, Feb 28, 2011 at 8:25 AM, Richard Zhu
-<Hong-Xing.Zhu@freescale.com> wrote:
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> ---
-> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-mx5/board-mx53_loco.c | ? ?2 ++
-> ?2 files changed, 3 insertions(+), 0 deletions(-)
+I accidently dropped the inline function while
+incorporating the comment from you. :(
 
-I think this patch should be the last one of the series.
+Fixed it. Updated version # 6770/1
 
 Regards,
-
-Fabio Estevam
+Santosh
