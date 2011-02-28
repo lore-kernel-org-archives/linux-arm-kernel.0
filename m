@@ -1,48 +1,70 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 28 Feb 2011 11:19:49 +0000
-Subject: [PATCH V4 0/4] ARM: Basic Xilinx Support
-In-Reply-To: <0d410c20-32b4-46d6-9639-249a2816cbe9@VA3EHSMHS005.ehs.local>
-References: <0d410c20-32b4-46d6-9639-249a2816cbe9@VA3EHSMHS005.ehs.local>
-Message-ID: <20110228111949.GC2754@pulham.picochip.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 28 Feb 2011 20:20:29 +0900
+Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
+In-Reply-To: <002801cbd721$42e4bad0$c8ae3070$%kim@samsung.com>
+References: <4D676BB8.9040803@samsung.com>
+	<002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
+	<4D6B5949.8020606@samsung.com>
+	<002801cbd721$42e4bad0$c8ae3070$%kim@samsung.com>
+Message-ID: <003701cbd739$85fc8e20$91f5aa60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 11:14:37AM -0700, John Linn wrote:
+Kukjin Kim wrote:
 > 
-> V4
+> Minkyu Kang wrote:
+> >
+> > Dear Kukjin Kim,
+> >
+> > 2011-02-28 ?? 4:42, Kukjin Kim ? ?:
+> > > Minkyu Kang wrote:
+> > >>
+> > >> This patch adds Samsung NURI board support.
+> > >>
+> > >> Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
+> > >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > >> ---
+> > >> This patch is base on next-exynos4 branch at kgene tree.
+> > >>
+> > >>  arch/arm/configs/exynos4_defconfig |    1 +
+> > >>  arch/arm/mach-exynos4/Kconfig      |   15 +++
+> > >>  arch/arm/mach-exynos4/Makefile     |    1 +
+> > >>  arch/arm/mach-exynos4/mach-nuri.c  |  233
+> > >> ++++++++++++++++++++++++++++++++++++
+> > >>  4 files changed, 250 insertions(+), 0 deletions(-)
+> > >>  create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
+> > >>
+> > >
+> > >> +enum fixed_regulator_id {
+> > >> +	FIXED_REG_ID_MMC = 0,
+> > >
+> > > 	FIXED_REG_ID_MMC,
+> > >
+> > > (snip)
+> > >
+> > >> +static struct platform_device emmc_fixed_voltage = {
+> > >> +	.name			= "reg-fixed-voltage",
+> > >> +	.id			= FIXED_REG_ID_MMC,
+> > >
+> > > Is there any reason to use FIXED_REG_ID_MMC instead directly id 0?
+> > >
+> >
+> > I'm going to add more IDs of fixed regulator that are LCD and Backlight,
+> and
+> > so on.
+> > So use enum values for avoid the hard coding.
+> >
 > 
-> I incorporated more feedback from Jamie Iles. It was 
-> primariy cleanup with the only significant change
-> being a move to using raw_read/write in the uncompressor
-> uart code.
-> 
-> The other changes were minor updates so that the patch
-> set applies to linux-next.
-> 
-> This patch set is now tested against the linux-next branch
-> from pub/scm/linux/kernel/git/sfr/linux-next.git.
+> Ok, applied this after removing "ifdef WATCHDOG".
 
-Hi John,
+Oops, NURI board is not registered yet :(
+So can't merge this before updating it now.
+Or should drop update defconfig from this...
 
-I've just tried a quick dummy build of this series (with a fudge in 
-mach-types to get it building) and I see a couple of minor sparse 
-warnings:
+Thanks.
 
-arch/arm/mach-xilinx/common.c:54:13: warning: symbol 
-'xilinx_system_init' was not declared. Should it be static?
-arch/arm/mach-xilinx/common.c:68:13: warning: symbol 'xilinx_irq_init' 
-was not declared. Should it be static?
-arch/arm/mach-xilinx/common.c:110:13: warning: symbol 'xilinx_map_io' 
-was not declared. Should it be static?
-arch/arm/mach-xilinx/timer.c:290:18: warning: symbol 'xttcpss_sys_timer' 
-was not declared. Should it be static?
-
-I think all of these can be resolved by including "common.h" in both 
-timer.c and common.c.
-
-I've put a couple of nitpicks for the individual patches, sorry I didn't 
-spot them before.  Otherwise,
-
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-
-Jamie
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
