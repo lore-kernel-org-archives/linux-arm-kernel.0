@@ -1,44 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Feb 2011 11:20:55 +0000
-Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
-In-Reply-To: <42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
-References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-2-git-send-email-john.linn@xilinx.com>
-	<1298052881-14591-3-git-send-email-john.linn@xilinx.com>
-	<42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
-Message-ID: <20110228112055.GC29843@n2100.arm.linux.org.uk>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Mon, 28 Feb 2011 19:25:11 +0800
+Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
+Message-ID: <1298892315-23386-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 18, 2011 at 11:14:40AM -0700, John Linn wrote:
-> diff --git a/arch/arm/mach-xilinx/include/mach/uncompress.h b/arch/arm/mach-xilinx/include/mach/uncompress.h
-> new file mode 100644
-> index 0000000..ff3754c
-> --- /dev/null
-> +++ b/arch/arm/mach-xilinx/include/mach/uncompress.h
-> @@ -0,0 +1,61 @@
-> +/* arch/arm/mach-xilinx/include/mach/uncompress.h
-> + *
-> + *  Copyright (C) 2011 Xilinx
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __MACH_UNCOMPRESS_H__
-> +#define __MACH_UNCOMPRESS_H__
-> +
-> +#include <mach/xilinx_soc.h>
-> +#include <mach/uart.h>
-> +#include <asm/processor.h>
-> +#include <asm/io.h>
-> +#include <mach/io.h>
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+---
+ arch/arm/mach-mx5/Kconfig           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
 
-You don't need mach/io.h here - it's already included by asm/io.h.
-It's probably also worth trying linux/io.h instead of asm/io.h too.
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index f065a0d..a72c833 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -162,6 +162,7 @@ config MACH_MX53_LOCO
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	help
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 160899e..0a18f8d 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -213,6 +213,8 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_imx2_wdt(0, NULL);
+ 	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
+ 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
++	imx53_add_sdhci_esdhc_imx(0, NULL);
++	imx53_add_sdhci_esdhc_imx(2, NULL);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
+-- 
+1.7.1
