@@ -1,51 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Feb 2011 15:47:45 +0100
-Subject: [patch 2/2] efika mx/sb: enable watchdog
-In-Reply-To: <20110228132646.494426111@rtp-net.org>
-References: <20110228132132.654689676@rtp-net.org>
-	<20110228132646.494426111@rtp-net.org>
-Message-ID: <20110228144745.GL22310@pengutronix.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 28 Feb 2011 15:55:00 +0100
+Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to	omap_display
+In-Reply-To: <20110228140617.GA2176@n2100.arm.linux.org.uk>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+	<1298539643.16119.54.camel@deskari>
+	<1298876015.2096.36.camel@deskari> <4D6B4A1A.9000304@ti.com>
+	<1298877549.2096.47.camel@deskari> <4D6B88BB.5010200@ti.com>
+	<1298895026.9809.27.camel@deskari>
+	<20110228121321.GB30781@n2100.arm.linux.org.uk>
+	<4D6BA558.5050700@ti.com>
+	<20110228140617.GA2176@n2100.arm.linux.org.uk>
+Message-ID: <4D6BB744.1010205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
-
-just one nitpick below ...
-
-On Mon, Feb 28, 2011 at 02:21:34PM +0100, Arnaud Patard wrote:
-> Register watchdog for efika mx and sb systems.
+On 2/28/2011 3:06 PM, Russell King - ARM Linux wrote:
+> On Mon, Feb 28, 2011 at 02:38:32PM +0100, Cousson, Benoit wrote:
+>> On 2/28/2011 1:13 PM, Russell King - ARM Linux wrote:
+>>> On Mon, Feb 28, 2011 at 02:10:26PM +0200, Tomi Valkeinen wrote:
+>>>> On Mon, 2011-02-28 at 05:36 -0600, Cousson, Benoit wrote:
+>>>>> Cannot you use a device hierarchy then to do that?
+>>>>>     omap_dss/core
+>>>>>     omap_dss/dsi
+>>>>>     omap_dss/venc
+>>>>>
+>>>>> This is moreover the way the HW is done.
+>>>>
+>>>> Hmm, how would that work? The devices are platform devices, and they
+>>>> have a unique global name, which is used to match the driver for the
+>>>> device.
+>>>
+>>> And not forgetting that '/' is not permitted in device or driver names.
+>>
+>> I was not really considering naming the device with a '/'. The idea is
+>> that the devices will not longer be flat platform devices but something
+>> like dss devices that will have have a omap_dss parent.
+>>
+>> I do not know if that makes sense to store some kind of hierarchy in the
+>> device model, but encoding the hierarchy in the name like it is proposed
+>> looks like a hack to me.
 > 
-> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> Try:
 > 
-> Index: linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/mx51_efika.c	2011-02-27 23:13:37.000000000 +0100
-> +++ linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c	2011-02-27 23:20:38.000000000 +0100
-> @@ -611,6 +611,7 @@
->  					ARRAY_SIZE(mx51efika_pads));
->  	imx51_add_imx_uart(0, &uart_pdata);
->  	mx51_efika_usb();
-> +	imx51_add_imx2_wdt(0, NULL);
->  	imx51_add_sdhci_esdhc_imx(0, NULL);
->  
->  	/* FIXME: comes from original code. check this. */
-> Index: linux-2.6-submit/arch/arm/mach-mx5/Kconfig
-> ===================================================================
-> --- linux-2.6-submit.orig/arch/arm/mach-mx5/Kconfig	2011-02-27 23:13:42.000000000 +0100
-> +++ linux-2.6-submit/arch/arm/mach-mx5/Kconfig	2011-02-27 23:20:38.000000000 +0100
-> @@ -117,6 +117,7 @@
->  	bool
->  	select SOC_IMX51
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
->  	select IMX_HAVE_PLATFORM_SPI_IMX
-These IMX_HAVE_PLATFORM entries are sorted alphabetically and 2 sorts
-before _, so IMX_HAVE_PLATFORM_IMX2_WDT should be the first entry here.
+> tree -d /sys/devices/pci0000\:00
+> 
+> on your PC, taking special note of how pci-to-pci bridges are handled.
 
-Best regards
-Uwe
+Here it is, but I'm not sure to understand how it is really done :-(
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+/sys/devices/pci0000:00
+??? 0000:00:00.0
+?   ??? firmware_node -> ../../LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/PNP0C02:00
+?   ??? power
+?   ??? subsystem -> ../../../bus/pci
+??? 0000:00:02.0
+?   ??? 0000:00:02.0:pcie01
+?   ?   ??? power
+?   ?   ??? subsystem -> ../../../../bus/pci_express
+?   ??? 0000:00:02.0:pcie02
+?   ?   ??? driver -> ../../../../bus/pci_express/drivers/aer
+?   ?   ??? power
+?   ?   ??? subsystem -> ../../../../bus/pci_express
+?   ??? 0000:06:00.0
+?   ?   ??? 0000:06:00.0:pcie12
+?   ?   ?   ??? power
+?   ?   ?   ??? subsystem -> ../../../../../bus/pci_express
+?   ?   ??? 0000:07:00.0
+?   ?   ?   ??? 0000:07:00.0:pcie22
+?   ?   ?   ?   ??? power
+?   ?   ?   ?   ??? subsystem -> ../../../../../../bus/pci_express
+?   ?   ?   ??? 0000:08:00.0
+?   ?   ?   ?   ??? 0000:09:00.0
+?   ?   ?   ?   ?   ??? driver -> ../../../../../../../bus/pci/drivers/bnx2
+?   ?   ?   ?   ?   ??? net
+?   ?   ?   ?   ?   ?   ??? eth1
+?   ?   ?   ?   ?   ?       ??? device -> ../../../0000:09:00.0
+?   ?   ?   ?   ?   ?       ??? power
+?   ?   ?   ?   ?   ?       ??? statistics
+?   ?   ?   ?   ?   ?       ??? subsystem -> ../../../../../../../../../class/net
+?   ?   ?   ?   ?   ??? power
+?   ?   ?   ?   ?   ??? subsystem -> ../../../../../../../bus/pci
+?   ?   ?   ?   ??? pci_bus
+?   ?   ?   ?   ?   ??? 0000:09
+?   ?   ?   ?   ?       ??? device -> ../../../0000:08:00.0
+?   ?   ?   ?   ?       ??? power
+?   ?   ?   ?   ?       ??? subsystem -> ../../../../../../../../class/pci_bus
+?   ?   ?   ?   ??? power
+?   ?   ?   ?   ??? subsystem -> ../../../../../../bus/pci
+?   ?   ?   ??? driver -> ../../../../../bus/pci/drivers/pcieport
+?   ?   ?   ??? pci_bus
+?   ?   ?   ?   ??? 0000:08
+?   ?   ?   ?       ??? device -> ../../../0000:07:00.0
+?   ?   ?   ?       ??? power
+?   ?   ?   ?       ??? subsystem -> ../../../../../../../class/pci_bus
+?   ?   ?   ??? power
+?   ?   ?   ??? subsystem -> ../../../../../bus/pci
+...
