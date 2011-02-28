@@ -1,28 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Feb 2011 12:13:21 +0000
-Subject: [PATCH v10 05/18] OMAP2,3 DSS2 Change driver name to omap_display
-In-Reply-To: <1298895026.9809.27.camel@deskari>
-References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
-	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
-	<1298539643.16119.54.camel@deskari>
-	<1298876015.2096.36.camel@deskari> <4D6B4A1A.9000304@ti.com>
-	<1298877549.2096.47.camel@deskari> <4D6B88BB.5010200@ti.com>
-	<1298895026.9809.27.camel@deskari>
-Message-ID: <20110228121321.GB30781@n2100.arm.linux.org.uk>
+From: tsoni@codeaurora.org (Trilok Soni)
+Date: Mon, 28 Feb 2011 17:43:37 +0530
+Subject: [PATCH 2/4] msm: iommu: Rework clock logic and add IOMMU bus
+	clock control
+In-Reply-To: <4D6828B5.6050608@codeaurora.org>
+References: <1298599242-21971-1-git-send-email-stepanm@codeaurora.org>
+	<1298599242-21971-2-git-send-email-stepanm@codeaurora.org>
+	<4D675A42.9090803@codeaurora.org> <4D6828B5.6050608@codeaurora.org>
+Message-ID: <4D6B9171.60600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 02:10:26PM +0200, Tomi Valkeinen wrote:
-> On Mon, 2011-02-28 at 05:36 -0600, Cousson, Benoit wrote:
-> > Cannot you use a device hierarchy then to do that?
-> >   omap_dss/core
-> >   omap_dss/dsi
-> >   omap_dss/venc
-> > 
-> > This is moreover the way the HW is done.
-> 
-> Hmm, how would that work? The devices are platform devices, and they
-> have a unique global name, which is used to match the driver for the
-> device.
+Hi Steve,
 
-And not forgetting that '/' is not permitted in device or driver names.
+On 2/26/2011 3:39 AM, Stepan Moskovchenko wrote:
+> On 2/24/2011 11:29 PM, Trilok Soni wrote:
+>> Hi Steve,
+> 
+> Hello
+> 
+>>> @@ -130,117 +131,134 @@ static int msm_iommu_probe(struct platform_device *pdev)
+>>>   {
+>>>       struct resource *r, *r2;
+>>>       struct clk *iommu_clk;
+>>> +    struct clk *iommu_pclk;
+>>>       struct msm_iommu_drvdata *drvdata;
+>>>       struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data;
+>> const please.
+>>
+> 
+> I am not clear on what you mean. Please be more specific here.
+
+I mean
+
+const struct msm_iommu_dev *iommu_dev = pdev->dev.platform_data; 
+
+Now I see that this change is not part of this patch so you can ignore my comment.
+
+> 
+>>> +    iommu_pclk = clk_get(NULL, "smmu_pclk");
+>>> +    if (IS_ERR(iommu_pclk)) {
+>>> +        ret = -ENODEV;
+>>> +        goto fail;
+>>> +    }
+>> I am not a big fan of this when you have the "device" around. You should just do
+>>
+>> iommu_pclk = clk_get(&pdev->dev, NULL);
+>>
+>> ...error logic...
+>>
+>> iommu_clk = clk_get(&pdev->dev, "iommu_clk");
+>>
+>> ...error logic...
+>>
+> 
+> The pclk is a "special" bus clock and does not have a specific device instance associated with it, so passing a device would not be appropriate in this case. I pass the device for other clocks that are indeed associated with devices, but this is not one of them. I suppose we could create 11 or 12 aliases for the pclk and associate it with all the IOMMU devices, but I would prefer to avoid doing that as I believe the current approach is cleaner.
+
+ok.
+
+> 
+>>> -            ret = -EBUSY;
+>>> -            goto fail;
+>>> -        }
+>>> +    len = r->end - r->start + 1;
+>>
+>> resource_size please.
+>>
+> 
+> Ok
+
+Thanks.
+
+---Trilok Soni
+
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
