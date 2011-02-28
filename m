@@ -1,54 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 27 Feb 2011 19:31:47 -0700 (MST)
-Subject: [PATCH 0/8] OMAP2+: hwmod/clockevent: allow late-init of
-	individual hwmods
-In-Reply-To: <4D651998.3040002@ti.com>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<4D651998.3040002@ti.com>
-Message-ID: <alpine.DEB.2.00.1102271928550.505@utopia.booyaka.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 28 Feb 2011 09:15:52 +0530
+Subject: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Way operationcan
+	cause data corruption
+In-Reply-To: <20110227120021.GA15314@n2100.arm.linux.org.uk>
+References: <1298032525-21115-1-git-send-email-santosh.shilimkar@ti.com>
+	<1298032525-21115-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110227120021.GA15314@n2100.arm.linux.org.uk>
+Message-ID: <680a3e4f3107f4fcb10f98bd0a589d1c@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Beno?t,
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Sunday, February 27, 2011 5:30 PM
+> To: Santosh Shilimkar
+> Cc: linux-arm-kernel at lists.infradead.org; tony at atomide.com;
+> catalin.marinas at arm.com; linux-omap at vger.kernel.org
+> Subject: Re: [PATCH 1/2] ARM: l2x0: Errata fix for flush by Way
+> operationcan cause data corruption
+>
+> On Fri, Feb 18, 2011 at 06:05:24PM +0530, Santosh Shilimkar wrote:
 
-On Wed, 23 Feb 2011, Cousson, Benoit wrote:
+[...]
 
-> On 2/23/2011 8:11 AM, Paul Walmsley wrote:
-> > This series adds the ability to late-initialize individual
-> > hwmods.  The goal here is for clockevent (and eventually
-> > clocksource) hwmods to be late-initialized individually, and
-> > right before they are needed, in the timer init code.  Then
-> > omap_hwmod_late_init(), which late-inits the rest of the hwmods,
-> > is intended to run as an initcall -- much later in the boot
-> > process.
-> > 
-> > This series includes the OMAP2/3 hwmod data for the GPTIMERs that
-> > Tarun posted earlier.  This data is necessary for this new code
-> > to avoid warnings during boot.
-> > 
-> > Boot-tested on N800, OMAP34xx Beagleboard and OMAP4430ES2 Panda.
-> 
-> I'm testing it on 4430sdp, and I have the following warning:
-> 
-> [    0.000000] omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
-> [    0.000000] ------------[ cut here ]------------
-> [    0.000000] WARNING: at arch/arm/mach-omap2/timer-gp.c:157 omap2_gp_timer_init+0x80/0x190()
-> [    0.000000] timer-gp: omap_dm_timer_set_source() failed
-> [    0.000000] Modules linked in:
-> [    0.000000] [<c0062a6c>] (unwind_backtrace+0x0/0xec) from [<c009422c>] (warn_slowpath_common+0x4c/0x64)
-> [    0.000000] [<c009422c>] (warn_slowpath_common+0x4c/0x64) from [<c00942c4>] (warn_slowpath_fmt+0x2c/0x3c)
-> [    0.000000] [<c00942c4>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0010e30>] (omap2_gp_timer_init+0x80/0x190)
-> [    0.000000] [<c0010e30>] (omap2_gp_timer_init+0x80/0x190) from [<c000c0dc>] (time_init+0x20/0x30)
-> [    0.000000] [<c000c0dc>] (time_init+0x20/0x30) from [<c0008cbc>] (start_kernel+0x1a4/0x30c)
-> [    0.000000] [<c0008cbc>] (start_kernel+0x1a4/0x30c) from [<80008038>] (0x80008038)
-> [    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-> [    0.000000] OMAP clockevent source: GPTIMER1 at 32768 Hz
+>
+> > @@ -329,6 +330,7 @@ void __init l2x0_init(void __iomem *base,
+> __u32 aux_val, __u32 aux_mask)
+> >  	outer_cache.flush_all = l2x0_flush_all;
+> >  	outer_cache.inv_all = l2x0_inv_all;
+> >  	outer_cache.disable = l2x0_disable;
+> > +	outer_cache.set_debug = NULL;
+>
+> 	outer_cache.set_debug = l2x0_set_debug;
+>
+> may result in more efficient code as we're avoiding having to test
+> the value of outer_cache.set_debug each time we want to call it and
+> branch appropriately.
 
-This is due to commit 3b03b58dab847883e6b9a431558c7d8e43fa94c6 ("OMAP4: 
-hwmod data: Prevent timer1 to be reset and idle during init").  Could you 
-please try reverting this and see if the warning disappears?
+Ok. Will do the necessary change and submit it to patch System
 
-Tony, I guess the omap-for-linus branch will probably need to get rebuilt 
-to drop that patch, once this series is merged...
-
-- Paul
+Regards,
+Santosh
