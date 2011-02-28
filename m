@@ -1,28 +1,122 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Feb 2011 10:04:03 +0000
-Subject: [PATCH 6/8] ARM i.MX5: Allow to increase max zone order
-In-Reply-To: <1298887229-7987-7-git-send-email-s.hauer@pengutronix.de>
-References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
-	<1298887229-7987-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110228100403.GA29843@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 28 Feb 2011 19:07:07 +0900
+Subject: [PATCH 1/2] drivers/watchdog/s3c2410_wdt.c: Convert
+	release_resource to release_region/release_mem_region
+In-Reply-To: <1298738079-28893-1-git-send-email-julia@diku.dk>
+References: <1298738079-28893-1-git-send-email-julia@diku.dk>
+Message-ID: <002e01cbd72f$448ac150$cda043f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 11:00:27AM +0100, Sascha Hauer wrote:
-> default setting of 11 allows us to allocate at maximum
-> 2MB chunks of contiguous memory. For resolutions up to
-> 1920x1080 32bpp we need much more memory, so make zone
-> order configurable
+Julia Lawall wrote:
+> 
+> Request_mem_region should be used with release_mem_region, not
+> release_resource.
+> 
+> The semantic match that finds this problem is as follows:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @@
+> expression x,E;
+> @@
+> *x = request_mem_region(...)
+> ... when != release_mem_region(x)
+>     when != x = E
+> * release_resource(x);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <julia@diku.dk>
+> 
+> ---
+>  drivers/watchdog/s3c2410_wdt.c |   19 ++++++++-----------
+>  1 file changed, 8 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/watchdog/s3c2410_wdt.c
+b/drivers/watchdog/s3c2410_wdt.c
+> index 25b39bf..95ae53d 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -402,7 +402,6 @@ static inline void s3c2410wdt_cpufreq_deregister(void)
+> 
+>  static int __devinit s3c2410wdt_probe(struct platform_device *pdev)
+>  {
+> -	struct resource *res;
+>  	struct device *dev;
+>  	unsigned int wtcon;
+>  	int started = 0;
+> @@ -416,20 +415,19 @@ static int __devinit s3c2410wdt_probe(struct
+> platform_device *pdev)
+> 
+>  	/* get the memory region for the watchdog timer */
+> 
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (res == NULL) {
+> +	wdt_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (wdt_mem == NULL) {
 
-Wouldn't it be better to add another 'default' in there for ARCH_MX5
-rather than expecting whoever configures the kernel to be able to work
-out the right value?
+Hmm...I think, 'res' is better for platform_get_resource().
+Do we _really_ need to change the name?...
 
->  config FORCE_MAX_ZONEORDER
-> -	int "Maximum zone order" if ARCH_SHMOBILE
-> -	range 11 64 if ARCH_SHMOBILE
-> +	int "Maximum zone order" if ARCH_SHMOBILE || ARCH_MX5
-> +	range 11 64 if ARCH_SHMOBILE || ARCH_MX5
->  	default "9" if SA1111
->  	default "11"
->  	help
+>  		dev_err(dev, "no memory resource specified\n");
+>  		return -ENOENT;
+>  	}
+> 
+> -	size = resource_size(res);
+> -	wdt_mem = request_mem_region(res->start, size, pdev->name);
+> -	if (wdt_mem == NULL) {
+> +	size = resource_size(wdt_mem);
+> +	if (!request_mem_region(wdt_mem->start, size, pdev->name)) {
+
+If we keep the name 'res', don't need to change above.
+
+>  		dev_err(dev, "failed to get memory region\n");
+>  		return -EBUSY;
+>  	}
+> 
+> -	wdt_base = ioremap(res->start, size);
+> +	wdt_base = ioremap(wdt_mem->start, size);
+
+Same as above.
+
+>  	if (wdt_base == NULL) {
+>  		dev_err(dev, "failed to ioremap() region\n");
+>  		ret = -EINVAL;
+> @@ -524,8 +522,8 @@ static int __devinit s3c2410wdt_probe(struct
+> platform_device *pdev)
+>  	iounmap(wdt_base);
+> 
+>   err_req:
+> -	release_resource(wdt_mem);
+> -	kfree(wdt_mem);
+> +	release_mem_region(wdt_mem->start, size);
+
+release_mem_region(res->start, size); ?
+
+> +	wdt_mem = NULL;
+> 
+>  	return ret;
+>  }
+> @@ -545,8 +543,7 @@ static int __devexit s3c2410wdt_remove(struct
+> platform_device *dev)
+> 
+>  	iounmap(wdt_base);
+> 
+> -	release_resource(wdt_mem);
+> -	kfree(wdt_mem);
+> +	release_mem_region(wdt_mem->start, resource_size(wdt_mem));
+
+release_mem_region(res->start, resource_size(res)); ?
+
+>  	wdt_mem = NULL;
+>  	return 0;
+>  }
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
