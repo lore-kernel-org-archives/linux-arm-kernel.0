@@ -1,70 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Feb 2011 20:20:29 +0900
-Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
-In-Reply-To: <002801cbd721$42e4bad0$c8ae3070$%kim@samsung.com>
-References: <4D676BB8.9040803@samsung.com>
-	<002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
-	<4D6B5949.8020606@samsung.com>
-	<002801cbd721$42e4bad0$c8ae3070$%kim@samsung.com>
-Message-ID: <003701cbd739$85fc8e20$91f5aa60$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Feb 2011 11:20:55 +0000
+Subject: [PATCH V4 3/4] ARM: Xilinx: base header files and assembly macros
+In-Reply-To: <42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
+References: <1298052881-14591-1-git-send-email-john.linn@xilinx.com>
+	<1298052881-14591-2-git-send-email-john.linn@xilinx.com>
+	<1298052881-14591-3-git-send-email-john.linn@xilinx.com>
+	<42efee69-aca1-446b-a997-f0063e113877@VA3EHSMHS009.ehs.local>
+Message-ID: <20110228112055.GC29843@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Minkyu Kang wrote:
-> >
-> > Dear Kukjin Kim,
-> >
-> > 2011-02-28 ?? 4:42, Kukjin Kim ? ?:
-> > > Minkyu Kang wrote:
-> > >>
-> > >> This patch adds Samsung NURI board support.
-> > >>
-> > >> Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
-> > >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > >> ---
-> > >> This patch is base on next-exynos4 branch at kgene tree.
-> > >>
-> > >>  arch/arm/configs/exynos4_defconfig |    1 +
-> > >>  arch/arm/mach-exynos4/Kconfig      |   15 +++
-> > >>  arch/arm/mach-exynos4/Makefile     |    1 +
-> > >>  arch/arm/mach-exynos4/mach-nuri.c  |  233
-> > >> ++++++++++++++++++++++++++++++++++++
-> > >>  4 files changed, 250 insertions(+), 0 deletions(-)
-> > >>  create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
-> > >>
-> > >
-> > >> +enum fixed_regulator_id {
-> > >> +	FIXED_REG_ID_MMC = 0,
-> > >
-> > > 	FIXED_REG_ID_MMC,
-> > >
-> > > (snip)
-> > >
-> > >> +static struct platform_device emmc_fixed_voltage = {
-> > >> +	.name			= "reg-fixed-voltage",
-> > >> +	.id			= FIXED_REG_ID_MMC,
-> > >
-> > > Is there any reason to use FIXED_REG_ID_MMC instead directly id 0?
-> > >
-> >
-> > I'm going to add more IDs of fixed regulator that are LCD and Backlight,
-> and
-> > so on.
-> > So use enum values for avoid the hard coding.
-> >
-> 
-> Ok, applied this after removing "ifdef WATCHDOG".
+On Fri, Feb 18, 2011 at 11:14:40AM -0700, John Linn wrote:
+> diff --git a/arch/arm/mach-xilinx/include/mach/uncompress.h b/arch/arm/mach-xilinx/include/mach/uncompress.h
+> new file mode 100644
+> index 0000000..ff3754c
+> --- /dev/null
+> +++ b/arch/arm/mach-xilinx/include/mach/uncompress.h
+> @@ -0,0 +1,61 @@
+> +/* arch/arm/mach-xilinx/include/mach/uncompress.h
+> + *
+> + *  Copyright (C) 2011 Xilinx
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __MACH_UNCOMPRESS_H__
+> +#define __MACH_UNCOMPRESS_H__
+> +
+> +#include <mach/xilinx_soc.h>
+> +#include <mach/uart.h>
+> +#include <asm/processor.h>
+> +#include <asm/io.h>
+> +#include <mach/io.h>
 
-Oops, NURI board is not registered yet :(
-So can't merge this before updating it now.
-Or should drop update defconfig from this...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+You don't need mach/io.h here - it's already included by asm/io.h.
+It's probably also worth trying linux/io.h instead of asm/io.h too.
