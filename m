@@ -1,180 +1,49 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Mon, 28 Feb 2011 10:16:18 +0530
-Subject: [PATCH v4 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources
-	used by PRUSS UIO driver
-In-Reply-To: <4D6796D6.5050008@mvista.com>
-References: <1298556402-26456-1-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-2-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-3-git-send-email-pratheesh@ti.com>
-	<4D6796D6.5050008@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BF3591A@dbde02.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 28 Feb 2011 14:16:45 +0900
+Subject: [PATCH 1/3] ARM: EXYNOS4: Add SYSTIMER IO Address mapping for MCT
+Message-ID: <1298870207-1850-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Changhwan Youn <chaos.youn@samsung.com>
 
-> -----Original Message-----
-> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
-> Sent: Friday, February 25, 2011 5:18 PM
-> To: TK, Pratheesh Gangadhar
-> Cc: davinci-linux-open-source at linux.davincidsp.com; hjk at hansjkoch.de;
-> gregkh at suse.de; tglx at linutronix.de; arnd at arndb.de; Chatterjee, Amit;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v4 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources
-> used by PRUSS UIO driver
-> 
-> On 24-02-2011 17:06, Pratheesh Gangadhar wrote:
-> 
-> > This patch defines PRUSS, ECAP clocks, memory and IRQ resources
-> > used by PRUSS UIO driver in DA850/AM18xx/OMAPL1-38 devices. UIO
-> 
->     It's OMAP-L138.
-Ok.
-> 
-> > driver exports 64K I/O region of PRUSS, 128KB L3 RAM and 256KB
-> > DDR buffer to user space. PRUSS has 8 host event interrupt lines
-> > mapped to IRQ_DA8XX_EVTOUT0..7 of ARM9 INTC.These in conjunction
-> > with shared memory can be used to implement IPC between ARM9 and
-> > PRUSS.
-> 
-> > Signed-off-by: Pratheesh Gangadhar<pratheesh@ti.com>
-> [...]
-> 
-> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-
-> davinci/board-da850-evm.c
-> > index 11f986b..bd85aa3 100644
-> > --- a/arch/arm/mach-davinci/board-da850-evm.c
-> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> > @@ -1077,6 +1077,10 @@ static __init void da850_evm_init(void)
-> >   		pr_warning("da850_evm_init: i2c0 registration failed: %d\n",
-> >   				ret);
-> >
-> > +	ret = da8xx_register_pruss();
-> > +	if (ret)
-> > +		pr_warning("da850_evm_init: pruss registration failed: %d\n",
-> > +				ret);
-> 
->     Use __func__ to print the function name.
-> 
-> >
-> >   	ret = da8xx_register_watchdog();
-> >   	if (ret)
-> 
->     As I said, please put this into serpate patch.
-> 
-Ok, will do.
-> > diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-
-> davinci/da850.c
-> > index 3443d97..0096d4f 100644
-> > --- a/arch/arm/mach-davinci/da850.c
-> > +++ b/arch/arm/mach-davinci/da850.c
-> > @@ -238,6 +238,13 @@ static struct clk tptc2_clk = {
-> >   	.flags		= ALWAYS_ENABLED,
-> >   };
-> >
-> > +static struct clk pruss_clk = {
-> > +	.name		= "pruss",
-> > +	.parent		= &pll0_sysclk2,
-> > +	.lpsc		= DA8XX_LPSC0_DMAX,
-> > +	.flags		= ALWAYS_ENABLED,
-> > +};
-> > +
-> 
->     This conflicts with previously posted patch.
-> 
-Ok, shall I rename to align with previous patch from Mistral or drop this from my patchset ?
-> >   static struct clk uart0_clk = {
-> >   	.name		= "uart0",
-> >   	.parent		=&pll0_sysclk2,
-> > @@ -359,6 +366,30 @@ static struct clk usb20_clk = {
-> >   	.gpsc		= 1,
-> >   };
-> >
-> > +static struct clk ecap0_clk = {
-> > +	.name		= "ecap0",
-> > +	.parent		= &pll0_sysclk2,
-> > +	.lpsc		= DA8XX_LPSC1_ECAP,
-> > +	.flags		= DA850_CLK_ASYNC3,
-> > +	.gpsc		= 1,
-> > +};
-> > +
-> > +static struct clk ecap1_clk = {
-> > +	.name		= "ecap1",
-> > +	.parent		= &pll0_sysclk2,
-> > +	.lpsc		= DA8XX_LPSC1_ECAP,
-> > +	.flags		= DA850_CLK_ASYNC3,
-> > +	.gpsc		= 1,
-> > +};
-> > +
-> > +static struct clk ecap2_clk = {
-> > +	.name		= "ecap2",
-> > +	.parent		= &pll0_sysclk2,
-> > +	.lpsc		= DA8XX_LPSC1_ECAP,
-> > +	.flags		= DA850_CLK_ASYNC3,
-> > +	.gpsc		= 1,
-> > +};
-> > +
-> 
->     This is worth separate patch too...
-> 
-Ok.
-> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-
-> davinci/devices-da8xx.c
-> > index beda8a4..4ea3d1f 100644
-> > --- a/arch/arm/mach-davinci/devices-da8xx.c
-> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> > @@ -725,3 +725,76 @@ int __init da8xx_register_cpuidle(void)
-> >
-> >   	return platform_device_register(&da8xx_cpuidle_device);
-> >   }
-> > +static struct resource pruss_resources[] = {
-> > +	[0] = {
-> > +		.start  = DA8XX_PRUSS_BASE,
-> > +		.end    = DA8XX_PRUSS_BASE + SZ_64K - 1,
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +	[1] = {
-> > +		.start  = DA8XX_L3RAM_BASE,
-> > +		.end    = DA8XX_L3RAM_BASE + SZ_128K - 1,
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +	[2] = {
-> > +		.start  = 0,
-> > +		.end    = SZ_256K - 1,
-> 
->     Huh? I don't see where it's filled...
-> 
-The current use is only to indicate memory block size to the PRUSS UIO driver when we allocate DDR memory using dma_alloc_coherent. sram_alloc is changed to use L3_RAM (128KB) instead of ARM RAM (8KB) in Mistral patch set - I need to follow the same convention for L3 RAM as well if I need to align with that patch. Is there a better way to do this?
-> > +		.flags  = IORESOURCE_MEM,
-> > +	},
-> > +
-> [...]
-> > +int __init da8xx_register_pruss()
-> > +{
-> > +	return platform_device_register(&pruss_device);
-> > +}
-> > diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-
-> davinci/include/mach/da8xx.h
-> > index cfcb223..3ed6ee0 100644
-> > --- a/arch/arm/mach-davinci/include/mach/da8xx.h
-> > +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-> > @@ -60,6 +60,7 @@ extern unsigned int da850_max_speed;
-> >   #define DA8XX_PLL0_BASE		0x01c11000
-> >   #define DA8XX_TIMER64P0_BASE	0x01c20000
-> >   #define DA8XX_TIMER64P1_BASE	0x01c21000
-> > +#define DA8XX_PRUSS_BASE	0x01c30000
-> >   #define DA8XX_GPIO_BASE		0x01e26000
-> >   #define DA8XX_PSC1_BASE		0x01e27000
-> >   #define DA8XX_LCD_CNTRL_BASE	0x01e13000
-> > @@ -68,6 +69,7 @@ extern unsigned int da850_max_speed;
-> >   #define DA8XX_AEMIF_CS2_BASE	0x60000000
-> >   #define DA8XX_AEMIF_CS3_BASE	0x62000000
-> >   #define DA8XX_AEMIF_CTL_BASE	0x68000000
-> > +#define DA8XX_L3RAM_BASE	0x80000000
-> 
->     There were already patches defining macros for these base addresses...
->
-Ok - will align with this.
+The MCT(Multi-Core Timer) is used for implementing kernel timers for
+EXYNOS4210.
 
-Thanks,
-Pratheesh
+Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos4/cpu.c              |    5 +++++
+ arch/arm/mach-exynos4/include/mach/map.h |    1 +
+ 2 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+index b0ec6d3..479dfa1 100644
+--- a/arch/arm/mach-exynos4/cpu.c
++++ b/arch/arm/mach-exynos4/cpu.c
+@@ -31,6 +31,11 @@ extern void combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq);
+ /* Initial IO mappings */
+ static struct map_desc exynos4_iodesc[] __initdata = {
+ 	{
++		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
++		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSTIMER),
++		.length		= SZ_4K,
++		.type	 	= MT_DEVICE,
++	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SYSRAM,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSRAM),
+ 		.length		= SZ_4K,
+diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
+index 80a41e0..d678f08 100644
+--- a/arch/arm/mach-exynos4/include/mach/map.h
++++ b/arch/arm/mach-exynos4/include/mach/map.h
+@@ -44,6 +44,7 @@
+ #define EXYNOS4_PA_PMU			0x10020000
+ #define EXYNOS4_PA_CMU			0x10030000
+ 
++#define EXYNOS4_PA_SYSTIMER		0x10050000
+ #define EXYNOS4_PA_WATCHDOG		0x10060000
+ #define EXYNOS4_PA_RTC			0x10070000
+ 
+-- 
+1.7.1
