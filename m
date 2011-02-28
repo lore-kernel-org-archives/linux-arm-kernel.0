@@ -1,99 +1,73 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 28 Feb 2011 15:55:00 +0100
-Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to	omap_display
-In-Reply-To: <20110228140617.GA2176@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 28 Feb 2011 16:57:36 +0200
+Subject: [PATCH v10 05/18] OMAP2,3 DSS2 Change driver name to omap_display
+In-Reply-To: <4D6BAA8C.2020203@ti.com>
 References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
 	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
-	<1298539643.16119.54.camel@deskari>
-	<1298876015.2096.36.camel@deskari> <4D6B4A1A.9000304@ti.com>
-	<1298877549.2096.47.camel@deskari> <4D6B88BB.5010200@ti.com>
-	<1298895026.9809.27.camel@deskari>
-	<20110228121321.GB30781@n2100.arm.linux.org.uk>
-	<4D6BA558.5050700@ti.com>
-	<20110228140617.GA2176@n2100.arm.linux.org.uk>
-Message-ID: <4D6BB744.1010205@ti.com>
+	<1298539643.16119.54.camel@deskari> <1298876015.2096.36.camel@deskari>
+	<4D6B4A1A.9000304@ti.com> <1298877549.2096.47.camel@deskari>
+	<4D6B88BB.5010200@ti.com> <1298895026.9809.27.camel@deskari>
+	<4D6BAA8C.2020203@ti.com>
+Message-ID: <1298905056.9809.128.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/28/2011 3:06 PM, Russell King - ARM Linux wrote:
-> On Mon, Feb 28, 2011 at 02:38:32PM +0100, Cousson, Benoit wrote:
->> On 2/28/2011 1:13 PM, Russell King - ARM Linux wrote:
->>> On Mon, Feb 28, 2011 at 02:10:26PM +0200, Tomi Valkeinen wrote:
->>>> On Mon, 2011-02-28 at 05:36 -0600, Cousson, Benoit wrote:
->>>>> Cannot you use a device hierarchy then to do that?
->>>>>     omap_dss/core
->>>>>     omap_dss/dsi
->>>>>     omap_dss/venc
->>>>>
->>>>> This is moreover the way the HW is done.
->>>>
->>>> Hmm, how would that work? The devices are platform devices, and they
->>>> have a unique global name, which is used to match the driver for the
->>>> device.
->>>
->>> And not forgetting that '/' is not permitted in device or driver names.
->>
->> I was not really considering naming the device with a '/'. The idea is
->> that the devices will not longer be flat platform devices but something
->> like dss devices that will have have a omap_dss parent.
->>
->> I do not know if that makes sense to store some kind of hierarchy in the
->> device model, but encoding the hierarchy in the name like it is proposed
->> looks like a hack to me.
+On Mon, 2011-02-28 at 08:00 -0600, Cousson, Benoit wrote:
+> On 2/28/2011 1:10 PM, Valkeinen, Tomi wrote:
+> > On Mon, 2011-02-28 at 05:36 -0600, Cousson, Benoit wrote:
+> >> Hi Tomi,
+> >>
+> >> On 2/28/2011 8:19 AM, Valkeinen, Tomi wrote:
+> >>> On Mon, 2011-02-28 at 01:09 -0600, Taneja, Archit wrote:
+> >>>> Hi,
+> >>>>
+> >>>> On Monday 28 February 2011 12:23 PM, Valkeinen, Tomi wrote:
+> >>>>> On Thu, 2011-02-24 at 03:27 -0600, Tomi Valkeinen wrote:
+> >>>>>> Hi,
+> >>>>>>
+> >>>>>> On Mon, 2011-01-24 at 11:51 +0530, ext Sumit Semwal wrote:
+> >>>>>>> From: Senthilvadivu Guruswamy<svadivu@ti.com>
+> >>>>>>>
+> >>>>>>> Change the driver name from omapdss to omap_display as the driver takes care of
+> >>>>>>> the display devices ie number of panels, type of panels available in the
+> >>>>>>> platform.  Change the device name in the board files and 2420,2430,3xxx clock
+> >>>>>>> files from omapdss to omap_display to match the driver name.
+> >>>>>>
+> >>>>>> I just realized that changing the driver name will break all scripts and
+> >>>>>> applications using omapdss sysfs files.
+> >>>>>>
+> >>>>>> How does this sound:
+> >>>>>>
+> >>>>>> Let's leave the omapdss device name as it is. It represents a "super"
+> >>>>>> device, containing the dss sysfs files and upper level dss management.
+> >>
+> >> This is the case for all the drivers migrated to omap_device anyway due
+> >> to the change in the top level hierarchy. Everything is below
+> >> platform/omap now.
+> >
+> > The HW module drivers are under platform/omap/, but omapdss is in
+> > platform/. Do you mean that omapdss should also be under platform/omap/?
 > 
-> Try:
-> 
-> tree -d /sys/devices/pci0000\:00
-> 
-> on your PC, taking special note of how pci-to-pci bridges are handled.
+> This is because you are probably not using omap_device yet. is should 
+> happen when you will change your platform_device to be omap_device.
 
-Here it is, but I'm not sure to understand how it is really done :-(
+Hmm. The HW module devices use omap_device. But we have also a
+"management" device, omapdss, which is doesn't match directly to any HW
+component but manages the HW module drivers. It contains, so to say, the
+HW module drivers.
 
-/sys/devices/pci0000:00
-??? 0000:00:00.0
-?   ??? firmware_node -> ../../LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00/PNP0C02:00
-?   ??? power
-?   ??? subsystem -> ../../../bus/pci
-??? 0000:00:02.0
-?   ??? 0000:00:02.0:pcie01
-?   ?   ??? power
-?   ?   ??? subsystem -> ../../../../bus/pci_express
-?   ??? 0000:00:02.0:pcie02
-?   ?   ??? driver -> ../../../../bus/pci_express/drivers/aer
-?   ?   ??? power
-?   ?   ??? subsystem -> ../../../../bus/pci_express
-?   ??? 0000:06:00.0
-?   ?   ??? 0000:06:00.0:pcie12
-?   ?   ?   ??? power
-?   ?   ?   ??? subsystem -> ../../../../../bus/pci_express
-?   ?   ??? 0000:07:00.0
-?   ?   ?   ??? 0000:07:00.0:pcie22
-?   ?   ?   ?   ??? power
-?   ?   ?   ?   ??? subsystem -> ../../../../../../bus/pci_express
-?   ?   ?   ??? 0000:08:00.0
-?   ?   ?   ?   ??? 0000:09:00.0
-?   ?   ?   ?   ?   ??? driver -> ../../../../../../../bus/pci/drivers/bnx2
-?   ?   ?   ?   ?   ??? net
-?   ?   ?   ?   ?   ?   ??? eth1
-?   ?   ?   ?   ?   ?       ??? device -> ../../../0000:09:00.0
-?   ?   ?   ?   ?   ?       ??? power
-?   ?   ?   ?   ?   ?       ??? statistics
-?   ?   ?   ?   ?   ?       ??? subsystem -> ../../../../../../../../../class/net
-?   ?   ?   ?   ?   ??? power
-?   ?   ?   ?   ?   ??? subsystem -> ../../../../../../../bus/pci
-?   ?   ?   ?   ??? pci_bus
-?   ?   ?   ?   ?   ??? 0000:09
-?   ?   ?   ?   ?       ??? device -> ../../../0000:08:00.0
-?   ?   ?   ?   ?       ??? power
-?   ?   ?   ?   ?       ??? subsystem -> ../../../../../../../../class/pci_bus
-?   ?   ?   ?   ??? power
-?   ?   ?   ?   ??? subsystem -> ../../../../../../bus/pci
-?   ?   ?   ??? driver -> ../../../../../bus/pci/drivers/pcieport
-?   ?   ?   ??? pci_bus
-?   ?   ?   ?   ??? 0000:08
-?   ?   ?   ?       ??? device -> ../../../0000:07:00.0
-?   ?   ?   ?       ??? power
-?   ?   ?   ?       ??? subsystem -> ../../../../../../../class/pci_bus
-?   ?   ?   ??? power
-?   ?   ?   ??? subsystem -> ../../../../../bus/pci
-...
+Should this device also be a omap_device? What does omap_device actually
+represent? My understanding is that omap_device is a linux device for a
+HW block inside OMAP. omapdss doesn't quite match that definition.
+
+> > The reason I'm unwilling to change omapdss name, or location, is that
+> > omapdss directory contains lots of DSS configuration files, used by
+> > scripts and programs.
+> 
+> Is that used for debug only?
+
+Unfortunately no. DSS contains many features which cannot be exported to
+userspace via the framebuffer device. While I'm not really happy with
+the current omapdss sysfs interface, it's the best we've come up with.
+
+ Tomi
