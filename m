@@ -1,91 +1,41 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Feb 2011 15:37:54 +0900
-Subject: [PATCH 03/09] ARM: s3c2440: gta02: Add button support
-In-Reply-To: <1297043521-21903-3-git-send-email-lars@metafoo.de>
+Date: Mon, 28 Feb 2011 15:38:48 +0900
+Subject: [PATCH 02/09] ARM: s3c2440: gta02: Register PCM device
+In-Reply-To: <1297043521-21903-2-git-send-email-lars@metafoo.de>
 References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-	<1297043521-21903-3-git-send-email-lars@metafoo.de>
-Message-ID: <000601cbd712$092d7bb0$1b887310$%kim@samsung.com>
+	<1297043521-21903-2-git-send-email-lars@metafoo.de>
+Message-ID: <000701cbd712$2a32da30$7e988e90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Lars-Peter Clausen wrote:
 > 
-> This patch adds support for the two buttons found on the gta02 device,
-which
-> are
-> connectd to gpio pins, using the gpio-keys driver.
+> The ASoC multi-component patch introduced a new pcm platform device, which
+> needs
+> to be registered by board files in order for sound to work.
+> This patch does this for the gta02 board.
 > 
 > Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 > ---
->  arch/arm/mach-s3c2440/mach-gta02.c |   34
-++++++++++++++++++++++++++++++++++
->  1 files changed, 34 insertions(+), 0 deletions(-)
+>  arch/arm/mach-s3c2440/mach-gta02.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
 b/arch/arm/mach-s3c2440/mach-
 > gta02.c
-> index e83062b..6629998 100644
+> index 9f2c14e..e83062b 100644
 > --- a/arch/arm/mach-s3c2440/mach-gta02.c
 > +++ b/arch/arm/mach-s3c2440/mach-gta02.c
-> @@ -58,6 +58,9 @@
->  #include <linux/mfd/pcf50633/pmic.h>
->  #include <linux/mfd/pcf50633/backlight.h>
-> 
-> +#include <linux/input.h>
-> +#include <linux/gpio_keys.h>
-> +
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/irq.h>
-> @@ -489,6 +492,36 @@ static struct s3c2410_hcd_info gta02_usb_info
+> @@ -509,6 +509,7 @@ static struct platform_device *gta02_devices[]
 __initdata
 > = {
->  	},
->  };
-> 
-> +/* Buttons */
-> +static struct gpio_keys_button gta02_buttons[] = {
-> +	{
-> +		.gpio = GTA02_GPIO_AUX_KEY,
-> +		.code = KEY_PHONE,
-> +		.desc = "Aux",
-> +		.type = EV_KEY,
-> +		.debounce_interval = 100,
-> +	},
-> +	{
-> +		.gpio = GTA02_GPIO_HOLD_KEY,
-> +		.code = KEY_PAUSE,
-> +		.desc = "Hold",
-> +		.type = EV_KEY,
-> +		.debounce_interval = 100,
-> +	},
-> +};
-> +
-> +static struct gpio_keys_platform_data gta02_buttons_pdata = {
-> +	.buttons = gta02_buttons,
-> +	.nbuttons = ARRAY_SIZE(gta02_buttons),
-> +};
-> +
-> +static struct platform_device gta02_buttons_device = {
-> +	.name = "gpio-keys",
-> +	.id = -1,
-> +	.dev = {
-> +		.platform_data = &gta02_buttons_pdata,
-> +	},
-> +};
-> 
->  static void __init gta02_map_io(void)
->  {
-> @@ -511,6 +544,7 @@ static struct platform_device *gta02_devices[]
-__initdata
-> = {
+>  	&gta02_nor_flash,
+>  	&s3c24xx_pwm_device,
 >  	&s3c_device_iis,
->  	&samsung_asoc_dma,
+> +	&samsung_asoc_dma,
 >  	&s3c_device_i2c0,
-> +	&gta02_buttons_device,
 >  };
 > 
->  /* These guys DO need to be children of PMU. */
 > --
 
 Ok, will apply.
