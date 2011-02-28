@@ -1,63 +1,65 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 28 Feb 2011 12:17:26 +0100
-Subject: [PATCH v2 09/09] ARM: s3c2440: gta02: Add touchscreen support
-In-Reply-To: <1297043521-21903-9-git-send-email-lars@metafoo.de>
-References: <1297043521-21903-9-git-send-email-lars@metafoo.de>
-Message-ID: <1298891846-7487-1-git-send-email-lars@metafoo.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 28 Feb 2011 12:17:46 +0100
+Subject: [PATCH 0/8] OMAP2+: hwmod/clockevent: allow late-init of
+	individual hwmods
+In-Reply-To: <alpine.DEB.2.00.1102271928550.505@utopia.booyaka.com>
+References: <20110223070455.5874.51326.stgit@twilight.localdomain>
+	<4D651998.3040002@ti.com>
+	<alpine.DEB.2.00.1102271928550.505@utopia.booyaka.com>
+Message-ID: <4D6B845A.9000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds registers the s3c touchscreen and adc devices to add touchscreen
-support for the gta02.
+Salut Paul,
 
-Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
----
- arch/arm/mach-s3c2440/mach-gta02.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+On 2/28/2011 3:31 AM, Paul Walmsley wrote:
+> Salut Beno?t,
+>
+> On Wed, 23 Feb 2011, Cousson, Benoit wrote:
+>
+>> On 2/23/2011 8:11 AM, Paul Walmsley wrote:
+>>> This series adds the ability to late-initialize individual
+>>> hwmods.  The goal here is for clockevent (and eventually
+>>> clocksource) hwmods to be late-initialized individually, and
+>>> right before they are needed, in the timer init code.  Then
+>>> omap_hwmod_late_init(), which late-inits the rest of the hwmods,
+>>> is intended to run as an initcall -- much later in the boot
+>>> process.
+>>>
+>>> This series includes the OMAP2/3 hwmod data for the GPTIMERs that
+>>> Tarun posted earlier.  This data is necessary for this new code
+>>> to avoid warnings during boot.
+>>>
+>>> Boot-tested on N800, OMAP34xx Beagleboard and OMAP4430ES2 Panda.
+>>
+>> I'm testing it on 4430sdp, and I have the following warning:
+>>
+>> [    0.000000] omap_hwmod: dpll_mpu_m2_ck: missing clockdomain for dpll_mpu_m2_ck.
+>> [    0.000000] ------------[ cut here ]------------
+>> [    0.000000] WARNING: at arch/arm/mach-omap2/timer-gp.c:157 omap2_gp_timer_init+0x80/0x190()
+>> [    0.000000] timer-gp: omap_dm_timer_set_source() failed
+>> [    0.000000] Modules linked in:
+>> [    0.000000] [<c0062a6c>] (unwind_backtrace+0x0/0xec) from [<c009422c>] (warn_slowpath_common+0x4c/0x64)
+>> [    0.000000] [<c009422c>] (warn_slowpath_common+0x4c/0x64) from [<c00942c4>] (warn_slowpath_fmt+0x2c/0x3c)
+>> [    0.000000] [<c00942c4>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0010e30>] (omap2_gp_timer_init+0x80/0x190)
+>> [    0.000000] [<c0010e30>] (omap2_gp_timer_init+0x80/0x190) from [<c000c0dc>] (time_init+0x20/0x30)
+>> [    0.000000] [<c000c0dc>] (time_init+0x20/0x30) from [<c0008cbc>] (start_kernel+0x1a4/0x30c)
+>> [    0.000000] [<c0008cbc>] (start_kernel+0x1a4/0x30c) from [<80008038>] (0x80008038)
+>> [    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+>> [    0.000000] OMAP clockevent source: GPTIMER1 at 32768 Hz
+>
+> This is due to commit 3b03b58dab847883e6b9a431558c7d8e43fa94c6 ("OMAP4:
+> hwmod data: Prevent timer1 to be reset and idle during init").  Could you
+> please try reverting this and see if the warning disappears?
 
-diff --git a/arch/arm/mach-s3c2440/mach-gta02.c b/arch/arm/mach-s3c2440/mach-gta02.c
-index 640ca68..12193ad 100644
---- a/arch/arm/mach-s3c2440/mach-gta02.c
-+++ b/arch/arm/mach-s3c2440/mach-gta02.c
-@@ -89,6 +89,8 @@
- #include <plat/udc.h>
- #include <plat/gpio-cfg.h>
- #include <plat/iic.h>
-+#include <plat/ts.h>
-+
- 
- static struct pcf50633 *gta02_pcf;
- 
-@@ -480,6 +482,13 @@ static struct s3c2410_hcd_info gta02_usb_info __initdata = {
- 	},
- };
- 
-+/* Touchscreen */
-+static struct s3c2410_ts_mach_info gta02_ts_info = {
-+	.delay			= 10000,
-+	.presc			= 0xff, /* slow as we can go */
-+	.oversampling_shift	= 2,
-+};
-+
- /* Buttons */
- static struct gpio_keys_button gta02_buttons[] = {
- 	{
-@@ -533,6 +542,8 @@ static struct platform_device *gta02_devices[] __initdata = {
- 	&samsung_asoc_dma,
- 	&s3c_device_i2c0,
- 	&gta02_buttons_device,
-+	&s3c_device_adc,
-+	&s3c_device_ts,
- };
- 
- /* These guys DO need to be children of PMU. */
-@@ -595,6 +606,7 @@ static void __init gta02_machine_init(void)
- #endif
- 
- 	s3c24xx_udc_set_platdata(&gta02_udc_cfg);
-+	s3c24xx_ts_set_platdata(&gta02_ts_info);
- 	s3c_ohci_set_platdata(&gta02_usb_info);
- 	s3c_nand_set_platdata(&gta02_nand_info);
- 	s3c_i2c0_set_platdata(NULL);
--- 
-1.7.2.3
+Thanks, this is indeed fixing this warning. I didn't see these two 
+patches were exclusive.
+
+Thanks,
+Benoit
+
+>
+> Tony, I guess the omap-for-linus branch will probably need to get rebuilt
+> to drop that patch, once this series is merged...
+>
+> - Paul
