@@ -1,24 +1,36 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 28 Feb 2011 10:46:35 +0000
-Subject: [PATCH 3/8 resend] dw_dmac: call dwc_scan_descriptor from
-	dwc_issue_pending only if active list is empty
-In-Reply-To: <8003205172278ef36cfca1fd50a54cb143fad958.1298889267.git.viresh.kumar@st.com>
-References: <cover.1298889267.git.viresh.kumar@st.com>
-	<8003205172278ef36cfca1fd50a54cb143fad958.1298889267.git.viresh.kumar@st.com>
-Message-ID: <20110228104635.GB2754@pulham.picochip.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 28 Feb 2011 19:49:57 +0900
+Subject: [PATCH 01/09] ARM: s3c2442: gta02: Fix usage gpio bank j pin
+	definitions
+In-Reply-To: <4D6B7D19.1050103@metafoo.de>
+References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
+	<000801cbd712$907019c0$b1504d40$%kim@samsung.com>
+	<4D6B7D19.1050103@metafoo.de>
+Message-ID: <003301cbd735$40353b20$c09fb160$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 04:11:18PM +0530, Viresh Kumar wrote:
-> dwc_scan_descriptor was called even when there were descriptors in active list.
-> Checking if active list is empty or not.
+Lars-Peter Clausen wrote:
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> On 02/28/2011 07:41 AM, Kukjin Kim wrote:
+> > Lars-Peter Clausen wrote:
 
-Hi Viresh,
+(snip)
 
-I have a similar patch to this that is already in next that should 
-achieve the same thing (dmaengine/dw_dmac: don't scan descriptors if no 
-xfers in progress).
+> >
+> > Yeah, old S3C2440_GPJx has removed.
+> > Is the S3C2410_GPJ(1) right instead of S3C2440_GPJ1?
+> 
+> I think so. At least the the compile errors are gone and the drivers using
+> these gpios work as expected.
+> 
+Ok, you mean test it on board...so will apply into my s5p-fixes-for-linus
+for 38-rc.
 
-Jamie
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
