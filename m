@@ -1,101 +1,40 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 28 Feb 2011 17:38:12 +0000
-Subject: [PATCH] ARM: Thumb-2: Work around buggy Thumb-2 short branch
-	relocations in gas
-Message-ID: <1298914692-19897-1-git-send-email-dave.martin@linaro.org>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Mon, 28 Feb 2011 18:41:21 +0100
+Subject: [PATCH 0/3] OMAP PM: implement the wake-up latency constraints using
+	PM QOS
+Message-ID: <1298914884-16468-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Various binutils versions can resolve Thumb-2 branches to
-locally-defined, preemptible global symbols as short-range "b.n"
-branch instructions.
+From: Jean Pihet <j-pihet@ti.com>
 
-This is a problem, because there's no guarantee the final
-destination of the symbol, or any candidate locations for a
-trampoline, are within range of the branch.  For this reason, the
-kernel does not support fixing up the R_ARM_THM_JUMP11 (102)
-relocation in modules at all, and it makes little sense to add
-support.
+Use the PM QOS framework to set wake-up latency constraints on the MPU and DMA.
+Cpuidle for OMAP34xx uses PM QOS to retreive the strongest constraint and to
+determine the next state for the MPU and CORE power domains.
 
-The symptom is that the kernel fails with an "unsupported
-relocation" error when loading some modules.
+As of today only I2C is requesting a constraint, but every omap_device
+should be able to do so.
 
-Until fixed tools are available, passing
--fno-optimize-sibling-calls to gcc should prevent gcc generating
-code which hits this problem, at the cost of a bit of extra runtime
-stack usage in some cases.
+Note: To be replaced by a more generic solution which allows every
+ device to put a constraint, and which can control all power
+ domains in the system. This solution is currently under
+ investigation.
 
-The problem is described in more detail at:
-    https://bugs.launchpad.net/binutils-linaro/+bug/725126
+Jean Pihet (3):
+  OMAP PM: create a PM layer plugin for the devices wakeup latency
+    constraints
+  OMAP: implement MPU and DMA wake-up constraints using PM_QOS
+  OMAP: use PM QOS for wake-up constraints from I2C
 
-Only Thumb-2 kernels are affected.
+ arch/arm/plat-omap/Kconfig                    |    7 +
+ arch/arm/plat-omap/Makefile                   |    1 +
+ arch/arm/plat-omap/i2c.c                      |   22 ++-
+ arch/arm/plat-omap/include/plat/omap-pm.h     |   96 ++++---
+ arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+ arch/arm/plat-omap/omap-pm-constraints.c      |  349 +++++++++++++++++++++++++
+ arch/arm/plat-omap/omap-pm-noop.c             |   70 +++---
+ 7 files changed, 469 insertions(+), 77 deletions(-)
+ create mode 100644 arch/arm/plat-omap/omap-pm-constraints.c
 
-This patch adds a new CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11 config
-option which adds -fno-optimize-sibling-calls to CFLAGS_MODULE
-when building a Thumb-2 kernel.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/Kconfig  |   31 +++++++++++++++++++++++++++++++
- arch/arm/Makefile |    4 ++++
- 2 files changed, 35 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5cff165..196f6d2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1371,6 +1371,37 @@ config THUMB2_KERNEL
- 
- 	  If unsure, say N.
- 
-+config THUMB2_AVOID_R_ARM_THM_JUMP11
-+	bool "Work around buggy Thumb-2 short branch relocations in gas"
-+	depends on THUMB2_KERNEL && MODULES
-+	default y
-+	help
-+	  Various binutils versions can resolve Thumb-2 branches to
-+	  locally-defined, preemptible global symbols as short-range "b.n"
-+	  branch instructions.
-+
-+	  This is a problem, because there's no guarantee the final
-+	  destination of the symbol, or any candidate locations for a
-+	  trampoline, are within range of the branch.  For this reason, the
-+	  kernel does not support fixing up the R_ARM_THM_JUMP11 (102)
-+	  relocation in modules at all, and it makes little sense to add
-+	  support.
-+
-+	  The symptom is that the kernel fails with an "unsupported
-+	  relocation" error when loading some modules.
-+
-+	  Until fixed tools are available, passing
-+	  -fno-optimize-sibling-calls to gcc should prevent gcc generating
-+	  code which hits this problem, at the cost of a bit of extra runtime
-+	  stack usage in some cases.
-+
-+	  The problem is described in more detail at:
-+	      https://bugs.launchpad.net/binutils-linaro/+bug/725126
-+
-+	  Only Thumb-2 kernels are affected.
-+
-+	  Unless you are sure your tools don't have this problem, say Y.
-+
- config ARM_ASM_UNIFIED
- 	bool
- 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index c22c1ad..ef5105a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -105,6 +105,10 @@ AFLAGS_AUTOIT	:=$(call as-option,-Wa$(comma)-mimplicit-it=always,-Wa$(comma)-mau
- AFLAGS_NOWARN	:=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
- CFLAGS_THUMB2	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
- AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
-+# Work around buggy relocation from gas if requested:
-+ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
-+CFLAGS_MODULE	+=-fno-optimize-sibling-calls
-+endif
- endif
- 
- # Need -Uarm for gcc < 3.x
 -- 
-1.7.1
+1.7.2.3
