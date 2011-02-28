@@ -1,82 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Feb 2011 20:56:12 +0900
-Subject: [PATCH v2 09/09] ARM: s3c2440: gta02: Add touchscreen support
-In-Reply-To: <1298891846-7487-1-git-send-email-lars@metafoo.de>
-References: <1297043521-21903-9-git-send-email-lars@metafoo.de>
-	<1298891846-7487-1-git-send-email-lars@metafoo.de>
-Message-ID: <003d01cbd73e$80ed2340$82c769c0$%kim@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 28 Feb 2011 15:05:24 +0300
+Subject: [PATCH 6/8 resend] dw_dmac: Mark all tx_descriptors with
+	DMA_CRTL_ACK after xfer finish
+In-Reply-To: <82027aa0c6446df3f7fb8e3c5fbdc28f60ea33b7.1298889267.git.viresh.kumar@st.com>
+References: <cover.1298889267.git.viresh.kumar@st.com>
+	<82027aa0c6446df3f7fb8e3c5fbdc28f60ea33b7.1298889267.git.viresh.kumar@st.com>
+Message-ID: <4D6B8F84.40905@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lars-Peter Clausen wrote:
-> 
-> This patch adds registers the s3c touchscreen and adc devices to add
-> touchscreen
-> support for the gta02.
-> 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
+Hello.
+
+On 28-02-2011 13:41, Viresh Kumar wrote:
+
+> dwc_desc_get checks all descriptors for DMA_CTRL_ACK before allocating them for
+> transfers. And descriptors are not marked with DMA_CRTL_ACK after transfer
+> finishes. Thus descriptor once used is not usable again. This patch marks
+> descriptors with DMA_CRTL_ACK after dma xfer finishes
+
+> Signed-off-by: Viresh Kumar<viresh.kumar@st.com>
 > ---
->  arch/arm/mach-s3c2440/mach-gta02.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
-b/arch/arm/mach-s3c2440/mach-
-> gta02.c
-> index 640ca68..12193ad 100644
-> --- a/arch/arm/mach-s3c2440/mach-gta02.c
-> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
-> @@ -89,6 +89,8 @@
->  #include <plat/udc.h>
->  #include <plat/gpio-cfg.h>
->  #include <plat/iic.h>
-> +#include <plat/ts.h>
-> +
-> 
->  static struct pcf50633 *gta02_pcf;
-> 
-> @@ -480,6 +482,13 @@ static struct s3c2410_hcd_info gta02_usb_info
-__initdata
-> = {
->  	},
->  };
-> 
-> +/* Touchscreen */
-> +static struct s3c2410_ts_mach_info gta02_ts_info = {
-> +	.delay			= 10000,
-> +	.presc			= 0xff, /* slow as we can go */
-> +	.oversampling_shift	= 2,
-> +};
-> +
->  /* Buttons */
->  static struct gpio_keys_button gta02_buttons[] = {
->  	{
-> @@ -533,6 +542,8 @@ static struct platform_device *gta02_devices[]
-__initdata
-> = {
->  	&samsung_asoc_dma,
->  	&s3c_device_i2c0,
->  	&gta02_buttons_device,
-> +	&s3c_device_adc,
-> +	&s3c_device_ts,
->  };
-> 
->  /* These guys DO need to be children of PMU. */
-> @@ -595,6 +606,7 @@ static void __init gta02_machine_init(void)
->  #endif
-> 
->  	s3c24xx_udc_set_platdata(&gta02_udc_cfg);
-> +	s3c24xx_ts_set_platdata(&gta02_ts_info);
->  	s3c_ohci_set_platdata(&gta02_usb_info);
->  	s3c_nand_set_platdata(&gta02_nand_info);
->  	s3c_i2c0_set_platdata(NULL);
-> --
-> 1.7.2.3
+>   drivers/dma/dw_dmac.c |    7 +++++++
+>   1 files changed, 7 insertions(+), 0 deletions(-)
 
-Ok, applied.
-Thanks.
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+> index c40b89f..01f783d 100644
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
+> @@ -196,6 +196,7 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
+>   	dma_async_tx_callback		callback;
+>   	void				*param;
+>   	struct dma_async_tx_descriptor	*txd =&desc->txd;
+> +	struct dw_desc	*child;
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+    Shouldn't this varaible name be aligned with the above variable names?
+
+WBR, Sergei
