@@ -1,184 +1,294 @@
 From: bones@secretlab.ca (John Bonesio)
-Date: Mon, 28 Feb 2011 15:33:27 -0800
-Subject: [PATCH 1/4] ARM:boot:device tree: Allow the device tree binary to be
-	appended to zImage
+Date: Mon, 28 Feb 2011 15:33:38 -0800
+Subject: [PATCH 2/4] ARM:boot:device tree: Merge specific atags into the
+	device tree
 In-Reply-To: <20110228233153.24836.24176.stgit@riker>
 References: <20110228233153.24836.24176.stgit@riker>
-Message-ID: <20110228233327.24836.94530.stgit@riker>
+Message-ID: <20110228233337.24836.54594.stgit@riker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides the ability to boot using a device tree that is appended
-to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+This patch is to merge in key atags into the appended device tree.  An appended
+device tree is where the zImage has a dtb binary appended at the end of it. The
+boot code looks for an appended device tree, then looks for a few key atags
+passed in by the bootloader.
+
+The bootargs and memory size settings, if they exist, override existing values
+in the appended device tree. If these values don't currently exist in the
+appended device tree, they are added.
 
 Signed-off-by: John Bonesio <bones@secretlab.ca>
 ---
 
- arch/arm/Kconfig                |    7 +++
- arch/arm/boot/compressed/head.S |   93 ++++++++++++++++++++++++++++++++++++---
- 2 files changed, 94 insertions(+), 6 deletions(-)
+ arch/arm/boot/compressed/Makefile |   31 ++++++++++++++--
+ arch/arm/boot/compressed/atags.c  |   70 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/compressed/head.S   |   15 ++++++++
+ arch/arm/boot/compressed/misc.c   |   58 ++++++++++++++++++++++++++++++-
+ 4 files changed, 167 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/atags.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d8a330f..68fc640 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1593,6 +1593,13 @@ config USE_OF
- 	help
- 	  Include support for flattened device tree machine descriptions.
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 9d328be..7a2fe22 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -49,6 +49,10 @@ ifeq ($(CONFIG_ARCH_SHMOBILE),y)
+ OBJS		+= head-shmobile.o
+ endif
  
-+config ARM_APPENDED_DTB
-+       bool "Use appended device tree blob" if OF
-+       default n
-+       help
-+         With this option, the boot code will look for a dtb bianry
-+         appended to zImage.
++ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
++OBJS		+= atags.o libfdt.a 
++endif
 +
- # Compressed boot loader in ROM.  Yes, we really want to ask about
- # TEXT and BSS so we preserve their values in the config files.
- config ZBOOT_ROM_TEXT
+ #
+ # We now have a PIC decompressor implementation.  Decompressors running
+ # from RAM should not define ZTEXTADDR.  Decompressors running directly
+@@ -80,7 +84,9 @@ ORIG_CFLAGS := $(KBUILD_CFLAGS)
+ KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
+ endif
+ 
+-EXTRA_CFLAGS  := -fpic -fno-builtin
++fdttree      := $(srctree)/scripts/dtc/libfdt
++
++EXTRA_CFLAGS  := -fpic -fno-builtin -I$(fdttree) -I$(obj)
+ EXTRA_AFLAGS  := -Wa,-march=all
+ 
+ # Provide size of uncompressed kernel to the decompressor via a linker symbol.
+@@ -102,13 +108,28 @@ LDFLAGS_vmlinux += -X
+ LDFLAGS_vmlinux += -T
+ 
+ # For __aeabi_uidivmod
+-lib1funcs = $(obj)/lib1funcs.o
++libfuncs = $(obj)/lib1funcs.o
+ 
+-$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
+-	$(call cmd,shipped)
++ifeq ($(CONFIG_ARM_APPENDED_DTB),y)
++# For memchr, memmove, etc
++libfuncs += $(obj)/memchr.o $(obj)/strchr.o $(obj)/memmove.o $(obj)/memzero.o
++endif
++
++
++libfdtheader := $(fdttree)/fdt.h $(fdttree)/libfdt.h $(fdttree)/libfdt_internal.h
++libfdtobj    := $(obj)/fdt.o $(obj)/fdt_ro.o $(obj)/fdt_wip.o $(obj)/fdt_sw.o $(obj)/fdt_rw.o $(obj)/fdt_strerror.o
++
++$(libfdtobj): $(obj)/%.o: $(srctree)/scripts/dtc/libfdt/%.c $(libfdtheader)
++	$(call cmd_cc_o_c)
++
++$(obj)/libfdt.a: $(libfdtobj)
++	$(AR) rcs $@ $^
++
++$(libfuncs): $(obj)/%.o: $(srctree)/arch/$(SRCARCH)/lib/%.S
++	$(call cmd_as_o_S)
+ 
+ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+-	 	$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) FORCE
++	 	$(addprefix $(obj)/, $(OBJS)) $(libfuncs) FORCE
+ 	$(call if_changed,ld)
+ 	@:
+ 
+diff --git a/arch/arm/boot/compressed/atags.c b/arch/arm/boot/compressed/atags.c
+new file mode 100644
+index 0000000..d19d53d
+--- /dev/null
++++ b/arch/arm/boot/compressed/atags.c
+@@ -0,0 +1,70 @@
++#include <stddef.h>
++#include <asm/byteorder.h>
++#include <asm/setup.h>
++#include <fdt.h>
++#include <libfdt.h>
++
++int dt_setprop(void *fdt, const char *node_path, const char *property,
++               uint32_t *val_array, int size)
++{
++	int offset;
++
++	offset = fdt_path_offset(fdt, node_path);
++	if (offset < 0)
++		return offset;
++
++	return fdt_setprop(fdt, offset, property, val_array, size);
++}
++
++int dt_setprop_string(void *fdt, const char *node_path,
++                      const char *property, const char *string)
++{
++	int offset;
++		
++	offset = fdt_path_offset(fdt, node_path);
++	if (offset < 0)
++		return offset;
++			
++	return fdt_setprop_string(fdt, offset, property, string);
++}
++
++int dt_setprop_cell(void *fdt, const char *node_path,
++                    const char *property, uint32_t val)
++{
++	int offset;
++
++	offset = fdt_path_offset(fdt, node_path);
++	if (offset < 0)
++		return offset;
++
++	return fdt_setprop_cell(fdt, offset, property, val);
++}
++
++void dt_merge_atags(void *dt,  void *ataglist)
++{
++	struct tag *atag = ataglist;
++	uint32_t mem_reg_property[2];
++	uint32_t initrd_start, initrd_size;
++	int rc;
++
++	while (atag && atag->hdr.tag != 0) {
++		if (atag->hdr.tag == ATAG_CMDLINE) {
++			dt_setprop_string(dt, "/chosen", "bootargs",
++			                  atag->u.cmdline.cmdline);
++		} else if (atag->hdr.tag == ATAG_MEM) {
++			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
++			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
++			dt_setprop(dt, "/memory", "reg", mem_reg_property,
++			           sizeof(mem_reg_property));
++		} else if (atag->hdr.tag == ATAG_INITRD2) {
++			initrd_start = atag->u.initrd.start;
++			initrd_size = atag->u.initrd.size;
++			dt_setprop_cell(dt, "/chosen", "linux,initrd-start",
++			                initrd_start);
++			dt_setprop_cell(dt, "/chosen", "linux,initrd-end",
++			                initrd_start + initrd_size);
++		}
++		atag = tag_next(atag);
++	}
++}
++
 diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 200625c..ae9f8c6 100644
+index ae9f8c6..c2cdc5f 100644
 --- a/arch/arm/boot/compressed/head.S
 +++ b/arch/arm/boot/compressed/head.S
-@@ -210,6 +210,46 @@ restart:	adr	r0, LC0
- 		 */
+@@ -211,6 +211,7 @@ restart:	adr	r0, LC0
  		mov	r10, r6
  #endif
-+#ifdef CONFIG_ARM_APPENDED_DTB
-+/*
-+ *   r0  = delta
-+ *   r2  = BSS start
-+ *   r3  = BSS end
-+ *   r4  = final kernel address
-+ *   r5  = start of this image
-+ *   r6  = _edata
-+ *   r7  = architecture ID
-+ *   r8  = atags/device tree pointer
-+ *   r9  = size of decompressed image
-+ *   r10 = end of this image, including  bss/stack/malloc space if non XIP
-+ *   r11 = GOT start
-+ *   r12 = GOT end
-+ *
-+ * if there are device trees (dtb) appended to zImage, advance r10 so that the
-+ * dtb data will get relocated along with the kernel if necessary.
-+ */
-+
-+		ldr	r12, [r6, #0]
-+		ldr	r1, =0xedfe0dd0		@ sig is 0xdoodfeed big endian
-+		cmp	r12, r1
-+		bne	dtb_check_done
-+
-+		/* Get the dtb's size */
-+		ldr	r12, [r6, #4]		@ device tree size
-+
-+		/* convert r12 (dtb size) to little endian */
-+		eor	r1, r12, r12, ror #16
-+		bic	r1, r1, #0x00ff0000
-+		mov	r12, r12, ror #8
-+		eor	r12, r12, r1, lsr #8
-+
-+		add	r10, r10, r12
-+		add	r6, r6, r12
-+
-+dtb_check_done:
-+		adr	r1, LC0
-+		ldr	r12, [r1, #28]		@ restore r12 (GOT end)
-+#endif
- 
+ #ifdef CONFIG_ARM_APPENDED_DTB
++#define MERGE_SPACE	1024
  /*
-  * Check to see if we will overwrite ourselves.
-@@ -223,8 +263,8 @@ restart:	adr	r0, LC0
-  */
- 		cmp	r4, r10
- 		bhs	wont_overwrite
--		add	r10, r4, r9
--		cmp	r10, r5
-+		add	r1, r4, r9
-+		cmp	r1, r5
- 		bls	wont_overwrite
+  *   r0  = delta
+  *   r2  = BSS start
+@@ -243,6 +244,8 @@ restart:	adr	r0, LC0
+ 		mov	r12, r12, ror #8
+ 		eor	r12, r12, r1, lsr #8
  
- /*
-@@ -272,8 +312,10 @@ wont_overwrite:
-  *   r12 = GOT end
-  *   sp  = stack pointer
-  */
--		teq	r0, #0
--		beq	not_relocated
-+		adr	r1, LC0
-+		ldr	r6, [r1, #16]		@ reload _edata value
++		add	r12, r12, #MERGE_SPACE	@ extra space to merge in atags
 +
-+		add	r6, r6, r0
- 		add	r11, r11, r0
- 		add	r12, r12, r0
+ 		add	r10, r10, r12
+ 		add	r6, r6, r12
  
-@@ -288,12 +330,34 @@ wont_overwrite:
+@@ -338,6 +341,8 @@ wont_overwrite:
+ 		             	 		@ ... GOT entry doesn't
+ 		             	 		@ ... overwrite end of image
  
- 		/*
- 		 * Relocate all entries in the GOT table.
-+		 * Bump bss entries to past image end (r10)
- 		 */
-+		sub	r5, r10, r6		@ delta of image end and _edata
-+		add	r5, r5, #7		@ ... rounded up to a multiple
-+		bic	r5, r5, #7		@ ... of 8 bytes, so misaligned
-+		             	 		@ ... GOT entry doesn't
-+		             	 		@ ... overwrite end of image
++		add	r5, r5, #MERGE_SPACE	@ extra space to merge in atags
 +
  1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
  		add	r1, r1, r0		@ table.  This fixes up the
-+		cmp	r1, r2
-+		movcc	r9, #0			@ r9 = entry < bss_start ? 0 :
-+		movcs	r9, #1			@      1;
-+		cmp	r1, r3
-+		movcs	r9, #0			@ r9 = entry >= end ? 0 : t1;
-+		cmp	r9, #0
-+		addne	r1, r5			@ entry += r9 ? bss delta : 0;
- 		str	r1, [r11], #4		@ C references.
- 		cmp	r11, r12
- 		blo	1b
-+
-+		/* bump our bss registers too */
-+		add	r2, r2, r5
-+		add	r3, r3, r5
-+
-+		/* bump the stack pinter, if at or above _edata */
-+		cmp	sp, r6
-+		addcs	sp, sp, r5
- #else
+ 		cmp	r1, r2
+@@ -396,6 +401,16 @@ wont_overwrite:
+ 		cmp	r0, r1
+ 		bne	keep_atags
  
- 		/*
-@@ -309,7 +373,7 @@ wont_overwrite:
- 		blo	1b
++#ifndef CONFIG_ZBOOT_ROM
++		ldr	r0, [r6, #4]
++		add	r0, r0, #MERGE_SPACE	
++		str	r0, [r6, #4]		@ increase device tree size
++
++		/* merge in some key atags into the dtb */
++		mov	r0, r6
++		mov	r1, r8
++		bl	dt_merge_atags
++#endif
+ 		mov	r8, r6			@ use the appended device tree
+ keep_atags:
+ #endif
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index e653a6d..2d4da4c 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -29,7 +29,7 @@ unsigned int __machine_arch_type;
+ #include <asm/unaligned.h>
+ 
+ 
+-static void putstr(const char *ptr);
++void putstr(const char *ptr);
+ extern void error(char *x);
+ 
+ #include <mach/uncompress.h>
+@@ -100,7 +100,7 @@ static void icedcc_putc(int ch)
+ #define putc(ch)	icedcc_putc(ch)
  #endif
  
--not_relocated:	mov	r0, #0
-+		mov	r0, #0
- 1:		str	r0, [r2], #4		@ clear bss
- 		str	r0, [r2], #4
- 		str	r0, [r2], #4
-@@ -317,8 +381,25 @@ not_relocated:	mov	r0, #0
- 		cmp	r2, r3
- 		blo	1b
+-static void putstr(const char *ptr)
++void putstr(const char *ptr)
+ {
+ 	char c;
+ 
+@@ -114,6 +114,60 @@ static void putstr(const char *ptr)
+ }
+ 
  
 +#ifdef CONFIG_ARM_APPENDED_DTB
-+/*
-+ * The C runtime environment should now be set up sufficiently.
-+ *   r4  = kernel execution address
-+ *   r6  = _edata
-+ *   r7  = architecture ID
-+ *   r8  = atags pointer
-+ *
-+ * if there is a device tree (dtb) appended to zImage, set up to use this dtb.
++/**
++ * strlen - Find the length of a string
++ * @s: The string to be sized
 + */
-+		ldr	r0, [r6, #0]
-+		ldr	r1, =0xedfe0dd0		@ sig is 0xdoodfeed big endian
-+		cmp	r0, r1
-+		bne	keep_atags
++size_t strlen(const char *s)
++{
++        const char *sc;
 +
-+		mov	r8, r6			@ use the appended device tree
-+keep_atags:
++        for (sc = s; *sc != '\0'; ++sc)
++                /* nothing */;
++        return sc - s;
++}
++
++/**
++ * strcmp - Compare two strings
++ * @cs: One string
++ * @ct: Another string
++ */
++#undef strcmp
++int strcmp(const char *cs, const char *ct)
++{
++	unsigned char c1, c2;
++
++	while (1) {
++		c1 = *cs++;
++		c2 = *ct++;
++		if (c1 != c2)
++			return c1 < c2 ? -1 : 1;
++		if (!c1)
++			break;
++	}
++	return 0;
++}
++
++/**
++ * memcmp - Compare two areas of memory
++ * @cs: One area of memory
++ * @ct: Another area of memory
++ * @count: The size of the area.
++ */
++#undef memcmp
++int memcmp(const void *cs, const void *ct, size_t count)
++{
++	const unsigned char *su1, *su2;
++	int res = 0;
++
++	for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
++		if ((res = *su1 - *su2) != 0)
++			break;
++	return res;
++}
 +#endif
- /*
-- * The C runtime environment should now be setup sufficiently.
-  * Set up some pointers, and start decompressing.
-  *   r4  = kernel execution address
-  *   r7  = architecture ID
++
+ void *memcpy(void *__dest, __const void *__src, size_t __n)
+ {
+ 	int i = 0;
