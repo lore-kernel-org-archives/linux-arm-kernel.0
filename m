@@ -1,31 +1,23 @@
-From: linuxzsc@gmail.com (Richard Zhao)
-Date: Mon, 28 Feb 2011 21:50:37 +0800
-Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
-In-Reply-To: <AANLkTin1U=B3xnp0UGK_2iHK2k=o4Tda=6NzyoLFgUAv@mail.gmail.com>
-References: <1298892315-23386-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-	<AANLkTin1U=B3xnp0UGK_2iHK2k=o4Tda=6NzyoLFgUAv@mail.gmail.com>
-Message-ID: <AANLkTimTsv1jsvX8Eq9EttU32O0sJ-8yj-SGadx9gwLD@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 28 Feb 2011 15:55:59 +0200
+Subject: [PATCH V5 1/6] pxa3xx_nand: make scan procedure more clear
+In-Reply-To: <1298860335-18638-2-git-send-email-leiwen@marvell.com>
+References: <1298019428-7809-1-git-send-email-leiwen@marvell.com>
+	<1298860335-18638-2-git-send-email-leiwen@marvell.com>
+Message-ID: <1298901359.2809.25.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 8:43 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Richard,
->
-> On Mon, Feb 28, 2011 at 8:25 AM, Richard Zhu
-> <Hong-Xing.Zhu@freescale.com> wrote:
->> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
->> ---
->> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-mx5/board-mx53_loco.c | ? ?2 ++
->> ?2 files changed, 3 insertions(+), 0 deletions(-)
->
-> I think this patch should be the last one of the series.
-Yes, but I don't think it matter much.
+On Mon, 2011-02-28 at 10:32 +0800, Lei Wen wrote:
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
 
-Thanks
-Richard
->
-> Regards,
->
-> Fabio Estevam
->
+Could you please improve the commit message and make it explain why your
+code makes "scan" more clear, what exactly you do to improve it?
+
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
