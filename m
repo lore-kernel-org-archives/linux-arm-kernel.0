@@ -1,52 +1,38 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 28 Feb 2011 17:09:17 +0200
-Subject: [PATCH resend] omap: Fix linker error in
-	drivers/video/omap/lcd_2430sdp.c
-In-Reply-To: <20110228164715.e34a965e.jhnikula@gmail.com>
-References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
-	<1298232248-347-1-git-send-email-jhnikula@gmail.com>
-	<20110224212644.GN20560@atomide.com>
-	<20110228164715.e34a965e.jhnikula@gmail.com>
-Message-ID: <1298905757.9809.135.camel@deskari>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Feb 2011 15:11:00 +0000
+Subject: When does mach-types get updated in a tree?
+In-Reply-To: <0812376c-ea4b-4185-aa6e-6fb582dce21f@VA3EHSMHS032.ehs.local>
+References: <a9937fcf-a4cb-41c5-a767-ecfebae5c748@VA3EHSMHS024.ehs.local>
+	<20110228101030.GB29843@n2100.arm.linux.org.uk>
+	<0812376c-ea4b-4185-aa6e-6fb582dce21f@VA3EHSMHS032.ehs.local>
+Message-ID: <20110228151100.GB1937@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-02-28 at 08:47 -0600, Jarkko Nikula wrote:
-> On Thu, 24 Feb 2011 13:26:44 -0800
-> Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > We should avoid selecting driver related things, otherwise we can never
-> > build a tiny kernel with initramfs with everything as modules.
-> > 
-> > Can you see if adding depends to the LCD panel option does the trick
-> > instead?
-> > 
-> True and as lcd_2430sdp.c is not compiled without CONFIG_FB_OMAP a hack
-> below should work a bit better.
-> 
-> What would you think Tomi?
-> 
-> diff --git a/drivers/video/omap/Kconfig b/drivers/video/omap/Kconfig
-> index 083c8fe..c981249 100644
-> --- a/drivers/video/omap/Kconfig
-> +++ b/drivers/video/omap/Kconfig
-> @@ -5,6 +5,7 @@ config FB_OMAP
->  	select FB_CFB_FILLRECT
->  	select FB_CFB_COPYAREA
->  	select FB_CFB_IMAGEBLIT
-> +	select TWL4030_CORE if MACH_OMAP_2430SDP
->  	help
->            Frame buffer driver for OMAP based boards.
-> 
+On Mon, Feb 28, 2011 at 07:35:57AM -0700, John Linn wrote:
+> What is your suggestion to people with regards to patches that need the
+> update?
 
-Well, it's a bit ugly, but I'm fine with it. It's for the old omapfb,
-which hopefully nobody uses anymore (right =), and there's no simple way
-to make it modular and neat.
+The only suggestion I can make is: don't wait until the last minute before
+putting something into the machine registry, because you will get into
+these kinds of problems.
 
-The old omapfb compiles lcd_2430sdp always into the kernel if
-MACH_OMAP_2430SDP is defined, so this looks like a correct fix to me.
+If I do an update now, it'll be the second time it's happened in February.
+It's likely it will need another update just before the merge window too
+in 3-4 weeks time.
 
-Heh, interestingly, the old omapfb Makefile says: "Makefile for the new
-OMAP framebuffer device driver". Things are relative =).
+So really all that I can say is that people need to ensure that they get
+stuff from the machine registry earlier rather than later.
 
- Tomi
+I do think we're heading for a major problem with the mach-types file
+becoming too big inspite of its brevity.  I think I may start marking
+entries as 'inactive' and therefore omitted from the kernel's tree if
+they don't appear in mainline within one year of being allocated (or
+some similar rule.)
+
+> I'm open to suggestions, just trying to work with everyone the best way
+> to get Xilinx patches into the system.
+
+The only thing I can think is to wait a couple more weeks and I'll see
+about doing an update mid-March.  Maybe by then we can have a smaller
+file...
