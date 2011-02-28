@@ -1,27 +1,53 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Mon, 28 Feb 2011 13:32:57 +0000
-Subject: Linux support for Samsung S3C2510A Processor
-In-Reply-To: <AANLkTinBZCQ7Q+BaSxhm62pKiZHhmVWAgNzxnm5jBhZy@mail.gmail.com>
-References: <AANLkTinBZCQ7Q+BaSxhm62pKiZHhmVWAgNzxnm5jBhZy@mail.gmail.com>
-Message-ID: <20110228133256.GB22646@trinity.fluff.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 28 Feb 2011 13:33:38 +0000
+Subject: [PATCH 2/6] ARM: omap: update GPIO chained IRQ handler to use EOI in
+	parent chip
+In-Reply-To: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1298900022-21516-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 06:52:15PM +0530, Madhavi Manchala wrote:
-> Dear All,
-> 
-> Does Linux kernel supports the Samsung S3C2510A processor? Why am I
-> asking this question is, when I looked into  the arch/arm/ directory I
-> did not find anything which is related to Samsung S3C2510A processor.
-> There are other directories like mach-s3c24xx and mach-s3c64xx
-> directories, but not mach-s3c25xx.
-> 
-> Any ideas / hints will be appreciated.
+On OMAP4, gpio_irq_handler can be chained to a physical interrupt using
+the GIC as the primary IRQ chip. Now that the GIC uses the fasteoi flow
+model, the chained handler must invoke ->irq_eoi once handling is
+complete.
 
-I think this is a no-mmu version, and there is not a lot of ARM no-mmu
-support at the moment.
+This patch adds a conditional call to ->irq_eoi in the GPIO IRQ handler
+for OMAP platforms. For OMAP implementations using other primary
+interrupt controllers, the ->irq_ack call remains and is also made
+conditional on the support offered by the controller.
 
+Cc: Colin Cross <ccross@google.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-and-tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/plat-omap/gpio.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 971d186..1d2d1c7 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -1144,7 +1144,8 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	u32 retrigger = 0;
+ 	int unmasked = 0;
+ 
+-	desc->irq_data.chip->irq_ack(&desc->irq_data);
++	if (desc->irq_data.chip->irq_ack)
++		desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 
+ 	bank = get_irq_data(irq);
+ #ifdef CONFIG_ARCH_OMAP1
+@@ -1238,6 +1239,8 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ exit:
+ 	if (!unmasked)
+ 		desc->irq_data.chip->irq_unmask(&desc->irq_data);
++	if (desc->irq_data.chip->irq_eoi)
++		desc->irq_data.chip->irq_eoi(&desc->irq_data);
+ }
+ 
+ static void gpio_irq_shutdown(struct irq_data *d)
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+1.7.0.4
