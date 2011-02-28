@@ -1,36 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Feb 2011 13:33:42 +0000
-Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use EOI in
-	parent chip
-In-Reply-To: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1298900022-21516-7-git-send-email-will.deacon@arm.com>
+Date: Mon, 28 Feb 2011 13:33:36 +0000
+Subject: [PATCH v2 0/6] Migrate GIC to fasteoi flow control
+Message-ID: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chained GPIO IRQ handler for the nomadik platform can be called
-with the GIC as its host chip on the mach-ux500 machines.
+Hello,
 
-This patch updates the code to use ->irq_eoi when it is available.
+This is version 2 of the patch series originally posted here:
 
-Cc: Rabin Vincent <rabin@rab.in>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/plat-nomadik/gpio.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043083.html
 
-diff --git a/arch/arm/plat-nomadik/gpio.c b/arch/arm/plat-nomadik/gpio.c
-index 1e88ecb..51cc71b 100644
---- a/arch/arm/plat-nomadik/gpio.c
-+++ b/arch/arm/plat-nomadik/gpio.c
-@@ -538,6 +538,8 @@ static void nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	}
- 
- 	host_chip->irq_unmask(&desc->irq_data);
-+	if (host_chip->irq_eoi)
-+		host_chip->irq_eoi(&desc->irq_data);
- }
- 
- static int nmk_gpio_init_irq(struct nmk_gpio_chip *nmk_chip)
--- 
-1.7.0.4
+Changes since v1:
+
+	* Added plat-nomadik changes after related patch from Rabin
+	* Fixed msm changes to call irq_eoi correctly
+	* No longer in quoted-printable encoding (thanks Colin)
+
+This is going to be a PITA to merge so any thoughts relating to that
+are welcome.
+
+Thanks,
+
+Will
+
+
+Will Deacon (6):
+  ARM: gic: use handle_fasteoi_irq for SPIs
+  ARM: omap: update GPIO chained IRQ handler to use EOI in parent chip
+  ARM: tegra: update GPIO chained IRQ handler to use EOI in parent chip
+  ARM: s5pv310: update IRQ combiner to use EOI in parent chip
+  ARM: msm: update GPIO chained IRQ handler to use EOI in parent chip
+  ARM: nmk: update GPIO chained IRQ handler to use EOI in parent chip
+
+ arch/arm/common/gic.c                |   23 +++++++++--------------
+ arch/arm/mach-msm/gpio-v2.c          |    3 ++-
+ arch/arm/mach-s5pv310/irq-combiner.c |    7 ++-----
+ arch/arm/mach-tegra/gpio.c           |   17 +----------------
+ arch/arm/plat-nomadik/gpio.c         |    2 ++
+ arch/arm/plat-omap/gpio.c            |    5 ++++-
+ 6 files changed, 20 insertions(+), 37 deletions(-)
