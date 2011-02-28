@@ -1,39 +1,36 @@
-From: vinay.hegde@ti.com (Hegde, Vinay)
-Date: Mon, 28 Feb 2011 13:45:20 +0530
-Subject: [PATCH v2] davinci_emac: Add Carrier Link OK check in Davinci RX
-	Handler
-Message-ID: <1298880920-22715-1-git-send-email-vinay.hegde@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 28 Feb 2011 10:29:15 +0200
+Subject: [PATCH v10 05/18] OMAP2,3 DSS2 Change driver name to omap_display
+In-Reply-To: <AANLkTikqPfjt=hemHWEu8OmAMmQDz4zNLzQqECKfPULM@mail.gmail.com>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+	<1298539643.16119.54.camel@deskari> <1298876015.2096.36.camel@deskari>
+	<4D6B4A1A.9000304@ti.com> <1298877549.2096.47.camel@deskari>
+	<4D6B4E45.7080108@ti.com>
+	<AANLkTikqPfjt=hemHWEu8OmAMmQDz4zNLzQqECKfPULM@mail.gmail.com>
+Message-ID: <1298881755.2278.4.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an additional check in the Davinci EMAC RX Handler,
-which tests the __LINK_STATE_NOCARRIER flag along with the
-__LINK_STATE_START flag as part EMAC shutting down procedure.
+On Mon, 2011-02-28 at 02:16 -0600, Semwal, Sumit wrote:
+> Hi,
+> 
+> On Mon, Feb 28, 2011 at 12:57 PM, archit taneja <archit@ti.com> wrote:
 
-This avoids
-WARNING: at drivers/net/davinci_emac.c:1040 emac_rx_handler+0xf8/0x120()
-during rtcwake used to suspend the target for a specified duration.
+<snip>
 
-Signed-off-by: Hegde, Vinay <vinay.hegde@ti.com>
-Acked-by: Cyril Chemparathy <cyril@ti.com>
----
-since v1: Changed the subject line
+> > Yes, it might get misleading if someone looking at the code tries to find
+> > "core" in the TRM, I guess we should stick to "omapdss_dss", this also
+> > ensures a uniform matching of the platform driver names and the beginning of
+> > register names for each HW module.
+> 
+> Hmmm... I guess omapdss_dss seems a better name in this view; I'm ok
+> with this way of naming - do you want me to send a patch for it, or
+> would you update this patch itself?
 
- drivers/net/davinci_emac.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I've made the change. I changed the commits in my tree according to this
+new naming. Quite a bit of changes, so I removed tested-bys from the
+patches. I'll do some more testing, and push the changes to my master
+branch.
 
-diff --git a/drivers/net/davinci_emac.c b/drivers/net/davinci_emac.c
-index 2a628d1..7018bfe 100644
---- a/drivers/net/davinci_emac.c
-+++ b/drivers/net/davinci_emac.c
-@@ -1008,7 +1008,7 @@ static void emac_rx_handler(void *token, int len, int status)
- 	int			ret;
- 
- 	/* free and bail if we are shutting down */
--	if (unlikely(!netif_running(ndev))) {
-+	if (unlikely(!netif_running(ndev) || !netif_carrier_ok(ndev))) {
- 		dev_kfree_skb_any(skb);
- 		return;
- 	}
--- 
-1.7.1
+ Tomi
