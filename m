@@ -1,31 +1,43 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Thu, 31 Mar 2011 12:41:16 -0000
-Subject: [PATCH 0/1] new module for amba axi on-chip interconnect
-Message-ID: <op.vs7j6jkw3ri7v4@arend-laptop>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Tue,  1 Mar 2011 02:31:34 +0530
+Subject: [PATCH v6 0/1] Add PRUSS UIO driver support
+Message-ID: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 March 2011 20:08:57 +0100 Russell King - ARM Linux wrote:
-> I think you're going to be waiting a very long time for that to happen.
-> No SoC vendor adds device IDs to their on-chip devices to allow them to
-> be automatically discovered - it's only through ARM Ltd's development of
-> their Primecells, and then vendors integrating those into their SoC  
-> (maybe
-> with their own modifications) that we've started to see this kind of ID
-> system appearing.
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAP-L138 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts
+to user space application.PRUSS UIO application API can be used to control PRUs
+in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+processor and PRUs. More information on PRUSS and UIO linux user space API
+available in the links below
 
-Actually, Broadcom does. ARM delivers the DMP plugin. This adds additional  
-register space with each core and each core is identified with a vendor id  
-(maintained by JEDEC to assure it is unique), a core id, and a core class.  
-Another used interconnect is SSB which also offers discovery functionality.
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-> Outside of the Primecell stuff, I'm unaware of anyone adding any kind
-> of discovery mechanism to SoC based devices.
+Platform/board specific portion of this patch depends on Mistral patches below
 
-Not sure either.
+[PATCH 1/1] davinci: changed SRAM allocator to shared ram :
+				https://patchwork.kernel.org/patch/549351/
+[PATCH 1/1] da830: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS :
+				 https://patchwork.kernel.org/patch/549331/
+[PATCH v2 01/13] mfd: pruss mfd driver :
+				https://patchwork.kernel.org/patch/549531/
+[PATCH v2 02/13] da850: pruss platform specific additions :
+				https://patchwork.kernel.org/patch/549521/
 
-Gr. AvS
--- 
-"The most merciful thing in the world, I think, is the inability of the  
-human
-mind to correlate all its contents." - "The Call of Cthulhu"
+I will submit a seperate patch set on top of these patches to support PRUSS UIO
+driver.
+
+Pratheesh Gangadhar (1):
+  PRUSS UIO driver support
+
+ drivers/uio/Kconfig     |   17 ++++
+ drivers/uio/Makefile    |    1 +
+ drivers/uio/uio_pruss.c |  237 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 255 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
