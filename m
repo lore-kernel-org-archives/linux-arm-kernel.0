@@ -1,50 +1,74 @@
-From: mk7.kang@samsung.com (Minkyu Kang)
-Date: Mon, 28 Feb 2011 17:14:01 +0900
-Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
-In-Reply-To: <002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
-References: <4D676BB8.9040803@samsung.com>
-	<002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
-Message-ID: <4D6B5949.8020606@samsung.com>
+From: sumit.semwal@ti.com (Semwal, Sumit)
+Date: Mon, 28 Feb 2011 13:46:31 +0530
+Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to omap_display
+In-Reply-To: <4D6B4E45.7080108@ti.com>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+	<1298539643.16119.54.camel@deskari>
+	<1298876015.2096.36.camel@deskari> <4D6B4A1A.9000304@ti.com>
+	<1298877549.2096.47.camel@deskari> <4D6B4E45.7080108@ti.com>
+Message-ID: <AANLkTikqPfjt=hemHWEu8OmAMmQDz4zNLzQqECKfPULM@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin Kim,
+Hi,
 
-2011-02-28 ?? 4:42, Kukjin Kim ? ?:
-> Minkyu Kang wrote:
+On Mon, Feb 28, 2011 at 12:57 PM, archit taneja <archit@ti.com> wrote:
+> Hi,
+>
+> On Monday 28 February 2011 12:49 PM, Valkeinen, Tomi wrote:
 >>
->> This patch adds Samsung NURI board support.
+>> On Mon, 2011-02-28 at 01:09 -0600, Taneja, Archit wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Monday 28 February 2011 12:23 PM, Valkeinen, Tomi wrote:
+>>>>
+<snip>
+>>>>> I just realized that changing the driver name will break all scripts
+>>>>> and
+>>>>> applications using omapdss sysfs files.
+>>>>>
+>>>>> How does this sound:
+>>>>>
+>>>>> Let's leave the omapdss device name as it is. It represents a "super"
+>>>>> device, containing the dss sysfs files and upper level dss management.
+>>>>>
+>>>>> Name the HW module platform drivers as: omapdss_dss, omapdss_venc,
+>>>>> omapdss_dispc, etc. This would indicate them to be clearly parts of
+>>>>> DSS,
+>>>>> and would also prevent any possible name conflict if there would happen
+>>>>> to be a, say, "dsi" block in some other HW component.
+>>>>
+>>>> Any comments on this?
+>>>
+>>> I also think we need to stick to the older name, "omapdss_dss" sounds a
+>>> bit confusing, and I think one of the previous versions had something
+>>> like "dss_dss" in it and it wasn't approved. Does something like
+>>> "omapdss_core" or "omapdss_dss_core" make sense, or is it more
+>>> misleading?
 >>
->> Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> This patch is base on next-exynos4 branch at kgene tree.
+>> It is confusing, but so is the hardware naming =). There is a DSS module
+>> inside the omap display subsystem. That's why I would like to name it
+>> "dss", not "core", so it's clear it refers to this DSS module.
 >>
->>  arch/arm/configs/exynos4_defconfig |    1 +
->>  arch/arm/mach-exynos4/Kconfig      |   15 +++
->>  arch/arm/mach-exynos4/Makefile     |    1 +
->>  arch/arm/mach-exynos4/mach-nuri.c  |  233
->> ++++++++++++++++++++++++++++++++++++
->>  4 files changed, 250 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
+>> "dss_dss" looks a bit silly, but I think "omapdss_dss" is slightly
+>> better in the sense that it doesn't repeat the same "dss", and there is
+>> an "omapdss" device, which acts like "manager" for these module devices.
+>> But yes, I wouldn't call it perfect either.
 >>
-> 
->> +enum fixed_regulator_id {
->> +	FIXED_REG_ID_MMC = 0,
-> 
-> 	FIXED_REG_ID_MMC,
-> 
-> (snip)
-> 
->> +static struct platform_device emmc_fixed_voltage = {
->> +	.name			= "reg-fixed-voltage",
->> +	.id			= FIXED_REG_ID_MMC,
-> 
-> Is there any reason to use FIXED_REG_ID_MMC instead directly id 0?
-> 
+>> "omapdss_dss_core" is one option. But then again, TRM doesn't speak of
+>> "core".
+>
+> Yes, it might get misleading if someone looking at the code tries to find
+> "core" in the TRM, I guess we should stick to "omapdss_dss", this also
+> ensures a uniform matching of the platform driver names and the beginning of
+> register names for each HW module.
 
-I'm going to add more IDs of fixed regulator that are LCD and Backlight, and so on.
-So use enum values for avoid the hard coding.
-
-Thanks.
-Minkyu Kang.
+Hmmm... I guess omapdss_dss seems a better name in this view; I'm ok
+with this way of naming - do you want me to send a patch for it, or
+would you update this patch itself?
+~Sumit.
+>
+> Archit
+>
