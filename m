@@ -1,48 +1,52 @@
-From: viresh.linux@gmail.com (viresh kumar)
-Date: Mon, 28 Feb 2011 20:34:02 +0530
-Subject: [PATCH 6/8 resend] dw_dmac: Mark all tx_descriptors with
-	DMA_CRTL_ACK after xfer finish
-In-Reply-To: <4D6B8F84.40905@ru.mvista.com>
-References: <cover.1298889267.git.viresh.kumar@st.com>
-	<82027aa0c6446df3f7fb8e3c5fbdc28f60ea33b7.1298889267.git.viresh.kumar@st.com>
-	<4D6B8F84.40905@ru.mvista.com>
-Message-ID: <AANLkTimhKCxD=9-+gGL41vo+FkaKUFwi6jvgEcGz_VQw@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 28 Feb 2011 17:09:17 +0200
+Subject: [PATCH resend] omap: Fix linker error in
+	drivers/video/omap/lcd_2430sdp.c
+In-Reply-To: <20110228164715.e34a965e.jhnikula@gmail.com>
+References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
+	<1298232248-347-1-git-send-email-jhnikula@gmail.com>
+	<20110224212644.GN20560@atomide.com>
+	<20110228164715.e34a965e.jhnikula@gmail.com>
+Message-ID: <1298905757.9809.135.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/28/11, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-> Hello.
->
-> On 28-02-2011 13:41, Viresh Kumar wrote:
->
->> dwc_desc_get checks all descriptors for DMA_CTRL_ACK before allocating
->> them for
->> transfers. And descriptors are not marked with DMA_CRTL_ACK after transfer
->> finishes. Thus descriptor once used is not usable again. This patch marks
->> descriptors with DMA_CRTL_ACK after dma xfer finishes
->
->> Signed-off-by: Viresh Kumar<viresh.kumar@st.com>
->> ---
->>   drivers/dma/dw_dmac.c |    7 +++++++
->>   1 files changed, 7 insertions(+), 0 deletions(-)
->
->> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
->> index c40b89f..01f783d 100644
->> --- a/drivers/dma/dw_dmac.c
->> +++ b/drivers/dma/dw_dmac.c
->> @@ -196,6 +196,7 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc,
->> struct dw_desc *desc)
->>   	dma_async_tx_callback		callback;
->>   	void				*param;
->>   	struct dma_async_tx_descriptor	*txd =&desc->txd;
->> +	struct dw_desc	*child;
->
->     Shouldn't this varaible name be aligned with the above variable names?
->
+On Mon, 2011-02-28 at 08:47 -0600, Jarkko Nikula wrote:
+> On Thu, 24 Feb 2011 13:26:44 -0800
+> Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > We should avoid selecting driver related things, otherwise we can never
+> > build a tiny kernel with initramfs with everything as modules.
+> > 
+> > Can you see if adding depends to the LCD panel option does the trick
+> > instead?
+> > 
+> True and as lcd_2430sdp.c is not compiled without CONFIG_FB_OMAP a hack
+> below should work a bit better.
+> 
+> What would you think Tomi?
+> 
+> diff --git a/drivers/video/omap/Kconfig b/drivers/video/omap/Kconfig
+> index 083c8fe..c981249 100644
+> --- a/drivers/video/omap/Kconfig
+> +++ b/drivers/video/omap/Kconfig
+> @@ -5,6 +5,7 @@ config FB_OMAP
+>  	select FB_CFB_FILLRECT
+>  	select FB_CFB_COPYAREA
+>  	select FB_CFB_IMAGEBLIT
+> +	select TWL4030_CORE if MACH_OMAP_2430SDP
+>  	help
+>            Frame buffer driver for OMAP based boards.
+> 
 
-Should be. Will take care of this while resending this patch series,
-after getting all
-review comments.
+Well, it's a bit ugly, but I'm fine with it. It's for the old omapfb,
+which hopefully nobody uses anymore (right =), and there's no simple way
+to make it modular and neat.
 
---
-viresh
+The old omapfb compiles lcd_2430sdp always into the kernel if
+MACH_OMAP_2430SDP is defined, so this looks like a correct fix to me.
+
+Heh, interestingly, the old omapfb Makefile says: "Makefile for the new
+OMAP framebuffer device driver". Things are relative =).
+
+ Tomi
