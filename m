@@ -1,42 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Feb 2011 13:33:36 +0000
-Subject: [PATCH v2 0/6] Migrate GIC to fasteoi flow control
-Message-ID: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+Date: Mon, 28 Feb 2011 13:33:39 +0000
+Subject: [PATCH 3/6] ARM: tegra: update GPIO chained IRQ handler to use EOI in
+	parent chip
+In-Reply-To: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1298900022-21516-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
+chip prior to handling the interrupt.
 
-This is version 2 of the patch series originally posted here:
+This patch updates the code to use ->irq_eoi now that the GIC has moved
+to using the fasteoi flow model.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/043083.html
+Acked-by: Colin Cross <ccross@android.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mach-tegra/gpio.c |   17 +----------------
+ 1 files changed, 1 insertions(+), 16 deletions(-)
 
-Changes since v1:
-
-	* Added plat-nomadik changes after related patch from Rabin
-	* Fixed msm changes to call irq_eoi correctly
-	* No longer in quoted-printable encoding (thanks Colin)
-
-This is going to be a PITA to merge so any thoughts relating to that
-are welcome.
-
-Thanks,
-
-Will
-
-
-Will Deacon (6):
-  ARM: gic: use handle_fasteoi_irq for SPIs
-  ARM: omap: update GPIO chained IRQ handler to use EOI in parent chip
-  ARM: tegra: update GPIO chained IRQ handler to use EOI in parent chip
-  ARM: s5pv310: update IRQ combiner to use EOI in parent chip
-  ARM: msm: update GPIO chained IRQ handler to use EOI in parent chip
-  ARM: nmk: update GPIO chained IRQ handler to use EOI in parent chip
-
- arch/arm/common/gic.c                |   23 +++++++++--------------
- arch/arm/mach-msm/gpio-v2.c          |    3 ++-
- arch/arm/mach-s5pv310/irq-combiner.c |    7 ++-----
- arch/arm/mach-tegra/gpio.c           |   17 +----------------
- arch/arm/plat-nomadik/gpio.c         |    2 ++
- arch/arm/plat-omap/gpio.c            |    5 ++++-
- 6 files changed, 20 insertions(+), 37 deletions(-)
+diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+index ad80488..5019b01 100644
+--- a/arch/arm/mach-tegra/gpio.c
++++ b/arch/arm/mach-tegra/gpio.c
+@@ -219,9 +219,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	struct tegra_gpio_bank *bank;
+ 	int port;
+ 	int pin;
+-	int unmasked = 0;
+-
+-	desc->irq_data.chip->irq_ack(&desc->irq_data);
+ 
+ 	bank = get_irq_data(irq);
+ 
+@@ -233,23 +230,11 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 
+ 		for_each_set_bit(pin, &sta, 8) {
+ 			__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
+-
+-			/* if gpio is edge triggered, clear condition
+-			 * before executing the hander so that we don't
+-			 * miss edges
+-			 */
+-			if (lvl & (0x100 << pin)) {
+-				unmasked = 1;
+-				desc->irq_data.chip->irq_unmask(&desc->irq_data);
+-			}
+-
+ 			generic_handle_irq(gpio_to_irq(gpio + pin));
+ 		}
+ 	}
+ 
+-	if (!unmasked)
+-		desc->irq_data.chip->irq_unmask(&desc->irq_data);
+-
++	desc->irq_data.chip->irq_eoi(&desc->irq_data);
+ }
+ 
+ #ifdef CONFIG_PM
+-- 
+1.7.0.4
