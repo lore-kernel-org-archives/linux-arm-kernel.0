@@ -1,61 +1,31 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 28 Feb 2011 15:38:38 +0530
-Subject: [PATCH v4 2/2] Defines DA850/AM18xx/OMAPL1-38 SOC resources
-	used by PRUSS UIO driver
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF3591A@dbde02.ent.ti.com>
-References: <1298556402-26456-1-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-2-git-send-email-pratheesh@ti.com>
-	<1298556402-26456-3-git-send-email-pratheesh@ti.com>
-	<4D6796D6.5050008@mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF3591A@dbde02.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BF35C6E@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 28 Feb 2011 10:10:30 +0000
+Subject: When does mach-types get updated in a tree?
+In-Reply-To: <a9937fcf-a4cb-41c5-a767-ecfebae5c748@VA3EHSMHS024.ehs.local>
+References: <a9937fcf-a4cb-41c5-a767-ecfebae5c748@VA3EHSMHS024.ehs.local>
+Message-ID: <20110228101030.GB29843@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratheesh,
-
-On Mon, Feb 28, 2011 at 10:16:18, TK, Pratheesh Gangadhar wrote:
-
-> > > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-
-> > davinci/devices-da8xx.c
-> > > index beda8a4..4ea3d1f 100644
-> > > --- a/arch/arm/mach-davinci/devices-da8xx.c
-> > > +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> > > @@ -725,3 +725,76 @@ int __init da8xx_register_cpuidle(void)
-> > >
-> > >   	return platform_device_register(&da8xx_cpuidle_device);
-> > >   }
-> > > +static struct resource pruss_resources[] = {
-> > > +	[0] = {
-> > > +		.start  = DA8XX_PRUSS_BASE,
-> > > +		.end    = DA8XX_PRUSS_BASE + SZ_64K - 1,
-> > > +		.flags  = IORESOURCE_MEM,
-> > > +	},
-> > > +	[1] = {
-> > > +		.start  = DA8XX_L3RAM_BASE,
-> > > +		.end    = DA8XX_L3RAM_BASE + SZ_128K - 1,
-> > > +		.flags  = IORESOURCE_MEM,
-> > > +	},
-> > > +	[2] = {
-> > > +		.start  = 0,
-> > > +		.end    = SZ_256K - 1,
+On Sat, Feb 26, 2011 at 08:40:24AM -0700, John Linn wrote:
+> > -----Original Message-----
+> > From: John Linn
+> > Sent: Wednesday, February 23, 2011 12:06 PM
+> > To: 'linux-arm-kernel at lists.infradead.org'; 'linux at arm.linux.org.uk'
+> > Cc: grant.likely at secretlab.ca
+> > Subject: When does mach-types get updated in a tree?
 > > 
-> >     Huh? I don't see where it's filled...
-> > 
-> The current use is only to indicate memory block size to the PRUSS UIO 
-> driver when we allocate DDR memory using dma_alloc_coherent.
+> > I am trying to get a branch ready that could be pulled from with my
+> new patches.
+> 
+> Maybe I missed it, but I didn't notice any response to this,
+> or it was a really dumb question that didn't deserve an answer.
 
-If the user/platform needs to specify the amount of memory that
-will be allocated by the driver, it can be done though platform
-data or (better) using module params.
+I don't update it too frequently because its becoming quite a burden to
+edit out all the buggered entries people have made in it - and I don't
+want to draw attention to it by updating it too regularly.  I can see
+that it's a file that Linus will eventually complain about - it is 134K,
+most of which is probably not used.
 
-> sram_alloc is changed to use L3_RAM (128KB) instead of ARM RAM (8KB) in 
-> Mistral patch set - I need to follow the same convention for L3 RAM as well 
-> if I need to align with that patch. Is there a better way to do this?
-
-Yes, with that patch sram_alloc() will allocate from L3 RAM. You can make
-calls to sram_alloc() in your driver. Again the size to be allocated can
-be platform data or module params.
-
-Thanks,
-Sekhar
+So I tend to update it on request, and normally no more than once every
+two months.
