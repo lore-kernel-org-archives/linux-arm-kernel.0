@@ -1,62 +1,115 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 28 Feb 2011 11:41:51 -0800
-Subject: [GIT PULL] omap fixes for v2.6.38-rc6
-Message-ID: <20110228194151.GJ20560@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 28 Feb 2011 14:58:11 -0500 (EST)
+Subject: [PATCH] ARM: Thumb-2: Work around buggy Thumb-2 short branch
+	relocations in gas
+In-Reply-To: <1298914692-19897-1-git-send-email-dave.martin@linaro.org>
+References: <1298914692-19897-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1102281456390.7544@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, 28 Feb 2011, Dave Martin wrote:
 
-Please pull omap fixes from:
+> Various binutils versions can resolve Thumb-2 branches to
+> locally-defined, preemptible global symbols as short-range "b.n"
+> branch instructions.
+> 
+> This is a problem, because there's no guarantee the final
+> destination of the symbol, or any candidate locations for a
+> trampoline, are within range of the branch.  For this reason, the
+> kernel does not support fixing up the R_ARM_THM_JUMP11 (102)
+> relocation in modules at all, and it makes little sense to add
+> support.
+> 
+> The symptom is that the kernel fails with an "unsupported
+> relocation" error when loading some modules.
+> 
+> Until fixed tools are available, passing
+> -fno-optimize-sibling-calls to gcc should prevent gcc generating
+> code which hits this problem, at the cost of a bit of extra runtime
+> stack usage in some cases.
+> 
+> The problem is described in more detail at:
+>     https://bugs.launchpad.net/binutils-linaro/+bug/725126
+> 
+> Only Thumb-2 kernels are affected.
+> 
+> This patch adds a new CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11 config
+> option which adds -fno-optimize-sibling-calls to CFLAGS_MODULE
+> when building a Thumb-2 kernel.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-This contains one more timer regression fix, a DPLL rate fix,
-and a mailbox NULL pointer fix that would be good to get
-in for 2.6.38. The series also removes world-writable flag for
-some debugfs entries.
-
-Other than I believe that's it for omap fixes for v2.6.38.
-
-Regards,
-
-Tony
-
-
-The following changes since commit f5412be599602124d2bdd49947b231dd77c0bf99:
-
-  Linux 2.6.38-rc6 (2011-02-21 17:25:52 -0800)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
-
-John Ogness (1):
-      OMAP2/3: clock: fix fint calculation for DPLL_FREQSEL
-
-Kevin Hilman (2):
-      OMAP2420: mailbox: fix IVA vs DSP IRQ numbering
-      OMAP2+: mailbox: fix lookups for multiple mailboxes
-
-Paul Walmsley (1):
-      OMAP2+: clocksource: fix crash on boot when !CONFIG_OMAP_32K_TIMER
-
-Santosh Shilimkar (1):
-      omap4: prcm: Fix the CPUx clockdomain offsets
-
-Tony Lindgren (1):
-      Merge branch 'patches_for_2.6.38rc' of git://git.pwsan.com/linux-2.6 into devel-fixes
-
-Vasiliy Kulikov (3):
-      mach-omap2: mux: world-writable debugfs files
-      mach-omap2: pm: world-writable debugfs timer files
-      mach-omap2: smartreflex: world-writable debugfs voltage files
-
- arch/arm/mach-omap2/clkt_dpll.c    |    2 +-
- arch/arm/mach-omap2/mailbox.c      |    2 +-
- arch/arm/mach-omap2/mux.c          |    2 +-
- arch/arm/mach-omap2/pm-debug.c     |    8 ++++----
- arch/arm/mach-omap2/prcm_mpu44xx.h |    4 ++--
- arch/arm/mach-omap2/smartreflex.c  |    4 ++--
- arch/arm/mach-omap2/timer-gp.c     |   13 +++++++++++++
- arch/arm/plat-omap/mailbox.c       |   11 +++++++----
- 8 files changed, 31 insertions(+), 15 deletions(-)
+> ---
+>  arch/arm/Kconfig  |   31 +++++++++++++++++++++++++++++++
+>  arch/arm/Makefile |    4 ++++
+>  2 files changed, 35 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5cff165..196f6d2 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1371,6 +1371,37 @@ config THUMB2_KERNEL
+>  
+>  	  If unsure, say N.
+>  
+> +config THUMB2_AVOID_R_ARM_THM_JUMP11
+> +	bool "Work around buggy Thumb-2 short branch relocations in gas"
+> +	depends on THUMB2_KERNEL && MODULES
+> +	default y
+> +	help
+> +	  Various binutils versions can resolve Thumb-2 branches to
+> +	  locally-defined, preemptible global symbols as short-range "b.n"
+> +	  branch instructions.
+> +
+> +	  This is a problem, because there's no guarantee the final
+> +	  destination of the symbol, or any candidate locations for a
+> +	  trampoline, are within range of the branch.  For this reason, the
+> +	  kernel does not support fixing up the R_ARM_THM_JUMP11 (102)
+> +	  relocation in modules at all, and it makes little sense to add
+> +	  support.
+> +
+> +	  The symptom is that the kernel fails with an "unsupported
+> +	  relocation" error when loading some modules.
+> +
+> +	  Until fixed tools are available, passing
+> +	  -fno-optimize-sibling-calls to gcc should prevent gcc generating
+> +	  code which hits this problem, at the cost of a bit of extra runtime
+> +	  stack usage in some cases.
+> +
+> +	  The problem is described in more detail at:
+> +	      https://bugs.launchpad.net/binutils-linaro/+bug/725126
+> +
+> +	  Only Thumb-2 kernels are affected.
+> +
+> +	  Unless you are sure your tools don't have this problem, say Y.
+> +
+>  config ARM_ASM_UNIFIED
+>  	bool
+>  
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index c22c1ad..ef5105a 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -105,6 +105,10 @@ AFLAGS_AUTOIT	:=$(call as-option,-Wa$(comma)-mimplicit-it=always,-Wa$(comma)-mau
+>  AFLAGS_NOWARN	:=$(call as-option,-Wa$(comma)-mno-warn-deprecated,-Wa$(comma)-W)
+>  CFLAGS_THUMB2	:=-mthumb $(AFLAGS_AUTOIT) $(AFLAGS_NOWARN)
+>  AFLAGS_THUMB2	:=$(CFLAGS_THUMB2) -Wa$(comma)-mthumb
+> +# Work around buggy relocation from gas if requested:
+> +ifeq ($(CONFIG_THUMB2_AVOID_R_ARM_THM_JUMP11),y)
+> +CFLAGS_MODULE	+=-fno-optimize-sibling-calls
+> +endif
+>  endif
+>  
+>  # Need -Uarm for gcc < 3.x
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
