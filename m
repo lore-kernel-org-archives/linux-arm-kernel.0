@@ -1,24 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 28 Feb 2011 14:37:41 +0000
-Subject: [patch 1/2] mc13892: reboot on wdi event
-In-Reply-To: <20110228132643.964403175@rtp-net.org>
-References: <20110228132132.654689676@rtp-net.org>
-	<20110228132643.964403175@rtp-net.org>
-Message-ID: <20110228143740.GD13869@opensource.wolfsonmicro.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Mon, 28 Feb 2011 16:47:15 +0200
+Subject: [PATCH resend] omap: Fix linker error in
+	drivers/video/omap/lcd_2430sdp.c
+In-Reply-To: <20110224212644.GN20560@atomide.com>
+References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
+	<1298232248-347-1-git-send-email-jhnikula@gmail.com>
+	<20110224212644.GN20560@atomide.com>
+Message-ID: <20110228164715.e34a965e.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 02:21:33PM +0100, Arnaud Patard wrote:
+On Thu, 24 Feb 2011 13:26:44 -0800
+Tony Lindgren <tony@atomide.com> wrote:
 
-> +
-> +	/* allows to reboot on wdi event */
-> +	ret = mc13xxx_reg_read(mc13892, MC13892_POWERCTL2, &val);
-> +	if (!ret) {
-> +		val |= MC13892_POWERCTL2_WDIRESET;
-> +		mc13xxx_reg_write(mc13892, MC13892_POWERCTL2, val);
-> +	}
-> +
+> We should avoid selecting driver related things, otherwise we can never
+> build a tiny kernel with initramfs with everything as modules.
+> 
+> Can you see if adding depends to the LCD panel option does the trick
+> instead?
+> 
+True and as lcd_2430sdp.c is not compiled without CONFIG_FB_OMAP a hack
+below should work a bit better.
 
-Also, why is this in the regulator driver?  The MFD core for the device
-might be a better choice - that'll ensure it gets done even if regulator
-support isn't enabled for some reason.
+What would you think Tomi?
+
+diff --git a/drivers/video/omap/Kconfig b/drivers/video/omap/Kconfig
+index 083c8fe..c981249 100644
+--- a/drivers/video/omap/Kconfig
++++ b/drivers/video/omap/Kconfig
+@@ -5,6 +5,7 @@ config FB_OMAP
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
++	select TWL4030_CORE if MACH_OMAP_2430SDP
+ 	help
+           Frame buffer driver for OMAP based boards.
+
+-- 
+Jarkko
