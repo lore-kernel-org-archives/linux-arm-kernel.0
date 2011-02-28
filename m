@@ -1,52 +1,57 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Feb 2011 17:20:24 +0900
-Subject: [PATCH] ARM: S5P64X0: Modify number of GPIO lines in Bank F
-In-Reply-To: <1298694349-16776-1-git-send-email-banajit.g@samsung.com>
-References: <1298694349-16776-1-git-send-email-banajit.g@samsung.com>
-Message-ID: <002401cbd720$5bfa3280$13ee9780$%kim@samsung.com>
+Date: Mon, 28 Feb 2011 17:26:50 +0900
+Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
+In-Reply-To: <4D6B5949.8020606@samsung.com>
+References: <4D676BB8.9040803@samsung.com>
+	<002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
+	<4D6B5949.8020606@samsung.com>
+Message-ID: <002801cbd721$42e4bad0$c8ae3070$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Banajit Goswami wrote:
+Minkyu Kang wrote:
 > 
-> This patch modifies the number of total GPIO lines for Bank F
-> for Samsung S5P6440 and S5P6450 SoCs from 2 to 16.
-> This is necessary as the GPIO lines from 0 to 13 are reserved
-> and only lines 14 and 15 are used. As during initialization,
-> the line number starts at 0, putting 2 does not solve the
-> intended purpose.
+> Dear Kukjin Kim,
 > 
-> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
-> ---
->  arch/arm/mach-s5p64x0/include/mach/gpio.h |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> 2011-02-28 ?? 4:42, Kukjin Kim ? ?:
+> > Minkyu Kang wrote:
+> >>
+> >> This patch adds Samsung NURI board support.
+> >>
+> >> Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
+> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >> ---
+> >> This patch is base on next-exynos4 branch at kgene tree.
+> >>
+> >>  arch/arm/configs/exynos4_defconfig |    1 +
+> >>  arch/arm/mach-exynos4/Kconfig      |   15 +++
+> >>  arch/arm/mach-exynos4/Makefile     |    1 +
+> >>  arch/arm/mach-exynos4/mach-nuri.c  |  233
+> >> ++++++++++++++++++++++++++++++++++++
+> >>  4 files changed, 250 insertions(+), 0 deletions(-)
+> >>  create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
+> >>
+> >
+> >> +enum fixed_regulator_id {
+> >> +	FIXED_REG_ID_MMC = 0,
+> >
+> > 	FIXED_REG_ID_MMC,
+> >
+> > (snip)
+> >
+> >> +static struct platform_device emmc_fixed_voltage = {
+> >> +	.name			= "reg-fixed-voltage",
+> >> +	.id			= FIXED_REG_ID_MMC,
+> >
+> > Is there any reason to use FIXED_REG_ID_MMC instead directly id 0?
+> >
 > 
-> diff --git a/arch/arm/mach-s5p64x0/include/mach/gpio.h b/arch/arm/mach-
-> s5p64x0/include/mach/gpio.h
-> index 5486c8f..adb5f29 100644
-> --- a/arch/arm/mach-s5p64x0/include/mach/gpio.h
-> +++ b/arch/arm/mach-s5p64x0/include/mach/gpio.h
-> @@ -23,7 +23,7 @@
->  #define S5P6440_GPIO_A_NR	(6)
->  #define S5P6440_GPIO_B_NR	(7)
->  #define S5P6440_GPIO_C_NR	(8)
-> -#define S5P6440_GPIO_F_NR	(2)
-> +#define S5P6440_GPIO_F_NR	(16)
->  #define S5P6440_GPIO_G_NR	(7)
->  #define S5P6440_GPIO_H_NR	(10)
->  #define S5P6440_GPIO_I_NR	(16)
-> @@ -36,7 +36,7 @@
->  #define S5P6450_GPIO_B_NR	(7)
->  #define S5P6450_GPIO_C_NR	(8)
->  #define S5P6450_GPIO_D_NR	(8)
-> -#define S5P6450_GPIO_F_NR	(2)
-> +#define S5P6450_GPIO_F_NR	(16)
->  #define S5P6450_GPIO_G_NR	(14)
->  #define S5P6450_GPIO_H_NR	(10)
->  #define S5P6450_GPIO_I_NR	(16)
-> --
+> I'm going to add more IDs of fixed regulator that are LCD and Backlight, and
+> so on.
+> So use enum values for avoid the hard coding.
+> 
 
-Ok, applied.
+Ok, applied this after removing "ifdef WATCHDOG".
 Thanks.
 
 Best regards,
