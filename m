@@ -1,42 +1,100 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 28 Feb 2011 21:44:45 +0000
-Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
-References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-	<1298900022-21516-7-git-send-email-will.deacon@arm.com>
-	<20110228140327.GA1937@n2100.arm.linux.org.uk>
-	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
-	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
-Message-ID: <20110228214445.GD1937@n2100.arm.linux.org.uk>
+From: john.linn@xilinx.com (John Linn)
+Date: Mon, 28 Feb 2011 14:51:59 -0700
+Subject: [PATCH V5 4/4] ARM: Xilinx: Adding Xilinx platform infrastructure
+	support
+In-Reply-To: <1298929919-510-4-git-send-email-john.linn@xilinx.com>
+References: <1298929919-510-1-git-send-email-john.linn@xilinx.com>
+	<1298929919-510-2-git-send-email-john.linn@xilinx.com>
+	<1298929919-510-3-git-send-email-john.linn@xilinx.com>
+	<1298929919-510-4-git-send-email-john.linn@xilinx.com>
+Message-ID: <18a47cd4-9482-4fb3-b759-5d9c06e867d0@VA3EHSMHS029.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 08:16:25PM +0100, Thomas Gleixner wrote:
-> So what's the gain of a barebone chained handler over a regular
-> interrupt:
-> 
->  - 100 instructions less
->  - lack of statistics
+Minimum infrastructure to add the Xilinx machine and allow it to
+be selected in the build.
 
-We don't want statistics.  Don't care how many times we go to look
-at the interrupt controller - and actually it's really wrong to count
-them in the first place.  Counting them means that you double-count
-these interrupt events, and the more layers of interrupt controllers
-there are the worse that problem gets.
+Signed-off-by: John Linn <john.linn@xilinx.com>
+---
 
-So no, that's a definite argument *for* chained handers.
+No updates for V5
 
->  - lack of affinity setting via standard interfaces
+V4
 
-Don't want affinity for them, as setting their affinity means that
-you then end up forcing the affinity for the sub-interrupts too.
-How you do cope with the high-level interrupt having affinity to
-CPU0 but a lower level interrupt being affine to CPU1 only?
+Updated to apply against linux-next branch.
 
-It's non-sensible, and is broken.  So no, again this isn't an
-argument for not using chained handlers.  It's an argument *for*
-them.
+No updates for V3
 
-Sorry, but I think this stuff is right, and chained handlers like
-these have their place.
+V2 Changes
+
+Updates based on Russell King's comments	
+	Cleanup of the Kconfig
+	Moved this patch to be last in the patch series
+
+ arch/arm/Kconfig    |   13 +++++++++++++
+ arch/arm/Makefile   |    1 +
+ arch/arm/mm/Kconfig |    2 +-
+ 3 files changed, 15 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5e15e6b..3983afa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -891,6 +891,17 @@ config PLAT_SPEAR
+ 	help
+ 	  Support for ST's SPEAr platform (SPEAr3xx, SPEAr6xx and SPEAr13xx).
+ 
++config ARCH_XILINX
++	bool "Xilinx ARM Cortex A9 Platform"
++	select CPU_V7
++	select GENERIC_TIME
++	select GENERIC_CLOCKEVENTS
++	select CLKDEV_LOOKUP
++	select ARM_GIC
++	select ARM_AMBA
++	help
++	  Support for Xilinx ARM Cortex A9 Platform
++
+ endchoice
+ 
+ #
+@@ -1025,6 +1036,8 @@ source "arch/arm/mach-vexpress/Kconfig"
+ 
+ source "arch/arm/mach-w90x900/Kconfig"
+ 
++source "arch/arm/mach-xilinx/Kconfig"
++
+ # Definitions to make life easier
+ config ARCH_ACORN
+ 	bool
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 6f7b292..a78ecf2 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -197,6 +197,7 @@ machine-$(CONFIG_MACH_SPEAR300)		:= spear3xx
+ machine-$(CONFIG_MACH_SPEAR310)		:= spear3xx
+ machine-$(CONFIG_MACH_SPEAR320)		:= spear3xx
+ machine-$(CONFIG_MACH_SPEAR600)		:= spear6xx
++machine-$(CONFIG_ARCH_XILINX)		:= xilinx
+ 
+ # Platform directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index e4509ba..cb0c570 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -813,7 +813,7 @@ config CACHE_L2X0
+ 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
+ 		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || \
+ 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_S5PV310 || ARCH_TEGRA || \
+-		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE
++		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || ARCH_XILINX
+ 	default y
+ 	select OUTER_CACHE
+ 	select OUTER_CACHE_SYNC
+-- 
+1.6.2.1
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
