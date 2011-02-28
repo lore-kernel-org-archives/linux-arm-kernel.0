@@ -1,63 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 28 Feb 2011 13:33:39 +0000
-Subject: [PATCH 3/6] ARM: tegra: update GPIO chained IRQ handler to use EOI in
-	parent chip
-In-Reply-To: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1298900022-21516-4-git-send-email-will.deacon@arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 28 Feb 2011 14:38:32 +0100
+Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to	omap_display
+In-Reply-To: <20110228121321.GB30781@n2100.arm.linux.org.uk>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+	<1298539643.16119.54.camel@deskari>
+	<1298876015.2096.36.camel@deskari> <4D6B4A1A.9000304@ti.com>
+	<1298877549.2096.47.camel@deskari> <4D6B88BB.5010200@ti.com>
+	<1298895026.9809.27.camel@deskari>
+	<20110228121321.GB30781@n2100.arm.linux.org.uk>
+Message-ID: <4D6BA558.5050700@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
-chip prior to handling the interrupt.
+On 2/28/2011 1:13 PM, Russell King - ARM Linux wrote:
+> On Mon, Feb 28, 2011 at 02:10:26PM +0200, Tomi Valkeinen wrote:
+>> On Mon, 2011-02-28 at 05:36 -0600, Cousson, Benoit wrote:
+>>> Cannot you use a device hierarchy then to do that?
+>>>    omap_dss/core
+>>>    omap_dss/dsi
+>>>    omap_dss/venc
+>>>
+>>> This is moreover the way the HW is done.
+>>
+>> Hmm, how would that work? The devices are platform devices, and they
+>> have a unique global name, which is used to match the driver for the
+>> device.
+>
+> And not forgetting that '/' is not permitted in device or driver names.
 
-This patch updates the code to use ->irq_eoi now that the GIC has moved
-to using the fasteoi flow model.
+I was not really considering naming the device with a '/'. The idea is 
+that the devices will not longer be flat platform devices but something 
+like dss devices that will have have a omap_dss parent.
 
-Acked-by: Colin Cross <ccross@android.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-tegra/gpio.c |   17 +----------------
- 1 files changed, 1 insertions(+), 16 deletions(-)
+I do not know if that makes sense to store some kind of hierarchy in the 
+device model, but encoding the hierarchy in the name like it is proposed 
+looks like a hack to me. The point is that the dsi instances might 
+potentially be in another part of the SoC. Having the device name based 
+on the hierarchy will not allow the driver to bind the device properly.
 
-diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-index ad80488..5019b01 100644
---- a/arch/arm/mach-tegra/gpio.c
-+++ b/arch/arm/mach-tegra/gpio.c
-@@ -219,9 +219,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	struct tegra_gpio_bank *bank;
- 	int port;
- 	int pin;
--	int unmasked = 0;
--
--	desc->irq_data.chip->irq_ack(&desc->irq_data);
- 
- 	bank = get_irq_data(irq);
- 
-@@ -233,23 +230,11 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 
- 		for_each_set_bit(pin, &sta, 8) {
- 			__raw_writel(1 << pin, GPIO_INT_CLR(gpio));
--
--			/* if gpio is edge triggered, clear condition
--			 * before executing the hander so that we don't
--			 * miss edges
--			 */
--			if (lvl & (0x100 << pin)) {
--				unmasked = 1;
--				desc->irq_data.chip->irq_unmask(&desc->irq_data);
--			}
--
- 			generic_handle_irq(gpio_to_irq(gpio + pin));
- 		}
- 	}
- 
--	if (!unmasked)
--		desc->irq_data.chip->irq_unmask(&desc->irq_data);
--
-+	desc->irq_data.chip->irq_eoi(&desc->irq_data);
- }
- 
- #ifdef CONFIG_PM
--- 
-1.7.0.4
+Please note, that I'm not really sure it is doable with the current 
+device model, hence the original question.
+
+Benoit
