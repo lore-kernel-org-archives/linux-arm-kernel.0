@@ -1,59 +1,70 @@
-From: R65037@freescale.com (Zhu Richard-R65037)
-Date: Mon, 28 Feb 2011 11:39:17 +0000
-Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
-In-Reply-To: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <010C9052C42A00499CE76D637FA5EE900C7A26@039-SN1MPN1-001.039d.mgd.msft.net>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 28 Feb 2011 14:49:06 +0300
+Subject: [PATCH] OMAP2+: sdrc: fix compile break on OMAP4-only config
+	on current omap-for-linus
+In-Reply-To: <alpine.DEB.2.00.1102271701450.4608@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1102251839360.6198@utopia.booyaka.com>
+	<4D6916D0.1080501@ru.mvista.com>
+	<alpine.DEB.2.00.1102271701450.4608@utopia.booyaka.com>
+Message-ID: <4D6B8BB2.2010503@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc the patchs to linaro guys.
+Hello.
 
-Best Regards
-Richard Zhu
+On 28-02-2011 3:03, Paul Walmsley wrote:
+
+>>     How about empty inline instead?
+
+> Thanks for the review; that is indeed a better approach.  Following is the
+> updated patch.
+
+> Tony, do you want to take this one?
 
 
-> -----Original Message-----
-> From: Zhu Richard-R65037
-> Sent: Monday, February 28, 2011 7:32 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: kernel at pengutronix.de; linux-mmc at vger.kernel.org; cjb at laptop.org;
-> avorontsov at ru.mvista.com; eric at eukrea.com; w.sang at pengutronix.de;
-> linuxzsc at gmail.com; Zhao Richard-B20223; Freescale at lists.linaro.org;
-> eric.miao at linaro.org; Zhu Richard-R65037
-> Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
->
-> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> - Paul
+
+> From: Paul Walmsley<paul@pwsan.com>
+> Date: Fri, 25 Feb 2011 17:38:25 -0700
+> Subject: [PATCH] OMAP2+: sdrc: fix compile break on OMAP4-only config on current omap-for-linus
+
+> On non-OMAP2 and non-OMAP3 kernel configs, turn omap2_sdrc_init() into
+> a no-op.  Otherwise, compilation breaks on an OMAP4-only config with
+> the current omap-for-linus branch:
+
+> arch/arm/mach-omap2/built-in.o: In function `omap2_init_common_devices':
+> ../mach-omap2/io.c:421: undefined reference to `omap2_sdrc_init'
+
+> Thanks to Sergei Shtylyov <sshtylyov@mvista.com>  for suggesting the use
+> of a empty static inline function rather than a macro.
+
+    Not at all. :-)
+
+> Signed-off-by: Paul Walmsley<paul@pwsan.com>
+> Cc: Tony Lindgren<tony@atomide.com>
+> Cc: Sergei Shtylyov<sshtylyov@mvista.com>
 > ---
->  arch/arm/mach-mx5/Kconfig           |    1 +
->  arch/arm/mach-mx5/board-mx53_loco.c |    2 ++
->  2 files changed, 3 insertions(+), 0 deletions(-)
+>   arch/arm/plat-omap/include/plat/sdrc.h |    6 ++++++
+>   1 files changed, 6 insertions(+), 0 deletions(-)
+
+> diff --git a/arch/arm/plat-omap/include/plat/sdrc.h b/arch/arm/plat-omap/include/plat/sdrc.h
+> index efd87c8..2a34a65 100644
+> --- a/arch/arm/plat-omap/include/plat/sdrc.h
+> +++ b/arch/arm/plat-omap/include/plat/sdrc.h
+> @@ -124,8 +124,14 @@ struct omap_sdrc_params {
+>   	u32 mr;
+>   };
 >
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig index
-> f065a0d..a72c833 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -162,6 +162,7 @@ config MACH_MX53_LOCO
->       select IMX_HAVE_PLATFORM_IMX2_WDT
->       select IMX_HAVE_PLATFORM_IMX_I2C
->       select IMX_HAVE_PLATFORM_IMX_UART
-> +     select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
->       help
->         Include support for MX53 LOCO platform. This includes specific
->         configurations for the board and its peripherals.
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-
-> mx5/board-mx53_loco.c
-> index 160899e..0a18f8d 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -213,6 +213,8 @@ static void __init mx53_loco_board_init(void)
->       imx53_add_imx2_wdt(0, NULL);
->       imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
->       imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
-> +     imx53_add_sdhci_esdhc_imx(0, NULL);
-> +     imx53_add_sdhci_esdhc_imx(2, NULL);
->  }
->
->  static void __init mx53_loco_timer_init(void)
-> --
-> 1.7.1
+> +#if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+>   void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+>   			    struct omap_sdrc_params *sdrc_cs1);
+> +#else
+> +static inline void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+
+    No need to annotate it as __init.
+
+> +					  struct omap_sdrc_params *sdrc_cs1) {};
+> +#endif
+> +
+
+WBR, Sergei
