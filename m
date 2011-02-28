@@ -1,61 +1,78 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 28 Feb 2011 14:12:02 -0700
-Subject: [PATCH v2 0/9] OMAP2+: hwmod/clockevent: allow hwmods to be set up
-	individually
-Message-ID: <20110228210858.15286.3200.stgit@twilight.localdomain>
+Date: Mon, 28 Feb 2011 14:12:28 -0700
+Subject: [PATCH v2 7/9] OMAP2+: hwmod: ignore attempts to re-setup a hwmod
+In-Reply-To: <20110228210858.15286.3200.stgit@twilight.localdomain>
+References: <20110228210858.15286.3200.stgit@twilight.localdomain>
+Message-ID: <20110228211224.15286.27149.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Previously, if a hwmod had already been set up, and the code attempted
+to set up the hwmod again, an error would be returned.  This is not
+really useful behavior if we wish to allow the OMAP core code to setup
+the hwmods needed for the Linux clocksources and clockevents before
+the rest of the hwmods are setup.  So, instead of generating errors,
+just ignore the attempt to re-setup the hwmod.
 
-This series adds the ability to set up (formerly known
-as "late-initialize") individual hwmods, rather than doing them
-all at once.  The goal here is for clockevent (and eventually
-clocksource) hwmods to be set up right before they are needed, in
-the timer init code.  Then omap_hwmod_setup_all(), which
-sets up the rest of the hwmods, is intended to run as an
-initcall -- much later in the boot process.
-
-This series includes the OMAP2/3 hwmod data for the GPTIMERs that
-Tarun posted earlier.  This data is necessary for this new code
-to avoid warnings during boot.
-
-Boot-tested on OMAP34xx Beagleboard and OMAP4430ES2 Panda.
-Applies on Tony's 7cab8713b1ed0dab08ad6458f92a40b7ff4be619
-("Merge branch 'for-tony' of
-git://gitorious.org/linux-omap-dss2/linux into omap-for-linus")
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c |   19 +++++++++++--------
+ 1 files changed, 11 insertions(+), 8 deletions(-)
 
-hwmod_clockevent_2.6.39
-   text	   data	    bss	    dec	    hex	filename
-5781261	 484056	5598712	11864029	 b507dd	vmlinux.omap2plus_defconfig.orig
-5785233	 491096	5598680	11875009	 b532c1	vmlinux.omap2plus_defconfig
-
-Paul Walmsley (6):
-      OMAP2+: hwmod: allow multiple calls to omap_hwmod_init()
-      OMAP2+: hwmod: rename some init functions
-      OMAP2+: hwmod: find MPU initiator hwmod during in _register()
-      OMAP2+: hwmod: ignore attempts to re-setup a hwmod
-      OMAP2+: hwmod: add ability to setup individual hwmods
-      OMAP2+: clockevent: set up GPTIMER clockevent hwmod right before timer init
-
-Thara Gopinath (3):
-      OMAP2420: hwmod data: add dmtimer
-      OMAP2430: hwmod data: add dmtimer
-      OMAP3: hwmod data: add dmtimer
-
-
- arch/arm/mach-omap2/omap_hwmod.c             |  154 ++++--
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |  636 +++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |  635 +++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |  651 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    2 
- arch/arm/mach-omap2/serial.c                 |    2 
- arch/arm/mach-omap2/timer-gp.c               |    7 
- arch/arm/plat-omap/include/plat/dmtimer.h    |   11 
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    9 
- 9 files changed, 2045 insertions(+), 62 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e4c934b..43aa894 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -902,17 +902,15 @@ static struct omap_hwmod *_lookup(const char *name)
+  * @data: not used; pass NULL
+  *
+  * Called by omap_hwmod_setup_all() (after omap2_clk_init()).
+- * Resolves all clock names embedded in the hwmod.  Returns -EINVAL if
+- * the omap_hwmod has not yet been registered or if the clocks have
+- * already been initialized, 0 on success, or a non-zero error on
+- * failure.
++ * Resolves all clock names embedded in the hwmod.  Returns 0 on
++ * success, or a negative error code on failure.
+  */
+ static int _init_clocks(struct omap_hwmod *oh, void *data)
+ {
+ 	int ret = 0;
+ 
+-	if (!oh || (oh->_state != _HWMOD_STATE_REGISTERED))
+-		return -EINVAL;
++	if (oh->_state != _HWMOD_STATE_REGISTERED)
++		return 0;
+ 
+ 	pr_debug("omap_hwmod: %s: looking up clocks\n", oh->name);
+ 
+@@ -1351,14 +1349,16 @@ static int _shutdown(struct omap_hwmod *oh)
+  * @oh: struct omap_hwmod *
+  *
+  * Writes the CLOCKACTIVITY bits @clockact to the hwmod @oh
+- * OCP_SYSCONFIG register.  Returns -EINVAL if the hwmod is in the
+- * wrong state or returns 0.
++ * OCP_SYSCONFIG register.  Returns 0.
+  */
+ static int _setup(struct omap_hwmod *oh, void *data)
+ {
+ 	int i, r;
+ 	u8 postsetup_state;
+ 
++	if (oh->_state != _HWMOD_STATE_CLKS_INITED)
++		return 0;
++
+ 	/* Set iclk autoidle mode */
+ 	if (oh->slaves_cnt > 0) {
+ 		for (i = 0; i < oh->slaves_cnt; i++) {
+@@ -1621,6 +1621,9 @@ int __init omap_hwmod_register(struct omap_hwmod **ohs)
+  */
+ static int __init _populate_mpu_rt_base(struct omap_hwmod *oh, void *data)
+ {
++	if (oh->_state != _HWMOD_STATE_REGISTERED)
++		return 0;
++
+ 	if (oh->_int_flags & _HWMOD_NO_MPU_PORT)
+ 		return 0;
+ 
