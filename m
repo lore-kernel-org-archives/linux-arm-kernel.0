@@ -1,73 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 28 Feb 2011 15:48:05 +0900
-Subject: [PATCH 05/09] ARM: s3c2440: gta02: Fix regulator valid_modes_ops
-In-Reply-To: <1297043521-21903-5-git-send-email-lars@metafoo.de>
-References: <1297043521-21903-1-git-send-email-lars@metafoo.de>
-	<1297043521-21903-5-git-send-email-lars@metafoo.de>
-Message-ID: <000c01cbd713$76b8bcc0$642a3640$%kim@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 28 Feb 2011 08:53:35 +0200
+Subject: [PATCH v10 05/18] OMAP2,3 DSS2 Change driver name to omap_display
+In-Reply-To: <1298539643.16119.54.camel@deskari>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>
+	<1298539643.16119.54.camel@deskari>
+Message-ID: <1298876015.2096.36.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lars-Peter Clausen wrote:
+On Thu, 2011-02-24 at 03:27 -0600, Tomi Valkeinen wrote:
+> Hi,
 > 
-> The REGULATOR_CHANGE_STATUS flag needs to be set on valid_ops_mask,
-otherwise
-> it
-> a driver wont be able to turn the regulator on or off.
+> On Mon, 2011-01-24 at 11:51 +0530, ext Sumit Semwal wrote:
+> > From: Senthilvadivu Guruswamy <svadivu@ti.com>
+> > 
+> > Change the driver name from omapdss to omap_display as the driver takes care of
+> > the display devices ie number of panels, type of panels available in the
+> > platform.  Change the device name in the board files and 2420,2430,3xxx clock
+> > files from omapdss to omap_display to match the driver name.
 > 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-> ---
->  arch/arm/mach-s3c2440/mach-gta02.c |    7 +++++--
->  1 files changed, 5 insertions(+), 2 deletions(-)
+> I just realized that changing the driver name will break all scripts and
+> applications using omapdss sysfs files.
 > 
-> diff --git a/arch/arm/mach-s3c2440/mach-gta02.c
-b/arch/arm/mach-s3c2440/mach-
-> gta02.c
-> index 6629998..e57c4d8 100644
-> --- a/arch/arm/mach-s3c2440/mach-gta02.c
-> +++ b/arch/arm/mach-s3c2440/mach-gta02.c
-> @@ -314,8 +314,8 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
->  				.min_uV = 2000000,
->  				.max_uV = 3300000,
->  				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-> -				.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
-> -				.always_on = 1,
-> +				.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-> +						REGULATOR_CHANGE_STATUS,
->  			},
->  		},
->  		[PCF50633_REGULATOR_LDO1] = {
-> @@ -323,6 +323,7 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
->  				.min_uV = 3300000,
->  				.max_uV = 3300000,
->  				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-> +				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
->  				.apply_uV = 1,
->  				.state_mem = {
->  					.enabled = 0,
-> @@ -350,6 +351,7 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
->  				.min_uV = 3200000,
->  				.max_uV = 3200000,
->  				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-> +				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
->  				.apply_uV = 1,
->  			},
->  		},
-> @@ -358,6 +360,7 @@ struct pcf50633_platform_data gta02_pcf_pdata = {
->  				.min_uV = 3000000,
->  				.max_uV = 3000000,
->  				.valid_modes_mask = REGULATOR_MODE_NORMAL,
-> +				.valid_ops_mask = REGULATOR_CHANGE_STATUS,
->  				.apply_uV = 1,
->  				.state_mem = {
->  					.enabled = 1,
-> --
+> How does this sound:
+> 
+> Let's leave the omapdss device name as it is. It represents a "super"
+> device, containing the dss sysfs files and upper level dss management.
+> 
+> Name the HW module platform drivers as: omapdss_dss, omapdss_venc,
+> omapdss_dispc, etc. This would indicate them to be clearly parts of DSS,
+> and would also prevent any possible name conflict if there would happen
+> to be a, say, "dsi" block in some other HW component.
 
-Ok, will apply.
-Thanks.
+Any comments on this?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ Tomi
