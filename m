@@ -1,105 +1,55 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Mon, 28 Feb 2011 16:56:35 +0900
-Subject: [PATCH 1/3] ARM: S5P: Add s5p_timer support for HRT
-In-Reply-To: <AANLkTinCyXm_z8tcjRHCYEvi79ifj+joKK7E8Kzboi2G@mail.gmail.com>
-References: <1298688357-20775-1-git-send-email-sbkim73@samsung.com>
-	<1298688357-20775-2-git-send-email-sbkim73@samsung.com>
-	<AANLkTinCyXm_z8tcjRHCYEvi79ifj+joKK7E8Kzboi2G@mail.gmail.com>
-Message-ID: <000601cbd71d$080cc870$18265950$@com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 28 Feb 2011 09:13:41 +0100
+Subject: [PATCH 2/2] ARM: imx35: fix trivial copy/paste error
+In-Reply-To: <1298767313-16351-3-git-send-email-desrt@desrt.ca>
+References: <1298767313-16351-1-git-send-email-desrt@desrt.ca>
+	<1298767313-16351-3-git-send-email-desrt@desrt.ca>
+Message-ID: <20110228081341.GJ22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Walleij,
+Hi Ryan,
 
-Thanks for your suggest.
-I will apply your suggest in the next version.
-Thanks & Regards,
+On Sat, Feb 26, 2011 at 07:41:53PM -0500, Ryan Lortie wrote:
+> Change imx31_add_imx_keypad() to imx35_add_imx_keypad() in
+> mach-mx3/devices-imx35.h.
+> 
+> Signed-off-by: Ryan Lortie <desrt@desrt.ca>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-S.B. Kim
+To increase your chances to get imx related patches in, you'd better Cc:
+kernel at pengutronix.de
 
-2011/2/26 Linus Walleij <linux.walleij@linaro.org> wrote:
-> -----Original Message-----
-> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-
-> owner at vger.kernel.org] On Behalf Of Linus Walleij
-> Sent: Saturday, February 26, 2011 6:34 PM
-> To: Sangbeom Kim
-> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
-> soc at vger.kernel.org; kgene.kim at samsung.com; ben-linux at fluff.org
-> Subject: Re: [PATCH 1/3] ARM: S5P: Add s5p_timer support for HRT
+Best regards
+Uwe
+
+> ---
+>  arch/arm/mach-mx3/devices-imx35.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> 2011/2/26 Sangbeom Kim <sbkim73@samsung.com>:
-> > (...)
-> > +static void s5p_clockevent_init(void)
-> > +{
-> > + ? ? ? unsigned long pclk;
-> > + ? ? ? unsigned long clock_rate;
-> > + ? ? ? unsigned int irq_number;
-> > + ? ? ? struct clk *tscaler;
-> > +
-> > + ? ? ? pclk = clk_get_rate(timerclk);
-> > +
-> > + ? ? ? tscaler = clk_get_parent(tdiv_event);
-> > +
-> > + ? ? ? clk_set_rate(tscaler, pclk / 2);
-> > + ? ? ? clk_set_rate(tdiv_event, pclk / 2);
-> > + ? ? ? clk_set_parent(tin_event, tdiv_event);
-> > +
-> > + ? ? ? clock_rate = clk_get_rate(tin_event);
-> > + ? ? ? clock_count_per_tick = clock_rate / HZ;
-> > +
-> > + ? ? ? time_event_device.mult =
-> > + ? ? ? ? ? ? ? div_sc(clock_rate, NSEC_PER_SEC,
-time_event_device.shift);
-> > + ? ? ? time_event_device.max_delta_ns =
-> > + ? ? ? ? ? ? ? clockevent_delta2ns(-1, &time_event_device);
-> > + ? ? ? time_event_device.min_delta_ns =
-> > + ? ? ? ? ? ? ? clockevent_delta2ns(1, &time_event_device);
-> 
-> This is a very complicated and inprecise way of doing this nowadays.
-> Skip hardcoding the shift value and calculating mult like that and use
-> 
-> /* Be able to sleep for atleast 4 seconds (usually more) */
-> #define EVT_MIN_RANGE 4
-> 
-> clockevents_calc_mult_shift(&time_event_device,
->                                     clock_rate, EVT_MIN_RANGE);
-> 
-> > (...)
-> > +static void s5p_clocksource_init(void)
-> > +{
-> > + ? ? ? unsigned long pclk;
-> > + ? ? ? unsigned long clock_rate;
-> > +
-> > + ? ? ? pclk = clk_get_rate(timerclk);
-> > +
-> > + ? ? ? clk_set_rate(tdiv_source, pclk / 2);
-> > + ? ? ? clk_set_parent(tin_source, tdiv_source);
-> > +
-> > + ? ? ? clock_rate = clk_get_rate(tin_source);
-> > +
-> > + ? ? ? s5p_time_setup(timer_source.source_id, TCNT_MAX);
-> > + ? ? ? s5p_time_start(timer_source.source_id, PERIODIC);
-> > +
-> > + ? ? ? if (clocksource_register_hz(&time_clocksource, clock_rate))
-> > + ? ? ? ? ? ? ? panic("%s: can't register clocksource\n",
-> time_clocksource.name);
-> > +}
-> 
-> This is more like it :-)
-> 
-> But you probably also want to add a sched_clock hook for this
-> platform too, so you get some nice scheduling resolution.
-> 
-> I suggest you look at the simple straight-forward driver
-> for U300 in arch/arm/mach-u300/timer.c for inspiration.
-> It's using the same timer that is used for clocksource for
-> sched_clock().
+> diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
+> index 677b18a..d545d86 100644
+> --- a/arch/arm/mach-mx3/devices-imx35.h
+> +++ b/arch/arm/mach-mx3/devices-imx35.h
+> @@ -35,7 +35,7 @@ extern const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst;
+>  #define imx35_add_imx_i2c2(pdata)	imx35_add_imx_i2c(2, pdata)
+>  
+>  extern const struct imx_imx_keypad_data imx35_imx_keypad_data __initconst;
+> -#define imx31_add_imx_keypad(pdata)	\
+> +#define imx35_add_imx_keypad(pdata)	\
+>  	imx_add_imx_keypad(&imx35_imx_keypad_data, pdata)
+>  
+>  extern const struct imx_imx_ssi_data imx35_imx_ssi_data[] __initconst;
+> -- 
+> 1.7.4.1
 > 
 > 
-> Yours,
-> Linus Walleij
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-
-> soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
