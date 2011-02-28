@@ -1,86 +1,59 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 28 Feb 2011 12:36:27 +0100
-Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to omap_display
-In-Reply-To: <1298877549.2096.47.camel@deskari>
-References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>	
-	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>	
-	<1298539643.16119.54.camel@deskari>
-	<1298876015.2096.36.camel@deskari>	 <4D6B4A1A.9000304@ti.com>
-	<1298877549.2096.47.camel@deskari>
-Message-ID: <4D6B88BB.5010200@ti.com>
+From: R65037@freescale.com (Zhu Richard-R65037)
+Date: Mon, 28 Feb 2011 11:39:17 +0000
+Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
+In-Reply-To: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <010C9052C42A00499CE76D637FA5EE900C7A26@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+Cc the patchs to linaro guys.
 
-On 2/28/2011 8:19 AM, Valkeinen, Tomi wrote:
-> On Mon, 2011-02-28 at 01:09 -0600, Taneja, Archit wrote:
->> Hi,
->>
->> On Monday 28 February 2011 12:23 PM, Valkeinen, Tomi wrote:
->>> On Thu, 2011-02-24 at 03:27 -0600, Tomi Valkeinen wrote:
->>>> Hi,
->>>>
->>>> On Mon, 2011-01-24 at 11:51 +0530, ext Sumit Semwal wrote:
->>>>> From: Senthilvadivu Guruswamy<svadivu@ti.com>
->>>>>
->>>>> Change the driver name from omapdss to omap_display as the driver takes care of
->>>>> the display devices ie number of panels, type of panels available in the
->>>>> platform.  Change the device name in the board files and 2420,2430,3xxx clock
->>>>> files from omapdss to omap_display to match the driver name.
->>>>
->>>> I just realized that changing the driver name will break all scripts and
->>>> applications using omapdss sysfs files.
->>>>
->>>> How does this sound:
->>>>
->>>> Let's leave the omapdss device name as it is. It represents a "super"
->>>> device, containing the dss sysfs files and upper level dss management.
+Best Regards
+Richard Zhu
 
-This is the case for all the drivers migrated to omap_device anyway due 
-to the change in the top level hierarchy. Everything is below 
-platform/omap now.
-That's why we are using that opportunity to clean and provide a 
-consistent naming for all devices.
 
->>>> Name the HW module platform drivers as: omapdss_dss, omapdss_venc,
->>>> omapdss_dispc, etc. This would indicate them to be clearly parts of DSS,
->>>> and would also prevent any possible name conflict if there would happen
->>>> to be a, say, "dsi" block in some other HW component.
-
-Cannot you use a device hierarchy then to do that?
-  omap_dss/core
-  omap_dss/dsi
-  omap_dss/venc
-
-This is moreover the way the HW is done.
-
->>> Any comments on this?
->>
->> I also think we need to stick to the older name, "omapdss_dss" sounds a
->> bit confusing, and I think one of the previous versions had something
->> like "dss_dss" in it and it wasn't approved. Does something like
->> "omapdss_core" or "omapdss_dss_core" make sense, or is it more misleading?
+> -----Original Message-----
+> From: Zhu Richard-R65037
+> Sent: Monday, February 28, 2011 7:32 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: kernel at pengutronix.de; linux-mmc at vger.kernel.org; cjb at laptop.org;
+> avorontsov at ru.mvista.com; eric at eukrea.com; w.sang at pengutronix.de;
+> linuxzsc at gmail.com; Zhao Richard-B20223; Freescale at lists.linaro.org;
+> eric.miao at linaro.org; Zhu Richard-R65037
+> Subject: [PATCH V3 1/4] ARM: imx53_loco: add esdhc device support
 >
-> It is confusing, but so is the hardware naming =). There is a DSS module
-> inside the omap display subsystem. That's why I would like to name it
-> "dss", not "core", so it's clear it refers to this DSS module.
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Kconfig           |    1 +
+>  arch/arm/mach-mx5/board-mx53_loco.c |    2 ++
+>  2 files changed, 3 insertions(+), 0 deletions(-)
 >
-> "dss_dss" looks a bit silly, but I think "omapdss_dss" is slightly
-> better in the sense that it doesn't repeat the same "dss", and there is
-> an "omapdss" device, which acts like "manager" for these module devices.
-> But yes, I wouldn't call it perfect either.
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig index
+> f065a0d..a72c833 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -162,6 +162,7 @@ config MACH_MX53_LOCO
+>       select IMX_HAVE_PLATFORM_IMX2_WDT
+>       select IMX_HAVE_PLATFORM_IMX_I2C
+>       select IMX_HAVE_PLATFORM_IMX_UART
+> +     select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+>       help
+>         Include support for MX53 LOCO platform. This includes specific
+>         configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-
+> mx5/board-mx53_loco.c
+> index 160899e..0a18f8d 100644
+> --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+> @@ -213,6 +213,8 @@ static void __init mx53_loco_board_init(void)
+>       imx53_add_imx2_wdt(0, NULL);
+>       imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
+>       imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
+> +     imx53_add_sdhci_esdhc_imx(0, NULL);
+> +     imx53_add_sdhci_esdhc_imx(2, NULL);
+>  }
 >
-> "omapdss_dss_core" is one option. But then again, TRM doesn't speak of
-> "core".
-
-We should not maintain silly names just because they are in the TRM, we 
-should just fix the TRM. This is exactly what we are going to do for 
-most HW names we introduced in OMAP4.
-
-So if we all agree that this name will avoid confusion and is much 
-better than the current one, we can change it right now with a comment 
-to explain the change and give the pointer to the current TRM naming.
-
-Regards,
-Benoit
+>  static void __init mx53_loco_timer_init(void)
+> --
+> 1.7.1
