@@ -1,55 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 28 Feb 2011 09:13:41 +0100
-Subject: [PATCH 2/2] ARM: imx35: fix trivial copy/paste error
-In-Reply-To: <1298767313-16351-3-git-send-email-desrt@desrt.ca>
-References: <1298767313-16351-1-git-send-email-desrt@desrt.ca>
-	<1298767313-16351-3-git-send-email-desrt@desrt.ca>
-Message-ID: <20110228081341.GJ22310@pengutronix.de>
+From: mk7.kang@samsung.com (Minkyu Kang)
+Date: Mon, 28 Feb 2011 17:14:01 +0900
+Subject: [PATCH] ARM: EXYNOS4: Adds Samsung NURI board support
+In-Reply-To: <002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
+References: <4D676BB8.9040803@samsung.com>
+	<002301cbd71b$1969bd00$4c3d3700$%kim@samsung.com>
+Message-ID: <4D6B5949.8020606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ryan,
+Dear Kukjin Kim,
 
-On Sat, Feb 26, 2011 at 07:41:53PM -0500, Ryan Lortie wrote:
-> Change imx31_add_imx_keypad() to imx35_add_imx_keypad() in
-> mach-mx3/devices-imx35.h.
+2011-02-28 ?? 4:42, Kukjin Kim ? ?:
+> Minkyu Kang wrote:
+>>
+>> This patch adds Samsung NURI board support.
+>>
+>> Signed-off-by: Minkyu Kang <mk7.kang@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> This patch is base on next-exynos4 branch at kgene tree.
+>>
+>>  arch/arm/configs/exynos4_defconfig |    1 +
+>>  arch/arm/mach-exynos4/Kconfig      |   15 +++
+>>  arch/arm/mach-exynos4/Makefile     |    1 +
+>>  arch/arm/mach-exynos4/mach-nuri.c  |  233
+>> ++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 250 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/mach-exynos4/mach-nuri.c
+>>
 > 
-> Signed-off-by: Ryan Lortie <desrt@desrt.ca>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
-To increase your chances to get imx related patches in, you'd better Cc:
-kernel at pengutronix.de
-
-Best regards
-Uwe
-
-> ---
->  arch/arm/mach-mx3/devices-imx35.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>> +enum fixed_regulator_id {
+>> +	FIXED_REG_ID_MMC = 0,
 > 
-> diff --git a/arch/arm/mach-mx3/devices-imx35.h b/arch/arm/mach-mx3/devices-imx35.h
-> index 677b18a..d545d86 100644
-> --- a/arch/arm/mach-mx3/devices-imx35.h
-> +++ b/arch/arm/mach-mx3/devices-imx35.h
-> @@ -35,7 +35,7 @@ extern const struct imx_imx_i2c_data imx35_imx_i2c_data[] __initconst;
->  #define imx35_add_imx_i2c2(pdata)	imx35_add_imx_i2c(2, pdata)
->  
->  extern const struct imx_imx_keypad_data imx35_imx_keypad_data __initconst;
-> -#define imx31_add_imx_keypad(pdata)	\
-> +#define imx35_add_imx_keypad(pdata)	\
->  	imx_add_imx_keypad(&imx35_imx_keypad_data, pdata)
->  
->  extern const struct imx_imx_ssi_data imx35_imx_ssi_data[] __initconst;
-> -- 
-> 1.7.4.1
+> 	FIXED_REG_ID_MMC,
 > 
+> (snip)
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> +static struct platform_device emmc_fixed_voltage = {
+>> +	.name			= "reg-fixed-voltage",
+>> +	.id			= FIXED_REG_ID_MMC,
+> 
+> Is there any reason to use FIXED_REG_ID_MMC instead directly id 0?
 > 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I'm going to add more IDs of fixed regulator that are LCD and Backlight, and so on.
+So use enum values for avoid the hard coding.
+
+Thanks.
+Minkyu Kang.
