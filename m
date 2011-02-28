@@ -1,47 +1,86 @@
-From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
-Date: Mon, 28 Feb 2011 19:32:04 +0800
-Subject: [PATCH V3 3/4] mmc: sdhci-esdhc: remove SDHCI_QUIRK_NO_CARD_NO_RESET
-	from ESDHC_DEFAULT_QUIRKS
-In-Reply-To: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-References: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
-Message-ID: <1298892725-23672-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 28 Feb 2011 12:36:27 +0100
+Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to omap_display
+In-Reply-To: <1298877549.2096.47.camel@deskari>
+References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>	
+	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>	
+	<1298539643.16119.54.camel@deskari>
+	<1298876015.2096.36.camel@deskari>	 <4D6B4A1A.9000304@ti.com>
+	<1298877549.2096.47.camel@deskari>
+Message-ID: <4D6B88BB.5010200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET. Make it OF-specific.
+Hi Tomi,
 
-Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc.h    |    3 +--
- drivers/mmc/host/sdhci-of-esdhc.c |    2 +-
- 2 files changed, 2 insertions(+), 3 deletions(-)
+On 2/28/2011 8:19 AM, Valkeinen, Tomi wrote:
+> On Mon, 2011-02-28 at 01:09 -0600, Taneja, Archit wrote:
+>> Hi,
+>>
+>> On Monday 28 February 2011 12:23 PM, Valkeinen, Tomi wrote:
+>>> On Thu, 2011-02-24 at 03:27 -0600, Tomi Valkeinen wrote:
+>>>> Hi,
+>>>>
+>>>> On Mon, 2011-01-24 at 11:51 +0530, ext Sumit Semwal wrote:
+>>>>> From: Senthilvadivu Guruswamy<svadivu@ti.com>
+>>>>>
+>>>>> Change the driver name from omapdss to omap_display as the driver takes care of
+>>>>> the display devices ie number of panels, type of panels available in the
+>>>>> platform.  Change the device name in the board files and 2420,2430,3xxx clock
+>>>>> files from omapdss to omap_display to match the driver name.
+>>>>
+>>>> I just realized that changing the driver name will break all scripts and
+>>>> applications using omapdss sysfs files.
+>>>>
+>>>> How does this sound:
+>>>>
+>>>> Let's leave the omapdss device name as it is. It represents a "super"
+>>>> device, containing the dss sysfs files and upper level dss management.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index afaf1bc..303cde0 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -24,8 +24,7 @@
- 				SDHCI_QUIRK_NONSTANDARD_CLOCK | \
- 				SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK | \
- 				SDHCI_QUIRK_PIO_NEEDS_DELAY | \
--				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET | \
--				SDHCI_QUIRK_NO_CARD_NO_RESET)
-+				SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
- 
- #define ESDHC_SYSTEM_CONTROL	0x2c
- #define ESDHC_CLOCK_MASK	0x0000fff0
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fcd0e1f..6337607 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -73,7 +73,7 @@ static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
- }
- 
- struct sdhci_of_data sdhci_esdhc = {
--	.quirks = ESDHC_DEFAULT_QUIRKS,
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_CARD_NO_RESET,
- 	.ops = {
- 		.read_l = sdhci_be32bs_readl,
- 		.read_w = esdhc_readw,
--- 
-1.7.1
+This is the case for all the drivers migrated to omap_device anyway due 
+to the change in the top level hierarchy. Everything is below 
+platform/omap now.
+That's why we are using that opportunity to clean and provide a 
+consistent naming for all devices.
+
+>>>> Name the HW module platform drivers as: omapdss_dss, omapdss_venc,
+>>>> omapdss_dispc, etc. This would indicate them to be clearly parts of DSS,
+>>>> and would also prevent any possible name conflict if there would happen
+>>>> to be a, say, "dsi" block in some other HW component.
+
+Cannot you use a device hierarchy then to do that?
+  omap_dss/core
+  omap_dss/dsi
+  omap_dss/venc
+
+This is moreover the way the HW is done.
+
+>>> Any comments on this?
+>>
+>> I also think we need to stick to the older name, "omapdss_dss" sounds a
+>> bit confusing, and I think one of the previous versions had something
+>> like "dss_dss" in it and it wasn't approved. Does something like
+>> "omapdss_core" or "omapdss_dss_core" make sense, or is it more misleading?
+>
+> It is confusing, but so is the hardware naming =). There is a DSS module
+> inside the omap display subsystem. That's why I would like to name it
+> "dss", not "core", so it's clear it refers to this DSS module.
+>
+> "dss_dss" looks a bit silly, but I think "omapdss_dss" is slightly
+> better in the sense that it doesn't repeat the same "dss", and there is
+> an "omapdss" device, which acts like "manager" for these module devices.
+> But yes, I wouldn't call it perfect either.
+>
+> "omapdss_dss_core" is one option. But then again, TRM doesn't speak of
+> "core".
+
+We should not maintain silly names just because they are in the TRM, we 
+should just fix the TRM. This is exactly what we are going to do for 
+most HW names we introduced in OMAP4.
+
+So if we all agree that this name will avoid confusion and is much 
+better than the current one, we can change it right now with a comment 
+to explain the change and give the pointer to the current TRM naming.
+
+Regards,
+Benoit
