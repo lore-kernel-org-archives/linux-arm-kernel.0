@@ -1,26 +1,60 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 28 Feb 2011 16:01:33 +0530
-Subject: [PATCH] davinci: cpufreq: fix section mismatch warning
-In-Reply-To: <1298345033.3903.7.camel@mola>
-References: <1298345033.3903.7.camel@mola>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BF35C9C@dbde02.ent.ti.com>
+From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
+Date: Mon, 28 Feb 2011 11:28:15 +0100
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <20110216115729.GA29817@besouro.research.nokia.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>
+	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>
+	<20110216115729.GA29817@besouro.research.nokia.com>
+Message-ID: <4D6B78BF.1020102@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Axel,
+Hello Eduardo,
 
-On Tue, Feb 22, 2011 at 08:53:53, Axel Lin wrote:
-> Fix below section mismatch warning:
-> WARNING: vmlinux.o(.data+0x673c): Section mismatch in reference from the variable davinci_driver to the function .init.text:davinci_cpu_init()
-> The variable davinci_driver references
-> the function __init davinci_cpu_init()
-> If the reference is valid then annotate the
-> variable with __init* or __refdata (see linux/init.h) or name the variable:
-> *_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console,
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+On 02/16/2011 12:57 PM, Eduardo Valentin wrote:
+> Hello Linus,
+>
+> On Tue, Feb 15, 2011 at 01:58:00PM +0100, ext Linus Walleij wrote:
+>> 2010/5/11 Eduardo Valentin<eduardo.valentin@nokia.com>:
+>>
+>>> Here is the version 5 of the change to export OMAP data to userspace
+>>> (name, revision, id code, production id and die id).
+>>>
+>>> Basically, this version is still attempting to create a new file under /proc.
+>>> It is the /proc/socinfo, which should be used to export bits which are SoC specific
+>>> (not CPU related, nor machine related).
+>>>
+>>> So, differences between previous version are:
+>>> - merged patch 02/04 with 03/04 to avoid compilation breakages.
+>>> - simplified the seq_file usage by using the single_open and single_release functions
+>>> - exported a function to register a seq_operation .show callback
+>>> - adapted the changes accordingly
+>>>
+>>> As usual, comments are welcome.
+>> Eduardo, what has happened to this patchset?
+> Got forgotten :-(. Unfortunately I didn't pushed it hard enough.
+  I propose to refactor your patchset, moving from procfs to sysfs.
+>> Do you want help in picking it up and try to polish it up?
+> Yeah, but it would need a refactoring. IIRC, result of last discussion was that
+> we should not mess with /proc. So, maybe moving back to something under sysfs.
+> Perhaps /sys/devices/soc or so?
+About the location of this new sysfs entry, where do you think it should be?
+I propose to create a new directory named "soc" in /sys/devices/system/.
 
-Will queue for Kevin to send upstream.
+As platform vendors have several/different kind of IDs to export to 
+sysfs, I propose each vendor to create file entries related to their IDs 
+(eg. /sys/devices/system/soc/idcode for OMAP platforms).
 
-Thanks,
-Sekhar
+However, I think we should have a common file entry to export the unique 
+ID of the platforms. Indeed, user-space applications should have a 
+unified way to get this kind of ID, regardless of the platform (eg. 
+/sys/devices/system/soc/unique_id).
+
+Do you agree with my proposal?
+
+Thanks for your comments.
+
+Regards,
+
+Maxime Coquelin
