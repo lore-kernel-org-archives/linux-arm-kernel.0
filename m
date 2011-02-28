@@ -1,57 +1,101 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Mon, 28 Feb 2011 15:23:33 +0800
-Subject: [PATCH v2 1/1] ARM: imx53: correct Silicon Revision definition
-	following fuse map
-In-Reply-To: <AANLkTikC-bMK=7CcbyEZWvab=Qe19TJBGWGC6tmN5gnd@mail.gmail.com>
-References: <1298031990-4521-1-git-send-email-richard.zhao@freescale.com>
-	<AANLkTikC-bMK=7CcbyEZWvab=Qe19TJBGWGC6tmN5gnd@mail.gmail.com>
-Message-ID: <20110228072332.GA2431@b20223-02.ap.freescale.net>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 28 Feb 2011 08:57:03 +0100
+Subject: [PATCH V12 0/4] ptp: IEEE 1588 hardware clock support
+Message-ID: <cover.1298878618.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+This really might be the last review of the PTP hardware clock patch
+series. These patches apply on top of the timers/core branch in the
+tip tree.
 
-Could you please merge this patch?
+* Why all the CCs?
+  - One driver is for PowerPC, and adds device tree stuff.
+  - One driver is for the ARM Xscale IXP465.
 
-Thanks
-Richard
-On Tue, Feb 22, 2011 at 03:46:31PM +0800, Jason Chen wrote:
-> 2011/2/18 Richard Zhao <richard.zhao@freescale.com>:
-> > Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
-> Acked-by: Jason Chen <jason.chen@freescale.com>
-> >
-> > diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
-> > index d40671d..df46b5e 100644
-> > --- a/arch/arm/mach-mx5/cpu.c
-> > +++ b/arch/arm/mach-mx5/cpu.c
-> > @@ -78,11 +78,16 @@ static int get_mx53_srev(void)
-> > ? ? ? ?void __iomem *iim_base = MX51_IO_ADDRESS(MX53_IIM_BASE_ADDR);
-> > ? ? ? ?u32 rev = readl(iim_base + IIM_SREV) & 0xff;
-> >
-> > - ? ? ? if (rev == 0x0)
-> > + ? ? ? switch (rev) {
-> > + ? ? ? case 0x0:
-> > ? ? ? ? ? ? ? ?return IMX_CHIP_REVISION_1_0;
-> > - ? ? ? else if (rev == 0x10)
-> > + ? ? ? case 0x2:
-> > ? ? ? ? ? ? ? ?return IMX_CHIP_REVISION_2_0;
-> > - ? ? ? return 0;
-> > + ? ? ? case 0x3:
-> > + ? ? ? ? ? ? ? return IMX_CHIP_REVISION_2_1;
-> > + ? ? ? default:
-> > + ? ? ? ? ? ? ? return IMX_CHIP_REVISION_UNKNOWN;
-> > + ? ? ? }
-> > ?}
-> >
-> > ?/*
-> > --
-> > 1.7.1
-> >
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
+* PHC Patch ChangeLog
+** v12
+*** gianfar_ptp
+   - fixed up device tree
+   - inlined the header file
+   - use platform_ calls instead of deprecated of_ calls
+   - removed static global single instance
+   - removed John Stultz's ack from this patch
+
+* Previous Discussions
+
+  - [V11] http://lkml.org/lkml/2011/2/23/107
+  - [V10] http://lkml.org/lkml/2011/1/27/71
+  - [V9]  http://lkml.org/lkml/2011/1/13/65
+  - [V8]  http://lkml.org/lkml/2010/12/31/128
+  - [V7]  http://lkml.org/lkml/2010/12/16/195
+  - [V6]  http://lkml.org/lkml/2010/9/23/310
+  - [V5]  http://lkml.org/lkml/2010/8/16/90
+
+  - Thomas Gleixner: Rework of the PTP support series core code
+    http://lkml.org/lkml/2011/2/1/137
+
+  - Dynamic clock devices [RFC]
+    http://lkml.org/lkml/2010/11/4/290
+
+  - POSIX clock tuning syscall with dynamic clock ids
+    http://lkml.org/lkml/2010/9/3/119
+
+  - POSIX clock tuning syscall with static clock ids
+    http://lkml.org/lkml/2010/8/23/49
+
+  - Versions 1-4 appeared on the netdev list.
+
+
+Richard Cochran (4):
+  ptp: Added a brand new class driver for ptp clocks.
+  ptp: Added a clock that uses the eTSEC found on the MPC85xx.
+  ptp: Added a clock driver for the IXP46x.
+  ptp: Added a clock driver for the National Semiconductor PHYTER.
+
+ Documentation/ABI/testing/sysfs-ptp                |   98 ++
+ .../devicetree/bindings/net/fsl-tsec-phy.txt       |   54 +
+ Documentation/ptp/ptp.txt                          |   89 ++
+ Documentation/ptp/testptp.c                        |  352 +++++++
+ Documentation/ptp/testptp.mk                       |   33 +
+ arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h      |   78 ++
+ arch/powerpc/boot/dts/mpc8313erdb.dts              |   13 +
+ arch/powerpc/boot/dts/mpc8572ds.dts                |   13 +
+ arch/powerpc/boot/dts/p2020ds.dts                  |   13 +
+ arch/powerpc/boot/dts/p2020rdb.dts                 |   13 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/net/Makefile                               |    1 +
+ drivers/net/arm/ixp4xx_eth.c                       |  192 ++++-
+ drivers/net/gianfar_ptp.c                          |  579 +++++++++++
+ drivers/net/phy/Makefile                           |    1 +
+ drivers/net/phy/dp83640.c                          | 1012 ++++++++++++++++++++
+ drivers/net/phy/dp83640_reg.h                      |  267 +++++
+ drivers/ptp/Kconfig                                |   75 ++
+ drivers/ptp/Makefile                               |    7 +
+ drivers/ptp/ptp_chardev.c                          |  156 +++
+ drivers/ptp/ptp_clock.c                            |  320 ++++++
+ drivers/ptp/ptp_ixp46x.c                           |  332 +++++++
+ drivers/ptp/ptp_private.h                          |   86 ++
+ drivers/ptp/ptp_sysfs.c                            |  230 +++++
+ include/linux/Kbuild                               |    1 +
+ include/linux/ptp_clock.h                          |   84 ++
+ include/linux/ptp_clock_kernel.h                   |  139 +++
+ 28 files changed, 4238 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-ptp
+ create mode 100644 Documentation/ptp/ptp.txt
+ create mode 100644 Documentation/ptp/testptp.c
+ create mode 100644 Documentation/ptp/testptp.mk
+ create mode 100644 arch/arm/mach-ixp4xx/include/mach/ixp46x_ts.h
+ create mode 100644 drivers/net/gianfar_ptp.c
+ create mode 100644 drivers/net/phy/dp83640.c
+ create mode 100644 drivers/net/phy/dp83640_reg.h
+ create mode 100644 drivers/ptp/Kconfig
+ create mode 100644 drivers/ptp/Makefile
+ create mode 100644 drivers/ptp/ptp_chardev.c
+ create mode 100644 drivers/ptp/ptp_clock.c
+ create mode 100644 drivers/ptp/ptp_ixp46x.c
+ create mode 100644 drivers/ptp/ptp_private.h
+ create mode 100644 drivers/ptp/ptp_sysfs.c
+ create mode 100644 include/linux/ptp_clock.h
+ create mode 100644 include/linux/ptp_clock_kernel.h
