@@ -1,206 +1,175 @@
 From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Wed,  2 Mar 2011 00:58:29 +0800
-Subject: [patch v1 1/3] arm: introduce cross trigger interface helpers
+Date: Wed,  2 Mar 2011 00:58:30 +0800
+Subject: [patch v1 2/3] arm: pmu: support pmu irq routed from CTI
 In-Reply-To: <1298998711-8165-1-git-send-email-tom.leiming@gmail.com>
 References: <1298998711-8165-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1298998711-8165-2-git-send-email-tom.leiming@gmail.com>
+Message-ID: <1298998711-8165-3-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ming Lei <tom.leiming@gmail.com>
 
-OMAP4 uses cross trigger interface(CTI) to route
-performance monitor irq to GIC, so introduce cti
-helpers to make access for cti easily.
+This patch introduces pmu_platform_data struct to
+support pmu irq routed from CTI, such as implemented
+on OMAP4.
+
+Generally speaking, clearing cti irq should be done in
+irq handler, also enabling cti module after calling
+request_irq and disabling cti module before calling
+free_irq.
 
 Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 ---
- arch/arm/include/asm/cti.h |  177 ++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 177 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/cti.h
+ arch/arm/include/asm/pmu.h   |   12 +++++++++
+ arch/arm/kernel/perf_event.c |   57 ++++++++++++++++++++++++++++++-----------
+ 2 files changed, 53 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/include/asm/cti.h b/arch/arm/include/asm/cti.h
-new file mode 100644
-index 0000000..c9addd3
---- /dev/null
-+++ b/arch/arm/include/asm/cti.h
-@@ -0,0 +1,177 @@
-+/*
-+ *  arch/arm/include/asm/cti.h
-+ */
-+#ifndef __ASMARM_CTI_H
-+#define __ASMARM_CTI_H
-+
-+#include	<asm/io.h>
-+
-+/*The registers' definition is from section 3.2 of
-+ * 	Embedded Cross Trigger Revision: r0p0
-+ **/
-+#define		CTICONTROL		0x000
-+#define		CTISTATUS		0x004
-+#define		CTILOCK			0x008
-+#define		CTIPROTECTION		0x00C
-+#define		CTIINTACK		0x010
-+#define		CTIAPPSET		0x014
-+#define		CTIAPPCLEAR		0x018
-+#define		CTIAPPPULSE		0x01c
-+#define		CTIINEN			0x020
-+#define		CTIOUTEN		0x0A0
-+#define		CTITRIGINSTATUS		0x130
-+#define		CTITRIGOUTSTATUS	0x134
-+#define		CTICHINSTATUS		0x138
-+#define		CTICHOUTSTATUS		0x13c
-+#define		CTIPERIPHID0		0xFE0
-+#define		CTIPERIPHID1		0xFE4
-+#define		CTIPERIPHID2		0xFE8
-+#define		CTIPERIPHID3		0xFEC
-+#define		CTIPCELLID0		0xFF0
-+#define		CTIPCELLID1		0xFF4
-+#define		CTIPCELLID2		0xFF8
-+#define		CTIPCELLID3		0xFFC
-+
-+/*The two below are from section 3.6.4 of
-+ * 	CoreSight v1.0 Architecture Specification
-+ **/
-+#define		LOCKACCESS		0xFB0
-+#define		LOCKSTATUS		0xFB4
-+
-+/**
-+ * struct cti - cross trigger interface struct
-+ * @base: mapped virtual address for the cti base
-+ * @irq: irq number for the cti
-+ * @trig_out_for_irq: triger out number which will cause
-+ * 	the @irq happen
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 7544ce6..6162aaf 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -13,20 +13,32 @@
+ #define __ARM_PMU_H__
+ 
+ #include <linux/interrupt.h>
++#include <asm/cti.h>
+ 
+ enum arm_pmu_type {
+ 	ARM_PMU_DEVICE_CPU	= 0,
+ 	ARM_NUM_PMU_DEVICES,
+ };
+ 
++#define MAX_CTI_NUM  4
+ /*
+  * struct arm_pmu_platdata - ARM PMU platform data
+  *
++ * @use_cti_irq: pmu irq is routed from cti
++ * @cti_cnt: cti counts used for pmu irq routing
++ * @cti: cti instances used to help access cti registers
+  * @handle_irq: an optional handler which will be called from the interrupt and
+  * passed the address of the low level handler, and can be used to implement
+  * any platform specific handling before or after calling it.
 + *
-+ * cti struct used to operate cti registers.
-+ */
-+struct cti {
-+	void *base;
-+	int irq;
-+	int trig_out_for_irq;
-+};
++ * If pmu irq is routed from CTI, @use_cti_irq, @cti_cnt and
++ * @cti must be initialized and passed to pmu driver.
+  */
+ struct arm_pmu_platdata {
++	int use_cti_irq;
++	int cti_cnt;
++	struct cti cti[MAX_CTI_NUM];
 +
-+/**
-+ * cti_init - initialize the cti instance
-+ * @cti: cti instance
-+ * @base: mapped virtual address for the cti base
-+ * @irq: irq number for the cti
-+ * @trig_out: triger out number which will cause
-+ * 	the @irq happen
-+ *
-+ * called by machine code to pass the board dependent
-+ * @base, @irq and @trig_out to cti.
-+ */
-+static inline void cti_init(struct cti *cti,
-+	void *base, int irq, int trig_out)
-+{
-+	cti->base = base;
-+	cti->irq  = irq;
-+	cti->trig_out_for_irq = trig_out;
+ 	irqreturn_t (*handle_irq)(int irq, void *dev,
+ 				  irq_handler_t pmu_handler);
+ };
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 22e194eb..9027a8f 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -377,18 +377,39 @@ validate_group(struct perf_event *event)
+ 	return 0;
+ }
+ 
+-static irqreturn_t armpmu_platform_irq(int irq, void *dev)
++static inline int cti_irq(struct arm_pmu_platdata *data)
+ {
+-	struct arm_pmu_platdata *plat = dev_get_platdata(&pmu_device->dev);
++	return data && data->use_cti_irq;
 +}
 +
-+/**
-+ * cti_map_trigger - use the @chan to map @trig_in to @trig_out
-+ * @cti: cti instance
-+ * @trig_in: trigger in number
-+ * @trig_out: trigger out number
-+ * @channel: channel number
-+ *
-+ * This function maps one trigger in of @trig_in to one trigger
-+ * out of @trig_out using the channel @chan.
-+ */
-+static inline void cti_map_trigger(struct cti *cti,
-+	int trig_in, int trig_out, int chan)
++static inline struct cti *irq_to_cti(struct arm_pmu_platdata *data,
++	int irq)
 +{
-+	void *base = cti->base;
-+	unsigned long val;
-+
-+	val = __raw_readl(base + CTIINEN + trig_in * 4);
-+	val |= 1 << chan;
-+	__raw_writel(val, base + CTIINEN + trig_in * 4);
-+
-+	val = __raw_readl(base + CTIOUTEN + trig_out * 4);
-+	val |= 1 << chan;
-+	__raw_writel(val, base + CTIOUTEN + trig_out * 4);
++	int idx;
+ 
+-	return plat->handle_irq(irq, dev, armpmu->handle_irq);
++	for(idx = 0; idx < data->cti_cnt; idx++)
++		if (data->cti[idx].irq == irq)
++			return &data->cti[idx];
++	return NULL;
 +}
 +
-+/**
-+ * cti_enable - enable the cti module
-+ * @cti: cti instance
-+ *
-+ * enable the cti module
-+ */
-+static inline void cti_enable(struct cti *cti)
++static inline irqreturn_t armpmu_handle_irq(int irq_num, void *dev)
 +{
-+	__raw_writel(0x1, cti->base);
-+}
++	struct arm_pmu_platdata *plat = dev;
 +
-+/**
-+ * cti_disable - disable the cti module
-+ * @cti: cti instance
-+ *
-+ * enable the cti module
-+ */
-+static inline void cti_disable(struct cti *cti)
-+{
-+	__raw_writel(0, cti->base);
-+}
++	if (cti_irq(plat))
++		cti_irq_ack(irq_to_cti(plat, irq_num));
 +
-+/**
-+ * cti_irq_ack - clear the cti irq
-+ * @cti: cti instance
-+ *
-+ * clear the cti irq
-+ */
-+static inline void cti_irq_ack(struct cti *cti)
-+{
-+	void *base = cti->base;
-+	unsigned long val;
-+
-+	val = __raw_readl(base + CTIINTACK);
-+	val |= 1 << cti->trig_out_for_irq;
-+	__raw_writel(val, base + CTIINTACK);
-+}
-+
-+/**
-+ * cti_unlock - unlock cti module
-+ * @cti: cti instance
-+ *
-+ * unlock the cti module, or else any writes to the cti
-+ * module is not allowed.
-+ */
-+static inline void cti_unlock(struct cti *cti)
-+{
-+	void *base = cti->base;
-+	unsigned long val;
-+
-+	val = __raw_readl(base + LOCKSTATUS);
-+
-+	if (val & 1) {
-+		val = 0xC5ACCE55;
-+		__raw_writel(val, base + LOCKACCESS);
-+	}
-+}
-+
-+/**
-+ * cti_unlock - lock cti module
-+ * @cti: cti instance
-+ *
-+ * lock the cti module, so any writes to the cti
-+ * module will be not allowed.
-+ */
-+static inline void cti_lock(struct cti *cti)
-+{
-+	void *base = cti->base;
-+	unsigned long val;
-+
-+	val = __raw_readl(base + LOCKSTATUS);
-+
-+	if (!(val & 1)) {
-+		val = ~0xC5ACCE55;
-+		__raw_writel(val, base + LOCKACCESS);
-+	}
-+}
-+#endif
++	if (plat && plat->handle_irq)
++		return plat->handle_irq(irq_num, dev, armpmu->handle_irq);
++	else
++		return armpmu->handle_irq(irq_num, NULL);
+ }
+ 
+ static int
+ armpmu_reserve_hardware(void)
+ {
+ 	struct arm_pmu_platdata *plat;
+-	irq_handler_t handle_irq;
+ 	int i, err = -ENODEV, irq;
+ 
+ 	pmu_device = reserve_pmu(ARM_PMU_DEVICE_CPU);
+@@ -399,11 +420,7 @@ armpmu_reserve_hardware(void)
+ 
+ 	init_pmu(ARM_PMU_DEVICE_CPU);
+ 
+-	plat = dev_get_platdata(&pmu_device->dev);
+-	if (plat && plat->handle_irq)
+-		handle_irq = armpmu_platform_irq;
+-	else
+-		handle_irq = armpmu->handle_irq;
++	plat = platform_get_drvdata(pmu_device);
+ 
+ 	if (pmu_device->num_resources < 1) {
+ 		pr_err("no irqs for PMUs defined\n");
+@@ -415,21 +432,25 @@ armpmu_reserve_hardware(void)
+ 		if (irq < 0)
+ 			continue;
+ 
+-		err = request_irq(irq, handle_irq,
++		err = request_irq(irq, armpmu_handle_irq,
+ 				  IRQF_DISABLED | IRQF_NOBALANCING,
+-				  "armpmu", NULL);
++				  "armpmu", plat);
+ 		if (err) {
+ 			pr_warning("unable to request IRQ%d for ARM perf "
+ 				"counters\n", irq);
+ 			break;
+-		}
++		} else if (cti_irq(plat))
++			cti_enable(irq_to_cti(plat, irq));
+ 	}
+ 
+ 	if (err) {
+ 		for (i = i - 1; i >= 0; --i) {
+ 			irq = platform_get_irq(pmu_device, i);
+-			if (irq >= 0)
+-				free_irq(irq, NULL);
++			if (irq >= 0) {
++				if (cti_irq(plat))
++					cti_disable(irq_to_cti(plat, irq));
++				free_irq(irq, plat);
++			}
+ 		}
+ 		release_pmu(pmu_device);
+ 		pmu_device = NULL;
+@@ -442,11 +463,15 @@ static void
+ armpmu_release_hardware(void)
+ {
+ 	int i, irq;
++	struct arm_pmu_platdata *plat = platform_get_drvdata(pmu_device);
+ 
+ 	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
+ 		irq = platform_get_irq(pmu_device, i);
+-		if (irq >= 0)
+-			free_irq(irq, NULL);
++		if (irq >= 0) {
++			if (cti_irq(plat))
++				cti_disable(irq_to_cti(plat, irq));
++			free_irq(irq, plat);
++		}
+ 	}
+ 	armpmu->stop();
+ 
 -- 
 1.7.3
