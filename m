@@ -1,34 +1,19 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 1 Mar 2011 09:34:15 +0100
-Subject: [PATCH] plat-mxc: Provide irq_chip name for GPIO IRQs
-In-Reply-To: <201103010838.37197.alexander.stein@systec-electronic.com>
-References: <1296489624-21355-1-git-send-email-alexander.stein@systec-electronic.com>
-	<201103010838.37197.alexander.stein@systec-electronic.com>
-Message-ID: <20110301083415.GA2212@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Mar 2011 08:49:49 +0000
+Subject: [RFC PATCH] ARM: Use generic BUG() handler
+In-Reply-To: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+Message-ID: <20110301084949.GA16733@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
+> +	asm volatile("1:\t.word %c3\n"				\
+> +		     ".pushsection __bug_table,\"a\"\n"		\
+> +		     "2:\t.word 1b, %c0\n"			\
+> +		     "\t.hword %c1, 0\n"			\
+> +		     "\t.org 2b+%c2\n"				\
 
-> >  static struct irq_chip gpio_irq_chip = {
-> > +	.name = "GPIO",
-
-I'd suggest a more specific name, e.g. "i.MX GPIO"? You can then also
-add my
-
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110301/dacba0d6/attachment.sig>
+%c doesn't work on lots of versions of gcc, which is why we can't use
+the generic bug support.  There's no way to reliably generate constants
+without many compiler versions spitting out a '#' before them.
