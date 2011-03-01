@@ -1,111 +1,61 @@
-From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Tue,  1 Mar 2011 21:17:14 +0800
-Subject: [PATCH 3/3] arm: omap4: support pmu
-In-Reply-To: <1298985434-3009-1-git-send-email-tom.leiming@gmail.com>
-References: <1298985434-3009-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1298985434-3009-4-git-send-email-tom.leiming@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Mar 2011 13:24:23 -0000
+Subject: [PATCH 3/6] ARM: tegra: update GPIO chained IRQ handler to use
+	EOI in	parent chip
+In-Reply-To: <4D6CF08C.6030109@ru.mvista.com>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+	<1298900022-21516-4-git-send-email-will.deacon@arm.com>
+	<4D6CF08C.6030109@ru.mvista.com>
+Message-ID: <000501cbd813$fb8de5f0$f2a9b1d0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ming Lei <tom.leiming@gmail.com>
+Sergei,
 
-This patch supports pmu irq routed from CTI, so
-make pmu/perf working on OMAP4.
+> On 28-02-2011 16:33, Will Deacon wrote:
+> 
+> > The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
+> > chip prior to handling the interrupt.
+> 
+> > This patch updates the code to use ->irq_eoi now that the GIC has moved
+> > to using the fasteoi flow model.
+> 
+> > Acked-by: Colin Cross<ccross@android.com>
+> > Signed-off-by: Will Deacon<will.deacon@arm.com>
+> > ---
+> >   arch/arm/mach-tegra/gpio.c |   17 +----------------
+> >   1 files changed, 1 insertions(+), 16 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
+> > index ad80488..5019b01 100644
+> > --- a/arch/arm/mach-tegra/gpio.c
+> > +++ b/arch/arm/mach-tegra/gpio.c
+> > @@ -219,9 +219,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+> >   	struct tegra_gpio_bank *bank;
+> >   	int port;
+> >   	int pin;
+> > -	int unmasked = 0;
+> > -
+> > -	desc->irq_data.chip->irq_ack(&desc->irq_data);
+> 
+>     Won't this code break after the first patch as it removes irq_ack()
+> method? I.e. shouldn't the patches be combined to keep them bisectable?
 
-The idea is from Woodruff Richard in the disscussion
-"Oprofile on Pandaboard / Omap4" of pandaboard at googlegroups.com.
+If you read the cover letter, I said:
 
-Cc: Woodruff Richard <r-woodruff2@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
----
- arch/arm/mach-omap2/devices.c |   54 ++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 53 insertions(+), 1 deletions(-)
+> This is going to be a PITA to merge so any thoughts relating to that
+> are welcome.
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 71f099b..54e9705 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -34,6 +34,7 @@
- 
- #include "mux.h"
- #include "control.h"
-+#include "dbg44xx.h"
- 
- #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
- 
-@@ -347,19 +348,70 @@ static struct resource omap3_pmu_resource = {
- 	.flags	= IORESOURCE_IRQ,
- };
- 
-+static struct resource omap4_pmu_resource[] = {
-+	{
-+	.start	= OMAP44XX_IRQ_CTI0,
-+	.end	= OMAP44XX_IRQ_CTI0,
-+	.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+	.start	= OMAP44XX_IRQ_CTI1,
-+	.end	= OMAP44XX_IRQ_CTI1,
-+	.flags	= IORESOURCE_IRQ,
-+	}
-+};
-+
- static struct platform_device omap_pmu_device = {
- 	.name		= "arm-pmu",
- 	.id		= ARM_PMU_DEVICE_CPU,
- 	.num_resources	= 1,
- };
- 
-+struct pmu_platform_data omap4_pmu_data;
-+
-+static void omap4_configure_pmu_irq(void)
-+{
-+	void *base0;
-+	void *base1;
-+
-+	base0 = ioremap(OMAP4430_CTI0_BASE, 4096);
-+	base1 = ioremap(OMAP4430_CTI1_BASE, 4096);
-+	if (!base0 && !base1) {
-+		pr_err("ioremap for omap4 CTI failed\n");
-+		return;
-+	}
-+
-+	/*configure CTI0 for pmu irq routing*/
-+	cti_init(&omap4_pmu_data.cti[0], base0,
-+			OMAP44XX_IRQ_CTI0, 6);
-+	cti_unlock(&omap4_pmu_data.cti[0]);
-+	cti_map_trigger(&omap4_pmu_data.cti[0],
-+			1, 6, 2);
-+
-+	/*configure CTI1 for pmu irq routing*/
-+	cti_init(&omap4_pmu_data.cti[1], base1,
-+			OMAP44XX_IRQ_CTI1, 6);
-+	cti_unlock(&omap4_pmu_data.cti[1]);
-+	cti_map_trigger(&omap4_pmu_data.cti[1],
-+			1, 6, 3);
-+
-+	omap4_pmu_data.cti_cnt = 2;
-+	omap4_pmu_data.use_cti_irq = 1;
-+}
-+
- static void omap_init_pmu(void)
- {
- 	if (cpu_is_omap24xx())
- 		omap_pmu_device.resource = &omap2_pmu_resource;
- 	else if (cpu_is_omap34xx())
- 		omap_pmu_device.resource = &omap3_pmu_resource;
--	else
-+	else if (cpu_is_omap44xx()) {
-+		omap_pmu_device.resource = omap4_pmu_resource;
-+		omap_pmu_device.num_resources = 2;
-+		omap_pmu_device.dev.platform_data = &omap4_pmu_data;
-+
-+		omap4_configure_pmu_irq();
-+	} else
- 		return;
- 
- 	platform_device_register(&omap_pmu_device);
--- 
-1.7.3
+I'm aware of the bisecting issues and Russell has come up with a solution
+using entry/exit functions to sort this out (with the GIC changes moved to
+the end of the series).
+
+But we have bigger fish to fry.
+
+The whole question about whether or not chained handlers should be written
+with multiple parent chips in mind is a hot topic. Thomas has some interesting
+ideas for the core code which will allow the chained handler not to care about
+flow control. Once we've sorted out the mechanism for this stuff, the merging
+should be fairly straightforward because the chip details will be irrelevant.
+
+Will
