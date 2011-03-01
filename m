@@ -1,35 +1,40 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 1 Mar 2011 14:07:43 +0000
-Subject: [PATCH v2 13/13] tty: pruss SUART driver
-In-Reply-To: <99CE1730AA2F4F2F91AFA71BD75FDC41@subhasishg>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-14-git-send-email-subhasish@mistralsolutions.com>
-	<20110211162814.6ff274f1@lxorguk.ukuu.org.uk>
-	<A6D1CF0E941748448610BE8874FC586F@subhasishg>
-	<20110222111103.5d0dd0a7@lxorguk.ukuu.org.uk>
-	<99CE1730AA2F4F2F91AFA71BD75FDC41@subhasishg>
-Message-ID: <20110301140743.0b9cf140@lxorguk.ukuu.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 1 Mar 2011 15:09:52 +0100 (CET)
+Subject: [PATCH 3/8] Add a mfd IPUv3 driver
+In-Reply-To: <201103011243.33765.arnd@arndb.de>
+References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
+	<201103011127.51605.arnd@arndb.de>
+	<20110301111220.GN29521@pengutronix.de>
+	<201103011243.33765.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1103011507220.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I tried using a tasklet for the TX part, but that did not help.
-> Another way is to prepare the buffer for the next read and read the data 
-> immediately.
-> Something like this:
+On Tue, 1 Mar 2011, Arnd Bergmann wrote:
+
+> On Tuesday 01 March 2011, Sascha Hauer wrote:
+> > > Taking one step back from this, have you considered making this
+> > > a regular interrupt controller? That would make the client drivers
+> > > more standard -- you could define the interrupt numbers as resources
+> > > of a platform device or in the device tree, for instance.
+> > > The cost might be more complex code, e.g. when a device requires
+> > > many interrupts, but I think it will be at least as efficient
+> > > at run-time, and less surprising for readers and authors of
+> > > client drivers.
+> > 
+> > I thought about this, but hesitated to increase NR_IRQS by 463. Do you
+> > think we should do this instead?
 > 
-> 1. Call tty_prepare_flip_string while startup.
-> 2. When the read interrupt arrives, read the data immediately.
-> 3. Call tty_prepare_flip_string for the next read.
+> I think there is a plan to virtualize the interrupt numbers on ARM,
+> and in that case NR_IRQS becomes rather meaningless. I don't know
+> exactly how far that effort has come.
 
-Only you then don't know the size of space required/
+Also sparse irqs allows us now to allocate beyond NR_IRQS. With sparse
+irqs NR_IRQS is pretty meaningless and just gives us an indicator how
+large the irq space might become, but we allow up to 8k dynamically
+allocated irqs beyond NR_IRQS, so this should be sufficient for your
+problem.
 
-> Again, the problem here is that we need to use global variables to store the 
-> pre-allocated buffers
+Thanks,
 
-You don't. You can store them per port in the existing objects !
-
-> The best way is if we can keep the current implementation, one extra copy is 
-> not hurting us
-> as we do it after the read_data API.
-
-No problem with that at all.
+	tglx
