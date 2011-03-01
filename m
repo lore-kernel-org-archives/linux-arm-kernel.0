@@ -1,37 +1,59 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 1 Mar 2011 14:11:06 +0000
-Subject: [PATCH 1/4] ASoC: Add TI tlv320aic32x4 codec support.
-In-Reply-To: <AANLkTinjj8rZS_Y9qiHbrU2nAYSXTikTNtyU71Bk7UqL@mail.gmail.com>
-References: <1298641370-17461-1-git-send-email-javier.martin@vista-silicon.com>
-	<20110228150014.GI13869@opensource.wolfsonmicro.com>
-	<AANLkTinjj8rZS_Y9qiHbrU2nAYSXTikTNtyU71Bk7UqL@mail.gmail.com>
-Message-ID: <20110301141105.GF9662@opensource.wolfsonmicro.com>
+Date: Tue, 1 Mar 2011 14:22:31 +0000
+Subject: [PATCH v2 1/4] ASoC: Add TI tlv320aic32x4 codec support.
+In-Reply-To: <1298988128-11520-2-git-send-email-javier.martin@vista-silicon.com>
+References: <1298988128-11520-1-git-send-email-javier.martin@vista-silicon.com>
+	<1298988128-11520-2-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20110301142231.GH9662@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 08:59:23AM +0100, javier Martin wrote:
+On Tue, Mar 01, 2011 at 03:02:05PM +0100, Javier Martin wrote:
 
-> > What are these "aic32x4_configs" all about? ?They look like you're
-> > setting non-default configurations...
+> +	SOC_DOUBLE_R_TLV("ADC Level Volume", AIC32X4_LADCVOL,
+> +			AIC32X4_RADCVOL, 0, 0x28, 0, tlv_step_0_5),
+> +	SOC_DOUBLE_R_TLV("PGA Gain Level Volume", AIC32X4_LMICPGAVOL,
+> +			AIC32X4_RMICPGAVOL, 0, 0x5f, 0, tlv_step_0_5),
 
-> This tlv320aic32x4 codec is kind of a huge monster; it has more than
-> 200 registers which provide more flexibility than it is needed.
+I suspect you don't want to have Gain and Level in there.
 
-So what is all this magic stuff and why is it using such an odd way of
-implementing whatever it's doing?  Part of the problem here is that the
-functionality is scattered all the way through the driver so it's less
-clear than it should be what's going on.
+> +	SOC_SINGLE("AGC Left Enable Switch", AIC32X4_LAGC1, 7, 1, 0),
+> +	SOC_SINGLE("AGC Right Enable Switch", AIC32X4_RAGC1, 7, 1, 0),
 
-> For example, BCLK and MCLK are forced here to derive from internal PLL
-> which is needed for frequency calculation table to be valid. Bypassing
-> this PLL doesn't provide new or better functionality.
+A switch is obviously an enable.
 
-I rather suspect it provides lower power consumption.
+> +static const struct aic32x4_configs aic32x4_reg_init[] = {
 
-> The same happens regarding DAC internal connections. I don't think
-> allowing the user to swap left and right channels makes sense here.
+As I said in reply to your previous posting this looks like it shouldn't
+be here.  A few things jump out as suspicious but not everything you're
+doing is clear:
 
-There are a number of CPUs out there that end up being happier with
-channels in the wrong order due to peculiarities of the DMA.  This is
-also used to get a microphone input connected to the right analogue
-input to appear on the left channel of a recording for mono use.
+> +	{AIC32X4_LDOCTL, AIC32X4_LDOCTLEN},
+
+This looks like it should be dynamically managed at runtime, either via
+DAPM or in the bias level functions.
+
+> +	{AIC32X4_CMMODE, AIC32X4_LDOIN_18_36 | AIC32X4_LDOIN2HP},
+> +	{AIC32X4_CLKMUX, AIC32X4_PLLCLKIN},
+> +	{AIC32X4_IFACE3, AIC32X4_DACMOD2BCLK},
+> +	{AIC32X4_DACSETUP,
+> +	 AIC32X4_LDAC2LCHN | AIC32X4_RDAC2RCHN | AIC32X4_SSTEP2WCLK},
+> +	{AIC32X4_LMICPGANIN, AIC32X4_LMICPGANIN_IN2R_10K},
+> +	{AIC32X4_RMICPGANIN, AIC32X4_RMICPGANIN_IN1L_10K},
+
+These look like platform configuration.
+
+> +	{AIC32X4_LMICPGAVOL, 0x00},
+> +	{AIC32X4_RMICPGAVOL, 0x00},
+
+These look like volume controls which should be exposed to users.
+
+> +	/* Unmute ADC left and right channels */
+> +	{AIC32X4_ADCFGA, 0x00},
+
+This looks like it should be user visible.
+
+> +	/* MICBIAS = 2.075V(CM=0.75V) generated from LDOIN */
+> +	{AIC32X4_MICBIAS, 0x68},
+
+This should be configured by the platform.
