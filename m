@@ -1,123 +1,457 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:56:11 +0530
-Subject: [PATCH V6 5/8] ST SPEAr3xx: Declare device structures after shirq code
+Date: Tue, 1 Mar 2011 16:56:13 +0530
+Subject: [PATCH V6 7/8] ST SPEAr: Remove unused *_SIZE macros from spear*.h
+	files
 In-Reply-To: <cover.1298977691.git.viresh.kumar@st.com>
 References: <cover.1298977691.git.viresh.kumar@st.com>
-Message-ID: <ace528081cf61ad4b0c539fbecad3a19db76ac84.1298977691.git.viresh.kumar@st.com>
+Message-ID: <92b2423158317c4fc283ae07edfe6047fedea5cf.1298977691.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Order of declarations should be: pmx_devs, shirq support, amba_devices,
-plat_devices, routines. This patch moves gpio_device below shirq support.
+Now we used standard SZ_* macros instead of self defined *_SIZE macros. This
+patch removes all such unused *_SIZE macros for spear3xx & 6xx.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/spear300.c |   40 ++++++++++++++++++------------------
- arch/arm/mach-spear3xx/spear310.c |    4 +-
- arch/arm/mach-spear3xx/spear320.c |    4 +-
- 3 files changed, 24 insertions(+), 24 deletions(-)
+ arch/arm/mach-spear3xx/include/mach/spear.h    |   63 ------------------
+ arch/arm/mach-spear3xx/include/mach/spear300.h |   29 --------
+ arch/arm/mach-spear3xx/include/mach/spear310.h |   14 +----
+ arch/arm/mach-spear3xx/include/mach/spear320.h |   32 +---------
+ arch/arm/mach-spear6xx/include/mach/spear.h    |   83 ------------------------
+ 5 files changed, 2 insertions(+), 219 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
-index 42dc29b..23d2a14 100644
---- a/arch/arm/mach-spear3xx/spear300.c
-+++ b/arch/arm/mach-spear3xx/spear300.c
-@@ -370,26 +370,6 @@ struct pmx_driver pmx_driver = {
- 	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
- };
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear.h b/arch/arm/mach-spear3xx/include/mach/spear.h
+index 8745802..df60e30 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear.h
+@@ -19,118 +19,55 @@
+ #include <mach/spear320.h>
  
--/* Add spear300 specific devices here */
--/* arm gpio1 device registration */
--static struct pl061_platform_data gpio1_plat_data = {
--	.gpio_base	= 8,
--	.irq_base	= SPEAR_GPIO1_INT_BASE,
--};
+ #define SPEAR3XX_ML_SDRAM_BASE		0x00000000
+-#define SPEAR3XX_ML_SDRAM_SIZE		0x40000000
+ 
+ #define SPEAR3XX_ICM9_BASE		0xC0000000
+-#define SPEAR3XX_ICM9_SIZE		0x10000000
+ 
+ /* ICM1 - Low speed connection */
+ #define SPEAR3XX_ICM1_2_BASE		0xD0000000
+-#define SPEAR3XX_ICM1_2_SIZE		0x10000000
 -
--struct amba_device gpio1_device = {
--	.dev = {
--		.init_name = "gpio1",
--		.platform_data = &gpio1_plat_data,
--	},
--	.res = {
--		.start = SPEAR300_GPIO_BASE,
--		.end = SPEAR300_GPIO_BASE + SPEAR300_GPIO_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	.irq = {VIRQ_GPIO1, NO_IRQ},
--};
+ #define SPEAR3XX_ICM1_UART_BASE		0xD0000000
+ #define VA_SPEAR3XX_ICM1_UART_BASE	IO_ADDRESS(SPEAR3XX_ICM1_UART_BASE)
+-#define SPEAR3XX_ICM1_UART_SIZE		0x00080000
 -
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -443,6 +423,26 @@ struct spear_shirq shirq_ras1 = {
- 	},
- };
- 
-+/* Add spear300 specific devices here */
-+/* arm gpio1 device registration */
-+static struct pl061_platform_data gpio1_plat_data = {
-+	.gpio_base	= 8,
-+	.irq_base	= SPEAR_GPIO1_INT_BASE,
-+};
-+
-+struct amba_device gpio1_device = {
-+	.dev = {
-+		.init_name = "gpio1",
-+		.platform_data = &gpio1_plat_data,
-+	},
-+	.res = {
-+		.start = SPEAR300_GPIO_BASE,
-+		.end = SPEAR300_GPIO_BASE + SPEAR300_GPIO_SIZE - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	.irq = {VIRQ_GPIO1, NO_IRQ},
-+};
-+
- /* spear300 routines */
- void __init spear300_init(void)
- {
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 5bfab14..3a3d548 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -139,8 +139,6 @@ struct pmx_driver pmx_driver = {
- 	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
- };
- 
--/* Add spear310 specific devices here */
+ #define SPEAR3XX_ICM1_ADC_BASE		0xD0080000
+-#define SPEAR3XX_ICM1_ADC_SIZE		0x00080000
 -
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -257,6 +255,8 @@ struct spear_shirq shirq_intrcomm_ras = {
- 	},
- };
- 
-+/* Add spear310 specific devices here */
-+
- /* spear310 routines */
- void __init spear310_init(void)
- {
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 6dba628..8ba3ff2 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -384,8 +384,6 @@ struct pmx_driver pmx_driver = {
- 	.mux_reg = {.offset = PAD_MUX_CONFIG_REG, .mask = 0x00007fff},
- };
- 
--/* Add spear320 specific devices here */
+ #define SPEAR3XX_ICM1_SSP_BASE		0xD0100000
+-#define SPEAR3XX_ICM1_SSP_SIZE		0x00080000
 -
- /* spear3xx shared irq */
- struct shirq_dev_config shirq_ras1_config[] = {
- 	{
-@@ -510,6 +508,8 @@ struct spear_shirq shirq_intrcomm_ras = {
- 	},
- };
+ #define SPEAR3XX_ICM1_I2C_BASE		0xD0180000
+-#define SPEAR3XX_ICM1_I2C_SIZE		0x00080000
+-
+ #define SPEAR3XX_ICM1_JPEG_BASE		0xD0800000
+-#define SPEAR3XX_ICM1_JPEG_SIZE		0x00800000
+-
+ #define SPEAR3XX_ICM1_IRDA_BASE		0xD1000000
+-#define SPEAR3XX_ICM1_IRDA_SIZE		0x00080000
+-
+ #define SPEAR3XX_ICM1_SRAM_BASE		0xD2800000
+-#define SPEAR3XX_ICM1_SRAM_SIZE		0x05800000
  
-+/* Add spear320 specific devices here */
+ /* ICM2 - Application Subsystem */
+ #define SPEAR3XX_ICM2_HWACCEL0_BASE	0xD8800000
+-#define SPEAR3XX_ICM2_HWACCEL0_SIZE	0x00800000
+-
+ #define SPEAR3XX_ICM2_HWACCEL1_BASE	0xD9000000
+-#define SPEAR3XX_ICM2_HWACCEL1_SIZE	0x00800000
+ 
+ /* ICM4 - High Speed Connection */
+ #define SPEAR3XX_ICM4_BASE		0xE0000000
+-#define SPEAR3XX_ICM4_SIZE		0x08000000
+-
+ #define SPEAR3XX_ICM4_MII_BASE		0xE0800000
+-#define SPEAR3XX_ICM4_MII_SIZE		0x00800000
+-
+ #define SPEAR3XX_ICM4_USBD_FIFO_BASE	0xE1000000
+-#define SPEAR3XX_ICM4_USBD_FIFO_SIZE	0x00100000
+-
+ #define SPEAR3XX_ICM4_USBD_CSR_BASE	0xE1100000
+-#define SPEAR3XX_ICM4_USBD_CSR_SIZE	0x00100000
+-
+ #define SPEAR3XX_ICM4_USBD_PLDT_BASE	0xE1200000
+-#define SPEAR3XX_ICM4_USBD_PLDT_SIZE	0x00100000
+-
+ #define SPEAR3XX_ICM4_USB_EHCI0_1_BASE	0xE1800000
+-#define SPEAR3XX_ICM4_USB_EHCI0_1_SIZE	0x00100000
+-
+ #define SPEAR3XX_ICM4_USB_OHCI0_BASE	0xE1900000
+-#define SPEAR3XX_ICM4_USB_OHCI0_SIZE	0x00100000
+-
+ #define SPEAR3XX_ICM4_USB_OHCI1_BASE	0xE2100000
+-#define SPEAR3XX_ICM4_USB_OHCI1_SIZE	0x00100000
+-
+ #define SPEAR3XX_ICM4_USB_ARB_BASE	0xE2800000
+-#define SPEAR3XX_ICM4_USB_ARB_SIZE	0x00010000
+ 
+ /* ML1 - Multi Layer CPU Subsystem */
+ #define SPEAR3XX_ICM3_ML1_2_BASE	0xF0000000
+-#define SPEAR3XX_ICM3_ML1_2_SIZE	0x0F000000
+-
+ #define SPEAR3XX_ML1_TMR_BASE		0xF0000000
+-#define SPEAR3XX_ML1_TMR_SIZE		0x00100000
+-
+ #define SPEAR3XX_ML1_VIC_BASE		0xF1100000
+ #define VA_SPEAR3XX_ML1_VIC_BASE	IO_ADDRESS(SPEAR3XX_ML1_VIC_BASE)
+-#define SPEAR3XX_ML1_VIC_SIZE		0x00100000
+ 
+ /* ICM3 - Basic Subsystem */
+ #define SPEAR3XX_ICM3_SMEM_BASE		0xF8000000
+-#define SPEAR3XX_ICM3_SMEM_SIZE		0x04000000
+-
+ #define SPEAR3XX_ICM3_SMI_CTRL_BASE	0xFC000000
+-#define SPEAR3XX_ICM3_SMI_CTRL_SIZE	0x00200000
+-
+ #define SPEAR3XX_ICM3_DMA_BASE		0xFC400000
+-#define SPEAR3XX_ICM3_DMA_SIZE		0x00200000
+-
+ #define SPEAR3XX_ICM3_SDRAM_CTRL_BASE	0xFC600000
+-#define SPEAR3XX_ICM3_SDRAM_CTRL_SIZE	0x00200000
+-
+ #define SPEAR3XX_ICM3_TMR0_BASE		0xFC800000
+-#define SPEAR3XX_ICM3_TMR0_SIZE		0x00080000
+-
+ #define SPEAR3XX_ICM3_WDT_BASE		0xFC880000
+-#define SPEAR3XX_ICM3_WDT_SIZE		0x00080000
+-
+ #define SPEAR3XX_ICM3_RTC_BASE		0xFC900000
+-#define SPEAR3XX_ICM3_RTC_SIZE		0x00080000
+-
+ #define SPEAR3XX_ICM3_GPIO_BASE		0xFC980000
+-#define SPEAR3XX_ICM3_GPIO_SIZE		0x00080000
+-
+ #define SPEAR3XX_ICM3_SYS_CTRL_BASE	0xFCA00000
+ #define VA_SPEAR3XX_ICM3_SYS_CTRL_BASE	IO_ADDRESS(SPEAR3XX_ICM3_SYS_CTRL_BASE)
+-#define SPEAR3XX_ICM3_SYS_CTRL_SIZE	0x00080000
+-
+ #define SPEAR3XX_ICM3_MISC_REG_BASE	0xFCA80000
+ #define VA_SPEAR3XX_ICM3_MISC_REG_BASE	IO_ADDRESS(SPEAR3XX_ICM3_MISC_REG_BASE)
+-#define SPEAR3XX_ICM3_MISC_REG_SIZE	0x00080000
+-
+ #define SPEAR3XX_ICM3_TMR1_BASE		0xFCB00000
+-#define SPEAR3XX_ICM3_TMR1_SIZE		0x00080000
+ 
+ /* Debug uart for linux, will be used for debug and uncompress messages */
+ #define SPEAR_DBG_UART_BASE		SPEAR3XX_ICM1_UART_BASE
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear300.h b/arch/arm/mach-spear3xx/include/mach/spear300.h
+index 1059d5a..8f96cc5 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear300.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear300.h
+@@ -18,10 +18,8 @@
+ 
+ /* Base address of various IPs */
+ #define SPEAR300_TELECOM_BASE		0x50000000
+-#define SPEAR300_TELECOM_SIZE		0x10000000
+ 
+ /* Interrupt registers offsets and masks */
+-#define SPEAR300_TELECOM_REG_SIZE	0x00010000
+ #define INT_ENB_MASK_REG		0x54
+ #define INT_STS_MASK_REG		0x58
+ #define IT_PERS_S_IRQ_MASK		(1 << 0)
+@@ -37,46 +35,19 @@
+ #define SHIRQ_RAS1_MASK			0x1FF
+ 
+ #define SPEAR300_CLCD_BASE		0x60000000
+-#define SPEAR300_CLCD_SIZE		0x10000000
+-
+ #define SPEAR300_SDHCI_BASE		0x70000000
+-#define SPEAR300_SDHCI_SIZE		0x10000000
+-
+ #define SPEAR300_NAND_0_BASE		0x80000000
+-#define SPEAR300_NAND_0_SIZE		0x04000000
+-
+ #define SPEAR300_NAND_1_BASE		0x84000000
+-#define SPEAR300_NAND_1_SIZE		0x04000000
+-
+ #define SPEAR300_NAND_2_BASE		0x88000000
+-#define SPEAR300_NAND_2_SIZE		0x04000000
+-
+ #define SPEAR300_NAND_3_BASE		0x8c000000
+-#define SPEAR300_NAND_3_SIZE		0x04000000
+-
+ #define SPEAR300_NOR_0_BASE		0x90000000
+-#define SPEAR300_NOR_0_SIZE		0x01000000
+-
+ #define SPEAR300_NOR_1_BASE		0x91000000
+-#define SPEAR300_NOR_1_SIZE		0x01000000
+-
+ #define SPEAR300_NOR_2_BASE		0x92000000
+-#define SPEAR300_NOR_2_SIZE		0x01000000
+-
+ #define SPEAR300_NOR_3_BASE		0x93000000
+-#define SPEAR300_NOR_3_SIZE		0x01000000
+-
+ #define SPEAR300_FSMC_BASE		0x94000000
+-#define SPEAR300_FSMC_SIZE		0x05000000
+-
+ #define SPEAR300_SOC_CONFIG_BASE	0x99000000
+-#define SPEAR300_SOC_CONFIG_SIZE	0x00000008
+-
+ #define SPEAR300_KEYBOARD_BASE		0xA0000000
+-#define SPEAR300_KEYBOARD_SIZE		0x09000000
+-
+ #define SPEAR300_GPIO_BASE		0xA9000000
+-#define SPEAR300_GPIO_SIZE		0x07000000
+ 
+ #endif /* __MACH_SPEAR300_H */
+ 
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear310.h b/arch/arm/mach-spear3xx/include/mach/spear310.h
+index b27bb8a..4f58eb1 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear310.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear310.h
+@@ -17,29 +17,17 @@
+ #define __MACH_SPEAR310_H
+ 
+ #define SPEAR310_NAND_BASE		0x40000000
+-#define SPEAR310_NAND_SIZE		0x04000000
+-
+ #define SPEAR310_FSMC_BASE		0x44000000
+-#define SPEAR310_FSMC_SIZE		0x01000000
+-
+ #define SPEAR310_UART1_BASE		0xB2000000
+ #define SPEAR310_UART2_BASE		0xB2080000
+ #define SPEAR310_UART3_BASE		0xB2100000
+ #define SPEAR310_UART4_BASE		0xB2180000
+ #define SPEAR310_UART5_BASE		0xB2200000
+-#define SPEAR310_UART_SIZE		0x00080000
+-
+ #define SPEAR310_HDLC_BASE		0xB2800000
+-#define SPEAR310_HDLC_SIZE		0x00800000
+-
+ #define SPEAR310_RS485_0_BASE		0xB3000000
+-#define SPEAR310_RS485_0_SIZE		0x00800000
+-
+ #define SPEAR310_RS485_1_BASE		0xB3800000
+-#define SPEAR310_RS485_1_SIZE		0x00800000
+-
+ #define SPEAR310_SOC_CONFIG_BASE	0xB4000000
+-#define SPEAR310_SOC_CONFIG_SIZE	0x00000070
 +
- /* spear320 routines */
- void __init spear320_init(void)
- {
+ /* Interrupt registers offsets and masks */
+ #define INT_STS_MASK_REG		0x04
+ #define SMII0_IRQ_MASK			(1 << 0)
+diff --git a/arch/arm/mach-spear3xx/include/mach/spear320.h b/arch/arm/mach-spear3xx/include/mach/spear320.h
+index 1c9d310..95bdb2e 100644
+--- a/arch/arm/mach-spear3xx/include/mach/spear320.h
++++ b/arch/arm/mach-spear3xx/include/mach/spear320.h
+@@ -17,53 +17,23 @@
+ #define __MACH_SPEAR320_H
+ 
+ #define SPEAR320_EMI_CTRL_BASE		0x40000000
+-#define SPEAR320_EMI_CTRL_SIZE		0x08000000
+-
+ #define SPEAR320_FSMC_BASE		0x4C000000
+-#define SPEAR320_FSMC_SIZE		0x01000000
+-
+ #define SPEAR320_I2S_BASE		0x60000000
+-#define SPEAR320_I2S_SIZE		0x10000000
+-
+ #define SPEAR320_SDHCI_BASE		0x70000000
+-#define SPEAR320_SDHCI_SIZE		0x10000000
+-
+ #define SPEAR320_CLCD_BASE		0x90000000
+-#define SPEAR320_CLCD_SIZE		0x10000000
+-
+ #define SPEAR320_PAR_PORT_BASE		0xA0000000
+-#define SPEAR320_PAR_PORT_SIZE		0x01000000
+-
+ #define SPEAR320_CAN0_BASE		0xA1000000
+-#define SPEAR320_CAN0_SIZE		0x01000000
+-
+ #define SPEAR320_CAN1_BASE		0xA2000000
+-#define SPEAR320_CAN1_SIZE		0x01000000
+-
+ #define SPEAR320_UART1_BASE		0xA3000000
+ #define SPEAR320_UART2_BASE		0xA4000000
+-#define SPEAR320_UART_SIZE		0x01000000
+-
+ #define SPEAR320_SSP0_BASE		0xA5000000
+-#define SPEAR320_SSP0_SIZE		0x01000000
+-
+ #define SPEAR320_SSP1_BASE		0xA6000000
+-#define SPEAR320_SSP1_SIZE		0x01000000
+-
+ #define SPEAR320_I2C_BASE		0xA7000000
+-#define SPEAR320_I2C_SIZE		0x01000000
+-
+ #define SPEAR320_PWM_BASE		0xA8000000
+-#define SPEAR320_PWM_SIZE		0x01000000
+-
+ #define SPEAR320_SMII0_BASE		0xAA000000
+-#define SPEAR320_SMII0_SIZE		0x01000000
+-
+ #define SPEAR320_SMII1_BASE		0xAB000000
+-#define SPEAR320_SMII1_SIZE		0x01000000
+-
+ #define SPEAR320_SOC_CONFIG_BASE	0xB3000000
+-#define SPEAR320_SOC_CONFIG_SIZE	0x00000070
++
+ /* Interrupt registers offsets and masks */
+ #define INT_STS_MASK_REG		0x04
+ #define INT_CLR_MASK_REG		0x04
+diff --git a/arch/arm/mach-spear6xx/include/mach/spear.h b/arch/arm/mach-spear6xx/include/mach/spear.h
+index 17ab5aa..c9bba39 100644
+--- a/arch/arm/mach-spear6xx/include/mach/spear.h
++++ b/arch/arm/mach-spear6xx/include/mach/spear.h
+@@ -17,149 +17,66 @@
+ #include <mach/spear600.h>
+ 
+ #define SPEAR6XX_ML_SDRAM_BASE		0x00000000
+-#define SPEAR6XX_ML_SDRAM_SIZE		0x40000000
+-
+ /* ICM1 - Low speed connection */
+ #define SPEAR6XX_ICM1_BASE		0xD0000000
+-#define SPEAR6XX_ICM1_SIZE		0x08000000
+ 
+ #define SPEAR6XX_ICM1_UART0_BASE	0xD0000000
+ #define VA_SPEAR6XX_ICM1_UART0_BASE	IO_ADDRESS(SPEAR6XX_ICM1_UART0_BASE)
+-#define SPEAR6XX_ICM1_UART0_SIZE	0x00080000
+ 
+ #define SPEAR6XX_ICM1_UART1_BASE	0xD0080000
+-#define SPEAR6XX_ICM1_UART1_SIZE	0x00080000
+-
+ #define SPEAR6XX_ICM1_SSP0_BASE		0xD0100000
+-#define SPEAR6XX_ICM1_SSP0_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM1_SSP1_BASE		0xD0180000
+-#define SPEAR6XX_ICM1_SSP1_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM1_I2C_BASE		0xD0200000
+-#define SPEAR6XX_ICM1_I2C_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM1_JPEG_BASE		0xD0800000
+-#define SPEAR6XX_ICM1_JPEG_SIZE		0x00800000
+-
+ #define SPEAR6XX_ICM1_IRDA_BASE		0xD1000000
+-#define SPEAR6XX_ICM1_IRDA_SIZE		0x00800000
+-
+ #define SPEAR6XX_ICM1_FSMC_BASE		0xD1800000
+-#define SPEAR6XX_ICM1_FSMC_SIZE		0x00800000
+-
+ #define SPEAR6XX_ICM1_NAND_BASE		0xD2000000
+-#define SPEAR6XX_ICM1_NAND_SIZE		0x00800000
+-
+ #define SPEAR6XX_ICM1_SRAM_BASE		0xD2800000
+-#define SPEAR6XX_ICM1_SRAM_SIZE		0x00800000
+ 
+ /* ICM2 - Application Subsystem */
+ #define SPEAR6XX_ICM2_BASE		0xD8000000
+-#define SPEAR6XX_ICM2_SIZE		0x08000000
+-
+ #define SPEAR6XX_ICM2_TMR0_BASE		0xD8000000
+-#define SPEAR6XX_ICM2_TMR0_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM2_TMR1_BASE		0xD8080000
+-#define SPEAR6XX_ICM2_TMR1_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM2_GPIO_BASE		0xD8100000
+-#define SPEAR6XX_ICM2_GPIO_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM2_SPI2_BASE		0xD8180000
+-#define SPEAR6XX_ICM2_SPI2_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM2_ADC_BASE		0xD8200000
+-#define SPEAR6XX_ICM2_ADC_SIZE		0x00080000
+ 
+ /* ML-1, 2 - Multi Layer CPU Subsystem */
+ #define SPEAR6XX_ML_CPU_BASE		0xF0000000
+-#define SPEAR6XX_ML_CPU_SIZE		0x08000000
+-
+ #define SPEAR6XX_CPU_TMR_BASE		0xF0000000
+-#define SPEAR6XX_CPU_TMR_SIZE		0x00100000
+-
+ #define SPEAR6XX_CPU_GPIO_BASE		0xF0100000
+-#define SPEAR6XX_CPU_GPIO_SIZE		0x00100000
+-
+ #define SPEAR6XX_CPU_VIC_SEC_BASE	0xF1000000
+ #define VA_SPEAR6XX_CPU_VIC_SEC_BASE	IO_ADDRESS(SPEAR6XX_CPU_VIC_SEC_BASE)
+-#define SPEAR6XX_CPU_VIC_SEC_SIZE	0x00100000
+-
+ #define SPEAR6XX_CPU_VIC_PRI_BASE	0xF1100000
+ #define VA_SPEAR6XX_CPU_VIC_PRI_BASE	IO_ADDRESS(SPEAR6XX_CPU_VIC_PRI_BASE)
+-#define SPEAR6XX_CPU_VIC_PRI_SIZE	0x00100000
+ 
+ /* ICM3 - Basic Subsystem */
+ #define SPEAR6XX_ICM3_BASE		0xF8000000
+-#define SPEAR6XX_ICM3_SIZE		0x08000000
+-
+ #define SPEAR6XX_ICM3_SMEM_BASE		0xF8000000
+-#define SPEAR6XX_ICM3_SMEM_SIZE		0x04000000
+-
+ #define SPEAR6XX_ICM3_SMI_CTRL_BASE	0xFC000000
+-#define SPEAR6XX_ICM3_SMI_CTRL_SIZE	0x00200000
+-
+ #define SPEAR6XX_ICM3_CLCD_BASE		0xFC200000
+-#define SPEAR6XX_ICM3_CLCD_SIZE		0x00200000
+-
+ #define SPEAR6XX_ICM3_DMA_BASE		0xFC400000
+-#define SPEAR6XX_ICM3_DMA_SIZE		0x00200000
+-
+ #define SPEAR6XX_ICM3_SDRAM_CTRL_BASE	0xFC600000
+-#define SPEAR6XX_ICM3_SDRAM_CTRL_SIZE	0x00200000
+-
+ #define SPEAR6XX_ICM3_TMR_BASE		0xFC800000
+-#define SPEAR6XX_ICM3_TMR_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM3_WDT_BASE		0xFC880000
+-#define SPEAR6XX_ICM3_WDT_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM3_RTC_BASE		0xFC900000
+-#define SPEAR6XX_ICM3_RTC_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM3_GPIO_BASE		0xFC980000
+-#define SPEAR6XX_ICM3_GPIO_SIZE		0x00080000
+-
+ #define SPEAR6XX_ICM3_SYS_CTRL_BASE	0xFCA00000
+ #define VA_SPEAR6XX_ICM3_SYS_CTRL_BASE	IO_ADDRESS(SPEAR6XX_ICM3_SYS_CTRL_BASE)
+-#define SPEAR6XX_ICM3_SYS_CTRL_SIZE	0x00080000
+-
+ #define SPEAR6XX_ICM3_MISC_REG_BASE	0xFCA80000
+ #define VA_SPEAR6XX_ICM3_MISC_REG_BASE	IO_ADDRESS(SPEAR6XX_ICM3_MISC_REG_BASE)
+-#define SPEAR6XX_ICM3_MISC_REG_SIZE	0x00080000
+ 
+ /* ICM4 - High Speed Connection */
+ #define SPEAR6XX_ICM4_BASE		0xE0000000
+-#define SPEAR6XX_ICM4_SIZE		0x08000000
+-
+ #define SPEAR6XX_ICM4_GMAC_BASE		0xE0800000
+-#define SPEAR6XX_ICM4_GMAC_SIZE		0x00800000
+-
+ #define SPEAR6XX_ICM4_USBD_FIFO_BASE	0xE1000000
+-#define SPEAR6XX_ICM4_USBD_FIFO_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USBD_CSR_BASE	0xE1100000
+-#define SPEAR6XX_ICM4_USBD_CSR_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USBD_PLDT_BASE	0xE1200000
+-#define SPEAR6XX_ICM4_USBD_PLDT_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USB_EHCI0_BASE	0xE1800000
+-#define SPEAR6XX_ICM4_USB_EHCI0_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USB_OHCI0_BASE	0xE1900000
+-#define SPEAR6XX_ICM4_USB_OHCI0_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USB_EHCI1_BASE	0xE2000000
+-#define SPEAR6XX_ICM4_USB_EHCI1_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USB_OHCI1_BASE	0xE2100000
+-#define SPEAR6XX_ICM4_USB_OHCI1_SIZE	0x00100000
+-
+ #define SPEAR6XX_ICM4_USB_ARB_BASE	0xE2800000
+-#define SPEAR6XX_ICM4_USB_ARB_SIZE	0x00010000
+ 
+ /* Debug uart for linux, will be used for debug and uncompress messages */
+ #define SPEAR_DBG_UART_BASE		SPEAR6XX_ICM1_UART0_BASE
 -- 
 1.7.2.2
