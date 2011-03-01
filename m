@@ -1,35 +1,37 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 1 Mar 2011 08:38:36 +0100
-Subject: [PATCH] plat-mxc: Provide irq_chip name for GPIO IRQs
-In-Reply-To: <1296489624-21355-1-git-send-email-alexander.stein@systec-electronic.com>
-References: <1296489624-21355-1-git-send-email-alexander.stein@systec-electronic.com>
-Message-ID: <201103010838.37197.alexander.stein@systec-electronic.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 1 Mar 2011 08:59:23 +0100
+Subject: [PATCH 1/4] ASoC: Add TI tlv320aic32x4 codec support.
+In-Reply-To: <20110228150014.GI13869@opensource.wolfsonmicro.com>
+References: <1298641370-17461-1-git-send-email-javier.martin@vista-silicon.com>
+	<20110228150014.GI13869@opensource.wolfsonmicro.com>
+Message-ID: <AANLkTinjj8rZS_Y9qiHbrU2nAYSXTikTNtyU71Bk7UqL@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Mark,
+thank you for your review. I will try to solve every issue you pointed out.
 
-On Monday 31 January 2011, 17:00:24 Alexander Stein wrote:
-> Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
-> ---
->  arch/arm/plat-mxc/gpio.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-> index d17b3c9..e396df8 100644
-> --- a/arch/arm/plat-mxc/gpio.c
-> +++ b/arch/arm/plat-mxc/gpio.c
-> @@ -233,6 +233,7 @@ static int gpio_set_wake_irq(struct irq_data *d, u32
-> enable) }
-> 
->  static struct irq_chip gpio_irq_chip = {
-> +	.name = "GPIO",
->  	.irq_ack = gpio_ack_irq,
->  	.irq_mask = gpio_mask_irq,
->  	.irq_unmask = gpio_unmask_irq,
+Regarding non-default configurations:
 
+>> +static const struct aic32x4_configs aic32x4_reg_init[] = {
+>> + ? ? {AIC32X4_PWRCFG, AIC32X4_AVDDWEAKDISABLE},
+>
+> What are these "aic32x4_configs" all about? ?They look like you're
+> setting non-default configurations...
 
-Did this get overlooked?
+This tlv320aic32x4 codec is kind of a huge monster; it has more than
+200 registers which provide more flexibility than it is needed.
+For example, BCLK and MCLK are forced here to derive from internal PLL
+which is needed for frequency calculation table to be valid. Bypassing
+this PLL doesn't provide new or better functionality.
+The same happens regarding DAC internal connections. I don't think
+allowing the user to swap left and right channels makes sense here.
 
-Regards,
-Alexander
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
