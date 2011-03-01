@@ -1,36 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue,  1 Mar 2011 20:16:22 +0000
-Subject: [PATCH] S3C64XX: Fix keypad setup to configure correct number of rows
-Message-ID: <1299010582-32481-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 1 Mar 2011 21:17:03 +0100
+Subject: [PATCH 1/5] ARM: mx35_3ds: Add I2C support
+In-Reply-To: <1299009588-8783-1-git-send-email-fabio.estevam@freescale.com>
+References: <1299009588-8783-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110301201703.GX22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben-linux@fluff.org>
+Hello,
 
-The call to s3c_gpio_cfgrange_nopull() takes a size and base
-but this looks like it is trying to do base and end. This means
-it is configuring too many GPIOs and on the case of the Cragganmore
-means we're seeing an overflow of the ROW pins causing problems
-with the keyboard driver.
+On Tue, Mar 01, 2011 at 04:59:44PM -0300, Fabio Estevam wrote:
+> +	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
+I'd slightly prefer using 
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/setup-keypad.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+	imx35_add_imx_i2c(0, ...)
 
-diff --git a/arch/arm/mach-s3c64xx/setup-keypad.c b/arch/arm/mach-s3c64xx/setup-keypad.c
-index f8ed0d2..1d4d0ee 100644
---- a/arch/arm/mach-s3c64xx/setup-keypad.c
-+++ b/arch/arm/mach-s3c64xx/setup-keypad.c
-@@ -17,7 +17,7 @@
- void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
- {
- 	/* Set all the necessary GPK pins to special-function 3: KP_ROW[x] */
--	s3c_gpio_cfgrange_nopull(S3C64XX_GPK(8), 8 + rows, S3C_GPIO_SFN(3));
-+	s3c_gpio_cfgrange_nopull(S3C64XX_GPK(8), rows, S3C_GPIO_SFN(3));
- 
- 	/* Set all the necessary GPL pins to special-function 3: KP_COL[x] */
- 	s3c_gpio_cfgrange_nopull(S3C64XX_GPL(0), cols, S3C_GPIO_SFN(3));
+because I intend to remove the imx35_add_imx_i2c0-like macros soon.  But
+if nothing else pops up there is no need to respin the series because of
+that.
+
+Other than that all 5 patches look good;
+	Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+
 -- 
-1.7.2.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
