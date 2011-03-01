@@ -1,58 +1,33 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 1 Mar 2011 17:57:45 +0100
-Subject: [PATCH 0/3] OMAP2+ hwmod fixes
-In-Reply-To: <19850e063c924a8a30c69ac02621a659@mail.gmail.com>
-References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
-	<4D5BCC10.2060301@ti.com>
-	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
-	<4D5E85EA.70605@ti.com>
-	<alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
-	<e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
-	<alpine.DEB.2.00.1102221200260.22636@utopia.booyaka.com>
-	<19850e063c924a8a30c69ac02621a659@mail.gmail.com>
-Message-ID: <4D6D2589.3090505@ti.com>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Wed,  2 Mar 2011 00:58:28 +0800
+Subject: [patch v1 0/3] arm: support pmu irq routed from CTI
+Message-ID: <1298998711-8165-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi,
 
-On 2/23/2011 11:05 AM, Nayak, Rajendra wrote:
-> Hi Paul,
->
->> From: Paul Walmsley [mailto:paul at pwsan.com]
->> Sent: Wednesday, February 23, 2011 12:40 AM
->>
->> Hi Rajendra
->>
->> On Tue, 22 Feb 2011, Rajendra Nayak wrote:
->>
->>> The original behavior of the iterators, to terminate upon
->>> encountering an error, seems fine to me. The only problem
->>> I faced was that they fail silently and go undetected, unless
->>> their user catches the return value and WARN's, which I found
->>> was not the case with most users, mainly those of
->>> omap_hwmod_for_each_by_class.
->>> I was thinking of keeping the behaviour of these iterators
->>> same for now and add WARN's in these iterators itself upon
->>> an error, so its seen even if the user fails to catch it.
->>
->> What's your opinion on adding the pr_err() or WARN() into the code that
->> the iterator calls for each hwmod?  That code should know why something
->> fails, so it should be able to provide a more detailed error message.
-> Of
->> course, it is not as general a solution...
->
-> I agree, if the callback functions are written with proper errors
-> or WARN's, they are the right place where most of the details'
-> exist. So maybe we don't need these in the iterator's after all.
+This patches support pmu irq routed from CTI, such as implemented
+on OMAP4:
 
-So to conclude, I will drop the #3 and just push #1 and #2.
+       - introduce some CTI helpers and registers' definition
+       - introduce platform_data to pmu driver, so perf irq handler
+       can handle irq correctly if it is routed from CTI
+       - configure CTI on OMAP4 so that perf can work on OMAP4
 
-#1 is fine with addition of the WARN.
-#2 does return an error but does not print anything, but since each call 
-(_init_main_clk, _init_interface_clks, _init_opt_clks) does report
-some pr_warn in case of error, this is fine.
+The patches have been tested Ok on Pandaboard, and 'perf' does work
+after applying them.
 
+v1:
+	- rebase the patch set against 2.6.38-rc6-next-20110301, fix
+	conflicts, which is pointed out by Will Deacon
 
-Regards,
-Benoit
+ arch/arm/include/asm/cti.h    |  177 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/pmu.h    |   12 +++
+ arch/arm/kernel/perf_event.c  |   57 ++++++++++----
+ arch/arm/mach-omap2/dbg44xx.h |   18 ++++
+ arch/arm/mach-omap2/devices.c |   55 +++++++++++++-
+
+thanks,
+--
+Lei Ming
