@@ -1,42 +1,41 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 1 Mar 2011 10:53:16 +0100 (CET)
-Subject: [PATCH v6 1/1] PRUSS UIO driver support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
-References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
-	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
-	<20110228212638.GB16806@local>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
-Message-ID: <alpine.LFD.2.00.1103011052020.2701@localhost6.localdomain6>
+From: Hong-Xing.Zhu@freescale.com (Richard Zhu)
+Date: Tue, 1 Mar 2011 17:58:17 +0800
+Subject: [PATCH V4 1/4] ARM: imx53_loco: add esdhc device support
+Message-ID: <1298973500-2858-1-git-send-email-Hong-Xing.Zhu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Mar 2011, TK, Pratheesh Gangadhar wrote:
-> > On Tue, Mar 01, 2011 at 02:31:35AM +0530, Pratheesh Gangadhar wrote:
-> > > +
-> > > +		/* Register PRUSS IRQ lines */
-> > > +		p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
-> > > +		p->handler = pruss_handler;
-> > > +
-> > > +		ret = uio_register_device(&dev->dev, p);
-> > > +
-> > > +		if (ret < 0)
-> > > +			goto out_free;
-> > > +	}
-> > > +
-> > > +	spin_lock_init(&lock);
-> > 
-> > That's too late. uio_register_device() enables the irq, and your spin_lock
-> > is not ready at that time.
-> 
-> This is ok in this context as "modprobe uio_pruss" is pre-requisite for
-> running PRUSS firmware and without firmware running PRUSS won't
-> generate interrupts. Actually PRUSS INTC is not setup till we start
-> user application.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ arch/arm/mach-mx5/Kconfig           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
 
-No, it's not. If you enable interrupts you have to be prepared for
-getting one whether the device mask is enabled or not. It's that
-simple.
-
-Thanks,
-
-	tglx
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index f065a0d..a72c833 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -162,6 +162,7 @@ config MACH_MX53_LOCO
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	help
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 160899e..0a18f8d 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -213,6 +213,8 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_imx2_wdt(0, NULL);
+ 	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
+ 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
++	imx53_add_sdhci_esdhc_imx(0, NULL);
++	imx53_add_sdhci_esdhc_imx(2, NULL);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
+-- 
+1.7.1
