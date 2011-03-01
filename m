@@ -1,175 +1,138 @@
 From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Wed,  2 Mar 2011 00:58:30 +0800
-Subject: [patch v1 2/3] arm: pmu: support pmu irq routed from CTI
+Date: Wed,  2 Mar 2011 00:58:31 +0800
+Subject: [patch v1 3/3] arm: omap4: support pmu
 In-Reply-To: <1298998711-8165-1-git-send-email-tom.leiming@gmail.com>
 References: <1298998711-8165-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1298998711-8165-3-git-send-email-tom.leiming@gmail.com>
+Message-ID: <1298998711-8165-4-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ming Lei <tom.leiming@gmail.com>
 
-This patch introduces pmu_platform_data struct to
-support pmu irq routed from CTI, such as implemented
-on OMAP4.
+This patch supports pmu irq routed from CTI, so
+make pmu/perf working on OMAP4.
 
-Generally speaking, clearing cti irq should be done in
-irq handler, also enabling cti module after calling
-request_irq and disabling cti module before calling
-free_irq.
+The idea is from Woodruff Richard in the disscussion
+"Oprofile on Pandaboard / Omap4" of pandaboard at googlegroups.com.
 
+Cc: Woodruff Richard <r-woodruff2@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 ---
- arch/arm/include/asm/pmu.h   |   12 +++++++++
- arch/arm/kernel/perf_event.c |   57 ++++++++++++++++++++++++++++++-----------
- 2 files changed, 53 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/dbg44xx.h |   18 +++++++++++++
+ arch/arm/mach-omap2/devices.c |   55 ++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 72 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/dbg44xx.h
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 7544ce6..6162aaf 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -13,20 +13,32 @@
- #define __ARM_PMU_H__
- 
- #include <linux/interrupt.h>
-+#include <asm/cti.h>
- 
- enum arm_pmu_type {
- 	ARM_PMU_DEVICE_CPU	= 0,
- 	ARM_NUM_PMU_DEVICES,
- };
- 
-+#define MAX_CTI_NUM  4
- /*
-  * struct arm_pmu_platdata - ARM PMU platform data
-  *
-+ * @use_cti_irq: pmu irq is routed from cti
-+ * @cti_cnt: cti counts used for pmu irq routing
-+ * @cti: cti instances used to help access cti registers
-  * @handle_irq: an optional handler which will be called from the interrupt and
-  * passed the address of the low level handler, and can be used to implement
-  * any platform specific handling before or after calling it.
+diff --git a/arch/arm/mach-omap2/dbg44xx.h b/arch/arm/mach-omap2/dbg44xx.h
+new file mode 100644
+index 0000000..e447ad5
+--- /dev/null
++++ b/arch/arm/mach-omap2/dbg44xx.h
+@@ -0,0 +1,18 @@
++/*
++ * OMAP44xx on-chip debug support
 + *
-+ * If pmu irq is routed from CTI, @use_cti_irq, @cti_cnt and
-+ * @cti must be initialized and passed to pmu driver.
-  */
- struct arm_pmu_platdata {
-+	int use_cti_irq;
-+	int cti_cnt;
-+	struct cti cti[MAX_CTI_NUM];
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * XXX This file needs to be updated to align on one of "OMAP4", "OMAP44XX",
++ *     or "OMAP4430".
++ */
 +
- 	irqreturn_t (*handle_irq)(int irq, void *dev,
- 				  irq_handler_t pmu_handler);
++#ifndef __ARCH_ARM_MACH_OMAP2_DBG44XX_H
++#define __ARCH_ARM_MACH_OMAP2_DBG44XX_H
++
++#define OMAP44XX_CTI0_BASE		0x54148000
++#define OMAP44XX_CTI1_BASE		0x54149000
++
++#endif
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index d216976..0420a58 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -35,6 +35,7 @@
+ 
+ #include "mux.h"
+ #include "control.h"
++#include "dbg44xx.h"
+ 
+ #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
+ 
+@@ -322,19 +323,71 @@ static struct resource omap3_pmu_resource = {
+ 	.flags	= IORESOURCE_IRQ,
  };
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 22e194eb..9027a8f 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -377,18 +377,39 @@ validate_group(struct perf_event *event)
- 	return 0;
- }
  
--static irqreturn_t armpmu_platform_irq(int irq, void *dev)
-+static inline int cti_irq(struct arm_pmu_platdata *data)
- {
--	struct arm_pmu_platdata *plat = dev_get_platdata(&pmu_device->dev);
-+	return data && data->use_cti_irq;
++static struct resource omap4_pmu_resource[] = {
++	{
++	.start	= OMAP44XX_IRQ_CTI0,
++	.end	= OMAP44XX_IRQ_CTI0,
++	.flags	= IORESOURCE_IRQ,
++	},
++	{
++	.start	= OMAP44XX_IRQ_CTI1,
++	.end	= OMAP44XX_IRQ_CTI1,
++	.flags	= IORESOURCE_IRQ,
++	}
++};
++
+ static struct platform_device omap_pmu_device = {
+ 	.name		= "arm-pmu",
+ 	.id		= ARM_PMU_DEVICE_CPU,
+ 	.num_resources	= 1,
+ };
+ 
++struct arm_pmu_platdata omap4_pmu_data;
++
++static void omap4_configure_pmu_irq(void)
++{
++	void *base0;
++	void *base1;
++
++	base0 = ioremap(OMAP44XX_CTI0_BASE, 4096);
++	base1 = ioremap(OMAP44XX_CTI1_BASE, 4096);
++	if (!base0 && !base1) {
++		pr_err("ioremap for omap4 CTI failed\n");
++		return;
++	}
++
++	/*configure CTI0 for pmu irq routing*/
++	cti_init(&omap4_pmu_data.cti[0], base0,
++			OMAP44XX_IRQ_CTI0, 6);
++	cti_unlock(&omap4_pmu_data.cti[0]);
++	cti_map_trigger(&omap4_pmu_data.cti[0],
++			1, 6, 2);
++
++	/*configure CTI1 for pmu irq routing*/
++	cti_init(&omap4_pmu_data.cti[1], base1,
++			OMAP44XX_IRQ_CTI1, 6);
++	cti_unlock(&omap4_pmu_data.cti[1]);
++	cti_map_trigger(&omap4_pmu_data.cti[1],
++			1, 6, 3);
++
++	omap4_pmu_data.cti_cnt = 2;
++	omap4_pmu_data.use_cti_irq = 1;
++	omap4_pmu_data.handle_irq = NULL;
 +}
 +
-+static inline struct cti *irq_to_cti(struct arm_pmu_platdata *data,
-+	int irq)
-+{
-+	int idx;
- 
--	return plat->handle_irq(irq, dev, armpmu->handle_irq);
-+	for(idx = 0; idx < data->cti_cnt; idx++)
-+		if (data->cti[idx].irq == irq)
-+			return &data->cti[idx];
-+	return NULL;
-+}
-+
-+static inline irqreturn_t armpmu_handle_irq(int irq_num, void *dev)
-+{
-+	struct arm_pmu_platdata *plat = dev;
-+
-+	if (cti_irq(plat))
-+		cti_irq_ack(irq_to_cti(plat, irq_num));
-+
-+	if (plat && plat->handle_irq)
-+		return plat->handle_irq(irq_num, dev, armpmu->handle_irq);
-+	else
-+		return armpmu->handle_irq(irq_num, NULL);
- }
- 
- static int
- armpmu_reserve_hardware(void)
+ static void omap_init_pmu(void)
  {
- 	struct arm_pmu_platdata *plat;
--	irq_handler_t handle_irq;
- 	int i, err = -ENODEV, irq;
- 
- 	pmu_device = reserve_pmu(ARM_PMU_DEVICE_CPU);
-@@ -399,11 +420,7 @@ armpmu_reserve_hardware(void)
- 
- 	init_pmu(ARM_PMU_DEVICE_CPU);
- 
--	plat = dev_get_platdata(&pmu_device->dev);
--	if (plat && plat->handle_irq)
--		handle_irq = armpmu_platform_irq;
+ 	if (cpu_is_omap24xx())
+ 		omap_pmu_device.resource = &omap2_pmu_resource;
+ 	else if (cpu_is_omap34xx())
+ 		omap_pmu_device.resource = &omap3_pmu_resource;
 -	else
--		handle_irq = armpmu->handle_irq;
-+	plat = platform_get_drvdata(pmu_device);
++	else if (cpu_is_omap44xx()) {
++		omap_pmu_device.resource = omap4_pmu_resource;
++		omap_pmu_device.num_resources = 2;
++		platform_set_drvdata(&omap_pmu_device, &omap4_pmu_data);
++
++		omap4_configure_pmu_irq();
++	} else
+ 		return;
  
- 	if (pmu_device->num_resources < 1) {
- 		pr_err("no irqs for PMUs defined\n");
-@@ -415,21 +432,25 @@ armpmu_reserve_hardware(void)
- 		if (irq < 0)
- 			continue;
- 
--		err = request_irq(irq, handle_irq,
-+		err = request_irq(irq, armpmu_handle_irq,
- 				  IRQF_DISABLED | IRQF_NOBALANCING,
--				  "armpmu", NULL);
-+				  "armpmu", plat);
- 		if (err) {
- 			pr_warning("unable to request IRQ%d for ARM perf "
- 				"counters\n", irq);
- 			break;
--		}
-+		} else if (cti_irq(plat))
-+			cti_enable(irq_to_cti(plat, irq));
- 	}
- 
- 	if (err) {
- 		for (i = i - 1; i >= 0; --i) {
- 			irq = platform_get_irq(pmu_device, i);
--			if (irq >= 0)
--				free_irq(irq, NULL);
-+			if (irq >= 0) {
-+				if (cti_irq(plat))
-+					cti_disable(irq_to_cti(plat, irq));
-+				free_irq(irq, plat);
-+			}
- 		}
- 		release_pmu(pmu_device);
- 		pmu_device = NULL;
-@@ -442,11 +463,15 @@ static void
- armpmu_release_hardware(void)
- {
- 	int i, irq;
-+	struct arm_pmu_platdata *plat = platform_get_drvdata(pmu_device);
- 
- 	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
- 		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
--			free_irq(irq, NULL);
-+		if (irq >= 0) {
-+			if (cti_irq(plat))
-+				cti_disable(irq_to_cti(plat, irq));
-+			free_irq(irq, plat);
-+		}
- 	}
- 	armpmu->stop();
- 
+ 	platform_device_register(&omap_pmu_device);
 -- 
 1.7.3
