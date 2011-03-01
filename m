@@ -1,34 +1,61 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 1 Mar 2011 08:29:22 +0200
-Subject: [PATCH resend] omap: Fix linker error in
-	drivers/video/omap/lcd_2430sdp.c
-In-Reply-To: <20110301013928.GL20560@atomide.com>
-References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
-	<1298232248-347-1-git-send-email-jhnikula@gmail.com>
-	<20110224212644.GN20560@atomide.com>
-	<20110228164715.e34a965e.jhnikula@gmail.com>
-	<1298905757.9809.135.camel@deskari>
-	<20110301013928.GL20560@atomide.com>
-Message-ID: <1298960962.2011.11.camel@deskari>
+From: b02280@freescale.com (Jason Chen)
+Date: Tue, 1 Mar 2011 14:30:18 +0800
+Subject: [PATCH 2/2] ARM MX53_LOCO: add pwm backlight device
+In-Reply-To: <1298961018-8988-1-git-send-email-b02280@freescale.com>
+References: <1298961018-8988-1-git-send-email-b02280@freescale.com>
+Message-ID: <1298961018-8988-2-git-send-email-b02280@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-02-28 at 19:39 -0600, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [110228 07:07]:
-> > 
-> > Well, it's a bit ugly, but I'm fine with it. It's for the old omapfb,
-> > which hopefully nobody uses anymore (right =), and there's no simple way
-> > to make it modular and neat.
-> 
-> How about let's make mach-omap2 boards all use the new code?
-> That way the old code can be omap1 only.
+Signed-off-by: Jason Chen <b02280@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_loco.c |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-That has been my long term plan, but I've never had time to start
-working on it. Some (many?) of the old panel drivers are trivial to
-port, needs just copying the panel timings. 
-
-Some are much more complex, and porting them without having the hardware
-may be a bit of a guesswork. But perhaps we can find testers for those
-after the code has been ported.
-
- Tomi
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 160899e..6c42185 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -23,6 +23,7 @@
+ #include <linux/fec.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
++#include <linux/pwm_backlight.h>
+ 
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+@@ -35,6 +36,7 @@
+ 
+ #include "crm_regs.h"
+ #include "devices-imx53.h"
++#include "devices.h"
+ 
+ #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+ 
+@@ -203,6 +205,13 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
++static struct platform_pwm_backlight_data loco_pwm_backlight_data = {
++	.pwm_id = 1,
++	.max_brightness = 255,
++	.dft_brightness = 128,
++	.pwm_period_ns = 50000,
++};
++
+ static void __init mx53_loco_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+@@ -213,6 +222,10 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_imx2_wdt(0, NULL);
+ 	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
+ 	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
++
++	imx53_add_mxc_pwm(1);
++	mxc_register_device(&mxc_pwm1_backlight_device,
++			&loco_pwm_backlight_data);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
+-- 
+1.7.1
