@@ -1,60 +1,65 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 01 Mar 2011 15:49:24 -0700
-Subject: [PATCH 1/2] OMAP3: cpuidle: prevent CORE power domain from going to
-	RET or OFF when DSS is on
+Date: Tue, 01 Mar 2011 15:49:25 -0700
+Subject: [PATCH 2/2] OMAP3: cpuidle: add more details to the DSS-related CORE
+	power domain state restriction
 In-Reply-To: <20110301220833.32613.54669.stgit@twilight.localdomain>
 References: <20110301220833.32613.54669.stgit@twilight.localdomain>
-Message-ID: <20110301224918.32613.95176.stgit@twilight.localdomain>
+Message-ID: <20110301224924.32613.57042.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <tero.kristo@nokia.com>
+Provide some more details about the rationale behind the CORE power domain
+state restriction while DSS is enabled -- hopefully, enough to enable others
+to implement an approach based on the DSS's required wakeup latency,
+which can vary based on quite a few parameters.
 
-Prevent the CORE power domain from entering RETENTION or OFF when DSS
-is on.  Otherwise, the display FIFO(s) may underflow due to the time
-needed for the CORE to wake back up, causing tearing and unnecessary
-interrupts.
-
-Signed-off-by: Tero Kristo <tero.kristo@nokia.com>
-[paul at pwsan.com: wrote commit message]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Tero Kristo <tero.kristo@nokia.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Senthilvadivu Guruswamy <svadivu@ti.com>
+Cc: Sumit Semwal <sumit.semwal@ti.com>
+Cc: Jean Pihet <j-pihet@ti.com>
 ---
- arch/arm/mach-omap2/cpuidle34xx.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/cpuidle34xx.c |   28 +++++++++++++++++++++++++++-
+ 1 files changed, 27 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 0335cd8..d1b7789 100644
+index d1b7789..6bdbb33 100644
 --- a/arch/arm/mach-omap2/cpuidle34xx.c
 +++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -9,8 +9,9 @@
-  * Copyright (C) 2007 Texas Instruments, Inc.
-  * Karthik Dasu <karthik-dp@ti.com>
-  *
-- * Copyright (C) 2006 Nokia Corporation
-+ * Copyright (C) 2006, 2011 Nokia Corporation
-  * Tony Lindgren <tony@atomide.com>
-+ * Tero Kristo <tero.kristo@nokia.com>
-  *
-  * Copyright (C) 2005 Texas Instruments, Inc.
-  * Richard Woodruff <r-woodruff2@ti.com>
-@@ -268,6 +269,12 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+@@ -269,7 +269,33 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
  		goto select_state;
  	}
  
-+	/* If DSS is active, prevent CORE RET/OFF */
-+	dss_state = pwrdm_read_pwrst(dss_pd);
-+	if (dss_state == PWRDM_POWER_ON &&
-+	    core_next_state != PWRDM_POWER_ON)
-+		core_next_state = PWRDM_POWER_INACTIVE;
-+
- 	/*
- 	 * Prevent PER off if CORE is not in retention or off as this
- 	 * would disable PER wakeups completely.
-@@ -288,7 +295,6 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
- 		iva2_state = pwrdm_read_pwrst(iva2_pd);
- 		sgx_state = pwrdm_read_pwrst(sgx_pd);
- 		usb_state = pwrdm_read_pwrst(usb_pd);
--		dss_state = pwrdm_read_pwrst(dss_pd);
- 
- 		if (cam_state > PWRDM_POWER_OFF ||
- 		    dss_state > PWRDM_POWER_OFF ||
+-	/* If DSS is active, prevent CORE RET/OFF */
++	/*
++	 * If DSS is active, prevent any CORE power domain transition
++	 * to RETENTION or lower.  This is because we don't currently
++	 * have the infrastructure in the DSS driver or kernel to
++	 * enter CORE RET without causing DSS FIFO underflows.  When
++	 * the DSS FIFO underflows, the screen image can be distorted,
++	 * because the CORE may not be able to come back on-line
++	 * quickly enough to service DSS requests to the SDRAM
++	 * framebuffer.  The DSS may also interrupt the MPU when the
++	 * FIFO underflows, potentially wasting power.
++	 *
++	 * The approach below is easy to implement, but potentially
++	 * wastes power, especially with screens that don't require a
++	 * backlight.  Probably the best long-term way to fix this is
++	 * for the DSS driver to constrain the CORE and SDRAM minimum
++	 * power state with omap_pm_set_max_dev_wakeup_lat(), based on
++	 * the DSS FIFO size(s), watermark levels, drain rate, and
++	 * refill time.  Based on that constraint, the OMAP PM code
++	 * should adjust the CORE maximum power state, CORE DPLL
++	 * autoidle mode, CORE_CLK rate, and voltage scaling to ensure
++	 * the required wakeup latency at the lowest power
++	 * consumption.
++	 *
++	 * (More information on the DSS low-power refresh mode can be
++	 * found in _Using Display Low-Power Refresh on the OMAP3430
++	 * Device_, TI Application Report, SWPA158 - October 2008.)
++	 */
+ 	dss_state = pwrdm_read_pwrst(dss_pd);
+ 	if (dss_state == PWRDM_POWER_ON &&
+ 	    core_next_state != PWRDM_POWER_ON)
