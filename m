@@ -1,238 +1,192 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Mon, 28 Feb 2011 16:27:43 -0800
-Subject: [RFC PATCH] ARM: Use generic BUG() handler
-Message-ID: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+From: kheitke@codeaurora.org (Kenneth Heitke)
+Date: Mon, 28 Feb 2011 18:11:30 -0700
+Subject: [RFC PATCH 3/5] RFC: msm: sps: Pipe Memory Manager
+In-Reply-To: <1298941892-25173-1-git-send-email-kheitke@codeaurora.org>
+References: <1298941892-25173-1-git-send-email-kheitke@codeaurora.org>
+Message-ID: <1298941892-25173-4-git-send-email-kheitke@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am looking for comments please on this patch.
+From: Amir Samuelovi <amirs@codeaurora.org>
 
-ARM uses its own BUG() handler which makes its output slightly different
-from other archtectures.
+The Smart Peripheral Subsystem (SPS) includes embedded memory, referred
+to as "pipe memory", that is available to serve as buffer space for
+transfers between BAM pipes.  The BAM is designed such that it can use
+system-accessible memory for buffers but the pipe memory provides the
+highest performance.  The genalloc kernel driver is used to manage the
+pipe memory pool.
 
-One of the problems is that the ARM implementation doesn't report the function
-with the BUG() in it, but always reports the PC being in __bug(). The generic
-implementation doesn't have this problem.
-
-Currently we get something like:
-
-kernel BUG at fs/proc/breakme.c:35!
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-...
-PC is at __bug+0x20/0x2c
-
-With this patch it displays:
-
-kernel BUG at fs/proc/breakme.c:35!
-Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
-...
-PC is at write_breakme+0xd0/0x1b4
-
-This implementation uses an undefined instruction to implement BUG, and sets up
-a bug table containing the relevant information.
-
-Also backtraces were reported slightly differently - so I have added a newline
-after the backtrace message, a space before the address, and ensured that the
-message appears even when CONFIG_ARM_UNWIND is defined. These are aimed at
-consistency between architectures, and may or may not be acceptable for ARM.
-In any case they may be best as a separate patch.
-
-Change-Id: I515db9a04e98084e6bbb21c4a1d13579568a0904
-
-Signed-off-by: Simon Glass <sjg@chromium.org>
+Signed-off-by: Amir Samuelov <amirs@codeaurora.org>
+Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
 ---
- arch/arm/Kconfig              |    4 ++++
- arch/arm/include/asm/bug.h    |   40 +++++++++++++++++++++++++++++++++++++++-
- arch/arm/kernel/traps.c       |   21 +++++++++++++++++++--
- arch/arm/kernel/unwind.c      |    1 +
- arch/arm/kernel/vmlinux.lds.S |   15 +++++++++++++--
- 5 files changed, 76 insertions(+), 5 deletions(-)
+ arch/arm/mach-msm/sps/sps_mem.c |  156 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 156 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/sps/sps_mem.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 26d45e5..d4fb0fb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -191,6 +191,10 @@ config VECTORS_BASE
- 	help
- 	  The base address of exception vectors.
- 
-+config GENERIC_BUG
-+	def_bool y
-+	depends on BUG
+diff --git a/arch/arm/mach-msm/sps/sps_mem.c b/arch/arm/mach-msm/sps/sps_mem.c
+new file mode 100644
+index 0000000..3aee4ba
+--- /dev/null
++++ b/arch/arm/mach-msm/sps/sps_mem.c
+@@ -0,0 +1,156 @@
++/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
- source "init/Kconfig"
- 
- source "kernel/Kconfig.freezer"
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 4d88425..bbbebe4 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -3,6 +3,40 @@
- 
- 
- #ifdef CONFIG_BUG
++/**
++ * Pipe-Memory allocation/free management.
++ */
 +
-+#ifdef CONFIG_GENERIC_BUG
++#include <linux/types.h>	/* u32 */
++#include <linux/kernel.h>	/* pr_info() */
++#include <linux/io.h>		/* ioremap() */
++#include <linux/mutex.h>	/* mutex */
++#include <linux/list.h>		/* list_head */
++#include <linux/genalloc.h>	/* gen_pool_alloc() */
++#include <linux/errno.h>	/* ENOMEM */
 +
++#include "sps_bam.h"
++#include "spsi.h"
 +
-+/* A suitable undefined instruction to use for ARM bug handling */
-+#define BUG_INSTR_ARM 0xec000000
++static u32 iomem_phys;
++static void *iomem_virt;
++static u32 iomem_size;
++static u32 iomem_offset;
++static struct gen_pool *pool;
++static u32 nid = 0xaa;
 +
++/* Debug */
++static u32 total_alloc;
++static u32 total_free;
 +
-+#ifdef CONFIG_DEBUG_BUGVERBOSE
-+#define BUG()							\
-+do {								\
-+	asm volatile("1:\t.word %c3\n"				\
-+		     ".pushsection __bug_table,\"a\"\n"		\
-+		     "2:\t.word 1b, %c0\n"			\
-+		     "\t.hword %c1, 0\n"			\
-+		     "\t.org 2b+%c2\n"				\
-+		     ".popsection"				\
-+		     :						\
-+		     : "i" (__FILE__), "i" (__LINE__),		\
-+		     "i" (sizeof(struct bug_entry)),		\
-+		     "i" (BUG_INSTR_ARM));			\
-+	unreachable();						\
-+} while (0)
-+
-+#else
-+#define BUG()							\
-+do {								\
-+	asm volatile("ud2");					\
-+	unreachable();						\
-+} while (0)
-+#endif
-+
-+#else  /* not CONFIG_GENERIC_BUG */
-+
- #ifdef CONFIG_DEBUG_BUGVERBOSE
- extern void __bug(const char *file, int line) __attribute__((noreturn));
- 
-@@ -16,8 +50,12 @@ extern void __bug(const char *file, int line) __attribute__((noreturn));
- 
- #endif
- 
-+#endif  /* CONFIG_GENERIC_BUG */
-+
- #define HAVE_ARCH_BUG
--#endif
-+
-+#endif /* CONFIG_BUG */
-+
- 
- #include <asm-generic/bug.h>
- 
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index ee57640..d5e5df9 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -21,6 +21,7 @@
- #include <linux/kdebug.h>
- #include <linux/module.h>
- #include <linux/kexec.h>
-+#include <linux/bug.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- 
-@@ -55,7 +56,8 @@ static void dump_mem(const char *, const char *, unsigned long, unsigned long);
- void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
- {
- #ifdef CONFIG_KALLSYMS
--	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
-+	printk(" [<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where,
-+	       from, (void *)from);
- #else
- 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
- #endif
-@@ -171,7 +173,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 	unsigned int fp, mode;
- 	int ok = 1;
- 
--	printk("Backtrace: ");
-+	printk("Backtrace:\n");
- 
- 	if (!tsk)
- 		tsk = current;
-@@ -271,6 +273,8 @@ void die(const char *str, struct pt_regs *regs, int err)
- 	spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
-+	if (!user_mode(regs))
-+		report_bug(regs->ARM_pc, regs);
- 	ret = __die(str, err, thread, regs);
- 
- 	if (regs && kexec_should_crash(thread->task))
-@@ -302,6 +306,19 @@ void arm_notify_die(const char *str, struct pt_regs *regs,
- 	}
- }
- 
-+int is_valid_bugaddr(unsigned long pc)
++/**
++ * Translate physical to virtual address
++ *
++ */
++void *spsi_get_mem_ptr(u32 phys_addr)
 +{
-+	unsigned bkpt;
++	void *virt = NULL;
 +
-+	if (pc < PAGE_OFFSET)
-+		return 0;
-+	if (probe_kernel_address((unsigned *)pc, bkpt))
-+		return 0;
-+
-+	return bkpt == BUG_INSTR_ARM;
++	if ((phys_addr >= iomem_phys) &&
++	    (phys_addr < (iomem_phys + iomem_size))) {
++		virt = (u8 *) iomem_virt + (phys_addr - iomem_phys);
++	} else {
++		virt = phys_to_virt(phys_addr);
++		SPS_ERR("sps:spsi_get_mem_ptr.invalid phys addr=0x%x.",
++			phys_addr);
++	}
++	return virt;
 +}
 +
++/**
++ * Allocate I/O (pipe) memory
++ *
++ */
++u32 sps_mem_alloc_io(u32 bytes)
++{
++	u32 phys_addr = SPS_ADDR_INVALID;
++	u32 virt_addr = 0;
 +
- static LIST_HEAD(undef_hook);
- static DEFINE_SPINLOCK(undef_lock);
- 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index d2cb0b3..3f065bd 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -355,6 +355,7 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 	register unsigned long current_sp asm ("sp");
- 
- 	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
-+	printk("Backtrace:\n");
- 
- 	if (!tsk)
- 		tsk = current;
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 86b66f3..591ab50 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -72,6 +72,18 @@ SECTIONS
- 
- 	PERCPU(PAGE_SIZE)
- 
-+	/*
-+	 * .exit.text is discarded@runtime, not link time, to deal with
-+	 *  references from bug_table
-+	 */
-+	.exit.text : AT(ADDR(.exit.text)) {
-+		EXIT_TEXT
++	virt_addr = gen_pool_alloc(pool, bytes);
++	if (virt_addr) {
++		iomem_offset = virt_addr - (u32) iomem_virt;
++		phys_addr = iomem_phys + iomem_offset;
++		total_alloc += bytes;
++	} else {
++		SPS_ERR("sps:gen_pool_alloc %d bytes fail.", bytes);
++		return SPS_ADDR_INVALID;
 +	}
 +
-+	.exit.data : AT(ADDR(.exit.data)) {
-+		EXIT_DATA
++	SPS_DBG("sps:sps_mem_alloc_io.phys=0x%x.virt=0x%x.size=0x%x.",
++		phys_addr, virt_addr, bytes);
++
++	return phys_addr;
++}
++
++/**
++ * Free I/O memory
++ *
++ */
++void sps_mem_free_io(u32 phys_addr, u32 bytes)
++{
++	u32 virt_addr = 0;
++
++	iomem_offset = phys_addr - iomem_phys;
++	virt_addr = (u32) iomem_virt + iomem_offset;
++
++	SPS_DBG("sps:sps_mem_free_io.phys=0x%x.virt=0x%x.size=0x%x.",
++		phys_addr, virt_addr, bytes);
++
++	gen_pool_free(pool, virt_addr, bytes);
++	total_free += bytes;
++}
++
++/**
++ * Initialize driver memory module
++ *
++ */
++int sps_mem_init(u32 pipemem_phys_base, u32 pipemem_size)
++{
++	int res;
++	/* 2^8=128. The desc-fifo and data-fifo minimal allocation. */
++	int min_alloc_order = 8;
++
++	iomem_phys = pipemem_phys_base;
++	iomem_size = pipemem_size;
++
++	if (iomem_phys == 0) {
++		SPS_ERR("sps:Invalid Pipe-Mem address");
++		return SPS_ERROR;
++	} else {
++		iomem_virt = ioremap(iomem_phys, iomem_size);
++		if (!iomem_virt) {
++			SPS_ERR("sps:Failed to IO map pipe memory.\n");
++			return -ENOMEM;
++		}
 +	}
 +
- #ifndef CONFIG_XIP_KERNEL
- 	. = ALIGN(PAGE_SIZE);
- 	__init_end = .;
-@@ -246,7 +258,6 @@ SECTIONS
- 		__tcm_end = .;
- 	}
- #endif
--
- 	BSS_SECTION(0, 0, 0)
- 	_end = .;
- 
-@@ -254,7 +265,7 @@ SECTIONS
- 	.comment 0 : { *(.comment) }
- 
- 	/* Default discards */
--	DISCARDS
-+	/*DISCARDS*/
- 
- #ifndef CONFIG_SMP_ON_UP
- 	/DISCARD/ : {
++	iomem_offset = 0;
++	SPS_DBG("sps:sps_mem_init.iomem_phys=0x%x,iomem_virt=0x%x.",
++		iomem_phys, (u32) iomem_virt);
++
++	pool = gen_pool_create(min_alloc_order, nid);
++	res = gen_pool_add(pool, (u32) iomem_virt, iomem_size, nid);
++	if (res)
++		return res;
++
++	return 0;
++}
++
++/**
++ * De-initialize driver memory module
++ *
++ */
++int sps_mem_de_init(void)
++{
++	if (iomem_virt != NULL) {
++		gen_pool_destroy(pool);
++		pool = NULL;
++		iounmap(iomem_virt);
++		iomem_virt = NULL;
++	}
++
++	if (total_alloc == total_free)
++		return 0;
++	else {
++		SPS_ERR("sps:sps_mem_de_init:some memory not free");
++		return SPS_ERROR;
++	}
++}
 -- 
-1.7.3.1
+1.7.3.3
+
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
