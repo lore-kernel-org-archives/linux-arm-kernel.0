@@ -1,114 +1,296 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:57:32 +0530
-Subject: [PATCH V6 04/17] ST SPEAr3xx: Adding support for ST's PWM IP
+Date: Tue, 1 Mar 2011 16:57:30 +0530
+Subject: [PATCH V6 02/17] ST SPEAr13xx: Added PCIe host controller base driver
+	support.
 In-Reply-To: <cover.1298977727.git.viresh.kumar@st.com>
 References: <cover.1298977727.git.viresh.kumar@st.com>
-Message-ID: <e402e0dfdcd3265dd45a905968bf9449f6971a4b.1298977728.git.viresh.kumar@st.com>
+Message-ID: <30b834e959889fb20404f45e7e66de78155874c2.1298977728.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Pratyush Anand <pratyush.anand@st.com>
+
+SPEAr13xx family contains Synopsys designware PCIe version 3.30a. This
+patch adds support for this PCIe module for spear platform.
+
 Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |    1 +
- arch/arm/mach-spear3xx/spear320.c             |   16 +
- arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
- arch/arm/plat-spear/Kconfig                   |    7 +
- arch/arm/plat-spear/Makefile                  |    2 +
- arch/arm/plat-spear/pwm.c                     |  484 +++++++++++++++++++++++++
- 6 files changed, 511 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-spear/pwm.c
+ arch/arm/Kconfig                                |    1 +
+ arch/arm/mach-spear13xx/Makefile                |    1 +
+ arch/arm/mach-spear13xx/include/mach/hardware.h |    7 +
+ arch/arm/mach-spear13xx/include/mach/irqs.h     |   19 +-
+ arch/arm/mach-spear13xx/include/mach/pcie.h     |  170 +++++
+ arch/arm/mach-spear13xx/pcie.c                  |  861 +++++++++++++++++++++++
+ arch/arm/mach-spear13xx/spear1300_evb.c         |   31 +
+ arch/arm/mach-spear13xx/spear1310_evb.c         |   31 +
+ arch/arm/mach-spear13xx/spear13xx.c             |   28 +
+ arch/arm/plat-spear/Kconfig                     |    2 +
+ 10 files changed, 1150 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-spear13xx/include/mach/pcie.h
+ create mode 100644 arch/arm/mach-spear13xx/pcie.c
 
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 31e7a03..f43d104 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -168,6 +168,7 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- #ifdef CONFIG_MACH_SPEAR320
- /* Add spear320 machine device structure declarations here */
- extern struct platform_device spear320_plgpio_device;
-+extern struct platform_device spear320_pwm_device;
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d9efe86..0aca70d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1263,6 +1263,7 @@ config PCI_HOST_ITE8152
+ 	select DMABOUNCE
  
- /* pad mux modes */
- extern struct pmx_mode spear320_auto_net_smii_mode;
-diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index 06b3332..c1642c1 100644
---- a/arch/arm/mach-spear3xx/spear320.c
-+++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -740,6 +740,22 @@ struct platform_device spear320_plgpio_device = {
- 	.resource = plgpio_resources,
- };
+ source "drivers/pci/Kconfig"
++source "drivers/pci/pcie/Kconfig"
  
-+/* pwm device registeration */
-+static struct resource pwm_resources[] = {
-+	{
-+		.start = SPEAR320_PWM_BASE,
-+		.end = SPEAR320_PWM_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	},
-+};
+ source "drivers/pcmcia/Kconfig"
+ 
+diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
+index 24bbe16..2a113b0 100644
+--- a/arch/arm/mach-spear13xx/Makefile
++++ b/arch/arm/mach-spear13xx/Makefile
+@@ -7,6 +7,7 @@ obj-y					+= spear13xx.o clock.o
+ obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+ obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
++obj-$(CONFIG_PCIEPORTBUS)		+= pcie.o
+ 
+ # spear1300 specific files
+ obj-$(CONFIG_MACH_SPEAR1300)		+= spear1300.o
+diff --git a/arch/arm/mach-spear13xx/include/mach/hardware.h b/arch/arm/mach-spear13xx/include/mach/hardware.h
+index fd8c2dc..c3fb454 100644
+--- a/arch/arm/mach-spear13xx/include/mach/hardware.h
++++ b/arch/arm/mach-spear13xx/include/mach/hardware.h
+@@ -28,4 +28,11 @@
+ /* typesafe io address */
+ #define __io_address(n)		__io(IO_ADDRESS(n))
+ 
++#if defined(CONFIG_PCI)
++#define PCIBIOS_MIN_IO		0
++#define PCIBIOS_MIN_MEM		0
++#define pcibios_assign_all_busses()	0
++#endif
 +
-+struct platform_device spear320_pwm_device = {
-+	.name = "pwm",
-+	.id = -1,
-+	.num_resources = ARRAY_SIZE(pwm_resources),
-+	.resource = pwm_resources,
-+};
 +
- /* spear320 routines */
- void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- 		u8 pmx_dev_count)
-diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index 4d747db..6190660 100644
---- a/arch/arm/mach-spear3xx/spear320_evb.c
-+++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -50,6 +50,7 @@ static struct platform_device *plat_devs[] __initdata = {
+ #endif /* __MACH_HARDWARE_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/irqs.h b/arch/arm/mach-spear13xx/include/mach/irqs.h
+index c4f0c9d..59bf61a 100644
+--- a/arch/arm/mach-spear13xx/include/mach/irqs.h
++++ b/arch/arm/mach-spear13xx/include/mach/irqs.h
+@@ -130,7 +130,24 @@
+ #define SPEAR_GPIO1_INT_BASE	(SPEAR_GPIO0_INT_BASE + 8)
+ #define SPEAR_GPIO_INT_END	(SPEAR_GPIO1_INT_BASE + 8)
  
- 	/* spear320 specific devices */
- 	&spear320_plgpio_device,
-+	&spear320_pwm_device,
- };
- 
- static void __init spear320_evb_init(void)
-diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
-index ee5fd4a..21f31cd 100644
---- a/arch/arm/plat-spear/Kconfig
-+++ b/arch/arm/plat-spear/Kconfig
-@@ -38,4 +38,11 @@ source "arch/arm/mach-spear13xx/Kconfig"
- source "arch/arm/mach-spear3xx/Kconfig"
- source "arch/arm/mach-spear6xx/Kconfig"
- 
-+config SPEAR_PWM
-+	tristate "SPEAr Pulse Width Modulator"
-+	depends on MACH_SPEAR320
-+	default y
-+	help
-+	  Support for ST Microelectronics Pulse Width Modulator present on SPEAr Platform.
+-#define VIRQ_END		SPEAR_GPIO_INT_END
++/* PCIE MSI virtual irqs */
++#define SPEAR_NUM_MSI_IRQS	64
++#define SPEAR_MSI0_INT_BASE	(SPEAR_GPIO_INT_END + 0)
++#define SPEAR_MSI0_INT_END	(SPEAR_MSI0_INT_BASE + SPEAR_NUM_MSI_IRQS)
++#define SPEAR_MSI1_INT_BASE	(SPEAR_MSI0_INT_END + 0)
++#define SPEAR_MSI1_INT_END	(SPEAR_MSI1_INT_BASE + SPEAR_NUM_MSI_IRQS)
++#define SPEAR_MSI2_INT_BASE	(SPEAR_MSI1_INT_END + 0)
++#define SPEAR_MSI2_INT_END	(SPEAR_MSI2_INT_BASE + SPEAR_NUM_MSI_IRQS)
 +
- endif
-diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index f462c8f..636678a 100644
---- a/arch/arm/plat-spear/Makefile
-+++ b/arch/arm/plat-spear/Makefile
-@@ -9,3 +9,5 @@ obj-$(CONFIG_ARCH_SPEAR13XX)	+= padmux.o
- obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
- obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
- obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
++#define SPEAR_NUM_INTX_IRQS	4
++#define SPEAR_INTX0_BASE	(SPEAR_MSI2_INT_END + 0)
++#define SPEAR_INTX0_END		(SPEAR_INTX0_BASE + SPEAR_NUM_INTX_IRQS)
++#define SPEAR_INTX1_BASE	(SPEAR_INTX0_END + 0)
++#define SPEAR_INTX1_END		(SPEAR_INTX1_BASE + SPEAR_NUM_INTX_IRQS)
++#define SPEAR_INTX2_BASE	(SPEAR_INTX1_END + 0)
++#define SPEAR_INTX2_END		(SPEAR_INTX2_BASE + SPEAR_NUM_INTX_IRQS)
 +
-+obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
-diff --git a/arch/arm/plat-spear/pwm.c b/arch/arm/plat-spear/pwm.c
++#define VIRQ_END		SPEAR_INTX2_END
+ #define NR_IRQS			VIRQ_END
+ 
+ #endif /* __MACH_IRQS_H */
+diff --git a/arch/arm/mach-spear13xx/include/mach/pcie.h b/arch/arm/mach-spear13xx/include/mach/pcie.h
 new file mode 100644
-index 0000000..307c725
+index 0000000..fa302e5
 --- /dev/null
-+++ b/arch/arm/plat-spear/pwm.c
-@@ -0,0 +1,484 @@
++++ b/arch/arm/mach-spear13xx/include/mach/pcie.h
+@@ -0,0 +1,170 @@
 +/*
-+ * arch/arm/plat-spear/pwm.c
++ * arch/arm/mach-spear13xx/include/mach/pcie.h
 + *
-+ * ST Microelectronics SPEAr Pulse Width Modulator driver
++ * Spear SoC PCIe handling.
 + *
 + * Copyright (C) 2010 ST Microelectronics
-+ * Viresh Kumar<viresh.kumar@st.com>
++ * Pratyush Anand <pratyush.anand@st.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_PCIE_H
++#define __MACH_PCIE_H
++
++extern int (*pcie_port_is_host)(int port);
++extern int enable_pcie0_clk(void);
++
++
++struct pcie_port {
++	u8			port;
++	u8			root_bus_nr;
++	void __iomem		*base;
++	void __iomem		*app_base;
++	void __iomem		*va_app_base;
++	void __iomem		*va_dbi_base;
++	void __iomem		*va_cfg0_base;
++	spinlock_t		conf_lock;
++	char			mem_space_name[16];
++	char			io_space_name[16];
++	struct resource		res[2];
++};
++
++struct pcie_app_reg {
++	u32	app_ctrl_0;		/*cr0*/
++	u32	app_ctrl_1;		/*cr1*/
++	u32	app_status_0;		/*cr2*/
++	u32	app_status_1;		/*cr3*/
++	u32	msg_status;		/*cr4*/
++	u32	msg_payload;		/*cr5*/
++	u32	int_sts;		/*cr6*/
++	u32	int_clr;		/*cr7*/
++	u32	int_mask;		/*cr8*/
++	u32	mst_bmisc;		/*cr9*/
++	u32	phy_ctrl;		/*cr10*/
++	u32	phy_status;		/*cr11*/
++	u32	cxpl_debug_info_0;	/*cr12*/
++	u32	cxpl_debug_info_1;	/*cr13*/
++	u32	ven_msg_ctrl_0;		/*cr14*/
++	u32	ven_msg_ctrl_1;		/*cr15*/
++	u32	ven_msg_data_0;		/*cr16*/
++	u32	ven_msg_data_1;		/*cr17*/
++	u32	ven_msi_0;		/*cr18*/
++	u32	ven_msi_1;		/*cr19*/
++	u32	mst_rmisc;		/*cr 20*/
++	u32	slv_awmisc;		/*cr 21*/
++	u32	slv_armisc;		/*cr 22*/
++	u32	pom0_mem_addr_start;	/*cr23*/
++	u32	pom1_mem_addr_start;	/*cr24*/
++	u32	pom_io_addr_start;	/*cr25*/
++	u32	pom_cfg0_addr_start;	/*cr26*/
++	u32	pom_cfg1_addr_start;	/*cr27*/
++	u32	in0_mem_addr_start;	/*cr28*/
++	u32	in1_mem_addr_start;	/*cr29*/
++	u32	in_io_addr_start;	/*cr30*/
++	u32	in_cfg0_addr_start;	/*cr31*/
++	u32	in_cfg1_addr_start;	/*cr32*/
++	u32	in_msg_addr_start;	/*cr33*/
++	u32	in0_mem_addr_limit;	/*cr34*/
++	u32	in1_mem_addr_limit;	/*cr35*/
++	u32	in_io_addr_limit;	/*cr36*/
++	u32	in_cfg0_addr_limit;	/*cr37*/
++	u32	in_cfg1_addr_limit;	/*cr38*/
++	u32	in_msg_addr_limit;	/*cr39*/
++	u32	mem0_addr_offset_limit;	/*cr40*/
++	u32	pim0_mem_addr_start;	/*cr41*/
++	u32	pim1_mem_addr_start;	/*cr42*/
++	u32	pim_io_addr_start;	/*cr43*/
++	u32	pim_rom_addr_start;	/*cr44*/
++};
++
++/*CR0 ID*/
++#define RX_LANE_FLIP_EN_ID	0
++#define TX_LANE_FLIP_EN_ID	1
++#define SYS_AUX_PWR_DET_ID	2
++#define APP_LTSSM_ENABLE_ID	3
++#define SYS_ATTEN_BUTTON_PRESSED_ID	4
++#define SYS_MRL_SENSOR_STATE_ID 5
++#define SYS_PWR_FAULT_DET_ID	6
++#define SYS_MRL_SENSOR_CHGED_ID 7
++#define SYS_PRE_DET_CHGED_ID	8
++#define SYS_CMD_CPLED_INT_ID	9
++#define APP_INIT_RST_0_ID	11
++#define APP_REQ_ENTR_L1_ID	12
++#define APP_READY_ENTR_L23_ID	13
++#define APP_REQ_EXIT_L1_ID	14
++#define DEVICE_TYPE_EP		(0 << 25)
++#define DEVICE_TYPE_LEP		(1 << 25)
++#define DEVICE_TYPE_RC		(4 << 25)
++#define SYS_INT_ID		29
++#define MISCTRL_EN_ID		30
++#define REG_TRANSLATION_ENABLE	31
++
++/*CR1 ID*/
++#define APPS_PM_XMT_TURNOFF_ID	2
++#define APPS_PM_XMT_PME_ID	5
++
++/*CR3 ID*/
++#define XMLH_LTSSM_STATE_ID	0
++#define XMLH_LTSSM_STATE_L0	((u32)0x11 << XMLH_LTSSM_STATE_ID)
++#define XMLH_LTSSM_STATE_MASK	((u32)0x1F << XMLH_LTSSM_STATE_ID)
++#define XMLH_LINK_UP_ID	5
++
++/*CR4 ID*/
++#define CFG_MSI_EN_ID	18
++
++/*CR6*/
++#define INTA_CTRL_INT	(1 << 7)
++#define INTB_CTRL_INT	(1 << 8)
++#define INTC_CTRL_INT	(1 << 9)
++#define INTD_CTRL_INT	(1 << 10)
++#define MSI_CTRL_INT	(1 << 26)
++
++/*CR19 ID*/
++#define VEN_MSI_REQ_ID	11
++#define VEN_MSI_FUN_NUM_ID	8
++#define VEN_MSI_TC_ID	5
++#define VEN_MSI_VECTOR_ID	0
++#define VEN_MSI_REQ_EN	((u32)0x1 << VEN_MSI_REQ_ID)
++#define VEN_MSI_FUN_NUM_MASK	((u32)0x7 << VEN_MSI_FUN_NUM_ID)
++#define VEN_MSI_TC_MASK	((u32)0x7 << VEN_MSI_TC_ID)
++#define VEN_MSI_VECTOR_MASK	((u32)0x1F << VEN_MSI_VECTOR_ID)
++#endif
++
++/*CE21-22 ID*/
++/*ID definitio of ARMISC*/
++#define AXI_OP_TYPE_ID	0
++#define AXI_OP_BCM_ID	5
++#define AXI_OP_EP_ID	6
++#define AXI_OP_TD_ID	7
++#define AXI_OP_ATTRIBUTE_ID	8
++#define AXI_OP_TC_ID	10
++#define AXI_OP_MSG_CODE_ID	13
++#define AXI_OP_DBI_ACCESS_ID	21
++#define AXI_OP_TYPE_MASK	0x1F
++#define AXI_OP_TYPE_MEM_RDRW	0
++#define AXI_OP_TYPE_MEM_RDRW_LOCKED	1
++#define AXI_OP_TYPE_IO_RDRW	2
++#define AXI_OP_TYPE_CONFIG_RDRW_TYPE0	4
++#define AXI_OP_TYPE_CONFIG_RDRW_TYPE1	5
++#define AXI_OP_TYPE_MSG_REQ	16
++#define AXI_OP_TYPE_COMPLETION	10
++#define AXI_OP_TYPE_COMPLETION_LOCKED	11
++#define AXI_OP_TYPE_DBI_ELBI_ENABLE	1
++
++/* synopsis specific PCIE configuration registers*/
++#define PCIE_MSI_ADDR_LO	0x820	/* 32 bits */
++#define PCIE_MSI_ADDR_HI	0x824	/* 32 bits */
++#define PCIE_MSI_INTR0_ENABLE	0x828	/* 32 bits */
++#define PCIE_MSI_INTR0_MASK	0x82C	/* 32 bits */
++#define PCIE_MSI_INTR0_STATUS	0x830	/* 32 bits */
++
++/*BAR MASK registers*/
++#define PCIE_BAR0_MASK_REG	0x1010
++
++static inline void pcie_init(int (*fptr)(int port))
++{
++	pcie_port_is_host = fptr;
++}
+diff --git a/arch/arm/mach-spear13xx/pcie.c b/arch/arm/mach-spear13xx/pcie.c
+new file mode 100644
+index 0000000..3528830
+--- /dev/null
++++ b/arch/arm/mach-spear13xx/pcie.c
+@@ -0,0 +1,861 @@
++/*
++ * arch/arm/mach-spear13xx/pcie.c
++ *
++ * PCIe functions for SPEAr 13xx SoCs
++ *
++ * Copyright (C) 2010 ST Microelectronics
++ * Pratyush Anand <pratyush.anand@st.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2. This program is licensed "as is" without any
@@ -116,475 +298,1016 @@ index 0000000..307c725
 + */
 +
 +#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
++#include <linux/delay.h>
 +#include <linux/kernel.h>
-+#include <linux/math64.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pwm.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++#include <linux/pci.h>
++#include <linux/msi.h>
++#include <linux/mbus.h>
++#include <linux/sched.h>
++#include <asm/irq.h>
++#include <asm/mach/irq.h>
++#include <asm/mach/pci.h>
++#include <mach/misc_regs.h>
++#include <mach/pcie.h>
 +
-+/* PWM registers and bits definitions */
-+#define PWMCR			0x00
-+#define PWMDCR			0x04
-+#define PWMPCR			0x08
++#define NUM_PCIE_PORTS	3
 +
-+#define PWM_EN_MASK		0x1
-+#define MIN_PRESCALE		0x00
-+#define MAX_PRESCALE		0x3FFF
-+#define PRESCALE_SHIFT		2
-+#define MIN_DUTY		0x0001
-+#define MAX_DUTY		0xFFFF
-+#define MAX_PERIOD		0xFFFF
-+#define MIN_PERIOD		0x0001
++/* Sum of all these space can maximum be 256MB*/
++#define IN0_MEM_SIZE	(200 * 1024 * 1024 - 1)
++/* In current implementation address translation is done using IN0 only.
++ * So IN1 start address and IN0 end address has been kept same
++*/
++#define IN1_MEM_SIZE	(0 * 1024 * 1024 - 1)
++#define IN_IO_SIZE	(20 * 1024 * 1024 - 1)
++#define IN_CFG0_SIZE	(1 * 1024 * 1024 - 1)
++#define IN_CFG1_SIZE	(1 * 1024 * 1024 - 1)
++#define IN_MSG_SIZE	(1 * 1024 * 1024 - 1)
 +
-+#define PWM_DEVICE_PER_IP	4
-+#define PWM_DEVICE_OFFSET	0x10
++#define MAX_LINK_UP_WAIT_JIFFIES	10
 +
-+/* lock for pwm_list */
-+static DEFINE_SPINLOCK(list_lock);
-+/* list of all pwm ips available in system */
-+static LIST_HEAD(pwm_list);
-+
-+/**
-+ * struct pwm_device: struct representing pwm device/channel
-+ *
-+ * pwmd_id: id of pwm device
-+ * pwm: pointer to parent pwm ip
-+ * label: used for storing label passed in pwm_request
-+ * offset: base address offset from parent pwm mmio_base
-+ * busy: represents usage status of a pwm device
-+ * lock: lock specific to a pwm device
-+ * node: node for adding device to parent pwm's devices list
-+ *
-+ * Each pwm IP contains four independent pwm device/channels. Some or all of
-+ * which may be present in our configuration.
-+ */
-+struct pwm_device {
-+	unsigned pwmd_id;
-+	struct pwm *pwm;
-+	const char *label;
-+	unsigned offset;
-+	unsigned busy;
-+	spinlock_t lock;
-+	struct list_head node;
++int (*pcie_port_is_host)(int port);
++static struct pcie_port pcie_port[NUM_PCIE_PORTS];
++static u32 spr_pcie_base[NUM_PCIE_PORTS] = {
++	SPEAR13XX_PCIE0_BASE,
++	SPEAR13XX_PCIE1_BASE,
++	SPEAR13XX_PCIE2_BASE,
++};
++static u32 spr_pcie_app_base[NUM_PCIE_PORTS] = {
++	SPEAR13XX_PCIE0_APP_BASE,
++	SPEAR13XX_PCIE1_APP_BASE,
++	SPEAR13XX_PCIE2_APP_BASE,
 +};
 +
-+/**
-+ * struct pwm: struct representing pwm ip
-+ *
-+ * id: id of pwm ip
-+ * mmio_base: base address of pwm
-+ * clk: pointer to clk structure of pwm ip
-+ * clk_enabled: clock enable status
-+ * pdev: pointer to pdev structure of pwm
-+ * lock: lock specific to current pwm ip
-+ * devices: list of devices/childrens of pwm ip
-+ * node: node for adding pwm to global list of all pwm ips
-+ */
-+struct pwm {
-+	unsigned id;
-+	void __iomem *mmio_base;
++/* Keeping all DDR area of 256MB accesible for inbound transaction */
++#define INBOUND_ADDR_MASK	0xFFFFFFF
++
++#ifdef CONFIG_PCI_MSI
++static DECLARE_BITMAP(msi_irq_in_use[NUM_PCIE_PORTS], SPEAR_NUM_MSI_IRQS);
++static unsigned int spear_msi_data[NUM_PCIE_PORTS];
++
++static void spear13xx_msi_init(struct pcie_port *pp);
++#endif
++
++static void spear_pcie_int_handler(unsigned int irq, struct irq_desc *desc);
++
++static void enable_dbi_access(struct pcie_app_reg *app_reg)
++{
++	/* Enable DBI access */
++	writel(readl(&app_reg->slv_armisc) | (1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_armisc);
++	writel(readl(&app_reg->slv_awmisc) | (1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_awmisc);
++
++}
++
++static void disable_dbi_access(struct pcie_app_reg *app_reg)
++{
++	/* disable DBI access */
++	writel(readl(&app_reg->slv_armisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_armisc);
++	writel(readl(&app_reg->slv_awmisc) & ~(1 << AXI_OP_DBI_ACCESS_ID),
++			&app_reg->slv_awmisc);
++
++}
++
++static void spear_dbi_read_reg(struct pcie_port *pp, int where, int size,
++		u32 *val)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 va_address;
++
++	/* Enable DBI access */
++	enable_dbi_access(app_reg);
++
++	va_address = (u32)pp->va_dbi_base + (where & ~0x3);
++
++	*val = readl(va_address);
++
++	if (size == 1)
++		*val = (*val >> (8 * (where & 3))) & 0xff;
++	else if (size == 2)
++		*val = (*val >> (8 * (where & 3))) & 0xffff;
++
++	/* Disable DBI access */
++	disable_dbi_access(app_reg);
++}
++
++static void spear_dbi_write_reg(struct pcie_port *pp, int where, int size,
++		u32 val)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 va_address;
++
++	/* Enable DBI access */
++	enable_dbi_access(app_reg);
++
++	va_address = (u32)pp->va_dbi_base + (where & ~0x3);
++
++	if (size == 4)
++		writel(val, va_address);
++	else if (size == 2)
++		writew(val, va_address + (where & 2));
++	else if (size == 1)
++		writeb(val, va_address + (where & 3));
++
++	/* Disable DBI access */
++	disable_dbi_access(app_reg);
++}
++
++static int spear13xx_pcie_link_up(void __iomem *va_app_base)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) va_app_base;
++	unsigned long deadline = jiffies + MAX_LINK_UP_WAIT_JIFFIES;
++
++	do {
++		if (readl(&app_reg->app_status_1) &
++				((u32)1 << XMLH_LINK_UP_ID))
++			return 1;
++
++		cond_resched();
++	} while (!time_after_eq(jiffies, deadline));
++
++	return 0;
++}
++
++static void spear13xx_pcie_host_init(struct pcie_port *pp)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	/*setup registers for outbound translation */
++
++	writel(pp->base, &app_reg->in0_mem_addr_start);
++	writel(app_reg->in0_mem_addr_start + IN0_MEM_SIZE,
++			&app_reg->in0_mem_addr_limit);
++	writel(app_reg->in0_mem_addr_limit + 1, &app_reg->in1_mem_addr_start);
++	writel(app_reg->in1_mem_addr_start + IN1_MEM_SIZE,
++			&app_reg->in1_mem_addr_limit);
++	writel(app_reg->in1_mem_addr_limit + 1, &app_reg->in_io_addr_start);
++	writel(app_reg->in_io_addr_start + IN_IO_SIZE,
++			&app_reg->in_io_addr_limit);
++	writel(app_reg->in_io_addr_limit + 1, &app_reg->in_cfg0_addr_start);
++	writel(app_reg->in_cfg0_addr_start + IN_CFG0_SIZE,
++			&app_reg->in_cfg0_addr_limit);
++	writel(app_reg->in_cfg0_addr_limit + 1, &app_reg->in_cfg1_addr_start);
++	writel(app_reg->in_cfg1_addr_start + IN_CFG1_SIZE,
++			&app_reg->in_cfg1_addr_limit);
++	writel(app_reg->in_cfg1_addr_limit + 1, &app_reg->in_msg_addr_start);
++	writel(app_reg->in_msg_addr_start + IN_MSG_SIZE,
++			&app_reg->in_msg_addr_limit);
++
++	writel(app_reg->in0_mem_addr_start, &app_reg->pom0_mem_addr_start);
++	writel(app_reg->in1_mem_addr_start, &app_reg->pom1_mem_addr_start);
++	writel(app_reg->in_io_addr_start, &app_reg->pom_io_addr_start);
++
++	/*setup registers for inbound translation */
++
++	writel(INBOUND_ADDR_MASK + 1, &app_reg->mem0_addr_offset_limit);
++	writel(0, &app_reg->pim0_mem_addr_start);
++	writel(0, &app_reg->pim1_mem_addr_start);
++	spear_dbi_write_reg(pp, PCIE_BAR0_MASK_REG, 4, INBOUND_ADDR_MASK);
++	spear_dbi_write_reg(pp, PCI_BASE_ADDRESS_0, 4, 0);
++
++	writel(0x0, &app_reg->pim_io_addr_start);
++	writel(0x0, &app_reg->pim_io_addr_start);
++	writel(0x0, &app_reg->pim_rom_addr_start);
++
++	writel(DEVICE_TYPE_RC | (1 << MISCTRL_EN_ID)
++			| (1 << APP_LTSSM_ENABLE_ID)
++			| ((u32)1 << REG_TRANSLATION_ENABLE),
++			&app_reg->app_ctrl_0);
++}
++
++static void __init spear13xx_pcie_preinit(void)
++{
++	int i;
++	struct pcie_port *pp;
++	struct pcie_app_reg *app_reg;
++
++	for (i = 0; i < NUM_PCIE_PORTS; i++) {
++		pp = pcie_port + i;
++		app_reg = (struct pcie_app_reg *) (pp->va_app_base);
++
++		/* init hosts only */
++		if ((*pcie_port_is_host)(i) != 1)
++			continue;
++		snprintf(pp->mem_space_name, sizeof(pp->mem_space_name),
++			"PCIe %d MEM", pp->port);
++		pp->mem_space_name[sizeof(pp->mem_space_name) - 1] = 0;
++		pp->res[0].name = pp->mem_space_name;
++		pp->res[0].start = app_reg->in0_mem_addr_start;
++		pp->res[0].end = app_reg->in0_mem_addr_limit;
++		pp->res[0].flags = IORESOURCE_MEM;
++
++		snprintf(pp->io_space_name, sizeof(pp->io_space_name),
++			"PCIe %d I/O", pp->port);
++		pp->io_space_name[sizeof(pp->io_space_name) - 1] = 0;
++		pp->res[1].name = pp->io_space_name;
++		pp->res[1].start = app_reg->in_io_addr_start;
++		pp->res[1].end = app_reg->in_io_addr_limit;
++		pp->res[1].flags = IORESOURCE_IO;
++
++		if (request_resource(&iomem_resource, &pp->res[0]))
++			panic("can't allocate PCIe I/O space");
++		if (request_resource(&iomem_resource, &pp->res[1]))
++			panic("can't allocate PCIe MEM space");
++	}
++}
++
++static int __init spear13xx_pcie_setup(int nr, struct pci_sys_data *sys)
++{
++	struct pcie_port *pp;
++	u32 val = 0;
++
++	if (nr >= NUM_PCIE_PORTS)
++		return 0;
++
++	if ((*pcie_port_is_host)(nr) != 1)
++		return 0;
++
++	pp = &pcie_port[nr];
++	if (!spear13xx_pcie_link_up((void __iomem *)pp->va_app_base))
++		return 0;
++	pp->root_bus_nr = sys->busnr;
++
++	/* Generic PCIe unit setup.*/
++
++	/* Enable own BME. It is necessary to enable own BME to do a
++	 * memory transaction on a downstream device
++	 */
++	spear_dbi_read_reg(pp, PCI_COMMAND, 2, &val);
++	val |= (PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER
++			| PCI_COMMAND_PARITY | PCI_COMMAND_SERR);
++	spear_dbi_write_reg(pp, PCI_COMMAND, 2, val);
++
++	/* Need to come back here*/
++
++	sys->resource[0] = &pp->res[0];
++	sys->resource[1] = &pp->res[1];
++	sys->resource[2] = NULL;
++
++	return 1;
++}
++
++static struct pcie_port *bus_to_port(int bus)
++{
++	int i;
++
++	for (i = NUM_PCIE_PORTS - 1; i >= 0; i--) {
++		int rbus = pcie_port[i].root_bus_nr;
++		if ((*pcie_port_is_host)(i) != 1)
++			continue;
++		if (rbus != -1 && rbus <= bus)
++			break;
++	}
++
++	return i >= 0 ? pcie_port + i : NULL;
++}
++
++static int pcie_valid_config(struct pcie_port *pp, int bus, int dev)
++{
++	/*If there is no link, then there is no device*/
++	if (!spear13xx_pcie_link_up((void __iomem *)pp->va_app_base))
++		return 0;
++	/*
++	 * Don't go out when trying to access nonexisting devices
++	 * on the local bus.
++	 * we have only one slot on each root port.
++	 */
++	if (bus == pp->root_bus_nr && dev > 0)
++		return 0;
++	return 1;
++}
++
++static int spear13xx_pcie_rd_conf(struct pcie_port *pp, struct pci_bus *bus,
++		u32 devfn, int where, int size, u32 *val)
++{
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 address = (u32)pp->va_cfg0_base | (PCI_FUNC(devfn) << 16)
++		| (where & 0xFFFC);
++
++	writel((bus->number << 24) | (PCI_SLOT(devfn) << 19),
++			&app_reg->pom_cfg0_addr_start);
++	writel(readl(&app_reg->slv_armisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_armisc);
++	writel(readl(&app_reg->slv_armisc) | AXI_OP_TYPE_CONFIG_RDRW_TYPE0,
++			&app_reg->slv_armisc);
++
++	*val = readl(address);
++	if (size == 1)
++		*val = (*val >> (8 * (where & 3))) & 0xff;
++	else if (size == 2)
++		*val = (*val >> (8 * (where & 3))) & 0xffff;
++
++	writel(readl(&app_reg->slv_armisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_armisc);
++
++	return PCIBIOS_SUCCESSFUL;
++}
++
++static int pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
++			int size, u32 *val)
++{
++	struct pcie_port *pp = bus_to_port(bus->number);
++	unsigned long flags;
++	int ret;
++
++	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0) {
++		*val = 0xffffffff;
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	}
++
++	spin_lock_irqsave(&pp->conf_lock, flags);
++	ret = spear13xx_pcie_rd_conf(pp, bus, devfn, where, size, val);
++	spin_unlock_irqrestore(&pp->conf_lock, flags);
++
++	return ret;
++}
++
++static int spear13xx_pcie_wr_conf(struct pcie_port *pp, struct pci_bus *bus,
++		u32 devfn, int where, int size, u32 val)
++{
++	int ret = PCIBIOS_SUCCESSFUL;
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *) pp->va_app_base;
++	u32 address = (u32)pp->va_cfg0_base | (PCI_FUNC(devfn) << 16)
++			| (where & 0xFFFC);
++
++	writel((bus->number << 24) | (PCI_SLOT(devfn) << 19),
++			&app_reg->pom_cfg0_addr_start);
++	writel(readl(&app_reg->slv_awmisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_awmisc);
++	writel(readl(&app_reg->slv_awmisc) | AXI_OP_TYPE_CONFIG_RDRW_TYPE0,
++			&app_reg->slv_awmisc);
++	if (size == 4)
++		writel(val, address);
++	else if (size == 2)
++		writew(val, address + (where & 2));
++	else if (size == 1)
++		writeb(val, address + (where & 3));
++	else
++		ret = PCIBIOS_BAD_REGISTER_NUMBER;
++	writel(readl(&app_reg->slv_awmisc) & ~(AXI_OP_TYPE_MASK),
++			&app_reg->slv_awmisc);
++	return ret;
++}
++
++static int pcie_wr_conf(struct pci_bus *bus, u32 devfn,
++			int where, int size, u32 val)
++{
++	struct pcie_port *pp = bus_to_port(bus->number);
++	unsigned long flags;
++	int ret;
++
++	if (pcie_valid_config(pp, bus->number, PCI_SLOT(devfn)) == 0)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++
++	spin_lock_irqsave(&pp->conf_lock, flags);
++	ret = spear13xx_pcie_wr_conf(pp, bus, devfn, where, size, val);
++	spin_unlock_irqrestore(&pp->conf_lock, flags);
++
++	return ret;
++}
++
++static struct pci_ops pcie_ops = {
++	.read = pcie_rd_conf,
++	.write = pcie_wr_conf,
++};
++
++static struct pci_bus __init *
++spear13xx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
++{
++	struct pci_bus *bus;
++
++	if ((nr < NUM_PCIE_PORTS) && ((*pcie_port_is_host)(nr)) == 1) {
++		bus = pci_scan_bus(sys->busnr, &pcie_ops, sys);
++	} else {
++		bus = NULL;
++		BUG();
++	}
++
++	return bus;
++}
++
++static int __init spear13xx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++{
++	struct pcie_port *pp = bus_to_port(dev->bus->number);
++	int irq = (SPEAR_INTX0_BASE + pp->port * SPEAR_NUM_INTX_IRQS + pin - 1);
++
++	return irq;
++}
++
++static struct hw_pci spear13xx_pci __initdata = {
++	.nr_controllers	= NUM_PCIE_PORTS,
++	.preinit	= spear13xx_pcie_preinit,
++	.swizzle	= pci_std_swizzle,
++	.setup		= spear13xx_pcie_setup,
++	.scan		= spear13xx_pcie_scan_bus,
++	.map_irq	= spear13xx_pcie_map_irq,
++};
++
++void mask_intx_irq(unsigned int irq)
++{
++	int irq_offset = (irq - SPEAR_INTX0_BASE) % SPEAR_NUM_INTX_IRQS;
++	int port = (irq - SPEAR_INTX0_BASE) / SPEAR_NUM_INTX_IRQS;
++	struct pcie_port *pp = &pcie_port[port];
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	switch (irq_offset) {
++	case 0:
++		writel(readl(&app_reg->int_mask) & ~INTA_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 1:
++		writel(readl(&app_reg->int_mask) & ~INTB_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 2:
++		writel(readl(&app_reg->int_mask) & ~INTC_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 3:
++		writel(readl(&app_reg->int_mask) & ~INTD_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	}
++}
++
++void unmask_intx_irq(unsigned int irq)
++{
++	int irq_offset = (irq - SPEAR_INTX0_BASE) % SPEAR_NUM_INTX_IRQS;
++	int port = (irq - SPEAR_INTX0_BASE) / SPEAR_NUM_INTX_IRQS;
++	struct pcie_port *pp = &pcie_port[port];
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++
++	switch (irq_offset) {
++	case 0:
++		writel(readl(&app_reg->int_mask) | INTA_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 1:
++		writel(readl(&app_reg->int_mask) | INTB_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 2:
++		writel(readl(&app_reg->int_mask) | INTC_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	case 3:
++		writel(readl(&app_reg->int_mask) | INTD_CTRL_INT,
++				&app_reg->int_mask);
++		break;
++	}
++}
++
++static struct irq_chip spear13xx_intx_chip = {
++	.name = "PCI-INTX",
++	.mask = mask_intx_irq,
++	.unmask = unmask_intx_irq,
++};
++
++static void spear13xx_int_init(struct pcie_port *pp)
++{
++	int i, irq;
++	struct pcie_app_reg *app_reg;
++
++	set_irq_chained_handler(IRQ_PCIE0 + pp->port, spear_pcie_int_handler);
++
++#ifdef CONFIG_PCI_MSI
++	spear13xx_msi_init(pp);
++#endif
++	/* Enbale INTX interrupt*/
++	app_reg = (struct pcie_app_reg *)pp->va_app_base;
++	writel(readl(&app_reg->int_mask) | INTA_CTRL_INT
++			| INTB_CTRL_INT	| INTC_CTRL_INT
++			| INTD_CTRL_INT, &app_reg->int_mask);
++
++	/* initilize INTX chip here only. MSI chip will be
++	 * initilized dynamically.*/
++	irq = (SPEAR_INTX0_BASE + pp->port * SPEAR_NUM_INTX_IRQS);
++	for (i = 0; i < SPEAR_NUM_INTX_IRQS; i++) {
++		set_irq_chip_and_handler(irq + i, &spear13xx_intx_chip,
++				handle_simple_irq);
++		set_irq_flags(irq + i, IRQF_VALID);
++	}
++}
++
++static void __init add_pcie_port(int port, u32 base, u32 app_base)
++{
++	struct pcie_port *pp = &pcie_port[port];
++	struct pcie_app_reg *app_reg;
++
++	pp->port = port;
++	pp->root_bus_nr = -1;
++	pp->base = (void __iomem *)base;
++	pp->app_base = (void __iomem *)app_base;
++	pp->va_app_base = (void __iomem *) ioremap(app_base, 0x200);
++	if (!pp->va_app_base) {
++		pr_err("error with ioremap in function %s\n", __func__);
++		return;
++	}
++	pp->va_dbi_base = (void __iomem *) ioremap(base, 0x2000);
++	if (!pp->va_dbi_base) {
++		pr_err("error with ioremap in function %s\n", __func__);
++		return;
++	}
++	spin_lock_init(&pp->conf_lock);
++	memset(pp->res, 0, sizeof(pp->res));
++	pr_info("spear13xx PCIe port %d\n", port);
++	if (spear13xx_pcie_link_up((void __iomem *)pp->va_app_base)) {
++		pr_info("link up in bios\n");
++	} else {
++		pr_info("link down in bios\n");
++		spear13xx_pcie_host_init(pp);
++		spear13xx_int_init(pp);
++		app_reg = (struct pcie_app_reg *)pp->va_app_base;
++		pp->va_cfg0_base = (void __iomem *)
++			ioremap(app_reg->in_cfg0_addr_start, IN_CFG0_SIZE);
++		if (!pp->va_cfg0_base) {
++			pr_err("error with ioremap in function %s\n", __func__);
++			return;
++		}
++
++	}
++}
++
++static int __init spear13xx_pcie_init(void)
++{
++	int port;
 +	struct clk *clk;
-+	int clk_enabled;
-+	struct platform_device *pdev;
-+	spinlock_t lock;
-+	struct list_head devices;
-+	struct list_head node;
++
++	for (port = 0; port < NUM_PCIE_PORTS; port++) {
++		/* do not enable clock if it is PCIE0. Ideally , all controller
++		 * should have been independent from others with respect to
++		 * clock. But PCIE1 and 2 depends on PCIE0.So PCIE0 clk
++		 * is provided during board init.*/
++		if (port == 1) {
++			/* Ideally CFG Clock should have been also enabled
++			 * here. But it is done currently during board
++			 * init routne*/
++			clk = clk_get_sys("pcie1", NULL);
++			if (IS_ERR(clk)) {
++				pr_err("%s:couldn't get clk for pcie1\n",
++						__func__);
++				continue;
++			}
++			if (clk_enable(clk)) {
++				pr_err("%s:couldn't enable clk for pcie1\n",
++						__func__);
++				continue;
++			}
++		} else if (port == 2) {
++			/* Ideally CFG Clock should have been also enabled
++			 * here. But it is done currently during board
++			 * init routne*/
++			clk = clk_get_sys("pcie2", NULL);
++			if (IS_ERR(clk)) {
++				pr_err("%s:couldn't get clk for pcie2\n",
++						__func__);
++				continue;
++			}
++			if (clk_enable(clk)) {
++				pr_err("%s:couldn't enable clk for pcie2\n",
++						__func__);
++				continue;
++			}
++		}
++
++		if ((*pcie_port_is_host)(port) == 1)
++			add_pcie_port(port, spr_pcie_base[port],
++					spr_pcie_app_base[port]);
++	}
++
++	pci_common_init(&spear13xx_pci);
++
++	return 0;
++}
++subsys_initcall(spear13xx_pcie_init);
++
++#ifdef CONFIG_PCI_MSI
++/* MSI int handler
++ */
++static void handle_msi(struct pcie_port *pp)
++{
++	unsigned long val;
++	int i, pos;
++
++	for (i = 0; i < 8; i++) {
++		spear_dbi_read_reg(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
++				(u32 *)&val);
++		if (val) {
++			pos = 0;
++			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
++				generic_handle_irq(SPEAR_MSI0_INT_BASE
++					+ pp->port * SPEAR_NUM_MSI_IRQS
++					+ (i * 32) + pos);
++				pos++;
++			}
++		}
++		spear_dbi_write_reg(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4, val);
++	}
++}
++#else
++static void handle_msi(struct pcie_port *pp)
++{
++}
++#endif
++
++static void spear_pcie_int_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct pcie_port *pp = &pcie_port[irq - IRQ_PCIE0];
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
++	unsigned int status;
++
++	status = readl(&app_reg->int_sts);
++
++	desc->chip->ack(irq);
++
++	if (status & MSI_CTRL_INT) {
++		handle_msi(pp);
++		writel(MSI_CTRL_INT, &app_reg->int_clr);
++	} else if (status & INTA_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS);
++	else if (status & INTB_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS + 1);
++	else if (status & INTC_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS + 2);
++	else if (status & INTD_CTRL_INT)
++		generic_handle_irq(SPEAR_INTX0_BASE
++				+ pp->port * SPEAR_NUM_INTX_IRQS + 3);
++	else
++		writel(status, &app_reg->int_clr);
++
++	desc->chip->unmask(irq);
++}
++
++#ifdef CONFIG_PCI_MSI
++static int find_valid_pos0(int port, int nvec, int pos, int *pos0)
++{
++	int flag = 1;
++	do {
++		pos = find_next_zero_bit(msi_irq_in_use[port],
++				SPEAR_NUM_MSI_IRQS, pos);
++		/*if you have reached to the end then get out from here.*/
++		if (pos == SPEAR_NUM_MSI_IRQS)
++			return -ENOSPC;
++		/* Check if this position is at correct offset.nvec is always a
++		 * power of two. pos0 must be nvec bit alligned.
++		 */
++		if (pos % nvec)
++			pos += nvec - (pos % nvec);
++		else
++			flag = 0;
++	} while (flag);
++
++	*pos0 = pos;
++	return 0;
++}
++
++static void spear13xx_msi_nop(unsigned int irq)
++{
++	return;
++}
++
++static struct irq_chip spear13xx_msi_chip = {
++	.name = "PCI-MSI",
++	.ack = spear13xx_msi_nop,
++	.irq_enable = unmask_msi_irq,
++	.irq_disable = mask_msi_irq,
++	.irq_mask = mask_msi_irq,
++	.irq_unmask = unmask_msi_irq,
 +};
 +
 +/*
-+ * period_ns = 10^9 * (PRESCALE + 1) * PV / PWM_CLK_RATE
-+ * duty_ns = 10^9 * (PRESCALE + 1) * DC / PWM_CLK_RATE
-+ *
-+ * PV = (PWM_CLK_RATE * period_ns)/ (10^9 * (PRESCALE + 1))
-+ * DC = (PWM_CLK_RATE * duty_ns)/ (10^9 * (PRESCALE + 1))
++ * Dynamic irq allocate and deallocation
 + */
-+int pwm_config(struct pwm_device *pwmd, int duty_ns, int period_ns)
++static int get_irq(int nvec, struct msi_desc *desc, int *pos)
 +{
-+	u64 val, div, clk_rate;
-+	unsigned long prescale = MIN_PRESCALE, pv, dc;
-+	int ret = 0;
++	int res, bit, irq, pos0, pos1, i;
++	u32 val;
++	struct pcie_port *pp = bus_to_port(desc->dev->bus->number);
 +
-+	if (!pwmd) {
-+		pr_err("pwm: config - NULL pwm device pointer\n");
-+		return -EFAULT;
++	pos0 = find_first_zero_bit(msi_irq_in_use[pp->port],
++			SPEAR_NUM_MSI_IRQS);
++	if (pos0 % nvec) {
++		if (find_valid_pos0(pp->port, nvec, pos0, &pos0))
++			goto no_valid_irq;
++	}
++	if (nvec > 1) {
++		pos1 = find_next_bit(msi_irq_in_use[pp->port],
++				SPEAR_NUM_MSI_IRQS, pos0);
++		/* there must be nvec number of consecutive free bits */
++		while ((pos1 - pos0) < nvec) {
++			if (find_valid_pos0(pp->port, nvec, pos1, &pos0))
++				goto no_valid_irq;
++			pos1 = find_next_bit(msi_irq_in_use[pp->port],
++					SPEAR_NUM_MSI_IRQS, pos0);
++		}
 +	}
 +
-+	if (period_ns == 0 || duty_ns > period_ns) {
-+		ret = -EINVAL;
-+		goto err;
++	irq = (SPEAR_MSI0_INT_BASE + (pp->port * SPEAR_NUM_MSI_IRQS)) + pos0;
++
++	if ((irq + nvec) > (SPEAR_MSI0_INT_END
++				+ (pp->port * SPEAR_NUM_MSI_IRQS)))
++		goto no_valid_irq;
++
++	i = 0;
++	while (i < nvec) {
++		set_bit(pos0 + i, msi_irq_in_use[pp->port]);
++		dynamic_irq_init(irq + i);
++		set_irq_msi(irq + i, desc);
++		set_irq_chip_and_handler(irq + i, &spear13xx_msi_chip,
++				handle_simple_irq);
++
++		/* Enable corresponding interrupt on MSI interrupt
++		 * controller.
++		 */
++		res = ((pos0 + i) / 32) * 12;
++		bit = (pos0 + i) % 32;
++		spear_dbi_read_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++		val |= 1 << bit;
++		spear_dbi_write_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++
++		i++;
 +	}
 +
-+	/* TODO: Need to optimize this loop */
-+	while (1) {
-+		div = 1000000000;
-+		div *= 1 + prescale;
-+		clk_rate = clk_get_rate(pwmd->pwm->clk);
-+		val = clk_rate * period_ns;
-+		pv = div64_u64(val, div);
-+		val = clk_rate * duty_ns;
-+		dc = div64_u64(val, div);
++	*pos = pos0;
++	return irq;
++no_valid_irq:
++	*pos = pos0;
++	return -ENOSPC;
++}
 +
-+		if ((pv == 0) || (dc == 0)) {
-+			ret = -EINVAL;
-+			goto err;
-+		}
-+		if ((pv > MAX_PERIOD) || (dc > MAX_DUTY)) {
-+			prescale++;
-+			if (prescale > MAX_PRESCALE) {
-+				ret = -EINVAL;
-+				goto err;
-+			}
-+			continue;
-+		}
-+		if ((pv < MIN_PERIOD) || (dc < MIN_DUTY)) {
-+			ret = -EINVAL;
-+			goto err;
-+		}
-+		break;
++static void clean_irq(unsigned int irq)
++{
++	int res, bit, val, pos;
++	struct irq_desc *desc = irq_to_desc(irq);
++	struct pcie_port *pp = bus_to_port(desc->msi_desc->dev->bus->number);
++
++	pos = irq - (SPEAR_MSI0_INT_BASE + (pp->port * SPEAR_NUM_MSI_IRQS));
++
++	dynamic_irq_cleanup(irq);
++
++	clear_bit(pos, msi_irq_in_use[pp->port]);
++
++	/* Disable corresponding interrupt on MSI interrupt
++	 * controller.
++	 */
++	res = (pos / 32) * 12;
++	bit = pos % 32;
++	spear_dbi_read_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, &val);
++	val &= ~(1 << bit);
++	spear_dbi_write_reg(pp, PCIE_MSI_INTR0_ENABLE + res, 4, val);
++
++}
++
++int arch_setup_msi_irq(struct pci_dev *pdev, struct msi_desc *desc)
++{
++	int cvec, rvec, irq, pos;
++	struct msi_msg msg;
++	uint16_t control;
++	struct pcie_port *pp = bus_to_port(pdev->bus->number);
++
++	/*
++	 * Read the MSI config to figure out how many IRQs this device
++	 * wants.Most devices only want 1, which will give
++	 * configured_private_bits and request_private_bits equal 0.
++	 */
++	pci_read_config_word(pdev, desc->msi_attrib.pos + PCI_MSI_FLAGS,
++			&control);
++
++	/*
++	 * If the number of private bits has been configured then use
++	 * that value instead of the requested number. This gives the
++	 * driver the chance to override the number of interrupts
++	 * before calling pci_enable_msi().
++	 */
++
++	cvec = (control & PCI_MSI_FLAGS_QSIZE) >> 4;
++
++	if (cvec == 0) {
++		/* Nothing is configured, so use the hardware requested size */
++		rvec = (control & PCI_MSI_FLAGS_QMASK) >> 1;
++	} else {
++		/*
++		 * Use the number of configured bits, assuming the
++		 * driver wanted to override the hardware request
++		 * value.
++		 */
++		rvec = cvec;
 +	}
 +
 +	/*
-+	 * NOTE: the clock to PWM has to be enabled first
-+	 * before writing to the registers
++	 * The PCI 2.3 spec mandates that there are at most 32
++	 * interrupts. If this device asks for more, only give it one.
 +	 */
-+	spin_lock(&pwmd->pwm->lock);
-+	ret = clk_enable(pwmd->pwm->clk);
-+	if (ret) {
-+		spin_unlock(&pwmd->pwm->lock);
-+		goto err;
-+	}
++	if (rvec > 5)
++		rvec = 0;
 +
-+	spin_lock(&pwmd->lock);
-+	writel(prescale << PRESCALE_SHIFT, pwmd->pwm->mmio_base +
-+			pwmd->offset + PWMCR);
-+	writel(dc, pwmd->pwm->mmio_base + pwmd->offset + PWMDCR);
-+	writel(pv, pwmd->pwm->mmio_base + pwmd->offset + PWMPCR);
-+	spin_unlock(&pwmd->lock);
-+	clk_disable(pwmd->pwm->clk);
-+	spin_unlock(&pwmd->pwm->lock);
++	irq = get_irq((1 << rvec), desc, &pos);
 +
-+	return 0;
-+err:
-+	dev_err(&pwmd->pwm->pdev->dev, "pwm config fail\n");
-+	return ret;
-+}
-+EXPORT_SYMBOL(pwm_config);
++	 if (irq < 0)
++		return irq;
 +
-+int pwm_enable(struct pwm_device *pwmd)
-+{
-+	int ret = 0;
-+	u32 val = 0;
++	 /* Update the number of IRQs the device has available to it */
++	 control &= ~PCI_MSI_FLAGS_QSIZE;
++	 control |= rvec << 4;
++	 pci_write_config_word(pdev, desc->msi_attrib.pos + PCI_MSI_FLAGS,
++			 control);
++	 desc->msi_attrib.multiple = rvec;
 +
-+	if (!pwmd) {
-+		pr_err("pwm: enable - NULL pwm device pointer\n");
-+		return -EFAULT;
-+	}
-+
-+	spin_lock(&pwmd->pwm->lock);
-+	ret = clk_enable(pwmd->pwm->clk);
-+	if (!ret)
-+		pwmd->pwm->clk_enabled++;
-+	else {
-+		spin_unlock(&pwmd->pwm->lock);
-+		goto err;
-+	}
-+
-+	spin_lock(&pwmd->lock);
-+	val = readl(pwmd->pwm->mmio_base + pwmd->offset + PWMCR);
-+	writel(val | PWM_EN_MASK, pwmd->pwm->mmio_base + pwmd->offset + PWMCR);
-+	spin_unlock(&pwmd->lock);
-+	spin_unlock(&pwmd->pwm->lock);
-+	return 0;
-+err:
-+	dev_err(&pwmd->pwm->pdev->dev, "pwm enable fail\n");
-+	return ret;
-+}
-+EXPORT_SYMBOL(pwm_enable);
-+
-+void pwm_disable(struct pwm_device *pwmd)
-+{
-+	if (!pwmd) {
-+		pr_err("pwm: disable - NULL pwm device pointer\n");
-+		return;
-+	}
-+
-+	spin_lock(&pwmd->pwm->lock);
-+	spin_lock(&pwmd->lock);
-+	writel(0, pwmd->pwm->mmio_base + pwmd->offset + PWMCR);
-+	if (pwmd->pwm->clk_enabled) {
-+		clk_disable(pwmd->pwm->clk);
-+		pwmd->pwm->clk_enabled--;
-+	}
-+	spin_unlock(&pwmd->lock);
-+	spin_unlock(&pwmd->pwm->lock);
-+}
-+EXPORT_SYMBOL(pwm_disable);
-+
-+struct pwm_device *pwm_request(int pwmd_id, const char *label)
-+{
-+	int found = 0;
-+	struct pwm *pwm;
-+	struct pwm_device *pwmd = NULL;
-+
-+	spin_lock(&list_lock);
-+	list_for_each_entry(pwm, &pwm_list, node) {
-+		spin_lock(&pwm->lock);
-+		list_for_each_entry(pwmd, &pwm->devices, node) {
-+			if (pwmd->pwmd_id == pwmd_id) {
-+				found = 1;
-+				break;
-+			}
-+		}
-+		spin_unlock(&pwm->lock);
-+		if (found)
-+			break;
-+	}
-+	spin_unlock(&list_lock);
-+
-+	if (found) {
-+		spin_lock(&pwmd->lock);
-+		if (pwmd->busy == 0) {
-+			pwmd->busy++;
-+			pwmd->label = label;
-+		} else
-+			pwmd = ERR_PTR(-EBUSY);
-+		spin_unlock(&pwmd->lock);
-+	} else
-+		pwmd = ERR_PTR(-ENOENT);
-+
-+	if (IS_ERR(pwmd))
-+		pr_err("pwm: request fail\n");
-+
-+	return pwmd;
-+}
-+EXPORT_SYMBOL(pwm_request);
-+
-+void pwm_free(struct pwm_device *pwmd)
-+{
-+	if (!pwmd) {
-+		pr_err("pwm: disable - NULL pwm device pointer\n");
-+		return;
-+	}
-+
-+	spin_lock(&pwmd->lock);
-+	if (pwmd->busy) {
-+		pwmd->busy--;
-+		pwmd->label = NULL;
-+	} else {
-+		spin_unlock(&pwmd->lock);
-+		dev_warn(&pwmd->pwm->pdev->dev, "pwm device already freed\n");
-+		return;
-+	}
-+
-+	spin_unlock(&pwmd->lock);
-+}
-+EXPORT_SYMBOL(pwm_free);
-+
-+/* creates and add pwmd device to parent pwm's devices list */
-+static int add_pwm_device(unsigned int pwmd_id, struct pwm *pwm)
-+{
-+	struct pwm_device *pwmd;
-+
-+	pwmd = kzalloc(sizeof(*pwmd), GFP_KERNEL);
-+	if (!pwmd)
-+		return -ENOMEM;
-+
-+	pwmd->pwm = pwm;
-+	pwmd->busy = 0;
-+	pwmd->pwmd_id = pwmd_id + pwm->id * PWM_DEVICE_PER_IP;
-+	pwmd->offset = pwmd_id * PWM_DEVICE_OFFSET;
-+	spin_lock_init(&pwmd->lock);
-+
-+	spin_lock(&pwm->lock);
-+	list_add_tail(&pwmd->node, &pwm->devices);
-+	spin_unlock(&pwm->lock);
++	/* An EP will modify lower 8 bits(max) of msi data while
++	 * sending any msi interrupt
++	 */
++	msg.address_hi = 0x0;
++	msg.address_lo = __virt_to_phys((u32)(&spear_msi_data[pp->port]));
++	msg.data = pos;
++	write_msi_msg(irq, &msg);
 +
 +	return 0;
 +}
 +
-+/* removes all pwmd devices from parent pwm's devices list */
-+static void remove_pwm_devices(struct pwm *pwm)
++void arch_teardown_msi_irq(unsigned int irq)
 +{
-+	struct pwm_device *pwmd;
-+
-+	spin_lock(&pwm->lock);
-+	list_for_each_entry(pwmd, &pwm->devices, node) {
-+		list_del(&pwmd->node);
-+		kfree(pwmd);
-+	}
-+	spin_unlock(&pwm->lock);
++	clean_irq(irq);
 +}
 +
-+static int __devinit spear_pwm_probe(struct platform_device *pdev)
++static void spear13xx_msi_init(struct pcie_port *pp)
 +{
-+	struct pwm *pwm = NULL;
-+	struct resource *res;
-+	int ret = 0, pwmd_id = 0;
++	struct pcie_app_reg *app_reg = (struct pcie_app_reg *)pp->va_app_base;
 +
-+	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
-+	if (!pwm) {
-+		ret = -ENOMEM;
-+		dev_dbg(&pdev->dev, "failed to allocate memory\n");
-+		goto err;
++	spear_dbi_write_reg(pp, PCIE_MSI_ADDR_LO, 4,
++			__virt_to_phys((u32)(&spear_msi_data[pp->port])));
++	spear_dbi_write_reg(pp, PCIE_MSI_ADDR_HI, 4, 0);
++	/* Enbale MSI interrupt*/
++	writel(readl(&app_reg->int_mask) | MSI_CTRL_INT,
++			&app_reg->int_mask);
++}
++#endif
+diff --git a/arch/arm/mach-spear13xx/spear1300_evb.c b/arch/arm/mach-spear13xx/spear1300_evb.c
+index cba0fee..4799ae1 100644
+--- a/arch/arm/mach-spear13xx/spear1300_evb.c
++++ b/arch/arm/mach-spear13xx/spear1300_evb.c
+@@ -16,6 +16,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/hardware.h>
++#include <mach/pcie.h>
+ 
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+@@ -45,6 +46,30 @@ static struct amba_device *amba_devs[] __initdata = {
+ static struct platform_device *plat_devs[] __initdata = {
+ };
+ 
++#ifdef CONFIG_PCIEPORTBUS
++/*
++ * This function is needed for PCIE host and device driver. Same
++ * controller can not be programmed as host as well as device. So host
++ * driver must call this function and if this function returns 1 then
++ * only host should add that particular port as RC.
++ * A port to be added as device, one must also add device's information
++ * in plat_devs array defined in this file.
++ */
++static int spear1300_pcie_port_is_host(int port)
++{
++	switch (port) {
++	case 0:
++		return 0;
++	case 1:
++		return 1;
++	case 2:
++		return 1;
 +	}
 +
-+	pwm->clk = clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(pwm->clk)) {
-+		ret = PTR_ERR(pwm->clk);
-+		dev_dbg(&pdev->dev, "Error getting clock\n");
-+		goto err_free;
++	return -EINVAL;
++}
++#endif
++
+ static void __init spear1300_evb_init(void)
+ {
+ 	unsigned int i;
+@@ -52,6 +77,12 @@ static void __init spear1300_evb_init(void)
+ 	/* call spear1300 machine init function */
+ 	spear1300_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
+ 
++#ifdef CONFIG_PCIEPORTBUS
++	/* Enable PCIE0 clk */
++	enable_pcie0_clk();
++	pcie_init(spear1300_pcie_port_is_host);
++#endif
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear13xx/spear1310_evb.c b/arch/arm/mach-spear13xx/spear1310_evb.c
+index 62af911..2e74879 100644
+--- a/arch/arm/mach-spear13xx/spear1310_evb.c
++++ b/arch/arm/mach-spear13xx/spear1310_evb.c
+@@ -16,6 +16,7 @@
+ #include <asm/mach-types.h>
+ #include <mach/generic.h>
+ #include <mach/hardware.h>
++#include <mach/pcie.h>
+ 
+ /* padmux devices to enable */
+ static struct pmx_dev *pmx_devs[] = {
+@@ -64,6 +65,30 @@ static struct platform_device *plat_devs[] __initdata = {
+ 	&spear1310_can1_device,
+ };
+ 
++#ifdef CONFIG_PCIEPORTBUS
++/*
++ * This function is needed for PCIE host and device driver. Same
++ * controller can not be programmed as host as well as device. So host
++ * driver must call this function and if this function returns 1 then
++ * only host should add that particular port as RC.
++ * A port to be added as device, one must also add device's information
++ * in plat_devs array defined in this file.
++ */
++static int spear1310_pcie_port_is_host(int port)
++{
++	switch (port) {
++	case 0:
++		return 0;
++	case 1:
++		return 1;
++	case 2:
++		return 1;
 +	}
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "no memory resource defined\n");
-+		goto err_free_clk;
++	return -EINVAL;
++}
++#endif
++
+ static void __init spear1310_evb_init(void)
+ {
+ 	unsigned int i;
+@@ -71,6 +96,12 @@ static void __init spear1310_evb_init(void)
+ 	/* call spear1310 machine init function */
+ 	spear1310_init(NULL, pmx_devs, ARRAY_SIZE(pmx_devs));
+ 
++#ifdef CONFIG_PCIEPORTBUS
++	/* Enable PCIE0 clk */
++	enable_pcie0_clk();
++	pcie_init(spear1310_pcie_port_is_host);
++#endif
++
+ 	/* Add Platform Devices */
+ 	platform_add_devices(plat_devs, ARRAY_SIZE(plat_devs));
+ 
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index 35582a6..6c2525a 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -76,6 +76,34 @@ struct amba_device spear13xx_uart_device = {
+ 	.irq = {IRQ_UART, NO_IRQ},
+ };
+ 
++#ifdef CONFIG_PCIEPORTBUS
++/* PCIE0 clock always needs to be enabled if any of the three PCIE port
++ * have to be used. So call this function from the board initilization
++ * file. Ideally , all controller should have been independent from
++ * others with respect to clock.
++ */
++int enable_pcie0_clk(void)
++{
++	struct clk *clk;
++	/*Enable all CLK in CFG registers here only. Idealy only PCIE0
++	 * should have been enabled. But Controler does not work
++	 * properly if PCIE1 and PCIE2's CFG CLK is enabled in stages.
++	 */
++	writel(PCIE0_CFG_VAL | PCIE1_CFG_VAL | PCIE2_CFG_VAL, PCIE_CFG);
++	clk = clk_get_sys("pcie0", NULL);
++	if (IS_ERR(clk)) {
++		pr_err("%s:couldn't get clk for pcie0\n", __func__);
++		return -ENODEV;
++	}
++	if (clk_enable(clk)) {
++		pr_err("%s:couldn't enable clk for pcie0\n", __func__);
++		return -ENODEV;
 +	}
 +
-+	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
-+		ret = -EBUSY;
-+		dev_dbg(&pdev->dev, "failed to request memory resource\n");
-+		goto err_free_clk;
-+	}
-+
-+	pwm->mmio_base = ioremap(res->start, resource_size(res));
-+	if (!pwm->mmio_base) {
-+		ret = -ENOMEM;
-+		dev_dbg(&pdev->dev, "failed to ioremap\n");
-+		goto err_free_mem;
-+	}
-+
-+	/* initialize pwm structure */
-+	pwm->clk_enabled = 0;
-+	pwm->pdev = pdev;
-+	/* if pdev->id is -1, only one pwm ip is present */
-+	if (pdev->id == -1)
-+		pwm->id = 0;
-+	else
-+		pwm->id = pdev->id;
-+
-+	spin_lock_init(&pwm->lock);
-+	INIT_LIST_HEAD(&pwm->devices);
-+	platform_set_drvdata(pdev, pwm);
-+
-+	/* add pwm to pwm list */
-+	spin_lock(&list_lock);
-+	list_add_tail(&pwm->node, &pwm_list);
-+	spin_unlock(&list_lock);
-+
-+	/* add pwm devices */
-+	for (pwmd_id = 0; pwmd_id < PWM_DEVICE_PER_IP; pwmd_id++) {
-+		ret = add_pwm_device(pwmd_id, pwm);
-+		if (!ret)
-+			continue;
-+		dev_err(&pdev->dev, "Add device fail for pwm device id: %d\n",
-+				pwmd_id);
-+	}
-+
-+	if (list_empty(&pwm->node))
-+		goto err_remove_pwm;
-+
-+	dev_info(&pdev->dev, "Initialization successful\n");
 +	return 0;
-+
-+err_remove_pwm:
-+	spin_lock(&list_lock);
-+	list_del(&pwm->node);
-+	spin_unlock(&list_lock);
-+
-+	platform_set_drvdata(pdev, NULL);
-+	iounmap(pwm->mmio_base);
-+err_free_mem:
-+	release_mem_region(res->start, resource_size(res));
-+err_free_clk:
-+	clk_put(pwm->clk);
-+err_free:
-+	kfree(pwm);
-+err:
-+	dev_err(&pdev->dev, "Initialization Fail. Error: %d\n", ret);
-+
-+	return ret;
 +}
++#endif
 +
-+static int __devexit spear_pwm_remove(struct platform_device *pdev)
-+{
-+	struct pwm *pwm;
-+	struct resource *res;
-+	int ret = 0;
-+
-+	pwm = platform_get_drvdata(pdev);
-+	if (pwm == NULL) {
-+		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "Remove: get_drvdata fail\n");
-+		goto err;
-+	}
-+	platform_set_drvdata(pdev, NULL);
-+
-+	/* remove pwm devices */
-+	remove_pwm_devices(pwm);
-+
-+	/* remove pwm from pwm_list */
-+	spin_lock(&list_lock);
-+	list_del(&pwm->node);
-+	spin_unlock(&list_lock);
-+
-+	iounmap(pwm->mmio_base);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "Remove: get_resource fail\n");
-+		goto err;
-+	}
-+	release_mem_region(res->start, resource_size(res));
-+
-+	if (pwm->clk_enabled)
-+		clk_disable(pwm->clk);
-+	clk_put(pwm->clk);
-+
-+	kfree(pwm);
-+	return 0;
-+
-+err:
-+	dev_err(&pdev->dev, "Remove: Fail - %d\n", ret);
-+	return ret;
-+}
-+
-+static struct platform_driver spear_pwm_driver = {
-+	.driver = {
-+		.name = "pwm",
-+		.bus = &platform_bus_type,
-+		.owner = THIS_MODULE,
-+	},
-+	.probe = spear_pwm_probe,
-+	.remove = __devexit_p(spear_pwm_remove)
-+};
-+
-+static int __init spear_pwm_init(void)
-+{
-+	int ret = 0;
-+
-+	ret = platform_driver_register(&spear_pwm_driver);
-+	if (ret)
-+		pr_err("failed to register spear_pwm_driver\n");
-+
-+	return ret;
-+}
-+module_init(spear_pwm_init);
-+
-+static void __exit spear_pwm_exit(void)
-+{
-+	platform_driver_unregister(&spear_pwm_driver);
-+}
-+module_exit(spear_pwm_exit);
-+
-+MODULE_AUTHOR("Viresh Kumar");
-+MODULE_DESCRIPTION("SPEAr PWM Driver");
-+MODULE_LICENSE("GPL");
+ /* Do spear13xx familiy common initialization part here */
+ void __init spear13xx_init(void)
+ {
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 29a25d2..ee5fd4a 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -12,6 +12,8 @@ config ARCH_SPEAR13XX
+ 	bool "SPEAr13XX"
+ 	select ARM_GIC
+ 	select CPU_V7
++	select ARCH_SUPPORTS_MSI
++	select MIGHT_HAVE_PCI
+ 	help
+ 	  Supports for ARM's SPEAR13XX family
+ 
 -- 
 1.7.2.2
