@@ -1,56 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 1 Mar 2011 11:27:49 +0100
-Subject: [PATCH 3/8] Add a mfd IPUv3 driver
-In-Reply-To: <20110301091544.GK29521@pengutronix.de>
-References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
-	<201102281811.45277.arnd@arndb.de>
-	<20110301091544.GK29521@pengutronix.de>
-Message-ID: <201103011127.51605.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 01 Mar 2011 10:30:39 +0000
+Subject: [PATCH 1/4] msm: scm: Mark inline asm as volatile
+In-Reply-To: <8yalj112x98.fsf@huya.qualcomm.com>
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<1298573085-23217-2-git-send-email-sboyd@codeaurora.org>
+	<1298635017.958.0.camel@e102144-lin.cambridge.arm.com>
+	<8yapqqe3bs3.fsf@huya.qualcomm.com> <1298805034.4626.4.camel@jazzbox>
+	<8yalj112x98.fsf@huya.qualcomm.com>
+Message-ID: <1298975439.7828.2.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 01 March 2011, Sascha Hauer wrote:
+Hi David,
 
-> When turning this into a kms driver moving the source code will be the
-> smallest problem I guess.
-> I have no preference where to put this code. First it was in
-> drivers/mfd/ and it felt wrong because there seems to be too much code
-> in it a mfd maintainer shouldn't be bothered with. drivers/video/ seems
-> to be wrong because this code will probably support cameras which belong
-> to drivers/media/video/. So if there's consensus on drivers/gpu/ I will
-> happily put it there.
-> What directory do you suggest? drivers/gpu/ or some subdirectory
-> (drm/vga)?
-
-I'd suggest a subdirectory of drivers/gpu/, e.g.
-drivers/gpu/embedded/imx-ipu/. Alan is currently adding a driver
-for the Intel GMA500, and there are others (TI, ST-Ericsson, ...)
-that fit in a similar category of complex graphics subsystems
-without an actual GPU core. I think they should all go to the same
-place.
-
-> > The interrupt logic needs some comments. What are you trying to achieve here?
+On Sun, 2011-02-27 at 17:38 +0000, David Brown wrote:
+> Per the gcc manual:
 > 
-> The IPU has 463 status bits which can trigger an interrupt. Most
-> of them are associated to channels, some are general interrupts. My
-> problem is that I don't know how the interrupts will be used by drivers
-> later. Most drivers will probably use only one interrupt but others
-> will be interested in a larger group of interrupts. So I decided to
-> use a bitmap allowing each driver to register for groups of event
-> it is interested in.
+>     If your assembler instructions access memory in an unpredictable
+>    fashion, add `memory' to the list of clobbered registers.  This will
+>    cause GCC to not keep memory values cached in registers across the
+>    assembler instruction and not optimize stores or loads to that
+>    memory.  You will also want to add the `volatile' keyword if the
+>    memory affected is not listed in the inputs or outputs of the `asm',
+>    as the `memory' clobber does not count as a side-effect of the `asm'.
+>    If you know how large the accessed memory is, you can add it as input
+>    or output but if this is not known, you should add `memory'.  As an
+>    example, if you access ten bytes of a string, you can use a memory
+>    input like:
+> 
+Right, so if you neglected to check the output from the smc block then
+it would be a candidate for removal even with a memory clobber. Now I
+see why you want a volatile in there!
 
-Ok, I see. So you essentially have a huge nested interrupt controller
-and try to be clever about the possible use cases, which may be the
-right choice, but apparently you don't know that yet because not
-all the drivers have been written at this point.
+For what it's worth:
 
-Taking one step back from this, have you considered making this
-a regular interrupt controller? That would make the client drivers
-more standard -- you could define the interrupt numbers as resources
-of a platform device or in the device tree, for instance.
-The cost might be more complex code, e.g. when a device requires
-many interrupts, but I think it will be at least as efficient
-at run-time, and less surprising for readers and authors of
-client drivers.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-	Arnd
+Will
