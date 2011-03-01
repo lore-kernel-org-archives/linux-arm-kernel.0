@@ -1,40 +1,37 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 1 Mar 2011 15:09:52 +0100 (CET)
-Subject: [PATCH 3/8] Add a mfd IPUv3 driver
-In-Reply-To: <201103011243.33765.arnd@arndb.de>
-References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
-	<201103011127.51605.arnd@arndb.de>
-	<20110301111220.GN29521@pengutronix.de>
-	<201103011243.33765.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1103011507220.2701@localhost6.localdomain6>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 1 Mar 2011 14:11:06 +0000
+Subject: [PATCH 1/4] ASoC: Add TI tlv320aic32x4 codec support.
+In-Reply-To: <AANLkTinjj8rZS_Y9qiHbrU2nAYSXTikTNtyU71Bk7UqL@mail.gmail.com>
+References: <1298641370-17461-1-git-send-email-javier.martin@vista-silicon.com>
+	<20110228150014.GI13869@opensource.wolfsonmicro.com>
+	<AANLkTinjj8rZS_Y9qiHbrU2nAYSXTikTNtyU71Bk7UqL@mail.gmail.com>
+Message-ID: <20110301141105.GF9662@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Mar 2011, Arnd Bergmann wrote:
+On Tue, Mar 01, 2011 at 08:59:23AM +0100, javier Martin wrote:
 
-> On Tuesday 01 March 2011, Sascha Hauer wrote:
-> > > Taking one step back from this, have you considered making this
-> > > a regular interrupt controller? That would make the client drivers
-> > > more standard -- you could define the interrupt numbers as resources
-> > > of a platform device or in the device tree, for instance.
-> > > The cost might be more complex code, e.g. when a device requires
-> > > many interrupts, but I think it will be at least as efficient
-> > > at run-time, and less surprising for readers and authors of
-> > > client drivers.
-> > 
-> > I thought about this, but hesitated to increase NR_IRQS by 463. Do you
-> > think we should do this instead?
-> 
-> I think there is a plan to virtualize the interrupt numbers on ARM,
-> and in that case NR_IRQS becomes rather meaningless. I don't know
-> exactly how far that effort has come.
+> > What are these "aic32x4_configs" all about? ?They look like you're
+> > setting non-default configurations...
 
-Also sparse irqs allows us now to allocate beyond NR_IRQS. With sparse
-irqs NR_IRQS is pretty meaningless and just gives us an indicator how
-large the irq space might become, but we allow up to 8k dynamically
-allocated irqs beyond NR_IRQS, so this should be sufficient for your
-problem.
+> This tlv320aic32x4 codec is kind of a huge monster; it has more than
+> 200 registers which provide more flexibility than it is needed.
 
-Thanks,
+So what is all this magic stuff and why is it using such an odd way of
+implementing whatever it's doing?  Part of the problem here is that the
+functionality is scattered all the way through the driver so it's less
+clear than it should be what's going on.
 
-	tglx
+> For example, BCLK and MCLK are forced here to derive from internal PLL
+> which is needed for frequency calculation table to be valid. Bypassing
+> this PLL doesn't provide new or better functionality.
+
+I rather suspect it provides lower power consumption.
+
+> The same happens regarding DAC internal connections. I don't think
+> allowing the user to swap left and right channels makes sense here.
+
+There are a number of CPUs out there that end up being happier with
+channels in the wrong order due to peculiarities of the DMA.  This is
+also used to get a microphone input connected to the right analogue
+input to appear on the left channel of a recording for mono use.
