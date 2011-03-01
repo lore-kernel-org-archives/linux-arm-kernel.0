@@ -1,54 +1,52 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 1 Mar 2011 10:51:43 +0100 (CET)
-Subject: [PATCH v6 1/1] PRUSS UIO driver support
-In-Reply-To: <1298926895-5294-2-git-send-email-pratheesh@ti.com>
-References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
-	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
-Message-ID: <alpine.LFD.2.00.1103011045340.2701@localhost6.localdomain6>
+From: madhavi.linux@gmail.com (Madhavi Manchala)
+Date: Tue, 1 Mar 2011 15:23:02 +0530
+Subject: Linux support for Samsung S3C2510A Processor
+In-Reply-To: <20110228133256.GB22646@trinity.fluff.org>
+References: <AANLkTinBZCQ7Q+BaSxhm62pKiZHhmVWAgNzxnm5jBhZy@mail.gmail.com>
+	<20110228133256.GB22646@trinity.fluff.org>
+Message-ID: <AANLkTikPENDpe32hJcV1fgKfJ_WOaOqqddZPD0cQLPUc@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Mar 2011, Pratheesh Gangadhar wrote:
-> +
-> +static spinlock_t lock;
+On Mon, Feb 28, 2011 at 7:02 PM, Ben Dooks <ben@trinity.fluff.org> wrote:
+> On Mon, Feb 28, 2011 at 06:52:15PM +0530, Madhavi Manchala wrote:
+>> Dear All,
+>>
+>> Does Linux kernel supports the Samsung S3C2510A processor? Why am I
+>> asking this question is, when I looked into ?the arch/arm/ directory I
+>> did not find anything which is related to Samsung S3C2510A processor.
+>> There are other directories like mach-s3c24xx and mach-s3c64xx
+>> directories, but not mach-s3c25xx.
+>>
+>> Any ideas / hints will be appreciated.
+>
+> I think this is a no-mmu version, and there is not a lot of ARM no-mmu
+> support at the moment.
 
-static DEFINE_SPINLOCK(lock);
+Dear Ben,
 
-> +static struct clk *pruss_clk;
-> +static struct uio_info *info;
-> +static dma_addr_t sram_paddr, ddr_paddr;
-> +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> +
-> +static irqreturn_t pruss_handler(int irq, struct uio_info *dev_info)
-> +{
-> +	unsigned long flags;
-> +	int val, intr_mask = (1 << (irq - 1));
-> +	void __iomem *base = dev_info->mem[0].internal_addr;
-> +	void __iomem *intren_reg = base + PINTC_HIER;
-> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + ((irq - 1) << 2);
-> +
-> +	spin_lock_irqsave(&lock, flags);
+Thank you very much for the information.
 
-spin_lock() is enough as we run handlers with interrupts disabled.
+I think, if I want to port the Linux on to my board, which is based on
+Samsung s3c2510a processor, then I need to develop the
+arch/arm/mach-s3c2510 sources, which are currently not available in
+the kernel source tree.
 
-> +	val = ioread32(intren_reg);
-> +	/* Is interrupt enabled and active ? */
-> +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND)) {
-> +		spin_unlock_irqrestore(&lock, flags);
-> +		return IRQ_NONE;
-> +	}
-> +
-> +	/* Disable interrupt */
-> +	iowrite32((val & ~intr_mask), intren_reg);
-> +	spin_unlock_irqrestore(&lock, flags);
-> +	return IRQ_HANDLED;
-> +}
+I saw that you only developed the sources for Samsung s3c24xx
+processor in arch/arm/ of the Linux sources.
 
-So now you still have not solved the problem of user space enabling an
-interrupt again. That's racy as well and you can solve it by providing
-an uio->irq_control function which handles the interrupt enable
-register under the lock as well.
+So, please suggest me with some good links / points for writing the
+sources for Samsung s3c2510a processor under arch/arm. At least, how
+can I start? Any templates?
 
-Thanks,
+Thank you very much for your suggestions.
 
-	tglx
+Thanks and Regards,
+Madhavi M.
+
+> --
+> Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+>
+> Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+>
+>
