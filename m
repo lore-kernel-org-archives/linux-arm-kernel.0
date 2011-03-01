@@ -1,61 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Mar 2011 13:24:23 -0000
-Subject: [PATCH 3/6] ARM: tegra: update GPIO chained IRQ handler to use
-	EOI in	parent chip
-In-Reply-To: <4D6CF08C.6030109@ru.mvista.com>
-References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-	<1298900022-21516-4-git-send-email-will.deacon@arm.com>
-	<4D6CF08C.6030109@ru.mvista.com>
-Message-ID: <000501cbd813$fb8de5f0$f2a9b1d0$@deacon@arm.com>
+From: stummala@codeaurora.org (Sahitya Tummala)
+Date: Tue, 01 Mar 2011 18:58:41 +0530
+Subject: [RFC] MMC: error handling improvements
+In-Reply-To: <20110219150006.GH29493@n2100.arm.linux.org.uk>
+References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
+	<8yaoc6c7tan.fsf@huya.qualcomm.com>
+	<20110219150006.GH29493@n2100.arm.linux.org.uk>
+Message-ID: <1298986121.15439.16.camel@stummala-linux.in.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei,
+Hi Russell King,
 
-> On 28-02-2011 16:33, Will Deacon wrote:
+On Sat, 2011-02-19 at 15:00 +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 15, 2011 at 03:49:04PM -0800, David Brown wrote:
+> > On Tue, Feb 15 2011, Russell King - ARM Linux wrote:
+> > 
+> > > This patch is for RFC only; it needs splitting up somewhat.  However, I
+> > > wanted to get it out there for some comment.
+> > 
+> > Just for kicks, I applied this and ran it on an MSM target (8x50).  It
+> > seems to cause lots of:
+> > 
+> >   mmc0: Data timeout
+> >   mmc0: Controller has been re-initialized
+> >   ...
+> >   mmc0: Data CRC error
+> > 
+> > and I can post more if you would find them interesting.  Eventually the
+> > MSM mmc driver derefernces a null pointer in the interrupt code.
 > 
-> > The chained GPIO IRQ handler on Tegra calls ->irq_ack on the parent
-> > chip prior to handling the interrupt.
+> That doesn't look right.  If resetting the MMC controller results in all
+> state being lost, it presumably means the card gets powered down too.
+> If that happens, the card needs to be reinitialized from scratch again,
+> and I don't see how that happens in this driver.
 > 
-> > This patch updates the code to use ->irq_eoi now that the GIC has moved
-> > to using the fasteoi flow model.
-> 
-> > Acked-by: Colin Cross<ccross@android.com>
-> > Signed-off-by: Will Deacon<will.deacon@arm.com>
-> > ---
-> >   arch/arm/mach-tegra/gpio.c |   17 +----------------
-> >   1 files changed, 1 insertions(+), 16 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-tegra/gpio.c b/arch/arm/mach-tegra/gpio.c
-> > index ad80488..5019b01 100644
-> > --- a/arch/arm/mach-tegra/gpio.c
-> > +++ b/arch/arm/mach-tegra/gpio.c
-> > @@ -219,9 +219,6 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
-> >   	struct tegra_gpio_bank *bank;
-> >   	int port;
-> >   	int pin;
-> > -	int unmasked = 0;
-> > -
-> > -	desc->irq_data.chip->irq_ack(&desc->irq_data);
-> 
->     Won't this code break after the first patch as it removes irq_ack()
-> method? I.e. shouldn't the patches be combined to keep them bisectable?
+> Nothing in this patch should cause data timeouts to appear where they
+> weren't already appearing before the patch - the patch only changes
+> what happens after an error occurs, so you must already be encountering
+> errors on the interface before you applied this patch.
 
-If you read the cover letter, I said:
+This patch sends CMD22 (mmc_sd_num_wr_blocks()) for SD cards after a
+write command. This function relies on csd->tacc_ns and csd->tacc_clks
+for setting timeout values. But for SDHC cards, these CSD values are not
+read and will always be 0. The host driver will only use the timeout
+values sent by upper layers and thus in this case we are writing 0 to
+MMCIDATATIMER. This is the reason for getting data timeout error for
+CMD22. Before sending CMD22 if I add mmc_set_data_timeout(), then it is
+working fine for me because mmc_set_data_timeout() uses hardcoded
+timeout values for SDHC cards.
 
-> This is going to be a PITA to merge so any thoughts relating to that
-> are welcome.
+All other SD read commands are also using mmc_set_data_timeout() to set
+the timeout values - mmc_sd_switch(), mmc_app_sd_status()  and
+mmc_app_send_scr(). I think it is a problem in mmc_sd_num_wr_blocks to
+use CSD contents for timeout values for all types of SD cards. 
 
-I'm aware of the bisecting issues and Russell has come up with a solution
-using entry/exit functions to sort this out (with the GIC changes moved to
-the end of the series).
-
-But we have bigger fish to fry.
-
-The whole question about whether or not chained handlers should be written
-with multiple parent chips in mind is a hot topic. Thomas has some interesting
-ideas for the core code which will allow the chained handler not to care about
-flow control. Once we've sorted out the mechanism for this stuff, the merging
-should be fairly straightforward because the chip details will be irrelevant.
-
-Will
+-- 
+Thanks,
+Sahitya.
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum.
