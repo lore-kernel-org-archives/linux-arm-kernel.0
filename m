@@ -1,132 +1,131 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:56:36 +0530
-Subject: [PATCH V6 03/11] ST SPEAr Clock: Updating for single image solution
+Date: Tue, 1 Mar 2011 16:56:40 +0530
+Subject: [PATCH V6 07/11] ST SPEAr3xx: Appending spear3** with global device
+	structures
 In-Reply-To: <cover.1298977709.git.viresh.kumar@st.com>
 References: <cover.1298977709.git.viresh.kumar@st.com>
-Message-ID: <5dbf6225c190e9b4bd2aadb98c1baf0d1f762b22.1298977709.git.viresh.kumar@st.com>
+Message-ID: <29487655ad1e85f901f624053a445c14dfd6fa9e.1298977709.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This patch creates different clk_lookup arrays for individual machines.
-These lookup arrays will be registered only if that specific machine is
-current machine.
 
 Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/clock.c |   70 ++++++++++++++++++++++++---------------
- 1 files changed, 43 insertions(+), 27 deletions(-)
+ arch/arm/mach-spear3xx/include/mach/generic.h |    6 +++---
+ arch/arm/mach-spear3xx/spear300.c             |    2 +-
+ arch/arm/mach-spear3xx/spear300_evb.c         |    6 +++---
+ arch/arm/mach-spear3xx/spear310_evb.c         |    4 ++--
+ arch/arm/mach-spear3xx/spear320_evb.c         |    4 ++--
+ arch/arm/mach-spear3xx/spear3xx.c             |    4 ++--
+ 6 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 5707772..f67860c 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -13,6 +13,7 @@
+diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
+index 9186e5a..5320ab6 100644
+--- a/arch/arm/mach-spear3xx/include/mach/generic.h
++++ b/arch/arm/mach-spear3xx/include/mach/generic.h
+@@ -31,8 +31,8 @@
+ #define SPEAR_GPT0_CHAN1_IRQ	SPEAR3XX_IRQ_CPU_GPT1_2
  
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <asm/mach-types.h>
- #include <plat/clock.h>
- #include <mach/misc_regs.h>
+ /* Add spear3xx family device structure declarations here */
+-extern struct amba_device gpio_device;
+-extern struct amba_device uart_device;
++extern struct amba_device spear3xx_gpio_device;
++extern struct amba_device spear3xx_uart_device;
+ extern struct sys_timer spear3xx_timer;
  
-@@ -688,56 +689,71 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "adc",		.clk = &adc_clk},
- 	{ .dev_id = "ssp-pl022.0",	.clk = &ssp0_clk},
- 	{ .dev_id = "gpio",		.clk = &gpio_clk},
--#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--	{ .dev_id = "physmap-flash",	.clk = &emi_clk},
--#endif
--#if defined(CONFIG_MACH_SPEAR300) || defined(CONFIG_MACH_SPEAR310) || \
--	defined(CONFIG_MACH_SPEAR320)
--	{ .con_id = "fsmc",		.clk = &fsmc_clk},
--#endif
--
--/* common clocks to spear310 and spear320 */
--#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
--	{ .dev_id = "uart1",		.clk = &uart1_clk},
--	{ .dev_id = "uart2",		.clk = &uart2_clk},
--#endif
--
--	/* common clock to spear300 and spear320 */
--#if defined(CONFIG_MACH_SPEAR300) || defined(CONFIG_MACH_SPEAR320)
--	{ .dev_id = "clcd",		.clk = &clcd_clk},
--	{ .dev_id = "sdhci",		.clk = &sdhci_clk},
--#endif /* CONFIG_MACH_SPEAR300 || CONFIG_MACH_SPEAR320 */
-+};
- 
--	/* spear300 machine specific clock structures */
-+/* array of all spear 300 clock lookups */
+ /* Add spear3xx family function declarations here */
+@@ -99,7 +99,7 @@ extern struct pmx_dev spear3xx_pmx_plgpio_45_46_49_50;
+ /* spear300 declarations */
  #ifdef CONFIG_MACH_SPEAR300
-+static struct clk_lookup spear300_clk_lookups[] = {
-+	{ .dev_id = "clcd",		.clk = &clcd_clk},
-+	{ .con_id = "fsmc",		.clk = &fsmc_clk},
- 	{ .dev_id = "gpio1",		.clk = &gpio1_clk},
- 	{ .dev_id = "keyboard",		.clk = &kbd_clk},
-+	{ .dev_id = "sdhci",		.clk = &sdhci_clk},
-+};
- #endif
+ /* Add spear300 machine device structure declarations here */
+-extern struct amba_device gpio1_device;
++extern struct amba_device spear300_gpio1_device;
  
--	/* spear310 machine specific clock structures */
-+/* array of all spear 310 clock lookups */
- #ifdef CONFIG_MACH_SPEAR310
-+static struct clk_lookup spear310_clk_lookups[] = {
-+	{ .con_id = "fsmc",		.clk = &fsmc_clk},
-+	{ .con_id = "emi",		.clk = &emi_clk},
-+	{ .dev_id = "uart1",		.clk = &uart1_clk},
-+	{ .dev_id = "uart2",		.clk = &uart2_clk},
- 	{ .dev_id = "uart3",		.clk = &uart3_clk},
- 	{ .dev_id = "uart4",		.clk = &uart4_clk},
- 	{ .dev_id = "uart5",		.clk = &uart5_clk},
--
-+};
- #endif
--	/* spear320 machine specific clock structures */
-+
-+/* array of all spear 320 clock lookups */
- #ifdef CONFIG_MACH_SPEAR320
-+static struct clk_lookup spear320_clk_lookups[] = {
-+	{ .dev_id = "clcd",		.clk = &clcd_clk},
-+	{ .con_id = "fsmc",		.clk = &fsmc_clk},
-+	{ .dev_id = "i2c_designware.1",	.clk = &i2c1_clk},
-+	{ .con_id = "emi",		.clk = &emi_clk},
-+	{ .dev_id = "pwm",		.clk = &pwm_clk},
-+	{ .dev_id = "sdhci",		.clk = &sdhci_clk},
- 	{ .dev_id = "c_can_platform.0",	.clk = &can0_clk},
- 	{ .dev_id = "c_can_platform.1",	.clk = &can1_clk},
--	{ .dev_id = "i2c_designware.1",	.clk = &i2c1_clk},
- 	{ .dev_id = "ssp-pl022.1",	.clk = &ssp1_clk},
- 	{ .dev_id = "ssp-pl022.2",	.clk = &ssp2_clk},
--	{ .dev_id = "pwm",		.clk = &pwm_clk},
--#endif
-+	{ .dev_id = "uart1",		.clk = &uart1_clk},
-+	{ .dev_id = "uart2",		.clk = &uart2_clk},
+ /* pad mux modes */
+ extern struct pmx_mode spear300_nand_mode;
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 2618181..89999bf 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -582,7 +582,7 @@ static struct pl061_platform_data gpio1_plat_data = {
+ 	.irq_base	= SPEAR300_GPIO1_INT_BASE,
  };
-+#endif
  
- void __init spear3xx_clk_init(void)
- {
--	int i;
-+	int i, cnt;
-+	struct clk_lookup *lookups;
-+
-+	if (machine_is_spear300()) {
-+		cnt = ARRAY_SIZE(spear300_clk_lookups);
-+		lookups = spear300_clk_lookups;
-+	} else if (machine_is_spear310()) {
-+		cnt = ARRAY_SIZE(spear310_clk_lookups);
-+		lookups = spear310_clk_lookups;
-+	} else {
-+		cnt = ARRAY_SIZE(spear320_clk_lookups);
-+		lookups = spear320_clk_lookups;
-+	}
+-struct amba_device gpio1_device = {
++struct amba_device spear300_gpio1_device = {
+ 	.dev = {
+ 		.init_name = "gpio1",
+ 		.platform_data = &gpio1_plat_data,
+diff --git a/arch/arm/mach-spear3xx/spear300_evb.c b/arch/arm/mach-spear3xx/spear300_evb.c
+index 405ae09..69006f6 100644
+--- a/arch/arm/mach-spear3xx/spear300_evb.c
++++ b/arch/arm/mach-spear3xx/spear300_evb.c
+@@ -34,11 +34,11 @@ static struct pmx_dev *pmx_devs[] = {
  
- 	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
- 		clk_register(&spear_clk_lookups[i]);
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&gpio_device,
+-	&uart_device,
++	&spear3xx_gpio_device,
++	&spear3xx_uart_device,
  
-+	for (i = 0; i < cnt; i++)
-+		clk_register(&lookups[i]);
-+
- 	clk_init();
- }
+ 	/* spear300 specific devices */
+-	&gpio1_device,
++	&spear300_gpio1_device,
+ };
+ 
+ static struct platform_device *plat_devs[] __initdata = {
+diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
+index 9d4aadb..c8684ce 100644
+--- a/arch/arm/mach-spear3xx/spear310_evb.c
++++ b/arch/arm/mach-spear3xx/spear310_evb.c
+@@ -42,8 +42,8 @@ static struct pmx_dev *pmx_devs[] = {
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&gpio_device,
+-	&uart_device,
++	&spear3xx_gpio_device,
++	&spear3xx_uart_device,
+ 
+ 	/* spear310 specific devices */
+ };
+diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
+index 7e5f17f..a12b353 100644
+--- a/arch/arm/mach-spear3xx/spear320_evb.c
++++ b/arch/arm/mach-spear3xx/spear320_evb.c
+@@ -39,8 +39,8 @@ static struct pmx_dev *pmx_devs[] = {
+ 
+ static struct amba_device *amba_devs[] __initdata = {
+ 	/* spear3xx specific devices */
+-	&gpio_device,
+-	&uart_device,
++	&spear3xx_gpio_device,
++	&spear3xx_uart_device,
+ 
+ 	/* spear320 specific devices */
+ };
+diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+index 64dac69..c32a186 100644
+--- a/arch/arm/mach-spear3xx/spear3xx.c
++++ b/arch/arm/mach-spear3xx/spear3xx.c
+@@ -28,7 +28,7 @@ static struct pl061_platform_data gpio_plat_data = {
+ 	.irq_base	= SPEAR3XX_GPIO_INT_BASE,
+ };
+ 
+-struct amba_device gpio_device = {
++struct amba_device spear3xx_gpio_device = {
+ 	.dev = {
+ 		.init_name = "gpio",
+ 		.platform_data = &gpio_plat_data,
+@@ -42,7 +42,7 @@ struct amba_device gpio_device = {
+ };
+ 
+ /* uart device registration */
+-struct amba_device uart_device = {
++struct amba_device spear3xx_uart_device = {
+ 	.dev = {
+ 		.init_name = "uart",
+ 	},
 -- 
 1.7.2.2
