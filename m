@@ -1,133 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 1 Mar 2011 19:06:46 +0530
-Subject: [PATCH 3/3] arm: omap4: support pmu
-In-Reply-To: <1298985434-3009-4-git-send-email-tom.leiming@gmail.com>
-References: <1298985434-3009-1-git-send-email-tom.leiming@gmail.com>
-	<1298985434-3009-4-git-send-email-tom.leiming@gmail.com>
-Message-ID: <98808a1e9a0e0409013a83a66c3847e7@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 1 Mar 2011 14:39:50 +0100
+Subject: [PATCH] mach-ux500: activate fix for errata 753970
+Message-ID: <1298986790-25548-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of tom.leiming at gmail.com
-> Sent: Tuesday, March 01, 2011 6:47 PM
-> To: linux at arm.linux.org.uk
-> Cc: linux-arm-kernel at lists.infradead.org; Ming Lei; Woodruff
-> Richard; Tony Lindgren; linux-omap at vger.kernel.org
-> Subject: [PATCH 3/3] arm: omap4: support pmu
->
-> From: Ming Lei <tom.leiming@gmail.com>
->
-> This patch supports pmu irq routed from CTI, so
-> make pmu/perf working on OMAP4.
->
-> The idea is from Woodruff Richard in the disscussion
-> "Oprofile on Pandaboard / Omap4" of pandaboard at googlegroups.com.
->
-> Cc: Woodruff Richard <r-woodruff2@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
+This applies errata fix 753970 for all ux500 platforms. All
+current ASICs suffer from this. If the problem is resolved in
+later ASICs, the errata selection can be pushed down to other
+Kconfig options.
 
-Thanks Mein Lei for this.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
->  arch/arm/mach-omap2/devices.c |   54
-> ++++++++++++++++++++++++++++++++++++++++-
->  1 files changed, 53 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-
-> omap2/devices.c
-> index 71f099b..54e9705 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -34,6 +34,7 @@
->
->  #include "mux.h"
->  #include "control.h"
-> +#include "dbg44xx.h"
->
->  #if defined(CONFIG_VIDEO_OMAP2) ||
-> defined(CONFIG_VIDEO_OMAP2_MODULE)
->
-> @@ -347,19 +348,70 @@ static struct resource omap3_pmu_resource = {
->  	.flags	= IORESOURCE_IRQ,
->  };
->
-> +static struct resource omap4_pmu_resource[] = {
-> +	{
-> +	.start	= OMAP44XX_IRQ_CTI0,
-> +	.end	= OMAP44XX_IRQ_CTI0,
-> +	.flags	= IORESOURCE_IRQ,
-> +	},
-> +	{
-> +	.start	= OMAP44XX_IRQ_CTI1,
-> +	.end	= OMAP44XX_IRQ_CTI1,
-> +	.flags	= IORESOURCE_IRQ,
-> +	}
-> +};
-> +
->  static struct platform_device omap_pmu_device = {
->  	.name		= "arm-pmu",
->  	.id		= ARM_PMU_DEVICE_CPU,
->  	.num_resources	= 1,
->  };
->
-> +struct pmu_platform_data omap4_pmu_data;
-> +
-> +static void omap4_configure_pmu_irq(void)
-> +{
-> +	void *base0;
-> +	void *base1;
-> +
-> +	base0 = ioremap(OMAP4430_CTI0_BASE, 4096);
-> +	base1 = ioremap(OMAP4430_CTI1_BASE, 4096);
-> +	if (!base0 && !base1) {
-> +		pr_err("ioremap for omap4 CTI failed\n");
-> +		return;
-> +	}
-> +
-> +	/*configure CTI0 for pmu irq routing*/
-> +	cti_init(&omap4_pmu_data.cti[0], base0,
-> +			OMAP44XX_IRQ_CTI0, 6);
-> +	cti_unlock(&omap4_pmu_data.cti[0]);
-> +	cti_map_trigger(&omap4_pmu_data.cti[0],
-> +			1, 6, 2);
-> +
-> +	/*configure CTI1 for pmu irq routing*/
-> +	cti_init(&omap4_pmu_data.cti[1], base1,
-> +			OMAP44XX_IRQ_CTI1, 6);
-> +	cti_unlock(&omap4_pmu_data.cti[1]);
-> +	cti_map_trigger(&omap4_pmu_data.cti[1],
-> +			1, 6, 3);
-> +
-> +	omap4_pmu_data.cti_cnt = 2;
-> +	omap4_pmu_data.use_cti_irq = 1;
-> +}
-> +
->  static void omap_init_pmu(void)
->  {
->  	if (cpu_is_omap24xx())
->  		omap_pmu_device.resource = &omap2_pmu_resource;
->  	else if (cpu_is_omap34xx())
->  		omap_pmu_device.resource = &omap3_pmu_resource;
-> -	else
-> +	else if (cpu_is_omap44xx()) {
-> +		omap_pmu_device.resource = omap4_pmu_resource;
-> +		omap_pmu_device.num_resources = 2;
-> +		omap_pmu_device.dev.platform_data = &omap4_pmu_data;
-> +
-> +		omap4_configure_pmu_irq();
-> +	} else
->  		return;
->
->  	platform_device_register(&omap_pmu_device);
-> --
-> 1.7.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-
-> omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 247caa3..203b986 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -6,6 +6,7 @@ config UX500_SOC_COMMON
+ 	select ARM_GIC
+ 	select HAS_MTU
+ 	select NOMADIK_GPIO
++	select ARM_ERRATA_753970
+ 
+ menu "Ux500 SoC"
+ 
+-- 
+1.7.3.2
