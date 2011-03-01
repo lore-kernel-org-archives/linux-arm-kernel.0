@@ -1,29 +1,38 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Tue, 1 Mar 2011 23:22:29 +0100
-Subject: [PATCH v7 1/1] PRUSS UIO driver support
-In-Reply-To: <alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
-References: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
-	<1299014895-2022-2-git-send-email-pratheesh@ti.com>
-	<alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
-Message-ID: <20110301222229.GE20497@local>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 01 Mar 2011 14:48:45 -0800
+Subject: [GIT PULL] omap fixes for v2.6.38-rc6
+In-Reply-To: <alpine.DEB.1.10.1103011931380.27610@esdhcp041196.research.nokia.com>
+	(Aaro Koskinen's message of "Tue, 1 Mar 2011 19:39:01 +0200 (EET)")
+References: <20110228194151.GJ20560@atomide.com>
+	<alpine.DEB.1.10.1103011931380.27610@esdhcp041196.research.nokia.com>
+Message-ID: <87aahefodu.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 10:45:25PM +0100, Thomas Gleixner wrote:
-> 
-> > +
-> > +	spin_lock_init(&lock);
-> 
-> Sigh. DEFINE_SPINLOCK(lock); already initializes the lock.
-> 
-> It's not the purpose of a review to tell you what you need to change
-> mechanically. Reviewers hint to a correct solution and you are
-> supposed to lookup what that solution means and act accordingly. If
-> you do not understand the hint or its implications please ask _before_
-> sending a new patch set.
+Aaro Koskinen <aaro.koskinen@nokia.com> writes:
 
-Correct. But I'm to blame here, too, since I suggested the wrong solution.
-Sorry for that, Gangadhar!
+> Hi,
+>
+> On Mon, 28 Feb 2011, Tony Lindgren wrote:
+>> Please pull omap fixes from:
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+>>
+>> This contains one more timer regression fix, a DPLL rate fix,
+>> and a mailbox NULL pointer fix that would be good to get
+>> in for 2.6.38. The series also removes world-writable flag for
+>> some debugfs entries.
+>>
+>> Other than I believe that's it for omap fixes for v2.6.38.
+>
+> I wonder what happened to this patch:
+>
+> 	http://marc.info/?l=linux-omap&m=129772313519005&w=2
+>
 
-Thanks,
-Hans
+I have it queued with some other PM fixes that I haven't (yet) pushed to
+Tony due to being on vacation.
+
+Will take care of that today or tomorrow at the latest.
+
+Kevin
