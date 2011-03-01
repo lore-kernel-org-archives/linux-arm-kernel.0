@@ -1,31 +1,40 @@
 From: kheitke@codeaurora.org (Kenneth Heitke)
-Date: Mon, 28 Feb 2011 18:11:29 -0700
-Subject: [RFC PATCH 2/5] RFC: msm: sps: BAM-DMA driver
+Date: Mon, 28 Feb 2011 18:11:28 -0700
+Subject: [RFC PATCH 1/5] RFC: msm: sps: Bus Access Manager (BAM) Hardware
+	driver
 In-Reply-To: <1298941892-25173-1-git-send-email-kheitke@codeaurora.org>
 References: <1298941892-25173-1-git-send-email-kheitke@codeaurora.org>
-Message-ID: <1298941892-25173-3-git-send-email-kheitke@codeaurora.org>
+Message-ID: <1298941892-25173-2-git-send-email-kheitke@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Amir Samuelovi <amirs@codeaurora.org>
 
-The BAM-DMA is a Bus Access Manager (BAM) hardware block specifically
-for data transfers from memory to memory rather than being associated
-with a peripheral core (like other BAMs).
+A primary component of the Smart Peripheral Subsytem (SPS) is the Bus
+Access Manager (BAM).  The BAM serves as a DMA engine for a peripheral
+core.  A BAM can provide multiple DMA channels, referred to as "pipes",
+which can perform DMA between other BAM pipes or to system memory under
+control of a host CPU.
+
+The BAM driver handles the following:
+- BAM and endpoint hardware configuration
+- BAM interrupt routing and dispatching
 
 Signed-off-by: Amir Samuelov <amirs@codeaurora.org>
 Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
 ---
- arch/arm/mach-msm/sps/sps_dma.c |  896 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 896 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-msm/sps/sps_dma.c
+ arch/arm/mach-msm/sps/bam.c |  588 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-msm/sps/bam.h |  375 +++++++++++++++++++++++++++
+ 2 files changed, 963 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-msm/sps/bam.c
+ create mode 100644 arch/arm/mach-msm/sps/bam.h
 
-diff --git a/arch/arm/mach-msm/sps/sps_dma.c b/arch/arm/mach-msm/sps/sps_dma.c
+diff --git a/arch/arm/mach-msm/sps/bam.c b/arch/arm/mach-msm/sps/bam.c
 new file mode 100644
-index 0000000..9179ed9
+index 0000000..be6b038
 --- /dev/null
-+++ b/arch/arm/mach-msm/sps/sps_dma.c
-@@ -0,0 +1,896 @@
++++ b/arch/arm/mach-msm/sps/bam.c
+@@ -0,0 +1,588 @@
 +/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -38,38 +47,215 @@ index 0000000..9179ed9
 + * GNU General Public License for more details.
 + */
 +
-+/* BAM-DMA Manager. */
++/* Bus-Access-Manager (BAM) Hardware manager. */
 +
-+#ifdef CONFIG_SPS_SUPPORT_BAMDMA
++#include <linux/types.h>	/* u32 */
++#include <linux/kernel.h>	/* pr_info() */
++#include <linux/io.h>		/* ioread32() */
++#include <linux/bitops.h>	/* find_first_bit() */
++#include <linux/errno.h>	/* ENODEV */
 +
-+#include <linux/memory.h>	/* memset */
-+
-+#include "spsi.h"
 +#include "bam.h"
-+#include "sps_bam.h"		/* bam_dma_thresh_dma */
-+#include "sps_core.h"		/* sps_h2bam() */
 +
 +/**
-+ * registers
++ *  Valid BAM Hardware version.
++ *
 + */
-+
-+#define DMA_ENBL			(0x00000000)
-+#define DMA_CHNL_CONFIG(n)		(0x00000004 + 4 * (n))
-+#define DMA_CONFIG			(0x00000040)
++#define BAM_MIN_VERSION 2
++#define BAM_MAX_VERSION 2
 +
 +/**
-+ * masks
++ *  BAM Hardware registers.
++ *
 + */
++#define CTRL                        (0xf80)
++#define REVISION                    (0xf84)
++#define NUM_PIPES                   (0xfbc)
++#define DESC_CNT_TRSHLD             (0xf88)
++#define IRQ_SRCS                    (0xf8c)
++#define IRQ_SRCS_MSK                (0xf90)
++#define IRQ_SRCS_UNMASKED           (0xfb0)
++#define IRQ_STTS                    (0xf94)
++#define IRQ_CLR                     (0xf98)
++#define IRQ_EN                      (0xf9c)
++#define IRQ_SIC_SEL                 (0xfa0)
++#define AHB_MASTER_ERR_CTRLS        (0xfa4)
++#define AHB_MASTER_ERR_ADDR         (0xfa8)
++#define AHB_MASTER_ERR_DATA         (0xfac)
++#define IRQ_DEST                    (0xfb4)
++#define PERIPH_IRQ_DEST             (0xfb8)
++#define TEST_BUS_REG                (0xff8)
++#define CNFG_BITS                   (0xffc)
 +
-+/* DMA_CHNL_confign */
-+#define DMA_CHNL_HALT_DONE		0x10000
-+#define DMA_CHNL_HALT			0x1000
-+#define DMA_CHNL_ENABLE                 0x100
-+#define DMA_CHNL_ACT_THRESH             0x30
-+#define DMA_CHNL_WEIGHT                 0x7
++#define P_CTRL(n)                  (0x0000 + 128 * (n))
++#define P_RST(n)                   (0x0004 + 128 * (n))
++#define P_HALT(n)                  (0x0008 + 128 * (n))
++#define P_IRQ_STTS(n)              (0x0010 + 128 * (n))
++#define P_IRQ_CLR(n)               (0x0014 + 128 * (n))
++#define P_IRQ_EN(n)                (0x0018 + 128 * (n))
++#define P_TIMER(n)                 (0x001c + 128 * (n))
++#define P_TIMER_CTRL(n)            (0x0020 + 128 * (n))
++#define P_EVNT_DEST_ADDR(n)        (0x102c + 64 * (n))
++#define P_EVNT_REG(n)              (0x1018 + 64 * (n))
++#define P_SW_OFSTS(n)              (0x1000 + 64 * (n))
++#define P_DATA_FIFO_ADDR(n)        (0x1024 + 64 * (n))
++#define P_DESC_FIFO_ADDR(n)        (0x101c + 64 * (n))
++#define P_EVNT_GEN_TRSHLD(n)       (0x1028 + 64 * (n))
++#define P_FIFO_SIZES(n)            (0x1020 + 64 * (n))
++#define P_IRQ_DEST_ADDR(n)         (0x103c + 64 * (n))
++#define P_RETR_CNTXT(n)           (0x1034 + 64 * (n))
++#define P_SI_CNTXT(n)             (0x1038 + 64 * (n))
++#define P_AU_PSM_CNTXT_1(n)       (0x1004 + 64 * (n))
++#define P_PSM_CNTXT_2(n)          (0x1008 + 64 * (n))
++#define P_PSM_CNTXT_3(n)          (0x100c + 64 * (n))
++#define P_PSM_CNTXT_4(n)          (0x1010 + 64 * (n))
++#define P_PSM_CNTXT_5(n)          (0x1014 + 64 * (n))
 +
-+/* DMA_CONFIG */
-+#define TESTBUS_SELECT                  0x3
++/**
++ *  BAM Hardware registers bitmask.
++ *  format: <register>_<field>
++ *
++ */
++/* CTRL */
++#define BAM_CACHED_DESC_STORE                   0x8000
++#define BAM_DESC_CACHE_SEL                      0x6000
++#define BAM_PERIPH_IRQ_SIC_SEL                  0x1000
++#define BAM_TESTBUS_SEL                          0xfe0
++#define BAM_EN_ACCUM                              0x10
++#define BAM_EN                                     0x2
++#define BAM_SW_RST                                 0x1
++
++/* IRQ_SRCS */
++#define BAM_IRQ                         0x80000000
++#define P_IRQ                           0x7fffffff
++
++#define IRQ_STTS_BAM_ERROR_IRQ                          0x4
++#define IRQ_STTS_BAM_HRESP_ERR_IRQ                      0x2
++#define IRQ_CLR_BAM_ERROR_CLR                           0x4
++#define IRQ_CLR_BAM_HRESP_ERR_CLR                       0x2
++#define IRQ_EN_BAM_ERROR_EN                             0x4
++#define IRQ_EN_BAM_HRESP_ERR_EN                         0x2
++#define IRQ_SIC_SEL_BAM_IRQ_SIC_SEL              0x80000000
++#define IRQ_SIC_SEL_P_IRQ_SIC_SEL                0x7fffffff
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_DIRECT_MODE    0x10000
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_HCID            0xf000
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_HPROT            0xf00
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_HBURST            0xe0
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_HSIZE             0x18
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_HWRITE             0x4
++#define AHB_MASTER_ERR_CTRLS_BAM_ERR_HTRANS             0x3
++#define CNFG_BITS_BAM_FULL_PIPE                       0x800
++#define CNFG_BITS_BAM_PIPE_CNFG                         0x4
++
++/* P_ctrln */
++#define P_SYS_MODE                             0x20
++#define P_SYS_STRM                             0x10
++#define P_DIRECTION                             0x8
++#define P_EN                                    0x2
++
++#define P_RST_P_SW_RST                                 0x1
++
++#define P_HALT_P_PROD_HALTED                           0x2
++#define P_HALT_P_HALT                                  0x1
++
++#define P_IRQ_STTS_P_TRNSFR_END_IRQ                   0x20
++#define P_IRQ_STTS_P_ERR_IRQ                          0x10
++#define P_IRQ_STTS_P_OUT_OF_DESC_IRQ                   0x8
++#define P_IRQ_STTS_P_WAKE_IRQ                          0x4
++#define P_IRQ_STTS_P_TIMER_IRQ                         0x2
++#define P_IRQ_STTS_P_PRCSD_DESC_IRQ                    0x1
++
++#define P_IRQ_CLR_P_TRNSFR_END_CLR                    0x20
++#define P_IRQ_CLR_P_ERR_CLR                           0x10
++#define P_IRQ_CLR_P_OUT_OF_DESC_CLR                    0x8
++#define P_IRQ_CLR_P_WAKE_CLR                           0x4
++#define P_IRQ_CLR_P_TIMER_CLR                          0x2
++#define P_IRQ_CLR_P_PRCSD_DESC_CLR                     0x1
++
++#define P_IRQ_EN_P_TRNSFR_END_EN                      0x20
++#define P_IRQ_EN_P_ERR_EN                             0x10
++#define P_IRQ_EN_P_OUT_OF_DESC_EN                      0x8
++#define P_IRQ_EN_P_WAKE_EN                             0x4
++#define P_IRQ_EN_P_TIMER_EN                            0x2
++#define P_IRQ_EN_P_PRCSD_DESC_EN                       0x1
++
++#define P_TIMER_P_TIMER                             0xffff
++
++/* P_TIMER_ctrln */
++#define P_TIMER_RST                0x80000000
++#define P_TIMER_RUN                0x40000000
++#define P_TIMER_MODE               0x20000000
++#define P_TIMER_TRSHLD                 0xffff
++
++/* P_EVNT_regn */
++#define P_BYTES_CONSUMED             0xffff0000
++#define P_DESC_FIFO_PEER_OFST            0xffff
++
++/* P_SW_ofstsn */
++#define SW_OFST_IN_DESC              0xffff0000
++#define SW_DESC_OFST                     0xffff
++
++#define P_EVNT_GEN_TRSHLD_P_TRSHLD                  0xffff
++
++/* P_FIFO_sizesn */
++#define P_DATA_FIFO_SIZE           0xffff0000
++#define P_DESC_FIFO_SIZE               0xffff
++
++#define P_RETR_CNTXT_RETR_DESC_OFST            0xffff0000
++#define P_RETR_CNTXT_RETR_OFST_IN_DESC             0xffff
++#define P_SI_CNTXT_SI_DESC_OFST                    0xffff
++#define P_AU_PSM_CNTXT_1_AU_PSM_ACCUMED        0xffff0000
++#define P_AU_PSM_CNTXT_1_AU_ACKED                  0xffff
++#define P_PSM_CNTXT_2_PSM_DESC_VALID           0x80000000
++#define P_PSM_CNTXT_2_PSM_DESC_IRQ             0x40000000
++#define P_PSM_CNTXT_2_PSM_DESC_IRQ_DONE        0x20000000
++#define P_PSM_CNTXT_2_PSM_GENERAL_BITS         0x1e000000
++#define P_PSM_CNTXT_2_PSM_CONS_STATE            0x1c00000
++#define P_PSM_CNTXT_2_PSM_PROD_SYS_STATE         0x380000
++#define P_PSM_CNTXT_2_PSM_PROD_B2B_STATE          0x70000
++#define P_PSM_CNTXT_2_PSM_DESC_SIZE                0xffff
++#define P_PSM_CNTXT_4_PSM_DESC_OFST            0xffff0000
++#define P_PSM_CNTXT_4_PSM_SAVED_ACCUMED_SIZE       0xffff
++#define P_PSM_CNTXT_5_PSM_BLOCK_BYTE_CNT       0xffff0000
++#define P_PSM_CNTXT_5_PSM_OFST_IN_DESC             0xffff
++
++#define BAM_ERROR   (-1)
++
++/**
++ *
++ * Read register with debug info.
++ *
++ * @base - bam base virtual address.
++ * @offset - register offset.
++ *
++ * @return u32
++ */
++static inline u32 bam_read_reg(void *base, u32 offset)
++{
++	u32 val = ioread32(base + offset);
++	pr_debug("bam: read reg 0x%x r_val 0x%x.\n", offset, val);
++	return val;
++}
++
++/**
++ * Read register masked field with debug info.
++ *
++ * @base - bam base virtual address.
++ * @offset - register offset.
++ * @mask - register bitmask.
++ *
++ * @return u32
++ */
++static inline u32 bam_read_reg_field(void *base, u32 offset, const u32 mask)
++{
++	u32 shift = find_first_bit((void *)&mask, 32);
++	u32 val = ioread32(base + offset);
++	val &= mask;		/* clear other bits */
++	val >>= shift;
++	pr_debug("bam: read reg 0x%x mask 0x%x r_val 0x%x.\n",
++		offset, mask, val);
++	return val;
++}
 +
 +/**
 + *
@@ -80,10 +266,10 @@ index 0000000..9179ed9
 + * @val - value to write.
 + *
 + */
-+static inline void dma_write_reg(void *base, u32 offset, u32 val)
++static inline void bam_write_reg(void *base, u32 offset, u32 val)
 +{
 +	iowrite32(val, base + offset);
-+	SPS_DBG("bamdma: write reg 0x%x w_val 0x%x.", offset, val);
++	pr_debug("bam: write reg 0x%x w_val 0x%x.\n", offset, val);
 +}
 +
 +/**
@@ -95,7 +281,7 @@ index 0000000..9179ed9
 + * @val - value to write.
 + *
 + */
-+static inline void dma_write_reg_field(void *base, u32 offset,
++static inline void bam_write_reg_field(void *base, u32 offset,
 +				       const u32 mask, u32 val)
 +{
 +	u32 shift = find_first_bit((void *)&mask, 32);
@@ -104,824 +290,720 @@ index 0000000..9179ed9
 +	tmp &= ~mask;		/* clear written bits */
 +	val = tmp | (val << shift);
 +	iowrite32(val, base + offset);
-+	SPS_DBG("bamdma: write reg 0x%x w_val 0x%x.", offset, val);
-+}
-+
-+/* Round max number of pipes to nearest multiple of 2 */
-+#define DMA_MAX_PIPES         ((BAM_MAX_PIPES / 2) * 2)
-+
-+/* Maximum number of BAM-DMAs supported */
-+#define MAX_BAM_DMA_DEVICES   1
-+
-+/* Maximum number of BAMs that will be registered */
-+#define MAX_BAM_DMA_BAMS      1
-+
-+/* Pipe enable check values */
-+#define DMA_PIPES_STATE_DIFF     0
-+#define DMA_PIPES_BOTH_DISABLED  1
-+#define DMA_PIPES_BOTH_ENABLED   2
-+
-+/* Even pipe is tx/dest/input/write, odd pipe is rx/src/output/read */
-+#define DMA_PIPE_IS_DEST(p)   (((p) & 1) == 0)
-+#define DMA_PIPE_IS_SRC(p)    (((p) & 1) != 0)
-+
-+/* BAM DMA pipe state */
-+enum bamdma_pipe_state {
-+	PIPE_INACTIVE = 0,
-+	PIPE_ACTIVE
-+};
-+
-+/* BAM DMA channel state */
-+enum bamdma_chan_state {
-+	DMA_CHAN_STATE_FREE = 0,
-+	DMA_CHAN_STATE_ALLOC_EXT,	/* Client allocation */
-+	DMA_CHAN_STATE_ALLOC_INT	/* Internal (resource mgr) allocation */
-+};
-+
-+struct bamdma_chan {
-+	/* Allocation state */
-+	enum bamdma_chan_state state;
-+
-+	/* BAM DMA channel configuration parameters */
-+	u32 threshold;
-+	enum sps_dma_priority priority;
-+
-+	/* HWIO channel configuration parameters */
-+	enum bam_dma_thresh_dma thresh;
-+	enum bam_dma_weight_dma weight;
-+
-+};
-+
-+/* BAM DMA device state */
-+struct bamdma_device {
-+	/* BAM-DMA device state */
-+	int enabled;
-+	int local;
-+
-+	/* BAM device state */
-+	struct sps_bam *bam;
-+
-+	/* BAM handle, for deregistration */
-+	u32 h;
-+
-+	/* BAM DMA device virtual mapping */
-+	void *virt_addr;
-+	int virtual_mapped;
-+	u32 phys_addr;
-+	void *hwio;
-+
-+	/* BAM DMA pipe/channel state */
-+	u32 num_pipes;
-+	enum bamdma_pipe_state pipes[DMA_MAX_PIPES];
-+	struct bamdma_chan chans[DMA_MAX_PIPES / 2];
-+
-+};
-+
-+/* BAM-DMA devices */
-+static struct bamdma_device bam_dma_dev[MAX_BAM_DMA_DEVICES];
-+static struct mutex bam_dma_lock;
-+
-+/*
-+ * The BAM DMA module registers all BAMs in the BSP properties, but only
-+ * uses the first BAM-DMA device for allocations.  References to the others
-+ * are stored in the following data array.
-+ */
-+static int num_bams;
-+static u32 bam_handles[MAX_BAM_DMA_BAMS];
-+
-+/**
-+ * Find BAM-DMA device
-+ *
-+ * This function finds the BAM-DMA device associated with the BAM handle.
-+ *
-+ * @h - BAM handle
-+ *
-+ * @return - pointer to BAM-DMA device, or NULL on error
-+ *
-+ */
-+static struct bamdma_device *sps_dma_find_device(u32 h)
-+{
-+	return &bam_dma_dev[0];
++	pr_debug("bam: write reg 0x%x w_val 0x%x.\n", offset, val);
 +}
 +
 +/**
-+ * BAM DMA device enable
-+ *
-+ * This function enables a BAM DMA device and the associated BAM.
-+ *
-+ * @dev - pointer to BAM DMA device context
-+ *
-+ * @return 0 on success, negative value on error
++ * Initialize a BAM device
 + *
 + */
-+static int sps_dma_device_enable(struct bamdma_device *dev)
++int bam_init(void *base, u32 ee,
++		u16 summing_threshold,
++		u32 irq_mask, u32 *version, u32 *num_pipes)
 +{
-+	if (dev->enabled)
-+		return 0;
++	/* disable bit#11 because of HW bug */
++	u32 cfg_bits = 0xffffffff & ~(1 << 11);
++	u32 ver = 0;
 +
-+	/*
-+	 *  If the BAM-DMA device is locally controlled then enable BAM-DMA
-+	 *  device
-+	 */
-+	if (dev->local)
-+		dma_write_reg(dev->virt_addr, DMA_ENBL, 1);
++	ver = bam_read_reg(base, REVISION);
 +
-+	/* Enable BAM device */
-+	if (sps_bam_enable(dev->bam)) {
-+		SPS_ERR("Failed to enable BAM DMA's BAM: %x", dev->phys_addr);
-+		return SPS_ERROR;
++	if ((ver < BAM_MIN_VERSION) || (ver > BAM_MAX_VERSION)) {
++		pr_err("bam:Invalid BAM version 0x%x.\n", ver);
++		return -ENODEV;
 +	}
 +
-+	dev->enabled = true;
++	if (summing_threshold == 0) {
++		summing_threshold = 4;
++		pr_err("bam:summing_threshold is zero , use default 4.\n");
++	}
++
++	bam_write_reg_field(base, CTRL, BAM_SW_RST, 1);
++	/* No delay needed */
++	bam_write_reg_field(base, CTRL, BAM_SW_RST, 0);
++
++	bam_write_reg_field(base, CTRL, BAM_EN, 1);
++
++	bam_write_reg(base, DESC_CNT_TRSHLD, summing_threshold);
++
++	bam_write_reg(base, CNFG_BITS, cfg_bits);
++
++	/*
++	 *  Enable Global BAM Interrupt - for error reasons ,
++	 *  filter with mask.
++	 *  Note: Pipes interrupts are disabled until BAM_P_IRQ_enn is set
++	 */
++	bam_write_reg_field(base, IRQ_SRCS_MSK, BAM_IRQ, 1);
++
++	bam_write_reg(base, IRQ_EN, irq_mask);
++
++	*num_pipes = bam_read_reg(base, NUM_PIPES);
++	*version = ver;
 +
 +	return 0;
 +}
 +
 +/**
-+ * BAM DMA device enable
-+ *
-+ * This function initializes a BAM DMA device.
-+ *
-+ * @dev - pointer to BAM DMA device context
-+ *
-+ * @return 0 on success, negative value on error
++ * Verify that a BAM device is enabled and gathers the hardware
++ * configuration.
 + *
 + */
-+static int sps_dma_device_disable(struct bamdma_device *dev)
++int bam_check(void *base, u32 *version, u32 *num_pipes)
 +{
-+	u32 pipe_index;
++	u32 ver = 0;
 +
-+	if (!dev->enabled)
-+		return 0;
++	if (!bam_read_reg_field(base, CTRL, BAM_EN))
++		return -ENODEV;
 +
-+	/* Do not disable if channels active */
-+	for (pipe_index = 0; pipe_index < dev->num_pipes; pipe_index++) {
-+		if (dev->pipes[pipe_index] != PIPE_INACTIVE)
-+			break;
-+	}
-+
-+	if (pipe_index < dev->num_pipes) {
-+		SPS_ERR("Failed to disable BAM-DMA %x: channels are active",
-+			dev->phys_addr);
-+		return SPS_ERROR;
-+	}
-+
-+	dev->enabled = false;
-+
-+	/* Disable BAM device */
-+	if (sps_bam_disable(dev->bam)) {
-+		SPS_ERR("Failed to disable BAM-DMA %x BAM", dev->phys_addr);
-+		return SPS_ERROR;
-+	}
-+
-+	/* Is the BAM-DMA device locally controlled? */
-+	if (dev->local)
-+		/* Disable BAM-DMA device */
-+		dma_write_reg(dev->virt_addr, DMA_ENBL, 0);
-+
-+	return 0;
-+}
-+
-+/**
-+ * Initialize BAM DMA device
-+ *
-+ */
-+int sps_dma_device_init(u32 h)
-+{
-+	struct bamdma_device *dev;
-+	struct sps_bam_props *props;
-+	u32 chan;
-+	int result = SPS_ERROR;
-+
-+	mutex_lock(&bam_dma_lock);
-+
-+	/* Find a free BAM-DMA device slot */
-+	dev = NULL;
-+	if (bam_dma_dev[0].bam != NULL) {
-+		SPS_ERR("BAM-DMA BAM device already initialized.");
-+		goto exit_err;
-+	} else {
-+		dev = &bam_dma_dev[0];
-+	}
-+
-+	/* Record BAM */
-+	memset(dev, 0, sizeof(*dev));
-+	dev->h = h;
-+	dev->bam = sps_h2bam(h);
-+
-+	/* Map the BAM DMA device into virtual space, if necessary */
-+	props = &dev->bam->props;
-+	dev->phys_addr = props->periph_phys_addr;
-+	if (props->periph_virt_addr != NULL) {
-+		dev->virt_addr = props->periph_virt_addr;
-+		dev->virtual_mapped = false;
-+	} else {
-+		if (props->periph_virt_size == 0) {
-+			SPS_ERR("Unable to map BAM DMA IO memory: %x %x",
-+			 dev->phys_addr, props->periph_virt_size);
-+			goto exit_err;
-+		}
-+
-+		dev->virt_addr = ioremap(dev->phys_addr,
-+					  props->periph_virt_size);
-+		if (dev->virt_addr == NULL) {
-+			SPS_ERR("Unable to map BAM DMA IO memory: %x %x",
-+				dev->phys_addr, props->periph_virt_size);
-+			goto exit_err;
-+		}
-+		dev->virtual_mapped = true;
-+	}
-+	dev->hwio = (void *) dev->virt_addr;
-+
-+	/* Is the BAM-DMA device locally controlled? */
-+	if ((props->manage & SPS_BAM_MGR_DEVICE_REMOTE) == 0) {
-+		SPS_DBG("BAM-DMA is controlled locally: %x",
-+			dev->phys_addr);
-+		dev->local = true;
-+	} else {
-+		SPS_DBG("BAM-DMA is controlled remotely: %x",
-+			dev->phys_addr);
-+		dev->local = false;
-+	}
++	ver = bam_read_reg(base, REVISION);
 +
 +	/*
-+	 * Enable the BAM DMA and determine the number of pipes/channels.
-+	 * Leave the BAM-DMA enabled, since it is always a shared device.
++	 *  Discover the hardware version number and the number of pipes
++	 *  supported by this BAM
 +	 */
-+	if (sps_dma_device_enable(dev))
-+		goto exit_err;
-+
-+	dev->num_pipes = dev->bam->props.num_pipes;
-+
-+	/* Disable all channels */
-+	if (dev->local)
-+		for (chan = 0; chan < (dev->num_pipes / 2); chan++) {
-+			dma_write_reg_field(dev->virt_addr,
-+					    DMA_CHNL_CONFIG(chan),
-+					    DMA_CHNL_ENABLE, 0);
-+		}
-+
-+	result = 0;
-+exit_err:
-+	if (result) {
-+		if (dev != NULL) {
-+			if (dev->virtual_mapped)
-+				iounmap(dev->virt_addr);
-+
-+			dev->bam = NULL;
-+		}
-+	}
-+
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
-+}
-+
-+/**
-+ * De-initialize BAM DMA device
-+ *
-+ */
-+int sps_dma_device_de_init(u32 h)
-+{
-+	struct bamdma_device *dev;
-+	u32 pipe_index;
-+	u32 chan;
-+	int result = 0;
-+
-+	mutex_lock(&bam_dma_lock);
-+
-+	dev = sps_dma_find_device(h);
-+	if (dev == NULL) {
-+		SPS_ERR("BAM-DMA: not registered: %x", h);
-+		result = SPS_ERROR;
-+		goto exit_err;
-+	}
-+
-+	/* Check for channel leaks */
-+	for (chan = 0; chan < dev->num_pipes / 2; chan++) {
-+		if (dev->chans[chan].state != DMA_CHAN_STATE_FREE) {
-+			SPS_ERR("BAM-DMA: channel not free: %d", chan);
-+			result = SPS_ERROR;
-+			dev->chans[chan].state = DMA_CHAN_STATE_FREE;
-+		}
-+	}
-+	for (pipe_index = 0; pipe_index < dev->num_pipes; pipe_index++) {
-+		if (dev->pipes[pipe_index] != PIPE_INACTIVE) {
-+			SPS_ERR("BAM-DMA: pipe not inactive: %d", pipe_index);
-+			result = SPS_ERROR;
-+			dev->pipes[pipe_index] = PIPE_INACTIVE;
-+		}
-+	}
-+
-+	/* Disable BAM and BAM-DMA */
-+	if (sps_dma_device_disable(dev))
-+		result = SPS_ERROR;
-+
-+	dev->h = BAM_HANDLE_INVALID;
-+	dev->bam = NULL;
-+	if (dev->virtual_mapped)
-+		iounmap(dev->virt_addr);
-+
-+exit_err:
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
-+}
-+
-+/**
-+ * Initialize BAM DMA module
-+ *
-+ */
-+int sps_dma_init(const struct sps_bam_props *bam_props)
-+{
-+	struct sps_bam_props props;
-+	const struct sps_bam_props *bam_reg;
-+	u32 h;
-+
-+	/* Init local data */
-+	memset(&bam_dma_dev, 0, sizeof(bam_dma_dev));
-+	num_bams = 0;
-+	memset(bam_handles, 0, sizeof(bam_handles));
-+
-+	/* Create a mutex to control access to the BAM-DMA devices */
-+	mutex_init(&bam_dma_lock);
-+
-+	/* Are there any BAM DMA devices? */
-+	if (bam_props == NULL)
-+		return 0;
-+
-+	/*
-+	 * Registers all BAMs in the BSP properties, but only uses the first
-+	 * BAM-DMA device for allocations.
-+	 */
-+	if (bam_props->phys_addr) {
-+		/* Force multi-EE option for all BAM-DMAs */
-+		bam_reg = bam_props;
-+		if ((bam_props->options & SPS_BAM_OPT_BAMDMA) &&
-+		    (bam_props->manage & SPS_BAM_MGR_MULTI_EE) == 0) {
-+			SPS_DBG("Setting multi-EE options for BAM-DMA: %x",
-+				bam_props->phys_addr);
-+			props = *bam_props;
-+			props.manage |= SPS_BAM_MGR_MULTI_EE;
-+			bam_reg = &props;
-+		}
-+
-+		/* Register the BAM */
-+		if (sps_register_bam_device(bam_reg, &h)) {
-+			SPS_ERR("Failed to register BAM-DMA BAM device: "
-+				"phys 0x%0x", bam_props->phys_addr);
-+			return SPS_ERROR;
-+		}
-+
-+		/* Record the BAM so that it may be deregistered later */
-+		if (num_bams < MAX_BAM_DMA_BAMS) {
-+			bam_handles[num_bams] = h;
-+			num_bams++;
-+		} else {
-+			SPS_ERR("BAM-DMA: BAM limit exceeded: %d", num_bams);
-+			return SPS_ERROR;
-+		}
-+	} else {
-+		SPS_ERR("BAM-DMA phys_addr is zero.");
-+		return SPS_ERROR;
-+	}
-+
-+
-+	return 0;
-+}
-+
-+/**
-+ * De-initialize BAM DMA module
-+ *
-+ */
-+void sps_dma_de_init(void)
-+{
-+	int n;
-+
-+	/* De-initialize the BAM devices */
-+	for (n = 0; n < num_bams; n++)
-+		sps_deregister_bam_device(bam_handles[n]);
-+
-+	/* Clear local data */
-+	memset(&bam_dma_dev, 0, sizeof(bam_dma_dev));
-+	num_bams = 0;
-+	memset(bam_handles, 0, sizeof(bam_handles));
-+}
-+
-+/**
-+ * Allocate a BAM DMA channel
-+ *
-+ */
-+int sps_alloc_dma_chan(const struct sps_alloc_dma_chan *alloc,
-+		       struct sps_dma_chan *chan_info)
-+{
-+	struct bamdma_device *dev;
-+	struct bamdma_chan *chan;
-+	u32 pipe_index;
-+	enum bam_dma_thresh_dma thresh = (enum bam_dma_thresh_dma) 0;
-+	enum bam_dma_weight_dma weight = (enum bam_dma_weight_dma) 0;
-+	int result = SPS_ERROR;
-+
-+	if (alloc == NULL || chan_info == NULL) {
-+		SPS_ERR("sps_alloc_dma_chan. invalid parameters");
-+		return SPS_ERROR;
-+	}
-+
-+	/* Translate threshold and priority to hwio values */
-+	if (alloc->threshold != SPS_DMA_THRESHOLD_DEFAULT) {
-+		if (alloc->threshold >= 512)
-+			thresh = BAM_DMA_THRESH_512;
-+		else if (alloc->threshold >= 256)
-+			thresh = BAM_DMA_THRESH_256;
-+		else if (alloc->threshold >= 128)
-+			thresh = BAM_DMA_THRESH_128;
-+		else
-+			thresh = BAM_DMA_THRESH_64;
-+	}
-+
-+	weight = alloc->priority;
-+
-+	if (alloc->priority > BAM_DMA_WEIGHT_HIGH) {
-+		SPS_ERR("BAM-DMA: invalid priority: %x", alloc->priority);
-+		return SPS_ERROR;
-+	}
-+
-+	mutex_lock(&bam_dma_lock);
-+
-+	dev = sps_dma_find_device(alloc->dev);
-+	if (dev == NULL) {
-+		SPS_ERR("BAM-DMA: invalid BAM handle: %x", alloc->dev);
-+		goto exit_err;
-+	}
-+
-+	/* Search for a free set of pipes */
-+	for (pipe_index = 0, chan = dev->chans;
-+	      pipe_index < dev->num_pipes; pipe_index += 2, chan++) {
-+		if (chan->state == DMA_CHAN_STATE_FREE) {
-+			/* Just check pipes for safety */
-+			if (dev->pipes[pipe_index] != PIPE_INACTIVE ||
-+			    dev->pipes[pipe_index + 1] != PIPE_INACTIVE) {
-+				SPS_ERR("BAM-DMA: channel %d state error:%d %d",
-+					pipe_index / 2, dev->pipes[pipe_index],
-+				 dev->pipes[pipe_index + 1]);
-+				goto exit_err;
-+			}
-+			break; /* Found free pipe */
-+		}
-+	}
-+
-+	if (pipe_index >= dev->num_pipes) {
-+		SPS_ERR("BAM-DMA: no free channel. num_pipes = %d",
-+			dev->num_pipes);
-+		goto exit_err;
-+	}
-+
-+	chan->state = DMA_CHAN_STATE_ALLOC_EXT;
-+
-+	/* Store config values for use when pipes are activated */
-+	chan = &dev->chans[pipe_index / 2];
-+	chan->threshold = alloc->threshold;
-+	chan->thresh = thresh;
-+	chan->priority = alloc->priority;
-+	chan->weight = weight;
-+
-+	SPS_DBG("sps_alloc_dma_chan. pipe %d.\n", pipe_index);
-+
-+	/* Report allocated pipes to client */
-+	chan_info->dev = dev->h;
-+	/* Dest/input/write pipex */
-+	chan_info->dest_pipe_index = pipe_index;
-+	/* Source/output/read pipe */
-+	chan_info->src_pipe_index = pipe_index + 1;
-+
-+	result = 0;
-+exit_err:
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
-+}
-+EXPORT_SYMBOL(sps_alloc_dma_chan);
-+
-+/**
-+ * Free a BAM DMA channel
-+ *
-+ */
-+int sps_free_dma_chan(struct sps_dma_chan *chan)
-+{
-+	struct bamdma_device *dev;
-+	u32 pipe_index;
-+	int result = 0;
-+
-+	if (chan == NULL) {
-+		SPS_ERR("sps_free_dma_chan. chan is NULL");
-+		return SPS_ERROR;
-+	}
-+
-+	mutex_lock(&bam_dma_lock);
-+
-+	dev = sps_dma_find_device(chan->dev);
-+	if (dev == NULL) {
-+		SPS_ERR("BAM-DMA: invalid BAM handle: %x", chan->dev);
-+		result = SPS_ERROR;
-+		goto exit_err;
-+	}
-+
-+	/* Verify the pipe indices */
-+	pipe_index = chan->dest_pipe_index;
-+	if (pipe_index >= dev->num_pipes || ((pipe_index & 1)) ||
-+	    (pipe_index + 1) != chan->src_pipe_index) {
-+		SPS_ERR("sps_free_dma_chan. Invalid pipe indices");
-+		SPS_DBG("num_pipes=%d.dest=%d.src=%d.",
-+			dev->num_pipes,
-+			chan->dest_pipe_index,
-+			chan->src_pipe_index);
-+		result = SPS_ERROR;
-+		goto exit_err;
-+	}
-+
-+	/* Are both pipes inactive? */
-+	if (dev->chans[pipe_index / 2].state != DMA_CHAN_STATE_ALLOC_EXT ||
-+	    dev->pipes[pipe_index] != PIPE_INACTIVE ||
-+	    dev->pipes[pipe_index + 1] != PIPE_INACTIVE) {
-+		SPS_ERR("BAM-DMA: attempt to free active chan %d: %d %d",
-+			pipe_index / 2, dev->pipes[pipe_index],
-+			dev->pipes[pipe_index + 1]);
-+		result = SPS_ERROR;
-+		goto exit_err;
-+	}
-+
-+	/* Free the channel */
-+	dev->chans[pipe_index / 2].state = DMA_CHAN_STATE_FREE;
-+
-+exit_err:
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
-+}
-+EXPORT_SYMBOL(sps_free_dma_chan);
-+
-+/**
-+ * Activate a BAM DMA pipe
-+ *
-+ * This function activates a BAM DMA pipe.
-+ *
-+ * @dev - pointer to BAM-DMA device descriptor
-+ *
-+ * @pipe_index - pipe index
-+ *
-+ * @return 0 on success, negative value on error
-+ *
-+ */
-+static u32 sps_dma_check_pipes(struct bamdma_device *dev, u32 pipe_index)
-+{
-+	u32 pipe_in;
-+	u32 pipe_out;
-+	int enabled_in;
-+	int enabled_out;
-+	u32 check;
-+
-+	pipe_in = pipe_index & ~1;
-+	pipe_out = pipe_in + 1;
-+	enabled_in = bam_pipe_is_enabled(dev->bam->base, pipe_in);
-+	enabled_out = bam_pipe_is_enabled(dev->bam->base, pipe_out);
-+
-+	if (!enabled_in && !enabled_out)
-+		check = DMA_PIPES_BOTH_DISABLED;
-+	else if (enabled_in && enabled_out)
-+		check = DMA_PIPES_BOTH_ENABLED;
-+	else
-+		check = DMA_PIPES_STATE_DIFF;
-+
-+	return check;
-+}
-+
-+/**
-+ * Allocate a BAM DMA pipe
-+ *
-+ */
-+int sps_dma_pipe_alloc(void *bam_arg, u32 pipe_index, enum sps_mode dir)
-+{
-+	struct sps_bam *bam = bam_arg;
-+	struct bamdma_device *dev;
-+	struct bamdma_chan *chan;
-+	u32 channel;
-+	int result = SPS_ERROR;
-+
-+	if (bam == NULL) {
-+		SPS_ERR("BAM context is NULL");
-+		return SPS_ERROR;
-+	}
-+
-+	/* Check pipe direction */
-+	if ((DMA_PIPE_IS_DEST(pipe_index) && dir != SPS_MODE_DEST) ||
-+	    (DMA_PIPE_IS_SRC(pipe_index) && dir != SPS_MODE_SRC)) {
-+		SPS_ERR("BAM-DMA: wrong direction for BAM %x pipe %d",
-+			bam->props.phys_addr, pipe_index);
-+		return SPS_ERROR;
-+	}
-+
-+	mutex_lock(&bam_dma_lock);
-+
-+	dev = sps_dma_find_device((u32) bam);
-+	if (dev == NULL) {
-+		SPS_ERR("BAM-DMA: invalid BAM: %x",
-+			bam->props.phys_addr);
-+		goto exit_err;
-+	}
-+	if (pipe_index >= dev->num_pipes) {
-+		SPS_ERR("BAM-DMA: BAM %x invalid pipe: %d",
-+			bam->props.phys_addr, pipe_index);
-+		goto exit_err;
-+	}
-+	if (dev->pipes[pipe_index] != PIPE_INACTIVE) {
-+		SPS_ERR("BAM-DMA: BAM %x pipe %d already active",
-+			bam->props.phys_addr, pipe_index);
-+		goto exit_err;
-+	}
-+
-+	/* Mark pipe active */
-+	dev->pipes[pipe_index] = PIPE_ACTIVE;
-+
-+	/* If channel is not allocated, make an internal allocation */
-+	channel = pipe_index / 2;
-+	chan = &dev->chans[channel];
-+	if (chan->state != DMA_CHAN_STATE_ALLOC_EXT &&
-+	    chan->state != DMA_CHAN_STATE_ALLOC_INT) {
-+		chan->state = DMA_CHAN_STATE_ALLOC_INT;
-+	}
-+
-+	result = 0;
-+exit_err:
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
-+}
-+
-+/**
-+ * Enable a BAM DMA pipe
-+ *
-+ */
-+int sps_dma_pipe_enable(void *bam_arg, u32 pipe_index)
-+{
-+	struct sps_bam *bam = bam_arg;
-+	struct bamdma_device *dev;
-+	struct bamdma_chan *chan;
-+	u32 channel;
-+	int result = SPS_ERROR;
-+
-+	SPS_DBG("sps_dma_pipe_enable.pipe %d", pipe_index);
-+
-+	mutex_lock(&bam_dma_lock);
-+
-+	dev = sps_dma_find_device((u32) bam);
-+	if (dev == NULL) {
-+		SPS_ERR("BAM-DMA: invalid BAM");
-+		goto exit_err;
-+	}
-+	if (pipe_index >= dev->num_pipes) {
-+		SPS_ERR("BAM-DMA: BAM %x invalid pipe: %d",
-+			bam->props.phys_addr, pipe_index);
-+		goto exit_err;
-+	}
-+	if (dev->pipes[pipe_index] != PIPE_ACTIVE) {
-+		SPS_ERR("BAM-DMA: BAM %x pipe %d not active",
-+			bam->props.phys_addr, pipe_index);
-+		goto exit_err;
-+	}
-+
-+      /*
-+       * The channel must be enabled when the dest/input/write pipe
-+       * is enabled
-+       */
-+	if (DMA_PIPE_IS_DEST(pipe_index)) {
-+		/* Configure and enable the channel */
-+		channel = pipe_index / 2;
-+		chan = &dev->chans[channel];
-+
-+		if (chan->threshold != SPS_DMA_THRESHOLD_DEFAULT)
-+			dma_write_reg_field(dev->virt_addr,
-+					    DMA_CHNL_CONFIG(channel),
-+					    DMA_CHNL_ACT_THRESH,
-+					    chan->thresh);
-+
-+		if (chan->priority != SPS_DMA_PRI_DEFAULT)
-+			dma_write_reg_field(dev->virt_addr,
-+					    DMA_CHNL_CONFIG(channel),
-+					    DMA_CHNL_WEIGHT,
-+					    chan->weight);
-+
-+		dma_write_reg_field(dev->virt_addr,
-+				    DMA_CHNL_CONFIG(channel),
-+				    DMA_CHNL_ENABLE, 1);
-+	}
-+
-+	result = 0;
-+exit_err:
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
-+}
-+
-+/**
-+ * Deactivate a BAM DMA pipe
-+ *
-+ * This function deactivates a BAM DMA pipe.
-+ *
-+ * @dev - pointer to BAM-DMA device descriptor
-+ *
-+ * @bam - pointer to BAM device descriptor
-+ *
-+ * @pipe_index - pipe index
-+ *
-+ * @return 0 on success, negative value on error
-+ *
-+ */
-+static int sps_dma_deactivate_pipe_atomic(struct bamdma_device *dev,
-+					  struct sps_bam *bam,
-+					  u32 pipe_index)
-+{
-+	u32 channel;
-+
-+	if (dev->bam != bam)
-+		return SPS_ERROR;
-+	if (pipe_index >= dev->num_pipes)
-+		return SPS_ERROR;
-+	if (dev->pipes[pipe_index] != PIPE_ACTIVE)
-+		return SPS_ERROR;	/* Pipe is not active */
-+
-+	SPS_DBG("BAM-DMA: deactivate pipe %d", pipe_index);
-+
-+	/* Mark pipe inactive */
-+	dev->pipes[pipe_index] = PIPE_INACTIVE;
-+
-+	/*
-+	 * Channel must be reset when either pipe is disabled, so just always
-+	 * reset regardless of other pipe's state
-+	 */
-+	channel = pipe_index / 2;
-+	dma_write_reg_field(dev->virt_addr, DMA_CHNL_CONFIG(channel),
-+			    DMA_CHNL_ENABLE, 0);
-+
-+	/* If the peer pipe is also inactive, reset the channel */
-+	if (sps_dma_check_pipes(dev, pipe_index) == DMA_PIPES_BOTH_DISABLED) {
-+		/* Free channel if allocated internally */
-+		if (dev->chans[channel].state == DMA_CHAN_STATE_ALLOC_INT)
-+			dev->chans[channel].state = DMA_CHAN_STATE_FREE;
++	*num_pipes = bam_read_reg(base, NUM_PIPES);
++	*version = ver;
++
++	/* Check BAM version */
++	if ((ver < BAM_MIN_VERSION) || (ver > BAM_MAX_VERSION)) {
++		pr_err("bam:Invalid BAM version 0x%x.\n", ver);
++		return -ENODEV;
 +	}
 +
 +	return 0;
 +}
 +
 +/**
-+ * Free a BAM DMA pipe
++ * Disable a BAM device
 + *
 + */
-+int sps_dma_pipe_free(void *bam_arg, u32 pipe_index)
++void bam_exit(void *base, u32 ee)
 +{
-+	struct bamdma_device *dev;
-+	struct sps_bam *bam = bam_arg;
-+	int result;
++	bam_write_reg_field(base, IRQ_SRCS_MSK, BAM_IRQ, 0);
 +
-+	mutex_lock(&bam_dma_lock);
++	bam_write_reg(base, IRQ_EN, 0);
 +
-+	dev = sps_dma_find_device((u32) bam);
-+	if (dev == NULL) {
-+		SPS_ERR("BAM-DMA: invalid BAM");
-+		result = SPS_ERROR;
-+		goto exit_err;
++	/* Disable the BAM */
++	bam_write_reg_field(base, CTRL, BAM_EN, 0);
++}
++
++/**
++ * Get and Clear BAM global IRQ status
++ *
++ * note: clear status only for pipes controlled by this
++ * processor
++ */
++u32 bam_get_and_clear_irq_status(void *base, u32 ee, u32 mask)
++{
++	u32 status = bam_read_reg(base, IRQ_SRCS);
++	u32 clr = status &= mask;
++
++	bam_write_reg(base, IRQ_CLR, clr);
++
++	return status;
++}
++
++/**
++ * Initialize a BAM pipe
++ */
++int bam_pipe_init(void *base, u32 pipe,	struct bam_pipe_parameters *param)
++{
++	/* Reset the BAM pipe */
++	bam_write_reg(base, P_RST(pipe), 1);
++	/* No delay needed */
++	bam_write_reg(base, P_RST(pipe), 0);
++
++	/* Enable the Pipe Interrupt at the BAM level */
++	bam_write_reg_field(base, IRQ_SRCS_MSK, (1 << pipe), 1);
++
++	bam_write_reg(base, P_IRQ_EN(pipe), param->pipe_irq_mask);
++
++	bam_write_reg_field(base, P_CTRL(pipe), P_DIRECTION, param->dir);
++	bam_write_reg_field(base, P_CTRL(pipe), P_SYS_MODE, param->mode);
++
++	bam_write_reg(base, P_EVNT_GEN_TRSHLD(pipe), param->event_threshold);
++
++	bam_write_reg(base, P_DESC_FIFO_ADDR(pipe), param->desc_base);
++	bam_write_reg_field(base, P_FIFO_SIZES(pipe), P_DESC_FIFO_SIZE,
++			    param->desc_size);
++
++	bam_write_reg_field(base, P_CTRL(pipe), P_SYS_STRM,
++			    param->stream_mode);
++
++	if (param->mode == BAM_PIPE_MODE_BAM2BAM) {
++		u32 peer_dest_addr = param->peer_phys_addr +
++				      P_EVNT_REG(param->peer_pipe);
++
++		bam_write_reg(base, P_DATA_FIFO_ADDR(pipe),
++			      param->data_base);
++		bam_write_reg_field(base, P_FIFO_SIZES(pipe),
++				    P_DATA_FIFO_SIZE, param->data_size);
++
++		bam_write_reg(base, P_EVNT_DEST_ADDR(pipe), peer_dest_addr);
++
++		pr_debug("bam:Bam=0x%x.Pipe=%d.peer_bam=0x%x.peer_pipe=%d.\n",
++			(u32) base, pipe,
++			(u32) param->peer_phys_addr,
++			param->peer_pipe);
 +	}
 +
-+	result = sps_dma_deactivate_pipe_atomic(dev, bam, pipe_index);
++	/* Pipe Enable - at last */
++	bam_write_reg_field(base, P_CTRL(pipe), P_EN, 1);
 +
-+exit_err:
-+	mutex_unlock(&bam_dma_lock);
-+
-+	return result;
++	return 0;
 +}
 +
 +/**
-+ * Get the BAM handle for BAM-DMA.
++ * Reset the BAM pipe
 + *
-+ * The BAM handle should be use as source/destination in the sps_connect().
-+ *
-+ * @return bam handle on success, zero on error
 + */
-+u32 sps_dma_get_bam_handle(void)
++void bam_pipe_exit(void *base, u32 pipe, u32 ee)
 +{
-+	return (u32) bam_dma_dev[0].bam;
++	bam_write_reg(base, P_IRQ_EN(pipe), 0);
++
++	/* Disable the Pipe Interrupt at the BAM level */
++	bam_write_reg_field(base, IRQ_SRCS_MSK, (1 << pipe), 0);
++
++	/* Pipe Disable */
++	bam_write_reg_field(base, P_CTRL(pipe), P_EN, 0);
 +}
-+EXPORT_SYMBOL(sps_dma_get_bam_handle);
 +
 +/**
-+ * Free the BAM handle for BAM-DMA.
++ * Enable a BAM pipe
 + *
 + */
-+void sps_dma_free_bam_handle(u32 h)
++void bam_pipe_enable(void *base, u32 pipe)
 +{
++	bam_write_reg_field(base, P_CTRL(pipe), P_EN, 1);
 +}
-+EXPORT_SYMBOL(sps_dma_free_bam_handle);
 +
-+#endif /* CONFIG_SPS_SUPPORT_BAMDMA */
++/**
++ * Diasble a BAM pipe
++ *
++ */
++void bam_pipe_disable(void *base, u32 pipe)
++{
++	bam_write_reg_field(base, P_CTRL(pipe), P_EN, 0);
++}
++
++/**
++ * Check if a BAM pipe is enabled.
++ *
++ */
++int bam_pipe_is_enabled(void *base, u32 pipe)
++{
++	return bam_read_reg_field(base, P_CTRL(pipe), P_EN);
++}
++
++/**
++ * Configure interrupt for a BAM pipe
++ *
++ */
++void bam_pipe_set_irq(void *base, u32 pipe, enum bam_enable irq_en,
++		      u32 src_mask, u32 ee)
++{
++	bam_write_reg(base, P_IRQ_EN(pipe), src_mask);
++	bam_write_reg_field(base, IRQ_SRCS_MSK, (1 << pipe), irq_en);
++}
++
++/**
++ * Configure a BAM pipe for satellite MTI use
++ *
++ */
++void bam_pipe_satellite_mti(void *base, u32 pipe, u32 irq_gen_addr, u32 ee)
++{
++	bam_write_reg(base, P_IRQ_EN(pipe), 0);
++	bam_write_reg(base, P_IRQ_DEST_ADDR(pipe), irq_gen_addr);
++
++	bam_write_reg_field(base, IRQ_SIC_SEL, (1 << pipe), 1);
++	bam_write_reg_field(base, IRQ_SRCS_MSK, (1 << pipe), 1);
++}
++
++/**
++ * Configure MTI for a BAM pipe
++ *
++ */
++void bam_pipe_set_mti(void *base, u32 pipe, enum bam_enable irq_en,
++		      u32 src_mask, u32 irq_gen_addr)
++{
++	/*
++	 * MTI use is only supported on BAMs when global config is controlled
++	 * by a remote processor.
++	 * Consequently, the global configuration register to enable SIC (MTI)
++	 * support cannot be accessed.
++	 * The remote processor must be relied upon to enable the SIC and the
++	 * interrupt. Since the remote processor enable both SIC and interrupt,
++	 * the interrupt enable mask must be set to zero for polling mode.
++	 */
++
++	bam_write_reg(base, P_IRQ_DEST_ADDR(pipe), irq_gen_addr);
++
++	if (!irq_en)
++		src_mask = 0;
++
++	bam_write_reg(base, P_IRQ_EN(pipe), src_mask);
++}
++
++/**
++ * Get and Clear BAM pipe IRQ status
++ *
++ */
++u32 bam_pipe_get_and_clear_irq_status(void *base, u32 pipe)
++{
++	u32 status = 0;
++
++	status = bam_read_reg(base, P_IRQ_STTS(pipe));
++	bam_write_reg(base, P_IRQ_CLR(pipe), status);
++
++	return status;
++}
++
++/**
++ * Set write offset for a BAM pipe
++ *
++ */
++void bam_pipe_set_desc_write_offset(void *base, u32 pipe, u32 next_write)
++{
++	/*
++	 * It is not necessary to perform a read-modify-write masking to write
++	 * the P_DESC_FIFO_PEER_OFST value, since the other field in the
++	 * register (P_BYTES_CONSUMED) is read-only.
++	 */
++	bam_write_reg_field(base, P_EVNT_REG(pipe), P_DESC_FIFO_PEER_OFST,
++			    next_write);
++}
++
++/**
++ * Get write offset for a BAM pipe
++ *
++ */
++u32 bam_pipe_get_desc_write_offset(void *base, u32 pipe)
++{
++	return bam_read_reg_field(base, P_EVNT_REG(pipe),
++				  P_DESC_FIFO_PEER_OFST);
++}
++
++/**
++ * Get read offset for a BAM pipe
++ *
++ */
++u32 bam_pipe_get_desc_read_offset(void *base, u32 pipe)
++{
++	return bam_read_reg_field(base, P_SW_OFSTS(pipe), SW_DESC_OFST);
++}
++
++/**
++ * Configure inactivity timer count for a BAM pipe
++ *
++ */
++void bam_pipe_timer_config(void *base, u32 pipe, enum bam_pipe_timer_mode mode,
++			 u32 timeout_count)
++{
++	bam_write_reg_field(base, P_TIMER_CTRL(pipe), P_TIMER_MODE, mode);
++	bam_write_reg_field(base, P_TIMER_CTRL(pipe), P_TIMER_TRSHLD,
++			    timeout_count);
++}
++
++/**
++ * Reset inactivity timer for a BAM pipe
++ *
++ */
++void bam_pipe_timer_reset(void *base, u32 pipe)
++{
++	/* reset */
++	bam_write_reg_field(base, P_TIMER_CTRL(pipe), P_TIMER_RST, 0);
++	/* active */
++	bam_write_reg_field(base, P_TIMER_CTRL(pipe), P_TIMER_RST, 1);
++}
++
++/**
++ * Get inactivity timer count for a BAM pipe
++ *
++ */
++u32 bam_pipe_timer_get_count(void *base, u32 pipe)
++{
++	return bam_read_reg(base, P_TIMER(pipe));
++}
+diff --git a/arch/arm/mach-msm/sps/bam.h b/arch/arm/mach-msm/sps/bam.h
+new file mode 100644
+index 0000000..5681f96
+--- /dev/null
++++ b/arch/arm/mach-msm/sps/bam.h
+@@ -0,0 +1,375 @@
++/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/* Bus-Access-Manager (BAM) Hardware manager functions API. */
++
++#ifndef _BAM_H_
++#define _BAM_H_
++
++#include <linux/types.h>	/* u32 */
++#include <linux/io.h>		/* ioread32() */
++#include <linux/bitops.h>	/* find_first_bit() */
++
++/* Pipe mode */
++enum bam_pipe_mode {
++	BAM_PIPE_MODE_BAM2BAM = 0,	/* BAM to BAM */
++	BAM_PIPE_MODE_SYSTEM = 1,	/* BAM to/from System Memory */
++};
++
++/* Pipe direction */
++enum bam_pipe_dir {
++	/* The Pipe Reads data from data-fifo or system-memory */
++	BAM_PIPE_CONSUMER = 0,
++	/* The Pipe Writes data to data-fifo or system-memory */
++	BAM_PIPE_PRODUCER = 1,
++};
++
++/* Stream mode Type */
++enum bam_stream_mode {
++	BAM_STREAM_MODE_DISABLE = 0,
++	BAM_STREAM_MODE_ENABLE = 1,
++};
++
++/* Enable Type */
++enum bam_enable {
++	BAM_DISABLE = 0,
++	BAM_ENABLE = 1,
++};
++
++/* Pipe timer mode */
++enum bam_pipe_timer_mode {
++	BAM_PIPE_TIMER_ONESHOT = 0,
++	BAM_PIPE_TIMER_PERIODIC = 1,
++};
++
++struct transfer_descriptor {
++	u32 addr;	/* Buffer physical address */
++	u32 size:16;	/* Buffer size in bytes */
++	u32 flags:16;	/* Flag bitmask (see SPS_IOVEC_FLAG_ #defines) */
++}  __packed;
++
++/* BAM pipe initialization parameters */
++struct bam_pipe_parameters {
++	u16 event_threshold;
++	u32 pipe_irq_mask;
++	enum bam_pipe_dir dir;
++	enum bam_pipe_mode mode;
++	u32 desc_base;	/* Physical address of descriptor FIFO */
++	u32 desc_size;	/* Size (bytes) of descriptor FIFO */
++	enum bam_stream_mode stream_mode;
++	u32 ee;		/* BAM execution environment index */
++
++	/* The following are only valid if mode is BAM2BAM */
++	u32 peer_phys_addr;
++	u32 peer_pipe;
++	u32 data_base;	/* Physical address of data FIFO */
++	u32 data_size;	/* Size (bytes) of data FIFO */
++};
++
++/**
++ * Initialize a BAM device
++ *
++ * This function initializes a BAM device.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @ee - BAM execution environment index
++ *
++ * @summing_threshold - summing threshold (global for all pipes)
++ *
++ * @irq_mask - error interrupts mask
++ *
++ * @version - return BAM hardware version
++ *
++ * @num_pipes - return number of pipes
++ *
++ * @return 0 on success, negative value on error
++ *
++ */
++int bam_init(void *base,
++		u32 ee,
++		u16 summing_threshold,
++		u32 irq_mask, u32 *version, u32 *num_pipes);
++
++/**
++ * Check a BAM device
++ *
++ * This function verifies that a BAM device is enabled and gathers
++ *    the hardware configuration.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @version - return BAM hardware version
++ *
++ * @num_pipes - return number of pipes
++ *
++ * @return 0 on success, negative value on error
++ *
++ */
++int bam_check(void *base, u32 *version, u32 *num_pipes);
++
++/**
++ * Disable a BAM device
++ *
++ * This function disables a BAM device.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @ee - BAM execution environment index
++ *
++ */
++void bam_exit(void *base, u32 ee);
++
++/**
++ * Get and Clear BAM global IRQ status
++ *
++ * This function gets and clears BAM global IRQ status.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @ee - BAM execution environment index
++ *
++ * @mask - active pipes mask.
++ *
++ * @return IRQ status
++ *
++ */
++u32 bam_get_and_clear_irq_status(void *base, u32 ee, u32 mask);
++
++/**
++ * Initialize a BAM pipe
++ *
++ * This function initializes a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @param - bam pipe parameters.
++ *
++ * @return 0 on success, negative value on error
++ *
++ */
++int bam_pipe_init(void *base, u32 pipe, struct bam_pipe_parameters *param);
++
++/**
++ * Reset the BAM pipe
++ *
++ * This function resets the BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @ee - BAM execution environment index
++ *
++ */
++void bam_pipe_exit(void *base, u32 pipe, u32 ee);
++
++/**
++ * Enable a BAM pipe
++ *
++ * This function enables a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ */
++void bam_pipe_enable(void *base, u32 pipe);
++
++/**
++ * Disable a BAM pipe
++ *
++ * This function disables a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ */
++void bam_pipe_disable(void *base, u32 pipe);
++
++/**
++ * Get a BAM pipe enable state
++ *
++ * This function determines if a BAM pipe is enabled.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @return true if enabled, false if disabled
++ *
++ */
++int bam_pipe_is_enabled(void *base, u32 pipe);
++
++/**
++ * Configure interrupt for a BAM pipe
++ *
++ * This function configures the interrupt for a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @irq_en - enable or disable interrupt
++ *
++ * @src_mask - interrupt source mask, set regardless of whether
++ *    interrupt is disabled
++ *
++ * @ee - BAM execution environment index
++ *
++ */
++void bam_pipe_set_irq(void *base, u32 pipe, enum bam_enable irq_en,
++		      u32 src_mask, u32 ee);
++
++/**
++ * Configure a BAM pipe for satellite MTI use
++ *
++ * This function configures a BAM pipe for satellite MTI use.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @irq_gen_addr - physical address written to generate MTI
++ *
++ * @ee - BAM execution environment index
++ *
++ */
++void bam_pipe_satellite_mti(void *base, u32 pipe, u32 irq_gen_addr, u32 ee);
++
++/**
++ * Configure MTI for a BAM pipe
++ *
++ * This function configures the interrupt for a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @irq_en - enable or disable interrupt
++ *
++ * @src_mask - interrupt source mask, set regardless of whether
++ *    interrupt is disabled
++ *
++ * @irq_gen_addr - physical address written to generate MTI
++ *
++ */
++void bam_pipe_set_mti(void *base, u32 pipe, enum bam_enable irq_en,
++		      u32 src_mask, u32 irq_gen_addr);
++
++/**
++ * Get and Clear BAM pipe IRQ status
++ *
++ * This function gets and clears BAM pipe IRQ status.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @return IRQ status
++ *
++ */
++u32 bam_pipe_get_and_clear_irq_status(void *base, u32 pipe);
++
++/**
++ * Set write offset for a BAM pipe
++ *
++ * This function sets the write offset for a BAM pipe.  This is
++ *    the offset that is maintained by software in system mode.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @next_write - descriptor FIFO write offset
++ *
++ */
++void bam_pipe_set_desc_write_offset(void *base, u32 pipe, u32 next_write);
++
++/**
++ * Get write offset for a BAM pipe
++ *
++ * This function gets the write offset for a BAM pipe.  This is
++ *    the offset that is maintained by the pipe's peer pipe or by software.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @return descriptor FIFO write offset
++ *
++ */
++u32 bam_pipe_get_desc_write_offset(void *base, u32 pipe);
++
++/**
++ * Get read offset for a BAM pipe
++ *
++ * This function gets the read offset for a BAM pipe.  This is
++ *    the offset that is maintained by the pipe in system mode.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @return descriptor FIFO read offset
++ *
++ */
++u32 bam_pipe_get_desc_read_offset(void *base, u32 pipe);
++
++/**
++ * Configure inactivity timer count for a BAM pipe
++ *
++ * This function configures the inactivity timer count for a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @mode - timer operating mode
++ *
++ * @timeout_count - timeout count
++ *
++ */
++void bam_pipe_timer_config(void *base, u32 pipe,
++			   enum bam_pipe_timer_mode mode,
++			   u32 timeout_count);
++
++/**
++ * Reset inactivity timer for a BAM pipe
++ *
++ * This function resets the inactivity timer count for a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ */
++void bam_pipe_timer_reset(void *base, u32 pipe);
++
++/**
++ * Get inactivity timer count for a BAM pipe
++ *
++ * This function gets the inactivity timer count for a BAM pipe.
++ *
++ * @base - BAM virtual base address.
++ *
++ * @pipe - pipe index
++ *
++ * @return inactivity timer count
++ *
++ */
++u32 bam_pipe_timer_get_count(void *base, u32 pipe);
++
++#endif				/* _BAM_H_ */
 -- 
 1.7.3.3
 
