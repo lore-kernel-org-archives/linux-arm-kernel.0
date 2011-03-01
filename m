@@ -1,33 +1,31 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 28 Feb 2011 17:10:16 -0700 (MST)
-Subject: [PATCH] omap3: fix compile-time warnings
-In-Reply-To: <1297415100-15912-1-git-send-email-premi@ti.com>
-References: <1297415100-15912-1-git-send-email-premi@ti.com>
-Message-ID: <alpine.DEB.2.00.1102281709330.29478@utopia.booyaka.com>
+Date: Mon, 28 Feb 2011 17:17:38 -0700 (MST)
+Subject: [PATCH 2/4] OMAP2/3: clockdomains: remove warnings on an
+	OMAP3-only compile
+In-Reply-To: <20110226002006.28142.52520.stgit@twilight.localdomain>
+References: <20110226001601.28142.46636.stgit@twilight.localdomain>
+	<20110226002006.28142.52520.stgit@twilight.localdomain>
+Message-ID: <alpine.DEB.2.00.1102281716460.29478@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Feb 2011, Sanjeev Premi wrote:
+On Fri, 25 Feb 2011, Paul Walmsley wrote:
 
-> This patch fixes these warnings when building kernel for OMAP3EVM
-> only.
+> Resolve these compile-time gcc warnings on OMAP3-only kernel compiles:
 > 
->   CC      arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.o
-> arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c:95: warning:
->  'dsp_24xx_wkdeps' defined but not used
-> arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c:119: warning:
->  'mpu_24xx_wkdeps' defined but not used
-> arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c:147: warning:
->  'core_24xx_wkdeps' defined but not used
+> .../mach-omap2/clockdomains2xxx_3xxx_data.c:95: warning: 'dsp_24xx_wkdeps' defined but not used
+> .../mach-omap2/clockdomains2xxx_3xxx_data.c:119: warning: 'mpu_24xx_wkdeps' defined but not used
+> .../mach-omap2/clockdomains2xxx_3xxx_data.c:147: warning: 'core_24xx_wkdeps' defined but not used
 > 
-> The problem should be noticed when building for other OMAP3
-> platforms (only) as well.
-> 
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 
-I just noticed this patch when digging through Patchwork.  I've dropped my 
-(later) patch which does the same thing and applied this one instead for 
-the 2.6.39 queue.
+For the archives, I've dropped this patch and replaced it with Sanjeev's 
+patch here:
+
+    http://marc.info/?l=linux-omap&m=129893821929982&w=2
 
 
 - Paul
