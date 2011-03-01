@@ -1,35 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Mar 2011 21:52:23 +0100
-Subject: [PATCH 1/2] ARM: mx3/cpuimx35: fix build failure
-In-Reply-To: <20110301203734.GF27107@n2100.arm.linux.org.uk>
-References: <20110301203018.GY22310@pengutronix.de>
-	<1299011459-18200-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110301203734.GF27107@n2100.arm.linux.org.uk>
-Message-ID: <20110301205223.GZ22310@pengutronix.de>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Tue, 01 Mar 2011 20:56:39 +0000
+Subject: [patch 1/2] mc13892: reboot on wdi event
+In-Reply-To: <87k4gkyydi.fsf@lebrac.rtp-net.org>
+References: <20110228132132.654689676@rtp-net.org>
+	<20110228132643.964403175@rtp-net.org>
+	<20110228143552.GC13869@opensource.wolfsonmicro.com>
+	<87k4gkyydi.fsf@lebrac.rtp-net.org>
+Message-ID: <1299012999.3345.80.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Tue, Mar 01, 2011 at 08:37:34PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 01, 2011 at 09:30:58PM +0100, Uwe Kleine-K?nig wrote:
-> > It seems vim's autocompletion played tricks on me without me noticing.
+On Mon, 2011-02-28 at 16:25 +0100, Arnaud Patard wrote:
+> Mark Brown <broonie@opensource.wolfsonmicro.com> writes:
 > 
-> Every time I hear the word 'autocompletion' it's always associated with
-> the wrong thing happening.  I really don't know why people even bother
-> with 'autocompletion' because it seems to go wrong very often.  Whether
-> it be with code, or with nicknames on IRC...
+> > On Mon, Feb 28, 2011 at 02:21:33PM +0100, Arnaud Patard wrote:
+> >> By default, on wdi (watchdog input) event the mc13892 is powering off.
+> >> This patch is changing this to reboot on wdi event.
+> >> 
+> >> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> >
+> > This strikes me as something that should be configurable by platforms.
 > 
-> The only autocompletion that I've seen which works right and avoids these
-> kinds of issues is in things like bash, where it won't autocomplete unless
-> there is exactly one completion available.
-Yeah, for vim autocompletion is "pop up a menu of possibilities and
-already select the first one".
-Still I consider the real problem to be "without me noticing".
+> afaik, mc13892 is used only on imx designs and the reset for imx is done
+> only throught the watchdog. From this point of view,  I don't see any
+> valid reason for powering off instead of rebooting on watchdog event
+> 
 
-Best regards
-Uwe
+If this change is for i.MX only then it should be optional as Freescale
+probably will sell this PMIC to non i.MX users.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+
+Liam
