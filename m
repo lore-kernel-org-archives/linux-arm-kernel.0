@@ -1,35 +1,60 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 Mar 2011 15:14:35 -0800
-Subject: [GIT PULL] OMAP PM fixes for 2.6.38-rc
-Message-ID: <87pqqae8mc.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Mar 2011 23:14:32 +0000
+Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+	<1298900022-21516-7-git-send-email-will.deacon@arm.com>
+	<20110228140327.GA1937@n2100.arm.linux.org.uk>
+	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
+	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
+	<20110228214445.GD1937@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
+	<20110301201904.GA27107@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+Message-ID: <20110301231432.GG27107@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, Mar 01, 2011 at 10:29:37PM +0100, Thomas Gleixner wrote:
+> Can you please take the time and explain me the difference of the
+> following:
 
-Here's a final batch of PM fixes for the 2.6.38-rc cycle.
+Can you please take the time to realise that sometimes the combination
+between the primary and secondary interrupt controller is so tied that
+this kind of thing can't happen?
 
-Kevin
+Sometimes the secondary interrupt controller *must* mask the parent
+interrupt because it has no masking capability of its own.
 
-The following changes since commit f5412be599602124d2bdd49947b231dd77c0bf99:
+Sometimes the secondary interrupt controller *must* cause the primary
+controller to ack the interrupt status *before* the secondary handler
+reads the status.
 
-  Linux 2.6.38-rc6 (2011-02-21 17:25:52 -0800)
+You can not say "the primary controller behaves like X so we always do
+X" because the action required on the primary is a combination of how
+the primary behaves *and* how the secondary behaves.
 
-are available in the git repository at:
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.38/pm-fixes
+Consider for example an edge triggered interrupt connected to a secondary
+controller - yes, we have that combination.  When you read the secondary
+status register and clear those interrupts which are pending, the
+secondary controller resets to inactive its output.  If there's still
+pending interrupts, it re-asserts the output causing a new edge.
 
-Aaro Koskinen (1):
-      arm: mach-omap2: smartreflex: fix another memory leak
+If your primary 'flow' handler were to acknowledge the interrupt *after*
+the demux, you'd lose interrupts.
 
-Shweta Gulati (1):
-      OMAP2+: PM: SmartReflex: fix memory leaks in Smartreflex driver
+However, if the very same primary interrupt controller is connected to
+a FPGA based oring of several interrupt sources, this has to ack before
+reading the status, read the status, process *all* interrupts, re-ack,
+re-read the status and repeat until the status register indicates no
+further interrupts are pending.
 
-Vasiliy Kulikov (3):
-      mach-omap2: mux: world-writable debugfs files
-      mach-omap2: pm: world-writable debugfs timer files
-      mach-omap2: smartreflex: world-writable debugfs voltage files
+You can't deal with these two situations if you tie all the primary
+flow handling outside of the secondary demux handler.  And it's
+*wrong* to do so.  The behaviour required for the primary controller
+inherently depends on the secondary controller.
 
- arch/arm/mach-omap2/mux.c         |    2 +-
- arch/arm/mach-omap2/pm-debug.c    |    8 ++++----
- arch/arm/mach-omap2/smartreflex.c |   37 +++++++++++++++++--------------------
- 3 files changed, 22 insertions(+), 25 deletions(-)
+It may not be clean from a software point of view, but that's hardware
+for you, and we have to make this work.  You *can't* do that by
+separating the primary flow from the demux.
