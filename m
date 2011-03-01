@@ -1,36 +1,47 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 1 Mar 2011 16:11:38 +0100
-Subject: [PATCH] mach-ux500: activate USB in the U8500 defconfig
-Message-ID: <1298992298-31854-1-git-send-email-linus.walleij@stericsson.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Tue, 1 Mar 2011 23:31:46 +0800
+Subject: [PATCH 2/3] arm: pmu: support pmu irq routed from CTI
+In-Reply-To: <-294597288559385401@unknownmsgid>
+References: <1298985434-3009-1-git-send-email-tom.leiming@gmail.com>
+	<1298985434-3009-3-git-send-email-tom.leiming@gmail.com>
+	<-294597288559385401@unknownmsgid>
+Message-ID: <AANLkTi=NLTqzj_PtWFvtbGP6PcZLOy1UvtxRT3TZsYV0@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi,
 
-Activate the new USB stuff so we atleast get some compile
-coverage for this stuff.
+2011/3/1 Will Deacon <will.deacon@arm.com>:
+> Hello,
+>
+>> Subject: [PATCH 2/3] arm: pmu: support pmu irq routed from CTI
+>>
+>> From: Ming Lei <tom.leiming@gmail.com>
+>>
+>> This patch introduces pmu_platform_data struct to
+>> support pmu irq routed from CTI, such as implemented
+>> on OMAP4.
+>>
+>> Generally speaking, clearing cti irq should be done in
+>> irq handler, also enabling cti module after calling
+>> request_irq and disabling cti module before calling
+>> free_irq.
+>>
+>> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+>> ---
+>> ?arch/arm/include/asm/pmu.h ? | ? 12 ++++++++++
+>> ?arch/arm/kernel/perf_event.c | ? 51 ++++++++++++++++++++++++++++++++++++-----
+>> ?2 files changed, 56 insertions(+), 7 deletions(-)
+>
+> This will conflict with the the ux500 PMU workaround:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-February/041145.html
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/u8500_defconfig |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+Thanks for your pointing out it.
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index a5cce24..e1d6020 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -67,7 +67,11 @@ CONFIG_AB8500_CORE=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_AB8500=y
- # CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB_MUSB_HDRC=y
-+CONFIG_USB_GADGET_MUSB_HDRC=y
-+CONFIG_MUSB_PIO_ONLY=y
-+CONFIG_USB_GADGET=y
-+CONFIG_AB8500_USB=y
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
+I will send out -v1 of these patches against the latest -next tree.
+
+
+thanks,
 -- 
-1.7.3.2
+Lei Ming
