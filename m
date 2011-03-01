@@ -1,52 +1,42 @@
-From: madhavi.linux@gmail.com (Madhavi Manchala)
-Date: Tue, 1 Mar 2011 15:23:02 +0530
-Subject: Linux support for Samsung S3C2510A Processor
-In-Reply-To: <20110228133256.GB22646@trinity.fluff.org>
-References: <AANLkTinBZCQ7Q+BaSxhm62pKiZHhmVWAgNzxnm5jBhZy@mail.gmail.com>
-	<20110228133256.GB22646@trinity.fluff.org>
-Message-ID: <AANLkTikPENDpe32hJcV1fgKfJ_WOaOqqddZPD0cQLPUc@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 1 Mar 2011 10:53:16 +0100 (CET)
+Subject: [PATCH v6 1/1] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
+References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
+	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
+	<20110228212638.GB16806@local>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
+Message-ID: <alpine.LFD.2.00.1103011052020.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28, 2011 at 7:02 PM, Ben Dooks <ben@trinity.fluff.org> wrote:
-> On Mon, Feb 28, 2011 at 06:52:15PM +0530, Madhavi Manchala wrote:
->> Dear All,
->>
->> Does Linux kernel supports the Samsung S3C2510A processor? Why am I
->> asking this question is, when I looked into ?the arch/arm/ directory I
->> did not find anything which is related to Samsung S3C2510A processor.
->> There are other directories like mach-s3c24xx and mach-s3c64xx
->> directories, but not mach-s3c25xx.
->>
->> Any ideas / hints will be appreciated.
->
-> I think this is a no-mmu version, and there is not a lot of ARM no-mmu
-> support at the moment.
+On Tue, 1 Mar 2011, TK, Pratheesh Gangadhar wrote:
+> > On Tue, Mar 01, 2011 at 02:31:35AM +0530, Pratheesh Gangadhar wrote:
+> > > +
+> > > +		/* Register PRUSS IRQ lines */
+> > > +		p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
+> > > +		p->handler = pruss_handler;
+> > > +
+> > > +		ret = uio_register_device(&dev->dev, p);
+> > > +
+> > > +		if (ret < 0)
+> > > +			goto out_free;
+> > > +	}
+> > > +
+> > > +	spin_lock_init(&lock);
+> > 
+> > That's too late. uio_register_device() enables the irq, and your spin_lock
+> > is not ready at that time.
+> 
+> This is ok in this context as "modprobe uio_pruss" is pre-requisite for
+> running PRUSS firmware and without firmware running PRUSS won't
+> generate interrupts. Actually PRUSS INTC is not setup till we start
+> user application.
 
-Dear Ben,
+No, it's not. If you enable interrupts you have to be prepared for
+getting one whether the device mask is enabled or not. It's that
+simple.
 
-Thank you very much for the information.
+Thanks,
 
-I think, if I want to port the Linux on to my board, which is based on
-Samsung s3c2510a processor, then I need to develop the
-arch/arm/mach-s3c2510 sources, which are currently not available in
-the kernel source tree.
-
-I saw that you only developed the sources for Samsung s3c24xx
-processor in arch/arm/ of the Linux sources.
-
-So, please suggest me with some good links / points for writing the
-sources for Samsung s3c2510a processor under arch/arm. At least, how
-can I start? Any templates?
-
-Thank you very much for your suggestions.
-
-Thanks and Regards,
-Madhavi M.
-
-> --
-> Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
->
-> Large Hadron Colada: A large Pina Colada that makes the universe disappear.
->
->
+	tglx
