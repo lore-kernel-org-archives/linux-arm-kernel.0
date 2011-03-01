@@ -1,58 +1,78 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Tue, 1 Mar 2011 19:33:35 +0100
-Subject: [PATCH v6 1/1] PRUSS UIO driver support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
-References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
-	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
-	<20110228212638.GB16806@local>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
-Message-ID: <20110301183334.GC20497@local>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Tue, 1 Mar 2011 20:37:22 +0200
+Subject: [PATCH] audio:am3517evm support for AIC23
+In-Reply-To: <1298994218-30610-1-git-send-email-abhilash.kv@ti.com>
+References: <1298994218-30610-1-git-send-email-abhilash.kv@ti.com>
+Message-ID: <20110301203722.3ba044e5.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 10:15:27AM +0530, TK, Pratheesh Gangadhar wrote:
-> Hi,
+Hi
+
+On Tue,  1 Mar 2011 21:13:38 +0530
+Abhilash K V <abhilash.kv@ti.com> wrote:
+
+> This patch aims to fix the registration of the AIC23-based audio
+> module on the AM3517-EVM, with the following two changes:
 > 
-> > -----Original Message-----
-> > From: Hans J. Koch [mailto:hjk at hansjkoch.de]
-> > Sent: Tuesday, March 01, 2011 2:57 AM
-> > To: TK, Pratheesh Gangadhar
-> > Cc: linux-kernel at vger.kernel.org; hjk at hansjkoch.de; gregkh at suse.de;
-> > tglx at linutronix.de; sshtylyov at mvista.com; arnd at arndb.de; Chatterjee, Amit;
-> > davinci-linux-open-source at linux.davincidsp.com; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v6 1/1] PRUSS UIO driver support
-> > 
-> > On Tue, Mar 01, 2011 at 02:31:35AM +0530, Pratheesh Gangadhar wrote:
-> > > +
-> > > +		/* Register PRUSS IRQ lines */
-> > > +		p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
-> > > +		p->handler = pruss_handler;
-> > > +
-> > > +		ret = uio_register_device(&dev->dev, p);
-> > > +
-> > > +		if (ret < 0)
-> > > +			goto out_free;
-> > > +	}
-> > > +
-> > > +	spin_lock_init(&lock);
-> > 
-> > That's too late. uio_register_device() enables the irq, and your spin_lock
-> > is not ready at that time.
+> 1. The i2c_board_info entry supporting aic23 codec was added into
+>    the i2c2 bus.
+> 2. The i2c client device name (".2-001a" in this case, including
+>    the separator period) was appended to the codec_name member of
+>    am3517evm_dai to resolve the names mismatch happening in
+>    soc_bind_dai_link().
 > 
-> This is ok in this context as "modprobe uio_pruss" is pre-requisite for
-> running PRUSS firmware and without firmware running PRUSS won't
-> generate interrupts. Actually PRUSS INTC is not setup till we start
-> user application.
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-am3517evm.c |    3 +++
+>  sound/soc/omap/am3517evm.c            |    2 +-
+>  2 files changed, 4 insertions(+), 1 deletions(-)
+> 
+First, your patch does the correct things.
 
-What if the user application is stopped, UIO driver module unloaded
-and loaded again?
+I investigated a bit and it looks like the sound/soc/omap/am3517evm.c
+never worked in mainline since the patch below adding codec to
+board-am3517evm.c wasn't applied by reason or another.
 
-Anyway, please don't use that kind of argumentation. The next newbie
-developer might copy your work as a basis for his new driver, and there
-it probably won't work.
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg18470.html
 
-Simply put the spin_lock_init before the loop.
+This means that you should split this patch into two and they can be
+sent as independent patches. am3517evm.c change via alsa-devel
+and board-am3517evm.c via linux-omap & linux-arm-kernel. Some comments
+below.
 
-Thanks,
-Hans
+> diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+> index ad71cbf..8da8d20 100644
+> --- a/arch/arm/mach-omap2/board-am3517evm.c
+> +++ b/arch/arm/mach-omap2/board-am3517evm.c
+> @@ -358,6 +358,9 @@ static struct pca953x_platform_data am3517evm_gpio_expander_info_0 = {
+>  };
+>  static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
+>  	{
+> +		I2C_BOARD_INFO("tlv320aic23", 0x1A),
+> +	},
+> +	{
+
+This is ok and don't need anything else as the rest pieces from
+original missing patch are added by another patches.
+
+> --- a/sound/soc/omap/am3517evm.c
+> +++ b/sound/soc/omap/am3517evm.c
+> @@ -139,7 +139,7 @@ static struct snd_soc_dai_link am3517evm_dai = {
+>  	.cpu_dai_name ="omap-mcbsp-dai.0",
+>  	.codec_dai_name = "tlv320aic23-hifi",
+>  	.platform_name = "omap-pcm-audio",
+> -	.codec_name = "tlv320aic23-codec",
+> +	.codec_name = "tlv320aic23-codec.2-001a",
+>  	.init = am3517evm_aic23_init,
+>  	.ops = &am3517evm_ops,
+>  };
+
+Subject for this part could be something like
+"ASoC: AM3517: Update codec name after multi-component update".
+
+Remember to cc ASoC maintainers Mark Brown and Liam Girdwood.
+
+You could add my acks to splitted patches.
+
+Acked-by: Jarkko Nikula <jhnikula@gmail.com>
