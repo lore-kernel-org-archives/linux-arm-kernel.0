@@ -1,52 +1,63 @@
-From: abhilash.kv@ti.com (Abhilash K V)
-Date: Tue,  1 Mar 2011 21:13:38 +0530
-Subject: [PATCH] audio:am3517evm support for AIC23
-Message-ID: <1298994218-30610-1-git-send-email-abhilash.kv@ti.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue, 1 Mar 2011 08:34:37 -0800
+Subject: [RFC PATCH] ARM: Use generic BUG() handler
+In-Reply-To: <20110301100306.GA18007@n2100.arm.linux.org.uk>
+References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+	<20110301084949.GA16733@n2100.arm.linux.org.uk>
+	<20110301085911.GB16733@n2100.arm.linux.org.uk>
+	<19820.47240.801312.507393@pilspetsen.it.uu.se>
+	<20110301100306.GA18007@n2100.arm.linux.org.uk>
+Message-ID: <AANLkTinMnZAupxn7oYFhqkN1Y0OD-eyN=UeRpw96no9r@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch aims to fix the registration of the AIC23-based audio
-module on the AM3517-EVM, with the following two changes:
+On Tue, Mar 1, 2011 at 2:03 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Mar 01, 2011 at 10:12:40AM +0100, Mikael Pettersson wrote:
+>> Russell King - ARM Linux writes:
+>> ?> On Tue, Mar 01, 2011 at 08:49:49AM +0000, Russell King - ARM Linux wrote:
+>> ?> > On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
+>> ?> > > + ? ? ?asm volatile("1:\t.word %c3\n" ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ?> > > + ? ? ? ? ? ? ? ? ? ".pushsection __bug_table,\"a\"\n" ? ? ? ? \
+>> ?> > > + ? ? ? ? ? ? ? ? ? "2:\t.word 1b, %c0\n" ? ? ? ? ? ? ? ? ? ? ?\
+>> ?> > > + ? ? ? ? ? ? ? ? ? "\t.hword %c1, 0\n" ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ?> > > + ? ? ? ? ? ? ? ? ? "\t.org 2b+%c2\n" ? ? ? ? ? ? ? ? ? ? ? ? ?\
+>> ?> >
+>> ?> > %c doesn't work on lots of versions of gcc, which is why we can't use
+>> ?> > the generic bug support. ?There's no way to reliably generate constants
+>> ?> > without many compiler versions spitting out a '#' before them.
+>> ?>
+>> ?> gcc 4.3.2:
+>> ?>
+>> ?> asm(".word %c0" : : "i" (0));
+>> ?>
+>> ?> produces:
+>> ?>
+>> ?> ? ? ? ? .word #0
+>> ?>
+>> ?> which gas chokes on:
+>> ?>
+>> ?> /tmp/cc2hGOHd.s:12: Error: bad expression
+>> ?> /tmp/cc2hGOHd.s:12: Error: junk at end of line, first unrecognized character is `0'
+>> ?>
+>> ?> So what this means is that it's impossible to generate constants in
+>> ?> assembly with GCC targetting ARM without having them prefixed by '#',
+>> ?> which in turn makes it impossible to use the generic BUG support.
+>> ?>
+>> ?> I reported this bug to gcc folk many years ago. ?I've no idea which
+>> ?> version it has been fixed in or if it's even been fixed.
+>>
+>> What's the gcc bugzilla bug number?
+>
+> No idea off hand - I'll have to search for that.
+>
 
-1. The i2c_board_info entry supporting aic23 codec was added into
-   the i2c2 bus.
-2. The i2c client device name (".2-001a" in this case, including
-   the separator period) was appended to the codec_name member of
-   am3517evm_dai to resolve the names mismatch happening in
-   soc_bind_dai_link().
+It seems I am lucky with the gcc I am using. I would have thought this
+would be a pretty fundamental feature, but yes I did notice that %c
+wasn't used anywhere.
 
-Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
----
- arch/arm/mach-omap2/board-am3517evm.c |    3 +++
- sound/soc/omap/am3517evm.c            |    2 +-
- 2 files changed, 4 insertions(+), 1 deletions(-)
+Would this kernel feature be acceptable as a selectable config option
+on ARM then?
 
-diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
-index ad71cbf..8da8d20 100644
---- a/arch/arm/mach-omap2/board-am3517evm.c
-+++ b/arch/arm/mach-omap2/board-am3517evm.c
-@@ -358,6 +358,9 @@ static struct pca953x_platform_data am3517evm_gpio_expander_info_0 = {
- };
- static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
- 	{
-+		I2C_BOARD_INFO("tlv320aic23", 0x1A),
-+	},
-+	{
- 		I2C_BOARD_INFO("tca6416", 0x21),
- 		.platform_data = &am3517evm_gpio_expander_info_0,
- 	},
-diff --git a/sound/soc/omap/am3517evm.c b/sound/soc/omap/am3517evm.c
-index 979dd50..ddbd2a1 100644
---- a/sound/soc/omap/am3517evm.c
-+++ b/sound/soc/omap/am3517evm.c
-@@ -139,7 +139,7 @@ static struct snd_soc_dai_link am3517evm_dai = {
- 	.cpu_dai_name ="omap-mcbsp-dai.0",
- 	.codec_dai_name = "tlv320aic23-hifi",
- 	.platform_name = "omap-pcm-audio",
--	.codec_name = "tlv320aic23-codec",
-+	.codec_name = "tlv320aic23-codec.2-001a",
- 	.init = am3517evm_aic23_init,
- 	.ops = &am3517evm_ops,
- };
--- 
-1.6.2.4
+Thanks,
+Simon
