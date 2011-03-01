@@ -1,67 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 1 Mar 2011 12:12:20 +0100
-Subject: [PATCH 3/8] Add a mfd IPUv3 driver
-In-Reply-To: <201103011127.51605.arnd@arndb.de>
-References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
-	<201102281811.45277.arnd@arndb.de>
-	<20110301091544.GK29521@pengutronix.de>
-	<201103011127.51605.arnd@arndb.de>
-Message-ID: <20110301111220.GN29521@pengutronix.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 1 Mar 2011 16:56:06 +0530
+Subject: [PATCH V6 0/8] SPEAr3xx & SPEAr6xx Fixes
+Message-ID: <cover.1298977691.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 11:27:49AM +0100, Arnd Bergmann wrote:
-> On Tuesday 01 March 2011, Sascha Hauer wrote:
-> 
-> > When turning this into a kms driver moving the source code will be the
-> > smallest problem I guess.
-> > I have no preference where to put this code. First it was in
-> > drivers/mfd/ and it felt wrong because there seems to be too much code
-> > in it a mfd maintainer shouldn't be bothered with. drivers/video/ seems
-> > to be wrong because this code will probably support cameras which belong
-> > to drivers/media/video/. So if there's consensus on drivers/gpu/ I will
-> > happily put it there.
-> > What directory do you suggest? drivers/gpu/ or some subdirectory
-> > (drm/vga)?
-> 
-> I'd suggest a subdirectory of drivers/gpu/, e.g.
-> drivers/gpu/embedded/imx-ipu/. Alan is currently adding a driver
-> for the Intel GMA500, and there are others (TI, ST-Ericsson, ...)
-> that fit in a similar category of complex graphics subsystems
-> without an actual GPU core. I think they should all go to the same
-> place.
-> 
-> > > The interrupt logic needs some comments. What are you trying to achieve here?
-> > 
-> > The IPU has 463 status bits which can trigger an interrupt. Most
-> > of them are associated to channels, some are general interrupts. My
-> > problem is that I don't know how the interrupts will be used by drivers
-> > later. Most drivers will probably use only one interrupt but others
-> > will be interested in a larger group of interrupts. So I decided to
-> > use a bitmap allowing each driver to register for groups of event
-> > it is interested in.
-> 
-> Ok, I see. So you essentially have a huge nested interrupt controller
-> and try to be clever about the possible use cases, which may be the
-> right choice, but apparently you don't know that yet because not
-> all the drivers have been written at this point.
-> 
-> Taking one step back from this, have you considered making this
-> a regular interrupt controller? That would make the client drivers
-> more standard -- you could define the interrupt numbers as resources
-> of a platform device or in the device tree, for instance.
-> The cost might be more complex code, e.g. when a device requires
-> many interrupts, but I think it will be at least as efficient
-> at run-time, and less surprising for readers and authors of
-> client drivers.
+This patchset contains minor fixes, renames, & reordering of code of #include
+files.
 
-I thought about this, but hesitated to increase NR_IRQS by 463. Do you
-think we should do this instead?
+Note: These patches were earlier sent as part of a larger patchset:
+"Updating SPEAr Support"
 
-Sascha
+Now it is divided into smaller patchsets. In order to apply these patches
+cleanly following order of patchsets must be maintained.
+- SPEAr3xx & SPEAr6xx Fixes
+- SPEAr3xx & SPEAr6xx: Single Image solution and padmux updates
+- Adding SPEAr13xx support
+- Adding devices support for all spear machines
+- Clock Framework & CPU Freq Updates
+
+Shiraz Hashim (1):
+  ST SPEAr: Append UL to device address macros.
+
+Viresh Kumar (7):
+  ST SPEAr: Reordering #includes in .h & .c files.
+  ST SPEAr: Include mach/hardware.h instead of mach/spear.h
+  ST SPEAr3xx: Rename sdio to sdhci
+  ST SPEAr Clock Framework: Rename usbd clock and align apb_clk entry
+  ST SPEAr3xx: Declare device structures after shirq code
+  ST SPEAr: Replacing SIZE macro's with SZ_4K macros
+  ST SPEAr: Remove unused *_SIZE macros from spear*.h files
+
+ arch/arm/mach-spear3xx/clock.c                    |    6 +-
+ arch/arm/mach-spear3xx/include/mach/entry-macro.S |    3 +-
+ arch/arm/mach-spear3xx/include/mach/generic.h     |   12 +-
+ arch/arm/mach-spear3xx/include/mach/hardware.h    |    1 +
+ arch/arm/mach-spear3xx/include/mach/irqs.h        |    4 +-
+ arch/arm/mach-spear3xx/include/mach/misc_regs.h   |    2 +-
+ arch/arm/mach-spear3xx/include/mach/spear.h       |  135 +++++------------
+ arch/arm/mach-spear3xx/include/mach/spear300.h    |   59 ++-----
+ arch/arm/mach-spear3xx/include/mach/spear310.h    |   34 ++---
+ arch/arm/mach-spear3xx/include/mach/spear320.h    |   67 +++------
+ arch/arm/mach-spear3xx/spear300.c                 |   70 ++++-----
+ arch/arm/mach-spear3xx/spear300_evb.c             |    4 +-
+ arch/arm/mach-spear3xx/spear310.c                 |   10 +-
+ arch/arm/mach-spear3xx/spear310_evb.c             |    2 +-
+ arch/arm/mach-spear3xx/spear320.c                 |   30 ++--
+ arch/arm/mach-spear3xx/spear320_evb.c             |    4 +-
+ arch/arm/mach-spear3xx/spear3xx.c                 |   14 +-
+ arch/arm/mach-spear6xx/clock.c                    |    6 +-
+ arch/arm/mach-spear6xx/include/mach/entry-macro.S |    3 +-
+ arch/arm/mach-spear6xx/include/mach/generic.h     |    4 +-
+ arch/arm/mach-spear6xx/include/mach/hardware.h    |    1 +
+ arch/arm/mach-spear6xx/include/mach/misc_regs.h   |    2 +-
+ arch/arm/mach-spear6xx/include/mach/spear.h       |  175 ++++++---------------
+ arch/arm/mach-spear6xx/spear600.c                 |    2 +-
+ arch/arm/mach-spear6xx/spear600_evb.c             |    2 +-
+ arch/arm/mach-spear6xx/spear6xx.c                 |   29 ++--
+ arch/arm/plat-spear/include/plat/debug-macro.S    |    2 +-
+ arch/arm/plat-spear/include/plat/system.h         |    4 +-
+ arch/arm/plat-spear/include/plat/uncompress.h     |    2 +-
+ arch/arm/plat-spear/time.c                        |    5 +-
+ 30 files changed, 235 insertions(+), 459 deletions(-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.2.2
