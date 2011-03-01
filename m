@@ -1,63 +1,58 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 1 Mar 2011 08:34:37 -0800
-Subject: [RFC PATCH] ARM: Use generic BUG() handler
-In-Reply-To: <20110301100306.GA18007@n2100.arm.linux.org.uk>
-References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
-	<20110301084949.GA16733@n2100.arm.linux.org.uk>
-	<20110301085911.GB16733@n2100.arm.linux.org.uk>
-	<19820.47240.801312.507393@pilspetsen.it.uu.se>
-	<20110301100306.GA18007@n2100.arm.linux.org.uk>
-Message-ID: <AANLkTinMnZAupxn7oYFhqkN1Y0OD-eyN=UeRpw96no9r@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 1 Mar 2011 17:57:45 +0100
+Subject: [PATCH 0/3] OMAP2+ hwmod fixes
+In-Reply-To: <19850e063c924a8a30c69ac02621a659@mail.gmail.com>
+References: <1297858285-7056-1-git-send-email-rnayak@ti.com>
+	<4D5BCC10.2060301@ti.com>
+	<6cc4b2788ff1e15c22987d5db91f0395@mail.gmail.com>
+	<4D5E85EA.70605@ti.com>
+	<alpine.DEB.2.00.1102210901140.22636@utopia.booyaka.com>
+	<e6550ef1ea27499e3bc093e264c54d0f@mail.gmail.com>
+	<alpine.DEB.2.00.1102221200260.22636@utopia.booyaka.com>
+	<19850e063c924a8a30c69ac02621a659@mail.gmail.com>
+Message-ID: <4D6D2589.3090505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 1, 2011 at 2:03 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 01, 2011 at 10:12:40AM +0100, Mikael Pettersson wrote:
->> Russell King - ARM Linux writes:
->> ?> On Tue, Mar 01, 2011 at 08:49:49AM +0000, Russell King - ARM Linux wrote:
->> ?> > On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
->> ?> > > + ? ? ?asm volatile("1:\t.word %c3\n" ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> ?> > > + ? ? ? ? ? ? ? ? ? ".pushsection __bug_table,\"a\"\n" ? ? ? ? \
->> ?> > > + ? ? ? ? ? ? ? ? ? "2:\t.word 1b, %c0\n" ? ? ? ? ? ? ? ? ? ? ?\
->> ?> > > + ? ? ? ? ? ? ? ? ? "\t.hword %c1, 0\n" ? ? ? ? ? ? ? ? ? ? ? ?\
->> ?> > > + ? ? ? ? ? ? ? ? ? "\t.org 2b+%c2\n" ? ? ? ? ? ? ? ? ? ? ? ? ?\
->> ?> >
->> ?> > %c doesn't work on lots of versions of gcc, which is why we can't use
->> ?> > the generic bug support. ?There's no way to reliably generate constants
->> ?> > without many compiler versions spitting out a '#' before them.
->> ?>
->> ?> gcc 4.3.2:
->> ?>
->> ?> asm(".word %c0" : : "i" (0));
->> ?>
->> ?> produces:
->> ?>
->> ?> ? ? ? ? .word #0
->> ?>
->> ?> which gas chokes on:
->> ?>
->> ?> /tmp/cc2hGOHd.s:12: Error: bad expression
->> ?> /tmp/cc2hGOHd.s:12: Error: junk at end of line, first unrecognized character is `0'
->> ?>
->> ?> So what this means is that it's impossible to generate constants in
->> ?> assembly with GCC targetting ARM without having them prefixed by '#',
->> ?> which in turn makes it impossible to use the generic BUG support.
->> ?>
->> ?> I reported this bug to gcc folk many years ago. ?I've no idea which
->> ?> version it has been fixed in or if it's even been fixed.
+Hi Paul,
+
+On 2/23/2011 11:05 AM, Nayak, Rajendra wrote:
+> Hi Paul,
+>
+>> From: Paul Walmsley [mailto:paul at pwsan.com]
+>> Sent: Wednesday, February 23, 2011 12:40 AM
 >>
->> What's the gcc bugzilla bug number?
+>> Hi Rajendra
+>>
+>> On Tue, 22 Feb 2011, Rajendra Nayak wrote:
+>>
+>>> The original behavior of the iterators, to terminate upon
+>>> encountering an error, seems fine to me. The only problem
+>>> I faced was that they fail silently and go undetected, unless
+>>> their user catches the return value and WARN's, which I found
+>>> was not the case with most users, mainly those of
+>>> omap_hwmod_for_each_by_class.
+>>> I was thinking of keeping the behaviour of these iterators
+>>> same for now and add WARN's in these iterators itself upon
+>>> an error, so its seen even if the user fails to catch it.
+>>
+>> What's your opinion on adding the pr_err() or WARN() into the code that
+>> the iterator calls for each hwmod?  That code should know why something
+>> fails, so it should be able to provide a more detailed error message.
+> Of
+>> course, it is not as general a solution...
 >
-> No idea off hand - I'll have to search for that.
->
+> I agree, if the callback functions are written with proper errors
+> or WARN's, they are the right place where most of the details'
+> exist. So maybe we don't need these in the iterator's after all.
 
-It seems I am lucky with the gcc I am using. I would have thought this
-would be a pretty fundamental feature, but yes I did notice that %c
-wasn't used anywhere.
+So to conclude, I will drop the #3 and just push #1 and #2.
 
-Would this kernel feature be acceptable as a selectable config option
-on ARM then?
+#1 is fine with addition of the WARN.
+#2 does return an error but does not print anything, but since each call 
+(_init_main_clk, _init_interface_clks, _init_opt_clks) does report
+some pr_warn in case of error, this is fine.
 
-Thanks,
-Simon
+
+Regards,
+Benoit
