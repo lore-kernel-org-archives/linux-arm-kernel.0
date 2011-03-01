@@ -1,33 +1,60 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 1 Mar 2011 15:33:24 -0600
-Subject: MMC quirks relating to performance/lifetime.
-In-Reply-To: <201103012051.13768.arnd@arndb.de>
-References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
-	<201103012011.51855.arnd@arndb.de> <4D6D45D2.2020900@kernel.dk>
-	<201103012051.13768.arnd@arndb.de>
-Message-ID: <AANLkTikqmVpMqiqXn3dHRzeWi6u5vJtcE8eP4S87AY=b@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 1 Mar 2011 22:38:10 +0100 (CET)
+Subject: [PATCH v6 1/1] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF36683@dbde02.ent.ti.com>
+References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
+	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
+	<20110228212638.GB16806@local>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
+	<20110301183334.GC20497@local>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BF36683@dbde02.ent.ti.com>
+Message-ID: <alpine.LFD.2.00.1103012232220.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 1, 2011 at 1:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 01 March 2011 20:15:30 Jens Axboe wrote:
->> Thanks for the recap. One way to handle this would be to have a dm
->> target that ensures that requests are never built up to violate any of
->> the above items. Doing splitting is a little silly, when you can prevent
->> it from happening in the first place.
->
-> Ok, that sounds good. I didn't know that it's possible to prevent
-> bios from getting created that violate this.
->
+On Wed, 2 Mar 2011, TK, Pratheesh Gangadhar wrote:
 
-Wouldn't someone still be able to perform a generic_make_request that
-would violate the conditions (i.e. cross alignment boundary while
-performing unaligned write)? You could prevent the merges that would
-result in violating the conditions, sure, but you would need to handle
-single unaligned accesses correctly too... Sorry, I'm just groping my
-way around the block layer...a lot I'm still trying to draw a mental
-picture for.
+> Hi,
+> > -----Original Message-----
+> > From: Hans J. Koch [mailto:hjk at hansjkoch.de]
+> > Sent: Wednesday, March 02, 2011 12:04 AM
+> > To: TK, Pratheesh Gangadhar
+> > Cc: Hans J. Koch; linux-kernel at vger.kernel.org; gregkh at suse.de;
+> > tglx at linutronix.de; sshtylyov at mvista.com; arnd at arndb.de; Chatterjee, Amit;
+> > davinci-linux-open-source at linux.davincidsp.com; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH v6 1/1] PRUSS UIO driver support
 
-P.S. I've submitted for review the first 3 patches. Tear into them :).
+Sigh, can you please use a mailer which does not repeat the headers
+for no value and just has a single line like this:
 
-A
+> > On Tue, Mar 01, 2011 at 10:15:27AM +0530, TK, Pratheesh Gangadhar wrote:
+> > Anyway, please don't use that kind of argumentation. The next newbie
+> > developer might copy your work as a basis for his new driver, and there
+> > it probably won't work.
+> > 
+> > Simply put the spin_lock_init before the loop.
+> > 
+> Agree, will fix this in next version.
+
+As I said before, we want stuff initialized when it is possibly
+used. But first of all we ant people to use the proper mechanisms to
+achive that.
+
+If that's a module global lock then it needs to be instantiated by
+
+static DEFINE_SPINLOCK(lock);
+
+which implies the initialization of the lock.
+
+If it's a lock which is in allocated memory then the
+
+   spin_lock_init(&lock);
+
+wants to be before it can be possibly used.
+
+So in your case DEFINE_SPINLOCK is the correct solution.
+
+Thanks,
+
+	tglx
