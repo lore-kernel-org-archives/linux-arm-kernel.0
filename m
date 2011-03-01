@@ -1,31 +1,23 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 1 Mar 2011 14:39:50 +0100
-Subject: [PATCH] mach-ux500: activate fix for errata 753970
-Message-ID: <1298986790-25548-1-git-send-email-linus.walleij@stericsson.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 1 Mar 2011 10:47:23 -0300
+Subject: [PATCH 1/2] ARM imx53: add pwm devices support
+In-Reply-To: <1298972303-1010-1-git-send-email-b02280@freescale.com>
+References: <1298972303-1010-1-git-send-email-b02280@freescale.com>
+Message-ID: <AANLkTimCxkN1HKvhoMS7kHBngYxk6jNbz5qTssH4Fz-B@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This applies errata fix 753970 for all ux500 platforms. All
-current ASICs suffer from this. If the problem is resolved in
-later ASICs, the errata selection can be pushed down to other
-Kconfig options.
+Hi Jason,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+On Tue, Mar 1, 2011 at 6:38 AM, Jason Chen <b02280@freescale.com> wrote:
+...
+> - ? ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
+> + ? ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51() ||
+> + ? ? ? ? ? ? ? cpu_is_mx53()) {
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 247caa3..203b986 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -6,6 +6,7 @@ config UX500_SOC_COMMON
- 	select ARM_GIC
- 	select HAS_MTU
- 	select NOMADIK_GPIO
-+	select ARM_ERRATA_753970
- 
- menu "Ux500 SoC"
- 
--- 
-1.7.3.2
+Wouldn?t  "if (!cpu_is_mx1() && !cpu_is_mx21())" work here and make
+the if statement simpler?
+
+Regards,
+
+Fabio Estevam
