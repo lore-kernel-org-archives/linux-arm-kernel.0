@@ -1,41 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Mar 2011 08:59:11 +0000
-Subject: [RFC PATCH] ARM: Use generic BUG() handler
-In-Reply-To: <20110301084949.GA16733@n2100.arm.linux.org.uk>
-References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
-	<20110301084949.GA16733@n2100.arm.linux.org.uk>
-Message-ID: <20110301085911.GB16733@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 1 Mar 2011 10:04:12 +0100
+Subject: [PATCH 1/2] ARM imx53: add pwm devices support
+In-Reply-To: <AANLkTin5SCtSZfFhErb9baWpMioDWk=UA15cOddb1B=R@mail.gmail.com>
+References: <1298961018-8988-1-git-send-email-b02280@freescale.com>
+	<20110301081043.GS22310@pengutronix.de>
+	<AANLkTin5SCtSZfFhErb9baWpMioDWk=UA15cOddb1B=R@mail.gmail.com>
+Message-ID: <20110301090412.GU22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 08:49:49AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
-> > +	asm volatile("1:\t.word %c3\n"				\
-> > +		     ".pushsection __bug_table,\"a\"\n"		\
-> > +		     "2:\t.word 1b, %c0\n"			\
-> > +		     "\t.hword %c1, 0\n"			\
-> > +		     "\t.org 2b+%c2\n"				\
+On Tue, Mar 01, 2011 at 04:21:37PM +0800, Eric Miao wrote:
+> >> ?config IMX_HAVE_PLATFORM_MXC_PWM
+> >> ? ? ? bool
+> >> + ? ? default y if ARCH_MX21 || ARCH_MX25 || SOC_IMX27 || SOC_IMX51 || SOC_IMX53
+> > If you do this, can you please use SOC_IMX21 and SOC_IMX25? ?Or maybe
+> > even def_bool y?
+> >
 > 
-> %c doesn't work on lots of versions of gcc, which is why we can't use
-> the generic bug support.  There's no way to reliably generate constants
-> without many compiler versions spitting out a '#' before them.
+> Or the other way, in config SOC_IMX53, select IMX_HAVE_PLATFORM_MXC_PWM?
+Yeah, that's how most of the other IMX_HAVE_PLATFORM_XYZ work.
 
-gcc 4.3.2:
+Best regards
+Uwe
 
-asm(".word %c0" : : "i" (0));
-
-produces:
-
-        .word #0
-
-which gas chokes on:
-
-/tmp/cc2hGOHd.s:12: Error: bad expression
-/tmp/cc2hGOHd.s:12: Error: junk at end of line, first unrecognized character is `0'
-
-So what this means is that it's impossible to generate constants in
-assembly with GCC targetting ARM without having them prefixed by '#',
-which in turn makes it impossible to use the generic BUG support.
-
-I reported this bug to gcc folk many years ago.  I've no idea which
-version it has been fixed in or if it's even been fixed.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
