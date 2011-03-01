@@ -1,201 +1,78 @@
 From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Tue,  1 Mar 2011 15:02:07 +0100
-Subject: [PATCH v2 3/4] ASoC: Add machine driver for Visstrim_M10 board.
+Date: Tue,  1 Mar 2011 15:02:08 +0100
+Subject: [PATCH v2 4/4] ARM: Add SSI and aic3204 code to Visstrim_M10 boards.
 In-Reply-To: <1298988128-11520-1-git-send-email-javier.martin@vista-silicon.com>
 References: <1298988128-11520-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1298988128-11520-4-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <1298988128-11520-5-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Visstrim_M10 board uses a tlv320aic3204 codec. This driver
-provides support for it.
+Visstrim_M10 boards have an TI tlv320aic3204 codec
+attached to SSI1.
 
 Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
 ---
- sound/soc/imx/Kconfig           |   10 +++
- sound/soc/imx/Makefile          |    2 +
- sound/soc/imx/mx27vis-aic32x4.c |  137 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 149 insertions(+), 0 deletions(-)
- create mode 100644 sound/soc/imx/mx27vis-aic32x4.c
+ arch/arm/mach-imx/Kconfig                   |    1 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |   14 ++++++++++++++
+ 2 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/imx/Kconfig b/sound/soc/imx/Kconfig
-index 642270a..15e7c04 100644
---- a/sound/soc/imx/Kconfig
-+++ b/sound/soc/imx/Kconfig
-@@ -30,6 +30,16 @@ config SND_MXC_SOC_WM1133_EV1
- 	  Enable support for audio on the i.MX31ADS with the WM1133-EV1
- 	  PMIC board with WM8835x fitted.
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 197f9e2..4d01d8c 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -168,6 +168,7 @@ config MACH_IMX27_VISSTRIM_M10
+ 	bool "Vista Silicon i.MX27 Visstrim_m10"
+ 	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
++	select IMX_HAVE_PLATFORM_IMX_SSI
+ 	help
+ 	  Include support for Visstrim_m10 platform and its different variants.
+ 	  This includes specific configurations for the board and its
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index 59716fa..b346484 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -69,6 +69,11 @@ static const int visstrim_m10_pins[] __initconst = {
+ 	PD15_AOUT_FEC_COL,
+ 	PD16_AIN_FEC_TX_ER,
+ 	PF23_AIN_FEC_TX_EN,
++	/* SSI1 */
++	PC20_PF_SSI1_FS,
++	PC21_PF_SSI1_RXD,
++	PC22_PF_SSI1_TXD,
++	PC23_PF_SSI1_CLK,
+ 	/* SDHC1 */
+ 	PE18_PF_SD1_D0,
+ 	PE19_PF_SD1_D1,
+@@ -207,6 +212,9 @@ static struct i2c_board_info visstrim_m10_i2c_devices[] = {
+ 		I2C_BOARD_INFO("pca9555", 0x20),
+ 		.platform_data = &visstrim_m10_pca9555_pdata,
+ 	},
++	{
++		I2C_BOARD_INFO("tlv320aic32x4", 0x18),
++	}
+ };
  
-+config SND_SOC_MX27VIS_AIC32X4
-+	tristate "SoC audio support for Visstrim M10 boards"
-+	depends on MACH_IMX27_VISSTRIM_M10
-+	select SND_SOC_TVL320AIC32X4
-+	select SND_MXC_SOC_SSI
-+	select SND_MXC_SOC_MX2
-+	help
-+	  Say Y if you want to add support for SoC audio on Visstrim SM10
-+	  board with TLV320AIC32X4 codec.
-+
- config SND_SOC_PHYCORE_AC97
- 	tristate "SoC Audio support for Phytec phyCORE (and phyCARD) boards"
- 	depends on MACH_PCM043 || MACH_PCA100
-diff --git a/sound/soc/imx/Makefile b/sound/soc/imx/Makefile
-index b67fc02..d6d609b 100644
---- a/sound/soc/imx/Makefile
-+++ b/sound/soc/imx/Makefile
-@@ -10,8 +10,10 @@ obj-$(CONFIG_SND_MXC_SOC_MX2) += snd-soc-imx-mx2.o
- # i.MX Machine Support
- snd-soc-eukrea-tlv320-objs := eukrea-tlv320.o
- snd-soc-phycore-ac97-objs := phycore-ac97.o
-+snd-soc-mx27vis-aic32x4-objs := mx27vis-aic32x4.o
- snd-soc-wm1133-ev1-objs := wm1133-ev1.o
+ /* USB OTG */
+@@ -222,6 +230,11 @@ static struct mxc_usbh_platform_data visstrim_m10_usbotg_pdata = {
+ 	.flags	= MXC_EHCI_POWER_PINS_ENABLED,
+ };
  
- obj-$(CONFIG_SND_SOC_EUKREA_TLV320) += snd-soc-eukrea-tlv320.o
- obj-$(CONFIG_SND_SOC_PHYCORE_AC97) += snd-soc-phycore-ac97.o
-+obj-$(CONFIG_SND_SOC_MX27VIS_AIC32X4) += snd-soc-mx27vis-aic32x4.o
- obj-$(CONFIG_SND_MXC_SOC_WM1133_EV1) += snd-soc-wm1133-ev1.o
-diff --git a/sound/soc/imx/mx27vis-aic32x4.c b/sound/soc/imx/mx27vis-aic32x4.c
-new file mode 100644
-index 0000000..054110b
---- /dev/null
-+++ b/sound/soc/imx/mx27vis-aic32x4.c
-@@ -0,0 +1,137 @@
-+/*
-+ * mx27vis-aic32x4.c
-+ *
-+ * Copyright 2011 Vista Silicon S.L.
-+ *
-+ * Author: Javier Martin <javier.martin@vista-silicon.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-+ * MA 02110-1301, USA.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/device.h>
-+#include <linux/i2c.h>
-+#include <sound/core.h>
-+#include <sound/pcm.h>
-+#include <sound/soc.h>
-+#include <sound/soc-dapm.h>
-+#include <asm/mach-types.h>
-+#include <mach/audmux.h>
-+
-+#include "../codecs/tlv320aic32x4.h"
-+#include "imx-ssi.h"
-+
-+static int mx27vis_aic32x4_hw_params(struct snd_pcm_substream *substream,
-+			    struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-+	int ret;
-+	u32 dai_format;
-+
-+	dai_format = SND_SOC_DAIFMT_DSP_B | SND_SOC_DAIFMT_NB_NF |
-+		SND_SOC_DAIFMT_CBM_CFM;
-+
-+	/* set codec DAI configuration */
-+	snd_soc_dai_set_fmt(codec_dai, dai_format);
-+
-+	/* set cpu DAI configuration */
-+	snd_soc_dai_set_fmt(cpu_dai, dai_format);
-+
-+	ret = snd_soc_dai_set_sysclk(codec_dai, 0,
-+				     25000000, SND_SOC_CLOCK_OUT);
-+	if (ret) {
-+		pr_err("%s: failed setting codec sysclk\n", __func__);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_dai_set_sysclk(cpu_dai, IMX_SSP_SYS_CLK, 0,
-+				SND_SOC_CLOCK_IN);
-+	if (ret) {
-+		pr_err("can't set CPU system clock IMX_SSP_SYS_CLK\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_ops mx27vis_aic32x4_snd_ops = {
-+	.hw_params	= mx27vis_aic32x4_hw_params,
++/* SSI */
++static const struct imx_ssi_platform_data visstrim_m10_ssi_pdata __initconst = {
++	.flags			= IMX_SSI_DMA | IMX_SSI_SYN,
 +};
 +
-+static struct snd_soc_dai_link mx27vis_aic32x4_dai = {
-+	.name		= "tlv320aic32x4",
-+	.stream_name	= "TLV320AIC32X4",
-+	.codec_dai_name	= "tlv320aic32x4-hifi",
-+	.platform_name	= "imx-pcm-audio.0",
-+	.codec_name	= "tlv320aic32x4.0-0018",
-+	.cpu_dai_name	= "imx-ssi.0",
-+	.ops		= &mx27vis_aic32x4_snd_ops,
-+};
-+
-+static struct snd_soc_card mx27vis_aic32x4 = {
-+	.name		= "visstrim_m10-audio",
-+	.dai_link	= &mx27vis_aic32x4_dai,
-+	.num_links	= 1,
-+};
-+
-+static struct platform_device *mx27vis_aic32x4_snd_device;
-+
-+static int __init mx27vis_aic32x4_init(void)
-+{
-+	int ret;
-+
-+	mx27vis_aic32x4_snd_device = platform_device_alloc("soc-audio", -1);
-+	if (!mx27vis_aic32x4_snd_device)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(mx27vis_aic32x4_snd_device, &mx27vis_aic32x4);
-+	ret = platform_device_add(mx27vis_aic32x4_snd_device);
-+
-+	if (ret) {
-+		printk(KERN_ERR "ASoC: Platform device allocation failed\n");
-+		platform_device_put(mx27vis_aic32x4_snd_device);
-+	}
-+
-+	/* Connect SSI0 as clock slave to SSI1 external pins */
-+	mxc_audmux_v1_configure_port(MX27_AUDMUX_HPCR1_SSI0,
-+			MXC_AUDMUX_V1_PCR_SYN |
-+			MXC_AUDMUX_V1_PCR_TFSDIR |
-+			MXC_AUDMUX_V1_PCR_TCLKDIR |
-+			MXC_AUDMUX_V1_PCR_TFCSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1) |
-+			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_PPCR1_SSI_PINS_1)
-+	);
-+	mxc_audmux_v1_configure_port(MX27_AUDMUX_PPCR1_SSI_PINS_1,
-+			MXC_AUDMUX_V1_PCR_SYN |
-+			MXC_AUDMUX_V1_PCR_RXDSEL(MX27_AUDMUX_HPCR1_SSI0)
-+	);
-+
-+	return ret;
-+}
-+
-+static void __exit mx27vis_aic32x4_exit(void)
-+{
-+	platform_device_unregister(mx27vis_aic32x4_snd_device);
-+}
-+
-+module_init(mx27vis_aic32x4_init);
-+module_exit(mx27vis_aic32x4_exit);
-+
-+MODULE_AUTHOR("Javier Martin <javier.martin@vista-silicon.com>");
-+MODULE_DESCRIPTION("ALSA SoC AIC32X4 mx27 visstrim");
-+MODULE_LICENSE("GPL");
+ static void __init visstrim_m10_board_init(void)
+ {
+ 	int ret;
+@@ -231,6 +244,7 @@ static void __init visstrim_m10_board_init(void)
+ 	if (ret)
+ 		pr_err("Failed to setup pins (%d)\n", ret);
+ 
++	imx27_add_imx_ssi(0, &visstrim_m10_ssi_pdata);
+ 	imx27_add_imx_uart0(&uart_pdata);
+ 
+ 	i2c_register_board_info(0, visstrim_m10_i2c_devices,
 -- 
 1.7.0.4
