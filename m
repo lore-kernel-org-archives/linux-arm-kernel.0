@@ -1,67 +1,33 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 1 Mar 2011 12:29:28 +0530
-Subject: [PATCH v2 02/13] da850: pruss platform specific additions.
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF35DEE@dbde02.ent.ti.com>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com>
-	<1297435892-28278-3-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF35DEE@dbde02.ent.ti.com>
-Message-ID: <4102429DCB2B4B47A4F51ED0B9A62E2B@subhasishg>
+From: tsoni@codeaurora.org (Trilok Soni)
+Date: Tue, 01 Mar 2011 12:45:30 +0530
+Subject: [PATCH v2 2/4] msm: iommu: Rework clock logic and add IOMMU bus
+	clock control
+In-Reply-To: <1298937782-28725-1-git-send-email-stepanm@codeaurora.org>
+References: <1298599242-21971-2-git-send-email-stepanm@codeaurora.org>
+	<1298937782-28725-1-git-send-email-stepanm@codeaurora.org>
+Message-ID: <4D6C9D12.8090207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Steve,
 
-Can we not have the PRU UIO also as a part of the MFD framework.
-I know that the UIO is not really a device, but I feel its incorrect to 
-register the same device twice.
-Instead we can have a single entry as the MFD framework and the UIO, as a 
-child device, based upon the MFD driver APIs.
+On 3/1/2011 5:33 AM, Stepan Moskovchenko wrote:
+> Clean up the clock control code in the probe calls, and add
+> support for controlling the clock for the IOMMU bus
+> interconnect. With the (proper) clock driver in place, the
+> clock control logic in the probe function can be made much
+> cleaner since it does not have to deal with the placeholder
+> driver anymore.
+> 
+> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+> ---
+> v2: Use resource_size.
 
-All that we need to do is add an entry into the da8xx_pruss_devices 
-structure
-and the MFD driver will do the rest to get the UIO probe called.
+Looks good to me.
 
---------------------------------------------------
-From: "TK, Pratheesh Gangadhar" <pratheesh@ti.com>
-Sent: Monday, February 28, 2011 6:34 PM
-To: "Subhasish Ghosh" <subhasish@mistralsolutions.com>; 
-<davinci-linux-open-source@linux.davincidsp.com>
-Cc: <sachi@mistralsolutions.com>; "Russell King" <linux@arm.linux.org.uk>; 
-"Kevin Hilman" <khilman@deeprootsystems.com>; "open list" 
-<linux-kernel@vger.kernel.org>; "Watkins, Melissa" <m-watkins@ti.com>; 
-<linux-arm-kernel@lists.infradead.org>
-Subject: RE: [PATCH v2 02/13] da850: pruss platform specific additions.
+Reviewed-by: Trilok Soni <tsoni@codeaurora.org>
 
-> Hi,
->
->> -----Original Message-----
->> From: davinci-linux-open-source-bounces at linux.davincidsp.com
->> [mailto:davinci-linux-open-source-bounces at linux.davincidsp.com] On Behalf
->> Of Subhasish Ghosh
->> Sent: Friday, February 11, 2011 8:21 PM
->> To: davinci-linux-open-source at linux.davincidsp.com
->> Cc: sachi at mistralsolutions.com; Russell King; Kevin Hilman; Subhasish
->> Ghosh; open list; Watkins, Melissa; linux-arm-kernel at lists.infradead.org
->> Subject: [PATCH v2 02/13] da850: pruss platform specific additions.
->>
->> This patch adds the platform device and assignes the platform resources
->> for the PRUSS mfd driver.
->>
->> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
->> ---
->> +struct platform_device da8xx_pruss_dev = {
-> Can you please rename this to da8xx_pruss_mfddev?
->> + .name = "da8xx_pruss",
-> Can you please rename name string as pruss_mfd? This will help to
-> base my UIO patches on top of yours.
->> + .id = -1,
->> + .num_resources = ARRAY_SIZE(da8xx_pruss_resources),
->> + .resource = da8xx_pruss_resources,
->> +};
->> +
->> +int __init da8xx_register_pruss(struct da8xx_pruss_devices 
->> *pruss_device)
-> Please rename this to da8xx_register_pruss_mfd
->
-> Thanks,
-> Pratheesh 
+---Trilok Soni
+-- 
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
