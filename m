@@ -1,114 +1,87 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:57:00 +0530
-Subject: [PATCH V6 00/10] Adding SPEAr13xx support
-Message-ID: <cover.1298977719.git.viresh.kumar@st.com>
+Date: Tue, 1 Mar 2011 16:57:05 +0530
+Subject: [PATCH V6 05/10] ST SPEAr13xx: Adding default config file
+In-Reply-To: <cover.1298977719.git.viresh.kumar@st.com>
+References: <cover.1298977719.git.viresh.kumar@st.com>
+Message-ID: <174439793e8885abf070e33b99cf083c4bfa7406.1298977719.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for SPEAr13xx machine family. Currently support
-for to machines SPEAr1300 & SPEAr1310 are added.
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
-Note: These patches were earlier sent as part of a larger patchset:
-"Updating SPEAr Support"
-
-Now it is divided into smaller patchsets. In order to apply these patches
-cleanly following order of patchsets must be maintained.
-- SPEAr3xx & SPEAr6xx Fixes
-- SPEAr3xx & SPEAr6xx: Single Image solution and padmux updates
-- Adding SPEAr13xx support
-- Adding devices support for all spear machines
-- Clock Framework & CPU Freq Updates
-
-Bhupesh Sharma (1):
-  ST SPEAr13xx: Adding support for SPEAr1310
-
-Deepak Sikri (1):
-  ST SPEAr13xx: Adding CPU hotplug support added for SMP platforms
-
-Shiraz Hashim (7):
-  ST SPEAr13xx: Adding machine specific header files
-  ST SPEAr13xx: Adding machine specific src files
-  ST SPEAr13xx: Adding support in SPEAr generic plat/
-  ST SPEAr13xx: Added compilation support in arch/arm/
-  ST SPEAr13xx: Adding default config file
-  ST SPEAr13xx: Adding information in Documentation/ and MAINTAINERS
-  ST SPEAr13xx: add L2 cache support
-
-Vipin Kumar (1):
-  ST SPEAr13xx: Add padmux support
-
- Documentation/arm/SPEAr/overview.txt               |   34 +-
- MAINTAINERS                                        |    6 +
- arch/arm/Kconfig                                   |    4 +-
- arch/arm/Makefile                                  |    2 +
- arch/arm/configs/spear13xx_defconfig               |   61 +
- arch/arm/mach-spear13xx/Kconfig                    |   32 +
- arch/arm/mach-spear13xx/Makefile                   |   21 +
- arch/arm/mach-spear13xx/Makefile.boot              |    3 +
- arch/arm/mach-spear13xx/clock.c                    | 1167 ++++++++++++++++++++
- arch/arm/mach-spear13xx/headsmp.S                  |   42 +
- arch/arm/mach-spear13xx/hotplug.c                  |  121 ++
- arch/arm/mach-spear13xx/include/mach/clkdev.h      |   19 +
- arch/arm/mach-spear13xx/include/mach/debug-macro.S |   14 +
- arch/arm/mach-spear13xx/include/mach/entry-macro.S |   22 +
- arch/arm/mach-spear13xx/include/mach/generic.h     |  261 +++++
- arch/arm/mach-spear13xx/include/mach/gpio.h        |   19 +
- arch/arm/mach-spear13xx/include/mach/hardware.h    |   31 +
- arch/arm/mach-spear13xx/include/mach/io.h          |   19 +
- arch/arm/mach-spear13xx/include/mach/irqs.h        |  128 +++
- arch/arm/mach-spear13xx/include/mach/memory.h      |   19 +
- arch/arm/mach-spear13xx/include/mach/misc_regs.h   |  386 +++++++
- arch/arm/mach-spear13xx/include/mach/smp.h         |   25 +
- arch/arm/mach-spear13xx/include/mach/spear.h       |   95 ++
- arch/arm/mach-spear13xx/include/mach/spear1300.h   |   21 +
- arch/arm/mach-spear13xx/include/mach/spear1310.h   |   64 ++
- arch/arm/mach-spear13xx/include/mach/system.h      |   35 +
- arch/arm/mach-spear13xx/include/mach/timex.h       |   19 +
- arch/arm/mach-spear13xx/include/mach/uncompress.h  |   19 +
- arch/arm/mach-spear13xx/include/mach/vmalloc.h     |   18 +
- arch/arm/mach-spear13xx/localtimer.c               |   25 +
- arch/arm/mach-spear13xx/platsmp.c                  |  162 +++
- arch/arm/mach-spear13xx/spear1300.c                |   38 +
- arch/arm/mach-spear13xx/spear1300_evb.c            |   67 ++
- arch/arm/mach-spear13xx/spear1310.c                |  494 +++++++++
- arch/arm/mach-spear13xx/spear1310_evb.c            |   86 ++
- arch/arm/mach-spear13xx/spear13xx.c                |  697 ++++++++++++
- arch/arm/mm/Kconfig                                |    2 +-
- arch/arm/plat-spear/Kconfig                        |    8 +
- arch/arm/plat-spear/Makefile                       |    1 +
- 39 files changed, 4273 insertions(+), 14 deletions(-)
+Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
+Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+---
+ arch/arm/configs/spear13xx_defconfig |   60 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 60 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/configs/spear13xx_defconfig
- create mode 100644 arch/arm/mach-spear13xx/Kconfig
- create mode 100644 arch/arm/mach-spear13xx/Makefile
- create mode 100644 arch/arm/mach-spear13xx/Makefile.boot
- create mode 100644 arch/arm/mach-spear13xx/clock.c
- create mode 100644 arch/arm/mach-spear13xx/headsmp.S
- create mode 100644 arch/arm/mach-spear13xx/hotplug.c
- create mode 100644 arch/arm/mach-spear13xx/include/mach/clkdev.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-spear13xx/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-spear13xx/include/mach/generic.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/gpio.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/hardware.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/io.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/irqs.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/memory.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/misc_regs.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/smp.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1300.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/spear1310.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/system.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/timex.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-spear13xx/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-spear13xx/localtimer.c
- create mode 100644 arch/arm/mach-spear13xx/platsmp.c
- create mode 100644 arch/arm/mach-spear13xx/spear1300.c
- create mode 100644 arch/arm/mach-spear13xx/spear1300_evb.c
- create mode 100644 arch/arm/mach-spear13xx/spear1310.c
- create mode 100644 arch/arm/mach-spear13xx/spear1310_evb.c
- create mode 100644 arch/arm/mach-spear13xx/spear13xx.c
 
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+new file mode 100644
+index 0000000..10b1cf5
+--- /dev/null
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -0,0 +1,60 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_BSD_PROCESS_ACCT=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_KALLSYMS_EXTRA_PASS=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_PLAT_SPEAR=y
++CONFIG_ARCH_SPEAR13XX=y
++CONFIG_BOARD_SPEAR1300_EVB=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++CONFIG_AEABI=y
++CONFIG_BINFMT_MISC=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_MTD=y
++CONFIG_MTD_CONCAT=y
++CONFIG_MTD_PARTITIONS=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_BLOCK=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_INPUT_FF_MEMLESS=y
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_RAW_DRIVER=y
++CONFIG_MAX_RAW_DEVS=8192
++# CONFIG_HWMON is not set
++# CONFIG_HID_SUPPORT is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
++CONFIG_EXT3_FS_SECURITY=y
++CONFIG_AUTOFS4_FS=m
++CONFIG_MSDOS_FS=m
++CONFIG_VFAT_FS=m
++CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="utf8"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=m
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DETECT_HUNG_TASK=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_SPINLOCK_SLEEP=y
++CONFIG_DEBUG_INFO=y
 -- 
 1.7.2.2
