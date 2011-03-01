@@ -1,30 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Mar 2011 20:04:20 +0100
-Subject: [PATCH 1/2] ARM imx53: add pwm devices support
-In-Reply-To: <AANLkTimCxkN1HKvhoMS7kHBngYxk6jNbz5qTssH4Fz-B@mail.gmail.com>
-References: <1298972303-1010-1-git-send-email-b02280@freescale.com>
-	<AANLkTimCxkN1HKvhoMS7kHBngYxk6jNbz5qTssH4Fz-B@mail.gmail.com>
-Message-ID: <20110301190420.GW22310@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 1 Mar 2011 20:11:51 +0100
+Subject: MMC quirks relating to performance/lifetime.
+In-Reply-To: <4D6D3F71.4040605@kernel.dk>
+References: <AANLkTikh4vfS7SLKAa-aUXhbTxcHzYHmBuaXj1qHHYN9@mail.gmail.com>
+	<201102251321.09232.arnd@arndb.de> <4D6D3F71.4040605@kernel.dk>
+Message-ID: <201103012011.51855.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Tue, Mar 01, 2011 at 10:47:23AM -0300, Fabio Estevam wrote:
-> On Tue, Mar 1, 2011 at 6:38 AM, Jason Chen <b02280@freescale.com> wrote:
-> ...
-> > - ? ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
-> > + ? ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51() ||
-> > + ? ? ? ? ? ? ? cpu_is_mx53()) {
+On Tuesday 01 March 2011 19:48:17 Jens Axboe wrote:
 > 
-> Wouldn?t  "if (!cpu_is_mx1() && !cpu_is_mx21())" work here and make
-> the if statement simpler?
-Yes, but less future proof.  (Assume the next generation SoC is
-different ...)
+> On 2011-02-25 07:21, Arnd Bergmann wrote:
+> > On Friday 25 February 2011, Andrei Warkentin wrote:
+> >> Yup. I understand :-).  That's the strategy I'm going to follow. For
+> >> page_size-alignment/splitting I'm looking at the block layer now. Is
+> >> that the right approach or should I still submit a (cleaned up) patch
+> >> to mmc/card/block.c for that performance improvement.
+> > 
+> > I guess it should live in block/cfq-iosched in the long run, but I don't
+> > know how easy it is to implement it there for test purposes.
+> 
+> I don't think I saw the original patch(es) for this?
 
-Best regards
-Uwe
+Nobody has posted one yet, only discussions. Andrei made a patch for the
+MMC block driver to split requests in some cases, but I think the
+concept has changed enough that it's probably not useful to look at
+that patch.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I think what needs to be done here is to split requests in these cases:
+
+* Small requests should be split on flash page boundaries, where a page
+is typically 8 to 32 KB. Sending one hardware request that spans two
+partial pages can be slower than sending two requests with the same
+data, but on page boundaries.
+
+* If a hardware transfer is limited to a few sectors, these should be
+aligned to page boundaries. E.g. assuming a 16 sector page and 32 sector
+maximum transfers, a request that spans from sector 7 to 62 should be
+split into three transfers: 7-15, 16-47 and 48-62, not 7-38 and 39-62.
+This reduces the number of page read-modify-write cycles that the drive
+does.
+
+* No request should ever span multiple erase blocks. Most flash drives today
+have 4MB erase blocks (sometimes 1, 2 or 8), and the I/O scheduler should
+treat the erase block boundary like a seek on a hard drive. The I/O
+scheduler should try to send all sector writes of an erase block in sequence,
+but after that it can chose any other erase block to write to next.
+
+I think if we get this logic, we can deal well with all cheap flash drives.
+The two parameters we need are the page size and the erase block size,
+which the kernel can sometimes guess, but should also be tunable in
+sysfs for devices that don't tell us or lie to the kernel about them.
+
+I'm not sure if we want to do this for all nonrotational media, or
+add another flag to enable these optimizations. On proper SSDs that have
+an intelligent controller and enough RAM, they probably would not help
+all that much, or even make it slightly slower due to a higher number
+of separate write requests.
+
+	Arnd
