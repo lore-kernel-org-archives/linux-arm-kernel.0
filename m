@@ -1,27 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 1 Mar 2011 14:43:31 +0000
-Subject: [PATCH v2 1/4] ASoC: Add TI tlv320aic32x4 codec support.
-In-Reply-To: <AANLkTinSqVuuiif33yd1zZBTzeb4mvvLpDd4+=RPiHHM@mail.gmail.com>
-References: <1298988128-11520-1-git-send-email-javier.martin@vista-silicon.com>
-	<1298988128-11520-2-git-send-email-javier.martin@vista-silicon.com>
-	<20110301142231.GH9662@opensource.wolfsonmicro.com>
-	<AANLkTinSqVuuiif33yd1zZBTzeb4mvvLpDd4+=RPiHHM@mail.gmail.com>
-Message-ID: <20110301144331.GI9662@opensource.wolfsonmicro.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 1 Mar 2011 07:56:50 -0700
+Subject: [PATCH 2/4] ARM:boot:device tree: Merge specific atags into the
+	device tree
+In-Reply-To: <alpine.LFD.2.00.1103010141140.10356@xanadu.home>
+References: <20110228233153.24836.24176.stgit@riker>
+	<20110228233337.24836.54594.stgit@riker>
+	<alpine.LFD.2.00.1103010141140.10356@xanadu.home>
+Message-ID: <AANLkTin1LBP61RNhgGxdXhVN8inw2N=6AqjYFZ1-FXMU@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 03:36:13PM +0100, javier Martin wrote:
+On Mon, Feb 28, 2011 at 11:45 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Mon, 28 Feb 2011, John Bonesio wrote:
+>
+>> This patch is to merge in key atags into the appended device tree. ?An appended
+>> device tree is where the zImage has a dtb binary appended at the end of it. The
+>> boot code looks for an appended device tree, then looks for a few key atags
+>> passed in by the bootloader.
+>>
+>> The bootargs and memory size settings, if they exist, override existing values
+>> in the appended device tree. If these values don't currently exist in the
+>> appended device tree, they are added.
+>>
+>> Signed-off-by: John Bonesio <bones@secretlab.ca>
+>
+> Is this really useful?
+>
+> I understand this might be handy for testing purposes. ?But if your
+> bootloader does ATAG only then your hardware is likely to have support
+> in the kernel without device tree support just fine.
+>
+> IOW I don't think this would be of much value in upstream.
 
-> Ok, let me organize all this stuff for better understanding. By the
-> way, when you said it should be configured by platform are you
-> referring to machine driver or to board specific code? Can you please
+That's fine.  This feature was implemented to meet a client's
+requirement and to experiment with manipulating the .dtb in the zimage
+wrapper.  We're posting it here for completeness if anyone else wants
+to play with it.  Same for the last patch that allows appending
+multiple dtbs.
 
-Either the machine driver or board specific code depending on what's
-idiomatic for the thing you're configuring (they're both machine
-specific anyway).  
-
-> point me to a codec driver which uses a similar approach?
-
-Quite a lot of CODEC drivers have platform data of various kinds, pretty
-much all of them have an include file in include/sound - look there for
-a list.
+g.
