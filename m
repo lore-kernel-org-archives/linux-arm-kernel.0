@@ -1,78 +1,49 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 1 Mar 2011 11:00:09 +0100 (CET)
-Subject: [PATCH 3/8] Add a mfd IPUv3 driver
-In-Reply-To: <20110301093956.GL29521@pengutronix.de>
-References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
-	<1298887229-7987-4-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.00.1102281858240.2701@localhost6.localdomain6>
-	<20110301093956.GL29521@pengutronix.de>
-Message-ID: <alpine.LFD.2.00.1103011054440.2701@localhost6.localdomain6>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Mar 2011 10:03:06 +0000
+Subject: [RFC PATCH] ARM: Use generic BUG() handler
+In-Reply-To: <19820.47240.801312.507393@pilspetsen.it.uu.se>
+References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+	<20110301084949.GA16733@n2100.arm.linux.org.uk>
+	<20110301085911.GB16733@n2100.arm.linux.org.uk>
+	<19820.47240.801312.507393@pilspetsen.it.uu.se>
+Message-ID: <20110301100306.GA18007@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 1 Mar 2011, Sascha Hauer wrote:
-> On Mon, Feb 28, 2011 at 07:33:05PM +0100, Thomas Gleixner wrote:
-> > > +void ipu_idmac_put(struct ipu_channel *channel)
-> > > +{
-> > > +	dev_dbg(ipu_dev, "%s %d\n", __func__, channel->num);
-> > 
-> > Do we really need this debug stuff in all these functions ?
+On Tue, Mar 01, 2011 at 10:12:40AM +0100, Mikael Pettersson wrote:
+> Russell King - ARM Linux writes:
+>  > On Tue, Mar 01, 2011 at 08:49:49AM +0000, Russell King - ARM Linux wrote:
+>  > > On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
+>  > > > +	asm volatile("1:\t.word %c3\n"				\
+>  > > > +		     ".pushsection __bug_table,\"a\"\n"		\
+>  > > > +		     "2:\t.word 1b, %c0\n"			\
+>  > > > +		     "\t.hword %c1, 0\n"			\
+>  > > > +		     "\t.org 2b+%c2\n"				\
+>  > > 
+>  > > %c doesn't work on lots of versions of gcc, which is why we can't use
+>  > > the generic bug support.  There's no way to reliably generate constants
+>  > > without many compiler versions spitting out a '#' before them.
+>  > 
+>  > gcc 4.3.2:
+>  > 
+>  > asm(".word %c0" : : "i" (0));
+>  > 
+>  > produces:
+>  > 
+>  >         .word #0
+>  > 
+>  > which gas chokes on:
+>  > 
+>  > /tmp/cc2hGOHd.s:12: Error: bad expression
+>  > /tmp/cc2hGOHd.s:12: Error: junk at end of line, first unrecognized character is `0'
+>  > 
+>  > So what this means is that it's impossible to generate constants in
+>  > assembly with GCC targetting ARM without having them prefixed by '#',
+>  > which in turn makes it impossible to use the generic BUG support.
+>  > 
+>  > I reported this bug to gcc folk many years ago.  I've no idea which
+>  > version it has been fixed in or if it's even been fixed.
 > 
-> Reading this comment I expected tons of dev_dbg in the driver. The one
-> you mentioned above (plus the corresponding one in ipu_idmac_get) are
-> indeed not particularly useful, but do you think there is still too much
-> debug code left?
+> What's the gcc bugzilla bug number?
 
-Well, I don't see a point in having useless debug stuff around.
-> > > +	DECLARE_IPU_IRQ_BITMAP(irqs);
-> > 
-> > Why the hell do we need this? It's a bog standard bitmap, right ?
-> 
-> It's defined as:
-> 
-> #define DECLARE_IPU_IRQ_BITMAP(name)     DECLARE_BITMAP(name, IPU_IRQ_COUNT)
-> 
-> So yes, it's a standard bitmask. It can be used in client drivers
-> aswell. Where's the problem of adding a define for this so that client
-> drivers do not have to care about the size of the bitmap?
-
-That's nonsense. You have to know about the size of the bitmap for any
-operation on it. Or are you going to provide wrappers around
-bitmap_zero() and all other possible bitmap_* functions as well?
-
-> > 
-> > > +	bitmap_zero(irqs, IPU_IRQ_COUNT);
-> > > +	ret = ipu_submodules_init(pdev, ipu_base, ipu_clk);
-> > > +	if (ret)
-> > > +		goto failed_submodules_init;
-> > > +
-> > > +	/* Set sync refresh channels as high priority */
-> > > +	ipu_idmac_write(0x18800000, IDMAC_CHA_PRI(0));
-> > 
-> > Hmm, this random prio setting here is odd.
-> 
-> This is 1:1 from the Freescale Kernel and I never thought about it. We
-> can remove it and see what happens. Maybe then some day we'll learn
-> *why* this is done.
-
-Well, the point is to move that to the init function which deals with
-IDMAC and not have it at some random place in the code.
- 
-> > > +	/* Wait for DC triple buffer to empty */
-> > > +	if (dc_channels[dc_chan].di == 0)
-> > > +		while ((__raw_readl(DC_STAT) & 0x00000002)
-> > > +			!= 0x00000002) {
-> > > +			msleep(2);
-> > > +			timeout -= 2;
-> > > +			if (timeout <= 0)
-> > > +				break;
-> > 
-> > So we poll stuff which is updated from some other function ?
-> 
-> We poll the DC_STAT register here which is updated from the hardware.
-
-And there is no interrupt for this ?
-
-Thanks,
-
-	tglx
+No idea off hand - I'll have to search for that.
