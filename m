@@ -1,84 +1,57 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 1 Mar 2011 22:45:25 +0100 (CET)
-Subject: [PATCH v7 1/1] PRUSS UIO driver support
-In-Reply-To: <1299014895-2022-2-git-send-email-pratheesh@ti.com>
-References: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
-	<1299014895-2022-2-git-send-email-pratheesh@ti.com>
-Message-ID: <alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 01 Mar 2011 13:54:17 -0800
+Subject: [PATCH] OMAP2+: PM: Warn users of sleep_while_idle if
+	!CONFIG_CPU_IDLE
+In-Reply-To: <1297857860-3713-1-git-send-email-rnayak@ti.com> (Rajendra
+	Nayak's message of "Wed, 16 Feb 2011 17:34:20 +0530")
+References: <1297857860-3713-1-git-send-email-rnayak@ti.com>
+Message-ID: <87sjv6h5h2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Mar 2011, Pratheesh Gangadhar wrote:
+Rajendra Nayak <rnayak@ti.com> writes:
+
+> This should help users who do a
+> 'echo 1 > /debug/pm_debug/sleep_while_idle' with a
+> config which has !CONFIG_CPU_IDLE and wonder
+> why OMAP is'nt sleeping in idle.
+
+This isn't quite right, as 'sleep_while_idle' is actually a flag for
+whether or not to call omap_sram_idle() at all.
+
+Even without CPUidle, WFI will still be attempted.
+
+Kevin
+
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm-debug.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+> index 125f565..1e722a0 100644
+> --- a/arch/arm/mach-omap2/pm-debug.c
+> +++ b/arch/arm/mach-omap2/pm-debug.c
+> @@ -569,6 +569,10 @@ static int option_get(void *data, u64 *val)
+>  
+>  	*val = *option;
+>  
+> +#ifndef CONFIG_CPU_IDLE
+> +	if (option == &sleep_while_idle)
+> +		pr_warn("CONFIG_CPU_IDLE is not enabled\n");
+> +#endif
+>  	return 0;
+>  }
+>  
+> @@ -581,6 +585,11 @@ static int option_set(void *data, u64 val)
+>  
+>  	*option = val;
+>  
+> +#ifndef CONFIG_CPU_IDLE
+> +	if (option == &sleep_while_idle)
+> +		pr_warn("CONFIG_CPU_IDLE is not enabled\n");
+> +#endif
 > +
-> +static DEFINE_SPINLOCK(lock);
-> +static struct clk *pruss_clk;
-> +static struct uio_info *info;
-> +static dma_addr_t sram_paddr, ddr_paddr;
-> +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> +
-> +static irqreturn_t pruss_handler(int irq, struct uio_info *info)
-> +{
-> +	int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
-> +	int val, intr_mask = (1 << intr_bit);
-> +	void __iomem *base = info->mem[0].internal_addr;
-> +	void __iomem *intren_reg = base + PINTC_HIER;
-> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + (intr_bit << 2);
-> +
-> +	spin_lock_irq(&lock);
-
-No, I said: spin_lock() is sufficient.
-
-> +	val = ioread32(intren_reg);
-> +	/* Is interrupt enabled and active ? */
-> +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND)) {
-> +		spin_unlock_irq(&lock);
-
-You unconditinally enable interrupts here where you are not supposed
-to do so.
-
-> +		return IRQ_NONE;
-> +	}
-> +
-> +	/* Disable interrupt */
-> +	iowrite32((val & ~intr_mask), intren_reg);
-> +	spin_unlock_irq(&lock);
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int pruss_irqcontrol(struct uio_info *info, s32 irq_on)
-> +{
-> +	int intr_bit = info->irq - IRQ_DA8XX_EVTOUT0 + 2;
-> +	int val, intr_mask = (1 << intr_bit);
-> +	void __iomem *base = info->mem[0].internal_addr;
-> +	void __iomem *intren_reg = base + PINTC_HIER;
-> +
-> +	spin_lock_irq(&lock);
-
-This one is correct, as this is always called from non interrupt
-disabled context.
-
-> +	val = ioread32(intren_reg);
-> +	if (irq_on)
-> +		iowrite32((val | intr_mask), intren_reg);
-> +	else
-> +		iowrite32((val & ~intr_mask), intren_reg);
-> +	spin_unlock_irq(&lock);
-> +
-> +	return 0;
-> +}
-
-
-> +
-> +	spin_lock_init(&lock);
-
-Sigh. DEFINE_SPINLOCK(lock); already initializes the lock.
-
-It's not the purpose of a review to tell you what you need to change
-mechanically. Reviewers hint to a correct solution and you are
-supposed to lookup what that solution means and act accordingly. If
-you do not understand the hint or its implications please ask _before_
-sending a new patch set.
-
-Thanks,
-
-	tglx
+>  	if (option == &enable_off_mode) {
+>  		if (val)
+>  			omap_pm_enable_off_mode();
