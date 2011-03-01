@@ -1,41 +1,28 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 1 Mar 2011 10:58:37 +0800
-Subject: [PATCH 0/4] Support for device-tree appended to zImage
-In-Reply-To: <20110228233153.24836.24176.stgit@riker>
-References: <20110228233153.24836.24176.stgit@riker>
-Message-ID: <20110301025836.GA3920@S2100-06.ap.freescale.net>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Tue, 1 Mar 2011 11:06:07 +0800
+Subject: [PATCH V3 4/4] mmc: sdhci-esdhc: enable esdhc on imx53
+In-Reply-To: <010C9052C42A00499CE76D637FA5EE900C7B7B@039-SN1MPN1-001.039d.mgd.msft.net>
+References: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1298892725-23672-4-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110228144741.GF15532@pengutronix.de>
+	<010C9052C42A00499CE76D637FA5EE900C7B7B@039-SN1MPN1-001.039d.mgd.msft.net>
+Message-ID: <AANLkTinabUZ8wot=iu7Yp6LnmVWu_k1Ha2srHaipy0qx@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+>> Hmm, to me, just using cpu_is_mx53() is more readable than introducing
+>> another layer of flags/quirks.
+> Hi Wolfram:
+> I discussed it with Richard Zhao before sending out these V3 patches.
+> As we know that there is not only mx53 has this issue, maybe some following SOCs have this issue too.
+> So we make a decision that we introduce another flags/quirks to declare it for all those SOCs that required this
+> mechanism in the end.
 
-On Mon, Feb 28, 2011 at 03:33:18PM -0800, John Bonesio wrote:
-> The following series support for device tree binary blobs (dtb) that are
-> appended to the compressed kernel image (zImage).
-> 
-> Having appended dtb data is not required to boot with a device tree. If no dtb
-> data is appended to zImage, the kernel will boot using prior methods.
-> 
-> ---
-> 
-> John Bonesio (4):
->       ARM:boot:device tree: Allow the device tree binary to be appended to zImage
->       ARM:boot:device tree: Merge specific atags into the device tree
->       ARM:boot:device tree: Add puthex routine for use in the boot wrapper
->       ARM:boot:device tree: Allow multiple device trees to be appended to zImage
-> 
-> 
->  arch/arm/Kconfig                  |    7 ++
->  arch/arm/boot/compressed/Makefile |   31 +++++++-
->  arch/arm/boot/compressed/atags.c  |   70 +++++++++++++++++++
->  arch/arm/boot/compressed/head.S   |  136 +++++++++++++++++++++++++++++++++++--
->  arch/arm/boot/compressed/misc.c   |  134 ++++++++++++++++++++++++++++++++++++
->  5 files changed, 365 insertions(+), 13 deletions(-)
->  create mode 100644 arch/arm/boot/compressed/atags.c
-> 
-I'm trying to test and use it.  But it does not apply against any tree
-that I can find, neither mainline nor Grant's tree.  Need rebasing?
+I agree with Richard here that a flag/quirk will be more generic than
+cpu_is_*(). Otherwise we may end up one day growing a big list of
+these cpu_is_*().
 
--- 
-Regards,
-Shawn
+One other point to consider is the SoC stepping, as this might be
+fixed in later steppings, and keeping cpu_is_mx53() or
+cpu_is_mx53_stepping_b2_or_above() doesn't look very good in
+the driver code itself.
