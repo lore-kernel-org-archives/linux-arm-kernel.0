@@ -1,56 +1,52 @@
-From: gregkh@suse.de (Greg KH)
-Date: Tue, 1 Mar 2011 10:34:38 -0500
-Subject: [RFC] device.h: add device_set_platdata routine
-In-Reply-To: <20110301075953.GR22310@pengutronix.de>
-References: <5c561db378360ad1763da41f8350c7be816daa06.1298953633.git.viresh.kumar@st.com>
-	<20110301075953.GR22310@pengutronix.de>
-Message-ID: <20110301153438.GB15633@suse.de>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Tue,  1 Mar 2011 21:13:38 +0530
+Subject: [PATCH] audio:am3517evm support for AIC23
+Message-ID: <1298994218-30610-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 08:59:53AM +0100, Uwe Kleine-K?nig wrote:
-> [added gregkh and lkml to Cc:]
-> 
-> Hi Viresh,
-> 
-> On Tue, Mar 01, 2011 at 10:03:20AM +0530, Viresh Kumar wrote:
-> > device.h supports device_get_platdata but doesn't support device_set_platdata.
-> > This routine is required by platforms in which device structure is declared
-> > in a machine specific file and platform data comes from board specific file.
-> > 
-> > This will be used by SPEAr patches sent in separate patch series.
-> > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> > ---
-> >  include/linux/device.h |    5 +++++
-> >  1 files changed, 5 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/include/linux/device.h b/include/linux/device.h
-> > index 1bf5cf0..6ce0f20 100644
-> > --- a/include/linux/device.h
-> > +++ b/include/linux/device.h
-> > @@ -576,6 +576,11 @@ static inline void *dev_get_platdata(const struct device *dev)
-> >  	return dev->platform_data;
-> >  }
-> >  
-> > +static inline void dev_set_platdata(struct device *dev, void *platdata)
-> > +{
-> > +	dev->platform_data = platdata;
-> > +}
-> > +
-> Note that dev->platform_data was designed to hold dynamically allocated
-> memory, at least it's kfreed in platform_device_release.  And note there
-> is platform_device_add_data that kmemdups its argument into
-> pdev->dev.platform_data.
-> 
-> Compared to your dev_set_platdata platform_device_add_data only works
-> for platform_devices, don't know if it's worth to change that.
-> 
-> And regarding platform_device_add_data I wonder if it wouldn't be more
-> consistent to set platform_data = NULL if (!data)?  Greg?
+This patch aims to fix the registration of the AIC23-based audio
+module on the AM3517-EVM, with the following two changes:
 
-Maybe, care to send a patch?
+1. The i2c_board_info entry supporting aic23 codec was added into
+   the i2c2 bus.
+2. The i2c client device name (".2-001a" in this case, including
+   the separator period) was appended to the codec_name member of
+   am3517evm_dai to resolve the names mismatch happening in
+   soc_bind_dai_link().
 
-thanks,
+Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+---
+ arch/arm/mach-omap2/board-am3517evm.c |    3 +++
+ sound/soc/omap/am3517evm.c            |    2 +-
+ 2 files changed, 4 insertions(+), 1 deletions(-)
 
-greg k-h
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index ad71cbf..8da8d20 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -358,6 +358,9 @@ static struct pca953x_platform_data am3517evm_gpio_expander_info_0 = {
+ };
+ static struct i2c_board_info __initdata am3517evm_i2c2_boardinfo[] = {
+ 	{
++		I2C_BOARD_INFO("tlv320aic23", 0x1A),
++	},
++	{
+ 		I2C_BOARD_INFO("tca6416", 0x21),
+ 		.platform_data = &am3517evm_gpio_expander_info_0,
+ 	},
+diff --git a/sound/soc/omap/am3517evm.c b/sound/soc/omap/am3517evm.c
+index 979dd50..ddbd2a1 100644
+--- a/sound/soc/omap/am3517evm.c
++++ b/sound/soc/omap/am3517evm.c
+@@ -139,7 +139,7 @@ static struct snd_soc_dai_link am3517evm_dai = {
+ 	.cpu_dai_name ="omap-mcbsp-dai.0",
+ 	.codec_dai_name = "tlv320aic23-hifi",
+ 	.platform_name = "omap-pcm-audio",
+-	.codec_name = "tlv320aic23-codec",
++	.codec_name = "tlv320aic23-codec.2-001a",
+ 	.init = am3517evm_aic23_init,
+ 	.ops = &am3517evm_ops,
+ };
+-- 
+1.6.2.4
