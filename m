@@ -1,39 +1,80 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 01 Mar 2011 10:30:39 +0000
-Subject: [PATCH 1/4] msm: scm: Mark inline asm as volatile
-In-Reply-To: <8yalj112x98.fsf@huya.qualcomm.com>
+Date: Tue, 01 Mar 2011 10:37:17 +0000
+Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
+In-Reply-To: <alpine.LFD.2.00.1102261452340.22034@xanadu.home>
 References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-2-git-send-email-sboyd@codeaurora.org>
-	<1298635017.958.0.camel@e102144-lin.cambridge.arm.com>
-	<8yapqqe3bs3.fsf@huya.qualcomm.com> <1298805034.4626.4.camel@jazzbox>
-	<8yalj112x98.fsf@huya.qualcomm.com>
-Message-ID: <1298975439.7828.2.camel@e102144-lin.cambridge.arm.com>
+	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
+	<1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
+	<4D688AF1.1090607@codeaurora.org>
+	<20110226084736.GB3640@n2100.arm.linux.org.uk>
+	<8yazkpi3cfa.fsf@huya.qualcomm.com>
+	<alpine.LFD.2.00.1102261452340.22034@xanadu.home>
+Message-ID: <1298975837.7828.9.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Nicolas,
 
-On Sun, 2011-02-27 at 17:38 +0000, David Brown wrote:
-> Per the gcc manual:
+On Sat, 2011-02-26 at 20:04 +0000, Nicolas Pitre wrote:
+> > The gcc docs say:
+> >
+> >    * Local register variables in specific registers do not reserve the
+> >      registers, except at the point where they are used as input or
+> >      output operands in an `asm' statement and the `asm' statement
+> >      itself is not deleted.  The compiler's data flow analysis is
+> >      capable of determining where the specified registers contain live
+> >      values, and where they are available for other uses.  Stores into
+> >      local register variables may be deleted when they appear to be
+> >      dead according to dataflow analysis.  References to local register
+> >      variables may be deleted or moved or simplified.
+> >
+> > which would suggest that it should at least detect that it can't keep
+> > the value in r0.  What it seems to do is detect that the value can't be
+> > in the register, so it never bothers putting it there in the first
+> > place.
+
+I suspect it sees the function call as a write to r0 and then somehow
+infers that the live range of the int r0 variable ends there. Without a
+use in the live range it then decides it can optimise away the
+definition. It really comes down to whether or not the variable is
+characterised by its identifier or the register in which it resides.
+
+> Right.  A minimal test case may look like this if someone feels like
+> filling a gcc bug report:
 > 
->     If your assembler instructions access memory in an unpredictable
->    fashion, add `memory' to the list of clobbered registers.  This will
->    cause GCC to not keep memory values cached in registers across the
->    assembler instruction and not optimize stores or loads to that
->    memory.  You will also want to add the `volatile' keyword if the
->    memory affected is not listed in the inputs or outputs of the `asm',
->    as the `memory' clobber does not count as a side-effect of the `asm'.
->    If you know how large the accessed memory is, you can add it as input
->    or output but if this is not known, you should add `memory'.  As an
->    example, if you access ten bytes of a string, you can use a memory
->    input like:
+> extern int foo(int x);
 > 
-Right, so if you neglected to check the output from the smc block then
-it would be a candidate for removal even with a memory clobber. Now I
-see why you want a volatile in there!
+> int bar(int x)
+> {
+>         register int a asm("r0") = 1;
+>         x = foo(x);
+>         asm ("add %0, %1, %2" : "=r" (x) : "r" (a), "r" (x));
+>         return x;
+> }
+> 
+> And the produced code is:
+> 
+> bar:
+>         stmfd   sp!, {r3, lr}
+>         bl      foo
+> #APP
+>         add r0, r0, r0
+>         ldmfd   sp!, {r3, pc}
+> 
+> So this is clearly bogus.
+> 
 
-For what it's worth:
+I agree that this is wrong, but the compiler people may try and argue
+the other way. I'll ask some of the compiler guys at ARM and see what
+they think.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> > In any case, fortunately it works with the fix.
+> 
+> Please add a comment in your patch to explain the issue.
+> 
+
+Perhaps a more robust fix would be to remove the register int
+declarations and handle the parameter marshalling in the same asm block
+that contains the smc?
 
 Will
