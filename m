@@ -1,38 +1,30 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 01 Mar 2011 14:48:45 -0800
-Subject: [GIT PULL] omap fixes for v2.6.38-rc6
-In-Reply-To: <alpine.DEB.1.10.1103011931380.27610@esdhcp041196.research.nokia.com>
-	(Aaro Koskinen's message of "Tue, 1 Mar 2011 19:39:01 +0200 (EET)")
-References: <20110228194151.GJ20560@atomide.com>
-	<alpine.DEB.1.10.1103011931380.27610@esdhcp041196.research.nokia.com>
-Message-ID: <87aahefodu.fsf@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 01 Mar 2011 15:49:18 -0700
+Subject: [PATCH 0/2] OMAP3: cpuidle: prevent CORE pwrdm from entering
+	low-power state when DSS active
+Message-ID: <20110301220833.32613.54669.stgit@twilight.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aaro Koskinen <aaro.koskinen@nokia.com> writes:
+This series prevents the OMAP3 CPUIdle code from programming the CORE
+powerdomain to enter any power state lower than ON when the DSS power domain
+is ON.  (The assumption is that in this case, the DSS is active, DMA'ing
+lines from RAM and displaying them somewhere.)
 
-> Hi,
->
-> On Mon, 28 Feb 2011, Tony Lindgren wrote:
->> Please pull omap fixes from:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
->>
->> This contains one more timer regression fix, a DPLL rate fix,
->> and a mailbox NULL pointer fix that would be good to get
->> in for 2.6.38. The series also removes world-writable flag for
->> some debugfs entries.
->>
->> Other than I believe that's it for omap fixes for v2.6.38.
->
-> I wonder what happened to this patch:
->
-> 	http://marc.info/?l=linux-omap&m=129772313519005&w=2
->
+Tero, please don't hesitate to comment on the patch from you if I got the
+commit message wrong.
 
-I have it queued with some other PM fixes that I haven't (yet) pushed to
-Tony due to being on vacation.
 
-Will take care of that today or tomorrow at the latest.
+- Paul
 
-Kevin
+---
+
+Tero Kristo (1):
+      OMAP3: cpuidle: prevent CORE power domain from going to RET or OFF when DSS is on
+
+Paul Walmsley (1):
+      OMAP3: cpuidle: add more details to the DSS-related CORE power domain state restriction
+
+
+ arch/arm/mach-omap2/cpuidle34xx.c |   36 ++++++++++++++++++++++++++++++++++--
+ 1 files changed, 34 insertions(+), 2 deletions(-)
