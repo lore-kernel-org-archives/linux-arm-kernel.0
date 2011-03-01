@@ -1,141 +1,133 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 1 Mar 2011 19:07:40 +0530
-Subject: [PATCH v2 13/13] tty: pruss SUART driver
-In-Reply-To: <20110222111103.5d0dd0a7@lxorguk.ukuu.org.uk>
-References: <1297435892-28278-1-git-send-email-subhasish@mistralsolutions.com><1297435892-28278-14-git-send-email-subhasish@mistralsolutions.com><20110211162814.6ff274f1@lxorguk.ukuu.org.uk><A6D1CF0E941748448610BE8874FC586F@subhasishg>
-	<20110222111103.5d0dd0a7@lxorguk.ukuu.org.uk>
-Message-ID: <99CE1730AA2F4F2F91AFA71BD75FDC41@subhasishg>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 1 Mar 2011 19:06:46 +0530
+Subject: [PATCH 3/3] arm: omap4: support pmu
+In-Reply-To: <1298985434-3009-4-git-send-email-tom.leiming@gmail.com>
+References: <1298985434-3009-1-git-send-email-tom.leiming@gmail.com>
+	<1298985434-3009-4-git-send-email-tom.leiming@gmail.com>
+Message-ID: <98808a1e9a0e0409013a83a66c3847e7@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-I tried using the tty_prepare_flip_string as shown below, but this is 
-causing some latency issues.
-
-Problem is, we do not have any flow control, so we must copy the FIFO data 
-before the next data
-is available. As we are using the tty_prepare_flip_string just before the 
-read API, the FIFO is getting
-overwritten and we are ending up missing chunks (FIFO sized) of data.
-
-I tried using a tasklet for the TX part, but that did not help.
-Another way is to prepare the buffer for the next read and read the data 
-immediately.
-Something like this:
-
-1. Call tty_prepare_flip_string while startup.
-2. When the read interrupt arrives, read the data immediately.
-3. Call tty_prepare_flip_string for the next read.
-
-Again, the problem here is that we need to use global variables to store the 
-pre-allocated buffers
-and at the last read, we allocated the buffer but never used it. I think 
-this will cause a memory leak.
-Or we can de-allocate it while driver close, not sure how to.
-
-The best way is if we can keep the current implementation, one extra copy is 
-not hurting us
-as we do it after the read_data API.
-
-
-==================================================================================
---- a/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-+++ b/drivers/tty/serial/da8xx_pruss/pruss_suart.c
-@@ -170,8 +170,9 @@ static void omapl_pru_rx_chars(struct omapl_pru_suart
-*soft_uart, u32 uart_no)
-        s8 flags = TTY_NORMAL;
-        u16 rx_status, data_len = SUART_FIFO_LEN;
-        u32 data_len_read;
--       u8 suart_data[SUART_FIFO_LEN + 1];
-+       u8 *suart_data = NULL;
-        s32 i = 0;
-+       s32 alloc_len = 0;
-
-        if (!(suart_get_duplex(soft_uart, uart_no) & ePRU_SUART_HALF_RX))
-                return;
-@@ -199,9 +200,10 @@ static void omapl_pru_rx_chars(struct omapl_pru_suart
-*soft_uart, u32 uart_no)
-                soft_uart->port[uart_no].sysrq = 0;
- #endif
-        } else {
-+               alloc_len = tty_prepare_flip_string(tty, &suart_data,
-data_len + 1);
-                pru_softuart_read_data(dev, &soft_uart->suart_hdl[uart_no],
--                                      suart_data, data_len + 1,
--                                      &data_len_read);
-+                                               suart_data, alloc_len,
-+                                               &data_len_read);
-
-                for (i = 0; i <= data_len_read; i++) {
-                        soft_uart->port[uart_no].icount.rx++;
-@@ -210,8 +212,6 @@ static void omapl_pru_rx_chars(struct omapl_pru_suart
-*soft_uart, u32 uart_no)
-                            (&soft_uart->port[uart_no], suart_data))
-                                continue;
-                }
--               /* update the tty data structure */
--               tty_insert_flip_string(tty, suart_data, data_len_read);
-        }
-============================================================================================
-
---------------------------------------------------
-From: "Alan Cox" <alan@lxorguk.ukuu.org.uk>
-Sent: Tuesday, February 22, 2011 4:41 PM
-To: "Subhasish" <subhasish@mistralsolutions.com>
-Cc: <davinci-linux-open-source@linux.davincidsp.com>; 
-<linux-arm-kernel@lists.infradead.org>; <m-watkins@ti.com>; 
-<nsekhar@ti.com>; <sachi@mistralsolutions.com>; "Greg Kroah-Hartman" 
-<gregkh@suse.de>; "open list" <linux-kernel@vger.kernel.org>; "Stalin 
-Srinivasan" <stalin.s@mistralsolutions.com>
-Subject: Re: [PATCH v2 13/13] tty: pruss SUART driver
-
->> we used separate files and hence we decided to keep the code in a 
->> separate
->> directory so that the related files can be identified easily.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of tom.leiming at gmail.com
+> Sent: Tuesday, March 01, 2011 6:47 PM
+> To: linux at arm.linux.org.uk
+> Cc: linux-arm-kernel at lists.infradead.org; Ming Lei; Woodruff
+> Richard; Tony Lindgren; linux-omap at vger.kernel.org
+> Subject: [PATCH 3/3] arm: omap4: support pmu
 >
-> Fair enough but I would have thought you could drop the two files in the
-> serial directory if they have obviously related names- trivial item/
->>
->> >
->> >
->> >
->> >> +#ifdef __SUART_DEBUG
->> >> +#define __suart_debug(fmt, args...) \
->> >> + printk(KERN_DEBUG "suart_debug: " fmt, ## args)
->> >> +#else
->> >> +#define __suart_debug(fmt, args...)
->> >> +#endif
->> >> +
->> >> +#define  __suart_err(fmt, args...) printk(KERN_ERR "suart_err: " fmt, 
->> >> ##
->> >> args)
->> >
->> > Use dev_dbg/dev_err/pr_debug/pr_err
->>
->> SG - did you mean replace the printks above with dev_dgb/err or the
->> suart_dbg/err.
+> From: Ming Lei <tom.leiming@gmail.com>
 >
-> Ideally all the messages shopuld use dev_dbg/dev_err etc. That allows you
-> to configure debug levels and the like nicely as well as producing
-> clearer printk info. In some cases with tty code you may not know the
-> device so have to use pr_err/pr_debug etc.
+> This patch supports pmu irq routed from CTI, so
+> make pmu/perf working on OMAP4.
 >
-> Ok
+> The idea is from Woodruff Richard in the disscussion
+> "Oprofile on Pandaboard / Omap4" of pandaboard at googlegroups.com.
 >
->> > Which is never checked. Far better to use WARN_ON and the like for such
->> > cases - or if like this one they don't appear to be possible to simply
->> > delete them
->>
->> SG -- OK, does this look ok ?
->> =================================
->> if (h_uart == NULL) {
->> +WARN_ON(1);
->> - return PRU_SUART_ERR_HANDLE_INVALID;
->> +return -EINVAL;
->> }
+> Cc: Woodruff Richard <r-woodruff2@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+> ---
+
+Thanks Mein Lei for this.
+
+>  arch/arm/mach-omap2/devices.c |   54
+> ++++++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 53 insertions(+), 1 deletions(-)
 >
-> Yep - the user will now get a backtrace, and in addition kerneloops.org
-> can capture it if that is set up in the distro in use.
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-
+> omap2/devices.c
+> index 71f099b..54e9705 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -34,6 +34,7 @@
 >
-> Alan 
+>  #include "mux.h"
+>  #include "control.h"
+> +#include "dbg44xx.h"
+>
+>  #if defined(CONFIG_VIDEO_OMAP2) ||
+> defined(CONFIG_VIDEO_OMAP2_MODULE)
+>
+> @@ -347,19 +348,70 @@ static struct resource omap3_pmu_resource = {
+>  	.flags	= IORESOURCE_IRQ,
+>  };
+>
+> +static struct resource omap4_pmu_resource[] = {
+> +	{
+> +	.start	= OMAP44XX_IRQ_CTI0,
+> +	.end	= OMAP44XX_IRQ_CTI0,
+> +	.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +	.start	= OMAP44XX_IRQ_CTI1,
+> +	.end	= OMAP44XX_IRQ_CTI1,
+> +	.flags	= IORESOURCE_IRQ,
+> +	}
+> +};
+> +
+>  static struct platform_device omap_pmu_device = {
+>  	.name		= "arm-pmu",
+>  	.id		= ARM_PMU_DEVICE_CPU,
+>  	.num_resources	= 1,
+>  };
+>
+> +struct pmu_platform_data omap4_pmu_data;
+> +
+> +static void omap4_configure_pmu_irq(void)
+> +{
+> +	void *base0;
+> +	void *base1;
+> +
+> +	base0 = ioremap(OMAP4430_CTI0_BASE, 4096);
+> +	base1 = ioremap(OMAP4430_CTI1_BASE, 4096);
+> +	if (!base0 && !base1) {
+> +		pr_err("ioremap for omap4 CTI failed\n");
+> +		return;
+> +	}
+> +
+> +	/*configure CTI0 for pmu irq routing*/
+> +	cti_init(&omap4_pmu_data.cti[0], base0,
+> +			OMAP44XX_IRQ_CTI0, 6);
+> +	cti_unlock(&omap4_pmu_data.cti[0]);
+> +	cti_map_trigger(&omap4_pmu_data.cti[0],
+> +			1, 6, 2);
+> +
+> +	/*configure CTI1 for pmu irq routing*/
+> +	cti_init(&omap4_pmu_data.cti[1], base1,
+> +			OMAP44XX_IRQ_CTI1, 6);
+> +	cti_unlock(&omap4_pmu_data.cti[1]);
+> +	cti_map_trigger(&omap4_pmu_data.cti[1],
+> +			1, 6, 3);
+> +
+> +	omap4_pmu_data.cti_cnt = 2;
+> +	omap4_pmu_data.use_cti_irq = 1;
+> +}
+> +
+>  static void omap_init_pmu(void)
+>  {
+>  	if (cpu_is_omap24xx())
+>  		omap_pmu_device.resource = &omap2_pmu_resource;
+>  	else if (cpu_is_omap34xx())
+>  		omap_pmu_device.resource = &omap3_pmu_resource;
+> -	else
+> +	else if (cpu_is_omap44xx()) {
+> +		omap_pmu_device.resource = omap4_pmu_resource;
+> +		omap_pmu_device.num_resources = 2;
+> +		omap_pmu_device.dev.platform_data = &omap4_pmu_data;
+> +
+> +		omap4_configure_pmu_irq();
+> +	} else
+>  		return;
+>
+>  	platform_device_register(&omap_pmu_device);
+> --
+> 1.7.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-
+> omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
