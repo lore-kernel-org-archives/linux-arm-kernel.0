@@ -1,56 +1,39 @@
-From: bones@secretlab.ca (John Bonesio)
-Date: Mon, 28 Feb 2011 19:25:22 -0800
-Subject: [PATCH 0/4] Support for device-tree appended to zImage
-In-Reply-To: <20110301025836.GA3920@S2100-06.ap.freescale.net>
-References: <20110228233153.24836.24176.stgit@riker>
-	<20110301025836.GA3920@S2100-06.ap.freescale.net>
-Message-ID: <4D6C6722.3040904@secretlab.ca>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 28 Feb 2011 20:21:00 -0800
+Subject: [PATCH 4/4] msm: scm: Get cacheline size from CTR
+In-Reply-To: <alpine.LFD.2.00.1102242056010.2701@localhost6.localdomain6>
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
+	<alpine.LFD.2.00.1102241959290.2701@localhost6.localdomain6>
+	<4D66B505.6010702@codeaurora.org>
+	<alpine.LFD.2.00.1102242056010.2701@localhost6.localdomain6>
+Message-ID: <4D6C742C.40507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 02/24/2011 11:56 AM, Thomas Gleixner wrote:
+> On Thu, 24 Feb 2011, Stephen Boyd wrote:
+>
+>>
+>> I definitely don't want to do it for every loop. I'm fine with getting
+>> it every scm_call() invocation though.
+>>
+>> For now, I'll pull the end and cacheline_size variables out of the
+>> do-while loop.
+>
+> Why not do it correct right away and retrieve it in an __init
+> function?
 
-I'm using Grant's tree with Nicolas Pitre's patch to the compressed
-image wrapper. His patches went out to the ARM list and I'm told they
-were accepted. These patches may not yet be in Grant's tree. These
-patches are titled:
+That would require an early_initcall, so hopefully that is fine.
 
-[PATCH 1/2] ARM: improvements to compressed/head.S
-[PATCH 2/2] ARM: remove the 4x expansion presumption while decompressing
-the kernel
+I wonder why the generic arm v7 cache operations don't do the same thing
+and store the dcache line size somewhere. Every dma operation is
+essentially calling dcache_line_size(). Perhaps some generic arm code
+should be determining the dcache line size really early on and storing
+it in the proc_info_list? Then both the dma code and scm code could
+query the processor for the dcache line size with something like
+cpu_dcache_line_size?
 
-Grant, is there a branch in your tree that people should be using, or
-should be they applying both sets of patches?
-
-- John
-
-On 02/28/2011 06:58 PM, Shawn Guo wrote:
-> Hi John,
-> 
-> On Mon, Feb 28, 2011 at 03:33:18PM -0800, John Bonesio wrote:
->> The following series support for device tree binary blobs (dtb) that are
->> appended to the compressed kernel image (zImage).
->>
->> Having appended dtb data is not required to boot with a device tree. If no dtb
->> data is appended to zImage, the kernel will boot using prior methods.
->>
->> ---
->>
->> John Bonesio (4):
->>       ARM:boot:device tree: Allow the device tree binary to be appended to zImage
->>       ARM:boot:device tree: Merge specific atags into the device tree
->>       ARM:boot:device tree: Add puthex routine for use in the boot wrapper
->>       ARM:boot:device tree: Allow multiple device trees to be appended to zImage
->>
->>
->>  arch/arm/Kconfig                  |    7 ++
->>  arch/arm/boot/compressed/Makefile |   31 +++++++-
->>  arch/arm/boot/compressed/atags.c  |   70 +++++++++++++++++++
->>  arch/arm/boot/compressed/head.S   |  136 +++++++++++++++++++++++++++++++++++--
->>  arch/arm/boot/compressed/misc.c   |  134 ++++++++++++++++++++++++++++++++++++
->>  5 files changed, 365 insertions(+), 13 deletions(-)
->>  create mode 100644 arch/arm/boot/compressed/atags.c
->>
-> I'm trying to test and use it.  But it does not apply against any tree
-> that I can find, neither mainline nor Grant's tree.  Need rebasing?
-> 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
