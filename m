@@ -1,460 +1,111 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:57:31 +0530
-Subject: [PATCH V6 03/17] ST SPEAr: Adding PLGPIO driver for spear platform
+Date: Tue, 1 Mar 2011 16:57:32 +0530
+Subject: [PATCH V6 04/17] ST SPEAr3xx: Adding support for ST's PWM IP
 In-Reply-To: <cover.1298977727.git.viresh.kumar@st.com>
 References: <cover.1298977727.git.viresh.kumar@st.com>
-Message-ID: <1047ea5019ba41f80fceb150965a4343d93d557d.1298977728.git.viresh.kumar@st.com>
+Message-ID: <e402e0dfdcd3265dd45a905968bf9449f6971a4b.1298977728.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Plgpio pads on few spear machines can be configured as gpios. This patch add
-support for configuring these PLGPIOs.
-
 Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/include/mach/generic.h |    2 +
- arch/arm/mach-spear3xx/include/mach/gpio.h    |  143 ++++++++
- arch/arm/mach-spear3xx/spear310.c             |   68 ++++
- arch/arm/mach-spear3xx/spear310_evb.c         |    1 +
- arch/arm/mach-spear3xx/spear320.c             |   28 ++
+ arch/arm/mach-spear3xx/include/mach/generic.h |    1 +
+ arch/arm/mach-spear3xx/spear320.c             |   16 +
  arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
- arch/arm/mach-spear6xx/include/mach/gpio.h    |   27 ++
+ arch/arm/plat-spear/Kconfig                   |    7 +
  arch/arm/plat-spear/Makefile                  |    2 +
- arch/arm/plat-spear/include/plat/gpio.h       |   35 ++
- arch/arm/plat-spear/plgpio.c                  |  473 +++++++++++++++++++++++++
- 10 files changed, 780 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-spear/plgpio.c
+ arch/arm/plat-spear/pwm.c                     |  484 +++++++++++++++++++++++++
+ 6 files changed, 511 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-spear/pwm.c
 
 diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 5320ab6..31e7a03 100644
+index 31e7a03..f43d104 100644
 --- a/arch/arm/mach-spear3xx/include/mach/generic.h
 +++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -145,6 +145,7 @@ void __init spear300_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- /* spear310 declarations */
- #ifdef CONFIG_MACH_SPEAR310
- /* Add spear310 machine device structure declarations here */
-+extern struct platform_device spear310_plgpio_device;
- 
- /* pad mux devices */
- extern struct pmx_dev spear310_pmx_emi_cs_0_1_4_5;
-@@ -166,6 +167,7 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
- /* spear320 declarations */
+@@ -168,6 +168,7 @@ void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
  #ifdef CONFIG_MACH_SPEAR320
  /* Add spear320 machine device structure declarations here */
-+extern struct platform_device spear320_plgpio_device;
+ extern struct platform_device spear320_plgpio_device;
++extern struct platform_device spear320_pwm_device;
  
  /* pad mux modes */
  extern struct pmx_mode spear320_auto_net_smii_mode;
-diff --git a/arch/arm/mach-spear3xx/include/mach/gpio.h b/arch/arm/mach-spear3xx/include/mach/gpio.h
-index 451b208..1881f70 100644
---- a/arch/arm/mach-spear3xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear3xx/include/mach/gpio.h
-@@ -16,4 +16,147 @@
- 
- #include <plat/gpio.h>
- 
-+#ifdef CONFIG_MACH_SPEAR310
-+#define SPEAR310_PLGPIO_ENB		0x0010
-+#define SPEAR310_PLGPIO_WDATA		0x0020
-+#define SPEAR310_PLGPIO_DIR		0x0030
-+#define SPEAR310_PLGPIO_IE		0x0040
-+#define SPEAR310_PLGPIO_RDATA		0x0050
-+#define SPEAR310_PLGPIO_MIS		0x0060
-+#endif /* CONFIG_MACH_SPEAR310 */
-+
-+#ifdef CONFIG_MACH_SPEAR320
-+#define SPEAR320_PLGPIO_ENB		0x0024
-+#define SPEAR320_PLGPIO_WDATA		0x0034
-+#define SPEAR320_PLGPIO_DIR		0x0044
-+#define SPEAR320_PLGPIO_RDATA		0x0054
-+#define SPEAR320_PLGPIO_IE		0x0064
-+#define SPEAR320_PLGPIO_MIS		0x0074
-+#endif /* CONFIG_MACH_SPEAR320 */
-+
-+#define BASIC_GPIO_0		0
-+#define BASIC_GPIO_1		1
-+#define BASIC_GPIO_2		2
-+#define BASIC_GPIO_3		3
-+#define BASIC_GPIO_4		4
-+#define BASIC_GPIO_5		5
-+#define BASIC_GPIO_6		6
-+#define BASIC_GPIO_7		7
-+
-+#ifdef CONFIG_MACH_SPEAR300
-+#define RAS_GPIO_0		8
-+#define RAS_GPIO_1		9
-+#define RAS_GPIO_2		10
-+#define RAS_GPIO_3		11
-+#define RAS_GPIO_4		12
-+#define RAS_GPIO_5		13
-+#define RAS_GPIO_6		14
-+#define RAS_GPIO_7		15
-+#endif /* CONFIG_MACH_SPEAR300 */
-+
-+#if defined(CONFIG_MACH_SPEAR310) || defined(CONFIG_MACH_SPEAR320)
-+#define PLGPIO_0		8
-+#define PLGPIO_1		9
-+#define PLGPIO_2		10
-+#define PLGPIO_3		11
-+#define PLGPIO_4		12
-+#define PLGPIO_5		13
-+#define PLGPIO_6		14
-+#define PLGPIO_7		15
-+#define PLGPIO_8		16
-+#define PLGPIO_9		17
-+#define PLGPIO_10		18
-+#define PLGPIO_11		19
-+#define PLGPIO_12		20
-+#define PLGPIO_13		21
-+#define PLGPIO_14		22
-+#define PLGPIO_15		23
-+#define PLGPIO_16		24
-+#define PLGPIO_17		25
-+#define PLGPIO_18		26
-+#define PLGPIO_19		27
-+#define PLGPIO_20		28
-+#define PLGPIO_21		29
-+#define PLGPIO_22		30
-+#define PLGPIO_23		31
-+#define PLGPIO_24		32
-+#define PLGPIO_25		33
-+#define PLGPIO_26		34
-+#define PLGPIO_27		35
-+#define PLGPIO_28		36
-+#define PLGPIO_29		37
-+#define PLGPIO_30		38
-+#define PLGPIO_31		39
-+#define PLGPIO_32		40
-+#define PLGPIO_33		41
-+#define PLGPIO_34		42
-+#define PLGPIO_35		43
-+#define PLGPIO_36		44
-+#define PLGPIO_37		45
-+#define PLGPIO_38		46
-+#define PLGPIO_39		47
-+#define PLGPIO_40		48
-+#define PLGPIO_41		49
-+#define PLGPIO_42		50
-+#define PLGPIO_43		51
-+#define PLGPIO_44		52
-+#define PLGPIO_45		53
-+#define PLGPIO_46		54
-+#define PLGPIO_47		55
-+#define PLGPIO_48		56
-+#define PLGPIO_49		57
-+#define PLGPIO_50		58
-+#define PLGPIO_51		59
-+#define PLGPIO_52		60
-+#define PLGPIO_53		61
-+#define PLGPIO_54		62
-+#define PLGPIO_55		63
-+#define PLGPIO_56		64
-+#define PLGPIO_57		65
-+#define PLGPIO_58		66
-+#define PLGPIO_59		67
-+#define PLGPIO_60		68
-+#define PLGPIO_61		69
-+#define PLGPIO_62		70
-+#define PLGPIO_63		71
-+#define PLGPIO_64		72
-+#define PLGPIO_65		73
-+#define PLGPIO_66		74
-+#define PLGPIO_67		75
-+#define PLGPIO_68		76
-+#define PLGPIO_69		77
-+#define PLGPIO_70		78
-+#define PLGPIO_71		79
-+#define PLGPIO_72		80
-+#define PLGPIO_73		81
-+#define PLGPIO_74		82
-+#define PLGPIO_75		83
-+#define PLGPIO_76		84
-+#define PLGPIO_77		85
-+#define PLGPIO_78		86
-+#define PLGPIO_79		87
-+#define PLGPIO_80		88
-+#define PLGPIO_81		89
-+#define PLGPIO_82		90
-+#define PLGPIO_83		91
-+#define PLGPIO_84		92
-+#define PLGPIO_85		93
-+#define PLGPIO_86		94
-+#define PLGPIO_87		95
-+#define PLGPIO_88		96
-+#define PLGPIO_89		97
-+#define PLGPIO_90		98
-+#define PLGPIO_91		99
-+#define PLGPIO_92		100
-+#define PLGPIO_93		101
-+#define PLGPIO_94		102
-+#define PLGPIO_95		103
-+#define PLGPIO_96		104
-+#define PLGPIO_97		105
-+#define PLGPIO_98		106
-+#define PLGPIO_99		107
-+#define PLGPIO_100		108
-+#define PLGPIO_101		109
-+#endif /* CONFIG_MACH_SPEAR310 || CONFIG_MACH_SPEAR320 */
-+
- #endif /* __MACH_GPIO_H */
-diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
-index 4522e48..a4cd44c 100644
---- a/arch/arm/mach-spear3xx/spear310.c
-+++ b/arch/arm/mach-spear3xx/spear310.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/ptrace.h>
- #include <asm/irq.h>
-+#include <plat/gpio.h>
- #include <plat/shirq.h>
- #include <mach/generic.h>
- #include <mach/hardware.h>
-@@ -308,6 +309,73 @@ static struct spear_shirq shirq_intrcomm_ras = {
- };
- 
- /* Add spear310 specific devices here */
-+/* plgpio device registeration */
-+/*
-+ * pin to offset and offset to pin converter functions
-+ *
-+ * In spear310 there is inconsistency among bit positions in plgpio regiseters,
-+ * for different plgpio pins. For example: for pin 27, bit offset is 23, pin
-+ * 28-33 are not supported, pin 95 has offset bit 95, bit 100 has offset bit 1
-+ */
-+static int spear300_p2o(int pin)
-+{
-+	int offset = pin;
-+
-+	if (pin <= 27)
-+		offset += 4;
-+	else if (pin <= 33)
-+		offset = -1;
-+	else if (pin <= 97)
-+		offset -= 2;
-+	else if (pin <= 101)
-+		offset = 101 - pin;
-+	else
-+		offset = -1;
-+
-+	return offset;
-+}
-+
-+int spear300_o2p(int offset)
-+{
-+	if (offset <= 3)
-+		return 101 - offset;
-+	else if (offset <= 31)
-+		return offset - 4;
-+	else
-+		return offset + 2;
-+}
-+
-+static struct plgpio_platform_data plgpio_plat_data = {
-+	.gpio_base = 8,
-+	.irq_base = SPEAR3XX_PLGPIO_INT_BASE,
-+	.gpio_count = SPEAR3XX_PLGPIO_COUNT,
-+	.p2o = spear300_p2o,
-+	.o2p = spear300_o2p,
-+	/* list of registers with inconsistency */
-+	.p2o_regs = PTO_RDATA_REG | PTO_WDATA_REG | PTO_DIR_REG |
-+		PTO_IE_REG | PTO_RDATA_REG | PTO_MIS_REG,
-+};
-+
-+static struct resource plgpio_resources[] = {
-+	{
-+		.start = SPEAR310_SOC_CONFIG_BASE,
-+		.end = SPEAR310_SOC_CONFIG_BASE + SZ_4K - 1,
-+		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = SPEAR310_VIRQ_PLGPIO,
-+		.flags = IORESOURCE_IRQ,
-+	},
-+};
-+
-+struct platform_device spear310_plgpio_device = {
-+	.name = "plgpio",
-+	.id = -1,
-+	.dev = {
-+		.platform_data = &plgpio_plat_data,
-+	},
-+	.num_resources = ARRAY_SIZE(plgpio_resources),
-+	.resource = plgpio_resources,
-+};
- 
- /* spear310 routines */
- void __init spear310_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
-diff --git a/arch/arm/mach-spear3xx/spear310_evb.c b/arch/arm/mach-spear3xx/spear310_evb.c
-index c8684ce..f6832c4 100644
---- a/arch/arm/mach-spear3xx/spear310_evb.c
-+++ b/arch/arm/mach-spear3xx/spear310_evb.c
-@@ -52,6 +52,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
- 
- 	/* spear310 specific devices */
-+	&spear310_plgpio_device,
- };
- 
- static void __init spear310_evb_init(void)
 diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
-index a99cf7c..06b3332 100644
+index 06b3332..c1642c1 100644
 --- a/arch/arm/mach-spear3xx/spear320.c
 +++ b/arch/arm/mach-spear3xx/spear320.c
-@@ -13,6 +13,7 @@
- 
- #include <linux/ptrace.h>
- #include <asm/irq.h>
-+#include <plat/gpio.h>
- #include <plat/shirq.h>
- #include <mach/generic.h>
- #include <mach/hardware.h>
-@@ -711,6 +712,33 @@ static struct spear_shirq shirq_intrcomm_ras = {
+@@ -740,6 +740,22 @@ struct platform_device spear320_plgpio_device = {
+ 	.resource = plgpio_resources,
  };
  
- /* Add spear320 specific devices here */
-+/* plgpio device registeration */
-+static struct plgpio_platform_data plgpio_plat_data = {
-+	.gpio_base = 8,
-+	.irq_base = SPEAR3XX_PLGPIO_INT_BASE,
-+	.gpio_count = SPEAR3XX_PLGPIO_COUNT,
-+};
-+
-+static struct resource plgpio_resources[] = {
++/* pwm device registeration */
++static struct resource pwm_resources[] = {
 +	{
-+		.start = SPEAR320_SOC_CONFIG_BASE,
-+		.end = SPEAR320_SOC_CONFIG_BASE + SZ_4K - 1,
++		.start = SPEAR320_PWM_BASE,
++		.end = SPEAR320_PWM_BASE + SZ_4K - 1,
 +		.flags = IORESOURCE_MEM,
-+	}, {
-+		.start = SPEAR320_VIRQ_PLGPIO,
-+		.flags = IORESOURCE_IRQ,
 +	},
 +};
 +
-+struct platform_device spear320_plgpio_device = {
-+	.name = "plgpio",
++struct platform_device spear320_pwm_device = {
++	.name = "pwm",
 +	.id = -1,
-+	.dev = {
-+		.platform_data = &plgpio_plat_data,
-+	},
-+	.num_resources = ARRAY_SIZE(plgpio_resources),
-+	.resource = plgpio_resources,
++	.num_resources = ARRAY_SIZE(pwm_resources),
++	.resource = pwm_resources,
 +};
- 
++
  /* spear320 routines */
  void __init spear320_init(struct pmx_mode *pmx_mode, struct pmx_dev **pmx_devs,
+ 		u8 pmx_dev_count)
 diff --git a/arch/arm/mach-spear3xx/spear320_evb.c b/arch/arm/mach-spear3xx/spear320_evb.c
-index a12b353..4d747db 100644
+index 4d747db..6190660 100644
 --- a/arch/arm/mach-spear3xx/spear320_evb.c
 +++ b/arch/arm/mach-spear3xx/spear320_evb.c
-@@ -49,6 +49,7 @@ static struct platform_device *plat_devs[] __initdata = {
- 	/* spear3xx specific devices */
+@@ -50,6 +50,7 @@ static struct platform_device *plat_devs[] __initdata = {
  
  	/* spear320 specific devices */
-+	&spear320_plgpio_device,
+ 	&spear320_plgpio_device,
++	&spear320_pwm_device,
  };
  
  static void __init spear320_evb_init(void)
-diff --git a/arch/arm/mach-spear6xx/include/mach/gpio.h b/arch/arm/mach-spear6xx/include/mach/gpio.h
-index 3a789db..465b2e7 100644
---- a/arch/arm/mach-spear6xx/include/mach/gpio.h
-+++ b/arch/arm/mach-spear6xx/include/mach/gpio.h
-@@ -16,4 +16,31 @@
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index ee5fd4a..21f31cd 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -38,4 +38,11 @@ source "arch/arm/mach-spear13xx/Kconfig"
+ source "arch/arm/mach-spear3xx/Kconfig"
+ source "arch/arm/mach-spear6xx/Kconfig"
  
- #include <plat/gpio.h>
- 
-+#define CPU_GPIO_0		0
-+#define CPU_GPIO_1		1
-+#define CPU_GPIO_2		2
-+#define CPU_GPIO_3		3
-+#define CPU_GPIO_4		4
-+#define CPU_GPIO_5		5
-+#define CPU_GPIO_6		6
-+#define CPU_GPIO_7		7
++config SPEAR_PWM
++	tristate "SPEAr Pulse Width Modulator"
++	depends on MACH_SPEAR320
++	default y
++	help
++	  Support for ST Microelectronics Pulse Width Modulator present on SPEAr Platform.
 +
-+#define BASIC_GPIO_0		8
-+#define BASIC_GPIO_1		9
-+#define BASIC_GPIO_2		10
-+#define BASIC_GPIO_3		11
-+#define BASIC_GPIO_4		12
-+#define BASIC_GPIO_5		13
-+#define BASIC_GPIO_6		14
-+#define BASIC_GPIO_7		15
-+
-+#define APPL_GPIO_0		16
-+#define APPL_GPIO_1		17
-+#define APPL_GPIO_2		18
-+#define APPL_GPIO_3		19
-+#define APPL_GPIO_4		20
-+#define APPL_GPIO_5		21
-+#define APPL_GPIO_6		22
-+#define APPL_GPIO_7		23
-+
- #endif /* __MACH_GPIO_H */
+ endif
 diff --git a/arch/arm/plat-spear/Makefile b/arch/arm/plat-spear/Makefile
-index 03f9acc..f462c8f 100644
+index f462c8f..636678a 100644
 --- a/arch/arm/plat-spear/Makefile
 +++ b/arch/arm/plat-spear/Makefile
-@@ -7,3 +7,5 @@ obj-y	:= clock.o time.o
- 
- obj-$(CONFIG_ARCH_SPEAR13XX)	+= padmux.o
+@@ -9,3 +9,5 @@ obj-$(CONFIG_ARCH_SPEAR13XX)	+= padmux.o
  obj-$(CONFIG_ARCH_SPEAR3XX)	+= shirq.o padmux.o
-+obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
-+obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
-diff --git a/arch/arm/plat-spear/include/plat/gpio.h b/arch/arm/plat-spear/include/plat/gpio.h
-index b857c91..450671e 100644
---- a/arch/arm/plat-spear/include/plat/gpio.h
-+++ b/arch/arm/plat-spear/include/plat/gpio.h
-@@ -21,4 +21,39 @@
- #define gpio_cansleep	__gpio_cansleep
- #define gpio_to_irq	__gpio_to_irq
- 
-+/* plgpio driver declarations */
-+/*
-+ * plgpio pins in all machines are not one to one mapped, bitwise with
-+ * registers bits. These set of macros define register masks for which below
-+ * functions (pin_to_offset and offset_to_pin) are required to be called.
-+ */
-+#define PTO_ENB_REG		0x001
-+#define PTO_WDATA_REG		0x002
-+#define PTO_DIR_REG		0x004
-+#define PTO_IE_REG		0x008
-+#define PTO_RDATA_REG		0x010
-+#define PTO_MIS_REG		0x020
+ obj-$(CONFIG_MACH_SPEAR310)	+= plgpio.o
+ obj-$(CONFIG_MACH_SPEAR320)	+= plgpio.o
 +
-+/* functions for converting pin to correct offset in register and vice versa */
-+/**
-+ * struct plgpio_platform_data: plgpio driver platform data
-+ *
-+ * gpio_base: gpio start number of plgpios
-+ * irq_base: irq number of plgpio0
-+ * gpio_count: total count of plgpios
-+ * p2o: function ptr for pin to offset conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * o2p: function ptr for offset to pin conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * p2o_regs: mask of registers for which p2o and o2p are applicable
-+ */
-+struct plgpio_platform_data {
-+	u32 gpio_base;
-+	u32 irq_base;
-+	u32 gpio_count;
-+	int (*p2o)(int pin);		/* pin_to_offset */
-+	int (*o2p)(int offset);		/* offset_to_pin */
-+	u32 p2o_regs;
-+};
-+
- #endif /* __PLAT_GPIO_H */
-diff --git a/arch/arm/plat-spear/plgpio.c b/arch/arm/plat-spear/plgpio.c
++obj-$(CONFIG_SPEAR_PWM)		+= pwm.o
+diff --git a/arch/arm/plat-spear/pwm.c b/arch/arm/plat-spear/pwm.c
 new file mode 100644
-index 0000000..4db9a07
+index 0000000..307c725
 --- /dev/null
-+++ b/arch/arm/plat-spear/plgpio.c
-@@ -0,0 +1,473 @@
++++ b/arch/arm/plat-spear/pwm.c
+@@ -0,0 +1,484 @@
 +/*
-+ * arch/arm/plat-spear/plgpio.c
++ * arch/arm/plat-spear/pwm.c
 + *
-+ * SPEAr platform PLGPIO driver source file
++ * ST Microelectronics SPEAr Pulse Width Modulator driver
 + *
 + * Copyright (C) 2010 ST Microelectronics
 + * Viresh Kumar<viresh.kumar@st.com>
@@ -464,465 +115,476 @@ index 0000000..4db9a07
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/bitops.h>
-+#include <linux/kernel.h>
-+#include <linux/spinlock.h>
-+#include <linux/errno.h>
-+#include <linux/module.h>
++#include <linux/clk.h>
++#include <linux/err.h>
 +#include <linux/io.h>
 +#include <linux/ioport.h>
-+#include <linux/irq.h>
-+#include <linux/gpio.h>
-+#include <linux/slab.h>
++#include <linux/kernel.h>
++#include <linux/math64.h>
++#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <asm/mach-types.h>
++#include <linux/pwm.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
 +
-+#define MAX_GPIO_PER_REG		32
-+#define PIN_OFFSET(pin)			(pin % MAX_GPIO_PER_REG)
-+#define REG_OFFSET(base, reg, pin)	(base + reg + (pin / MAX_GPIO_PER_REG)\
-+		* sizeof(int *))
++/* PWM registers and bits definitions */
++#define PWMCR			0x00
++#define PWMDCR			0x04
++#define PWMPCR			0x08
 +
-+static unsigned int plgpio_enb, plgpio_wdata, plgpio_dir, plgpio_rdata,
-+		    plgpio_ie, plgpio_mis;
++#define PWM_EN_MASK		0x1
++#define MIN_PRESCALE		0x00
++#define MAX_PRESCALE		0x3FFF
++#define PRESCALE_SHIFT		2
++#define MIN_DUTY		0x0001
++#define MAX_DUTY		0xFFFF
++#define MAX_PERIOD		0xFFFF
++#define MIN_PERIOD		0x0001
++
++#define PWM_DEVICE_PER_IP	4
++#define PWM_DEVICE_OFFSET	0x10
++
++/* lock for pwm_list */
++static DEFINE_SPINLOCK(list_lock);
++/* list of all pwm ips available in system */
++static LIST_HEAD(pwm_list);
++
++/**
++ * struct pwm_device: struct representing pwm device/channel
++ *
++ * pwmd_id: id of pwm device
++ * pwm: pointer to parent pwm ip
++ * label: used for storing label passed in pwm_request
++ * offset: base address offset from parent pwm mmio_base
++ * busy: represents usage status of a pwm device
++ * lock: lock specific to a pwm device
++ * node: node for adding device to parent pwm's devices list
++ *
++ * Each pwm IP contains four independent pwm device/channels. Some or all of
++ * which may be present in our configuration.
++ */
++struct pwm_device {
++	unsigned pwmd_id;
++	struct pwm *pwm;
++	const char *label;
++	unsigned offset;
++	unsigned busy;
++	spinlock_t lock;
++	struct list_head node;
++};
++
++/**
++ * struct pwm: struct representing pwm ip
++ *
++ * id: id of pwm ip
++ * mmio_base: base address of pwm
++ * clk: pointer to clk structure of pwm ip
++ * clk_enabled: clock enable status
++ * pdev: pointer to pdev structure of pwm
++ * lock: lock specific to current pwm ip
++ * devices: list of devices/childrens of pwm ip
++ * node: node for adding pwm to global list of all pwm ips
++ */
++struct pwm {
++	unsigned id;
++	void __iomem *mmio_base;
++	struct clk *clk;
++	int clk_enabled;
++	struct platform_device *pdev;
++	spinlock_t lock;
++	struct list_head devices;
++	struct list_head node;
++};
 +
 +/*
-+ * struct plgpio: plgpio driver specific structure
++ * period_ns = 10^9 * (PRESCALE + 1) * PV / PWM_CLK_RATE
++ * duty_ns = 10^9 * (PRESCALE + 1) * DC / PWM_CLK_RATE
 + *
-+ * lock: lock for guarding gpio registers
-+ * base: base address of plgpio block
-+ * irq_base: irq number of plgpio0
-+ * chip: gpio framework specific chip information structure
-+ * p2o: function ptr for pin to offset conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * o2p: function ptr for offset to pin conversion. This is required only for
-+ * machines where mapping b/w pin and offset is not 1-to-1.
-+ * p2o_regs: mask of registers for which p2o and o2p are applicable
++ * PV = (PWM_CLK_RATE * period_ns)/ (10^9 * (PRESCALE + 1))
++ * DC = (PWM_CLK_RATE * duty_ns)/ (10^9 * (PRESCALE + 1))
 + */
-+struct plgpio {
-+	spinlock_t		lock;
-+	void __iomem		*base;
-+	unsigned		irq_base;
-+	struct gpio_chip	chip;
-+	int (*p2o)(int pin);		/* pin_to_offset */
-+	int (*o2p)(int offset);		/* offset_to_pin */
-+	u32			p2o_regs;
-+};
-+
-+/* register manipulation inline functions */
-+static inline u32 is_plgpio_set(void __iomem *base, u32 pin, u32 reg)
++int pwm_config(struct pwm_device *pwmd, int duty_ns, int period_ns)
 +{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl(reg_off);
-+
-+	return val & (1 << offset);
-+}
-+
-+static inline void plgpio_reg_set(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl(reg_off);
-+
-+	writel(val | (1 << offset), reg_off);
-+}
-+
-+static inline void plgpio_reg_reset(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl(reg_off);
-+
-+	writel(val & ~(1 << offset), reg_off);
-+}
-+
-+/* gpio framework specific routines */
-+static int plgpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_DIR_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, plgpio_dir);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int plgpio_direction_output(struct gpio_chip *chip, unsigned offset,
-+		int value)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+	unsigned dir_offset = offset, wdata_offset = offset, tmp;
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & (PTO_DIR_REG | PTO_WDATA_REG))) {
-+		tmp = plgpio->p2o(offset);
-+		if (tmp == -1)
-+			return -EINVAL;
-+
-+		if (plgpio->p2o_regs & PTO_DIR_REG)
-+			dir_offset = tmp;
-+		if (plgpio->p2o_regs & PTO_WDATA_REG)
-+			wdata_offset = tmp;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, dir_offset, plgpio_dir);
-+	if (value)
-+		plgpio_reg_set(plgpio->base, wdata_offset, plgpio_wdata);
-+	else
-+		plgpio_reg_reset(plgpio->base, wdata_offset, plgpio_wdata);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int plgpio_get_value(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_RDATA_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	return is_plgpio_set(plgpio->base, offset, plgpio_rdata);
-+}
-+
-+static void plgpio_set_value(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (offset >= chip->ngpio)
-+		return;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_WDATA_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	if (value)
-+		plgpio_reg_set(plgpio->base, offset, plgpio_wdata);
-+	else
-+		plgpio_reg_reset(plgpio->base, offset, plgpio_wdata);
-+}
-+
-+static int plgpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
++	u64 val, div, clk_rate;
++	unsigned long prescale = MIN_PRESCALE, pv, dc;
 +	int ret = 0;
 +
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
++	if (!pwmd) {
++		pr_err("pwm: config - NULL pwm device pointer\n");
++		return -EFAULT;
++	}
++
++	if (period_ns == 0 || duty_ns > period_ns) {
++		ret = -EINVAL;
++		goto err;
++	}
++
++	/* TODO: Need to optimize this loop */
++	while (1) {
++		div = 1000000000;
++		div *= 1 + prescale;
++		clk_rate = clk_get_rate(pwmd->pwm->clk);
++		val = clk_rate * period_ns;
++		pv = div64_u64(val, div);
++		val = clk_rate * duty_ns;
++		dc = div64_u64(val, div);
++
++		if ((pv == 0) || (dc == 0)) {
++			ret = -EINVAL;
++			goto err;
++		}
++		if ((pv > MAX_PERIOD) || (dc > MAX_DUTY)) {
++			prescale++;
++			if (prescale > MAX_PRESCALE) {
++				ret = -EINVAL;
++				goto err;
++			}
++			continue;
++		}
++		if ((pv < MIN_PERIOD) || (dc < MIN_DUTY)) {
++			ret = -EINVAL;
++			goto err;
++		}
++		break;
++	}
 +
 +	/*
-+	 * put gpio in IN mode before enabling it. This make enabling gpio safe
++	 * NOTE: the clock to PWM has to be enabled first
++	 * before writing to the registers
 +	 */
-+	ret = plgpio_direction_input(chip, offset);
-+	if (ret)
-+		return ret;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_ENB_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
++	spin_lock(&pwmd->pwm->lock);
++	ret = clk_enable(pwmd->pwm->clk);
++	if (ret) {
++		spin_unlock(&pwmd->pwm->lock);
++		goto err;
 +	}
 +
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, plgpio_enb);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
++	spin_lock(&pwmd->lock);
++	writel(prescale << PRESCALE_SHIFT, pwmd->pwm->mmio_base +
++			pwmd->offset + PWMCR);
++	writel(dc, pwmd->pwm->mmio_base + pwmd->offset + PWMDCR);
++	writel(pv, pwmd->pwm->mmio_base + pwmd->offset + PWMPCR);
++	spin_unlock(&pwmd->lock);
++	clk_disable(pwmd->pwm->clk);
++	spin_unlock(&pwmd->pwm->lock);
 +
 +	return 0;
++err:
++	dev_err(&pwmd->pwm->pdev->dev, "pwm config fail\n");
++	return ret;
 +}
++EXPORT_SYMBOL(pwm_config);
 +
-+static void plgpio_free(struct gpio_chip *chip, unsigned offset)
++int pwm_enable(struct pwm_device *pwmd)
 +{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
++	int ret = 0;
++	u32 val = 0;
 +
-+	if (offset >= chip->ngpio)
++	if (!pwmd) {
++		pr_err("pwm: enable - NULL pwm device pointer\n");
++		return -EFAULT;
++	}
++
++	spin_lock(&pwmd->pwm->lock);
++	ret = clk_enable(pwmd->pwm->clk);
++	if (!ret)
++		pwmd->pwm->clk_enabled++;
++	else {
++		spin_unlock(&pwmd->pwm->lock);
++		goto err;
++	}
++
++	spin_lock(&pwmd->lock);
++	val = readl(pwmd->pwm->mmio_base + pwmd->offset + PWMCR);
++	writel(val | PWM_EN_MASK, pwmd->pwm->mmio_base + pwmd->offset + PWMCR);
++	spin_unlock(&pwmd->lock);
++	spin_unlock(&pwmd->pwm->lock);
++	return 0;
++err:
++	dev_err(&pwmd->pwm->pdev->dev, "pwm enable fail\n");
++	return ret;
++}
++EXPORT_SYMBOL(pwm_enable);
++
++void pwm_disable(struct pwm_device *pwmd)
++{
++	if (!pwmd) {
++		pr_err("pwm: disable - NULL pwm device pointer\n");
 +		return;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_ENB_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
 +	}
 +
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, offset, plgpio_enb);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
++	spin_lock(&pwmd->pwm->lock);
++	spin_lock(&pwmd->lock);
++	writel(0, pwmd->pwm->mmio_base + pwmd->offset + PWMCR);
++	if (pwmd->pwm->clk_enabled) {
++		clk_disable(pwmd->pwm->clk);
++		pwmd->pwm->clk_enabled--;
++	}
++	spin_unlock(&pwmd->lock);
++	spin_unlock(&pwmd->pwm->lock);
 +}
++EXPORT_SYMBOL(pwm_disable);
 +
-+static int plgpio_to_irq(struct gpio_chip *chip, unsigned offset)
++struct pwm_device *pwm_request(int pwmd_id, const char *label)
 +{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
++	int found = 0;
++	struct pwm *pwm;
++	struct pwm_device *pwmd = NULL;
 +
-+	if (plgpio->irq_base == (unsigned) -1)
-+		return -EINVAL;
++	spin_lock(&list_lock);
++	list_for_each_entry(pwm, &pwm_list, node) {
++		spin_lock(&pwm->lock);
++		list_for_each_entry(pwmd, &pwm->devices, node) {
++			if (pwmd->pwmd_id == pwmd_id) {
++				found = 1;
++				break;
++			}
++		}
++		spin_unlock(&pwm->lock);
++		if (found)
++			break;
++	}
++	spin_unlock(&list_lock);
 +
-+	return plgpio->irq_base + offset;
++	if (found) {
++		spin_lock(&pwmd->lock);
++		if (pwmd->busy == 0) {
++			pwmd->busy++;
++			pwmd->label = label;
++		} else
++			pwmd = ERR_PTR(-EBUSY);
++		spin_unlock(&pwmd->lock);
++	} else
++		pwmd = ERR_PTR(-ENOENT);
++
++	if (IS_ERR(pwmd))
++		pr_err("pwm: request fail\n");
++
++	return pwmd;
 +}
++EXPORT_SYMBOL(pwm_request);
 +
-+/* PLGPIO IRQ */
-+static void plgpio_irq_mask(unsigned irq)
++void pwm_free(struct pwm_device *pwmd)
 +{
-+	struct plgpio *plgpio = get_irq_chip_data(irq);
-+	int offset = irq - plgpio->irq_base;
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_IE_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
++	if (!pwmd) {
++		pr_err("pwm: disable - NULL pwm device pointer\n");
++		return;
 +	}
 +
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, plgpio_ie);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+}
-+
-+static void plgpio_irq_unmask(unsigned irq)
-+{
-+	struct plgpio *plgpio = get_irq_chip_data(irq);
-+	int offset = irq - plgpio->irq_base;
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_IE_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
++	spin_lock(&pwmd->lock);
++	if (pwmd->busy) {
++		pwmd->busy--;
++		pwmd->label = NULL;
++	} else {
++		spin_unlock(&pwmd->lock);
++		dev_warn(&pwmd->pwm->pdev->dev, "pwm device already freed\n");
++		return;
 +	}
 +
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, offset, plgpio_ie);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
++	spin_unlock(&pwmd->lock);
 +}
++EXPORT_SYMBOL(pwm_free);
 +
-+static int plgpio_irq_type(unsigned irq, unsigned trigger)
++/* creates and add pwmd device to parent pwm's devices list */
++static int add_pwm_device(unsigned int pwmd_id, struct pwm *pwm)
 +{
-+	struct plgpio *plgpio = get_irq_chip_data(irq);
-+	int offset = irq - plgpio->irq_base;
++	struct pwm_device *pwmd;
 +
-+	if (offset >= plgpio->chip.ngpio)
-+		return -EINVAL;
++	pwmd = kzalloc(sizeof(*pwmd), GFP_KERNEL);
++	if (!pwmd)
++		return -ENOMEM;
 +
-+	if (trigger != IRQ_TYPE_LEVEL_HIGH)
-+		return -EINVAL;
++	pwmd->pwm = pwm;
++	pwmd->busy = 0;
++	pwmd->pwmd_id = pwmd_id + pwm->id * PWM_DEVICE_PER_IP;
++	pwmd->offset = pwmd_id * PWM_DEVICE_OFFSET;
++	spin_lock_init(&pwmd->lock);
++
++	spin_lock(&pwm->lock);
++	list_add_tail(&pwmd->node, &pwm->devices);
++	spin_unlock(&pwm->lock);
++
 +	return 0;
 +}
 +
-+static struct irq_chip plgpio_irqchip = {
-+	.name		= "PLGPIO",
-+	.mask		= plgpio_irq_mask,
-+	.unmask		= plgpio_irq_unmask,
-+	.set_type	= plgpio_irq_type,
-+};
-+
-+static void plgpio_irq_handler(unsigned irq, struct irq_desc *desc)
++/* removes all pwmd devices from parent pwm's devices list */
++static void remove_pwm_devices(struct pwm *pwm)
 +{
-+	struct plgpio *plgpio = get_irq_data(irq);
-+	unsigned long pending;
-+	int regs_count = DIV_ROUND_UP(plgpio->chip.ngpio, MAX_GPIO_PER_REG),
-+	    count, pin, offset, i = 0;
++	struct pwm_device *pwmd;
 +
-+	/* check all plgpio MIS registers for a possible interrupt */
-+	for (; i < regs_count; i++) {
-+		pending = readl(plgpio->base + plgpio_mis + i * sizeof(int *));
-+		if (!pending)
-+			continue;
-+
-+		/*
-+		 * clear extra bits in last register having gpios < MAX/REG
-+		 * ex: Suppose there are max 102 plgpios. then last register
-+		 * must have only (102 - MAX_GPIO_PER_REG * 3) = 6 relevant bits
-+		 * so, we must not take other 28 bits into consideration for
-+		 * checking interrupt. so clear those bits.
-+		 */
-+		count = plgpio->chip.ngpio - i * MAX_GPIO_PER_REG;
-+		if (count < MAX_GPIO_PER_REG)
-+			pending &= (1 << count) - 1;
-+
-+		for_each_set_bit(offset, &pending, MAX_GPIO_PER_REG) {
-+			/* get correct pin for "offset" */
-+			if (plgpio->o2p && (plgpio->p2o_regs & PTO_MIS_REG)) {
-+				pin = plgpio->o2p(offset);
-+				if (pin == -1)
-+					continue;
-+			} else
-+				pin = offset;
-+
-+			generic_handle_irq(plgpio_to_irq(&plgpio->chip,
-+						i * MAX_GPIO_PER_REG + pin));
-+		}
++	spin_lock(&pwm->lock);
++	list_for_each_entry(pwmd, &pwm->devices, node) {
++		list_del(&pwmd->node);
++		kfree(pwmd);
 +	}
++	spin_unlock(&pwm->lock);
 +}
 +
-+static int __devinit plgpio_probe(struct platform_device *pdev)
++static int __devinit spear_pwm_probe(struct platform_device *pdev)
 +{
-+	struct plgpio_platform_data *pdata;
-+	struct plgpio *plgpio;
-+	int ret, irq, i;
++	struct pwm *pwm = NULL;
 +	struct resource *res;
++	int ret = 0, pwmd_id = 0;
 +
-+	pdata = pdev->dev.platform_data;
-+	if (!pdata) {
-+		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "invalid platform data\n");
-+		goto fail;
++	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
++	if (!pwm) {
++		ret = -ENOMEM;
++		dev_dbg(&pdev->dev, "failed to allocate memory\n");
++		goto err;
++	}
++
++	pwm->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(pwm->clk)) {
++		ret = PTR_ERR(pwm->clk);
++		dev_dbg(&pdev->dev, "Error getting clock\n");
++		goto err_free;
 +	}
 +
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	if (!res) {
-+		ret = -EBUSY;
-+		dev_dbg(&pdev->dev, "invalid IORESOURCE_MEM\n");
-+		goto fail;
-+	}
-+
-+	if (!request_mem_region(res->start, resource_size(res), "plgpio")) {
-+		ret = -EBUSY;
-+		dev_dbg(&pdev->dev, "request mem region fail\n");
-+		goto fail;
-+	}
-+
-+	plgpio = kzalloc(sizeof(*plgpio), GFP_KERNEL);
-+	if (!plgpio) {
-+		ret = -ENOMEM;
-+		dev_dbg(&pdev->dev, "memory allocation fail\n");
-+		goto release_region;
-+	}
-+
-+	plgpio->base = ioremap(res->start, resource_size(res));
-+	if (!plgpio->base) {
-+		ret = -ENOMEM;
-+		dev_dbg(&pdev->dev, "ioremap fail\n");
-+		goto kfree;
-+	}
-+
-+	spin_lock_init(&plgpio->lock);
-+
-+	plgpio->chip.request = plgpio_request;
-+	plgpio->chip.free = plgpio_free;
-+	plgpio->chip.direction_input = plgpio_direction_input;
-+	plgpio->chip.direction_output = plgpio_direction_output;
-+	plgpio->chip.get = plgpio_get_value;
-+	plgpio->chip.set = plgpio_set_value;
-+	plgpio->chip.to_irq = plgpio_to_irq;
-+	plgpio->chip.base = pdata->gpio_base;
-+	plgpio->chip.ngpio = pdata->gpio_count;
-+	plgpio->chip.label = dev_name(&pdev->dev);
-+	plgpio->chip.dev = &pdev->dev;
-+	plgpio->chip.owner = THIS_MODULE;
-+	plgpio->irq_base = pdata->irq_base;
-+	plgpio->p2o = pdata->p2o;
-+	plgpio->o2p = pdata->o2p;
-+	plgpio->p2o_regs = pdata->p2o_regs;
-+
-+	ret = gpiochip_add(&plgpio->chip);
-+	if (ret) {
-+		dev_dbg(&pdev->dev, "unable to add gpio chip\n");
-+		goto iounmap;
-+	}
-+
-+	/* irq_chip support */
-+	if (pdata->irq_base == (unsigned) -1) {
-+		dev_info(&pdev->dev, "Initialization successful\n");
-+		return 0;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
 +		ret = -ENODEV;
-+		dev_dbg(&pdev->dev, "invalid irq number\n");
-+		goto remove_gpiochip;
++		dev_dbg(&pdev->dev, "no memory resource defined\n");
++		goto err_free_clk;
 +	}
 +
-+	set_irq_chained_handler(irq, plgpio_irq_handler);
-+	for (i = 0; i < pdata->gpio_count; i++) {
-+		set_irq_chip(i+plgpio->irq_base, &plgpio_irqchip);
-+		set_irq_handler(i+plgpio->irq_base, handle_simple_irq);
-+		set_irq_flags(i+plgpio->irq_base, IRQF_VALID);
-+		set_irq_chip_data(i+plgpio->irq_base, plgpio);
++	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
++		ret = -EBUSY;
++		dev_dbg(&pdev->dev, "failed to request memory resource\n");
++		goto err_free_clk;
 +	}
-+	set_irq_data(irq, plgpio);
++
++	pwm->mmio_base = ioremap(res->start, resource_size(res));
++	if (!pwm->mmio_base) {
++		ret = -ENOMEM;
++		dev_dbg(&pdev->dev, "failed to ioremap\n");
++		goto err_free_mem;
++	}
++
++	/* initialize pwm structure */
++	pwm->clk_enabled = 0;
++	pwm->pdev = pdev;
++	/* if pdev->id is -1, only one pwm ip is present */
++	if (pdev->id == -1)
++		pwm->id = 0;
++	else
++		pwm->id = pdev->id;
++
++	spin_lock_init(&pwm->lock);
++	INIT_LIST_HEAD(&pwm->devices);
++	platform_set_drvdata(pdev, pwm);
++
++	/* add pwm to pwm list */
++	spin_lock(&list_lock);
++	list_add_tail(&pwm->node, &pwm_list);
++	spin_unlock(&list_lock);
++
++	/* add pwm devices */
++	for (pwmd_id = 0; pwmd_id < PWM_DEVICE_PER_IP; pwmd_id++) {
++		ret = add_pwm_device(pwmd_id, pwm);
++		if (!ret)
++			continue;
++		dev_err(&pdev->dev, "Add device fail for pwm device id: %d\n",
++				pwmd_id);
++	}
++
++	if (list_empty(&pwm->node))
++		goto err_remove_pwm;
++
 +	dev_info(&pdev->dev, "Initialization successful\n");
-+
 +	return 0;
 +
-+remove_gpiochip:
-+	if (gpiochip_remove(&plgpio->chip))
-+		dev_dbg(&pdev->dev, "unable to remove gpiochip\n");
-+iounmap:
-+	iounmap(plgpio->base);
-+kfree:
-+	kfree(plgpio);
-+release_region:
++err_remove_pwm:
++	spin_lock(&list_lock);
++	list_del(&pwm->node);
++	spin_unlock(&list_lock);
++
++	platform_set_drvdata(pdev, NULL);
++	iounmap(pwm->mmio_base);
++err_free_mem:
 +	release_mem_region(res->start, resource_size(res));
-+fail:
-+	dev_err(&pdev->dev, "probe fail: %d\n", ret);
++err_free_clk:
++	clk_put(pwm->clk);
++err_free:
++	kfree(pwm);
++err:
++	dev_err(&pdev->dev, "Initialization Fail. Error: %d\n", ret);
++
 +	return ret;
 +}
 +
-+static struct platform_driver plgpio_driver = {
-+	.probe		= plgpio_probe,
-+	.driver		= {
-+		.name	= "plgpio",
-+		.owner	= THIS_MODULE,
++static int __devexit spear_pwm_remove(struct platform_device *pdev)
++{
++	struct pwm *pwm;
++	struct resource *res;
++	int ret = 0;
++
++	pwm = platform_get_drvdata(pdev);
++	if (pwm == NULL) {
++		ret = -ENODEV;
++		dev_dbg(&pdev->dev, "Remove: get_drvdata fail\n");
++		goto err;
++	}
++	platform_set_drvdata(pdev, NULL);
++
++	/* remove pwm devices */
++	remove_pwm_devices(pwm);
++
++	/* remove pwm from pwm_list */
++	spin_lock(&list_lock);
++	list_del(&pwm->node);
++	spin_unlock(&list_lock);
++
++	iounmap(pwm->mmio_base);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		ret = -ENODEV;
++		dev_dbg(&pdev->dev, "Remove: get_resource fail\n");
++		goto err;
++	}
++	release_mem_region(res->start, resource_size(res));
++
++	if (pwm->clk_enabled)
++		clk_disable(pwm->clk);
++	clk_put(pwm->clk);
++
++	kfree(pwm);
++	return 0;
++
++err:
++	dev_err(&pdev->dev, "Remove: Fail - %d\n", ret);
++	return ret;
++}
++
++static struct platform_driver spear_pwm_driver = {
++	.driver = {
++		.name = "pwm",
++		.bus = &platform_bus_type,
++		.owner = THIS_MODULE,
 +	},
++	.probe = spear_pwm_probe,
++	.remove = __devexit_p(spear_pwm_remove)
 +};
 +
-+static int __init plgpio_init(void)
++static int __init spear_pwm_init(void)
 +{
-+	if (machine_is_spear310()) {
-+		plgpio_enb = SPEAR310_PLGPIO_ENB;
-+		plgpio_wdata = SPEAR310_PLGPIO_WDATA;
-+		plgpio_dir = SPEAR310_PLGPIO_DIR;
-+		plgpio_rdata = SPEAR310_PLGPIO_IE;
-+		plgpio_ie = SPEAR310_PLGPIO_RDATA;
-+		plgpio_mis = SPEAR310_PLGPIO_MIS;
-+	} else if (machine_is_spear320()) {
-+		plgpio_enb = SPEAR320_PLGPIO_ENB;
-+		plgpio_wdata = SPEAR320_PLGPIO_WDATA;
-+		plgpio_dir = SPEAR320_PLGPIO_DIR;
-+		plgpio_rdata = SPEAR320_PLGPIO_IE;
-+		plgpio_ie = SPEAR320_PLGPIO_RDATA;
-+		plgpio_mis = SPEAR320_PLGPIO_MIS;
-+	} else
-+		return -EACCES;
++	int ret = 0;
 +
-+	return platform_driver_register(&plgpio_driver);
++	ret = platform_driver_register(&spear_pwm_driver);
++	if (ret)
++		pr_err("failed to register spear_pwm_driver\n");
++
++	return ret;
 +}
-+subsys_initcall(plgpio_init);
++module_init(spear_pwm_init);
 +
-+MODULE_AUTHOR("Viresh Kumar <viresh.kumar@st.com>");
-+MODULE_DESCRIPTION("SPEAr PLGPIO driver");
++static void __exit spear_pwm_exit(void)
++{
++	platform_driver_unregister(&spear_pwm_driver);
++}
++module_exit(spear_pwm_exit);
++
++MODULE_AUTHOR("Viresh Kumar");
++MODULE_DESCRIPTION("SPEAr PWM Driver");
 +MODULE_LICENSE("GPL");
 -- 
 1.7.2.2
