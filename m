@@ -1,147 +1,180 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:56:35 +0530
-Subject: [PATCH V6 02/11] ST SPEAr clock: Define common clk_init routine in
-	plat/clock.c
+Date: Tue, 1 Mar 2011 16:56:37 +0530
+Subject: [PATCH V6 04/11] ST SPEAr3xx: Make local shirq structures static
 In-Reply-To: <cover.1298977709.git.viresh.kumar@st.com>
 References: <cover.1298977709.git.viresh.kumar@st.com>
-Message-ID: <03e1caef6dfeea7448165f7845a9d7111baf86f7.1298977709.git.viresh.kumar@st.com>
+Message-ID: <1f184bb627677fbb2f4577d362fcbbb73fa7fed0.1298977709.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define common clk_init routine in plat/clock.c for calling recalc_root_clocks.
-This routine will be used for any common code across all machine families.
-Whereas family specific spear*xx_clk_init routines will be used for family
-specific code.
+From: Ryan Mallon <ryan@bluewatersys.com>
 
+Several structures in arch/arm/mach-spear3xx are not marked static
+like they should be. Fix this.
+
+Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
+Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear3xx/clock.c                |    4 ++--
- arch/arm/mach-spear3xx/include/mach/generic.h |    2 +-
- arch/arm/mach-spear3xx/spear3xx.c             |    2 +-
- arch/arm/mach-spear6xx/clock.c                |    4 ++--
- arch/arm/mach-spear6xx/include/mach/generic.h |    2 +-
- arch/arm/mach-spear6xx/spear6xx.c             |    2 +-
- arch/arm/plat-spear/clock.c                   |    5 +++++
- arch/arm/plat-spear/include/plat/clock.h      |    1 +
- 8 files changed, 14 insertions(+), 8 deletions(-)
+ arch/arm/mach-spear3xx/spear300.c |    4 ++--
+ arch/arm/mach-spear3xx/spear310.c |   16 ++++++++--------
+ arch/arm/mach-spear3xx/spear320.c |   12 ++++++------
+ 3 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-spear3xx/clock.c b/arch/arm/mach-spear3xx/clock.c
-index 98bc7ed..5707772 100644
---- a/arch/arm/mach-spear3xx/clock.c
-+++ b/arch/arm/mach-spear3xx/clock.c
-@@ -732,12 +732,12 @@ static struct clk_lookup spear_clk_lookups[] = {
- #endif
+diff --git a/arch/arm/mach-spear3xx/spear300.c b/arch/arm/mach-spear3xx/spear300.c
+index 2e856d8..a1280ba 100644
+--- a/arch/arm/mach-spear3xx/spear300.c
++++ b/arch/arm/mach-spear3xx/spear300.c
+@@ -523,7 +523,7 @@ struct pmx_driver pmx_driver = {
  };
  
--void __init clk_init(void)
-+void __init spear3xx_clk_init(void)
- {
- 	int i;
- 
- 	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
- 		clk_register(&spear_clk_lookups[i]);
- 
--	recalc_root_clocks();
-+	clk_init();
- }
-diff --git a/arch/arm/mach-spear3xx/include/mach/generic.h b/arch/arm/mach-spear3xx/include/mach/generic.h
-index 33e04fe..4772507 100644
---- a/arch/arm/mach-spear3xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear3xx/include/mach/generic.h
-@@ -36,7 +36,7 @@ extern struct amba_device uart_device;
- extern struct sys_timer spear3xx_timer;
- 
- /* Add spear3xx family function declarations here */
--void __init clk_init(void);
-+void __init spear3xx_clk_init(void);
- void __init spear_setup_timer(void);
- void __init spear3xx_map_io(void);
- void __init spear3xx_init_irq(void);
-diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
-index b7a83b2..9a9e92b 100644
---- a/arch/arm/mach-spear3xx/spear3xx.c
-+++ b/arch/arm/mach-spear3xx/spear3xx.c
-@@ -97,7 +97,7 @@ void __init spear3xx_map_io(void)
- 	iotable_init(spear3xx_io_desc, ARRAY_SIZE(spear3xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear3xx_clk_init();
- }
- 
- /* pad multiplexing support */
-diff --git a/arch/arm/mach-spear6xx/clock.c b/arch/arm/mach-spear6xx/clock.c
-index 88b748b..ac70e0d 100644
---- a/arch/arm/mach-spear6xx/clock.c
-+++ b/arch/arm/mach-spear6xx/clock.c
-@@ -671,12 +671,12 @@ static struct clk_lookup spear_clk_lookups[] = {
- 	{ .dev_id = "gpio2",		.clk = &gpio2_clk},
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_IT_PERS_S,
+ 		.enb_mask = IT_PERS_S_IRQ_MASK,
+@@ -563,7 +563,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
  };
  
--void __init clk_init(void)
-+void __init spear6xx_clk_init(void)
- {
- 	int i;
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+diff --git a/arch/arm/mach-spear3xx/spear310.c b/arch/arm/mach-spear3xx/spear310.c
+index 20182d2..3a2c4b2 100644
+--- a/arch/arm/mach-spear3xx/spear310.c
++++ b/arch/arm/mach-spear3xx/spear310.c
+@@ -192,7 +192,7 @@ struct pmx_dev pmx_tdm0 = {
+ struct pmx_driver pmx_driver;
  
- 	for (i = 0; i < ARRAY_SIZE(spear_clk_lookups); i++)
- 		clk_register(&spear_clk_lookups[i]);
- 
--	recalc_root_clocks();
-+	clk_init();
- }
-diff --git a/arch/arm/mach-spear6xx/include/mach/generic.h b/arch/arm/mach-spear6xx/include/mach/generic.h
-index 94cf4a6..183f023 100644
---- a/arch/arm/mach-spear6xx/include/mach/generic.h
-+++ b/arch/arm/mach-spear6xx/include/mach/generic.h
-@@ -39,7 +39,7 @@ void __init spear6xx_map_io(void);
- void __init spear6xx_init_irq(void);
- void __init spear6xx_init(void);
- void __init spear600_init(void);
--void __init clk_init(void);
-+void __init spear6xx_clk_init(void);
- 
- /* Add spear600 machine device structure declarations here */
- 
-diff --git a/arch/arm/mach-spear6xx/spear6xx.c b/arch/arm/mach-spear6xx/spear6xx.c
-index 9818129..e0f6628 100644
---- a/arch/arm/mach-spear6xx/spear6xx.c
-+++ b/arch/arm/mach-spear6xx/spear6xx.c
-@@ -148,7 +148,7 @@ void __init spear6xx_map_io(void)
- 	iotable_init(spear6xx_io_desc, ARRAY_SIZE(spear6xx_io_desc));
- 
- 	/* This will initialize clock framework */
--	clk_init();
-+	spear6xx_clk_init();
- }
- 
- static void __init spear6xx_timer_init(void)
-diff --git a/arch/arm/plat-spear/clock.c b/arch/arm/plat-spear/clock.c
-index bdbd7ec..6fa474c 100644
---- a/arch/arm/plat-spear/clock.c
-+++ b/arch/arm/plat-spear/clock.c
-@@ -903,6 +903,11 @@ void recalc_root_clocks(void)
- 	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- 
-+void __init clk_init(void)
-+{
-+	recalc_root_clocks();
-+}
-+
- #ifdef CONFIG_DEBUG_FS
- /*
-  *	debugfs support to trace clock tree hierarchy and attributes
-diff --git a/arch/arm/plat-spear/include/plat/clock.h b/arch/arm/plat-spear/include/plat/clock.h
-index 2ae6606..e4cc787 100644
---- a/arch/arm/plat-spear/include/plat/clock.h
-+++ b/arch/arm/plat-spear/include/plat/clock.h
-@@ -224,6 +224,7 @@ struct clcd_rate_tbl {
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_SMII0,
+ 		.status_mask = SMII0_IRQ_MASK,
+@@ -220,7 +220,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
  };
  
- /* platform specific clock functions */
-+void __init clk_init(void);
- void clk_register(struct clk_lookup *cl);
- void recalc_root_clocks(void);
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+@@ -232,7 +232,7 @@ struct spear_shirq shirq_ras1 = {
+ 	},
+ };
  
+-struct shirq_dev_config shirq_ras2_config[] = {
++static struct shirq_dev_config shirq_ras2_config[] = {
+ 	{
+ 		.virq = VIRQ_UART1,
+ 		.status_mask = UART1_IRQ_MASK,
+@@ -251,7 +251,7 @@ struct shirq_dev_config shirq_ras2_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras2 = {
++static struct spear_shirq shirq_ras2 = {
+ 	.irq = IRQ_GEN_RAS_2,
+ 	.dev_config = shirq_ras2_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras2_config),
+@@ -263,14 +263,14 @@ struct spear_shirq shirq_ras2 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras3_config[] = {
++static struct shirq_dev_config shirq_ras3_config[] = {
+ 	{
+ 		.virq = VIRQ_EMI,
+ 		.status_mask = EMI_IRQ_MASK,
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras3 = {
++static struct spear_shirq shirq_ras3 = {
+ 	.irq = IRQ_GEN_RAS_3,
+ 	.dev_config = shirq_ras3_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
+@@ -282,7 +282,7 @@ struct spear_shirq shirq_ras3 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_intrcomm_ras_config[] = {
++static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	{
+ 		.virq = VIRQ_TDM_HDLC,
+ 		.status_mask = TDM_HDLC_IRQ_MASK,
+@@ -295,7 +295,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_intrcomm_ras = {
++static struct spear_shirq shirq_intrcomm_ras = {
+ 	.irq = IRQ_INTRCOMM_RAS_ARM,
+ 	.dev_config = shirq_intrcomm_ras_config,
+ 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 249798b3..fee265b 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -587,7 +587,7 @@ struct pmx_driver pmx_driver = {
+ };
+ 
+ /* spear3xx shared irq */
+-struct shirq_dev_config shirq_ras1_config[] = {
++static struct shirq_dev_config shirq_ras1_config[] = {
+ 	{
+ 		.virq = VIRQ_EMI,
+ 		.status_mask = EMI_IRQ_MASK,
+@@ -603,7 +603,7 @@ struct shirq_dev_config shirq_ras1_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras1 = {
++static struct spear_shirq shirq_ras1 = {
+ 	.irq = IRQ_GEN_RAS_1,
+ 	.dev_config = shirq_ras1_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras1_config),
+@@ -616,7 +616,7 @@ struct spear_shirq shirq_ras1 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_ras3_config[] = {
++static struct shirq_dev_config shirq_ras3_config[] = {
+ 	{
+ 		.virq = VIRQ_PLGPIO,
+ 		.enb_mask = GPIO_IRQ_MASK,
+@@ -635,7 +635,7 @@ struct shirq_dev_config shirq_ras3_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_ras3 = {
++static struct spear_shirq shirq_ras3 = {
+ 	.irq = IRQ_GEN_RAS_3,
+ 	.dev_config = shirq_ras3_config,
+ 	.dev_count = ARRAY_SIZE(shirq_ras3_config),
+@@ -649,7 +649,7 @@ struct spear_shirq shirq_ras3 = {
+ 	},
+ };
+ 
+-struct shirq_dev_config shirq_intrcomm_ras_config[] = {
++static struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	{
+ 		.virq = VIRQ_CANU,
+ 		.status_mask = CAN_U_IRQ_MASK,
+@@ -697,7 +697,7 @@ struct shirq_dev_config shirq_intrcomm_ras_config[] = {
+ 	},
+ };
+ 
+-struct spear_shirq shirq_intrcomm_ras = {
++static struct spear_shirq shirq_intrcomm_ras = {
+ 	.irq = IRQ_INTRCOMM_RAS_ARM,
+ 	.dev_config = shirq_intrcomm_ras_config,
+ 	.dev_count = ARRAY_SIZE(shirq_intrcomm_ras_config),
 -- 
 1.7.2.2
