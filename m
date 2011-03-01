@@ -1,163 +1,78 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:57:07 +0530
-Subject: [PATCH V6 07/10] ST SPEAr13xx: Adding CPU hotplug support added for
-	SMP platforms
+Date: Tue, 1 Mar 2011 16:57:08 +0530
+Subject: [PATCH V6 08/10] ST SPEAr13xx: add L2 cache support
 In-Reply-To: <cover.1298977719.git.viresh.kumar@st.com>
 References: <cover.1298977719.git.viresh.kumar@st.com>
-Message-ID: <0db268d488c9b9cae73d42d6374d4f47ad95d2a5.1298977719.git.viresh.kumar@st.com>
+Message-ID: <bb253a7e1f4f0a5149a57038d9310ae57e11ead2.1298977719.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Shiraz Hashim <shiraz.hashim@st.com>
 
 Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: shiraz hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- arch/arm/mach-spear13xx/Makefile  |    1 +
- arch/arm/mach-spear13xx/hotplug.c |  121 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 122 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-spear13xx/hotplug.c
+ arch/arm/mach-spear13xx/spear13xx.c |   19 ++++++++++++++++++-
+ arch/arm/mm/Kconfig                 |    2 +-
+ 2 files changed, 19 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-spear13xx/Makefile b/arch/arm/mach-spear13xx/Makefile
-index cb5ae9e..09b71e4 100644
---- a/arch/arm/mach-spear13xx/Makefile
-+++ b/arch/arm/mach-spear13xx/Makefile
-@@ -5,6 +5,7 @@
- # common files
- obj-y					+= spear13xx.o clock.o
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
- obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+diff --git a/arch/arm/mach-spear13xx/spear13xx.c b/arch/arm/mach-spear13xx/spear13xx.c
+index 06f9abb..b5da555 100644
+--- a/arch/arm/mach-spear13xx/spear13xx.c
++++ b/arch/arm/mach-spear13xx/spear13xx.c
+@@ -18,6 +18,7 @@
+ #include <asm/irq.h>
+ #include <asm/localtimer.h>
+ #include <asm/mach/arch.h>
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/smp_twd.h>
+ #include <mach/generic.h>
+ #include <mach/hardware.h>
+@@ -40,7 +41,16 @@ struct amba_device spear13xx_uart_device = {
+ /* Do spear13xx familiy common initialization part here */
+ void __init spear13xx_init(void)
+ {
+-	/* nothing to do for now */
++#ifdef CONFIG_CACHE_L2X0
++	/*
++	 * 512KB (64KB/way), 8-way associativity, parity supported
++	 *
++	 * TODO: 0x249, picked from nomadik, to be analyzed
++	 * Comment from nomadik:
++	 * At full speed latency must be >=2, so 0x249 in low bits
++	 */
++	l2x0_init(__io_address(SPEAR13XX_L2CC_BASE), 0x00260249, 0xfe00ffff);
++#endif
+ }
  
- # spear1300 specific files
-diff --git a/arch/arm/mach-spear13xx/hotplug.c b/arch/arm/mach-spear13xx/hotplug.c
-new file mode 100644
-index 0000000..ee6b06d
---- /dev/null
-+++ b/arch/arm/mach-spear13xx/hotplug.c
-@@ -0,0 +1,121 @@
-+/*
-+ * linux/arch/arm/mach-spear13xx/hotplug.c
-+ *
-+ * Copyright (C) 2010 ST Microelectronics Ltd.
-+ * Deepak Sikri <deepak.sikri@st.com>
-+ *
-+ * based upon linux/arch/arm/mach-realview/hotplug.c
-+ *
-+ * Copyright (C) 2002 ARM Ltd.
-+ * All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
-+#include <asm/cacheflush.h>
-+#include <asm/system.h>
-+
-+extern volatile int pen_release;
-+
-+static inline void cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	flush_cache_all();
-+	asm volatile(
-+	"	mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	dsb\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, #0x20\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	: "=&r" (v)
-+	: "r" (0), "Ir" (CR_C)
-+	: "cc", "memory");
-+}
-+
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile("mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, %1\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, #0x20\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	: "=&r" (v)
-+	: "Ir" (CR_C)
-+	: "cc");
-+}
-+
-+static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-+{
-+	for (;;) {
-+		wfi();
-+
-+		if (pen_release == cpu) {
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		}
-+
-+		/*
-+		 * Getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * Just note it happening - when we're woken, we can report
-+		 * its occurrence.
-+		 */
-+		(*spurious)++;
-+	}
-+}
-+
-+int platform_cpu_kill(unsigned int cpu)
-+{
-+	return 1;
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void __cpuinit platform_cpu_die(unsigned int cpu)
-+{
-+	int spurious = 0;
-+
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	cpu_enter_lowpower();
-+	platform_do_lowpower(cpu, &spurious);
-+
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	cpu_leave_lowpower();
-+
-+	if (spurious)
-+		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
-+}
-+
-+int platform_cpu_disable(unsigned int cpu)
-+{
-+	/*
-+	 * we don't allow CPU 0 to be shutdown (it is still too special
-+	 * e.g. clock tick interrupts)
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
-+}
+ /* This will initialize vic */
+@@ -62,6 +72,13 @@ struct map_desc spear13xx_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(SPEAR13XX_A9SM_PERIP_BASE),
+ 		.length		= SZ_8K,
+ 		.type		= MT_DEVICE
++#ifdef CONFIG_CACHE_L2X0
++	}, {
++		.virtual	= IO_ADDRESS(SPEAR13XX_L2CC_BASE),
++		.pfn		= __phys_to_pfn(SPEAR13XX_L2CC_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
++#endif
+ 	}, {
+ 		.virtual	= IO_ADDRESS(SPEAR13XX_MISC_BASE),
+ 		.pfn		= __phys_to_pfn(SPEAR13XX_MISC_BASE),
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index e4509ba..fff2d89 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -813,7 +813,7 @@ config CACHE_L2X0
+ 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
+ 		   REALVIEW_EB_A9MP || ARCH_MX35 || ARCH_MX31 || MACH_REALVIEW_PBX || \
+ 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_S5PV310 || ARCH_TEGRA || \
+-		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE
++		   ARCH_SPEAR13XX || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE
+ 	default y
+ 	select OUTER_CACHE
+ 	select OUTER_CACHE_SYNC
 -- 
 1.7.2.2
