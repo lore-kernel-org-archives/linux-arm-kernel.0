@@ -1,87 +1,56 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 1 Mar 2011 11:18:08 +0100
-Subject: [PATCH v10 05/18] OMAP2, 3 DSS2 Change driver name to omap_display
-In-Reply-To: <1298905056.9809.128.camel@deskari>
-References: <1295850125-21405-1-git-send-email-sumit.semwal@ti.com>	
-	<1295850125-21405-6-git-send-email-sumit.semwal@ti.com>	
-	<1298539643.16119.54.camel@deskari>
-	<1298876015.2096.36.camel@deskari>	 <4D6B4A1A.9000304@ti.com>
-	<1298877549.2096.47.camel@deskari>	 <4D6B88BB.5010200@ti.com>
-	<1298895026.9809.27.camel@deskari>	 <4D6BAA8C.2020203@ti.com>
-	<1298905056.9809.128.camel@deskari>
-Message-ID: <4D6CC7E0.9010209@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 1 Mar 2011 11:27:49 +0100
+Subject: [PATCH 3/8] Add a mfd IPUv3 driver
+In-Reply-To: <20110301091544.GK29521@pengutronix.de>
+References: <1298887229-7987-1-git-send-email-s.hauer@pengutronix.de>
+	<201102281811.45277.arnd@arndb.de>
+	<20110301091544.GK29521@pengutronix.de>
+Message-ID: <201103011127.51605.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/28/2011 3:57 PM, Valkeinen, Tomi wrote:
-> On Mon, 2011-02-28 at 08:00 -0600, Cousson, Benoit wrote:
->> On 2/28/2011 1:10 PM, Valkeinen, Tomi wrote:
->>> On Mon, 2011-02-28 at 05:36 -0600, Cousson, Benoit wrote:
->>>> Hi Tomi,
->>>>
->>>> On 2/28/2011 8:19 AM, Valkeinen, Tomi wrote:
->>>>> On Mon, 2011-02-28 at 01:09 -0600, Taneja, Archit wrote:
->>>>>> Hi,
->>>>>>
->>>>>> On Monday 28 February 2011 12:23 PM, Valkeinen, Tomi wrote:
->>>>>>> On Thu, 2011-02-24 at 03:27 -0600, Tomi Valkeinen wrote:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> On Mon, 2011-01-24 at 11:51 +0530, ext Sumit Semwal wrote:
->>>>>>>>> From: Senthilvadivu Guruswamy<svadivu@ti.com>
->>>>>>>>>
->>>>>>>>> Change the driver name from omapdss to omap_display as the driver takes care of
->>>>>>>>> the display devices ie number of panels, type of panels available in the
->>>>>>>>> platform.  Change the device name in the board files and 2420,2430,3xxx clock
->>>>>>>>> files from omapdss to omap_display to match the driver name.
->>>>>>>>
->>>>>>>> I just realized that changing the driver name will break all scripts and
->>>>>>>> applications using omapdss sysfs files.
->>>>>>>>
->>>>>>>> How does this sound:
->>>>>>>>
->>>>>>>> Let's leave the omapdss device name as it is. It represents a "super"
->>>>>>>> device, containing the dss sysfs files and upper level dss management.
->>>>
->>>> This is the case for all the drivers migrated to omap_device anyway due
->>>> to the change in the top level hierarchy. Everything is below
->>>> platform/omap now.
->>>
->>> The HW module drivers are under platform/omap/, but omapdss is in
->>> platform/. Do you mean that omapdss should also be under platform/omap/?
->>
->> This is because you are probably not using omap_device yet. is should
->> happen when you will change your platform_device to be omap_device.
->
-> Hmm. The HW module devices use omap_device. But we have also a
-> "management" device, omapdss, which is doesn't match directly to any HW
-> component but manages the HW module drivers. It contains, so to say, the
-> HW module drivers.
+On Tuesday 01 March 2011, Sascha Hauer wrote:
 
-OK, so you will have two different paths. omapdss will be directly below 
-platform whereas all the omap_device based DSS IPs will be below 
-platform/omap.
+> When turning this into a kms driver moving the source code will be the
+> smallest problem I guess.
+> I have no preference where to put this code. First it was in
+> drivers/mfd/ and it felt wrong because there seems to be too much code
+> in it a mfd maintainer shouldn't be bothered with. drivers/video/ seems
+> to be wrong because this code will probably support cameras which belong
+> to drivers/media/video/. So if there's consensus on drivers/gpu/ I will
+> happily put it there.
+> What directory do you suggest? drivers/gpu/ or some subdirectory
+> (drm/vga)?
 
-> Should this device also be a omap_device? What does omap_device actually
-> represent? My understanding is that omap_device is a linux device for a
-> HW block inside OMAP. omapdss doesn't quite match that definition.
+I'd suggest a subdirectory of drivers/gpu/, e.g.
+drivers/gpu/embedded/imx-ipu/. Alan is currently adding a driver
+for the Intel GMA500, and there are others (TI, ST-Ericsson, ...)
+that fit in a similar category of complex graphics subsystems
+without an actual GPU core. I think they should all go to the same
+place.
 
-Yep, in that case you do not need an omap_device since you do not have 
-any hwmod to map to.
-The only weird thing is the different root paths you will have for the 
-various devices. But it looks like the only one you have to expose is 
-the omapdss.
+> > The interrupt logic needs some comments. What are you trying to achieve here?
+> 
+> The IPU has 463 status bits which can trigger an interrupt. Most
+> of them are associated to channels, some are general interrupts. My
+> problem is that I don't know how the interrupts will be used by drivers
+> later. Most drivers will probably use only one interrupt but others
+> will be interested in a larger group of interrupts. So I decided to
+> use a bitmap allowing each driver to register for groups of event
+> it is interested in.
 
->>> The reason I'm unwilling to change omapdss name, or location, is that
->>> omapdss directory contains lots of DSS configuration files, used by
->>> scripts and programs.
->>
->> Is that used for debug only?
->
-> Unfortunately no. DSS contains many features which cannot be exported to
-> userspace via the framebuffer device. While I'm not really happy with
-> the current omapdss sysfs interface, it's the best we've come up with.
+Ok, I see. So you essentially have a huge nested interrupt controller
+and try to be clever about the possible use cases, which may be the
+right choice, but apparently you don't know that yet because not
+all the drivers have been written at this point.
 
-OK, then, something you will be able to fix in the DSS3:-)
+Taking one step back from this, have you considered making this
+a regular interrupt controller? That would make the client drivers
+more standard -- you could define the interrupt numbers as resources
+of a platform device or in the device tree, for instance.
+The cost might be more complex code, e.g. when a device requires
+many interrupts, but I think it will be at least as efficient
+at run-time, and less surprising for readers and authors of
+client drivers.
 
-Benoit
+	Arnd
