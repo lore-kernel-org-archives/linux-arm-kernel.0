@@ -1,152 +1,45 @@
-From: weitway@gmail.com (Jason Chen)
-Date: Tue, 1 Mar 2011 17:08:04 +0800
-Subject: [PATCH 1/2] ARM imx53: add pwm devices support
-In-Reply-To: <20110301081043.GS22310@pengutronix.de>
-References: <1298961018-8988-1-git-send-email-b02280@freescale.com>
-	<20110301081043.GS22310@pengutronix.de>
-Message-ID: <AANLkTikKTMVYRw83yn8jTGaxEX4LSr0onXDzJ19UkQCm@mail.gmail.com>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Tue, 1 Mar 2011 10:12:40 +0100
+Subject: [RFC PATCH] ARM: Use generic BUG() handler
+In-Reply-To: <20110301085911.GB16733@n2100.arm.linux.org.uk>
+References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+	<20110301084949.GA16733@n2100.arm.linux.org.uk>
+	<20110301085911.GB16733@n2100.arm.linux.org.uk>
+Message-ID: <19820.47240.801312.507393@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Uwe,
+Russell King - ARM Linux writes:
+ > On Tue, Mar 01, 2011 at 08:49:49AM +0000, Russell King - ARM Linux wrote:
+ > > On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
+ > > > +	asm volatile("1:\t.word %c3\n"				\
+ > > > +		     ".pushsection __bug_table,\"a\"\n"		\
+ > > > +		     "2:\t.word 1b, %c0\n"			\
+ > > > +		     "\t.hword %c1, 0\n"			\
+ > > > +		     "\t.org 2b+%c2\n"				\
+ > > 
+ > > %c doesn't work on lots of versions of gcc, which is why we can't use
+ > > the generic bug support.  There's no way to reliably generate constants
+ > > without many compiler versions spitting out a '#' before them.
+ > 
+ > gcc 4.3.2:
+ > 
+ > asm(".word %c0" : : "i" (0));
+ > 
+ > produces:
+ > 
+ >         .word #0
+ > 
+ > which gas chokes on:
+ > 
+ > /tmp/cc2hGOHd.s:12: Error: bad expression
+ > /tmp/cc2hGOHd.s:12: Error: junk at end of line, first unrecognized character is `0'
+ > 
+ > So what this means is that it's impossible to generate constants in
+ > assembly with GCC targetting ARM without having them prefixed by '#',
+ > which in turn makes it impossible to use the generic BUG support.
+ > 
+ > I reported this bug to gcc folk many years ago.  I've no idea which
+ > version it has been fixed in or if it's even been fixed.
 
-Thanks for your comments.
-
-2011/3/1 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Tue, Mar 01, 2011 at 02:30:17PM +0800, Jason Chen wrote:
->> Signed-off-by: Jason Chen <b02280@freescale.com>
->> ---
->> ?arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ? ?| ? ?2 ++
->> ?arch/arm/mach-mx5/devices-imx53.h ? ? ? ? ? ?| ? ?4 ++++
->> ?arch/arm/mach-mx5/devices.c ? ? ? ? ? ? ? ? ?| ? 10 ++++++++++
->> ?arch/arm/mach-mx5/devices.h ? ? ? ? ? ? ? ? ?| ? ?2 ++
->> ?arch/arm/plat-mxc/devices/Kconfig ? ? ? ? ? ?| ? ?1 +
->> ?arch/arm/plat-mxc/devices/platform-mxc_pwm.c | ? ?9 +++++++++
->> ?arch/arm/plat-mxc/pwm.c ? ? ? ? ? ? ? ? ? ? ?| ? ?3 ++-
->> ?7 files changed, 30 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
->> index 8164b1d..e18807b 100644
->> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
->> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
->> @@ -1338,6 +1338,8 @@ static struct clk_lookup mx53_lookups[] = {
->> ? ? ? _REGISTER_CLOCK("imx53-cspi.0", NULL, cspi_clk)
->> ? ? ? _REGISTER_CLOCK("imx2-wdt.0", NULL, dummy_clk)
->> ? ? ? _REGISTER_CLOCK("imx2-wdt.1", NULL, dummy_clk)
->> + ? ? _REGISTER_CLOCK("mxc_pwm.0", "pwm", pwm1_clk)
->> + ? ? _REGISTER_CLOCK("mxc_pwm.1", "pwm", pwm2_clk)
-> Do you really need "pwm"? ?I think NULL should do the job.
-yes, I will remove it.
->
->> ?};
->>
->> ?static void clk_tree_init(void)
->> diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
->> index 9251008..5a1d6c9 100644
->> --- a/arch/arm/mach-mx5/devices-imx53.h
->> +++ b/arch/arm/mach-mx5/devices-imx53.h
->> @@ -33,3 +33,7 @@ extern const struct imx_spi_imx_data imx53_ecspi_data[] __initconst;
->> ?extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
->> ?#define imx53_add_imx2_wdt(id, pdata) ? ? ? ?\
->> ? ? ? imx_add_imx2_wdt(&imx53_imx2_wdt_data[id])
->> +
->> +extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
->> +#define imx53_add_mxc_pwm(id) ? ? ? ?\
->> + ? ? imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
->> diff --git a/arch/arm/mach-mx5/devices.c b/arch/arm/mach-mx5/devices.c
->> index 153ada5..74aec2b 100644
->> --- a/arch/arm/mach-mx5/devices.c
->> +++ b/arch/arm/mach-mx5/devices.c
->> @@ -120,6 +120,16 @@ struct platform_device mxc_usbh2_device = {
->> ? ? ? },
->> ?};
->>
->> +struct platform_device mxc_pwm1_backlight_device = {
->> + ? ? .name = "pwm-backlight",
->> + ? ? .id = 0,
->> +};
->> +
->> +struct platform_device mxc_pwm2_backlight_device = {
->> + ? ? .name = "pwm-backlight",
->> + ? ? .id = 1,
->> +};
->> +
-> IMHO these should go into a seperate patch and preferably dynamically
-> allocated.
-ok, I will seperate this.
->
->> ?static struct mxc_gpio_port mxc_gpio_ports[] = {
->> ? ? ? {
->> ? ? ? ? ? ? ? .chip.label = "gpio-0",
->> diff --git a/arch/arm/mach-mx5/devices.h b/arch/arm/mach-mx5/devices.h
->> index 55a5129..a74cd97 100644
->> --- a/arch/arm/mach-mx5/devices.h
->> +++ b/arch/arm/mach-mx5/devices.h
->> @@ -3,3 +3,5 @@ extern struct platform_device mxc_usbh1_device;
->> ?extern struct platform_device mxc_usbh2_device;
->> ?extern struct platform_device mxc_usbdr_udc_device;
->> ?extern struct platform_device mxc_hsi2c_device;
->> +extern struct platform_device mxc_pwm1_backlight_device;
->> +extern struct platform_device mxc_pwm2_backlight_device;
->> diff --git a/arch/arm/plat-mxc/devices/Kconfig b/arch/arm/plat-mxc/devices/Kconfig
->> index b9ab1d5..aee9f4b 100644
->> --- a/arch/arm/plat-mxc/devices/Kconfig
->> +++ b/arch/arm/plat-mxc/devices/Kconfig
->> @@ -58,6 +58,7 @@ config IMX_HAVE_PLATFORM_MXC_NAND
->>
->> ?config IMX_HAVE_PLATFORM_MXC_PWM
->> ? ? ? bool
->> + ? ? default y if ARCH_MX21 || ARCH_MX25 || SOC_IMX27 || SOC_IMX51 || SOC_IMX53
-> If you do this, can you please use SOC_IMX21 and SOC_IMX25? ?Or maybe
-> even def_bool y?
->
-sure
->> ?config IMX_HAVE_PLATFORM_MXC_RNGA
->> ? ? ? bool
->> diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
->> index b0c4ae2..18cfd07 100644
->> --- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
->> +++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
->> @@ -49,6 +49,15 @@ const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
->> ?};
->> ?#endif /* ifdef CONFIG_SOC_IMX51 */
->>
->> +#ifdef CONFIG_SOC_IMX53
->> +const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst = {
->> +#define imx53_mxc_pwm_data_entry(_id, _hwid) ? ? ? ? ? ? ? ? ? ? ? ? \
->> + ? ? imx_mxc_pwm_data_entry(MX53, _id, _hwid, SZ_16K)
->> + ? ? imx53_mxc_pwm_data_entry(0, 1),
->> + ? ? imx53_mxc_pwm_data_entry(1, 2),
->> +};
->> +#endif /* ifdef CONFIG_SOC_IMX53 */
->> +
->> ?struct platform_device *__init imx_add_mxc_pwm(
->> ? ? ? ? ? ? ? const struct imx_mxc_pwm_data *data)
->> ?{
->> diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
->> index 7a61ef8..61dd8fb 100644
->> --- a/arch/arm/plat-mxc/pwm.c
->> +++ b/arch/arm/plat-mxc/pwm.c
->> @@ -57,7 +57,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
->> ? ? ? if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
->> ? ? ? ? ? ? ? return -EINVAL;
->>
->> - ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
->> + ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51() ||
->> + ? ? ? ? ? ? cpu_is_mx53()) {
->> ? ? ? ? ? ? ? unsigned long long c;
->> ? ? ? ? ? ? ? unsigned long period_cycles, duty_cycles, prescale;
->> ? ? ? ? ? ? ? u32 cr;
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+What's the gcc bugzilla bug number?
