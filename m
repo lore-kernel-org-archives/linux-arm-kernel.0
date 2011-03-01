@@ -1,33 +1,91 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  1 Mar 2011 21:30:58 +0100
-Subject: [PATCH 1/2] ARM: mx3/cpuimx35: fix build failure
-In-Reply-To: <20110301203018.GY22310@pengutronix.de>
-References: <20110301203018.GY22310@pengutronix.de>
-Message-ID: <1299011459-18200-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Mar 2011 20:32:35 +0000
+Subject: [RFC PATCH] ARM: Use generic BUG() handler
+In-Reply-To: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
+Message-ID: <20110301203235.GE27107@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems vim's autocompletion played tricks on me without me noticing.
-This was intruduced in
-	97976e2 (ARM: mx3: use .init_early to initialize cpu type, reset address and iomuxer)
+On Mon, Feb 28, 2011 at 04:27:43PM -0800, Simon Glass wrote:
+> @@ -55,7 +56,8 @@ static void dump_mem(const char *, const char *, unsigned long, unsigned long);
+>  void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long frame)
+>  {
+>  #ifdef CONFIG_KALLSYMS
+> -	printk("[<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where, from, (void *)from);
+> +	printk(" [<%08lx>] (%pS) from [<%08lx>] (%pS)\n", where, (void *)where,
+> +	       from, (void *)from);
+>  #else
+>  	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
+>  #endif
+> @@ -171,7 +173,7 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>  	unsigned int fp, mode;
+>  	int ok = 1;
+>  
+> -	printk("Backtrace: ");
+> +	printk("Backtrace:\n");
+>  
+>  	if (!tsk)
+>  		tsk = current;
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-mx3/mach-cpuimx35.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Why are you changing the way backtraces are printed?  This introduces a
+useless blank line in the oops dump.  The previous hunk increases the
+probability of mailers wrapping the backtrace making it harder to read.
 
-diff --git a/arch/arm/mach-mx3/mach-cpuimx35.c b/arch/arm/mach-mx3/mach-cpuimx35.c
-index a42f1a9..ec63d99 100644
---- a/arch/arm/mach-mx3/mach-cpuimx35.c
-+++ b/arch/arm/mach-mx3/mach-cpuimx35.c
-@@ -196,7 +196,7 @@ MACHINE_START(EUKREA_CPUIMX35, "Eukrea CPUIMX35")
- 	/* Maintainer: Eukrea Electromatique */
- 	.boot_params = MX3x_PHYS_OFFSET + 0x100,
- 	.map_io = mx35_map_io,
--	.init_ext3_fs = imx35_init_early,
-+	.init_early = imx35_init_early,
- 	.init_irq = mx35_init_irq,
- 	.timer = &eukrea_cpuimx35_timer,
- 	.init_machine = eukrea_cpuimx35_init,
--- 
-1.7.2.3
+If you're going to change the formatting of the Oops dump, please do it
+as a separate patch and explain carefully why the change is necessary.
+
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index d2cb0b3..3f065bd 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -355,6 +355,7 @@ void unwind_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+>  	register unsigned long current_sp asm ("sp");
+>  
+>  	pr_debug("%s(regs = %p tsk = %p)\n", __func__, regs, tsk);
+> +	printk("Backtrace:\n");
+
+Err, no.  This is in the wrong place.
+
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 86b66f3..591ab50 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -72,6 +72,18 @@ SECTIONS
+>  
+>  	PERCPU(PAGE_SIZE)
+>  
+> +	/*
+> +	 * .exit.text is discarded at runtime, not link time, to deal with
+> +	 *  references from bug_table
+> +	 */
+> +	.exit.text : AT(ADDR(.exit.text)) {
+> +		EXIT_TEXT
+> +	}
+> +
+> +	.exit.data : AT(ADDR(.exit.data)) {
+> +		EXIT_DATA
+> +	}
+> +
+>  #ifndef CONFIG_XIP_KERNEL
+>  	. = ALIGN(PAGE_SIZE);
+>  	__init_end = .;
+> @@ -246,7 +258,6 @@ SECTIONS
+>  		__tcm_end = .;
+>  	}
+>  #endif
+> -
+>  	BSS_SECTION(0, 0, 0)
+>  	_end = .;
+>  
+> @@ -254,7 +265,7 @@ SECTIONS
+>  	.comment 0 : { *(.comment) }
+>  
+>  	/* Default discards */
+> -	DISCARDS
+> +	/*DISCARDS*/
+>  
+>  #ifndef CONFIG_SMP_ON_UP
+>  	/DISCARD/ : {
+
+And this is a mess.
