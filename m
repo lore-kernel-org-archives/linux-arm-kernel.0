@@ -1,59 +1,83 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 1 Mar 2011 22:38:10 +0100 (CET)
-Subject: [PATCH v6 1/1] PRUSS UIO driver support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF36683@dbde02.ent.ti.com>
-References: <1298926895-5294-1-git-send-email-pratheesh@ti.com>
-	<1298926895-5294-2-git-send-email-pratheesh@ti.com>
-	<20110228212638.GB16806@local>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF3601C@dbde02.ent.ti.com>
-	<20110301183334.GC20497@local>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BF36683@dbde02.ent.ti.com>
-Message-ID: <alpine.LFD.2.00.1103012232220.2701@localhost6.localdomain6>
+Date: Tue, 1 Mar 2011 22:45:25 +0100 (CET)
+Subject: [PATCH v7 1/1] PRUSS UIO driver support
+In-Reply-To: <1299014895-2022-2-git-send-email-pratheesh@ti.com>
+References: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
+	<1299014895-2022-2-git-send-email-pratheesh@ti.com>
+Message-ID: <alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Mar 2011, TK, Pratheesh Gangadhar wrote:
+On Wed, 2 Mar 2011, Pratheesh Gangadhar wrote:
+> +
+> +static DEFINE_SPINLOCK(lock);
+> +static struct clk *pruss_clk;
+> +static struct uio_info *info;
+> +static dma_addr_t sram_paddr, ddr_paddr;
+> +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
+> +
+> +static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+> +{
+> +	int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
+> +	int val, intr_mask = (1 << intr_bit);
+> +	void __iomem *base = info->mem[0].internal_addr;
+> +	void __iomem *intren_reg = base + PINTC_HIER;
+> +	void __iomem *intrstat_reg = base + PINTC_HIPIR + (intr_bit << 2);
+> +
+> +	spin_lock_irq(&lock);
 
-> Hi,
-> > -----Original Message-----
-> > From: Hans J. Koch [mailto:hjk at hansjkoch.de]
-> > Sent: Wednesday, March 02, 2011 12:04 AM
-> > To: TK, Pratheesh Gangadhar
-> > Cc: Hans J. Koch; linux-kernel at vger.kernel.org; gregkh at suse.de;
-> > tglx at linutronix.de; sshtylyov at mvista.com; arnd at arndb.de; Chatterjee, Amit;
-> > davinci-linux-open-source at linux.davincidsp.com; linux-arm-
-> > kernel at lists.infradead.org
-> > Subject: Re: [PATCH v6 1/1] PRUSS UIO driver support
+No, I said: spin_lock() is sufficient.
 
-Sigh, can you please use a mailer which does not repeat the headers
-for no value and just has a single line like this:
+> +	val = ioread32(intren_reg);
+> +	/* Is interrupt enabled and active ? */
+> +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND)) {
+> +		spin_unlock_irq(&lock);
 
-> > On Tue, Mar 01, 2011 at 10:15:27AM +0530, TK, Pratheesh Gangadhar wrote:
-> > Anyway, please don't use that kind of argumentation. The next newbie
-> > developer might copy your work as a basis for his new driver, and there
-> > it probably won't work.
-> > 
-> > Simply put the spin_lock_init before the loop.
-> > 
-> Agree, will fix this in next version.
+You unconditinally enable interrupts here where you are not supposed
+to do so.
 
-As I said before, we want stuff initialized when it is possibly
-used. But first of all we ant people to use the proper mechanisms to
-achive that.
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	/* Disable interrupt */
+> +	iowrite32((val & ~intr_mask), intren_reg);
+> +	spin_unlock_irq(&lock);
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int pruss_irqcontrol(struct uio_info *info, s32 irq_on)
+> +{
+> +	int intr_bit = info->irq - IRQ_DA8XX_EVTOUT0 + 2;
+> +	int val, intr_mask = (1 << intr_bit);
+> +	void __iomem *base = info->mem[0].internal_addr;
+> +	void __iomem *intren_reg = base + PINTC_HIER;
+> +
+> +	spin_lock_irq(&lock);
 
-If that's a module global lock then it needs to be instantiated by
+This one is correct, as this is always called from non interrupt
+disabled context.
 
-static DEFINE_SPINLOCK(lock);
+> +	val = ioread32(intren_reg);
+> +	if (irq_on)
+> +		iowrite32((val | intr_mask), intren_reg);
+> +	else
+> +		iowrite32((val & ~intr_mask), intren_reg);
+> +	spin_unlock_irq(&lock);
+> +
+> +	return 0;
+> +}
 
-which implies the initialization of the lock.
 
-If it's a lock which is in allocated memory then the
+> +
+> +	spin_lock_init(&lock);
 
-   spin_lock_init(&lock);
+Sigh. DEFINE_SPINLOCK(lock); already initializes the lock.
 
-wants to be before it can be possibly used.
-
-So in your case DEFINE_SPINLOCK is the correct solution.
+It's not the purpose of a review to tell you what you need to change
+mechanically. Reviewers hint to a correct solution and you are
+supposed to lookup what that solution means and act accordingly. If
+you do not understand the hint or its implications please ask _before_
+sending a new patch set.
 
 Thanks,
 
