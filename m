@@ -1,78 +1,60 @@
-From: fernando.lugo@ti.com (Fernando Guzman Lugo)
-Date: Tue,  1 Mar 2011 13:46:33 -0600
-Subject: [PATCH] OMAP:iommu - pgd and pte entries weren't getting flushed out
-In-Reply-To: <1299008793-27428-1-git-send-email-fernando.lugo@ti.com>
-References: <1299008793-27428-1-git-send-email-fernando.lugo@ti.com>
-Message-ID: <1299008793-27428-2-git-send-email-fernando.lugo@ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 1 Mar 2011 16:59:44 -0300
+Subject: [PATCH 1/5] ARM: mx35_3ds: Add I2C support
+Message-ID: <1299009588-8783-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hari Kanigeri <h-kanigeri2@ti.com>
-
-pgd and pte entries weren't getting flushed out leading to MMU faults.
-
-Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/plat-omap/iommu.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-mx3/Kconfig         |    1 +
+ arch/arm/mach-mx3/mach-mx35_3ds.c |    8 ++++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-index aeb2c33..e9473ff 100644
---- a/arch/arm/plat-omap/iommu.c
-+++ b/arch/arm/plat-omap/iommu.c
-@@ -508,7 +508,7 @@ static u32 *iopte_alloc(struct iommu *obj, u32 *iopgd, u32 da)
- 			return ERR_PTR(-ENOMEM);
+diff --git a/arch/arm/mach-mx3/Kconfig b/arch/arm/mach-mx3/Kconfig
+index 4f57f13..8b4b097 100644
+--- a/arch/arm/mach-mx3/Kconfig
++++ b/arch/arm/mach-mx3/Kconfig
+@@ -183,6 +183,7 @@ config MACH_MX35_3DS
+ 	select MXC_DEBUG_BOARD
+ 	select IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_MXC_EHCI
+ 	select IMX_HAVE_PLATFORM_MXC_NAND
+diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
+index be12ac1..5f35d5c 100644
+--- a/arch/arm/mach-mx3/mach-mx35_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+@@ -118,6 +118,9 @@ static iomux_v3_cfg_t mx35pdk_pads[] = {
+ 	MX35_PAD_SD1_DATA1__ESDHC1_DAT1,
+ 	MX35_PAD_SD1_DATA2__ESDHC1_DAT2,
+ 	MX35_PAD_SD1_DATA3__ESDHC1_DAT3,
++	/* I2C1 */
++	MX35_PAD_I2C1_CLK__I2C1_SCL,
++	MX35_PAD_I2C1_DAT__I2C1_SDA,
+ };
  
- 		*iopgd = virt_to_phys(iopte) | IOPGD_TABLE;
--		flush_iopgd_range(iopgd, iopgd);
-+		flush_iopgd_range(iopgd, iopgd + 1);
+ static int mx35_3ds_otg_init(struct platform_device *pdev)
+@@ -163,6 +166,10 @@ static int __init mx35_3ds_otg_mode(char *options)
+ }
+ __setup("otg_mode=", mx35_3ds_otg_mode);
  
- 		dev_vdbg(obj->dev, "%s: a new pte:%p\n", __func__, iopte);
- 	} else {
-@@ -537,7 +537,7 @@ static int iopgd_alloc_section(struct iommu *obj, u32 da, u32 pa, u32 prot)
- 	}
- 
- 	*iopgd = (pa & IOSECTION_MASK) | prot | IOPGD_SECTION;
--	flush_iopgd_range(iopgd, iopgd);
-+	flush_iopgd_range(iopgd, iopgd + 1);
- 	return 0;
++static const struct imxi2c_platform_data mx35_3ds_i2c0_data __initconst = {
++	.bitrate = 100000,
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -190,6 +197,7 @@ static void __init mx35_3ds_init(void)
+ 	if (mxc_expio_init(MX35_CS5_BASE_ADDR, EXPIO_PARENT_INT))
+ 		pr_warn("Init of the debugboard failed, all "
+ 				"devices on the debugboard are unusable.\n");
++	imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
  }
  
-@@ -554,7 +554,7 @@ static int iopgd_alloc_super(struct iommu *obj, u32 da, u32 pa, u32 prot)
- 
- 	for (i = 0; i < 16; i++)
- 		*(iopgd + i) = (pa & IOSUPER_MASK) | prot | IOPGD_SUPER;
--	flush_iopgd_range(iopgd, iopgd + 15);
-+	flush_iopgd_range(iopgd, iopgd + 16);
- 	return 0;
- }
- 
-@@ -567,7 +567,7 @@ static int iopte_alloc_page(struct iommu *obj, u32 da, u32 pa, u32 prot)
- 		return PTR_ERR(iopte);
- 
- 	*iopte = (pa & IOPAGE_MASK) | prot | IOPTE_SMALL;
--	flush_iopte_range(iopte, iopte);
-+	flush_iopte_range(iopte, iopte + 1);
- 
- 	dev_vdbg(obj->dev, "%s: da:%08x pa:%08x pte:%p *pte:%08x\n",
- 		 __func__, da, pa, iopte, *iopte);
-@@ -592,7 +592,7 @@ static int iopte_alloc_large(struct iommu *obj, u32 da, u32 pa, u32 prot)
- 
- 	for (i = 0; i < 16; i++)
- 		*(iopte + i) = (pa & IOLARGE_MASK) | prot | IOPTE_LARGE;
--	flush_iopte_range(iopte, iopte + 15);
-+	flush_iopte_range(iopte, iopte + 16);
- 	return 0;
- }
- 
-@@ -763,7 +763,7 @@ void iopgtable_clear_entry_all(struct iommu *obj)
- 			iopte_free(iopte_offset(iopgd, 0));
- 
- 		*iopgd = 0;
--		flush_iopgd_range(iopgd, iopgd);
-+		flush_iopgd_range(iopgd, iopgd + 1);
- 	}
- 
- 	flush_iotlb_all(obj);
+ static void __init mx35pdk_timer_init(void)
 -- 
-1.7.0.4
+1.6.0.4
