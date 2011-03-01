@@ -1,10 +1,9 @@
 From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 1 Mar 2011 16:57:06 +0530
-Subject: [PATCH V6 06/10] ST SPEAr13xx: Adding information in Documentation/
-	and MAINTAINERS
+Date: Tue, 1 Mar 2011 16:57:03 +0530
+Subject: [PATCH V6 03/10] ST SPEAr13xx: Adding support in SPEAr generic plat/
 In-Reply-To: <cover.1298977719.git.viresh.kumar@st.com>
 References: <cover.1298977719.git.viresh.kumar@st.com>
-Message-ID: <e9d874cd638ec0b79104f9079ede39945017f186.1298977719.git.viresh.kumar@st.com>
+Message-ID: <9151fcac82261032f318f1243f1d8a8f6ca138b4.1298977719.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,93 +13,34 @@ Reviewed-by: Stanley Miao <stanley.miao@windriver.com>
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 ---
- Documentation/arm/SPEAr/overview.txt |   34 +++++++++++++++++++++++-----------
- MAINTAINERS                          |    6 ++++++
- 2 files changed, 29 insertions(+), 11 deletions(-)
+ arch/arm/plat-spear/Kconfig |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/arm/SPEAr/overview.txt b/Documentation/arm/SPEAr/overview.txt
-index 253a35c..4e510061 100644
---- a/Documentation/arm/SPEAr/overview.txt
-+++ b/Documentation/arm/SPEAr/overview.txt
-@@ -9,8 +9,9 @@ Introduction
+diff --git a/arch/arm/plat-spear/Kconfig b/arch/arm/plat-spear/Kconfig
+index 1bb3dbc..29a25d2 100644
+--- a/arch/arm/plat-spear/Kconfig
++++ b/arch/arm/plat-spear/Kconfig
+@@ -8,6 +8,13 @@ choice
+ 	prompt "ST SPEAr Family"
+ 	default ARCH_SPEAR3XX
  
-   The ST Microelectronics SPEAr range of ARM9/CortexA9 System-on-Chip CPUs are
-   supported by the 'spear' platform of ARM Linux. Currently SPEAr300,
--  SPEAr310, SPEAr320 and SPEAr600 SOCs are supported. Support for the SPEAr13XX
--  series is in progress.
-+  SPEAr310, SPEAr320, SPEAr600, SPEAr1300 and SPEAr1310 SOCs are supported.
-+  SPEAr3XX and SPEAr6XX are based on ARM9 whereas SPEAr13XX is based on latest
-+  ARM Cortex A9 CPUs.
- 
-   Hierarchy in SPEAr is as follows:
- 
-@@ -27,16 +28,25 @@ Introduction
- 			- SPEAr600_EVB (Evaluation Board)
- 	- SPEAr13XX (13XX SOC series, based on ARM CORTEXA9)
- 		- SPEAr1300 (SOC)
-+			- SPEAr1300_EVB (Evaluation Board)
-+		- SPEAr1310 (SOC)
-+			- SPEAr1310_EVB (Evaluation Board)
- 
-   Configuration
-   -------------
- 
--  A generic configuration is provided for each machine, and can be used as the
-+  A generic configuration is provided for each machine family, and can be used as the
-   default by
--	make spear600_defconfig
--	make spear300_defconfig
--	make spear310_defconfig
--	make spear320_defconfig
-+	#make ARCH=arm spear13xx_defconfig
-+	#make ARCH=arm spear3xx_defconfig
-+	#make ARCH=arm spear6xx_defconfig
++config ARCH_SPEAR13XX
++	bool "SPEAr13XX"
++	select ARM_GIC
++	select CPU_V7
++	help
++	  Supports for ARM's SPEAR13XX family
 +
-+  Compilation
-+  -----------
-+
-+  After applying default configuration, Linux kernel for SPEAr architecture
-+  can be compiled as
-+	#make ARCH=arm CROSS_COMPILE=arm-linux- uImage
+ config ARCH_SPEAR3XX
+ 	bool "SPEAr3XX"
+ 	select ARM_VIC
+@@ -25,6 +32,7 @@ config ARCH_SPEAR6XX
+ endchoice
  
-   Layout
-   ------
-@@ -48,13 +58,15 @@ Introduction
-   Each machine series have a directory with name arch/arm/mach-spear followed by
-   series name. Like mach-spear3xx, mach-spear6xx and mach-spear13xx.
+ # Adding SPEAr machine specific configuration files
++source "arch/arm/mach-spear13xx/Kconfig"
+ source "arch/arm/mach-spear3xx/Kconfig"
+ source "arch/arm/mach-spear6xx/Kconfig"
  
--  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c and for
--  spear6xx is mach-spear6xx/spear6xx.c. mach-spear* also contain soc/machine
-+  Common file for machines of spear3xx family is mach-spear3xx/spear3xx.c, for
-+  spear6xx is mach-spear6xx/spear6xx.c and similarly for spear13xx is
-+  mach-spear13xx/spear13xx.c. mach-spear* also contain soc/machine
-   specific files, like spear300.c, spear310.c, spear320.c and spear600.c.
--  mach-spear* also contains board specific files for each machine type.
-+  Board specific files for each machine type is also contained in mach-spear*
-+  folder.
- 
- 
-   Document Author
-   ---------------
- 
--  Viresh Kumar, (c) 2010 ST Microelectronics
-+  Viresh Kumar, Shiraz Hashim (c) 2010 ST Microelectronics
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8afba63..da45149 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5852,6 +5852,12 @@ W:	http://www.st.com/spear
- S:	Maintained
- F:	arch/arm/plat-spear/
- 
-+SPEAR13XX MACHINE SUPPORT
-+M:	Shiraz Hashim <shiraz.hashim@st.com>
-+W:	http://www.st.com/spear
-+S:	Maintained
-+F:	arch/arm/mach-spear13xx/
-+
- SPEAR3XX MACHINE SUPPORT
- M:	Viresh Kumar <viresh.kumar@st.com>
- W:	http://www.st.com/spear
 -- 
 1.7.2.2
