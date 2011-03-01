@@ -1,28 +1,20 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 01 Mar 2011 20:23:36 +0300
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Mar 2011 17:31:33 -0000
 Subject: [PATCH] ARM: vexpress ct-ca9x4: only set twd_base if local timers
 	are	being used
-In-Reply-To: <1288891845-12630-1-git-send-email-will.deacon@arm.com>
+In-Reply-To: <4D6D2B98.4090501@ru.mvista.com>
 References: <1288891845-12630-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4D6D2B98.4090501@ru.mvista.com>
+	<4D6D2B98.4090501@ru.mvista.com>
+Message-ID: <000801cbd836$828d8f20$87a8ad60$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+> Will Deacon wrote:
+> 
+> > In commit bde28b84, I made the assumption that CONFIG_SMP is always set
+> 
+>     Linus asks to also specify the commit summary in parens.
 
-Will Deacon wrote:
+Well he merged it for v2.6.37 so I guess it's not the end of the world.
 
-> In commit bde28b84, I made the assumption that CONFIG_SMP is always set
-
-    Linus asks to also specify the commit summary in parens.
-
-> for the quad-core ct-ca9x4 platform. As it turns out, people who aren't
-> using the SMP goodness are confronted with a build failure.
-
-> This patch fixes this issue by ensure that twd_base is only set if
-> local timers are being used (and therefore SMP support is configured).
-
-> Reported-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-WBR, Sergei
+Will
