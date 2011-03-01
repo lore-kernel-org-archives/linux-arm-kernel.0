@@ -1,37 +1,36 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 01 Mar 2011 12:11:45 -0800
-Subject: [RFC PATCH 5/5] RFC: msm: sps: Smart Peripheral System (SPS)
-	driver.
-In-Reply-To: <1298941892-25173-6-git-send-email-kheitke@codeaurora.org>
-	(Kenneth Heitke's message of "Mon, 28 Feb 2011 18:11:32 -0700")
-References: <1298941892-25173-1-git-send-email-kheitke@codeaurora.org>
-	<1298941892-25173-6-git-send-email-kheitke@codeaurora.org>
-Message-ID: <8yahbbmvbwe.fsf@huya.qualcomm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue,  1 Mar 2011 20:16:22 +0000
+Subject: [PATCH] S3C64XX: Fix keypad setup to configure correct number of rows
+Message-ID: <1299010582-32481-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 28 2011, Kenneth Heitke wrote:
+From: Ben Dooks <ben-linux@fluff.org>
 
-> diff --git a/arch/arm/mach-msm/include/mach/msm_sps.h b/arch/arm/mach-msm/include/mach/msm_sps.h
-> +
+The call to s3c_gpio_cfgrange_nopull() takes a size and base
+but this looks like it is trying to do base and end. This means
+it is configuring too many GPIOs and on the case of the Cragganmore
+means we're seeing an overflow of the ROW pins causing problems
+with the keyboard driver.
 
-> diff --git a/arch/arm/mach-msm/sps/Makefile b/arch/arm/mach-msm/sps/Makefile
-> +
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/setup-keypad.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> diff --git a/arch/arm/mach-msm/sps/sps.c b/arch/arm/mach-msm/sps/sps.c
-> +
-
-> diff --git a/arch/arm/mach-msm/sps/sps_bam.c b/arch/arm/mach-msm/sps/sps_bam.c
-> +
-
-These four files add spurious blank lines to the end of their files.  If
-there are no other changes to the patches, I can fix this up before
-applying the patches.  Otherwise, please remove these before resending
-the patches.
-
-Thanks,
-David
-
+diff --git a/arch/arm/mach-s3c64xx/setup-keypad.c b/arch/arm/mach-s3c64xx/setup-keypad.c
+index f8ed0d2..1d4d0ee 100644
+--- a/arch/arm/mach-s3c64xx/setup-keypad.c
++++ b/arch/arm/mach-s3c64xx/setup-keypad.c
+@@ -17,7 +17,7 @@
+ void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
+ {
+ 	/* Set all the necessary GPK pins to special-function 3: KP_ROW[x] */
+-	s3c_gpio_cfgrange_nopull(S3C64XX_GPK(8), 8 + rows, S3C_GPIO_SFN(3));
++	s3c_gpio_cfgrange_nopull(S3C64XX_GPK(8), rows, S3C_GPIO_SFN(3));
+ 
+ 	/* Set all the necessary GPL pins to special-function 3: KP_COL[x] */
+ 	s3c_gpio_cfgrange_nopull(S3C64XX_GPL(0), cols, S3C_GPIO_SFN(3));
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.2.3
