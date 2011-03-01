@@ -1,27 +1,43 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 1 Mar 2011 18:23:46 -0300
-Subject: [PATCH 2/2] ARM: mx3/pcm043: fix build failure
-In-Reply-To: <1299011459-18200-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110301203018.GY22310@pengutronix.de>
-	<1299011459-18200-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <AANLkTi=Yu0O4T92UAeCnDg8-vdJXEOMB80i5JE+x+=PT@mail.gmail.com>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Wed,  2 Mar 2011 02:58:14 +0530
+Subject: [PATCH v7 0/1] Add PRUSS UIO driver support
+Message-ID: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Uwe,
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAP-L138 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts
+to user space application.PRUSS UIO application API can be used to control PRUs
+in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+processor and PRUs. More information on PRUSS and UIO linux user space API
+available in the links below
 
-2011/3/1 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Commit
->
-> ? ? ? ?530aca5 (arm: mach-mx3: pcm043: add write-protect and card-detect for SD1)
->
-> assigned a non-existing member .cd_gpio in a struct esdhc_platform_data.
-> Though I expect this to change soon I remove it for now to unbreak the
-> autobuilders.
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-Same error happens on mx25_3ds. Would you like me to send a patch for
-fixing it for mx25_3ds too?
+Platform/board specific portion of this patch depends on Mistral patches below
 
-Regards,
+[PATCH 1/1] davinci: changed SRAM allocator to shared ram :
+				https://patchwork.kernel.org/patch/549351/
+[PATCH 1/1] da830: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS :
+				 https://patchwork.kernel.org/patch/549331/
+[PATCH v2 01/13] mfd: pruss mfd driver :
+				https://patchwork.kernel.org/patch/549531/
+[PATCH v2 02/13] da850: pruss platform specific additions :
+				https://patchwork.kernel.org/patch/549521/
 
-Fabio Estevam
+I will submit a seperate patch set on top of these patches to support PRUSS
+UIO driver.
+
+Pratheesh Gangadhar (1):
+  PRUSS UIO driver support
+
+ drivers/uio/Kconfig     |   17 +++
+ drivers/uio/Makefile    |    1 +
+ drivers/uio/uio_pruss.c |  257 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 275 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
