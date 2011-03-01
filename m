@@ -1,47 +1,21 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Tue,  1 Mar 2011 21:33:41 +0100
-Subject: [PATCH 2/2] ARM: mxc91231/iomux: mark pin_list as const
-In-Reply-To: <1299011621-18886-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1299011621-18886-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1299011621-18886-2-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Mar 2011 20:37:34 +0000
+Subject: [PATCH 1/2] ARM: mx3/cpuimx35: fix build failure
+In-Reply-To: <1299011459-18200-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110301203018.GY22310@pengutronix.de>
+	<1299011459-18200-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110301203734.GF27107@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/mach-mxc91231/iomux.c                  |    4 ++--
- arch/arm/plat-mxc/include/mach/iomux-mxc91231.h |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+On Tue, Mar 01, 2011 at 09:30:58PM +0100, Uwe Kleine-K?nig wrote:
+> It seems vim's autocompletion played tricks on me without me noticing.
 
-diff --git a/arch/arm/mach-mxc91231/iomux.c b/arch/arm/mach-mxc91231/iomux.c
-index 405d9b1..5acb4d0 100644
---- a/arch/arm/mach-mxc91231/iomux.c
-+++ b/arch/arm/mach-mxc91231/iomux.c
-@@ -134,10 +134,10 @@ int mxc_iomux_alloc_pin(const unsigned int pin_mode, const char *label)
- }
- EXPORT_SYMBOL(mxc_iomux_alloc_pin);
- 
--int mxc_iomux_setup_multiple_pins(unsigned int *pin_list, unsigned count,
-+int mxc_iomux_setup_multiple_pins(const unsigned int *pin_list, unsigned count,
- 		const char *label)
- {
--	unsigned int *p = pin_list;
-+	const unsigned int *p = pin_list;
- 	int i;
- 	int ret = -EINVAL;
- 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mxc91231.h b/arch/arm/plat-mxc/include/mach/iomux-mxc91231.h
-index 15d5951..a86983d 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mxc91231.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mxc91231.h
-@@ -51,7 +51,7 @@ int mxc_iomux_alloc_pin(const unsigned int pin_mode, const char *label);
-  * setups mutliple pins
-  * convenient way to call the above function with tables
-  */
--int mxc_iomux_setup_multiple_pins(unsigned int *pin_list, unsigned count,
-+int mxc_iomux_setup_multiple_pins(const unsigned int *pin_list, unsigned count,
- 		const char *label);
- 
- /*
--- 
-1.7.2.3
+Every time I hear the word 'autocompletion' it's always associated with
+the wrong thing happening.  I really don't know why people even bother
+with 'autocompletion' because it seems to go wrong very often.  Whether
+it be with code, or with nicknames on IRC...
+
+The only autocompletion that I've seen which works right and avoids these
+kinds of issues is in things like bash, where it won't autocomplete unless
+there is exactly one completion available.
