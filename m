@@ -1,39 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 28 Feb 2011 20:21:00 -0800
-Subject: [PATCH 4/4] msm: scm: Get cacheline size from CTR
-In-Reply-To: <alpine.LFD.2.00.1102242056010.2701@localhost6.localdomain6>
-References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
-	<1298573085-23217-5-git-send-email-sboyd@codeaurora.org>
-	<alpine.LFD.2.00.1102241959290.2701@localhost6.localdomain6>
-	<4D66B505.6010702@codeaurora.org>
-	<alpine.LFD.2.00.1102242056010.2701@localhost6.localdomain6>
-Message-ID: <4D6C742C.40507@codeaurora.org>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 28 Feb 2011 20:51:34 -0800
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <4D6B78BF.1020102@stericsson.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>
+	<4D6B78BF.1020102@stericsson.com>
+Message-ID: <4D6C7B56.9060109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2011 11:56 AM, Thomas Gleixner wrote:
-> On Thu, 24 Feb 2011, Stephen Boyd wrote:
+On 02/28/2011 02:28 AM, Maxime Coquelin wrote:
+> Hello Eduardo,
 >
->>
->> I definitely don't want to do it for every loop. I'm fine with getting
->> it every scm_call() invocation though.
->>
->> For now, I'll pull the end and cacheline_size variables out of the
->> do-while loop.
+> On 02/16/2011 12:57 PM, Eduardo Valentin wrote:
+>>> Eduardo, what has happened to this patchset?
+>> Got forgotten :-(. Unfortunately I didn't pushed it hard enough.
+> I propose to refactor your patchset, moving from procfs to sysfs.
+
+>>> Do you want help in picking it up and try to polish it up?
+>> Yeah, but it would need a refactoring. IIRC, result of last discussion
+>> was that we should not mess with /proc. So, maybe moving back
+ >> to something under sysfs. Perhaps /sys/devices/soc or so?
+> About the location of this new sysfs entry, where do you think it should
+> be?
+> I propose to create a new directory named "soc" in /sys/devices/system/.
 >
-> Why not do it correct right away and retrieve it in an __init
-> function?
+> As platform vendors have several/different kind of IDs to export to
+> sysfs, I propose each vendor to create file entries related to their IDs
+> (eg. /sys/devices/system/soc/idcode for OMAP platforms).
 
-That would require an early_initcall, so hopefully that is fine.
+I think the path /sys/devices/system/soc/ will work for the MSM too. I 
+would have ideally liked it to be /sys/devices/system/soc/msm, 
+/sys/devices/system/soc/omap, etc, but we can't get to pick names for 
+devices under a class. So, we can make do with /sys/devices/system/soc/.
 
-I wonder why the generic arm v7 cache operations don't do the same thing
-and store the dcache line size somewhere. Every dma operation is
-essentially calling dcache_line_size(). Perhaps some generic arm code
-should be determining the dcache line size really early on and storing
-it in the proc_info_list? Then both the dma code and scm code could
-query the processor for the dcache line size with something like
-cpu_dcache_line_size?
+> However, I think we should have a common file entry to export the unique
+> ID of the platforms. Indeed, user-space applications should have a
+> unified way to get this kind of ID, regardless of the platform (eg.
+> /sys/devices/system/soc/unique_id).
 
+I like the idea of have a common file across all implementations that 
+will let user space identify what implementation is exporting the other 
+files and how to interpret them.
+
+I would like to propose an "arch" file to identify the arch the soc info 
+file are for. I'm guessing within an arch, the soc files would mostly be 
+the same? If there are other minor differences, we can let the arch 
+specific code deal with how the files are interpreted.
+
+Does "arch" work for everyone?
+
+Thanks,
+Saravana
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
