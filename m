@@ -1,47 +1,45 @@
-From: mnalajal@codeaurora.org (Murali Nalajala)
-Date: Tue,  1 Mar 2011 06:17:29 +0530
-Subject: [PATCH 1/2] mtd: nand: Allow NAND chip ids to be included standalone.
-Message-ID: <1298940450-27365-1-git-send-email-mnalajal@codeaurora.org>
+From: R65037@freescale.com (Zhu Richard-R65037)
+Date: Tue, 1 Mar 2011 01:25:05 +0000
+Subject: [PATCH V3 3/4] mmc: sdhci-esdhc: remove
+	SDHCI_QUIRK_NO_CARD_NO_RESET from ESDHC_DEFAULT_QUIRKS
+In-Reply-To: <20110228142037.GE15532@pengutronix.de>
+References: <1298892725-23672-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<1298892725-23672-3-git-send-email-Hong-Xing.Zhu@freescale.com>
+	<20110228142037.GE15532@pengutronix.de>
+Message-ID: <010C9052C42A00499CE76D637FA5EE900C7B55@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lets non-standard NAND drivers take advantage of known NAND
-chip information.
+Hi Wolfram:
+Thanks for you to make tests on your mx35 platform.
 
-Signed-off-by: Dima Zavin <dima@android.com>
-Signed-off-by: Murali Nalajala <mnalajal@codeaurora.org>
----
- drivers/mtd/nand/Kconfig |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+Best Regards
+Richard Zhu
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index c895922..782275e 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -1,3 +1,10 @@
-+config MTD_NAND_IDS
-+	tristate "Include chip ids for known NAND devices."
-+	depends on MTD
-+	help
-+	  Useful for NAND drivers that do not use the NAND subsystem but
-+	  still like to take advantage of the known chip information.
-+
- config MTD_NAND_ECC
- 	tristate
- 
-@@ -123,9 +130,6 @@ config MTD_NAND_OMAP_PREFETCH_DMA
- 	 or in DMA interrupt mode.
- 	 Say y for DMA mode or MPU mode will be used
- 
--config MTD_NAND_IDS
--	tristate
--
- config MTD_NAND_RICOH
- 	tristate "Ricoh xD card reader"
- 	default n
--- 
-1.7.1.1
 
---
-Sent by a consultant of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> -----Original Message-----
+> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> Sent: Monday, February 28, 2011 10:21 PM
+> To: Zhu Richard-R65037
+> Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de; linux-
+> mmc at vger.kernel.org; cjb at laptop.org; avorontsov at ru.mvista.com;
+> eric at eukrea.com; linuxzsc at gmail.com; Zhao Richard-B20223;
+> Freescale at lists.linaro.org; eric.miao at linaro.org
+> Subject: Re: [PATCH V3 3/4] mmc: sdhci-esdhc: remove
+> SDHCI_QUIRK_NO_CARD_NO_RESET from ESDHC_DEFAULT_QUIRKS
+>
+> On Mon, Feb 28, 2011 at 07:32:04PM +0800, Richard Zhu wrote:
+> > sdhci-esdhc-imx does not need SDHCI_QUIRK_NO_CARD_NO_RESET. Make it OF-
+> specific.
+> >
+> > Signed-off-by: Richard Zhu <Hong-Xing.Zhu@freescale.com>
+>
+> Seems to work on mx35 at least:
+>
+> Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+>
+> --
+> Pengutronix e.K.                           | Wolfram Sang
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
