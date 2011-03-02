@@ -1,119 +1,15 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 Mar 2011 12:11:48 +0100
-Subject: [PATCH] ARM: mxs/mx28evk: add flexcan devices
-In-Reply-To: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
-References: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <20110302111148.GV29521@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 2 Mar 2011 11:15:47 +0000
+Subject: [PATCH] ARM: SAMSUNG: Include devs.h in dev-uart.c to
+	prototype devices
+In-Reply-To: <1299060244-22710-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1299060244-22710-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20110302111546.GA21424@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, Mar 02, 2011 at 10:04:04AM +0000, Mark Brown wrote:
+> Ensures that the declaration agrees with the definition and makes sparse
+> happy.
 
-On Wed, Mar 02, 2011 at 06:54:44PM +0800, Shawn Guo wrote:
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
->  arch/arm/mach-mxs/Kconfig        |    1 +
->  arch/arm/mach-mxs/mach-mx28evk.c |   37 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 55bf075..9a1f2cb 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -31,6 +31,7 @@ config MACH_MX28EVK
->  	select MXS_HAVE_AMBA_DUART
->  	select MXS_HAVE_PLATFORM_AUART
->  	select MXS_HAVE_PLATFORM_FEC
-> +	select MXS_HAVE_PLATFORM_FLEXCAN
->  	select MXS_OCOTP
->  	default y
->  	help
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index 1f0b708..3cefb73 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -28,6 +28,7 @@
->  #include "devices-mx28.h"
->  #include "gpio.h"
->  
-> +#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
->  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
->  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
->  
-> @@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
->  	/* phy reset line */
->  	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
->  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-> +
-> +	/* flexcan0 */
-> +	MX28_PAD_GPMI_RDY2__CAN0_TX,
-> +	MX28_PAD_GPMI_RDY3__CAN0_RX,
-> +	/* flexcan1 */
-> +	MX28_PAD_GPMI_CE2N__CAN1_TX,
-> +	MX28_PAD_GPMI_CE3N__CAN1_RX,
-> +	/* transceiver power control */
-> +	MX28_PAD_SSP1_CMD__GPIO_2_13,
->  };
->  
->  /* fec */
-> @@ -178,8 +188,28 @@ error:
->  	return -ETIMEDOUT;
->  }
->  
-> +/* flexcan */
-> +static void mx28evk_flexcan_switch(int enable)
-> +{
-> +	static int count;
-> +
-> +	if (enable) {
-> +		if (!count++)
-> +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
-> +	} else {
-> +		if (!--count)
-> +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
-> +	}
-> +}
-
-Why this count variable? It shouldn't hurt to call gpio_set_value
-multiple times.
-
-
-Sascha
-
-> +
-> +static const struct flexcan_platform_data mx28evk_flexcan_pdata __initconst = {
-> +	.transceiver_switch = mx28evk_flexcan_switch,
-> +};
-> +
->  static void __init mx28evk_init(void)
->  {
-> +	int ret;
-> +
->  	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
->  
->  	mx28_add_duart();
-> @@ -192,6 +222,13 @@ static void __init mx28evk_init(void)
->  	mx28evk_fec_reset();
->  	mx28_add_fec(0, &mx28_fec_pdata[0]);
->  	mx28_add_fec(1, &mx28_fec_pdata[1]);
-> +
-> +	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
-> +				"flexcan-switch");
-> +	if (ret)
-> +		pr_warn("failed to request gpio flexcan-switch: %d\n", ret);
-> +	mx28_add_flexcan(0, &mx28evk_flexcan_pdata);
-> +	mx28_add_flexcan(1, &mx28evk_flexcan_pdata);
->  }
->  
->  static void __init mx28evk_timer_init(void)
-> -- 
-> 1.7.1
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sorry, this patch is clearly bogus - no idea what's going on there.
