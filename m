@@ -1,55 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 2 Mar 2011 08:39:04 +0000
-Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
-In-Reply-To: <4D6D9C03.2080906@codeaurora.org>
-References: <4D6D9C03.2080906@codeaurora.org>
-Message-ID: <20110302083904.GA4493@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Mar 2011 09:46:37 +0100
+Subject: [PATCH 2/2] ARM MX53_LOCO: add pwm backlight device
+In-Reply-To: <1298972303-1010-2-git-send-email-b02280@freescale.com>
+References: <1298972303-1010-1-git-send-email-b02280@freescale.com>
+	<1298972303-1010-2-git-send-email-b02280@freescale.com>
+Message-ID: <20110302084637.GS29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 05:23:15PM -0800, Saravana Kannan wrote:
-> If I'm not missing some magic, this would mean that  
-> "CONFIG_ARM_DMA_MEM_BUFFERABLE" determines if readl(s)/writel(s) get to  
-> have a built in mb() or not.
+On Tue, Mar 01, 2011 at 05:38:23PM +0800, Jason Chen wrote:
+> Signed-off-by: Jason Chen <b02280@freescale.com>
+> ---
+>  arch/arm/mach-mx5/Kconfig           |    1 +
+>  arch/arm/mach-mx5/board-mx53_loco.c |   11 +++++++++++
+>  arch/arm/mach-mx5/devices-imx53.h   |    4 ++++
+>  3 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index f065a0d..baf5223 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -162,6 +162,7 @@ config MACH_MX53_LOCO
+>  	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+> +	select IMX_HAVE_PLATFORM_MXC_PWM
+>  	help
+>  	  Include support for MX53 LOCO platform. This includes specific
+>  	  configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+> index 160899e..3b0b200 100644
+> --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/fec.h>
+>  #include <linux/delay.h>
+>  #include <linux/gpio.h>
+> +#include <linux/pwm_backlight.h>
+>  
+>  #include <mach/common.h>
+>  #include <mach/hardware.h>
+> @@ -203,6 +204,13 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
+>  	.bitrate = 100000,
+>  };
+>  
+> +static struct platform_pwm_backlight_data loco_pwm_backlight_data = {
+> +	.pwm_id = 1,
+> +	.max_brightness = 255,
+> +	.dft_brightness = 128,
+> +	.pwm_period_ns = 50000,
+> +};
+> +
+>  static void __init mx53_loco_board_init(void)
+>  {
+>  	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+> @@ -213,6 +221,9 @@ static void __init mx53_loco_board_init(void)
+>  	imx53_add_imx2_wdt(0, NULL);
+>  	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
+>  	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
+> +
+> +	imx53_add_mxc_pwm(1);
+> +	imx53_add_mxc_pwm_backlight(0, &loco_pwm_backlight_data);
+>  }
+>  
+>  static void __init mx53_loco_timer_init(void)
+> diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+> index 5a1d6c9..e9c5661 100644
+> --- a/arch/arm/mach-mx5/devices-imx53.h
+> +++ b/arch/arm/mach-mx5/devices-imx53.h
+> @@ -37,3 +37,7 @@ extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
+>  extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
+>  #define imx53_add_mxc_pwm(id)	\
+>  	imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
+> +
+> +#define imx53_add_mxc_pwm_backlight(id, pdata)			\
+> +	imx_add_platform_device("pwm-backlight", id, NULL,	\
+> +			0, pdata, sizeof(*pdata));
 
-You're missing that CONFIG_ARM_DMA_MEM_BUFFERABLE not only changes
-readl/writel but also the type for DMA coherent memory from strongly
-ordered to memory, non-cacheable.
 
-The barriers are required to ensure that reads and writes to DMA
-coherent memory are visible to the DMA device before the write
-completes, and any value read from DMA coherent memory will not
-bypass a read from a DMA device.
+No. There is nothing i.MX53 specific in this, not even i.MX specific.
+Please just add a static struct platform_device or maybe
+platform_device_register_resndata.
 
-The barriers in the IO macros have nothing to do with whether reads/writes
-to normal cacheable memory are visible to DMA devices.  That is what the
-streaming DMA API is for.
+Sascha
 
-In any case, the IO macros are always ordered with respect to other
-device writes irrespective of CONFIG_ARM_DMA_MEM_BUFFERABLE.
-
-> There are so many other drivers that don't use or care about DMA and  
-> might still want to ensure some ordering constraints between their  
-> readl(s)/writel(s). They can't depend on readl/writel taking care of it  
-> for them since their code could be used in a kernel configuration that  
-> doesn't enable this config.
-
-The majority of device drivers don't need ordering on their IO macros.
-However, Linus refuses to introduce relaxed IO ordering to the kernel,
-saying that architectures must reflect the x86 behaviour as much as
-possible.
-
-So, we're stuck with device drivers which use readl/writel both where
-they don't need the ordering constraints _and_ where they do need the
-ordering constraints.  That means we must provide the ordering in these
-macros to ensure proper system functioning.
-
-> Firstly, I don't know how many people noticed this and realize they  
-> can't depend on readl/writel to take care of the mb()s for them. Seems  
-> like an unnecessary encouragement to make mistakes when it didn't need  
-> to be so.
-
-I think you misunderstand what's going on.  IO accesses are always ordered
-with respect to themselves.  The barriers are there to ensure ordering
-between DMA coherent memory (normal non-cached memory) and IO accesses
-(device).
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
