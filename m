@@ -1,49 +1,43 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 2 Mar 2011 11:38:23 +0000
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
-References: <AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>
-	<4D6D9B10.9000606@codeaurora.org>
-	<4D6D9D06.2020204@bluewatersys.com>
-	<4D6D9FC7.1090206@codeaurora.org>
-	<4D6DA290.2010607@bluewatersys.com>
-	<4D6DAA24.3000204@codeaurora.org>
-	<4D6DAE6E.4030701@bluewatersys.com>
-	<4D6DB1B1.4060908@codeaurora.org> <4D6DFE67.3020801@stericsson.com>
-	<AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
-Message-ID: <20110302113823.GB2728@pulham.picochip.com>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Wed,  2 Mar 2011 17:08:05 +0530
+Subject: [PATCH v8 0/1] Add PRUSS UIO driver support
+Message-ID: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 11:36:38AM +0100, Linus Walleij wrote:
-> On Wed, Mar 2, 2011 at 9:23 AM, Maxime Coquelin
-> <maxime.coquelin-nonst@stericsson.com> wrote:
-> 
-> > I think we should have a tree like this :
-> >
-> > /sys/devices/system/soc/
-> > /sys/devices/system/soc/unique_id<- Unified way to export an ID for all machs
-> 
-> Arbitrary number of bits? Some will have a 64-bit ID, some will have 32-bit
-> etc.
-> 
-> Should we say it's a hex string of 64 bits?
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAP-L138 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts
+to user space application.PRUSS UIO application API can be used to control PRUs
+in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+processor and PRUs. More information on PRUSS and UIO linux user space API
+available in the links below
 
-Could we provide hooks for the platform that takes the buffer and length 
-and let the platform do the snprintf()?  Our devices have a 128-bit 
-serial number and I'm sure there must be others.
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-> > /sys/devices/system/soc/mach/
-> > /sys/devices/system/soc/mach/name<- Name of the mach
-> > /sys/devices/system/soc/mach/foo_id
-> > /sys/devices/system/soc/mach/bar_id<- Vendors may have several/different IDs
-> > to export (IDCODE for OMAP, Production ID...)
+Platform/board specific portion of this patch depends on Mistral patches below
 
-Do we need a way to allow platforms to specify additional attributes to 
-co into the socinfo?  For our devices we can boot in different modes and 
-how we boot determines how the firmware is upgraded.  In the case above 
-the platform could specify that it needs foo_id and bar_id and the 
-callbacks to fill them in.
+[PATCH 1/1] davinci: changed SRAM allocator to shared ram :
+				https://patchwork.kernel.org/patch/549351/
+[PATCH 1/1] da830: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS :
+				 https://patchwork.kernel.org/patch/549331/
+[PATCH v2 01/13] mfd: pruss mfd driver :
+				https://patchwork.kernel.org/patch/549531/
+[PATCH v2 02/13] da850: pruss platform specific additions :
+				https://patchwork.kernel.org/patch/549521/
 
-Jamie
+I will submit a seperate patch set on top of these patches to support PRUSS
+UIO driver.
+
+Pratheesh Gangadhar (1):
+  PRUSS UIO driver support
+
+ drivers/uio/Kconfig     |   17 ++++
+ drivers/uio/Makefile    |    1 +
+ drivers/uio/uio_pruss.c |  226 +++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 244 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
