@@ -1,53 +1,55 @@
-From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
-Date: Wed, 2 Mar 2011 13:17:18 +0100
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <20110302113823.GB2728@pulham.picochip.com>
-References: <AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>
-	<4D6D9B10.9000606@codeaurora.org>
-	<4D6D9D06.2020204@bluewatersys.com>
-	<4D6D9FC7.1090206@codeaurora.org>
-	<4D6DA290.2010607@bluewatersys.com>
-	<4D6DAA24.3000204@codeaurora.org>
-	<4D6DAE6E.4030701@bluewatersys.com>
-	<4D6DB1B1.4060908@codeaurora.org> <4D6DFE67.3020801@stericsson.com>
-	<AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
-	<20110302113823.GB2728@pulham.picochip.com>
-Message-ID: <4D6E354E.5010208@stericsson.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed,  2 Mar 2011 14:34:04 +0200
+Subject: [PATCH 1/3] ARM: tegra: PCIE minor code refactoring
+In-Reply-To: <cover.1299068166.git.mike@compulab.co.il>
+References: <cover.1299068166.git.mike@compulab.co.il>
+Message-ID: <14be7b76cf6dd9e3ce6a77ed86a11525581bfaa1.1299068166.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2011 12:38 PM, Jamie Iles wrote:
-> On Wed, Mar 02, 2011 at 11:36:38AM +0100, Linus Walleij wrote:
->> On Wed, Mar 2, 2011 at 9:23 AM, Maxime Coquelin
->> <maxime.coquelin-nonst@stericsson.com>  wrote:
->>
->>> I think we should have a tree like this :
->>>
->>> /sys/devices/system/soc/
->>> /sys/devices/system/soc/unique_id<- Unified way to export an ID for all machs
->> Arbitrary number of bits? Some will have a 64-bit ID, some will have 32-bit
->> etc.
->>
->> Should we say it's a hex string of 64 bits?
-> Could we provide hooks for the platform that takes the buffer and length
-> and let the platform do the snprintf()?  Our devices have a 128-bit
-> serial number and I'm sure there must be others.
+Move tegra_pcie_power_off before tegra_pcie_power_on for clean addition
+of PCIE power gating
 
-This is one possibility, another one is to let the platform specify how 
-it exports this serial, as you proposed bellow.
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+---
+ arch/arm/mach-tegra/pcie.c |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
 
->>> /sys/devices/system/soc/mach/
->>> /sys/devices/system/soc/mach/name<- Name of the mach
->>> /sys/devices/system/soc/mach/foo_id
->>> /sys/devices/system/soc/mach/bar_id<- Vendors may have several/different IDs
->>> to export (IDCODE for OMAP, Production ID...)
-> Do we need a way to allow platforms to specify additional attributes to
-> co into the socinfo?  For our devices we can boot in different modes and
-> how we boot determines how the firmware is upgraded.  In the case above
-> the platform could specify that it needs foo_id and bar_id and the
-> callbacks to fill them in.
-
-Yes it was what I thought with the foo and bar IDs exports.
-
-Maxime
+diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
+index 53f5fa3..6de5ef4 100644
+--- a/arch/arm/mach-tegra/pcie.c
++++ b/arch/arm/mach-tegra/pcie.c
+@@ -682,6 +682,15 @@ static void tegra_pcie_xclk_clamp(bool clamp)
+ 	pmc_writel(reg, PMC_SCRATCH42);
+ }
+ 
++static void tegra_pcie_power_off(void)
++{
++	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
++	tegra_periph_reset_assert(tegra_pcie.afi_clk);
++	tegra_periph_reset_assert(tegra_pcie.pex_clk);
++
++	tegra_pcie_xclk_clamp(true);
++}
++
+ static int tegra_pcie_power_on(void)
+ {
+ 	tegra_pcie_xclk_clamp(true);
+@@ -693,15 +702,6 @@ static int tegra_pcie_power_on(void)
+ 	return clk_enable(tegra_pcie.pll_e);
+ }
+ 
+-static void tegra_pcie_power_off(void)
+-{
+-	tegra_periph_reset_assert(tegra_pcie.pcie_xclk);
+-	tegra_periph_reset_assert(tegra_pcie.afi_clk);
+-	tegra_periph_reset_assert(tegra_pcie.pex_clk);
+-
+-	tegra_pcie_xclk_clamp(true);
+-}
+-
+ static int tegra_pcie_clocks_get(void)
+ {
+ 	int err;
+-- 
+1.7.3.1
