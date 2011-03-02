@@ -1,49 +1,50 @@
-From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
-Date: Wed, 2 Mar 2011 11:53:03 +0100
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>	<4D6DAE6E.4030701@bluewatersys.com>	<4D6DB1B1.4060908@codeaurora.org>	<4D6DFE67.3020801@stericsson.com>
-	<AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
-Message-ID: <4D6E218F.2020804@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Mar 2011 12:02:30 +0100
+Subject: [PATCH] ARM: imx/mx25_3ds: Fix build failure
+In-Reply-To: <1299028552-13186-1-git-send-email-festevam@gmail.com>
+References: <1299028552-13186-1-git-send-email-festevam@gmail.com>
+Message-ID: <20110302110230.GU29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2011 11:36 AM, Linus Walleij wrote:
-> On Wed, Mar 2, 2011 at 9:23 AM, Maxime Coquelin
-> <maxime.coquelin-nonst@stericsson.com>  wrote:
->
->> I think we should have a tree like this :
->>
->> /sys/devices/system/soc/
->> /sys/devices/system/soc/unique_id<- Unified way to export an ID for all machs
-> Arbitrary number of bits? Some will have a 64-bit ID, some will have 32-bit
-> etc.
+On Tue, Mar 01, 2011 at 10:15:52PM -0300, Fabio Estevam wrote:
+> Commit
+> ca8d906 (ARM: mach-imx: mx25_3ds: add write-protect and card-detect for SD)
+> 
+> assigned a non-existing member .cd_gpio in a struct esdhc_platform_data.
+> This field can be added later after the esdhc patches are merged.
+> Fix the build for now.
 
-Yes, here is the difficulty. For example, in our case, the SoC unique ID 
-is 160 bits long.
-Maybe it would be a better solution to get rid of this unified file, and 
-keep only mach specific entries? I mean :
+I skipped the patch causing the issue instead. Please resend once the
+dependencies are merged into mainline.
 
-/sys/devices/system/soc/
-/sys/devices/system/soc/mach_name
-/sys/devices/system/soc/foo_id
-/sys/devices/system/soc/bar_id
+Sascha
 
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-mx25_3ds.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
+> index 561f07f..11c25f9 100644
+> --- a/arch/arm/mach-imx/mach-mx25_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx25_3ds.c
+> @@ -208,7 +208,6 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
+>  
+>  static const struct esdhc_platform_data mx25pdk_esdhc_pdata __initconst = {
+>  	.wp_gpio = SD1_GPIO_WP,
+> -	.cd_gpio = SD1_GPIO_CD,
+>  };
+>  
+>  static void __init mx25pdk_init(void)
+> -- 
+> 1.6.0.4
+> 
+> 
 
-> Should we say it's a hex string of 64 bits?
->
->> /sys/devices/system/soc/mach/
->> /sys/devices/system/soc/mach/name<- Name of the mach
->> /sys/devices/system/soc/mach/foo_id
->> /sys/devices/system/soc/mach/bar_id<- Vendors may have several/different IDs
->> to export (IDCODE for OMAP, Production ID...)
-> For Ux500 we can export the stuff we print today in mach-ux500/id.c,
-> put in place earlier by Rabin, I'd prefer if you hook in the new ID stuff
-> there as well, since it's so little platform code, and a logical place to
-> have it in.
-
-I agree.
-
-Regards,
-Maxime
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
