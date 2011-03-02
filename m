@@ -1,42 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed,  2 Mar 2011 16:25:25 +0530
-Subject: [PATCH v2 12/18] omap3+: sr: enable/disable SR only on need
-In-Reply-To: <1299063331-27968-1-git-send-email-nm@ti.com>
-References: <1299063331-27968-1-git-send-email-nm@ti.com>
-Message-ID: <1299063331-27968-13-git-send-email-nm@ti.com>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Wed,  2 Mar 2011 18:56:57 +0800
+Subject: [patch v2 0/3] arm: pmu: support pmu/perf on OMAP4
+Message-ID: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we already know the state of the autocomp enablement, we can
-see if the requested state is different from the current state and
-enable/disable SR only on the need basis.
+Hi,
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/smartreflex.c |   11 +++++++----
- 1 files changed, 7 insertions(+), 4 deletions(-)
+This patches support pmu irq routed from CTI, such as implemented
+on OMAP4:
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 8cad92d..4fc679e 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -819,10 +819,13 @@ static int omap_sr_autocomp_store(void *data, u64 val)
- 		return -EINVAL;
- 	}
- 
--	if (!val)
--		sr_stop_vddautocomp(sr_info);
--	else
--		sr_start_vddautocomp(sr_info);
-+	/* control enable/disable only if there is a delta in value */
-+	if (sr_info->autocomp_active ^ val) {
-+		if (!val)
-+			sr_stop_vddautocomp(sr_info);
-+		else
-+			sr_start_vddautocomp(sr_info);
-+	}
- 
- 	return 0;
- }
--- 
-1.7.1
+      - introduce some CTI helpers and registers' definition
+      - introduce .enable_irq and .disable_irq into platform_data,
+	so perf irq handler can handle irq correctly if it is
+	routed from CTI on OMAP4
+      - configure CTI on OMAP4 so that perf can work on OMAP4
+
+The patches have been tested Ok on Pandaboard, and 'perf' does work
+after applying them.
+
+v2:
+	- move cti related code out of perf_event.c
+	- introduce .enable_irq and .disable_irq into platform_data
+	as suggested by Will.
+
+v1:
+       - rebase the patch set against 2.6.38-rc6-next-20110301, fix
+       conflicts, which is pointed out by Will Deacon
+
+ arch/arm/include/asm/cti.h    |  177 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/pmu.h    |   15 +++-
+ arch/arm/kernel/perf_event.c  |   15 +++-
+ arch/arm/mach-omap2/dbg44xx.h |   18 ++++
+ arch/arm/mach-omap2/devices.c |   83 ++++++++++++++++++-
+ 5 files changed, 299 insertions(+), 9 deletions(-)
+
+thanks,
+--
+Lei Ming
