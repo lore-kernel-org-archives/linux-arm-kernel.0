@@ -1,83 +1,201 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 01 Mar 2011 19:21:47 -0800
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <4D6DB566.4090908@bluewatersys.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>	<4D6DAE6E.4030701@bluewatersys.com>	<4D6DB1B1.4060908@codeaurora.org>
-	<4D6DB566.4090908@bluewatersys.com>
-Message-ID: <4D6DB7CB.7070701@codeaurora.org>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 2 Mar 2011 11:28:46 +0800
+Subject: [RFC PATCH 1/1] ARM: imx5x: clean up ARCH_MX5X
+Message-ID: <1299036526-15674-1-git-send-email-richard.zhao@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2011 07:11 PM, Ryan Mallon wrote:
-> On 03/02/2011 03:55 PM, Saravana Kannan wrote:
->> On 03/01/2011 06:41 PM, Ryan Mallon wrote:
->>> On 03/02/2011 03:23 PM, Saravana Kannan wrote:
->>>> I don't have any attachment to the "arch" file suggestion. If there is a
->>>> better solution to identify the different implementations of socinfo
->>>> without having to maintain some "unique id" list in the kernel, then I'm
->>>> all for it. But cpuinfo is not it.
->>>
->>> Sorry I am confusing the 'arch' and 'mach' bits here. I definitely have
->>> an objection to having an 'arch' file (i.e. ARM). A 'mach' (i.e. omap)
->>> file makes a bit more sense, but should probably be called 'mach' rather
->>> than 'arch' to avoid this confusion :-).
->>
->> Sorry for the confusion. Sure, I don't care much for the filename as
->> long as we can all agree on it. I care more about the content of the
->> file (using names very close to xxxx in mach-xxxx). I like "soc-family"
->> better since it's generic enough to not force, say omap3 and omap4, to
->> report different values.
->>
->> Linus Walleij, Eduardo, Maxime, Andrei,
->>
->> Would like to hear your opinion on the file name (soc-family vs. mach vs
->> <somethingelse>) and the path /sys/devices/system/soc/.
->
-> 'family' sounds good. I don't think we need the 'soc-' prefix on
-> filenames if they are already in /sys/devices/system/soc/.
+Remove legacy support of ARCH_MX5X. Move to SOC_SOC_IMX5X.
 
-Makes sense. We can drop the soc- prefix. So the contenders left: family 
-vs <somethingelse>. Would still be nice if the other folks chime in.
+My understanding is ARCH_MX5 selects Kconfig in arch/arm/mach-mx5,
+and every board can be selected/unselected, and SOC_XXX be selected
+by the board config. MACH_XXXX/SOC_XXXX then select those HAVE_XXXX.
 
->> If we settle on this, may be it would be easier to get this through.
->>
->>> I still think it is a solution in search of a problem though. What
->>> userspace programs need to know what specific SoC they are on? My
->>> feeling is that if userspace needs to know this information, then it is
->>> probably dicking around with things that should be managed by the
->>> kernel. Differences in available peripherals, etc can be determined by
->>> looking at existing sysfs files.
->>
->> I certainly have seen several use cases. Couple of easy examples:
->>
->> * A lot of test scripts would find this very useful. For example, some
->> clock (present is all/most MSMs) shouldn't be tested on some SOCs as it
->> would lock up the system if you try to turn it off while the CPU is
->> running.
->
-> I don't follow here. Do you mean a struct clk clock or something else?
-> Why is userspace allowed to disable a clock which will effectively hang
-> the system? :-).
+If everyone is happty with that, I'd like to clean up ARCH_MX3X too.
 
-Ah, sorry. Didn't give enough details. To give some context, I manage 
-the clock stuff for MSM. The MSM clock driver exports clock control thru 
-debugfs. We have test scripts that bang the clocks to test them. Each 
-SoC has a different set of "touch me and you die" clocks that the test 
-script shouldn't mess with. This socinfo would be useful for those test 
-cases.
+Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
 
->> * Some of the user space tools might want to report different "product
->> id/type" (nothing to do with USB, etc) depending on what SOC it is
->> running on.
->
-> This makes more sense. It would actually be useful for custom USB
-> devices (gadget) which can be done from user space.
-
-Hmm... didn't know USB devices/gadgets could be handled from userspace.
-
-Thanks,
-Saravana
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index f065a0d..518a39e 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -1,14 +1,4 @@
+ if ARCH_MX5
+-# ARCH_MX51 and ARCH_MX50 are left for compatibility
+-
+-config ARCH_MX50
+-	bool
+-
+-config ARCH_MX51
+-	bool
+-
+-config ARCH_MX53
+-	bool
+ 
+ config SOC_IMX50
+ 	bool
+@@ -16,7 +6,6 @@ config SOC_IMX50
+ 	select ARCH_MXC_IOMUX_V3
+ 	select ARCH_MXC_AUDMUX_V2
+ 	select ARCH_HAS_CPUFREQ
+-	select ARCH_MX50
+ 
+ config	SOC_IMX51
+ 	bool
+@@ -24,13 +13,11 @@ config	SOC_IMX51
+ 	select ARCH_MXC_IOMUX_V3
+ 	select ARCH_MXC_AUDMUX_V2
+ 	select ARCH_HAS_CPUFREQ
+-	select ARCH_MX51
+ 
+ config	SOC_IMX53
+ 	bool
+ 	select MXC_TZIC
+ 	select ARCH_MXC_IOMUX_V3
+-	select ARCH_MX53
+ 
+ comment "MX5 platforms:"
+ 
+diff --git a/arch/arm/mach-mx5/Makefile.boot b/arch/arm/mach-mx5/Makefile.boot
+index e928be1..cdc70b3 100644
+--- a/arch/arm/mach-mx5/Makefile.boot
++++ b/arch/arm/mach-mx5/Makefile.boot
+@@ -1,9 +1,9 @@
+-   zreladdr-$(CONFIG_ARCH_MX50)	:= 0x70008000
+-params_phys-$(CONFIG_ARCH_MX50)	:= 0x70000100
+-initrd_phys-$(CONFIG_ARCH_MX50)	:= 0x70800000
+-   zreladdr-$(CONFIG_ARCH_MX51)	:= 0x90008000
+-params_phys-$(CONFIG_ARCH_MX51)	:= 0x90000100
+-initrd_phys-$(CONFIG_ARCH_MX51)	:= 0x90800000
+-   zreladdr-$(CONFIG_ARCH_MX53)	:= 0x70008000
+-params_phys-$(CONFIG_ARCH_MX53)	:= 0x70000100
+-initrd_phys-$(CONFIG_ARCH_MX53)	:= 0x70800000
++   zreladdr-$(CONFIG_SOC_MX50)	:= 0x70008000
++params_phys-$(CONFIG_SOC_MX50)	:= 0x70000100
++initrd_phys-$(CONFIG_SOC_MX50)	:= 0x70800000
++   zreladdr-$(CONFIG_SOC_MX51)	:= 0x90008000
++params_phys-$(CONFIG_SOC_MX51)	:= 0x90000100
++initrd_phys-$(CONFIG_SOC_MX51)	:= 0x90800000
++   zreladdr-$(CONFIG_SOC_MX53)	:= 0x70008000
++params_phys-$(CONFIG_SOC_MX53)	:= 0x70000100
++initrd_phys-$(CONFIG_SOC_MX53)	:= 0x70800000
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+index 33530d2..be7df13 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+@@ -194,7 +194,7 @@ static int __init imxXX_add_imx_dma(void)
+ 	} else
+ #endif
+ 
+-#if defined(CONFIG_ARCH_MX51)
++#if defined(CONFIG_SOC_IMX51)
+ 	if (cpu_is_mx51()) {
+ 		imx51_imx_sdma_data.pdata.script_addrs = &addr_imx51_to1;
+ 		ret = imx_add_imx_sdma(&imx51_imx_sdma_data);
+diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+index ba65c92..a3d930d 100644
+--- a/arch/arm/plat-mxc/include/mach/irqs.h
++++ b/arch/arm/plat-mxc/include/mach/irqs.h
+@@ -23,17 +23,17 @@
+ #define MXC_GPIO_IRQ_START	MXC_INTERNAL_IRQS
+ 
+ /* these are ordered by size to support multi-SoC kernels */
+-#if defined CONFIG_ARCH_MX53
++#if defined CONFIG_SOC_IMX53
+ #define MXC_GPIO_IRQS		(32 * 7)
+ #elif defined CONFIG_ARCH_MX2
+ #define MXC_GPIO_IRQS		(32 * 6)
+-#elif defined CONFIG_ARCH_MX50
++#elif defined CONFIG_SOC_IMX50
+ #define MXC_GPIO_IRQS		(32 * 6)
+ #elif defined CONFIG_ARCH_MX1
+ #define MXC_GPIO_IRQS		(32 * 4)
+ #elif defined CONFIG_ARCH_MX25
+ #define MXC_GPIO_IRQS		(32 * 4)
+-#elif defined CONFIG_ARCH_MX51
++#elif defined CONFIG_SOC_IMX51
+ #define MXC_GPIO_IRQS		(32 * 4)
+ #elif defined CONFIG_ARCH_MXC91231
+ #define MXC_GPIO_IRQS		(32 * 4)
+diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+index 8386140..f1e9c0a 100644
+--- a/arch/arm/plat-mxc/include/mach/memory.h
++++ b/arch/arm/plat-mxc/include/mach/memory.h
+@@ -34,11 +34,11 @@
+ #  define PHYS_OFFSET		MX3x_PHYS_OFFSET
+ # elif defined CONFIG_ARCH_MXC91231
+ #  define PHYS_OFFSET		MXC91231_PHYS_OFFSET
+-# elif defined CONFIG_ARCH_MX50
++# elif defined CONFIG_SOC_IMX50
+ #  define PHYS_OFFSET		MX50_PHYS_OFFSET
+-# elif defined CONFIG_ARCH_MX51
++# elif defined CONFIG_SOC_IMX51
+ #  define PHYS_OFFSET		MX51_PHYS_OFFSET
+-# elif defined CONFIG_ARCH_MX53
++# elif defined CONFIG_SOC_IMX53
+ #  define PHYS_OFFSET		MX53_PHYS_OFFSET
+ # endif
+ #endif
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 04c7a26..3781f2f 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -127,7 +127,7 @@ extern unsigned int __mxc_cpu_type;
+ # define cpu_is_mx35()		(0)
+ #endif
+ 
+-#ifdef CONFIG_ARCH_MX50
++#ifdef CONFIG_SOC_IMX50
+ # ifdef mxc_cpu_type
+ #  undef mxc_cpu_type
+ #  define mxc_cpu_type __mxc_cpu_type
+@@ -139,7 +139,7 @@ extern unsigned int __mxc_cpu_type;
+ # define cpu_is_mx50()		(0)
+ #endif
+ 
+-#ifdef CONFIG_ARCH_MX51
++#ifdef CONFIG_SOC_IMX51
+ # ifdef mxc_cpu_type
+ #  undef mxc_cpu_type
+ #  define mxc_cpu_type __mxc_cpu_type
+@@ -151,7 +151,7 @@ extern unsigned int __mxc_cpu_type;
+ # define cpu_is_mx51()		(0)
+ #endif
+ 
+-#ifdef CONFIG_ARCH_MX53
++#ifdef CONFIG_SOC_IMX53
+ # ifdef mxc_cpu_type
+ #  undef mxc_cpu_type
+ #  define mxc_cpu_type __mxc_cpu_type
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index c895922..daeafc2 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -476,7 +476,7 @@ config MTD_NAND_MPC5121_NFC
+ 
+ config MTD_NAND_MXC
+ 	tristate "MXC NAND support"
+-	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3 || ARCH_MX51
++	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3 || SOC_IMX51
+ 	help
+ 	  This enables the driver for the NAND flash controller on the
+ 	  MXC processors.
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index bb233a9..9f9d3f7 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -164,10 +164,10 @@ config SPI_IMX_VER_0_4
+ 	def_bool y if ARCH_MX31
+ 
+ config SPI_IMX_VER_0_7
+-	def_bool y if ARCH_MX25 || ARCH_MX35 || ARCH_MX51 || ARCH_MX53
++	def_bool y if ARCH_MX25 || ARCH_MX35 || SOC_IMX51 || SOC_IMX53
+ 
+ config SPI_IMX_VER_2_3
+-	def_bool y if ARCH_MX51 || ARCH_MX53
++	def_bool y if SOC_IMX51 || SOC_IMX53
+ 
+ config SPI_IMX
+ 	tristate "Freescale i.MX SPI controllers"
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
