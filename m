@@ -1,204 +1,205 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  2 Mar 2011 16:53:16 +0000
-Subject: [RFC PATCH 10/20] ARM: Platform dependent sched_clock() override
+Date: Wed,  2 Mar 2011 16:53:18 +0000
+Subject: [RFC PATCH 12/20] ARM: versatile/vexpress: rework timer support
 In-Reply-To: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
 References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1299084806-16546-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1299084806-16546-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sched_clock being a (weak) global symbol, there can only be
-a single implementation in the kernel, which may cause problems
-on the rocky road towards supporting multiple architectures in
-a single kernel image.
+Dynamically register the TWD setup function.
 
-This patch adds a way of overriding the default sched_clock()
-by extending the ARM sched_clock framework. The sched_clock()
-call also becomes slightly more expensive (indirect function call).
-
-VExpress support is updated to use that functionnality.
+For vexpress, give preference to architected timers over SP804 timers
+and versatile sched_clock implementation, if available.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig                      |    9 +++++++
- arch/arm/include/asm/sched_clock.h    |   41 +++++++++++++++++++++++++++++---
- arch/arm/kernel/sched_clock.c         |   23 +++++++++++++++++-
- arch/arm/plat-versatile/sched-clock.c |    7 +++--
- 4 files changed, 72 insertions(+), 8 deletions(-)
+ arch/arm/mach-realview/realview_eb.c              |    4 ++-
+ arch/arm/mach-realview/realview_pb11mp.c          |    4 ++-
+ arch/arm/mach-realview/realview_pbx.c             |    5 ++-
+ arch/arm/mach-vexpress/v2m.c                      |   29 ++++++++++++++++++++-
+ arch/arm/plat-versatile/include/plat/localtimer.h |    9 ++++++
+ arch/arm/plat-versatile/localtimer.c              |   10 ++++++-
+ 6 files changed, 55 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/plat-versatile/include/plat/localtimer.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 316da4b..26fde47 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -48,6 +48,14 @@ config SYS_SUPPORTS_APM_EMULATION
- config HAVE_SCHED_CLOCK
- 	bool
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 2ecc1d9..3a0900f 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -45,6 +45,8 @@
+ #include <mach/board-eb.h>
+ #include <mach/irqs.h>
  
-+config ARCH_SCHED_CLOCK
-+	bool
-+	help
-+	  Allow the default sched_clock() to be overloaded at runtime.
-+	  Use this option if you build a kernel for a platform with
-+	  multiplee sched_clock sources, one of which will be selected
-+	  at runtime.
++#include <plat/localtimer.h>
 +
- config GENERIC_GPIO
- 	bool
+ #include "core.h"
  
-@@ -271,6 +279,7 @@ config ARCH_VEXPRESS
- 	select ARM_TIMER_SP804
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
-+	select ARCH_SCHED_CLOCK
- 	select HAVE_CLK
- 	select HAVE_PATA_PLATFORM
- 	select ICST
-diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-index c8e6ddf..27ef05e 100644
---- a/arch/arm/include/asm/sched_clock.h
-+++ b/arch/arm/include/asm/sched_clock.h
-@@ -21,6 +21,17 @@ struct clock_data {
+ static struct map_desc realview_eb_io_desc[] __initdata = {
+@@ -402,7 +404,7 @@ static void __init realview_eb_timer_init(void)
  
- #define DEFINE_CLOCK_DATA(name)	struct clock_data name
- 
-+#ifdef CONFIG_ARCH_SCHED_CLOCK
-+#define __DEFINE_SCHED_CLOCK_ALIAS(name)
-+#else
-+#define __DEFINE_SCHED_CLOCK_ALIAS(name) \
-+	unsigned long long sched_clock(void) __attribute__ ((alias (#name)));
-+#endif
-+
-+#define DEFINE_SCHED_CLOCK_FUNC(name) \
-+	__DEFINE_SCHED_CLOCK_ALIAS(name)	\
-+	static unsigned long long notrace name(void)
-+
- static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
- {
- 	return (cyc * mult) >> shift;
-@@ -94,20 +105,35 @@ static inline unsigned long long cyc_to_sched_clock(struct clock_data *cd,
-  * and shift.  Also setup a timer to ensure that the epoch is refreshed
-  * at the appropriate time interval, which will call your update
-  * handler.
-+ *
-+ * Use the _arch_ version if you want your sched_clock function to be
-+ * selected at run time (if CONFIG_ARCH_SCHED_CLOCK is enabled).
-  */
--void init_sched_clock(struct clock_data *, void (*)(void),
-+void init_arch_sched_clock(struct clock_data *, void (*)(void),
-+	unsigned long long (*)(void),
- 	unsigned int, unsigned long);
- 
-+static inline void init_sched_clock(struct clock_data *cd,
-+				    void (*update)(void),
-+				    unsigned int bits, unsigned long rate)
-+{
-+	init_arch_sched_clock(cd, update, NULL, bits, rate);
-+}
-+
- /*
-  * Use this initialization function rather than init_sched_clock() if
-  * you're using cyc_to_fixed_sched_clock, which will warn if your
-  * constants are incorrect.
-+ *
-+ * Use the _arch_ version if you want your sched_clock function to be
-+ * selected at run time (if CONFIG_ARCH_SCHED_CLOCK is enabled).
-  */
--static inline void init_fixed_sched_clock(struct clock_data *cd,
--	void (*update)(void), unsigned int bits, unsigned long rate,
-+static inline void init_fixed_arch_sched_clock(struct clock_data *cd,
-+	void (*update)(void), unsigned long long (*sched_clock_fn)(void),
-+	unsigned int bits, unsigned long rate,
- 	u32 mult, u32 shift)
- {
--	init_sched_clock(cd, update, bits, rate);
-+	init_arch_sched_clock(cd, update, sched_clock_fn, bits, rate);
- 	if (cd->mult != mult || cd->shift != shift) {
- 		pr_crit("sched_clock: wrong multiply/shift: %u>>%u vs calculated %u>>%u\n"
- 			"sched_clock: fix multiply/shift to avoid scheduler hiccups\n",
-@@ -115,6 +141,13 @@ static inline void init_fixed_sched_clock(struct clock_data *cd,
- 	}
- }
- 
-+static inline void init_fixed_sched_clock(struct clock_data *cd,
-+	void (*update)(void), unsigned int bits, unsigned long rate,
-+	u32 mult, u32 shift)
-+{
-+	init_fixed_arch_sched_clock(cd, update, NULL, bits, rate, mult, shift);
-+}
-+
- extern void sched_clock_postinit(void);
- 
+ 	if (core_tile_eb11mp() || core_tile_a9mp()) {
+ #ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(REALVIEW_EB11MP_TWD_BASE);
++		versatile_local_timer_init(__io_address(REALVIEW_EB11MP_TWD_BASE));
  #endif
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 9a46370..3c1d08b 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -18,13 +18,29 @@ static void sched_clock_poll(unsigned long wrap_ticks);
- static DEFINE_TIMER(sched_clock_timer, sched_clock_poll, 0, 0);
- static void (*sched_clock_update_fn)(void);
+ 		timer_irq = IRQ_EB11MP_TIMER0_1;
+ 	} else
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index b2985fc..76da67d 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -46,6 +46,8 @@
+ #include <mach/board-pb11mp.h>
+ #include <mach/irqs.h>
  
-+#ifdef CONFIG_ARCH_SCHED_CLOCK
-+static unsigned long long notrace default_sched_clock(void)
-+{
-+	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
-+					* (NSEC_PER_SEC / HZ);
++#include <plat/localtimer.h>
++
+ #include "core.h"
+ 
+ static struct map_desc realview_pb11mp_io_desc[] __initdata = {
+@@ -306,7 +308,7 @@ static void __init realview_pb11mp_timer_init(void)
+ 	timer3_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE) + 0x20;
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = __io_address(REALVIEW_TC11MP_TWD_BASE);
++	versatile_local_timer_init(__io_address(REALVIEW_TC11MP_TWD_BASE));
+ #endif
+ 	realview_timer_init(IRQ_TC11MP_TIMER0_1);
+ }
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 92ace2c..280befd 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -31,7 +31,6 @@
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+-#include <asm/smp_twd.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -44,6 +43,8 @@
+ #include <mach/board-pbx.h>
+ #include <mach/irqs.h>
+ 
++#include <plat/localtimer.h>
++
+ #include "core.h"
+ 
+ static struct map_desc realview_pbx_io_desc[] __initdata = {
+@@ -310,7 +311,7 @@ static void __init realview_pbx_timer_init(void)
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+ 	if (core_tile_pbx11mp() || core_tile_pbxa9mp())
+-		twd_base = __io_address(REALVIEW_PBX_TILE_TWD_BASE);
++		versatile_local_timer_init(__io_address(REALVIEW_PBX_TILE_TWD_BASE));
+ #endif
+ 	realview_timer_init(IRQ_PBX_TIMER0_1);
+ }
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index ba46e8e..9fa5ad6 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -16,6 +16,8 @@
+ 
+ #include <asm/mach-types.h>
+ #include <asm/sizes.h>
++#include <asm/localtimer.h>
++#include <asm/arch_timer.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+@@ -28,6 +30,7 @@
+ #include <mach/motherboard.h>
+ 
+ #include <plat/sched_clock.h>
++#include <plat/localtimer.h>
+ 
+ #include "core.h"
+ 
+@@ -49,13 +52,37 @@ static struct map_desc v2m_io_desc[] __initdata = {
+ static void __init v2m_init_early(void)
+ {
+ 	ct_desc->init_early();
+-	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
 +}
 +
-+static unsigned long long __read_mostly (*sched_clock_fn)(void) = default_sched_clock;
-+
-+unsigned long long notrace sched_clock(void)
++static int __cpuinit v2m_arch_timer_setup(struct clock_event_device *evt)
 +{
-+	return sched_clock_fn();
++	versatile_local_timer_setup(evt);
++
++	/*
++	 * Enable PPI 30 in case we're running in normal mode instead
++	 * of secure mode. The timer has been stopped in the pre_setup()
++	 * phase, so it is safe to enable the interrupt here.
++	 */
++	gic_enable_ppi(30);
++
++	return 0;
+ }
+ 
+ static void __init v2m_timer_init(void)
+ {
+ 	u32 scctrl;
+ 
++	/*
++	 * Try architected timers first. If they are not available,
++	 * fallback to TWD and versatile sched_clock.
++	 */
++	if (!arch_timer_register_setup(v2m_arch_timer_setup))
++		return;
++
++	versatile_local_timer_init(NULL);
++
++	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
++
+ 	/* Select 1MHz TIMCLK as the reference clock for SP804 timers */
+ 	scctrl = readl(MMIO_P2V(V2M_SYSCTL + SCCTRL));
+ 	scctrl |= SCCTRL_TIMEREN0SEL_TIMCLK;
+diff --git a/arch/arm/plat-versatile/include/plat/localtimer.h b/arch/arm/plat-versatile/include/plat/localtimer.h
+new file mode 100644
+index 0000000..c6cdf72
+--- /dev/null
++++ b/arch/arm/plat-versatile/include/plat/localtimer.h
+@@ -0,0 +1,9 @@
++#ifndef ARM_PLAT_LOCALTIMER_H
++#define ARM_PLAT_LOCALTIMER_H
++
++#include <linux/clockchips.h>
++
++void versatile_local_timer_setup(struct clock_event_device *evt);
++void versatile_local_timer_init(void __iomem *base);
++
++#endif
+diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+index 93ea3e3..01025ea 100644
+--- a/arch/arm/plat-versatile/localtimer.c
++++ b/arch/arm/plat-versatile/localtimer.c
+@@ -11,14 +11,22 @@
+ #include <linux/init.h>
+ #include <linux/clockchips.h>
+ 
++#include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
+ #include <mach/irqs.h>
+ 
+ /*
+  * Setup the local clock events for a CPU.
+  */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
++int __cpuinit versatile_local_timer_setup(struct clock_event_device *evt)
+ {
+ 	evt->irq = IRQ_LOCALTIMER;
+ 	return 0;
+ }
++
++void __init versatile_local_timer_init(void __iomem *base)
++{
++	if (base)
++		twd_base = base;
++	twd_timer_register_setup(versatile_local_timer_setup);
 +}
-+#endif
-+
- static void sched_clock_poll(unsigned long wrap_ticks)
- {
- 	mod_timer(&sched_clock_timer, round_jiffies(jiffies + wrap_ticks));
- 	sched_clock_update_fn();
- }
- 
--void __init init_sched_clock(struct clock_data *cd, void (*update)(void),
-+void __init init_arch_sched_clock(struct clock_data *cd, void (*update)(void),
-+	unsigned long long (*arch_sched_clock_fn)(void),
- 	unsigned int clock_bits, unsigned long rate)
- {
- 	unsigned long r, w;
-@@ -33,6 +49,11 @@ void __init init_sched_clock(struct clock_data *cd, void (*update)(void),
- 
- 	sched_clock_update_fn = update;
- 
-+#ifdef CONFIG_ARCH_SCHED_CLOCK
-+	if (arch_sched_clock_fn)
-+		sched_clock_fn = arch_sched_clock_fn;
-+#endif
-+
- 	/* calculate the mult/shift to convert counter ticks to ns. */
- 	clocks_calc_mult_shift(&cd->mult, &cd->shift, rate, NSEC_PER_SEC, 0);
- 
-diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
-index 3d6a4c2..d6ebd0f 100644
---- a/arch/arm/plat-versatile/sched-clock.c
-+++ b/arch/arm/plat-versatile/sched-clock.c
-@@ -34,7 +34,7 @@ static void __iomem *ctr;
- #define SC_MULT		2796202667u
- #define SC_SHIFT	26
- 
--unsigned long long notrace sched_clock(void)
-+DEFINE_SCHED_CLOCK_FUNC(versatile_sched_clock)
- {
- 	if (ctr) {
- 		u32 cyc = readl(ctr);
-@@ -53,6 +53,7 @@ static void notrace versatile_update_sched_clock(void)
- void __init versatile_sched_clock_init(void __iomem *reg, unsigned long rate)
- {
- 	ctr = reg;
--	init_fixed_sched_clock(&cd, versatile_update_sched_clock,
--			       32, rate, SC_MULT, SC_SHIFT);
-+	init_fixed_arch_sched_clock(&cd, versatile_update_sched_clock,
-+				    versatile_sched_clock,
-+				    32, rate, SC_MULT, SC_SHIFT);
- }
 -- 
 1.7.0.4
