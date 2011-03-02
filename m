@@ -1,30 +1,31 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 01 Mar 2011 18:59:19 -0800
-Subject: [PATCH] msm: gpiomux: Remove GPIOMUX_VALID and merge config enums
-In-Reply-To: <AANLkTi=ePu9hTeecOfKoxKEXd6VZ6tJBN2XphDO5suOA@mail.gmail.com>
-References: <4D680EEE.1070706@codeaurora.org>	<AANLkTinZCtbQnAk_OX92jqbW_GjH5wpxvbeoMkHV1inn@mail.gmail.com>	<4D689230.7020704@codeaurora.org>
-	<AANLkTi=ePu9hTeecOfKoxKEXd6VZ6tJBN2XphDO5suOA@mail.gmail.com>
-Message-ID: <4D6DB287.4000102@codeaurora.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 2 Mar 2011 11:08:30 +0800
+Subject: [PATCH 2/6] ARM: pxa2xx: reorganize I2C files
+In-Reply-To: <4D6D9426.8030905@fluff.org>
+References: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
+	<1298461100-14869-3-git-send-email-bigeasy@linutronix.de>
+	<4D6D9426.8030905@fluff.org>
+Message-ID: <AANLkTikPDAtH10gPauq9F54MFSg=XBKt-p-PVXp8J7AW@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2011 06:25 PM, Dima Zavin wrote:
-> Good point, ptr to anon struct would work.
-
-Glad to know the suggestion helped.
-
-> I would still very much like to see the helper macros be added though
-> as it really would be very helpful in keeping the pinmuxing tidy in
-> the board files. Doing it as a separate patch is fine.
+On Wed, Mar 2, 2011 at 8:49 AM, Ben Dooks <ben-linux@fluff.org> wrote:
+> On 23/02/11 11:38, Sebastian Andrzej Siewior wrote:
+>>
+>> This patch moves the platform data definition from
+>> arch/arm/plat-pxa/include/plat/i2c.h to include/linux/i2c/pxa-i2c.h so
+>> it can be accessed from x86 the same way as on ARM.
+>>
+>> This change should make no functional change to the PXA code. The move
+>> is verified by building the following defconfigs:
+>> ? cm_x2xx_defconfig corgi_defconfig em_x270_defconfig ezx_defconfig
+>> ? imote2_defconfig pxa3xx_defconfig spitz_defconfig zeus_defconfig
+>> ? raumfeld_defconfig magician_defconfig mmp2_defconfig pxa168_defconfig
+>> ? pxa910_defconfig
+>>
 >
-> Other than the addition of helper macros, ack.
+> Russell/others, you OK with this going through my tree?
+>
 
-Rohit, would you mind adding the helper macros that use pointer to anon 
-struct to simplify the GPIO config population in the board files? You 
-can contact me offline if you need any help with it.
-
-Thanks,
-Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Ben, I'm fine that you take this change. Trivial changes to me, so
+I expect no significant merge conflicts.
