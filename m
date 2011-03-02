@@ -1,50 +1,100 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed,  2 Mar 2011 16:25:28 +0530
-Subject: [PATCH v2 15/18] omap3+: sr: disable spamming interrupts
-In-Reply-To: <1299063331-27968-1-git-send-email-nm@ti.com>
-References: <1299063331-27968-1-git-send-email-nm@ti.com>
-Message-ID: <1299063331-27968-16-git-send-email-nm@ti.com>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Wed,  2 Mar 2011 18:56:59 +0800
+Subject: [patch v2 2/3] arm: pmu: allow platform specifc irq enable/disable
+	handling
+In-Reply-To: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
+References: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
+Message-ID: <1299063420-22203-3-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At times with bad SR configurations especially during silicon bringups,
-we could get continuous spurious interrupts which end up hanging the
-platform in the form of an ISR call for status bits that are
-automatically enabled by the h/w without any s/w clearing option.
+From: Ming Lei <tom.leiming@gmail.com>
 
-If we detect scenarios where isr was called without the corresponding
-notification bit being set, instead of hanging up the system,
-we will disable interrupt after noting the event in the system log
-to try and keep system sanity and allow developer to debug and fix
-the condition.
+This patch introduces .enable_irq and .disable_irq into
+struct arm_pmu_platdata, so platform specific irq enablement
+can be handled after request_irq, and platform specific irq
+disablement can be handled before free_irq.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+This patch is for support of  pmu irq routed from CTI on omap4.
+
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/pmu.h   |   15 ++++++++++++---
+ arch/arm/kernel/perf_event.c |   15 ++++++++++++---
+ 2 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 49a04ea..d62da3d 100644
---- a/arch/arm/mach-omap2/smartreflex.c
-+++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -209,8 +209,16 @@ static irqreturn_t sr_interrupt(int irq, void *data)
- 		value = irqstat_to_notifier_v2(status);
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index 7544ce6..e50c542 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -22,13 +22,22 @@ enum arm_pmu_type {
+ /*
+  * struct arm_pmu_platdata - ARM PMU platform data
+  *
+- * @handle_irq: an optional handler which will be called from the interrupt and
+- * passed the address of the low level handler, and can be used to implement
+- * any platform specific handling before or after calling it.
++ * @handle_irq: an optional handler which will be called from the
++ * 	interrupt and passed the address of the low level handler,
++ * 	and can be used to implement any platform specific handling
++ * 	before or after calling it.
++ * @enable_irq: an optional handler which will be called after
++ * 	request_irq and be used to handle some platform specific
++ * 	irq enablement
++ * @disable_irq: an optional handler which will be called before
++ * 	free_irq and be used to handle some platform specific
++ * 	irq disablement
+  */
+ struct arm_pmu_platdata {
+ 	irqreturn_t (*handle_irq)(int irq, void *dev,
+ 				  irq_handler_t pmu_handler);
++	void (*enable_irq)(int irq);
++	void (*disable_irq)(int irq);
+ };
+ 
+ #ifdef CONFIG_CPU_HAS_PMU
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 22e194eb..61ff471 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -422,14 +422,18 @@ armpmu_reserve_hardware(void)
+ 			pr_warning("unable to request IRQ%d for ARM perf "
+ 				"counters\n", irq);
+ 			break;
+-		}
++		} else if (plat->enable_irq)
++			plat->enable_irq(irq);
  	}
  
--	if (sr_class->notify)
--		sr_class->notify(sr_info->voltdm, value);
-+	/* Attempt some resemblence of recovery! */
-+	if (!value) {
-+		dev_err(&sr_info->pdev->dev, "%s: Spurious interrupt!"
-+			"status = 0x%08x. Disabling to prevent spamming!!\n",
-+			__func__, status);
-+		disable_irq_nosync(sr_info->irq);
-+	} else {
-+		if (sr_class->notify)
-+			sr_class->notify(sr_info->voltdm, value);
-+	}
+ 	if (err) {
+ 		for (i = i - 1; i >= 0; --i) {
+ 			irq = platform_get_irq(pmu_device, i);
+-			if (irq >= 0)
++			if (irq >= 0) {
++				if (plat->disable_irq)
++					plat->disable_irq(irq);
+ 				free_irq(irq, NULL);
++			}
+ 		}
+ 		release_pmu(pmu_device);
+ 		pmu_device = NULL;
+@@ -442,11 +446,16 @@ static void
+ armpmu_release_hardware(void)
+ {
+ 	int i, irq;
++	struct arm_pmu_platdata *plat =
++		dev_get_platdata(&pmu_device->dev);
  
- 	return IRQ_HANDLED;
- }
+ 	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
+ 		irq = platform_get_irq(pmu_device, i);
+-		if (irq >= 0)
++		if (irq >= 0) {
++			if (plat->disable_irq)
++				plat->disable_irq(irq);
+ 			free_irq(irq, NULL);
++		}
+ 	}
+ 	armpmu->stop();
+ 
 -- 
-1.7.1
+1.7.3
