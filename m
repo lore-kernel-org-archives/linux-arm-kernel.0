@@ -1,61 +1,67 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 01 Mar 2011 18:55:45 -0800
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <4D6DAE6E.4030701@bluewatersys.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>
-	<4D6DAE6E.4030701@bluewatersys.com>
-Message-ID: <4D6DB1B1.4060908@codeaurora.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 1 Mar 2011 21:57:18 -0500 (EST)
+Subject: [PATCH 1/4] ARM:boot:device tree: Allow the device tree binary
+	to be appended to zImage
+In-Reply-To: <4D6DA7C3.4040609@secretlab.ca>
+References: <20110228233153.24836.24176.stgit@riker>
+	<20110228233327.24836.94530.stgit@riker>
+	<alpine.LFD.2.00.1103010019160.10356@xanadu.home>
+	<4D6DA7C3.4040609@secretlab.ca>
+Message-ID: <alpine.LFD.2.00.1103012139070.9350@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2011 06:41 PM, Ryan Mallon wrote:
-> On 03/02/2011 03:23 PM, Saravana Kannan wrote:
->> I don't have any attachment to the "arch" file suggestion. If there is a
->> better solution to identify the different implementations of socinfo
->> without having to maintain some "unique id" list in the kernel, then I'm
->> all for it. But cpuinfo is not it.
->
-> Sorry I am confusing the 'arch' and 'mach' bits here. I definitely have
-> an objection to having an 'arch' file (i.e. ARM). A 'mach' (i.e. omap)
-> file makes a bit more sense, but should probably be called 'mach' rather
-> than 'arch' to avoid this confusion :-).
+On Tue, 1 Mar 2011, John Bonesio wrote:
 
-Sorry for the confusion. Sure, I don't care much for the filename as 
-long as we can all agree on it. I care more about the content of the 
-file (using names very close to xxxx in mach-xxxx). I like "soc-family" 
-better since it's generic enough to not force, say omap3 and omap4, to 
-report different values.
+> Comment/question below.
+> 
+> On 02/28/2011 10:39 PM, Nicolas Pitre wrote:
+> > On Mon, 28 Feb 2011, John Bonesio wrote:
+> > 
+> >> @@ -288,12 +330,34 @@ wont_overwrite:
+> >>  
+> >>  		/*
+> >>  		 * Relocate all entries in the GOT table.
+> >> +		 * Bump bss entries to past image end (r10)
+> >>  		 */
+> >> +		sub	r5, r10, r6		@ delta of image end and _edata
+> >> +		add	r5, r5, #7		@ ... rounded up to a multiple
+> >> +		bic	r5, r5, #7		@ ... of 8 bytes, so misaligned
+> >> +		             	 		@ ... GOT entry doesn't
+> >> +		             	 		@ ... overwrite end of image
+> > 
+> > This is wrong. You are going to displace the .bss pointers even if they 
+> > don't need that in the case where no dtb was found.  And if a dtb was 
+> > found the displacement is going to be the size of the dtb _plus_ the 
+> > size of the .bss_stack instead of only the dtb size.
+> > 
+> > At this point you should only keep track of the .bss displacement in 
+> > addition to the delta offset in r0.  And if both are equal to zero then 
+> > skip over the fixup loop as before.
+> 
+> Maybe I'm not understanding correctly. I think that if there is an
+> appended dtb, then there are sections like the code and data that needs
+> to be adjusted by the old r0 value, while the bss and the stack need to
+> be adjusted by the old r0 + dtb size.
 
-Linus Walleij, Eduardo, Maxime, Andrei,
+Exact.
 
-Would like to hear your opinion on the file name (soc-family vs. mach vs 
-<somethingelse>) and the path /sys/devices/system/soc/.
+> If my understanding is right, then we can't just add the dtb size to r0
+> and adjust everything.
 
-If we settle on this, may be it would be easier to get this through.
+indeed.
 
-> I still think it is a solution in search of a problem though. What
-> userspace programs need to know what specific SoC they are on? My
-> feeling is that if userspace needs to know this information, then it is
-> probably dicking around with things that should be managed by the
-> kernel. Differences in available peripherals, etc can be determined by
-> looking at existing sysfs files.
+> Am I missing something?
 
-I certainly have seen several use cases. Couple of easy examples:
+Suppose that no dtb was found.  In that case, r10 is still pointing to 
+the top of the stack.  So r5 will contain the size of .bss and the 
+stack.  Then you bump .bss pointers in the GOT by that size.  If a dtb 
+was found then r5 ends up with the size of the dtb plus .bss plus stack.
 
-* A lot of test scripts would find this very useful. For example, some 
-clock (present is all/most MSMs) shouldn't be tested on some SOCs as it 
-would lock up the system if you try to turn it off while the CPU is running.
+What I'm suggesting is that the size of the dtb be kept in a register of 
+its own up to this point.  That size can be 0 if none was found.  If
+r0 == 0 and dtb_size == 0 then the whole GOT fixup can be skipped as it 
+is done at the moment by branching to not_relocated.
 
-* Some of the user space tools might want to report different "product 
-id/type" (nothing to do with USB, etc) depending on what SOC it is 
-running on.
 
-Thank,
-Saravana
-P.S: Removed felipe.balbi at nokia.com <felipe.balbi@nokia.com> since I 
-keep getting delivery failure emails.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Nicolas
