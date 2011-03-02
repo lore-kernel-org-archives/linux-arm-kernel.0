@@ -1,141 +1,98 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed,  2 Mar 2011 16:42:23 +0530
-Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable requested
-	pads
-Message-ID: <1299064343-28534-1-git-send-email-govindraj.raja@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Mar 2011 18:54:44 +0800
+Subject: [PATCH] ARM: mxs/mx28evk: add flexcan devices
+Message-ID: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For device pads which have OMAP_DEVICE_PAD_WAKEUP set (which means they
-are wakeup capable) enable the IO-daisy wakeup capability.
-During re-muxing avoid direct write with val as this can disturb if any
-mux done at bootloader level so read the pad then write back.
-
-Also add an API to fetch the wake-up status bit is set for given omap-hwmod
-device using available mux info which is added during omap_hwmod_mux_init.
-Wakeup status bit is needed for uart_resume_idle call from sram_idle path
-based on wake-up event has occurred for given uart we can enable clocks back.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
 ---
- arch/arm/mach-omap2/mux.c                    |   28 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 ++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |   13 ++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 55 insertions(+), 0 deletions(-)
+ arch/arm/mach-mxs/Kconfig        |    1 +
+ arch/arm/mach-mxs/mach-mx28evk.c |   37 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 98148b6..50edcea 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -317,6 +317,29 @@ err1:
- 	return NULL;
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 55bf075..9a1f2cb 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -31,6 +31,7 @@ config MACH_MX28EVK
+ 	select MXS_HAVE_AMBA_DUART
+ 	select MXS_HAVE_PLATFORM_AUART
+ 	select MXS_HAVE_PLATFORM_FEC
++	select MXS_HAVE_PLATFORM_FLEXCAN
+ 	select MXS_OCOTP
+ 	default y
+ 	help
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index 1f0b708..3cefb73 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -28,6 +28,7 @@
+ #include "devices-mx28.h"
+ #include "gpio.h"
+ 
++#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+ #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+ #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+ 
+@@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+ 	/* phy reset line */
+ 	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+ 		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++
++	/* flexcan0 */
++	MX28_PAD_GPMI_RDY2__CAN0_TX,
++	MX28_PAD_GPMI_RDY3__CAN0_RX,
++	/* flexcan1 */
++	MX28_PAD_GPMI_CE2N__CAN1_TX,
++	MX28_PAD_GPMI_CE3N__CAN1_RX,
++	/* transceiver power control */
++	MX28_PAD_SSP1_CMD__GPIO_2_13,
+ };
+ 
+ /* fec */
+@@ -178,8 +188,28 @@ error:
+ 	return -ETIMEDOUT;
  }
  
-+/* Gets the wakeup status of given pad from omap-hwmod */
-+int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
++/* flexcan */
++static void mx28evk_flexcan_switch(int enable)
 +{
-+	int i;
-+	unsigned int val;
-+	u8 ret = 0;
++	static int count;
 +
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
-+
-+		if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+			val = omap_mux_read(pad->partition,
-+						pad->mux->reg_offset);
-+			if (val & OMAP_WAKEUP_EVENT) {
-+				ret = 1;
-+				break;
-+			}
-+		}
++	if (enable) {
++		if (!count++)
++			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
++	} else {
++		if (!--count)
++			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
 +	}
-+
-+	return ret;
 +}
 +
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
++static const struct flexcan_platform_data mx28evk_flexcan_pdata __initconst = {
++	.transceiver_switch = mx28evk_flexcan_switch,
++};
++
+ static void __init mx28evk_init(void)
  {
-@@ -342,6 +365,9 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- 				break;
- 			flags &= ~OMAP_DEVICE_PAD_ENABLED;
- 			val = pad->idle;
-+			if (flags & OMAP_DEVICE_PAD_WAKEUP)
-+				val |= OMAP_WAKEUP_EN;
++	int ret;
 +
- 			pr_debug("%s: Idling %s %x\n", __func__,
- 					pad->name, val);
- 			break;
-@@ -358,6 +384,8 @@ void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- 		};
+ 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
  
- 		if (val >= 0) {
-+			val |= omap_mux_read(pad->partition,
-+						pad->mux->reg_offset);
- 			omap_mux_write(pad->partition, val,
- 					pad->mux->reg_offset);
- 			pad->flags = flags;
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index a4ab17a..84a8fc2 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -220,8 +220,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
+ 	mx28_add_duart();
+@@ -192,6 +222,13 @@ static void __init mx28evk_init(void)
+ 	mx28evk_fec_reset();
+ 	mx28_add_fec(0, &mx28_fec_pdata[0]);
+ 	mx28_add_fec(1, &mx28_fec_pdata[1]);
 +
-+/**
-+ * omap_hwmod_mux_wakeup - omap hwmod check given pad had wakeup event
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
- {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 9e89a58..893dae1 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2239,3 +2239,16 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
- 
- 	return ret;
++	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
++				"flexcan-switch");
++	if (ret)
++		pr_warn("failed to request gpio flexcan-switch: %d\n", ret);
++	mx28_add_flexcan(0, &mx28evk_flexcan_pdata);
++	mx28_add_flexcan(1, &mx28evk_flexcan_pdata);
  }
-+
-+/**
-+ * omap_hwmod_pad_wakeup_status - get pad wakeup status if mux is available.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Returns the wake_up status bit of available pad mux pin.
-+ */
-+int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh->mux)
-+		return omap_hwmod_mux_wakeup(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index fedd829..4100be0 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -588,6 +588,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
- int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
- u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
  
-+int omap_hmwod_pad_wakeup_status(struct omap_hwmod *oh);
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
+ static void __init mx28evk_timer_init(void)
 -- 
 1.7.1
