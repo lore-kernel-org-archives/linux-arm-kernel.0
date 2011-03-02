@@ -1,173 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 Mar 2011 14:51:36 +0100
-Subject: [PATCH] ARM: mxs/mx28evk: add flexcan devices
-In-Reply-To: <20110302125525.GD21601@S2100-06.ap.freescale.net>
-References: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
-	<20110302111148.GV29521@pengutronix.de>
-	<20110302114549.GC21601@S2100-06.ap.freescale.net>
-	<20110302125525.GD21601@S2100-06.ap.freescale.net>
-Message-ID: <20110302135136.GA29521@pengutronix.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 2 Mar 2011 11:26:49 -0300
+Subject: [PATCH] ARM: mx3/mx35_3ds: Use MX35 USB OTG Erratum
+Message-ID: <1299076009-14253-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 08:55:25PM +0800, Shawn Guo wrote:
-> On Wed, Mar 02, 2011 at 07:45:50PM +0800, Shawn Guo wrote:
-> > On Wed, Mar 02, 2011 at 12:11:48PM +0100, Sascha Hauer wrote:
-> > > Hi Shawn,
-> > > 
-> > Hi Sascha,
-> > 
-> > > On Wed, Mar 02, 2011 at 06:54:44PM +0800, Shawn Guo wrote:
-> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> > > > ---
-> > > >  arch/arm/mach-mxs/Kconfig        |    1 +
-> > > >  arch/arm/mach-mxs/mach-mx28evk.c |   37 +++++++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 38 insertions(+), 0 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> > > > index 55bf075..9a1f2cb 100644
-> > > > --- a/arch/arm/mach-mxs/Kconfig
-> > > > +++ b/arch/arm/mach-mxs/Kconfig
-> > > > @@ -31,6 +31,7 @@ config MACH_MX28EVK
-> > > >  	select MXS_HAVE_AMBA_DUART
-> > > >  	select MXS_HAVE_PLATFORM_AUART
-> > > >  	select MXS_HAVE_PLATFORM_FEC
-> > > > +	select MXS_HAVE_PLATFORM_FLEXCAN
-> > > >  	select MXS_OCOTP
-> > > >  	default y
-> > > >  	help
-> > > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > > index 1f0b708..3cefb73 100644
-> > > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> > > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> > > > @@ -28,6 +28,7 @@
-> > > >  #include "devices-mx28.h"
-> > > >  #include "gpio.h"
-> > > >  
-> > > > +#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
-> > > >  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
-> > > >  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
-> > > >  
-> > > > @@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
-> > > >  	/* phy reset line */
-> > > >  	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
-> > > >  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
-> > > > +
-> > > > +	/* flexcan0 */
-> > > > +	MX28_PAD_GPMI_RDY2__CAN0_TX,
-> > > > +	MX28_PAD_GPMI_RDY3__CAN0_RX,
-> > > > +	/* flexcan1 */
-> > > > +	MX28_PAD_GPMI_CE2N__CAN1_TX,
-> > > > +	MX28_PAD_GPMI_CE3N__CAN1_RX,
-> > > > +	/* transceiver power control */
-> > > > +	MX28_PAD_SSP1_CMD__GPIO_2_13,
-> > > >  };
-> > > >  
-> > > >  /* fec */
-> > > > @@ -178,8 +188,28 @@ error:
-> > > >  	return -ETIMEDOUT;
-> > > >  }
-> > > >  
-> > > > +/* flexcan */
-> > > > +static void mx28evk_flexcan_switch(int enable)
-> > > > +{
-> > > > +	static int count;
-> > > > +
-> > > > +	if (enable) {
-> > > > +		if (!count++)
-> > > > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
-> > > > +	} else {
-> > > > +		if (!--count)
-> > > > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
-> > > > +	}
-> > > > +}
-> > > 
-> > > Why this count variable? It shouldn't hurt to call gpio_set_value
-> > > multiple times.
-> > > 
-> Something like this?
-> 
-> /*
->  * On mx28evk board, two flexcan transceivers are controlled
->  * by one power switch gpio.
->  */
-> #define FLEXCAN0_SWITCH_ON	(1 << 0)
-> #define FLEXCAN1_SWITCH_ON	(1 << 1)
-> 
-> static int flexcan_switch_on;
-> 
-> static void mx28evk_flexcan0_switch(int enable)
-> {
-> 	if (enable) {
-> 		flexcan_switch_on |= FLEXCAN0_SWITCH_ON;
-> 		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
-> 	} else {
-> 		flexcan_switch_on &= ~FLEXCAN0_SWITCH_ON;
-> 		if (!flexcan_switch_on)
-> 			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
-> 	}
-> }
-> 
-> static void mx28evk_flexcan1_switch(int enable)
-> {
-> 	if (enable) {
-> 		flexcan_switch_on |= FLEXCAN1_SWITCH_ON;
-> 		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
-> 	} else {
-> 		flexcan_switch_on &= ~FLEXCAN1_SWITCH_ON;
-> 		if (!flexcan_switch_on)
-> 			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
-> 	}
-> }
-> 
-> static const struct flexcan_platform_data
-> 		mx28evk_flexcan_pdata[] __initconst = {
-> 	{
-> 		.transceiver_switch = mx28evk_flexcan0_switch,
-> 	}, {
-> 		.transceiver_switch = mx28evk_flexcan1_switch,
-> 	}
-> };
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx3/mach-mx35_3ds.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-More like this, which is slightly easier to read, but the effect is the
-same.
-
-static int flexcan0_en, flexcan0_en;
-
-/*
- * MX28EVK_FLEXCAN_SWITCH is shared between both can controllers
- */
-static void mx28evk_flexcan_switch(void)
-{
-	if (flexcan0_en || flexcan1_en)
-		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
-	else
-		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
-}
-
-static void mx28evk_flexcan0_switch(int enable)
-{
-	flexcan0_en = enable;
-	mx28evk_flexcan_switch();
-}
-
-static void mx28evk_flexcan1_switch(int enable)
-{
-	flexcan1_en = enable;
-	mx28evk_flexcan_switch();
-}
-
-static const struct flexcan_platform_data
-                mx28evk_flexcan_pdata[] __initconst = {
-        {
-                .transceiver_switch = mx28evk_flexcan0_switch,
-        }, {
-                .transceiver_switch = mx28evk_flexcan1_switch,
-        }
-};
-
+diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
+index 5f35d5c..f2cec07 100644
+--- a/arch/arm/mach-mx3/mach-mx35_3ds.c
++++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
+@@ -132,6 +132,11 @@ static int mx35_3ds_otg_init(struct platform_device *pdev)
+ static const struct fsl_usb2_platform_data usb_otg_pdata __initconst = {
+ 	.operating_mode	= FSL_USB2_DR_DEVICE,
+ 	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
++	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
++/*
++ * ENGCM09152 also requires a hardware change.
++ * Please check the MX35 Chip Errata document for details.
++ */
+ };
+ 
+ static struct mxc_usbh_platform_data otg_pdata __initdata = {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.6.0.4
