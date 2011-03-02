@@ -1,115 +1,130 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 2 Mar 2011 13:10:58 +0530
-Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be configured
-	from board file
-In-Reply-To: <056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
-References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
-	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
-	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
-Message-ID: <AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
+From: banajit.g@samsung.com (Banajit Goswami)
+Date: Wed,  2 Mar 2011 16:27:26 +0900
+Subject: [PATCH V2 5/6] ARM: SAMSUNG: Add PWM backlight support on Samsung
+	S5PC100
+In-Reply-To: <1299050847-16148-1-git-send-email-banajit.g@samsung.com>
+References: <1299050847-16148-1-git-send-email-banajit.g@samsung.com>
+Message-ID: <1299050847-16148-4-git-send-email-banajit.g@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2011 at 12:46 AM, Sricharan R <r.sricharan@ti.com> wrote:
-> Hi,
->>diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->>index 755f4aa..530e9e3 100644
->>--- a/arch/arm/mach-omap2/serial.c
->>+++ b/arch/arm/mach-omap2/serial.c
->>@@ -44,6 +44,15 @@
->>
->> static int omap_uart_con_id __initdata = -1;
->>
->>+static struct omap_uart_port_info omap_serial_default_info[] = {
->>+ ? ? ?{
->>+ ? ? ? ? ? ? ?.dma_enabled ? ?= 0,
->>+ ? ? ? ? ? ? ?.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
->>+ ? ? ? ? ? ? ?.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
->>+ ? ? ? ? ? ? ?.idle_timeout ? = DEFAULT_IDLE_TIMEOUT,
->>+ ? ? ?},
->>+};
->>+
->> static int uart_idle_hwmod(struct omap_device *od)
->> {
->> ? ? ? omap_hwmod_idle(od->hwmods[0]);
->>@@ -66,6 +75,54 @@ static struct omap_device_pm_latency
-> omap_uart_latency[]
->>= {
->> ? ? ? },
->> };
->>
->>+#ifdef CONFIG_OMAP_MUX
->>+static struct omap_device_pad default_serial0_pads[] __initdata = {
->>+ ? ? ?{
->>+ ? ? ? ? ? ? ?.name ? = "uart1_rx.uart1_rx",
->>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
->>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>+ ? ? ?},
->>+};
->>+
->>+static struct omap_device_pad default_serial1_pads[] __initdata = {
->>+ ? ? ?{
->>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
->>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
->>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>+ ? ? ?},
->>+};
->>+
->>+static struct omap_device_pad default_serial2_pads[] __initdata = {
->>+ ? ? ?{
->>+ ? ? ? ? ? ? ?.name ? = "uart3_rx_irrx.uart3_rx_irrx",
->>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
->>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>+ ? ? ?},
->>+};
->>+
->>+static struct omap_device_pad default_omap36xx_serial3_pads[] __initdata
-> =
->>{
->>+ ? ? ?{
->>+ ? ? ? ? ? ? ?.name ? = "gpmc_wait3.uart4_rx",
->>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
->>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE2,
->>+ ? ? ?},
->>+};
->>+
->>+static struct omap_device_pad default_omap4_serial3_pads[] __initdata =
-> {
->>+ ? ? ?{
->>+ ? ? ? ? ? ? ?.name ? = "uart4_rx.uart4_rx",
->>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
->>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>+ ? ? ?},
->>+};
-> Here only the UART RX pins are muxed, so what about the cts, rts, tx pins?
+This patch adds support for LCD backlight using PWM timer for
+Samsung SMDKC100 board.
 
-The intention here is to enable wakeup capabilities for uart rx pad.
+Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+---
+Changes since v1:
+- Used common GPIO macro
+- Removed redundant timers
 
-AFAIK most of the boards are currently dependent on bootloader for
-uart-muxing if any board is not dependent on bootloader then we
-can use omap_serial_init_port along with board_mux_info from board.
+ arch/arm/mach-s5pc100/Kconfig         |    1 +
+ arch/arm/mach-s5pc100/mach-smdkc100.c |   49 ++++++++++++++++++++++++++++++---
+ 2 files changed, 45 insertions(+), 4 deletions(-)
 
-Prior to this change uart wakeup is based on rx_pad and we were populating
-offset and using omap_ctrl api's to read/write which is cleaned up now.
-Most of boards are dependent on uart-rx wakeup to avoid breaking any
-board support we
-are using omap_serial_init by filling default values, which provides
-us with same
-environment but with right approach towards handling mux data with a
-handshake with
-hwmod framework.
-
-So if any board needs specific mux they can go ahead and add required
-mux data in
-board file and use map_serial_init_port instead of current omap_serial_init.
-
-
-> Is it consistent that across all socs that only UART3 would have UART/IRDA
-> functions capability so that serial2 pads can always be called "rx_irxx"
-> ?.
-
-Yes from OMAP2420 to OMAP4430 uart3 can used as irda.
-
---
-Thanks,
-Govindraj.R
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index b8fbf2f..608722f 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -58,6 +58,7 @@ config MACH_SMDKC100
+ 	select SAMSUNG_DEV_ADC
+ 	select SAMSUNG_DEV_IDE
+ 	select SAMSUNG_DEV_KEYPAD
++	select SAMSUNG_DEV_PWM
+ 	select SAMSUNG_DEV_TS
+ 	select S5PC100_SETUP_FB_24BPP
+ 	select S5PC100_SETUP_I2C1
+diff --git a/arch/arm/mach-s5pc100/mach-smdkc100.c b/arch/arm/mach-s5pc100/mach-smdkc100.c
+index dd192a2..22d5348 100644
+--- a/arch/arm/mach-s5pc100/mach-smdkc100.c
++++ b/arch/arm/mach-s5pc100/mach-smdkc100.c
+@@ -23,12 +23,15 @@
+ #include <linux/fb.h>
+ #include <linux/delay.h>
+ #include <linux/input.h>
++#include <linux/pwm_backlight.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ 
+ #include <mach/map.h>
+ #include <mach/regs-fb.h>
++#include <mach/regs-gpio.h>
++
+ #include <video/platform_lcd.h>
+ 
+ #include <asm/irq.h>
+@@ -107,9 +110,6 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+ static void smdkc100_lcd_power_set(struct plat_lcd_data *pd,
+ 				   unsigned int power)
+ {
+-	/* backlight */
+-	gpio_direction_output(S5PC100_GPD(0), power);
+-
+ 	if (power) {
+ 		/* module reset */
+ 		gpio_direction_output(S5PC100_GPH0(6), 1);
+@@ -178,6 +178,45 @@ static struct samsung_keypad_platdata smdkc100_keypad_data __initdata = {
+ 	.rows		= 2,
+ 	.cols		= 8,
+ };
++
++static int smdkc100_backlight_init(struct device *dev)
++{
++	int ret;
++
++	ret = gpio_request(S5PC100_GPD(0), "Backlight");
++	if (ret) {
++		printk(KERN_ERR "failed to request GPF for PWM-OUT0\n");
++		return ret;
++	}
++
++	/* Configure GPIO pin with S5PC100_GPD_TOUT_0 */
++	s3c_gpio_cfgpin(S5PC100_GPD(0), S3C_GPIO_SFN(2));
++
++	return 0;
++}
++
++static void smdkc100_backlight_exit(struct device *dev)
++{
++	s3c_gpio_cfgpin(S5PC100_GPD(0), S3C_GPIO_OUTPUT);
++	gpio_free(S5PC100_GPD(0));
++}
++
++static struct platform_pwm_backlight_data smdkc100_backlight_data = {
++	.pwm_id		= 0,
++	.max_brightness	= 255,
++	.dft_brightness	= 255,
++	.pwm_period_ns	= 78770,
++	.init		= smdkc100_backlight_init,
++	.exit		= smdkc100_backlight_exit,
++};
++
++static struct platform_device smdkc100_backlight_device = {
++	.name		= "pwm-backlight",
++	.dev		= {
++		.parent		= &s3c_device_timer[0].dev,
++		.platform_data	= &smdkc100_backlight_data,
++	},
++};
+ 
+ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&s3c_device_adc,
+@@ -200,6 +238,8 @@ static struct platform_device *smdkc100_devices[] __initdata = {
+ 	&s5p_device_fimc1,
+ 	&s5p_device_fimc2,
+ 	&s5pc100_device_spdif,
++	&s3c_device_timer[0],
++	&smdkc100_backlight_device,
+ };
+ 
+ static struct s3c2410_ts_mach_info s3c_ts_platform __initdata = {
+@@ -233,7 +274,6 @@ static void __init smdkc100_machine_init(void)
+ 	s5pc100_spdif_setup_gpio(S5PC100_SPDIF_GPD);
+ 
+ 	/* LCD init */
+-	gpio_request(S5PC100_GPD(0), "GPD");
+ 	gpio_request(S5PC100_GPH0(6), "GPH0");
+ 	smdkc100_lcd_power_set(&smdkc100_lcd_power_data, 0);
+ 	platform_add_devices(smdkc100_devices, ARRAY_SIZE(smdkc100_devices));
+-- 
+1.6.5.2
