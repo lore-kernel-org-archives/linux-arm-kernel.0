@@ -1,36 +1,29 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 2 Mar 2011 21:56:37 +0100 (CET)
-Subject: [PATCH v8 1/1] PRUSS UIO driver support
-In-Reply-To: <201103022123.38050.arnd@arndb.de>
-References: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
-	<1299065886-30099-2-git-send-email-pratheesh@ti.com>
-	<20110302200956.GB23818@local> <201103022123.38050.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1103022155030.2701@localhost6.localdomain6>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 02 Mar 2011 15:58:14 -0500 (EST)
+Subject: [patch 1/1] t5325: add audio support
+In-Reply-To: <87tyflw98o.fsf@lebrac.rtp-net.org>
+References: <20110118072802.620728772@rtp-net.org>
+	<87tyflw98o.fsf@lebrac.rtp-net.org>
+Message-ID: <alpine.LFD.2.00.1103021556350.16531@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Mar 2011, Arnd Bergmann wrote:
+On Wed, 2 Mar 2011, Arnaud Patard wrote:
 
-> On Wednesday 02 March 2011 21:09:56 Hans J. Koch wrote:
-> > > +static struct uio_info *info;
-> > > +static dma_addr_t sram_paddr, ddr_paddr;
-> > > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> > 
-> > So the correct thing would be
-> > 
-> > static void __iomem *prussio_vaddr;
-> > static void *sram_vaddr, *ddr_vaddr;
+> Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
 > 
-> I also commented that it should not be a global variable at
-> all, but a dynamic data structure referenced from the device.
+> Hi,
 > 
-> Not important, but Pratheesh said he'd change it. If it stays
-> a global variable, I'd at least expect an explanation why
-> the static variable is considered better in this case.
+> > This patch declares the i2c audio codec and initialise audio.
+> > It's adding the alc5621 codec in the i2c board info and is calling
+> > kirkwood_audio_init() to initialize kirkwood audio.
+> 
+> Please, can someone tell me what's wrong in this patch ? I'd like to see
+> this patch merged so if something needs to be fixed, please tell it to
+> me.
 
-I did not pick at that, because there is no indicator that we'll see
-more than one PRUSS unit per SoC in the forseeable future.
+I don't know.  Could you make sure it still applies to the latest tree 
+and repost it?
 
-Thanks,
 
-	tglx
+Nicolas
