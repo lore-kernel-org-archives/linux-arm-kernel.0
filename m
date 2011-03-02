@@ -1,100 +1,170 @@
-From: tom.leiming@gmail.com (tom.leiming at gmail.com)
-Date: Wed,  2 Mar 2011 18:56:59 +0800
-Subject: [patch v2 2/3] arm: pmu: allow platform specifc irq enable/disable
-	handling
-In-Reply-To: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
-References: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
-Message-ID: <1299063420-22203-3-git-send-email-tom.leiming@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed,  2 Mar 2011 16:25:29 +0530
+Subject: [PATCH v2 16/18] omap3+: sr: make enable path use volt_data pointer
+In-Reply-To: <1299063331-27968-1-git-send-email-nm@ti.com>
+References: <1299063331-27968-1-git-send-email-nm@ti.com>
+Message-ID: <1299063331-27968-17-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ming Lei <tom.leiming@gmail.com>
+Passing the volt_data pointers accross allows us to save us the effort
+of looking up the voltage data pointer from the voltage value at
+multiple layers, we need to look at the voltage data in dvfs layer
+for further processing, so modify the APIs to pass the voltage data
+pointer all the way through to lower layers to the smartreflex class
+drivers.
 
-This patch introduces .enable_irq and .disable_irq into
-struct arm_pmu_platdata, so platform specific irq enablement
-can be handled after request_irq, and platform specific irq
-disablement can be handled before free_irq.
-
-This patch is for support of  pmu irq routed from CTI on omap4.
-
-Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/include/asm/pmu.h   |   15 ++++++++++++---
- arch/arm/kernel/perf_event.c |   15 ++++++++++++---
- 2 files changed, 24 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/smartreflex-class3.c      |   13 +++----------
+ arch/arm/mach-omap2/smartreflex.c             |   25 ++++++++++++-------------
+ arch/arm/plat-omap/include/plat/smartreflex.h |    8 +++++---
+ 3 files changed, 20 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 7544ce6..e50c542 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -22,13 +22,22 @@ enum arm_pmu_type {
- /*
-  * struct arm_pmu_platdata - ARM PMU platform data
+diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
+index 2195668..7ac88da 100644
+--- a/arch/arm/mach-omap2/smartreflex-class3.c
++++ b/arch/arm/mach-omap2/smartreflex-class3.c
+@@ -13,19 +13,12 @@
+ 
+ #include <plat/smartreflex.h>
+ 
+-static int sr_class3_enable(struct voltagedomain *voltdm)
++static int sr_class3_enable(struct voltagedomain *voltdm,
++		struct omap_volt_data *volt_data)
+ {
+-	unsigned long volt = omap_get_operation_voltage(
+-		omap_voltage_get_nom_volt(voltdm));
+-
+-	if (!volt) {
+-		pr_warning("%s: Curr voltage unknown. Cannot enable sr_%s\n",
+-				__func__, voltdm->name);
+-		return -ENODATA;
+-	}
+ 
+ 	omap_vp_enable(voltdm);
+-	return sr_enable(voltdm, volt);
++	return sr_enable(voltdm, volt_data);
+ }
+ 
+ static int sr_class3_disable(struct voltagedomain *voltdm, int is_volt_reset)
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index d62da3d..9b9d380 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -302,7 +302,8 @@ static void sr_start_vddautocomp(struct omap_sr *sr)
+ 		return;
+ 	}
+ 
+-	if (!sr_class->enable(sr->voltdm))
++	if (!sr_class->enable(sr->voltdm,
++			omap_voltage_get_nom_volt(sr->voltdm)))
+ 		sr->autocomp_active = true;
+ }
+ 
+@@ -618,7 +619,7 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
+ /**
+  * sr_enable() - Enables the smartreflex module.
+  * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
+- * @volt:	The voltage at which the Voltage domain associated with
++ * @volt_data:	The voltage at which the Voltage domain associated with
+  *		the smartreflex module is operating at.
+  *		This is required only to program the correct Ntarget value.
   *
-- * @handle_irq: an optional handler which will be called from the interrupt and
-- * passed the address of the low level handler, and can be used to implement
-- * any platform specific handling before or after calling it.
-+ * @handle_irq: an optional handler which will be called from the
-+ * 	interrupt and passed the address of the low level handler,
-+ * 	and can be used to implement any platform specific handling
-+ * 	before or after calling it.
-+ * @enable_irq: an optional handler which will be called after
-+ * 	request_irq and be used to handle some platform specific
-+ * 	irq enablement
-+ * @disable_irq: an optional handler which will be called before
-+ * 	free_irq and be used to handle some platform specific
-+ * 	irq disablement
+@@ -626,10 +627,9 @@ int sr_configure_minmax(struct voltagedomain *voltdm)
+  * enable a smartreflex module. Returns 0 on success. Returns error
+  * value if the voltage passed is wrong or if ntarget value is wrong.
   */
- struct arm_pmu_platdata {
- 	irqreturn_t (*handle_irq)(int irq, void *dev,
- 				  irq_handler_t pmu_handler);
-+	void (*enable_irq)(int irq);
-+	void (*disable_irq)(int irq);
+-int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
++int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data)
+ {
+ 	u32 nvalue_reciprocal;
+-	struct omap_volt_data *volt_data;
+ 	struct omap_sr *sr = _sr_lookup(voltdm);
+ 	int ret;
+ 
+@@ -639,19 +639,16 @@ int sr_enable(struct voltagedomain *voltdm, unsigned long volt)
+ 		return -EINVAL;
+ 	}
+ 
+-	volt_data = omap_voltage_get_voltdata(sr->voltdm, volt);
+-
+-	if (IS_ERR(volt_data)) {
+-		dev_warn(&sr->pdev->dev, "%s: Unable to get voltage table"
+-			"for nominal voltage %ld\n", __func__, volt);
+-		return -ENODATA;
++	if (IS_ERR_OR_NULL(volt_data)) {
++		dev_warn(&sr->pdev->dev, "%s: bad voltage data\n", __func__);
++		return -EINVAL;
+ 	}
+ 
+ 	nvalue_reciprocal = sr_retrieve_nvalue(sr, volt_data->sr_efuse_offs);
+ 
+ 	if (!nvalue_reciprocal) {
+ 		dev_warn(&sr->pdev->dev, "%s: NVALUE = 0 at voltage %ld\n",
+-			__func__, volt);
++			__func__, omap_get_operation_voltage(volt_data));
+ 		return -ENODATA;
+ 	}
+ 
+@@ -808,13 +805,15 @@ int sr_register_class(struct omap_sr_class_data *class_data)
+  * omap_sr_enable() -  API to enable SR clocks and to call into the
+  *			registered smartreflex class enable API.
+  * @voltdm:	VDD pointer to which the SR module to be configured belongs to.
++ * @volt_data:	Voltage data to go to
+  *
+  * This API is to be called from the kernel in order to enable
+  * a particular smartreflex module. This API will do the initial
+  * configurations to turn on the smartreflex module and in turn call
+  * into the registered smartreflex class enable API.
+  */
+-void omap_sr_enable(struct voltagedomain *voltdm)
++void omap_sr_enable(struct voltagedomain *voltdm,
++			struct omap_volt_data *volt_data)
+ {
+ 	struct omap_sr *sr = _sr_lookup(voltdm);
+ 
+@@ -833,7 +832,7 @@ void omap_sr_enable(struct voltagedomain *voltdm)
+ 		return;
+ 	}
+ 
+-	sr_class->enable(voltdm);
++	sr_class->enable(voltdm, volt_data);
+ }
+ 
+ /**
+diff --git a/arch/arm/plat-omap/include/plat/smartreflex.h b/arch/arm/plat-omap/include/plat/smartreflex.h
+index d420f44..07f35b2 100644
+--- a/arch/arm/plat-omap/include/plat/smartreflex.h
++++ b/arch/arm/plat-omap/include/plat/smartreflex.h
+@@ -185,7 +185,8 @@ struct omap_sr_pmic_data {
+  * @class_priv_data:	Class specific private data (optional)
+  */
+ struct omap_sr_class_data {
+-	int (*enable)(struct voltagedomain *voltdm);
++	int (*enable)(struct voltagedomain *voltdm,
++			struct omap_volt_data *volt_data);
+ 	int (*disable)(struct voltagedomain *voltdm, int is_volt_reset);
+ 	int (*class_init)(struct voltagedomain *voltdm, void *class_priv_data);
+ 	int (*class_deinit)(struct voltagedomain *voltdm,
+@@ -232,7 +233,8 @@ struct omap_sr_data {
  };
  
- #ifdef CONFIG_CPU_HAS_PMU
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 22e194eb..61ff471 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -422,14 +422,18 @@ armpmu_reserve_hardware(void)
- 			pr_warning("unable to request IRQ%d for ARM perf "
- 				"counters\n", irq);
- 			break;
--		}
-+		} else if (plat->enable_irq)
-+			plat->enable_irq(irq);
- 	}
+ /* Smartreflex module enable/disable interface */
+-void omap_sr_enable(struct voltagedomain *voltdm);
++void omap_sr_enable(struct voltagedomain *voltdm,
++			struct omap_volt_data *volt_data);
+ void omap_sr_disable(struct voltagedomain *voltdm);
+ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
  
- 	if (err) {
- 		for (i = i - 1; i >= 0; --i) {
- 			irq = platform_get_irq(pmu_device, i);
--			if (irq >= 0)
-+			if (irq >= 0) {
-+				if (plat->disable_irq)
-+					plat->disable_irq(irq);
- 				free_irq(irq, NULL);
-+			}
- 		}
- 		release_pmu(pmu_device);
- 		pmu_device = NULL;
-@@ -442,11 +446,16 @@ static void
- armpmu_release_hardware(void)
- {
- 	int i, irq;
-+	struct arm_pmu_platdata *plat =
-+		dev_get_platdata(&pmu_device->dev);
+@@ -240,7 +242,7 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm);
+ void omap_sr_register_pmic(struct omap_sr_pmic_data *pmic_data);
  
- 	for (i = pmu_device->num_resources - 1; i >= 0; --i) {
- 		irq = platform_get_irq(pmu_device, i);
--		if (irq >= 0)
-+		if (irq >= 0) {
-+			if (plat->disable_irq)
-+				plat->disable_irq(irq);
- 			free_irq(irq, NULL);
-+		}
- 	}
- 	armpmu->stop();
- 
+ /* Smartreflex driver hooks to be called from Smartreflex class driver */
+-int sr_enable(struct voltagedomain *voltdm, unsigned long volt);
++int sr_enable(struct voltagedomain *voltdm, struct omap_volt_data *volt_data);
+ void sr_disable(struct voltagedomain *voltdm);
+ int sr_notifier_control(struct voltagedomain *voltdm, bool enable);
+ int sr_configure_errgen(struct voltagedomain *voltdm);
 -- 
-1.7.3
+1.7.1
