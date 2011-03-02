@@ -1,30 +1,29 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 2 Mar 2011 11:26:49 -0300
-Subject: [PATCH] ARM: mx3/mx35_3ds: Use MX35 USB OTG Erratum
-Message-ID: <1299076009-14253-1-git-send-email-fabio.estevam@freescale.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Wed, 2 Mar 2011 22:35:59 +0800
+Subject: [patch v2 2/3] arm: pmu: allow platform specifc irq
+	enable/disable handling
+In-Reply-To: <-3190832915456449126@unknownmsgid>
+References: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
+	<1299063420-22203-3-git-send-email-tom.leiming@gmail.com>
+	<-3190832915456449126@unknownmsgid>
+Message-ID: <AANLkTinbZjNHGiY5Ge-CjHpx9MOxpiELhzmricPEsU=o@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx3/mach-mx35_3ds.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+Hi Will,
 
-diff --git a/arch/arm/mach-mx3/mach-mx35_3ds.c b/arch/arm/mach-mx3/mach-mx35_3ds.c
-index 5f35d5c..f2cec07 100644
---- a/arch/arm/mach-mx3/mach-mx35_3ds.c
-+++ b/arch/arm/mach-mx3/mach-mx35_3ds.c
-@@ -132,6 +132,11 @@ static int mx35_3ds_otg_init(struct platform_device *pdev)
- static const struct fsl_usb2_platform_data usb_otg_pdata __initconst = {
- 	.operating_mode	= FSL_USB2_DR_DEVICE,
- 	.phy_mode	= FSL_USB2_PHY_UTMI_WIDE,
-+	.workaround	= FLS_USB2_WORKAROUND_ENGCM09152,
-+/*
-+ * ENGCM09152 also requires a hardware change.
-+ * Please check the MX35 Chip Errata document for details.
-+ */
- };
- 
- static struct mxc_usbh_platform_data otg_pdata __initdata = {
+2011/3/2 Will Deacon <will.deacon@arm.com>:
+> Looks good to me. Unfortunately, I don't have an OMAP4 to test this
+> on (contributions welcome :) so I've just eyeballed the code:
+>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+>
+> You'll need to wait for the ux500 stuff to be merged before you can
+> get this upstream (Linus W is handling the pull request afaik).
+
+Thanks for your review, the ux500 stuff has been merged into -next
+tree already, so this one may be into -next too.
+
+thanks,
 -- 
-1.6.0.4
+Lei Ming
