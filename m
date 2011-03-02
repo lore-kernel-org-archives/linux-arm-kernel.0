@@ -1,52 +1,83 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Wed, 2 Mar 2011 19:41:45 +0000
-Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <8762s1xqmj.fsf@lebrac.rtp-net.org>
-References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<8762s1xqmj.fsf@lebrac.rtp-net.org>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA18A7C0@039-SN1MPN1-004.039d.mgd.msft.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 2 Mar 2011 20:47:16 +0100
+Subject: [patch v2 1/2] mc13892: reboot on wdi event
+In-Reply-To: <20110302185000.369378760@rtp-net.org>
+References: <20110302184512.512010086@rtp-net.org>
+	<20110302185000.369378760@rtp-net.org>
+Message-ID: <20110302194716.GH22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hello Arnaud,
 
+On Wed, Mar 02, 2011 at 07:45:13PM +0100, Arnaud Patard wrote:
+> By default, on wdi (watchdog input) event the mc13892 is powering off.
+> This patch allows to change this behaviour throught platform_data.
+> 
+> v2:
+> - move to mc13xxx-core
+> - make it configurable
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> 
+> Index: linux-2.6-submit/drivers/mfd/mc13xxx-core.c
+> ===================================================================
+> --- linux-2.6-submit.orig/drivers/mfd/mc13xxx-core.c	2011-03-01 22:26:40.000000000 +0100
+> +++ linux-2.6-submit/drivers/mfd/mc13xxx-core.c	2011-03-02 12:24:30.000000000 +0100
+> @@ -136,6 +136,9 @@
+>  #define MC13XXX_REVISION_FAB		(0x03 << 11)
+>  #define MC13XXX_REVISION_ICIDCODE	(0x3f << 13)
+>  
+> +#define MC13892_POWERCTL2		15
+> +#define MC13892_POWERCTL2_WDIRESET	(1<<12)
+> +
+>  #define MC13783_ADC1		44
+>  #define MC13783_ADC1_ADEN		(1 << 0)
+>  #define MC13783_ADC1_RAND		(1 << 1)
+> @@ -715,6 +718,7 @@
+>  	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
+>  	enum mc13xxx_id id;
+>  	int ret;
+> +	unsigned int val;
+>  
+>  	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
+>  	if (!mc13xxx)
+> @@ -734,6 +738,15 @@
+>  	if (ret || id == MC13XXX_ID_INVALID)
+>  		goto err_revision;
+>  
+> +	if ((id == MC13XXX_ID_MC13892) && pdata->wdi_reboot) {
+> +		/* allows to reboot on wdi event */
+> +		ret = mc13xxx_reg_read(mc13xxx, MC13892_POWERCTL2, &val);
+> +		if (!ret) {
+> +			val |= MC13892_POWERCTL2_WDIRESET;
+> +			mc13xxx_reg_write(mc13xxx, MC13892_POWERCTL2, val);
+> +		}
+> +	}
+> +
+>  	/* mask all irqs */
+>  	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK0, 0x00ffffff);
+>  	if (ret)
+> Index: linux-2.6-submit/include/linux/mfd/mc13xxx.h
+> ===================================================================
+> --- linux-2.6-submit.orig/include/linux/mfd/mc13xxx.h	2011-03-01 22:30:59.000000000 +0100
+> +++ linux-2.6-submit/include/linux/mfd/mc13xxx.h	2011-03-01 22:31:27.000000000 +0100
+> @@ -149,6 +149,8 @@
+git diff provide some info about the context after the @@ hunk header.
+I consider this really useful.  GNU diff is able to do this, too (option
+-p).
 
->-----Original Message-----
-From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-
->bounces at lists.infradead.org] On Behalf Of Arnaud Patard
->Sent: Wednesday, March 02, 2011 1:35 PM
->To: Nguyen Dinh-R00091
->Cc: linux at arm.linux.org.uk; s.hauer at pengutronix.de; linux-kernel at vger.kernel.org; u.kleine-
->koenig at pengutronix.de; Zhang Lily-R58066; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
->
-><Dinh.Nguyen@freescale.com> writes:
->
->Hi,
->
->> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->>
->> Adds initial low power suspend functionality to MX51.
->> Supports "mem" and "standby" modes.
->
->I've very quickly tried suspend to mem on my system and despite having set
->some irq as wakeup source, it doesn't wake up. Is there some extra step
->to be done in order to test your patch ?
->
->Moreover, the code I've seen for suspend is very different. It's seems
->to handle some cpufreq stuff and seems to be copying some code into some
->special ram. Is all this stuff unneeded ?
+>  	int num_regulators;
+>  	struct mc13xxx_regulator_init_data *regulators;
+>  	struct mc13xxx_leds_platform_data *leds;
+> +
+> +	unsigned int wdi_reboot;
+there is already a member .flags.  What about defining another bit for
+that?
 
-I am able to wakeup using gpio-key on my mx51-babbage system if I comment out the most of the drivers except for the gpio-keys driver. Yes, there are additional cpufreq and code that needs to get run in IRAM for mx51, which I will add on to this patch. This is just the initial patch to put the SoC in to suspend and have other developers add to it.
+Best regards
+Uwe
 
-Thanks,
-
-Dinh
-
->
->Arnaud
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
