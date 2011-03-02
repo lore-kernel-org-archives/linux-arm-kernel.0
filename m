@@ -1,109 +1,121 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 2 Mar 2011 17:33:26 +0100
-Subject: [RFC PATCH 1/1] ARM: imx5x: clean up ARCH_MX5X
-In-Reply-To: <20110302160605.GA2994@richard-laptop>
-References: <1299036526-15674-1-git-send-email-richard.zhao@freescale.com>
-	<20110302112559.GC22310@pengutronix.de>
-	<20110302160605.GA2994@richard-laptop>
-Message-ID: <20110302163326.GG22310@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  2 Mar 2011 16:53:06 +0000
+Subject: [RFC PATCH 00/20] A15 architected timer support
+Message-ID: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 12:06:05AM +0800, Richard Zhao wrote:
-> Hi Uwe,
-> 
-> Thanks for your detailed explanation!
-> On Wed, Mar 02, 2011 at 12:25:59PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello Richard,
-> > 
-> > On Wed, Mar 02, 2011 at 11:28:46AM +0800, Richard Zhao wrote:
-> > > Remove legacy support of ARCH_MX5X. Move to SOC_SOC_IMX5X.
-> > > 
-> > > My understanding is ARCH_MX5 selects Kconfig in arch/arm/mach-mx5,
-> > > and every board can be selected/unselected, and SOC_XXX be selected
-> > > by the board config. MACH_XXXX/SOC_XXXX then select those HAVE_XXXX.
-> > My intended goal with these ARCH_MX.., MACH_MX.. and SOC_IMX.. symbols is:
-> > 
-> >  - ARCH_MX.. should be only a helper to group all machines together that
-> >    can be built in a single image. In the far future it hopefully dies
-> >    because we can compile everything together. These IMHO should not be
-> >    used in Makefiles or source files at all as the grouping can change
-> >    over time. I'm not sure the name ARCH_MX.. is that good. Didn't think
-> >    about a better naming scheme, so if you have suggestions don't
-> >    hesitate to tell them.
-> Would it make sense to go straight forward? 
-> ARCH_MX.. for SoC series. eg. ARCH_MX1/2/3/5. It groups SoCs.
-This doesn't work. Where do you want to put i.MX25? Conceptually the
-easy groups are { i.MX21, i.MX27 } and { i.MX25, i.MX31, i.MX35 }
-because these share PHYS_OFFSETs. And note that i.MX31 has a different
-iomuxer than i.MX25 and i.MX35. As soon as we have support for runtime
-PHYS_OFFSET the remaining groups are:
+This patch set adds support for the architected (or generic) timers
+that appear in the Cortex A15. The specification is part of the
+ARMv7-AR LPA Virtualization Extensions, available from (free
+registration required):
 
-	ARMv4 + ARMv5 vs. ARMv6 + ARMv7
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
 
-(I think) which doesn't match the ARCH_MX1/2/3/5 approach anymore.
+They provide physical and virtual timers/counters (the later being
+under control of the hypervisor). The code provides a clock source
+(using the physical counter) and a sched_clock implementation (using
+the virtual counter, so the local scheduling is not affected by having
+multiple VMs scheduled in and out of the CPU by the hypervisor).
 
-> SOC_IMX.. for single SoC. eg. SOC_IMX31/35/50/51/53. It groups Machines.
-> MACH_.. for single machine. eg. MACH_MX51_BABBAGE.
-> 
-> They can be used in Makefiles to help include source files, but idealy not be
-> used in source files. For multi-soc in single image, it's more easy to select
-> build targets. It can also help transit to single image step by step.
-Here I'd prefer things like:
+Modifications are relatively invasive:
 
-	config SOC_IMX21
-		bool
-		select IMX_HAVE_IOMUX_V1
+- The timer interrupt is on IRQ 29 or 30, depending on whether the
+  kernel is running in secure or normal mode. As it is not possible to
+  distinguish between the two modes in a reliable way, we have to
+  check if we're running on an A15 or not (the feature register may be
+  virtualized, and thus potentially expensive to access).
+- Local timer is also used in an UP configuration, so the local timer
+  code is isolated from SMP support.
+- A registration interface is introduced to allow a platform to pick
+  its preferred implementation (architected timers, twd, msm local
+  timers...). This causes some code churn in the platform specific
+  code as the registration mechanism takes place at runtime instead of
+  having a link time selection (local_timer_setup).
+- Broadcast timers become the fallback in case no local timers are
+  available.
+- Allow the kernel to have multiple sched_clock() implementations
+  compiled in, and extend the existing API to register one at
+  runtime.
 
-	obj-$(IMX_HAVE_IOMUX_V1) += tralala.o
+On the (emulated) Versatile Express platform, the A15 is running
+without the SP804 that is usually used across the whole Versatile
+range. The same binary kernel also runs on the Cortex A5 tile using
+TWD and SP804 (both patch sets to be posted shortly).
 
-> >  - MACH_MX.. actually are misnomers becauce they clash with the name
-> >    space of the machine db. So they should be substituted by SOC_IMX...
-> >    (maybe a few by ARCH_MX..)  (affected: MACH_MX21 and MACH_MX27)
-> >  - SOC_IMX.. are used to differentiate between SoCs.
-> > 
-> > So a goal is to review all ARCH_MX.. and MACH_MX.. used in .c and .h
-> > files and try to use the SOC_IMX variables instead.
-> > Here I consider important that SOC_IMX... is really only used with
-> > having multi-SoC-kernels in mind. So you can consider ARCH_MX and
-> > MACH_MX as todo-markers for that (and this is the main difference IMHO).
-> > E.g. the Makefile.boots are such a place that are not multi-soc capable
-> > yet as is the selection of PHYS_OFFSET. I'd like to keep them marked
-> > somehow.
-> The ToDO markers might label itself as markers, Or it cause many people
-> confused.
-I don't know what you mean here.
+Patches #1, 9, 10 and 11 carry the core modifications. All the others
+are platform support changes and various cleanups. This patch set
+depends on Will Deacon's multi-tile patch. Tested on next-20110302.
 
-> And are you sure we won't need ARCH_MX.. in the final single image solution?
-> IMHO, single image needs to select what targetis it builds for too. The ARCH_MX..
-> works as categories and help reduce image size. 
-Again, I don't understand you here.
+Any comments are welcome.
 
-> > I don't know if it's sensible to coordinate this effort, it mainly
-> > depends on how many people are willing to help. I'll start with ARCH_MX2
-> > and MACH_MX2[17] next.
-> > 
-> > A bit orthogonal to this issue is to clean up mach-mx3 and mach-mx5 to
-> > allow them to be merged into mach-imx. I didn't look at all on mxc91231,
-> > yet.
-> > 
-> > Comments and patches are welcome. If you want to help and don't know
-> > where to start, here are a few hints:
-> > 
-> >  - git grep -E 'M?AR?CH_MX' drivers
-> >  - convert arch/arm/mach-mx[35]/devices.c to dynamically allocation
-> > 
-> > Richard, having said that, some of your changes look OK, while I'm not
-> > completely happy with the others.
-> It seems only PHYS_OFFSET are not ok?
-and Makefile.boot
+Marc Zyngier (20):
+  ARM: architected timers: move local timer support to percpu_timer.c
+  ARM: omap2: remove stubbed twd_timer_setup call
+  ARM: exynos4: remove stubbed twd_timer_setup call
+  ARM: shmobile: remove stubbed twd_timer_setup call
+  ARM: tegra: remove stubbed twd_timer_setup call
+  ARM: ux500: remove stubbed twd_timer_setup call
+  ARM: versatile: remove stubbed twd_timer_setup call
+  ARM: remove unused twd_timer_setup stub
+  ARM: architected timers: add A15 architected timers
+  ARM: Platform dependent sched_clock() override
+  ARM: architected timers: Add A15 specific sched_clock implementation
+  ARM: versatile/vexpress: rework timer support
+  ARM: msm: dynamically register local timer setup function
+  ARM: omap4: dynamically register local timer setup function
+  ARM: exynos4: dynamically register local timer setup function
+  ARM: shmobile: dynamically register local timer setup function
+  ARM: tegra: dynamically register local timer setup function
+  ARM: ux500: dynamically register local timer setup function
+  ARM: simplify percpu_timer_setup
+  ARM: simplify percpu_timer_ack
 
->                                       Maybe the p2v patch can help?
-Indeed.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ arch/arm/Kconfig                                  |   20 ++-
+ arch/arm/include/asm/arch_timer.h                 |   13 +
+ arch/arm/include/asm/entry-macro-multi.S          |    2 +-
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |   18 ++
+ arch/arm/include/asm/localtimer.h                 |   61 +++--
+ arch/arm/include/asm/sched_clock.h                |   41 +++-
+ arch/arm/include/asm/smp.h                        |    7 +-
+ arch/arm/include/asm/smp_twd.h                    |   14 +-
+ arch/arm/kernel/Makefile                          |    2 +
+ arch/arm/kernel/arch_timer.c                      |  253 +++++++++++++++++++++
+ arch/arm/kernel/irq.c                             |    1 +
+ arch/arm/kernel/percpu_timer.c                    |  141 ++++++++++++
+ arch/arm/kernel/sched_clock.c                     |   23 ++-
+ arch/arm/kernel/smp.c                             |   92 +-------
+ arch/arm/kernel/smp_twd.c                         |   21 ++-
+ arch/arm/mach-exynos4/Makefile                    |    1 -
+ arch/arm/mach-exynos4/localtimer.c                |   26 --
+ arch/arm/mach-exynos4/time.c                      |   10 +
+ arch/arm/mach-msm/timer.c                         |   22 ++-
+ arch/arm/mach-omap2/Makefile                      |    1 -
+ arch/arm/mach-omap2/timer-gp.c                    |   12 +-
+ arch/arm/mach-omap2/timer-mpu.c                   |   39 ----
+ arch/arm/mach-realview/realview_eb.c              |    4 +-
+ arch/arm/mach-realview/realview_pb11mp.c          |    4 +-
+ arch/arm/mach-realview/realview_pbx.c             |    5 +-
+ arch/arm/mach-shmobile/Makefile                   |    1 -
+ arch/arm/mach-shmobile/localtimer.c               |   26 --
+ arch/arm/mach-shmobile/timer.c                    |   12 +
+ arch/arm/mach-tegra/Makefile                      |    2 +-
+ arch/arm/mach-tegra/localtimer.c                  |   26 --
+ arch/arm/mach-tegra/timer.c                       |   10 +
+ arch/arm/mach-ux500/Makefile                      |    1 -
+ arch/arm/mach-ux500/cpu.c                         |   12 +
+ arch/arm/mach-ux500/localtimer.c                  |   29 ---
+ arch/arm/mach-vexpress/v2m.c                      |   29 +++-
+ arch/arm/plat-versatile/include/plat/localtimer.h |    9 +
+ arch/arm/plat-versatile/localtimer.c              |   11 +-
+ arch/arm/plat-versatile/sched-clock.c             |    7 +-
+ 38 files changed, 711 insertions(+), 297 deletions(-)
+ create mode 100644 arch/arm/include/asm/arch_timer.h
+ create mode 100644 arch/arm/kernel/arch_timer.c
+ create mode 100644 arch/arm/kernel/percpu_timer.c
+ delete mode 100644 arch/arm/mach-exynos4/localtimer.c
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
+ delete mode 100644 arch/arm/mach-shmobile/localtimer.c
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
+ create mode 100644 arch/arm/plat-versatile/include/plat/localtimer.h
