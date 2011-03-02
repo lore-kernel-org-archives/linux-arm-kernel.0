@@ -1,126 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 2 Mar 2011 22:52:38 +0100
-Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
-References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
-Message-ID: <20110302215238.GK22310@pengutronix.de>
+From: x0095078@ti.com (Armando Uribe)
+Date: Wed,  2 Mar 2011 16:14:18 -0600
+Subject: [PATCHv2] omap:mailbox: resolve hang issue
+Message-ID: <1299104058-28565-1-git-send-email-x0095078@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 11:17:58AM -0600, Dinh.Nguyen at freescale.com wrote:
-> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> Adds initial low power suspend functionality to MX51.
-> Supports "mem" and "standby" modes.
-> 
-> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> ---
->  arch/arm/mach-mx5/Makefile           |    1 +
->  arch/arm/mach-mx5/pm.c               |   75 ++++++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/mxc.h |    1 +
->  3 files changed, 77 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mx5/pm.c
-> 
-> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-> index 4f63048..7f9435d 100644
-> --- a/arch/arm/mach-mx5/Makefile
-> +++ b/arch/arm/mach-mx5/Makefile
-> @@ -6,6 +6,7 @@
->  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o
->  obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
->  
-> +obj-$(CONFIG_PM) += pm.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
->  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
->  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-> diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
-> new file mode 100644
-> index 0000000..137d204
-> --- /dev/null
-> +++ b/arch/arm/mach-mx5/pm.c
-I'd like to have that called pm-imx51.c
+From: Hari Kanigeri <h-kanigeri2@ti.com>
 
-> @@ -0,0 +1,75 @@
-> +/*
-> + *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +#include <linux/suspend.h>
-> +#include <asm/mach/map.h>
-> +#include <mach/system.h>
-> +#include "crm_regs.h"
-> +
-> +static int mx5_suspend_enter(suspend_state_t state)
-> +{
-> +	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
-> +
-> +	/* always allow platform to issue a deep sleep mode request */
-> +	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
-> +	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
-> +	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-> +	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
-> +
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-> +		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-the parentheses aren't needed here
+omap4 interrupt disable bits is different. On rx kfifo full, the mbox rx
+interrupts wasn't getting disabled, and this is causing the rcm stress tests
+to hang.
 
-> +		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-> +		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-> +		break;
-> +	case PM_SUSPEND_STANDBY:
-> +		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-ditto
+Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+Signed-off-by: Armando Uribe <x0095078@ti.com>
+Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
+---
+ arch/arm/mach-omap2/mailbox.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
-> +		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-> +		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-> +		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-> +	arm_srpgcr |= MXC_SRPGCR_PCR;
-> +
-> +	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-> +	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-> +	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-> +	__raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
-> +
-> +	if (tzic_enable_wake(0) != 0)
-> +		return -EAGAIN;
-> +
-> +	cpu_do_idle();
-> +	return 0;
-> +}
-> +
-> +static int mx5_pm_valid(suspend_state_t state)
-> +{
-> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-> +}
-> +
-> +static const struct platform_suspend_ops mx5_suspend_ops = {
-> +	.valid = mx5_pm_valid,
-> +	.enter = mx5_suspend_enter,
-> +};
-> +
-> +static int __init mx5_pm_init(void)
-> +{
-> +	if (cpu_is_mx51())
-> +		suspend_set_ops(&mx5_suspend_ops);
-I'd prefer to have that called by imx51_init_early.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 394413d..011ca50 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -193,10 +193,12 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
+ 		omap_mbox_type_t irq)
+ {
+ 	struct omap_mbox2_priv *p = mbox->priv;
+-	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+-	l = mbox_read_reg(p->irqdisable);
+-	l &= ~bit;
+-	mbox_write_reg(l, p->irqdisable);
++	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
++
++	if (!cpu_is_omap44xx())
++		bit = mbox_read_reg(p->irqdisable) & ~bit;
++
++	mbox_write_reg(bit, p->irqdisable);
+ }
+ 
+ static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.0.4
