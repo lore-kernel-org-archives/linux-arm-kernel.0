@@ -1,39 +1,35 @@
 From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 02 Mar 2011 23:43:53 +0530
-Subject: [PATCH 4/8 resend] dw_dmac: calling dwc_scan_descriptors from
-	dwc_tx_status() after taking lock
-In-Reply-To: <725d9e629bce9f79d87bdab4596a5088b70ea416.1298889267.git.viresh.kumar@st.com>
+Date: Thu, 03 Mar 2011 00:04:15 +0530
+Subject: [PATCH 6/8 resend] dw_dmac: Mark all tx_descriptors with
+	DMA_CRTL_ACK after xfer finish
+In-Reply-To: <82027aa0c6446df3f7fb8e3c5fbdc28f60ea33b7.1298889267.git.viresh.kumar@st.com>
 References: <cover.1298889267.git.viresh.kumar@st.com>
-	<725d9e629bce9f79d87bdab4596a5088b70ea416.1298889267.git.viresh.kumar@st.com>
-Message-ID: <1299089633.6974.93.camel@vkoul-udesk3>
+	<82027aa0c6446df3f7fb8e3c5fbdc28f60ea33b7.1298889267.git.viresh.kumar@st.com>
+Message-ID: <1299090855.6974.94.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
+> dwc_desc_get checks all descriptors for DMA_CTRL_ACK before allocating them for
+> transfers. And descriptors are not marked with DMA_CRTL_ACK after transfer
+> finishes. Thus descriptor once used is not usable again. This patch marks
+> descriptors with DMA_CRTL_ACK after dma xfer finishes
+> 
 > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 > ---
->  drivers/dma/dw_dmac.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+>  drivers/dma/dw_dmac.c |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
 > 
 > diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index 3bf4772..5cc5abf 100644
+> index c40b89f..01f783d 100644
 > --- a/drivers/dma/dw_dmac.c
 > +++ b/drivers/dma/dw_dmac.c
-> @@ -830,7 +830,9 @@ dwc_tx_status(struct dma_chan *chan,
->  
->  	ret = dma_async_is_complete(cookie, last_complete, last_used);
->  	if (ret != DMA_SUCCESS) {
-> +		spin_lock_bh(&dwc->lock);
->  		dwc_scan_descriptors(to_dw_dma(chan->device), dwc);
-> +		spin_unlock_bh(&dwc->lock);
->  
->  		last_complete = dwc->completed;
->  		last_used = chan->cookie;
-
-Please always add a short description in the patch, helps in long run
-
-Shouldnt you be doing this for dwc_handle_error() as well? I see thats
-called without taking the lock....
+> @@ -196,6 +196,7 @@ dwc_descriptor_complete(struct dw_dma_chan *dwc, struct dw_desc *desc)
+>  	dma_async_tx_callback		callback;
+>  	void				*param;
+>  	struct dma_async_tx_descriptor	*txd = &desc->txd;
+> +	struct dw_desc	*child;
+Please align this with previous ones....
 
 -- 
 ~Vinod
