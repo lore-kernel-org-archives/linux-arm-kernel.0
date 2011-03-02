@@ -1,48 +1,115 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 2 Mar 2011 16:39:32 +0900
-Subject: [PATCH V4] ARM: EXYNOS4: Implement kernel timers using MCT
-In-Reply-To: <010b01cbd8ab$8d575830$a8060890$%kim@samsung.com>
-References: <1298870207-1850-1-git-send-email-kgene.kim@samsung.com>
-	<1298870207-1850-3-git-send-email-kgene.kim@samsung.com>
-	<AANLkTim9XMD=x5dbm0vOcrCcrL0TRKvdb7CuXBv3r_qX@mail.gmail.com>
-	<010b01cbd8ab$8d575830$a8060890$%kim@samsung.com>
-Message-ID: <AANLkTi=Fe14x9jCH0sLtDLF4rpPSVdhwVUNJ9fWwmRs=@mail.gmail.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Wed, 2 Mar 2011 13:10:58 +0530
+Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be configured
+	from board file
+In-Reply-To: <056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
+	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
+Message-ID: <AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2011 at 4:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kyungmin Park wrote:
+On Wed, Mar 2, 2011 at 12:46 AM, Sricharan R <r.sricharan@ti.com> wrote:
+> Hi,
+>>diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+>>index 755f4aa..530e9e3 100644
+>>--- a/arch/arm/mach-omap2/serial.c
+>>+++ b/arch/arm/mach-omap2/serial.c
+>>@@ -44,6 +44,15 @@
 >>
->> Hi,
+>> static int omap_uart_con_id __initdata = -1;
 >>
->> MCT is only possible from EVT1.0 or later. The current universal_c210
->> used the EVT0 version.
->> So can you remove the ifdef and board can select which timer is used?
->> Please refer the omap implementation and how to use it.
+>>+static struct omap_uart_port_info omap_serial_default_info[] = {
+>>+ ? ? ?{
+>>+ ? ? ? ? ? ? ?.dma_enabled ? ?= 0,
+>>+ ? ? ? ? ? ? ?.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
+>>+ ? ? ? ? ? ? ?.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+>>+ ? ? ? ? ? ? ?.idle_timeout ? = DEFAULT_IDLE_TIMEOUT,
+>>+ ? ? ?},
+>>+};
+>>+
+>> static int uart_idle_hwmod(struct omap_device *od)
+>> {
+>> ? ? ? omap_hwmod_idle(od->hwmods[0]);
+>>@@ -66,6 +75,54 @@ static struct omap_device_pm_latency
+> omap_uart_latency[]
+>>= {
+>> ? ? ? },
+>> };
 >>
-> Basically, "CONFIG_EXYNOS4_MCT" can be selected in kernel menuconfig.
-> It means default one is using local timer which is included in every
-> Exynos4210.
->
->> If we use the same configuration, It will be boot failed at
->> universal_c210 board.
->>
-> No, see as above.
->
-> One more basically, each machine specific CONFIGs should be selected in
-> kernel menuconfig after "make exynos4_defconfig". Because each machine
-> supports different components on each one now.
->
-> As a note, however, I don't want to add each machine's defconfig. Maybe
-> Russell also.
+>>+#ifdef CONFIG_OMAP_MUX
+>>+static struct omap_device_pad default_serial0_pads[] __initdata = {
+>>+ ? ? ?{
+>>+ ? ? ? ? ? ? ?.name ? = "uart1_rx.uart1_rx",
+>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>+ ? ? ?},
+>>+};
+>>+
+>>+static struct omap_device_pad default_serial1_pads[] __initdata = {
+>>+ ? ? ?{
+>>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
+>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>+ ? ? ?},
+>>+};
+>>+
+>>+static struct omap_device_pad default_serial2_pads[] __initdata = {
+>>+ ? ? ?{
+>>+ ? ? ? ? ? ? ?.name ? = "uart3_rx_irrx.uart3_rx_irrx",
+>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>+ ? ? ?},
+>>+};
+>>+
+>>+static struct omap_device_pad default_omap36xx_serial3_pads[] __initdata
+> =
+>>{
+>>+ ? ? ?{
+>>+ ? ? ? ? ? ? ?.name ? = "gpmc_wait3.uart4_rx",
+>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE2,
+>>+ ? ? ?},
+>>+};
+>>+
+>>+static struct omap_device_pad default_omap4_serial3_pads[] __initdata =
+> {
+>>+ ? ? ?{
+>>+ ? ? ? ? ? ? ?.name ? = "uart4_rx.uart4_rx",
+>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>+ ? ? ?},
+>>+};
+> Here only the UART RX pins are muxed, so what about the cts, rts, tx pins?
 
-I agree, but there are better way, make it compile both and select
-timer for each board.
-Of course no need to add any statement if default timer is used.
+The intention here is to enable wakeup capabilities for uart rx pad.
 
-BTW, What's the purpose of exynos4_defconfig? as you said, If I want
-to use the MCT for EVT1 board,
-then make defconfig and select it again? why do the these job?
+AFAIK most of the boards are currently dependent on bootloader for
+uart-muxing if any board is not dependent on bootloader then we
+can use omap_serial_init_port along with board_mux_info from board.
 
-Thank you,
-Kyungmin Park
+Prior to this change uart wakeup is based on rx_pad and we were populating
+offset and using omap_ctrl api's to read/write which is cleaned up now.
+Most of boards are dependent on uart-rx wakeup to avoid breaking any
+board support we
+are using omap_serial_init by filling default values, which provides
+us with same
+environment but with right approach towards handling mux data with a
+handshake with
+hwmod framework.
+
+So if any board needs specific mux they can go ahead and add required
+mux data in
+board file and use map_serial_init_port instead of current omap_serial_init.
+
+
+> Is it consistent that across all socs that only UART3 would have UART/IRDA
+> functions capability so that serial2 pads can always be called "rx_irxx"
+> ?.
+
+Yes from OMAP2420 to OMAP4430 uart3 can used as irda.
+
+--
+Thanks,
+Govindraj.R
