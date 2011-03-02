@@ -1,51 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  2 Mar 2011 16:53:26 +0000
-Subject: [RFC PATCH 20/20] ARM: simplify percpu_timer_ack
-In-Reply-To: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1299084806-16546-21-git-send-email-marc.zyngier@arm.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 02 Mar 2011 21:59:06 +0530
+Subject: [PATCH v5] dmaengine: mxs-dma: add dma support for i.MX23/28
+In-Reply-To: <1298738862-3623-1-git-send-email-shawn.guo@freescale.com>
+References: <1298738862-3623-1-git-send-email-shawn.guo@freescale.com>
+Message-ID: <1299083346.6974.80.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no provider of local_timer_ack anymore after the conversion
-of msm to the percpu_timer interface. Remove the weak local_timer_ack
-symbol and directly call percpu_timer_ack.
+On Sat, 2011-02-26 at 22:17 +0530, Shawn Guo wrote:
+> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
+> including apbh-dma and apbx-dma.
+> 
+> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
+>   instances.
+> 
+> * apbh-dma is different between mx23 and mx28, hardware version
+>   register is used to differentiate.
+> 
+> * mxs-dma supports pio function besides data transfer.  The driver
+>   uses dma_data_direction DMA_NONE to identify the pio mode, and
+>   steals sgl and sg_len to get pio words and numbers from clients.
+> 
+> * mxs dmaengine has some very specific features, like sense function
+>   and the special NAND support (nand_lock, nand_wait4ready).  These
+>   are too specific to implemented in generic dmaengine driver.
+> 
+> * The driver refers to imx-sdma and only a single descriptor is
+>   statically assigned to each channel.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> ---
+> Change since v4:
+> 
+> Fix checkpatch errors (sorry for forgetting this basical requirement)
+> 
+>  arch/arm/mach-mxs/include/mach/dma.h |   26 ++
+>  drivers/dma/Kconfig                  |    8 +
+>  drivers/dma/Makefile                 |    1 +
+>  drivers/dma/mxs-dma.c                |  724 ++++++++++++++++++++++++++++++++++
+>  4 files changed, 759 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
+>  create mode 100644 drivers/dma/mxs-dma.c
+Thanks, Applied to my tree at
+git://git.infradead.org/users/vkoul/slave-dma.git
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/percpu_timer.c |    8 +-------
- 1 files changed, 1 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/kernel/percpu_timer.c b/arch/arm/kernel/percpu_timer.c
-index 85af863..6e1942b 100644
---- a/arch/arm/kernel/percpu_timer.c
-+++ b/arch/arm/kernel/percpu_timer.c
-@@ -60,24 +60,18 @@ void percpu_timer_register(struct local_timer_ops *ops)
-  *
-  * If a local timer interrupt has occurred, acknowledge and return 1.
-  * Otherwise, return 0.
-- *
-- * This can be overloaded by platform code that doesn't provide its
-- * timer in timer_fns way (msm at the moment). Once all platforms have
-- * migrated, the weak alias can be removed.
-  */
- static int percpu_timer_ack(void)
- {
- 	return timer_ops->ack();
- }
- 
--int local_timer_ack(void) __attribute__ ((weak, alias("percpu_timer_ack")));
--
- asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
- {
- 	struct pt_regs *old_regs = set_irq_regs(regs);
- 	int cpu = smp_processor_id();
- 
--	if (local_timer_ack()) {
-+	if (percpu_timer_ack()) {
- 		__inc_irq_stat(cpu, local_timer_irqs);
- 		percpu_timer_run();
- 	}
--- 
-1.7.0.4
+~Vinod
