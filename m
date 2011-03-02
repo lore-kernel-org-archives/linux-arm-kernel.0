@@ -1,129 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  2 Mar 2011 18:23:05 +0100
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to CPU
-	family choice
-In-Reply-To: <20110302112559.GC22310@pengutronix.de>
-References: <20110302112559.GC22310@pengutronix.de>
-Message-ID: <1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 02 Mar 2011 18:34:46 +0100
+Subject: [PATCH/RFC 0/3] ARM: S5P: Add common DPHY control code for
+	MIPI-CSIS/MIPI-DSIM devices
+Message-ID: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only use of selecting MX2-based before was to get the choice to select
-between i.MX21 and i.MX27. So better provide this choice directly.
+Hello,
 
-Note that this has an influence on reduced i.MX21 configs because the
-former default "MACH_MX21" for the "CPUs" choice makes MACH_MX21 not
-appear in the reduced config and so the default for "Freescale CPU family:"
-(i.e. ARCH_MX3) is used now.  mx21_defconfig is adapted not to be affected
-by this problem.
+the following patch series adds a common platform code to enable control 
+of MIPI-CSI receiver's DPHY from within it's V4L2 subdev driver. The driver
+is supposed to support possibly all S5P SoCs variants and the PHY handling
+details need to be hidden in the platform code. The functionality behind
+"dphy_csis" clocks is not exact a functionality of the clock, but they have 
+common features. If the clock API rules are to strict to accept this kind 
+of usage then I'm willing to create some intermediate layer that will finally
+solve PHY handling for MIPI-CSI, MIPI-DSIM, USB, SATA.. devices, without issues
+on a common kernel binary for multiple boards.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/configs/mx21_defconfig |    2 +-
- arch/arm/configs/mx27_defconfig |    1 -
- arch/arm/mach-imx/Kconfig       |   20 --------------------
- arch/arm/plat-mxc/Kconfig       |   19 ++++++++++++++++---
- 4 files changed, 17 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/configs/mx21_defconfig b/arch/arm/configs/mx21_defconfig
-index a5a71c2..761fea6 100644
---- a/arch/arm/configs/mx21_defconfig
-+++ b/arch/arm/configs/mx21_defconfig
-@@ -12,7 +12,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_MXC=y
--CONFIG_ARCH_MX2=y
-+CONFIG_MACH_MX21=y
- CONFIG_MACH_MX21ADS=y
- CONFIG_MXC_PWM=y
- CONFIG_NO_HZ=y
-diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
-index 3817c60..098d77d 100644
---- a/arch/arm/configs/mx27_defconfig
-+++ b/arch/arm/configs/mx27_defconfig
-@@ -17,7 +17,6 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_MXC=y
--CONFIG_ARCH_MX2=y
- CONFIG_MACH_MX27=y
- CONFIG_MACH_MX27ADS=y
- CONFIG_MACH_PCM038=y
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index c172418..c94cbad 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -53,26 +53,6 @@ config MACH_SCB9328
- 
- endif
- 
--if ARCH_MX2
--
--choice
--	prompt "CPUs:"
--	default MACH_MX21
--
--config MACH_MX21
--	bool "i.MX21 support"
--	help
--	  This enables support for Freescale's MX2 based i.MX21 processor.
--
--config MACH_MX27
--	bool "i.MX27 support"
--	help
--	  This enables support for Freescale's MX2 based i.MX27 processor.
--
--endchoice
--
--endif
--
- if MACH_MX21
- 
- comment "MX21 platforms:"
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 389f217..03a9a9e 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -2,6 +2,10 @@ if ARCH_MXC
- 
- source "arch/arm/plat-mxc/devices/Kconfig"
- 
-+config ARCH_MX2
-+	# don't use this in new code
-+	bool
-+
- menu "Freescale MXC Implementations"
- 
- choice
-@@ -14,16 +18,25 @@ config ARCH_MX1
- 	help
- 	  This enables support for systems based on the Freescale i.MX1 family
- 
--config ARCH_MX2
--	bool "MX2-based"
-+config MACH_MX21
-+	bool "MX21-based"
-+	select ARCH_MX2
- 	help
--	  This enables support for systems based on the Freescale i.MX2 family
-+	  This enables support for systems based on the Freescale i.MX21 family
- 
- config ARCH_MX25
- 	bool "MX25-based"
-+	# note that i.MX25 doesn't match the expectations that are currently
-+	# called ARCH_MX2
- 	help
- 	  This enables support for systems based on the Freescale i.MX25 family
- 
-+config MACH_MX27
-+	bool "MX27-based"
-+	select ARCH_MX2
-+	help
-+	  This enables support for Freescale's MX2 based i.MX27 processor.
-+
- config ARCH_MX3
- 	bool "MX3-based"
- 	select CPU_V6
--- 
-1.7.2.3
+The patch series contains:
+[PATCH 1/3] ARM: S5P: Rename MIPI-CSIS header and update Copyright
+[PATCH 2/3] ARM: S5PV210: Add clock entries for MIPI DPHY control
+[PATCH 3/3] ARM: EXYNOS4: Add clock entries for MIPI DPHY control
+
+Rebased onto kgene-for-next branch at:
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+
+
+Regards,
+--
+Sylwester Nawrocki
+Samsung Poland R&D Center
