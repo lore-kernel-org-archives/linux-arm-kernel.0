@@ -1,29 +1,31 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 02 Mar 2011 15:58:14 -0500 (EST)
-Subject: [patch 1/1] t5325: add audio support
-In-Reply-To: <87tyflw98o.fsf@lebrac.rtp-net.org>
-References: <20110118072802.620728772@rtp-net.org>
-	<87tyflw98o.fsf@lebrac.rtp-net.org>
-Message-ID: <alpine.LFD.2.00.1103021556350.16531@xanadu.home>
+From: carlv@codeaurora.org (Carl Vanderlip)
+Date: Wed,  2 Mar 2011 13:15:42 -0800
+Subject: [PATCH 0/4] Initial patches for MSM display update
+Message-ID: <1299100542-11120-1-git-send-email-carlv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Mar 2011, Arnaud Patard wrote:
+These are the first series of a set of patches to update the MSM display
+drivers to support newer MDP versions and display modes (while also providing
+a base for future display development). The original source for these patches
+is the Google Android kernel tree located here:
+http://android.git.kernel.org/kernel/msm.git
 
-> Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
-> 
-> Hi,
-> 
-> > This patch declares the i2c audio codec and initialise audio.
-> > It's adding the alc5621 codec in the i2c board info and is calling
-> > kirkwood_audio_init() to initialize kirkwood audio.
-> 
-> Please, can someone tell me what's wrong in this patch ? I'd like to see
-> this patch merged so if something needs to be fixed, please tell it to
-> me.
+Arve Hj?nnev?g (1):
+  [ARM] msm_fb: Fix framebuffer console
 
-I don't know.  Could you make sure it still applies to the latest tree 
-and repost it?
+Dima Zavin (3):
+  video: msmfb: Put the partial update magic value into the fix_screen
+    struct.
+  [ARM] msm: mdp: Add support for RGBX 8888 image format.
+  [ARM] msm: mdp: Set the correct pack pattern for XRGB/ARGB
 
+ drivers/video/msm/mdp_hw.h  |   11 +++++++++--
+ drivers/video/msm/mdp_ppp.c |    1 +
+ drivers/video/msm/msm_fb.c  |   16 ++++++++++++++--
+ include/linux/msm_mdp.h     |    1 +
+ 4 files changed, 25 insertions(+), 4 deletions(-)
 
-Nicolas
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
