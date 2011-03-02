@@ -1,53 +1,161 @@
-From: Tero.Kristo@nokia.com (Tero.Kristo at nokia.com)
-Date: Wed, 2 Mar 2011 08:18:29 +0000
-Subject: [PATCH 0/2] OMAP3: cpuidle: prevent CORE pwrdm from entering
-	low-power state when DSS active
-In-Reply-To: <20110301220833.32613.54669.stgit@twilight.localdomain>
-References: <20110301220833.32613.54669.stgit@twilight.localdomain>
-Message-ID: <854C6400F5AA6644BA6FE7953F3E769B0380D180@008-AM1MPN1-013.mgdnok.nokia.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 2 Mar 2011 13:49:41 +0530
+Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be configured
+	from board file
+In-Reply-To: <AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
+	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
+	<AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
+Message-ID: <8ab9882cd92792e9bf2b836c0ec9c7fe@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
+Hi,
 >-----Original Message-----
->From: ext Paul Walmsley [mailto:paul at pwsan.com]
->Sent: 02 March, 2011 00:49
->To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->Kristo Tero (Nokia-MS/Tampere)
->Subject: [PATCH 0/2] OMAP3: cpuidle: prevent CORE pwrdm from entering
->low-power state when DSS active
+>From: Govindraj [mailto:govindraj.ti at gmail.com]
+>Sent: Wednesday, March 02, 2011 1:11 PM
+>To: Sricharan R
+>Cc: Govindraj.R; linux-omap at vger.kernel.org;
+linux-serial at vger.kernel.org;
+>linux-arm-kernel at lists.infradead.org; Jon Hunter; Tony Lindgren; Benoit
+>Cousson; Kevin Hilman; Paul Walmsley; Rajendra Nayak; Deepak Kattungal
+>Subject: Re: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
+>configured from board file
 >
->This series prevents the OMAP3 CPUIdle code from programming the CORE
->powerdomain to enter any power state lower than ON when the DSS power
->domain
->is ON.  (The assumption is that in this case, the DSS is active, DMA'ing
->lines from RAM and displaying them somewhere.)
+>On Wed, Mar 2, 2011 at 12:46 AM, Sricharan R <r.sricharan@ti.com> wrote:
+>> Hi,
+>>>diff --git a/arch/arm/mach-omap2/serial.c
+b/arch/arm/mach-omap2/serial.c
+>>>index 755f4aa..530e9e3 100644
+>>>--- a/arch/arm/mach-omap2/serial.c
+>>>+++ b/arch/arm/mach-omap2/serial.c
+>>>@@ -44,6 +44,15 @@
+>>>
+>>> static int omap_uart_con_id __initdata = -1;
+>>>
+>>>+static struct omap_uart_port_info omap_serial_default_info[] = {
+>>>+ ? ? ?{
+>>>+ ? ? ? ? ? ? ?.dma_enabled ? ?= 0,
+>>>+ ? ? ? ? ? ? ?.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
+>>>+ ? ? ? ? ? ? ?.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+>>>+ ? ? ? ? ? ? ?.idle_timeout ? = DEFAULT_IDLE_TIMEOUT,
+>>>+ ? ? ?},
+>>>+};
+>>>+
+>>> static int uart_idle_hwmod(struct omap_device *od)
+>>> {
+>>> ? ? ? omap_hwmod_idle(od->hwmods[0]);
+>>>@@ -66,6 +75,54 @@ static struct omap_device_pm_latency
+>> omap_uart_latency[]
+>>>= {
+>>> ? ? ? },
+>>> };
+>>>
+>>>+#ifdef CONFIG_OMAP_MUX
+>>>+static struct omap_device_pad default_serial0_pads[] __initdata = {
+>>>+ ? ? ?{
+>>>+ ? ? ? ? ? ? ?.name ? = "uart1_rx.uart1_rx",
+>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+OMAP_DEVICE_PAD_WAKEUP,
+>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>+ ? ? ?},
+>>>+};
+>>>+
+>>>+static struct omap_device_pad default_serial1_pads[] __initdata = {
+>>>+ ? ? ?{
+>>>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
+>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+OMAP_DEVICE_PAD_WAKEUP,
+>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>+ ? ? ?},
+>>>+};
+>>>+
+>>>+static struct omap_device_pad default_serial2_pads[] __initdata = {
+>>>+ ? ? ?{
+>>>+ ? ? ? ? ? ? ?.name ? = "uart3_rx_irrx.uart3_rx_irrx",
+>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+OMAP_DEVICE_PAD_WAKEUP,
+>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>+ ? ? ?},
+>>>+};
+>>>+
+>>>+static struct omap_device_pad default_omap36xx_serial3_pads[]
+__initdata
+>> =
+>>>{
+>>>+ ? ? ?{
+>>>+ ? ? ? ? ? ? ?.name ? = "gpmc_wait3.uart4_rx",
+>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+OMAP_DEVICE_PAD_WAKEUP,
+>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE2,
+>>>+ ? ? ?},
+>>>+};
+>>>+
+>>>+static struct omap_device_pad default_omap4_serial3_pads[] __initdata
+=
+>> {
+>>>+ ? ? ?{
+>>>+ ? ? ? ? ? ? ?.name ? = "uart4_rx.uart4_rx",
+>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+OMAP_DEVICE_PAD_WAKEUP,
+>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>+ ? ? ?},
+>>>+};
+>> Here only the UART RX pins are muxed, so what about the cts, rts, tx
+>pins?
 >
->Tero, please don't hesitate to comment on the patch from you if I got
->the
->commit message wrong.
+>The intention here is to enable wakeup capabilities for uart rx pad.
+>
+>AFAIK most of the boards are currently dependent on bootloader for
+>uart-muxing if any board is not dependent on bootloader then we
+>can use omap_serial_init_port along with board_mux_info from board.
+>
+Yes. The idea is to be independent of the bootloaders for mux settings.
 
-Hi Paul,
+>Prior to this change uart wakeup is based on rx_pad and we were
+populating
+>offset and using omap_ctrl api's to read/write which is cleaned up now.
+>Most of boards are dependent on uart-rx wakeup to avoid breaking any
+>board support we
+>are using omap_serial_init by filling default values, which provides
+>us with same
+>environment but with right approach towards handling mux data with a
+>handshake with
+>hwmod framework.
+>
+Now, in this change only the RX pin is configured. So if some board uses
+omap_serial_init then only the RX is going to be configured.
+How will they configure the rest of the pins?
+They cannot call omap_serial_init_port after this just to configure the
+rest of the mux pins( cts, rts, tx).
 
-It looks good to me.
+So data which is passed from omap_serial_init should have the
+configuration
+for all the pins, and this default data should be consistent across
+atleast
+some boards, so that they can use this. This will reduce the data
+duplication across board files.
 
+If this is not true, then all the pads can be configured from the board
+files itself using omap_serial_init_port and you can set the required
+RX wakeup capability there as well.
 
+>So if any board needs specific mux they can go ahead and add required
+>mux data in
+>board file and use map_serial_init_port instead of current
+>omap_serial_init.
 >
 >
->- Paul
+>> Is it consistent that across all socs that only UART3 would have
+>UART/IRDA
+>> functions capability so that serial2 pads can always be called
+"rx_irxx"
+>> ?.
 >
->---
+>Yes from OMAP2420 to OMAP4430 uart3 can used as irda.
 >
->Tero Kristo (1):
->      OMAP3: cpuidle: prevent CORE power domain from going to RET or OFF
->when DSS is on
->
->Paul Walmsley (1):
->      OMAP3: cpuidle: add more details to the DSS-related CORE power
->domain state restriction
->
->
-> arch/arm/mach-omap2/cpuidle34xx.c |   36
->++++++++++++++++++++++++++++++++++--
-> 1 files changed, 34 insertions(+), 2 deletions(-)
+Ok.
+>--
+>Thanks,
+>Govindraj.R
