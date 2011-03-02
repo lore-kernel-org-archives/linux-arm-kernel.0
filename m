@@ -1,47 +1,32 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 02 Mar 2011 21:59:06 +0530
-Subject: [PATCH v5] dmaengine: mxs-dma: add dma support for i.MX23/28
-In-Reply-To: <1298738862-3623-1-git-send-email-shawn.guo@freescale.com>
-References: <1298738862-3623-1-git-send-email-shawn.guo@freescale.com>
-Message-ID: <1299083346.6974.80.camel@vkoul-udesk3>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 02 Mar 2011 22:30:54 +0530
+Subject: [PATCH v2 15/18] omap3+: sr: disable spamming interrupts
+In-Reply-To: <4D6E49E9.1020307@ru.mvista.com>
+References: <1299063331-27968-1-git-send-email-nm@ti.com>
+	<1299063331-27968-16-git-send-email-nm@ti.com>
+	<4D6E49E9.1020307@ru.mvista.com>
+Message-ID: <4D6E77C6.209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-02-26 at 22:17 +0530, Shawn Guo wrote:
-> This patch adds dma support for Freescale MXS-based SoC i.MX23/28,
-> including apbh-dma and apbx-dma.
-> 
-> * apbh-dma and apbx-dma are supported in the driver as two mxs-dma
->   instances.
-> 
-> * apbh-dma is different between mx23 and mx28, hardware version
->   register is used to differentiate.
-> 
-> * mxs-dma supports pio function besides data transfer.  The driver
->   uses dma_data_direction DMA_NONE to identify the pio mode, and
->   steals sgl and sg_len to get pio words and numbers from clients.
-> 
-> * mxs dmaengine has some very specific features, like sense function
->   and the special NAND support (nand_lock, nand_wait4ready).  These
->   are too specific to implemented in generic dmaengine driver.
-> 
-> * The driver refers to imx-sdma and only a single descriptor is
->   statically assigned to each channel.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
-> ---
-> Change since v4:
-> 
-> Fix checkpatch errors (sorry for forgetting this basical requirement)
-> 
->  arch/arm/mach-mxs/include/mach/dma.h |   26 ++
->  drivers/dma/Kconfig                  |    8 +
->  drivers/dma/Makefile                 |    1 +
->  drivers/dma/mxs-dma.c                |  724 ++++++++++++++++++++++++++++++++++
->  4 files changed, 759 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/dma.h
->  create mode 100644 drivers/dma/mxs-dma.c
-Thanks, Applied to my tree at
-git://git.infradead.org/users/vkoul/slave-dma.git
+Sergei Shtylyov wrote, on 03/02/2011 07:15 PM:
+[...]
+>> diff --git a/arch/arm/mach-omap2/smartreflex.c
+>> b/arch/arm/mach-omap2/smartreflex.c
+>> index 49a04ea..d62da3d 100644
+>> --- a/arch/arm/mach-omap2/smartreflex.c
+>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>> @@ -209,8 +209,16 @@ static irqreturn_t sr_interrupt(int irq, void *data)
+>> value = irqstat_to_notifier_v2(status);
+>> }
+>>
+>> - if (sr_class->notify)
+>> - sr_class->notify(sr_info->voltdm, value);
+>> + /* Attempt some resemblence of recovery! */
+>
+> Resemblance?
+arrgh.. thanks for catching :)
 
-~Vinod
+-- 
+Regards,
+Nishanth Menon
