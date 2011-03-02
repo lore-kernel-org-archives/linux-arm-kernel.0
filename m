@@ -1,127 +1,129 @@
-From: Dinh.Nguyen@freescale.com (Dinh.Nguyen at freescale.com)
-Date: Wed, 2 Mar 2011 11:17:58 -0600
-Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
-Message-ID: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  2 Mar 2011 18:23:05 +0100
+Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to CPU
+	family choice
+In-Reply-To: <20110302112559.GC22310@pengutronix.de>
+References: <20110302112559.GC22310@pengutronix.de>
+Message-ID: <1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+The only use of selecting MX2-based before was to get the choice to select
+between i.MX21 and i.MX27. So better provide this choice directly.
 
-Adds initial low power suspend functionality to MX51.
-Supports "mem" and "standby" modes.
+Note that this has an influence on reduced i.MX21 configs because the
+former default "MACH_MX21" for the "CPUs" choice makes MACH_MX21 not
+appear in the reduced config and so the default for "Freescale CPU family:"
+(i.e. ARCH_MX3) is used now.  mx21_defconfig is adapted not to be affected
+by this problem.
 
-Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-mx5/Makefile           |    1 +
- arch/arm/mach-mx5/pm.c               |   75 ++++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mxc.h |    1 +
- 3 files changed, 77 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mx5/pm.c
+ arch/arm/configs/mx21_defconfig |    2 +-
+ arch/arm/configs/mx27_defconfig |    1 -
+ arch/arm/mach-imx/Kconfig       |   20 --------------------
+ arch/arm/plat-mxc/Kconfig       |   19 ++++++++++++++++---
+ 4 files changed, 17 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 4f63048..7f9435d 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -6,6 +6,7 @@
- obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o
- obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
+diff --git a/arch/arm/configs/mx21_defconfig b/arch/arm/configs/mx21_defconfig
+index a5a71c2..761fea6 100644
+--- a/arch/arm/configs/mx21_defconfig
++++ b/arch/arm/configs/mx21_defconfig
+@@ -12,7 +12,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_MXC=y
+-CONFIG_ARCH_MX2=y
++CONFIG_MACH_MX21=y
+ CONFIG_MACH_MX21ADS=y
+ CONFIG_MXC_PWM=y
+ CONFIG_NO_HZ=y
+diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
+index 3817c60..098d77d 100644
+--- a/arch/arm/configs/mx27_defconfig
++++ b/arch/arm/configs/mx27_defconfig
+@@ -17,7 +17,6 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_MXC=y
+-CONFIG_ARCH_MX2=y
+ CONFIG_MACH_MX27=y
+ CONFIG_MACH_MX27ADS=y
+ CONFIG_MACH_PCM038=y
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index c172418..c94cbad 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -53,26 +53,6 @@ config MACH_SCB9328
  
-+obj-$(CONFIG_PM) += pm.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
- obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
-diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
-new file mode 100644
-index 0000000..137d204
---- /dev/null
-+++ b/arch/arm/mach-mx5/pm.c
-@@ -0,0 +1,75 @@
-+/*
-+ *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include <linux/suspend.h>
-+#include <asm/mach/map.h>
-+#include <mach/system.h>
-+#include "crm_regs.h"
-+
-+static int mx5_suspend_enter(suspend_state_t state)
-+{
-+	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
-+
-+	/* always allow platform to issue a deep sleep mode request */
-+	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
-+	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
-+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
-+	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
-+
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
-+		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
-+		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
-+		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
-+		break;
-+	case PM_SUSPEND_STANDBY:
-+		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
-+		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
-+		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
-+		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
-+	arm_srpgcr |= MXC_SRPGCR_PCR;
-+
-+	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
-+	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
-+	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
-+	__raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
-+
-+	if (tzic_enable_wake(0) != 0)
-+		return -EAGAIN;
-+
-+	cpu_do_idle();
-+	return 0;
-+}
-+
-+static int mx5_pm_valid(suspend_state_t state)
-+{
-+	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
-+}
-+
-+static const struct platform_suspend_ops mx5_suspend_ops = {
-+	.valid = mx5_pm_valid,
-+	.enter = mx5_suspend_enter,
-+};
-+
-+static int __init mx5_pm_init(void)
-+{
-+	if (cpu_is_mx51())
-+		suspend_set_ops(&mx5_suspend_ops);
-+
-+	return 0;
-+}
-+device_initcall(mx5_pm_init);
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index 04c7a26..a72839f 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -53,6 +53,7 @@
+ endif
  
- #ifndef __ASSEMBLY__
- extern unsigned int __mxc_cpu_type;
-+int tzic_enable_wake(int is_idle);
- #endif
+-if ARCH_MX2
+-
+-choice
+-	prompt "CPUs:"
+-	default MACH_MX21
+-
+-config MACH_MX21
+-	bool "i.MX21 support"
+-	help
+-	  This enables support for Freescale's MX2 based i.MX21 processor.
+-
+-config MACH_MX27
+-	bool "i.MX27 support"
+-	help
+-	  This enables support for Freescale's MX2 based i.MX27 processor.
+-
+-endchoice
+-
+-endif
+-
+ if MACH_MX21
  
- #ifdef CONFIG_ARCH_MX1
+ comment "MX21 platforms:"
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index 389f217..03a9a9e 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -2,6 +2,10 @@ if ARCH_MXC
+ 
+ source "arch/arm/plat-mxc/devices/Kconfig"
+ 
++config ARCH_MX2
++	# don't use this in new code
++	bool
++
+ menu "Freescale MXC Implementations"
+ 
+ choice
+@@ -14,16 +18,25 @@ config ARCH_MX1
+ 	help
+ 	  This enables support for systems based on the Freescale i.MX1 family
+ 
+-config ARCH_MX2
+-	bool "MX2-based"
++config MACH_MX21
++	bool "MX21-based"
++	select ARCH_MX2
+ 	help
+-	  This enables support for systems based on the Freescale i.MX2 family
++	  This enables support for systems based on the Freescale i.MX21 family
+ 
+ config ARCH_MX25
+ 	bool "MX25-based"
++	# note that i.MX25 doesn't match the expectations that are currently
++	# called ARCH_MX2
+ 	help
+ 	  This enables support for systems based on the Freescale i.MX25 family
+ 
++config MACH_MX27
++	bool "MX27-based"
++	select ARCH_MX2
++	help
++	  This enables support for Freescale's MX2 based i.MX27 processor.
++
+ config ARCH_MX3
+ 	bool "MX3-based"
+ 	select CPU_V6
 -- 
-1.6.0.4
+1.7.2.3
