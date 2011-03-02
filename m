@@ -1,47 +1,39 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Wed, 2 Mar 2011 16:54:00 +0800
-Subject: [PATCH 1/5] ARM: mx35_3ds: Add I2C support
-In-Reply-To: <20110302083736.GR29521@pengutronix.de>
-References: <1299009588-8783-1-git-send-email-fabio.estevam@freescale.com>
-	<20110301201703.GX22310@pengutronix.de>
-	<AANLkTi=c_vWNqBbqPzRpCzWD-s5PFvLmD8ROr=Jss1hA@mail.gmail.com>
-	<20110302083736.GR29521@pengutronix.de>
-Message-ID: <AANLkTi=Oogbyp4gsm5=uyK6gNDFJYiVg+ih1tXVoPBB4@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Mar 2011 08:53:56 +0000
+Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+	<1298900022-21516-7-git-send-email-will.deacon@arm.com>
+	<20110228140327.GA1937@n2100.arm.linux.org.uk>
+	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
+	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
+	<20110228214445.GD1937@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
+	<20110301201904.GA27107@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+Message-ID: <20110302085356.GB4493@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sascha,
+On Tue, Mar 01, 2011 at 10:29:37PM +0100, Thomas Gleixner wrote:
+> Errm. I did never say that we disable the parent interrupt by any
+> means except when the chained handler explicitely wants to do that,
+> which is pretty much pointlesss nowadays, as we run all interrupt
+> handlers with interrupts disabled.
 
-2011/3/2 Sascha Hauer <s.hauer@pengutronix.de>:
-> On Wed, Mar 02, 2011 at 03:14:30PM +0800, Jason Liu wrote:
->> Hi, Uwe,
->>
->> 2011/3/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
->> > Hello,
->> >
->> > On Tue, Mar 01, 2011 at 04:59:44PM -0300, Fabio Estevam wrote:
->> >> + ? ? imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
->> > I'd slightly prefer using
->> >
->> > ? ? ? ?imx35_add_imx_i2c(0, ...)
->> >
->> > because I intend to remove the imx35_add_imx_i2c0-like macros soon. ?But
->>
->> Could you please explain why you intend to remove
->> imx35_add_imx_i2c0-like macros?
->> What you would like to do instead? Thanks,
->
-> These just produce additional macros without value.
+And that's now why some platforms struggle to work, and we're having
+to bodge around this - like the ARM platforms with MMC support.  Like
+some other platforms where having IRQs disabled during IDE prevents
+interrupts being recevied for long periods of time (longer than the
+100Hz tick period).
 
-Get it. Thanks,
+I *violently* disagree with the direction that genirq is heading.  It's
+*actively* breaking stuff.  What's really annoying is that problems like
+the above I did point out, but you seem happy to completely ignore them.
+The result is that more and more ARM platforms *are* becoming utterly
+useless, or requiring additional complexity being shoved into subsystems
+to cope with this crap.
 
->
-> Sascha
->
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
+What we need is a *decent* IRQ support system.  Not something created out
+of religious arguments which is what we have now.
