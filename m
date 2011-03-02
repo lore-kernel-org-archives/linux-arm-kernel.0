@@ -1,372 +1,126 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 Mar 2011 13:47:00 -0800
-Subject: [PATCH 01/17] omap4: pm: Add omap WakeupGen module support
-In-Reply-To: <1298112158-28469-2-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Sat, 19 Feb 2011 16:12:22 +0530")
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-	<1298112158-28469-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87hbbl8aaz.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 2 Mar 2011 22:52:38 +0100
+Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
+In-Reply-To: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+Message-ID: <20110302215238.GK22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-
-> This patch adds OMAP WakeupGen support. The WakeupGen unit is responsible
-> for generating wakeup event from the incoming interrupts and enable bits.
-> The WakeupGen is implemented in MPU Always-On power domain. During normal
-> operation, WakeupGen delivers external interrupts directly to the GIC.
-> When the CPUx asserts StandbyWFI, indicating it wants to enter lowpower
-> state, the Standby Controller checks with the WakeupGen unit using the
-> idlereq/idleack handshake to make sure there is no incoming interrupts.
-> The GIC and WakeupGen needs to be kept in synchronisation for proper
-> interrupt functioning.
->
-> Hence this patch hooks up the omap WakeupGen mask/unmask along with GIC using
-> architecture specific hooks.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-
-A few comments below...
-
+On Wed, Mar 02, 2011 at 11:17:58AM -0600, Dinh.Nguyen at freescale.com wrote:
+> From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> 
+> Adds initial low power suspend functionality to MX51.
+> Supports "mem" and "standby" modes.
+> 
+> Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
 > ---
->  arch/arm/mach-omap2/Makefile                      |    3 +-
->  arch/arm/mach-omap2/include/mach/omap-wakeupgen.h |   40 ++++
->  arch/arm/mach-omap2/omap-wakeupgen.c              |  213 +++++++++++++++++++++
->  arch/arm/mach-omap2/omap4-common.c                |    3 +
->  4 files changed, 258 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
->  create mode 100644 arch/arm/mach-omap2/omap-wakeupgen.c
->
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 72f2891..54ff219 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -24,7 +24,8 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
->  obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
->  obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
->  obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
-> -obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
-> +obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o \
-> +					   omap-wakeupgen.o
+>  arch/arm/mach-mx5/Makefile           |    1 +
+>  arch/arm/mach-mx5/pm.c               |   75 ++++++++++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/mxc.h |    1 +
+>  3 files changed, 77 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mx5/pm.c
+> 
+> diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
+> index 4f63048..7f9435d 100644
+> --- a/arch/arm/mach-mx5/Makefile
+> +++ b/arch/arm/mach-mx5/Makefile
+> @@ -6,6 +6,7 @@
+>  obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o
+>  obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
 >  
->  plus_sec := $(call as-instr,.arch_extension sec,+sec)
->  AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
-> diff --git a/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h b/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
+> +obj-$(CONFIG_PM) += pm.o
+>  obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
+>  obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
+>  obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
+> diff --git a/arch/arm/mach-mx5/pm.c b/arch/arm/mach-mx5/pm.c
 > new file mode 100644
-> index 0000000..f10d106
+> index 0000000..137d204
 > --- /dev/null
-> +++ b/arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
-> @@ -0,0 +1,40 @@
+> +++ b/arch/arm/mach-mx5/pm.c
+I'd like to have that called pm-imx51.c
+
+> @@ -0,0 +1,75 @@
 > +/*
-> + * OMAP WakeupGen header file
+> + *  Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
 > + *
-> + * Copyright (C) 2011 Texas Instruments, Inc.
-> + * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
 > + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
 > + */
-> +#ifndef OMAP_ARCH_WAKEUPGEN_H
-> +#define OMAP_ARCH_WAKEUPGEN_H
+> +#include <linux/suspend.h>
+> +#include <asm/mach/map.h>
+> +#include <mach/system.h>
+> +#include "crm_regs.h"
 > +
-> +#define OMAP_WKG_CONTROL_0			0x00
-> +#define OMAP_WKG_ENB_A_0			0x10
-> +#define OMAP_WKG_ENB_B_0			0x14
-> +#define OMAP_WKG_ENB_C_0			0x18
-> +#define OMAP_WKG_ENB_D_0			0x1c
-> +#define OMAP_WKG_ENB_SECURE_A_0			0x20
-> +#define OMAP_WKG_ENB_SECURE_B_0			0x24
-> +#define OMAP_WKG_ENB_SECURE_C_0			0x28
-> +#define OMAP_WKG_ENB_SECURE_D_0			0x2c
-> +#define OMAP_WKG_ENB_A_1			0x410
-> +#define OMAP_WKG_ENB_B_1			0x414
-> +#define OMAP_WKG_ENB_C_1			0x418
-> +#define OMAP_WKG_ENB_D_1			0x41c
-> +#define OMAP_WKG_ENB_SECURE_A_1			0x420
-> +#define OMAP_WKG_ENB_SECURE_B_1			0x424
-> +#define OMAP_WKG_ENB_SECURE_C_1			0x428
-> +#define OMAP_WKG_ENB_SECURE_D_1			0x42c
-> +#define OMAP_AUX_CORE_BOOT_0			0x800
-> +#define OMAP_AUX_CORE_BOOT_1			0x804
-> +#define OMAP_PTMSYNCREQ_MASK			0xc00
-> +#define OMAP_PTMSYNCREQ_EN			0xc04
-> +#define OMAP_TIMESTAMPCYCLELO			0xc08
-> +#define OMAP_TIMESTAMPCYCLEHI			0xc0c
-> +
-> +extern int __init omap_wakeupgen_init(void);
-> +extern void omap_wakeupgen_irqmask_all(unsigned int cpu, unsigned int set);
-> +#endif
-> diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-> new file mode 100644
-> index 0000000..e26a0ed
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-> @@ -0,0 +1,213 @@
-> +/*
-> + * OMAP WakeupGen Source file
-> + *
-> + * The WakeupGen unit is responsible for generating wakeup event from the
-> + * incoming interrupts and enable bits. The WakeupGen is implemented in MPU
-> + * always-On power domain. The WakeupGen consists of two sub-units, one for
-> + * each CPU and manages only SPI interrupts. Hardware requirements is that
-> + * the GIC and WakeupGen should be kept in sync for proper operation.
-> + *
-> + * Copyright (C) 2011 Texas Instruments, Inc.
-> + * Written by Santosh Shilimkar <santosh.shilimkar@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <asm/hardware/gic.h>
-> +
-> +#include <mach/omap-wakeupgen.h>
-> +
-> +#define NR_BANKS		4
-> +#define MAX_IRQS		128
-> +#define WKG_MASK_ALL		0x00000000
-> +#define WKG_UNMASK_ALL		0xffffffff
-> +#define CPU_ENA_OFFSET		0x400
-> +#define CPU0_ID			0x0
-> +#define CPU1_ID			0x1
-> +
-> +/* WakeupGen Base addres */
-> +static void __iomem *wakeupgen_base;
-> +static DEFINE_PER_CPU(u32 [NR_BANKS], irqmasks);
-> +static DEFINE_SPINLOCK(wakeupgen_lock);
-> +
-> +/*
-> + * Static helper functions
-> + */
-> +
-> +static inline u32 cpu_readl(u8 idx, u32 cpu)
-
-Minor nit: the cpu_ prefix is too generic, how about wakeupgen_ or wugen_?
-
+> +static int mx5_suspend_enter(suspend_state_t state)
 > +{
-> +	return __raw_readl(wakeupgen_base + OMAP_WKG_ENB_A_0 +
-> +				(cpu * CPU_ENA_OFFSET) + (idx * 4));
-> +}
+> +	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
 > +
-> +static inline void cpu_writel(u32 val, u8 idx, u32 cpu)
-> +{
-> +	__raw_writel(val, wakeupgen_base + OMAP_WKG_ENB_A_0 +
-> +				(cpu * CPU_ENA_OFFSET) + (idx * 4));
-> +}
+> +	/* always allow platform to issue a deep sleep mode request */
+> +	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
+> +	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
+> +	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
+> +	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
 > +
-> +static void _wakeupgen_set_all(unsigned int cpu, unsigned int reg)
-> +{
-> +	u8 i;
-> +
-> +	for (i = 0; i < NR_BANKS; i++)
-> +		cpu_writel(reg, i, cpu);
-> +}
-> +
-> +static void _wakeupgen_set(unsigned int irq, unsigned int set)
+> +	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		ccm_clpcr |= (0x2 << MXC_CCM_CLPCR_LPM_OFFSET);
+> +		ccm_clpcr |= (0x3 << MXC_CCM_CLPCR_STBY_COUNT_OFFSET);
+the parentheses aren't needed here
 
-I (still) don't like a single "set" function, especially when it takes a
-"set" argument.  
+> +		ccm_clpcr |= MXC_CCM_CLPCR_VSTBY;
+> +		ccm_clpcr |= MXC_CCM_CLPCR_SBYOS;
+> +		break;
+> +	case PM_SUSPEND_STANDBY:
+> +		ccm_clpcr |= (0x1 << MXC_CCM_CLPCR_LPM_OFFSET);
+ditto
 
-Make separate set and clear functions, with the common stuff in a helper
-function like _wakeupgen_get_irq() or something.
-
-> +{
-> +	unsigned int val, spi_irq;
-> +	unsigned int cpu = smp_processor_id();
-> +	u8 i;
-> +
-> +	/*
-> +	 * PPIs and SGIs are not supported
-> +	 */
-> +	if (irq < OMAP44XX_IRQ_GIC_START)
-> +		return;
-> +
-> +	/*
-> +	 * Subtract the GIC offset
-> +	 */
-> +	spi_irq = irq - OMAP44XX_IRQ_GIC_START;
-> +	if (spi_irq > MAX_IRQS) {
-> +		pr_err("omap wakeupGen: Invalid IRQ%d\n", irq);
-> +		return ;
+> +		ccm_clpcr &= ~MXC_CCM_CLPCR_VSTBY;
+> +		ccm_clpcr &= ~MXC_CCM_CLPCR_SBYOS;
+> +		break;
+> +	default:
+> +		return -EINVAL;
 > +	}
 > +
-> +	/*
-> +	 * Each wakeup gen register controls 32
-> +	 * interrupts. i.e 1 bit per SPI IRQ
-> +	 */
-> +	i = spi_irq >> 5;
-> +	spi_irq %= 32;
+> +	plat_lpc |= MXC_CORTEXA8_PLAT_LPC_DSM
+> +		    | MXC_CORTEXA8_PLAT_LPC_DBG_DSM;
+> +	arm_srpgcr |= MXC_SRPGCR_PCR;
 > +
-> +	val = cpu_readl(i, cpu);
-> +	if (set)
-> +		val |= BIT(spi_irq);
-> +	else
-> +		val &= ~BIT(spi_irq);
-> +	cpu_writel(val, i, cpu);
-> +}
+> +	__raw_writel(plat_lpc, MXC_CORTEXA8_PLAT_LPC);
+> +	__raw_writel(ccm_clpcr, MXC_CCM_CLPCR);
+> +	__raw_writel(arm_srpgcr, MXC_SRPG_ARM_SRPGCR);
+> +	__raw_writel(arm_srpgcr, MXC_SRPG_NEON_SRPGCR);
 > +
-> +static void _wakeupgen_save_masks(unsigned int cpu)
-> +{
-> +	u8 i;
+> +	if (tzic_enable_wake(0) != 0)
+> +		return -EAGAIN;
 > +
-> +	for (i = 0; i < NR_BANKS; i++)
-> +		per_cpu(irqmasks, cpu)[i] = cpu_readl(i, cpu);
-> +}
-> +
-> +static void _wakeupgen_restore_masks(unsigned int cpu)
-> +{
-> +	u8 i;
-> +
-> +	for (i = 0; i < NR_BANKS; i++)
-> +		cpu_writel(per_cpu(irqmasks, cpu)[i], i, cpu);
-> +}
-> +
-> +/*
-> + * Architecture specific Mask extensiom
-> + */
-> +static void wakeupgen_mask(struct irq_data *d)
-> +{
-> +	spin_lock(&wakeupgen_lock);
-> +	_wakeupgen_set(d->irq, 0);
-> +	spin_unlock(&wakeupgen_lock);
-> +}
-> +
-> +/*
-> + * Architecture specific Unmask extensiom
-> + */
-> +static void wakeupgen_unmask(struct irq_data *d)
-> +{
-> +
-> +	spin_lock(&wakeupgen_lock);
-> +	_wakeupgen_set(d->irq, 1);
-> +	spin_unlock(&wakeupgen_lock);
-> +}
-> +
-> +#ifdef CONFIG_PM
-
-I think this should be CONFIG_SUSPEND
-
-> +/*
-> + * Architecture specific set_wake extension
-> + */
-> +static int wakeupgen_set_wake(struct irq_data *d, unsigned int on)
-> +{
-> +	spin_lock(&wakeupgen_lock);
-> +	_wakeupgen_set(d->irq, on);
-> +	spin_unlock(&wakeupgen_lock);
-> +
+> +	cpu_do_idle();
 > +	return 0;
 > +}
 > +
-> +#else
-> +#define wakeupgen_set_wake	NULL
-> +#endif
-> +
-> +/**
-> + * omap_wakeupgen_irqmask_all() -  Mask or unmask interrupts
-> + * @cpu - CPU ID
-> + * @set - The IRQ register mask.
-> + *	0 = Mask all interrupts on the 'cpu'
-> + *	1 = Unmask all interrupts on the 'cpu'
-> + *
-> + * Ensure that the initial mask is maintained. This is faster than
-> + * iterating through GIC rgeisters to arrive at the correct masks
-> + */
-> +void omap_wakeupgen_irqmask_all(unsigned int cpu, unsigned int set)
+> +static int mx5_pm_valid(suspend_state_t state)
 > +{
-> +	if (omap_rev() == OMAP4430_REV_ES1_0)
-> +		return;
-> +
-> +	spin_lock(&wakeupgen_lock);
-> +	if (set) {
-> +		_wakeupgen_save_masks(cpu);
-> +		_wakeupgen_set_all(cpu, WKG_MASK_ALL);
-> +	} else {
-> +		_wakeupgen_set_all(cpu, WKG_UNMASK_ALL);
-> +		_wakeupgen_restore_masks(cpu);
-> +	}
-> +	spin_unlock(&wakeupgen_lock);
+> +	return (state > PM_SUSPEND_ON && state <= PM_SUSPEND_MAX);
 > +}
 > +
-> +/*
-> + * Initialse the wakeupgen module
-> + */
-> +int __init omap_wakeupgen_init(void)
+> +static const struct platform_suspend_ops mx5_suspend_ops = {
+> +	.valid = mx5_pm_valid,
+> +	.enter = mx5_suspend_enter,
+> +};
+> +
+> +static int __init mx5_pm_init(void)
 > +{
-> +	u8 i;
-> +
-> +	/* Not supported on on OMAP4 ES1.0 silicon */
-> +	if (omap_rev() == OMAP4430_REV_ES1_0) {
-> +		WARN(1, "WakeupGen: Not supported on OMAP4430 ES1.0\n");
-> +		return -EPERM;
-> +	}
-> +
-> +	/* Static mapping, never released */
-> +	wakeupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
-> +	BUG_ON(!wakeupgen_base);
+> +	if (cpu_is_mx51())
+> +		suspend_set_ops(&mx5_suspend_ops);
+I'd prefer to have that called by imx51_init_early.
 
-A WARN_ON() with a graceful exit is more appropriate here:
+Best regards
+Uwe
 
-from asm-generic/bug.h:
-
-/*
- * Don't use BUG() or BUG_ON() unless there's really no way out; one
- * example might be detecting data structure corruption in the middle
- * of an operation that can't be backed out of.  If the (sub)system
- * can somehow continue operating, perhaps with reduced functionality,
- * it's probably not BUG-worthy.
- *
- * If you're tempted to BUG(), think again:  is completely giving up
- * really the *only* solution?  There are usually better options, where
- * users don't need to reboot ASAP and can mostly shut down cleanly.
- */
-
-> +	/* Clear all IRQ bitmasks at wakeupGen level */
-> +	for (i = 0; i < NR_BANKS; i++) {
-> +		cpu_writel(0, i, CPU0_ID);
-> +		cpu_writel(0, i, CPU1_ID);
-> +	}
-> +
-> +	/*
-> +	 * Override gic architecture specific fucntioms to add
-> +	 * OMAP WakeupGen interrupt controller along with GIC
-> +	 */
-> +	gic_arch_extn.irq_mask = wakeupgen_mask;
-> +	gic_arch_extn.irq_unmask = wakeupgen_unmask;
-> +	gic_arch_extn.irq_set_wake = wakeupgen_set_wake;
-> +
-> +	return 0;
-> +}
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index 1926864..559d227 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -21,6 +21,7 @@
->  
->  #include <mach/hardware.h>
->  #include <mach/omap4-common.h>
-> +#include <mach/omap-wakeupgen.h>
->  
->  #ifdef CONFIG_CACHE_L2X0
->  void __iomem *l2cache_base;
-> @@ -41,6 +42,8 @@ void __init gic_init_irq(void)
->  	gic_cpu_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
->  	BUG_ON(!gic_cpu_base);
->  
-> +	omap_wakeupgen_init();
-> +
->  	gic_init(0, 29, gic_dist_base_addr, gic_cpu_base);
->  }
-
-Kevin
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
