@@ -1,29 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 Mar 2011 21:23:37 +0100
-Subject: [PATCH v8 1/1] PRUSS UIO driver support
-In-Reply-To: <20110302200956.GB23818@local>
-References: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
-	<1299065886-30099-2-git-send-email-pratheesh@ti.com>
-	<20110302200956.GB23818@local>
-Message-ID: <201103022123.38050.arnd@arndb.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 02 Mar 2011 12:32:38 -0800
+Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer
+	setup function
+In-Reply-To: <1299084806-16546-14-git-send-email-marc.zyngier@arm.com> (Marc
+	Zyngier's message of "Wed, 2 Mar 2011 16:53:19 +0000")
+References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
+	<1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <8ya39n5ntzt.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2011 21:09:56 Hans J. Koch wrote:
-> > +static struct uio_info *info;
-> > +static dma_addr_t sram_paddr, ddr_paddr;
-> > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> 
-> So the correct thing would be
-> 
-> static void __iomem *prussio_vaddr;
-> static void *sram_vaddr, *ddr_vaddr;
+On Wed, Mar 02 2011, Marc Zyngier wrote:
 
-I also commented that it should not be a global variable at
-all, but a dynamic data structure referenced from the device.
+> ---
+>  arch/arm/mach-msm/timer.c |   22 +++++++++++++++++++---
+>  1 files changed, 19 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+> index 56f920c..e029363 100644
+> --- a/arch/arm/mach-msm/timer.c
+> +++ b/arch/arm/mach-msm/timer.c
+> @@ -228,6 +243,8 @@ static void __init msm_timer_init(void)
+>  	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
+>  #endif
+>  
+> +	percpu_timer_register(msm_timer_ops_ptr);
+> +
+>  	for (i = 0; i < ARRAY_SIZE(msm_clocks); i++) {
+>  		struct msm_clock *clock = &msm_clocks[i];
+>  		struct clock_event_device *ce = &clock->clockevent;
 
-Not important, but Pratheesh said he'd change it. If it stays
-a global variable, I'd at least expect an explanation why
-the static variable is considered better in this case.
+I'm having difficulty figuring out what tree/branch these patches are
+based off of, so I haven't been able to test this, yet.  But, so far,
+the MSM changes look coherent.
 
-	Arnd
+If you can give me a ref for your source tree, I can try to do some
+testing of these changes to make sure nothing is broken by it.
+
+Thanks,
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
