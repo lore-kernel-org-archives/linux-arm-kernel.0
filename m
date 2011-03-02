@@ -1,46 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Mar 2011 12:10:55 -0000
-Subject: [patch v2 2/3] arm: pmu: allow platform specifc irq
-	enable/disable handling
-In-Reply-To: <1299063420-22203-3-git-send-email-tom.leiming@gmail.com>
-References: <1299063420-22203-1-git-send-email-tom.leiming@gmail.com>
-	<1299063420-22203-3-git-send-email-tom.leiming@gmail.com>
-Message-ID: <001001cbd8d2$e25c9080$a715b180$@deacon@arm.com>
+From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
+Date: Wed, 2 Mar 2011 13:17:18 +0100
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <20110302113823.GB2728@pulham.picochip.com>
+References: <AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>
+	<4D6D9B10.9000606@codeaurora.org>
+	<4D6D9D06.2020204@bluewatersys.com>
+	<4D6D9FC7.1090206@codeaurora.org>
+	<4D6DA290.2010607@bluewatersys.com>
+	<4D6DAA24.3000204@codeaurora.org>
+	<4D6DAE6E.4030701@bluewatersys.com>
+	<4D6DB1B1.4060908@codeaurora.org> <4D6DFE67.3020801@stericsson.com>
+	<AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
+	<20110302113823.GB2728@pulham.picochip.com>
+Message-ID: <4D6E354E.5010208@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 03/02/2011 12:38 PM, Jamie Iles wrote:
+> On Wed, Mar 02, 2011 at 11:36:38AM +0100, Linus Walleij wrote:
+>> On Wed, Mar 2, 2011 at 9:23 AM, Maxime Coquelin
+>> <maxime.coquelin-nonst@stericsson.com>  wrote:
+>>
+>>> I think we should have a tree like this :
+>>>
+>>> /sys/devices/system/soc/
+>>> /sys/devices/system/soc/unique_id<- Unified way to export an ID for all machs
+>> Arbitrary number of bits? Some will have a 64-bit ID, some will have 32-bit
+>> etc.
+>>
+>> Should we say it's a hex string of 64 bits?
+> Could we provide hooks for the platform that takes the buffer and length
+> and let the platform do the snprintf()?  Our devices have a 128-bit
+> serial number and I'm sure there must be others.
 
-> -----Original Message-----
-> From: tom.leiming at gmail.com [mailto:tom.leiming at gmail.com]
-> Sent: 02 March 2011 10:57
-> To: linux at arm.linux.org.uk
-> Cc: linux-arm-kernel at lists.infradead.org; Will Deacon; Ming Lei
-> Subject: [patch v2 2/3] arm: pmu: allow platform specifc irq enable/disable handling
-> 
-> From: Ming Lei <tom.leiming@gmail.com>
-> 
-> This patch introduces .enable_irq and .disable_irq into
-> struct arm_pmu_platdata, so platform specific irq enablement
-> can be handled after request_irq, and platform specific irq
-> disablement can be handled before free_irq.
-> 
-> This patch is for support of  pmu irq routed from CTI on omap4.
-> 
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
-> ---
->  arch/arm/include/asm/pmu.h   |   15 ++++++++++++---
->  arch/arm/kernel/perf_event.c |   15 ++++++++++++---
->  2 files changed, 24 insertions(+), 6 deletions(-)
+This is one possibility, another one is to let the platform specify how 
+it exports this serial, as you proposed bellow.
 
-[...]
+>>> /sys/devices/system/soc/mach/
+>>> /sys/devices/system/soc/mach/name<- Name of the mach
+>>> /sys/devices/system/soc/mach/foo_id
+>>> /sys/devices/system/soc/mach/bar_id<- Vendors may have several/different IDs
+>>> to export (IDCODE for OMAP, Production ID...)
+> Do we need a way to allow platforms to specify additional attributes to
+> co into the socinfo?  For our devices we can boot in different modes and
+> how we boot determines how the firmware is upgraded.  In the case above
+> the platform could specify that it needs foo_id and bar_id and the
+> callbacks to fill them in.
 
-Looks good to me. Unfortunately, I don't have an OMAP4 to test this
-on (contributions welcome :) so I've just eyeballed the code:
+Yes it was what I thought with the foo and bar IDs exports.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-You'll need to wait for the ux500 stuff to be merged before you can
-get this upstream (Linus W is handling the pull request afaik).
-
-Will
+Maxime
