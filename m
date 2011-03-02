@@ -1,211 +1,47 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Wed, 2 Mar 2011 18:10:28 +0800
-Subject: [patch v1 2/3] arm: pmu: support pmu irq routed from CTI
-In-Reply-To: <1299016524.5379.27.camel@jazzbox>
-References: <1298998711-8165-1-git-send-email-tom.leiming@gmail.com>
-	<1298998711-8165-3-git-send-email-tom.leiming@gmail.com>
-	<1299016524.5379.27.camel@jazzbox>
-Message-ID: <AANLkTikhQp33SQnAjd+ZrKrPWonfKB+tyx5b94hTz_kq@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Mar 2011 11:12:44 +0100
+Subject: Fwd: [RFC] MMC: error handling improvements
+In-Reply-To: <a8453bae3ced14c4c325d1782be92e24.squirrel@www.codeaurora.org>
+References: <20110215230311.GT4152@n2100.arm.linux.org.uk>
+	<8yaoc6c7tan.fsf@huya.qualcomm.com>
+	<AANLkTikpdwfM19oirENbOhnz8Rh40ZnMXByGX_QKdu-V@mail.gmail.com>
+	<8ya8vxf4w4w.fsf@huya.qualcomm.com>
+	<AANLkTimQqGVTwUv4ywQnmd4Z1Ur4vWk2sK5+ZLa4mmTs@mail.gmail.com>
+	<AANLkTikDxOeW9Nfaew_mZLnVJ6e7pyzQTNs139g_AehW@mail.gmail.com>
+	<AANLkTin64W=VQP+EomU3PK-Ye=Nz_SP+DOLxgT__4fkQ@mail.gmail.com>
+	<AANLkTin7UaKPgvmPC0+cJf5nBWuUmuUreAjDZxQGNB2j@mail.gmail.com>
+	<AANLkTimE5xK8RgNiP+9D2D_beBcbWhBNSzjnhEU36GTO@mail.gmail.com>
+	<AANLkTimpJUoc64py_jCrvsrXscawsR2c7JBtr1e0U+e8@mail.gmail.com>
+	<a8453bae3ced14c4c325d1782be92e24.squirrel@www.codeaurora.org>
+Message-ID: <AANLkTi=jfB-BiEpKqAy98_jtOTyN4Ozavp=7CnYMGZ_h@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Thanks for writing back Murali!
 
-2011/3/2 Will Deacon <will.deacon@arm.com>:
-> Hi Ming Lei,
->
-> It's good to see somebody looking at OMAP4 since I've been hearing from
-> people having trouble getting perf going on the PandaBoard.
->
->
-> On Tue, 2011-03-01 at 16:58 +0000, tom.leiming at gmail.com wrote:
->> From: Ming Lei <tom.leiming@gmail.com>
->>
->> This patch introduces pmu_platform_data struct to
->> support pmu irq routed from CTI, such as implemented
->> on OMAP4.
->>
->> Generally speaking, clearing cti irq should be done in
->> irq handler, also enabling cti module after calling
->> request_irq and disabling cti module before calling
->> free_irq.
->>
->> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
->> ---
->> ?arch/arm/include/asm/pmu.h ? | ? 12 +++++++++
->> ?arch/arm/kernel/perf_event.c | ? 57 ++++++++++++++++++++++++++++++-----------
->> ?2 files changed, 53 insertions(+), 16 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
->> index 7544ce6..6162aaf 100644
->> --- a/arch/arm/include/asm/pmu.h
->> +++ b/arch/arm/include/asm/pmu.h
->> @@ -13,20 +13,32 @@
->> ?#define __ARM_PMU_H__
->>
->> ?#include <linux/interrupt.h>
->> +#include <asm/cti.h>
->>
->> ?enum arm_pmu_type {
->> ? ? ? ? ARM_PMU_DEVICE_CPU ? ? ?= 0,
->> ? ? ? ? ARM_NUM_PMU_DEVICES,
->> ?};
->>
->> +#define MAX_CTI_NUM ?4
->
-> Why is this in the PMU header file rather than the CTI one?
->
->> ?/*
->> ? * struct arm_pmu_platdata - ARM PMU platform data
->> ? *
->> + * @use_cti_irq: pmu irq is routed from cti
->> + * @cti_cnt: cti counts used for pmu irq routing
->> + * @cti: cti instances used to help access cti registers
->> ? * @handle_irq: an optional handler which will be called from the interrupt and
->> ? * passed the address of the low level handler, and can be used to implement
->> ? * any platform specific handling before or after calling it.
->> + *
->> + * If pmu irq is routed from CTI, @use_cti_irq, @cti_cnt and
->> + * @cti must be initialized and passed to pmu driver.
->> ? */
->> ?struct arm_pmu_platdata {
->> + ? ? ? int use_cti_irq;
->> + ? ? ? int cti_cnt;
->> + ? ? ? struct cti cti[MAX_CTI_NUM];
->> +
->> ? ? ? ? irqreturn_t (*handle_irq)(int irq, void *dev,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? irq_handler_t pmu_handler);
->> ?};
->> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
->> index 22e194eb..9027a8f 100644
->> --- a/arch/arm/kernel/perf_event.c
->> +++ b/arch/arm/kernel/perf_event.c
->> @@ -377,18 +377,39 @@ validate_group(struct perf_event *event)
->> ? ? ? ? return 0;
->> ?}
->>
->> -static irqreturn_t armpmu_platform_irq(int irq, void *dev)
->> +static inline int cti_irq(struct arm_pmu_platdata *data)
->> ?{
->> - ? ? ? struct arm_pmu_platdata *plat = dev_get_platdata(&pmu_device->dev);
->> + ? ? ? return data && data->use_cti_irq;
->> +}
->> +
->> +static inline struct cti *irq_to_cti(struct arm_pmu_platdata *data,
->> + ? ? ? int irq)
->> +{
->> + ? ? ? int idx;
->>
->> - ? ? ? return plat->handle_irq(irq, dev, armpmu->handle_irq);
->> + ? ? ? for(idx = 0; idx < data->cti_cnt; idx++)
->> + ? ? ? ? ? ? ? if (data->cti[idx].irq == irq)
->> + ? ? ? ? ? ? ? ? ? ? ? return &data->cti[idx];
->> + ? ? ? return NULL;
->> +}
->
-> Hmm, since OMAP is the only platform using this, I'm not especially
-> happy sticking this directly in the PMU code.
->
->> +static inline irqreturn_t armpmu_handle_irq(int irq_num, void *dev)
->> +{
->> + ? ? ? struct arm_pmu_platdata *plat = dev;
->> +
->> + ? ? ? if (cti_irq(plat))
->> + ? ? ? ? ? ? ? cti_irq_ack(irq_to_cti(plat, irq_num));
->> +
->> + ? ? ? if (plat && plat->handle_irq)
->> + ? ? ? ? ? ? ? return plat->handle_irq(irq_num, dev, armpmu->handle_irq);
->> + ? ? ? else
->> + ? ? ? ? ? ? ? return armpmu->handle_irq(irq_num, NULL);
->> ?}
->>
-> You can use the new arm_pmu_platdata.handle_irq function to register
-> your own IRQ callback. I don't think we should define the handler here.
->
->> ?static int
->> ?armpmu_reserve_hardware(void)
->> ?{
->> ? ? ? ? struct arm_pmu_platdata *plat;
->> - ? ? ? irq_handler_t handle_irq;
->> ? ? ? ? int i, err = -ENODEV, irq;
->>
->> ? ? ? ? pmu_device = reserve_pmu(ARM_PMU_DEVICE_CPU);
->> @@ -399,11 +420,7 @@ armpmu_reserve_hardware(void)
->>
->> ? ? ? ? init_pmu(ARM_PMU_DEVICE_CPU);
->>
->> - ? ? ? plat = dev_get_platdata(&pmu_device->dev);
->> - ? ? ? if (plat && plat->handle_irq)
->> - ? ? ? ? ? ? ? handle_irq = armpmu_platform_irq;
->> - ? ? ? else
->> - ? ? ? ? ? ? ? handle_irq = armpmu->handle_irq;
->> + ? ? ? plat = platform_get_drvdata(pmu_device);
->>
->> ? ? ? ? if (pmu_device->num_resources < 1) {
->> ? ? ? ? ? ? ? ? pr_err("no irqs for PMUs defined\n");
->> @@ -415,21 +432,25 @@ armpmu_reserve_hardware(void)
->> ? ? ? ? ? ? ? ? if (irq < 0)
->> ? ? ? ? ? ? ? ? ? ? ? ? continue;
->>
->> - ? ? ? ? ? ? ? err = request_irq(irq, handle_irq,
->> + ? ? ? ? ? ? ? err = request_irq(irq, armpmu_handle_irq,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED | IRQF_NOBALANCING,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "armpmu", NULL);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "armpmu", plat);
->> ? ? ? ? ? ? ? ? if (err) {
->> ? ? ? ? ? ? ? ? ? ? ? ? pr_warning("unable to request IRQ%d for ARM perf "
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "counters\n", irq);
->> ? ? ? ? ? ? ? ? ? ? ? ? break;
->> - ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? } else if (cti_irq(plat))
->> + ? ? ? ? ? ? ? ? ? ? ? cti_enable(irq_to_cti(plat, irq));
->> ? ? ? ? }
->>
->> ? ? ? ? if (err) {
->> ? ? ? ? ? ? ? ? for (i = i - 1; i >= 0; --i) {
->> ? ? ? ? ? ? ? ? ? ? ? ? irq = platform_get_irq(pmu_device, i);
->> - ? ? ? ? ? ? ? ? ? ? ? if (irq >= 0)
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? free_irq(irq, NULL);
->> + ? ? ? ? ? ? ? ? ? ? ? if (irq >= 0) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (cti_irq(plat))
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cti_disable(irq_to_cti(plat, irq));
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? free_irq(irq, plat);
->> + ? ? ? ? ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? ? release_pmu(pmu_device);
->> ? ? ? ? ? ? ? ? pmu_device = NULL;
->> @@ -442,11 +463,15 @@ static void
->> ?armpmu_release_hardware(void)
->> ?{
->> ? ? ? ? int i, irq;
->> + ? ? ? struct arm_pmu_platdata *plat = platform_get_drvdata(pmu_device);
->>
->> ? ? ? ? for (i = pmu_device->num_resources - 1; i >= 0; --i) {
->> ? ? ? ? ? ? ? ? irq = platform_get_irq(pmu_device, i);
->> - ? ? ? ? ? ? ? if (irq >= 0)
->> - ? ? ? ? ? ? ? ? ? ? ? free_irq(irq, NULL);
->> + ? ? ? ? ? ? ? if (irq >= 0) {
->> + ? ? ? ? ? ? ? ? ? ? ? if (cti_irq(plat))
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cti_disable(irq_to_cti(plat, irq));
->> + ? ? ? ? ? ? ? ? ? ? ? free_irq(irq, plat);
->> + ? ? ? ? ? ? ? }
->> ? ? ? ? }
->> ? ? ? ? armpmu->stop();
->>
-> Right, so I think a better way to do this is to put all the CTI stuff in
-> its own file. Whether this lives in the OMAP BSP is up to you (perhaps
-> the best place for it at the moment, until other platforms use it too).
->
-> Then we can add ->enable and ->disable hooks in the platdata which are
-> not CTI-specific and may also be useful for other platforms and PMU
-> implementations.
->
-> Does that work for you?
+2011/3/1 Murali Krishna Palnati <palnatim@codeaurora.org>:
 
-Good, I will move cti code out of perf_event.c and introduce
-.enable_irq and .disable_irq into platdata, which makes perf_event.c
-cleaner.
+> Though the bulk of the MSM SDCC controller is designed around PL180, there
+> are still some modifications to include flow control, SDIO support,
 
-thanks,
--- 
-Lei Ming
+We have these fixes in the U300/Ux500 version of MMCI as well, I suspect
+it's nothing more than altering which bits are to be poked into which
+registers.
+
+> Data
+> Mover interface (DMA engine on Qualcomm MSMs) etc. Support/ability to talk
+> to the Data Mover is one of the main differences when compared to original
+> PL180 prime cell.
+
+The main work would be to switch the DMA engine in MSM to using
+the DMA engine in drivers/dma. This is one thing we do to avoid the
+proliferation of DMA engine code in arch/arm/*, and we very early
+started to use that framework for U300 and Ux500 and I must say that
+it has payed off well for us, now we have much nicer interfaces and more
+review than any of the custom engines under arch/arm/*.
+
+It's some upfront work but I think it would benefit you if you could
+do this.
+
+Yours,
+Linus Walleij
