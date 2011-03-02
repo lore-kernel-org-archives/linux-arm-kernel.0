@@ -1,45 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 Mar 2011 09:23:36 +0100
-Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
-In-Reply-To: <4D6D9C03.2080906@codeaurora.org>
-References: <4D6D9C03.2080906@codeaurora.org>
-Message-ID: <201103020923.36796.arnd@arndb.de>
+From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
+Date: Wed, 2 Mar 2011 09:23:03 +0100
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <4D6DB1B1.4060908@codeaurora.org>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>
+	<4D6DAE6E.4030701@bluewatersys.com>
+	<4D6DB1B1.4060908@codeaurora.org>
+Message-ID: <4D6DFE67.3020801@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 March 2011 02:23:15 Saravana Kannan wrote:
-> There are so many other drivers that don't use or care about DMA and 
-> might still want to ensure some ordering constraints between their 
-> readl(s)/writel(s). They can't depend on readl/writel taking care of it 
-> for them since their code could be used in a kernel configuration that 
-> doesn't enable this config.
+On 03/02/2011 03:55 AM, Saravana Kannan wrote:
+> On 03/01/2011 06:41 PM, Ryan Mallon wrote:
+>> On 03/02/2011 03:23 PM, Saravana Kannan wrote:
+>>> I don't have any attachment to the "arch" file suggestion. If there is a
+>>> better solution to identify the different implementations of socinfo
+>>> without having to maintain some "unique id" list in the kernel, then I'm
+>>> all for it. But cpuinfo is not it.
+>> Sorry I am confusing the 'arch' and 'mach' bits here. I definitely have
+>> an objection to having an 'arch' file (i.e. ARM). A 'mach' (i.e. omap)
+>> file makes a bit more sense, but should probably be called 'mach' rather
+>> than 'arch' to avoid this confusion :-).
+> Sorry for the confusion. Sure, I don't care much for the filename as
+> long as we can all agree on it. I care more about the content of the
+> file (using names very close to xxxx in mach-xxxx). I like "soc-family"
+> better since it's generic enough to not force, say omap3 and omap4, to
+> report different values.
+>
+> Linus Walleij, Eduardo, Maxime, Andrei,
+>
+> Would like to hear your opinion on the file name (soc-family vs. mach vs
+> <somethingelse>) and the path /sys/devices/system/soc/.
+>
+> If we settle on this, may be it would be easier to get this through.
+>
 
-What exactly are the ordering constraints, do you need the full
-dmb() for readl() and dsb() for writel(), or just a compiler barrier?
+I think we should have a tree like this :
 
-I think we need the barrier() even for the relaxed variant, but 
-that is fairly lightweight. What would be a reason to have more?
+/sys/devices/system/soc/
+/sys/devices/system/soc/unique_id<- Unified way to export an ID for all machs
+/sys/devices/system/soc/mach/
+/sys/devices/system/soc/mach/name<- Name of the mach
+/sys/devices/system/soc/mach/foo_id
+/sys/devices/system/soc/mach/bar_id<- Vendors may have several/different IDs to export (IDCODE for OMAP, Production ID...)
 
-> Firstly, I don't know how many people noticed this and realize they 
-> can't depend on readl/writel to take care of the mb()s for them. Seems 
-> like an unnecessary encouragement to make mistakes when it didn't need 
-> to be so.
-> 
-> Secondly, even if they realize they have to take care of it, they will 
-> have to continue using mb()s in to force ordering between their 
-> reads/writes. So, are we depending on the compiler to optimize these 
-> extra mb() out in the case where the config is enabled? I'm not sure it 
-> will be able to optimize out the extra mb()s in all cases.
+Linus, do you agree?
 
-The compiler certainly won't merge multiple inline assembly statements,
-but multiple barrier() statements don't make it worse than just one.
-barrier() just forces accessing variables from memory that could otherwise
-be kept in registers.
+>> I still think it is a solution in search of a problem though. What
+>> userspace programs need to know what specific SoC they are on? My
+>> feeling is that if userspace needs to know this information, then it is
+>> probably dicking around with things that should be managed by the
+>> kernel. Differences in available peripherals, etc can be determined by
+>> looking at existing sysfs files.
+> I certainly have seen several use cases. Couple of easy examples:
+>
+> * A lot of test scripts would find this very useful. For example, some
+> clock (present is all/most MSMs) shouldn't be tested on some SOCs as it
+> would lock up the system if you try to turn it off while the CPU is running.
+>
+> * Some of the user space tools might want to report different "product
+> id/type" (nothing to do with USB, etc) depending on what SOC it is
+> running on.
+>
 
-The other problems we still need to fix are the complete absence of
-barriers in inb()/outb() style accessors, which are meant to be stricter
-than readl()/writel(), and the fact that we rely on undefined behavior
-in gcc regarding the atomicity of multi-byte accesses, as we recently
-found out when a new gcc turned a readl into byte accesses.
+For example, we have some user-space tools which need to have serial 
+number to write it in logs.
 
-	Arnd
+> Thank,
+> Saravana
+> P.S: Removed felipe.balbi at nokia.com<felipe.balbi@nokia.com>  since I
+> keep getting delivery failure emails.
+>
