@@ -1,30 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Mar 2011 23:50:51 +0000
-Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <alpine.LFD.2.00.1103020033080.2701@localhost6.localdomain6>
-References: <1298900022-21516-7-git-send-email-will.deacon@arm.com>
-	<20110228140327.GA1937@n2100.arm.linux.org.uk>
-	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
-	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
-	<20110228214445.GD1937@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
-	<20110301201904.GA27107@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
-	<20110301231432.GG27107@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103020033080.2701@localhost6.localdomain6>
-Message-ID: <20110301235051.GH27107@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 01 Mar 2011 19:02:27 -0500 (EST)
+Subject: [PATCH 2/4] msm: scm: Fix improper register assignment
+In-Reply-To: <4D6D652A.5050502@codeaurora.org>
+References: <1298573085-23217-1-git-send-email-sboyd@codeaurora.org>
+	<1298573085-23217-3-git-send-email-sboyd@codeaurora.org>
+	<1298640219.958.74.camel@e102144-lin.cambridge.arm.com>
+	<4D688AF1.1090607@codeaurora.org>
+	<20110226084736.GB3640@n2100.arm.linux.org.uk>
+	<8yazkpi3cfa.fsf@huya.qualcomm.com>
+	<alpine.LFD.2.00.1102261452340.22034@xanadu.home>
+	<1298975837.7828.9.camel@e102144-lin.cambridge.arm.com>
+	<4D6D652A.5050502@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1103011858370.6799@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 12:44:05AM +0100, Thomas Gleixner wrote:
-> The problem which caused that discussion has nothing to do with the
-> above. It's about bog standard nested controllers which do not have a
-> tight coupling to the the primary chip. But changing the primary chip
-> from ack based to eoi based requires to touch multiple demux handlers
-> while a primary chip agnostic solution for these cases would avoid
-> that. W/O any negative side effects.
+On Tue, 1 Mar 2011, Saravana Kannan wrote:
 
-If you think its soo damned simple, maybe you should put the effort in
-and fix all this up, get it tested as fully working on the affected
-platforms, and show the patches then.
+> On 03/01/2011 02:37 AM, Will Deacon wrote:
+> > Perhaps a more robust fix would be to remove the register int
+> > declarations and handle the parameter marshalling in the same asm block
+> > that contains the smc?
+> 
+> I was thinking the same, but the opposing idea I heard was that not doing it
+> inside the asm block would allow GCC to be make better use of the registers.
+
+Indeed.  And a significant body of code out there does rely on this gcc 
+feature, so it has to minimally work.
+
+> Didn't have a strong opinion either way, so we went with the implementation
+> that was sent out.
+
+ACK.
+
+
+Nicolas
