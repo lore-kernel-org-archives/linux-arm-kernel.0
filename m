@@ -1,24 +1,44 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Wed, 02 Mar 2011 00:49:42 +0000
-Subject: [PATCH 2/6] ARM: pxa2xx: reorganize I2C files
-In-Reply-To: <1298461100-14869-3-git-send-email-bigeasy@linutronix.de>
-References: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
-	<1298461100-14869-3-git-send-email-bigeasy@linutronix.de>
-Message-ID: <4D6D9426.8030905@fluff.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 2 Mar 2011 10:27:34 +0100 (CET)
+Subject: [PATCH v7 1/1] PRUSS UIO driver support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024BF36776@dbde02.ent.ti.com>
+References: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
+	<1299014895-2022-2-git-send-email-pratheesh@ti.com>
+	<alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BF36776@dbde02.ent.ti.com>
+Message-ID: <alpine.LFD.2.00.1103021026240.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/11 11:38, Sebastian Andrzej Siewior wrote:
-> This patch moves the platform data definition from
-> arch/arm/plat-pxa/include/plat/i2c.h to include/linux/i2c/pxa-i2c.h so
-> it can be accessed from x86 the same way as on ARM.
->
-> This change should make no functional change to the PXA code. The move
-> is verified by building the following defconfigs:
->    cm_x2xx_defconfig corgi_defconfig em_x270_defconfig ezx_defconfig
->    imote2_defconfig pxa3xx_defconfig spitz_defconfig zeus_defconfig
->    raumfeld_defconfig magician_defconfig mmp2_defconfig pxa168_defconfig
->    pxa910_defconfig
->
+On Wed, 2 Mar 2011, TK, Pratheesh Gangadhar wrote:
+> > From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> > > +	/* Disable interrupt */
+> > > +	iowrite32((val & ~intr_mask), intren_reg);
+> 
+> I checked more on this and actually INTC h/w has Host Interrupt
+> Enable Indexed Set Register (HIEISR) and Host Interrupt Enable Indexed
+> Clear Register(HIEICR) which I can use to enable/disable interrupts
+> without doing RMW. I will use these registers and then we don't need
+> all the spinlock and irqcontrol stuff. So I need to do
+> 
+> iowrite32((intr_bit, HIEICR);// This disable the interrupt bit
+> in intern_reg.
+> 
+> Userspace can use HIEISR to re-enable the interrupt.
 
-Russell/others, you OK with this going through my tree?
+Great, that makes it way simpler!
+ 
+> > It's not the purpose of a review to tell you what you need to change
+> > mechanically. Reviewers hint to a correct solution and you are
+> > supposed to lookup what that solution means and act accordingly. If
+> > you do not understand the hint or its implications please ask _before_
+> > sending a new patch set.
+> 
+> Seriously, I went to "fix the comments" mode. Sorry about that. Anyway
+> I learnt more about things by making mistakes i.e. the positive side.
+> Thanks a lot for helping us improve on this. 
+
+Welcome!
+
+
+	tglx
