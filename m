@@ -1,161 +1,45 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 2 Mar 2011 13:49:41 +0530
-Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be configured
-	from board file
-In-Reply-To: <AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
-References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
-	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
-	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
-	<AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
-Message-ID: <8ab9882cd92792e9bf2b836c0ec9c7fe@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 2 Mar 2011 09:23:36 +0100
+Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
+In-Reply-To: <4D6D9C03.2080906@codeaurora.org>
+References: <4D6D9C03.2080906@codeaurora.org>
+Message-ID: <201103020923.36796.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
->-----Original Message-----
->From: Govindraj [mailto:govindraj.ti at gmail.com]
->Sent: Wednesday, March 02, 2011 1:11 PM
->To: Sricharan R
->Cc: Govindraj.R; linux-omap at vger.kernel.org;
-linux-serial at vger.kernel.org;
->linux-arm-kernel at lists.infradead.org; Jon Hunter; Tony Lindgren; Benoit
->Cousson; Kevin Hilman; Paul Walmsley; Rajendra Nayak; Deepak Kattungal
->Subject: Re: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
->configured from board file
->
->On Wed, Mar 2, 2011 at 12:46 AM, Sricharan R <r.sricharan@ti.com> wrote:
->> Hi,
->>>diff --git a/arch/arm/mach-omap2/serial.c
-b/arch/arm/mach-omap2/serial.c
->>>index 755f4aa..530e9e3 100644
->>>--- a/arch/arm/mach-omap2/serial.c
->>>+++ b/arch/arm/mach-omap2/serial.c
->>>@@ -44,6 +44,15 @@
->>>
->>> static int omap_uart_con_id __initdata = -1;
->>>
->>>+static struct omap_uart_port_info omap_serial_default_info[] = {
->>>+ ? ? ?{
->>>+ ? ? ? ? ? ? ?.dma_enabled ? ?= 0,
->>>+ ? ? ? ? ? ? ?.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
->>>+ ? ? ? ? ? ? ?.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
->>>+ ? ? ? ? ? ? ?.idle_timeout ? = DEFAULT_IDLE_TIMEOUT,
->>>+ ? ? ?},
->>>+};
->>>+
->>> static int uart_idle_hwmod(struct omap_device *od)
->>> {
->>> ? ? ? omap_hwmod_idle(od->hwmods[0]);
->>>@@ -66,6 +75,54 @@ static struct omap_device_pm_latency
->> omap_uart_latency[]
->>>= {
->>> ? ? ? },
->>> };
->>>
->>>+#ifdef CONFIG_OMAP_MUX
->>>+static struct omap_device_pad default_serial0_pads[] __initdata = {
->>>+ ? ? ?{
->>>+ ? ? ? ? ? ? ?.name ? = "uart1_rx.uart1_rx",
->>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
-OMAP_DEVICE_PAD_WAKEUP,
->>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>+ ? ? ?},
->>>+};
->>>+
->>>+static struct omap_device_pad default_serial1_pads[] __initdata = {
->>>+ ? ? ?{
->>>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
->>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
-OMAP_DEVICE_PAD_WAKEUP,
->>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>+ ? ? ?},
->>>+};
->>>+
->>>+static struct omap_device_pad default_serial2_pads[] __initdata = {
->>>+ ? ? ?{
->>>+ ? ? ? ? ? ? ?.name ? = "uart3_rx_irrx.uart3_rx_irrx",
->>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
-OMAP_DEVICE_PAD_WAKEUP,
->>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>+ ? ? ?},
->>>+};
->>>+
->>>+static struct omap_device_pad default_omap36xx_serial3_pads[]
-__initdata
->> =
->>>{
->>>+ ? ? ?{
->>>+ ? ? ? ? ? ? ?.name ? = "gpmc_wait3.uart4_rx",
->>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
-OMAP_DEVICE_PAD_WAKEUP,
->>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE2,
->>>+ ? ? ?},
->>>+};
->>>+
->>>+static struct omap_device_pad default_omap4_serial3_pads[] __initdata
-=
->> {
->>>+ ? ? ?{
->>>+ ? ? ? ? ? ? ?.name ? = "uart4_rx.uart4_rx",
->>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
-OMAP_DEVICE_PAD_WAKEUP,
->>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>+ ? ? ?},
->>>+};
->> Here only the UART RX pins are muxed, so what about the cts, rts, tx
->pins?
->
->The intention here is to enable wakeup capabilities for uart rx pad.
->
->AFAIK most of the boards are currently dependent on bootloader for
->uart-muxing if any board is not dependent on bootloader then we
->can use omap_serial_init_port along with board_mux_info from board.
->
-Yes. The idea is to be independent of the bootloaders for mux settings.
+On Wednesday 02 March 2011 02:23:15 Saravana Kannan wrote:
+> There are so many other drivers that don't use or care about DMA and 
+> might still want to ensure some ordering constraints between their 
+> readl(s)/writel(s). They can't depend on readl/writel taking care of it 
+> for them since their code could be used in a kernel configuration that 
+> doesn't enable this config.
 
->Prior to this change uart wakeup is based on rx_pad and we were
-populating
->offset and using omap_ctrl api's to read/write which is cleaned up now.
->Most of boards are dependent on uart-rx wakeup to avoid breaking any
->board support we
->are using omap_serial_init by filling default values, which provides
->us with same
->environment but with right approach towards handling mux data with a
->handshake with
->hwmod framework.
->
-Now, in this change only the RX pin is configured. So if some board uses
-omap_serial_init then only the RX is going to be configured.
-How will they configure the rest of the pins?
-They cannot call omap_serial_init_port after this just to configure the
-rest of the mux pins( cts, rts, tx).
+What exactly are the ordering constraints, do you need the full
+dmb() for readl() and dsb() for writel(), or just a compiler barrier?
 
-So data which is passed from omap_serial_init should have the
-configuration
-for all the pins, and this default data should be consistent across
-atleast
-some boards, so that they can use this. This will reduce the data
-duplication across board files.
+I think we need the barrier() even for the relaxed variant, but 
+that is fairly lightweight. What would be a reason to have more?
 
-If this is not true, then all the pads can be configured from the board
-files itself using omap_serial_init_port and you can set the required
-RX wakeup capability there as well.
+> Firstly, I don't know how many people noticed this and realize they 
+> can't depend on readl/writel to take care of the mb()s for them. Seems 
+> like an unnecessary encouragement to make mistakes when it didn't need 
+> to be so.
+> 
+> Secondly, even if they realize they have to take care of it, they will 
+> have to continue using mb()s in to force ordering between their 
+> reads/writes. So, are we depending on the compiler to optimize these 
+> extra mb() out in the case where the config is enabled? I'm not sure it 
+> will be able to optimize out the extra mb()s in all cases.
 
->So if any board needs specific mux they can go ahead and add required
->mux data in
->board file and use map_serial_init_port instead of current
->omap_serial_init.
->
->
->> Is it consistent that across all socs that only UART3 would have
->UART/IRDA
->> functions capability so that serial2 pads can always be called
-"rx_irxx"
->> ?.
->
->Yes from OMAP2420 to OMAP4430 uart3 can used as irda.
->
-Ok.
->--
->Thanks,
->Govindraj.R
+The compiler certainly won't merge multiple inline assembly statements,
+but multiple barrier() statements don't make it worse than just one.
+barrier() just forces accessing variables from memory that could otherwise
+be kept in registers.
+
+The other problems we still need to fix are the complete absence of
+barriers in inb()/outb() style accessors, which are meant to be stricter
+than readl()/writel(), and the fact that we rely on undefined behavior
+in gcc regarding the atomicity of multi-byte accesses, as we recently
+found out when a new gcc turned a readl into byte accesses.
+
+	Arnd
