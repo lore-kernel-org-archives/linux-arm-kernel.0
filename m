@@ -1,37 +1,62 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 2 Mar 2011 09:16:48 +0100
-Subject: [PATCH] ARM: imx/mx25_3ds: Fix build failure
-In-Reply-To: <1299028552-13186-1-git-send-email-festevam@gmail.com>
-References: <1299028552-13186-1-git-send-email-festevam@gmail.com>
-Message-ID: <20110302081648.GA22310@pengutronix.de>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Wed,  2 Mar 2011 08:11:05 +0000
+Subject: [PATCH] MX1: Add structure,
+	registration functions for framebuffer and rename LCDC INT
+Message-ID: <1299053465-99879-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 10:15:52PM -0300, Fabio Estevam wrote:
-> Commit
-> ca8d906 (ARM: mach-imx: mx25_3ds: add write-protect and card-detect for SD)
-> 
-> assigned a non-existing member .cd_gpio in a struct esdhc_platform_data.
-> This field can be added later after the esdhc patches are merged.
-> Fix the build for now.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/mach-mx25_3ds.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx25_3ds.c b/arch/arm/mach-imx/mach-mx25_3ds.c
-> index 561f07f..11c25f9 100644
-> --- a/arch/arm/mach-imx/mach-mx25_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx25_3ds.c
-> @@ -208,7 +208,6 @@ static const struct fsl_usb2_platform_data otg_device_pdata __initconst = {
->  
->  static const struct esdhc_platform_data mx25pdk_esdhc_pdata __initconst = {
->  	.wp_gpio = SD1_GPIO_WP,
-> -	.cd_gpio = SD1_GPIO_CD,
->  };
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ arch/arm/mach-imx/devices-imx1.h            |    4 ++++
+ arch/arm/plat-mxc/devices/platform-imx-fb.c |    5 +++++
+ arch/arm/plat-mxc/include/mach/mx1.h        |    2 +-
+ 3 files changed, 10 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-imx/devices-imx1.h b/arch/arm/mach-imx/devices-imx1.h
+index fd26715..da59365 100644
+--- a/arch/arm/mach-imx/devices-imx1.h
++++ b/arch/arm/mach-imx/devices-imx1.h
+@@ -9,6 +9,10 @@
+ #include <mach/mx1.h>
+ #include <mach/devices-common.h>
+ 
++extern const struct imx_imx_fb_data imx1_imx_fb_data __initconst;
++#define imx1_add_imx_fb(pdata) \
++    imx_add_imx_fb(&imx1_imx_fb_data, pdata)
++
+ extern const struct imx_imx_i2c_data imx1_imx_i2c_data __initconst;
+ #define imx1_add_imx_i2c(pdata)		\
+ 	imx_add_imx_i2c(&imx1_imx_i2c_data, pdata)
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-fb.c b/arch/arm/plat-mxc/devices/platform-imx-fb.c
+index 6100a7d..79a1cb1 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-fb.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-fb.c
+@@ -16,6 +16,11 @@
+ 		.irq = soc ## _INT_LCDC,				\
+ 	}
+ 
++#ifdef CONFIG_SOC_IMX1
++const struct imx_imx_fb_data imx1_imx_fb_data __initconst =
++	imx_imx_fb_data_entry_single(MX1, SZ_4K);
++#endif /* ifdef CONFIG_SOC_IMX1 */
++
+ #ifdef CONFIG_SOC_IMX21
+ const struct imx_imx_fb_data imx21_imx_fb_data __initconst =
+ 	imx_imx_fb_data_entry_single(MX21, SZ_4K);
+diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
+index 7c871b8..97b19e7 100644
+--- a/arch/arm/plat-mxc/include/mach/mx1.h
++++ b/arch/arm/plat-mxc/include/mach/mx1.h
+@@ -89,7 +89,7 @@
+ #define MX1_GPIO_INT_PORTA	11
+ #define MX1_GPIO_INT_PORTB	12
+ #define MX1_GPIO_INT_PORTC	13
+-#define MX1_LCDC_INT		14
++#define MX1_INT_LCDC		14
+ #define MX1_SIM_INT		15
+ #define MX1_SIM_DATA_INT	16
+ #define MX1_RTC_INT		17
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.3.4
