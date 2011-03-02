@@ -1,35 +1,87 @@
-From: ccross@google.com (Colin Cross)
-Date: Tue, 1 Mar 2011 18:23:13 -0800
-Subject: Common suspend and resume with L2 cache on
-Message-ID: <AANLkTimxDjSun5+gaU5fMNf2KMVTNbfdq-D=0iU6tYZg@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 01 Mar 2011 18:23:32 -0800
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <4D6DA290.2010607@bluewatersys.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>
+	<4D6DA290.2010607@bluewatersys.com>
+Message-ID: <4D6DAA24.3000204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that common suspend helpers are in linux-next, I'm going back to
-trying to use them with the L2 cache on, which is required when
-implementing cpuidle states that put a cpu in reset in an SMP system.
+On 03/01/2011 05:51 PM, Ryan Mallon wrote:
+> On 03/02/2011 02:39 PM, Saravana Kannan wrote:
+>> On 03/01/2011 05:27 PM, Ryan Mallon wrote:
+>>> On 03/02/2011 02:19 PM, Saravana Kannan wrote:
+>>>> On 03/01/2011 05:13 PM, Andrei Warkentin wrote:
+>>>>> On Mon, Feb 28, 2011 at 10:51 PM, Saravana Kannan
+>>>>> <skannan@codeaurora.org>    wrote:
+>>>
+>>> <snip>
+>>>
+>>>>> What would an "arch" file mean? The name of the soc platform?
+>>>>
+>>>> The arch file would pretty much be the "xxxx" from arch/arm/mach-xxxx or
+>>>> similar paths. If that info is already available elsewhere, then that
+>>>> file is not needed. I proposed using the arch since that will remove the
+>>>> need to maintain some database of unique/reserved names/numbers for each
+>>>> implementation of socinfo (like the machinetypes list we have).
+>>>
+>>> /proc/cpuinfo already tells you what the CPU is, which gives more
+>>> information than just the architecture name.
+>>>
+>>> Why is the arch information even required by userspace?
+>>
+>> The socinfo exported by each soc is different. If userspace is trying to
+>> make decisions based on socinfo, it will need to know what type of soc
+>> (really what type of socinfo implementation) it is before trying to
+>> interpret the rest of the socinfo files. Keep in mind that cpuinfo is
+>> different from socinfo -- the cpu is just a small part of a soc.
+>
+> I understand that having a socinfo file for obtaining information about
+> a particular SoC would be useful. A similar discussion came up a few
+> years ago when we talked about having a socinfo file for exposing the
+> ep93xx Maverick crunch id, but nothing ever came out of it.
+>
+> What I don't understand is why you want the 'arch' file (ie the
+> mach-xxxx) name. /proc/cpuinfo already gives you more information than
+> an 'arch' file would. I also can't think of a particularly good
+> situation why userspace would need to know at runtime what the
+> architecture is.
+>
+> Have a socinfo file to expose implementation details of the particular
+> SoC I am fine with (assuming those details are useful to userspace),
+> having an 'arch' file to expose the architecture I am against.
 
-There are a few obvious requirements - the stack pointer, stack
-contents, and page tables must be flushed in the L2 during suspend.
+You probably already understood this, but just to be sure, when I say 
+"socinfo implementation" I mean the various ways the socinfo data should 
+be interpreted by userspace. "socid" of 1 would mean a different thing 
+depending on whether it's for omap, msm, kirkwood, etc.
 
-There is one trickier problem. The current resume sequence starts from
-reset, with cache and MMU off:
-   Restore cpu registers, including TTBR0, but not SCTLR
-   Rewrite the page table to map the MMU trampoline VA=PA
-   Restore SCTLR with dcache bit off (enables MMU)
-   Jump to virtual address
-   Restore SCTLR with original dcache bit
+I don't have any attachment to the "arch" file suggestion. If there is a 
+better solution to identify the different implementations of socinfo 
+without having to maintain some "unique id" list in the kernel, then I'm 
+all for it. But cpuinfo is not it.
 
-The page table is rewritten with the temporary mapping with the cache
-off, so the write goes directly to memory.  When the MMU is enabled,
-the TTBR0 RGN and IRGN bits determine the cachability attributes of
-the page table walk memory accesses.  These bits are normally set to
-cachable, so when the MMU is turned on, the page table walks can hit
-the L2 instead of memory.  If a stale entry for the temporary mapping
-is in the L2, which can happen if it is prefetched by the other cpu
-during suspend, the page table walk will not see the new mapping.
+Which data listed in cpuinfo do you think will let you identify the 
+socinfo implementation in a unique manner? The only thing that's even 
+remotely possible is vendor_id, but I'm not sure what it's supposed to 
+be if the CPU core is licensed from some vendor and used in a SOC by 
+another vendor. What is a Samsung with an ARM11 core supposed to list 
+for vendor_id? What if the another Samsung SOC has a Samsung's own CPU 
+core? What about non-ARM architectures? I would rather not add implicit 
+dependency on cpuinfo that's hard to maintain or guarantee and instead 
+have the socinfo implementation explicitly exported.
 
-This could be fixed by restoring the TTBR0 register with caching
-disabled, and re-enabling caching after the page table entry is
-restored, or by switching to a custom page table prepared during init
-to avoid any writes while the cache is off.
+The "arch" filename and what it's supposed to contain was just a 
+suggestion. Another alternative might be to call it soc-family and the a 
+general guideline to keep it as close as possible to the mach-xxxx name. 
+For example, omap3 and omap4 might not care for having different socinfo 
+implementations and can decide to use the socfamily name of "omap".
+
+Thanks,
+Saravana
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
