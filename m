@@ -1,39 +1,46 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 02 Mar 2011 22:16:12 +0530
-Subject: [PATCH 1/8 resend] dw_dmac: Remove compilation dependency from
-	AVR32
-In-Reply-To: <d41145ce4d5e3d870f720709f68d5b1dbf34d6a0.1298889267.git.viresh.kumar@st.com>
-References: <cover.1298889267.git.viresh.kumar@st.com>
-	<d41145ce4d5e3d870f720709f68d5b1dbf34d6a0.1298889267.git.viresh.kumar@st.com>
-Message-ID: <1299084372.6974.91.camel@vkoul-udesk3>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 02 Mar 2011 22:38:39 +0530
+Subject: [PATCH v2 10/18] omap3+: sr: call handler with interrupt disabled
+In-Reply-To: <4D6E4866.6070107@ru.mvista.com>
+References: <1299063331-27968-1-git-send-email-nm@ti.com>
+	<1299063331-27968-11-git-send-email-nm@ti.com>
+	<4D6E4866.6070107@ru.mvista.com>
+Message-ID: <4D6E7997.2040303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
-> This will be used in SPEAr, ARM family.
-Does this mean it can be used on AVR32 now? Did you implay it will
-*also* be....
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/dma/Kconfig |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 1c28816..95c7db7 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -82,7 +82,6 @@ config INTEL_IOP_ADMA
->  
->  config DW_DMAC
->  	tristate "Synopsys DesignWare AHB DMA support"
-> -	depends on AVR32
-Shouldn't you be adding a corresponding depends on new arch? And since
-this supports old arch as well, it should say depends on both...
->  	select DMA_ENGINE
->  	default y if CPU_AT32AP7000
->  	help
-
+Sergei Shtylyov wrote, on 03/02/2011 07:08 PM:
+> Hello.
+>
+> On 02-03-2011 13:55, Nishanth Menon wrote:
+>
+>> Request the handler irq such that there is no nesting for calls.
+>> the notifiers are not expected to be nested, further the interrupt
+>> events for status change should be handled prior to the next event
+>> else there is a risk of loosing events.
+>
+>> Signed-off-by: Nishanth Menon<nm@ti.com>
+>> ---
+>> arch/arm/mach-omap2/smartreflex.c | 2 +-
+>> 1 files changed, 1 insertions(+), 1 deletions(-)
+>
+>> diff --git a/arch/arm/mach-omap2/smartreflex.c
+>> b/arch/arm/mach-omap2/smartreflex.c
+>> index 99e4c4f..a4e9f2d 100644
+>> --- a/arch/arm/mach-omap2/smartreflex.c
+>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>> @@ -278,7 +278,7 @@ static int sr_late_init(struct omap_sr *sr_info)
+>> goto error;
+>> }
+>> ret = request_irq(sr_info->irq, sr_interrupt,
+>> - 0, name, (void *)sr_info);
+>> + IRQF_DISABLED, name, (void *)sr_info);
+>
+> Isn't this flag a nop now?
+thanks. hmm...
+Documentation/feature-removal-schedule.txt says so as well.. I guess I 
+was just being paranoid (again?).
 
 -- 
-~Vinod
+Regards,
+Nishanth Menon
