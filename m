@@ -1,245 +1,112 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 Mar 2011 14:45:39 -0800
-Subject: [PATCH 11/17] omap4: suspend: Add MPUSS RET and OFF support
-In-Reply-To: <1298112158-28469-12-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Sat, 19 Feb 2011 16:12:32 +0530")
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-	<1298112158-28469-12-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87r5ap2lbg.fsf@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 2 Mar 2011 22:46:16 +0000
+Subject: [Qualcomm PM8921 MFD 2/6] mfd: pm8xxx: Add irq support
+In-Reply-To: <1299104001-5240-3-git-send-email-adharmap@codeaurora.org>
+References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
+	<1299104001-5240-3-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20110302224616.GB32325@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Wed, Mar 02, 2011 at 02:13:17PM -0800, adharmap at codeaurora.org wrote:
+> 
+> Change-Id: Ibb23878cd382af9a750d62ab49482f5dc72e3714
+> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
 
-> This patch adds MPUSS(MPU Sub System) RET and OFF mode support
-> to suspend path. For both MPUSS RET and OFF support, CPUs are
-> programmed to OFF state.
->
-> Only MPUSS RET and OFF supported at this point of time. CORE RET
-> will be added subsequently.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/mach-omap2/omap4-mpuss-lowpower.c |    8 ++-
->  arch/arm/mach-omap2/pm-debug.c             |    2 +
->  arch/arm/mach-omap2/pm.h                   |    1 +
->  arch/arm/mach-omap2/pm44xx.c               |   88 ++++++++++++++++++++++++++--
->  4 files changed, 93 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
-> index bff768f..ab2e101 100644
-> --- a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
-> +++ b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
-> @@ -25,7 +25,7 @@
->   *	ON(Inactive)	OFF		ON(Inactive)
->   *	OFF		OFF		CSWR
->   *	OFF		OFF		OSWR (*TBD)
-> - *	OFF		OFF		OFF* (*TBD)
-> + *	OFF		OFF		OFF
->   *	----------------------------------------------
->   *
->   * Note: CPU0 is the master core and it is the last CPU to go down
-> @@ -291,6 +291,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->  	 * Check MPUSS next state and save GIC if needed
->  	 * GIC lost during MPU OFF and OSWR
->  	 */
-> +	pwrdm_clear_all_prev_pwrst(mpuss_pd);
->  	if (pwrdm_read_next_pwrst(mpuss_pd) == PWRDM_POWER_OFF) {
->  		omap_wakeupgen_save();
->  		gic_save_context();
-> @@ -357,6 +358,8 @@ int __init omap4_mpuss_init(void)
->  		pr_err("Lookup failed for CPU0 pwrdm\n");
->  		return -ENODEV;
+Remove the change IDs from upstream submissions.  The kernel doesn't use
+gerritt.
+
+>  struct pm8921 {
+> -	struct device *dev;
+> +	struct device			*dev;
+> +	struct device			*irq_dev;
+
+Is it really useful to register a struct device purely for the interrupt
+controller?  I'd have expected this to be core functionality of the
+device.  The fact that you need to store the device at all is a bit odd
+too as you're using the MFD API.
+
+>  static struct pm8xxx_drvdata pm8921_drvdata = {
+> -	.pmic_readb	= pm8921_readb,
+> -	.pmic_writeb	= pm8921_writeb,
+> -	.pmic_read_buf	= pm8921_read_buf,
+> -	.pmic_write_buf = pm8921_write_buf,
+> +	.pmic_readb		= pm8921_readb,
+> +	.pmic_writeb		= pm8921_writeb,
+> +	.pmic_read_buf		= pm8921_read_buf,
+> +	.pmic_write_buf		= pm8921_write_buf,
+> +	.pmic_read_irq_stat	= pm8921_read_irq_stat,
+> +};
+
+It'd seem better to indent things as per the final driver in the first
+patch - this reindentation creates a lot of noise in the diff.
+
+>  		goto err_read_rev;
 >  	}
-> +	/* Clear CPU previous power domain state */
-> +	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
+> -	pr_info("PMIC revision:   %02X\n", val);
+> +	pr_info("PMIC revision 1: %02X\n", val);
+> +	rev = val;
+>  
 
-?  duplicate of lines immediately following.
+Again, do this in the first patch.
 
->  	/* Clear CPU previous power domain state */
->  	pwrdm_clear_all_prev_pwrst(pm_info->pwrdm);
-> @@ -394,6 +397,9 @@ int __init omap4_mpuss_init(void)
->  		return -ENODEV;
->  	}
->  
-> +	/* Clear CPU previous power domain state */
-> +	pwrdm_clear_all_prev_pwrst(mpuss_pd);
-> +
->  	/*
->  	 * Find out how many interrupts are supported.
->  	 * OMAP4 supports max of 128 SPIs where as GIC can support
-> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-> index 125f565..9b46b3e 100644
-> --- a/arch/arm/mach-omap2/pm-debug.c
-> +++ b/arch/arm/mach-omap2/pm-debug.c
-> @@ -588,6 +588,8 @@ static int option_set(void *data, u64 val)
->  			omap_pm_disable_off_mode();
->  		if (cpu_is_omap34xx())
->  			omap3_pm_off_mode_enable(val);
-> +		else if (cpu_is_omap44xx())
-> +			omap4_pm_off_mode_enable(val);
->  	}
->  
->  	return 0;
-> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-> index 1c1b0ab..f557407 100644
-> --- a/arch/arm/mach-omap2/pm.h
-> +++ b/arch/arm/mach-omap2/pm.h
-> @@ -17,6 +17,7 @@
->  
->  extern void *omap3_secure_ram_storage;
->  extern void omap3_pm_off_mode_enable(int);
-> +extern void omap4_pm_off_mode_enable(int);
->  extern void omap_sram_idle(void);
->  extern int omap3_can_sleep(void);
->  extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index 9a9dc41..f527e33 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -1,8 +1,9 @@
->  /*
->   * OMAP4 Power Management Routines
->   *
-> - * Copyright (C) 2010 Texas Instruments, Inc.
-> + * Copyright (C) 2010-2011 Texas Instruments, Inc.
->   * Rajendra Nayak <rnayak@ti.com>
-> + * Santosh Shilimkar <santosh.shilimkar@ti.com>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
-> @@ -21,6 +22,7 @@
->  
->  #include "powerdomain.h"
->  #include "clockdomain.h"
-> +#include "pm.h"
->  
->  struct power_state {
->  	struct powerdomain *pwrdm;
-> @@ -36,7 +38,50 @@ static LIST_HEAD(pwrst_list);
->  #ifdef CONFIG_SUSPEND
->  static int omap4_pm_suspend(void)
->  {
-> -	do_wfi();
-> +	struct power_state *pwrst;
-> +	int state, ret = 0;
-> +	u32 cpu_id = smp_processor_id();
-> +
-> +	/* Save current powerdomain state */
-> +	list_for_each_entry(pwrst, &pwrst_list, node) {
-> +		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
-> +	}
-> +
-> +	/* Set targeted power domain states by suspend */
-> +	list_for_each_entry(pwrst, &pwrst_list, node) {
-> +		/* FIXME: Remove this check when CORE retention is supported */
-> +		if (!strcmp(pwrst->pwrdm->name, "mpu_pwrdm"))
-> +			omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-> +	}
-
-pwrst_list is the list of powerdomains to that will be changed during
-suspend.
-
-Rather than doing this string match for every suspend, just do the check
-once during init and only add powerdomains that can transition to the
-list.
-
-> +	/*
-> +	 * For MPUSS to hit power domain retention(CSWR or OSWR),
-> +	 * CPU0 and CPU1 power domain needs to be in OFF or DORMANT
-> +	 * state. For MPUSS to reach off-mode. CPU0 and CPU1 power domain
-> +	 * should be in off state.
-> +	 * Only master CPU followes suspend path. All other CPUs follow
-> +	 * cpu-hotplug path in system wide suspend. On OMAP4, CPU power
-> +	 * domain CSWR is not supported by hardware.
-> +	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
-> +	 */
-> +	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
-> +
-> +	/* Restore next powerdomain state */
-> +	list_for_each_entry(pwrst, &pwrst_list, node) {
-> +		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
-> +		if (state > pwrst->next_state) {
-> +			pr_info("Powerdomain (%s) didn't enter "
-> +			       "target state %d\n",
-> +			       pwrst->pwrdm->name, pwrst->next_state);
-> +			ret = -1;
-> +		}
-> +		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
-> +	}
-> +	if (ret)
-> +		pr_err("Could not enter target state in pm_suspend\n");
-> +	else
-> +		pr_err("Successfully put all powerdomains to target state\n");
-> +
->  	return 0;
->  }
->  
-> @@ -91,7 +136,6 @@ static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
->  	return 0;
->  }
->  
-> -
-
-stray whitespace change
-
->  static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->  {
->  	struct power_state *pwrst;
-> @@ -99,14 +143,48 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->  	if (!pwrdm->pwrsts)
->  		return 0;
->  
-> +	/*
-> +	 * Skip CPU0 and CPU1 power domains. CPU1 is programmed
-> +	 * through hotplug path and CPU0 explicitly programmed
-> +	 * further down in the code path
-> +	 */
-> +	if ((!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
-> +		(!strcmp(pwrdm->name, "cpu1_pwrdm")))
-> +		return 0;
-> +
->  	pwrst = kmalloc(sizeof(struct power_state), GFP_ATOMIC);
->  	if (!pwrst)
->  		return -ENOMEM;
->  	pwrst->pwrdm = pwrdm;
-> -	pwrst->next_state = PWRDM_POWER_ON;
-> +
-> +	/* FIXME: Remove this check when core retention is supported */
-> +	if (!strcmp(pwrst->pwrdm->name, "mpu_pwrdm"))
-> +		pwrst->next_state = PWRDM_POWER_RET;
-> +	else
-> +		pwrst->next_state = PWRDM_POWER_ON;
-> +
->  	list_add(&pwrst->node, &pwrst_list);
->  
-> -	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
-> +	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
-> +}
-> +
-> +void omap4_pm_off_mode_enable(int enable)
+> +static int
+> +pm8xxx_read_block(const struct pm_irq_chip *chip, u8 bp, u8 *ip)
 > +{
-> +	struct power_state *pwrst;
-> +	u32 state;
+> +	int	rc;
 > +
-> +	if (enable)
-> +		state = PWRDM_POWER_OFF;
-> +	else
-> +		state = PWRDM_POWER_RET;
-> +
-> +	list_for_each_entry(pwrst, &pwrst_list, node) {
-> +		/* FIXME: Remove this check when core retention is supported */
-> +		if (!strcmp(pwrst->pwrdm->name, "mpu_pwrdm")) {
-
-same string-match comment as above
-
-> +			pwrst->next_state = state;
-> +			omap_set_pwrdm_state(pwrst->pwrdm, state);
-> +		}
+> +	rc = pm8xxx_writeb(chip->dev->parent,
+> +				SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
+> +	if (rc) {
+> +		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
+> +		goto bail_out;
 > +	}
->  }
->  
->  /**
+> +
+> +	rc = pm8xxx_readb(chip->dev->parent,
+> +			SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
+> +	if (rc)
+> +		pr_err("Failed Reading Status rc=%d\n", rc);
+> +bail_out:
+> +	return rc;
+> +}
 
-Kevin
+The namespacing here is odd, this looks like it should be a generic API
+not a block specific one.
+
+> +	/* Check IRQ bits */
+> +	for (k = 0; k < 8; k++) {
+> +		if (bits & (1 << k)) {
+> +			pmirq = block * 8 + k;
+> +			irq = pmirq + chip->irq_base;
+> +			/* Check spurious interrupts */
+> +			if (((1 << k) & chip->irqs_allowed[block])) {
+> +				/* Found one */
+> +				chip->irqs_to_handle[*handled] = irq;
+> +				(*handled)++;
+> +			} else { /* Clear and mask wrong one */
+> +				config = PM_IRQF_W_C_M |
+> +					(k << PM_IRQF_BITS_SHIFT);
+> +
+> +				pm8xxx_config_irq(chip,
+> +						  block, config);
+> +
+> +				if (pm8xxx_can_print())
+> +					pr_err("Spurious IRQ: %d "
+> +					       "[block, bit]="
+> +					       "[%d, %d]\n",
+> +					       irq, block, k);
+> +			}
+
+The generic IRQ code should be able to take care of spurious interrupts
+for you?  It's a bit surprising that there's all this logic - I'd expect
+an IRQ chip to just defer logic about which interrupts are valid and so
+on to the generic IRQ code.
+
+>  #include <linux/device.h>
+> +#include <linux/mfd/pm8xxx/irq.h>
+> +
+> +#define NR_PM8921_IRQS 256
+
+Traditionally this'd be namespaced like this:
+
++#define PM8921_NR_IRQS 256
