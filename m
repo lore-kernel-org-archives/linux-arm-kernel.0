@@ -1,109 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  2 Mar 2011 16:53:24 +0000
-Subject: [RFC PATCH 18/20] ARM: ux500: dynamically register local timer setup
+Date: Wed,  2 Mar 2011 16:53:19 +0000
+Subject: [RFC PATCH 13/20] ARM: msm: dynamically register local timer setup
 	function
 In-Reply-To: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
 References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1299084806-16546-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1299084806-16546-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-ux500/Makefile     |    1 -
- arch/arm/mach-ux500/cpu.c        |   12 ++++++++++++
- arch/arm/mach-ux500/localtimer.c |   26 --------------------------
- 3 files changed, 12 insertions(+), 27 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/localtimer.c
+ arch/arm/mach-msm/timer.c |   22 +++++++++++++++++++---
+ 1 files changed, 19 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index b549a8f..224bc74 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -14,7 +14,6 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
- obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
--obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
- obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
- obj-$(CONFIG_U5500_MBOX)	+= mbox-db5500.o
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 5a43107..e043d47 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -8,12 +8,15 @@
- #include <linux/platform_device.h>
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 56f920c..e029363 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -22,8 +22,10 @@
+ #include <linux/delay.h>
  #include <linux/io.h>
- #include <linux/clk.h>
-+#include <linux/clockchips.h>
  
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/hardware/gic.h>
- #include <asm/mach/map.h>
-+#include <asm/irq.h>
- #include <asm/localtimer.h>
-+#include <asm/smp_twd.h>
++#include <asm/localtimer.h>
+ #include <asm/mach/time.h>
+ #include <mach/msm_iomap.h>
++
+ #include <mach/cpu.h>
  
- #include <plat/mtu.h>
- #include <mach/hardware.h>
-@@ -115,6 +118,13 @@ static int ux500_l2x0_init(void)
- early_initcall(ux500_l2x0_init);
- #endif
+ #define TIMER_MATCH_VAL         0x0000
+@@ -200,6 +202,19 @@ static struct msm_clock msm_clocks[] = {
+ 	}
+ };
  
-+#ifdef CONFIG_LOCAL_TIMERS
-+static void __cpuinit ux500_local_timer_setup(struct clock_event_device *evt)
-+{
-+	evt->irq = IRQ_LOCALTIMER;
-+}
++#ifdef CONFIG_SMP
++static void __cpuinit msm_local_timer_setup(struct clock_event_device *evt);
++static int msm_local_timer_ack(void);
++
++static struct local_timer_ops msm_timer_ops = {
++	.setup	= msm_local_timer_setup,
++	.ack	= msm_local_timer_ack,
++};
++#define msm_timer_ops_ptr	(&msm_timer_ops)
++#else
++#define msm_timer_ops_ptr	NULL
 +#endif
 +
- static void __init ux500_timer_init(void)
+ static void __init msm_timer_init(void)
  {
- #ifdef CONFIG_LOCAL_TIMERS
-@@ -125,6 +135,8 @@ static void __init ux500_timer_init(void)
- 		twd_base = __io_address(U8500_TWD_BASE);
- 	else
- 		ux500_unknown_soc();
-+
-+	twd_timer_register_setup(ux500_local_timer_setup);
+ 	int i;
+@@ -228,6 +243,8 @@ static void __init msm_timer_init(void)
+ 	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
  #endif
- 	if (cpu_is_u5500())
- 		mtu_base = __io_address(U5500_MTU0_BASE);
-diff --git a/arch/arm/mach-ux500/localtimer.c b/arch/arm/mach-ux500/localtimer.c
-deleted file mode 100644
-index c648725..0000000
---- a/arch/arm/mach-ux500/localtimer.c
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- * Copyright (C) 2008-2009 ST-Ericsson
-- * Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-- *
-- * This file is heavily based on relaview platform, almost a copy.
-- *
-- * Copyright (C) 2002 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/init.h>
--#include <linux/clockchips.h>
--
--#include <asm/irq.h>
--#include <asm/localtimer.h>
--
--/*
-- * Setup the local clock events for a CPU.
-- */
+ 
++	percpu_timer_register(msm_timer_ops_ptr);
++
+ 	for (i = 0; i < ARRAY_SIZE(msm_clocks); i++) {
+ 		struct msm_clock *clock = &msm_clocks[i];
+ 		struct clock_event_device *ce = &clock->clockevent;
+@@ -263,7 +280,7 @@ static void __init msm_timer_init(void)
+ }
+ 
+ #ifdef CONFIG_SMP
 -int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	evt->irq = IRQ_LOCALTIMER;
++static void __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
+ {
+ 	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
+ 
+@@ -295,10 +312,9 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ 	gic_enable_ppi(clock->irq.irq);
+ 
+ 	clockevents_register_device(evt);
 -	return 0;
--}
+ }
+ 
+-inline int local_timer_ack(void)
++static inline int mem_local_timer_ack(void)
+ {
+ 	return 1;
+ }
 -- 
 1.7.0.4
