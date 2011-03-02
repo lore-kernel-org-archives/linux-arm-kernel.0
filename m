@@ -1,63 +1,77 @@
-From: adharmap@codeaurora.org (adharmap at codeaurora.org)
-Date: Wed,  2 Mar 2011 14:13:15 -0800
-Subject: [Qualcomm PM8921 MFD 0/6] *** SUBJECT HERE ***
-Message-ID: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 02 Mar 2011 14:17:59 -0800
+Subject: [PATCH 05/17] omap4: pm: Initialise all the clockdomains to
+	supported states
+In-Reply-To: <1298112158-28469-6-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Sat, 19 Feb 2011 16:12:26 +0530")
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
+	<1298112158-28469-6-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87r5ap5fqg.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-This patch series adds support for pmic 8921 chip and its subdevices.
-The pmic 8921 chip is used as a power management ic for 8960 based boards. It
-communicates over the ssbi bus, ssbi bus can be found here
+> Initialise hardware supervised mode for all clockdomains if it's
+> supported. Initiate sleep transition for other clockdomains,
+> if they are not being used.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm44xx.c |   22 +++++++++++++++++++++-
+>  1 files changed, 21 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+> index b142673..9a9dc41 100644
+> --- a/arch/arm/mach-omap2/pm44xx.c
+> +++ b/arch/arm/mach-omap2/pm44xx.c
+> @@ -17,9 +17,11 @@
+>  #include <linux/slab.h>
+>  #include <plat/clock.h>
+>  
+> -#include "powerdomain.h"
+>  #include <mach/omap4-common.h>
+>  
+> +#include "powerdomain.h"
+> +#include "clockdomain.h"
+> +
+>  struct power_state {
+>  	struct powerdomain *pwrdm;
+>  	u32 next_state;
+> @@ -74,6 +76,22 @@ static const struct platform_suspend_ops omap_pm_ops = {
+>  };
+>  #endif /* CONFIG_SUSPEND */
+>  
+> +/*
+> + * Enable hardwarew supervised mode for all clockdomains if it's
 
-https://patchwork.kernel.org/patch/601771/
+typo: hardware
 
-The patch set contains support for interrupt, gpio and mpp (multi purpose pin)
-subdevices.
-
-Note that gpio and mpp subdevices need the interrupt subdevice to
-be operational, this is becuase the reading the the value of gpio/mpp lines
-happens by doing a transaction over registers managed by the interrupt subdev.
-The code invokes a call on interrupt subdevice, rather than writing to those
-registers directly, avoiding race conditions.
-
-Abhijeet Dharmapurikar (5):
-  mfd: pm8921: Add PMIC 8921 core driver
-  mfd: pm8xxx: Add irq support
-  gpio: pm8xxx-gpio: Add pm8xxx gpio driver
-  MAINTAINERS: Add pmic8921, pmic8xxx subdevices maintainers
-  msm: board-8960: Add support for pm8921
-
-David Collins (1):
-  mfd: pm8xxx-mpp: Add pm8xxx MPP driver
-
- MAINTAINERS                                |    6 +
- arch/arm/mach-msm/board-msm8960.c          |   47 ++-
- arch/arm/mach-msm/include/mach/irqs-8960.h |    9 +-
- drivers/gpio/Kconfig                       |   10 +
- drivers/gpio/Makefile                      |    1 +
- drivers/gpio/pm8xxx-gpio.c                 |  452 +++++++++++++++++++++
- drivers/mfd/Kconfig                        |   41 ++
- drivers/mfd/Makefile                       |    3 +
- drivers/mfd/pm8921-core.c                  |  288 +++++++++++++
- drivers/mfd/pm8xxx-irq.c                   |  599 ++++++++++++++++++++++++++++
- drivers/mfd/pm8xxx-mpp.c                   |  319 +++++++++++++++
- include/linux/mfd/pm8921.h                 |   48 +++
- include/linux/mfd/pm8xxx/core.h            |   75 ++++
- include/linux/mfd/pm8xxx/gpio.h            |  132 ++++++
- include/linux/mfd/pm8xxx/irq.h             |   62 +++
- include/linux/mfd/pm8xxx/mpp.h             |  233 +++++++++++
- 16 files changed, 2310 insertions(+), 15 deletions(-)
- create mode 100644 drivers/gpio/pm8xxx-gpio.c
- create mode 100644 drivers/mfd/pm8921-core.c
- create mode 100644 drivers/mfd/pm8xxx-irq.c
- create mode 100644 drivers/mfd/pm8xxx-mpp.c
- create mode 100644 include/linux/mfd/pm8921.h
- create mode 100644 include/linux/mfd/pm8xxx/core.h
- create mode 100644 include/linux/mfd/pm8xxx/gpio.h
- create mode 100644 include/linux/mfd/pm8xxx/irq.h
- create mode 100644 include/linux/mfd/pm8xxx/mpp.h
-
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+> + * supported. Initiate sleep transition for other clockdomains, if
+> + * they are not used
+> + */
+> +static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
+> +{
+> +	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
+> +		clkdm_allow_idle(clkdm);
+> +	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
+> +			atomic_read(&clkdm->usecount) == 0)
+> +		clkdm_sleep(clkdm);
+> +	return 0;
+> +}
+> +
+> +
+>  static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
+>  {
+>  	struct power_state *pwrst;
+> @@ -116,6 +134,8 @@ static int __init omap4_pm_init(void)
+>  	/* Enable autoidle for all clks which support it*/
+>  	omap_clk_enable_autoidle();
+>  
+> +	(void) clkdm_for_each(clkdms_setup, NULL);
+> +
+>  	ret = omap4_mpuss_init();
+>  	if (ret) {
+>  		pr_err("Failed to initialise OMAP4 MPUSS\n");
