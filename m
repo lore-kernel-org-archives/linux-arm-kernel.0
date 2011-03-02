@@ -1,84 +1,25 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 01 Mar 2011 17:19:12 -0800
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>
-	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>
-Message-ID: <4D6D9B10.9000606@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 1 Mar 2011 22:21:53 -0300
+Subject: [PATCH V4 1/4] ARM: imx53_loco: add esdhc device support
+In-Reply-To: <1298973500-2858-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+References: <1298973500-2858-1-git-send-email-Hong-Xing.Zhu@freescale.com>
+Message-ID: <AANLkTinR9+tFVfNb626LF4TSc8c+8a+rSUNvQB7DwSUZ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2011 05:13 PM, Andrei Warkentin wrote:
-> On Mon, Feb 28, 2011 at 10:51 PM, Saravana Kannan
-> <skannan@codeaurora.org>  wrote:
->> On 02/28/2011 02:28 AM, Maxime Coquelin wrote:
->>>
->>> Hello Eduardo,
->>>
->>> On 02/16/2011 12:57 PM, Eduardo Valentin wrote:
->>>>>
->>>>> Eduardo, what has happened to this patchset?
->>>>
->>>> Got forgotten :-(. Unfortunately I didn't pushed it hard enough.
->>>
->>> I propose to refactor your patchset, moving from procfs to sysfs.
->>
->>>>> Do you want help in picking it up and try to polish it up?
->>>>
->>>> Yeah, but it would need a refactoring. IIRC, result of last discussion
->>>> was that we should not mess with /proc. So, maybe moving back
->>
->>>> to something under sysfs. Perhaps /sys/devices/soc or so?
->>>
->>> About the location of this new sysfs entry, where do you think it should
->>> be?
->>> I propose to create a new directory named "soc" in /sys/devices/system/.
->>>
->>> As platform vendors have several/different kind of IDs to export to
->>> sysfs, I propose each vendor to create file entries related to their IDs
->>> (eg. /sys/devices/system/soc/idcode for OMAP platforms).
->>
->> I think the path /sys/devices/system/soc/ will work for the MSM too. I would
->> have ideally liked it to be /sys/devices/system/soc/msm,
->> /sys/devices/system/soc/omap, etc, but we can't get to pick names for
->> devices under a class. So, we can make do with /sys/devices/system/soc/.
->>
->>> However, I think we should have a common file entry to export the unique
->>> ID of the platforms. Indeed, user-space applications should have a
->>> unified way to get this kind of ID, regardless of the platform (eg.
->>> /sys/devices/system/soc/unique_id).
->>
->> I like the idea of have a common file across all implementations that will
->> let user space identify what implementation is exporting the other files and
->> how to interpret them.
->>
->> I would like to propose an "arch" file to identify the arch the soc info
->> file are for. I'm guessing within an arch, the soc files would mostly be the
->> same? If there are other minor differences, we can let the arch specific
->> code deal with how the files are interpreted.
->>
->> Does "arch" work for everyone?
->>
->
-> Sorry to butt in, but what kind of info are you guys talking about?
+On Tue, Mar 1, 2011 at 6:58 AM, Richard Zhu <Hong-Xing.Zhu@freescale.com> wrote:
+> Signed-off-by: Richard Zhao <richard.zhao@freescale.com>
+> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> ---
+> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mx5/board-mx53_loco.c | ? ?2 ++
+> ?2 files changed, 3 insertions(+), 0 deletions(-)
 
-Please do butt in :-), that's what a community discussion is for.
+I thought you were going to put this patch as the last of the series.
 
-> Like SOC revision, serial numbers, etc...?
+It is strange to add support for the board first and add the support
+for the MX53 later.
 
-Like SOC type (to identify different chipsets), revision, etc.
+Regards,
 
-> What would an "arch" file mean? The name of the soc platform?
-
-The arch file would pretty much be the "xxxx" from arch/arm/mach-xxxx or 
-similar paths. If that info is already available elsewhere, then that 
-file is not needed. I proposed using the arch since that will remove the 
-need to maintain some database of unique/reserved names/numbers for each 
-implementation of socinfo (like the machinetypes list we have).
-
--Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Fabio Estevam
