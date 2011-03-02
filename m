@@ -1,62 +1,53 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Wed,  2 Mar 2011 08:11:05 +0000
-Subject: [PATCH] MX1: Add structure,
-	registration functions for framebuffer and rename LCDC INT
-Message-ID: <1299053465-99879-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: Tero.Kristo@nokia.com (Tero.Kristo at nokia.com)
+Date: Wed, 2 Mar 2011 08:18:29 +0000
+Subject: [PATCH 0/2] OMAP3: cpuidle: prevent CORE pwrdm from entering
+	low-power state when DSS active
+In-Reply-To: <20110301220833.32613.54669.stgit@twilight.localdomain>
+References: <20110301220833.32613.54669.stgit@twilight.localdomain>
+Message-ID: <854C6400F5AA6644BA6FE7953F3E769B0380D180@008-AM1MPN1-013.mgdnok.nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/mach-imx/devices-imx1.h            |    4 ++++
- arch/arm/plat-mxc/devices/platform-imx-fb.c |    5 +++++
- arch/arm/plat-mxc/include/mach/mx1.h        |    2 +-
- 3 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-imx/devices-imx1.h b/arch/arm/mach-imx/devices-imx1.h
-index fd26715..da59365 100644
---- a/arch/arm/mach-imx/devices-imx1.h
-+++ b/arch/arm/mach-imx/devices-imx1.h
-@@ -9,6 +9,10 @@
- #include <mach/mx1.h>
- #include <mach/devices-common.h>
- 
-+extern const struct imx_imx_fb_data imx1_imx_fb_data __initconst;
-+#define imx1_add_imx_fb(pdata) \
-+    imx_add_imx_fb(&imx1_imx_fb_data, pdata)
-+
- extern const struct imx_imx_i2c_data imx1_imx_i2c_data __initconst;
- #define imx1_add_imx_i2c(pdata)		\
- 	imx_add_imx_i2c(&imx1_imx_i2c_data, pdata)
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-fb.c b/arch/arm/plat-mxc/devices/platform-imx-fb.c
-index 6100a7d..79a1cb1 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-fb.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-fb.c
-@@ -16,6 +16,11 @@
- 		.irq = soc ## _INT_LCDC,				\
- 	}
- 
-+#ifdef CONFIG_SOC_IMX1
-+const struct imx_imx_fb_data imx1_imx_fb_data __initconst =
-+	imx_imx_fb_data_entry_single(MX1, SZ_4K);
-+#endif /* ifdef CONFIG_SOC_IMX1 */
-+
- #ifdef CONFIG_SOC_IMX21
- const struct imx_imx_fb_data imx21_imx_fb_data __initconst =
- 	imx_imx_fb_data_entry_single(MX21, SZ_4K);
-diff --git a/arch/arm/plat-mxc/include/mach/mx1.h b/arch/arm/plat-mxc/include/mach/mx1.h
-index 7c871b8..97b19e7 100644
---- a/arch/arm/plat-mxc/include/mach/mx1.h
-+++ b/arch/arm/plat-mxc/include/mach/mx1.h
-@@ -89,7 +89,7 @@
- #define MX1_GPIO_INT_PORTA	11
- #define MX1_GPIO_INT_PORTB	12
- #define MX1_GPIO_INT_PORTC	13
--#define MX1_LCDC_INT		14
-+#define MX1_INT_LCDC		14
- #define MX1_SIM_INT		15
- #define MX1_SIM_DATA_INT	16
- #define MX1_RTC_INT		17
--- 
-1.7.3.4
+>-----Original Message-----
+>From: ext Paul Walmsley [mailto:paul at pwsan.com]
+>Sent: 02 March, 2011 00:49
+>To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>Kristo Tero (Nokia-MS/Tampere)
+>Subject: [PATCH 0/2] OMAP3: cpuidle: prevent CORE pwrdm from entering
+>low-power state when DSS active
+>
+>This series prevents the OMAP3 CPUIdle code from programming the CORE
+>powerdomain to enter any power state lower than ON when the DSS power
+>domain
+>is ON.  (The assumption is that in this case, the DSS is active, DMA'ing
+>lines from RAM and displaying them somewhere.)
+>
+>Tero, please don't hesitate to comment on the patch from you if I got
+>the
+>commit message wrong.
+
+Hi Paul,
+
+It looks good to me.
+
+
+>
+>
+>- Paul
+>
+>---
+>
+>Tero Kristo (1):
+>      OMAP3: cpuidle: prevent CORE power domain from going to RET or OFF
+>when DSS is on
+>
+>Paul Walmsley (1):
+>      OMAP3: cpuidle: add more details to the DSS-related CORE power
+>domain state restriction
+>
+>
+> arch/arm/mach-omap2/cpuidle34xx.c |   36
+>++++++++++++++++++++++++++++++++++--
+> 1 files changed, 34 insertions(+), 2 deletions(-)
