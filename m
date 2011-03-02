@@ -1,123 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 Mar 2011 14:23:39 -0800
-Subject: [PATCH 07/17] omap4: pm: CPU1 wakeup workaround form Low power
-	modes
-In-Reply-To: <1298112158-28469-8-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Sat, 19 Feb 2011 16:12:28 +0530")
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-	<1298112158-28469-8-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87ipw15fh0.fsf@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 2 Mar 2011 22:28:51 +0000
+Subject: [Qualcomm PM8921 MFD 1/6] mfd: pm8921: Add PMIC 8921 core driver
+In-Reply-To: <1299104001-5240-2-git-send-email-adharmap@codeaurora.org>
+References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
+	<1299104001-5240-2-git-send-email-adharmap@codeaurora.org>
+Message-ID: <20110302222850.GA32325@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Wed, Mar 02, 2011 at 02:13:16PM -0800, adharmap at codeaurora.org wrote:
 
-> The SGI(Software Generated Interrupts) are not wakeup capable from
-> low power states. This is known limitation on OMAP4 and needs to be
-> worked around by using software forced clockdomain wake-up. CPU0 forces
-> the CPU1 clockdomain to software force wakeup. After the wakeup, CPU1
-> restores its clockdomain hardware supervised mode.
->
-> More details can be found in OMAP4430 TRM - Version J
-> Section :
-> 	4.3.4.2 Power States of CPU0 and CPU1
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/mach-omap2/omap-hotplug.c |    9 +++++++++
->  arch/arm/mach-omap2/omap-smp.c     |   27 ++++++++++++++++++++++++++-
->  2 files changed, 35 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
-> index 9f8f097..cf4ab15 100644
-> --- a/arch/arm/mach-omap2/omap-hotplug.c
-> +++ b/arch/arm/mach-omap2/omap-hotplug.c
-> @@ -23,6 +23,7 @@
->  #include <mach/omap-wakeupgen.h>
->  
->  #include "powerdomain.h"
-> +#include "clockdomain.h"
->  
->  int platform_cpu_kill(unsigned int cpu)
->  {
-> @@ -36,6 +37,11 @@ int platform_cpu_kill(unsigned int cpu)
->  void platform_cpu_die(unsigned int cpu)
->  {
->  	unsigned int this_cpu;
-> +	static struct clockdomain *cpu1_clkdm;
-> +
-> +	/* To avoid cpu1 clockdomain lookup every time */
+> +config MFD_PM8XXX
+> +	tristate "Support for Qualcomm PM8xxx subdevices"
+> +	help
+> +	  This option enables the usage of various Qualcomm PMIC 8xxx subdevice
+> +	  drivers. This is required in order to use generic PM8xxx subdevice
+> +	  drivers. Selecting with option will result in PM8xxx subdevice
+> +	  drivers being compiled by default.
 
-minor: comment doesn't really match code and could just be removed
+As this is selected by the driver it shouldn't have any help text -
+there's no point in users seeing the option since it's useless by
+itself.  If we get enough to make an option useful either a menu or
+dependencies from the individual MFDs would be a better option.
 
-> +	if (!cpu1_clkdm)
-> +		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
->  
->  	flush_cache_all();
->  	dsb();
-> @@ -59,6 +65,9 @@ void platform_cpu_die(unsigned int cpu)
->  			 * OK, proper wakeup, we're done
->  			 */
->  			omap_wakeupgen_irqmask_all(this_cpu, 0);
-> +
-> +			/* Restore clockdomain to hardware supervised */
-> +			clkdm_allow_idle(cpu1_clkdm);
->  			break;
->  		}
->  		pr_debug("CPU%u: spurious wakeup call\n", cpu);
-> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> index b105a29..31c9b79 100644
-> --- a/arch/arm/mach-omap2/omap-smp.c
-> +++ b/arch/arm/mach-omap2/omap-smp.c
-> @@ -25,6 +25,8 @@
->  #include <mach/hardware.h>
->  #include <mach/omap4-common.h>
->  
-> +#include "clockdomain.h"
-> +
->  /* SCU base address */
->  void __iomem *scu_base;
->  
-> @@ -48,6 +50,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
->  
->  int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
-> +	static struct clockdomain *cpu1_clkdm;
-> +	static bool booted;
->  	/*
->  	 * Set synchronisation state between this boot processor
->  	 * and the secondary one
-> @@ -63,7 +67,28 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
->  	flush_cache_all();
->  	smp_wmb();
-> -	smp_cross_call(cpumask_of(cpu), 1);
-> +
-> +	/* To avoid cpu1 clockdomain lookup every time */
+> +static int __devinit pm8921_add_subdevices(const struct pm8921_platform_data
+> +					   *pdata,
+> +					   struct pm8921 *pmic)
+> +{
+> +	return 0;
+> +}
 
-ditto
+This looks suspicious.
 
-> +	if (!cpu1_clkdm)
-> +		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
-> +
-> +	/*
-> +	 * The SGI(Software Generated Interrupts) are not wakeup capable
-> +	 * from low power states. This is known limitation on OMAP4 and
-> +	 * needs to be worked around by using software forced clockdomain
-> +	 * wake-up. To wakeup CPU1, CPU0 forces the CPU1 clockdomain to
-> +	 * software force wakeup. After the wakeup, CPU1 restores its
-> +	 * clockdomain hardware supervised mode.
-> +	 * More details can be found in OMAP4430 TRM - Version J
-> +	 * Section :
-> +	 *	4.3.4.2 Power States of CPU0 and CPU1
-> +	 */
-> +	if (booted) {
-> +		clkdm_wakeup(cpu1_clkdm);
-> +	} else {
-> +		dsb_sev();
-> +		booted = true;
-> +	}
->  
->  	/*
->  	 * Now the secondary core is starting up let it run its
+> +static int __init pm8921_init(void)
+> +{
+> +	return platform_driver_register(&pm8921_driver);
+> +}
+> +postcore_initcall(pm8921_init);
+
+Typically subsys_initcall() has been used.
