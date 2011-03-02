@@ -1,103 +1,96 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 03 Mar 2011 00:16:01 +0530
-Subject: [PATCH 8/8 resend] dw_dmac.c: Pass Channel Priority from
-	platform_data
-In-Reply-To: <12a1cd2df6804fbd27adf57d73b5fb0c0fb6145c.1298889267.git.viresh.kumar@st.com>
-References: <cover.1298889267.git.viresh.kumar@st.com>
-	<12a1cd2df6804fbd27adf57d73b5fb0c0fb6145c.1298889267.git.viresh.kumar@st.com>
-Message-ID: <1299091561.6974.103.camel@vkoul-udesk3>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 2 Mar 2011 19:17:44 +0000
+Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <alpine.LFD.2.00.1103021015110.2701@localhost6.localdomain6>
+References: <1298900022-21516-7-git-send-email-will.deacon@arm.com>
+	<20110228140327.GA1937@n2100.arm.linux.org.uk>
+	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
+	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
+	<20110228214445.GD1937@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
+	<20110301201904.GA27107@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+	<20110302085356.GB4493@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103021015110.2701@localhost6.localdomain6>
+Message-ID: <20110302191744.GA13179@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
-> In Synopsys designware, channel priority is programmable. This patch adds
-> support for passing channel priority through platform data. By default Ascending
-> channel priority will be followed, i.e. channel 0 will get highest priority and
-> channel 7 will get lowest.
+On Wed, Mar 02, 2011 at 10:25:02AM +0100, Thomas Gleixner wrote:
+> On Wed, 2 Mar 2011, Russell King - ARM Linux wrote:
+> > On Tue, Mar 01, 2011 at 10:29:37PM +0100, Thomas Gleixner wrote:
+> > > Errm. I did never say that we disable the parent interrupt by any
+> > > means except when the chained handler explicitely wants to do that,
+> > > which is pretty much pointlesss nowadays, as we run all interrupt
+> > > handlers with interrupts disabled.
+> > 
+> > And that's now why some platforms struggle to work, and we're having
+> > to bodge around this - like the ARM platforms with MMC support.  Like
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> ---
->  drivers/dma/dw_dmac.c      |   11 ++++++++++-
->  drivers/dma/dw_dmac_regs.h |    3 +++
->  include/linux/dw_dmac.h    |    4 +++-
->  3 files changed, 16 insertions(+), 2 deletions(-)
+> Whats the problem for MMC?
+
+The FIFO interrupt gets completely buggered by USB interrupts such that
+we can't read data fast enough.  With the old IRQF_DISABLED system,
+the FIFO interrupt was marked IRQF_DISABLED as it was *fast* and needed
+not to be interrupted.  Other interrupts didn't have IRQF_DISABLED set.
+
+That means such interrupts can be handled while other longer interrupts
+are in progress.  All that's gone out of the window now that all IRQ
+handlers are run with IRQs permanently disabled.
+
+And when this kind of behaviour becomes system specific (eg, the USB
+device driver doesn't have this problem on x86 so why should it change)
+then it all becomes impossible.  There's hardware modifications in
+progress to add deeper FIFOs (which need to be extended to something
+idiotic like 512 32-bit words to work around the problem) and adaptive
+clocking schemes which retry transfers at slower clock rates in the hope
+that the IRQ handler can keep up.
+
+It's a complete mess.
+
+Another example - a platform I've worked on requires tight timings from
+I2C in order for the CPU not to be spontaneously rebooted.  A timeout
+on I2C will cause this.  We managed to get this platform to work reliably
+by using IRQF_DISABLED and having the standard behaviour (IRQs enabled
+during other interrupts).  Now - god knows if it'll work reliably anymore,
+my guess is that with latest kernels it'll be impossibly unreliable.
+
+> > some other platforms where having IRQs disabled during IDE prevents
+> > interrupts being recevied for long periods of time (longer than the
+> > 100Hz tick period).
 > 
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index 37ffd2c..edb3d3b 100644
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-> @@ -896,8 +896,11 @@ static int dwc_alloc_chan_resources(struct dma_chan *chan)
->  		BUG_ON(!dws->dma_dev || dws->dma_dev != dw->dma.dev);
->  
->  		cfghi = dws->cfg_hi;
-> -		cfglo = dws->cfg_lo;
-> +		cfglo = dws->cfg_lo & ~DWC_CFGL_CH_PRIOR_MASK;
->  	}
-> +
-> +	cfglo |= DWC_CFGL_CH_PRIOR(dwc->priority);
-> +
->  	channel_writel(dwc, CFG_LO, cfglo);
->  	channel_writel(dwc, CFG_HI, cfghi);
->  
-> @@ -1320,6 +1323,12 @@ static int __init dw_probe(struct platform_device *pdev)
->  		else
->  			list_add(&dwc->chan.device_node, &dw->dma.channels);
->  
-> +		/* 7 is highest priority & 0 is lowest. */
-> +		if (pdata->chan_priority == CHAN_PRIORITY_ASCENDING)
-> +			dwc->priority = 7 - i;
-> +		else
-> +			dwc->priority = i;
-> +
->  		dwc->ch_regs = &__dw_regs(dw)->CHAN[i];
->  		spin_lock_init(&dwc->lock);
->  		dwc->mask = 1 << i;
-> diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-> index d9a939f..6a8e6d3 100644
-> --- a/drivers/dma/dw_dmac_regs.h
-> +++ b/drivers/dma/dw_dmac_regs.h
-> @@ -101,6 +101,8 @@ struct dw_dma_regs {
->  #define DWC_CTLH_BLOCK_TS_MASK	0x00000fff
->  
->  /* Bitfields in CFG_LO. Platform-configurable bits are in <linux/dw_dmac.h> */
-> +#define DWC_CFGL_CH_PRIOR_MASK	(0x7 << 5)	/* priority mask */
-> +#define DWC_CFGL_CH_PRIOR(x)	((x) << 5)	/* priority */
->  #define DWC_CFGL_CH_SUSP	(1 << 8)	/* pause xfer */
->  #define DWC_CFGL_FIFO_EMPTY	(1 << 9)	/* pause xfer */
->  #define DWC_CFGL_HS_DST		(1 << 10)	/* handshake w/dst */
-> @@ -134,6 +136,7 @@ struct dw_dma_chan {
->  	struct dma_chan		chan;
->  	void __iomem		*ch_regs;
->  	u8			mask;
-> +	u8			priority;
->  
->  	spinlock_t		lock;
->  
-> diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
-> index 057e883..53072c8 100644
-> --- a/include/linux/dw_dmac.h
-> +++ b/include/linux/dw_dmac.h
-> @@ -22,6 +22,9 @@ struct dw_dma_platform_data {
->  #define CHAN_ALLOCATION_ASCENDING	0	/* zero to seven */
->  #define CHAN_ALLOCATION_DESCENDING	1	/* seven to zero */
->  	unsigned int	chan_allocation_order;
-> +#define CHAN_PRIORITY_ASCENDING		0	/* chan0 highest */
-> +#define CHAN_PRIORITY_DESCENDING	1	/* chan7 highest */
-How about generic CHAN_ORDER_ASCENDING which you can use in both?
+> That was discussed to death already and the general agreement was that
+> those handlers should either enable interrupts themself, when it's
+> required, or being converted to threaded handlers. An interrupt
+> handler or any other code section which runs more than 10ms with
+> interrupts disabled is a bug by definition.
 
-> +	unsigned int	chan_priority;
->  };
->  
->  /**
-> @@ -65,7 +68,6 @@ struct dw_dma_slave {
->  #define DWC_CFGH_DST_PER(x)	((x) << 11)
->  
->  /* Platform-configurable bits in CFG_LO */
-> -#define DWC_CFGL_PRIO(x)	((x) << 5)	/* priority */
->  #define DWC_CFGL_LOCK_CH_XFER	(0 << 12)	/* scope of LOCK_CH */
->  #define DWC_CFGL_LOCK_CH_BLOCK	(1 << 12)
->  #define DWC_CFGL_LOCK_CH_XACT	(2 << 12)
+I haven't noticed PATA getting this support.  So how do platforms force
+device drivers which turn out to be problematical to conform to their
+timing issues when there wasn't a problem with previous kernels?
 
+> > I *violently* disagree with the direction that genirq is heading.  It's
+> > *actively* breaking stuff.  What's really annoying is that problems like
+> > the above I did point out, but you seem happy to completely ignore them.
+> > The result is that more and more ARM platforms *are* becoming utterly
+> > useless, or requiring additional complexity being shoved into subsystems
+> > to cope with this crap.
+> > 
+> > What we need is a *decent* IRQ support system.  Not something created out
+> > of religious arguments which is what we have now.
+>  
+> I'm not religious about it, at least not more than you with your total
+> refusement to distinguish between special case oddball FPGA demux and
+> bog standard functional irq chips.
 
--- 
-~Vinod
+Clearly you don't want to know about the problems all this stuff is
+causing.  Maybe you like being responsible for breaking the most ARM
+platforms with your changes - are you trying for an entry in the
+Guiness Book of World Records for this, because I think that's where
+you're heading.
+
+I don't agree with the distinction that you're trying to make.  It only
+works for a simple subset of cases - but it seems you're overall attitude
+is that you only care about a small subset of easy cases and to hell
+with everything else.
