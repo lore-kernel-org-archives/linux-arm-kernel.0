@@ -1,91 +1,66 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 02 Mar 2011 20:58:28 +0100
-Subject: [patch v2 1/2] mc13892: reboot on wdi event
-In-Reply-To: <20110302194716.GH22310@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
-	=?utf-8?Q?e-K=C3=B6nig=22's?=
-	message of "Wed, 2 Mar 2011 20:47:16 +0100")
-References: <20110302184512.512010086@rtp-net.org>
-	<20110302185000.369378760@rtp-net.org>
-	<20110302194716.GH22310@pengutronix.de>
-Message-ID: <871v2pxpjv.fsf@lebrac.rtp-net.org>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Thu, 03 Mar 2011 09:09:39 +1300
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <4D6E04DF.3070905@stericsson.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>	<4D6DAE6E.4030701@bluewatersys.com>	<4D6DB1B1.4060908@codeaurora.org>	<4D6DB566.4090908@bluewatersys.com>	<4D6DB7CB.7070701@codeaurora.org>
+	<4D6DBAED.7070805@bluewatersys.com> <4D6DBD8C.70904@codeaurora.org>
+	<4D6DBF59.2050005@bluewatersys.com>
+	<4D6E04DF.3070905@stericsson.com>
+Message-ID: <4D6EA403.2060407@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> writes:
+On 03/02/2011 09:50 PM, Maxime Coquelin wrote:
+> On 03/02/2011 04:54 AM, Ryan Mallon wrote:
+>> On 03/02/2011 04:46 PM, Saravana Kannan wrote:
+>>> On 03/01/2011 07:35 PM, Ryan Mallon wrote:
+>>>> The only real objection I have to adding the SoC family information is
+>>>> basically to discourage it being abused by userspace. I can see it
+>>>> being
+>>>> useful in debug situations, but I can also see stupid userspace
+>>>> applications explicitly testing for some particular SoC, rather than
+>>>> more correctly (IMHO) checking for presence of certain drivers etc.
+>>> True, but so many other things could be misused by stupid userspace
+>>> programs. When there are legitimate usecases, I think we shouldn't
+>>> prevent them just because we think a stupid userspace program could
+>>> misuse it.
+>>>
+>>> Again, although you might not be gung-ho about this, I think I have at
+>>> least made you indifferent/mildly supportive to adding socinfo. If you
+>>> don't mind, I would like to wait for others to chime in before
+>>> continuing this discussion.
+>> Agreed.
+>>
+>> In general I am in support of having the SoC information exposed
+>> somewhere. I think we just want to be careful that it doesn't become a
+>> dumping ground for anything and everything SoC related whether the
+>> information is useful or not. I think each piece of exposed information
+>> should have a genuine use case, not just "because we can".
+> I definitely agree we should not export every SoC-related information
+> just because we can do it.
+> The first goal of this interface was to export some SoCs IDs, as we need
+> this kind of information for some user-space tools.
+> Does someone need to export other information than the mach name and
+> some IDs?
+> 
+> As proposed in my previous mail, do you agree to have a unified file for
+> all vendors, which exports the unique silicon ID of the chip?
 
-Hi,
-> Hello Arnaud,
->
-> On Wed, Mar 02, 2011 at 07:45:13PM +0100, Arnaud Patard wrote:
->> By default, on wdi (watchdog input) event the mc13892 is powering off.
->> This patch allows to change this behaviour throught platform_data.
->> 
->> v2:
->> - move to mc13xxx-core
->> - make it configurable
->> 
->> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->> 
->> Index: linux-2.6-submit/drivers/mfd/mc13xxx-core.c
->> ===================================================================
->> --- linux-2.6-submit.orig/drivers/mfd/mc13xxx-core.c	2011-03-01 22:26:40.000000000 +0100
->> +++ linux-2.6-submit/drivers/mfd/mc13xxx-core.c	2011-03-02 12:24:30.000000000 +0100
->> @@ -136,6 +136,9 @@
->>  #define MC13XXX_REVISION_FAB		(0x03 << 11)
->>  #define MC13XXX_REVISION_ICIDCODE	(0x3f << 13)
->>  
->> +#define MC13892_POWERCTL2		15
->> +#define MC13892_POWERCTL2_WDIRESET	(1<<12)
->> +
->>  #define MC13783_ADC1		44
->>  #define MC13783_ADC1_ADEN		(1 << 0)
->>  #define MC13783_ADC1_RAND		(1 << 1)
->> @@ -715,6 +718,7 @@
->>  	struct mc13xxx_platform_data *pdata = dev_get_platdata(&spi->dev);
->>  	enum mc13xxx_id id;
->>  	int ret;
->> +	unsigned int val;
->>  
->>  	mc13xxx = kzalloc(sizeof(*mc13xxx), GFP_KERNEL);
->>  	if (!mc13xxx)
->> @@ -734,6 +738,15 @@
->>  	if (ret || id == MC13XXX_ID_INVALID)
->>  		goto err_revision;
->>  
->> +	if ((id == MC13XXX_ID_MC13892) && pdata->wdi_reboot) {
->> +		/* allows to reboot on wdi event */
->> +		ret = mc13xxx_reg_read(mc13xxx, MC13892_POWERCTL2, &val);
->> +		if (!ret) {
->> +			val |= MC13892_POWERCTL2_WDIRESET;
->> +			mc13xxx_reg_write(mc13xxx, MC13892_POWERCTL2, val);
->> +		}
->> +	}
->> +
->>  	/* mask all irqs */
->>  	ret = mc13xxx_reg_write(mc13xxx, MC13XXX_IRQMASK0, 0x00ffffff);
->>  	if (ret)
->> Index: linux-2.6-submit/include/linux/mfd/mc13xxx.h
->> ===================================================================
->> --- linux-2.6-submit.orig/include/linux/mfd/mc13xxx.h	2011-03-01 22:30:59.000000000 +0100
->> +++ linux-2.6-submit/include/linux/mfd/mc13xxx.h	2011-03-01 22:31:27.000000000 +0100
->> @@ -149,6 +149,8 @@
-> git diff provide some info about the context after the @@ hunk header.
-> I consider this really useful.  GNU diff is able to do this, too (option
-> -p).
->
+As mentioned earlier, on ep93xx we would like to export the Maverick
+Crunch ID, which is a unique identifier for the chip.
 
-hmm... I forgot to configure quilt to do that. sorry.
+I think the ABI should specify a minimum set of values which are
+guaranteed to be provided on all SoCs, but allow individual SoCs to
+provide additional information as necessary.
 
->>  	int num_regulators;
->>  	struct mc13xxx_regulator_init_data *regulators;
->>  	struct mc13xxx_leds_platform_data *leds;
->> +
->> +	unsigned int wdi_reboot;
-> there is already a member .flags.  What about defining another bit for
-> that?
->
+~Ryan
 
-I thought that using the .flags member for that was kind of misusing it
-as for now, it's only used to enable or disable some mc13xxx sub device.
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
 
-Arnaud
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
