@@ -1,58 +1,44 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 2 Mar 2011 18:10:20 +0100 (CET)
-Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <001301cbd8ef$29403c10$7bc0b430$@deacon@arm.com>
-References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
-	<1298900022-21516-7-git-send-email-will.deacon@arm.com>
-	<20110228140327.GA1937@n2100.arm.linux.org.uk>
-	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
-	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
-	<20110228214445.GD1937@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
-	<20110301201904.GA27107@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
-	<001301cbd8ef$29403c10$7bc0b430$@deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1103021806560.2701@localhost6.localdomain6>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 2 Mar 2011 22:42:43 +0530
+Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
+In-Reply-To: <25DBF349769A4CF7B883D6D7FF01AD70@subhasishg>
+References: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BE49175@dbde02.ent.ti.com>
+	<886E26C48DE446C3937D89ECF86030B2@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
+	<25DBF349769A4CF7B883D6D7FF01AD70@subhasishg>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C0082E3@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Mar 2011, Will Deacon wrote:
+Hi Subhasish,
 
-> Hi Thomas,
+On Sat, Feb 26, 2011 at 17:42:39, Subhasish Ghosh wrote:
+> Hi Sekhar,
 > 
-> > Can you please take the time and explain me the difference of the
-> > following:
-> > 
-> > irqchip1.c
-> > 
-> > struct irq_chip1;
-> > 
-> > handle_primary_irq(int irq, struct irq_desc *desc)
-> > {
-> > 	chip->irq_ack();
-> > 	desc->demux();
-> > }
-> > 
-> > init()
-> > {
-> > 	irq_set_chip(PRIMARY_IRQ, &irq_chip1);
-> > 	irq_set_primary_handler(PRIMARY_IRQ, handle_primary_irq);
-> > }
+> I tried this using MMC and Kelvin's suggestions, but it never came back. 
+> Here is a log:
+
+Was this result with or without this patch applied?
+
 > 
-> I think with this approach you get the exact opposite problem; that
-> is the primary irq_chip doesn't know which IRQs are going to be
-> demuxed so it cannot know at init time which IRQs need their primary 
-> handler set. Is the idea that you set_primary_handler for all IRQs,
-> stash that in the descriptor somewhere and then replace handle_irq
-> with the primary handler when a demux handler is registered?
+> root at arago:~# rtcwake -d /dev/rtc0 -s 20 -m mem
+> wakeup from "mem" at Tue Apr 21 14:31:13 2009
+> PM: Syncing filesystems ... done.
+> Freezing user space processes ... (elapsed 0.01 seconds) done.
+> Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+> Suspending console(s) (use no_console_suspend to debug)
 > 
-> I guess I'm missing something here,
+> From the Kconfig I had enabled RTC_DRV_OMAP, CONFIG_PM, CONFIG_SUSPEND.
 
-No, I missed that. Darn, yes this would need storing the
-primary_handler in some separate pointer or having a callback into the
-chip implementation to make this fully distangled.
+Nothing stands out from these logs. One thing to
+verify is if the RTC Alarm interrupt is really
+working by using the test program present in the
+Documentation/ folder.
 
-Grmbl.
+Anyway, the easiest way for you to move quickly is
+to use ramdisk so you can bypass all driver specific
+issues.
 
-	tglx
+Thanks,
+Sekhar
