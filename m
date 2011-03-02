@@ -1,31 +1,77 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 2 Mar 2011 11:08:30 +0800
-Subject: [PATCH 2/6] ARM: pxa2xx: reorganize I2C files
-In-Reply-To: <4D6D9426.8030905@fluff.org>
-References: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
-	<1298461100-14869-3-git-send-email-bigeasy@linutronix.de>
-	<4D6D9426.8030905@fluff.org>
-Message-ID: <AANLkTikPDAtH10gPauq9F54MFSg=XBKt-p-PVXp8J7AW@mail.gmail.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Wed, 02 Mar 2011 16:11:34 +1300
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <4D6DB1B1.4060908@codeaurora.org>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>
+	<4D6DAE6E.4030701@bluewatersys.com>
+	<4D6DB1B1.4060908@codeaurora.org>
+Message-ID: <4D6DB566.4090908@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 2, 2011 at 8:49 AM, Ben Dooks <ben-linux@fluff.org> wrote:
-> On 23/02/11 11:38, Sebastian Andrzej Siewior wrote:
+On 03/02/2011 03:55 PM, Saravana Kannan wrote:
+> On 03/01/2011 06:41 PM, Ryan Mallon wrote:
+>> On 03/02/2011 03:23 PM, Saravana Kannan wrote:
+>>> I don't have any attachment to the "arch" file suggestion. If there is a
+>>> better solution to identify the different implementations of socinfo
+>>> without having to maintain some "unique id" list in the kernel, then I'm
+>>> all for it. But cpuinfo is not it.
 >>
->> This patch moves the platform data definition from
->> arch/arm/plat-pxa/include/plat/i2c.h to include/linux/i2c/pxa-i2c.h so
->> it can be accessed from x86 the same way as on ARM.
->>
->> This change should make no functional change to the PXA code. The move
->> is verified by building the following defconfigs:
->> ? cm_x2xx_defconfig corgi_defconfig em_x270_defconfig ezx_defconfig
->> ? imote2_defconfig pxa3xx_defconfig spitz_defconfig zeus_defconfig
->> ? raumfeld_defconfig magician_defconfig mmp2_defconfig pxa168_defconfig
->> ? pxa910_defconfig
->>
->
-> Russell/others, you OK with this going through my tree?
->
+>> Sorry I am confusing the 'arch' and 'mach' bits here. I definitely have
+>> an objection to having an 'arch' file (i.e. ARM). A 'mach' (i.e. omap)
+>> file makes a bit more sense, but should probably be called 'mach' rather
+>> than 'arch' to avoid this confusion :-).
+> 
+> Sorry for the confusion. Sure, I don't care much for the filename as
+> long as we can all agree on it. I care more about the content of the
+> file (using names very close to xxxx in mach-xxxx). I like "soc-family"
+> better since it's generic enough to not force, say omap3 and omap4, to
+> report different values.
+> 
+> Linus Walleij, Eduardo, Maxime, Andrei,
+> 
+> Would like to hear your opinion on the file name (soc-family vs. mach vs
+> <somethingelse>) and the path /sys/devices/system/soc/.
 
-Ben, I'm fine that you take this change. Trivial changes to me, so
-I expect no significant merge conflicts.
+'family' sounds good. I don't think we need the 'soc-' prefix on
+filenames if they are already in /sys/devices/system/soc/.
+
+> 
+> If we settle on this, may be it would be easier to get this through.
+> 
+>> I still think it is a solution in search of a problem though. What
+>> userspace programs need to know what specific SoC they are on? My
+>> feeling is that if userspace needs to know this information, then it is
+>> probably dicking around with things that should be managed by the
+>> kernel. Differences in available peripherals, etc can be determined by
+>> looking at existing sysfs files.
+> 
+> I certainly have seen several use cases. Couple of easy examples:
+> 
+> * A lot of test scripts would find this very useful. For example, some
+> clock (present is all/most MSMs) shouldn't be tested on some SOCs as it
+> would lock up the system if you try to turn it off while the CPU is
+> running.
+
+I don't follow here. Do you mean a struct clk clock or something else?
+Why is userspace allowed to disable a clock which will effectively hang
+the system? :-).
+
+> * Some of the user space tools might want to report different "product
+> id/type" (nothing to do with USB, etc) depending on what SOC it is
+> running on.
+
+This makes more sense. It would actually be useful for custom USB
+devices (gadget) which can be done from user space.
+
+~Ryan
+
+-- 
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
