@@ -1,22 +1,31 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Mar 2011 09:54:23 -0800
-Subject: [PATCH 0/8] OMAP2+: hwmod/clockevent: allow late-init of
-	individual hwmods
-In-Reply-To: <4D6B845A.9000900@ti.com>
-References: <20110223070455.5874.51326.stgit@twilight.localdomain>
-	<4D651998.3040002@ti.com>
-	<alpine.DEB.2.00.1102271928550.505@utopia.booyaka.com>
-	<4D6B845A.9000900@ti.com>
-Message-ID: <20110302175422.GY20560@atomide.com>
+Date: Wed, 2 Mar 2011 10:24:02 -0800
+Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
+	configured from board file
+In-Reply-To: <AANLkTi=MJigLvbJrRJ4CpyDcGd8sZXB7-1nFYup6EeDm@mail.gmail.com>
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
+	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
+	<AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
+	<8ab9882cd92792e9bf2b836c0ec9c7fe@mail.gmail.com>
+	<AANLkTi=MJigLvbJrRJ4CpyDcGd8sZXB7-1nFYup6EeDm@mail.gmail.com>
+Message-ID: <20110302182402.GC20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 2/28/2011 3:31 AM, Paul Walmsley wrote:
-> >Tony, I guess the omap-for-linus branch will probably need to get rebuilt
-> >to drop that patch, once this series is merged...
+* Govindraj <govindraj.ti@gmail.com> [110302 02:05]:
+>
+> >>>>+static struct omap_device_pad default_serial1_pads[] __initdata = {
+> >>>>+ ? ? ?{
+> >>>>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
+> >>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+> > OMAP_DEVICE_PAD_WAKEUP,
+> >>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+> >>>>+ ? ? ?},
+...
 
-Let's rather apply a fix or revert instead than start messing with
-omap-for-linus. That branch is supposed to be a stable base for others
-to base their branches on.
+AFAIK you should only need the OMAP_DEVICE_PAD_REMUX option for
+omap24xx. And if you use that option, you also need the .idle
+value.
 
 Tony
