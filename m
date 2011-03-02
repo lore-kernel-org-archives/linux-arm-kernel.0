@@ -1,87 +1,153 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 01 Mar 2011 18:23:32 -0800
-Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
-	OMAP data
-In-Reply-To: <4D6DA290.2010607@bluewatersys.com>
-References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>
-	<4D6DA290.2010607@bluewatersys.com>
-Message-ID: <4D6DAA24.3000204@codeaurora.org>
+From: dima@android.com (Dima Zavin)
+Date: Tue, 1 Mar 2011 18:25:36 -0800
+Subject: [PATCH] msm: gpiomux: Remove GPIOMUX_VALID and merge config enums
+In-Reply-To: <4D689230.7020704@codeaurora.org>
+References: <4D680EEE.1070706@codeaurora.org>
+	<AANLkTinZCtbQnAk_OX92jqbW_GjH5wpxvbeoMkHV1inn@mail.gmail.com>
+	<4D689230.7020704@codeaurora.org>
+Message-ID: <AANLkTi=ePu9hTeecOfKoxKEXd6VZ6tJBN2XphDO5suOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2011 05:51 PM, Ryan Mallon wrote:
-> On 03/02/2011 02:39 PM, Saravana Kannan wrote:
->> On 03/01/2011 05:27 PM, Ryan Mallon wrote:
->>> On 03/02/2011 02:19 PM, Saravana Kannan wrote:
->>>> On 03/01/2011 05:13 PM, Andrei Warkentin wrote:
->>>>> On Mon, Feb 28, 2011 at 10:51 PM, Saravana Kannan
->>>>> <skannan@codeaurora.org>    wrote:
->>>
->>> <snip>
->>>
->>>>> What would an "arch" file mean? The name of the soc platform?
->>>>
->>>> The arch file would pretty much be the "xxxx" from arch/arm/mach-xxxx or
->>>> similar paths. If that info is already available elsewhere, then that
->>>> file is not needed. I proposed using the arch since that will remove the
->>>> need to maintain some database of unique/reserved names/numbers for each
->>>> implementation of socinfo (like the machinetypes list we have).
->>>
->>> /proc/cpuinfo already tells you what the CPU is, which gives more
->>> information than just the architecture name.
->>>
->>> Why is the arch information even required by userspace?
+Good point, ptr to anon struct would work.
+
+I would still very much like to see the helper macros be added though
+as it really would be very helpful in keeping the pinmuxing tidy in
+the board files. Doing it as a separate patch is fine.
+
+Other than the addition of helper macros, ack.
+
+--Dima
+
+On Fri, Feb 25, 2011 at 9:40 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> On 02/25/2011 05:20 PM, Dima Zavin wrote:
 >>
->> The socinfo exported by each soc is different. If userspace is trying to
->> make decisions based on socinfo, it will need to know what type of soc
->> (really what type of socinfo implementation) it is before trying to
->> interpret the rest of the socinfo files. Keep in mind that cpuinfo is
->> different from socinfo -- the cpu is just a small part of a soc.
+>> On Fri, Feb 25, 2011 at 12:19 PM, Rohit Vaswani<rvaswani@codeaurora.org>
+>> ?wrote:
+>>>
+>>> diff --git a/arch/arm/mach-msm/board-qsd8x50.c
+>>> b/arch/arm/mach-msm/board-qsd8x50.c
+>>> index 33ab1fe..d665b0e 100644
+>>> --- a/arch/arm/mach-msm/board-qsd8x50.c
+>>> +++ b/arch/arm/mach-msm/board-qsd8x50.c
+>>> @@ -38,19 +38,26 @@
+>>> ?#include "devices.h"
+>>> ?#include "gpiomux.h"
+>>>
+>>> -#define UART3_SUSPENDED (GPIOMUX_DRV_2MA | GPIOMUX_PULL_DOWN |\
+>>> - ? ? ? ? ? ?GPIOMUX_FUNC_1 | GPIOMUX_VALID)
+>>> +static struct gpiomux_setting uart3_suspended = {
+>>> + ? ?.drv = GPIOMUX_DRV_2MA,
+>>> + ? ?.pull = GPIOMUX_PULL_DOWN,
+>>> + ? ?.func = GPIOMUX_FUNC_1,
+>>> +};
+>>>
+>>> ?extern struct sys_timer msm_timer;
+>>>
+>>> -struct msm_gpiomux_config qsd8x50_uart3_configs[] __initdata = {
+>>> +struct msm_gpiomux_config qsd8x50_uart3_configs[] = {
+>>> ? ? {
+>>> ? ? ? ? .gpio = 86, /* UART3 RX */
+>>> - ? ? ? ?.suspended = UART3_SUSPENDED,
+>>> + ? ? ? ?.settings = {
+>>> + ? ? ? ? ? ?[GPIOMUX_SUSPENDED] =&uart3_suspended,
+>>> + ? ? ? ?},
+>>> ? ? },
+>>> ? ? {
+>>> ? ? ? ? .gpio = 87, /* UART3 TX */
+>>> - ? ? ? ?.suspended = UART3_SUSPENDED,
+>>> + ? ? ? ?.settings = {
+>>> + ? ? ? ? ? ?[GPIOMUX_SUSPENDED] =&uart3_suspended,
+>>> + ? ? ? ?},
+>>> ? ? },
+>>> ?};
+>>
+>> I think this new interface is way too verbose and will quickly get
+>> unwieldy for configurations that have more than a few pins. For
+>> instance, imagine what the above would look like when muxing a 24bit
+>> LCD pin list...
+>>
+>> How about adding a "bool valid" to gpiomux_setting, and convert the
+>> "sets" array to an array of settings and not pointers to settings.
+>> This will allow us to do (in gpiomux.h):
+>>
+>> struct msm_gpiomux_rec {
+>> ? ? struct gpiomux_setting sets[GPIOMUX_NSETTINGS];
+>> ? ? int ref;
+>> };
+>>
+>> struct gpiomux_setting {
+>> ? ? enum gpiomux_func func;
+>> ? ? enum gpiomux_drv ?drv;
+>> ? ? enum gpiomux_pull pull;
+>> ? ? bool valid;
+>> };
+>>
+>> This way, I can do something like (very rough):
+>>
+>> #define GPIOMUX_SET(func,drv,pull) { \
+>> ? ? .func = GPIOMUX_##func, \
+>> ? ? .drv = GPIOMUX_##drv, \
+>> ? ? .pull = GPIOMUX_##pull, \
+>> ? ? .valid = true, \
+>> ? }
+>>
+>> #define GPIOMUX_SET_NONE { .valid = false, }
+>>
+>> #define GPIOMUX_CFG(g, active, suspended) { \
+>> ? ? ?.gpio = g, \
+>> ? ? ?.sets = { \
+>> ? ? ? ? ?[GPIOMUX_ACTIVE] = active, \
+>> ? ? ? ? ?[GPIOMUX_SUSPENDED] = suspended, \
+>> ? ? ? }, \
+>> ?}
+>>
+>> This will then allow me to define the uart3 pinmuxing in my board file
+>> as follows:
+>>
+>> struct msm_gpiomux_rec uart3_mux_cfg[] = {
+>> ? ? GPIOMUX_CFG(86, GPIOMUX_SET_NONE,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOMUX_SET(FUNC_1, DRV_2MA, PULL_DOWN)),
+>> ? ? GPIOMUX_CFG(87, GPIOMUX_SET_NONE,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ?GPIOMUX_SET(FUNC_1, DRV_2MA, PULL_DOWN)),
+>> };
+>>
+>> Thoughts?
+>>
 >
-> I understand that having a socinfo file for obtaining information about
-> a particular SoC would be useful. A similar discussion came up a few
-> years ago when we talked about having a socinfo file for exposing the
-> ep93xx Maverick crunch id, but nothing ever came out of it.
+> I haven't read this GPIO code thoroughly, but by looking just at the diff, I
+> think you can still have these type of macros with the structure definition
+> Rohit chose. I have no opinion one which struct definition is better (not
+> enough context). Just trying to help with writing helper macros.
 >
-> What I don't understand is why you want the 'arch' file (ie the
-> mach-xxxx) name. /proc/cpuinfo already gives you more information than
-> an 'arch' file would. I also can't think of a particularly good
-> situation why userspace would need to know at runtime what the
-> architecture is.
+> The trick is to use pointers to anonymous struct. A very rough macro:
 >
-> Have a socinfo file to expose implementation details of the particular
-> SoC I am fine with (assuming those details are useful to userspace),
-> having an 'arch' file to expose the architecture I am against.
-
-You probably already understood this, but just to be sure, when I say 
-"socinfo implementation" I mean the various ways the socinfo data should 
-be interpreted by userspace. "socid" of 1 would mean a different thing 
-depending on whether it's for omap, msm, kirkwood, etc.
-
-I don't have any attachment to the "arch" file suggestion. If there is a 
-better solution to identify the different implementations of socinfo 
-without having to maintain some "unique id" list in the kernel, then I'm 
-all for it. But cpuinfo is not it.
-
-Which data listed in cpuinfo do you think will let you identify the 
-socinfo implementation in a unique manner? The only thing that's even 
-remotely possible is vendor_id, but I'm not sure what it's supposed to 
-be if the CPU core is licensed from some vendor and used in a SOC by 
-another vendor. What is a Samsung with an ARM11 core supposed to list 
-for vendor_id? What if the another Samsung SOC has a Samsung's own CPU 
-core? What about non-ARM architectures? I would rather not add implicit 
-dependency on cpuinfo that's hard to maintain or guarantee and instead 
-have the socinfo implementation explicitly exported.
-
-The "arch" filename and what it's supposed to contain was just a 
-suggestion. Another alternative might be to call it soc-family and the a 
-general guideline to keep it as close as possible to the mach-xxxx name. 
-For example, omap3 and omap4 might not care for having different socinfo 
-implementations and can decide to use the socfamily name of "omap".
-
-Thanks,
-Saravana
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> #define GPIOMUX_SET(f, d, p) \
+> &(struct gpiomux_setting) {
+> ? ? ? ?.func = f,
+> ? ? ? ?.drv = d,
+> ? ? ? ?.pull = p,
+> }
+>
+> #define GPIOMUX_CFG(g, active, suspended) { \
+> ? ? ? ?.gpio = g,
+> ? ? ? ?.settings = {
+> ? ? ? ? ? ? ? ?[ACTIVE] = active,
+> ? ? ? ? ? ? ? ?[SUSPENDED] = suspended,
+> ? ? ? ?}
+> }
+>
+> struct msm_gpiomux_config foo_bar[] = {
+> ? ? ? ?GPIOMUX_CFG(10, GPIOMUX_SET(FUNC, 2MA, PULL_UP), NULL),
+> ? ? ? ?GPIOMUX_CFG(11, GPIOMUX_SET(FUNC, 2MA, PULL_UP), NULL),
+> };
+>
+> I'm certain the pointer to anonymous struct stuff works. You might have to
+> tweak the macros a bit though. Hope this help.
+>
+> -Saravana
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
