@@ -1,152 +1,251 @@
-From: dh09.lee@samsung.com (Donghwa Lee)
-Date: Wed, 02 Mar 2011 10:17:50 +0900
-Subject: [PATCH] ARM: EXYNOS4: enabled lcd and backlight in NURI board
-Message-ID: <1299028671-9062-1-git-send-email-dh09.lee@samsung.com>
+From: bones@secretlab.ca (John Bonesio)
+Date: Tue, 01 Mar 2011 18:13:23 -0800
+Subject: [PATCH 1/4] ARM:boot:device tree: Allow the device tree binary
+	to be appended to zImage
+In-Reply-To: <alpine.LFD.2.00.1103010019160.10356@xanadu.home>
+References: <20110228233153.24836.24176.stgit@riker>
+	<20110228233327.24836.94530.stgit@riker>
+	<alpine.LFD.2.00.1103010019160.10356@xanadu.home>
+Message-ID: <4D6DA7C3.4040609@secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables lcd and backlight drivers in NURI board.
+Comment/question below.
 
-Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-------
- arch/arm/configs/exynos4_nuri_defconfig |    9 +++-
- arch/arm/mach-exynos4/Kconfig           |    1 +
- arch/arm/mach-exynos4/mach-nuri.c       |   62 +++++++++++++++++++++++++++++++
- 3 files changed, 70 insertions(+), 2 deletions(-)
+On 02/28/2011 10:39 PM, Nicolas Pitre wrote:
+> On Mon, 28 Feb 2011, John Bonesio wrote:
+> 
+>> This patch provides the ability to boot using a device tree that is appended
+>> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+>>
+>> Signed-off-by: John Bonesio <bones@secretlab.ca>
+> 
+> Comments below.
+> 
+>> ---
+>>
+>>  arch/arm/Kconfig                |    7 +++
+>>  arch/arm/boot/compressed/head.S |   93 ++++++++++++++++++++++++++++++++++++---
+>>  2 files changed, 94 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index d8a330f..68fc640 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1593,6 +1593,13 @@ config USE_OF
+>>  	help
+>>  	  Include support for flattened device tree machine descriptions.
+>>  
+>> +config ARM_APPENDED_DTB
+>> +       bool "Use appended device tree blob" if OF
+>> +       default n
+> 
+> The default is n by default, so you don't need to mention it.
+> 
+> Also this should depend on OF (CONFIG_OF).
+> 
+>> +       help
+>> +         With this option, the boot code will look for a dtb bianry
+> 
+> s/bianry/binary/
+> 
+> Since this is an help text for people who might not have a clue about 
+> "dtb", it would be better to spell it out.
+> 
+>> +         appended to zImage.
+>> +
+>>  # Compressed boot loader in ROM.  Yes, we really want to ask about
+>>  # TEXT and BSS so we preserve their values in the config files.
+>>  config ZBOOT_ROM_TEXT
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index 200625c..ae9f8c6 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -210,6 +210,46 @@ restart:	adr	r0, LC0
+>>  		 */
+>>  		mov	r10, r6
+>>  #endif
+>> +#ifdef CONFIG_ARM_APPENDED_DTB
+>> +/*
+>> + *   r0  = delta
+>> + *   r2  = BSS start
+>> + *   r3  = BSS end
+>> + *   r4  = final kernel address
+>> + *   r5  = start of this image
+>> + *   r6  = _edata
+>> + *   r7  = architecture ID
+>> + *   r8  = atags/device tree pointer
+>> + *   r9  = size of decompressed image
+>> + *   r10 = end of this image, including  bss/stack/malloc space if non XIP
+>> + *   r11 = GOT start
+>> + *   r12 = GOT end
+>> + *
+>> + * if there are device trees (dtb) appended to zImage, advance r10 so that the
+>> + * dtb data will get relocated along with the kernel if necessary.
+>> + */
+>> +
+>> +		ldr	r12, [r6, #0]
+>> +		ldr	r1, =0xedfe0dd0		@ sig is 0xdoodfeed big endian
+>> +		cmp	r12, r1
+>> +		bne	dtb_check_done
+>> +
+>> +		/* Get the dtb's size */
+>> +		ldr	r12, [r6, #4]		@ device tree size
+>> +
+>> +		/* convert r12 (dtb size) to little endian */
+>> +		eor	r1, r12, r12, ror #16
+>> +		bic	r1, r1, #0x00ff0000
+>> +		mov	r12, r12, ror #8
+>> +		eor	r12, r12, r1, lsr #8
+>> +
+>> +		add	r10, r10, r12
+>> +		add	r6, r6, r12
+>> +
+>> +dtb_check_done:
+>> +		adr	r1, LC0
+>> +		ldr	r12, [r1, #28]		@ restore r12 (GOT end)
+>> +#endif
+> 
+> Instead of clobbering r12, you could use lr instead.
+> 
+> The byte swap on the size should be done only if __ARMEB__ is not 
+> defined i.e. #ifndef __ARMEB__ ...
+> 
+> Also the DT signature should be endian aware.
+> 
+>>  /*
+>>   * Check to see if we will overwrite ourselves.
+>> @@ -223,8 +263,8 @@ restart:	adr	r0, LC0
+>>   */
+>>  		cmp	r4, r10
+>>  		bhs	wont_overwrite
+>> -		add	r10, r4, r9
+>> -		cmp	r10, r5
+>> +		add	r1, r4, r9
+>> +		cmp	r1, r5
+>>  		bls	wont_overwrite
+>>  
+>>  /*
+>> @@ -272,8 +312,10 @@ wont_overwrite:
+>>   *   r12 = GOT end
+>>   *   sp  = stack pointer
+>>   */
+>> -		teq	r0, #0
+>> -		beq	not_relocated
+>> +		adr	r1, LC0
+>> +		ldr	r6, [r1, #16]		@ reload _edata value
+> 
+> Why?
+> 
+>> +
+>> +		add	r6, r6, r0
+>>  		add	r11, r11, r0
+>>  		add	r12, r12, r0
+>>  
+>> @@ -288,12 +330,34 @@ wont_overwrite:
+>>  
+>>  		/*
+>>  		 * Relocate all entries in the GOT table.
+>> +		 * Bump bss entries to past image end (r10)
+>>  		 */
+>> +		sub	r5, r10, r6		@ delta of image end and _edata
+>> +		add	r5, r5, #7		@ ... rounded up to a multiple
+>> +		bic	r5, r5, #7		@ ... of 8 bytes, so misaligned
+>> +		             	 		@ ... GOT entry doesn't
+>> +		             	 		@ ... overwrite end of image
+> 
+> This is wrong. You are going to displace the .bss pointers even if they 
+> don't need that in the case where no dtb was found.  And if a dtb was 
+> found the displacement is going to be the size of the dtb _plus_ the 
+> size of the .bss_stack instead of only the dtb size.
+> 
+> At this point you should only keep track of the .bss displacement in 
+> addition to the delta offset in r0.  And if both are equal to zero then 
+> skip over the fixup loop as before.
 
-diff --git a/arch/arm/configs/exynos4_nuri_defconfig b/arch/arm/configs/exynos4_nuri_defconfig
-index 5f03027..e2f0bfb 100644
---- a/arch/arm/configs/exynos4_nuri_defconfig
-+++ b/arch/arm/configs/exynos4_nuri_defconfig
-@@ -786,8 +786,13 @@ CONFIG_REGULATOR=y
- # CONFIG_DRM is not set
- # CONFIG_VGASTATE is not set
- # CONFIG_VIDEO_OUTPUT_CONTROL is not set
--# CONFIG_FB is not set
--# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
-+CONFIG_FB=y
-+CONFIG_FB_S3C=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_BACKLIGHT_PWM=y
- 
- #
- # Display device support
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 5bf00b9..1d0d222 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -135,6 +135,7 @@ config MACH_NURI
- 	select EXYNOS4_SETUP_I2C1
- 	select EXYNOS4_SETUP_I2C5
- 	select EXYNOS4_SETUP_SDHCI
-+	select HAVE_PWM
- 	help
- 	  Machine support for Samsung Mobile NURI Board.
- 
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index 28010bd..d06cc91 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -17,6 +17,10 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- #include <linux/mmc/host.h>
-+#include <linux/fb.h>
-+#include <linux/pwm_backlight.h>
-+
-+#include <video/platform_lcd.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -26,6 +30,8 @@
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/sdhci.h>
-+#include <plat/fb.h>
-+#include <plat/regs-fb.h>
- 
- #include <mach/map.h>
- 
-@@ -181,6 +187,60 @@ static struct platform_device nuri_gpio_keys = {
- 	},
- };
- 
-+static int lcd_power_on(struct lcd_device *ld, int enable)
-+{
-+	int gpio = EXYNOS4_GPE1(5);
-+
-+	gpio_request(gpio, "LVDS_nSHDN");
-+
-+	if (enable)
-+		gpio_direction_output(gpio, 1);
-+	else
-+		gpio_direction_output(gpio, 0);
-+
-+	return 0;
-+}
-+
-+static int backlight_init(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+/* nuri pwm backlight */
-+static struct platform_pwm_backlight_data nuri_backlight_data = {
-+	.pwm_id			= 0,
-+	.pwm_period_ns		= 30000,
-+	.max_brightness		= 100,
-+	.dft_brightness		= 50,
-+	.init			= backlight_init,
-+};
-+
-+static struct platform_device nuri_backlight_device = {
-+	.name			= "pwm-backlight",
-+	.id			= -1,
-+	.dev			= {
-+		.platform_data	= &nuri_backlight_data,
-+	},
-+};
-+
-+static struct plat_lcd_data nuri_lcd_platform_data = {
-+	.set_power		= lcd_power_on,
-+};
-+
-+static struct platform_device nuri_lcd_device = {
-+	.name			= "platform-lcd",
-+	.id			= -1,
-+	.dev			= {
-+		.platform_data	= (void *) &nuri_lcd_platform_data,
-+	},
-+};
-+
-+static void __init nuri_fb_init(void)
-+{
-+	platform_device_register(&nuri_lcd_device);
-+	platform_device_register(&nuri_backlight_device);
-+}
-+
- /* I2C1 */
- static struct i2c_board_info i2c1_devs[] __initdata = {
- 	/* Gyro, To be updated */
-@@ -201,6 +261,7 @@ static struct platform_device *nuri_devices[] __initdata = {
- 	&s3c_device_wdt,
- #endif
- 
-+	&s3c_device_timer[0],
- 	/* NURI Devices */
- 	&nuri_gpio_keys,
- };
-@@ -219,6 +280,7 @@ static void __init nuri_machine_init(void)
- 	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
- 	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
- 
-+	nuri_fb_init();
- 	/* Last */
- 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
- }
--- 
-1.6.0.4
+Maybe I'm not understanding correctly. I think that if there is an
+appended dtb, then there are sections like the code and data that needs
+to be adjusted by the old r0 value, while the bss and the stack need to
+be adjusted by the old r0 + dtb size.
+
+If my understanding is right, then we can't just add the dtb size to r0
+and adjust everything.
+
+Am I missing something?
+
+
+> 
+>>  1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
+>>  		add	r1, r1, r0		@ table.  This fixes up the
+>> +		cmp	r1, r2
+>> +		movcc	r9, #0			@ r9 = entry < bss_start ? 0 :
+>> +		movcs	r9, #1			@      1;
+>> +		cmp	r1, r3
+>> +		movcs	r9, #0			@ r9 = entry >= end ? 0 : t1;
+>> +		cmp	r9, #0
+>> +		addne	r1, r5			@ entry += r9 ? bss delta : 0;
+> 
+> The above would be much more elegant if written like this:
+> 
+> 		cmp	r1, r2
+> 		cmphs	r3, r1
+> 		addhi	r1, r5
+> 
+>>  		str	r1, [r11], #4		@ C references.
+>>  		cmp	r11, r12
+>>  		blo	1b
+>> +
+>> +		/* bump our bss registers too */
+>> +		add	r2, r2, r5
+>> +		add	r3, r3, r5
+>> +
+>> +		/* bump the stack pinter, if at or above _edata */
+>> +		cmp	sp, r6
+>> +		addcs	sp, sp, r5
+> 
+> This will always be true as this is within #ifndef CONFIG_ZBOOT_ROM.
+> 
+>>  #else
+>>  
+>>  		/*
+>> @@ -309,7 +373,7 @@ wont_overwrite:
+>>  		blo	1b
+>>  #endif
+>>  
+>> -not_relocated:	mov	r0, #0
+>> +		mov	r0, #0
+>>  1:		str	r0, [r2], #4		@ clear bss
+>>  		str	r0, [r2], #4
+>>  		str	r0, [r2], #4
+>> @@ -317,8 +381,25 @@ not_relocated:	mov	r0, #0
+>>  		cmp	r2, r3
+>>  		blo	1b
+>>  
+>> +#ifdef CONFIG_ARM_APPENDED_DTB
+>> +/*
+>> + * The C runtime environment should now be set up sufficiently.
+>> + *   r4  = kernel execution address
+>> + *   r6  = _edata
+>> + *   r7  = architecture ID
+>> + *   r8  = atags pointer
+>> + *
+>> + * if there is a device tree (dtb) appended to zImage, set up to use this dtb.
+>> + */
+>> +		ldr	r0, [r6, #0]
+>> +		ldr	r1, =0xedfe0dd0		@ sig is 0xdoodfeed big endian
+>> +		cmp	r0, r1
+>> +		bne	keep_atags
+>> +
+>> +		mov	r8, r6			@ use the appended device tree
+> 
+> You should have updated r8 the moment you knew you have a valid dtb 
+> earlier instead of duplicating this test here.
+> 
+>> +keep_atags:
+>> +#endif
+>>  /*
+>> - * The C runtime environment should now be setup sufficiently.
+>>   * Set up some pointers, and start decompressing.
+>>   *   r4  = kernel execution address
+>>   *   r7  = architecture ID
+>>
