@@ -1,40 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 2 Mar 2011 09:36:10 -0800
-Subject: [PATCH resend] omap: Fix linker error in
-	drivers/video/omap/lcd_2430sdp.c
-In-Reply-To: <1298960962.2011.11.camel@deskari>
-References: <1298193466-29534-1-git-send-email-jhnikula@gmail.com>
-	<1298232248-347-1-git-send-email-jhnikula@gmail.com>
-	<20110224212644.GN20560@atomide.com>
-	<20110228164715.e34a965e.jhnikula@gmail.com>
-	<1298905757.9809.135.camel@deskari>
-	<20110301013928.GL20560@atomide.com>
-	<1298960962.2011.11.camel@deskari>
-Message-ID: <20110302173610.GV20560@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 02 Mar 2011 20:39:02 +0300
+Subject: [PATCH v2 10/18] omap3+: sr: call handler with interrupt disabled
+In-Reply-To: <4D6E4866.6070107@ru.mvista.com>
+References: <1299063331-27968-1-git-send-email-nm@ti.com>
+	<1299063331-27968-11-git-send-email-nm@ti.com>
+	<4D6E4866.6070107@ru.mvista.com>
+Message-ID: <4D6E80B6.9090901@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [110228 22:27]:
-> On Mon, 2011-02-28 at 19:39 -0600, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [110228 07:07]:
-> > > 
-> > > Well, it's a bit ugly, but I'm fine with it. It's for the old omapfb,
-> > > which hopefully nobody uses anymore (right =), and there's no simple way
-> > > to make it modular and neat.
-> > 
-> > How about let's make mach-omap2 boards all use the new code?
-> > That way the old code can be omap1 only.
-> 
-> That has been my long term plan, but I've never had time to start
-> working on it. Some (many?) of the old panel drivers are trivial to
-> port, needs just copying the panel timings. 
+I wrote:
 
-OK, that will probably make things a lot easier in the long run.
- 
-> Some are much more complex, and porting them without having the hardware
-> may be a bit of a guesswork. But perhaps we can find testers for those
-> after the code has been ported.
+>> Request the handler irq such that there is no nesting for calls.
+>> the notifiers are not expected to be nested, further the interrupt
+>> events for status change should be handled prior to the next event
+>> else there is a risk of loosing events.
 
-Sure, once we get one working others should be easy..
+>> Signed-off-by: Nishanth Menon<nm@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/smartreflex.c |    2 +-
+>>   1 files changed, 1 insertions(+), 1 deletions(-)
 
-Tony
+>> diff --git a/arch/arm/mach-omap2/smartreflex.c 
+>> b/arch/arm/mach-omap2/smartreflex.c
+>> index 99e4c4f..a4e9f2d 100644
+>> --- a/arch/arm/mach-omap2/smartreflex.c
+>> +++ b/arch/arm/mach-omap2/smartreflex.c
+>> @@ -278,7 +278,7 @@ static int sr_late_init(struct omap_sr *sr_info)
+>>               goto error;
+>>           }
+>>           ret = request_irq(sr_info->irq, sr_interrupt,
+>> -                0, name, (void *)sr_info);
+>> +                IRQF_DISABLED, name, (void *)sr_info);
+
+>    Isn't this flag a nop now?
+
+    Indeed, it is, according to the comment in <linux/interrupt.h>. So what does 
+this patch really achieve?
+
+WBR, Sergei
