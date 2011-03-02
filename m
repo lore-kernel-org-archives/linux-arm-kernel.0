@@ -1,136 +1,146 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 2 Mar 2011 21:44:13 +0100 (CET)
-Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
-	EOI in parent chip
-In-Reply-To: <20110302191744.GA13179@n2100.arm.linux.org.uk>
-References: <1298900022-21516-7-git-send-email-will.deacon@arm.com>
-	<20110228140327.GA1937@n2100.arm.linux.org.uk>
-	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
-	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
-	<20110228214445.GD1937@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
-	<20110301201904.GA27107@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
-	<20110302085356.GB4493@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1103021015110.2701@localhost6.localdomain6>
-	<20110302191744.GA13179@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1103022032530.2701@localhost6.localdomain6>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 2 Mar 2011 21:48:03 +0100
+Subject: about MISC_DEVICES not being enabled in many defconfigs
+Message-ID: <20110302204803.GI22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2 Mar 2011, Russell King - ARM Linux wrote:
-> On Wed, Mar 02, 2011 at 10:25:02AM +0100, Thomas Gleixner wrote:
-> > On Wed, 2 Mar 2011, Russell King - ARM Linux wrote:
-> > > On Tue, Mar 01, 2011 at 10:29:37PM +0100, Thomas Gleixner wrote:
-> > > > Errm. I did never say that we disable the parent interrupt by any
-> > > > means except when the chained handler explicitely wants to do that,
-> > > > which is pretty much pointlesss nowadays, as we run all interrupt
-> > > > handlers with interrupts disabled.
-> > > 
-> > > And that's now why some platforms struggle to work, and we're having
-> > > to bodge around this - like the ARM platforms with MMC support.  Like
-> > 
-> > Whats the problem for MMC?
-> 
-> The FIFO interrupt gets completely buggered by USB interrupts such that
-> we can't read data fast enough.  With the old IRQF_DISABLED system,
-> the FIFO interrupt was marked IRQF_DISABLED as it was *fast* and needed
-> not to be interrupted.  Other interrupts didn't have IRQF_DISABLED set.
-> 
-> That means such interrupts can be handled while other longer interrupts
-> are in progress.  All that's gone out of the window now that all IRQ
-> handlers are run with IRQs permanently disabled.
-> 
-> And when this kind of behaviour becomes system specific (eg, the USB
-> device driver doesn't have this problem on x86 so why should it change)
+Hello,
 
-I wouldn't say that. USB is known to be a trouble spot even on
-x86. And Linus argued for enforcing IRQ_DISABLED to weed out such
-crap. Anything which runs longer than a few micro seconds in the hard
-interrupt context needs to be fixed.
+while working on an defconfig (arm/mx27) I noticed that just updating
+it[1] results in removing CONFIG_EEPROM_AT24=y.  The reason is that
+since commit
 
-> I haven't noticed PATA getting this support.  So how do platforms force
-> device drivers which turn out to be problematical to conform to their
-> timing issues when there wasn't a problem with previous kernels?
+	v2.6.36-5965-g5f2365d (misc devices: do not enable by default)
 
-As I said above. PATA was talked about going threaded for years, but
-nobody cared as the irq enabled vs. IRQ_DISABLED mode made things
-magically work most of the time, except when you added some other
-random driver, which required IRQ_DISABLED as well and spent a
-millisecond and more in its handler. I know that pain and I wasted
-enough time with the wreckage caused by long running handlers.
+MISC_DEVICES isn't enabled anymore by default.  So all defconfigs that
+have CONFIG_SOME_SYMBOL=y (or =m) (with SOME_SYMBOL depending on
+MISC_DEVICES) but not CONFIG_MISC_DEVICES=y suffer from the same
+problem.
 
-So at some point we had to make a decision:
+As a defconfig that was reduced before 5f2365d obviously didn't have
+CONFIG_MISC_DEVICES=y many defconfigs have that problem.
 
-Either let the status quo, which is not satisfying at all and causes
-headache left and right, or create a situation which enforces that
-shit gets cleaned up.
+I did the following to (hopefully) find all affected defconfigs:
 
-The general consensus was that enforcing the shit to be cleaned up is
-the better long term strategy even when it causes some short term
-irritation.
+	$ git describe
+	v2.6.38-rc7
+	$ git ls-files drivers/misc | grep Kconfig | xargs grep -h ^config | sed 's/config \(.*\)/CONFIG_\1=/' > miscsymbols
+	$ git ls-files *defconfig | xargs grep -L CONFIG_MISC_DEVICES= | xargs grep -F -f miscsymbols
+	arch/arm/configs/afeb9260_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/afeb9260_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/at572d940hfek_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/arm/configs/at572d940hfek_defconfig:CONFIG_ATMEL_SSC=m
+	arch/arm/configs/at572d940hfek_defconfig:CONFIG_SENSORS_TSL2550=m
+	arch/arm/configs/at572d940hfek_defconfig:CONFIG_DS1682=m
+	arch/arm/configs/at91cap9adk_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/at91rm9200_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/arm/configs/at91rm9200_defconfig:CONFIG_EEPROM_LEGACY=m
+	arch/arm/configs/at91sam9260ek_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/at91sam9261ek_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/at91sam9263ek_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/at91sam9g20ek_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/at91sam9rlek_defconfig:CONFIG_ATMEL_SSC=y
+	arch/arm/configs/da8xx_omapl_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/davinci_all_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/ep93xx_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/arm/configs/ixp2000_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/arm/configs/ixp23xx_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/arm/configs/ixp4xx_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/arm/configs/mini2440_defconfig:CONFIG_SENSORS_TSL2550=m
+	arch/arm/configs/mx27_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/mx3_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/neocore926_defconfig:CONFIG_ATMEL_PWM=y
+	arch/arm/configs/neocore926_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/arm/configs/omap2plus_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/arm/configs/pcontrol_g20_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/arm/configs/pcontrol_g20_defconfig:CONFIG_EEPROM_AT24=m
+	arch/arm/configs/pnx4008_defconfig:CONFIG_EEPROM_LEGACY=m
+	arch/arm/configs/raumfeld_defconfig:CONFIG_ISL29003=y
+	arch/arm/configs/raumfeld_defconfig:CONFIG_TI_DAC7512=y
+	arch/arm/configs/realview-smp_defconfig:CONFIG_ARM_CHARLCD=y
+	arch/arm/configs/realview_defconfig:CONFIG_ARM_CHARLCD=y
+	arch/arm/configs/s3c2410_defconfig:CONFIG_EEPROM_AT25=m
+	arch/arm/configs/s3c2410_defconfig:CONFIG_EEPROM_LEGACY=m
+	arch/arm/configs/s3c2410_defconfig:CONFIG_EEPROM_93CX6=m
+	arch/arm/configs/s3c6400_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/s5pc100_defconfig:CONFIG_EEPROM_AT24=y
+	arch/arm/configs/versatile_defconfig:CONFIG_EEPROM_LEGACY=m
+	arch/arm/configs/zeus_defconfig:CONFIG_EEPROM_AT24=m
+	arch/avr32/configs/atngw100_mrmt_defconfig:CONFIG_ATMEL_PWM=y
+	arch/avr32/configs/favr-32_defconfig:CONFIG_ATMEL_PWM=m
+	arch/avr32/configs/favr-32_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/avr32/configs/favr-32_defconfig:CONFIG_ATMEL_SSC=m
+	arch/avr32/configs/hammerhead_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/avr32/configs/merisc_defconfig:CONFIG_ATMEL_PWM=y
+	arch/avr32/configs/merisc_defconfig:CONFIG_ATMEL_SSC=y
+	arch/avr32/configs/mimc200_defconfig:CONFIG_ATMEL_TCLIB=y
+	arch/avr32/configs/mimc200_defconfig:CONFIG_EEPROM_AT24=y
+	arch/avr32/configs/mimc200_defconfig:CONFIG_EEPROM_AT25=y
+	arch/blackfin/configs/BlackStamp_defconfig:CONFIG_EEPROM_AT25=y
+	arch/blackfin/configs/H8606_defconfig:CONFIG_EEPROM_AT25=y
+	arch/blackfin/configs/SRV1_defconfig:CONFIG_EEPROM_AT25=m
+	arch/ia64/configs/generic_defconfig:CONFIG_SGI_IOC4=y
+	arch/ia64/configs/generic_defconfig:CONFIG_SGI_XP=m
+	arch/ia64/configs/gensparse_defconfig:CONFIG_SGI_IOC4=y
+	arch/mips/configs/bigsur_defconfig:CONFIG_SGI_IOC4=m
+	arch/mips/configs/bigsur_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/mips/configs/bigsur_defconfig:CONFIG_EEPROM_MAX6875=y
+	arch/mips/configs/gpr_defconfig:CONFIG_TIFM_CORE=m
+	arch/mips/configs/ip32_defconfig:CONFIG_SGI_IOC4=y
+	arch/mips/configs/markeins_defconfig:CONFIG_SGI_IOC4=m
+	arch/mips/configs/pnx8550-jbs_defconfig:CONFIG_SGI_IOC4=m
+	arch/mips/configs/rm200_defconfig:CONFIG_SGI_IOC4=m
+	arch/mips/configs/sb1250-swarm_defconfig:CONFIG_SGI_IOC4=m
+	arch/mips/configs/wrppmc_defconfig:CONFIG_SGI_IOC4=m
+	arch/mips/configs/yosemite_defconfig:CONFIG_SGI_IOC4=m
+	arch/powerpc/configs/44x/warp_defconfig:CONFIG_EEPROM_AT24=y
+	arch/powerpc/configs/52xx/motionpro_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/86xx/gef_ppc9a_defconfig:CONFIG_DS1682=y
+	arch/powerpc/configs/86xx/gef_sbc310_defconfig:CONFIG_DS1682=y
+	arch/powerpc/configs/86xx/gef_sbc610_defconfig:CONFIG_DS1682=y
+	arch/powerpc/configs/86xx/mpc8641_hpcn_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/e55xx_smp_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/linkstation_defconfig:CONFIG_EEPROM_LEGACY=m
+	arch/powerpc/configs/mpc512x_defconfig:CONFIG_EEPROM_AT24=y
+	arch/powerpc/configs/mpc5200_defconfig:CONFIG_EEPROM_AT24=y
+	arch/powerpc/configs/mpc85xx_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/mpc85xx_smp_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/mpc86xx_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/pasemi_defconfig:CONFIG_EEPROM_LEGACY=y
+	arch/powerpc/configs/ppc6xx_defconfig:CONFIG_ENCLOSURE_SERVICES=m
+	arch/powerpc/configs/ppc6xx_defconfig:CONFIG_SENSORS_TSL2550=m
+	arch/powerpc/configs/ppc6xx_defconfig:CONFIG_EEPROM_AT24=m
+	arch/powerpc/configs/ppc6xx_defconfig:CONFIG_EEPROM_LEGACY=m
+	arch/powerpc/configs/ppc6xx_defconfig:CONFIG_EEPROM_MAX6875=m
+	arch/powerpc/configs/ppc6xx_defconfig:CONFIG_EEPROM_93CX6=m
+	arch/sh/configs/se7206_defconfig:CONFIG_EEPROM_93CX6=y
 
-If that hits ARM full force, sorry, but it's not my lonely decision in
-order to get an Guinness Book entry.
+(For those wondering about the commands above: A line 
 
-I assume, you know which drivers are responsible for this kind of
-wreckage. Could you provide a list?
+	arch/$arch/configs/xyz_defconfig:CONFIG_SOME_DEVICE=y
 
-> > > I *violently* disagree with the direction that genirq is heading.  It's
-> > > *actively* breaking stuff.  What's really annoying is that problems like
-> > > the above I did point out, but you seem happy to completely ignore them.
-> > > The result is that more and more ARM platforms *are* becoming utterly
-> > > useless, or requiring additional complexity being shoved into subsystems
-> > > to cope with this crap.
-> > > 
-> > > What we need is a *decent* IRQ support system.  Not something created out
-> > > of religious arguments which is what we have now.
-> >  
-> > I'm not religious about it, at least not more than you with your total
-> > refusement to distinguish between special case oddball FPGA demux and
-> > bog standard functional irq chips.
-> 
-> Clearly you don't want to know about the problems all this stuff is
-> causing.  Maybe you like being responsible for breaking the most ARM
+means here, that running
 
-I want to hear about problems and I'm the least person who refuses to
-help. And you are very well aware of that.
+	make ARCH=$arch xyz_defconfig
 
-Let's take it the other way around. Do you want to know about the pain
-of maintaining generic infrastructure like this and being blocked to
-change a few things in the core code just because nobody is talking to
-you and takes it for granted, that fiddling in the guts of the generic
-code by circumventing it (and I'm not talking about chained handlers
-here) is a good idea, just because the header files are public
-accessible via include/linux ?
+results in a config without SOME_DEVICE.
 
-> platforms with your changes - are you trying for an entry in the
-> Guiness Book of World Records for this, because I think that's where
-> you're heading.
+I don't know if that bothers you, but if it does, you should add
 
-Didn't know that they have a category for that. Can you point me to
-the website where to apply?
+	CONFIG_MISC_DEVICES=y
 
-> I don't agree with the distinction that you're trying to make.  It only
-> works for a simple subset of cases - but it seems you're overall attitude
-> is that you only care about a small subset of easy cases and to hell
-> with everything else.
+to your defconfig.
 
-That's not true at all. I said more than once that I understand why
-you want to keep the original concept of those chained handlers and
-I'm not going to change anything about them. I saw it a bit too
-simplistic at the beginning of the discussion and admitted that and
-corrected my POV right away.
+Just to let you know ...
 
-I'm merily trying to help and provide infrastructure for repeating
-patterns. If those patterns happen to be the simple ones, then we
-still want to avoid copied and duplicated code all over the place.
+Best regards
+Uwe
 
-Again, I'm not trying to kill the current chained handlers at all
-neither do I believe that everything is nail because we have a
-hammer. I'm trying to understand the problems instead of being fixated
-on a method which turned out to solve one of them.
+[1] make mx27_defconfig
+    make savedefconfig
+    mv defconfig arch/arm/configs/mx27_defconfig
 
-Thanks,
-
-	tglx
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
