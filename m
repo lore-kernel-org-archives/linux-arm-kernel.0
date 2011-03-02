@@ -1,104 +1,204 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  2 Mar 2011 16:53:17 +0000
-Subject: [RFC PATCH 11/20] ARM: architected timers: Add A15 specific
-	sched_clock implementation
+Date: Wed,  2 Mar 2011 16:53:16 +0000
+Subject: [RFC PATCH 10/20] ARM: Platform dependent sched_clock() override
 In-Reply-To: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
 References: <1299084806-16546-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1299084806-16546-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1299084806-16546-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide an A15 sched_clock implementation using the virtual counter,
-which is thought to be more useful than the physical one in a
-virtualised environment, as it can offset the time spent in another
-VM or the hypervisor.
+sched_clock being a (weak) global symbol, there can only be
+a single implementation in the kernel, which may cause problems
+on the rocky road towards supporting multiple architectures in
+a single kernel image.
+
+This patch adds a way of overriding the default sched_clock()
+by extending the ARM sched_clock framework. The sched_clock()
+call also becomes slightly more expensive (indirect function call).
+
+VExpress support is updated to use that functionnality.
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h |    4 ++--
- arch/arm/kernel/arch_timer.c      |   32 +++++++++++++++++++++++++++++++-
- 2 files changed, 33 insertions(+), 3 deletions(-)
+ arch/arm/Kconfig                      |    9 +++++++
+ arch/arm/include/asm/sched_clock.h    |   41 +++++++++++++++++++++++++++++---
+ arch/arm/kernel/sched_clock.c         |   23 +++++++++++++++++-
+ arch/arm/plat-versatile/sched-clock.c |    7 +++--
+ 4 files changed, 72 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index f98263c..9fa0556 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -2,9 +2,9 @@
- #define __ASMARM_ARCH_TIMER_H
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 316da4b..26fde47 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -48,6 +48,14 @@ config SYS_SUPPORTS_APM_EMULATION
+ config HAVE_SCHED_CLOCK
+ 	bool
  
- #ifdef CONFIG_HAVE_ARCH_TIMERS
--int arch_timer_register_setup(void (*setup)(struct clock_event_device *));
-+int arch_timer_register_setup(int (*setup)(struct clock_event_device *));
- #else
--static inline int arch_timer_register_setup(void (*setup)(struct clock_event_device *))
-+static inline int arch_timer_register_setup(int (*setup)(struct clock_event_device *))
++config ARCH_SCHED_CLOCK
++	bool
++	help
++	  Allow the default sched_clock() to be overloaded at runtime.
++	  Use this option if you build a kernel for a platform with
++	  multiplee sched_clock sources, one of which will be selected
++	  at runtime.
++
+ config GENERIC_GPIO
+ 	bool
+ 
+@@ -271,6 +279,7 @@ config ARCH_VEXPRESS
+ 	select ARM_TIMER_SP804
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
++	select ARCH_SCHED_CLOCK
+ 	select HAVE_CLK
+ 	select HAVE_PATA_PLATFORM
+ 	select ICST
+diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
+index c8e6ddf..27ef05e 100644
+--- a/arch/arm/include/asm/sched_clock.h
++++ b/arch/arm/include/asm/sched_clock.h
+@@ -21,6 +21,17 @@ struct clock_data {
+ 
+ #define DEFINE_CLOCK_DATA(name)	struct clock_data name
+ 
++#ifdef CONFIG_ARCH_SCHED_CLOCK
++#define __DEFINE_SCHED_CLOCK_ALIAS(name)
++#else
++#define __DEFINE_SCHED_CLOCK_ALIAS(name) \
++	unsigned long long sched_clock(void) __attribute__ ((alias (#name)));
++#endif
++
++#define DEFINE_SCHED_CLOCK_FUNC(name) \
++	__DEFINE_SCHED_CLOCK_ALIAS(name)	\
++	static unsigned long long notrace name(void)
++
+ static inline u64 cyc_to_ns(u64 cyc, u32 mult, u32 shift)
  {
- 	return -ENODEV;
- }
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index bc05604..fe55919 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -20,10 +20,13 @@
+ 	return (cyc * mult) >> shift;
+@@ -94,20 +105,35 @@ static inline unsigned long long cyc_to_sched_clock(struct clock_data *cd,
+  * and shift.  Also setup a timer to ensure that the epoch is refreshed
+  * at the appropriate time interval, which will call your update
+  * handler.
++ *
++ * Use the _arch_ version if you want your sched_clock function to be
++ * selected at run time (if CONFIG_ARCH_SCHED_CLOCK is enabled).
+  */
+-void init_sched_clock(struct clock_data *, void (*)(void),
++void init_arch_sched_clock(struct clock_data *, void (*)(void),
++	unsigned long long (*)(void),
+ 	unsigned int, unsigned long);
  
- #include <asm/cputype.h>
- #include <asm/localtimer.h>
-+#include <asm/sched_clock.h>
- #include <asm/hardware/gic.h>
- 
- static unsigned long arch_timer_rate;
- 
-+static DEFINE_CLOCK_DATA(cd);
++static inline void init_sched_clock(struct clock_data *cd,
++				    void (*update)(void),
++				    unsigned int bits, unsigned long rate)
++{
++	init_arch_sched_clock(cd, update, NULL, bits, rate);
++}
 +
  /*
-  * Architected system timer support.
+  * Use this initialization function rather than init_sched_clock() if
+  * you're using cyc_to_fixed_sched_clock, which will warn if your
+  * constants are incorrect.
++ *
++ * Use the _arch_ version if you want your sched_clock function to be
++ * selected at run time (if CONFIG_ARCH_SCHED_CLOCK is enabled).
   */
-@@ -201,6 +204,30 @@ static struct clocksource clocksource_counter = {
- 	.flags	= (CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_VALID_FOR_HRES),
- };
- 
-+static u32 arch_counter_get_cntvct32(void)
-+{
-+	cycle_t cntvct;
-+
-+	cntvct = arch_counter_get_cntvct();
-+
-+	/*
-+	 * The sched_clock infrastructure only knows about counters
-+	 * with at most 32bits. Forget about the upper 24 bits for the
-+	 * time being...
-+	 */
-+	return (u32)(cntvct & (u32)~0);
-+}
-+
-+DEFINE_SCHED_CLOCK_FUNC(arch_timer_sched_clock)
-+{
-+	return cyc_to_sched_clock(&cd, arch_counter_get_cntvct32(), (u32)~0);
-+}
-+
-+static void notrace arch_timer_update_sched_clock(void)
-+{
-+	update_sched_clock(&cd, arch_counter_get_cntvct32(), (u32)~0);
-+}
-+
- static int __init arch_timer_clocksource_init(void)
+-static inline void init_fixed_sched_clock(struct clock_data *cd,
+-	void (*update)(void), unsigned int bits, unsigned long rate,
++static inline void init_fixed_arch_sched_clock(struct clock_data *cd,
++	void (*update)(void), unsigned long long (*sched_clock_fn)(void),
++	unsigned int bits, unsigned long rate,
+ 	u32 mult, u32 shift)
  {
- 	struct clocksource *cs = &clocksource_counter;
-@@ -209,10 +236,13 @@ static int __init arch_timer_clocksource_init(void)
- 
- 	clocksource_register_hz(cs, arch_timer_rate);
- 
-+	init_arch_sched_clock(&cd, arch_timer_update_sched_clock,
-+			      arch_timer_sched_clock, 32, arch_timer_rate);
-+
- 	return 0;
+-	init_sched_clock(cd, update, bits, rate);
++	init_arch_sched_clock(cd, update, sched_clock_fn, bits, rate);
+ 	if (cd->mult != mult || cd->shift != shift) {
+ 		pr_crit("sched_clock: wrong multiply/shift: %u>>%u vs calculated %u>>%u\n"
+ 			"sched_clock: fix multiply/shift to avoid scheduler hiccups\n",
+@@ -115,6 +141,13 @@ static inline void init_fixed_sched_clock(struct clock_data *cd,
+ 	}
  }
  
--int __init arch_timer_register_setup(void (*setup)(struct clock_event_device *))
-+int __init arch_timer_register_setup(int (*setup)(struct clock_event_device *))
++static inline void init_fixed_sched_clock(struct clock_data *cd,
++	void (*update)(void), unsigned int bits, unsigned long rate,
++	u32 mult, u32 shift)
++{
++	init_fixed_arch_sched_clock(cd, update, NULL, bits, rate, mult, shift);
++}
++
+ extern void sched_clock_postinit(void);
+ 
+ #endif
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index 9a46370..3c1d08b 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -18,13 +18,29 @@ static void sched_clock_poll(unsigned long wrap_ticks);
+ static DEFINE_TIMER(sched_clock_timer, sched_clock_poll, 0, 0);
+ static void (*sched_clock_update_fn)(void);
+ 
++#ifdef CONFIG_ARCH_SCHED_CLOCK
++static unsigned long long notrace default_sched_clock(void)
++{
++	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
++					* (NSEC_PER_SEC / HZ);
++}
++
++static unsigned long long __read_mostly (*sched_clock_fn)(void) = default_sched_clock;
++
++unsigned long long notrace sched_clock(void)
++{
++	return sched_clock_fn();
++}
++#endif
++
+ static void sched_clock_poll(unsigned long wrap_ticks)
  {
- 	if (!arch_timer_available())
- 		return -ENODEV;
+ 	mod_timer(&sched_clock_timer, round_jiffies(jiffies + wrap_ticks));
+ 	sched_clock_update_fn();
+ }
+ 
+-void __init init_sched_clock(struct clock_data *cd, void (*update)(void),
++void __init init_arch_sched_clock(struct clock_data *cd, void (*update)(void),
++	unsigned long long (*arch_sched_clock_fn)(void),
+ 	unsigned int clock_bits, unsigned long rate)
+ {
+ 	unsigned long r, w;
+@@ -33,6 +49,11 @@ void __init init_sched_clock(struct clock_data *cd, void (*update)(void),
+ 
+ 	sched_clock_update_fn = update;
+ 
++#ifdef CONFIG_ARCH_SCHED_CLOCK
++	if (arch_sched_clock_fn)
++		sched_clock_fn = arch_sched_clock_fn;
++#endif
++
+ 	/* calculate the mult/shift to convert counter ticks to ns. */
+ 	clocks_calc_mult_shift(&cd->mult, &cd->shift, rate, NSEC_PER_SEC, 0);
+ 
+diff --git a/arch/arm/plat-versatile/sched-clock.c b/arch/arm/plat-versatile/sched-clock.c
+index 3d6a4c2..d6ebd0f 100644
+--- a/arch/arm/plat-versatile/sched-clock.c
++++ b/arch/arm/plat-versatile/sched-clock.c
+@@ -34,7 +34,7 @@ static void __iomem *ctr;
+ #define SC_MULT		2796202667u
+ #define SC_SHIFT	26
+ 
+-unsigned long long notrace sched_clock(void)
++DEFINE_SCHED_CLOCK_FUNC(versatile_sched_clock)
+ {
+ 	if (ctr) {
+ 		u32 cyc = readl(ctr);
+@@ -53,6 +53,7 @@ static void notrace versatile_update_sched_clock(void)
+ void __init versatile_sched_clock_init(void __iomem *reg, unsigned long rate)
+ {
+ 	ctr = reg;
+-	init_fixed_sched_clock(&cd, versatile_update_sched_clock,
+-			       32, rate, SC_MULT, SC_SHIFT);
++	init_fixed_arch_sched_clock(&cd, versatile_update_sched_clock,
++				    versatile_sched_clock,
++				    32, rate, SC_MULT, SC_SHIFT);
+ }
 -- 
 1.7.0.4
