@@ -1,45 +1,173 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 02 Mar 2011 16:45:13 +0300
-Subject: [PATCH v2 15/18] omap3+: sr: disable spamming interrupts
-In-Reply-To: <1299063331-27968-16-git-send-email-nm@ti.com>
-References: <1299063331-27968-1-git-send-email-nm@ti.com>
-	<1299063331-27968-16-git-send-email-nm@ti.com>
-Message-ID: <4D6E49E9.1020307@ru.mvista.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 2 Mar 2011 14:51:36 +0100
+Subject: [PATCH] ARM: mxs/mx28evk: add flexcan devices
+In-Reply-To: <20110302125525.GD21601@S2100-06.ap.freescale.net>
+References: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
+	<20110302111148.GV29521@pengutronix.de>
+	<20110302114549.GC21601@S2100-06.ap.freescale.net>
+	<20110302125525.GD21601@S2100-06.ap.freescale.net>
+Message-ID: <20110302135136.GA29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Mar 02, 2011 at 08:55:25PM +0800, Shawn Guo wrote:
+> On Wed, Mar 02, 2011 at 07:45:50PM +0800, Shawn Guo wrote:
+> > On Wed, Mar 02, 2011 at 12:11:48PM +0100, Sascha Hauer wrote:
+> > > Hi Shawn,
+> > > 
+> > Hi Sascha,
+> > 
+> > > On Wed, Mar 02, 2011 at 06:54:44PM +0800, Shawn Guo wrote:
+> > > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > > ---
+> > > >  arch/arm/mach-mxs/Kconfig        |    1 +
+> > > >  arch/arm/mach-mxs/mach-mx28evk.c |   37 +++++++++++++++++++++++++++++++++++++
+> > > >  2 files changed, 38 insertions(+), 0 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> > > > index 55bf075..9a1f2cb 100644
+> > > > --- a/arch/arm/mach-mxs/Kconfig
+> > > > +++ b/arch/arm/mach-mxs/Kconfig
+> > > > @@ -31,6 +31,7 @@ config MACH_MX28EVK
+> > > >  	select MXS_HAVE_AMBA_DUART
+> > > >  	select MXS_HAVE_PLATFORM_AUART
+> > > >  	select MXS_HAVE_PLATFORM_FEC
+> > > > +	select MXS_HAVE_PLATFORM_FLEXCAN
+> > > >  	select MXS_OCOTP
+> > > >  	default y
+> > > >  	help
+> > > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> > > > index 1f0b708..3cefb73 100644
+> > > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> > > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> > > > @@ -28,6 +28,7 @@
+> > > >  #include "devices-mx28.h"
+> > > >  #include "gpio.h"
+> > > >  
+> > > > +#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+> > > >  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+> > > >  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> > > >  
+> > > > @@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+> > > >  	/* phy reset line */
+> > > >  	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+> > > >  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > > > +
+> > > > +	/* flexcan0 */
+> > > > +	MX28_PAD_GPMI_RDY2__CAN0_TX,
+> > > > +	MX28_PAD_GPMI_RDY3__CAN0_RX,
+> > > > +	/* flexcan1 */
+> > > > +	MX28_PAD_GPMI_CE2N__CAN1_TX,
+> > > > +	MX28_PAD_GPMI_CE3N__CAN1_RX,
+> > > > +	/* transceiver power control */
+> > > > +	MX28_PAD_SSP1_CMD__GPIO_2_13,
+> > > >  };
+> > > >  
+> > > >  /* fec */
+> > > > @@ -178,8 +188,28 @@ error:
+> > > >  	return -ETIMEDOUT;
+> > > >  }
+> > > >  
+> > > > +/* flexcan */
+> > > > +static void mx28evk_flexcan_switch(int enable)
+> > > > +{
+> > > > +	static int count;
+> > > > +
+> > > > +	if (enable) {
+> > > > +		if (!count++)
+> > > > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+> > > > +	} else {
+> > > > +		if (!--count)
+> > > > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+> > > > +	}
+> > > > +}
+> > > 
+> > > Why this count variable? It shouldn't hurt to call gpio_set_value
+> > > multiple times.
+> > > 
+> Something like this?
+> 
+> /*
+>  * On mx28evk board, two flexcan transceivers are controlled
+>  * by one power switch gpio.
+>  */
+> #define FLEXCAN0_SWITCH_ON	(1 << 0)
+> #define FLEXCAN1_SWITCH_ON	(1 << 1)
+> 
+> static int flexcan_switch_on;
+> 
+> static void mx28evk_flexcan0_switch(int enable)
+> {
+> 	if (enable) {
+> 		flexcan_switch_on |= FLEXCAN0_SWITCH_ON;
+> 		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+> 	} else {
+> 		flexcan_switch_on &= ~FLEXCAN0_SWITCH_ON;
+> 		if (!flexcan_switch_on)
+> 			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+> 	}
+> }
+> 
+> static void mx28evk_flexcan1_switch(int enable)
+> {
+> 	if (enable) {
+> 		flexcan_switch_on |= FLEXCAN1_SWITCH_ON;
+> 		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+> 	} else {
+> 		flexcan_switch_on &= ~FLEXCAN1_SWITCH_ON;
+> 		if (!flexcan_switch_on)
+> 			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+> 	}
+> }
+> 
+> static const struct flexcan_platform_data
+> 		mx28evk_flexcan_pdata[] __initconst = {
+> 	{
+> 		.transceiver_switch = mx28evk_flexcan0_switch,
+> 	}, {
+> 		.transceiver_switch = mx28evk_flexcan1_switch,
+> 	}
+> };
 
-On 02-03-2011 13:55, Nishanth Menon wrote:
+More like this, which is slightly easier to read, but the effect is the
+same.
 
-> At times with bad SR configurations especially during silicon bringups,
-> we could get continuous spurious interrupts which end up hanging the
-> platform in the form of an ISR call for status bits that are
-> automatically enabled by the h/w without any s/w clearing option.
+static int flexcan0_en, flexcan0_en;
 
-> If we detect scenarios where isr was called without the corresponding
-> notification bit being set, instead of hanging up the system,
-> we will disable interrupt after noting the event in the system log
-> to try and keep system sanity and allow developer to debug and fix
-> the condition.
+/*
+ * MX28EVK_FLEXCAN_SWITCH is shared between both can controllers
+ */
+static void mx28evk_flexcan_switch(void)
+{
+	if (flexcan0_en || flexcan1_en)
+		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+	else
+		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+}
 
-> Signed-off-by: Nishanth Menon<nm@ti.com>
-> ---
->   arch/arm/mach-omap2/smartreflex.c |   12 ++++++++++--
->   1 files changed, 10 insertions(+), 2 deletions(-)
+static void mx28evk_flexcan0_switch(int enable)
+{
+	flexcan0_en = enable;
+	mx28evk_flexcan_switch();
+}
 
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 49a04ea..d62da3d 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -209,8 +209,16 @@ static irqreturn_t sr_interrupt(int irq, void *data)
->   		value = irqstat_to_notifier_v2(status);
->   	}
->
-> -	if (sr_class->notify)
-> -		sr_class->notify(sr_info->voltdm, value);
-> +	/* Attempt some resemblence of recovery! */
+static void mx28evk_flexcan1_switch(int enable)
+{
+	flexcan1_en = enable;
+	mx28evk_flexcan_switch();
+}
 
-    Resemblance?
+static const struct flexcan_platform_data
+                mx28evk_flexcan_pdata[] __initconst = {
+        {
+                .transceiver_switch = mx28evk_flexcan0_switch,
+        }, {
+                .transceiver_switch = mx28evk_flexcan1_switch,
+        }
+};
 
-WBR, Sergei
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
