@@ -1,91 +1,103 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 2 Mar 2011 09:46:37 +0100
-Subject: [PATCH 2/2] ARM MX53_LOCO: add pwm backlight device
-In-Reply-To: <1298972303-1010-2-git-send-email-b02280@freescale.com>
-References: <1298972303-1010-1-git-send-email-b02280@freescale.com>
-	<1298972303-1010-2-git-send-email-b02280@freescale.com>
-Message-ID: <20110302084637.GS29521@pengutronix.de>
+From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
+Date: Wed, 2 Mar 2011 14:17:42 +0530
+Subject: [PATCH v7 1/1] PRUSS UIO driver support
+In-Reply-To: <alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
+References: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
+	<1299014895-2022-2-git-send-email-pratheesh@ti.com>
+	<alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BF36776@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 01, 2011 at 05:38:23PM +0800, Jason Chen wrote:
-> Signed-off-by: Jason Chen <b02280@freescale.com>
-> ---
->  arch/arm/mach-mx5/Kconfig           |    1 +
->  arch/arm/mach-mx5/board-mx53_loco.c |   11 +++++++++++
->  arch/arm/mach-mx5/devices-imx53.h   |    4 ++++
->  3 files changed, 16 insertions(+), 0 deletions(-)
+Hi,
+
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: Wednesday, March 02, 2011 3:15 AM
+> > +
+> > +static DEFINE_SPINLOCK(lock);
+> > +static struct clk *pruss_clk;
+> > +static struct uio_info *info;
+> > +static dma_addr_t sram_paddr, ddr_paddr;
+> > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
+> > +
+> > +static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+> > +{
+> > +	int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
+> > +	int val, intr_mask = (1 << intr_bit);
+> > +	void __iomem *base = info->mem[0].internal_addr;
+> > +	void __iomem *intren_reg = base + PINTC_HIER;
+> > +	void __iomem *intrstat_reg = base + PINTC_HIPIR + (intr_bit << 2);
+> > +
+> > +	spin_lock_irq(&lock);
 > 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index f065a0d..baf5223 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -162,6 +162,7 @@ config MACH_MX53_LOCO
->  	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	select IMX_HAVE_PLATFORM_IMX_I2C
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_MXC_PWM
->  	help
->  	  Include support for MX53 LOCO platform. This includes specific
->  	  configurations for the board and its peripherals.
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index 160899e..3b0b200 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -23,6 +23,7 @@
->  #include <linux/fec.h>
->  #include <linux/delay.h>
->  #include <linux/gpio.h>
-> +#include <linux/pwm_backlight.h>
->  
->  #include <mach/common.h>
->  #include <mach/hardware.h>
-> @@ -203,6 +204,13 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
->  	.bitrate = 100000,
->  };
->  
-> +static struct platform_pwm_backlight_data loco_pwm_backlight_data = {
-> +	.pwm_id = 1,
-> +	.max_brightness = 255,
-> +	.dft_brightness = 128,
-> +	.pwm_period_ns = 50000,
-> +};
-> +
->  static void __init mx53_loco_board_init(void)
->  {
->  	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
-> @@ -213,6 +221,9 @@ static void __init mx53_loco_board_init(void)
->  	imx53_add_imx2_wdt(0, NULL);
->  	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
->  	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
-> +
-> +	imx53_add_mxc_pwm(1);
-> +	imx53_add_mxc_pwm_backlight(0, &loco_pwm_backlight_data);
->  }
->  
->  static void __init mx53_loco_timer_init(void)
-> diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
-> index 5a1d6c9..e9c5661 100644
-> --- a/arch/arm/mach-mx5/devices-imx53.h
-> +++ b/arch/arm/mach-mx5/devices-imx53.h
-> @@ -37,3 +37,7 @@ extern const struct imx_imx2_wdt_data imx53_imx2_wdt_data[] __initconst;
->  extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
->  #define imx53_add_mxc_pwm(id)	\
->  	imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
-> +
-> +#define imx53_add_mxc_pwm_backlight(id, pdata)			\
-> +	imx_add_platform_device("pwm-backlight", id, NULL,	\
-> +			0, pdata, sizeof(*pdata));
+> No, I said: spin_lock() is sufficient.
+Ok. 
+> > +	val = ioread32(intren_reg);
+> > +	/* Is interrupt enabled and active ? */
+> > +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND)) {
+> > +		spin_unlock_irq(&lock);
+> 
+> You unconditinally enable interrupts here where you are not supposed
+> to do so.
+> 
+Ok.
+> > +		return IRQ_NONE;
+> > +	}
+> > +
+> > +	/* Disable interrupt */
+> > +	iowrite32((val & ~intr_mask), intren_reg);
 
+I checked more on this and actually INTC h/w has Host Interrupt
+Enable Indexed Set Register (HIEISR) and Host Interrupt Enable Indexed
+Clear Register(HIEICR) which I can use to enable/disable interrupts
+without doing RMW. I will use these registers and then we don't need
+all the spinlock and irqcontrol stuff. So I need to do
 
-No. There is nothing i.MX53 specific in this, not even i.MX specific.
-Please just add a static struct platform_device or maybe
-platform_device_register_resndata.
+iowrite32((intr_bit, HIEICR);// This disable the interrupt bit
+in intern_reg.
 
-Sascha
+Userspace can use HIEISR to re-enable the interrupt.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> > +	spin_unlock_irq(&lock);
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int pruss_irqcontrol(struct uio_info *info, s32 irq_on)
+> > +{
+> > +	int intr_bit = info->irq - IRQ_DA8XX_EVTOUT0 + 2;
+> > +	int val, intr_mask = (1 << intr_bit);
+> > +	void __iomem *base = info->mem[0].internal_addr;
+> > +	void __iomem *intren_reg = base + PINTC_HIER;
+> > +
+> > +	spin_lock_irq(&lock);
+> 
+> This one is correct, as this is always called from non interrupt
+> disabled context.
+> 
+> > +	val = ioread32(intren_reg);
+> > +	if (irq_on)
+> > +		iowrite32((val | intr_mask), intren_reg);
+> > +	else
+> > +		iowrite32((val & ~intr_mask), intren_reg);
+> > +	spin_unlock_irq(&lock);
+> > +
+> > +	return 0;
+> > +}
+> 
+> 
+> > +
+> > +	spin_lock_init(&lock);
+> 
+> Sigh. DEFINE_SPINLOCK(lock); already initializes the lock.
+> 
+> It's not the purpose of a review to tell you what you need to change
+> mechanically. Reviewers hint to a correct solution and you are
+> supposed to lookup what that solution means and act accordingly. If
+> you do not understand the hint or its implications please ask _before_
+> sending a new patch set.
+
+Seriously, I went to "fix the comments" mode. Sorry about that. Anyway
+I learnt more about things by making mistakes i.e. the positive side.
+Thanks a lot for helping us improve on this. 
+
+Pratheesh
