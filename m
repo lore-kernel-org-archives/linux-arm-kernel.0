@@ -1,331 +1,280 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Wed, 02 Mar 2011 00:51:12 +0000
-Subject: [PATCH 3/6] i2c-pxa2xx: Add PCI support for PXA I2C controller
-In-Reply-To: <1298461100-14869-4-git-send-email-bigeasy@linutronix.de>
-References: <1298461100-14869-1-git-send-email-bigeasy@linutronix.de>
-	<1298461100-14869-4-git-send-email-bigeasy@linutronix.de>
-Message-ID: <4D6D9480.7050108@fluff.org>
+From: omar.ramirez@ti.com (Omar Ramirez Luna)
+Date: Tue,  1 Mar 2011 18:46:49 -0600
+Subject: [PATCH] OMAP2+: hwmod: use status bit info for reset line
+Message-ID: <1299026809-32168-1-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/11 11:38, Sebastian Andrzej Siewior wrote:
-> The Sodaville I2C controller is almost the same as found on PXA2xx. The
-> difference:
-> - the register are at a different offset
-> - no slave support
->
-> The PCI probe code adds three platform devices which are probed then by
-> the platform code.
-> The X86 part also adds dummy clock defines because we don't have HW
-> clock support.
->
-> Signed-off-by: Sebastian Andrzej Siewior<bigeasy@linutronix.de>
-> Signed-off-by: Dirk Brandewie<dirk.brandewie@gmail.com>
-> ---
->   drivers/i2c/busses/Kconfig       |    7 +-
->   drivers/i2c/busses/Makefile      |    1 +
->   drivers/i2c/busses/i2c-pxa-pci.c |  176 ++++++++++++++++++++++++++++++++++++++
->   drivers/i2c/busses/i2c-pxa.c     |   27 +++++-
->   4 files changed, 206 insertions(+), 5 deletions(-)
->   create mode 100644 drivers/i2c/busses/i2c-pxa-pci.c
->
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 113505a..deefa13 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -525,15 +525,18 @@ config I2C_PNX
->
->   config I2C_PXA
->   	tristate "Intel PXA2XX I2C adapter"
-> -	depends on ARCH_PXA || ARCH_MMP
-> +	depends on ARCH_PXA || ARCH_MMP || (X86_32&&  PCI&&  OF)
->   	help
->   	  If you have devices in the PXA I2C bus, say yes to this option.
->   	  This driver can also be built as a module.  If so, the module
->   	  will be called i2c-pxa.
->
-> +config I2C_PXA_PCI
-> +	def_bool I2C_PXA&&  X86_32&&  PCI&&  OF
-> +
->   config I2C_PXA_SLAVE
->   	bool "Intel PXA2XX I2C Slave comms support"
-> -	depends on I2C_PXA
-> +	depends on I2C_PXA&&  !X86_32
->   	help
->   	  Support I2C slave mode communications on the PXA I2C bus.  This
->   	  is necessary for systems where the PXA may be a target on the
-> diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-> index 9d2d0ec..e95d0bf 100644
-> --- a/drivers/i2c/busses/Makefile
-> +++ b/drivers/i2c/busses/Makefile
-> @@ -52,6 +52,7 @@ obj-$(CONFIG_I2C_PCA_PLATFORM)	+= i2c-pca-platform.o
->   obj-$(CONFIG_I2C_PMCMSP)	+= i2c-pmcmsp.o
->   obj-$(CONFIG_I2C_PNX)		+= i2c-pnx.o
->   obj-$(CONFIG_I2C_PXA)		+= i2c-pxa.o
-> +obj-$(CONFIG_I2C_PXA_PCI)	+= i2c-pxa-pci.o
->   obj-$(CONFIG_I2C_S3C2410)	+= i2c-s3c2410.o
->   obj-$(CONFIG_I2C_S6000)		+= i2c-s6000.o
->   obj-$(CONFIG_I2C_SH7760)	+= i2c-sh7760.o
-> diff --git a/drivers/i2c/busses/i2c-pxa-pci.c b/drivers/i2c/busses/i2c-pxa-pci.c
-> new file mode 100644
-> index 0000000..6659d26
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-pxa-pci.c
-> @@ -0,0 +1,176 @@
-> +/*
-> + * The CE4100's I2C device is more or less the same one as found on PXA.
-> + * It does not support slave mode, the register slightly moved. This PCI
-> + * device provides three bars, every contains a single I2C controller.
-> + */
-> +#include<linux/pci.h>
-> +#include<linux/platform_device.h>
-> +#include<linux/i2c/pxa-i2c.h>
-> +#include<linux/of.h>
-> +#include<linux/of_device.h>
-> +#include<linux/of_address.h>
-> +
-> +#define CE4100_PCI_I2C_DEVS	3
-> +
-> +struct ce4100_devices {
-> +	struct platform_device *pdev[CE4100_PCI_I2C_DEVS];
-> +};
-> +
-> +static struct platform_device *add_i2c_device(struct pci_dev *dev, int bar)
-> +{
-> +	struct platform_device *pdev;
-> +	struct i2c_pxa_platform_data pdata;
-> +	struct resource res[2];
-> +	struct device_node *child;
-> +	static int devnum;
-> +	int ret;
-> +
-> +	memset(&pdata, 0, sizeof(struct i2c_pxa_platform_data));
-> +	memset(&res, 0, sizeof(res));
-> +
-> +	res[0].flags = IORESOURCE_MEM;
-> +	res[0].start = pci_resource_start(dev, bar);
-> +	res[0].end = pci_resource_end(dev, bar);
-> +
-> +	res[1].flags = IORESOURCE_IRQ;
-> +	res[1].start = dev->irq;
-> +	res[1].end = dev->irq;
-> +
-> +	for_each_child_of_node(dev->dev.of_node, child) {
-> +		const void *prop;
-> +		struct resource r;
-> +		int ret;
-> +
-> +		ret = of_address_to_resource(child, 0,&r);
-> +		if (ret<  0)
-> +			continue;
-> +		if (r.start != res[0].start)
-> +			continue;
-> +		if (r.end != res[0].end)
-> +			continue;
-> +		if (r.flags != res[0].flags)
-> +			continue;
-> +
-> +		prop = of_get_property(child, "fast-mode", NULL);
-> +		if (prop)
-> +			pdata.fast_mode = 1;
-> +
-> +		break;
-> +	}
-> +
-> +	if (!child) {
-> +		dev_err(&dev->dev, "failed to match a DT node for bar %d.\n",
-> +				bar);
-> +		ret = -EINVAL;
-> +		goto out;
-> +	}
-> +
-> +	pdev = platform_device_alloc("ce4100-i2c", devnum);
-> +	if (!pdev) {
-> +		of_node_put(child);
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
-> +	pdev->dev.parent =&dev->dev;
-> +	pdev->dev.of_node = child;
-> +
-> +	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
-> +	if (ret)
-> +		goto err;
-> +
-> +	ret = platform_device_add_data(pdev,&pdata, sizeof(pdata));
-> +	if (ret)
-> +		goto err;
-> +
-> +	ret = platform_device_add(pdev);
-> +	if (ret)
-> +		goto err;
-> +	devnum++;
-> +	return pdev;
-> +err:
-> +	platform_device_put(pdev);
-> +out:
-> +	return ERR_PTR(ret);
-> +}
-> +
-> +static int __devinit ce4100_i2c_probe(struct pci_dev *dev,
-> +		const struct pci_device_id *ent)
-> +{
-> +	int ret;
-> +	int i;
-> +	struct ce4100_devices *sds;
-> +
-> +	ret = pci_enable_device_mem(dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (!dev->dev.of_node) {
-> +		dev_err(&dev->dev, "Missing device tree node.\n");
-> +		return -EINVAL;
-> +	}
-> +	sds = kzalloc(sizeof(*sds), GFP_KERNEL);
-> +	if (!sds)
-> +		goto err_mem;
-> +
-> +	for (i = 0; i<  ARRAY_SIZE(sds->pdev); i++) {
-> +		sds->pdev[i] = add_i2c_device(dev, i);
-> +		if (IS_ERR(sds->pdev[i])) {
-> +			while (--i>= 0)
-> +				platform_device_unregister(sds->pdev[i]);
-> +			goto err_dev_add;
-> +		}
-> +	}
-> +	pci_set_drvdata(dev, sds);
-> +	return 0;
-> +
-> +err_dev_add:
-> +	pci_set_drvdata(dev, NULL);
-> +	kfree(sds);
-> +err_mem:
-> +	pci_disable_device(dev);
-> +	return ret;
-> +}
-> +
-> +static void __devexit ce4100_i2c_remove(struct pci_dev *dev)
-> +{
-> +	struct ce4100_devices *sds;
-> +	unsigned int i;
-> +
-> +	sds = pci_get_drvdata(dev);
-> +	pci_set_drvdata(dev, NULL);
-> +
-> +	for (i = 0; i<  ARRAY_SIZE(sds->pdev); i++)
-> +		platform_device_unregister(sds->pdev[i]);
-> +
-> +	pci_disable_device(dev);
-> +	kfree(sds);
-> +}
-> +
-> +static struct pci_device_id ce4100_i2c_devices[] __devinitdata = {
-> +	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, 0x2e68)},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(pci, ce4100_i2c_devices);
-> +
-> +static struct pci_driver ce4100_i2c_driver = {
-> +	.name           = "ce4100_i2c",
-> +	.id_table       = ce4100_i2c_devices,
-> +	.probe          = ce4100_i2c_probe,
-> +	.remove         = __devexit_p(ce4100_i2c_remove),
-> +};
-> +
-> +static int __init ce4100_i2c_init(void)
-> +{
-> +	return pci_register_driver(&ce4100_i2c_driver);
-> +}
-> +module_init(ce4100_i2c_init);
-> +
-> +static void __exit ce4100_i2c_exit(void)
-> +{
-> +	pci_unregister_driver(&ce4100_i2c_driver);
-> +}
-> +module_exit(ce4100_i2c_exit);
-> +
-> +MODULE_DESCRIPTION("CE4100 PCI-I2C glue code for PXA's driver");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Sebastian Andrzej Siewior<bigeasy@linutronix.de>");
-> diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-> index fc2a90e..225e9a5 100644
-> --- a/drivers/i2c/busses/i2c-pxa.c
-> +++ b/drivers/i2c/busses/i2c-pxa.c
-> @@ -38,6 +38,13 @@
->
->   #include<asm/irq.h>
->
-> +#ifdef CONFIG_X86
-> +#define clk_get(dev, id)	NULL
-> +#define clk_put(clk)		do { } while (0)
-> +#define clk_disable(clk)	do { } while (0)
-> +#define clk_enable(clk)		do { } while (0)
-> +#endif
-> +
+On OMAP2 and OMAP3 the reset ctrl shift doesn't match the
+status bit, as it does on OMAP4, when handling the reset lines.
 
-Maybe be better on !CONFIG_HAVE_CLOCK (or whatever it is called)
+This patch adds a new member in the reset info structure, so now it
+can be added as part of hwmod data, and checked accordingly for
+OMAP2 or 3; otherwise, there could be cases when the shift masks
+doesn't match both of the registers, and a successful reset might
+throw an error message or vice versa.
 
->   struct pxa_reg_layout {
->   	u32 ibmr;
->   	u32 idbr;
-> @@ -49,6 +56,7 @@ struct pxa_reg_layout {
->   enum pxa_i2c_types {
->   	REGS_PXA2XX,
->   	REGS_PXA3XX,
-> +	REGS_CE4100,
->   };
->
->   /*
-> @@ -69,11 +77,19 @@ static struct pxa_reg_layout pxa_reg_layout[] = {
->   		.isr =	0x18,
->   		.isar =	0x20,
->   	},
-> +	[REGS_CE4100] = {
-> +		.ibmr =	0x14,
-> +		.idbr =	0x0c,
-> +		.icr =	0x00,
-> +		.isr =	0x04,
-> +		/* no isar register */
-> +	},
->   };
->
->   static const struct platform_device_id i2c_pxa_id_table[] = {
->   	{ "pxa2xx-i2c",		REGS_PXA2XX },
->   	{ "pxa3xx-pwri2c",	REGS_PXA3XX },
-> +	{ "ce4100-i2c",		REGS_CE4100 },
->   	{ },
->   };
->   MODULE_DEVICE_TABLE(platform, i2c_pxa_id_table);
-> @@ -442,7 +458,8 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->   	writel(I2C_ISR_INIT, _ISR(i2c));
->   	writel(readl(_ICR(i2c))&  ~ICR_UR, _ICR(i2c));
->
-> -	writel(i2c->slave_addr, _ISAR(i2c));
-> +	if (i2c->reg_isar)
-> +		writel(i2c->slave_addr, _ISAR(i2c));
->
->   	/* set control register values */
->   	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
-> @@ -1074,7 +1091,8 @@ static int i2c_pxa_probe(struct platform_device *dev)
->   	i2c->reg_idbr = i2c->reg_base + pxa_reg_layout[i2c_type].idbr;
->   	i2c->reg_icr = i2c->reg_base + pxa_reg_layout[i2c_type].icr;
->   	i2c->reg_isr = i2c->reg_base + pxa_reg_layout[i2c_type].isr;
-> -	i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
-> +	if (i2c_type != REGS_CE4100)
-> +		i2c->reg_isar = i2c->reg_base + pxa_reg_layout[i2c_type].isar;
->
->   	i2c->iobase = res->start;
->   	i2c->iosize = resource_size(res);
-> @@ -1113,7 +1131,10 @@ static int i2c_pxa_probe(struct platform_device *dev)
->   	i2c->adap.algo_data = i2c;
->   	i2c->adap.dev.parent =&dev->dev;
->
-> -	ret = i2c_add_numbered_adapter(&i2c->adap);
-> +	if (i2c_type == REGS_CE4100)
-> +		ret = i2c_add_adapter(&i2c->adap);
-> +	else
-> +		ret = i2c_add_numbered_adapter(&i2c->adap);
->   	if (ret<  0) {
->   		printk(KERN_INFO "I2C: Failed to add bus\n");
->   		goto eadapt;
+Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+---
+
+In OMAP3 (with an IVA), this affects IVA domain (in parenthesis the
+shift needed).
+
+RSTCTRL has:
+  RST3(2)
+  RST2(1)
+  RST1(0)
+
+RSTST has:
+...
+IVA2_SW_RST3 (10)
+IVA2_SW_RST2 (9)
+IVA2_SW_RST1 (8)
+COREDOMAINWKUP_RST (3)
+GLOBALWARM_RST (2)
+DOMAINWKUP_RST (1)
+GLOBALCOLD_RST (0)
+
+In OMAP2, it could potentially affect GFX, DSP and MDM domains; if the
+resets are also used.
+
+ arch/arm/mach-omap2/omap_hwmod.c             |   64 ++++++++++++++------------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c           |   18 ++++---
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |    5 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    2 +
+ 4 files changed, 50 insertions(+), 39 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index e282e35..019fb29 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -972,25 +972,29 @@ static int _wait_target_ready(struct omap_hwmod *oh)
+ }
+ 
+ /**
+- * _lookup_hardreset - return the register bit shift for this hwmod/reset line
++ * _lookup_hardreset - fill register bit info for this hwmod/reset line
+  * @oh: struct omap_hwmod *
+  * @name: name of the reset line in the context of this hwmod
++ * @r: pointer to be filled with the register bit shifts
+  *
+  * Return the bit position of the reset line that match the
+  * input name. Return -ENOENT if not found.
+  */
+-static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name)
++static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name,
++			    struct omap_hwmod_rst_info *r)
+ {
+ 	int i;
+ 
+ 	for (i = 0; i < oh->rst_lines_cnt; i++) {
+ 		const char *rst_line = oh->rst_lines[i].name;
+ 		if (!strcmp(rst_line, name)) {
+-			u8 shift = oh->rst_lines[i].rst_shift;
+-			pr_debug("omap_hwmod: %s: _lookup_hardreset: %s: %d\n",
+-				 oh->name, rst_line, shift);
++			r->rst_shift = oh->rst_lines[i].rst_shift;
++			r->st_shift = oh->rst_lines[i].st_shift;
++			pr_debug("omap_hwmod: %s: %s: %s: rst %d st %d\n",
++				 oh->name, __func__, rst_line, r->rst_shift,
++				 r->st_shift);
+ 
+-			return shift;
++			return 0;
+ 		}
+ 	}
+ 
+@@ -1009,21 +1013,22 @@ static u8 _lookup_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+-	u8 shift;
++	struct omap_hwmod_rst_info r;
++	u8 ret;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	shift = _lookup_hardreset(oh, name);
+-	if (IS_ERR_VALUE(shift))
+-		return shift;
++	ret = _lookup_hardreset(oh, name, &r);
++	if (IS_ERR_VALUE(ret))
++		return ret;
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+ 		return omap2_prm_assert_hardreset(oh->prcm.omap2.module_offs,
+-						  shift);
++						  r.rst_shift);
+ 	else if (cpu_is_omap44xx())
+ 		return omap4_prm_assert_hardreset(oh->prcm.omap4.rstctrl_reg,
+-						  shift);
++						  r.rst_shift);
+ 	else
+ 		return -EINVAL;
+ }
+@@ -1040,29 +1045,29 @@ static int _assert_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+-	u8 shift;
+-	int r;
++	struct omap_hwmod_rst_info r;
++	int ret;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	shift = _lookup_hardreset(oh, name);
+-	if (IS_ERR_VALUE(shift))
+-		return shift;
++	ret = _lookup_hardreset(oh, name, &r);
++	if (IS_ERR_VALUE(ret))
++		return ret;
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
+-		r = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
+-						 shift);
++		ret = omap2_prm_deassert_hardreset(oh->prcm.omap2.module_offs,
++						 r.rst_shift, r.st_shift);
+ 	else if (cpu_is_omap44xx())
+-		r = omap4_prm_deassert_hardreset(oh->prcm.omap4.rstctrl_reg,
+-						 shift);
++		ret = omap4_prm_deassert_hardreset(oh->prcm.omap4.rstctrl_reg,
++						 r.rst_shift);
+ 	else
+ 		return -EINVAL;
+ 
+-	if (r == -EBUSY)
++	if (ret == -EBUSY)
+ 		pr_warning("omap_hwmod: %s: failed to hardreset\n", oh->name);
+ 
+-	return r;
++	return ret;
+ }
+ 
+ /**
+@@ -1075,21 +1080,22 @@ static int _deassert_hardreset(struct omap_hwmod *oh, const char *name)
+  */
+ static int _read_hardreset(struct omap_hwmod *oh, const char *name)
+ {
+-	u8 shift;
++	struct omap_hwmod_rst_info r;
++	u8 ret;
+ 
+ 	if (!oh)
+ 		return -EINVAL;
+ 
+-	shift = _lookup_hardreset(oh, name);
+-	if (IS_ERR_VALUE(shift))
+-		return shift;
++	ret = _lookup_hardreset(oh, name, &r);
++	if (IS_ERR_VALUE(ret))
++		return ret;
+ 
+ 	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		return omap2_prm_is_hardreset_asserted(oh->prcm.omap2.module_offs,
+-						       shift);
++						       r.st_shift);
+ 	} else if (cpu_is_omap44xx()) {
+ 		return omap4_prm_is_hardreset_asserted(oh->prcm.omap4.rstctrl_reg,
+-						       shift);
++						       r.rst_shift);
+ 	} else {
+ 		return -EINVAL;
+ 	}
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index ec03625..051213f 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -118,7 +118,8 @@ int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
+ /**
+  * omap2_prm_deassert_hardreset - deassert a submodule hardreset line and wait
+  * @prm_mod: PRM submodule base (e.g. CORE_MOD)
+- * @shift: register bit shift corresponding to the reset line to deassert
++ * @rst_shift: register bit shift corresponding to the reset line to deassert
++ * @st_shift: register bit shift for the status of the deasserted submodule
+  *
+  * Some IPs like dsp or iva contain processors that require an HW
+  * reset line to be asserted / deasserted in order to fully enable the
+@@ -129,27 +130,28 @@ int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
+  * -EINVAL upon an argument error, -EEXIST if the submodule was already out
+  * of reset, or -EBUSY if the submodule did not exit reset promptly.
+  */
+-int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift)
++int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift)
+ {
+-	u32 mask;
++	u32 rst, st;
+ 	int c;
+ 
+ 	if (!(cpu_is_omap24xx() || cpu_is_omap34xx()))
+ 		return -EINVAL;
+ 
+-	mask = 1 << shift;
++	rst = 1 << rst_shift;
++	st = 1 << st_shift;
+ 
+ 	/* Check the current status to avoid de-asserting the line twice */
+-	if (omap2_prm_read_mod_bits_shift(prm_mod, OMAP2_RM_RSTCTRL, mask) == 0)
++	if (omap2_prm_read_mod_bits_shift(prm_mod, OMAP2_RM_RSTCTRL, rst) == 0)
+ 		return -EEXIST;
+ 
+ 	/* Clear the reset status by writing 1 to the status bit */
+-	omap2_prm_rmw_mod_reg_bits(0xffffffff, mask, prm_mod, OMAP2_RM_RSTST);
++	omap2_prm_rmw_mod_reg_bits(0xffffffff, st, prm_mod, OMAP2_RM_RSTST);
+ 	/* de-assert the reset control line */
+-	omap2_prm_rmw_mod_reg_bits(mask, 0, prm_mod, OMAP2_RM_RSTCTRL);
++	omap2_prm_rmw_mod_reg_bits(rst, 0, prm_mod, OMAP2_RM_RSTCTRL);
+ 	/* wait the status to be set */
+ 	omap_test_timeout(omap2_prm_read_mod_bits_shift(prm_mod, OMAP2_RM_RSTST,
+-						  mask),
++						  st),
+ 			  MAX_MODULE_HARDRESET_WAIT, c);
+ 
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 49654c8..a1fc62a 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -282,7 +282,8 @@ static inline int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift)
+ 		"not suppose to be used on omap4\n");
+ 	return 0;
+ }
+-static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift)
++static inline int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift,
++						u8 st_shift)
+ {
+ 	WARN(1, "prm: omap2xxx/omap3xxx specific function and "
+ 		"not suppose to be used on omap4\n");
+@@ -300,7 +301,7 @@ extern u32 omap2_prm_read_mod_bits_shift(s16 domain, s16 idx, u32 mask);
+ /* These omap2_ PRM functions apply to both OMAP2 and 3 */
+ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+-extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 shift);
++extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
+ 
+ #endif	/* CONFIG_ARCH_OMAP4 */
+ #endif
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 1eee85a..28596b7 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -124,6 +124,7 @@ struct omap_hwmod_dma_info {
+  * struct omap_hwmod_rst_info - IPs reset lines use by hwmod
+  * @name: name of the reset line (module local name)
+  * @rst_shift: Offset of the reset bit
++ * @st_shift: Offset of the reset status bit
+  *
+  * @name should be something short, e.g., "cpu0" or "rst". It is defined
+  * locally to the hwmod.
+@@ -131,6 +132,7 @@ struct omap_hwmod_dma_info {
+ struct omap_hwmod_rst_info {
+ 	const char	*name;
+ 	u8		rst_shift;
++	u8		st_shift;
+ };
+ 
+ /**
+-- 
+1.7.1
