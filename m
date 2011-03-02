@@ -1,299 +1,90 @@
-From: pratheesh@ti.com (Pratheesh Gangadhar)
-Date: Wed,  2 Mar 2011 17:08:06 +0530
-Subject: [PATCH v8 1/1] PRUSS UIO driver support
-In-Reply-To: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
-References: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
-Message-ID: <1299065886-30099-2-git-send-email-pratheesh@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Mar 2011 19:45:50 +0800
+Subject: [PATCH] ARM: mxs/mx28evk: add flexcan devices
+In-Reply-To: <20110302111148.GV29521@pengutronix.de>
+References: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
+	<20110302111148.GV29521@pengutronix.de>
+Message-ID: <20110302114549.GC21601@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements PRUSS (Programmable Real-time Unit Sub System)
-UIO driver which exports SOC resources associated with PRUSS like
-I/O, memories and IRQs to user space. PRUSS is dual 32-bit RISC
-processors which is efficient in performing embedded tasks that
-require manipulation of packed memory mapped data structures and
-handling system events that have tight real time constraints. This
-driver is currently supported on Texas Instruments DA850, AM18xx and
-OMAP-L138 devices.
-For example, PRUSS runs firmware for real-time critical industrial
-communication data link layer and communicates with application stack
-running in user space via shared memory and IRQs.
+On Wed, Mar 02, 2011 at 12:11:48PM +0100, Sascha Hauer wrote:
+> Hi Shawn,
+> 
+Hi Sascha,
 
-Signed-off-by: Pratheesh Gangadhar <pratheesh@ti.com>
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/uio/Kconfig     |   17 ++++
- drivers/uio/Makefile    |    1 +
- drivers/uio/uio_pruss.c |  226 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 244 insertions(+), 0 deletions(-)
- create mode 100644 drivers/uio/uio_pruss.c
+> On Wed, Mar 02, 2011 at 06:54:44PM +0800, Shawn Guo wrote:
+> > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/Kconfig        |    1 +
+> >  arch/arm/mach-mxs/mach-mx28evk.c |   37 +++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 38 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> > index 55bf075..9a1f2cb 100644
+> > --- a/arch/arm/mach-mxs/Kconfig
+> > +++ b/arch/arm/mach-mxs/Kconfig
+> > @@ -31,6 +31,7 @@ config MACH_MX28EVK
+> >  	select MXS_HAVE_AMBA_DUART
+> >  	select MXS_HAVE_PLATFORM_AUART
+> >  	select MXS_HAVE_PLATFORM_FEC
+> > +	select MXS_HAVE_PLATFORM_FLEXCAN
+> >  	select MXS_OCOTP
+> >  	default y
+> >  	help
+> > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> > index 1f0b708..3cefb73 100644
+> > --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> > @@ -28,6 +28,7 @@
+> >  #include "devices-mx28.h"
+> >  #include "gpio.h"
+> >  
+> > +#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+> >  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+> >  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> >  
+> > @@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+> >  	/* phy reset line */
+> >  	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+> >  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > +
+> > +	/* flexcan0 */
+> > +	MX28_PAD_GPMI_RDY2__CAN0_TX,
+> > +	MX28_PAD_GPMI_RDY3__CAN0_RX,
+> > +	/* flexcan1 */
+> > +	MX28_PAD_GPMI_CE2N__CAN1_TX,
+> > +	MX28_PAD_GPMI_CE3N__CAN1_RX,
+> > +	/* transceiver power control */
+> > +	MX28_PAD_SSP1_CMD__GPIO_2_13,
+> >  };
+> >  
+> >  /* fec */
+> > @@ -178,8 +188,28 @@ error:
+> >  	return -ETIMEDOUT;
+> >  }
+> >  
+> > +/* flexcan */
+> > +static void mx28evk_flexcan_switch(int enable)
+> > +{
+> > +	static int count;
+> > +
+> > +	if (enable) {
+> > +		if (!count++)
+> > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+> > +	} else {
+> > +		if (!--count)
+> > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+> > +	}
+> > +}
+> 
+> Why this count variable? It shouldn't hurt to call gpio_set_value
+> multiple times.
+> 
+This gpio controls the power of both flexcan0 and flexcan1
+transceivers, and we do not want one power-off really shut the power
+down if the other is still on.
 
-diff --git a/drivers/uio/Kconfig b/drivers/uio/Kconfig
-index bb44079..6f3ea9b 100644
---- a/drivers/uio/Kconfig
-+++ b/drivers/uio/Kconfig
-@@ -94,4 +94,21 @@ config UIO_NETX
- 	  To compile this driver as a module, choose M here; the module
- 	  will be called uio_netx.
- 
-+config UIO_PRUSS
-+	tristate "Texas Instruments PRUSS driver"
-+	depends on ARCH_DAVINCI_DA850
-+	help
-+	  PRUSS driver for OMAPL138/DA850/AM18XX devices
-+	  PRUSS driver requires user space components, examples and user space
-+	  driver is available from below SVN repo - you may use anonymous login
-+
-+	  https://gforge.ti.com/gf/project/pru_sw/
-+
-+	  More info on API is available at below wiki
-+
-+	  http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called uio_pruss.
-+
- endif
-diff --git a/drivers/uio/Makefile b/drivers/uio/Makefile
-index 18fd818..d4dd9a5 100644
---- a/drivers/uio/Makefile
-+++ b/drivers/uio/Makefile
-@@ -6,3 +6,4 @@ obj-$(CONFIG_UIO_AEC)	+= uio_aec.o
- obj-$(CONFIG_UIO_SERCOS3)	+= uio_sercos3.o
- obj-$(CONFIG_UIO_PCI_GENERIC)	+= uio_pci_generic.o
- obj-$(CONFIG_UIO_NETX)	+= uio_netx.o
-+obj-$(CONFIG_UIO_PRUSS)         += uio_pruss.o
-diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
-new file mode 100644
-index 0000000..12469ae
---- /dev/null
-+++ b/drivers/uio/uio_pruss.c
-@@ -0,0 +1,226 @@
-+/*
-+ * Programmable Real-Time Unit Sub System (PRUSS) UIO driver (uio_pruss)
-+ *
-+ * This driver exports PRUSS host event out interrupts and PRUSS, L3 RAM,
-+ * and DDR RAM to user space for applications interacting with PRUSS firmware
-+ *
-+ * Copyright (C) 2010-11 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/platform_device.h>
-+#include <linux/uio_driver.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/slab.h>
-+#include <mach/sram.h>
-+
-+#define DRV_NAME "pruss_uio"
-+#define DRV_VERSION "0.50"
-+
-+static int sram_pool_sz = SZ_16K;
-+module_param(sram_pool_sz, int, 0);
-+MODULE_PARM_DESC(sram_pool_sz, "sram pool size to allocate ");
-+
-+static int extram_pool_sz = SZ_256K;
-+module_param(extram_pool_sz, int, 0);
-+MODULE_PARM_DESC(extram_pool_sz, "external ram pool size to allocate");
-+
-+/*
-+ * Host event IRQ numbers from PRUSS - PRUSS can generate upto 8 interrupt
-+ * events to AINTC of ARM host processor - which can be used for IPC b/w PRUSS
-+ * firmware and user space application, async notification from PRU firmware
-+ * to user space application
-+ * 3	PRU_EVTOUT0
-+ * 4	PRU_EVTOUT1
-+ * 5	PRU_EVTOUT2
-+ * 6	PRU_EVTOUT3
-+ * 7	PRU_EVTOUT4
-+ * 8	PRU_EVTOUT5
-+ * 9	PRU_EVTOUT6
-+ * 10	PRU_EVTOUT7
-+*/
-+#define MAX_PRUSS_EVT	8
-+
-+#define PINTC_HIDISR	0x4038
-+#define PINTC_HIPIR	0x4900
-+#define HIPIR_NOPEND	0x80000000
-+#define PINTC_HIER	0x5500
-+
-+static struct clk *pruss_clk;
-+static struct uio_info *info;
-+static dma_addr_t sram_paddr, ddr_paddr;
-+static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-+
-+static irqreturn_t pruss_handler(int irq, struct uio_info *info)
-+{
-+	int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
-+	int val, intr_mask = (1 << intr_bit);
-+	void __iomem *base = info->mem[0].internal_addr;
-+	void __iomem *intren_reg = base + PINTC_HIER;
-+	void __iomem *intrdis_reg = base + PINTC_HIDISR;
-+	void __iomem *intrstat_reg = base + PINTC_HIPIR + (intr_bit << 2);
-+
-+	val = ioread32(intren_reg);
-+	/* Is interrupt enabled and active ? */
-+	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND))
-+		return IRQ_NONE;
-+	/* Disable interrupt */
-+	iowrite32(intr_bit, intrdis_reg);
-+	return IRQ_HANDLED;
-+}
-+
-+static void pruss_cleanup(struct platform_device *dev, struct uio_info *info)
-+{
-+	int cnt;
-+	struct uio_info *p = info;
-+
-+	for (cnt = 0; cnt < MAX_PRUSS_EVT; cnt++, p++) {
-+		uio_unregister_device(p);
-+		kfree(p->name);
-+	}
-+	iounmap(prussio_vaddr);
-+	if (ddr_vaddr) {
-+		dma_free_coherent(&dev->dev, extram_pool_sz, ddr_vaddr,
-+			ddr_paddr);
-+	}
-+	if (sram_vaddr)
-+		sram_free(sram_vaddr, sram_pool_sz);
-+	kfree(info);
-+	clk_put(pruss_clk);
-+}
-+
-+static int __devinit pruss_probe(struct platform_device *dev)
-+{
-+	struct uio_info *p;
-+	struct resource *regs_prussio;
-+	int ret = -ENODEV, cnt = 0, len;
-+
-+	info = kzalloc(sizeof(struct uio_info) * MAX_PRUSS_EVT, GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+	/* Power on PRU in case its not done as part of boot-loader */
-+	pruss_clk = clk_get(&dev->dev, "pruss");
-+	if (IS_ERR(pruss_clk)) {
-+		dev_err(&dev->dev, "Failed to get clock\n");
-+		kfree(info);
-+		ret = PTR_ERR(pruss_clk);
-+		return ret;
-+	} else {
-+		clk_enable(pruss_clk);
-+	}
-+
-+	regs_prussio = platform_get_resource(dev, IORESOURCE_MEM, 0);
-+	if (!regs_prussio) {
-+		dev_err(&dev->dev, "No PRUSS I/O resource specified\n");
-+		goto out_free;
-+	}
-+
-+	if (!regs_prussio->start) {
-+		dev_err(&dev->dev, "Invalid memory resource\n");
-+		goto out_free;
-+	}
-+
-+	sram_vaddr = sram_alloc(sram_pool_sz, &sram_paddr);
-+	if (!sram_vaddr) {
-+		dev_err(&dev->dev, "Could not allocate SRAM pool\n");
-+		goto out_free;
-+	}
-+
-+	ddr_vaddr = dma_alloc_coherent(&dev->dev, extram_pool_sz, &ddr_paddr,
-+				GFP_KERNEL | GFP_DMA);
-+	if (!ddr_vaddr) {
-+		dev_err(&dev->dev, "Could not allocate external memory\n");
-+		goto out_free;
-+	}
-+
-+	len = resource_size(regs_prussio);
-+	prussio_vaddr = ioremap(regs_prussio->start, len);
-+	if (!prussio_vaddr) {
-+		dev_err(&dev->dev, "Can't remap PRUSS I/O  address range\n");
-+		goto out_free;
-+	}
-+
-+	for (cnt = 0, p = info; cnt < MAX_PRUSS_EVT; cnt++, p++) {
-+		p->mem[0].internal_addr = prussio_vaddr;
-+		p->mem[0].addr = regs_prussio->start;
-+		p->mem[0].size = resource_size(regs_prussio);
-+		p->mem[0].memtype = UIO_MEM_PHYS;
-+
-+		p->mem[1].internal_addr = sram_vaddr;
-+		p->mem[1].addr = sram_paddr;
-+		p->mem[1].size = sram_pool_sz;
-+		p->mem[1].memtype = UIO_MEM_PHYS;
-+
-+		p->mem[2].internal_addr = ddr_vaddr;
-+		p->mem[2].addr = ddr_paddr;
-+		p->mem[2].size = extram_pool_sz;
-+		p->mem[2].memtype = UIO_MEM_PHYS;
-+
-+		p->name = kasprintf(GFP_KERNEL, "pruss_evt%d", cnt);
-+		p->version = "0.50";
-+
-+		/* Register PRUSS IRQ lines */
-+		p->irq = IRQ_DA8XX_EVTOUT0 + cnt;
-+		p->handler = pruss_handler;
-+
-+		ret = uio_register_device(&dev->dev, p);
-+		if (ret < 0)
-+			goto out_free;
-+	}
-+
-+	platform_set_drvdata(dev, info);
-+	return 0;
-+
-+out_free:
-+	pruss_cleanup(dev, info);
-+	return ret;
-+}
-+
-+static int __devexit pruss_remove(struct platform_device *dev)
-+{
-+	struct uio_info *info = platform_get_drvdata(dev);
-+
-+	pruss_cleanup(dev, info);
-+	platform_set_drvdata(dev, NULL);
-+	return 0;
-+}
-+
-+static struct platform_driver pruss_driver = {
-+	.probe = pruss_probe,
-+	.remove = __devexit_p(pruss_remove),
-+	.driver = {
-+		   .name = DRV_NAME,
-+		   .owner = THIS_MODULE,
-+		   },
-+};
-+
-+static int __init pruss_init_module(void)
-+{
-+	return platform_driver_register(&pruss_driver);
-+}
-+
-+module_init(pruss_init_module);
-+
-+static void __exit pruss_exit_module(void)
-+{
-+	platform_driver_unregister(&pruss_driver);
-+}
-+
-+module_exit(pruss_exit_module);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_VERSION(DRV_VERSION);
-+MODULE_AUTHOR("Amit Chatterjee <amit.chatterjee@ti.com>");
-+MODULE_AUTHOR("Pratheesh Gangadhar <pratheesh@ti.com>");
 -- 
-1.6.0.6
+Regards,
+Shawn
