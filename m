@@ -1,103 +1,47 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Wed, 2 Mar 2011 14:17:42 +0530
-Subject: [PATCH v7 1/1] PRUSS UIO driver support
-In-Reply-To: <alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
-References: <1299014895-2022-1-git-send-email-pratheesh@ti.com>
-	<1299014895-2022-2-git-send-email-pratheesh@ti.com>
-	<alpine.LFD.2.00.1103012238360.2701@localhost6.localdomain6>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024BF36776@dbde02.ent.ti.com>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Wed, 2 Mar 2011 16:54:00 +0800
+Subject: [PATCH 1/5] ARM: mx35_3ds: Add I2C support
+In-Reply-To: <20110302083736.GR29521@pengutronix.de>
+References: <1299009588-8783-1-git-send-email-fabio.estevam@freescale.com>
+	<20110301201703.GX22310@pengutronix.de>
+	<AANLkTi=c_vWNqBbqPzRpCzWD-s5PFvLmD8ROr=Jss1hA@mail.gmail.com>
+	<20110302083736.GR29521@pengutronix.de>
+Message-ID: <AANLkTi=Oogbyp4gsm5=uyK6gNDFJYiVg+ih1tXVoPBB4@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Sascha,
 
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Wednesday, March 02, 2011 3:15 AM
-> > +
-> > +static DEFINE_SPINLOCK(lock);
-> > +static struct clk *pruss_clk;
-> > +static struct uio_info *info;
-> > +static dma_addr_t sram_paddr, ddr_paddr;
-> > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> > +
-> > +static irqreturn_t pruss_handler(int irq, struct uio_info *info)
-> > +{
-> > +	int intr_bit = (irq - IRQ_DA8XX_EVTOUT0 + 2);
-> > +	int val, intr_mask = (1 << intr_bit);
-> > +	void __iomem *base = info->mem[0].internal_addr;
-> > +	void __iomem *intren_reg = base + PINTC_HIER;
-> > +	void __iomem *intrstat_reg = base + PINTC_HIPIR + (intr_bit << 2);
-> > +
-> > +	spin_lock_irq(&lock);
-> 
-> No, I said: spin_lock() is sufficient.
-Ok. 
-> > +	val = ioread32(intren_reg);
-> > +	/* Is interrupt enabled and active ? */
-> > +	if (!(val & intr_mask) && (ioread32(intrstat_reg) & HIPIR_NOPEND)) {
-> > +		spin_unlock_irq(&lock);
-> 
-> You unconditinally enable interrupts here where you are not supposed
-> to do so.
-> 
-Ok.
-> > +		return IRQ_NONE;
-> > +	}
-> > +
-> > +	/* Disable interrupt */
-> > +	iowrite32((val & ~intr_mask), intren_reg);
+2011/3/2 Sascha Hauer <s.hauer@pengutronix.de>:
+> On Wed, Mar 02, 2011 at 03:14:30PM +0800, Jason Liu wrote:
+>> Hi, Uwe,
+>>
+>> 2011/3/2 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > Hello,
+>> >
+>> > On Tue, Mar 01, 2011 at 04:59:44PM -0300, Fabio Estevam wrote:
+>> >> + ? ? imx35_add_imx_i2c0(&mx35_3ds_i2c0_data);
+>> > I'd slightly prefer using
+>> >
+>> > ? ? ? ?imx35_add_imx_i2c(0, ...)
+>> >
+>> > because I intend to remove the imx35_add_imx_i2c0-like macros soon. ?But
+>>
+>> Could you please explain why you intend to remove
+>> imx35_add_imx_i2c0-like macros?
+>> What you would like to do instead? Thanks,
+>
+> These just produce additional macros without value.
 
-I checked more on this and actually INTC h/w has Host Interrupt
-Enable Indexed Set Register (HIEISR) and Host Interrupt Enable Indexed
-Clear Register(HIEICR) which I can use to enable/disable interrupts
-without doing RMW. I will use these registers and then we don't need
-all the spinlock and irqcontrol stuff. So I need to do
+Get it. Thanks,
 
-iowrite32((intr_bit, HIEICR);// This disable the interrupt bit
-in intern_reg.
-
-Userspace can use HIEISR to re-enable the interrupt.
-
-> > +	spin_unlock_irq(&lock);
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +static int pruss_irqcontrol(struct uio_info *info, s32 irq_on)
-> > +{
-> > +	int intr_bit = info->irq - IRQ_DA8XX_EVTOUT0 + 2;
-> > +	int val, intr_mask = (1 << intr_bit);
-> > +	void __iomem *base = info->mem[0].internal_addr;
-> > +	void __iomem *intren_reg = base + PINTC_HIER;
-> > +
-> > +	spin_lock_irq(&lock);
-> 
-> This one is correct, as this is always called from non interrupt
-> disabled context.
-> 
-> > +	val = ioread32(intren_reg);
-> > +	if (irq_on)
-> > +		iowrite32((val | intr_mask), intren_reg);
-> > +	else
-> > +		iowrite32((val & ~intr_mask), intren_reg);
-> > +	spin_unlock_irq(&lock);
-> > +
-> > +	return 0;
-> > +}
-> 
-> 
-> > +
-> > +	spin_lock_init(&lock);
-> 
-> Sigh. DEFINE_SPINLOCK(lock); already initializes the lock.
-> 
-> It's not the purpose of a review to tell you what you need to change
-> mechanically. Reviewers hint to a correct solution and you are
-> supposed to lookup what that solution means and act accordingly. If
-> you do not understand the hint or its implications please ask _before_
-> sending a new patch set.
-
-Seriously, I went to "fix the comments" mode. Sorry about that. Anyway
-I learnt more about things by making mistakes i.e. the positive side.
-Thanks a lot for helping us improve on this. 
-
-Pratheesh
+>
+> Sascha
+>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
