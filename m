@@ -1,59 +1,132 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 2 Mar 2011 18:18:05 +0530
-Subject: [PATCH] omap:iommu-added cache flushing operation for L2 cache
-In-Reply-To: <1299008793-27428-1-git-send-email-fernando.lugo@ti.com>
-References: <1299008793-27428-1-git-send-email-fernando.lugo@ti.com>
-Message-ID: <1dc497a090414bf80ff588791d6db5cc@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 2 Mar 2011 20:55:25 +0800
+Subject: [PATCH] ARM: mxs/mx28evk: add flexcan devices
+In-Reply-To: <20110302114549.GC21601@S2100-06.ap.freescale.net>
+References: <1299063284-21795-1-git-send-email-shawn.guo@freescale.com>
+	<20110302111148.GV29521@pengutronix.de>
+	<20110302114549.GC21601@S2100-06.ap.freescale.net>
+Message-ID: <20110302125525.GD21601@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> owner at vger.kernel.org] On Behalf Of Fernando Guzman Lugo
-> Sent: Wednesday, March 02, 2011 1:17 AM
-> To: hiroshi.doyu at nokia.com
-> Cc: tony at atomide.com; linux at arm.linux.org.uk; linux-
-> omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Ramesh Gupta; Hari Kanigeri
-> Subject: [PATCH] omap:iommu-added cache flushing operation for L2
-> cache
->
-> From: Ramesh Gupta <grgupta@ti.com>
->
-> Signed-off-by: Ramesh Gupta <grgupta@ti.com>
-> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
-> ---
->  arch/arm/plat-omap/iommu.c |   22 ++++++++--------------
->  1 files changed, 8 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-> index e3eb038..aeb2c33 100644
-> --- a/arch/arm/plat-omap/iommu.c
-> +++ b/arch/arm/plat-omap/iommu.c
-> @@ -471,22 +471,15 @@ EXPORT_SYMBOL_GPL(foreach_iommu_device);
->   */
->  static void flush_iopgd_range(u32 *first, u32 *last)
->  {
-> -	/* FIXME: L2 cache should be taken care of if it exists */
-> -	do {
-> -		asm("mcr	p15, 0, %0, c7, c10, 1 @ flush_pgd"
-> -		    : : "r" (first));
-> -		first += L1_CACHE_BYTES / sizeof(*first);
-> -	} while (first <= last);
-> +	dmac_flush_range(first, last);
+On Wed, Mar 02, 2011 at 07:45:50PM +0800, Shawn Guo wrote:
+> On Wed, Mar 02, 2011 at 12:11:48PM +0100, Sascha Hauer wrote:
+> > Hi Shawn,
+> > 
+> Hi Sascha,
+> 
+> > On Wed, Mar 02, 2011 at 06:54:44PM +0800, Shawn Guo wrote:
+> > > Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+> > > ---
+> > >  arch/arm/mach-mxs/Kconfig        |    1 +
+> > >  arch/arm/mach-mxs/mach-mx28evk.c |   37 +++++++++++++++++++++++++++++++++++++
+> > >  2 files changed, 38 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> > > index 55bf075..9a1f2cb 100644
+> > > --- a/arch/arm/mach-mxs/Kconfig
+> > > +++ b/arch/arm/mach-mxs/Kconfig
+> > > @@ -31,6 +31,7 @@ config MACH_MX28EVK
+> > >  	select MXS_HAVE_AMBA_DUART
+> > >  	select MXS_HAVE_PLATFORM_AUART
+> > >  	select MXS_HAVE_PLATFORM_FEC
+> > > +	select MXS_HAVE_PLATFORM_FLEXCAN
+> > >  	select MXS_OCOTP
+> > >  	default y
+> > >  	help
+> > > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> > > index 1f0b708..3cefb73 100644
+> > > --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> > > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> > > @@ -28,6 +28,7 @@
+> > >  #include "devices-mx28.h"
+> > >  #include "gpio.h"
+> > >  
+> > > +#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+> > >  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+> > >  #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+> > >  
+> > > @@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+> > >  	/* phy reset line */
+> > >  	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+> > >  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+> > > +
+> > > +	/* flexcan0 */
+> > > +	MX28_PAD_GPMI_RDY2__CAN0_TX,
+> > > +	MX28_PAD_GPMI_RDY3__CAN0_RX,
+> > > +	/* flexcan1 */
+> > > +	MX28_PAD_GPMI_CE2N__CAN1_TX,
+> > > +	MX28_PAD_GPMI_CE3N__CAN1_RX,
+> > > +	/* transceiver power control */
+> > > +	MX28_PAD_SSP1_CMD__GPIO_2_13,
+> > >  };
+> > >  
+> > >  /* fec */
+> > > @@ -178,8 +188,28 @@ error:
+> > >  	return -ETIMEDOUT;
+> > >  }
+> > >  
+> > > +/* flexcan */
+> > > +static void mx28evk_flexcan_switch(int enable)
+> > > +{
+> > > +	static int count;
+> > > +
+> > > +	if (enable) {
+> > > +		if (!count++)
+> > > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+> > > +	} else {
+> > > +		if (!--count)
+> > > +			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+> > > +	}
+> > > +}
+> > 
+> > Why this count variable? It shouldn't hurt to call gpio_set_value
+> > multiple times.
+> > 
+Something like this?
 
-There is note just above this API.
 /*
- * These are private to the dma-mapping API.  Do not use directly.
- * Their sole purpose is to ensure that data held in the cache
- * is visible to DMA, or data written by DMA to system memory is
- * visible to the CPU.
+ * On mx28evk board, two flexcan transceivers are controlled
+ * by one power switch gpio.
  */
-#define dmac_map_area                   cpu_cache.dma_map_area
-#define dmac_unmap_area         cpu_cache.dma_unmap_area
-#define dmac_flush_range                cpu_cache.dma_flush_range
+#define FLEXCAN0_SWITCH_ON	(1 << 0)
+#define FLEXCAN1_SWITCH_ON	(1 << 1)
 
-> +	outer_flush_range(virt_to_phys(first), virt_to_phys(last));
->  }
->
+static int flexcan_switch_on;
+
+static void mx28evk_flexcan0_switch(int enable)
+{
+	if (enable) {
+		flexcan_switch_on |= FLEXCAN0_SWITCH_ON;
+		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+	} else {
+		flexcan_switch_on &= ~FLEXCAN0_SWITCH_ON;
+		if (!flexcan_switch_on)
+			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+	}
+}
+
+static void mx28evk_flexcan1_switch(int enable)
+{
+	if (enable) {
+		flexcan_switch_on |= FLEXCAN1_SWITCH_ON;
+		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
+	} else {
+		flexcan_switch_on &= ~FLEXCAN1_SWITCH_ON;
+		if (!flexcan_switch_on)
+			gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
+	}
+}
+
+static const struct flexcan_platform_data
+		mx28evk_flexcan_pdata[] __initconst = {
+	{
+		.transceiver_switch = mx28evk_flexcan0_switch,
+	}, {
+		.transceiver_switch = mx28evk_flexcan1_switch,
+	}
+};
+
+-- 
+Regards,
+Shawn
