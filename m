@@ -1,22 +1,58 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 02 Mar 2011 22:09:34 +0530
-Subject: [PATCH 0/8 resend] dw_dmac: Extending support & minor fixes
-In-Reply-To: <cover.1298889267.git.viresh.kumar@st.com>
-References: <cover.1298889267.git.viresh.kumar@st.com>
-Message-ID: <1299083974.6974.85.camel@vkoul-udesk3>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 2 Mar 2011 18:10:20 +0100 (CET)
+Subject: [PATCH 6/6] ARM: nmk: update GPIO chained IRQ handler to use
+	EOI in parent chip
+In-Reply-To: <001301cbd8ef$29403c10$7bc0b430$@deacon@arm.com>
+References: <1298900022-21516-1-git-send-email-will.deacon@arm.com>
+	<1298900022-21516-7-git-send-email-will.deacon@arm.com>
+	<20110228140327.GA1937@n2100.arm.linux.org.uk>
+	<001401cbd772$a1f93ae0$e5ebb0a0$@deacon@arm.com>
+	<alpine.LFD.2.00.1102281949050.2701@localhost6.localdomain6>
+	<20110228214445.GD1937@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103011140560.2701@localhost6.localdomain6>
+	<20110301201904.GA27107@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1103012133530.2701@localhost6.localdomain6>
+	<001301cbd8ef$29403c10$7bc0b430$@deacon@arm.com>
+Message-ID: <alpine.LFD.2.00.1103021806560.2701@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-02-28 at 16:11 +0530, Viresh Kumar wrote:
-> Following set of patches extends dw_dmac support and fixes minor bugs.
-> 
-> This patch series has earlier been posted to linux-kernel at vger.kernel.org.
-> Didn't get any review there, so including linux-arm-kernel at lists.infradead.org.
-> 
-Please remember to copy the MAINTAINERS, (in this case Dan and me) thats
-why didn't get review last time.
+On Wed, 2 Mar 2011, Will Deacon wrote:
 
-Will look into this series now...
+> Hi Thomas,
+> 
+> > Can you please take the time and explain me the difference of the
+> > following:
+> > 
+> > irqchip1.c
+> > 
+> > struct irq_chip1;
+> > 
+> > handle_primary_irq(int irq, struct irq_desc *desc)
+> > {
+> > 	chip->irq_ack();
+> > 	desc->demux();
+> > }
+> > 
+> > init()
+> > {
+> > 	irq_set_chip(PRIMARY_IRQ, &irq_chip1);
+> > 	irq_set_primary_handler(PRIMARY_IRQ, handle_primary_irq);
+> > }
+> 
+> I think with this approach you get the exact opposite problem; that
+> is the primary irq_chip doesn't know which IRQs are going to be
+> demuxed so it cannot know at init time which IRQs need their primary 
+> handler set. Is the idea that you set_primary_handler for all IRQs,
+> stash that in the descriptor somewhere and then replace handle_irq
+> with the primary handler when a demux handler is registered?
+> 
+> I guess I'm missing something here,
 
--- 
-~Vinod
+No, I missed that. Darn, yes this would need storing the
+primary_handler in some separate pointer or having a callback into the
+chip implementation to make this fully distangled.
+
+Grmbl.
+
+	tglx
