@@ -1,40 +1,63 @@
-From: adharmap@codeaurora.org (adharmap at codeaurora.org)
-Date: Wed,  2 Mar 2011 14:13:20 -0800
-Subject: [Qualcomm PM8921 MFD 5/6] MAINTAINERS: Add pmic8921,
-	pmic8xxx subdevices maintainers
-In-Reply-To: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
-References: <1299104001-5240-1-git-send-email-adharmap@codeaurora.org>
-Message-ID: <1299104001-5240-6-git-send-email-adharmap@codeaurora.org>
+From: grgupta@ti.com (Gupta, Ramesh)
+Date: Wed, 2 Mar 2011 09:46:55 -0600
+Subject: [PATCH] omap:iommu-added cache flushing operation for L2 cache
+In-Reply-To: <1dc497a090414bf80ff588791d6db5cc@mail.gmail.com>
+References: <1299008793-27428-1-git-send-email-fernando.lugo@ti.com>
+	<1dc497a090414bf80ff588791d6db5cc@mail.gmail.com>
+Message-ID: <AANLkTikyLQ4ZxM+dK5c09964VLA_TLxV12Y1jqXJhOC-@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+Hi Santosh,
 
-Change-Id: I253231c9410930a221351a3d69da95e0014f4786
-Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
----
- MAINTAINERS |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 696cb18..97107fd 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -905,6 +905,12 @@ F:	drivers/mmc/host/msm_sdcc.h
- F:	drivers/tty/serial/msm_serial.h
- F:	drivers/tty/serial/msm_serial.c
- F:	drivers/platform/msm/
-+F:	drivers/mfd/pm8921-core.c
-+F:	drivers/mfd/pm8xxx-mpp.c
-+F:	include/linux/mfd/pm8921.h
-+F:	include/linux/mfd/pm8xxx/
-+F:	drivers/gpio/pm8xxx-gpio.c
-+F:	drivers/mfd/pm8xxx-irq.c
- T:	git git://codeaurora.org/quic/kernel/davidb/linux-msm.git
- S:	Maintained
- 
--- 
-1.7.1
+On Wed, Mar 2, 2011 at 6:48 AM, Santosh Shilimkar
+<santosh.shilimkar@ti.com>wrote:
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum
+> Hello,
+>  > -----Original Message-----
+> > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> > owner at vger.kernel.org] On Behalf Of Fernando Guzman Lugo
+> > Sent: Wednesday, March 02, 2011 1:17 AM
+> > To: hiroshi.doyu at nokia.com
+> > Cc: tony at atomide.com; linux at arm.linux.org.uk; linux-
+> > omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> > kernel at vger.kernel.org; Ramesh Gupta; Hari Kanigeri
+> > Subject: [PATCH] omap:iommu-added cache flushing operation for L2
+> > cache
+> >
+> > From: Ramesh Gupta <grgupta@ti.com>
+> >
+> > Signed-off-by: Ramesh Gupta <grgupta@ti.com>
+> > Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+> > ---
+> >  arch/arm/plat-omap/iommu.c |   22 ++++++++--------------
+> >  1 files changed, 8 insertions(+), 14 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
+> > index e3eb038..aeb2c33 100644
+> > --- a/arch/arm/plat-omap/iommu.c
+> > +++ b/arch/arm/plat-omap/iommu.c
+> > @@ -471,22 +471,15 @@ EXPORT_SYMBOL_GPL(foreach_iommu_device);
+> >   */
+> >  static void flush_iopgd_range(u32 *first, u32 *last)
+> >  {
+> > -     /* FIXME: L2 cache should be taken care of if it exists */
+> > -     do {
+> > -             asm("mcr        p15, 0, %0, c7, c10, 1 @ flush_pgd"
+> > -                 : : "r" (first));
+> > -             first += L1_CACHE_BYTES / sizeof(*first);
+> > -     } while (first <= last);
+> > +     dmac_flush_range(first, last);
+>
+> There is note just above this API.
+>
+
+Thank you for your comment. I agree, I will send an updated patch with
+proper apis.
+
+regards
+Ramesh Gupta G
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110302/32e35286/attachment-0001.html>
