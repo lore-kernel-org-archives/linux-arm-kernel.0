@@ -1,136 +1,69 @@
-From: kheitke@codeaurora.org (Kenneth Heitke)
-Date: Tue,  1 Mar 2011 21:20:47 -0700
-Subject: [PATCH] msm: Add SSBI support for MSM8960
-Message-ID: <1299039647-12766-1-git-send-email-kheitke@codeaurora.org>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Wed, 2 Mar 2011 10:19:58 +0530
+Subject: [PATCH 2/7] OMAP2+: mux: Enable wakeup for wakeup enable
+	requested pads
+In-Reply-To: <1298903958-6496-3-git-send-email-govindraj.raja@ti.com>
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-3-git-send-email-govindraj.raja@ti.com>
+Message-ID: <AANLkTim8tTO5wDvzXxy8G35vYMBsXP2fJu=KHDHpw7aC@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device definitions and platform data to support
-SSBI on MSM8960 simulator and RUMI3 targets.
+Govind,
 
-SSBI is the Qualcomm single-wire serial bus interface used
-to connect the MSM devices to other devices.
+Couple of minor comments.
 
-Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
----
-This patch depends on the "[PATCH v3 x/2] msm: add single-wire serial
-bus interface (SSBI) driver" patch series which is under review
+On Mon, Feb 28, 2011 at 20:09, Govindraj.R <govindraj.raja@ti.com> wrote:
+> For device pads which have OMAP_DEVICE_PAD_WAKEUP set (which means they
+> are wakeup capable) enable the IO-daisy wakeup capability.
+> During re-muxing avoid direct write with val as this can disturb if any
+> mux done at bootloader level so read the pad then write back.
+>
+> Also add a api to fetch the wake-up status bit is set for given omap-hwmod
 
- arch/arm/mach-msm/board-msm8960.c               |   15 +++++++++++++++
- arch/arm/mach-msm/devices-msm8960.c             |   16 ++++++++++++++++
- arch/arm/mach-msm/devices.h                     |    1 +
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h |    4 ++++
- 4 files changed, 36 insertions(+), 0 deletions(-)
+%s/a api/an API/
 
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-index 052cb35..bf1a24b 100644
---- a/arch/arm/mach-msm/board-msm8960.c
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/clkdev.h>
-+#include <linux/msm_ssbi.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -59,21 +60,35 @@ static void __init msm8960_init_irq(void)
- 
- static struct platform_device *sim_devices[] __initdata = {
- 	&msm8960_device_uart_gsbi2,
-+	&msm8960_device_ssbi_pm8921,
- };
- 
- static struct platform_device *rumi3_devices[] __initdata = {
- 	&msm8960_device_uart_gsbi5,
- };
- 
-+static struct msm_ssbi_platform_data msm8960_ssbi_pm8921_pdata = {
-+	.controller_type = MSM_SBI_CTRL_PMIC_ARBITER,
-+	.slave	= {
-+		.name		= "pm8921-core",
-+	},
-+};
-+
- static void __init msm8960_sim_init(void)
- {
- 	msm_clock_init(msm_clocks_8960, msm_num_clocks_8960);
-+	msm8960_device_ssbi_pm8921.dev.platform_data =
-+					&msm8960_ssbi_pm8921_pdata;
-+
- 	platform_add_devices(sim_devices, ARRAY_SIZE(sim_devices));
- }
- 
- static void __init msm8960_rumi3_init(void)
- {
- 	msm_clock_init(msm_clocks_8960, msm_num_clocks_8960);
-+	msm8960_device_ssbi_pm8921.dev.platform_data =
-+					&msm8960_ssbi_pm8921_pdata;
-+
- 	platform_add_devices(rumi3_devices, ARRAY_SIZE(rumi3_devices));
- }
- 
-diff --git a/arch/arm/mach-msm/devices-msm8960.c b/arch/arm/mach-msm/devices-msm8960.c
-index 894ff98..40ceb78 100644
---- a/arch/arm/mach-msm/devices-msm8960.c
-+++ b/arch/arm/mach-msm/devices-msm8960.c
-@@ -24,6 +24,7 @@
- 
- #include <mach/irqs-8960.h>
- #include <mach/board.h>
-+#include <mach/msm_iomap.h>
- 
- #include "devices.h"
- #include "clock.h"
-@@ -89,6 +90,21 @@ struct platform_device msm8960_device_uart_gsbi5 = {
- 	.resource	= resources_uart_gsbi5,
- };
- 
-+static struct resource resources_ssbi_pm8921[] = {
-+	{
-+		.start  = MSM_PMIC1_SSBI_CMD_PHYS,
-+		.end    = MSM_PMIC1_SSBI_CMD_PHYS + MSM_PMIC_SSBI_SIZE - 1,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device msm8960_device_ssbi_pm8921 = {
-+	.name           = "msm_ssbi",
-+	.id             = 0,
-+	.resource       = resources_ssbi_pm8921,
-+	.num_resources  = ARRAY_SIZE(resources_ssbi_pm8921),
-+};
-+
- struct clk_lookup msm_clocks_8960[] = {
- 	CLK_DUMMY("ce_clk",		CE2_CLK,		NULL, OFF),
- 	CLK_DUMMY("gsbi_uart_clk",	GSBI1_UART_CLK,		NULL, OFF),
-diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
-index e7a0cb0..e7c7fe0 100644
---- a/arch/arm/mach-msm/devices.h
-+++ b/arch/arm/mach-msm/devices.h
-@@ -26,6 +26,7 @@ extern struct platform_device msm_device_uart3;
- 
- extern struct platform_device msm8960_device_uart_gsbi2;
- extern struct platform_device msm8960_device_uart_gsbi5;
-+extern struct platform_device msm8960_device_ssbi_pm8921;
- 
- extern struct platform_device msm_device_sdc1;
- extern struct platform_device msm_device_sdc2;
-diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-index 3c9d960..2d2210f 100644
---- a/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-+++ b/arch/arm/mach-msm/include/mach/msm_iomap-8960.h
-@@ -45,4 +45,8 @@
- #define MSM8960_TMR0_PHYS	0x0208A000
- #define MSM8960_TMR0_SIZE	SZ_4K
- 
-+#define MSM_PMIC1_SSBI_CMD_PHYS	0x00500000
-+#define MSM_PMIC2_SSBI_CMD_PHYS	0x00C00000
-+#define MSM_PMIC_SSBI_SIZE	SZ_4K
-+
- #endif
--- 
-1.7.3.3
+> device using available mux info which is added during omap_hwmod_mux_init.
+> Wakeup status bit is needed for uart_resume_idle call from sram_idle path
+> based on wake-up event has occurred for given uart we can enable clocks back.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+> ?arch/arm/mach-omap2/mux.c ? ? ? ? ? ? ? ? ? ?| ? 23 +++++++++++++++++++++++
+> ?arch/arm/mach-omap2/mux.h ? ? ? ? ? ? ? ? ? ?| ? 13 +++++++++++++
+> ?arch/arm/mach-omap2/omap_hwmod.c ? ? ? ? ? ? | ? 13 +++++++++++++
+> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 +
+> ?4 files changed, 50 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
+> index 98148b6..5338b93 100644
+> --- a/arch/arm/mach-omap2/mux.c
+> +++ b/arch/arm/mach-omap2/mux.c
+> @@ -317,6 +317,24 @@ err1:
+> ? ? ? ?return NULL;
+> ?}
+>
+> +/* Gets the wakeup status of given pad from omap-hwmod */
+> +int omap_hwmod_mux_wakeup(struct omap_hwmod_mux_info *hmux)
+> +{
+> + ? ? ? int i;
+> + ? ? ? unsigned int val = -EINVAL;
+> +
+> + ? ? ? for (i = 0; i < hmux->nr_pads; i++) {
+> + ? ? ? ? ? ? ? struct omap_device_pad *pad = &hmux->pads[i];
+> +
+> + ? ? ? ? ? ? ? val = omap_mux_read(pad->partition, pad->mux->reg_offset);
+> + ? ? ? }
+> +
+> + ? ? ? if (val > 0 && val & OMAP_WAKEUP_EVENT)
+> + ? ? ? ? ? ? ? return 1;
+> + ? ? ? else
 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+No need of else here.
+
+> + ? ? ? ? ? ? ? return 0;
+> +}
+> +
+
+- V Charulatha
