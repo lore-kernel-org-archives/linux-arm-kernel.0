@@ -1,63 +1,27 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 02 Mar 2011 23:57:10 -0800
-Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
-In-Reply-To: <201103020923.36796.arnd@arndb.de>
-References: <4D6D9C03.2080906@codeaurora.org>
-	<201103020923.36796.arnd@arndb.de>
-Message-ID: <4D6F49D6.3080605@codeaurora.org>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 03 Mar 2011 09:24:31 +0100
+Subject: [PATCH] ARM: mx51: Print silicon revision on boot
+In-Reply-To: <1299114747-14091-1-git-send-email-festevam@gmail.com> (Fabio
+	Estevam's message of "Wed, 2 Mar 2011 22:12:27 -0300")
+References: <1299114747-14091-1-git-send-email-festevam@gmail.com>
+Message-ID: <87lj0wwr0g.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2011 12:23 AM, Arnd Bergmann wrote:
-> On Wednesday 02 March 2011 02:23:15 Saravana Kannan wrote:
->> There are so many other drivers that don't use or care about DMA and
->> might still want to ensure some ordering constraints between their
->> readl(s)/writel(s). They can't depend on readl/writel taking care of it
->> for them since their code could be used in a kernel configuration that
->> doesn't enable this config.
->
-> What exactly are the ordering constraints, do you need the full
-> dmb() for readl() and dsb() for writel(), or just a compiler barrier?
+Fabio Estevam <festevam@gmail.com> writes:
+Hi,
 
-I wasn't referring to a compiler barrier. I'm referring to one of the 
-real barrier instructions.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> I think we need the barrier() even for the relaxed variant, but
-> that is fairly lightweight. What would be a reason to have more?
+Why I like having boot log, I don't like have too verbose boot logs. If
+you add this, you have a good reason (I hope), but I can't know
+it. There's no patch description. So, please give a patch with proper
+explanation of why you need that. Anyway, having a proper patch
+description is imho always a good idea.
 
-Please see my response to Russell in other other email. I think it 
-should answer your question by clarifying my point.
+Moreover, there's already good hint if you want to know if you're on to2
+or to3. On rev < 3.0, you have this in logs:
+VFP support v0.3: implementor 41 architecture 3 part 30 variant c rev 2
+Turning off NEON support, detected broken NEON implementation
 
->> Firstly, I don't know how many people noticed this and realize they
->> can't depend on readl/writel to take care of the mb()s for them. Seems
->> like an unnecessary encouragement to make mistakes when it didn't need
->> to be so.
->>
->> Secondly, even if they realize they have to take care of it, they will
->> have to continue using mb()s in to force ordering between their
->> reads/writes. So, are we depending on the compiler to optimize these
->> extra mb() out in the case where the config is enabled? I'm not sure it
->> will be able to optimize out the extra mb()s in all cases.
->
-> The compiler certainly won't merge multiple inline assembly statements,
-> but multiple barrier() statements don't make it worse than just one.
-> barrier() just forces accessing variables from memory that could otherwise
-> be kept in registers.
-
-Yes, I was aware of how compiler barriers work and how multiple 
-consecutive compiler barriers are the same as one compiler barrier. The 
-email was about the real barrier instructions.
-
-> The other problems we still need to fix are the complete absence of
-> barriers in inb()/outb() style accessors, which are meant to be stricter
-> than readl()/writel(), and the fact that we rely on undefined behavior
-> in gcc regarding the atomicity of multi-byte accesses, as we recently
-> found out when a new gcc turned a readl into byte accesses.
-
-I haven't gotten that far :-) I really appreciate response!
-
-Thanks,
-Saravana
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Arnaud
