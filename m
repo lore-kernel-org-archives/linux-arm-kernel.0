@@ -1,79 +1,243 @@
-From: pratyush.anand@st.com (pratyush)
-Date: Thu, 3 Mar 2011 10:30:15 +0530
-Subject: [PATCH V5 Resend] ST SPEAr: PCIE gadget suppport
-In-Reply-To: <20110223160632.0b21c550.akpm@linux-foundation.org>
-References: <1298276455-23989-1-git-send-email-pratyush.anand@st.com>
-	<20110223160632.0b21c550.akpm@linux-foundation.org>
-Message-ID: <4D6F205F.5080209@st.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 3 Mar 2011 10:38:12 +0530
+Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be configured
+	from board file
+In-Reply-To: <AANLkTi=MJigLvbJrRJ4CpyDcGd8sZXB7-1nFYup6EeDm@mail.gmail.com>
+References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
+	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
+	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
+	<AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
+	<8ab9882cd92792e9bf2b836c0ec9c7fe@mail.gmail.com>
+	<AANLkTi=MJigLvbJrRJ4CpyDcGd8sZXB7-1nFYup6EeDm@mail.gmail.com>
+Message-ID: <0dac991a1fbbf1d4bccd8fd259a28f35@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/24/2011 5:36 AM, Andrew Morton wrote:
-> On Mon, 21 Feb 2011 13:50:55 +0530
-> Pratyush Anand <pratyush.anand@st.com> wrote:
-> 
->> This is a configurable gadget. can be configured by configfs interface. Any
->> IP available at PCIE bus can be programmed to be used by host
->> controller.It supoorts both INTX and MSI.
->> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
->> with size 0x1000
+Hi,
+>-----Original Message-----
+>From: Govindraj [mailto:govindraj.ti at gmail.com]
+>Sent: Wednesday, March 02, 2011 3:37 PM
+>To: Sricharan R
+>Cc: Govindraj.R; linux-omap at vger.kernel.org;
+linux-serial at vger.kernel.org;
+>linux-arm-kernel at lists.infradead.org; Jon Hunter; Tony Lindgren; Benoit
+>Cousson; Kevin Hilman; Paul Walmsley; Rajendra Nayak; Deepak Kattungal
+>Subject: Re: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
+>configured from board file
+>
+>On Wed, Mar 2, 2011 at 1:49 PM, Sricharan R <r.sricharan@ti.com> wrote:
+>> Hi,
+>>>-----Original Message-----
+>>>From: Govindraj [mailto:govindraj.ti at gmail.com]
+>>>Sent: Wednesday, March 02, 2011 1:11 PM
+>>>To: Sricharan R
+>>>Cc: Govindraj.R; linux-omap at vger.kernel.org;
+>> linux-serial at vger.kernel.org;
+>>>linux-arm-kernel at lists.infradead.org; Jon Hunter; Tony Lindgren; Benoit
+>>>Cousson; Kevin Hilman; Paul Walmsley; Rajendra Nayak; Deepak Kattungal
+>>>Subject: Re: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
+>>>configured from board file
+>>>
+>>>On Wed, Mar 2, 2011 at 12:46 AM, Sricharan R <r.sricharan@ti.com>
+wrote:
+>>>> Hi,
+>>>>>diff --git a/arch/arm/mach-omap2/serial.c
+>> b/arch/arm/mach-omap2/serial.c
+>>>>>index 755f4aa..530e9e3 100644
+>>>>>--- a/arch/arm/mach-omap2/serial.c
+>>>>>+++ b/arch/arm/mach-omap2/serial.c
+>>>>>@@ -44,6 +44,15 @@
+>>>>>
+>>>>> static int omap_uart_con_id __initdata = -1;
+>>>>>
+>>>>>+static struct omap_uart_port_info omap_serial_default_info[] = {
+>>>>>+ ? ? ?{
+>>>>>+ ? ? ? ? ? ? ?.dma_enabled ? ?= 0,
+>>>>>+ ? ? ? ? ? ? ?.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
+>>>>>+ ? ? ? ? ? ? ?.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
+>>>>>+ ? ? ? ? ? ? ?.idle_timeout ? = DEFAULT_IDLE_TIMEOUT,
+>>>>>+ ? ? ?},
+>>>>>+};
+>>>>>+
+>>>>> static int uart_idle_hwmod(struct omap_device *od)
+>>>>> {
+>>>>> ? ? ? omap_hwmod_idle(od->hwmods[0]);
+>>>>>@@ -66,6 +75,54 @@ static struct omap_device_pm_latency
+>>>> omap_uart_latency[]
+>>>>>= {
+>>>>> ? ? ? },
+>>>>> };
+>>>>>
+>>>>>+#ifdef CONFIG_OMAP_MUX
+>>>>>+static struct omap_device_pad default_serial0_pads[] __initdata = {
+>>>>>+ ? ? ?{
+>>>>>+ ? ? ? ? ? ? ?.name ? = "uart1_rx.uart1_rx",
+>>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+>> OMAP_DEVICE_PAD_WAKEUP,
+>>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>>>+ ? ? ?},
+>>>>>+};
+>>>>>+
+>>>>>+static struct omap_device_pad default_serial1_pads[] __initdata = {
+>>>>>+ ? ? ?{
+>>>>>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
+>>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+>> OMAP_DEVICE_PAD_WAKEUP,
+>>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>>>+ ? ? ?},
+>>>>>+};
+>>>>>+
+>>>>>+static struct omap_device_pad default_serial2_pads[] __initdata = {
+>>>>>+ ? ? ?{
+>>>>>+ ? ? ? ? ? ? ?.name ? = "uart3_rx_irrx.uart3_rx_irrx",
+>>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+>> OMAP_DEVICE_PAD_WAKEUP,
+>>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>>>+ ? ? ?},
+>>>>>+};
+>>>>>+
+>>>>>+static struct omap_device_pad default_omap36xx_serial3_pads[]
+>> __initdata
+>>>> =
+>>>>>{
+>>>>>+ ? ? ?{
+>>>>>+ ? ? ? ? ? ? ?.name ? = "gpmc_wait3.uart4_rx",
+>>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+>> OMAP_DEVICE_PAD_WAKEUP,
+>>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE2,
+>>>>>+ ? ? ?},
+>>>>>+};
+>>>>>+
+>>>>>+static struct omap_device_pad default_omap4_serial3_pads[]
+__initdata
+>> =
+>>>> {
+>>>>>+ ? ? ?{
+>>>>>+ ? ? ? ? ? ? ?.name ? = "uart4_rx.uart4_rx",
+>>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
+>> OMAP_DEVICE_PAD_WAKEUP,
+>>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
+>>>>>+ ? ? ?},
+>>>>>+};
+>>>> Here only the UART RX pins are muxed, so what about the cts, rts, tx
+>>>pins?
+>>>
+>>>The intention here is to enable wakeup capabilities for uart rx pad.
+>>>
+>>>AFAIK most of the boards are currently dependent on bootloader for
+>>>uart-muxing if any board is not dependent on bootloader then we
+>>>can use omap_serial_init_port along with board_mux_info from board.
+>>>
+>> Yes. The idea is to be independent of the bootloaders for mux settings.
 >>
->> Changes since V4:
->> - All documentation related comments incorporated
+>>>Prior to this change uart wakeup is based on rx_pad and we were
+>> populating
+>>>offset and using omap_ctrl api's to read/write which is cleaned up now.
+>>>Most of boards are dependent on uart-rx wakeup to avoid breaking any
+>>>board support we
+>>>are using omap_serial_init by filling default values, which provides
+>>>us with same
+>>>environment but with right approach towards handling mux data with a
+>>>handshake with
+>>>hwmod framework.
+>>>
+>> Now, in this change only the RX pin is configured. So if some board
+uses
+>> omap_serial_init then only the RX is going to be configured.
+>> How will they configure the rest of the pins?
+>
+>
+>They should call omap_serial_init_port to configure each individual uart
+>with
+>mux_info filled and not use omap_serial_init.
+>
+>If any board is not dependent for mux from u-boot then they use above
+said
+>init_port func.
+>
+>
+>> They cannot call omap_serial_init_port after this just to configure the
+>> rest of the mux pins( cts, rts, tx).
+>
+>No. You need to use either omap_serial_init_port or omap_serial_init
+>you cannot call both apis from board file please refer to both func
+>documentation.
+>
+>Also please note i am not configuring all uart pins for pullups and pull
+>downs
+>with this patch series and its not related to this patch series.
+>I am only enabling wakeup-enable pin for rx as it was done before.
+>
+>> So data which is passed from omap_serial_init should have the
+>> configuration
+>> for all the pins, and this default data should be consistent across
+>> atleast
+>> some boards, so that they can use this. This will reduce the data
+>> duplication across board files.
 >>
->> Changes since V3:
->> - support for multiple instances of such device
-> 
-> ^^ This doesn't seem to agree with the documentation.
-> 
-
-Will add a line in documentation for it.
-
->> ...
+>> If this is not true, then all the pads can be configured from the board
+>> files itself using omap_serial_init_port and you can set the required
+>> RX wakeup capability there as well.
 >>
->> --- /dev/null
->> +++ b/Documentation/ABI/testing/configfs-spear-pcie-gadget
->> @@ -0,0 +1,30 @@
->> +What:		/config/pcie-gadget
->> +Date:		Feb 2011
->> +KernelVersion:	2.6.37
->> +Contact:	Pratyush Anand <pratyush.anand@st.com>
->> +Description:
->> +
->> +	Interface is used to configure selected dual mode PCIe controller
->> +	as device and then program its various registers to configure it
->> +	as a particular device type.
->> +	This interfaces can be used to show spear's PCIe device capability.
->> +
->> +	Nodes are only visible when configfs is mounted. To mount configfs
->> +	in /config directory use:
->> +	# mount -t configfs none /config/
->> +
->> +	/config/pcie-gadget/
->> +		link ... used to enable ltssm and read its status.
->> +		int_type ...used to configure and read type of supported
->> +			interrupt
->> +		no_of_msi ... used to configure number of MSI vector needed and
->> +			to read no of MSI granted.
->> +		inta ... write 1 to assert INTA and 0 to de-assert.
->> +		send_msi ... write MSI vector to be sent.
->> +		vendor_id ... used to write and read vendor id (hex)
->> +		device_id ... used to write and read device id (hex)
->> +		bar0_size ... used to write and read bar0_size
->> +		bar0_address ... used to write and read bar0 mapped area in hex.
->> +		bar0_rw_offset ... used to write and read offset of bar0 where
->> +			bar0_data will be written or read.
->> +		bar0_data ... used to write and read data at bar0_rw_offset.
-> 
-> What's the configfs naming scheme for the second and later devices?
-> 
+>
+>Yes that be done but currently but that is not in my intention here
+>with my patch
+>I just want to retain rx wakeup by default to avoid breaking support
+>for any board.
+>
+>Adding pin mux for each individual pin is a separate activity where I
+also
+>need access to various boards So I am leaving that to developers who
+>want to configure
+>for the corresponding boards using init_port api.
+>
+>Removing mux from u-boot level and adding it to board file is beyond
+>the scope of this
+>patch series and is a separate topic of discussion, as current patch
+series
+>assumes that uarts are muxed from u-boot level and needs to only enable
+>wakeup
+>capability for rx-pin.
+>
+>Hope this clarifies.
+>
+It is true that this patch is not intending to configure the pads.
 
-there would be pcie-gadget.n directory under /config for
-nth PCIe Device Controller.
+But my question is, after this patch say
+   1) some board file calls omap_serial_port.
+   2) As a result , all the uarts devices are build and only the Rx pad is
+configured for each device.
+   3) After this there will be no way of configuring the rest of the pads
+??
+      That should not happen. Also relying that the bootloaders are going
+      to do the configuration is not correct.
 
-Regards
-Pratyush
+      So if some board calls omap_serial_port then there should be default
+values for all pads which a board can use, otherwise the board calls
+omap_serial_init_port for each of the device.
 
-> 
-> .
-> 
+
+>--
+>Thanks,
+>Govindraj.R
+>
+>
+>>>So if any board needs specific mux they can go ahead and add required
+>>>mux data in
+>>>board file and use map_serial_init_port instead of current
+>>>omap_serial_init.
+>>>
+>>>
+>>>> Is it consistent that across all socs that only UART3 would have
+>>>UART/IRDA
+>>>> functions capability so that serial2 pads can always be called
+>> "rx_irxx"
+>>>> ?.
+>>>
+>>>Yes from OMAP2420 to OMAP4430 uart3 can used as irda.
+>>>
+>> Ok.
+>>>--
+>>>Thanks,
+>>>Govindraj.R
+>>
