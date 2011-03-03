@@ -1,58 +1,50 @@
 From: raghuveer.murthy@ti.com (Raghuveer Murthy)
-Date: Thu,  3 Mar 2011 20:57:58 +0530
-Subject: [PATCH v3 1/3] OMAP: DSS2: Adding dss_features for independent core
-	clk divider
-In-Reply-To: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
-References: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
-Message-ID: <1299166080-15380-2-git-send-email-raghuveer.murthy@ti.com>
+Date: Thu,  3 Mar 2011 20:57:57 +0530
+Subject: [PATCH v3 0/3] OMAP: DSS2: Fix for DISPC core functional clock divider
+Message-ID: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In OMAP3xxx DISPC_DIVISOR register has a logical clock divisor (lcd_div)
-field. The lcd_div is common, for deciding the DISPC core functional clock
-frequency, and the final pixel clock frequency for LCD display.
+OMAP4 has 2 LCD channels and corresponding DISPC_DIVISOR1 and DISPC_DIVISOR2
+registers to configure the pixel clock frequency, for the respective LCD
+displays.
 
-In OMAP4, there are 2 LCD channels, hence two divisor registers, DISPC_DIVISOR1
-and DISPC_DIVISOR2. Also, there is a third register DISPC_DIVISOR.
+There is also DISPC_DIVISOR register, which by default has the ENABLE bit
+set to zero, for backward compatibility mode. Hence the logical clock divider of
+DISPC_DIVISOR1.LCD, gets used for core func clk configuration. The default value
+of DISPC_DIVISOR1.LCD is 4.
 
-The DISPC_DIVISOR in OMAP4 is used to configure lcd_div exclusively for core
-functional clock configuration. For pixel clock configuration of primary and
-secondary LCDs, lcd_div of DISPC_DIVISOR1 and DISPC_DIVISOR2 are used
-respectively
+If only the secondary LCD is enabled, at high pixel resolutions the core clk 
+lags behind the pixel clock, causing stair-step effect (diagonal lines with
+tearing) on the display.
 
-Signed-off-by: Archit Taneja <archit@ti.com>
-Signed-off-by: Raghuveer Murthy <raghuveer.murthy@ti.com>
----
- drivers/video/omap2/dss/dss_features.c |    3 ++-
- drivers/video/omap2/dss/dss_features.h |    2 ++
- 2 files changed, 4 insertions(+), 1 deletions(-)
+Hence DISPC_DIVISOR.ENABLE is set to 1, and the core functional clock is set 
+independently and exclusively in DISPC_DIVISOR.LCD.
 
-diff --git a/drivers/video/omap2/dss/dss_features.c b/drivers/video/omap2/dss/dss_features.c
-index ccae57b..dc170ad 100644
---- a/drivers/video/omap2/dss/dss_features.c
-+++ b/drivers/video/omap2/dss/dss_features.c
-@@ -234,7 +234,8 @@ static struct omap_dss_features omap4_dss_features = {
- 
- 	.has_feature	=
- 		FEAT_GLOBAL_ALPHA | FEAT_PRE_MULT_ALPHA |
--		FEAT_MGR_LCD2 | FEAT_GLOBAL_ALPHA_VID1,
-+		FEAT_MGR_LCD2 | FEAT_GLOBAL_ALPHA_VID1 |
-+		FEAT_CORE_CLK_DIV,
- 
- 	.num_mgrs = 3,
- 	.num_ovls = 3,
-diff --git a/drivers/video/omap2/dss/dss_features.h b/drivers/video/omap2/dss/dss_features.h
-index 65d6de7..569d1b2 100644
---- a/drivers/video/omap2/dss/dss_features.h
-+++ b/drivers/video/omap2/dss/dss_features.h
-@@ -36,6 +36,8 @@ enum dss_feat_id {
- 	FEAT_LINEBUFFERSPLIT	= 1 << 8,
- 	FEAT_ROWREPEATENABLE	= 1 << 9,
- 	FEAT_RESIZECONF		= 1 << 10,
-+	/* Independent core clk divider */
-+	FEAT_CORE_CLK_DIV	= 1 << 11,
- };
- 
- /* DSS register field id */
--- 
-1.7.0.4
+- Added the above as dss_features
+
+-----------------------------------------------------
+History
+-------
+Changes from previous version (v1)
+- Fixed comments from Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+Changes from previous version (v2)
+- Rebased against the DSS2 master to avoid conflicts 
+
+Base
+----
+url = git://gitorious.org/linux-omap-dss2/linux.git
+branch "master"
+commit a2792bb44d45ef97963e67565ad1e1dd5bf0cbd7
+
+-----------------------------------------------------
+Raghuveer Murthy (3):
+  OMAP: DSS2: Adding dss_features for independent core clk divider
+  OMAP: DSS2: Renaming register macro DISPC_DIVISOR(ch)
+  OMAP4: DSS2: Using dss_features to set independent core clock divider
+
+ drivers/video/omap2/dss/dispc.c        |   51 +++++++++++++++++++++++--------
+ drivers/video/omap2/dss/dss_features.c |    3 +-
+ drivers/video/omap2/dss/dss_features.h |    2 +
+ 3 files changed, 42 insertions(+), 14 deletions(-)
