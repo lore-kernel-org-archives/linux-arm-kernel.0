@@ -1,139 +1,67 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Thu, 3 Mar 2011 13:26:54 +0800
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
-	CPU family choice
-In-Reply-To: <1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110302112559.GC22310@pengutronix.de>
-	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110303052653.GA19961@b20223-02.ap.freescale.net>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 02 Mar 2011 21:55:39 -0800
+Subject: [PATCHv5 0/3] Introduce the /proc/socinfo and use it to export
+	OMAP data
+In-Reply-To: <4D6E218F.2020804@stericsson.com>
+References: <1273587331-24604-1-git-send-email-eduardo.valentin@nokia.com>	<AANLkTin7vRMreG3hOAk95MYZUCV-Kr6ac7gD7jgvX6Gf@mail.gmail.com>	<20110216115729.GA29817@besouro.research.nokia.com>	<4D6B78BF.1020102@stericsson.com>	<4D6C7B56.9060109@codeaurora.org>	<AANLkTikvhj49DftS9c_NouASY9_MbYPCfmSUdJg6pf-5@mail.gmail.com>	<4D6D9B10.9000606@codeaurora.org>	<4D6D9D06.2020204@bluewatersys.com>	<4D6D9FC7.1090206@codeaurora.org>	<4D6DA290.2010607@bluewatersys.com>	<4D6DAA24.3000204@codeaurora.org>	<4D6DAE6E.4030701@bluewatersys.com>	<4D6DB1B1.4060908@codeaurora.org>	<4D6DFE67.3020801@stericsson.com>	<AANLkTimJh_uGP6SYo=9ndz4xiUs1Tbg7z70ng0aFcWyG@mail.gmail.com>
+	<4D6E218F.2020804@stericsson.com>
+Message-ID: <4D6F2D5B.10009@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-On Wed, Mar 02, 2011 at 06:23:05PM +0100, Uwe Kleine-K?nig wrote:
-> The only use of selecting MX2-based before was to get the choice to select
-> between i.MX21 and i.MX27. So better provide this choice directly.
-> 
-> Note that this has an influence on reduced i.MX21 configs because the
-> former default "MACH_MX21" for the "CPUs" choice makes MACH_MX21 not
-> appear in the reduced config and so the default for "Freescale CPU family:"
-> (i.e. ARCH_MX3) is used now.  mx21_defconfig is adapted not to be affected
-> by this problem.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/configs/mx21_defconfig |    2 +-
->  arch/arm/configs/mx27_defconfig |    1 -
->  arch/arm/mach-imx/Kconfig       |   20 --------------------
->  arch/arm/plat-mxc/Kconfig       |   19 ++++++++++++++++---
->  4 files changed, 17 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/configs/mx21_defconfig b/arch/arm/configs/mx21_defconfig
-> index a5a71c2..761fea6 100644
-> --- a/arch/arm/configs/mx21_defconfig
-> +++ b/arch/arm/configs/mx21_defconfig
-> @@ -12,7 +12,7 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_IOSCHED_DEADLINE is not set
->  # CONFIG_IOSCHED_CFQ is not set
->  CONFIG_ARCH_MXC=y
-> -CONFIG_ARCH_MX2=y
-> +CONFIG_MACH_MX21=y
->  CONFIG_MACH_MX21ADS=y
->  CONFIG_MXC_PWM=y
->  CONFIG_NO_HZ=y
-> diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
-> index 3817c60..098d77d 100644
-> --- a/arch/arm/configs/mx27_defconfig
-> +++ b/arch/arm/configs/mx27_defconfig
-> @@ -17,7 +17,6 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_IOSCHED_DEADLINE is not set
->  # CONFIG_IOSCHED_CFQ is not set
->  CONFIG_ARCH_MXC=y
-> -CONFIG_ARCH_MX2=y
->  CONFIG_MACH_MX27=y
->  CONFIG_MACH_MX27ADS=y
->  CONFIG_MACH_PCM038=y
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index c172418..c94cbad 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -53,26 +53,6 @@ config MACH_SCB9328
->  
->  endif
->  
-> -if ARCH_MX2
-> -
-> -choice
-> -	prompt "CPUs:"
-> -	default MACH_MX21
-> -
-> -config MACH_MX21
-> -	bool "i.MX21 support"
-> -	help
-> -	  This enables support for Freescale's MX2 based i.MX21 processor.
-> -
-> -config MACH_MX27
-> -	bool "i.MX27 support"
-> -	help
-> -	  This enables support for Freescale's MX2 based i.MX27 processor.
-> -
-> -endchoice
-> -
-> -endif
-> -
->  if MACH_MX21
->  
->  comment "MX21 platforms:"
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index 389f217..03a9a9e 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -2,6 +2,10 @@ if ARCH_MXC
->  
->  source "arch/arm/plat-mxc/devices/Kconfig"
->  
-> +config ARCH_MX2
-> +	# don't use this in new code
-> +	bool
-> +
->  menu "Freescale MXC Implementations"
->  
->  choice
-> @@ -14,16 +18,25 @@ config ARCH_MX1
->  	help
->  	  This enables support for systems based on the Freescale i.MX1 family
->  
-> -config ARCH_MX2
-> -	bool "MX2-based"
-> +config MACH_MX21
-> +	bool "MX21-based"
-> +	select ARCH_MX2
->  	help
-> -	  This enables support for systems based on the Freescale i.MX2 family
-> +	  This enables support for systems based on the Freescale i.MX21 family
-Is it ToDo marker like ARCH_51? Why is it MACH_xx while others are ARCH_XX?
-It might be little strange that mx2x is a excetion while others are grouped.
+On 03/02/2011 02:53 AM, Maxime Coquelin wrote:
+> On 03/02/2011 11:36 AM, Linus Walleij wrote:
+>> On Wed, Mar 2, 2011 at 9:23 AM, Maxime Coquelin
+>> <maxime.coquelin-nonst@stericsson.com> wrote:
+>>
+>>> I think we should have a tree like this :
+>>>
+>>> /sys/devices/system/soc/
+>>> /sys/devices/system/soc/unique_id<- Unified way to export an ID for
+>>> all machs
+>> Arbitrary number of bits? Some will have a 64-bit ID, some will have
+>> 32-bit
+>> etc.
+>
+> Yes, here is the difficulty. For example, in our case, the SoC unique ID
+> is 160 bits long.
+> Maybe it would be a better solution to get rid of this unified file, and
+> keep only mach specific entries? I mean :
+>
+> /sys/devices/system/soc/
+> /sys/devices/system/soc/mach_name
+> /sys/devices/system/soc/foo_id
+> /sys/devices/system/soc/bar_id
 
-Thanks
-Richard
->  
->  config ARCH_MX25
->  	bool "MX25-based"
-> +	# note that i.MX25 doesn't match the expectations that are currently
-> +	# called ARCH_MX2
->  	help
->  	  This enables support for systems based on the Freescale i.MX25 family
->  
-> +config MACH_MX27
-> +	bool "MX27-based"
-> +	select ARCH_MX2
-> +	help
-> +	  This enables support for Freescale's MX2 based i.MX27 processor.
-> +
->  config ARCH_MX3
->  	bool "MX3-based"
->  	select CPU_V6
-> -- 
-> 1.7.2.3
-> 
-> 
+Sorry for the late reply guys. Got wrapped up is some other stuff.
+
+I'm with Maxime on getting rid of the unique id file. It's not as if 
+it's unique across all machs and archs. Any user space caring to look at 
+the id will anyway have to check the mach/family first. So, there is no 
+point in having this unique id file. It just adds more weirdness and 
+complexity to deal with the different formats or ways each family wants 
+to export the id. Actually, in the case of MSM, we don't have any need 
+to export unique id. We just want to export what type of soc it is 
+within the MSM family.
+
+As for the path, it's not clear we have settled on the final path. I see 
+us ping-pong between /sys/devices/system/soc/ and 
+/sys/devices/system/soc/mach/. Can we drop the "mach" subdir? Seems 
+pointless.
+
+The mandatory file, I would like to call it "family", since "mach" is 
+too specific (omap3 and omap4 is my usual example -- they can have one 
+implementation of socinfo and report the family as "omap"). We don't 
+want people to misunderstand "mach" to be an accurate representation of 
+the xxxx in mach-xxxx.
+
+The patch that adds this should probably allow each socinfo 
+implementation to specify the family name and an array of attributes 
+(struct attribute *) that can be used to expose whatever else they want 
+to export.
+
+Thanks,
+Saravana
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
