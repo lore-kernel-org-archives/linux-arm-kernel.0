@@ -1,67 +1,105 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 3 Mar 2011 22:12:33 +0100
-Subject: [PATCH 2/4] OMAP3 I2C document why cpu type and not peripheral
-	unit ID used to probe
-In-Reply-To: <20110303135030.30648.14923.stgit@otae.warmcat.com>
+Date: Thu, 3 Mar 2011 22:33:11 +0100
+Subject: [PATCH 3/4] OMAP3 and 4 i2c mark extended reg enums as extended
+	only
+In-Reply-To: <20110303135037.30648.90406.stgit@otae.warmcat.com>
 References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
-	<20110303135030.30648.14923.stgit@otae.warmcat.com>
-Message-ID: <4D700441.50206@ti.com>
+	<20110303135037.30648.90406.stgit@otae.warmcat.com>
+Message-ID: <4D700917.70105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 3/3/2011 2:50 PM, Andy Green wrote:
-> Describe why we can't simply probe the peripheral unit ID
-> to make the decision about what register map to use
+> The OMAP I2C driver dynamically chooses between two register sets of
+> differing sizes depending on the cpu type it finds itself on.
+>
+> It has been observed that the existing code references non-existing
+> registers on OMAP3530, because while it correctly chose the smaller
+> register layout based on cpu type, the code uses the probed register
+> ID to decide if to execute code referencing an extra register, and
+> both register layout devices on OMAP3530 and OMAP4430 report the same
+> probed ID of 0x40.
+
+Since it is a patch on the I2C driver, the subject should start with 
+something like "I2C: OMAP2+: XXXXX". That comment is also applicable for 
+the other patches of the series except the first one.
+
+> This patch changes the extended register name to make it clearer
+> they only exist in OMAP4 context
 >
 > Cc: patches at linaro.org
+> Reported-by: Peter Maydell<peter.maydell@linaro.org>
 > Signed-off-by: Andy Green<andy.green@linaro.org>
+
+The I2C maintainer should be in CC as well.
+
 > ---
 >
->   drivers/i2c/busses/i2c-omap.c |   11 +++++++++++
->   1 files changed, 11 insertions(+), 0 deletions(-)
+>   drivers/i2c/busses/i2c-omap.c |   23 ++++++++++++-----------
+>   1 files changed, 12 insertions(+), 11 deletions(-)
 >
 > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index b605ff3..d6500ec 100644
+> index d6500ec..e09c62d 100644
 > --- a/drivers/i2c/busses/i2c-omap.c
 > +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1032,6 +1032,17 @@ omap_i2c_probe(struct platform_device *pdev)
->   	else
->   		dev->reg_shift = 2;
->
-> +	dev->regs = (u8 *)reg_map;
-> +
-> +	/*
-> +	 * this is a bit tricky, implementation on 4430 has the active
-> +	 * part of its ID register moved to +4 instead of +0 as
-> +	 * previously.  So, we can't probe just using the ID register
-> +	 * Complicating matters the older implementation using the
-> +	 * simpler register set on 3530 also reports its revision as
-> +	 * 0x40, same as the 4430 newer implementation.
-> +	 */
+> @@ -72,11 +72,12 @@ enum {
+>   	OMAP_I2C_SCLH_REG,
+>   	OMAP_I2C_SYSTEST_REG,
+>   	OMAP_I2C_BUFSTAT_REG,
+> -	OMAP_I2C_REVNB_LO,
+> -	OMAP_I2C_REVNB_HI,
+> -	OMAP_I2C_IRQSTATUS_RAW,
+> -	OMAP_I2C_IRQENABLE_SET,
+> -	OMAP_I2C_IRQENABLE_CLR,
+> +	/* only on OMAP4430 */
+> +	OMAP_I2C_OMAP4430_REVNB_LO,
+> +	OMAP_I2C_OMAP4430_REVNB_HI,
+> +	OMAP_I2C_OMAP4430_IRQSTATUS_RAW,
+> +	OMAP_I2C_OMAP4430_IRQENABLE_SET,
 
-The issue is that this revision field is not really documented in OMAP4 
-TRM, so you should not rely on it. Moreover, as you already noticed, the 
-revision number is not even accurate. OMAP3 and 4 are using a different 
-programming model but this is not reflected in this field.
+I think that you should keep only the comment, because it is not really 
+recommended to add SoC related information directly in IP register names.
+These new registers are just an evolution of the I2C IP. The first 
+instances of that version are used in OMAP4 first, but OMAP4 variants 
+(4440) and OMAP5 will use the same one.
 
-Since that issue is quite common in many OMAP IPs, we introduced a SW 
-field in hwmod_class that should reflect the change in IP programming 
-model. For the moment it is a simple integer that we increment each time 
-there is change in a programming model that will impact the driver.
-
-You can check how it was done for the timer for example:
-https://patchwork.kernel.org/patch/587211/
-Then you need to copy that info to a pdata field in order to allow the 
-driver to access it. Check omap_timer_init in:
-https://patchwork.kernel.org/patch/587241/
-
-> +
->   	if (cpu_is_omap44xx())
->   		dev->regs = (u8 *) omap4_reg_map;
-
-OK, this is not part of your patch, but any call to cpu_is are forbidden 
-from the driver. As soon as you have the revision field from hwmod you 
-can get rid of all that code.
+Bottom line is that we can probably drop that patch from the series.
 
 Regards,
 Benoit
+
+> +	OMAP_I2C_OMAP4430_IRQENABLE_CLR,
+>   };
+>
+>   /* I2C Interrupt Enable Register (OMAP_I2C_IE): */
+> @@ -244,11 +245,11 @@ const static u8 omap4_reg_map[] = {
+>   	[OMAP_I2C_SCLH_REG] = 0xb8,
+>   	[OMAP_I2C_SYSTEST_REG] = 0xbC,
+>   	[OMAP_I2C_BUFSTAT_REG] = 0xc0,
+> -	[OMAP_I2C_REVNB_LO] = 0x00,
+> -	[OMAP_I2C_REVNB_HI] = 0x04,
+> -	[OMAP_I2C_IRQSTATUS_RAW] = 0x24,
+> -	[OMAP_I2C_IRQENABLE_SET] = 0x2c,
+> -	[OMAP_I2C_IRQENABLE_CLR] = 0x30,
+> +	[OMAP_I2C_OMAP4430_REVNB_LO] = 0x00,
+> +	[OMAP_I2C_OMAP4430_REVNB_HI] = 0x04,
+> +	[OMAP_I2C_OMAP4430_IRQSTATUS_RAW] = 0x24,
+> +	[OMAP_I2C_OMAP4430_IRQENABLE_SET] = 0x2c,
+> +	[OMAP_I2C_OMAP4430_IRQENABLE_CLR] = 0x30,
+>   };
+>
+>   static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
+> @@ -309,7 +310,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
+>
+>   	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+>   	if (dev->rev>= OMAP_I2C_REV_ON_4430)
+> -		omap_i2c_write_reg(dev, OMAP_I2C_IRQENABLE_CLR, 1);
+> +		omap_i2c_write_reg(dev, OMAP_I2C_OMAP4430_IRQENABLE_CLR, 1);
+>   	else
+>   		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, 0);
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
