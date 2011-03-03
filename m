@@ -1,66 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Mar 2011 13:44:17 +0000
-Subject: clcdfb: Question about clcdfb_check() routine
-In-Reply-To: <4D6F83E2.2020701@st.com>
-References: <4D6F83E2.2020701@st.com>
-Message-ID: <20110303134417.GB25891@n2100.arm.linux.org.uk>
+Date: Thu, 3 Mar 2011 13:45:51 +0000
+Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
+In-Reply-To: <20110303124658.GR22310@pengutronix.de>
+References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<20110302215238.GK22310@pengutronix.de>
+	<20110303115242.GA25891@n2100.arm.linux.org.uk>
+	<20110303124658.GR22310@pengutronix.de>
+Message-ID: <20110303134551.GC25891@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 05:34:50PM +0530, vksamar wrote:
-> I had a doubt on clcdfb_check() routine in include/linux/amba/clcd.h.
-> Hard coded lower value of right margin, left margin and hsync len is (5+1).
+On Thu, Mar 03, 2011 at 01:46:58PM +0100, Uwe Kleine-K?nig wrote:
+> On Thu, Mar 03, 2011 at 11:52:42AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Mar 02, 2011 at 10:52:38PM +0100, Uwe Kleine-K?nig wrote:
+> > > > +static int __init mx5_pm_init(void)
+> > > > +{
+> > > > +	if (cpu_is_mx51())
+> > > > +		suspend_set_ops(&mx5_suspend_ops);
+> > > I'd prefer to have that called by imx51_init_early.
+> > 
+> > This function name looks fine.  As we now have an init_early in the
+> > arch hooks, let's keep things called foo_init_early() to that use
+> > and not start using 'early' for stuff used from initcalls.
+> > 
+> > Renaming this is a recipe for causing confusion and having grep hit
+> > false positives.  Please leave it as is.
+> It seems you and Thomas both didn't notice the "by" in my sentence.
+> Or maybe it's not proper English? The thing I wanted to express is that
+> instead of introducing another initcall I prefer that imx51_init_early
+> calls mx5_pm_init instead. The name mx5_pm_init is fine for me, though
+> imx51_pm_init would still be better.
 
-The +1 is there as we always subtract one off of the value:
+Is there a reason to set this really really early?  What's that reason
+exactly?
 
-        val |= (var->hsync_len - 1) << 8;
-        val |= (var->right_margin - 1) << 16;
-        val |= (var->left_margin - 1) << 24;
-
-The 5 comes from these statements:
-
-For PL110:
-
-Horizontal timing restrictions DMA requests new data at the start of a
-horizontal display line. Some time must be allowed for the DMA transfer
-and for the data to propagate down the FIFO path in the LCD interface.
-The data path latency forces some restrictions on the usable minimum
-values for horizontal porch width in STN mode. The minimum values are
-HSW = 2 and HBP = 2.
-Single panel mode:
- ? HSW = 3
- ? HBP = 5
-Dual panel mode:
- ? HSW = 3
- ? HBP = 5
- ? HFP = 5
- ? PCD = 5 (CLCDCLK/7).
-If sufficient time is given at the start of the line (for example, setting
-HSW = 6, HBP = 10), data will not get corrupted for PCD = 4 (minimum value).
-
-For PL111:
-
-Horizontal timing restrictions DMA requests new data at the start of a
-horizontal display line. You must allocate some time for the DMA transfer
-and for the data to propagate down the FIFO path in the LCD interface. The
-data path latency forces some restrictions on the usable minimum values
-for horizontal porch width in STN mode. The minimum values are HSW = 2
-and HBP = 2.
-Single-panel mode:
- ? HSW = 3
- ? HBP = 5
- ? HFP = 5
- ? Panel Clock Divisor (PCD) = 1 (CLCDCLK/3).
-Dual-panel mode:
- ? HSW = 3
- ? HBP = 5
- ? HFP = 5
- ? PCD = 5 (CLCDCLK/7).
-If enough time is given at the start of the line, for example, setting
-HSW = 6, HBP = 10, data does not corrupt for PCD = 4, the minimum value.
-
-As we don't know@'check' time which conditions will be satisfied, to
-ensure that we always program the registers with legal values we have
-to enforce the highest minimum limits, which is right_margin = 5 + 1,
-left_margin = 5 + 1, hsync_len = 3 + 1 - I suspect this can be reduced
-to '4'.  But apparantly not '1'.
+You can't suspend the system until the scheduler is up and running.
+Neither can you use cpuidle.  So it seems there isn't a pressing reason
+to place this stuff really early in the fragile part of kernel
+initialization.
