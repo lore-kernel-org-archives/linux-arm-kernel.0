@@ -1,28 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Mar 2011 21:39:00 +0530
-Subject: [PATCH 03/17] omap4: Export scu base address
-In-Reply-To: <87lj0x6v70.fsf@ti.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-4-git-send-email-santosh.shilimkar@ti.com>
-	<87lj0x6v70.fsf@ti.com>
-Message-ID: <98068b5a2cff38b99d47f8527340ce11@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 3 Mar 2011 18:12:56 +0200
+Subject: [PATCH v3 0/3] OMAP: DSS2: Fix for DISPC core functional clock
+	divider
+In-Reply-To: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
+References: <1299166080-15380-1-git-send-email-raghuveer.murthy@ti.com>
+Message-ID: <1299168776.2615.154.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 03, 2011 3:29 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 03/17] omap4: Export scu base address
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> > The scu base address needs to be accessed in cpu hotplug
-> > for power management. Hence export the same
->
-> As with previous patch, rather than export the base address itself,
-> it should export a helper function to get the base address
->
+On Thu, 2011-03-03 at 09:27 -0600, Murthy, Raghuveer wrote:
+> OMAP4 has 2 LCD channels and corresponding DISPC_DIVISOR1 and DISPC_DIVISOR2
+> registers to configure the pixel clock frequency, for the respective LCD
+> displays.
+> 
+> There is also DISPC_DIVISOR register, which by default has the ENABLE bit
+> set to zero, for backward compatibility mode. Hence the logical clock divider of
+> DISPC_DIVISOR1.LCD, gets used for core func clk configuration. The default value
+> of DISPC_DIVISOR1.LCD is 4.
+> 
+> If only the secondary LCD is enabled, at high pixel resolutions the core clk 
+> lags behind the pixel clock, causing stair-step effect (diagonal lines with
+> tearing) on the display.
+> 
+> Hence DISPC_DIVISOR.ENABLE is set to 1, and the core functional clock is set 
+> independently and exclusively in DISPC_DIVISOR.LCD.
+> 
+> - Added the above as dss_features
 
-I dropped this patch in favor of the exported helpers to
-get base address.
+Thanks, applied.
+
+ Tomi
