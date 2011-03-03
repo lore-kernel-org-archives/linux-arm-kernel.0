@@ -1,77 +1,52 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 02 Mar 2011 17:22:50 -0800
-Subject: [PATCH 0/6] omap3: pm: Fixes for low power code
-In-Reply-To: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Mon, 21 Feb 2011 18:49:19 +0530")
-References: <1298294365-30770-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87k4ghro9h.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 2 Mar 2011 17:44:16 -0800
+Subject: [PATCHv2] omap:mailbox: resolve hang issue
+In-Reply-To: <1299104058-28565-1-git-send-email-x0095078@ti.com>
+References: <1299104058-28565-1-git-send-email-x0095078@ti.com>
+Message-ID: <20110303014416.GL20560@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+* Armando Uribe <x0095078@ti.com> [110302 13:54]:
+> From: Hari Kanigeri <h-kanigeri2@ti.com>
+> 
+> omap4 interrupt disable bits is different. On rx kfifo full, the mbox rx
+> interrupts wasn't getting disabled, and this is causing the rcm stress tests
+> to hang.
+> 
+> Signed-off-by: Hari Kanigeri <h-kanigeri2@ti.com>
+> Signed-off-by: Armando Uribe <x0095078@ti.com>
+> Signed-off-by: Fernando Guzman Lugo <fernando.lugo@ti.com>
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+Should we merge this as a fix for the 2.6.38 still?
 
-> The series does below fixes to the omap3 low power code.
-> 	1. Use supported ARMv7 instructions instead of the legacy ones
-> 	2. Fix the MMU on sequence
-> 	3. Fix the cache flush scenario when only L1 lost.
-> 	4. Remove all un-necessary context save registers
-> 	5. Disable C-bit before cache clean
-> 	6. Use set_cr() exported API instead of custom one. 
+Tony
 
-Look like good cleanups, thanks.
-
-> It's generated against mainline and tested with OMAP3630 ZOOM3.
-> 	1. Renetion and off-mode mode in suspend - ok.
-> 	2. Retention in idle - ok
-
-Testing this series along with other PM changes queued up for mainline
-(my pm-core branch), this doesn't work for me on 3630/Zoom3 (but works
-fine on 3430/n900.)
-
-Here's what I did using omap2plus_defconfig + enabling CPUidle
-
-First tested suspend:
-
-echo 4 > /debug/pm_debug/wakeup_timer_seconds 
-echo mem > /sys/power/state
-
-then, setup UART idle/wakeup:
-
-echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout 
-echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout 
-echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout 
-echo 5 > /sys/devices/platform/omap/omap_uart.3/sleep_timeout 
-echo enabled > /sys/devices/platform/serial8250.0/tty/ttyS0/power/wakeup 
-
-then enabled idle:
-
-echo 1 > /debug/pm_debug/sleep_while_idle  
-
-As soon as I do this, it hangs.
-
-Without your series, it's working fine for me.  Only after merging your
-series it hangs.
-
-Kevin
-
-
-> The following changes since commit 85e2efbb1db9a18d218006706d6e4fbeb0216213:
->   Linus Torvalds (1):
->         Linux 2.6.38-rc5
->
-> Santosh Shilimkar (6):
->   omap3: pm: Use amrv7 supported instructions instead of legacy cp15
->     ones
->   omap3: pm: Fix the mmu on sequence in the asm code
->   omap3: pm: Allow the cache clean when L1 is lost.
->   omap3: pm: Remove un-necessary cp15 registers form low power cpu
->     context
->   omap3: pm: Clear the SCTLR C bit in asm code to prevent data cache
->     allocation
->   omap3: pm: Use exported set_cr() instead of a custom one.
->
->  arch/arm/mach-omap2/pm34xx.c    |    7 +-
->  arch/arm/mach-omap2/sleep34xx.S |  223 ++++++++++++++-------------------------
->  2 files changed, 78 insertions(+), 152 deletions(-)
+> ---
+>  arch/arm/mach-omap2/mailbox.c |   10 ++++++----
+>  1 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+> index 394413d..011ca50 100644
+> --- a/arch/arm/mach-omap2/mailbox.c
+> +++ b/arch/arm/mach-omap2/mailbox.c
+> @@ -193,10 +193,12 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
+>  		omap_mbox_type_t irq)
+>  {
+>  	struct omap_mbox2_priv *p = mbox->priv;
+> -	u32 l, bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+> -	l = mbox_read_reg(p->irqdisable);
+> -	l &= ~bit;
+> -	mbox_write_reg(l, p->irqdisable);
+> +	u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
+> +
+> +	if (!cpu_is_omap44xx())
+> +		bit = mbox_read_reg(p->irqdisable) & ~bit;
+> +
+> +	mbox_write_reg(bit, p->irqdisable);
+>  }
+>  
+>  static void omap2_mbox_ack_irq(struct omap_mbox *mbox,
+> -- 
+> 1.7.0.4
+> 
