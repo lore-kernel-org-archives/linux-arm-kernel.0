@@ -1,55 +1,79 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 03 Mar 2011 13:43:02 +0900
-Subject: [PATCH/RFC 0/3] ARM: S5P: Add common DPHY control code for
-	MIPI-CSIS/MIPI-DSIM devices
-In-Reply-To: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
-References: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <01a701cbd95d$9873c160$c95b4420$%kim@samsung.com>
+From: pratyush.anand@st.com (pratyush)
+Date: Thu, 3 Mar 2011 10:30:15 +0530
+Subject: [PATCH V5 Resend] ST SPEAr: PCIE gadget suppport
+In-Reply-To: <20110223160632.0b21c550.akpm@linux-foundation.org>
+References: <1298276455-23989-1-git-send-email-pratyush.anand@st.com>
+	<20110223160632.0b21c550.akpm@linux-foundation.org>
+Message-ID: <4D6F205F.5080209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On 2/24/2011 5:36 AM, Andrew Morton wrote:
+> On Mon, 21 Feb 2011 13:50:55 +0530
+> Pratyush Anand <pratyush.anand@st.com> wrote:
 > 
-> Hello,
+>> This is a configurable gadget. can be configured by configfs interface. Any
+>> IP available at PCIE bus can be programmed to be used by host
+>> controller.It supoorts both INTX and MSI.
+>> By default, gadget is configured for INTX and SYSRAM1 is mapped to BAR0
+>> with size 0x1000
+>>
+>> Changes since V4:
+>> - All documentation related comments incorporated
+>>
+>> Changes since V3:
+>> - support for multiple instances of such device
 > 
-> the following patch series adds a common platform code to enable control
-> of MIPI-CSI receiver's DPHY from within it's V4L2 subdev driver. The
-driver
-> is supposed to support possibly all S5P SoCs variants and the PHY handling
-> details need to be hidden in the platform code. The functionality behind
-> "dphy_csis" clocks is not exact a functionality of the clock, but they
-have
-> common features. If the clock API rules are to strict to accept this kind
-> of usage then I'm willing to create some intermediate layer that will
-finally
-> solve PHY handling for MIPI-CSI, MIPI-DSIM, USB, SATA.. devices, without
-> issues
-> on a common kernel binary for multiple boards.
-> 
-> 
-> The patch series contains:
-> [PATCH 1/3] ARM: S5P: Rename MIPI-CSIS header and update Copyright
-> [PATCH 2/3] ARM: S5PV210: Add clock entries for MIPI DPHY control
-> [PATCH 3/3] ARM: EXYNOS4: Add clock entries for MIPI DPHY control
-> 
-> Rebased onto kgene-for-next branch at:
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> ^^ This doesn't seem to agree with the documentation.
 > 
 
-Maybe we discussed about this ago.
-I remember, we agree that to control phy cannot be handled in clock part.
+Will add a line in documentation for it.
 
-And didn't say to make some kind of common s5p phy setup/control function?
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/038038.ht
-ml
+>> ...
+>>
+>> --- /dev/null
+>> +++ b/Documentation/ABI/testing/configfs-spear-pcie-gadget
+>> @@ -0,0 +1,30 @@
+>> +What:		/config/pcie-gadget
+>> +Date:		Feb 2011
+>> +KernelVersion:	2.6.37
+>> +Contact:	Pratyush Anand <pratyush.anand@st.com>
+>> +Description:
+>> +
+>> +	Interface is used to configure selected dual mode PCIe controller
+>> +	as device and then program its various registers to configure it
+>> +	as a particular device type.
+>> +	This interfaces can be used to show spear's PCIe device capability.
+>> +
+>> +	Nodes are only visible when configfs is mounted. To mount configfs
+>> +	in /config directory use:
+>> +	# mount -t configfs none /config/
+>> +
+>> +	/config/pcie-gadget/
+>> +		link ... used to enable ltssm and read its status.
+>> +		int_type ...used to configure and read type of supported
+>> +			interrupt
+>> +		no_of_msi ... used to configure number of MSI vector needed and
+>> +			to read no of MSI granted.
+>> +		inta ... write 1 to assert INTA and 0 to de-assert.
+>> +		send_msi ... write MSI vector to be sent.
+>> +		vendor_id ... used to write and read vendor id (hex)
+>> +		device_id ... used to write and read device id (hex)
+>> +		bar0_size ... used to write and read bar0_size
+>> +		bar0_address ... used to write and read bar0 mapped area in hex.
+>> +		bar0_rw_offset ... used to write and read offset of bar0 where
+>> +			bar0_data will be written or read.
+>> +		bar0_data ... used to write and read data at bar0_rw_offset.
+> 
+> What's the configfs naming scheme for the second and later devices?
+> 
 
-I thought it is possible to make it even though some registers is in
-different place.
+there would be pcie-gadget.n directory under /config for
+nth PCIe Device Controller.
 
-Thanks.
+Regards
+Pratyush
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> .
+> 
