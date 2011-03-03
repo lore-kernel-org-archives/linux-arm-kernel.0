@@ -1,61 +1,132 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 03 Mar 2011 09:05:51 -0800
-Subject: [PATCH 12/17] omap4: pm-debug: Add wakeup timer and debug counters
-In-Reply-To: <ff69224b634bfd89405d29a720755b64@mail.gmail.com> (Santosh
-	Shilimkar's message of "Thu, 3 Mar 2011 22:04:27 +0530")
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com>
-	<1298112158-28469-13-git-send-email-santosh.shilimkar@ti.com>
-	<87hbbl2l1y.fsf@ti.com>
-	<ff69224b634bfd89405d29a720755b64@mail.gmail.com>
-Message-ID: <87r5aoqgls.fsf@ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 3 Mar 2011 18:42:10 +0100
+Subject: [PATCH 1/4] OMAP3 and 4 hwmod I2C units only allow 16 bit access
+In-Reply-To: <20110303135022.30648.8996.stgit@otae.warmcat.com>
+References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
+	<20110303135022.30648.8996.stgit@otae.warmcat.com>
+Message-ID: <4D6FD2F2.8050701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On 3/3/2011 2:50 PM, Andy Green wrote:
+> Peter Maydell noticed when running under QEMU he was getting
+> errors reporting 32-bit access to I2C peripheral unit registers
+> that are documented to be 8 or 16-bit only[1][2]
 
->> -----Original Message-----
->> From: Kevin Hilman [mailto:khilman at ti.com]
->> Sent: Thursday, March 03, 2011 4:21 AM
->> To: Santosh Shilimkar
->> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH 12/17] omap4: pm-debug: Add wakeup timer and
->> debug counters
->>
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
->> > This patch adds configurable wakeup timer support in suspend. Also
->> > for statistics pm counter support is added.
->> >
->> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > Reviewed-by: Kevin Hilman <khilman@ti.com>
->> > ---
->> >  arch/arm/mach-omap2/omap4-mpuss-lowpower.c |    8 ++++++++
->> >  arch/arm/mach-omap2/pm-debug.c             |    6 ++++--
->> >  arch/arm/mach-omap2/pm44xx.c               |    5 +++++
->> >  3 files changed, 17 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
->> b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
->> > index ab2e101..5e0141e 100644
->> > --- a/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
->> > +++ b/arch/arm/mach-omap2/omap4-mpuss-lowpower.c
->> > @@ -287,6 +287,10 @@ int omap4_enter_lowpower(unsigned int cpu,
->> unsigned int power_state)
->> >  	if (cpu)
->> >  		goto cpu_prepare;
->> >
->> > +#ifdef CONFIG_PM_DEBUG
->> > +	pwrdm_pre_transition();
->> > +#endif
->>
->> Why the #ifdef?
->>
-> Because these stats updates are quite expensive
-> in low power code and for the production kernel
-> you don't need this extra penalty.
+Well, in that case, it is more a QEMU bug since the HW is working fine 
+with 32 bits access to sysconfig :-)
 
-OK, then please fix this in the powerdomain code (or header.)
+> The I2C driver is blameless as it wraps its accesses in a
+> function using __raw_writew and __raw_readw, it turned out it
+> is the hwmod stuff.
+>
+> However the hwmod code already has a flag to force a
+> perhipheral unit to only be accessed using 16-bit operations..
 
-c.f. "#ifdefs are ugly" section of Documentation/SubmittingPatches
+In fact that flag was added because 32 bits access to I2C sysconfig was 
+generating bus abort on 2420 only: 
+(2004290f55f03c52e22044a5843928cf0f6cc56a).
 
-Kevin
+Since 2430, OMAP3 and OMAP4 are working fine with 32 bits, we were lazy 
+and didn't add that flag.
+
+Did you check this patch on a real HW? Since this was reported using 
+QEMU only.
+
+Otherwise, I'm fine with that patch, it will not change anything but 
+will improve the consistency across SoC version.
+
+BTW, It will be good if you could update the omap_hwmod_2430_data.c file 
+as well.
+
+Thanks,
+Benoit
+
+> This patch applies the 16-bit only flag to the OMAP3xxx and
+> OMAP44xx hwmod structs.
+>
+> [1] OMAP4430 Technical reference manual section 23.1.6.2
+> [2] OMAP3530 Techincal reference manual section 18.6
+>
+> Cc: patches at linaro.org
+> Reported-by: Peter Maydell<peter.maydell@linaro.org>
+> Signed-off-by: Andy Green<andy.green@linaro.org>
+> ---
+>
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    3 +++
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++----
+>   2 files changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 541092c..1409779 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -1170,6 +1170,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_i2c1_slaves[] = {
+>
+>   static struct omap_hwmod omap3xxx_i2c1_hwmod = {
+>   	.name		= "i2c1",
+> +	.flags		= HWMOD_16BIT_REG,
+>   	.mpu_irqs	= i2c1_mpu_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(i2c1_mpu_irqs),
+>   	.sdma_reqs	= i2c1_sdma_reqs,
+> @@ -1212,6 +1213,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_i2c2_slaves[] = {
+>
+>   static struct omap_hwmod omap3xxx_i2c2_hwmod = {
+>   	.name		= "i2c2",
+> +	.flags		= HWMOD_16BIT_REG,
+>   	.mpu_irqs	= i2c2_mpu_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(i2c2_mpu_irqs),
+>   	.sdma_reqs	= i2c2_sdma_reqs,
+> @@ -1254,6 +1256,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_i2c3_slaves[] = {
+>
+>   static struct omap_hwmod omap3xxx_i2c3_hwmod = {
+>   	.name		= "i2c3",
+> +	.flags		= HWMOD_16BIT_REG,
+>   	.mpu_irqs	= i2c3_mpu_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(i2c3_mpu_irqs),
+>   	.sdma_reqs	= i2c3_sdma_reqs,
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> index ce646f2..c500416 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+> @@ -2280,7 +2280,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c1_slaves[] = {
+>   static struct omap_hwmod omap44xx_i2c1_hwmod = {
+>   	.name		= "i2c1",
+>   	.class		=&omap44xx_i2c_hwmod_class,
+> -	.flags		= HWMOD_INIT_NO_RESET,
+> +	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
+>   	.mpu_irqs	= omap44xx_i2c1_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c1_irqs),
+>   	.sdma_reqs	= omap44xx_i2c1_sdma_reqs,
+> @@ -2396,7 +2396,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c2_slaves[] = {
+>   static struct omap_hwmod omap44xx_i2c2_hwmod = {
+>   	.name		= "i2c2",
+>   	.class		=&omap44xx_i2c_hwmod_class,
+> -	.flags		= HWMOD_INIT_NO_RESET,
+> +	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
+>   	.mpu_irqs	= omap44xx_i2c2_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c2_irqs),
+>   	.sdma_reqs	= omap44xx_i2c2_sdma_reqs,
+> @@ -2449,7 +2449,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c3_slaves[] = {
+>   static struct omap_hwmod omap44xx_i2c3_hwmod = {
+>   	.name		= "i2c3",
+>   	.class		=&omap44xx_i2c_hwmod_class,
+> -	.flags		= HWMOD_INIT_NO_RESET,
+> +	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
+>   	.mpu_irqs	= omap44xx_i2c3_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c3_irqs),
+>   	.sdma_reqs	= omap44xx_i2c3_sdma_reqs,
+> @@ -2502,7 +2502,7 @@ static struct omap_hwmod_ocp_if *omap44xx_i2c4_slaves[] = {
+>   static struct omap_hwmod omap44xx_i2c4_hwmod = {
+>   	.name		= "i2c4",
+>   	.class		=&omap44xx_i2c_hwmod_class,
+> -	.flags		= HWMOD_INIT_NO_RESET,
+> +	.flags		= HWMOD_INIT_NO_RESET | HWMOD_16BIT_REG,
+>   	.mpu_irqs	= omap44xx_i2c4_irqs,
+>   	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_i2c4_irqs),
+>   	.sdma_reqs	= omap44xx_i2c4_sdma_reqs,
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
