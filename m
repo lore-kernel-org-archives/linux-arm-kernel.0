@@ -1,36 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu,  3 Mar 2011 14:30:59 +0100
-Subject: [PATCH 5/6] watchdog i.MX: use IMX_HAVE_PLATFORM_IMX2_WDT to depend on
-In-Reply-To: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
-References: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1299159060-9289-6-git-send-email-s.hauer@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Mar 2011 13:44:17 +0000
+Subject: clcdfb: Question about clcdfb_check() routine
+In-Reply-To: <4D6F83E2.2020701@st.com>
+References: <4D6F83E2.2020701@st.com>
+Message-ID: <20110303134417.GB25891@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX architecture provides IMX_HAVE_PLATFORM_* macros to signal
-that a selected SoC supports a certain hardware. Use them instead of
-depending on ARCH_* directly.
+On Thu, Mar 03, 2011 at 05:34:50PM +0530, vksamar wrote:
+> I had a doubt on clcdfb_check() routine in include/linux/amba/clcd.h.
+> Hard coded lower value of right margin, left margin and hsync len is (5+1).
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Wim Van Sebroeck <wim@iguana.be>
-Cc: linux-watchdog at vger.kernel.org
----
- drivers/watchdog/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+The +1 is there as we always subtract one off of the value:
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 31649b7..2b095d3 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -321,7 +321,7 @@ config MAX63XX_WATCHDOG
- 
- config IMX2_WDT
- 	tristate "IMX2+ Watchdog"
--	depends on ARCH_MX2 || ARCH_MX25 || ARCH_MX3 || ARCH_MX5
-+	depends on IMX_HAVE_PLATFORM_IMX2_WDT
- 	help
- 	  This is the driver for the hardware watchdog
- 	  on the Freescale IMX2 and later processors.
--- 
-1.7.2.3
+        val |= (var->hsync_len - 1) << 8;
+        val |= (var->right_margin - 1) << 16;
+        val |= (var->left_margin - 1) << 24;
+
+The 5 comes from these statements:
+
+For PL110:
+
+Horizontal timing restrictions DMA requests new data at the start of a
+horizontal display line. Some time must be allowed for the DMA transfer
+and for the data to propagate down the FIFO path in the LCD interface.
+The data path latency forces some restrictions on the usable minimum
+values for horizontal porch width in STN mode. The minimum values are
+HSW = 2 and HBP = 2.
+Single panel mode:
+ ? HSW = 3
+ ? HBP = 5
+Dual panel mode:
+ ? HSW = 3
+ ? HBP = 5
+ ? HFP = 5
+ ? PCD = 5 (CLCDCLK/7).
+If sufficient time is given at the start of the line (for example, setting
+HSW = 6, HBP = 10), data will not get corrupted for PCD = 4 (minimum value).
+
+For PL111:
+
+Horizontal timing restrictions DMA requests new data at the start of a
+horizontal display line. You must allocate some time for the DMA transfer
+and for the data to propagate down the FIFO path in the LCD interface. The
+data path latency forces some restrictions on the usable minimum values
+for horizontal porch width in STN mode. The minimum values are HSW = 2
+and HBP = 2.
+Single-panel mode:
+ ? HSW = 3
+ ? HBP = 5
+ ? HFP = 5
+ ? Panel Clock Divisor (PCD) = 1 (CLCDCLK/3).
+Dual-panel mode:
+ ? HSW = 3
+ ? HBP = 5
+ ? HFP = 5
+ ? PCD = 5 (CLCDCLK/7).
+If enough time is given at the start of the line, for example, setting
+HSW = 6, HBP = 10, data does not corrupt for PCD = 4, the minimum value.
+
+As we don't know@'check' time which conditions will be satisfied, to
+ensure that we always program the registers with legal values we have
+to enforce the highest minimum limits, which is right_margin = 5 + 1,
+left_margin = 5 + 1, hsync_len = 3 + 1 - I suspect this can be reduced
+to '4'.  But apparantly not '1'.
