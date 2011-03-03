@@ -1,53 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Mar 2011 13:48:54 +0000
-Subject: [PATCH] ARM: Thumb-2: Add local symbols to work around gas
-	behaviour
-In-Reply-To: <1299155946-3641-1-git-send-email-dave.martin@linaro.org>
-References: <1299155946-3641-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110303134854.GD25891@n2100.arm.linux.org.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 3 Mar 2011 15:48:58 +0200
+Subject: [PATCH 4/6] video i.MX: remove mx1 compile time dependencies
+In-Reply-To: <1299159060-9289-5-git-send-email-s.hauer@pengutronix.de>
+References: <1299159060-9289-1-git-send-email-s.hauer@pengutronix.de>
+	<1299159060-9289-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110303134858.GH20423@jasper.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 12:39:06PM +0000, Dave Martin wrote:
-> All current versions of gas at the time of writing have issues
-> fixing up pc-relative instructions which reference global symbols,
-> due to the potential need to support symbol preemption.
-> Even though symbol preemption is not relevant to the Linux kernel,
-> there is no way to inform the tools of this, so we get the problem.
-> 
-> Most pc-relative forms in ARM, and all pc-relative forms in
-> Thumb, will cause the assembler to fail with various fixup error
-> messages when used to reference global symbols.
-> 
-> The legacy behaviour is for ADR and plain LDR instructions in ARM
-> which reference global symbols to be fixed up silently with no
-> relocation emitted.  This means that building the kernel in ARM
-> currently works without problems, but it may be a bug, and the
-> behaviour could change in the future.
-> 
-> After discussion with Richard Earnshaw, it seems that there is
-> no single obvious remedy for this inconsistent behaviour,
-> so there is not likely to be a comprehensive upstream fix for
-> a while.
-> 
-> A workaround which should be valid for all past and all
-> foreseeable future versions of gas is to express the need for
-> a local fixup explicitly, by declaring a shadow local symbol
-> for any global symbol which needs to be addressed using ADR
-> or any pc-relative LDR variant.
-> 
-> This patch implements this workaround for the one part of the
-> main kernel currently known to be affected.  The resulting code
-> builds and works correctly in ARM and Thumb.
-> 
-> Similar fixes may be needed in mach-specific assembler.
+Hi Sascha,
 
-This all sounds like dumbness on the part of the assembler, and to say
-that this kind of behaviour may change in the future is completely brain
-dead.
+On Thu, Mar 03, 2011 at 02:30:58PM +0100, Sascha Hauer wrote:
+> remove usage of CONFIG_ARCH_MX1. It's mostly unused anyway, replace
+> it with cpu_is_mx1() where necessary. Also, depend on
+> IMX_HAVE_PLATFORM_IMX_FB instead of the architectures directly.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  drivers/video/Kconfig |    2 +-
+>  drivers/video/imxfb.c |   28 ++++++----------------------
+>  2 files changed, 7 insertions(+), 23 deletions(-)
+> 
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 6bafb51b..59c1e97 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -422,7 +422,7 @@ config FB_SA1100
+>  
+>  config FB_IMX
+>  	tristate "Freescale i.MX LCD support"
+> -	depends on FB && (HAVE_FB_IMX || ARCH_MX1 || ARCH_MX2)
+> +	depends on FB && IMX_HAVE_PLATFORM_IMX_FB
 
-I am *FAR* from happy with this, and as far as I'm concerned, the
-assembler must work as one expects irrespective of whether symbols are
-local or global.  I've no idea what binutils people are playing at here
-but it sounds utterly idiotic and broken.  I want no part in it.  If
-that means developing our own assembler, so be it.
+The HAVE_FB_IMX symbol becomes redundant, then. We should remove it entirely 
+from drivers/video/Kconfig and arch/arm/plat-mxc/devices/Kconfig.
+
+baruch
+
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
