@@ -1,46 +1,85 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Mar 2011 21:15:13 +0100
-Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <20110303134551.GC25891@n2100.arm.linux.org.uk>
-References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<20110302215238.GK22310@pengutronix.de>
-	<20110303115242.GA25891@n2100.arm.linux.org.uk>
-	<20110303124658.GR22310@pengutronix.de>
-	<20110303134551.GC25891@n2100.arm.linux.org.uk>
-Message-ID: <20110303201513.GU22310@pengutronix.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 3 Mar 2011 21:40:32 +0100
+Subject: [PATCH 1/4] OMAP3 and 4 hwmod I2C units only allow 16 bit access
+In-Reply-To: <4D6FD63C.6000102@linaro.org>
+References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
+	<20110303135022.30648.8996.stgit@otae.warmcat.com>
+	<4D6FD2F2.8050701@ti.com> <4D6FD63C.6000102@linaro.org>
+Message-ID: <4D6FFCC0.8000007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 01:45:51PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 03, 2011 at 01:46:58PM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Mar 03, 2011 at 11:52:42AM +0000, Russell King - ARM Linux wrote:
-> > > On Wed, Mar 02, 2011 at 10:52:38PM +0100, Uwe Kleine-K?nig wrote:
-> > > > > +static int __init mx5_pm_init(void)
-> > > > > +{
-> > > > > +	if (cpu_is_mx51())
-> > > > > +		suspend_set_ops(&mx5_suspend_ops);
-> > > > I'd prefer to have that called by imx51_init_early.
-> > > 
-> > > This function name looks fine.  As we now have an init_early in the
-> > > arch hooks, let's keep things called foo_init_early() to that use
-> > > and not start using 'early' for stuff used from initcalls.
-> > > 
-> > > Renaming this is a recipe for causing confusion and having grep hit
-> > > false positives.  Please leave it as is.
-> > It seems you and Thomas both didn't notice the "by" in my sentence.
-> > Or maybe it's not proper English? The thing I wanted to express is that
-> > instead of introducing another initcall I prefer that imx51_init_early
-> > calls mx5_pm_init instead. The name mx5_pm_init is fine for me, though
-> > imx51_pm_init would still be better.
-> 
-> Is there a reason to set this really really early?  What's that reason
-> exactly?
-No there is no reason. If there were a imx51_init this would be the
-right place. Maybe it's time to implement it.
- 
-Best regards
-Uwe
+On 3/3/2011 6:56 PM, Andy Green wrote:
+> On 03/03/2011 05:42 PM, Somebody in the thread at some point said:
+>> On 3/3/2011 2:50 PM, Andy Green wrote:
+>
+> Hi -
+>
+> Thanks for the reply.
+>
+>>> Peter Maydell noticed when running under QEMU he was getting
+>>> errors reporting 32-bit access to I2C peripheral unit registers
+>>> that are documented to be 8 or 16-bit only[1][2]
+>>
+>> Well, in that case, it is more a QEMU bug since the HW is working fine
+>> with 32 bits access to sysconfig :-)
+>
+> Actually it's documented in TI documentation, as noted:
+>
+>   >>  [1] OMAP4430 Technical reference manual section 23.1.6.2
+>   >>  [2] OMAP3530 Techincal reference manual section 18.6
+>
+> With the following warning in a nice big grey box -->
+>
+> ''CAUTION
+> The I2Ci registers are limited to 16 bit and 8 bit data accesses, 32 bit
+> data access is not allowed and can corrupt register content.''
+>
+> So, as a side-issue it can be worth confirming with the author of the
+> warning if it still holds or not and letting Qemu guys know if it's not
+> actually true what is written in the TI docs about that.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I was able to check for OMAP4, and in fact since the I2C bus is using 
+only the 16 LSB of the 32 bits interconnect, doing 32 bits access is 
+harmless.
+
+But OMAP2 & 3 were using a different interconnect, so it was probably 
+not done like that, hence the big CAUTION in the TRM.
+
+>> In fact that flag was added because 32 bits access to I2C sysconfig was
+>> generating bus abort on 2420 only:
+>> (2004290f55f03c52e22044a5843928cf0f6cc56a).
+>>
+>> Since 2430, OMAP3 and OMAP4 are working fine with 32 bits, we were lazy
+>> and didn't add that flag.
+>
+> There is no bus abort.  However if the warning in the documentation is
+> true, it'd be better that there was a bus abort.
+>
+>> Did you check this patch on a real HW? Since this was reported using
+>> QEMU only.
+>
+> I checked my patched code works OK on both IGEP2 (OMAP3) and Panda
+> (OMAP4), there's no visible symptom without the patch it's true.
+
+Even if starting from OMAP4 generation we can do 32 bits access, since 
+the whole IP is documented with 16 bits registers, it is cleaner to 
+prevent hwmod access in 32 bits.
+I will still report that to the TRM team in order to avoid unnecessary 
+scary notes.
+
+>> Otherwise, I'm fine with that patch, it will not change anything but
+>> will improve the consistency across SoC version.
+>>
+>> BTW, It will be good if you could update the omap_hwmod_2430_data.c file
+>> as well.
+>
+> I left it because I can't test it, but I'll happily do it additionally
+> if you can test it on some OMAP2 hardware.
+
+Don't hesitate to do it, and clearly add in the cover-letter that it was 
+tested on 3430 and 4430 only.
+Someone from TI should be able to test it on 2430.
+
+Thanks,
+Benoit
