@@ -1,66 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 3 Mar 2011 21:45:02 +0530
-Subject: [PATCH 07/17] omap4: pm: CPU1 wakeup workaround form Low power
-	modes
-In-Reply-To: <87ipw15fh0.fsf@ti.com>
-References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-8-git-send-email-santosh.shilimkar@ti.com>
-	<87ipw15fh0.fsf@ti.com>
-Message-ID: <2438425cddc1f413357129985562ec74@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 3 Mar 2011 17:25:13 +0100
+Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
+	CPU family choice
+In-Reply-To: <20110303121153.GJ29521@pengutronix.de>
+References: <20110302112559.GC22310@pengutronix.de>
+	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110303121153.GJ29521@pengutronix.de>
+Message-ID: <20110303162513.GS22310@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at ti.com]
-> Sent: Thursday, March 03, 2011 3:54 AM
-> To: Santosh Shilimkar
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 07/17] omap4: pm: CPU1 wakeup workaround form
-> Low power modes
->
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->
-> > The SGI(Software Generated Interrupts) are not wakeup capable from
-> > low power states. This is known limitation on OMAP4 and needs to
-> be
-> > worked around by using software forced clockdomain wake-up. CPU0
-> forces
-> > the CPU1 clockdomain to software force wakeup. After the wakeup,
-> CPU1
-> > restores its clockdomain hardware supervised mode.
-> >
-> > More details can be found in OMAP4430 TRM - Version J
-> > Section :
-> > 	4.3.4.2 Power States of CPU0 and CPU1
-> >
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Reviewed-by: Kevin Hilman <khilman@ti.com>
-> > ---
-> >  arch/arm/mach-omap2/omap-hotplug.c |    9 +++++++++
-> >  arch/arm/mach-omap2/omap-smp.c     |   27
-> ++++++++++++++++++++++++++-
-> >  2 files changed, 35 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-
-> omap2/omap-hotplug.c
-> > index 9f8f097..cf4ab15 100644
-> > --- a/arch/arm/mach-omap2/omap-hotplug.c
-> > +++ b/arch/arm/mach-omap2/omap-hotplug.c
-> > @@ -23,6 +23,7 @@
-> >  #include <mach/omap-wakeupgen.h>
-> >
-> >  #include "powerdomain.h"
-> > +#include "clockdomain.h"
-> >
-> >  int platform_cpu_kill(unsigned int cpu)
-> >  {
-> > @@ -36,6 +37,11 @@ int platform_cpu_kill(unsigned int cpu)
-> >  void platform_cpu_die(unsigned int cpu)
-> >  {
-> >  	unsigned int this_cpu;
-> > +	static struct clockdomain *cpu1_clkdm;
-> > +
-> > +	/* To avoid cpu1 clockdomain lookup every time */
->
-> minor: comment doesn't really match code and could just be removed
->
-Fixed
+Hello Sascha,
+
+On Thu, Mar 03, 2011 at 01:11:53PM +0100, Sascha Hauer wrote:
+>  config SOC_IMX27
+>  	bool
+> +	select ARCH_MX2
+> +	select MACH_MX27
+I'd let MACH_MX27 select ARCH_MX2, but that's just a minor detail.
+
+>  	select CPU_ARM926T
+>  	select ARCH_MXC_AUDMUX_V1
+>  	select IMX_HAVE_DMA_V1
+>  	select IMX_HAVE_IOMUX_V1
+>  	select MXC_AVIC
+>  
+> -if ARCH_MX1
+> +config IMX_MULTI_ARCHITECTURE
+> +	bool "i.MX multi architecture support"
+> +	depends on ARM_PATCH_PHYS_VIRT
+> +	depends on AUTO_ZRELADDR
+depends on EXPERIMENTAL?
+
+> +
+> +if IMX_MULTI_ARCHITECTURE
+> +config ARCH_IMX_MULTI_MX1
+> +	select SOC_IMX1
+> +	bool "i.MX1 support"
+> +
+> +config ARCH_IMX_MULTI_MX21
+> +	select SOC_IMX21
+> +	bool "i.MX21 support"
+> +
+> +config ARCH_IMX_MULTI_MX25
+> +	select SOC_IMX25
+> +	bool "i.MX25 support"
+> +
+> +config ARCH_IMX_MULTI_MX27
+> +	select SOC_IMX27
+> +	bool "i.MX27 support"
+I'm not sure it's a good idea to use SOC_IMX21 et al for both, Kconfig
+logic to select machines and to signal there are machines selected with
+the correspondig soc.
+
+On reason is that selecting ARCH_IMX_MULTI_MX21 and ARCH_IMX_MULTI_MX27
+but no i.MX21 based machine currently makes cpu_is_mx27() more (runtime)
+complicated than necessary.
+
+Just judging the UI it looks good.  (I.e. I like the explicit "i.MX
+multi architecture support" knob.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
