@@ -1,77 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Mar 2011 19:00:26 +0100
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
-	CPU family choice
-In-Reply-To: <20110303162513.GS22310@pengutronix.de>
-References: <20110302112559.GC22310@pengutronix.de>
-	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110303121153.GJ29521@pengutronix.de>
-	<20110303162513.GS22310@pengutronix.de>
-Message-ID: <20110303180026.GC18351@pengutronix.de>
+From: pratheesh@ti.com (Pratheesh Gangadhar)
+Date: Thu,  3 Mar 2011 23:37:56 +0530
+Subject: [PATCH v9 0/1] Add PRUSS UIO driver support
+Message-ID: <1299175677-17859-1-git-send-email-pratheesh@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 05:25:13PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Sascha,
-> 
-> On Thu, Mar 03, 2011 at 01:11:53PM +0100, Sascha Hauer wrote:
-> >  config SOC_IMX27
-> >  	bool
-> > +	select ARCH_MX2
-> > +	select MACH_MX27
-> I'd let MACH_MX27 select ARCH_MX2, but that's just a minor detail.
-> 
-> >  	select CPU_ARM926T
-> >  	select ARCH_MXC_AUDMUX_V1
-> >  	select IMX_HAVE_DMA_V1
-> >  	select IMX_HAVE_IOMUX_V1
-> >  	select MXC_AVIC
-> >  
-> > -if ARCH_MX1
-> > +config IMX_MULTI_ARCHITECTURE
-> > +	bool "i.MX multi architecture support"
-> > +	depends on ARM_PATCH_PHYS_VIRT
-> > +	depends on AUTO_ZRELADDR
-> depends on EXPERIMENTAL?
+This patch series add support for PRUSS (Programmable Real-time Unit Sub
+System) UIO driver in Texas Instruments DA850, AM18xx and OMAP-L138 processors.
+PRUSS is programmable RISC core which can be used to implement Soft IPs
+(eg:- DMA, CAN, UART,SmartCard) and Industrial communications data link layers
+(eg:- PROFIBUS). UIO driver exposes PRUSS resources like memory and interrupts
+to user space application.PRUSS UIO application API can be used to control PRUs
+in PRUSS, setup PRU INTC, load firmware to PRUs and implement IPC between Host
+processor and PRUs. More information on PRUSS and UIO linux user space API
+available in the links below
 
-ARM_PATCH_PHYS_VIRT depends on EXPERIMENTAL already. I think once
-ARM_PATCH_PHYS_VIRT is considered stable, we can consider i.MX
-multiarchitecture support stable aswell.
+http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader
+http://processors.wiki.ti.com/index.php/PRU_Linux_Application_Loader_API_Guide
 
-> 
-> > +
-> > +if IMX_MULTI_ARCHITECTURE
-> > +config ARCH_IMX_MULTI_MX1
-> > +	select SOC_IMX1
-> > +	bool "i.MX1 support"
-> > +
-> > +config ARCH_IMX_MULTI_MX21
-> > +	select SOC_IMX21
-> > +	bool "i.MX21 support"
-> > +
-> > +config ARCH_IMX_MULTI_MX25
-> > +	select SOC_IMX25
-> > +	bool "i.MX25 support"
-> > +
-> > +config ARCH_IMX_MULTI_MX27
-> > +	select SOC_IMX27
-> > +	bool "i.MX27 support"
-> I'm not sure it's a good idea to use SOC_IMX21 et al for both, Kconfig
-> logic to select machines and to signal there are machines selected with
-> the correspondig soc.
-> 
-> On reason is that selecting ARCH_IMX_MULTI_MX21 and ARCH_IMX_MULTI_MX27
-> but no i.MX21 based machine currently makes cpu_is_mx27() more (runtime)
-> complicated than necessary.
+Platform/board specific portion of this patch depends on Mistral patches below
 
-Then there's no reason to select IMX_MULTI_ARCHITECTURE in the first
-place. What are the other reasons?
+[PATCH 1/1] davinci: changed SRAM allocator to shared ram :
+				https://patchwork.kernel.org/patch/549351/
+[PATCH 1/1] da830: macro rename DA8XX_LPSC0_DMAX to DA8XX_LPSC0_PRUSS :
+				 https://patchwork.kernel.org/patch/549331/
+[PATCH v2 01/13] mfd: pruss mfd driver :
+				https://patchwork.kernel.org/patch/549531/
+[PATCH v2 02/13] da850: pruss platform specific additions :
+				https://patchwork.kernel.org/patch/549521/
 
-Sascha
+I will submit a seperate patch set on top of these patches to support PRUSS
+UIO driver.
 
+Pratheesh Gangadhar (1):
+  PRUSS UIO driver support
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ drivers/uio/Kconfig       |   17 +++
+ drivers/uio/Makefile      |    1 +
+ drivers/uio/uio_pruss.c   |  264 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/uio_pruss.h |   29 +++++
+ 4 files changed, 311 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/uio/uio_pruss.c
+ create mode 100644 include/linux/uio_pruss.h
