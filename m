@@ -1,37 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Mar 2011 13:46:58 +0100
-Subject: [PATCHv1] ARM: imx: Add support for low power suspend on MX51.
-In-Reply-To: <20110303115242.GA25891@n2100.arm.linux.org.uk>
-References: <1299086278-12131-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<20110302215238.GK22310@pengutronix.de>
-	<20110303115242.GA25891@n2100.arm.linux.org.uk>
-Message-ID: <20110303124658.GR22310@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 3 Mar 2011 13:54:04 +0100
+Subject: [patch v2 2/2] efika mx/sb: enable watchdog
+In-Reply-To: <20110302185002.798370465@rtp-net.org>
+References: <20110302184512.512010086@rtp-net.org>
+	<20110302185002.798370465@rtp-net.org>
+Message-ID: <20110303125404.GM29521@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 11:52:42AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Mar 02, 2011 at 10:52:38PM +0100, Uwe Kleine-K?nig wrote:
-> > > +static int __init mx5_pm_init(void)
-> > > +{
-> > > +	if (cpu_is_mx51())
-> > > +		suspend_set_ops(&mx5_suspend_ops);
-> > I'd prefer to have that called by imx51_init_early.
-> 
-> This function name looks fine.  As we now have an init_early in the
-> arch hooks, let's keep things called foo_init_early() to that use
-> and not start using 'early' for stuff used from initcalls.
-> 
-> Renaming this is a recipe for causing confusion and having grep hit
-> false positives.  Please leave it as is.
-It seems you and Thomas both didn't notice the "by" in my sentence.
-Or maybe it's not proper English? The thing I wanted to express is that
-instead of introducing another initcall I prefer that imx51_init_early
-calls mx5_pm_init instead. The name mx5_pm_init is fine for me, though
-imx51_pm_init would still be better.
+Arnaud,
 
-Best regards
-Uwe
+On Wed, Mar 02, 2011 at 07:45:14PM +0100, Arnaud Patard wrote:
+> Register watchdog for efika mx and sb systems.
+
+I promised myself to keep a better eye on patches I can't take because
+they have dependencies to other subsystems. This patch is one of those
+as it depends on the wdi_reboot field in the platform data.
+Can you please resend this once the other patches have hit mainline?
+
+Sascha
+
+> 
+> v2:
+> - reorder Kconfig entry
+> - set wdi_reboot in mc13xxx platform data
+> 
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> 
+> Index: linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c
+> ===================================================================
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/mx51_efika.c	2011-03-01 22:24:31.000000000 +0100
+> +++ linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c	2011-03-01 22:36:35.000000000 +0100
+> @@ -574,6 +574,7 @@
+>  	.flags = MC13XXX_USE_RTC | MC13XXX_USE_REGULATOR,
+>  	.num_regulators = ARRAY_SIZE(mx51_efika_regulators),
+>  	.regulators = mx51_efika_regulators,
+> +	.wdi_reboot = 1,
+>  };
+>  
+>  static struct spi_board_info mx51_efika_spi_board_info[] __initdata = {
+> @@ -611,6 +612,7 @@
+>  					ARRAY_SIZE(mx51efika_pads));
+>  	imx51_add_imx_uart(0, &uart_pdata);
+>  	mx51_efika_usb();
+> +	imx51_add_imx2_wdt(0, NULL);
+>  	imx51_add_sdhci_esdhc_imx(0, NULL);
+>  
+>  	/* FIXME: comes from original code. check this. */
+> Index: linux-2.6-submit/arch/arm/mach-mx5/Kconfig
+> ===================================================================
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/Kconfig	2011-03-01 22:24:31.000000000 +0100
+> +++ linux-2.6-submit/arch/arm/mach-mx5/Kconfig	2011-03-01 22:35:47.000000000 +0100
+> @@ -116,6 +116,7 @@
+>  config MX51_EFIKA_COMMON
+>  	bool
+>  	select SOC_IMX51
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+>  	select IMX_HAVE_PLATFORM_SPI_IMX
+> 
+> 
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
