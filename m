@@ -1,39 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu,  3 Mar 2011 22:36:57 +0100
-Subject: [PATCH] ARM: mxc91231: select MXC_AVIC
-Message-ID: <1299188217-2051-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 3 Mar 2011 22:45:25 +0100
+Subject: [PATCH 4/4] OMAP3 and 4 I2C use cpu type consistently for new
+	register availability
+In-Reply-To: <20110303135044.30648.27273.stgit@otae.warmcat.com>
+References: <20110303134744.30648.91218.stgit@otae.warmcat.com>
+	<20110303135044.30648.27273.stgit@otae.warmcat.com>
+Message-ID: <4D700BF5.8090308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes:
+On 3/3/2011 2:50 PM, Andy Green wrote:
+> The driver makes the choice about which register layout to
+> use based on cpu, however it then tries to use the probed
+> peripheral unit version register to decide whether to access
+> registers that only exist in the 4430 unit.
+>
+> Unfortunately, the unit with the smaller register map on the
+> OMAP3530 has the same peripheral unit version number, leading
+> the OMAP3530 to dereference the register map beyond the bounds
+> of its array, and then to access a 'random' register offset taken
+> from whatever happens to be sitting beyond the register map
+> array, as reported here
+>
+> https://bugs.launchpad.net/linux-linaro/+bug/645324
+>
+> This patch makes both the choice of register map and the decision
+> to use a register only present in the larger map both do so based
+> on cpu type, which correctly reflects register availability.
+>
+> Cc: patches at linaro.org
+> Reported-by: Peter Maydell<peter.maydell@linaro.org>
+> Signed-off-by: Andy Green<andy.green@linaro.org>
+> ---
+>
+>   drivers/i2c/busses/i2c-omap.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index e09c62d..c82e1bb5 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -309,7 +309,7 @@ static void omap_i2c_idle(struct omap_i2c_dev *dev)
+>   	pdata = pdev->dev.platform_data;
+>
+>   	dev->iestate = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+> -	if (dev->rev>= OMAP_I2C_REV_ON_4430)
+> +	if (cpu_is_omap44xx())
 
-	arch/arm/kernel/built-in.o: In function `__irq_svc':
-	io.c:(.text+0x2e0): undefined reference to `avic_base'
-	arch/arm/kernel/built-in.o: In function `__irq_usr':
-	io.c:(.text+0x4c8): undefined reference to `avic_base'
-	arch/arm/mach-mxc91231/built-in.o: In function `mxc91231_init_irq':
-	magx-zn5.c:(.init.text+0x18): undefined reference to `mxc_init_irq'
+As explained before, you should not add any cpu_is_XXX in the driver. 
+That rev field is the way to go, except that it should be populated 
+using hwmod data information instead of inaccurate I2C register revision 
+field.
 
-and was broken by
-
-	c7259df (ARM i.MX irq: Compile avic irq code only on SoCs that need it)
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/plat-mxc/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 15dd518..8d183c5 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -33,6 +33,7 @@ config ARCH_MX3
- config ARCH_MXC91231
- 	bool "MXC91231-based"
- 	select CPU_V6
-+	select MXC_AVIC
- 	help
- 	  This enables support for systems based on the Freescale MXC91231 family
- 
--- 
-1.7.2.3
+Regards,
+Benoit
