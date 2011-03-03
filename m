@@ -1,43 +1,55 @@
-From: pratheesh@ti.com (TK, Pratheesh Gangadhar)
-Date: Thu, 3 Mar 2011 14:59:42 +0530
-Subject: [PATCH v8 1/1] PRUSS UIO driver support
-In-Reply-To: <alpine.LFD.2.00.1103022155030.2701@localhost6.localdomain6>
-References: <1299065886-30099-1-git-send-email-pratheesh@ti.com>
-	<1299065886-30099-2-git-send-email-pratheesh@ti.com>
-	<20110302200956.GB23818@local> <201103022123.38050.arnd@arndb.de>
-	<alpine.LFD.2.00.1103022155030.2701@localhost6.localdomain6>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024C008731@dbde02.ent.ti.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 03 Mar 2011 10:34:21 +0100
+Subject: [PATCH 1/3] ARM: S5P: Rename MIPI-CSIS header and update Copyright
+In-Reply-To: <01a501cbd95c$37069cf0$a513d6d0$%kim@samsung.com>
+References: <1299087289-29926-1-git-send-email-s.nawrocki@samsung.com>
+	<1299087289-29926-2-git-send-email-s.nawrocki@samsung.com>
+	<01a501cbd95c$37069cf0$a513d6d0$%kim@samsung.com>
+Message-ID: <4D6F609D.3020501@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi,
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: Thursday, March 03, 2011 2:27 AM
-> On Wed, 2 Mar 2011, Arnd Bergmann wrote:
+On 03/03/2011 05:33 AM, Kukjin Kim wrote:
+> Sylwester Nawrocki wrote:
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>>  arch/arm/plat-s5p/dev-csis0.c              |    2 +-
+>>  arch/arm/plat-s5p/dev-csis1.c              |    2 +-
+>>  arch/arm/plat-s5p/include/plat/csis.h      |   28
+> --------------------------
+>> --
+>>  arch/arm/plat-s5p/include/plat/mipi_csis.h |   28
+>> ++++++++++++++++++++++++++++
+>>  4 files changed, 30 insertions(+), 30 deletions(-)
+>>  delete mode 100644 arch/arm/plat-s5p/include/plat/csis.h
+>>  create mode 100644 arch/arm/plat-s5p/include/plat/mipi_csis.h
+>>
+> Oops, why didn't use '-M'?
+> It can show me this like following.
 > 
-> > On Wednesday 02 March 2011 21:09:56 Hans J. Koch wrote:
-> > > > +static struct uio_info *info;
-> > > > +static dma_addr_t sram_paddr, ddr_paddr;
-> > > > +static void *prussio_vaddr, *sram_vaddr, *ddr_vaddr;
-> > >
-> > > So the correct thing would be
-> > >
-> > > static void __iomem *prussio_vaddr;
-> > > static void *sram_vaddr, *ddr_vaddr;
-> >
-> > I also commented that it should not be a global variable at
-> > all, but a dynamic data structure referenced from the device.
-> >
-> > Not important, but Pratheesh said he'd change it. If it stays
-> > a global variable, I'd at least expect an explanation why
-> > the static variable is considered better in this case.
+
+Yes, I could do better. Sorry, I had two version of the patch
+and somehow ended up with te wrong one being send.
+
+> .../plat-s5p/include/plat/{csis.h => mipi_csis.h}  |   10 +++++-----
+>  3 files changed, 7 insertions(+), 7 deletions(-)
+>  rename arch/arm/plat-s5p/include/plat/{csis.h => mipi_csis.h} (68%)
 > 
-> I did not pick at that, because there is no indicator that we'll see
-> more than one PRUSS unit per SoC in the forseeable future.
+> Secondly, I remember this...
+> Following is your response at that time.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/038037.ht
+> ml
 > 
-It's a possibility - May be in 2-3 years time.
+
+Yes, but afterwards I realized there will be issues when one is trying
+to build common kernel binary for multiple SoCs.
+Nevertheless I will prepare common code for S5P and a callback into platform
+code, so at least we can move on with the v4l driver.
 
 Thanks,
-Pratheesh
+-- 
+Sylwester Nawrocki
+Samsung Poland R&D Center
