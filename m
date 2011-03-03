@@ -1,44 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 3 Mar 2011 17:44:27 +0100
-Subject: [PATCH] ARM: mx51: Print silicon revision on boot
-In-Reply-To: <AANLkTinPvxKR0ppW5jKWSOw=x05w0tb6_d6x+e4ZWdan@mail.gmail.com>
-References: <1299114747-14091-1-git-send-email-festevam@gmail.com>
-	<87lj0wwr0g.fsf@lebrac.rtp-net.org>
-	<AANLkTinPvxKR0ppW5jKWSOw=x05w0tb6_d6x+e4ZWdan@mail.gmail.com>
-Message-ID: <20110303164427.GX29521@pengutronix.de>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Thu, 3 Mar 2011 17:47:38 +0100
+Subject: Memory Compaction feature.
+In-Reply-To: <AANLkTikFHPYf74QNKYEQD2o+=VvZgVNGgbbydcUiF0WF@mail.gmail.com>
+References: <AANLkTikFHPYf74QNKYEQD2o+=VvZgVNGgbbydcUiF0WF@mail.gmail.com>
+Message-ID: <20110303164738.GA3863@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 03, 2011 at 12:43:14PM -0300, Fabio Estevam wrote:
-> Hi Arnaud,
+On Thu, Mar 03, 2011 at 06:32:35PM +0530, naveen yadav wrote:
+
+[I changed the bogus linux-arm-kernel-request at lists.arm.linux.org.uk
+address to linux-arm-kernel at lists.infradead.org.  I have no idea where
+people keep pulling out -request addresses.]
+
+> I want clarification is anybody verify this feature on ARM or MIPS architecture.
 > 
-> On Thu, Mar 3, 2011 at 5:24 AM, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> > Fabio Estevam <festevam@gmail.com> writes:
-> > Hi,
-> >
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> >
-> > Why I like having boot log, I don't like have too verbose boot logs. If
-> > you add this, you have a good reason (I hope), but I can't know
-> > it. There's no patch description. So, please give a patch with proper
-> > explanation of why you need that. Anyway, having a proper patch
-> > description is imho always a good idea.
-> 
-> I think that printing the silicon version on boot is useful
-> information. Many issues are fixed in the latest silicon revision, so
-> while debugging mx51 issues it is good to know from the boot log if
-> someone is using the latest silicon version or not.
+> http://lwn.net/Articles/381677/
 
-+1
+This got merged for 2.6.35 and as it doesn't tinker with architecture
+specific code I assume it should just work on all architectures.  However
+I have no reports of success or failure on MIPS.
 
-There is less useful information in the bootlog than this. Also, there's
-the quiet option to not wait on the slow serial console.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+  Ralf
