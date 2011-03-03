@@ -1,68 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 3 Mar 2011 17:25:13 +0100
-Subject: [PATCH] ARM: imx: move selection between i.MX21 and i.MX27 to
-	CPU family choice
-In-Reply-To: <20110303121153.GJ29521@pengutronix.de>
-References: <20110302112559.GC22310@pengutronix.de>
-	<1299086585-22707-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110303121153.GJ29521@pengutronix.de>
-Message-ID: <20110303162513.GS22310@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 3 Mar 2011 21:59:04 +0530
+Subject: [PATCH 08/17] omap4: pm: Add GIC save/restore support
+In-Reply-To: <8739n55f75.fsf@ti.com>
+References: <1298112158-28469-1-git-send-email-santosh.shilimkar@ti.com><1298112158-28469-9-git-send-email-santosh.shilimkar@ti.com>
+	<8739n55f75.fsf@ti.com>
+Message-ID: <000b275e5d210abd5dec6c09c5508734@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+> -----Original Message-----
+> From: Kevin Hilman [mailto:khilman at ti.com]
+> Sent: Thursday, March 03, 2011 4:00 AM
+> To: Santosh Shilimkar
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 08/17] omap4: pm: Add GIC save/restore support
+[...]
 
-On Thu, Mar 03, 2011 at 01:11:53PM +0100, Sascha Hauer wrote:
->  config SOC_IMX27
->  	bool
-> +	select ARCH_MX2
-> +	select MACH_MX27
-I'd let MACH_MX27 select ARCH_MX2, but that's just a minor detail.
+> > @@ -67,6 +82,17 @@ struct omap4_cpu_pm_info {
+> >
+> >  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
+> >
+> > +/* Helper functions */
+> > +static inline void sar_writel(u32 val, u32 offset, u8 idx)
+> > +{
+> > +	__raw_writel(val, sar_ram_base + offset + 4 * idx);
+> > +}
+>
+> aha, this is what I was thinking of in the earlier SAR patch.
+>
+> Something like this should be part of the SAR code, not here.
+>
+If you remember during the internal review, this helpers
+are added to improve the readability and they are inline
+functions. Same is the case with wakeupgen save code.
 
->  	select CPU_ARM926T
->  	select ARCH_MXC_AUDMUX_V1
->  	select IMX_HAVE_DMA_V1
->  	select IMX_HAVE_IOMUX_V1
->  	select MXC_AVIC
->  
-> -if ARCH_MX1
-> +config IMX_MULTI_ARCHITECTURE
-> +	bool "i.MX multi architecture support"
-> +	depends on ARM_PATCH_PHYS_VIRT
-> +	depends on AUTO_ZRELADDR
-depends on EXPERIMENTAL?
+If you move this code to SAR file and GIC helper
+to gic file, the save routine will become highly
+un-optimal.
 
-> +
-> +if IMX_MULTI_ARCHITECTURE
-> +config ARCH_IMX_MULTI_MX1
-> +	select SOC_IMX1
-> +	bool "i.MX1 support"
-> +
-> +config ARCH_IMX_MULTI_MX21
-> +	select SOC_IMX21
-> +	bool "i.MX21 support"
-> +
-> +config ARCH_IMX_MULTI_MX25
-> +	select SOC_IMX25
-> +	bool "i.MX25 support"
-> +
-> +config ARCH_IMX_MULTI_MX27
-> +	select SOC_IMX27
-> +	bool "i.MX27 support"
-I'm not sure it's a good idea to use SOC_IMX21 et al for both, Kconfig
-logic to select machines and to signal there are machines selected with
-the correspondig soc.
+In General Save is like below.
+	Read_Harfware_register()
+	Write_it_sar_location()
 
-On reason is that selecting ARCH_IMX_MULTI_MX21 and ARCH_IMX_MULTI_MX27
-but no i.MX21 based machine currently makes cpu_is_mx27() more (runtime)
-complicated than necessary.
+This happens for every GIC and wakeupgen
+registers and hence moving this across files
+and calling them from there is going add un-necessary
+stack overhead.
 
-Just judging the UI it looks good.  (I.e. I like the explicit "i.MX
-multi architecture support" knob.)
+I already got rid-off the global address pointers. I will
+get those now using omap4_get_*_base() and store it for
+local use in the file.
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> > +static inline u32 gic_readl(u32 offset, u8 idx)
+> > +{
+> > +	return __raw_readl(gic_dist_base_addr + offset + 4 * idx);
+> > +}
+>
+> Similarily, it would be nice tos see this as part of GIC code so
+> this code doesn't have to access a global base address pointer.
+>
+Same comment applies here too.
+
+Regards
+Santosh
