@@ -1,21 +1,32 @@
-From: madhavi.linux@gmail.com (Madhavi Manchala)
-Date: Thu, 3 Mar 2011 19:19:16 +0530
-Subject: hard coded value for idcode field in struct cpu_table
-Message-ID: <AANLkTinYBcaOcuOMQBy+gN8h2i+fEOR9zT0c3DZQdP57@mail.gmail.com>
+From: andy@warmcat.com (Andy Green)
+Date: Thu, 03 Mar 2011 13:50:14 +0000
+Subject: [PATCH 0/4] OMAP 3 and 4 i2c fixes
+Message-ID: <20110303134744.30648.91218.stgit@otae.warmcat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+The following series fixes two issues with OMAP 3 and 4 i2c support.
 
-I do not understand the value of idcode field in the struct cpu_table
-i.e. the value is hard coded. I did not find that value in the user
-manuals also. The code is available at
-linux/arch/arm/plat-s3c24xx/cpu.c file. Currently, I am implementing
-code for Samsung S3C2510A processor which is not available in the
-current sources. Where can I find the idcode value for Samsung
-S3C2510A processor?
+First, hwmod tables don't have the i2c units marked up as being
+for 16-bit access only, which is mandatory.
 
-Any ideas will be appreciated.
+Second, the i2c peripheral unit init code is confused about using
+cpu_is...() and probed peripheral unit version, leading to OMAP3
+i2c code doing the wrong thing and accessing nonexistant registers.
 
-Thanks and  Regards,
-Madhavi M.
+---
+
+Andy Green (4):
+      OMAP3 and 4 I2C use cpu type consistently for new register availability
+      OMAP3 and 4 i2c  mark extended reg enums as extended only
+      OMAP3 I2C document why cpu type and not peripheral unit ID used to probe
+      OMAP3 and 4 hwmod I2C units only allow 16 bit access
+
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    3 ++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 +++---
+ drivers/i2c/busses/i2c-omap.c              |   36 +++++++++++++++++++---------
+ 3 files changed, 31 insertions(+), 16 deletions(-)
+
+-- 
+Signature
