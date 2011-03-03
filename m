@@ -1,55 +1,117 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Mar 2011 14:11:13 +0000
-Subject: [RFC PATCH] ARM: Use generic BUG() handler
-In-Reply-To: <20110302105930.GA2363@arm.com>
-References: <1298939263-16421-1-git-send-email-sjg@chromium.org>
-	<20110301084949.GA16733@n2100.arm.linux.org.uk>
-	<20110301085911.GB16733@n2100.arm.linux.org.uk>
-	<19820.47240.801312.507393@pilspetsen.it.uu.se>
-	<20110301100306.GA18007@n2100.arm.linux.org.uk>
-	<AANLkTinMnZAupxn7oYFhqkN1Y0OD-eyN=UeRpw96no9r@mail.gmail.com>
-	<20110302105930.GA2363@arm.com>
-Message-ID: <20110303141113.GF25891@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 3 Mar 2011 22:13:38 +0800
+Subject: [PATCH v2] ARM: mxs/mx28evk: add flexcan devices
+Message-ID: <1299161618-10387-1-git-send-email-shawn.guo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2011 at 10:59:50AM +0000, Dave Martin wrote:
-> +	asm volatile("1:\t" __bug_instr "\n"		q	\
-> +		     ".pushsection .rodata.str, \"a\"\n"	\
-> +		     "2:\t.asciz \"" #__file "\"\n"		\
-> +		     ".popsection\n"				\ 
+Signed-off-by: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-mxs/Kconfig        |    1 +
+ arch/arm/mach-mxs/mach-mx28evk.c |   55 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+), 0 deletions(-)
 
-Doesn't this mean we end up with multiple file names?
-
-> +		     ".pushsection __bug_table,\"a\"\n"		\
-> +		     "3:\t.word 1b, 2b\n"			\
-> +		     "\t.hword " #__line ", 0\n"		\
-> +		     ".popsection"				\
-> +	unreachable();						\
-> +} while (0)
-
-Second problem is that the above produces this:
-
-        1:      .word 0xec000000
-.pushsection .rodata.str, "a"
-2:      .asciz "__FILE__"
-.popsection
-.pushsection __bug_table,"a"
-3:      .word 1b, 2b
-        .hword __LINE__, 0
-.popsection
-
-which is clearly not what we want.  Adding another level of indirection
-starts to get closer to what we desire:
-
-        1:      .word 0xec000000
-.pushsection .rodata.str, "a"
-2:      .asciz ""t.c""
-.popsection
-.pushsection __bug_table,"a"
-3:      .word 1b, 2b
-        .hword 19, 0
-.popsection
-
-but we're still ending up with multiple strings containing the filename,
-which is going to excessively bloat the kernel no end.
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 895d066..cdbe18b 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -33,6 +33,7 @@ config MACH_MX28EVK
+ 	select MXS_HAVE_AMBA_DUART
+ 	select MXS_HAVE_PLATFORM_AUART
+ 	select MXS_HAVE_PLATFORM_FEC
++	select MXS_HAVE_PLATFORM_FLEXCAN
+ 	select MXS_OCOTP
+ 	default y
+ 	help
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index 1f0b708..652ce0e 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -28,6 +28,7 @@
+ #include "devices-mx28.h"
+ #include "gpio.h"
+ 
++#define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
+ #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
+ #define MX28EVK_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+ 
+@@ -95,6 +96,15 @@ static const iomux_cfg_t mx28evk_pads[] __initconst = {
+ 	/* phy reset line */
+ 	MX28_PAD_ENET0_RX_CLK__GPIO_4_13 |
+ 		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
++
++	/* flexcan0 */
++	MX28_PAD_GPMI_RDY2__CAN0_TX,
++	MX28_PAD_GPMI_RDY3__CAN0_RX,
++	/* flexcan1 */
++	MX28_PAD_GPMI_CE2N__CAN1_TX,
++	MX28_PAD_GPMI_CE3N__CAN1_RX,
++	/* transceiver power control */
++	MX28_PAD_SSP1_CMD__GPIO_2_13,
+ };
+ 
+ /* fec */
+@@ -178,8 +188,44 @@ error:
+ 	return -ETIMEDOUT;
+ }
+ 
++/*
++ * MX28EVK_FLEXCAN_SWITCH is shared between both flexcan controllers
++ */
++static int flexcan0_en, flexcan1_en;
++
++static void mx28evk_flexcan_switch(void)
++{
++	if (flexcan0_en || flexcan1_en)
++		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 1);
++	else
++		gpio_set_value(MX28EVK_FLEXCAN_SWITCH, 0);
++}
++
++static void mx28evk_flexcan0_switch(int enable)
++{
++	flexcan0_en = enable;
++	mx28evk_flexcan_switch();
++}
++
++static void mx28evk_flexcan1_switch(int enable)
++{
++	flexcan1_en = enable;
++	mx28evk_flexcan_switch();
++}
++
++static const struct flexcan_platform_data
++		mx28evk_flexcan_pdata[] __initconst = {
++	{
++		.transceiver_switch = mx28evk_flexcan0_switch,
++	}, {
++		.transceiver_switch = mx28evk_flexcan1_switch,
++	}
++};
++
+ static void __init mx28evk_init(void)
+ {
++	int ret;
++
+ 	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
+ 
+ 	mx28_add_duart();
+@@ -192,6 +238,15 @@ static void __init mx28evk_init(void)
+ 	mx28evk_fec_reset();
+ 	mx28_add_fec(0, &mx28_fec_pdata[0]);
+ 	mx28_add_fec(1, &mx28_fec_pdata[1]);
++
++	ret = gpio_request_one(MX28EVK_FLEXCAN_SWITCH, GPIOF_DIR_OUT,
++				"flexcan-switch");
++	if (ret) {
++		pr_err("failed to request gpio flexcan-switch: %d\n", ret);
++	} else {
++		mx28_add_flexcan(0, &mx28evk_flexcan_pdata[0]);
++		mx28_add_flexcan(1, &mx28evk_flexcan_pdata[1]);
++	}
+ }
+ 
+ static void __init mx28evk_timer_init(void)
+-- 
+1.7.1
