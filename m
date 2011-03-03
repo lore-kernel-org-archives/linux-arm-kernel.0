@@ -1,45 +1,52 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 3 Mar 2011 15:47:23 +0530
-Subject: [PATCH V2 10/13] dw_dmac: Changing type of src_master and dest_master
-	to u8.
-In-Reply-To: <cover.1299146382.git.viresh.kumar@st.com>
-References: <cover.1299146382.git.viresh.kumar@st.com>
-Message-ID: <ec99139f828ed619a28723dc536c3ef38b0af1c3.1299146382.git.viresh.kumar@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 3 Mar 2011 10:24:11 +0000
+Subject: CONFIG_ARM_DMA_MEM_BUFFERABLE and readl/writel weirdness
+In-Reply-To: <4D6F481B.8000700@codeaurora.org>
+References: <4D6D9C03.2080906@codeaurora.org>
+	<20110302083904.GA4493@n2100.arm.linux.org.uk>
+	<4D6F481B.8000700@codeaurora.org>
+Message-ID: <20110303102411.GB13179@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-src_master & dest_master don't required u32 as they have values limited to u8
-only. Also their description is missing from doc style comment. This patch
-fixes above mentioned issues.
+On Wed, Mar 02, 2011 at 11:49:47PM -0800, Saravana Kannan wrote:
+>> I think you misunderstand what's going on.  IO accesses are always ordered
+>> with respect to themselves.  The barriers are there to ensure ordering
+>> between DMA coherent memory (normal non-cached memory) and IO accesses
+>> (device).
+>
+> Unfortunately this is not correct. The ARM spec doesn't guarantee that  
+> all IO accesses should be ordered with respect to themselves. It only  
+> requires that the ordering should be guaranteed at least within a 1KB  
+> region.
+>
+> You can find this info in ARMv7 ARM spec[1] named  
+> "DDI0406B_arm_architecture_reference_manual_errata_markup_8_0.pdf", on  
+> page A3-45. There is a para that goes:
+>
+> "Accesses must arrive at any particular memory-mapped peripheral or  
+> block of memory in program order, that is, A1 must arrive before A2.  
+> There are no ordering restrictions about when accesses arrive at  
+> different peripherals or blocks of memory, provided that the accesses  
+> follow the general ordering rules given in this section."
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
----
- include/linux/dw_dmac.h |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+That is news to me.  My DDI0406B does not have this paragraph, so it's
+something that ARM has sprung upon us without telling *anyone* about it.
+It's not unreasonable or even unexpected.  That is exactly the same
+condition which applies on buses like PCI due to write posting on bridges
+downstream of the CPU, and issuing memory barriers will not help with
+that.
 
-diff --git a/include/linux/dw_dmac.h b/include/linux/dw_dmac.h
-index 64c76da..3ba2f06 100644
---- a/include/linux/dw_dmac.h
-+++ b/include/linux/dw_dmac.h
-@@ -53,6 +53,8 @@ enum dw_dma_slave_width {
-  * @reg_width: peripheral register width
-  * @cfg_hi: Platform-specific initializer for the CFG_HI register
-  * @cfg_lo: Platform-specific initializer for the CFG_LO register
-+ * @src_master: src master for transfers on allocated channel.
-+ * @dst_master: dest master for transfers on allocated channel.
-  */
- struct dw_dma_slave {
- 	struct device		*dma_dev;
-@@ -61,8 +63,8 @@ struct dw_dma_slave {
- 	enum dw_dma_slave_width	reg_width;
- 	u32			cfg_hi;
- 	u32			cfg_lo;
--	int			src_master;
--	int			dst_master;
-+	u8			src_master;
-+	u8			dst_master;
- };
- 
- /* Platform-configurable bits in CFG_HI */
--- 
-1.7.2.2
+Consider two PCI devices each behind their own P2P bridge.  Device A's
+bridge is really lazy and takes time to empty its write post buffer.
+Device B's bridge is really fast at getting writes.  If you write to
+device A then device B, they'll arrive at device B before device A.
+Again, let me stress that memory barriers will not allow you to solve
+this problem.
+
+The only way to solve this is to read back from the device, because reads
+to device memory can not bypass writes to device memory, otherwise the
+system is unpredictable.  With PCI, it's recommended to read back from
+the exact same address which you've written to _provided_ there's no
+side effects from doing so.  If there are, you have to find some other
+solution to it.
