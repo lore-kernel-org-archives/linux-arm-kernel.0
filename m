@@ -1,243 +1,212 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 3 Mar 2011 10:38:12 +0530
-Subject: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be configured
-	from board file
-In-Reply-To: <AANLkTi=MJigLvbJrRJ4CpyDcGd8sZXB7-1nFYup6EeDm@mail.gmail.com>
-References: <1298903958-6496-1-git-send-email-govindraj.raja@ti.com>
-	<1298903958-6496-7-git-send-email-govindraj.raja@ti.com>
-	<056ac5e848953fa5c37f7ed7a8cc1050@mail.gmail.com>
-	<AANLkTimD9rOC=4P6Vy2jzvcXZ-gZmF42Te4CBjS8AJLT@mail.gmail.com>
-	<8ab9882cd92792e9bf2b836c0ec9c7fe@mail.gmail.com>
-	<AANLkTi=MJigLvbJrRJ4CpyDcGd8sZXB7-1nFYup6EeDm@mail.gmail.com>
-Message-ID: <0dac991a1fbbf1d4bccd8fd259a28f35@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 03 Mar 2011 14:09:00 +0900
+Subject: [PATCH] ARM: EXYNOS4: enabled lcd and backlight in NURI board
+In-Reply-To: <1299028671-9062-1-git-send-email-dh09.lee@samsung.com>
+References: <1299028671-9062-1-git-send-email-dh09.lee@samsung.com>
+Message-ID: <01ad01cbd961$40e69720$c2b3c560$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
->-----Original Message-----
->From: Govindraj [mailto:govindraj.ti at gmail.com]
->Sent: Wednesday, March 02, 2011 3:37 PM
->To: Sricharan R
->Cc: Govindraj.R; linux-omap at vger.kernel.org;
-linux-serial at vger.kernel.org;
->linux-arm-kernel at lists.infradead.org; Jon Hunter; Tony Lindgren; Benoit
->Cousson; Kevin Hilman; Paul Walmsley; Rajendra Nayak; Deepak Kattungal
->Subject: Re: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
->configured from board file
->
->On Wed, Mar 2, 2011 at 1:49 PM, Sricharan R <r.sricharan@ti.com> wrote:
->> Hi,
->>>-----Original Message-----
->>>From: Govindraj [mailto:govindraj.ti at gmail.com]
->>>Sent: Wednesday, March 02, 2011 1:11 PM
->>>To: Sricharan R
->>>Cc: Govindraj.R; linux-omap at vger.kernel.org;
->> linux-serial at vger.kernel.org;
->>>linux-arm-kernel at lists.infradead.org; Jon Hunter; Tony Lindgren; Benoit
->>>Cousson; Kevin Hilman; Paul Walmsley; Rajendra Nayak; Deepak Kattungal
->>>Subject: Re: [PATCH 6/7] OMAP: Serial: Allow UART parameters to be
->>>configured from board file
->>>
->>>On Wed, Mar 2, 2011 at 12:46 AM, Sricharan R <r.sricharan@ti.com>
-wrote:
->>>> Hi,
->>>>>diff --git a/arch/arm/mach-omap2/serial.c
->> b/arch/arm/mach-omap2/serial.c
->>>>>index 755f4aa..530e9e3 100644
->>>>>--- a/arch/arm/mach-omap2/serial.c
->>>>>+++ b/arch/arm/mach-omap2/serial.c
->>>>>@@ -44,6 +44,15 @@
->>>>>
->>>>> static int omap_uart_con_id __initdata = -1;
->>>>>
->>>>>+static struct omap_uart_port_info omap_serial_default_info[] = {
->>>>>+ ? ? ?{
->>>>>+ ? ? ? ? ? ? ?.dma_enabled ? ?= 0,
->>>>>+ ? ? ? ? ? ? ?.dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
->>>>>+ ? ? ? ? ? ? ?.dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
->>>>>+ ? ? ? ? ? ? ?.idle_timeout ? = DEFAULT_IDLE_TIMEOUT,
->>>>>+ ? ? ?},
->>>>>+};
->>>>>+
->>>>> static int uart_idle_hwmod(struct omap_device *od)
->>>>> {
->>>>> ? ? ? omap_hwmod_idle(od->hwmods[0]);
->>>>>@@ -66,6 +75,54 @@ static struct omap_device_pm_latency
->>>> omap_uart_latency[]
->>>>>= {
->>>>> ? ? ? },
->>>>> };
->>>>>
->>>>>+#ifdef CONFIG_OMAP_MUX
->>>>>+static struct omap_device_pad default_serial0_pads[] __initdata = {
->>>>>+ ? ? ?{
->>>>>+ ? ? ? ? ? ? ?.name ? = "uart1_rx.uart1_rx",
->>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
->> OMAP_DEVICE_PAD_WAKEUP,
->>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>>>+ ? ? ?},
->>>>>+};
->>>>>+
->>>>>+static struct omap_device_pad default_serial1_pads[] __initdata = {
->>>>>+ ? ? ?{
->>>>>+ ? ? ? ? ? ? ?.name ? = "uart2_rx.uart2_rx",
->>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
->> OMAP_DEVICE_PAD_WAKEUP,
->>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>>>+ ? ? ?},
->>>>>+};
->>>>>+
->>>>>+static struct omap_device_pad default_serial2_pads[] __initdata = {
->>>>>+ ? ? ?{
->>>>>+ ? ? ? ? ? ? ?.name ? = "uart3_rx_irrx.uart3_rx_irrx",
->>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
->> OMAP_DEVICE_PAD_WAKEUP,
->>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>>>+ ? ? ?},
->>>>>+};
->>>>>+
->>>>>+static struct omap_device_pad default_omap36xx_serial3_pads[]
->> __initdata
->>>> =
->>>>>{
->>>>>+ ? ? ?{
->>>>>+ ? ? ? ? ? ? ?.name ? = "gpmc_wait3.uart4_rx",
->>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
->> OMAP_DEVICE_PAD_WAKEUP,
->>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE2,
->>>>>+ ? ? ?},
->>>>>+};
->>>>>+
->>>>>+static struct omap_device_pad default_omap4_serial3_pads[]
+Donghwa Lee wrote:
+> 
+> This patch enables lcd and backlight drivers in NURI board.
+> 
+> Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ------
+>  arch/arm/configs/exynos4_nuri_defconfig |    9 +++-
+>  arch/arm/mach-exynos4/Kconfig           |    1 +
+>  arch/arm/mach-exynos4/mach-nuri.c       |   62
+> +++++++++++++++++++++++++++++++
+>  3 files changed, 70 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/configs/exynos4_nuri_defconfig
+> b/arch/arm/configs/exynos4_nuri_defconfig
+> index 5f03027..e2f0bfb 100644
+> --- a/arch/arm/configs/exynos4_nuri_defconfig
+> +++ b/arch/arm/configs/exynos4_nuri_defconfig
+> @@ -786,8 +786,13 @@ CONFIG_REGULATOR=y
+>  # CONFIG_DRM is not set
+>  # CONFIG_VGASTATE is not set
+>  # CONFIG_VIDEO_OUTPUT_CONTROL is not set
+> -# CONFIG_FB is not set
+> -# CONFIG_BACKLIGHT_LCD_SUPPORT is not set
+> +CONFIG_FB=y
+> +CONFIG_FB_S3C=y
+> +CONFIG_LCD_CLASS_DEVICE=y
+> +CONFIG_LCD_PLATFORM=y
+> +CONFIG_BACKLIGHT_CLASS_DEVICE=y
+> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> +CONFIG_BACKLIGHT_PWM=y
+> 
+Hmm...where is exynos4_nuri_defconfig?
+
+And as I said, don't add machine specific defconfig now...
+I'm thinking about handling specific CONFIGs on each machine with one
+defconfig.
+
+>  #
+>  # Display device support
+> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+> index 5bf00b9..1d0d222 100644
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@ -135,6 +135,7 @@ config MACH_NURI
+>  	select EXYNOS4_SETUP_I2C1
+>  	select EXYNOS4_SETUP_I2C5
+>  	select EXYNOS4_SETUP_SDHCI
+> +	select HAVE_PWM
+
+Since Banajit's PWM backlight patches will be merged, should be following
+your next patch.
+
++	select SAMSUNG_DEV_PWM
+
+>  	help
+>  	  Machine support for Samsung Mobile NURI Board.
+> 
+> diff --git a/arch/arm/mach-exynos4/mach-nuri.c
+b/arch/arm/mach-exynos4/mach-
+> nuri.c
+> index 28010bd..d06cc91 100644
+> --- a/arch/arm/mach-exynos4/mach-nuri.c
+> +++ b/arch/arm/mach-exynos4/mach-nuri.c
+> @@ -17,6 +17,10 @@
+>  #include <linux/regulator/machine.h>
+>  #include <linux/regulator/fixed.h>
+>  #include <linux/mmc/host.h>
+> +#include <linux/fb.h>
+> +#include <linux/pwm_backlight.h>
+> +
+> +#include <video/platform_lcd.h>
+> 
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach-types.h>
+> @@ -26,6 +30,8 @@
+>  #include <plat/cpu.h>
+>  #include <plat/devs.h>
+>  #include <plat/sdhci.h>
+> +#include <plat/fb.h>
+> +#include <plat/regs-fb.h>
+> 
+>  #include <mach/map.h>
+> 
+> @@ -181,6 +187,60 @@ static struct platform_device nuri_gpio_keys = {
+>  	},
+>  };
+> 
+> +static int lcd_power_on(struct lcd_device *ld, int enable)
+
+Should be following..."void" and "struct plat_lcd_data *" ?
+
+static void nuri_lcd_power_on(struct plat_lcd_data *ld, int enable)
+
+> +{
+> +	int gpio = EXYNOS4_GPE1(5);
+> +
+> +	gpio_request(gpio, "LVDS_nSHDN");
+> +
+> +	if (enable)
+> +		gpio_direction_output(gpio, 1);
+> +	else
+> +		gpio_direction_output(gpio, 0);
+
+how about following?
+
+	gpio_direction_output(gpio, enable); ?
+
+> +
+> +	return 0;
+
+So no need...
+
+> +}
+> +
+> +static int backlight_init(struct device *dev)
+
+Please don't use common function name even though it is used with 'static'
+
+> +{
+
+Don't we need any gpio configuration for this?
+
+> +	return 0;
+> +}
+> +
+> +/* nuri pwm backlight */
+> +static struct platform_pwm_backlight_data nuri_backlight_data = {
+> +	.pwm_id			= 0,
+> +	.pwm_period_ns		= 30000,
+> +	.max_brightness		= 100,
+> +	.dft_brightness		= 50,
+> +	.init			= backlight_init,
+> +};
+> +
+> +static struct platform_device nuri_backlight_device = {
+> +	.name			= "pwm-backlight",
+> +	.id			= -1,
+> +	.dev			= {
+
+No need following here?
+		.parent		= &s3c_device_timer[0].dev,
+
+> +		.platform_data	= &nuri_backlight_data,
+> +	},
+> +};
+> +
+> +static struct plat_lcd_data nuri_lcd_platform_data = {
+> +	.set_power		= lcd_power_on,
+> +};
+> +
+> +static struct platform_device nuri_lcd_device = {
+> +	.name			= "platform-lcd",
+> +	.id			= -1,
+> +	.dev			= {
+> +		.platform_data	= (void *) &nuri_lcd_platform_data,
+
+		.platform_data	= &nuri_lcd_platform_data,
+
+> +	},
+> +};
+> +
+> +static void __init nuri_fb_init(void)
+> +{
+> +	platform_device_register(&nuri_lcd_device);
+> +	platform_device_register(&nuri_backlight_device);
+
+How about to add above into nuri_devices[] instead?
+
+> +}
+> +
+>  /* I2C1 */
+>  static struct i2c_board_info i2c1_devs[] __initdata = {
+>  	/* Gyro, To be updated */
+> @@ -201,6 +261,7 @@ static struct platform_device *nuri_devices[]
 __initdata
->> =
->>>> {
->>>>>+ ? ? ?{
->>>>>+ ? ? ? ? ? ? ?.name ? = "uart4_rx.uart4_rx",
->>>>>+ ? ? ? ? ? ? ?.flags ?= OMAP_DEVICE_PAD_REMUX |
->> OMAP_DEVICE_PAD_WAKEUP,
->>>>>+ ? ? ? ? ? ? ?.enable = OMAP_MUX_MODE0,
->>>>>+ ? ? ?},
->>>>>+};
->>>> Here only the UART RX pins are muxed, so what about the cts, rts, tx
->>>pins?
->>>
->>>The intention here is to enable wakeup capabilities for uart rx pad.
->>>
->>>AFAIK most of the boards are currently dependent on bootloader for
->>>uart-muxing if any board is not dependent on bootloader then we
->>>can use omap_serial_init_port along with board_mux_info from board.
->>>
->> Yes. The idea is to be independent of the bootloaders for mux settings.
->>
->>>Prior to this change uart wakeup is based on rx_pad and we were
->> populating
->>>offset and using omap_ctrl api's to read/write which is cleaned up now.
->>>Most of boards are dependent on uart-rx wakeup to avoid breaking any
->>>board support we
->>>are using omap_serial_init by filling default values, which provides
->>>us with same
->>>environment but with right approach towards handling mux data with a
->>>handshake with
->>>hwmod framework.
->>>
->> Now, in this change only the RX pin is configured. So if some board
-uses
->> omap_serial_init then only the RX is going to be configured.
->> How will they configure the rest of the pins?
->
->
->They should call omap_serial_init_port to configure each individual uart
->with
->mux_info filled and not use omap_serial_init.
->
->If any board is not dependent for mux from u-boot then they use above
-said
->init_port func.
->
->
->> They cannot call omap_serial_init_port after this just to configure the
->> rest of the mux pins( cts, rts, tx).
->
->No. You need to use either omap_serial_init_port or omap_serial_init
->you cannot call both apis from board file please refer to both func
->documentation.
->
->Also please note i am not configuring all uart pins for pullups and pull
->downs
->with this patch series and its not related to this patch series.
->I am only enabling wakeup-enable pin for rx as it was done before.
->
->> So data which is passed from omap_serial_init should have the
->> configuration
->> for all the pins, and this default data should be consistent across
->> atleast
->> some boards, so that they can use this. This will reduce the data
->> duplication across board files.
->>
->> If this is not true, then all the pads can be configured from the board
->> files itself using omap_serial_init_port and you can set the required
->> RX wakeup capability there as well.
->>
->
->Yes that be done but currently but that is not in my intention here
->with my patch
->I just want to retain rx wakeup by default to avoid breaking support
->for any board.
->
->Adding pin mux for each individual pin is a separate activity where I
-also
->need access to various boards So I am leaving that to developers who
->want to configure
->for the corresponding boards using init_port api.
->
->Removing mux from u-boot level and adding it to board file is beyond
->the scope of this
->patch series and is a separate topic of discussion, as current patch
-series
->assumes that uarts are muxed from u-boot level and needs to only enable
->wakeup
->capability for rx-pin.
->
->Hope this clarifies.
->
-It is true that this patch is not intending to configure the pads.
-
-But my question is, after this patch say
-   1) some board file calls omap_serial_port.
-   2) As a result , all the uarts devices are build and only the Rx pad is
-configured for each device.
-   3) After this there will be no way of configuring the rest of the pads
-??
-      That should not happen. Also relying that the bootloaders are going
-      to do the configuration is not correct.
-
-      So if some board calls omap_serial_port then there should be default
-values for all pads which a board can use, otherwise the board calls
-omap_serial_init_port for each of the device.
+> = {
+>  	&s3c_device_wdt,
+>  #endif
+> 
+> +	&s3c_device_timer[0],
+>  	/* NURI Devices */
+>  	&nuri_gpio_keys,
+>  };
+> @@ -219,6 +280,7 @@ static void __init nuri_machine_init(void)
+>  	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
+>  	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
+> 
+> +	nuri_fb_init();
+>  	/* Last */
+>  	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+>  }
+> --
+> 1.6.0.4
 
 
->--
->Thanks,
->Govindraj.R
->
->
->>>So if any board needs specific mux they can go ahead and add required
->>>mux data in
->>>board file and use map_serial_init_port instead of current
->>>omap_serial_init.
->>>
->>>
->>>> Is it consistent that across all socs that only UART3 would have
->>>UART/IRDA
->>>> functions capability so that serial2 pads can always be called
->> "rx_irxx"
->>>> ?.
->>>
->>>Yes from OMAP2420 to OMAP4430 uart3 can used as irda.
->>>
->> Ok.
->>>--
->>>Thanks,
->>>Govindraj.R
->>
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
